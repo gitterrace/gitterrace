@@ -42,6 +42,12 @@ pub(crate) fn router(app: Arc<App>) -> Router {
         .route("/blob/{rev}/{*path}", get(blob))
         .route("/blame/{rev}/{*path}", get(blame))
         .route("/refs", get(refs))
+        .route("/search", get(crate::search::search))
+        .route("/worktree", get(worktree))
+        .route("/api/files/{rev}", get(api_files))
+        .route("/api/refs", get(api_refs))
+        .route("/api/last/{rev}", get(api_last_root))
+        .route("/api/last/{rev}/{*path}", get(api_last))
         .route("/stats", get(stats))
         .route("/stats/files", get(stats_files))
         .route("/stats/types", get(stats_types))
@@ -83,6 +89,15 @@ pub(crate) fn router(app: Arc<App>) -> Router {
                 asset(
                     "text/javascript; charset=utf-8",
                     include_str!("../static/markdown.js"),
+                )
+            }),
+        )
+        .route(
+            "/static/nav.js",
+            get(|| async {
+                asset(
+                    "text/javascript; charset=utf-8",
+                    include_str!("../static/nav.js"),
                 )
             }),
         )
@@ -278,7 +293,7 @@ async fn log(
             q
         };
         Ok(LogPage {
-            c: views::chrome(a, "log"),
+            c: views::chrome_at(a, "log", &rev),
             newer: (pg > 0).then(|| link(pg - 1)),
             older: more.then(|| link(pg + 1)),
             empty: list.is_empty(),
@@ -316,7 +331,12 @@ async fn commit(State(app): Shared, Path(id): Path<String>) -> Result<Html<Strin
         let id = a.repo.resolve(&id)?;
         let d = a.repo.commit(&id)?;
         Ok(CommitPage {
-            c: views::chrome(a, "log"),
+            c: Chrome {
+                commit: id.clone(),
+                rev: id.clone(),
+                rev_enc: id.clone(),
+                ..views::chrome(a, "log")
+            },
             subject: d.summary.subject.clone(),
             body: d.body.trim().to_owned(),
             author: d.summary.author.name.clone(),
@@ -385,7 +405,7 @@ async fn tree(
         Ok(TreePage {
             c: Chrome {
                 md: readme.is_some(),
-                ..views::chrome(a, "files")
+                ..views::chrome_at(a, "files", &rev)
             },
             readme,
             title: if path.is_empty() {
@@ -448,7 +468,7 @@ async fn blob(
         Ok(BlobPage {
             c: Chrome {
                 md: rendered.is_some(),
-                ..views::chrome(a, "files")
+                ..views::chrome_at(a, "files", &rev)
             },
             rendered,
             crumbs: views::crumbs(&rev, &path, true),
@@ -483,7 +503,7 @@ async fn blame(
         let path = path.trim_matches('/').to_owned();
         let lines = a.repo.blame(&id, &path)?;
         Ok(BlamePage {
-            c: views::chrome(a, "files"),
+            c: views::chrome_at(a, "files", &rev),
             crumbs: views::crumbs(&rev, &path, true),
             blob_href: format!("/blob/{}/{}", fmt::enc(&rev, false), fmt::enc(&path, true)),
             html: views::blame_html(&lines, fmt::now()),
@@ -764,4 +784,148 @@ async fn progress(State(app): Shared) -> Json<ProgressBody> {
         total: p.total,
         ready: app.ready(),
     })
+}
+
+#[derive(Template)]
+#[template(path = "worktree.html")]
+struct WorktreePage {
+    c: Chrome,
+    files: Vec<FileStatRow>,
+    diff: String,
+    clean: bool,
+    adds: String,
+    dels: String,
+}
+
+async fn worktree(State(app): Shared) -> Result<Html<String>> {
+    let p = blocking(&app, |a| {
+        let files = gitterrace_git::worktree_diff(&a.repo)?;
+        let (adds, dels) = files
+            .iter()
+            .fold((0, 0), |(x, y), f| (x + f.additions, y + f.deletions));
+        let stats = files
+            .iter()
+            .enumerate()
+            .map(|(i, f)| FileStatRow {
+                anchor: format!("f{i}"),
+                label: views::file_label(f),
+                additions: fmt::thousands(f.additions),
+                deletions: fmt::thousands(f.deletions),
+            })
+            .collect();
+        Ok(WorktreePage {
+            c: views::chrome(a, "files"),
+            clean: files.is_empty(),
+            diff: views::diff_html_with(None, &files),
+            adds: fmt::thousands(adds),
+            dels: fmt::thousands(dels),
+            files: stats,
+        })
+    })
+    .await?;
+    page(&p)
+}
+
+fn json<T: serde::Serialize>(v: &T) -> Response {
+    match serde_json::to_vec(v) {
+        Ok(b) => (
+            [
+                (
+                    header::CONTENT_TYPE,
+                    HeaderValue::from_static("application/json"),
+                ),
+                (header::CACHE_CONTROL, HeaderValue::from_static("no-cache")),
+            ],
+            b,
+        )
+            .into_response(),
+        Err(e) => crate::error::Error::Index(std::io::Error::other(e)).into_response(),
+    }
+}
+
+/// All file paths at a revision, for the client-side finder.
+async fn api_files(State(app): Shared, Path(rev): Path<String>) -> Result<Response> {
+    let paths = blocking(&app, move |a| {
+        let id = a.repo.resolve(&rev)?;
+        a.file_paths(&id)
+    })
+    .await?;
+    Ok(json(&*paths))
+}
+
+#[derive(serde::Serialize)]
+struct RefBody {
+    name: String,
+    kind: &'static str,
+    when: String,
+}
+
+/// Branches and tags for the switcher. Remotes are left out to keep the list short.
+async fn api_refs(State(app): Shared) -> Result<Response> {
+    let list = blocking(&app, |a| {
+        let now = fmt::now();
+        Ok(a.repo
+            .refs()?
+            .into_iter()
+            .filter(|r| r.kind != RefKind::Remote)
+            .map(|r| RefBody {
+                kind: if r.kind == RefKind::Tag {
+                    "tag"
+                } else {
+                    "branch"
+                },
+                when: fmt::ago(r.time, now),
+                name: r.name,
+            })
+            .collect::<Vec<_>>())
+    })
+    .await?;
+    Ok(json(&list))
+}
+
+#[derive(serde::Serialize)]
+struct LastBody {
+    name: String,
+    id: String,
+    subject: String,
+    when: String,
+}
+
+async fn api_last_root(state: Shared, Path(rev): Path<String>) -> Result<Response> {
+    api_last(state, Path((rev, String::new()))).await
+}
+
+/// Last commit per entry of a directory, filled into the tree after first paint.
+async fn api_last(
+    State(app): Shared,
+    Path((rev, path)): Path<(String, String)>,
+) -> Result<Response> {
+    let list = blocking(&app, move |a| {
+        let id = a.repo.resolve(&rev)?;
+        let now = fmt::now();
+        let found = a.last_commits(&id, path.trim_matches('/'))?;
+        Ok(found
+            .iter()
+            .map(|c| LastBody {
+                name: c.name.clone(),
+                id: c.id.clone(),
+                subject: c.subject.clone(),
+                when: fmt::ago(c.time, now),
+            })
+            .collect::<Vec<_>>())
+    })
+    .await?;
+    Ok(json(&list))
+}
+
+#[cfg(test)]
+#[allow(clippy::expect_used)]
+mod tests {
+    use crate::routes::content_type;
+
+    #[test]
+    fn content_types() {
+        assert_eq!(content_type("a.PNG"), "image/png");
+        assert_eq!(content_type("a.rs"), "text/plain; charset=utf-8");
+    }
 }

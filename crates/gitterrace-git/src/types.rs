@@ -45,6 +45,20 @@ pub struct FileDiff {
     pub deletions: u32,
     pub binary: bool,
     pub hunks: Vec<Hunk>,
+    /// Line count of the file after the change (0 when binary or deleted).
+    pub lines: u32,
+    /// Lines in change blocks that both removed and added (the smaller side), a measure of rework.
+    pub rewritten: u32,
+    /// The same counts with whitespace-only and blank lines ignored.
+    pub code: CodeCounts,
+}
+
+/// Additions, deletions and rewritten lines once whitespace differences are ignored.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct CodeCounts {
+    pub additions: u32,
+    pub deletions: u32,
+    pub rewritten: u32,
 }
 
 #[derive(Debug, Clone)]

@@ -20,6 +20,13 @@ pub(crate) struct Chrome {
     pub(crate) branch: String,
     /// Page contains rendered markdown, so the markdown script is loaded.
     pub(crate) md: bool,
+    /// Revision as written in the URL, used by the finder and the ref switcher.
+    pub(crate) rev: String,
+    pub(crate) rev_enc: String,
+    /// Full commit id of `rev`, for permalinks.
+    pub(crate) commit: String,
+    /// Worktree differs from HEAD: show the Working tree chip.
+    pub(crate) dirty: bool,
     pub(crate) nav: Vec<Nav>,
 }
 
@@ -86,6 +93,10 @@ pub(crate) fn day_groups(list: &[CommitSummary], now: i64) -> Vec<crate::routes:
 }
 
 pub(crate) fn chrome(app: &crate::app::App, active: &str) -> Chrome {
+    chrome_at(app, active, "HEAD")
+}
+
+pub(crate) fn chrome_at(app: &crate::app::App, active: &str, rev: &str) -> Chrome {
     let items = [
         ("/", "Code", "files"),
         ("/log/HEAD", "Commits", "log"),
@@ -96,6 +107,10 @@ pub(crate) fn chrome(app: &crate::app::App, active: &str) -> Chrome {
         name: app.name.clone(),
         branch: app.repo.head_branch().unwrap_or_else(|| "HEAD".to_owned()),
         md: false,
+        rev: rev.to_owned(),
+        rev_enc: enc(rev, false),
+        commit: app.repo.resolve(rev).unwrap_or_default(),
+        dirty: app.dirty(),
         nav: items
             .into_iter()
             .map(|(href, label, key)| Nav {
@@ -244,6 +259,11 @@ fn num(n: Option<u32>) -> String {
 }
 
 pub(crate) fn diff_html(rev: &str, files: &[FileDiff]) -> String {
+    diff_html_with(Some(rev), files)
+}
+
+/// `rev` of `None` renders file names without links (the worktree has no blob URLs).
+pub(crate) fn diff_html_with(rev: Option<&str>, files: &[FileDiff]) -> String {
     let mut out = String::new();
     for (i, f) in files.iter().enumerate() {
         crate::fmt::push(
@@ -255,7 +275,7 @@ pub(crate) fn diff_html(rev: &str, files: &[FileDiff]) -> String {
         );
         if f.kind == ChangeKind::Deleted {
             out.push_str(&esc(&f.path));
-        } else {
+        } else if let Some(rev) = rev {
             crate::fmt::push(
                 &mut out,
                 &format!(
@@ -265,6 +285,8 @@ pub(crate) fn diff_html(rev: &str, files: &[FileDiff]) -> String {
                     esc(&file_label(f))
                 ),
             );
+        } else {
+            out.push_str(&esc(&file_label(f)));
         }
         crate::fmt::push(
             &mut out,

@@ -168,6 +168,9 @@ fn file_diff(path: String, kind: ChangeKind, old: &[u8], new: &[u8]) -> FileDiff
             deletions: 0,
             binary: true,
             hunks: Vec::new(),
+            lines: 0,
+            rewritten: 0,
+            code: crate::CodeCounts::default(),
         };
     }
     let input = InternedInput::new(old, new);
@@ -182,6 +185,9 @@ fn file_diff(path: String, kind: ChangeKind, old: &[u8], new: &[u8]) -> FileDiff
         deletions,
         binary: false,
         hunks: hunks(old, new, &diff),
+        lines: 0,
+        rewritten: 0,
+        code: crate::CodeCounts::default(),
     }
 }
 

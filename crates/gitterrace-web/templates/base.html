@@ -11,13 +11,15 @@
 <link rel="stylesheet" href="/static/app.css">
 <link rel="stylesheet" href="/static/markdown.css">
 </head>
-<body>
+<body data-rev="{{ c.rev }}" data-commit="{{ c.commit }}">
 <header class="top"><div class="wrap">
 <div class="topbar">
 <a class="brand" href="/"><svg class="logo" viewBox="0 0 24 24" aria-hidden="true"><path class="l1" d="M4.25 3h15.5a2.25 2.25 0 0 1 0 4.5H4.25a2.25 2.25 0 0 1 0-4.5z"/><path class="l2" d="M4.25 9.75H12v4.5H4.25a2.25 2.25 0 0 1 0-4.5zM17 9.75h2.75a2.25 2.25 0 0 1 0 4.5H17z"/><path class="l3" d="M4.25 16.5H12v4.5H4.25a2.25 2.25 0 0 1 0-4.5zM17 16.5h.75a2.25 2.25 0 0 1 0 4.5H17z"/><path class="drill" d="M14.5 7.5v11.25"/><circle class="l1" cx="14.5" cy="12" r="1.75"/><circle class="l1" cx="14.5" cy="18.75" r="1.75"/></svg></a>
 <a class="reponame" href="/">{{ c.name }}</a>
-<a class="branch" href="/refs" title="Branches and tags"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5 3.5a1.5 1.5 0 1 1-2 1.41v6.18a1.5 1.5 0 1 1 1.5 0V8.5H9a1 1 0 0 0 1-1V6.4a1.5 1.5 0 1 1 1.5 0V7.5A2.5 2.5 0 0 1 9 10H4.5v1.09A1.5 1.5 0 1 1 3 11.09V4.91A1.5 1.5 0 0 1 5 3.5z"/></svg>{{ c.branch }}</a>
+<div class="refswitch"><button class="branch" type="button" id="refbtn" aria-haspopup="true" aria-expanded="false" title="Switch branch or tag"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5 3.5a1.5 1.5 0 1 1-2 1.41v6.18a1.5 1.5 0 1 1 1.5 0V8.5H9a1 1 0 0 0 1-1V6.4a1.5 1.5 0 1 1 1.5 0V7.5A2.5 2.5 0 0 1 9 10H4.5v1.09A1.5 1.5 0 1 1 3 11.09V4.91A1.5 1.5 0 0 1 5 3.5z"/></svg>{% if c.rev == "HEAD" %}{{ c.branch }}{% else %}{{ c.rev }}{% endif %}<span class="caret" aria-hidden="true"></span></button></div>
+{% if c.dirty %}<a class="wtchip" href="/worktree" title="Uncommitted changes in the working tree"><span class="dot"></span>Working tree</a>{% endif %}
 <span class="spacer"></span>
+<form class="topsearch" action="/search" method="get" role="search"><input id="q" name="q" type="search" placeholder="Search code and commits" aria-label="Search" autocomplete="off"><input type="hidden" name="rev" value="{{ c.rev }}"><kbd>/</kbd></form>
 <button class="theme" type="button" id="theme" aria-label="Color theme" title="Color theme">
 <svg class="i-auto" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 0 0 16z" class="fill"/></svg>
 <svg class="i-light" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8"/></svg>
@@ -30,6 +32,7 @@
 {% block content %}{% endblock %}
 </main>
 <script src="/static/app.js" defer></script>
+<script src="/static/nav.js" defer></script>
 {% if c.md %}<script src="/static/markdown.js" defer></script>{% endif %}
 </body>
 </html>

@@ -7,6 +7,7 @@ mod fmt;
 mod markdown;
 pub mod palette;
 mod routes;
+mod search;
 mod views;
 
 use std::{io, net::SocketAddr, path::PathBuf, sync::Arc};
@@ -101,6 +102,34 @@ mod tests {
         let (_, js) = get(&app, "/api/progress").await;
         assert!(js.contains("\"ready\":false"));
         assert_eq!(get(&app, "/static/app.css").await.0, 200);
+
+        let (s, body) = get(&app, "/search?q=fn+main").await;
+        assert_eq!((s, body.contains("<mark>fn main</mark>")), (200, true));
+        let (_, body) = get(&app, "/search?q=%28&regex=1").await;
+        assert!(body.contains("class=\"err\""));
+        let (_, body) = get(&app, "/search?q=second&kind=commits").await;
+        assert!(body.contains("fix: second"));
+        let (_, body) = get(&app, "/search?q=fn&glob=*.md").await;
+        assert!(body.contains("No results"));
+        let (_, js) = get(&app, "/api/files/HEAD").await;
+        assert_eq!(js, "[\"README.md\",\"src/a.rs\"]");
+        let (_, js) = get(&app, "/api/last/HEAD/src").await;
+        assert!(js.contains("\"name\":\"a.rs\"") && js.contains("fix: second"));
+        let (_, js) = get(&app, "/api/refs").await;
+        assert!(js.contains("\"name\":\"main\""));
+        let (s, body) = get(&app, "/worktree").await;
+        assert_eq!((s, body.contains("clean")), (200, true));
+        assert_eq!(get(&app, "/static/nav.js").await.0, 200);
+        std::fs::write(p.join("src/a.rs"), "fn main() {\n}\n// dirty\n").expect("write");
+        std::fs::write(p.join("new.txt"), "x\n").expect("write");
+        let (_, body) = get(&app, "/worktree").await;
+        assert!(
+            body.contains("src/a.rs")
+                && body.contains("new.txt")
+                && body.contains("class=\"diff\"")
+        );
+        std::fs::remove_file(p.join("new.txt")).expect("rm");
+        git(p, &["checkout", "-q", "."]);
 
         let head = app.repo.resolve("HEAD").expect("head");
         let (s, body) = get(&app, &format!("/commit/{head}")).await;

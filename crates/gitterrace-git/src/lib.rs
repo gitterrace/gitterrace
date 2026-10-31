@@ -15,8 +15,8 @@ mod worktree;
 pub use error::{Error, Result};
 pub use repo::Repo;
 pub use types::{
-    BlameLine, Blob, ChangeKind, CommitDetail, CommitSummary, FileDiff, Hunk, HunkLine, LineKind,
-    RefInfo, RefKind, Signature, TreeEntry, TreeEntryKind,
+    BlameLine, Blob, ChangeKind, CodeCounts, CommitDetail, CommitSummary, FileDiff, Hunk, HunkLine,
+    LineKind, RefInfo, RefKind, Signature, TreeEntry, TreeEntryKind,
 };
 pub use walk::{
     BlobId, BlobReader, FileRef, LastCommit, files, last_commits, scan_commits, tree_id,

@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}Working tree · {{ c.name }}{% endblock %}
+{% block content %}
+<div class="head"><h1>Working tree <span class="muted">vs HEAD</span></h1></div>
+<p class="meta muted">Staged, unstaged and untracked changes, read directly from disk. Not committed, so not shareable.</p>
+{% if clean %}<p class="muted">The working tree is clean.</p>{% else %}
+<details class="card files" open><summary>{{ files.len() }} changed files <span class="counts"><b class="add">+{{ adds }}</b> <b class="del">-{{ dels }}</b></span></summary>
+<ul>{% for f in files %}<li><a href="#{{ f.anchor }}">{{ f.label }}</a><span class="counts"><b class="add">+{{ f.additions }}</b> <b class="del">-{{ f.deletions }}</b></span></li>{% endfor %}</ul></details>
+{{ diff|safe }}
+{% endif %}
+{% endblock %}

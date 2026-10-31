@@ -1,19 +1,24 @@
 //! Shared state and the background index refresher.
 
 use std::{
+    collections::HashMap,
     sync::{
         Arc, Mutex,
         atomic::{AtomicBool, Ordering},
     },
-    time::Duration,
+    time::{Duration, Instant},
 };
 
-use gitterrace_git::Repo;
+use gitterrace_git::{LastCommit, Repo};
 use gitterrace_index::{CommitRecord, Index, Progress};
 
 use crate::error::Result;
 
 const POLL: Duration = Duration::from_secs(3);
+/// How long a dirty-worktree answer is reused, so every page need not run a status.
+const DIRTY_TTL: Duration = Duration::from_secs(2);
+/// Cap on cached directory listings and file lists; both are cheap to rebuild.
+const CACHE_ENTRIES: usize = 256;
 
 pub(crate) struct App {
     pub(crate) repo: Repo,
@@ -22,6 +27,9 @@ pub(crate) struct App {
     progress: Mutex<Progress>,
     ready: AtomicBool,
     records: Mutex<Option<(String, Arc<Vec<CommitRecord>>)>>,
+    dirty: Mutex<Option<(Instant, bool)>>,
+    file_lists: Mutex<HashMap<String, Arc<Vec<String>>>>,
+    last_commits: Mutex<HashMap<String, Arc<Vec<LastCommit>>>>,
 }
 
 impl App {
@@ -34,7 +42,69 @@ impl App {
             progress: Mutex::new(Progress::default()),
             ready: AtomicBool::new(false),
             records: Mutex::new(None),
+            dirty: Mutex::new(None),
+            file_lists: Mutex::new(HashMap::new()),
+            last_commits: Mutex::new(HashMap::new()),
         }
+    }
+
+    /// Whether the worktree differs from HEAD, reused for a couple of seconds.
+    pub(crate) fn dirty(&self) -> bool {
+        if let Ok(g) = self.dirty.lock()
+            && let Some((at, v)) = *g
+            && at.elapsed() < DIRTY_TTL
+        {
+            return v;
+        }
+        let v = gitterrace_git::is_dirty(&self.repo);
+        if let Ok(mut g) = self.dirty.lock() {
+            *g = Some((Instant::now(), v));
+        }
+        v
+    }
+
+    /// Paths of all files at a full commit id. Commits are immutable, so entries never expire.
+    pub(crate) fn file_paths(&self, commit: &str) -> Result<Arc<Vec<String>>> {
+        if let Ok(g) = self.file_lists.lock()
+            && let Some(v) = g.get(commit)
+        {
+            return Ok(Arc::clone(v));
+        }
+        let list: Vec<String> = gitterrace_git::files(&self.repo, commit)?
+            .into_iter()
+            .map(|f| f.path)
+            .collect();
+        let list = Arc::new(list);
+        if let Ok(mut g) = self.file_lists.lock() {
+            if g.len() >= CACHE_ENTRIES {
+                g.clear();
+            }
+            g.insert(commit.to_owned(), Arc::clone(&list));
+        }
+        Ok(list)
+    }
+
+    /// Last commit per entry of `dir`, cached by the directory's tree id.
+    pub(crate) fn last_commits(&self, commit: &str, dir: &str) -> Result<Arc<Vec<LastCommit>>> {
+        let key = gitterrace_git::tree_id(&self.repo, commit, dir)?;
+        if let Ok(g) = self.last_commits.lock()
+            && let Some(v) = g.get(&key)
+        {
+            return Ok(Arc::clone(v));
+        }
+        let v = Arc::new(gitterrace_git::last_commits(
+            &self.repo,
+            commit,
+            dir,
+            Duration::from_secs(20),
+        )?);
+        if let Ok(mut g) = self.last_commits.lock() {
+            if g.len() >= CACHE_ENTRIES {
+                g.clear();
+            }
+            g.insert(key, Arc::clone(&v));
+        }
+        Ok(v)
     }
 
     fn set_progress(&self, p: Progress) {

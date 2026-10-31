@@ -34,7 +34,9 @@ async fn main() -> anyhow::Result<()> {
         }
         // stdout carries the MCP protocol, so logs go to stderr.
         Command::Mcp => {
-            tracing_subscriber::fmt().with_writer(std::io::stderr).init();
+            tracing_subscriber::fmt()
+                .with_writer(std::io::stderr)
+                .init();
             gitterrace_api::serve_mcp(&cli.path).await?;
         }
     }

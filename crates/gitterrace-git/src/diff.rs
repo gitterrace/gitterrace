@@ -5,7 +5,7 @@ use gix::diff::blob::{Algorithm, Diff, InternedInput};
 use gix::object::tree::diff::ChangeDetached;
 
 use crate::error::git;
-use crate::{ChangeKind, FileDiff, Hunk, HunkLine, LineKind, Result};
+use crate::{ChangeKind, CodeCounts, FileDiff, Hunk, HunkLine, LineKind, Result};
 
 const CONTEXT: usize = 3;
 /// Same probe window as git: a NUL in the first 8000 bytes marks a blob binary.
@@ -16,6 +16,23 @@ struct Counted {
     deletions: u32,
     binary: bool,
     hunks: Vec<Hunk>,
+    lines: u32,
+    rewritten: u32,
+    code: CodeCounts,
+}
+
+impl Counted {
+    fn empty(binary: bool) -> Self {
+        Self {
+            additions: 0,
+            deletions: 0,
+            binary,
+            hunks: Vec::new(),
+            lines: 0,
+            rewritten: 0,
+            code: CodeCounts::default(),
+        }
+    }
 }
 
 /// Changes of `commit` against its first parent (or the empty tree for a root).
@@ -64,7 +81,7 @@ fn file_diff(
         return Ok(None);
     }
     let rewrite_stats = match &change {
-        ChangeDetached::Rewrite { diff, .. } => Some(*diff),
+        ChangeDetached::Rewrite { diff, .. } => Some(diff.as_ref().map(|_| ())),
         _ => None,
     };
     let (path, old_path, kind, old_id, new_id, diffable) = match change {
@@ -126,20 +143,13 @@ fn file_diff(
         ),
     };
     let counted = if !diffable {
+        Counted::empty(false)
+    } else if let (false, Some(None)) = (with_hunks, rewrite_stats) {
+        // Rename tracking found identical content: a pure move, nothing changed.
+        let lines = line_count(&blob(repo, new_id)?);
         Counted {
-            additions: 0,
-            deletions: 0,
-            binary: false,
-            hunks: Vec::new(),
-        }
-    } else if let (false, Some(stats)) = (with_hunks, rewrite_stats) {
-        // Rename tracking already diffed the pair; `None` means identical content.
-        let (additions, deletions) = stats.map_or((0, 0), |s| (s.insertions, s.removals));
-        Counted {
-            additions,
-            deletions,
-            binary: false,
-            hunks: Vec::new(),
+            lines,
+            ..Counted::empty(false)
         }
     } else {
         let old = blob(repo, old_id)?;
@@ -154,6 +164,9 @@ fn file_diff(
         deletions: counted.deletions,
         binary: counted.binary,
         hunks: counted.hunks,
+        lines: counted.lines,
+        rewritten: counted.rewritten,
+        code: counted.code,
     }))
 }
 
@@ -168,19 +181,63 @@ fn is_binary(data: &[u8]) -> bool {
     data[..data.len().min(BINARY_PROBE)].contains(&0)
 }
 
+#[allow(clippy::naive_bytecount)] // one short pass per blob, a new dependency is not worth it
+fn line_count(data: &[u8]) -> u32 {
+    if is_binary(data) {
+        return 0;
+    }
+    let n = data.iter().filter(|b| **b == b'\n').count()
+        + usize::from(!data.is_empty() && !data.ends_with(b"\n"));
+    u32::try_from(n).unwrap_or(u32::MAX)
+}
+
+/// Sum over change blocks of the smaller side: lines that replaced existing lines.
+fn rewritten(diff: &Diff) -> u32 {
+    diff.hunks()
+        .map(|h| (h.before.end - h.before.start).min(h.after.end - h.after.start))
+        .sum()
+}
+
+/// Line counts of the diff with whitespace ignored, like `git diff -w`, except blank lines also
+/// vanish. A line that differs only in whitespace counts as unchanged.
+fn code_counts(old: &[u8], new: &[u8]) -> CodeCounts {
+    let norm = |data: &[u8]| -> Vec<Vec<u8>> {
+        lines(data)
+            .into_iter()
+            .map(|l| {
+                l.iter()
+                    .copied()
+                    .filter(|b| !b.is_ascii_whitespace())
+                    .collect::<Vec<u8>>()
+            })
+            .filter(|l| !l.is_empty())
+            .collect()
+    };
+    let mut input: InternedInput<Vec<u8>> = InternedInput::default();
+    input.update_before(norm(old).into_iter());
+    input.update_after(norm(new).into_iter());
+    let diff = Diff::compute(Algorithm::Myers, &input);
+    CodeCounts {
+        additions: diff.count_additions(),
+        deletions: diff.count_removals(),
+        rewritten: rewritten(&diff),
+    }
+}
+
 fn count(old: &[u8], new: &[u8], with_hunks: bool) -> Counted {
     if is_binary(old) || is_binary(new) {
-        return Counted {
-            additions: 0,
-            deletions: 0,
-            binary: true,
-            hunks: Vec::new(),
-        };
+        return Counted::empty(true);
     }
     let input = InternedInput::new(old, new);
     // Myers matches the counts of `git log --numstat`.
     let mut diff = Diff::compute(Algorithm::Myers, &input);
     let (additions, deletions) = (diff.count_additions(), diff.count_removals());
+    let rewritten = rewritten(&diff);
+    let code = if additions + deletions == 0 {
+        CodeCounts::default()
+    } else {
+        code_counts(old, new)
+    };
     let hunks = if with_hunks {
         diff.postprocess_lines(&input);
         build_hunks(old, new, &diff)
@@ -192,6 +249,9 @@ fn count(old: &[u8], new: &[u8], with_hunks: bool) -> Counted {
         deletions,
         binary: false,
         hunks,
+        lines: line_count(new),
+        rewritten,
+        code,
     }
 }
 
