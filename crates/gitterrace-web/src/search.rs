@@ -333,7 +333,7 @@ pub(crate) fn file_hits(path: &str, rev_enc: &str, text: &str, re: &Regex) -> Fi
         last = Some(to);
     }
     FileHits {
-        href: format!("/blob/{rev_enc}/{}", fmt::enc(path, true)),
+        href: fmt::href(&format!("/blob/{rev_enc}/{}", fmt::enc(path, true))),
         path: path.to_owned(),
         count: hit_idx.len(),
         lines: out,

@@ -4,4 +4,4 @@
 {% include "tabs.html" %}
 {{ body|safe }}
 {% endblock %}
-{% block scripts %}<script src="/static/loc.js" defer></script>{% endblock %}
+{% block scripts %}<script src="{{ c.base }}/static/loc.js" defer></script>{% endblock %}

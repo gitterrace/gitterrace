@@ -6,6 +6,10 @@
   var rev = body.dataset.rev || "HEAD";
   var commit = body.dataset.commit || "";
   var revEnc = encodeURIComponent(rev);
+  // Repository prefix ("" or "/r/NAME"); every in-app URL starts with it.
+  var meta = document.querySelector('meta[name="gt-base"]');
+  var B = meta ? meta.content : "";
+  function local(p) { return B && p.indexOf(B + "/") === 0 ? p.slice(B.length) : p; }
   var open = null;
 
   function el(tag, cls, text) {
@@ -128,7 +132,7 @@
   function loadFiles() {
     if (files) return Promise.resolve(files);
     if (!filesPending) {
-      filesPending = fetch("/api/files/" + revEnc).then(function (r) { return r.json(); }).then(function (l) { files = l; return l; });
+      filesPending = fetch(B + "/api/files/" + revEnc).then(function (r) { return r.json(); }).then(function (l) { files = l; return l; });
     }
     return filesPending;
   }
@@ -153,7 +157,7 @@
       li.appendChild(el("span", "name", it.f.slice(i + 1)));
       if (i >= 0) li.appendChild(el("span", "dir", it.f.slice(0, i)));
     }, function (it, e) {
-      var url = "/blob/" + revEnc + "/" + it.f.split("/").map(encodeURIComponent).join("/");
+      var url = B + "/blob/" + revEnc + "/" + it.f.split("/").map(encodeURIComponent).join("/");
       if (e && (e.metaKey || e.ctrlKey)) window.open(url, "_blank"); else location.href = url;
     }, "Enter to open, Esc to close");
     var status = el("div", "ov-status", "Loading files...");
@@ -164,12 +168,12 @@
   // ---- ref switcher -------------------------------------------------------
   var refs = null;
   function swapRev(name) {
-    var parts = location.pathname.split("/");
+    var parts = local(location.pathname).split("/");
     if (["tree", "blob", "blame", "log", "raw"].indexOf(parts[1]) >= 0 && parts.length > 2) {
       parts[2] = encodeURIComponent(name);
-      location.href = parts.join("/") + location.search;
+      location.href = B + parts.join("/") + location.search;
     } else {
-      location.href = "/tree/" + encodeURIComponent(name);
+      location.href = B + "/tree/" + encodeURIComponent(name);
     }
   }
   function openRefs() {
@@ -190,8 +194,30 @@
       li.appendChild(el("span", "dir", it.when));
     }, function (it) { swapRev(it.name); }, "Enter to switch");
     if (refs) p.refresh();
-    else fetch("/api/refs").then(function (r) { return r.json(); }).then(function (l) { refs = l; p.refresh(); });
+    else fetch(B + "/api/refs").then(function (r) { return r.json(); }).then(function (l) { refs = l; p.refresh(); });
   }
+
+  // ---- repository switcher (only rendered when several repos are served) --
+  var repos = null;
+  function openRepos() {
+    var btn = document.getElementById("repobtn");
+    var box = overlay("refs");
+    btn.setAttribute("aria-expanded", "true");
+    var r = btn.getBoundingClientRect();
+    box.classList.add("anchored");
+    box.style.left = Math.max(8, r.left) + "px";
+    box.style.top = r.bottom + 6 + "px";
+    var p = listPicker(box, "Filter repositories", function (q) {
+      return (repos || []).filter(function (x) { return !q || x.name.toLowerCase().indexOf(q) >= 0; });
+    }, function (li, it) {
+      li.appendChild(el("span", "name", it.name));
+      li.appendChild(el("span", "dir", it.when));
+    }, function (it) { location.href = it.href; }, "Enter to open");
+    if (repos) p.refresh();
+    else fetch("/api/repos").then(function (r) { return r.json(); }).then(function (l) { repos = l; p.refresh(); });
+  }
+  var repoBtn = document.getElementById("repobtn");
+  if (repoBtn) repoBtn.addEventListener("click", openRepos);
 
   // ---- shortcut sheet -----------------------------------------------------
   var SHORTCUTS = [
@@ -215,9 +241,9 @@
   // ---- permalink ----------------------------------------------------------
   function permalink() {
     if (!commit) { toast("No commit for this page"); return; }
-    var parts = location.pathname.split("/");
+    var parts = local(location.pathname).split("/");
     if (["tree", "blob", "blame", "log", "raw"].indexOf(parts[1]) >= 0 && parts.length > 2) parts[2] = commit;
-    var path = parts.join("/");
+    var path = B + parts.join("/");
     history.replaceState(null, "", path + location.search + location.hash);
     copy(location.href, "Permalink copied");
   }
@@ -240,7 +266,7 @@
 
   // ---- keys ---------------------------------------------------------------
   var chord = false, chordTimer = null;
-  var goto = { c: "/", i: "/stats", b: "/refs", l: "/log/" + revEnc, s: "/search" };
+  var goto = { c: B + "/", i: B + "/stats", b: B + "/refs", l: B + "/log/" + revEnc, s: B + "/search" };
   document.addEventListener("keydown", function (e) {
     if (e.metaKey || e.ctrlKey || e.altKey) return;
     if (e.key === "Escape") { closeOverlay(); if (typing(e.target)) e.target.blur(); return; }
@@ -322,9 +348,9 @@
     if (!t) return;
     if (t.dataset.copy) copy(t.dataset.copy, "Copied sha");
     else {
-      var parts = location.pathname.split("/");
+      var parts = local(location.pathname).split("/");
       if (commit && parts.length > 2) parts[2] = commit;
-      copy(location.origin + parts.join("/") + location.search + location.hash, "Permalink copied");
+      copy(location.origin + B + parts.join("/") + location.search + location.hash, "Permalink copied");
     }
   });
 
@@ -338,7 +364,7 @@
         var c = by[td.dataset.name];
         if (!c) return;
         var a = el("a", "", c.subject);
-        a.href = "/commit/" + c.id;
+        a.href = B + "/commit/" + c.id;
         a.title = c.subject;
         td.appendChild(a);
         // The age gets its own right-aligned column, like GitHub, so the

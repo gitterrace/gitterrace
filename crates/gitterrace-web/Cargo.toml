@@ -26,9 +26,9 @@ syntect.workspace = true
 ammonia.workspace = true
 serde_json.workspace = true
 regex = "1"
+tower.workspace = true
 
 [dev-dependencies]
-tower.workspace = true
 tempfile.workspace = true
 http-body-util = "0.1"
 serde_urlencoded = "0.7"

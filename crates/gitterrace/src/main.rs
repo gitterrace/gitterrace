@@ -9,9 +9,10 @@ mod export;
 #[derive(Parser)]
 #[command(version = option_env!("GITTERRACE_VERSION").unwrap_or(env!("CARGO_PKG_VERSION")))]
 struct Cli {
-    /// Repository to serve (any path inside it).
-    #[arg(default_value = ".", global = true)]
-    path: PathBuf,
+    /// Repositories to serve (any path inside one), or folders to search two levels deep.
+    /// Other commands use the first.
+    #[arg(default_value = ".", global = true, num_args = 1..)]
+    paths: Vec<PathBuf>,
     /// Address to listen on. Local only by default.
     #[arg(long, default_value = "127.0.0.1:4242")]
     addr: SocketAddr,
@@ -69,17 +70,22 @@ enum Look {
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
+    let path = cli
+        .paths
+        .first()
+        .cloned()
+        .unwrap_or_else(|| PathBuf::from("."));
     match cli.command.unwrap_or(Command::Serve) {
         Command::Serve => {
             tracing_subscriber::fmt().init();
-            gitterrace_web::serve(cli.path, cli.addr).await?;
+            gitterrace_web::serve(gitterrace_web::discover_repos(&cli.paths), cli.addr).await?;
         }
         // stdout carries the MCP protocol, so logs go to stderr.
         Command::Mcp => {
             tracing_subscriber::fmt()
                 .with_writer(std::io::stderr)
                 .init();
-            gitterrace_api::serve_mcp(&cli.path).await?;
+            gitterrace_api::serve_mcp(&path).await?;
         }
         Command::Wrapped {
             year,
@@ -87,7 +93,7 @@ async fn main() -> anyhow::Result<()> {
             theme,
             png,
             out,
-        } => wrapped(&cli.path, year, layout, theme, png, out)?,
+        } => wrapped(&path, year, layout, theme, png, out)?,
         Command::Export {
             out,
             commits,
@@ -97,7 +103,7 @@ async fn main() -> anyhow::Result<()> {
                 commits,
                 max_file: max_file_kb * 1024,
             };
-            let n = export::export(&cli.path, &out, &scope).await?;
+            let n = export::export(&path, &out, &scope).await?;
             println!("wrote {n} files to {}", out.display());
         }
     }

@@ -86,9 +86,27 @@ pub(crate) fn enc(s: &str, keep_slash: bool) -> String {
     out
 }
 
-/// The one place absolute in-app URLs are built, so a multi-repo prefix is a one-line change.
+thread_local! {
+    /// URL prefix of the repository being rendered on this thread; empty for a single repo.
+    static BASE: std::cell::RefCell<String> = const { std::cell::RefCell::new(String::new()) };
+}
+
+/// The one place absolute in-app URLs are built: prefixes the current repository's base.
 pub(crate) fn href(path: &str) -> String {
-    path.to_owned()
+    BASE.with(|b| format!("{}{path}", b.borrow()))
+}
+
+/// Prefix `href` adds on this thread, for templates and the JS meta tag.
+pub(crate) fn base() -> String {
+    BASE.with(|b| b.borrow().clone())
+}
+
+/// Runs `f` with `href` prefixing `base`, restoring the previous prefix afterwards.
+pub(crate) fn with_base<T>(base: &str, f: impl FnOnce() -> T) -> T {
+    let prev = BASE.with(|b| b.replace(base.to_owned()));
+    let out = f();
+    BASE.with(|b| *b.borrow_mut() = prev);
+    out
 }
 
 /// Appends an owned string; keeps `format!` call sites free of `push_str(&format!(..))`.

@@ -8,6 +8,7 @@ mod filter;
 mod fmt;
 mod languages;
 mod markdown;
+mod multi;
 pub mod palette;
 mod routes;
 mod search;
@@ -22,6 +23,7 @@ use std::{
 };
 
 use axum::response::IntoResponse;
+pub use multi::discover_repos;
 use gitterrace_git::Repo;
 use gitterrace_index::Index;
 
@@ -74,23 +76,52 @@ async fn host_guard(
     }
 }
 
-fn build(repo_path: &Path, extra: Option<IpAddr>) -> io::Result<(axum::Router, String)> {
+/// Router for several repositories: an index at `/`, each repository under `/r/NAME`.
+/// One path behaves exactly like [`app_router`]. Same Host rules.
+pub fn multi_router(paths: Vec<PathBuf>) -> io::Result<axum::Router> {
+    Ok(build_multi(paths, None)?.0)
+}
+
+/// One repository's pages, `/api/v1`, cards and badges, with links under `base`. Starts its
+/// index refresher, so call it inside a tokio runtime.
+fn repo_router(repo_path: &Path, base: String) -> io::Result<axum::Router> {
     let repo = Repo::discover(repo_path).map_err(io::Error::other)?;
     let index = Index::open(&repo)?;
-    let app = Arc::new(App::new(repo, index));
+    let mut app = App::new(repo, index);
+    app.base = base;
+    let app = Arc::new(app);
     tokio::spawn(app::keep_index_fresh(Arc::clone(&app)));
     let api = gitterrace_api::ApiState::open(repo_path).map_err(io::Error::other)?;
-    let name = app.name.clone();
-    let router = routes::router(app)
-        .nest("/api/v1", gitterrace_api::router(api))
-        .layer(axum::middleware::from_fn_with_state(extra, host_guard));
-    Ok((router, name))
+    Ok(routes::router(app).nest("/api/v1", gitterrace_api::router(api)))
+}
+
+fn guarded(router: axum::Router, extra: Option<IpAddr>) -> axum::Router {
+    router.layer(axum::middleware::from_fn_with_state(extra, host_guard))
+}
+
+fn build(repo_path: &Path, extra: Option<IpAddr>) -> io::Result<(axum::Router, String)> {
+    let name = Repo::discover(repo_path).map_err(io::Error::other)?.name();
+    Ok((guarded(repo_router(repo_path, String::new())?, extra), name))
+}
+
+fn build_multi(paths: Vec<PathBuf>, extra: Option<IpAddr>) -> io::Result<(axum::Router, String)> {
+    match <[PathBuf; 1]>::try_from(paths) {
+        Ok([one]) => build(&one, extra),
+        Err(paths) => {
+            let n = paths.len();
+            let table = Arc::new(multi::Table::new(paths)?);
+            Ok((
+                guarded(multi::router(table), extra),
+                format!("{n} repositories"),
+            ))
+        }
+    }
 }
 
 /// Starts serving until ctrl-c.
-pub async fn serve(repo_path: PathBuf, addr: SocketAddr) -> io::Result<()> {
+pub async fn serve(repo_paths: Vec<PathBuf>, addr: SocketAddr) -> io::Result<()> {
     let extra = (!addr.ip().is_loopback() && !addr.ip().is_unspecified()).then(|| addr.ip());
-    let (router, name) = build(&repo_path, extra)?;
+    let (router, name) = build_multi(repo_paths, extra)?;
     if !addr.ip().is_loopback() {
         tracing::warn!(
             "serving to the network: anyone who can reach this address can read the repository"
@@ -317,5 +348,179 @@ mod tests {
                 .expect("response");
             assert_eq!(res.status().as_u16(), want, "{host:?}");
         }
+    }
+
+    fn fixture(name: &str, root: &std::path::Path) -> std::path::PathBuf {
+        let p = root.join(name);
+        std::fs::create_dir_all(p.join("src")).expect("dir");
+        git(&p, &["init", "-q", "-b", "main"]);
+        std::fs::write(p.join("README.md"), "# Hi\n\n[a](src/a.rs) ![i](img.png)\n").expect("w");
+        std::fs::write(p.join("src/a.rs"), "fn main() {}\n").expect("w");
+        git(&p, &["add", "."]);
+        git(&p, &["commit", "-q", "-m", "feat(core): first"]);
+        std::fs::write(p.join("src/a.rs"), "fn main() {\n}\n").expect("w");
+        git(&p, &["commit", "-qam", "fix: second"]);
+        p
+    }
+
+    async fn fetch(router: &axum::Router, uri: &str, host: &str) -> (u16, String) {
+        let res = router
+            .clone()
+            .oneshot(
+                Request::get(uri)
+                    .header("host", host)
+                    .body(Body::empty())
+                    .expect("req"),
+            )
+            .await
+            .expect("res");
+        let s = res.status().as_u16();
+        let b = res.into_body().collect().await.expect("body").to_bytes();
+        (s, String::from_utf8_lossy(&b).into_owned())
+    }
+
+    /// Same-origin `href`, `src`, `action` and `data-last` values in a page.
+    fn links(html: &str) -> Vec<String> {
+        let mut out = Vec::new();
+        for attr in ["href=\"", "src=\"", "action=\"", "data-last=\""] {
+            for (i, _) in html.match_indices(attr) {
+                let rest = &html[i + attr.len()..];
+                let v = &rest[..rest.find('"').unwrap_or(0)];
+                if v.starts_with('/') && !v.starts_with("//") {
+                    out.push(v.replace("&amp;", "&"));
+                }
+            }
+        }
+        out
+    }
+
+    /// Crawls every page of both repositories and fails on any link leaving its `/r/NAME`.
+    #[tokio::test]
+    async fn multi_repo_links_stay_inside_their_repo() {
+        let dir = tempfile::tempdir().expect("tmp");
+        let a = fixture("alpha", dir.path());
+        let b = fixture("beta", dir.path());
+        let router = crate::multi_router(vec![a, b]).expect("router");
+        let (s, idx) = fetch(&router, "/", "localhost").await;
+        assert_eq!(s, 200);
+        assert!(idx.contains("/r/alpha/") && idx.contains("/r/beta/"));
+        for name in ["alpha", "beta"] {
+            let prefix = format!("/r/{name}/");
+            let mut todo = vec![prefix.clone()];
+            let mut seen = std::collections::HashSet::new();
+            let mut escapes = Vec::new();
+            while let Some(u) = todo.pop() {
+                if !seen.insert(u.clone()) || seen.len() > 400 {
+                    continue;
+                }
+                let (st, body) = fetch(&router, &u, "localhost").await;
+                assert!(st < 500, "{u}: {st} {body}");
+                if !body.contains("<html") {
+                    continue;
+                }
+                for l in links(&body) {
+                    if l == "/" {
+                        continue; // the brand links to the repository index on purpose
+                    }
+                    if !l.starts_with(&prefix) {
+                        escapes.push(format!("{u} -> {l}"));
+                    } else if !l.contains("/static/") && !l.contains("/raw/") {
+                        todo.push(l.split('#').next().unwrap_or("").to_owned());
+                    }
+                }
+            }
+            assert!(seen.len() > 10, "crawl too shallow: {}", seen.len());
+            assert!(
+                escapes.is_empty(),
+                "links escape {prefix}:\n{}",
+                escapes.join("\n")
+            );
+        }
+        let (s, js) = fetch(&router, "/r/beta/api/files/HEAD", "localhost").await;
+        assert_eq!((s, js.contains("src/a.rs")), (200, true));
+        assert_eq!(
+            fetch(&router, "/r/alpha/api/v1/repo", "localhost").await.0,
+            200
+        );
+        assert_eq!(
+            fetch(&router, "/r/alpha/raw/HEAD/src/a.rs", "localhost")
+                .await
+                .0,
+            200
+        );
+        assert_eq!(fetch(&router, "/static/app.css", "localhost").await.0, 200);
+    }
+
+    #[tokio::test]
+    async fn multi_repo_names_resolve_only_through_the_table() {
+        let dir = tempfile::tempdir().expect("tmp");
+        let a = fixture("alpha", dir.path());
+        let b = fixture("beta", dir.path());
+        let router = crate::multi_router(vec![a, b]).expect("router");
+        for u in [
+            "/r/../alpha/",
+            "/r/..%2Falpha/",
+            "/r/%2e%2e/alpha/",
+            "/r/%2E%2E/",
+            "/r/alpha%2F..%2Fbeta/",
+            "/r/./",
+            "/r/gamma/",
+            "/r/ALPHA/",
+            "/r/alpha%00/",
+            "/r//",
+            "/r/alpha/../../etc/passwd",
+            "/r/alpha/raw/HEAD/../../../etc/passwd",
+        ] {
+            let (s, body) = fetch(&router, u, "localhost").await;
+            assert!(matches!(s, 400 | 404), "{u}: {s} {body}");
+            assert!(!body.contains("root:"), "{u}");
+        }
+        assert_eq!(fetch(&router, "/r/alpha", "localhost").await.0, 308);
+    }
+
+    #[tokio::test]
+    async fn multi_repo_host_guard_covers_nested_routes() {
+        let dir = tempfile::tempdir().expect("tmp");
+        let a = fixture("alpha", dir.path());
+        let b = fixture("beta", dir.path());
+        let router = crate::multi_router(vec![a, b]).expect("router");
+        for u in [
+            "/",
+            "/api/repos",
+            "/static/app.css",
+            "/r/alpha/",
+            "/r/alpha/api/v1/repo",
+            "/r/alpha/raw/HEAD/src/a.rs",
+            "/r/beta/api/files/HEAD",
+            "/r/nope/",
+        ] {
+            assert_eq!(fetch(&router, u, "evil.example:4242").await.0, 403, "{u}");
+        }
+        assert_eq!(
+            fetch(&router, "/r/alpha/api/v1/repo", "127.0.0.1:4242")
+                .await
+                .0,
+            200
+        );
+    }
+
+    #[test]
+    fn duplicate_folder_names_get_a_suffix() {
+        let dir = tempfile::tempdir().expect("tmp");
+        let a = fixture("same", &dir.path().join("x"));
+        let b = fixture("same", &dir.path().join("y"));
+        let t = crate::multi::Table::new(vec![a, b]).expect("table");
+        assert!(t.get("same").is_some() && t.get("same-2").is_some());
+    }
+
+    #[tokio::test]
+    async fn single_repo_urls_are_unprefixed() {
+        let dir = tempfile::tempdir().expect("tmp");
+        let a = fixture("solo", dir.path());
+        let router = crate::multi_router(vec![a]).expect("router");
+        let (_, body) = fetch(&router, "/", "localhost").await;
+        assert!(body.contains("href=\"/log/HEAD\"") && !body.contains("/r/solo"));
+        assert!(body.contains("<meta name=\"gt-base\" content=\"\">"));
+        assert!(!body.contains("repobtn"));
     }
 }

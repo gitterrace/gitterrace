@@ -5,7 +5,7 @@ use gitterrace_git::{
     TreeEntryKind,
 };
 
-use crate::fmt::{ago, date, enc, esc, short};
+use crate::fmt::{ago, date, enc, esc, href, short};
 
 const MAX_BLOB_LINES: usize = 20_000;
 
@@ -108,7 +108,7 @@ pub(crate) fn chrome_at(app: &crate::app::App, active: &str, rev: &str) -> Chrom
         ("/stats", "Insights", "stats"),
     ];
     Chrome {
-        base: String::new(),
+        base: crate::fmt::base(),
         name: app.name.clone(),
         branch: app.repo.head_branch().unwrap_or_else(|| "HEAD".to_owned()),
         md: false,
@@ -118,8 +118,8 @@ pub(crate) fn chrome_at(app: &crate::app::App, active: &str, rev: &str) -> Chrom
         dirty: app.dirty(),
         nav: items
             .into_iter()
-            .map(|(href, label, key)| Nav {
-                href: href.to_owned(),
+            .map(|(path, label, key)| Nav {
+                href: href(path),
                 label,
                 on: key == active,
             })
@@ -135,8 +135,8 @@ pub(crate) fn stats_tabs(active: &str) -> Vec<Nav> {
         ("/stats/languages", "Languages", "l"),
     ]
     .into_iter()
-    .map(|(href, label, key)| Nav {
-        href: href.to_owned(),
+    .map(|(path, label, key)| Nav {
+        href: href(path),
         label,
         on: key == active,
     })
@@ -159,7 +159,7 @@ pub(crate) fn hue(name: &str) -> u32 {
 
 /// Link to the commit list of one author.
 pub(crate) fn author_href(email: &str) -> String {
-    crate::fmt::href(&format!("/log/HEAD?author={}", enc(email, false)))
+    href(&format!("/log/HEAD?author={}", enc(email, false)))
 }
 
 pub(crate) fn commit_row(c: &CommitSummary, now: i64) -> CommitRow {
@@ -167,7 +167,7 @@ pub(crate) fn commit_row(c: &CommitSummary, now: i64) -> CommitRow {
         short: short(&c.id),
         initial: initial(&c.author.name),
         hue: hue(&c.author.name),
-        href: format!("/commit/{}", c.id),
+        href: href(&format!("/commit/{}", c.id)),
         subject: c.subject.clone(),
         author: c.author.name.clone(),
         author_href: author_href(&c.author.email),
@@ -181,7 +181,7 @@ pub(crate) fn crumbs(rev: &str, path: &str, last_is_file: bool) -> Vec<Crumb> {
     let r = enc(rev, false);
     let mut out = vec![Crumb {
         name: rev.to_owned(),
-        href: format!("/tree/{r}"),
+        href: href(&format!("/tree/{r}")),
     }];
     let parts: Vec<&str> = path.split('/').filter(|p| !p.is_empty()).collect();
     let mut acc = String::new();
@@ -197,7 +197,7 @@ pub(crate) fn crumbs(rev: &str, path: &str, last_is_file: bool) -> Vec<Crumb> {
         };
         out.push(Crumb {
             name: (*p).to_owned(),
-            href: format!("/{kind}/{r}/{}", enc(&acc, true)),
+            href: href(&format!("/{kind}/{r}/{}", enc(&acc, true))),
         });
     }
     out
@@ -214,9 +214,9 @@ pub(crate) fn entries(rev: &str, path: &str, list: &[TreeEntry]) -> Vec<Entry> {
             let full = enc(&format!("{base}{}", e.name), true);
             let r = enc(rev, false);
             let (href, kind) = match e.kind {
-                TreeEntryKind::Dir => (format!("/tree/{r}/{full}"), "dir"),
-                TreeEntryKind::File => (format!("/blob/{r}/{full}"), "file"),
-                TreeEntryKind::Symlink => (format!("/blob/{r}/{full}"), "link"),
+                TreeEntryKind::Dir => (href(&format!("/tree/{r}/{full}")), "dir"),
+                TreeEntryKind::File => (href(&format!("/blob/{r}/{full}")), "file"),
+                TreeEntryKind::Symlink => (href(&format!("/blob/{r}/{full}")), "link"),
                 TreeEntryKind::Submodule => (String::new(), "module"),
             };
             Entry {
@@ -234,7 +234,7 @@ pub(crate) fn ref_rows(refs: &[RefInfo], kind: gitterrace_git::RefKind, now: i64
         .filter(|r| r.kind == kind)
         .map(|r| RefRow {
             name: r.name.clone(),
-            log: format!("/log/{}", enc(&r.name, false)),
+            log: href(&format!("/log/{}", enc(&r.name, false))),
             commit: short(&r.target),
             when: ago(r.time, now),
         })
@@ -295,7 +295,8 @@ pub(crate) fn diff_html_with(rev: Option<&str>, files: &[FileDiff]) -> String {
             crate::fmt::push(
                 &mut out,
                 &format!(
-                    "<a href=\"/blob/{}/{}\">{}</a>",
+                    "<a href=\"{}/blob/{}/{}\">{}</a>",
+                    crate::fmt::base(),
                     enc(rev, false),
                     enc(&f.path, true),
                     esc(&file_label(f))
@@ -391,7 +392,8 @@ pub(crate) fn blame_html(lines: &[BlameLine], now: i64) -> String {
             crate::fmt::push(
                 &mut out,
                 &format!(
-                    "<td class=\"who\"><a href=\"/commit/{}\">{}</a> <span>{}</span> <span class=\"muted\">{}</span></td>",
+                    "<td class=\"who\"><a href=\"{}/commit/{}\">{}</a> <span>{}</span> <span class=\"muted\">{}</span></td>",
+                    crate::fmt::base(),
                     esc(&l.commit),
                     esc(&short(&l.commit)),
                     esc(&l.author),

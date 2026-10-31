@@ -140,9 +140,9 @@ fn rewrite_url(base: &Base, url: &str, image: bool) -> String {
         "blob"
     };
     if resolved.is_empty() {
-        format!("/{kind}/{}{suffix}", base.rev)
+        crate::fmt::href(&format!("/{kind}/{}{suffix}", base.rev))
     } else {
-        format!("/{kind}/{}/{resolved}{suffix}", base.rev)
+        crate::fmt::href(&format!("/{kind}/{}/{resolved}{suffix}", base.rev))
     }
 }
 

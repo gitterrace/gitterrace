@@ -34,7 +34,10 @@ pub(crate) type Shared = State<Arc<App>>;
 pub(crate) fn router(app: Arc<App>) -> Router {
     Router::new()
         .route("/", get(overview))
-        .route("/log", get(|| async { Redirect::to("/log/HEAD") }))
+        .route(
+            "/log",
+            get(|State(a): Shared| async move { Redirect::to(&format!("{}/log/HEAD", a.base)) }),
+        )
         .route("/log/{rev}", get(log))
         .route("/commit/{id}", get(commit))
         .route("/tree/{rev}", get(tree_root))
@@ -53,6 +56,17 @@ pub(crate) fn router(app: Arc<App>) -> Router {
         .route("/stats/files", get(stats_files))
         .route("/stats/types", get(crate::types::page))
         .route("/stats/languages", get(crate::languages::page))
+        .route("/raw/{rev}/{*path}", get(raw))
+        .route("/cards/wrapped/{year}", get(crate::cards::wrapped))
+        .route("/badges/{name}", get(crate::cards::badge))
+        .route("/api/progress", get(progress))
+        .merge(assets())
+        .with_state(app)
+}
+
+/// Embedded stylesheets, scripts and fonts; stateless, so the multi-repo index serves them too.
+pub(crate) fn assets<S: Clone + Send + Sync + 'static>() -> Router<S> {
+    Router::new()
         .route(
             "/static/loc.js",
             get(|| async {
@@ -62,7 +76,6 @@ pub(crate) fn router(app: Arc<App>) -> Router {
                 )
             }),
         )
-        .route("/api/progress", get(progress))
         .route(
             "/static/tokens.css",
             get(|| async {
@@ -114,10 +127,6 @@ pub(crate) fn router(app: Arc<App>) -> Router {
         )
         .route("/static/vendor/mermaid-11.17.2.min.js", get(mermaid_js))
         .route("/static/fonts/{name}", get(font))
-        .route("/raw/{rev}/{*path}", get(raw))
-        .route("/cards/wrapped/{year}", get(crate::cards::wrapped))
-        .route("/badges/{name}", get(crate::cards::badge))
-        .with_state(app)
 }
 
 /// Vendored OFL fonts, Latin subsets: Fraunces (display) and Bricolage Grotesque (body).
@@ -393,7 +402,7 @@ async fn log(
             if let Some(w) = who {
                 crate::fmt::push(&mut q, &format!("&author={}", fmt::enc(w, false)));
             }
-            q
+            fmt::href(&q)
         };
         Ok(LogPage {
             c: views::chrome_at(a, "log", &rev),
@@ -493,10 +502,10 @@ async fn tree(
         let rev_enc = fmt::enc(&rev, false);
         let up = path
             .rsplit_once('/')
-            .map(|(parent, _)| format!("/tree/{rev_enc}/{}", fmt::enc(parent, true)));
+            .map(|(parent, _)| fmt::href(&format!("/tree/{rev_enc}/{}", fmt::enc(parent, true))));
         let up = match (up, path.is_empty()) {
             (Some(u), _) => Some(u),
-            (None, false) => Some(format!("/tree/{rev_enc}")),
+            (None, false) => Some(fmt::href(&format!("/tree/{rev_enc}"))),
             (None, true) => None,
         };
         let readme = README_NAMES.iter().find_map(|n| {
@@ -579,8 +588,8 @@ async fn blob(
             rendered,
             crumbs: views::crumbs(&rev, &path, true),
             size: fmt::size(b.size),
-            blame_href: format!("/blame/{r}/{pe}"),
-            log_href: format!("/log/{r}?path={pe}"),
+            blame_href: fmt::href(&format!("/blame/{r}/{pe}")),
+            log_href: fmt::href(&format!("/log/{r}?path={pe}")),
             title: path,
             html,
             cut,
@@ -611,7 +620,11 @@ async fn blame(
         Ok(BlamePage {
             c: views::chrome_at(a, "files", &rev),
             crumbs: views::crumbs(&rev, &path, true),
-            blob_href: format!("/blob/{}/{}", fmt::enc(&rev, false), fmt::enc(&path, true)),
+            blob_href: fmt::href(&format!(
+                "/blob/{}/{}",
+                fmt::enc(&rev, false),
+                fmt::enc(&path, true)
+            )),
             html: views::blame_html(&lines, fmt::now()),
             title: path,
         })
@@ -756,7 +769,7 @@ struct RowGroup {
 
 fn file_row(f: gitterrace_index::FileChurn, max: u64) -> Row {
     Row {
-        href: format!("/blob/HEAD/{}", fmt::enc(&f.path, true)),
+        href: fmt::href(&format!("/blob/HEAD/{}", fmt::enc(&f.path, true))),
         pct: charts::pct(f.commits as u64, max),
         label: f.path,
         commits: fmt::thousands(f.commits),
@@ -801,7 +814,7 @@ async fn stats_files(State(app): Shared, Query(f): Query<Filter>) -> Result<Html
                             href: if d.path == "." {
                                 String::new()
                             } else {
-                                format!("/tree/HEAD/{}", fmt::enc(&d.path, true))
+                                fmt::href(&format!("/tree/HEAD/{}", fmt::enc(&d.path, true)))
                             },
                             pct: charts::pct(d.commits as u64, dmax),
                             label: d.path,

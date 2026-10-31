@@ -210,9 +210,9 @@ impl View {
             q.push(format!("to={b}"));
         }
         if q.is_empty() {
-            "/stats/languages".to_owned()
+            fmt::href("/stats/languages")
         } else {
-            format!("/stats/languages?{}", q.join("&"))
+            fmt::href(&format!("/stats/languages?{}", q.join("&")))
         }
     }
 }
@@ -526,7 +526,8 @@ fn range_card(ch: &Chain, view: View) -> String {
     for i in (to + 1 - shown..=to).rev() {
         let _ = write!(
             s,
-            r#"<li><a class="sha" href="/commit/{}">{}</a> <span class="subj" title="{}">{}</span> <span class="muted">{}</span></li>"#,
+            r#"<li><a class="sha" href="{}/commit/{}">{}</a> <span class="subj" title="{}">{}</span> <span class="muted">{}</span></li>"#,
+            fmt::base(),
             ch.ids[i],
             fmt::short(&ch.ids[i]),
             esc(&ch.subjects[i]),

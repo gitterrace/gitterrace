@@ -1,5 +1,6 @@
 (function () {
   var root = document.documentElement;
+  function base() { var m = document.querySelector('meta[name="gt-base"]'); return m ? m.content : ""; }
   document.querySelectorAll("[data-md-view]").forEach(function (box) {
     var btns = box.querySelectorAll("[data-show]");
     btns.forEach(function (b) {
@@ -22,7 +23,7 @@
     return window.matchMedia && matchMedia("(prefers-color-scheme: dark)").matches;
   }
   var s = document.createElement("script");
-  s.src = "/static/vendor/mermaid-11.17.2.min.js";
+  s.src = base() + "/static/vendor/mermaid-11.17.2.min.js";
   s.onload = function () {
     var n = 0;
     function draw() {

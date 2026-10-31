@@ -27,6 +27,8 @@ pub(crate) struct App {
     pub(crate) repo: Repo,
     pub(crate) index: Index,
     pub(crate) name: String,
+    /// URL prefix: empty for a single repository, `/r/NAME` when several share the server.
+    pub(crate) base: String,
     progress: Mutex<Progress>,
     ready: AtomicBool,
     records: Mutex<Option<(String, Arc<Vec<CommitRecord>>)>>,
@@ -44,6 +46,7 @@ impl App {
             repo,
             index,
             name,
+            base: String::new(),
             progress: Mutex::new(Progress::default()),
             ready: AtomicBool::new(false),
             records: Mutex::new(None),
@@ -206,7 +209,7 @@ pub(crate) async fn blocking<T: Send + 'static>(
     f: impl FnOnce(&App) -> Result<T> + Send + 'static,
 ) -> Result<T> {
     let app = Arc::clone(app);
-    tokio::task::spawn_blocking(move || f(&app)).await?
+    tokio::task::spawn_blocking(move || crate::fmt::with_base(&app.base, || f(&app))).await?
 }
 
 /// Re-indexes whenever HEAD moves. Browsing never waits on this task.
