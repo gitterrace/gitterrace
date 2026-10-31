@@ -140,7 +140,8 @@ impl App {
             return Arc::clone(c);
         }
         let ignore = gitterrace_git::IgnoreSet::at(&self.repo, head).ok();
-        let ins = gitterrace_index::Insights::new(records, gitterrace_index::Options::default(), ignore);
+        let ins =
+            gitterrace_index::Insights::new(records, gitterrace_index::Options::default(), ignore);
         let subjects = self.subjects(head);
         let c = Arc::new(crate::languages::Chain::build(records, &ins, &subjects));
         if let Ok(mut g) = self.chain.lock() {
@@ -159,8 +160,9 @@ impl App {
             return Arc::clone(f);
         }
         let mut cache = gitterrace_index::LineCache::load(self.index.dir());
-        let files =
-            Arc::new(gitterrace_index::head_files(&self.repo, head, &mut cache).unwrap_or_default());
+        let files = Arc::new(
+            gitterrace_index::head_files(&self.repo, head, &mut cache).unwrap_or_default(),
+        );
         if let Err(e) = cache.save(self.index.dir()) {
             tracing::warn!("line cache not saved: {e}");
         }

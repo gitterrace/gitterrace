@@ -6,9 +6,11 @@ The principles, colours, type, space, radius, shadow and motion are the shared
 schwarzwald contract. This file holds only what is specific to gitterrace.
 
 - Shared contract: `schwarzwald/contract/shared.md`.
-- gitterrace extension (code, heat, series roles):
-  `schwarzwald/contract/extension-gitterrace.md`. See also
-  [theme-extension.md](theme-extension.md).
+- gitterrace extension (code rows and words, syntax, selection, the heat
+  ramp, the eight series, the window surfaces): the rules live in
+  `schwarzwald/contract/extension-gitterrace.md`, the values in
+  `theme/schwarzwald/theme-tokens.json` under `code.*`, `heat.*`, `series.*`
+  and `surfaces.*`. gitterrace does not solve colours; it reads them.
 
 ## How the theme gets here
 
@@ -21,7 +23,7 @@ snapshot into what the code reads:
   dark, fonts, type scale, space grid, radius, motion.
 - `theme/schwarzwald/rust`: the vendored `schwarzwald` crate (no dependencies),
   the same colours as Rust constants. `gitterrace-web` re-exports it from
-  `palette.rs`; `gitterrace-cards` reads `KANDEL` directly.
+  `palette.rs`; `gitterrace-cards` adapts `KANDEL` in its own `palette.rs`.
 
 `make theme` runs both checks and is part of `make check` and CI. To update:
 run `sync.py`, then `scripts/gen-theme.py`, then commit. Only Kandel ships.

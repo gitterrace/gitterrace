@@ -4,9 +4,9 @@
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 
-use serde_json::{Value, json};
 use gitterrace_git::Repo;
 use gitterrace_index::{CommitRecord, Index};
+use serde_json::{Value, json};
 
 use crate::error::ApiError;
 use crate::{insights, json};
@@ -18,7 +18,7 @@ const MAX_BLOB_LINES: usize = 5000;
 const MAX_BLOB_BYTES: usize = 256 * 1024;
 const MAX_BLAME_LINES: usize = 5000;
 
-/// Shared handle on one repository and its stats cache.
+/// Shared handle on one repository and its insights cache.
 #[derive(Clone)]
 pub struct ApiState {
     pub(crate) repo: Arc<Repo>,

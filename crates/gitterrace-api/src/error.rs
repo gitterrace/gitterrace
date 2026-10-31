@@ -21,9 +21,9 @@ impl ApiError {
     pub fn status(&self) -> StatusCode {
         match self {
             Self::BadRequest(_) => StatusCode::BAD_REQUEST,
-            Self::Git(gitterrace_git::Error::RevNotFound(_) | gitterrace_git::Error::PathNotFound(_)) => {
-                StatusCode::NOT_FOUND
-            }
+            Self::Git(
+                gitterrace_git::Error::RevNotFound(_) | gitterrace_git::Error::PathNotFound(_),
+            ) => StatusCode::NOT_FOUND,
             Self::Git(_) | Self::Index(_) | Self::Task(_) => StatusCode::INTERNAL_SERVER_ERROR,
         }
     }

@@ -1,4 +1,4 @@
-//! Incremental stats cache in `.git/gitterrace/`. One record per commit, appended;
+//! Incremental insights cache in `.git/gitterrace/`. One record per commit, appended;
 //! aggregates are computed from the records on demand.
 
 mod aggregates;

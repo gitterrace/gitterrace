@@ -24,9 +24,9 @@ pub(crate) type Result<T> = std::result::Result<T, Error>;
 impl IntoResponse for Error {
     fn into_response(self) -> Response {
         let status = match &self {
-            Self::Git(gitterrace_git::Error::RevNotFound(_) | gitterrace_git::Error::PathNotFound(_)) => {
-                StatusCode::NOT_FOUND
-            }
+            Self::Git(
+                gitterrace_git::Error::RevNotFound(_) | gitterrace_git::Error::PathNotFound(_),
+            ) => StatusCode::NOT_FOUND,
             _ => StatusCode::INTERNAL_SERVER_ERROR,
         };
         if status == StatusCode::INTERNAL_SERVER_ERROR {

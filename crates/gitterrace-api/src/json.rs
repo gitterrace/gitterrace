@@ -1,10 +1,10 @@
 //! Stable `snake_case` JSON for the git types, which carry no serde impls themselves.
 
-use serde_json::{Value, json};
 use gitterrace_git::{
     BlameLine, ChangeKind, CommitDetail, CommitSummary, FileDiff, LineKind, RefInfo, RefKind,
     Signature, TreeEntry, TreeEntryKind,
 };
+use serde_json::{Value, json};
 
 pub(crate) fn signature(s: &Signature) -> Value {
     json!({ "name": s.name, "email": s.email, "time": s.time, "offset": s.offset })

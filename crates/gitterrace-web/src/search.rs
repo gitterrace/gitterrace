@@ -14,9 +14,9 @@ use axum::{
     extract::{Query, State},
     response::Html,
 };
+use gitterrace_git::{BlobReader, FileRef};
 use regex::{Regex, RegexBuilder};
 use serde::Deserialize;
-use gitterrace_git::{BlobReader, FileRef};
 
 use crate::{
     app::{App, blocking},

@@ -944,6 +944,102 @@ dependencies = [
 ]
 
 [[package]]
+name = "gitterrace"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "axum",
+ "clap",
+ "gitterrace-api",
+ "gitterrace-cards",
+ "gitterrace-git",
+ "gitterrace-index",
+ "gitterrace-web",
+ "serde_json",
+ "tempfile",
+ "tokio",
+ "tower",
+ "tracing-subscriber",
+]
+
+[[package]]
+name = "gitterrace-api"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "gitterrace-git",
+ "gitterrace-index",
+ "http-body-util",
+ "rmcp",
+ "schemars",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror",
+ "tokio",
+ "tower",
+]
+
+[[package]]
+name = "gitterrace-cards"
+version = "0.1.0"
+dependencies = [
+ "gitterrace-git",
+ "gitterrace-index",
+ "resvg",
+ "schwarzwald",
+ "thiserror",
+ "usvg",
+]
+
+[[package]]
+name = "gitterrace-git"
+version = "0.1.0"
+dependencies = [
+ "gix",
+ "tempfile",
+ "thiserror",
+]
+
+[[package]]
+name = "gitterrace-index"
+version = "0.1.0"
+dependencies = [
+ "gitterrace-git",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror",
+]
+
+[[package]]
+name = "gitterrace-web"
+version = "0.1.0"
+dependencies = [
+ "ammonia",
+ "askama",
+ "axum",
+ "gitterrace-api",
+ "gitterrace-cards",
+ "gitterrace-git",
+ "gitterrace-index",
+ "http-body-util",
+ "pulldown-cmark",
+ "regex",
+ "schwarzwald",
+ "serde",
+ "serde_json",
+ "serde_urlencoded",
+ "syntect",
+ "tempfile",
+ "thiserror",
+ "tokio",
+ "tower",
+ "tower-http",
+ "tracing",
+]
+
+[[package]]
 name = "gix"
 version = "0.90.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2913,102 +3009,6 @@ name = "stable_deref_trait"
 version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6ce2be8dc25455e1f91df71bfa12ad37d7af1092ae736f3a6cd0e37bc7810596"
-
-[[package]]
-name = "gitterrace"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "axum",
- "clap",
- "serde_json",
- "gitterrace-api",
- "gitterrace-cards",
- "gitterrace-git",
- "gitterrace-index",
- "gitterrace-web",
- "tempfile",
- "tokio",
- "tower",
- "tracing-subscriber",
-]
-
-[[package]]
-name = "gitterrace-api"
-version = "0.1.0"
-dependencies = [
- "axum",
- "http-body-util",
- "rmcp",
- "schemars",
- "serde",
- "serde_json",
- "gitterrace-git",
- "gitterrace-index",
- "tempfile",
- "thiserror",
- "tokio",
- "tower",
-]
-
-[[package]]
-name = "gitterrace-cards"
-version = "0.1.0"
-dependencies = [
- "resvg",
- "schwarzwald",
- "gitterrace-git",
- "gitterrace-index",
- "thiserror",
- "usvg",
-]
-
-[[package]]
-name = "gitterrace-git"
-version = "0.1.0"
-dependencies = [
- "gix",
- "tempfile",
- "thiserror",
-]
-
-[[package]]
-name = "gitterrace-index"
-version = "0.1.0"
-dependencies = [
- "serde",
- "serde_json",
- "gitterrace-git",
- "tempfile",
- "thiserror",
-]
-
-[[package]]
-name = "gitterrace-web"
-version = "0.1.0"
-dependencies = [
- "ammonia",
- "askama",
- "axum",
- "http-body-util",
- "pulldown-cmark",
- "regex",
- "schwarzwald",
- "serde",
- "serde_json",
- "serde_urlencoded",
- "gitterrace-api",
- "gitterrace-cards",
- "gitterrace-git",
- "gitterrace-index",
- "syntect",
- "tempfile",
- "thiserror",
- "tokio",
- "tower",
- "tower-http",
- "tracing",
-]
 
 [[package]]
 name = "strict-num"

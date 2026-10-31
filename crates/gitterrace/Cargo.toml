@@ -31,7 +31,8 @@ serde_json.workspace = true
 tracing-subscriber.workspace = true
 
 # `git terrace` works because git runs any `git-<name>` on PATH. `gitterrace` is
-# the same binary under a shorter name.
+# the same program under its own name. Both share main.rs on purpose; cargo's
+# "present in multiple build targets" note about it is expected.
 [[bin]]
 name = "git-terrace"
 path = "src/main.rs"

@@ -1,4 +1,4 @@
-//! File name to language, the table repoview uses.
+//! File name to language, by extension and well-known file names.
 
 const LANGUAGES: &[(&str, &[&str])] = &[
     ("Rust", &["rs"]),
@@ -78,7 +78,7 @@ mod tests {
     use super::language;
 
     #[test]
-    fn matches_repoview() {
+    fn maps_extensions_and_known_names() {
         assert_eq!(language("src/a/main.RS"), "Rust");
         assert_eq!(language("a/Makefile"), "Make");
         assert_eq!(language(".gitignore"), "Config");

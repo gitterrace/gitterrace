@@ -26,9 +26,9 @@ use std::{
     sync::Arc,
 };
 
-pub use multi::discover_repos;
 use gitterrace_git::Repo;
 use gitterrace_index::Index;
+pub use multi::discover_repos;
 
 use crate::app::App;
 

@@ -14,8 +14,8 @@ use std::sync::Arc;
 use askama::Template;
 use axum::extract::{Query, State};
 use axum::response::Html;
-use serde::Deserialize;
 use gitterrace_index::{CommitRecord, Insights};
+use serde::Deserialize;
 
 use crate::{
     charts::nice_step,

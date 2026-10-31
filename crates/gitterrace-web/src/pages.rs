@@ -3,8 +3,8 @@
 use askama::Template;
 use axum::extract::{Path, Query, RawQuery, State};
 use axum::response::Html;
-use serde::Deserialize;
 use gitterrace_index::Period;
+use serde::Deserialize;
 
 use crate::{
     charts,

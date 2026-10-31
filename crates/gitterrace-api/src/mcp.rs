@@ -240,7 +240,7 @@ impl McpServer {
 }
 
 /// Serves MCP on stdin/stdout for the repository containing `repo_path` until the client leaves.
-/// The stats cache is brought up to date first.
+/// The insights cache is brought up to date first.
 pub async fn serve_mcp(repo_path: &Path) -> Result<(), ApiError> {
     let path = repo_path.to_owned();
     let state = tokio::task::spawn_blocking(move || {

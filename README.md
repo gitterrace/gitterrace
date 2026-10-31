@@ -58,10 +58,14 @@ to delete.
 
 ## Install
 
+From source, with Rust 1.96 or newer:
+
 ```bash
-brew install timorunge/tap/gitterrace
+cargo install --path crates/gitterrace
 ```
 
-Or build it: `cargo install --path crates/gitterrace`. MIT licensed.
+This installs `git-terrace`, which git runs as `git terrace`, and `gitterrace`.
+Release builds and a Homebrew formula (`timorunge/tap/gitterrace`) come with the
+first release. MIT licensed.
 
 More: [architecture](docs/architecture.md), [design](docs/design.md).

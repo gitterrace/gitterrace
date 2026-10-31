@@ -7,8 +7,8 @@ use axum::{
     http::{HeaderValue, StatusCode, header},
     response::{IntoResponse, Response},
 };
-use serde::Deserialize;
 use gitterrace_cards::{Badge, Layout, Theme};
+use serde::Deserialize;
 
 use crate::{
     app::{App, blocking},

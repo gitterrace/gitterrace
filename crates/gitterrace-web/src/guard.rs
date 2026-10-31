@@ -14,8 +14,8 @@ use axum::{
 /// Hashes of the inline theme snippets in `base.html` and `repos.html`; the
 /// `inline_scripts_are_hashed` test fails when a template changes without this.
 const CSP: &str = "default-src 'self'; img-src 'self' data:; media-src 'self'; style-src 'self' 'unsafe-inline'; \
-    script-src 'self' 'sha256-f8yF5KiP4g1r0wpmUjDwQ50o+2qbnsXV/gZXuaQHLGo=' \
-    'sha256-7Mrre5gu7kp7yI9IZqpAANWdNSEkrx/tOnHcVhDX2LE='; object-src 'self'; \
+    script-src 'self' 'sha256-fYt56R17Pz3RaWQCK4ngD4kWxzR9lHjYqQRanR4kAxk=' \
+    'sha256-Rbk1A+FIExFQ+koGhLey9hvtVuj90foK6DS83At6mms='; object-src 'self'; \
     frame-ancestors 'none'; base-uri 'none'; form-action 'self'";
 
 /// Host-header allowlist: loopback names plus, when bound elsewhere, the bound IP. A bind to

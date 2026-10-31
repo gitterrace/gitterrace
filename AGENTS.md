@@ -1,32 +1,45 @@
 # gitterrace: Agent Guide
 
-gitterrace is a local, read-only git browser with stats. One binary, run inside a
-repository, serves `127.0.0.1:4242`. No database, no users, no comments.
+gitterrace is a local, read-only git browser with insights. One binary serves
+one or several repositories on `127.0.0.1:4242`. No database, no users, no
+comments. [Architecture](docs/architecture.md) has the crates, cache, routes
+and guard; [design](docs/design.md) has the look and the theme pipeline.
 
 ## Layout
 
-| Crate          | Owns                                                          |
-| -------------- | ------------------------------------------------------------- |
-| `gitterrace-git`   | All git reads via gix. Pinned to commits, never the worktree. |
-| `gitterrace-index` | Stats cache in `.git/gitterrace/`, append-only, rebuildable.      |
-| `gitterrace-web`   | axum server, askama templates, embedded static assets.        |
-| `gitterrace`       | CLI binary: parse args, call `gitterrace_web::serve`.             |
+| Crate | Owns |
+| --- | --- |
+| `gitterrace-git` | All git reads via gix, pinned to commits. The worktree only in `worktree.rs`. |
+| `gitterrace-index` | Insights cache in `.git/gitterrace/`, append-only, rebuildable. |
+| `gitterrace-api` | JSON API (`/api/v1`) and the MCP server. |
+| `gitterrace-cards` | SVG/PNG cards and badges (`png` feature). |
+| `gitterrace-web` | axum server, askama templates, static assets, the request guard. |
+| `gitterrace` | CLI: binaries `git-terrace` and `gitterrace`. |
 
-Dependency direction is strictly downward: `gitterrace -> web -> index -> git`.
-`gitterrace-web` may call `gitterrace-git` directly for browsing. Nothing below `web`
-knows about HTTP; nothing outside `gitterrace-git` imports `gix`.
+Dependencies point down: `gitterrace -> web -> (api, cards) -> index -> git`.
+Nothing below `web` knows about HTTP; nothing outside `gitterrace-git`
+imports `gix`. Colours come only from the vendored `schwarzwald` crate in
+`theme/schwarzwald/rust`.
 
 ## Rules
 
 - Read-only. gitterrace never writes to the repository except `.git/gitterrace/`.
-  No shelling out to `git`.
-- Browsing never waits on the index. Stats pages show progress until ready.
+  No shelling out to `git` outside test fixtures.
+- Browsing never waits on the index. Insights pages show progress until ready.
 - Every repo read takes a resolved commit id, so a commit landing mid-request
   cannot tear a page. The one exception is the Uncommitted view, which reads
   the worktree read-only, lives only in `gitterrace-git/src/worktree.rs`, and must
   tolerate files changing or vanishing mid-read (skip, never fail the page).
-- Crates: `gitterrace-cards` (shareable SVG/PNG cards, badges) and `gitterrace-api`
-  (JSON API + MCP) sit beside `gitterrace-web` and depend only on git and index.
+- Every link goes through `fmt::href` (templates: `c.base`, JS: the `gt-base`
+  meta), so a repo works at `/` and at `/r/{name}/`. A crawler test fails on a
+  link that escapes its repo.
+- Every new insights page uses the shared `Filter` and the page memo
+  (`cached` in `insights.rs`). Add unfiltered pages to `WARM_PAGES` in `lib.rs`.
+- No inline scripts beyond the hashed theme snippet: the CSP refuses them. JS
+  lives in `static/`.
+- Colours and fonts come from `theme/schwarzwald`, a snapshot written by
+  schwarzwald's `sync.py`. Never edit it or the generated block in
+  `tokens.css`; `make theme` fails on drift. No raw colour outside `tokens.css`.
 - The cache is disposable: deleting `.git/gitterrace/` must only cost a rebuild.
   Bump its format version instead of migrating.
 - Logic lives in Rust. Templates render values, they do not compute them.

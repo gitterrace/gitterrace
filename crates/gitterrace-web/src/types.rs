@@ -9,8 +9,8 @@ use std::sync::Arc;
 use askama::Template;
 use axum::extract::{Query, RawQuery, State};
 use axum::response::Html;
-use serde::Deserialize;
 use gitterrace_index::{CommitRecord, Granularity, LabelBucket, LabelCount};
+use serde::Deserialize;
 
 use crate::{
     charts,

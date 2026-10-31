@@ -1,9 +1,9 @@
 //! Registry of the aggregates in `gitterrace_index`. To expose a new aggregate, add one
 //! entry to [`INSIGHTS`]; the HTTP route `/insights/{name}` and the docs list pick it up.
 
+use gitterrace_index::{CommitRecord, Granularity, Label};
 use serde::Deserialize;
 use serde_json::{Value, to_value};
-use gitterrace_index::{CommitRecord, Granularity, Label};
 
 use crate::error::ApiError;
 

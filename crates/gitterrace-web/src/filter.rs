@@ -4,8 +4,8 @@
 
 use std::borrow::Cow;
 
-use serde::Deserialize;
 use gitterrace_index::{CommitRecord, Period};
+use serde::Deserialize;
 
 use crate::fmt::{enc, esc, href};
 

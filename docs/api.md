@@ -2,8 +2,12 @@
 
 Read-only. Everything is pinned to a revision (`rev`, default `HEAD`). Errors are
 `{"error": {"code", "message"}}` with 400 (`bad_request`) or 404 (`rev_not_found`,
-`path_not_found`). Every response carries `ETag: "<head commit>-<index version>"` and honours
-`If-None-Match` with 304. JSON is `snake_case`.
+`path_not_found`). Every response carries an `ETag` built from HEAD, every ref's target and
+the cache format, so moving any branch or tag invalidates it; `If-None-Match` gets 304.
+JSON is `snake_case`. Answers are capped so one file cannot flood a client: `blob` at 5,000
+lines and 256 KiB, `blame` at 5,000 lines, each with `truncated` when cut.
+
+Under several repositories the API of each lives at `/r/{name}/api/v1`.
 
 Rust: `gitterrace_api::router(ApiState)` (nest under `/api/v1`), `gitterrace_api::serve_mcp(path)`.
 
@@ -18,7 +22,7 @@ Rust: `gitterrace_api::router(ApiState)` (nest under `/api/v1`), `gitterrace_api
 | `GET /commits/{id}` | `diff` (default true), `max_lines` | message, files, hunks, truncated |
 | `GET /tree` | `rev`, `path` | directory entries |
 | `GET /blob` | `rev`, `path`, `start_line`, `limit` | text, total_lines, truncated, binary |
-| `GET /blame` | `rev`, `path` | per-line commit, author, time |
+| `GET /blame` | `rev`, `path` | per-line commit, author, time, truncated |
 | `GET /contributors` | `rev` | authors, bus_factor |
 | `GET /insights` | | available insights |
 | `GET /insights/{name}` | `rev`, `granularity`, `label`, `since`, `limit` | `{insight, data}` |
@@ -28,6 +32,8 @@ Insights: `totals`, `activity`, `heatmap`, `authors`, `file_churn`, `hotspots`, 
 `crates/gitterrace-api/src/insights.rs`.
 
 ## MCP (stdio, all tools read-only)
+
+`git terrace mcp [path]` serves one repository.
 
 | Tool | Use |
 | --- | --- |

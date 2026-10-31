@@ -18,7 +18,7 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  # The same gate as `make check`: fmt, clippy -D warnings, tests, docs.
+  # The same gate as `make check`: theme, fmt, clippy -D warnings, tests, docs.
   check:
     name: Check (${{ matrix.os }})
     runs-on: ${{ matrix.os }}

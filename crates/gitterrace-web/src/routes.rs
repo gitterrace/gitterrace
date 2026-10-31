@@ -10,9 +10,9 @@ use axum::{
     response::{Html, IntoResponse, Redirect, Response},
     routing::get,
 };
-use serde::Deserialize;
 use gitterrace_git::RefKind;
 use gitterrace_index::Granularity;
+use serde::Deserialize;
 
 use crate::{
     app::{App, blocking},
