@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}Refs · {{ c.name }}{% endblock %}
+{% block content %}
+{% for g in groups %}
+<h2>{{ g.title }}</h2>
+<div class="card"><table class="entries">
+{% for r in g.rows %}<tr><td><a href="{{ r.log }}">{{ r.name }}</a></td><td><code>{{ r.commit }}</code></td><td class="muted r">{{ r.when }}</td></tr>{% endfor %}
+{% if g.rows.is_empty() %}<tr><td class="muted">None</td></tr>{% endif %}
+</table></div>
+{% endfor %}
+{% endblock %}

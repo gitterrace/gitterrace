@@ -1,0 +1,336 @@
+//! View models and the HTML fragments too hot to loop over in templates.
+
+use gitterrace_git::{
+    BlameLine, ChangeKind, CommitDetail, CommitSummary, FileDiff, LineKind, RefInfo, TreeEntry,
+    TreeEntryKind,
+};
+
+use crate::fmt::{ago, date, enc, esc, short};
+
+const MAX_BLOB_LINES: usize = 20_000;
+
+pub(crate) struct Nav {
+    pub(crate) href: String,
+    pub(crate) label: &'static str,
+    pub(crate) on: bool,
+}
+
+pub(crate) struct Chrome {
+    pub(crate) name: String,
+    pub(crate) nav: Vec<Nav>,
+}
+
+pub(crate) struct Crumb {
+    pub(crate) name: String,
+    pub(crate) href: String,
+}
+
+pub(crate) struct CommitRow {
+    pub(crate) short: String,
+    pub(crate) href: String,
+    pub(crate) subject: String,
+    pub(crate) author: String,
+    pub(crate) when: String,
+    pub(crate) date: String,
+}
+
+pub(crate) struct Entry {
+    pub(crate) name: String,
+    pub(crate) href: String,
+    pub(crate) kind: &'static str,
+    pub(crate) size: String,
+}
+
+pub(crate) struct RefRow {
+    pub(crate) name: String,
+    pub(crate) log: String,
+    pub(crate) commit: String,
+    pub(crate) when: String,
+}
+
+pub(crate) struct FileStatRow {
+    pub(crate) anchor: String,
+    pub(crate) label: String,
+    pub(crate) additions: u32,
+    pub(crate) deletions: u32,
+}
+
+pub(crate) struct Row {
+    pub(crate) label: String,
+    pub(crate) href: String,
+    pub(crate) commits: usize,
+    pub(crate) additions: u64,
+    pub(crate) deletions: u64,
+    pub(crate) pct: u32,
+}
+
+pub(crate) fn chrome(name: &str, active: &str) -> Chrome {
+    let items = [
+        ("/", "Overview", "overview"),
+        ("/log/HEAD", "Commits", "log"),
+        ("/tree/HEAD", "Files", "files"),
+        ("/refs", "Refs", "refs"),
+        ("/stats", "Stats", "stats"),
+    ];
+    Chrome {
+        name: name.to_owned(),
+        nav: items
+            .into_iter()
+            .map(|(href, label, key)| Nav {
+                href: href.to_owned(),
+                label,
+                on: key == active,
+            })
+            .collect(),
+    }
+}
+
+pub(crate) fn stats_tabs(active: &str) -> Vec<Nav> {
+    [
+        ("/stats", "Activity", "a"),
+        ("/stats/files", "Files", "f"),
+        ("/stats/types", "Types", "t"),
+    ]
+    .into_iter()
+    .map(|(href, label, key)| Nav {
+        href: href.to_owned(),
+        label,
+        on: key == active,
+    })
+    .collect()
+}
+
+pub(crate) fn commit_row(c: &CommitSummary, now: i64) -> CommitRow {
+    CommitRow {
+        short: short(&c.id),
+        href: format!("/commit/{}", c.id),
+        subject: c.subject.clone(),
+        author: c.author.name.clone(),
+        when: ago(c.author.time, now),
+        date: date(c.author.time, c.author.offset),
+    }
+}
+
+/// Breadcrumbs for `path` under `rev`; `kind` is `tree` for every part but the last of a blob.
+pub(crate) fn crumbs(rev: &str, path: &str, last_is_file: bool) -> Vec<Crumb> {
+    let r = enc(rev, false);
+    let mut out = vec![Crumb {
+        name: rev.to_owned(),
+        href: format!("/tree/{r}"),
+    }];
+    let parts: Vec<&str> = path.split('/').filter(|p| !p.is_empty()).collect();
+    let mut acc = String::new();
+    for (i, p) in parts.iter().enumerate() {
+        if !acc.is_empty() {
+            acc.push('/');
+        }
+        acc.push_str(p);
+        let kind = if last_is_file && i + 1 == parts.len() {
+            "blob"
+        } else {
+            "tree"
+        };
+        out.push(Crumb {
+            name: (*p).to_owned(),
+            href: format!("/{kind}/{r}/{}", enc(&acc, true)),
+        });
+    }
+    out
+}
+
+pub(crate) fn entries(rev: &str, path: &str, list: &[TreeEntry]) -> Vec<Entry> {
+    let base = if path.is_empty() {
+        String::new()
+    } else {
+        format!("{}/", path.trim_matches('/'))
+    };
+    list.iter()
+        .map(|e| {
+            let full = enc(&format!("{base}{}", e.name), true);
+            let r = enc(rev, false);
+            let (href, kind) = match e.kind {
+                TreeEntryKind::Dir => (format!("/tree/{r}/{full}"), "dir"),
+                TreeEntryKind::File => (format!("/blob/{r}/{full}"), "file"),
+                TreeEntryKind::Symlink => (format!("/blob/{r}/{full}"), "link"),
+                TreeEntryKind::Submodule => (String::new(), "module"),
+            };
+            Entry {
+                name: e.name.clone(),
+                href,
+                kind,
+                size: e.size.map(crate::fmt::size).unwrap_or_default(),
+            }
+        })
+        .collect()
+}
+
+pub(crate) fn ref_rows(refs: &[RefInfo], kind: gitterrace_git::RefKind, now: i64) -> Vec<RefRow> {
+    refs.iter()
+        .filter(|r| r.kind == kind)
+        .map(|r| RefRow {
+            name: r.name.clone(),
+            log: format!("/log/{}", enc(&r.name, false)),
+            commit: short(&r.target),
+            when: ago(r.time, now),
+        })
+        .collect()
+}
+
+pub(crate) fn file_label(f: &FileDiff) -> String {
+    match &f.old_path {
+        Some(old) if f.kind == ChangeKind::Renamed => format!("{old} -> {}", f.path),
+        _ => f.path.clone(),
+    }
+}
+
+fn kind_name(k: ChangeKind) -> &'static str {
+    match k {
+        ChangeKind::Added => "added",
+        ChangeKind::Modified => "modified",
+        ChangeKind::Deleted => "deleted",
+        ChangeKind::Renamed => "renamed",
+    }
+}
+
+pub(crate) fn file_stats(d: &CommitDetail) -> Vec<FileStatRow> {
+    d.files
+        .iter()
+        .enumerate()
+        .map(|(i, f)| FileStatRow {
+            anchor: format!("f{i}"),
+            label: file_label(f),
+            additions: f.additions,
+            deletions: f.deletions,
+        })
+        .collect()
+}
+
+fn num(n: Option<u32>) -> String {
+    n.map_or_else(String::new, |n| n.to_string())
+}
+
+pub(crate) fn diff_html(rev: &str, files: &[FileDiff]) -> String {
+    let mut out = String::new();
+    for (i, f) in files.iter().enumerate() {
+        out.push_str(&format!(
+            "<section class=\"file\" id=\"f{i}\"><header><span class=\"badge {k}\">{k}</span> ",
+            k = kind_name(f.kind)
+        ));
+        if f.kind == ChangeKind::Deleted {
+            out.push_str(&esc(&f.path));
+        } else {
+            out.push_str(&format!(
+                "<a href=\"/blob/{}/{}\">{}</a>",
+                enc(rev, false),
+                enc(&f.path, true),
+                esc(&file_label(f))
+            ));
+        }
+        out.push_str(&format!(
+            "<span class=\"counts\"><b class=\"add\">+{}</b> <b class=\"del\">-{}</b></span></header>",
+            f.additions, f.deletions
+        ));
+        if f.binary {
+            out.push_str("<p class=\"muted pad\">Binary file not shown.</p>");
+        } else if f.hunks.is_empty() {
+            out.push_str("<p class=\"muted pad\">No textual changes.</p>");
+        } else {
+            out.push_str("<table class=\"diff\">");
+            for h in &f.hunks {
+                out.push_str(&format!(
+                    "<tr class=\"hh\"><td colspan=\"4\">{}</td></tr>",
+                    esc(&h.header)
+                ));
+                for l in &h.lines {
+                    let (cls, sign) = match l.kind {
+                        LineKind::Added => ("add", '+'),
+                        LineKind::Removed => ("del", '-'),
+                        LineKind::Context => ("ctx", ' '),
+                    };
+                    out.push_str(&format!(
+                        "<tr class=\"{cls}\"><td class=\"n\">{}</td><td class=\"n\">{}</td><td class=\"g\">{sign}</td><td class=\"c\">{}</td></tr>",
+                        num(l.old_no),
+                        num(l.new_no),
+                        esc(&l.text)
+                    ));
+                }
+            }
+            out.push_str("</table>");
+        }
+        out.push_str("</section>");
+    }
+    out
+}
+
+/// Returns the table and whether it was cut at the line cap.
+pub(crate) fn code_html(text: &str) -> (String, bool) {
+    let mut out = String::with_capacity(text.len() * 2);
+    out.push_str("<table class=\"code\">");
+    let mut cut = false;
+    for (i, line) in text.lines().enumerate() {
+        if i >= MAX_BLOB_LINES {
+            cut = true;
+            break;
+        }
+        let n = i + 1;
+        out.push_str(&format!(
+            "<tr id=\"L{n}\"><td class=\"n\"><a href=\"#L{n}\">{n}</a></td><td class=\"c\">{}</td></tr>",
+            esc(line)
+        ));
+    }
+    out.push_str("</table>");
+    (out, cut)
+}
+
+pub(crate) fn blame_html(lines: &[BlameLine], now: i64) -> String {
+    let mut out = String::from("<table class=\"code blame\">");
+    let mut prev = "";
+    for l in lines {
+        let first = l.commit != prev;
+        prev = &l.commit;
+        out.push_str(&format!(
+            "<tr id=\"L{}\"{}>",
+            l.line_no,
+            if first { " class=\"run\"" } else { "" }
+        ));
+        if first {
+            out.push_str(&format!(
+                "<td class=\"who\"><a href=\"/commit/{}\">{}</a> <span>{}</span> <span class=\"muted\">{}</span></td>",
+                esc(&l.commit),
+                esc(&short(&l.commit)),
+                esc(&l.author),
+                ago(l.time, now)
+            ));
+        } else {
+            out.push_str("<td class=\"who\"></td>");
+        }
+        out.push_str(&format!(
+            "<td class=\"n\"><a href=\"#L{n}\">{n}</a></td><td class=\"c\">{}</td></tr>",
+            esc(&l.text),
+            n = l.line_no
+        ));
+    }
+    out.push_str("</table>");
+    out
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::views::{code_html, crumbs};
+
+    #[test]
+    fn crumbs_link_prefixes() {
+        let c = crumbs("main", "a/b.rs", true);
+        assert_eq!(c.len(), 3);
+        assert_eq!(c[1].href, "/tree/main/a");
+        assert_eq!(c[2].href, "/blob/main/a/b.rs");
+    }
+
+    #[test]
+    fn code_escapes() {
+        let (h, cut) = code_html("<b>\nx");
+        assert!(h.contains("&lt;b&gt;"));
+        assert!(!cut);
+        assert!(h.contains("id=\"L2\""));
+    }
+}

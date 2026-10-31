@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>{% block title %}{{ c.name }}{% endblock %} · gitterrace</title>
+<link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+<header class="top"><div class="wrap topbar">
+<a class="brand" href="/">{{ c.name }}</a>
+<nav>{% for n in c.nav %}<a href="{{ n.href }}"{% if n.on %} class="on" aria-current="page"{% endif %}>{{ n.label }}</a>{% endfor %}</nav>
+</div></header>
+<main class="wrap">
+{% block content %}{% endblock %}
+</main>
+<script src="/static/app.js" defer></script>
+</body>
+</html>

@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}{{ title }} · {{ c.name }}{% endblock %}
+{% block content %}
+<div class="head"><nav class="crumbs">{% for k in crumbs %}{% if !loop.first %}<i>/</i>{% endif %}<a href="{{ k.href }}">{{ k.name }}</a>{% endfor %}</nav>
+<span class="muted">{{ size }} · <a href="{{ blame_href }}">Blame</a> · <a href="{{ log_href }}">History</a></span></div>
+<div class="card scroll">
+{% if let Some(h) = html %}{{ h|safe }}{% if cut %}<p class="muted pad">Truncated after 20000 lines.</p>{% endif %}{% else %}<p class="muted pad">Binary file, {{ size }}.</p>{% endif %}
+</div>
+{% endblock %}

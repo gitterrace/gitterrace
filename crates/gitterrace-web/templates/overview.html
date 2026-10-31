@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="numbers">
+{% if let Some(t) = totals %}
+<div><b>{{ t.commits }}</b><span>commits</span></div>
+<div><b>{{ t.authors }}</b><span>authors</span></div>
+<div><b>{{ t.files_touched }}</b><span>files touched</span></div>
+<div><b class="add">+{{ t.additions }}</b><b class="del">-{{ t.deletions }}</b><span>lines</span></div>
+{% else %}
+<div class="progress" data-progress><span class="muted">Indexing history</span><progress max="100" value="0"></progress></div>
+{% endif %}
+</section>
+<div class="cols">
+<article>
+{% if let Some(html) = readme %}<div class="card md">{{ html|safe }}</div>{% else %}<p class="muted">No README at HEAD.</p>{% endif %}
+</article>
+<aside>
+<h2>Recent commits</h2>
+<ul class="list">
+{% for r in recent %}<li><a href="{{ r.href }}">{{ r.subject }}</a><span class="muted">{{ r.author }} · {{ r.when }}</span></li>{% endfor %}
+</ul>
+<p><a href="/log/HEAD">All commits</a></p>
+</aside>
+</div>
+{% endblock %}

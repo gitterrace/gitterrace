@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Commits · {{ c.name }}{% endblock %}
+{% block content %}
+<div class="head"><h1>Commits <span class="muted">{{ rev }}</span></h1>
+<form class="filter" method="get" action="/log/{{ rev_enc }}"><input name="path" value="{{ path }}" placeholder="Filter by path" aria-label="Filter by path"><button>Filter</button></form></div>
+{% if rows.is_empty() %}<p class="muted">No commits.</p>{% endif %}
+<ul class="list log">
+{% for r in rows %}<li><a href="{{ r.href }}">{{ r.subject }}</a><span class="muted">{{ r.author }} · <time title="{{ r.date }}">{{ r.when }}</time> · <code>{{ r.short }}</code></span></li>{% endfor %}
+</ul>
+<nav class="pager">
+{% if let Some(h) = newer %}<a href="{{ h }}">Newer</a>{% else %}<span></span>{% endif %}
+{% if let Some(h) = older %}<a href="{{ h }}">Older</a>{% endif %}
+</nav>
+{% endblock %}

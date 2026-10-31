@@ -1,8 +1,117 @@
 //! HTTP server: server-rendered pages over `gitterrace-git` and `gitterrace-index`.
 
-use std::{net::SocketAddr, path::PathBuf};
+mod app;
+mod charts;
+mod error;
+mod fmt;
+mod markdown;
+mod routes;
+mod views;
+
+use std::{io, net::SocketAddr, path::PathBuf, sync::Arc};
+
+use gitterrace_git::Repo;
+use gitterrace_index::Index;
+
+use crate::app::App;
 
 /// Starts serving until ctrl-c.
-pub async fn serve(_repo_path: PathBuf, _addr: SocketAddr) -> std::io::Result<()> {
-    todo!("gitterrace-web")
+pub async fn serve(repo_path: PathBuf, addr: SocketAddr) -> io::Result<()> {
+    let repo = Repo::discover(&repo_path).map_err(io::Error::other)?;
+    let index = Index::open(&repo)?;
+    let app = Arc::new(App::new(repo, index));
+    tokio::spawn(app::keep_index_fresh(Arc::clone(&app)));
+    let listener = tokio::net::TcpListener::bind(addr).await?;
+    tracing::info!("serving {} on http://{addr}", app.name);
+    axum::serve(listener, routes::router(app))
+        .with_graceful_shutdown(async {
+            if tokio::signal::ctrl_c().await.is_err() {
+                std::future::pending::<()>().await;
+            }
+        })
+        .await
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{process::Command, sync::Arc};
+
+    use axum::{body::Body, http::Request};
+    use http_body_util::BodyExt;
+    use tower::ServiceExt;
+
+    use crate::{app::App, routes};
+
+    fn git(dir: &std::path::Path, args: &[&str]) {
+        let ok = Command::new("git")
+            .args(["-c", "user.name=T", "-c", "user.email=t@e.x"])
+            .args(args)
+            .current_dir(dir)
+            .status()
+            .is_ok_and(|s| s.success());
+        assert!(ok, "git {args:?}");
+    }
+
+    async fn get(app: &Arc<App>, uri: &str) -> (u16, String) {
+        let res = routes::router(Arc::clone(app))
+            .oneshot(Request::get(uri).body(Body::empty()).expect("request"))
+            .await
+            .expect("response");
+        let status = res.status().as_u16();
+        let bytes = res.into_body().collect().await.expect("body").to_bytes();
+        (status, String::from_utf8_lossy(&bytes).into_owned())
+    }
+
+    #[tokio::test]
+    async fn serves_every_page() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let p = dir.path();
+        git(p, &["init", "-q", "-b", "main"]);
+        std::fs::write(p.join("README.md"), "# Hello <b>\n").expect("write");
+        std::fs::create_dir(p.join("src")).expect("dir");
+        std::fs::write(p.join("src/a.rs"), "fn main() {}\n").expect("write");
+        git(p, &["add", "."]);
+        git(p, &["commit", "-q", "-m", "feat(core): first"]);
+        std::fs::write(p.join("src/a.rs"), "fn main() {\n}\n").expect("write");
+        git(p, &["commit", "-qam", "fix: second"]);
+
+        let repo = gitterrace_git::Repo::discover(p).expect("repo");
+        let index = gitterrace_index::Index::open(&repo).expect("index");
+        let app = Arc::new(App::new(repo, index));
+
+        let (s, body) = get(&app, "/").await;
+        assert_eq!(s, 200);
+        assert!(body.contains("<h1>Hello"));
+        let (s, body) = get(&app, "/log/HEAD").await;
+        assert_eq!((s, body.contains("fix: second")), (200, true));
+        let (s, body) = get(&app, "/log/HEAD?path=src/a.rs&page=0").await;
+        assert_eq!((s, body.contains("first")), (200, true));
+        let (s, body) = get(&app, "/tree/HEAD/src").await;
+        assert_eq!((s, body.contains("a.rs")), (200, true));
+        let (s, body) = get(&app, "/blob/HEAD/src/a.rs").await;
+        assert_eq!((s, body.contains("fn main")), (200, true));
+        assert_eq!(get(&app, "/blame/HEAD/src/a.rs").await.0, 200);
+        assert_eq!(get(&app, "/refs").await.0, 200);
+        let (s, body) = get(&app, "/stats").await;
+        assert_eq!((s, body.contains("data-progress")), (200, true));
+        assert_eq!(get(&app, "/nope/x").await.0, 404);
+        assert_eq!(get(&app, "/blob/HEAD/missing").await.0, 404);
+        let (_, js) = get(&app, "/api/progress").await;
+        assert!(js.contains("\"ready\":false"));
+        assert_eq!(get(&app, "/static/app.css").await.0, 200);
+
+        let head = app.repo.resolve("HEAD").expect("head");
+        let (s, body) = get(&app, &format!("/commit/{head}")).await;
+        assert_eq!((s, body.contains("class=\"diff\"")), (200, true));
+
+        app.index
+            .update(&app.repo, "HEAD", &|_| {})
+            .expect("update");
+        app.mark_ready();
+        for u in ["/stats", "/stats/files", "/stats/types", "/"] {
+            let (s, body) = get(&app, u).await;
+            assert_eq!(s, 200, "{u}");
+            assert!(!body.contains("data-progress"), "{u}");
+        }
+    }
 }

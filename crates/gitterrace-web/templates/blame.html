@@ -1,0 +1,7 @@
+{% extends "base.html" %}
+{% block title %}Blame {{ title }} · {{ c.name }}{% endblock %}
+{% block content %}
+<div class="head"><nav class="crumbs">{% for k in crumbs %}{% if !loop.first %}<i>/</i>{% endif %}<a href="{{ k.href }}">{{ k.name }}</a>{% endfor %}</nav>
+<a href="{{ blob_href }}">Plain view</a></div>
+<div class="card scroll">{{ html|safe }}</div>
+{% endblock %}
