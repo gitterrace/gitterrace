@@ -374,7 +374,9 @@ div.diff .hh{background:var(--soft);color:var(--muted)}
 /* insights: diverging bars, line, tags */
 svg.chart .up{fill:var(--add)}svg.chart .dn{fill:var(--del)}
 svg.chart .col:hover .up,svg.chart .col:hover .dn{opacity:.75}
-svg.chart .line{fill:none;stroke:var(--accent);stroke-width:2;stroke-linejoin:round}
+svg.chart .line{fill:none;stroke:var(--accent);stroke-width:2;stroke-linejoin:round;pointer-events:none}
+svg.chart .dot{fill:var(--accent);stroke:var(--surface);stroke-width:2;opacity:0}
+svg.chart .col:hover .dot{opacity:1}
 .tag{font-size:var(--text-2xs);color:var(--muted);border:var(--border);border-radius:var(--radius);padding:0 5px}
 
 /* media: checkerboard stage, before/after diff, image icon */

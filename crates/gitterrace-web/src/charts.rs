@@ -294,6 +294,24 @@ pub(crate) fn percent_line(points: &[(String, Option<f64>)]) -> String {
         );
     }
     let sl = slot(points.len());
+    // Hover columns first, so they paint under the line. Each also carries the point
+    // dot, shown on hover, so the reading is marked on the line itself.
+    for (i, (label, v)) in points.iter().enumerate() {
+        if let Some(v) = v {
+            #[allow(clippy::cast_precision_loss)]
+            let x = LEFT + i as f64 * sl;
+            let y = TOP_PAD + plot - v.clamp(0.0, 1.0) * plot;
+            fmt::push(
+                &mut svg,
+                &format!(
+                    r#"<g class="col"><title>{}: {:.0}%</title><rect class="hit" x="{x:.1}" y="{TOP_PAD}" width="{sl:.1}" height="{plot:.1}"/><circle class="dot" cx="{:.1}" cy="{y:.1}" r="3.5"/></g>"#,
+                    esc(label),
+                    v * 100.0,
+                    x + sl / 2.0
+                ),
+            );
+        }
+    }
     let mut d = String::new();
     let mut pen = false;
     for (i, (_, v)) in points.iter().enumerate() {
@@ -311,20 +329,6 @@ pub(crate) fn percent_line(points: &[(String, Option<f64>)]) -> String {
         pen = true;
     }
     fmt::push(&mut svg, &format!(r#"<path class="line" d="{d}"/>"#));
-    for (i, (label, v)) in points.iter().enumerate() {
-        if let Some(v) = v {
-            #[allow(clippy::cast_precision_loss)]
-            let x = LEFT + i as f64 * sl;
-            fmt::push(
-                &mut svg,
-                &format!(
-                    r#"<g class="col"><title>{}: {:.0}%</title><rect class="hit" x="{x:.1}" y="{TOP_PAD}" width="{sl:.1}" height="{plot:.1}"/></g>"#,
-                    esc(label),
-                    v * 100.0
-                ),
-            );
-        }
-    }
     let keys: Vec<&str> = points.iter().map(|p| p.0.as_str()).collect();
     svg.push_str(&x_labels(&keys));
     svg.push_str("</svg>");
@@ -486,7 +490,7 @@ pub(crate) fn pct(v: u64, max: u64) -> u32 {
 
 #[cfg(test)]
 mod tests {
-    use crate::charts::{bars, heatmap, pct};
+    use crate::charts::{bars, diverging, heatmap, pct, percent_line};
 
     #[test]
     fn bars_escape_labels_and_scale() {
@@ -510,5 +514,32 @@ mod tests {
         assert_eq!(pct(1, 1000), 1);
         assert_eq!(pct(0, 10), 0);
         assert_eq!(pct(5, 10), 50);
+    }
+
+    /// A hover band is opaque on hover; drawn after a mark it hides the mark. In every
+    /// chart, the last hover band must come before the first data mark it could cover.
+    #[test]
+    fn hover_bands_paint_under_the_data() {
+        let line = percent_line(&[
+            ("a".to_owned(), Some(0.2)),
+            ("b".to_owned(), Some(0.5)),
+            ("c".to_owned(), None),
+        ]);
+        let last_hit = line.rfind(r#"class="hit""#).expect("hit");
+        let path = line.find(r#"class="line""#).expect("line");
+        assert!(last_hit < path, "hover band drawn over the line");
+        for svg in [
+            bars(&[("a".to_owned(), 3), ("b".to_owned(), 1)]),
+            diverging(&[("a".to_owned(), 3, 1)]),
+        ] {
+            for col in svg.split(r#"<g class="col">"#).skip(1) {
+                let hit = col.find(r#"class="hit""#).expect("hit");
+                let mark = col
+                    .find(r#"class="bar""#)
+                    .or_else(|| col.find(r#"class="up""#))
+                    .expect("mark");
+                assert!(hit < mark, "hover band drawn over a bar");
+            }
+        }
     }
 }
