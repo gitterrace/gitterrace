@@ -6,7 +6,7 @@
 {% if empty %}<p class="muted">No commits.</p>{% endif %}
 {% for d in days %}<h3 class="day">{{ d.label }}</h3>
 <ul class="list log">
-{% for r in d.rows %}<li class="crow"><span class="av" style="--hue:{{ r.hue }}">{{ r.initial }}</span><div class="cmain"><a href="{{ r.href }}">{{ r.subject }}</a><span class="muted"><b>{{ r.author }}</b> committed <time title="{{ r.date }}">{{ r.when }}</time></span></div><a class="sha" href="{{ r.href }}">{{ r.short }}</a></li>{% endfor %}
+{% for r in d.rows %}<li class="crow"><span class="av" style="--hue:{{ r.hue }}">{{ r.initial }}</span><div class="cmain"><a href="{{ r.href }}">{{ r.subject }}</a><span class="muted"><b>{{ r.author }}</b> · <time title="{{ r.date }}">{{ r.when }}</time></span></div><a class="sha" href="{{ r.href }}">{{ r.short }}</a></li>{% endfor %}
 </ul>
 {% endfor %}
 <nav class="pager">

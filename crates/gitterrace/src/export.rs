@@ -103,7 +103,8 @@ async fn wait_for_index(router: &Router) -> anyhow::Result<()> {
 
 async fn fetch(router: &Router, path: &str) -> anyhow::Result<(StatusCode, String, Vec<u8>)> {
     // The router refuses requests without a local Host (DNS-rebinding guard).
-    let req = Request::get(path)
+    // Paths travel decoded (they name files on disk); encode them for the URI.
+    let req = Request::get(percent_encode(path))
         .header(axum::http::header::HOST, "localhost")
         .body(Body::empty())
         .context("building a request")?;
@@ -237,9 +238,51 @@ fn links(html: &str) -> Vec<String> {
 }
 
 fn decode_entities(s: &str) -> String {
-    s.replace("&amp;", "&")
+    let s = s
+        .replace("&amp;", "&")
         .replace("&#x2F;", "/")
-        .replace("&#47;", "/")
+        .replace("&#47;", "/");
+    percent_decode(&s)
+}
+
+/// Inverse of the web's `fmt::enc`: `%XX` back to bytes, then UTF-8. Links are
+/// matched and written by their real name, so `a b.md` exports as `a b.md`, not
+/// `a%20b.md`, which a static server would decode and then miss.
+fn percent_decode(s: &str) -> String {
+    let b = s.as_bytes();
+    let mut out = Vec::with_capacity(b.len());
+    let mut i = 0;
+    while i < b.len() {
+        let hex = |c: u8| char::from(c).to_digit(16);
+        if b[i] == b'%'
+            && let (Some(&h), Some(&l)) = (b.get(i + 1), b.get(i + 2))
+            && let (Some(h), Some(l)) = (hex(h), hex(l))
+        {
+            out.push(u8::try_from(h * 16 + l).unwrap_or(b'?'));
+            i += 3;
+            continue;
+        }
+        out.push(b[i]);
+        i += 1;
+    }
+    String::from_utf8_lossy(&out).into_owned()
+}
+
+/// The web's `fmt::enc` with slashes kept: every byte outside `A-Za-z0-9-._~/`
+/// becomes `%XX`, so `percent_decode(percent_encode(p)) == p`.
+fn percent_encode(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    for b in s.bytes() {
+        if b.is_ascii_alphanumeric() || matches!(b, b'-' | b'.' | b'_' | b'~' | b'/') {
+            out.push(char::from(b));
+        } else {
+            const HEX: &[u8; 16] = b"0123456789ABCDEF";
+            out.push('%');
+            out.push(char::from(HEX[usize::from(b >> 4)]));
+            out.push(char::from(HEX[usize::from(b & 15)]));
+        }
+    }
+    out
 }
 
 /// File the page lands in: HTML pages become `<path>/index.html` so their links
@@ -290,7 +333,25 @@ fn write_page(out: &Path, path: &str, content_type: &str, body: &[u8]) -> anyhow
 mod tests {
     use std::path::Path;
 
-    use crate::export::{links, target, write_page};
+    use crate::export::{links, percent_decode, percent_encode, target, write_page};
+
+    #[test]
+    fn encoded_names_round_trip_to_real_file_names() {
+        let html = r#"<a href="/blob/HEAD/docs/a%20b%23c.md">x</a><a href="/blob/HEAD/%C3%BCber.md">y</a>"#;
+        assert_eq!(
+            links(html),
+            vec!["/blob/HEAD/docs/a b#c.md", "/blob/HEAD/über.md"]
+        );
+        for p in [
+            "/blob/HEAD/docs/a b#c.md",
+            "/blob/HEAD/über.md",
+            "/tree/HEAD/x%y",
+        ] {
+            assert_eq!(percent_decode(&percent_encode(p)), p);
+        }
+        assert_eq!(percent_encode("/blob/HEAD/a b.md"), "/blob/HEAD/a%20b.md");
+        assert_eq!(percent_decode("bad%zz%4"), "bad%zz%4");
+    }
 
     #[test]
     fn links_keeps_same_origin_paths_only() {

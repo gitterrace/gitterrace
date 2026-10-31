@@ -41,10 +41,10 @@ pub struct Palette {
 
 /// Light theme: Kandel, from tendir.
 pub const LIGHT: Palette = Palette {
-    bg: "#fbfbfb",
-    surface: "#ffffff",
-    soft: "#f6f6f7",
-    line: "#e2e3e4",
+    bg: "#f7f8fa",
+    surface: "#f7f8fa",
+    soft: "#f0f1f3",
+    line: "#dfe1e4",
     faint: "#707881",
     muted: "#4a5159",
     fg: "#21272e",
@@ -53,18 +53,18 @@ pub const LIGHT: Palette = Palette {
     del: "#af383d",
     warn: "#875900",
     info: "#57646d",
-    seq: ["#eff0f0", "#c8cad8", "#a2a5bf", "#7d81a6", "#5b5e8d"],
+    seq: ["#eaebee", "#c4c6d6", "#9fa2bd", "#7c80a5", "#5b5e8d"],
     cat: [
-        "#306693", "#8c5528", "#127050", "#6e3a52", "#1f6a72", "#994b4c", "#706226", "#c8c9cb",
+        "#306693", "#8c5528", "#127050", "#6e3a52", "#1f6a72", "#994b4c", "#706226", "#c8cacd",
     ],
 };
 
 /// Dark theme: Kandel, from tendir.
 pub const DARK: Palette = Palette {
-    bg: "#131313",
-    surface: "#191a1a",
-    soft: "#1d1e1e",
-    line: "#2c2d2e",
+    bg: "#1e2023",
+    surface: "#1e2023",
+    soft: "#27292c",
+    line: "#34363a",
     faint: "#a1aab3",
     muted: "#bbc4cd",
     fg: "#e3ecf6",
@@ -73,9 +73,9 @@ pub const DARK: Palette = Palette {
     del: "#ff7778",
     warn: "#e1a447",
     info: "#9fadb6",
-    seq: ["#242425", "#3f404c", "#5c5f77", "#7b7fa4", "#9ca1d4"],
+    seq: ["#2d2f33", "#474958", "#62657f", "#7e82a8", "#9ca1d4"],
     cat: [
-        "#66a6dd", "#cf945f", "#50b291", "#d28caf", "#4caeb8", "#de898e", "#aea25c", "#414345",
+        "#66a6dd", "#cf945f", "#50b291", "#d28caf", "#4caeb8", "#de898e", "#aea25c", "#45494d",
     ],
 };
 

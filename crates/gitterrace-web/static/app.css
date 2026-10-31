@@ -102,7 +102,7 @@ button:hover{border-color:var(--line-strong);background:var(--hover)}
 .files-card{margin-bottom:var(--space-6)}
 .readme-h{display:flex;align-items:center;gap:var(--space-2);padding:var(--space-2) var(--space-4);min-height:44px;background:var(--surface);border-bottom:var(--border);font-size:var(--text-sm);font-weight:var(--weight-semibold);color:var(--fg)}
 .facts{list-style:none;margin:0 0 var(--space-4);padding:0;color:var(--muted)}.facts li{padding:var(--space-1) 0}.facts b{color:var(--fg);font-weight:var(--weight-semibold);font-variant-numeric:tabular-nums}.facts b.add{color:var(--add)}.facts b.del{color:var(--del)}
-.tree-msg{color:var(--muted);max-width:480px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tree-msg{color:var(--muted);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
 /* commit list */
 .list{list-style:none;margin:0;padding:0}
@@ -113,10 +113,16 @@ button:hover{border-color:var(--line-strong);background:var(--hover)}
 .log{border:var(--border);border-radius:var(--radius);background:var(--surface);overflow:hidden}
 .day{font-size:var(--text-sm);font-weight:var(--weight-medium);color:var(--muted);margin:var(--space-6) 0 var(--space-2);display:flex;align-items:center;gap:var(--space-2)}
 .day::before{content:"";width:8px;height:8px;border-radius:50%;border:2px solid var(--line-strong)}
-.crow{flex-direction:row!important;align-items:center;gap:var(--space-3)!important}
-.cmain{display:flex;flex-direction:column;gap:2px;flex:1;min-width:0}
-.cmain>a{color:var(--fg);font-weight:var(--weight-semibold);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.cmain>a:hover{color:var(--accent-fg)}
-.cmain .muted b{color:var(--fg);font-weight:var(--weight-medium)}
+.crow{flex-direction:row!important;align-items:center;gap:var(--space-3)!important;padding-top:var(--space-2)!important;padding-bottom:var(--space-2)!important}
+.crow .av{width:18px;height:18px;font-size:10px;flex:none}
+/* One line per commit: subject takes the room, author and time sit after it,
+   muted, and give way first when the line is short. */
+.cmain{display:flex;flex-direction:row;align-items:baseline;gap:var(--space-3);flex:1;min-width:0}
+.cmain>a{color:var(--fg);font-weight:var(--weight-medium);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:0 1 auto;min-width:0}.cmain>a:hover{color:var(--accent-fg)}
+.cmain .muted{flex:0 100 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-left:auto}
+.cmain .muted b{color:var(--muted);font-weight:var(--weight-regular)}
+.crow .sha{flex:none}
+.day{margin:var(--space-4) 0 var(--space-2)!important}
 
 /* commit page and diff */
 .meta{color:var(--muted);margin:var(--space-2) 0 var(--space-6)}.meta b{color:var(--fg)}
@@ -195,17 +201,18 @@ button.branch{height:auto;cursor:pointer}
 .topsearch input[type=search]{min-width:220px;width:260px;padding-right:32px;height:30px}
 .topsearch kbd{position:absolute;right:8px;pointer-events:none}
 kbd{font:var(--weight-medium) 11px/1 var(--mono);color:var(--muted);border:var(--border);border-bottom-width:2px;border-radius:var(--radius-sm);padding:2px 5px;background:var(--soft)}
-.ov-back{position:fixed;inset:0;background:color-mix(in srgb,var(--fg) 35%,transparent);z-index:50;display:flex;justify-content:center;align-items:flex-start;padding-top:12vh}
-.ov{background:var(--surface);border:var(--border);border-radius:var(--radius-lg);box-shadow:var(--shadow-2);width:min(640px,92vw);max-height:70vh;display:flex;flex-direction:column;overflow:hidden}
+.ov-back{position:fixed;inset:0;background:var(--scrim);z-index:50;display:flex;justify-content:center;align-items:flex-start;padding-top:12vh}
+.ov{background:var(--raised);border:var(--border);border-radius:var(--radius-lg);box-shadow:var(--shadow-2);width:min(640px,92vw);max-height:70vh;display:flex;flex-direction:column;overflow:hidden}
 .ov.anchored{position:fixed;width:min(380px,92vw)}
 .ov-input{border:0;border-bottom:var(--border);border-radius:0;height:44px;min-width:0;flex:none;padding:0 var(--space-4);font-size:var(--text-md);width:100%;background:transparent}
 .ov-input:focus{outline:0;border-color:var(--line)}
 .ov-list{list-style:none;margin:0;padding:var(--space-1);overflow:auto;flex:1}
 .ov-list li{display:flex;gap:var(--space-3);align-items:baseline;padding:6px var(--space-3);border-radius:var(--radius);cursor:pointer;font-size:var(--text-base)}
 .ov-list li.on{background:var(--accent-soft)}
+.ov-list .name{flex:none}
 .ov-list li.none{color:var(--muted);cursor:default}
 .ov-list .name{font-family:var(--mono);font-size:var(--text-sm);color:var(--fg);white-space:nowrap}
-.ov-list .dir{color:var(--muted);font-size:var(--text-xs);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-left:auto}
+.ov-list .dir{min-width:0;flex:0 1 auto;color:var(--muted);font-size:var(--text-xs);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-left:auto}
 .ov-list .tag{font-size:11px;color:var(--muted);border:var(--border);border-radius:var(--radius-full);padding:1px 6px}
 .ov-foot,.ov-status{padding:6px var(--space-4);color:var(--muted);font-size:var(--text-xs);border-top:var(--border);background:var(--soft)}
 .ov-status{border-top:0;border-bottom:var(--border)}
@@ -222,10 +229,10 @@ kbd{font:var(--weight-medium) 11px/1 var(--mono);color:var(--muted);border:var(-
 tr.sel td{background:var(--accent-soft)!important;box-shadow:none}
 tr.sel td.n{box-shadow:inset 2px 0 0 var(--accent)}
 .cur{outline:2px solid var(--ring);outline-offset:-2px}
-table.entries[data-last]{table-layout:fixed}table.entries[data-last] td:first-child{width:34%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}table.entries[data-last] td.r{width:90px}
-td.lc{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:var(--text-sm)}
+table.entries[data-last]{table-layout:fixed}table.entries[data-last] td:first-child{width:clamp(12rem,28%,20rem);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}table.entries[data-last] td.lc{width:auto}table.entries[data-last] td.ago{width:7.5rem;text-align:right}table.entries[data-last] td.r{width:4.5rem;padding-left:0}
+td.lc{font-size:var(--text-sm);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 td.lc a{color:var(--muted)!important}td.lc a:hover{color:var(--accent-fg)!important}
-td.lc .ago{margin-left:var(--space-3);color:var(--faint);font-size:var(--text-xs)}
+td.ago{color:var(--faint);font-size:var(--text-xs);white-space:nowrap}
 .searchform{padding:var(--space-4);margin-bottom:var(--space-4)}
 .searchform .srow{display:flex;gap:var(--space-3);align-items:center;flex-wrap:wrap}
 .searchform .srow+.srow{margin-top:var(--space-3)}
@@ -246,7 +253,8 @@ mark{background:var(--warn-bg);color:var(--fg);box-shadow:0 0 0 1px var(--warn);
 
 /* ---- voice: serif display, grotesk body, mono metadata, hairlines ---- */
 body{background:var(--bg)}
-.top{background:var(--bg)}
+.top{background:var(--header);border-bottom:var(--border)}
+body{background-image:radial-gradient(60rem 22rem at 80% -6rem,color-mix(in srgb,var(--accent) 7%,transparent),transparent 70%);background-repeat:no-repeat}
 .reponame{font:var(--weight-semibold) 22px/1 var(--serif);letter-spacing:-.01em}
 h1,.crumbs{font-family:var(--serif);font-weight:600;font-size:26px;letter-spacing:-.015em}
 .crumbs{font-size:22px}
@@ -259,7 +267,7 @@ main h2::after{content:"";flex:1;border-top:var(--border)}
 .branch,.sha,.badge{background:transparent;border-radius:2px}
 .card,section.file,.log{background:var(--bg)}
 .entries .th td,.latest,section.file>header,.files summary,.readme-h{background:var(--soft)}
-.entries td.r,.facts b,.meta,.latest code,.latest .muted,.cmain .muted,td.lc .ago{font-family:var(--mono);font-size:var(--text-sm)}
+.entries td.r,.facts b,.meta,.latest code,.latest .muted,.cmain .muted,td.ago{font-family:var(--mono);font-size:var(--text-sm)}
 .latest .subj,td.lc{font-size:var(--text-sm)}
 .day{font:11px var(--mono);text-transform:uppercase;letter-spacing:.1em}
 .day::before{width:12px;height:0;border-radius:0;border:0;border-top:1px solid var(--line-strong)}
@@ -318,3 +326,7 @@ svg.loc .xh{display:none;stroke:var(--fg);stroke-width:1;stroke-dasharray:3 3;po
 .foot{color:var(--muted);font-size:var(--text-sm);margin:var(--space-2) 0 0}
 svg.spark{display:block;fill:none;stroke-width:1.6;stroke-linejoin:round}
 svg.spark.s1{stroke:var(--cat-1)}svg.spark.s2{stroke:var(--cat-2)}svg.spark.s3{stroke:var(--cat-3)}svg.spark.s4{stroke:var(--cat-4)}svg.spark.s5{stroke:var(--cat-5)}svg.spark.s6{stroke:var(--cat-6)}svg.spark.s7{stroke:var(--cat-7)}svg.spark.s8{stroke:var(--cat-8)}
+
+/* last-commit column: the message fills the cell, the age has its own column */
+.latest .subj{white-space:nowrap}
+@media (max-width:600px){table.entries[data-last] td:first-child{width:45%}table.entries[data-last] td.r,table.entries[data-last] td.ago{display:none}}

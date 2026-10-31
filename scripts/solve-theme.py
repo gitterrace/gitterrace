@@ -35,20 +35,18 @@ BEGIN, END = "/* BEGIN solved colours */", "/* END solved colours */"
 #
 # Every constant below is a rule, named after the tendir rule it extends.
 RULES = {
-    # Page surfaces: tendir surfaces are the system's own, chroma 0. A browser
-    # has no system window, so the window is fixed (white light, L 0.185 dark)
-    # and every other surface is primary ink laid over it at a fixed share,
-    # the construction of tendir's chipFillQuiet. The ink's 0.016 chroma
-    # shrinks to under 0.003 at these shares, a felt-not-seen hue.
-    "window": {"light": "#ffffff", "dark": 0.185},
+    # Page surfaces: tendir.sh's grounds (see `grounds()`), so gitterrace and
+    # tendir's website are one family. The reading surface is the page and the
+    # card; every other neutral is primary ink laid over it at a fixed share,
+    # the construction of tendir's chipFillQuiet.
     "surface_share": {
         #            light  dark
-        "bg": (0.020, 0.000),
-        "surface": (0.000, 0.030),
-        "soft": (0.040, 0.050),
-        "hover": (0.070, 0.080),
-        "line": (0.130, 0.120),
-        "line_strong": (0.250, 0.220),
+        "bg": (0.000, 0.000),
+        "surface": (0.000, 0.000),
+        "soft": (0.035, 0.045),
+        "hover": (0.060, 0.075),
+        "line": (0.110, 0.110),
+        "line_strong": (0.220, 0.200),
     },
     # Selected row: tendir's selection wash, at its 12% (hover 5%) share.
     "selection_share": 0.12,
@@ -57,7 +55,7 @@ RULES = {
     # 2.0 light, 4.0 dark) from its own grey; the highlight steps one pill
     # share above the row.
     "row_share": {"light": 0.10, "dark": 0.14},
-    "hl_share": {"light": 0.24, "dark": 0.30},
+    "hl_share": {"light": 0.24, "dark": 0.28},
     "cast": {"light": 2.0, "dark": 4.0},
     # Text selection: tendir's choiceFill share (accent at 24% light, 35% dark).
     "choice_share": {"light": 0.24, "dark": 0.35},
@@ -304,13 +302,37 @@ def cast_fill(colour, surface, share, cast):
     return out
 
 
+def grounds(theme, mode):
+    """tendir website's three grounds (website/scripts/sync-theme-tokens.mjs,
+    `grounds()`): light is the theme background mixed toward white, dark is
+    its lightness mixed toward black, keeping the hue at the chroma share the
+    light ground keeps. Reused so gitterrace and tendir.sh share one family."""
+    mix_light = {"forest": 0.88, "surface": 0.95, "raised": 0.80}
+    mix_dark = {"forest": 0.70, "surface": 0.62, "raised": 0.54}
+    bg = theme[mode]["background"]["hex"].lower()
+    if mode == "light":
+        return {k: over("#ffffff", bg, w) for k, w in mix_light.items()}
+    bg_light = theme["light"]["background"]["hex"].lower()
+    c_light = oklch(bg_light)[1]
+    _, c_dark, h_dark = oklch(bg)
+    share = oklch(over("#ffffff", bg_light, mix_light["forest"]))[1] / c_light if c_light > 1e-4 else 0
+    out = {}
+    for k, w in mix_dark.items():
+        plain = over("#000000", bg, w)
+        out[k] = plain if (c_dark < 1e-4 or share == 0) else from_lch(oklch(plain)[0], c_dark * share, h_dark)
+    return out
+
+
 def solve(theme, mode):
     t = theme[mode]
     hx = {k: v["hex"].lower() for k, v in t.items()}
     rules = RULES
     li = 0 if mode == "light" else 1
-    win = rules["window"][mode]
-    window = win if isinstance(win, str) else from_lch(win, 0, 0)
+    g = grounds(theme, mode)
+    # The page is tendir.sh's reading surface; the header band is its forest.
+    # Every other neutral is ink over the page at a fixed share, so lines and
+    # hover states sit on the same hue family instead of on pure grey.
+    window = g["surface"]
     ink = hx["ink.primary"]
     s = {}
     for name, shares in rules["surface_share"].items():
@@ -332,21 +354,12 @@ def solve(theme, mode):
     }
     surface = tok["n-0"]
     tok["accent-soft"] = cast_fill(hx["selectionWash"], surface, rules["selection_share"], rules["cast"][mode])
-    # Header band (tendir website's --forest): one surface step off the page,
-    # darker in both modes, at the selection-wash hue with the themed-fill cast.
-    step = abs(oklch(s["bg"])[0] - oklch(s["hover"])[0]) if mode == "light" else oklch(s["surface"])[0] - oklch(s["bg"])[0]
-    hL = oklch(s["bg"])[0] - max(step, 0.02)
-    _, wC, wH = oklch(hx["selectionWash"])
-    hC = 0.0
-    tok["header"] = from_lch(hL, 0, 0)
-    # The light cast (2.0) in both modes: near black a 4.0 cast needs chroma
-    # that reads as navy, and the band is a surface, not a fill.
-    while wC >= 0.008 and de2000(tok["header"], grey_of(tok["header"])) < rules["cast"]["light"] and hC < 0.1:
-        hC += 0.001
-        tok["header"] = from_lch(hL, hC, wH)
-    # Raised (popover, dialog): the surface in light; in dark one ink share
-    # above it, as system popovers lift off a dark window.
-    tok["raised"] = surface if mode == "light" else over(ink, window, 0.08)
+    # Header band: tendir.sh's forest ground, the one place gitterrace shows
+    # the theme's own background hue, exactly as tendir's header does.
+    tok["header"] = g["forest"]
+    # Raised (popover, dialog): the page surface in light; in dark tendir's
+    # raised ground, which lifts off the page without turning grey.
+    tok["raised"] = surface if mode == "light" else g["raised"]
     # Scrim: tendir's SCRIM veil, black at 30% in both modes, so it only darkens.
     tok["scrim"] = "#0000004d"
     tok["selection"] = over(hx["accent"], surface, rules["choice_share"][mode])

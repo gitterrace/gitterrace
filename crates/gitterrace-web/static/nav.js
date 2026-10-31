@@ -339,8 +339,12 @@
         if (!c) return;
         var a = el("a", "", c.subject);
         a.href = "/commit/" + c.id;
+        a.title = c.subject;
         td.appendChild(a);
-        td.appendChild(el("span", "ago", c.when));
+        // The age gets its own right-aligned column, like GitHub, so the
+        // message can use all the width between name and age.
+        var age = el("td", "ago", c.when);
+        td.parentNode.insertBefore(age, td.nextSibling);
       });
       table.classList.add("has-last");
     }).catch(function () {});
