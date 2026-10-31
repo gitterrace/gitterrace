@@ -242,3 +242,81 @@ td.lc .ago{margin-left:var(--space-3);color:var(--faint);font-size:var(--text-xs
 mark{background:var(--warn-bg);color:var(--fg);box-shadow:0 0 0 1px var(--warn);border-radius:2px;padding:0 1px}
 @media (max-width:600px){.topsearch{display:none}}
 .searchform input[type=radio],.searchform input[type=checkbox]{min-width:0;width:auto;height:auto;flex:none;margin:0}
+
+/* ---- design v2 candidate looks, toggled by ?look=a|b|c (phase 1 only) ---- */
+/* a: survey. serif display, warm grotesk, mono metadata, hairlines */
+[data-look=a] body{background:var(--bg)}
+[data-look=a] .top{background:var(--bg)}
+[data-look=a] .reponame{font:var(--weight-semibold) 22px/1 var(--serif);letter-spacing:-.01em}
+[data-look=a] h1,[data-look=a] .crumbs{font-family:var(--serif);font-weight:600;font-size:26px;letter-spacing:-.015em}
+[data-look=a] .crumbs{font-size:22px}
+[data-look=a] h2,[data-look=a] .readme-h,[data-look=a] .files summary{font:var(--weight-regular) 11px/1.4 var(--mono);text-transform:uppercase;letter-spacing:.12em;color:var(--muted)}
+[data-look=a] main h2{display:flex;align-items:center;gap:var(--space-3)}
+[data-look=a] main h2::after{content:"";flex:1;border-top:var(--border)}
+[data-look=a] .tabnav a,[data-look=a] .tabs a{font:var(--weight-regular) 12px/1.4 var(--mono);text-transform:uppercase;letter-spacing:.08em}
+[data-look=a] .tabnav a.on,[data-look=a] .tabs a.on{font-weight:600}
+[data-look=a] .tabnav a::before,[data-look=a] .tabs a::before{display:none}
+[data-look=a] .branch,[data-look=a] .sha,[data-look=a] .badge{background:transparent;border-radius:2px}
+[data-look=a] .card,[data-look=a] section.file,[data-look=a] .log{background:var(--bg)}
+[data-look=a] .entries .th td,[data-look=a] .latest,[data-look=a] section.file>header,[data-look=a] .files summary,[data-look=a] .readme-h{background:var(--soft)}
+[data-look=a] .entries td.r,[data-look=a] .facts b,[data-look=a] .meta,[data-look=a] .latest,[data-look=a] .cmain .muted,[data-look=a] td.lc{font-family:var(--mono);font-size:var(--text-sm)}
+[data-look=a] .day{font:11px var(--mono);text-transform:uppercase;letter-spacing:.1em}
+[data-look=a] .day::before{width:12px;height:0;border-radius:0;border:0;border-top:1px solid var(--line-strong)}
+[data-look=a] .av{border-radius:2px}
+[data-look=a] .entries .bar{height:2px;border-radius:0}
+[data-look=a] .legend i,[data-look=a] .heat-legend i{border-radius:0}
+[data-look=a] svg.chart text{font-family:var(--mono)}
+
+/* b: terminal. one mono, square, dense, inverted active state */
+[data-look=b] .top{background:var(--bg)}
+[data-look=b] h1,[data-look=b] .crumbs{font-size:var(--text-lg);font-weight:600}
+[data-look=b] h2{font-size:var(--text-base);margin:var(--space-6) 0 var(--space-2)}
+[data-look=b] h2::before{content:"## ";color:var(--faint)}
+[data-look=b] .tabnav,[data-look=b] .tabs{gap:0}
+[data-look=b] .tabnav a,[data-look=b] .tabs a{padding:var(--space-1) var(--space-3);border-bottom:0;font-weight:400}
+[data-look=b] .tabnav a::before,[data-look=b] .tabs a::before{display:none}
+[data-look=b] .tabnav a.on,[data-look=b] .tabs a.on{background:var(--fg);color:var(--bg);font-weight:600}
+[data-look=b] .tabnav{padding-bottom:var(--space-2)}
+[data-look=b] .card,[data-look=b] section.file,[data-look=b] .log{background:var(--bg)}
+[data-look=b] .entries td{padding:3px var(--space-3);line-height:20px}
+[data-look=b] .entries .th td{background:transparent;color:var(--faint);font-weight:400;border-bottom:var(--border)}
+[data-look=b] .list li{padding:var(--space-2) var(--space-3)}
+[data-look=b] .entries tr:hover td,[data-look=b] .list li:hover{background:var(--accent-soft)}
+[data-look=b] .day::before{content:"--";width:auto;height:auto;border:0;color:var(--faint)}
+[data-look=b] .av{border-radius:0}
+[data-look=b] .entries .bar{height:2px;border-radius:0}
+[data-look=b] .legend i,[data-look=b] .heat-legend i{border-radius:0}
+[data-look=b] .facts li::before{content:"> ";color:var(--faint)}
+
+/* c: swiss. strong sizes, rules not boxes, wide margins */
+[data-look=c] .top{background:var(--bg);border-bottom:2px solid var(--fg)}
+[data-look=c] .reponame{font-size:20px;font-weight:700;letter-spacing:-.02em}
+[data-look=c] h1{font-size:var(--text-lg);font-weight:700;letter-spacing:-.025em;line-height:1.1}
+[data-look=c] .crumbs{font-size:22px;font-weight:700;letter-spacing:-.02em}
+[data-look=c] main.wrap{padding-top:var(--space-10)}
+[data-look=c] h2{font-size:13px;font-weight:700;margin:var(--space-12) 0 var(--space-3);padding-top:var(--space-2);border-top:2px solid var(--fg)}
+[data-look=c] aside h2{margin-top:0}
+[data-look=c] .tabnav a::before,[data-look=c] .tabs a::before{display:none}
+[data-look=c] .tabnav a.on,[data-look=c] .tabs a.on{border-bottom-color:var(--fg);font-weight:700}
+[data-look=c] .card,[data-look=c] section.file,[data-look=c] .log{border-width:1px 0;background:transparent}
+[data-look=c] .entries .th td,[data-look=c] .latest,[data-look=c] section.file>header,[data-look=c] .files summary,[data-look=c] .readme-h{background:transparent}
+[data-look=c] .latest{border-width:1px 0 0}
+[data-look=c] .entries td,[data-look=c] .list li{padding-left:0;padding-right:var(--space-3)}
+[data-look=c] .entries td.r{font-variant-numeric:tabular-nums}
+[data-look=c] .av{border-radius:0}
+[data-look=c] .branch,[data-look=c] .sha{background:transparent}
+[data-look=c] .day::before{display:none}
+[data-look=c] .day{color:var(--fg);font-weight:700}
+.brand{gap:var(--space-2)}
+.wordmark{font:var(--weight-semibold) var(--text-sm)/1 var(--mono);color:var(--muted);letter-spacing:-.01em}
+.sep{color:var(--faint)}
+[data-look=a] .wordmark{font:600 17px/1 var(--serif);color:var(--fg)}
+@media (max-width:600px){.wordmark,.sep{display:none}}
+/* iteration 2 */
+[data-look] .ico.dir{background:var(--muted);opacity:1}
+[data-look=a] .entries td{padding-top:6px;padding-bottom:6px}
+[data-look=a] .tabnav a.on,[data-look=a] .tabs a.on{border-bottom-width:1px;border-bottom-color:var(--fg)}
+[data-look=a] .reponame{font-size:20px}
+[data-look=a] .head h1{font-size:28px}
+[data-look=b] .top{border-bottom-style:dashed}
+[data-look=c] .tabnav a.on,[data-look=c] .tabs a.on{border-bottom-width:3px}

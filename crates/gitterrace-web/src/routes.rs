@@ -102,8 +102,50 @@ pub(crate) fn router(app: Arc<App>) -> Router {
             }),
         )
         .route("/static/vendor/mermaid-11.17.2.min.js", get(mermaid_js))
+        .route("/static/fonts/{name}", get(font))
         .route("/raw/{rev}/{*path}", get(raw))
         .with_state(app)
+}
+
+/// Candidate-look fonts, OFL, Latin subsets.
+const FONTS: [(&str, &[u8]); 5] = [
+    (
+        "fraunces-600.woff2",
+        include_bytes!("../static/fonts/fraunces-600.woff2"),
+    ),
+    (
+        "bricolage-400.woff2",
+        include_bytes!("../static/fonts/bricolage-400.woff2"),
+    ),
+    (
+        "bricolage-600.woff2",
+        include_bytes!("../static/fonts/bricolage-600.woff2"),
+    ),
+    (
+        "jbmono-400.woff2",
+        include_bytes!("../static/fonts/jbmono-400.woff2"),
+    ),
+    (
+        "jbmono-600.woff2",
+        include_bytes!("../static/fonts/jbmono-600.woff2"),
+    ),
+];
+
+async fn font(Path(name): Path<String>) -> Response {
+    let Some((_, body)) = FONTS.iter().find(|(n, _)| *n == name) else {
+        return axum::http::StatusCode::NOT_FOUND.into_response();
+    };
+    (
+        [
+            (header::CONTENT_TYPE, HeaderValue::from_static("font/woff2")),
+            (
+                header::CACHE_CONTROL,
+                HeaderValue::from_static("public, max-age=31536000, immutable"),
+            ),
+        ],
+        *body,
+    )
+        .into_response()
 }
 
 static MERMAID: &[u8] = include_bytes!("../static/vendor/mermaid.min.js");

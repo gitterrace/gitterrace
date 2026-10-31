@@ -5,7 +5,7 @@
 </picture>
 </h1>
 
-<p align="center"><b>Your repository's history, layer by layer: a GitHub-style view of any git repo, offline, one binary.</b></p>
+<p align="center"><b>gitterrace: your repository's history, step by step. A GitHub-style view of any git repo, offline, one binary. Run <code>git terrace</code>.</b></p>
 
 A GitHub/GitLab-style view of any git repository, offline. Run it inside a
 repository and open the printed address: browse code, commits, branches and
