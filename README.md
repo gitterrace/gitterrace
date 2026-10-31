@@ -1,4 +1,11 @@
-# gitterrace
+<h1 align="center">
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/brand/readme-header-dark.svg">
+  <img alt="gitterrace" src="assets/brand/readme-header-light.svg" width="600">
+</picture>
+</h1>
+
+<p align="center"><b>Your repository's history, layer by layer: a GitHub-style view of any git repo, offline, one binary.</b></p>
 
 A GitHub/GitLab-style view of any git repository, offline. Run it inside a
 repository and open the printed address: browse code, commits, branches and

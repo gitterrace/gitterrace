@@ -1,9 +1,7 @@
 /* Rendered markdown. Everything is scoped to .markdown-body and themed
    through the app variables. Syntax classes carry the s- prefix. */
-.markdown-body{--md-note:#0969da;--md-tip:#1a7f37;--md-important:#8250df;--md-warning:#9a6700;--md-caution:#d1242f;--md-k1:#cf222e;--md-k2:#8250df;--md-k3:#0550ae;--md-k4:#0a3069;--md-k5:#6e7781;--md-k6:#116329;--md-k7:#953800;
+.markdown-body{--md-note:var(--info);--md-tip:var(--add);--md-important:var(--done);--md-warning:var(--warn);--md-caution:var(--del);--md-k1:var(--syn-keyword);--md-k2:var(--syn-entity);--md-k3:var(--syn-constant);--md-k4:var(--syn-string);--md-k5:var(--syn-comment);--md-k6:var(--syn-tag);--md-k7:var(--syn-param);
   color:var(--fg);font-size:16px;line-height:1.5;overflow-wrap:break-word}
-@media (prefers-color-scheme:dark){:root:not([data-theme=light]) .markdown-body{--md-note:#4493f8;--md-tip:#3fb950;--md-important:#ab7df8;--md-warning:#d29922;--md-caution:#f85149;--md-k1:#ff7b72;--md-k2:#d2a8ff;--md-k3:#79c0ff;--md-k4:#a5d6ff;--md-k5:#8b949e;--md-k6:#7ee787;--md-k7:#ffa657}}
-:root[data-theme=dark] .markdown-body{--md-note:#4493f8;--md-tip:#3fb950;--md-important:#ab7df8;--md-warning:#d29922;--md-caution:#f85149;--md-k1:#ff7b72;--md-k2:#d2a8ff;--md-k3:#79c0ff;--md-k4:#a5d6ff;--md-k5:#8b949e;--md-k6:#7ee787;--md-k7:#ffa657}
 .markdown-body>:first-child{margin-top:0!important}
 .markdown-body>:last-child{margin-bottom:0!important}
 .markdown-body a{color:var(--accent);text-decoration:none}

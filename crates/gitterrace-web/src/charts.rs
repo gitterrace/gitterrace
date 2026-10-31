@@ -1,4 +1,5 @@
-//! Server-rendered SVG charts. Colors come from CSS classes so themes apply.
+//! Server-rendered SVG charts. Colors come from CSS classes mapped to the
+//! tokens in `static/tokens.css`, so a theme switch needs no re-render.
 
 use crate::fmt::{self, esc};
 
@@ -8,7 +9,8 @@ const LEFT: f64 = 44.0;
 const TOP_PAD: f64 = 10.0;
 const BOTTOM: f64 = 26.0;
 const LABEL_PX: f64 = 52.0;
-const SERIES: usize = 6;
+/// Named series before folding into "other"; matches `--cat-1..7`.
+const SERIES: usize = 7;
 const DAYS: [&str; 7] = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 /// Horizontal geometry shared by both bar charts: slot width for `n` columns.
@@ -77,6 +79,15 @@ fn x_labels(keys: &[&str]) -> String {
         );
     }
     svg
+}
+
+/// Categorical class for series `k` of `named`; anything past the named ones is "other".
+fn cat(k: usize, named: usize) -> String {
+    if k >= named {
+        "c8".to_owned()
+    } else {
+        format!("c{}", k + 1)
+    }
 }
 
 fn open_svg(label: &str) -> String {
@@ -180,7 +191,8 @@ pub(crate) fn stacked(buckets: &[gitterrace_index::LabelBucket]) -> String {
             fmt::push(
                 &mut svg,
                 &format!(
-                    r#"<rect class="s{k}" x="{x:.1}" y="{y:.1}" width="{bw:.1}" height="{h:.1}"/>"#
+                    r#"<rect class="{}" x="{x:.1}" y="{y:.1}" width="{bw:.1}" height="{h:.1}"/>"#,
+                    cat(k, names.len())
                 ),
             );
         }
@@ -192,14 +204,15 @@ pub(crate) fn stacked(buckets: &[gitterrace_index::LabelBucket]) -> String {
     for (k, n) in names.iter().enumerate() {
         fmt::push(
             &mut svg,
-            &format!(r#"<span><i class="s{k}"></i>{}</span>"#, esc(n)),
+            &format!(
+                r#"<span><i class="{}"></i>{}</span>"#,
+                cat(k, names.len()),
+                esc(n)
+            ),
         );
     }
     if has_other {
-        fmt::push(
-            &mut svg,
-            &format!(r#"<span><i class="s{}"></i>other</span>"#, names.len()),
-        );
+        fmt::push(&mut svg, r#"<span><i class="c8"></i>other</span>"#);
     }
     svg.push_str("</div>");
     svg
@@ -207,9 +220,10 @@ pub(crate) fn stacked(buckets: &[gitterrace_index::LabelBucket]) -> String {
 
 /// Weekday by hour grid. Cell intensity is bucketed into five levels.
 pub(crate) fn heatmap(cells: &[[u32; 24]; 7], max: u32) -> String {
-    const CELL: usize = 24;
-    const LEFT: usize = 36;
-    const TOP: usize = 16;
+    // Sized near the bar charts' width so labels render at the same pixel size.
+    const CELL: usize = 38;
+    const LEFT: usize = 40;
+    const TOP: usize = 20;
     let w = LEFT + 24 * CELL;
     let h = TOP + 7 * CELL;
     let mut svg = format!(
@@ -219,7 +233,7 @@ pub(crate) fn heatmap(cells: &[[u32; 24]; 7], max: u32) -> String {
         fmt::push(
             &mut svg,
             &format!(
-                r#"<text class="ax" x="{}" y="11">{hour:02}</text>"#,
+                r#"<text class="ax" x="{}" y="12">{hour:02}</text>"#,
                 LEFT + hour * CELL
             ),
         );
@@ -230,7 +244,7 @@ pub(crate) fn heatmap(cells: &[[u32; 24]; 7], max: u32) -> String {
             &mut svg,
             &format!(
                 r#"<text class="ax" x="0" y="{}">{}</text>"#,
-                y + 16,
+                y + 22,
                 DAYS[d]
             ),
         );
@@ -243,16 +257,18 @@ pub(crate) fn heatmap(cells: &[[u32; 24]; 7], max: u32) -> String {
             fmt::push(
                 &mut svg,
                 &format!(
-                    r#"<rect class="h{level}" x="{}" y="{y}" width="{}" height="{}" rx="3"><title>{} {hr:02}:00, {v} commits</title></rect>"#,
+                    r#"<rect class="h{level}" x="{}" y="{y}" width="{}" height="{}" rx="4"><title>{} {hr:02}:00, {v} commits</title></rect>"#,
                     LEFT + hr * CELL,
-                    CELL - 2,
-                    CELL - 2,
+                    CELL - 4,
+                    CELL - 4,
                     DAYS[d]
                 ),
             );
         }
     }
-    svg.push_str("</svg>");
+    svg.push_str(
+        r#"</svg><div class="heat-legend">Less<i></i><i></i><i></i><i></i><i></i>More</div>"#,
+    );
     svg
 }
 
