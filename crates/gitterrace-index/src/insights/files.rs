@@ -325,14 +325,7 @@ impl Insights<'_> {
                 .map(|o| o.1)
                 .sum::<f64>()
                 .max(f64::MIN_POSITIVE);
-            let (mut acc, mut bus) = (0.0, 0);
-            for (_, w) in &owners {
-                acc += w;
-                bus += 1;
-                if acc >= total / 2.0 {
-                    break;
-                }
-            }
+            let bus = crate::aggregates::bus_factor(owners.iter().map(|o| o.1));
             DirOwnership {
                 path,
                 lines: a.lines,

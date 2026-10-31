@@ -9,7 +9,9 @@ git objects --> gitterrace-git --(on demand)--> gitterrace-web --> browser
 
 ## Index format (v1)
 
-- `.git/gitterrace/VERSION` holds `1`. A mismatch deletes and rebuilds.
+- `.git/gitterrace/VERSION` holds the cache format version (`FORMAT_VERSION` in
+  `crates/gitterrace-index/src/store.rs`). A mismatch deletes and rebuilds, so a
+  format change only costs one rebuild.
 - `.git/gitterrace/commits.jsonl`: one `CommitRecord` per line, keyed by id.
 - `update` walks `rev_list`, skips ids already present, appends the rest.
   Records whose commits are no longer reachable are ignored by `records`, so

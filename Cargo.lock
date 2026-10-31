@@ -2860,7 +2860,6 @@ dependencies = [
  "tempfile",
  "tokio",
  "tower",
- "tracing",
  "tracing-subscriber",
 ]
 
@@ -2925,6 +2924,7 @@ dependencies = [
  "regex",
  "serde",
  "serde_json",
+ "serde_urlencoded",
  "gitterrace-api",
  "gitterrace-cards",
  "gitterrace-git",

@@ -28,7 +28,6 @@ clap.workspace = true
 tokio.workspace = true
 anyhow.workspace = true
 serde_json.workspace = true
-tracing.workspace = true
 tracing-subscriber.workspace = true
 
 # `git terrace` works because git runs any `git-<name>` on PATH. `gitterrace` is

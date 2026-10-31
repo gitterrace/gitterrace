@@ -29,7 +29,9 @@ jobs:
         os: [ubuntu-latest, macos-latest]
     steps:
       - uses: actions/checkout@v7
-      - uses: dtolnay/rust-toolchain@stable
+      # Same toolchain as local (rust-toolchain.toml): a floating `stable`
+      # turns every new clippy lint into a red build nobody caused.
+      - uses: dtolnay/rust-toolchain@1.98.0
         id: toolchain
         with:
           components: clippy, rustfmt

@@ -147,17 +147,7 @@ pub fn repo_summary(repo: &str, records: &[CommitRecord]) -> RepoSummary {
             dels += u64::from(f.deletions);
         }
     }
-    let mut counts: Vec<usize> = by_author.values().copied().collect();
-    counts.sort_unstable_by(|a, b| b.cmp(a));
-    let mut acc = 0;
-    let mut bus = 0;
-    for c in &counts {
-        acc += c;
-        bus += 1;
-        if acc * 2 > records.len() {
-            break;
-        }
-    }
+    let bus = gitterrace_index::bus_factor(by_author.values().map(|&c| c as f64));
     let mut weekly = vec![0u32; 26];
     if let Some(l) = last {
         let newest = (l / DAY) / 7;

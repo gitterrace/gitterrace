@@ -186,16 +186,7 @@ impl ApiState {
         let rev = Self::rev(rev);
         let mut authors = gitterrace_index::authors(&self.records(rev)?);
         authors.sort_by_key(|a| std::cmp::Reverse(a.commits));
-        let total: usize = authors.iter().map(|a| a.commits).sum();
-        let mut acc = 0;
-        let mut bus_factor = 0;
-        for a in &authors {
-            if acc * 2 >= total {
-                break;
-            }
-            acc += a.commits;
-            bus_factor += 1;
-        }
+        let bus_factor = gitterrace_index::bus_factor(authors.iter().map(|a| a.commits as f64));
         Ok(json!({ "rev": rev, "bus_factor": bus_factor, "authors": authors }))
     }
 }

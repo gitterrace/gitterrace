@@ -146,6 +146,23 @@ pub fn heatmap(records: &[CommitRecord]) -> Heatmap {
     Heatmap { cells, max }
 }
 
+/// Bus factor: the fewest contributors whose shares, largest first, hold at
+/// least half of the total. Shares in any order; zero when there are none.
+/// The one definition every surface (insights, API, MCP, cards) uses.
+pub fn bus_factor(shares: impl IntoIterator<Item = f64>) -> usize {
+    let mut v: Vec<f64> = shares.into_iter().filter(|s| *s > 0.0).collect();
+    v.sort_by(|a, b| b.total_cmp(a));
+    let total: f64 = v.iter().sum();
+    let mut acc = 0.0;
+    for (i, s) in v.iter().enumerate() {
+        acc += s;
+        if acc * 2.0 >= total {
+            return i + 1;
+        }
+    }
+    0
+}
+
 /// Authors keyed by email, most commits first, then name.
 pub fn authors(records: &[CommitRecord]) -> Vec<AuthorStats> {
     struct Acc {
@@ -377,10 +394,21 @@ pub(crate) fn civil(days: i64) -> (i64, i64, i64) {
 #[cfg(test)]
 mod tests {
     use crate::aggregates::{
-        Granularity, Label, activity, authors, dir_churn, file_churn, heatmap, hotspots,
-        label_breakdown, label_over_time, totals,
+        Granularity, Label, activity, authors, bus_factor, dir_churn, file_churn, heatmap,
+        hotspots, label_breakdown, label_over_time, totals,
     };
     use crate::{CommitRecord, FileStat};
+
+    #[test]
+    fn bus_factor_counts_who_hold_at_least_half() {
+        // The 50/50 split is the case the surfaces used to disagree on.
+        assert_eq!(bus_factor([5.0, 5.0]), 1);
+        assert_eq!(bus_factor([6.0, 3.0, 1.0]), 1);
+        assert_eq!(bus_factor([3.0, 3.0, 3.0, 1.0]), 2);
+        assert_eq!(bus_factor([1.0, 4.0]), 1);
+        assert_eq!(bus_factor([0.0, 0.0]), 0);
+        assert_eq!(bus_factor(std::iter::empty()), 0);
+    }
 
     // 2024-01-01 is a Monday.
     const MON: i64 = 1_704_067_200;
