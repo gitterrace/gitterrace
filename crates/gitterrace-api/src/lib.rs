@@ -134,6 +134,28 @@ mod tests {
     }
 
     #[test]
+    fn one_huge_line_is_capped_by_bytes() {
+        let (d, _) = fixture();
+        let p = d.path();
+        std::fs::write(p.join("min.js"), "é".repeat(400 * 1024)).expect("write");
+        git(p, &["add", "."]);
+        git(p, &["commit", "-q", "-m", "chore: minified"]);
+        let s = ApiState::open(p).expect("open");
+        let v = s.blob(None, "min.js", None, None).expect("blob");
+        assert!(v["text"].as_str().expect("text").len() <= 256 * 1024);
+        assert_eq!(v["truncated"], true);
+    }
+
+    #[test]
+    fn etag_moves_with_any_ref_not_only_head() {
+        let (d, s) = fixture();
+        git(d.path(), &["branch", "side", "HEAD~1"]);
+        let before = s.etag().expect("tag");
+        git(d.path(), &["branch", "-f", "side", "HEAD"]);
+        assert_ne!(before, s.etag().expect("tag"), "side branch moved, HEAD did not");
+    }
+
+    #[test]
     fn mcp_lists_read_only_tools() {
         let names = McpServer::tool_names();
         for want in [

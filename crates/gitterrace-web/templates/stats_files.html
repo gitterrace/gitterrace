@@ -2,6 +2,7 @@
 {% block title %}File stats · {{ c.name }}{% endblock %}
 {% block content %}
 {% include "tabs.html" %}
+{% include "filterbar.html" %}
 {% for g in groups %}
 <h2>{{ g.title }}</h2>
 <div class="card"><table class="entries">

@@ -8,7 +8,7 @@ const H: f64 = 220.0;
 const LEFT: f64 = 44.0;
 const TOP_PAD: f64 = 10.0;
 const BOTTOM: f64 = 26.0;
-const LABEL_PX: f64 = 52.0;
+const LABEL_PX: f64 = 84.0;
 /// Named series before folding into "other"; matches `--cat-1..7`.
 const SERIES: usize = 7;
 const DAYS: [&str; 7] = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];

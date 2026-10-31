@@ -16,6 +16,8 @@ pub(crate) struct Nav {
 }
 
 pub(crate) struct Chrome {
+    /// Prefix for absolute links; empty for a single repository.
+    pub(crate) base: String,
     pub(crate) name: String,
     pub(crate) branch: String,
     /// Page contains rendered markdown, so the markdown script is loaded.
@@ -42,6 +44,8 @@ pub(crate) struct CommitRow {
     pub(crate) href: String,
     pub(crate) subject: String,
     pub(crate) author: String,
+    /// Commit list narrowed to this author, matched by (mailmapped) email.
+    pub(crate) author_href: String,
     pub(crate) when: String,
     pub(crate) date: String,
 }
@@ -104,6 +108,7 @@ pub(crate) fn chrome_at(app: &crate::app::App, active: &str, rev: &str) -> Chrom
         ("/stats", "Insights", "stats"),
     ];
     Chrome {
+        base: String::new(),
         name: app.name.clone(),
         branch: app.repo.head_branch().unwrap_or_else(|| "HEAD".to_owned()),
         md: false,
@@ -138,24 +143,34 @@ pub(crate) fn stats_tabs(active: &str) -> Vec<Nav> {
     .collect()
 }
 
+/// First letter of a name for the avatar disc.
+pub(crate) fn initial(name: &str) -> String {
+    name.chars()
+        .next()
+        .map_or_else(|| "?".to_owned(), |ch| ch.to_uppercase().collect())
+}
+
+/// Stable avatar hue per name.
+pub(crate) fn hue(name: &str) -> u32 {
+    name.bytes()
+        .fold(7u32, |h, b| h.wrapping_mul(31).wrapping_add(u32::from(b)))
+        % 360
+}
+
+/// Link to the commit list of one author.
+pub(crate) fn author_href(email: &str) -> String {
+    crate::fmt::href(&format!("/log/HEAD?author={}", enc(email, false)))
+}
+
 pub(crate) fn commit_row(c: &CommitSummary, now: i64) -> CommitRow {
     CommitRow {
         short: short(&c.id),
-        initial: c
-            .author
-            .name
-            .chars()
-            .next()
-            .map_or_else(|| "?".to_owned(), |ch| ch.to_uppercase().collect()),
-        hue: c
-            .author
-            .name
-            .bytes()
-            .fold(7u32, |h, b| h.wrapping_mul(31).wrapping_add(u32::from(b)))
-            % 360,
+        initial: initial(&c.author.name),
+        hue: hue(&c.author.name),
         href: format!("/commit/{}", c.id),
         subject: c.subject.clone(),
         author: c.author.name.clone(),
+        author_href: author_href(&c.author.email),
         when: ago(c.author.time, now),
         date: date(c.author.time, c.author.offset),
     }

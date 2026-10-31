@@ -12,12 +12,13 @@ use axum::{
 };
 use serde::Deserialize;
 use gitterrace_git::RefKind;
-use gitterrace_index::{Granularity, Label};
+use gitterrace_index::Granularity;
 
 use crate::{
     app::{App, blocking},
     charts,
     error::Result,
+    filter::{Dim, Filter, FilterBar},
     fmt, markdown, views,
     views::{Chrome, CommitRow, Crumb, Entry, FileStatRow, Nav, RefRow, Row},
 };
@@ -50,7 +51,7 @@ pub(crate) fn router(app: Arc<App>) -> Router {
         .route("/api/last/{rev}/{*path}", get(api_last))
         .route("/stats", get(stats))
         .route("/stats/files", get(stats_files))
-        .route("/stats/types", get(stats_types))
+        .route("/stats/types", get(crate::types::page))
         .route("/stats/languages", get(crate::languages::page))
         .route(
             "/static/loc.js",
@@ -295,6 +296,7 @@ async fn overview(State(app): Shared) -> Result<Html<String>> {
 struct LogQuery {
     path: Option<String>,
     page: Option<usize>,
+    author: Option<String>,
 }
 
 pub(crate) struct DayGroup {
@@ -313,6 +315,40 @@ struct LogPage {
     empty: bool,
     newer: Option<String>,
     older: Option<String>,
+    /// Removable chip for the active author filter: (name, href without it).
+    author_chip: Option<(String, String)>,
+}
+
+/// One page of commits by `who` (email or name): walks the log in chunks, since the walk
+/// cannot filter by author itself.
+fn author_page(
+    a: &App,
+    id: &str,
+    path: Option<&str>,
+    who: &str,
+    pg: usize,
+) -> Result<(Vec<gitterrace_git::CommitSummary>, bool)> {
+    const CHUNK: usize = 500;
+    let want = pg.saturating_mul(PAGE) + PAGE + 1;
+    let mut hits = Vec::new();
+    let mut skip = 0;
+    loop {
+        let chunk = a.repo.log(id, path, skip, CHUNK)?;
+        let n = chunk.len();
+        hits.extend(
+            chunk
+                .into_iter()
+                .filter(|c| c.author.email.eq_ignore_ascii_case(who) || c.author.name == who),
+        );
+        if hits.len() >= want || n < CHUNK {
+            break;
+        }
+        skip += CHUNK;
+    }
+    let mut page: Vec<_> = hits.into_iter().skip(pg.saturating_mul(PAGE)).collect();
+    let more = page.len() > PAGE;
+    page.truncate(PAGE);
+    Ok((page, more))
 }
 
 async fn log(
@@ -322,13 +358,31 @@ async fn log(
 ) -> Result<Html<String>> {
     let path = q.path.unwrap_or_default().trim_matches('/').to_owned();
     let pg = q.page.unwrap_or(0);
+    let author = q.author;
     let p = blocking(&app, move |a| {
         let id = a.repo.resolve(&rev)?;
         let filter = (!path.is_empty()).then_some(path.as_str());
         // One extra row tells us whether an older page exists.
-        let mut list = a.repo.log(&id, filter, pg.saturating_mul(PAGE), PAGE + 1)?;
-        let more = list.len() > PAGE;
-        list.truncate(PAGE);
+        let who = author.as_deref().filter(|s| !s.is_empty());
+        let (mut list, more) = if let Some(w) = who {
+            author_page(a, &id, filter, w, pg)?
+        } else {
+            let mut list = a.repo.log(&id, filter, pg.saturating_mul(PAGE), PAGE + 1)?;
+            let more = list.len() > PAGE;
+            list.truncate(PAGE);
+            (list, more)
+        };
+        let author_chip = who.map(|w| {
+            let name = list
+                .first()
+                .map_or_else(|| w.to_owned(), |c| c.author.name.clone());
+            let mut back = fmt::href(&format!("/log/{}", fmt::enc(&rev, false)));
+            if !path.is_empty() {
+                fmt::push(&mut back, &format!("?path={}", fmt::enc(&path, true)));
+            }
+            (name, back)
+        });
+        list.shrink_to_fit();
         let now = fmt::now();
         let rev_enc = fmt::enc(&rev, false);
         let link = |n: usize| {
@@ -336,12 +390,16 @@ async fn log(
             if !path.is_empty() {
                 crate::fmt::push(&mut q, &format!("&path={}", fmt::enc(&path, true)));
             }
+            if let Some(w) = who {
+                crate::fmt::push(&mut q, &format!("&author={}", fmt::enc(w, false)));
+            }
             q
         };
         Ok(LogPage {
             c: views::chrome_at(a, "log", &rev),
             newer: (pg > 0).then(|| link(pg - 1)),
             older: more.then(|| link(pg + 1)),
+            author_chip,
             empty: list.is_empty(),
             days: views::day_groups(&list, now),
             rev,
@@ -366,6 +424,7 @@ struct CommitPage {
     subject: String,
     body: String,
     author: String,
+    author_href: String,
     date: String,
     parents: Vec<Parent>,
     files: Vec<FileStatRow>,
@@ -386,6 +445,7 @@ async fn commit(State(app): Shared, Path(id): Path<String>) -> Result<Html<Strin
             subject: d.summary.subject.clone(),
             body: d.body.trim().to_owned(),
             author: d.summary.author.name.clone(),
+            author_href: views::author_href(&d.summary.author.email),
             date: fmt::date(d.summary.author.time, d.summary.author.offset),
             parents: d
                 .summary
@@ -602,6 +662,7 @@ struct PendingPage {
 
 struct AuthorRow {
     label: String,
+    href: String,
     commits: String,
     additions: String,
     deletions: String,
@@ -615,6 +676,7 @@ struct AuthorRow {
 struct StatsPage {
     c: Chrome,
     tabs: Vec<Nav>,
+    fb: FilterBar,
     activity: String,
     heatmap: String,
     authors: Vec<AuthorRow>,
@@ -642,8 +704,10 @@ pub(crate) async fn with_records<T: Template + Send + 'static>(
     Ok(Html(html))
 }
 
-async fn stats(State(app): Shared) -> Result<Html<String>> {
-    with_records(&app, "a", |_, r, c| {
+async fn stats(State(app): Shared, Query(f): Query<Filter>) -> Result<Html<String>> {
+    with_records(&app, "a", move |_, all, c| {
+        let fb = f.bar("/stats", all);
+        let r = &*f.apply(all);
         let points = gitterrace_index::activity(r, Granularity::Month)
             .into_iter()
             .map(|b| (b.key, b.commits as u64))
@@ -654,6 +718,7 @@ async fn stats(State(app): Shared) -> Result<Html<String>> {
         StatsPage {
             c,
             tabs: views::stats_tabs("a"),
+            fb,
             activity: charts::bars(&points),
             heatmap: charts::heatmap(&h.cells, h.max),
             authors: authors
@@ -661,6 +726,7 @@ async fn stats(State(app): Shared) -> Result<Html<String>> {
                 .take(TABLE_LIMIT)
                 .map(|a| AuthorRow {
                     pct: charts::pct(a.commits as u64, max),
+                    href: f.link("/stats", Dim::Author, &a.email),
                     label: a.name,
                     commits: fmt::thousands(a.commits),
                     additions: fmt::thousands(a.additions),
@@ -679,6 +745,7 @@ async fn stats(State(app): Shared) -> Result<Html<String>> {
 struct StatsFilesPage {
     c: Chrome,
     tabs: Vec<Nav>,
+    fb: FilterBar,
     groups: Vec<RowGroup>,
 }
 
@@ -698,8 +765,10 @@ fn file_row(f: gitterrace_index::FileChurn, max: u64) -> Row {
     }
 }
 
-async fn stats_files(State(app): Shared) -> Result<Html<String>> {
-    with_records(&app, "f", |_, r, c| {
+async fn stats_files(State(app): Shared, Query(f): Query<Filter>) -> Result<Html<String>> {
+    with_records(&app, "f", move |_, all, c| {
+        let fb = f.bar("/stats/files", all);
+        let r = &*f.apply(all);
         let rows = |v: Vec<gitterrace_index::FileChurn>| {
             let max = v.first().map_or(0, |f| f.commits as u64);
             v.into_iter()
@@ -713,6 +782,7 @@ async fn stats_files(State(app): Shared) -> Result<Html<String>> {
         StatsFilesPage {
             c,
             tabs: views::stats_tabs("f"),
+            fb,
             groups: vec![
                 RowGroup {
                     title: "Hotspots, last 90 days",
@@ -742,75 +812,6 @@ async fn stats_files(State(app): Shared) -> Result<Html<String>> {
                         .collect(),
                 },
             ],
-        }
-    })
-    .await
-}
-
-#[derive(Template)]
-#[template(path = "stats_types.html")]
-struct StatsTypesPage {
-    c: Chrome,
-    tabs: Vec<Nav>,
-    kinds: Vec<Row>,
-    scopes: Vec<Row>,
-    over_time: String,
-}
-
-fn label_rows(v: Vec<gitterrace_index::LabelCount>) -> Vec<Row> {
-    let max = v.first().map_or(0, |l| l.commits as u64);
-    v.into_iter()
-        .take(TABLE_LIMIT)
-        .map(|l| Row {
-            pct: charts::pct(l.commits as u64, max),
-            label: l.label,
-            href: String::new(),
-            commits: fmt::thousands(l.commits),
-            additions: String::new(),
-            deletions: String::new(),
-        })
-        .collect()
-}
-
-/// Types under 1% of typed commits fold into one `other` row. `merge` is shown as `merges`.
-fn kind_rows(v: Vec<gitterrace_index::LabelCount>) -> Vec<Row> {
-    let total: usize = v.iter().map(|l| l.commits).sum();
-    let mut keep = Vec::new();
-    let mut other = 0;
-    for mut l in v {
-        if l.commits * 100 < total {
-            other += l.commits;
-            continue;
-        }
-        if l.label == "merge" {
-            "merges".clone_into(&mut l.label);
-        }
-        keep.push(l);
-    }
-    if other > 0 {
-        keep.push(gitterrace_index::LabelCount {
-            label: "other".to_owned(),
-            commits: other,
-        });
-    }
-    keep.sort_by(|a, b| {
-        b.commits
-            .cmp(&a.commits)
-            .then_with(|| a.label.cmp(&b.label))
-    });
-    label_rows(keep)
-}
-
-async fn stats_types(State(app): Shared) -> Result<Html<String>> {
-    with_records(&app, "t", |_, r, c| {
-        let buckets = gitterrace_index::label_over_time(r, Label::Kind, Granularity::Month);
-        let over_time = charts::stacked(&buckets);
-        StatsTypesPage {
-            c,
-            tabs: views::stats_tabs("t"),
-            kinds: kind_rows(gitterrace_index::label_breakdown(r, Label::Kind)),
-            scopes: label_rows(gitterrace_index::label_breakdown(r, Label::Scope)),
-            over_time,
         }
     })
     .await

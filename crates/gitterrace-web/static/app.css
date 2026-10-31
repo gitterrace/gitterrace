@@ -330,3 +330,26 @@ svg.spark.s1{stroke:var(--cat-1)}svg.spark.s2{stroke:var(--cat-2)}svg.spark.s3{s
 /* last-commit column: the message fills the cell, the age has its own column */
 .latest .subj{white-space:nowrap}
 @media (max-width:600px){table.entries[data-last] td:first-child{width:45%}table.entries[data-last] td.r,table.entries[data-last] td.ago{display:none}}
+
+/* insights filter: chips, matrix, author links */
+.fbar{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:var(--space-3) var(--space-6);margin:var(--space-4) 0}
+.chips{display:flex;flex-wrap:wrap;align-items:center;gap:var(--space-2);margin:var(--space-2) 0;min-height:28px}
+.chip{display:inline-flex;align-items:center;gap:6px;background:var(--accent-soft);border:var(--border);border-radius:var(--radius-full);padding:3px 4px 3px 12px;font-size:var(--text-sm);color:var(--fg)}
+.chip i{font-style:normal;color:var(--muted)}
+.chip a{display:inline-grid;place-items:center;width:20px;height:20px;border-radius:50%;color:var(--muted)}
+.chip a:hover{background:var(--hover);color:var(--fg);text-decoration:none}
+.chips .clear{font-size:var(--text-sm);color:var(--muted)}
+a.who{color:inherit}a.who:hover b{color:var(--accent-fg);text-decoration:underline}
+.matrix{overflow-x:auto}
+.matrix table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums}
+.matrix th{font-weight:var(--weight-medium);font-size:var(--text-sm);padding:var(--space-2) var(--space-3);text-align:left;white-space:nowrap;color:var(--muted)}
+.matrix thead th,.matrix tr:first-child th{text-align:center}
+.matrix tr>th:first-child{text-align:right;color:var(--fg)}
+.matrix td{text-align:center;padding:0;border:2px solid var(--surface);min-width:44px}
+.matrix td a{display:block;padding:var(--space-2) var(--space-2);color:var(--fg)}
+.matrix td a:hover{text-decoration:none;outline:2px solid var(--fg);outline-offset:-2px}
+.matrix .m1{background:var(--seq-1)}.matrix .m2{background:var(--seq-2)}.matrix .m3{background:var(--seq-3)}.matrix .m4{background:var(--seq-4)}
+.matrix .m3 a,.matrix .m4 a{color:var(--on-accent)}
+.chart-head+.card,.chart-head+.card.pad{margin-top:0}
+main.wrap>.chart-head{margin-top:var(--space-8)}
+.kpis+.chart-head{margin-top:var(--space-6)}

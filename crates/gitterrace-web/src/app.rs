@@ -20,6 +20,9 @@ const DIRTY_TTL: Duration = Duration::from_secs(2);
 /// Cap on cached directory listings and file lists; both are cheap to rebuild.
 const CACHE_ENTRIES: usize = 256;
 
+/// Commit subjects by full id.
+pub(crate) type Subjects = HashMap<String, String>;
+
 pub(crate) struct App {
     pub(crate) repo: Repo,
     pub(crate) index: Index,
@@ -31,6 +34,7 @@ pub(crate) struct App {
     file_lists: Mutex<HashMap<String, Arc<Vec<String>>>>,
     last_commits: Mutex<HashMap<String, Arc<Vec<LastCommit>>>>,
     chain: Mutex<Option<(String, Arc<crate::languages::Chain>)>>,
+    subjects: Mutex<Option<(String, Arc<Subjects>)>>,
 }
 
 impl App {
@@ -47,6 +51,7 @@ impl App {
             file_lists: Mutex::new(HashMap::new()),
             last_commits: Mutex::new(HashMap::new()),
             chain: Mutex::new(None),
+            subjects: Mutex::new(None),
         }
     }
 
@@ -123,18 +128,34 @@ impl App {
         }
         let ignore = gitterrace_git::IgnoreSet::at(&self.repo, head).ok();
         let ins = gitterrace_index::Insights::new(records, gitterrace_index::Options::default(), ignore);
-        let mut subjects: HashMap<String, String> = HashMap::new();
-        if let Err(e) = gitterrace_git::scan_commits(&self.repo, head, |s, _| {
-            subjects.insert(s.id.clone(), s.subject.clone());
-            true
-        }) {
-            tracing::warn!("subjects unavailable: {e}");
-        }
+        let subjects = self.subjects(head);
         let c = Arc::new(crate::languages::Chain::build(records, &ins, &subjects));
         if let Ok(mut g) = self.chain.lock() {
             *g = Some((head.to_owned(), Arc::clone(&c)));
         }
         c
+    }
+
+    /// Commit subjects by id for everything reachable from `head`, scanned once per head.
+    pub(crate) fn subjects(&self, head: &str) -> Arc<HashMap<String, String>> {
+        if let Ok(g) = self.subjects.lock()
+            && let Some((id, m)) = g.as_ref()
+            && id == head
+        {
+            return Arc::clone(m);
+        }
+        let mut map: HashMap<String, String> = HashMap::new();
+        if let Err(e) = gitterrace_git::scan_commits(&self.repo, head, |s, _| {
+            map.insert(s.id.clone(), s.subject.clone());
+            true
+        }) {
+            tracing::warn!("subjects unavailable: {e}");
+        }
+        let m = Arc::new(map);
+        if let Ok(mut g) = self.subjects.lock() {
+            *g = Some((head.to_owned(), Arc::clone(&m)));
+        }
+        m
     }
 
     fn set_progress(&self, p: Progress) {

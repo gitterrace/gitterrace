@@ -86,6 +86,11 @@ pub(crate) fn enc(s: &str, keep_slash: bool) -> String {
     out
 }
 
+/// The one place absolute in-app URLs are built, so a multi-repo prefix is a one-line change.
+pub(crate) fn href(path: &str) -> String {
+    path.to_owned()
+}
+
 /// Appends an owned string; keeps `format!` call sites free of `push_str(&format!(..))`.
 pub(crate) fn push(out: &mut String, piece: &str) {
     out.push_str(piece);

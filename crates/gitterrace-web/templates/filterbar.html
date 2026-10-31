@@ -1,0 +1,4 @@
+<div class="fbar">
+<div class="chips">{% for ch in fb.chips %}<span class="chip"><i>{{ ch.dim }}</i> {{ ch.label }} <a href="{{ ch.href }}" aria-label="Remove {{ ch.dim }} filter">×</a></span>{% endfor %}{% if !fb.chips.is_empty() %}<a class="clear" href="{{ fb.clear }}">Clear all</a>{% endif %}</div>
+<div class="seg"><span>Period</span>{% for p in fb.periods %}<a href="{{ p.href }}"{% if p.on %} class="on"{% endif %}>{{ p.label }}</a>{% endfor %}</div>
+</div>

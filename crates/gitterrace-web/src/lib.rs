@@ -4,12 +4,14 @@ mod app;
 mod cards;
 mod charts;
 mod error;
+mod filter;
 mod fmt;
 mod languages;
 mod markdown;
 pub mod palette;
 mod routes;
 mod search;
+mod types;
 mod views;
 
 use std::{
@@ -174,6 +176,11 @@ mod tests {
         assert!(js.contains("\"ready\":false"));
         assert_eq!(get(&app, "/static/app.css").await.0, 200);
 
+        let (s, body) = get(&app, "/log/HEAD?author=nobody%40example.com").await;
+        assert_eq!((s, body.contains("author: ")), (200, true));
+        let (_, body) = get(&app, "/log/HEAD?author=t%40e.x").await;
+        assert!(body.contains("fix: second") && body.contains("first"));
+
         let (s, body) = get(&app, "/search?q=fn+main").await;
         assert_eq!((s, body.contains("<mark>fn main</mark>")), (200, true));
         let (_, body) = get(&app, "/search?q=%28&regex=1").await;
@@ -213,7 +220,12 @@ mod tests {
         for u in [
             "/stats",
             "/stats/files",
+            "/stats/files?type=fix&period=1y",
+            "/stats?author=t%40e.x&path=src",
             "/stats/types",
+            "/stats/types?type=fix",
+            "/stats/types?type=fix&scope=none&period=3m",
+            "/stats/types?type=other&path=src&author=x",
             "/stats/languages",
             "/stats/languages?x=time&scale=share&from=0&to=1",
             "/",
@@ -222,6 +234,11 @@ mod tests {
             assert_eq!(s, 200, "{u}");
             assert!(!body.contains("data-progress"), "{u}");
         }
+        let (_, body) = get(&app, "/stats/types?type=fix").await;
+        assert!(body.contains("class=\"chip\"") && body.contains("fix: second"));
+        assert!(!body.contains("feat: first"));
+        let (_, body) = get(&app, "/stats/types").await;
+        assert!(body.contains("/stats/types?type=feat"));
     }
 
     #[tokio::test]

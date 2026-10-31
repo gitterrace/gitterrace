@@ -31,3 +31,4 @@ regex = "1"
 tower.workspace = true
 tempfile.workspace = true
 http-body-util = "0.1"
+serde_urlencoded = "0.7"

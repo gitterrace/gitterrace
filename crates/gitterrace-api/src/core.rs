@@ -14,6 +14,9 @@ use crate::{insights, json};
 const DEFAULT_REV: &str = "HEAD";
 const MAX_PAGE: usize = 500;
 const MAX_BLOB_LINES: usize = 5000;
+/// Lines alone do not bound an answer: one minified line can be megabytes.
+const MAX_BLOB_BYTES: usize = 256 * 1024;
+const MAX_BLAME_LINES: usize = 5000;
 
 /// Shared handle on one repository and its stats cache.
 #[derive(Clone)]
@@ -41,12 +44,25 @@ impl ApiState {
         Ok(())
     }
 
-    /// Entity tag for the current answer: head commit id plus cache format version.
+    /// Entity tag for every answer: HEAD, every ref's target and the cache format
+    /// version. Requests may name any `rev`, so moving any branch or tag must
+    /// invalidate, not only a new HEAD commit.
     pub fn etag(&self) -> Option<String> {
+        use std::hash::{Hash, Hasher};
         let head = self.repo.resolve(DEFAULT_REV).ok()?;
+        let mut refs: Vec<(String, String)> = self
+            .repo
+            .refs()
+            .ok()?
+            .into_iter()
+            .map(|r| (r.name, r.target))
+            .collect();
+        refs.sort();
+        let mut h = std::collections::hash_map::DefaultHasher::new();
+        refs.hash(&mut h);
         let version = std::fs::read_to_string(self.index.dir().join("VERSION"))
             .map_or_else(|_| "0".to_owned(), |v| v.trim().to_owned());
-        Some(format!("\"{head}-{version}\""))
+        Some(format!("\"{head}-{:016x}-{version}\"", h.finish()))
     }
 
     fn records(&self, rev: &str) -> Result<Vec<CommitRecord>, ApiError> {
@@ -141,10 +157,19 @@ impl ApiState {
                 let limit = limit.unwrap_or(MAX_BLOB_LINES).min(MAX_BLOB_LINES);
                 let end = all.len().min(start.saturating_add(limit));
                 let slice = all.get(start..end).unwrap_or(&[]);
+                let mut text = slice.join("\n");
+                let over = text.len() > MAX_BLOB_BYTES;
+                if over {
+                    let mut cut = MAX_BLOB_BYTES;
+                    while !text.is_char_boundary(cut) {
+                        cut -= 1;
+                    }
+                    text.truncate(cut);
+                }
                 (
-                    Some(slice.join("\n")),
+                    Some(text),
                     Some(all.len()),
-                    end < all.len() || start > 0,
+                    over || end < all.len() || start > 0,
                 )
             }
             None => (None, None, false),
@@ -159,13 +184,16 @@ impl ApiState {
     pub fn blame(&self, rev: Option<&str>, path: &str) -> Result<Value, ApiError> {
         let rev = Self::rev(rev);
         let id = self.repo.resolve(rev)?;
-        let lines: Vec<Value> = self
-            .repo
-            .blame(&id, path)?
+        let all = self.repo.blame(&id, path)?;
+        let lines: Vec<Value> = all
             .iter()
+            .take(MAX_BLAME_LINES)
             .map(json::blame_line)
             .collect();
-        Ok(json!({ "rev": rev, "commit": id, "path": path, "lines": lines }))
+        Ok(json!({
+            "rev": rev, "commit": id, "path": path,
+            "truncated": all.len() > MAX_BLAME_LINES, "lines": lines,
+        }))
     }
 
     /// One named aggregate over the cached records reachable from `rev`.
