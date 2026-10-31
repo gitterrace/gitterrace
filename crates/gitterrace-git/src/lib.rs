@@ -7,12 +7,14 @@
 mod diff;
 mod error;
 mod ident;
+mod ignore;
 mod repo;
 mod types;
 mod walk;
 mod worktree;
 
 pub use error::{Error, Result};
+pub use ignore::IgnoreSet;
 pub use repo::Repo;
 pub use types::{
     BlameLine, Blob, ChangeKind, CodeCounts, CommitDetail, CommitSummary, FileDiff, Hunk, HunkLine,

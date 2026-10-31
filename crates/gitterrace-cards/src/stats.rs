@@ -318,8 +318,10 @@ pub(crate) mod fixtures {
                     path: (*p).to_owned(),
                     additions: *a,
                     deletions: 1,
+                    ..FileStat::default()
                 })
                 .collect(),
+            ..CommitRecord::default()
         }
     }
 

@@ -5,7 +5,7 @@ use std::path::Path;
 
 use crate::CommitRecord;
 
-pub(crate) const FORMAT_VERSION: &str = "1";
+pub(crate) const FORMAT_VERSION: &str = "2";
 pub(crate) const VERSION_FILE: &str = "VERSION";
 pub(crate) const COMMITS_FILE: &str = "commits.jsonl";
 

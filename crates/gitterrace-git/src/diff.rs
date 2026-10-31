@@ -182,7 +182,7 @@ fn is_binary(data: &[u8]) -> bool {
 }
 
 #[allow(clippy::naive_bytecount)] // one short pass per blob, a new dependency is not worth it
-fn line_count(data: &[u8]) -> u32 {
+pub(crate) fn line_count(data: &[u8]) -> u32 {
     if is_binary(data) {
         return 0;
     }
@@ -198,30 +198,42 @@ fn rewritten(diff: &Diff) -> u32 {
         .sum()
 }
 
-/// Line counts of the diff with whitespace ignored, like `git diff -w`, except blank lines also
-/// vanish. A line that differs only in whitespace counts as unchanged.
-fn code_counts(old: &[u8], new: &[u8]) -> CodeCounts {
-    let norm = |data: &[u8]| -> Vec<Vec<u8>> {
-        lines(data)
-            .into_iter()
-            .map(|l| {
-                l.iter()
-                    .copied()
-                    .filter(|b| !b.is_ascii_whitespace())
-                    .collect::<Vec<u8>>()
-            })
+fn squash(line: &[u8]) -> Vec<u8> {
+    line.iter()
+        .copied()
+        .filter(|b| !b.is_ascii_whitespace())
+        .collect()
+}
+
+/// The counts of `diff` with whitespace ignored, like `git diff -w`, and blank lines dropped.
+/// Works hunk by hunk, so the cost follows the size of the change, not of the file.
+fn code_counts(old: &[&[u8]], new: &[&[u8]], diff: &Diff) -> CodeCounts {
+    let mut out = CodeCounts::default();
+    for h in diff.hunks() {
+        let before: Vec<Vec<u8>> = old[h.before.start as usize..h.before.end as usize]
+            .iter()
+            .map(|l| squash(l))
             .filter(|l| !l.is_empty())
-            .collect()
-    };
-    let mut input: InternedInput<Vec<u8>> = InternedInput::default();
-    input.update_before(norm(old).into_iter());
-    input.update_after(norm(new).into_iter());
-    let diff = Diff::compute(Algorithm::Myers, &input);
-    CodeCounts {
-        additions: diff.count_additions(),
-        deletions: diff.count_removals(),
-        rewritten: rewritten(&diff),
+            .collect();
+        let after: Vec<Vec<u8>> = new[h.after.start as usize..h.after.end as usize]
+            .iter()
+            .map(|l| squash(l))
+            .filter(|l| !l.is_empty())
+            .collect();
+        if before.is_empty() || after.is_empty() {
+            out.deletions += u32::try_from(before.len()).unwrap_or(u32::MAX);
+            out.additions += u32::try_from(after.len()).unwrap_or(u32::MAX);
+            continue;
+        }
+        let mut input: InternedInput<Vec<u8>> = InternedInput::default();
+        input.update_before(before.into_iter());
+        input.update_after(after.into_iter());
+        let sub = Diff::compute(Algorithm::Myers, &input);
+        out.additions += sub.count_additions();
+        out.deletions += sub.count_removals();
+        out.rewritten += rewritten(&sub);
     }
+    out
 }
 
 fn count(old: &[u8], new: &[u8], with_hunks: bool) -> Counted {
@@ -236,7 +248,7 @@ fn count(old: &[u8], new: &[u8], with_hunks: bool) -> Counted {
     let code = if additions + deletions == 0 {
         CodeCounts::default()
     } else {
-        code_counts(old, new)
+        code_counts(&lines(old), &lines(new), &diff)
     };
     let hunks = if with_hunks {
         diff.postprocess_lines(&input);

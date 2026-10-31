@@ -5,7 +5,7 @@ use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 use crate::CommitRecord;
 
-const DAY: i64 = 86_400;
+pub(crate) const DAY: i64 = 86_400;
 
 /// Bucket width for time series.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
@@ -328,22 +328,22 @@ fn sorted_counts(map: HashMap<&str, usize>) -> Vec<LabelCount> {
     out
 }
 
-fn line_totals(r: &CommitRecord) -> (u64, u64) {
+pub(crate) fn line_totals(r: &CommitRecord) -> (u64, u64) {
     r.files.iter().fold((0, 0), |(a, d), f| {
         (a + u64::from(f.additions), d + u64::from(f.deletions))
     })
 }
 
-fn local_time(r: &CommitRecord) -> i64 {
+pub(crate) fn local_time(r: &CommitRecord) -> i64 {
     r.time + i64::from(r.offset)
 }
 
 /// Monday is 0. Day 0 (1970-01-01) was a Thursday.
-fn weekday(days: i64) -> usize {
+pub(crate) fn weekday(days: i64) -> usize {
     usize::try_from((days + 3).rem_euclid(7)).unwrap_or(0)
 }
 
-fn bucket_key(r: &CommitRecord, granularity: Granularity) -> String {
+pub(crate) fn bucket_key(r: &CommitRecord, granularity: Granularity) -> String {
     let days = local_time(r).div_euclid(DAY);
     match granularity {
         Granularity::Day => format_date(days),
@@ -355,13 +355,13 @@ fn bucket_key(r: &CommitRecord, granularity: Granularity) -> String {
     }
 }
 
-fn format_date(days: i64) -> String {
+pub(crate) fn format_date(days: i64) -> String {
     let (y, m, d) = civil(days);
     format!("{y:04}-{m:02}-{d:02}")
 }
 
 /// Days since the epoch to (year, month, day), proleptic Gregorian.
-fn civil(days: i64) -> (i64, i64, i64) {
+pub(crate) fn civil(days: i64) -> (i64, i64, i64) {
     let z = days + 719_468;
     let era = z.div_euclid(146_097);
     let doe = z.rem_euclid(146_097);
@@ -402,8 +402,10 @@ mod tests {
                     path: (*p).into(),
                     additions: *a,
                     deletions: *d,
+                    ..FileStat::default()
                 })
                 .collect(),
+            ..CommitRecord::default()
         }
     }
 

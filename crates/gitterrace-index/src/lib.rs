@@ -3,6 +3,7 @@
 
 mod aggregates;
 mod conventional;
+mod insights;
 mod source;
 mod store;
 
@@ -12,10 +13,14 @@ use std::path::PathBuf;
 use gitterrace_git::Repo;
 
 pub use aggregates::*;
+pub use insights::*;
 pub use source::CommitSource;
 
+/// Commits built per batch: enough to keep all cores busy, small enough for steady progress.
+const BATCH: usize = 256;
+
 /// Per-commit facts the stats pages are built from.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 pub struct CommitRecord {
     pub id: String,
     pub author: String,
@@ -23,17 +28,60 @@ pub struct CommitRecord {
     pub time: i64,
     pub offset: i32,
     pub merge: bool,
+    /// Parent ids, first parent first. Lets history be followed along the first-parent chain.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub parents: Vec<String>,
     /// Conventional-commit type and scope, when the subject follows it.
     pub kind: Option<String>,
     pub scope: Option<String>,
     pub files: Vec<FileStat>,
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+/// One file touched by a commit, diffed against the first parent with rename detection.
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 pub struct FileStat {
     pub path: String,
     pub additions: u32,
     pub deletions: u32,
+    /// Line count of the file after the commit (0 when deleted or binary).
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub lines: u32,
+    /// Lines in change blocks that both removed and added: the rework part of the change.
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub rewritten: u32,
+    /// Counts with whitespace-only and blank-line changes ignored. `None` when equal to the
+    /// raw counts, which is nearly always.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub code: Option<CodeStat>,
+    /// Previous path when the file was renamed in this commit.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub old: Option<String>,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub binary: bool,
+}
+
+/// Line counts that ignore whitespace-only differences.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct CodeStat {
+    pub additions: u32,
+    pub deletions: u32,
+    pub rewritten: u32,
+}
+
+impl FileStat {
+    /// Counts without whitespace noise, or the raw counts when nothing differs.
+    pub fn code_stat(&self) -> CodeStat {
+        self.code.unwrap_or(CodeStat {
+            additions: self.additions,
+            deletions: self.deletions,
+            rewritten: self.rewritten,
+        })
+    }
+}
+
+#[allow(clippy::trivially_copy_pass_by_ref)] // serde skip_serializing_if signature
+fn is_zero(n: &u32) -> bool {
+    *n == 0
 }
 
 /// Progress of the background build, read by the web layer.
@@ -88,9 +136,14 @@ impl Index {
         let total = todo.len();
         progress(Progress { done: 0, total });
         let mut out = store::Appender::open(&self.dir, valid)?;
-        for (i, id) in todo.into_iter().enumerate() {
-            out.push(&source.record(id)?)?;
-            progress(Progress { done: i + 1, total });
+        let mut done = 0;
+        for chunk in todo.chunks(BATCH) {
+            let ids: Vec<String> = chunk.iter().map(|id| (*id).clone()).collect();
+            for record in source.records(&ids)? {
+                out.push(&record)?;
+            }
+            done += chunk.len();
+            progress(Progress { done, total });
         }
         out.flush()
     }
@@ -139,12 +192,7 @@ mod tests {
                 id: id.to_owned(),
                 author: "a".into(),
                 email: "a@x".into(),
-                time: 0,
-                offset: 0,
-                merge: false,
-                kind: None,
-                scope: None,
-                files: Vec::new(),
+                ..CommitRecord::default()
             })
         }
     }
@@ -209,7 +257,10 @@ mod tests {
         assert!(idx.records_from(&src, "HEAD")?.is_empty());
         idx.update_from(&src, "HEAD", &|_| {})?;
         assert_eq!(src.built.get(), 2);
-        assert_eq!(std::fs::read_to_string(path.join("VERSION"))?.trim(), "1");
+        assert_eq!(
+            std::fs::read_to_string(path.join("VERSION"))?.trim(),
+            crate::store::FORMAT_VERSION
+        );
         Ok(())
     }
 }

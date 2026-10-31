@@ -19,6 +19,13 @@ const BINARY_PROBE: usize = 8000;
 #[derive(Clone, Copy, Debug)]
 pub struct BlobId(gix::ObjectId);
 
+impl BlobId {
+    /// Lowercase hex object id, a stable cache key.
+    pub fn hex(&self) -> String {
+        self.0.to_string()
+    }
+}
+
 /// A file in a commit's tree.
 #[derive(Debug, Clone)]
 pub struct FileRef {
@@ -85,6 +92,21 @@ impl BlobReader {
             return None;
         }
         String::from_utf8(data).ok()
+    }
+}
+
+impl BlobReader {
+    /// Number of lines (a last line without newline counts), or `None` for binary content or
+    /// blobs larger than `max` bytes.
+    pub fn line_count(&self, id: BlobId, max: u64) -> Option<u32> {
+        if self.repo.find_header(id.0).ok()?.size() > max {
+            return None;
+        }
+        let data = self.repo.find_object(id.0).ok()?.detach().data;
+        if data[..data.len().min(BINARY_PROBE)].contains(&0) {
+            return None;
+        }
+        Some(crate::diff::line_count(&data))
     }
 }
 

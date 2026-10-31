@@ -2,7 +2,7 @@
 //!
 //! Every function is pure: records in, a self-contained SVG string out (inline styles, a system
 //! font stack, no external references). Each takes a [`Theme`]. With the `png` feature,
-//! [`png::render`] rasterizes any of them.
+//! `png::render` rasterizes any of them.
 
 #![allow(
     clippy::needless_raw_string_hashes,
