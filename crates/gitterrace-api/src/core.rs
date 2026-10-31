@@ -2,7 +2,7 @@
 //! so the two surfaces cannot drift apart. Everything here is blocking.
 
 use std::path::Path;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use serde_json::{Value, json};
 use gitterrace_git::Repo;
@@ -23,11 +23,19 @@ const MAX_BLAME_LINES: usize = 5000;
 pub struct ApiState {
     pub(crate) repo: Arc<Repo>,
     pub(crate) index: Arc<Index>,
+    /// Parsed records of the last request, keyed by (resolved tip, index generation).
+    cache: Arc<Mutex<Option<RecordsCache>>>,
 }
+
+type RecordsCache = ((String, u64), Arc<Vec<CommitRecord>>);
 
 impl ApiState {
     pub fn new(repo: Arc<Repo>, index: Arc<Index>) -> Self {
-        Self { repo, index }
+        Self {
+            repo,
+            index,
+            cache: Arc::default(),
+        }
     }
 
     /// Opens the repository containing `path` and its cache.
@@ -65,8 +73,22 @@ impl ApiState {
         Some(format!("\"{head}-{:016x}-{version}\"", h.finish()))
     }
 
-    fn records(&self, rev: &str) -> Result<Vec<CommitRecord>, ApiError> {
-        Ok(self.index.records(&self.repo, rev)?)
+    /// Records reachable from `rev`, shared between calls while the tip and the cache file are
+    /// unchanged.
+    pub(crate) fn records(&self, rev: &str) -> Result<Arc<Vec<CommitRecord>>, ApiError> {
+        let tip = self.repo.resolve(rev)?;
+        let key = (tip, self.index.generation());
+        if let Ok(g) = self.cache.lock()
+            && let Some((k, v)) = g.as_ref()
+            && *k == key
+        {
+            return Ok(Arc::clone(v));
+        }
+        let recs = Arc::new(self.index.records(&self.repo, rev)?);
+        if let Ok(mut g) = self.cache.lock() {
+            *g = Some((key, Arc::clone(&recs)));
+        }
+        Ok(recs)
     }
 
     fn rev(rev: Option<&str>) -> &str {

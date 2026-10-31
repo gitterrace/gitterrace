@@ -1,6 +1,7 @@
 use std::cmp::Reverse;
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::path::Path;
+use std::sync::{Arc, Mutex};
 
 use gix::bstr::ByteSlice;
 use gix::revision::walk::Sorting;
@@ -21,6 +22,54 @@ const BINARY_PROBE: usize = 8000;
 /// A repository opened read-only.
 pub struct Repo {
     inner: gix::ThreadSafeRepository,
+    blame_cache: Mutex<BlameCache>,
+}
+
+/// Blame results kept per (commit id, path), bounded by approximate bytes.
+const BLAME_CACHE_BYTES: usize = 32 * 1024 * 1024;
+
+#[derive(Default)]
+struct BlameCache {
+    map: HashMap<(gix::ObjectId, String), Arc<Vec<BlameLine>>>,
+    /// Least recently used first.
+    order: VecDeque<(gix::ObjectId, String)>,
+    bytes: usize,
+}
+
+fn blame_size(lines: &[BlameLine]) -> usize {
+    lines
+        .iter()
+        .map(|l| 64 + l.commit.len() + l.author.len() + l.text.len())
+        .sum()
+}
+
+impl BlameCache {
+    fn get(&mut self, key: &(gix::ObjectId, String)) -> Option<Arc<Vec<BlameLine>>> {
+        let hit = self.map.get(key)?.clone();
+        if let Some(i) = self.order.iter().position(|k| k == key) {
+            let k = self.order.remove(i)?;
+            self.order.push_back(k);
+        }
+        Some(hit)
+    }
+
+    fn put(&mut self, key: (gix::ObjectId, String), value: Arc<Vec<BlameLine>>) {
+        let size = blame_size(&value);
+        if size > BLAME_CACHE_BYTES || self.map.contains_key(&key) {
+            return;
+        }
+        while self.bytes + size > BLAME_CACHE_BYTES {
+            let Some(old) = self.order.pop_front() else {
+                break;
+            };
+            if let Some(v) = self.map.remove(&old) {
+                self.bytes -= blame_size(&v);
+            }
+        }
+        self.bytes += size;
+        self.order.push_back(key.clone());
+        self.map.insert(key, value);
+    }
 }
 
 impl Repo {
@@ -28,7 +77,10 @@ impl Repo {
     pub fn discover(path: &Path) -> Result<Self> {
         let inner = gix::ThreadSafeRepository::discover(path)
             .map_err(|e| crate::Error::NotARepo(e.to_string()))?;
-        Ok(Self { inner })
+        Ok(Self {
+            inner,
+            blame_cache: Mutex::new(BlameCache::default()),
+        })
     }
 
     /// Path of the `.git` directory, where gitterrace keeps its cache.
@@ -233,7 +285,10 @@ impl Repo {
     pub fn blob_bytes(&self, rev: &str, path: &str) -> Result<Vec<u8>> {
         let repo = self.repo();
         let tip = Self::resolve_id(&repo, rev)?;
-        let path = path.trim_matches('/');
+        Self::blob_bytes_at(&repo, tip, path.trim_matches('/'))
+    }
+
+    fn blob_bytes_at(repo: &gix::Repository, tip: gix::ObjectId, path: &str) -> Result<Vec<u8>> {
         let entry = repo
             .find_commit(tip)
             .map_err(git)?
@@ -266,8 +321,15 @@ impl Repo {
         let repo = self.repo();
         let tip = Self::resolve_id(&repo, rev)?;
         let path = path.trim_matches('/');
-        let content = self.blob(rev, path)?;
-        let Some(text) = content.text else {
+        let key = (tip, path.to_string());
+        if let Some(hit) = self.blame_cache.lock().ok().and_then(|mut c| c.get(&key)) {
+            return Ok(hit.as_ref().clone());
+        }
+        let data = Self::blob_bytes_at(&repo, tip, path)?;
+        if data[..data.len().min(BINARY_PROBE)].contains(&0) {
+            return Ok(Vec::new());
+        }
+        let Ok(text) = String::from_utf8(data) else {
             return Ok(Vec::new());
         };
         let outcome = repo
@@ -304,6 +366,9 @@ impl Repo {
             }
         }
         lines.sort_by_key(|l| l.line_no);
+        if let Ok(mut c) = self.blame_cache.lock() {
+            c.put(key, Arc::new(lines.clone()));
+        }
         Ok(lines)
     }
 
@@ -651,6 +716,25 @@ mod tests {
         assert!(kinds.contains(&("main", crate::RefKind::Branch)));
         assert!(kinds.contains(&("v1", crate::RefKind::Tag)));
         assert!(!repo.name().is_empty());
+    }
+
+    #[test]
+    fn blame_cache_follows_the_commit() {
+        let tmp = fixture();
+        let d = tmp.path();
+        let repo = Repo::discover(d).expect("open");
+        let second = repo.log("HEAD", None, 0, 10).expect("log")[2].id.clone();
+        let before = repo.blame(&second, "a.txt").expect("blame");
+        assert_eq!(
+            repo.blame(&second, "a.txt").expect("cached").len(),
+            before.len()
+        );
+        git(d, &["checkout", "-q", "-b", "other", &second]);
+        std::fs::write(d.join("a.txt"), "only\n").expect("write");
+        git(d, &["commit", "-qam", "shrink"]);
+        let after = repo.blame("other", "a.txt").expect("blame");
+        assert_eq!((before.len(), after.len()), (41, 1));
+        assert_eq!(repo.blame(&second, "a.txt").expect("old").len(), 41);
     }
 
     /// Run with `GITTERRACE_BENCH_REPO=<path> cargo test -p gitterrace-git --release bench -- --ignored --nocapture`.

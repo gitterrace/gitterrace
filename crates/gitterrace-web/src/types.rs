@@ -7,7 +7,7 @@ use std::collections::{BTreeMap, HashMap};
 use std::sync::Arc;
 
 use askama::Template;
-use axum::extract::{Query, State};
+use axum::extract::{Query, RawQuery, State};
 use axum::response::Html;
 use serde::Deserialize;
 use gitterrace_index::{CommitRecord, Granularity, LabelBucket, LabelCount};
@@ -426,9 +426,21 @@ fn build(a: &crate::app::App, all: &[CommitRecord], c: Chrome, q: &TypesQuery) -
     }
 }
 
-pub(crate) async fn page(State(app): Shared, Query(q): Query<TypesQuery>) -> Result<Html<String>> {
+pub(crate) async fn page(
+    State(app): Shared,
+    RawQuery(raw): RawQuery,
+    Query(q): Query<TypesQuery>,
+) -> Result<Html<String>> {
     let q = Arc::new(q);
-    with_records(&app, "t", move |a, r, c| build(a, r, c, &q)).await
+    let key = crate::app::blocking(&app, move |a| Ok(a.memo_key("t", raw.as_deref()))).await?;
+    if let Some(h) = app.memo_get(&key) {
+        return Ok(Html((*h).clone()));
+    }
+    let html = with_records(&app, "t", move |a, r, c| build(a, r, c, &q)).await?;
+    if app.ready() {
+        app.memo_put(key, Arc::new(html.0.clone()));
+    }
+    Ok(html)
 }
 
 #[cfg(test)]

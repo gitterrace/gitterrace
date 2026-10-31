@@ -5,7 +5,7 @@ use std::sync::Arc;
 use askama::Template;
 use axum::{
     Json, Router,
-    extract::{Path, Query, State},
+    extract::{Path, Query, RawQuery, State},
     http::{HeaderValue, header},
     response::{Html, IntoResponse, Redirect, Response},
     routing::get,
@@ -66,82 +66,59 @@ pub(crate) fn router(app: Arc<App>) -> Router {
 
 /// Embedded stylesheets, scripts and fonts; stateless, so the multi-repo index serves them too.
 pub(crate) fn assets<S: Clone + Send + Sync + 'static>() -> Router<S> {
+    const JS: &str = "text/javascript; charset=utf-8";
+    const CSS: &str = "text/css; charset=utf-8";
     Router::new()
         .route(
             "/static/loc.js",
-            get(|| async {
-                asset(
-                    "text/javascript; charset=utf-8",
-                    include_str!("../static/loc.js"),
-                )
-            }),
+            static_asset(JS, include_str!("../static/loc.js")),
         )
         .route(
             "/static/tokens.css",
-            get(|| async {
-                asset(
-                    "text/css; charset=utf-8",
-                    include_str!("../static/tokens.css"),
-                )
-            }),
+            static_asset(CSS, include_str!("../static/tokens.css")),
         )
         .route(
             "/static/app.css",
-            get(|| async { asset("text/css; charset=utf-8", include_str!("../static/app.css")) }),
+            static_asset(CSS, include_str!("../static/app.css")),
         )
         .route(
             "/static/app.js",
-            get(|| async {
-                asset(
-                    "text/javascript; charset=utf-8",
-                    include_str!("../static/app.js"),
-                )
-            }),
+            static_asset(JS, include_str!("../static/app.js")),
         )
         .route(
             "/static/markdown.css",
-            get(|| async {
-                asset(
-                    "text/css; charset=utf-8",
-                    include_str!("../static/markdown.css"),
-                )
-            }),
+            static_asset(CSS, include_str!("../static/markdown.css")),
         )
         .route(
             "/static/markdown.js",
-            get(|| async {
-                asset(
-                    "text/javascript; charset=utf-8",
-                    include_str!("../static/markdown.js"),
-                )
-            }),
+            static_asset(JS, include_str!("../static/markdown.js")),
         )
         .route(
             "/static/nav.js",
-            get(|| async {
-                asset(
-                    "text/javascript; charset=utf-8",
-                    include_str!("../static/nav.js"),
-                )
-            }),
+            static_asset(JS, include_str!("../static/nav.js")),
         )
         .route("/static/vendor/mermaid-11.17.2.min.js", get(mermaid_js))
         .route("/static/fonts/{name}", get(font))
 }
 
-/// Vendored OFL fonts, Latin subsets: Fraunces (display) and Bricolage Grotesque (body).
+/// Vendored OFL variable fonts, Latin subsets: Fraunces (display), Bricolage Grotesque (body)
+/// and JetBrains Mono (code).
 const FONTS: [(&str, &[u8]); 3] = [
     (
-        "fraunces-600.woff2",
-        include_bytes!("../static/fonts/fraunces-600.woff2"),
+        "fraunces.woff2",
+        include_bytes!("../../../theme/schwarzwald/fonts/fraunces/fraunces-latin-wght-normal.woff2"),
     ),
     (
-        "bricolage-400.woff2",
-        include_bytes!("../static/fonts/bricolage-400.woff2"),
+        "bricolage-grotesque.woff2",
+        include_bytes!(
+            "../../../theme/schwarzwald/fonts/bricolage-grotesque/bricolage-grotesque-latin-wght-normal.woff2"
+        ),
     ),
     (
-        "bricolage-600.woff2",
-        include_bytes!("../static/fonts/bricolage-600.woff2"),
+        "jetbrains-mono.woff2",
+        include_bytes!(
+            "../../../theme/schwarzwald/fonts/jetbrains-mono/jetbrains-mono-latin-wght-normal.woff2"
+        ),
     ),
 ];
 
@@ -229,12 +206,48 @@ async fn raw(State(app): Shared, Path((rev, path)): Path<(String, String)>) -> R
         .into_response())
 }
 
-fn asset(kind: &'static str, body: &'static str) -> Response {
+/// A strong ETag from the embedded bytes: stable for one build, changes with the content.
+fn etag(body: &str) -> HeaderValue {
+    use std::hash::{Hash, Hasher};
+    let mut h = std::collections::hash_map::DefaultHasher::new();
+    body.hash(&mut h);
+    HeaderValue::from_str(&format!("\"{:016x}-{:x}\"", h.finish(), body.len()))
+        .unwrap_or_else(|_| HeaderValue::from_static("\"0\""))
+}
+
+/// Revalidating route for an embedded file: `no-cache` plus an ETag, so a repeat visit costs a 304.
+fn static_asset<S: Clone + Send + Sync + 'static>(
+    kind: &'static str,
+    body: &'static str,
+) -> axum::routing::MethodRouter<S> {
+    let tag = etag(body);
+    get(move |headers: axum::http::HeaderMap| {
+        let tag = tag.clone();
+        async move { asset(&headers, kind, body, tag) }
+    })
+}
+
+fn asset(
+    headers: &axum::http::HeaderMap,
+    kind: &'static str,
+    body: &'static str,
+    tag: HeaderValue,
+) -> Response {
+    let fresh = headers.get(header::IF_NONE_MATCH).is_some_and(|v| {
+        v.as_bytes()
+            .split(|b| *b == b',')
+            .any(|t| t.trim_ascii() == tag.as_bytes())
+    });
+    let meta = [
+        (header::CACHE_CONTROL, HeaderValue::from_static("no-cache")),
+        (header::ETAG, tag),
+    ];
+    if fresh {
+        return (axum::http::StatusCode::NOT_MODIFIED, meta).into_response();
+    }
     (
-        [
-            (header::CONTENT_TYPE, HeaderValue::from_static(kind)),
-            (header::CACHE_CONTROL, HeaderValue::from_static("no-cache")),
-        ],
+        [(header::CONTENT_TYPE, HeaderValue::from_static(kind))],
+        meta,
         body,
     )
         .into_response()
@@ -778,8 +791,24 @@ fn file_row(f: gitterrace_index::FileChurn, max: u64) -> Row {
     }
 }
 
-async fn stats_files(State(app): Shared, Query(f): Query<Filter>) -> Result<Html<String>> {
-    with_records(&app, "f", move |_, all, c| {
+async fn stats_files(
+    State(app): Shared,
+    RawQuery(raw): RawQuery,
+    Query(f): Query<Filter>,
+) -> Result<Html<String>> {
+    let key = blocking(&app, move |a| Ok(a.memo_key("f", raw.as_deref()))).await?;
+    if let Some(h) = app.memo_get(&key) {
+        return Ok(Html((*h).clone()));
+    }
+    let html = stats_files_render(&app, f).await?;
+    if app.ready() {
+        app.memo_put(key, Arc::new(html.0.clone()));
+    }
+    Ok(html)
+}
+
+async fn stats_files_render(app: &Arc<App>, f: Filter) -> Result<Html<String>> {
+    with_records(app, "f", move |_, all, c| {
         let fb = f.bar("/stats/files", all);
         let r = &*f.apply(all);
         let rows = |v: Vec<gitterrace_index::FileChurn>| {

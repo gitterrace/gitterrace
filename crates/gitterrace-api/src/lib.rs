@@ -156,6 +156,23 @@ mod tests {
     }
 
     #[test]
+    fn records_cache_is_shared_and_follows_the_tip() {
+        let (dir, state) = fixture();
+        let first = state.records("HEAD").expect("records");
+        let second = state.records("HEAD").expect("records");
+        assert!(std::sync::Arc::ptr_eq(&first, &second), "second call reparsed");
+        assert_eq!(first.len(), 2);
+        std::fs::write(dir.path().join("c.txt"), "x\n").expect("write");
+        git(dir.path(), &["add", "."]);
+        git(dir.path(), &["commit", "-q", "-m", "feat: third"]);
+        state.refresh_index().expect("index");
+        let moved = state.records("HEAD").expect("records");
+        assert_eq!(moved.len(), 3, "moved tip must change the answer");
+        let earlier = state.records("HEAD~1").expect("records");
+        assert_eq!(earlier.len(), 2, "another rev must not reuse the HEAD entry");
+    }
+
+    #[test]
     fn mcp_lists_read_only_tools() {
         let names = McpServer::tool_names();
         for want in [

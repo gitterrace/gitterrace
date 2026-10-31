@@ -44,6 +44,8 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ steps.toolchain.outputs.cachekey }}-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-cargo-${{ steps.toolchain.outputs.cachekey }}-
+      # The theme snapshot and its generated files (part of `make check` too).
+      - run: make theme
       - run: make check
       # The PNG feature is off by default; keep it compiling.
       - run: cargo clippy -p gitterrace --all-targets --features png -- -D warnings

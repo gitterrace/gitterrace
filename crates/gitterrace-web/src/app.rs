@@ -14,7 +14,10 @@ use gitterrace_index::{CommitRecord, Index, Progress};
 
 use crate::error::Result;
 
-const POLL: Duration = Duration::from_secs(3);
+const POLL: Duration = Duration::from_secs(1);
+/// Rendered stats pages are reused this long; time-relative windows move slowly.
+const MEMO_TTL: Duration = Duration::from_secs(60);
+const MEMO_ENTRIES: usize = 64;
 /// How long a dirty-worktree answer is reused, so every page need not run a status.
 const DIRTY_TTL: Duration = Duration::from_secs(2);
 /// Cap on cached directory listings and file lists; both are cheap to rebuild.
@@ -22,6 +25,9 @@ const CACHE_ENTRIES: usize = 256;
 
 /// Commit subjects by full id.
 pub(crate) type Subjects = HashMap<String, String>;
+
+/// Parsed records keyed by (head, index generation).
+type RecordsEntry = ((String, u64), Arc<Vec<CommitRecord>>);
 
 pub(crate) struct App {
     pub(crate) repo: Repo,
@@ -31,7 +37,8 @@ pub(crate) struct App {
     pub(crate) base: String,
     progress: Mutex<Progress>,
     ready: AtomicBool,
-    records: Mutex<Option<(String, Arc<Vec<CommitRecord>>)>>,
+    records: Mutex<Option<RecordsEntry>>,
+    memo: Mutex<HashMap<String, (Instant, Arc<String>)>>,
     dirty: Mutex<Option<(Instant, bool)>>,
     file_lists: Mutex<HashMap<String, Arc<Vec<String>>>>,
     last_commits: Mutex<HashMap<String, Arc<Vec<LastCommit>>>>,
@@ -50,6 +57,7 @@ impl App {
             progress: Mutex::new(Progress::default()),
             ready: AtomicBool::new(false),
             records: Mutex::new(None),
+            memo: Mutex::new(HashMap::new()),
             dirty: Mutex::new(None),
             file_lists: Mutex::new(HashMap::new()),
             last_commits: Mutex::new(HashMap::new()),
@@ -161,6 +169,36 @@ impl App {
         m
     }
 
+    /// A rendered page for `key`, if fresh.
+    pub(crate) fn memo_get(&self, key: &str) -> Option<Arc<String>> {
+        let g = self.memo.lock().ok()?;
+        let (at, html) = g.get(key)?;
+        (at.elapsed() < MEMO_TTL).then(|| Arc::clone(html))
+    }
+
+    pub(crate) fn memo_put(&self, key: String, html: Arc<String>) {
+        if let Ok(mut g) = self.memo.lock() {
+            if g.len() >= MEMO_ENTRIES {
+                g.clear();
+            }
+            g.insert(key, (Instant::now(), html));
+        }
+    }
+
+    /// Key for a rendered page: moves with HEAD, the index file, the branch name, the dirty
+    /// chip and the query, so any of them changing yields a fresh render.
+    pub(crate) fn memo_key(&self, tab: &str, query: Option<&str>) -> String {
+        format!(
+            "{tab}\u{0}{}\u{0}{}\u{0}{}\u{0}{}\u{0}{}\u{0}{}",
+            self.base,
+            self.repo.resolve("HEAD").unwrap_or_default(),
+            self.index.generation(),
+            self.repo.head_branch().unwrap_or_default(),
+            self.dirty(),
+            query.unwrap_or_default()
+        )
+    }
+
     fn set_progress(&self, p: Progress) {
         if let Ok(mut g) = self.progress.lock() {
             *g = p;
@@ -177,9 +215,6 @@ impl App {
     }
 
     pub(crate) fn mark_ready(&self) {
-        if let Ok(mut g) = self.records.lock() {
-            *g = None;
-        }
         self.ready.store(true, Ordering::Release);
     }
 
@@ -189,15 +224,16 @@ impl App {
         if !self.ready() {
             return Ok(None);
         }
+        let key = (head.to_owned(), self.index.generation());
         if let Ok(g) = self.records.lock()
-            && let Some((id, recs)) = g.as_ref()
-            && id == head
+            && let Some((k, recs)) = g.as_ref()
+            && *k == key
         {
             return Ok(Some(Arc::clone(recs)));
         }
         let recs = Arc::new(self.index.records(&self.repo, head)?);
         if let Ok(mut g) = self.records.lock() {
-            *g = Some((head.to_owned(), Arc::clone(&recs)));
+            *g = Some((key, Arc::clone(&recs)));
         }
         Ok(Some(recs))
     }
@@ -226,6 +262,15 @@ pub(crate) async fn keep_index_fresh(app: Arc<App>) {
             match run {
                 Ok(Ok(())) => {
                     app.mark_ready();
+                    if let Some(h) = head.clone() {
+                        let a = Arc::clone(&app);
+                        // Warm what the first visitor would otherwise pay for.
+                        tokio::task::spawn_blocking(move || {
+                            if let Ok(Some(r)) = a.records(&h) {
+                                a.chain(&h, &r);
+                            }
+                        });
+                    }
                     last = head;
                 }
                 Ok(Err(e)) => tracing::warn!("index update failed: {e}"),
@@ -233,5 +278,60 @@ pub(crate) async fn keep_index_fresh(app: Arc<App>) {
             }
         }
         tokio::time::sleep(POLL).await;
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::expect_used)]
+mod tests {
+    use std::process::Command;
+
+    use super::App;
+
+    fn git(dir: &std::path::Path, args: &[&str]) {
+        let ok = Command::new("git")
+            .args(["-c", "user.name=T", "-c", "user.email=t@e.x"])
+            .args(args)
+            .current_dir(dir)
+            .status()
+            .is_ok_and(|s| s.success());
+        assert!(ok, "git {args:?}");
+    }
+
+    #[test]
+    fn memo_key_moves_with_head_and_index_and_records_follow() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path();
+        git(path, &["init", "-q", "-b", "main"]);
+        std::fs::write(path.join("a.txt"), "1\n").expect("write");
+        git(path, &["add", "."]);
+        git(path, &["commit", "-q", "-m", "feat: one"]);
+        let repo = gitterrace_git::Repo::discover(path).expect("repo");
+        let index = gitterrace_index::Index::open(&repo).expect("index");
+        let app = App::new(repo, index);
+        app.index
+            .update(&app.repo, "HEAD", &|_| {})
+            .expect("update");
+        app.mark_ready();
+        let head = app.repo.resolve("HEAD").expect("head");
+        let key = app.memo_key("t", Some("type=fix"));
+        assert_ne!(key, app.memo_key("t", Some("type=feat")));
+        app.memo_put(key.clone(), std::sync::Arc::new("page".into()));
+        assert!(app.memo_get(&key).is_some());
+        let first = app.records(&head).expect("records").expect("ready");
+        assert_eq!(first.len(), 1);
+
+        std::fs::write(path.join("a.txt"), "2\n").expect("write");
+        git(path, &["commit", "-qam", "fix: two"]);
+        let moved = app.memo_key("t", Some("type=fix"));
+        assert_ne!(key, moved, "moving HEAD must change the memo key");
+        assert!(app.memo_get(&moved).is_none());
+        app.index
+            .update(&app.repo, "HEAD", &|_| {})
+            .expect("update");
+        app.mark_ready();
+        let head = app.repo.resolve("HEAD").expect("head");
+        let second = app.records(&head).expect("records").expect("ready");
+        assert_eq!(second.len(), 2, "records cache must follow the new tip");
     }
 }

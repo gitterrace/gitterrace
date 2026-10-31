@@ -91,12 +91,47 @@ fn repo_router(repo_path: &Path, base: String) -> io::Result<axum::Router> {
     app.base = base;
     let app = Arc::new(app);
     tokio::spawn(app::keep_index_fresh(Arc::clone(&app)));
+    tokio::spawn(prewarm(Arc::clone(&app)));
     let api = gitterrace_api::ApiState::open(repo_path).map_err(io::Error::other)?;
     Ok(routes::router(app).nest("/api/v1", gitterrace_api::router(api)))
 }
 
+/// Parses the record set for HEAD as soon as each index generation is ready, so the first
+/// page that needs it does not pay for it.
+async fn prewarm(app: Arc<App>) {
+    let mut warmed: Option<String> = None;
+    loop {
+        let head = app::blocking(&app, |a| {
+            let head = a.repo.resolve("HEAD")?;
+            a.records(&head)?;
+            Ok(head)
+        })
+        .await
+        .ok();
+        if head.is_some() && head == warmed {
+            tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+        } else if head.is_some() && app.ready() {
+            warmed = head;
+        } else {
+            tokio::time::sleep(std::time::Duration::from_millis(250)).await;
+        }
+    }
+}
+
 fn guarded(router: axum::Router, extra: Option<IpAddr>) -> axum::Router {
-    router.layer(axum::middleware::from_fn_with_state(extra, host_guard))
+    use tower_http::compression::{CompressionLayer, Predicate, predicate::NotForContentType};
+    // Fonts and images are already compressed; the default predicate also skips tiny bodies.
+    let worth_it = tower_http::compression::DefaultPredicate::new()
+        .and(NotForContentType::new("font/"))
+        .and(NotForContentType::IMAGES);
+    router
+        .layer(
+            CompressionLayer::new()
+                .gzip(true)
+                .br(true)
+                .compress_when(worth_it),
+        )
+        .layer(axum::middleware::from_fn_with_state(extra, host_guard))
 }
 
 fn build(repo_path: &Path, extra: Option<IpAddr>) -> io::Result<(axum::Router, String)> {
@@ -320,6 +355,36 @@ mod tests {
         }
         assert!(crate::host_allowed("192.168.1.5:4242", Some(ip)));
         assert!(!crate::host_allowed("10.0.0.1", Some(ip)));
+    }
+
+    #[tokio::test]
+    async fn stats_files_memo_follows_head() {
+        let dir = tempfile::tempdir().expect("tmp");
+        let p = dir.path();
+        git(p, &["init", "-q", "-b", "main"]);
+        std::fs::write(p.join("first.txt"), "x\n").expect("write");
+        git(p, &["add", "."]);
+        git(p, &["commit", "-q", "-m", "init"]);
+        let repo = gitterrace_git::Repo::discover(p).expect("repo");
+        let index = gitterrace_index::Index::open(&repo).expect("index");
+        let app = Arc::new(App::new(repo, index));
+        let refresh = |app: &Arc<App>| {
+            app.index
+                .update(&app.repo, "HEAD", &|_| {})
+                .expect("update");
+            app.mark_ready();
+        };
+        refresh(&app);
+        let (_, a) = get(&app, "/stats/files").await;
+        let (_, again) = get(&app, "/stats/files").await;
+        assert!(a.contains("first.txt") && a == again);
+
+        std::fs::write(p.join("second.txt"), "y\n").expect("write");
+        git(p, &["add", "."]);
+        git(p, &["commit", "-q", "-m", "more"]);
+        refresh(&app);
+        let (_, b) = get(&app, "/stats/files").await;
+        assert!(b.contains("second.txt"), "memo outlived HEAD");
     }
 
     #[tokio::test]

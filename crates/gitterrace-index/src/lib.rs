@@ -117,6 +117,12 @@ impl Index {
         self.update_from(repo, rev, progress)
     }
 
+    /// Size in bytes of the cache file. It changes whenever records are added, so a cache of
+    /// parsed records can key on it.
+    pub fn generation(&self) -> u64 {
+        store::file_len(&self.dir)
+    }
+
     /// All cached records reachable from `rev`, oldest first.
     pub fn records(&self, repo: &Repo, rev: &str) -> io::Result<Vec<CommitRecord>> {
         self.records_from(repo, rev)
@@ -213,6 +219,34 @@ mod tests {
         assert_eq!(src.built.get(), 3);
         assert_eq!(last.get(), Progress { done: 1, total: 1 });
         assert_eq!(ids(&idx.records_from(&src, "HEAD")?), ["a", "b", "c"]);
+        Ok(())
+    }
+
+    #[test]
+    fn stored_ids_match_parsed_ids_and_parallel_parse_keeps_order() -> io::Result<()> {
+        let dir = tempfile::tempdir()?;
+        let idx = Index::open_dir(dir.path().join("gitterrace"))?;
+        let names: Vec<String> = (0..4000).map(|i| format!("{i:040x}")).collect();
+        let wanted: Vec<&str> = names.iter().map(String::as_str).collect();
+        let src = Fake::new(&wanted);
+        idx.update_from(&src, "HEAD", &|_| {})?;
+        let (known, _) = crate::store::stored_ids(idx.dir())?;
+        assert_eq!(known.len(), 4000);
+        let (parsed, _) = crate::store::read_records(idx.dir())?;
+        assert_eq!(ids(&parsed), wanted);
+        Ok(())
+    }
+
+    #[test]
+    fn generation_moves_when_records_are_added() -> io::Result<()> {
+        let dir = tempfile::tempdir()?;
+        let idx = Index::open_dir(dir.path().join("gitterrace"))?;
+        let src = Fake::new(&["a"]);
+        idx.update_from(&src, "HEAD", &|_| {})?;
+        let before = idx.generation();
+        src.ids.borrow_mut().push("b".into());
+        idx.update_from(&src, "HEAD", &|_| {})?;
+        assert!(idx.generation() > before);
         Ok(())
     }
 

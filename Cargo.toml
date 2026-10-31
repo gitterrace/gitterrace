@@ -34,6 +34,7 @@ ammonia = "4"
 rmcp = { version = "1.7", features = ["server", "transport-io", "macros"] }
 schemars = "1"
 tower = { version = "0.5", features = ["util"] }
+tower-http = { version = "0.6", default-features = false, features = ["compression-gzip", "compression-br"] }
 
 [workspace.lints.rust]
 warnings = { level = "deny", priority = -1 }

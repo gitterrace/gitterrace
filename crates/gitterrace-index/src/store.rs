@@ -36,17 +36,80 @@ pub(crate) fn read_records(dir: &Path) -> io::Result<(Vec<CommitRecord>, u64)> {
         Err(e) => return Err(e),
     };
     let end = bytes.iter().rposition(|&b| b == b'\n').map_or(0, |i| i + 1);
-    let records = bytes[..end]
-        .split(|&b| b == b'\n')
-        .filter_map(|line| serde_json::from_slice(line).ok())
-        .collect();
-    Ok((records, end as u64))
+    Ok((parse_parallel(&bytes[..end]), end as u64))
 }
 
-/// Ids already stored, plus the valid prefix length.
+fn parse_lines(chunk: &[u8]) -> Vec<CommitRecord> {
+    chunk
+        .split(|&b| b == b'\n')
+        .filter_map(|line| serde_json::from_slice(line).ok())
+        .collect()
+}
+
+/// Below this a single thread is faster than spawning.
+const PARALLEL_MIN: usize = 256 * 1024;
+
+/// Splits `data` (whole lines) at newline boundaries into one chunk per core, parses the chunks
+/// on scoped threads and joins them in file order.
+fn parse_parallel(data: &[u8]) -> Vec<CommitRecord> {
+    let threads = std::thread::available_parallelism().map_or(1, std::num::NonZero::get);
+    if threads < 2 || data.len() < PARALLEL_MIN {
+        return parse_lines(data);
+    }
+    let mut chunks: Vec<&[u8]> = Vec::with_capacity(threads);
+    let mut start = 0;
+    for i in 1..threads {
+        let target = (data.len() * i / threads).max(start);
+        let cut = data[target..]
+            .iter()
+            .position(|&b| b == b'\n')
+            .map_or(data.len(), |p| target + p + 1);
+        if cut > start {
+            chunks.push(&data[start..cut]);
+            start = cut;
+        }
+    }
+    if start < data.len() {
+        chunks.push(&data[start..]);
+    }
+    std::thread::scope(|s| {
+        let handles: Vec<_> = chunks
+            .iter()
+            .map(|c| s.spawn(move || parse_lines(c)))
+            .collect();
+        handles
+            .into_iter()
+            .flat_map(|h| h.join().unwrap_or_default())
+            .collect()
+    })
+}
+
+/// Byte length of the cache file, a cheap generation marker for callers that cache records.
+pub(crate) fn file_len(dir: &Path) -> u64 {
+    fs::metadata(dir.join(COMMITS_FILE)).map_or(0, |m| m.len())
+}
+
+const ID_PREFIX: &[u8] = b"{\"id\":\"";
+
+/// Ids already stored, plus the valid prefix length. Reads each id from the line prefix
+/// without parsing the line; a line that is not a complete object is skipped as torn.
 pub(crate) fn stored_ids(dir: &Path) -> io::Result<(HashSet<String>, u64)> {
-    let (records, valid) = read_records(dir)?;
-    Ok((records.into_iter().map(|r| r.id).collect(), valid))
+    let bytes = match fs::read(dir.join(COMMITS_FILE)) {
+        Ok(b) => b,
+        Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok((HashSet::new(), 0)),
+        Err(e) => return Err(e),
+    };
+    let end = bytes.iter().rposition(|&b| b == b'\n').map_or(0, |i| i + 1);
+    let ids = bytes[..end]
+        .split(|&b| b == b'\n')
+        .filter(|l| l.ends_with(b"}") && l.starts_with(ID_PREFIX))
+        .filter_map(|l| {
+            let rest = &l[ID_PREFIX.len()..];
+            let n = rest.iter().position(|&b| b == b'"')?;
+            std::str::from_utf8(&rest[..n]).ok().map(str::to_owned)
+        })
+        .collect();
+    Ok((ids, end as u64))
 }
 
 /// Appends records, first cutting any torn tail at `valid` bytes.
