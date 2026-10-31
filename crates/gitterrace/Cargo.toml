@@ -13,6 +13,7 @@ workspace = true
 gitterrace-git.workspace = true
 gitterrace-index.workspace = true
 gitterrace-api.workspace = true
+gitterrace-cards.workspace = true
 gitterrace-web.workspace = true
 clap.workspace = true
 tokio.workspace = true
@@ -29,3 +30,9 @@ path = "src/main.rs"
 [[bin]]
 name = "gitterrace"
 path = "src/main.rs"
+
+[features]
+default = []
+# Rasterize cards to PNG (`git terrace wrapped --png`). Off by default: it adds
+# a text renderer to the binary.
+png = ["gitterrace-cards/png"]

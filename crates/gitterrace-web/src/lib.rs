@@ -1,6 +1,7 @@
 //! HTTP server: server-rendered pages over `gitterrace-git` and `gitterrace-index`.
 
 mod app;
+mod cards;
 mod charts;
 mod error;
 mod fmt;
@@ -10,22 +11,41 @@ mod routes;
 mod search;
 mod views;
 
-use std::{io, net::SocketAddr, path::PathBuf, sync::Arc};
+use std::{
+    io,
+    net::SocketAddr,
+    path::{Path, PathBuf},
+    sync::Arc,
+};
 
 use gitterrace_git::Repo;
 use gitterrace_index::Index;
 
 use crate::app::App;
 
-/// Starts serving until ctrl-c.
-pub async fn serve(repo_path: PathBuf, addr: SocketAddr) -> io::Result<()> {
-    let repo = Repo::discover(&repo_path).map_err(io::Error::other)?;
+/// The full router `serve` uses: pages, `/api/v1`, cards and badges. Starts the index
+/// refresher, so call it inside a tokio runtime. Drive it in-process with tower's `oneshot`.
+pub fn app_router(repo_path: impl AsRef<Path>) -> io::Result<axum::Router> {
+    Ok(build(repo_path.as_ref())?.0)
+}
+
+fn build(repo_path: &Path) -> io::Result<(axum::Router, String)> {
+    let repo = Repo::discover(repo_path).map_err(io::Error::other)?;
     let index = Index::open(&repo)?;
     let app = Arc::new(App::new(repo, index));
     tokio::spawn(app::keep_index_fresh(Arc::clone(&app)));
+    let api = gitterrace_api::ApiState::open(repo_path).map_err(io::Error::other)?;
+    let name = app.name.clone();
+    let router = routes::router(app).nest("/api/v1", gitterrace_api::router(api));
+    Ok((router, name))
+}
+
+/// Starts serving until ctrl-c.
+pub async fn serve(repo_path: PathBuf, addr: SocketAddr) -> io::Result<()> {
+    let (router, name) = build(&repo_path)?;
     let listener = tokio::net::TcpListener::bind(addr).await?;
-    tracing::info!("serving {} on http://{addr}", app.name);
-    axum::serve(listener, routes::router(app))
+    tracing::info!("serving {name} on http://{addr}");
+    axum::serve(listener, router)
         .with_graceful_shutdown(async {
             if tokio::signal::ctrl_c().await.is_err() {
                 std::future::pending::<()>().await;
@@ -144,5 +164,31 @@ mod tests {
             assert_eq!(s, 200, "{u}");
             assert!(!body.contains("data-progress"), "{u}");
         }
+    }
+
+    #[tokio::test]
+    async fn app_router_nests_api_cards_and_badges() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let p = dir.path();
+        git(p, &["init", "-q", "-b", "main"]);
+        std::fs::write(p.join("a.txt"), "a\n").expect("write");
+        git(p, &["add", "."]);
+        git(p, &["commit", "-q", "-m", "feat: first"]);
+        let router = crate::app_router(p).expect("router");
+        let status = |uri: &'static str| {
+            let r = router.clone();
+            async move {
+                r.oneshot(Request::get(uri).body(Body::empty()).expect("request"))
+                    .await
+                    .expect("response")
+                    .status()
+                    .as_u16()
+            }
+        };
+        assert_eq!(status("/api/v1/repo").await, 200);
+        assert_eq!(status("/").await, 200);
+        assert_eq!(status("/badges/nope.svg").await, 404);
+        assert_eq!(status("/cards/wrapped/x.svg").await, 404);
+        assert!(matches!(status("/badges/commits.svg").await, 200 | 503));
     }
 }

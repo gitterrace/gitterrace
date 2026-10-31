@@ -104,6 +104,8 @@ pub(crate) fn router(app: Arc<App>) -> Router {
         .route("/static/vendor/mermaid-11.17.2.min.js", get(mermaid_js))
         .route("/static/fonts/{name}", get(font))
         .route("/raw/{rev}/{*path}", get(raw))
+        .route("/cards/wrapped/{year}", get(crate::cards::wrapped))
+        .route("/badges/{name}", get(crate::cards::badge))
         .with_state(app)
 }
 
