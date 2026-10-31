@@ -12,6 +12,7 @@ workspace = true
 [dependencies]
 gitterrace-git.workspace = true
 gitterrace-index.workspace = true
+gitterrace-api.workspace = true
 gitterrace-web.workspace = true
 clap.workspace = true
 tokio.workspace = true

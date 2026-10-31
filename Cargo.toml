@@ -13,7 +13,10 @@ repository = "https://github.com/timorunge/gitterrace"
 gitterrace-git = { path = "crates/gitterrace-git" }
 gitterrace-index = { path = "crates/gitterrace-index" }
 gitterrace-web = { path = "crates/gitterrace-web" }
-gix = { version = "0.90", default-features = false, features = ["max-performance", "sha1", "blob-diff", "blame", "revision", "index", "mailmap"] }
+gitterrace-api = { path = "crates/gitterrace-api" }
+gitterrace-cards = { path = "crates/gitterrace-cards" }
+resvg = { version = "0.45", default-features = false, features = ["text", "system-fonts"] }
+gix = { version = "0.90", default-features = false, features = ["max-performance", "sha1", "blob-diff", "blame", "revision", "index", "mailmap", "status"] }
 axum = "0.8"
 askama = "0.16"
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "signal", "time"] }
@@ -28,6 +31,8 @@ tempfile = "3"
 pulldown-cmark = { version = "0.13", default-features = false, features = ["html"] }
 syntect = { version = "5", default-features = false, features = ["parsing", "default-syntaxes", "html", "regex-fancy"] }
 ammonia = "4"
+rmcp = { version = "1.7", features = ["server", "transport-io", "macros"] }
+schemars = "1"
 tower = { version = "0.5", features = ["util"] }
 
 [workspace.lints.rust]
