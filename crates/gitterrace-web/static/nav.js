@@ -292,10 +292,10 @@
   if (rb) rb.addEventListener("click", openRefs);
 
   // ---- line selection on blob and blame pages -------------------------------
-  var code = document.querySelector("table.code[class]") && document.querySelector(".card table.code:not(.hits table)");
+  var code = document.querySelector(".card .src");
   function paintLines() {
     var m = /^#L(\d+)(?:-L?(\d+))?$/.exec(location.hash);
-    var prev = document.querySelectorAll("tr.sel");
+    var prev = document.querySelectorAll(".src .sel");
     for (var i = 0; i < prev.length; i++) prev[i].classList.remove("sel");
     if (!m) return;
     var a = +m[1], b = m[2] ? +m[2] : a;
@@ -307,12 +307,12 @@
     var first = document.getElementById("L" + a);
     if (first && first.scrollIntoView) first.scrollIntoView({ block: "center" });
   }
-  if (code && code.querySelector("tr[id^=L]")) {
+  if (code && code.querySelector("[id^=L]")) {
     var anchor = null;
     code.addEventListener("click", function (e) {
-      var a = e.target.closest && e.target.closest("td.n a");
-      if (!a) return;
-      var n = +a.textContent;
+      var a = e.target.closest && e.target.closest(".l");
+      if (!a || e.clientX - a.getBoundingClientRect().left > 8 * parseFloat(getComputedStyle(a).fontSize)) return;
+      var n = +a.id.slice(1);
       e.preventDefault();
       var h;
       if (e.shiftKey && anchor) h = "#L" + Math.min(anchor, n) + "-L" + Math.max(anchor, n);
@@ -324,13 +324,23 @@
     paintLines();
   }
 
+  // ---- folded diffs -----------------------------------------------------------
+  document.addEventListener("click", function (e) {
+    var b = e.target.closest && e.target.closest("[data-load-diff]");
+    if (!b) return;
+    b.disabled = true;
+    fetch(b.dataset.loadDiff).then(function (r) { return r.text(); }).then(function (h) {
+      b.parentNode.outerHTML = h;
+    }, function () { b.disabled = false; });
+  });
+
   // ---- copy buttons ---------------------------------------------------------
   Array.prototype.forEach.call(document.querySelectorAll("[data-copyable]"), function (card) {
     var b = el("button", "copy float", "Copy");
     b.type = "button";
     b.title = "Copy file contents";
     b.addEventListener("click", function () {
-      var cells = card.querySelectorAll("td.c");
+      var cells = card.querySelectorAll(".src .l, td.c");
       copy(Array.prototype.map.call(cells, function (c) { return c.textContent; }).join("\n") + "\n", "Copied file");
     });
     card.style.position = "relative";

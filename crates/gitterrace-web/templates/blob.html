@@ -10,6 +10,6 @@
 {% if let Some(h) = html %}{{ h|safe }}{% endif %}
 </div></div>
 {% else %}<div class="card scroll" data-copyable>
-{% if let Some(h) = html %}{{ h|safe }}{% if cut %}<p class="muted pad">Truncated after 20000 lines.</p>{% endif %}{% else %}<p class="muted pad">Binary file, {{ size }}.</p>{% endif %}
+{% if let Some(h) = html %}{{ h|safe }}{% if cut %}<p class="muted pad">Truncated after 20000 lines.</p>{% endif %}{% else if too_large %}<p class="muted pad">File too large to display ({{ size }}). <a href="{{ raw_href }}">View raw</a>.</p>{% else %}<p class="muted pad">Binary file, {{ size }}.</p>{% endif %}
 </div>{% endif %}
 {% endblock %}

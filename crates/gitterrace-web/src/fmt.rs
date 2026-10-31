@@ -155,6 +155,13 @@ pub(crate) fn short(id: &str) -> String {
     id.chars().take(8).collect()
 }
 
+/// Escapes element content only: quotes stay as they are, which keeps JSON-heavy sources small.
+pub(crate) fn esc_text(s: &str) -> String {
+    s.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+}
+
 pub(crate) fn esc(s: &str) -> String {
     s.replace('&', "&amp;")
         .replace('<', "&lt;")

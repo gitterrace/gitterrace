@@ -40,6 +40,7 @@ pub(crate) fn router(app: Arc<App>) -> Router {
         )
         .route("/log/{rev}", get(log))
         .route("/commit/{id}", get(commit))
+        .route("/diff/{rev}/{index}", get(views::diff_fragment))
         .route("/tree/{rev}", get(tree_root))
         .route("/tree/{rev}/", get(tree_root))
         .route("/tree/{rev}/{*path}", get(tree))
@@ -56,6 +57,8 @@ pub(crate) fn router(app: Arc<App>) -> Router {
         .route("/stats/files", get(stats_files))
         .route("/stats/types", get(crate::types::page))
         .route("/stats/languages", get(crate::languages::page))
+        .route("/stats/frequency", get(crate::insights::code_frequency))
+        .route("/stats/contributors", get(crate::insights::contributors))
         .route("/raw/{rev}/{*path}", get(raw))
         .route("/cards/wrapped/{year}", get(crate::cards::wrapped))
         .route("/badges/{name}", get(crate::cards::badge))
@@ -102,11 +105,13 @@ pub(crate) fn assets<S: Clone + Send + Sync + 'static>() -> Router<S> {
 }
 
 /// Vendored OFL variable fonts, Latin subsets: Fraunces (display), Bricolage Grotesque (body)
-/// and JetBrains Mono (code).
+/// and `JetBrains` Mono (code).
 const FONTS: [(&str, &[u8]); 3] = [
     (
         "fraunces.woff2",
-        include_bytes!("../../../theme/schwarzwald/fonts/fraunces/fraunces-latin-wght-normal.woff2"),
+        include_bytes!(
+            "../../../theme/schwarzwald/fonts/fraunces/fraunces-latin-wght-normal.woff2"
+        ),
     ),
     (
         "bricolage-grotesque.woff2",
@@ -206,7 +211,7 @@ async fn raw(State(app): Shared, Path((rev, path)): Path<(String, String)>) -> R
         .into_response())
 }
 
-/// A strong ETag from the embedded bytes: stable for one build, changes with the content.
+/// A strong `ETag` from the embedded bytes: stable for one build, changes with the content.
 fn etag(body: &str) -> HeaderValue {
     use std::hash::{Hash, Hasher};
     let mut h = std::collections::hash_map::DefaultHasher::new();
@@ -215,7 +220,7 @@ fn etag(body: &str) -> HeaderValue {
         .unwrap_or_else(|_| HeaderValue::from_static("\"0\""))
 }
 
-/// Revalidating route for an embedded file: `no-cache` plus an ETag, so a repeat visit costs a 304.
+/// Revalidating route for an embedded file: `no-cache` plus an `ETag`, so a repeat visit costs a 304.
 fn static_asset<S: Clone + Send + Sync + 'static>(
     kind: &'static str,
     body: &'static str,
@@ -563,6 +568,8 @@ struct BlobPage {
     log_href: String,
     html: Option<String>,
     cut: bool,
+    too_large: bool,
+    raw_href: String,
     rendered: Option<String>,
 }
 
@@ -581,14 +588,16 @@ async fn blob(
         let id = a.repo.resolve(&rev)?;
         let path = path.trim_matches('/').to_owned();
         let b = a.repo.blob(&id, &path)?;
-        let (html, cut) = match b.text.as_deref() {
+        let too_large = b.size > views::MAX_BLOB_BYTES;
+        let text = b.text.as_deref().filter(|_| !too_large);
+        let (html, cut) = match text {
             Some(t) => {
                 let (h, cut) = views::code_html(t);
                 (Some(h), cut)
             }
             None => (None, false),
         };
-        let rendered = b.text.as_deref().filter(|_| is_markdown(&path)).map(|t| {
+        let rendered = text.filter(|_| is_markdown(&path)).map(|t| {
             let dir = path.rsplit_once('/').map_or("", |(d, _)| d);
             markdown::render_with(t, markdown::Base::new(&rev, dir)).html
         });
@@ -606,6 +615,8 @@ async fn blob(
             title: path,
             html,
             cut,
+            too_large,
+            raw_href: fmt::href(&format!("/raw/{r}/{pe}")),
         })
     })
     .await?;

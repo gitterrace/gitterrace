@@ -111,6 +111,11 @@ impl Filter {
             .filter(|p| *p != Period::All)
     }
 
+    /// The period including `All`, for pages that window themselves.
+    pub(crate) fn period_value(&self) -> Option<Period> {
+        self.get(Dim::Period).and_then(Period::parse)
+    }
+
     pub(crate) fn is_active(&self) -> bool {
         DIMS.iter().any(|d| self.get(*d).is_some())
     }

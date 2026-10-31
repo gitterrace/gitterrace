@@ -13,9 +13,6 @@
 )]
 
 mod badges;
-#[path = "../../gitterrace-web/src/palette.rs"]
-#[allow(dead_code, clippy::pedantic, clippy::expect_used)]
-mod design;
 mod palette;
 mod repo_card;
 mod stats;

@@ -15,12 +15,13 @@ schwarzwald contract. This file holds only what is specific to gitterrace.
 `theme/schwarzwald/` is a committed snapshot, written by schwarzwald's
 `sync.py` and never edited by hand. `scripts/check-theme-snapshot.py` compares
 each file's sha256 with `manifest.json`. `scripts/gen-theme.py` turns the
-snapshot into the two files the code reads:
+snapshot into what the code reads:
 
 - `crates/gitterrace-web/static/tokens.css`, between its markers: Kandel light and
   dark, fonts, type scale, space grid, radius, motion.
-- `crates/gitterrace-web/src/palette.rs`: the same colours as Rust constants for
-  server-side SVG and `gitterrace-cards`.
+- `theme/schwarzwald/rust`: the vendored `schwarzwald` crate (no dependencies),
+  the same colours as Rust constants. `gitterrace-web` re-exports it from
+  `palette.rs`; `gitterrace-cards` reads `KANDEL` directly.
 
 `make theme` runs both checks and is part of `make check` and CI. To update:
 run `sync.py`, then `scripts/gen-theme.py`, then commit. Only Kandel ships.
@@ -56,7 +57,7 @@ or chart. Charts come from `charts.rs` and colour marks by class (`.bar`,
 - **Charts.** Server-rendered SVG coloured through classes. Single series
   `--accent`, stacked `--cat-*`, heatmaps `--seq-*`. A `<title>` per mark and
   an `aria-label`.
-- **Badges and cards** (`gitterrace-cards`). Colours from `palette.rs`.
+- **Badges and cards** (`gitterrace-cards`). Colours from the `schwarzwald` crate.
 
 ## Logo
 

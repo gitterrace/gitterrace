@@ -24,11 +24,15 @@ fn stylesheets_hold_no_raw_colors() {
     }
 }
 
-/// The generated Rust palette and the stylesheet carry the same accent.
+/// The vendored Rust palette and the stylesheet carry the same accent.
 #[test]
 fn palette_accent_is_in_tokens_css() {
     let css = include_str!("../static/tokens.css");
-    for p in [gitterrace_web::palette::LIGHT, gitterrace_web::palette::DARK] {
-        assert!(css.contains(&format!("--accent:{};", p.accent)));
+    for p in [
+        gitterrace_web::palette::KANDEL.light,
+        gitterrace_web::palette::KANDEL.dark,
+    ] {
+        let want = format!("--accent:{};", p.accent_ink.hex.to_lowercase());
+        assert!(css.contains(&want), "tokens.css lacks {want}");
     }
 }

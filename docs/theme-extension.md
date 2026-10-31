@@ -10,4 +10,4 @@ themes and the contrast floors are there:
   `series.*` and `surfaces.*`.
 
 gitterrace does not solve colours. `scripts/gen-theme.py` reads the snapshot
-and writes `tokens.css` and `palette.rs`. See [design.md](design.md).
+and writes `tokens.css`; Rust reads the vendored `schwarzwald` crate. See [design.md](design.md).

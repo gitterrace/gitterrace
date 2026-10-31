@@ -2733,6 +2733,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "schwarzwald"
+version = "0.1.0"
+
+[[package]]
 name = "scopeguard"
 version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2952,6 +2956,7 @@ name = "gitterrace-cards"
 version = "0.1.0"
 dependencies = [
  "resvg",
+ "schwarzwald",
  "gitterrace-git",
  "gitterrace-index",
  "thiserror",
@@ -2988,6 +2993,7 @@ dependencies = [
  "http-body-util",
  "pulldown-cmark",
  "regex",
+ "schwarzwald",
  "serde",
  "serde_json",
  "serde_urlencoded",

@@ -5,7 +5,7 @@ use crate::fmt::{self, esc};
 
 const W: f64 = 960.0;
 const H: f64 = 220.0;
-const LEFT: f64 = 44.0;
+const LEFT: f64 = 58.0;
 const TOP_PAD: f64 = 10.0;
 const BOTTOM: f64 = 26.0;
 const LABEL_PX: f64 = 84.0;
@@ -68,7 +68,11 @@ fn x_labels(keys: &[&str]) -> String {
     for (i, k) in keys.iter().enumerate().filter(|(i, _)| i % every == 0) {
         #[allow(clippy::cast_precision_loss)]
         let cx = LEFT + i as f64 * sl + sl / 2.0;
-        let (x, anchor) = (cx, "middle");
+        let (x, anchor) = if cx > W - LABEL_PX / 2.0 {
+            (W, "end")
+        } else {
+            (cx, "middle")
+        };
         fmt::push(
             &mut svg,
             &format!(
@@ -216,6 +220,132 @@ pub(crate) fn stacked(buckets: &[gitterrace_index::LabelBucket]) -> String {
     }
     svg.push_str("</div>");
     svg
+}
+
+/// Weekly additions above the axis and deletions below it, one column per bucket.
+#[allow(clippy::many_single_char_names)]
+pub(crate) fn diverging(points: &[(String, u64, u64)]) -> String {
+    let max = points.iter().map(|p| p.1.max(p.2)).max().unwrap_or(0);
+    let step = nice_step(max);
+    #[allow(clippy::cast_precision_loss)]
+    let top = (step * max.div_ceil(step).max(1)) as f64;
+    let half = (H - TOP_PAD - BOTTOM) / 2.0;
+    let mid = TOP_PAD + half;
+    let mut svg = open_svg("Additions and deletions per week");
+    let mut v = 0;
+    while (v as f64) <= top {
+        #[allow(clippy::cast_precision_loss)]
+        let dy = v as f64 / top * half;
+        for (sign, y) in [("", mid - dy), ("-", mid + dy)] {
+            if v == 0 && sign == "-" {
+                continue;
+            }
+            fmt::push(
+                &mut svg,
+                &format!(
+                    r#"<line class="grid" x1="{LEFT}" x2="{W}" y1="{y:.1}" y2="{y:.1}"/><text class="ax" x="{:.1}" y="{:.1}" text-anchor="end">{sign}{}</text>"#,
+                    LEFT - 8.0,
+                    y + 3.5,
+                    fmt::thousands(v)
+                ),
+            );
+        }
+        v += step;
+    }
+    let sl = slot(points.len());
+    let bw = (sl * 0.8).clamp(1.0, 48.0);
+    for (i, (label, a, d)) in points.iter().enumerate() {
+        #[allow(clippy::cast_precision_loss)]
+        let x = LEFT + i as f64 * sl + (sl - bw) / 2.0;
+        #[allow(clippy::cast_precision_loss)]
+        let (ha, hd) = (*a as f64 / top * half, *d as f64 / top * half);
+        fmt::push(
+            &mut svg,
+            &format!(
+                r#"<g class="col"><title>{}: +{} / -{}</title><rect class="hit" x="{:.1}" y="{TOP_PAD}" width="{sl:.1}" height="{:.1}"/><rect class="up" x="{x:.1}" y="{:.1}" width="{bw:.1}" height="{ha:.1}"/><rect class="dn" x="{x:.1}" y="{mid:.1}" width="{bw:.1}" height="{hd:.1}"/></g>"#,
+                esc(label),
+                fmt::thousands(a),
+                fmt::thousands(d),
+                x - (sl - bw) / 2.0,
+                half * 2.0,
+                mid - ha
+            ),
+        );
+    }
+    let keys: Vec<&str> = points.iter().map(|p| p.0.as_str()).collect();
+    svg.push_str(&x_labels(&keys));
+    svg.push_str("</svg>");
+    svg
+}
+
+/// A 0..100 percent line over buckets; `None` values break the line.
+pub(crate) fn percent_line(points: &[(String, Option<f64>)]) -> String {
+    let plot = H - TOP_PAD - BOTTOM;
+    let mut svg = open_svg("Rework share over time");
+    for p in [0, 25, 50, 75, 100] {
+        let y = TOP_PAD + plot - f64::from(p) / 100.0 * plot;
+        fmt::push(
+            &mut svg,
+            &format!(
+                r#"<line class="grid" x1="{LEFT}" x2="{W}" y1="{y:.1}" y2="{y:.1}"/><text class="ax" x="{:.1}" y="{:.1}" text-anchor="end">{p}%</text>"#,
+                LEFT - 8.0,
+                y + 3.5
+            ),
+        );
+    }
+    let sl = slot(points.len());
+    let mut d = String::new();
+    let mut pen = false;
+    for (i, (_, v)) in points.iter().enumerate() {
+        let Some(v) = v else {
+            pen = false;
+            continue;
+        };
+        #[allow(clippy::cast_precision_loss)]
+        let x = LEFT + i as f64 * sl + sl / 2.0;
+        let y = TOP_PAD + plot - v.clamp(0.0, 1.0) * plot;
+        fmt::push(
+            &mut d,
+            &format!("{}{x:.1} {y:.1}", if pen { "L" } else { "M" }),
+        );
+        pen = true;
+    }
+    fmt::push(&mut svg, &format!(r#"<path class="line" d="{d}"/>"#));
+    for (i, (label, v)) in points.iter().enumerate() {
+        if let Some(v) = v {
+            #[allow(clippy::cast_precision_loss)]
+            let x = LEFT + i as f64 * sl;
+            fmt::push(
+                &mut svg,
+                &format!(
+                    r#"<g class="col"><title>{}: {:.0}%</title><rect class="hit" x="{x:.1}" y="{TOP_PAD}" width="{sl:.1}" height="{plot:.1}"/></g>"#,
+                    esc(label),
+                    v * 100.0
+                ),
+            );
+        }
+    }
+    let keys: Vec<&str> = points.iter().map(|p| p.0.as_str()).collect();
+    svg.push_str(&x_labels(&keys));
+    svg.push_str("</svg>");
+    svg
+}
+
+/// Tiny polyline of `values`, 120x22, for table rows.
+pub(crate) fn sparkline(values: &[u32], class: &str) -> String {
+    let max = values.iter().copied().max().unwrap_or(0).max(1);
+    let n = values.len().max(2) - 1;
+    let mut pts = String::new();
+    for (i, v) in values.iter().enumerate() {
+        #[allow(clippy::cast_precision_loss)]
+        let x = i as f64 * 120.0 / n as f64;
+        let y = 20.0 - f64::from(*v) * 18.0 / f64::from(max);
+        fmt::push(&mut pts, &format!("{x:.1},{y:.1} "));
+    }
+    format!(
+        r#"<svg class="spark {class}" viewBox="0 0 120 22" width="120" height="22" aria-hidden="true"><polyline points="{}"/></svg>"#,
+        pts.trim_end()
+    )
 }
 
 /// Weekday by hour grid. Cell intensity is bucketed into five levels.

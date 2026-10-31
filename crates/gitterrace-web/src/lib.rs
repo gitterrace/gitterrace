@@ -6,6 +6,8 @@ mod charts;
 mod error;
 mod filter;
 mod fmt;
+mod guard;
+mod insights;
 mod languages;
 mod markdown;
 mod multi;
@@ -22,7 +24,6 @@ use std::{
     sync::Arc,
 };
 
-use axum::response::IntoResponse;
 pub use multi::discover_repos;
 use gitterrace_git::Repo;
 use gitterrace_index::Index;
@@ -37,43 +38,6 @@ use crate::app::App;
 /// `Host: localhost`.
 pub fn app_router(repo_path: impl AsRef<Path>) -> io::Result<axum::Router> {
     Ok(build(repo_path.as_ref(), None)?.0)
-}
-
-/// Host-header allowlist: loopback names plus, when bound elsewhere, the bound IP.
-fn host_allowed(host: &str, extra: Option<IpAddr>) -> bool {
-    let name = match host.strip_prefix('[') {
-        Some(rest) => match rest.split_once(']') {
-            Some((ip, _)) => ip,
-            None => return false,
-        },
-        None => host.rsplit_once(':').map_or(host, |(h, _)| h),
-    };
-    let name = name.to_ascii_lowercase();
-    if matches!(name.as_str(), "localhost" | "127.0.0.1" | "::1") {
-        return true;
-    }
-    extra.is_some_and(|ip| name.parse::<IpAddr>().is_ok_and(|n| n == ip))
-}
-
-async fn host_guard(
-    axum::extract::State(extra): axum::extract::State<Option<IpAddr>>,
-    req: axum::extract::Request,
-    next: axum::middleware::Next,
-) -> axum::response::Response {
-    let ok = req
-        .headers()
-        .get(axum::http::header::HOST)
-        .and_then(|h| h.to_str().ok())
-        .is_some_and(|h| host_allowed(h, extra));
-    if ok {
-        next.run(req).await
-    } else {
-        (
-            axum::http::StatusCode::FORBIDDEN,
-            "forbidden: unrecognised Host header\n",
-        )
-            .into_response()
-    }
 }
 
 /// Router for several repositories: an index at `/`, each repository under `/r/NAME`.
@@ -131,7 +95,7 @@ fn guarded(router: axum::Router, extra: Option<IpAddr>) -> axum::Router {
                 .br(true)
                 .compress_when(worth_it),
         )
-        .layer(axum::middleware::from_fn_with_state(extra, host_guard))
+        .layer(axum::middleware::from_fn_with_state(extra, guard::guard))
 }
 
 fn build(repo_path: &Path, extra: Option<IpAddr>) -> io::Result<(axum::Router, String)> {
@@ -155,7 +119,7 @@ fn build_multi(paths: Vec<PathBuf>, extra: Option<IpAddr>) -> io::Result<(axum::
 
 /// Starts serving until ctrl-c.
 pub async fn serve(repo_paths: Vec<PathBuf>, addr: SocketAddr) -> io::Result<()> {
-    let extra = (!addr.ip().is_loopback() && !addr.ip().is_unspecified()).then(|| addr.ip());
+    let extra = (!addr.ip().is_loopback()).then(|| addr.ip());
     let (router, name) = build_multi(repo_paths, extra)?;
     if !addr.ip().is_loopback() {
         tracing::warn!(
@@ -205,6 +169,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[allow(clippy::too_many_lines)]
     async fn serves_every_page() {
         let dir = tempfile::tempdir().expect("tempdir");
         let p = dir.path();
@@ -223,7 +188,7 @@ mod tests {
 
         let (s, body) = get(&app, "/").await;
         assert_eq!(s, 200);
-        assert!(body.contains("<h1 id=\"hello"));
+        assert!(body.contains("<h1 id=\"user-content-hello"));
         let (s, body) = get(&app, "/log/HEAD").await;
         assert_eq!((s, body.contains("fix: second")), (200, true));
         let (s, body) = get(&app, "/log/HEAD?path=src/a.rs&page=0").await;
@@ -293,6 +258,10 @@ mod tests {
             "/stats/types?type=fix&scope=none&period=3m",
             "/stats/types?type=other&path=src&author=x",
             "/stats/languages",
+            "/stats/frequency",
+            "/stats/frequency?type=fix&path=src&period=1y",
+            "/stats/contributors",
+            "/stats/contributors?bots=1&period=3m&author=t%40e.x",
             "/stats/languages?x=time&scale=share&from=0&to=1",
             "/",
         ] {
@@ -305,6 +274,29 @@ mod tests {
         assert!(!body.contains("feat: first"));
         let (_, body) = get(&app, "/stats/types").await;
         assert!(body.contains("/stats/types?type=feat"));
+        let (_, body) = get(&app, "/stats/contributors").await;
+        assert!(body.contains("/stats/contributors?author=") && body.contains("/log/HEAD?author="));
+        let (_, body) = get(&app, "/blame/HEAD/src/a.rs").await;
+        assert!(body.contains("class=\"who\" href=\"/log/HEAD?author="));
+    }
+
+    #[tokio::test]
+    async fn oversized_blob_links_to_raw_instead_of_rendering() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let p = dir.path();
+        git(p, &["init", "-q", "-b", "main"]);
+        let big = "x\n".repeat(crate::views::MAX_BLOB_BYTES as usize / 2 + 10);
+        std::fs::write(p.join("big.txt"), big).expect("write");
+        git(p, &["add", "."]);
+        git(p, &["commit", "-q", "-m", "feat: big"]);
+        let repo = gitterrace_git::Repo::discover(p).expect("repo");
+        let index = gitterrace_index::Index::open(&repo).expect("index");
+        let app = Arc::new(App::new(repo, index));
+        let (s, body) = get(&app, "/blob/HEAD/big.txt").await;
+        assert_eq!(s, 200);
+        assert!(body.contains("File too large to display"));
+        assert!(body.contains("/raw/HEAD/big.txt"));
+        assert!(!body.contains("class=\"ch\""));
     }
 
     #[tokio::test]
@@ -336,25 +328,6 @@ mod tests {
         assert_eq!(status("/badges/nope.svg").await, 404);
         assert_eq!(status("/cards/wrapped/x.svg").await, 404);
         assert!(matches!(status("/badges/commits.svg").await, 200 | 503));
-    }
-
-    #[test]
-    fn host_allowlist() {
-        let ip: std::net::IpAddr = "192.168.1.5".parse().expect("ip");
-        for h in [
-            "localhost",
-            "localhost:4242",
-            "127.0.0.1:4242",
-            "[::1]:4242",
-            "LOCALHOST",
-        ] {
-            assert!(crate::host_allowed(h, None), "{h}");
-        }
-        for h in ["evil.example:4242", "192.168.1.5:80", "[::1", ""] {
-            assert!(!crate::host_allowed(h, None), "{h}");
-        }
-        assert!(crate::host_allowed("192.168.1.5:4242", Some(ip)));
-        assert!(!crate::host_allowed("10.0.0.1", Some(ip)));
     }
 
     #[tokio::test]
@@ -413,6 +386,33 @@ mod tests {
                 .expect("response");
             assert_eq!(res.status().as_u16(), want, "{host:?}");
         }
+
+        let send = |uri: &str, site: Option<&str>| {
+            let mut b = Request::get(uri).header("host", "localhost");
+            if let Some(s) = site {
+                b = b.header("sec-fetch-site", s);
+            }
+            router
+                .clone()
+                .oneshot(b.body(Body::empty()).expect("request"))
+        };
+        for uri in ["/", "/badges/commits.svg", "/cards/wrapped/x.svg"] {
+            let res = send(uri, Some("cross-site")).await.expect("response");
+            assert_eq!(res.status().as_u16(), 403, "{uri}");
+            assert_eq!(res.headers()["cross-origin-resource-policy"], "same-origin");
+        }
+        for site in [Some("same-origin"), Some("same-site"), Some("none"), None] {
+            let res = send("/", site).await.expect("response");
+            assert_eq!(res.status().as_u16(), 200, "{site:?}");
+            let h = res.headers();
+            assert_eq!(h["cross-origin-resource-policy"], "same-origin");
+            assert_eq!(h["x-content-type-options"], "nosniff");
+            let csp = h["content-security-policy"].to_str().expect("ascii");
+            assert!(csp.contains("frame-ancestors 'none'") && csp.contains("script-src 'self'"));
+        }
+        let res = send("/api/v1/repo", None).await.expect("response");
+        assert_eq!(res.headers()["x-content-type-options"], "nosniff");
+        assert!(!res.headers().contains_key("content-security-policy"));
     }
 
     fn fixture(name: &str, root: &std::path::Path) -> std::path::PathBuf {

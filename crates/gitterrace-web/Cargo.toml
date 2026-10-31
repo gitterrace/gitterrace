@@ -15,6 +15,7 @@ gitterrace-git.workspace = true
 gitterrace-index.workspace = true
 gitterrace-api.workspace = true
 gitterrace-cards.workspace = true
+schwarzwald.workspace = true
 axum.workspace = true
 askama.workspace = true
 tokio.workspace = true

@@ -9,8 +9,7 @@ use std::collections::HashMap;
 use std::sync::OnceLock;
 
 use pulldown_cmark::{BlockQuoteKind, CodeBlockKind, Event, Options, Parser, Tag, TagEnd, html};
-use syntect::html::{ClassStyle, ClassedHTMLGenerator};
-use syntect::parsing::SyntaxSet;
+use syntect::parsing::{ParseState, Scope, ScopeStack, SyntaxSet};
 use syntect::util::LinesWithEndings;
 
 /// Larger blocks are shown plain: highlighting must never dominate a request.
@@ -151,21 +150,88 @@ fn syntaxes() -> &'static SyntaxSet {
     SET.get_or_init(SyntaxSet::load_defaults_newlines)
 }
 
+/// Colour categories the stylesheet knows, in stylesheet order: a later one wins within one scope.
+const CATEGORIES: [(&str, &str); 13] = [
+    ("comment", "s-comment"),
+    ("keyword", "s-keyword"),
+    ("storage", "s-keyword"),
+    ("string", "s-string"),
+    ("constant", "s-constant"),
+    ("support", "s-constant"),
+    ("entity", "s-entity"),
+    ("variable", "s-entity"),
+    ("tag", "s-tag"),
+    ("numeric", "s-numeric"),
+    ("invalid", "s-invalid"),
+    ("punctuation", "s-punctuation"),
+    ("parameter", "s-parameter"),
+];
+
+/// The colour class of one scope: among its atoms the stylesheet colours, the one whose rule comes last.
+fn scope_class(scope: Scope) -> Option<&'static str> {
+    let name = scope.build_string();
+    name.split('.')
+        .filter_map(|atom| CATEGORIES.iter().rposition(|(a, _)| *a == atom))
+        .max()
+        .map(|i| CATEGORIES[i].1)
+}
+
+/// Highlighted HTML with one span per run of equally coloured text and none for plain text.
 fn highlight(code: &str, lang: &str) -> Option<String> {
     if code.len() > HIGHLIGHT_LIMIT {
         return None;
     }
     let set = syntaxes();
     let syntax = set.find_syntax_by_token(lang)?;
-    let mut gen_ = ClassedHTMLGenerator::new_with_class_style(
-        syntax,
-        set,
-        ClassStyle::SpacedPrefixed { prefix: "s-" },
-    );
+    let mut state = ParseState::new(syntax);
+    let mut stack = ScopeStack::new();
+    let mut cache: HashMap<Scope, Option<&'static str>> = HashMap::new();
+    let mut out = String::with_capacity(code.len() + code.len() / 2);
+    let mut open: Option<&'static str> = None;
+    let emit = |out: &mut String,
+                open: &mut Option<&'static str>,
+                class: Option<&'static str>,
+                text: &str| {
+        if text.is_empty() {
+            return;
+        }
+        if *open != class {
+            if open.is_some() {
+                out.push_str("</span>");
+            }
+            if let Some(c) = class {
+                out.push_str("<span class=\"");
+                out.push_str(c);
+                out.push_str("\">");
+            }
+            *open = class;
+        }
+        out.push_str(&crate::fmt::esc_text(text));
+    };
     for line in LinesWithEndings::from(code) {
-        gen_.parse_html_for_line_which_includes_newline(line).ok()?;
+        let ops = state.parse_line(line, set).ok()?;
+        let mut prev = 0;
+        for (i, op) in ops {
+            let class = stack
+                .as_slice()
+                .iter()
+                .rev()
+                .find_map(|s| *cache.entry(*s).or_insert_with(|| scope_class(*s)));
+            emit(&mut out, &mut open, class, &line[prev..i]);
+            prev = i;
+            stack.apply(&op).ok()?;
+        }
+        let class = stack
+            .as_slice()
+            .iter()
+            .rev()
+            .find_map(|s| *cache.entry(*s).or_insert_with(|| scope_class(*s)));
+        emit(&mut out, &mut open, class, &line[prev..]);
     }
-    Some(gen_.finalize())
+    if open.is_some() {
+        out.push_str("</span>");
+    }
+    Some(out)
 }
 
 fn code_block(code: &str, lang: &str) -> String {
@@ -274,6 +340,18 @@ fn transform<'a>(parser: Parser<'a>, has_mermaid: &mut bool) -> Vec<Event<'a>> {
     out
 }
 
+/// Ids from the document live under this prefix so they cannot collide with page anchors.
+const USER_ID: &str = "user-content-";
+/// Class prefixes the renderer itself emits; anything else could restyle the page chrome.
+const SAFE_CLASS: [&str; 6] = [
+    "language-",
+    "s-",
+    "markdown-",
+    "anchor",
+    "mermaid",
+    "footnote",
+];
+
 fn sanitizer(base: Base) -> ammonia::Builder<'static> {
     let mut b = ammonia::Builder::default();
     b.add_tags(["input"])
@@ -283,7 +361,21 @@ fn sanitizer(base: Base) -> ammonia::Builder<'static> {
         .add_generic_attributes(["class", "id"])
         .url_relative(ammonia::UrlRelative::PassThrough)
         .attribute_filter(move |element, attr, value| match (element, attr) {
-            ("a", "href") => Some(Cow::Owned(rewrite_url(&base, value, false))),
+            ("a", "href") => {
+                let url = rewrite_url(&base, value, false);
+                Some(Cow::Owned(match url.strip_prefix('#') {
+                    Some(frag) if !frag.is_empty() => format!("#{USER_ID}{frag}"),
+                    _ => url,
+                }))
+            }
+            (_, "id") => Some(Cow::Owned(format!("{USER_ID}{value}"))),
+            (_, "class") => {
+                let kept: Vec<&str> = value
+                    .split_whitespace()
+                    .filter(|c| SAFE_CLASS.iter().any(|p| c.starts_with(p)))
+                    .collect();
+                (!kept.is_empty()).then(|| Cow::Owned(kept.join(" ")))
+            }
             ("img", "src") => Some(Cow::Owned(rewrite_url(&base, value, true))),
             // Only the alignment the parser itself emits survives.
             (_, "style") => matches!(
@@ -368,13 +460,24 @@ mod tests {
     }
 
     #[test]
+    fn hostile_class_and_id_are_neutralised() {
+        let out = render(
+            "<div class=\"ov-back\" id=\"L1\">x</div>\n\n<p class=\"language-rs ov-back\">y</p>\n",
+        );
+        assert!(!out.contains("ov-back"), "{out}");
+        assert!(!out.contains("id=\"L1\""), "{out}");
+        assert!(out.contains("id=\"user-content-L1\""), "{out}");
+        assert!(out.contains("class=\"language-rs\""), "{out}");
+    }
+
+    #[test]
     fn heading_anchors_follow_github_slugs() {
         assert_eq!(slugify("Hello, World! v1.2_x"), "hello-world-v12_x");
         let out = render("## Same\n\n## Same\n\n## `Code` & more\n");
-        assert!(out.contains("id=\"same\""));
-        assert!(out.contains("id=\"same-1\""));
-        assert!(out.contains("id=\"code--more\""));
-        assert!(out.contains("class=\"anchor\" href=\"#same\""));
+        assert!(out.contains("id=\"user-content-same\""));
+        assert!(out.contains("id=\"user-content-same-1\""));
+        assert!(out.contains("id=\"user-content-code--more\""));
+        assert!(out.contains("class=\"anchor\" href=\"#user-content-same\""));
     }
 
     #[test]
@@ -389,7 +492,7 @@ mod tests {
         assert!(out.contains("href=\"/blob/abc123/docs/a.md#frag\""));
         assert!(out.contains("href=\"/tree/abc123/docs/guide/sub\""));
         assert!(out.contains("href=\"https://e.com/a\""));
-        assert!(out.contains("href=\"#top\""));
+        assert!(out.contains("href=\"#user-content-top\""));
     }
 
     #[test]

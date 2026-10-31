@@ -5,9 +5,11 @@ use gitterrace_git::{
     TreeEntryKind,
 };
 
-use crate::fmt::{ago, date, enc, esc, href, short};
+use crate::fmt::{ago, date, enc, esc, esc_text, href, short};
 
 const MAX_BLOB_LINES: usize = 20_000;
+/// Largest text blob the browser builds a page for; bigger ones link to the raw bytes.
+pub(crate) const MAX_BLOB_BYTES: u64 = 2 * 1024 * 1024;
 
 pub(crate) struct Nav {
     pub(crate) href: String,
@@ -133,6 +135,8 @@ pub(crate) fn stats_tabs(active: &str) -> Vec<Nav> {
         ("/stats/files", "Hot files", "f"),
         ("/stats/types", "Commit types", "t"),
         ("/stats/languages", "Languages", "l"),
+        ("/stats/frequency", "Code frequency", "cf"),
+        ("/stats/contributors", "Contributors", "co"),
     ]
     .into_iter()
     .map(|(path, label, key)| Nav {
@@ -278,9 +282,66 @@ pub(crate) fn diff_html(rev: &str, files: &[FileDiff]) -> String {
     diff_html_with(Some(rev), files)
 }
 
+/// A file whose changed lines pass this is folded behind a "Load diff" button.
+const FILE_DIFF_BUDGET: usize = 400;
+/// Once the files before it changed this many lines in all, later files are folded too.
+const TOTAL_DIFF_BUDGET: usize = 2_000;
+/// The same budgets in rendered bytes, since a few huge lines cost more than many short ones.
+const FILE_DIFF_BYTES: usize = 40_000;
+const TOTAL_DIFF_BYTES: usize = 250_000;
+/// Lines per `content-visibility` chunk (the stylesheet sizes a chunk as this many rows).
+const CHUNK_LINES: usize = 100;
+
+/// The hunks of one file as line blocks. Also the body of the fragment a folded file loads.
+pub(crate) fn diff_body_html(f: &FileDiff) -> String {
+    let mut out = String::from("<div class=\"diffwrap\"><div class=\"diff\">");
+    let mut in_chunk = 0usize;
+    for h in &f.hunks {
+        if in_chunk == 0 {
+            out.push_str("<div class=\"ch\">");
+        }
+        crate::fmt::push(
+            &mut out,
+            &format!("<div class=\"hh\">{}</div>", esc(&h.header)),
+        );
+        in_chunk += 1;
+        for l in &h.lines {
+            if in_chunk == 0 {
+                out.push_str("<div class=\"ch\">");
+            }
+            let cls = match l.kind {
+                LineKind::Added => "add",
+                LineKind::Removed => "del",
+                LineKind::Context => "ctx",
+            };
+            crate::fmt::push(
+                &mut out,
+                &format!(
+                    "<div class=\"{cls}\" data-o=\"{}\" data-n=\"{}\">{}</div>",
+                    num(l.old_no),
+                    num(l.new_no),
+                    esc_text(&l.text)
+                ),
+            );
+            in_chunk += 1;
+            if in_chunk >= CHUNK_LINES {
+                out.push_str("</div>");
+                in_chunk = 0;
+            }
+        }
+    }
+    if in_chunk != 0 {
+        out.push_str("</div>");
+    }
+    out.push_str("</div></div>");
+    out
+}
+
 /// `rev` of `None` renders file names without links (the worktree has no blob URLs).
 pub(crate) fn diff_html_with(rev: Option<&str>, files: &[FileDiff]) -> String {
     let mut out = String::new();
+    let mut budget_used = 0usize;
+    let mut bytes_used = 0usize;
     for (i, f) in files.iter().enumerate() {
         crate::fmt::push(
             &mut out,
@@ -318,59 +379,88 @@ pub(crate) fn diff_html_with(rev: Option<&str>, files: &[FileDiff]) -> String {
         } else if f.hunks.is_empty() {
             out.push_str("<p class=\"muted pad\">No textual changes.</p>");
         } else {
-            out.push_str("<div class=\"diffwrap\"><table class=\"diff\">");
-            for h in &f.hunks {
+            let changed = (f.additions + f.deletions) as usize;
+            let bytes: usize = f
+                .hunks
+                .iter()
+                .flat_map(|h| &h.lines)
+                .map(|l| l.text.len() + 48)
+                .sum();
+            let over = rev.is_some()
+                && (changed > FILE_DIFF_BUDGET
+                    || bytes > FILE_DIFF_BYTES
+                    || budget_used + changed > TOTAL_DIFF_BUDGET
+                    || bytes_used + bytes > TOTAL_DIFF_BYTES);
+            budget_used += changed;
+            bytes_used += bytes;
+            if let (true, Some(rev)) = (over, rev) {
                 crate::fmt::push(
                     &mut out,
                     &format!(
-                        "<tr class=\"hh\"><td colspan=\"4\">{}</td></tr>",
-                        esc(&h.header)
+                        "<p class=\"muted pad\"><button type=\"button\" class=\"linkbtn\" data-load-diff=\"{}/diff/{}/{i}\">Load diff ({} changed lines)</button></p>",
+                        crate::fmt::base(),
+                        enc(rev, false),
+                        crate::fmt::thousands(changed)
                     ),
                 );
-                for l in &h.lines {
-                    let (cls, sign) = match l.kind {
-                        LineKind::Added => ("add", '+'),
-                        LineKind::Removed => ("del", '-'),
-                        LineKind::Context => ("ctx", ' '),
-                    };
-                    crate::fmt::push(
-                        &mut out,
-                        &format!(
-                            "<tr class=\"{cls}\"><td class=\"n\">{}</td><td class=\"n\">{}</td><td class=\"g\">{sign}</td><td class=\"c\">{}</td></tr>",
-                            num(l.old_no),
-                            num(l.new_no),
-                            esc(&l.text)
-                        ),
-                    );
-                }
+            } else {
+                out.push_str(&diff_body_html(f));
             }
-            out.push_str("</table></div>");
         }
         out.push_str("</section>");
     }
     out
 }
 
-/// Returns the table and whether it was cut at the line cap.
+/// `GET /diff/{rev}/{index}`: the body of one folded file of a commit, as a fragment.
+pub(crate) async fn diff_fragment(
+    axum::extract::State(app): axum::extract::State<std::sync::Arc<crate::app::App>>,
+    axum::extract::Path((rev, index)): axum::extract::Path<(String, usize)>,
+) -> crate::error::Result<axum::response::Html<String>> {
+    let html = crate::app::blocking(&app, move |a| {
+        let id = a.repo.resolve(&rev)?;
+        let d = a.repo.commit(&id)?;
+        Ok(d.files.get(index).map(diff_body_html).unwrap_or_default())
+    })
+    .await?;
+    Ok(axum::response::Html(html))
+}
+
+/// Returns the line blocks and whether it was cut at the line cap.
+/// One div per line: the number is a CSS counter, so it neither selects nor copies.
 pub(crate) fn code_html(text: &str) -> (String, bool) {
-    let mut out = String::with_capacity(text.len() * 2);
-    out.push_str("<table class=\"code\">");
+    let mut out = String::with_capacity(text.len() + text.len() / 8 + 64);
+    out.push_str("<div class=\"code src\">");
     let mut cut = false;
+    let mut open = false;
     for (i, line) in text.lines().enumerate() {
         if i >= MAX_BLOB_LINES {
             cut = true;
             break;
         }
-        let n = i + 1;
+        if i % CHUNK_LINES == 0 {
+            if open {
+                out.push_str("</div>");
+            }
+            crate::fmt::push(
+                &mut out,
+                &format!("<div class=\"ch\" style=\"counter-reset:n {i}\">"),
+            );
+            open = true;
+        }
         crate::fmt::push(
             &mut out,
             &format!(
-                "<tr id=\"L{n}\"><td class=\"n\"><a href=\"#L{n}\">{n}</a></td><td class=\"c\">{}</td></tr>",
-                esc(line)
+                "<div id=\"L{}\" class=\"l\">{}</div>",
+                i + 1,
+                esc_text(line)
             ),
         );
     }
-    out.push_str("</table>");
+    if open {
+        out.push_str("</div>");
+    }
+    out.push_str("</div>");
     (out, cut)
 }
 
@@ -392,10 +482,11 @@ pub(crate) fn blame_html(lines: &[BlameLine], now: i64) -> String {
             crate::fmt::push(
                 &mut out,
                 &format!(
-                    "<td class=\"who\"><a href=\"{}/commit/{}\">{}</a> <span>{}</span> <span class=\"muted\">{}</span></td>",
+                    "<td class=\"who\"><a href=\"{}/commit/{}\">{}</a> <a class=\"who\" href=\"{}\">{}</a> <span class=\"muted\">{}</span></td>",
                     crate::fmt::base(),
                     esc(&l.commit),
                     esc(&short(&l.commit)),
+                    esc(&author_href(&l.author)),
                     esc(&l.author),
                     ago(l.time, now)
                 ),
@@ -418,7 +509,8 @@ pub(crate) fn blame_html(lines: &[BlameLine], now: i64) -> String {
 
 #[cfg(test)]
 mod tests {
-    use crate::views::{code_html, crumbs};
+    use crate::views::{code_html, crumbs, diff_html};
+    use gitterrace_git::{ChangeKind, FileDiff, LineKind};
 
     #[test]
     fn crumbs_link_prefixes() {
@@ -434,5 +526,50 @@ mod tests {
         assert!(h.contains("&lt;b&gt;"));
         assert!(!cut);
         assert!(h.contains("id=\"L2\""));
+        assert!(!h.contains("<table"));
+    }
+
+    #[test]
+    fn code_chunks_restart_the_counter() {
+        let text = "l\n".repeat(250);
+        let (h, _) = code_html(&text);
+        assert_eq!(h.matches("class=\"ch\"").count(), 3);
+        assert!(h.contains("counter-reset:n 100"));
+        assert!(h.contains("id=\"L250\""));
+    }
+
+    #[test]
+    fn huge_diffs_fold_behind_a_load_button() {
+        use gitterrace_git::{CodeCounts, Hunk, HunkLine};
+        let lines = |n: usize| {
+            (0..n)
+                .map(|i| HunkLine {
+                    kind: LineKind::Added,
+                    old_no: None,
+                    new_no: Some(i as u32 + 1),
+                    text: "x".into(),
+                })
+                .collect::<Vec<_>>()
+        };
+        let file = |n: usize| FileDiff {
+            path: "a.rs".into(),
+            old_path: None,
+            kind: ChangeKind::Modified,
+            binary: false,
+            additions: n as u32,
+            deletions: 0,
+            hunks: vec![Hunk {
+                header: "@@".into(),
+                lines: lines(n),
+            }],
+            lines: n as u32,
+            rewritten: 0,
+            code: CodeCounts::default(),
+        };
+        let small = diff_html("abc", &[file(10)]);
+        assert!(!small.contains("data-load-diff"));
+        let big = diff_html("abc", &[file(401)]);
+        assert!(big.contains("data-load-diff=\"/diff/abc/0\""));
+        assert!(!big.contains("<div class=\"add\""));
     }
 }

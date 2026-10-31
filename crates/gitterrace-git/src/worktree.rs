@@ -95,48 +95,73 @@ pub fn worktree_diff(repo: &Repo) -> Result<Vec<FileDiff>> {
     let work = r.workdir().map(Path::to_path_buf);
     let head = r.head_commit().ok().and_then(|c| c.tree().ok());
     let mut out = Vec::new();
+    let root = work.as_deref().and_then(|w| w.canonicalize().ok());
     for path in paths {
-        let old = head.as_ref().and_then(|t| head_blob(&r, t, &path));
-        let new = work
+        let old = head
+            .as_ref()
+            .map_or(Read::Missing, |t| head_blob(&r, t, &path));
+        let new = root
             .as_deref()
             .map_or(Read::Skip, |w| read_worktree(w, &path));
-        let new = match new {
-            Read::Data(d) => Some(d),
-            Read::Missing => None,
-            Read::Skip => continue,
-        };
         let kind = match (&old, &new) {
-            (None, None) => continue,
-            (None, Some(_)) => ChangeKind::Added,
-            (Some(_), None) => ChangeKind::Deleted,
-            (Some(a), Some(b)) if a == b => continue,
+            (Read::Skip, _) | (_, Read::Skip) | (Read::Missing, Read::Missing) => continue,
+            (Read::Missing, _) => ChangeKind::Added,
+            (_, Read::Missing) => ChangeKind::Deleted,
+            (Read::Data(a), Read::Data(b)) if a == b => continue,
             _ => ChangeKind::Modified,
         };
-        let (a, b) = (old.unwrap_or_default(), new.unwrap_or_default());
-        out.push(file_diff(path, kind, &a, &b));
+        let big = matches!(old, Read::Big) || matches!(new, Read::Big);
+        out.push(file_diff(path, kind, old.bytes(), new.bytes(), big));
     }
     Ok(out)
 }
 
-fn head_blob(repo: &gix::Repository, tree: &gix::Tree<'_>, path: &str) -> Option<Vec<u8>> {
-    let entry = tree.lookup_entry_by_path(path).ok()??;
+fn head_blob(repo: &gix::Repository, tree: &gix::Tree<'_>, path: &str) -> Read {
+    let Ok(Some(entry)) = tree.lookup_entry_by_path(path) else {
+        return Read::Missing;
+    };
     let mode = entry.mode();
     if mode.is_tree() || mode.is_commit() {
-        return None;
+        return Read::Missing;
     }
-    Some(repo.find_object(entry.object_id()).ok()?.detach().data)
+    let id = entry.object_id();
+    match repo.find_header(id) {
+        Ok(h) if h.size() > MAX_DIFF_BYTES as u64 => Read::Big,
+        Ok(_) => repo
+            .find_object(id)
+            .map_or(Read::Skip, |o| Read::Data(o.detach().data)),
+        Err(_) => Read::Skip,
+    }
 }
 
 enum Read {
     Data(Vec<u8>),
+    /// Over [`MAX_DIFF_BYTES`]: listed without hunks, never read.
+    Big,
     /// The file is gone, which for a tracked path means deleted.
     Missing,
-    /// Unreadable, a directory or a nested repository.
+    /// Unreadable, a directory, a nested repository or behind a symlinked directory.
     Skip,
 }
 
+impl Read {
+    fn bytes(&self) -> &[u8] {
+        match self {
+            Self::Data(d) => d,
+            Self::Big | Self::Missing | Self::Skip => &[],
+        }
+    }
+}
+
+/// `work` must be canonical. A path whose parent resolves outside it (a symlinked directory)
+/// is skipped, so the view never renders files from elsewhere on disk.
 fn read_worktree(work: &Path, rel: &str) -> Read {
     let full = work.join(rel);
+    match full.parent().map(Path::canonicalize) {
+        Some(Ok(parent)) if parent.starts_with(work) => {}
+        Some(Err(e)) if e.kind() == std::io::ErrorKind::NotFound => return Read::Missing,
+        _ => return Read::Skip,
+    }
     let Ok(meta) = std::fs::symlink_metadata(&full) else {
         return Read::Missing;
     };
@@ -149,6 +174,9 @@ fn read_worktree(work: &Path, rel: &str) -> Read {
     if !meta.is_file() {
         return Read::Skip;
     }
+    if meta.len() > MAX_DIFF_BYTES as u64 {
+        return Read::Big;
+    }
     match std::fs::read(&full) {
         Ok(d) => Read::Data(d),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Read::Missing,
@@ -156,9 +184,8 @@ fn read_worktree(work: &Path, rel: &str) -> Read {
     }
 }
 
-fn file_diff(path: String, kind: ChangeKind, old: &[u8], new: &[u8]) -> FileDiff {
+fn file_diff(path: String, kind: ChangeKind, old: &[u8], new: &[u8], big: bool) -> FileDiff {
     let probe = |d: &[u8]| d[..d.len().min(BINARY_PROBE)].contains(&0);
-    let big = old.len() > MAX_DIFF_BYTES || new.len() > MAX_DIFF_BYTES;
     if probe(old) || probe(new) || big {
         return FileDiff {
             path,
@@ -326,5 +353,50 @@ mod tests {
         let a = d.iter().find(|f| f.path == "a.txt").expect("a");
         assert_eq!((a.additions, a.deletions), (1, 1));
         assert!(!p.join(".git/index.lock").exists());
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn large_file_listed_without_reading_it() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = tempfile::tempdir().expect("tempdir");
+        let p = dir.path();
+        git(p, &["init", "-q", "-b", "main"]);
+        std::fs::write(p.join("a.txt"), "a\n").expect("write");
+        git(p, &["add", "."]);
+        git(p, &["commit", "-qm", "init"]);
+        // Unreadable, so any read fails and the file would be skipped: listing it proves
+        // the size cap ran on metadata alone.
+        let big = p.join("dump.sql");
+        std::fs::File::create(&big)
+            .and_then(|f| f.set_len(2 * super::MAX_DIFF_BYTES as u64))
+            .expect("sparse");
+        std::fs::set_permissions(&big, std::fs::Permissions::from_mode(0o000)).expect("chmod");
+        let d = worktree_diff(&Repo::discover(p).expect("repo")).expect("diff");
+        let f = d.iter().find(|f| f.path == "dump.sql").expect("listed");
+        assert!(f.binary && f.hunks.is_empty());
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn symlinked_directory_is_not_followed() {
+        let outside = tempfile::tempdir().expect("tempdir");
+        std::fs::write(outside.path().join("secret.txt"), "secret\n").expect("write");
+        let dir = tempfile::tempdir().expect("tempdir");
+        let p = dir.path();
+        git(p, &["init", "-q", "-b", "main"]);
+        std::fs::create_dir(p.join("docs")).expect("dir");
+        std::fs::write(p.join("docs/secret.txt"), "public\n").expect("write");
+        git(p, &["add", "."]);
+        git(p, &["commit", "-qm", "init"]);
+        std::fs::remove_dir_all(p.join("docs")).expect("rm");
+        std::os::unix::fs::symlink(outside.path(), p.join("docs")).expect("link");
+        let d = worktree_diff(&Repo::discover(p).expect("repo")).expect("diff");
+        let leaked = d
+            .iter()
+            .flat_map(|f| &f.hunks)
+            .flat_map(|h| &h.lines)
+            .any(|l| l.text.contains("secret"));
+        assert!(!leaked, "{d:?}");
     }
 }

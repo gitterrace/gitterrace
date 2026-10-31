@@ -1,6 +1,8 @@
-use crate::design;
+use std::sync::OnceLock;
 
-/// Light or dark rendering. Colors come from the shared gitterrace design palette.
+use schwarzwald::{KANDEL, Palette as Colours};
+
+/// Light or dark rendering. Colors come from the vendored schwarzwald crate (Kandel).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum Theme {
     #[default]
@@ -23,24 +25,44 @@ pub(crate) struct Palette {
     pub series: [&'static str; 8],
 }
 
+/// Card SVG carries lowercase hex; the crate ships uppercase. Each of the two
+/// palettes is lowercased once and kept for the life of the process.
+fn lower(hex: &str) -> &'static str {
+    Box::leak(hex.to_ascii_lowercase().into_boxed_str())
+}
+
 impl Theme {
-    pub(crate) fn palette(self) -> Palette {
-        let (d, on_accent) = match self {
-            Theme::Light => (design::LIGHT, "#ffffff"),
-            Theme::Dark => (design::DARK, "#0c1513"),
-        };
-        Palette {
-            bg: d.bg,
-            bg2: d.soft,
-            surface: d.surface,
-            fg: d.fg,
-            muted: d.muted,
-            faint: d.faint,
-            line: d.line,
-            accent: d.accent,
-            accent_fg: d.accent,
-            on_accent,
-            series: d.cat,
+    pub(crate) fn palette(self) -> &'static Palette {
+        static LIGHT: OnceLock<Palette> = OnceLock::new();
+        static DARK: OnceLock<Palette> = OnceLock::new();
+        match self {
+            Theme::Light => LIGHT.get_or_init(|| build(&KANDEL.light, "#ffffff")),
+            Theme::Dark => DARK.get_or_init(|| build(&KANDEL.dark, "#0c1513")),
         }
+    }
+}
+
+fn build(c: &Colours, on_accent: &'static str) -> Palette {
+    Palette {
+        bg: lower(c.surfaces_bg.hex),
+        bg2: lower(c.surfaces_soft.hex),
+        surface: lower(c.surfaces_window.hex),
+        fg: lower(c.ink_primary.hex),
+        muted: lower(c.ink_secondary.hex),
+        faint: lower(c.ink_tertiary.hex),
+        line: lower(c.surfaces_line.hex),
+        accent: lower(c.accent_ink.hex),
+        accent_fg: lower(c.accent_ink.hex),
+        on_accent,
+        series: [
+            lower(c.series_1.hex),
+            lower(c.series_2.hex),
+            lower(c.series_3.hex),
+            lower(c.series_4.hex),
+            lower(c.series_5.hex),
+            lower(c.series_6.hex),
+            lower(c.series_7.hex),
+            lower(c.series_8.hex),
+        ],
     }
 }

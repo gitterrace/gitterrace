@@ -86,8 +86,8 @@ pub fn wrapped_svg(w: &WrappedStats, layout: Layout, theme: Theme) -> String {
         );
     }
     match layout {
-        Layout::Landscape => landscape(&mut s, w, &p),
-        Layout::Portrait => portrait(&mut s, w, &p),
+        Layout::Landscape => landscape(&mut s, w, p),
+        Layout::Portrait => portrait(&mut s, w, p),
     }
     s.push_str("</svg>");
     s

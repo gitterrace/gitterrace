@@ -86,7 +86,7 @@ pub fn repo_card_svg(repo: &str, records: &[CommitRecord], now: i64, theme: Them
                 r##"<rect x="{}" y="124" width="{}" height="6" fill="{}"/>"##,
                 n(x),
                 n(sw),
-                lang_color(&p, i)
+                lang_color(p, i)
             );
             x += sw;
         }
@@ -98,7 +98,7 @@ pub fn repo_card_svg(repo: &str, records: &[CommitRecord], now: i64, theme: Them
                 o,
                 r##"<circle cx="{}" cy="145" r="3.5" fill="{}"/>"##,
                 n(x + 3.5),
-                lang_color(&p, i)
+                lang_color(p, i)
             );
             t(&mut o, x + 12.0, 149.0, 11, 500, p.muted, "s", &label);
             x += 12.0 + label.chars().count() as f64 * 6.2 + 14.0;

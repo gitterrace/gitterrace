@@ -138,7 +138,7 @@ pub(crate) fn badge_from_summary(badge: Badge, s: &RepoSummary, now: i64, theme:
                     r##"<rect x="{}" y="6" width="{}" height="8" fill="{}"/>"##,
                     n(x),
                     n(sw),
-                    lang_color(&p, i)
+                    lang_color(p, i)
                 );
                 x += sw;
             }

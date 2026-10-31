@@ -16,6 +16,7 @@ png = ["dep:resvg"]
 
 [dependencies]
 gitterrace-index.workspace = true
+schwarzwald.workspace = true
 thiserror.workspace = true
 resvg = { workspace = true, optional = true }
 
