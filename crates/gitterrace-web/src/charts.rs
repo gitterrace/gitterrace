@@ -1,39 +1,46 @@
 //! Server-rendered SVG charts. Colors come from CSS classes so themes apply.
 
-use crate::fmt::esc;
+use crate::fmt::{self, esc};
 
-const WIDTH: usize = 720;
-const HEIGHT: usize = 140;
-const LABEL_H: usize = 18;
+const HEIGHT: usize = 170;
+const LABEL_H: usize = 52;
+const TOP_PAD: f64 = 14.0;
+const SLOT_MIN: f64 = 16.0;
+const SLOT_MAX: f64 = 40.0;
+const FIT_WIDTH: f64 = 720.0;
 const DAYS: [&str; 7] = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
-/// Vertical bars, one per `(label, value)`. Only the first and last label are drawn.
+/// Vertical bars, one per `(label, value)`, each labelled and with its count above it. Bar
+/// width is capped so short series do not turn into flat blocks.
+#[allow(clippy::many_single_char_names)]
 pub(crate) fn bars(points: &[(String, u64)]) -> String {
     let max = points.iter().map(|p| p.1).max().unwrap_or(0).max(1);
     let n = points.len().max(1);
-    let slot = WIDTH as f64 / n as f64;
-    let plot = (HEIGHT - LABEL_H) as f64;
+    #[allow(clippy::cast_precision_loss)]
+    let slot = (FIT_WIDTH / n as f64).clamp(SLOT_MIN, SLOT_MAX);
+    #[allow(clippy::cast_precision_loss)]
+    let width = slot * n as f64;
+    let plot = HEIGHT as f64 - LABEL_H as f64 - TOP_PAD;
     let mut svg = format!(
-        r#"<svg class="chart" viewBox="0 0 {WIDTH} {HEIGHT}" role="img" aria-label="Activity">"#
+        r#"<svg class="chart" viewBox="0 0 {width:.0} {HEIGHT}" style="max-width:{width:.0}px" role="img" aria-label="Activity">"#
     );
     for (i, (label, v)) in points.iter().enumerate() {
         #[allow(clippy::cast_precision_loss)]
         let h = (*v as f64 / max as f64 * plot).max(if *v > 0 { 1.0 } else { 0.0 });
-        let x = i as f64 * slot;
-        let w = (slot * 0.8).max(1.0);
-        svg.push_str(&format!(
-            r#"<rect x="{x:.1}" y="{:.1}" width="{w:.1}" height="{h:.1}"><title>{}: {v}</title></rect>"#,
-            plot - h,
-            esc(label)
-        ));
-    }
-    if let (Some(first), Some(last)) = (points.first(), points.last()) {
-        let y = HEIGHT - 4;
-        svg.push_str(&format!(r#"<text x="0" y="{y}">{}</text>"#, esc(&first.0)));
-        svg.push_str(&format!(
-            r#"<text x="{WIDTH}" y="{y}" text-anchor="end">{}</text>"#,
-            esc(&last.0)
-        ));
+        #[allow(clippy::cast_precision_loss)]
+        let x = i as f64 * slot + slot * 0.15;
+        let w = slot * 0.7;
+        let top = TOP_PAD + plot - h;
+        let cx = x + w / 2.0;
+        let ly = TOP_PAD + plot + 8.0;
+        let l = esc(label);
+        fmt::push(
+            &mut svg,
+            &format!(
+                r#"<g><title>{l}: {v}</title><rect x="{x:.1}" y="{top:.1}" width="{w:.1}" height="{h:.1}" rx="2"/><text class="val" x="{cx:.1}" y="{:.1}" text-anchor="middle">{v}</text><text class="lab" transform="translate({cx:.1} {ly:.1}) rotate(-60)" text-anchor="end">{l}</text></g>"#,
+                top - 3.0
+            ),
+        );
     }
     svg.push_str("</svg>");
     svg
@@ -50,27 +57,36 @@ pub(crate) fn heatmap(cells: &[[u32; 24]; 7], max: u32) -> String {
         r#"<svg class="chart heat" viewBox="0 0 {w} {h}" role="img" aria-label="Commits by weekday and hour">"#
     );
     for hour in (0..24).step_by(3) {
-        svg.push_str(&format!(
-            r#"<text x="{}" y="11">{hour:02}</text>"#,
-            LEFT + hour * CELL
-        ));
+        fmt::push(
+            &mut svg,
+            &format!(
+                r#"<text x="{}" y="11">{hour:02}</text>"#,
+                LEFT + hour * CELL
+            ),
+        );
     }
     for (d, row) in cells.iter().enumerate() {
         let y = TOP + d * CELL;
-        svg.push_str(&format!(r#"<text x="0" y="{}">{}</text>"#, y + 16, DAYS[d]));
+        fmt::push(
+            &mut svg,
+            &format!(r#"<text x="0" y="{}">{}</text>"#, y + 16, DAYS[d]),
+        );
         for (hr, v) in row.iter().enumerate() {
             let level = if *v == 0 || max == 0 {
                 0
             } else {
                 (*v * 4).div_ceil(max).min(4)
             };
-            svg.push_str(&format!(
-                r#"<rect class="h{level}" x="{}" y="{y}" width="{}" height="{}" rx="3"><title>{} {hr:02}:00, {v} commits</title></rect>"#,
-                LEFT + hr * CELL,
-                CELL - 2,
-                CELL - 2,
-                DAYS[d]
-            ));
+            fmt::push(
+                &mut svg,
+                &format!(
+                    r#"<rect class="h{level}" x="{}" y="{y}" width="{}" height="{}" rx="3"><title>{} {hr:02}:00, {v} commits</title></rect>"#,
+                    LEFT + hr * CELL,
+                    CELL - 2,
+                    CELL - 2,
+                    DAYS[d]
+                ),
+            );
         }
     }
     svg.push_str("</svg>");

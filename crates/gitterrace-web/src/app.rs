@@ -65,12 +65,11 @@ impl App {
         if !self.ready() {
             return Ok(None);
         }
-        if let Ok(g) = self.records.lock() {
-            if let Some((id, recs)) = g.as_ref() {
-                if id == head {
-                    return Ok(Some(Arc::clone(recs)));
-                }
-            }
+        if let Ok(g) = self.records.lock()
+            && let Some((id, recs)) = g.as_ref()
+            && id == head
+        {
+            return Ok(Some(Arc::clone(recs)));
         }
         let recs = Arc::new(self.index.records(&self.repo, head)?);
         if let Ok(mut g) = self.records.lock() {

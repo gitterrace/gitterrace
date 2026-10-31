@@ -28,6 +28,7 @@ mod tests {
         parse_subject(s)
     }
 
+    #[allow(clippy::unnecessary_wraps)]
     fn some(s: &str) -> Option<String> {
         Some(s.to_owned())
     }

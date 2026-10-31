@@ -4,14 +4,14 @@
 {% include "tabs.html" %}
 <h2>Types</h2>
 <div class="card"><table class="entries">
-{% for r in kinds %}<tr><td><div class="bar" style="--w:{{ r.pct }}%"></div>{{ r.label }}</td><td class="r">{{ r.commits }}</td></tr>{% endfor %}
+{% for r in kinds %}<tr><td class="fill"><div class="bar" style="--w:{{ r.pct }}%"></div>{{ r.label }}</td><td class="r">{{ r.commits }}</td></tr>{% endfor %}
 {% if kinds.is_empty() %}<tr><td class="muted">No conventional commits found.</td></tr>{% endif %}
 </table></div>
 <h2>Types over time</h2>
 <div class="card pad">{{ over_time|safe }}</div>
 <h2>Scopes</h2>
 <div class="card"><table class="entries">
-{% for r in scopes %}<tr><td><div class="bar" style="--w:{{ r.pct }}%"></div>{{ r.label }}</td><td class="r">{{ r.commits }}</td></tr>{% endfor %}
+{% for r in scopes %}<tr><td class="fill"><div class="bar" style="--w:{{ r.pct }}%"></div>{{ r.label }}</td><td class="r">{{ r.commits }}</td></tr>{% endfor %}
 {% if scopes.is_empty() %}<tr><td class="muted">No scopes found.</td></tr>{% endif %}
 </table></div>
 {% endblock %}

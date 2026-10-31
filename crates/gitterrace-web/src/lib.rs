@@ -33,6 +33,7 @@ pub async fn serve(repo_path: PathBuf, addr: SocketAddr) -> io::Result<()> {
 }
 
 #[cfg(test)]
+#[allow(clippy::expect_used)]
 mod tests {
     use std::{process::Command, sync::Arc};
 

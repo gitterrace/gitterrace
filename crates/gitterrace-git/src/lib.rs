@@ -1,7 +1,12 @@
 //! Read-only access to a git repository. Every read is pinned to a commit;
 //! the working tree is never touched.
 
+// Every fallible read fails the same way, so per-function `# Errors` sections add nothing.
+#![allow(clippy::missing_errors_doc)]
+
+mod diff;
 mod error;
+mod ident;
 mod repo;
 mod types;
 

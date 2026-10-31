@@ -24,7 +24,7 @@ main.wrap{padding-top:28px;padding-bottom:64px}
 .card{border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--bg)}
 .scroll{overflow-x:auto}
 .numbers{display:flex;gap:40px;margin-bottom:28px;min-height:52px;align-items:center}
-.numbers div{display:flex;flex-direction:column}.numbers b{font-size:24px;letter-spacing:-.02em}
+.numbers div{display:flex;flex-direction:column}.numbers b{font-size:24px;letter-spacing:-.02em;font-variant-numeric:tabular-nums}.numbers .lines{flex-direction:row;flex-wrap:wrap;gap:0 10px;align-items:baseline}.numbers .lines span{flex-basis:100%}
 .numbers span{color:var(--muted);font-size:13px}
 .cols{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:40px}
 @media (max-width:860px){.cols{grid-template-columns:1fr}}
@@ -50,8 +50,8 @@ button:hover{border-color:var(--muted)}
 .entries tr:first-child td{border-top:0}
 .entries .th td{color:var(--muted);font-size:12px;background:var(--soft)}
 .entries tr:hover td{background:var(--soft)}
-.entries .bar{position:absolute;inset:3px auto 3px 0;width:var(--w);background:var(--hunk);opacity:.8;z-index:0;height:auto;gap:0;display:block}
-.entries td>*{position:relative}.entries td>.bar{position:absolute}
+.entries td.fill{padding-bottom:12px}
+.entries .bar{position:absolute;left:16px;right:16px;bottom:5px;height:3px;border-radius:2px;background:linear-gradient(90deg,var(--accent) var(--w),transparent var(--w));opacity:.55;display:block}
 .ico{display:inline-block;width:14px;height:14px;margin-right:10px;vertical-align:-2px;border-radius:3px;border:1.5px solid var(--muted)}
 .ico.dir{background:var(--accent);border-color:var(--accent);opacity:.75}.ico.module{border-style:dashed}
 .meta{color:var(--muted);margin:8px 0 20px}.meta b{color:var(--fg)}
@@ -61,12 +61,12 @@ button:hover{border-color:var(--muted)}
 .files li{display:flex;justify-content:space-between;padding:6px 16px;border-top:1px solid var(--line);font-family:var(--mono);font-size:12.5px}
 .add{color:var(--add)}.del{color:var(--del)}.counts{font-family:var(--mono);font-size:12.5px;font-weight:600}
 .file{border:1px solid var(--line);border-radius:8px;margin-top:20px;overflow:hidden}
-.file>header{display:flex;gap:10px;align-items:center;padding:8px 16px;background:var(--soft);border-bottom:1px solid var(--line);font-family:var(--mono);font-size:13px;position:sticky;top:52px}
+.file>header{display:flex;gap:10px;align-items:center;padding:8px 16px;background:var(--soft);border-bottom:1px solid var(--line);font-family:var(--mono);font-size:13px;}
 .file>header .counts{margin-left:auto}
 .badge{font:600 10px/1 system-ui;text-transform:uppercase;letter-spacing:.05em;padding:3px 6px;border-radius:10px;border:1px solid var(--line);color:var(--muted)}
 .badge.added{color:var(--add)}.badge.deleted{color:var(--del)}
 table.diff,table.code{border-collapse:collapse;width:100%}
-.diff{overflow-x:auto;display:block}.diff tr{display:table-row}
+.diffwrap{overflow-x:auto}
 .diff td,.code td{padding:0 10px;line-height:20px;white-space:pre;vertical-align:top}
 .n{width:1%;min-width:44px;text-align:right;color:var(--muted);user-select:none}
 .n a{color:inherit}.g{width:1%;user-select:none;padding:0 4px!important}
@@ -77,10 +77,12 @@ table.diff,table.code{border-collapse:collapse;width:100%}
 .blame .who{width:1%;white-space:nowrap;font:12px system-ui;min-width:280px;padding-right:16px;border-right:1px solid var(--line)}
 .blame .run td{border-top:1px solid var(--line)}.blame .who span{margin-left:6px}
 svg.chart{width:100%;height:auto;display:block}
-svg.chart rect{fill:var(--accent)}svg.chart text{fill:var(--muted);font:11px system-ui}
+svg.chart rect{fill:var(--accent)}svg.chart .val{font-size:10px}svg.chart .lab{font-size:10px}svg.chart g:hover rect{opacity:.75}svg.chart text{fill:var(--muted);font:11px system-ui}
 svg.heat{max-width:640px}
 svg.heat rect.h0{fill:var(--h0)}svg.heat rect.h1{fill:var(--h1)}svg.heat rect.h2{fill:var(--h2)}svg.heat rect.h3{fill:var(--h3)}svg.heat rect.h4{fill:var(--h4)}
 progress{width:100%;accent-color:var(--accent);height:6px}
 .progress{display:flex;flex-direction:column;gap:8px;max-width:420px}
 .legend{display:flex;flex-wrap:wrap;gap:12px;margin-top:8px;font-size:12px;color:var(--muted)}
 .legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px}
+.day{font-size:13px;font-weight:600;color:var(--muted);margin:24px 0 4px}.day:first-child{margin-top:0}
+.tree-msg{color:var(--muted);max-width:480px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}

@@ -4,8 +4,8 @@
 {% if let Some(t) = totals %}
 <div><b>{{ t.commits }}</b><span>commits</span></div>
 <div><b>{{ t.authors }}</b><span>authors</span></div>
-<div><b>{{ t.files_touched }}</b><span>files touched</span></div>
-<div><b class="add">+{{ t.additions }}</b><b class="del">-{{ t.deletions }}</b><span>lines</span></div>
+<div><b>{{ t.files }}</b><span>files touched</span></div>
+<div class="lines"><b class="add">+{{ t.additions }}</b><b class="del">-{{ t.deletions }}</b><span>lines</span></div>
 {% else %}
 <div class="progress" data-progress><span class="muted">Indexing history</span><progress max="100" value="0"></progress></div>
 {% endif %}

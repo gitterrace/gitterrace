@@ -5,7 +5,7 @@
 {% for g in groups %}
 <h2>{{ g.title }}</h2>
 <div class="card"><table class="entries">
-{% for r in g.rows %}<tr><td><div class="bar" style="--w:{{ r.pct }}%"></div>{% if r.href.is_empty() %}{{ r.label }}{% else %}<a href="{{ r.href }}">{{ r.label }}</a>{% endif %}</td><td class="r">{{ r.commits }}</td><td class="r"><b class="add">+{{ r.additions }}</b> <b class="del">-{{ r.deletions }}</b></td></tr>{% endfor %}
+{% for r in g.rows %}<tr><td class="fill"><div class="bar" style="--w:{{ r.pct }}%"></div>{% if r.href.is_empty() %}{{ r.label }}{% else %}<a href="{{ r.href }}">{{ r.label }}</a>{% endif %}</td><td class="r">{{ r.commits }}</td><td class="r"><b class="add">+{{ r.additions }}</b> <b class="del">-{{ r.deletions }}</b></td></tr>{% endfor %}
 {% if g.rows.is_empty() %}<tr><td class="muted">Nothing yet</td></tr>{% endif %}
 </table></div>
 {% endfor %}

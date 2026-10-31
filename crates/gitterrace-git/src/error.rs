@@ -12,3 +12,7 @@ pub enum Error {
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
+
+pub(crate) fn git<E: std::fmt::Display>(e: E) -> Error {
+    Error::Git(e.to_string())
+}

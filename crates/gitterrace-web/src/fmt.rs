@@ -80,10 +80,52 @@ pub(crate) fn enc(s: &str, keep_slash: bool) -> String {
         {
             out.push(char::from(b));
         } else {
-            out.push_str(&format!("%{b:02X}"));
+            push(&mut out, &format!("%{b:02X}"));
         }
     }
     out
+}
+
+/// Appends an owned string; keeps `format!` call sites free of `push_str(&format!(..))`.
+pub(crate) fn push(out: &mut String, piece: &str) {
+    out.push_str(piece);
+}
+
+/// `13972` as `13,972`.
+pub(crate) fn thousands(n: impl std::fmt::Display) -> String {
+    let digits = n.to_string();
+    let mut out = String::with_capacity(digits.len() + digits.len() / 3);
+    for (i, ch) in digits.chars().enumerate() {
+        if i > 0 && (digits.len() - i).is_multiple_of(3) {
+            out.push(',');
+        }
+        out.push(ch);
+    }
+    out
+}
+
+const MONTHS: [&str; 12] = [
+    "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+];
+
+/// Day header such as `Today`, `Yesterday` or `Oct 29`, in the commit's own offset.
+pub(crate) fn day_label(time: i64, offset: i32, now: i64) -> String {
+    let d = (time + i64::from(offset)).div_euclid(86_400);
+    let today = (now + i64::from(offset)).div_euclid(86_400);
+    match today - d {
+        0 => "Today".to_owned(),
+        1 => "Yesterday".to_owned(),
+        _ => {
+            let (y, m, day) = civil(d);
+            let (ty, _, _) = civil(today);
+            let mon = MONTHS[(m as usize).saturating_sub(1).min(11)];
+            if y == ty {
+                format!("{mon} {day}")
+            } else {
+                format!("{mon} {day}, {y}")
+            }
+        }
+    }
 }
 
 pub(crate) fn short(id: &str) -> String {
@@ -99,7 +141,7 @@ pub(crate) fn esc(s: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use crate::fmt::{ago, date, enc, size};
+    use crate::fmt::{ago, date, day_label, enc, size, thousands};
 
     #[test]
     fn formats_epoch_and_offset() {
@@ -113,6 +155,16 @@ mod tests {
         assert_eq!(ago(0, 90), "1 minute ago");
         assert_eq!(ago(0, 86_400 * 3), "3 days ago");
         assert_eq!(size(1536), "1.5 KiB");
+    }
+
+    #[test]
+    fn groups_digits_and_days() {
+        assert_eq!(thousands(3_522_647_u64), "3,522,647");
+        assert_eq!(thousands(12_u32), "12");
+        assert_eq!(day_label(100, 0, 150), "Today");
+        assert_eq!(day_label(0, 0, 86_400), "Yesterday");
+        assert_eq!(day_label(0, 0, 86_400 * 10), "Jan 1");
+        assert_eq!(day_label(0, 0, 86_400 * 400), "Jan 1, 1970");
     }
 
     #[test]

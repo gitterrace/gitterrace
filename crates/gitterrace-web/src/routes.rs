@@ -12,7 +12,7 @@ use axum::{
 };
 use serde::Deserialize;
 use gitterrace_git::RefKind;
-use gitterrace_index::{Granularity, Label, Totals};
+use gitterrace_index::{Granularity, Label};
 
 use crate::{
     app::{App, blocking},
@@ -49,11 +49,11 @@ pub(crate) fn router(app: Arc<App>) -> Router {
         .route("/api/progress", get(progress))
         .route(
             "/static/app.css",
-            get(|| asset("text/css; charset=utf-8", include_str!("../static/app.css"))),
+            get(|| async { asset("text/css; charset=utf-8", include_str!("../static/app.css")) }),
         )
         .route(
             "/static/app.js",
-            get(|| {
+            get(|| async {
                 asset(
                     "text/javascript; charset=utf-8",
                     include_str!("../static/app.js"),
@@ -63,7 +63,7 @@ pub(crate) fn router(app: Arc<App>) -> Router {
         .with_state(app)
 }
 
-async fn asset(kind: &'static str, body: &'static str) -> Response {
+fn asset(kind: &'static str, body: &'static str) -> Response {
     (
         [
             (header::CONTENT_TYPE, HeaderValue::from_static(kind)),
@@ -78,11 +78,19 @@ fn page<T: Template>(t: &T) -> Result<Html<String>> {
     Ok(Html(t.render()?))
 }
 
+struct Numbers {
+    commits: String,
+    authors: String,
+    files: String,
+    additions: String,
+    deletions: String,
+}
+
 #[derive(Template)]
 #[template(path = "overview.html")]
 struct OverviewPage {
     c: Chrome,
-    totals: Option<Totals>,
+    totals: Option<Numbers>,
     readme: Option<String>,
     recent: Vec<CommitRow>,
 }
@@ -99,7 +107,16 @@ async fn overview(State(app): Shared) -> Result<Html<String>> {
                 .and_then(|b| b.text)
                 .map(|t| markdown::render(&t))
         });
-        let totals = a.records(&head)?.map(|r| gitterrace_index::totals(&r));
+        let totals = a.records(&head)?.map(|r| {
+            let t = gitterrace_index::totals(&r);
+            Numbers {
+                commits: fmt::thousands(t.commits),
+                authors: fmt::thousands(t.authors),
+                files: fmt::thousands(t.files_touched),
+                additions: fmt::thousands(t.additions),
+                deletions: fmt::thousands(t.deletions),
+            }
+        });
         Ok(OverviewPage {
             c: views::chrome(&a.name, "overview"),
             totals,
@@ -117,6 +134,11 @@ struct LogQuery {
     page: Option<usize>,
 }
 
+pub(crate) struct DayGroup {
+    pub(crate) label: String,
+    pub(crate) rows: Vec<CommitRow>,
+}
+
 #[derive(Template)]
 #[template(path = "log.html")]
 struct LogPage {
@@ -124,7 +146,8 @@ struct LogPage {
     rev: String,
     rev_enc: String,
     path: String,
-    rows: Vec<CommitRow>,
+    days: Vec<DayGroup>,
+    empty: bool,
     newer: Option<String>,
     older: Option<String>,
 }
@@ -148,7 +171,7 @@ async fn log(
         let link = |n: usize| {
             let mut q = format!("/log/{rev_enc}?page={n}");
             if !path.is_empty() {
-                q.push_str(&format!("&path={}", fmt::enc(&path, true)));
+                crate::fmt::push(&mut q, &format!("&path={}", fmt::enc(&path, true)));
             }
             q
         };
@@ -156,7 +179,8 @@ async fn log(
             c: views::chrome(&a.name, "log"),
             newer: (pg > 0).then(|| link(pg - 1)),
             older: more.then(|| link(pg + 1)),
-            rows: list.iter().map(|c| views::commit_row(c, now)).collect(),
+            empty: list.is_empty(),
+            days: views::day_groups(&list, now),
             rev,
             rev_enc,
             path,
@@ -550,6 +574,35 @@ fn label_rows(v: Vec<gitterrace_index::LabelCount>) -> Vec<Row> {
         .collect()
 }
 
+/// Types under 1% of typed commits fold into one `other` row. `merge` is shown as `merges`.
+fn kind_rows(v: Vec<gitterrace_index::LabelCount>) -> Vec<Row> {
+    let total: usize = v.iter().map(|l| l.commits).sum();
+    let mut keep = Vec::new();
+    let mut other = 0;
+    for mut l in v {
+        if l.commits * 100 < total {
+            other += l.commits;
+            continue;
+        }
+        if l.label == "merge" {
+            "merges".clone_into(&mut l.label);
+        }
+        keep.push(l);
+    }
+    if other > 0 {
+        keep.push(gitterrace_index::LabelCount {
+            label: "other".to_owned(),
+            commits: other,
+        });
+    }
+    keep.sort_by(|a, b| {
+        b.commits
+            .cmp(&a.commits)
+            .then_with(|| a.label.cmp(&b.label))
+    });
+    label_rows(keep)
+}
+
 async fn stats_types(State(app): Shared) -> Result<Html<String>> {
     with_records(&app, "t", |_, r, c| {
         let buckets = gitterrace_index::label_over_time(r, Label::Kind, Granularity::Month);
@@ -565,7 +618,7 @@ async fn stats_types(State(app): Shared) -> Result<Html<String>> {
         StatsTypesPage {
             c,
             tabs: views::stats_tabs("t"),
-            kinds: label_rows(gitterrace_index::label_breakdown(r, Label::Kind)),
+            kinds: kind_rows(gitterrace_index::label_breakdown(r, Label::Kind)),
             scopes: label_rows(gitterrace_index::label_breakdown(r, Label::Scope)),
             over_time: charts::bars(&points),
         }

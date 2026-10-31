@@ -64,6 +64,22 @@ pub(crate) struct Row {
     pub(crate) pct: u32,
 }
 
+/// Consecutive commits sharing a calendar day (in the author's offset) form one group.
+pub(crate) fn day_groups(list: &[CommitSummary], now: i64) -> Vec<crate::routes::DayGroup> {
+    let mut out: Vec<crate::routes::DayGroup> = Vec::new();
+    for c in list {
+        let label = crate::fmt::day_label(c.author.time, c.author.offset, now);
+        match out.last_mut() {
+            Some(g) if g.label == label => g.rows.push(commit_row(c, now)),
+            _ => out.push(crate::routes::DayGroup {
+                label,
+                rows: vec![commit_row(c, now)],
+            }),
+        }
+    }
+    out
+}
+
 pub(crate) fn chrome(name: &str, active: &str) -> Chrome {
     let items = [
         ("/", "Overview", "overview"),
@@ -212,50 +228,65 @@ fn num(n: Option<u32>) -> String {
 pub(crate) fn diff_html(rev: &str, files: &[FileDiff]) -> String {
     let mut out = String::new();
     for (i, f) in files.iter().enumerate() {
-        out.push_str(&format!(
-            "<section class=\"file\" id=\"f{i}\"><header><span class=\"badge {k}\">{k}</span> ",
-            k = kind_name(f.kind)
-        ));
+        crate::fmt::push(
+            &mut out,
+            &format!(
+                "<section class=\"file\" id=\"f{i}\"><header><span class=\"badge {k}\">{k}</span> ",
+                k = kind_name(f.kind)
+            ),
+        );
         if f.kind == ChangeKind::Deleted {
             out.push_str(&esc(&f.path));
         } else {
-            out.push_str(&format!(
-                "<a href=\"/blob/{}/{}\">{}</a>",
-                enc(rev, false),
-                enc(&f.path, true),
-                esc(&file_label(f))
-            ));
+            crate::fmt::push(
+                &mut out,
+                &format!(
+                    "<a href=\"/blob/{}/{}\">{}</a>",
+                    enc(rev, false),
+                    enc(&f.path, true),
+                    esc(&file_label(f))
+                ),
+            );
         }
-        out.push_str(&format!(
-            "<span class=\"counts\"><b class=\"add\">+{}</b> <b class=\"del\">-{}</b></span></header>",
-            f.additions, f.deletions
-        ));
+        crate::fmt::push(
+            &mut out,
+            &format!(
+                "<span class=\"counts\"><b class=\"add\">+{}</b> <b class=\"del\">-{}</b></span></header>",
+                f.additions, f.deletions
+            ),
+        );
         if f.binary {
             out.push_str("<p class=\"muted pad\">Binary file not shown.</p>");
         } else if f.hunks.is_empty() {
             out.push_str("<p class=\"muted pad\">No textual changes.</p>");
         } else {
-            out.push_str("<table class=\"diff\">");
+            out.push_str("<div class=\"diffwrap\"><table class=\"diff\">");
             for h in &f.hunks {
-                out.push_str(&format!(
-                    "<tr class=\"hh\"><td colspan=\"4\">{}</td></tr>",
-                    esc(&h.header)
-                ));
+                crate::fmt::push(
+                    &mut out,
+                    &format!(
+                        "<tr class=\"hh\"><td colspan=\"4\">{}</td></tr>",
+                        esc(&h.header)
+                    ),
+                );
                 for l in &h.lines {
                     let (cls, sign) = match l.kind {
                         LineKind::Added => ("add", '+'),
                         LineKind::Removed => ("del", '-'),
                         LineKind::Context => ("ctx", ' '),
                     };
-                    out.push_str(&format!(
-                        "<tr class=\"{cls}\"><td class=\"n\">{}</td><td class=\"n\">{}</td><td class=\"g\">{sign}</td><td class=\"c\">{}</td></tr>",
-                        num(l.old_no),
-                        num(l.new_no),
-                        esc(&l.text)
-                    ));
+                    crate::fmt::push(
+                        &mut out,
+                        &format!(
+                            "<tr class=\"{cls}\"><td class=\"n\">{}</td><td class=\"n\">{}</td><td class=\"g\">{sign}</td><td class=\"c\">{}</td></tr>",
+                            num(l.old_no),
+                            num(l.new_no),
+                            esc(&l.text)
+                        ),
+                    );
                 }
             }
-            out.push_str("</table>");
+            out.push_str("</table></div>");
         }
         out.push_str("</section>");
     }
@@ -273,10 +304,13 @@ pub(crate) fn code_html(text: &str) -> (String, bool) {
             break;
         }
         let n = i + 1;
-        out.push_str(&format!(
-            "<tr id=\"L{n}\"><td class=\"n\"><a href=\"#L{n}\">{n}</a></td><td class=\"c\">{}</td></tr>",
-            esc(line)
-        ));
+        crate::fmt::push(
+            &mut out,
+            &format!(
+                "<tr id=\"L{n}\"><td class=\"n\"><a href=\"#L{n}\">{n}</a></td><td class=\"c\">{}</td></tr>",
+                esc(line)
+            ),
+        );
     }
     out.push_str("</table>");
     (out, cut)
@@ -288,27 +322,36 @@ pub(crate) fn blame_html(lines: &[BlameLine], now: i64) -> String {
     for l in lines {
         let first = l.commit != prev;
         prev = &l.commit;
-        out.push_str(&format!(
-            "<tr id=\"L{}\"{}>",
-            l.line_no,
-            if first { " class=\"run\"" } else { "" }
-        ));
+        crate::fmt::push(
+            &mut out,
+            &format!(
+                "<tr id=\"L{}\"{}>",
+                l.line_no,
+                if first { " class=\"run\"" } else { "" }
+            ),
+        );
         if first {
-            out.push_str(&format!(
-                "<td class=\"who\"><a href=\"/commit/{}\">{}</a> <span>{}</span> <span class=\"muted\">{}</span></td>",
-                esc(&l.commit),
-                esc(&short(&l.commit)),
-                esc(&l.author),
-                ago(l.time, now)
-            ));
+            crate::fmt::push(
+                &mut out,
+                &format!(
+                    "<td class=\"who\"><a href=\"/commit/{}\">{}</a> <span>{}</span> <span class=\"muted\">{}</span></td>",
+                    esc(&l.commit),
+                    esc(&short(&l.commit)),
+                    esc(&l.author),
+                    ago(l.time, now)
+                ),
+            );
         } else {
             out.push_str("<td class=\"who\"></td>");
         }
-        out.push_str(&format!(
-            "<td class=\"n\"><a href=\"#L{n}\">{n}</a></td><td class=\"c\">{}</td></tr>",
-            esc(&l.text),
-            n = l.line_no
-        ));
+        crate::fmt::push(
+            &mut out,
+            &format!(
+                "<td class=\"n\"><a href=\"#L{n}\">{n}</a></td><td class=\"c\">{}</td></tr>",
+                esc(&l.text),
+                n = l.line_no
+            ),
+        );
     }
     out.push_str("</table>");
     out
