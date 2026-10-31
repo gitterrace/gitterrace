@@ -1,0 +1,3 @@
+# Tests may panic on setup failures; production code may not (see AGENTS.md).
+allow-expect-in-tests = true
+allow-unwrap-in-tests = true

@@ -115,7 +115,6 @@ pub fn repo_card_svg(repo: &str, records: &[CommitRecord], now: i64, theme: Them
 }
 
 #[cfg(test)]
-#[allow(clippy::expect_used)]
 mod tests {
     use crate::stats::fixtures::sample;
     use crate::{Theme, repo_card_svg};

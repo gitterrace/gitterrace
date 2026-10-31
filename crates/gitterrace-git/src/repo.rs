@@ -408,7 +408,6 @@ fn path_id(commit: &gix::Commit<'_>, path: &str) -> Result<Option<gix::ObjectId>
 }
 
 #[cfg(test)]
-#[allow(clippy::expect_used)]
 mod tests {
     use std::collections::BTreeMap;
     use std::fs;

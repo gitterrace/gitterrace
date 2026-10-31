@@ -275,7 +275,6 @@ fn portrait(s: &mut String, w: &WrappedStats, p: &Palette) {
 }
 
 #[cfg(test)]
-#[allow(clippy::expect_used)]
 mod tests {
     use crate::stats::fixtures::sample;
     use crate::{Layout, Theme, wrapped_stats, wrapped_svg};

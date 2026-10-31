@@ -18,7 +18,6 @@ pub use insights::{INSIGHTS, Insight, Params as InsightParams};
 pub use mcp::{McpServer, serve_mcp};
 
 #[cfg(test)]
-#[allow(clippy::expect_used)]
 mod tests {
     use std::path::Path;
     use std::process::Command;

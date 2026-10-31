@@ -36,6 +36,7 @@ const MAX_PAGES: usize = 20_000;
 
 /// Writes the scoped site to `out` and returns how many files were written.
 pub async fn export(repo_path: &Path, out: &Path, scope: &Scope) -> anyhow::Result<usize> {
+    std::fs::create_dir_all(out).with_context(|| format!("creating {}", out.display()))?;
     let router = gitterrace_web::app_router(repo_path).context("building the router")?;
     wait_for_index(&router).await?;
     let repo = gitterrace_git::Repo::discover(repo_path).context("opening the repository")?;
@@ -88,7 +89,11 @@ async fn wait_for_index(router: &Router) -> anyhow::Result<()> {
     eprintln!("building the cache (first run reads every commit once)...");
     for _ in 0..3_600 {
         let (_, _, body) = fetch(router, "/api/progress").await?;
-        if String::from_utf8_lossy(&body).contains("\"ready\":true") {
+        let ready = serde_json::from_slice::<serde_json::Value>(&body)
+            .ok()
+            .and_then(|v| v.get("ready")?.as_bool())
+            .unwrap_or(false);
+        if ready {
             return Ok(());
         }
         tokio::time::sleep(std::time::Duration::from_millis(250)).await;
@@ -97,7 +102,9 @@ async fn wait_for_index(router: &Router) -> anyhow::Result<()> {
 }
 
 async fn fetch(router: &Router, path: &str) -> anyhow::Result<(StatusCode, String, Vec<u8>)> {
+    // The router refuses requests without a local Host (DNS-rebinding guard).
     let req = Request::get(path)
+        .header(axum::http::header::HOST, "localhost")
         .body(Body::empty())
         .context("building a request")?;
     let res = router
@@ -251,9 +258,30 @@ fn target(out: &Path, path: &str, content_type: &str) -> PathBuf {
 
 fn write_page(out: &Path, path: &str, content_type: &str, body: &[u8]) -> anyhow::Result<()> {
     let file = target(out, path, content_type);
+    let root = out
+        .canonicalize()
+        .with_context(|| format!("resolving {}", out.display()))?;
+    // `target` drops `..`, but a symlink already inside `out` could still lead
+    // elsewhere. Walk down one component at a time and refuse before creating
+    // anything: checking after `create_dir_all` would already have written
+    // directories through the link.
+    let mut dir = out.to_path_buf();
     if let Some(parent) = file.parent() {
-        std::fs::create_dir_all(parent)
-            .with_context(|| format!("creating {}", parent.display()))?;
+        for part in parent.strip_prefix(out).unwrap_or(parent).components() {
+            dir.push(part);
+            if !dir.exists() {
+                std::fs::create_dir(&dir).with_context(|| format!("creating {}", dir.display()))?;
+            }
+            let real = dir
+                .canonicalize()
+                .with_context(|| format!("resolving {}", dir.display()))?;
+            anyhow::ensure!(
+                real.starts_with(&root),
+                "refusing to write {} outside {}",
+                file.display(),
+                out.display()
+            );
+        }
     }
     std::fs::write(&file, body).with_context(|| format!("writing {}", file.display()))
 }
@@ -262,7 +290,7 @@ fn write_page(out: &Path, path: &str, content_type: &str, body: &[u8]) -> anyhow
 mod tests {
     use std::path::Path;
 
-    use crate::export::{links, target};
+    use crate::export::{links, target, write_page};
 
     #[test]
     fn links_keeps_same_origin_paths_only() {
@@ -299,5 +327,18 @@ mod tests {
             target(out, "/raw/HEAD/../../etc", "text/plain"),
             Path::new("/o/raw/HEAD/etc")
         );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn write_page_refuses_a_symlink_that_leads_outside() {
+        let out = tempfile::tempdir().expect("tempdir");
+        let elsewhere = tempfile::tempdir().expect("tempdir");
+        std::os::unix::fs::symlink(elsewhere.path(), out.path().join("stats")).expect("symlink");
+        let err = write_page(out.path(), "/stats/files", "text/html", b"x").unwrap_err();
+        assert!(err.to_string().contains("refusing to write"), "{err}");
+        assert!(!elsewhere.path().join("files").exists());
+        write_page(out.path(), "/refs", "text/html", b"ok").expect("normal page writes");
+        assert!(out.path().join("refs/index.html").exists());
     }
 }

@@ -349,7 +349,6 @@ pub(crate) mod fixtures {
 }
 
 #[cfg(test)]
-#[allow(clippy::expect_used)]
 mod tests {
     use crate::stats::fixtures::sample;
     use crate::stats::{civil, days_from_civil, repo_summary, wrapped_stats};

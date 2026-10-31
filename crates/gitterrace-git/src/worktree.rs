@@ -284,7 +284,6 @@ fn group(changes: &[Change], old: &[&[u8]], new: &[&[u8]]) -> Hunk {
 }
 
 #[cfg(test)]
-#[allow(clippy::expect_used)]
 mod tests {
     use std::process::Command;
 

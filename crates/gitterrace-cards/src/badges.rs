@@ -163,7 +163,6 @@ pub(crate) fn lang_color(p: &crate::palette::Palette, i: usize) -> &'static str 
 }
 
 #[cfg(test)]
-#[allow(clippy::expect_used)]
 mod tests {
     use crate::stats::fixtures::sample;
     use crate::{Badge, Theme, badge_svg};

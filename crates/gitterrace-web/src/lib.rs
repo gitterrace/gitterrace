@@ -14,11 +14,12 @@ mod views;
 
 use std::{
     io,
-    net::SocketAddr,
+    net::{IpAddr, SocketAddr},
     path::{Path, PathBuf},
     sync::Arc,
 };
 
+use axum::response::IntoResponse;
 use gitterrace_git::Repo;
 use gitterrace_index::Index;
 
@@ -26,24 +27,73 @@ use crate::app::App;
 
 /// The full router `serve` uses: pages, `/api/v1`, cards and badges. Starts the index
 /// refresher, so call it inside a tokio runtime. Drive it in-process with tower's `oneshot`.
+///
+/// Requests must carry a loopback `Host` header (`localhost`, `127.0.0.1`, `[::1]`), which
+/// stops DNS-rebinding pages from reading the repository. In-process callers send
+/// `Host: localhost`.
 pub fn app_router(repo_path: impl AsRef<Path>) -> io::Result<axum::Router> {
-    Ok(build(repo_path.as_ref())?.0)
+    Ok(build(repo_path.as_ref(), None)?.0)
 }
 
-fn build(repo_path: &Path) -> io::Result<(axum::Router, String)> {
+/// Host-header allowlist: loopback names plus, when bound elsewhere, the bound IP.
+fn host_allowed(host: &str, extra: Option<IpAddr>) -> bool {
+    let name = match host.strip_prefix('[') {
+        Some(rest) => match rest.split_once(']') {
+            Some((ip, _)) => ip,
+            None => return false,
+        },
+        None => host.rsplit_once(':').map_or(host, |(h, _)| h),
+    };
+    let name = name.to_ascii_lowercase();
+    if matches!(name.as_str(), "localhost" | "127.0.0.1" | "::1") {
+        return true;
+    }
+    extra.is_some_and(|ip| name.parse::<IpAddr>().is_ok_and(|n| n == ip))
+}
+
+async fn host_guard(
+    axum::extract::State(extra): axum::extract::State<Option<IpAddr>>,
+    req: axum::extract::Request,
+    next: axum::middleware::Next,
+) -> axum::response::Response {
+    let ok = req
+        .headers()
+        .get(axum::http::header::HOST)
+        .and_then(|h| h.to_str().ok())
+        .is_some_and(|h| host_allowed(h, extra));
+    if ok {
+        next.run(req).await
+    } else {
+        (
+            axum::http::StatusCode::FORBIDDEN,
+            "forbidden: unrecognised Host header\n",
+        )
+            .into_response()
+    }
+}
+
+fn build(repo_path: &Path, extra: Option<IpAddr>) -> io::Result<(axum::Router, String)> {
     let repo = Repo::discover(repo_path).map_err(io::Error::other)?;
     let index = Index::open(&repo)?;
     let app = Arc::new(App::new(repo, index));
     tokio::spawn(app::keep_index_fresh(Arc::clone(&app)));
     let api = gitterrace_api::ApiState::open(repo_path).map_err(io::Error::other)?;
     let name = app.name.clone();
-    let router = routes::router(app).nest("/api/v1", gitterrace_api::router(api));
+    let router = routes::router(app)
+        .nest("/api/v1", gitterrace_api::router(api))
+        .layer(axum::middleware::from_fn_with_state(extra, host_guard));
     Ok((router, name))
 }
 
 /// Starts serving until ctrl-c.
 pub async fn serve(repo_path: PathBuf, addr: SocketAddr) -> io::Result<()> {
-    let (router, name) = build(&repo_path)?;
+    let extra = (!addr.ip().is_loopback() && !addr.ip().is_unspecified()).then(|| addr.ip());
+    let (router, name) = build(&repo_path, extra)?;
+    if !addr.ip().is_loopback() {
+        tracing::warn!(
+            "serving to the network: anyone who can reach this address can read the repository"
+        );
+    }
     let listener = tokio::net::TcpListener::bind(addr).await?;
     tracing::info!("serving {name} on http://{addr}");
     axum::serve(listener, router)
@@ -186,11 +236,16 @@ mod tests {
         let status = |uri: &'static str| {
             let r = router.clone();
             async move {
-                r.oneshot(Request::get(uri).body(Body::empty()).expect("request"))
-                    .await
-                    .expect("response")
-                    .status()
-                    .as_u16()
+                r.oneshot(
+                    Request::get(uri)
+                        .header("host", "localhost")
+                        .body(Body::empty())
+                        .expect("request"),
+                )
+                .await
+                .expect("response")
+                .status()
+                .as_u16()
             }
         };
         assert_eq!(status("/api/v1/repo").await, 200);
@@ -198,5 +253,52 @@ mod tests {
         assert_eq!(status("/badges/nope.svg").await, 404);
         assert_eq!(status("/cards/wrapped/x.svg").await, 404);
         assert!(matches!(status("/badges/commits.svg").await, 200 | 503));
+    }
+
+    #[test]
+    fn host_allowlist() {
+        let ip: std::net::IpAddr = "192.168.1.5".parse().expect("ip");
+        for h in [
+            "localhost",
+            "localhost:4242",
+            "127.0.0.1:4242",
+            "[::1]:4242",
+            "LOCALHOST",
+        ] {
+            assert!(crate::host_allowed(h, None), "{h}");
+        }
+        for h in ["evil.example:4242", "192.168.1.5:80", "[::1", ""] {
+            assert!(!crate::host_allowed(h, None), "{h}");
+        }
+        assert!(crate::host_allowed("192.168.1.5:4242", Some(ip)));
+        assert!(!crate::host_allowed("10.0.0.1", Some(ip)));
+    }
+
+    #[tokio::test]
+    async fn router_rejects_foreign_and_missing_host() {
+        let dir = tempfile::tempdir().expect("tmp");
+        let p = dir.path();
+        git(p, &["init", "-q", "-b", "main"]);
+        std::fs::write(p.join("a.txt"), "x\n").expect("write");
+        git(p, &["add", "."]);
+        git(p, &["commit", "-q", "-m", "init"]);
+        let router = crate::app_router(p).expect("router");
+        for (host, want) in [
+            (Some("evil.example:4242"), 403),
+            (None, 403),
+            (Some("localhost"), 200),
+            (Some("127.0.0.1:4242"), 200),
+        ] {
+            let mut b = Request::get("/api/v1/repo");
+            if let Some(h) = host {
+                b = b.header("host", h);
+            }
+            let res = router
+                .clone()
+                .oneshot(b.body(Body::empty()).expect("request"))
+                .await
+                .expect("response");
+            assert_eq!(res.status().as_u16(), want, "{host:?}");
+        }
     }
 }
