@@ -5,6 +5,7 @@ mod cards;
 mod charts;
 mod error;
 mod fmt;
+mod languages;
 mod markdown;
 pub mod palette;
 mod routes;
@@ -159,7 +160,14 @@ mod tests {
             .update(&app.repo, "HEAD", &|_| {})
             .expect("update");
         app.mark_ready();
-        for u in ["/stats", "/stats/files", "/stats/types", "/"] {
+        for u in [
+            "/stats",
+            "/stats/files",
+            "/stats/types",
+            "/stats/languages",
+            "/stats/languages?x=time&scale=share&from=0&to=1",
+            "/",
+        ] {
             let (s, body) = get(&app, u).await;
             assert_eq!(s, 200, "{u}");
             assert!(!body.contains("data-progress"), "{u}");

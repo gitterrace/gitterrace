@@ -2,19 +2,19 @@
 all-features = true
 
 [advisories]
+# Each ignore names the crate, the path that pulls it in, and why it stays.
+# Revisit when the upstream that pulls it in moves.
 ignore = [
-    # paste: unmaintained but widely used, transitive dep -- no alternative yet
-    "RUSTSEC-2024-0436",
-    # unsafe-libyaml: unmaintained, pulled in by serde_yaml_ng (our mandated YAML
-    # crate). Revisit when switching to a safe-Rust YAML parser.
-    "RUSTSEC-2024-0449",
-    # zip 8: SUID bits / symlinks in ZipArchive::extract and ZipStreamReader::extract.
-    # nothing here calls extract() -- archive.rs copies entry bytes into regular files
-    # and applies no Unix modes. zip 8 stays because calamine (via kreuzberg) needs
-    # it, and zip 9 breaks the kreuzberg-tesseract 4.10.4 build script (`zip >=7`).
-    "RUSTSEC-2026-0367",
-    "RUSTSEC-2026-0368",
-    "RUSTSEC-2026-0369",
+    # basic-toml (unmaintained): askama's derive macro reads askama.toml with
+    # it at compile time only; no runtime input reaches it.
+    "RUSTSEC-2026-0374",
+    # bincode (unmaintained): syntect loads its bundled, compiled-in syntax
+    # dump with it; no untrusted input is ever decoded.
+    "RUSTSEC-2025-0141",
+    # rustybuzz / ttf-parser (unmaintained): usvg's text shaping for the
+    # optional PNG export of our own generated cards; fonts are the system's.
+    "RUSTSEC-2026-0206",
+    "RUSTSEC-2026-0192",
 ]
 
 [licenses]
@@ -28,13 +28,10 @@ allow = [
     "Unicode-3.0",
     "Unicode-DFS-2016",
     "Zlib",
-    "OpenSSL",
     "BSL-1.0",
     "CC0-1.0",
     "MPL-2.0",
-    "Elastic-2.0",
-    "bzip2-1.0.6",
-    "CDLA-Permissive-2.0",
+    "OFL-1.1",
 ]
 
 [licenses.private]
@@ -43,6 +40,8 @@ ignore = true
 [bans]
 multiple-versions = "warn"
 wildcards = "deny"
+# Internal crates depend on each other by path; they never publish.
+allow-wildcard-paths = true
 
 [sources]
 unknown-registry = "deny"

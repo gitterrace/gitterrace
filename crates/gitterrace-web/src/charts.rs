@@ -46,7 +46,7 @@ fn axis(max: u64) -> (String, f64) {
 }
 
 /// A 1/2/5 step giving about four gridlines.
-fn nice_step(max: u64) -> u64 {
+pub(crate) fn nice_step(max: u64) -> u64 {
     let raw = (max.max(1)).div_ceil(4);
     let mut mag = 1;
     while mag * 10 <= raw {

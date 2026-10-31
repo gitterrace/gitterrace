@@ -127,6 +127,7 @@ pub(crate) fn stats_tabs(active: &str) -> Vec<Nav> {
         ("/stats", "Activity", "a"),
         ("/stats/files", "Hot files", "f"),
         ("/stats/types", "Commit types", "t"),
+        ("/stats/languages", "Languages", "l"),
     ]
     .into_iter()
     .map(|(href, label, key)| Nav {

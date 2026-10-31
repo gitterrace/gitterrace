@@ -10,11 +10,11 @@ license = "MIT"
 repository = "https://github.com/timorunge/gitterrace"
 
 [workspace.dependencies]
-gitterrace-git = { path = "crates/gitterrace-git" }
-gitterrace-index = { path = "crates/gitterrace-index" }
-gitterrace-web = { path = "crates/gitterrace-web" }
-gitterrace-api = { path = "crates/gitterrace-api" }
-gitterrace-cards = { path = "crates/gitterrace-cards" }
+gitterrace-git = { path = "crates/gitterrace-git", version = "0.1.0" }
+gitterrace-index = { path = "crates/gitterrace-index", version = "0.1.0" }
+gitterrace-web = { path = "crates/gitterrace-web", version = "0.1.0" }
+gitterrace-api = { path = "crates/gitterrace-api", version = "0.1.0" }
+gitterrace-cards = { path = "crates/gitterrace-cards", version = "0.1.0" }
 resvg = { version = "0.45", default-features = false, features = ["text", "system-fonts"] }
 gix = { version = "0.90", default-features = false, features = ["max-performance", "sha1", "blob-diff", "blame", "revision", "index", "mailmap", "status"] }
 axum = "0.8"
@@ -79,4 +79,3 @@ targets = [
 unix-archive = ".tar.gz"
 checksum = "sha256"
 pr-run-mode = "plan"
-allow-dirty = ["ci"]

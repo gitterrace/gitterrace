@@ -30,6 +30,7 @@ pub(crate) struct App {
     dirty: Mutex<Option<(Instant, bool)>>,
     file_lists: Mutex<HashMap<String, Arc<Vec<String>>>>,
     last_commits: Mutex<HashMap<String, Arc<Vec<LastCommit>>>>,
+    chain: Mutex<Option<(String, Arc<crate::languages::Chain>)>>,
 }
 
 impl App {
@@ -45,6 +46,7 @@ impl App {
             dirty: Mutex::new(None),
             file_lists: Mutex::new(HashMap::new()),
             last_commits: Mutex::new(HashMap::new()),
+            chain: Mutex::new(None),
         }
     }
 
@@ -105,6 +107,34 @@ impl App {
             g.insert(key, Arc::clone(&v));
         }
         Ok(v)
+    }
+
+    /// Lines of code per language at every first-parent commit of `head`, built once per head.
+    pub(crate) fn chain(
+        &self,
+        head: &str,
+        records: &[CommitRecord],
+    ) -> Arc<crate::languages::Chain> {
+        if let Ok(g) = self.chain.lock()
+            && let Some((id, c)) = g.as_ref()
+            && id == head
+        {
+            return Arc::clone(c);
+        }
+        let ignore = gitterrace_git::IgnoreSet::at(&self.repo, head).ok();
+        let ins = gitterrace_index::Insights::new(records, gitterrace_index::Options::default(), ignore);
+        let mut subjects: HashMap<String, String> = HashMap::new();
+        if let Err(e) = gitterrace_git::scan_commits(&self.repo, head, |s, _| {
+            subjects.insert(s.id.clone(), s.subject.clone());
+            true
+        }) {
+            tracing::warn!("subjects unavailable: {e}");
+        }
+        let c = Arc::new(crate::languages::Chain::build(records, &ins, &subjects));
+        if let Ok(mut g) = self.chain.lock() {
+            *g = Some((head.to_owned(), Arc::clone(&c)));
+        }
+        c
     }
 
     fn set_progress(&self, p: Progress) {

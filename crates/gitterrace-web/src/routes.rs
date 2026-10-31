@@ -28,7 +28,7 @@ const HOT_LIMIT: usize = 25;
 const TABLE_LIMIT: usize = 30;
 const README_NAMES: [&str; 4] = ["README.md", "README.markdown", "Readme.md", "readme.md"];
 
-type Shared = State<Arc<App>>;
+pub(crate) type Shared = State<Arc<App>>;
 
 pub(crate) fn router(app: Arc<App>) -> Router {
     Router::new()
@@ -51,6 +51,16 @@ pub(crate) fn router(app: Arc<App>) -> Router {
         .route("/stats", get(stats))
         .route("/stats/files", get(stats_files))
         .route("/stats/types", get(stats_types))
+        .route("/stats/languages", get(crate::languages::page))
+        .route(
+            "/static/loc.js",
+            get(|| async {
+                asset(
+                    "text/javascript; charset=utf-8",
+                    include_str!("../static/loc.js"),
+                )
+            }),
+        )
         .route("/api/progress", get(progress))
         .route(
             "/static/tokens.css",
@@ -611,7 +621,7 @@ struct StatsPage {
 }
 
 /// Runs `build` over the cached records, or yields the progress page while none exist yet.
-async fn with_records<T: Template + Send + 'static>(
+pub(crate) async fn with_records<T: Template + Send + 'static>(
     app: &Arc<App>,
     tab: &'static str,
     build: impl FnOnce(&App, &[gitterrace_index::CommitRecord], Chrome) -> T + Send + 'static,
