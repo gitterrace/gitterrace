@@ -229,7 +229,8 @@ impl Repo {
         Ok(out)
     }
 
-    pub fn blob(&self, rev: &str, path: &str) -> Result<Blob> {
+    /// Raw bytes of the file at `path` in `rev`.
+    pub fn blob_bytes(&self, rev: &str, path: &str) -> Result<Vec<u8>> {
         let repo = self.repo();
         let tip = Self::resolve_id(&repo, rev)?;
         let path = path.trim_matches('/');
@@ -242,7 +243,12 @@ impl Repo {
             .map_err(git)?
             .filter(|e| !e.mode().is_tree() && !e.mode().is_commit())
             .ok_or_else(|| Error::PathNotFound(path.to_string()))?;
-        let data = entry.object().map_err(git)?.detach().data;
+        Ok(entry.object().map_err(git)?.detach().data)
+    }
+
+    pub fn blob(&self, rev: &str, path: &str) -> Result<Blob> {
+        let path = path.trim_matches('/');
+        let data = self.blob_bytes(rev, path)?;
         let binary = data[..data.len().min(BINARY_PROBE)].contains(&0);
         let text = if binary {
             None

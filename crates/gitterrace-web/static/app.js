@@ -1,4 +1,26 @@
 (function () {
+  var root = document.documentElement;
+  var btn = document.getElementById("theme");
+  var order = ["system", "light", "dark"];
+  function current() {
+    return root.dataset.theme || "system";
+  }
+  function label() {
+    if (btn) btn.title = "Theme: " + current() + " (click to change)";
+  }
+  if (btn) {
+    label();
+    btn.addEventListener("click", function () {
+      var next = order[(order.indexOf(current()) + 1) % 3];
+      if (next === "system") delete root.dataset.theme;
+      else root.dataset.theme = next;
+      try {
+        if (next === "system") localStorage.removeItem("gitterrace-theme");
+        else localStorage.setItem("gitterrace-theme", next);
+      } catch (e) {}
+      label();
+    });
+  }
   var boxes = document.querySelectorAll("[data-progress]");
   if (!boxes.length) return;
   var timer = setInterval(async function () {
@@ -8,6 +30,8 @@
       boxes.forEach(function (b) {
         var bar = b.querySelector("progress");
         if (bar) bar.value = pct;
+        var t = b.querySelector(".pct");
+        if (t) t.textContent = pct + "%";
       });
       if (p.ready) {
         clearInterval(timer);

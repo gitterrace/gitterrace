@@ -3,7 +3,13 @@
 {% block content %}
 <div class="head"><nav class="crumbs">{% for k in crumbs %}{% if !loop.first %}<i>/</i>{% endif %}<a href="{{ k.href }}">{{ k.name }}</a>{% endfor %}</nav>
 <span class="muted">{{ size }} · <a href="{{ blame_href }}">Blame</a> · <a href="{{ log_href }}">History</a></span></div>
-<div class="card scroll">
+{% if let Some(m) = rendered %}<div class="card" data-md-view>
+<div class="readme-h seg"><button type="button" class="on" data-show="rendered">Preview</button><button type="button" data-show="source">Code</button></div>
+<div class="markdown-body md-pane" data-pane="rendered">{{ m|safe }}</div>
+<div class="scroll md-pane" data-pane="source" hidden>
+{% if let Some(h) = html %}{{ h|safe }}{% endif %}
+</div></div>
+{% else %}<div class="card scroll">
 {% if let Some(h) = html %}{{ h|safe }}{% if cut %}<p class="muted pad">Truncated after 20000 lines.</p>{% endif %}{% else %}<p class="muted pad">Binary file, {{ size }}.</p>{% endif %}
-</div>
+</div>{% endif %}
 {% endblock %}

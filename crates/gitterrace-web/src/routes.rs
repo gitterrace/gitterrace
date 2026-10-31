@@ -23,7 +23,6 @@ use crate::{
 };
 
 const PAGE: usize = 50;
-const RECENT: usize = 8;
 const HOT_DAYS: i64 = 90;
 const HOT_LIMIT: usize = 25;
 const TABLE_LIMIT: usize = 30;
@@ -48,6 +47,15 @@ pub(crate) fn router(app: Arc<App>) -> Router {
         .route("/stats/types", get(stats_types))
         .route("/api/progress", get(progress))
         .route(
+            "/static/tokens.css",
+            get(|| async {
+                asset(
+                    "text/css; charset=utf-8",
+                    include_str!("../static/tokens.css"),
+                )
+            }),
+        )
+        .route(
             "/static/app.css",
             get(|| async { asset("text/css; charset=utf-8", include_str!("../static/app.css")) }),
         )
@@ -60,7 +68,94 @@ pub(crate) fn router(app: Arc<App>) -> Router {
                 )
             }),
         )
+        .route(
+            "/static/markdown.css",
+            get(|| async {
+                asset(
+                    "text/css; charset=utf-8",
+                    include_str!("../static/markdown.css"),
+                )
+            }),
+        )
+        .route(
+            "/static/markdown.js",
+            get(|| async {
+                asset(
+                    "text/javascript; charset=utf-8",
+                    include_str!("../static/markdown.js"),
+                )
+            }),
+        )
+        .route("/static/vendor/mermaid-11.17.2.min.js", get(mermaid_js))
+        .route("/raw/{rev}/{*path}", get(raw))
         .with_state(app)
+}
+
+static MERMAID: &[u8] = include_bytes!("../static/vendor/mermaid.min.js");
+
+async fn mermaid_js() -> Response {
+    (
+        [
+            (
+                header::CONTENT_TYPE,
+                HeaderValue::from_static("text/javascript; charset=utf-8"),
+            ),
+            (
+                header::CACHE_CONTROL,
+                HeaderValue::from_static("public, max-age=31536000, immutable"),
+            ),
+        ],
+        MERMAID,
+    )
+        .into_response()
+}
+
+fn content_type(path: &str) -> &'static str {
+    let ext = path.rsplit_once('.').map_or("", |(_, e)| e);
+    match ext.to_ascii_lowercase().as_str() {
+        "png" => "image/png",
+        "jpg" | "jpeg" => "image/jpeg",
+        "gif" => "image/gif",
+        "webp" => "image/webp",
+        "avif" => "image/avif",
+        "ico" => "image/x-icon",
+        "bmp" => "image/bmp",
+        "svg" => "image/svg+xml",
+        "pdf" => "application/pdf",
+        "mp4" => "video/mp4",
+        "webm" => "video/webm",
+        _ => "text/plain; charset=utf-8",
+    }
+}
+
+/// Serves blob bytes for relative images. Content is untrusted, so scripts are disabled.
+async fn raw(State(app): Shared, Path((rev, path)): Path<(String, String)>) -> Result<Response> {
+    let (bytes, kind) = blocking(&app, move |a| {
+        let id = a.repo.resolve(&rev)?;
+        let path = path.trim_matches('/').to_owned();
+        let bytes = a.repo.blob_bytes(&id, &path)?;
+        Ok((bytes, content_type(&path)))
+    })
+    .await?;
+    Ok((
+        [
+            (header::CONTENT_TYPE, HeaderValue::from_static(kind)),
+            (
+                header::CONTENT_SECURITY_POLICY,
+                HeaderValue::from_static("sandbox; default-src 'none'; style-src 'unsafe-inline'"),
+            ),
+            (
+                header::X_CONTENT_TYPE_OPTIONS,
+                HeaderValue::from_static("nosniff"),
+            ),
+            (
+                header::CACHE_CONTROL,
+                HeaderValue::from_static("private, max-age=300"),
+            ),
+        ],
+        bytes,
+    )
+        .into_response())
 }
 
 fn asset(kind: &'static str, body: &'static str) -> Response {
@@ -92,21 +187,24 @@ struct OverviewPage {
     c: Chrome,
     totals: Option<Numbers>,
     readme: Option<String>,
-    recent: Vec<CommitRow>,
+    entries: Vec<views::Entry>,
+    latest: Option<CommitRow>,
 }
 
 async fn overview(State(app): Shared) -> Result<Html<String>> {
     let p = blocking(&app, |a| {
         let head = a.repo.resolve("HEAD")?;
         let now = fmt::now();
-        let recent = a.repo.log(&head, None, 0, RECENT)?;
+        let recent = a.repo.log(&head, None, 0, 1)?;
+        let list = a.repo.tree(&head, "")?;
         let readme = README_NAMES.iter().find_map(|n| {
             a.repo
                 .blob(&head, n)
                 .ok()
                 .and_then(|b| b.text)
-                .map(|t| markdown::render(&t))
+                .map(|t| markdown::render_with(&t, markdown::Base::new("HEAD", "")))
         });
+        let readme = readme.map(|r| r.html);
         let totals = a.records(&head)?.map(|r| {
             let t = gitterrace_index::totals(&r);
             Numbers {
@@ -118,10 +216,14 @@ async fn overview(State(app): Shared) -> Result<Html<String>> {
             }
         });
         Ok(OverviewPage {
-            c: views::chrome(&a.name, "overview"),
+            c: Chrome {
+                md: readme.is_some(),
+                ..views::chrome(a, "files")
+            },
             totals,
             readme,
-            recent: recent.iter().map(|c| views::commit_row(c, now)).collect(),
+            entries: views::entries("HEAD", "", &list),
+            latest: recent.first().map(|c| views::commit_row(c, now)),
         })
     })
     .await?;
@@ -176,7 +278,7 @@ async fn log(
             q
         };
         Ok(LogPage {
-            c: views::chrome(&a.name, "log"),
+            c: views::chrome(a, "log"),
             newer: (pg > 0).then(|| link(pg - 1)),
             older: more.then(|| link(pg + 1)),
             empty: list.is_empty(),
@@ -214,7 +316,7 @@ async fn commit(State(app): Shared, Path(id): Path<String>) -> Result<Html<Strin
         let id = a.repo.resolve(&id)?;
         let d = a.repo.commit(&id)?;
         Ok(CommitPage {
-            c: views::chrome(&a.name, "log"),
+            c: views::chrome(a, "log"),
             subject: d.summary.subject.clone(),
             body: d.body.trim().to_owned(),
             author: d.summary.author.name.clone(),
@@ -247,6 +349,7 @@ struct TreePage {
     crumbs: Vec<Crumb>,
     up: Option<String>,
     entries: Vec<Entry>,
+    readme: Option<String>,
 }
 
 async fn tree_root(state: Shared, Path(rev): Path<String>) -> Result<Html<String>> {
@@ -270,8 +373,21 @@ async fn tree(
             (None, false) => Some(format!("/tree/{rev_enc}")),
             (None, true) => None,
         };
+        let readme = README_NAMES.iter().find_map(|n| {
+            let file = if path.is_empty() {
+                (*n).to_owned()
+            } else {
+                format!("{path}/{n}")
+            };
+            let text = a.repo.blob(&id, &file).ok()?.text?;
+            Some(markdown::render_with(&text, markdown::Base::new(&rev, &path)).html)
+        });
         Ok(TreePage {
-            c: views::chrome(&a.name, "files"),
+            c: Chrome {
+                md: readme.is_some(),
+                ..views::chrome(a, "files")
+            },
+            readme,
             title: if path.is_empty() {
                 rev.clone()
             } else {
@@ -299,6 +415,14 @@ struct BlobPage {
     log_href: String,
     html: Option<String>,
     cut: bool,
+    rendered: Option<String>,
+}
+
+fn is_markdown(path: &str) -> bool {
+    let lower = path.to_ascii_lowercase();
+    [".md", ".markdown", ".mdown"]
+        .iter()
+        .any(|e| lower.ends_with(e))
 }
 
 async fn blob(
@@ -316,9 +440,17 @@ async fn blob(
             }
             None => (None, false),
         };
+        let rendered = b.text.as_deref().filter(|_| is_markdown(&path)).map(|t| {
+            let dir = path.rsplit_once('/').map_or("", |(d, _)| d);
+            markdown::render_with(t, markdown::Base::new(&rev, dir)).html
+        });
         let (r, pe) = (fmt::enc(&rev, false), fmt::enc(&path, true));
         Ok(BlobPage {
-            c: views::chrome(&a.name, "files"),
+            c: Chrome {
+                md: rendered.is_some(),
+                ..views::chrome(a, "files")
+            },
+            rendered,
             crumbs: views::crumbs(&rev, &path, true),
             size: fmt::size(b.size),
             blame_href: format!("/blame/{r}/{pe}"),
@@ -351,7 +483,7 @@ async fn blame(
         let path = path.trim_matches('/').to_owned();
         let lines = a.repo.blame(&id, &path)?;
         Ok(BlamePage {
-            c: views::chrome(&a.name, "files"),
+            c: views::chrome(a, "files"),
             crumbs: views::crumbs(&rev, &path, true),
             blob_href: format!("/blob/{}/{}", fmt::enc(&rev, false), fmt::enc(&path, true)),
             html: views::blame_html(&lines, fmt::now()),
@@ -383,7 +515,7 @@ async fn refs(State(app): Shared) -> Result<Html<String>> {
             rows: views::ref_rows(&all, kind, now),
         };
         Ok(RefsPage {
-            c: views::chrome(&a.name, "refs"),
+            c: views::chrome(a, "refs"),
             groups: vec![
                 group("Branches", RefKind::Branch),
                 group("Tags", RefKind::Tag),
@@ -404,10 +536,10 @@ struct PendingPage {
 
 struct AuthorRow {
     label: String,
-    commits: usize,
-    additions: u64,
-    deletions: u64,
-    detail: usize,
+    commits: String,
+    additions: String,
+    deletions: String,
+    detail: String,
     last: String,
     pct: u32,
 }
@@ -430,7 +562,7 @@ async fn with_records<T: Template + Send + 'static>(
 ) -> Result<Html<String>> {
     let html = blocking(app, move |a| {
         let head = a.repo.resolve("HEAD")?;
-        let c = views::chrome(&a.name, "stats");
+        let c = views::chrome(a, "stats");
         match a.records(&head)? {
             Some(r) => Ok(build(a, &r, c).render()?),
             None => Ok(PendingPage {
@@ -464,10 +596,10 @@ async fn stats(State(app): Shared) -> Result<Html<String>> {
                 .map(|a| AuthorRow {
                     pct: charts::pct(a.commits as u64, max),
                     label: a.name,
-                    commits: a.commits,
-                    additions: a.additions,
-                    deletions: a.deletions,
-                    detail: a.active_days,
+                    commits: fmt::thousands(a.commits),
+                    additions: fmt::thousands(a.additions),
+                    deletions: fmt::thousands(a.deletions),
+                    detail: fmt::thousands(a.active_days),
                     last: fmt::day(a.last_commit),
                 })
                 .collect(),
@@ -494,9 +626,9 @@ fn file_row(f: gitterrace_index::FileChurn, max: u64) -> Row {
         href: format!("/blob/HEAD/{}", fmt::enc(&f.path, true)),
         pct: charts::pct(f.commits as u64, max),
         label: f.path,
-        commits: f.commits,
-        additions: f.additions,
-        deletions: f.deletions,
+        commits: fmt::thousands(f.commits),
+        additions: fmt::thousands(f.additions),
+        deletions: fmt::thousands(f.deletions),
     }
 }
 
@@ -537,9 +669,9 @@ async fn stats_files(State(app): Shared) -> Result<Html<String>> {
                             },
                             pct: charts::pct(d.commits as u64, dmax),
                             label: d.path,
-                            commits: d.commits,
-                            additions: d.additions,
-                            deletions: d.deletions,
+                            commits: fmt::thousands(d.commits),
+                            additions: fmt::thousands(d.additions),
+                            deletions: fmt::thousands(d.deletions),
                         })
                         .collect(),
                 },
@@ -567,9 +699,9 @@ fn label_rows(v: Vec<gitterrace_index::LabelCount>) -> Vec<Row> {
             pct: charts::pct(l.commits as u64, max),
             label: l.label,
             href: String::new(),
-            commits: l.commits,
-            additions: 0,
-            deletions: 0,
+            commits: fmt::thousands(l.commits),
+            additions: String::new(),
+            deletions: String::new(),
         })
         .collect()
 }
@@ -606,21 +738,13 @@ fn kind_rows(v: Vec<gitterrace_index::LabelCount>) -> Vec<Row> {
 async fn stats_types(State(app): Shared) -> Result<Html<String>> {
     with_records(&app, "t", |_, r, c| {
         let buckets = gitterrace_index::label_over_time(r, Label::Kind, Granularity::Month);
-        let points = buckets
-            .iter()
-            .map(|b| {
-                (
-                    b.key.clone(),
-                    b.counts.iter().map(|c| c.commits as u64).sum(),
-                )
-            })
-            .collect::<Vec<_>>();
+        let over_time = charts::stacked(&buckets);
         StatsTypesPage {
             c,
             tabs: views::stats_tabs("t"),
             kinds: kind_rows(gitterrace_index::label_breakdown(r, Label::Kind)),
             scopes: label_rows(gitterrace_index::label_breakdown(r, Label::Scope)),
-            over_time: charts::bars(&points),
+            over_time,
         }
     })
     .await

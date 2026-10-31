@@ -5,6 +5,7 @@ mod charts;
 mod error;
 mod fmt;
 mod markdown;
+pub mod palette;
 mod routes;
 mod views;
 
@@ -82,7 +83,7 @@ mod tests {
 
         let (s, body) = get(&app, "/").await;
         assert_eq!(s, 200);
-        assert!(body.contains("<h1>Hello"));
+        assert!(body.contains("<h1 id=\"hello"));
         let (s, body) = get(&app, "/log/HEAD").await;
         assert_eq!((s, body.contains("fix: second")), (200, true));
         let (s, body) = get(&app, "/log/HEAD?path=src/a.rs&page=0").await;

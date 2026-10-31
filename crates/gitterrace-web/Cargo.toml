@@ -19,6 +19,8 @@ serde.workspace = true
 tracing.workspace = true
 thiserror.workspace = true
 pulldown-cmark.workspace = true
+syntect.workspace = true
+ammonia.workspace = true
 
 [dev-dependencies]
 tower.workspace = true

@@ -17,6 +17,9 @@ pub(crate) struct Nav {
 
 pub(crate) struct Chrome {
     pub(crate) name: String,
+    pub(crate) branch: String,
+    /// Page contains rendered markdown, so the markdown script is loaded.
+    pub(crate) md: bool,
     pub(crate) nav: Vec<Nav>,
 }
 
@@ -27,6 +30,8 @@ pub(crate) struct Crumb {
 
 pub(crate) struct CommitRow {
     pub(crate) short: String,
+    pub(crate) initial: String,
+    pub(crate) hue: u32,
     pub(crate) href: String,
     pub(crate) subject: String,
     pub(crate) author: String,
@@ -51,16 +56,16 @@ pub(crate) struct RefRow {
 pub(crate) struct FileStatRow {
     pub(crate) anchor: String,
     pub(crate) label: String,
-    pub(crate) additions: u32,
-    pub(crate) deletions: u32,
+    pub(crate) additions: String,
+    pub(crate) deletions: String,
 }
 
 pub(crate) struct Row {
     pub(crate) label: String,
     pub(crate) href: String,
-    pub(crate) commits: usize,
-    pub(crate) additions: u64,
-    pub(crate) deletions: u64,
+    pub(crate) commits: String,
+    pub(crate) additions: String,
+    pub(crate) deletions: String,
     pub(crate) pct: u32,
 }
 
@@ -80,16 +85,17 @@ pub(crate) fn day_groups(list: &[CommitSummary], now: i64) -> Vec<crate::routes:
     out
 }
 
-pub(crate) fn chrome(name: &str, active: &str) -> Chrome {
+pub(crate) fn chrome(app: &crate::app::App, active: &str) -> Chrome {
     let items = [
-        ("/", "Overview", "overview"),
+        ("/", "Code", "files"),
         ("/log/HEAD", "Commits", "log"),
-        ("/tree/HEAD", "Files", "files"),
-        ("/refs", "Refs", "refs"),
-        ("/stats", "Stats", "stats"),
+        ("/refs", "Branches & Tags", "refs"),
+        ("/stats", "Insights", "stats"),
     ];
     Chrome {
-        name: name.to_owned(),
+        name: app.name.clone(),
+        branch: app.repo.head_branch().unwrap_or_else(|| "HEAD".to_owned()),
+        md: false,
         nav: items
             .into_iter()
             .map(|(href, label, key)| Nav {
@@ -104,8 +110,8 @@ pub(crate) fn chrome(name: &str, active: &str) -> Chrome {
 pub(crate) fn stats_tabs(active: &str) -> Vec<Nav> {
     [
         ("/stats", "Activity", "a"),
-        ("/stats/files", "Files", "f"),
-        ("/stats/types", "Types", "t"),
+        ("/stats/files", "Hot files", "f"),
+        ("/stats/types", "Commit types", "t"),
     ]
     .into_iter()
     .map(|(href, label, key)| Nav {
@@ -119,6 +125,18 @@ pub(crate) fn stats_tabs(active: &str) -> Vec<Nav> {
 pub(crate) fn commit_row(c: &CommitSummary, now: i64) -> CommitRow {
     CommitRow {
         short: short(&c.id),
+        initial: c
+            .author
+            .name
+            .chars()
+            .next()
+            .map_or_else(|| "?".to_owned(), |ch| ch.to_uppercase().collect()),
+        hue: c
+            .author
+            .name
+            .bytes()
+            .fold(7u32, |h, b| h.wrapping_mul(31).wrapping_add(u32::from(b)))
+            % 360,
         href: format!("/commit/{}", c.id),
         subject: c.subject.clone(),
         author: c.author.name.clone(),
@@ -215,8 +233,8 @@ pub(crate) fn file_stats(d: &CommitDetail) -> Vec<FileStatRow> {
         .map(|(i, f)| FileStatRow {
             anchor: format!("f{i}"),
             label: file_label(f),
-            additions: f.additions,
-            deletions: f.deletions,
+            additions: crate::fmt::thousands(f.additions),
+            deletions: crate::fmt::thousands(f.deletions),
         })
         .collect()
 }
@@ -252,7 +270,8 @@ pub(crate) fn diff_html(rev: &str, files: &[FileDiff]) -> String {
             &mut out,
             &format!(
                 "<span class=\"counts\"><b class=\"add\">+{}</b> <b class=\"del\">-{}</b></span></header>",
-                f.additions, f.deletions
+                crate::fmt::thousands(f.additions),
+                crate::fmt::thousands(f.deletions)
             ),
         );
         if f.binary {

@@ -22,7 +22,11 @@ knows about HTTP; nothing outside `gitterrace-git` imports `gix`.
   No shelling out to `git`.
 - Browsing never waits on the index. Stats pages show progress until ready.
 - Every repo read takes a resolved commit id, so a commit landing mid-request
-  cannot tear a page.
+  cannot tear a page. The one exception is the Uncommitted view, which reads
+  the worktree read-only, lives only in `gitterrace-git/src/worktree.rs`, and must
+  tolerate files changing or vanishing mid-read (skip, never fail the page).
+- Crates: `gitterrace-cards` (shareable SVG/PNG cards, badges) and `gitterrace-api`
+  (JSON API + MCP) sit beside `gitterrace-web` and depend only on git and index.
 - The cache is disposable: deleting `.git/gitterrace/` must only cost a rebuild.
   Bump its format version instead of migrating.
 - Logic lives in Rust. Templates render values, they do not compute them.

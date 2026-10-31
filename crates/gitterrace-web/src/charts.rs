@@ -2,47 +2,206 @@
 
 use crate::fmt::{self, esc};
 
-const HEIGHT: usize = 170;
-const LABEL_H: usize = 52;
-const TOP_PAD: f64 = 14.0;
-const SLOT_MIN: f64 = 16.0;
-const SLOT_MAX: f64 = 40.0;
-const FIT_WIDTH: f64 = 720.0;
+const W: f64 = 960.0;
+const H: f64 = 220.0;
+const LEFT: f64 = 44.0;
+const TOP_PAD: f64 = 10.0;
+const BOTTOM: f64 = 26.0;
+const LABEL_PX: f64 = 52.0;
+const SERIES: usize = 6;
 const DAYS: [&str; 7] = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
-/// Vertical bars, one per `(label, value)`, each labelled and with its count above it. Bar
-/// width is capped so short series do not turn into flat blocks.
-#[allow(clippy::many_single_char_names)]
-pub(crate) fn bars(points: &[(String, u64)]) -> String {
-    let max = points.iter().map(|p| p.1).max().unwrap_or(0).max(1);
-    let n = points.len().max(1);
+/// Horizontal geometry shared by both bar charts: slot width for `n` columns.
+fn slot(n: usize) -> f64 {
     #[allow(clippy::cast_precision_loss)]
-    let slot = (FIT_WIDTH / n as f64).clamp(SLOT_MIN, SLOT_MAX);
+    let n = n.max(1) as f64;
+    (W - LEFT) / n
+}
+
+/// Gridlines with thousands-separated tick labels; returns the SVG and the scale ceiling.
+fn axis(max: u64) -> (String, f64) {
+    let mut svg = String::new();
+    let plot = H - TOP_PAD - BOTTOM;
+    let step = nice_step(max);
     #[allow(clippy::cast_precision_loss)]
-    let width = slot * n as f64;
-    let plot = HEIGHT as f64 - LABEL_H as f64 - TOP_PAD;
-    let mut svg = format!(
-        r#"<svg class="chart" viewBox="0 0 {width:.0} {HEIGHT}" style="max-width:{width:.0}px" role="img" aria-label="Activity">"#
-    );
-    for (i, (label, v)) in points.iter().enumerate() {
+    let top = (step * max.div_ceil(step).max(1)) as f64;
+    let mut v = 0;
+    while (v as f64) <= top {
         #[allow(clippy::cast_precision_loss)]
-        let h = (*v as f64 / max as f64 * plot).max(if *v > 0 { 1.0 } else { 0.0 });
-        #[allow(clippy::cast_precision_loss)]
-        let x = i as f64 * slot + slot * 0.15;
-        let w = slot * 0.7;
-        let top = TOP_PAD + plot - h;
-        let cx = x + w / 2.0;
-        let ly = TOP_PAD + plot + 8.0;
-        let l = esc(label);
+        let y = TOP_PAD + plot - v as f64 / top * plot;
         fmt::push(
             &mut svg,
             &format!(
-                r#"<g><title>{l}: {v}</title><rect x="{x:.1}" y="{top:.1}" width="{w:.1}" height="{h:.1}" rx="2"/><text class="val" x="{cx:.1}" y="{:.1}" text-anchor="middle">{v}</text><text class="lab" transform="translate({cx:.1} {ly:.1}) rotate(-60)" text-anchor="end">{l}</text></g>"#,
-                top - 3.0
+                r#"<line class="grid" x1="{LEFT}" x2="{W}" y1="{y:.1}" y2="{y:.1}"/><text class="ax" x="{:.1}" y="{:.1}" text-anchor="end">{}</text>"#,
+                LEFT - 8.0,
+                y + 3.5,
+                fmt::thousands(v)
+            ),
+        );
+        v += step;
+    }
+    (svg, top)
+}
+
+/// A 1/2/5 step giving about four gridlines.
+fn nice_step(max: u64) -> u64 {
+    let raw = (max.max(1)).div_ceil(4);
+    let mut mag = 1;
+    while mag * 10 <= raw {
+        mag *= 10;
+    }
+    [1, 2, 5, 10]
+        .iter()
+        .map(|m| m * mag)
+        .find(|s| *s >= raw)
+        .unwrap_or(mag * 10)
+}
+
+/// Month labels thinned so neighbours never collide, centred under their column. The plot
+/// keeps `LEFT` clear on the left so the first label is never clipped.
+fn x_labels(keys: &[&str]) -> String {
+    let sl = slot(keys.len());
+    let every = (LABEL_PX / sl).ceil().max(1.0) as usize;
+    let mut svg = String::new();
+    for (i, k) in keys.iter().enumerate().filter(|(i, _)| i % every == 0) {
+        #[allow(clippy::cast_precision_loss)]
+        let cx = LEFT + i as f64 * sl + sl / 2.0;
+        let (x, anchor) = (cx, "middle");
+        fmt::push(
+            &mut svg,
+            &format!(
+                r#"<text class="ax" x="{x:.1}" y="{:.1}" text-anchor="{anchor}">{}</text>"#,
+                H - 8.0,
+                esc(k)
             ),
         );
     }
+    svg
+}
+
+fn open_svg(label: &str) -> String {
+    format!(
+        r#"<svg class="chart" viewBox="0 0 {W:.0} {H:.0}" role="img" aria-label="{label}" preserveAspectRatio="xMidYMid meet">"#
+    )
+}
+
+/// Vertical bars, one per `(label, value)`, scaled to the full container width.
+#[allow(clippy::many_single_char_names)]
+pub(crate) fn bars(points: &[(String, u64)]) -> String {
+    let max = points.iter().map(|p| p.1).max().unwrap_or(0);
+    let (grid, top) = axis(max);
+    let sl = slot(points.len());
+    let bw = (sl * 0.62).min(48.0);
+    let plot = H - TOP_PAD - BOTTOM;
+    let mut svg = open_svg("Activity");
+    svg.push_str(&grid);
+    for (i, (label, v)) in points.iter().enumerate() {
+        #[allow(clippy::cast_precision_loss)]
+        let h = (*v as f64 / top * plot).max(if *v > 0 { 1.0 } else { 0.0 });
+        #[allow(clippy::cast_precision_loss)]
+        let x = LEFT + i as f64 * sl + (sl - bw) / 2.0;
+        let y = TOP_PAD + plot - h;
+        fmt::push(
+            &mut svg,
+            &format!(
+                r#"<g class="col"><title>{}: {}</title><rect class="hit" x="{:.1}" y="{TOP_PAD}" width="{sl:.1}" height="{plot:.1}"/><rect class="bar" x="{x:.1}" y="{y:.1}" width="{bw:.1}" height="{h:.1}" rx="2"/></g>"#,
+                esc(label),
+                fmt::thousands(v),
+                x - (sl - bw) / 2.0
+            ),
+        );
+    }
+    let keys: Vec<&str> = points.iter().map(|p| p.0.as_str()).collect();
+    svg.push_str(&x_labels(&keys));
     svg.push_str("</svg>");
+    svg
+}
+
+/// Stacked columns per bucket by the `SERIES` biggest labels (rest folded into `other`),
+/// with a legend. Series order is overall frequency, biggest at the bottom.
+#[allow(clippy::many_single_char_names)]
+pub(crate) fn stacked(buckets: &[gitterrace_index::LabelBucket]) -> String {
+    let mut totals: std::collections::BTreeMap<&str, usize> = std::collections::BTreeMap::new();
+    for b in buckets {
+        for c in &b.counts {
+            *totals.entry(c.label.as_str()).or_default() += c.commits;
+        }
+    }
+    let mut order: Vec<(&str, usize)> = totals.into_iter().collect();
+    order.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(b.0)));
+    let names: Vec<&str> = order.iter().take(SERIES).map(|o| o.0).collect();
+    let has_other = order.len() > SERIES;
+    let cols: Vec<Vec<u64>> = buckets
+        .iter()
+        .map(|b| {
+            let mut col = vec![0u64; names.len() + 1];
+            for c in &b.counts {
+                let i = names
+                    .iter()
+                    .position(|n| *n == c.label)
+                    .unwrap_or(names.len());
+                col[i] += c.commits as u64;
+            }
+            col
+        })
+        .collect();
+    let max = cols
+        .iter()
+        .map(|c| c.iter().sum::<u64>())
+        .max()
+        .unwrap_or(0);
+    let (grid, top) = axis(max);
+    let sl = slot(cols.len());
+    let bw = (sl * 0.62).min(48.0);
+    let plot = H - TOP_PAD - BOTTOM;
+    let mut svg = open_svg("Commit types over time");
+    svg.push_str(&grid);
+    for (i, col) in cols.iter().enumerate() {
+        #[allow(clippy::cast_precision_loss)]
+        let x = LEFT + i as f64 * sl + (sl - bw) / 2.0;
+        let mut y = TOP_PAD + plot;
+        let key = esc(&buckets[i].key);
+        let total: u64 = col.iter().sum();
+        fmt::push(
+            &mut svg,
+            &format!(
+                r#"<g class="col"><title>{key}: {}</title><rect class="hit" x="{:.1}" y="{TOP_PAD}" width="{sl:.1}" height="{plot:.1}"/>"#,
+                fmt::thousands(total),
+                x - (sl - bw) / 2.0
+            ),
+        );
+        for (k, v) in col.iter().enumerate() {
+            if *v == 0 {
+                continue;
+            }
+            #[allow(clippy::cast_precision_loss)]
+            let h = *v as f64 / top * plot;
+            y -= h;
+            fmt::push(
+                &mut svg,
+                &format!(
+                    r#"<rect class="s{k}" x="{x:.1}" y="{y:.1}" width="{bw:.1}" height="{h:.1}"/>"#
+                ),
+            );
+        }
+        svg.push_str("</g>");
+    }
+    let keys: Vec<&str> = buckets.iter().map(|b| b.key.as_str()).collect();
+    svg.push_str(&x_labels(&keys));
+    svg.push_str("</svg><div class=\"legend\">");
+    for (k, n) in names.iter().enumerate() {
+        fmt::push(
+            &mut svg,
+            &format!(r#"<span><i class="s{k}"></i>{}</span>"#, esc(n)),
+        );
+    }
+    if has_other {
+        fmt::push(
+            &mut svg,
+            &format!(r#"<span><i class="s{}"></i>other</span>"#, names.len()),
+        );
+    }
+    svg.push_str("</div>");
     svg
 }
 
@@ -60,7 +219,7 @@ pub(crate) fn heatmap(cells: &[[u32; 24]; 7], max: u32) -> String {
         fmt::push(
             &mut svg,
             &format!(
-                r#"<text x="{}" y="11">{hour:02}</text>"#,
+                r#"<text class="ax" x="{}" y="11">{hour:02}</text>"#,
                 LEFT + hour * CELL
             ),
         );
@@ -69,7 +228,11 @@ pub(crate) fn heatmap(cells: &[[u32; 24]; 7], max: u32) -> String {
         let y = TOP + d * CELL;
         fmt::push(
             &mut svg,
-            &format!(r#"<text x="0" y="{}">{}</text>"#, y + 16, DAYS[d]),
+            &format!(
+                r#"<text class="ax" x="0" y="{}">{}</text>"#,
+                y + 16,
+                DAYS[d]
+            ),
         );
         for (hr, v) in row.iter().enumerate() {
             let level = if *v == 0 || max == 0 {
@@ -112,7 +275,7 @@ mod tests {
         let svg = bars(&[("<a>".to_owned(), 5), ("b".to_owned(), 0)]);
         assert!(svg.contains("&lt;a&gt;"));
         assert!(!svg.contains("<a>"));
-        assert_eq!(svg.matches("<rect").count(), 2);
+        assert_eq!(svg.matches(r#"class="bar""#).count(), 2);
     }
 
     #[test]
