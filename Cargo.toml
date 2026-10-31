@@ -56,3 +56,27 @@ expect_used = "warn"
 lto = "thin"
 codegen-units = 1
 strip = true
+
+# The profile cargo-dist builds and publishes. Same as release; named so a
+# release build can be tuned without changing what ships.
+[profile.dist]
+inherits = "release"
+
+# Release automation (cargo-dist): GitHub releases with prebuilt binaries, a
+# shell installer and a formula in the shared tap. Run `dist plan` to preview.
+[workspace.metadata.dist]
+cargo-dist-version = "0.31.0"
+ci = ["github"]
+installers = ["shell", "homebrew"]
+tap = "timorunge/homebrew-tap"
+publish-jobs = ["homebrew"]
+targets = [
+  "x86_64-unknown-linux-gnu",
+  "aarch64-unknown-linux-gnu",
+  "x86_64-apple-darwin",
+  "aarch64-apple-darwin",
+]
+unix-archive = ".tar.gz"
+checksum = "sha256"
+pr-run-mode = "plan"
+allow-dirty = ["ci"]

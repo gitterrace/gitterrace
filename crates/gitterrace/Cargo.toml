@@ -5,6 +5,13 @@ edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
+description = "A GitHub/GitLab-style view of any git repository, offline, in one binary"
+homepage = "https://github.com/timorunge/gitterrace"
+keywords = ["git", "github", "insights", "repository", "offline"]
+categories = ["command-line-utilities", "development-tools"]
+
+[package.metadata.dist]
+dist = true
 
 [lints]
 workspace = true
@@ -15,6 +22,8 @@ gitterrace-index.workspace = true
 gitterrace-api.workspace = true
 gitterrace-cards.workspace = true
 gitterrace-web.workspace = true
+axum.workspace = true
+tower.workspace = true
 clap.workspace = true
 tokio.workspace = true
 anyhow.workspace = true

@@ -2849,6 +2849,7 @@ name = "gitterrace"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "axum",
  "clap",
  "gitterrace-api",
  "gitterrace-cards",
@@ -2856,6 +2857,7 @@ dependencies = [
  "gitterrace-index",
  "gitterrace-web",
  "tokio",
+ "tower",
  "tracing",
  "tracing-subscriber",
 ]

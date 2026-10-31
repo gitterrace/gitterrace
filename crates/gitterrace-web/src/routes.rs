@@ -109,8 +109,8 @@ pub(crate) fn router(app: Arc<App>) -> Router {
         .with_state(app)
 }
 
-/// Candidate-look fonts, OFL, Latin subsets.
-const FONTS: [(&str, &[u8]); 5] = [
+/// Vendored OFL fonts, Latin subsets: Fraunces (display) and Bricolage Grotesque (body).
+const FONTS: [(&str, &[u8]); 3] = [
     (
         "fraunces-600.woff2",
         include_bytes!("../static/fonts/fraunces-600.woff2"),
@@ -122,14 +122,6 @@ const FONTS: [(&str, &[u8]); 5] = [
     (
         "bricolage-600.woff2",
         include_bytes!("../static/fonts/bricolage-600.woff2"),
-    ),
-    (
-        "jbmono-400.woff2",
-        include_bytes!("../static/fonts/jbmono-400.woff2"),
-    ),
-    (
-        "jbmono-600.woff2",
-        include_bytes!("../static/fonts/jbmono-600.woff2"),
     ),
 ];
 

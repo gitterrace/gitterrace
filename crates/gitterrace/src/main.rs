@@ -3,6 +3,8 @@ use std::{net::SocketAddr, path::PathBuf};
 use anyhow::Context;
 use clap::{Parser, Subcommand, ValueEnum};
 
+mod export;
+
 /// A GitHub/GitLab-style view of a git repository, offline.
 #[derive(Parser)]
 #[command(version = option_env!("GITTERRACE_VERSION").unwrap_or(env!("CARGO_PKG_VERSION")))]
@@ -35,9 +37,20 @@ enum Command {
         /// Write a PNG instead of an SVG (needs the `png` build feature).
         #[arg(long)]
         png: bool,
-        /// Output file. Defaults to wrapped-<year>.svg or .png.
+        /// Output file. Defaults to `wrapped-YEAR.svg` or `.png`.
         #[arg(long, short)]
         out: Option<PathBuf>,
+    },
+    /// Write a static copy of the site to a folder, for sharing or hosting.
+    Export {
+        /// Folder to write into (created if missing).
+        out: PathBuf,
+        /// Newest commits to include as pages.
+        #[arg(long, default_value_t = 500)]
+        commits: usize,
+        /// Largest file to include as a page, in KiB.
+        #[arg(long, default_value_t = 512)]
+        max_file_kb: u64,
     },
 }
 
@@ -75,6 +88,18 @@ async fn main() -> anyhow::Result<()> {
             png,
             out,
         } => wrapped(&cli.path, year, layout, theme, png, out)?,
+        Command::Export {
+            out,
+            commits,
+            max_file_kb,
+        } => {
+            let scope = export::Scope {
+                commits,
+                max_file: max_file_kb * 1024,
+            };
+            let n = export::export(&cli.path, &out, &scope).await?;
+            println!("wrote {n} files to {}", out.display());
+        }
     }
     Ok(())
 }
