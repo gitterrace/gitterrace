@@ -36,6 +36,14 @@ const MAX_PAGES: usize = 20_000;
 
 /// Writes the scoped site to `out` and returns how many files were written.
 pub async fn export(repo_path: &Path, out: &Path, scope: &Scope) -> anyhow::Result<usize> {
+    // Swapped arguments (`export <repo> <out>`) would scatter pages over a
+    // checkout. An ignored folder inside a repo is fine; its root is not.
+    if out.join(".git").exists() {
+        bail!(
+            "{} is the root of a git repository. Choose an output folder (usage: export <OUT> [REPO])",
+            out.display()
+        );
+    }
     std::fs::create_dir_all(out).with_context(|| format!("creating {}", out.display()))?;
     let router = gitterrace_web::app_router(repo_path).context("building the router")?;
     wait_for_index(&router).await?;
@@ -63,20 +71,37 @@ pub async fn export(repo_path: &Path, out: &Path, scope: &Scope) -> anyhow::Resu
 
     let mut seen: BTreeSet<String> = queue.iter().cloned().collect();
     let mut written = 0usize;
-    while let Some(path) = queue.pop_front() {
-        if written >= MAX_PAGES {
-            bail!("export stopped at {MAX_PAGES} pages; lower --commits or --max-file-kb");
+    // Pages render on blocking threads, so one at a time leaves the cores idle.
+    // Fetch a batch concurrently, then write and follow links in queue order so
+    // the output and the page cap stay deterministic.
+    let width = std::thread::available_parallelism().map_or(4, |n| n.get() * 2);
+    while !queue.is_empty() {
+        let batch: Vec<String> = queue.drain(..queue.len().min(width)).collect();
+        let mut tasks = tokio::task::JoinSet::new();
+        for (i, path) in batch.into_iter().enumerate() {
+            let router = router.clone();
+            tasks.spawn(async move { (i, fetch(&router, &path).await.map(|r| (path, r))) });
         }
-        let (status, content_type, body) = fetch(&router, &path).await?;
-        if status != StatusCode::OK {
-            continue;
+        let mut done = Vec::with_capacity(tasks.len());
+        while let Some(joined) = tasks.join_next().await {
+            done.push(joined.context("an export task panicked")?);
         }
-        write_page(out, &path, &content_type, &body)?;
-        written += 1;
-        if content_type.starts_with("text/html") || content_type.starts_with("text/css") {
-            for link in links(&String::from_utf8_lossy(&body)) {
-                if allowed.contains(&link) && seen.insert(link.clone()) {
-                    queue.push_back(link);
+        done.sort_by_key(|(i, _)| *i);
+        for (_, fetched) in done {
+            let (path, (status, content_type, body)) = fetched?;
+            if status != StatusCode::OK {
+                continue;
+            }
+            if written >= MAX_PAGES {
+                bail!("export stopped at {MAX_PAGES} pages. Lower --commits or --max-file-kb");
+            }
+            write_page(out, &path, &content_type, &body)?;
+            written += 1;
+            if content_type.starts_with("text/html") || content_type.starts_with("text/css") {
+                for link in links(&String::from_utf8_lossy(&body)) {
+                    if allowed.contains(&link) && seen.insert(link.clone()) {
+                        queue.push_back(link);
+                    }
                 }
             }
         }
@@ -401,5 +426,18 @@ mod tests {
         assert!(!elsewhere.path().join("files").exists());
         write_page(out.path(), "/refs", "text/html", b"ok").expect("normal page writes");
         assert!(out.path().join("refs/index.html").exists());
+    }
+
+    #[tokio::test]
+    async fn export_refuses_a_repository_root_as_output() {
+        let repo = tempfile::tempdir().expect("tempdir");
+        std::fs::create_dir(repo.path().join(".git")).expect("mkdir");
+        let scope = crate::export::Scope { commits: 1, max_file: 1024 };
+        let err = crate::export::export(repo.path(), repo.path(), &scope)
+            .await
+            .unwrap_err();
+        assert!(err.to_string().contains("root of a git repository"), "{err}");
+        let left: Vec<_> = std::fs::read_dir(repo.path()).expect("read").collect();
+        assert_eq!(left.len(), 1, "nothing but .git may be written");
     }
 }
