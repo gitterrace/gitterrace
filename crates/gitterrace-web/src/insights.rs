@@ -24,19 +24,174 @@ const REWORK_WINDOW: usize = 100;
 #[derive(Deserialize, Default)]
 pub(crate) struct InsightsQuery {
     #[serde(flatten)]
-    filter: Filter,
-    /// `bots=1` includes bot accounts.
+    pub(crate) filter: Filter,
+    /// `bots=1` counts bot accounts.
     bots: Option<String>,
+    /// Comma separated globs left out of path statistics.
+    exclude: Option<String>,
+    /// `generated=1` counts lock files and minified output.
+    generated: Option<String>,
+    /// `ignore=0` counts paths that .gitignore rules out.
+    ignore: Option<String>,
+    /// `ws=1` counts whitespace-only changes.
+    ws: Option<String>,
 }
 
-fn insights<'a>(a: &App, recs: &'a [CommitRecord]) -> Insights<'a> {
-    let head = a.repo.resolve("HEAD").unwrap_or_default();
-    let ignore = gitterrace_git::IgnoreSet::at(&a.repo, &head).ok();
-    Insights::new(recs, Options::default(), ignore)
+impl InsightsQuery {
+    pub(crate) fn options(&self) -> Options {
+        let on = |v: &Option<String>| v.as_deref() == Some("1");
+        Options {
+            exclude: self
+                .exclude
+                .as_deref()
+                .unwrap_or_default()
+                .split(',')
+                .map(str::trim)
+                .filter(|g| !g.is_empty())
+                .map(str::to_owned)
+                .collect(),
+            include_generated: on(&self.generated),
+            respect_ignore: self.ignore.as_deref() != Some("0"),
+            count_whitespace: on(&self.ws),
+            include_bots: on(&self.bots),
+        }
+    }
+
+    /// Option parameters as they appear in a query, defaults left out.
+    fn pairs(&self) -> Vec<(&'static str, String)> {
+        let o = self.options();
+        let mut v = Vec::new();
+        if !o.exclude.is_empty() {
+            v.push(("exclude", o.exclude.join(",")));
+        }
+        for (k, on) in [
+            ("generated", o.include_generated),
+            ("ws", o.count_whitespace),
+            ("bots", o.include_bots),
+        ] {
+            if on {
+                v.push((k, "1".to_owned()));
+            }
+        }
+        if !o.respect_ignore {
+            v.push(("ignore", "0".to_owned()));
+        }
+        v
+    }
+
+    /// Link to `base` with the current filters and options, `key` replaced by `value`
+    /// (`None` removes it).
+    fn link(&self, base: &str, key: &str, value: Option<&str>) -> String {
+        let mut extra: Vec<(&str, String)> = self
+            .pairs()
+            .into_iter()
+            .filter(|(k, _)| *k != key)
+            .collect();
+        if let Some(v) = value {
+            extra.push((
+                match key {
+                    "generated" => "generated",
+                    "ws" => "ws",
+                    "bots" => "bots",
+                    "ignore" => "ignore",
+                    _ => "exclude",
+                },
+                v.to_owned(),
+            ));
+        }
+        let pairs: Vec<(&str, &str)> = extra.iter().map(|(k, v)| (*k, v.as_str())).collect();
+        fmt::href(&format!("{base}{}", self.filter.query(&pairs)))
+    }
+
+    /// The quiet options row under the filter bar.
+    pub(crate) fn row(&self, base: &str) -> Vec<OptLink> {
+        let o = self.options();
+        let mut row = vec![
+            OptLink::new(
+                "Generated files",
+                o.include_generated,
+                "counted",
+                "left out",
+                self.link(base, "generated", (!o.include_generated).then_some("1")),
+            ),
+            OptLink::new(
+                "Gitignored",
+                !o.respect_ignore,
+                "counted",
+                "left out",
+                self.link(base, "ignore", o.respect_ignore.then_some("0")),
+            ),
+            OptLink::new(
+                "Whitespace",
+                o.count_whitespace,
+                "counted",
+                "ignored",
+                self.link(base, "ws", (!o.count_whitespace).then_some("1")),
+            ),
+            OptLink::new(
+                "Bots",
+                o.include_bots,
+                "counted",
+                "left out",
+                self.link(base, "bots", (!o.include_bots).then_some("1")),
+            ),
+        ];
+        if !o.exclude.is_empty() {
+            row.push(OptLink {
+                label: "Exclude",
+                state: o.exclude.join(", "),
+                href: self.link(base, "exclude", None),
+                on: true,
+            });
+        }
+        row
+    }
+}
+
+pub(crate) struct OptLink {
+    pub(crate) label: &'static str,
+    pub(crate) state: String,
+    pub(crate) href: String,
+    pub(crate) on: bool,
+}
+
+impl OptLink {
+    fn new(label: &'static str, on: bool, yes: &str, no: &str, href: String) -> Self {
+        Self {
+            label,
+            state: (if on { yes } else { no }).to_owned(),
+            href,
+            on,
+        }
+    }
+}
+
+/// Insights over `recs` with the options in force. The head ignore rules apply when asked.
+pub(crate) fn insights<'a>(a: &App, recs: &'a [CommitRecord], o: Options) -> Insights<'a> {
+    let ignore = if o.respect_ignore {
+        let head = a.repo.resolve("HEAD").unwrap_or_default();
+        gitterrace_git::IgnoreSet::at(&a.repo, &head).ok()
+    } else {
+        None
+    };
+    Insights::new(recs, o, ignore)
+}
+
+/// Records after every filter except the period, which the insights methods window themselves.
+pub(crate) fn scoped<'a>(
+    f: &Filter,
+    r: &'a [CommitRecord],
+) -> std::borrow::Cow<'a, [CommitRecord]> {
+    f.with(Dim::Period, None).apply(r)
+}
+
+/// Text files of HEAD with line counts, the cache persisted under `.git/gitterrace`.
+pub(crate) fn head_lines(a: &App) -> Arc<Vec<gitterrace_index::HeadFile>> {
+    a.head_lines(&a.repo.resolve("HEAD").unwrap_or_default())
 }
 
 /// Memoizes the rendered page per tip and query, building on a miss.
-async fn cached<T: askama::Template + Send + 'static>(
+pub(crate) async fn cached<T: askama::Template + Send + 'static>(
     app: &Arc<App>,
     tab: &'static str,
     raw: Option<String>,
@@ -53,7 +208,7 @@ async fn cached<T: askama::Template + Send + 'static>(
     Ok(html)
 }
 
-struct Kpi(&'static str, String);
+pub(crate) struct Kpi(pub(crate) &'static str, pub(crate) String);
 
 #[derive(Template)]
 #[template(path = "code_frequency.html")]
@@ -61,6 +216,7 @@ struct CodeFrequencyPage {
     c: Chrome,
     tabs: Vec<Nav>,
     fb: FilterBar,
+    opts: Vec<OptLink>,
     kpis: Vec<Kpi>,
     weekly: String,
     rework: String,
@@ -76,7 +232,7 @@ pub(crate) async fn code_frequency(
         let f = &q.filter;
         let fb = f.bar("/stats/frequency", r);
         let recs = f.apply(r);
-        let ins = insights(a, &recs);
+        let ins = insights(a, &recs, q.options());
         let weeks = ins.code_frequency();
         let (add, del, rew) = weeks.iter().fold((0, 0, 0), |t, w| {
             (t.0 + w.additions, t.1 + w.deletions, t.2 + w.rewritten)
@@ -100,6 +256,7 @@ pub(crate) async fn code_frequency(
             c,
             tabs: views::stats_tabs("cf"),
             fb,
+            opts: q.row("/stats/frequency"),
             kpis: vec![
                 Kpi("Lines added", fmt::thousands(add)),
                 Kpi("Lines removed", fmt::thousands(del)),
@@ -151,10 +308,9 @@ struct ContributorsPage {
     c: Chrome,
     tabs: Vec<Nav>,
     fb: FilterBar,
+    opts: Vec<OptLink>,
     kpis: Vec<Kpi>,
     people: Vec<PersonRow>,
-    bots_href: String,
-    bots: bool,
 }
 
 pub(crate) async fn contributors(
@@ -164,12 +320,12 @@ pub(crate) async fn contributors(
 ) -> Result<Html<String>> {
     cached(&app, "co", raw, move |a, r, c| {
         let f = &q.filter;
-        let bots = q.bots.as_deref() == Some("1");
+        let bots = q.options().include_bots;
         let fb = f.bar("/stats/contributors", r);
         // The period is applied by Insights so first-time contributors are judged against all
         // history that the other filters keep.
-        let recs = f.with(Dim::Period, None).apply(r);
-        let ins = insights(a, &recs);
+        let recs = scoped(f, r);
+        let ins = insights(a, &recs, q.options());
         let period = f.period_value().unwrap_or(Period::All);
         let report = ins.contributors(period);
         let people: Vec<PersonRow> = report
@@ -200,11 +356,11 @@ pub(crate) async fn contributors(
             .iter()
             .filter(|p| bots || !p.bot)
             .fold((0, 0), |t, p| (t.0 + p.additions, t.1 + p.deletions));
-        let query = f.query(&if bots { vec![] } else { vec![("bots", "1")] });
         ContributorsPage {
             c,
             tabs: views::stats_tabs("co"),
             fb,
+            opts: q.row("/stats/contributors"),
             kpis: vec![
                 Kpi("Contributors", fmt::thousands(people.len())),
                 Kpi(
@@ -215,8 +371,6 @@ pub(crate) async fn contributors(
                 Kpi("Lines removed", fmt::thousands(del)),
             ],
             people,
-            bots_href: fmt::href(&format!("/stats/contributors{query}")),
-            bots,
         }
     })
     .await

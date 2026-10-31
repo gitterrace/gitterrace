@@ -11,14 +11,21 @@ pub struct Colour {
 
 impl Colour {
     pub const fn new(hex: &'static str, r: u8, g: u8, b: u8) -> Self {
-        Self { hex, rgb: [r, g, b] }
+        Self {
+            hex,
+            rgb: [r, g, b],
+        }
     }
 
     /// WCAG 2.x relative luminance.
     pub fn luminance(self) -> f64 {
         let lin = |c: u8| {
             let c = f64::from(c) / 255.0;
-            if c <= 0.03928 { c / 12.92 } else { ((c + 0.055) / 1.055).powf(2.4) }
+            if c <= 0.03928 {
+                c / 12.92
+            } else {
+                ((c + 0.055) / 1.055).powf(2.4)
+            }
         };
         0.2126 * lin(self.rgb[0]) + 0.7152 * lin(self.rgb[1]) + 0.0722 * lin(self.rgb[2])
     }
@@ -480,13 +487,13 @@ pub const SCHAUINSLAND: Theme = Theme {
         code_del_row: Colour::new("#F1E5E5", 241, 229, 229),
         code_del_word: Colour::new("#E6CACB", 230, 202, 203),
         code_selection: Colour::new("#CECECE", 206, 206, 206),
-        code_syntax_comment: Colour::new("#6E6E6E", 110, 110, 110),
-        code_syntax_constant: Colour::new("#505050", 80, 80, 80),
-        code_syntax_entity: Colour::new("#262626", 38, 38, 38),
-        code_syntax_keyword: Colour::new("#505050", 80, 80, 80),
-        code_syntax_param: Colour::new("#505050", 80, 80, 80),
-        code_syntax_string: Colour::new("#505050", 80, 80, 80),
-        code_syntax_tag: Colour::new("#505050", 80, 80, 80),
+        code_syntax_comment: Colour::new("#6D6D6D", 109, 109, 109),
+        code_syntax_constant: Colour::new("#3C3C3C", 60, 60, 60),
+        code_syntax_entity: Colour::new("#484848", 72, 72, 72),
+        code_syntax_keyword: Colour::new("#262626", 38, 38, 38),
+        code_syntax_param: Colour::new("#616161", 97, 97, 97),
+        code_syntax_string: Colour::new("#313131", 49, 49, 49),
+        code_syntax_tag: Colour::new("#545454", 84, 84, 84),
         code_warn_row: Colour::new("#E7E7E7", 231, 231, 231),
         danger: Colour::new("#AF383D", 175, 56, 61),
         heat_0: Colour::new("#EBEBEB", 235, 235, 235),
@@ -511,14 +518,14 @@ pub const SCHAUINSLAND: Theme = Theme {
         muted: Colour::new("#505050", 80, 80, 80),
         positive: Colour::new("#236958", 35, 105, 88),
         selection_wash: Colour::new("#777777", 119, 119, 119),
-        series_1: Colour::new("#505050", 80, 80, 80),
-        series_2: Colour::new("#505050", 80, 80, 80),
-        series_3: Colour::new("#505050", 80, 80, 80),
+        series_1: Colour::new("#262626", 38, 38, 38),
+        series_2: Colour::new("#343434", 52, 52, 52),
+        series_3: Colour::new("#424242", 66, 66, 66),
         series_4: Colour::new("#505050", 80, 80, 80),
-        series_5: Colour::new("#505050", 80, 80, 80),
-        series_6: Colour::new("#505050", 80, 80, 80),
-        series_7: Colour::new("#505050", 80, 80, 80),
-        series_8: Colour::new("#CACACA", 202, 202, 202),
+        series_5: Colour::new("#5F5F5F", 95, 95, 95),
+        series_6: Colour::new("#6F6F6F", 111, 111, 111),
+        series_7: Colour::new("#7F7F7F", 127, 127, 127),
+        series_8: Colour::new("#8F8F8F", 143, 143, 143),
         surfaces_bg: Colour::new("#F8F8F8", 248, 248, 248),
         surfaces_header: Colour::new("#EEEEEE", 238, 238, 238),
         surfaces_hover: Colour::new("#EBEBEB", 235, 235, 235),
@@ -539,13 +546,13 @@ pub const SCHAUINSLAND: Theme = Theme {
         code_del_row: Colour::new("#3F2C2C", 63, 44, 44),
         code_del_word: Colour::new("#5E3839", 94, 56, 57),
         code_selection: Colour::new("#3B3B3B", 59, 59, 59),
-        code_syntax_comment: Colour::new("#A9A9A9", 169, 169, 169),
-        code_syntax_constant: Colour::new("#C3C3C3", 195, 195, 195),
-        code_syntax_entity: Colour::new("#EBEBEB", 235, 235, 235),
-        code_syntax_keyword: Colour::new("#C3C3C3", 195, 195, 195),
-        code_syntax_param: Colour::new("#C3C3C3", 195, 195, 195),
-        code_syntax_string: Colour::new("#C3C3C3", 195, 195, 195),
-        code_syntax_tag: Colour::new("#C3C3C3", 195, 195, 195),
+        code_syntax_comment: Colour::new("#909090", 144, 144, 144),
+        code_syntax_constant: Colour::new("#CCCCCC", 204, 204, 204),
+        code_syntax_entity: Colour::new("#BCBCBC", 188, 188, 188),
+        code_syntax_keyword: Colour::new("#EBEBEB", 235, 235, 235),
+        code_syntax_param: Colour::new("#9E9E9E", 158, 158, 158),
+        code_syntax_string: Colour::new("#DBDBDB", 219, 219, 219),
+        code_syntax_tag: Colour::new("#ADADAD", 173, 173, 173),
         code_warn_row: Colour::new("#373737", 55, 55, 55),
         danger: Colour::new("#FF7778", 255, 119, 120),
         heat_0: Colour::new("#2F2F2F", 47, 47, 47),
@@ -570,14 +577,14 @@ pub const SCHAUINSLAND: Theme = Theme {
         muted: Colour::new("#C3C3C3", 195, 195, 195),
         positive: Colour::new("#78C9B7", 120, 201, 183),
         selection_wash: Colour::new("#A9A9A9", 169, 169, 169),
-        series_1: Colour::new("#C3C3C3", 195, 195, 195),
-        series_2: Colour::new("#C3C3C3", 195, 195, 195),
-        series_3: Colour::new("#C3C3C3", 195, 195, 195),
-        series_4: Colour::new("#C3C3C3", 195, 195, 195),
-        series_5: Colour::new("#C3C3C3", 195, 195, 195),
-        series_6: Colour::new("#C3C3C3", 195, 195, 195),
-        series_7: Colour::new("#C3C3C3", 195, 195, 195),
-        series_8: Colour::new("#494949", 73, 73, 73),
+        series_1: Colour::new("#EBEBEB", 235, 235, 235),
+        series_2: Colour::new("#D8D8D8", 216, 216, 216),
+        series_3: Colour::new("#C5C5C5", 197, 197, 197),
+        series_4: Colour::new("#B2B2B2", 178, 178, 178),
+        series_5: Colour::new("#9F9F9F", 159, 159, 159),
+        series_6: Colour::new("#8D8D8D", 141, 141, 141),
+        series_7: Colour::new("#7C7C7C", 124, 124, 124),
+        series_8: Colour::new("#6B6B6B", 107, 107, 107),
         surfaces_bg: Colour::new("#202020", 32, 32, 32),
         surfaces_header: Colour::new("#1A1A1A", 26, 26, 26),
         surfaces_hover: Colour::new("#2F2F2F", 47, 47, 47),
@@ -597,7 +604,8 @@ pub mod design {
     pub const TYPE_SCALE_PX: [u16; 7] = [11, 12, 13, 15, 16, 20, 26];
     pub const TYPE_WEIGHTS: [u16; 2] = [400, 600];
     pub const SPACE_GRID_PX: u16 = 4;
-    pub const SPACE_STEPS_PX: [u16; 16] = [4, 8, 12, 16, 20, 24, 28, 32, 36, 40, 44, 48, 52, 56, 60, 64];
+    pub const SPACE_STEPS_PX: [u16; 16] =
+        [4, 8, 12, 16, 20, 24, 28, 32, 36, 40, 44, 48, 52, 56, 60, 64];
     pub const RADIUS_WEB_PX: u16 = 3;
     pub const RADIUS_NATIVE_PX: [u16; 2] = [6, 12];
     pub const MOTION_HOVER_MS: u16 = 120;
@@ -608,9 +616,13 @@ pub mod design {
 
 /// The three families as woff2 bytes (OFL, Latin subset).
 pub mod fonts {
-    pub const FRAUNCES: &[u8] = include_bytes!("../../fonts/fraunces/fraunces-latin-wght-normal.woff2");
-    pub const BRICOLAGE_GROTESQUE: &[u8] = include_bytes!("../../fonts/bricolage-grotesque/bricolage-grotesque-latin-wght-normal.woff2");
-    pub const JETBRAINS_MONO: &[u8] = include_bytes!("../../fonts/jetbrains-mono/jetbrains-mono-latin-wght-normal.woff2");
+    pub const FRAUNCES: &[u8] =
+        include_bytes!("../../fonts/fraunces/fraunces-latin-wght-normal.woff2");
+    pub const BRICOLAGE_GROTESQUE: &[u8] = include_bytes!(
+        "../../fonts/bricolage-grotesque/bricolage-grotesque-latin-wght-normal.woff2"
+    );
+    pub const JETBRAINS_MONO: &[u8] =
+        include_bytes!("../../fonts/jetbrains-mono/jetbrains-mono-latin-wght-normal.woff2");
 }
 
 #[cfg(test)]
@@ -624,7 +636,11 @@ mod tests {
             for (mode, p) in [("light", theme.light), ("dark", theme.dark)] {
                 for (name, ink) in [("primary", p.ink_primary), ("secondary", p.ink_secondary)] {
                     let ratio = ink.contrast(p.surfaces_bg);
-                    assert!(ratio >= 4.5, "{} {mode} ink {name} on page: {ratio:.2}", theme.id);
+                    assert!(
+                        ratio >= 4.5,
+                        "{} {mode} ink {name} on page: {ratio:.2}",
+                        theme.id
+                    );
                 }
             }
         }
@@ -632,14 +648,21 @@ mod tests {
 
     #[test]
     fn contrast_is_symmetric_and_bounded() {
-        let (w, k) = (Colour::new("#FFFFFF", 255, 255, 255), Colour::new("#000000", 0, 0, 0));
+        let (w, k) = (
+            Colour::new("#FFFFFF", 255, 255, 255),
+            Colour::new("#000000", 0, 0, 0),
+        );
         assert!((w.contrast(k) - 21.0).abs() < 1e-9 && w.contrast(k) == k.contrast(w));
         assert!((w.contrast(w) - 1.0).abs() < 1e-9);
     }
 
     #[test]
     fn fonts_are_woff2() {
-        for f in [fonts::FRAUNCES, fonts::BRICOLAGE_GROTESQUE, fonts::JETBRAINS_MONO] {
+        for f in [
+            fonts::FRAUNCES,
+            fonts::BRICOLAGE_GROTESQUE,
+            fonts::JETBRAINS_MONO,
+        ] {
             assert_eq!(&f[..4], b"wOF2");
         }
     }

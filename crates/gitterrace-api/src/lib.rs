@@ -152,7 +152,11 @@ mod tests {
         git(d.path(), &["branch", "side", "HEAD~1"]);
         let before = s.etag().expect("tag");
         git(d.path(), &["branch", "-f", "side", "HEAD"]);
-        assert_ne!(before, s.etag().expect("tag"), "side branch moved, HEAD did not");
+        assert_ne!(
+            before,
+            s.etag().expect("tag"),
+            "side branch moved, HEAD did not"
+        );
     }
 
     #[test]
@@ -160,7 +164,10 @@ mod tests {
         let (dir, state) = fixture();
         let first = state.records("HEAD").expect("records");
         let second = state.records("HEAD").expect("records");
-        assert!(std::sync::Arc::ptr_eq(&first, &second), "second call reparsed");
+        assert!(
+            std::sync::Arc::ptr_eq(&first, &second),
+            "second call reparsed"
+        );
         assert_eq!(first.len(), 2);
         std::fs::write(dir.path().join("c.txt"), "x\n").expect("write");
         git(dir.path(), &["add", "."]);
@@ -169,7 +176,11 @@ mod tests {
         let moved = state.records("HEAD").expect("records");
         assert_eq!(moved.len(), 3, "moved tip must change the answer");
         let earlier = state.records("HEAD~1").expect("records");
-        assert_eq!(earlier.len(), 2, "another rev must not reuse the HEAD entry");
+        assert_eq!(
+            earlier.len(),
+            2,
+            "another rev must not reuse the HEAD entry"
+        );
     }
 
     #[test]

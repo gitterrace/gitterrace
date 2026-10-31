@@ -10,7 +10,9 @@ mod guard;
 mod insights;
 mod languages;
 mod markdown;
+mod media;
 mod multi;
+mod pages;
 pub mod palette;
 mod routes;
 mod search;
@@ -55,14 +57,32 @@ fn repo_router(repo_path: &Path, base: String) -> io::Result<axum::Router> {
     app.base = base;
     let app = Arc::new(app);
     tokio::spawn(app::keep_index_fresh(Arc::clone(&app)));
-    tokio::spawn(prewarm(Arc::clone(&app)));
     let api = gitterrace_api::ApiState::open(repo_path).map_err(io::Error::other)?;
-    Ok(routes::router(app).nest("/api/v1", gitterrace_api::router(api)))
+    let pages = routes::router(Arc::clone(&app)).nest("/api/v1", gitterrace_api::router(api));
+    tokio::spawn(prewarm(Arc::clone(&app), pages.clone()));
+    Ok(pages)
 }
 
-/// Parses the record set for HEAD as soon as each index generation is ready, so the first
-/// page that needs it does not pay for it.
-async fn prewarm(app: Arc<App>) {
+/// Unfiltered pages rendered in the background whenever HEAD moves. Each costs 40-90 ms to
+/// build on a 14k-commit repo, then a few ms from the memo, so no visitor pays the build.
+const WARM_PAGES: [&str; 11] = [
+    "/",
+    "/stats",
+    "/stats/files",
+    "/stats/types",
+    "/stats/languages",
+    "/stats/frequency",
+    "/stats/contributors",
+    "/stats/pulse",
+    "/stats/hotspots",
+    "/stats/ownership",
+    "/stats/patterns",
+];
+
+/// Parses the record set for HEAD as soon as each index generation is ready, then renders
+/// the unfiltered pages once, so the first visit to any of them is served from the memo.
+async fn prewarm(app: Arc<App>, pages: axum::Router) {
+    use tower::ServiceExt;
     let mut warmed: Option<String> = None;
     loop {
         let head = app::blocking(&app, |a| {
@@ -75,6 +95,13 @@ async fn prewarm(app: Arc<App>) {
         if head.is_some() && head == warmed {
             tokio::time::sleep(std::time::Duration::from_secs(1)).await;
         } else if head.is_some() && app.ready() {
+            for path in WARM_PAGES {
+                // Internal requests skip the Host and cross-site guard, which wraps the outer
+                // router; a failed warm-up only means the first visitor builds the page.
+                if let Ok(req) = axum::http::Request::get(path).body(axum::body::Body::empty()) {
+                    let _warm = pages.clone().oneshot(req).await;
+                }
+            }
             warmed = head;
         } else {
             tokio::time::sleep(std::time::Duration::from_millis(250)).await;
@@ -261,6 +288,17 @@ mod tests {
             "/stats/frequency",
             "/stats/frequency?type=fix&path=src&period=1y",
             "/stats/contributors",
+            "/stats/pulse",
+            "/stats/pulse?period=1w&type=fix&bots=1&ws=1&generated=1&ignore=0&exclude=*.md",
+            "/stats/hotspots",
+            "/stats/hotspots?period=3m&path=src",
+            "/stats/ownership",
+            "/stats/patterns",
+            "/compare",
+            "/compare?base=HEAD~1&head=HEAD",
+            "/compare?base=nope",
+            "/history/src/a.rs",
+            "/history/missing.rs",
             "/stats/contributors?bots=1&period=3m&author=t%40e.x",
             "/stats/languages?x=time&scale=share&from=0&to=1",
             "/",
@@ -297,6 +335,71 @@ mod tests {
         assert!(body.contains("File too large to display"));
         assert!(body.contains("/raw/HEAD/big.txt"));
         assert!(!body.contains("class=\"ch\""));
+    }
+
+    #[tokio::test]
+    async fn media_renders_inline_and_in_diffs() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let p = dir.path();
+        git(p, &["init", "-q", "-b", "main"]);
+        let mut png = b"\x89PNG\r\n\x1a\n\0\0\0\rIHDR".to_vec();
+        png.extend([0, 0, 0, 7, 0, 0, 0, 5, 8, 6, 0, 0, 0]);
+        std::fs::write(p.join("a.png"), &png).expect("write");
+        std::fs::write(p.join("v.svg"), "<svg xmlns='http://www.w3.org/2000/svg'/>").expect("w");
+        std::fs::write(p.join("d.pdf"), b"%PDF-1.4\n\0").expect("write");
+        git(p, &["add", "."]);
+        git(p, &["commit", "-q", "-m", "feat: media"]);
+        png.extend([1, 2, 3]);
+        std::fs::write(p.join("a.png"), &png).expect("write");
+        git(p, &["commit", "-qam", "fix: png"]);
+        let repo = gitterrace_git::Repo::discover(p).expect("repo");
+        let index = gitterrace_index::Index::open(&repo).expect("index");
+        let app = Arc::new(App::new(repo, index));
+        let (_, body) = get(&app, "/blob/HEAD/a.png").await;
+        assert!(
+            body.contains("class=\"media-img\" src=\"/raw/HEAD/a.png\"") && body.contains("7 x 5")
+        );
+        let (_, body) = get(&app, "/blob/HEAD/v.svg").await;
+        assert!(body.contains("media-src") && body.contains("src=\"/raw/HEAD/v.svg\""));
+        let (_, body) = get(&app, "/blob/HEAD/d.pdf").await;
+        assert!(body.contains("<object"));
+        let head = app.repo.resolve("HEAD").expect("head");
+        let (_, body) = get(&app, &format!("/commit/{head}")).await;
+        assert!(
+            body.contains("media-diff") && body.matches("<img").count() == 2,
+            "{body}"
+        );
+        let res = routes::router(Arc::clone(&app))
+            .oneshot(
+                Request::get("/raw/HEAD/d.pdf")
+                    .body(Body::empty())
+                    .expect("req"),
+            )
+            .await
+            .expect("res");
+        let h = res.headers();
+        assert_eq!(h["content-type"], "application/pdf");
+        assert_eq!(h["content-disposition"], "inline");
+        assert!(
+            !h["content-security-policy"]
+                .to_str()
+                .expect("s")
+                .contains("sandbox")
+        );
+        let res = routes::router(Arc::clone(&app))
+            .oneshot(
+                Request::get("/raw/HEAD/v.svg")
+                    .body(Body::empty())
+                    .expect("req"),
+            )
+            .await
+            .expect("res");
+        assert!(
+            res.headers()["content-security-policy"]
+                .to_str()
+                .expect("s")
+                .contains("sandbox")
+        );
     }
 
     #[tokio::test]

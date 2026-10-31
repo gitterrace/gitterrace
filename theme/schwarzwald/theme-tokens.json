@@ -2871,22 +2871,30 @@
           ]
         },
         "code.syntax.comment": {
-          "hex": "#A9A9A9",
+          "hex": "#909090",
           "oklch": [
-            0.7348,
+            0.6534,
             0.0,
             null
           ]
         },
         "code.syntax.constant": {
-          "hex": "#C3C3C3",
+          "hex": "#CCCCCC",
           "oklch": [
-            0.8172,
+            0.8452,
             0.0,
             null
           ]
         },
         "code.syntax.entity": {
+          "hex": "#BCBCBC",
+          "oklch": [
+            0.7952,
+            0.0,
+            null
+          ]
+        },
+        "code.syntax.keyword": {
           "hex": "#EBEBEB",
           "oklch": [
             0.9401,
@@ -2894,34 +2902,26 @@
             null
           ]
         },
-        "code.syntax.keyword": {
-          "hex": "#C3C3C3",
-          "oklch": [
-            0.8172,
-            0.0,
-            null
-          ]
-        },
         "code.syntax.param": {
-          "hex": "#C3C3C3",
+          "hex": "#9E9E9E",
           "oklch": [
-            0.8172,
+            0.6993,
             0.0,
             null
           ]
         },
         "code.syntax.string": {
-          "hex": "#C3C3C3",
+          "hex": "#DBDBDB",
           "oklch": [
-            0.8172,
+            0.8914,
             0.0,
             null
           ]
         },
         "code.syntax.tag": {
-          "hex": "#C3C3C3",
+          "hex": "#ADADAD",
           "oklch": [
-            0.8172,
+            0.7476,
             0.0,
             null
           ]
@@ -3119,65 +3119,65 @@
           ]
         },
         "series.1": {
-          "hex": "#C3C3C3",
+          "hex": "#EBEBEB",
           "oklch": [
-            0.8172,
+            0.9401,
             0.0,
             null
           ]
         },
         "series.2": {
-          "hex": "#C3C3C3",
+          "hex": "#D8D8D8",
           "oklch": [
-            0.8172,
+            0.8822,
             0.0,
             null
           ]
         },
         "series.3": {
-          "hex": "#C3C3C3",
+          "hex": "#C5C5C5",
           "oklch": [
-            0.8172,
+            0.8234,
             0.0,
             null
           ]
         },
         "series.4": {
-          "hex": "#C3C3C3",
+          "hex": "#B2B2B2",
           "oklch": [
-            0.8172,
+            0.7636,
             0.0,
             null
           ]
         },
         "series.5": {
-          "hex": "#C3C3C3",
+          "hex": "#9F9F9F",
           "oklch": [
-            0.8172,
+            0.7025,
             0.0,
             null
           ]
         },
         "series.6": {
-          "hex": "#C3C3C3",
+          "hex": "#8D8D8D",
           "oklch": [
-            0.8172,
+            0.6434,
             0.0,
             null
           ]
         },
         "series.7": {
-          "hex": "#C3C3C3",
+          "hex": "#7C7C7C",
           "oklch": [
-            0.8172,
+            0.5863,
             0.0,
             null
           ]
         },
         "series.8": {
-          "hex": "#494949",
+          "hex": "#6B6B6B",
           "oklch": [
-            0.4054,
+            0.5278,
             0.0,
             null
           ]
@@ -3329,22 +3329,30 @@
           ]
         },
         "code.syntax.comment": {
-          "hex": "#6E6E6E",
+          "hex": "#6D6D6D",
           "oklch": [
-            0.5382,
+            0.5348,
             0.0,
             null
           ]
         },
         "code.syntax.constant": {
-          "hex": "#505050",
+          "hex": "#3C3C3C",
           "oklch": [
-            0.4313,
+            0.3562,
             0.0,
             null
           ]
         },
         "code.syntax.entity": {
+          "hex": "#484848",
+          "oklch": [
+            0.4017,
+            0.0,
+            null
+          ]
+        },
+        "code.syntax.keyword": {
           "hex": "#262626",
           "oklch": [
             0.2686,
@@ -3352,34 +3360,26 @@
             null
           ]
         },
-        "code.syntax.keyword": {
-          "hex": "#505050",
-          "oklch": [
-            0.4313,
-            0.0,
-            null
-          ]
-        },
         "code.syntax.param": {
-          "hex": "#505050",
+          "hex": "#616161",
           "oklch": [
-            0.4313,
+            0.4926,
             0.0,
             null
           ]
         },
         "code.syntax.string": {
-          "hex": "#505050",
+          "hex": "#313131",
           "oklch": [
-            0.4313,
+            0.3132,
             0.0,
             null
           ]
         },
         "code.syntax.tag": {
-          "hex": "#505050",
+          "hex": "#545454",
           "oklch": [
-            0.4313,
+            0.4459,
             0.0,
             null
           ]
@@ -3577,25 +3577,25 @@
           ]
         },
         "series.1": {
-          "hex": "#505050",
+          "hex": "#262626",
           "oklch": [
-            0.4313,
+            0.2686,
             0.0,
             null
           ]
         },
         "series.2": {
-          "hex": "#505050",
+          "hex": "#343434",
           "oklch": [
-            0.4313,
+            0.325,
             0.0,
             null
           ]
         },
         "series.3": {
-          "hex": "#505050",
+          "hex": "#424242",
           "oklch": [
-            0.4313,
+            0.3791,
             0.0,
             null
           ]
@@ -3609,33 +3609,33 @@
           ]
         },
         "series.5": {
-          "hex": "#505050",
+          "hex": "#5F5F5F",
           "oklch": [
-            0.4313,
+            0.4855,
             0.0,
             null
           ]
         },
         "series.6": {
-          "hex": "#505050",
+          "hex": "#6F6F6F",
           "oklch": [
-            0.4313,
+            0.5417,
             0.0,
             null
           ]
         },
         "series.7": {
-          "hex": "#505050",
+          "hex": "#7F7F7F",
           "oklch": [
-            0.4313,
+            0.5965,
             0.0,
             null
           ]
         },
         "series.8": {
-          "hex": "#CACACA",
+          "hex": "#8F8F8F",
           "oklch": [
-            0.839,
+            0.65,
             0.0,
             null
           ]

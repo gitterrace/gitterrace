@@ -348,6 +348,78 @@ pub(crate) fn sparkline(values: &[u32], class: &str) -> String {
     )
 }
 
+/// One dot of [`scatter`].
+pub(crate) struct Dot {
+    pub(crate) x: u64,
+    pub(crate) y: u64,
+    /// Radius driver, for example the number of authors.
+    pub(crate) size: u64,
+    pub(crate) href: String,
+    pub(crate) title: String,
+}
+
+/// Dots on a linear plane: x along the bottom, y up the side, each dot a link.
+#[allow(clippy::many_single_char_names)]
+pub(crate) fn scatter(dots: &[Dot], x_title: &str) -> String {
+    let xmax = dots.iter().map(|d| d.x).max().unwrap_or(0);
+    // One giant file would flatten everything else: scale to the 97th percentile and pin
+    // outliers to the top edge (their tooltip still has the real size).
+    let mut ys: Vec<u64> = dots.iter().map(|d| d.y).collect();
+    ys.sort_unstable();
+    let ymax = ys
+        .get(ys.len().saturating_sub(1) * 97 / 100)
+        .copied()
+        .unwrap_or(0);
+    let smax = dots.iter().map(|d| d.size).max().unwrap_or(1).max(1);
+    let (grid, ytop) = axis(ymax);
+    let xstep = nice_step(xmax);
+    #[allow(clippy::cast_precision_loss)]
+    let xtop = (xstep * xmax.div_ceil(xstep).max(1)) as f64;
+    let plot = H - TOP_PAD - BOTTOM;
+    let mut svg = open_svg("Change frequency against size");
+    svg.push_str(&grid);
+    let mut v = 0;
+    while (v as f64) <= xtop {
+        #[allow(clippy::cast_precision_loss)]
+        let x = LEFT + v as f64 / xtop * (W - LEFT - 6.0);
+        fmt::push(
+            &mut svg,
+            &format!(
+                r#"<text class="ax" x="{x:.1}" y="{:.1}" text-anchor="middle">{}</text>"#,
+                H - 8.0,
+                fmt::thousands(v)
+            ),
+        );
+        v += xstep;
+    }
+    for d in dots {
+        #[allow(clippy::cast_precision_loss)]
+        let (cx, cy, r) = (
+            LEFT + d.x as f64 / xtop * (W - LEFT - 6.0),
+            TOP_PAD + plot - (d.y as f64 / ytop).min(1.0) * plot,
+            3.0 + 5.0 * (d.size as f64 / smax as f64).sqrt(),
+        );
+        fmt::push(
+            &mut svg,
+            &format!(
+                r#"<a href="{}"><circle class="dot-pt" cx="{cx:.1}" cy="{cy:.1}" r="{r:.1}"><title>{}</title></circle></a>"#,
+                esc(&d.href),
+                esc(&d.title)
+            ),
+        );
+    }
+    fmt::push(
+        &mut svg,
+        &format!(
+            r#"<text class="ax" x="{W}" y="{:.1}" text-anchor="end">{}</text>"#,
+            TOP_PAD + 2.0,
+            esc(x_title)
+        ),
+    );
+    svg.push_str("</svg>");
+    svg
+}
+
 /// Weekday by hour grid. Cell intensity is bucketed into five levels.
 pub(crate) fn heatmap(cells: &[[u32; 24]; 7], max: u32) -> String {
     // Sized near the bar charts' width so labels render at the same pixel size.

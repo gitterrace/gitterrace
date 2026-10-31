@@ -44,6 +44,7 @@ pub(crate) struct App {
     last_commits: Mutex<HashMap<String, Arc<Vec<LastCommit>>>>,
     chain: Mutex<Option<(String, Arc<crate::languages::Chain>)>>,
     subjects: Mutex<Option<(String, Arc<Subjects>)>>,
+    head_lines: Mutex<Option<(String, Arc<Vec<gitterrace_index::HeadFile>>)>>,
 }
 
 impl App {
@@ -63,6 +64,7 @@ impl App {
             last_commits: Mutex::new(HashMap::new()),
             chain: Mutex::new(None),
             subjects: Mutex::new(None),
+            head_lines: Mutex::new(None),
         }
     }
 
@@ -145,6 +147,27 @@ impl App {
             *g = Some((head.to_owned(), Arc::clone(&c)));
         }
         c
+    }
+
+    /// Line count of every file in `head`, built once per head. Reading the line cache,
+    /// walking the tree and saving the cache cost tens of ms per insights page otherwise.
+    pub(crate) fn head_lines(&self, head: &str) -> Arc<Vec<gitterrace_index::HeadFile>> {
+        if let Ok(g) = self.head_lines.lock()
+            && let Some((id, f)) = g.as_ref()
+            && id == head
+        {
+            return Arc::clone(f);
+        }
+        let mut cache = gitterrace_index::LineCache::load(self.index.dir());
+        let files =
+            Arc::new(gitterrace_index::head_files(&self.repo, head, &mut cache).unwrap_or_default());
+        if let Err(e) = cache.save(self.index.dir()) {
+            tracing::warn!("line cache not saved: {e}");
+        }
+        if let Ok(mut g) = self.head_lines.lock() {
+            *g = Some((head.to_owned(), Arc::clone(&files)));
+        }
+        files
     }
 
     /// Commit subjects by id for everything reachable from `head`, scanned once per head.

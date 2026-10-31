@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Compare · {{ c.name }}{% endblock %}
+{% block content %}
+{% include "tabs.html" %}
+<form class="cmp" action="{{ c.base }}/compare" method="get"><label>Base <input name="base" value="{{ base }}" placeholder="v1.0 or a commit" required></label><label>Head <input name="head" value="{{ head }}"></label><button type="submit">Compare</button></form>
+{% if !tags.is_empty() %}<p class="hint">Since a tag: {% for t in tags %}<a href="{{ t.1 }}">{{ t.0 }}</a>{% if !loop.last %} · {% endif %}{% endfor %}</p>{% endif %}
+{% if let Some(e) = error %}<p class="muted">{{ e }}</p>{% endif %}
+{% if let Some(r) = result %}
+<div class="kpis">{% for k in r.kpis %}<div><b>{{ k.1 }}</b><span>{{ k.0 }}</span></div>{% endfor %}</div>
+<p class="hint"><a href="{{ r.diff_href }}">Open the head commit</a></p>
+<div class="chart-head"><div><h2>Languages</h2><p class="hint">Lines added and removed per language between the two revisions, largest net change first.</p></div></div>
+<div class="card"><table class="entries">
+<tr class="th"><td>Language</td><td class="r">Added</td><td class="r">Removed</td><td class="r">Net</td></tr>
+{% for l in r.langs %}<tr><td>{{ l.language }}</td><td class="r"><b class="add">+{{ l.added }}</b></td><td class="r"><b class="del">-{{ l.removed }}</b></td><td class="r"><b class="{{ l.tone }}">{{ l.net }}</b></td></tr>{% endfor %}
+</table></div>
+<div class="chart-head"><div><h2>Commits</h2></div></div>
+<ul class="list log">{% for m in r.commits %}<li class="crow"><div class="cmain"><a href="{{ m.href }}">{{ m.subject }}</a></div><a class="sha" href="{{ m.href }}">{{ m.short }}</a></li>{% endfor %}</ul>
+{% if r.more > 0 %}<p class="muted">and {{ r.more }} more.</p>{% endif %}
+{% endif %}
+{% endblock %}

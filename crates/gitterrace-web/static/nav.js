@@ -154,6 +154,7 @@
       return out.slice(0, 50);
     }, function (li, it, q) {
       var i = it.f.lastIndexOf("/");
+      li.appendChild(el("span", /\.(png|jpe?g|gif|webp|avif|bmp|ico|svg)$/i.test(it.f) ? "ico img" : "ico file", ""));
       li.appendChild(el("span", "name", it.f.slice(i + 1)));
       if (i >= 0) li.appendChild(el("span", "dir", it.f.slice(0, i)));
     }, function (it, e) {

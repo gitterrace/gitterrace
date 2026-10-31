@@ -432,11 +432,17 @@ mod tests {
     async fn export_refuses_a_repository_root_as_output() {
         let repo = tempfile::tempdir().expect("tempdir");
         std::fs::create_dir(repo.path().join(".git")).expect("mkdir");
-        let scope = crate::export::Scope { commits: 1, max_file: 1024 };
+        let scope = crate::export::Scope {
+            commits: 1,
+            max_file: 1024,
+        };
         let err = crate::export::export(repo.path(), repo.path(), &scope)
             .await
             .unwrap_err();
-        assert!(err.to_string().contains("root of a git repository"), "{err}");
+        assert!(
+            err.to_string().contains("root of a git repository"),
+            "{err}"
+        );
         let left: Vec<_> = std::fs::read_dir(repo.path()).expect("read").collect();
         assert_eq!(left.len(), 1, "nothing but .git may be written");
     }

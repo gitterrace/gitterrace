@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Pulse · {{ c.name }}{% endblock %}
+{% block content %}
+{% include "tabs.html" %}
+{% include "filterbar.html" %}
+{% include "options.html" %}
+<p class="hint">{{ span }}.</p>
+<div class="card"><table class="entries">
+<tr class="th"><td></td><td class="r">This period</td><td class="r">Before</td><td class="r">Change</td></tr>
+{% for r in rows %}<tr><td>{{ r.label }}</td><td class="r"><b>{{ r.now }}</b></td><td class="r muted">{{ r.before }}</td><td class="r delta {{ r.tone }}">{{ r.delta }}</td></tr>{% endfor %}
+</table></div>
+<div class="chart-head"><div><h2>Commits per week</h2><p class="hint">Weekly commit counts in the period.</p></div></div>
+<div class="card pad">{{ weekly|safe }}</div>
+{% endblock %}

@@ -134,6 +134,11 @@ pub(crate) fn stats_tabs(active: &str) -> Vec<Nav> {
         ("/stats", "Activity", "a"),
         ("/stats/files", "Hot files", "f"),
         ("/stats/types", "Commit types", "t"),
+        ("/stats/pulse", "Pulse", "pu"),
+        ("/stats/hotspots", "Hotspots", "ho"),
+        ("/stats/ownership", "Ownership", "ow"),
+        ("/stats/patterns", "Patterns", "pa"),
+        ("/compare", "Compare", "cm"),
         ("/stats/languages", "Languages", "l"),
         ("/stats/frequency", "Code frequency", "cf"),
         ("/stats/contributors", "Contributors", "co"),
@@ -219,7 +224,14 @@ pub(crate) fn entries(rev: &str, path: &str, list: &[TreeEntry]) -> Vec<Entry> {
             let r = enc(rev, false);
             let (href, kind) = match e.kind {
                 TreeEntryKind::Dir => (href(&format!("/tree/{r}/{full}")), "dir"),
-                TreeEntryKind::File => (href(&format!("/blob/{r}/{full}")), "file"),
+                TreeEntryKind::File => (
+                    href(&format!("/blob/{r}/{full}")),
+                    if crate::media::is_image(&e.name) {
+                        "img"
+                    } else {
+                        "file"
+                    },
+                ),
                 TreeEntryKind::Symlink => (href(&format!("/blob/{r}/{full}")), "link"),
                 TreeEntryKind::Submodule => (String::new(), "module"),
             };
@@ -278,8 +290,8 @@ fn num(n: Option<u32>) -> String {
     n.map_or_else(String::new, |n| n.to_string())
 }
 
-pub(crate) fn diff_html(rev: &str, files: &[FileDiff]) -> String {
-    diff_html_with(Some(rev), files)
+pub(crate) fn diff_html(rev: &str, parent: Option<&str>, files: &[FileDiff]) -> String {
+    diff_html_with(Some(rev), parent, files)
 }
 
 /// A file whose changed lines pass this is folded behind a "Load diff" button.
@@ -338,7 +350,11 @@ pub(crate) fn diff_body_html(f: &FileDiff) -> String {
 }
 
 /// `rev` of `None` renders file names without links (the worktree has no blob URLs).
-pub(crate) fn diff_html_with(rev: Option<&str>, files: &[FileDiff]) -> String {
+pub(crate) fn diff_html_with(
+    rev: Option<&str>,
+    parent: Option<&str>,
+    files: &[FileDiff],
+) -> String {
     let mut out = String::new();
     let mut budget_used = 0usize;
     let mut bytes_used = 0usize;
@@ -374,7 +390,18 @@ pub(crate) fn diff_html_with(rev: Option<&str>, files: &[FileDiff]) -> String {
                 crate::fmt::thousands(f.deletions)
             ),
         );
-        if f.binary {
+        if f.binary && crate::media::is_image(&f.path) && rev.is_some() {
+            let old_path = f.old_path.as_deref().unwrap_or(&f.path);
+            let old = (f.kind != ChangeKind::Added)
+                .then_some(parent)
+                .flatten()
+                .map(|p| (p, old_path));
+            let new = (f.kind != ChangeKind::Deleted)
+                .then_some(rev)
+                .flatten()
+                .map(|r| (r, f.path.as_str()));
+            out.push_str(&crate::media::diff_html(old, new));
+        } else if f.binary {
             out.push_str("<p class=\"muted pad\">Binary file not shown.</p>");
         } else if f.hunks.is_empty() {
             out.push_str("<p class=\"muted pad\">No textual changes.</p>");
@@ -566,9 +593,9 @@ mod tests {
             rewritten: 0,
             code: CodeCounts::default(),
         };
-        let small = diff_html("abc", &[file(10)]);
+        let small = diff_html("abc", None, &[file(10)]);
         assert!(!small.contains("data-load-diff"));
-        let big = diff_html("abc", &[file(401)]);
+        let big = diff_html("abc", None, &[file(401)]);
         assert!(big.contains("data-load-diff=\"/diff/abc/0\""));
         assert!(!big.contains("<div class=\"add\""));
     }

@@ -58,6 +58,12 @@ pub(crate) fn router(app: Arc<App>) -> Router {
         .route("/stats/types", get(crate::types::page))
         .route("/stats/languages", get(crate::languages::page))
         .route("/stats/frequency", get(crate::insights::code_frequency))
+        .route("/stats/pulse", get(crate::pages::pulse))
+        .route("/stats/hotspots", get(crate::pages::hotspots))
+        .route("/stats/ownership", get(crate::pages::ownership))
+        .route("/stats/patterns", get(crate::pages::patterns))
+        .route("/compare", get(crate::pages::compare))
+        .route("/history/{*path}", get(crate::pages::history))
         .route("/stats/contributors", get(crate::insights::contributors))
         .route("/raw/{rev}/{*path}", get(raw))
         .route("/cards/wrapped/{year}", get(crate::cards::wrapped))
@@ -164,38 +170,35 @@ async fn mermaid_js() -> Response {
 }
 
 fn content_type(path: &str) -> &'static str {
-    let ext = path.rsplit_once('.').map_or("", |(_, e)| e);
-    match ext.to_ascii_lowercase().as_str() {
-        "png" => "image/png",
-        "jpg" | "jpeg" => "image/jpeg",
-        "gif" => "image/gif",
-        "webp" => "image/webp",
-        "avif" => "image/avif",
-        "ico" => "image/x-icon",
-        "bmp" => "image/bmp",
-        "svg" => "image/svg+xml",
-        "pdf" => "application/pdf",
-        "mp4" => "video/mp4",
-        "webm" => "video/webm",
-        _ => "text/plain; charset=utf-8",
-    }
+    crate::media::content_type(path)
 }
 
 /// Serves blob bytes for relative images. Content is untrusted, so scripts are disabled.
 async fn raw(State(app): Shared, Path((rev, path)): Path<(String, String)>) -> Result<Response> {
-    let (bytes, kind) = blocking(&app, move |a| {
+    let (bytes, kind, plain) = blocking(&app, move |a| {
         let id = a.repo.resolve(&rev)?;
         let path = path.trim_matches('/').to_owned();
         let bytes = a.repo.blob_bytes(&id, &path)?;
-        Ok((bytes, content_type(&path)))
+        Ok((bytes, content_type(&path), crate::media::plain_media(&path)))
     })
     .await?;
+    // The sandbox keeps SVG and text scriptless. It also stops the browser's PDF viewer, so
+    // formats that run no author code are served without it.
+    let csp = if plain {
+        "default-src 'none'; style-src 'unsafe-inline'"
+    } else {
+        "sandbox; default-src 'none'; style-src 'unsafe-inline'"
+    };
     Ok((
         [
             (header::CONTENT_TYPE, HeaderValue::from_static(kind)),
             (
                 header::CONTENT_SECURITY_POLICY,
-                HeaderValue::from_static("sandbox; default-src 'none'; style-src 'unsafe-inline'"),
+                HeaderValue::from_static(csp),
+            ),
+            (
+                header::CONTENT_DISPOSITION,
+                HeaderValue::from_static("inline"),
             ),
             (
                 header::X_CONTENT_TYPE_OPTIONS,
@@ -484,7 +487,7 @@ async fn commit(State(app): Shared, Path(id): Path<String>) -> Result<Html<Strin
                 })
                 .collect(),
             files: views::file_stats(&d),
-            diff: views::diff_html(&id, &d.files),
+            diff: views::diff_html(&id, d.summary.parents.first().map(String::as_str), &d.files),
             id,
         })
     })
@@ -568,6 +571,7 @@ struct BlobPage {
     log_href: String,
     html: Option<String>,
     cut: bool,
+    media: Option<String>,
     too_large: bool,
     raw_href: String,
     rendered: Option<String>,
@@ -588,6 +592,23 @@ async fn blob(
         let id = a.repo.resolve(&rev)?;
         let path = path.trim_matches('/').to_owned();
         let b = a.repo.blob(&id, &path)?;
+        let media = match crate::media::kind(&path) {
+            Some(k) => {
+                let bytes = a.repo.blob_bytes(&id, &path)?;
+                let src = (k == crate::media::Kind::Svg)
+                    .then(|| String::from_utf8(bytes.clone()).ok())
+                    .flatten()
+                    .filter(|t| t.len() as u64 <= views::MAX_BLOB_BYTES);
+                Some(crate::media::blob_html(
+                    k,
+                    &rev,
+                    &path,
+                    &bytes,
+                    src.as_deref(),
+                ))
+            }
+            None => None,
+        };
         let too_large = b.size > views::MAX_BLOB_BYTES;
         let text = b.text.as_deref().filter(|_| !too_large);
         let (html, cut) = match text {
@@ -615,6 +636,7 @@ async fn blob(
             title: path,
             html,
             cut,
+            media,
             too_large,
             raw_href: fmt::href(&format!("/raw/{r}/{pe}")),
         })
@@ -916,7 +938,7 @@ async fn worktree(State(app): Shared) -> Result<Html<String>> {
         Ok(WorktreePage {
             c: views::chrome(a, "files"),
             clean: files.is_empty(),
-            diff: views::diff_html_with(None, &files),
+            diff: views::diff_html_with(None, None, &files),
             adds: fmt::thousands(adds),
             dels: fmt::thousands(dels),
             files: stats,
