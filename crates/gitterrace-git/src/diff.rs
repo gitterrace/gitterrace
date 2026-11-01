@@ -5,7 +5,7 @@ use gix::diff::blob::{Algorithm, Diff, InternedInput};
 use gix::object::tree::diff::ChangeDetached;
 
 use crate::error::git;
-use crate::{ChangeKind, CodeCounts, FileDiff, Hunk, HunkLine, LineKind, MAX_TEXT_BYTES, Result};
+use crate::{ChangeKind, CodeCounts, FileDiff, Hunk, HunkLine, LineKind, Result};
 
 const CONTEXT: usize = 3;
 /// Same probe window as git: a NUL in the first 8000 bytes marks a blob binary.
@@ -40,6 +40,7 @@ pub(crate) fn changes(
     repo: &gix::Repository,
     commit: &gix::Commit<'_>,
     with_hunks: bool,
+    text_limit: u64,
 ) -> Result<Vec<FileDiff>> {
     let new_tree = commit.tree().map_err(git)?;
     let old_tree = match commit.parent_ids().next() {
@@ -59,7 +60,7 @@ pub(crate) fn changes(
         .map_err(git)?;
     let mut out = Vec::with_capacity(raw.len());
     for change in raw {
-        if let Some(diff) = file_diff(repo, change, with_hunks)? {
+        if let Some(diff) = file_diff(repo, change, with_hunks, text_limit)? {
             out.push(diff);
         }
     }
@@ -70,6 +71,7 @@ fn file_diff(
     repo: &gix::Repository,
     change: ChangeDetached,
     with_hunks: bool,
+    text_limit: u64,
 ) -> Result<Option<FileDiff>> {
     let is_tree = match &change {
         ChangeDetached::Addition { entry_mode, .. }
@@ -144,7 +146,7 @@ fn file_diff(
     };
     let counted = if !diffable {
         Counted::empty(false)
-    } else if too_large(repo, old_id) || too_large(repo, new_id) {
+    } else if too_large(repo, old_id, text_limit) || too_large(repo, new_id, text_limit) {
         // Never read, never diffed: Myers on two huge blobs costs minutes.
         Counted::empty(true)
     } else if let (false, Some(None)) = (with_hunks, rewrite_stats) {
@@ -180,10 +182,10 @@ fn blob(repo: &gix::Repository, id: Option<gix::ObjectId>) -> Result<Vec<u8>> {
     }
 }
 
-/// Whether the blob is over [`MAX_TEXT_BYTES`], from its header alone.
-fn too_large(repo: &gix::Repository, id: Option<gix::ObjectId>) -> bool {
+/// Whether the blob is over `limit` bytes, from its header alone.
+fn too_large(repo: &gix::Repository, id: Option<gix::ObjectId>, limit: u64) -> bool {
     id.and_then(|id| repo.find_header(id).ok())
-        .is_some_and(|h| h.size() > MAX_TEXT_BYTES)
+        .is_some_and(|h| h.size() > limit)
 }
 
 pub(crate) fn is_binary(data: &[u8]) -> bool {

@@ -29,12 +29,12 @@ pub(crate) fn ensure_dir(dir: &Path) -> io::Result<()> {
 
 /// Reads all complete lines. A last line without a trailing newline is torn and dropped, as is
 /// any line that does not parse. Returns the records and the byte length of the valid prefix.
-pub(crate) fn read_records(dir: &Path) -> io::Result<(Vec<CommitRecord>, u64)> {
+pub(crate) fn read_records(dir: &Path, threads: usize) -> io::Result<(Vec<CommitRecord>, u64)> {
     let Some(bytes) = cache::read(dir, COMMITS_FILE)? else {
         return Ok((Vec::new(), 0));
     };
     let end = bytes.iter().rposition(|&b| b == b'\n').map_or(0, |i| i + 1);
-    Ok((parse_parallel(&bytes[..end]), end as u64))
+    Ok((parse_parallel(&bytes[..end], threads), end as u64))
 }
 
 fn parse_lines(chunk: &[u8]) -> Vec<CommitRecord> {
@@ -47,13 +47,15 @@ fn parse_lines(chunk: &[u8]) -> Vec<CommitRecord> {
 /// Below this a single thread is faster than spawning.
 const PARALLEL_MIN: usize = 256 * 1024;
 
-/// Splits `data` (whole lines) at newline boundaries into one chunk per core, parses the chunks
-/// on scoped threads and joins them in file order.
-fn parse_parallel(data: &[u8]) -> Vec<CommitRecord> {
-    let threads = std::thread::available_parallelism().map_or(1, std::num::NonZero::get);
-    if threads < 2 || data.len() < PARALLEL_MIN {
-        return parse_lines(data);
-    }
+/// Threads used when none are configured: one per core, at most 8.
+fn default_threads() -> usize {
+    std::thread::available_parallelism()
+        .map_or(1, std::num::NonZero::get)
+        .min(8)
+}
+
+/// Splits `data` (whole lines) at newline boundaries into at most `threads` chunks.
+fn split_lines(data: &[u8], threads: usize) -> Vec<&[u8]> {
     let mut chunks: Vec<&[u8]> = Vec::with_capacity(threads);
     let mut start = 0;
     for i in 1..threads {
@@ -70,6 +72,21 @@ fn parse_parallel(data: &[u8]) -> Vec<CommitRecord> {
     if start < data.len() {
         chunks.push(&data[start..]);
     }
+    chunks
+}
+
+/// Parses the chunks on scoped threads and joins them in file order. `threads` of 0 means the
+/// default.
+fn parse_parallel(data: &[u8], threads: usize) -> Vec<CommitRecord> {
+    let threads = if threads == 0 {
+        default_threads()
+    } else {
+        threads
+    };
+    if threads < 2 || data.len() < PARALLEL_MIN {
+        return parse_lines(data);
+    }
+    let chunks = split_lines(data, threads);
     std::thread::scope(|s| {
         let handles: Vec<_> = chunks
             .iter()
@@ -149,4 +166,26 @@ pub(crate) fn select(records: Vec<CommitRecord>, order: &[String]) -> Vec<Commit
         by_id.entry(r.id.clone()).or_insert(r);
     }
     order.iter().filter_map(|id| by_id.remove(id)).collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::split_lines;
+
+    #[test]
+    fn the_thread_setting_bounds_the_chunk_count() {
+        let data: Vec<u8> = (0..1000)
+            .flat_map(|i| format!("line {i}\n").into_bytes())
+            .collect();
+        for n in [2, 3, 5] {
+            let chunks = split_lines(&data, n);
+            assert!(
+                chunks.len() <= n && chunks.len() > 1,
+                "{n} threads: {}",
+                chunks.len()
+            );
+            assert_eq!(chunks.concat(), data, "no line is lost or cut");
+        }
+        assert_eq!(split_lines(&data, 1).len(), 1);
+    }
 }

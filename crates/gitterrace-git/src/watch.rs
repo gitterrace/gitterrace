@@ -22,10 +22,9 @@ use crate::Repo;
 /// tick (4 ms) a change could hide, far above 2 s only costs extra `stat` calls.
 const RACY_WINDOW: Duration = Duration::from_secs(2);
 
-/// Files under the git directory whose replacement means the repository moved.
-const GIT_DIR_FILES: [&str; 11] = [
+/// Files under the git directory that say where HEAD is and what operation is half done.
+const HEAD_FILES: [&str; 10] = [
     "HEAD",
-    "index",
     "MERGE_HEAD",
     "CHERRY_PICK_HEAD",
     "REVERT_HEAD",
@@ -37,8 +36,11 @@ const GIT_DIR_FILES: [&str; 11] = [
     "AUTO_MERGE",
 ];
 
-/// Files under the common git directory.
-const COMMON_FILES: [&str; 3] = ["packed-refs", "reftable/tables.list", "worktrees"];
+/// Files under the common git directory that hold refs besides the `refs` tree.
+const REF_FILES: [&str; 2] = ["packed-refs", "reftable/tables.list"];
+
+/// The stash ref and its reflog, which `git stash drop` rewrites without touching the ref.
+const STASH_FILES: [&str; 2] = ["refs/stash", "logs/refs/stash"];
 
 /// What one `stat` says about a path. `None` fields mean the path is absent.
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
@@ -101,6 +103,44 @@ pub struct Cost {
     pub dir_listings: u64,
 }
 
+/// One hash per kind of change, so a page can react to what it shows. Equal parts mean that
+/// kind did not move.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub struct Parts {
+    /// HEAD itself, or an operation marker (merge, rebase, cherry-pick, revert, bisect).
+    pub head: u64,
+    /// Any branch, tag or remote ref, loose or packed. A commit moves this.
+    pub refs: u64,
+    /// The stash.
+    pub stash: u64,
+    /// The list of linked worktrees, or one worktree's HEAD or index.
+    pub worktrees: u64,
+    /// The main index: staging, and most commands that touch files.
+    pub index: u64,
+}
+
+impl Parts {
+    /// Names of the parts that differ from `before`, in a fixed order.
+    pub fn changed_since(&self, before: &Self) -> Vec<&'static str> {
+        [
+            ("head", self.head != before.head),
+            ("refs", self.refs != before.refs),
+            ("stash", self.stash != before.stash),
+            ("worktrees", self.worktrees != before.worktrees),
+            ("index", self.index != before.index),
+        ]
+        .into_iter()
+        .filter_map(|(n, moved)| moved.then_some(n))
+        .collect()
+    }
+
+    fn combined(&self) -> u64 {
+        let mut h = std::collections::hash_map::DefaultHasher::new();
+        (self.head, self.refs, self.stash, self.worktrees, self.index).hash(&mut h);
+        h.finish()
+    }
+}
+
 /// Fingerprints one repository. Keep it between ticks: it remembers which ref directories exist.
 pub struct Watcher {
     git_dir: PathBuf,
@@ -139,25 +179,42 @@ impl Watcher {
     /// The current fingerprint. Equal values mean nothing a page shows has changed; a different
     /// value means something may have.
     pub fn fingerprint(&mut self) -> u64 {
+        self.parts().combined()
+    }
+
+    /// The fingerprint split by kind of change. Same cost as [`Watcher::fingerprint`].
+    pub fn parts(&mut self) -> Parts {
         self.cost = Cost::default();
         let now = SystemTime::now();
-        let mut h = std::collections::hash_map::DefaultHasher::new();
+        let hasher = || std::collections::hash_map::DefaultHasher::new();
+        let (mut head, mut refs, mut stash, mut worktrees, mut index) =
+            (hasher(), hasher(), hasher(), hasher(), hasher());
 
-        for name in GIT_DIR_FILES {
-            self.stamp(&self.git_dir.join(name)).hash(&mut h);
+        for name in HEAD_FILES {
+            self.stamp(&self.git_dir.join(name)).hash(&mut head);
         }
-        for name in COMMON_FILES {
-            self.stamp(&self.common_dir.join(name)).hash(&mut h);
+        self.stamp(&self.git_dir.join("index")).hash(&mut index);
+        for name in REF_FILES {
+            self.stamp(&self.common_dir.join(name)).hash(&mut refs);
+        }
+        for name in STASH_FILES {
+            self.stamp(&self.common_dir.join(name)).hash(&mut stash);
         }
         let mut roots = vec![self.common_dir.join("refs")];
         if self.git_dir != self.common_dir {
             roots.push(self.git_dir.join("refs"));
         }
         for root in roots {
-            self.hash_tree(&root, now, &mut h);
+            self.hash_tree(&root, now, &mut refs);
         }
-        self.hash_worktrees(&mut h);
-        h.finish()
+        self.hash_worktrees(&mut worktrees);
+        Parts {
+            head: head.finish(),
+            refs: refs.finish(),
+            stash: stash.finish(),
+            worktrees: worktrees.finish(),
+            index: index.finish(),
+        }
     }
 
     fn stamp(&mut self, path: &Path) -> Stamp {
@@ -227,6 +284,7 @@ impl Watcher {
         let Some(wt) = self.dirs_listing(&base) else {
             return;
         };
+        self.stamp(&base).hash(h);
         for id in wt {
             self.stamp(&base.join(&id).join("HEAD")).hash(h);
             self.stamp(&base.join(&id).join("index")).hash(h);
@@ -372,6 +430,48 @@ mod tests {
             &["worktree", "remove", "--force", wt.to_str().expect("utf8")],
         );
         step("worktree removed", &mut w, &mut last);
+    }
+
+    #[test]
+    fn parts_name_what_moved() {
+        let (_tmp, dir) = base();
+        let repo = Repo::discover(&dir).expect("open");
+        let mut w = quiet(&repo);
+        let mut last = w.parts();
+        let mut moved = |w: &mut Watcher| {
+            let now = w.parts();
+            let names = now.changed_since(&last);
+            last = now;
+            names
+        };
+        fs::write(dir.join("b"), "x").expect("write");
+        git(&dir, &["add", "b"]);
+        assert_eq!(moved(&mut w), ["index"], "staging moves the index only");
+        git(&dir, &["commit", "-qm", "two"]);
+        let names = moved(&mut w);
+        assert!(
+            names.contains(&"refs") && !names.contains(&"head"),
+            "{names:?}"
+        );
+        git(&dir, &["checkout", "-q", "--detach"]);
+        assert!(moved(&mut w).contains(&"head"), "detaching moves HEAD");
+        fs::write(dir.join("a"), "dirty").expect("write");
+        git(&dir, &["stash", "-q"]);
+        assert!(moved(&mut w).contains(&"stash"));
+        let wt = dir.parent().expect("parent").join("wt2");
+        git(
+            &dir,
+            &[
+                "worktree",
+                "add",
+                "-q",
+                wt.to_str().expect("utf8"),
+                "-b",
+                "w2",
+            ],
+        );
+        assert!(moved(&mut w).contains(&"worktrees"));
+        assert!(moved(&mut w).is_empty(), "a quiet tick names nothing");
     }
 
     #[test]

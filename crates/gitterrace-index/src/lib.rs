@@ -96,6 +96,8 @@ pub struct Progress {
 /// The cache for one repository.
 pub struct Index {
     dir: PathBuf,
+    /// Threads that parse the stored records; 0 means one per core, at most 8.
+    threads: usize,
 }
 
 impl Index {
@@ -107,7 +109,14 @@ impl Index {
     /// Opens or creates the cache in `dir`. A format version mismatch discards old records.
     pub fn open_dir(dir: PathBuf) -> io::Result<Self> {
         store::ensure_dir(&dir)?;
-        Ok(Self { dir })
+        Ok(Self { dir, threads: 0 })
+    }
+
+    /// Sets the threads that parse stored records; 0 means one per core, at most 8.
+    #[must_use]
+    pub fn with_threads(mut self, threads: usize) -> Self {
+        self.threads = threads;
+        self
     }
 
     pub fn dir(&self) -> &std::path::Path {
@@ -157,7 +166,7 @@ impl Index {
     /// All cached records reachable from `rev`, oldest first.
     pub fn records(&self, source: &dyn CommitSource, rev: &str) -> io::Result<Vec<CommitRecord>> {
         let order = source.rev_list(rev)?;
-        let (records, _) = store::read_records(&self.dir)?;
+        let (records, _) = store::read_records(&self.dir, self.threads)?;
         Ok(store::select(records, &order))
     }
 }
@@ -244,7 +253,7 @@ mod tests {
         idx.update(&src, "HEAD", &|_| {})?;
         let (known, _) = crate::store::stored_ids(idx.dir())?;
         assert_eq!(known.len(), 4000);
-        let (parsed, _) = crate::store::read_records(idx.dir())?;
+        let (parsed, _) = crate::store::read_records(idx.dir(), 0)?;
         assert_eq!(ids(&parsed), wanted);
         Ok(())
     }

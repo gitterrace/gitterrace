@@ -21,6 +21,10 @@ const OBJECT_CACHE_BYTES: usize = 128 * 1024 * 1024;
 pub struct Repo {
     inner: gix::ThreadSafeRepository,
     blame_cache: Mutex<BlameCache>,
+    /// Largest blob read as text by this handle, see [`Repo::with_limits`].
+    text_limit: u64,
+    /// Threads [`Repo::numstat_many`] uses; 0 means one per core.
+    workers: usize,
     /// Ahead and behind per (branch tip, base): immutable for a pair of commits.
     pub(crate) divergence: Mutex<HashMap<(gix::ObjectId, gix::ObjectId), (usize, usize)>>,
     /// The root-commit id, see `repo_id.rs`.
@@ -30,8 +34,9 @@ pub struct Repo {
 /// Blame results kept per (commit id, path), bounded by approximate bytes.
 const BLAME_CACHE_BYTES: usize = 32 * 1024 * 1024;
 
-#[derive(Default)]
 struct BlameCache {
+    /// Approximate bytes kept before the oldest entries go.
+    limit: usize,
     map: HashMap<(gix::ObjectId, String), Arc<Vec<BlameLine>>>,
     /// Least recently used first.
     order: VecDeque<(gix::ObjectId, String)>,
@@ -46,6 +51,15 @@ fn blame_size(lines: &[BlameLine]) -> usize {
 }
 
 impl BlameCache {
+    fn with_limit(limit: usize) -> Self {
+        Self {
+            limit,
+            map: HashMap::new(),
+            order: VecDeque::new(),
+            bytes: 0,
+        }
+    }
+
     fn get(&mut self, key: &(gix::ObjectId, String)) -> Option<Arc<Vec<BlameLine>>> {
         let hit = self.map.get(key)?.clone();
         if let Some(i) = self.order.iter().position(|k| k == key) {
@@ -57,10 +71,10 @@ impl BlameCache {
 
     fn put(&mut self, key: (gix::ObjectId, String), value: Arc<Vec<BlameLine>>) {
         let size = blame_size(&value);
-        if size > BLAME_CACHE_BYTES || self.map.contains_key(&key) {
+        if size > self.limit || self.map.contains_key(&key) {
             return;
         }
-        while self.bytes + size > BLAME_CACHE_BYTES {
+        while self.bytes + size > self.limit {
             let Some(old) = self.order.pop_front() else {
                 break;
             };
@@ -81,10 +95,36 @@ impl Repo {
             .map_err(|e| crate::Error::NotARepo(e.to_string()))?;
         Ok(Self {
             inner,
-            blame_cache: Mutex::new(BlameCache::default()),
+            blame_cache: Mutex::new(BlameCache::with_limit(BLAME_CACHE_BYTES)),
+            text_limit: MAX_TEXT_BYTES,
+            workers: 0,
             divergence: Mutex::new(HashMap::new()),
             id_cache: OnceLock::new(),
         })
+    }
+
+    /// Sets the largest blob this handle reads as text (blob views, blame, diffs with hunks)
+    /// and the memory the blame cache may keep. The index always uses [`MAX_TEXT_BYTES`], so
+    /// its stored numbers do not depend on a display setting.
+    #[must_use]
+    pub fn with_limits(mut self, text_bytes: u64, blame_cache_bytes: usize) -> Self {
+        self.text_limit = text_bytes;
+        if let Ok(mut c) = self.blame_cache.lock() {
+            c.limit = blame_cache_bytes;
+        }
+        self
+    }
+
+    /// Sets the threads [`Repo::numstat_many`] spreads a batch over; 0 means one per core.
+    #[must_use]
+    pub fn with_workers(mut self, workers: usize) -> Self {
+        self.workers = workers;
+        self
+    }
+
+    /// The text cap in force, see [`Repo::with_limits`].
+    pub fn text_limit(&self) -> u64 {
+        self.text_limit
     }
 
     /// Path of the `.git` directory, where gitterrace keeps its cache.
@@ -194,7 +234,7 @@ impl Repo {
         Ok(CommitDetail {
             summary: summary(&commit, &mailmap)?,
             body,
-            files: crate::diff::changes(&repo, &commit, true)?,
+            files: crate::diff::changes(&repo, &commit, true, self.text_limit)?,
         })
     }
 
@@ -223,7 +263,7 @@ impl Repo {
         let repo = self.repo();
         let oid = Self::resolve_id(&repo, id)?;
         let commit = repo.find_commit(oid).map_err(git)?;
-        crate::diff::changes(&repo, &commit, false)
+        crate::diff::changes(&repo, &commit, false, MAX_TEXT_BYTES)
     }
 
     /// [`Repo::numstat`] for many commits, spread over all cores. Results are in the order of
@@ -231,7 +271,10 @@ impl Repo {
     /// A commit whose objects cannot be read (a shallow clone's boundary, a pruned or hostile
     /// object store) gets no file stats instead of failing the whole batch.
     pub fn numstat_many(&self, ids: &[String]) -> Result<Vec<Vec<crate::FileDiff>>> {
-        let workers = std::thread::available_parallelism().map_or(1, usize::from);
+        let workers = match self.workers {
+            0 => std::thread::available_parallelism().map_or(1, usize::from),
+            n => n,
+        };
         let per = ids.len().div_ceil(workers).max(1);
         std::thread::scope(|scope| {
             let handles: Vec<_> = ids
@@ -244,7 +287,8 @@ impl Repo {
                             .map(|id| {
                                 let oid = Self::resolve_id(&repo, id)?;
                                 let commit = repo.find_commit(oid).map_err(git)?;
-                                Ok(crate::diff::changes(&repo, &commit, false).unwrap_or_default())
+                                Ok(crate::diff::changes(&repo, &commit, false, MAX_TEXT_BYTES)
+                                    .unwrap_or_default())
                             })
                             .collect::<Result<Vec<_>>>()
                     })
@@ -344,7 +388,7 @@ impl Repo {
         let path = path.trim_matches('/');
         let id = Self::blob_id_at(&repo, tip, path)?;
         let size = repo.find_header(id).map_err(git)?.size();
-        let text = if size > MAX_TEXT_BYTES {
+        let text = if size > self.text_limit {
             None
         } else {
             let data = repo.find_object(id).map_err(git)?.detach().data;
@@ -371,7 +415,7 @@ impl Repo {
         }
         let id = Self::blob_id_at(&repo, tip, path)?;
         // Blame of a huge file costs as much as its diff against every ancestor.
-        if repo.find_header(id).map_err(git)?.size() > MAX_TEXT_BYTES {
+        if repo.find_header(id).map_err(git)?.size() > self.text_limit {
             return Ok(Vec::new());
         }
         let data = repo.find_object(id).map_err(git)?.detach().data;
@@ -531,7 +575,9 @@ mod tests {
     use std::collections::BTreeMap;
     use std::fs;
     use std::process::Command;
+    use std::sync::Arc;
 
+    use super::BlameCache;
     use crate::{ChangeKind, LineKind, Repo};
 
     fn git(dir: &std::path::Path, args: &[&str]) -> String {
@@ -770,6 +816,39 @@ mod tests {
         assert!(kinds.contains(&("main", crate::RefKind::Branch)));
         assert!(kinds.contains(&("v1", crate::RefKind::Tag)));
         assert!(!repo.name().is_empty());
+    }
+
+    #[test]
+    fn a_lower_text_cap_hides_text_and_a_small_blame_cache_keeps_nothing() {
+        let tmp = fixture();
+        let d = tmp.path();
+        let open = Repo::discover(d).expect("open");
+        let at = open.log("HEAD", None, 0, 10).expect("log")[2].id.clone();
+        assert!(open.blob(&at, "a.txt").expect("blob").text.is_some());
+        let tiny = Repo::discover(d).expect("open").with_limits(10, 1);
+        assert_eq!(tiny.text_limit(), 10);
+        let blob = tiny.blob(&at, "a.txt").expect("blob");
+        assert!(blob.size > 10 && blob.text.is_none(), "over the cap");
+        assert!(tiny.blame(&at, "a.txt").expect("blame").is_empty());
+        let mut cache = BlameCache::with_limit(1);
+        let key = (
+            gix::ObjectId::empty_tree(gix::hash::Kind::Sha1),
+            "p".to_owned(),
+        );
+        cache.put(
+            key.clone(),
+            Arc::new(open.blame(&at, "a.txt").expect("blame")),
+        );
+        assert!(
+            cache.get(&key).is_none(),
+            "a result over the budget is not kept"
+        );
+        let mut roomy = BlameCache::with_limit(1 << 20);
+        roomy.put(
+            key.clone(),
+            Arc::new(open.blame(&at, "a.txt").expect("blame")),
+        );
+        assert!(roomy.get(&key).is_some());
     }
 
     #[test]

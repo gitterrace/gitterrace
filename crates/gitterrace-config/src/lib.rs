@@ -1,5 +1,5 @@
 //! The one user configuration: `config.toml` in [`config_dir`]. Never read from a served
-//! repository. Precedence is flag over file over default; [`Config::describe`] shows which won.
+//! repository. Precedence is flag over file over default; [`Loaded::describe`] shows which won.
 //!
 //! The settings are declared once in the `settings!` call in `schema.rs`. Its doc comments are
 //! the descriptions in `docs/configuration.md`, so the file, the loader and the page cannot drift.
