@@ -46,7 +46,7 @@ ul.features{list-style:none;padding:0;margin:0}
 ul.features li{padding:var(--space-2) 0;border-top:var(--border)}
 ul.features b{font-weight:var(--weight-semibold)}
 figure{margin:var(--space-6) 0}
-.shot{display:flex;align-items:center;justify-content:center;min-height:140px;padding:var(--space-4);text-align:center;color:var(--faint);background:var(--soft);border:1px dashed var(--line-strong);border-radius:var(--radius);font-size:var(--text-sm)}
+figure img{display:block;width:100%;height:auto;border:var(--border);border-radius:var(--radius)}
 figcaption{font-size:var(--text-xs);color:var(--faint);margin-top:var(--space-1)}
 nav.links,footer{display:flex;flex-wrap:wrap;gap:var(--space-4);font-size:var(--text-sm)}
 footer{margin-top:var(--space-16);padding-top:var(--space-4);border-top:var(--border);color:var(--faint)}
@@ -107,6 +107,8 @@ pub fn render(root: &Path, ws: &Workspace) -> Result<Vec<Out>> {
         ));
     }
 
+    outs.extend(shot_files(root)?);
+
     let repo = &pkg.repository;
     let home = pkg.homepage.trim_end_matches('/');
     let mut h = head(&pkg.name, &pkg.description, home);
@@ -136,7 +138,7 @@ pub fn render(root: &Path, ws: &Workspace) -> Result<Vec<Out>> {
         "<section>\n<h2>What it does</h2>\n<ul class=\"features\">\n{}</ul>\n<h3>Commands</h3>\n{}{}</section>\n",
         features(),
         commands(),
-        shots()
+        shots(root)?
     );
     let _ = write!(
         h,
@@ -181,6 +183,9 @@ fn host_files(home: &str, repo: &str, name: &str) -> Vec<Out> {
 
 /assets/fonts/*
   Cache-Control: public, max-age=31536000, immutable
+
+/assets/screenshots/*
+  Cache-Control: public, max-age=86400
 ";
     let not_found = format!(
         "<!doctype html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n\
@@ -338,30 +343,90 @@ fn sentence(items: &[String]) -> String {
     }
 }
 
-/// Placeholders only: the screenshots are the owner's.
-fn shots() -> String {
+/// The screenshots in `docs/screenshots/`: file stem, alt text, caption. The site and the README
+/// both read this list, so a name here without its PNG, or a PNG not listed here, fails generation.
+pub const SHOTS: [(&str, &str, &str); 4] = [
+    (
+        "overview",
+        "Overview: the repository page with README, last commit, file list and key numbers.",
+        "Overview",
+    ),
+    (
+        "blame",
+        "Blame: who last changed each line, with the commit and its age beside the code.",
+        "Blame",
+    ),
+    (
+        "send",
+        "Send to window: a selected line with its context and the list of targets.",
+        "Send to window",
+    ),
+    (
+        "insights",
+        "Insights: activity, heatmap and hotspots for a repository.",
+        "Insights",
+    ),
+];
+
+const SHOT_DIR: &str = "docs/screenshots";
+
+/// One `Out` per PNG, copied to `site/assets/screenshots/`. Fails on a missing file and on a PNG
+/// in the folder that nothing references.
+fn shot_files(root: &Path) -> Result<Vec<Out>> {
+    let mut want: Vec<String> = SHOTS
+        .iter()
+        .flat_map(|(n, ..)| ["light", "dark"].map(|c| format!("{n}-{c}.png")))
+        .collect();
+    want.sort();
+    let mut have: Vec<String> = std::fs::read_dir(root.join(SHOT_DIR))
+        .with_context(|| format!("reading {SHOT_DIR} (run `make site-shots`)"))?
+        .filter_map(|e| e.ok()?.file_name().into_string().ok())
+        .filter(|f| Path::new(f).extension().is_some_and(|e| e == "png"))
+        .collect();
+    have.sort();
+    if let Some(f) = want.iter().find(|f| !have.contains(f)) {
+        anyhow::bail!(
+            "{SHOT_DIR}/{f} is named by the site and README but does not exist (make site-shots)"
+        );
+    }
+    if let Some(f) = have.iter().find(|f| !want.contains(f)) {
+        anyhow::bail!(
+            "{SHOT_DIR}/{f} is not referenced: add it to SHOTS in xtask/src/site.rs or delete it"
+        );
+    }
+    want.into_iter()
+        .map(|f| {
+            let path = format!("{SHOT_DIR}/{f}");
+            let bytes =
+                std::fs::read(root.join(&path)).with_context(|| format!("reading {path}"))?;
+            Ok(Out::bytes(format!("site/assets/screenshots/{f}"), bytes))
+        })
+        .collect()
+}
+
+/// Width and height in CSS pixels of a 2x PNG, from its header.
+fn shot_size(root: &Path, file: &str) -> Result<(u32, u32)> {
+    let path = format!("{SHOT_DIR}/{file}");
+    let b = std::fs::read(root.join(&path)).with_context(|| format!("reading {path}"))?;
+    anyhow::ensure!(b.len() > 24 && &b[1..4] == b"PNG", "{path} is not a PNG");
+    let w = u32::from_be_bytes([b[16], b[17], b[18], b[19]]);
+    let h = u32::from_be_bytes([b[20], b[21], b[22], b[23]]);
+    Ok((w / 2, h / 2))
+}
+
+fn shots(root: &Path) -> Result<String> {
     let mut s = String::new();
-    for (alt, cap) in [
-        (
-            "Overview: the repository page with README, last commit, file list and key numbers.",
-            "Overview",
-        ),
-        (
-            "Send to window: a selected line with its context and the list of targets.",
-            "Send to window",
-        ),
-        (
-            "Insights: activity, heatmap and hotspots for a repository.",
-            "Insights",
-        ),
-    ] {
+    for (name, alt, cap) in SHOTS {
+        let (w, h) = shot_size(root, &format!("{name}-light.png"))?;
         let _ = writeln!(
             s,
-            "<figure>\n<div class=\"shot\" role=\"img\" aria-label=\"{a}\">Screenshot placeholder: {a}</div>\n<figcaption>{cap}</figcaption>\n</figure>",
+            "<figure>\n<picture>\n<source media=\"(prefers-color-scheme: dark)\" srcset=\"assets/screenshots/{name}-dark.png\">\n\
+             <img src=\"assets/screenshots/{name}-light.png\" alt=\"{a}\" width=\"{w}\" height=\"{h}\" loading=\"lazy\">\n</picture>\n\
+             <figcaption>{cap}</figcaption>\n</figure>",
             a = esc(alt)
         );
     }
-    s
+    Ok(s)
 }
 
 fn md(text: &str) -> String {
@@ -387,5 +452,27 @@ mod tests {
         assert!(r.contains(
             "/install.sh https://github.com/o/r/releases/latest/download/r-installer.sh 302"
         ));
+    }
+
+    #[test]
+    fn a_missing_or_unreferenced_screenshot_fails() {
+        let dir = std::env::temp_dir().join(format!("gt-shots-{}", std::process::id()));
+        let shots = dir.join(SHOT_DIR);
+        std::fs::create_dir_all(&shots).expect("mkdir");
+        let err = shot_files(&dir)
+            .err()
+            .expect("empty folder fails")
+            .to_string();
+        assert!(err.contains("does not exist"), "{err}");
+        for (n, ..) in SHOTS {
+            for c in ["light", "dark"] {
+                std::fs::write(shots.join(format!("{n}-{c}.png")), b"x").expect("write");
+            }
+        }
+        assert!(shot_files(&dir).is_ok());
+        std::fs::write(shots.join("stray.png"), b"x").expect("write");
+        let err = shot_files(&dir).err().expect("stray fails").to_string();
+        assert!(err.contains("not referenced"), "{err}");
+        std::fs::remove_dir_all(&dir).expect("cleanup");
     }
 }

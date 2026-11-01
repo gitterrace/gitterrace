@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: build run fmt clippy lint test doc theme actions docs-gen docs-check names check site-render help bench bench-large bench-report bench-clean bench-guard browser-check site deploy stage shipped domains send-vectors preview
+.PHONY: build run fmt clippy lint test doc theme actions docs-gen docs-check names check site-render site-shots help bench bench-large bench-report bench-clean bench-guard browser-check site deploy stage shipped domains send-vectors preview
 
 ## build: Release binary
 build:
@@ -115,6 +115,10 @@ stage: docs-check shipped site-render
 ## site-render: Render the touch icon and link-preview image from docs/brand (ignored, never committed)
 site-render:
 	node scripts/site-render.mjs
+
+## site-shots: Take docs/screenshots/*.png from a running preview (URL=http://127.0.0.1:4242). Needs browsers, so not in check
+site-shots:
+	node scripts/site-shots-run.mjs $(URL)
 
 ## shipped: site/ and wrangler.toml are committed, so a deploy ships a known commit
 shipped:

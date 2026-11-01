@@ -41,6 +41,7 @@ so it lives beside the history and is built from the same repository.
 - Not a writer. It never changes your repository. Its only files are a disposable cache under
   `.git/gitterrace/` and your own config.
 - Not a replacement for git or your editor. It is a place to read.
+- Not a terminal UI. For that, use lazygit, tig or gitui.
 
 ## How it is made
 

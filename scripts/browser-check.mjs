@@ -17,6 +17,12 @@
 //   header       from 1440 down to 320 px the top bar's tools (search, actions, theme) share one
 //                row and the page never scrolls sideways; where search is folded, its button opens
 //                the field with focus and Escape folds it again
+//   marked       text marked with the mouse is what the menu acts on: marking lines 2-3 of a file
+//                shows a trigger, and Send to's title and context carry L2-3 and their text;
+//                marked README prose arrives as a > quote
+//   gutter       in a 250-line file (three chunks) every line's gutter number equals its line,
+//                read from the CSS counter itself, with the selection trigger shown; and the
+//                Send to window opens small and grows with its text
 //
 // --from-disk serves crates/gitterrace-web/static/*.js from the working tree over the (possibly
 // older) binary's copies, to test edits before a rebuild. Playwright comes from $PLAYWRIGHT_CORE,
@@ -31,7 +37,7 @@ const bin = resolve(arg('--bin', join(root, 'target/debug/git-terrace')));
 const fromDisk = process.argv.includes('--from-disk');
 const tabCounts = arg('--tabs', '8,12').split(',').map(Number);
 const browsers = arg('--browsers', 'webkit,chromium').split(',');
-const ALL = ['truncation', 'live-tabs', 'mermaid', 'chip', 'doctabs', 'chords', 'header'];
+const ALL = ['truncation', 'live-tabs', 'mermaid', 'chip', 'doctabs', 'chords', 'header', 'marked', 'gutter'];
 const wanted = arg('--checks', ALL.join(',')).split(',');
 for (const c of wanted) if (!ALL.includes(c)) { console.error(`unknown check ${c}; known: ${ALL.join(', ')}`); process.exit(2); }
 
@@ -266,7 +272,7 @@ async function chords() {
 
 // ---- header -----------------------------------------------------------------------------------
 async function header() {
-  for (const name of ['chromium', 'webkit']) {
+  for (const name of browsers) {
     const { b, ctx } = await context(name);
     const p = await ctx.newPage();
     let folded = 0;
@@ -297,7 +303,105 @@ async function header() {
   }
 }
 
-const checks = { truncation, 'live-tabs': liveTabs, mermaid, chip, doctabs, chords, header };
+// ---- marked -----------------------------------------------------------------------------------
+async function marked() {
+  writeFileSync(join(dir, 'marked.txt'), 'first line\nsecond line\nthird line\nfourth line\n');
+  writeFileSync(join(dir, 'README.md'), '# Fixture\n\nA sentence worth quoting.\n');
+  sh(dir, 'git', 'add', '-A');
+  sh(dir, 'git', 'commit', '-q', '-m', 'docs: text to mark');
+  await new Promise((ok) => setTimeout(ok, 600));
+  const mark = (sel) => (s) => {
+    const r = document.createRange();
+    if (s === 'lines') {
+      const a = document.getElementById('L2'), z = document.getElementById('L3');
+      r.setStart(a, 0); r.setEnd(z, z.childNodes.length);
+    } else {
+      const w = document.createTreeWalker(document.querySelector('.markdown-body'), NodeFilter.SHOW_TEXT);
+      let t; while ((t = w.nextNode())) if (t.textContent.trim().length > 3) break;
+      r.setStart(t, 0); r.setEnd(t, t.textContent.length);
+    }
+    const g = getSelection(); g.removeAllRanges(); g.addRange(r);
+    return r.toString().trim();
+  };
+  for (const name of browsers) {
+    const { b, ctx } = await context(name);
+    const p = await ctx.newPage();
+    await p.goto(srv.base + '/blob/HEAD/marked.txt', { waitUntil: 'load' });
+    const isCode = await p.$('#L3');
+    if (!isCode) { r.fail(`marked ${name}: no code lines to mark`); await b.close(); continue; }
+    await p.evaluate(mark(), 'lines');
+    await p.waitForTimeout(300);
+    const shown = await p.evaluate(() => { const m = document.getElementById('actmark'); return !!m && !m.hidden; });
+    if (!shown) { r.fail(`marked ${name}: no trigger appears for marked lines`); await b.close(); continue; }
+    await p.click('#actmark');
+    await p.keyboard.press('s');
+    await p.waitForSelector('.send-ctx');
+    const send = await p.evaluate(() => ({ title: document.querySelector('.send-title').value, ctx: document.querySelector('.send-ctx').value }));
+    const line3 = await p.$eval('#L3', (e) => e.textContent.trim());
+    if (shown && /:L2-3$/.test(send.title) && send.ctx.includes('#L2-L3') && send.ctx.includes(line3)) r.ok(`marked ${name}: lines 2-3 reach Send to`);
+    else r.fail(`marked ${name}: trigger=${shown} title=${send.title}`);
+    await p.keyboard.press('Escape');
+    await p.goto(srv.base + '/', { waitUntil: 'load' });
+    const phrase = await p.evaluate(mark(), 'prose');
+    await p.waitForTimeout(300);
+    await p.keyboard.press('.');
+    await p.keyboard.press('s');
+    await p.waitForSelector('.send-ctx');
+    const ctx2 = await p.$eval('.send-ctx', (e) => e.value);
+    if (phrase && ctx2.includes('> ' + phrase)) r.ok(`marked ${name}: README prose arrives as a quote`);
+    else r.fail(`marked ${name}: quote missing for ${JSON.stringify(phrase)}`);
+    await b.close();
+  }
+}
+
+// ---- gutter -----------------------------------------------------------------------------------
+async function gutter() {
+  writeFileSync(join(dir, 'long.txt'), Array.from({ length: 250 }, (_, i) => `line ${i + 1}`).join('\n') + '\n');
+  sh(dir, 'git', 'add', '-A');
+  sh(dir, 'git', 'commit', '-q', '-m', 'docs: a file across chunks');
+  await new Promise((ok) => setTimeout(ok, 600));
+  for (const name of browsers) {
+    const { b, ctx } = await context(name);
+    const p = await ctx.newPage();
+    await p.setViewportSize({ width: 1200, height: 900 });
+    await p.goto(srv.base + '/blob/HEAD/long.txt#L99-L103', { waitUntil: 'load' });
+    await p.waitForTimeout(300);
+    // Script cannot read a CSS counter's value, so replay the CSS rules the gutter uses over
+    // the real DOM: every line increments n by one, then a line's counter-set replaces it.
+    // The number shown before a line is the result. Every number must equal its line.
+    const nums = await p.evaluate(() => {
+      let n = 0;
+      return [...document.querySelectorAll('.src .l')].map((l) => {
+        n += 1;
+        const m = /counter-set:\s*n\s+(-?\d+)/.exec(l.getAttribute('style') || '');
+        if (m) n = +m[1];
+        return String(n);
+      });
+    });
+    const wrong = nums.map((n, i) => [i + 1, n]).filter(([want, n]) => String(want) !== n);
+    const shown = await p.evaluate(() => !!document.getElementById('actsel'));
+    if (!wrong.length && nums.length === 250) r.ok(`gutter ${name}: 250 lines numbered 1..250 with the trigger shown=${shown}`);
+    else r.fail(`gutter ${name}: ${wrong.length} wrong, first ${JSON.stringify(wrong.slice(0, 3))}`);
+    // Send to opens small and grows with its text. Measured in Chromium: headless WebKit
+    // stalls on this menu-then-dialog sequence (the marked check covers its dialog).
+    if (name !== 'chromium') { await b.close(); continue; }
+    await p.click('#actsel');
+    await p.keyboard.press('s');
+    await p.waitForSelector('.send-ctx');
+    const size = await p.evaluate(async () => {
+      const box = document.querySelector('.ov.send'), t = document.querySelector('.send-ctx');
+      const before = { w: box.getBoundingClientRect().width, h: t.getBoundingClientRect().height };
+      t.value += '\n'.repeat(30) + 'end'; t.dispatchEvent(new Event('input'));
+      await new Promise((ok) => requestAnimationFrame(() => requestAnimationFrame(ok)));
+      return { ...before, grown: t.getBoundingClientRect().height, cap: innerHeight * 0.6 + 1 };
+    });
+    if (size.w <= 521 && size.h < 300 && size.grown > size.h && size.grown <= size.cap) r.ok(`gutter ${name}: Send to ${Math.round(size.w)}x${Math.round(size.h)} grows to ${Math.round(size.grown)}`);
+    else r.fail(`gutter ${name}: Send to size ${JSON.stringify(size)}`);
+    await b.close();
+  }
+}
+
+const checks = { truncation, 'live-tabs': liveTabs, mermaid, chip, doctabs, chords, header, marked, gutter };
 try {
   for (const c of wanted) { console.log(`-- ${c}`); await checks[c](); }
 } finally {

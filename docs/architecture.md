@@ -10,7 +10,6 @@ flowchart TD
   config["config: config.toml"]
   git["git: all git reads, via gix"]
   index["index: insights cache"]
-  testkit["testkit: "]
   web["web: server, pages, guard"]
   schwarzwald["schwarzwald: the theme and its palette"]
   gitterrace --> cards
@@ -22,14 +21,16 @@ flowchart TD
   cards --> index
   cards --> schwarzwald
   index --> git
-  testkit --> config
   web --> api
 ```
 
 <!-- END GENERATED: crates -->
 
-Each box is a crate. An arrow means "uses". `schwarzwald` is the vendored theme; `cards` reads
-its palette, called Kandel, to color the year card.
+Each box is a crate the binary ships, and an arrow means "uses". An arrow already implied by a
+longer path is left out, so `web` and `api` use `config` too, though only `actions` points at
+it. `config` reads `config.toml` and knows nothing else. `testkit` is not drawn, since only
+tests use it. `schwarzwald` is the vendored theme. `cards` reads its palette, called Kandel, to
+color the year card.
 
 ## Decisions
 

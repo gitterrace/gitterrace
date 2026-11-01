@@ -30,7 +30,7 @@ pub fn render(root: &Path, ws: &Workspace, scripts: &[Script]) -> Result<Vec<Out
         Out::block(ACTIONS, "starter", starter()),
         Out::block(ACTIONS, "send", send()),
         Out::block(ACTIONS, "scripts", script_table(scripts)),
-        Out::block(ARCH, "crates", crate_diagram(ws)),
+        Out::block(ARCH, "crates", crate_diagram(ws)?),
         Out::block(ARCH, "routes", routes()),
         Out::block(ARCH, "cache", cache()),
         Out::block(BENCH, "results", bench_results(root)?),

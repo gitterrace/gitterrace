@@ -45,6 +45,7 @@ pub fn render(ws: &Workspace, scripts: &[Script]) -> Vec<Out> {
         Out::block(README, "actions", actions),
         Out::block(README, "license", license_md(bin)),
         Out::block(README, "demo", demo_md(ws)),
+        Out::block(README, "shots", shots_md()),
         Out::block("AGENTS.md", "crates", crate_table(ws)),
     ]
 }
@@ -72,6 +73,14 @@ pub fn demo_md(ws: &Workspace) -> String {
     format!(
         "Try it without installing: [the live demo]({}){shows}.\n",
         ws.demo
+    )
+}
+
+/// One screenshot, light and dark, from the same list the site uses.
+fn shots_md() -> String {
+    let (name, alt, _) = crate::site::SHOTS[0];
+    format!(
+        "<picture>\n<source media=\"(prefers-color-scheme: dark)\" srcset=\"docs/screenshots/{name}-dark.png\">\n<img src=\"docs/screenshots/{name}-light.png\" alt=\"{alt}\">\n</picture>\n"
     )
 }
 
@@ -260,11 +269,30 @@ const ROLES: [(&str, &str); 9] = [
     ("schwarzwald", "the theme and its palette"),
 ];
 
-/// The crate dependency diagram, from the workspace's own edges.
-pub fn crate_diagram(ws: &Workspace) -> String {
+/// The crate dependency diagram, from the workspace's own edges. Only crates the binary
+/// ships are drawn: a crate nothing depends on outside dev-dependencies (testkit) is test
+/// support, not a layer. A shipped crate without a role in `ROLES` fails generation, so a
+/// new crate can never show up as an empty box.
+pub fn crate_diagram(ws: &Workspace) -> anyhow::Result<String> {
     let short = |n: &str| n.strip_prefix("gitterrace-").unwrap_or(n).to_owned();
     let mut s = String::from("```mermaid\nflowchart TD\n");
     let mut edges = ws.reduced_edges();
+    // What the binaries reach through normal dependencies: the shipped layers.
+    let mut shipped: Vec<&str> = ws
+        .crates()
+        .filter(|p| !p.bins.is_empty())
+        .map(|p| p.name.as_str())
+        .collect();
+    let mut i = 0;
+    while let Some(n) = shipped.get(i).copied() {
+        for d in ws.packages.get(n).into_iter().flat_map(|p| &p.deps) {
+            if !shipped.contains(&d.as_str()) {
+                shipped.push(d);
+            }
+        }
+        i += 1;
+    }
+    edges.retain(|(a, b)| shipped.contains(&a.as_str()) && shipped.contains(&b.as_str()));
     edges.sort();
     let mut names: Vec<String> = edges
         .iter()
@@ -274,22 +302,36 @@ pub fn crate_diagram(ws: &Workspace) -> String {
     names.dedup();
     for n in &names {
         let name = short(n);
-        let role = ROLES
-            .iter()
-            .find(|(k, _)| *k == name)
-            .map_or("", |(_, r)| *r);
+        let Some((_, role)) = ROLES.iter().find(|(k, _)| *k == name) else {
+            anyhow::bail!(
+                "crate `{n}` has no role for the architecture diagram: add it to ROLES in \
+                 xtask/src/readme_agents_md.rs"
+            );
+        };
         let _ = writeln!(s, "  {name}[\"{name}: {role}\"]");
     }
     for (from, to) in edges {
         let _ = writeln!(s, "  {} --> {}", short(&from), short(&to));
     }
     s.push_str("```\n");
-    s
+    Ok(s)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Guard class: every box in the architecture diagram names a role, and a crate only
+    /// tests use (testkit, or any later one) is never drawn as a layer.
+    #[test]
+    fn the_diagram_draws_shipped_crates_each_with_a_role() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+        let ws = crate::facts::load(&root).expect("workspace");
+        let d = crate_diagram(&ws).expect("diagram");
+        assert!(!d.contains(": \"]"), "a box without a role:\n{d}");
+        assert!(!d.contains("testkit"), "a test-only crate is drawn:\n{d}");
+        assert!(d.contains("config[\"config: config.toml\"]"), "{d}");
+    }
 
     #[test]
     fn installer_and_curl_line_derive_from_metadata() {

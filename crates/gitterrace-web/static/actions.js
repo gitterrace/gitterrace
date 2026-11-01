@@ -82,12 +82,38 @@
     }
     return out.join("\n");
   }
+  // What the reader marked with the mouse, if anything: inside a code view the lines it spans
+  // and the exact text; elsewhere the text alone. Null when nothing is marked.
+  function marked() {
+    var s = window.getSelection && window.getSelection();
+    if (!s || s.isCollapsed || !s.rangeCount) return null;
+    var text = s.toString();
+    if (!text.trim()) return null;
+    var r = s.getRangeAt(0);
+    var line = function (n) {
+      var e = n && (n.nodeType === 1 ? n : n.parentElement);
+      return e && e.closest && e.closest(".src .l, table.code tr[id^=L], table.blame tr[id^=L]");
+    };
+    var a = line(r.startContainer), b = line(r.endContainer);
+    // A selection that ends at the very start of the next line does not include that line.
+    if (b && b !== a && r.endOffset === 0 && b.previousElementSibling) b = b.previousElementSibling;
+    if (a && b && /^L\d+$/.test(a.id) && /^L\d+$/.test(b.id)) {
+      var x = +a.id.slice(1), y = +b.id.slice(1);
+      return { lines: { start: Math.min(x, y), end: Math.max(x, y) }, text: text.replace(/\n$/, "") };
+    }
+    return { text: text };
+  }
   function current() {
-    var path = filePath(), lines = selection();
+    var path = filePath(), lines = selection(), m = marked();
+    if (path && m && m.lines) return { kind: "line", path: path, lines: m.lines, text: m.text };
     if (path && lines) return { kind: "line", path: path, lines: lines, text: lineText(lines) };
-    if (path) return { kind: "file", path: path };
-    if (local().indexOf("/commit/") === 0) return commitTarget();
-    return { kind: "page" };
+    var t;
+    if (path) t = { kind: "file", path: path };
+    else if (local().indexOf("/commit/") === 0) t = commitTarget();
+    else t = { kind: "page" };
+    // Marked prose (a README, a commit message) travels as the quote, not the whole page.
+    if (m) t.quote = m.text;
+    return t;
   }
   function commitTarget() {
     var h = document.querySelector(".head h1");
@@ -133,8 +159,10 @@
   // The same string the payload's `markdown` field carries.
   function markdown(t) {
     var link = permalink(t);
-    if (!t.path) return "**" + (t.subject || document.title) + "** @ " + shortSha() + "\n" + (t.author || "") + "\n" + link + "\n";
-    var md = "**" + ref(t) + "** @ " + shortSha() + "\n" + link + "\n";
+    // Marked prose rides along as a quote under the link.
+    var quote = t.quote ? "\n" + t.quote.split("\n").slice(0, MD_LINES).map(function (l) { return "> " + l; }).join("\n") + "\n" : "";
+    if (!t.path) return "**" + (t.subject || document.title) + "** @ " + shortSha() + "\n" + (t.author || "") + "\n" + link + "\n" + quote;
+    var md = "**" + ref(t) + "** @ " + shortSha() + "\n" + link + "\n" + quote;
     if (t.text != null && t.lines) {
       var snippet = t.text.split("\n").slice(0, MD_LINES).join("\n");
       var runs = snippet.match(/`+/g) || [];
@@ -308,11 +336,37 @@
   document.addEventListener("click", function (e) { if (e.target.closest && e.target.closest(".src, table.code")) setTimeout(placeSel, 0); });
   setTimeout(placeSel, 0);
 
+  // Marked text anywhere: a trigger at the end of the selection. It is fixed to the window
+  // and lives outside the text, so it never becomes part of what is copied. The target is
+  // read on mousedown, before the press would collapse the selection.
+  var markBtn = button("Actions for the marked text (.)");
+  markBtn.id = "actmark";
+  markBtn.classList.add("mark");
+  markBtn.hidden = true;
+  document.body.appendChild(markBtn);
+  var markTarget = null;
+  markBtn.addEventListener("mousedown", function (e) { markTarget = current(); e.preventDefault(); });
+  markBtn.addEventListener("click", function () { openMenu(markTarget || current(), markBtn); markTarget = null; });
+  function placeMark() {
+    var s = window.getSelection();
+    var m = !menu && marked();
+    if (!m || !s.rangeCount) { markBtn.hidden = true; return; }
+    var rects = s.getRangeAt(0).getClientRects();
+    var r = rects[rects.length - 1];
+    if (!r) { markBtn.hidden = true; return; }
+    markBtn.hidden = false;
+    markBtn.style.left = Math.min(r.right + 4, window.innerWidth - 32) + "px";
+    markBtn.style.top = Math.max(4, r.top + r.height / 2 - 11) + "px";
+  }
+  var markTimer = null;
+  document.addEventListener("selectionchange", function () { clearTimeout(markTimer); markTimer = setTimeout(placeMark, 120); });
+  window.addEventListener("scroll", function () { if (!markBtn.hidden) placeMark(); }, { passive: true });
+
   document.addEventListener("keydown", function (e) {
     if (e.key !== "." || e.metaKey || e.ctrlKey || e.altKey || menu) return;
     var t = e.target;
     if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return;
-    var anchor = document.getElementById("actsel") || document.querySelector(".actbtn.top");
+    var anchor = (!markBtn.hidden && markBtn) || document.getElementById("actsel") || document.querySelector(".actbtn.top");
     if (!anchor) return;
     openMenu(current(), anchor);
     e.preventDefault();

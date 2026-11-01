@@ -443,6 +443,8 @@ table.own td{white-space:nowrap}table.own td:first-child{width:30%}
 .actbtn.float{position:absolute;right:var(--space-2);top:50%;transform:translateY(-50%);z-index:2;opacity:0;transition:opacity var(--dur-fast)}
 td:has(>.actbtn.float){position:relative}
 :hover>.actbtn.float,.actbtn.float:focus-visible,.actbtn.float.sel{opacity:1}
+.actbtn.mark{position:fixed;z-index:20;box-shadow:var(--shadow-2)}
+.actbtn.mark[hidden]{display:none}
 .meta .actbtn{margin-left:var(--space-1)}
 .actmenu-back{background:transparent;padding:0}
 .ov.actmenu{width:min(300px,92vw)}
@@ -455,10 +457,12 @@ td:has(>.actbtn.float){position:relative}
 .actmenu .ov-list li.hint a{color:var(--muted)}
 
 /* send */
-.ov.send{width:min(720px,94vw);max-height:80vh}
+.ov.send{width:min(520px,94vw);max-height:80vh}
 .send-title{border:0;border-bottom:var(--border);border-radius:0;height:40px;padding:0 var(--space-4);font-size:var(--text-md);width:100%;background:transparent;flex:none}
 .send-title:focus{outline:0}
-.send-ctx{border:0;border-radius:0;resize:none;flex:1;min-height:42vh;padding:var(--space-3) var(--space-4);font-family:var(--font-mono);font-size:var(--text-sm);line-height:1.5;background:transparent;color:var(--fg)}
+/* The context box starts a few lines tall and grows with what is in it (field-sizing where the
+   browser has it, send.js elsewhere), up to most of the window, then scrolls. */
+.send-ctx{border:0;border-radius:0;resize:none;flex:none;field-sizing:content;min-height:calc(1.5em*4 + var(--space-3)*2);max-height:60vh;overflow-y:auto;padding:var(--space-3) var(--space-4);font-family:var(--font-mono);font-size:var(--text-sm);line-height:1.5;background:transparent;color:var(--fg)}
 .send-ctx:focus{outline:0}
 .send-foot{display:flex;gap:var(--space-3);align-items:center;padding:var(--space-2) var(--space-4);border-top:var(--border);background:var(--soft);flex:none}
 .send-pick{min-width:0;max-width:50%}

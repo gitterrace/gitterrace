@@ -728,9 +728,10 @@ fn code_html_uncached(path: &str, text: &str, lit_lines: usize) -> (String, bool
             open = true;
         }
         // `counter-reset` on the chunk would open a new counter scope there, which resets
-        // the number to 1 for each chunk. `counter-set` on the first line keeps a single counter.
+        // the number to 1 for each chunk. `counter-set` on the first line keeps a single
+        // counter; it applies after that line's own increment, so it names the line itself.
         let set = if i > 0 && i % CHUNK_LINES == 0 {
-            format!(" style=\"counter-set:n {i}\"")
+            format!(" style=\"counter-set:n {}\"", i + 1)
         } else {
             String::new()
         };
@@ -864,7 +865,7 @@ mod tests {
         assert_eq!(h.matches("class=\"ch\"").count(), 3);
         // A reset would open a new scope per chunk and number each one from 1.
         assert!(!h.contains("counter-reset"));
-        assert!(h.contains("id=\"L101\" class=\"l\" style=\"counter-set:n 100\""));
+        assert!(h.contains("id=\"L101\" class=\"l\" style=\"counter-set:n 101\""));
         assert!(h.contains("id=\"L250\""));
     }
 

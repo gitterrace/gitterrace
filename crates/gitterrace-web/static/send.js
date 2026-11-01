@@ -68,6 +68,12 @@
     ctx.value = "\n" + c.markdown;
     ctx.setAttribute("aria-label", "Context");
     ctx.spellcheck = false;
+    // Grows with its content up to the CSS max-height. Browsers with field-sizing do this in CSS.
+    if (!CSS.supports || !CSS.supports("field-sizing", "content")) {
+      var grow = function () { ctx.style.height = "auto"; ctx.style.height = ctx.scrollHeight + "px"; };
+      ctx.addEventListener("input", grow);
+      requestAnimationFrame(grow);
+    }
     var foot = el("div", "send-foot");
     var pick = el("select", "send-pick");
     pick.setAttribute("aria-label", "Target");
