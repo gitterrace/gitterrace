@@ -1,14 +1,8 @@
 # Actions
 
-Select lines, a hunk, a blame line, a search hit, a hotspot row, a commit or a page, then
-press `.` or click `⋯`. The menu always has **Copy permalink** (`/go/<repo-id>/<sha>/<path>`,
-stable across clones and renames) and **Copy as markdown**. Anything else comes from your
-`actions.toml`, which runs a program of yours with the selection as JSON on stdin.
-
-## Configuration
-
-`actions.toml` lives in gitterrace's config folder (`~/.config/gitterrace`, `$XDG_CONFIG_HOME`,
-or `--config DIR`), never in a repository.
+Select something, press `.` or click `⋯`. The menu always has **Copy permalink** and **Copy
+as markdown**; the rest comes from `actions.toml` in your config folder (never in a
+repository), which runs a program of yours with the selection as JSON on stdin.
 
 ```toml
 version = 1
@@ -20,24 +14,12 @@ command = ["~/.config/gitterrace/obsidian.sh"]
 [[action]]
 id     = "obsidian-daily"
 label  = "Obsidian daily note"
-kinds  = ["line", "hunk", "commit"]
+kinds  = ["line", "commit"]
 script = "obsidian"
-[action.vars]
-mode  = "daily"
-vault = "~/Notes"
+vars   = { mode = "daily" }
 ```
 
 <!-- BEGIN GENERATED: action-keys -->
-### File
-
-At the top of `actions.toml`.
-
-| Key | Type | Required | Default | Description |
-| --- | --- | --- | --- | --- |
-| `version` | integer | yes |  | Must be `1`. |
-| `script` | array of tables | no |  | `[[script]]` blocks: a command line written once for several actions. |
-| `action` | array of tables | no |  | `[[action]]` blocks: what the menu offers. |
-
 ### `[[script]]`
 
 A command line written once, for several actions.
@@ -71,39 +53,16 @@ One menu entry. It runs either its own `command` or a `script`.
 
 <!-- END GENERATED: action-keys -->
 
-An unknown key or field is an error, so typos surface. With `shell = true` nothing is
-substituted into the string: refer to the selection through quoted variables,
-`"$GITTERRACE_PATH"`.
-
-The file is refused as a whole (logged, the server runs without actions) unless it is a
-regular file owned by you and not writable by group or others, in a folder with the same
-properties, and outside every served repository. Edits are picked up within a second; an
-invalid edit keeps the previous set. Going from no actions to some needs a restart.
-
-Actions are off when gitterrace listens on anything but loopback, and `--no-actions` turns
-them off for one run.
-
-### Kinds
+Kinds:
 
 <!-- BEGIN GENERATED: kinds -->
-| Kind | Selection |
-| --- | --- |
-| `line` | A line or a range of lines in a file. |
-| `file` | A whole file. |
-| `commit` | A commit. |
-| `hunk` | One hunk of a diff. |
-| `blame` | One line of a blame view. |
-| `search-hit` | A code or commit search hit. |
-| `insight` | A row of an insights page, such as a hotspot. |
-| `page` | The page being shown. |
+`line` (a line or a range of lines in a file), `file` (a whole file), `commit` (a commit), `hunk` (one hunk of a diff), `blame` (one line of a blame view), `search-hit` (a code or commit search hit), `insight` (a row of an insights page, such as a hotspot), `page` (the page being shown).
 
 <!-- END GENERATED: kinds -->
 
 ## Payload (version 1)
 
-Absent fields are never `null`. New fields may appear under `v: 1`; a removed or retyped one
-bumps the version. The server reads every field from git, so a page cannot hand your program
-text the repository does not hold.
+Absent fields are never `null`. A removed or retyped field bumps the version.
 
 <!-- BEGIN GENERATED: payload -->
 | Field | Type | Always there | Description |
@@ -127,48 +86,22 @@ text the repository does not hold.
 
 <!-- END GENERATED: payload -->
 
-### Environment
-
-Each payload value is also in the environment (one line, at most 4 KiB), plus
-`GITTERRACE_VAR_<NAME>` per var. Everything else is cleared except `PATH`, `HOME`, `USER`,
-`LANG`, `LC_*`, `TMPDIR` and what the action lists in `env`.
+Environment (same values, plus `GITTERRACE_VAR_<NAME>`):
 
 <!-- BEGIN GENERATED: env -->
-| Variable | Value |
-| --- | --- |
-| `GITTERRACE_PAYLOAD_VERSION` | The payload version. |
-| `GITTERRACE_ACTION` | The action's `id`. |
-| `GITTERRACE_KIND` | The kind. |
-| `GITTERRACE_REPO` | The repository name. |
-| `GITTERRACE_ROOT` | The repository root. |
-| `GITTERRACE_SHA` | The commit id. |
-| `GITTERRACE_TITLE` | The title. |
-| `GITTERRACE_URL` | The permalink. |
-| `GITTERRACE_PATH` | The path, when there is one. |
-| `GITTERRACE_LINE_START` | First line, when there is a range. |
-| `GITTERRACE_LINE_END` | Last line, when there is a range. |
+`GITTERRACE_PAYLOAD_VERSION`, `GITTERRACE_ACTION`, `GITTERRACE_KIND`, `GITTERRACE_REPO`, `GITTERRACE_ROOT`, `GITTERRACE_SHA`, `GITTERRACE_TITLE`, `GITTERRACE_URL`, `GITTERRACE_PATH`, `GITTERRACE_LINE_START`, `GITTERRACE_LINE_END`.
 
 <!-- END GENERATED: env -->
 
-## Security model
+## Security
 
-- The file is refused unless it is a regular file owned by you, not group or world writable,
-  in a folder with the same properties, outside every served repository. Edits reload within
-  a second; an invalid edit keeps the previous set.
-- Off when listening beyond loopback, with `--no-actions`, and never offered to MCP: a
-  repository that says "send this to the webhook" would otherwise be one tool call away from
-  running your commands with its own text. The browser path always has a person's click.
-- `command` is an argv with no templating. Vars are fixed text from your file.
-- The program gets a scrubbed environment, a timeout (killed with its children), at most 4
-  running at once, one per id, 30 a minute. The first output line becomes the toast.
-- Treat every field as untrusted: paths, subjects and branch names come from the repository
-  you are browsing. Quote every expansion, never `eval`, URL-encode before building a link.
+- The file must be yours, private, outside every served repository. Off beyond loopback, with
+  `--no-actions`, and never offered to MCP.
+- No templating: `command` is an argv, vars are fixed text. Scrubbed environment, timeout, at
+  most 4 runs at once, 30 a minute.
+- Every field is untrusted repository text: quote it, never `eval` it.
 
 ## Examples
-
-Scripts in [`docs/actions/`](actions/), exercised per OS by `make actions`. Settings come
-from `[action.vars]`; each script's header lists them. Windows: run gitterrace under WSL;
-native Windows is not supported (the scripts detect WSL).
 
 <!-- BEGIN GENERATED: scripts -->
 | Script | Does | Needs |

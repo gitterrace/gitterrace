@@ -331,7 +331,10 @@ main.wrap>.chart-head{margin-top:var(--space-8)}
 
 /* blob and diff lines: one block per line, numbers from CSS counters, chunks skipped while off screen */
 .src,.diff{font-family:var(--mono);font-size:var(--text-sm);line-height:var(--leading-code)}
-.src .ch,.diff .ch{content-visibility:auto;contain-intrinsic-size:auto calc(var(--leading-code)*100)}
+/* A content-visibility chunk clips to its own box, so it must be as wide as its longest line
+   for the card to scroll sideways. The placeholder size is set for height only: a single
+   contain-intrinsic-size value would also give every skipped chunk that width. */
+.src .ch,.diff .ch{content-visibility:auto;contain-intrinsic-block-size:auto calc(var(--leading-code)*100);width:max-content;min-width:100%}
 .src .l{counter-increment:n;white-space:pre;min-height:var(--leading-code);padding:0 var(--space-3) 0 0;min-width:max-content;position:relative;padding-left:calc(6ch + var(--space-3)*2)}
 .src .l::before{content:counter(n);position:absolute;left:0;width:calc(6ch + var(--space-3));text-align:right;color:var(--faint);user-select:none;cursor:pointer}
 .src .l:hover{background:var(--soft)}

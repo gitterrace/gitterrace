@@ -5,7 +5,7 @@ use std::path::Path;
 
 use anyhow::{Context as _, Result};
 use gitterrace_actions::schema::{
-    ACTION_KEYS, ENV_VARS, FILE_KEYS, Item, KINDS, PAYLOAD_FIELDS, SCRIPT_KEYS, kind_name,
+    ACTION_KEYS, ENV_VARS, Item, KINDS, PAYLOAD_FIELDS, SCRIPT_KEYS, kind_name,
 };
 
 use crate::facts::Workspace;
@@ -32,11 +32,17 @@ pub fn render(root: &Path, ws: &Workspace, scripts: &[Script]) -> Result<Vec<Out
 }
 
 fn kinds() -> String {
-    let mut s = String::from("| Kind | Selection |\n| --- | --- |\n");
-    for (k, doc) in KINDS {
-        let _ = writeln!(s, "| `{}` | {doc} |", kind_name(k));
-    }
-    s
+    let rows: Vec<String> = KINDS
+        .iter()
+        .map(|(k, doc)| {
+            format!(
+                "`{}` ({})",
+                kind_name(*k),
+                doc.trim_end_matches('.').to_lowercase()
+            )
+        })
+        .collect();
+    format!("{}.\n", rows.join(", "))
 }
 
 fn payload() -> String {
@@ -56,11 +62,8 @@ fn payload() -> String {
 }
 
 fn env() -> String {
-    let mut s = String::from("| Variable | Value |\n| --- | --- |\n");
-    for (k, doc) in ENV_VARS {
-        let _ = writeln!(s, "| `{k}` | {doc} |");
-    }
-    s
+    let names: Vec<String> = ENV_VARS.iter().map(|(k, _)| format!("`{k}`")).collect();
+    format!("{}.\n", names.join(", "))
 }
 
 fn yes(b: bool) -> &'static str {
@@ -87,7 +90,6 @@ fn key_table(title: &str, intro: &str, items: &[Item]) -> String {
 
 fn action_keys() -> String {
     [
-        key_table("File", "At the top of `actions.toml`.", &FILE_KEYS),
         key_table(
             "`[[script]]`",
             "A command line written once, for several actions.",

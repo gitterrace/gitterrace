@@ -645,12 +645,19 @@ fn code_html_uncached(path: &str, text: &str, lit_lines: usize) -> (String, bool
             if open {
                 out.push_str("</div>");
             }
-            let _ = write!(out, "<div class=\"ch\" style=\"counter-reset:n {i}\">");
+            out.push_str("<div class=\"ch\">");
             open = true;
         }
+        // `counter-reset` on the chunk would open a new counter scope there, which resets
+        // the number to 1 for each chunk. `counter-set` on the first line keeps a single counter.
+        let set = if i > 0 && i % CHUNK_LINES == 0 {
+            format!(" style=\"counter-set:n {i}\"")
+        } else {
+            String::new()
+        };
         let _ = write!(
             out,
-            "<div id=\"L{}\" class=\"l\">{}</div>",
+            "<div id=\"L{}\" class=\"l\"{set}>{}</div>",
             i + 1,
             hl.as_mut().map_or_else(|| esc_text(line), |h| h.line(line))
         );
@@ -780,7 +787,9 @@ mod tests {
         let text = "l\n".repeat(250);
         let (h, _) = code_html(CACHE, "x.txt", &text);
         assert_eq!(h.matches("class=\"ch\"").count(), 3);
-        assert!(h.contains("counter-reset:n 100"));
+        // A reset would open a new scope per chunk and number each one from 1.
+        assert!(!h.contains("counter-reset"));
+        assert!(h.contains("id=\"L101\" class=\"l\" style=\"counter-set:n 100\""));
         assert!(h.contains("id=\"L250\""));
     }
 

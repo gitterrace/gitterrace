@@ -27,9 +27,7 @@ pub fn render(ws: &Workspace, scripts: &[Script]) -> Vec<Out> {
         let names: Vec<String> = p.bins.iter().map(|b| format!("`{b}`")).collect();
         let _ = writeln!(
             install,
-            "Every route installs {} names for one program: {}. git runs `git-terrace` as \
-             `git terrace`.",
-            p.bins.len(),
+            "Installs {} for one program; git runs `git-terrace` as `git terrace`.",
             names.join(" and ")
         );
     }
@@ -41,19 +39,12 @@ pub fn render(ws: &Workspace, scripts: &[Script]) -> Vec<Out> {
         .iter()
         .map(|(k, _)| format!("`{}`", kind_name(*k)))
         .collect();
-    let mut actions = format!(
-        "Built in, no configuration: **Copy permalink** and **Copy as markdown**. Your own \
-         actions run a program of yours on a selection, offered on {}. Examples in \
-         [`docs/actions/`](docs/actions/):\n\n",
-        kinds.join(", ")
+    let files: Vec<String> = scripts.iter().map(|s| format!("`{}`", s.file)).collect();
+    let actions = format!(
+        "Run your own program on a selection ({}). Examples in `docs/actions/`: {}.\n",
+        kinds.join(", "),
+        files.join(", ")
     );
-    for s in scripts {
-        let _ = writeln!(
-            actions,
-            "- [`{}`](docs/actions/{}): {}",
-            s.file, s.file, s.summary
-        );
-    }
 
     vec![
         Out::block(README, "msrv", msrv),
@@ -181,25 +172,12 @@ fn crate_table(ws: &Workspace) -> String {
 
 /// The crate dependency diagram, from the workspace's own edges.
 pub fn crate_diagram(ws: &Workspace) -> String {
-    let id = |n: &str| n.replace('-', "_");
+    let short = |n: &str| n.strip_prefix("gitterrace-").unwrap_or(n).to_owned();
     let mut s = String::from("```mermaid\nflowchart TD\n");
-    for p in ws.crates() {
-        let short = p.name.strip_prefix("gitterrace-").unwrap_or(&p.name);
-        let _ = writeln!(
-            s,
-            "  {}[\"{}\"]",
-            id(&p.name),
-            if p.name == "gitterrace" {
-                "gitterrace (CLI)"
-            } else {
-                short
-            }
-        );
-    }
     let mut edges = ws.reduced_edges();
     edges.sort();
     for (from, to) in edges {
-        let _ = writeln!(s, "  {} --> {}", id(&from), id(&to));
+        let _ = writeln!(s, "  {} --> {}", short(&from), short(&to));
     }
     s.push_str("```\n");
     s

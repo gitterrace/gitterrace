@@ -23,34 +23,22 @@ const fn page(shown: &'static str, does: &'static str, routes: &'static [&'stati
 pub const PAGES: &[Page] = &[
     page("`/`", "README, last commit, file list, key numbers", &["/"]),
     page(
-        "`/tree/{rev}/{path}`",
-        "Directory listing",
-        &["/tree/{rev}", "/tree/{rev}/", "/tree/{rev}/{*path}"],
+        "`/tree`, `/blob`, `/raw`, `/blame` `/{rev}/{path}`",
+        "Files: listing, highlighted view (large files load in chunks), bytes, authorship",
+        &[
+            "/tree/{rev}",
+            "/tree/{rev}/",
+            "/tree/{rev}/{*path}",
+            "/blob/{rev}/{*path}",
+            "/hl/{rev}/{*path}",
+            "/raw/{rev}/{*path}",
+            "/blame/{rev}/{*path}",
+        ],
     ),
     page(
-        "`/blob/{rev}/{path}`",
-        "File with highlighting; large files load in chunks",
-        &["/blob/{rev}/{*path}", "/hl/{rev}/{*path}"],
-    ),
-    page(
-        "`/raw/{rev}/{path}`",
-        "The bytes; over `limits.raw_mb` is refused",
-        &["/raw/{rev}/{*path}"],
-    ),
-    page(
-        "`/blame/{rev}/{path}`",
-        "Line authorship",
-        &["/blame/{rev}/{*path}"],
-    ),
-    page(
-        "`/log/{rev}`",
-        "Commits, filterable by author",
-        &["/log", "/log/{rev}"],
-    ),
-    page(
-        "`/history/{path}`",
-        "One file's commits with lines changed and renames",
-        &["/history/{*path}"],
+        "`/log/{rev}`, `/history/{path}`, `/compare`",
+        "Commits, one file's history, two revisions",
+        &["/log", "/log/{rev}", "/history/{*path}", "/compare"],
     ),
     page(
         "`/commit/{id}`, `/diff/{rev}/{index}`",
@@ -58,24 +46,15 @@ pub const PAGES: &[Page] = &[
         &["/commit/{id}", "/diff/{rev}/{index}"],
     ),
     page(
-        "`/compare?base=&head=`",
-        "What changed between two revisions",
-        &["/compare"],
-    ),
-    page(
-        "`/refs`, `/tag/{name}`",
-        "Branches with divergence, tags with annotations",
-        &["/refs", "/tag/{name}"],
-    ),
-    page(
-        "`/worktrees`, `/stashes`",
-        "Linked worktrees and stashes",
-        &["/worktrees", "/stashes"],
-    ),
-    page(
-        "`/worktree`",
-        "Uncommitted changes, read-only",
-        &["/worktree"],
+        "`/refs`, `/tag/{name}`, `/worktrees`, `/stashes`, `/worktree`",
+        "Git state: branches, tags, linked worktrees, stashes, uncommitted changes",
+        &[
+            "/refs",
+            "/tag/{name}",
+            "/worktrees",
+            "/stashes",
+            "/worktree",
+        ],
     ),
     page("`/search`", "Code and commit search", &["/search"]),
     page(
@@ -100,14 +79,10 @@ pub const PAGES: &[Page] = &[
         &["/badges/{name}", "/cards/wrapped/{year}"],
     ),
     page(
-        "`/events`",
-        "Server-sent events: the page refreshes when the repository changes",
-        &["/events"],
-    ),
-    page(
-        "`/api/files/{rev}`, `/api/refs`, `/api/last/{rev}/{path}`, `/api/progress`",
-        "Fragments the pages fetch (file finder, ref switcher, last commits, index progress)",
+        "`/events`, `/api/{files,refs,last,progress}`",
+        "Live updates and the fragments pages fetch",
         &[
+            "/events",
             "/api/files/{rev}",
             "/api/refs",
             "/api/last/{rev}",
@@ -118,18 +93,13 @@ pub const PAGES: &[Page] = &[
     page("`/api/v1/...`", "JSON API, see [api.md](api.md)", &[]),
     page(
         "`/go/{repo-id}/{sha}/{path}`",
-        "Permalink: finds the served repository by id and redirects",
+        "Permalink: finds the served repository by id",
         &["/go/{*rest}"],
     ),
     page(
-        "`/r/{name}/...`",
-        "Everything above for one repository, under several",
-        &["/r/{name}", "/r/{name}/", "/r/{name}/{*rest}"],
-    ),
-    page(
-        "`/api/repos`",
-        "The repository list the switcher reads",
-        &["/api/repos"],
+        "`/r/{name}/...`, `/api/repos`",
+        "Everything above under several repositories; the list the switcher reads",
+        &["/r/{name}", "/r/{name}/", "/r/{name}/{*rest}", "/api/repos"],
     ),
 ];
 

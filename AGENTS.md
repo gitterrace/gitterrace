@@ -1,8 +1,7 @@
 # gitterrace: Agent Guide
 
-gitterrace is a local, read-only git browser with insights. One binary serves
-one or several repositories on `127.0.0.1:4242`. [Architecture](docs/architecture.md) has the
-decisions; [design](docs/design.md) the theme pipeline.
+Local, read-only git browser with insights. [Architecture](docs/architecture.md),
+[design](docs/design.md).
 
 ## Layout
 
@@ -21,20 +20,13 @@ decisions; [design](docs/design.md) the theme pipeline.
 
 <!-- END GENERATED: crates -->
 
-Dependencies point down: `gitterrace -> web -> (api, cards, actions) -> index -> git`, with `config` beside them (see the diagram in [architecture](docs/architecture.md)).
-Nothing below `web` knows about HTTP; nothing outside `gitterrace-git`
-imports `gix`. Colours come only from the vendored `schwarzwald` crate in
-`theme/schwarzwald/rust`.
+Dependencies point down (diagram in architecture). Nothing below `web` knows HTTP. Nothing
+outside `gitterrace-git` imports `gix`.
 
 ## Rules
 
-- Read-only. gitterrace never writes to the repository except `.git/gitterrace/`.
-  No shelling out to `git` outside test fixtures.
-- Browsing never waits on the index. Insights pages show progress until ready.
-- Every repo read takes a resolved commit id, so a commit landing mid-request
-  cannot tear a page. The one exception is the Uncommitted view, which reads
-  the worktree read-only, lives only in `gitterrace-git/src/worktree.rs`, and must
-  tolerate files changing or vanishing mid-read (skip, never fail the page).
+- Read-only: no shelling out to `git` outside test fixtures. The worktree is read only in
+  `gitterrace-git/src/worktree.rs`.
 - Every link goes through `fmt::href` (templates: `c.base`, JS: the `gt-base`
   meta), so a repo works at `/` and at `/r/{name}/`. A crawler test fails on a
   link that escapes its repo.
@@ -42,19 +34,13 @@ imports `gix`. Colours come only from the vendored `schwarzwald` crate in
   (`cached` in `insights.rs`). Add unfiltered pages to `WARM_PAGES` in `lib.rs`.
 - No inline scripts beyond the hashed theme snippet: the CSP refuses them. JS
   lives in `static/`.
-- Colours and fonts come from `theme/schwarzwald`, a snapshot written by
-  schwarzwald's `sync.py`. Never edit it or the generated block in
-  `tokens.css`; `make theme` fails on drift. No raw colour outside `tokens.css`.
-- The cache is disposable: deleting `.git/gitterrace/` must only cost a rebuild.
-  Bump its format version instead of migrating.
+- Never edit `theme/schwarzwald` or the generated block in `tokens.css`. `make theme` fails on
+  drift. No raw colour outside `tokens.css`.
 - Logic lives in Rust. Templates render values, they do not compute them.
-- Generated docs: `docs/api.md`, `docs/configuration.md` and the `<!-- BEGIN GENERATED: id -->`
-  blocks in README, AGENTS, `docs/actions.md`, `architecture.md` and `design.md`. Facts live in
-  code registries (`ENDPOINTS`, `INSIGHTS`, config keys, `gitterrace_actions::schema`,
-  `gitterrace_web::sitemap`, `CACHE_FILES`, the clap `Cli`, Cargo.toml, `docs/actions/*.sh`
-  headers). Change the registry, run `make generate`, never edit a block. `make check` fails on
-  drift, a block nobody fills, and a registry that disagrees with the code it describes. Prose
-  stays by hand and holds decisions, not inventories.
+- Docs: `api.md`, `configuration.md` and every `GENERATED` block come from code registries
+  (`ENDPOINTS`, `INSIGHTS`, config keys, `actions::schema`, `web::sitemap`, `CACHE_FILES`,
+  clap `Cli`, Cargo.toml, script headers). Change the registry, `make generate`, never edit a
+  block. Prose holds decisions, not inventories.
 
 ## Code conventions
 
