@@ -25,8 +25,10 @@ pub fn percent_encode(s: &str, keep_slash: bool) -> String {
 mod tests {
     use crate::percent_encode;
 
+    /// RFC 3986: unreserved bytes pass through, `keep_slash` also keeps `/`, every other byte
+    /// (UTF-8 included) becomes uppercase `%XX`.
     #[test]
-    fn pins_old_outputs() {
+    fn percent_encoding_follows_rfc_3986() {
         let cases = [
             ("", "", ""),
             ("AZaz09-._~", "AZaz09-._~", "AZaz09-._~"),

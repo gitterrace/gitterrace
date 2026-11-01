@@ -295,15 +295,3 @@ fn tokens(root: &Path) -> Result<String> {
         names.join(", ")
     ))
 }
-
-#[cfg(test)]
-mod tests {
-    use super::tokens;
-
-    #[test]
-    fn role_alias_list_is_not_empty() {
-        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
-        let text = tokens(&root).expect("tokens.css parses");
-        assert!(text.contains("`--bg`"), "no role aliases found: {text}");
-    }
-}

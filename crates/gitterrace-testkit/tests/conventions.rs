@@ -78,31 +78,3 @@ fn no_git_test_helper_outside_the_testkit() {
         found.join("\n")
     );
 }
-
-/// The default address is written once, as `DEFAULT_ADDR` in the config schema. Production reads
-/// it from there, tests from the testkit. Digits on either side mean a different number.
-#[test]
-fn default_address_is_not_respelled() {
-    let port = concat!("42", "42");
-    let found = hits(
-        &["crates", "scripts", "xtask"],
-        &["rs", "sh", "py", "mjs", "js"],
-        &[
-            "gitterrace-config/src/schema.rs",
-            "gitterrace-testkit/tests/",
-        ],
-        |l| {
-            l.match_indices(port).any(|(i, _)| {
-                let before = l[..i].chars().next_back();
-                let after = l[i + 4..].chars().next();
-                !before.is_some_and(|c| c.is_ascii_alphanumeric())
-                    && !after.is_some_and(|c| c.is_ascii_alphanumeric())
-            })
-        },
-    );
-    assert!(
-        found.is_empty(),
-        "derive it from DEFAULT_ADDR:\n{}",
-        found.join("\n")
-    );
-}

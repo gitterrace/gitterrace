@@ -1,0 +1,6 @@
+# Repositories shown at demo.gitterrace.dev, one per line: name, clone URL, release tag.
+# The folder name becomes /r/<name>/. Bump a tag and run `make demo` to refresh. Chosen for
+# contrast: jq is maintained by a team that changed over the years, ripgrep mostly by one
+# person. Both are MIT licensed; each page credits its project in the snapshot banner.
+jq       https://github.com/jqlang/jq           jq-1.8.2
+ripgrep  https://github.com/BurntSushi/ripgrep  15.2.0

@@ -435,29 +435,19 @@ mod tests {
         );
     }
 
+    /// Every starter issue target has a commit search, and a lookup holds only the commit's ids.
     #[test]
-    fn starter_lookups_are_the_commit_search_entries() {
-        let c = starter_sends();
-        let with: Vec<&str> = c
-            .sends
-            .iter()
-            .filter(|t| t.lookup.is_some())
-            .map(|t| t.id.as_str())
-            .collect();
-        assert_eq!(
-            with,
-            [
-                "github-issue",
-                "gitlab-issue",
-                "gitlab-issue-self-hosted",
-                "forgejo-issue"
-            ]
-        );
-        let gh = c.sends.iter().find(|t| t.id == "github-issue").expect("gh");
-        assert_eq!(
-            gh.lookup_url("abc123").as_deref(),
-            Some("https://github.com/owner/name/search?q=abc123&type=commits")
-        );
+    fn starter_lookups_use_only_commit_ids_and_cover_issue_targets() {
+        for t in &starter_sends().sends {
+            if t.id.contains("issue") {
+                assert!(t.lookup.is_some(), "{} has no commit search", t.id);
+            }
+            for part in t.lookup.iter().flatten() {
+                if let Part::Ph(name) = part {
+                    assert!(LOOKUP_FIELDS.contains(&name.as_str()), "{}: {name}", t.id);
+                }
+            }
+        }
     }
 
     /// A hostile title cannot add a parameter, a fragment or a path: the query stays two

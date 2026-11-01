@@ -1,6 +1,6 @@
-# Cloudflare config for demo.gitterrace.dev: a static export of this repository, to click
-# around without installing anything. Built by `make demo` (scripts/site-export.sh) into
-# target/demo, deployed with `make demo-deploy`. Same shape as ../wrangler.toml: a Worker
+# Cloudflare config for demo.gitterrace.dev: a static export of the public repositories in
+# repos.txt, to click around without installing anything. Built and deployed by `make demo`
+# (scripts/site-export.sh) from target/demo. Same shape as ../wrangler.toml: a Worker
 # with static assets and no script.
 name = "gitterrace-demo"
 compatibility_date = "2026-10-01"

@@ -77,12 +77,24 @@ async fn main() -> anyhow::Result<()> {
             out,
             commits,
             max_file_kb,
+            project,
         } => {
             let scope = export::Scope {
                 commits,
                 max_file: max_file_kb * 1024,
+                projects: project
+                    .iter()
+                    .map(|p| export::Project::parse(p))
+                    .collect::<anyhow::Result<_>>()?,
             };
-            let n = export::export(&path, &out, &scope).await?;
+            // The same repositories `serve` would show for these paths, so an export of a
+            // folder of repos is the multi-repo site, index and all.
+            let m = &loaded.config.multi;
+            let repos = gitterrace_web::discover_repos(&cli.paths, m.depth, &m.skip_dirs);
+            if repos.is_empty() {
+                anyhow::bail!("no git repository found in {}", path.display());
+            }
+            let n = export::export(&repos, &out, &scope).await?;
             println!("wrote {n} files to {}", out.display());
         }
     }
@@ -198,16 +210,9 @@ fn wrapped(
     Ok(())
 }
 
-/// Civil year of a Unix timestamp (UTC), without a date dependency.
+/// Civil year of a Unix timestamp (UTC).
 fn year_of(secs: i64) -> i32 {
-    let days = secs.div_euclid(86_400);
-    let z = days + 719_468;
-    let era = z.div_euclid(146_097);
-    let doe = z - era * 146_097;
-    let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
-    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
-    let mp = (5 * doy + 2) / 153;
-    let year = yoe + era * 400 + i64::from(mp >= 10);
+    let (year, _, _) = gitterrace_git::civil_from_days(secs.div_euclid(86_400));
     i32::try_from(year).unwrap_or(i32::MAX)
 }
 
@@ -217,7 +222,7 @@ fn year_of(secs: i64) -> i32 {
 mod tests {
     use std::os::unix::fs::PermissionsExt as _;
 
-    use crate::{init_in, year_of};
+    use crate::init_in;
 
     fn files() -> [(&'static str, String); 2] {
         [
@@ -273,13 +278,5 @@ mod tests {
             "mine"
         );
         assert_eq!(mode(&tmp.path().join("config.toml")), 0o600);
-    }
-
-    #[test]
-    fn year_of_known_dates() {
-        assert_eq!(year_of(0), 1970);
-        assert_eq!(year_of(1_798_761_599), 2026); // 2026-12-31T23:59:59Z
-        assert_eq!(year_of(1_798_761_600), 2027);
-        assert_eq!(year_of(951_782_400), 2000); // 2000-02-29
     }
 }

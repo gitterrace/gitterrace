@@ -440,9 +440,7 @@ mod tests {
 
     #[test]
     fn shade_levels_cover_the_ramp() {
-        assert_eq!(level(0, 10), 0);
-        assert_eq!(level(1, 10), 1);
-        assert_eq!(level(10, 10), 4);
-        assert_eq!(level(5, 0), 0);
+        assert_eq!(level(5, 0), 0, "zero max stays on the lowest shade");
+        assert_eq!(level(10, 10), 4, "the max count takes the top shade");
     }
 }

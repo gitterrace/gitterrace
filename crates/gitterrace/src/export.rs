@@ -28,6 +28,30 @@ pub struct Scope {
     pub commits: usize,
     /// Largest file, in bytes, whose page is written.
     pub max_file: u64,
+    /// Repositories that are someone else's project, credited in their banner by folder name.
+    pub projects: Vec<Project>,
+}
+
+/// Someone else's repository shown in an export, named and linked in the banner.
+pub struct Project {
+    pub name: String,
+    pub url: String,
+}
+
+impl Project {
+    /// `name=url`, with an http(s) URL: the banner links it, so nothing else may get in.
+    pub fn parse(s: &str) -> anyhow::Result<Self> {
+        let (name, url) = s
+            .split_once('=')
+            .context("--project takes NAME=URL, for example jq=https://github.com/jqlang/jq")?;
+        if name.trim().is_empty() || !(url.starts_with("https://") || url.starts_with("http://")) {
+            bail!("--project takes NAME=URL with an http(s) URL, got {s:?}");
+        }
+        Ok(Self {
+            name: name.trim().to_owned(),
+            url: url.to_owned(),
+        })
+    }
 }
 
 /// Largest response body read from the router.
@@ -44,8 +68,10 @@ fn seeds() -> impl Iterator<Item = &'static str> {
     SEEDS.into_iter().chain(gitterrace_web::WARM_PAGES)
 }
 
-/// Writes the scoped site to `out` and returns how many files were written.
-pub async fn export(repo_path: &Path, out: &Path, scope: &Scope) -> anyhow::Result<usize> {
+/// Writes the scoped site to `out` and returns how many files were written. One repository
+/// exports at `/`; several export like the server serves them: an index at `/` and each
+/// repository under `/r/<name>/`, named by the server's own table.
+pub async fn export(repos: &[PathBuf], out: &Path, scope: &Scope) -> anyhow::Result<usize> {
     // Swapped arguments (`export <repo> <out>`) would scatter pages over a
     // checkout. An ignored folder inside a repo is fine; its root is not.
     if out.join(".git").exists() {
@@ -55,23 +81,54 @@ pub async fn export(repo_path: &Path, out: &Path, scope: &Scope) -> anyhow::Resu
         );
     }
     std::fs::create_dir_all(out).with_context(|| format!("creating {}", out.display()))?;
-    let router = gitterrace_web::app_router(repo_path).context("building the router")?;
-    wait_for_index(&router).await?;
-    let repo = gitterrace_git::Repo::discover(repo_path).context("opening the repository")?;
-    let head = repo.resolve("HEAD").context("resolving HEAD")?;
-    let stamp = snapshot_label(&repo, &head)?;
+    let router = gitterrace_web::multi_router(repos.to_vec()).context("building the router")?;
+    let sites = sites(&router, repos).await?;
 
     let mut queue: VecDeque<String> = VecDeque::new();
-    for seed in seeds() {
-        queue.push_back(seed.to_owned());
+    if repos.len() > 1 {
+        queue.push_back("/".to_owned());
     }
-    for c in repo
-        .log(&head, None, 0, scope.commits)
-        .context("reading the log")?
-    {
-        queue.push_back(format!("/commit/{}", c.id));
+    let mut site_of = Vec::with_capacity(sites.len());
+    for path in repos.iter().zip(&sites) {
+        let (repo_path, site) = path;
+        wait_for_index(&router, &site.prefix).await?;
+        let repo = gitterrace_git::Repo::discover(repo_path).context("opening the repository")?;
+        let head = repo.resolve("HEAD").context("resolving HEAD")?;
+        for seed in seeds() {
+            queue.push_back(format!("{}{seed}", site.prefix));
+        }
+        for c in repo
+            .log(&head, None, 0, scope.commits)
+            .context("reading the log")?
+        {
+            queue.push_back(format!("{}/commit/{}", site.prefix, c.id));
+        }
+        let name = repo.name();
+        site_of.push(Site {
+            prefix: site.prefix.clone(),
+            stamp: snapshot_label(&repo, &head)?,
+            credit: scope.projects.iter().position(|p| p.name == name),
+            allowed: Allowed::new(&repo, &head, scope)?,
+        });
     }
-    let allowed = Allowed::new(&repo, &head, scope)?;
+    if let Some(p) = scope.projects.iter().find(|p| {
+        !site_of
+            .iter()
+            .any(|s| s.credit.is_some_and(|i| scope.projects[i].name == p.name))
+    }) {
+        bail!(
+            "--project {}: no exported repository has that folder name",
+            p.name
+        );
+    }
+    // The longest prefix wins, so `/r/a-2/` never matches `/r/a`. The root site (one repo, or
+    // the index of several) has the empty prefix and catches the rest.
+    site_of.sort_by_key(|s| std::cmp::Reverse(s.prefix.len()));
+    let site_for = |path: &str| {
+        site_of.iter().find(|s| {
+            s.prefix.is_empty() || path == s.prefix || path.starts_with(&format!("{}/", s.prefix))
+        })
+    };
 
     let mut seen: BTreeSet<String> = queue.iter().cloned().collect();
     let mut written = 0usize;
@@ -99,8 +156,12 @@ pub async fn export(repo_path: &Path, out: &Path, scope: &Scope) -> anyhow::Resu
             if written >= MAX_PAGES {
                 bail!("export stopped at {MAX_PAGES} pages. Lower --commits or --max-file-kb");
             }
+            let site = site_for(&path);
             let body = if content_type.starts_with("text/html") {
-                mark_snapshot(&body, &stamp)
+                // The index of several repositories names no revision.
+                let stamp = site.map_or("", |s| s.stamp.as_str());
+                let credit = site.and_then(|s| s.credit).map(|i| &scope.projects[i]);
+                mark_snapshot(&body, stamp, credit)
             } else {
                 body
             };
@@ -108,7 +169,9 @@ pub async fn export(repo_path: &Path, out: &Path, scope: &Scope) -> anyhow::Resu
             written += 1;
             if content_type.starts_with("text/html") || content_type.starts_with("text/css") {
                 for link in links(&String::from_utf8_lossy(&body)) {
-                    if allowed.contains(&link) && seen.insert(link.clone()) {
+                    let ok = link.starts_with("/static/")
+                        || site_for(&link).is_some_and(|s| s.allows(&link));
+                    if ok && seen.insert(link.clone()) {
                         queue.push_back(link);
                     }
                 }
@@ -119,11 +182,66 @@ pub async fn export(repo_path: &Path, out: &Path, scope: &Scope) -> anyhow::Resu
     Ok(written + 1)
 }
 
+/// One repository in an export: where its pages live and which of them are in scope.
+struct Site {
+    /// `""` for a single repository, `/r/<name>` among several.
+    prefix: String,
+    /// The revision the banner names.
+    stamp: String,
+    /// Index into `Scope::projects` when this repository is credited.
+    credit: Option<usize>,
+    allowed: Allowed,
+}
+
+impl Site {
+    fn allows(&self, link: &str) -> bool {
+        let local = link.strip_prefix(&self.prefix).unwrap_or(link);
+        let local = if local.is_empty() { "/" } else { local };
+        self.allowed.contains(local)
+    }
+}
+
+/// Where each repository's pages live, in `repos` order, from the server itself: one
+/// repository serves at `/`, several under the names `/api/repos` lists. Asking the router
+/// keeps naming (and its collision rule) in one place.
+async fn sites(router: &Router, repos: &[PathBuf]) -> anyhow::Result<Vec<SitePrefix>> {
+    if repos.len() < 2 {
+        return Ok(vec![SitePrefix {
+            prefix: String::new(),
+        }]);
+    }
+    let (_, _, body) = fetch(router, "/api/repos").await?;
+    let items: Vec<serde_json::Value> =
+        serde_json::from_slice(&body).context("reading /api/repos")?;
+    let prefixes: Vec<SitePrefix> = items
+        .iter()
+        .filter_map(|i| i.get("href")?.as_str())
+        .map(|h| SitePrefix {
+            prefix: h.trim_end_matches('/').to_owned(),
+        })
+        .collect();
+    if prefixes.len() != repos.len() {
+        bail!(
+            "the server lists {} repositories, expected {}",
+            prefixes.len(),
+            repos.len()
+        );
+    }
+    Ok(prefixes)
+}
+
+struct SitePrefix {
+    prefix: String,
+}
+
 /// Polls the progress endpoint so insights pages are exported built, not "indexing".
-async fn wait_for_index(router: &Router) -> anyhow::Result<()> {
-    eprintln!("building the cache (first run reads every commit once)...");
+async fn wait_for_index(router: &Router, prefix: &str) -> anyhow::Result<()> {
+    eprintln!(
+        "building the cache for {} (first run reads every commit once)...",
+        if prefix.is_empty() { "/" } else { prefix }
+    );
     for _ in 0..3_600 {
-        let (_, _, body) = fetch(router, "/api/progress").await?;
+        let (_, _, body) = fetch(router, &format!("{prefix}/api/progress")).await?;
         let ready = serde_json::from_slice::<serde_json::Value>(&body)
             .ok()
             .and_then(|v| v.get("ready")?.as_bool())
@@ -319,7 +437,7 @@ fn snapshot_label(repo: &gitterrace_git::Repo, head: &str) -> anyhow::Result<Str
 /// The banner every exported page carries, so nobody mistakes a frozen copy for a live view:
 /// it says what it is, which revision it froze, and where the real thing comes from. Inserted
 /// right after `<body ...>`, outside the app's chrome, so no template has to know about export.
-fn mark_snapshot(html: &[u8], label: &str) -> Vec<u8> {
+fn mark_snapshot(html: &[u8], label: &str, project: Option<&Project>) -> Vec<u8> {
     let page = String::from_utf8_lossy(html);
     let Some(open) = page.find("<body") else {
         return html.to_vec();
@@ -327,12 +445,22 @@ fn mark_snapshot(html: &[u8], label: &str) -> Vec<u8> {
     let Some(end) = page[open..].find('>').map(|i| open + i + 1) else {
         return html.to_vec();
     };
+    let what = match project {
+        Some(p) => format!(
+            "Static snapshot of <a href=\"{}\">{}</a> at <b>{}</b>, shown in gitterrace.",
+            escape(&p.url),
+            escape(&p.name),
+            escape(label)
+        ),
+        // The index of several repositories names no revision of its own.
+        None if label.is_empty() => "Static snapshot.".to_owned(),
+        None => format!("Static snapshot at <b>{}</b>.", escape(label)),
+    };
     let banner = format!(
         "<link rel=\"stylesheet\" href=\"/snapshot.css\">\
-         <div class=\"snapshot\" role=\"note\"><div class=\"wrap\">Static snapshot at <b>{}</b>. \
+         <div class=\"snapshot\" role=\"note\"><div class=\"wrap\">{what} \
          Search, live updates and actions need the real thing. \
-         <a href=\"https://gitterrace.dev\">Install gitterrace</a></div></div>",
-        escape(label)
+         <a href=\"https://gitterrace.dev\">Install gitterrace</a></div></div>"
     );
     let mut out = String::with_capacity(page.len() + banner.len() + 12);
     // `data-static` tells the page scripts there is no server: they skip live updates and
@@ -505,8 +633,9 @@ mod tests {
         let scope = crate::export::Scope {
             commits: 1,
             max_file: 1024,
+            projects: Vec::new(),
         };
-        let err = crate::export::export(repo.path(), repo.path(), &scope)
+        let err = crate::export::export(&[repo.path().to_path_buf()], repo.path(), &scope)
             .await
             .unwrap_err();
         assert!(
@@ -527,8 +656,9 @@ mod tests {
         let scope = crate::export::Scope {
             commits: 5,
             max_file: 64 * 1024,
+            projects: Vec::new(),
         };
-        crate::export::export(repo.path(), &out, &scope)
+        crate::export::export(&[repo.path().to_path_buf()], &out, &scope)
             .await
             .expect("export");
         for page in gitterrace_web::WARM_PAGES {
@@ -548,5 +678,49 @@ mod tests {
             out.join("snapshot.css").is_file(),
             "the banner style is missing"
         );
+    }
+
+    /// Several repositories export like the server serves them: an index at `/`, each one
+    /// under `/r/<name>/` with every insights page, and no link leaves its own repository.
+    #[tokio::test]
+    async fn several_repositories_export_like_the_server_serves_them() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let a = gitterrace_testkit::Fixture::standard(&dir.path().join("alpha"));
+        let b = gitterrace_testkit::Fixture::standard(&dir.path().join("beta"));
+        let out = dir.path().join("out");
+        let scope = crate::export::Scope {
+            commits: 5,
+            max_file: 64 * 1024,
+            projects: Vec::new(),
+        };
+        crate::export::export(
+            &[a.path().to_path_buf(), b.path().to_path_buf()],
+            &out,
+            &scope,
+        )
+        .await
+        .expect("export");
+        let index = std::fs::read_to_string(out.join("index.html")).expect("index page");
+        for name in ["alpha", "beta"] {
+            assert!(
+                index.contains(&format!("/r/{name}/")),
+                "index does not link {name}"
+            );
+            for page in gitterrace_web::WARM_PAGES {
+                let file = target(&out, &format!("/r/{name}{page}"), "text/html");
+                assert!(file.is_file(), "/r/{name}{page} was not exported");
+            }
+        }
+        // A repository's pages link only into itself, the index, or the shared assets.
+        let alpha = std::fs::read_to_string(target(&out, "/r/alpha/", "text/html")).expect("alpha");
+        for link in links(&alpha) {
+            assert!(
+                link.starts_with("/r/alpha")
+                    || link == "/"
+                    || link == "/snapshot.css"
+                    || link.starts_with("/static/"),
+                "alpha links outside itself: {link}"
+            );
+        }
     }
 }

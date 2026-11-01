@@ -52,6 +52,32 @@ nav.links,footer{display:flex;flex-wrap:wrap;gap:var(--space-4);font-size:var(--
 footer{margin-top:var(--space-16);padding-top:var(--space-4);border-top:var(--border);color:var(--faint)}
 ";
 
+/// The home page `<head>`: title, description, link previews and icons.
+fn head(name: &str, desc: &str, home: &str) -> String {
+    format!(
+        "<!doctype html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n\
+         <meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">\n\
+         <meta name=\"color-scheme\" content=\"light dark\">\n\
+         <title>{name}</title>\n<meta name=\"description\" content=\"{desc}\">\n\
+         <link rel=\"canonical\" href=\"{home}/\">\n\
+         <meta property=\"og:title\" content=\"{name}\">\n\
+         <meta property=\"og:description\" content=\"{desc}\">\n\
+         <meta property=\"og:url\" content=\"{home}/\">\n\
+         <meta property=\"og:type\" content=\"website\">\n\
+         <meta property=\"og:image\" content=\"{home}/assets/og.png\">\n\
+         <meta property=\"og:image:width\" content=\"1200\">\n\
+         <meta property=\"og:image:height\" content=\"630\">\n\
+         <meta property=\"og:image:alt\" content=\"{name}\">\n\
+         <meta name=\"twitter:card\" content=\"summary_large_image\">\n\
+         <link rel=\"icon\" type=\"image/svg+xml\" href=\"assets/mark.svg\">\n\
+         <link rel=\"apple-touch-icon\" href=\"assets/apple-touch-icon.png\">\n\
+         <link rel=\"stylesheet\" href=\"assets/site.css\">\n</head>\n<body>\n<main>\n",
+        name = esc(name),
+        desc = esc(desc),
+        home = esc(home),
+    )
+}
+
 pub fn render(root: &Path, ws: &Workspace) -> Result<Vec<Out>> {
     let read = |rel: &str| -> Result<String> {
         std::fs::read_to_string(root.join(rel)).with_context(|| format!("reading {rel}"))
@@ -81,32 +107,9 @@ pub fn render(root: &Path, ws: &Workspace) -> Result<Vec<Out>> {
         ));
     }
 
-    let mut h = String::new();
     let repo = &pkg.repository;
     let home = pkg.homepage.trim_end_matches('/');
-    let _ = write!(
-        h,
-        "<!doctype html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n\
-         <meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">\n\
-         <meta name=\"color-scheme\" content=\"light dark\">\n\
-         <title>{name}</title>\n<meta name=\"description\" content=\"{desc}\">\n\
-         <link rel=\"canonical\" href=\"{home}/\">\n\
-         <meta property=\"og:title\" content=\"{name}\">\n\
-         <meta property=\"og:description\" content=\"{desc}\">\n\
-         <meta property=\"og:url\" content=\"{home}/\">\n\
-         <meta property=\"og:type\" content=\"website\">\n\
-         <meta property=\"og:image\" content=\"{home}/assets/og.png\">\n\
-         <meta property=\"og:image:width\" content=\"1200\">\n\
-         <meta property=\"og:image:height\" content=\"630\">\n\
-         <meta property=\"og:image:alt\" content=\"{name}\">\n\
-         <meta name=\"twitter:card\" content=\"summary_large_image\">\n\
-         <link rel=\"icon\" type=\"image/svg+xml\" href=\"assets/mark.svg\">\n\
-         <link rel=\"apple-touch-icon\" href=\"assets/apple-touch-icon.png\">\n\
-         <link rel=\"stylesheet\" href=\"assets/site.css\">\n</head>\n<body>\n<main>\n",
-        name = esc(&pkg.name),
-        desc = esc(&pkg.description),
-        home = esc(home),
-    );
+    let mut h = head(&pkg.name, &pkg.description, home);
     let _ = write!(
         h,
         "<header>\n<picture>\n<source media=\"(prefers-color-scheme: dark)\" srcset=\"assets/logo-dark.svg\">\n\

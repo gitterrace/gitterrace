@@ -31,7 +31,7 @@ theme:
 	python3 scripts/theme-gen.py --check
 	python3 scripts/theme-logo.py --check
 	@if command -v uv >/dev/null; then uv run -q --with fonttools --with brotli python scripts/theme-tagline.py --check; \
-	else echo "SKIP theme-tagline: uv not installed, the README header tagline was NOT verified"; fi
+	else echo "theme-tagline: uv is required to verify the README header tagline"; exit 1; fi
 
 ## actions: Example actions work per OS profile (stubbed PATH)
 actions:
@@ -108,7 +108,7 @@ shipped:
 domains:
 	python3 scripts/site-check.py domains
 
-## demo: Export the newest tag to target/demo and ship it to demo.gitterrace.dev (run per tag)
+## demo: Export the repositories in demo/repos.txt and ship them to demo.gitterrace.dev
 demo:
 	scripts/site-export.sh
 	cd demo && npx wrangler@4 deploy

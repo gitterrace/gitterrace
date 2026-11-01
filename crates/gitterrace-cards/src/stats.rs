@@ -259,15 +259,7 @@ pub(crate) mod fixtures {
 #[cfg(test)]
 mod tests {
     use crate::stats::fixtures::sample;
-    use crate::stats::{civil, days_from_civil, wrapped_stats};
-
-    #[test]
-    fn civil_roundtrip() {
-        for d in [-1000, 0, 19_000, 20_089] {
-            let (y, m, dd) = civil(d);
-            assert_eq!(days_from_civil(y, m, dd), d);
-        }
-    }
+    use crate::stats::wrapped_stats;
 
     #[test]
     fn wrapped_counts() {

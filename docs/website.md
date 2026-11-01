@@ -46,20 +46,28 @@ Bump `SECURITY_TXT_EXPIRES` in `xtask/src/site.rs`, `make docs-gen`, commit, the
 
 ## Demo
 
-demo.gitterrace.dev is `git terrace export` of this repository at its newest tag: the real app's
-pages, frozen, to click around without installing anything. `make demo` builds it from a fresh
-clone of the tag (no working-tree changes, local branches or stashes leak in) into
-`target/demo`, then deploys the `gitterrace-demo` Worker from `demo/wrangler.toml`.
+demo.gitterrace.dev is `git terrace export` of well-known public repositories, each at a release
+tag: the real app's pages, frozen, to click around without installing anything. It exports
+like `git terrace` serves a folder of repositories: an index at `/`, each repository under
+`/r/<name>/`. `make demo` clones the repositories in `demo/repos.txt` into `target/demo` and
+deploys the `gitterrace-demo` Worker from `demo/wrangler.toml`.
 
-- **One tag, one demo.** The demo shows a release, not main, so it matches what `brew install`
-  gives. Run `make demo` after each tag; it is a local step like `make deploy`, no workflow.
-- **It says what it is.** Every exported page carries a "Static snapshot at <tag>" banner with
-  a link to install, so nobody mistakes it for a live view. Search, live updates, actions and
-  the API do not exist in a static copy.
+- **Someone else's projects, not ours.** This repository's history is ten layer commits on one
+  day, which makes a thin demo. jq and ripgrep have years of history and hundreds of
+  contributors, and contrast with each other: jq is kept by a team that changed over the
+  years, ripgrep mostly by one person. Both are MIT licensed.
+- **Each one credited.** Every page names and links its project in the snapshot banner
+  ("Static snapshot of jq at jq-1.8.2, shown in gitterrace") through `export --project`.
+- **Pinned to a release.** Each repository is checked out on a branch named after its tag, so
+  pages show a branch, not a detached HEAD. To refresh, bump a tag in `demo/repos.txt` and run
+  `make demo`, and also after each gitterrace release, so the demo shows the newest app. A
+  local step like `make deploy`, no workflow.
+- **It says what it is.** Search, live updates, actions and the API need a server; the export
+  hides them and the banner links to install.
 - **Not indexed.** `demo/_headers` sends `X-Robots-Tag: noindex`: the site is the page to
   find, the demo is where it links.
 - **Every insights page is in it.** Export seeds its crawl from the server's prewarmed pages, and
-  a test fails when one of them is missing from an export.
+  a test fails when one is missing, for one repository and for several.
 
 One-time setup: add the custom domain `demo.gitterrace.dev` by deploying once (`make demo`);
 the route in `demo/wrangler.toml` creates it.

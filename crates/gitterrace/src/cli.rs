@@ -92,5 +92,10 @@ pub(crate) enum Command {
         /// Largest file to include as a page, in KiB.
         #[arg(long, default_value_t = 512)]
         max_file_kb: u64,
+        /// Credit a repository that is someone else's project (a demo), as `name=url`: its
+        /// pages name and link it in the snapshot banner. `name` is the repository's folder
+        /// name. Repeat it for several repositories.
+        #[arg(long, value_name = "NAME=URL")]
+        project: Vec<String>,
     },
 }
