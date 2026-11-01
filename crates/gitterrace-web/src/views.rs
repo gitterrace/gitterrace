@@ -148,11 +148,11 @@ pub(crate) fn chrome_at(app: &crate::app::App, active: &str, rev: &str) -> Chrom
             })
             .collect(),
         banner: banner(&app.repo.head_state()),
-        theme: match app.cfg.display.theme.as_str() {
+        theme: match app.cfg().display.theme.as_str() {
             "system" => String::new(),
             t => t.to_owned(),
         },
-        live: app.cfg.watch.enabled && !crate::live::Mode::pinned_to(rev),
+        live: app.cfg().watch.enabled && !crate::live::Mode::pinned_to(rev),
         live_how: "",
         live_on: "",
         version: app.version().to_string(),

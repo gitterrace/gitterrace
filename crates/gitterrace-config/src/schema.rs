@@ -97,7 +97,8 @@ pub struct RepoOverride {
 
 settings! {
     server: Server {
-        /// Address to listen on. Keep it local: pages show source code and there is no login.
+        /// Address to listen on. Keep it local: pages show source code and there is no login. Needs a
+        /// restart.
         addr: String = "127.0.0.1:4242".to_owned(),
         /// Maximum open live-update streams per repository (one per browser tab).
         max_streams: usize = 32,
@@ -114,7 +115,7 @@ settings! {
         /// repository, at its first visit when several share the server. Off waits for the first
         /// page that needs it (Insights).
         build_on_start: bool = true,
-        /// Threads used to parse the index. 0 means one per core, capped at 8.
+        /// Threads used to parse the index. 0 means one per core, capped at 8. Needs a restart.
         threads: usize = 0,
     }
     resources: Resources {
@@ -154,9 +155,9 @@ settings! {
         dates: String = "relative".to_owned(),
     }
     multi: Multi {
-        /// How many folder levels to search below a given folder for repositories.
+        /// How many folder levels to search below a given folder for repositories. Needs a restart.
         depth: usize = 2,
-        /// Folder names never searched, besides hidden ones.
+        /// Folder names never searched, besides hidden ones. Needs a restart.
         skip_dirs: Vec<String> = vec!["node_modules".to_owned(), "target".to_owned(), ".wt".to_owned()],
     }
 }

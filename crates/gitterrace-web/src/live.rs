@@ -25,6 +25,9 @@ const HEARTBEAT: Duration = Duration::from_secs(15);
 /// Every part of the repository, for a stream that cannot say what it missed.
 const ALL: [&str; 6] = ["head", "refs", "stash", "worktrees", "index", "worktree"];
 
+/// The kind that says the settings changed, see `static/live.js`.
+const CONFIG: &str = "config";
+
 /// What moved, and the state the chrome shows, read once for all listeners.
 pub(crate) struct Change {
     pub(crate) kinds: Vec<&'static str>,
@@ -33,6 +36,18 @@ pub(crate) struct Change {
     pub(crate) banner: Option<String>,
     /// The Working tree chip in the top bar.
     pub(crate) dirty: bool,
+}
+
+impl Change {
+    /// The settings were reloaded: pages rendered before it show stale values. Carries no chrome.
+    pub(crate) fn config(v: u64) -> Self {
+        Self {
+            kinds: vec![CONFIG],
+            v,
+            banner: None,
+            dirty: false,
+        }
+    }
 }
 
 /// How a page reacts to a change, read by `live.js` from `data-live` and `data-live-on`.
@@ -103,6 +118,10 @@ impl Drop for WorktreeWatch {
 }
 
 fn event(c: &Change) -> Event {
+    if c.kinds == [CONFIG] {
+        let body = serde_json::json!({ "kinds": c.kinds, "v": c.v.to_string() });
+        return Event::default().event("change").data(body.to_string());
+    }
     let body = serde_json::json!({
         "kinds": c.kinds,
         "v": c.v.to_string(),

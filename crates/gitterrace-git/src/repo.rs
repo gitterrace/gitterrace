@@ -1,6 +1,7 @@
 use std::cmp::Reverse;
 use std::collections::{HashMap, VecDeque};
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
 
 use gix::bstr::ByteSlice;
@@ -22,7 +23,7 @@ pub struct Repo {
     inner: gix::ThreadSafeRepository,
     blame_cache: Mutex<BlameCache>,
     /// Largest blob read as text by this handle, see [`Repo::with_limits`].
-    text_limit: u64,
+    text_limit: AtomicU64,
     /// Threads [`Repo::numstat_many`] uses; 0 means one per core.
     workers: usize,
     /// Ahead and behind per (branch tip, base): immutable for a pair of commits.
@@ -96,7 +97,7 @@ impl Repo {
         Ok(Self {
             inner,
             blame_cache: Mutex::new(BlameCache::with_limit(BLAME_CACHE_BYTES)),
-            text_limit: MAX_TEXT_BYTES,
+            text_limit: AtomicU64::new(MAX_TEXT_BYTES),
             workers: 0,
             divergence: Mutex::new(HashMap::new()),
             id_cache: OnceLock::new(),
@@ -107,12 +108,18 @@ impl Repo {
     /// and the memory the blame cache may keep. The index always uses [`MAX_TEXT_BYTES`], so
     /// its stored numbers do not depend on a display setting.
     #[must_use]
-    pub fn with_limits(mut self, text_bytes: u64, blame_cache_bytes: usize) -> Self {
-        self.text_limit = text_bytes;
+    pub fn with_limits(self, text_bytes: u64, blame_cache_bytes: usize) -> Self {
+        self.set_limits(text_bytes, blame_cache_bytes);
+        self
+    }
+
+    /// [`Repo::with_limits`] on a handle in use. A smaller blame cache shrinks as entries are
+    /// added, so memory falls without a stall.
+    pub fn set_limits(&self, text_bytes: u64, blame_cache_bytes: usize) {
+        self.text_limit.store(text_bytes, Ordering::Relaxed);
         if let Ok(mut c) = self.blame_cache.lock() {
             c.limit = blame_cache_bytes;
         }
-        self
     }
 
     /// Sets the threads [`Repo::numstat_many`] spreads a batch over; 0 means one per core.
@@ -124,7 +131,7 @@ impl Repo {
 
     /// The text cap in force, see [`Repo::with_limits`].
     pub fn text_limit(&self) -> u64 {
-        self.text_limit
+        self.text_limit.load(Ordering::Relaxed)
     }
 
     /// Path of the `.git` directory, where gitterrace keeps its cache.
@@ -234,7 +241,7 @@ impl Repo {
         Ok(CommitDetail {
             summary: summary(&commit, &mailmap)?,
             body,
-            files: crate::diff::changes(&repo, &commit, true, self.text_limit)?,
+            files: crate::diff::changes(&repo, &commit, true, self.text_limit())?,
         })
     }
 
@@ -388,7 +395,7 @@ impl Repo {
         let path = path.trim_matches('/');
         let id = Self::blob_id_at(&repo, tip, path)?;
         let size = repo.find_header(id).map_err(git)?.size();
-        let text = if size > self.text_limit {
+        let text = if size > self.text_limit() {
             None
         } else {
             let data = repo.find_object(id).map_err(git)?.detach().data;
@@ -415,7 +422,7 @@ impl Repo {
         }
         let id = Self::blob_id_at(&repo, tip, path)?;
         // Blame of a huge file costs as much as its diff against every ancestor.
-        if repo.find_header(id).map_err(git)?.size() > self.text_limit {
+        if repo.find_header(id).map_err(git)?.size() > self.text_limit() {
             return Ok(Vec::new());
         }
         let data = repo.find_object(id).map_err(git)?.detach().data;

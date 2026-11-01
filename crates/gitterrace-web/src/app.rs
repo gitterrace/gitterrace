@@ -3,7 +3,7 @@
 use std::{
     collections::HashMap,
     sync::{
-        Arc, Mutex,
+        Arc, Mutex, RwLock, Weak,
         atomic::{AtomicBool, AtomicU64, Ordering},
     },
     time::{Duration, Instant},
@@ -33,26 +33,113 @@ pub(crate) type Subjects = HashMap<String, String>;
 /// Parsed records keyed by (head, index generation).
 type RecordsEntry = ((String, u64), Arc<Vec<CommitRecord>>);
 
-/// What every repository of one server shares: the settings, the cap on page-building jobs and
-/// the shutdown signal that ends live streams.
+/// What every repository of one server shares: the settings in force, the cap on page-building
+/// jobs and the shutdown signal that ends live streams.
 #[derive(Clone)]
 pub(crate) struct Env {
-    pub(crate) cfg: Arc<Config>,
+    cfg: Arc<RwLock<Arc<Config>>>,
+    /// Every repository app built so far, so a reload reaches them.
+    apps: Arc<Mutex<Vec<Weak<App>>>>,
     jobs: Arc<Semaphore>,
+    jobs_cap: Arc<Mutex<usize>>,
     stop: Arc<watch::Sender<bool>>,
+}
+
+/// Page-building slots for `cfg`: 0 means one per core.
+fn job_slots(cfg: &Config) -> usize {
+    match cfg.resources.blocking_jobs {
+        0 => std::thread::available_parallelism().map_or(2, usize::from),
+        n => n,
+    }
+}
+
+/// Text cap and blame cache size in bytes for a repository handle.
+pub(crate) fn repo_limits(cfg: &Config) -> (u64, usize) {
+    (
+        cfg.limits.text_kb << 10,
+        cfg.resources.cache_mb * (1 << 20) / 2,
+    )
+}
+
+/// Moves a semaphore to `new` slots. Slots in use are not taken back, so a lower cap settles as
+/// they are released; `cap` then keeps the number actually in force.
+fn resize(sem: &Semaphore, cap: &Mutex<usize>, new: usize) {
+    let Ok(mut cap) = cap.lock() else { return };
+    if new >= *cap {
+        sem.add_permits(new - *cap);
+        *cap = new;
+    } else {
+        *cap -= sem.forget_permits(*cap - new);
+    }
 }
 
 impl Env {
     pub(crate) fn new(cfg: Config) -> Self {
-        let jobs = match cfg.resources.blocking_jobs {
-            0 => std::thread::available_parallelism().map_or(2, usize::from),
-            n => n,
-        };
+        let jobs = job_slots(&cfg);
         Self {
-            cfg: Arc::new(cfg),
+            cfg: Arc::new(RwLock::new(Arc::new(cfg))),
+            apps: Arc::new(Mutex::new(Vec::new())),
             jobs: Arc::new(Semaphore::new(jobs)),
+            jobs_cap: Arc::new(Mutex::new(jobs)),
             stop: Arc::new(watch::channel(false).0),
         }
+    }
+
+    /// The settings in force now.
+    pub(crate) fn cfg(&self) -> Arc<Config> {
+        self.cfg
+            .read()
+            .map_or_else(|e| Arc::clone(&e.into_inner()), |g| Arc::clone(&g))
+    }
+
+    /// Lets a reload reach `app`.
+    pub(crate) fn register(&self, app: &Arc<App>) {
+        if let Ok(mut g) = self.apps.lock() {
+            g.retain(|w| w.strong_count() > 0);
+            g.push(Arc::downgrade(app));
+        }
+    }
+
+    /// Puts `new` in force. Settings that need a restart keep their running value. Returns the
+    /// keys of those the file changed. Every repository drops its rendered pages and tells its
+    /// open tabs.
+    pub(crate) fn apply(&self, mut new: Config) -> Vec<&'static str> {
+        let old = self.cfg();
+        let mut restart = Vec::new();
+        for (key, moved) in [
+            ("server.addr", new.server.addr != old.server.addr),
+            ("index.threads", new.index.threads != old.index.threads),
+            ("multi.depth", new.multi.depth != old.multi.depth),
+            (
+                "multi.skip_dirs",
+                new.multi.skip_dirs != old.multi.skip_dirs,
+            ),
+        ] {
+            if moved {
+                restart.push(key);
+            }
+        }
+        new.server.addr.clone_from(&old.server.addr);
+        new.index.threads = old.index.threads;
+        new.multi = old.multi.clone();
+        if new == *old {
+            return restart;
+        }
+        let new = Arc::new(new);
+        match self.cfg.write() {
+            Ok(mut g) => *g = Arc::clone(&new),
+            Err(e) => *e.into_inner() = Arc::clone(&new),
+        }
+        resize(&self.jobs, &self.jobs_cap, job_slots(&new));
+        let apps: Vec<Arc<App>> = self
+            .apps
+            .lock()
+            .map(|g| g.iter().filter_map(Weak::upgrade).collect())
+            .unwrap_or_default();
+        for app in apps {
+            app.reconfigure(&new);
+        }
+        restart
     }
 
     /// Ends every live stream, so a graceful shutdown does not wait for open tabs.
@@ -63,10 +150,10 @@ impl Env {
 
 pub(crate) struct App {
     pub(crate) repo: Repo,
-    pub(crate) cfg: Arc<Config>,
-    jobs: Arc<Semaphore>,
+    env: Env,
     /// Open `/events` streams, capped by `server.max_streams`.
     pub(crate) streams: Arc<Semaphore>,
+    streams_cap: Mutex<usize>,
     /// Change notices for the open streams. Nothing is sent while nobody listens.
     pub(crate) changes: broadcast::Sender<Arc<Change>>,
     pub(crate) stop: watch::Receiver<bool>,
@@ -114,14 +201,14 @@ impl App {
 
     pub(crate) fn configured(repo: Repo, index: Index, env: &Env) -> Self {
         let name = repo.name();
-        let cfg = Arc::clone(&env.cfg);
-        let streams = Arc::new(Semaphore::new(cfg.server.max_streams));
+        let max_streams = env.cfg().server.max_streams;
+        let streams = Arc::new(Semaphore::new(max_streams));
         Self {
             repo,
             index,
-            cfg,
-            jobs: Arc::clone(&env.jobs),
+            env: env.clone(),
             streams,
+            streams_cap: Mutex::new(max_streams),
             changes: broadcast::channel(16).0,
             stop: env.stop.subscribe(),
             _stop_tx: Arc::clone(&env.stop),
@@ -146,6 +233,27 @@ impl App {
             subjects: Mutex::new(None),
             head_lines: Mutex::new(None),
         }
+    }
+
+    /// The settings in force now; a reload can change them between two calls.
+    pub(crate) fn cfg(&self) -> Arc<Config> {
+        self.env.cfg()
+    }
+
+    /// Takes a reloaded config: limits, stream cap, rendered pages and open tabs.
+    fn reconfigure(&self, cfg: &Config) {
+        let (text_bytes, blame_bytes) = repo_limits(cfg);
+        self.repo.set_limits(text_bytes, blame_bytes);
+        resize(&self.streams, &self.streams_cap, cfg.server.max_streams);
+        if let Ok(mut g) = self.memo.lock() {
+            g.clear();
+        }
+        // The watcher loop re-reads `watch.*` when woken.
+        self.wake.notify_one();
+        // An error only says no tab is open.
+        self.changes
+            .send(Arc::new(Change::config(self.version())))
+            .ok();
     }
 
     /// Whether the worktree differs from HEAD, reused for a couple of seconds.
@@ -181,7 +289,7 @@ impl App {
 
     /// Size in bytes of the highlighted-code cache: half of `resources.cache_mb`.
     pub(crate) fn code_cache_bytes(&self) -> usize {
-        self.cfg.resources.cache_mb * (1 << 20) / 2
+        repo_limits(&self.cfg()).1
     }
 
     /// Marks that a page needs the commit index, which starts the build when it waits for one.
@@ -428,8 +536,8 @@ pub(crate) async fn blocking<T: Send + 'static>(
         .try_with(Clone::clone)
         .unwrap_or_else(|_| "HEAD".to_owned());
     // Held until the work ends: `resources.blocking_jobs` bounds git work, not waiting.
-    let _slot = Arc::clone(&app.jobs).acquire_owned().await.ok();
-    let absolute = app.cfg.display.dates == "absolute";
+    let _slot = Arc::clone(&app.env.jobs).acquire_owned().await.ok();
+    let absolute = app.cfg().display.dates == "absolute";
     tokio::task::spawn_blocking(move || {
         crate::fmt::with_dates(absolute, || {
             crate::fmt::with_base(&app.base, || crate::fmt::with_rev(&rev, || f(&app)))
@@ -467,16 +575,8 @@ impl App {
 /// `watch.interval_ms` says whether anything moved; only then is HEAD resolved again. With the
 /// watcher off nothing runs on a timer: a page that finds the index behind queues a refresh.
 pub(crate) async fn keep_index_fresh(app: Arc<App>) {
-    let every = app
-        .cfg
-        .watch
-        .enabled
-        .then(|| Duration::from_millis(app.cfg.watch.interval_ms));
-    let mut watcher = every.map(|_| app.repo.watcher());
-    let mut seen = watcher.as_mut().map(gitterrace_git::Watcher::parts);
-    if let Some(p) = seen {
-        app.version.store(p.digest(), Ordering::Release);
-    }
+    let mut watcher: Option<gitterrace_git::Watcher> = None;
+    let mut seen = None;
     let mut last: Option<String> = None;
     let mut check_head = true;
     let mut wt_seen: Option<u64> = None;
@@ -484,7 +584,23 @@ pub(crate) async fn keep_index_fresh(app: Arc<App>) {
     loop {
         // With `index.build_on_start` off the index waits for the first page that needs it;
         // the watcher below keeps running either way.
-        if app.cfg.index.build_on_start || app.demanded.load(Ordering::Acquire) {
+        // `watch.*` can change while running: the interval and the on switch are read per round.
+        let cfg = app.cfg();
+        let every = cfg
+            .watch
+            .enabled
+            .then(|| Duration::from_millis(cfg.watch.interval_ms));
+        if every.is_none() {
+            watcher = None;
+            seen = None;
+        } else if watcher.is_none() {
+            let mut w = app.repo.watcher();
+            let p = w.parts();
+            app.version.store(p.digest(), Ordering::Release);
+            seen = Some(p);
+            watcher = Some(w);
+        }
+        if cfg.index.build_on_start || app.demanded.load(Ordering::Acquire) {
             if check_head {
                 check_head = false;
                 let head = blocking(&app, |a| Ok(a.repo.resolve("HEAD")?)).await.ok();

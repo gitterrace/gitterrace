@@ -17,6 +17,7 @@ mod markdown;
 mod media;
 mod multi;
 mod pages;
+mod reload;
 mod routes;
 mod search;
 mod types;
@@ -35,6 +36,7 @@ use gitterrace_config::Config;
 use gitterrace_git::Repo;
 use gitterrace_index::Index;
 pub use multi::discover_repos;
+pub use reload::{Load, Watched};
 
 use crate::app::{App, Env};
 
@@ -73,13 +75,11 @@ fn repo_router(
     live: Option<Arc<actions::Live>>,
     env: &Env,
 ) -> io::Result<axum::Router> {
-    let cfg = &env.cfg;
+    let cfg = env.cfg();
+    let (text_bytes, blame_bytes) = app::repo_limits(&cfg);
     let repo = Repo::discover(repo_path)
         .map_err(io::Error::other)?
-        .with_limits(
-            cfg.limits.text_kb << 10,
-            cfg.resources.cache_mb * (1 << 20) / 2,
-        )
+        .with_limits(text_bytes, blame_bytes)
         .with_workers(cfg.index.threads);
     let index = Index::open(&repo)?.with_threads(cfg.index.threads);
     let mut app = App::configured(repo, index, env);
@@ -87,6 +87,7 @@ fn repo_router(
     app.key = key;
     app.actions = live;
     let app = Arc::new(app);
+    env.register(&app);
     tokio::spawn(app::keep_index_fresh(Arc::clone(&app)));
     let api = gitterrace_api::ApiState::open(repo_path).map_err(io::Error::other)?;
     let pages = routes::router(Arc::clone(&app)).nest("/api/v1", gitterrace_api::router(api));
@@ -205,15 +206,20 @@ fn build_multi(
 
 /// Starts serving until ctrl-c. `actions` is the user's `actions.toml`; `None` (no config
 /// folder, or `--no-actions`) leaves the run route unmounted, as does a non-loopback bind.
+/// `watched` is the `config.toml` to reload while running, see [`Watched`].
 pub async fn serve(
     repo_paths: Vec<PathBuf>,
     addr: SocketAddr,
     actions: Option<PathBuf>,
     cfg: Config,
+    watched: Option<Watched>,
 ) -> io::Result<()> {
     let extra = (!addr.ip().is_loopback()).then(|| addr.ip());
     let env = Env::new(cfg);
     let (router, name) = build_multi(repo_paths, extra, actions.as_deref(), &env)?;
+    if let Some(w) = watched {
+        tokio::spawn(reload::run(reload::Reloader::new(w), env.clone()));
+    }
     if !addr.ip().is_loopback() {
         tracing::warn!(
             "serving to the network: anyone who can reach this address can read the repository"

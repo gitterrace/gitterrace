@@ -185,7 +185,7 @@ async fn raw(State(app): Shared, Path((rev, path)): Path<(String, String)>) -> R
         let id = a.repo.resolve(&rev)?;
         let path = path.trim_matches('/').to_owned();
         // The header size comes first: `blob` reads nothing above the text cap.
-        if raw_refused(a.repo.blob(&id, &path)?.size, a.cfg.limits.raw_mb) {
+        if raw_refused(a.repo.blob(&id, &path)?.size, a.cfg().limits.raw_mb) {
             return Ok(None);
         }
         let bytes = a.repo.blob_bytes(&id, &path)?;
@@ -547,7 +547,7 @@ async fn commit(State(app): Shared, Path(id): Path<String>) -> Result<Html<Strin
                 .collect(),
             files: views::file_stats(&d),
             diff: views::diff_html(
-                a.cfg.limits.diff_fold_lines,
+                a.cfg().limits.diff_fold_lines,
                 &id,
                 d.summary.parents.first().map(String::as_str),
                 &d.files,
@@ -1051,7 +1051,7 @@ async fn worktree(State(app): Shared) -> Result<Html<String>> {
         Ok(WorktreePage {
             c: views::chrome(a, "files").live(Mode::WORKTREE),
             clean: files.is_empty(),
-            diff: views::diff_html_with(a.cfg.limits.diff_fold_lines, None, None, &files),
+            diff: views::diff_html_with(a.cfg().limits.diff_fold_lines, None, None, &files),
             adds: fmt::thousands(adds),
             dels: fmt::thousands(dels),
             files: stats,

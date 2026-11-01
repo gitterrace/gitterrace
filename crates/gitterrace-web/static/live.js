@@ -38,7 +38,7 @@
   function notice() {
     if (!note) return;
     note.textContent = "Updated, refresh";
-    note.title = "The repository changed since this page was loaded. Click to reload.";
+    note.title = "The repository or the settings changed since this page was loaded. Click to reload.";
     note.hidden = false;
   }
 
@@ -71,6 +71,8 @@
     try { c = JSON.parse(ev.data); } catch (e) { return; }
     version = c.v || version;
     chrome(c);
+    // A reload of config.toml can change any page, whatever kinds it follows.
+    if ((c.kinds || []).indexOf("config") >= 0) { notice(); return; }
     if (!shows(c.kinds || [])) return;
     if (how === "refresh") refresh();
     else if (how === "notice") notice();

@@ -59,9 +59,9 @@ impl Defaults {
 
 impl App {
     pub(crate) fn defaults(&self) -> Defaults {
-        let i = &self.cfg.insights;
+        let i = &self.cfg().insights;
         let mut exclude = i.exclude.clone();
-        if let Some(o) = self.cfg.repo.get(&self.name) {
+        if let Some(o) = self.cfg().repo.get(&self.name) {
             exclude.extend(o.exclude.iter().cloned());
         }
         Defaults {

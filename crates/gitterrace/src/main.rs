@@ -21,33 +21,31 @@ async fn main() -> anyhow::Result<()> {
         .with_writer(std::io::stderr)
         .init();
     let dir = gitterrace_config::config_dir(cli.config.as_deref());
-    let mut loaded = gitterrace_config::load(dir.as_deref()).context("reading config.toml")?;
+    let flags = Flags {
+        dir: dir.clone(),
+        addr: cli.addr,
+        poll: cli.poll,
+        no_watch: cli.no_watch,
+    };
+    let loaded = flags.load().context("reading config.toml")?;
     for w in &loaded.warnings {
         tracing::warn!("config: {w}");
     }
-    if let Some(a) = cli.addr {
-        loaded.config.server.addr = a.to_string();
-        loaded.flagged("server.addr");
-    }
-    if let Some(ms) = cli.poll {
-        loaded.config.watch.interval_ms = ms;
-        loaded.flagged("watch.interval_ms");
-    }
-    if cli.no_watch {
-        loaded.config.watch.enabled = false;
-        loaded.flagged("watch.enabled");
-    }
-    loaded.validate().context("config")?;
     match cli.command.unwrap_or(Command::Serve) {
         Command::Config => print!("{}", loaded.describe()),
         Command::Serve => {
             let addr: SocketAddr = loaded.config.server.addr.parse().context("server.addr")?;
             let actions = dir
+                .clone()
                 .filter(|_| !cli.no_actions)
                 .map(|d| d.join("actions.toml"));
             let m = &loaded.config.multi;
             let repos = gitterrace_web::discover_repos(&cli.paths, m.depth, &m.skip_dirs);
-            gitterrace_web::serve(repos, addr, actions, loaded.config).await?;
+            let watched = dir.as_ref().map(|d| gitterrace_web::Watched {
+                file: d.join("config.toml"),
+                load: Box::new(move || flags.load().map(|l| l.config)),
+            });
+            gitterrace_web::serve(repos, addr, actions, loaded.config, watched).await?;
         }
         Command::Mcp => {
             gitterrace_api::serve_mcp(&path).await?;
@@ -72,6 +70,36 @@ async fn main() -> anyhow::Result<()> {
         }
     }
     Ok(())
+}
+
+/// The command-line flags that beat `config.toml`, kept to load the file again on reload.
+#[derive(Clone)]
+struct Flags {
+    dir: Option<PathBuf>,
+    addr: Option<SocketAddr>,
+    poll: Option<u64>,
+    no_watch: bool,
+}
+
+impl Flags {
+    /// The file with the flags laid over it, validated.
+    fn load(&self) -> Result<gitterrace_config::Loaded, gitterrace_config::ConfigError> {
+        let mut loaded = gitterrace_config::load(self.dir.as_deref())?;
+        if let Some(a) = self.addr {
+            loaded.config.server.addr = a.to_string();
+            loaded.flagged("server.addr");
+        }
+        if let Some(ms) = self.poll {
+            loaded.config.watch.interval_ms = ms;
+            loaded.flagged("watch.interval_ms");
+        }
+        if self.no_watch {
+            loaded.config.watch.enabled = false;
+            loaded.flagged("watch.enabled");
+        }
+        loaded.validate()?;
+        Ok(loaded)
+    }
 }
 
 fn wrapped(

@@ -4,6 +4,8 @@
 
 One optional file, `config.toml`, in `$XDG_CONFIG_HOME/gitterrace` or `~/.config/gitterrace` (`--config DIR` picks another folder). It is never read from a served repository. A flag beats the file, the file beats the default. Unknown keys warn, invalid values stop startup naming the key. `git terrace config` prints what is in force and where each value came from.
 
+A running server reloads `config.toml` within a second of an edit. An invalid edit is logged with the key and the old settings stay. Open pages show "Updated, refresh". Settings marked "Needs a restart" log a warning and keep their running value.
+
 Per-repository overrides go under `[repo.NAME]` (the repository's folder name) and take `exclude`, a list of path globs added to `insights.exclude`.
 
 Actions live in their own file, `actions.toml`, because they run commands.
@@ -12,7 +14,7 @@ Actions live in their own file, `actions.toml`, because they run commands.
 
 | Key | Type | Default | Description |
 | --- | --- | --- | --- |
-| `addr` | string | `"127.0.0.1:4242"` | Address to listen on. Keep it local: pages show source code and there is no login. |
+| `addr` | string | `"127.0.0.1:4242"` | Address to listen on. Keep it local: pages show source code and there is no login. Needs a restart. |
 | `max_streams` | integer | `32` | Maximum open live-update streams per repository (one per browser tab). |
 
 ## `[watch]`
@@ -27,7 +29,7 @@ Actions live in their own file, `actions.toml`, because they run commands.
 | Key | Type | Default | Description |
 | --- | --- | --- | --- |
 | `build_on_start` | bool | `true` | Build the commit index as soon as a repository is served: at startup for one repository, at its first visit when several share the server. Off waits for the first page that needs it (Insights). |
-| `threads` | integer | `0` | Threads used to parse the index. 0 means one per core, capped at 8. |
+| `threads` | integer | `0` | Threads used to parse the index. 0 means one per core, capped at 8. Needs a restart. |
 
 ## `[resources]`
 
@@ -65,5 +67,5 @@ Actions live in their own file, `actions.toml`, because they run commands.
 
 | Key | Type | Default | Description |
 | --- | --- | --- | --- |
-| `depth` | integer | `2` | How many folder levels to search below a given folder for repositories. |
-| `skip_dirs` | list of strings | `["node_modules", "target", ".wt"]` | Folder names never searched, besides hidden ones. |
+| `depth` | integer | `2` | How many folder levels to search below a given folder for repositories. Needs a restart. |
+| `skip_dirs` | list of strings | `["node_modules", "target", ".wt"]` | Folder names never searched, besides hidden ones. Needs a restart. |

@@ -15,6 +15,9 @@ pub fn render() -> Out {
          served repository. A flag beats the file, the file beats the default. Unknown keys \
          warn, invalid values stop startup naming the key. `git terrace config` prints what is \
          in force and where each value came from.\n\n\
+         A running server reloads `config.toml` within a second of an edit. An invalid edit is \
+         logged with the key and the old settings stay. Open pages show \"Updated, refresh\". \
+         Settings marked \"Needs a restart\" log a warning and keep their running value.\n\n\
          Per-repository overrides go under `[repo.NAME]` (the repository's folder name) and \
          take `exclude`, a list of path globs added to `insights.exclude`.\n\n\
          Actions live in their own file, `actions.toml`, because they run commands.\n",

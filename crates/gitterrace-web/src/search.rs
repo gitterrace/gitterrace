@@ -232,7 +232,7 @@ fn search_code(a: &App, rev: &str, re: &Regex, glob: Option<&Regex>) -> Result<C
         .iter()
         .filter(|f| glob.is_none_or(|g| g.is_match(&f.path)))
         .collect();
-    let max_matches = a.cfg.limits.search_matches;
+    let max_matches = a.cfg().limits.search_matches;
     let next = AtomicUsize::new(0);
     let total = AtomicUsize::new(0);
     let scanned = AtomicUsize::new(0);
