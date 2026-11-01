@@ -5,7 +5,7 @@
 {% include "filterbar.html" %}
 <h2>{{ activity_title }}</h2>
 <div class="card pad">{{ activity|safe }}</div>
-<h2>When commits happen</h2>
+<h2 data-tip="Commits by weekday and hour of day. Darker cells have more commits.">When commits happen</h2>
 <div class="card pad">{{ heatmap|safe }}</div>
 <h2>Authors</h2>
 <div class="card"><table class="entries">

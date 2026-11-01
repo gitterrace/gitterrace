@@ -17,6 +17,37 @@ pub(crate) struct Nav {
     pub(crate) on: bool,
 }
 
+/// The Branches & tags, Worktrees and Stashes tab bar, the same on all three pages: every tab
+/// shows its count, 0 included, so a count never appears on one page and vanishes on the next.
+pub(crate) struct RefTab {
+    pub(crate) href: String,
+    pub(crate) label: &'static str,
+    pub(crate) count: usize,
+    pub(crate) on: bool,
+}
+
+/// The counts come from the same repository reads on every page.
+pub(crate) fn ref_tabs(app: &crate::app::App, on: &str) -> crate::error::Result<Vec<RefTab>> {
+    // Branches and tags together, as the tab is labelled; remotes have their own section.
+    let local = app
+        .repo
+        .refs()?
+        .iter()
+        .filter(|r| r.kind != gitterrace_git::RefKind::Remote)
+        .count();
+    let tab = |key: &str, label, count| RefTab {
+        href: crate::fmt::href(&format!("/{key}")),
+        label,
+        count,
+        on: key == on,
+    };
+    Ok(vec![
+        tab("refs", "Branches & tags", local),
+        tab("worktrees", "Worktrees", app.repo.linked_worktrees()?.len()),
+        tab("stashes", "Stashes", app.repo.stashes()?.len()),
+    ])
+}
+
 pub(crate) struct Chrome {
     /// Prefix for absolute links; empty for a single repository.
     pub(crate) base: String,

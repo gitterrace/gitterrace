@@ -116,7 +116,7 @@ pub(crate) fn bars(points: &[(String, u64)]) -> String {
         let y = TOP_PAD + plot - h;
         let _ = write!(
             svg,
-            r#"<g class="col"><title>{}: {}</title><rect class="hit" x="{:.1}" y="{TOP_PAD}" width="{sl:.1}" height="{plot:.1}"/><rect class="bar" x="{x:.1}" y="{y:.1}" width="{bw:.1}" height="{h:.1}" rx="2"/></g>"#,
+            r#"<g class="col" data-tip="{}: {}"><rect class="hit" x="{:.1}" y="{TOP_PAD}" width="{sl:.1}" height="{plot:.1}"/><rect class="bar" x="{x:.1}" y="{y:.1}" width="{bw:.1}" height="{h:.1}" rx="2"/></g>"#,
             esc(label),
             fmt::thousands(v),
             x - (sl - bw) / 2.0
@@ -175,7 +175,7 @@ pub(crate) fn stacked(buckets: &[gitterrace_index::LabelBucket]) -> String {
         let total: u64 = col.iter().sum();
         let _ = write!(
             svg,
-            r#"<g class="col"><title>{key}: {}</title><rect class="hit" x="{:.1}" y="{TOP_PAD}" width="{sl:.1}" height="{plot:.1}"/>"#,
+            r#"<g class="col" data-tip="{key}: {}"><rect class="hit" x="{:.1}" y="{TOP_PAD}" width="{sl:.1}" height="{plot:.1}"/>"#,
             fmt::thousands(total),
             x - (sl - bw) / 2.0
         );
@@ -249,7 +249,7 @@ pub(crate) fn diverging(points: &[(String, u64, u64)], title: &str) -> String {
         let (ha, hd) = (*a as f64 / top * half, *d as f64 / top * half);
         let _ = write!(
             svg,
-            r#"<g class="col"><title>{}: +{} / -{}</title><rect class="hit" x="{:.1}" y="{TOP_PAD}" width="{sl:.1}" height="{:.1}"/><rect class="up" x="{x:.1}" y="{:.1}" width="{bw:.1}" height="{ha:.1}"/><rect class="dn" x="{x:.1}" y="{mid:.1}" width="{bw:.1}" height="{hd:.1}"/></g>"#,
+            r#"<g class="col" data-tip="{}: +{} / -{}"><rect class="hit" x="{:.1}" y="{TOP_PAD}" width="{sl:.1}" height="{:.1}"/><rect class="up" x="{x:.1}" y="{:.1}" width="{bw:.1}" height="{ha:.1}"/><rect class="dn" x="{x:.1}" y="{mid:.1}" width="{bw:.1}" height="{hd:.1}"/></g>"#,
             esc(label),
             fmt::thousands(a),
             fmt::thousands(d),
@@ -287,7 +287,7 @@ pub(crate) fn percent_line(points: &[(String, Option<f64>)]) -> String {
             let y = TOP_PAD + plot - v.clamp(0.0, 1.0) * plot;
             let _ = write!(
                 svg,
-                r#"<g class="col"><title>{}: {:.0}%</title><rect class="hit" x="{x:.1}" y="{TOP_PAD}" width="{sl:.1}" height="{plot:.1}"/><circle class="dot" cx="{:.1}" cy="{y:.1}" r="3.5"/></g>"#,
+                r#"<g class="col" data-tip="{}: {:.0}%"><rect class="hit" x="{x:.1}" y="{TOP_PAD}" width="{sl:.1}" height="{plot:.1}"/><circle class="dot" cx="{:.1}" cy="{y:.1}" r="3.5"/></g>"#,
                 esc(label),
                 v * 100.0,
                 x + sl / 2.0
@@ -382,7 +382,7 @@ pub(crate) fn scatter(dots: &[Dot], x_title: &str) -> String {
         );
         let _ = write!(
             svg,
-            r#"<a href="{}"><circle class="dot-pt" cx="{cx:.1}" cy="{cy:.1}" r="{r:.1}"><title>{}</title></circle></a>"#,
+            r#"<a href="{}"><circle class="dot-pt" cx="{cx:.1}" cy="{cy:.1}" r="{r:.1}" data-tip="{}"/></a>"#,
             esc(&d.href),
             esc(&d.title)
         );
@@ -431,7 +431,7 @@ pub(crate) fn heatmap(cells: &[[u32; 24]; 7], max: u32) -> String {
             };
             let _ = write!(
                 svg,
-                r#"<rect class="h{level}" x="{}" y="{y}" width="{}" height="{}" rx="4"><title>{} {hr:02}:00, {v} commits</title></rect>"#,
+                r#"<rect class="h{level}" x="{}" y="{y}" width="{}" height="{}" rx="4" data-tip="{} {hr:02}:00, {v} commits"/>"#,
                 LEFT + hr * CELL,
                 CELL - 4,
                 CELL - 4,

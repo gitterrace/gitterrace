@@ -190,7 +190,10 @@ button.branch{height:auto;cursor:pointer}
 [hidden]{display:none!important}
 .wtchip{display:inline-flex;align-items:center;gap:6px;font:var(--weight-semibold) var(--text-xs)/1 var(--mono);color:var(--warn);background:var(--warn-bg);border:var(--border);border-radius:var(--radius);padding:5px 10px;white-space:nowrap}
 .wtchip:hover{text-decoration:none;border-color:var(--warn)}
-.wtchip .dot{width:6px;height:6px;border-radius:50%;background:var(--warn)}
+.wtchip .dot{width:6px;height:6px;border-radius:50%;background:var(--warn);animation:wtpulse 2.4s ease-in-out infinite}
+/* A slow breath, so the chip reads as live without pulling the eye. Still for reduced motion. */
+@keyframes wtpulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.35;transform:scale(.7)}}
+@media (prefers-reduced-motion:reduce){.wtchip .dot{animation:none}}
 .topsearch{position:relative;display:flex;align-items:center}
 .topsearch input[type=search]{min-width:220px;width:260px;padding-right:32px;height:30px}
 .topsearch kbd{position:absolute;right:8px;pointer-events:none}
@@ -420,3 +423,8 @@ td:has(>.actbtn.float){position:relative}
 .send-hint{margin-left:auto;color:var(--muted);font-size:var(--text-xs)}
 .send-go{background:var(--accent);color:var(--on-accent);border:0;border-radius:var(--radius);padding:4px var(--space-4);font-size:var(--text-sm);cursor:pointer}
 .send-go:focus-visible{outline:2px solid var(--ring);outline-offset:2px}
+.tip,.loc-tip{background:var(--surface);border:var(--border);border-radius:var(--radius);box-shadow:var(--shadow-2);color:var(--fg)}
+.tip{position:fixed;left:0;top:0;z-index:50;box-sizing:border-box;max-width:320px;padding:var(--space-2) var(--space-3);font:var(--text-xs)/1.4 var(--sans);overflow-wrap:anywhere;white-space:normal;pointer-events:none;opacity:0;visibility:hidden;transition:opacity var(--dur-fast) var(--ease),visibility 0s linear var(--dur-fast)}
+.tip.on{opacity:1;visibility:visible;transition:opacity var(--dur-fast) var(--ease)}
+[data-tip]:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+@media (prefers-reduced-motion:reduce){.tip,.tip.on{transition:none}}

@@ -15,7 +15,7 @@
 <div class="chart-head"><div><h2>Type by scope</h2><p class="hint">Commits per type and scope. Darker cells have more commits. Click a cell to filter by both.</p></div></div>
 <div class="card matrix"><table>
 <tr><th></th>{% for col in matrix.cols %}<th><a href="{{ col.href }}">{{ col.label }}</a></th>{% endfor %}</tr>
-{% for row in matrix.rows %}<tr><th><a href="{{ row.href }}">{{ row.label }}</a></th>{% for cell in row.cells %}<td class="m{{ cell.level }}">{% if cell.n > 0 %}<a href="{{ cell.href }}" title="{{ row.label }} / {{ cell.scope }}: {{ cell.n }}">{{ cell.n }}</a>{% endif %}</td>{% endfor %}</tr>{% endfor %}
+{% for row in matrix.rows %}<tr><th><a href="{{ row.href }}">{{ row.label }}</a></th>{% for cell in row.cells %}<td class="m{{ cell.level }}">{% if cell.n > 0 %}<a href="{{ cell.href }}" data-tip="{{ row.label }} / {{ cell.scope }}: {{ cell.n }}">{{ cell.n }}</a>{% endif %}</td>{% endfor %}</tr>{% endfor %}
 </table></div>
 {% endif %}
 <div class="chart-head"><div><h2>{{ over_title }}</h2><p class="hint">{{ over_hint }}</p></div></div>
@@ -28,7 +28,7 @@
 {% endfor %}
 <div class="chart-head"><div><h2>Commits</h2><p class="hint">{{ commits_total }} matching, newest first.</p></div></div>
 <ul class="list log">
-{% for r in commits %}<li class="crow"><span class="av" style="--hue:{{ r.hue }}">{{ r.initial }}</span><div class="cmain"><a href="{{ r.href }}">{{ r.subject }}</a><span class="muted"><a class="who" href="{{ r.author_href }}"><b>{{ r.author }}</b></a> · <time title="{{ r.date }}">{{ r.when }}</time></span></div><a class="sha" href="{{ r.href }}">{{ r.short }}</a></li>{% endfor %}
+{% for r in commits %}<li class="crow"><span class="av" style="--hue:{{ r.hue }}">{{ r.initial }}</span><div class="cmain"><a href="{{ r.href }}">{{ r.subject }}</a><span class="muted"><a class="who" href="{{ r.author_href }}"><b>{{ r.author }}</b></a> · <time data-tip="{{ r.date }}" tabindex="0">{{ r.when }}</time></span></div><a class="sha" href="{{ r.href }}">{{ r.short }}</a></li>{% endfor %}
 </ul>
 <nav class="pager">
 {% if let Some(h) = newer %}<a href="{{ h }}">Newer</a>{% else %}<span></span>{% endif %}

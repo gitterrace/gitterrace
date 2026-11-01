@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Worktrees · {{ c.name }}{% endblock %}
 {% block content %}
-<nav class="tabs"><a href="{{ c.base }}/refs">Branches &amp; tags</a><a href="{{ c.base }}/worktrees" class="on">Worktrees <span class="tag">{{ rows.len() }}</span></a><a href="{{ c.base }}/stashes">Stashes</a></nav>
+{% include "reftabs.html" %}
 <p class="meta muted">Linked worktrees recorded in this repository's git directory. Paths are shown as written; gitterrace does not open them.</p>
 <div class="card"><table class="entries">
 <tr class="th"><td>Path</td><td>Name</td><td>Checked out</td><td>Commit</td></tr>

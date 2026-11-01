@@ -256,7 +256,7 @@
   function button(title) {
     var b = el("button", "actbtn", null);
     b.type = "button";
-    b.title = title;
+    b.setAttribute("data-tip", title);
     b.setAttribute("aria-haspopup", "menu");
     b.setAttribute("aria-label", title);
     return b;

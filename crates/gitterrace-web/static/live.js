@@ -38,7 +38,7 @@
   function notice() {
     if (!note) return;
     note.textContent = "Updated, refresh";
-    note.title = "The repository or the settings changed since this page was loaded. Click to reload.";
+    note.setAttribute("data-tip", "The repository or the settings changed since this page was loaded. Click to reload.");
     note.hidden = false;
   }
 

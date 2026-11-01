@@ -598,6 +598,19 @@ async fn every_static_file_a_template_loads_is_served() {
     }
 }
 
+/// Hovers are `data-tip` handled by one script, never a native `title=` that shows late and
+/// unstyled. Truncated subjects are the only place `title` stays.
+#[tokio::test]
+async fn hovers_use_the_shared_tip() {
+    let dir = tempfile::tempdir().expect("tmp");
+    let p = repo(dir.path(), "r");
+    let r = router(&p, Config::default());
+    let (_, body) = get(&r, "/stats").await;
+    assert!(body.contains("/static/tip.js"), "tip.js is loaded");
+    assert!(body.contains("data-tip=\"Commits by weekday"), "heading tip");
+    assert!(!body.contains("<title>Mon"), "no native svg titles");
+}
+
 /// `links.style` decides what Copy permalink copies: the page tells the scripts which form.
 #[tokio::test]
 async fn links_style_switches_copy_permalink() {
@@ -615,5 +628,44 @@ async fn links_style_switches_copy_permalink() {
     assert!(
         js.contains("dataset.link") && js.contains("\"gitterrace://\""),
         "actions.js reads the style"
+    );
+}
+
+/// The Branches & tags, Worktrees and Stashes pages share one tab bar: on every page each tab
+/// shows its count, 0 included, so a number never shows on one page and vanishes on the next.
+#[tokio::test]
+async fn ref_tabs_show_every_count_on_every_page() {
+    let dir = tempfile::tempdir().expect("tmp");
+    let p = repo(dir.path(), "r");
+    let r = router(&p, Config::default());
+    let mut bars = Vec::new();
+    for page in ["/refs", "/worktrees", "/stashes"] {
+        let (code, html) = get(&r, page).await;
+        assert_eq!(code, 200, "{page}");
+        let bar = html
+            .split("<nav class=\"tabs\">")
+            .nth(1)
+            .and_then(|s| s.split("</nav>").next())
+            .expect("tab bar")
+            .replace(" class=\"on\" aria-current=\"page\"", "");
+        assert_eq!(
+            bar.matches("<span class=\"tag\">").count(),
+            3,
+            "{page}: {bar}"
+        );
+        // No linked worktrees and no stashes in this repo: both still say 0.
+        assert!(
+            bar.contains("Worktrees <span class=\"tag\">0</span>"),
+            "{page}: {bar}"
+        );
+        assert!(
+            bar.contains("Stashes <span class=\"tag\">0</span>"),
+            "{page}: {bar}"
+        );
+        bars.push(bar);
+    }
+    assert!(
+        bars.windows(2).all(|w| w[0] == w[1]),
+        "the bar differs by page: {bars:?}"
     );
 }

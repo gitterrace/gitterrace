@@ -362,7 +362,7 @@
   Array.prototype.forEach.call(document.querySelectorAll("[data-copyable]"), function (card) {
     var b = el("button", "copy float", "Copy");
     b.type = "button";
-    b.title = "Copy file contents";
+    b.setAttribute("data-tip", "Copy file contents");
     b.addEventListener("click", function () {
       var cells = card.querySelectorAll(".src .l, td.c");
       copy(Array.prototype.map.call(cells, function (c) { return c.textContent; }).join("\n") + "\n", "Copied file");

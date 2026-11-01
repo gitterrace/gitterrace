@@ -92,10 +92,11 @@ async fn selected_rev(req: axum::extract::Request, next: axum::middleware::Next)
 pub(crate) fn assets<S: Clone + Send + Sync + 'static>() -> Router<S> {
     const JS: &str = "text/javascript; charset=utf-8";
     const CSS: &str = "text/css; charset=utf-8";
-    let table: [(&str, &str, &'static str); 10] = [
+    let table: [(&str, &str, &'static str); 11] = [
         ("loc.js", JS, include_str!("../static/loc.js")),
         ("tokens.css", CSS, include_str!("../static/tokens.css")),
         ("app.css", CSS, include_str!("../static/app.css")),
+        ("tip.js", JS, include_str!("../static/tip.js")),
         ("app.js", JS, include_str!("../static/app.js")),
         ("markdown.css", CSS, include_str!("../static/markdown.css")),
         ("markdown.js", JS, include_str!("../static/markdown.js")),
@@ -791,8 +792,7 @@ struct RefsPage {
     branches: Vec<crate::gitstate::BranchRow>,
     tags: Vec<TagRow>,
     remotes: Vec<RefRow>,
-    worktrees: usize,
-    stashes: usize,
+    reftabs: Vec<views::RefTab>,
 }
 
 async fn refs(State(app): Shared) -> Result<Html<String>> {
@@ -819,8 +819,7 @@ async fn refs(State(app): Shared) -> Result<Html<String>> {
             branches: crate::gitstate::branch_rows(a)?,
             tags,
             remotes: views::ref_rows(&all, RefKind::Remote, now),
-            worktrees: a.repo.linked_worktrees()?.len(),
-            stashes: a.repo.stashes()?.len(),
+            reftabs: views::ref_tabs(a, "refs")?,
         })
     })
     .await?;

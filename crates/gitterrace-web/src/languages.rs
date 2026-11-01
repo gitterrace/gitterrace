@@ -360,7 +360,7 @@ fn area_chart(ch: &Chain, view: View) -> String {
         }
         let _ = write!(
             svg,
-            r#"<path class="{}" d="{d}Z"><title>{}</title></path>"#,
+            r#"<path class="{}" d="{d}Z" data-tip="{}"/>"#,
             cat(lang, k),
             esc(&ch.langs[lang])
         );
@@ -559,7 +559,7 @@ fn languages_now(ch: &Chain) -> String {
         if f > 0.0 {
             let _ = write!(
                 bar,
-                r#"<b class="{}" style="width:{:.3}%" title="{} {}"></b>"#,
+                r#"<b class="{}" style="width:{:.3}%" data-tip="{} {}"></b>"#,
                 cat(i, k),
                 f * 100.0,
                 esc(&ch.langs[i]),

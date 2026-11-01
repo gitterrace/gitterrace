@@ -7,7 +7,7 @@
     return root.dataset.theme || "system";
   }
   function label() {
-    if (btn) btn.title = "Theme: " + current() + " (click to change)";
+    if (btn) btn.setAttribute("data-tip", "Theme: " + current() + " (click to change)");
   }
   if (btn) {
     label();

@@ -29,6 +29,7 @@ pub(crate) struct WorktreeRow {
 #[template(path = "worktrees.html")]
 struct WorktreesPage {
     c: Chrome,
+    reftabs: Vec<crate::views::RefTab>,
     rows: Vec<WorktreeRow>,
 }
 
@@ -60,6 +61,7 @@ pub(crate) async fn worktrees(State(app): Shared) -> Result<Html<String>> {
             .collect();
         Ok(WorktreesPage {
             c: views::chrome(a, "refs").live(Mode::WORKTREES),
+            reftabs: views::ref_tabs(a, "worktrees")?,
             rows,
         }
         .render()?)
@@ -79,6 +81,7 @@ pub(crate) struct StashRow {
 #[template(path = "stashes.html")]
 struct StashesPage {
     c: Chrome,
+    reftabs: Vec<crate::views::RefTab>,
     rows: Vec<StashRow>,
 }
 
@@ -98,6 +101,7 @@ pub(crate) async fn stashes(State(app): Shared) -> Result<Html<String>> {
             .collect();
         Ok(StashesPage {
             c: views::chrome(a, "refs").live(Mode::STASHES),
+            reftabs: views::ref_tabs(a, "stashes")?,
             rows,
         }
         .render()?)
