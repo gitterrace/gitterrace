@@ -9,6 +9,8 @@
 
 Browse any git repository in your browser, offline, read-only: code, commits, blame,
 branches, worktrees, stashes, live updates and insights. No database, accounts or network.
+Agents write more of the code each month, and few people read their diffs. This is a calm
+place to look again ([why](docs/why.md)).
 
 ## Install
 

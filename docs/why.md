@@ -1,9 +1,16 @@
 # Why gitterrace
 
-When you work on a project, and more so when agents write much of the code, you want to look
-at what changed. Not on a host, after a push, but here: the working tree, the branches, the
-worktrees, the history. We wanted to read that calmly, offline, in a browser, without
-sending anything anywhere first.
+Agents now write much of the code, and fast. Many changes land without anyone reading the
+diff: there are too many, they arrive while you do something else, and they mostly work. The
+repository still holds the whole story, but nobody looks at it anymore.
+
+gitterrace is a place to look again. Not every line, and not as a gate before each merge, but
+calmly and after the fact: what changed today, which files keep churning, which branches and
+worktrees the agents left behind, what the working tree holds right now. It reads the
+repository on your machine, offline, in a browser, without sending anything anywhere first.
+
+Reading is cheap when it is pleasant. If one glance at a commit or a hot file is a click away,
+you take that glance, and that is often enough to catch the change nobody meant.
 
 ## Reading, then sending on
 
