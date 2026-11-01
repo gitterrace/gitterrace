@@ -106,6 +106,9 @@ fn syntax_for_file(path: &str, first_line: &str) -> Option<&'static SyntaxRefere
             set.find_syntax_by_token("rb")
         }
         "Package.swift" => set.find_syntax_by_token("swift"),
+        // Autoconf is shell under m4 macros, and the set has no m4 grammar.
+        "configure.in" => set.find_syntax_by_token("sh"),
+        _ if name.ends_with(".ac") || name.ends_with(".m4") => set.find_syntax_by_token("sh"),
         ".bashrc" | ".zshrc" | ".bash_profile" | ".zprofile" | ".profile" | ".zshenv" => {
             set.find_syntax_by_token("sh")
         }
@@ -228,7 +231,7 @@ mod tests {
     use super::*;
 
     /// (file name, source) that must produce a keyword or string span.
-    const CASES: [(&str, &str); 17] = [
+    const CASES: [(&str, &str); 20] = [
         ("a.py", "import os\nx = \"hi\"\n"),
         ("a.sh", "if [ -f x ]; then echo \"hi\"; fi\n"),
         ("a.bash", "for i in 1 2; do echo \"$i\"; done\n"),
@@ -249,6 +252,9 @@ mod tests {
         ("a.yaml", "key: \"v\"\nlist:\n  - true\n"),
         ("a.json", "{\"a\": \"b\"}\n"),
         ("a.sql", "SELECT \"a\" FROM t WHERE x = 'b';\n"),
+        ("configure.ac", "AS_IF([test -z \"$MAKE\"], [MAKE=make])\n"),
+        ("configure.in", "AS_IF([test -z \"$MAKE\"], [MAKE=make])\n"),
+        ("m4/ax_check.m4", "AC_DEFUN([AX_X], [echo \"x\"])\n"),
     ];
 
     fn render(path: &str, src: &str) -> Option<String> {

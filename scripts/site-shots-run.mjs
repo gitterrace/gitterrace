@@ -24,14 +24,18 @@ const SHOTS = [
   { name: 'blame', path: '/r/jq/blame/release/configure.ac' },
   {
     name: 'send',
-    path: '/r/jq/blob/release/src/main.c#L100-L112',
+    path: '/r/jq/blob/release/src/main.c#L108-L110',
     async prepare(p) {
       await p.waitForSelector('#actsel');
       await p.click('#actsel');
       await p.waitForSelector('.actmenu');
       await p.click('.actmenu li:has-text("Send to…") >> nth=0');
       await p.waitForSelector('.send, dialog, [role=dialog]', { timeout: 5000 });
+      // A narrow file view jumps sideways to the anchor; keep the code at its left edge.
+      await p.evaluate(() => document.querySelectorAll('*').forEach((e) => { if (e.scrollLeft) e.scrollLeft = 0; }));
     },
+    // The dialog and the marked lines around it, so the small window reads at site width.
+    clip: '.send, dialog, [role=dialog]',
   },
 ];
 
@@ -48,7 +52,15 @@ for (const scheme of ['light', 'dark']) {
     if (s.prepare) await s.prepare(p);
     await p.waitForTimeout(400);
     const file = join(out, `${s.name}-${scheme}.png`);
-    await p.screenshot({ path: file });
+    let clip;
+    if (s.clip) {
+      const b = await p.locator(s.clip).first().boundingBox();
+      const pad = 48;
+      const x = Math.max(0, b.x - 160);
+      const y = Math.max(0, b.y - pad);
+      clip = { x, y, width: Math.min(1280 - x, b.width + 320), height: Math.min(800 - y, b.height + pad * 2) };
+    }
+    await p.screenshot({ path: file, clip });
     await p.close();
     console.log(`wrote docs/screenshots/${s.name}-${scheme}.png`);
   }
