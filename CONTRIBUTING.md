@@ -15,7 +15,7 @@ same terms.
 ## Setup
 
 You need a Rust toolchain (the version is pinned in `rust-toolchain.toml`), git and
-Python 3. The site and logo checks use `uv` if present.
+Python 3. `uv` is only needed to regenerate the README header tagline.
 
 ```sh
 git clone https://github.com/gitterrace/gitterrace && cd gitterrace
@@ -50,6 +50,8 @@ it reports as missing.
 - shellcheck and shfmt: `scripts/*.sh`
 - ruff (`ruff.toml`): `scripts/*.py`
 - cargo-machete: unused dependencies
+- ast-grep (`sgconfig.yml`, `scripts/ast-grep/`): structural rules from AGENTS.md (gix only in
+  gitterrace-git, no git subprocess, no `use super::` outside tests), each with a test
 
 ## Commits
 

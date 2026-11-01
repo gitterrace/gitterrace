@@ -1,0 +1,6 @@
+id: no-git-subprocess
+valid:
+  - 'let c = Command::new("node");'
+  - 'mod tests { fn f() { Command::new("git"); } }'
+invalid:
+  - 'fn f() { let out = Command::new("git").arg("log").output(); }'

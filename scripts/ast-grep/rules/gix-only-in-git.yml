@@ -1,0 +1,12 @@
+id: gix-only-in-git
+language: rust
+severity: error
+message: gix is used outside gitterrace-git.
+note: Every git read goes through gitterrace-git (AGENTS.md); add a function there and call it.
+files: [crates/**/*.rs, xtask/**/*.rs]
+ignores: [crates/gitterrace-git/**]
+rule:
+  any:
+    - {kind: use_declaration, regex: '\bgix\b'}
+    - {kind: scoped_identifier, regex: '^gix::'}
+    - {kind: scoped_type_identifier, regex: '^gix::'}

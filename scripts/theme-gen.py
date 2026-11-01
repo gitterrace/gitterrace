@@ -2,14 +2,18 @@
 """Generate gitterrace's theme files from the schwarzwald snapshot (stdlib only).
 
     scripts/theme-gen.py           write the files
-    scripts/theme-gen.py --check   exit 1 naming a file that differs from its generated form
+    scripts/theme-gen.py --check   exit 1 if the snapshot differs from its manifest, then if a
+                                   file differs from its generated form
 
-Reads theme/schwarzwald/tokens/{theme-tokens,design-tokens}.json. Writes
+The check compares the sha256 of every file under theme/schwarzwald with manifest.json
+(missing, changed and unlisted files). Refresh the snapshot with schwarzwald's sync.py, never
+by editing it. Reads theme/schwarzwald/tokens/{theme-tokens,design-tokens}.json. Writes
 crates/gitterrace-web/static/tokens.css (between the markers only). Rust code reads
 the vendored `schwarzwald` crate directly. Change the theme in schwarzwald, run its
 sync.py, then this; never edit the generated parts by hand.
 """
 
+import hashlib
 import json
 import sys
 from pathlib import Path
@@ -156,7 +160,29 @@ def gen_css(tokens, design, old):
     return old[:b] + BEGIN + "\n" + "\n".join(parts) + "\n" + old[e:]
 
 
+def snapshot_problems():
+    manifest = SNAP / "manifest.json"
+    if not manifest.is_file():
+        return [f"no manifest: {manifest}"]
+    want = json.loads(manifest.read_text())["files"]
+    have = {
+        str(p.relative_to(SNAP)): hashlib.sha256(p.read_bytes()).hexdigest()
+        for p in sorted(SNAP.rglob("*"))
+        if p.is_file() and p.name != "manifest.json"
+    }
+    bad = [f"missing: {r}" for r in want if r not in have]
+    bad += [f"differs: {r}" for r in want if r in have and have[r] != want[r]]
+    bad += [f"not in manifest: {r}" for r in have if r not in want]
+    return bad
+
+
 def main():
+    if "--check" in sys.argv:
+        bad = snapshot_problems()
+        for line in bad:
+            print(line)
+        if bad:
+            return 1
     tokens = json.loads((SNAP / "tokens/theme-tokens.json").read_text())
     design = json.loads((SNAP / "tokens/design-tokens.json").read_text())
     want = {CSS: gen_css(tokens, design, CSS.read_text())}

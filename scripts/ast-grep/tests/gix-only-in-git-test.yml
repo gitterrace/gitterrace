@@ -1,0 +1,8 @@
+id: gix-only-in-git
+valid:
+  - 'use gitterrace_git::Repo;'
+  - 'let r = gitterrace_git::Repo::discover(p);'
+invalid:
+  - 'use gix::ObjectId;'
+  - 'let id = gix::ObjectId::empty_tree(h);'
+  - 'fn f(r: &gix::Repository) {}'

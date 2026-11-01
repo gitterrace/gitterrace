@@ -335,7 +335,7 @@ pub async fn serve_in(
     let listener = tokio::net::TcpListener::bind(addr).await?;
     let addr = listener.local_addr()?;
     // The secret `open` reads to add a repository. Without a state folder, or when it cannot
-    // be written, the route stays unmounted and `open` falls back to a server of its own.
+    // be written, the route stays unmounted and `open` starts a server of its own.
     let add = match (&state, extra) {
         (Some(dir), None) => publish_add_token(dir, addr.port()),
         _ => None,

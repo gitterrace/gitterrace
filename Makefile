@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: build run fmt clippy lint test doc theme actions docs-gen docs-check names check site-render help bench bench-large bench-report bench-clean bench-guard browser-check site deploy stage shipped domains send-vectors
+.PHONY: build run fmt clippy lint test doc theme actions docs-gen docs-check names check site-render help bench bench-large bench-report bench-clean bench-guard browser-check site deploy stage shipped domains send-vectors preview
 
 ## build: Release binary
 build:
@@ -31,11 +31,9 @@ doc:
 
 ## theme: Snapshot matches its manifest, generated files match the snapshot
 theme:
-	python3 scripts/theme-snapshot-check.py
 	python3 scripts/theme-gen.py --check
 	python3 scripts/theme-logo-gen.py --check
-	@if command -v uv >/dev/null; then uv run -q --with fonttools --with brotli python scripts/theme-tagline-gen.py --check; \
-	else echo "theme-tagline-gen: uv is required to verify the README header tagline"; exit 1; fi
+	python3 scripts/theme-tagline-gen.py --check
 
 ## actions: Example actions work per OS profile (stubbed PATH)
 actions:
@@ -59,7 +57,22 @@ check: theme actions send-vectors names bench-guard docs-check fmt clippy lint t
 
 ## send-vectors: Check send.js against the shared send vectors
 send-vectors:
-	python3 scripts/send-vectors-check.py
+	node scripts/send-vectors-check.mjs
+
+## preview: Rebuild and restart the preview on DEFAULT_ADDR (PREVIEW_ADDR overrides). PREVIEW_REPOS="a b" picks repos, default this checkout
+preview:
+	@set -eu; \
+	addr="$${PREVIEW_ADDR:-$$(sed -n 's/.*DEFAULT_ADDR: &str = "\(.*\)";/\1/p' crates/gitterrace-config/src/schema.rs)}"; \
+	log="/tmp/gt-$${addr##*:}.log"; \
+	cargo build -q --release -p gitterrace; \
+	pkill -f "target/release/git-terrace .*$$addr" 2>/dev/null || true; \
+	sleep 0.3; \
+	nohup ./target/release/git-terrace $${PREVIEW_REPOS:-$$PWD} --addr "$$addr" >"$$log" 2>&1 & \
+	for _ in $$(seq 1 50); do \
+		curl -s -o /dev/null -m 1 "$$addr"/ && { echo "preview up: http://$$addr ($$(git rev-parse --short HEAD))"; exit 0; }; \
+		sleep 0.2; \
+	done; \
+	echo "preview did not come up, see $$log" >&2; exit 1
 
 ## bench: Benchmark gitterrace on the pinned corpus (small, medium, rust). Needs the network
 bench: build

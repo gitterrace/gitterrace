@@ -474,11 +474,6 @@ def main():
     ap.add_argument("--runs", type=int, default=5)
     ap.add_argument("--idle-secs", type=int, default=60)
     ap.add_argument("--bin", default=str(ROOT / "target/release/git-terrace"))
-    ap.add_argument("--corpus", default=str(ROOT / "bench/corpus.toml"))
-    ap.add_argument("--out-dir", default=str(ROOT / "bench/results"))
-    ap.add_argument(
-        "--fetch-only", action="store_true", help="clone and backfill, measure nothing"
-    )
     ap.add_argument(
         "--synthetic", action="store_true", help="tiny generated repo, one run (guard)"
     )
@@ -486,7 +481,7 @@ def main():
     a.bin = str(Path(a.bin).resolve())
     if not Path(a.bin).exists():
         sys.exit(f"no binary at {a.bin}, run `make build` (release) first")
-    corpus = parse_toml(Path(a.corpus).read_text())
+    corpus = parse_toml((ROOT / "bench/corpus.toml").read_text())
     base = Path(
         os.environ.get("GITTERRACE_BENCH_DIR", Path.home() / ".cache/gitterrace-bench")
     )
@@ -510,8 +505,6 @@ def main():
                     f"{r['name']} is opt-in: set BENCH_LARGE=1 (about {r.get('need_gb')} GB)"
                 )
             todo.append((r, ensure_clone(r, base, logdir)))
-    if a.fetch_only:
-        return 0
     result = {
         "when": datetime.datetime.now().isoformat(timespec="seconds"),
         "runs": a.runs,
@@ -529,7 +522,7 @@ def main():
             if v["status"] == "over"
         ]
         result["repos"][repo["name"]] = res
-    out_dir = Path(a.out_dir if not a.synthetic else logdir)
+    out_dir = logdir if a.synthetic else ROOT / "bench/results"
     out_dir.mkdir(parents=True, exist_ok=True)
     path = out_dir / f"{datetime.date.today()}-{result['machine']['host']}.json"
     path.write_text(json.dumps(result, indent=1) + "\n")

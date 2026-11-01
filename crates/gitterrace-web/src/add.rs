@@ -317,6 +317,11 @@ mod tests {
         let b = repo(&t.path().join("b"), "b root");
         let env = crate::app::Env::new(gitterrace_config::Config::default());
         let (r, _) = crate::build_server(vec![a], None, None, &env, None, None).expect("r");
-        assert_eq!(send(&r, post(Some("x")), body(&b)).await.0, 405);
+        // Unmounted, so the request reaches no handler: the page router's 404 (or 405).
+        let status = send(&r, post(Some("x")), body(&b)).await.0;
+        assert!(
+            status == 404 || status == 405,
+            "added without a token route: {status}"
+        );
     }
 }

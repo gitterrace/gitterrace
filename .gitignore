@@ -1,7 +1,9 @@
 /target
 /.wt
 /.mcp.json
-# Rendered from docs/brand at deploy (scripts/site-png.mjs); the SVGs are the source.
+# wrangler's local state (dev sessions, deploy cache); never part of the repository.
+/.wrangler/
+# Rendered from docs/brand at deploy (scripts/site-render.mjs); the SVGs are the source.
 /site/assets/*.png
 
 # Vale: `vale sync` downloads proselint into styles/. Only styles/gitterrace is ours.

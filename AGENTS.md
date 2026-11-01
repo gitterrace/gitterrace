@@ -58,8 +58,9 @@ outside `gitterrace-git` imports `gix`.
 ## Workflow
 
 - Gate: `make check` (theme, actions, docs-check, fmt, clippy `-D warnings`, lint, test, doc).
-  `make lint` runs typos, vale, gitleaks, markdownlint, shellcheck, shfmt, ruff and cargo-machete.
-  `cargo test -p <crate>` while working on one crate. `scripts/preview-run.sh` restarts the
+  `make lint` runs typos, vale, gitleaks, markdownlint, shellcheck, shfmt, ruff, actionlint,
+  ast-grep and cargo-machete.
+  `cargo test -p <crate>` while working on one crate. `make preview` restarts the
   preview on the default address.
 - Commits: `type(scope): subject`, scope is the crate without `gitterrace-`. Commit by
   pathspec, never `git add -A`.

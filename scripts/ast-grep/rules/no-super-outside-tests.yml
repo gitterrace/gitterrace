@@ -1,0 +1,10 @@
+id: no-super-outside-tests
+language: rust
+severity: error
+message: 'A `use super::` import outside `mod tests`.'
+note: 'Name it by a crate:: path (AGENTS.md, imports).'
+files: [crates/**/*.rs, xtask/**/*.rs]
+rule:
+  kind: use_declaration
+  regex: '^(pub(\([a-z ]+\))?\s+)?use\s+super::'
+  not: {inside: {stopBy: end, kind: mod_item, regex: '^mod tests'}}

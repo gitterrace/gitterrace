@@ -1,0 +1,10 @@
+id: no-git-subprocess
+language: rust
+severity: error
+message: Shells out to git.
+note: gitterrace is read-only and reads through gix (AGENTS.md); only gitterrace-testkit may run git, to build fixtures, and build.rs, to stamp the version at build time.
+files: [crates/**/*.rs, xtask/**/*.rs]
+ignores: [crates/gitterrace-testkit/**, crates/gitterrace/build.rs]
+rule:
+  pattern: Command::new("git")
+  not: {inside: {stopBy: end, kind: mod_item, regex: '^mod tests'}}

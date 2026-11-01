@@ -1,0 +1,7 @@
+id: no-super-outside-tests
+valid:
+  - 'mod tests { use super::f; }'
+  - 'use crate::fmt::count;'
+invalid:
+  - 'use super::fmt;'
+  - 'pub(crate) use super::Item;'

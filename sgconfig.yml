@@ -1,0 +1,6 @@
+# ast-grep: structural rules from AGENTS.md that clippy and grep cannot express. `make lint`
+# runs `ast-grep scan` and `ast-grep test`; every rule has a test with a valid and an invalid case.
+ruleDirs:
+  - scripts/ast-grep/rules
+testConfigs:
+  - testDir: scripts/ast-grep/tests

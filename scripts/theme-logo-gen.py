@@ -26,7 +26,7 @@ LOGO_BOX = (24, 18, 540, 120)
 MARK_GROUP = re.compile(
     r"<g transform=\"translate\(30 22\) scale\(5\.2\)\">.*?</g>", re.S
 )
-PATHS = re.compile(r'<path fill="#[0-9a-f]{6}" d="[^"]*"/>')
+PATHS = re.compile(r'<path fill="#[0-9a-f]{6}"(?: data-[a-z]+="[^"]*")* d="[^"]*"/>')
 # The wordmark's two halves must stay visibly apart in every theme.
 MIN_SPLIT = 3.0
 

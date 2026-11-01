@@ -18,6 +18,5 @@
     "MD036": false,
     "MD060": false
   },
-  "globs": ["docs/**/*.md", "README.md", "CONTRIBUTING.md", "SECURITY.md", "CHANGELOG.md", "AGENTS.md"],
-  "ignores": ["**/vendor/**", "target/**", "node_modules/**", ".wt/**", "styles/**", "site/**"]
+  "globs": ["docs/**/*.md", "README.md", "CONTRIBUTING.md", "SECURITY.md", "CHANGELOG.md", "AGENTS.md"]
 }

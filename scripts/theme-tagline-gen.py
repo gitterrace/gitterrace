@@ -3,21 +3,22 @@
 
 The header's text is outlined (no font is needed to view it), so a wording change has to be
 rendered again. This draws TAGLINE with the vendored Bricolage Grotesque at the header's
-size and position and swaps it into both files, keeping each file's colour.
+size and position and swaps it into both files, keeping each file's colour. The path carries
+data-text (the words it spells) and data-sha (sha256 of its path data).
 
-    uv run --with fonttools --with brotli python scripts/theme-tagline-gen.py [--check]
+    scripts/theme-tagline-gen.py --check    stdlib only: data-text equals TAGLINE, data-sha
+                                            matches the path
+    uv run --with fonttools --with brotli python scripts/theme-tagline-gen.py    rewrite
 
 `make theme` runs the check, so the outlined words cannot drift from TAGLINE, and the
 names check reads TAGLINE as prose.
 """
 
+import hashlib
+import html
 import re
+import sys
 from pathlib import Path
-
-from fontTools.pens.svgPathPen import SVGPathPen
-from fontTools.pens.transformPen import TransformPen
-from fontTools.ttLib import TTFont
-from fontTools.varLib.instancer import instantiateVariableFont
 
 TAGLINE = "Your repository's history, step by step. Offline, one binary."
 ROOT = Path(__file__).resolve().parent.parent
@@ -29,6 +30,11 @@ X, BASELINE, SIZE, WEIGHT = 174.0, 150.0, 22.0, 400
 
 
 def outline(text: str) -> str:
+    from fontTools.pens.svgPathPen import SVGPathPen
+    from fontTools.pens.transformPen import TransformPen
+    from fontTools.ttLib import TTFont
+    from fontTools.varLib.instancer import instantiateVariableFont
+
     font = instantiateVariableFont(TTFont(FONT), {"wght": WEIGHT})
     scale = SIZE / font["head"].unitsPerEm
     cmap, glyphs, hmtx = font.getBestCmap(), font.getGlyphSet(), font["hmtx"]
@@ -41,28 +47,37 @@ def outline(text: str) -> str:
     return pen.getCommands()
 
 
-def main() -> int:
-    import sys
+PATH = re.compile(
+    r'<path fill="(#[0-9a-f]{6})"(?: data-text="([^"]*)" data-sha="([0-9a-f]{64})")? d="([^"]*)"/>'
+)
 
+
+def sha(d: str) -> str:
+    return hashlib.sha256(d.encode()).hexdigest()
+
+
+def main() -> int:
     check = "--check" in sys.argv
-    d = outline(TAGLINE)
+    d = None if check else outline(TAGLINE)
     stale = []
     for theme in ("light", "dark"):
         path = ROOT / f"docs/brand/readme-header-{theme}.svg"
         svg = path.read_text()
-        last = list(re.finditer(r'<path fill="(#[0-9a-f]{6})" d="[^"]*"/>', svg))[-1]
+        last = list(PATH.finditer(svg))[-1]
+        rel = str(path.relative_to(ROOT))
+        if check:
+            text, digest, cur = last.group(2), last.group(3), last.group(4)
+            if text is None or html.unescape(text) != TAGLINE or digest != sha(cur):
+                stale.append(rel)
+            continue
         new = (
             svg[: last.start()]
-            + f'<path fill="{last.group(1)}" d="{d}"/>'
+            + f'<path fill="{last.group(1)}" data-text="{html.escape(TAGLINE)}" data-sha="{sha(d)}" d="{d}"/>'
             + svg[last.end() :]
         )
-        if new == svg:
-            continue
-        if check:
-            stale.append(str(path.relative_to(ROOT)))
-        else:
+        if new != svg:
             path.write_text(new)
-            print(f"wrote {path.relative_to(ROOT)}")
+            print(f"wrote {rel}")
     for s in stale:
         print(f"{s}: tagline does not match TAGLINE; run this script without --check")
     return 1 if stale else 0

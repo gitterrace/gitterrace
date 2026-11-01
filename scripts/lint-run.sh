@@ -41,6 +41,8 @@ run shfmt shfmt "brew install shfmt" shfmt -d -i 2 scripts/*.sh
 run ruff-check ruff "brew install ruff" ruff check scripts
 run ruff-format ruff "brew install ruff" ruff format --check scripts
 run actionlint actionlint "brew install actionlint" actionlint
+run ast-grep ast-grep "brew install ast-grep" ast-grep scan --error
+run ast-grep-test ast-grep "brew install ast-grep" ast-grep test --skip-snapshot-tests
 run machete cargo-machete "cargo install cargo-machete" cargo-machete
 
 [ "$fails" -eq 0 ] || {

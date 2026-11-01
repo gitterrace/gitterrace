@@ -346,7 +346,7 @@ pub(crate) fn router(table: Arc<Table>) -> Router {
 }
 
 /// What a single-repository server adds in front of its own pages: added repositories under
-/// `/r/NAME` and the switcher list. No index and no fallback: `/` stays the repository.
+/// `/r/NAME` and the switcher list. No index and no catch-all: `/` stays the repository.
 pub(crate) fn added_router(table: Arc<Table>) -> Router {
     Router::new()
         .route("/api/repos", get(repos_json))
