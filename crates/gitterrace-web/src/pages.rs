@@ -7,11 +7,14 @@ use gitterrace_index::Period;
 use serde::Deserialize;
 
 use crate::{
+    app::App,
     charts,
     error::Result,
     filter::{Dim, FilterBar},
     fmt::{self, enc, href},
-    insights::{InsightsQuery, Kpi, OptLink, cached, head_lines, insights, period_of, scoped},
+    insights::{
+        InsightsQuery, Kpi, OptLink, cached, cached_keyed, head_lines, insights, period_of, scoped,
+    },
     routes::Shared,
     views::{self, Chrome, Nav},
 };
@@ -598,8 +601,8 @@ pub(crate) async fn history(
     RawQuery(raw): RawQuery,
 ) -> Result<Html<String>> {
     let path = path.trim_matches('/').to_owned();
-    let key = Some(format!("{path}?{}", raw.unwrap_or_default()));
-    cached(&app, "hi", key, move |a, r, c| {
+    let key = format!("{path}\0{}", App::canonical_query(raw.as_deref()));
+    cached_keyed(&app, "hi", key, move |a, r, c| {
         let ins = insights(a, r, gitterrace_index::Options::default());
         let head = a.repo.resolve("HEAD").unwrap_or_default();
         let subjects = a.subjects(&head);

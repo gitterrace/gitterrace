@@ -10,8 +10,6 @@ use gitterrace_git::{
 use crate::fmt::{ago, date, enc, esc, esc_text, href, short};
 
 const MAX_BLOB_LINES: usize = 20_000;
-/// Largest text blob the browser builds a page for; bigger ones link to the raw bytes.
-pub(crate) const MAX_BLOB_BYTES: u64 = 2 * 1024 * 1024;
 
 pub(crate) struct Nav {
     pub(crate) href: String,
@@ -462,34 +460,46 @@ pub(crate) async fn diff_fragment(
     let html = crate::app::blocking(&app, move |a| {
         let id = a.repo.resolve(&rev)?;
         let d = a.repo.commit(&id)?;
-        Ok(d.files.get(index).map(diff_body_html).unwrap_or_default())
+        Ok(d.files.get(index).map(diff_body_html))
     })
     .await?;
-    Ok(axum::response::Html(html))
+    html.map(axum::response::Html)
+        .ok_or_else(|| gitterrace_git::Error::PathNotFound(format!("file {index}")).into())
+}
+
+/// Chunks highlighted before first paint of a big file; the rest is plain until `code_tail_html`.
+const EAGER_CHUNKS: usize = 2;
+/// Files up to this size are highlighted whole (about 20 ms): the fragment round trip is not worth it.
+const EAGER_BYTES: usize = 32 * 1024;
+
+type Memo = Option<(usize, std::collections::HashMap<u64, (String, bool)>)>;
+static CODE_CACHE: std::sync::Mutex<Memo> = std::sync::Mutex::new(None);
+const CODE_CACHE_BYTES: usize = 32 << 20;
+
+fn code_key(path: &str, text: &str) -> u64 {
+    use std::hash::{Hash, Hasher};
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    (path, text).hash(&mut hasher);
+    hasher.finish()
+}
+
+fn code_cached(key: u64) -> Option<(String, bool)> {
+    let g = CODE_CACHE.lock().ok()?;
+    g.as_ref()?.1.get(&key).cloned()
 }
 
 /// Returns the line blocks and whether it was cut at the line cap.
 /// One div per line: the number is a CSS counter, so it neither selects nor copies.
+/// Highlighting costs ~0.7 ms/KB, so a blob is rendered once per content.
 pub(crate) fn code_html(path: &str, text: &str) -> (String, bool) {
-    use std::hash::{Hash, Hasher};
-    // Highlighting costs ~0.7 ms/KB, so a blob is rendered once per content.
-    type Memo = Option<(usize, std::collections::HashMap<u64, (String, bool)>)>;
-    static CACHE: std::sync::Mutex<Memo> = std::sync::Mutex::new(None);
-    const CACHE_BYTES: usize = 32 << 20;
-    let mut hasher = std::collections::hash_map::DefaultHasher::new();
-    (path, text).hash(&mut hasher);
-    let key = hasher.finish();
-    if let Some(hit) = CACHE
-        .lock()
-        .ok()
-        .and_then(|g| g.as_ref().and_then(|(_, m)| m.get(&key).cloned()))
-    {
+    let key = code_key(path, text);
+    if let Some(hit) = code_cached(key) {
         return hit;
     }
-    let built = code_html_uncached(path, text);
-    if let Ok(mut g) = CACHE.lock() {
+    let built = code_html_uncached(path, text, usize::MAX);
+    if let Ok(mut g) = CODE_CACHE.lock() {
         let (size, map) = g.get_or_insert_with(Default::default);
-        if *size + built.0.len() > CACHE_BYTES {
+        if *size + built.0.len() > CODE_CACHE_BYTES {
             map.clear();
             *size = 0;
         }
@@ -499,18 +509,46 @@ pub(crate) fn code_html(path: &str, text: &str) -> (String, bool) {
     built
 }
 
-fn code_html_uncached(path: &str, text: &str) -> (String, bool) {
+/// Like `code_html`, but a big uncached file highlights only its first chunks and marks the
+/// block `data-hl` so the page fetches the rest from `code_tail_html` after first paint.
+pub(crate) fn code_html_first(path: &str, text: &str) -> (String, bool) {
+    if text.len() <= EAGER_BYTES || code_cached(code_key(path, text)).is_some() {
+        return code_html(path, text);
+    }
+    code_html_uncached(path, text, EAGER_CHUNKS * CHUNK_LINES)
+}
+
+/// The chunks `code_html_first` left plain, highlighted.
+pub(crate) fn code_tail_html(path: &str, text: &str) -> String {
+    let (full, _) = code_html(path, text);
+    let marker = "<div class=\"ch\"";
+    let from = full
+        .match_indices(marker)
+        .nth(EAGER_CHUNKS)
+        .map_or(full.len(), |m| m.0);
+    full[from..full.len() - "</div>".len()].to_owned()
+}
+
+fn code_html_uncached(path: &str, text: &str, lit_lines: usize) -> (String, bool) {
     let mut hl = (text.len() <= crate::highlight::HIGHLIGHT_LIMIT)
         .then(|| crate::highlight::for_file(path, text.lines().next().unwrap_or("")))
         .flatten();
+    let lazy = hl.is_some() && lit_lines != usize::MAX;
     let mut out = String::with_capacity(text.len() + text.len() / 8 + 64);
-    out.push_str("<div class=\"code src\">");
+    out.push_str(if lazy {
+        "<div class=\"code src\" data-hl>"
+    } else {
+        "<div class=\"code src\">"
+    });
     let mut cut = false;
     let mut open = false;
     for (i, line) in text.lines().enumerate() {
         if i >= MAX_BLOB_LINES {
             cut = true;
             break;
+        }
+        if i == lit_lines {
+            hl = None;
         }
         if i % CHUNK_LINES == 0 {
             if open {
@@ -577,7 +615,7 @@ pub(crate) fn blame_html(path: &str, lines: &[BlameLine], now: i64) -> String {
 
 #[cfg(test)]
 mod tests {
-    use crate::views::{code_html, crumbs, diff_html};
+    use crate::views::{code_html, code_html_first, code_tail_html, crumbs, diff_html};
     use gitterrace_git::{ChangeKind, FileDiff, LineKind};
 
     #[test]
@@ -595,6 +633,53 @@ mod tests {
         assert!(!cut);
         assert!(h.contains("id=\"L2\""));
         assert!(!h.contains("<table"));
+    }
+
+    #[test]
+    fn big_files_light_the_first_chunks_and_the_tail_completes_them() {
+        let text = "fn f() { let x = 1; }\n".repeat(3_000);
+        let (first, _) = code_html_first("a.rs", &text);
+        assert!(first.starts_with("<div class=\"code src\" data-hl>"));
+        let lit = |h: &str| h.matches("s-keyword").count();
+        assert!(lit(&first) > 0 && lit(&first) < 3_000 * 2);
+        let (full, _) = code_html("a.rs", &text);
+        let tail = code_tail_html("a.rs", &text);
+        let head_end = first.match_indices("<div class=\"ch\"").nth(2).unwrap().0;
+        let glued = format!(
+            "{}{}</div>",
+            &full[..full.match_indices("<div class=\"ch\"").nth(2).unwrap().0],
+            tail
+        );
+        assert_eq!(glued.replace(" data-hl", ""), full);
+        assert!(first[..head_end].contains("s-keyword"));
+        let (small, _) = code_html_first("a.rs", "fn f() {}\n");
+        assert!(!small.contains("data-hl"));
+    }
+
+    #[tokio::test]
+    async fn diff_fragment_out_of_range_is_not_found() {
+        use axum::extract::{Path, State};
+        let dir = tempfile::tempdir().expect("tmp");
+        let p = dir.path();
+        let git = |args: &[&str]| {
+            let ok = std::process::Command::new("git")
+                .args(["-c", "user.name=T", "-c", "user.email=t@e.x"])
+                .args(args)
+                .current_dir(p)
+                .status()
+                .is_ok_and(|s| s.success());
+            assert!(ok, "git {args:?}");
+        };
+        git(&["init", "-q", "-b", "main"]);
+        std::fs::write(p.join("a.txt"), "x\n").expect("write");
+        git(&["add", "."]);
+        git(&["commit", "-q", "-m", "feat: a"]);
+        let repo = gitterrace_git::Repo::discover(p).expect("repo");
+        let index = gitterrace_index::Index::open(&repo).expect("index");
+        let app = std::sync::Arc::new(crate::app::App::new(repo, index));
+        let ask = |i: usize| super::diff_fragment(State(app.clone()), Path(("HEAD".into(), i)));
+        assert!(ask(0).await.is_ok());
+        assert!(ask(99_999).await.is_err());
     }
 
     #[test]

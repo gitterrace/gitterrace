@@ -326,7 +326,7 @@ mod tests {
         let dir = tempfile::tempdir().expect("tempdir");
         let p = dir.path();
         git(p, &["init", "-q", "-b", "main"]);
-        let big = "x\n".repeat(crate::views::MAX_BLOB_BYTES as usize / 2 + 10);
+        let big = "x\n".repeat(gitterrace_git::MAX_TEXT_BYTES as usize / 2 + 10);
         std::fs::write(p.join("big.txt"), big).expect("write");
         git(p, &["add", "."]);
         git(p, &["commit", "-q", "-m", "feat: big"]);
@@ -338,6 +338,44 @@ mod tests {
         assert!(body.contains("File too large to display"));
         assert!(body.contains("/raw/HEAD/big.txt"));
         assert!(!body.contains("class=\"ch\""));
+    }
+
+    #[tokio::test]
+    async fn huge_blobs_are_refused_before_they_are_loaded() {
+        use std::io::Write as _;
+        let dir = tempfile::tempdir().expect("tempdir");
+        let p = dir.path();
+        git(p, &["init", "-q", "-b", "main"]);
+        let zeros = |name: &str, head: &[u8], mib: usize| {
+            let mut f = std::fs::File::create(p.join(name)).expect("create");
+            f.write_all(head).expect("head");
+            f.write_all(&vec![0u8; mib << 20]).expect("fill");
+        };
+        let mut png = b"\x89PNG\r\n\x1a\n\0\0\0\rIHDR".to_vec();
+        png.extend([0, 0, 0, 7, 0, 0, 0, 5, 8, 6, 0, 0, 0]);
+        zeros(
+            "big.png",
+            &png,
+            crate::routes::MAX_PREVIEW_BYTES as usize >> 20,
+        );
+        std::fs::write(
+            p.join("big.txt"),
+            "x\n".repeat(gitterrace_git::MAX_TEXT_BYTES as usize / 2 + 10),
+        )
+        .expect("write");
+        git(p, &["add", "."]);
+        git(p, &["commit", "-q", "-m", "feat: big"]);
+        let repo = gitterrace_git::Repo::discover(p).expect("repo");
+        let index = gitterrace_index::Index::open(&repo).expect("index");
+        let app = Arc::new(App::new(repo, index));
+        assert!(crate::routes::raw_refused(crate::routes::MAX_RAW_BYTES + 1));
+        assert!(!crate::routes::raw_refused(crate::routes::MAX_RAW_BYTES));
+        let (s, body) = get(&app, "/blob/HEAD/big.png").await;
+        assert_eq!(s, 200);
+        assert!(body.contains("class=\"media-img\"") && !body.contains("7 x 5"));
+        let (s, body) = get(&app, "/blame/HEAD/big.txt").await;
+        assert_eq!(s, 200);
+        assert!(body.contains("too large"), "{body}");
     }
 
     #[tokio::test]
@@ -365,7 +403,7 @@ mod tests {
         let (_, body) = get(&app, "/blob/HEAD/v.svg").await;
         assert!(body.contains("media-src") && body.contains("src=\"/raw/HEAD/v.svg\""));
         let (_, body) = get(&app, "/blob/HEAD/d.pdf").await;
-        assert!(body.contains("<object"));
+        assert!(body.contains("media-file") && !body.contains("<object"));
         let head = app.repo.resolve("HEAD").expect("head");
         let (_, body) = get(&app, &format!("/commit/{head}")).await;
         assert!(
@@ -382,6 +420,21 @@ mod tests {
             .expect("res");
         let h = res.headers();
         assert_eq!(h["content-type"], "application/pdf");
+        assert!(
+            h["content-disposition"]
+                .to_str()
+                .expect("s")
+                .starts_with("attachment")
+        );
+        let res = routes::router(Arc::clone(&app))
+            .oneshot(
+                Request::get("/raw/HEAD/a.png")
+                    .body(Body::empty())
+                    .expect("req"),
+            )
+            .await
+            .expect("res");
+        let h = res.headers();
         assert_eq!(h["content-disposition"], "inline");
         assert!(
             !h["content-security-policy"]
@@ -529,12 +582,15 @@ mod tests {
                 .clone()
                 .oneshot(b.body(Body::empty()).expect("request"))
         };
-        for uri in ["/", "/badges/commits.svg", "/cards/wrapped/x.svg"] {
-            let res = send(uri, Some("cross-site")).await.expect("response");
-            assert_eq!(res.status().as_u16(), 403, "{uri}");
-            assert_eq!(res.headers()["cross-origin-resource-policy"], "same-origin");
+        // Another port on localhost is same-site, so it is refused as well.
+        for site in ["cross-site", "same-site"] {
+            for uri in ["/", "/badges/commits.svg", "/cards/wrapped/x.svg"] {
+                let res = send(uri, Some(site)).await.expect("response");
+                assert_eq!(res.status().as_u16(), 403, "{uri} {site}");
+                assert_eq!(res.headers()["cross-origin-resource-policy"], "same-origin");
+            }
         }
-        for site in [Some("same-origin"), Some("same-site"), Some("none"), None] {
+        for site in [Some("same-origin"), Some("none"), None] {
             let res = send("/", site).await.expect("response");
             assert_eq!(res.status().as_u16(), 200, "{site:?}");
             let h = res.headers();

@@ -178,14 +178,25 @@ pub(crate) fn head_lines(a: &App) -> Arc<Vec<gitterrace_index::HeadFile>> {
     a.head_lines(&a.repo.resolve("HEAD").unwrap_or_default())
 }
 
-/// Memoizes the rendered page per tip and query, building on a miss.
+/// Memoizes the rendered page per tip and the parameters it reads, building on a miss.
 pub(crate) async fn cached<T: askama::Template + Send + 'static>(
     app: &Arc<App>,
     tab: &'static str,
     raw: Option<String>,
     build: impl FnOnce(&App, &[CommitRecord], Chrome) -> T + Send + 'static,
 ) -> Result<Html<String>> {
-    let key = blocking(app, move |a| Ok(a.memo_key(tab, raw.as_deref()))).await?;
+    let query = App::canonical_query(raw.as_deref());
+    cached_keyed(app, tab, query, build).await
+}
+
+/// `cached` with a caller-built key, for pages keyed by more than their query.
+pub(crate) async fn cached_keyed<T: askama::Template + Send + 'static>(
+    app: &Arc<App>,
+    tab: &'static str,
+    query: String,
+    build: impl FnOnce(&App, &[CommitRecord], Chrome) -> T + Send + 'static,
+) -> Result<Html<String>> {
+    let key = blocking(app, move |a| Ok(a.memo_key(tab, Some(&query)))).await?;
     if let Some(h) = app.memo_get(&key) {
         return Ok(Html((*h).clone()));
     }

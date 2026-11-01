@@ -29,16 +29,42 @@ impl IntoResponse for Error {
             ) => StatusCode::NOT_FOUND,
             _ => StatusCode::INTERNAL_SERVER_ERROR,
         };
-        if status == StatusCode::INTERNAL_SERVER_ERROR {
+        // Server-side detail (paths, gix internals) stays in the log.
+        let shown = if status == StatusCode::INTERNAL_SERVER_ERROR {
             tracing::error!("{self}");
-        }
+            "internal error".to_owned()
+        } else {
+            self.to_string()
+        };
         let body = format!(
             "<!doctype html><meta charset=utf-8><meta name=viewport content=\"width=device-width\">\
              <link rel=stylesheet href=/static/tokens.css><link rel=stylesheet href=/static/app.css><main class=wrap><h1>{}</h1><p class=muted>{}</p>\
              <p><a href=/>Back to overview</a></p></main>",
             status.as_u16(),
-            esc(&self.to_string())
+            esc(&shown)
         );
         (status, Html(body)).into_response()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use axum::response::IntoResponse;
+    use http_body_util::BodyExt;
+
+    use crate::error::Error;
+
+    #[tokio::test]
+    async fn server_errors_hide_their_detail_and_not_found_keeps_it() {
+        let io = Error::Index(std::io::Error::other("/secret/.git/objects/pack/x"));
+        let res = io.into_response();
+        assert_eq!(res.status().as_u16(), 500);
+        let body = res.into_body().collect().await.expect("body").to_bytes();
+        let body = String::from_utf8_lossy(&body);
+        assert!(body.contains("internal error") && !body.contains("/secret"));
+        let nf = Error::Git(gitterrace_git::Error::RevNotFound("abc".into())).into_response();
+        assert_eq!(nf.status().as_u16(), 404);
+        let body = nf.into_body().collect().await.expect("body").to_bytes();
+        assert!(String::from_utf8_lossy(&body).contains("abc"));
     }
 }

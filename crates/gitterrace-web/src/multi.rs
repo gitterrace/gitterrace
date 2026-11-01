@@ -6,7 +6,7 @@ use std::{
     collections::HashMap,
     io,
     path::{Path, PathBuf},
-    sync::Arc,
+    sync::{Arc, Mutex},
 };
 
 use askama::Template;
@@ -17,7 +17,7 @@ use axum::{
     response::{Html, IntoResponse, Redirect, Response},
     routing::get,
 };
-use gitterrace_git::Repo;
+use gitterrace_git::{CommitSummary, Repo};
 use tokio::sync::OnceCell;
 use tower::ServiceExt;
 
@@ -38,6 +38,9 @@ pub(crate) struct Served {
     pub(crate) name: String,
     pub(crate) path: PathBuf,
     router: OnceCell<Router>,
+    /// Newest commits at the HEAD they were read for, so the index page opens a repository
+    /// once per HEAD move instead of once per hit.
+    recent: Mutex<Option<(String, Arc<Vec<CommitSummary>>)>>,
 }
 
 /// The startup repository table. A URL name resolves only through this map, never by
@@ -92,6 +95,7 @@ impl Table {
                 name: name.clone(),
                 path,
                 router: OnceCell::new(),
+                recent: Mutex::new(None),
             });
             by_name.insert(name, Arc::clone(&served));
             order.push(served);
@@ -101,6 +105,29 @@ impl Table {
 
     pub(crate) fn get(&self, name: &str) -> Option<&Arc<Served>> {
         self.by_name.get(name)
+    }
+}
+
+impl Served {
+    /// The newest `SPARK_COMMITS` commits, one discover and one log per HEAD.
+    fn recent(&self) -> Arc<Vec<CommitSummary>> {
+        let Ok(repo) = Repo::discover(&self.path) else {
+            return Arc::default();
+        };
+        let Ok(head) = repo.resolve("HEAD") else {
+            return Arc::default();
+        };
+        if let Ok(g) = self.recent.lock()
+            && let Some((at, list)) = g.as_ref()
+            && *at == head
+        {
+            return Arc::clone(list);
+        }
+        let list = Arc::new(repo.log(&head, None, 0, SPARK_COMMITS).unwrap_or_default());
+        if let Ok(mut g) = self.recent.lock() {
+            *g = Some((head, Arc::clone(&list)));
+        }
+        list
     }
 }
 
@@ -223,26 +250,15 @@ fn repo_router(served: &Served) -> io::Result<Router> {
     crate::repo_router(&served.path, base)
 }
 
-fn last(path: &Path) -> Option<gitterrace_git::CommitSummary> {
-    let repo = Repo::discover(path).ok()?;
-    let head = repo.resolve("HEAD").ok()?;
-    repo.log(&head, None, 0, 1).ok()?.into_iter().next()
-}
-
 /// Commits per week over the last `SPARK_WEEKS` weeks as a polyline in a 90x20 box.
-fn spark(path: &Path, now: i64) -> String {
+fn spark(list: &[CommitSummary], now: i64) -> String {
     let mut weeks = [0u32; SPARK_WEEKS];
-    if let Ok(repo) = Repo::discover(path)
-        && let Ok(head) = repo.resolve("HEAD")
-        && let Ok(list) = repo.log(&head, None, 0, SPARK_COMMITS)
-    {
-        for c in list {
-            let age = (now - c.author.time).max(0) / WEEK;
-            if let Ok(i) = usize::try_from(age)
-                && i < SPARK_WEEKS
-            {
-                weeks[SPARK_WEEKS - 1 - i] += 1;
-            }
+    for c in list {
+        let age = (now - c.author.time).max(0) / WEEK;
+        if let Ok(i) = usize::try_from(age)
+            && i < SPARK_WEEKS
+        {
+            weeks[SPARK_WEEKS - 1 - i] += 1;
         }
     }
     let max = weeks.iter().copied().max().unwrap_or(0).max(1);
@@ -264,19 +280,17 @@ async fn index(State(table): State<Arc<Table>>) -> crate::error::Result<Html<Str
             .iter()
             .map(|s| {
                 let href = format!("/r/{}/", s.name);
-                let c = last(&s.path);
+                let list = s.recent();
+                let c = list.first();
                 IndexRow {
                     name: s.name.clone(),
-                    subject: c.as_ref().map(|c| c.subject.clone()).unwrap_or_default(),
-                    when: c
-                        .as_ref()
-                        .map(|c| fmt::ago(c.author.time, now))
-                        .unwrap_or_default(),
-                    commit_href: c.as_ref().map_or_else(
+                    subject: c.map(|c| c.subject.clone()).unwrap_or_default(),
+                    when: c.map(|c| fmt::ago(c.author.time, now)).unwrap_or_default(),
+                    commit_href: c.map_or_else(
                         || href.clone(),
                         |c| format!("/r/{}/commit/{}", s.name, c.id),
                     ),
-                    spark: spark(&s.path, now),
+                    spark: spark(&list, now),
                     href,
                 }
             })
@@ -296,7 +310,9 @@ async fn repos_json(State(table): State<Arc<Table>>) -> Response {
             .map(|s| RepoItem {
                 name: s.name.clone(),
                 href: format!("/r/{}/", s.name),
-                when: last(&s.path)
+                when: s
+                    .recent()
+                    .first()
                     .map(|c| fmt::ago(c.author.time, now))
                     .unwrap_or_default(),
             })
@@ -319,5 +335,36 @@ mod tests {
         for bad in ["", ".", "..", ".hidden", "a/b", "a b", "a%2e"] {
             assert!(!valid_name(bad), "{bad}");
         }
+    }
+
+    fn git(dir: &std::path::Path, args: &[&str]) {
+        let ok = std::process::Command::new("git")
+            .args(["-c", "user.name=T", "-c", "user.email=t@e.x"])
+            .args(args)
+            .current_dir(dir)
+            .status()
+            .is_ok_and(|s| s.success());
+        assert!(ok, "git {args:?}");
+    }
+
+    #[test]
+    fn recent_is_memoised_by_head() {
+        let dir = tempfile::Builder::new()
+            .prefix("repo")
+            .tempdir()
+            .expect("tmp");
+        let p = dir.path();
+        git(p, &["init", "-q", "-b", "main"]);
+        git(p, &["commit", "-q", "--allow-empty", "-m", "one"]);
+        let table = super::Table::new(vec![p.to_path_buf()]).expect("table");
+        let s = table.order[0].clone();
+        let first = s.recent();
+        assert!(
+            std::sync::Arc::ptr_eq(&first, &s.recent()),
+            "same HEAD reuses the read"
+        );
+        git(p, &["commit", "-q", "--allow-empty", "-m", "two"]);
+        let after = s.recent();
+        assert_eq!((first.len(), after.len()), (1, 2));
     }
 }

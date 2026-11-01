@@ -61,10 +61,7 @@ pub(crate) fn content_type(path: &str) -> &'static str {
 /// Whether `/raw` may drop the sandbox. Only formats the browser renders without running
 /// author code: scripts live in SVG and HTML, so those keep the sandbox.
 pub(crate) fn plain_media(path: &str) -> bool {
-    matches!(
-        kind(path),
-        Some(Kind::Image | Kind::Pdf | Kind::Audio | Kind::Video)
-    )
+    matches!(kind(path), Some(Kind::Image | Kind::Audio | Kind::Video))
 }
 
 fn be16(b: &[u8], at: usize) -> Option<u32> {
@@ -160,9 +157,8 @@ fn element(k: Kind, rev: &str, path: &str) -> String {
         Kind::Image | Kind::Svg => {
             format!(r#"<img class="media-img" src="{url}" alt="{name}" loading="lazy">"#)
         }
-        Kind::Pdf => format!(
-            r#"<object class="media-pdf" data="{url}" type="application/pdf"><a href="{url}">Download {name}</a></object>"#
-        ),
+        // No embedded viewer: a crafted PDF would run in the app's origin.
+        Kind::Pdf => format!(r#"<a class="media-file" href="{url}" download>Download {name}</a>"#),
         Kind::Audio => {
             format!(r#"<audio class="media-av" src="{url}" controls preload="metadata"></audio>"#)
         }
@@ -175,6 +171,7 @@ fn element(k: Kind, rev: &str, path: &str) -> String {
 /// The blob view body for a media file: the preview on a checkerboard, a facts line and links.
 pub(crate) fn blob_html(
     k: Kind,
+    len: u64,
     rev: &str,
     path: &str,
     bytes: &[u8],
@@ -190,7 +187,7 @@ pub(crate) fn blob_html(
             ""
         },
         element(k, rev, path),
-        size(bytes.len() as u64),
+        size(len),
     );
     if let Some(src) = svg_src {
         let _ = write!(
@@ -242,6 +239,12 @@ mod tests {
         ] {
             assert_eq!(content_type(p), t);
         }
+    }
+
+    #[test]
+    fn content_types_by_extension() {
+        assert_eq!(content_type("a.PNG"), "image/png");
+        assert_eq!(content_type("a.rs"), "text/plain; charset=utf-8");
     }
 
     #[test]

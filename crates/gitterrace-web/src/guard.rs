@@ -26,7 +26,11 @@ pub(crate) fn host_allowed(host: &str, bound: Option<IpAddr>) -> bool {
             Some((ip, _)) => ip,
             None => return false,
         },
-        None => host.rsplit_once(':').map_or(host, |(h, _)| h),
+        None => match host.rsplit_once(':') {
+            Some((h, port)) if !port.is_empty() && port.bytes().all(|b| b.is_ascii_digit()) => h,
+            Some(_) => return false,
+            None => host,
+        },
     };
     let name = name.to_ascii_lowercase();
     if matches!(name.as_str(), "localhost" | "127.0.0.1" | "::1") {
@@ -47,10 +51,12 @@ fn refusal(headers: &HeaderMap, bound: Option<IpAddr>) -> Option<&'static str> {
     if !host_ok {
         return Some("forbidden: unrecognised Host header\n");
     }
-    let cross = headers
-        .get("sec-fetch-site")
-        .is_some_and(|v| v.as_bytes().eq_ignore_ascii_case(b"cross-site"));
-    cross.then_some("forbidden: cross-site request\n")
+    // Another port on localhost is same-site, so only same-origin and a direct visit pass.
+    let foreign = headers.get("sec-fetch-site").is_some_and(|v| {
+        !(v.as_bytes().eq_ignore_ascii_case(b"same-origin")
+            || v.as_bytes().eq_ignore_ascii_case(b"none"))
+    });
+    foreign.then_some("forbidden: cross-site request\n")
 }
 
 pub(crate) async fn guard(
@@ -101,7 +107,15 @@ mod tests {
         ] {
             assert!(host_allowed(h, None), "{h}");
         }
-        for h in ["evil.example:4242", "192.168.1.5:80", "[::1", ""] {
+        for h in [
+            "evil.example:4242",
+            "192.168.1.5:80",
+            "[::1",
+            "",
+            "127.0.0.1:4242@evil",
+            "localhost:",
+            "localhost:80a",
+        ] {
             assert!(!host_allowed(h, None), "{h}");
         }
         assert!(host_allowed("192.168.1.5:4242", Some(ip)));

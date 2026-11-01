@@ -7,7 +7,7 @@ use askama::Template;
 use axum::{
     Json, Router,
     extract::{Path, Query, RawQuery, State},
-    http::{HeaderValue, header},
+    http::{HeaderValue, StatusCode, header},
     response::{Html, IntoResponse, Redirect, Response},
     routing::get,
 };
@@ -47,6 +47,7 @@ pub(crate) fn router(app: Arc<App>) -> Router {
         .route("/tree/{rev}/{*path}", get(tree))
         .route("/blob/{rev}/{*path}", get(blob))
         .route("/blame/{rev}/{*path}", get(blame))
+        .route("/hl/{rev}/{*path}", get(highlight_tail))
         .route("/refs", get(refs))
         .route("/search", get(crate::search::search))
         .route("/worktree", get(worktree))
@@ -78,35 +79,20 @@ pub(crate) fn router(app: Arc<App>) -> Router {
 pub(crate) fn assets<S: Clone + Send + Sync + 'static>() -> Router<S> {
     const JS: &str = "text/javascript; charset=utf-8";
     const CSS: &str = "text/css; charset=utf-8";
-    Router::new()
-        .route(
-            "/static/loc.js",
-            static_asset(JS, include_str!("../static/loc.js")),
-        )
-        .route(
-            "/static/tokens.css",
-            static_asset(CSS, include_str!("../static/tokens.css")),
-        )
-        .route(
-            "/static/app.css",
-            static_asset(CSS, include_str!("../static/app.css")),
-        )
-        .route(
-            "/static/app.js",
-            static_asset(JS, include_str!("../static/app.js")),
-        )
-        .route(
-            "/static/markdown.css",
-            static_asset(CSS, include_str!("../static/markdown.css")),
-        )
-        .route(
-            "/static/markdown.js",
-            static_asset(JS, include_str!("../static/markdown.js")),
-        )
-        .route(
-            "/static/nav.js",
-            static_asset(JS, include_str!("../static/nav.js")),
-        )
+    let table: [(&str, &str, &'static str); 7] = [
+        ("loc.js", JS, include_str!("../static/loc.js")),
+        ("tokens.css", CSS, include_str!("../static/tokens.css")),
+        ("app.css", CSS, include_str!("../static/app.css")),
+        ("app.js", JS, include_str!("../static/app.js")),
+        ("markdown.css", CSS, include_str!("../static/markdown.css")),
+        ("markdown.js", JS, include_str!("../static/markdown.js")),
+        ("nav.js", JS, include_str!("../static/nav.js")),
+    ];
+    table
+        .into_iter()
+        .fold(Router::new(), |r, (name, kind, body)| {
+            r.route(&format!("/static/{name}"), static_asset(kind, body))
+        })
         .route("/static/vendor/mermaid-11.17.2.min.js", get(mermaid_js))
         .route("/static/fonts/{name}", get(font))
 }
@@ -170,19 +156,42 @@ async fn mermaid_js() -> Response {
         .into_response()
 }
 
-fn content_type(path: &str) -> &'static str {
-    crate::media::content_type(path)
+/// Largest media file the blob page reads, for its pixel size; bigger ones show no facts.
+pub(crate) const MAX_PREVIEW_BYTES: u64 = 16 << 20;
+/// Largest object `/raw` loads into memory in one piece.
+pub(crate) const MAX_RAW_BYTES: u64 = 256 << 20;
+
+pub(crate) fn raw_refused(size: u64) -> bool {
+    size > MAX_RAW_BYTES
 }
 
 /// Serves blob bytes for relative images. Content is untrusted, so scripts are disabled.
 async fn raw(State(app): Shared, Path((rev, path)): Path<(String, String)>) -> Result<Response> {
-    let (bytes, kind, plain) = blocking(&app, move |a| {
+    let loaded = blocking(&app, move |a| {
         let id = a.repo.resolve(&rev)?;
         let path = path.trim_matches('/').to_owned();
+        // The header size comes first: `blob` reads nothing above the text cap.
+        if raw_refused(a.repo.blob(&id, &path)?.size) {
+            return Ok(None);
+        }
         let bytes = a.repo.blob_bytes(&id, &path)?;
-        Ok((bytes, content_type(&path), crate::media::plain_media(&path)))
+        // PDFs never open in the browser's viewer on this origin.
+        let disposition = if crate::media::kind(&path) == Some(crate::media::Kind::Pdf) {
+            "attachment"
+        } else {
+            "inline"
+        };
+        Ok(Some((
+            bytes,
+            crate::media::content_type(&path),
+            crate::media::plain_media(&path),
+            disposition,
+        )))
     })
     .await?;
+    let Some((bytes, kind, plain, disposition)) = loaded else {
+        return Ok((StatusCode::PAYLOAD_TOO_LARGE, "too large to serve\n").into_response());
+    };
     // The sandbox keeps SVG and text scriptless. It also stops the browser's PDF viewer, so
     // formats that run no author code are served without it.
     let csp = if plain {
@@ -199,7 +208,7 @@ async fn raw(State(app): Shared, Path((rev, path)): Path<(String, String)>) -> R
             ),
             (
                 header::CONTENT_DISPOSITION,
-                HeaderValue::from_static("inline"),
+                HeaderValue::from_static(disposition),
             ),
             (
                 header::X_CONTENT_TYPE_OPTIONS,
@@ -349,8 +358,35 @@ struct LogPage {
     author_chip: Option<(String, String)>,
 }
 
-/// One page of commits by `who` (email or name): walks the log in chunks, since the walk
-/// cannot filter by author itself.
+/// Pages past this are clamped: the walk behind a page costs its offset.
+const MAX_PAGE: usize = 1_000;
+/// Commits per read of the unindexed author walk.
+const CHUNK: usize = 500;
+/// Commits the unindexed author walk reads before it gives up with what it has.
+const AUTHOR_WALK: usize = 2_000;
+
+/// Whether `who` (email or name) wrote the commit.
+fn by(who: &str, author: &str, email: &str) -> bool {
+    email.eq_ignore_ascii_case(who) || author == who
+}
+
+/// Ids of the commits by `who` touching `path`, newest first, from the index records
+/// (oldest first), so no history is walked.
+fn indexed_author_ids(
+    recs: &[gitterrace_index::CommitRecord],
+    who: &str,
+    path: Option<&str>,
+) -> Vec<String> {
+    recs.iter()
+        .rev()
+        .filter(|r| by(who, &r.author, &r.email))
+        .filter(|r| path.is_none_or(|p| r.files.iter().any(|f| crate::filter::under(&f.path, p))))
+        .map(|r| r.id.clone())
+        .collect()
+}
+
+/// One page of commits by `who`. With a ready index the records answer it. Without one the
+/// log is walked in chunks (the walk cannot filter by author), up to `AUTHOR_WALK` commits.
 fn author_page(
     a: &App,
     id: &str,
@@ -358,24 +394,28 @@ fn author_page(
     who: &str,
     pg: usize,
 ) -> Result<(Vec<gitterrace_git::CommitSummary>, bool)> {
-    const CHUNK: usize = 500;
-    let want = pg.saturating_mul(PAGE) + PAGE + 1;
+    let from = pg * PAGE;
+    if let Some(recs) = a.records(id)? {
+        let ids = indexed_author_ids(&recs, who, path);
+        let more = ids.len() > from + PAGE;
+        let slice: Vec<String> = ids.into_iter().skip(from).take(PAGE).collect();
+        return Ok((a.repo.summaries(&slice)?, more));
+    }
+    let want = from + PAGE + 1;
     let mut hits = Vec::new();
-    let mut skip = 0;
-    loop {
+    for skip in (0..AUTHOR_WALK).step_by(CHUNK) {
         let chunk = a.repo.log(id, path, skip, CHUNK)?;
         let n = chunk.len();
         hits.extend(
             chunk
                 .into_iter()
-                .filter(|c| c.author.email.eq_ignore_ascii_case(who) || c.author.name == who),
+                .filter(|c| by(who, &c.author.name, &c.author.email)),
         );
         if hits.len() >= want || n < CHUNK {
             break;
         }
-        skip += CHUNK;
     }
-    let mut page: Vec<_> = hits.into_iter().skip(pg.saturating_mul(PAGE)).collect();
+    let mut page: Vec<_> = hits.into_iter().skip(from).collect();
     let more = page.len() > PAGE;
     page.truncate(PAGE);
     Ok((page, more))
@@ -387,7 +427,7 @@ async fn log(
     Query(q): Query<LogQuery>,
 ) -> Result<Html<String>> {
     let path = q.path.unwrap_or_default().trim_matches('/').to_owned();
-    let pg = q.page.unwrap_or(0);
+    let pg = q.page.unwrap_or(0).min(MAX_PAGE);
     let author = q.author;
     let p = blocking(&app, move |a| {
         let id = a.repo.resolve(&rev)?;
@@ -587,6 +627,21 @@ fn is_markdown(path: &str) -> bool {
         .any(|e| lower.ends_with(e))
 }
 
+/// The highlighted chunks a big blob's first paint left plain; `nav.js` swaps them in.
+async fn highlight_tail(
+    State(app): Shared,
+    Path((rev, path)): Path<(String, String)>,
+) -> Result<Html<String>> {
+    let html = blocking(&app, move |a| {
+        let id = a.repo.resolve(&rev)?;
+        let path = path.trim_matches('/').to_owned();
+        let text = a.repo.blob(&id, &path)?.text.unwrap_or_default();
+        Ok(views::code_tail_html(&path, &text))
+    })
+    .await?;
+    Ok(Html(html))
+}
+
 async fn blob(
     State(app): Shared,
     Path((rev, path)): Path<(String, String)>,
@@ -597,26 +652,25 @@ async fn blob(
         let b = a.repo.blob(&id, &path)?;
         let media = match crate::media::kind(&path) {
             Some(k) => {
-                let bytes = a.repo.blob_bytes(&id, &path)?;
+                // One read, and only for files small enough to want facts about.
+                let bytes = if b.size <= MAX_PREVIEW_BYTES {
+                    a.repo.blob_bytes(&id, &path)?
+                } else {
+                    Vec::new()
+                };
                 let src = (k == crate::media::Kind::Svg)
-                    .then(|| String::from_utf8(bytes.clone()).ok())
+                    .then(|| std::str::from_utf8(&bytes).ok())
                     .flatten()
-                    .filter(|t| t.len() as u64 <= views::MAX_BLOB_BYTES);
-                Some(crate::media::blob_html(
-                    k,
-                    &rev,
-                    &path,
-                    &bytes,
-                    src.as_deref(),
-                ))
+                    .filter(|t| t.len() as u64 <= gitterrace_git::MAX_TEXT_BYTES);
+                Some(crate::media::blob_html(k, b.size, &rev, &path, &bytes, src))
             }
             None => None,
         };
-        let too_large = b.size > views::MAX_BLOB_BYTES;
+        let too_large = b.size > gitterrace_git::MAX_TEXT_BYTES;
         let text = b.text.as_deref().filter(|_| !too_large);
         let (html, cut) = match text {
             Some(t) => {
-                let (h, cut) = views::code_html(&path, t);
+                let (h, cut) = views::code_html_first(&path, t);
                 (Some(h), cut)
             }
             None => (None, false),
@@ -666,6 +720,14 @@ async fn blame(
         let id = a.repo.resolve(&rev)?;
         let path = path.trim_matches('/').to_owned();
         let lines = a.repo.blame(&id, &path)?;
+        // Blame is empty for binary and oversized files; say which, from the header size.
+        let too_large =
+            lines.is_empty() && a.repo.blob(&id, &path)?.size > gitterrace_git::MAX_TEXT_BYTES;
+        let raw = fmt::href(&format!(
+            "/raw/{}/{}",
+            fmt::enc(&rev, false),
+            fmt::enc(&path, true)
+        ));
         Ok(BlamePage {
             c: views::chrome_at(a, "files", &rev),
             crumbs: views::crumbs(&rev, &path, true),
@@ -674,7 +736,14 @@ async fn blame(
                 fmt::enc(&rev, false),
                 fmt::enc(&path, true)
             )),
-            html: views::blame_html(&path, &lines, fmt::now()),
+            html: if too_large {
+                format!(
+                    "<p class=\"muted pad\">File too large to blame. <a href=\"{}\">View raw</a>.</p>",
+                    fmt::esc(&raw)
+                )
+            } else {
+                views::blame_html(&path, &lines, fmt::now())
+            },
             title: path,
         })
     })
@@ -1035,13 +1104,38 @@ async fn api_last(
 }
 
 #[cfg(test)]
-#[allow(clippy::expect_used)]
 mod tests {
-    use crate::routes::content_type;
+    use gitterrace_index::{CommitRecord, FileStat};
+
+    use crate::routes::indexed_author_ids;
+
+    fn rec(id: &str, author: &str, email: &str, path: &str) -> CommitRecord {
+        CommitRecord {
+            id: id.into(),
+            author: author.into(),
+            email: email.into(),
+            time: 0,
+            offset: 0,
+            merge: false,
+            parents: Vec::new(),
+            kind: None,
+            scope: None,
+            files: vec![FileStat {
+                path: path.into(),
+                ..FileStat::default()
+            }],
+        }
+    }
 
     #[test]
-    fn content_types() {
-        assert_eq!(content_type("a.PNG"), "image/png");
-        assert_eq!(content_type("a.rs"), "text/plain; charset=utf-8");
+    fn author_log_comes_from_the_records_newest_first() {
+        let recs = [
+            rec("a", "Ann", "ann@x.y", "src/a.rs"),
+            rec("b", "Bob", "bob@x.y", "src/b.rs"),
+            rec("c", "Ann", "ANN@x.y", "docs/c.md"),
+        ];
+        assert_eq!(indexed_author_ids(&recs, "ann@x.y", None), ["c", "a"]);
+        assert_eq!(indexed_author_ids(&recs, "Ann", Some("src")), ["a"]);
+        assert!(indexed_author_ids(&recs, "nobody", None).is_empty());
     }
 }

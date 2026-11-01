@@ -325,6 +325,22 @@
     paintLines();
   }
 
+  // ---- big files arrive with only the first screen highlighted ---------------
+  var plain = document.querySelector(".src[data-hl]");
+  if (plain) {
+    var chunks = plain.querySelectorAll(".ch");
+    var hlUrl = location.pathname.replace(/\/blob\//, "/hl/");
+    fetch(hlUrl).then(function (r) { return r.ok ? r.text() : null; }).then(function (html) {
+      if (html === null || chunks.length < 3) return;
+      var sel = plain.querySelectorAll(".sel");
+      var ids = [];
+      for (var i = 0; i < sel.length; i++) ids.push(sel[i].id);
+      for (var j = chunks.length - 1; j >= 2; j--) chunks[j].remove();
+      chunks[1].insertAdjacentHTML("afterend", html);
+      for (var k = 0; k < ids.length; k++) { var el = document.getElementById(ids[k]); if (el) el.classList.add("sel"); }
+    }).catch(function () {});
+  }
+
   // ---- folded diffs -----------------------------------------------------------
   document.addEventListener("click", function (e) {
     var b = e.target.closest && e.target.closest("[data-load-diff]");

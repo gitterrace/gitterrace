@@ -13,7 +13,7 @@
 </div></form>
 {% if let Some(e) = error %}<p class="err">{{ e }}</p>{% endif %}
 {% if searched && error.is_none() %}
-<p class="muted sum">{{ matches }}{% if capped %}+{% endif %} {% if commits_mode %}commits{% else %}matches{% endif %}{% if !commits_mode %} in {{ files.len() }} files, {{ scanned }} files scanned, {{ skipped }} skipped (binary or over 1 MB){% endif %} in {{ ms }} ms{% if capped %}. Showing the first results only, narrow the query to see more.{% endif %}</p>
+<p class="muted sum">{{ matches }}{% if capped %}+{% endif %} {% if commits_mode %}commits{% else %}matches{% endif %}{% if !commits_mode %} in {{ files.len() }} files, {{ scanned }} files scanned, {{ skipped }} skipped (binary or over 2 MiB){% endif %} in {{ ms }} ms{% if capped %}. Showing the first results only, narrow the query to see more.{% endif %}</p>
 {% if commits_mode %}
 <ul class="list log">
 {% for r in commits %}<li class="crow"><span class="av" style="--hue:{{ r.hue }}">{{ r.initial }}</span><div class="cmain"><a href="{{ r.href }}">{{ r.subject }}</a><span class="muted"><a class="who" href="{{ r.author_href }}"><b>{{ r.author }}</b></a> · <time title="{{ r.date }}">{{ r.when }}</time></span></div><a class="sha" href="{{ r.href }}">{{ r.short }}</a></li>{% endfor %}

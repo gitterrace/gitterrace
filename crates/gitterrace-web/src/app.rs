@@ -210,6 +210,35 @@ impl App {
         }
     }
 
+    /// The query reduced to what the stats pages read, sorted: unknown parameters and the
+    /// order of known ones must not make a new memo entry.
+    pub(crate) fn canonical_query(raw: Option<&str>) -> String {
+        const KNOWN: [&str; 12] = [
+            "type",
+            "scope",
+            "author",
+            "path",
+            "period",
+            "page",
+            "bots",
+            "exclude",
+            "generated",
+            "ignore",
+            "ws",
+            "base",
+        ];
+        let mut pairs: Vec<&str> = raw
+            .unwrap_or_default()
+            .split('&')
+            .filter(|p| {
+                let key = p.split_once('=').map_or(*p, |(k, _)| k);
+                KNOWN.contains(&key) || key == "head"
+            })
+            .collect();
+        pairs.sort_unstable();
+        pairs.join("&")
+    }
+
     /// Key for a rendered page: moves with HEAD, the index file, the branch name, the dirty
     /// chip and the query, so any of them changing yields a fresh render.
     pub(crate) fn memo_key(&self, tab: &str, query: Option<&str>) -> String {
@@ -321,6 +350,15 @@ mod tests {
             .status()
             .is_ok_and(|s| s.success());
         assert!(ok, "git {args:?}");
+    }
+
+    #[test]
+    fn junk_and_order_do_not_make_new_memo_keys() {
+        let canon = |q| App::canonical_query(Some(q));
+        assert_eq!(canon("x=1&type=fix"), canon("type=fix&x=2&y"));
+        assert_eq!(canon("period=1y&type=fix"), canon("type=fix&period=1y"));
+        assert_ne!(canon("type=fix"), canon("type=feat"));
+        assert_eq!(App::canonical_query(None), "");
     }
 
     #[test]

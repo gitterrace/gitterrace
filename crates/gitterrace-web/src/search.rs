@@ -1,7 +1,6 @@
 //! Code search across the tree at a revision and commit search over history.
 
 use std::{
-    ops::Range,
     sync::{
         Arc, Mutex,
         atomic::{AtomicBool, AtomicUsize, Ordering},
@@ -30,7 +29,6 @@ const MAX_MATCHES: usize = 500;
 const MAX_PER_FILE: usize = 100;
 const MAX_COMMITS: usize = 200;
 /// Files above this are skipped, like GitHub does.
-const MAX_FILE_BYTES: u64 = 1024 * 1024;
 const MAX_LINE_CHARS: usize = 300;
 
 #[derive(Deserialize, Default)]
@@ -254,7 +252,7 @@ fn search_code(a: &App, rev: &str, re: &Regex, glob: Option<&Regex>) -> Result<C
                 while !stop.load(Ordering::Relaxed) {
                     let i = next.fetch_add(1, Ordering::Relaxed);
                     let Some(f) = list.get(i) else { break };
-                    let Some(text) = reader.text(f.blob, MAX_FILE_BYTES) else {
+                    let Some(text) = reader.text(f.blob, gitterrace_git::MAX_TEXT_BYTES) else {
                         skipped.fetch_add(1, Ordering::Relaxed);
                         continue;
                     };
@@ -325,7 +323,7 @@ pub(crate) fn file_hits(path: &str, rev_enc: &str, text: &str, re: &Regex) -> Fi
                 html: if is_hit {
                     highlight(line, re)
                 } else {
-                    fmt::esc(&clip(line, 0..0))
+                    fmt::esc(&line.chars().take(MAX_LINE_CHARS).collect::<String>())
                 },
                 hit: is_hit,
             });
@@ -338,18 +336,6 @@ pub(crate) fn file_hits(path: &str, rev_enc: &str, text: &str, re: &Regex) -> Fi
         count: hit_idx.len(),
         lines: out,
     }
-}
-
-/// Window of at most `MAX_LINE_CHARS` characters that keeps `focus` visible.
-fn clip(line: &str, focus: Range<usize>) -> String {
-    if line.chars().count() <= MAX_LINE_CHARS {
-        return line.to_owned();
-    }
-    let start = line[..focus.start.min(line.len())]
-        .chars()
-        .count()
-        .saturating_sub(40);
-    line.chars().skip(start).take(MAX_LINE_CHARS).collect()
 }
 
 /// Escaped line with matches wrapped in `<mark>`.
