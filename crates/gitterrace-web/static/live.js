@@ -7,7 +7,7 @@
 (function () {
   "use strict";
   var body = document.body;
-  if (!body || body.dataset.live === undefined || !window.EventSource) return;
+  if (!body || body.dataset.live === undefined || body.dataset.static !== undefined || !window.EventSource) return;
   var meta = document.querySelector('meta[name="gt-base"]');
   var B = meta ? meta.content : "";
   var how = body.dataset.live;

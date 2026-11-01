@@ -5,6 +5,8 @@
 (function () {
   "use strict";
   var body = document.body;
+  // A static export (`git terrace export`) has no server to run or list actions.
+  if (body && body.dataset.static !== undefined) return;
   var meta = function (n) { return document.querySelector('meta[name="' + n + '"]'); };
   var B = (meta("gt-base") || {}).content || "";
   var repoMeta = meta("gt-repo");

@@ -383,7 +383,8 @@
 
   // ---- last commit column -----------------------------------------------------
   var table = document.querySelector("table.entries[data-last]");
-  if (table) {
+  // A static export has no API: leave the column empty rather than fetch a 404.
+  if (table && document.body.dataset.static === undefined) {
     fetch(table.dataset.last.replace(/\/$/, "")).then(function (r) { return r.json(); }).then(function (list) {
       var by = {};
       list.forEach(function (c) { by[c.name] = c; });

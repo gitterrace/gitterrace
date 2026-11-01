@@ -293,11 +293,16 @@ fn percent_decode(s: &str) -> String {
     String::from_utf8_lossy(&out).into_owned()
 }
 
-/// Style for the snapshot banner, written next to the pages. Kept out of the app's own CSS:
-/// only an export ever shows the banner. Colours are the app's tokens, already on the page.
+/// Style for the snapshot banner and the static page, written next to the pages. Kept out of
+/// the app's own CSS: only an export is ever static. Colours are the app's tokens, already on
+/// the page. A static copy has no server, so the chrome that needs one is hidden: search, the
+/// action buttons (their menu runs scripts and Send to), the working-tree chip and live notes.
+/// Copy permalink stays: it needs nothing but the page.
 const SNAPSHOT_CSS: &str = ".snapshot{background:var(--accent-soft);color:var(--fg);\
- border-bottom:var(--border);font:var(--text-sm)/1.4 var(--sans);padding:var(--space-2) 0}\
- .snapshot a{color:var(--accent-fg);font-weight:var(--weight-semibold)}\n";
+ border-bottom:1px solid var(--line-strong);font:var(--text-sm)/1.4 var(--sans);padding:var(--space-2) 0}\
+ .snapshot a{color:var(--accent-fg);font-weight:var(--weight-semibold)}\
+ body[data-static] .topsearch,body[data-static] .actbtn,body[data-static] .wtchip,\
+ body[data-static] .livenote,body[data-static] .actnote{display:none!important}\n";
 
 /// What the snapshot banner names: the tag on HEAD when there is one, else the short commit id.
 fn snapshot_label(repo: &gitterrace_git::Repo, head: &str) -> anyhow::Result<String> {
@@ -324,13 +329,16 @@ fn mark_snapshot(html: &[u8], label: &str) -> Vec<u8> {
     };
     let banner = format!(
         "<link rel=\"stylesheet\" href=\"/snapshot.css\">\
-         <div class=\"snapshot\" role=\"note\"><div class=\"wrap\">Static snapshot at <b>{}</b>: \
-         search, live updates and actions need the real thing. \
+         <div class=\"snapshot\" role=\"note\"><div class=\"wrap\">Static snapshot at <b>{}</b>. \
+         Search, live updates and actions need the real thing. \
          <a href=\"https://gitterrace.dev\">Install gitterrace</a></div></div>",
         escape(label)
     );
-    let mut out = String::with_capacity(page.len() + banner.len());
-    out.push_str(&page[..end]);
+    let mut out = String::with_capacity(page.len() + banner.len() + 12);
+    // `data-static` tells the page scripts there is no server: they skip live updates and
+    // the actions poll, and the snapshot CSS hides what needs one.
+    out.push_str(&page[..end - 1]);
+    out.push_str(" data-static>");
     out.push_str(&banner);
     out.push_str(&page[end..]);
     out.into_bytes()
