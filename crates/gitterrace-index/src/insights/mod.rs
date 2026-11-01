@@ -34,6 +34,7 @@ pub use files::{
     Touch,
 };
 pub use filter::{PathFilter, is_generated};
+pub(crate) use headfiles::CACHE_FILE;
 pub use headfiles::{HeadFile, LangShare, LineCache, head_files, language_share};
 pub use lang::language;
 pub use misc::{Cadence, Comparison, LangDelta, Release, SizeBucket, release_tags};

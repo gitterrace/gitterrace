@@ -5,14 +5,18 @@
 
 mod api_page;
 mod config_page;
+mod docs_pages;
+mod facts;
 mod out;
+mod readme;
+mod scripts;
 
 use std::path::{Path, PathBuf};
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 
-use crate::out::{Mode, Out, apply};
+use crate::out::{Mode, Out, apply, unowned_blocks};
 
 #[derive(Parser)]
 #[command(name = "xtask")]
@@ -30,21 +34,32 @@ enum Cmd {
 }
 
 /// Every generator. A new one is checked by being listed here.
-fn generators() -> Vec<Out> {
-    vec![api_page::render(), config_page::render()]
+fn generators(root: &Path) -> Result<Vec<Out>> {
+    let ws = facts::load(root)?;
+    let scripts = scripts::load(root)?;
+    let mut outs = vec![api_page::render(), config_page::render()];
+    outs.extend(readme::render(&ws, &scripts));
+    outs.extend(docs_pages::render(root, &ws, &scripts)?);
+    Ok(outs)
 }
 
 fn main() -> Result<()> {
     let root = repo_root();
     match Cli::parse().cmd {
         Cmd::Generate => {
-            for path in apply(&root, generators(), Mode::Write)? {
+            for path in apply(&root, generators(&root)?, Mode::Write)? {
                 println!("  wrote {path}");
             }
             println!("generate: done");
         }
         Cmd::Check => {
-            let stale = apply(&root, generators(), Mode::Check)?;
+            let outs = generators(&root)?;
+            let orphans = unowned_blocks(&root, &outs)?;
+            if !orphans.is_empty() {
+                println!("generated blocks nobody fills: {}", orphans.join(", "));
+                std::process::exit(1);
+            }
+            let stale = apply(&root, outs, Mode::Check)?;
             if !stale.is_empty() {
                 println!(
                     "generated output is stale, run `make generate`: {}",

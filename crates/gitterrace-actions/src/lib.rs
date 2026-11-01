@@ -9,6 +9,7 @@
 pub mod config;
 pub mod payload;
 pub mod runner;
+pub mod schema;
 pub mod token;
 
 pub use config::{Action, Config, ConfigError, Cwd, Kind, Output, Reloader};

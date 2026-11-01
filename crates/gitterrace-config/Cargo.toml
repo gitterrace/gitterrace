@@ -6,6 +6,7 @@ rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
 publish = false
+description = "config.toml: the settings table, loader, validation and where each value came from."
 
 [lints]
 workspace = true

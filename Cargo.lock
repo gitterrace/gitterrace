@@ -3592,8 +3592,12 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "clap",
+ "gitterrace-actions",
  "gitterrace-api",
  "gitterrace-config",
+ "gitterrace-index",
+ "gitterrace-web",
+ "serde_json",
  "tempfile",
 ]
 

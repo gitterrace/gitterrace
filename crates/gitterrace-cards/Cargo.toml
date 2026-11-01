@@ -6,6 +6,7 @@ rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
 publish = false
+description = "SVG cards and badges, and the year-in-review card."
 
 [lints]
 workspace = true

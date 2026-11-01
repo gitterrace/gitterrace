@@ -13,6 +13,10 @@ workspace = true
 [dependencies]
 gitterrace-api.workspace = true
 gitterrace-config.workspace = true
+gitterrace-actions.workspace = true
+gitterrace-web.workspace = true
+gitterrace-index.workspace = true
+serde_json.workspace = true
 anyhow.workspace = true
 clap.workspace = true
 

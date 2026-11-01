@@ -8,16 +8,31 @@ use std::path::Path;
 
 use anyhow::{Context as _, Result};
 
-/// One generated file. The path is relative to the repo root.
-pub struct Out {
-    pub path: String,
-    pub body: String,
+/// One piece of generated output. Paths are relative to the repo root.
+pub enum Out {
+    /// A whole file.
+    File { path: String, body: String },
+    /// The text between `<!-- BEGIN GENERATED: <id> -->` and `<!-- END GENERATED: <id> -->` in a
+    /// hand-written file.
+    Block {
+        path: String,
+        id: String,
+        body: String,
+    },
 }
 
 impl Out {
     pub fn file(path: impl Into<String>, body: impl Into<String>) -> Self {
-        Self {
+        Self::File {
             path: path.into(),
+            body: body.into(),
+        }
+    }
+
+    pub fn block(path: impl Into<String>, id: impl Into<String>, body: impl Into<String>) -> Self {
+        Self::Block {
+            path: path.into(),
+            id: id.into(),
             body: body.into(),
         }
     }
@@ -29,34 +44,172 @@ pub enum Mode {
     Check,
 }
 
-/// Write `outs` or compare them with the tree. Returns the paths that differed; in
-/// [`Mode::Write`] those are the ones rewritten.
+/// Write `outs` or compare them with the tree. Returns what differed (a file, or `file#block`);
+/// in [`Mode::Write`] those are the ones rewritten. A missing file, a missing or unclosed marker
+/// is an error.
 pub fn apply(root: &Path, outs: Vec<Out>, mode: Mode) -> Result<Vec<String>> {
     let mut stale = Vec::new();
-    for Out { path, body } in outs {
-        let file = root.join(&path);
-        let current = match std::fs::read_to_string(&file) {
-            Ok(s) => Some(s),
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => None,
-            Err(e) => return Err(e).with_context(|| format!("reading {path}")),
+    for out in outs {
+        let (path, label, next, current) = match out {
+            Out::File { path, body } => {
+                let current = read(&root.join(&path))?;
+                (path.clone(), path, body, current)
+            }
+            Out::Block { path, id, body } => {
+                let current =
+                    read(&root.join(&path))?.with_context(|| format!("{path} does not exist"))?;
+                let next = splice(&current, &id, &body).with_context(|| path.clone())?;
+                (path.clone(), format!("{path}#{id}"), next, Some(current))
+            }
         };
-        if current.as_deref() == Some(body.as_str()) {
+        if current.as_deref() == Some(next.as_str()) {
             continue;
         }
         if mode == Mode::Write {
+            let file = root.join(&path);
             if let Some(parent) = file.parent() {
                 std::fs::create_dir_all(parent).with_context(|| format!("creating {path}"))?;
             }
-            std::fs::write(&file, &body).with_context(|| format!("writing {path}"))?;
+            std::fs::write(&file, &next).with_context(|| format!("writing {path}"))?;
         }
-        stale.push(path);
+        stale.push(label);
     }
     Ok(stale)
 }
 
+fn read(path: &Path) -> Result<Option<String>> {
+    match std::fs::read_to_string(path) {
+        Ok(s) => Ok(Some(s)),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
+        Err(e) => Err(e).with_context(|| format!("reading {}", path.display())),
+    }
+}
+
+/// Replace the body of block `id`. A blank line always closes a non-empty block, so a block
+/// ending in a list cannot absorb the END marker as a lazy continuation.
+fn splice(text: &str, id: &str, body: &str) -> Result<String> {
+    let begin = format!("<!-- BEGIN GENERATED: {id} -->\n");
+    let end = format!("<!-- END GENERATED: {id} -->");
+    let start = text
+        .find(&begin)
+        .with_context(|| format!("no `{}` marker", begin.trim_end()))?
+        + begin.len();
+    let stop = start
+        + text[start..]
+            .find(&end)
+            .with_context(|| format!("no `{end}` marker"))?;
+    let body = body.trim_end_matches('\n');
+    let filled = if body.is_empty() {
+        String::new()
+    } else {
+        format!("{body}\n\n")
+    };
+    Ok(format!("{}{filled}{}", &text[..start], &text[stop..]))
+}
+
+/// The sorted names of the files directly in `dir` with extension `ext`.
+pub fn files_in(dir: &Path, ext: &str) -> Result<Vec<String>> {
+    let mut names = Vec::new();
+    for entry in std::fs::read_dir(dir).with_context(|| format!("reading {}", dir.display()))? {
+        let name = entry?.file_name().to_string_lossy().into_owned();
+        if Path::new(&name).extension().is_some_and(|e| e == ext) {
+            names.push(name);
+        }
+    }
+    names.sort();
+    Ok(names)
+}
+
+/// Markers in the hand-written markdown that no generator fills. A block nobody generates would
+/// rot silently, so this is a staleness finding like any other.
+pub fn unowned_blocks(root: &Path, outs: &[Out]) -> Result<Vec<String>> {
+    let owned: Vec<(&str, &str)> = outs
+        .iter()
+        .filter_map(|o| match o {
+            Out::Block { path, id, .. } => Some((path.as_str(), id.as_str())),
+            Out::File { .. } => None,
+        })
+        .collect();
+    let mut pages = vec!["README.md".to_owned(), "AGENTS.md".to_owned()];
+    if let Ok(entries) = std::fs::read_dir(root.join("docs")) {
+        for e in entries.flatten() {
+            let name = e.file_name().to_string_lossy().into_owned();
+            if Path::new(&name).extension().is_some_and(|e| e == "md") {
+                pages.push(format!("docs/{name}"));
+            }
+        }
+    }
+    pages.sort();
+    let mut out = Vec::new();
+    for path in pages {
+        let Some(text) = read(&root.join(&path))? else {
+            continue;
+        };
+        for line in text.lines() {
+            if let Some(id) = line
+                .strip_prefix("<!-- BEGIN GENERATED: ")
+                .and_then(|r| r.strip_suffix(" -->"))
+                && !owned.contains(&(path.as_str(), id))
+            {
+                out.push(format!("{path}#{id} has no generator"));
+            }
+        }
+    }
+    Ok(out)
+}
+
 #[cfg(test)]
 mod tests {
-    use crate::out::{Mode, Out, apply};
+    use crate::out::{Mode, Out, apply, splice, unowned_blocks};
+
+    const PAGE: &str = "intro\n<!-- BEGIN GENERATED: a -->\nold\n<!-- END GENERATED: a -->\n\
+                        middle\n<!-- BEGIN GENERATED: b -->\nkeep\n<!-- END GENERATED: b -->\n";
+
+    #[test]
+    fn splice_replaces_only_its_block_and_is_idempotent() {
+        let out = splice(PAGE, "a", "- new\n").expect("splice");
+        assert!(out.contains("<!-- BEGIN GENERATED: a -->\n- new\n\n<!-- END GENERATED: a -->"));
+        assert!(out.contains("keep\n<!-- END GENERATED: b -->"));
+        assert_eq!(splice(&out, "a", "- new").expect("splice"), out);
+    }
+
+    #[test]
+    fn splice_refuses_a_missing_or_unclosed_marker() {
+        assert!(splice(PAGE, "c", "x").is_err());
+        assert!(splice("<!-- BEGIN GENERATED: a -->\nx\n", "a", "y").is_err());
+    }
+
+    #[test]
+    fn a_block_without_a_generator_is_reported() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        std::fs::write(tmp.path().join("README.md"), PAGE).expect("write");
+        let outs = vec![Out::block("README.md", "a", "x")];
+        assert_eq!(
+            unowned_blocks(tmp.path(), &outs).expect("scan"),
+            ["README.md#b has no generator"]
+        );
+    }
+
+    #[test]
+    fn check_reports_a_stale_block_and_writes_nothing() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        std::fs::write(tmp.path().join("README.md"), PAGE).expect("write");
+        let outs = || vec![Out::block("README.md", "a", "fresh")];
+        assert_eq!(
+            apply(tmp.path(), outs(), Mode::Check).expect("check"),
+            ["README.md#a"]
+        );
+        assert_eq!(
+            std::fs::read_to_string(tmp.path().join("README.md")).expect("read"),
+            PAGE
+        );
+        apply(tmp.path(), outs(), Mode::Write).expect("write");
+        assert!(
+            apply(tmp.path(), outs(), Mode::Check)
+                .expect("check")
+                .is_empty()
+        );
+    }
 
     #[test]
     fn check_reports_without_writing_and_write_converges() {

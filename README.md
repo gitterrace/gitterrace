@@ -7,79 +7,85 @@
 
 <p align="center"><b>Your repository's history, step by step. A GitHub-style view of any git repo, offline, in one binary. Run <code>git terrace</code>.</b></p>
 
-gitterrace serves any git repository in your browser: code, commits,
-branches, blame and rendered markdown (with mermaid), plus insights that go
-past what GitHub and GitLab show. It is read-only and local, with no database,
-no accounts and no network.
+Browse any git repository in your browser, offline: code, commits, branches, blame, rendered
+markdown, and insights that go past what GitHub and GitLab show. Read-only and local, with no
+database, no accounts and no network.
 
 ```bash
 git terrace                       # the repo you are in, on 127.0.0.1:4242
 git terrace ~/src/app ~/src/lib   # several repos on one port
-git terrace ~/src                 # every repo in a folder, two levels deep
+git terrace ~/src                 # every repo in a folder
 ```
 
 ## Install
 
-**Homebrew** (macOS, Linux):
-
 ```bash
 brew install timorunge/tap/gitterrace
-```
-
-**Shell installer** (prebuilt binary for macOS and Linux, x86_64 and arm64):
-
-```bash
 curl -LsSf https://github.com/timorunge/gitterrace/releases/latest/download/gitterrace-installer.sh | sh
-```
-
-**From source** (Rust 1.96 or newer):
-
-```bash
 cargo install --git https://github.com/timorunge/gitterrace gitterrace
 ```
 
-Homebrew and the installer need a published release. Until then, build from a
-checkout with `cargo install --path crates/gitterrace`.
+<!-- BEGIN GENERATED: msrv -->
+Rust 1.96 or newer.
 
-Every route installs two names for one program: `git-terrace`, which git runs
-as `git terrace`, and `gitterrace`.
+<!-- END GENERATED: msrv -->
+
+<!-- BEGIN GENERATED: install -->
+Every route installs 2 names for one program: `git-terrace` and `gitterrace`. git runs `git-terrace` as `git terrace`.
+
+<!-- END GENERATED: install -->
+
+Windows: run gitterrace under WSL; native Windows is not supported (the scripts detect WSL).
 
 ## What you get
 
-- **Browse.** Tree, files with highlighting, raw, blame, commits with
-  diffs, branches and tags, and a view of uncommitted changes. Line links
-  (`#L12-L20`) and permalinks.
-- **Find.** `t` opens a file finder, `/` searches code and commits, and `?`
-  lists every key.
-- **Markdown.** GitHub-flavoured, with alerts, anchors, relative images and
-  mermaid diagrams, sanitised.
-- **Insights.** Activity, hot files, commit types by scope, lines of code by
-  language over time, and authors. One filter drives every page: type, scope,
-  author, path and period, as removable chips. Click an author to see their
-  work.
-- **Several repos.** One port, a repo index at `/`, and a switcher in the
-  header. Each repo lives at `/r/<name>/`.
-- **Fast.** Pages render in a few milliseconds on a 14,000-commit repo.
-  Responses are compressed, and huge diffs load on demand.
+- **Several repos** on one port, with a switcher.
+- **Full git view**: files, blame, commits, branches, tags, worktrees, stashes, uncommitted
+  changes, and a banner for a detached HEAD or an operation in progress.
+- **Live**: pages refresh when the repository changes.
+- **Insights** on one shared filter (type, scope, author, path, period). `?rev=` follows any ref.
+- **Actions**: send a selection to your own script. Off until you write `actions.toml`.
+- **Export** a static site, **wrapped** year card, **MCP** server for agents.
+
+`?` in the browser lists every key.
 
 ## Commands
 
-| Command | Does |
-|---|---|
-| `git terrace [paths]` | Serve in the browser (`--addr` to change the address) |
-| `git terrace export <out> [path]` | Write a static copy of the site (`--commits`, `--max-file-kb`) |
-| `git terrace wrapped [path]` | Write a year-in-review card as SVG (`--year`, `--layout`, `--theme`) |
-| `git terrace mcp [path]` | Run a read-only MCP server over stdio, for agents |
+<!-- BEGIN GENERATED: commands -->
+```
+git terrace [paths]       A GitHub/GitLab-style view of a git repository, offline [--addr --poll --no-watch --config --no-actions]
+git terrace serve         Serve the repository in the browser (the default)
+git terrace config        Print the effective configuration and where each value comes from
+git terrace mcp           Run a read-only MCP server over stdio for agents
+git terrace wrapped       Write the year-in-review card for the repository [--year --layout --theme --out]
+git terrace export <out>  Write a static copy of the site to a folder, for sharing or hosting [--commits --max-file-kb]
+```
 
-`gitterrace` is the same binary under its own name. A JSON API lives at
-`/api/v1`; see [the API reference](docs/api.md).
+<!-- END GENERATED: commands -->
+
+`git terrace config` prints every setting and where it came from. Keys and defaults:
+[configuration](docs/configuration.md). JSON API: [JSON API](docs/api.md).
+
+## Actions
+
+<!-- BEGIN GENERATED: actions -->
+Built in, no configuration: **Copy permalink** and **Copy as markdown**. Your own actions run a program of yours on a selection, offered on `line`, `file`, `commit`, `hunk`, `blame`, `search-hit`, `insight`, `page`. Examples in [`docs/actions/`](docs/actions/):
+
+- [`clipboard.sh`](docs/actions/clipboard.sh): Copy the selection as markdown.
+- [`editor.sh`](docs/actions/editor.sh): Open the file at the selected line in the editor.
+- [`obsidian.sh`](docs/actions/obsidian.sh): Send the selection to Obsidian.
+- [`tendir.sh`](docs/actions/tendir.sh): Send to tendir.
+- [`webhook.sh`](docs/actions/webhook.sh): POST the payload as-is.
+
+<!-- END GENERATED: actions -->
+
+Keys, payload and the security model: [actions](docs/actions.md).
 
 ## Safe by default
 
-It binds to `127.0.0.1`. It refuses requests whose Host is not local (DNS
-rebinding) and requests from other websites, and it sends a strict Content
-Security Policy. It never changes your history, refs or working tree; its only
-write is a cache in `.git/gitterrace/`, built once in the background and safe
-to delete.
+Binds to `127.0.0.1`, refuses foreign Host headers and cross-site requests, strict CSP. It
+never changes your history, refs or working tree; its only write is a disposable cache in
+`.git/gitterrace/`. Actions are the one state-changing path: off until you write an
+`actions.toml` in your own config folder, which a repository cannot supply.
 
-MIT licensed. More: [architecture](docs/architecture.md), [design](docs/design.md).
+[Architecture](docs/architecture.md), [design](docs/design.md). MIT licensed.

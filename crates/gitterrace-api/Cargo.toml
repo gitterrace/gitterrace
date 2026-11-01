@@ -6,6 +6,7 @@ rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
 publish = false
+description = "JSON API (/api/v1) and the read-only MCP server, from one endpoint registry."
 
 [lints]
 workspace = true

@@ -6,6 +6,7 @@ rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
 publish = false
+description = "Insights cache in .git/gitterrace/, append-only and rebuildable, and the aggregates over it."
 
 [lints]
 workspace = true

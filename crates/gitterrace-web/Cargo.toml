@@ -6,6 +6,7 @@ rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
 publish = false
+description = "axum server, askama templates, static assets and the request guard."
 
 [lints]
 workspace = true

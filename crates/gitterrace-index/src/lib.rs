@@ -18,6 +18,23 @@ pub use insights::*;
 pub use source::CommitSource;
 pub use store::FORMAT_VERSION;
 
+/// Every file the cache keeps in `.git/gitterrace/`, with what it holds. The architecture page is
+/// rendered from this, and a test fails when the folder holds a file not listed here.
+pub const CACHE_FILES: [(&str, &str); 3] = [
+    (
+        store::VERSION_FILE,
+        "The cache format. A mismatch deletes the cache and rebuilds it. The format is never migrated.",
+    ),
+    (
+        store::COMMITS_FILE,
+        "One record per commit, appended as the history is walked. Unreachable records are ignored, so rewritten history needs no cleanup, and a torn last line is dropped.",
+    ),
+    (
+        insights::CACHE_FILE,
+        "Line counts per blob id for the language chart. A blob never changes, so the counts never go stale.",
+    ),
+];
+
 /// Commits built per batch: enough to keep all cores busy, small enough for steady progress.
 const BATCH: usize = 256;
 
@@ -210,6 +227,26 @@ mod tests {
 
     fn ids(rs: &[CommitRecord]) -> Vec<&str> {
         rs.iter().map(|r| r.id.as_str()).collect()
+    }
+
+    /// The folder holds exactly the files `CACHE_FILES` documents.
+    #[test]
+    fn cache_folder_holds_the_documented_files() -> io::Result<()> {
+        let dir = tempfile::tempdir()?;
+        let idx = Index::open_dir(dir.path().join("gitterrace"))?;
+        idx.update(&Fake::new(&["a"]), "HEAD", &|_| {})?;
+        let mut lines = crate::LineCache::load(idx.dir());
+        lines.map.insert("abc".into(), 3);
+        lines.dirty = true;
+        lines.save(idx.dir())?;
+        let mut have: Vec<String> = std::fs::read_dir(idx.dir())?
+            .map(|e| e.map(|e| e.file_name().to_string_lossy().into_owned()))
+            .collect::<io::Result<_>>()?;
+        have.sort();
+        let mut want: Vec<&str> = crate::CACHE_FILES.iter().map(|(n, _)| *n).collect();
+        want.sort_unstable();
+        assert_eq!(have, want);
+        Ok(())
     }
 
     #[test]

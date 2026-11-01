@@ -20,6 +20,7 @@ mod pages;
 mod reload;
 mod routes;
 mod search;
+pub mod sitemap;
 mod types;
 mod views;
 #[cfg(test)]

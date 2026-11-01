@@ -6,6 +6,7 @@ rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
 publish = false
+description = "User actions: actions.toml, the payload v1 contract and the sandboxed runner."
 
 [lints]
 workspace = true
