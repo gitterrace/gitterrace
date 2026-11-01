@@ -337,8 +337,9 @@ fn encode_path(p: &str) -> String {
 }
 
 /// `/go/<id>/<sha>[/<path>][#L<a>[-L<b>]]`. A repo without an id (no root commit) cannot
-/// have a sha, so the name fallback is only for completeness.
-fn permalink(
+/// have a sha, so the name fallback is only for completeness. Shared with the API, which
+/// passes an empty `origin` to get the path form.
+pub fn permalink(
     origin: &str,
     id: Option<&str>,
     name: &str,

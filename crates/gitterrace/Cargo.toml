@@ -6,7 +6,7 @@ rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
 description = "Browse any git repository in your browser: code, history and insights, offline, in one binary"
-homepage = "https://github.com/timorunge/gitterrace"
+homepage = "https://github.com/gitterrace/gitterrace"
 keywords = ["git", "browser", "insights", "repository", "offline"]
 categories = ["command-line-utilities", "development-tools"]
 

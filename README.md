@@ -12,15 +12,16 @@ branches, worktrees, stashes, live updates and insights. No database, accounts o
 
 ## Install
 
-```bash
-brew install timorunge/tap/gitterrace   # or: cargo install --git https://github.com/timorunge/gitterrace gitterrace
-```
-
 <!-- BEGIN GENERATED: msrv -->
 Rust 1.96 or newer.
 
 <!-- END GENERATED: msrv -->
 <!-- BEGIN GENERATED: install -->
+```bash
+brew install gitterrace/tap/gitterrace
+cargo install --git https://github.com/gitterrace/gitterrace gitterrace
+```
+
 Installs `git-terrace` and `gitterrace` for one program; git runs `git-terrace` as `git terrace`.
 
 <!-- END GENERATED: install -->

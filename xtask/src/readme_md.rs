@@ -24,6 +24,17 @@ pub fn render(ws: &Workspace, scripts: &[Script]) -> Vec<Out> {
     let bin = ws.packages.get("gitterrace");
     let mut install = String::new();
     if let Some(p) = bin {
+        // `owner/homebrew-tap` installs as `owner/tap/<formula>`.
+        let tap = ws
+            .tap
+            .strip_suffix("/homebrew-tap")
+            .map(|o| format!("{o}/tap"));
+        install.push_str("```bash\n");
+        if let Some(tap) = tap {
+            let _ = writeln!(install, "brew install {tap}/{}", p.name);
+        }
+        let _ = writeln!(install, "cargo install --git {} {}", p.repository, p.name);
+        install.push_str("```\n\n");
         let names: Vec<String> = p.bins.iter().map(|b| format!("`{b}`")).collect();
         let _ = writeln!(
             install,

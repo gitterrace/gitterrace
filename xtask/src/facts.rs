@@ -12,6 +12,8 @@ pub struct Package {
     pub name: String,
     pub description: String,
     pub rust_version: String,
+    /// The `repository` URL, from the workspace for every member.
+    pub repository: String,
     pub bins: Vec<String>,
     /// Workspace members this package depends on (normal dependencies only).
     pub deps: BTreeSet<String>,
@@ -19,6 +21,9 @@ pub struct Package {
 
 pub struct Workspace {
     pub packages: BTreeMap<String, Package>,
+    /// The Homebrew tap the release publishes to (`owner/homebrew-tap`), from
+    /// `[workspace.metadata.dist]`; empty when there is none.
+    pub tap: String,
 }
 
 pub fn load(root: &Path) -> Result<Workspace> {
@@ -73,12 +78,17 @@ pub fn load(root: &Path) -> Result<Workspace> {
                 name,
                 description: text("description"),
                 rust_version: text("rust_version"),
+                repository: text("repository"),
                 bins,
                 deps,
             },
         );
     }
-    Ok(Workspace { packages })
+    let tap = meta["metadata"]["dist"]["tap"]
+        .as_str()
+        .unwrap_or_default()
+        .to_owned();
+    Ok(Workspace { packages, tap })
 }
 
 impl Workspace {

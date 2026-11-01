@@ -6,11 +6,11 @@ flowchart TD
   gitterrace --> web
   actions --> config
   actions --> git
+  api --> actions
   api --> index
   cards --> index
   cards --> schwarzwald
   index --> git
-  web --> actions
   web --> api
   web --> cards
 ```

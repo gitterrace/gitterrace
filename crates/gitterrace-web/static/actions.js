@@ -16,7 +16,7 @@
   try { mine = act ? JSON.parse(act.dataset.menu || "[]") : []; } catch (e) { mine = []; }
   var rev = body.dataset.rev || "HEAD";
   var commit = body.dataset.commit || "";
-  var DOCS = "https://github.com/timorunge/gitterrace/blob/main/docs/actions.md";
+  var DOCS = "https://github.com/gitterrace/gitterrace/blob/main/docs/actions.md";
   var MD_LINES = 40;
 
   // The server renders the note into the page, so it is there at first paint. The poll only

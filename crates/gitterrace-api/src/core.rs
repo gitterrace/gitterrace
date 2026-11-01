@@ -106,6 +106,29 @@ impl ApiState {
         checked(rev.filter(|r| !r.is_empty()).unwrap_or(DEFAULT_REV))
     }
 
+    /// `/go/<repo-id>/<sha>[/<path>][#Lx-Ly]`, the web's permalink in path form (the MCP has no
+    /// server address). `None` for a repository without commits.
+    fn permalink(
+        &self,
+        sha: &str,
+        path: Option<&str>,
+        lines: Option<(usize, usize)>,
+    ) -> Option<String> {
+        let id = self.repo.id()?;
+        let lines = lines.map(|(a, b)| gitterrace_actions::Lines {
+            start: u32::try_from(a).unwrap_or(u32::MAX),
+            end: u32::try_from(b).unwrap_or(u32::MAX),
+        });
+        Some(gitterrace_actions::permalink(
+            "",
+            Some(&id),
+            &self.repo.name(),
+            sha,
+            path,
+            lines,
+        ))
+    }
+
     pub fn repo_info(&self) -> Result<Value, ApiError> {
         let head = self.repo.resolve(DEFAULT_REV).ok();
         let totals = self
@@ -144,7 +167,15 @@ impl ApiState {
         // One extra row tells us whether another page exists.
         let rows = self.repo.log(rev, path, skip, per_page + 1)?;
         let has_more = rows.len() > per_page;
-        let commits: Vec<Value> = rows.iter().take(per_page).map(json::summary).collect();
+        let commits: Vec<Value> = rows
+            .iter()
+            .take(per_page)
+            .map(|c| {
+                let mut v = json::summary(c);
+                v["permalink"] = json!(self.permalink(&c.id, None, None));
+                v
+            })
+            .collect();
         Ok(json!({
             "rev": rev, "path": path, "page": page, "per_page": per_page,
             "has_more": has_more, "commits": commits,
@@ -159,7 +190,17 @@ impl ApiState {
     ) -> Result<Value, ApiError> {
         let id = self.repo.resolve(checked(id)?)?;
         let detail = self.repo.commit(&id)?;
-        Ok(json::detail(&detail, diff, max_lines))
+        let mut v = json::detail(&detail, diff, max_lines);
+        v["permalink"] = json!(self.permalink(&id, None, None));
+        if let Some(files) = v["files"].as_array_mut() {
+            for f in files {
+                let link = f["path"]
+                    .as_str()
+                    .and_then(|p| self.permalink(&id, Some(p), None));
+                f["permalink"] = json!(link);
+            }
+        }
+        Ok(v)
     }
 
     pub fn tree(&self, rev: Option<&str>, path: Option<&str>) -> Result<Value, ApiError> {
@@ -211,7 +252,16 @@ impl ApiState {
             }
             None => (None, None, false),
         };
+        let shown = match (&text, total_lines) {
+            (Some(t), Some(_)) if !t.is_empty() => {
+                let first = start_line.unwrap_or(1).max(1);
+                Some((first, first + t.lines().count() - 1))
+            }
+            _ => None,
+        };
+        let permalink = self.permalink(&id, Some(&blob.path), shown);
         Ok(json!({
+            "permalink": permalink,
             "rev": rev, "commit": id, "path": blob.path, "size": blob.size,
             "binary": blob.text.is_none(), "total_lines": total_lines,
             "truncated": truncated, "text": text,
@@ -228,6 +278,7 @@ impl ApiState {
             .map(json::blame_line)
             .collect();
         Ok(json!({
+            "permalink": self.permalink(&id, Some(path), None),
             "rev": rev, "commit": id, "path": path,
             "truncated": all.len() > MAX_BLAME_LINES, "lines": lines,
         }))
@@ -242,7 +293,18 @@ impl ApiState {
     ) -> Result<Value, ApiError> {
         let rev = Self::rev(rev)?;
         let records = self.records(rev)?;
-        let data = insights::compute(name, &records, params)?;
+        let mut data = insights::compute(name, &records, params)?;
+        if matches!(name, "hotspots" | "file_churn") {
+            let tip = self.repo.resolve(rev)?;
+            if let Some(rows) = data.as_array_mut() {
+                for row in rows {
+                    let link = row["path"]
+                        .as_str()
+                        .and_then(|p| self.permalink(&tip, Some(p), None));
+                    row["permalink"] = json!(link);
+                }
+            }
+        }
         Ok(json!({ "rev": rev, "insight": name, "commits_indexed": records.len(), "data": data }))
     }
 

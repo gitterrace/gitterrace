@@ -13,6 +13,6 @@ pub mod schema;
 pub mod token;
 
 pub use config::{Action, Config, ConfigError, Cwd, Kind, Output, Reloader};
-pub use payload::{Lines, Locator, Payload, PayloadError, RunRequest};
+pub use payload::{Lines, Locator, Payload, PayloadError, RunRequest, permalink};
 pub use runner::{Limits, Outcome, RunError, Runner};
 pub use token::Token;

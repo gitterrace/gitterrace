@@ -266,6 +266,14 @@ impl Repo {
         })
     }
 
+    /// One file of [`Self::commit`]'s list, by index, without diffing the others.
+    pub fn commit_file(&self, id: &str, index: usize) -> Result<Option<crate::FileDiff>> {
+        let repo = self.repo();
+        let oid = Self::resolve_id(&repo, id)?;
+        let commit = repo.find_commit(oid).map_err(git)?;
+        crate::diff::change_at(&repo, &commit, index, self.text_limit())
+    }
+
     /// Summaries of exactly these commits, in order. Each commit is mapped through its own
     /// `.mailmap`, parsed once per distinct blob instead of once per commit.
     pub fn summaries(&self, ids: &[String]) -> Result<Vec<CommitSummary>> {

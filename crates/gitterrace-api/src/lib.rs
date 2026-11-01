@@ -99,6 +99,36 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn results_carry_go_permalinks() {
+        let (_d, s) = fixture();
+        let id = s.repo.id().expect("id");
+        let (_, head) = get(&s, "/commits/HEAD").await;
+        let sha = head["id"].as_str().expect("sha").to_owned();
+        let base = format!("/go/{id}/{sha}");
+        assert_eq!(head["permalink"], base.as_str());
+        let file = head["files"]
+            .as_array()
+            .and_then(|f| f.iter().find(|f| f["path"] == "src/b.rs"))
+            .expect("file");
+        assert_eq!(file["permalink"], format!("{base}/src/b.rs").as_str());
+
+        let (_, log) = get(&s, "/log").await;
+        assert_eq!(log["commits"][0]["permalink"], base.as_str());
+
+        let (_, blob) = get(&s, "/blob?path=a.txt").await;
+        assert_eq!(blob["permalink"], format!("{base}/a.txt#L1-L3").as_str());
+        let (_, blame) = get(&s, "/blame?path=a.txt").await;
+        assert_eq!(blame["permalink"], format!("{base}/a.txt").as_str());
+
+        let (_, hot) = get(&s, "/insights/hotspots").await;
+        let row = hot["data"]
+            .as_array()
+            .and_then(|r| r.iter().find(|r| r["path"] == "a.txt"))
+            .expect("row");
+        assert_eq!(row["permalink"], format!("{base}/a.txt").as_str());
+    }
+
+    #[tokio::test]
     async fn every_insight_answers() {
         let (_d, s) = fixture();
         for i in crate::INSIGHTS {

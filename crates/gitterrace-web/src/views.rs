@@ -548,8 +548,7 @@ pub(crate) async fn diff_fragment(
 ) -> crate::error::Result<axum::response::Html<String>> {
     let html = crate::app::blocking(&app, move |a| {
         let id = a.repo.resolve(&rev)?;
-        let d = a.repo.commit(&id)?;
-        Ok(d.files.get(index).map(diff_body_html))
+        Ok(a.repo.commit_file(&id, index)?.as_ref().map(diff_body_html))
     })
     .await?;
     html.map(axum::response::Html)

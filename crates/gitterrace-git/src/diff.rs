@@ -67,6 +67,48 @@ pub(crate) fn changes(
     Ok(out)
 }
 
+/// The `index`th file of [`changes`] with hunks, diffing only that one file's blobs.
+pub(crate) fn change_at(
+    repo: &gix::Repository,
+    commit: &gix::Commit<'_>,
+    index: usize,
+    text_limit: u64,
+) -> Result<Option<FileDiff>> {
+    let new_tree = commit.tree().map_err(git)?;
+    let old_tree = match commit.parent_ids().next() {
+        Some(parent) => Some(
+            parent
+                .object()
+                .and_then(gix::Object::peel_to_commit)
+                .map_err(git)?
+                .tree()
+                .map_err(git)?,
+        ),
+        None => None,
+    };
+    let opts = gix::diff::Options::default().with_rewrites(Some(gix::diff::Rewrites::default()));
+    let raw = repo
+        .diff_tree_to_tree(old_tree.as_ref(), Some(&new_tree), opts)
+        .map_err(git)?;
+    let mut seen = 0;
+    for change in raw {
+        let is_tree = match &change {
+            ChangeDetached::Addition { entry_mode, .. }
+            | ChangeDetached::Deletion { entry_mode, .. }
+            | ChangeDetached::Modification { entry_mode, .. }
+            | ChangeDetached::Rewrite { entry_mode, .. } => entry_mode.is_tree(),
+        };
+        if is_tree {
+            continue;
+        }
+        if seen == index {
+            return file_diff(repo, change, true, text_limit);
+        }
+        seen += 1;
+    }
+    Ok(None)
+}
+
 fn file_diff(
     repo: &gix::Repository,
     change: ChangeDetached,
