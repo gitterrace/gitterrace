@@ -1,7 +1,7 @@
 {
   "schwarzwald": null,
   "dirty": false,
-  "date": "2026-11-01T10:25:22Z",
+  "date": "2026-11-01T10:37:42Z",
   "parts": [
     "design-tokens.json",
     "fonts",
@@ -9,15 +9,16 @@
     "theme-tokens.json"
   ],
   "files": {
-    "design-tokens.json": "736aa109acf55189466767386f25cf84c33502abd16c811a8b5b3ee304d15a56",
+    "README.md": "100027a3365de59d6ba9e8e148fff50e6bf836b64fb423fa287acc5cfdf84498",
+    "design-tokens.json": "39b39ed41d5c6980af8f221260dc0a5e199aebb1f5f5bc4bf29628450ea1bd02",
     "fonts/bricolage-grotesque/OFL.txt": "923f4ddf0fd39f9b7794ab0df7332f3d95dc43e8ad7ec2289d6d9e8491177f51",
     "fonts/bricolage-grotesque/bricolage-grotesque-latin-wght-normal.woff2": "a97804dc9fbe5fc972a08018c5eda4dab7ef2346f64c57e61419d05e6de4ea1c",
     "fonts/fraunces/OFL.txt": "cd3384cafac6f2bddc3955273958a2e029f97027c8037ac539ef5744a77b579e",
     "fonts/fraunces/fraunces-latin-wght-normal.woff2": "7f9d191d999336d3b9790afa72e1358e50a13b06d4f289341e92a311967a80f9",
     "fonts/jetbrains-mono/OFL.txt": "403581b69dac5cff4079205e01c6b467e56af449ecbd7247693ddb1baafa005b",
     "fonts/jetbrains-mono/jetbrains-mono-latin-wght-normal.woff2": "18be452724bfdc236c074ca94a249a7f41a86752c7d04ab258ce9ed5651f6a7e",
-    "rust/Cargo.toml": "d5f7215283b0fca88b0761bc8a8c4155b7147098d0464b0c5ab2f8b4c97f6748",
-    "rust/src/lib.rs": "89b4bd4ce23457b457a99df5c64fca9a54698872615562a2dc17726042120f61",
-    "theme-tokens.json": "aefc93cf862282242331c5624f8a9d790054c7a9fd88bc77529dc308ddda1046"
+    "rust/Cargo.toml": "32f75e8fc66d827eb5202347519a222460f68efb1e2f54b7cff99cc4d4395e4a",
+    "rust/src/lib.rs": "4be00360c05fcb11cadfb82bdeddb80e690e0c80a4a2d4a532cf459160b0a949",
+    "theme-tokens.json": "e14f85bab6bac5f9dfdf4c1a8c0565ae6ae2135fec61234f97199c130741b826"
   }
 }

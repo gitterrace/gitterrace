@@ -23,3 +23,22 @@ fn stylesheets_hold_no_raw_colors() {
         }
     }
 }
+
+/// A rule that clips its overflow needs room for descenders: with a line height of 1,
+/// the bottom of g, j, p, q and y is cut off.
+#[test]
+fn clipped_text_keeps_room_for_descenders() {
+    for (name, css) in [
+        ("app.css", include_str!("../static/app.css")),
+        ("markdown.css", include_str!("../static/markdown.css")),
+    ] {
+        for rule in css.split('}') {
+            let tight = rule.contains("/1 ") || rule.contains("line-height:1;");
+            assert!(
+                !(tight && rule.contains("overflow:hidden")),
+                "{name}: `{}` clips overflow at line height 1, raise it",
+                rule.trim().split('{').next().unwrap_or_default()
+            );
+        }
+    }
+}

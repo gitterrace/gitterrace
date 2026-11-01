@@ -16,6 +16,10 @@ const DEFAULT_TIMEOUT: Duration = Duration::from_secs(10);
 const MAX_TIMEOUT: Duration = Duration::from_secs(120);
 /// A config larger than this is not hand-written; refuse instead of parsing it.
 const MAX_CONFIG_BYTES: u64 = 256 * 1024;
+/// Limits on `[action.vars]`: names `[a-z0-9_]{1,32}`, values are plain strings.
+const MAX_VARS: usize = 32;
+const MAX_VAR_NAME: usize = 32;
+const MAX_VAR_BYTES: usize = 4 * 1024;
 
 #[derive(Debug, thiserror::Error)]
 pub enum ConfigError {
@@ -27,6 +31,8 @@ pub enum ConfigError {
     Parse(String),
     #[error("action {id}: {why}")]
     Invalid { id: String, why: String },
+    #[error("script {id}: {why}")]
+    Script { id: String, why: String },
 }
 
 /// What a request may act on. Unknown names are a load error so typos surface.
@@ -71,6 +77,9 @@ pub struct Action {
     pub key: Option<char>,
     /// Extra variable names passed through from gitterrace's own environment.
     pub env: Vec<String>,
+    /// Fixed values from `[action.vars]`, delivered as `GITTERRACE_VAR_<NAME>` and
+    /// `payload.vars`. Only `actions.toml` sets them; never templated into `argv`.
+    pub vars: BTreeMap<String, String>,
 }
 
 /// The loaded set, in file order.
@@ -84,10 +93,25 @@ pub struct Config {
 struct RawFile {
     version: u32,
     #[serde(default)]
+    script: Vec<RawScript>,
+    #[serde(default)]
     action: Vec<RawAction>,
 }
 
+/// A `[[script]]` block: the command line written once for several actions. It cannot name
+/// another script, so references are one level deep and never cycle.
 #[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RawScript {
+    id: String,
+    command: RawCommand,
+    cwd: Option<String>,
+    timeout: Option<String>,
+    #[serde(default)]
+    shell: bool,
+}
+
+#[derive(Clone, Deserialize)]
 #[serde(untagged)]
 enum RawCommand {
     Argv(Vec<String>),
@@ -100,15 +124,17 @@ struct RawAction {
     id: String,
     label: String,
     kinds: Vec<Kind>,
-    command: RawCommand,
+    command: Option<RawCommand>,
+    script: Option<String>,
     cwd: Option<String>,
     timeout: Option<String>,
     output: Option<Output>,
-    #[serde(default)]
-    shell: bool,
+    shell: Option<bool>,
     key: Option<String>,
     #[serde(default)]
     env: Vec<String>,
+    #[serde(default)]
+    vars: BTreeMap<String, String>,
 }
 
 impl Config {
@@ -133,10 +159,20 @@ impl Config {
                 raw.version
             )));
         }
+        let mut scripts = BTreeMap::new();
+        for sc in raw.script {
+            if !valid_id(&sc.id) {
+                return Err(script_err(&sc.id, "id must match [a-z0-9-]{1,32}"));
+            }
+            if scripts.contains_key(&sc.id) {
+                return Err(script_err(&sc.id, "duplicate id"));
+            }
+            scripts.insert(sc.id.clone(), sc);
+        }
         let mut seen = HashSet::new();
         let mut actions = Vec::with_capacity(raw.action.len());
         for a in raw.action {
-            let action = validate(a, home)?;
+            let action = validate(a, &scripts, home)?;
             if !seen.insert(action.id.clone()) {
                 return Err(invalid(&action.id, "duplicate id"));
             }
@@ -186,6 +222,21 @@ fn invalid(id: &str, why: impl Into<String>) -> ConfigError {
     }
 }
 
+fn script_err(id: &str, why: impl Into<String>) -> ConfigError {
+    ConfigError::Script {
+        id: id.to_string(),
+        why: why.into(),
+    }
+}
+
+fn valid_id(id: &str) -> bool {
+    !id.is_empty()
+        && id.len() <= 32
+        && id
+            .bytes()
+            .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-')
+}
+
 fn unsafe_path(path: &Path, why: impl Into<String>) -> ConfigError {
     ConfigError::Unsafe {
         path: path.to_path_buf(),
@@ -232,14 +283,13 @@ fn owned_private(path: &Path, meta: &std::fs::Metadata, uid: u32) -> Result<(), 
     Ok(())
 }
 
-fn validate(a: RawAction, home: &Path) -> Result<Action, ConfigError> {
+fn validate(
+    a: RawAction,
+    scripts: &BTreeMap<String, RawScript>,
+    home: &Path,
+) -> Result<Action, ConfigError> {
     let id = a.id;
-    if id.is_empty()
-        || id.len() > 32
-        || !id
-            .bytes()
-            .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-')
-    {
+    if !valid_id(&id) {
         return Err(invalid(&id, "id must match [a-z0-9-]{1,32}"));
     }
     if a.label.trim().is_empty() || a.label.chars().count() > 80 {
@@ -248,7 +298,27 @@ fn validate(a: RawAction, home: &Path) -> Result<Action, ConfigError> {
     if a.kinds.is_empty() {
         return Err(invalid(&id, "kinds is empty"));
     }
-    let argv = match (a.shell, a.command) {
+    // The action's own command, or the named script's; its cwd and timeout override.
+    let (command, shell, base_cwd, base_timeout) = match (a.script, a.command) {
+        (Some(_), Some(_)) => return Err(invalid(&id, "set either script or command, not both")),
+        (None, None) => return Err(invalid(&id, "command or script is required")),
+        (None, Some(c)) => (c, a.shell.unwrap_or(false), None, None),
+        (Some(name), None) => {
+            if a.shell.is_some() {
+                return Err(invalid(&id, "shell belongs to the script block"));
+            }
+            let sc = scripts
+                .get(&name)
+                .ok_or_else(|| invalid(&id, format!("script {name:?} is not defined")))?;
+            (
+                sc.command.clone(),
+                sc.shell,
+                sc.cwd.clone(),
+                sc.timeout.clone(),
+            )
+        }
+    };
+    let argv = match (shell, command) {
         (false, RawCommand::Argv(v)) if !v.is_empty() => {
             let mut v = v;
             v[0] = resolve_program(&v[0], home)
@@ -266,7 +336,7 @@ fn validate(a: RawAction, home: &Path) -> Result<Action, ConfigError> {
         }
         (true, _) => return Err(invalid(&id, "command must be one string when shell = true")),
     };
-    let cwd = match a.cwd.as_deref() {
+    let cwd = match a.cwd.or(base_cwd).as_deref() {
         None | Some("home") => Cwd::Home,
         Some("repo") => Cwd::Repo,
         Some(p) => {
@@ -280,7 +350,7 @@ fn validate(a: RawAction, home: &Path) -> Result<Action, ConfigError> {
             Cwd::Path(p)
         }
     };
-    let timeout = match a.timeout.as_deref() {
+    let timeout = match a.timeout.or(base_timeout).as_deref() {
         None => DEFAULT_TIMEOUT,
         Some(t) => parse_duration(t)
             .filter(|d| !d.is_zero() && *d <= MAX_TIMEOUT)
@@ -304,6 +374,7 @@ fn validate(a: RawAction, home: &Path) -> Result<Action, ConfigError> {
             return Err(invalid(&id, format!("env name {name:?} is not allowed")));
         }
     }
+    let vars = validate_vars(&id, a.vars)?;
     Ok(Action {
         id,
         label: a.label,
@@ -314,7 +385,45 @@ fn validate(a: RawAction, home: &Path) -> Result<Action, ConfigError> {
         output: a.output.unwrap_or(Output::Toast),
         key,
         env: a.env,
+        vars,
     })
+}
+
+fn validate_vars(
+    id: &str,
+    vars: BTreeMap<String, String>,
+) -> Result<BTreeMap<String, String>, ConfigError> {
+    if vars.len() > MAX_VARS {
+        return Err(invalid(id, format!("at most {MAX_VARS} vars")));
+    }
+    for (name, value) in &vars {
+        let lower = name.to_ascii_lowercase();
+        let fixable = lower.len() <= MAX_VAR_NAME
+            && lower
+                .bytes()
+                .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'_');
+        if *name != lower && fixable {
+            return Err(invalid(id, format!("vars.{name}: use lowercase: {lower}")));
+        }
+        if name.is_empty()
+            || name.len() > MAX_VAR_NAME
+            || !name
+                .bytes()
+                .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'_')
+        {
+            return Err(invalid(
+                id,
+                format!("vars.{name}: name must match [a-z0-9_]{{1,32}}"),
+            ));
+        }
+        if value.len() > MAX_VAR_BYTES {
+            return Err(invalid(id, format!("vars.{name}: value over 4 KiB")));
+        }
+        if value.contains('\0') {
+            return Err(invalid(id, format!("vars.{name}: value contains NUL")));
+        }
+    }
+    Ok(vars)
 }
 
 fn expand_tilde(p: &str, home: &Path) -> PathBuf {
@@ -492,6 +601,102 @@ command = 'printf %s "$GITTERRACE_TITLE"'
         assert!(Config::parse(&upper, Path::new("/")).is_err());
     }
 
+    fn err(text: &str) -> String {
+        Config::parse(text, Path::new("/"))
+            .expect_err("must refuse")
+            .to_string()
+    }
+
+    const HEAD: &str = "version = 1\n[[action]]\nid = \"a\"\nlabel = \"A\"\nkinds = [\"line\"]\ncommand = [\"/bin/echo\"]\n";
+
+    #[test]
+    fn vars_are_validated_naming_the_key() {
+        let ok = Config::parse(
+            &format!("{HEAD}[action.vars]\nvault = \"Notes\"\nmode_2 = \"daily\"\n"),
+            Path::new("/"),
+        )
+        .expect("parse");
+        let vars = &ok.get("a").expect("a").vars;
+        assert_eq!(vars.get("vault").map(String::as_str), Some("Notes"));
+        assert_eq!(vars.len(), 2);
+
+        for (bad, needle) in [
+            ("MODE = \"x\"", "use lowercase: mode"),
+            ("\"a-b\" = \"x\"", "vars.a-b"),
+            ("\"\" = \"x\"", "vars."),
+            (&format!("{} = \"x\"", "n".repeat(33)), "name must match"),
+            (&format!("big = \"{}\"", "x".repeat(4097)), "vars.big"),
+            ("num = 3", "parse"),
+        ] {
+            let e = err(&format!("{HEAD}[action.vars]\n{bad}\n"));
+            assert!(
+                e.contains(needle) && e.contains("action a") || needle == "parse",
+                "{bad}: {e}"
+            );
+        }
+        let at_limit = format!("{HEAD}[action.vars]\nbig = \"{}\"\n", "x".repeat(4096));
+        assert!(Config::parse(&at_limit, Path::new("/")).is_ok());
+        let many: String = (0..33)
+            .map(|i| ["v", &i.to_string(), " = \"x\"\n"].concat())
+            .collect();
+        assert!(err(&format!("{HEAD}[action.vars]\n{many}")).contains("at most 32 vars"));
+    }
+
+    #[test]
+    fn scripts_are_shared_and_overridden() {
+        let text = r#"
+version = 1
+[[script]]
+id = "obsidian"
+command = ["/bin/echo", "obs"]
+cwd = "repo"
+timeout = "5s"
+
+[[action]]
+id = "daily"
+label = "Daily"
+kinds = ["page"]
+script = "obsidian"
+timeout = "7s"
+[action.vars]
+mode = "daily"
+
+[[action]]
+id = "inbox"
+label = "Inbox"
+kinds = ["page"]
+script = "obsidian"
+cwd = "home"
+"#;
+        let c = Config::parse(text, Path::new("/")).expect("parse");
+        let daily = c.get("daily").expect("daily");
+        let inbox = c.get("inbox").expect("inbox");
+        assert_eq!(daily.argv, ["/bin/echo", "obs"]);
+        assert_eq!(inbox.argv, daily.argv);
+        assert_eq!((daily.cwd.clone(), daily.timeout.as_secs()), (Cwd::Repo, 7));
+        assert_eq!((inbox.cwd.clone(), inbox.timeout.as_secs()), (Cwd::Home, 5));
+
+        let e = err(&text.replace("script = \"obsidian\"\ncwd", "script = \"nope\"\ncwd"));
+        assert!(e.contains("action inbox") && e.contains("\"nope\""), "{e}");
+        let both = err(&format!("{HEAD}script = \"x\"\n"));
+        assert!(both.contains("not both"), "{both}");
+        let dup = err(&format!(
+            "{text}\n[[script]]\nid = \"obsidian\"\ncommand = [\"/bin/echo\"]\n"
+        ));
+        assert!(
+            dup.contains("script obsidian") && dup.contains("duplicate"),
+            "{dup}"
+        );
+        // A script cannot reference another script, so a cycle cannot be written.
+        let nested =
+            err("version = 1\n[[script]]\nid = \"s\"\nscript = \"s\"\ncommand = [\"/bin/echo\"]\n");
+        assert!(nested.contains("script"), "{nested}");
+        let bad_cmd = err(
+            "version = 1\n[[script]]\nid = \"s\"\ncommand = [\"/nonexistent\"]\n[[action]]\nid = \"a\"\nlabel = \"A\"\nkinds = [\"line\"]\nscript = \"s\"\n",
+        );
+        assert!(bad_cmd.contains("action a"), "{bad_cmd}");
+    }
+
     #[test]
     fn permission_checks() {
         let d = private_dir();
@@ -581,5 +786,21 @@ command = 'printf %s "$GITTERRACE_TITLE"'
         );
         assert!(r.poll()[0].contains("keeping the old set"));
         assert_eq!(h.read().expect("lock").actions.len(), 1);
+
+        let with_vars = format!("{fewer}\n[action.vars]\nmode = \"daily\"\n");
+        write(d.path(), "actions.toml", &with_vars, 0o600);
+        assert_eq!(r.poll(), ["action changed: echo -> /bin/echo hi"]);
+        let bad_var = with_vars.replace("mode =", "Mode =") + "\n";
+        write(d.path(), "actions.toml", &bad_var, 0o600);
+        assert!(r.poll()[0].contains("keeping the old set"));
+        let cur = h.read().expect("lock").clone();
+        assert_eq!(
+            cur.get("echo")
+                .expect("echo")
+                .vars
+                .get("mode")
+                .map(String::as_str),
+            Some("daily")
+        );
     }
 }

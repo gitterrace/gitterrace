@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: build run fmt lint test doc theme generate generated check help
+.PHONY: build run fmt lint test doc theme actions generate generated check help
 
 ## build: Release binary
 build:
@@ -30,6 +30,10 @@ theme:
 	python3 scripts/check-theme-snapshot.py
 	python3 scripts/gen-theme.py --check
 
+## actions: Example actions work per OS profile (stubbed PATH)
+actions:
+	sh scripts/test-actions.sh
+
 ## generate: Regenerate generated files (docs/api.md)
 generate:
 	cargo xtask generate
@@ -39,7 +43,7 @@ generated:
 	cargo xtask check
 
 ## check: Every gate
-check: theme generated fmt lint test doc
+check: theme actions generated fmt lint test doc
 
 ## help: This list
 help:

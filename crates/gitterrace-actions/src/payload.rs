@@ -10,6 +10,8 @@ use serde::{Deserialize, Serialize};
 use crate::config::Kind;
 
 pub const PAYLOAD_VERSION: u32 = 1;
+/// Prefix of the per-action var env names; no payload variable starts with it.
+const VAR_PREFIX: &str = "GITTERRACE_VAR_";
 /// `text` caps: past either one the script gets the head and `text_truncated`.
 const MAX_TEXT_BYTES: usize = 64 * 1024;
 const MAX_TEXT_LINES: usize = 400;
@@ -86,6 +88,9 @@ pub struct Payload {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub commit: Option<CommitInfo>,
     pub markdown: String,
+    /// The action's `[action.vars]`, set by the runner from `actions.toml` only. Added in v1
+    /// without a version bump: readers ignore fields they do not know.
+    pub vars: BTreeMap<String, String>,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -203,6 +208,7 @@ impl Payload {
             title,
             commit,
             markdown,
+            vars: BTreeMap::new(),
         })
     }
 
@@ -228,6 +234,15 @@ impl Payload {
             put("GITTERRACE_LINE_END", &l.end.to_string());
         }
         e
+    }
+
+    /// `GITTERRACE_VAR_<NAME>` for each var. Names are `[a-z0-9_]`, so the prefix keeps them
+    /// out of the payload variables, `PATH` and `HOME`; values are passed verbatim.
+    pub fn var_env(&self) -> BTreeMap<String, String> {
+        self.vars
+            .iter()
+            .map(|(k, v)| (format!("{VAR_PREFIX}{}", k.to_ascii_uppercase()), v.clone()))
+            .collect()
     }
 }
 

@@ -115,7 +115,9 @@ impl Runner {
         repo_root: &Path,
     ) -> Result<Outcome, RunError> {
         let _slot = self.acquire(&action.id)?;
-        let stdin = serde_json::to_vec(payload)?;
+        let mut payload = payload.clone();
+        payload.vars.clone_from(&action.vars);
+        let stdin = serde_json::to_vec(&payload)?;
         let mut cmd = Command::new(&action.argv[0]);
         cmd.args(&action.argv[1..])
             .env_clear()
@@ -137,6 +139,8 @@ impl Runner {
                 cmd.env(&k, v);
             }
         }
+        // Vars first, payload last: even a colliding name could not replace a payload value.
+        cmd.envs(payload.var_env());
         cmd.envs(payload.env());
         let child = cmd
             .spawn()
@@ -296,6 +300,7 @@ mod tests {
             output: Output::Toast,
             key: None,
             env: vec![],
+            vars: std::collections::BTreeMap::new(),
         }
     }
 
@@ -358,6 +363,50 @@ mod tests {
                 .trim(),
             repo.root().to_string_lossy()
         );
+    }
+
+    #[test]
+    fn vars_reach_env_and_stdin_but_never_shadow() {
+        let (t, repo) = fixture();
+        let out = t.path().join("vars");
+        let mut a = shell(
+            "v",
+            &format!("cat > '{0}.json'; env > '{0}.env'", out.display()),
+            Duration::from_secs(5),
+        );
+        // Names chosen to collide with the payload vars, PATH and HOME if unprefixed.
+        a.vars = [
+            ("vault", "Notes"),
+            ("path", "/evil"),
+            ("home", "/evil"),
+            ("var_path", "x"),
+        ]
+        .into_iter()
+        .map(|(k, v)| (k.to_string(), v.to_string()))
+        .collect();
+        let p = payload(&repo, Kind::Line);
+        let r = Runner::new(Limits::default())
+            .run(&a, &p, &repo.root())
+            .expect("run");
+        assert!(r.ok, "{r:?}");
+        let json: serde_json::Value =
+            serde_json::from_slice(&std::fs::read(t.path().join("vars.json")).expect("stdin"))
+                .expect("json");
+        assert_eq!(json["v"], 1);
+        assert_eq!(json["vars"]["vault"], "Notes");
+        assert_eq!(json["vars"]["path"], "/evil");
+        assert_eq!(json["path"], "src/a.rs");
+        let env = std::fs::read_to_string(t.path().join("vars.env")).expect("env");
+        let get = |k: &str| {
+            env.lines()
+                .find_map(|l| l.strip_prefix(&format!("{k}=")).map(str::to_string))
+        };
+        assert_eq!(get("GITTERRACE_VAR_VAULT").as_deref(), Some("Notes"));
+        assert_eq!(get("GITTERRACE_VAR_PATH").as_deref(), Some("/evil"));
+        assert_eq!(get("GITTERRACE_VAR_VAR_PATH").as_deref(), Some("x"));
+        assert_eq!(get("GITTERRACE_PATH").as_deref(), Some("src/a.rs"));
+        assert_ne!(get("PATH").as_deref(), Some("/evil"));
+        assert_ne!(get("HOME").as_deref(), Some("/evil"));
     }
 
     #[test]
