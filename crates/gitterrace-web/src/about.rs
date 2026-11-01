@@ -90,10 +90,10 @@ pub(crate) fn card(
     } else {
         format!("{dir}/{}", active.file)
     };
-    let is_md = {
-        let l = active.file.to_ascii_lowercase();
-        l.ends_with(".md") || l.ends_with(".markdown")
-    };
+    let is_md = std::path::Path::new(&active.file)
+        .extension()
+        .and_then(|e| e.to_str())
+        .is_some_and(|e| e.eq_ignore_ascii_case("md") || e.eq_ignore_ascii_case("markdown"));
     let html = match a.repo.blob(id, &file).ok().and_then(|b| b.text) {
         Some(t) if is_md => markdown::render_with(&t, markdown::Base::new(rev, dir)),
         Some(t) => format!("<pre>{}</pre>", fmt::esc_text(&t)),

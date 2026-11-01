@@ -13,14 +13,14 @@
 //   mermaid      the README diagram renders and has no Copy node
 //   chip         the Working tree chip dot has no animation, in light and dark
 //   doctabs      the README/LICENSE/SECURITY tab row is one line at 360, 900 and 1440 px and the
-//                active tab has aria-current; shots into target/shots/doctabs-*.png
+//                active tab has aria-current; shots into --shots (default target/shots)/doctabs-*.png
 //
 // --from-disk serves crates/gitterrace-web/static/*.js from the working tree over the (possibly
 // older) binary's copies, to test edits before a rebuild. Playwright comes from $PLAYWRIGHT_CORE,
 // the repo's node_modules or the website checkout (see browser-lib.mjs).
-import { readFileSync, writeFileSync, rmSync, mkdirSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, rmSync, mkdirSync, mkdtempSync, existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { homedir } from 'node:os';
+import { tmpdir } from 'node:os';
 import { root, loadPlaywright, launch, makeRepo, serve, openPage, reporter, sh } from './browser-lib.mjs';
 
 const arg = (k, d) => { const i = process.argv.indexOf(k); return i < 0 ? d : process.argv[i + 1]; };
@@ -34,7 +34,12 @@ for (const c of wanted) if (!ALL.includes(c)) { console.error(`unknown check ${c
 
 const pw = await loadPlaywright();
 const dir = makeRepo();
-const srv = await serve(bin, dir);
+// The chords check needs one action, key "x", that touches a marker file. It has to exist
+// before the server starts (read at load) and outside the repository (refused inside one).
+const cfg = mkdtempSync(join(tmpdir(), 'gt-cfg-'));
+const marker = join(cfg, 'chord-ran');
+writeFileSync(join(cfg, 'actions.toml'), `version = 1\n[[action]]\nid = "mark"\nlabel = "Mark"\nkinds = ["page"]\ncommand = ["/usr/bin/touch", ${JSON.stringify(marker)}]\nkey = "x"\n`, { mode: 0o600 });
+const srv = await serve(bin, dir, cfg);
 const r = reporter();
 console.log('serving', srv.base, 'with', bin);
 
@@ -201,7 +206,7 @@ async function doctabs() {
   sh(dir, 'git', 'add', '-A');
   sh(dir, 'git', 'commit', '-q', '-m', 'docs: about files');
   await new Promise((ok) => setTimeout(ok, 600));
-  const shots = join(homedir(), 'target/shots');
+  const shots = resolve(arg('--shots', join(root, 'target/shots')));
   mkdirSync(shots, { recursive: true });
   const b = await launch(pw, 'chromium');
   for (const width of [360, 900, 1440]) {
@@ -226,15 +231,10 @@ async function doctabs() {
 }
 
 // ---- chords -----------------------------------------------------------------------------------
-// Needs a server whose actions.toml has one action, key "x", that touches a marker file.
 async function chords() {
-  const marker = join(dir, 'chord-ran');
-  const cfg = join(dir, 'cfg');
-  mkdirSync(cfg, { recursive: true, mode: 0o700 });
-  writeFileSync(join(cfg, 'actions.toml'), `version = 1\n[[action]]\nid = "mark"\nlabel = "Mark"\nkinds = ["page"]\ncommand = ["/usr/bin/touch", ${JSON.stringify(marker)}]\nkey = "x"\n`, { mode: 0o600 });
-  await new Promise((ok) => setTimeout(ok, 800));
-  const b = await launch(pw, 'chromium');
-  const p = await openPage(b, srv.base + '/');
+  const { b, ctx } = await context('chromium');
+  const p = await ctx.newPage();
+  await p.goto(srv.base + '/', { waitUntil: 'load' });
   await p.keyboard.press('a');
   await p.keyboard.press('x');
   await new Promise((ok) => setTimeout(ok, 800));
@@ -245,12 +245,14 @@ async function chords() {
   rmSync(marker, { force: true });
   // A static export (body[data-static]) must ignore the chord.
   await p.close();
-  const q = await b.newPage();
-  await q.addInitScript(() => {
-    new MutationObserver((_, o) => { if (document.body) { document.body.dataset.static = ''; o.disconnect(); } })
-      .observe(document.documentElement, { childList: true });
+  const q = await ctx.newPage();
+  // Mark the page as an export does, in the HTML itself, so the flag is there before any script.
+  await q.route(srv.base + '/', async (rt) => {
+    const res = await rt.fetch();
+    rt.fulfill({ response: res, body: (await res.text()).replace(/<body/, '<body data-static') });
   });
   await q.goto(srv.base + '/', { waitUntil: 'load' });
+  if (await q.evaluate(() => document.body.dataset.static) === undefined) r.fail('chords: the static fixture is not marked');
   await q.keyboard.press('a');
   await q.keyboard.press('x');
   await new Promise((ok) => setTimeout(ok, 800));
@@ -265,5 +267,6 @@ try {
 } finally {
   srv.stop();
   rmSync(dir, { recursive: true, force: true });
+  rmSync(cfg, { recursive: true, force: true });
 }
 process.exit(r.result());

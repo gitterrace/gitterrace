@@ -48,8 +48,11 @@ pub(crate) struct Env {
     actions_note: Arc<RwLock<Option<Arc<crate::actions::Status>>>>,
     /// The `actions.toml` Send to targets, reloaded with the file: the commit page reads their
     /// `lookup` links from here.
-    sends: Arc<RwLock<Option<Arc<RwLock<Arc<gitterrace_actions::Config>>>>>>,
+    sends: Arc<RwLock<Option<SharedActions>>>,
 }
+
+/// The live `actions.toml`, swapped whole on reload.
+type SharedActions = Arc<RwLock<Arc<gitterrace_actions::Config>>>;
 
 /// Page-building slots for `cfg`: 0 means one per core.
 fn job_slots(cfg: &Config) -> usize {
@@ -101,7 +104,7 @@ impl Env {
     }
 
     /// Hands the Send to config to every page this server renders.
-    pub(crate) fn set_sends(&self, sends: &Arc<RwLock<Arc<gitterrace_actions::Config>>>) {
+    pub(crate) fn set_sends(&self, sends: &SharedActions) {
         if let Ok(mut g) = self.sends.write() {
             *g = Some(Arc::clone(sends));
         }

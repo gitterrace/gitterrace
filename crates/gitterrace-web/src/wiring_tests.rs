@@ -689,9 +689,9 @@ async fn ref_tabs_show_every_count_on_every_page() {
 #[cfg(unix)]
 #[tokio::test]
 async fn action_chords_are_wired_and_listed_in_the_help_sheet() {
+    use std::os::unix::fs::PermissionsExt;
     let dir = tempfile::tempdir().expect("tmp");
     let p = repo(dir.path(), "r");
-    use std::os::unix::fs::PermissionsExt;
     let conf = dir.path().join("conf");
     std::fs::create_dir(&conf).expect("dir");
     std::fs::set_permissions(&conf, std::fs::Permissions::from_mode(0o700)).expect("chmod");

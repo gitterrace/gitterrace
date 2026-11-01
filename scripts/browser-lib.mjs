@@ -85,9 +85,10 @@ export function makeRepo() {
  * Serves `dir` with `bin` on a free port. Returns { origin, base, stop }, where `base` is the
  * repository's own root, wherever it is mounted.
  */
-export async function serve(bin, dir) {
+/** Serves `dir` with `bin`. `cfg` is the config folder; it must sit outside `dir`, since actions.toml inside a served repository is refused. */
+export async function serve(bin, dir, cfg = mkdtempSync(join(tmpdir(), 'gt-cfg-'))) {
   const port = await freePort();
-  const child = spawn(bin, ['serve', '--addr', `127.0.0.1:${port}`, '--poll', '250', '--config', join(dir, 'cfg'), dir], { stdio: 'ignore' });
+  const child = spawn(bin, ['serve', '--addr', `127.0.0.1:${port}`, '--poll', '250', '--config', cfg, dir], { stdio: 'ignore' });
   const origin = `http://127.0.0.1:${port}`;
   let up = false;
   for (let i = 0; i < 100 && !up; i++) {
