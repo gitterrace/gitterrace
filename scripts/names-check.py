@@ -51,7 +51,9 @@ STEM = re.compile(r"^_?[a-z][a-z0-9_]*$")
 # R4: URL segments whose template carries a longer, clearer name.
 TEMPLATE_ALIAS = {"types": "commit_types"}
 # R5: `-lib` marks a library imported by other scripts, not a command.
-SCRIPT = re.compile(r"^[a-z]+(-[a-z]+)*-(check|gen|run|export|report|render|lib)\.(py|sh|mjs)$")
+SCRIPT = re.compile(
+    r"^[a-z]+(-[a-z]+)*-(check|gen|run|export|report|render|lib)\.(py|sh|mjs)$"
+)
 HEADER = ("//", "#", '"""')
 MAKE_TARGET = re.compile(r"^[a-z]+(-[a-z]+)?$")
 
@@ -84,7 +86,9 @@ def check_modules() -> list[str]:
         if f.name == "types.rs":
             text = f.read_text()
             if "#[template" in text or "fn page" in text:
-                bad.append(f"{rel}: types.rs holds a page, name the module for its route (R2)")
+                bad.append(
+                    f"{rel}: types.rs holds a page, name the module for its route (R2)"
+                )
     return bad
 
 
@@ -100,11 +104,17 @@ def check_templates() -> list[str]:
     for f in sorted([*src.glob("src/**/*.rs"), *tdir.glob("*.html")]):
         for m in re.finditer(r'#\[template\(path = "([^"]+)"', f.read_text()):
             if m.group(1).startswith("_"):
-                bad.append(f"{f.relative_to(ROOT)}: page template {m.group(1)} has a partial's `_` (R3)")
+                bad.append(
+                    f"{f.relative_to(ROOT)}: page template {m.group(1)} has a partial's `_` (R3)"
+                )
         if f.suffix == ".html":
-            for m in re.finditer(r'\{%-?\s*(?:include|import|extends)\s+"([^"]+)"', f.read_text()):
+            for m in re.finditer(
+                r'\{%-?\s*(?:include|import|extends)\s+"([^"]+)"', f.read_text()
+            ):
                 if not m.group(1).startswith("_"):
-                    bad.append(f"{f.relative_to(ROOT)}: {m.group(1)} is used as a partial, name it _{m.group(1)} (R3)")
+                    bad.append(
+                        f"{f.relative_to(ROOT)}: {m.group(1)} is used as a partial, name it _{m.group(1)} (R3)"
+                    )
     routes = (src / "src/routes.rs").read_text()
     insights = (ROOT / "crates/gitterrace-api/src/insights.rs").read_text()
     ids = set(re.findall(r'name: "([a-z_]+)"', insights))
@@ -112,10 +122,14 @@ def check_templates() -> list[str]:
         snake = seg.replace("-", "_")
         want = TEMPLATE_ALIAS.get(snake, snake)
         if want not in stems:
-            bad.append(f"/stats/{seg}: no template {want}.html, route and template share one name (R4)")
+            bad.append(
+                f"/stats/{seg}: no template {want}.html, route and template share one name (R4)"
+            )
         for i in sorted(ids):
             if i != snake and (i.endswith("_" + snake) or i.startswith(snake + "_")):
-                bad.append(f"/stats/{seg}: insight `{i}` names the same thing differently (R4)")
+                bad.append(
+                    f"/stats/{seg}: insight `{i}` names the same thing differently (R4)"
+                )
     return bad
 
 
@@ -124,26 +138,64 @@ def check_headers() -> list[str]:
     bad = []
     for f in sorted((ROOT / "scripts").iterdir()):
         if f.is_file() and not SCRIPT.match(f.name):
-            bad.append(f"scripts/{f.name}: not <area>-<verb> with a verb of check|gen|run|export|report|render|lib (R5)")
+            bad.append(
+                f"scripts/{f.name}: not <area>-<verb> with a verb of check|gen|run|export|report|render|lib (R5)"
+            )
     files = [f for f in (ROOT / "scripts").iterdir() if f.is_file()]
     files += sorted((ROOT / "crates/gitterrace-web/static").glob("*.js"))
     files += sorted((ROOT / "xtask/src").glob("*.rs"))
     for f in files:
         if not first_line(f).startswith(HEADER):
-            bad.append(f"{f.relative_to(ROOT)}: first line is not a header comment (R5)")
+            bad.append(
+                f"{f.relative_to(ROOT)}: first line is not a header comment (R5)"
+            )
     return bad
 
 
 def check_generators() -> list[str]:
     """R6: a generator's `//!` header names every file it writes."""
     bad = []
-    for f in sorted((ROOT / "xtask/src").glob("*_md.rs")) + [ROOT / "xtask/src/readme_agents_md.rs"]:
+    for f in sorted((ROOT / "xtask/src").glob("*_md.rs")) + [
+        ROOT / "xtask/src/readme_agents_md.rs"
+    ]:
         text = f.read_text()
         head = "\n".join(ln for ln in text.splitlines() if ln.startswith("//!"))
         body = text.split("#[cfg(test)]")[0]
         for path in sorted(set(re.findall(r'"((?:[\w.-]+/)*[A-Z\w.-]+\.md)"', body))):
             if path not in head:
-                bad.append(f"xtask/src/{f.name}: header does not name {path}, which it writes (R6)")
+                bad.append(
+                    f"xtask/src/{f.name}: header does not name {path}, which it writes (R6)"
+                )
+    return bad
+
+
+# Paths a script, generator or the Makefile names under these roots must exist.
+PATH_REF = re.compile(
+    r"(?<![\w./-])((?:crates|scripts|docs|xtask|demo|theme|site|styles)/[\w./-]*\w\.\w+)"
+)
+# Paths a generator writes or a doc names as an example are not references.
+PATH_REF_SKIP = ("site/", "docs/brand/")
+
+
+def check_path_refs() -> list[str]:
+    """R7: a renamed file leaves no stale path in the scripts, generators or Makefile."""
+    bad = []
+    sources = [
+        *sorted((ROOT / "scripts").glob("*.*")),
+        *sorted((ROOT / "xtask/src").glob("*.rs")),
+        ROOT / "Makefile",
+    ]
+    for f in sources:
+        # Test fixtures name made-up paths on purpose.
+        body = f.read_text().split("#[cfg(test)]")[0]
+        for n, line in enumerate(body.splitlines(), 1):
+            for path in PATH_REF.findall(line):
+                if "*" in path or "{" in path or path.startswith(PATH_REF_SKIP):
+                    continue
+                if not (ROOT / path).exists():
+                    bad.append(
+                        f"{f.relative_to(ROOT)}:{n}: names {path}, which does not exist (R7)"
+                    )
     return bad
 
 
@@ -153,6 +205,7 @@ def main() -> int:
         *check_templates(),
         *check_headers(),
         *check_generators(),
+        *check_path_refs(),
     ]
     bad += [
         f"Makefile: target `{t}` is not <area>[-<verb>]"

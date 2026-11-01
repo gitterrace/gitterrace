@@ -25,6 +25,7 @@ Rust 1.96 or newer.
 <!-- END GENERATED: msrv -->
 <!-- BEGIN GENERATED: install -->
 ```bash
+curl -fsSL https://gitterrace.dev/install.sh | sh
 brew install gitterrace/tap/gitterrace
 cargo install --git https://github.com/gitterrace/gitterrace gitterrace
 ```

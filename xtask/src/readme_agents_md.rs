@@ -82,6 +82,17 @@ fn license_md(bin: Option<&crate::facts::Package>) -> String {
     })
 }
 
+/// The shell installer dist attaches to every release (`installers = ["shell"]`), named
+/// `<package>-installer.sh`. The site redirects `/install.sh` here.
+pub fn installer_url(repo: &str, name: &str) -> String {
+    format!("{repo}/releases/latest/download/{name}-installer.sh")
+}
+
+/// The one-line install, served by the site's `/install.sh` redirect.
+pub fn curl_install(home: &str) -> String {
+    format!("curl -fsSL {}/install.sh | sh", home.trim_end_matches('/'))
+}
+
 /// The install block: the README and the site both show exactly this.
 pub fn install_md(ws: &Workspace) -> String {
     let mut install = String::new();
@@ -92,6 +103,9 @@ pub fn install_md(ws: &Workspace) -> String {
             .strip_suffix("/homebrew-tap")
             .map(|o| format!("{o}/tap"));
         install.push_str("```bash\n");
+        if !p.homepage.is_empty() {
+            let _ = writeln!(install, "{}", curl_install(&p.homepage));
+        }
         if let Some(tap) = tap {
             let _ = writeln!(install, "brew install {tap}/{}", p.name);
         }
@@ -271,4 +285,21 @@ pub fn crate_diagram(ws: &Workspace) -> String {
     }
     s.push_str("```\n");
     s
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn installer_and_curl_line_derive_from_metadata() {
+        assert_eq!(
+            installer_url("https://github.com/o/r", "r"),
+            "https://github.com/o/r/releases/latest/download/r-installer.sh"
+        );
+        assert_eq!(
+            curl_install("https://example.dev/"),
+            "curl -fsSL https://example.dev/install.sh | sh"
+        );
+    }
 }

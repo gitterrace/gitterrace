@@ -40,6 +40,7 @@ run shellcheck shellcheck "brew install shellcheck" shellcheck scripts/*.sh
 run shfmt shfmt "brew install shfmt" shfmt -d -i 2 scripts/*.sh
 run ruff-check ruff "brew install ruff" ruff check scripts
 run ruff-format ruff "brew install ruff" ruff format --check scripts
+run actionlint actionlint "brew install actionlint" actionlint
 run machete cargo-machete "cargo install cargo-machete" cargo-machete
 
 [ "$fails" -eq 0 ] || {

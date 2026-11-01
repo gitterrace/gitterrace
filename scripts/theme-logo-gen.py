@@ -122,7 +122,7 @@ def main() -> int:
             print(f"wrote {path.relative_to(ROOT)}")
     # The app inlines the same mark as its favicon (the CSP refuses a separate request-free
     # icon otherwise), so the one include every page head uses must carry exactly this SVG.
-    tpl = ROOT / "crates/gitterrace-web/templates/favicon.html"
+    tpl = ROOT / "crates/gitterrace-web/templates/_favicon.html"
     m = re.search(
         r'<link rel="icon" href="data:image/svg\+xml,([^"]*)">', tpl.read_text()
     )
@@ -136,10 +136,10 @@ def main() -> int:
         t.relative_to(ROOT)
         for t in sorted(tpl.parent.glob("*.html"))
         if "<head>" in t.read_text()
-        and '{% include "favicon.html" %}' not in t.read_text()
+        and '{% include "_favicon.html" %}' not in t.read_text()
     ]
     for t in bare:
-        print(f'{t}: has a <head> without {{% include "favicon.html" %}}')
+        print(f'{t}: has a <head> without {{% include "_favicon.html" %}}')
     return 1 if stale or bare else 0
 
 

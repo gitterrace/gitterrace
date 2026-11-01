@@ -100,3 +100,4 @@ targets = [
 unix-archive = ".tar.gz"
 checksum = "sha256"
 pr-run-mode = "plan"
+allow-dirty = ["ci"]
