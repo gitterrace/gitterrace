@@ -3,12 +3,12 @@
     reason = "a developer command-line tool: the terminal is its output"
 )]
 
-mod api_page;
-mod config_page;
-mod docs_pages;
+mod api_md;
+mod config_md;
+mod docs_md;
 mod facts;
 mod out;
-mod readme;
+mod readme_md;
 mod scripts;
 
 use std::path::{Path, PathBuf};
@@ -37,9 +37,9 @@ enum Cmd {
 fn generators(root: &Path) -> Result<Vec<Out>> {
     let ws = facts::load(root)?;
     let scripts = scripts::load(root)?;
-    let mut outs = vec![api_page::render(), config_page::render()];
-    outs.extend(readme::render(&ws, &scripts));
-    outs.extend(docs_pages::render(root, &ws, &scripts)?);
+    let mut outs = vec![api_md::render(), config_md::render()];
+    outs.extend(readme_md::render(&ws, &scripts));
+    outs.extend(docs_md::render(root, &ws, &scripts)?);
     Ok(outs)
 }
 
@@ -62,7 +62,7 @@ fn main() -> Result<()> {
             let stale = apply(&root, outs, Mode::Check)?;
             if !stale.is_empty() {
                 println!(
-                    "generated output is stale, run `make generate`: {}",
+                    "generated output is stale, run `make docs-gen`: {}",
                     stale.join(", ")
                 );
                 std::process::exit(1);

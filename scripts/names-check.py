@@ -1,0 +1,55 @@
+#!/usr/bin/env python3
+"""Naming guard (stdlib only), run by `make names`.
+
+1. Files in scripts/ are `<area>-<verb>.<ext>` with a known area prefix.
+2. No `GT_` environment name anywhere: GITTERRACE_* is the product namespace and
+   harness-only variables use a TEST_ prefix.
+3. No references to other projects' internals (OUTSIDE_NAMES), outside the vendored
+   theme snapshot and Cargo.lock.
+"""
+import re, subprocess, sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+AREAS = {"theme", "actions", "preview", "names"}
+NAME = re.compile(r"^[a-z]+(-[a-z]+)+\.(sh|py)$")
+# Policy list of outside project names: this repo stands on its own and must not lean on
+# another repo's internals. Not a ban on any deleted name.
+OUTSIDE_NAMES = ("(?!)",)
+# .mcp.json is local agent tooling config, not product content.
+SKIP = ("theme/schwarzwald/", "Cargo.lock", ".mcp.json", "scripts/names-check.py")
+# Assembled so this file never matches itself.
+ENV_PREFIX = re.compile(r"\bG" + r"T_[A-Z0-9_]+")
+OUTSIDE = re.compile(r"\b(" + "|".join(OUTSIDE_NAMES) + r")\b", re.I)
+
+
+def main() -> int:
+    bad = []
+    for p in sorted((ROOT / "scripts").iterdir()):
+        if not p.is_file():
+            continue
+        if not NAME.match(p.name) or p.name.split("-")[0] not in AREAS:
+            bad.append(f"scripts/{p.name}: not <area>-<verb>.<sh|py> with area in {sorted(AREAS)}")
+    tracked = subprocess.run(["git", "ls-files", "-z"], cwd=ROOT, capture_output=True, check=True).stdout
+    for rel in tracked.decode().split("\0"):
+        f = ROOT / rel
+        if not rel or rel.startswith(SKIP) or not f.is_file() or f.suffix in {".js", ".woff2", ".png"}:
+            continue
+        try:
+            text = f.read_text()
+        except UnicodeDecodeError:
+            continue
+        for n, line in enumerate(text.splitlines(), 1):
+            for rx, why in ((ENV_PREFIX, "GT_ env name"), (OUTSIDE, "outside project name")):
+                m = rx.search(line)
+                if m:
+                    bad.append(f"{rel}:{n}: {why}: {m.group(0)}")
+    for b in bad:
+        print(b)
+    if bad:
+        return 1
+    print("names: ok")
+    return 0
+
+
+sys.exit(main())

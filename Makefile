@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: build run fmt lint test doc theme actions generate generated check help
+.PHONY: build run fmt lint test doc theme actions docs-gen docs-check names check help
 
 ## build: Release binary
 build:
@@ -27,23 +27,27 @@ doc:
 
 ## theme: Snapshot matches its manifest, generated files match the snapshot
 theme:
-	python3 scripts/check-theme-snapshot.py
-	python3 scripts/gen-theme.py --check
+	python3 scripts/theme-snapshot-check.py
+	python3 scripts/theme-gen.py --check
 
 ## actions: Example actions work per OS profile (stubbed PATH)
 actions:
-	sh scripts/test-actions.sh
+	sh scripts/actions-test.sh
 
-## generate: Regenerate generated files (docs/api.md)
-generate:
+## docs-gen: Regenerate generated files (docs/api.md)
+docs-gen:
 	cargo xtask generate
 
-## generated: Generated files are up to date
-generated:
+## docs-check: Generated files are up to date
+docs-check:
 	cargo xtask check
 
+## names: File, env and project names follow the conventions
+names:
+	python3 scripts/names-check.py
+
 ## check: Every gate
-check: theme actions generated fmt lint test doc
+check: theme actions names docs-check fmt lint test doc
 
 ## help: This list
 help:

@@ -39,7 +39,7 @@ outside `gitterrace-git` imports `gix`.
 - Logic lives in Rust. Templates render values, they do not compute them.
 - Docs: `api.md`, `configuration.md` and every `GENERATED` block come from code registries
   (`ENDPOINTS`, `INSIGHTS`, config keys, `actions::schema`, `web::sitemap`, `CACHE_FILES`,
-  clap `Cli`, Cargo.toml, script headers). Change the registry, `make generate`, never edit a
+  clap `Cli`, Cargo.toml, script headers). Change the registry, `make docs-gen`, never edit a
   block. Prose holds decisions, not inventories.
 
 ## Code conventions
@@ -57,3 +57,10 @@ outside `gitterrace-git` imports `gix`.
 
 ## Workflow
 
+- Gate: `make check` (theme, actions, docs-check, fmt, clippy `-D warnings`, test, doc).
+  `cargo test -p <crate>` while working on one crate. `scripts/preview-run.sh` restarts the
+  preview on 4242.
+- Commits: `type(scope): subject`, scope is the crate without `gitterrace-`. Commit by
+  pathspec, never `git add -A`.
+- Names: files in `scripts/` are `<area>-<verb>.<ext>`, make targets are single words,
+  harness-only env vars use a `TEST_` prefix. `make names` enforces it.

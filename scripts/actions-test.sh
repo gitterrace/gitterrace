@@ -20,7 +20,7 @@ profile() {
     p=$(command -v "$t") && ln -s "$p" "$bin/$t"
   done
   for t in "$@"; do
-    printf '#!/bin/sh\nprintf "%%s\\n" "$0" "$@" >> "$GT_LOG"\ncat >> "$GT_LOG.stdin"\nexit 0\n' > "$bin/$t"
+    printf '#!/bin/sh\nprintf "%%s\\n" "$0" "$@" >> "$TEST_ACTIONS_LOG"\ncat >> "$TEST_ACTIONS_LOG.stdin"\nexit 0\n' > "$bin/$t"
     chmod +x "$bin/$t"
   done
 }
@@ -28,14 +28,14 @@ profile() {
 # run PROFILE SCRIPT [VAR=value...]: sets out, rc, log, stdin_log
 run() {
   prof=$1; script=$2; shift 2
-  d="$tmp/$prof"; GT_LOG="$d/log"; : > "$GT_LOG"; : > "$GT_LOG.stdin"
+  d="$tmp/$prof"; TEST_ACTIONS_LOG="$d/log"; : > "$TEST_ACTIONS_LOG"; : > "$TEST_ACTIONS_LOG.stdin"
   mkdir -p "$d/work"
-  out=$(cd "$d/work" && printf '%s' "$payload" | env -i "PATH=$d/bin" "HOME=$d" "GT_LOG=$GT_LOG" \
+  out=$(cd "$d/work" && printf '%s' "$payload" | env -i "PATH=$d/bin" "HOME=$d" "TEST_ACTIONS_LOG=$TEST_ACTIONS_LOG" \
     'GITTERRACE_TITLE=t $(touch PWNED)' "GITTERRACE_ROOT=$d/my repo" 'GITTERRACE_PATH=a b/$(x).rs' \
     GITTERRACE_LINE_START=7 "$@" /bin/dash "$root/docs/actions/$script" 2>&1)
   rc=$?
-  log=$(cat "$GT_LOG")
-  stdin_log=$(cat "$GT_LOG.stdin")
+  log=$(cat "$TEST_ACTIONS_LOG")
+  stdin_log=$(cat "$TEST_ACTIONS_LOG.stdin")
 }
 expect_log() { case $log in *"$2"*) ;; *) fail "$1: log lacks '$2': $log" ;; esac; }
 expect_rc() { [ "$rc" = "$2" ] || fail "$1: rc $rc, want $2 ($out)"; }

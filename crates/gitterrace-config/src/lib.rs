@@ -172,11 +172,11 @@ mod tests {
 
     #[test]
     fn file_sets_values_and_source() {
-        let l = parse("[watch]\ninterval_ms = 500\n[repo.tendir]\nexclude = [\"vendor/**\"]\n")
+        let l = parse("[watch]\ninterval_ms = 500\n[repo.example]\nexclude = [\"vendor/**\"]\n")
             .expect("parse");
         assert_eq!(l.config.watch.interval_ms, 500);
         assert_eq!(l.sources["watch.interval_ms"], Source::File);
-        assert_eq!(l.config.repo["tendir"].exclude, ["vendor/**"]);
+        assert_eq!(l.config.repo["example"].exclude, ["vendor/**"]);
         assert!(l.describe().contains("watch.interval_ms = 500  (file)"));
     }
 

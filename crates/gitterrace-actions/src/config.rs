@@ -181,7 +181,7 @@ impl Config {
         Ok(Self { actions })
     }
 
-    /// Lines like "action added: tendir -> ~/bin/notes" for a reload log.
+    /// Lines like "action added: copy -> ~/bin/copy.sh" for a reload log.
     pub fn diff(&self, new: &Self) -> Vec<String> {
         let old: BTreeMap<_, _> = self.actions.iter().map(|a| (&a.id, a)).collect();
         let next: BTreeMap<_, _> = new.actions.iter().map(|a| (&a.id, a)).collect();
@@ -465,6 +465,7 @@ pub struct Reloader {
     repos: Vec<PathBuf>,
     stamp: Option<(SystemTime, u64)>,
     current: Arc<RwLock<Arc<Config>>>,
+    error: Option<String>,
 }
 
 impl Reloader {
@@ -475,7 +476,13 @@ impl Reloader {
             repos,
             stamp,
             current: Arc::new(RwLock::new(Arc::new(initial))),
+            error: None,
         }
+    }
+
+    /// Why the last reload was refused; `None` once a later one succeeded.
+    pub fn error(&self) -> Option<&str> {
+        self.error.as_deref()
     }
 
     /// The shared handle the run route reads from.
@@ -493,6 +500,7 @@ impl Reloader {
         self.stamp = now;
         match Config::load(&self.path, &self.repos) {
             Ok(new) => {
+                self.error = None;
                 let Ok(mut cur) = self.current.write() else {
                     return vec!["actions: config lock poisoned, reload skipped".into()];
                 };
@@ -500,7 +508,10 @@ impl Reloader {
                 *cur = Arc::new(new);
                 lines
             }
-            Err(e) => vec![format!("actions: reload refused, keeping the old set: {e}")],
+            Err(e) => {
+                self.error = Some(e.to_string());
+                vec![format!("actions: reload refused, keeping the old set: {e}")]
+            }
         }
     }
 }
