@@ -43,8 +43,16 @@ pub fn render(ws: &Workspace, scripts: &[Script]) -> Vec<Out> {
         Out::block(README, "install", install),
         Out::block(README, "commands", commands()),
         Out::block(README, "actions", actions),
+        Out::block(README, "license", license_md(bin)),
         Out::block("AGENTS.md", "crates", crate_table(ws)),
     ]
+}
+
+/// The license line, from the binary's manifest; the full text is the root `LICENSE` file.
+fn license_md(bin: Option<&crate::facts::Package>) -> String {
+    bin.map_or_else(String::new, |p| {
+        format!("{}, see [LICENSE](LICENSE).", p.license)
+    })
 }
 
 /// The install block: the README and the site both show exactly this.

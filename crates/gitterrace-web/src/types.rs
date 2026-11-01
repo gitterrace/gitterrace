@@ -373,16 +373,27 @@ fn build(a: &crate::app::App, all: &[CommitRecord], c: Chrome, q: &TypesQuery) -
         });
     }
 
-    let head = a.repo.resolve(&fmt::selected()).unwrap_or_default();
-    let subjects = a.subjects(&head);
     let mut list: Vec<&CommitRecord> = recs.iter().collect();
     list.sort_by_key(|r| std::cmp::Reverse(r.time));
     let pg = q.page.unwrap_or(0);
     let now = fmt::now();
-    let commits = list
+    let shown: Vec<&&CommitRecord> = list
         .iter()
         .skip(pg.saturating_mul(PAGE))
         .take(PAGE)
+        .collect();
+    // Only this page's subjects: scanning the whole history for 20 lines cost seconds on a
+    // large repository.
+    let ids: Vec<String> = shown.iter().map(|r| r.id.clone()).collect();
+    let subjects: HashMap<String, String> = a
+        .repo
+        .summaries(&ids)
+        .unwrap_or_default()
+        .into_iter()
+        .map(|s| (s.id, s.subject))
+        .collect();
+    let commits = shown
+        .iter()
         .map(|r| CommitRow {
             sha: fmt::sha_link(&r.id),
             initial: views::initial(&r.author),

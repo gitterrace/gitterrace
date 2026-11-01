@@ -543,6 +543,9 @@ impl App {
         {
             return Ok(Some(Arc::clone(recs)));
         }
+        if self.index.newer_format().is_some() {
+            return Ok(None);
+        }
         if self.index.pending(&self.repo, head)? > 0 {
             if let Ok(mut w) = self.wanted.lock() {
                 w.insert(head.to_owned());

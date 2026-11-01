@@ -4,11 +4,11 @@ use std::fmt::Write as _;
 use std::path::Path;
 
 use anyhow::{Context as _, Result};
+use gitterrace_actions::Config;
 use gitterrace_actions::schema::{
     ACTION_KEYS, ENV_VARS, Item, KINDS, MODIFIERS, PAYLOAD_FIELDS, PLACEHOLDERS, SCRIPT_KEYS,
     SEND_KEYS, SEND_PLACEHOLDERS, kind_name,
 };
-use gitterrace_actions::Config;
 use gitterrace_actions::send::DENIED_SCHEMES;
 
 use crate::facts::Workspace;
@@ -153,10 +153,7 @@ pub fn starter_entries() -> Vec<Entry> {
             } else {
                 return None;
             };
-            let about: Vec<&str> = chunk
-                .lines()
-                .filter_map(|l| l.strip_prefix("# "))
-                .collect();
+            let about: Vec<&str> = chunk.lines().filter_map(|l| l.strip_prefix("# ")).collect();
             let body: Vec<&str> = chunk.lines().filter(|l| !l.starts_with('#')).collect();
             let text = body.join("\n");
             let vars = value(&text, "vars")
@@ -189,13 +186,17 @@ fn starter() -> String {
             s,
             "| `{}` | {} | {} | {} | {} |",
             e.id,
-            if e.table == "send" { "Send to" } else { "action" },
+            if e.table == "send" {
+                "Send to"
+            } else {
+                "action"
+            },
             yes(e.enabled),
             e.about,
             e.vars.join(", ")
         );
     }
-    s.push_str("\nThe whole file, as `gitterrace actions-init` writes it:\n\n```toml\n");
+    s.push_str("\nThe whole file, as `git terrace actions-init` writes it:\n\n```toml\n");
     s.push_str(Config::STARTER.trim_end());
     s.push_str("\n```\n");
     s

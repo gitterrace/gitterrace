@@ -37,6 +37,7 @@ git terrace mcp              Run a read-only MCP server over stdio for agents
 git terrace wrapped          Write the year-in-review card for the repository [--year --layout --theme --out]
 git terrace open <link>      Open a `gitterrace://` or `/go` permalink in the browser, starting a server if needed [--print]
 git terrace install-handler  Register (or with `--uninstall` remove) this program as the `gitterrace://` link handler [--uninstall]
+git terrace actions-init     Write the pre-filled `actions.toml` (Send to targets and example actions) to the config folder
 git terrace export <out>     Write a static copy of the site to a folder, for sharing or hosting [--commits --max-file-kb]
 ```
 
@@ -50,10 +51,17 @@ Send a selection to a tracker, notes app or mail draft, or run your own program 
 
 Docs: [why](docs/why.md), [configuration](docs/configuration.md), [JSON API](docs/api.md),
 [architecture](docs/architecture.md), [design](docs/design.md), [benchmarks](docs/benchmarks.md). Binds to `127.0.0.1`, never
-writes to your repository. MIT licensed. The one-page site is generated into [site/](site/index.html).
+writes to your repository. The one-page site is generated into [site/](site/index.html).
 
 ## Contributing
 
 Issues and pull requests are welcome: see [contributing](CONTRIBUTING.md), and report
 vulnerabilities privately as [SECURITY.md](SECURITY.md) describes. Built by AI coding agents
 and humans together. A human sets the direction and decides ([why](docs/why.md)).
+
+## License
+
+<!-- BEGIN GENERATED: license -->
+MIT, see [LICENSE](LICENSE).
+
+<!-- END GENERATED: license -->

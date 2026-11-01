@@ -40,17 +40,151 @@ one exists. It is an ordinary `actions.toml`. An entry with `enabled = false` is
 not offered: switch on the ones you use and fill in their `vars`.
 
 <!-- BEGIN GENERATED: starter -->
+| Entry | Kind | On | What it does | Needs in `vars` |
+| --- | --- | --- | --- | --- |
+| `tendir` | Send to | yes | Opens tendir's new-task sheet, filled in. Needs the tendir app. |  |
+| `mail` | Send to | yes | A mail draft in your mail app. |  |
+| `github-issue` | Send to | no | A new issue on github.com. `repo` is `owner/name`. | `repo` |
+| `github-discussion` | Send to | no | A new discussion on github.com. `repo` is `owner/name`, `category` the category slug. | `repo`, `category` |
+| `gitlab-issue` | Send to | no | A new issue on gitlab.com. `project` is `group/name`, or `group/subgroup/name`. | `project` |
+| `gitlab-issue-self-hosted` | Send to | no | A new issue on a self-hosted instance of that host. `base` is the instance URL, `project` is `group/name`. | `base`, `project` |
+| `gitlab-merge-request` | Send to | no | A new merge request on gitlab.com from a fixed branch. `branch` is the source branch; the Send window has no branch field, so change `branch` in this file before you send. | `project`, `branch` |
+| `forgejo-issue` | Send to | no | A new issue on a self-hosted forge. `base` is the instance URL, `repo` is `owner/name`. | `base`, `repo` |
+| `copy` | action | no | Copies the selection as markdown on any system. Needs `clipboard.sh` from docs/actions in your config folder. |  |
+| `edit` | action | no | Opens the file at the selected line in your editor. Needs `editor.sh` from docs/actions. |  |
+| `tendir-add` | action | no | Adds a task with the tendir command line tool. |  |
+| `webhook` | action | no | Posts the payload as JSON to a webhook of yours. Set `url` in `vars`. | `url` |
+| `obsidian-new` | action | no | Writes a new note in an Obsidian vault. `vault` and `folder` pick where it lands. | `vault`, `folder` |
+
+The whole file, as `git terrace actions-init` writes it:
+
+```toml
+# gitterrace actions.toml, pre-filled. `git terrace actions-init` writes this file to your
+# config folder. Edit it freely. It is a normal actions file, loaded by the same rules as
+# any other. An entry with `enabled = false` is checked at load but not offered, so switch on
+# only what you use: set `enabled = true` and fill in its `vars`.
+#
+# Each block is described by the comment lines right above it.
+
+version = 1
+
+# ---- Send to: URL templates the browser opens; you confirm on the destination's own page.
+
+# Opens tendir's new-task sheet, filled in. Needs the tendir app.
+[[send]]
+id    = "tendir"
+label = "Send to tendir"
+url   = "tendir://new-task?title={title}&notes={notes}"
+
+# A mail draft in your mail app.
+[[send]]
+id    = "mail"
+label = "Mail draft"
+url   = "mailto:?subject={title}&body={notes}"
+
+# A new issue on github.com. `repo` is `owner/name`.
+[[send]]
+id      = "github-issue"
+label   = "New issue"
+enabled = false
+url     = "https://github.com/{var.repo}/issues/new?title={title}&body={notes}"
+vars    = { repo = "owner/name" }
+
+# A new discussion on github.com. `repo` is `owner/name`, `category` the category slug.
+[[send]]
+id      = "github-discussion"
+label   = "New discussion"
+enabled = false
+url     = "https://github.com/{var.repo}/discussions/new?category={var.category}&title={title}&body={notes}"
+vars    = { repo = "owner/name", category = "general" }
+
+# A new issue on gitlab.com. `project` is `group/name`, or `group/subgroup/name`.
+[[send]]
+id      = "gitlab-issue"
+label   = "New issue"
+enabled = false
+url     = "https://gitlab.com/{var.project}/-/issues/new?issue%5Btitle%5D={title}&issue%5Bdescription%5D={notes}"
+vars    = { project = "group/name" }
+
+# A new issue on a self-hosted instance of that host. `base` is the instance URL, `project` is `group/name`.
+[[send]]
+id      = "gitlab-issue-self-hosted"
+label   = "New issue"
+enabled = false
+url     = "{var.base}/{var.project}/-/issues/new?issue%5Btitle%5D={title}&issue%5Bdescription%5D={notes}"
+vars    = { base = "https://gitlab.example.test", project = "group/name" }
+
+# A new merge request on gitlab.com from a fixed branch. `branch` is the source branch. The
+# Send window has no branch field, so change `branch` in this file before you send.
+[[send]]
+id      = "gitlab-merge-request"
+label   = "New merge request"
+enabled = false
+url     = "https://gitlab.com/{var.project}/-/merge_requests/new?merge_request%5Bsource_branch%5D={var.branch}&merge_request%5Btitle%5D={title}&merge_request%5Bdescription%5D={notes}"
+vars    = { project = "group/name", branch = "my-branch" }
+
+# A new issue on a self-hosted forge. `base` is the instance URL, `repo` is `owner/name`.
+[[send]]
+id      = "forgejo-issue"
+label   = "New issue"
+enabled = false
+url     = "{var.base}/{var.repo}/issues/new?title={title}&body={notes}"
+vars    = { base = "https://codeberg.org", repo = "owner/name" }
+
+# ---- Actions: programs of yours, run with no shell. See the scripts in docs/actions.
+
+# Copies the selection as markdown on any system. Needs `clipboard.sh` from docs/actions in your config folder.
+[[action]]
+id      = "copy"
+label   = "Copy to clipboard"
+enabled = false
+kinds   = ["line", "file", "commit"]
+command = ["~/.config/gitterrace/clipboard.sh"]
+stdin   = "markdown"
+
+# Opens the file at the selected line in your editor. Needs `editor.sh` from docs/actions.
+[[action]]
+id      = "edit"
+label   = "Open in editor"
+enabled = false
+kinds   = ["line"]
+command = ["~/.config/gitterrace/editor.sh", "{line_start}", "{root}/{path}"]
+stdin   = "none"
+
+# Adds a task with the tendir command line tool.
+[[action]]
+id      = "tendir-add"
+label   = "Add to tendir"
+enabled = false
+kinds   = ["line", "hunk", "commit", "blame", "page"]
+command = ["tendir", "add", "--notes", "{markdown}", "--", "{title}"]
+key     = "t"
+
+# Posts the payload as JSON to a webhook of yours. Set `url` in `vars`.
+[[action]]
+id      = "webhook"
+label   = "Post to webhook"
+enabled = false
+kinds   = ["line", "commit"]
+command = ["curl", "-fsS", "-m", "8", "-H", "Content-Type: application/json", "--data-binary", "@-", "{var.url}"]
+stdin   = "json"
+vars    = { url = "https://example.test/hook" }
+
+# Writes a new note in an Obsidian vault. `vault` and `folder` pick where it lands.
+[[action]]
+id      = "obsidian-new"
+label   = "New Obsidian note"
+enabled = false
+kinds   = ["line", "commit"]
+command = ["open", "obsidian://new?vault={var.vault:url}&file={var.folder:url}%2F{title:url}&content={markdown:url}"]
+vars    = { vault = "Notes", folder = "Inbox" }
+```
+
 <!-- END GENERATED: starter -->
 
 ### Reference
 
 <!-- BEGIN GENERATED: send -->
-| Preset | Opens | Needs in `vars` | Default label |
-| --- | --- | --- | --- |
-| `tendir` | tendir's new-task sheet, filled in. `tendir://new-task?title={title}&notes={notes}` |  | Send to tendir |
-| `github-issue` | A new issue on a hosted service. `repo` is `owner/name`. `https://github.com/{var.repo}/issues/new?title={title}&body={notes}` | `repo` | New issue |
-| `forgejo-issue` | A new issue on a self-hosted forge. `base` is the instance URL, `repo` is `owner/name`. `{var.base}/{var.repo}/issues/new?title={title}&body={notes}` | `base`, `repo` | New issue |
-| `mail` | A mail draft in your mail app. `mailto:?subject={title}&body={notes}` |  | Mail draft |
 
 | Placeholder | Value |
 | --- | --- |
@@ -67,15 +201,15 @@ Refused schemes: `javascript:`, `data:`, `file:`, `vbscript:`, `blob:`, `about:`
 
 ### `[[send]]`
 
-One Send to target: its own `url`, or a `preset`.
+One Send to target: a `url` template.
 
 | Key | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | `id` | string | yes |  | `[a-z0-9-]`, 1 to 32 characters, unique among sends. |
-| `label` | string | no |  | Text in the Send window, 1 to 80 characters. A preset has a default. |
-| `url` | string | no |  | The URL template. The scheme and host are literal; placeholders (below) fill the path, query or fragment, each percent-encoded. Set exactly one of `url` and `preset`. |
-| `preset` | string | no |  | A built-in target by name (below). Set exactly one of `url` and `preset`. |
-| `vars` | table of strings | no | `{}` | `[send.vars]`: settings, inserted verbatim as `{var.<name>}`, one line each, at most 4 KiB. A preset names the ones it needs. |
+| `label` | string | yes |  | Text in the Send window, 1 to 80 characters. |
+| `url` | string | yes |  | The URL template. The scheme and host are literal; placeholders (below) fill the path, query or fragment, each percent-encoded. |
+| `enabled` | boolean | no | `true` | `false` checks the block but does not offer it. The starter file ships the ones that need your settings this way. |
+| `vars` | table of strings | no | `{}` | `[send.vars]`: settings, inserted verbatim as `{var.<name>}`, one line each, at most 4 KiB. |
 
 <!-- END GENERATED: send -->
 
@@ -214,6 +348,7 @@ One menu entry. It runs either its own `command` or a `script`.
 | --- | --- | --- | --- | --- |
 | `id` | string | yes |  | `[a-z0-9-]`, 1 to 32 characters, unique. |
 | `label` | string | yes |  | Menu text, 1 to 80 characters. |
+| `enabled` | boolean | no | `true` | `false` checks the block but does not offer it, and its program may be missing. The starter file ships the examples this way. |
 | `kinds` | array of strings | yes |  | Where the action is offered, from the kinds below. An unknown kind is an error. |
 | `command` | array or string | no |  | As in a script. Set exactly one of `command` and `script`. |
 | `script` | string | no |  | The `id` of a `[[script]]`. `shell` is not allowed beside it. |

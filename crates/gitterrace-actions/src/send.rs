@@ -301,7 +301,11 @@ mod tests {
             let query = got.split_once('?').expect("query").1;
             assert!(!query.contains(['#', '?', '/', ' ', '+']), "{id}: {got}");
             let n = query.split('&').count();
-            assert_eq!(n, if id.ends_with("request") { 3 } else { 2 }, "{id}: {got}");
+            assert_eq!(
+                n,
+                if id.ends_with("request") { 3 } else { 2 },
+                "{id}: {got}"
+            );
             assert!(got.contains("a%26b%20%231%20%3F%2F%20%2B%20%C3%A9%F0%9F%98%80"));
         }
     }

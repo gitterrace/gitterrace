@@ -112,6 +112,8 @@ pub struct Index {
     dir: PathBuf,
     /// Threads that parse the stored records; 0 means one per core, at most 8.
     threads: usize,
+    /// The format of a cache written by a newer build. Such a cache is never read or written.
+    newer: Option<String>,
 }
 
 impl Index {
@@ -122,8 +124,12 @@ impl Index {
 
     /// Opens or creates the cache in `dir`. A format version mismatch discards old records.
     pub fn open_dir(dir: PathBuf) -> io::Result<Self> {
-        store::ensure_dir(&dir)?;
-        Ok(Self { dir, threads: 0 })
+        let newer = store::ensure_dir(&dir)?;
+        Ok(Self {
+            dir,
+            threads: 0,
+            newer,
+        })
     }
 
     /// Sets the threads that parse stored records; 0 means one per core, at most 8.
@@ -131,6 +137,16 @@ impl Index {
     pub fn with_threads(mut self, threads: usize) -> Self {
         self.threads = threads;
         self
+    }
+
+    /// The cache format found on disk when a newer build wrote it. Then [`Index::update`] and
+    /// [`Index::records`] fail with an explanation and leave the files alone.
+    pub fn newer_format(&self) -> Option<&str> {
+        self.newer.as_deref()
+    }
+
+    fn writable(&self) -> io::Result<()> {
+        store::check_writable(&self.dir)
     }
 
     pub fn dir(&self) -> &std::path::Path {
@@ -150,6 +166,7 @@ impl Index {
         rev: &str,
         progress: &dyn Fn(Progress),
     ) -> io::Result<()> {
+        self.writable()?;
         let ids = source.rev_list(rev)?;
         let (known, valid) = store::stored_ids(&self.dir)?;
         let mut seen = known;
@@ -344,6 +361,59 @@ mod tests {
         assert_eq!(&*got[1].files[1].path, "y.rs");
         assert_eq!(got[2].files[0].old.as_deref(), Some("src/x.rs"));
         assert_eq!(got[0].files[0].additions, 2);
+        Ok(())
+    }
+
+    /// A build never touches a cache a newer build wrote, and says why. The same holds when the
+    /// newer build takes the cache over while this one is already running.
+    #[test]
+    fn a_newer_cache_is_left_byte_identical() -> io::Result<()> {
+        let dir = tempfile::tempdir()?;
+        let path = dir.path().join("gitterrace");
+        let idx = Index::open_dir(path.clone())?;
+        let src = Fake::new(&["a", "b"]);
+        idx.update(&src, "HEAD", &|_| {})?;
+        let snapshot = |p: &std::path::Path| -> io::Result<Vec<(String, Vec<u8>)>> {
+            let mut v = Vec::new();
+            for e in std::fs::read_dir(p)? {
+                let e = e?;
+                v.push((
+                    e.file_name().to_string_lossy().into_owned(),
+                    std::fs::read(e.path())?,
+                ));
+            }
+            v.sort();
+            Ok(v)
+        };
+        // A newer build takes over while `idx` is open.
+        std::fs::write(path.join("VERSION"), "99\n")?;
+        src.ids.borrow_mut().push("c".into());
+        let before = snapshot(&path)?;
+        let err = idx.update(&src, "HEAD", &|_| {}).expect_err("must refuse");
+        assert!(err.to_string().contains("newer"), "{err}");
+        assert!(idx.records(&src, "HEAD").is_err());
+        assert!(idx.pending(&src, "HEAD").is_err());
+        // A build that starts after it sees the same.
+        let late = Index::open_dir(path.clone())?;
+        assert_eq!(late.newer_format(), Some("99"));
+        assert!(late.update(&src, "HEAD", &|_| {}).is_err());
+        assert_eq!(snapshot(&path)?, before);
+        Ok(())
+    }
+
+    #[test]
+    fn unreadable_rows_are_counted_not_silent() -> io::Result<()> {
+        let dir = tempfile::tempdir()?;
+        let path = dir.path().join("gitterrace");
+        let idx = Index::open_dir(path.clone())?;
+        let src = Fake::new(&["a", "b"]);
+        idx.update(&src, "HEAD", &|_| {})?;
+        let file = path.join("commits.jsonl");
+        let mut text = std::fs::read_to_string(&file)?;
+        text.push_str("{\"id\":\"z\",\"files\":[{\"path\":\"old/style.rs\"}]}\n");
+        std::fs::write(&file, text)?;
+        // The bad row is dropped, the good ones survive; the count goes to stderr.
+        assert_eq!(ids(&idx.records(&src, "HEAD")?), ["a", "b"]);
         Ok(())
     }
 

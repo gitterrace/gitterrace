@@ -820,6 +820,8 @@ async fn refs(State(app): Shared) -> Result<Html<String>> {
 struct PendingPage {
     c: Chrome,
     tabs: Vec<Nav>,
+    /// Set when a newer build owns the cache: this one leaves it alone instead of indexing.
+    newer: Option<String>,
 }
 
 struct AuthorRow {
@@ -859,6 +861,15 @@ pub(crate) async fn with_records<T: Template + Send + 'static>(
             None => Ok(PendingPage {
                 c,
                 tabs: views::stats_tabs(tab),
+                newer: a.index.newer_format().map(|v| {
+                    format!(
+                        "The history cache was written by a newer gitterrace (format {v}, this \
+                         build reads {}). It is left untouched: run the newer build, or delete \
+                         {} to rebuild it here.",
+                        gitterrace_index::FORMAT_VERSION,
+                        a.index.dir().display()
+                    )
+                }),
             }
             .render()?),
         }
