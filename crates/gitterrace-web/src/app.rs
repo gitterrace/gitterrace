@@ -533,8 +533,12 @@ impl App {
             return Ok(None);
         }
         let key = (head.to_owned(), self.index.generation());
-        if let Ok(g) = self.records.lock()
-            && let Some((k, recs)) = g.as_ref()
+        // Held across the load: callers racing on a cold holder wait for the one parse instead
+        // of each parsing the whole record file, which multiplied peak memory.
+        let Ok(mut g) = self.records.lock() else {
+            return Ok(None);
+        };
+        if let Some((k, recs)) = g.as_ref()
             && *k == key
         {
             return Ok(Some(Arc::clone(recs)));
@@ -546,10 +550,10 @@ impl App {
             self.wake.notify_one();
             return Ok(None);
         }
+        // Drop the stale set first so the old and the new one are never alive together.
+        *g = None;
         let recs = Arc::new(self.index.records(&self.repo, head)?);
-        if let Ok(mut g) = self.records.lock() {
-            *g = Some((key, Arc::clone(&recs)));
-        }
+        *g = Some((key, Arc::clone(&recs)));
         Ok(Some(recs))
     }
 }
@@ -814,5 +818,36 @@ mod tests {
         let head = app.repo.resolve("HEAD").expect("head");
         let second = app.records(&head).expect("records").expect("ready");
         assert_eq!(second.len(), 2, "records cache must follow the new tip");
+    }
+
+    #[test]
+    fn racing_callers_share_one_parsed_record_set() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path();
+        git(path, &["init", "-q", "-b", "main"]);
+        std::fs::write(path.join("a.txt"), "1\n").expect("write");
+        git(path, &["add", "."]);
+        git(path, &["commit", "-q", "-m", "feat: one"]);
+        let repo = gitterrace_git::Repo::discover(path).expect("repo");
+        let index = gitterrace_index::Index::open(&repo).expect("index");
+        let app = std::sync::Arc::new(App::new(repo, index));
+        app.index
+            .update(&app.repo, "HEAD", &|_| {})
+            .expect("update");
+        app.mark_ready();
+        let head = app.repo.resolve("HEAD").expect("head");
+        let sets: Vec<_> = (0..8)
+            .map(|_| {
+                let (a, h) = (std::sync::Arc::clone(&app), head.clone());
+                std::thread::spawn(move || a.records(&h).expect("records").expect("ready"))
+            })
+            .collect::<Vec<_>>()
+            .into_iter()
+            .map(|t| t.join().expect("join"))
+            .collect();
+        assert!(
+            sets.iter().all(|s| std::sync::Arc::ptr_eq(s, &sets[0])),
+            "every racing caller must get the one parsed set"
+        );
     }
 }

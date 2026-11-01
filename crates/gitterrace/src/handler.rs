@@ -1,7 +1,7 @@
 //! `install-handler`: opt-in registration of the `gitterrace://` scheme with the OS.
 //!
-//! macOS gets a small AppleScript app (URLs reach apps as Apple events, not argv) in
-//! `~/Applications`, registered with LaunchServices. Linux gets a `.desktop` file and
+//! macOS gets a small `AppleScript` app (URLs reach apps as Apple events, not argv) in
+//! `~/Applications`, registered with `LaunchServices`. Linux gets a `.desktop` file and
 //! `xdg-mime`. WSL only prints steps. The handler just runs `<this program> open <url>`; the
 //! strict parsing and lookup live in `open`.
 
@@ -11,7 +11,7 @@ use std::{
     process::Command,
 };
 
-use anyhow::{bail, Context};
+use anyhow::{Context, bail};
 
 const APP_NAME: &str = "gitterrace-open.app";
 const BUNDLE_ID: &str = "dev.gitterrace.open";
@@ -37,12 +37,15 @@ fn is_wsl() -> bool {
     std::fs::read_to_string("/proc/version").is_ok_and(|v| v.to_lowercase().contains("microsoft"))
 }
 
-/// AppleScript source of the macOS handler. The URL is shell-quoted, and the program runs in
+/// `AppleScript` source of the macOS handler. The URL is shell-quoted, and the program runs in
 /// the background so the app returns at once.
 pub(crate) fn applescript(exe: &Path) -> String {
     format!(
         "on open location theURL\n\tdo shell script quoted form of \"{}\" & \" open \" & quoted form of theURL & \" >/dev/null 2>&1 &\"\nend open location\n",
-        exe.display().to_string().replace('\\', "\\\\").replace('"', "\\\"")
+        exe.display()
+            .to_string()
+            .replace('\\', "\\\\")
+            .replace('"', "\\\"")
     )
 }
 
@@ -58,7 +61,10 @@ fn app_path(home: &Path) -> PathBuf {
 fn tool(cmd: &mut Command) -> anyhow::Result<()> {
     let out = cmd.output().with_context(|| format!("running {cmd:?}"))?;
     if !out.status.success() {
-        bail!("{cmd:?} failed: {}", String::from_utf8_lossy(&out.stderr).trim());
+        bail!(
+            "{cmd:?} failed: {}",
+            String::from_utf8_lossy(&out.stderr).trim()
+        );
     }
     Ok(())
 }
@@ -76,11 +82,17 @@ fn macos(home: &Path, exe: &Path, uninstall: bool) -> anyhow::Result<()> {
         }
         let plist = std::fs::read_to_string(app.join("Contents/Info.plist")).unwrap_or_default();
         if !plist.contains(BUNDLE_ID) {
-            bail!("{} was not written by install-handler, leaving it", app.display());
+            bail!(
+                "{} was not written by install-handler, leaving it",
+                app.display()
+            );
         }
         let _ = Command::new(LSREGISTER).arg("-u").arg(&app).output();
         std::fs::remove_dir_all(&app).with_context(|| format!("removing {}", app.display()))?;
-        println!("removed {}\nunregistered gitterrace:// from LaunchServices", app.display());
+        println!(
+            "removed {}\nunregistered gitterrace:// from LaunchServices",
+            app.display()
+        );
         return Ok(());
     }
     if app.exists() {
@@ -91,17 +103,30 @@ fn macos(home: &Path, exe: &Path, uninstall: bool) -> anyhow::Result<()> {
         std::fs::remove_dir_all(&app)?;
     }
     std::fs::create_dir_all(app.parent().context("no parent")?)?;
-    let script = std::env::temp_dir().join(format!("gitterrace-open-{}.applescript", std::process::id()));
+    let script = std::env::temp_dir().join(format!(
+        "gitterrace-open-{}.applescript",
+        std::process::id()
+    ));
     std::fs::write(&script, applescript(exe))?;
     let made = tool(Command::new("osacompile").arg("-o").arg(&app).arg(&script));
     let _ = std::fs::remove_file(&script);
     made?;
     let plist = app.join("Contents/Info.plist");
-    plist_set(&plist, &["-replace", "CFBundleIdentifier", "-string", BUNDLE_ID])?;
+    plist_set(
+        &plist,
+        &["-replace", "CFBundleIdentifier", "-string", BUNDLE_ID],
+    )?;
     plist_set(&plist, &["-replace", "LSUIElement", "-bool", "true"])?;
-    plist_set(&plist, &["-replace", "CFBundleURLTypes", "-json", url_types_json()])?;
+    plist_set(
+        &plist,
+        &["-replace", "CFBundleURLTypes", "-json", url_types_json()],
+    )?;
     // Editing the bundle invalidates osacompile's ad hoc signature, so sign it again.
-    tool(Command::new("codesign").args(["--force", "--sign", "-"]).arg(&app))?;
+    tool(
+        Command::new("codesign")
+            .args(["--force", "--sign", "-"])
+            .arg(&app),
+    )?;
     tool(Command::new(LSREGISTER).arg("-f").arg(&app))?;
     println!(
         "wrote {} (runs: {} open <url>)\nregistered gitterrace:// with LaunchServices\nremove with: git terrace install-handler --uninstall",
@@ -132,7 +157,9 @@ fn linux(home: &Path, exe: &Path, uninstall: bool) -> anyhow::Result<()> {
         } else {
             println!("nothing to remove: {} does not exist", file.display());
         }
-        let _ = Command::new("update-desktop-database").arg(file.parent().unwrap_or(home)).output();
+        let _ = Command::new("update-desktop-database")
+            .arg(file.parent().unwrap_or(home))
+            .output();
         return Ok(());
     }
     std::fs::create_dir_all(file.parent().context("no parent")?)?;

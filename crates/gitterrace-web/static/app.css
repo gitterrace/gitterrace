@@ -222,7 +222,7 @@ kbd{font:var(--weight-semibold) var(--text-2xs)/1 var(--mono);color:var(--muted)
 .copy{height:24px;padding:0 var(--space-2);font-size:var(--text-xs)}
 .copy.float{position:absolute;top:8px;right:8px;opacity:0;transition:opacity var(--dur-fast)}
 [data-copyable]:hover .copy.float,.markdown-body pre:hover .copy.float,.copy.float:focus-visible{opacity:1}
-.linkbtn{all:unset;color:var(--accent-fg);cursor:pointer}.linkbtn:hover{text-decoration:underline}
+.linkbtn,.linkbtn:hover,.linkbtn:active{all:unset;color:var(--accent-fg);cursor:pointer}.linkbtn:hover{text-decoration:underline;text-underline-offset:3px}.linkbtn:focus-visible{outline:2px solid var(--accent-fg);outline-offset:2px}
 tr.sel td{background:var(--accent-soft)!important;box-shadow:none}
 tr.sel td.n{box-shadow:inset 2px 0 0 var(--accent)}
 .cur{outline:2px solid var(--ring);outline-offset:-2px}

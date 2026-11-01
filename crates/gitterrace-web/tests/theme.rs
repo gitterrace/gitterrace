@@ -42,3 +42,23 @@ fn clipped_text_keeps_room_for_descenders() {
         }
     }
 }
+
+/// `all:unset` loses to the global `button:hover` on hover, so a reset that
+/// stops at the base state paints a button background on a text control.
+#[test]
+fn unset_resets_cover_hover() {
+    let css = include_str!("../static/app.css");
+    for rule in css.split('}') {
+        let Some((sel, body)) = rule.split_once('{') else { continue };
+        if !body.contains("all:unset") {
+            continue;
+        }
+        let sels: Vec<&str> = sel.split(',').map(str::trim).collect();
+        for base in sels.iter().filter(|s| !s.contains(':')) {
+            assert!(
+                sels.contains(&format!("{base}:hover").as_str()),
+                "{base} resets with all:unset but not on :hover, so button:hover leaks through"
+            );
+        }
+    }
+}

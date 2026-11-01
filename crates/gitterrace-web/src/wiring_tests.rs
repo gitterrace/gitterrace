@@ -605,10 +605,10 @@ async fn hovers_use_the_shared_tip() {
     let dir = tempfile::tempdir().expect("tmp");
     let p = repo(dir.path(), "r");
     let r = router(&p, Config::default());
-    let (_, body) = get(&r, "/stats").await;
+    let (_, body) = get(&r, "/refs").await;
     assert!(body.contains("/static/tip.js"), "tip.js is loaded");
-    assert!(body.contains("data-tip=\"Commits by weekday"), "heading tip");
-    assert!(!body.contains("<title>Mon"), "no native svg titles");
+    assert!(body.contains("data-tip=\"Commits ahead"), "column tip");
+    assert!(!body.contains("title=\"Commits"), "no native title");
 }
 
 /// `links.style` decides what Copy permalink copies: the page tells the scripts which form.
