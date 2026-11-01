@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use super::{Insights, Period};
 
 /// Additions and deletions of one bucket, moves and (by default) whitespace excluded.
@@ -31,24 +29,6 @@ pub struct Rework {
     pub window: usize,
     pub unit: super::BucketUnit,
     pub points: Vec<ReworkPoint>,
-}
-
-/// Lines of code per language at the end of each bucket.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
-pub struct LocSeries {
-    /// Largest first at the end of history; ends with `Other` when languages were folded.
-    pub languages: Vec<String>,
-    /// Languages folded into `Other`, largest first.
-    pub other: Vec<String>,
-    pub points: Vec<LocPoint>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
-pub struct LocPoint {
-    pub key: String,
-    pub label: String,
-    /// Aligned with [`LocSeries::languages`].
-    pub lines: Vec<i64>,
 }
 
 /// `2 * rewritten / (added + removed)`: 0 for purely new code, 1 when every change replaced
@@ -152,97 +132,6 @@ impl Insights<'_> {
             points,
         }
     }
-
-    /// Lines of code per language over time, exact: a running sum of additions minus deletions
-    /// along the first-parent chain from the newest commit. Merge diffs against their first
-    /// parent are how a branch's lines arrive, so merges count here. Whitespace is always
-    /// counted so the final column equals the tree. `top` languages are kept, the rest folded.
-    pub fn loc_over_time(&self, top: usize, period: Period) -> LocSeries {
-        let axis = self.axis(Some(period));
-        let by_id: HashMap<&str, usize> = self
-            .records
-            .iter()
-            .enumerate()
-            .map(|(i, r)| (r.id.as_str(), i))
-            .collect();
-        let mut chain = Vec::new();
-        let mut at = self.records.len().checked_sub(1);
-        while let Some(i) = at {
-            chain.push(i);
-            at = self.records[i]
-                .parents
-                .first()
-                .and_then(|p| by_id.get(p.as_str()).copied());
-        }
-        chain.reverse();
-
-        let mut names: Vec<String> = Vec::new();
-        let mut slot: HashMap<String, usize> = HashMap::new();
-        let mut lang_of: HashMap<&str, usize> = HashMap::new();
-        let mut running: Vec<i64> = Vec::new();
-        let mut rows: Vec<Option<Vec<i64>>> = vec![None; axis.len()];
-        for i in chain {
-            let r = &self.records[i];
-            for f in &r.files {
-                if self.filter.skips(&f.path) {
-                    continue;
-                }
-                let s = *lang_of.entry(f.path.as_str()).or_insert_with(|| {
-                    let l = super::language(&f.path);
-                    *slot.entry(l.clone()).or_insert_with(|| {
-                        names.push(l);
-                        running.push(0);
-                        names.len() - 1
-                    })
-                });
-                running[s] += i64::from(f.additions) - i64::from(f.deletions);
-            }
-            if let Some(slot) = axis.slot(r) {
-                rows[slot] = Some(running.clone());
-            }
-        }
-        let final_row: Vec<i64> = running.clone();
-        let mut order: Vec<usize> = (0..names.len()).filter(|s| final_row[*s] > 0).collect();
-        order.sort_by(|a, b| {
-            final_row[*b]
-                .cmp(&final_row[*a])
-                .then_with(|| names[*a].cmp(&names[*b]))
-        });
-        let keep: Vec<usize> = if order.len() <= top + 1 {
-            order.clone()
-        } else {
-            order[..top].to_vec()
-        };
-        let folded: Vec<usize> = (0..names.len()).filter(|s| !keep.contains(s)).collect();
-        let mut other: Vec<usize> = folded.clone();
-        other.sort_by(|a, b| {
-            final_row[*b]
-                .cmp(&final_row[*a])
-                .then_with(|| names[*a].cmp(&names[*b]))
-        });
-        let mut languages: Vec<String> = keep.iter().map(|s| names[*s].clone()).collect();
-        if !folded.is_empty() {
-            languages.push("Other".to_owned());
-        }
-        let mut points: Vec<LocPoint> = Vec::new();
-        let mut carry = vec![0i64; names.len()];
-        for (slot, (key, label)) in axis.names().enumerate() {
-            if let Some(row) = &rows[slot] {
-                carry.clone_from(row);
-                carry.resize(names.len(), 0);
-            }
-            let mut lines: Vec<i64> = keep.iter().map(|s| carry[*s]).collect();
-            if !folded.is_empty() {
-                lines.push(folded.iter().map(|s| carry[*s]).sum());
-            }
-            points.push(LocPoint { key, label, lines });
-        }
-        LocSeries {
-            languages,
-            other: other.iter().map(|s| names[*s].clone()).collect(),
-            points,
-        }
-    }
 }
 
 #[cfg(test)]
@@ -325,32 +214,5 @@ mod tests {
         assert_eq!(ins.rework(Period::All).window, 50);
         assert_eq!(ins.rework(Period::Week).window, 10);
         assert_eq!(ins.rework(Period::Week).points.len(), 7);
-    }
-
-    #[test]
-    fn loc_follows_first_parent_and_folds() {
-        let mut a = rec(
-            "a",
-            "Ann",
-            0,
-            vec![file("x.rs", 100, 0, 100), file("y.py", 10, 0, 10)],
-        );
-        a.parents = vec![];
-        let mut b = rec("b", "Ann", 1, vec![file("x.rs", 5, 25, 80)]);
-        b.parents = vec!["a".into()];
-        // A side branch commit that is not on the first-parent chain of the merge.
-        let mut side = rec("s", "Bob", 2, vec![file("z.rs", 999, 0, 999)]);
-        side.parents = vec!["a".into()];
-        let mut m = rec("m", "Ann", 3, vec![file("w.md", 7, 0, 7)]);
-        m.parents = vec!["b".into(), "s".into()];
-        m.merge = true;
-        let recs = vec![a, side, b, m];
-        let ins = Insights::new(&recs, Options::default(), None);
-        let loc = ins.loc_over_time(1, Period::All);
-        assert_eq!(loc.languages, ["Rust", "Other"]);
-        assert_eq!(loc.other, ["Python", "Markdown"]);
-        let last = loc.points.last().map(|p| p.lines.clone());
-        assert_eq!(last, Some(vec![80, 17]));
-        assert_eq!(loc.points.len(), 4);
     }
 }

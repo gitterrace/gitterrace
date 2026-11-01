@@ -4,8 +4,6 @@ use std::path::Path;
 
 use gitterrace_git::{BlobReader, MAX_TEXT_BYTES, Repo};
 
-use super::{Insights, PathFilter, language};
-
 pub(crate) const CACHE_FILE: &str = "lines.json";
 
 /// A text file of the head tree with its line count.
@@ -13,15 +11,6 @@ pub(crate) const CACHE_FILE: &str = "lines.json";
 pub struct HeadFile {
     pub path: String,
     pub lines: u32,
-}
-
-/// Language share of the head tree.
-#[derive(Debug, Clone, PartialEq, serde::Serialize)]
-pub struct LangShare {
-    pub language: String,
-    pub lines: u64,
-    pub files: usize,
-    pub share: f64,
 }
 
 /// Line counts per blob id, kept in `.git/gitterrace/lines.json`. A blob never changes, so the
@@ -83,69 +72,9 @@ pub fn head_files(
     Ok(out)
 }
 
-/// Share per language of `files`, largest first, skipping what `filter` skips.
-pub fn language_share(files: &[HeadFile], filter: &PathFilter) -> Vec<LangShare> {
-    let mut map: HashMap<String, (u64, usize)> = HashMap::new();
-    for f in files.iter().filter(|f| !filter.skips(&f.path)) {
-        let e = map.entry(language(&f.path)).or_default();
-        e.0 += u64::from(f.lines);
-        e.1 += 1;
-    }
-    let total: u64 = map.values().map(|v| v.0).sum();
-    let mut out: Vec<LangShare> = map
-        .into_iter()
-        .map(|(language, (lines, files))| LangShare {
-            language,
-            lines,
-            files,
-            share: if total == 0 {
-                0.0
-            } else {
-                lines as f64 / total as f64
-            },
-        })
-        .collect();
-    out.sort_by(|a, b| {
-        b.lines
-            .cmp(&a.lines)
-            .then_with(|| a.language.cmp(&b.language))
-    });
-    out
-}
-
-impl Insights<'_> {
-    /// [`language_share`] under this instance's options.
-    pub fn languages_now(&self, files: &[HeadFile]) -> Vec<LangShare> {
-        language_share(files, &self.filter)
-    }
-}
-
 #[cfg(test)]
 mod tests {
-    use super::{HeadFile, LineCache, language_share};
-    use crate::{Options, PathFilter};
-
-    #[test]
-    fn share_sums_and_skips() {
-        let files = [
-            ("a.rs", 30),
-            ("b.rs", 50),
-            ("c.md", 20),
-            ("Cargo.lock", 900),
-        ]
-        .map(|(p, n)| HeadFile {
-            path: p.into(),
-            lines: n,
-        });
-        let f = PathFilter::new(&Options::default(), None);
-        let s = language_share(&files, &f);
-        assert_eq!(
-            (s[0].language.as_str(), s[0].lines, s[0].files),
-            ("Rust", 80, 2)
-        );
-        assert!((s[0].share - 0.8).abs() < 1e-9);
-        assert_eq!(s.len(), 2);
-    }
+    use super::LineCache;
 
     #[test]
     fn cache_round_trips() -> std::io::Result<()> {

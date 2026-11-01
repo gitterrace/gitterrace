@@ -26,16 +26,14 @@ use crate::aggregates::civil;
 use crate::{CommitRecord, FileStat};
 
 pub use axis::{BucketUnit, TimeAxis};
-pub use code::{
-    CodeFrequency, LocPoint, LocSeries, Rework, ReworkPoint, rework_share, rework_verdict,
-};
+pub use code::{CodeFrequency, Rework, ReworkPoint, rework_share, rework_verdict};
 pub use files::{
     AgeBucket, AgeReport, Coupling, DirOwnership, Hotspot, HotspotReport, Owner, OwnershipReport,
     Touch,
 };
 pub use filter::{PathFilter, is_generated};
 pub(crate) use headfiles::CACHE_FILE;
-pub use headfiles::{HeadFile, LangShare, LineCache, head_files, language_share};
+pub use headfiles::{HeadFile, LineCache, head_files};
 pub use lang::language;
 pub use misc::{Cadence, Comparison, LangDelta, Release, SizeBucket, release_tags};
 pub use people::{People, Person};
