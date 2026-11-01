@@ -50,7 +50,8 @@ main.wrap>h2:first-child,main.wrap>.tabs+h2{margin-top:var(--space-6)}
 .card{border:var(--border);border-radius:var(--radius);overflow:hidden;overflow-x:auto;background:var(--bg)}
 .scroll{overflow-x:auto}
 .cols{display:grid;grid-template-columns:minmax(0,1fr) 280px;gap:var(--space-8)}
-@media (max-width:860px){.cols{grid-template-columns:minmax(0,1fr);gap:var(--space-6)}aside{order:-1}}
+@media (max-width:1100px){.cols{grid-template-columns:minmax(0,1fr);gap:var(--space-6)}}
+@media (max-width:860px){aside{order:-1}}
 aside h2{margin-top:0}
 input{font:inherit;padding:5px var(--space-3);border:1px solid var(--line-strong);border-radius:var(--radius);background:var(--surface);color:var(--fg);min-width:240px;height:32px}
 input::placeholder{color:var(--faint)}
@@ -93,7 +94,7 @@ button:hover{border-color:var(--line-strong);background:var(--hover)}
 .latest{display:flex;align-items:center;gap:var(--space-2);padding:var(--space-3) var(--space-4);border-radius:var(--radius) var(--radius) 0 0;border-bottom:0;background:var(--soft);font-size:var(--text-sm)}
 .latest+.files-card{border-radius:0 0 var(--radius) var(--radius)}
 .latest b{font-weight:var(--weight-semibold)}
-.latest .subj{color:var(--muted);flex:1;min-width:0;overflow-wrap:break-word}.latest .subj:hover{color:var(--accent-fg)}
+.latest .subj{color:var(--muted);flex:1}.latest .subj:hover{color:var(--accent-fg)}
 .latest .hist{font-weight:var(--weight-semibold);color:var(--fg)}
 .files-card{margin-bottom:var(--space-6)}
 /* The README below a file list sits apart from it on every page, not only the overview. */
@@ -115,8 +116,11 @@ button:hover{border-color:var(--line-strong);background:var(--hover)}
 /* One line per commit: subject takes the room, author and time sit after it,
    muted, and give way first when the line is short. */
 .cmain{display:flex;flex-direction:row;flex-wrap:wrap;align-items:baseline;gap:0 var(--space-3);flex:1;min-width:0}
-.cmain>a{color:var(--fg);font-weight:var(--weight-semibold);overflow-wrap:break-word;flex:0 1 auto;min-width:0}.cmain>a:hover{color:var(--accent-fg)}
-.cmain .muted{flex:0 1 auto;min-width:0;overflow-wrap:break-word;margin-left:auto}
+/* The one place text is cut: a commit message is a single line that ends in an ellipsis
+   when the room runs out, and carries the full text as a hover (tip.js). */
+.subj{display:block;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cmain>.subj{color:var(--fg);font-weight:var(--weight-semibold);flex:0 1 auto}.cmain>.subj:hover{color:var(--accent-fg)}
+.cmain .muted{flex:0 0 auto;max-width:100%;overflow-wrap:break-word;margin-left:auto}
 .cmain .muted b{color:var(--muted);font-weight:var(--weight-regular)}
 .crow .sha{flex:none}
 
@@ -223,7 +227,7 @@ kbd{font:var(--weight-semibold) var(--text-2xs)/1 var(--mono);color:var(--muted)
 tr.sel td{background:var(--accent-soft)!important;box-shadow:none}
 tr.sel td.n{box-shadow:inset 2px 0 0 var(--accent)}
 .cur{outline:2px solid var(--ring);outline-offset:-2px}
-table.entries[data-last] td:first-child{width:1%;white-space:nowrap}table.entries[data-last] td.lc{width:100%;overflow-wrap:break-word}table.entries[data-last] td.ago{width:1%;text-align:right;white-space:nowrap}table.entries[data-last] td.r{width:1%;padding-left:0;white-space:nowrap}
+table.entries[data-last] td:first-child{width:1%;min-width:0;white-space:nowrap}table.entries[data-last] td.lc{width:100%;max-width:0}table.entries[data-last] td.ago{width:1%;text-align:right;white-space:nowrap}table.entries[data-last] td.r{width:1%;padding-left:0;white-space:nowrap}
 td.lc{font-size:var(--text-sm);overflow-wrap:break-word}
 td.lc a{color:var(--muted)!important}td.lc a:hover{color:var(--accent-fg)!important}
 td.ago{color:var(--faint);font-size:var(--text-xs);white-space:nowrap}
@@ -300,14 +304,14 @@ svg.loc .xh{display:none;stroke:var(--fg);stroke-width:1;stroke-dasharray:3 3;po
 .rlist{margin-top:var(--space-4)}.rlist summary{cursor:pointer;color:var(--muted);font-size:var(--text-sm)}
 .rlist ul{list-style:none;margin:var(--space-3) 0 0;padding:0;max-height:360px;overflow:auto}
 .rlist li{display:flex;gap:var(--space-3);align-items:baseline;padding:3px 0;border-top:var(--border);min-width:0}
-.rlist .subj{flex:1;min-width:0;overflow-wrap:break-word}
+.rlist .subj{flex:1}
 .foot{color:var(--muted);font-size:var(--text-sm);margin:var(--space-2) 0 0}
 svg.spark{display:block;fill:none;stroke-width:1.6;stroke-linejoin:round}
 td.sparkcell{white-space:nowrap}td.sparkcell svg.spark{display:inline-block;vertical-align:middle;margin-right:var(--space-2)}td.sparkcell span{display:inline-block;min-width:6ch;text-align:right;font:var(--text-xs) var(--mono);font-variant-numeric:tabular-nums}
 svg.spark.s1{stroke:var(--cat-1)}svg.spark.s2{stroke:var(--cat-2)}svg.spark.s3{stroke:var(--cat-3)}svg.spark.s4{stroke:var(--cat-4)}svg.spark.s5{stroke:var(--cat-5)}svg.spark.s6{stroke:var(--cat-6)}svg.spark.s7{stroke:var(--cat-7)}svg.spark.s8{stroke:var(--cat-8)}
 
 /* last-commit column: the message fills the cell, the age has its own column */
-@media (max-width:600px){table.entries[data-last] td:first-child{width:45%}table.entries[data-last] td.r,table.entries[data-last] td.ago{display:none}}
+@media (max-width:600px){table.entries[data-last] td.r,table.entries[data-last] td.ago{display:none}}
 
 /* insights filter: chips, matrix, author links */
 .fbar{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:var(--space-3) var(--space-6);margin:var(--space-4) 0}
@@ -384,8 +388,8 @@ table.own td{white-space:nowrap}table.own td:first-child{width:30%}
 .headstate{background:var(--warn-bg);color:var(--warn);border-bottom:var(--border);font:var(--weight-semibold) var(--text-sm)/1.4 var(--mono);padding:var(--space-2) 0}
 .actnote{background:var(--soft);color:var(--muted);border-bottom:var(--border);font:var(--text-xs)/1.5 var(--mono);padding:var(--space-2) 0;overflow-wrap:break-word}
 .branches td:first-child{white-space:nowrap}
-.entries.grow td:first-child{width:auto;white-space:nowrap}.entries td.grow{width:100%}
-.branches .subj{overflow-wrap:break-word}
+.entries.grow td:first-child{width:auto;white-space:nowrap}.entries td.grow{width:100%;max-width:0}
+.branches .line{display:flex;gap:var(--space-2);align-items:baseline;min-width:0}.branches .line>.subj{flex:0 1 auto}.branches .line>*:not(.subj){flex:none}
 .entries .th td{white-space:nowrap}
 .tag.merged{color:var(--accent-fg)}
 .tagmsg pre{margin:var(--space-3) 0 0;white-space:pre-wrap;font:var(--text-sm)/1.5 var(--mono)}

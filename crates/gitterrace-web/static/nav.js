@@ -405,7 +405,7 @@
       Array.prototype.forEach.call(table.querySelectorAll("td.lc"), function (td) {
         var c = by[td.dataset.name];
         if (!c) return;
-        var a = el("a", "", c.subject);
+        var a = el("a", "subj", c.subject);
         a.href = B + "/commit/" + c.id;
         td.appendChild(a);
         // The age gets its own right-aligned column, so the

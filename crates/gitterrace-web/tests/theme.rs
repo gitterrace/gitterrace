@@ -65,11 +65,11 @@ fn unset_resets_cover_hover() {
     }
 }
 
-/// Owner rule: text is never cut with an ellipsis. It wraps, or the layout gives it room.
-/// The allowlist is empty on purpose.
+/// Owner rule: text is never cut with an ellipsis, with one exception. A commit message is a
+/// single line that ends in an ellipsis and carries its full text as a tip. Every commit
+/// message uses the one `.subj` class, so that is the only selector allowed to truncate.
 #[test]
-fn stylesheets_never_truncate_text() {
-    const ALLOWED: [&str; 0] = [];
+fn only_commit_messages_truncate() {
     for (name, css) in [
         ("app.css", include_str!("../static/app.css")),
         ("markdown.css", include_str!("../static/markdown.css")),
@@ -77,10 +77,11 @@ fn stylesheets_never_truncate_text() {
         for rule in css.split('}') {
             let squeezed: String = rule.split_whitespace().collect();
             if squeezed.contains("text-overflow:ellipsis") {
-                let sel = rule.trim().split('{').next().unwrap_or_default();
+                let sel = rule.rsplit_once('{').map(|(s, _)| s).unwrap_or_default();
+                let sel = sel.rsplit("*/").next().unwrap_or_default().trim();
                 assert!(
-                    ALLOWED.contains(&sel),
-                    "{name}: `{sel}` truncates text with an ellipsis, wrap it instead"
+                    sel == ".subj",
+                    "{name}: `{sel}` truncates text with an ellipsis, only the commit message class `.subj` may"
                 );
             }
         }

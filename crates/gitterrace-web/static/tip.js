@@ -18,7 +18,17 @@
     return tip;
   }
 
+  // A commit message (.subj) is cut with an ellipsis when it runs out of room; only then does
+  // it carry its full text as a tip.
+  function cut(node) {
+    var s = node && node.closest ? node.closest(".subj") : null;
+    if (!s) return;
+    if (s.scrollWidth > s.clientWidth) s.setAttribute("data-tip", s.textContent.trim());
+    else s.removeAttribute("data-tip");
+  }
+
   function target(node) {
+    cut(node);
     return node && node.closest ? node.closest("[data-tip]") : null;
   }
 
