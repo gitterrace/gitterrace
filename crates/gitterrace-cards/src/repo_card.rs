@@ -12,7 +12,7 @@ const H: u32 = 195;
 
 /// A 495x195 README card: name, totals, languages bar and activity sparkline.
 pub fn repo_card_svg(repo: &str, records: &[CommitRecord], now: i64, theme: Theme) -> String {
-    let s = repo_summary(repo, records);
+    let s = repo_summary(records);
     let p = theme.palette();
     let mut o = String::new();
     let _ = write!(
@@ -45,16 +45,7 @@ pub fn repo_card_svg(repo: &str, records: &[CommitRecord], now: i64, theme: Them
             esc(v)
         );
     };
-    t(
-        &mut o,
-        24.0,
-        36.0,
-        18,
-        700,
-        p.accent_fg,
-        "s",
-        &clip(repo, 30),
-    );
+    t(&mut o, 24.0, 36.0, 18, 700, p.accent, "s", &clip(repo, 30));
     let last = s.last_commit.map_or("no commits".to_owned(), |l| {
         format!("last commit {}", ago(now, l))
     });

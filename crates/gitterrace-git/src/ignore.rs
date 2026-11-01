@@ -9,7 +9,8 @@ use gix::ignore::{Search, search::Ignore};
 
 use crate::{BlobReader, Repo, Result, files};
 
-const MAX_IGNORE_BYTES: u64 = 1024 * 1024;
+/// Largest ignore or mailmap file read: these are configuration, never megabytes.
+pub(crate) const MAX_CONFIG_BYTES: u64 = 1024 * 1024;
 const FILE_NAMES: [&str; 2] = [".gitignore", ".ignore"];
 
 /// All ignore files of one revision, deeper files overriding shallower ones.
@@ -29,7 +30,7 @@ impl IgnoreSet {
             })
             .filter_map(|f| {
                 reader
-                    .text(f.blob, MAX_IGNORE_BYTES)
+                    .text(f.blob, MAX_CONFIG_BYTES)
                     .map(|text| (f.path, text))
             })
             .collect();

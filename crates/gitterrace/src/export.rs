@@ -33,6 +33,15 @@ pub struct Scope {
 const MAX_BODY: usize = 64 * 1024 * 1024;
 /// Hard ceiling on pages, so a mis-scoped export fails instead of filling a disk.
 const MAX_PAGES: usize = 20_000;
+/// Pages the crawl starts from; each is exported whatever links point at it.
+const SEEDS: [&str; 6] = [
+    "/",
+    "/refs",
+    "/stats",
+    "/stats/files",
+    "/stats/types",
+    "/log/HEAD",
+];
 
 /// Writes the scoped site to `out` and returns how many files were written.
 pub async fn export(repo_path: &Path, out: &Path, scope: &Scope) -> anyhow::Result<usize> {
@@ -51,14 +60,7 @@ pub async fn export(repo_path: &Path, out: &Path, scope: &Scope) -> anyhow::Resu
     let head = repo.resolve("HEAD").context("resolving HEAD")?;
 
     let mut queue: VecDeque<String> = VecDeque::new();
-    for seed in [
-        "/",
-        "/refs",
-        "/stats",
-        "/stats/files",
-        "/stats/types",
-        "/log/HEAD",
-    ] {
+    for seed in SEEDS {
         queue.push_back(seed.to_owned());
     }
     for c in repo
@@ -171,17 +173,7 @@ impl Allowed {
             .collect();
         let mut tree = BTreeSet::new();
         walk(repo, head, "", scope.max_file, &mut tree)?;
-        let exact = [
-            "/",
-            "/refs",
-            "/stats",
-            "/stats/files",
-            "/stats/types",
-            "/log/HEAD",
-        ]
-        .into_iter()
-        .map(str::to_owned)
-        .collect();
+        let exact = SEEDS.into_iter().map(str::to_owned).collect();
         Ok(Self {
             exact,
             commits,
@@ -351,6 +343,14 @@ fn write_page(out: &Path, path: &str, content_type: &str, body: &[u8]) -> anyhow
             );
         }
     }
+    // The parents are real directories inside `out`; the leaf itself may still be a link.
+    if let Ok(m) = std::fs::symlink_metadata(&file) {
+        anyhow::ensure!(
+            m.is_file(),
+            "refusing to write {}: not a regular file",
+            file.display()
+        );
+    }
     std::fs::write(&file, body).with_context(|| format!("writing {}", file.display()))
 }
 
@@ -426,6 +426,19 @@ mod tests {
         assert!(!elsewhere.path().join("files").exists());
         write_page(out.path(), "/refs", "text/html", b"ok").expect("normal page writes");
         assert!(out.path().join("refs/index.html").exists());
+    }
+
+    #[test]
+    fn write_page_refuses_a_symlink_at_the_leaf() {
+        let out = tempfile::tempdir().expect("tempdir");
+        let elsewhere = tempfile::tempdir().expect("tempdir");
+        let victim = elsewhere.path().join("victim");
+        std::fs::write(&victim, "keep").expect("write");
+        std::fs::create_dir(out.path().join("refs")).expect("mkdir");
+        std::os::unix::fs::symlink(&victim, out.path().join("refs/index.html")).expect("symlink");
+        let err = write_page(out.path(), "/refs", "text/html", b"x").unwrap_err();
+        assert!(err.to_string().contains("refusing to write"), "{err}");
+        assert_eq!(std::fs::read_to_string(&victim).expect("read"), "keep");
     }
 
     #[tokio::test]

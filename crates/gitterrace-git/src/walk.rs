@@ -13,7 +13,6 @@ use crate::ident;
 use crate::{CommitSummary, Repo, Result};
 
 const OBJECT_CACHE_BYTES: usize = 64 * 1024 * 1024;
-const BINARY_PROBE: usize = 8000;
 
 /// Opaque handle to a blob in the object database.
 #[derive(Clone, Copy, Debug)]
@@ -88,7 +87,7 @@ impl BlobReader {
             return None;
         }
         let data = self.repo.find_object(id.0).ok()?.detach().data;
-        if data[..data.len().min(BINARY_PROBE)].contains(&0) {
+        if crate::diff::is_binary(&data) {
             return None;
         }
         String::from_utf8(data).ok()
@@ -103,7 +102,7 @@ impl BlobReader {
             return None;
         }
         let data = self.repo.find_object(id.0).ok()?.detach().data;
-        if data[..data.len().min(BINARY_PROBE)].contains(&0) {
+        if crate::diff::is_binary(&data) {
             return None;
         }
         Some(crate::diff::line_count(&data))

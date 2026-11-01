@@ -2,7 +2,6 @@ use std::fmt::Write;
 
 use gitterrace_index::CommitRecord;
 
-use crate::Error;
 use crate::palette::Theme;
 use crate::stats::{RepoSummary, repo_summary};
 use crate::svg::{SANS, ago, area, compact, esc, n, text_width};
@@ -42,19 +41,16 @@ impl Badge {
     }
 
     /// Parses a route segment, with or without the `.svg` suffix.
-    pub fn parse(s: &str) -> Result<Self, Error> {
+    pub fn parse(s: &str) -> Option<Self> {
         let s = s.strip_suffix(".svg").unwrap_or(s);
-        Self::ALL
-            .into_iter()
-            .find(|b| b.name() == s)
-            .ok_or_else(|| Error::UnknownBadge(s.to_owned()))
+        Self::ALL.into_iter().find(|b| b.name() == s)
     }
 }
 
 /// A flat 20px badge. `now` (epoch seconds) is only used for "last commit" and is a parameter
 /// so output stays deterministic.
 pub fn badge_svg(badge: Badge, records: &[CommitRecord], now: i64, theme: Theme) -> String {
-    badge_from_summary(badge, &repo_summary("", records), now, theme)
+    badge_from_summary(badge, &repo_summary(records), now, theme)
 }
 
 pub(crate) fn badge_from_summary(badge: Badge, s: &RepoSummary, now: i64, theme: Theme) -> String {
@@ -189,10 +185,7 @@ mod tests {
         assert!(badge_svg(Badge::Contributors, &r, now, Theme::Light).contains(">3<"));
         assert!(badge_svg(Badge::LastCommit, &r, now, Theme::Light).contains("3 days ago"));
         assert!(badge_svg(Badge::BusFactor, &r, now, Theme::Light).contains(">1<"));
-        assert_eq!(
-            Badge::parse("last-commit.svg").ok(),
-            Some(Badge::LastCommit)
-        );
-        assert!(Badge::parse("nope").is_err());
+        assert_eq!(Badge::parse("last-commit.svg"), Some(Badge::LastCommit));
+        assert!(Badge::parse("nope").is_none());
     }
 }

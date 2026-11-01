@@ -1,13 +1,11 @@
 use std::collections::HashMap;
-use std::fs;
 use std::io;
 use std::path::Path;
 
-use gitterrace_git::{BlobReader, Repo};
+use gitterrace_git::{BlobReader, MAX_TEXT_BYTES, Repo};
 
 use super::{Insights, PathFilter, language};
 
-const MAX_BLOB: u64 = 4 * 1024 * 1024;
 const CACHE_FILE: &str = "lines.json";
 
 /// A text file of the head tree with its line count.
@@ -30,14 +28,15 @@ pub struct LangShare {
 /// cache never goes stale; losing it only costs a re-read.
 #[derive(Debug, Default)]
 pub struct LineCache {
-    map: HashMap<String, u32>,
-    dirty: bool,
+    pub(crate) map: HashMap<String, u32>,
+    pub(crate) dirty: bool,
 }
 
 impl LineCache {
     pub fn load(dir: &Path) -> Self {
-        let map = fs::read(dir.join(CACHE_FILE))
+        let map = crate::cache::read(dir, CACHE_FILE)
             .ok()
+            .flatten()
             .and_then(|b| serde_json::from_slice(&b).ok())
             .unwrap_or_default();
         Self { map, dirty: false }
@@ -47,12 +46,8 @@ impl LineCache {
         if !self.dirty {
             return Ok(());
         }
-        let tmp = dir.join("lines.json.tmp");
-        fs::write(
-            &tmp,
-            serde_json::to_vec(&self.map).map_err(io::Error::other)?,
-        )?;
-        fs::rename(tmp, dir.join(CACHE_FILE))?;
+        let bytes = serde_json::to_vec(&self.map).map_err(io::Error::other)?;
+        crate::cache::write_atomic(dir, CACHE_FILE, &bytes)?;
         self.dirty = false;
         Ok(())
     }
@@ -81,7 +76,7 @@ pub fn head_files(
             *n
         } else {
             // Binary or oversized blobs are cached as 0 so they are not re-read.
-            let n = reader.line_count(f.blob, MAX_BLOB).unwrap_or(0);
+            let n = reader.line_count(f.blob, MAX_TEXT_BYTES).unwrap_or(0);
             cache.map.insert(key, n);
             cache.dirty = true;
             n

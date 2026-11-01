@@ -38,6 +38,17 @@ pub enum Layout {
 }
 
 impl Layout {
+    /// `landscape` or `portrait`; anything else is `None`.
+    pub fn parse(s: &str) -> Option<Self> {
+        match s {
+            "landscape" => Some(Self::Landscape),
+            "portrait" => Some(Self::Portrait),
+            _ => None,
+        }
+    }
+}
+
+impl Layout {
     pub fn size(self) -> (u32, u32) {
         match self {
             Layout::Landscape => (1200, 630),
@@ -75,7 +86,6 @@ pub fn wrapped_svg(w: &WrappedStats, layout: Layout, theme: Theme) -> String {
     } else {
         (940.0, 120.0)
     };
-    let _ = write!(s, r##""##);
     for i in 0..5 {
         let _ = write!(
             s,

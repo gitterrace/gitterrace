@@ -2,6 +2,7 @@
 //! aggregates are computed from the records on demand.
 
 mod aggregates;
+mod cache;
 mod conventional;
 mod insights;
 mod source;
@@ -15,6 +16,7 @@ use gitterrace_git::Repo;
 pub use aggregates::*;
 pub use insights::*;
 pub use source::CommitSource;
+pub use store::FORMAT_VERSION;
 
 /// Commits built per batch: enough to keep all cores busy, small enough for steady progress.
 const BATCH: usize = 256;
@@ -295,6 +297,56 @@ mod tests {
             std::fs::read_to_string(path.join("VERSION"))?.trim(),
             crate::store::FORMAT_VERSION
         );
+        Ok(())
+    }
+
+    /// Plants a link at `name` inside a cache (or at the cache itself for `""`), runs the
+    /// whole cache cycle and asserts the link target outside is untouched.
+    #[cfg(unix)]
+    fn planted(name: &str) -> io::Result<()> {
+        const PRECIOUS: &str = "precious user data\nno newline tail";
+        let repo = tempfile::tempdir()?;
+        let outside = tempfile::tempdir()?;
+        let victim = outside.path().join("victim");
+        std::fs::write(&victim, PRECIOUS)?;
+        let dir = repo.path().join("gitterrace");
+        if name.is_empty() {
+            std::os::unix::fs::symlink(outside.path(), &dir)?;
+        } else {
+            std::fs::create_dir(&dir)?;
+            if name != "VERSION" {
+                std::fs::write(dir.join("VERSION"), "0\n")?;
+            }
+            std::os::unix::fs::symlink(&victim, dir.join(name))?;
+        }
+        let src = Fake::new(&["a"]);
+        if let Ok(idx) = Index::open_dir(dir.clone())
+            && idx.update_from(&src, "HEAD", &|_| {}).is_ok()
+        {
+            let mut lines = crate::LineCache::load(idx.dir());
+            lines.map.insert("abc".into(), 3);
+            lines.dirty = true;
+            drop(lines.save(idx.dir()));
+        }
+        assert_eq!(std::fs::read_to_string(&victim)?, PRECIOUS, "{name}");
+        assert_eq!(std::fs::read_dir(outside.path())?.count(), 1, "{name}");
+        assert_eq!(src.built.get(), 1, "the cache still works for {name:?}");
+        assert!(!dir.is_symlink(), "{name}");
+        Ok(())
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn planted_links_never_write_outside() -> io::Result<()> {
+        for name in [
+            "",
+            "VERSION",
+            "commits.jsonl",
+            "lines.json",
+            "lines.json.tmp",
+        ] {
+            planted(name).map_err(|e| io::Error::other(format!("{name:?}: {e}")))?;
+        }
         Ok(())
     }
 }

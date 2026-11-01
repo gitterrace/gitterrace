@@ -206,7 +206,7 @@ mod tests {
 
     #[test]
     fn mcp_lists_read_only_tools() {
-        let names = McpServer::tool_names();
+        let names: Vec<String> = McpServer::tool_docs().into_iter().map(|t| t.name).collect();
         for want in [
             "activity",
             "blame",
@@ -219,6 +219,57 @@ mod tests {
             "show_commit",
         ] {
             assert!(names.iter().any(|n| n == want), "missing {want}");
+        }
+    }
+
+    /// CI checkouts are shallow: missing parents must degrade records, not fail the index.
+    #[test]
+    fn shallow_clone_indexes_and_answers() {
+        let (src, _) = fixture();
+        let dir = tempfile::tempdir().expect("tempdir");
+        let url = format!("file://{}", src.path().display());
+        git(dir.path(), &["clone", "-q", "--depth", "1", &url, "c"]);
+        let state = ApiState::open(&dir.path().join("c")).expect("open");
+        state.refresh_index().expect("index");
+        assert_eq!(state.records("HEAD").expect("records").len(), 1);
+        assert_eq!(
+            state.log(None, None, 1, 10).expect("log")["commits"]
+                .as_array()
+                .map(Vec::len),
+            Some(1)
+        );
+    }
+
+    #[test]
+    fn hostile_paging_and_rev_syntax_are_refused() {
+        let (_d, s) = fixture();
+        let huge = s.log(None, None, usize::MAX, 2);
+        assert!(
+            matches!(huge, Err(crate::ApiError::BadRequest(_))),
+            "{huge:?}"
+        );
+        assert!(s.log(None, Some("a.txt"), 25_001, 2).is_ok());
+        assert!(s.log(None, Some("a.txt"), 25_002, 2).is_err());
+        for rev in [":/first", "HEAD^{/first}", "main@{1}"] {
+            let r = s.log(Some(rev), None, 1, 1);
+            assert!(matches!(r, Err(crate::ApiError::BadRequest(_))), "{rev}");
+            assert!(s.commit(rev, false, None).is_err(), "{rev}");
+        }
+        assert!(s.log(Some("HEAD~1"), None, 1, 1).is_ok());
+    }
+
+    /// Tools that return free text from the repository say it is untrusted, and so does the
+    /// server: a commit body must never read as an instruction to the agent.
+    #[test]
+    fn free_text_tools_warn_about_untrusted_content() {
+        use rmcp::ServerHandler;
+        let (_d, s) = fixture();
+        let info = McpServer::new(s).get_info();
+        assert!(info.instructions.is_some_and(|i| i.contains("untrusted")));
+        for t in McpServer::tool_docs() {
+            if ["read_file", "show_commit", "log", "blame"].contains(&t.name.as_str()) {
+                assert!(t.description.contains("untrusted"), "{}", t.name);
+            }
         }
     }
 }

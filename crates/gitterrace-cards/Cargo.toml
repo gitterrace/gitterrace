@@ -13,8 +13,6 @@ workspace = true
 [dependencies]
 gitterrace-index.workspace = true
 schwarzwald.workspace = true
-thiserror.workspace = true
 
 [dev-dependencies]
 usvg = { version = "0.45", default-features = false }
-gitterrace-git.workspace = true

@@ -78,7 +78,7 @@ pub(crate) async fn badge(
     Path(name): Path<String>,
     Query(q): Query<CardQuery>,
 ) -> Result<Response> {
-    let Ok(badge) = Badge::parse(&name) else {
+    let Some(badge) = Badge::parse(&name) else {
         return Ok(StatusCode::NOT_FOUND.into_response());
     };
     let theme = theme(q.theme.as_deref());

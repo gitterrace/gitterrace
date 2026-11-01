@@ -17,7 +17,6 @@ const MAX_FILES: usize = 2000;
 /// Larger files are listed but shown without hunks.
 const MAX_DIFF_BYTES: usize = 1024 * 1024;
 const CONTEXT: usize = 3;
-const BINARY_PROBE: usize = 8000;
 
 fn open(repo: &Repo) -> Result<gix::Repository> {
     gix::open(repo.git_dir()).map_err(git)
@@ -185,8 +184,7 @@ fn read_worktree(work: &Path, rel: &str) -> Read {
 }
 
 fn file_diff(path: String, kind: ChangeKind, old: &[u8], new: &[u8], big: bool) -> FileDiff {
-    let probe = |d: &[u8]| d[..d.len().min(BINARY_PROBE)].contains(&0);
-    if probe(old) || probe(new) || big {
+    if crate::diff::is_binary(old) || crate::diff::is_binary(new) || big {
         return FileDiff {
             path,
             kind,

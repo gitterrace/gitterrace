@@ -20,6 +20,11 @@ pub const MAX_BLOB_LINES: usize = 5000;
 pub const MAX_BLOB_BYTES: usize = 256 * 1024;
 /// Most lines one blame answer carries.
 pub const MAX_BLAME_LINES: usize = 5000;
+/// Deepest the log pages: a path filter walks every skipped commit with tree lookups.
+const MAX_LOG_SKIP: usize = 50_000;
+/// Rev syntax that searches history (`:/text`, `^{/text}`) or reads reflogs (`@{...}`): a
+/// request could make one call walk every commit. Branch, tag, sha and `~`/`^` stay allowed.
+const REJECTED_REV: [&str; 3] = [":/", "^{/", "@{"];
 
 /// Shared handle on one repository and its insights cache.
 #[derive(Clone)]
@@ -71,8 +76,7 @@ impl ApiState {
         refs.sort();
         let mut h = std::collections::hash_map::DefaultHasher::new();
         refs.hash(&mut h);
-        let version = std::fs::read_to_string(self.index.dir().join("VERSION"))
-            .map_or_else(|_| "0".to_owned(), |v| v.trim().to_owned());
+        let version = gitterrace_index::FORMAT_VERSION;
         Some(format!("\"{head}-{:016x}-{version}\"", h.finish()))
     }
 
@@ -94,8 +98,8 @@ impl ApiState {
         Ok(recs)
     }
 
-    fn rev(rev: Option<&str>) -> &str {
-        rev.filter(|r| !r.is_empty()).unwrap_or(DEFAULT_REV)
+    fn rev(rev: Option<&str>) -> Result<&str, ApiError> {
+        checked(rev.filter(|r| !r.is_empty()).unwrap_or(DEFAULT_REV))
     }
 
     pub fn repo_info(&self) -> Result<Value, ApiError> {
@@ -124,13 +128,17 @@ impl ApiState {
         page: usize,
         per_page: usize,
     ) -> Result<Value, ApiError> {
-        let rev = Self::rev(rev);
+        let rev = Self::rev(rev)?;
         let per_page = per_page.clamp(1, MAX_PAGE);
         let page = page.max(1);
+        let skip = (page - 1).saturating_mul(per_page);
+        if skip > MAX_LOG_SKIP {
+            return Err(ApiError::BadRequest(format!(
+                "page too deep: at most {MAX_LOG_SKIP} commits can be skipped"
+            )));
+        }
         // One extra row tells us whether another page exists.
-        let rows = self
-            .repo
-            .log(rev, path, (page - 1) * per_page, per_page + 1)?;
+        let rows = self.repo.log(rev, path, skip, per_page + 1)?;
         let has_more = rows.len() > per_page;
         let commits: Vec<Value> = rows.iter().take(per_page).map(json::summary).collect();
         Ok(json!({
@@ -145,13 +153,13 @@ impl ApiState {
         diff: bool,
         max_lines: Option<usize>,
     ) -> Result<Value, ApiError> {
-        let id = self.repo.resolve(id)?;
+        let id = self.repo.resolve(checked(id)?)?;
         let detail = self.repo.commit(&id)?;
         Ok(json::detail(&detail, diff, max_lines))
     }
 
     pub fn tree(&self, rev: Option<&str>, path: Option<&str>) -> Result<Value, ApiError> {
-        let rev = Self::rev(rev);
+        let rev = Self::rev(rev)?;
         let id = self.repo.resolve(rev)?;
         let path = path.unwrap_or("");
         let entries: Vec<Value> = self
@@ -172,7 +180,7 @@ impl ApiState {
         start_line: Option<usize>,
         limit: Option<usize>,
     ) -> Result<Value, ApiError> {
-        let rev = Self::rev(rev);
+        let rev = Self::rev(rev)?;
         let id = self.repo.resolve(rev)?;
         let blob = self.repo.blob(&id, path)?;
         let (text, total_lines, truncated) = match &blob.text {
@@ -207,7 +215,7 @@ impl ApiState {
     }
 
     pub fn blame(&self, rev: Option<&str>, path: &str) -> Result<Value, ApiError> {
-        let rev = Self::rev(rev);
+        let rev = Self::rev(rev)?;
         let id = self.repo.resolve(rev)?;
         let all = self.repo.blame(&id, path)?;
         let lines: Vec<Value> = all
@@ -228,7 +236,7 @@ impl ApiState {
         rev: Option<&str>,
         params: &insights::Params,
     ) -> Result<Value, ApiError> {
-        let rev = Self::rev(rev);
+        let rev = Self::rev(rev)?;
         let records = self.records(rev)?;
         let data = insights::compute(name, &records, params)?;
         Ok(json!({ "rev": rev, "insight": name, "commits_indexed": records.len(), "data": data }))
@@ -236,10 +244,20 @@ impl ApiState {
 
     /// Authors plus a commit-share bus factor: the fewest authors who made half the commits.
     pub fn contributors(&self, rev: Option<&str>) -> Result<Value, ApiError> {
-        let rev = Self::rev(rev);
+        let rev = Self::rev(rev)?;
         let mut authors = gitterrace_index::authors(&self.records(rev)?);
         authors.sort_by_key(|a| std::cmp::Reverse(a.commits));
         let bus_factor = gitterrace_index::bus_factor(authors.iter().map(|a| a.commits as f64));
         Ok(json!({ "rev": rev, "bus_factor": bus_factor, "authors": authors }))
     }
+}
+
+/// `rev` unless it uses syntax in [`REJECTED_REV`].
+fn checked(rev: &str) -> Result<&str, ApiError> {
+    if REJECTED_REV.iter().any(|p| rev.contains(p)) {
+        return Err(ApiError::BadRequest(format!(
+            "unsupported revision syntax in {rev:?}: use a branch, tag, sha or HEAD~n"
+        )));
+    }
+    Ok(rev)
 }

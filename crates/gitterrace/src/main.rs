@@ -1,7 +1,7 @@
 use std::{net::SocketAddr, path::PathBuf};
 
 use anyhow::Context;
-use clap::{Parser, Subcommand, ValueEnum};
+use clap::{Parser, Subcommand};
 
 mod export;
 
@@ -31,10 +31,10 @@ enum Command {
         /// Year to summarise. Defaults to the year of the newest commit.
         #[arg(long)]
         year: Option<i32>,
-        #[arg(long, value_enum, default_value_t = Shape::Landscape)]
-        layout: Shape,
-        #[arg(long, value_enum, default_value_t = Look::Dark)]
-        theme: Look,
+        #[arg(long, value_parser = ["landscape", "portrait"], default_value = "landscape")]
+        layout: String,
+        #[arg(long, value_parser = ["light", "dark"], default_value = "dark")]
+        theme: String,
         /// Output file. Defaults to `wrapped-YEAR.svg`.
         #[arg(long, short)]
         out: Option<PathBuf>,
@@ -52,18 +52,6 @@ enum Command {
     },
 }
 
-#[derive(Clone, Copy, ValueEnum)]
-enum Shape {
-    Landscape,
-    Portrait,
-}
-
-#[derive(Clone, Copy, ValueEnum)]
-enum Look {
-    Light,
-    Dark,
-}
-
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
@@ -72,16 +60,15 @@ async fn main() -> anyhow::Result<()> {
         .first()
         .cloned()
         .unwrap_or_else(|| PathBuf::from("."));
+    // stdout carries the MCP protocol, so logs always go to stderr.
+    tracing_subscriber::fmt()
+        .with_writer(std::io::stderr)
+        .init();
     match cli.command.unwrap_or(Command::Serve) {
         Command::Serve => {
-            tracing_subscriber::fmt().init();
             gitterrace_web::serve(gitterrace_web::discover_repos(&cli.paths), cli.addr).await?;
         }
-        // stdout carries the MCP protocol, so logs go to stderr.
         Command::Mcp => {
-            tracing_subscriber::fmt()
-                .with_writer(std::io::stderr)
-                .init();
             gitterrace_api::serve_mcp(&path).await?;
         }
         Command::Wrapped {
@@ -89,7 +76,7 @@ async fn main() -> anyhow::Result<()> {
             layout,
             theme,
             out,
-        } => wrapped(&path, year, layout, theme, out)?,
+        } => wrapped(&path, year, &layout, &theme, out)?,
         Command::Export {
             out,
             commits,
@@ -109,8 +96,8 @@ async fn main() -> anyhow::Result<()> {
 fn wrapped(
     path: &std::path::Path,
     year: Option<i32>,
-    layout: Shape,
-    theme: Look,
+    layout: &str,
+    theme: &str,
     out: Option<PathBuf>,
 ) -> anyhow::Result<()> {
     let repo = gitterrace_git::Repo::discover(path).context("opening the repository")?;
@@ -123,14 +110,8 @@ fn wrapped(
     let newest = records.iter().map(|r| r.time).max().unwrap_or(0);
     let year = year.unwrap_or_else(|| year_of(newest));
     let stats = gitterrace_cards::wrapped_stats(&repo.name(), &records, year);
-    let layout = match layout {
-        Shape::Landscape => gitterrace_cards::Layout::Landscape,
-        Shape::Portrait => gitterrace_cards::Layout::Portrait,
-    };
-    let theme = match theme {
-        Look::Light => gitterrace_cards::Theme::Light,
-        Look::Dark => gitterrace_cards::Theme::Dark,
-    };
+    let layout = gitterrace_cards::Layout::parse(layout).context("unknown layout")?;
+    let theme = gitterrace_cards::Theme::parse(theme).context("unknown theme")?;
     let svg = gitterrace_cards::wrapped_svg(&stats, layout, theme);
     let out = out.unwrap_or_else(|| PathBuf::from(format!("wrapped-{year}.svg")));
     std::fs::write(&out, svg).with_context(|| format!("writing {}", out.display()))?;

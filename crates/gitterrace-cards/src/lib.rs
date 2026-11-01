@@ -23,10 +23,3 @@ pub use palette::Theme;
 pub use repo_card::repo_card_svg;
 pub use stats::{RepoSummary, WrappedStats, repo_summary, wrapped_stats};
 pub use wrapped::{Layout, wrapped_svg};
-
-/// Errors from card rendering.
-#[derive(Debug, thiserror::Error)]
-pub enum Error {
-    #[error("unknown badge: {0}")]
-    UnknownBadge(String),
-}

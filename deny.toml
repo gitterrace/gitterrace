@@ -1,6 +1,3 @@
-[graph]
-all-features = true
-
 [advisories]
 # Each ignore names the crate, the path that pulls it in, and why it stays.
 # Revisit when the upstream that pulls it in moves.
@@ -11,10 +8,6 @@ ignore = [
     # bincode (unmaintained): syntect loads its bundled, compiled-in syntax
     # dump with it; no untrusted input is ever decoded.
     "RUSTSEC-2025-0141",
-    # rustybuzz / ttf-parser (unmaintained): usvg's text shaping for the
-    # optional PNG export of our own generated cards; fonts are the system's.
-    "RUSTSEC-2026-0206",
-    "RUSTSEC-2026-0192",
 ]
 
 [licenses]
@@ -47,4 +40,3 @@ allow-wildcard-paths = true
 unknown-registry = "deny"
 unknown-git = "deny"
 allow-registry = ["https://github.com/rust-lang/crates.io-index"]
-allow-git = []

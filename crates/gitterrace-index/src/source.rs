@@ -70,7 +70,8 @@ impl CommitSource for Repo {
             .into_iter()
             .next()
             .ok_or_else(|| io::Error::other(format!("commit {id} not found")))?;
-        let files = file_stats(Repo::numstat(self, id).map_err(io::Error::other)?);
+        // Unreadable objects (a shallow boundary) cost the file stats, not the record.
+        let files = file_stats(Repo::numstat(self, id).unwrap_or_default());
         Ok(build(summary, files))
     }
 

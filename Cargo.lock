@@ -918,10 +918,8 @@ dependencies = [
 name = "gitterrace-cards"
 version = "0.1.0"
 dependencies = [
- "gitterrace-git",
  "gitterrace-index",
  "schwarzwald",
- "thiserror",
  "usvg",
 ]
 
@@ -939,6 +937,7 @@ name = "gitterrace-index"
 version = "0.1.0"
 dependencies = [
  "gitterrace-git",
+ "libc",
  "serde",
  "serde_json",
  "tempfile",

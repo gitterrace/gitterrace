@@ -5,7 +5,7 @@ use gix::diff::blob::{Algorithm, Diff, InternedInput};
 use gix::object::tree::diff::ChangeDetached;
 
 use crate::error::git;
-use crate::{ChangeKind, CodeCounts, FileDiff, Hunk, HunkLine, LineKind, Result};
+use crate::{ChangeKind, CodeCounts, FileDiff, Hunk, HunkLine, LineKind, MAX_TEXT_BYTES, Result};
 
 const CONTEXT: usize = 3;
 /// Same probe window as git: a NUL in the first 8000 bytes marks a blob binary.
@@ -144,6 +144,9 @@ fn file_diff(
     };
     let counted = if !diffable {
         Counted::empty(false)
+    } else if too_large(repo, old_id) || too_large(repo, new_id) {
+        // Never read, never diffed: Myers on two huge blobs costs minutes.
+        Counted::empty(true)
     } else if let (false, Some(None)) = (with_hunks, rewrite_stats) {
         // Rename tracking found identical content: a pure move, nothing changed.
         let lines = line_count(&blob(repo, new_id)?);
@@ -177,7 +180,13 @@ fn blob(repo: &gix::Repository, id: Option<gix::ObjectId>) -> Result<Vec<u8>> {
     }
 }
 
-fn is_binary(data: &[u8]) -> bool {
+/// Whether the blob is over [`MAX_TEXT_BYTES`], from its header alone.
+fn too_large(repo: &gix::Repository, id: Option<gix::ObjectId>) -> bool {
+    id.and_then(|id| repo.find_header(id).ok())
+        .is_some_and(|h| h.size() > MAX_TEXT_BYTES)
+}
+
+pub(crate) fn is_binary(data: &[u8]) -> bool {
     data[..data.len().min(BINARY_PROBE)].contains(&0)
 }
 

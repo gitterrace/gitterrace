@@ -29,11 +29,14 @@ jobs:
         os: [ubuntu-latest, macos-latest]
     steps:
       - uses: actions/checkout@v7
-      # Same toolchain as local (rust-toolchain.toml): a floating `stable`
+      # The toolchain is pinned once, in rust-toolchain.toml: a floating `stable`
       # turns every new clippy lint into a red build nobody caused.
-      - uses: dtolnay/rust-toolchain@1.98.0
+      - id: pin
+        run: echo "channel=$(sed -n 's/^channel *= *"\(.*\)"/\1/p' rust-toolchain.toml)" >> "$GITHUB_OUTPUT"
+      - uses: dtolnay/rust-toolchain@master
         id: toolchain
         with:
+          toolchain: ${{ steps.pin.outputs.channel }}
           components: clippy, rustfmt
       - uses: actions/cache@v6
         with:
@@ -44,8 +47,6 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ steps.toolchain.outputs.cachekey }}-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-cargo-${{ steps.toolchain.outputs.cachekey }}-
-      # The theme snapshot and its generated files (part of `make check` too).
-      - run: make theme
       - run: make check
 
   deny:

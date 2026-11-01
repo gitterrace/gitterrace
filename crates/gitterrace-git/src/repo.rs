@@ -10,14 +10,12 @@ use gix::traverse::commit::simple::CommitTimeOrder;
 use crate::error::git;
 use crate::ident;
 use crate::{
-    BlameLine, Blob, CommitDetail, CommitSummary, Error, RefInfo, RefKind, Result, TreeEntry,
-    TreeEntryKind,
+    BlameLine, Blob, CommitDetail, CommitSummary, Error, MAX_TEXT_BYTES, RefInfo, RefKind, Result,
+    TreeEntry, TreeEntryKind,
 };
 
 /// Decoded-object cache; trees and commits are re-read constantly by walks and diffs.
 const OBJECT_CACHE_BYTES: usize = 128 * 1024 * 1024;
-/// Same probe window as git for binary detection.
-const BINARY_PROBE: usize = 8000;
 
 /// A repository opened read-only.
 pub struct Repo {
@@ -200,6 +198,8 @@ impl Repo {
 
     /// [`Repo::numstat`] for many commits, spread over all cores. Results are in the order of
     /// `ids`. Prefer this to a loop over `numstat`: the work is CPU bound and independent.
+    /// A commit whose objects cannot be read (a shallow clone's boundary, a pruned or hostile
+    /// object store) gets no file stats instead of failing the whole batch.
     pub fn numstat_many(&self, ids: &[String]) -> Result<Vec<Vec<crate::FileDiff>>> {
         let workers = std::thread::available_parallelism().map_or(1, usize::from);
         let per = ids.len().div_ceil(workers).max(1);
@@ -214,7 +214,7 @@ impl Repo {
                             .map(|id| {
                                 let oid = Self::resolve_id(&repo, id)?;
                                 let commit = repo.find_commit(oid).map_err(git)?;
-                                crate::diff::changes(&repo, &commit, false)
+                                Ok(crate::diff::changes(&repo, &commit, false).unwrap_or_default())
                             })
                             .collect::<Result<Vec<_>>>()
                     })
@@ -289,7 +289,12 @@ impl Repo {
     }
 
     fn blob_bytes_at(repo: &gix::Repository, tip: gix::ObjectId, path: &str) -> Result<Vec<u8>> {
-        let entry = repo
+        let id = Self::blob_id_at(repo, tip, path)?;
+        Ok(repo.find_object(id).map_err(git)?.detach().data)
+    }
+
+    fn blob_id_at(repo: &gix::Repository, tip: gix::ObjectId, path: &str) -> Result<gix::ObjectId> {
+        Ok(repo
             .find_commit(tip)
             .map_err(git)?
             .tree()
@@ -297,22 +302,31 @@ impl Repo {
             .lookup_entry_by_path(path)
             .map_err(git)?
             .filter(|e| !e.mode().is_tree() && !e.mode().is_commit())
-            .ok_or_else(|| Error::PathNotFound(path.to_string()))?;
-        Ok(entry.object().map_err(git)?.detach().data)
+            .ok_or_else(|| Error::PathNotFound(path.to_string()))?
+            .object_id())
     }
 
+    /// The file at `path` in `rev`. `text` is `None` for binary blobs and for blobs over
+    /// [`MAX_TEXT_BYTES`], which are never read.
     pub fn blob(&self, rev: &str, path: &str) -> Result<Blob> {
+        let repo = self.repo();
+        let tip = Self::resolve_id(&repo, rev)?;
         let path = path.trim_matches('/');
-        let data = self.blob_bytes(rev, path)?;
-        let binary = data[..data.len().min(BINARY_PROBE)].contains(&0);
-        let text = if binary {
+        let id = Self::blob_id_at(&repo, tip, path)?;
+        let size = repo.find_header(id).map_err(git)?.size();
+        let text = if size > MAX_TEXT_BYTES {
             None
         } else {
-            String::from_utf8(data.clone()).ok()
+            let data = repo.find_object(id).map_err(git)?.detach().data;
+            if crate::diff::is_binary(&data) {
+                None
+            } else {
+                String::from_utf8(data).ok()
+            }
         };
         Ok(Blob {
             path: path.to_string(),
-            size: data.len() as u64,
+            size,
             text,
         })
     }
@@ -325,8 +339,13 @@ impl Repo {
         if let Some(hit) = self.blame_cache.lock().ok().and_then(|mut c| c.get(&key)) {
             return Ok(hit.as_ref().clone());
         }
-        let data = Self::blob_bytes_at(&repo, tip, path)?;
-        if data[..data.len().min(BINARY_PROBE)].contains(&0) {
+        let id = Self::blob_id_at(&repo, tip, path)?;
+        // Blame of a huge file costs as much as its diff against every ancestor.
+        if repo.find_header(id).map_err(git)?.size() > MAX_TEXT_BYTES {
+            return Ok(Vec::new());
+        }
+        let data = repo.find_object(id).map_err(git)?.detach().data;
+        if crate::diff::is_binary(&data) {
             return Ok(Vec::new());
         }
         let Ok(text) = String::from_utf8(data) else {
@@ -762,5 +781,26 @@ mod tests {
                 .sum::<usize>();
         }
         println!("numstat all: {:?} ({files} file changes)", t.elapsed());
+    }
+
+    #[test]
+    fn blobs_over_the_text_cap_are_never_read_as_text() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let d = tmp.path();
+        git(d, &["init", "-q", "-b", "main"]);
+        git(d, &["config", "user.name", "A"]);
+        git(d, &["config", "user.email", "a@x"]);
+        let size = crate::MAX_TEXT_BYTES as usize + 2;
+        write(d, "big.txt", &"a\n".repeat(size / 2));
+        commit(d, "add big");
+        write(d, "big.txt", &"b\n".repeat(size / 2));
+        commit(d, "rewrite big");
+        let repo = Repo::discover(d).expect("open");
+        let blob = repo.blob("HEAD", "big.txt").expect("blob");
+        assert_eq!((blob.size, blob.text), (size as u64, None));
+        assert!(repo.blame("HEAD", "big.txt").expect("blame").is_empty());
+        let file = &repo.commit("HEAD").expect("commit").files[0];
+        assert!(file.binary && file.hunks.is_empty());
+        assert_eq!((file.additions, file.deletions), (0, 0));
     }
 }

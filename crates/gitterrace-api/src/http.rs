@@ -66,15 +66,18 @@ async fn etag(
     res
 }
 
-pub(crate) async fn index() -> Json<Value> {
-    let insights: Vec<Value> = INSIGHTS
+fn insight_rows() -> Vec<Value> {
+    INSIGHTS
         .iter()
         .map(|i| json!({ "name": i.name, "summary": i.summary }))
-        .collect();
+        .collect()
+}
+
+pub(crate) async fn index() -> Json<Value> {
     Json(json!({
         "version": 1,
         "endpoints": endpoints::all(),
-        "insights": insights,
+        "insights": insight_rows(),
     }))
 }
 
@@ -172,11 +175,7 @@ pub(crate) async fn contributors(State(s): State<ApiState>, Query(q): Query<RevQ
 }
 
 pub(crate) async fn insight_list() -> Json<Value> {
-    let list: Vec<Value> = INSIGHTS
-        .iter()
-        .map(|i| json!({ "name": i.name, "summary": i.summary }))
-        .collect();
-    Json(json!({ "insights": list }))
+    Json(json!({ "insights": insight_rows() }))
 }
 
 #[derive(Deserialize)]

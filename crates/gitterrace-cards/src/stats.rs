@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
-use gitterrace_index::CommitRecord;
+use gitterrace_index::{CommitRecord, People};
 
 const DAY: i64 = 86_400;
 
@@ -23,32 +23,25 @@ pub struct WrappedStats {
     pub top_language: Option<(String, f64)>,
     pub top_dir: Option<(String, usize)>,
     pub biggest_commit: Option<BiggestCommit>,
-    pub additions: u64,
-    pub deletions: u64,
     /// Commits per week from the first week of the year through the last.
     pub weekly: Vec<u32>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BiggestCommit {
-    pub id: String,
-    pub files: usize,
     pub lines: u64,
 }
 
 /// Whole-history numbers for badges and the repo card.
 #[derive(Debug, Clone, PartialEq)]
 pub struct RepoSummary {
-    pub repo: String,
     pub commits: usize,
     pub contributors: usize,
     pub additions: u64,
-    pub deletions: u64,
     pub last_commit: Option<i64>,
     /// Commits per week over the last 26 weeks ending at the newest commit.
     pub weekly: Vec<u32>,
-    pub commits_last_week: u32,
-    /// Fewest authors whose commits add up to more than half of all commits.
+    /// Fewest people (identities merged as in [`People`]) whose commits add up to at least half of all commits.
     pub bus_factor: usize,
     /// Languages by share of file touches, largest first, at most six plus "Other".
     pub languages: Vec<(String, f64)>,
@@ -65,7 +58,6 @@ pub fn wrapped_stats(repo: &str, records: &[CommitRecord], year: i32) -> Wrapped
     let mut hours = [0u32; 24];
     let mut authors: HashMap<&str, (&str, usize)> = HashMap::new();
     let mut dirs: HashMap<&str, usize> = HashMap::new();
-    let (mut adds, mut dels) = (0u64, 0u64);
     let mut biggest: Option<BiggestCommit> = None;
     let jan1 = days_from_civil(i64::from(year), 1, 1);
     let start = jan1 - weekday(jan1) as i64;
@@ -89,8 +81,6 @@ pub fn wrapped_stats(repo: &str, records: &[CommitRecord], year: i32) -> Wrapped
         let mut seen = HashSet::new();
         let mut lines = 0u64;
         for f in &r.files {
-            adds += u64::from(f.additions);
-            dels += u64::from(f.deletions);
             lines += u64::from(f.additions) + u64::from(f.deletions);
             let dir = f.path.rsplit_once('/').map_or(".", |(d, _)| d);
             if seen.insert(dir) {
@@ -98,11 +88,7 @@ pub fn wrapped_stats(repo: &str, records: &[CommitRecord], year: i32) -> Wrapped
             }
         }
         if biggest.as_ref().is_none_or(|b| lines > b.lines) && !r.files.is_empty() {
-            biggest = Some(BiggestCommit {
-                id: r.id.clone(),
-                files: r.files.len(),
-                lines,
-            });
+            biggest = Some(BiggestCommit { lines });
         }
     }
     let mut top_authors: Vec<(String, usize)> = authors
@@ -129,25 +115,21 @@ pub fn wrapped_stats(repo: &str, records: &[CommitRecord], year: i32) -> Wrapped
         top_language: langs.into_iter().find(|(n, _)| n != "Other"),
         top_dir,
         biggest_commit: biggest,
-        additions: adds,
-        deletions: dels,
         weekly,
     }
 }
 
-pub fn repo_summary(repo: &str, records: &[CommitRecord]) -> RepoSummary {
-    let mut by_author: HashMap<&str, usize> = HashMap::new();
-    let (mut adds, mut dels) = (0u64, 0u64);
+pub fn repo_summary(records: &[CommitRecord]) -> RepoSummary {
+    let people = People::build(records);
+    let mut adds = 0u64;
     let mut last: Option<i64> = None;
     for r in records {
-        *by_author.entry(r.email.as_str()).or_default() += 1;
         last = Some(last.map_or(r.time, |v| v.max(r.time)));
         for f in &r.files {
             adds += u64::from(f.additions);
-            dels += u64::from(f.deletions);
         }
     }
-    let bus = gitterrace_index::bus_factor(by_author.values().map(|&c| c as f64));
+    let bus = gitterrace_index::bus_factor(people.list.iter().map(|p| p.commits as f64));
     let mut weekly = vec![0u32; 26];
     if let Some(l) = last {
         let newest = (l / DAY) / 7;
@@ -161,13 +143,10 @@ pub fn repo_summary(repo: &str, records: &[CommitRecord]) -> RepoSummary {
     let mut languages = languages(records.iter());
     languages.truncate(7);
     RepoSummary {
-        repo: repo.to_owned(),
         commits: records.len(),
-        contributors: by_author.len(),
+        contributors: people.list.len(),
         additions: adds,
-        deletions: dels,
         last_commit: last,
-        commits_last_week: weekly[25],
         weekly,
         bus_factor: bus,
         languages,
@@ -340,8 +319,9 @@ pub(crate) mod fixtures {
 
 #[cfg(test)]
 mod tests {
-    use crate::stats::fixtures::sample;
+    use crate::stats::fixtures::{rec, sample};
     use crate::stats::{civil, days_from_civil, repo_summary, wrapped_stats};
+    use gitterrace_index::People;
 
     #[test]
     fn civil_roundtrip() {
@@ -356,7 +336,7 @@ mod tests {
         let w = wrapped_stats("demo", &sample(), 2025);
         assert_eq!(w.commits, 41);
         assert_eq!(w.top_authors[0], ("alice".to_owned(), 30));
-        assert_eq!(w.biggest_commit.as_ref().map(|b| b.files), Some(2));
+        assert!(w.biggest_commit.as_ref().is_some_and(|b| b.lines > 500));
         assert_eq!(w.weekly.iter().sum::<u32>(), 41);
         assert_eq!(w.busiest_month, Some(0));
         assert!(w.longest_streak >= 2);
@@ -366,11 +346,33 @@ mod tests {
 
     #[test]
     fn summary_numbers() {
-        let s = repo_summary("demo", &sample());
+        let s = repo_summary(&sample());
         assert_eq!(s.commits, 41);
         assert_eq!(s.contributors, 3);
         assert_eq!(s.bus_factor, 1);
         assert_eq!(s.weekly.len(), 26);
         assert_eq!(s.weekly.iter().sum::<u32>(), 41);
+    }
+
+    #[test]
+    fn bus_factor_matches_the_shared_definition_per_identity() {
+        // Two spellings of one address are one person, so 40 of 50 commits are theirs.
+        let mut r = Vec::new();
+        for i in 0..20 {
+            r.push(rec(i, "Alice", 0, 9, &[("a.rs", 1)]));
+            let mut other = rec(100 + i, "Alice B", 0, 9, &[("a.rs", 1)]);
+            other.email = "Alice@x.io".to_owned();
+            r.push(other);
+        }
+        for (i, who) in ["bob", "carol", "dave", "erin", "frank"].iter().enumerate() {
+            for j in 0..2 {
+                r.push(rec(200 + i * 2 + j, who, 1, 9, &[("b.rs", 1)]));
+            }
+        }
+        let people = People::build(&r);
+        let want = gitterrace_index::bus_factor(people.list.iter().map(|p| p.commits as f64));
+        assert_eq!(repo_summary(&r).bus_factor, want);
+        assert_eq!(want, 1);
+        assert_eq!(repo_summary(&r).contributors, people.list.len());
     }
 }
