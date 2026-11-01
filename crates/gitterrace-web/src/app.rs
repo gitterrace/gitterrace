@@ -21,6 +21,8 @@ use crate::live::Change;
 const MEMO_TTL: Duration = Duration::from_secs(60);
 const MEMO_ENTRIES: usize = 64;
 /// How long a dirty-worktree answer is reused, so every page need not run a status.
+/// The working tree scan runs on every this-many-th watcher tick.
+const WORKTREE_EVERY: u64 = 1;
 const DIRTY_TTL: Duration = Duration::from_secs(2);
 /// Cap on cached directory listings and file lists; both are cheap to rebuild.
 const CACHE_ENTRIES: usize = 256;
@@ -94,6 +96,8 @@ pub(crate) struct App {
     records: Mutex<Option<RecordsEntry>>,
     memo: Mutex<HashMap<String, (Instant, Arc<String>)>>,
     dirty: Mutex<Option<(Instant, bool)>>,
+    /// Open streams on a page that shows the working tree. Zero means no scan runs.
+    pub(crate) wt_watchers: std::sync::atomic::AtomicUsize,
     file_lists: Mutex<HashMap<String, Arc<Vec<String>>>>,
     last_commits: Mutex<HashMap<String, Arc<Vec<LastCommit>>>>,
     chain: Mutex<Option<(String, Arc<crate::languages::Chain>)>>,
@@ -135,6 +139,7 @@ impl App {
             records: Mutex::new(None),
             memo: Mutex::new(HashMap::new()),
             dirty: Mutex::new(None),
+            wt_watchers: std::sync::atomic::AtomicUsize::new(0),
             file_lists: Mutex::new(HashMap::new()),
             last_commits: Mutex::new(HashMap::new()),
             chain: Mutex::new(None),
@@ -167,7 +172,7 @@ impl App {
         {
             g.clear();
         }
-        if (moved("head") || moved("refs") || moved("index"))
+        if (moved("head") || moved("refs") || moved("index") || moved("worktree"))
             && let Ok(mut g) = self.dirty.lock()
         {
             *g = None;
@@ -474,6 +479,8 @@ pub(crate) async fn keep_index_fresh(app: Arc<App>) {
     }
     let mut last: Option<String> = None;
     let mut check_head = true;
+    let mut wt_seen: Option<u64> = None;
+    let mut ticks: u64 = 0;
     loop {
         // With `index.build_on_start` off the index waits for the first page that needs it;
         // the watcher below keeps running either way.
@@ -506,8 +513,30 @@ pub(crate) async fn keep_index_fresh(app: Arc<App>) {
             () = tick => {
                 let Some(w) = watcher.as_mut() else { continue };
                 let now = w.parts();
-                if let Some(before) = seen.filter(|b| *b != now) {
-                    let kinds = now.changed_since(&before);
+                let mut kinds = seen
+                    .filter(|b| *b != now)
+                    .map(|before| now.changed_since(&before))
+                    .unwrap_or_default();
+                ticks = ticks.wrapping_add(1);
+                // The working tree scan runs only while a page shows it.
+                if app.wt_watchers.load(Ordering::Acquire) == 0 {
+                    wt_seen = None;
+                } else if ticks.is_multiple_of(WORKTREE_EVERY) {
+                    let a = Arc::clone(&app);
+                    let sig = tokio::task::spawn_blocking(move || {
+                        gitterrace_git::worktree_signature(&a.repo).ok()
+                    })
+                    .await
+                    .ok()
+                    .flatten();
+                    if wt_seen.is_some() && sig.is_some() && sig != wt_seen {
+                        kinds.push("worktree");
+                    }
+                    if sig.is_some() {
+                        wt_seen = sig;
+                    }
+                }
+                if !kinds.is_empty() {
                     check_head |= kinds.iter().any(|k| matches!(*k, "head" | "refs"));
                     app.changed(kinds, now.digest()).await;
                 }

@@ -1,5 +1,5 @@
 // Live updates. One EventSource per tab on GET /events. The server says which parts of the
-// repository moved (head, refs, stash, worktrees, index); the page decides what that means:
+// repository moved (head, refs, stash, worktrees, index, worktree); the page decides what that means:
 //   data-live="refresh"  re-fetch this page and swap <main> in place
 //   data-live="notice"   show a quiet "Updated, refresh" note, never reload on its own
 // The top bar chip and the HEAD banner always follow. Pages pinned to a commit or tag carry no
@@ -75,7 +75,8 @@
 
   function connect() {
     if (source) source.close();
-    source = new EventSource(B + "/events?v=" + encodeURIComponent(version));
+    source = new EventSource(B + "/events?v=" + encodeURIComponent(version) +
+      (on.indexOf("worktree") >= 0 ? "&wt=1" : ""));
     source.addEventListener("change", handle);
     source.onopen = function () { delay = 1000; };
     source.onerror = function () {

@@ -23,7 +23,7 @@ use crate::app::App;
 const HEARTBEAT: Duration = Duration::from_secs(15);
 
 /// Every part of the repository, for a stream that cannot say what it missed.
-const ALL: [&str; 5] = ["head", "refs", "stash", "worktrees", "index"];
+const ALL: [&str; 6] = ["head", "refs", "stash", "worktrees", "index", "worktree"];
 
 /// What moved, and the state the chrome shows, read once for all listeners.
 pub(crate) struct Change {
@@ -58,7 +58,7 @@ impl Mode {
     };
     pub(crate) const WORKTREE: Self = Self {
         how: "refresh",
-        on: "head refs index",
+        on: "head refs index worktree",
     };
     pub(crate) const STASHES: Self = Self {
         how: "refresh",
@@ -79,6 +79,27 @@ impl Mode {
 pub(crate) struct EventsQuery {
     /// Fingerprint digest the page was rendered at.
     v: Option<String>,
+    /// `1` when the page shows the working tree, which turns the working tree scan on.
+    wt: Option<String>,
+}
+
+/// Counts the open streams that need the working tree scanned; released on drop.
+pub(crate) struct WorktreeWatch(Arc<App>);
+
+impl WorktreeWatch {
+    pub(crate) fn new(app: &Arc<App>) -> Self {
+        app.wt_watchers
+            .fetch_add(1, std::sync::atomic::Ordering::AcqRel);
+        Self(Arc::clone(app))
+    }
+}
+
+impl Drop for WorktreeWatch {
+    fn drop(&mut self) {
+        self.0
+            .wt_watchers
+            .fetch_sub(1, std::sync::atomic::Ordering::AcqRel);
+    }
 }
 
 fn event(c: &Change) -> Event {
@@ -104,6 +125,7 @@ struct Stream {
     first: Option<Event>,
     /// Released when the stream drops, which frees the slot.
     _slot: OwnedSemaphorePermit,
+    _wt: Option<WorktreeWatch>,
 }
 
 /// `GET /events`: one stream per tab. Refused with 503 past `server.max_streams`.
@@ -127,6 +149,7 @@ pub(crate) async fn events(State(app): State<Arc<App>>, Query(q): Query<EventsQu
         rx,
         stop: app.stop.clone(),
         first: behind.then(|| everything(now)),
+        _wt: (q.wt.as_deref() == Some("1")).then(|| WorktreeWatch::new(&app)),
         app,
         _slot: slot,
     };

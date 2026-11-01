@@ -78,6 +78,58 @@ fn staged_paths(repo: &gix::Repository, out: &mut BTreeSet<String>) -> Result<()
     Ok(())
 }
 
+/// A hash of the unstaged and untracked state: which paths differ from the index and their size
+/// and mtime, so editing a modified file again moves it too. Reads only, like the rest of this
+/// module. Capped like the view, so a forgotten `node_modules` stays cheap.
+pub fn worktree_signature(repo: &Repo) -> Result<u64> {
+    use gix::status::{UntrackedFiles, index_worktree::Item as Iw};
+    use std::hash::{Hash, Hasher};
+
+    let r = open(repo)?;
+    let work = r.workdir().map(Path::to_path_buf);
+    let mut items: Vec<(String, u64, u128)> = Vec::new();
+    let iter = r
+        .status(gix::progress::Discard)
+        .map_err(git)?
+        .untracked_files(UntrackedFiles::Files)
+        .into_index_worktree_iter(Vec::new())
+        .map_err(git)?;
+    for item in iter {
+        let Ok(item) = item else { continue };
+        let path = match item {
+            Iw::Modification { rela_path, .. } => rela_path.to_str_lossy().into_owned(),
+            Iw::DirectoryContents { entry, .. } => {
+                if entry.status != gix::dir::entry::Status::Untracked {
+                    continue;
+                }
+                entry.rela_path.to_str_lossy().into_owned()
+            }
+            Iw::Rewrite { dirwalk_entry, .. } => {
+                dirwalk_entry.rela_path.to_str_lossy().into_owned()
+            }
+        };
+        let (size, mtime) = work
+            .as_ref()
+            .and_then(|w| std::fs::symlink_metadata(w.join(&path)).ok())
+            .map_or((0, 0), |m| {
+                let t = m
+                    .modified()
+                    .ok()
+                    .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+                    .map_or(0, |d| d.as_nanos());
+                (m.len(), t)
+            });
+        items.push((path, size, mtime));
+        if items.len() >= MAX_FILES {
+            break;
+        }
+    }
+    items.sort();
+    let mut h = std::collections::hash_map::DefaultHasher::new();
+    items.hash(&mut h);
+    Ok(h.finish())
+}
+
 /// True when anything differs from HEAD. Stops at the first difference.
 #[must_use]
 pub fn is_dirty(repo: &Repo) -> bool {
@@ -258,6 +310,42 @@ mod tests {
         let a = d.iter().find(|f| f.path == "a.txt").expect("a");
         assert_eq!((a.additions, a.deletions), (1, 1));
         assert!(!p.join(".git/index.lock").exists());
+    }
+
+    /// `GITTERRACE_BENCH_REPO=<path> cargo test --release -p gitterrace-git -- --ignored --nocapture signature_cost`.
+    #[test]
+    #[ignore = "measurement, run by hand in release"]
+    fn signature_cost() {
+        let p = std::env::var("GITTERRACE_BENCH_REPO").expect("GITTERRACE_BENCH_REPO");
+        let repo = Repo::discover(std::path::Path::new(&p)).expect("repo");
+        crate::worktree_signature(&repo).expect("warm");
+        let t = std::time::Instant::now();
+        for _ in 0..20 {
+            crate::worktree_signature(&repo).expect("sig");
+        }
+        println!("worktree signature: {:?} per tick", t.elapsed() / 20);
+    }
+
+    #[test]
+    fn signature_moves_on_edit_and_new_file_only() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let p = dir.path();
+        git(p, &["init", "-q", "-b", "main"]);
+        std::fs::write(p.join("a.txt"), "1\n").expect("write");
+        git(p, &["add", "."]);
+        git(p, &["commit", "-qm", "init"]);
+        let repo = Repo::discover(p).expect("repo");
+        let sig = || crate::worktree_signature(&repo).expect("sig");
+        let clean = sig();
+        assert_eq!(sig(), clean, "an untouched tree is stable");
+        std::fs::write(p.join("a.txt"), "changed\n").expect("write");
+        let edited = sig();
+        assert_ne!(edited, clean, "editing a tracked file");
+        std::fs::write(p.join("a.txt"), "changed again\n").expect("write");
+        let again = sig();
+        assert_ne!(again, edited, "editing a modified file again");
+        std::fs::write(p.join("new.txt"), "n\n").expect("write");
+        assert_ne!(sig(), again, "a new untracked file");
     }
 
     #[test]

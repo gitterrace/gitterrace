@@ -31,4 +31,4 @@ pub use walk::{
     BlobId, BlobReader, FileRef, LastCommit, files, last_commits, scan_commits, tree_id,
 };
 pub use watch::{Cost, Parts, Watcher};
-pub use worktree::{is_dirty, worktree_diff};
+pub use worktree::{is_dirty, worktree_diff, worktree_signature};

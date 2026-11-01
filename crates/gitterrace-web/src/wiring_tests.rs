@@ -474,3 +474,38 @@ async fn watch_off_runs_no_timer() {
     let got = tokio::time::timeout(Duration::from_millis(1500), rx.recv()).await;
     assert!(got.is_err(), "no change is announced with the watcher off");
 }
+
+#[tokio::test]
+async fn working_tree_is_scanned_only_for_a_subscriber() {
+    let dir = tempfile::tempdir().expect("tmp");
+    let p = repo(dir.path(), "r");
+    let a = app(&p, with(|c| c.watch.interval_ms = 250));
+    tokio::spawn(crate::app::keep_index_fresh(Arc::clone(&a)));
+    let mut rx = a.changes.subscribe();
+    tokio::time::sleep(Duration::from_millis(400)).await;
+    let kinds = |c: Arc<crate::live::Change>| c.kinds.clone();
+    std::fs::write(p.join("small.txt"), "edited without a subscriber\n").expect("write");
+    let got = tokio::time::timeout(Duration::from_millis(900), rx.recv()).await;
+    assert!(got.is_err(), "no worktree scan without a subscriber");
+
+    let _wt = crate::live::WorktreeWatch::new(&a);
+    tokio::time::sleep(Duration::from_millis(600)).await;
+    while rx.try_recv().is_ok() {}
+    std::fs::write(p.join("small.txt"), "edited with a subscriber\n").expect("write");
+    let got = tokio::time::timeout(Duration::from_millis(1500), rx.recv())
+        .await
+        .expect("event")
+        .expect("open");
+    assert!(kinds(got).contains(&"worktree"), "an edit is seen");
+    std::fs::write(p.join("brand-new.txt"), "x\n").expect("write");
+    let got = tokio::time::timeout(Duration::from_millis(1500), rx.recv())
+        .await
+        .expect("event")
+        .expect("open");
+    assert!(
+        kinds(got).contains(&"worktree"),
+        "an untracked file is seen"
+    );
+    let quiet = tokio::time::timeout(Duration::from_millis(900), rx.recv()).await;
+    assert!(quiet.is_err(), "an untouched tree sends nothing");
+}
