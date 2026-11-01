@@ -48,6 +48,8 @@ pub(crate) struct Served {
 pub(crate) struct Table {
     order: Vec<Arc<Served>>,
     by_name: HashMap<String, Arc<Served>>,
+    /// Actions, when on; each repository's pages embed its token.
+    pub(crate) live: Option<Arc<crate::actions::Live>>,
 }
 
 #[derive(Template)]
@@ -100,11 +102,29 @@ impl Table {
             by_name.insert(name, Arc::clone(&served));
             order.push(served);
         }
-        Ok(Self { order, by_name })
+        Ok(Self {
+            order,
+            by_name,
+            live: None,
+        })
     }
 
     pub(crate) fn get(&self, name: &str) -> Option<&Arc<Served>> {
         self.by_name.get(name)
+    }
+
+    /// Each repository opened once, keyed by its URL name, for permalinks and run requests.
+    pub(crate) fn targets(&self) -> io::Result<Vec<crate::actions::Target>> {
+        self.order
+            .iter()
+            .map(|s| {
+                Ok(crate::actions::Target {
+                    key: s.name.clone(),
+                    base: format!("/r/{}", s.name),
+                    repo: Repo::discover(&s.path).map_err(io::Error::other)?,
+                })
+            })
+            .collect()
     }
 }
 
@@ -215,7 +235,7 @@ async fn dispatch(State(table): State<Arc<Table>>, req: Request) -> Response {
     };
     let router = match served
         .router
-        .get_or_try_init(|| async { repo_router(&served) })
+        .get_or_try_init(|| async { repo_router(&served, table.live.clone()) })
         .await
     {
         Ok(r) => r.clone(),
@@ -245,9 +265,9 @@ async fn dispatch(State(table): State<Arc<Table>>, req: Request) -> Response {
     }
 }
 
-fn repo_router(served: &Served) -> io::Result<Router> {
+fn repo_router(served: &Served, live: Option<Arc<crate::actions::Live>>) -> io::Result<Router> {
     let base = format!("/r/{}", served.name);
-    crate::repo_router(&served.path, base)
+    crate::repo_router(&served.path, base, served.name.clone(), live)
 }
 
 /// Commits per week over the last `SPARK_WEEKS` weeks as a polyline in a 90x20 box.

@@ -36,6 +36,13 @@ pub(crate) struct Chrome {
     pub(crate) banner: Option<String>,
     /// The repository's overview, keeping the selected ref.
     pub(crate) home: String,
+    /// Repo id for permalinks (`/go/<id>/...`); empty for a repo without commits.
+    pub(crate) repo_id: String,
+    /// Name run requests use for this repo.
+    pub(crate) repo_key: String,
+    /// Per-process action token and the menu as JSON; `None` when actions are off, so pages
+    /// carry neither.
+    pub(crate) actions: Option<(String, String)>,
 }
 
 pub(crate) struct Crumb {
@@ -132,6 +139,12 @@ pub(crate) fn chrome_at(app: &crate::app::App, active: &str, rev: &str) -> Chrom
             .collect(),
         banner: banner(&app.repo.head_state()),
         home: href("/"),
+        repo_id: app.repo.id().unwrap_or_default(),
+        repo_key: app.key.clone(),
+        actions: app
+            .actions
+            .as_ref()
+            .map(|l| (l.token().to_owned(), l.menu_json())),
     }
 }
 
@@ -412,8 +425,9 @@ pub(crate) fn diff_html_with(
     for (i, f) in files.iter().enumerate() {
         let _ = write!(
             out,
-            "<section class=\"file\" id=\"f{i}\"><header><span class=\"badge {k}\">{k}</span> ",
-            k = kind_name(f.kind)
+            "<section class=\"file\" id=\"f{i}\" data-path=\"{p}\"><header><span class=\"badge {k}\">{k}</span> ",
+            k = kind_name(f.kind),
+            p = esc(&f.path)
         );
         if f.kind == ChangeKind::Deleted {
             out.push_str(&esc(&f.path));

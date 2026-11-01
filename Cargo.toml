@@ -15,6 +15,7 @@ gitterrace-index = { path = "crates/gitterrace-index", version = "0.1.0" }
 gitterrace-web = { path = "crates/gitterrace-web", version = "0.1.0" }
 gitterrace-api = { path = "crates/gitterrace-api", version = "0.1.0" }
 gitterrace-config = { path = "crates/gitterrace-config", version = "0.1.0" }
+gitterrace-actions = { path = "crates/gitterrace-actions", version = "0.1.0" }
 gitterrace-cards = { path = "crates/gitterrace-cards", version = "0.1.0" }
 schwarzwald = { path = "theme/schwarzwald/rust" }
 gix = { version = "0.90", default-features = false, features = ["max-performance", "sha1", "blob-diff", "blame", "revision", "index", "mailmap", "status"] }

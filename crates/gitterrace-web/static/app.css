@@ -379,3 +379,22 @@ table.own td{white-space:nowrap}table.own td:first-child{width:30%}
 .entries .th td{white-space:nowrap}
 .tag.merged{color:var(--accent-fg)}
 .tagmsg pre{margin:var(--space-3) 0 0;white-space:pre-wrap;font:var(--text-sm)/1.5 var(--mono)}
+/* Action menu: one trigger style, the overlay list reused as a popover. */
+.actbtn{display:inline-grid;place-items:center;width:24px;height:22px;padding:0;border:var(--border);border-radius:var(--radius);background:var(--raised);color:var(--muted);font:var(--weight-semibold) var(--text-sm)/1 var(--sans);cursor:pointer;vertical-align:middle}
+.actbtn::after{content:"\22EF"}
+.actbtn:hover,.actbtn:focus-visible{color:var(--fg);border-color:var(--line)}
+.actbtn.top{width:32px;height:32px;border-color:transparent;background:transparent}
+.actbtn.top:hover{background:var(--hover);border-color:var(--line)}
+.actbtn.float{position:absolute;right:var(--space-2);top:50%;transform:translateY(-50%);z-index:2;opacity:0;transition:opacity var(--dur-fast)}
+td:has(>.actbtn.float){position:relative}
+:hover>.actbtn.float,.actbtn.float:focus-visible,.actbtn.float.sel{opacity:1}
+.meta .actbtn{margin-left:var(--space-1)}
+.actmenu-back{background:transparent;padding:0}
+.ov.actmenu{width:min(300px,92vw)}
+.actmenu .ov-list li{justify-content:space-between;align-items:center}
+.actmenu .ov-list li kbd{margin-left:auto}
+.actmenu .ov-list li.busy{opacity:.55;pointer-events:none}
+.actmenu .ov-list li.busy .name::after{content:" \2026"}
+.actmenu .ov-list li.sep{height:0;padding:0;margin:var(--space-1) 0;border-top:var(--border);cursor:default}
+.actmenu .ov-list li.hint{cursor:default;font-size:var(--text-xs)}
+.actmenu .ov-list li.hint a{color:var(--muted)}

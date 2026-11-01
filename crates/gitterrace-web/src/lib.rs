@@ -1,5 +1,6 @@
 //! HTTP server: server-rendered pages over `gitterrace-git` and `gitterrace-index`.
 
+mod actions;
 mod app;
 mod cards;
 mod charts;
@@ -40,22 +41,29 @@ use crate::app::App;
 /// stops DNS-rebinding pages from reading the repository. In-process callers send
 /// `Host: localhost`.
 pub fn app_router(repo_path: impl AsRef<Path>) -> io::Result<axum::Router> {
-    Ok(build(repo_path.as_ref(), None)?.0)
+    Ok(build(repo_path.as_ref(), None, None)?.0)
 }
 
 /// Router for several repositories: an index at `/`, each repository under `/r/NAME`.
 /// One path behaves exactly like [`app_router`]. Same Host rules.
 pub fn multi_router(paths: Vec<PathBuf>) -> io::Result<axum::Router> {
-    Ok(build_multi(paths, None)?.0)
+    Ok(build_multi(paths, None, None)?.0)
 }
 
 /// One repository's pages, `/api/v1`, cards and badges, with links under `base`. Starts its
 /// index refresher, so call it inside a tokio runtime.
-fn repo_router(repo_path: &Path, base: String) -> io::Result<axum::Router> {
+fn repo_router(
+    repo_path: &Path,
+    base: String,
+    key: String,
+    live: Option<Arc<actions::Live>>,
+) -> io::Result<axum::Router> {
     let repo = Repo::discover(repo_path).map_err(io::Error::other)?;
     let index = Index::open(&repo)?;
     let mut app = App::new(repo, index);
     app.base = base;
+    app.key = key;
+    app.actions = live;
     let app = Arc::new(app);
     tokio::spawn(app::keep_index_fresh(Arc::clone(&app)));
     let api = gitterrace_api::ApiState::open(repo_path).map_err(io::Error::other)?;
@@ -126,29 +134,61 @@ fn guarded(router: axum::Router, extra: Option<IpAddr>) -> axum::Router {
         .layer(axum::middleware::from_fn_with_state(extra, guard::guard))
 }
 
-fn build(repo_path: &Path, extra: Option<IpAddr>) -> io::Result<(axum::Router, String)> {
-    let name = Repo::discover(repo_path).map_err(io::Error::other)?.name();
-    Ok((guarded(repo_router(repo_path, String::new())?, extra), name))
+fn build(
+    repo_path: &Path,
+    extra: Option<IpAddr>,
+    actions_file: Option<&Path>,
+) -> io::Result<(axum::Router, String)> {
+    let repo = Repo::discover(repo_path).map_err(io::Error::other)?;
+    let name = repo.name();
+    let live = actions::start(actions_file, &[repo.root()], extra.is_none());
+    let site = Arc::new(actions::Site {
+        targets: vec![actions::Target {
+            key: name.clone(),
+            base: String::new(),
+            repo,
+        }],
+        live: live.clone(),
+    });
+    let pages = repo_router(repo_path, String::new(), name.clone(), live)?;
+    Ok((guarded(pages.merge(actions::router(site)), extra), name))
 }
 
-fn build_multi(paths: Vec<PathBuf>, extra: Option<IpAddr>) -> io::Result<(axum::Router, String)> {
+fn build_multi(
+    paths: Vec<PathBuf>,
+    extra: Option<IpAddr>,
+    actions_file: Option<&Path>,
+) -> io::Result<(axum::Router, String)> {
     match <[PathBuf; 1]>::try_from(paths) {
-        Ok([one]) => build(&one, extra),
+        Ok([one]) => build(&one, extra, actions_file),
         Err(paths) => {
             let n = paths.len();
-            let table = Arc::new(multi::Table::new(paths)?);
+            let mut table = multi::Table::new(paths)?;
+            let targets = table.targets()?;
+            let roots: Vec<PathBuf> = targets.iter().map(|t| t.repo.root()).collect();
+            let live = actions::start(actions_file, &roots, extra.is_none());
+            table.live.clone_from(&live);
+            let site = Arc::new(actions::Site { targets, live });
             Ok((
-                guarded(multi::router(table), extra),
+                guarded(
+                    multi::router(Arc::new(table)).merge(actions::router(site)),
+                    extra,
+                ),
                 format!("{n} repositories"),
             ))
         }
     }
 }
 
-/// Starts serving until ctrl-c.
-pub async fn serve(repo_paths: Vec<PathBuf>, addr: SocketAddr) -> io::Result<()> {
+/// Starts serving until ctrl-c. `actions` is the user's `actions.toml`; `None` (no config
+/// folder, or `--no-actions`) leaves the run route unmounted, as does a non-loopback bind.
+pub async fn serve(
+    repo_paths: Vec<PathBuf>,
+    addr: SocketAddr,
+    actions: Option<PathBuf>,
+) -> io::Result<()> {
     let extra = (!addr.ip().is_loopback()).then(|| addr.ip());
-    let (router, name) = build_multi(repo_paths, extra)?;
+    let (router, name) = build_multi(repo_paths, extra, actions.as_deref())?;
     if !addr.ip().is_loopback() {
         tracing::warn!(
             "serving to the network: anyone who can reach this address can read the repository"
@@ -174,6 +214,7 @@ mod tests {
     use http_body_util::BodyExt;
     use tower::ServiceExt;
 
+    use crate::actions::actions_tests;
     use crate::{app::App, routes};
 
     fn git(dir: &std::path::Path, args: &[&str]) {
@@ -909,15 +950,38 @@ mod tests {
 
     /// Methods a route may answer besides GET and HEAD, as (path, method). gitterrace is
     /// read-only, so a write route is an owner decision recorded here, never an accident.
-    const WRITE_ALLOWLIST: [(&str, &str); 0] = [];
+    /// The one entry is the action runner, mounted only when the user configured actions.
+    const WRITE_ALLOWLIST: [(&str, &str); 1] = [(crate::actions::RUN_PATH, "POST")];
 
-    /// Every page a crawl reaches, the API and the assets refuse any method but GET and HEAD.
+    /// Every page a crawl reaches, the API and the assets refuse any method but GET and HEAD,
+    /// with actions off and on. With them off the allowlisted route does not exist at all.
     #[tokio::test]
     async fn every_route_is_read_only() {
         let dir = tempfile::tempdir().expect("tmp");
         let a = fixture("alpha", dir.path());
         let b = fixture("beta", dir.path());
-        let router = crate::multi_router(vec![a, b]).expect("router");
+        let cfg = actions_tests::config_dir(actions_tests::ECHO);
+        let off = crate::multi_router(vec![a.clone(), b.clone()]).expect("router");
+        let on = crate::build_multi(vec![a, b], None, Some(&cfg.path().join("actions.toml")))
+            .expect("router")
+            .0;
+        for (router, actions) in [(off.clone(), false), (on, true)] {
+            crawl_read_only(&router, actions).await;
+        }
+        let res = off
+            .oneshot(
+                Request::post(crate::actions::RUN_PATH)
+                    .header("host", "localhost")
+                    .body(Body::empty())
+                    .expect("req"),
+            )
+            .await
+            .expect("res");
+        assert_eq!(res.status(), 404, "run route exists with actions off");
+    }
+
+    async fn crawl_read_only(router: &axum::Router, actions: bool) {
+        let router = router.clone();
         let mut todo = vec![
             "/".to_owned(),
             "/r/alpha/".to_owned(),
@@ -935,6 +999,8 @@ mod tests {
         );
         let mut seen = std::collections::HashSet::new();
         let mut writable = Vec::new();
+        // The run route renders no link, so the crawl is seeded with it; GET on it is 405.
+        todo.push(crate::actions::RUN_PATH.to_owned());
         while let Some(u) = todo.pop() {
             if !seen.insert(u.clone()) || seen.len() > 300 {
                 continue;
@@ -957,7 +1023,8 @@ mod tests {
                     .await
                     .expect("res");
                 let path = u.split('?').next().unwrap_or_default();
-                let allowed = WRITE_ALLOWLIST.iter().any(|(p, am)| *p == path && *am == m);
+                let allowed =
+                    actions && WRITE_ALLOWLIST.iter().any(|(p, am)| *p == path && *am == m);
                 // 405 is a route that exists for GET only. A URL that GET cannot find either
                 // (a `data-last` prefix) may answer 404; any other status means a handler took
                 // the write.

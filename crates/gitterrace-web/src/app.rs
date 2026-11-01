@@ -35,6 +35,10 @@ pub(crate) struct App {
     pub(crate) name: String,
     /// URL prefix: empty for a single repository, `/r/NAME` when several share the server.
     pub(crate) base: String,
+    /// Name run requests use for this repo: the URL name with several repos.
+    pub(crate) key: String,
+    /// Set when actions are on: pages embed the token and the menu.
+    pub(crate) actions: Option<Arc<crate::actions::Live>>,
     progress: Mutex<Progress>,
     ready: AtomicBool,
     /// Selected commits outside HEAD's history, queued for the one indexer loop so the cache
@@ -56,8 +60,10 @@ impl App {
         Self {
             repo,
             index,
+            key: name.clone(),
             name,
             base: String::new(),
+            actions: None,
             progress: Mutex::new(Progress::default()),
             ready: AtomicBool::new(false),
             wanted: Mutex::new(std::collections::BTreeSet::new()),

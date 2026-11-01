@@ -89,7 +89,7 @@ async fn selected_rev(req: axum::extract::Request, next: axum::middleware::Next)
 pub(crate) fn assets<S: Clone + Send + Sync + 'static>() -> Router<S> {
     const JS: &str = "text/javascript; charset=utf-8";
     const CSS: &str = "text/css; charset=utf-8";
-    let table: [(&str, &str, &'static str); 7] = [
+    let table: [(&str, &str, &'static str); 8] = [
         ("loc.js", JS, include_str!("../static/loc.js")),
         ("tokens.css", CSS, include_str!("../static/tokens.css")),
         ("app.css", CSS, include_str!("../static/app.css")),
@@ -97,6 +97,7 @@ pub(crate) fn assets<S: Clone + Send + Sync + 'static>() -> Router<S> {
         ("markdown.css", CSS, include_str!("../static/markdown.css")),
         ("markdown.js", JS, include_str!("../static/markdown.js")),
         ("nav.js", JS, include_str!("../static/nav.js")),
+        ("actions.js", JS, include_str!("../static/actions.js")),
     ];
     table
         .into_iter()

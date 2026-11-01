@@ -19,6 +19,9 @@ struct Cli {
     /// Folder holding `config.toml` (and `actions.toml`). Defaults to the XDG config folder.
     #[arg(long, global = true)]
     config: Option<PathBuf>,
+    /// Never run user actions, even when `actions.toml` declares some.
+    #[arg(long, global = true)]
+    no_actions: bool,
     #[command(subcommand)]
     command: Option<Command>,
 }
@@ -83,7 +86,11 @@ async fn main() -> anyhow::Result<()> {
         Command::Config => print!("{}", loaded.describe()),
         Command::Serve => {
             let addr: SocketAddr = loaded.config.server.addr.parse().context("server.addr")?;
-            gitterrace_web::serve(gitterrace_web::discover_repos(&cli.paths), addr).await?;
+            let actions = dir
+                .filter(|_| !cli.no_actions)
+                .map(|d| d.join("actions.toml"));
+            gitterrace_web::serve(gitterrace_web::discover_repos(&cli.paths), addr, actions)
+                .await?;
         }
         Command::Mcp => {
             gitterrace_api::serve_mcp(&path).await?;
