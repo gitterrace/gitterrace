@@ -21,12 +21,9 @@ use gitterrace_git::{CommitSummary, Repo};
 use tokio::sync::OnceCell;
 use tower::ServiceExt;
 
+use crate::app::Env;
 use crate::fmt;
 
-/// Folders never searched for repositories.
-const SKIP_DIRS: [&str; 3] = ["node_modules", "target", ".wt"];
-/// How deep below a given folder repositories are looked for.
-const WALK_DEPTH: usize = 2;
 /// Weeks shown in the index sparkline.
 const SPARK_WEEKS: usize = 26;
 /// Newest commits read per repository for the sparkline.
@@ -46,6 +43,7 @@ pub(crate) struct Served {
 /// The startup repository table. A URL name resolves only through this map, never by
 /// joining it onto a filesystem path.
 pub(crate) struct Table {
+    env: Env,
     order: Vec<Arc<Served>>,
     by_name: HashMap<String, Arc<Served>>,
     /// Actions, when on; each repository's pages embed its token.
@@ -76,7 +74,7 @@ struct RepoItem {
 
 impl Table {
     /// Names each repository after its folder, deduplicated with a numeric suffix.
-    pub(crate) fn new(paths: Vec<PathBuf>) -> io::Result<Self> {
+    pub(crate) fn new(paths: Vec<PathBuf>, env: Env) -> io::Result<Self> {
         let mut order = Vec::with_capacity(paths.len());
         let mut by_name = HashMap::new();
         for path in paths {
@@ -103,6 +101,7 @@ impl Table {
             order.push(served);
         }
         Ok(Self {
+            env,
             order,
             by_name,
             live: None,
@@ -160,9 +159,10 @@ fn valid_name(name: &str) -> bool {
             .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'-' | b'_' | b'.'))
 }
 
-/// Expands the CLI paths: a repository stays as is, a plain folder is searched for
-/// repositories, and a folder with none is taken as a path inside one.
-pub fn discover_repos(paths: &[PathBuf]) -> Vec<PathBuf> {
+/// Expands the CLI paths: a repository stays as is, a plain folder is searched `depth` levels
+/// down for repositories (skipping hidden folders and those in `skip`), and a folder with none
+/// is taken as a path inside one.
+pub fn discover_repos(paths: &[PathBuf], depth: usize, skip: &[String]) -> Vec<PathBuf> {
     let mut out = Vec::new();
     for p in paths {
         if p.join(".git").exists() {
@@ -170,7 +170,7 @@ pub fn discover_repos(paths: &[PathBuf]) -> Vec<PathBuf> {
             continue;
         }
         let before = out.len();
-        walk(p, WALK_DEPTH, &mut out);
+        walk(p, depth, skip, &mut out);
         if out.len() == before {
             out.push(p.clone());
         }
@@ -178,7 +178,7 @@ pub fn discover_repos(paths: &[PathBuf]) -> Vec<PathBuf> {
     out
 }
 
-fn walk(dir: &Path, depth: usize, out: &mut Vec<PathBuf>) {
+fn walk(dir: &Path, depth: usize, skip: &[String], out: &mut Vec<PathBuf>) {
     if depth == 0 {
         return;
     }
@@ -191,7 +191,7 @@ fn walk(dir: &Path, depth: usize, out: &mut Vec<PathBuf>) {
         .filter(|e| {
             let n = e.file_name();
             let n = n.to_string_lossy();
-            !n.starts_with('.') && !SKIP_DIRS.contains(&n.as_ref())
+            !n.starts_with('.') && !skip.iter().any(|s| s.as_str() == n)
         })
         .map(|e| e.path())
         .collect();
@@ -200,7 +200,7 @@ fn walk(dir: &Path, depth: usize, out: &mut Vec<PathBuf>) {
         if d.join(".git").exists() {
             out.push(d);
         } else {
-            walk(&d, depth - 1, out);
+            walk(&d, depth - 1, skip, out);
         }
     }
 }
@@ -235,7 +235,7 @@ async fn dispatch(State(table): State<Arc<Table>>, req: Request) -> Response {
     };
     let router = match served
         .router
-        .get_or_try_init(|| async { repo_router(&served, table.live.clone()) })
+        .get_or_try_init(|| async { repo_router(&served, table.live.clone(), &table.env) })
         .await
     {
         Ok(r) => r.clone(),
@@ -265,9 +265,13 @@ async fn dispatch(State(table): State<Arc<Table>>, req: Request) -> Response {
     }
 }
 
-fn repo_router(served: &Served, live: Option<Arc<crate::actions::Live>>) -> io::Result<Router> {
+fn repo_router(
+    served: &Served,
+    live: Option<Arc<crate::actions::Live>>,
+    env: &Env,
+) -> io::Result<Router> {
     let base = format!("/r/{}", served.name);
-    crate::repo_router(&served.path, base, served.name.clone(), live)
+    crate::repo_router(&served.path, base, served.name.clone(), live, env)
 }
 
 /// Commits per week over the last `SPARK_WEEKS` weeks as a polyline in a 90x20 box.
@@ -376,7 +380,11 @@ mod tests {
         let p = dir.path();
         git(p, &["init", "-q", "-b", "main"]);
         git(p, &["commit", "-q", "--allow-empty", "-m", "one"]);
-        let table = super::Table::new(vec![p.to_path_buf()]).expect("table");
+        let table = super::Table::new(
+            vec![p.to_path_buf()],
+            crate::app::Env::new(gitterrace_config::Config::default()),
+        )
+        .expect("table");
         let s = table.order[0].clone();
         let first = s.recent();
         assert!(

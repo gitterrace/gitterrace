@@ -16,6 +16,14 @@ struct Cli {
     /// Address to listen on. Local only by default. Overrides `server.addr`.
     #[arg(long, global = true)]
     addr: Option<SocketAddr>,
+    /// Check for repository changes every N milliseconds (at least 250). Overrides
+    /// `watch.interval_ms`.
+    #[arg(long, global = true, value_name = "MS")]
+    poll: Option<u64>,
+    /// Do not watch for changes: no live updates, and a restart or reload picks up new commits.
+    /// Overrides `watch.enabled`.
+    #[arg(long, global = true)]
+    no_watch: bool,
     /// Folder holding `config.toml` (and `actions.toml`). Defaults to the XDG config folder.
     #[arg(long, global = true)]
     config: Option<PathBuf>,
@@ -81,6 +89,14 @@ async fn main() -> anyhow::Result<()> {
         loaded.config.server.addr = a.to_string();
         loaded.flagged("server.addr");
     }
+    if let Some(ms) = cli.poll {
+        loaded.config.watch.interval_ms = ms;
+        loaded.flagged("watch.interval_ms");
+    }
+    if cli.no_watch {
+        loaded.config.watch.enabled = false;
+        loaded.flagged("watch.enabled");
+    }
     loaded.validate().context("config")?;
     match cli.command.unwrap_or(Command::Serve) {
         Command::Config => print!("{}", loaded.describe()),
@@ -89,8 +105,9 @@ async fn main() -> anyhow::Result<()> {
             let actions = dir
                 .filter(|_| !cli.no_actions)
                 .map(|d| d.join("actions.toml"));
-            gitterrace_web::serve(gitterrace_web::discover_repos(&cli.paths), addr, actions)
-                .await?;
+            let m = &loaded.config.multi;
+            let repos = gitterrace_web::discover_repos(&cli.paths, m.depth, &m.skip_dirs);
+            gitterrace_web::serve(repos, addr, actions, loaded.config).await?;
         }
         Command::Mcp => {
             gitterrace_api::serve_mcp(&path).await?;

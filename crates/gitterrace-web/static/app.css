@@ -185,6 +185,7 @@ input{min-width:0;flex:1}.filter{width:100%}
 .refswitch{display:inline-flex}
 button.branch{height:auto;cursor:pointer}
 .branch .caret{width:0;height:0;border:4px solid transparent;border-top-color:currentColor;margin:4px 0 0 2px}
+[hidden]{display:none!important}
 .wtchip{display:inline-flex;align-items:center;gap:6px;font:var(--weight-semibold) var(--text-xs)/1 var(--mono);color:var(--warn);background:var(--warn-bg);border:var(--border);border-radius:var(--radius);padding:5px 10px;white-space:nowrap}
 .wtchip:hover{text-decoration:none;border-color:var(--warn)}
 .wtchip .dot{width:6px;height:6px;border-radius:50%;background:var(--warn)}
@@ -372,6 +373,8 @@ svg.chart .col:hover .dot{opacity:1}
 svg.chart .dot-pt{fill:var(--accent);fill-opacity:.55;stroke:var(--accent);stroke-width:1}svg.chart a:hover .dot-pt{fill-opacity:.95}
 .cmp{display:flex;flex-wrap:wrap;gap:var(--space-3);align-items:end;margin:var(--space-4) 0}.cmp label{display:flex;flex-direction:column;gap:4px;font-size:var(--text-sm);color:var(--muted)}.cmp input{border:var(--border);min-width:220px}.cmp button{font-weight:var(--weight-regular);padding:5px var(--space-4);background:var(--accent-soft)}
 table.own td{white-space:nowrap}table.own td:first-child{width:30%}
+.livenote{font:var(--weight-semibold) var(--text-xs)/1 var(--mono);color:var(--muted);background:var(--soft);border:var(--border);border-radius:var(--radius);padding:5px 10px;white-space:nowrap;cursor:pointer}
+.livenote:hover{border-color:var(--line-strong)}
 .headstate{background:var(--warn-bg);color:var(--warn);border-bottom:var(--border);font:var(--weight-semibold) var(--text-sm)/1.4 var(--mono);padding:var(--space-2) 0}
 .branches td:first-child{white-space:nowrap}
 .entries.grow td:first-child{width:auto;white-space:nowrap}.entries td.grow{width:100%}

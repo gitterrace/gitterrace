@@ -21,7 +21,7 @@ schwarzwald = { path = "theme/schwarzwald/rust" }
 gix = { version = "0.90", default-features = false, features = ["max-performance", "sha1", "blob-diff", "blame", "revision", "index", "mailmap", "status"] }
 axum = "0.8"
 askama = "0.16"
-tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "signal", "time"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "signal", "time", "sync"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 thiserror = "2"
@@ -37,6 +37,7 @@ two-face = { version = "0.5", default-features = false, features = ["syntect-oni
 ammonia = "4"
 rmcp = { version = "1.7", features = ["server", "transport-io", "macros"] }
 schemars = "1"
+futures-util = { version = "0.3", default-features = false, features = ["std"] }
 tower = { version = "0.5", features = ["util"] }
 tower-http = { version = "0.6", default-features = false, features = ["compression-gzip", "compression-br"] }
 

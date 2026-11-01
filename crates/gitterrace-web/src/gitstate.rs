@@ -11,6 +11,7 @@ use crate::{
     app::blocking,
     error::Result,
     fmt::{self, ago, enc, href, short},
+    live::Mode,
     routes::Shared,
     views::{self, Chrome},
 };
@@ -58,7 +59,7 @@ pub(crate) async fn worktrees(State(app): Shared) -> Result<Html<String>> {
             })
             .collect();
         Ok(WorktreesPage {
-            c: views::chrome(a, "refs"),
+            c: views::chrome(a, "refs").live(Mode::WORKTREES),
             rows,
         }
         .render()?)
@@ -96,7 +97,7 @@ pub(crate) async fn stashes(State(app): Shared) -> Result<Html<String>> {
             })
             .collect();
         Ok(StashesPage {
-            c: views::chrome(a, "refs"),
+            c: views::chrome(a, "refs").live(Mode::STASHES),
             rows,
         }
         .render()?)
@@ -130,7 +131,7 @@ pub(crate) async fn tag(State(app): Shared, Path(name): Path<String>) -> Result<
         let now = fmt::now();
         let note = r.annotation.as_ref();
         Ok(TagPage {
-            c: views::chrome(a, "refs"),
+            c: views::chrome(a, "refs").pinned(),
             commit: short(&r.target),
             commit_href: href(&format!("/commit/{}", r.target)),
             tree_href: href(&format!("/tree/{}", enc(&r.name, false))),

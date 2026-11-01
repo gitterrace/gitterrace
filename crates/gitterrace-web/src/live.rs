@@ -1,0 +1,163 @@
+//! Live updates: `GET /events` is a server-sent event stream per repository. The watcher in
+//! `app.rs` sends one `change` event whenever a part of the repository moved; `static/live.js`
+//! decides what each page does about it.
+
+use std::{convert::Infallible, sync::Arc, time::Duration};
+
+use axum::{
+    extract::{Query, State},
+    http::{StatusCode, header},
+    response::{
+        IntoResponse, Response,
+        sse::{Event, KeepAlive, Sse},
+    },
+};
+use futures_util::stream;
+use serde::Deserialize;
+use tokio::sync::{OwnedSemaphorePermit, broadcast, watch};
+
+use crate::app::App;
+
+/// Seconds between the comment lines that keep an idle stream open through proxies and tell the
+/// browser the server is alive.
+const HEARTBEAT: Duration = Duration::from_secs(15);
+
+/// Every part of the repository, for a stream that cannot say what it missed.
+const ALL: [&str; 5] = ["head", "refs", "stash", "worktrees", "index"];
+
+/// What moved, and the state the chrome shows, read once for all listeners.
+pub(crate) struct Change {
+    pub(crate) kinds: Vec<&'static str>,
+    /// Digest of the fingerprint, as a decimal string: it does not fit a JavaScript number.
+    pub(crate) v: u64,
+    pub(crate) banner: Option<String>,
+    /// The Working tree chip in the top bar.
+    pub(crate) dirty: bool,
+}
+
+/// How a page reacts to a change, read by `live.js` from `data-live` and `data-live-on`.
+#[derive(Clone, Copy)]
+pub(crate) struct Mode {
+    /// `refresh` re-renders the page in place, `notice` shows a quiet "Updated, refresh" note,
+    /// empty ignores changes and never opens a stream.
+    pub(crate) how: &'static str,
+    /// Space separated kinds the page shows.
+    pub(crate) on: &'static str,
+}
+
+impl Mode {
+    /// Lists of commits and anything that follows HEAD.
+    pub(crate) const NOTICE: Self = Self {
+        how: "notice",
+        on: "head refs",
+    };
+    /// Branches, tags, stashes and worktrees are all counted on the refs page.
+    pub(crate) const REFS: Self = Self {
+        how: "notice",
+        on: "head refs stash worktrees",
+    };
+    pub(crate) const WORKTREE: Self = Self {
+        how: "refresh",
+        on: "head refs index",
+    };
+    pub(crate) const STASHES: Self = Self {
+        how: "refresh",
+        on: "stash",
+    };
+    pub(crate) const WORKTREES: Self = Self {
+        how: "refresh",
+        on: "worktrees head refs",
+    };
+
+    /// A page about a full commit id never changes.
+    pub(crate) fn pinned_to(rev: &str) -> bool {
+        rev.len() >= 40 && rev.bytes().all(|b| b.is_ascii_hexdigit())
+    }
+}
+
+#[derive(Deserialize)]
+pub(crate) struct EventsQuery {
+    /// Fingerprint digest the page was rendered at.
+    v: Option<String>,
+}
+
+fn event(c: &Change) -> Event {
+    let body = serde_json::json!({
+        "kinds": c.kinds,
+        "v": c.v.to_string(),
+        "banner": c.banner,
+        "dirty": c.dirty,
+    });
+    Event::default().event("change").data(body.to_string())
+}
+
+/// A change for a stream that missed some: everything may have moved, the chrome is unknown.
+fn everything(v: u64) -> Event {
+    let body = serde_json::json!({ "kinds": ALL, "v": v.to_string() });
+    Event::default().event("change").data(body.to_string())
+}
+
+struct Stream {
+    rx: broadcast::Receiver<Arc<Change>>,
+    stop: watch::Receiver<bool>,
+    app: Arc<App>,
+    first: Option<Event>,
+    /// Released when the stream drops, which frees the slot.
+    _slot: OwnedSemaphorePermit,
+}
+
+/// `GET /events`: one stream per tab. Refused with 503 past `server.max_streams`.
+pub(crate) async fn events(State(app): State<Arc<App>>, Query(q): Query<EventsQuery>) -> Response {
+    let Ok(slot) = Arc::clone(&app.streams).try_acquire_owned() else {
+        return (
+            StatusCode::SERVICE_UNAVAILABLE,
+            [(header::RETRY_AFTER, "30")],
+            "too many open pages for live updates\n",
+        )
+            .into_response();
+    };
+    let rx = app.changes.subscribe();
+    // A page that was rendered before the newest change missed it, which also covers a
+    // reconnect after a pause.
+    let now = app.version();
+    let behind =
+        q.v.and_then(|v| v.parse::<u64>().ok())
+            .is_some_and(|v| v != now);
+    let state = Stream {
+        rx,
+        stop: app.stop.clone(),
+        first: behind.then(|| everything(now)),
+        app,
+        _slot: slot,
+    };
+    let body = stream::unfold(state, |mut s| async move {
+        if let Some(e) = s.first.take() {
+            return Some((Ok::<_, Infallible>(e), s));
+        }
+        loop {
+            tokio::select! {
+                got = s.rx.recv() => match got {
+                    Ok(c) => return Some((Ok(event(&c)), s)),
+                    Err(broadcast::error::RecvError::Lagged(_)) => {
+                        let v = s.app.version();
+                        return Some((Ok(everything(v)), s));
+                    }
+                    Err(broadcast::error::RecvError::Closed) => return None,
+                },
+                gone = s.stop.changed() => {
+                    if gone.is_err() || *s.stop.borrow() {
+                        return None;
+                    }
+                }
+            }
+        }
+    });
+    let mut res = Sse::new(body)
+        .keep_alive(KeepAlive::new().interval(HEARTBEAT).text("hb"))
+        .into_response();
+    res.headers_mut().insert(
+        header::CACHE_CONTROL,
+        header::HeaderValue::from_static("no-store"),
+    );
+    res
+}

@@ -12,6 +12,7 @@ mod guard;
 mod highlight;
 mod insights;
 mod languages;
+mod live;
 mod markdown;
 mod media;
 mod multi;
@@ -20,6 +21,8 @@ mod routes;
 mod search;
 mod types;
 mod views;
+#[cfg(test)]
+mod wiring_tests;
 
 use std::{
     io,
@@ -28,11 +31,12 @@ use std::{
     sync::Arc,
 };
 
+use gitterrace_config::Config;
 use gitterrace_git::Repo;
 use gitterrace_index::Index;
 pub use multi::discover_repos;
 
-use crate::app::App;
+use crate::app::{App, Env};
 
 /// The full router `serve` uses: pages, `/api/v1`, cards and badges. Starts the index
 /// refresher, so call it inside a tokio runtime. Drive it in-process with tower's `oneshot`.
@@ -41,13 +45,23 @@ use crate::app::App;
 /// stops DNS-rebinding pages from reading the repository. In-process callers send
 /// `Host: localhost`.
 pub fn app_router(repo_path: impl AsRef<Path>) -> io::Result<axum::Router> {
-    Ok(build(repo_path.as_ref(), None, None)?.0)
+    app_router_with(repo_path, Config::default())
+}
+
+/// [`app_router`] with the settings in force.
+pub fn app_router_with(repo_path: impl AsRef<Path>, cfg: Config) -> io::Result<axum::Router> {
+    Ok(build(repo_path.as_ref(), None, None, &Env::new(cfg))?.0)
 }
 
 /// Router for several repositories: an index at `/`, each repository under `/r/NAME`.
 /// One path behaves exactly like [`app_router`]. Same Host rules.
 pub fn multi_router(paths: Vec<PathBuf>) -> io::Result<axum::Router> {
-    Ok(build_multi(paths, None, None)?.0)
+    multi_router_with(paths, Config::default())
+}
+
+/// [`multi_router`] with the settings in force.
+pub fn multi_router_with(paths: Vec<PathBuf>, cfg: Config) -> io::Result<axum::Router> {
+    Ok(build_multi(paths, None, None, &Env::new(cfg))?.0)
 }
 
 /// One repository's pages, `/api/v1`, cards and badges, with links under `base`. Starts its
@@ -57,10 +71,18 @@ fn repo_router(
     base: String,
     key: String,
     live: Option<Arc<actions::Live>>,
+    env: &Env,
 ) -> io::Result<axum::Router> {
-    let repo = Repo::discover(repo_path).map_err(io::Error::other)?;
-    let index = Index::open(&repo)?;
-    let mut app = App::new(repo, index);
+    let cfg = &env.cfg;
+    let repo = Repo::discover(repo_path)
+        .map_err(io::Error::other)?
+        .with_limits(
+            cfg.limits.text_kb << 10,
+            cfg.resources.cache_mb * (1 << 20) / 2,
+        )
+        .with_workers(cfg.index.threads);
+    let index = Index::open(&repo)?.with_threads(cfg.index.threads);
+    let mut app = App::configured(repo, index, env);
     app.base = base;
     app.key = key;
     app.actions = live;
@@ -88,22 +110,23 @@ const WARM_PAGES: [&str; 11] = [
     "/stats/patterns",
 ];
 
-/// Parses the record set for HEAD as soon as each index generation is ready, then renders
-/// the unfiltered pages once, so the first visit to any of them is served from the memo.
+/// Parses the record set for HEAD each time the index moves, then renders the unfiltered pages
+/// once, so the first visit to any of them is served from the memo. Sleeps between moves.
 async fn prewarm(app: Arc<App>, pages: axum::Router) {
     use tower::ServiceExt;
-    let mut warmed: Option<String> = None;
-    loop {
-        let head = app::blocking(&app, |a| {
-            let head = a.repo.resolve("HEAD")?;
-            a.records(&head)?;
-            Ok(head)
-        })
-        .await
-        .ok();
-        if head.is_some() && head == warmed {
-            tokio::time::sleep(std::time::Duration::from_secs(1)).await;
-        } else if head.is_some() && app.ready() {
+    let by = Arc::clone(&app);
+    app::on_refreshed(app, move || {
+        let (app, pages) = (Arc::clone(&by), pages.clone());
+        async move {
+            let ready = app::blocking(&app, |a| {
+                let head = a.repo.resolve("HEAD")?;
+                Ok(a.records(&head)?.is_some())
+            })
+            .await
+            .unwrap_or(false);
+            if !ready {
+                return;
+            }
             for path in WARM_PAGES {
                 // Internal requests skip the Host and cross-site guard, which wraps the outer
                 // router; a failed warm-up only means the first visitor builds the page.
@@ -111,11 +134,9 @@ async fn prewarm(app: Arc<App>, pages: axum::Router) {
                     let _warm = pages.clone().oneshot(req).await;
                 }
             }
-            warmed = head;
-        } else {
-            tokio::time::sleep(std::time::Duration::from_millis(250)).await;
         }
-    }
+    })
+    .await;
 }
 
 fn guarded(router: axum::Router, extra: Option<IpAddr>) -> axum::Router {
@@ -138,6 +159,7 @@ fn build(
     repo_path: &Path,
     extra: Option<IpAddr>,
     actions_file: Option<&Path>,
+    env: &Env,
 ) -> io::Result<(axum::Router, String)> {
     let repo = Repo::discover(repo_path).map_err(io::Error::other)?;
     let name = repo.name();
@@ -150,7 +172,7 @@ fn build(
         }],
         live: live.clone(),
     });
-    let pages = repo_router(repo_path, String::new(), name.clone(), live)?;
+    let pages = repo_router(repo_path, String::new(), name.clone(), live, env)?;
     Ok((guarded(pages.merge(actions::router(site)), extra), name))
 }
 
@@ -158,12 +180,13 @@ fn build_multi(
     paths: Vec<PathBuf>,
     extra: Option<IpAddr>,
     actions_file: Option<&Path>,
+    env: &Env,
 ) -> io::Result<(axum::Router, String)> {
     match <[PathBuf; 1]>::try_from(paths) {
-        Ok([one]) => build(&one, extra, actions_file),
+        Ok([one]) => build(&one, extra, actions_file, env),
         Err(paths) => {
             let n = paths.len();
-            let mut table = multi::Table::new(paths)?;
+            let mut table = multi::Table::new(paths, env.clone())?;
             let targets = table.targets()?;
             let roots: Vec<PathBuf> = targets.iter().map(|t| t.repo.root()).collect();
             let live = actions::start(actions_file, &roots, extra.is_none());
@@ -186,9 +209,11 @@ pub async fn serve(
     repo_paths: Vec<PathBuf>,
     addr: SocketAddr,
     actions: Option<PathBuf>,
+    cfg: Config,
 ) -> io::Result<()> {
     let extra = (!addr.ip().is_loopback()).then(|| addr.ip());
-    let (router, name) = build_multi(repo_paths, extra, actions.as_deref())?;
+    let env = Env::new(cfg);
+    let (router, name) = build_multi(repo_paths, extra, actions.as_deref(), &env)?;
     if !addr.ip().is_loopback() {
         tracing::warn!(
             "serving to the network: anyone who can reach this address can read the repository"
@@ -197,10 +222,12 @@ pub async fn serve(
     let listener = tokio::net::TcpListener::bind(addr).await?;
     tracing::info!("serving {name} on http://{addr}");
     axum::serve(listener, router)
-        .with_graceful_shutdown(async {
+        .with_graceful_shutdown(async move {
             if tokio::signal::ctrl_c().await.is_err() {
                 std::future::pending::<()>().await;
             }
+            // Open tabs hold their streams; closing them lets the server stop.
+            env.shut_down();
         })
         .await
 }
@@ -410,8 +437,8 @@ mod tests {
         let repo = gitterrace_git::Repo::discover(p).expect("repo");
         let index = gitterrace_index::Index::open(&repo).expect("index");
         let app = Arc::new(App::new(repo, index));
-        assert!(crate::routes::raw_refused(crate::routes::MAX_RAW_BYTES + 1));
-        assert!(!crate::routes::raw_refused(crate::routes::MAX_RAW_BYTES));
+        assert!(crate::routes::raw_refused((256 << 20) + 1, 256));
+        assert!(!crate::routes::raw_refused(256 << 20, 256));
         let (s, body) = get(&app, "/blob/HEAD/big.png").await;
         assert_eq!(s, 200);
         assert!(body.contains("class=\"media-img\"") && !body.contains("7 x 5"));
@@ -805,7 +832,11 @@ mod tests {
         let dir = tempfile::tempdir().expect("tmp");
         let a = fixture("same", &dir.path().join("x"));
         let b = fixture("same", &dir.path().join("y"));
-        let t = crate::multi::Table::new(vec![a, b]).expect("table");
+        let t = crate::multi::Table::new(
+            vec![a, b],
+            crate::app::Env::new(gitterrace_config::Config::default()),
+        )
+        .expect("table");
         assert!(t.get("same").is_some() && t.get("same-2").is_some());
     }
 
@@ -881,15 +912,17 @@ mod tests {
         let (s, body) = get(&app, "/stashes").await;
         assert!(s == 200 && body.contains("stash@{0}") && body.contains("wip stash"));
         assert!(
-            !body.contains("class=\"headstate\""),
-            "no banner on a branch"
+            body.contains("id=\"headstate\" hidden>"),
+            "the banner is hidden on a branch"
         );
         let head = app.repo.resolve("HEAD").expect("head");
         git(&p, &["checkout", "-q", "--detach"]);
         let (_, body) = get(&app, "/").await;
         let short = &head[..7];
         assert!(
-            body.contains(&format!("class=\"headstate\" role=\"status\"><div class=\"wrap\">HEAD is detached at {short}")),
+            body.contains(&format!(
+                "id=\"headstate\"><div class=\"wrap\">HEAD is detached at {short}"
+            )),
             "{body}"
         );
     }
@@ -962,9 +995,14 @@ mod tests {
         let b = fixture("beta", dir.path());
         let cfg = actions_tests::config_dir(actions_tests::ECHO);
         let off = crate::multi_router(vec![a.clone(), b.clone()]).expect("router");
-        let on = crate::build_multi(vec![a, b], None, Some(&cfg.path().join("actions.toml")))
-            .expect("router")
-            .0;
+        let on = crate::build_multi(
+            vec![a, b],
+            None,
+            Some(&cfg.path().join("actions.toml")),
+            &crate::app::Env::new(gitterrace_config::Config::default()),
+        )
+        .expect("router")
+        .0;
         for (router, actions) in [(off.clone(), false), (on, true)] {
             crawl_read_only(&router, actions).await;
         }

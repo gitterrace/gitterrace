@@ -110,15 +110,19 @@ settings! {
         interval_ms: u64 = 1000,
     }
     index: Index {
-        /// Build the commit index for every repository at startup instead of at first visit.
+        /// Build the commit index as soon as a repository is served: at startup for one
+        /// repository, at its first visit when several share the server. Off waits for the first
+        /// page that needs it (Insights).
         build_on_start: bool = true,
         /// Threads used to parse the index. 0 means one per core, capped at 8.
         threads: usize = 0,
     }
     resources: Resources {
-        /// Memory for the blame and highlighted-code caches together, in MB.
+        /// Memory for the blame and highlighted-code caches together, in MB, shared half and
+        /// half. The highlighted-code cache is per process, the blame cache per repository.
         cache_mb: usize = 64,
-        /// Most git or index jobs running at once. 0 means one per core.
+        /// Most page-building git jobs running at once across all repositories. 0 means one per
+        /// core.
         blocking_jobs: usize = 0,
     }
     limits: Limits {
@@ -138,7 +142,9 @@ settings! {
         bots: bool = false,
         /// Count lock files and minified output.
         generated: bool = false,
-        /// Period used when the URL names none: 1w, 1m, 3m, 1y or all.
+        /// Period the Pulse, Hotspots, Ownership, Patterns, Code frequency and Contributors
+        /// pages use when the URL names none: 1w, 1m, 3m, 1y or all. All leaves each page its own
+        /// default (Pulse opens on a month).
         period: String = "all".to_owned(),
     }
     display: Display {

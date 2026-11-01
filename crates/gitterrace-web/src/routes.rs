@@ -20,7 +20,9 @@ use crate::{
     charts,
     error::Result,
     filter::{Dim, Filter, FilterBar},
-    fmt, markdown, views,
+    fmt,
+    live::Mode,
+    markdown, views,
     views::{Chrome, CommitRow, Crumb, Entry, FileStatRow, Nav, RefRow, Row},
 };
 
@@ -74,6 +76,7 @@ pub(crate) fn router(app: Arc<App>) -> Router {
         .route("/worktrees", get(crate::gitstate::worktrees))
         .route("/stashes", get(crate::gitstate::stashes))
         .route("/tag/{name}", get(crate::gitstate::tag))
+        .route("/events", get(crate::live::events))
         .layer(axum::middleware::from_fn(selected_rev))
         .merge(assets())
         .with_state(app)
@@ -89,7 +92,7 @@ async fn selected_rev(req: axum::extract::Request, next: axum::middleware::Next)
 pub(crate) fn assets<S: Clone + Send + Sync + 'static>() -> Router<S> {
     const JS: &str = "text/javascript; charset=utf-8";
     const CSS: &str = "text/css; charset=utf-8";
-    let table: [(&str, &str, &'static str); 8] = [
+    let table: [(&str, &str, &'static str); 9] = [
         ("loc.js", JS, include_str!("../static/loc.js")),
         ("tokens.css", CSS, include_str!("../static/tokens.css")),
         ("app.css", CSS, include_str!("../static/app.css")),
@@ -98,6 +101,7 @@ pub(crate) fn assets<S: Clone + Send + Sync + 'static>() -> Router<S> {
         ("markdown.js", JS, include_str!("../static/markdown.js")),
         ("nav.js", JS, include_str!("../static/nav.js")),
         ("actions.js", JS, include_str!("../static/actions.js")),
+        ("live.js", JS, include_str!("../static/live.js")),
     ];
     table
         .into_iter()
@@ -169,11 +173,10 @@ async fn mermaid_js() -> Response {
 
 /// Largest media file the blob page reads, for its pixel size; bigger ones show no facts.
 pub(crate) const MAX_PREVIEW_BYTES: u64 = 16 << 20;
-/// Largest object `/raw` loads into memory in one piece.
-pub(crate) const MAX_RAW_BYTES: u64 = 256 << 20;
 
-pub(crate) fn raw_refused(size: u64) -> bool {
-    size > MAX_RAW_BYTES
+/// Whether a blob of `size` bytes is too big for `/raw` under `limits.raw_mb`.
+pub(crate) fn raw_refused(size: u64, raw_mb: u64) -> bool {
+    size > raw_mb << 20
 }
 
 /// Serves blob bytes for relative images. Content is untrusted, so scripts are disabled.
@@ -182,7 +185,7 @@ async fn raw(State(app): Shared, Path((rev, path)): Path<(String, String)>) -> R
         let id = a.repo.resolve(&rev)?;
         let path = path.trim_matches('/').to_owned();
         // The header size comes first: `blob` reads nothing above the text cap.
-        if raw_refused(a.repo.blob(&id, &path)?.size) {
+        if raw_refused(a.repo.blob(&id, &path)?.size, a.cfg.limits.raw_mb) {
             return Ok(None);
         }
         let bytes = a.repo.blob_bytes(&id, &path)?;
@@ -333,7 +336,8 @@ async fn overview(State(app): Shared) -> Result<Html<String>> {
             c: Chrome {
                 md: readme.is_some(),
                 ..views::chrome(a, "files")
-            },
+            }
+            .live(Mode::NOTICE),
             totals,
             readme,
             entries: views::entries(&rev, "", &list),
@@ -480,7 +484,7 @@ async fn log(
             fmt::href(&q)
         };
         Ok(LogPage {
-            c: views::chrome_at(a, "log", &rev),
+            c: views::chrome_at(a, "log", &rev).live(Mode::NOTICE),
             newer: (pg > 0).then(|| link(pg - 1)),
             older: more.then(|| link(pg + 1)),
             author_chip,
@@ -525,7 +529,8 @@ async fn commit(State(app): Shared, Path(id): Path<String>) -> Result<Html<Strin
                 rev: id.clone(),
                 rev_enc: id.clone(),
                 ..views::chrome(a, "log")
-            },
+            }
+            .pinned(),
             subject: d.summary.subject.clone(),
             body: d.body.trim().to_owned(),
             author: d.summary.author.name.clone(),
@@ -541,7 +546,12 @@ async fn commit(State(app): Shared, Path(id): Path<String>) -> Result<Html<Strin
                 })
                 .collect(),
             files: views::file_stats(&d),
-            diff: views::diff_html(&id, d.summary.parents.first().map(String::as_str), &d.files),
+            diff: views::diff_html(
+                a.cfg.limits.diff_fold_lines,
+                &id,
+                d.summary.parents.first().map(String::as_str),
+                &d.files,
+            ),
             id,
         })
     })
@@ -650,7 +660,7 @@ async fn highlight_tail(
         let id = a.repo.resolve(&rev)?;
         let path = path.trim_matches('/').to_owned();
         let text = a.repo.blob(&id, &path)?.text.unwrap_or_default();
-        Ok(views::code_tail_html(&path, &text))
+        Ok(views::code_tail_html(a.code_cache_bytes(), &path, &text))
     })
     .await?;
     Ok(Html(html))
@@ -675,16 +685,16 @@ async fn blob(
                 let src = (k == crate::media::Kind::Svg)
                     .then(|| std::str::from_utf8(&bytes).ok())
                     .flatten()
-                    .filter(|t| t.len() as u64 <= gitterrace_git::MAX_TEXT_BYTES);
+                    .filter(|t| t.len() as u64 <= a.repo.text_limit());
                 Some(crate::media::blob_html(k, b.size, &rev, &path, &bytes, src))
             }
             None => None,
         };
-        let too_large = b.size > gitterrace_git::MAX_TEXT_BYTES;
+        let too_large = b.size > a.repo.text_limit();
         let text = b.text.as_deref().filter(|_| !too_large);
         let (html, cut) = match text {
             Some(t) => {
-                let (h, cut) = views::code_html_first(&path, t);
+                let (h, cut) = views::code_html_first(a.code_cache_bytes(), &path, t);
                 (Some(h), cut)
             }
             None => (None, false),
@@ -736,7 +746,7 @@ async fn blame(
         let lines = a.repo.blame(&id, &path)?;
         // Blame is empty for binary and oversized files; say which, from the header size.
         let too_large =
-            lines.is_empty() && a.repo.blob(&id, &path)?.size > gitterrace_git::MAX_TEXT_BYTES;
+            lines.is_empty() && a.repo.blob(&id, &path)?.size > a.repo.text_limit();
         let raw = fmt::href(&format!(
             "/raw/{}/{}",
             fmt::enc(&rev, false),
@@ -804,7 +814,7 @@ async fn refs(State(app): Shared) -> Result<Html<String>> {
             })
             .collect();
         Ok(RefsPage {
-            c: views::chrome(a, "refs"),
+            c: views::chrome(a, "refs").live(Mode::REFS),
             branches: crate::gitstate::branch_rows(a)?,
             tags,
             remotes: views::ref_rows(&all, RefKind::Remote, now),
@@ -854,7 +864,7 @@ pub(crate) async fn with_records<T: Template + Send + 'static>(
 ) -> Result<Html<String>> {
     let html = blocking(app, move |a| {
         let head = a.repo.resolve(&fmt::selected())?;
-        let c = views::chrome(a, "stats");
+        let c = views::chrome(a, "stats").live(Mode::NOTICE);
         match a.records(&head)? {
             Some(r) => Ok(build(a, &r, c).render()?),
             None => Ok(PendingPage {
@@ -1039,9 +1049,9 @@ async fn worktree(State(app): Shared) -> Result<Html<String>> {
             })
             .collect();
         Ok(WorktreePage {
-            c: views::chrome(a, "files"),
+            c: views::chrome(a, "files").live(Mode::WORKTREE),
             clean: files.is_empty(),
-            diff: views::diff_html_with(None, None, &files),
+            diff: views::diff_html_with(a.cfg.limits.diff_fold_lines, None, None, &files),
             adds: fmt::thousands(adds),
             dels: fmt::thousands(dels),
             files: stats,

@@ -40,6 +40,16 @@ pub(crate) struct Chrome {
     pub(crate) repo_id: String,
     /// Name run requests use for this repo.
     pub(crate) repo_key: String,
+    /// Color theme before the visitor picks one (`display.theme`), empty for the system's.
+    pub(crate) theme: String,
+    /// Open a live-update stream: off on pages pinned to a commit or tag.
+    pub(crate) live: bool,
+    /// What the page does with a change: `refresh`, `notice` or nothing but the chrome.
+    pub(crate) live_how: &'static str,
+    /// Kinds of change the page shows, space separated.
+    pub(crate) live_on: &'static str,
+    /// Fingerprint the page was rendered at, so a reconnect can tell it missed a change.
+    pub(crate) version: String,
     /// Per-process action token and the menu as JSON; `None` when actions are off, so pages
     /// carry neither.
     pub(crate) actions: Option<(String, String)>,
@@ -138,6 +148,14 @@ pub(crate) fn chrome_at(app: &crate::app::App, active: &str, rev: &str) -> Chrom
             })
             .collect(),
         banner: banner(&app.repo.head_state()),
+        theme: match app.cfg.display.theme.as_str() {
+            "system" => String::new(),
+            t => t.to_owned(),
+        },
+        live: app.cfg.watch.enabled && !crate::live::Mode::pinned_to(rev),
+        live_how: "",
+        live_on: "",
+        version: app.version().to_string(),
         home: href("/"),
         repo_id: app.repo.id().unwrap_or_default(),
         repo_key: app.key.clone(),
@@ -145,6 +163,25 @@ pub(crate) fn chrome_at(app: &crate::app::App, active: &str, rev: &str) -> Chrom
             .actions
             .as_ref()
             .map(|l| (l.token().to_owned(), l.menu_json())),
+    }
+}
+
+impl Chrome {
+    /// How this page reacts to changes in the repository.
+    pub(crate) fn live(self, mode: crate::live::Mode) -> Self {
+        Self {
+            live_how: mode.how,
+            live_on: mode.on,
+            ..self
+        }
+    }
+
+    /// A page about a fixed commit or tag: nothing in the repository can change it.
+    pub(crate) fn pinned(self) -> Self {
+        Self {
+            live: false,
+            ..self
+        }
     }
 }
 
@@ -333,12 +370,15 @@ fn num(n: Option<u32>) -> String {
     n.map_or_else(String::new, |n| n.to_string())
 }
 
-pub(crate) fn diff_html(rev: &str, parent: Option<&str>, files: &[FileDiff]) -> String {
-    diff_html_with(Some(rev), parent, files)
+pub(crate) fn diff_html(
+    fold_lines: usize,
+    rev: &str,
+    parent: Option<&str>,
+    files: &[FileDiff],
+) -> String {
+    diff_html_with(fold_lines, Some(rev), parent, files)
 }
 
-/// A file whose changed lines pass this is folded behind a "Load diff" button.
-const FILE_DIFF_BUDGET: usize = 400;
 /// Once the files before it changed this many lines in all, later files are folded too.
 const TOTAL_DIFF_BUDGET: usize = 2_000;
 /// The same budgets in rendered bytes, since a few huge lines cost more than many short ones.
@@ -413,8 +453,10 @@ pub(crate) fn diff_body_html(f: &FileDiff) -> String {
     out
 }
 
-/// `rev` of `None` renders file names without links (the worktree has no blob URLs).
+/// `rev` of `None` renders file names without links (the worktree has no blob URLs). A file
+/// whose changed lines pass `fold_lines` is folded behind a "Load diff" button.
 pub(crate) fn diff_html_with(
+    fold_lines: usize,
     rev: Option<&str>,
     parent: Option<&str>,
     files: &[FileDiff],
@@ -473,7 +515,7 @@ pub(crate) fn diff_html_with(
                 .map(|l| l.text.len() + 48)
                 .sum();
             let over = rev.is_some()
-                && (changed > FILE_DIFF_BUDGET
+                && (changed > fold_lines
                     || bytes > FILE_DIFF_BYTES
                     || budget_used + changed > TOTAL_DIFF_BUDGET
                     || bytes_used + bytes > TOTAL_DIFF_BYTES);
@@ -518,13 +560,18 @@ const EAGER_BYTES: usize = 32 * 1024;
 
 type Memo = Option<(usize, std::collections::HashMap<u64, (String, bool)>)>;
 static CODE_CACHE: std::sync::Mutex<Memo> = std::sync::Mutex::new(None);
-const CODE_CACHE_BYTES: usize = 32 << 20;
 
 fn code_key(path: &str, text: &str) -> u64 {
     use std::hash::{Hash, Hasher};
     let mut hasher = std::collections::hash_map::DefaultHasher::new();
     (path, text).hash(&mut hasher);
     hasher.finish()
+}
+
+/// Whether the highlighted lines of this file are in the cache.
+#[cfg(test)]
+pub(crate) fn code_is_cached(path: &str, text: &str) -> bool {
+    code_cached(code_key(path, text)).is_some()
 }
 
 fn code_cached(key: u64) -> Option<(String, bool)> {
@@ -535,7 +582,7 @@ fn code_cached(key: u64) -> Option<(String, bool)> {
 /// Returns the line blocks and whether it was cut at the line cap.
 /// One div per line: the number is a CSS counter, so it neither selects nor copies.
 /// Highlighting costs ~0.7 ms/KB, so a blob is rendered once per content.
-pub(crate) fn code_html(path: &str, text: &str) -> (String, bool) {
+pub(crate) fn code_html(cache_bytes: usize, path: &str, text: &str) -> (String, bool) {
     let key = code_key(path, text);
     if let Some(hit) = code_cached(key) {
         return hit;
@@ -543,7 +590,7 @@ pub(crate) fn code_html(path: &str, text: &str) -> (String, bool) {
     let built = code_html_uncached(path, text, usize::MAX);
     if let Ok(mut g) = CODE_CACHE.lock() {
         let (size, map) = g.get_or_insert_with(Default::default);
-        if *size + built.0.len() > CODE_CACHE_BYTES {
+        if *size + built.0.len() > cache_bytes {
             map.clear();
             *size = 0;
         }
@@ -555,16 +602,16 @@ pub(crate) fn code_html(path: &str, text: &str) -> (String, bool) {
 
 /// Like `code_html`, but a big uncached file highlights only its first chunks and marks the
 /// block `data-hl` so the page fetches the rest from `code_tail_html` after first paint.
-pub(crate) fn code_html_first(path: &str, text: &str) -> (String, bool) {
+pub(crate) fn code_html_first(cache_bytes: usize, path: &str, text: &str) -> (String, bool) {
     if text.len() <= EAGER_BYTES || code_cached(code_key(path, text)).is_some() {
-        return code_html(path, text);
+        return code_html(cache_bytes, path, text);
     }
     code_html_uncached(path, text, EAGER_CHUNKS * CHUNK_LINES)
 }
 
 /// The chunks `code_html_first` left plain, highlighted.
-pub(crate) fn code_tail_html(path: &str, text: &str) -> String {
-    let (full, _) = code_html(path, text);
+pub(crate) fn code_tail_html(cache_bytes: usize, path: &str, text: &str) -> String {
+    let (full, _) = code_html(cache_bytes, path, text);
     let marker = "<div class=\"ch\"";
     let from = full
         .match_indices(marker)
@@ -660,6 +707,8 @@ pub(crate) fn blame_html(path: &str, lines: &[BlameLine], now: i64) -> String {
 #[cfg(test)]
 mod tests {
     use crate::views::{code_html, code_html_first, code_tail_html, crumbs, diff_html};
+
+    const CACHE: usize = 32 << 20;
     use gitterrace_git::{ChangeKind, FileDiff, LineKind};
 
     #[test]
@@ -672,7 +721,7 @@ mod tests {
 
     #[test]
     fn code_escapes() {
-        let (h, cut) = code_html("x.txt", "<b>\nx");
+        let (h, cut) = code_html(CACHE, "x.txt", "<b>\nx");
         assert!(h.contains("&lt;b&gt;"));
         assert!(!cut);
         assert!(h.contains("id=\"L2\""));
@@ -682,12 +731,12 @@ mod tests {
     #[test]
     fn big_files_light_the_first_chunks_and_the_tail_completes_them() {
         let text = "fn f() { let x = 1; }\n".repeat(3_000);
-        let (first, _) = code_html_first("a.rs", &text);
+        let (first, _) = code_html_first(CACHE, "a.rs", &text);
         assert!(first.starts_with("<div class=\"code src\" data-hl>"));
         let lit = |h: &str| h.matches("s-keyword").count();
         assert!(lit(&first) > 0 && lit(&first) < 3_000 * 2);
-        let (full, _) = code_html("a.rs", &text);
-        let tail = code_tail_html("a.rs", &text);
+        let (full, _) = code_html(CACHE, "a.rs", &text);
+        let tail = code_tail_html(CACHE, "a.rs", &text);
         let head_end = first.match_indices("<div class=\"ch\"").nth(2).unwrap().0;
         let glued = format!(
             "{}{}</div>",
@@ -696,7 +745,7 @@ mod tests {
         );
         assert_eq!(glued.replace(" data-hl", ""), full);
         assert!(first[..head_end].contains("s-keyword"));
-        let (small, _) = code_html_first("a.rs", "fn f() {}\n");
+        let (small, _) = code_html_first(CACHE, "a.rs", "fn f() {}\n");
         assert!(!small.contains("data-hl"));
     }
 
@@ -729,7 +778,7 @@ mod tests {
     #[test]
     fn code_chunks_restart_the_counter() {
         let text = "l\n".repeat(250);
-        let (h, _) = code_html("x.txt", &text);
+        let (h, _) = code_html(CACHE, "x.txt", &text);
         assert_eq!(h.matches("class=\"ch\"").count(), 3);
         assert!(h.contains("counter-reset:n 100"));
         assert!(h.contains("id=\"L250\""));
@@ -763,9 +812,10 @@ mod tests {
             rewritten: 0,
             code: CodeCounts::default(),
         };
-        let small = diff_html("abc", None, &[file(10)]);
+        let small = diff_html(400, "abc", None, &[file(10)]);
         assert!(!small.contains("data-load-diff"));
-        let big = diff_html("abc", None, &[file(401)]);
+        let big = diff_html(400, "abc", None, &[file(401)]);
+        assert!(!diff_html(500, "abc", None, &[file(401)]).contains("data-load-diff"));
         assert!(big.contains("data-load-diff=\"/diff/abc/0\""));
         assert!(!big.contains("<div class=\"add\""));
     }

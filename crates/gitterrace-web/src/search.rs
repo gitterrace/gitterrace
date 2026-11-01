@@ -25,7 +25,6 @@ use crate::{
 };
 
 /// Matching lines kept per search before the rest is reported as cut off.
-const MAX_MATCHES: usize = 500;
 const MAX_PER_FILE: usize = 100;
 const MAX_COMMITS: usize = 200;
 /// Files above this are skipped, like GitHub does.
@@ -233,6 +232,7 @@ fn search_code(a: &App, rev: &str, re: &Regex, glob: Option<&Regex>) -> Result<C
         .iter()
         .filter(|f| glob.is_none_or(|g| g.is_match(&f.path)))
         .collect();
+    let max_matches = a.cfg.limits.search_matches;
     let next = AtomicUsize::new(0);
     let total = AtomicUsize::new(0);
     let scanned = AtomicUsize::new(0);
@@ -252,7 +252,7 @@ fn search_code(a: &App, rev: &str, re: &Regex, glob: Option<&Regex>) -> Result<C
                 while !stop.load(Ordering::Relaxed) {
                     let i = next.fetch_add(1, Ordering::Relaxed);
                     let Some(f) = list.get(i) else { break };
-                    let Some(text) = reader.text(f.blob, gitterrace_git::MAX_TEXT_BYTES) else {
+                    let Some(text) = reader.text(f.blob, a.repo.text_limit()) else {
                         skipped.fetch_add(1, Ordering::Relaxed);
                         continue;
                     };
@@ -264,11 +264,11 @@ fn search_code(a: &App, rev: &str, re: &Regex, glob: Option<&Regex>) -> Result<C
                     if hits.count == 0 {
                         continue;
                     }
-                    let room = MAX_MATCHES.saturating_sub(total.load(Ordering::Relaxed));
+                    let room = max_matches.saturating_sub(total.load(Ordering::Relaxed));
                     if hits.count > room {
                         hits.count = room;
                     }
-                    if total.fetch_add(hits.count, Ordering::Relaxed) + hits.count >= MAX_MATCHES {
+                    if total.fetch_add(hits.count, Ordering::Relaxed) + hits.count >= max_matches {
                         stop.store(true, Ordering::Relaxed);
                     }
                     if let Ok(mut g) = found.lock() {

@@ -26,15 +26,15 @@ Actions live in their own file, `actions.toml`, because they run commands.
 
 | Key | Type | Default | Description |
 | --- | --- | --- | --- |
-| `build_on_start` | bool | `true` | Build the commit index for every repository at startup instead of at first visit. |
+| `build_on_start` | bool | `true` | Build the commit index as soon as a repository is served: at startup for one repository, at its first visit when several share the server. Off waits for the first page that needs it (Insights). |
 | `threads` | integer | `0` | Threads used to parse the index. 0 means one per core, capped at 8. |
 
 ## `[resources]`
 
 | Key | Type | Default | Description |
 | --- | --- | --- | --- |
-| `cache_mb` | integer | `64` | Memory for the blame and highlighted-code caches together, in MB. |
-| `blocking_jobs` | integer | `0` | Most git or index jobs running at once. 0 means one per core. |
+| `cache_mb` | integer | `64` | Memory for the blame and highlighted-code caches together, in MB, shared half and half. The highlighted-code cache is per process, the blame cache per repository. |
+| `blocking_jobs` | integer | `0` | Most page-building git jobs running at once across all repositories. 0 means one per core. |
 
 ## `[limits]`
 
@@ -52,7 +52,7 @@ Actions live in their own file, `actions.toml`, because they run commands.
 | `exclude` | list of strings | `[]` | Paths (globs) left out of every insight. |
 | `bots` | bool | `false` | Count commits by bots. |
 | `generated` | bool | `false` | Count lock files and minified output. |
-| `period` | string | `"all"` | Period used when the URL names none: 1w, 1m, 3m, 1y or all. |
+| `period` | string | `"all"` | Period the Pulse, Hotspots, Ownership, Patterns, Code frequency and Contributors pages use when the URL names none: 1w, 1m, 3m, 1y or all. All leaves each page its own default (Pulse opens on a month). |
 
 ## `[display]`
 

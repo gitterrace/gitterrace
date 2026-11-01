@@ -314,7 +314,7 @@ mod tests {
         let text = std::fs::read_to_string(&path).expect("read");
         for run in 0..4 {
             let t = std::time::Instant::now();
-            let (h, _) = crate::views::code_html(&path, &text);
+            let (h, _) = crate::views::code_html(32 << 20, &path, &text);
             eprintln!(
                 "run {run}: {} KB -> {} KB in {:?}",
                 text.len() / 1024,

@@ -134,7 +134,8 @@ impl Parts {
         .collect()
     }
 
-    fn combined(&self) -> u64 {
+    /// One value for all parts: it differs whenever any part does.
+    pub fn digest(&self) -> u64 {
         let mut h = std::collections::hash_map::DefaultHasher::new();
         (self.head, self.refs, self.stash, self.worktrees, self.index).hash(&mut h);
         h.finish()
@@ -179,7 +180,7 @@ impl Watcher {
     /// The current fingerprint. Equal values mean nothing a page shows has changed; a different
     /// value means something may have.
     pub fn fingerprint(&mut self) -> u64 {
-        self.parts().combined()
+        self.parts().digest()
     }
 
     /// The fingerprint split by kind of change. Same cost as [`Watcher::fingerprint`].

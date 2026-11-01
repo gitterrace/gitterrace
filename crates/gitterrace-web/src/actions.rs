@@ -470,6 +470,7 @@ mod tests {
             vec![repo.to_path_buf()],
             bound,
             cfg.map(|d| d.join("actions.toml")).as_deref(),
+            &crate::app::Env::new(gitterrace_config::Config::default()),
         )
         .expect("router")
         .0
@@ -744,9 +745,14 @@ mod tests {
 
         // 18. the repo's own actions.toml files never load: naming one is refused.
         for local in [repo.clone(), repo.join(".gitterrace")] {
-            let r = crate::build_multi(vec![repo.clone()], None, Some(&local.join("actions.toml")))
-                .expect("router")
-                .0;
+            let r = crate::build_multi(
+                vec![repo.clone()],
+                None,
+                Some(&local.join("actions.toml")),
+                &crate::app::Env::new(gitterrace_config::Config::default()),
+            )
+            .expect("router")
+            .0;
             assert_eq!(
                 send(&r, Req::ok("x", body("echo", "page", ""))).await.0,
                 404,

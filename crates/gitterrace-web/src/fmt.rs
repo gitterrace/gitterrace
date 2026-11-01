@@ -34,8 +34,24 @@ pub(crate) fn day(time: i64) -> String {
     date(time, 0)[..10].to_owned()
 }
 
-/// Coarse relative time such as `3 days ago`.
+thread_local! {
+    /// `display.dates = "absolute"` for the request rendered on this thread.
+    static ABSOLUTE: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+/// Runs `f` with [`ago`] answering a date instead of a distance when `absolute`.
+pub(crate) fn with_dates<T>(absolute: bool, f: impl FnOnce() -> T) -> T {
+    let prev = ABSOLUTE.with(|a| a.replace(absolute));
+    let out = f();
+    ABSOLUTE.with(|a| a.set(prev));
+    out
+}
+
+/// Coarse relative time such as `3 days ago`, or the date under `display.dates = "absolute"`.
 pub(crate) fn ago(time: i64, now: i64) -> String {
+    if ABSOLUTE.with(std::cell::Cell::get) {
+        return day(time);
+    }
     let secs = now - time;
     if secs < 60 {
         return "just now".to_owned();
@@ -261,7 +277,7 @@ pub(crate) fn esc(s: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use crate::fmt::{ago, date, day_label, enc, size, thousands};
+    use crate::fmt::{ago, date, day_label, enc, size, thousands, with_dates};
 
     #[test]
     fn formats_epoch_and_offset() {
@@ -274,6 +290,15 @@ mod tests {
     fn relative_and_size() {
         assert_eq!(ago(0, 90), "1 minute ago");
         assert_eq!(ago(0, 86_400 * 3), "3 days ago");
+        assert_eq!(
+            with_dates(true, || ago(86_400 * 40, 86_400 * 43)),
+            "1970-02-10"
+        );
+        assert_eq!(
+            ago(0, 90),
+            "1 minute ago",
+            "the mode does not leak out of its scope"
+        );
         assert_eq!(size(1536), "1.5 KiB");
     }
 

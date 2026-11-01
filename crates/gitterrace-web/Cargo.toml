@@ -13,12 +13,14 @@ workspace = true
 [dependencies]
 gitterrace-git.workspace = true
 gitterrace-actions.workspace = true
+gitterrace-config.workspace = true
 gitterrace-index.workspace = true
 gitterrace-api.workspace = true
 gitterrace-cards.workspace = true
 axum.workspace = true
 askama.workspace = true
 tokio.workspace = true
+futures-util.workspace = true
 serde.workspace = true
 tracing.workspace = true
 thiserror.workspace = true

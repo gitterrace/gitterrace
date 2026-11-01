@@ -78,8 +78,9 @@ pub(crate) async fn pulse(
     cached(&app, "pu", raw, move |a, r, c| {
         let f = &q.filter;
         let recs = scoped(f, r);
-        let ins = insights(a, &recs, q.options());
-        let period = period_of(&q, Period::Month);
+        let d = a.defaults();
+        let ins = insights(a, &recs, q.options(&d));
+        let period = period_of(&q, &d, Period::Month);
         let s = ins.period_summary(period);
         let prev = s.previous.as_ref();
         let row = |label, now: u64, before: Option<u64>| {
@@ -139,7 +140,7 @@ pub(crate) async fn pulse(
             c,
             tabs: views::stats_tabs("pu"),
             fb: f.bar("/stats/pulse", r),
-            opts: q.row("/stats/pulse"),
+            opts: q.row(&d, "/stats/pulse"),
             rows,
             span,
             unit,
@@ -183,9 +184,10 @@ pub(crate) async fn hotspots(
     cached(&app, "ho", raw, move |a, r, c| {
         let f = &q.filter;
         let recs = scoped(f, r);
-        let ins = insights(a, &recs, q.options());
+        let d = a.defaults();
+        let ins = insights(a, &recs, q.options(&d));
         let files = head_lines(a);
-        let rep = ins.hotspots(&files, period_of(&q, Period::All));
+        let rep = ins.hotspots(&files, period_of(&q, &d, Period::All));
         let max = rep.files.first().map_or(0.0, |h| h.score);
         let dots: Vec<_> = rep
             .files
@@ -230,7 +232,7 @@ pub(crate) async fn hotspots(
             c,
             tabs: views::stats_tabs("ho"),
             fb: f.bar("/stats/hotspots", r),
-            opts: q.row("/stats/hotspots"),
+            opts: q.row(&d, "/stats/hotspots"),
             kpis: vec![
                 Kpi("Files changed", fmt::thousands(rep.files.len())),
                 Kpi("Changes", fmt::thousands(rep.total_changes)),
@@ -280,9 +282,10 @@ pub(crate) async fn ownership(
     cached(&app, "ow", raw, move |a, r, c| {
         let f = &q.filter;
         let recs = scoped(f, r);
-        let ins = insights(a, &recs, q.options());
+        let d = a.defaults();
+        let ins = insights(a, &recs, q.options(&d));
         let files = head_lines(a);
-        let rep = ins.ownership(&files, period_of(&q, Period::All), 2);
+        let rep = ins.ownership(&files, period_of(&q, &d, Period::All), 2);
         let row = |d: &gitterrace_index::DirOwnership, name: String| DirRow {
             href: f.link("/stats/ownership", Dim::Path, &d.path),
             path: name,
@@ -307,7 +310,7 @@ pub(crate) async fn ownership(
             c,
             tabs: views::stats_tabs("ow"),
             fb: f.bar("/stats/ownership", r),
-            opts: q.row("/stats/ownership"),
+            opts: q.row(&d, "/stats/ownership"),
             kpis: vec![
                 Kpi("Bus factor", fmt::thousands(rep.overall.bus_factor)),
                 Kpi("Solo lines", fmt::thousands(rep.solo_lines)),
@@ -364,9 +367,10 @@ pub(crate) async fn patterns(
     cached(&app, "pa", raw, move |a, r, c| {
         let f = &q.filter;
         let recs = scoped(f, r);
-        let ins = insights(a, &recs, q.options());
+        let d = a.defaults();
+        let ins = insights(a, &recs, q.options(&d));
         let files = head_lines(a);
-        let period = period_of(&q, Period::All);
+        let period = period_of(&q, &d, Period::All);
         let pairs = ins
             .coupling(&files, period, 3, TOP_PAIRS)
             .into_iter()
@@ -418,7 +422,7 @@ pub(crate) async fn patterns(
             c,
             tabs: views::stats_tabs("pa"),
             fb: f.bar("/stats/patterns", r),
-            opts: q.row("/stats/patterns"),
+            opts: q.row(&d, "/stats/patterns"),
             pairs,
             age: charts::bars(&age),
             sizes: charts::bars(&sizes),
@@ -504,7 +508,7 @@ pub(crate) async fn compare(
         if !b2.is_empty() {
             match (a.repo.resolve(&b2), a.repo.resolve(&h2)) {
                 (Ok(bi), Ok(hi)) => {
-                    let ins = insights(a, r, gitterrace_index::Options::default());
+                    let ins = insights(a, r, a.defaults().into_options());
                     let cmp = ins.compare(&bi, &hi);
                     let subjects = a.subjects(&hi);
                     let net = cmp.added.abs_diff(cmp.removed);
@@ -603,7 +607,7 @@ pub(crate) async fn history(
     let path = path.trim_matches('/').to_owned();
     let key = format!("{path}\0{}", App::canonical_query(raw.as_deref()));
     cached_keyed(&app, "hi", key, move |a, r, c| {
-        let ins = insights(a, r, gitterrace_index::Options::default());
+        let ins = insights(a, r, a.defaults().into_options());
         let head = a.repo.resolve(&fmt::selected()).unwrap_or_default();
         let subjects = a.subjects(&head);
         let now = fmt::now();
