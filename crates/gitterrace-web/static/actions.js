@@ -202,7 +202,11 @@
     }
     add("Copy permalink", "p", function () { copy(permalink(t), "Permalink copied"); closeMenu(); });
     add("Copy as markdown", "m", function () { copy(markdown(t), "Markdown copied"); closeMenu(); });
-    var keys = { p: 0, m: 1 };
+    add("Send to\u2026", "s", function () {
+      closeMenu();
+      if (window.gtSend) window.gtSend.open({ kind: t.kind, path: t.path || "", lines: t.lines || null, subject: t.subject || "", sha: commit, link: permalink(t), markdown: markdown(t), text: t.text || "" });
+    });
+    var keys = { p: 0, m: 1, s: 2 };
     var usable = mine.filter(function (a) { return a.kinds.indexOf(t.kind) >= 0; });
     if (usable.length) list.appendChild(el("li", "sep"));
     usable.forEach(function (a) {

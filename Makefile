@@ -49,7 +49,11 @@ names:
 	python3 scripts/names-check.py
 
 ## check: Every gate
-check: theme actions names docs-check fmt lint test doc
+check: theme actions send-vectors names docs-check fmt lint test doc
+
+## send-vectors: Check send.js against the shared send vectors
+send-vectors:
+	python3 scripts/send-vectors-check.py
 
 ## help: This list
 help:

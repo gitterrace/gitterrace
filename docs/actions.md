@@ -1,24 +1,45 @@
-# Actions
+# Send to and actions
 
 Select something, press `.` or click `⋯`. The menu always has **Copy permalink** and **Copy
-as markdown**; the rest comes from `actions.toml` in your config folder (never in a
-repository). An action runs a program of yours directly, with no shell: placeholders such as
-`{title}` fill whole arguments, and stdin carries the payload as JSON or the markdown alone.
-Where a destination has its own add screen, the samples use it so you confirm the item there;
-writing directly is the alternative.
+as markdown**. The rest comes from `actions.toml` in your config folder (never in a
+repository), in two kinds: **Send to** for handing a selection to another app, **actions**
+for running a program of yours.
 
-The tendir action opens tendir's new-task sheet, filled in, for you to confirm. It uses `open`
-on macOS (`xdg-open` on Linux); `tendir add` is the direct alternative.
+## Send to
+
+A `[[send]]` target is a URL template. The menu opens a small window with the title and notes
+filled in. You edit them and press Send, and the browser opens the destination's own add
+screen, where you confirm. gitterrace starts no process and makes no request, so it stays
+read-only and holds no token.
 
 ```toml
 version = 1
 
-[[action]]
-id      = "tendir"
-label   = "Send to tendir"
-kinds   = ["line", "commit"]
-command = ["open", "tendir://new-task?title={title:url}&notes={markdown:url}"]
+[[send]]
+id     = "issue"
+preset = "github-issue"
+vars   = { repo = "owner/name" }
 
+[[send]]
+id    = "notes"
+label = "New note"
+url   = "obsidian://new?vault={var.vault}&file=Inbox%2F{title}&content={notes}"
+vars  = { vault = "Notes" }
+```
+
+Presets: `tendir`, `github-issue`, `forgejo-issue` (for your own instance, with `base`
+and `repo` in `vars`) and `mail`. Placeholders are `{title}`, `{notes}`, `{permalink}`,
+`{path}`, `{lines}`, `{sha}`, `{repo}` and `{var.NAME}`. Page values are always
+percent-encoded and can never reach the scheme or the host. Schemes that run code
+(`javascript:`, `data:`, `file:` and similar) are refused when the file loads.
+
+## Actions
+
+An action runs a program of yours directly, with no shell: placeholders such as `{title}`
+fill whole arguments, and stdin carries the payload as JSON or the markdown alone. Use one
+when the job is a write with no add screen, a script, or a webhook.
+
+```toml
 [[action]]
 id      = "webhook"
 label   = "Post to webhook"
@@ -26,16 +47,6 @@ kinds   = ["line", "commit"]
 command = ["curl", "-fsS", "-m", "8", "-H", "Content-Type: application/json", "--data-binary", "@-", "{var.url}"]
 stdin   = "json"
 vars    = { url = "https://example.test/hook" }
-```
-
-The direct form of the tendir action writes the task without a sheet:
-
-```toml
-[[action]]
-id      = "tendir-add"
-label   = "Add to tendir"
-kinds   = ["line", "commit"]
-command = ["tendir", "add", "--notes", "{markdown}", "--", "{title}"]
 ```
 
 Obsidian's `obsidian://new` takes `vault`, `file` (a path in the vault, `/` encoded as `%2F`),

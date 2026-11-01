@@ -3,6 +3,15 @@
 <!-- BEGIN GENERATED: crates -->
 ```mermaid
 flowchart TD
+  gitterrace["gitterrace: the binary and CLI"]
+  actions["actions: actions.toml and Send to"]
+  api["api: JSON API and MCP"]
+  cards["cards: SVG badges, year card"]
+  config["config: config.toml"]
+  git["git: all git reads, via gix"]
+  index["index: insights cache"]
+  web["web: server, pages, guard"]
+  schwarzwald["schwarzwald: the theme and its palette"]
   gitterrace --> web
   actions --> config
   actions --> git
@@ -17,6 +26,10 @@ flowchart TD
 
 <!-- END GENERATED: crates -->
 
+Each box is a crate. An arrow means "uses". `schwarzwald` is the vendored theme (colours, type,
+tokens, see [design](design.md)); `cards` reads its palette, called Kandel, to colour the SVG
+badges and the year card.
+
 ## Decisions
 
 - **Read-only, pinned.** Every read takes a resolved commit id, so a commit landing
@@ -25,6 +38,8 @@ flowchart TD
 - **One guard** (`gitterrace-web/src/guard.rs`): loopback Host, no cross-site requests, hashed
   inline script CSP.
 - **Live.** A watcher pushes changes over `/events`; config files reload on change.
+- **Send to opens a URL in your browser.** The server never calls the destination, so there is
+  nothing to authenticate and nothing written ([how Send to works](actions.md)).
 - **Several repos** under `/r/{name}/`, resolved only through the startup table.
 
 ## Cache

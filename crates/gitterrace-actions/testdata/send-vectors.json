@@ -1,0 +1,228 @@
+[
+  {
+    "name": "hostile title",
+    "parts": [
+      {
+        "lit": "https://h.test/new?title="
+      },
+      {
+        "ph": "title"
+      },
+      {
+        "lit": "&body="
+      },
+      {
+        "ph": "notes"
+      }
+    ],
+    "values": {
+      "title": "a&b=1#frag?x=/y+z w\nnext",
+      "notes": "ok"
+    },
+    "expected": "https://h.test/new?title=a%26b%3D1%23frag%3Fx%3D%2Fy%2Bz%20w%0Anext&body=ok"
+  },
+  {
+    "name": "unicode",
+    "parts": [
+      {
+        "lit": "https://h.test/new?title="
+      },
+      {
+        "ph": "title"
+      }
+    ],
+    "values": {
+      "title": "café ☃ 😀"
+    },
+    "expected": "https://h.test/new?title=caf%C3%A9%20%E2%98%83%20%F0%9F%98%80"
+  },
+  {
+    "name": "leading dash",
+    "parts": [
+      {
+        "lit": "https://h.test/new?title="
+      },
+      {
+        "ph": "title"
+      }
+    ],
+    "values": {
+      "title": "-rf --help"
+    },
+    "expected": "https://h.test/new?title=-rf%20--help"
+  },
+  {
+    "name": "empty string",
+    "parts": [
+      {
+        "lit": "https://h.test/new?title="
+      },
+      {
+        "ph": "title"
+      },
+      {
+        "lit": "&body="
+      },
+      {
+        "ph": "notes"
+      }
+    ],
+    "values": {
+      "title": "",
+      "notes": ""
+    },
+    "expected": "https://h.test/new?title=&body="
+  },
+  {
+    "name": "missing value",
+    "parts": [
+      {
+        "lit": "https://h.test/new?title="
+      },
+      {
+        "ph": "title"
+      },
+      {
+        "lit": "&body="
+      },
+      {
+        "ph": "notes"
+      }
+    ],
+    "values": {
+      "title": "t"
+    },
+    "expected": "https://h.test/new?title=t&body="
+  },
+  {
+    "name": "all fields",
+    "parts": [
+      {
+        "lit": "https://h.test/"
+      },
+      {
+        "ph": "path"
+      },
+      {
+        "lit": "?l="
+      },
+      {
+        "ph": "lines"
+      },
+      {
+        "lit": "&s="
+      },
+      {
+        "ph": "sha"
+      },
+      {
+        "lit": "&r="
+      },
+      {
+        "ph": "repo"
+      },
+      {
+        "lit": "&p="
+      },
+      {
+        "ph": "permalink"
+      }
+    ],
+    "values": {
+      "path": "src/a b.rs",
+      "lines": "L3-L7",
+      "sha": "0123abcd",
+      "repo": "my repo",
+      "permalink": "http://127.0.0.1:7070/go/x/0123abcd/src/a.rs"
+    },
+    "expected": "https://h.test/src%2Fa%20b.rs?l=L3-L7&s=0123abcd&r=my%20repo&p=http%3A%2F%2F127.0.0.1%3A7070%2Fgo%2Fx%2F0123abcd%2Fsrc%2Fa.rs"
+  },
+  {
+    "name": "preset tendir",
+    "parts": [
+      {
+        "lit": "tendir://new-task?title="
+      },
+      {
+        "ph": "title"
+      },
+      {
+        "lit": "&notes="
+      },
+      {
+        "ph": "notes"
+      }
+    ],
+    "values": {
+      "title": "Fix & ship",
+      "notes": "line 1\nline 2"
+    },
+    "expected": "tendir://new-task?title=Fix%20%26%20ship&notes=line%201%0Aline%202"
+  },
+  {
+    "name": "preset github-issue",
+    "parts": [
+      {
+        "lit": "https://github.com/owner/name/issues/new?title="
+      },
+      {
+        "ph": "title"
+      },
+      {
+        "lit": "&body="
+      },
+      {
+        "ph": "notes"
+      }
+    ],
+    "values": {
+      "title": "Bug #12?",
+      "notes": "see /go"
+    },
+    "expected": "https://github.com/owner/name/issues/new?title=Bug%20%2312%3F&body=see%20%2Fgo"
+  },
+  {
+    "name": "preset forgejo-issue",
+    "parts": [
+      {
+        "lit": "https://codeberg.org/owner/name/issues/new?title="
+      },
+      {
+        "ph": "title"
+      },
+      {
+        "lit": "&body="
+      },
+      {
+        "ph": "notes"
+      }
+    ],
+    "values": {
+      "title": "a+b",
+      "notes": "café ☃ 😀"
+    },
+    "expected": "https://codeberg.org/owner/name/issues/new?title=a%2Bb&body=caf%C3%A9%20%E2%98%83%20%F0%9F%98%80"
+  },
+  {
+    "name": "preset mail",
+    "parts": [
+      {
+        "lit": "mailto:?subject="
+      },
+      {
+        "ph": "title"
+      },
+      {
+        "lit": "&body="
+      },
+      {
+        "ph": "notes"
+      }
+    ],
+    "values": {
+      "title": "Hi there",
+      "notes": "a=b&c"
+    },
+    "expected": "mailto:?subject=Hi%20there&body=a%3Db%26c"
+  }
+]

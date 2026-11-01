@@ -305,22 +305,4 @@ mod tests {
             .replace("&amp;", "&");
         assert_eq!(text, src.trim_end_matches('\n'));
     }
-
-    /// `HL_FILE=path cargo test --release -- --ignored hl_timing --nocapture`
-    #[test]
-    #[ignore = "manual timing"]
-    fn hl_timing() {
-        let path = std::env::var("HL_FILE").expect("HL_FILE");
-        let text = std::fs::read_to_string(&path).expect("read");
-        for run in 0..4 {
-            let t = std::time::Instant::now();
-            let (h, _) = crate::views::code_html(32 << 20, &path, &text);
-            eprintln!(
-                "run {run}: {} KB -> {} KB in {:?}",
-                text.len() / 1024,
-                h.len() / 1024,
-                t.elapsed()
-            );
-        }
-    }
 }

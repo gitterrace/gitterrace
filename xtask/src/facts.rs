@@ -122,7 +122,7 @@ impl Workspace {
         };
         let mut out = Vec::new();
         for p in self.crates() {
-            for d in p.deps.iter().filter(|d| d.as_str() != "xtask") {
+            for d in &p.deps {
                 if !reaches(&p.name, d, d) {
                     out.push((p.name.clone(), d.clone()));
                 }

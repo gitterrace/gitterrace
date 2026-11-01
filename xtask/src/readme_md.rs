@@ -181,12 +181,33 @@ fn crate_table(ws: &Workspace) -> String {
     s
 }
 
+/// One short label per crate for the diagram, so a box says what it is.
+const ROLES: [(&str, &str); 9] = [
+    ("gitterrace", "the binary and CLI"),
+    ("web", "server, pages, guard"),
+    ("api", "JSON API and MCP"),
+    ("cards", "SVG badges, year card"),
+    ("actions", "actions.toml and Send to"),
+    ("config", "config.toml"),
+    ("index", "insights cache"),
+    ("git", "all git reads, via gix"),
+    ("schwarzwald", "the theme and its palette"),
+];
+
 /// The crate dependency diagram, from the workspace's own edges.
 pub fn crate_diagram(ws: &Workspace) -> String {
     let short = |n: &str| n.strip_prefix("gitterrace-").unwrap_or(n).to_owned();
     let mut s = String::from("```mermaid\nflowchart TD\n");
     let mut edges = ws.reduced_edges();
     edges.sort();
+    let mut names: Vec<String> = edges.iter().flat_map(|(a, b)| [a.clone(), b.clone()]).collect();
+    names.sort();
+    names.dedup();
+    for n in &names {
+        let name = short(n);
+        let role = ROLES.iter().find(|(k, _)| *k == name).map_or("", |(_, r)| *r);
+        let _ = writeln!(s, "  {name}[\"{name}: {role}\"]");
+    }
     for (from, to) in edges {
         let _ = writeln!(s, "  {} --> {}", short(&from), short(&to));
     }

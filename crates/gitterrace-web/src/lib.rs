@@ -59,12 +59,7 @@ pub fn app_router_with(repo_path: impl AsRef<Path>, cfg: Config) -> io::Result<a
 /// Router for several repositories: an index at `/`, each repository under `/r/NAME`.
 /// One path behaves exactly like [`app_router`]. Same Host rules.
 pub fn multi_router(paths: Vec<PathBuf>) -> io::Result<axum::Router> {
-    multi_router_with(paths, Config::default())
-}
-
-/// [`multi_router`] with the settings in force.
-pub fn multi_router_with(paths: Vec<PathBuf>, cfg: Config) -> io::Result<axum::Router> {
-    Ok(build_multi(paths, None, None, &Env::new(cfg))?.0)
+    Ok(build_multi(paths, None, None, &Env::new(Config::default()))?.0)
 }
 
 /// One repository's pages, `/api/v1`, cards and badges, with links under `base`. Starts its

@@ -44,8 +44,13 @@ git terrace export <out>  Write a static copy of the site to a folder, for shari
 Run your own program on a selection (`line`, `file`, `commit`, `hunk`, `blame`, `search-hit`, `insight`, `page`). Examples in `docs/actions/`: `clipboard.sh`, `editor.sh`, `obsidian.sh`.
 
 <!-- END GENERATED: actions -->
-Off until you write `actions.toml`: [actions](docs/actions.md).
+Send a selection to a tracker, notes app or mail draft, or run your own program on it. Off until you write `actions.toml`: [how to set it up](docs/actions.md).
 
-Docs: [configuration](docs/configuration.md), [JSON API](docs/api.md),
+Docs: [why](docs/why.md), [configuration](docs/configuration.md), [JSON API](docs/api.md),
 [architecture](docs/architecture.md), [design](docs/design.md). Binds to `127.0.0.1`, never
 writes to your repository. MIT licensed.
+
+## Contributing
+
+Issues and pull requests are welcome. Built by AI coding agents and humans together; a human
+sets direction and decides ([why](docs/why.md)).

@@ -97,6 +97,8 @@ button:hover{border-color:var(--line-strong);background:var(--hover)}
 .latest code{font-size:var(--text-xs)}
 .latest .hist{font-weight:var(--weight-semibold);color:var(--fg)}
 .files-card{margin-bottom:var(--space-6)}
+/* The README below a file list sits apart from it on every page, not only the overview. */
+.card+.card.readme{margin-top:var(--space-6)}.files-card+.card.readme{margin-top:0}
 .readme-h{display:flex;align-items:center;gap:var(--space-2);padding:var(--space-2) var(--space-4);min-height:44px;background:var(--soft);border-bottom:var(--border);font-size:var(--text-sm);font-weight:var(--weight-semibold);color:var(--fg)}
 .facts{list-style:none;margin:0 0 var(--space-4);padding:0;color:var(--muted)}.facts li{padding:var(--space-1) 0}.facts b{color:var(--fg);font-weight:var(--weight-semibold);font-variant-numeric:tabular-nums}.facts b.add{color:var(--add)}.facts b.del{color:var(--del)}
 
@@ -406,3 +408,15 @@ td:has(>.actbtn.float){position:relative}
 .actmenu .ov-list li.sep{height:0;padding:0;margin:var(--space-1) 0;border-top:var(--border);cursor:default}
 .actmenu .ov-list li.hint{cursor:default;font-size:var(--text-xs)}
 .actmenu .ov-list li.hint a{color:var(--muted)}
+
+/* send */
+.ov.send{width:min(720px,94vw);max-height:80vh}
+.send-title{border:0;border-bottom:var(--border);border-radius:0;height:40px;padding:0 var(--space-4);font-size:var(--text-md);width:100%;background:transparent;flex:none}
+.send-title:focus{outline:0}
+.send-ctx{border:0;border-radius:0;resize:none;flex:1;min-height:42vh;padding:var(--space-3) var(--space-4);font-family:var(--font-mono);font-size:var(--text-sm);line-height:1.5;background:transparent;color:var(--fg)}
+.send-ctx:focus{outline:0}
+.send-foot{display:flex;gap:var(--space-3);align-items:center;padding:var(--space-2) var(--space-4);border-top:var(--border);background:var(--soft);flex:none}
+.send-pick{min-width:0;max-width:50%}
+.send-hint{margin-left:auto;color:var(--muted);font-size:var(--text-xs)}
+.send-go{background:var(--accent);color:var(--on-accent);border:0;border-radius:var(--radius);padding:4px var(--space-4);font-size:var(--text-sm);cursor:pointer}
+.send-go:focus-visible{outline:2px solid var(--ring);outline-offset:2px}
