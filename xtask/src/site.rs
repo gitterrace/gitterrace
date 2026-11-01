@@ -34,8 +34,11 @@ a{color:var(--accent-ink)}
 h1,h2{font-family:var(--serif);line-height:var(--leading-tight);font-weight:var(--weight-semibold)}
 h2{font-size:var(--text-xl);margin:var(--space-16) 0 var(--space-3)}
 h3{font-size:var(--text-lg);margin:var(--space-8) 0 var(--space-2)}
-header{padding:var(--space-8) 0 var(--space-4)}
-header img{display:block;max-width:100%;height:auto}
+header{padding:var(--space-8) 0 var(--space-4);position:relative}
+.gh{position:absolute;top:var(--space-8);right:0;color:var(--muted);line-height:0}
+.gh:hover,.gh:focus-visible{color:var(--fg)}
+.gh svg{fill:currentColor}
+header img{display:block;max-width:calc(100% - 40px);height:auto}
 .tag{font-family:var(--serif);font-size:var(--text-lg);color:var(--muted);margin:var(--space-4) 0 0}
 pre,code{font-family:var(--mono);font-size:var(--text-sm)}
 pre{background:var(--soft);border:var(--border);border-radius:var(--radius);padding:var(--space-3) var(--space-4);overflow-x:auto}
@@ -54,9 +57,12 @@ figure img,.lightbox img{display:block;width:100%;height:auto;border:var(--borde
 .lightbox:target picture{max-width:min(1280px,100%)}
 .demo{margin-top:var(--space-6)}
 figcaption{font-size:var(--text-xs);color:var(--muted);margin-top:var(--space-2);line-height:1.4}figcaption b{color:var(--fg);font-weight:var(--weight-semibold)}
-nav.links,footer{display:flex;flex-wrap:wrap;gap:var(--space-4);font-size:var(--text-sm)}
+footer{display:flex;flex-wrap:wrap;gap:var(--space-4);font-size:var(--text-sm)}
 footer{margin-top:var(--space-16);padding-top:var(--space-4);border-top:var(--border);color:var(--faint)}
 ";
+
+/// The source host's mark (16x16 path), the link to the source in the top right corner.
+const GH_MARK: &str = "M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z";
 
 /// The home page `<head>`: title, description, link previews and icons.
 fn head(name: &str, desc: &str, home: &str) -> String {
@@ -122,7 +128,7 @@ pub fn render(root: &Path, ws: &Workspace) -> Result<Vec<Out>> {
         h,
         "<header>\n<picture>\n<source media=\"(prefers-color-scheme: dark)\" srcset=\"assets/logo-dark.svg\">\n\
          <img src=\"assets/logo-light.svg\" alt=\"{n}\" width=\"540\" height=\"120\">\n</picture>\n\
-         <p class=\"tag\">{tag}</p>\n<nav class=\"links\"><a href=\"{r}\">Source on GitHub</a></nav>\n</header>\n",
+         <p class=\"tag\">{tag}</p>\n<a class=\"gh\" href=\"{r}\" aria-label=\"{n} on GitHub\" title=\"GitHub\"><svg viewBox=\"0 0 16 16\" width=\"24\" height=\"24\" aria-hidden=\"true\"><path d=\"{GH_MARK}\"/></svg></a>\n</header>\n",
         r = esc(repo),
         n = esc(&pkg.name),
         tag = esc(&tagline(root)?),
