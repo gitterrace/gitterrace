@@ -36,16 +36,31 @@ impl IntoResponse for Error {
         } else {
             self.to_string()
         };
-        let body = format!(
-            "<!doctype html><meta charset=utf-8><meta name=viewport content=\"width=device-width\">{}\
-             <link rel=stylesheet href=/static/tokens.css><link rel=stylesheet href=/static/app.css><main class=wrap><h1>{}</h1><p class=muted>{}</p>\
-             <p><a href=/>Back to overview</a></p></main>",
-            crate::fmt::FAVICON,
-            status.as_u16(),
-            esc(&shown)
-        );
-        (status, Html(body)).into_response()
+        (status, page(status, &shown)).into_response()
     }
+}
+
+/// The page every error answers with: the app's favicon and styles, the status, one line of
+/// detail and a way back. One shell, so no error page ships without the icon.
+pub(crate) fn page(status: StatusCode, detail: &str) -> Html<String> {
+    Html(format!(
+        "<!doctype html><meta charset=utf-8><meta name=viewport content=\"width=device-width\">{}\
+         <link rel=stylesheet href=/static/tokens.css><link rel=stylesheet href=/static/app.css><main class=wrap><h1>{}</h1><p class=muted>{}</p>\
+         <p><a href=/>Back to overview</a></p></main>",
+        crate::fmt::FAVICON,
+        status.as_u16(),
+        esc(detail)
+    ))
+}
+
+/// A 404 with [`page`], for a path or repository nothing serves.
+pub(crate) fn not_found(detail: &str) -> Response {
+    (StatusCode::NOT_FOUND, page(StatusCode::NOT_FOUND, detail)).into_response()
+}
+
+/// Answers every path no route matches: the error page, never an empty body.
+pub(crate) async fn fallback() -> Response {
+    not_found("Nothing here.")
 }
 
 #[cfg(test)]

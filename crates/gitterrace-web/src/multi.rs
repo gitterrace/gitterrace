@@ -236,6 +236,7 @@ pub(crate) fn router(table: Arc<Table>) -> Router {
         .route("/r/{name}/", axum::routing::any(dispatch))
         .route("/r/{name}/{*rest}", axum::routing::any(dispatch))
         .merge(crate::routes::assets())
+        .fallback(crate::error::fallback)
         .with_state(table)
 }
 
@@ -247,13 +248,13 @@ async fn slash(uri: Uri) -> Redirect {
 async fn dispatch(State(table): State<Arc<Table>>, req: Request) -> Response {
     let raw = req.uri().path().to_owned();
     let Some(after) = raw.strip_prefix("/r/") else {
-        return StatusCode::NOT_FOUND.into_response();
+        return crate::error::not_found("Nothing here.");
     };
     let (seg, rest) = after.split_once('/').unwrap_or((after, ""));
     // The raw segment must match a table name byte for byte: an encoded `%2e%2e` or `%2F`
     // never equals a valid name, so it falls through to 404.
     let Some(served) = table.get(seg).cloned() else {
-        return StatusCode::NOT_FOUND.into_response();
+        return crate::error::not_found(&format!("No repository named {seg} is served here."));
     };
     let router = match served
         .router

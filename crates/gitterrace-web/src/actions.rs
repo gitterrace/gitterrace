@@ -16,7 +16,7 @@ use axum::{
     Router,
     extract::{Path as UrlPath, Request, State},
     http::{HeaderMap, HeaderValue, StatusCode, header},
-    response::{Html, IntoResponse, Response},
+    response::{IntoResponse, Response},
     routing::{get, post},
 };
 use gitterrace_actions::{
@@ -25,7 +25,7 @@ use gitterrace_actions::{
 };
 use gitterrace_git::Repo;
 
-use crate::fmt::{enc_path, esc};
+use crate::fmt::enc_path;
 
 pub(crate) const RUN_PATH: &str = "/_actions/run";
 const STATUS_PATH: &str = "/_actions/status";
@@ -331,15 +331,9 @@ async fn go(State(site): State<Arc<Site>>, UrlPath(rest): UrlPath<String>) -> Re
         return (StatusCode::FOUND, [(header::LOCATION, loc)]).into_response();
     }
     let id = rest.split('/').next().unwrap_or_default();
-    let body = format!(
-        "<!doctype html><meta charset=utf-8>{}<link rel=stylesheet href=/static/tokens.css>\
-         <link rel=stylesheet href=/static/app.css><main class=wrap><h1>404</h1>\
-         <p class=muted>Repository {} (or that commit) is not served here.</p>\
-         <p><a href=/>Back to overview</a></p></main>",
-        crate::fmt::FAVICON,
-        esc(id)
-    );
-    (StatusCode::NOT_FOUND, Html(body)).into_response()
+    crate::error::not_found(&format!(
+        "Repository {id} (or that commit) is not served here."
+    ))
 }
 
 /// Why a run request is refused before its body is read. Fetch metadata must say

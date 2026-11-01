@@ -630,8 +630,12 @@ async fn every_page_shell_has_the_favicon() {
     for (r, path) in [
         (&one, "/"),
         (&one, "/blob/HEAD/no-such-file"),
+        (&one, "/no-such-page"),
         (&many, "/"),
         (&many, "/r/a/"),
+        (&many, "/r/a/no-such-page"),
+        (&many, "/r/no-such-repo/"),
+        (&many, "/no-such-page"),
         (&many, "/go/nope/abc"),
     ] {
         let (_, html) = get(r, path).await;

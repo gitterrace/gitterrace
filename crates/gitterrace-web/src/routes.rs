@@ -70,6 +70,7 @@ pub(crate) fn router(app: Arc<App>) -> Router {
         .route("/events", get(crate::live::events))
         .layer(axum::middleware::from_fn(selected_rev))
         .merge(assets())
+        .fallback(crate::error::fallback)
         .with_state(app)
 }
 
