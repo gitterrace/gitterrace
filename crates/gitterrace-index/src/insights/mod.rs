@@ -30,10 +30,10 @@ pub use code::{
     CodeFrequency, LocPoint, LocSeries, Rework, ReworkPoint, rework_share, rework_verdict,
 };
 pub use files::{
-    AgeBucket, AgeReport, Coupling, DirOwnership, FileCommit, Hotspot, HotspotReport, Owner,
-    OwnershipReport, Touch,
+    AgeBucket, AgeReport, Coupling, DirOwnership, Hotspot, HotspotReport, Owner, OwnershipReport,
+    Touch,
 };
-pub use filter::PathFilter;
+pub use filter::{PathFilter, is_generated};
 pub use headfiles::{HeadFile, LangShare, LineCache, head_files, language_share};
 pub use lang::language;
 pub use misc::{Cadence, Comparison, LangDelta, Release, SizeBucket, release_tags};
@@ -122,29 +122,19 @@ impl<'a> Insights<'a> {
         }
     }
 
-    pub fn options(&self) -> &Options {
-        &self.opts
-    }
-
-    pub fn people(&self) -> &People {
-        &self.people
-    }
-
-    /// Time of the newest commit, the reference point for "last 30 days".
-    pub fn now(&self) -> i64 {
-        self.now
-    }
-
     /// True when path statistics leave `path` out.
     pub fn skips(&self, path: &str) -> bool {
         self.filter.skips(path)
     }
 
     pub(crate) fn lines(&self, f: &FileStat) -> Option<Lines> {
-        if self.filter.skips(&f.path) {
-            return None;
-        }
-        Some(if self.opts.count_whitespace {
+        (!self.filter.skips(&f.path)).then(|| self.lines_unfiltered(f))
+    }
+
+    /// Line counts of a file under the whitespace option, whether or not the path filter
+    /// would skip it.
+    pub(crate) fn lines_unfiltered(&self, f: &FileStat) -> Lines {
+        if self.opts.count_whitespace {
             Lines {
                 add: f.additions,
                 del: f.deletions,
@@ -157,7 +147,7 @@ impl<'a> Insights<'a> {
                 del: c.deletions,
                 rewritten: c.rewritten,
             }
-        })
+        }
     }
 
     /// Non-merge commit by someone who counts under the options.
@@ -251,73 +241,5 @@ mod tests {
             let (y, m, dd) = civil(d);
             assert_eq!(days_from_civil(y, m, dd), d);
         }
-    }
-}
-
-#[cfg(test)]
-mod bench {
-    use std::time::Instant;
-
-    use gitterrace_git::Repo;
-
-    use crate::{Index, Insights, Options, Period};
-
-    /// `GITTERRACE_BENCH_REPO=<path> cargo test -p gitterrace-index --release bench -- --ignored --nocapture`
-    #[test]
-    #[ignore = "needs a large real repository"]
-    #[allow(clippy::expect_used, clippy::print_stdout)]
-    fn bench_real_repo() {
-        let Ok(path) = std::env::var("GITTERRACE_BENCH_REPO") else {
-            return;
-        };
-        let repo = Repo::discover(std::path::Path::new(&path)).expect("open");
-        let dir = tempfile::tempdir().expect("tmp");
-        let idx = Index::open_dir(dir.path().join("gitterrace")).expect("index");
-        let t = Instant::now();
-        idx.update(&repo, "HEAD", &|_| {}).expect("update");
-        println!("index build: {:?}", t.elapsed());
-        let t = Instant::now();
-        let recs = idx.records(&repo, "HEAD").expect("records");
-        println!("records load: {:?} ({} commits)", t.elapsed(), recs.len());
-        let t = Instant::now();
-        let set = gitterrace_git::IgnoreSet::at(&repo, "HEAD").expect("ignore");
-        println!("ignore set: {:?}", t.elapsed());
-        let t = Instant::now();
-        let ins = Insights::new(&recs, Options::default(), Some(set));
-        println!("Insights::new: {:?}", t.elapsed());
-        let mut cache = crate::LineCache::default();
-        let t = Instant::now();
-        let files = crate::head_files(&repo, "HEAD", &mut cache).expect("files");
-        println!("head files cold: {:?} ({} files)", t.elapsed(), files.len());
-        let t = Instant::now();
-        let files = crate::head_files(&repo, "HEAD", &mut cache).expect("files");
-        println!("head files warm: {:?}", t.elapsed());
-        macro_rules! time {
-            ($name:expr, $e:expr) => {{
-                let t = Instant::now();
-                let v = $e;
-                println!("{:<14} {:?}", $name, t.elapsed());
-                v
-            }};
-        }
-        let s = time!("summary", ins.period_summary(Period::Quarter));
-        println!("  {:?}", s.current);
-        time!("rhythm", ins.rhythm(Period::All));
-        time!("contributors", ins.contributors(Period::All));
-        time!("code_freq", ins.code_frequency(Period::All));
-        let rw = time!("rework", ins.rework(Period::All));
-        println!("  last {:?}", rw.points.last());
-        let loc = time!("loc_over_time", ins.loc_over_time(7, Period::All));
-        println!("  {:?} {:?}", loc.languages, loc.points.last());
-        time!("languages_now", ins.languages_now(&files));
-        time!("follow(first)", ins.hotspots(&files, Period::All));
-        let h = time!("hotspots", ins.hotspots(&files, Period::All));
-        for f in h.files.iter().take(5) {
-            println!("  {} changes={} lines={}", f.path, f.changes, f.lines);
-        }
-        time!("ownership", ins.ownership(&files, Period::All, 2));
-        time!("coupling", ins.coupling(&files, Period::All, 5, 50));
-        time!("code_age", ins.code_age(&files));
-        time!("commit_sizes", ins.commit_sizes());
     }
 }

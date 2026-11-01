@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, HashMap, HashSet};
 
-use super::{HeadFile, Insights, Lines, Period, year_of};
+use super::{HeadFile, Insights, Period, year_of};
 
 /// Most files in one commit that still say something about coupling; bigger commits are
 /// sweeps (formatting, renames, vendoring).
@@ -33,9 +33,6 @@ pub struct Touch {
     /// Name the file had in that commit.
     pub path: String,
 }
-
-/// Alias of [`Touch`] for per-file history pages.
-pub type FileCommit = Touch;
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize)]
 pub struct Hotspot {
@@ -140,7 +137,7 @@ impl Insights<'_> {
                 if let Some(old) = &f.old {
                     alias.insert(old.as_str(), path);
                 }
-                let l = self.raw_lines(f);
+                let l = self.lines_unfiltered(f);
                 touches.entry(path.to_owned()).or_default().push(TouchRaw {
                     commit: u32::try_from(i).unwrap_or(u32::MAX),
                     file: u32::try_from(fi).unwrap_or(u32::MAX),
@@ -149,23 +146,6 @@ impl Insights<'_> {
             }
         }
         Follow { touches }
-    }
-
-    fn raw_lines(&self, f: &crate::FileStat) -> Lines {
-        if self.opts.count_whitespace {
-            Lines {
-                add: f.additions,
-                del: f.deletions,
-                rewritten: f.rewritten,
-            }
-        } else {
-            let c = f.code_stat();
-            Lines {
-                add: c.additions,
-                del: c.deletions,
-                rewritten: c.rewritten,
-            }
-        }
     }
 
     /// Touches of `path` in the period by counted commits, newest first.
@@ -189,8 +169,8 @@ impl Insights<'_> {
 
     /// Full history of a file as it is named at the newest commit, following renames.
     /// Includes bots and every non-merge commit, newest first.
-    pub fn file_history(&self, path: &str) -> Vec<FileCommit> {
-        let mut out: Vec<FileCommit> = self
+    pub fn file_history(&self, path: &str) -> Vec<Touch> {
+        let mut out: Vec<Touch> = self
             .follow()
             .touches
             .get(path)

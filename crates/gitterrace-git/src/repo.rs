@@ -187,6 +187,25 @@ impl Repo {
         })
     }
 
+    /// Summaries of exactly these commits, in order. Each commit is mapped through its own
+    /// `.mailmap`, parsed once per distinct blob instead of once per commit.
+    pub fn summaries(&self, ids: &[String]) -> Result<Vec<CommitSummary>> {
+        let repo = self.repo();
+        let mut maps: std::collections::HashMap<Option<gix::ObjectId>, gix::mailmap::Snapshot> =
+            std::collections::HashMap::new();
+        ids.iter()
+            .map(|id| {
+                let oid = Self::resolve_id(&repo, id)?;
+                let commit = repo.find_commit(oid).map_err(git)?;
+                let blob = ident::mailmap_blob(&repo, oid);
+                let map = maps
+                    .entry(blob)
+                    .or_insert_with(|| ident::parse_mailmap(&repo, blob));
+                summary(&commit, map)
+            })
+            .collect()
+    }
+
     /// Per-file line counts against the first parent, without hunk text.
     /// The indexer calls this once per commit, so it must stay cheap.
     pub fn numstat(&self, id: &str) -> Result<Vec<crate::FileDiff>> {
@@ -754,33 +773,6 @@ mod tests {
         let after = repo.blame("other", "a.txt").expect("blame");
         assert_eq!((before.len(), after.len()), (41, 1));
         assert_eq!(repo.blame(&second, "a.txt").expect("old").len(), 41);
-    }
-
-    /// Run with `GITTERRACE_BENCH_REPO=<path> cargo test -p gitterrace-git --release bench -- --ignored --nocapture`.
-    #[test]
-    #[ignore = "needs a large real repository"]
-    fn bench_real_repo() {
-        let Ok(path) = std::env::var("GITTERRACE_BENCH_REPO") else {
-            return;
-        };
-        let repo = Repo::discover(std::path::Path::new(&path)).expect("open");
-        let t = std::time::Instant::now();
-        let first = repo.log("HEAD", None, 0, 50).expect("log");
-        println!("log 50: {:?} ({} commits)", t.elapsed(), first.len());
-        let t = std::time::Instant::now();
-        let ids = repo.rev_list("HEAD").expect("rev_list");
-        println!("rev_list: {:?} ({} commits)", t.elapsed(), ids.len());
-        let t = std::time::Instant::now();
-        let mut files = 0;
-        for chunk in ids.chunks(2000) {
-            files += repo
-                .numstat_many(chunk)
-                .expect("numstat")
-                .iter()
-                .map(Vec::len)
-                .sum::<usize>();
-        }
-        println!("numstat all: {:?} ({files} file changes)", t.elapsed());
     }
 
     #[test]

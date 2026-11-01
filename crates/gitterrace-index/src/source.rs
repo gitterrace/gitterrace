@@ -65,28 +65,18 @@ impl CommitSource for Repo {
     }
 
     fn record(&self, id: &str) -> io::Result<CommitRecord> {
-        let summary = Repo::log(self, id, None, 0, 1)
-            .map_err(io::Error::other)?
-            .into_iter()
-            .next()
-            .ok_or_else(|| io::Error::other(format!("commit {id} not found")))?;
-        // Unreadable objects (a shallow boundary) cost the file stats, not the record.
-        let files = file_stats(Repo::numstat(self, id).unwrap_or_default());
-        Ok(build(summary, files))
+        let mut all = self.records(&[id.to_owned()])?;
+        all.pop()
+            .ok_or_else(|| io::Error::other(format!("commit {id} not found")))
     }
 
     fn records(&self, ids: &[String]) -> io::Result<Vec<CommitRecord>> {
         let diffs = self.numstat_many(ids).map_err(io::Error::other)?;
-        ids.iter()
+        let summaries = Repo::summaries(self, ids).map_err(io::Error::other)?;
+        Ok(summaries
+            .into_iter()
             .zip(diffs)
-            .map(|(id, d)| {
-                let summary = Repo::log(self, id, None, 0, 1)
-                    .map_err(io::Error::other)?
-                    .into_iter()
-                    .next()
-                    .ok_or_else(|| io::Error::other(format!("commit {id} not found")))?;
-                Ok(build(summary, file_stats(d)))
-            })
-            .collect()
+            .map(|(summary, d)| build(summary, file_stats(d)))
+            .collect())
     }
 }

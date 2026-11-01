@@ -21,6 +21,15 @@ const GENERATED: [&str; 10] = [
     "*.snap",
 ];
 
+/// True for lock files and minified output. The one definition of "generated": the path
+/// filter, the web pages and the API hotspots all use it.
+pub fn is_generated(path: &str) -> bool {
+    let name = path.rsplit('/').next().unwrap_or(path);
+    GENERATED
+        .iter()
+        .any(|p| fnmatch(p, path) || fnmatch(p, name))
+}
+
 /// Decides per path whether statistics leave it out.
 pub struct PathFilter {
     patterns: Vec<String>,

@@ -211,12 +211,13 @@ pub fn authors(records: &[CommitRecord]) -> Vec<AuthorStats> {
 
 /// Every file with its churn, most commits first, then path.
 pub fn file_churn(records: &[CommitRecord]) -> Vec<FileChurn> {
-    churn_since(records, i64::MIN)
+    churn_since(records, i64::MIN, |_| true)
 }
 
-/// The `limit` most changed files among commits at or after `since` (epoch seconds).
+/// The `limit` most changed files among commits at or after `since` (epoch seconds), leaving
+/// out generated files (lock files, minified output) as the web hotspots page does.
 pub fn hotspots(records: &[CommitRecord], since: i64, limit: usize) -> Vec<FileChurn> {
-    let mut out = churn_since(records, since);
+    let mut out = churn_since(records, since, |p| !crate::is_generated(p));
     out.truncate(limit);
     out
 }
@@ -295,11 +296,15 @@ pub fn label_over_time(
         .collect()
 }
 
-fn churn_since(records: &[CommitRecord], since: i64) -> Vec<FileChurn> {
+fn churn_since(
+    records: &[CommitRecord],
+    since: i64,
+    keep: impl Fn(&str) -> bool,
+) -> Vec<FileChurn> {
     let mut map: HashMap<&str, FileChurn> = HashMap::new();
     for r in records.iter().filter(|r| r.time >= since) {
         let mut seen: HashSet<&str> = HashSet::new();
-        for f in &r.files {
+        for f in r.files.iter().filter(|f| keep(&f.path)) {
             let c = map.entry(f.path.as_str()).or_insert_with(|| FileChurn {
                 path: f.path.clone(),
                 commits: 0,
@@ -566,6 +571,24 @@ mod tests {
     fn same_file_twice_in_one_commit_counts_one_commit() {
         let r = rec("1", "a", MON, &[("x", 1, 0), ("x", 2, 0)]);
         assert_eq!(file_churn(&[r])[0].commits, 1);
+    }
+
+    #[test]
+    fn hotspots_leave_out_generated_files() {
+        let mut r = sample();
+        for rec in &mut r {
+            rec.files.push(crate::FileStat {
+                path: "Cargo.lock".to_owned(),
+                additions: 1,
+                ..crate::FileStat::default()
+            });
+        }
+        assert!(
+            hotspots(&r, i64::MIN, 100)
+                .iter()
+                .all(|f| f.path != "Cargo.lock")
+        );
+        assert!(file_churn(&r).iter().any(|f| f.path == "Cargo.lock"));
     }
 
     #[test]

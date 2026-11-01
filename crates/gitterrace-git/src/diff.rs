@@ -286,7 +286,7 @@ fn text(line: &[u8]) -> String {
     line.to_str_lossy().into_owned()
 }
 
-fn build_hunks(old: &[u8], new: &[u8], diff: &Diff) -> Vec<Hunk> {
+pub(crate) fn build_hunks(old: &[u8], new: &[u8], diff: &Diff) -> Vec<Hunk> {
     let (old_lines, new_lines) = (lines(old), lines(new));
     let changes: Vec<(Range<usize>, Range<usize>)> = diff
         .hunks()

@@ -16,8 +16,8 @@ pub use core::{ApiState, MAX_BLAME_LINES, MAX_BLOB_BYTES, MAX_BLOB_LINES, MAX_PA
 pub use endpoints::{ENDPOINTS, Endpoint, Param};
 pub use error::ApiError;
 pub use http::router;
-pub use insights::{INSIGHTS, Insight, Params as InsightParams};
-pub use mcp::{McpServer, Param as ToolParam, ToolDoc, serve_mcp};
+pub use insights::{INSIGHTS, Insight};
+pub use mcp::{McpServer, ToolDoc, serve_mcp};
 
 #[cfg(test)]
 mod tests {
@@ -206,7 +206,12 @@ mod tests {
 
     #[test]
     fn mcp_lists_read_only_tools() {
-        let names: Vec<String> = McpServer::tool_docs().into_iter().map(|t| t.name).collect();
+        let docs = McpServer::tool_docs();
+        assert!(
+            docs.iter().all(|t| t.read_only),
+            "every tool must be read only"
+        );
+        let names: Vec<String> = docs.into_iter().map(|t| t.name).collect();
         for want in [
             "activity",
             "blame",

@@ -56,7 +56,7 @@ impl ApiState {
     /// Brings the cache up to date with `HEAD`. Blocking; the web layer does this in the
     /// background, the MCP server does it once at start.
     pub fn refresh_index(&self) -> Result<(), ApiError> {
-        self.index.update(&self.repo, DEFAULT_REV, &|_| {})?;
+        self.index.update(&*self.repo, DEFAULT_REV, &|_| {})?;
         Ok(())
     }
 
@@ -64,7 +64,6 @@ impl ApiState {
     /// version. Requests may name any `rev`, so moving any branch or tag must
     /// invalidate, not only a new HEAD commit.
     pub fn etag(&self) -> Option<String> {
-        use std::hash::{Hash, Hasher};
         let head = self.repo.resolve(DEFAULT_REV).ok()?;
         let mut refs: Vec<(String, String)> = self
             .repo
@@ -74,10 +73,15 @@ impl ApiState {
             .map(|r| (r.name, r.target))
             .collect();
         refs.sort();
-        let mut h = std::collections::hash_map::DefaultHasher::new();
-        refs.hash(&mut h);
+        // FNV-1a: stable across Rust releases, unlike `DefaultHasher`.
+        let mut h: u64 = 0xcbf2_9ce4_8422_2325;
+        for (name, target) in &refs {
+            for b in name.bytes().chain([0]).chain(target.bytes()).chain([0]) {
+                h = (h ^ u64::from(b)).wrapping_mul(0x0100_0000_01b3);
+            }
+        }
         let version = gitterrace_index::FORMAT_VERSION;
-        Some(format!("\"{head}-{:016x}-{version}\"", h.finish()))
+        Some(format!("\"{head}-{h:016x}-{version}\""))
     }
 
     /// Records reachable from `rev`, shared between calls while the tip and the cache file are
@@ -91,7 +95,7 @@ impl ApiState {
         {
             return Ok(Arc::clone(v));
         }
-        let recs = Arc::new(self.index.records(&self.repo, rev)?);
+        let recs = Arc::new(self.index.records(&*self.repo, rev)?);
         if let Ok(mut g) = self.cache.lock() {
             *g = Some((key, Arc::clone(&recs)));
         }

@@ -114,24 +114,14 @@ impl Index {
         &self.dir
     }
 
-    /// Indexes commits reachable from `rev` that are not yet cached.
-    pub fn update(&self, repo: &Repo, rev: &str, progress: &dyn Fn(Progress)) -> io::Result<()> {
-        self.update_from(repo, rev, progress)
-    }
-
     /// Size in bytes of the cache file. It changes whenever records are added, so a cache of
     /// parsed records can key on it.
     pub fn generation(&self) -> u64 {
         store::file_len(&self.dir)
     }
 
-    /// All cached records reachable from `rev`, oldest first.
-    pub fn records(&self, repo: &Repo, rev: &str) -> io::Result<Vec<CommitRecord>> {
-        self.records_from(repo, rev)
-    }
-
-    /// [`Index::update`] over any commit source.
-    pub fn update_from(
+    /// Indexes commits reachable from `rev` that are not yet cached.
+    pub fn update(
         &self,
         source: &dyn CommitSource,
         rev: &str,
@@ -156,12 +146,8 @@ impl Index {
         out.flush()
     }
 
-    /// [`Index::records`] over any commit source.
-    pub fn records_from(
-        &self,
-        source: &dyn CommitSource,
-        rev: &str,
-    ) -> io::Result<Vec<CommitRecord>> {
+    /// All cached records reachable from `rev`, oldest first.
+    pub fn records(&self, source: &dyn CommitSource, rev: &str) -> io::Result<Vec<CommitRecord>> {
         let order = source.rev_list(rev)?;
         let (records, _) = store::read_records(&self.dir)?;
         Ok(store::select(records, &order))
@@ -214,13 +200,13 @@ mod tests {
         let dir = tempfile::tempdir()?;
         let idx = Index::open_dir(dir.path().join("gitterrace"))?;
         let src = Fake::new(&["a", "b"]);
-        idx.update_from(&src, "HEAD", &|_| {})?;
+        idx.update(&src, "HEAD", &|_| {})?;
         src.ids.borrow_mut().push("c".into());
         let last = Cell::new(Progress::default());
-        idx.update_from(&src, "HEAD", &|p| last.set(p))?;
+        idx.update(&src, "HEAD", &|p| last.set(p))?;
         assert_eq!(src.built.get(), 3);
         assert_eq!(last.get(), Progress { done: 1, total: 1 });
-        assert_eq!(ids(&idx.records_from(&src, "HEAD")?), ["a", "b", "c"]);
+        assert_eq!(ids(&idx.records(&src, "HEAD")?), ["a", "b", "c"]);
         Ok(())
     }
 
@@ -231,7 +217,7 @@ mod tests {
         let names: Vec<String> = (0..4000).map(|i| format!("{i:040x}")).collect();
         let wanted: Vec<&str> = names.iter().map(String::as_str).collect();
         let src = Fake::new(&wanted);
-        idx.update_from(&src, "HEAD", &|_| {})?;
+        idx.update(&src, "HEAD", &|_| {})?;
         let (known, _) = crate::store::stored_ids(idx.dir())?;
         assert_eq!(known.len(), 4000);
         let (parsed, _) = crate::store::read_records(idx.dir())?;
@@ -244,10 +230,10 @@ mod tests {
         let dir = tempfile::tempdir()?;
         let idx = Index::open_dir(dir.path().join("gitterrace"))?;
         let src = Fake::new(&["a"]);
-        idx.update_from(&src, "HEAD", &|_| {})?;
+        idx.update(&src, "HEAD", &|_| {})?;
         let before = idx.generation();
         src.ids.borrow_mut().push("b".into());
-        idx.update_from(&src, "HEAD", &|_| {})?;
+        idx.update(&src, "HEAD", &|_| {})?;
         assert!(idx.generation() > before);
         Ok(())
     }
@@ -257,9 +243,9 @@ mod tests {
         let dir = tempfile::tempdir()?;
         let idx = Index::open_dir(dir.path().join("gitterrace"))?;
         let src = Fake::new(&["a", "b", "c"]);
-        idx.update_from(&src, "HEAD", &|_| {})?;
+        idx.update(&src, "HEAD", &|_| {})?;
         src.ids.replace(vec!["a".into(), "c".into()]);
-        assert_eq!(ids(&idx.records_from(&src, "HEAD")?), ["a", "c"]);
+        assert_eq!(ids(&idx.records(&src, "HEAD")?), ["a", "c"]);
         Ok(())
     }
 
@@ -269,15 +255,15 @@ mod tests {
         let path = dir.path().join("gitterrace");
         let idx = Index::open_dir(path.clone())?;
         let src = Fake::new(&["a", "b"]);
-        idx.update_from(&src, "HEAD", &|_| {})?;
+        idx.update(&src, "HEAD", &|_| {})?;
         let file = path.join("commits.jsonl");
         let mut text = std::fs::read_to_string(&file)?;
         text.pop();
         text.truncate(text.len() - 5);
         std::fs::write(&file, text)?;
-        assert_eq!(ids(&idx.records_from(&src, "HEAD")?), ["a"]);
-        idx.update_from(&src, "HEAD", &|_| {})?;
-        assert_eq!(ids(&idx.records_from(&src, "HEAD")?), ["a", "b"]);
+        assert_eq!(ids(&idx.records(&src, "HEAD")?), ["a"]);
+        idx.update(&src, "HEAD", &|_| {})?;
+        assert_eq!(ids(&idx.records(&src, "HEAD")?), ["a", "b"]);
         assert_eq!(std::fs::read_to_string(&file)?.lines().count(), 2);
         Ok(())
     }
@@ -287,11 +273,11 @@ mod tests {
         let dir = tempfile::tempdir()?;
         let path = dir.path().join("gitterrace");
         let src = Fake::new(&["a"]);
-        Index::open_dir(path.clone())?.update_from(&src, "HEAD", &|_| {})?;
+        Index::open_dir(path.clone())?.update(&src, "HEAD", &|_| {})?;
         std::fs::write(path.join("VERSION"), "0\n")?;
         let idx = Index::open_dir(path.clone())?;
-        assert!(idx.records_from(&src, "HEAD")?.is_empty());
-        idx.update_from(&src, "HEAD", &|_| {})?;
+        assert!(idx.records(&src, "HEAD")?.is_empty());
+        idx.update(&src, "HEAD", &|_| {})?;
         assert_eq!(src.built.get(), 2);
         assert_eq!(
             std::fs::read_to_string(path.join("VERSION"))?.trim(),
@@ -321,7 +307,7 @@ mod tests {
         }
         let src = Fake::new(&["a"]);
         if let Ok(idx) = Index::open_dir(dir.clone())
-            && idx.update_from(&src, "HEAD", &|_| {}).is_ok()
+            && idx.update(&src, "HEAD", &|_| {}).is_ok()
         {
             let mut lines = crate::LineCache::load(idx.dir());
             lines.map.insert("abc".into(), 3);

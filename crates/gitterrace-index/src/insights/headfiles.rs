@@ -51,14 +51,6 @@ impl LineCache {
         self.dirty = false;
         Ok(())
     }
-
-    pub fn len(&self) -> usize {
-        self.map.len()
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.map.is_empty()
-    }
 }
 
 /// Text files of the tree at `rev` with line counts. Binary and oversized blobs are left out.
@@ -162,7 +154,7 @@ mod tests {
         c.map.insert("abc".into(), 7);
         c.dirty = true;
         c.save(dir.path())?;
-        assert_eq!(LineCache::load(dir.path()).len(), 1);
+        assert_eq!(LineCache::load(dir.path()).map.len(), 1);
         Ok(())
     }
 }

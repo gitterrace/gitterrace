@@ -10,13 +10,12 @@ use gix::bstr::ByteSlice;
 use gix::diff::blob::{Algorithm, Diff, InternedInput};
 
 use crate::error::git;
-use crate::{ChangeKind, FileDiff, Hunk, HunkLine, LineKind, Repo, Result};
+use crate::{ChangeKind, FileDiff, Repo, Result};
 
 /// Untracked trees can be enormous (a forgotten `node_modules`), so the view stops here.
 const MAX_FILES: usize = 2000;
 /// Larger files are listed but shown without hunks.
 const MAX_DIFF_BYTES: usize = 1024 * 1024;
-const CONTEXT: usize = 3;
 
 fn open(repo: &Repo) -> Result<gix::Repository> {
     gix::open(repo.git_dir()).map_err(git)
@@ -209,102 +208,10 @@ fn file_diff(path: String, kind: ChangeKind, old: &[u8], new: &[u8], big: bool) 
         additions,
         deletions,
         binary: false,
-        hunks: hunks(old, new, &diff),
+        hunks: crate::diff::build_hunks(old, new, &diff),
         lines: 0,
         rewritten: 0,
         code: crate::CodeCounts::default(),
-    }
-}
-
-fn split(data: &[u8]) -> Vec<&[u8]> {
-    data.split_inclusive(|b| *b == b'\n').collect()
-}
-
-fn text(line: &[u8]) -> String {
-    let line = line.strip_suffix(b"\n").unwrap_or(line);
-    let line = line.strip_suffix(b"\r").unwrap_or(line);
-    line.to_str_lossy().into_owned()
-}
-
-/// Groups changes whose context windows touch, as `git diff -U3` does.
-fn hunks(old: &[u8], new: &[u8], diff: &Diff) -> Vec<Hunk> {
-    let (ol, nl) = (split(old), split(new));
-    let changes: Vec<_> = diff
-        .hunks()
-        .map(|h| {
-            (
-                h.before.start as usize..h.before.end as usize,
-                h.after.start as usize..h.after.end as usize,
-            )
-        })
-        .collect();
-    let mut out = Vec::new();
-    let mut i = 0;
-    while i < changes.len() {
-        let mut j = i;
-        while j + 1 < changes.len() && changes[j + 1].0.start - changes[j].0.end <= 2 * CONTEXT {
-            j += 1;
-        }
-        out.push(group(&changes[i..=j], &ol, &nl));
-        i = j + 1;
-    }
-    out
-}
-
-fn ctx(old: &[&[u8]], ob: &mut usize, nb: &mut usize, n: usize, out: &mut Vec<HunkLine>) {
-    for _ in 0..n {
-        out.push(HunkLine {
-            kind: LineKind::Context,
-            old_no: u32::try_from(*ob + 1).ok(),
-            new_no: u32::try_from(*nb + 1).ok(),
-            text: text(old[*ob]),
-        });
-        *ob += 1;
-        *nb += 1;
-    }
-}
-
-type Change = (std::ops::Range<usize>, std::ops::Range<usize>);
-
-fn group(changes: &[Change], old: &[&[u8]], new: &[&[u8]]) -> Hunk {
-    let lead = changes[0].0.start.min(CONTEXT);
-    let mut ob = changes[0].0.start - lead;
-    let mut nb = changes[0].1.start - lead;
-    let (old_start, new_start) = (ob, nb);
-    let mut lines = Vec::new();
-    for (before, after) in changes {
-        let gap = before.start - ob;
-        ctx(old, &mut ob, &mut nb, gap, &mut lines);
-        for l in &old[before.clone()] {
-            lines.push(HunkLine {
-                kind: LineKind::Removed,
-                old_no: u32::try_from(ob + 1).ok(),
-                new_no: None,
-                text: text(l),
-            });
-            ob += 1;
-        }
-        for l in &new[after.clone()] {
-            lines.push(HunkLine {
-                kind: LineKind::Added,
-                old_no: None,
-                new_no: u32::try_from(nb + 1).ok(),
-                text: text(l),
-            });
-            nb += 1;
-        }
-    }
-    let trail = (old.len() - ob).min(CONTEXT);
-    ctx(old, &mut ob, &mut nb, trail, &mut lines);
-    let (ol, nl) = (ob - old_start, nb - new_start);
-    let from = |s: usize, len: usize| if len == 0 { s } else { s + 1 };
-    Hunk {
-        header: format!(
-            "@@ -{},{ol} +{},{nl} @@",
-            from(old_start, ol),
-            from(new_start, nl)
-        ),
-        lines,
     }
 }
 
