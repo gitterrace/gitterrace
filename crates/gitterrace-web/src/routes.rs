@@ -12,24 +12,18 @@ use axum::{
     routing::get,
 };
 use gitterrace_git::RefKind;
-use gitterrace_index::TimeAxis;
 use serde::Deserialize;
 
 use crate::{
     app::{App, blocking},
-    charts,
     error::Result,
-    filter::{Dim, Filter, FilterBar},
     fmt,
     live::Mode,
     markdown, views,
-    views::{Chrome, CommitRow, Crumb, Entry, FileStatRow, Nav, RefRow, Row},
+    views::{Chrome, CommitRow, Crumb, Entry, FileStatRow, RefRow},
 };
 
 const PAGE: usize = 50;
-const HOT_DAYS: i64 = 90;
-const HOT_LIMIT: usize = 25;
-const TABLE_LIMIT: usize = 30;
 
 pub(crate) type Shared = State<Arc<App>>;
 
@@ -56,12 +50,12 @@ pub(crate) fn router(app: Arc<App>) -> Router {
         .route("/api/refs", get(api_refs))
         .route("/api/last/{rev}", get(api_last_root))
         .route("/api/last/{rev}/{*path}", get(api_last))
-        .route("/stats", get(stats))
-        .route("/stats/files", get(stats_files))
+        .route("/stats", get(crate::pages::activity))
+        .route("/stats/files", get(moved("/stats/hotspots")))
         .route("/stats/types", get(crate::types::page))
         .route("/stats/languages", get(crate::languages::page))
         .route("/stats/frequency", get(crate::insights::code_frequency))
-        .route("/stats/pulse", get(crate::pages::pulse))
+        .route("/stats/pulse", get(moved("/stats")))
         .route("/stats/hotspots", get(crate::pages::hotspots))
         .route("/stats/ownership", get(crate::pages::ownership))
         .route("/stats/patterns", get(crate::pages::patterns))
@@ -369,11 +363,13 @@ async fn overview(State(app): Shared, Query(q): Query<DocQuery>) -> Result<Html<
         let docs = crate::about::find(&list);
         let about = crate::about::card(a, &head, &rev, "", "/", &docs, q.doc.as_deref());
         let totals = a.records(&head)?.map(|r| {
-            let t = gitterrace_index::totals(&r);
+            let t = crate::insights::insights(a, &r, a.defaults().into_options())
+                .period_summary(gitterrace_index::Period::All)
+                .current;
             Numbers {
                 commits: fmt::thousands(t.commits),
                 authors: fmt::thousands(t.authors),
-                files: fmt::thousands(t.files_touched),
+                files: fmt::thousands(t.files),
                 additions: fmt::thousands(t.additions),
                 deletions: fmt::thousands(t.deletions),
             }
@@ -866,36 +862,27 @@ async fn refs(State(app): Shared) -> Result<Html<String>> {
     page(&p)
 }
 
+/// A permanent redirect from a removed insights page to the one that replaced it, the query
+/// (filters, period, options) kept so old links land on the same selection.
+fn moved(
+    to: &'static str,
+) -> impl Fn(State<Arc<App>>, RawQuery) -> std::future::Ready<Response> + Clone + Send + 'static {
+    move |State(a), RawQuery(q)| {
+        let q = q.map(|q| format!("?{q}")).unwrap_or_default();
+        let at = format!("{}{to}{q}", a.base);
+        std::future::ready(
+            (StatusCode::MOVED_PERMANENTLY, [(header::LOCATION, at)]).into_response(),
+        )
+    }
+}
+
 #[derive(Template)]
 #[template(path = "pending.html")]
 struct PendingPage {
     c: Chrome,
-    tabs: Vec<Nav>,
+    tabs: views::Tabs,
     /// Set when a newer build owns the cache: this one leaves it alone instead of indexing.
     newer: Option<String>,
-}
-
-struct AuthorRow {
-    label: String,
-    href: String,
-    commits: String,
-    additions: String,
-    deletions: String,
-    detail: String,
-    last: String,
-    pct: u32,
-}
-
-#[derive(Template)]
-#[template(path = "stats.html")]
-struct StatsPage {
-    c: Chrome,
-    tabs: Vec<Nav>,
-    fb: FilterBar,
-    activity_title: String,
-    activity: String,
-    heatmap: String,
-    authors: Vec<AuthorRow>,
 }
 
 /// Runs `build` over the cached records, or yields the progress page while none exist yet.
@@ -927,133 +914,6 @@ pub(crate) async fn with_records<T: Template + Send + 'static>(
     })
     .await?;
     Ok(Html(html))
-}
-
-async fn stats(State(app): Shared, Query(f): Query<Filter>) -> Result<Html<String>> {
-    with_records(&app, "a", move |_, all, c| {
-        let fb = f.bar("/stats", all);
-        let r = &*f.apply(all);
-        let axis = TimeAxis::covering(f.period_value(), all, r);
-        let points = gitterrace_index::activity(r, &axis)
-            .into_iter()
-            .map(|b| (b.label, b.commits as u64))
-            .collect::<Vec<_>>();
-        let h = gitterrace_index::heatmap(r);
-        let authors = gitterrace_index::authors(r);
-        let max = authors.first().map_or(0, |a| a.commits as u64);
-        StatsPage {
-            c,
-            tabs: views::stats_tabs("a"),
-            fb,
-            activity_title: format!("Commits per {}", axis.unit().noun()),
-            activity: charts::bars(&points),
-            heatmap: charts::heatmap(&h.cells, h.max),
-            authors: authors
-                .into_iter()
-                .take(TABLE_LIMIT)
-                .map(|a| AuthorRow {
-                    pct: charts::pct(a.commits as u64, max),
-                    href: f.link("/stats", Dim::Author, &a.email),
-                    label: a.name,
-                    commits: fmt::thousands(a.commits),
-                    additions: fmt::thousands(a.additions),
-                    deletions: fmt::thousands(a.deletions),
-                    detail: fmt::thousands(a.active_days),
-                    last: fmt::day(a.last_commit),
-                })
-                .collect(),
-        }
-    })
-    .await
-}
-
-#[derive(Template)]
-#[template(path = "stats_files.html")]
-struct StatsFilesPage {
-    c: Chrome,
-    tabs: Vec<Nav>,
-    fb: FilterBar,
-    groups: Vec<RowGroup>,
-}
-
-struct RowGroup {
-    title: &'static str,
-    rows: Vec<Row>,
-}
-
-fn file_row(f: gitterrace_index::FileChurn, max: u64) -> Row {
-    Row {
-        href: fmt::href(&format!(
-            "/blob/{}/{}",
-            fmt::selected_seg(),
-            fmt::enc(&f.path, true)
-        )),
-        pct: charts::pct(f.commits as u64, max),
-        label: f.path,
-        commits: fmt::thousands(f.commits),
-        additions: fmt::thousands(f.additions),
-        deletions: fmt::thousands(f.deletions),
-    }
-}
-
-async fn stats_files(
-    State(app): Shared,
-    RawQuery(raw): RawQuery,
-    Query(f): Query<Filter>,
-) -> Result<Html<String>> {
-    crate::insights::cached(&app, "f", raw, move |_, all, c| {
-        let fb = f.bar("/stats/files", all);
-        let r = &*f.apply(all);
-        let rows = |v: Vec<gitterrace_index::FileChurn>| {
-            let max = v.first().map_or(0, |f| f.commits as u64);
-            v.into_iter()
-                .take(HOT_LIMIT)
-                .map(|f| file_row(f, max))
-                .collect::<Vec<_>>()
-        };
-        let since = fmt::now() - HOT_DAYS * 86_400;
-        let dirs = gitterrace_index::dir_churn(r);
-        let dmax = dirs.first().map_or(0, |d| d.commits as u64);
-        StatsFilesPage {
-            c,
-            tabs: views::stats_tabs("f"),
-            fb,
-            groups: vec![
-                RowGroup {
-                    title: "Hotspots, last 90 days",
-                    rows: rows(gitterrace_index::hotspots(r, since, HOT_LIMIT)),
-                },
-                RowGroup {
-                    title: "Most changed files",
-                    rows: rows(gitterrace_index::file_churn(r)),
-                },
-                RowGroup {
-                    title: "Directories",
-                    rows: dirs
-                        .into_iter()
-                        .take(HOT_LIMIT)
-                        .map(|d| Row {
-                            href: if d.path == "." {
-                                String::new()
-                            } else {
-                                fmt::href(&format!(
-                                    "/tree/{}/{}",
-                                    fmt::selected_seg(),
-                                    fmt::enc(&d.path, true)
-                                ))
-                            },
-                            pct: charts::pct(d.commits as u64, dmax),
-                            label: d.path,
-                            commits: fmt::thousands(d.commits),
-                            additions: fmt::thousands(d.additions),
-                            deletions: fmt::thousands(d.deletions),
-                        })
-                        .collect(),
-                },
-            ],
-        }
-    })
-    .await
 }
 
 #[derive(serde::Serialize)]

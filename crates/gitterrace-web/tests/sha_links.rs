@@ -137,7 +137,6 @@ async fn every_commit_id_is_a_sha_link() {
         "/stats".to_owned(),
         "/stats/types".to_owned(),
         "/stats/languages".to_owned(),
-        "/stats/pulse".to_owned(),
         "/stats/hotspots".to_owned(),
     ];
     let mut with_links = 0;

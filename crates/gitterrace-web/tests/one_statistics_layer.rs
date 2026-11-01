@@ -1,0 +1,155 @@
+//! The web pages and the JSON API answer from one statistics layer. For the same filter and
+//! options, every number a page prints must equal the API's: a second implementation on either
+//! side drifts, and this test catches it whichever side moves.
+#![allow(clippy::expect_used)]
+
+use std::time::Duration;
+
+use gitterrace_testkit::{Fixture, get};
+use serde_json::Value;
+
+/// Cells of the table rows of `html` holding `marker`, tags stripped, thousands separators gone.
+fn rows(html: &str, marker: &str) -> Vec<Vec<String>> {
+    html.split("<tr")
+        .filter(|r| r.contains(marker))
+        .map(|r| {
+            r.split("<td")
+                .skip(1)
+                .map(|c| {
+                    let cell = c.split("</td>").next().unwrap_or_default();
+                    let cell = cell.split_once('>').map_or("", |(_, rest)| rest);
+                    let mut out = String::new();
+                    let mut tag = false;
+                    for ch in cell.chars() {
+                        match ch {
+                            '<' => tag = true,
+                            '>' if tag => tag = false,
+                            _ if !tag => out.push(ch),
+                            _ => {}
+                        }
+                    }
+                    out.replace(',', "").trim().to_owned()
+                })
+                .collect()
+        })
+        .collect()
+}
+
+async fn api(router: &axum::Router, name: &str, query: &str) -> Value {
+    let (s, body) = get(router, &format!("/api/v1/insights/{name}?{query}")).await;
+    assert_eq!(s, 200, "{name}?{query}: {body}");
+    serde_json::from_str::<Value>(&body).expect("json")["data"].clone()
+}
+
+fn num(v: &Value) -> String {
+    v.as_u64().map(|n| n.to_string()).unwrap_or_default()
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn api_and_pages_give_the_same_numbers_for_the_same_filter() {
+    let root = tempfile::tempdir().expect("tmp");
+    let f = Fixture::init(&root.path().join("repo"))
+        .at("2024-03-01T12:00:00Z")
+        .write("src/a.rs", "fn a() {}\n")
+        .write("Cargo.lock", "lock\n")
+        .commit("feat(core): first")
+        .at("2024-03-20T12:00:00Z")
+        .write("src/a.rs", "fn a() {}\nfn b() {}\n")
+        .write("src/b.rs", "x\ny\n")
+        .write("Cargo.lock", "lock\nmore\n")
+        .commit("fix(core): second")
+        .at("2024-04-10T12:00:00Z")
+        .write("docs/x.md", "doc\n")
+        .write("src/b.rs", "x\n")
+        .commit("docs: third");
+    let router = gitterrace_web::app_router(f.path()).expect("router");
+    for _ in 0..200 {
+        let (_, body) = get(&router, "/stats").await;
+        if !body.contains("data-progress") {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(50)).await;
+    }
+
+    // Each query narrows differently: none, a type, a path, a period, and options that change
+    // which files count. The pages read them the same way the API does.
+    for q in [
+        "",
+        "type=fix",
+        "path=src",
+        "period=1m",
+        "generated=1&exclude=docs/*",
+        "author=t%40e.x&period=3m",
+    ] {
+        let (s, page) = get(&router, &format!("/stats?{q}")).await;
+        assert_eq!(s, 200, "/stats?{q}");
+        let sum = api(&router, "summary", q).await;
+        let now: Vec<String> = rows(&page, "class=\"r\"><b>")
+            .into_iter()
+            .map(|r| r[1].clone())
+            .collect();
+        let c = &sum["current"];
+        let want = [
+            num(&c["commits"]),
+            num(&c["authors"]),
+            num(&c["files"]),
+            num(&c["additions"]),
+            num(&c["deletions"]),
+        ];
+        assert_eq!(now, want, "Activity against /insights/summary for {q:?}");
+        if !c["commits"].as_u64().is_some_and(|n| n > 0) {
+            continue;
+        }
+
+        let (_, page) = get(&router, &format!("/stats/hotspots?{q}")).await;
+        let web: Vec<(String, String)> = rows(&page, "data-act=\"insight\"")
+            .into_iter()
+            .map(|r| (r[0].clone(), r[3].clone()))
+            .collect();
+        let hot = api(&router, "hotspots", &format!("{q}&limit=50")).await;
+        let api_rows: Vec<(String, String)> = hot["files"]
+            .as_array()
+            .expect("files")
+            .iter()
+            .map(|h| (h["path"].as_str().expect("path").to_owned(), num(&h["changes"])))
+            .collect();
+        assert_eq!(web, api_rows, "Hotspots page against API for {q:?}");
+
+        let (_, page) = get(&router, &format!("/stats/contributors?{q}")).await;
+        let people = api(&router, "contributors", q).await;
+        let web: Vec<String> = rows(&page, "class=\"av\"")
+            .into_iter()
+            .map(|r| r[2].clone())
+            .collect();
+        let api_rows: Vec<String> = people["contributors"]
+            .as_array()
+            .expect("contributors")
+            .iter()
+            .filter(|p| p["bot"] != true)
+            .map(|p| num(&p["commits"]))
+            .collect();
+        assert_eq!(web, api_rows, "Contributors page against API for {q:?}");
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn removed_pages_redirect_with_their_query() {
+    let root = tempfile::tempdir().expect("tmp");
+    let f = Fixture::standard(&root.path().join("repo"));
+    let router = gitterrace_web::app_router(f.path()).expect("router");
+    for (from, to) in [
+        ("/stats/pulse?period=1w&type=fix", "/stats?period=1w&type=fix"),
+        ("/stats/pulse", "/stats"),
+        ("/stats/files?path=src", "/stats/hotspots?path=src"),
+    ] {
+        let req = axum::http::Request::get(from)
+            .header("host", "localhost")
+            .body(axum::body::Body::empty())
+            .expect("req");
+        let res = tower::ServiceExt::oneshot(router.clone(), req)
+            .await
+            .expect("res");
+        assert_eq!(res.status(), 301, "{from}");
+        assert_eq!(res.headers()["location"], to, "{from}");
+    }
+}

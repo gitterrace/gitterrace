@@ -1,10 +1,10 @@
-//! `docs/api.md`, rendered from the live registries: [`ENDPOINTS`], [`INSIGHTS`], the MCP tool
+//! `docs/api.md`, rendered from the live registries: [`ENDPOINTS`], [`insight_list`], the MCP tool
 //! router and the cap constants. Never from scraped source.
 
 use std::fmt::Write as _;
 
 use gitterrace_api::{
-    ENDPOINTS, INSIGHTS, MAX_BLAME_LINES, MAX_BLOB_BYTES, MAX_BLOB_LINES, MAX_PAGE, McpServer,
+    ENDPOINTS, MAX_BLAME_LINES, MAX_BLOB_BYTES, MAX_BLOB_LINES, MAX_PAGE, McpServer, insight_list,
     Param,
 };
 
@@ -65,8 +65,8 @@ pub fn render() -> Out {
     s.push_str(
         "\n## Insights\n\nServed at `GET /insights/{name}`.\n\n| Name | Summary |\n| --- | --- |\n",
     );
-    for i in INSIGHTS {
-        let _ = writeln!(s, "| `{}` | {} |", i.name, i.summary);
+    for (name, summary) in insight_list() {
+        let _ = writeln!(s, "| `{name}` | {summary} |");
     }
 
     s.push_str(

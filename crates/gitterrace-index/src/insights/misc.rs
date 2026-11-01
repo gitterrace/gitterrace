@@ -169,8 +169,7 @@ impl Insights<'_> {
                 continue;
             }
             people.insert(self.person[i]);
-            for file in &rec.files {
-                let Some(l) = self.lines(file) else { continue };
+            for (file, l) in self.files_of(i) {
                 paths.insert(&*file.path);
                 let e = langs.entry(language(&file.path)).or_default();
                 e.0 += u64::from(l.add);

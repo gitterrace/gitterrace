@@ -62,16 +62,19 @@ pub const PAGES: &[Page] = &[
         "Insights on the shared filter and period. `?rev=` follows any ref",
         &[
             "/stats",
-            "/stats/files",
             "/stats/types",
             "/stats/languages",
             "/stats/frequency",
-            "/stats/pulse",
             "/stats/hotspots",
             "/stats/ownership",
             "/stats/patterns",
             "/stats/contributors",
         ],
+    ),
+    page(
+        "`/stats/pulse`, `/stats/files`",
+        "Permanent redirects from removed pages, query kept: to `/stats` and `/stats/hotspots`",
+        &["/stats/pulse", "/stats/files"],
     ),
     page(
         "`/events`, `/api/{files,refs,last,progress}`",

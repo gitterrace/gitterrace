@@ -4,14 +4,14 @@
 
 use std::borrow::Cow;
 
-use gitterrace_index::{CommitRecord, Period};
+use gitterrace_index::{CommitRecord, Period, Selection};
 use serde::Deserialize;
 
 use crate::fmt::{enc, esc, href};
 
-/// Value that selects commits without a type (`other`) or without a scope (`none`).
-pub(crate) const OTHER: &str = "other";
-pub(crate) const NO_SCOPE: &str = "none";
+/// Value that selects commits without a scope (`none`).
+pub(crate) const NO_SCOPE: &str = Selection::NO_SCOPE;
+pub(crate) use gitterrace_index::under;
 
 const PERIODS: [(&str, &str); 5] = [
     ("1w", "Week"),
@@ -116,10 +116,6 @@ impl Filter {
         self.get(Dim::Period).and_then(Period::parse)
     }
 
-    pub(crate) fn is_active(&self) -> bool {
-        DIMS.iter().any(|d| self.get(*d).is_some())
-    }
-
     /// This filter with one dimension replaced (or removed with `None`).
     pub(crate) fn with(&self, d: Dim, value: Option<&str>) -> Self {
         let mut f = self.clone();
@@ -156,57 +152,33 @@ impl Filter {
         href(&format!("{base}{}", self.with(d, Some(value)).query(&[])))
     }
 
-    fn matches(&self, r: &CommitRecord, window: (i64, i64)) -> bool {
-        if r.time < window.0 || r.time >= window.1 {
-            return false;
+    /// The commit selection, without the period: what the API's `type`, `scope`, `author` and
+    /// `path` parameters parse to as well.
+    pub(crate) fn selection(&self) -> Selection {
+        let own = |d| self.get(d).map(str::to_owned);
+        Selection {
+            kind: own(Dim::Kind),
+            scope: own(Dim::Scope),
+            author: own(Dim::Author),
+            path: own(Dim::Path),
         }
-        if let Some(k) = self.kind()
-            && r.kind.as_deref().unwrap_or(OTHER) != k
-        {
-            return false;
-        }
-        if let Some(s) = self.scope()
-            && r.scope.as_deref().unwrap_or(NO_SCOPE) != s
-        {
-            return false;
-        }
-        if let Some(a) = self.get(Dim::Author)
-            && !r.email.eq_ignore_ascii_case(a)
-            && r.author != a
-        {
-            return false;
-        }
-        true
     }
 
-    /// The records the filters keep. With a path filter each kept commit lists only the files
-    /// under the path, so line counts and churn are the path's own. Unfiltered input is borrowed.
+    /// The records the filters keep, the period window included. With a path filter each kept
+    /// commit lists only the files under the path. Unfiltered input is borrowed.
     pub(crate) fn apply<'a>(&self, records: &'a [CommitRecord]) -> Cow<'a, [CommitRecord]> {
-        if !self.is_active() {
-            return Cow::Borrowed(records);
-        }
+        let kept = self.selection().apply(records);
+        let Some(p) = self.period() else {
+            return kept;
+        };
         let newest = records.iter().map(|r| r.time).max().unwrap_or(0);
-        let window = self
-            .period()
-            .map_or((i64::MIN, i64::MAX), |p| p.window(newest));
-        let path = self.path();
-        let out = records
-            .iter()
-            .filter(|r| self.matches(r, window))
-            .filter_map(|r| match path {
-                None => Some(r.clone()),
-                Some(p) => {
-                    let files: Vec<_> = r
-                        .files
-                        .iter()
-                        .filter(|f| under(&f.path, p))
-                        .cloned()
-                        .collect();
-                    (!files.is_empty()).then(|| CommitRecord { files, ..r.clone() })
-                }
-            })
-            .collect();
-        Cow::Owned(out)
+        let (from, to) = p.window(newest);
+        Cow::Owned(
+            kept.iter()
+                .filter(|r| r.time >= from && r.time < to)
+                .cloned()
+                .collect(),
+        )
     }
 
     /// Chips and period picker for a page served at `base`.
@@ -254,14 +226,6 @@ impl Filter {
             clear: href(base),
         }
     }
-}
-
-/// True when `path` is `prefix` itself or inside it.
-pub(crate) fn under(path: &str, prefix: &str) -> bool {
-    path == prefix
-        || path
-            .strip_prefix(prefix)
-            .is_some_and(|rest| rest.starts_with('/'))
 }
 
 #[cfg(test)]
@@ -328,8 +292,6 @@ mod tests {
             (f.kind(), f.scope(), f.path()),
             (Some("fix"), None, Some("crates/web"))
         );
-        assert!(!Filter::default().is_active());
-        assert!(f.is_active());
     }
 
     #[test]

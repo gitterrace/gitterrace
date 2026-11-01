@@ -1,1 +1,1 @@
-<nav class="tabs">{% for t in tabs %}<a href="{{ t.href }}"{% if t.on %} class="on"{% endif %}>{{ t.label }}</a>{% endfor %}</nav>
+<nav class="tabs">{% for t in tabs.primary %}<a href="{{ t.href }}"{% if t.on %} class="on"{% endif %}>{{ t.label }}</a>{% endfor %}<details class="more"{% if tabs.more_on %} open{% endif %}><summary{% if tabs.more_on %} class="on"{% endif %}>More</summary><div>{% for t in tabs.more %}<a href="{{ t.href }}"{% if t.on %} class="on"{% endif %}>{{ t.label }}</a>{% endfor %}</div></details></nav>

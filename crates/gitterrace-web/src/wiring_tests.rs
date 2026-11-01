@@ -612,7 +612,7 @@ async fn every_page_shell_has_the_favicon() {
         for (at, _) in html.match_indices("/static/") {
             let before = &html[..at];
             assert!(
-                before.ends_with('"') || before.ends_with('\''),
+                before.ends_with('"') || before.ends_with('\'') || before.ends_with('='),
                 "{path} loads an asset under a prefix: {}",
                 &html[at.saturating_sub(30)..at + 20]
             );

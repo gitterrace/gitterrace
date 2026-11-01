@@ -260,35 +260,50 @@ pub(crate) fn banner(h: &gitterrace_git::HeadState, base: &str) -> Option<String
     }
 }
 
-/// Path, label and key of each insights tab.
-const STATS_TABS: [(&str, &str, &str); 11] = [
+/// Path, label and key of each insights tab. The first [`PRIMARY_TABS`] are what a first visit
+/// needs (is it alive, who works on it, where the risk is, what it is made of); the rest sit
+/// behind one "More" disclosure.
+const STATS_TABS: [(&str, &str, &str); 9] = [
     ("/stats", "Activity", "a"),
-    ("/stats/files", "Hot files", "f"),
-    ("/stats/types", "Commit types", "t"),
-    ("/stats/pulse", "Pulse", "pu"),
+    ("/stats/contributors", "Contributors", "co"),
     ("/stats/hotspots", "Hotspots", "ho"),
+    ("/stats/languages", "Languages", "l"),
     ("/stats/ownership", "Ownership", "ow"),
+    ("/stats/types", "Commit types", "t"),
+    ("/stats/frequency", "Code frequency", "cf"),
     ("/stats/patterns", "Patterns", "pa"),
     ("/compare", "Compare", "cm"),
-    ("/stats/languages", "Languages", "l"),
-    ("/stats/frequency", "Code frequency", "cf"),
-    ("/stats/contributors", "Contributors", "co"),
 ];
+const PRIMARY_TABS: usize = 4;
 
 /// The labels of the insights tabs, in tab order.
 pub fn stats_tab_labels() -> Vec<&'static str> {
     STATS_TABS.iter().map(|(_, label, _)| *label).collect()
 }
 
-pub(crate) fn stats_tabs(active: &str) -> Vec<Nav> {
-    STATS_TABS
+/// The insights tab row: the primary tabs, then the rest under "More", open when one of them
+/// is the current page so the active tab is always visible.
+pub(crate) struct Tabs {
+    pub(crate) primary: Vec<Nav>,
+    pub(crate) more: Vec<Nav>,
+    pub(crate) more_on: bool,
+}
+
+pub(crate) fn stats_tabs(active: &str) -> Tabs {
+    let mut all: Vec<Nav> = STATS_TABS
         .into_iter()
         .map(|(path, label, key)| Nav {
             href: href(path),
             label,
             on: key == active,
         })
-        .collect()
+        .collect();
+    let more = all.split_off(PRIMARY_TABS);
+    Tabs {
+        more_on: more.iter().any(|n| n.on),
+        primary: all,
+        more,
+    }
 }
 
 /// First letter of a name for the avatar disc.

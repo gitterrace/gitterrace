@@ -5,7 +5,9 @@ use std::sync::Arc;
 use askama::Template;
 use axum::extract::{Query, RawQuery, State};
 use axum::response::Html;
-use gitterrace_index::{CommitRecord, Insights, Options, Period, rework_share, rework_verdict};
+use gitterrace_index::{
+    CommitRecord, Insights, OptionParams, Options, Period, rework_share, rework_verdict,
+};
 use serde::Deserialize;
 
 use crate::{
@@ -15,23 +17,16 @@ use crate::{
     filter::{Dim, Filter, FilterBar},
     fmt,
     routes::{Shared, with_records},
-    views::{self, Chrome, Nav},
+    views::{self, Chrome, Tabs},
 };
 
 #[derive(Deserialize, Default)]
 pub(crate) struct InsightsQuery {
     #[serde(flatten)]
     pub(crate) filter: Filter,
-    /// `bots=1` counts bot accounts.
-    bots: Option<String>,
-    /// Comma separated globs left out of path statistics.
-    exclude: Option<String>,
-    /// `generated=1` counts lock files and minified output.
-    generated: Option<String>,
-    /// `ignore=0` counts paths that .gitignore rules out.
-    ignore: Option<String>,
-    /// `ws=1` counts whitespace-only changes.
-    ws: Option<String>,
+    /// `bots`, `generated`, `ignore`, `ws`, `exclude`: parsed as the API parses them.
+    #[serde(flatten)]
+    pub(crate) opts: OptionParams,
 }
 
 /// What the options are when the URL says nothing: `insights.*` and `[repo.NAME]` of the config.
@@ -74,37 +69,12 @@ impl App {
 }
 
 impl InsightsQuery {
-    /// The URL's own globs, without the configured ones.
     fn own_exclude(&self) -> Vec<String> {
-        self.exclude
-            .as_deref()
-            .unwrap_or_default()
-            .split(',')
-            .map(str::trim)
-            .filter(|g| !g.is_empty())
-            .map(str::to_owned)
-            .collect()
-    }
-
-    /// `1` turns an option on, `0` off, absence keeps the configured default.
-    fn flag(v: Option<&String>, default: bool) -> bool {
-        match v.map(String::as_str) {
-            Some("1") => true,
-            Some("0") => false,
-            _ => default,
-        }
+        self.opts.own_exclude()
     }
 
     pub(crate) fn options(&self, d: &Defaults) -> Options {
-        let mut exclude = d.exclude.clone();
-        exclude.extend(self.own_exclude());
-        Options {
-            exclude,
-            include_generated: Self::flag(self.generated.as_ref(), d.generated),
-            respect_ignore: self.ignore.as_deref() != Some("0"),
-            count_whitespace: self.ws.as_deref() == Some("1"),
-            include_bots: Self::flag(self.bots.as_ref(), d.bots),
-        }
+        self.opts.apply(d.clone().into_options())
     }
 
     /// Option parameters as they appear in a query, defaults left out.
@@ -283,7 +253,7 @@ pub(crate) struct Kpi(pub(crate) &'static str, pub(crate) String);
 #[template(path = "code_frequency.html")]
 struct CodeFrequencyPage {
     c: Chrome,
-    tabs: Vec<Nav>,
+    tabs: Tabs,
     fb: FilterBar,
     opts: Vec<OptLink>,
     kpis: Vec<Kpi>,
@@ -387,7 +357,7 @@ struct PersonRow {
 struct ContributorsPage {
     unit: &'static str,
     c: Chrome,
-    tabs: Vec<Nav>,
+    tabs: Tabs,
     fb: FilterBar,
     opts: Vec<OptLink>,
     kpis: Vec<Kpi>,

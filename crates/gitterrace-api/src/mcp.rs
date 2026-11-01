@@ -175,8 +175,10 @@ struct BlameArgs {
 #[derive(Deserialize, JsonSchema)]
 struct HotspotArgs {
     rev: Option<String>,
-    /// Only count changes after this Unix timestamp. Defaults to all time.
-    since: Option<i64>,
+    /// `1w`, `1m`, `3m`, `1y` or `all` (default): only changes in that window count.
+    period: Option<String>,
+    /// Only files under this directory.
+    path: Option<String>,
     /// Files to return. Defaults to 20.
     limit: Option<usize>,
 }
@@ -278,25 +280,30 @@ impl McpServer {
         self.run(move |s| s.blame(a.rev.as_deref(), &a.path)).await
     }
 
-    /// Most frequently changed files (commits, additions, deletions, last change), from the stats
-    /// cache. Use to find risky or central code and where to look first. Optional `since`.
+    /// Files of the head tree that change most for their size (changes, lines, authors, last
+    /// change, score = changes times the square root of lines), the web Hotspots page's numbers.
+    /// Use to find risky or central code and where to look first. Optional `period` and `path`.
     #[tool(name = "hotspots", annotations(read_only_hint = true))]
     async fn hotspots(
         &self,
         Parameters(a): Parameters<HotspotArgs>,
     ) -> Result<CallToolResult, ErrorData> {
         let p = Params {
-            since: a.since,
+            period: a.period,
             limit: a.limit,
+            select: gitterrace_index::Selection {
+                path: a.path,
+                ..Default::default()
+            },
             ..Params::default()
         };
         self.run(move |s| s.insight("hotspots", a.rev.as_deref(), &p))
             .await
     }
 
-    /// Contributors with commits, lines, first and last commit and active days, most active
-    /// first, plus `bus_factor` (the fewest authors who made half of all commits). Use for
-    /// ownership and knowledge-concentration questions.
+    /// Contributors (identities merged, bots left out) with commits, lines, first and last commit
+    /// and active days, most active first, plus `bus_factor` (the fewest people who made half of
+    /// all commits). Use for ownership and knowledge-concentration questions.
     #[tool(name = "contributors", annotations(read_only_hint = true))]
     async fn contributors(
         &self,
@@ -305,7 +312,8 @@ impl McpServer {
         self.run(move |s| s.contributors(a.rev.as_deref())).await
     }
 
-    /// Commits and lines changed per bucket (day, week, month, quarter or year, chosen by `period`). Use for "how active is this project" and
+    /// Commits and lines changed per bucket (day, week, month, quarter or year, chosen by
+    /// `period`) and a weekday-by-hour punch card. Use for "how active is this project" and
     /// trend questions.
     #[tool(name = "activity", annotations(read_only_hint = true))]
     async fn activity(

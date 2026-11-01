@@ -5,8 +5,7 @@
 use gitterrace_git::civil_from_days as civil;
 
 use crate::CommitRecord;
-use crate::aggregates::{format_date, weekday};
-use crate::insights::{Period, days_from_civil, local_day};
+use crate::insights::{Period, days_from_civil, format_date, local_day, weekday};
 
 /// Longest `All` span, in days, that still reads best as one bar per day (60 bars).
 const ALL_DAYS_MAX: i64 = 60;

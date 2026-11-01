@@ -3,6 +3,7 @@
 {% block content %}
 {% include "tabs.html" %}
 {% include "filterbar.html" %}
+{% include "options.html" %}
 {% include "kpis.html" %}
 {% if commits_total == 0 %}<p class="muted">No commits match these filters.</p>{% else %}
 {% if !kinds.is_empty() %}

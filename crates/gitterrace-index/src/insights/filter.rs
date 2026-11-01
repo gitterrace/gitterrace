@@ -35,10 +35,6 @@ pub struct PathFilter {
     patterns: Vec<String>,
     ignore: Option<IgnoreSet>,
     memo: Mutex<FastMap<String, bool>>,
-    /// Answers by the address of a record's shared path. Records built by the loader share one
-    /// `Arc<str>` per distinct path, so the per-file hot loops hash a pointer, not the string.
-    /// The records outlive the filter, so an address never names a different path.
-    by_addr: Mutex<FastMap<usize, bool>>,
 }
 
 impl PathFilter {
@@ -51,23 +47,7 @@ impl PathFilter {
             patterns,
             ignore: if opts.respect_ignore { ignore } else { None },
             memo: Mutex::new(FastMap::default()),
-            by_addr: Mutex::new(FastMap::default()),
         }
-    }
-
-    /// [`PathFilter::skips`] for a path shared between records, memoized by address.
-    pub(crate) fn skips_shared(&self, path: &std::sync::Arc<str>) -> bool {
-        let key = std::sync::Arc::as_ptr(path).cast::<u8>() as usize;
-        if let Ok(m) = self.by_addr.lock()
-            && let Some(hit) = m.get(&key)
-        {
-            return *hit;
-        }
-        let skip = self.skips(path);
-        if let Ok(mut m) = self.by_addr.lock() {
-            m.insert(key, skip);
-        }
-        skip
     }
 
     /// True when `path` is excluded, generated or ignored.
@@ -77,16 +57,20 @@ impl PathFilter {
         {
             return *hit;
         }
-        let name = path.rsplit('/').next().unwrap_or(path);
-        let skip = self
-            .patterns
-            .iter()
-            .any(|p| fnmatch(p, path) || fnmatch(p, name))
-            || self.ignore.as_ref().is_some_and(|i| i.is_ignored(path));
+        let skip = self.decide(path);
         if let Ok(mut memo) = self.memo.lock() {
             memo.insert(path.to_owned(), skip);
         }
         skip
+    }
+
+    /// [`PathFilter::skips`] without the memo, for callers that decide each path once anyway.
+    pub(crate) fn decide(&self, path: &str) -> bool {
+        let name = path.rsplit('/').next().unwrap_or(path);
+        self.patterns
+            .iter()
+            .any(|p| fnmatch(p, path) || fnmatch(p, name))
+            || self.ignore.as_ref().is_some_and(|i| i.is_ignored(path))
     }
 }
 

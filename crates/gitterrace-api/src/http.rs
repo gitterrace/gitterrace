@@ -10,7 +10,7 @@ use serde_json::{Value, json};
 use crate::core::ApiState;
 use crate::endpoints::{self, ENDPOINTS};
 use crate::error::ApiError;
-use crate::insights::{self, INSIGHTS};
+use crate::insights;
 
 type Reply = Result<Json<Value>, ApiError>;
 
@@ -67,9 +67,8 @@ async fn etag(
 }
 
 fn insight_rows() -> Vec<Value> {
-    INSIGHTS
-        .iter()
-        .map(|i| json!({ "name": i.name, "summary": i.summary }))
+    insights::list()
+        .map(|(name, summary)| json!({ "name": name, "summary": summary }))
         .collect()
 }
 
@@ -181,10 +180,8 @@ pub(crate) async fn insight_list() -> Json<Value> {
 #[derive(Deserialize)]
 pub(crate) struct InsightQuery {
     rev: Option<String>,
-    period: Option<String>,
-    label: Option<String>,
-    since: Option<i64>,
-    limit: Option<usize>,
+    #[serde(flatten)]
+    params: insights::Params,
 }
 
 pub(crate) async fn insight(
@@ -192,11 +189,6 @@ pub(crate) async fn insight(
     Path(name): Path<String>,
     Query(q): Query<InsightQuery>,
 ) -> Reply {
-    let params = insights::Params {
-        period: q.period,
-        label: q.label,
-        since: q.since,
-        limit: q.limit,
-    };
-    blocking(&s, move |s| s.insight(&name, q.rev.as_deref(), &params)).await
+    let InsightQuery { rev, params } = q;
+    blocking(&s, move |s| s.insight(&name, rev.as_deref(), &params)).await
 }

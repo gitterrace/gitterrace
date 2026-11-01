@@ -1,7 +1,6 @@
 //! Incremental insights cache in `.git/gitterrace/`. One record per commit, appended;
-//! aggregates are computed from the records on demand.
+//! statistics are computed from the records on demand by [`Insights`].
 
-mod aggregates;
 mod cache;
 mod conventional;
 mod insights;
@@ -13,7 +12,6 @@ use std::path::PathBuf;
 
 use gitterrace_git::Repo;
 
-pub use aggregates::*;
 /// Re-exported so the cards crate shares the one date rule without a new dependency.
 pub use gitterrace_git::civil_from_days;
 pub use insights::*;

@@ -146,9 +146,8 @@ settings! {
         bots: bool = false,
         /// Count lock files and minified output.
         generated: bool = false,
-        /// Period the Pulse, Hotspots, Ownership, Patterns, Code frequency and Contributors
-        /// pages use when the URL names none: 1w, 1m, 3m, 1y or all. All leaves each page its own
-        /// default (Pulse opens on a month).
+        /// Period the insights pages use when the URL names none: 1w, 1m, 3m, 1y or all. The
+        /// API and MCP default to all. Their `period` parameter picks one.
         period: String = "all".to_owned(),
     }
     display: Display {

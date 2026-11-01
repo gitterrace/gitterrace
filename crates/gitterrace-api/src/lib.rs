@@ -16,7 +16,9 @@ pub use core::{ApiState, MAX_BLAME_LINES, MAX_BLOB_BYTES, MAX_BLOB_LINES, MAX_PA
 pub use endpoints::{ENDPOINTS, Endpoint, Param};
 pub use error::ApiError;
 pub use http::router;
-pub use insights::{INSIGHTS, Insight};
+pub use insights::{
+    HEAD_INSIGHTS, INSIGHTS, Insight, OWNERSHIP_DEPTH, Params, list as insight_list,
+};
 pub use mcp::{McpServer, ToolDoc, serve_mcp};
 
 #[cfg(test)]
@@ -110,7 +112,7 @@ mod tests {
         assert_eq!(blame["permalink"], format!("{base}/a.txt").as_str());
 
         let (_, hot) = get(&s, "/insights/hotspots").await;
-        let row = hot["data"]
+        let row = hot["data"]["files"]
             .as_array()
             .and_then(|r| r.iter().find(|r| r["path"] == "a.txt"))
             .expect("row");
@@ -129,9 +131,9 @@ mod tests {
     #[tokio::test]
     async fn every_insight_answers() {
         let (_d, s) = fixture();
-        for i in crate::INSIGHTS {
-            let (st, v) = get(&s, &format!("/insights/{}", i.name)).await;
-            assert_eq!(st, StatusCode::OK, "{}", i.name);
+        for (name, _) in crate::insight_list() {
+            let (st, v) = get(&s, &format!("/insights/{name}")).await;
+            assert_eq!(st, StatusCode::OK, "{name}");
             assert!(v.get("data").is_some());
         }
         let (st, _) = get(&s, "/insights/nope").await;

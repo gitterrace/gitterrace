@@ -9,16 +9,17 @@ use std::sync::Arc;
 use askama::Template;
 use axum::extract::{Query, RawQuery, State};
 use axum::response::Html;
-use gitterrace_index::{CommitRecord, LabelBucket, LabelCount, TimeAxis};
+use gitterrace_index::{CommitRecord, Label, LabelCount, Period};
 use serde::Deserialize;
 
 use crate::{
     charts,
     error::Result,
-    filter::{Dim, Filter, FilterBar, NO_SCOPE, OTHER},
+    filter::{Dim, Filter, FilterBar, NO_SCOPE},
+    insights::{InsightsQuery, Kpi, OptLink, insights, period_of, scoped},
     fmt::{self, href},
     routes::Shared,
-    views::{self, Chrome, CommitRow, Nav, Row},
+    views::{self, Chrome, CommitRow, Row, Tabs},
 };
 
 const BASE: &str = "/stats/types";
@@ -30,8 +31,9 @@ const LIST: usize = 12;
 #[derive(Deserialize, Default)]
 pub(crate) struct TypesQuery {
     #[serde(flatten)]
-    filter: Filter,
-    page: Option<usize>,
+    q: InsightsQuery,
+    /// A string: inside a flattened query every value arrives as one.
+    page: Option<String>,
 }
 
 struct Group {
@@ -68,9 +70,10 @@ struct Matrix {
 #[template(path = "stats_types.html")]
 struct TypesPage {
     c: Chrome,
-    tabs: Vec<Nav>,
+    tabs: Tabs,
     fb: FilterBar,
-    kpis: Vec<(&'static str, String)>,
+    opts: Vec<OptLink>,
+    kpis: Vec<Kpi>,
     kinds: Vec<Row>,
     matrix: Matrix,
     over_title: String,
@@ -83,46 +86,6 @@ struct TypesPage {
     older: Option<String>,
 }
 
-fn line_totals(r: &CommitRecord) -> (u64, u64) {
-    r.files.iter().fold((0, 0), |(a, d), f| {
-        (a + u64::from(f.additions), d + u64::from(f.deletions))
-    })
-}
-
-fn kind_of(r: &CommitRecord) -> &str {
-    r.kind.as_deref().unwrap_or(OTHER)
-}
-
-fn scope_of(r: &CommitRecord) -> &str {
-    r.scope.as_deref().unwrap_or(NO_SCOPE)
-}
-
-fn ranked(map: HashMap<&str, usize>) -> Vec<LabelCount> {
-    let mut v: Vec<LabelCount> = map
-        .into_iter()
-        .map(|(label, commits)| LabelCount {
-            label: label.to_owned(),
-            commits,
-        })
-        .collect();
-    v.sort_by(|a, b| {
-        b.commits
-            .cmp(&a.commits)
-            .then_with(|| a.label.cmp(&b.label))
-    });
-    v
-}
-
-fn count<'a>(
-    recs: &'a [CommitRecord],
-    key: impl Fn(&'a CommitRecord) -> &'a str,
-) -> Vec<LabelCount> {
-    let mut m: HashMap<&str, usize> = HashMap::new();
-    for r in recs {
-        *m.entry(key(r)).or_default() += 1;
-    }
-    ranked(m)
-}
 
 fn label_rows(v: &[LabelCount], link: impl Fn(&str) -> String) -> Vec<Row> {
     let max = v.first().map_or(0, |l| l.commits as u64);
@@ -148,21 +111,28 @@ fn level(n: usize, max: usize) -> u8 {
     u8::try_from(l).unwrap_or(4)
 }
 
-fn matrix(recs: &[CommitRecord], f: &Filter) -> Matrix {
-    let kinds: Vec<String> = count(recs, kind_of)
-        .into_iter()
+fn matrix(
+    recs: &[&CommitRecord],
+    kinds: &[LabelCount],
+    scopes: &[LabelCount],
+    f: &Filter,
+) -> Matrix {
+    let kinds: Vec<String> = kinds
+        .iter()
         .take(TOP_KINDS)
-        .map(|l| l.label)
+        .map(|l| l.label.clone())
         .collect();
-    let scopes: Vec<String> = count(recs, scope_of)
-        .into_iter()
+    let scopes: Vec<String> = scopes
+        .iter()
         .filter(|l| l.label != NO_SCOPE)
         .take(TOP_SCOPES)
-        .map(|l| l.label)
+        .map(|l| l.label.clone())
         .collect();
     let mut grid: HashMap<(&str, &str), usize> = HashMap::new();
     for r in recs {
-        *grid.entry((kind_of(r), scope_of(r))).or_default() += 1;
+        *grid
+            .entry((Label::Kind.of(r), Label::Scope.of(r)))
+            .or_default() += 1;
     }
     let max = scopes
         .iter()
@@ -205,27 +175,6 @@ fn matrix(recs: &[CommitRecord], f: &Filter) -> Matrix {
     }
 }
 
-/// Commits per time bucket, split by type (or by scope once a type is chosen).
-fn over_time(recs: &[CommitRecord], by_scope: bool, axis: &TimeAxis) -> String {
-    let mut maps: Vec<HashMap<&str, usize>> = vec![HashMap::new(); axis.len()];
-    for r in recs {
-        if let Some(i) = axis.slot(r) {
-            let label = if by_scope { scope_of(r) } else { kind_of(r) };
-            *maps[i].entry(label).or_default() += 1;
-        }
-    }
-    let buckets: Vec<LabelBucket> = axis
-        .names()
-        .zip(maps)
-        .map(|((key, label), m)| LabelBucket {
-            key,
-            label,
-            counts: ranked(m),
-        })
-        .collect();
-    charts::stacked(&buckets)
-}
-
 fn churn_rows(v: Vec<(String, String, usize, u64, u64)>) -> Vec<Row> {
     let max = v.first().map_or(0, |r| r.2 as u64);
     v.into_iter()
@@ -245,42 +194,50 @@ fn page_link(f: &Filter, n: usize) -> String {
     href(&format!("{BASE}{}", f.query(&[("page", &n.to_string())])))
 }
 
-fn build(a: &crate::app::App, all: &[CommitRecord], c: Chrome, q: &TypesQuery) -> TypesPage {
+fn build(a: &crate::app::App, all: &[CommitRecord], c: Chrome, tq: &TypesQuery) -> TypesPage {
+    let q = &tq.q;
     let f = &q.filter;
-    let recs = f.apply(all);
-    let recs: &[CommitRecord] = &recs;
-    let (adds, dels) = recs.iter().fold((0u64, 0u64), |(x, y), r| {
-        let (p, d) = line_totals(r);
-        (x + p, y + d)
-    });
+    let d = a.defaults();
+    let scoped = scoped(f, all);
+    let ins = insights(a, &scoped, q.options(&d));
+    let period = period_of(q, &d, Period::All);
+    let recs: Vec<&CommitRecord> = ins.counted_records(period).collect();
     let n = recs.len();
-    let authors = gitterrace_index::authors(recs);
-    let size = if n == 0 { 0 } else { (adds + dels) / n as u64 };
+    let sum = ins.period_summary(period).current;
+    let people = ins.contributors(period).contributors;
+    let size = if n == 0 {
+        0
+    } else {
+        (sum.additions + sum.deletions) / n as u64
+    };
     let kpis = vec![
-        ("Commits", fmt::thousands(n)),
-        ("Authors", fmt::thousands(authors.len())),
-        ("Lines added", format!("+{}", fmt::thousands(adds))),
-        ("Lines removed", format!("-{}", fmt::thousands(dels))),
-        ("Average commit", format!("{} lines", fmt::thousands(size))),
+        Kpi("Commits", fmt::thousands(n)),
+        Kpi("Authors", fmt::thousands(sum.authors)),
+        Kpi("Lines added", format!("+{}", fmt::thousands(sum.additions))),
+        Kpi("Lines removed", format!("-{}", fmt::thousands(sum.deletions))),
+        Kpi("Average commit", format!("{} lines", fmt::thousands(size))),
     ];
 
-    let kinds = if f.kind().is_some() {
-        Vec::new()
+    let kind_counts = ins.label_breakdown(Label::Kind, period);
+    let scope_counts = ins.label_breakdown(Label::Scope, period);
+    let (kinds, mx) = if f.kind().is_some() {
+        (
+            Vec::new(),
+            Matrix {
+                cols: Vec::new(),
+                rows: Vec::new(),
+            },
+        )
     } else {
-        label_rows(&count(recs, kind_of), |l| f.link(BASE, Dim::Kind, l))
-    };
-    let mx = if f.kind().is_some() {
-        Matrix {
-            cols: Vec::new(),
-            rows: Vec::new(),
-        }
-    } else {
-        matrix(recs, f)
+        (
+            label_rows(&kind_counts, |l| f.link(BASE, Dim::Kind, l)),
+            matrix(&recs, &kind_counts, &scope_counts, f),
+        )
     };
 
-    let axis = TimeAxis::covering(f.period_value(), all, recs);
     let by_scope = f.kind().is_some();
-    let unit = axis.unit().noun();
+    let over = ins.label_over_time(if by_scope { Label::Scope } else { Label::Kind }, period);
+    let unit = ins.bucket_unit(period).noun();
     let (over_title, over_hint) = if by_scope {
         (
             format!("Scopes over time, per {unit}"),
@@ -295,15 +252,16 @@ fn build(a: &crate::app::App, all: &[CommitRecord], c: Chrome, q: &TypesQuery) -
 
     let mut groups = Vec::new();
     if f.scope().is_none() {
-        let scopes: Vec<LabelCount> = count(recs, scope_of);
+        let scopes = &scope_counts;
         groups.push(Group {
             title: "Scopes",
             hint: "The part of the code a commit says it touches, from type(scope). Click one to narrow to it; none means no scope given.",
             lines: false,
-            rows: label_rows(&scopes, |l| f.link(BASE, Dim::Scope, l)),
+            rows: label_rows(scopes, |l| f.link(BASE, Dim::Scope, l)),
         });
     }
-    let dirs = gitterrace_index::dir_churn(recs)
+    let dirs = ins
+        .dir_churn(period)
         .into_iter()
         .map(|d| {
             let h = if d.path == "." {
@@ -330,7 +288,8 @@ fn build(a: &crate::app::App, all: &[CommitRecord], c: Chrome, q: &TypesQuery) -
         lines: true,
         rows: churn_rows(dirs),
     });
-    let files = gitterrace_index::file_churn(recs)
+    let files = ins
+        .file_churn(period)
         .into_iter()
         .map(|x| {
             (
@@ -353,12 +312,13 @@ fn build(a: &crate::app::App, all: &[CommitRecord], c: Chrome, q: &TypesQuery) -
         rows: churn_rows(files),
     });
     if f.author().is_none() {
-        let people = authors
+        let people = people
             .iter()
             .map(|p| {
+                let email = p.emails.first().map_or(p.name.as_str(), String::as_str);
                 (
                     p.name.clone(),
-                    f.link(BASE, Dim::Author, &p.email),
+                    f.link(BASE, Dim::Author, email),
                     p.commits,
                     p.additions,
                     p.deletions,
@@ -373,14 +333,15 @@ fn build(a: &crate::app::App, all: &[CommitRecord], c: Chrome, q: &TypesQuery) -
         });
     }
 
-    let mut list: Vec<&CommitRecord> = recs.iter().collect();
+    let mut list = recs;
     list.sort_by_key(|r| std::cmp::Reverse(r.time));
-    let pg = q.page.unwrap_or(0);
+    let pg: usize = tq.page.as_deref().and_then(|p| p.parse().ok()).unwrap_or(0);
     let now = fmt::now();
-    let shown: Vec<&&CommitRecord> = list
+    let shown: Vec<&CommitRecord> = list
         .iter()
         .skip(pg.saturating_mul(PAGE))
         .take(PAGE)
+        .copied()
         .collect();
     // Only this page's subjects: scanning the whole history for 20 lines cost seconds on a
     // large repository.
@@ -411,12 +372,13 @@ fn build(a: &crate::app::App, all: &[CommitRecord], c: Chrome, q: &TypesQuery) -
         c,
         tabs: views::stats_tabs("t"),
         fb: f.bar(BASE, all),
+        opts: q.row(&d, BASE),
         kpis,
         kinds,
         matrix: mx,
         over_title,
         over_hint,
-        over_time: over_time(recs, by_scope, &axis),
+        over_time: charts::stacked(&over),
         groups,
         commits_total: n,
         commits,

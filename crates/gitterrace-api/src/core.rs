@@ -6,7 +6,7 @@ use std::sync::{Arc, Mutex};
 
 use gitterrace_actions::{Lines, LinkStyle, styled};
 use gitterrace_git::Repo;
-use gitterrace_index::{CommitRecord, Index};
+use gitterrace_index::{CommitRecord, Index, Insights, Options};
 use serde_json::{Value, json};
 
 use crate::error::ApiError;
@@ -39,6 +39,9 @@ pub struct ApiState {
     cache: Arc<Mutex<Option<RecordsCache>>>,
     /// Form of the `link` field (`links.style`); `permalink` is always `/go`.
     style: LinkStyle,
+    /// Counting options when a request names none: the `insights` configuration, the same
+    /// defaults the web pages start from.
+    defaults: Options,
 }
 
 type RecordsCache = ((String, u64), Arc<Vec<CommitRecord>>);
@@ -50,7 +53,15 @@ impl ApiState {
             index,
             cache: Arc::default(),
             style: LinkStyle::default(),
+            defaults: Options::default(),
         }
+    }
+
+    /// Counting options from the configuration, used when a request leaves one unset.
+    #[must_use]
+    pub fn with_defaults(mut self, defaults: Options) -> Self {
+        self.defaults = defaults;
+        self
     }
 
     /// The `link` field in `style` from now on.
@@ -148,9 +159,11 @@ impl ApiState {
 
     pub fn repo_info(&self) -> Result<Value, ApiError> {
         let head = self.repo.resolve(DEFAULT_REV).ok();
+        let records = self.records(DEFAULT_REV)?;
         let totals = self
-            .records(DEFAULT_REV)
-            .map(|r| gitterrace_index::totals(&r))?;
+            .insights(DEFAULT_REV, &records, self.defaults.clone())
+            .period_summary(gitterrace_index::Period::All)
+            .current;
         Ok(json!({
             "name": self.repo.name(),
             "head": head,
@@ -302,7 +315,18 @@ impl ApiState {
         Ok(v)
     }
 
-    /// One named aggregate over the cached records reachable from `rev`.
+    /// Statistics over `records` under `opts`, with the ignore rules of `rev` when asked: what
+    /// the web pages build for the same options.
+    fn insights<'a>(&self, rev: &str, records: &'a [CommitRecord], opts: Options) -> Insights<'a> {
+        let ignore = opts
+            .respect_ignore
+            .then(|| gitterrace_git::IgnoreSet::at(&self.repo, rev).ok())
+            .flatten();
+        Insights::new(records, opts, ignore)
+    }
+
+    /// One named statistic over the cached records reachable from `rev`, after the selection
+    /// and under the options of `params`.
     pub fn insight(
         &self,
         name: &str,
@@ -310,28 +334,45 @@ impl ApiState {
         params: &insights::Params,
     ) -> Result<Value, ApiError> {
         let rev = Self::rev(rev)?;
-        let records = self.records(rev)?;
-        let mut data = insights::compute(name, &records, params)?;
-        if matches!(name, "hotspots" | "file_churn") {
-            let tip = self.repo.resolve(rev)?;
-            if let Some(rows) = data.as_array_mut() {
-                for row in rows {
-                    if let Some(p) = row["path"].as_str().map(str::to_owned) {
-                        self.put_links(row, &tip, Some(&p), None);
-                    }
-                }
+        let tip = self.repo.resolve(rev)?;
+        let all = self.records(rev)?;
+        let records = params.select.apply(&all);
+        let opts = params.options.apply(self.defaults.clone());
+        let ins = self.insights(&tip, &records, opts);
+        let mut data = insights::compute(name, &ins, params, || {
+            let mut cache = gitterrace_index::LineCache::load(self.index.dir());
+            gitterrace_index::head_files(&self.repo, &tip, &mut cache).unwrap_or_default()
+        })?;
+        let rows = match name {
+            "file_churn" => data.as_array_mut(),
+            "hotspots" => data["files"].as_array_mut(),
+            _ => None,
+        };
+        for row in rows.into_iter().flatten() {
+            if let Some(p) = row["path"].as_str().map(str::to_owned) {
+                self.put_links(row, &tip, Some(&p), None);
             }
         }
-        Ok(json!({ "rev": rev, "insight": name, "commits_indexed": records.len(), "data": data }))
+        Ok(json!({ "rev": rev, "insight": name, "commits_indexed": all.len(), "data": data }))
     }
 
-    /// Authors plus a commit-share bus factor: the fewest authors who made half the commits.
+    /// People with their commits, plus a commit-share bus factor: the fewest people who made
+    /// half the commits. Bots are left out unless the configuration counts them.
     pub fn contributors(&self, rev: Option<&str>) -> Result<Value, ApiError> {
         let rev = Self::rev(rev)?;
-        let mut authors = gitterrace_index::authors(&self.records(rev)?);
-        authors.sort_by_key(|a| std::cmp::Reverse(a.commits));
-        let bus_factor = gitterrace_index::bus_factor(authors.iter().map(|a| a.commits as f64));
-        Ok(json!({ "rev": rev, "bus_factor": bus_factor, "authors": authors }))
+        let records = self.records(rev)?;
+        let opts = self.defaults.clone();
+        let bots = opts.include_bots;
+        let report = self
+            .insights(rev, &records, opts)
+            .contributors(gitterrace_index::Period::All);
+        let people: Vec<_> = report
+            .contributors
+            .into_iter()
+            .filter(|c| bots || !c.bot)
+            .collect();
+        let bus_factor = gitterrace_index::bus_factor(people.iter().map(|c| c.commits as f64));
+        Ok(json!({ "rev": rev, "bus_factor": bus_factor, "authors": people }))
     }
 }
 

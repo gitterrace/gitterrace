@@ -1,15 +1,16 @@
 {% extends "base.html" %}
-{% block title %}Stats · {{ c.name }}{% endblock %}
+{% block title %}Activity · {{ c.name }}{% endblock %}
 {% block content %}
 {% include "tabs.html" %}
 {% include "filterbar.html" %}
-<h2>{{ activity_title }}</h2>
-<div class="card pad">{{ activity|safe }}</div>
-<h2 data-tip="Commits by weekday and hour of day. Darker cells have more commits.">When commits happen</h2>
-<div class="card pad">{{ heatmap|safe }}</div>
-<h2>Authors</h2>
+{% include "options.html" %}
+<p class="hint">{{ span }}.</p>
 <div class="card"><table class="entries">
-<tr class="th"><td>Author</td><td class="r">Commits</td><td class="r">Lines</td><td class="r">Active days</td><td class="r">Last</td></tr>
-{% for a in authors %}<tr><td class="fill"><div class="bar" style="--w:{{ a.pct }}%"></div><a class="who" href="{{ a.href }}">{{ a.label }}</a></td><td class="r">{{ a.commits }}</td><td class="r"><b class="add">+{{ a.additions }}</b> <b class="del">-{{ a.deletions }}</b></td><td class="r">{{ a.detail }}</td><td class="r muted">{{ a.last }}</td></tr>{% endfor %}
+<tr class="th"><td></td><td class="r">This period</td>{% if compared %}<td class="r">Before</td><td class="r">Change</td>{% endif %}</tr>
+{% for r in rows %}<tr><td>{{ r.label }}</td><td class="r"><b>{{ r.now }}</b></td>{% if compared %}<td class="r muted">{{ r.before }}</td><td class="r delta {{ r.tone }}">{{ r.delta }}</td>{% endif %}</tr>{% endfor %}
 </table></div>
+<div class="chart-head"><div><h2>Commits per {{ unit }}</h2><p class="hint">One column per {{ unit }}, empty ones included.</p></div></div>
+<div class="card pad">{{ series|safe }}</div>
+<h2 data-tip="Commits by weekday and hour of day, in each commit's own time zone. Darker cells have more commits.">When commits happen</h2>
+<div class="card pad">{{ heatmap|safe }}</div>
 {% endblock %}

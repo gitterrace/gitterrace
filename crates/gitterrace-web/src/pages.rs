@@ -1,4 +1,4 @@
-//! The remaining insights pages: pulse, hotspots, ownership, patterns, compare and file history.
+//! The remaining insights pages: activity, hotspots, ownership, patterns, compare and file history.
 
 use askama::Template;
 use axum::extract::{Path, Query, RawQuery, State};
@@ -16,7 +16,7 @@ use crate::{
         InsightsQuery, Kpi, OptLink, cached, cached_keyed, head_lines, insights, period_of, scoped,
     },
     routes::Shared,
-    views::{self, Chrome, Nav},
+    views::{self, Chrome, Tabs},
 };
 
 const TOP_HOT: usize = 50;
@@ -47,7 +47,7 @@ fn delta(now: u64, before: Option<u64>) -> (String, &'static str) {
     (format!("{pct:+.0}%"), if pct >= 0.0 { "up" } else { "dn" })
 }
 
-// ---- pulse -----------------------------------------------------------------------------
+// ---- activity ---------------------------------------------------------------------------
 
 struct PulseRow {
     label: &'static str,
@@ -58,29 +58,33 @@ struct PulseRow {
 }
 
 #[derive(Template)]
-#[template(path = "pulse.html")]
-struct PulsePage {
+#[template(path = "stats.html")]
+struct ActivityPage {
     c: Chrome,
-    tabs: Vec<Nav>,
+    tabs: Tabs,
     fb: FilterBar,
     opts: Vec<OptLink>,
     rows: Vec<PulseRow>,
     span: String,
+    compared: bool,
     unit: &'static str,
-    weekly: String,
+    series: String,
+    heatmap: String,
 }
 
-pub(crate) async fn pulse(
+/// The landing insights page: the period against the one before it, commits per bucket and
+/// when commits happen.
+pub(crate) async fn activity(
     State(app): Shared,
     RawQuery(raw): RawQuery,
     Query(q): Query<InsightsQuery>,
 ) -> Result<Html<String>> {
-    cached(&app, "pu", raw, move |a, r, c| {
+    cached(&app, "a", raw, move |a, r, c| {
         let f = &q.filter;
         let recs = scoped(f, r);
         let d = a.defaults();
         let ins = insights(a, &recs, q.options(&d));
-        let period = period_of(&q, &d, Period::Month);
+        let period = period_of(&q, &d, Period::All);
         let s = ins.period_summary(period);
         let prev = s.previous.as_ref();
         let row = |label, now: u64, before: Option<u64>| {
@@ -127,24 +131,25 @@ pub(crate) async fn pulse(
                 fmt::day(s.to - 1),
                 period.days().unwrap_or(0)
             ),
-            None => format!("all history up to {}", fmt::day(s.to - 1)),
+            None => format!("All history up to {}", fmt::day(s.to - 1)),
         };
         let rhythm = ins.rhythm(period);
-        let unit = rhythm.unit.noun();
-        let weekly: Vec<_> = rhythm
+        let series: Vec<_> = rhythm
             .series
-            .into_iter()
-            .map(|p| (p.label, u64::from(p.commits)))
+            .iter()
+            .map(|p| (p.label.clone(), u64::from(p.commits)))
             .collect();
-        PulsePage {
+        ActivityPage {
             c,
-            tabs: views::stats_tabs("pu"),
-            fb: f.bar("/stats/pulse", r),
-            opts: q.row(&d, "/stats/pulse"),
+            tabs: views::stats_tabs("a"),
+            fb: f.bar("/stats", r),
+            opts: q.row(&d, "/stats"),
             rows,
             span,
-            unit,
-            weekly: charts::bars(&weekly),
+            compared: prev.is_some(),
+            unit: rhythm.unit.noun(),
+            series: charts::bars(&series),
+            heatmap: charts::heatmap(&rhythm.punch_card, rhythm.punch_max),
         }
     })
     .await
@@ -168,7 +173,7 @@ struct HotRow {
 #[template(path = "hotspots.html")]
 struct HotspotsPage {
     c: Chrome,
-    tabs: Vec<Nav>,
+    tabs: Tabs,
     fb: FilterBar,
     opts: Vec<OptLink>,
     kpis: Vec<Kpi>,
@@ -267,7 +272,7 @@ struct DirRow {
 #[template(path = "ownership.html")]
 struct OwnershipPage {
     c: Chrome,
-    tabs: Vec<Nav>,
+    tabs: Tabs,
     fb: FilterBar,
     opts: Vec<OptLink>,
     kpis: Vec<Kpi>,
@@ -285,7 +290,11 @@ pub(crate) async fn ownership(
         let d = a.defaults();
         let ins = insights(a, &recs, q.options(&d));
         let files = head_lines(a);
-        let rep = ins.ownership(&files, period_of(&q, &d, Period::All), 2);
+        let rep = ins.ownership(
+            &files,
+            period_of(&q, &d, Period::All),
+            gitterrace_api::OWNERSHIP_DEPTH,
+        );
         let row = |d: &gitterrace_index::DirOwnership, name: String| DirRow {
             href: f.link("/stats/ownership", Dim::Path, &d.path),
             path: name,
@@ -349,7 +358,7 @@ struct ReleaseRow {
 #[template(path = "patterns.html")]
 struct PatternsPage {
     c: Chrome,
-    tabs: Vec<Nav>,
+    tabs: Tabs,
     fb: FilterBar,
     opts: Vec<OptLink>,
     pairs: Vec<PairRow>,
@@ -467,7 +476,7 @@ struct Result2 {
 #[template(path = "compare.html")]
 struct ComparePage {
     c: Chrome,
-    tabs: Vec<Nav>,
+    tabs: Tabs,
     base: String,
     head: String,
     tags: Vec<(String, String)>,

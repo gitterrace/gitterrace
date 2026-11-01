@@ -303,7 +303,7 @@ impl<'a> Insights<'a> {
                 .map(|o| o.1)
                 .sum::<f64>()
                 .max(f64::MIN_POSITIVE);
-            let bus = crate::aggregates::bus_factor(owners.iter().map(|o| o.1));
+            let bus = super::bus_factor(owners.iter().map(|o| o.1));
             DirOwnership {
                 path,
                 lines: a.lines,

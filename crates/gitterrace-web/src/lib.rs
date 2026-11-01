@@ -91,7 +91,8 @@ fn repo_router(
     let style = gitterrace_actions::LinkStyle::from_config(&env.cfg().links.style);
     let api = gitterrace_api::ApiState::open(repo_path)
         .map_err(io::Error::other)?
-        .with_link_style(style);
+        .with_link_style(style)
+        .with_defaults(app.defaults().into_options());
     let pages = routes::router(Arc::clone(&app)).nest("/api/v1", gitterrace_api::router(api));
     tokio::spawn(prewarm(Arc::clone(&app), pages.clone()));
     Ok(pages)
@@ -100,15 +101,13 @@ fn repo_router(
 /// Unfiltered pages rendered in the background whenever HEAD moves. Each costs 40-90 ms to
 /// build on a 14k-commit repo, then a few ms from the memo, so no visitor pays the build.
 /// `export` seeds its crawl from the same list, so a static copy has every insights page.
-pub const WARM_PAGES: [&str; 11] = [
+pub const WARM_PAGES: [&str; 9] = [
     "/",
     "/stats",
-    "/stats/files",
     "/stats/types",
     "/stats/languages",
     "/stats/frequency",
     "/stats/contributors",
-    "/stats/pulse",
     "/stats/hotspots",
     "/stats/ownership",
     "/stats/patterns",
@@ -434,8 +433,7 @@ mod tests {
         app.mark_ready();
         for u in [
             "/stats",
-            "/stats/files",
-            "/stats/files?type=fix&period=1y",
+            "/stats?type=fix&period=1y",
             "/stats?author=t%40e.x&path=src",
             "/stats/types",
             "/stats/types?type=fix",
@@ -445,8 +443,8 @@ mod tests {
             "/stats/frequency",
             "/stats/frequency?type=fix&path=src&period=1y",
             "/stats/contributors",
-            "/stats/pulse",
-            "/stats/pulse?period=1w&type=fix&bots=1&ws=1&generated=1&ignore=0&exclude=*.md",
+            "/stats?period=1w&type=fix&bots=1&ws=1&generated=1&ignore=0&exclude=*.md",
+            "/stats/types?bots=1&ws=1&page=1",
             "/stats/hotspots",
             "/stats/hotspots?period=3m&path=src",
             "/stats/ownership",
@@ -657,7 +655,7 @@ mod tests {
             .update(&app.repo, "HEAD", &|_| {})
             .expect("update");
         app.mark_ready();
-        for page in ["/stats", "/stats/frequency", "/stats/types", "/stats/pulse"] {
+        for page in ["/stats", "/stats/frequency", "/stats/types"] {
             let (s, body) = get(&app, &format!("{page}?period=1w")).await;
             assert_eq!(s, 200, "{page}");
             let chart = body.split("<svg class=\"chart\"").nth(1).expect("chart");
@@ -670,7 +668,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn stats_files_memo_follows_head() {
+    async fn hotspots_memo_follows_head() {
         let dir = tempfile::tempdir().expect("tmp");
         let p = dir.path();
         git(p, &["init", "-q", "-b", "main"]);
@@ -687,15 +685,15 @@ mod tests {
             app.mark_ready();
         };
         refresh(&app);
-        let (_, a) = get(&app, "/stats/files").await;
-        let (_, again) = get(&app, "/stats/files").await;
+        let (_, a) = get(&app, "/stats/hotspots").await;
+        let (_, again) = get(&app, "/stats/hotspots").await;
         assert!(a.contains("first.txt") && a == again);
 
         std::fs::write(p.join("second.txt"), "y\n").expect("write");
         git(p, &["add", "."]);
         git(p, &["commit", "-q", "-m", "more"]);
         refresh(&app);
-        let (_, b) = get(&app, "/stats/files").await;
+        let (_, b) = get(&app, "/stats/hotspots").await;
         assert!(b.contains("second.txt"), "memo outlived HEAD");
     }
 
@@ -816,12 +814,14 @@ mod tests {
                     continue;
                 }
                 for l in links(&body) {
-                    if l == "/" {
-                        continue; // the brand links to the repository index on purpose
+                    // The brand links to the repository index, and stylesheets and scripts
+                    // are the server's, shared by every repository: both at the root on purpose.
+                    if l == "/" || l.starts_with("/static/") {
+                        continue;
                     }
                     if !l.starts_with(&prefix) {
                         escapes.push(format!("{u} -> {l}"));
-                    } else if !l.contains("/static/") && !l.contains("/raw/") {
+                    } else if !l.contains("/raw/") {
                         todo.push(l.split('#').next().unwrap_or("").to_owned());
                     }
                 }

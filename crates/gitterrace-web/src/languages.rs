@@ -22,7 +22,7 @@ use crate::{
     error::Result,
     fmt::{self, esc},
     routes::{Shared, with_records},
-    views::{self, Chrome, Nav},
+    views::{self, Chrome, Tabs},
 };
 
 const TOP: usize = 7;
@@ -661,7 +661,7 @@ fn body(ch: &Chain, view: View, subj: &Subjects) -> String {
 #[template(path = "languages.html")]
 struct LanguagesPage {
     c: Chrome,
-    tabs: Vec<Nav>,
+    tabs: Tabs,
     body: String,
 }
 

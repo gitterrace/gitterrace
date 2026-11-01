@@ -1,7 +1,6 @@
 use std::collections::{BTreeSet, HashSet};
 
-use crate::aggregates::weekday;
-use crate::insights::{BucketUnit, Insights, local_day};
+use crate::insights::{BucketUnit, Insights, local_day, weekday};
 
 const DAY: i64 = crate::insights::DAY;
 
@@ -126,12 +125,10 @@ impl Insights<'_> {
             }
             s.commits += 1;
             people.insert(self.person[i]);
-            for f in &r.files {
-                if let Some(l) = self.lines(f) {
-                    files.insert(&*f.path);
-                    s.additions += u64::from(l.add);
-                    s.deletions += u64::from(l.del);
-                }
+            for (f, l) in self.files_of(i) {
+                files.insert(&*f.path);
+                s.additions += u64::from(l.add);
+                s.deletions += u64::from(l.del);
             }
         }
         s.authors = people.len();

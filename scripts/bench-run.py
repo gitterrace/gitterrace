@@ -14,8 +14,8 @@ from pathlib import Path
 from urllib.parse import quote
 
 ROOT = Path(__file__).resolve().parent.parent
-STATS = ["", "/files", "/types", "/languages", "/frequency", "/pulse", "/hotspots",
-         "/ownership", "/patterns", "/contributors"]
+STATS = ["", "/types", "/languages", "/frequency", "/hotspots", "/ownership", "/patterns",
+         "/contributors"]
 TEXT_BAD = {".png", ".jpg", ".jpeg", ".gif", ".ico", ".woff", ".woff2", ".pdf", ".zip", ".gz",
             ".bin", ".svg", ".lock", ".so", ".a", ".o", ".wasm", ".pack", ".idx", ".mp4"}
 
