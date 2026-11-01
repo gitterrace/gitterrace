@@ -7,6 +7,7 @@ mod gitdir;
 mod ident;
 mod ignore;
 mod repo;
+mod repo_id;
 mod types;
 mod walk;
 mod worktree;
@@ -20,6 +21,7 @@ pub const MAX_TEXT_BYTES: u64 = 2 * 1024 * 1024;
 pub use gitdir::{BranchStatus, HeadState, InProgress, LinkedWorktree, Stash, TagAnnotation};
 pub use ignore::IgnoreSet;
 pub use repo::Repo;
+pub use repo_id::resolve_permalink;
 pub use types::{
     BlameLine, Blob, ChangeKind, CodeCounts, CommitDetail, CommitSummary, FileDiff, Hunk, HunkLine,
     LineKind, RefInfo, RefKind, Signature, TreeEntry, TreeEntryKind,

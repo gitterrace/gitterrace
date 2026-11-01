@@ -1,7 +1,7 @@
 use std::cmp::Reverse;
 use std::collections::{HashMap, VecDeque};
-use std::path::Path;
-use std::sync::{Arc, Mutex};
+use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex, OnceLock};
 
 use gix::bstr::ByteSlice;
 use gix::revision::walk::Sorting;
@@ -23,6 +23,8 @@ pub struct Repo {
     blame_cache: Mutex<BlameCache>,
     /// Ahead and behind per (branch tip, base): immutable for a pair of commits.
     pub(crate) divergence: Mutex<HashMap<(gix::ObjectId, gix::ObjectId), (usize, usize)>>,
+    /// The root-commit id, see `repo_id.rs`.
+    pub(crate) id_cache: OnceLock<Option<String>>,
 }
 
 /// Blame results kept per (commit id, path), bounded by approximate bytes.
@@ -81,6 +83,7 @@ impl Repo {
             inner,
             blame_cache: Mutex::new(BlameCache::default()),
             divergence: Mutex::new(HashMap::new()),
+            id_cache: OnceLock::new(),
         })
     }
 
@@ -89,19 +92,24 @@ impl Repo {
         self.inner.git_dir()
     }
 
-    /// Display name: the worktree folder name.
-    pub fn name(&self) -> String {
+    /// The worktree folder, canonical; for a bare repository its git dir (or the folder
+    /// holding a `.git` dir).
+    pub fn root(&self) -> PathBuf {
         let root = self
             .inner
             .work_dir()
             .unwrap_or_else(|| self.inner.git_dir());
         let root = root.canonicalize().unwrap_or_else(|_| root.to_path_buf());
-        let dir = if root.file_name().is_some_and(|n| n == ".git") {
+        if root.file_name().is_some_and(|n| n == ".git") {
             root.parent().map(Path::to_path_buf).unwrap_or(root)
         } else {
             root
-        };
-        dir.file_name().map_or_else(
+        }
+    }
+
+    /// Display name: the worktree folder name.
+    pub fn name(&self) -> String {
+        self.root().file_name().map_or_else(
             || "repository".to_string(),
             |n| n.to_string_lossy().into_owned(),
         )
