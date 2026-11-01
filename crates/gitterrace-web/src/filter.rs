@@ -33,7 +33,7 @@ pub(crate) enum Dim {
 const DIMS: [Dim; 5] = [Dim::Kind, Dim::Scope, Dim::Author, Dim::Path, Dim::Period];
 
 impl Dim {
-    fn key(self) -> &'static str {
+    const fn key(self) -> &'static str {
         match self {
             Self::Kind => "type",
             Self::Scope => "scope",

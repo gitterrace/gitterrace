@@ -179,7 +179,9 @@ fn valid_name(name: &str) -> bool {
             .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'-' | b'_' | b'.'))
 }
 
-/// Expands the CLI paths: a repository stays as is, a plain folder is searched `depth` levels
+/// Expands the CLI paths.
+///
+/// A repository stays as is, a plain folder is searched `depth` levels
 /// down for repositories (skipping hidden folders and those in `skip`), and a folder with none
 /// is taken as a path inside one.
 pub fn discover_repos(paths: &[PathBuf], depth: usize, skip: &[String]) -> Vec<PathBuf> {
@@ -264,10 +266,10 @@ async fn dispatch(State(table): State<Arc<Table>>, req: Request) -> Response {
             return StatusCode::INTERNAL_SERVER_ERROR.into_response();
         }
     };
-    let pq = match req.uri().query() {
-        Some(q) => format!("/{rest}?{q}"),
-        None => format!("/{rest}"),
-    };
+    let pq = req
+        .uri()
+        .query()
+        .map_or_else(|| format!("/{rest}"), |q| format!("/{rest}?{q}"));
     let (parts, body) = req.into_parts();
     let Ok(uri) = pq.parse::<Uri>() else {
         return StatusCode::BAD_REQUEST.into_response();
@@ -313,7 +315,6 @@ fn spark(weeks: &[u32], max: u32) -> String {
     let max = max.max(1);
     let mut pts = String::new();
     for (i, n) in weeks.iter().enumerate() {
-        #[allow(clippy::cast_precision_loss)]
         let x = i as f64 * 90.0 / (SPARK_WEEKS - 1) as f64;
         let y = 19.0 - f64::from(*n) * 18.0 / f64::from(max);
         let _ = write!(pts, "{x:.1},{y:.1} ");

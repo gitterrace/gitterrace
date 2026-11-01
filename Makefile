@@ -7,7 +7,7 @@ build:
 
 ## run: Serve the current repository
 run:
-	cargo run -p gitterrace --bin gitterrace -- .
+	cargo run -p gitterrace --bin git-terrace -- .
 
 ## fmt: Check formatting
 fmt:

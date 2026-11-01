@@ -177,7 +177,7 @@ impl Watcher {
 
     /// System calls made by the last [`Watcher::fingerprint`].
     #[cfg(test)]
-    pub fn last_cost(&self) -> Cost {
+    pub const fn last_cost(&self) -> Cost {
         self.cost
     }
 
@@ -226,7 +226,14 @@ impl Watcher {
     }
 
     // `self` carries the test-only cost counters; without them it is unused.
-    #[cfg_attr(not(test), allow(clippy::unused_self))]
+    #[cfg_attr(
+        not(test),
+        expect(
+            clippy::unused_self,
+            clippy::needless_pass_by_ref_mut,
+            reason = "the test-only cost counters need &mut self"
+        )
+    )]
     fn stamp(&mut self, path: &Path) -> Stamp {
         #[cfg(test)]
         {
@@ -270,7 +277,14 @@ impl Watcher {
 
     /// Subdirectories of `dir`, sorted, and for a racy directory a hash of its entries' stamps.
     // `self` carries the test-only cost counters; without them it is unused.
-    #[cfg_attr(not(test), allow(clippy::unused_self))]
+    #[cfg_attr(
+        not(test),
+        expect(
+            clippy::unused_self,
+            clippy::needless_pass_by_ref_mut,
+            reason = "the test-only cost counters need &mut self"
+        )
+    )]
     fn list(&mut self, dir: &Path, with_entries: bool) -> (Vec<PathBuf>, u64) {
         #[cfg(test)]
         {
@@ -350,7 +364,6 @@ fn is_racy(stamp: Stamp, now: SystemTime, window: Duration) -> bool {
 }
 
 #[cfg(test)]
-#[allow(clippy::expect_used)]
 mod tests {
     use gitterrace_testkit::git;
     use std::fs;
@@ -530,6 +543,7 @@ mod tests {
     #[test]
     #[ignore = "measurement, run by hand in release"]
     fn watcher_cost() {
+        #[expect(clippy::print_stdout, reason = "a bench reports its measurement")]
         fn measure(label: &str, repo: &Repo) {
             let mut w = repo.watcher();
             w.racy = std::time::Duration::ZERO;

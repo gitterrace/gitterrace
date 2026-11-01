@@ -10,6 +10,10 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 
 /// Makes `dir` a real directory, replacing a symlink or other non-directory entry.
+#[expect(
+    clippy::print_stderr,
+    reason = "the index crate has no logging facade: a cache warning goes to the user's stderr"
+)]
 pub(crate) fn cache_dir(dir: &Path) -> io::Result<()> {
     match fs::symlink_metadata(dir) {
         Ok(m) if m.is_dir() => return Ok(()),
@@ -42,6 +46,10 @@ pub(crate) fn cache_dir(dir: &Path) -> io::Result<()> {
 /// Path of `name` in the cache `dir`, after checking that neither is a link and that the
 /// file, when present, is a regular file. A link or special file is removed so the caller
 /// sees it as missing.
+#[expect(
+    clippy::print_stderr,
+    reason = "the index crate has no logging facade: a cache warning goes to the user's stderr"
+)]
 pub(crate) fn cache_file(dir: &Path, name: &str) -> io::Result<PathBuf> {
     if !fs::symlink_metadata(dir)?.is_dir() {
         return Err(refused(dir));

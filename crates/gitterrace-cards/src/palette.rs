@@ -34,13 +34,13 @@ impl Theme {
         static LIGHT: OnceLock<Palette> = OnceLock::new();
         static DARK: OnceLock<Palette> = OnceLock::new();
         match self {
-            Theme::Light => LIGHT.get_or_init(|| build(&KANDEL.light)),
-            Theme::Dark => DARK.get_or_init(|| build(&KANDEL.dark)),
+            Self::Light => LIGHT.get_or_init(|| build(&KANDEL.light)),
+            Self::Dark => DARK.get_or_init(|| build(&KANDEL.dark)),
         }
     }
 }
 
-fn build(c: &Colours) -> Palette {
+const fn build(c: &Colours) -> Palette {
     Palette {
         bg: c.surfaces_bg.hex,
         bg2: c.surfaces_soft.hex,

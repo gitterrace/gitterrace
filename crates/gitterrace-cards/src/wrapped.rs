@@ -49,10 +49,10 @@ impl Layout {
 }
 
 impl Layout {
-    pub fn size(self) -> (u32, u32) {
+    pub const fn size(self) -> (u32, u32) {
         match self {
-            Layout::Landscape => (1200, 630),
-            Layout::Portrait => (1080, 1350),
+            Self::Landscape => (1200, 630),
+            Self::Portrait => (1080, 1350),
         }
     }
 }
@@ -92,7 +92,7 @@ pub fn wrapped_svg(w: &WrappedStats, layout: Layout, theme: Theme) -> String {
             r##"<circle cx="{gx}" cy="{gy}" r="{}" fill="none" stroke="{}" stroke-opacity="{}" stroke-width="1.5"/>"##,
             120 + i * 70,
             p.accent,
-            n(0.16 - f64::from(i) * 0.028),
+            n(f64::from(i).mul_add(-0.028, 0.16)),
         );
     }
     match layout {
@@ -191,7 +191,7 @@ fn authors(s: &mut String, w: &WrappedStats, p: &Palette, x: f64, y: f64, width:
     text(s, x, y, 15, 700, p.faint, "m", "TOP AUTHORS");
     let max = w.top_authors.first().map_or(1, |a| a.1.max(1)) as f64;
     for (i, (name, c)) in w.top_authors.iter().enumerate() {
-        let ry = y + 36.0 + row * i as f64;
+        let ry = row.mul_add(i as f64, y + 36.0);
         text(s, x, ry, 22, 600, p.fg, "s", &clip(name, 24));
         let _ = write!(
             s,
@@ -210,7 +210,7 @@ fn authors(s: &mut String, w: &WrappedStats, p: &Palette, x: f64, y: f64, width:
             n(ry + 10.0),
             n(bw),
             p.accent,
-            n(1.0 - i as f64 * 0.25),
+            n((i as f64).mul_add(-0.25, 1.0)),
             x = n(x),
             width = n(width),
         );
@@ -267,7 +267,15 @@ fn grid(
     for (i, (l, v)) in f.iter().enumerate() {
         let col = (i % cols) as f64;
         let row = (i / cols) as f64;
-        tile(s, x + col * dx, y + row * dy, l, &clip(v, clip_at), p, big);
+        tile(
+            s,
+            col.mul_add(dx, x),
+            row.mul_add(dy, y),
+            l,
+            &clip(v, clip_at),
+            p,
+            big,
+        );
     }
 }
 

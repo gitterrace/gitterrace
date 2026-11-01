@@ -18,7 +18,7 @@ pub enum ApiError {
 }
 
 impl ApiError {
-    pub fn status(&self) -> StatusCode {
+    pub const fn status(&self) -> StatusCode {
         match self {
             Self::BadRequest(_) => StatusCode::BAD_REQUEST,
             Self::Git(
@@ -28,7 +28,7 @@ impl ApiError {
         }
     }
 
-    fn code(&self) -> &'static str {
+    const fn code(&self) -> &'static str {
         match self {
             Self::BadRequest(_) => "bad_request",
             Self::Git(gitterrace_git::Error::RevNotFound(_)) => "rev_not_found",

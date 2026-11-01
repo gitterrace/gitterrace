@@ -1,4 +1,6 @@
-//! `actions.toml`: the user's declared actions. Trust comes from where the file lives: the
+//! `actions.toml`: the user's declared actions.
+//!
+//! Trust comes from where the file lives: the
 //! user's config folder (or `--config <dir>`), never the served repository, its `.git`, the
 //! cwd or an env var a repo could set. Running a click must never be a property of the
 //! content being browsed.
@@ -109,7 +111,9 @@ pub enum Output {
     Ignore,
 }
 
-/// One validated action. `argv` is a template: element 0 is a resolved, literal program and
+/// One validated action.
+///
+/// `argv` is a template: element 0 is a resolved, literal program and
 /// every other element is expanded on its own, so a value is always exactly one argument and
 /// never reaches a shell.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -194,7 +198,7 @@ struct RawAction {
     vars: BTreeMap<String, String>,
 }
 
-fn yes() -> bool {
+const fn yes() -> bool {
     true
 }
 
@@ -303,8 +307,9 @@ impl Config {
     }
 }
 
-/// `actions.toml` in gitterrace's config folder (`--config <dir>`, else the XDG folder). The
-/// folder rule lives in `gitterrace-config`, so no environment variable a repo could set
+/// `actions.toml` in gitterrace's config folder (`--config <dir>`, else the XDG folder).
+///
+/// The folder rule lives in `gitterrace-config`, so no environment variable a repo could set
 /// moves it. `None` when there is no home to resolve against.
 pub fn default_path(config_flag: Option<&Path>) -> Option<PathBuf> {
     gitterrace_config::config_dir(config_flag).map(|d| d.join("actions.toml"))
@@ -389,7 +394,10 @@ fn check_file(path: &Path, repos: &[PathBuf]) -> Result<(), ConfigError> {
 /// Windows has no mode bits and this does not read ACLs: the file lives under the user's
 /// profile (`%APPDATA%`), which is private by default, so the owner check is skipped.
 #[cfg(windows)]
-#[allow(clippy::unnecessary_wraps)]
+#[expect(
+    clippy::unnecessary_wraps,
+    reason = "the signature must match the unix variant"
+)]
 fn owned_private(_: &Path, _: &std::fs::Metadata, _: u32) -> Result<(), ConfigError> {
     Ok(())
 }
@@ -572,9 +580,11 @@ fn check_command(
     shell: bool,
     vars: Option<&BTreeMap<String, String>>,
 ) -> Result<(), String> {
-    let known = |name: &str| match name.strip_prefix("var.") {
-        Some(v) => vars.is_none_or(|vars| vars.contains_key(v)),
-        None => FIELDS.contains(&name),
+    let known = |name: &str| {
+        name.strip_prefix("var.").map_or_else(
+            || FIELDS.contains(&name),
+            |v| vars.is_none_or(|vars| vars.contains_key(v)),
+        )
     };
     let elements = match command {
         RawCommand::Shell(s) => {
@@ -612,15 +622,15 @@ fn check_command(
                     ));
                 }
                 if !known(name) {
-                    return Err(match name.strip_prefix("var.") {
-                        Some(v) => {
-                            format!("command[{i}]: {{{name}}}: no var {v:?} in [action.vars]")
-                        }
-                        None => format!(
-                            "command[{i}]: unknown placeholder {{{name}}}; known: {}, var.NAME",
-                            FIELDS.join(", ")
-                        ),
-                    });
+                    return Err(name.strip_prefix("var.").map_or_else(
+                        || {
+                            format!(
+                                "command[{i}]: unknown placeholder {{{name}}}; known: {}, var.NAME",
+                                FIELDS.join(", ")
+                            )
+                        },
+                        |v| format!("command[{i}]: {{{name}}}: no var {v:?} in [action.vars]"),
+                    ));
                 }
                 if i == 0 {
                     return Err(format!(
@@ -823,6 +833,10 @@ fn stamp(path: &Path) -> Option<(SystemTime, u64)> {
 // The fixtures use /bin/sh, chmod modes and symlinks, so they run on unix only.
 #[cfg(test)]
 #[cfg(unix)]
+#[expect(
+    clippy::literal_string_with_formatting_args,
+    reason = "the tests spell action placeholders like {title}, which are not format strings"
+)]
 mod tests {
     use std::os::unix::fs::PermissionsExt;
     use std::path::{Path, PathBuf};
@@ -1252,6 +1266,10 @@ cwd = "home"
             } else {
                 format!("version = 1\n{block}")
             };
+            #[expect(
+                clippy::needless_collect,
+                reason = "the loop rewrites `text`, which the line iterator would still borrow"
+            )]
             for prog in text
                 .lines()
                 .filter_map(|l| l.trim().strip_prefix("command"))

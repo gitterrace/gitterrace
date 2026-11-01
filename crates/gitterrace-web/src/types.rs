@@ -1,7 +1,11 @@
 //! Commit types page: a pivot over type, scope, directory and author. Every row is a link that
 //! adds a filter, and every number respects all active filters.
 
-#![allow(clippy::many_single_char_names, clippy::too_many_lines)]
+#![expect(
+    clippy::many_single_char_names,
+    clippy::too_many_lines,
+    reason = "geometry and colour math reads best with x, y, w, h; one linear sequence, splitting it hides the flow"
+)]
 
 use std::collections::HashMap;
 use std::sync::Arc;

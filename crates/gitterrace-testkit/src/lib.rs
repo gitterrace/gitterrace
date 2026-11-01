@@ -2,7 +2,7 @@
 //!
 //! Dev-dependency only: nothing here ships. `tests/conventions.rs` refuses a second copy of
 //! the git helper or of the default address anywhere else in the workspace.
-#![allow(clippy::expect_used)]
+#![expect(clippy::expect_used, reason = "setup failures should panic")]
 
 mod fixture;
 mod web;

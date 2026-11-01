@@ -1,4 +1,6 @@
-//! Send to: `[[send]]` targets are URL templates the browser opens. No process, no POST and
+//! Send to: `[[send]]` targets are URL templates the browser opens.
+//!
+//! No process, no POST and
 //! no token, so gitterrace stays read-only. The server never builds the final URL: it hands
 //! the page the template as parts, and the page fills each placeholder with [`fill`]'s rule
 //! (`static/send.js` mirrors it, `testdata/send-vectors.json` holds both to it).
@@ -104,7 +106,7 @@ pub fn fill(parts: &[Part], values: &BTreeMap<String, String>) -> String {
         .collect()
 }
 
-fn yes() -> bool {
+const fn yes() -> bool {
     true
 }
 
@@ -208,10 +210,10 @@ fn check_prefix(key: &str, prefix: &str, has_placeholder: bool) -> Result<(), St
     if lower == "http" {
         let authority = &after[..host_end.unwrap_or(after.len())];
         let host = authority.rsplit('@').next().unwrap_or_default();
-        let host = match host.strip_prefix('[') {
-            Some(v6) => v6.split(']').next().unwrap_or_default(),
-            None => host.split(':').next().unwrap_or_default(),
-        };
+        let host = host.strip_prefix('[').map_or_else(
+            || host.split(':').next().unwrap_or_default(),
+            |v6| v6.split(']').next().unwrap_or_default(),
+        );
         let loopback = host.eq_ignore_ascii_case("localhost")
             || host
                 .parse::<std::net::IpAddr>()

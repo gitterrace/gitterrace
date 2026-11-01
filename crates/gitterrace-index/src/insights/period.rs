@@ -15,7 +15,7 @@ pub enum Period {
 }
 
 impl Period {
-    pub fn days(self) -> Option<i64> {
+    pub const fn days(self) -> Option<i64> {
         match self {
             Self::Week => Some(7),
             Self::Month => Some(30),
@@ -38,7 +38,7 @@ impl Period {
     }
 
     /// `[from, to)` in epoch seconds with `now` the newest commit. `All` starts at `i64::MIN`.
-    pub fn window(self, now: i64) -> (i64, i64) {
+    pub const fn window(self, now: i64) -> (i64, i64) {
         match self.days() {
             Some(d) => (now + 1 - d * DAY, now + 1),
             None => (i64::MIN, now + 1),

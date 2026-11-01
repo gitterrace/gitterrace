@@ -33,10 +33,9 @@ impl Fixture {
 
     /// Runs git in the repository and returns trimmed stdout.
     pub fn git(&self, args: &[&str]) -> String {
-        match &self.date {
-            Some(d) => git_at(&self.dir, d, args),
-            None => git(&self.dir, args),
-        }
+        self.date
+            .as_ref()
+            .map_or_else(|| git(&self.dir, args), |d| git_at(&self.dir, d, args))
     }
 
     /// Writes `body` to `path`, creating parent directories.

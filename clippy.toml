@@ -1,3 +1,10 @@
 # Tests may panic on setup failures; production code may not (see AGENTS.md).
 allow-expect-in-tests = true
 allow-unwrap-in-tests = true
+allow-dbg-in-tests = true
+
+# A span guard held across an await leaves the span entered on a thread the executor moved on from.
+# Use `.instrument(span)` on the future instead.
+await-holding-invalid-types = [
+    { path = "tracing::span::Entered", reason = "held across an await, this panics the tracing runtime: use `.instrument(span)` on the future instead" },
+]

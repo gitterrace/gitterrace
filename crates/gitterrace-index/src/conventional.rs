@@ -28,7 +28,10 @@ mod tests {
         parse_subject(s)
     }
 
-    #[allow(clippy::unnecessary_wraps)]
+    #[expect(
+        clippy::unnecessary_wraps,
+        reason = "the signature must match the unix variant"
+    )]
     fn some(s: &str) -> Option<String> {
         Some(s.to_owned())
     }

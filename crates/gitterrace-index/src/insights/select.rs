@@ -79,17 +79,19 @@ impl Selection {
         let out = records
             .iter()
             .filter(|r| self.matches(r))
-            .filter_map(|r| match path {
-                None => Some(r.clone()),
-                Some(p) => {
-                    let files: Vec<_> = r
-                        .files
-                        .iter()
-                        .filter(|f| under(&f.path, p))
-                        .cloned()
-                        .collect();
-                    (!files.is_empty()).then(|| CommitRecord { files, ..r.clone() })
-                }
+            .filter_map(|r| {
+                path.map_or_else(
+                    || Some(r.clone()),
+                    |p| {
+                        let files: Vec<_> = r
+                            .files
+                            .iter()
+                            .filter(|f| under(&f.path, p))
+                            .cloned()
+                            .collect();
+                        (!files.is_empty()).then(|| CommitRecord { files, ..r.clone() })
+                    },
+                )
             })
             .collect();
         Cow::Owned(out)

@@ -73,7 +73,12 @@ pub(crate) fn area(values: &[u32], x: f64, y: f64, w: f64, h: f64) -> (String, S
     let pts: Vec<(f64, f64)> = values
         .iter()
         .enumerate()
-        .map(|(i, v)| (x + step * i as f64, y + h - f64::from(*v) / max * h))
+        .map(|(i, v)| {
+            (
+                x + step * i as f64,
+                (f64::from(*v) / max).mul_add(-h, y + h),
+            )
+        })
         .collect();
     let mut line = format!("M{} {}", n(pts[0].0), n(pts[0].1));
     for p in &pts[1..] {

@@ -76,7 +76,7 @@ pub(crate) fn resolve(
         };
         let mut l = Link {
             sha: full.clone(),
-            ..link.clone()
+            ..link
         };
         let mut note = None;
         if !r.has(&full, l.path.as_deref()) {
@@ -105,6 +105,11 @@ pub(crate) fn resolve(
     })
 }
 
+#[expect(
+    clippy::print_stderr,
+    clippy::print_stdout,
+    reason = "user-facing CLI output: this is the command's result or diagnostic, not a log line"
+)]
 /// Runs the subcommand: resolve, find or start a server, then open or print the URL.
 pub(crate) fn run(
     input: &str,
@@ -138,6 +143,10 @@ pub(crate) fn run(
     browse(&url)
 }
 
+#[expect(
+    clippy::print_stderr,
+    reason = "user-facing CLI output: this is the command's result or diagnostic, not a log line"
+)]
 /// The address of a server serving `clone`: the configured one when it already does, else a
 /// new detached server, on the configured address when free and on a free port when another
 /// server holds it.
@@ -265,7 +274,6 @@ fn browse(url: &str) -> anyhow::Result<()> {
 }
 
 #[cfg(test)]
-#[allow(clippy::expect_used)]
 mod tests {
     use gitterrace_testkit::git;
     use std::path::Path;
@@ -306,9 +314,7 @@ mod tests {
 
         let go = format!("http://127.0.0.1:9/go/{id}/{head}/src/a.rs#L2-L3");
         assert_eq!(
-            resolve(&go, &[(id.clone(), a.clone())], &[], 2, &[])
-                .expect("go")
-                .path,
+            resolve(&go, &[(id, a)], &[], 2, &[]).expect("go").path,
             want
         );
     }

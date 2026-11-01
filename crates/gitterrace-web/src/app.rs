@@ -63,7 +63,7 @@ fn job_slots(cfg: &Config) -> usize {
 }
 
 /// Text cap and blame cache size in bytes for a repository handle.
-pub(crate) fn repo_limits(cfg: &Config) -> (u64, usize) {
+pub(crate) const fn repo_limits(cfg: &Config) -> (u64, usize) {
     (
         cfg.limits.text_kb << 10,
         cfg.resources.cache_mb * (1 << 20) / 2,
@@ -798,7 +798,6 @@ where
 }
 
 #[cfg(test)]
-#[allow(clippy::expect_used)]
 mod tests {
     use gitterrace_testkit::git;
 

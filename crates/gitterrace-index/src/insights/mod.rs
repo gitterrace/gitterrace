@@ -50,7 +50,10 @@ pub use stats::{DirChurn, FileChurn, Label, LabelBucket, LabelCount};
 pub(crate) const DAY: i64 = 86_400;
 
 /// Which paths and commits count.
-#[allow(clippy::struct_excessive_bools)] // independent switches, one per option
+#[expect(
+    clippy::struct_excessive_bools,
+    reason = "independent switches, one per option"
+)]
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Options {
     /// Extra globs (`fnmatch` style, matched against the full path and the file name).
@@ -244,6 +247,10 @@ impl SkipTable {
         let threads = std::thread::available_parallelism().map_or(1, std::num::NonZero::get);
         let chunk = paths.len().div_ceil(threads).max(1);
         let decided: Vec<bool> = std::thread::scope(|s| {
+            #[expect(
+                clippy::needless_collect,
+                reason = "all threads must be spawned before the first join, or they would run one after another"
+            )]
             let parts: Vec<_> = paths
                 .chunks(chunk)
                 .map(|c| s.spawn(move || c.iter().map(|p| filter.decide(p)).collect::<Vec<_>>()))
@@ -283,8 +290,9 @@ pub(crate) fn format_date(days: i64) -> String {
     format!("{y:04}-{m:02}-{d:02}")
 }
 
-/// Bus factor: the fewest contributors whose shares, largest first, hold at
-/// least half of the total. Shares in any order; zero when there are none.
+/// Bus factor: the fewest contributors whose shares, largest first, hold at least half.
+///
+/// Shares in any order; zero when there are none.
 /// The one definition every surface (insights, API, MCP, cards) uses.
 pub fn bus_factor(shares: impl IntoIterator<Item = f64>) -> usize {
     let mut v: Vec<f64> = shares.into_iter().filter(|s| *s > 0.0).collect();

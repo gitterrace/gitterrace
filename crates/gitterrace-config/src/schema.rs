@@ -21,7 +21,7 @@ macro_rules! settings {
         $(#[doc = $doc:literal])* $name:ident : $ty:ty = $default:expr ,
     )* } )*) => {
         $(
-            #[derive(Debug, Clone, PartialEq)]
+            #[derive(Debug, Clone, PartialEq, Eq)]
             pub struct $sec { $( $(#[doc = $doc])* pub $name: $ty, )* }
             impl Default for $sec {
                 fn default() -> Self { Self { $( $name: $default, )* } }
@@ -29,7 +29,7 @@ macro_rules! settings {
         )*
 
         /// The effective configuration.
-        #[derive(Debug, Clone, Default, PartialEq)]
+        #[derive(Debug, Clone, Default, PartialEq, Eq)]
         pub struct Config {
             $( pub $field: $sec, )*
             /// Per-repository overrides, by repository name.
@@ -89,7 +89,7 @@ macro_rules! settings {
 }
 
 /// Overrides for one repository, matched by its folder name.
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct RepoOverride {
     /// Paths (globs) left out of every insight for this repository, added to `insights.exclude`.
     pub exclude: Vec<String>,

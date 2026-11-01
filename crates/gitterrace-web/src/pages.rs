@@ -42,7 +42,6 @@ fn delta(now: u64, before: Option<u64>) -> (String, &'static str) {
             "up",
         );
     }
-    #[allow(clippy::cast_precision_loss)]
     let pct = (now as f64 - b as f64) / b as f64 * 100.0;
     (format!("{pct:+.0}%"), if pct >= 0.0 { "up" } else { "dn" })
 }
@@ -225,7 +224,6 @@ pub(crate) async fn hotspots(
                 authors: fmt::thousands(h.authors),
                 last: fmt::day(h.last_change),
                 score: fmt::thousands(h.score.round() as u64),
-                #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
                 pct: if max > 0.0 {
                     (h.score / max * 100.0).max(1.0) as u32
                 } else {

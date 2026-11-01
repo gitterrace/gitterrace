@@ -517,7 +517,7 @@ mod tests {
             .map(|f| (f.changes, f.authors));
         assert_eq!(x, Some((4, 2)));
         assert_eq!(rep.files[0].path, "new/x.rs");
-        assert!((rep.files[0].score - 4.0 * 14f64.sqrt()).abs() < 1e-9);
+        assert!(4.0f64.mul_add(-14f64.sqrt(), rep.files[0].score).abs() < 1e-9);
         assert_eq!(rep.total_changes, 7);
         assert_eq!(rep.single_author_files, 1);
         let h = ins.file_history("new/x.rs");

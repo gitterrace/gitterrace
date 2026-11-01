@@ -72,10 +72,8 @@ fn unique_slug(seen: &mut HashMap<String, usize>, base: String) -> String {
 }
 
 fn has_scheme(url: &str) -> bool {
-    match url.find([':', '/', '?', '#']) {
-        Some(i) => url.as_bytes()[i] == b':',
-        None => false,
-    }
+    url.find([':', '/', '?', '#'])
+        .is_some_and(|i| url.as_bytes()[i] == b':')
 }
 
 /// Resolves `target` against `dir`, collapsing `.` and `..`. Escaping the root clamps to it.
@@ -144,7 +142,7 @@ fn alert_open(kind: BlockQuoteKind) -> String {
     )
 }
 
-fn heading_level(level: pulldown_cmark::HeadingLevel) -> u8 {
+const fn heading_level(level: pulldown_cmark::HeadingLevel) -> u8 {
     level as u8
 }
 

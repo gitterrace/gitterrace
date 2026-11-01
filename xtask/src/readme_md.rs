@@ -12,7 +12,7 @@ use crate::out::Out;
 use crate::scripts::Script;
 
 #[path = "../../crates/gitterrace/src/cli.rs"]
-#[allow(
+#[expect(
     dead_code,
     reason = "xtask only reads the definition, never the parsed values"
 )]
@@ -100,7 +100,7 @@ pub fn install_md(ws: &Workspace) -> String {
         let names: Vec<String> = p.bins.iter().map(|b| format!("`{b}`")).collect();
         let _ = writeln!(
             install,
-            "Installs {} for one program; git runs `git-terrace` as `git terrace`.",
+            "Installs {}; git runs it as `git terrace`.",
             names.join(" and ")
         );
     }
@@ -218,12 +218,17 @@ fn crate_table(ws: &Workspace) -> String {
     names.sort_by_key(|n| order.iter().position(|o| o == n).unwrap_or(order.len()));
     for n in names {
         let p = &ws.packages[n];
-        let extra = if p.bins.is_empty() {
-            String::new()
-        } else {
-            format!(" Binaries `{}`.", p.bins.join("` and `"))
+        let extra = match p.bins.as_slice() {
+            [] => String::new(),
+            [one] => format!(" Binary `{one}`."),
+            many => format!(" Binaries `{}`.", many.join("` and `")),
         };
-        let _ = writeln!(s, "| `{}` | {}{extra} |", p.name, p.description);
+        let sep = if extra.is_empty() || p.description.ends_with('.') {
+            ""
+        } else {
+            "."
+        };
+        let _ = writeln!(s, "| `{}` | {}{sep}{extra} |", p.name, p.description);
     }
     s
 }

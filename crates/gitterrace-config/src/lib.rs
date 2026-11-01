@@ -23,7 +23,7 @@ pub enum Source {
 }
 
 impl Source {
-    pub fn label(self) -> &'static str {
+    pub const fn label(self) -> &'static str {
         match self {
             Self::Default => "default",
             Self::File => "file",
@@ -44,8 +44,10 @@ impl std::fmt::Display for ConfigError {
 
 impl std::error::Error for ConfigError {}
 
-/// On Windows `%APPDATA%\gitterrace`. Else `$XDG_CONFIG_HOME/gitterrace` when that is absolute, else `$HOME/.config/gitterrace` (also on
-/// macOS). `override_dir` is the `--config` flag. No other environment variable moves it.
+/// Where the config directory is.
+///
+/// On Windows `%APPDATA%\gitterrace`. Else `$XDG_CONFIG_HOME/gitterrace` when that is absolute,
+/// else `$HOME/.config/gitterrace` (also on macOS). `override_dir` is the `--config` flag. No other environment variable moves it.
 pub fn config_dir(override_dir: Option<&Path>) -> Option<PathBuf> {
     if let Some(d) = override_dir {
         return Some(d.to_path_buf());
@@ -190,7 +192,6 @@ pub fn parse(text: &str) -> Result<Loaded, ConfigError> {
 }
 
 #[cfg(test)]
-#[allow(clippy::expect_used)]
 mod tests {
     use super::{Source, load, parse, template};
 

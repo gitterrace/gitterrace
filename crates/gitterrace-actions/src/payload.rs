@@ -270,7 +270,7 @@ impl Payload {
     }
 }
 
-fn kind_name(k: Kind) -> &'static str {
+const fn kind_name(k: Kind) -> &'static str {
     match k {
         Kind::Line => "line",
         Kind::File => "file",
@@ -322,7 +322,9 @@ fn lossy_line(s: &str, max: usize) -> String {
     cap(&flat, max).0
 }
 
-/// `/go/<id>/<sha>[/<path>][#L<a>[-L<b>]]`. A repo without an id (no root commit) cannot
+/// `/go/<id>/<sha>[/<path>][#L<a>[-L<b>]]`.
+///
+/// A repo without an id (no root commit) cannot
 /// have a sha, so the name branch exists only for completeness. Shared with the API, which
 /// passes an empty `origin` to get the path form.
 pub fn permalink(

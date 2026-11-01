@@ -82,8 +82,8 @@ pub fn resolve_permalink<'a, R: AsRef<Repo>>(
     })
 }
 
-impl AsRef<Repo> for Repo {
-    fn as_ref(&self) -> &Repo {
+impl AsRef<Self> for Repo {
+    fn as_ref(&self) -> &Self {
         self
     }
 }

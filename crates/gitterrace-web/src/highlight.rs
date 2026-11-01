@@ -214,10 +214,9 @@ pub(crate) fn block(code: &str, token: &str) -> Option<String> {
     let mut h = Highlighter::new(syntax_for_token(token)?);
     let mut out = String::with_capacity(code.len() * 2);
     for line in code.split_inclusive('\n') {
-        let (body, nl) = match line.strip_suffix('\n') {
-            Some(b) => (b.strip_suffix('\r').unwrap_or(b), "\n"),
-            None => (line, ""),
-        };
+        let (body, nl) = line
+            .strip_suffix('\n')
+            .map_or((line, ""), |b| (b.strip_suffix('\r').unwrap_or(b), "\n"));
         out.push_str(&h.line(body));
         out.push_str(nl);
     }

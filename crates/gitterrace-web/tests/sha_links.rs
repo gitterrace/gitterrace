@@ -1,6 +1,5 @@
 //! Every commit id on a page is the shared `a.sha` link. Renders the main pages of a fixture
 //! repository and checks that no 7-to-40 hex token in visible text sits outside one.
-#![allow(clippy::expect_used)]
 
 use gitterrace_testkit::{get, git};
 use std::time::Duration;

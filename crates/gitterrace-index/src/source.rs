@@ -61,7 +61,7 @@ fn build(summary: gitterrace_git::CommitSummary, files: Vec<FileStat>) -> Commit
 
 impl CommitSource for Repo {
     fn rev_list(&self, rev: &str) -> io::Result<Vec<String>> {
-        Repo::rev_list(self, rev).map_err(io::Error::other)
+        Self::rev_list(self, rev).map_err(io::Error::other)
     }
 
     fn record(&self, id: &str) -> io::Result<CommitRecord> {
@@ -72,7 +72,7 @@ impl CommitSource for Repo {
 
     fn records(&self, ids: &[String]) -> io::Result<Vec<CommitRecord>> {
         let diffs = self.numstat_many(ids).map_err(io::Error::other)?;
-        let summaries = Repo::summaries(self, ids).map_err(io::Error::other)?;
+        let summaries = Self::summaries(self, ids).map_err(io::Error::other)?;
         Ok(summaries
             .into_iter()
             .zip(diffs)

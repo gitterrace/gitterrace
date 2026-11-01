@@ -34,7 +34,7 @@ pub enum BucketUnit {
 
 impl BucketUnit {
     /// For hints and titles: "per day", "per week".
-    pub fn noun(self) -> &'static str {
+    pub const fn noun(self) -> &'static str {
         match self {
             Self::Day => "day",
             Self::Week => "week",
@@ -94,7 +94,7 @@ pub struct TimeAxis {
 }
 
 impl TimeAxis {
-    fn empty() -> Self {
+    const fn empty() -> Self {
         Self {
             unit: BucketUnit::Day,
             starts: Vec::new(),
@@ -156,15 +156,15 @@ impl TimeAxis {
         }
     }
 
-    pub fn unit(&self) -> BucketUnit {
+    pub const fn unit(&self) -> BucketUnit {
         self.unit
     }
 
-    pub fn len(&self) -> usize {
+    pub const fn len(&self) -> usize {
         self.starts.len()
     }
 
-    pub fn is_empty(&self) -> bool {
+    pub const fn is_empty(&self) -> bool {
         self.starts.is_empty()
     }
 

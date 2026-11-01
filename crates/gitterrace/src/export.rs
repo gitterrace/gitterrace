@@ -224,6 +224,10 @@ async fn sites(router: &Router, repos: &[PathBuf]) -> anyhow::Result<Vec<String>
     Ok(prefixes)
 }
 
+#[expect(
+    clippy::print_stderr,
+    reason = "user-facing CLI output: this is the command's result or diagnostic, not a log line"
+)]
 /// Polls the progress endpoint so insights pages are exported built, not "indexing".
 async fn wait_for_index(router: &Router, prefix: &str) -> anyhow::Result<()> {
     eprintln!(
@@ -476,6 +480,10 @@ fn target(out: &Path, path: &str, content_type: &str) -> Option<PathBuf> {
     Some(p)
 }
 
+#[expect(
+    clippy::print_stderr,
+    reason = "user-facing CLI output: this is the command's result or diagnostic, not a log line"
+)]
 /// Writes one page; `false` when its path is refused by `target` and the page is skipped.
 fn write_page(out: &Path, path: &str, content_type: &str, body: &[u8]) -> anyhow::Result<bool> {
     let Some(file) = target(out, path, content_type) else {

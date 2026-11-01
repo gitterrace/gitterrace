@@ -1,4 +1,5 @@
 //! `gitterrace://<repo-id>/<sha>[/<path>][#Lx-Ly]`: a permalink that names what, not where.
+//!
 //! It carries the same tuple as `/go/<id>/<sha>/<path>`, so the two convert both ways. A link
 //! arrives from outside (a chat, a terminal, the OS handler) and drives a local lookup, so the
 //! parser is strict: anything it does not expect is refused, never repaired.
@@ -33,7 +34,7 @@ impl LinkStyle {
         }
     }
 
-    pub fn as_str(self) -> &'static str {
+    pub const fn as_str(self) -> &'static str {
         match self {
             Self::Gitterrace => "gitterrace",
             Self::Go => "go",

@@ -1,7 +1,7 @@
 //! The web pages and the JSON API answer from one statistics layer. For the same filter and
 //! options, every number a page prints must equal the API's: a second implementation on either
 //! side drifts, and this test catches it whichever side moves.
-#![allow(clippy::expect_used)]
+#![expect(clippy::expect_used, reason = "setup failures should panic")]
 
 use std::time::Duration;
 

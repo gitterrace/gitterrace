@@ -1,4 +1,6 @@
-//! Spawns a configured action. The payload reaches the script as data only (stdin JSON and
+//! Spawns a configured action.
+//!
+//! The payload reaches the script as data only (stdin JSON and
 //! `GITTERRACE_*` env), the environment is scrubbed, the whole process group is killed on
 //! timeout, and concurrency and rate limits bound what a runaway client can start.
 
@@ -449,6 +451,10 @@ fn first_line(bytes: &[u8]) -> Option<String> {
 // The fixtures use /bin/sh, chmod modes and symlinks, so they run on unix only.
 #[cfg(test)]
 #[cfg(unix)]
+#[expect(
+    clippy::literal_string_with_formatting_args,
+    reason = "the tests spell action placeholders like {title}, which are not format strings"
+)]
 mod tests {
     use std::path::Path;
     use std::time::{Duration, Instant};

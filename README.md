@@ -29,7 +29,7 @@ brew install gitterrace/tap/gitterrace
 cargo install --git https://github.com/gitterrace/gitterrace gitterrace
 ```
 
-Installs `git-terrace` and `gitterrace` for one program; git runs `git-terrace` as `git terrace`.
+Installs `git-terrace`; git runs it as `git terrace`.
 
 <!-- END GENERATED: install -->
 Windows: builds natively (`x86_64-pc-windows-msvc`), but the runtime is only tested on WSL so far. Use WSL until a native run is confirmed. Config lives in `%APPDATA%\gitterrace`, the repo registry in `%LOCALAPPDATA%\gitterrace`, and `install-handler` prints the `reg add` commands instead of writing the registry.

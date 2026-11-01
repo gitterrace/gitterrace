@@ -32,7 +32,7 @@ pub fn load(root: &Path) -> Result<Vec<Script>> {
             .join(" ");
         let summary = first
             .split_once(". ")
-            .map_or(first.clone(), |(a, _)| format!("{a}."));
+            .map_or_else(|| first.clone(), |(a, _)| format!("{a}."));
         let at = comment.iter().position(|l| l.starts_with("Needs"));
         let needs = at.map_or_else(String::new, |i| {
             let mut paragraph: Vec<&str> = comment[i..]

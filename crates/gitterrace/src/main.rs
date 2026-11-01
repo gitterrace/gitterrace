@@ -10,6 +10,11 @@ mod open;
 
 use cli::{Cli, Command};
 
+#[expect(
+    clippy::print_stderr,
+    clippy::print_stdout,
+    reason = "user-facing CLI output: this is the command's result or diagnostic, not a log line"
+)]
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
@@ -101,6 +106,10 @@ async fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
+#[expect(
+    clippy::print_stdout,
+    reason = "user-facing CLI output: this is the command's result or diagnostic, not a log line"
+)]
 /// Writes `config.toml` and `actions.toml` into the config folder, private to the user, never
 /// over an existing file. Prints one line per file.
 fn init(config: Option<&std::path::Path>) -> anyhow::Result<()> {
@@ -184,6 +193,11 @@ impl Flags {
     }
 }
 
+#[expect(
+    clippy::print_stderr,
+    clippy::print_stdout,
+    reason = "user-facing CLI output: this is the command's result or diagnostic, not a log line"
+)]
 fn wrapped(
     path: &std::path::Path,
     year: Option<i32>,
@@ -218,7 +232,6 @@ fn year_of(secs: i64) -> i32 {
 
 #[cfg(test)]
 #[cfg(unix)]
-#[allow(clippy::expect_used)]
 mod tests {
     use std::os::unix::fs::PermissionsExt as _;
 

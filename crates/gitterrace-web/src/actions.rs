@@ -489,7 +489,6 @@ fn run_blocking(
 /// Fixtures shared with the read-only crawl in `lib.rs`.
 #[cfg(test)]
 #[cfg(unix)]
-#[allow(clippy::expect_used)]
 pub(crate) mod actions_tests {
     use std::os::unix::fs::PermissionsExt;
     use std::path::Path;
@@ -547,6 +546,10 @@ command = "cat >/dev/null; sleep 2"
         d
     }
 
+    #[expect(
+        clippy::literal_string_with_formatting_args,
+        reason = "`{rev}` and `{dir}` are our own placeholders, not format arguments"
+    )]
     pub(crate) fn write_config(dir: &Path, template: &str, mode: u32) {
         let p = dir.join("actions.toml");
         let body = template.replace("{dir}", &dir.to_string_lossy());
@@ -557,7 +560,10 @@ command = "cat >/dev/null; sleep 2"
 
 #[cfg(test)]
 #[cfg(unix)]
-#[allow(clippy::expect_used, clippy::too_many_lines)]
+#[expect(
+    clippy::too_many_lines,
+    reason = "one linear sequence, splitting it hides the flow"
+)]
 mod tests {
     use gitterrace_testkit::git;
     use std::path::{Path, PathBuf};

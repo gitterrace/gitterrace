@@ -132,7 +132,7 @@ impl Index {
 
     /// Sets the threads that parse stored records; 0 means one per core, at most 8.
     #[must_use]
-    pub fn with_threads(mut self, threads: usize) -> Self {
+    pub const fn with_threads(mut self, threads: usize) -> Self {
         self.threads = threads;
         self
     }

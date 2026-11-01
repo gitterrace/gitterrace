@@ -27,8 +27,9 @@ pub fn short_id(id: &str) -> &str {
     id.get(..SHORT_ID_LEN).unwrap_or(id)
 }
 
-/// Largest blob read as text anywhere: blob views, blame, line counts and diffs. Checked
-/// against the object header before reading, so a huge blob never reaches memory; larger
+/// Largest blob read as text anywhere: blob views, blame, line counts and diffs.
+///
+/// Checked against the object header before reading, so a huge blob never reaches memory; larger
 /// blobs are treated like binary ones.
 pub const MAX_TEXT_BYTES: u64 = 2 * 1024 * 1024;
 pub use gitdir::{BranchStatus, HeadState, InProgress, LinkedWorktree, Stash, TagAnnotation};

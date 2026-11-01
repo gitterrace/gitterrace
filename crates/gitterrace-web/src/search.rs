@@ -54,7 +54,10 @@ struct FileHits {
 }
 
 // The flags mirror the form's checkboxes; the template reads them directly.
-#[allow(clippy::struct_excessive_bools)]
+#[expect(
+    clippy::struct_excessive_bools,
+    reason = "independent switches, one per option"
+)]
 #[derive(Template)]
 #[template(path = "search.html")]
 struct SearchPage {
@@ -412,7 +415,6 @@ fn search_commits(
 }
 
 #[cfg(test)]
-#[allow(clippy::expect_used)]
 mod tests {
     use crate::search::{build_regex, file_hits, glob_regex, highlight};
 

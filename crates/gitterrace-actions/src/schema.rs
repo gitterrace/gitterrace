@@ -1,4 +1,6 @@
-//! The documented shape of the actions contract: payload fields, `actions.toml` keys,
+//! The documented shape of the actions contract.
+//!
+//! Payload fields, `actions.toml` keys,
 //! environment variables and kinds. `cargo xtask generate` renders `docs/actions.md` and the
 //! README from these tables, and the tests below fail when a table and the code disagree, so a
 //! change to a field, key or kind cannot ship without its documentation.

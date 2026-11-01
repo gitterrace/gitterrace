@@ -11,7 +11,7 @@ const SEED: u64 = 0x51_7c_c1_b7_27_22_0a_95;
 pub(crate) struct FastHasher(u64);
 
 impl FastHasher {
-    fn add(&mut self, word: u64) {
+    const fn add(&mut self, word: u64) {
         self.0 = (self.0.rotate_left(5) ^ word).wrapping_mul(SEED);
     }
 }

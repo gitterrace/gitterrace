@@ -159,6 +159,10 @@ pub(crate) fn chrome(app: &crate::app::App, active: &str) -> Chrome {
     chrome_at(app, active, &crate::fmt::selected())
 }
 
+#[expect(
+    clippy::literal_string_with_formatting_args,
+    reason = "`{rev}` and `{dir}` are our own placeholders, not format arguments"
+)]
 pub(crate) fn chrome_at(app: &crate::app::App, active: &str, rev: &str) -> Chrome {
     let items = [
         ("/", "Code", "files"),
@@ -422,7 +426,7 @@ pub(crate) fn file_label(f: &FileDiff) -> String {
     }
 }
 
-fn kind_name(k: ChangeKind) -> &'static str {
+const fn kind_name(k: ChangeKind) -> &'static str {
     match k {
         ChangeKind::Added => "added",
         ChangeKind::Modified => "modified",

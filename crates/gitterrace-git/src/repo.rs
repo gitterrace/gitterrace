@@ -130,7 +130,7 @@ impl Repo {
 
     /// Sets the threads [`Repo::numstat_many`] spreads a batch over; 0 means one per core.
     #[must_use]
-    pub fn with_workers(mut self, workers: usize) -> Self {
+    pub const fn with_workers(mut self, workers: usize) -> Self {
         self.workers = workers;
         self
     }
@@ -591,10 +591,7 @@ impl Repo {
     /// A full 40-digit commit id parsed directly. Going through `rev_parse` costs a rescan of
     /// the object database per commit, which dominated the index build on large repositories.
     pub(crate) fn full_id(repo: &gix::Repository, id: &str) -> Result<gix::ObjectId> {
-        match gix::ObjectId::from_hex(id.as_bytes()) {
-            Ok(oid) => Ok(oid),
-            Err(_) => Self::resolve_id(repo, id),
-        }
+        gix::ObjectId::from_hex(id.as_bytes()).or_else(|_| Self::resolve_id(repo, id))
     }
 
     pub(crate) fn resolve_id(repo: &gix::Repository, rev: &str) -> Result<gix::ObjectId> {
@@ -711,7 +708,10 @@ mod tests {
     }
 
     /// Parses `git log --numstat -z -M` into id to path to `(add, del, old_path)`.
-    #[allow(clippy::type_complexity)]
+    #[expect(
+        clippy::type_complexity,
+        reason = "test reference shape, a named type adds nothing"
+    )]
     fn reference(
         dir: &std::path::Path,
     ) -> BTreeMap<String, BTreeMap<String, (u32, u32, Option<String>)>> {

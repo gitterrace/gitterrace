@@ -41,7 +41,9 @@ pub fn state_dir() -> Option<PathBuf> {
     gitterrace_config::home_var().map(|h| PathBuf::from(h).join(".local/state/gitterrace"))
 }
 
-/// Every recorded entry, unchecked: a path may now hold another project, and reading an id
+/// Every recorded entry, unchecked.
+///
+/// A path may now hold another project, and reading an id
 /// walks the whole history (seconds on a large clone). A caller narrows by the recorded id,
 /// then reads the candidate's own id before trusting it.
 pub fn candidates(dir: &Path) -> io::Result<Vec<Entry>> {
@@ -160,7 +162,6 @@ fn refused(path: &Path) -> io::Error {
 }
 
 #[cfg(test)]
-#[allow(clippy::expect_used)]
 mod tests {
     use gitterrace_git::Repo;
     use std::path::Path;

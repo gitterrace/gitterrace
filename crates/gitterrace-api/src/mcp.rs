@@ -50,7 +50,7 @@ fn schema_type(schema: &Value) -> String {
 }
 
 impl McpServer {
-    pub fn new(state: ApiState) -> Self {
+    pub const fn new(state: ApiState) -> Self {
         Self { state }
     }
 
@@ -330,9 +330,14 @@ impl McpServer {
 }
 
 /// Serves MCP on stdin/stdout for the repository containing `repo_path` until the client leaves.
+///
 /// The insights cache is brought up to date first; when that fails the server still answers
 /// with whatever the cache holds, since browsing reads never need it. `style` is the form of
 /// each result's `link` field.
+#[expect(
+    clippy::print_stderr,
+    reason = "a stdio MCP server owns stdout for the protocol, so its startup warning goes to stderr"
+)]
 pub async fn serve_mcp(
     repo_path: &Path,
     style: gitterrace_actions::LinkStyle,

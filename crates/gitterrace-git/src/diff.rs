@@ -223,7 +223,7 @@ fn file_diff(
     } else if too_large(repo, old_id, text_limit) || too_large(repo, new_id, text_limit) {
         // Never read, never diffed: Myers on two huge blobs costs minutes.
         Counted::empty(true)
-    } else if let (false, Some(None)) = (with_hunks, rewrite_stats) {
+    } else if (with_hunks, rewrite_stats) == (false, Some(None)) {
         // Rename tracking found identical content: a pure move, nothing changed.
         let lines = line_count(&blob(repo, new_id)?);
         Counted {
@@ -266,7 +266,10 @@ pub(crate) fn is_binary(data: &[u8]) -> bool {
     data[..data.len().min(BINARY_PROBE)].contains(&0)
 }
 
-#[allow(clippy::naive_bytecount)] // one short pass per blob, a new dependency is not worth it
+#[expect(
+    clippy::naive_bytecount,
+    reason = "one short pass per blob, a new dependency is not worth it"
+)]
 pub(crate) fn line_count(data: &[u8]) -> u32 {
     if is_binary(data) {
         return 0;

@@ -27,7 +27,9 @@ run() {
 # Vale needs its proselint package in styles/ (git-ignored), fetched once.
 vale_run() {
   [ -d styles/proselint ] || vale sync >/dev/null || return 1
-  vale --minAlertLevel=error .
+  # Tracked files only: `.` would walk .wt/ worktrees and target/.
+  git ls-files -z -- '*.md' '*.rs' ':!:vendor/**' ':!:theme/schwarzwald/**' |
+    xargs -0 vale --minAlertLevel=error
 }
 
 run typos typos "brew install typos-cli" typos

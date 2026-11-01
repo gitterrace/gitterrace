@@ -1,10 +1,11 @@
 //! Languages page: lines of code per language at every first-parent commit, a brush that
 //! selects a commit range, and the range card the server renders from `?from&to`.
 
-#![allow(
+#![expect(
     clippy::many_single_char_names,
     clippy::too_many_lines,
-    clippy::needless_range_loop
+    clippy::needless_range_loop,
+    reason = "geometry and colour math reads best with x, y, w, h; one linear sequence, splitting it hides the flow; the index is used for several parallel arrays"
 )]
 
 use std::collections::HashMap;
@@ -138,7 +139,7 @@ impl Chain {
         }
     }
 
-    fn len(&self) -> usize {
+    const fn len(&self) -> usize {
         self.ids.len()
     }
 
@@ -307,7 +308,7 @@ fn area_chart(ch: &Chain, view: View, subj: &Subjects) -> String {
         } else {
             i as f64 / (n - 1).max(1) as f64
         };
-        let x = LEFT + frac.clamp(0.0, 1.0) * pw;
+        let x = frac.clamp(0.0, 1.0).mul_add(pw, LEFT);
         xs.push(xs.last().map_or(x, |p: &f64| p.max(x)));
     }
     let totals: Vec<i64> = pts
@@ -315,21 +316,21 @@ fn area_chart(ch: &Chain, view: View, subj: &Subjects) -> String {
         .map(|i| ch.lines[*i].iter().map(|v| (*v).max(0)).sum())
         .collect();
     let max = totals.iter().copied().max().unwrap_or(0).max(1);
-    let (ymax, step) = if view.share {
-        (100.0, 25u64)
+    let (ymax_n, step) = if view.share {
+        (100u64, 25u64)
     } else {
         let step = nice_step(max as u64);
-        let top = step * (max as u64).div_ceil(step).max(1);
-        (top as f64, step)
+        (step * (max as u64).div_ceil(step).max(1), step)
     };
-    let yat = |v: f64| TOP_PAD + ph - v / ymax * ph;
+    let ymax = ymax_n as f64;
+    let yat = |v: f64| (v / ymax).mul_add(-ph, TOP_PAD + ph);
 
     let mut svg = format!(
         r#"<svg class="chart loc" id="loc" viewBox="0 0 {W:.0} {H:.0}" data-left="{LEFT}" data-right="{:.1}" role="img" aria-label="Lines of code by language over history">"#,
         W - RIGHT
     );
     let mut v = 0u64;
-    while (v as f64) <= ymax {
+    while v <= ymax_n {
         let y = yat(v as f64);
         let label = if view.share {
             format!("{v}%")
@@ -606,8 +607,8 @@ fn languages_now(ch: &Chain) -> String {
             .map(|(j, v)| {
                 format!(
                     "{:.1},{:.1}",
-                    j as f64 / m as f64 * 88.0 + 1.0,
-                    19.0 - *v as f64 / maxv as f64 * 18.0
+                    (j as f64 / m as f64).mul_add(88.0, 1.0),
+                    (*v as f64 / maxv as f64).mul_add(-18.0, 19.0)
                 )
             })
             .collect();

@@ -90,7 +90,6 @@ pub(crate) async fn guard(
 }
 
 #[cfg(test)]
-#[allow(clippy::expect_used)]
 mod tests {
     use super::{CSP, host_allowed};
 

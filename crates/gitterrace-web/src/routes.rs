@@ -168,7 +168,7 @@ async fn mermaid_js() -> Response {
 pub(crate) const MAX_PREVIEW_BYTES: u64 = 16 << 20;
 
 /// Whether a blob of `size` bytes is too big for `/raw` under `limits.raw_mb`.
-pub(crate) fn raw_refused(size: u64, raw_mb: u64) -> bool {
+pub(crate) const fn raw_refused(size: u64, raw_mb: u64) -> bool {
     size > raw_mb << 20
 }
 
@@ -740,13 +740,10 @@ async fn blob(
         };
         let too_large = b.size > a.repo.text_limit();
         let text = b.text.as_deref().filter(|_| !too_large);
-        let (html, cut) = match text {
-            Some(t) => {
-                let (h, cut) = views::code_html_first(a.code_cache_bytes(), &path, t);
-                (Some(h), cut)
-            }
-            None => (None, false),
-        };
+        let (html, cut) = text.map_or((None, false), |t| {
+            let (h, cut) = views::code_html_first(a.code_cache_bytes(), &path, t);
+            (Some(h), cut)
+        });
         let rendered = text.filter(|_| is_markdown(&path)).map(|t| {
             let dir = path.rsplit_once('/').map_or("", |(d, _)| d);
             markdown::render_with(t, markdown::Base::new(&rev, dir))

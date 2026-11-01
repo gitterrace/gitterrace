@@ -8,7 +8,9 @@ use serde_json::{Value, to_value};
 
 use crate::error::ApiError;
 
-/// Query parameters any insight may read. Unused ones are ignored. The selection and option
+/// Query parameters any insight may read.
+///
+/// Unused ones are ignored. The selection and option
 /// parameters are the web pages' own (`type`, `scope`, `author`, `path`, `bots`, `generated`,
 /// `ignore`, `ws`, `exclude`), so a page URL's query gives the same numbers here.
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -158,12 +160,14 @@ fn number<'de, D: serde::Deserializer<'de>>(d: D) -> Result<Option<usize>, D::Er
 }
 
 fn period(p: &Params) -> Result<Period, ApiError> {
-    match p.period.as_deref().filter(|s| !s.is_empty()) {
-        None => Ok(Period::All),
-        Some(s) => Period::parse(s).ok_or_else(|| {
-            ApiError::BadRequest(format!("period must be 1w, 1m, 3m, 1y or all, got {s}"))
-        }),
-    }
+    p.period
+        .as_deref()
+        .filter(|s| !s.is_empty())
+        .map_or(Ok(Period::All), |s| {
+            Period::parse(s).ok_or_else(|| {
+                ApiError::BadRequest(format!("period must be 1w, 1m, 3m, 1y or all, got {s}"))
+            })
+        })
 }
 
 fn label(p: &Params) -> Result<Label, ApiError> {

@@ -177,8 +177,9 @@ fn entries(repo: &gix::Repository, id: Option<gix::ObjectId>) -> HashMap<Vec<u8>
     out
 }
 
-/// For each entry of the directory `dir` at `rev`, the newest commit that changed it. One
-/// walk, stopping as soon as every entry is resolved or `budget` runs out (then the entries
+/// For each entry of the directory `dir` at `rev`, the newest commit that changed it.
+///
+/// One walk, stopping as soon as every entry is resolved or `budget` runs out (then the entries
 /// not yet resolved are missing from the result).
 pub fn last_commits(
     repo: &Repo,

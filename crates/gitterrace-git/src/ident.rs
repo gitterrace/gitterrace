@@ -19,10 +19,10 @@ pub(crate) fn parse_mailmap(
     repo: &gix::Repository,
     blob: Option<gix::ObjectId>,
 ) -> gix::mailmap::Snapshot {
-    match blob.and_then(|id| repo.find_object(id).ok()) {
-        Some(b) => gix::mailmap::Snapshot::from_bytes(&b.data),
-        None => gix::mailmap::Snapshot::default(),
-    }
+    blob.and_then(|id| repo.find_object(id).ok())
+        .map_or_else(gix::mailmap::Snapshot::default, |b| {
+            gix::mailmap::Snapshot::from_bytes(&b.data)
+        })
 }
 
 /// Mailmap of a commit.

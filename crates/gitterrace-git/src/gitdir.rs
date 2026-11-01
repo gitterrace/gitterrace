@@ -61,7 +61,7 @@ pub struct BranchStatus {
 
 impl BranchStatus {
     /// Every commit of the branch is already in the base.
-    pub fn merged(&self) -> bool {
+    pub const fn merged(&self) -> bool {
         self.ahead == 0
     }
 }
@@ -403,6 +403,7 @@ mod tests {
     /// gitterrace-git bench_branch_status -- --ignored --nocapture`.
     #[test]
     #[ignore = "needs GITTERRACE_BENCH_REPO"]
+    #[expect(clippy::print_stdout, reason = "a bench reports its measurement")]
     fn bench_branch_status() {
         let Ok(path) = std::env::var("GITTERRACE_BENCH_REPO") else {
             return;

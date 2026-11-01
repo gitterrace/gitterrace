@@ -12,8 +12,11 @@ pub(crate) const VERSION_FILE: &str = "VERSION";
 pub(crate) const COMMITS_FILE: &str = "commits.jsonl";
 pub(crate) const PATHS_FILE: &str = "paths.jsonl";
 
-#[allow(clippy::trivially_copy_pass_by_ref)] // serde skip_serializing_if signature
-fn is_zero(n: &u32) -> bool {
+#[expect(
+    clippy::trivially_copy_pass_by_ref,
+    reason = "serde skip_serializing_if signature"
+)]
+const fn is_zero(n: &u32) -> bool {
     *n == 0
 }
 
@@ -132,14 +135,15 @@ fn newer_version(dir: &Path) -> io::Result<Option<String>> {
 /// Fails when the cache now belongs to a newer build. Called right before every write, so a
 /// long-running older process cannot append rows in its format to a rewritten cache.
 pub(crate) fn check_writable(dir: &Path) -> io::Result<()> {
-    match newer_version(dir)? {
-        Some(found) => Err(io::Error::other(newer_message(&found))),
-        None => Ok(()),
-    }
+    newer_version(dir)?.map_or(Ok(()), |found| Err(io::Error::other(newer_message(&found))))
 }
 
 /// Creates `dir` and resets it when its format version differs from ours. A newer version is
 /// left alone and returned, so the caller can refuse to use it.
+#[expect(
+    clippy::print_stderr,
+    reason = "the index crate has no logging facade: a cache warning goes to the user's stderr"
+)]
 pub(crate) fn ensure_dir(dir: &Path) -> io::Result<Option<String>> {
     cache::cache_dir(dir)?;
     if let Some(found) = newer_version(dir)? {
@@ -169,6 +173,10 @@ fn check_readable(dir: &Path) -> io::Result<()> {
 
 /// Reads all complete lines. A last line without a trailing newline is torn and dropped, as is
 /// any line that does not parse. Returns the records and the byte length of the valid prefix.
+#[expect(
+    clippy::print_stderr,
+    reason = "the index crate has no logging facade: a cache warning goes to the user's stderr"
+)]
 pub(crate) fn read_records(dir: &Path, threads: usize) -> io::Result<(Vec<CommitRecord>, u64)> {
     let Some(bytes) = cache::read(dir, COMMITS_FILE)? else {
         return Ok((Vec::new(), 0));
@@ -242,6 +250,10 @@ fn parse_parallel(data: &[u8], threads: usize, paths: &Paths) -> Vec<CommitRecor
     }
     let chunks = split_lines(data, threads);
     std::thread::scope(|s| {
+        #[expect(
+            clippy::needless_collect,
+            reason = "all threads must be spawned before the first join, or they would run one after another"
+        )]
         let handles: Vec<_> = chunks
             .iter()
             .map(|c| s.spawn(move || parse_lines(c, paths)))

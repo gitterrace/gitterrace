@@ -99,7 +99,9 @@ fn repo_router(
     Ok(pages)
 }
 
-/// Unfiltered pages rendered in the background whenever HEAD moves. Each costs 40-90 ms to
+/// Unfiltered pages rendered in the background whenever HEAD moves.
+///
+/// Each costs 40-90 ms to
 /// build on a 14k-commit repo, then a few ms from the memo, so no visitor pays the build.
 /// `export` seeds its crawl from the same list, so a static copy has every insights page.
 pub const WARM_PAGES: [&str; 9] = [
@@ -241,7 +243,9 @@ fn remember(paths: &[PathBuf]) {
     }
 }
 
-/// Starts serving until ctrl-c. `actions` is the user's `actions.toml`; `None` (no config
+/// Starts serving until ctrl-c.
+///
+/// `actions` is the user's `actions.toml`; `None` (no config
 /// folder, or `--no-actions`) leaves the run route unmounted, as does a non-loopback bind.
 /// `watched` is the `config.toml` to reload while running, see [`Watched`].
 pub async fn serve(
@@ -280,7 +284,6 @@ pub async fn serve(
 }
 
 #[cfg(test)]
-#[allow(clippy::expect_used)]
 mod tests {
     use gitterrace_testkit::{Fixture, git};
     use std::sync::Arc;
@@ -353,7 +356,10 @@ mod tests {
     }
 
     #[tokio::test]
-    #[allow(clippy::too_many_lines)]
+    #[expect(
+        clippy::too_many_lines,
+        reason = "one linear sequence, splitting it hides the flow"
+    )]
     async fn serves_every_page() {
         let dir = tempfile::tempdir().expect("tempdir");
         let p = dir.path();

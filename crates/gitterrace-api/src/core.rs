@@ -66,7 +66,7 @@ impl ApiState {
 
     /// The `link` field in `style` from now on.
     #[must_use]
-    pub fn with_link_style(mut self, style: LinkStyle) -> Self {
+    pub const fn with_link_style(mut self, style: LinkStyle) -> Self {
         self.style = style;
         self
     }
@@ -258,30 +258,27 @@ impl ApiState {
         let rev = Self::rev(rev)?;
         let id = self.repo.resolve(rev)?;
         let blob = self.repo.blob(&id, path)?;
-        let (text, total_lines, truncated) = match &blob.text {
-            Some(t) => {
-                let all: Vec<&str> = t.lines().collect();
-                let start = start_line.unwrap_or(1).max(1) - 1;
-                let limit = limit.unwrap_or(MAX_BLOB_LINES).min(MAX_BLOB_LINES);
-                let end = all.len().min(start.saturating_add(limit));
-                let slice = all.get(start..end).unwrap_or(&[]);
-                let mut text = slice.join("\n");
-                let over = text.len() > MAX_BLOB_BYTES;
-                if over {
-                    let mut cut = MAX_BLOB_BYTES;
-                    while !text.is_char_boundary(cut) {
-                        cut -= 1;
-                    }
-                    text.truncate(cut);
+        let (text, total_lines, truncated) = blob.text.as_ref().map_or((None, None, false), |t| {
+            let all: Vec<&str> = t.lines().collect();
+            let start = start_line.unwrap_or(1).max(1) - 1;
+            let limit = limit.unwrap_or(MAX_BLOB_LINES).min(MAX_BLOB_LINES);
+            let end = all.len().min(start.saturating_add(limit));
+            let slice = all.get(start..end).unwrap_or(&[]);
+            let mut text = slice.join("\n");
+            let over = text.len() > MAX_BLOB_BYTES;
+            if over {
+                let mut cut = MAX_BLOB_BYTES;
+                while !text.is_char_boundary(cut) {
+                    cut -= 1;
                 }
-                (
-                    Some(text),
-                    Some(all.len()),
-                    over || end < all.len() || start > 0,
-                )
+                text.truncate(cut);
             }
-            None => (None, None, false),
-        };
+            (
+                Some(text),
+                Some(all.len()),
+                over || end < all.len() || start > 0,
+            )
+        });
         let shown = match (&text, total_lines) {
             (Some(t), Some(_)) if !t.is_empty() => {
                 let first = start_line.unwrap_or(1).max(1);

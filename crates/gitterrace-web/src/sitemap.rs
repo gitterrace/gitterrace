@@ -1,5 +1,6 @@
-//! The registry of what the server answers, outside `/api/v1` (that has its own in
-//! `gitterrace-api`). The architecture page renders it, and the test below fails when a
+//! The registry of what the server answers, outside `/api/v1`.
+//!
+//! (That has its own in `gitterrace-api`.) The architecture page renders it, and the test below fails when a
 //! `.route(...)` is added or removed without an entry here.
 
 /// One row of the route table.

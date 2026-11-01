@@ -50,7 +50,7 @@ const PATH: Param = p("path", "string", "Repository-relative path.");
 
 /// [`ENDPOINTS`] behind a function call: `index` is itself a route in the registry, and naming the
 /// const inside its own body would be a type cycle.
-pub(crate) fn all() -> &'static [Endpoint] {
+pub(crate) const fn all() -> &'static [Endpoint] {
     ENDPOINTS
 }
 

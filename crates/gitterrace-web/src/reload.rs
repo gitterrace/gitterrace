@@ -89,7 +89,6 @@ pub(crate) async fn run(mut reloader: Reloader, env: Env) {
 }
 
 #[cfg(test)]
-#[allow(clippy::expect_used)]
 mod tests {
     use gitterrace_testkit::git;
     use std::sync::Arc;

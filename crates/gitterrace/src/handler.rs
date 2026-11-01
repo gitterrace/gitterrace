@@ -18,6 +18,10 @@ const BUNDLE_ID: &str = "dev.gitterrace.open";
 const DESKTOP_NAME: &str = "gitterrace-open.desktop";
 const LSREGISTER: &str = "/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister";
 
+#[expect(
+    clippy::print_stdout,
+    reason = "user-facing CLI output: this is the command's result or diagnostic, not a log line"
+)]
 pub(crate) fn run(uninstall: bool) -> anyhow::Result<()> {
     let home = gitterrace_config::home_var()
         .map(PathBuf::from)
@@ -53,7 +57,7 @@ pub(crate) fn applescript(exe: &Path) -> String {
 }
 
 /// JSON for `CFBundleURLTypes`, inserted into the generated `Info.plist`.
-pub(crate) fn url_types_json() -> &'static str {
+pub(crate) const fn url_types_json() -> &'static str {
     r#"[{"CFBundleURLName":"gitterrace link","CFBundleURLSchemes":["gitterrace"]}]"#
 }
 
@@ -76,6 +80,10 @@ fn plist_set(plist: &Path, args: &[&str]) -> anyhow::Result<()> {
     tool(Command::new("plutil").args(args).arg(plist))
 }
 
+#[expect(
+    clippy::print_stdout,
+    reason = "user-facing CLI output: this is the command's result or diagnostic, not a log line"
+)]
 fn macos(home: &Path, exe: &Path, uninstall: bool) -> anyhow::Result<()> {
     let app = app_path(home);
     if uninstall {
@@ -175,6 +183,10 @@ fn desktop_path(home: &Path) -> PathBuf {
     home.join(".local/share/applications").join(DESKTOP_NAME)
 }
 
+#[expect(
+    clippy::print_stdout,
+    reason = "user-facing CLI output: this is the command's result or diagnostic, not a log line"
+)]
 fn linux(home: &Path, exe: &Path, uninstall: bool) -> anyhow::Result<()> {
     let file = desktop_path(home);
     if uninstall {

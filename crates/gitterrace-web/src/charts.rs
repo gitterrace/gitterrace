@@ -17,7 +17,6 @@ const DAYS: [&str; 7] = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 /// Horizontal geometry shared by both bar charts: slot width for `n` columns.
 fn slot(n: usize) -> f64 {
-    #[allow(clippy::cast_precision_loss)]
     let n = n.max(1) as f64;
     (W - LEFT) / n
 }
@@ -27,12 +26,11 @@ fn axis(max: u64) -> (String, f64) {
     let mut svg = String::new();
     let plot = H - TOP_PAD - BOTTOM;
     let step = nice_step(max);
-    #[allow(clippy::cast_precision_loss)]
-    let top = (step * max.div_ceil(step).max(1)) as f64;
+    let top_n = step * max.div_ceil(step).max(1);
+    let top = top_n as f64;
     let mut v = 0;
-    while (v as f64) <= top {
-        #[allow(clippy::cast_precision_loss)]
-        let y = TOP_PAD + plot - v as f64 / top * plot;
+    while v <= top_n {
+        let y = (v as f64 / top).mul_add(-plot, TOP_PAD + plot);
         let _ = write!(
             svg,
             r#"<line class="grid" x1="{LEFT}" x2="{W}" y1="{y:.1}" y2="{y:.1}"/><text class="ax" x="{:.1}" y="{:.1}" text-anchor="end">{}</text>"#,
@@ -66,8 +64,7 @@ fn x_labels(keys: &[&str]) -> String {
     let every = (LABEL_PX / sl).ceil().max(1.0) as usize;
     let mut svg = String::new();
     for (i, k) in keys.iter().enumerate().filter(|(i, _)| i % every == 0) {
-        #[allow(clippy::cast_precision_loss)]
-        let cx = LEFT + i as f64 * sl + sl / 2.0;
+        let cx = (i as f64).mul_add(sl, LEFT) + sl / 2.0;
         let (x, anchor) = if cx > W - LABEL_PX / 2.0 {
             (W, "end")
         } else {
@@ -99,7 +96,6 @@ fn open_svg(label: &str) -> String {
 }
 
 /// Vertical bars, one per `(label, value)`, scaled to the full container width.
-#[allow(clippy::many_single_char_names)]
 pub(crate) fn bars(points: &[(String, u64)]) -> String {
     let max = points.iter().map(|p| p.1).max().unwrap_or(0);
     let (grid, top) = axis(max);
@@ -109,10 +105,8 @@ pub(crate) fn bars(points: &[(String, u64)]) -> String {
     let mut svg = open_svg("Activity");
     svg.push_str(&grid);
     for (i, (label, v)) in points.iter().enumerate() {
-        #[allow(clippy::cast_precision_loss)]
         let h = (*v as f64 / top * plot).max(if *v > 0 { 1.0 } else { 0.0 });
-        #[allow(clippy::cast_precision_loss)]
-        let x = LEFT + i as f64 * sl + (sl - bw) / 2.0;
+        let x = (i as f64).mul_add(sl, LEFT) + (sl - bw) / 2.0;
         let y = TOP_PAD + plot - h;
         let _ = write!(
             svg,
@@ -130,7 +124,6 @@ pub(crate) fn bars(points: &[(String, u64)]) -> String {
 
 /// Stacked columns per bucket by the `SERIES` biggest labels (rest folded into `other`),
 /// with a legend. Series order is overall frequency, biggest at the bottom.
-#[allow(clippy::many_single_char_names)]
 pub(crate) fn stacked(buckets: &[gitterrace_index::LabelBucket]) -> String {
     let mut totals: std::collections::BTreeMap<&str, usize> = std::collections::BTreeMap::new();
     for b in buckets {
@@ -168,8 +161,7 @@ pub(crate) fn stacked(buckets: &[gitterrace_index::LabelBucket]) -> String {
     let mut svg = open_svg("Commit types over time");
     svg.push_str(&grid);
     for (i, col) in cols.iter().enumerate() {
-        #[allow(clippy::cast_precision_loss)]
-        let x = LEFT + i as f64 * sl + (sl - bw) / 2.0;
+        let x = (i as f64).mul_add(sl, LEFT) + (sl - bw) / 2.0;
         let mut y = TOP_PAD + plot;
         let key = esc(&buckets[i].label);
         let total: u64 = col.iter().sum();
@@ -183,7 +175,6 @@ pub(crate) fn stacked(buckets: &[gitterrace_index::LabelBucket]) -> String {
             if *v == 0 {
                 continue;
             }
-            #[allow(clippy::cast_precision_loss)]
             let h = *v as f64 / top * plot;
             y -= h;
             let _ = write!(
@@ -213,18 +204,16 @@ pub(crate) fn stacked(buckets: &[gitterrace_index::LabelBucket]) -> String {
 }
 
 /// Additions above the axis and deletions below it, one column per bucket.
-#[allow(clippy::many_single_char_names)]
 pub(crate) fn diverging(points: &[(String, u64, u64)], title: &str) -> String {
     let max = points.iter().map(|p| p.1.max(p.2)).max().unwrap_or(0);
     let step = nice_step(max);
-    #[allow(clippy::cast_precision_loss)]
-    let top = (step * max.div_ceil(step).max(1)) as f64;
+    let top_n = step * max.div_ceil(step).max(1);
+    let top = top_n as f64;
     let half = (H - TOP_PAD - BOTTOM) / 2.0;
     let mid = TOP_PAD + half;
     let mut svg = open_svg(title);
     let mut v = 0;
-    while (v as f64) <= top {
-        #[allow(clippy::cast_precision_loss)]
+    while v <= top_n {
         let dy = v as f64 / top * half;
         for (sign, y) in [("", mid - dy), ("-", mid + dy)] {
             if v == 0 && sign == "-" {
@@ -243,9 +232,7 @@ pub(crate) fn diverging(points: &[(String, u64, u64)], title: &str) -> String {
     let sl = slot(points.len());
     let bw = (sl * 0.8).clamp(1.0, 48.0);
     for (i, (label, a, d)) in points.iter().enumerate() {
-        #[allow(clippy::cast_precision_loss)]
-        let x = LEFT + i as f64 * sl + (sl - bw) / 2.0;
-        #[allow(clippy::cast_precision_loss)]
+        let x = (i as f64).mul_add(sl, LEFT) + (sl - bw) / 2.0;
         let (ha, hd) = (*a as f64 / top * half, *d as f64 / top * half);
         let _ = write!(
             svg,
@@ -269,7 +256,7 @@ pub(crate) fn percent_line(points: &[(String, Option<f64>)]) -> String {
     let plot = H - TOP_PAD - BOTTOM;
     let mut svg = open_svg("Rework share over time");
     for p in [0, 25, 50, 75, 100] {
-        let y = TOP_PAD + plot - f64::from(p) / 100.0 * plot;
+        let y = (f64::from(p) / 100.0).mul_add(-plot, TOP_PAD + plot);
         let _ = write!(
             svg,
             r#"<line class="grid" x1="{LEFT}" x2="{W}" y1="{y:.1}" y2="{y:.1}"/><text class="ax" x="{:.1}" y="{:.1}" text-anchor="end">{p}%</text>"#,
@@ -282,9 +269,8 @@ pub(crate) fn percent_line(points: &[(String, Option<f64>)]) -> String {
     // dot, shown on hover, so the reading is marked on the line itself.
     for (i, (label, v)) in points.iter().enumerate() {
         if let Some(v) = v {
-            #[allow(clippy::cast_precision_loss)]
-            let x = LEFT + i as f64 * sl;
-            let y = TOP_PAD + plot - v.clamp(0.0, 1.0) * plot;
+            let x = (i as f64).mul_add(sl, LEFT);
+            let y = v.clamp(0.0, 1.0).mul_add(-plot, TOP_PAD + plot);
             let _ = write!(
                 svg,
                 r#"<g class="col" data-tip="{}: {:.0}%"><rect class="hit" x="{x:.1}" y="{TOP_PAD}" width="{sl:.1}" height="{plot:.1}"/><circle class="dot" cx="{:.1}" cy="{y:.1}" r="3.5"/></g>"#,
@@ -301,9 +287,8 @@ pub(crate) fn percent_line(points: &[(String, Option<f64>)]) -> String {
             pen = false;
             continue;
         };
-        #[allow(clippy::cast_precision_loss)]
-        let x = LEFT + i as f64 * sl + sl / 2.0;
-        let y = TOP_PAD + plot - v.clamp(0.0, 1.0) * plot;
+        let x = (i as f64).mul_add(sl, LEFT) + sl / 2.0;
+        let y = v.clamp(0.0, 1.0).mul_add(-plot, TOP_PAD + plot);
         let _ = write!(d, "{}{x:.1} {y:.1}", if pen { "L" } else { "M" });
         pen = true;
     }
@@ -320,7 +305,6 @@ pub(crate) fn sparkline(values: &[u32], class: &str) -> String {
     let n = values.len().max(2) - 1;
     let mut pts = String::new();
     for (i, v) in values.iter().enumerate() {
-        #[allow(clippy::cast_precision_loss)]
         let x = i as f64 * 120.0 / n as f64;
         let y = 20.0 - f64::from(*v) * 18.0 / f64::from(max);
         let _ = write!(pts, "{x:.1},{y:.1} ");
@@ -342,7 +326,6 @@ pub(crate) struct Dot {
 }
 
 /// Dots on a linear plane: x along the bottom, y up the side, each dot a link.
-#[allow(clippy::many_single_char_names)]
 pub(crate) fn scatter(dots: &[Dot], x_title: &str) -> String {
     let xmax = dots.iter().map(|d| d.x).max().unwrap_or(0);
     // One giant file would flatten everything else: scale to the 97th percentile and pin
@@ -356,15 +339,14 @@ pub(crate) fn scatter(dots: &[Dot], x_title: &str) -> String {
     let smax = dots.iter().map(|d| d.size).max().unwrap_or(1).max(1);
     let (grid, ytop) = axis(ymax);
     let xstep = nice_step(xmax);
-    #[allow(clippy::cast_precision_loss)]
-    let xtop = (xstep * xmax.div_ceil(xstep).max(1)) as f64;
+    let xtop_n = xstep * xmax.div_ceil(xstep).max(1);
+    let xtop = xtop_n as f64;
     let plot = H - TOP_PAD - BOTTOM;
     let mut svg = open_svg("Change frequency against size");
     svg.push_str(&grid);
     let mut v = 0;
-    while (v as f64) <= xtop {
-        #[allow(clippy::cast_precision_loss)]
-        let x = LEFT + v as f64 / xtop * (W - LEFT - 6.0);
+    while v <= xtop_n {
+        let x = (v as f64 / xtop).mul_add(W - LEFT - 6.0, LEFT);
         let _ = write!(
             svg,
             r#"<text class="ax" x="{x:.1}" y="{:.1}" text-anchor="middle">{}</text>"#,
@@ -374,11 +356,10 @@ pub(crate) fn scatter(dots: &[Dot], x_title: &str) -> String {
         v += xstep;
     }
     for d in dots {
-        #[allow(clippy::cast_precision_loss)]
         let (cx, cy, r) = (
-            LEFT + d.x as f64 / xtop * (W - LEFT - 6.0),
-            TOP_PAD + plot - (d.y as f64 / ytop).min(1.0) * plot,
-            3.0 + 5.0 * (d.size as f64 / smax as f64).sqrt(),
+            (d.x as f64 / xtop).mul_add(W - LEFT - 6.0, LEFT),
+            (d.y as f64 / ytop).min(1.0).mul_add(-plot, TOP_PAD + plot),
+            5.0f64.mul_add((d.size as f64 / smax as f64).sqrt(), 3.0),
         );
         let _ = write!(
             svg,
@@ -451,7 +432,6 @@ pub(crate) fn pct(v: u64, max: u64) -> u32 {
     if max == 0 {
         return 0;
     }
-    #[allow(clippy::cast_possible_truncation)]
     let p = (v.saturating_mul(100) / max) as u32;
     p.max(u32::from(v > 0))
 }

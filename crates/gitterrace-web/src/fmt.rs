@@ -65,7 +65,6 @@ pub(crate) fn now() -> i64 {
         .map_or(0, |d| i64::try_from(d.as_secs()).unwrap_or(0))
 }
 
-#[allow(clippy::cast_precision_loss)]
 pub(crate) fn size(bytes: u64) -> String {
     const UNITS: [&str; 4] = ["B", "KiB", "MiB", "GiB"];
     let mut v = bytes as f64;

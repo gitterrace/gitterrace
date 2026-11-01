@@ -89,7 +89,7 @@ fn env() -> String {
     format!("{}.\n", names.join(", "))
 }
 
-fn yes(b: bool) -> &'static str {
+const fn yes(b: bool) -> &'static str {
     if b { "yes" } else { "no" }
 }
 
