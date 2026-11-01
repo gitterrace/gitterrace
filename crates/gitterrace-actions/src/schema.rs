@@ -198,6 +198,14 @@ pub const PLACEHOLDERS: [(&str, bool, &str); 12] = [
     ),
 ];
 
+/// Modifiers any placeholder may take as `{name:modifier}`; another is a load error.
+pub const MODIFIERS: [(&str, &str); 1] = [(
+    "url",
+    "Percent-encodes the value for a URL query value: letters, digits and `-._~` stay, every \
+     other byte (`&`, `=`, `?`, `#`, `/`, `+`, space, newline, non-ASCII) becomes `%XX`, so \
+     the value cannot leave its parameter. The caps count the encoded length.",
+)];
+
 /// Top-level keys of `actions.toml`.
 pub const FILE_KEYS: [Item; 3] = [
     item("version", "integer", true, "", "Must be `1`."),

@@ -76,18 +76,11 @@ runa xsel clipboard.sh "$md";    expect_rc xsel-clip 0; expect_log xsel-clip "--
 runa wsl clipboard.sh "$md";     expect_rc wsl-clip 0; expect_log wsl-clip "clip.exe"
 runa none clipboard.sh "$md";    expect_rc none-clip 1; one_line none-clip
 
-# obsidian: url mode
-run mac obsidian.sh GITTERRACE_VAR_MODE=url; expect_rc mac-obs 0; expect_log mac-obs "/open"; expect_log mac-obs "obsidian://new?vault=Notes"
-case $log in *'$('*|*'`'*) fail "mac-obs: unencoded payload: $log" ;; esac
-run x11 obsidian.sh GITTERRACE_VAR_MODE=url "GITTERRACE_VAR_VAULT=My Vault"; expect_rc x11-obs 0; expect_log x11-obs "/xdg-open"; expect_log x11-obs "vault=My%20Vault"
-run wsl obsidian.sh GITTERRACE_VAR_MODE=url; expect_rc wsl-obs 0; expect_log wsl-obs "explorer.exe"
-run none obsidian.sh GITTERRACE_VAR_MODE=url; expect_rc none-obs 1; one_line none-obs
-# obsidian: file modes
+# obsidian: daily append (new notes go through obsidian://new, no script)
 run mac obsidian.sh; expect_rc daily 0
 ls "$tmp"/mac/Notes/Daily/*.md >/dev/null 2>&1 || fail "daily note not in default place"
-run mac obsidian.sh GITTERRACE_VAR_MODE=inbox "GITTERRACE_VAR_VAULT=$tmp/my vault" GITTERRACE_VAR_FOLDER=In; expect_rc inbox 0
-grep -q 'md \$(touch PWNED) body' "$tmp/my vault/In/gitterrace.md" 2>/dev/null || fail "inbox note not written"
-run mac obsidian.sh GITTERRACE_VAR_MODE=bogus; expect_rc obs-bogus 1; one_line obs-bogus
+run mac obsidian.sh "GITTERRACE_VAR_VAULT=$tmp/my vault" GITTERRACE_VAR_FOLDER=In; expect_rc daily-folder 0
+grep -q 'md \$(touch PWNED) body' "$tmp/my vault/In/$(date +%F).md" 2>/dev/null || fail "daily note not written in FOLDER"
 run mac obsidian.sh "GITTERRACE_VAR_VAULT=~/Tilde"; expect_rc obs-tilde 0
 ls "$tmp"/mac/Tilde/Daily/*.md >/dev/null 2>&1 || fail "~/ in vault not expanded to HOME"
 run none obsidian.sh; expect_rc none-daily 0

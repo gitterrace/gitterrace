@@ -84,7 +84,32 @@ pub enum Stdin {
     None,
 }
 
-/// One piece of a `command` element: literal text or a `{name}` placeholder.
+/// Splits `name:modifier` into the placeholder name and its modifier, if any.
+pub(crate) fn field_parts(raw: &str) -> (&str, Option<&str>) {
+    match raw.split_once(':') {
+        Some((name, m)) => (name, Some(m)),
+        None => (raw, None),
+    }
+}
+
+/// Percent-encodes `v` for a URL query value: RFC 3986 unreserved bytes stay, every other
+/// byte becomes `%XX`, so the value cannot end its parameter or start another.
+pub(crate) fn url_encode(v: &str) -> String {
+    let mut out = String::with_capacity(v.len());
+    for b in v.bytes() {
+        if b.is_ascii_alphanumeric() || matches!(b, b'-' | b'.' | b'_' | b'~') {
+            out.push(char::from(b));
+        } else {
+            const HEX: &[u8; 16] = b"0123456789ABCDEF";
+            out.push('%');
+            out.push(char::from(HEX[usize::from(b >> 4)]));
+            out.push(char::from(HEX[usize::from(b & 15)]));
+        }
+    }
+    out
+}
+
+/// One piece of a `command` element: literal text or a `{name}` / `{name:modifier}` placeholder.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Piece {
     Text(String),
@@ -512,7 +537,17 @@ fn check_command(
     for (i, el) in elements.iter().enumerate() {
         let ps = pieces(el).map_err(|why| format!("command[{i}]: {why}"))?;
         for p in &ps {
-            if let Piece::Field(name) = p {
+            if let Piece::Field(raw) = p {
+                let (name, modifier) = field_parts(raw);
+                if let Some(m) = modifier
+                    && !crate::schema::MODIFIERS.iter().any(|(k, _)| *k == m)
+                {
+                    let known: Vec<_> = crate::schema::MODIFIERS.iter().map(|(k, _)| *k).collect();
+                    return Err(format!(
+                        "command[{i}]: {{{raw}}}: unknown modifier :{m}; known: :{}",
+                        known.join(", :")
+                    ));
+                }
                 if !known(name) {
                     return Err(match name.strip_prefix("var.") {
                         Some(v) => {
@@ -526,13 +561,13 @@ fn check_command(
                 }
                 if i == 0 {
                     return Err(format!(
-                        "command[0]: the program is literal, {{{name}}} is not allowed there"
+                        "command[0]: the program is literal, {{{raw}}} is not allowed there"
                     ));
                 }
             }
         }
-        let opens_with_repo_value =
-            matches!(ps.first(), Some(Piece::Field(n)) if REPO_FIELDS.contains(&n.as_str()));
+        let opens_with_repo_value = matches!(ps.first(),
+            Some(Piece::Field(n)) if REPO_FIELDS.contains(&field_parts(n).0));
         // A value right after a literal option (`--notes {markdown}`) is that option's
         // argument, so the parser never reads it as an option.
         if opens_with_repo_value && !after_dashdash && !prev_option {
@@ -1007,6 +1042,12 @@ cwd = "home"
         assert_eq!(a.stdin, crate::config::Stdin::Markdown);
         // A literal prefix or a trusted first value needs no `--`.
         let prefixed = cmd("command = [\"/bin/echo\", \"x={title}\", \"{root}/{path}\"]");
+        let url = cmd(
+            "command = [\"/bin/echo\", \"tendir://new-task?title={title:url}&notes={markdown:url}\", \"{var.v:url}\", \"{sha:url}\"]\nvars = { v = \"x\" }",
+        );
+        if let Err(e) = Config::parse(&url, Path::new("/")) {
+            panic!("{e}");
+        }
         assert!(Config::parse(&prefixed, Path::new("/")).is_ok());
         for (bad, needle) in [
             (
@@ -1024,6 +1065,18 @@ cwd = "home"
             (
                 "command = [\"/bin/echo\", \"{path}\", \"--\"]",
                 "put a literal \"--\"",
+            ),
+            (
+                "command = [\"/bin/echo\", \"--\", \"{title:bogus}\"]",
+                "command[2]: {title:bogus}: unknown modifier :bogus; known: :url",
+            ),
+            (
+                "command = [\"/bin/echo\", \"{title:url}\"]",
+                "command[1]: {title:url} comes from the repository",
+            ),
+            (
+                "command = [\"/bin/echo\", \"--\", \"{titel:url}\"]",
+                "command[2]: unknown placeholder {titel}",
             ),
             (
                 "command = [\"/bin/echo\", \"{var.nope}\"]",
@@ -1066,5 +1119,52 @@ cwd = "home"
         // Shell text that only looks like braces keeps working.
         let awk = cmd("shell = true\ncommand = 'echo ${HOME} | awk \"{print}\"'");
         assert!(Config::parse(&awk, Path::new("/")).is_ok());
+    }
+
+    /// Every `toml` block in docs/actions.md loads, so the docs never show a config the
+    /// server refuses. Programs are stubbed: `~/...` under a temp home, bare names as
+    /// absolute stubs, so only the PATH lookup itself is not exercised here.
+    #[test]
+    fn every_documented_example_loads() {
+        use std::os::unix::fs::PermissionsExt;
+        let doc = include_str!("../../../docs/actions.md");
+        let home = tempfile::tempdir().expect("tmp");
+        let stub = |p: &Path| {
+            std::fs::create_dir_all(p.parent().expect("parent")).expect("dir");
+            std::fs::write(p, "#!/bin/sh\n").expect("write");
+            std::fs::set_permissions(p, std::fs::Permissions::from_mode(0o700)).expect("chmod");
+        };
+        let blocks: Vec<&str> = doc
+            .split("```toml\n")
+            .skip(1)
+            .filter_map(|b| b.split("```").next())
+            .collect();
+        assert!(blocks.len() >= 3, "found {} toml blocks", blocks.len());
+        for (i, block) in blocks.iter().enumerate() {
+            let mut text = if block.contains("version") {
+                (*block).to_owned()
+            } else {
+                format!("version = 1\n{block}")
+            };
+            for prog in text
+                .lines()
+                .filter_map(|l| l.trim().strip_prefix("command"))
+                .filter_map(|l| l.split('"').nth(1))
+                .map(str::to_owned)
+                .collect::<Vec<_>>()
+            {
+                if let Some(rest) = prog.strip_prefix("~/") {
+                    stub(&home.path().join(rest));
+                } else if !prog.contains('/') {
+                    let abs = home.path().join("bin").join(&prog);
+                    stub(&abs);
+                    text =
+                        text.replace(&format!("[\"{prog}\""), &format!("[\"{}\"", abs.display()));
+                }
+            }
+            if let Err(e) = Config::parse(&text, home.path()) {
+                panic!("docs/actions.md toml block {i} does not load: {e}\n{text}");
+            }
+        }
     }
 }

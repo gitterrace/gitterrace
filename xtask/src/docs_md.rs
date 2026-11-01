@@ -5,7 +5,8 @@ use std::path::Path;
 
 use anyhow::{Context as _, Result};
 use gitterrace_actions::schema::{
-    ACTION_KEYS, ENV_VARS, Item, KINDS, PAYLOAD_FIELDS, PLACEHOLDERS, SCRIPT_KEYS, kind_name,
+    ACTION_KEYS, ENV_VARS, Item, KINDS, MODIFIERS, PAYLOAD_FIELDS, PLACEHOLDERS, SCRIPT_KEYS,
+    kind_name,
 };
 
 use crate::facts::Workspace;
@@ -94,6 +95,10 @@ fn placeholders() -> String {
         String::from("| Placeholder | From the repository | Value |\n| --- | --- | --- |\n");
     for (name, repo, doc) in PLACEHOLDERS {
         let _ = writeln!(s, "| `{{{name}}}` | {} | {doc} |", yes(repo));
+    }
+    s.push_str("\n| Modifier | Effect |\n| --- | --- |\n");
+    for (name, doc) in MODIFIERS {
+        let _ = writeln!(s, "| `{{name:{name}}}` | {doc} |");
     }
     s
 }

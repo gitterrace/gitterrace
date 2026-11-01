@@ -4,6 +4,11 @@ Select something, press `.` or click `⋯`. The menu always has **Copy permalink
 as markdown**; the rest comes from `actions.toml` in your config folder (never in a
 repository). An action runs a program of yours directly, with no shell: placeholders such as
 `{title}` fill whole arguments, and stdin carries the payload as JSON or the markdown alone.
+Where a destination has its own add screen, the samples use it so you confirm the item there;
+writing directly is the alternative.
+
+The tendir action opens tendir's new-task sheet, filled in, for you to confirm. It uses `open`
+on macOS (`xdg-open` on Linux); `tendir add` is the direct alternative.
 
 ```toml
 version = 1
@@ -12,14 +17,7 @@ version = 1
 id      = "tendir"
 label   = "Send to tendir"
 kinds   = ["line", "commit"]
-command = ["tendir", "add", "--notes", "{markdown}", "--", "{title}"]
-
-[[action]]
-id      = "copy"
-label   = "Copy to clipboard"
-kinds   = ["line", "file", "commit"]
-command = ["pbcopy"]
-stdin   = "markdown"
+command = ["open", "tendir://new-task?title={title:url}&notes={markdown:url}"]
 
 [[action]]
 id      = "webhook"
@@ -30,8 +28,51 @@ stdin   = "json"
 vars    = { url = "https://example.test/hook" }
 ```
 
-A job with several steps, or one that must work on every OS, stays a script. Declare it once
-as a `[[script]]` and point actions at it, each with its own settings:
+The direct form of the tendir action writes the task without a sheet:
+
+```toml
+[[action]]
+id      = "tendir-add"
+label   = "Add to tendir"
+kinds   = ["line", "commit"]
+command = ["tendir", "add", "--notes", "{markdown}", "--", "{title}"]
+```
+
+Obsidian's `obsidian://new` takes `vault`, `file` (a path in the vault, `/` encoded as `%2F`),
+`content` and `append`, and opens the note it wrote. With `append`, repeated sends add to one
+inbox note instead of a new note each time:
+
+```toml
+[[action]]
+id      = "obsidian-new"
+label   = "New Obsidian note"
+kinds   = ["line", "commit"]
+command = ["open", "obsidian://new?vault={var.vault:url}&file={var.folder:url}%2F{title:url}&content={markdown:url}"]
+vars    = { vault = "Notes", folder = "Inbox" }
+
+[[action]]
+id      = "obsidian-inbox"
+label   = "Obsidian inbox"
+kinds   = ["line", "commit"]
+command = ["open", "obsidian://new?vault={var.vault:url}&file={var.folder:url}%2Fgitterrace&append=true&content={markdown:url}"]
+vars    = { vault = "Notes", folder = "Inbox" }
+```
+
+When the same action must work on every system, a script picks the tool. The copy action
+with [`clipboard.sh`](actions/clipboard.sh) runs unchanged on macOS, Linux (Wayland or X11)
+and WSL:
+
+```toml
+[[action]]
+id      = "copy"
+label   = "Copy to clipboard"
+kinds   = ["line", "file", "commit"]
+command = ["~/.config/gitterrace/clipboard.sh"]
+stdin   = "markdown"
+```
+
+A job with several steps stays a script too. Declare it once as a `[[script]]` and point
+actions at it, each with its own settings:
 
 ```toml
 [[script]]
@@ -43,7 +84,7 @@ id     = "obsidian-daily"
 label  = "Obsidian daily note"
 kinds  = ["line", "commit"]
 script = "obsidian"
-vars   = { mode = "daily" }
+vars   = { folder = "Daily" }
 
 [[action]]
 id      = "edit"
@@ -76,11 +117,16 @@ placeholder.
 | `{kind}` | no | The kind. |
 | `{var.<name>}` | no | A value from `[action.vars]`. An undefined name is a load error. |
 
+| Modifier | Effect |
+| --- | --- |
+| `{name:url}` | Percent-encodes the value for a URL query value: letters, digits and `-._~` stay, every other byte (`&`, `=`, `?`, `#`, `/`, `+`, space, newline, non-ASCII) becomes `%XX`, so the value cannot leave its parameter. The caps count the encoded length. |
+
 <!-- END GENERATED: placeholders -->
 
 Rules, checked when the file loads so a mistake never waits for a click:
 
 - An unknown placeholder, or `{var.NAME}` with no such var, is an error naming the element.
+- An unknown modifier (`{title:bogus}`) is an error naming the element.
 - `shell = true` takes no placeholders. Read the `GITTERRACE_*` environment instead.
 - A value from the repository may start with `-` and be read as an option. It may open an
   element only after a literal `--`, right after a literal option it is the argument of
@@ -176,14 +222,14 @@ Environment (same values, plus `GITTERRACE_VAR_<NAME>`):
 ## Scripts
 
 The samples left are the jobs a single command cannot do: `clipboard.sh` picks the clipboard
-tool of the OS, `editor.sh` picks your editor and its line syntax, `obsidian.sh` appends to a
-dated note or URL-encodes the text into an `obsidian://` link.
+tool of the OS, `editor.sh` picks your editor and its line syntax, `obsidian.sh` appends to today's
+daily note, a write with no Obsidian screen of its own.
 
 <!-- BEGIN GENERATED: scripts -->
 | Script | Does | Needs |
 | --- | --- | --- |
 | [`clipboard.sh`](actions/clipboard.sh) | Copy the selection as markdown, on any OS. | (first present wins): macOS:         pbcopy (built in) Linux Wayland: wl-copy (wl-clipboard) Linux X11:     xclip or xsel WSL:           clip.exe (built in) |
 | [`editor.sh`](actions/editor.sh) | Open a file at a line in the editor, on any OS. | (all OSes): an editor. Picks $VISUAL, then $EDITOR, then code, then vi. Line jump is known for code, vim/nvim/vi, nano, emacs, subl, zed and hx; any other editor opens the file without a line. |
-| [`obsidian.sh`](actions/obsidian.sh) | Send the selection to Obsidian. | (all OSes): jq (brew install jq, apt install jq). date and mkdir are POSIX. url mode also needs Obsidian and a URL opener (first present wins): macOS: open (built in) Linux: xdg-open (xdg-utils) WSL:   wslview (wslu) or explorer.exe |
+| [`obsidian.sh`](actions/obsidian.sh) | Append the selection to today's Obsidian daily note. | (all OSes): jq (brew install jq, apt install jq). date and mkdir are POSIX. |
 
 <!-- END GENERATED: scripts -->

@@ -14,7 +14,7 @@ use std::time::{Duration, Instant};
 
 use rustix::process::{Pid, Signal, kill_process_group};
 
-use crate::config::{Action, Cwd, Piece, REPO_FIELDS, Stdin, pieces};
+use crate::config::{Action, Cwd, Piece, REPO_FIELDS, Stdin, field_parts, pieces, url_encode};
 use crate::payload::Payload;
 
 /// Captured per stream; the rest is read and dropped so the child never blocks on a pipe.
@@ -206,9 +206,20 @@ pub fn expand(template: &[String], payload: &Payload) -> Result<Vec<String>, Run
             match p {
                 Piece::Text(t) => arg.push_str(t),
                 Piece::Field(name) => {
-                    let v = payload.placeholder(name).ok_or_else(|| {
+                    let (base, modifier) = field_parts(name);
+                    let raw = payload.placeholder(base).ok_or_else(|| {
                         RunError::Refused(format!("unknown placeholder {{{name}}}"))
                     })?;
+                    // The NUL check and the caps see the encoded value, the one passed on.
+                    let v = match modifier {
+                        None => raw,
+                        Some("url") => url_encode(&raw),
+                        Some(m) => {
+                            return Err(RunError::Refused(format!(
+                                "{{{name}}}: unknown modifier :{m}"
+                            )));
+                        }
+                    };
                     if v.contains('\0') {
                         return Err(RunError::Refused(format!("{{{name}}} contains a NUL byte")));
                     }
@@ -224,8 +235,8 @@ pub fn expand(template: &[String], payload: &Payload) -> Result<Vec<String>, Run
         }
         // The loader lets a repository value open an element only behind `--` or right after
         // a literal option; in the second case a leading `-` would still read as an option.
-        let repo_first =
-            matches!(ps.first(), Some(Piece::Field(n)) if REPO_FIELDS.contains(&n.as_str()));
+        let repo_first = matches!(ps.first(),
+            Some(Piece::Field(n)) if REPO_FIELDS.contains(&field_parts(n).0));
         if !after_dashdash && repo_first && arg.starts_with('-') {
             return Err(RunError::Refused(format!(
                 "command[{i}] would start with '-' and read as an option"
@@ -745,6 +756,45 @@ mod tests {
             matches!(&e, RunError::Refused(m) if m.contains("NUL")),
             "{e}"
         );
+    }
+
+    #[test]
+    fn url_modifier_encodes_a_query_value() {
+        let (t, repo) = fixture();
+        let mut p = payload(&repo, Kind::Commit);
+        for (title, want) in [
+            ("a&b", "a%26b"),
+            ("a=b", "a%3Db"),
+            ("a#b", "a%23b"),
+            ("a?b", "a%3Fb"),
+            ("a/b", "a%2Fb"),
+            ("a+b", "a%2Bb"),
+            ("a b", "a%20b"),
+            ("-._~Az09", "-._~Az09"),
+            ("\u{e9}\u{1f600}", "%C3%A9%F0%9F%98%80"),
+            ("a\nb", "a%0Ab"),
+        ] {
+            p.title = title.into();
+            let got = record(t.path(), &["q={title:url}"], Stdin::None, &p).expect("run");
+            assert_eq!(got, [format!("q={want}")], "{title:?}");
+        }
+        // A title cannot add a parameter of its own.
+        p.title = "t&notes=x".into();
+        p.markdown = "m".into();
+        let got = record(
+            t.path(),
+            &["x://new?title={title:url}&notes={markdown:url}"],
+            Stdin::None,
+            &p,
+        )
+        .expect("run");
+        assert_eq!(got, ["x://new?title=t%26notes%3Dx&notes=m"]);
+        let query = got[0].split_once('?').expect("query").1;
+        assert_eq!(query.matches("notes=").count(), 1, "{query}");
+        // The cap counts the encoded value: 30 KiB of spaces is 90 KiB encoded.
+        p.title = " ".repeat(30 * 1024);
+        let e = record(t.path(), &["q={title:url}"], Stdin::None, &p).expect_err("cap");
+        assert!(e.to_string().contains("64 KiB"), "{e}");
     }
 
     #[test]
