@@ -47,8 +47,6 @@ figure{margin:var(--space-6) 0}
 figcaption{font-size:var(--text-xs);color:var(--faint);margin-top:var(--space-1)}
 nav.links,footer{display:flex;flex-wrap:wrap;gap:var(--space-4);font-size:var(--text-sm)}
 footer{margin-top:var(--space-16);padding-top:var(--space-4);border-top:var(--border);color:var(--faint)}
-.dark{display:none}
-@media (prefers-color-scheme:dark){.light{display:none}.dark{display:block}}
 ";
 
 pub fn render(root: &Path, ws: &Workspace) -> Result<Vec<Out>> {
@@ -95,8 +93,8 @@ pub fn render(root: &Path, ws: &Workspace) -> Result<Vec<Out>> {
     );
     let _ = write!(
         h,
-        "<header>\n<img class=\"light\" src=\"assets/logo-light.svg\" alt=\"{n}\" width=\"540\" height=\"120\">\n\
-         <img class=\"dark\" src=\"assets/logo-dark.svg\" alt=\"\" width=\"540\" height=\"120\" aria-hidden=\"true\">\n\
+        "<header>\n<picture>\n<source media=\"(prefers-color-scheme: dark)\" srcset=\"assets/logo-dark.svg\">\n\
+         <img src=\"assets/logo-light.svg\" alt=\"{n}\" width=\"540\" height=\"120\">\n</picture>\n\
          <p class=\"tag\">{tag}</p>\n</header>\n",
         n = esc(&pkg.name),
         tag = esc(&tagline(root)?),

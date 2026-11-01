@@ -187,12 +187,10 @@ input{min-width:0;flex:1}.filter{width:100%}
 button.branch{height:auto;cursor:pointer}
 .branch .caret{width:0;height:0;border:4px solid transparent;border-top-color:currentColor;margin:4px 0 0 2px}
 [hidden]{display:none!important}
-.wtchip{display:inline-flex;align-items:center;gap:6px;font:var(--weight-semibold) var(--text-xs)/1 var(--mono);color:var(--warn);background:var(--warn-bg);border:var(--border);border-radius:var(--radius);padding:5px 10px;white-space:nowrap}
-.wtchip:hover{text-decoration:none;border-color:var(--warn)}
-.wtchip .dot{width:6px;height:6px;border-radius:50%;background:var(--warn);animation:wtpulse 2.4s ease-in-out infinite}
-/* A slow breath, so the chip reads as live without pulling the eye. Still for reduced motion. */
-@keyframes wtpulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.35;transform:scale(.7)}}
-@media (prefers-reduced-motion:reduce){.wtchip .dot{animation:none}}
+.wtchip{display:inline-flex;align-items:center;gap:6px;font:var(--weight-semibold) var(--text-xs)/1 var(--mono);color:var(--muted);background:transparent;border:var(--border);border-radius:var(--radius);padding:5px 10px 5px 8px;white-space:nowrap;transition:color var(--dur-fast),border-color var(--dur-fast)}
+.wtchip:hover{text-decoration:none;color:var(--fg);border-color:var(--warn)}
+/* Uncommitted work is a normal state: quiet label, only the dot carries the warn colour. No motion. */
+.wtchip .dot{width:6px;height:6px;border-radius:50%;background:var(--warn)}
 .topsearch{position:relative;display:flex;align-items:center}
 .topsearch input[type=search]{min-width:220px;width:260px;padding-right:32px;height:30px}
 .topsearch kbd{position:absolute;right:8px;pointer-events:none}
