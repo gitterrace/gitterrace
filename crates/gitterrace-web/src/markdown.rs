@@ -238,8 +238,11 @@ const SAFE_CLASS: [&str; 6] = [
 
 fn sanitizer(base: Base) -> ammonia::Builder<'static> {
     let mut b = ammonia::Builder::default();
-    b.add_tags(["input"])
+    // `<picture>` with a `prefers-color-scheme` source is how READMEs ship a light and a
+    // dark image; GitHub and GitLab render it, so it is kept.
+    b.add_tags(["input", "picture", "source"])
         .add_tag_attributes("input", ["type", "checked", "disabled"])
+        .add_tag_attributes("source", ["media", "srcset", "type"])
         .add_tag_attributes("th", ["style"])
         .add_tag_attributes("td", ["style"])
         .add_generic_attributes(["class", "id"])
@@ -261,6 +264,16 @@ fn sanitizer(base: Base) -> ammonia::Builder<'static> {
                 (!kept.is_empty()).then(|| Cow::Owned(kept.join(" ")))
             }
             ("img", "src") => Some(Cow::Owned(rewrite_url(&base, value, true))),
+            // One candidate, as the README idiom writes it. A list with widths or densities
+            // would need each URL rewritten, so it is dropped and the `<img>` shows instead.
+            ("source", "srcset") => (!value.contains([',', ' ']))
+                .then(|| Cow::Owned(rewrite_url(&base, value.trim(), true))),
+            // Only colour-scheme queries: they are what the page's theme switch can honour.
+            ("source", "media") => matches!(
+                value.replace(' ', "").as_str(),
+                "(prefers-color-scheme:dark)" | "(prefers-color-scheme:light)"
+            )
+            .then(|| Cow::Borrowed(value)),
             // Only the alignment the parser itself emits survives.
             (_, "style") => matches!(
                 value,
@@ -373,6 +386,27 @@ mod tests {
         assert!(out.contains("href=\"/tree/abc123/docs/guide/sub\""));
         assert!(out.contains("href=\"https://e.com/a\""));
         assert!(out.contains("href=\"#user-content-top\""));
+    }
+
+    #[test]
+    fn picture_keeps_its_colour_scheme_sources() {
+        let out = at(
+            "<picture>\n<source media=\"(prefers-color-scheme: dark)\" srcset=\"b/d.svg\">\n<img alt=\"x\" src=\"b/l.svg\">\n</picture>",
+            "docs",
+        );
+        assert!(out.contains("<picture>"), "{out}");
+        assert!(
+            out.contains("media=\"(prefers-color-scheme: dark)\""),
+            "{out}"
+        );
+        assert!(out.contains("srcset=\"/raw/abc123/docs/b/d.svg\""), "{out}");
+        assert!(out.contains("src=\"/raw/abc123/docs/b/l.svg\""), "{out}");
+        // Other queries and candidate lists are not passed through.
+        let odd = at(
+            "<picture><source media=\"print\" srcset=\"a.svg 1x, b.svg 2x\"><img src=\"l.svg\"></picture>",
+            "",
+        );
+        assert!(!odd.contains("media=") && !odd.contains("srcset="), "{odd}");
     }
 
     #[test]

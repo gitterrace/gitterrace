@@ -13,6 +13,22 @@
     });
   });
 
+  // A README <picture> picks its source by the OS colour scheme. When the page theme is
+  // forced, rewrite each source's query so the image follows the page instead.
+  var sources = Array.prototype.slice.call(document.querySelectorAll(".markdown-body picture source[media]"));
+  sources.forEach(function (s) { s.dataset.media = s.media; });
+  function syncPictures() {
+    var t = root.dataset.theme;
+    sources.forEach(function (s) {
+      var wants = /dark/.test(s.dataset.media) ? "dark" : "light";
+      s.media = !t ? s.dataset.media : (t === wants ? "all" : "not all");
+    });
+  }
+  if (sources.length) {
+    syncPictures();
+    new MutationObserver(syncPictures).observe(root, { attributes: true, attributeFilter: ["data-theme"] });
+  }
+
   var nodes = Array.prototype.slice.call(document.querySelectorAll("pre.mermaid"));
   if (!nodes.length) return;
   nodes.forEach(function (n) { n.dataset.src = n.textContent; });

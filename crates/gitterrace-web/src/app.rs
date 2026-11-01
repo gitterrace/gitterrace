@@ -271,6 +271,13 @@ impl App {
         v
     }
 
+    /// Records a freshly measured answer so the next event carries it.
+    pub(crate) fn set_dirty(&self, v: bool) {
+        if let Ok(mut g) = self.dirty.lock() {
+            *g = Some((Instant::now(), v));
+        }
+    }
+
     /// Drops what a change in the repository can make stale: rendered pages and the dirty chip.
     /// Everything else is keyed by a commit or tree id, which never changes.
     pub(crate) fn invalidate(&self, kinds: &[&str]) {
@@ -580,6 +587,7 @@ pub(crate) async fn keep_index_fresh(app: Arc<App>) {
     let mut last: Option<String> = None;
     let mut check_head = true;
     let mut wt_seen: Option<u64> = None;
+    let mut dirty_seen: Option<bool> = None;
     let mut ticks: u64 = 0;
     loop {
         // With `index.build_on_start` off the index waits for the first page that needs it;
@@ -637,7 +645,16 @@ pub(crate) async fn keep_index_fresh(app: Arc<App>) {
                 // The working tree scan runs only while a page shows it.
                 if app.wt_watchers.load(Ordering::Acquire) == 0 {
                     wt_seen = None;
+                    // Any other page still shows the top bar chip: one early-exit check per
+                    // tick, and an event only when the answer flips.
+                    if let Some(flip) = chip_flip(&app, &mut dirty_seen).await
+                        && kinds.is_empty()
+                    {
+                        app.set_dirty(flip);
+                        kinds.push("dirty");
+                    }
                 } else if ticks.is_multiple_of(WORKTREE_EVERY) {
+                    dirty_seen = None;
                     let a = Arc::clone(&app);
                     let sig = tokio::task::spawn_blocking(move || {
                         gitterrace_git::worktree_signature(&a.repo).ok()
@@ -660,6 +677,22 @@ pub(crate) async fn keep_index_fresh(app: Arc<App>) {
             }
         }
     }
+}
+
+/// The early-exit dirty check for the top bar chip, run only while a tab listens. Returns the
+/// new answer when it differs from the last one seen.
+async fn chip_flip(app: &Arc<App>, seen: &mut Option<bool>) -> Option<bool> {
+    if app.changes.receiver_count() == 0 {
+        *seen = None;
+        return None;
+    }
+    let a = Arc::clone(app);
+    let now = tokio::task::spawn_blocking(move || gitterrace_git::is_dirty(&a.repo))
+        .await
+        .ok()?;
+    let flipped = seen.is_some_and(|b| b != now);
+    *seen = Some(now);
+    flipped.then_some(now)
 }
 
 /// Brings the index up to `rev`; for HEAD (`warm` holds its id) also builds what the first

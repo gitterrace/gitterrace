@@ -165,7 +165,7 @@ fn build(
 ) -> io::Result<(axum::Router, String)> {
     let repo = Repo::discover(repo_path).map_err(io::Error::other)?;
     let name = repo.name();
-    let live = actions::start(actions_file, &[repo.root()], extra.is_none());
+    let (live, status) = actions::start(actions_file, &[repo.root()], extra.is_none());
     let site = Arc::new(actions::Site {
         targets: vec![actions::Target {
             key: name.clone(),
@@ -173,6 +173,7 @@ fn build(
             repo,
         }],
         live: live.clone(),
+        status,
     });
     let pages = repo_router(repo_path, String::new(), name.clone(), live, env)?;
     Ok((guarded(pages.merge(actions::router(site)), extra), name))
@@ -191,9 +192,13 @@ fn build_multi(
             let mut table = multi::Table::new(paths, env.clone())?;
             let targets = table.targets()?;
             let roots: Vec<PathBuf> = targets.iter().map(|t| t.repo.root()).collect();
-            let live = actions::start(actions_file, &roots, extra.is_none());
+            let (live, status) = actions::start(actions_file, &roots, extra.is_none());
             table.live.clone_from(&live);
-            let site = Arc::new(actions::Site { targets, live });
+            let site = Arc::new(actions::Site {
+                targets,
+                live,
+                status,
+            });
             Ok((
                 guarded(
                     multi::router(Arc::new(table)).merge(actions::router(site)),

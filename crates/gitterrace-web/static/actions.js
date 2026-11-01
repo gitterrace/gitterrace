@@ -19,6 +19,34 @@
   var DOCS = "https://github.com/timorunge/gitterrace/blob/main/docs/actions.md";
   var MD_LINES = 40;
 
+  // A refused actions.toml says so in a strip under the top bar, in full, and the strip goes
+  // when a later edit is fine.
+  var noteEl = null;
+  function showNote(text) {
+    if (!text) { if (noteEl) noteEl.hidden = true; return; }
+    if (!noteEl) {
+      var anchor = document.getElementById("headstate");
+      if (!anchor) return;
+      noteEl = document.createElement("div");
+      noteEl.className = "actnote";
+      noteEl.id = "actnote";
+      noteEl.setAttribute("role", "status");
+      noteEl.appendChild(document.createElement("div")).className = "wrap";
+      anchor.after(noteEl);
+    }
+    noteEl.firstChild.textContent = text;
+    noteEl.hidden = false;
+  }
+  function pollNote() {
+    if (document.hidden) return;
+    fetch("/_actions/status", { cache: "no-store" })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (j) { if (j) showNote(j.note); })
+      .catch(function () {});
+  }
+  pollNote();
+  setInterval(pollNote, 3000);
+
   function el(tag, cls, text) {
     var e = document.createElement(tag);
     if (cls) e.className = cls;

@@ -485,8 +485,13 @@ async fn working_tree_is_scanned_only_for_a_subscriber() {
     tokio::time::sleep(Duration::from_millis(400)).await;
     let kinds = |c: Arc<crate::live::Change>| c.kinds.clone();
     std::fs::write(p.join("small.txt"), "edited without a subscriber\n").expect("write");
-    let got = tokio::time::timeout(Duration::from_millis(900), rx.recv()).await;
-    assert!(got.is_err(), "no worktree scan without a subscriber");
+    // The cheap dirty check may announce the flip, but never a full worktree scan.
+    while let Ok(Ok(c)) = tokio::time::timeout(Duration::from_millis(900), rx.recv()).await {
+        assert!(
+            !kinds(c).contains(&"worktree"),
+            "no worktree scan without a subscriber"
+        );
+    }
 
     let _wt = crate::live::WorktreeWatch::new(&a);
     tokio::time::sleep(Duration::from_millis(600)).await;
@@ -508,4 +513,32 @@ async fn working_tree_is_scanned_only_for_a_subscriber() {
     );
     let quiet = tokio::time::timeout(Duration::from_millis(900), rx.recv()).await;
     assert!(quiet.is_err(), "an untouched tree sends nothing");
+}
+
+#[tokio::test]
+async fn dirty_chip_follows_on_pages_without_the_worktree() {
+    let dir = tempfile::tempdir().expect("tmp");
+    let p = repo(dir.path(), "r");
+    let a = app(&p, with(|c| c.watch.interval_ms = 250));
+    tokio::spawn(crate::app::keep_index_fresh(Arc::clone(&a)));
+    // A listener, but no page that shows the working tree.
+    let mut rx = a.changes.subscribe();
+    tokio::time::sleep(Duration::from_millis(600)).await;
+    while rx.try_recv().is_ok() {}
+    let mut next = async |want: bool| {
+        loop {
+            let c = tokio::time::timeout(Duration::from_millis(2000), rx.recv())
+                .await
+                .expect("event")
+                .expect("open");
+            if c.dirty == want {
+                return;
+            }
+        }
+    };
+    std::fs::write(p.join("small.txt"), "edited\n").expect("write");
+    next(true).await;
+    git(&p, &["checkout", "-q", "--", "small.txt"]);
+    next(false).await;
+    assert_eq!(a.wt_watchers.load(std::sync::atomic::Ordering::Acquire), 0);
 }
