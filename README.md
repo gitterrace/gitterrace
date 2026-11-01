@@ -40,7 +40,7 @@ git terrace export <out>  Write a static copy of the site to a folder, for shari
 <!-- END GENERATED: commands -->
 
 <!-- BEGIN GENERATED: actions -->
-Run your own program on a selection (`line`, `file`, `commit`, `hunk`, `blame`, `search-hit`, `insight`, `page`). Examples in `docs/actions/`: `clipboard.sh`, `editor.sh`, `obsidian.sh`, `tendir.sh`, `webhook.sh`.
+Run your own program on a selection (`line`, `file`, `commit`, `hunk`, `blame`, `search-hit`, `insight`, `page`). Examples in `docs/actions/`: `clipboard.sh`, `editor.sh`, `obsidian.sh`.
 
 <!-- END GENERATED: actions -->
 Off until you write `actions.toml`: [actions](docs/actions.md).

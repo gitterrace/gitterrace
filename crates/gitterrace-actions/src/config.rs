@@ -20,6 +20,23 @@ const MAX_CONFIG_BYTES: u64 = 256 * 1024;
 const MAX_VARS: usize = 32;
 const MAX_VAR_NAME: usize = 32;
 const MAX_VAR_BYTES: usize = 4 * 1024;
+/// Placeholders a `command` element may hold, besides `{var.NAME}`.
+pub(crate) const FIELDS: [&str; 11] = [
+    "title",
+    "markdown",
+    "text",
+    "path",
+    "line_start",
+    "line_end",
+    "sha",
+    "url",
+    "repo",
+    "root",
+    "kind",
+];
+/// Fields whose values come from the browsed repository. One of them opening an argv element
+/// could be read as an option (`--upload-pack=...`), so the loader asks for a guard first.
+pub(crate) const REPO_FIELDS: [&str; 4] = ["title", "markdown", "text", "path"];
 
 #[derive(Debug, thiserror::Error)]
 pub enum ConfigError {
@@ -56,6 +73,24 @@ pub enum Cwd {
     Path(PathBuf),
 }
 
+/// What the child reads on stdin.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Stdin {
+    /// The payload as JSON.
+    Json,
+    /// The `markdown` field alone, so `pbcopy` needs no script.
+    Markdown,
+    /// Nothing: stdin is closed.
+    None,
+}
+
+/// One piece of a `command` element: literal text or a `{name}` placeholder.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Piece {
+    Text(String),
+    Field(String),
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Output {
@@ -63,14 +98,16 @@ pub enum Output {
     Ignore,
 }
 
-/// One validated action. `argv` is exactly what is spawned; nothing from a request is ever
-/// substituted into it.
+/// One validated action. `argv` is a template: element 0 is a resolved, literal program and
+/// every other element is expanded on its own, so a value is always exactly one argument and
+/// never reaches a shell.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Action {
     pub id: String,
     pub label: String,
     pub kinds: Vec<Kind>,
     pub argv: Vec<String>,
+    pub stdin: Stdin,
     pub cwd: Cwd,
     pub timeout: Duration,
     pub output: Output,
@@ -78,7 +115,7 @@ pub struct Action {
     /// Extra variable names passed through from gitterrace's own environment.
     pub env: Vec<String>,
     /// Fixed values from `[action.vars]`, delivered as `GITTERRACE_VAR_<NAME>` and
-    /// `payload.vars`. Only `actions.toml` sets them; never templated into `argv`.
+    /// `payload.vars`, and to `{var.NAME}` in `argv`. Only `actions.toml` sets them.
     pub vars: BTreeMap<String, String>,
 }
 
@@ -107,6 +144,7 @@ struct RawScript {
     command: RawCommand,
     cwd: Option<String>,
     timeout: Option<String>,
+    stdin: Option<String>,
     #[serde(default)]
     shell: bool,
 }
@@ -129,6 +167,7 @@ struct RawAction {
     cwd: Option<String>,
     timeout: Option<String>,
     output: Option<Output>,
+    stdin: Option<String>,
     shell: Option<bool>,
     key: Option<String>,
     #[serde(default)]
@@ -167,6 +206,7 @@ impl Config {
             if scripts.contains_key(&sc.id) {
                 return Err(script_err(&sc.id, "duplicate id"));
             }
+            check_command(&sc.command, sc.shell, None).map_err(|why| script_err(&sc.id, why))?;
             scripts.insert(sc.id.clone(), sc);
         }
         let mut seen = HashSet::new();
@@ -299,10 +339,10 @@ fn validate(
         return Err(invalid(&id, "kinds is empty"));
     }
     // The action's own command, or the named script's; its cwd and timeout override.
-    let (command, shell, base_cwd, base_timeout) = match (a.script, a.command) {
+    let (command, shell, base_cwd, base_timeout, base_stdin) = match (a.script, a.command) {
         (Some(_), Some(_)) => return Err(invalid(&id, "set either script or command, not both")),
         (None, None) => return Err(invalid(&id, "command or script is required")),
-        (None, Some(c)) => (c, a.shell.unwrap_or(false), None, None),
+        (None, Some(c)) => (c, a.shell.unwrap_or(false), None, None, None),
         (Some(name), None) => {
             if a.shell.is_some() {
                 return Err(invalid(&id, "shell belongs to the script block"));
@@ -315,9 +355,12 @@ fn validate(
                 sc.shell,
                 sc.cwd.clone(),
                 sc.timeout.clone(),
+                sc.stdin.clone(),
             )
         }
     };
+    check_command(&command, shell, Some(&a.vars)).map_err(|why| invalid(&id, why))?;
+    let stdin = parse_stdin(a.stdin.or(base_stdin).as_deref()).map_err(|why| invalid(&id, why))?;
     let argv = match (shell, command) {
         (false, RawCommand::Argv(v)) if !v.is_empty() => {
             let mut v = v;
@@ -356,16 +399,7 @@ fn validate(
             .filter(|d| !d.is_zero() && *d <= MAX_TIMEOUT)
             .ok_or_else(|| invalid(&id, "timeout must be like 10s or 500ms, at most 120s"))?,
     };
-    let key = match a.key.as_deref() {
-        None => None,
-        Some(k) => {
-            let mut c = k.chars();
-            match (c.next(), c.next()) {
-                (Some(ch), None) if ch.is_ascii_alphanumeric() => Some(ch),
-                _ => return Err(invalid(&id, "key must be one letter or digit")),
-            }
-        }
-    };
+    let key = parse_key(a.key.as_deref()).map_err(|why| invalid(&id, why))?;
     for name in &a.env {
         if name.is_empty()
             || !name.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_')
@@ -380,6 +414,7 @@ fn validate(
         label: a.label,
         kinds: a.kinds,
         argv,
+        stdin,
         cwd,
         timeout,
         output: a.output.unwrap_or(Output::Toast),
@@ -387,6 +422,147 @@ fn validate(
         env: a.env,
         vars,
     })
+}
+
+/// Splits a `command` element into literal text and `{name}` placeholders. `{{` and `}}` are
+/// literal braces; a lone brace is an error so a typo never passes as text.
+pub fn pieces(element: &str) -> Result<Vec<Piece>, String> {
+    let mut out = Vec::new();
+    let mut text = String::new();
+    let mut chars = element.chars().peekable();
+    while let Some(c) = chars.next() {
+        match c {
+            '{' if chars.peek() == Some(&'{') => {
+                chars.next();
+                text.push('{');
+            }
+            '}' if chars.peek() == Some(&'}') => {
+                chars.next();
+                text.push('}');
+            }
+            '{' => {
+                let mut name = String::new();
+                let mut closed = false;
+                for c in chars.by_ref() {
+                    if c == '}' {
+                        closed = true;
+                        break;
+                    }
+                    name.push(c);
+                }
+                if !closed {
+                    return Err(format!("{element:?}: unclosed {{"));
+                }
+                if name.is_empty() || name.contains('{') {
+                    return Err(format!(
+                        "{element:?}: write a literal brace as {{{{ or }}}}"
+                    ));
+                }
+                if !text.is_empty() {
+                    out.push(Piece::Text(std::mem::take(&mut text)));
+                }
+                out.push(Piece::Field(name));
+            }
+            '}' => {
+                return Err(format!(
+                    "{element:?}: write a literal brace as {{{{ or }}}}"
+                ));
+            }
+            c => text.push(c),
+        }
+    }
+    if !text.is_empty() {
+        out.push(Piece::Text(text));
+    }
+    Ok(out)
+}
+
+/// The placeholder rules, checked once at load. `vars` is the action's `[action.vars]`, or
+/// `None` for a `[[script]]` block, whose `{var.NAME}` is checked against each action using it.
+fn check_command(
+    command: &RawCommand,
+    shell: bool,
+    vars: Option<&BTreeMap<String, String>>,
+) -> Result<(), String> {
+    let known = |name: &str| match name.strip_prefix("var.") {
+        Some(v) => vars.is_none_or(|vars| vars.contains_key(v)),
+        None => FIELDS.contains(&name),
+    };
+    let elements = match command {
+        RawCommand::Shell(s) => {
+            // `${HOME}` and awk's `{print}` are shell text; only a real placeholder name is
+            // refused, so existing shell commands keep working.
+            let named = FIELDS
+                .iter()
+                .map(|f| format!("{{{f}}}"))
+                .chain(std::iter::once("{var.".to_string()))
+                .find(|p| s.contains(p.as_str()));
+            if shell && let Some(p) = named {
+                return Err(format!(
+                    "command: shell = true cannot take placeholders ({p}); write command as an \
+                     array and drop shell"
+                ));
+            }
+            return Ok(());
+        }
+        RawCommand::Argv(v) => v,
+    };
+    let mut after_dashdash = false;
+    let mut prev_option = false;
+    for (i, el) in elements.iter().enumerate() {
+        let ps = pieces(el).map_err(|why| format!("command[{i}]: {why}"))?;
+        for p in &ps {
+            if let Piece::Field(name) = p {
+                if !known(name) {
+                    return Err(match name.strip_prefix("var.") {
+                        Some(v) => {
+                            format!("command[{i}]: {{{name}}}: no var {v:?} in [action.vars]")
+                        }
+                        None => format!(
+                            "command[{i}]: unknown placeholder {{{name}}}; known: {}, var.NAME",
+                            FIELDS.join(", ")
+                        ),
+                    });
+                }
+                if i == 0 {
+                    return Err(format!(
+                        "command[0]: the program is literal, {{{name}}} is not allowed there"
+                    ));
+                }
+            }
+        }
+        let opens_with_repo_value =
+            matches!(ps.first(), Some(Piece::Field(n)) if REPO_FIELDS.contains(&n.as_str()));
+        // A value right after a literal option (`--notes {markdown}`) is that option's
+        // argument, so the parser never reads it as an option.
+        if opens_with_repo_value && !after_dashdash && !prev_option {
+            return Err(format!(
+                "command[{i}]: {el} comes from the repository and could start with `-`; put a \
+                 literal \"--\" before it, or give it a literal prefix (\"--flag={el}\")"
+            ));
+        }
+        after_dashdash |= el == "--";
+        prev_option = i > 0 && el.starts_with('-') && el != "--" && !el.contains('{');
+    }
+    Ok(())
+}
+
+fn parse_key(key: Option<&str>) -> Result<Option<char>, &'static str> {
+    let Some(k) = key else { return Ok(None) };
+    let mut c = k.chars();
+    match (c.next(), c.next()) {
+        (Some(ch), None) if ch.is_ascii_alphanumeric() => Ok(Some(ch)),
+        _ => Err("key must be one letter or digit"),
+    }
+}
+
+fn parse_stdin(value: Option<&str>) -> Result<Stdin, String> {
+    match value {
+        None | Some("json") => Ok(Stdin::Json),
+        Some("markdown") => Ok(Stdin::Markdown),
+        Some("none") => Ok(Stdin::None),
+        Some(other) => Err(format!("stdin = {other:?}: use json, markdown or none")),
+    }
 }
 
 fn validate_vars(
@@ -813,5 +989,82 @@ cwd = "home"
                 .map(String::as_str),
             Some("daily")
         );
+    }
+
+    #[test]
+    fn placeholders_load_and_every_refusal_names_its_key() {
+        let cmd = |c: &str| HEAD.replace("command = [\"/bin/echo\"]", c);
+        let ok = Config::parse(
+            &cmd("command = [\"/bin/echo\", \"--notes\", \"{markdown}\", \"--\", \"{title}\", \"{{x}}\"]\nstdin = \"markdown\""),
+            Path::new("/"),
+        )
+        .expect("parse");
+        let a = ok.get("a").expect("a");
+        assert_eq!(
+            a.argv[1..],
+            ["--notes", "{markdown}", "--", "{title}", "{{x}}"]
+        );
+        assert_eq!(a.stdin, crate::config::Stdin::Markdown);
+        // A literal prefix or a trusted first value needs no `--`.
+        let prefixed = cmd("command = [\"/bin/echo\", \"x={title}\", \"{root}/{path}\"]");
+        assert!(Config::parse(&prefixed, Path::new("/")).is_ok());
+        for (bad, needle) in [
+            (
+                "command = [\"/bin/echo\", \"{titel}\"]",
+                "command[1]: unknown placeholder {titel}",
+            ),
+            (
+                "command = [\"{sha}\"]",
+                "command[0]: the program is literal",
+            ),
+            (
+                "command = [\"/bin/echo\", \"{title}\"]",
+                "command[1]: {title} comes from the repository",
+            ),
+            (
+                "command = [\"/bin/echo\", \"{path}\", \"--\"]",
+                "put a literal \"--\"",
+            ),
+            (
+                "command = [\"/bin/echo\", \"{var.nope}\"]",
+                "command[1]: {var.nope}: no var",
+            ),
+            ("command = [\"/bin/echo\", \"a}\"]", "command[1]"),
+            ("command = [\"/bin/echo\", \"{x\"]", "command[1]"),
+            (
+                "shell = true\ncommand = 'echo {title}'",
+                "command: shell = true cannot take placeholders",
+            ),
+            (
+                "command = [\"/bin/echo\"]\nstdin = \"xml\"",
+                "stdin = \"xml\"",
+            ),
+        ] {
+            let e = err(&cmd(bad));
+            assert!(e.contains("action a") && e.contains(needle), "{bad}: {e}");
+        }
+        let script =
+            "version = 1\n[[script]]\nid = \"s\"\ncommand = [\"/bin/echo\", \"{title}\"]\n";
+        let e = err(script);
+        assert!(e.contains("script s") && e.contains("command[1]"), "{e}");
+        let shell = "version = 1\n[[script]]\nid = \"s\"\nshell = true\ncommand = 'echo {url}'\n";
+        assert!(
+            err(shell).contains("script s: command: shell"),
+            "{}",
+            err(shell)
+        );
+        // A script's {var.NAME} is checked against each action that uses it.
+        let uses = "version = 1\n[[script]]\nid = \"s\"\ncommand = [\"/bin/echo\", \"{var.url}\"]\n\
+                    [[action]]\nid = \"a\"\nlabel = \"A\"\nkinds = [\"line\"]\nscript = \"s\"\n";
+        assert!(
+            err(uses).contains("action a: command[1]: {var.url}"),
+            "{}",
+            err(uses)
+        );
+        let with = format!("{uses}[action.vars]\nurl = \"https://x\"\n");
+        assert!(Config::parse(&with, Path::new("/")).is_ok());
+        // Shell text that only looks like braces keeps working.
+        let awk = cmd("shell = true\ncommand = 'echo ${HOME} | awk \"{print}\"'");
+        assert!(Config::parse(&awk, Path::new("/")).is_ok());
     }
 }

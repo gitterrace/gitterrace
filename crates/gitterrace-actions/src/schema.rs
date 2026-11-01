@@ -177,6 +177,27 @@ pub const ENV_VARS: [(&str, &str); 11] = [
     ("GITTERRACE_LINE_END", "Last line, when there is a range."),
 ];
 
+/// Placeholders a `command` element may hold. `repo` marks values read from the browsed
+/// repository, which the loader keeps from opening an argument.
+pub const PLACEHOLDERS: [(&str, bool, &str); 12] = [
+    ("title", true, "The title."),
+    ("markdown", true, "The markdown text."),
+    ("text", true, "The selected text, or empty."),
+    ("path", true, "The repository-relative path, or empty."),
+    ("line_start", false, "First line, or empty."),
+    ("line_end", false, "Last line, or empty."),
+    ("sha", false, "The full commit id."),
+    ("url", false, "The permalink."),
+    ("repo", false, "The repository name."),
+    ("root", false, "The repository root."),
+    ("kind", false, "The kind."),
+    (
+        "var.<name>",
+        false,
+        "A value from `[action.vars]`. An undefined name is a load error.",
+    ),
+];
+
 /// Top-level keys of `actions.toml`.
 pub const FILE_KEYS: [Item; 3] = [
     item("version", "integer", true, "", "Must be `1`."),
@@ -197,7 +218,7 @@ pub const FILE_KEYS: [Item; 3] = [
 ];
 
 /// Keys of a `[[script]]` block.
-pub const SCRIPT_KEYS: [Item; 5] = [
+pub const SCRIPT_KEYS: [Item; 6] = [
     item(
         "id",
         "string",
@@ -210,7 +231,14 @@ pub const SCRIPT_KEYS: [Item; 5] = [
         "array or string",
         true,
         "",
-        "The argv, no templating; `argv[0]` is resolved once at load. One string when `shell = true`.",
+        "The argv, run with no shell. `argv[0]` is literal, resolved once at load. Other elements may hold placeholders (below), each filled in as exactly one argument. One string when `shell = true`, which takes no placeholders.",
+    ),
+    item(
+        "stdin",
+        "string",
+        false,
+        "`json`",
+        "What the program reads: `json` (the payload), `markdown` (the `markdown` field alone) or `none`.",
     ),
     item(
         "cwd",
@@ -231,12 +259,12 @@ pub const SCRIPT_KEYS: [Item; 5] = [
         "boolean",
         false,
         "`false`",
-        "Run `command` as `sh -c \"<string>\"`. Nothing is substituted into it.",
+        "Run `command` as `sh -c \"<string>\"`. A placeholder in it is a load error. Read the environment instead.",
     ),
 ];
 
 /// Keys of an `[[action]]` block.
-pub const ACTION_KEYS: [Item; 12] = [
+pub const ACTION_KEYS: [Item; 13] = [
     item(
         "id",
         "string",
@@ -293,6 +321,13 @@ pub const ACTION_KEYS: [Item; 12] = [
         "`toast`",
         "`toast` shows the first output line, `ignore` shows failures only.",
     ),
+    item(
+        "stdin",
+        "string",
+        false,
+        "`json`",
+        "As in a script. Overrides the script's.",
+    ),
     item("shell", "boolean", false, "`false`", "As in a script."),
     item(
         "key",
@@ -313,7 +348,7 @@ pub const ACTION_KEYS: [Item; 12] = [
         "table of strings",
         false,
         "`{}`",
-        "`[action.vars]`: fixed settings, lowercase names `[a-z0-9_]{1,32}`, at most 32, each value at most 4 KiB. They reach the script as `GITTERRACE_VAR_<NAME>` and as `payload.vars`, and are never templated into `argv`.",
+        "`[action.vars]`: fixed settings, lowercase names `[a-z0-9_]{1,32}`, at most 32, each value at most 4 KiB. They reach the script as `GITTERRACE_VAR_<NAME>`, as `payload.vars` and as `{var.<name>}` in `command`.",
     ),
 ];
 
@@ -325,7 +360,8 @@ mod tests {
     use crate::config::{Config, Kind};
     use crate::payload::{CommitInfo, Lines, Payload, RepoInfo};
     use crate::schema::{
-        ACTION_KEYS, ENV_VARS, FILE_KEYS, Item, KINDS, PAYLOAD_FIELDS, SCRIPT_KEYS, kind_name,
+        ACTION_KEYS, ENV_VARS, FILE_KEYS, Item, KINDS, PAYLOAD_FIELDS, PLACEHOLDERS, SCRIPT_KEYS,
+        kind_name,
     };
 
     fn names(items: &[Item]) -> BTreeSet<String> {
@@ -430,6 +466,18 @@ mod tests {
              command = [\"/bin/echo\"]\nzzz = 1\n",
         );
         assert_eq!(expected(&action), names(&ACTION_KEYS), "{action}");
+    }
+
+    #[test]
+    fn placeholder_table_is_the_placeholders() {
+        let p = payload(true);
+        for (name, _, _) in &PLACEHOLDERS[..11] {
+            assert!(p.placeholder(name).is_some(), "{name}");
+        }
+        let doc: Vec<&str> = PLACEHOLDERS[..11].iter().map(|(n, _, _)| *n).collect();
+        assert_eq!(doc, crate::config::FIELDS);
+        let repo: Vec<&str> = PLACEHOLDERS.iter().filter(|p| p.1).map(|p| p.0).collect();
+        assert_eq!(repo, crate::config::REPO_FIELDS);
     }
 
     /// The limits the tables state are the limits the loader enforces.

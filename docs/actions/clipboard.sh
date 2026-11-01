@@ -1,16 +1,14 @@
 #!/bin/sh
-# Copy the selection as markdown. Payload fields come from the browsed repository: treat
-# them as untrusted.
+# Copy the selection as markdown, on any OS. Use with stdin = "markdown": the text arrives
+# on stdin and goes straight to the clipboard tool, never parsed. On macOS alone,
+# command = ["pbcopy"] does the same with no script.
 #
 # Needs (first present wins):
 #   macOS:         pbcopy (built in)
 #   Linux Wayland: wl-copy (wl-clipboard)
 #   Linux X11:     xclip or xsel
 #   WSL:           clip.exe (built in)
-# Always needs jq (macOS: brew install jq; Debian/Ubuntu: apt install jq).
 set -eu
-need() { command -v "$1" >/dev/null 2>&1 || { echo "gitterrace: $1 not found. $2"; exit 1; }; }
-need jq "Install it with your package manager (brew install jq, apt install jq)."
 if command -v pbcopy >/dev/null 2>&1; then set -- pbcopy
 elif command -v wl-copy >/dev/null 2>&1; then set -- wl-copy
 elif command -v xclip >/dev/null 2>&1; then set -- xclip -selection clipboard
@@ -20,5 +18,5 @@ else
   echo "gitterrace: no clipboard tool found. Install wl-clipboard (Wayland) or xclip (X11)."
   exit 1
 fi
-jq -r .markdown | "$@"
+"$@"
 echo "copied $GITTERRACE_TITLE"

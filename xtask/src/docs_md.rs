@@ -5,7 +5,7 @@ use std::path::Path;
 
 use anyhow::{Context as _, Result};
 use gitterrace_actions::schema::{
-    ACTION_KEYS, ENV_VARS, Item, KINDS, PAYLOAD_FIELDS, SCRIPT_KEYS, kind_name,
+    ACTION_KEYS, ENV_VARS, Item, KINDS, PAYLOAD_FIELDS, PLACEHOLDERS, SCRIPT_KEYS, kind_name,
 };
 
 use crate::facts::Workspace;
@@ -23,6 +23,7 @@ pub fn render(root: &Path, ws: &Workspace, scripts: &[Script]) -> Result<Vec<Out
         Out::block(ACTIONS, "payload", payload()),
         Out::block(ACTIONS, "env", env()),
         Out::block(ACTIONS, "action-keys", action_keys()),
+        Out::block(ACTIONS, "placeholders", placeholders()),
         Out::block(ACTIONS, "scripts", script_table(scripts)),
         Out::block(ARCH, "crates", crate_diagram(ws)),
         Out::block(ARCH, "routes", routes()),
@@ -84,6 +85,15 @@ fn key_table(title: &str, intro: &str, items: &[Item]) -> String {
             i.default,
             i.doc
         );
+    }
+    s
+}
+
+fn placeholders() -> String {
+    let mut s =
+        String::from("| Placeholder | From the repository | Value |\n| --- | --- | --- |\n");
+    for (name, repo, doc) in PLACEHOLDERS {
+        let _ = writeln!(s, "| `{{{name}}}` | {} | {doc} |", yes(repo));
     }
     s
 }

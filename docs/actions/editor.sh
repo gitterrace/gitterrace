@@ -1,16 +1,20 @@
 #!/bin/sh
-# Open the file at the selected line in the editor. Use with cwd = "repo".
-# This opens the working-tree copy, which may differ from the commit you are viewing.
-# Payload fields come from the browsed repository: treat them as untrusted. The path is
-# passed as one argument, never through a shell string.
+# Open a file at a line in the editor, on any OS. Use with
+#   command = ["~/.config/gitterrace/editor.sh", "{line_start}", "{root}/{path}"]
+#   stdin   = "none"
+# This opens the working-tree copy, which may differ from the commit you are viewing. Each
+# argument arrives as one argv element, never through a shell string.
 #
 # Needs (all OSes): an editor. Picks $VISUAL, then $EDITOR, then code, then vi.
 # Line jump is known for code, vim/nvim/vi, nano, emacs, subl, zed and hx; any other
 # editor opens the file without a line.
 set -eu
-cat >/dev/null
-f="$GITTERRACE_ROOT/$GITTERRACE_PATH"
-l="${GITTERRACE_LINE_START:-1}"
+if [ "$#" != 2 ]; then
+  echo "gitterrace: editor.sh takes a line and a file: \"{line_start}\", \"{root}/{path}\"."
+  exit 1
+fi
+l=${1:-1}
+f=$2
 ed="${VISUAL:-${EDITOR:-}}"
 if [ -z "$ed" ]; then
   if command -v code >/dev/null 2>&1; then ed=code; else ed="vi"; fi
@@ -31,4 +35,4 @@ case "$(basename "$1")" in
   subl|zed|hx) "$@" "$f:$l" ;;
   *) "$@" "$f" ;;
 esac
-echo "opened $GITTERRACE_PATH"
+echo "opened $f"

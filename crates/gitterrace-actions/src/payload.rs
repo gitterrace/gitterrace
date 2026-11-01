@@ -236,6 +236,27 @@ impl Payload {
         e
     }
 
+    /// The value a `{name}` placeholder in `command` expands to; `None` for an unknown name.
+    /// A field the selection does not have (no path on a commit) expands to "".
+    pub fn placeholder(&self, name: &str) -> Option<String> {
+        let opt = |v: &Option<String>| v.clone().unwrap_or_default();
+        let line = |f: fn(Lines) -> u32| self.lines.map(|l| f(l).to_string()).unwrap_or_default();
+        Some(match name {
+            "title" => self.title.clone(),
+            "markdown" => self.markdown.clone(),
+            "text" => opt(&self.text),
+            "path" => opt(&self.path),
+            "line_start" => line(|l| l.start),
+            "line_end" => line(|l| l.end),
+            "sha" => self.sha.clone(),
+            "url" => self.permalink.clone(),
+            "repo" => self.repo.name.clone(),
+            "root" => self.repo.root.clone(),
+            "kind" => kind_name(self.kind).to_string(),
+            _ => self.vars.get(name.strip_prefix("var.")?)?.clone(),
+        })
+    }
+
     /// `GITTERRACE_VAR_<NAME>` for each var. Names are `[a-z0-9_]`, so the prefix keeps them
     /// out of the payload variables, `PATH` and `HOME`; values are passed verbatim.
     pub fn var_env(&self) -> BTreeMap<String, String> {

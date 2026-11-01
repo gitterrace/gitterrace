@@ -37,6 +37,19 @@ run() {
   log=$(cat "$TEST_ACTIONS_LOG")
   stdin_log=$(cat "$TEST_ACTIONS_LOG.stdin")
 }
+# runa PROFILE SCRIPT STDIN ARG...: as run, for a script the action calls with placeholder
+# arguments. STDIN is what stdin = "markdown" or "none" sends; the args are what gitterrace
+# expands, one element each.
+runa() {
+  prof=$1; script=$2; in=$3; shift 3
+  d="$tmp/$prof"; TEST_ACTIONS_LOG="$d/log"; : > "$TEST_ACTIONS_LOG"; : > "$TEST_ACTIONS_LOG.stdin"
+  mkdir -p "$d/work"
+  out=$(cd "$d/work" && printf '%s' "$in" | env -i "PATH=$d/bin" "HOME=$d" "TEST_ACTIONS_LOG=$TEST_ACTIONS_LOG" \
+    'GITTERRACE_TITLE=t $(touch PWNED)' ${TEST_EDITOR:+"$TEST_EDITOR"} /bin/dash "$root/docs/actions/$script" "$@" 2>&1)
+  rc=$?
+  log=$(cat "$TEST_ACTIONS_LOG")
+  stdin_log=$(cat "$TEST_ACTIONS_LOG.stdin")
+}
 expect_log() { case $log in *"$2"*) ;; *) fail "$1: log lacks '$2': $log" ;; esac; }
 expect_rc() { [ "$rc" = "$2" ] || fail "$1: rc $rc, want $2 ($out)"; }
 expect_clean() { [ ! -e "$tmp/$1/work/PWNED" ] && [ ! -e "$tmp/$1/work/PWNED2" ] || fail "$1: payload was executed"; }
@@ -45,23 +58,23 @@ one_line() {
   case $out in "gitterrace:"*) ;; *) fail "$1: message: $out" ;; esac
 }
 
-profile mac pbcopy open code tendir curl
+profile mac pbcopy open code
 profile x11 xclip xdg-open code
 profile wayland wl-copy xdg-open
 profile xsel xsel xdg-open
 profile wsl clip.exe explorer.exe
 profile none
-profile clionly tendir
 profile ed vim nano subl mystery
 
-# clipboard
-run mac clipboard.sh;     expect_rc mac-clip 0; expect_log mac-clip "/pbcopy"
-case $stdin_log in *'md $(touch PWNED) body'*) ;; *) fail "mac-clip stdin: $stdin_log" ;; esac
-run x11 clipboard.sh;     expect_rc x11-clip 0; expect_log x11-clip "/xclip"; expect_log x11-clip "clipboard"
-run wayland clipboard.sh; expect_rc wl-clip 0;  expect_log wl-clip "/wl-copy"
-run xsel clipboard.sh;    expect_rc xsel-clip 0; expect_log xsel-clip "--input"
-run wsl clipboard.sh;     expect_rc wsl-clip 0; expect_log wsl-clip "clip.exe"
-run none clipboard.sh;    expect_rc none-clip 1; one_line none-clip
+# clipboard: stdin = "markdown", so the text arrives raw and jq is not needed
+md='md $(touch PWNED) body'
+runa mac clipboard.sh "$md";     expect_rc mac-clip 0; expect_log mac-clip "/pbcopy"
+[ "$stdin_log" = "$md" ] || fail "mac-clip stdin: $stdin_log"
+runa x11 clipboard.sh "$md";     expect_rc x11-clip 0; expect_log x11-clip "/xclip"; expect_log x11-clip "clipboard"
+runa wayland clipboard.sh "$md"; expect_rc wl-clip 0;  expect_log wl-clip "/wl-copy"
+runa xsel clipboard.sh "$md";    expect_rc xsel-clip 0; expect_log xsel-clip "--input"
+runa wsl clipboard.sh "$md";     expect_rc wsl-clip 0; expect_log wsl-clip "clip.exe"
+runa none clipboard.sh "$md";    expect_rc none-clip 1; one_line none-clip
 
 # obsidian: url mode
 run mac obsidian.sh GITTERRACE_VAR_MODE=url; expect_rc mac-obs 0; expect_log mac-obs "/open"; expect_log mac-obs "obsidian://new?vault=Notes"
@@ -79,30 +92,19 @@ run mac obsidian.sh "GITTERRACE_VAR_VAULT=~/Tilde"; expect_rc obs-tilde 0
 ls "$tmp"/mac/Tilde/Daily/*.md >/dev/null 2>&1 || fail "~/ in vault not expanded to HOME"
 run none obsidian.sh; expect_rc none-daily 0
 
-# tendir
-run mac tendir.sh;           expect_rc mac-tendir 0; expect_log mac-tendir "/open"; expect_log mac-tendir "tendir://new-task?title="
-case $log in *'$('*|*'`'*) fail "mac-tendir: unencoded payload: $log" ;; esac
-run mac tendir.sh GITTERRACE_VAR_MODE=cli; expect_rc tendir-cli 0; expect_log tendir-cli "/tendir"; expect_log tendir-cli "--notes"
-run x11 tendir.sh GITTERRACE_VAR_MODE=cli; expect_rc tendir-cli-missing 1; one_line tendir-cli-missing
-run x11 tendir.sh;           expect_rc x11-tendir 0; expect_log x11-tendir "/xdg-open"
-run clionly tendir.sh;       expect_rc clionly 0; expect_log clionly "--notes"
-run mac tendir.sh GITTERRACE_VAR_MODE=bogus; expect_rc tendir-bogus 1; one_line tendir-bogus
-run none tendir.sh;          expect_rc none-tendir 1; one_line none-tendir
-
-# editor
-run mac editor.sh;           expect_rc mac-ed 0; expect_log mac-ed "--goto"; expect_log mac-ed "my repo/a b/\$(x).rs:7"
-run wayland editor.sh;       expect_rc none-ed 1; one_line none-ed
-run ed editor.sh VISUAL=vim;    expect_rc vim 0; expect_log vim "+7"
-run ed editor.sh EDITOR=nano;   expect_rc nano 0; expect_log nano "+7"
-run ed editor.sh EDITOR=subl;   expect_rc subl 0; expect_log subl ".rs:7"
-run ed editor.sh "EDITOR=vim -u NONE"; expect_rc vimflags 0; expect_log vimflags "NONE"
-run ed editor.sh EDITOR=mystery; expect_rc mystery 0
+# editor: command = [editor.sh, "{line_start}", "{root}/{path}"], stdin = "none"
+f="$tmp/my repo/a b/\$(x).rs"
+runa mac editor.sh '' 7 "$f";      expect_rc mac-ed 0; expect_log mac-ed "--goto"; expect_log mac-ed "my repo/a b/\$(x).rs:7"
+runa mac editor.sh '' '' "$f";     expect_rc ed-noline 0; expect_log ed-noline ".rs:1"
+runa mac editor.sh '';             expect_rc ed-noargs 1; one_line ed-noargs
+runa wayland editor.sh '' 7 "$f";  expect_rc none-ed 1; one_line none-ed
+TEST_EDITOR=VISUAL=vim runa ed editor.sh '' 7 "$f";  expect_rc vim 0; expect_log vim "+7"
+TEST_EDITOR=EDITOR=nano runa ed editor.sh '' 7 "$f"; expect_rc nano 0; expect_log nano "+7"
+TEST_EDITOR=EDITOR=subl runa ed editor.sh '' 7 "$f"; expect_rc subl 0; expect_log subl ".rs:7"
+TEST_EDITOR="EDITOR=vim -u NONE" runa ed editor.sh '' 7 "$f"; expect_rc vimflags 0; expect_log vimflags "NONE"
+TEST_EDITOR=EDITOR=mystery runa ed editor.sh '' 7 "$f"; expect_rc mystery 0
 case $log in *"+7"*|*":7"*) fail "mystery editor got a line: $log" ;; esac
 
-# webhook
-run mac webhook.sh GITTERRACE_VAR_URL=https://x.test/h; expect_rc mac-hook 0; expect_log mac-hook "https://x.test/h"
-run none webhook.sh;         expect_rc none-hook 1; one_line none-hook
-
-for p in mac x11 wayland xsel wsl none clionly ed; do expect_clean "$p"; done
+for p in mac x11 wayland xsel wsl none ed; do expect_clean "$p"; done
 
 if [ "$fails" = 0 ]; then echo "actions tests: ok"; else echo "actions tests: $fails failure(s)"; exit 1; fi

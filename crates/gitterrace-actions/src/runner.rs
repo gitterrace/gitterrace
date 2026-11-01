@@ -14,7 +14,7 @@ use std::time::{Duration, Instant};
 
 use rustix::process::{Pid, Signal, kill_process_group};
 
-use crate::config::{Action, Cwd};
+use crate::config::{Action, Cwd, Piece, REPO_FIELDS, Stdin, pieces};
 use crate::payload::Payload;
 
 /// Captured per stream; the rest is read and dropped so the child never blocks on a pipe.
@@ -27,6 +27,10 @@ const POLL: Duration = Duration::from_millis(20);
 /// Inherited variables a script may see; everything else (tokens, agent sockets) is dropped
 /// unless the action names it in `env`.
 const KEEP_ENV: &[&str] = &["PATH", "HOME", "USER", "LANG", "TMPDIR"];
+/// One expanded placeholder value. Larger values belong on stdin, not in argv.
+const MAX_VALUE_BYTES: usize = 64 * 1024;
+/// The whole expanded argv, well under every OS's `ARG_MAX` with the environment beside it.
+const MAX_ARGV_BYTES: usize = 256 * 1024;
 
 #[derive(Debug, Clone, Copy)]
 pub struct Limits {
@@ -69,6 +73,9 @@ pub enum RunError {
     Io(#[from] std::io::Error),
     #[error("payload: {0}")]
     Json(#[from] serde_json::Error),
+    /// The selection cannot be passed as arguments; shown to the user as is.
+    #[error("{0}")]
+    Refused(String),
 }
 
 #[derive(Default)]
@@ -117,16 +124,25 @@ impl Runner {
         let _slot = self.acquire(&action.id)?;
         let mut payload = payload.clone();
         payload.vars.clone_from(&action.vars);
-        let stdin = serde_json::to_vec(&payload)?;
-        let mut cmd = Command::new(&action.argv[0]);
-        cmd.args(&action.argv[1..])
+        let argv = expand(&action.argv, &payload)?;
+        let stdin = match action.stdin {
+            Stdin::Json => Some(serde_json::to_vec(&payload)?),
+            Stdin::Markdown => Some(payload.markdown.clone().into_bytes()),
+            Stdin::None => None,
+        };
+        let mut cmd = Command::new(&argv[0]);
+        cmd.args(&argv[1..])
             .env_clear()
             .current_dir(match &action.cwd {
                 Cwd::Repo => repo_root.to_path_buf(),
                 Cwd::Home => std::env::var_os("HOME").map_or_else(|| "/".into(), Into::into),
                 Cwd::Path(p) => p.clone(),
             })
-            .stdin(Stdio::piped())
+            .stdin(if stdin.is_some() {
+                Stdio::piped()
+            } else {
+                Stdio::null()
+            })
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .process_group(0);
@@ -173,10 +189,64 @@ impl Runner {
     }
 }
 
-fn supervise(mut child: Child, stdin: Vec<u8>, timeout: Duration) -> Outcome {
+/// Fills each element of the template with the payload's values. Each element stays one
+/// argument; no shell sees it. Refuses rather than truncates: a cut title is a wrong title.
+pub fn expand(template: &[String], payload: &Payload) -> Result<Vec<String>, RunError> {
+    let mut out = Vec::with_capacity(template.len());
+    let mut total = 0;
+    let mut after_dashdash = false;
+    for (i, el) in template.iter().enumerate() {
+        if i == 0 {
+            out.push(el.clone());
+            continue;
+        }
+        let ps = pieces(el).map_err(RunError::Refused)?;
+        let mut arg = String::new();
+        for p in &ps {
+            match p {
+                Piece::Text(t) => arg.push_str(t),
+                Piece::Field(name) => {
+                    let v = payload.placeholder(name).ok_or_else(|| {
+                        RunError::Refused(format!("unknown placeholder {{{name}}}"))
+                    })?;
+                    if v.contains('\0') {
+                        return Err(RunError::Refused(format!("{{{name}}} contains a NUL byte")));
+                    }
+                    if v.len() > MAX_VALUE_BYTES {
+                        return Err(RunError::Refused(format!(
+                            "{{{name}}} is {} KiB, over the 64 KiB argument cap. Use stdin",
+                            v.len() / 1024
+                        )));
+                    }
+                    arg.push_str(&v);
+                }
+            }
+        }
+        // The loader lets a repository value open an element only behind `--` or right after
+        // a literal option; in the second case a leading `-` would still read as an option.
+        let repo_first =
+            matches!(ps.first(), Some(Piece::Field(n)) if REPO_FIELDS.contains(&n.as_str()));
+        if !after_dashdash && repo_first && arg.starts_with('-') {
+            return Err(RunError::Refused(format!(
+                "command[{i}] would start with '-' and read as an option"
+            )));
+        }
+        after_dashdash |= el == "--";
+        total += arg.len() + 1;
+        if total > MAX_ARGV_BYTES {
+            return Err(RunError::Refused(
+                "the arguments are over 256 KiB together. Use stdin".into(),
+            ));
+        }
+        out.push(arg);
+    }
+    Ok(out)
+}
+
+fn supervise(mut child: Child, stdin: Option<Vec<u8>>, timeout: Duration) -> Outcome {
     let pgid = Pid::from_child(&child);
     // Writing on its own thread: a script that never reads stdin must not stall us.
-    if let Some(mut pipe) = child.stdin.take() {
+    if let (Some(mut pipe), Some(stdin)) = (child.stdin.take(), stdin) {
         thread::spawn(move || {
             if pipe.write_all(&stdin).is_err() {
                 // The script closed stdin early; that is its choice.
@@ -285,7 +355,7 @@ mod tests {
 
     use gitterrace_git::Repo;
 
-    use crate::config::{Action, Cwd, Kind, Output};
+    use crate::config::{Action, Cwd, Kind, Output, Stdin};
     use crate::payload::{Lines, Locator, Payload};
     use crate::runner::{Limits, RunError, Runner};
 
@@ -295,6 +365,7 @@ mod tests {
             label: id.into(),
             kinds: vec![Kind::Line, Kind::Commit],
             argv: vec!["/bin/sh".into(), "-c".into(), script.into()],
+            stdin: Stdin::Json,
             cwd: Cwd::Repo,
             timeout,
             output: Output::Toast,
@@ -564,5 +635,130 @@ mod tests {
             limited.run(&quick, &p, Path::new("/")),
             Err(RunError::RateLimited)
         ));
+    }
+
+    /// Runs `argv` (placeholders included) with a recorder in front: `/bin/sh -c` writes each
+    /// argument it gets on its own NUL-terminated record, and stdin beside it.
+    fn record(t: &Path, args: &[&str], stdin: Stdin, p: &Payload) -> Result<Vec<String>, RunError> {
+        let out = t.join("argv");
+        let script = format!(
+            "printf '%s\\0' \"$@\" > '{0}'; cat > '{0}.in'",
+            out.display()
+        );
+        let mut a = shell("rec", &script, Duration::from_secs(5));
+        a.argv.push("rec".into());
+        a.argv.extend(args.iter().map(|s| (*s).to_string()));
+        a.stdin = stdin;
+        a.vars.clone_from(&p.vars);
+        let r = Runner::new(Limits::default()).run(&a, p, t)?;
+        assert!(r.ok, "{r:?}");
+        let raw = std::fs::read_to_string(&out).expect("argv");
+        Ok(raw.split_terminator('\0').map(str::to_string).collect())
+    }
+
+    #[test]
+    fn child_argv_is_the_template_filled_in() {
+        let (t, repo) = fixture();
+        let mut p = payload(&repo, Kind::Line);
+        p.vars.insert("tag".into(), "x y".into());
+        let got = record(
+            t.path(),
+            &[
+                "add",
+                "--notes",
+                "{markdown}",
+                "--line={line_start}",
+                "{{lit}}",
+                "#{var.tag}",
+                "--",
+                "{title}",
+                "{path}",
+            ],
+            Stdin::Json,
+            &p,
+        )
+        .expect("run");
+        let want = [
+            "add".to_string(),
+            "--notes".into(),
+            p.markdown.clone(),
+            "--line=1".into(),
+            "{lit}".into(),
+            "#x y".into(),
+            "--".into(),
+            p.title.clone(),
+            "src/a.rs".into(),
+        ];
+        assert_eq!(got, want);
+    }
+
+    #[test]
+    fn hostile_titles_are_one_literal_argument() {
+        let (t, repo) = fixture();
+        let mut p = payload(&repo, Kind::Commit);
+        for title in [
+            "--help",
+            "$(touch PWNED)",
+            "a b; touch PWNED",
+            "`touch PWNED`",
+        ] {
+            p.title = title.into();
+            let got = record(t.path(), &["--", "{title}"], Stdin::None, &p).expect("run");
+            assert_eq!(got, ["--", title]);
+            assert!(!t.path().join("PWNED").exists(), "{title} ran");
+        }
+        // Without `--`, a value after a literal option that starts with `-` is refused.
+        p.markdown = "-rf".into();
+        let e = record(t.path(), &["--notes", "{markdown}"], Stdin::None, &p).expect_err("refused");
+        assert!(e.to_string().contains("option"), "{e}");
+    }
+
+    #[test]
+    fn caps_and_nul_refuse_the_run() {
+        let (t, repo) = fixture();
+        let mut p = payload(&repo, Kind::Commit);
+        p.title = "x".repeat(64 * 1024);
+        assert!(
+            record(t.path(), &["--", "{title}"], Stdin::None, &p).is_ok(),
+            "at cap"
+        );
+        p.title.push('x');
+        let e = record(t.path(), &["--", "{title}"], Stdin::None, &p).expect_err("over");
+        assert!(
+            matches!(&e, RunError::Refused(m) if m.contains("{title}") && m.contains("64 KiB")),
+            "{e}"
+        );
+        p.title = "x".repeat(60 * 1024);
+        let five = ["--", "{title}", "{title}", "{title}", "{title}", "{title}"];
+        let e = record(t.path(), &five, Stdin::None, &p).expect_err("total");
+        assert!(
+            matches!(&e, RunError::Refused(m) if m.contains("256 KiB")),
+            "{e}"
+        );
+        assert!(
+            record(t.path(), &five[..5], Stdin::None, &p).is_ok(),
+            "under total"
+        );
+        p.title = "a\0b".into();
+        let e = record(t.path(), &["--", "{title}"], Stdin::None, &p).expect_err("nul");
+        assert!(
+            matches!(&e, RunError::Refused(m) if m.contains("NUL")),
+            "{e}"
+        );
+    }
+
+    #[test]
+    fn stdin_modes() {
+        let (t, repo) = fixture();
+        let p = payload(&repo, Kind::Line);
+        let read = || std::fs::read(t.path().join("argv.in")).expect("stdin");
+        record(t.path(), &[], Stdin::Json, &p).expect("json");
+        let mut full = p.clone();
+        full.vars.clear();
+        assert_eq!(read(), serde_json::to_vec(&full).expect("json"));
+        record(t.path(), &[], Stdin::Markdown, &p).expect("md");
+        assert_eq!(read(), p.markdown.as_bytes());
+        record(t.path(), &[], Stdin::None, &p).expect("none");
+        assert!(read().is_empty());
     }
 }

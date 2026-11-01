@@ -393,6 +393,9 @@ async fn run(State(site): State<Arc<Site>>, req: Request) -> Response {
         Err(Failed::Run(e @ (RunError::Busy | RunError::RateLimited))) => {
             reply(StatusCode::TOO_MANY_REQUESTS, false, None, &e.to_string())
         }
+        Err(Failed::Run(RunError::Refused(why))) => {
+            reply(StatusCode::UNPROCESSABLE_ENTITY, false, None, &why)
+        }
         Err(Failed::Run(e)) => {
             tracing::warn!("action failed to start: {e}");
             reply(
