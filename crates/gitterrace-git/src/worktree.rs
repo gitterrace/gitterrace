@@ -26,6 +26,11 @@ fn changed_paths(repo: &gix::Repository, limit: usize) -> Result<BTreeSet<String
     use gix::status::{UntrackedFiles, index_worktree::Item as Iw};
 
     let mut out = BTreeSet::new();
+    // A bare repository has no working tree to differ from HEAD, and diffing HEAD against its
+    // empty index would walk the whole tree on every watcher tick.
+    if repo.workdir().is_none() {
+        return Ok(out);
+    }
     let iter = repo
         .status(gix::progress::Discard)
         .map_err(git)?
@@ -87,6 +92,9 @@ pub fn worktree_signature(repo: &Repo) -> Result<u64> {
 
     let r = open(repo)?;
     let work = r.workdir().map(Path::to_path_buf);
+    if work.is_none() {
+        return Ok(0);
+    }
     let mut items: Vec<(String, u64, u128)> = Vec::new();
     let iter = r
         .status(gix::progress::Discard)
@@ -281,6 +289,26 @@ mod tests {
             .status()
             .is_ok_and(|s| s.success());
         assert!(ok, "git {args:?}");
+    }
+
+    #[test]
+    fn a_bare_repository_is_never_dirty() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let src = dir.path().join("src");
+        std::fs::create_dir(&src).expect("mkdir");
+        git(&src, &["init", "-q", "-b", "main"]);
+        std::fs::write(src.join("a.txt"), "1\n").expect("write");
+        git(&src, &["add", "."]);
+        git(&src, &["commit", "-qm", "init"]);
+        let bare = dir.path().join("bare.git");
+        git(
+            dir.path(),
+            &["clone", "-q", "--bare", "src", bare.to_str().expect("utf8")],
+        );
+        let repo = Repo::discover(&bare).expect("repo");
+        assert!(!crate::is_dirty(&repo));
+        assert_eq!(crate::worktree_signature(&repo).expect("sig"), 0);
+        assert!(worktree_diff(&repo).expect("diff").is_empty());
     }
 
     #[test]
