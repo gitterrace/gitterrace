@@ -43,6 +43,7 @@ docs-gen:
 
 ## docs-check: Generated files are up to date
 docs-check:
+	python3 scripts/bench-report.py --check
 	cargo xtask check
 
 ## names: File, env and project names follow the conventions

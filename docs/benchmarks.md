@@ -64,13 +64,132 @@ repository to prove it still works.
 <!-- BEGIN GENERATED: results -->
 Run 2026-11-01T14:13:10 on Apple M1 Max, 10 cores, 64.0 GB, Darwin 25.6.0. git version 2.54.0 (Apple Git-157), gitterrace 0.1.0. 5 warm runs per page, 60 s idle windows.
 
+#### control
+
+small repository, pinned at `d2ef86fee2`. All 6 metrics are within budget. Against budget: warm page 9 ms of 300 ms, cold page 37 ms of 1500 ms, index build 0.5 s of 30 s, idle CPU 0.40 % of 1 %, peak memory 52 MB of 500 MB, export 2.1 s of 60 s.
+
+#### git
+
+medium repository, pinned at `50fe5cc63f`. All 6 metrics are within budget. Against budget: warm page 27 ms of 300 ms, cold page 2459 ms of 3000 ms, index build 58.4 s of 300 s, idle CPU 0.47 % of 1 %, peak memory 1384 MB of 1500 MB, export 7.4 s of 300 s.
+
+#### rust
+
+large repository, pinned at `f90a2d27c2`. 3 of 5 metrics are within budget. Against budget: warm page 291 ms of 300 ms, cold page 2714 ms of 10000 ms, index build 1262.3 s of 1800 s, idle CPU 4.71 % of 1 %, peak memory 4837 MB of 4000 MB.
+
+- **Over budget:** idle CPU is 4.71 % against a limit of 1 % (4.7x).
+- **Over budget:** peak memory is 4837 MB against a limit of 4000 MB (1.2x).
+
 | Repo | Class | Pin | Index | Peak RSS | Cache | RSS after pages | Idle CPU | Idle CPU with /events | Export |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | control | small | `d2ef86fee2` | 0.5 s | 50 MB | 0 MB | 52 MB | 0.03% | 0.40% | 2.1 s, 26 MB |
 | git | medium | `50fe5cc63f` | 58.4 s | 756 MB | 47 MB | 1384 MB | 0.05% | 0.47% | 7.4 s, 153 MB |
 | rust | large | `f90a2d27c2` | 1262.3 s | 1981 MB | 685 MB | 4837 MB | 1.03% | 4.71% | not run |
 
-#### control
+<svg xmlns="http://www.w3.org/2000/svg" role="img" viewBox="0 0 640 154" width="640" aria-label="Warm page, slowest median per repository against its budget">
+<title>Warm page, slowest median (ms) against budget</title>
+<style>.ok{fill:#5f8a6e}.over{fill:#b5654a}@media(prefers-color-scheme:dark){.ok{fill:#8fb89c}.over{fill:#d98b72}}</style>
+<text x="8" y="16" fill="currentColor" font-family="sans-serif" font-size="13" font-weight="600">Warm page, slowest median (ms)</text>
+<text x="8" y="47" fill="currentColor" font-family="sans-serif" font-size="12">control</text>
+<rect class="ok" x="84" y="34" width="10.8" height="18" rx="2" fill="#5f8a6e"/>
+<line x1="435.9" y1="30" x2="435.9" y2="56" stroke="currentColor" stroke-width="1.5" stroke-dasharray="3 2"/>
+<text x="478" y="47" fill="currentColor" font-family="sans-serif" font-size="12">9 of 300</text>
+<text x="8" y="81" fill="currentColor" font-family="sans-serif" font-size="12">git</text>
+<rect class="ok" x="84" y="68" width="32.2" height="18" rx="2" fill="#5f8a6e"/>
+<line x1="435.9" y1="64" x2="435.9" y2="90" stroke="currentColor" stroke-width="1.5" stroke-dasharray="3 2"/>
+<text x="478" y="81" fill="currentColor" font-family="sans-serif" font-size="12">27 of 300</text>
+<text x="8" y="115" fill="currentColor" font-family="sans-serif" font-size="12">rust</text>
+<rect class="ok" x="84" y="102" width="341.0" height="18" rx="2" fill="#5f8a6e"/>
+<line x1="435.9" y1="98" x2="435.9" y2="124" stroke="currentColor" stroke-width="1.5" stroke-dasharray="3 2"/>
+<text x="478" y="115" fill="currentColor" font-family="sans-serif" font-size="12">291 of 300</text>
+<text x="84" y="148" fill="currentColor" font-family="sans-serif" font-size="11" opacity="0.7">dashed line: budget</text></svg>
+
+<svg xmlns="http://www.w3.org/2000/svg" role="img" viewBox="0 0 640 154" width="640" aria-label="Cold page, slowest per repository against its budget">
+<title>Cold page, slowest (ms) against budget</title>
+<style>.ok{fill:#5f8a6e}.over{fill:#b5654a}@media(prefers-color-scheme:dark){.ok{fill:#8fb89c}.over{fill:#d98b72}}</style>
+<text x="8" y="16" fill="currentColor" font-family="sans-serif" font-size="13" font-weight="600">Cold page, slowest (ms)</text>
+<text x="8" y="47" fill="currentColor" font-family="sans-serif" font-size="12">control</text>
+<rect class="ok" x="84" y="34" width="1.5" height="18" rx="2" fill="#5f8a6e"/>
+<line x1="136.8" y1="30" x2="136.8" y2="56" stroke="currentColor" stroke-width="1.5" stroke-dasharray="3 2"/>
+<text x="478" y="47" fill="currentColor" font-family="sans-serif" font-size="12">37 of 1500</text>
+<text x="8" y="81" fill="currentColor" font-family="sans-serif" font-size="12">git</text>
+<rect class="ok" x="84" y="68" width="86.5" height="18" rx="2" fill="#5f8a6e"/>
+<line x1="189.6" y1="64" x2="189.6" y2="90" stroke="currentColor" stroke-width="1.5" stroke-dasharray="3 2"/>
+<text x="478" y="81" fill="currentColor" font-family="sans-serif" font-size="12">2459 of 3000</text>
+<text x="8" y="115" fill="currentColor" font-family="sans-serif" font-size="12">rust</text>
+<rect class="ok" x="84" y="102" width="95.5" height="18" rx="2" fill="#5f8a6e"/>
+<line x1="435.9" y1="98" x2="435.9" y2="124" stroke="currentColor" stroke-width="1.5" stroke-dasharray="3 2"/>
+<text x="478" y="115" fill="currentColor" font-family="sans-serif" font-size="12">2714 of 10000</text>
+<text x="84" y="148" fill="currentColor" font-family="sans-serif" font-size="11" opacity="0.7">dashed line: budget</text></svg>
+
+<svg xmlns="http://www.w3.org/2000/svg" role="img" viewBox="0 0 640 154" width="640" aria-label="Index build per repository against its budget">
+<title>Index build (s) against budget</title>
+<style>.ok{fill:#5f8a6e}.over{fill:#b5654a}@media(prefers-color-scheme:dark){.ok{fill:#8fb89c}.over{fill:#d98b72}}</style>
+<text x="8" y="16" fill="currentColor" font-family="sans-serif" font-size="13" font-weight="600">Index build (s)</text>
+<text x="8" y="47" fill="currentColor" font-family="sans-serif" font-size="12">control</text>
+<rect class="ok" x="84" y="34" width="1.5" height="18" rx="2" fill="#5f8a6e"/>
+<line x1="89.9" y1="30" x2="89.9" y2="56" stroke="currentColor" stroke-width="1.5" stroke-dasharray="3 2"/>
+<text x="478" y="47" fill="currentColor" font-family="sans-serif" font-size="12">0.5 of 30</text>
+<text x="8" y="81" fill="currentColor" font-family="sans-serif" font-size="12">git</text>
+<rect class="ok" x="84" y="68" width="11.4" height="18" rx="2" fill="#5f8a6e"/>
+<line x1="142.6" y1="64" x2="142.6" y2="90" stroke="currentColor" stroke-width="1.5" stroke-dasharray="3 2"/>
+<text x="478" y="81" fill="currentColor" font-family="sans-serif" font-size="12">58.4 of 300</text>
+<text x="8" y="115" fill="currentColor" font-family="sans-serif" font-size="12">rust</text>
+<rect class="ok" x="84" y="102" width="246.8" height="18" rx="2" fill="#5f8a6e"/>
+<line x1="435.9" y1="98" x2="435.9" y2="124" stroke="currentColor" stroke-width="1.5" stroke-dasharray="3 2"/>
+<text x="478" y="115" fill="currentColor" font-family="sans-serif" font-size="12">1262.3 of 1800</text>
+<text x="84" y="148" fill="currentColor" font-family="sans-serif" font-size="11" opacity="0.7">dashed line: budget</text></svg>
+
+<svg xmlns="http://www.w3.org/2000/svg" role="img" viewBox="0 0 640 154" width="640" aria-label="Idle CPU with /events client per repository against its budget">
+<title>Idle CPU with /events client (%) against budget</title>
+<style>.ok{fill:#5f8a6e}.over{fill:#b5654a}@media(prefers-color-scheme:dark){.ok{fill:#8fb89c}.over{fill:#d98b72}}</style>
+<text x="8" y="16" fill="currentColor" font-family="sans-serif" font-size="13" font-weight="600">Idle CPU with /events client (%)</text>
+<text x="8" y="47" fill="currentColor" font-family="sans-serif" font-size="12">control</text>
+<rect class="ok" x="84" y="34" width="29.9" height="18" rx="2" fill="#5f8a6e"/>
+<line x1="158.7" y1="30" x2="158.7" y2="56" stroke="currentColor" stroke-width="1.5" stroke-dasharray="3 2"/>
+<text x="478" y="47" fill="currentColor" font-family="sans-serif" font-size="12">0.40 of 1</text>
+<text x="8" y="81" fill="currentColor" font-family="sans-serif" font-size="12">git</text>
+<rect class="ok" x="84" y="68" width="34.8" height="18" rx="2" fill="#5f8a6e"/>
+<line x1="158.7" y1="64" x2="158.7" y2="90" stroke="currentColor" stroke-width="1.5" stroke-dasharray="3 2"/>
+<text x="478" y="81" fill="currentColor" font-family="sans-serif" font-size="12">0.47 of 1</text>
+<text x="8" y="115" fill="currentColor" font-family="sans-serif" font-size="12">rust</text>
+<rect class="over" x="84" y="102" width="351.9" height="18" rx="2" fill="#b5654a"/>
+<line x1="158.7" y1="98" x2="158.7" y2="124" stroke="currentColor" stroke-width="1.5" stroke-dasharray="3 2"/>
+<text x="478" y="115" fill="currentColor" font-family="sans-serif" font-size="12">4.71 of 1 (over)</text>
+<text x="84" y="148" fill="currentColor" font-family="sans-serif" font-size="11" opacity="0.7">dashed line: budget</text></svg>
+
+<svg xmlns="http://www.w3.org/2000/svg" role="img" viewBox="0 0 640 154" width="640" aria-label="Peak memory (RSS) per repository against its budget">
+<title>Peak memory (RSS) (MB) against budget</title>
+<style>.ok{fill:#5f8a6e}.over{fill:#b5654a}@media(prefers-color-scheme:dark){.ok{fill:#8fb89c}.over{fill:#d98b72}}</style>
+<text x="8" y="16" fill="currentColor" font-family="sans-serif" font-size="13" font-weight="600">Peak memory (RSS) (MB)</text>
+<text x="8" y="47" fill="currentColor" font-family="sans-serif" font-size="12">control</text>
+<rect class="ok" x="84" y="34" width="3.8" height="18" rx="2" fill="#5f8a6e"/>
+<line x1="120.4" y1="30" x2="120.4" y2="56" stroke="currentColor" stroke-width="1.5" stroke-dasharray="3 2"/>
+<text x="478" y="47" fill="currentColor" font-family="sans-serif" font-size="12">52 of 500</text>
+<text x="8" y="81" fill="currentColor" font-family="sans-serif" font-size="12">git</text>
+<rect class="ok" x="84" y="68" width="100.7" height="18" rx="2" fill="#5f8a6e"/>
+<line x1="193.1" y1="64" x2="193.1" y2="90" stroke="currentColor" stroke-width="1.5" stroke-dasharray="3 2"/>
+<text x="478" y="81" fill="currentColor" font-family="sans-serif" font-size="12">1384 of 1500</text>
+<text x="8" y="115" fill="currentColor" font-family="sans-serif" font-size="12">rust</text>
+<rect class="over" x="84" y="102" width="351.9" height="18" rx="2" fill="#b5654a"/>
+<line x1="375.0" y1="98" x2="375.0" y2="124" stroke="currentColor" stroke-width="1.5" stroke-dasharray="3 2"/>
+<text x="478" y="115" fill="currentColor" font-family="sans-serif" font-size="12">4837 of 4000 (over)</text>
+<text x="84" y="148" fill="currentColor" font-family="sans-serif" font-size="11" opacity="0.7">dashed line: budget</text></svg>
+
+<svg xmlns="http://www.w3.org/2000/svg" role="img" viewBox="0 0 640 120" width="640" aria-label="Export per repository against its budget">
+<title>Export (s) against budget</title>
+<style>.ok{fill:#5f8a6e}.over{fill:#b5654a}@media(prefers-color-scheme:dark){.ok{fill:#8fb89c}.over{fill:#d98b72}}</style>
+<text x="8" y="16" fill="currentColor" font-family="sans-serif" font-size="13" font-weight="600">Export (s)</text>
+<text x="8" y="47" fill="currentColor" font-family="sans-serif" font-size="12">control</text>
+<rect class="ok" x="84" y="34" width="2.4" height="18" rx="2" fill="#5f8a6e"/>
+<line x1="154.4" y1="30" x2="154.4" y2="56" stroke="currentColor" stroke-width="1.5" stroke-dasharray="3 2"/>
+<text x="478" y="47" fill="currentColor" font-family="sans-serif" font-size="12">2.1 of 60</text>
+<text x="8" y="81" fill="currentColor" font-family="sans-serif" font-size="12">git</text>
+<rect class="ok" x="84" y="68" width="8.7" height="18" rx="2" fill="#5f8a6e"/>
+<line x1="435.9" y1="64" x2="435.9" y2="90" stroke="currentColor" stroke-width="1.5" stroke-dasharray="3 2"/>
+<text x="478" y="81" fill="currentColor" font-family="sans-serif" font-size="12">7.4 of 300</text>
+<text x="84" y="114" fill="currentColor" font-family="sans-serif" font-size="11" opacity="0.7">dashed line: budget</text></svg>
+
+<details><summary>control: every page</summary>
 
 Probes: `crates/gitterrace-web/static/vendor/mermaid.min.js` (largest text file).
 
@@ -106,7 +225,9 @@ Probes: `crates/gitterrace-web/static/vendor/mermaid.min.js` (largest text file)
 | rss_mb | 52.0 | 500 | pass |
 | export_secs | 2.1 | 60 | pass |
 
-#### git
+</details>
+
+<details><summary>git: every page</summary>
 
 Probes: `po/bg.po` (largest text file), commit `50fe5cc63f`.
 
@@ -142,7 +263,9 @@ Probes: `po/bg.po` (largest text file), commit `50fe5cc63f`.
 | rss_mb | 1384.4 | 1500 | pass |
 | export_secs | 7.4 | 300 | pass |
 
-#### rust
+</details>
+
+<details><summary>rust: every page</summary>
 
 Probes: `src/doc/rustc-dev-guide/src/queries/example-0.html` (largest text file), commit `f90a2d27c2`.
 
@@ -176,5 +299,7 @@ Probes: `src/doc/rustc-dev-guide/src/queries/example-0.html` (largest text file)
 | index_secs | 1262.3 | 1800 | pass |
 | idle_cpu_pct | 4.7 | 1 | over |
 | rss_mb | 4837.0 | 4000 | over |
+
+</details>
 
 <!-- END GENERATED: results -->

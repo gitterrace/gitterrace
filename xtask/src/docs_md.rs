@@ -18,6 +18,7 @@ use crate::scripts::Script;
 const ACTIONS: &str = "docs/actions.md";
 const ARCH: &str = "docs/architecture.md";
 const DESIGN: &str = "docs/design.md";
+const BENCH: &str = "docs/benchmarks.md";
 
 pub fn render(root: &Path, ws: &Workspace, scripts: &[Script]) -> Result<Vec<Out>> {
     Ok(vec![
@@ -32,7 +33,23 @@ pub fn render(root: &Path, ws: &Workspace, scripts: &[Script]) -> Result<Vec<Out
         Out::block(ARCH, "routes", routes()),
         Out::block(ARCH, "cache", cache()),
         Out::block(DESIGN, "tokens", tokens(root)?),
+        Out::block(BENCH, "results", bench_results(root)?),
     ])
+}
+
+/// The benchmark results block: `scripts/bench-report.py --print` renders the newest result file.
+fn bench_results(root: &Path) -> Result<String> {
+    let out = std::process::Command::new("python3")
+        .args(["scripts/bench-report.py", "--print"])
+        .current_dir(root)
+        .output()
+        .context("running scripts/bench-report.py")?;
+    anyhow::ensure!(
+        out.status.success(),
+        "bench-report.py: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    String::from_utf8(out.stdout).context("bench-report.py output")
 }
 
 fn kinds() -> String {
