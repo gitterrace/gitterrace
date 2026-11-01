@@ -8,7 +8,7 @@ pub(crate) use gitterrace_git::{
 };
 
 /// The favicon `<link>`, the same file the page templates include, for pages built as strings.
-pub(crate) const FAVICON: &str = include_str!("../templates/favicon.html");
+pub(crate) const FAVICON: &str = include_str!("../templates/_favicon.html");
 
 /// `YYYY-MM-DD HH:MM` in the commit's own offset.
 pub(crate) fn date(time: i64, offset: i32) -> String {

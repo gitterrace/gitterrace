@@ -1,10 +1,10 @@
-{% extends "base.html" %}
+{% extends "_base.html" %}
 {% block title %}Hotspots · {{ c.name }}{% endblock %}
 {% block content %}
-{% include "tabs.html" %}
-{% include "filterbar.html" %}
-{% include "options.html" %}
-{% include "kpis.html" %}
+{% include "_tabs.html" %}
+{% include "_filterbar.html" %}
+{% include "_options.html" %}
+{% include "_kpis.html" %}
 <div class="chart-head"><div><h2>Change frequency against size</h2><p class="hint">Each dot is a file: how often it changed against how many lines it has now. Dot size is the number of authors. Big files that change a lot are the risky ones. Click a dot for its history.</p></div></div>
 <div class="card pad">{{ scatter|safe }}</div>
 <div class="chart-head"><div><h2>Hotspots</h2><p class="hint">Score is changes times the square root of lines. Click a file for its history.</p></div></div>

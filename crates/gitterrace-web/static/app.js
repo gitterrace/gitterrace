@@ -1,3 +1,5 @@
+// Copy-to-clipboard helpers, the toast that confirms a copy and the flash on a jumped-to line.
+// Vanilla JS, no dependencies.
 (function () {
   var root = document.documentElement;
   function base() { var m = document.querySelector('meta[name="gt-base"]'); return m ? m.content : ""; }

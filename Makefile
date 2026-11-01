@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: build run fmt clippy lint test doc theme actions docs-gen docs-check names check site-png help bench bench-large bench-report bench-clean bench-guard browser-check site deploy stage shipped domains demo send-vectors
+.PHONY: build run fmt clippy lint test doc theme actions docs-gen docs-check names check site-render help bench bench-large bench-report bench-clean bench-guard browser-check site deploy stage shipped domains demo send-vectors
 
 ## build: Release binary
 build:
@@ -33,13 +33,13 @@ doc:
 theme:
 	python3 scripts/theme-snapshot-check.py
 	python3 scripts/theme-gen.py --check
-	python3 scripts/theme-logo.py --check
-	@if command -v uv >/dev/null; then uv run -q --with fonttools --with brotli python scripts/theme-tagline.py --check; \
-	else echo "theme-tagline: uv is required to verify the README header tagline"; exit 1; fi
+	python3 scripts/theme-logo-gen.py --check
+	@if command -v uv >/dev/null; then uv run -q --with fonttools --with brotli python scripts/theme-tagline-gen.py --check; \
+	else echo "theme-tagline-gen: uv is required to verify the README header tagline"; exit 1; fi
 
 ## actions: Example actions work per OS profile (stubbed PATH)
 actions:
-	sh scripts/actions-test.sh
+	sh scripts/actions-check.sh
 
 ## docs-gen: Regenerate generated files (docs/api.md)
 docs-gen:
@@ -92,16 +92,16 @@ site: docs-check
 	python3 scripts/site-check.py release
 
 ## deploy: Ship site/ to gitterrace.dev (wrangler deploy, the Worker is in wrangler.toml)
-deploy: site shipped site-png
+deploy: site shipped site-render
 	npx wrangler@4 deploy
 
 ## stage: Deploy without the release check, only while gitterrace.dev is blocked at the edge
-stage: docs-check shipped site-png
+stage: docs-check shipped site-render
 	npx wrangler@4 deploy
 
-## site-png: Render the touch icon and link-preview image from docs/brand (ignored, never committed)
-site-png:
-	node scripts/site-png.mjs
+## site-render: Render the touch icon and link-preview image from docs/brand (ignored, never committed)
+site-render:
+	node scripts/site-render.mjs
 
 ## shipped: site/ and wrangler.toml are committed, so a deploy ships a known commit
 shipped:

@@ -1,10 +1,10 @@
-{% extends "base.html" %}
+{% extends "_base.html" %}
 {% block title %}Commit types · {{ c.name }}{% endblock %}
 {% block content %}
-{% include "tabs.html" %}
-{% include "filterbar.html" %}
-{% include "options.html" %}
-{% include "kpis.html" %}
+{% include "_tabs.html" %}
+{% include "_filterbar.html" %}
+{% include "_options.html" %}
+{% include "_kpis.html" %}
 {% if commits_total == 0 %}<p class="muted">No commits match these filters.</p>{% else %}
 {% if !kinds.is_empty() %}
 <div class="chart-head"><div><h2>Types</h2><p class="hint">Conventional-commit type of each subject line. Click a type to narrow every number on the page to it. Commits that do not follow the convention are grouped as other.</p></div></div>
@@ -29,7 +29,7 @@
 {% endfor %}
 <div class="chart-head"><div><h2>Commits</h2><p class="hint">{{ commits_total }} matching, newest first.</p></div></div>
 <ul class="list log">
-{% for r in commits %}{% include "commit_row.html" %}{% endfor %}
+{% for r in commits %}{% include "_commit_row.html" %}{% endfor %}
 </ul>
 <nav class="pager">
 {% if let Some(h) = newer %}<a href="{{ h }}">Newer</a>{% else %}<span></span>{% endif %}

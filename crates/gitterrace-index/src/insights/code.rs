@@ -2,7 +2,7 @@ use crate::insights::{Insights, Period};
 
 /// Additions and deletions of one bucket, moves and (by default) whitespace excluded.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
-pub struct CodeFrequency {
+pub struct Frequency {
     pub key: String,
     pub label: String,
     pub additions: u64,
@@ -48,12 +48,12 @@ pub fn rework_verdict(share: f64) -> &'static str {
 }
 
 impl Insights<'_> {
-    pub fn code_frequency(&self, period: Period) -> (super::BucketUnit, Vec<CodeFrequency>) {
+    pub fn frequency(&self, period: Period) -> (super::BucketUnit, Vec<Frequency>) {
         let (from, to) = period.window(self.now);
         let axis = self.axis(Some(period));
-        let mut out: Vec<CodeFrequency> = axis
+        let mut out: Vec<Frequency> = axis
             .names()
-            .map(|(key, label)| CodeFrequency {
+            .map(|(key, label)| Frequency {
                 key,
                 label,
                 additions: 0,
@@ -197,11 +197,11 @@ mod tests {
             None,
         );
         assert_eq!(ws.rework(Period::All).points[9].added, 55);
-        let (unit, f) = ins.code_frequency(Period::All);
+        let (unit, f) = ins.frequency(Period::All);
         assert_eq!((unit, f.len()), (BucketUnit::Day, 10));
         assert_eq!((f[0].additions, f[0].deletions), (10, 0));
         assert_eq!((f[1].additions, f[1].deletions), (5, 5));
-        let (_, week) = ins.code_frequency(Period::Week);
+        let (_, week) = ins.frequency(Period::Week);
         assert_eq!(week.len(), 7);
     }
 

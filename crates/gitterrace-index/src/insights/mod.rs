@@ -10,15 +10,17 @@
 
 mod axis;
 mod code;
+mod compare;
 pub(crate) mod fasthash;
 mod files;
 mod filter;
 mod headfiles;
 mod lang;
-mod misc;
 mod people;
 mod period;
+mod releases;
 mod select;
+mod sizes;
 mod stats;
 
 use std::sync::{Arc, OnceLock};
@@ -30,7 +32,8 @@ use crate::{CommitRecord, FileStat};
 use fasthash::FastMap;
 
 pub use axis::{BucketUnit, TimeAxis};
-pub use code::{CodeFrequency, Rework, ReworkPoint, rework_share, rework_verdict};
+pub use code::{Frequency, Rework, ReworkPoint, rework_share, rework_verdict};
+pub use compare::{Comparison, LangDelta};
 pub use files::{
     AgeBucket, AgeReport, Coupling, DirOwnership, Hotspot, HotspotReport, Owner, OwnershipReport,
     Touch,
@@ -39,12 +42,13 @@ pub use filter::{PathFilter, is_generated};
 pub(crate) use headfiles::CACHE_FILE;
 pub use headfiles::{HeadFile, LineCache, head_files};
 pub use lang::language;
-pub use misc::{Cadence, Comparison, LangDelta, Release, SizeBucket, release_tags};
 pub use people::{People, Person};
 pub use period::{
     Contributor, ContributorReport, Period, PeriodStats, PeriodSummary, Rhythm, SeriesPoint,
 };
+pub use releases::{Cadence, Release, release_tags};
 pub use select::{OptionParams, Selection, under};
+pub use sizes::SizeBucket;
 pub use stats::{DirChurn, FileChurn, Label, LabelBucket, LabelCount};
 
 pub(crate) const DAY: i64 = 86_400;
@@ -328,6 +332,25 @@ pub(crate) mod fixtures {
             lines,
             ..FileStat::default()
         }
+    }
+
+    /// Four commits in a line: a, b, c, d.
+    pub fn chain() -> Vec<CommitRecord> {
+        let mut v = vec![
+            rec("a", "Ann", 0, vec![file("x.rs", 1, 0, 1)]),
+            rec("b", "Ann", 10, vec![file("x.rs", 30, 0, 31)]),
+            rec(
+                "c",
+                "Bob",
+                30,
+                vec![file("y.py", 300, 100, 200), file("x.rs", 0, 3, 28)],
+            ),
+            rec("d", "Bob", 40, vec![file("y.py", 3000, 0, 3200)]),
+        ];
+        for i in 1..v.len() {
+            v[i].parents = vec![v[i - 1].id.clone()];
+        }
+        v
     }
 
     pub fn rec(id: &str, who: &str, day: i64, files: Vec<FileStat>) -> CommitRecord {

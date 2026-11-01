@@ -250,8 +250,8 @@ pub(crate) fn period_of(q: &InsightsQuery, d: &Defaults, default: Period) -> Per
 pub(crate) struct Kpi(pub(crate) &'static str, pub(crate) String);
 
 #[derive(Template)]
-#[template(path = "code_frequency.html")]
-struct CodeFrequencyPage {
+#[template(path = "frequency.html")]
+struct FrequencyPage {
     c: Chrome,
     tabs: Tabs,
     fb: FilterBar,
@@ -264,7 +264,7 @@ struct CodeFrequencyPage {
     verdict: String,
 }
 
-pub(crate) async fn code_frequency(
+pub(crate) async fn frequency(
     State(app): Shared,
     RawQuery(raw): RawQuery,
     Query(q): Query<InsightsQuery>,
@@ -276,7 +276,7 @@ pub(crate) async fn code_frequency(
         let recs = scoped(f, r);
         let ins = insights(a, &recs, q.options(&d));
         let period = period_of(&q, &d, Period::All);
-        let (unit, weeks) = ins.code_frequency(period);
+        let (unit, weeks) = ins.frequency(period);
         let (add, del, rew) = weeks.iter().fold((0, 0, 0), |t, w| {
             (t.0 + w.additions, t.1 + w.deletions, t.2 + w.rewritten)
         });
@@ -296,7 +296,7 @@ pub(crate) async fn code_frequency(
                 )
             },
         );
-        CodeFrequencyPage {
+        FrequencyPage {
             c,
             tabs: views::stats_tabs("cf"),
             fb,

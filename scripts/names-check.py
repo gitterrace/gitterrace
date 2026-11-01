@@ -6,6 +6,11 @@
 2. Prose describes gitterrace on its own terms: no hosting product names (PRODUCT_NAMES)
    in docs, comments or descriptions. Code may still name them as data, such as a bot
    address, and release config may name its target.
+3. Make targets are `<area>[-<verb>]`, lowercase words joined by single hyphens.
+4. File and module names (R1 to R6 below): no catch-all stems, page modules named for their
+   route, template partials marked with `_`, one name per insight, scripts as
+   `<area>-<verb>` with a closed verb list, a header on every script, and generators whose
+   header names what they write.
 """
 
 import re
@@ -38,8 +43,122 @@ PRODUCT_SKIP = ("Cargo.toml", ".github/")
 VENDORED = "/vendor/"
 
 
-def main() -> int:
+# R1: stems that say nothing about what the module holds.
+CATCH_ALL = {"misc", "util", "utils", "helpers", "common", "other", "pages", "stuff"}
+SRC_DIRS = ("crates/*/src", "xtask/src")
+TEMPLATES = "crates/gitterrace-web/templates"
+STEM = re.compile(r"^_?[a-z][a-z0-9_]*$")
+# R4: URL segments whose template carries a longer, clearer name.
+TEMPLATE_ALIAS = {"types": "commit_types"}
+# R5: `-lib` marks a library imported by other scripts, not a command.
+SCRIPT = re.compile(r"^[a-z]+(-[a-z]+)*-(check|gen|run|export|report|render|lib)\.(py|sh|mjs)$")
+HEADER = ("//", "#", '"""')
+MAKE_TARGET = re.compile(r"^[a-z]+(-[a-z]+)?$")
+
+
+def make_targets() -> list[str]:
+    """Names declared in .PHONY, the Makefile's list of real targets."""
+    text = (ROOT / "Makefile").read_text()
+    out: list[str] = []
+    for m in re.finditer(r"^\.PHONY:(.*)$", text, re.M):
+        out += m.group(1).split()
+    return out
+
+
+def first_line(f: Path) -> str:
+    lines = [ln for ln in f.read_text().splitlines() if not ln.startswith("#!")]
+    return lines[0].strip() if lines else ""
+
+
+def rust_files() -> list[Path]:
+    return sorted(f for d in SRC_DIRS for f in ROOT.glob(d + "/**/*.rs"))
+
+
+def check_modules() -> list[str]:
+    """R1 and R2: module names say what the module holds."""
     bad = []
+    for f in rust_files():
+        rel = f.relative_to(ROOT)
+        if f.stem in CATCH_ALL or any(p in CATCH_ALL for p in rel.parts[:-1]):
+            bad.append(f"{rel}: catch-all module name, name it for its subject (R1)")
+        if f.name == "types.rs":
+            text = f.read_text()
+            if "#[template" in text or "fn page" in text:
+                bad.append(f"{rel}: types.rs holds a page, name the module for its route (R2)")
+    return bad
+
+
+def check_templates() -> list[str]:
+    """R3 and R4: partials start with `_`, pages do not, and a route has one name."""
+    bad = []
+    tdir = ROOT / TEMPLATES
+    stems = {f.stem for f in tdir.glob("*.html")}
+    for st in sorted(stems):
+        if not STEM.match(st):
+            bad.append(f"{TEMPLATES}/{st}.html: template name must be snake_case (R3)")
+    src = ROOT / "crates/gitterrace-web"
+    for f in sorted([*src.glob("src/**/*.rs"), *tdir.glob("*.html")]):
+        for m in re.finditer(r'#\[template\(path = "([^"]+)"', f.read_text()):
+            if m.group(1).startswith("_"):
+                bad.append(f"{f.relative_to(ROOT)}: page template {m.group(1)} has a partial's `_` (R3)")
+        if f.suffix == ".html":
+            for m in re.finditer(r'\{%-?\s*(?:include|import|extends)\s+"([^"]+)"', f.read_text()):
+                if not m.group(1).startswith("_"):
+                    bad.append(f"{f.relative_to(ROOT)}: {m.group(1)} is used as a partial, name it _{m.group(1)} (R3)")
+    routes = (src / "src/routes.rs").read_text()
+    insights = (ROOT / "crates/gitterrace-api/src/insights.rs").read_text()
+    ids = set(re.findall(r'name: "([a-z_]+)"', insights))
+    for seg in re.findall(r'\.route\("/stats/([a-z-]+)"', routes):
+        snake = seg.replace("-", "_")
+        want = TEMPLATE_ALIAS.get(snake, snake)
+        if want not in stems:
+            bad.append(f"/stats/{seg}: no template {want}.html, route and template share one name (R4)")
+        for i in sorted(ids):
+            if i != snake and (i.endswith("_" + snake) or i.startswith(snake + "_")):
+                bad.append(f"/stats/{seg}: insight `{i}` names the same thing differently (R4)")
+    return bad
+
+
+def check_headers() -> list[str]:
+    """R5: scripts are `<area>-<verb>` and every script and static file opens with a comment."""
+    bad = []
+    for f in sorted((ROOT / "scripts").iterdir()):
+        if f.is_file() and not SCRIPT.match(f.name):
+            bad.append(f"scripts/{f.name}: not <area>-<verb> with a verb of check|gen|run|export|report|render|lib (R5)")
+    files = [f for f in (ROOT / "scripts").iterdir() if f.is_file()]
+    files += sorted((ROOT / "crates/gitterrace-web/static").glob("*.js"))
+    files += sorted((ROOT / "xtask/src").glob("*.rs"))
+    for f in files:
+        if not first_line(f).startswith(HEADER):
+            bad.append(f"{f.relative_to(ROOT)}: first line is not a header comment (R5)")
+    return bad
+
+
+def check_generators() -> list[str]:
+    """R6: a generator's `//!` header names every file it writes."""
+    bad = []
+    for f in sorted((ROOT / "xtask/src").glob("*_md.rs")) + [ROOT / "xtask/src/readme_agents_md.rs"]:
+        text = f.read_text()
+        head = "\n".join(ln for ln in text.splitlines() if ln.startswith("//!"))
+        body = text.split("#[cfg(test)]")[0]
+        for path in sorted(set(re.findall(r'"((?:[\w.-]+/)*[A-Z\w.-]+\.md)"', body))):
+            if path not in head:
+                bad.append(f"xtask/src/{f.name}: header does not name {path}, which it writes (R6)")
+    return bad
+
+
+def main() -> int:
+    bad = [
+        *check_modules(),
+        *check_templates(),
+        *check_headers(),
+        *check_generators(),
+    ]
+    bad += [
+        f"Makefile: target `{t}` is not <area>[-<verb>]"
+        for t in make_targets()
+        if not MAKE_TARGET.match(t)
+    ]
     tracked = subprocess.run(
         ["git", "ls-files", "-z"], cwd=ROOT, capture_output=True, check=True
     ).stdout

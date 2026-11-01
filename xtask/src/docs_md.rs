@@ -1,4 +1,5 @@
-//! Generated blocks of `docs/actions.md`, `docs/architecture.md` and `docs/design.md`.
+//! Generated blocks of `docs/actions.md`, `docs/architecture.md`, `docs/design.md` and
+//! `docs/benchmarks.md`.
 
 use std::fmt::Write as _;
 use std::path::Path;
@@ -11,10 +12,10 @@ use gitterrace_actions::schema::{
 };
 use gitterrace_actions::send::DENIED_SCHEMES;
 
+use crate::action_scripts::Script;
 use crate::facts::Workspace;
 use crate::out::Out;
-use crate::readme_md::crate_diagram;
-use crate::scripts::Script;
+use crate::readme_agents_md::crate_diagram;
 
 const ACTIONS: &str = "docs/actions.md";
 const ARCH: &str = "docs/architecture.md";

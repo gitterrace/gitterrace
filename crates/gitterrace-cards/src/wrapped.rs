@@ -146,7 +146,13 @@ fn header(
 
 fn hero(s: &mut String, w: &WrappedStats, p: &Palette, x: f64, y: f64, size: u32) {
     text(s, x, y, size, 800, p.accent, "s", &group(w.commits as u64));
-    text(s, x, y + 40.0, 26, 500, p.muted, "s", "commits this year");
+    // The number is drawn large above, so the noun stands alone and must still agree with it.
+    let noun = if w.commits == 1 {
+        "commit this year"
+    } else {
+        "commits this year"
+    };
+    text(s, x, y + 40.0, 26, 500, p.muted, "s", noun);
 }
 
 fn tile(s: &mut String, x: f64, y: f64, label: &str, value: &str, p: &Palette, big: u32) {

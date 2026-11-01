@@ -8,7 +8,7 @@ mark alone, for each theme:
     logo-{light,dark}.svg   mark and wordmark, cropped
     mark-{light,dark}.svg   the mark alone, square
 
-    python3 scripts/theme-logo.py [--check]
+    python3 scripts/theme-logo-gen.py [--check]
 
 `make theme` runs the check, so the logos cannot drift from the headers.
 """
@@ -129,7 +129,7 @@ def main() -> int:
     if not m or urllib.parse.unquote(m.group(1)) != svg.strip():
         stale.append(tpl.relative_to(ROOT))
     for s in stale:
-        print(f"{s}: does not match the README header; run scripts/theme-logo.py")
+        print(f"{s}: does not match the README header; run scripts/theme-logo-gen.py")
     # Every template that writes its own <head> takes the icon from that include, so a new
     # page shell cannot ship without a favicon.
     bare = [

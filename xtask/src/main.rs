@@ -1,15 +1,18 @@
+//! The generator behind `make docs-gen` and `make docs-check`: runs every `*_md` module and the
+//! site writer, then writes the result or compares it with the tree.
+
 #![expect(
     clippy::print_stdout,
     reason = "a developer command-line tool: the terminal is its output"
 )]
 
+mod action_scripts;
 mod api_md;
 mod config_md;
 mod docs_md;
 mod facts;
 mod out;
-mod readme_md;
-mod scripts;
+mod readme_agents_md;
 mod site;
 
 use std::path::{Path, PathBuf};
@@ -37,9 +40,9 @@ enum Cmd {
 /// Every generator. A new one is checked by being listed here.
 fn generators(root: &Path) -> Result<Vec<Out>> {
     let ws = facts::load(root)?;
-    let scripts = scripts::load(root)?;
+    let scripts = action_scripts::load(root)?;
     let mut outs = vec![api_md::render(), config_md::render()];
-    outs.extend(readme_md::render(&ws, &scripts));
+    outs.extend(readme_agents_md::render(&ws, &scripts));
     outs.extend(docs_md::render(root, &ws, &scripts)?);
     outs.extend(site::render(root, &ws)?);
     Ok(outs)

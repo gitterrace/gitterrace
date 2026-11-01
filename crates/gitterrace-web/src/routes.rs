@@ -6,7 +6,7 @@ use std::sync::Arc;
 use askama::Template;
 use axum::{
     Json, Router,
-    extract::{Path, Query, RawQuery, State},
+    extract::{Path, Query, State},
     http::{HeaderValue, StatusCode, header},
     response::{Html, IntoResponse, Redirect, Response},
     routing::get,
@@ -50,17 +50,15 @@ pub(crate) fn router(app: Arc<App>) -> Router {
         .route("/api/refs", get(api_refs))
         .route("/api/last/{rev}", get(api_last_root))
         .route("/api/last/{rev}/{*path}", get(api_last))
-        .route("/stats", get(crate::pages::activity))
-        .route("/stats/files", get(moved("/stats/hotspots")))
-        .route("/stats/types", get(crate::types::page))
+        .route("/stats", get(crate::activity::page))
+        .route("/stats/types", get(crate::commit_types::page))
         .route("/stats/languages", get(crate::languages::page))
-        .route("/stats/frequency", get(crate::insights::code_frequency))
-        .route("/stats/pulse", get(moved("/stats")))
-        .route("/stats/hotspots", get(crate::pages::hotspots))
-        .route("/stats/ownership", get(crate::pages::ownership))
-        .route("/stats/patterns", get(crate::pages::patterns))
-        .route("/compare", get(crate::pages::compare))
-        .route("/history/{*path}", get(crate::pages::history))
+        .route("/stats/frequency", get(crate::insights::frequency))
+        .route("/stats/hotspots", get(crate::hotspots::page))
+        .route("/stats/ownership", get(crate::ownership::page))
+        .route("/stats/patterns", get(crate::patterns::page))
+        .route("/compare", get(crate::compare::page))
+        .route("/history/{*path}", get(crate::history::page))
         .route("/stats/contributors", get(crate::insights::contributors))
         .route("/raw/{rev}/{*path}", get(raw))
         .route("/api/progress", get(progress))
@@ -868,20 +866,6 @@ async fn refs(State(app): Shared) -> Result<Html<String>> {
     })
     .await?;
     page(&p)
-}
-
-/// A permanent redirect from a removed insights page to the one that replaced it, the query
-/// (filters, period, options) kept so old links land on the same selection.
-fn moved(
-    to: &'static str,
-) -> impl Fn(State<Arc<App>>, RawQuery) -> std::future::Ready<Response> + Clone + Send + 'static {
-    move |State(a), RawQuery(q)| {
-        let q = q.map(|q| format!("?{q}")).unwrap_or_default();
-        let at = format!("{}{to}{q}", a.base);
-        std::future::ready(
-            (StatusCode::MOVED_PERMANENTLY, [(header::LOCATION, at)]).into_response(),
-        )
-    }
 }
 
 #[derive(Template)]

@@ -4,7 +4,7 @@
 //   site/assets/og.png                1200x630, the light README header (link previews)
 // Chromium draws the SVGs, since simpler renderers drop the stroked path of the mark.
 //
-//   node scripts/site-png.mjs
+//   node scripts/site-render.mjs
 import { readFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { root, loadPlaywright, launch } from './browser-lib.mjs';
@@ -33,4 +33,4 @@ await b.close();
 // Every .png the generated pages link must now exist, or the deploy ships a dead image.
 const html = ['index.html', '404.html'].map((f) => readFileSync(join(root, 'site', f), 'utf8')).join('');
 const missing = [...html.matchAll(/assets\/([\w-]+\.png)/g)].map((m) => m[1]).filter((f) => !shots.some((s) => s.file === f));
-if (missing.length) { console.error(`site-png: linked but not rendered: ${missing.join(', ')}`); process.exit(1); }
+if (missing.length) { console.error(`site-render: linked but not rendered: ${missing.join(', ')}`); process.exit(1); }

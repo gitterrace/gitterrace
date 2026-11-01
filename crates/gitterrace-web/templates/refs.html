@@ -1,7 +1,7 @@
-{% extends "base.html" %}
+{% extends "_base.html" %}
 {% block title %}Refs · {{ c.name }}{% endblock %}
 {% block content %}
-{% include "reftabs.html" %}
+{% include "_reftabs.html" %}
 <h2>Branches</h2>
 <div class="card"><table class="entries branches grow">
 <tr class="th"><td>Branch</td><td class="grow">Last commit</td><td class="r" data-tip="Commits behind the default branch">Behind</td><td class="r" data-tip="Commits ahead of the default branch">Ahead</td><td class="r">Updated</td></tr>

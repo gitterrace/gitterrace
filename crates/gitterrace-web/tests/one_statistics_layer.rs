@@ -136,28 +136,3 @@ async fn api_and_pages_give_the_same_numbers_for_the_same_filter() {
         assert_eq!(web, api_rows, "Contributors page against API for {q:?}");
     }
 }
-
-#[tokio::test(flavor = "multi_thread")]
-async fn removed_pages_redirect_with_their_query() {
-    let root = tempfile::tempdir().expect("tmp");
-    let f = Fixture::standard(&root.path().join("repo"));
-    let router = gitterrace_web::app_router(f.path()).expect("router");
-    for (from, to) in [
-        (
-            "/stats/pulse?period=1w&type=fix",
-            "/stats?period=1w&type=fix",
-        ),
-        ("/stats/pulse", "/stats"),
-        ("/stats/files?path=src", "/stats/hotspots?path=src"),
-    ] {
-        let req = axum::http::Request::get(from)
-            .header("host", "localhost")
-            .body(axum::body::Body::empty())
-            .expect("req");
-        let res = tower::ServiceExt::oneshot(router.clone(), req)
-            .await
-            .expect("res");
-        assert_eq!(res.status(), 301, "{from}");
-        assert_eq!(res.headers()["location"], to, "{from}");
-    }
-}

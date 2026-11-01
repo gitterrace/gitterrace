@@ -2,27 +2,32 @@
 
 mod about;
 mod actions;
+mod activity;
 mod app;
 mod charts;
+mod commit_types;
+mod compare;
 mod error;
 mod filter;
 mod fmt;
 mod gitstate;
 mod guard;
 mod highlight;
+mod history;
+mod hotspots;
 mod insights;
 mod languages;
 mod live;
 mod markdown;
 mod media;
 mod multi;
-mod pages;
+mod ownership;
+mod patterns;
 mod registry;
 mod reload;
 mod routes;
 mod search;
 pub mod sitemap;
-mod types;
 mod views;
 #[cfg(test)]
 mod wiring_tests;

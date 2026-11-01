@@ -788,6 +788,11 @@ pub(crate) fn blame_html(path: &str, lines: &[BlameLine], now: i64) -> String {
     out
 }
 
+/// Link to the history page of one file.
+pub(crate) fn file_link(path: &str) -> String {
+    crate::fmt::href(&format!("/history/{}", crate::fmt::enc_path(path)))
+}
+
 #[cfg(test)]
 mod tests {
     use crate::views::{code_html, code_html_first, code_tail_html, crumbs, diff_html};

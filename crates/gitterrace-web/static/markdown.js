@@ -1,3 +1,5 @@
+// Rendered Markdown extras: mermaid diagrams drawn on demand and picture sources kept in sync
+// with the colour theme. Without it the Markdown still reads as plain text and images.
 (function () {
   var root = document.documentElement;
   function base() { var m = document.querySelector('meta[name="gt-base"]'); return m ? m.content : ""; }

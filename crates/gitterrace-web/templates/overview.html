@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+{% extends "_base.html" %}
 {% block content %}
 <div class="cols">
 <article>
@@ -6,7 +6,7 @@
 <div class="card files-card"><table class="entries" data-last="{{ c.base }}/api/last/{{ c.rev_enc }}/">
 {% for e in entries %}<tr><td>{% if e.href.is_empty() %}<span class="ico {{ e.kind }}"></span>{{ e.name }}{% else %}<a href="{{ e.href }}"><span class="ico {{ e.kind }}"></span>{{ e.name }}</a>{% endif %}</td><td class="lc muted" data-name="{{ e.name }}"></td><td class="muted r">{{ e.size }}</td></tr>{% endfor %}
 </table></div>
-{% if let Some(a) = about %}<div class="card readme" id="about">{% if a.tabs.is_empty() %}<div class="readme-h">{{ a.label }}</div>{% else %}{% include "doctabs.html" %}{% endif %}<div class="markdown-body">{{ a.html|safe }}</div></div>{% endif %}
+{% if let Some(a) = about %}<div class="card readme" id="about">{% if a.tabs.is_empty() %}<div class="readme-h">{{ a.label }}</div>{% else %}{% include "_doctabs.html" %}{% endif %}<div class="markdown-body">{{ a.html|safe }}</div></div>{% endif %}
 </article>
 <aside>
 <h2>About</h2>

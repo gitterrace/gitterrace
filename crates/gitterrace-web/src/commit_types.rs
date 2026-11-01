@@ -71,7 +71,7 @@ struct Matrix {
 }
 
 #[derive(Template)]
-#[template(path = "stats_types.html")]
+#[template(path = "commit_types.html")]
 struct TypesPage {
     c: Chrome,
     tabs: Tabs,
@@ -252,7 +252,7 @@ fn build(a: &crate::app::App, all: &[CommitRecord], c: Chrome, tq: &TypesQuery) 
     } else {
         (
             format!("Types over time, per {unit}"),
-            "Commits stacked by type; the biggest types sit at the bottom.".to_owned(),
+            "Commits stacked by type. The biggest types sit at the bottom.".to_owned(),
         )
     };
 
@@ -260,7 +260,7 @@ fn build(a: &crate::app::App, all: &[CommitRecord], c: Chrome, tq: &TypesQuery) 
     if f.scope().is_none() {
         groups.push(Group {
             title: "Scopes",
-            hint: "The part of the code a commit says it touches, from type(scope). Click one to narrow to it; none means no scope given.",
+            hint: "The part of the code a commit says it touches, from type(scope). Click one to narrow to it. None means no scope given.",
             lines: false,
             rows: label_rows(&scope_counts, |l| f.link(BASE, Dim::Scope, l)),
         });

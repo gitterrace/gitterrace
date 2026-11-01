@@ -1,9 +1,9 @@
-{% extends "base.html" %}
+{% extends "_base.html" %}
 {% block title %}Activity · {{ c.name }}{% endblock %}
 {% block content %}
-{% include "tabs.html" %}
-{% include "filterbar.html" %}
-{% include "options.html" %}
+{% include "_tabs.html" %}
+{% include "_filterbar.html" %}
+{% include "_options.html" %}
 <p class="hint">{{ span }}.</p>
 <div class="card"><table class="entries">
 <tr class="th"><td></td><td class="r">This period</td>{% if compared %}<td class="r">Before</td><td class="r">Change</td>{% endif %}</tr>

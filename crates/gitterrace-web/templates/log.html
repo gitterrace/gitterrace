@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+{% extends "_base.html" %}
 {% block title %}Commits · {{ c.name }}{% endblock %}
 {% block content %}
 <div class="head"><h1>Commits <span class="muted">{{ rev }}</span></h1>
@@ -7,7 +7,7 @@
 {% if empty %}<p class="muted">No commits.</p>{% endif %}
 {% for d in days %}<h3 class="day">{{ d.label }}</h3>
 <ul class="list log">
-{% for r in d.rows %}{% include "commit_row.html" %}{% endfor %}
+{% for r in d.rows %}{% include "_commit_row.html" %}{% endfor %}
 </ul>
 {% endfor %}
 <nav class="pager">

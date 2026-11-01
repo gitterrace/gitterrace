@@ -49,24 +49,49 @@ fn clipboard_writes_go_through_gt_copy() {
     assert!(checked > 0, "no scripts found in {}", dir.display());
 }
 
-/// Nouns that a template must never put straight after a number: `{{ n }} commits` says
-/// "1 commits". Render the pair from Rust with `fmt::count` or `fmt::noun`.
-const COUNTED_NOUNS: [&str; 14] = [
+/// Nouns that must never follow a number fixed in the plural: `{{ n }} commits` says
+/// "1 commits", `{n} hours` says "1 hours". Render the pair with `fmt::count` or `fmt::noun`
+/// (cards: `svg::count`). Time units count too.
+const COUNTED_NOUNS: [&str; 26] = [
     "commits",
     "authors",
     "files",
     "lines",
-    "days",
-    "weeks",
     "repositories",
     "contributors",
     "changes",
     "matches",
     "branches",
     "tags",
+    "releases",
     "people",
     "hunks",
+    "results",
+    "times",
+    "seconds",
+    "minutes",
+    "hours",
+    "days",
+    "nights",
+    "weekdays",
+    "weekends",
+    "weeks",
+    "months",
+    "years",
+    "streaks",
 ];
+
+/// The counted noun at the start of `s` after optional spaces, if any.
+fn counted_noun(s: &str) -> Option<&str> {
+    let word = s.trim_start_matches([' ', '\t', '\n']);
+    if word.len() == s.len() {
+        return None;
+    }
+    let end = word
+        .find(|c: char| !c.is_ascii_alphabetic())
+        .unwrap_or(word.len());
+    COUNTED_NOUNS.contains(&&word[..end]).then(|| &word[..end])
+}
 
 /// `}}` or `}}</b>`, whitespace, then a counted noun, as a word.
 fn fixed_plural(html: &str) -> Option<String> {
@@ -74,18 +99,105 @@ fn fixed_plural(html: &str) -> Option<String> {
     while let Some(at) = rest.find("}}") {
         rest = &rest[at + 2..];
         let tail = rest.strip_prefix("</b>").unwrap_or(rest);
-        let word = tail.trim_start_matches([' ', '\t', '\n']);
-        if word.len() == tail.len() {
-            continue;
-        }
-        let end = word
-            .find(|c: char| !c.is_ascii_alphabetic())
-            .unwrap_or(word.len());
-        if COUNTED_NOUNS.contains(&&word[..end]) {
-            return Some(format!("}}}} {}", &word[..end]));
+        if let Some(noun) = counted_noun(tail) {
+            return Some(format!("}}}} {noun}"));
         }
     }
     None
+}
+
+/// In Rust source: a format placeholder (`{n}`, `{}`, `{x:>3}`) then a counted noun, as in
+/// `format!("{n} hours")`. In JS: a closing `+ "` then a counted noun, as in `n + " hours"`.
+fn fixed_plural_in_code(src: &str) -> Option<String> {
+    for line in src.lines() {
+        let code = line.trim_start();
+        if code.starts_with("//") || code.starts_with("assert") {
+            continue;
+        }
+        let mut rest = line;
+        while let Some(at) = rest.find('}') {
+            let before = &rest[..at];
+            rest = &rest[at + 1..];
+            // `{}`/`{name}`/`{n:>3}` only: not `}}` escapes, not a closing block brace.
+            let open = before.rfind('{');
+            let placeholder = open.is_some_and(|o| {
+                before[o + 1..]
+                    .chars()
+                    .all(|c| c.is_ascii_alphanumeric() || "_.:<>^".contains(c))
+            });
+            if placeholder
+                && !rest.starts_with('}')
+                && let Some(noun) = counted_noun(rest)
+            {
+                return Some(format!("{{..}} {noun}: {}", line.trim()));
+            }
+        }
+        for quote in ["+ \"", "+ '"] {
+            let mut rest = line;
+            while let Some(at) = rest.find(quote) {
+                rest = &rest[at + quote.len()..];
+                if let Some(noun) = counted_noun(rest) {
+                    return Some(format!("+ \" {noun}: {}", line.trim()));
+                }
+            }
+        }
+    }
+    None
+}
+
+/// The text sources a page or card is built from: web and cards Rust, and the static JS.
+/// An unreadable directory yields nothing, so the test below asserts it found sources.
+fn code_sources() -> Vec<std::path::PathBuf> {
+    let web = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let mut out = Vec::new();
+    for dir in [
+        web.join("src"),
+        web.join("static"),
+        web.join("../gitterrace-cards/src"),
+    ] {
+        for entry in fs::read_dir(dir).into_iter().flatten().flatten() {
+            let p = entry.path();
+            if p.extension().is_some_and(|e| e == "rs" || e == "js") {
+                out.push(p);
+            }
+        }
+    }
+    out
+}
+
+#[test]
+fn code_never_pairs_a_number_with_a_fixed_plural() {
+    let sources = code_sources();
+    assert!(sources.len() > 20, "found only {} sources", sources.len());
+    for path in sources {
+        let Ok(src) = fs::read_to_string(&path) else {
+            continue;
+        };
+        // Unit tests at the bottom may spell out expected text; the guard is for page text.
+        let src = src.split("#[cfg(test)]").next().unwrap_or(&src);
+        if let Some(hit) = fixed_plural_in_code(src) {
+            panic!(
+                "{} builds `{hit}`: use fmt::count / fmt::noun (cards: svg::count)",
+                path.display()
+            );
+        }
+    }
+}
+
+#[test]
+#[expect(
+    clippy::literal_string_with_formatting_args,
+    reason = "the inputs are source text the scan reads, not format strings"
+)]
+fn the_code_plural_scan_sees_what_it_should() {
+    assert!(fixed_plural_in_code(r#"format!("{n} hours")"#).is_some());
+    assert!(fixed_plural_in_code(r#"format!("{} times", x)"#).is_some());
+    assert!(fixed_plural_in_code(r#"format!("{d:>3} days since")"#).is_some());
+    assert!(fixed_plural_in_code(r#"var t = n + " commits";"#).is_some());
+    assert!(fixed_plural_in_code(r#"format!("{} in 26 weeks", c)"#).is_none());
+    assert!(fixed_plural_in_code(r#"format!("{n} {unit}{} ago", s)"#).is_none());
+    assert!(fixed_plural_in_code("if x { y } days").is_none());
+    assert!(fixed_plural_in_code(r#"format!("{{n}} commits")"#).is_none());
 }
 
 #[test]

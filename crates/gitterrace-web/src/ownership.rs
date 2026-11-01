@@ -1,0 +1,93 @@
+//! The ownership page, `/stats/ownership`: knowledge share and bus factor per directory.
+
+use askama::Template;
+use axum::extract::{Query, RawQuery, State};
+use axum::response::Html;
+use gitterrace_index::Period;
+
+use crate::{
+    error::Result,
+    filter::{Dim, FilterBar},
+    fmt::{self},
+    insights::{InsightsQuery, Kpi, OptLink, cached, head_lines, insights, period_of, scoped},
+    routes::Shared,
+    views::{self, Chrome, Tabs},
+};
+
+const TOP_DIRS: usize = 40;
+
+struct DirRow {
+    path: String,
+    href: String,
+    lines: String,
+    files: String,
+    owners: Vec<(String, String)>,
+    bus: usize,
+}
+
+#[derive(Template)]
+#[template(path = "ownership.html")]
+struct OwnershipPage {
+    c: Chrome,
+    tabs: Tabs,
+    fb: FilterBar,
+    opts: Vec<OptLink>,
+    kpis: Vec<Kpi>,
+    rows: Vec<DirRow>,
+}
+
+pub(crate) async fn page(
+    State(app): Shared,
+    RawQuery(raw): RawQuery,
+    Query(q): Query<InsightsQuery>,
+) -> Result<Html<String>> {
+    cached(&app, "ow", raw, move |a, r, c| {
+        let f = &q.filter;
+        let recs = scoped(f, r);
+        let d = a.defaults();
+        let ins = insights(a, &recs, q.options(&d));
+        let files = head_lines(a);
+        let rep = ins.ownership(
+            &files,
+            period_of(&q, &d, Period::All),
+            gitterrace_api::OWNERSHIP_DEPTH,
+        );
+        let row = |d: &gitterrace_index::DirOwnership, name: String| DirRow {
+            href: f.link("/stats/ownership", Dim::Path, &d.path),
+            path: name,
+            lines: fmt::thousands(d.lines),
+            files: fmt::thousands(d.files),
+            owners: d
+                .owners
+                .iter()
+                .take(3)
+                .map(|o| (o.name.clone(), format!("{:.0}%", o.share * 100.0)))
+                .collect(),
+            bus: d.bus_factor,
+        };
+        let mut rows = vec![row(&rep.overall, "(whole repository)".to_owned())];
+        rows.extend(
+            rep.dirs
+                .iter()
+                .take(TOP_DIRS)
+                .map(|d| row(d, d.path.clone())),
+        );
+        OwnershipPage {
+            c,
+            tabs: views::stats_tabs("ow"),
+            fb: f.bar("/stats/ownership", r),
+            opts: q.row(&d, "/stats/ownership"),
+            kpis: vec![
+                Kpi("Bus factor", fmt::thousands(rep.overall.bus_factor)),
+                Kpi("Solo lines", fmt::thousands(rep.solo_lines)),
+                Kpi("Stale lines", fmt::thousands(rep.stale_lines)),
+                Kpi(
+                    "Directories at one",
+                    fmt::thousands(rep.dirs_with_bus_factor_one),
+                ),
+            ],
+            rows,
+        }
+    })
+    .await
+}

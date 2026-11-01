@@ -11,7 +11,7 @@ use axum::{
     response::{IntoResponse, Response},
 };
 
-/// Hashes of the inline theme snippets in `base.html` and `repos.html`; the
+/// Hashes of the inline theme snippets in `_base.html` and `repos.html`; the
 /// `inline_scripts_are_hashed` test fails when a template changes without this.
 const CSP: &str = "default-src 'self'; img-src 'self' data:; media-src 'self'; style-src 'self' 'unsafe-inline'; \
     script-src 'self' 'sha256-fYt56R17Pz3RaWQCK4ngD4kWxzR9lHjYqQRanR4kAxk=' \

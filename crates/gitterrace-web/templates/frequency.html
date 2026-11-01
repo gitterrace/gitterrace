@@ -1,10 +1,10 @@
-{% extends "base.html" %}
+{% extends "_base.html" %}
 {% block title %}Code frequency · {{ c.name }}{% endblock %}
 {% block content %}
-{% include "tabs.html" %}
-{% include "filterbar.html" %}
-{% include "options.html" %}
-{% include "kpis.html" %}
+{% include "_tabs.html" %}
+{% include "_filterbar.html" %}
+{% include "_options.html" %}
+{% include "_kpis.html" %}
 <div class="chart-head"><div><h2>Additions and deletions per {{ unit }}</h2><p class="hint">Lines added above the axis, removed below, one column per {{ unit }}. Moves, lock files and whitespace-only changes are left out.</p></div></div>
 <div class="card pad">{{ weekly|safe }}</div>
 <div class="chart-head"><div><h2>Growing or reworking?</h2><p class="hint">Share of changed lines that replaced existing code, over a rolling window of {{ window }}, read at the end of each {{ unit }}. Low means new code, high means rewriting.</p></div></div>

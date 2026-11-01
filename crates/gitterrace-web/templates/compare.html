@@ -1,7 +1,7 @@
-{% extends "base.html" %}
+{% extends "_base.html" %}
 {% block title %}Compare · {{ c.name }}{% endblock %}
 {% block content %}
-{% include "tabs.html" %}
+{% include "_tabs.html" %}
 <form class="cmp" action="{{ c.base }}/compare" method="get"><label>Base <input name="base" value="{{ base }}" placeholder="v1.0 or a commit" required></label><label>Head <input name="head" value="{{ head }}"></label><button type="submit">Compare</button></form>
 {% if !tags.is_empty() %}<p class="hint">Since a tag: {% for t in tags %}<a href="{{ t.1 }}">{{ t.0 }}</a>{% if !loop.last %} · {% endif %}{% endfor %}</p>{% endif %}
 {% if let Some(e) = error %}<p class="muted">{{ e }}</p>{% endif %}

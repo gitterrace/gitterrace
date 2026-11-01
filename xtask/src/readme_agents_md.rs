@@ -7,9 +7,9 @@ use std::fmt::Write as _;
 use clap::CommandFactory as _;
 use gitterrace_actions::schema::{KINDS, kind_name};
 
+use crate::action_scripts::Script;
 use crate::facts::Workspace;
 use crate::out::Out;
-use crate::scripts::Script;
 
 #[path = "../../crates/gitterrace/src/cli.rs"]
 #[expect(

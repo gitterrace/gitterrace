@@ -1,10 +1,10 @@
-{% extends "base.html" %}
+{% extends "_base.html" %}
 {% block title %}Contributors · {{ c.name }}{% endblock %}
 {% block content %}
-{% include "tabs.html" %}
-{% include "filterbar.html" %}
-{% include "options.html" %}
-{% include "kpis.html" %}
+{% include "_tabs.html" %}
+{% include "_filterbar.html" %}
+{% include "_options.html" %}
+{% include "_kpis.html" %}
 <div class="chart-head"><div><h2>People</h2><p class="hint">Most commits first. The sparkline is commits per {{ unit }} over the period. Click a name to narrow the page to that person.</p></div></div>
 {% if people.is_empty() %}<p class="muted">No contributors match these filters.</p>{% else %}
 <div class="card"><table class="entries">

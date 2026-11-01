@@ -78,9 +78,9 @@ pub const INSIGHTS: &[Insight] = &[
         compute: |i, p, q| val(&i.label_over_time(label(q)?, p)),
     },
     Insight {
-        name: "code_frequency",
+        name: "frequency",
         summary: "Lines added, removed and rewritten per bucket (period).",
-        compute: |i, p, _| val(&i.code_frequency(p).1),
+        compute: |i, p, _| val(&i.frequency(p).1),
     },
 ];
 

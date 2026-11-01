@@ -79,7 +79,6 @@ Disposable: bump the format version instead of migrating.
 | `/refs`, `/tag/{name}`, `/worktrees`, `/stashes`, `/worktree` | Git state: branches, tags, linked worktrees, stashes, uncommitted changes |
 | `/search` | Code and commit search |
 | `/stats`, `/stats/{page}` | Insights on the shared filter and period. `?rev=` follows any ref |
-| `/stats/pulse`, `/stats/files` | Permanent redirects from removed pages, query kept: to `/stats` and `/stats/hotspots` |
 | `/events`, `/api/{files,refs,last,progress}` | Live updates and the fragments pages fetch |
 | `/api/v1/...` | JSON API, see [api.md](api.md) |
 | `/go/{repo-id}/{sha}/{path}` | Permalink: finds the served repository by id |

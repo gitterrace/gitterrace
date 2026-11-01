@@ -10,7 +10,7 @@ use pulldown_cmark::{Options, Parser, html};
 
 use crate::facts::Workspace;
 use crate::out::Out;
-use crate::readme_md;
+use crate::readme_agents_md;
 
 const FONTS: [(&str, &str); 3] = [
     ("fraunces", "fraunces-latin-wght-normal.woff2"),
@@ -129,7 +129,7 @@ pub fn render(root: &Path, ws: &Workspace) -> Result<Vec<Out>> {
     let _ = write!(
         h,
         "<section>\n<h2>Install</h2>\n{}</section>\n",
-        md(&readme_md::install_md(ws))
+        md(&readme_agents_md::install_md(ws))
     );
     let _ = write!(
         h,
@@ -218,15 +218,15 @@ fn host_files(home: &str, repo: &str, name: &str) -> Vec<Out> {
     ]
 }
 
-/// `TAGLINE` from `scripts/theme-tagline.py`, so the page, the README header and the logo agree.
+/// `TAGLINE` from `scripts/theme-tagline-gen.py`, so the page, the README header and the logo agree.
 fn tagline(root: &Path) -> Result<String> {
-    let src = std::fs::read_to_string(root.join("scripts/theme-tagline.py"))
-        .context("reading scripts/theme-tagline.py")?;
+    let src = std::fs::read_to_string(root.join("scripts/theme-tagline-gen.py"))
+        .context("reading scripts/theme-tagline-gen.py")?;
     src.lines()
         .find_map(|l| l.strip_prefix("TAGLINE = \""))
         .and_then(|l| l.strip_suffix('"'))
         .map(str::to_owned)
-        .context("TAGLINE in scripts/theme-tagline.py")
+        .context("TAGLINE in scripts/theme-tagline-gen.py")
 }
 
 /// The generated block of the app's tokens, with the font paths pointed at `assets/fonts/`.
@@ -305,7 +305,7 @@ fn features() -> String {
 /// One row per command, the README block's rows, as a definition list so long text wraps
 /// instead of running off the edge.
 fn commands() -> String {
-    let rows = readme_md::commands_rows();
+    let rows = readme_agents_md::commands_rows();
     let mut s = String::from("<dl class=\"cmds\">");
     for (a, b) in rows {
         let about = b.split(" [--").next().unwrap_or(&b);

@@ -108,7 +108,7 @@ Served at `GET /insights/{name}`.
 | `dir_churn` | Per-directory commits and lines changed (period, limit). |
 | `label_breakdown` | Conventional-commit type or scope counts (label, period). |
 | `label_over_time` | Type or scope counts per bucket, empty ones included (label, period). |
-| `code_frequency` | Lines added, removed and rewritten per bucket (period). |
+| `frequency` | Lines added, removed and rewritten per bucket (period). |
 | `hotspots` | Files of the head tree by changes times the square root of their size (period, limit). |
 | `ownership` | Knowledge share and bus factor per directory two levels deep, weighted by size now (period). |
 

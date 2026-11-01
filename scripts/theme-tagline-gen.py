@@ -5,7 +5,7 @@ The header's text is outlined (no font is needed to view it), so a wording chang
 rendered again. This draws TAGLINE with the vendored Bricolage Grotesque at the header's
 size and position and swaps it into both files, keeping each file's colour.
 
-    uv run --with fonttools --with brotli python scripts/theme-tagline.py [--check]
+    uv run --with fonttools --with brotli python scripts/theme-tagline-gen.py [--check]
 
 `make theme` runs the check, so the outlined words cannot drift from TAGLINE, and the
 names check reads TAGLINE as prose.

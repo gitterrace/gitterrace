@@ -73,11 +73,6 @@ pub const PAGES: &[Page] = &[
         ],
     ),
     page(
-        "`/stats/pulse`, `/stats/files`",
-        "Permanent redirects from removed pages, query kept: to `/stats` and `/stats/hotspots`",
-        &["/stats/pulse", "/stats/files"],
-    ),
-    page(
         "`/events`, `/api/{files,refs,last,progress}`",
         "Live updates and the fragments pages fetch",
         &[

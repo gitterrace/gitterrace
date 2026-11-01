@@ -1,9 +1,9 @@
-{% extends "base.html" %}
+{% extends "_base.html" %}
 {% block title %}Patterns · {{ c.name }}{% endblock %}
 {% block content %}
-{% include "tabs.html" %}
-{% include "filterbar.html" %}
-{% include "options.html" %}
+{% include "_tabs.html" %}
+{% include "_filterbar.html" %}
+{% include "_options.html" %}
 <div class="chart-head"><div><h2>Coupled files</h2><p class="hint">Pairs of files that change in the same commits. Degree is shared commits over the changes of the less-changed file.</p></div></div>
 <div class="card"><table class="entries">
 <tr class="th"><td>File</td><td>Changes with</td><td class="r">Together</td><td class="r">Degree</td></tr>

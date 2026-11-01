@@ -601,8 +601,8 @@ mod tests {
             Path::new("/o/index.html")
         );
         assert_eq!(
-            t("/stats/files", "text/html"),
-            Path::new("/o/stats/files/index.html")
+            t("/stats/hotspots", "text/html"),
+            Path::new("/o/stats/hotspots/index.html")
         );
         assert_eq!(
             t("/static/app.css", "text/css"),
@@ -669,9 +669,9 @@ mod tests {
         let out = tempfile::tempdir().expect("tempdir");
         let elsewhere = tempfile::tempdir().expect("tempdir");
         std::os::unix::fs::symlink(elsewhere.path(), out.path().join("stats")).expect("symlink");
-        let err = write_page(out.path(), "/stats/files", "text/html", b"x").unwrap_err();
+        let err = write_page(out.path(), "/stats/hotspots", "text/html", b"x").unwrap_err();
         assert!(err.to_string().contains("refusing to write"), "{err}");
-        assert!(!elsewhere.path().join("files").exists());
+        assert!(!elsewhere.path().join("hotspots").exists());
         write_page(out.path(), "/refs", "text/html", b"ok").expect("normal page writes");
         assert!(out.path().join("refs/index.html").exists());
     }

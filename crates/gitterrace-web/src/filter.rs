@@ -67,7 +67,7 @@ pub(crate) struct PeriodLink {
     pub(crate) on: bool,
 }
 
-/// What `filterbar.html` renders: removable chips and the period picker.
+/// What `_filterbar.html` renders: removable chips and the period picker.
 pub(crate) struct FilterBar {
     pub(crate) chips: Vec<Chip>,
     pub(crate) periods: Vec<PeriodLink>,

@@ -64,5 +64,5 @@ outside `gitterrace-git` imports `gix`.
   preview on the default address.
 - Commits: `type(scope): subject`, scope is the crate without `gitterrace-`. Commit by
   pathspec, never `git add -A`.
-- Names: files in `scripts/` are `<area>-<verb>.<ext>`, make targets are single words,
+- Names: files in `scripts/` are `<area>-<verb>.<ext>`, make targets are `<area>[-<verb>]`,
   harness-only env vars use a `TEST_` prefix. `make names` enforces it.
