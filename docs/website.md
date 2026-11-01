@@ -42,7 +42,27 @@ credential than the task deserves, so `make domains` measures the result instead
 ## Each release
 
 Bump `SECURITY_TXT_EXPIRES` in `xtask/src/site.rs`, `make docs-gen`, commit, then
-`make deploy`.
+`make deploy`. After pushing the tag, `make demo` refreshes demo.gitterrace.dev.
+
+## Demo
+
+demo.gitterrace.dev is `git terrace export` of this repository at its newest tag: the real app's
+pages, frozen, to click around without installing anything. `make demo` builds it from a fresh
+clone of the tag (no working-tree changes, local branches or stashes leak in) into
+`target/demo`, then deploys the `gitterrace-demo` Worker from `demo/wrangler.toml`.
+
+- **One tag, one demo.** The demo shows a release, not main, so it matches what `brew install`
+  gives. Run `make demo` after each tag; it is a local step like `make deploy`, no workflow.
+- **It says what it is.** Every exported page carries a "Static snapshot at <tag>" banner with
+  a link to install, so nobody mistakes it for a live view. Search, live updates, actions and
+  the API do not exist in a static copy.
+- **Not indexed.** `demo/_headers` sends `X-Robots-Tag: noindex`: the site is the page to
+  find, the demo is where it links.
+- **Every insights page is in it.** Export seeds its crawl from the server's prewarmed pages, and
+  a test fails when one of them is missing from an export.
+
+One-time setup: add the custom domain `demo.gitterrace.dev` by deploying once (`make demo`);
+the route in `demo/wrangler.toml` creates it.
 
 ## Before the release
 

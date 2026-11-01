@@ -12,6 +12,11 @@ branches, worktrees, stashes, live updates and insights. No database, accounts o
 Agents write more of the code each month, and few people read their diffs. This is a calm
 place to look again ([why](docs/why.md)).
 
+<!-- BEGIN GENERATED: demo -->
+Try it without installing: [the live demo](https://demo.gitterrace.dev) is this repository, exported.
+
+<!-- END GENERATED: demo -->
+
 ## Install
 
 <!-- BEGIN GENERATED: msrv -->

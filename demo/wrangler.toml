@@ -1,0 +1,15 @@
+# Cloudflare config for demo.gitterrace.dev: a static export of this repository, to click
+# around without installing anything. Built by `make demo` (scripts/site-export.sh) into
+# target/demo, deployed with `make demo-deploy`. Same shape as ../wrangler.toml: a Worker
+# with static assets and no script.
+name = "gitterrace-demo"
+compatibility_date = "2026-10-01"
+workers_dev = false
+preview_urls = false
+routes = [{ pattern = "demo.gitterrace.dev", custom_domain = true }]
+
+[assets]
+directory = "../target/demo"
+not_found_handling = "404-page"
+# Exported pages are folders with index.html; serve /stats as /stats/ without a 301 loop.
+html_handling = "auto-trailing-slash"

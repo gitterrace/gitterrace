@@ -28,6 +28,9 @@ pub struct Workspace {
     /// The Homebrew tap the release publishes to (`owner/homebrew-tap`), from
     /// `[workspace.metadata.dist]`; empty when there is none.
     pub tap: String,
+    /// The live demo's URL, from the custom-domain route in `demo/wrangler.toml`; empty when
+    /// there is no demo. The deploy config is the one place it is written down.
+    pub demo: String,
 }
 
 pub fn load(root: &Path) -> Result<Workspace> {
@@ -95,7 +98,27 @@ pub fn load(root: &Path) -> Result<Workspace> {
         .as_str()
         .unwrap_or_default()
         .to_owned();
-    Ok(Workspace { packages, tap })
+    Ok(Workspace {
+        packages,
+        tap,
+        demo: demo_url(root),
+    })
+}
+
+/// `https://<pattern>` of the first `custom_domain` route in `demo/wrangler.toml`.
+fn demo_url(root: &Path) -> String {
+    let text = std::fs::read_to_string(root.join("demo/wrangler.toml")).unwrap_or_default();
+    text.lines()
+        .filter(|l| l.trim_start().starts_with("routes") && l.contains("custom_domain = true"))
+        .find_map(|l| {
+            l.split("pattern = \"")
+                .nth(1)?
+                .split('"')
+                .next()
+                .map(str::to_owned)
+        })
+        .map(|host| format!("https://{host}"))
+        .unwrap_or_default()
 }
 
 impl Workspace {

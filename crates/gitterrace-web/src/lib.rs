@@ -99,7 +99,8 @@ fn repo_router(
 
 /// Unfiltered pages rendered in the background whenever HEAD moves. Each costs 40-90 ms to
 /// build on a 14k-commit repo, then a few ms from the memo, so no visitor pays the build.
-const WARM_PAGES: [&str; 11] = [
+/// `export` seeds its crawl from the same list, so a static copy has every insights page.
+pub const WARM_PAGES: [&str; 11] = [
     "/",
     "/stats",
     "/stats/files",

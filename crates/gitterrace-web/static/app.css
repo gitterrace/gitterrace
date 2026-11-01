@@ -115,7 +115,7 @@ button:hover{border-color:var(--line-strong);background:var(--hover)}
 .crow .av{width:18px;height:18px;font-size:10px;flex:none}
 /* One line per commit: subject takes the room, author and time sit after it,
    muted, and give way first when the line is short. */
-.cmain{display:flex;flex-direction:row;flex-wrap:wrap;align-items:baseline;gap:0 var(--space-3);flex:1;min-width:0}
+.cmain{display:flex;flex-direction:row;flex-wrap:nowrap;align-items:baseline;gap:0 var(--space-3);flex:1;min-width:0}
 /* The one place text is cut: a commit message is a single line that ends in an ellipsis
    when the room runs out, and carries the full text as a hover (tip.js). */
 .subj{display:block;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -123,6 +123,9 @@ button:hover{border-color:var(--line-strong);background:var(--hover)}
 .cmain .muted{flex:0 0 auto;max-width:100%;overflow-wrap:break-word;margin-left:auto}
 .cmain .muted b{color:var(--muted);font-weight:var(--weight-regular)}
 .crow .sha{flex:none}
+/* Narrow screens: author and time always take their own row under the full-width subject, so
+   every row has the same two lines whatever the subject's length. */
+@media (max-width:600px){.cmain{flex-wrap:wrap}.cmain>.subj{flex:1 0 100%}.cmain .muted{margin-left:0;white-space:nowrap}}
 
 /* commit page and diff */
 .meta{color:var(--muted);margin:var(--space-2) 0 var(--space-6)}.meta b{color:var(--fg)}

@@ -34,15 +34,15 @@ pub struct Scope {
 const MAX_BODY: usize = 64 * 1024 * 1024;
 /// Hard ceiling on pages, so a mis-scoped export fails instead of filling a disk.
 const MAX_PAGES: usize = 20_000;
-/// Pages the crawl starts from; each is exported whatever links point at it.
-const SEEDS: [&str; 6] = [
-    "/",
-    "/refs",
-    "/stats",
-    "/stats/files",
-    "/stats/types",
-    "/log/HEAD",
-];
+/// Pages the crawl starts from, beside every page the server prewarms; each is exported
+/// whatever links point at it.
+const SEEDS: [&str; 2] = ["/refs", "/log/HEAD"];
+
+/// Every seed: the extra ones, then the server's prewarmed pages (every unfiltered insights
+/// page), so a page added to the server is exported without touching this list.
+fn seeds() -> impl Iterator<Item = &'static str> {
+    SEEDS.into_iter().chain(gitterrace_web::WARM_PAGES)
+}
 
 /// Writes the scoped site to `out` and returns how many files were written.
 pub async fn export(repo_path: &Path, out: &Path, scope: &Scope) -> anyhow::Result<usize> {
@@ -59,9 +59,10 @@ pub async fn export(repo_path: &Path, out: &Path, scope: &Scope) -> anyhow::Resu
     wait_for_index(&router).await?;
     let repo = gitterrace_git::Repo::discover(repo_path).context("opening the repository")?;
     let head = repo.resolve("HEAD").context("resolving HEAD")?;
+    let stamp = snapshot_label(&repo, &head)?;
 
     let mut queue: VecDeque<String> = VecDeque::new();
-    for seed in SEEDS {
+    for seed in seeds() {
         queue.push_back(seed.to_owned());
     }
     for c in repo
@@ -98,6 +99,11 @@ pub async fn export(repo_path: &Path, out: &Path, scope: &Scope) -> anyhow::Resu
             if written >= MAX_PAGES {
                 bail!("export stopped at {MAX_PAGES} pages. Lower --commits or --max-file-kb");
             }
+            let body = if content_type.starts_with("text/html") {
+                mark_snapshot(&body, &stamp)
+            } else {
+                body
+            };
             write_page(out, &path, &content_type, &body)?;
             written += 1;
             if content_type.starts_with("text/html") || content_type.starts_with("text/css") {
@@ -109,7 +115,8 @@ pub async fn export(repo_path: &Path, out: &Path, scope: &Scope) -> anyhow::Resu
             }
         }
     }
-    Ok(written)
+    write_page(out, "/snapshot.css", "text/css", SNAPSHOT_CSS.as_bytes())?;
+    Ok(written + 1)
 }
 
 /// Polls the progress endpoint so insights pages are exported built, not "indexing".
@@ -174,7 +181,7 @@ impl Allowed {
             .collect();
         let mut tree = BTreeSet::new();
         walk(repo, head, "", scope.max_file, &mut tree)?;
-        let exact = SEEDS.into_iter().map(str::to_owned).collect();
+        let exact = seeds().map(str::to_owned).collect();
         Ok(Self {
             exact,
             commits,
@@ -284,6 +291,56 @@ fn percent_decode(s: &str) -> String {
         i += 1;
     }
     String::from_utf8_lossy(&out).into_owned()
+}
+
+/// Style for the snapshot banner, written next to the pages. Kept out of the app's own CSS:
+/// only an export ever shows the banner. Colours are the app's tokens, already on the page.
+const SNAPSHOT_CSS: &str = ".snapshot{background:var(--accent-soft);color:var(--fg);\
+ border-bottom:var(--border);font:var(--text-sm)/1.4 var(--sans);padding:var(--space-2) 0}\
+ .snapshot a{color:var(--accent-fg);font-weight:var(--weight-semibold)}\n";
+
+/// What the snapshot banner names: the tag on HEAD when there is one, else the short commit id.
+fn snapshot_label(repo: &gitterrace_git::Repo, head: &str) -> anyhow::Result<String> {
+    let tag = repo
+        .refs()
+        .context("reading refs")?
+        .into_iter()
+        .filter(|r| r.kind == gitterrace_git::RefKind::Tag && r.target == head)
+        .map(|r| r.name)
+        .max();
+    Ok(tag.unwrap_or_else(|| gitterrace_git::short_id(head).to_owned()))
+}
+
+/// The banner every exported page carries, so nobody mistakes a frozen copy for a live view:
+/// it says what it is, which revision it froze, and where the real thing comes from. Inserted
+/// right after `<body ...>`, outside the app's chrome, so no template has to know about export.
+fn mark_snapshot(html: &[u8], label: &str) -> Vec<u8> {
+    let page = String::from_utf8_lossy(html);
+    let Some(open) = page.find("<body") else {
+        return html.to_vec();
+    };
+    let Some(end) = page[open..].find('>').map(|i| open + i + 1) else {
+        return html.to_vec();
+    };
+    let banner = format!(
+        "<link rel=\"stylesheet\" href=\"/snapshot.css\">\
+         <div class=\"snapshot\" role=\"note\"><div class=\"wrap\">Static snapshot at <b>{}</b>: \
+         search, live updates and actions need the real thing. \
+         <a href=\"https://gitterrace.dev\">Install gitterrace</a></div></div>",
+        escape(label)
+    );
+    let mut out = String::with_capacity(page.len() + banner.len());
+    out.push_str(&page[..end]);
+    out.push_str(&banner);
+    out.push_str(&page[end..]);
+    out.into_bytes()
+}
+
+fn escape(s: &str) -> String {
+    s.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
 }
 
 /// File the page lands in: HTML pages become `<path>/index.html` so their links
@@ -447,5 +504,38 @@ mod tests {
         );
         let left: Vec<_> = std::fs::read_dir(repo.path()).expect("read").collect();
         assert_eq!(left.len(), 1, "nothing but .git may be written");
+    }
+
+    /// A static copy must hold every page the server treats as a landing page: the demo is
+    /// built from export, and a missing insights page is a dead tab, not a slow one.
+    #[tokio::test]
+    async fn export_writes_every_prewarmed_page() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let repo = gitterrace_testkit::Fixture::standard(&dir.path().join("r"));
+        let out = dir.path().join("out");
+        let scope = crate::export::Scope {
+            commits: 5,
+            max_file: 64 * 1024,
+        };
+        crate::export::export(repo.path(), &out, &scope)
+            .await
+            .expect("export");
+        for page in gitterrace_web::WARM_PAGES {
+            let file = target(&out, page, "text/html");
+            assert!(
+                file.is_file(),
+                "{page} was not exported (looked for {})",
+                file.display()
+            );
+            let html = std::fs::read_to_string(&file).expect("read page");
+            assert!(
+                html.contains("class=\"snapshot\"") && html.contains("Static snapshot at"),
+                "{page} does not say it is a static snapshot"
+            );
+        }
+        assert!(
+            out.join("snapshot.css").is_file(),
+            "the banner style is missing"
+        );
     }
 }

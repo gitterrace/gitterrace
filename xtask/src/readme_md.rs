@@ -44,8 +44,20 @@ pub fn render(ws: &Workspace, scripts: &[Script]) -> Vec<Out> {
         Out::block(README, "commands", commands()),
         Out::block(README, "actions", actions),
         Out::block(README, "license", license_md(bin)),
+        Out::block(README, "demo", demo_md(ws)),
         Out::block("AGENTS.md", "crates", crate_table(ws)),
     ]
+}
+
+/// The live demo link, from `demo/wrangler.toml`; nothing when there is no demo.
+pub fn demo_md(ws: &Workspace) -> String {
+    if ws.demo.is_empty() {
+        return String::new();
+    }
+    format!(
+        "Try it without installing: [the live demo]({0}) is this repository, exported.\n",
+        ws.demo
+    )
 }
 
 /// The license line, from the binary's manifest; the full text is the root `LICENSE` file.

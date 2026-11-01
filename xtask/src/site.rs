@@ -105,9 +105,17 @@ pub fn render(root: &Path, ws: &Workspace) -> Result<Vec<Out>> {
         h,
         "<header>\n<picture>\n<source media=\"(prefers-color-scheme: dark)\" srcset=\"assets/logo-dark.svg\">\n\
          <img src=\"assets/logo-light.svg\" alt=\"{n}\" width=\"540\" height=\"120\">\n</picture>\n\
-         <p class=\"tag\">{tag}</p>\n</header>\n",
+         <p class=\"tag\">{tag}</p>\n{demo}</header>\n",
         n = esc(&pkg.name),
         tag = esc(&tagline(root)?),
+        demo = if ws.demo.is_empty() {
+            String::new()
+        } else {
+            format!(
+                "<p class=\"demo\"><a href=\"{}\">Try the live demo</a>, no install needed.</p>\n",
+                esc(&ws.demo)
+            )
+        },
     );
     let _ = write!(
         h,

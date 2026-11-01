@@ -104,6 +104,11 @@ shipped:
 domains:
 	python3 scripts/site-check.py domains
 
+## demo: Export the newest tag to target/demo and ship it to demo.gitterrace.dev (run per tag)
+demo:
+	scripts/site-export.sh
+	cd demo && npx wrangler@4 deploy
+
 ## help: This list
 help:
 	@grep -E '^## ' $(MAKEFILE_LIST) | sed 's/## //' | column -t -s ':'

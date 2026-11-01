@@ -98,6 +98,17 @@ function measure() {
     e.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
     if (e.scrollWidth > e.clientWidth + 1 && !e.getAttribute('data-tip')) out.subj.push(`cut without tip: ${t}`);
   }
+  // A commit row never grows a line for its message: above the narrow breakpoint the subject
+  // and its author share one line (the subject is cut instead); below it, the author line sits
+  // under the subject and is itself one line. So no row is a line taller than the shortest.
+  const rows = [...document.querySelectorAll('li.crow')].filter((li) => li.offsetParent);
+  if (rows.length) {
+    const hs = rows.map((li) => li.getBoundingClientRect().height);
+    const min = Math.min(...hs);
+    const line = parseFloat(getComputedStyle(rows[0].querySelector('.subj')).lineHeight) || 20;
+    const tall = hs.filter((h) => h > min + line / 2).length;
+    if (tall) out.subj.push(`${tall} commit rows grow a line (shortest ${Math.round(min)}px, tallest ${Math.round(Math.max(...hs))}px)`);
+  }
   out.hscroll = document.documentElement.scrollWidth > innerWidth;
   return out;
 }
