@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light dark">
 <meta name="gt-base" content="{{ c.base }}">
-<meta name="gt-repo" content="{{ c.repo_key }}" data-id="{{ c.repo_id }}">
+<meta name="gt-repo" content="{{ c.repo_key }}" data-id="{{ c.repo_id }}" data-link="{{ c.link_style }}">
 {% if let Some((token, menu)) = c.actions %}<meta name="gitterrace-actions" content="{{ token }}" data-menu="{{ menu }}">{% endif %}
 <title>{% block title %}{{ c.name }}{% endblock %} · gitterrace</title>
 <script>(function(){try{var q=/[?&]theme=(light|dark)/.exec(location.search),t=q?q[1]:localStorage.getItem("gitterrace-theme");if(t==="light"||t==="dark")document.documentElement.dataset.theme=t}catch(e){}})()</script>

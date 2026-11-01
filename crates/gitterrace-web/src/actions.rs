@@ -114,6 +114,14 @@ pub(crate) struct Site {
     pub(crate) status: Arc<Status>,
     /// The config `[[send]]` targets come from: the live, reloaded one when actions are on.
     pub(crate) sends: Arc<RwLock<Arc<Config>>>,
+    /// The server's settings, read per request so a reload of `links.style` reaches payloads.
+    pub(crate) env: crate::app::Env,
+}
+
+impl Site {
+    fn link_style(&self) -> gitterrace_actions::LinkStyle {
+        gitterrace_actions::LinkStyle::from_config(&self.env.cfg().links.style)
+    }
 }
 
 /// Turns actions on when the file at `file` is safe and declares at least one action, and
@@ -461,8 +469,9 @@ fn run_blocking(
     origin: &str,
 ) -> Result<(gitterrace_actions::Outcome, Output), Failed> {
     let t = site.targets.get(idx).ok_or(Failed::Internal)?;
-    let payload =
-        Payload::build(&t.repo, &action.id, rr.kind, &rr.locator, origin).map_err(|e| match e {
+    let style = site.link_style();
+    let payload = Payload::build(&t.repo, &action.id, rr.kind, &rr.locator, origin, style)
+        .map_err(|e| match e {
             PayloadError::BadLocator(why) => Failed::Locator(why),
             PayloadError::Git(e) => {
                 tracing::warn!("action payload: {e}");
@@ -812,7 +821,7 @@ mod tests {
             stdin["permalink"]
                 .as_str()
                 .expect("link")
-                .starts_with("http://localhost:4242/go/")
+                .starts_with("gitterrace://")
         );
         let env = std::fs::read_to_string(cfg.path().join("env.txt")).expect("env");
         for line in env.lines() {

@@ -130,7 +130,7 @@ pub const PAYLOAD_FIELDS: [Item; 16] = [
         "string",
         true,
         "",
-        "A `/go/<repo-id>/<sha>/<path>#L<a>-L<b>` link that survives clones and renames.",
+        "`gitterrace://<repo-id>/<sha>/<path>#L<a>-L<b>`, or the `/go` URL with `links.style = \"go\"`. Survives clones and renames.",
     ),
     item(
         "title",
@@ -283,7 +283,7 @@ pub const SEND_PLACEHOLDERS: [(&str, &str); 8] = [
         "notes",
         "The rest of the note, the quoted selection and the permalink.",
     ),
-    ("permalink", "The `/go` permalink."),
+    ("permalink", "The permalink, in `links.style`."),
     ("path", "The repository-relative path, or empty."),
     ("lines", "The line range, like `L3-L7`, or empty."),
     ("sha", "The full commit id."),

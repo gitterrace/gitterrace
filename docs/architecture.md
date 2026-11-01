@@ -41,6 +41,13 @@ badges and the year card.
 - **Send to opens a URL in your browser.** The server never calls the destination, so there is
   nothing to authenticate and nothing written ([how Send to works](actions.md)).
 - **Several repos** under `/r/{name}/`, resolved only through the startup table.
+- **`gitterrace://` permalinks name what, not where.** `gitterrace://<repo-id>/<sha>/<path>`
+  is the `/go` tuple without a host, so it works with no server running and on another
+  machine. `git terrace open` finds the clone among repositories served before (recorded in
+  `$XDG_STATE_HOME/gitterrace/repos.json`, else `~/.local/state/gitterrace`, on macOS too) and
+  under `links.roots`, rechecks its id, then starts or reuses a server. A link is input from
+  outside: one strict parser in `gitterrace-actions/src/link.rs`, the registry never stores
+  anything from a link, and an unknown id never clones or fetches.
 
 ## Cache
 

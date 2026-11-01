@@ -597,3 +597,23 @@ async fn every_static_file_a_template_loads_is_served() {
         assert_eq!(code, 200, "{path} is linked from a template but not served");
     }
 }
+
+/// `links.style` decides what Copy permalink copies: the page tells the scripts which form.
+#[tokio::test]
+async fn links_style_switches_copy_permalink() {
+    let dir = tempfile::tempdir().expect("tmp");
+    let p = repo(dir.path(), "r");
+    let (_, body) = get(&router(&p, Config::default()), "/blob/HEAD/small.txt").await;
+    assert!(
+        body.contains("data-link=\"gitterrace\""),
+        "default gitterrace"
+    );
+    let go = with(|c| c.links.style = "go".to_owned());
+    let (_, body) = get(&router(&p, go), "/blob/HEAD/small.txt").await;
+    assert!(body.contains("data-link=\"go\""), "links.style = go");
+    let js = include_str!("../static/actions.js");
+    assert!(
+        js.contains("dataset.link") && js.contains("\"gitterrace://\""),
+        "actions.js reads the style"
+    );
+}

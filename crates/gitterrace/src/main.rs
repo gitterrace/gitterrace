@@ -5,6 +5,7 @@ use clap::Parser;
 
 mod cli;
 mod export;
+mod open;
 
 use cli::{Cli, Command};
 
@@ -48,7 +49,20 @@ async fn main() -> anyhow::Result<()> {
             gitterrace_web::serve(repos, addr, actions, loaded.config, watched).await?;
         }
         Command::Mcp => {
-            gitterrace_api::serve_mcp(&path).await?;
+            let style = gitterrace_actions::LinkStyle::from_config(&loaded.config.links.style);
+            gitterrace_api::serve_mcp(&path, style).await?;
+        }
+        Command::Open { link, print } => {
+            let r = tokio::task::block_in_place(|| {
+                open::run(&link, print, &loaded, cli.config.as_deref())
+            });
+            if let Err(e) = r {
+                if let Some(o) = e.downcast_ref::<open::OpenError>() {
+                    eprintln!("gitterrace: {o}");
+                    std::process::exit(2);
+                }
+                return Err(e);
+            }
         }
         Command::Wrapped {
             year,

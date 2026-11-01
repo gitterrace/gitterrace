@@ -40,6 +40,8 @@ pub(crate) struct Chrome {
     pub(crate) home: String,
     /// Repo id for permalinks (`/go/<id>/...`); empty for a repo without commits.
     pub(crate) repo_id: String,
+    /// Form Copy permalink and Send to hand out (`links.style`): `gitterrace` or `go`.
+    pub(crate) link_style: &'static str,
     /// Name run requests use for this repo.
     pub(crate) repo_key: String,
     /// Color theme before the visitor picks one (`display.theme`), empty for the system's.
@@ -161,6 +163,7 @@ pub(crate) fn chrome_at(app: &crate::app::App, active: &str, rev: &str) -> Chrom
         version: app.version().to_string(),
         home: href("/"),
         repo_id: app.repo.id().unwrap_or_default(),
+        link_style: gitterrace_actions::LinkStyle::from_config(&app.cfg().links.style).as_str(),
         repo_key: app.key.clone(),
         actions: app
             .actions

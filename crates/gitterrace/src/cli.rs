@@ -54,6 +54,18 @@ pub(crate) enum Command {
         #[arg(long, short)]
         out: Option<PathBuf>,
     },
+    /// Open a `gitterrace://` or `/go` permalink in the browser, starting a server if needed.
+    ///
+    /// The clone is found among repositories served before and under `links.roots`. An
+    /// unknown repository exits 2, with no clone and no network.
+    Open {
+        /// `gitterrace://<id>/<sha>[/<path>][#L<a>-L<b>]`, an `http(s)://.../go/...` URL or a
+        /// bare `/go/...` path.
+        link: String,
+        /// Print the URL instead of opening a browser.
+        #[arg(long)]
+        print: bool,
+    },
     /// Write a static copy of the site to a folder, for sharing or hosting.
     Export {
         /// Folder to write into (created if missing).

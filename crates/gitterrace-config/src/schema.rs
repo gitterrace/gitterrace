@@ -160,6 +160,15 @@ settings! {
         /// Folder names never searched, besides hidden ones. Needs a restart.
         skip_dirs: Vec<String> = vec!["node_modules".to_owned(), "target".to_owned(), ".wt".to_owned()],
     }
+    links: Links {
+        /// Form of the permalink Copy permalink, Send to, action payloads and the MCP hand out:
+        /// gitterrace (`gitterrace://<id>/<sha>/<path>`, opened by `git terrace open` without a
+        /// running server) or go (`http://<addr>/go/...`, needs this server running).
+        style: String = "gitterrace".to_owned(),
+        /// Folders `git terrace open` searches, `multi.depth` levels deep, for a clone a link
+        /// names, besides every repository served before.
+        roots: Vec<String> = Vec::new(),
+    }
 }
 
 impl Config {
@@ -195,6 +204,9 @@ impl Config {
         }
         if !["relative", "absolute"].contains(&self.display.dates.as_str()) {
             return bad("display.dates", "expected relative or absolute");
+        }
+        if !["gitterrace", "go"].contains(&self.links.style.as_str()) {
+            return bad("links.style", "expected gitterrace or go");
         }
         if self.multi.depth == 0 || self.multi.depth > 6 {
             return bad("multi.depth", "must be between 1 and 6");

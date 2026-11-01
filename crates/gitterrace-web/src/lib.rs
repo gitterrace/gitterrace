@@ -17,6 +17,7 @@ mod markdown;
 mod media;
 mod multi;
 mod pages;
+mod registry;
 mod reload;
 mod routes;
 mod search;
@@ -37,6 +38,7 @@ use gitterrace_config::Config;
 use gitterrace_git::Repo;
 use gitterrace_index::Index;
 pub use multi::discover_repos;
+pub use registry::{Entry as RegistryEntry, read as read_registry, state_dir};
 pub use reload::{Load, Watched};
 pub use views::stats_tab_labels;
 
@@ -86,7 +88,10 @@ fn repo_router(
     let app = Arc::new(app);
     env.register(&app);
     tokio::spawn(app::keep_index_fresh(Arc::clone(&app)));
-    let api = gitterrace_api::ApiState::open(repo_path).map_err(io::Error::other)?;
+    let style = gitterrace_actions::LinkStyle::from_config(&env.cfg().links.style);
+    let api = gitterrace_api::ApiState::open(repo_path)
+        .map_err(io::Error::other)?
+        .with_link_style(style);
     let pages = routes::router(Arc::clone(&app)).nest("/api/v1", gitterrace_api::router(api));
     tokio::spawn(prewarm(Arc::clone(&app), pages.clone()));
     Ok(pages)
@@ -173,6 +178,7 @@ fn build(
         live: live.clone(),
         status,
         sends,
+        env: env.clone(),
     });
     let pages = repo_router(repo_path, String::new(), name.clone(), live, env)?;
     Ok((guarded(pages.merge(actions::router(site)), extra), name))
@@ -200,6 +206,7 @@ fn build_multi(
                 live,
                 status,
                 sends,
+                env: env.clone(),
             });
             Ok((
                 guarded(
@@ -209,6 +216,25 @@ fn build_multi(
                 format!("{n} repositories"),
             ))
         }
+    }
+}
+
+/// Records the served repositories for `git terrace open`. Best effort: a read-only or odd
+/// state folder must not stop the server, so a failure is only logged.
+fn remember(paths: &[PathBuf]) {
+    let Some(dir) = registry::state_dir() else {
+        return;
+    };
+    let repos: Vec<Repo> = paths
+        .iter()
+        .filter_map(|p| Repo::discover(p).ok())
+        .collect();
+    let refs: Vec<&Repo> = repos.iter().collect();
+    if let Err(e) = registry::record(&dir, &refs) {
+        tracing::warn!(
+            "not recording served repositories in {}: {e}",
+            dir.display()
+        );
     }
 }
 
@@ -223,6 +249,10 @@ pub async fn serve(
     watched: Option<Watched>,
 ) -> io::Result<()> {
     let extra = (!addr.ip().is_loopback()).then(|| addr.ip());
+    tokio::task::spawn_blocking({
+        let paths = repo_paths.clone();
+        move || remember(&paths)
+    });
     let env = Env::new(cfg);
     let (router, name) = build_multi(repo_paths, extra, actions.as_deref(), &env)?;
     if let Some(w) = watched {

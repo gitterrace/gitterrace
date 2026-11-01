@@ -4,6 +4,7 @@
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 
+use gitterrace_actions::{Lines, LinkStyle, styled};
 use gitterrace_git::Repo;
 use gitterrace_index::{CommitRecord, Index};
 use serde_json::{Value, json};
@@ -33,6 +34,8 @@ pub struct ApiState {
     pub(crate) index: Arc<Index>,
     /// Parsed records of the last request, keyed by (resolved tip, index generation).
     cache: Arc<Mutex<Option<RecordsCache>>>,
+    /// Form of the `link` field (`links.style`); `permalink` is always `/go`.
+    style: LinkStyle,
 }
 
 type RecordsCache = ((String, u64), Arc<Vec<CommitRecord>>);
@@ -43,7 +46,15 @@ impl ApiState {
             repo,
             index,
             cache: Arc::default(),
+            style: LinkStyle::default(),
         }
+    }
+
+    /// The `link` field in `style` from now on.
+    #[must_use]
+    pub fn with_link_style(mut self, style: LinkStyle) -> Self {
+        self.style = style;
+        self
     }
 
     /// Opens the repository containing `path` and its cache.
@@ -106,27 +117,30 @@ impl ApiState {
         checked(rev.filter(|r| !r.is_empty()).unwrap_or(DEFAULT_REV))
     }
 
-    /// `/go/<repo-id>/<sha>[/<path>][#Lx-Ly]`, the web's permalink in path form (the MCP has no
-    /// server address). `None` for a repository without commits.
-    fn permalink(
+    /// Sets `permalink` (`/go/<repo-id>/<sha>[/<path>][#Lx-Ly]`, the web's permalink in path
+    /// form, since the MCP has no server address) and `link` (the same in `links.style`, so
+    /// `gitterrace://` by default) on `v`. Both null for a repository without commits.
+    fn put_links(
         &self,
+        v: &mut Value,
         sha: &str,
         path: Option<&str>,
         lines: Option<(usize, usize)>,
-    ) -> Option<String> {
-        let id = self.repo.id()?;
-        let lines = lines.map(|(a, b)| gitterrace_actions::Lines {
+    ) {
+        let Some(id) = self.repo.id() else {
+            v["permalink"] = Value::Null;
+            v["link"] = Value::Null;
+            return;
+        };
+        let lines = lines.map(|(a, b)| Lines {
             start: u32::try_from(a).unwrap_or(u32::MAX),
             end: u32::try_from(b).unwrap_or(u32::MAX),
         });
-        Some(gitterrace_actions::permalink(
-            "",
-            Some(&id),
-            &self.repo.name(),
-            sha,
-            path,
-            lines,
-        ))
+        let name = self.repo.name();
+        let go = gitterrace_actions::permalink("", Some(&id), &name, sha, path, lines);
+        let link = styled(self.style, "", Some(&id), &name, sha, path, lines);
+        v["permalink"] = json!(go);
+        v["link"] = json!(link);
     }
 
     pub fn repo_info(&self) -> Result<Value, ApiError> {
@@ -172,7 +186,7 @@ impl ApiState {
             .take(per_page)
             .map(|c| {
                 let mut v = json::summary(c);
-                v["permalink"] = json!(self.permalink(&c.id, None, None));
+                self.put_links(&mut v, &c.id, None, None);
                 v
             })
             .collect();
@@ -191,13 +205,12 @@ impl ApiState {
         let id = self.repo.resolve(checked(id)?)?;
         let detail = self.repo.commit(&id)?;
         let mut v = json::detail(&detail, diff, max_lines);
-        v["permalink"] = json!(self.permalink(&id, None, None));
+        self.put_links(&mut v, &id, None, None);
         if let Some(files) = v["files"].as_array_mut() {
             for f in files {
-                let link = f["path"]
-                    .as_str()
-                    .and_then(|p| self.permalink(&id, Some(p), None));
-                f["permalink"] = json!(link);
+                if let Some(p) = f["path"].as_str().map(str::to_owned) {
+                    self.put_links(f, &id, Some(&p), None);
+                }
             }
         }
         Ok(v)
@@ -259,13 +272,13 @@ impl ApiState {
             }
             _ => None,
         };
-        let permalink = self.permalink(&id, Some(&blob.path), shown);
-        Ok(json!({
-            "permalink": permalink,
+        let mut v = json!({
             "rev": rev, "commit": id, "path": blob.path, "size": blob.size,
             "binary": blob.text.is_none(), "total_lines": total_lines,
             "truncated": truncated, "text": text,
-        }))
+        });
+        self.put_links(&mut v, &id, Some(&blob.path), shown);
+        Ok(v)
     }
 
     pub fn blame(&self, rev: Option<&str>, path: &str) -> Result<Value, ApiError> {
@@ -277,11 +290,12 @@ impl ApiState {
             .take(MAX_BLAME_LINES)
             .map(json::blame_line)
             .collect();
-        Ok(json!({
-            "permalink": self.permalink(&id, Some(path), None),
+        let mut v = json!({
             "rev": rev, "commit": id, "path": path,
             "truncated": all.len() > MAX_BLAME_LINES, "lines": lines,
-        }))
+        });
+        self.put_links(&mut v, &id, Some(path), None);
+        Ok(v)
     }
 
     /// One named aggregate over the cached records reachable from `rev`.
@@ -298,10 +312,9 @@ impl ApiState {
             let tip = self.repo.resolve(rev)?;
             if let Some(rows) = data.as_array_mut() {
                 for row in rows {
-                    let link = row["path"]
-                        .as_str()
-                        .and_then(|p| self.permalink(&tip, Some(p), None));
-                    row["permalink"] = json!(link);
+                    if let Some(p) = row["path"].as_str().map(str::to_owned) {
+                        self.put_links(row, &tip, Some(&p), None);
+                    }
                 }
             }
         }

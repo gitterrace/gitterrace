@@ -8,6 +8,7 @@ use gitterrace_git::{Repo, civil_from_days, percent_encode};
 use serde::{Deserialize, Serialize};
 
 use crate::config::Kind;
+use crate::link::{LinkStyle, styled};
 
 pub const PAYLOAD_VERSION: u32 = 1;
 /// Prefix of the per-action var env names; no payload variable starts with it.
@@ -108,13 +109,14 @@ fn bad(why: impl Into<String>) -> PayloadError {
 
 impl Payload {
     /// Builds the payload for `action` from git. `origin` is the page origin
-    /// (`http://127.0.0.1:4242`) the permalink is rooted at.
+    /// (`http://127.0.0.1:4242`) a `/go` permalink is rooted at; `style` picks the form.
     pub fn build(
         repo: &Repo,
         action: &str,
         kind: Kind,
         loc: &Locator,
         origin: &str,
+        style: LinkStyle,
     ) -> Result<Self, PayloadError> {
         let rev = loc.sha.as_deref().unwrap_or(&loc.rev);
         if rev.is_empty()
@@ -170,7 +172,8 @@ impl Payload {
         });
         let short = &sha[..7];
         let id = repo.id();
-        let permalink = permalink(
+        let permalink = styled(
+            style,
             origin,
             id.as_deref(),
             &repo.name(),
@@ -422,6 +425,7 @@ pub(crate) mod tests {
     use gitterrace_git::Repo;
 
     use crate::config::Kind;
+    use crate::link::LinkStyle;
     use crate::payload::{Lines, Locator, Payload, PayloadError, RunRequest, rfc3339};
 
     pub(crate) fn git(dir: &Path, args: &[&str]) -> String {
@@ -489,6 +493,7 @@ pub(crate) mod tests {
             Kind::Line,
             &loc(Some("src/a.rs"), Some((2, 3))),
             "http://127.0.0.1:4242",
+            LinkStyle::Go,
         )
         .expect("build");
         assert_eq!(p.sha, sha);
@@ -501,6 +506,17 @@ pub(crate) mod tests {
         assert_eq!(
             p.permalink,
             format!("http://127.0.0.1:4242/go/{id}/{sha}/src/a.rs#L2-L3")
+        );
+        let l = loc(Some("src/a.rs"), Some((2, 3)));
+        let gt = Payload::build(&repo, "x", Kind::Line, &l, "o", LinkStyle::Gitterrace);
+        let gt = gt.expect("build");
+        assert_eq!(
+            gt.permalink,
+            format!("gitterrace://{id}/{sha}/src/a.rs#L2-L3")
+        );
+        assert!(
+            gt.markdown.contains(&gt.permalink),
+            "markdown carries the styled link"
         );
         assert_eq!(p.title, format!("a.rs:2-3 @ {}", &sha[..7]));
         assert!(
@@ -532,12 +548,21 @@ pub(crate) mod tests {
             Kind::Line,
             &loc(Some("src/a.rs"), Some((1, 500))),
             "o",
+            LinkStyle::Go,
         )
         .expect("build");
         assert_eq!(p.text.as_deref().expect("text").lines().count(), 400);
         assert_eq!(p.text_truncated, Some(true));
 
-        let c = Payload::build(&repo, "x", Kind::Commit, &loc(None, None), "o").expect("build");
+        let c = Payload::build(
+            &repo,
+            "x",
+            Kind::Commit,
+            &loc(None, None),
+            "o",
+            LinkStyle::Go,
+        );
+        let c = c.expect("build");
         let json = serde_json::to_value(&c).expect("json");
         for absent in ["path", "lines", "text", "text_truncated"] {
             assert!(json.get(absent).is_none(), "{absent}");
@@ -555,7 +580,7 @@ pub(crate) mod tests {
         let repo = Repo::discover(t.path()).expect("open");
         let bad = |kind, l: Locator| {
             matches!(
-                Payload::build(&repo, "x", kind, &l, "o"),
+                Payload::build(&repo, "x", kind, &l, "o", LinkStyle::Go),
                 Err(PayloadError::BadLocator(_))
             )
         };

@@ -384,6 +384,13 @@
     else {
       var parts = local(location.pathname).split("/");
       if (commit && parts.length > 2) parts[2] = commit;
+      // links.style = "gitterrace": the same file as gitterrace://<id>/<sha>/<path>#L..
+      var rm = document.querySelector('meta[name="gt-repo"]');
+      if (rm && rm.dataset.link === "gitterrace" && rm.dataset.id && commit && parts[1] === "blob") {
+        var hash = /^#L\d+(-L\d+)?$/.test(location.hash) ? location.hash : "";
+        copy("gitterrace://" + rm.dataset.id + "/" + commit + "/" + parts.slice(3).join("/") + hash, "Permalink copied");
+        return;
+      }
       copy(location.origin + B + parts.join("/") + location.search + location.hash, "Permalink copied");
     }
   });

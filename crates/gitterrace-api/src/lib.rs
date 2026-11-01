@@ -126,6 +126,15 @@ mod tests {
             .and_then(|r| r.iter().find(|r| r["path"] == "a.txt"))
             .expect("row");
         assert_eq!(row["permalink"], format!("{base}/a.txt").as_str());
+        let gt = format!("gitterrace://{id}/{sha}");
+        assert_eq!(head["link"], gt.as_str(), "link defaults to gitterrace://");
+        assert_eq!(blob["link"], format!("{gt}/a.txt#L1-L3").as_str());
+        assert_eq!(row["link"], format!("{gt}/a.txt").as_str());
+
+        let go = s.clone().with_link_style(gitterrace_actions::LinkStyle::Go);
+        let (_, head) = get(&go, "/commits/HEAD").await;
+        assert_eq!(head["link"], base.as_str(), "links.style = go");
+        assert_eq!(head["permalink"], base.as_str(), "permalink stays /go");
     }
 
     #[tokio::test]

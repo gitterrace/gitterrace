@@ -368,6 +368,7 @@ mod tests {
     use gitterrace_git::Repo;
 
     use crate::config::{Action, Cwd, Kind, Output, Stdin};
+    use crate::link::LinkStyle;
     use crate::payload::{Lines, Locator, Payload};
     use crate::runner::{Limits, RunError, Runner};
 
@@ -397,7 +398,15 @@ mod tests {
             sha: None,
             query: None,
         };
-        Payload::build(repo, "t", kind, &loc, "http://127.0.0.1:4242").expect("payload")
+        Payload::build(
+            repo,
+            "t",
+            kind,
+            &loc,
+            "http://127.0.0.1:4242",
+            LinkStyle::Go,
+        )
+        .expect("payload")
     }
 
     fn fixture() -> (tempfile::TempDir, Repo) {

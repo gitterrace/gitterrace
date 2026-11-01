@@ -8,6 +8,7 @@
 //! - [`token`] is the per-process secret the browser must echo back.
 
 pub mod config;
+pub mod link;
 pub mod payload;
 pub mod runner;
 pub mod schema;
@@ -15,6 +16,7 @@ pub mod send;
 pub mod token;
 
 pub use config::{Action, Config, ConfigError, Cwd, Kind, Output, Reloader};
+pub use link::{Link, LinkError, LinkStyle, styled};
 pub use payload::{Lines, Locator, Payload, PayloadError, RunRequest, permalink};
 pub use runner::{Limits, Outcome, RunError, Runner};
 pub use send::{Part, fill};

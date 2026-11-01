@@ -10,6 +10,9 @@
   var repoMeta = meta("gt-repo");
   var repoKey = repoMeta ? repoMeta.content : "";
   var repoId = repoMeta ? repoMeta.dataset.id : "";
+  // links.style: "gitterrace" hands out gitterrace://<id>/<sha>/..., opened by `git terrace
+  // open` without a running server; "go" the /go URL of this server.
+  var linkStyle = repoMeta ? repoMeta.dataset.link : "go";
   var act = meta("gitterrace-actions");
   var token = act ? act.content : "";
   var mine = [];
@@ -127,7 +130,7 @@
   }
   function permalink(t) {
     if (!repoId || !commit) return location.href;
-    var url = location.origin + "/go/" + repoId + "/" + commit;
+    var url = (linkStyle === "gitterrace" ? "gitterrace://" : location.origin + "/go/") + repoId + "/" + commit;
     if (t.path) url += "/" + encPath(t.path);
     if (t.lines) url += "#L" + t.lines.start + (t.lines.end !== t.lines.start ? "-L" + t.lines.end : "");
     return url;

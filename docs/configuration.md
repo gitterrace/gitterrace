@@ -69,3 +69,10 @@ Actions live in their own file, `actions.toml`, because they run commands.
 | --- | --- | --- | --- |
 | `depth` | integer | `2` | How many folder levels to search below a given folder for repositories. Needs a restart. |
 | `skip_dirs` | list of strings | `["node_modules", "target", ".wt"]` | Folder names never searched, besides hidden ones. Needs a restart. |
+
+## `[links]`
+
+| Key | Type | Default | Description |
+| --- | --- | --- | --- |
+| `style` | string | `"gitterrace"` | Form of the permalink Copy permalink, Send to, action payloads and the MCP hand out: gitterrace (`gitterrace://<id>/<sha>/<path>`, opened by `git terrace open` without a running server) or go (`http://<addr>/go/...`, needs this server running). |
+| `roots` | list of strings | `[]` | Folders `git terrace open` searches, `multi.depth` levels deep, for a clone a link names, besides every repository served before. |

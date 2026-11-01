@@ -44,7 +44,7 @@ Copy as markdown.
 | --- | --- |
 | `{title}` | The note's first line, or the selection's name. |
 | `{notes}` | The rest of the note, the quoted selection and the permalink. |
-| `{permalink}` | The `/go` permalink. |
+| `{permalink}` | The permalink, in `links.style`. |
 | `{path}` | The repository-relative path, or empty. |
 | `{lines}` | The line range, like `L3-L7`, or empty. |
 | `{sha}` | The full commit id. |
@@ -241,7 +241,7 @@ Absent fields are never `null`. A removed or retyped field bumps the version.
 | `text` | string | no | The selected text, read from git. Capped at 64 KiB or 400 lines. |
 | `text_truncated` | boolean | no | Set with `text`: true when a cap cut it. |
 | `query` | string | no | The search query, for a search hit. |
-| `permalink` | string | yes | A `/go/<repo-id>/<sha>/<path>#L<a>-L<b>` link that survives clones and renames. |
+| `permalink` | string | yes | `gitterrace://<repo-id>/<sha>/<path>#L<a>-L<b>`, or the `/go` URL with `links.style = "go"`. Survives clones and renames. |
 | `title` | string | yes | A short label such as `guard.rs:44-60 @ 4f0c2e9`. |
 | `commit` | object | no | `subject`, `author` and `date` (RFC 3339) of `sha`. |
 | `markdown` | string | yes | The same text the Copy as markdown built-in produces. |
