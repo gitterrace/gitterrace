@@ -205,6 +205,18 @@ pub(crate) fn chrome_at(app: &crate::app::App, active: &str, rev: &str) -> Chrom
 }
 
 impl Chrome {
+    /// What the ref switcher button shows: the branch for HEAD, the abbreviated id when the page
+    /// is pinned to a full commit id, otherwise the ref as written.
+    pub(crate) fn switcher_label(&self) -> &str {
+        if self.rev == "HEAD" {
+            &self.branch
+        } else if self.rev == self.commit {
+            gitterrace_git::short_id(&self.rev)
+        } else {
+            &self.rev
+        }
+    }
+
     /// How this page reacts to changes in the repository.
     pub(crate) fn live(self, mode: crate::live::Mode) -> Self {
         Self {

@@ -80,7 +80,7 @@ pub(crate) fn changes_with(
         gix::objs::TreeRefIter::from_bytes(&old.data, old.id.kind()),
         gix::objs::TreeRefIter::from_bytes(&new_tree.data, new_tree.id.kind()),
         cache,
-        &mut Default::default(),
+        &mut gix::diff::tree::State::default(),
         &repo.objects,
         |change| {
             raw.push(change.into_owned());

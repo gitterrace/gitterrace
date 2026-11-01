@@ -56,14 +56,17 @@ fn bare_ids(html: &str) -> Vec<String> {
                 skip_until = None;
             }
         } else if tag.starts_with('/') {
-            if name == "a" {
+            if name == "a" || name == "button" {
                 in_sha = false;
             }
         } else if name == "script" {
             skip_until = Some("script");
         } else if name == "style" {
             skip_until = Some("style");
-        } else if name == "a" && tag.contains("class=\"sha\"") {
+        } else if (name == "a" && tag.contains("class=\"sha\""))
+            || (name == "button" && tag.contains("id=\"refbtn\""))
+        {
+            // The ref switcher shows the short id of a pinned commit as its label.
             in_sha = true;
         }
         rest = &rest[gt + 1..];

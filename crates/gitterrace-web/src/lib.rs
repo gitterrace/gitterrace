@@ -962,10 +962,10 @@ mod tests {
         let head = app.repo.resolve("HEAD").expect("head");
         git(&p, &["checkout", "-q", "--detach"]);
         let (_, body) = get(&app, "/").await;
-        let short = &head[..7];
+        let short = gitterrace_git::short_id(&head);
         assert!(
             body.contains(&format!(
-                "id=\"headstate\"><div class=\"wrap\">HEAD is detached at {short}"
+                "id=\"headstate\"><div class=\"wrap\">HEAD is detached at <a class=\"sha\" href=\"/commit/{head}\" data-tip=\"{head}\">{short}</a>"
             )),
             "{body}"
         );
