@@ -1,7 +1,6 @@
 # gitterrace: Agent Guide
 
-Local, read-only git browser with insights. [Architecture](docs/architecture.md),
-[design](docs/design.md).
+Local, read-only git browser with insights. [Architecture](docs/architecture.md).
 
 ## Layout
 

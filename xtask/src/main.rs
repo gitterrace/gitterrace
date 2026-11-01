@@ -11,6 +11,7 @@ mod api_md;
 mod config_md;
 mod docs_md;
 mod facts;
+mod openapi_json;
 mod out;
 mod readme_agents_md;
 mod site;
@@ -41,7 +42,11 @@ enum Cmd {
 fn generators(root: &Path) -> Result<Vec<Out>> {
     let ws = facts::load(root)?;
     let scripts = action_scripts::load(root)?;
-    let mut outs = vec![api_md::render(), config_md::render()];
+    let mut outs = vec![
+        api_md::render(),
+        config_md::render(),
+        openapi_json::render(&ws),
+    ];
     outs.extend(readme_agents_md::render(&ws, &scripts));
     outs.extend(docs_md::render(root, &ws, &scripts)?);
     outs.extend(site::render(root, &ws)?);

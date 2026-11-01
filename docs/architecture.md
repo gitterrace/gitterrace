@@ -28,12 +28,15 @@ flowchart TD
 
 <!-- END GENERATED: crates -->
 
-Each box is a crate. An arrow means "uses". `schwarzwald` is the vendored theme (colors, type,
-tokens, see [design](design.md)); `cards` reads its palette, called Kandel, to color the year
-card.
+Each box is a crate. An arrow means "uses". `schwarzwald` is the vendored theme; `cards` reads
+its palette, called Kandel, to color the year card.
 
 ## Decisions
 
+- **The theme is a snapshot, not a design.** Colors, type, space and motion come only from
+  `theme/schwarzwald/`, replaced as a whole, never edited. `scripts/theme-gen.py` writes the
+  block in `tokens.css` and the cards constants. `make theme` fails on drift. Components use
+  the role aliases, never a raw color, and charts are server-rendered SVG colored by class.
 - **Read-only, pinned.** Every read takes a resolved commit id, so a commit landing
   mid-request cannot tear a page. Only the uncommitted view reads the worktree.
 - **Browsing never waits on the cache**; insights show progress.

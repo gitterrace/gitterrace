@@ -1,0 +1,775 @@
+{
+  "components": {
+    "responses": {
+      "Error": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        },
+        "description": "Bad request or not found."
+      }
+    },
+    "schemas": {
+      "Error": {
+        "properties": {
+          "error": {
+            "properties": {
+              "code": {
+                "enum": [
+                  "bad_request",
+                  "rev_not_found",
+                  "path_not_found"
+                ],
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "code",
+              "message"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "error"
+        ],
+        "type": "object"
+      }
+    }
+  },
+  "info": {
+    "description": "Read-only and local. Every answer is pinned to a revision (`rev`, default `HEAD`). Under several repositories each one's API lives at `/r/{name}/api/v1`.",
+    "license": {
+      "identifier": "MIT",
+      "name": "MIT"
+    },
+    "title": "gitterrace API",
+    "version": "0.1.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/": {
+      "get": {
+        "operationId": "index",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "endpoints": {},
+                    "insights": {},
+                    "version": {}
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "version, endpoints, insights",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "Not modified (`If-None-Match` matched the `ETag`)."
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "summary": "Endpoint and insight list."
+      }
+    },
+    "/blame": {
+      "get": {
+        "operationId": "blame",
+        "parameters": [
+          {
+            "description": "Revision to read, default `HEAD`.",
+            "in": "query",
+            "name": "rev",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "File to blame.",
+            "in": "query",
+            "name": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "lines": {},
+                    "truncated": {}
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "lines (commit, author, time), truncated",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "Not modified (`If-None-Match` matched the `ETag`)."
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "summary": "Per-line authorship."
+      }
+    },
+    "/blob": {
+      "get": {
+        "operationId": "blob",
+        "parameters": [
+          {
+            "description": "Revision to read, default `HEAD`.",
+            "in": "query",
+            "name": "rev",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "File to read.",
+            "in": "query",
+            "name": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "First line of the window.",
+            "in": "query",
+            "name": "start_line",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Lines in the window, capped.",
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "binary": {},
+                    "text": {},
+                    "total_lines": {},
+                    "truncated": {}
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "text, total_lines, truncated, binary",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "Not modified (`If-None-Match` matched the `ETag`)."
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "summary": "File text at a revision."
+      }
+    },
+    "/commits/{id}": {
+      "get": {
+        "operationId": "commits_id",
+        "parameters": [
+          {
+            "description": "A commit id or any revision git understands.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Include hunks, default true.",
+            "in": "query",
+            "name": "diff",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "Cap on diff lines.",
+            "in": "query",
+            "name": "max_lines",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "files": {},
+                    "hunks": {},
+                    "message": {},
+                    "truncated": {}
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "message, files, hunks, truncated",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "Not modified (`If-None-Match` matched the `ETag`)."
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "summary": "One commit with its diff."
+      }
+    },
+    "/contributors": {
+      "get": {
+        "operationId": "contributors",
+        "parameters": [
+          {
+            "description": "Revision to read, default `HEAD`.",
+            "in": "query",
+            "name": "rev",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "authors": {},
+                    "bus_factor": {}
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "authors, bus_factor",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "Not modified (`If-None-Match` matched the `ETag`)."
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "summary": "Authors and bus factor."
+      }
+    },
+    "/insights": {
+      "get": {
+        "operationId": "insights",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "insights": {}
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "insights",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "Not modified (`If-None-Match` matched the `ETag`)."
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "summary": "Available insights."
+      }
+    },
+    "/insights/{name}": {
+      "get": {
+        "operationId": "insights_name",
+        "parameters": [
+          {
+            "description": "Insight name, one of: summary, activity, contributors, file_churn, dir_churn, label_breakdown, label_over_time, frequency, hotspots, ownership.",
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Revision to read, default `HEAD`.",
+            "in": "query",
+            "name": "rev",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "`1w`, `1m`, `3m`, `1y` or `all` (default): the window, ending at the newest commit. Sets the bucket unit.",
+            "in": "query",
+            "name": "period",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "`kind` or `scope`.",
+            "in": "query",
+            "name": "label",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Cap on rows.",
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Only commits of this conventional type, `other` for none.",
+            "in": "query",
+            "name": "type",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Only commits of this scope, `none` for none.",
+            "in": "query",
+            "name": "scope",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Only commits by this e-mail or name.",
+            "in": "query",
+            "name": "author",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Only files under this directory.",
+            "in": "query",
+            "name": "path",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "`1` counts bot accounts, `0` leaves them out.",
+            "in": "query",
+            "name": "bots",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "`1` counts lock files and minified output.",
+            "in": "query",
+            "name": "generated",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "`0` counts paths that `.gitignore` rules out.",
+            "in": "query",
+            "name": "ignore",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "`1` counts whitespace-only changes.",
+            "in": "query",
+            "name": "ws",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Comma separated globs left out.",
+            "in": "query",
+            "name": "exclude",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "data}": {},
+                    "{insight": {}
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "{insight, data}",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "Not modified (`If-None-Match` matched the `ETag`)."
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "summary": "One insight."
+      }
+    },
+    "/log": {
+      "get": {
+        "operationId": "log",
+        "parameters": [
+          {
+            "description": "Revision to read, default `HEAD`.",
+            "in": "query",
+            "name": "rev",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Only commits touching this path.",
+            "in": "query",
+            "name": "path",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "1-based page, default 1.",
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Page size, default 50, capped.",
+            "in": "query",
+            "name": "per_page",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "commits": {},
+                    "has_more": {}
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "commits, has_more",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "Not modified (`If-None-Match` matched the `ETag`)."
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "summary": "Paged history."
+      }
+    },
+    "/refs": {
+      "get": {
+        "operationId": "refs",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "refs": {}
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "refs",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "Not modified (`If-None-Match` matched the `ETag`)."
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "summary": "Branches, tags and remotes."
+      }
+    },
+    "/repo": {
+      "get": {
+        "operationId": "repo",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "head": {},
+                    "head_branch": {},
+                    "name": {},
+                    "totals": {}
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "name, head, head_branch, totals",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "Not modified (`If-None-Match` matched the `ETag`)."
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "summary": "Repository identity and totals."
+      }
+    },
+    "/tree": {
+      "get": {
+        "operationId": "tree",
+        "parameters": [
+          {
+            "description": "Revision to read, default `HEAD`.",
+            "in": "query",
+            "name": "rev",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Repository-relative path.",
+            "in": "query",
+            "name": "path",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "entries": {}
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "entries",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "Not modified (`If-None-Match` matched the `ETag`)."
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "summary": "One directory level."
+      }
+    }
+  },
+  "security": [],
+  "servers": [
+    {
+      "description": "the default address",
+      "url": "http://127.0.0.1:4242/api/v1"
+    }
+  ]
+}

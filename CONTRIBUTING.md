@@ -67,6 +67,17 @@ The local gate is the one that counts. The hosted workflows run a subset of it.
 - `make bench` if you changed how pages, the index or the server do their work (see
   [benchmarks](docs/benchmarks.md))
 
+## Releasing (maintainers)
+
+gitterrace.dev is generated into `site/` and shipped from a maintainer's machine with
+`make deploy`. There is no deploy workflow and no Cloudflare token in the repository.
+
+1. Bump `SECURITY_TXT_EXPIRES` in `xtask/src/site.rs`, `make docs-gen`, commit.
+2. Tag and push. The release workflow builds the binaries, the installer and the formula.
+3. `make deploy` (it refuses until the tag, repository and tap answer), then `make domains`.
+4. Refresh the demo from [gitterrace/demo](https://github.com/gitterrace/demo): `make deploy`
+   there.
+
 ## Security
 
 Please do not report a vulnerability in a public issue. See [SECURITY.md](SECURITY.md).

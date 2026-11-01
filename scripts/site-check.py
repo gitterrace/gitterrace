@@ -8,8 +8,8 @@ domains: gitterrace.dev serves the page over HTTPS with the generated headers, a
   host (www, gitterrace.com, www.gitterrace.com) redirects to it permanently. A www host that
   resolves to nothing looks like DNS propagation and goes unnoticed for weeks; this measures it.
 
-Creates nothing: attaching custom domains and the redirect rule are dashboard steps (see
-docs/website.md), and scripting them needs a Zone:Edit token, too large a credential for this.
+Creates nothing: attaching custom domains and the redirect rule are Cloudflare dashboard
+steps, and scripting them needs a Zone:Edit token, too large a credential for this.
 
   python3 scripts/site-check.py release
   python3 scripts/site-check.py domains

@@ -6,7 +6,7 @@ Read-only. Everything is pinned to a revision (`rev`, default `HEAD`). Errors ar
 `{"error": {"code", "message"}}` with 400 (`bad_request`) or 404 (`rev_not_found`,
 `path_not_found`). Every response carries an `ETag` built from HEAD, every ref's target and
 the cache format, so moving any branch or tag invalidates it; `If-None-Match` gets 304.
-JSON is `snake_case`.
+JSON is `snake_case`. The same endpoints as `OpenAPI` 3.1: [openapi.json](openapi.json).
 
 Under several repositories the API of each lives at `/r/{name}/api/v1`.
 
