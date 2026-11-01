@@ -22,8 +22,8 @@
   var DOCS = "https://github.com/gitterrace/gitterrace/blob/main/docs/actions.md";
   var MD_LINES = 40;
 
-  // The server renders the note into the page, so it is there at first paint. The poll only
-  // follows later edits of actions.toml, and touches the page only when the text changes.
+  // The server renders the note into the page, so it is there at first paint. Later edits of
+  // actions.toml are fetched when the tab is shown or focused, and touches the page only when the text changes.
   var noteEl = document.getElementById("actnote");
   function showNote(text) {
     if (!noteEl) return;
@@ -40,7 +40,9 @@
       .catch(function () {});
   }
   pollNote();
-  setInterval(pollNote, 3000);
+  // No timer: a poll per tab holds connections that WebKit's 6 per host cap needs for navigation.
+  document.addEventListener("visibilitychange", pollNote);
+  window.addEventListener("focus", pollNote);
 
   function el(tag, cls, text) {
     var e = document.createElement(tag);

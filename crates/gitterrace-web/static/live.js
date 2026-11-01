@@ -78,34 +78,121 @@
     else if (how === "notice") notice();
   }
 
-  function connect() {
+  // One stream per browser, not per tab: WebKit allows 6 HTTP/1.1 connections per host, and a
+  // stream per tab starves navigation after a few tabs. The visible tab that holds the Web Lock
+  // for this repository is the leader: it owns the EventSource and relays every event to the
+  // other tabs over a BroadcastChannel. A hidden tab holds nothing (it drops the lock, the next
+  // visible tab takes over), and catches up on return through the version.
+  var wantWt = on.indexOf("worktree") >= 0;
+  var id = Math.random().toString(36).slice(2);
+  var shared = !!(window.BroadcastChannel && navigator.locks && navigator.locks.request);
+  var chan = shared ? new BroadcastChannel("gt-live:" + B) : null;
+  var leader = false;
+  var latest = version; // newest version seen on the stream, leader only
+  var peers = {};       // id -> needs the working tree scan, visible tabs only
+  var held = null;      // { abort, release } of the lock request
+
+  function streamWt() {
+    if (wantWt) return true;
+    for (var k in peers) if (peers[k]) return true;
+    return false;
+  }
+
+  function open() {
     if (source) source.close();
-    source = new EventSource(B + "/events?v=" + encodeURIComponent(version) +
-      (on.indexOf("worktree") >= 0 ? "&wt=1" : ""));
-    source.addEventListener("change", handle);
+    var wt = streamWt();
+    source = new EventSource(B + "/events?v=" + encodeURIComponent(latest) + (wt ? "&wt=1" : ""));
+    source.wt = wt;
+    source.addEventListener("change", function (ev) {
+      try { latest = JSON.parse(ev.data).v || latest; } catch (e) {}
+      if (chan) chan.postMessage({ t: "ev", data: ev.data });
+      handle(ev);
+    });
     source.onopen = function () { delay = 1000; };
     source.onerror = function () {
-      // The browser would retry on its own, but at a fixed short interval. Back off instead,
-      // and stop for good when the server refuses the stream (too many open pages).
+      // The browser would retry on its own, but at a fixed short interval. Back off instead.
+      // A refused stream (503, too many open pages) lands here too and retries slowly.
       source.close();
       source = null;
       clearTimeout(timer);
-      timer = setTimeout(connect, delay);
+      timer = setTimeout(open, delay);
       delay = Math.min(delay * 2, 30000);
     };
   }
 
+  function stop() {
+    if (source) { source.close(); source = null; }
+    clearTimeout(timer);
+  }
+
+  function lead(release) {
+    leader = true;
+    latest = version;
+    peers = {};
+    delay = 1000;
+    held.release = release;
+    open();
+    chan.postMessage({ t: "who" });
+  }
+
+  function claim() {
+    if (held || document.hidden) return;
+    if (!shared) { delay = 1000; open(); return; }
+    var ctl = new AbortController();
+    held = { abort: function () { ctl.abort(); }, release: null };
+    navigator.locks.request("gt-live:" + B, { signal: ctl.signal }, function () {
+      return new Promise(function (release) { lead(release); });
+    }).catch(function () {}).then(function () { held = null; });
+  }
+
+  function drop() {
+    if (!shared) { stop(); return; }
+    if (held) {
+      if (held.release) held.release(); else held.abort();
+    }
+    if (leader) { leader = false; stop(); }
+    held = null;
+  }
+
+  function hello() {
+    if (chan) chan.postMessage({ t: "hello", id: id, wt: wantWt, v: version });
+  }
+
+  if (chan) {
+    chan.onmessage = function (m) {
+      var d = m.data || {};
+      if (d.t === "ev") {
+        if (!document.hidden) handle({ data: d.data });
+      } else if (d.t === "who") {
+        if (!document.hidden) hello();
+      } else if (leader && d.t === "hello") {
+        var before = streamWt();
+        peers[d.id] = d.wt;
+        // A tab that was hidden may have missed changes: tell it everything may have moved.
+        if (d.v !== latest) {
+          chan.postMessage({ t: "ev", data: JSON.stringify({ kinds: ["head", "refs", "stash", "worktrees", "index", "worktree"], v: latest }) });
+        }
+        if (!before && streamWt() && source) open();
+      } else if (leader && d.t === "bye") {
+        delete peers[d.id];
+      }
+    };
+  }
+
   if (note) note.addEventListener("click", function () { location.reload(); });
-  // A background tab needs no stream: close it, and catch up on return via the version.
   document.addEventListener("visibilitychange", function () {
     if (document.hidden) {
-      if (source) { source.close(); source = null; }
-      clearTimeout(timer);
-    } else if (!source) {
+      if (chan) chan.postMessage({ t: "bye", id: id });
+      drop();
+    } else {
       delay = 1000;
-      connect();
+      hello();
+      claim();
     }
   });
-  window.addEventListener("pagehide", function () { if (source) source.close(); });
-  if (!document.hidden) connect();
+  window.addEventListener("pagehide", function () {
+    if (chan) chan.postMessage({ t: "bye", id: id });
+    drop();
+  });
+  if (!document.hidden) { hello(); claim(); }
 })();

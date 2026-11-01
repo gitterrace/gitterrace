@@ -370,7 +370,8 @@
     card.style.position = "relative";
     card.appendChild(b);
   });
-  Array.prototype.forEach.call(document.querySelectorAll(".markdown-body pre"), function (pre) {
+  // Not on diagrams: mermaid reads the block's text, so a button inside it becomes a node.
+  Array.prototype.forEach.call(document.querySelectorAll(".markdown-body pre:not(.mermaid)"), function (pre) {
     var b = el("button", "copy float", "Copy");
     b.type = "button";
     b.addEventListener("click", function () { copy(pre.textContent, "Copied"); });
@@ -406,7 +407,6 @@
         if (!c) return;
         var a = el("a", "", c.subject);
         a.href = B + "/commit/" + c.id;
-        a.title = c.subject;
         td.appendChild(a);
         // The age gets its own right-aligned column, so the
         // message can use all the width between name and age.

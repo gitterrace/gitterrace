@@ -14,8 +14,8 @@ import re, subprocess, sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-AREAS = {"theme", "actions", "preview", "names", "send", "bench"}
-NAME = re.compile(r"^[a-z]+(-[a-z]+)+\.(sh|py)$")
+AREAS = {"theme", "actions", "preview", "names", "send", "bench", "site", "live"}
+NAME = re.compile(r"^[a-z]+(-[a-z]+)+\.(sh|py|mjs)$")
 # Policy list of outside project names: this repo stands on its own and must not lean on
 # another repo's internals. Not a ban on any deleted name.
 OUTSIDE_NAMES = ("(?!)",)
@@ -46,7 +46,7 @@ def main() -> int:
         if not p.is_file():
             continue
         if not NAME.match(p.name) or p.name.split("-")[0] not in AREAS:
-            bad.append(f"scripts/{p.name}: not <area>-<verb>.<sh|py> with area in {sorted(AREAS)}")
+            bad.append(f"scripts/{p.name}: not <area>-<verb>.<sh|py|mjs> with area in {sorted(AREAS)}")
     tracked = subprocess.run(["git", "ls-files", "-z"], cwd=ROOT, capture_output=True, check=True).stdout
     for rel in tracked.decode().split("\0"):
         f = ROOT / rel

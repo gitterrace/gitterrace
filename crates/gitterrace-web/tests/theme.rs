@@ -64,3 +64,25 @@ fn unset_resets_cover_hover() {
         }
     }
 }
+
+/// Owner rule: text is never cut with an ellipsis. It wraps, or the layout gives it room.
+/// The allowlist is empty on purpose.
+#[test]
+fn stylesheets_never_truncate_text() {
+    const ALLOWED: [&str; 0] = [];
+    for (name, css) in [
+        ("app.css", include_str!("../static/app.css")),
+        ("markdown.css", include_str!("../static/markdown.css")),
+    ] {
+        for rule in css.split('}') {
+            let squeezed: String = rule.split_whitespace().collect();
+            if squeezed.contains("text-overflow:ellipsis") {
+                let sel = rule.trim().split('{').next().unwrap_or_default();
+                assert!(
+                    ALLOWED.contains(&sel),
+                    "{name}: `{sel}` truncates text with an ellipsis, wrap it instead"
+                );
+            }
+        }
+    }
+}

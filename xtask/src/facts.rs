@@ -16,6 +16,8 @@ pub struct Package {
     pub license: String,
     /// The `repository` URL, from the workspace for every member.
     pub repository: String,
+    /// The `homepage` URL: the website, which the site canonicals to.
+    pub homepage: String,
     pub bins: Vec<String>,
     /// Workspace members this package depends on (normal dependencies only).
     pub deps: BTreeSet<String>,
@@ -83,6 +85,7 @@ pub fn load(root: &Path) -> Result<Workspace> {
                 version: text("version"),
                 license: text("license"),
                 repository: text("repository"),
+                homepage: text("homepage"),
                 bins,
                 deps,
             },

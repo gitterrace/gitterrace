@@ -79,6 +79,18 @@ bench-guard:
 	cargo build -q -p gitterrace
 	python3 scripts/bench-run.py --synthetic --bin target/debug/git-terrace >/dev/null
 
+## site: Refuse to publish install lines before the repository, tap and release tag answer
+site: docs-check
+	python3 scripts/site-check.py release
+
+## deploy: Ship site/ to gitterrace.dev (wrangler deploy, the Worker is in wrangler.toml)
+deploy: site
+	npx wrangler@4 deploy
+
+## domains: Check that gitterrace.dev serves and every other host redirects to it
+domains:
+	python3 scripts/site-check.py domains
+
 ## help: This list
 help:
 	@grep -E '^## ' $(MAKEFILE_LIST) | sed 's/## //' | column -t -s ':'
