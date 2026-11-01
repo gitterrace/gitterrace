@@ -9,6 +9,8 @@ extend-ignore-re = [
   '\{titel[:}]',
   # token.rs: RFC 4648 test vector "fo"
   'b"fo"',
+  # names-check.py: SHA-256 prefixes are hex, not words
+  '"[0-9a-f]{16}"',
 ]
 
 [default.extend-words]

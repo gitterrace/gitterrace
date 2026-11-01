@@ -186,9 +186,11 @@ div.diff .add,div.diff .del{color:inherit}
 .blame .bl{display:grid;grid-template-columns:auto 1fr auto;gap:var(--space-2);align-items:center;white-space:nowrap}
 .blame .bl a.who{color:var(--fg)}
 .blame .run td{border-top:var(--border)}
-/* Blame rows are 24px so the 20px sha chip has 2px above and below; code and numbers share it. */
+/* Blame rows are 24px. The run's top rule already frames the row, so the sha drops the chip
+   border here (a border under the rule read as a double line) and shows it only on hover. */
 .blame td{line-height:24px}
-.blame td.who .sha{display:inline-block;padding:0 var(--space-1);line-height:18px}
+.blame td.who .sha{border-color:transparent;padding:0 var(--space-1);line-height:inherit}
+.blame td.who .sha:hover{border-color:var(--line-strong)}
 
 /* charts: marks are colored by class so the theme switches without re-render */
 svg.chart{width:100%;height:auto;display:block;overflow:visible}
