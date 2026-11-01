@@ -317,4 +317,27 @@
     openMenu(current(), anchor);
     e.preventDefault();
   });
+
+  // Chords: "a" then an action's key runs it from the page, no menu. The loader has already
+  // refused keys that clash with the menu's own or with each other; "a" as prefix keeps the
+  // chord clear of the page keys (g, t, /, y, b, j, k, ?).
+  var armed = false, armTimer = null;
+  function disarm() { armed = false; clearTimeout(armTimer); }
+  document.addEventListener("keydown", function (e) {
+    if (e.metaKey || e.ctrlKey || e.altKey || menu) return;
+    var t = e.target;
+    if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT" || t.isContentEditable)) return;
+    if (armed) {
+      disarm();
+      var tg = current();
+      var hit = mine.filter(function (a) { return a.key === e.key && a.kinds.indexOf(tg.kind) >= 0; })[0];
+      if (hit) { run(hit, tg, e, null); e.preventDefault(); }
+      return;
+    }
+    if (e.key === "a" && token && mine.some(function (a) { return a.key; })) {
+      armed = true;
+      armTimer = setTimeout(disarm, 1200);
+      toast("a, then " + mine.filter(function (a) { return a.key; }).map(function (a) { return a.key + " " + a.label; }).join(", "));
+    }
+  });
 })();

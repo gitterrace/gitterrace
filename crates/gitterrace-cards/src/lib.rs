@@ -1,4 +1,4 @@
-//! Shareable SVG cards and badges built from cached commit records.
+//! The year-in-review SVG card built from cached commit records.
 //!
 //! Every function is pure: records in, a self-contained SVG string out (inline styles, a system
 //! font stack, no external references). Each takes a [`Theme`].
@@ -11,15 +11,11 @@
     clippy::format_push_string
 )]
 
-mod badges;
 mod palette;
-mod repo_card;
 mod stats;
 mod svg;
 mod wrapped;
 
-pub use badges::{Badge, badge_svg};
 pub use palette::Theme;
-pub use repo_card::repo_card_svg;
-pub use stats::{RepoSummary, WrappedStats, repo_summary, wrapped_stats};
+pub use stats::{WrappedStats, wrapped_stats};
 pub use wrapped::{Layout, wrapped_svg};

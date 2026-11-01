@@ -40,21 +40,21 @@ one exists. It is an ordinary `actions.toml`. An entry with `enabled = false` is
 not offered: switch on the ones you use and fill in their `vars`.
 
 <!-- BEGIN GENERATED: starter -->
-| Entry | Kind | On | What it does | Needs in `vars` |
-| --- | --- | --- | --- | --- |
-| `tendir` | Send to | yes | Opens tendir's new-task sheet, filled in. Needs the tendir app. |  |
-| `mail` | Send to | yes | A mail draft in your mail app. |  |
-| `github-issue` | Send to | no | A new issue on github.com. `repo` is `owner/name`. | `repo` |
-| `github-discussion` | Send to | no | A new discussion on github.com. `repo` is `owner/name`, `category` the category slug. | `repo`, `category` |
-| `gitlab-issue` | Send to | no | A new issue on gitlab.com. `project` is `group/name`, or `group/subgroup/name`. | `project` |
-| `gitlab-issue-self-hosted` | Send to | no | A new issue on a self-hosted instance of that host. `base` is the instance URL, `project` is `group/name`. | `base`, `project` |
-| `gitlab-merge-request` | Send to | no | A new merge request on gitlab.com from a fixed branch. `branch` is the source branch; the Send window has no branch field, so change `branch` in this file before you send. | `project`, `branch` |
-| `forgejo-issue` | Send to | no | A new issue on a self-hosted forge. `base` is the instance URL, `repo` is `owner/name`. | `base`, `repo` |
-| `copy` | action | no | Copies the selection as markdown on any system. Needs `clipboard.sh` from docs/actions in your config folder. |  |
-| `edit` | action | no | Opens the file at the selected line in your editor. Needs `editor.sh` from docs/actions. |  |
-| `tendir-add` | action | no | Adds a task with the tendir command line tool. |  |
-| `webhook` | action | no | Posts the payload as JSON to a webhook of yours. Set `url` in `vars`. | `url` |
-| `obsidian-new` | action | no | Writes a new note in an Obsidian vault. `vault` and `folder` pick where it lands. | `vault`, `folder` |
+| Entry | Kind | On | What it does | Needs in `vars` | Commit lookup |
+| --- | --- | --- | --- | --- | --- |
+| `tendir` | Send to | yes | Opens tendir's new-task sheet, filled in. Needs the tendir app. |  | no |
+| `mail` | Send to | yes | A mail draft in your mail app. |  | no |
+| `github-issue` | Send to | no | A new issue on github.com. `repo` is `owner/name`. | `repo` | yes |
+| `github-discussion` | Send to | no | A new discussion on github.com. `repo` is `owner/name`, `category` the category slug. | `repo`, `category` | no |
+| `gitlab-issue` | Send to | no | A new issue on gitlab.com. `project` is `group/name`, or `group/subgroup/name`. | `project` | yes |
+| `gitlab-issue-self-hosted` | Send to | no | A new issue on a self-hosted instance of that host. `base` is the instance URL, `project` is `group/name`. | `base`, `project` | yes |
+| `gitlab-merge-request` | Send to | no | A new merge request on gitlab.com from a fixed branch. `branch` is the source branch. The Send window has no branch field, so change `branch` in this file before you send. | `project`, `branch` | no |
+| `forgejo-issue` | Send to | no | A new issue on a self-hosted forge. `base` is the instance URL, `repo` is `owner/name`. | `base`, `repo` | yes |
+| `copy` | action | no | Copies the selection as markdown on any system. Needs `clipboard.sh` from docs/actions in your config folder. |  | no |
+| `edit` | action | no | Opens the file at the selected line in your editor. Needs `editor.sh` from docs/actions. |  | no |
+| `tendir-add` | action | no | Adds a task with the tendir command line tool. |  | no |
+| `webhook` | action | no | Posts the payload as JSON to a webhook of yours. Set `url` in `vars`. | `url` | no |
+| `obsidian-new` | action | no | Writes a new note in an Obsidian vault. `vault` and `folder` pick where it lands. | `vault`, `folder` | no |
 
 The whole file, as `git terrace init` writes it:
 
@@ -63,6 +63,9 @@ The whole file, as `git terrace init` writes it:
 # config folder. Edit it freely. It is a normal actions file, loaded by the same rules as
 # any other. An entry with `enabled = false` is checked at load but not offered, so switch on
 # only what you use: set `enabled = true` and fill in its `vars`.
+#
+# A send may also have a `lookup` template: the commit page then links to it as "Find this
+# commit in ...", and the destination does the search. It takes {sha} and {short}.
 #
 # Each block is described by the comment lines right above it.
 
@@ -88,6 +91,7 @@ id      = "github-issue"
 label   = "New issue"
 enabled = false
 url     = "https://github.com/{var.repo}/issues/new?title={title}&body={notes}"
+lookup  = "https://github.com/{var.repo}/search?q={sha}&type=commits"
 vars    = { repo = "owner/name" }
 
 # A new discussion on github.com. `repo` is `owner/name`, `category` the category slug.
@@ -104,6 +108,7 @@ id      = "gitlab-issue"
 label   = "New issue"
 enabled = false
 url     = "https://gitlab.com/{var.project}/-/issues/new?issue%5Btitle%5D={title}&issue%5Bdescription%5D={notes}"
+lookup  = "https://gitlab.com/{var.project}/-/search?search={sha}&scope=commits"
 vars    = { project = "group/name" }
 
 # A new issue on a self-hosted instance of that host. `base` is the instance URL, `project` is `group/name`.
@@ -112,6 +117,7 @@ id      = "gitlab-issue-self-hosted"
 label   = "New issue"
 enabled = false
 url     = "{var.base}/{var.project}/-/issues/new?issue%5Btitle%5D={title}&issue%5Bdescription%5D={notes}"
+lookup  = "{var.base}/{var.project}/-/search?search={sha}&scope=commits"
 vars    = { base = "https://gitlab.example.test", project = "group/name" }
 
 # A new merge request on gitlab.com from a fixed branch. `branch` is the source branch. The
@@ -129,6 +135,7 @@ id      = "forgejo-issue"
 label   = "New issue"
 enabled = false
 url     = "{var.base}/{var.repo}/issues/new?title={title}&body={notes}"
+lookup  = "{var.base}/{var.repo}/issues?q={sha}&type=all"
 vars    = { base = "https://codeberg.org", repo = "owner/name" }
 
 # ---- Actions: programs of yours, run with no shell. See the scripts in docs/actions.
@@ -207,7 +214,8 @@ One Send to target: a `url` template.
 | --- | --- | --- | --- | --- |
 | `id` | string | yes |  | `[a-z0-9-]`, 1 to 32 characters, unique among sends. |
 | `label` | string | yes |  | Text in the Send window, 1 to 80 characters. |
-| `url` | string | yes |  | The URL template. The scheme and host are literal; placeholders (below) fill the path, query or fragment, each percent-encoded. |
+| `url` | string | yes |  | The URL template. The scheme and host are literal. Placeholders (below) fill the path, query or fragment, each percent-encoded. |
+| `lookup` | string | no |  | A URL template that searches the destination for a commit. The commit page links to it as "Find this commit in ...". Nothing is fetched. Same scheme rules as `url`. Only `{sha}` (full id), `{short}` (first 7 characters) and `{var.<name>}` are allowed. |
 | `enabled` | boolean | no | `true` | `false` checks the block but does not offer it. The starter file ships the ones that need your settings this way. |
 | `vars` | table of strings | no | `{}` | `[send.vars]`: settings, inserted verbatim as `{var.<name>}`, one line each, at most 4 KiB. |
 
@@ -248,6 +256,15 @@ kinds   = ["line", "commit"]
 command = ["open", "obsidian://new?vault={var.vault:url}&file={var.folder:url}%2Fgitterrace&append=true&content={markdown:url}"]
 vars    = { vault = "Notes", folder = "Inbox" }
 ```
+
+### Windows
+
+gitterrace builds for native Windows, but the action runner there is untested at runtime:
+only WSL has been run. Natively, a timeout ends the script with `taskkill /T` (then `/F`)
+instead of a process group signal, `actions.toml` is read from `%APPDATA%\gitterrace` without
+an owner or mode check (Windows has no mode bits, and ACLs are not read), and `command[0]`
+must be an `.exe`, `.cmd`, `.bat` or `.com`. The sample `.sh` scripts need a POSIX shell, so
+call a Windows tool directly, for example `command = ["clip.exe"]` with `stdin = "markdown"`.
 
 When the same action must work on every system, a script picks the tool. The copy action
 with [`clipboard.sh`](actions/clipboard.sh) runs unchanged on macOS, Linux (Wayland or X11)
@@ -357,7 +374,7 @@ One menu entry. It runs either its own `command` or a `script`.
 | `output` | string | no | `toast` | `toast` shows the first output line, `ignore` shows failures only. |
 | `stdin` | string | no | `json` | As in a script. Overrides the script's. |
 | `shell` | boolean | no | `false` | As in a script. |
-| `key` | string | no |  | One letter or digit, a shortcut inside the menu. |
+| `key` | string | no |  | One letter or digit: a shortcut inside the menu, and on the page press `a` then the key (`a t`). Not `p`, `m` or `s`, and unique among actions; either is a load error. |
 | `env` | array of strings | no | `[]` | Variables passed through from gitterrace's environment. `GITTERRACE_*` names are refused. |
 | `vars` | table of strings | no | `{}` | `[action.vars]`: fixed settings, lowercase names `[a-z0-9_]{1,32}`, at most 32, each value at most 4 KiB. They reach the script as `GITTERRACE_VAR_<NAME>`, as `payload.vars` and as `{var.<name>}` in `command`. |
 
@@ -420,8 +437,8 @@ daily note, a write with no Obsidian screen of its own.
 <!-- BEGIN GENERATED: scripts -->
 | Script | Does | Needs |
 | --- | --- | --- |
-| [`clipboard.sh`](actions/clipboard.sh) | Copy the selection as markdown, on any OS. | (first present wins): macOS:         pbcopy (built in) Linux Wayland: wl-copy (wl-clipboard) Linux X11:     xclip or xsel WSL:           clip.exe (built in) |
-| [`editor.sh`](actions/editor.sh) | Open a file at a line in the editor, on any OS. | (all OSes): an editor. Picks $VISUAL, then $EDITOR, then the first of code, zed, zeditor found, then vi. Line jump is known for code, vim/nvim/vi, nano, emacs, subl, zed/zeditor and hx; any other editor opens the file without a line. |
+| [`clipboard.sh`](actions/clipboard.sh) | Copy the selection as markdown, on any OS. | (first present wins): macOS:         pbcopy (built in) Linux Wayland: wl-copy (wl-clipboard) Linux X11:     xclip or xsel WSL:           clip.exe (built in) Windows:       a POSIX sh is needed. On native Windows use command = ["clip.exe"] instead |
+| [`editor.sh`](actions/editor.sh) | Open a file at a line in the editor, on any OS. | (all OSes): an editor. Picks $VISUAL, then $EDITOR, then the first of code, zed, zeditor found, then vi. Line jump is known for code, vim/nvim/vi, nano, emacs, subl, zed/zeditor and hx. Any other editor opens the file without a line. |
 | [`obsidian.sh`](actions/obsidian.sh) | Append the selection to today's Obsidian daily note. | (all OSes): jq (brew install jq, apt install jq). date and mkdir are POSIX. |
 
 <!-- END GENERATED: scripts -->

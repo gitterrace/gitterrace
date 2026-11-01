@@ -558,6 +558,7 @@ async fn dirty_chip_follows_on_pages_without_the_worktree() {
 
 /// A refused actions.toml is in the page's first HTML, so the note never arrives late and
 /// shifts the page down.
+#[cfg(unix)]
 #[tokio::test]
 async fn a_refused_actions_file_is_in_the_first_paint() {
     use std::os::unix::fs::PermissionsExt;
@@ -681,4 +682,76 @@ async fn ref_tabs_show_every_count_on_every_page() {
         bars.windows(2).all(|w| w[0] == w[1]),
         "the bar differs by page: {bars:?}"
     );
+}
+
+/// "a" then an action's key fires the action from the page, and the `?` sheet lists the chord.
+/// The keys come from the loader-validated menu the page already embeds.
+#[cfg(unix)]
+#[tokio::test]
+async fn action_chords_are_wired_and_listed_in_the_help_sheet() {
+    let dir = tempfile::tempdir().expect("tmp");
+    let p = repo(dir.path(), "r");
+    use std::os::unix::fs::PermissionsExt;
+    let conf = dir.path().join("conf");
+    std::fs::create_dir(&conf).expect("dir");
+    std::fs::set_permissions(&conf, std::fs::Permissions::from_mode(0o700)).expect("chmod");
+    let file = conf.join("actions.toml");
+    std::fs::write(
+        &file,
+        "version = 1\n[[action]]\nid = \"x\"\nlabel = \"X\"\nkinds = [\"page\"]\ncommand = [\"/bin/echo\"]\nkey = \"x\"\n",
+    )
+    .expect("write");
+    std::fs::set_permissions(&file, std::fs::Permissions::from_mode(0o600)).expect("chmod");
+    let env = Env::new(Config::default());
+    let (r, _) = crate::build(&p, None, Some(&file), &env).expect("build");
+    let (_, html) = get(&r, "/").await;
+    assert!(
+        html.contains("&#34;key&#34;:&#34;x&#34;") || html.contains("\"key\":\"x\""),
+        "menu carries the key"
+    );
+    let acts = include_str!("../static/actions.js");
+    assert!(
+        acts.contains("e.key === \"a\"")
+            && acts.contains("a.key === e.key")
+            && acts.contains("run(hit"),
+        "actions.js fires a-then-key"
+    );
+    let nav = include_str!("../static/nav.js");
+    assert!(
+        nav.contains("actionChords()") && nav.contains("\"a \" + a.key"),
+        "the ? sheet lists the chords"
+    );
+}
+
+#[tokio::test]
+async fn commit_page_links_only_the_targets_with_a_lookup() {
+    let dir = tempfile::tempdir().expect("tmp");
+    let p = repo(dir.path(), "r");
+    let file = dir.path().join("actions.toml");
+    std::fs::write(
+        &file,
+        "version = 1\n\
+         [[send]]\nid = \"a\"\nlabel = \"Alpha\"\nurl = \"mailto:?subject={title}\"\n\
+         lookup = \"https://alpha.test/s?q={sha}&s={short}\"\n\
+         [[send]]\nid = \"b\"\nlabel = \"Beta\"\nurl = \"mailto:?subject={title}\"\n",
+    )
+    .expect("write");
+    let (app, _) =
+        crate::build(&p, None, Some(&file), &Env::new(Config::default())).expect("build");
+    let (_, log) = get(&app, "/log/HEAD").await;
+    let id = log
+        .split("/commit/")
+        .nth(1)
+        .and_then(|s| s.split(['"', '#']).next())
+        .expect("a commit link")
+        .to_owned();
+    let (_, page) = get(&app, &format!("/commit/{id}")).await;
+    assert!(page.contains("Find this commit in"), "{page}");
+    assert!(
+        page.contains(&format!("https://alpha.test/s?q={id}&#38;s={}", &id[..7])),
+        "{page}"
+    );
+    assert!(page.contains(">Alpha</a>") && !page.contains("Beta"));
+    let (_, plain) = get(&router(&p, Config::default()), &format!("/commit/{id}")).await;
+    assert!(!plain.contains("Find this commit in"));
 }

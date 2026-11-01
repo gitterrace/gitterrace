@@ -19,11 +19,14 @@ const DESKTOP_NAME: &str = "gitterrace-open.desktop";
 const LSREGISTER: &str = "/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister";
 
 pub(crate) fn run(uninstall: bool) -> anyhow::Result<()> {
-    let home = std::env::var_os("HOME")
+    let home = gitterrace_config::home_var()
         .map(PathBuf::from)
-        .context("HOME is not set")?;
+        .context("the home folder variable (HOME, or USERPROFILE on Windows) is not set")?;
     let exe = std::env::current_exe().context("finding this program")?;
-    if cfg!(target_os = "macos") {
+    if cfg!(windows) {
+        print!("{}", windows_steps(&exe));
+        Ok(())
+    } else if cfg!(target_os = "macos") {
         macos(&home, &exe, uninstall)
     } else if is_wsl() {
         print!("{}", wsl_steps(&exe));
@@ -202,6 +205,19 @@ pub(crate) fn wsl_steps(exe: &Path) -> String {
         "WSL: nothing was written. To open gitterrace:// links from Windows, register a\n\
          handler for the scheme yourself that runs:\n  wsl.exe {} open \"%1\"\n",
         exe.display()
+    )
+}
+
+/// Windows registers a scheme under `HKCU\Software\Classes`. Writing the registry from here is
+/// not done: the commands are printed for the user to run, like on WSL.
+pub(crate) fn windows_steps(exe: &Path) -> String {
+    let exe = exe.display();
+    format!(
+        "Windows: nothing was written. To open gitterrace:// links, run in a terminal:\n\
+         \x20 reg add HKCU\\Software\\Classes\\gitterrace /ve /d \"URL:gitterrace link\" /f\n\
+         \x20 reg add HKCU\\Software\\Classes\\gitterrace /v \"URL Protocol\" /d \"\" /f\n\
+         \x20 reg add HKCU\\Software\\Classes\\gitterrace\\shell\\open\\command /ve /d \"\\\"{exe}\\\" open \\\"%1\\\"\" /f\n\
+         remove with: reg delete HKCU\\Software\\Classes\\gitterrace /f\n"
     )
 }
 

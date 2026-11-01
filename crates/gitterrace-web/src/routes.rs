@@ -30,7 +30,6 @@ const PAGE: usize = 50;
 const HOT_DAYS: i64 = 90;
 const HOT_LIMIT: usize = 25;
 const TABLE_LIMIT: usize = 30;
-const README_NAMES: [&str; 4] = ["README.md", "README.markdown", "Readme.md", "readme.md"];
 
 pub(crate) type Shared = State<Arc<App>>;
 
@@ -70,8 +69,6 @@ pub(crate) fn router(app: Arc<App>) -> Router {
         .route("/history/{*path}", get(crate::pages::history))
         .route("/stats/contributors", get(crate::insights::contributors))
         .route("/raw/{rev}/{*path}", get(raw))
-        .route("/cards/wrapped/{year}", get(crate::cards::wrapped))
-        .route("/badges/{name}", get(crate::cards::badge))
         .route("/api/progress", get(progress))
         .route("/worktrees", get(crate::gitstate::worktrees))
         .route("/stashes", get(crate::gitstate::stashes))
@@ -345,31 +342,32 @@ struct Numbers {
     deletions: String,
 }
 
+/// `?doc=` picks the tab of the about card.
+#[derive(Deserialize)]
+struct DocQuery {
+    doc: Option<String>,
+}
+
 #[derive(Template)]
 #[template(path = "overview.html")]
 struct OverviewPage {
     c: Chrome,
     totals: Option<Numbers>,
-    readme: Option<String>,
+    about: Option<crate::about::About>,
     entries: Vec<views::Entry>,
     latest: Option<CommitRow>,
     insights_href: String,
 }
 
-async fn overview(State(app): Shared) -> Result<Html<String>> {
-    let p = blocking(&app, |a| {
+async fn overview(State(app): Shared, Query(q): Query<DocQuery>) -> Result<Html<String>> {
+    let p = blocking(&app, move |a| {
         let rev = fmt::selected();
         let head = a.repo.resolve(&rev)?;
         let now = fmt::now();
         let recent = a.repo.log(&head, None, 0, 1)?;
         let list = a.repo.tree(&head, "")?;
-        let readme = README_NAMES.iter().find_map(|n| {
-            a.repo
-                .blob(&head, n)
-                .ok()
-                .and_then(|b| b.text)
-                .map(|t| markdown::render_with(&t, markdown::Base::new(&rev, "")))
-        });
+        let docs = crate::about::find(&list);
+        let about = crate::about::card(a, &head, &rev, "", "/", &docs, q.doc.as_deref());
         let totals = a.records(&head)?.map(|r| {
             let t = gitterrace_index::totals(&r);
             Numbers {
@@ -382,12 +380,12 @@ async fn overview(State(app): Shared) -> Result<Html<String>> {
         });
         Ok(OverviewPage {
             c: Chrome {
-                md: readme.is_some(),
+                md: about.as_ref().is_some_and(|d| d.markdown),
                 ..views::chrome(a, "files")
             }
             .live(Mode::NOTICE),
             totals,
-            readme,
+            about,
             entries: views::entries(&rev, "", &list),
             latest: recent.first().map(|c| views::commit_row(c, now)),
             insights_href: fmt::href("/stats"),
@@ -560,6 +558,8 @@ struct CommitPage {
     date: String,
     parents: Vec<String>,
     files: Vec<FileStatRow>,
+    /// `(label, url)`: "Find this commit in ..." links from the `lookup` of each Send to target.
+    lookups: Vec<(String, String)>,
     diff: String,
 }
 
@@ -583,6 +583,7 @@ async fn commit(State(app): Shared, Path(id): Path<String>) -> Result<Html<Strin
             date: fmt::date(d.summary.author.time, d.summary.author.offset),
             parents: d.summary.parents.iter().map(|p| fmt::sha_link(p)).collect(),
             files: views::file_stats(&d),
+            lookups: a.lookups(&id),
             diff: views::diff_html(
                 a.cfg().limits.diff_fold_lines,
                 &id,
@@ -606,16 +607,21 @@ struct TreePage {
     crumbs: Vec<Crumb>,
     up: Option<String>,
     entries: Vec<Entry>,
-    readme: Option<String>,
+    about: Option<crate::about::About>,
 }
 
-async fn tree_root(state: Shared, Path(rev): Path<String>) -> Result<Html<String>> {
-    tree(state, Path((rev, String::new()))).await
+async fn tree_root(
+    state: Shared,
+    Path(rev): Path<String>,
+    q: Query<DocQuery>,
+) -> Result<Html<String>> {
+    tree(state, Path((rev, String::new())), q).await
 }
 
 async fn tree(
     State(app): Shared,
     Path((rev, path)): Path<(String, String)>,
+    Query(q): Query<DocQuery>,
 ) -> Result<Html<String>> {
     let p = blocking(&app, move |a| {
         let id = a.repo.resolve(&rev)?;
@@ -630,24 +636,23 @@ async fn tree(
             (None, false) => Some(fmt::href(&format!("/tree/{rev_enc}"))),
             (None, true) => None,
         };
-        let readme = README_NAMES.iter().find_map(|n| {
-            let file = if path.is_empty() {
-                (*n).to_owned()
-            } else {
-                format!("{path}/{n}")
-            };
-            let text = a.repo.blob(&id, &file).ok()?.text?;
-            Some(markdown::render_with(
-                &text,
-                markdown::Base::new(&rev, &path),
-            ))
-        });
+        let docs = crate::about::find(&list);
+        let page = format!("/tree/{rev_enc}/{}", fmt::enc(&path, true));
+        let about = crate::about::card(
+            a,
+            &id,
+            &rev,
+            &path,
+            page.trim_end_matches('/'),
+            &docs,
+            q.doc.as_deref(),
+        );
         Ok(TreePage {
             c: Chrome {
-                md: readme.is_some(),
+                md: about.as_ref().is_some_and(|d| d.markdown),
                 ..views::chrome_at(a, "files", &rev)
             },
-            readme,
+            about,
             title: if path.is_empty() {
                 rev.clone()
             } else {

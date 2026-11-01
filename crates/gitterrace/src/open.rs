@@ -234,7 +234,10 @@ fn loopback(a: SocketAddr) -> SocketAddr {
 
 /// `~/x` against `$HOME`; anything else as written.
 fn expand(p: &str) -> PathBuf {
-    match (p.strip_prefix("~/"), std::env::var_os("HOME")) {
+    let rest = p
+        .strip_prefix("~/")
+        .or_else(|| p.strip_prefix("~\\").filter(|_| cfg!(windows)));
+    match (rest, gitterrace_config::home_var()) {
         (Some(rest), Some(h)) => PathBuf::from(h).join(rest),
         _ => PathBuf::from(p),
     }

@@ -4,8 +4,9 @@
 //! content being browsed.
 
 use std::collections::{BTreeMap, HashSet};
+#[cfg(unix)]
 use std::os::unix::fs::{MetadataExt, PermissionsExt};
-use std::path::{Path, PathBuf};
+use std::path::{MAIN_SEPARATOR, Path, PathBuf};
 use std::sync::{Arc, RwLock};
 use std::time::{Duration, SystemTime};
 
@@ -243,6 +244,20 @@ impl Config {
                 return Err(invalid(&action.id, "duplicate id"));
             }
             if enabled {
+                if let Some(k) = action.key {
+                    if let Some(who) = BUILTIN_KEYS.iter().find(|(b, _)| *b == k) {
+                        return Err(invalid(
+                            &action.id,
+                            format!("key {k:?} is already used by the built-in {}", who.1),
+                        ));
+                    }
+                    if let Some(other) = actions.iter().find(|o: &&Action| o.key == Some(k)) {
+                        return Err(invalid(
+                            &action.id,
+                            format!("key {k:?} is already used by action {}", other.id),
+                        ));
+                    }
+                }
                 actions.push(action);
             }
         }
@@ -296,7 +311,11 @@ pub fn default_path(config_flag: Option<&Path>) -> Option<PathBuf> {
 }
 
 fn home() -> PathBuf {
-    std::env::var_os("HOME").map_or_else(|| PathBuf::from("/"), PathBuf::from)
+    let var = if cfg!(windows) { "USERPROFILE" } else { "HOME" };
+    std::env::var_os(var).map_or_else(
+        || PathBuf::from(std::path::MAIN_SEPARATOR_STR),
+        PathBuf::from,
+    )
 }
 
 fn invalid(id: &str, why: impl Into<String>) -> ConfigError {
@@ -338,7 +357,10 @@ fn unsafe_path(path: &Path, why: impl Into<String>) -> ConfigError {
 /// Regular file (not a symlink), owned by us, not group or world writable; the same for
 /// its directory; and not inside a served repository.
 fn check_file(path: &Path, repos: &[PathBuf]) -> Result<(), ConfigError> {
+    #[cfg(unix)]
     let uid = rustix::process::getuid().as_raw();
+    #[cfg(windows)]
+    let uid = 0;
     let meta = std::fs::symlink_metadata(path).map_err(|e| ConfigError::Io(path.into(), e))?;
     if !meta.file_type().is_file() {
         return Err(unsafe_path(path, "not a regular file"));
@@ -364,6 +386,15 @@ fn check_file(path: &Path, repos: &[PathBuf]) -> Result<(), ConfigError> {
     Ok(())
 }
 
+/// Windows has no mode bits and this does not read ACLs: the file lives under the user's
+/// profile (`%APPDATA%`), which is private by default, so the owner check is skipped.
+#[cfg(windows)]
+#[allow(clippy::unnecessary_wraps)]
+fn owned_private(_: &Path, _: &std::fs::Metadata, _: u32) -> Result<(), ConfigError> {
+    Ok(())
+}
+
+#[cfg(unix)]
 fn owned_private(path: &Path, meta: &std::fs::Metadata, uid: u32) -> Result<(), ConfigError> {
     if meta.uid() != uid {
         return Err(unsafe_path(path, "not owned by the current user"));
@@ -614,6 +645,14 @@ fn check_command(
     Ok(())
 }
 
+/// Keys the action menu already owns. An action key is also its chord on the page ("a" then
+/// the key), so one table gates both.
+const BUILTIN_KEYS: [(char, &str); 3] = [
+    ('p', "Copy permalink"),
+    ('m', "Copy as markdown"),
+    ('s', "Send to\u{2026}"),
+];
+
 fn parse_key(key: Option<&str>) -> Result<Option<char>, &'static str> {
     let Some(k) = key else { return Ok(None) };
     let mut c = k.chars();
@@ -672,6 +711,7 @@ fn validate_vars(
 fn expand_tilde(p: &str, home: &Path) -> PathBuf {
     match p.strip_prefix("~/") {
         Some(rest) => home.join(rest),
+        None if cfg!(windows) && p.starts_with("~\\") => home.join(&p[2..]),
         None if p == "~" => home.to_path_buf(),
         None => PathBuf::from(p),
     }
@@ -680,10 +720,8 @@ fn expand_tilde(p: &str, home: &Path) -> PathBuf {
 /// argv[0] as an absolute executable: tilde-expanded, or looked up in `PATH` when it has no
 /// slash. A relative path with a slash is refused: it would resolve against the cwd.
 fn resolve_program(prog: &str, home: &Path) -> Option<String> {
-    let exec = |p: &Path| {
-        std::fs::metadata(p).is_ok_and(|m| m.is_file() && m.permissions().mode() & 0o111 != 0)
-    };
-    let found = if prog.contains('/') || prog.starts_with('~') {
+    let exec = |p: &Path| is_executable(p);
+    let found = if prog.contains('/') || prog.contains(MAIN_SEPARATOR) || prog.starts_with('~') {
         Some(expand_tilde(prog, home)).filter(|p| p.is_absolute() && exec(p))
     } else {
         std::env::split_paths(&std::env::var_os("PATH")?)
@@ -692,6 +730,24 @@ fn resolve_program(prog: &str, home: &Path) -> Option<String> {
             .find(|p| exec(p))
     };
     found.map(|p| p.to_string_lossy().into_owned())
+}
+
+#[cfg(unix)]
+fn is_executable(p: &Path) -> bool {
+    std::fs::metadata(p).is_ok_and(|m| m.is_file() && m.permissions().mode() & 0o111 != 0)
+}
+
+/// Windows decides by extension, as `CreateProcess` and `cmd` do.
+#[cfg(windows)]
+fn is_executable(p: &Path) -> bool {
+    let ext_ok = |p: &Path| {
+        p.extension().and_then(|e| e.to_str()).is_some_and(|e| {
+            ["exe", "cmd", "bat", "com"]
+                .iter()
+                .any(|x| e.eq_ignore_ascii_case(x))
+        })
+    };
+    std::fs::metadata(p).is_ok_and(|m| m.is_file()) && ext_ok(p)
 }
 
 fn parse_duration(t: &str) -> Option<Duration> {
@@ -764,7 +820,9 @@ fn stamp(path: &Path) -> Option<(SystemTime, u64)> {
     Some((m.modified().ok()?, m.len()))
 }
 
+// The fixtures use /bin/sh, chmod modes and symlinks, so they run on unix only.
 #[cfg(test)]
+#[cfg(unix)]
 mod tests {
     use std::os::unix::fs::PermissionsExt;
     use std::path::{Path, PathBuf};
@@ -812,6 +870,22 @@ command = 'printf %s "$GITTERRACE_TITLE"'
         assert_eq!(echo.timeout.as_secs(), 3);
         assert_eq!(echo.kinds, [Kind::Line, Kind::Commit]);
         assert_eq!(c.get("sh").expect("sh").argv[..2], ["/bin/sh", "-c"]);
+    }
+
+    #[test]
+    fn a_duplicate_or_built_in_key_is_refused_naming_both() {
+        let two = |k1: &str, k2: &str| {
+            format!(
+                "version = 1\n[[action]]\nid = \"one\"\nlabel = \"One\"\nkinds = [\"page\"]\ncommand = [\"/bin/echo\"]\nkey = \"{k1}\"\n[[action]]\nid = \"two\"\nlabel = \"Two\"\nkinds = [\"page\"]\ncommand = [\"/bin/echo\"]\nkey = \"{k2}\"\n"
+            )
+        };
+        let dup = Config::parse(&two("x", "x"), Path::new("/")).expect_err("duplicate");
+        let msg = dup.to_string();
+        assert!(msg.contains("two") && msg.contains("action one"), "{msg}");
+        let clash = Config::parse(&two("x", "s"), Path::new("/")).expect_err("clash");
+        let msg = clash.to_string();
+        assert!(msg.contains("two") && msg.contains("Send to"), "{msg}");
+        assert!(Config::parse(&two("x", "y"), Path::new("/")).is_ok());
     }
 
     #[test]

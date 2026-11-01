@@ -409,7 +409,9 @@ mod tests {
 
     use gitterrace_git::percent_encode;
 
-    use crate::export::{links, percent_decode, target, write_page};
+    #[cfg(unix)]
+    use crate::export::write_page;
+    use crate::export::{links, percent_decode, target};
 
     #[test]
     fn encoded_names_round_trip_to_real_file_names() {
@@ -482,6 +484,7 @@ mod tests {
         assert!(out.path().join("refs/index.html").exists());
     }
 
+    #[cfg(unix)]
     #[test]
     fn write_page_refuses_a_symlink_at_the_leaf() {
         let out = tempfile::tempdir().expect("tempdir");

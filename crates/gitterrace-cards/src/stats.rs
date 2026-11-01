@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
-use gitterrace_index::{CommitRecord, People, civil_from_days as civil};
+use gitterrace_index::{CommitRecord, civil_from_days as civil};
 
 const DAY: i64 = 86_400;
 
@@ -30,21 +30,6 @@ pub struct WrappedStats {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BiggestCommit {
     pub lines: u64,
-}
-
-/// Whole-history numbers for badges and the repo card.
-#[derive(Debug, Clone, PartialEq)]
-pub struct RepoSummary {
-    pub commits: usize,
-    pub contributors: usize,
-    pub additions: u64,
-    pub last_commit: Option<i64>,
-    /// Commits per week over the last 26 weeks ending at the newest commit.
-    pub weekly: Vec<u32>,
-    /// Fewest people (identities merged as in [`People`]) whose commits add up to at least half of all commits.
-    pub bus_factor: usize,
-    /// Languages by share of file touches, largest first, at most six plus "Other".
-    pub languages: Vec<(String, f64)>,
 }
 
 pub fn wrapped_stats(repo: &str, records: &[CommitRecord], year: i32) -> WrappedStats {
@@ -116,40 +101,6 @@ pub fn wrapped_stats(repo: &str, records: &[CommitRecord], year: i32) -> Wrapped
         top_dir,
         biggest_commit: biggest,
         weekly,
-    }
-}
-
-pub fn repo_summary(records: &[CommitRecord]) -> RepoSummary {
-    let people = People::build(records);
-    let mut adds = 0u64;
-    let mut last: Option<i64> = None;
-    for r in records {
-        last = Some(last.map_or(r.time, |v| v.max(r.time)));
-        for f in &r.files {
-            adds += u64::from(f.additions);
-        }
-    }
-    let bus = gitterrace_index::bus_factor(people.list.iter().map(|p| p.commits as f64));
-    let mut weekly = vec![0u32; 26];
-    if let Some(l) = last {
-        let newest = (l / DAY) / 7;
-        for r in records {
-            let age = usize::try_from(newest - (r.time / DAY) / 7).unwrap_or(usize::MAX);
-            if age < 26 {
-                weekly[25 - age] += 1;
-            }
-        }
-    }
-    let mut languages = languages(records.iter());
-    languages.truncate(7);
-    RepoSummary {
-        commits: records.len(),
-        contributors: people.list.len(),
-        additions: adds,
-        last_commit: last,
-        weekly,
-        bus_factor: bus,
-        languages,
     }
 }
 
@@ -307,9 +258,8 @@ pub(crate) mod fixtures {
 
 #[cfg(test)]
 mod tests {
-    use crate::stats::fixtures::{rec, sample};
-    use crate::stats::{civil, days_from_civil, repo_summary, wrapped_stats};
-    use gitterrace_index::People;
+    use crate::stats::fixtures::sample;
+    use crate::stats::{civil, days_from_civil, wrapped_stats};
 
     #[test]
     fn civil_roundtrip() {
@@ -330,37 +280,5 @@ mod tests {
         assert!(w.longest_streak >= 2);
         assert_eq!(w.top_language.as_ref().map(|l| l.0.as_str()), Some("Rust"));
         assert_eq!(wrapped_stats("demo", &sample(), 2020).commits, 0);
-    }
-
-    #[test]
-    fn summary_numbers() {
-        let s = repo_summary(&sample());
-        assert_eq!(s.commits, 41);
-        assert_eq!(s.contributors, 3);
-        assert_eq!(s.bus_factor, 1);
-        assert_eq!(s.weekly.len(), 26);
-        assert_eq!(s.weekly.iter().sum::<u32>(), 41);
-    }
-
-    #[test]
-    fn bus_factor_matches_the_shared_definition_per_identity() {
-        // Two spellings of one address are one person, so 40 of 50 commits are theirs.
-        let mut r = Vec::new();
-        for i in 0..20 {
-            r.push(rec(i, "Alice", 0, 9, &[("a.rs", 1)]));
-            let mut other = rec(100 + i, "Alice B", 0, 9, &[("a.rs", 1)]);
-            other.email = "Alice@x.io".to_owned();
-            r.push(other);
-        }
-        for (i, who) in ["bob", "carol", "dave", "erin", "frank"].iter().enumerate() {
-            for j in 0..2 {
-                r.push(rec(200 + i * 2 + j, who, 1, 9, &[("b.rs", 1)]));
-            }
-        }
-        let people = People::build(&r);
-        let want = gitterrace_index::bus_factor(people.list.iter().map(|p| p.commits as f64));
-        assert_eq!(repo_summary(&r).bus_factor, want);
-        assert_eq!(want, 1);
-        assert_eq!(repo_summary(&r).contributors, people.list.len());
     }
 }

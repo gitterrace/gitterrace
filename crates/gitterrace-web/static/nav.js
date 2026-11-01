@@ -213,11 +213,18 @@
     ["g c", "Code"], ["g i", "Insights"], ["g b", "Branches and tags"], ["g l", "Commits"], ["g s", "Search"],
     ["b", "Switch branch or tag"], ["j / k", "Next / previous commit or result"], ["?", "This sheet"], ["Esc", "Close"]
   ];
+  // Action chords: "a" then the key the user gave an action in actions.toml.
+  function actionChords() {
+    var m = document.querySelector('meta[name="gitterrace-actions"]');
+    var list = [];
+    try { list = m ? JSON.parse(m.dataset.menu || "[]") : []; } catch (e) { list = []; }
+    return list.filter(function (a) { return a.key; }).map(function (a) { return ["a " + a.key, a.label]; });
+  }
   function openHelp() {
     var box = overlay("help");
     box.appendChild(el("h2", "", "Keyboard shortcuts"));
     var dl = el("dl", "keys");
-    SHORTCUTS.forEach(function (s) {
+    SHORTCUTS.concat(actionChords()).forEach(function (s) {
       var dt = el("dt");
       s[0].split(" ").forEach(function (k) { if (k !== "/" || s[0] === "/") { dt.appendChild(el("kbd", "", k)); dt.appendChild(document.createTextNode(" ")); } });
       dl.appendChild(dt);

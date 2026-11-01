@@ -429,6 +429,7 @@ mod tests {
 
     /// A hostile `.git/worktrees` must not make the reader leave the git directory: a symlinked
     /// entry, a symlinked HEAD and a `gitdir` naming `/etc` are all visible attacks.
+    #[cfg(unix)]
     #[test]
     fn hostile_worktree_entries_never_read_outside() {
         let (t, d) = base();

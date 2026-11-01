@@ -132,6 +132,8 @@ pub struct Entry {
     pub label: String,
     pub about: String,
     pub vars: Vec<String>,
+    /// The block has a `lookup` template.
+    pub lookup: bool,
 }
 
 /// The blocks of `defaults/actions.toml`: a chunk is the comment lines right above a
@@ -171,6 +173,7 @@ pub fn starter_entries() -> Vec<Entry> {
                 label: value(&text, "label")?,
                 about: about.join(" "),
                 vars,
+                lookup: value(&text, "lookup").is_some(),
             })
         })
         .collect()
@@ -178,13 +181,13 @@ pub fn starter_entries() -> Vec<Entry> {
 
 fn starter() -> String {
     let mut s = String::from(
-        "| Entry | Kind | On | What it does | Needs in `vars` |\n| --- | --- | --- | --- | --- |\n",
+        "| Entry | Kind | On | What it does | Needs in `vars` | Commit lookup |\n| --- | --- | --- | --- | --- | --- |\n",
     );
     let entries = starter_entries();
     for e in &entries {
         let _ = writeln!(
             s,
-            "| `{}` | {} | {} | {} | {} |",
+            "| `{}` | {} | {} | {} | {} | {} |",
             e.id,
             if e.table == "send" {
                 "Send to"
@@ -193,7 +196,8 @@ fn starter() -> String {
             },
             yes(e.enabled),
             e.about,
-            e.vars.join(", ")
+            e.vars.join(", "),
+            yes(e.lookup)
         );
     }
     s.push_str("\nThe whole file, as `git terrace init` writes it:\n\n```toml\n");

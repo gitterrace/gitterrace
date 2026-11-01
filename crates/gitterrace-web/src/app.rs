@@ -46,6 +46,9 @@ pub(crate) struct Env {
     /// Why `actions.toml` is not in force; rendered into every page so the note is there
     /// at first paint instead of arriving with a poll and pushing the page down.
     actions_note: Arc<RwLock<Option<Arc<crate::actions::Status>>>>,
+    /// The `actions.toml` Send to targets, reloaded with the file: the commit page reads their
+    /// `lookup` links from here.
+    sends: Arc<RwLock<Option<Arc<RwLock<Arc<gitterrace_actions::Config>>>>>>,
 }
 
 /// Page-building slots for `cfg`: 0 means one per core.
@@ -86,6 +89,7 @@ impl Env {
             jobs_cap: Arc::new(Mutex::new(jobs)),
             stop: Arc::new(watch::channel(false).0),
             actions_note: Arc::default(),
+            sends: Arc::default(),
         }
     }
 
@@ -94,6 +98,33 @@ impl Env {
         if let Ok(mut g) = self.actions_note.write() {
             *g = Some(Arc::clone(status));
         }
+    }
+
+    /// Hands the Send to config to every page this server renders.
+    pub(crate) fn set_sends(&self, sends: &Arc<RwLock<Arc<gitterrace_actions::Config>>>) {
+        if let Ok(mut g) = self.sends.write() {
+            *g = Some(Arc::clone(sends));
+        }
+    }
+
+    /// `(label, url)` for each Send to target with a `lookup`, filled for `sha`.
+    pub(crate) fn lookups(&self, sha: &str) -> Vec<(String, String)> {
+        let Some(config) = self
+            .sends
+            .read()
+            .ok()
+            .and_then(|g| g.as_ref().map(Arc::clone))
+        else {
+            return Vec::new();
+        };
+        let Ok(config) = config.read() else {
+            return Vec::new();
+        };
+        config
+            .sends
+            .iter()
+            .filter_map(|t| Some((t.label.clone(), t.lookup_url(sha)?)))
+            .collect()
     }
 
     /// The actions note to render now, if any.
@@ -257,6 +288,10 @@ impl App {
     }
 
     /// The actions note for this page, rendered with it.
+    pub(crate) fn lookups(&self, sha: &str) -> Vec<(String, String)> {
+        self.env.lookups(sha)
+    }
+
     pub(crate) fn actions_note(&self) -> Option<String> {
         self.env.actions_note()
     }

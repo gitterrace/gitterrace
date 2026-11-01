@@ -74,11 +74,6 @@ pub const PAGES: &[Page] = &[
         ],
     ),
     page(
-        "`/badges/{name}`, `/cards/wrapped/{year}`",
-        "SVG badges and the year card",
-        &["/badges/{name}", "/cards/wrapped/{year}"],
-    ),
-    page(
         "`/events`, `/api/{files,refs,last,progress}`",
         "Live updates and the fragments pages fetch",
         &[

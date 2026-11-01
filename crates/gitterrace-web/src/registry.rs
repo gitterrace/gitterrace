@@ -26,13 +26,19 @@ pub struct Entry {
 }
 
 /// The registry folder: absolute `$XDG_STATE_HOME/gitterrace`, else
-/// `$HOME/.local/state/gitterrace`.
+/// `$HOME/.local/state/gitterrace`; `%LOCALAPPDATA%\gitterrace` on Windows.
 pub fn state_dir() -> Option<PathBuf> {
+    #[cfg(windows)]
+    {
+        if let Some(a) = std::env::var_os("LOCALAPPDATA").map(PathBuf::from) {
+            return Some(a.join("gitterrace"));
+        }
+    }
     let xdg = std::env::var_os("XDG_STATE_HOME").map(PathBuf::from);
     if let Some(x) = xdg.filter(|p| p.is_absolute()) {
         return Some(x.join("gitterrace"));
     }
-    std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".local/state/gitterrace"))
+    gitterrace_config::home_var().map(|h| PathBuf::from(h).join(".local/state/gitterrace"))
 }
 
 /// Every recorded entry, unchecked: a path may now hold another project, and reading an id

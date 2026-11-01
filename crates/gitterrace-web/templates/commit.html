@@ -6,7 +6,8 @@
 <p class="meta"><a class="who" href="{{ author_href }}"><b>{{ author }}</b></a> <span class="muted">{{ date }}</span> · {{ sha|safe }} <button type="button" class="copy" data-copy="{{ id }}" data-tip="Copy full sha">Copy</button>
 {% for p in parents %} · parent {{ p|safe }}{% endfor %}
 · <a href="{{ c.base }}/tree/{{ id }}">Browse files</a></p>
-<details class="card files" open><summary>{{ files.len() }} changed files</summary>
+{% if !lookups.is_empty() %}<p class="meta lookups">Find this commit in {% for (label, url) in lookups %}{% if !loop.first %} · {% endif %}<a href="{{ url }}" rel="noopener noreferrer">{{ label }}</a>{% endfor %}</p>
+{% endif %}<details class="card files" open><summary>{{ files.len() }} changed files</summary>
 <ul>{% for f in files %}<li><a href="#{{ f.anchor }}">{{ f.label }}</a><span class="counts"><b class="add">+{{ f.additions }}</b> <b class="del">-{{ f.deletions }}</b></span></li>{% endfor %}</ul></details>
 {{ diff|safe }}
 {% endblock %}

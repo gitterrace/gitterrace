@@ -113,21 +113,23 @@ fn init_in(
     files: &[(&str, String)],
 ) -> anyhow::Result<Vec<(PathBuf, &'static str)>> {
     use std::io::Write as _;
+    #[cfg(unix)]
     use std::os::unix::fs::{DirBuilderExt as _, OpenOptionsExt as _};
 
-    std::fs::DirBuilder::new()
-        .recursive(true)
-        .mode(0o700)
-        .create(dir)
-        .context("creating the config folder")?;
+    let mut dirs = std::fs::DirBuilder::new();
+    dirs.recursive(true);
+    // Windows has no mode bits: the folder lives under `%APPDATA%`, private to the user.
+    #[cfg(unix)]
+    dirs.mode(0o700);
+    dirs.create(dir).context("creating the config folder")?;
     let mut done = Vec::new();
     for (name, text) in files {
         let path = dir.join(name);
-        let opened = std::fs::OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .mode(0o600)
-            .open(&path);
+        let mut opts = std::fs::OpenOptions::new();
+        opts.write(true).create_new(true);
+        #[cfg(unix)]
+        opts.mode(0o600);
+        let opened = opts.open(&path);
         match opened {
             Ok(mut f) => {
                 f.write_all(text.as_bytes())?;
@@ -210,6 +212,7 @@ fn year_of(secs: i64) -> i32 {
 }
 
 #[cfg(test)]
+#[cfg(unix)]
 #[allow(clippy::expect_used)]
 mod tests {
     use std::os::unix::fs::PermissionsExt as _;

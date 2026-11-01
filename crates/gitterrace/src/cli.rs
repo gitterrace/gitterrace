@@ -69,7 +69,7 @@ pub(crate) enum Command {
     /// Register (or with `--uninstall` remove) this program as the `gitterrace://` link handler.
     ///
     /// Opt-in. macOS writes `~/Applications/gitterrace-open.app`, Linux a `.desktop` file, and
-    /// WSL only prints the steps. It prints exactly what it wrote.
+    /// WSL and Windows only print the steps. It prints exactly what it wrote.
     InstallHandler {
         /// Remove what a previous install wrote.
         #[arg(long)]

@@ -312,5 +312,103 @@
       "notes": "x=1&issue[title]=evil\nline 2"
     },
     "expected": "https://codeberg.org/owner/name/issues/new?title=a%26b%20%231%20%3F%2F%20%2B%20%C3%A9%F0%9F%98%80&body=x%3D1%26issue%5Btitle%5D%3Devil%0Aline%202"
+  },
+  {
+    "name": "starter lookup github-issue",
+    "parts": [
+      {
+        "lit": "https://github.com/owner/name/search?q="
+      },
+      {
+        "ph": "sha"
+      },
+      {
+        "lit": "&type=commits"
+      }
+    ],
+    "values": {
+      "sha": "0123456789abcdef0123456789abcdef01234567",
+      "short": "0123456"
+    },
+    "expected": "https://github.com/owner/name/search?q=0123456789abcdef0123456789abcdef01234567&type=commits"
+  },
+  {
+    "name": "lookup short and hostile",
+    "parts": [
+      {
+        "lit": "https://h.test/s?q="
+      },
+      {
+        "ph": "short"
+      },
+      {
+        "lit": "&full="
+      },
+      {
+        "ph": "sha"
+      }
+    ],
+    "values": {
+      "sha": "a&b#c/d e",
+      "short": "a&b#c/d"
+    },
+    "expected": "https://h.test/s?q=a%26b%23c%2Fd&full=a%26b%23c%2Fd%20e"
+  },
+  {
+    "name": "starter lookup gitlab-issue",
+    "parts": [
+      {
+        "lit": "https://gitlab.com/group/name/-/search?search="
+      },
+      {
+        "ph": "sha"
+      },
+      {
+        "lit": "&scope=commits"
+      }
+    ],
+    "values": {
+      "sha": "0123456789abcdef0123456789abcdef01234567",
+      "short": "0123456"
+    },
+    "expected": "https://gitlab.com/group/name/-/search?search=0123456789abcdef0123456789abcdef01234567&scope=commits"
+  },
+  {
+    "name": "starter lookup gitlab-issue-self-hosted",
+    "parts": [
+      {
+        "lit": "https://gitlab.example.test/group/name/-/search?search="
+      },
+      {
+        "ph": "sha"
+      },
+      {
+        "lit": "&scope=commits"
+      }
+    ],
+    "values": {
+      "sha": "0123456789abcdef0123456789abcdef01234567",
+      "short": "0123456"
+    },
+    "expected": "https://gitlab.example.test/group/name/-/search?search=0123456789abcdef0123456789abcdef01234567&scope=commits"
+  },
+  {
+    "name": "starter lookup forgejo-issue",
+    "parts": [
+      {
+        "lit": "https://codeberg.org/owner/name/issues?q="
+      },
+      {
+        "ph": "sha"
+      },
+      {
+        "lit": "&type=all"
+      }
+    ],
+    "values": {
+      "sha": "0123456789abcdef0123456789abcdef01234567",
+      "short": "0123456"
+    },
+    "expected": "https://codeberg.org/owner/name/issues?q=0123456789abcdef0123456789abcdef01234567&type=all"
   }
 ]

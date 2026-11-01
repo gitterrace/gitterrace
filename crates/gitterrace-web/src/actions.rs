@@ -487,6 +487,7 @@ fn run_blocking(
 
 /// Fixtures shared with the read-only crawl in `lib.rs`.
 #[cfg(test)]
+#[cfg(unix)]
 #[allow(clippy::expect_used)]
 pub(crate) mod actions_tests {
     use std::os::unix::fs::PermissionsExt;
@@ -554,6 +555,7 @@ command = "cat >/dev/null; sleep 2"
 }
 
 #[cfg(test)]
+#[cfg(unix)]
 #[allow(clippy::expect_used, clippy::too_many_lines)]
 mod tests {
     use gitterrace_testkit::git;

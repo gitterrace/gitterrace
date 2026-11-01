@@ -3,6 +3,9 @@
 # any other. An entry with `enabled = false` is checked at load but not offered, so switch on
 # only what you use: set `enabled = true` and fill in its `vars`.
 #
+# A send may also have a `lookup` template: the commit page then links to it as "Find this
+# commit in ...", and the destination does the search. It takes {sha} and {short}.
+#
 # Each block is described by the comment lines right above it.
 
 version = 1
@@ -27,6 +30,7 @@ id      = "github-issue"
 label   = "New issue"
 enabled = false
 url     = "https://github.com/{var.repo}/issues/new?title={title}&body={notes}"
+lookup  = "https://github.com/{var.repo}/search?q={sha}&type=commits"
 vars    = { repo = "owner/name" }
 
 # A new discussion on github.com. `repo` is `owner/name`, `category` the category slug.
@@ -43,6 +47,7 @@ id      = "gitlab-issue"
 label   = "New issue"
 enabled = false
 url     = "https://gitlab.com/{var.project}/-/issues/new?issue%5Btitle%5D={title}&issue%5Bdescription%5D={notes}"
+lookup  = "https://gitlab.com/{var.project}/-/search?search={sha}&scope=commits"
 vars    = { project = "group/name" }
 
 # A new issue on a self-hosted instance of that host. `base` is the instance URL, `project` is `group/name`.
@@ -51,6 +56,7 @@ id      = "gitlab-issue-self-hosted"
 label   = "New issue"
 enabled = false
 url     = "{var.base}/{var.project}/-/issues/new?issue%5Btitle%5D={title}&issue%5Bdescription%5D={notes}"
+lookup  = "{var.base}/{var.project}/-/search?search={sha}&scope=commits"
 vars    = { base = "https://gitlab.example.test", project = "group/name" }
 
 # A new merge request on gitlab.com from a fixed branch. `branch` is the source branch. The
@@ -68,6 +74,7 @@ id      = "forgejo-issue"
 label   = "New issue"
 enabled = false
 url     = "{var.base}/{var.repo}/issues/new?title={title}&body={notes}"
+lookup  = "{var.base}/{var.repo}/issues?q={sha}&type=all"
 vars    = { base = "https://codeberg.org", repo = "owner/name" }
 
 # ---- Actions: programs of yours, run with no shell. See the scripts in docs/actions.

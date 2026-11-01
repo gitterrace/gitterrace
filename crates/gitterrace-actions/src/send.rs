@@ -25,6 +25,9 @@ pub const SEND_FIELDS: [&str; 7] = [
     "repo",
 ];
 
+/// Placeholders a `lookup` template may hold: only the commit's own ids.
+pub const LOOKUP_FIELDS: [&str; 2] = ["sha", "short"];
+
 /// Schemes refused even though they look like an app scheme: each runs code, reads local
 /// data or reaches browser internals.
 pub const DENIED_SCHEMES: [&str; 8] = [
@@ -53,6 +56,22 @@ pub struct Target {
     pub id: String,
     pub label: String,
     pub parts: Vec<Part>,
+    /// How to search the destination for a commit; `None` when the target has no such search.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub lookup: Option<Vec<Part>>,
+}
+
+impl Target {
+    /// The link that searches this destination for `sha`: `None` without a `lookup`.
+    /// Filled with [`fill`]'s rule, so the id is percent-encoded.
+    pub fn lookup_url(&self, sha: &str) -> Option<String> {
+        let short: String = sha.chars().take(7).collect();
+        let values = BTreeMap::from([
+            ("sha".to_owned(), sha.to_owned()),
+            ("short".to_owned(), short),
+        ]);
+        self.lookup.as_deref().map(|p| fill(p, &values))
+    }
 }
 
 #[derive(Deserialize)]
@@ -61,6 +80,10 @@ pub(crate) struct RawSend {
     id: String,
     label: String,
     url: String,
+    /// Optional template that searches the destination for a commit: `{sha}`, `{short}` and
+    /// `{var.NAME}`, under the same scheme rules as `url`.
+    #[serde(default)]
+    lookup: Option<String>,
     /// `false` keeps the block checked but not offered: how the shipped starter file lists
     /// targets that need settings of yours.
     #[serde(default = "yes")]
@@ -98,31 +121,52 @@ pub(crate) fn compile(raw: RawSend) -> Result<Target, String> {
             return Err(format!("vars.{name}: one line, at most 4 KiB"));
         }
     }
-    let (template, label) = (raw.url.as_str(), raw.label.as_str());
+    let label = raw.label.as_str();
     if label.trim().is_empty() || label.chars().count() > 80 {
         return Err("label must be 1 to 80 characters".into());
     }
+    let parts = template_parts(&raw.vars, "url", &raw.url, &SEND_FIELDS)?;
+    let lookup = raw
+        .lookup
+        .as_deref()
+        .map(|t| template_parts(&raw.vars, "lookup", t, &LOOKUP_FIELDS))
+        .transpose()?;
+    Ok(Target {
+        id: raw.id,
+        label: raw.label,
+        parts,
+        lookup,
+    })
+}
+
+/// Splits `template` into parts: `{var.NAME}` is inserted verbatim, a name in `allowed`
+/// stays a placeholder, anything else is refused. `key` names the field in the error.
+fn template_parts(
+    vars: &BTreeMap<String, String>,
+    key: &str,
+    template: &str,
+    allowed: &[&str],
+) -> Result<Vec<Part>, String> {
     let mut parts: Vec<Part> = Vec::new();
     let push_lit = |parts: &mut Vec<Part>, s: &str| match parts.last_mut() {
         Some(Part::Lit(l)) => l.push_str(s),
         _ => parts.push(Part::Lit(s.to_owned())),
     };
-    for piece in pieces(template)? {
+    for piece in pieces(template).map_err(|e| format!("{key}: {e}"))? {
         match piece {
             Piece::Text(t) => push_lit(&mut parts, &t),
             Piece::Field(f) => {
                 if let Some(v) = f.strip_prefix("var.") {
-                    let value = raw
-                        .vars
+                    let value = vars
                         .get(v)
-                        .ok_or_else(|| format!("url: {{{f}}}: no vars.{v}"))?;
+                        .ok_or_else(|| format!("{key}: {{{f}}}: no vars.{v}"))?;
                     push_lit(&mut parts, value);
-                } else if SEND_FIELDS.contains(&f.as_str()) {
+                } else if allowed.contains(&f.as_str()) {
                     parts.push(Part::Ph(f));
                 } else {
                     return Err(format!(
-                        "url: unknown placeholder {{{f}}}; known: {}, var.<name>",
-                        SEND_FIELDS.join(", ")
+                        "{key}: unknown placeholder {{{f}}}, known: {}, var.<name>",
+                        allowed.join(", ")
                     ));
                 }
             }
@@ -132,36 +176,34 @@ pub(crate) fn compile(raw: RawSend) -> Result<Target, String> {
         Some(Part::Lit(l)) => l.as_str(),
         _ => "",
     };
-    check_prefix(prefix, parts.len() > 1)?;
-    Ok(Target {
-        id: raw.id,
-        label: raw.label,
-        parts,
-    })
+    check_prefix(key, prefix, parts.len() > 1)?;
+    Ok(parts)
 }
 
 /// The literal text before the first page placeholder must fix the scheme and, when a
 /// placeholder follows, end the host: a value can then only land in the path, query or
 /// fragment.
-fn check_prefix(prefix: &str, has_placeholder: bool) -> Result<(), String> {
+fn check_prefix(key: &str, prefix: &str, has_placeholder: bool) -> Result<(), String> {
     let (scheme, rest) = prefix
         .split_once(':')
-        .ok_or("url: the scheme must be literal, before any placeholder")?;
+        .ok_or_else(|| format!("{key}: the scheme must be literal, before any placeholder"))?;
     let lower = scheme.to_ascii_lowercase();
     let well_formed = lower.bytes().next().is_some_and(|b| b.is_ascii_lowercase())
         && lower
             .bytes()
             .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b"+.-".contains(&b));
     if !well_formed {
-        return Err(format!("url: bad scheme {scheme:?}"));
+        return Err(format!("{key}: bad scheme {scheme:?}"));
     }
     if DENIED_SCHEMES.contains(&lower.as_str()) {
-        return Err(format!("url: scheme {lower}: is refused"));
+        return Err(format!("{key}: scheme {lower}: is refused"));
     }
     let after = rest.strip_prefix("//").unwrap_or(rest);
     let host_end = after.find(['/', '?', '#']);
     if has_placeholder && host_end.is_none() {
-        return Err("url: a placeholder may not be part of the scheme or host".into());
+        return Err(format!(
+            "{key}: a placeholder may not be part of the scheme or host"
+        ));
     }
     if lower == "http" {
         let authority = &after[..host_end.unwrap_or(after.len())];
@@ -175,7 +217,9 @@ fn check_prefix(prefix: &str, has_placeholder: bool) -> Result<(), String> {
                 .parse::<std::net::IpAddr>()
                 .is_ok_and(|ip| ip.is_loopback());
         if !loopback {
-            return Err("url: http is allowed only for loopback; use https".into());
+            return Err(format!(
+                "{key}: http is allowed only for loopback. Use https"
+            ));
         }
     }
     Ok(())
@@ -333,7 +377,87 @@ mod tests {
             assert!(vectors.iter().any(|v| v.name == name), "{name}");
             let v = vectors.iter().find(|v| v.name == name).expect("vector");
             assert_eq!(v.parts, t.parts, "{name}");
+            if let Some(lookup) = &t.lookup {
+                let name = format!("starter lookup {}", t.id);
+                let v = vectors.iter().find(|v| v.name == name).expect(&name);
+                assert_eq!(&v.parts, lookup, "{name}");
+            }
         }
+    }
+
+    #[test]
+    fn lookup_allows_only_the_commit_ids() {
+        let ok = |l: &str| {
+            load(&format!(
+                "label = \"S\"\nurl = \"mailto:x\"\nlookup = {l:?}\n"
+            ))
+        };
+        assert!(ok("https://h.test/s?q={sha}&s={short}").is_ok());
+        for bad in [
+            "https://h.test/s?q={title}",
+            "https://h.test/s?q={notes}",
+            "https://h.test/s?q={repo}",
+            "https://h.test/s?q={path}",
+            "https://{sha}.test/s",
+            "javascript:x{sha}",
+            "http://h.test/s?q={sha}",
+            "no-scheme?q={sha}",
+        ] {
+            let e = ok(bad).expect_err(bad);
+            assert!(e.contains("lookup:"), "{bad}: {e}");
+        }
+        let e = ok("https://h.test/{var.nope}/{sha}").expect_err("var");
+        assert!(e.contains("lookup: {var.nope}"), "{e}");
+        // `sha` is a url placeholder but `short` is not: the two lists differ on purpose.
+        assert!(url("https://h.test/s?q={short}").is_err());
+    }
+
+    #[test]
+    fn lookup_url_is_filled_and_absent_without_a_lookup() {
+        let c = load(
+            "label = \"S\"\nurl = \"mailto:x\"\nlookup = \"{var.base}/s?q={sha}&s={short}\"\n\
+             vars = { base = \"https://h.test\" }\n",
+        )
+        .expect("load");
+        let t = &c.sends[0];
+        assert_eq!(
+            t.lookup_url("0123456789abcdef").as_deref(),
+            Some("https://h.test/s?q=0123456789abcdef&s=0123456")
+        );
+        // Whatever arrives is encoded, never spliced.
+        assert_eq!(
+            t.lookup_url("a&b#c").as_deref(),
+            Some("https://h.test/s?q=a%26b%23c&s=a%26b%23c")
+        );
+        assert_eq!(
+            url("mailto:x").expect("load").sends[0].lookup_url("abc"),
+            None
+        );
+    }
+
+    #[test]
+    fn starter_lookups_are_the_commit_search_entries() {
+        let c = starter_sends();
+        let with: Vec<&str> = c
+            .sends
+            .iter()
+            .filter(|t| t.lookup.is_some())
+            .map(|t| t.id.as_str())
+            .collect();
+        assert_eq!(
+            with,
+            [
+                "github-issue",
+                "gitlab-issue",
+                "gitlab-issue-self-hosted",
+                "forgejo-issue"
+            ]
+        );
+        let gh = c.sends.iter().find(|t| t.id == "github-issue").expect("gh");
+        assert_eq!(
+            gh.lookup_url("abc123").as_deref(),
+            Some("https://github.com/owner/name/search?q=abc123&type=commits")
+        );
     }
 
     /// A hostile title cannot add a parameter, a fragment or a path: the query stays two

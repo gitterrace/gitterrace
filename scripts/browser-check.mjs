@@ -12,12 +12,15 @@
 //                every one shows the Working tree chip within 2 s of a file edit
 //   mermaid      the README diagram renders and has no Copy node
 //   chip         the Working tree chip dot has no animation, in light and dark
+//   doctabs      the README/LICENSE/SECURITY tab row is one line at 360, 900 and 1440 px and the
+//                active tab has aria-current; shots into target/shots/doctabs-*.png
 //
 // --from-disk serves crates/gitterrace-web/static/*.js from the working tree over the (possibly
 // older) binary's copies, to test edits before a rebuild. Playwright comes from $PLAYWRIGHT_CORE,
 // the repo's node_modules or the website checkout (see browser-lib.mjs).
-import { readFileSync, writeFileSync, rmSync } from 'node:fs';
+import { readFileSync, writeFileSync, rmSync, mkdirSync, existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
+import { homedir } from 'node:os';
 import { root, loadPlaywright, launch, makeRepo, serve, openPage, reporter, sh } from './browser-lib.mjs';
 
 const arg = (k, d) => { const i = process.argv.indexOf(k); return i < 0 ? d : process.argv[i + 1]; };
@@ -25,7 +28,7 @@ const bin = resolve(arg('--bin', join(root, 'target/debug/git-terrace')));
 const fromDisk = process.argv.includes('--from-disk');
 const tabCounts = arg('--tabs', '8,12').split(',').map(Number);
 const browsers = arg('--browsers', 'webkit,chromium').split(',');
-const ALL = ['truncation', 'live-tabs', 'mermaid', 'chip'];
+const ALL = ['truncation', 'live-tabs', 'mermaid', 'chip', 'doctabs', 'chords'];
 const wanted = arg('--checks', ALL.join(',')).split(',');
 for (const c of wanted) if (!ALL.includes(c)) { console.error(`unknown check ${c}; known: ${ALL.join(', ')}`); process.exit(2); }
 
@@ -190,7 +193,73 @@ async function chip() {
   sh(dir, 'git', 'checkout', '-q', '--', 'a.txt');
 }
 
-const checks = { truncation, 'live-tabs': liveTabs, mermaid, chip };
+// ---- doctabs ----------------------------------------------------------------------------------
+async function doctabs() {
+  writeFileSync(join(dir, 'LICENSE'), 'MIT License\n');
+  writeFileSync(join(dir, 'SECURITY.md'), '# Security\n');
+  writeFileSync(join(dir, 'contributing.md'), '# Contributing\n');
+  sh(dir, 'git', 'add', '-A');
+  sh(dir, 'git', 'commit', '-q', '-m', 'docs: about files');
+  await new Promise((ok) => setTimeout(ok, 600));
+  const shots = join(homedir(), 'target/shots');
+  mkdirSync(shots, { recursive: true });
+  const b = await launch(pw, 'chromium');
+  for (const width of [360, 900, 1440]) {
+    const p = await openPage(b, srv.base + '/?doc=license', { width });
+    const m = await p.$eval('.doctabs', (n) => {
+      const tops = new Set([...n.children].map((a) => Math.round(a.getBoundingClientRect().top)));
+      return { n: n.children.length, lines: tops.size, on: n.querySelectorAll('a[aria-current]').length };
+    }).catch(() => null);
+    if (!m) r.fail(`doctabs ${width}: no tab row`);
+    else if (m.lines !== 1) r.fail(`doctabs ${width}: tab row wraps onto ${m.lines} lines`);
+    else if (m.on !== 1) r.fail(`doctabs ${width}: ${m.on} tabs marked aria-current`);
+    else r.ok(`doctabs ${width}: ${m.n} tabs on one line, active marked`);
+    await p.close();
+  }
+  for (const scheme of ['light', 'dark']) {
+    const p = await openPage(b, srv.base + '/?doc=license', { width: 900, scheme });
+    await (await p.$('.card.readme'))?.scrollIntoViewIfNeeded();
+    await p.screenshot({ path: join(shots, `doctabs-${scheme}.png`) });
+    await p.close();
+  }
+  await b.close();
+}
+
+// ---- chords -----------------------------------------------------------------------------------
+// Needs a server whose actions.toml has one action, key "x", that touches a marker file.
+async function chords() {
+  const marker = join(dir, 'chord-ran');
+  const cfg = join(dir, 'cfg');
+  mkdirSync(cfg, { recursive: true, mode: 0o700 });
+  writeFileSync(join(cfg, 'actions.toml'), `version = 1\n[[action]]\nid = "mark"\nlabel = "Mark"\nkinds = ["page"]\ncommand = ["/usr/bin/touch", ${JSON.stringify(marker)}]\nkey = "x"\n`, { mode: 0o600 });
+  await new Promise((ok) => setTimeout(ok, 800));
+  const b = await launch(pw, 'chromium');
+  const p = await openPage(b, srv.base + '/');
+  await p.keyboard.press('a');
+  await p.keyboard.press('x');
+  await new Promise((ok) => setTimeout(ok, 800));
+  if (existsSync(marker)) r.ok('chords: a then x opens the action'); else r.fail('chords: a then x did not run the action');
+  await p.keyboard.press('?');
+  const sheet = await p.$eval('.help, .ov', (n) => n.textContent).catch(() => '');
+  if (/Mark/.test(sheet)) r.ok('chords: the ? sheet lists a x'); else r.fail('chords: the ? sheet lacks the chord');
+  rmSync(marker, { force: true });
+  // A static export (body[data-static]) must ignore the chord.
+  await p.close();
+  const q = await b.newPage();
+  await q.addInitScript(() => {
+    new MutationObserver((_, o) => { if (document.body) { document.body.dataset.static = ''; o.disconnect(); } })
+      .observe(document.documentElement, { childList: true });
+  });
+  await q.goto(srv.base + '/', { waitUntil: 'load' });
+  await q.keyboard.press('a');
+  await q.keyboard.press('x');
+  await new Promise((ok) => setTimeout(ok, 800));
+  if (existsSync(marker)) r.fail('chords: a then x ran on a static page'); else r.ok('chords: a then x does nothing on a static page');
+  await q.close();
+  await b.close();
+}
+
+const checks = { truncation, 'live-tabs': liveTabs, mermaid, chip, doctabs, chords };
 try {
   for (const c of wanted) { console.log(`-- ${c}`); await checks[c](); }
 } finally {

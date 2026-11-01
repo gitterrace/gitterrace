@@ -998,7 +998,6 @@ dependencies = [
  "futures-util",
  "gitterrace-actions",
  "gitterrace-api",
- "gitterrace-cards",
  "gitterrace-config",
  "gitterrace-git",
  "gitterrace-index",

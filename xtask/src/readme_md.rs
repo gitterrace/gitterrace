@@ -218,7 +218,7 @@ const ROLES: [(&str, &str); 9] = [
     ("gitterrace", "the binary and CLI"),
     ("web", "server, pages, guard"),
     ("api", "JSON API and MCP"),
-    ("cards", "SVG badges, year card"),
+    ("cards", "year card"),
     ("actions", "actions.toml and Send to"),
     ("config", "config.toml"),
     ("index", "insights cache"),

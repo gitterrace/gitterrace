@@ -6,13 +6,14 @@ flowchart TD
   gitterrace["gitterrace: the binary and CLI"]
   actions["actions: actions.toml and Send to"]
   api["api: JSON API and MCP"]
-  cards["cards: SVG badges, year card"]
+  cards["cards: year card"]
   config["config: config.toml"]
   git["git: all git reads, via gix"]
   index["index: insights cache"]
   testkit["testkit: "]
   web["web: server, pages, guard"]
   schwarzwald["schwarzwald: the theme and its palette"]
+  gitterrace --> cards
   gitterrace --> web
   actions --> config
   actions --> git
@@ -23,14 +24,13 @@ flowchart TD
   index --> git
   testkit --> config
   web --> api
-  web --> cards
 ```
 
 <!-- END GENERATED: crates -->
 
 Each box is a crate. An arrow means "uses". `schwarzwald` is the vendored theme (colours, type,
-tokens, see [design](design.md)); `cards` reads its palette, called Kandel, to colour the SVG
-badges and the year card.
+tokens, see [design](design.md)); `cards` reads its palette, called Kandel, to colour the year
+card.
 
 ## Decisions
 
@@ -79,7 +79,6 @@ Disposable: bump the format version instead of migrating.
 | `/refs`, `/tag/{name}`, `/worktrees`, `/stashes`, `/worktree` | Git state: branches, tags, linked worktrees, stashes, uncommitted changes |
 | `/search` | Code and commit search |
 | `/stats`, `/stats/{page}` | Insights on the shared filter and period. `?rev=` follows any ref |
-| `/badges/{name}`, `/cards/wrapped/{year}` | SVG badges and the year card |
 | `/events`, `/api/{files,refs,last,progress}` | Live updates and the fragments pages fetch |
 | `/api/v1/...` | JSON API, see [api.md](api.md) |
 | `/go/{repo-id}/{sha}/{path}` | Permalink: finds the served repository by id |

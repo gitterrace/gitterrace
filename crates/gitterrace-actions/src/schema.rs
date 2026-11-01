@@ -236,7 +236,7 @@ pub const FILE_KEYS: [Item; 4] = [
 ];
 
 /// Keys of a `[[send]]` block.
-pub const SEND_KEYS: [Item; 5] = [
+pub const SEND_KEYS: [Item; 6] = [
     item(
         "id",
         "string",
@@ -258,6 +258,16 @@ pub const SEND_KEYS: [Item; 5] = [
         "",
         "The URL template. The scheme and host are literal. Placeholders (below) fill the \
          path, query or fragment, each percent-encoded.",
+    ),
+    item(
+        "lookup",
+        "string",
+        false,
+        "",
+        "A URL template that searches the destination for a commit. The commit page links \
+         to it as \"Find this commit in ...\". Nothing is fetched. Same scheme rules as \
+         `url`. Only `{sha}` (full id), `{short}` (first 7 characters) and `{var.<name>}` \
+         are allowed.",
     ),
     item(
         "enabled",
@@ -418,7 +428,7 @@ pub const ACTION_KEYS: [Item; 14] = [
         "string",
         false,
         "",
-        "One letter or digit, a shortcut inside the menu.",
+        "One letter or digit: a shortcut inside the menu, and on the page press `a` then the key (`a t`). Not `p`, `m` or `s`, and unique among actions; either is a load error.",
     ),
     item(
         "env",

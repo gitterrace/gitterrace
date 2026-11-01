@@ -8,6 +8,7 @@
 #   Linux Wayland: wl-copy (wl-clipboard)
 #   Linux X11:     xclip or xsel
 #   WSL:           clip.exe (built in)
+#   Windows:       a POSIX sh is needed. On native Windows use command = ["clip.exe"] instead
 set -eu
 if command -v pbcopy >/dev/null 2>&1; then set -- pbcopy
 elif command -v wl-copy >/dev/null 2>&1; then set -- wl-copy

@@ -20,8 +20,10 @@ thiserror.workspace = true
 tracing.workspace = true
 toml = { version = "1", default-features = false, features = ["std", "serde", "parse"] }
 getrandom = "0.4"
-rustix = { version = "1", default-features = false, features = ["std", "process"] }
 
 [dev-dependencies]
 gitterrace-testkit.workspace = true
 tempfile.workspace = true
+
+[target.'cfg(unix)'.dependencies]
+rustix = { version = "1", default-features = false, features = ["std", "process"] }

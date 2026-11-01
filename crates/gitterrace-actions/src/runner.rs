@@ -4,7 +4,10 @@
 
 use std::collections::{HashSet, VecDeque};
 use std::io::{Read, Write};
+#[cfg(unix)]
 use std::os::unix::process::{CommandExt, ExitStatusExt};
+#[cfg(windows)]
+use std::os::windows::process::CommandExt;
 use std::path::Path;
 use std::process::{Child, Command, Stdio};
 use std::sync::mpsc;
@@ -13,7 +16,6 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 use gitterrace_git::percent_encode;
-use rustix::process::{Pid, Signal, kill_process_group};
 
 use crate::config::{Action, Cwd, Piece, REPO_FIELDS, Stdin, field_parts, pieces};
 use crate::payload::Payload;
@@ -27,7 +29,21 @@ const KILL_GRACE: Duration = Duration::from_secs(2);
 const POLL: Duration = Duration::from_millis(20);
 /// Inherited variables a script may see; everything else (tokens, agent sockets) is dropped
 /// unless the action names it in `env`.
-const KEEP_ENV: &[&str] = &["PATH", "HOME", "USER", "LANG", "TMPDIR"];
+const KEEP_ENV: &[&str] = &[
+    "PATH",
+    "HOME",
+    "USER",
+    "LANG",
+    "TMPDIR",
+    #[cfg(windows)]
+    "SystemRoot",
+    #[cfg(windows)]
+    "USERPROFILE",
+    #[cfg(windows)]
+    "TEMP",
+    #[cfg(windows)]
+    "PATHEXT",
+];
 /// One expanded placeholder value. Larger values belong on stdin, not in argv.
 const MAX_VALUE_BYTES: usize = 64 * 1024;
 /// The whole expanded argv, well under every OS's `ARG_MAX` with the environment beside it.
@@ -136,7 +152,8 @@ impl Runner {
             .env_clear()
             .current_dir(match &action.cwd {
                 Cwd::Repo => repo_root.to_path_buf(),
-                Cwd::Home => std::env::var_os("HOME").map_or_else(|| "/".into(), Into::into),
+                Cwd::Home => std::env::var_os(if cfg!(windows) { "USERPROFILE" } else { "HOME" })
+                    .map_or_else(|| std::path::MAIN_SEPARATOR_STR.into(), Into::into),
                 Cwd::Path(p) => p.clone(),
             })
             .stdin(if stdin.is_some() {
@@ -145,8 +162,8 @@ impl Runner {
                 Stdio::null()
             })
             .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .process_group(0);
+            .stderr(Stdio::piped());
+        new_group(&mut cmd);
         for (k, v) in std::env::vars_os() {
             let name = k.to_string_lossy();
             if KEEP_ENV.contains(&name.as_ref())
@@ -256,7 +273,7 @@ pub fn expand(template: &[String], payload: &Payload) -> Result<Vec<String>, Run
 }
 
 fn supervise(mut child: Child, stdin: Option<Vec<u8>>, timeout: Duration) -> Outcome {
-    let pgid = Pid::from_child(&child);
+    let pgid = group_of(&child);
     // Writing on its own thread: a script that never reads stdin must not stall us.
     if let (Some(mut pipe), Some(stdin)) = (child.stdin.take(), stdin) {
         thread::spawn(move || {
@@ -276,12 +293,12 @@ fn supervise(mut child: Child, stdin: Option<Vec<u8>>, timeout: Duration) -> Out
             Ok(None) if Instant::now() < deadline => thread::sleep(POLL),
             Ok(None) => {
                 timed_out = true;
-                signal_group(pgid, Signal::TERM);
+                signal_group(pgid, Sig::Term);
                 let grace = Instant::now() + KILL_GRACE;
                 while Instant::now() < grace && matches!(child.try_wait(), Ok(None)) {
                     thread::sleep(POLL);
                 }
-                signal_group(pgid, Signal::KILL);
+                signal_group(pgid, Sig::Kill);
                 break child.wait().ok();
             }
             Err(_) => break None,
@@ -289,7 +306,9 @@ fn supervise(mut child: Child, stdin: Option<Vec<u8>>, timeout: Duration) -> Out
     };
     // Leftover children (backgrounded by the script) hold the pipes open and outlive the
     // click; the group dies with the run.
-    signal_group(pgid, Signal::KILL);
+    // Windows has no group left to name once the leader exited, so only a timeout kills there.
+    #[cfg(unix)]
+    signal_group(pgid, Sig::Kill);
 
     let collect = |rx: Option<mpsc::Receiver<Vec<u8>>>| {
         rx.and_then(|r| r.recv_timeout(KILL_GRACE).ok())
@@ -308,7 +327,7 @@ fn supervise(mut child: Child, stdin: Option<Vec<u8>>, timeout: Duration) -> Out
         };
         first_line(pick).unwrap_or_else(|| {
             status
-                .and_then(|s| s.signal())
+                .and_then(exit_signal)
                 .map_or_else(String::new, |sig| format!("killed by signal {sig}"))
         })
     };
@@ -323,9 +342,76 @@ fn supervise(mut child: Child, stdin: Option<Vec<u8>>, timeout: Duration) -> Out
     }
 }
 
-fn signal_group(pgid: Pid, sig: Signal) {
+#[derive(Clone, Copy)]
+enum Sig {
+    Term,
+    Kill,
+}
+
+#[cfg(unix)]
+type Group = rustix::process::Pid;
+#[cfg(windows)]
+type Group = u32;
+
+#[cfg(unix)]
+fn new_group(cmd: &mut Command) {
+    cmd.process_group(0);
+}
+
+/// `CREATE_NEW_PROCESS_GROUP`: the child gets its own group so a console Ctrl event meant
+/// for the server never reaches it, and `taskkill /T` can walk its tree.
+#[cfg(windows)]
+fn new_group(cmd: &mut Command) {
+    cmd.creation_flags(0x0000_0200);
+}
+
+#[cfg(unix)]
+fn group_of(child: &Child) -> Group {
+    rustix::process::Pid::from_child(child)
+}
+
+#[cfg(windows)]
+fn group_of(child: &Child) -> Group {
+    child.id()
+}
+
+#[cfg(unix)]
+fn exit_signal(s: std::process::ExitStatus) -> Option<i32> {
+    s.signal()
+}
+
+#[cfg(windows)]
+fn exit_signal(_: std::process::ExitStatus) -> Option<i32> {
+    None
+}
+
+#[cfg(unix)]
+fn signal_group(pgid: Group, sig: Sig) {
+    use rustix::process::{Signal, kill_process_group};
+    let sig = match sig {
+        Sig::Term => Signal::TERM,
+        Sig::Kill => Signal::KILL,
+    };
     if kill_process_group(pgid, sig).is_err() {
         // ESRCH: the group is already gone.
+    }
+}
+
+/// `taskkill /T` ends the whole tree; `/F` is the forceful kill after the grace period.
+#[cfg(windows)]
+fn signal_group(pid: Group, sig: Sig) {
+    let mut cmd = Command::new("taskkill");
+    cmd.arg("/T");
+    if matches!(sig, Sig::Kill) {
+        cmd.arg("/F");
+    }
+    cmd.arg("/PID")
+        .arg(pid.to_string())
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null());
+    if cmd.status().is_err() {
+        // taskkill missing or the tree already gone.
     }
 }
 
@@ -360,7 +446,9 @@ fn first_line(bytes: &[u8]) -> Option<String> {
     Some(line)
 }
 
+// The fixtures use /bin/sh, chmod modes and symlinks, so they run on unix only.
 #[cfg(test)]
+#[cfg(unix)]
 mod tests {
     use std::path::Path;
     use std::time::{Duration, Instant};

@@ -32,21 +32,6 @@ pub(crate) fn group(n: u64) -> String {
     o
 }
 
-/// 1234 -> "1.2k", `2_500_000` -> "2.5M".
-pub(crate) fn compact(n: u64) -> String {
-    let f = |v: f64, s: &str| {
-        let t = format!("{v:.1}");
-        format!("{}{s}", t.strip_suffix(".0").unwrap_or(&t))
-    };
-    if n >= 1_000_000 {
-        f(n as f64 / 1e6, "M")
-    } else if n >= 1_000 {
-        f(n as f64 / 1e3, "k")
-    } else {
-        n.to_string()
-    }
-}
-
 /// Shortens `s` to at most `max` characters with an ellipsis.
 pub(crate) fn clip(s: &str, max: usize) -> String {
     if s.chars().count() <= max {
@@ -56,35 +41,6 @@ pub(crate) fn clip(s: &str, max: usize) -> String {
         o.push('\u{2026}');
         o
     }
-}
-
-/// Rough text width in px for sans-serif at `size`, good enough to size badges.
-pub(crate) fn text_width(s: &str, size: f64) -> f64 {
-    s.chars()
-        .map(|c| match c {
-            'i' | 'l' | 'j' | '.' | ',' | ':' | ';' | '|' | '\'' | '!' | 'I' | '1' => 0.31,
-            ' ' | 't' | 'f' | 'r' | '-' | '/' | '(' | ')' => 0.38,
-            'm' | 'w' | 'M' | 'W' | '%' => 0.88,
-            c if c.is_ascii_uppercase() => 0.68,
-            c if c.is_ascii_digit() => 0.6,
-            _ => 0.56,
-        })
-        .sum::<f64>()
-        * size
-}
-
-/// Relative age such as "3 days ago".
-pub(crate) fn ago(now: i64, then: i64) -> String {
-    let d = (now - then).max(0);
-    let (n, unit) = match d {
-        0..=59 => return "just now".to_owned(),
-        60..=3599 => (d / 60, "minute"),
-        3600..=86_399 => (d / 3600, "hour"),
-        86_400..=2_591_999 => (d / 86_400, "day"),
-        2_592_000..=31_535_999 => (d / 2_592_000, "month"),
-        _ => (d / 31_536_000, "year"),
-    };
-    format!("{n} {unit}{} ago", if n == 1 { "" } else { "s" })
 }
 
 /// Formats a float coordinate compactly and deterministically.

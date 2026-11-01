@@ -1,8 +1,8 @@
 //! HTTP server: server-rendered pages over `gitterrace-git` and `gitterrace-index`.
 
+mod about;
 mod actions;
 mod app;
-mod cards;
 mod charts;
 mod error;
 mod filter;
@@ -44,7 +44,7 @@ pub use views::stats_tab_labels;
 
 use crate::app::{App, Env};
 
-/// The full router `serve` uses: pages, `/api/v1`, cards and badges. Starts the index
+/// The full router `serve` uses: pages and `/api/v1`. Starts the index
 /// refresher, so call it inside a tokio runtime. Drive it in-process with tower's `oneshot`.
 ///
 /// Requests must carry a loopback `Host` header (`localhost`, `127.0.0.1`, `[::1]`), which
@@ -65,7 +65,7 @@ pub fn multi_router(paths: Vec<PathBuf>) -> io::Result<axum::Router> {
     Ok(build_multi(paths, None, None, &Env::new(Config::default()))?.0)
 }
 
-/// One repository's pages, `/api/v1`, cards and badges, with links under `base`. Starts its
+/// One repository's pages and `/api/v1`, with links under `base`. Starts its
 /// index refresher, so call it inside a tokio runtime.
 fn repo_router(
     repo_path: &Path,
@@ -170,6 +170,7 @@ fn build(
     let (live, status) = actions::start(actions_file, &[repo.root()], extra.is_none());
     env.set_actions_status(&status);
     let sends = actions::sends(live.as_ref(), actions_file, &[repo.root()]);
+    env.set_sends(&sends);
     let site = Arc::new(actions::Site {
         targets: vec![actions::Target {
             key: name.clone(),
@@ -202,6 +203,7 @@ fn build_multi(
             env.set_actions_status(&status);
             table.live.clone_from(&live);
             let sends = actions::sends(live.as_ref(), actions_file, &roots);
+            env.set_sends(&sends);
             let site = Arc::new(actions::Site {
                 targets,
                 live,
@@ -287,11 +289,64 @@ mod tests {
     use http_body_util::BodyExt;
     use tower::ServiceExt;
 
+    #[cfg(unix)]
     use crate::actions::actions_tests;
     use crate::{app::App, routes};
 
     async fn get(app: &Arc<App>, uri: &str) -> (u16, String) {
         gitterrace_testkit::get(&routes::router(Arc::clone(app)), uri).await
+    }
+
+    #[tokio::test]
+    async fn about_tabs_follow_the_docs_present() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let f = Fixture::init(dir.path())
+            .write("README.md", "# Hi\n")
+            .write("LICENSE", "Permission <is> granted\n")
+            .write("SECURITY.md", "# Report here\n")
+            .write("contributing.md", "# Help\n")
+            .write("docs/LICENSE/x.txt", "folder named LICENSE\n")
+            .commit("feat: docs");
+        let repo = gitterrace_git::Repo::discover(f.path()).expect("repo");
+        let index = gitterrace_index::Index::open(&repo).expect("index");
+        let app = Arc::new(App::new(repo, index));
+        let (s, body) = get(&app, "/").await;
+        assert_eq!(s, 200);
+        assert_eq!(body.matches("class=\"tabs doctabs\"").count(), 1);
+        let nav = body
+            .split("tabs doctabs")
+            .nth(1)
+            .and_then(|t| t.split("</nav>").next())
+            .unwrap_or_default();
+        let labels: Vec<&str> = nav
+            .split("</a>")
+            .filter_map(|t| t.rsplit('>').next())
+            .filter(|t| !t.is_empty())
+            .collect();
+        assert_eq!(
+            labels,
+            ["README", "LICENSE", "CONTRIBUTING", "SECURITY"],
+            "{nav}"
+        );
+        let (_, body) = get(&app, "/?doc=license").await;
+        assert!(body.contains("Permission &lt;is&gt; granted"));
+        assert!(body.contains("aria-current=\"page\""));
+        let (_, body) = get(&app, "/tree/HEAD/docs").await;
+        assert!(
+            !body.contains("doctabs"),
+            "a folder called LICENSE is no doc"
+        );
+    }
+
+    #[tokio::test]
+    async fn readme_alone_has_no_tab_row() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let f = Fixture::standard(dir.path());
+        let repo = gitterrace_git::Repo::discover(f.path()).expect("repo");
+        let index = gitterrace_index::Index::open(&repo).expect("index");
+        let app = Arc::new(App::new(repo, index));
+        let (_, body) = get(&app, "/").await;
+        assert!(body.contains("readme-h") && !body.contains("doctabs"));
     }
 
     #[tokio::test]
@@ -558,7 +613,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn app_router_nests_api_cards_and_badges() {
+    async fn app_router_nests_api_and_drops_cards_and_badges() {
         let dir = tempfile::tempdir().expect("tempdir");
         let p = dir.path();
         git(p, &["init", "-q", "-b", "main"]);
@@ -583,9 +638,8 @@ mod tests {
         };
         assert_eq!(status("/api/v1/repo").await, 200);
         assert_eq!(status("/").await, 200);
-        assert_eq!(status("/badges/nope.svg").await, 404);
-        assert_eq!(status("/cards/wrapped/x.svg").await, 404);
-        assert!(matches!(status("/badges/commits.svg").await, 200 | 503));
+        assert_eq!(status("/badges/commits.svg").await, 404);
+        assert_eq!(status("/cards/wrapped/2025.svg").await, 404);
     }
 
     #[tokio::test]
@@ -684,11 +738,9 @@ mod tests {
         };
         // Another port on localhost is same-site, so it is refused as well.
         for site in ["cross-site", "same-site"] {
-            for uri in ["/", "/badges/commits.svg", "/cards/wrapped/x.svg"] {
-                let res = send(uri, Some(site)).await.expect("response");
-                assert_eq!(res.status().as_u16(), 403, "{uri} {site}");
-                assert_eq!(res.headers()["cross-origin-resource-policy"], "same-origin");
-            }
+            let res = send("/", Some(site)).await.expect("response");
+            assert_eq!(res.status().as_u16(), 403, "/ {site}");
+            assert_eq!(res.headers()["cross-origin-resource-policy"], "same-origin");
         }
         for site in [Some("same-origin"), Some("none"), None] {
             let res = send("/", site).await.expect("response");
@@ -1041,10 +1093,12 @@ mod tests {
     /// Methods a route may answer besides GET and HEAD, as (path, method). gitterrace is
     /// read-only, so a write route is an owner decision recorded here, never an accident.
     /// The one entry is the action runner, mounted only when the user configured actions.
+    #[cfg(unix)]
     const WRITE_ALLOWLIST: [(&str, &str); 1] = [(crate::actions::RUN_PATH, "POST")];
 
     /// Every page a crawl reaches, the API and the assets refuse any method but GET and HEAD,
     /// with actions off and on. With them off the allowlisted route does not exist at all.
+    #[cfg(unix)]
     #[tokio::test]
     async fn every_route_is_read_only() {
         let dir = tempfile::tempdir().expect("tmp");
@@ -1075,6 +1129,7 @@ mod tests {
         assert_eq!(res.status(), 404, "run route exists with actions off");
     }
 
+    #[cfg(unix)]
     async fn crawl_read_only(router: &axum::Router, actions: bool) {
         let router = router.clone();
         let mut todo = vec![

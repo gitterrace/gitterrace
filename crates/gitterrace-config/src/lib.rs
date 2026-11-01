@@ -44,17 +44,29 @@ impl std::fmt::Display for ConfigError {
 
 impl std::error::Error for ConfigError {}
 
-/// `$XDG_CONFIG_HOME/gitterrace` when that is absolute, else `$HOME/.config/gitterrace` (also on
+/// On Windows `%APPDATA%\gitterrace`. Else `$XDG_CONFIG_HOME/gitterrace` when that is absolute, else `$HOME/.config/gitterrace` (also on
 /// macOS). `override_dir` is the `--config` flag. No other environment variable moves it.
 pub fn config_dir(override_dir: Option<&Path>) -> Option<PathBuf> {
     if let Some(d) = override_dir {
         return Some(d.to_path_buf());
     }
+    #[cfg(windows)]
+    {
+        // The roaming profile folder (`%APPDATA%`), private to the user by default.
+        if let Some(a) = std::env::var_os("APPDATA").map(PathBuf::from) {
+            return Some(a.join("gitterrace"));
+        }
+    }
     let xdg = std::env::var_os("XDG_CONFIG_HOME").map(PathBuf::from);
     if let Some(x) = xdg.filter(|p| p.is_absolute()) {
         return Some(x.join("gitterrace"));
     }
-    std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".config/gitterrace"))
+    home_var().map(|h| PathBuf::from(h).join(".config/gitterrace"))
+}
+
+/// The home folder variable: `USERPROFILE` on Windows, `HOME` elsewhere.
+pub fn home_var() -> Option<std::ffi::OsString> {
+    std::env::var_os(if cfg!(windows) { "USERPROFILE" } else { "HOME" })
 }
 
 /// A loaded config plus where each key came from and what was ignored.
