@@ -178,10 +178,16 @@ table.code{border-collapse:collapse;width:100%}
 div.diff .add,div.diff .del{color:inherit}
 .code tr:hover td{background:var(--soft)}
 .code tr:target td{background:var(--accent-soft);box-shadow:inset 2px 0 0 var(--accent)}
-.blame .who{width:1%;white-space:nowrap;font:var(--text-xs) var(--sans);min-width:280px;padding-right:var(--space-4);border-right:var(--border);color:var(--muted)}
-.blame .run td{border-top:var(--border)}.blame .who span{margin-left:6px}
-/* A blame row is one code line tall; the chip's own padding would spill over the row rules. */
-.blame .who .sha{padding:0 var(--space-1);line-height:inherit}
+/* The gutter: inside each cell a grid of sha, author and age. The column takes its widest
+   cell, so the three line up down the page. The grid sits in a div, since a grid td leaves
+   the table layout. Names are never cut (theme test), a long one widens the column. */
+.blame td.who{min-width:300px;font:var(--text-xs) var(--sans);padding-right:var(--space-4);border-right:var(--border);color:var(--muted)}
+.blame .bl{display:grid;grid-template-columns:auto 1fr auto;gap:var(--space-2);align-items:center;white-space:nowrap}
+.blame .bl a.who{color:var(--fg)}
+.blame .run td{border-top:var(--border)}
+/* Blame rows are 24px so the 20px sha chip has 2px above and below; code and numbers share it. */
+.blame td{line-height:24px}
+.blame td.who .sha{display:inline-block;padding:0 var(--space-1);line-height:18px}
 
 /* charts: marks are colored by class so the theme switches without re-render */
 svg.chart{width:100%;height:auto;display:block;overflow:visible}
@@ -220,7 +226,7 @@ progress::-moz-progress-bar{background:var(--accent);border-radius:var(--radius)
 .entries td{padding:var(--space-2) var(--space-3)}
 .entries td:first-child{min-width:140px}
 input{min-width:0;flex:1}.filter{width:100%}
-.blame .who{min-width:160px}
+.blame td.who{min-width:170px}.blame .bl{grid-template-columns:auto 1fr}.blame .bl .muted{display:none}
 }
 
 /* ---- navigation: finder, switcher, search, shortcuts (gitterrace-ux) ---- */
@@ -343,7 +349,8 @@ svg.loc .xh{display:none;stroke:var(--fg);stroke-width:1;stroke-dasharray:3 3;po
 .dcol{width:30%;min-width:100px}
 .dbar{display:block;height:6px;background:var(--soft);border-radius:3px;overflow:hidden}
 .dbar b{display:block;height:100%}.dbar b.up{background:var(--add)}.dbar b.dn{background:var(--del)}
-.range .entries td{padding-left:0}.card.pad .entries td:first-child{padding-left:0}.card.pad .entries td:last-child{padding-right:0}
+/* Tables in a card keep their outer cell padding: the header band and the row hover reach the
+   card's inner edge, and text flush against them reads as cut off. */
 .rlist{margin-top:var(--space-4)}.rlist summary{cursor:pointer;color:var(--muted);font-size:var(--text-sm)}
 .rlist ul{list-style:none;margin:var(--space-3) 0 0;padding:0;max-height:360px;overflow:auto}
 .rlist li{display:flex;gap:var(--space-3);align-items:baseline;padding:3px 0;border-top:var(--border);min-width:0}
