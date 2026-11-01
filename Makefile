@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: build run fmt lint test doc theme actions docs-gen docs-check names check help
+.PHONY: build run fmt lint test doc theme actions docs-gen docs-check names check help bench bench-large bench-report bench-clean bench-guard
 
 ## build: Release binary
 build:
@@ -50,11 +50,33 @@ names:
 	python3 scripts/names-check.py
 
 ## check: Every gate
-check: theme actions send-vectors names docs-check fmt lint test doc
+check: theme actions send-vectors names bench-guard docs-check fmt lint test doc
 
 ## send-vectors: Check send.js against the shared send vectors
 send-vectors:
 	python3 scripts/send-vectors-check.py
+
+## bench: Benchmark gitterrace on the pinned corpus (small, medium, rust). Needs the network
+bench: build
+	python3 scripts/bench-run.py --bin target/release/git-terrace --repos control,git,rust
+
+## bench-large: As bench, plus the linux kernel (about 30 GB, opt-in)
+bench-large: build
+	BENCH_LARGE=1 python3 scripts/bench-run.py --bin target/release/git-terrace --large
+
+## bench-report: Write the newest results into docs/benchmarks.md
+bench-report:
+	python3 scripts/bench-report.py
+
+## bench-clean: Remove the cached benchmark clones
+bench-clean:
+	@d="$${GITTERRACE_BENCH_DIR:-$$HOME/.cache/gitterrace-bench}"; \
+	if [ -d "$$d" ]; then echo "removing $$d ($$(du -sh "$$d" | cut -f1))"; rm -rf "$$d"; else echo "nothing at $$d"; fi
+
+## bench-guard: The harness still works, on a tiny generated repo (part of check)
+bench-guard:
+	cargo build -q -p gitterrace
+	python3 scripts/bench-run.py --synthetic --bin target/debug/git-terrace >/dev/null
 
 ## help: This list
 help:
