@@ -22,7 +22,7 @@ pub use store::FORMAT_VERSION;
 
 /// Every file the cache keeps in `.git/gitterrace/`, with what it holds. The architecture page is
 /// rendered from this, and a test fails when the folder holds a file not listed here.
-pub const CACHE_FILES: [(&str, &str); 3] = [
+pub const CACHE_FILES: [(&str, &str); 4] = [
     (
         store::VERSION_FILE,
         "The cache format. A mismatch deletes the cache and rebuilds it. The format is never migrated.",
@@ -30,6 +30,10 @@ pub const CACHE_FILES: [(&str, &str); 3] = [
     (
         store::COMMITS_FILE,
         "One record per commit, appended as the history is walked. Unreachable records are ignored, so rewritten history needs no cleanup, and a torn last line is dropped.",
+    ),
+    (
+        store::PATHS_FILE,
+        "Every file path any record mentions, one JSON string per line. Records refer to a path by its line number, so a path is stored once however many commits touch it.",
     ),
     (
         insights::CACHE_FILE,
@@ -43,7 +47,7 @@ pub const CACHE_FILES: [(&str, &str); 3] = [
 const BATCH: usize = 2048;
 
 /// Per-commit facts the stats pages are built from.
-#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Default)]
 pub struct CommitRecord {
     pub id: String,
     pub author: String,
@@ -52,7 +56,6 @@ pub struct CommitRecord {
     pub offset: i32,
     pub merge: bool,
     /// Parent ids, first parent first. Lets history be followed along the first-parent chain.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub parents: Vec<String>,
     /// Conventional-commit type and scope, when the subject follows it.
     pub kind: Option<String>,
@@ -61,25 +64,20 @@ pub struct CommitRecord {
 }
 
 /// One file touched by a commit, diffed against the first parent with rename detection.
-#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Default)]
 pub struct FileStat {
-    pub path: String,
+    pub path: std::sync::Arc<str>,
     pub additions: u32,
     pub deletions: u32,
     /// Line count of the file after the commit (0 when deleted or binary).
-    #[serde(default, skip_serializing_if = "is_zero")]
     pub lines: u32,
     /// Lines in change blocks that both removed and added: the rework part of the change.
-    #[serde(default, skip_serializing_if = "is_zero")]
     pub rewritten: u32,
     /// Counts with whitespace-only and blank-line changes ignored. `None` when equal to the
     /// raw counts, which is nearly always.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub code: Option<CodeStat>,
     /// Previous path when the file was renamed in this commit.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub old: Option<String>,
-    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub old: Option<std::sync::Arc<str>>,
     pub binary: bool,
 }
 
@@ -100,11 +98,6 @@ impl FileStat {
             rewritten: self.rewritten,
         })
     }
-}
-
-#[allow(clippy::trivially_copy_pass_by_ref)] // serde skip_serializing_if signature
-fn is_zero(n: &u32) -> bool {
-    *n == 0
 }
 
 /// Progress of the background build, read by the web layer.
@@ -318,6 +311,39 @@ mod tests {
         idx.update(&src, "HEAD", &|_| {})?;
         assert_eq!(src.batches.get(), 5000_usize.div_ceil(crate::BATCH));
         assert!(src.batches.get() <= 3);
+        Ok(())
+    }
+
+    /// A path is stored once however many records name it, and survives the round trip with
+    /// renames, across a reopened cache.
+    #[test]
+    fn paths_are_interned_and_round_trip() -> io::Result<()> {
+        let dir = tempfile::tempdir()?;
+        let idx = Index::open_dir(dir.path().join("gitterrace"))?;
+        let src = Fake::new(&["a", "b", "c"]);
+        let stat = |p: &str, old: Option<&str>| crate::FileStat {
+            path: p.into(),
+            old: old.map(Into::into),
+            additions: 2,
+            ..crate::FileStat::default()
+        };
+        let mut out = crate::store::Appender::open(idx.dir(), 0)?;
+        for (id, files) in [
+            ("a", vec![stat("src/x.rs", None)]),
+            ("b", vec![stat("src/x.rs", None), stat("y.rs", None)]),
+            ("c", vec![stat("z.rs", Some("src/x.rs"))]),
+        ] {
+            let mut r = src.record(id)?;
+            r.files = files;
+            out.push(&r)?;
+        }
+        out.flush()?;
+        let paths = std::fs::read_to_string(idx.dir().join("paths.jsonl"))?;
+        assert_eq!(paths.lines().count(), 3, "{paths}");
+        let got = idx.records(&src, "HEAD")?;
+        assert_eq!(&*got[1].files[1].path, "y.rs");
+        assert_eq!(got[2].files[0].old.as_deref(), Some("src/x.rs"));
+        assert_eq!(got[0].files[0].additions, 2);
         Ok(())
     }
 

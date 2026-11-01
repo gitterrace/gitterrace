@@ -56,9 +56,10 @@ badges and the year card.
 | --- | --- |
 | `VERSION` | The cache format. A mismatch deletes the cache and rebuilds it. The format is never migrated. |
 | `commits.jsonl` | One record per commit, appended as the history is walked. Unreachable records are ignored, so rewritten history needs no cleanup, and a torn last line is dropped. |
+| `paths.jsonl` | Every file path any record mentions, one JSON string per line. Records refer to a path by its line number, so a path is stored once however many commits touch it. |
 | `lines.json` | Line counts per blob id for the language chart. A blob never changes, so the counts never go stale. |
 
-The format version is `2`.
+The format version is `3`.
 
 <!-- END GENERATED: cache -->
 

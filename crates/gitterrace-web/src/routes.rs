@@ -535,12 +535,7 @@ async fn commit(State(app): Shared, Path(id): Path<String>) -> Result<Html<Strin
             author: d.summary.author.name.clone(),
             author_href: views::author_href(&d.summary.author.email),
             date: fmt::date(d.summary.author.time, d.summary.author.offset),
-            parents: d
-                .summary
-                .parents
-                .iter()
-                .map(|p| fmt::sha_link(p))
-                .collect(),
+            parents: d.summary.parents.iter().map(|p| fmt::sha_link(p)).collect(),
             files: views::file_stats(&d),
             diff: views::diff_html(
                 a.cfg().limits.diff_fold_lines,

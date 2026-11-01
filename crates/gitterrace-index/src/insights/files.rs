@@ -131,12 +131,9 @@ impl<'a> Insights<'a> {
                 continue;
             }
             for (fi, f) in r.files.iter().enumerate() {
-                let path = alias
-                    .get(f.path.as_str())
-                    .copied()
-                    .unwrap_or(f.path.as_str());
+                let path = alias.get(&*f.path).copied().unwrap_or(&*f.path);
                 if let Some(old) = &f.old {
-                    alias.insert(old.as_str(), path);
+                    alias.insert(&**old, path);
                 }
                 let l = self.lines_unfiltered(f);
                 touches.entry(path).or_default().push(TouchRaw {
@@ -186,7 +183,7 @@ impl<'a> Insights<'a> {
                         .name
                         .clone(),
                     lines: t.lines,
-                    path: r.files[t.file as usize].path.clone(),
+                    path: r.files[t.file as usize].path.to_string(),
                 }
             })
             .collect();
@@ -349,7 +346,7 @@ impl<'a> Insights<'a> {
         let head: HashSet<&str> = files
             .iter()
             .filter(|f| !self.filter.skips(&f.path))
-            .map(|f| f.path.as_str())
+            .map(|f| &*f.path)
             .collect();
         // Commit -> its head files, from the follow index so renames are joined.
         let mut per_commit: HashMap<u32, Vec<&str>> = HashMap::new();

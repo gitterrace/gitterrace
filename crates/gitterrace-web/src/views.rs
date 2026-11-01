@@ -247,7 +247,8 @@ pub(crate) fn banner(h: &gitterrace_git::HeadState, base: &str) -> Option<String
         P::Bisect => "Bisect in progress",
         P::ApplyMailbox => "Applying patches (git am) in progress",
     });
-    let at = h.commit
+    let at = h
+        .commit
         .as_deref()
         .map(|c| crate::fmt::sha_link_at(base, c))
         .unwrap_or_default();

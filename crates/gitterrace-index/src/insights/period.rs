@@ -128,7 +128,7 @@ impl Insights<'_> {
             people.insert(self.person[i]);
             for f in &r.files {
                 if let Some(l) = self.lines(f) {
-                    files.insert(f.path.as_str());
+                    files.insert(&*f.path);
                     s.additions += u64::from(l.add);
                     s.deletions += u64::from(l.del);
                 }

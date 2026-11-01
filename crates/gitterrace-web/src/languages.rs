@@ -84,7 +84,7 @@ impl Chain {
                 if ins.skips(&f.path) {
                     continue;
                 }
-                let s = *lang_of.entry(f.path.as_str()).or_insert_with(|| {
+                let s = *lang_of.entry(&*f.path).or_insert_with(|| {
                     let l = gitterrace_index::language(&f.path);
                     *slot.entry(l.clone()).or_insert_with(|| {
                         names.push(l);

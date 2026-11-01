@@ -272,7 +272,7 @@ pub(crate) mod fixtures {
             files: files
                 .iter()
                 .map(|(p, a)| FileStat {
-                    path: (*p).to_owned(),
+                    path: (*p).into(),
                     additions: *a,
                     deletions: 1,
                     ..FileStat::default()

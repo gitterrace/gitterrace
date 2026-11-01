@@ -291,12 +291,12 @@ mod tests {
             scope: scope.map(str::to_owned),
             files: vec![
                 FileStat {
-                    path: path.to_owned(),
+                    path: path.into(),
                     additions: 3,
                     ..FileStat::default()
                 },
                 FileStat {
-                    path: "other/x.rs".to_owned(),
+                    path: "other/x.rs".into(),
                     additions: 1,
                     ..FileStat::default()
                 },

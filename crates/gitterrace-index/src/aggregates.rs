@@ -98,7 +98,7 @@ pub fn totals(records: &[CommitRecord]) -> Totals {
     for r in records {
         authors.insert(r.email.as_str());
         for f in &r.files {
-            files.insert(f.path.as_str());
+            files.insert(&*f.path);
             t.additions += u64::from(f.additions);
             t.deletions += u64::from(f.deletions);
         }
@@ -250,7 +250,7 @@ pub fn dir_churn(records: &[CommitRecord]) -> Vec<DirChurn> {
                 touched.push(dir);
                 acc.commits += 1;
             }
-            if paths.insert(f.path.as_str()) {
+            if paths.insert(&*f.path) {
                 acc.files += 1;
             }
             acc.additions += u64::from(f.additions);
@@ -314,15 +314,15 @@ fn churn_since(
         // A commit touches few files, so a scan beats hashing for the once-per-commit check.
         let mut seen: Vec<&str> = Vec::new();
         for f in r.files.iter().filter(|f| keep(&f.path)) {
-            let c = map.entry(f.path.as_str()).or_insert_with(|| FileChurn {
-                path: f.path.clone(),
+            let c = map.entry(&*f.path).or_insert_with(|| FileChurn {
+                path: f.path.to_string(),
                 commits: 0,
                 additions: 0,
                 deletions: 0,
                 last_commit: r.time,
             });
-            if !seen.contains(&f.path.as_str()) {
-                seen.push(f.path.as_str());
+            if !seen.contains(&&*f.path) {
+                seen.push(&*f.path);
                 c.commits += 1;
             }
             c.additions += u64::from(f.additions);
@@ -574,7 +574,7 @@ mod tests {
         let mut r = sample();
         for rec in &mut r {
             rec.files.push(crate::FileStat {
-                path: "Cargo.lock".to_owned(),
+                path: "Cargo.lock".into(),
                 additions: 1,
                 ..crate::FileStat::default()
             });

@@ -1,5 +1,6 @@
 //! Every commit id on a page is the shared `a.sha` link. Renders the main pages of a fixture
 //! repository and checks that no 7-to-40 hex token in visible text sits outside one.
+#![allow(clippy::expect_used)]
 
 use std::{path::Path, process::Command, time::Duration};
 
@@ -88,7 +89,8 @@ fn bare_ids(html: &str) -> Vec<String> {
         }
         let tok = &text[start..i];
         let hex = tok.bytes().all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f'));
-        let mixed = tok.bytes().any(|b| b.is_ascii_digit()) && tok.bytes().any(|b| b.is_ascii_lowercase());
+        let mixed =
+            tok.bytes().any(|b| b.is_ascii_digit()) && tok.bytes().any(|b| b.is_ascii_lowercase());
         if hex && mixed && (7..=40).contains(&tok.len()) {
             found.push(tok.to_owned());
         }
@@ -125,7 +127,10 @@ async fn every_commit_id_is_a_sha_link() {
     std::fs::write(p.join("src/a.rs"), "fn main() {\n    1;\n}\n").expect("w");
     git(&p, &["stash", "push", "-q", "-m", "wip stash"]);
     let wt = root.path().join("wt");
-    git(&p, &["worktree", "add", "-q", wt.to_str().expect("utf8"), "side"]);
+    git(
+        &p,
+        &["worktree", "add", "-q", wt.to_str().expect("utf8"), "side"],
+    );
     // A detached HEAD puts the id into the banner shown on every page.
     git(&p, &["checkout", "-q", "--detach"]);
 
@@ -179,5 +184,8 @@ async fn every_commit_id_is_a_sha_link() {
             with_links += 1;
         }
     }
-    assert!(with_links >= 8, "the fixture should show ids on most pages, got {with_links}");
+    assert!(
+        with_links >= 8,
+        "the fixture should show ids on most pages, got {with_links}"
+    );
 }

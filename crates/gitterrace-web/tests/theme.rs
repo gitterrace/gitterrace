@@ -49,7 +49,9 @@ fn clipped_text_keeps_room_for_descenders() {
 fn unset_resets_cover_hover() {
     let css = include_str!("../static/app.css");
     for rule in css.split('}') {
-        let Some((sel, body)) = rule.split_once('{') else { continue };
+        let Some((sel, body)) = rule.split_once('{') else {
+            continue;
+        };
         if !body.contains("all:unset") {
             continue;
         }

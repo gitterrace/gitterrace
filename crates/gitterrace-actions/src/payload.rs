@@ -518,11 +518,14 @@ pub(crate) mod tests {
             gt.markdown.contains(&gt.permalink),
             "markdown carries the styled link"
         );
-        assert_eq!(p.title, format!("a.rs:2-3 @ {}", gitterrace_git::short_id(&sha)));
-        assert!(
-            p.markdown
-                .starts_with(&format!("**a.rs:2-3** @ {}\n", gitterrace_git::short_id(&sha)))
+        assert_eq!(
+            p.title,
+            format!("a.rs:2-3 @ {}", gitterrace_git::short_id(&sha))
         );
+        assert!(p.markdown.starts_with(&format!(
+            "**a.rs:2-3** @ {}\n",
+            gitterrace_git::short_id(&sha)
+        )));
         assert!(p.markdown.contains("```rs\nline 2"));
         assert_eq!(
             p.commit.as_ref().expect("commit").date,

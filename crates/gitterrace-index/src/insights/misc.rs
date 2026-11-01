@@ -171,7 +171,7 @@ impl Insights<'_> {
             people.insert(self.person[i]);
             for file in &rec.files {
                 let Some(l) = self.lines(file) else { continue };
-                paths.insert(file.path.as_str());
+                paths.insert(&*file.path);
                 let e = langs.entry(language(&file.path)).or_default();
                 e.0 += u64::from(l.add);
                 e.1 += u64::from(l.del);

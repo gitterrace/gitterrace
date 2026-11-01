@@ -26,7 +26,7 @@ fn file_stats(diffs: Vec<gitterrace_git::FileDiff>) -> Vec<FileStat> {
             let raw = (f.additions, f.deletions, f.rewritten);
             let code = (f.code.additions, f.code.deletions, f.code.rewritten);
             FileStat {
-                path: f.path,
+                path: f.path.into(),
                 additions: f.additions,
                 deletions: f.deletions,
                 lines: f.lines,
@@ -36,7 +36,7 @@ fn file_stats(diffs: Vec<gitterrace_git::FileDiff>) -> Vec<FileStat> {
                     deletions: f.code.deletions,
                     rewritten: f.code.rewritten,
                 }),
-                old: f.old_path,
+                old: f.old_path.map(Into::into),
                 binary: f.binary,
             }
         })
