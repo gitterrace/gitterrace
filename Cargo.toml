@@ -94,7 +94,7 @@ repos = ["jq jq-1.8.2", "ripgrep 15.2.0"]
 [workspace.metadata.dist]
 cargo-dist-version = "0.31.0"
 ci = ["github"]
-installers = ["shell", "homebrew"]
+installers = ["shell", "powershell", "homebrew"]
 tap = "gitterrace/homebrew-tap"
 publish-jobs = ["homebrew"]
 targets = [
@@ -102,8 +102,12 @@ targets = [
   "aarch64-unknown-linux-gnu",
   "x86_64-apple-darwin",
   "aarch64-apple-darwin",
+  "x86_64-pc-windows-msvc",
 ]
 unix-archive = ".tar.gz"
+windows-archive = ".zip"
+# Tests and a runtime smoke of every built binary, before host and the tap. See release-check.yml.
+allow-dirty = ["ci"]
+local-artifacts-jobs = ["./release-check"]
 checksum = "sha256"
 pr-run-mode = "plan"
-allow-dirty = ["ci"]

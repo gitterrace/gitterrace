@@ -9,6 +9,7 @@ mod ignore;
 mod repo;
 mod repo_id;
 mod time;
+mod treepath;
 mod types;
 mod url;
 mod walk;

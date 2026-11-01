@@ -176,7 +176,7 @@ pub fn worktree_diff(repo: &Repo) -> Result<Vec<FileDiff>> {
 }
 
 fn head_blob(repo: &gix::Repository, tree: &gix::Tree<'_>, path: &str) -> Read {
-    let Ok(Some(entry)) = tree.lookup_entry_by_path(path) else {
+    let Ok(Some(entry)) = crate::treepath::lookup(tree, path) else {
         return Read::Missing;
     };
     let mode = entry.mode();

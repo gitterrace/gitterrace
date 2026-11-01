@@ -160,9 +160,7 @@ fn dir_oid(commit: &gix::Commit<'_>, dir: &str) -> Result<Option<gix::ObjectId>>
     if dir.is_empty() {
         return Ok(Some(tree.id));
     }
-    Ok(tree
-        .lookup_entry_by_path(dir)
-        .map_err(git)?
+    Ok(crate::treepath::lookup(&tree, dir)?
         .filter(|e| e.mode().is_tree())
         .map(|e| e.object_id()))
 }

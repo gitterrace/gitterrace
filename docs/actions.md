@@ -259,8 +259,9 @@ vars    = { vault = "Notes", folder = "Inbox" }
 
 ### Windows
 
-gitterrace builds for native Windows, but the action runner there is untested at runtime:
-only WSL has been run. Natively, a timeout ends the script with `taskkill /T` (then `/F`)
+gitterrace builds and is smoke-tested on native Windows (CI) and under Wine, including a
+timeout that kills its child. Registry, ACL and process group behavior are not exercised
+by Wine. Natively, a timeout ends the script with `taskkill /T` (then `/F`)
 instead of a process group signal, `actions.toml` is read from `%APPDATA%\gitterrace` without
 an owner or mode check (Windows has no mode bits, and ACLs are not read), and `command[0]`
 must be an `.exe`, `.cmd`, `.bat` or `.com`. The sample `.sh` scripts need a POSIX shell, so

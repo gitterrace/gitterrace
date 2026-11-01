@@ -358,9 +358,7 @@ impl Repo {
         let tree = if path.is_empty() {
             root
         } else {
-            let entry = root
-                .lookup_entry_by_path(path)
-                .map_err(git)?
+            let entry = crate::treepath::lookup(&root, path)?
                 .ok_or_else(|| Error::PathNotFound(path.to_string()))?;
             if !entry.mode().is_tree() {
                 return Err(Error::PathNotFound(path.to_string()));
@@ -437,13 +435,8 @@ impl Repo {
     }
 
     fn blob_id_at(repo: &gix::Repository, tip: gix::ObjectId, path: &str) -> Result<gix::ObjectId> {
-        Ok(repo
-            .find_commit(tip)
-            .map_err(git)?
-            .tree()
-            .map_err(git)?
-            .lookup_entry_by_path(path)
-            .map_err(git)?
+        let tree = repo.find_commit(tip).map_err(git)?.tree().map_err(git)?;
+        Ok(crate::treepath::lookup(&tree, path)?
             .filter(|e| !e.mode().is_tree() && !e.mode().is_commit())
             .ok_or_else(|| Error::PathNotFound(path.to_string()))?
             .object_id())
@@ -646,7 +639,7 @@ fn touches_path(repo: &gix::Repository, commit: &gix::Commit<'_>, path: &str) ->
 
 fn path_id(commit: &gix::Commit<'_>, path: &str) -> Result<Option<gix::ObjectId>> {
     let tree = commit.tree().map_err(git)?;
-    let entry = tree.lookup_entry_by_path(path).map_err(git)?;
+    let entry = crate::treepath::lookup(&tree, path)?;
     Ok(entry.map(|e| e.object_id()))
 }
 

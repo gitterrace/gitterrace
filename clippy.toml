@@ -8,3 +8,10 @@ allow-dbg-in-tests = true
 await-holding-invalid-types = [
     { path = "tracing::span::Entered", reason = "held across an await, this panics the tracing runtime: use `.instrument(span)` on the future instead" },
 ]
+
+# gix splits these on the platform separator, so a `\` in a URL path walks into a folder on
+# Windows. Use the `/` splitting lookup in gitterrace-git's treepath module.
+disallowed-methods = [
+    { path = "gix::Tree::lookup_entry_by_path", reason = "splits on `\\` on Windows: use treepath::lookup" },
+    { path = "gix::Tree::peel_to_entry_by_path", reason = "splits on `\\` on Windows: use treepath::lookup" },
+]

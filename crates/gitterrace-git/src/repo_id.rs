@@ -60,7 +60,7 @@ impl Repo {
         commit
             .tree()
             .ok()
-            .and_then(|t| t.lookup_entry_by_path(path).ok().flatten())
+            .and_then(|t| crate::treepath::lookup(&t, path).ok().flatten())
             .is_some()
     }
 }

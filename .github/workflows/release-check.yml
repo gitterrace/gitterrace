@@ -1,0 +1,45 @@
+# The checks a release must pass before dist publishes anything. Called by release.yml (the
+# `local-artifacts-jobs` hook in Cargo.toml), which waits for it before host and the tap.
+# This is the one hand-written part of the release flow; release.yml itself is generated.
+name: Release check
+
+on:
+  workflow_call:
+    inputs:
+      plan:
+        description: dist's plan, passed through by the generated caller
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  check:
+    name: Check (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: true
+      matrix:
+        os: [ubuntu-22.04, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - id: pin
+        shell: bash
+        run: echo "channel=$(sed -n 's/^channel *= *"\(.*\)"/\1/p' rust-toolchain.toml)" >> "$GITHUB_OUTPUT"
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ steps.pin.outputs.channel }}
+      - run: cargo test --locked --workspace
+      # The binary dist ships is built with this profile; the smoke test runs it, so a build
+      # that links but cannot serve stops the release.
+      - run: cargo build --locked --profile dist -p gitterrace
+      - name: Smoke test
+        shell: bash
+        run: bash scripts/smoke-check.sh "target/dist/git-terrace${{ runner.os == 'Windows' && '.exe' || '' }}"
