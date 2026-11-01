@@ -50,6 +50,8 @@ pub enum ConfigError {
     Invalid { id: String, why: String },
     #[error("script {id}: {why}")]
     Script { id: String, why: String },
+    #[error("send {id}: {why}")]
+    Send { id: String, why: String },
 }
 
 /// What a request may act on. Unknown names are a load error so typos surface.
@@ -148,6 +150,8 @@ pub struct Action {
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Config {
     pub actions: Vec<Action>,
+    /// `[[send]]` targets, in file order: URL templates the page opens, never a process.
+    pub sends: Vec<crate::send::Target>,
 }
 
 #[derive(Deserialize)]
@@ -158,6 +162,8 @@ struct RawFile {
     script: Vec<RawScript>,
     #[serde(default)]
     action: Vec<RawAction>,
+    #[serde(default)]
+    send: Vec<crate::send::RawSend>,
 }
 
 /// A `[[script]]` block: the command line written once for several actions. It cannot name
@@ -243,7 +249,19 @@ impl Config {
             }
             actions.push(action);
         }
-        Ok(Self { actions })
+        let mut sends = Vec::with_capacity(raw.send.len());
+        for raw_send in raw.send {
+            let id = raw_send.id().to_owned();
+            let target = crate::send::compile(raw_send).map_err(|why| send_err(&id, why))?;
+            if !valid_id(&id) {
+                return Err(send_err(&id, "id must match [a-z0-9-]{1,32}"));
+            }
+            if sends.iter().any(|t: &crate::send::Target| t.id == id) {
+                return Err(send_err(&id, "duplicate id"));
+            }
+            sends.push(target);
+        }
+        Ok(Self { actions, sends })
     }
 
     /// Lines like "action added: copy -> ~/bin/copy.sh" for a reload log.
@@ -289,6 +307,13 @@ fn invalid(id: &str, why: impl Into<String>) -> ConfigError {
 
 fn script_err(id: &str, why: impl Into<String>) -> ConfigError {
     ConfigError::Script {
+        id: id.to_string(),
+        why: why.into(),
+    }
+}
+
+fn send_err(id: &str, why: impl Into<String>) -> ConfigError {
+    ConfigError::Send {
         id: id.to_string(),
         why: why.into(),
     }

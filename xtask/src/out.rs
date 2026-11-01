@@ -12,6 +12,8 @@ use anyhow::{Context as _, Result};
 pub enum Out {
     /// A whole file.
     File { path: String, body: String },
+    /// A whole binary file (a vendored font).
+    Bytes { path: String, body: Vec<u8> },
     /// The text between `<!-- BEGIN GENERATED: <id> -->` and `<!-- END GENERATED: <id> -->` in a
     /// hand-written file.
     Block {
@@ -26,6 +28,13 @@ impl Out {
         Self::File {
             path: path.into(),
             body: body.into(),
+        }
+    }
+
+    pub fn bytes(path: impl Into<String>, body: Vec<u8>) -> Self {
+        Self::Bytes {
+            path: path.into(),
+            body,
         }
     }
 
@@ -50,11 +59,26 @@ pub enum Mode {
 pub fn apply(root: &Path, outs: Vec<Out>, mode: Mode) -> Result<Vec<String>> {
     let mut stale = Vec::new();
     for out in outs {
+        if let Out::Bytes { path, body } = out {
+            let file = root.join(&path);
+            if std::fs::read(&file).ok().as_deref() == Some(body.as_slice()) {
+                continue;
+            }
+            if mode == Mode::Write {
+                if let Some(parent) = file.parent() {
+                    std::fs::create_dir_all(parent).with_context(|| format!("creating {path}"))?;
+                }
+                std::fs::write(&file, &body).with_context(|| format!("writing {path}"))?;
+            }
+            stale.push(path);
+            continue;
+        }
         let (path, label, next, current) = match out {
             Out::File { path, body } => {
                 let current = read(&root.join(&path))?;
                 (path.clone(), path, body, current)
             }
+            Out::Bytes { .. } => continue,
             Out::Block { path, id, body } => {
                 let current =
                     read(&root.join(&path))?.with_context(|| format!("{path} does not exist"))?;
@@ -127,7 +151,7 @@ pub fn unowned_blocks(root: &Path, outs: &[Out]) -> Result<Vec<String>> {
         .iter()
         .filter_map(|o| match o {
             Out::Block { path, id, .. } => Some((path.as_str(), id.as_str())),
-            Out::File { .. } => None,
+            Out::File { .. } | Out::Bytes { .. } => None,
         })
         .collect();
     let mut pages = vec!["README.md".to_owned(), "AGENTS.md".to_owned()];

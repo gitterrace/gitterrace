@@ -10,6 +10,7 @@ mod facts;
 mod out;
 mod readme_md;
 mod scripts;
+mod site;
 
 use std::path::{Path, PathBuf};
 
@@ -40,6 +41,7 @@ fn generators(root: &Path) -> Result<Vec<Out>> {
     let mut outs = vec![api_md::render(), config_md::render()];
     outs.extend(readme_md::render(&ws, &scripts));
     outs.extend(docs_md::render(root, &ws, &scripts)?);
+    outs.extend(site::render(root, &ws)?);
     Ok(outs)
 }
 

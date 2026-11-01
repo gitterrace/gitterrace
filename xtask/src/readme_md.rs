@@ -22,26 +22,7 @@ const README: &str = "README.md";
 
 pub fn render(ws: &Workspace, scripts: &[Script]) -> Vec<Out> {
     let bin = ws.packages.get("gitterrace");
-    let mut install = String::new();
-    if let Some(p) = bin {
-        // `owner/homebrew-tap` installs as `owner/tap/<formula>`.
-        let tap = ws
-            .tap
-            .strip_suffix("/homebrew-tap")
-            .map(|o| format!("{o}/tap"));
-        install.push_str("```bash\n");
-        if let Some(tap) = tap {
-            let _ = writeln!(install, "brew install {tap}/{}", p.name);
-        }
-        let _ = writeln!(install, "cargo install --git {} {}", p.repository, p.name);
-        install.push_str("```\n\n");
-        let names: Vec<String> = p.bins.iter().map(|b| format!("`{b}`")).collect();
-        let _ = writeln!(
-            install,
-            "Installs {} for one program; git runs `git-terrace` as `git terrace`.",
-            names.join(" and ")
-        );
-    }
+    let install = install_md(ws);
     let msrv = bin.map_or_else(String::new, |p| {
         format!("Rust {} or newer.", p.rust_version)
     });
@@ -64,6 +45,40 @@ pub fn render(ws: &Workspace, scripts: &[Script]) -> Vec<Out> {
         Out::block(README, "actions", actions),
         Out::block("AGENTS.md", "crates", crate_table(ws)),
     ]
+}
+
+/// The install block: the README and the site both show exactly this.
+pub fn install_md(ws: &Workspace) -> String {
+    let mut install = String::new();
+    if let Some(p) = ws.packages.get("gitterrace") {
+        // `owner/homebrew-tap` installs as `owner/tap/<formula>`.
+        let tap = ws
+            .tap
+            .strip_suffix("/homebrew-tap")
+            .map(|o| format!("{o}/tap"));
+        install.push_str("```bash\n");
+        if let Some(tap) = tap {
+            let _ = writeln!(install, "brew install {tap}/{}", p.name);
+        }
+        let _ = writeln!(install, "cargo install --git {} {}", p.repository, p.name);
+        install.push_str("```\n\n");
+        let names: Vec<String> = p.bins.iter().map(|b| format!("`{b}`")).collect();
+        let _ = writeln!(
+            install,
+            "Installs {} for one program; git runs `git-terrace` as `git terrace`.",
+            names.join(" and ")
+        );
+    }
+    install
+}
+
+/// `(name, about)` of each subcommand, from the clap definition.
+pub fn subcommands() -> Vec<(String, String)> {
+    cli::Cli::command()
+        .get_subcommands()
+        .filter(|s| s.get_name() != "help")
+        .map(|s| (s.get_name().to_owned(), first_line(s)))
+        .collect()
 }
 
 /// One line per subcommand and flag, from the clap definition.
@@ -200,12 +215,18 @@ pub fn crate_diagram(ws: &Workspace) -> String {
     let mut s = String::from("```mermaid\nflowchart TD\n");
     let mut edges = ws.reduced_edges();
     edges.sort();
-    let mut names: Vec<String> = edges.iter().flat_map(|(a, b)| [a.clone(), b.clone()]).collect();
+    let mut names: Vec<String> = edges
+        .iter()
+        .flat_map(|(a, b)| [a.clone(), b.clone()])
+        .collect();
     names.sort();
     names.dedup();
     for n in &names {
         let name = short(n);
-        let role = ROLES.iter().find(|(k, _)| *k == name).map_or("", |(_, r)| *r);
+        let role = ROLES
+            .iter()
+            .find(|(k, _)| *k == name)
+            .map_or("", |(_, r)| *r);
         let _ = writeln!(s, "  {name}[\"{name}: {role}\"]");
     }
     for (from, to) in edges {

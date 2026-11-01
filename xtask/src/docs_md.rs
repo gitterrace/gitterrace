@@ -6,8 +6,9 @@ use std::path::Path;
 use anyhow::{Context as _, Result};
 use gitterrace_actions::schema::{
     ACTION_KEYS, ENV_VARS, Item, KINDS, MODIFIERS, PAYLOAD_FIELDS, PLACEHOLDERS, SCRIPT_KEYS,
-    kind_name,
+    SEND_KEYS, SEND_PLACEHOLDERS, kind_name,
 };
+use gitterrace_actions::send::{DENIED_SCHEMES, PRESETS};
 
 use crate::facts::Workspace;
 use crate::out::Out;
@@ -25,6 +26,7 @@ pub fn render(root: &Path, ws: &Workspace, scripts: &[Script]) -> Result<Vec<Out
         Out::block(ACTIONS, "env", env()),
         Out::block(ACTIONS, "action-keys", action_keys()),
         Out::block(ACTIONS, "placeholders", placeholders()),
+        Out::block(ACTIONS, "send", send()),
         Out::block(ACTIONS, "scripts", script_table(scripts)),
         Out::block(ARCH, "crates", crate_diagram(ws)),
         Out::block(ARCH, "routes", routes()),
@@ -100,6 +102,36 @@ fn placeholders() -> String {
     for (name, doc) in MODIFIERS {
         let _ = writeln!(s, "| `{{name:{name}}}` | {doc} |");
     }
+    s
+}
+
+fn send() -> String {
+    let mut s = String::from(
+        "| Preset | Opens | Needs in `vars` | Default label |\n| --- | --- | --- | --- |\n",
+    );
+    for p in &PRESETS {
+        let needs: Vec<String> = p.vars.iter().map(|v| format!("`{v}`")).collect();
+        let _ = writeln!(
+            s,
+            "| `{}` | {} `{}` | {} | {} |",
+            p.name,
+            p.doc,
+            p.url,
+            needs.join(", "),
+            p.label
+        );
+    }
+    s.push_str("\n| Placeholder | Value |\n| --- | --- |\n");
+    for (name, doc) in SEND_PLACEHOLDERS {
+        let _ = writeln!(s, "| `{{{name}}}` | {doc} |");
+    }
+    let denied: Vec<String> = DENIED_SCHEMES.iter().map(|d| format!("`{d}:`")).collect();
+    let _ = writeln!(s, "\nRefused schemes: {}.\n", denied.join(", "));
+    s.push_str(&key_table(
+        "`[[send]]`",
+        "One Send to target: its own `url`, or a `preset`.",
+        &SEND_KEYS,
+    ));
     s
 }
 

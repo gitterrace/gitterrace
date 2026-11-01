@@ -572,3 +572,28 @@ async fn a_refused_actions_file_is_in_the_first_paint() {
     assert!(!strip.starts_with(" hidden"), "{strip}");
     assert!(strip.contains("actions.toml not loaded"), "{strip}");
 }
+
+/// Every `/static/...` file a template asks for is served. A script added to a template but
+/// not to the asset table 404s, and the browser then refuses it for its empty MIME type.
+#[tokio::test]
+async fn every_static_file_a_template_loads_is_served() {
+    let dir = tempfile::tempdir().expect("tmp");
+    let p = repo(dir.path(), "r");
+    let r = router(&p, Config::default());
+    let templates =
+        std::fs::read_dir(concat!(env!("CARGO_MANIFEST_DIR"), "/templates")).expect("templates");
+    let mut wanted = std::collections::BTreeSet::new();
+    for entry in templates {
+        let text = std::fs::read_to_string(entry.expect("entry").path()).expect("read");
+        for (at, _) in text.match_indices("/static/") {
+            let rest = &text[at..];
+            let end = rest.find(['"', '\'', ' ', '>', '?']).unwrap_or(rest.len());
+            wanted.insert(rest[..end].to_owned());
+        }
+    }
+    assert!(wanted.len() >= 5, "found only {wanted:?}");
+    for path in wanted {
+        let (code, _) = get(&r, &path).await;
+        assert_eq!(code, 200, "{path} is linked from a template but not served");
+    }
+}

@@ -48,7 +48,7 @@ Send a selection to a tracker, notes app or mail draft, or run your own program 
 
 Docs: [why](docs/why.md), [configuration](docs/configuration.md), [JSON API](docs/api.md),
 [architecture](docs/architecture.md), [design](docs/design.md). Binds to `127.0.0.1`, never
-writes to your repository. MIT licensed.
+writes to your repository. MIT licensed. The one-page site is generated into [site/](site/index.html).
 
 ## Contributing
 

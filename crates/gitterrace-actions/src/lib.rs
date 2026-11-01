@@ -4,15 +4,18 @@
 //! - [`config`] loads the user's `actions.toml`, never one a repository ships.
 //! - [`payload`] builds the v1 JSON from a locator by reading git, never from browser text.
 //! - [`runner`] spawns the configured argv with a scrubbed env, limits and a group timeout.
+//! - [`send`] checks `[[send]]` URL templates the page fills and opens: no process, no POST.
 //! - [`token`] is the per-process secret the browser must echo back.
 
 pub mod config;
 pub mod payload;
 pub mod runner;
 pub mod schema;
+pub mod send;
 pub mod token;
 
 pub use config::{Action, Config, ConfigError, Cwd, Kind, Output, Reloader};
 pub use payload::{Lines, Locator, Payload, PayloadError, RunRequest, permalink};
 pub use runner::{Limits, Outcome, RunError, Runner};
+pub use send::{Part, fill};
 pub use token::Token;

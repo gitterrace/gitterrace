@@ -97,6 +97,11 @@ pub const PAGES: &[Page] = &[
         &["/go/{*rest}"],
     ),
     page(
+        "`/_send/targets`",
+        "Send to targets as JSON template parts, filled in by the page",
+        &["/_send/targets", "/r/{name}/_send/targets"],
+    ),
+    page(
         "`/r/{name}/...`, `/api/repos`",
         "Everything above under several repositories; the list the switcher reads",
         &["/r/{name}", "/r/{name}/", "/r/{name}/{*rest}", "/api/repos"],

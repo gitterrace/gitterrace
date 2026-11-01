@@ -162,6 +162,7 @@ fn build(
     let name = repo.name();
     let (live, status) = actions::start(actions_file, &[repo.root()], extra.is_none());
     env.set_actions_status(&status);
+    let sends = actions::sends(live.as_ref(), actions_file, &[repo.root()]);
     let site = Arc::new(actions::Site {
         targets: vec![actions::Target {
             key: name.clone(),
@@ -170,6 +171,7 @@ fn build(
         }],
         live: live.clone(),
         status,
+        sends,
     });
     let pages = repo_router(repo_path, String::new(), name.clone(), live, env)?;
     Ok((guarded(pages.merge(actions::router(site)), extra), name))
@@ -191,10 +193,12 @@ fn build_multi(
             let (live, status) = actions::start(actions_file, &roots, extra.is_none());
             env.set_actions_status(&status);
             table.live.clone_from(&live);
+            let sends = actions::sends(live.as_ref(), actions_file, &roots);
             let site = Arc::new(actions::Site {
                 targets,
                 live,
                 status,
+                sends,
             });
             Ok((
                 guarded(

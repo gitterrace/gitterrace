@@ -12,6 +12,8 @@ pub struct Package {
     pub name: String,
     pub description: String,
     pub rust_version: String,
+    pub version: String,
+    pub license: String,
     /// The `repository` URL, from the workspace for every member.
     pub repository: String,
     pub bins: Vec<String>,
@@ -78,6 +80,8 @@ pub fn load(root: &Path) -> Result<Workspace> {
                 name,
                 description: text("description"),
                 rust_version: text("rust_version"),
+                version: text("version"),
+                license: text("license"),
                 repository: text("repository"),
                 bins,
                 deps,

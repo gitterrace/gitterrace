@@ -27,11 +27,45 @@ url   = "obsidian://new?vault={var.vault}&file=Inbox%2F{title}&content={notes}"
 vars  = { vault = "Notes" }
 ```
 
-Presets: `tendir`, `github-issue`, `forgejo-issue` (for your own instance, with `base`
-and `repo` in `vars`) and `mail`. Placeholders are `{title}`, `{notes}`, `{permalink}`,
-`{path}`, `{lines}`, `{sha}`, `{repo}` and `{var.NAME}`. Page values are always
-percent-encoded and can never reach the scheme or the host. Schemes that run code
-(`javascript:`, `data:`, `file:` and similar) are refused when the file loads.
+Page values are always percent-encoded and can never reach the scheme or the host: the text
+before the first placeholder must hold the scheme and end the host. `https`, `mailto` and app
+schemes are allowed, `http` only for loopback. With no `[[send]]` entry, the window offers
+Copy as markdown.
+
+<!-- BEGIN GENERATED: send -->
+| Preset | Opens | Needs in `vars` | Default label |
+| --- | --- | --- | --- |
+| `tendir` | tendir's new-task sheet, filled in. `tendir://new-task?title={title}&notes={notes}` |  | Send to tendir |
+| `github-issue` | A new issue on github.com. `repo` is `owner/name`. `https://github.com/{var.repo}/issues/new?title={title}&body={notes}` | `repo` | New issue |
+| `forgejo-issue` | A new issue on a self-hosted forge. `base` is the instance URL, `repo` is `owner/name`. `{var.base}/{var.repo}/issues/new?title={title}&body={notes}` | `base`, `repo` | New issue |
+| `mail` | A mail draft in your mail app. `mailto:?subject={title}&body={notes}` |  | Mail draft |
+
+| Placeholder | Value |
+| --- | --- |
+| `{title}` | The note's first line, or the selection's name. |
+| `{notes}` | The rest of the note, the quoted selection and the permalink. |
+| `{permalink}` | The `/go` permalink. |
+| `{path}` | The repository-relative path, or empty. |
+| `{lines}` | The line range, like `L3-L7`, or empty. |
+| `{sha}` | The full commit id. |
+| `{repo}` | The repository name. |
+| `{var.<name>}` | A value from `[send.vars]`, inserted verbatim, so it may hold the base URL. |
+
+Refused schemes: `javascript:`, `data:`, `file:`, `vbscript:`, `blob:`, `about:`, `chrome:`, `view-source:`.
+
+### `[[send]]`
+
+One Send to target: its own `url`, or a `preset`.
+
+| Key | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `id` | string | yes |  | `[a-z0-9-]`, 1 to 32 characters, unique among sends. |
+| `label` | string | no |  | Text in the Send window, 1 to 80 characters. A preset has a default. |
+| `url` | string | no |  | The URL template. The scheme and host are literal; placeholders (below) fill the path, query or fragment, each percent-encoded. Set exactly one of `url` and `preset`. |
+| `preset` | string | no |  | A built-in target by name (below). Set exactly one of `url` and `preset`. |
+| `vars` | table of strings | no | `{}` | `[send.vars]`: settings, inserted verbatim as `{var.<name>}`, one line each, at most 4 KiB. A preset names the ones it needs. |
+
+<!-- END GENERATED: send -->
 
 ## Actions
 

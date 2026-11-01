@@ -112,6 +112,8 @@ pub(crate) struct Site {
     pub(crate) targets: Vec<Target>,
     pub(crate) live: Option<Arc<Live>>,
     pub(crate) status: Arc<Status>,
+    /// The config `[[send]]` targets come from: the live, reloaded one when actions are on.
+    pub(crate) sends: Arc<RwLock<Arc<Config>>>,
 }
 
 /// Turns actions on when the file at `file` is safe and declares at least one action, and
@@ -125,6 +127,23 @@ pub(crate) fn start(
 ) -> (Option<Arc<Live>>, Arc<Status>) {
     let status = Arc::new(Status::default());
     (start_live(file, roots, loopback, &status), status)
+}
+
+/// Where `GET /_send/targets` reads from. Sending opens a URL in the browser and starts
+/// nothing, so it needs neither loopback nor an action; a refused file sends nowhere.
+pub(crate) fn sends(
+    live: Option<&Arc<Live>>,
+    file: Option<&Path>,
+    roots: &[PathBuf],
+) -> Arc<RwLock<Arc<Config>>> {
+    if let Some(l) = live {
+        return Arc::clone(&l.config);
+    }
+    let config = file
+        .filter(|f| std::fs::symlink_metadata(f).is_ok())
+        .and_then(|f| Config::load(f, roots).ok())
+        .unwrap_or_default();
+    Arc::new(RwLock::new(Arc::new(config)))
 }
 
 fn start_live(
@@ -237,7 +256,9 @@ async fn retry(file: PathBuf, roots: Vec<PathBuf>, status: Arc<Status>) {
 pub(crate) fn router(site: Arc<Site>) -> Router {
     let r = Router::new()
         .route("/go/{*rest}", get(go))
-        .route(STATUS_PATH, get(status));
+        .route(STATUS_PATH, get(status))
+        .route("/_send/targets", get(send_targets))
+        .route("/r/{name}/_send/targets", get(send_targets));
     let r = if site.live.is_some() {
         r.route(RUN_PATH, post(run))
     } else {
@@ -255,6 +276,23 @@ async fn status(State(site): State<Arc<Site>>) -> Response {
             (header::CACHE_CONTROL, "no-store"),
         ],
         body.to_string(),
+    )
+        .into_response()
+}
+
+/// `GET /_send/targets`: `[{"id","label","parts":[{"lit"}|{"ph"}]}]`, `[]` with none.
+/// The same list under every repository prefix, since targets are not per repository.
+async fn send_targets(State(site): State<Arc<Site>>) -> Response {
+    let config = site
+        .sends
+        .read()
+        .map_or_else(|_| Arc::default(), |c| Arc::clone(&c));
+    (
+        [
+            (header::CONTENT_TYPE, "application/json"),
+            (header::CACHE_CONTROL, "no-store"),
+        ],
+        serde_json::to_string(&config.sends).unwrap_or_else(|_| "[]".to_owned()),
     )
         .into_response()
 }
@@ -958,6 +996,36 @@ mod tests {
         assert!(
             html.contains(&format!("data-id=\"{id}\"")),
             "permalink id not in the page"
+        );
+    }
+
+    /// Targets come back as parts with `var` already resolved; no file or a file with no
+    /// `[[send]]` is `[]`, and sending needs no action.
+    #[tokio::test(flavor = "multi_thread")]
+    async fn send_targets_are_template_parts() {
+        let tmp = tempfile::tempdir().expect("tmp");
+        let (repo, _) = hostile(tmp.path());
+        let (status, body) = page(&router(&repo, None, None), "/_send/targets").await;
+        assert_eq!((status, body.as_str()), (200, "[]"));
+        let cfg = config_dir(
+            "version = 1\n[[send]]\nid = \"gh\"\npreset = \"github-issue\"\nvars = { repo = \"o/n\" }\n",
+        );
+        let r = router(&repo, Some(cfg.path()), None);
+        let (status, body) = page(&r, "/_send/targets").await;
+        assert_eq!(status, 200, "{body}");
+        let want = serde_json::json!([{
+            "id": "gh",
+            "label": "New issue",
+            "parts": [
+                {"lit": "https://github.com/o/n/issues/new?title="},
+                {"ph": "title"},
+                {"lit": "&body="},
+                {"ph": "notes"},
+            ],
+        }]);
+        assert_eq!(
+            serde_json::from_str::<serde_json::Value>(&body).expect("json"),
+            want
         );
     }
 }

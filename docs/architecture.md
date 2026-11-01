@@ -73,6 +73,7 @@ Disposable: bump the format version instead of migrating.
 | `/events`, `/api/{files,refs,last,progress}` | Live updates and the fragments pages fetch |
 | `/api/v1/...` | JSON API, see [api.md](api.md) |
 | `/go/{repo-id}/{sha}/{path}` | Permalink: finds the served repository by id |
+| `/_send/targets` | Send to targets as JSON template parts, filled in by the page |
 | `/r/{name}/...`, `/api/repos` | Everything above under several repositories; the list the switcher reads |
 
 <!-- END GENERATED: routes -->

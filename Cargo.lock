@@ -3598,6 +3598,7 @@ dependencies = [
  "gitterrace-config",
  "gitterrace-index",
  "gitterrace-web",
+ "pulldown-cmark",
  "serde_json",
  "tempfile",
 ]

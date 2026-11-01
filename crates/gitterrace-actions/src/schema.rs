@@ -207,7 +207,7 @@ pub const MODIFIERS: [(&str, &str); 1] = [(
 )];
 
 /// Top-level keys of `actions.toml`.
-pub const FILE_KEYS: [Item; 3] = [
+pub const FILE_KEYS: [Item; 4] = [
     item("version", "integer", true, "", "Must be `1`."),
     item(
         "script",
@@ -222,6 +222,72 @@ pub const FILE_KEYS: [Item; 3] = [
         false,
         "",
         "`[[action]]` blocks: what the menu offers.",
+    ),
+    item(
+        "send",
+        "array of tables",
+        false,
+        "",
+        "`[[send]]` blocks: Send to targets, URLs the browser opens.",
+    ),
+];
+
+/// Keys of a `[[send]]` block.
+pub const SEND_KEYS: [Item; 5] = [
+    item(
+        "id",
+        "string",
+        true,
+        "",
+        "`[a-z0-9-]`, 1 to 32 characters, unique among sends.",
+    ),
+    item(
+        "label",
+        "string",
+        false,
+        "",
+        "Text in the Send window, 1 to 80 characters. A preset has a default.",
+    ),
+    item(
+        "url",
+        "string",
+        false,
+        "",
+        "The URL template. The scheme and host are literal. Placeholders (below) fill the \
+         path, query or fragment, each percent-encoded. Set exactly one of `url` and `preset`.",
+    ),
+    item(
+        "preset",
+        "string",
+        false,
+        "",
+        "A built-in target by name (below). Set exactly one of `url` and `preset`.",
+    ),
+    item(
+        "vars",
+        "table of strings",
+        false,
+        "`{}`",
+        "`[send.vars]`: settings, inserted verbatim as `{var.<name>}`, one line each, at most \
+         4 KiB. A preset names the ones it needs.",
+    ),
+];
+
+/// Placeholders a `[[send]]` url may hold; the page fills them, each percent-encoded.
+pub const SEND_PLACEHOLDERS: [(&str, &str); 8] = [
+    ("title", "The note's first line, or the selection's name."),
+    (
+        "notes",
+        "The rest of the note, the quoted selection and the permalink.",
+    ),
+    ("permalink", "The `/go` permalink."),
+    ("path", "The repository-relative path, or empty."),
+    ("lines", "The line range, like `L3-L7`, or empty."),
+    ("sha", "The full commit id."),
+    ("repo", "The repository name."),
+    (
+        "var.<name>",
+        "A value from `[send.vars]`, inserted verbatim, so it may hold the base URL.",
     ),
 ];
 
@@ -369,7 +435,7 @@ mod tests {
     use crate::payload::{CommitInfo, Lines, Payload, RepoInfo};
     use crate::schema::{
         ACTION_KEYS, ENV_VARS, FILE_KEYS, Item, KINDS, PAYLOAD_FIELDS, PLACEHOLDERS, SCRIPT_KEYS,
-        kind_name,
+        SEND_KEYS, SEND_PLACEHOLDERS, kind_name,
     };
 
     fn names(items: &[Item]) -> BTreeSet<String> {
@@ -474,6 +540,8 @@ mod tests {
              command = [\"/bin/echo\"]\nzzz = 1\n",
         );
         assert_eq!(expected(&action), names(&ACTION_KEYS), "{action}");
+        let send = parse_error("version = 1\n[[send]]\nid = \"s\"\nzzz = 1\n");
+        assert_eq!(expected(&send), names(&SEND_KEYS), "{send}");
     }
 
     #[test]
@@ -486,6 +554,12 @@ mod tests {
         assert_eq!(doc, crate::config::FIELDS);
         let repo: Vec<&str> = PLACEHOLDERS.iter().filter(|p| p.1).map(|p| p.0).collect();
         assert_eq!(repo, crate::config::REPO_FIELDS);
+    }
+
+    #[test]
+    fn send_placeholder_table_is_the_fields() {
+        let doc: Vec<&str> = SEND_PLACEHOLDERS[..7].iter().map(|(n, _)| *n).collect();
+        assert_eq!(doc, crate::send::SEND_FIELDS);
     }
 
     /// The limits the tables state are the limits the loader enforces.
