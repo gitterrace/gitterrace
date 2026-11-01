@@ -7,7 +7,7 @@ use std::borrow::Cow;
 use gitterrace_index::{CommitRecord, Period, Selection};
 use serde::Deserialize;
 
-use crate::fmt::{enc, esc, href};
+use crate::fmt::{enc_seg, esc, href};
 
 /// Value that selects commits without a scope (`none`).
 pub(crate) const NO_SCOPE: &str = Selection::NO_SCOPE;
@@ -134,12 +134,9 @@ impl Filter {
     pub(crate) fn query(&self, extra: &[(&str, &str)]) -> String {
         let mut parts: Vec<String> = DIMS
             .iter()
-            .filter_map(|d| {
-                self.get(*d)
-                    .map(|v| format!("{}={}", d.key(), enc(v, false)))
-            })
+            .filter_map(|d| self.get(*d).map(|v| format!("{}={}", d.key(), enc_seg(v))))
             .collect();
-        parts.extend(extra.iter().map(|(k, v)| format!("{k}={}", enc(v, false))));
+        parts.extend(extra.iter().map(|(k, v)| format!("{k}={}", enc_seg(v))));
         if parts.is_empty() {
             String::new()
         } else {

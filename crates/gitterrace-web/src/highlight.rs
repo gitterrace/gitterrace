@@ -72,7 +72,7 @@ fn alias(token: &str) -> &str {
 }
 
 /// The syntax for a markdown fence token.
-pub(crate) fn syntax_for_token(token: &str) -> Option<&'static SyntaxReference> {
+fn syntax_for_token(token: &str) -> Option<&'static SyntaxReference> {
     let set = syntaxes();
     let token = token.trim();
     set.find_syntax_by_token(alias(token))
@@ -92,7 +92,7 @@ fn syntax_for_shebang(first: &str) -> Option<&'static SyntaxReference> {
 }
 
 /// The syntax for a file: by name, then extension, then shebang, then the set's first-line rules.
-pub(crate) fn syntax_for_file(path: &str, first_line: &str) -> Option<&'static SyntaxReference> {
+fn syntax_for_file(path: &str, first_line: &str) -> Option<&'static SyntaxReference> {
     let set = syntaxes();
     let name = path.rsplit('/').next().unwrap_or(path);
     let by_name = match name {

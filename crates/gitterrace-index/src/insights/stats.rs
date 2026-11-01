@@ -244,7 +244,10 @@ mod tests {
         r[1].merge = true;
         let ins = Insights::new(&r, Options::default(), None);
         let f = ins.file_churn(Period::All);
-        assert!(f.iter().all(|c| c.path != "Cargo.lock"), "generated left out");
+        assert!(
+            f.iter().all(|c| c.path != "Cargo.lock"),
+            "generated left out"
+        );
         assert_eq!(f[0].commits, 2, "the merge does not count");
         let all = Insights::new(
             &r,
@@ -263,7 +266,12 @@ mod tests {
 
     #[test]
     fn same_file_twice_in_one_commit_counts_one_commit() {
-        let r = [rec("1", "a", 0, vec![file("x", 1, 0, 1), file("x", 2, 0, 3)])];
+        let r = [rec(
+            "1",
+            "a",
+            0,
+            vec![file("x", 1, 0, 1), file("x", 2, 0, 3)],
+        )];
         let ins = Insights::new(&r, Options::default(), None);
         assert_eq!(ins.file_churn(Period::All)[0].commits, 1);
     }

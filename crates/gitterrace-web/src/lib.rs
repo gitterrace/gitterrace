@@ -37,6 +37,7 @@ use std::{
 use gitterrace_config::Config;
 use gitterrace_git::Repo;
 use gitterrace_index::Index;
+pub use media::plain_media;
 pub use multi::discover_repos;
 pub use registry::{Entry as RegistryEntry, candidates as registry_candidates, state_dir};
 pub use reload::{Load, Watched};

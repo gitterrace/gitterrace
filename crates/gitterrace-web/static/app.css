@@ -42,7 +42,8 @@ main.wrap>h2:first-child,main.wrap>.tabs+h2{margin-top:var(--space-6)}
 .tabs a{margin-bottom:-1px}
 .tabs .more>summary{list-style:none;cursor:pointer;color:var(--muted);padding:var(--space-2) var(--space-3) 10px;font:var(--weight-regular) 12px/1.4 var(--mono);text-transform:uppercase;letter-spacing:.08em;white-space:nowrap}
 .tabs .more>summary::-webkit-details-marker{display:none}
-.tabs .more>summary::after{content:" \25BE"}
+.tabs .more>summary::after{content:"\25BE";display:inline-block;margin-left:.4em;transition:transform var(--dur-fast) var(--ease)}
+.tabs .more[open]>summary::after{transform:rotate(-90deg)}
 .tabs .more>summary:hover,.tabs .more>summary.on{color:var(--fg)}
 .tabs .more,.tabs .more[open]>div{display:flex;flex-wrap:wrap}
 .tabnav a:hover,.tabs a:hover{color:var(--fg);text-decoration:none}

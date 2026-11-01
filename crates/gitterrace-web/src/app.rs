@@ -331,7 +331,7 @@ impl App {
     }
 
     /// Records a freshly measured answer so the next event carries it.
-    pub(crate) fn set_dirty(&self, v: bool) {
+    fn set_dirty(&self, v: bool) {
         if let Ok(mut g) = self.dirty.lock() {
             *g = Some((Instant::now(), v));
         }
@@ -339,7 +339,7 @@ impl App {
 
     /// Drops what a change in the repository can make stale: rendered pages and the dirty chip.
     /// Everything else is keyed by a commit or tree id, which never changes.
-    pub(crate) fn invalidate(&self, kinds: &[&str]) {
+    fn invalidate(&self, kinds: &[&str]) {
         let moved = |k: &str| kinds.contains(&k);
         if (moved("head") || moved("refs"))
             && let Ok(mut g) = self.memo.lock()

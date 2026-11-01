@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
-use gitterrace_index::{CommitRecord, civil_from_days as civil};
+use gitterrace_index::{CommitRecord, civil_from_days as civil, days_from_civil};
 
 const DAY: i64 = 86_400;
 
@@ -193,16 +193,6 @@ fn local(r: &CommitRecord) -> i64 {
 
 fn weekday(days: i64) -> usize {
     usize::try_from((days + 3).rem_euclid(7)).unwrap_or(0)
-}
-
-fn days_from_civil(y: i64, m: i64, d: i64) -> i64 {
-    let y = if m <= 2 { y - 1 } else { y };
-    let era = y.div_euclid(400);
-    let yoe = y.rem_euclid(400);
-    let mp = (m + 9) % 12;
-    let doy = (153 * mp + 2) / 5 + d - 1;
-    let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
-    era * 146_097 + doe - 719_468
 }
 
 #[cfg(test)]

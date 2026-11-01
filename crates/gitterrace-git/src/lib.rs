@@ -19,7 +19,7 @@ pub use error::{Error, Result};
 
 /// How many hex digits of a commit id any surface shows. One constant, so a short id looks the
 /// same in the web pages, the action payloads and the CLI.
-pub const SHORT_ID_LEN: usize = 8;
+const SHORT_ID_LEN: usize = 8;
 
 /// The abbreviated form of a commit id (or the whole string when it is already shorter).
 #[must_use]
@@ -35,14 +35,16 @@ pub use gitdir::{BranchStatus, HeadState, InProgress, LinkedWorktree, Stash, Tag
 pub use ignore::IgnoreSet;
 pub use repo::Repo;
 pub use repo_id::resolve_permalink;
-pub use time::civil_from_days;
+pub use time::{civil_from_days, days_from_civil};
 pub use types::{
     BlameLine, Blob, ChangeKind, CodeCounts, CommitDetail, CommitSummary, FileDiff, Hunk, HunkLine,
     LineKind, RawBlob, RefInfo, RefKind, Signature, TreeEntry, TreeEntryKind,
 };
-pub use url::percent_encode;
+pub use url::{percent_decode, percent_encode_path, percent_encode_segment};
 pub use walk::{
     BlobId, BlobReader, FileRef, LastCommit, files, last_commits, scan_commits, tree_id,
 };
-pub use watch::{Cost, Parts, Watcher};
+#[cfg(test)]
+pub use watch::Cost;
+pub use watch::{Parts, Watcher};
 pub use worktree::{is_dirty, worktree_diff, worktree_signature};

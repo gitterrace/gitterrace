@@ -19,28 +19,28 @@ use axum::{
     body::{Body, to_bytes},
     http::{Request, StatusCode},
 };
-use gitterrace_git::percent_encode;
+use gitterrace_git::{percent_decode, percent_encode_path};
 use tower::ServiceExt;
 
 /// What to include in an export.
-pub struct Scope {
+pub(crate) struct Scope {
     /// Newest commits whose pages (and log pages) are written.
-    pub commits: usize,
+    pub(crate) commits: usize,
     /// Largest file, in bytes, whose page is written.
-    pub max_file: u64,
+    pub(crate) max_file: u64,
     /// Repositories that are someone else's project, credited in their banner by folder name.
-    pub projects: Vec<Project>,
+    pub(crate) projects: Vec<Project>,
 }
 
 /// Someone else's repository shown in an export, named and linked in the banner.
-pub struct Project {
-    pub name: String,
-    pub url: String,
+pub(crate) struct Project {
+    pub(crate) name: String,
+    pub(crate) url: String,
 }
 
 impl Project {
     /// `name=url`, with an http(s) URL: the banner links it, so nothing else may get in.
-    pub fn parse(s: &str) -> anyhow::Result<Self> {
+    pub(crate) fn parse(s: &str) -> anyhow::Result<Self> {
         let (name, url) = s
             .split_once('=')
             .context("--project takes NAME=URL, for example jq=https://github.com/jqlang/jq")?;
@@ -71,7 +71,7 @@ fn seeds() -> impl Iterator<Item = &'static str> {
 /// Writes the scoped site to `out` and returns how many files were written. One repository
 /// exports at `/`; several export like the server serves them: an index at `/` and each
 /// repository under `/r/<name>/`, named by the server's own table.
-pub async fn export(repos: &[PathBuf], out: &Path, scope: &Scope) -> anyhow::Result<usize> {
+pub(crate) async fn export(repos: &[PathBuf], out: &Path, scope: &Scope) -> anyhow::Result<usize> {
     // Swapped arguments (`export <repo> <out>`) would scatter pages over a
     // checkout. An ignored folder inside a repo is fine; its root is not.
     if out.join(".git").exists() {
@@ -89,23 +89,22 @@ pub async fn export(repos: &[PathBuf], out: &Path, scope: &Scope) -> anyhow::Res
         queue.push_back("/".to_owned());
     }
     let mut site_of = Vec::with_capacity(sites.len());
-    for path in repos.iter().zip(&sites) {
-        let (repo_path, site) = path;
-        wait_for_index(&router, &site.prefix).await?;
+    for (repo_path, site) in repos.iter().zip(&sites) {
+        wait_for_index(&router, site).await?;
         let repo = gitterrace_git::Repo::discover(repo_path).context("opening the repository")?;
         let head = repo.resolve("HEAD").context("resolving HEAD")?;
         for seed in seeds() {
-            queue.push_back(format!("{}{seed}", site.prefix));
+            queue.push_back(format!("{site}{seed}"));
         }
         for c in repo
             .log(&head, None, 0, scope.commits)
             .context("reading the log")?
         {
-            queue.push_back(format!("{}/commit/{}", site.prefix, c.id));
+            queue.push_back(format!("{site}/commit/{}", c.id));
         }
         let name = repo.name();
         site_of.push(Site {
-            prefix: site.prefix.clone(),
+            prefix: site.clone(),
             stamp: snapshot_label(&repo, &head)?,
             credit: scope.projects.iter().position(|p| p.name == name),
             allowed: Allowed::new(&repo, &head, scope)?,
@@ -165,8 +164,7 @@ pub async fn export(repos: &[PathBuf], out: &Path, scope: &Scope) -> anyhow::Res
             } else {
                 body
             };
-            write_page(out, &path, &content_type, &body)?;
-            written += 1;
+            written += usize::from(write_page(out, &path, &content_type, &body)?);
             if content_type.starts_with("text/html") || content_type.starts_with("text/css") {
                 for link in links(&String::from_utf8_lossy(&body)) {
                     let ok = link.starts_with("/static/")
@@ -204,21 +202,17 @@ impl Site {
 /// Where each repository's pages live, in `repos` order, from the server itself: one
 /// repository serves at `/`, several under the names `/api/repos` lists. Asking the router
 /// keeps naming (and its collision rule) in one place.
-async fn sites(router: &Router, repos: &[PathBuf]) -> anyhow::Result<Vec<SitePrefix>> {
+async fn sites(router: &Router, repos: &[PathBuf]) -> anyhow::Result<Vec<String>> {
     if repos.len() < 2 {
-        return Ok(vec![SitePrefix {
-            prefix: String::new(),
-        }]);
+        return Ok(vec![String::new()]);
     }
     let (_, _, body) = fetch(router, "/api/repos").await?;
     let items: Vec<serde_json::Value> =
         serde_json::from_slice(&body).context("reading /api/repos")?;
-    let prefixes: Vec<SitePrefix> = items
+    let prefixes: Vec<String> = items
         .iter()
         .filter_map(|i| i.get("href")?.as_str())
-        .map(|h| SitePrefix {
-            prefix: h.trim_end_matches('/').to_owned(),
-        })
+        .map(|h| h.trim_end_matches('/').to_owned())
         .collect();
     if prefixes.len() != repos.len() {
         bail!(
@@ -228,10 +222,6 @@ async fn sites(router: &Router, repos: &[PathBuf]) -> anyhow::Result<Vec<SitePre
         );
     }
     Ok(prefixes)
-}
-
-struct SitePrefix {
-    prefix: String,
 }
 
 /// Polls the progress endpoint so insights pages are exported built, not "indexing".
@@ -257,7 +247,7 @@ async fn wait_for_index(router: &Router, prefix: &str) -> anyhow::Result<()> {
 async fn fetch(router: &Router, path: &str) -> anyhow::Result<(StatusCode, String, Vec<u8>)> {
     // The router refuses requests without a local Host (DNS-rebinding guard).
     // Paths travel decoded (they name files on disk); encode them for the URI.
-    let req = Request::get(percent_encode(path, true))
+    let req = Request::get(percent_encode_path(path))
         .header(axum::http::header::HOST, "localhost")
         .body(Body::empty())
         .context("building a request")?;
@@ -281,8 +271,6 @@ async fn fetch(router: &Router, path: &str) -> anyhow::Result<(StatusCode, Strin
 
 /// The set of paths an export follows.
 struct Allowed {
-    /// Exact paths allowed besides the prefix rules.
-    exact: BTreeSet<String>,
     /// Commit ids in scope.
     commits: BTreeSet<String>,
     /// Paths (relative to the repo root) of files and directories at HEAD in scope.
@@ -299,16 +287,11 @@ impl Allowed {
             .collect();
         let mut tree = BTreeSet::new();
         walk(repo, head, "", scope.max_file, &mut tree)?;
-        let exact = seeds().map(str::to_owned).collect();
-        Ok(Self {
-            exact,
-            commits,
-            tree,
-        })
+        Ok(Self { commits, tree })
     }
 
     fn contains(&self, link: &str) -> bool {
-        if self.exact.contains(link) || link.starts_with("/static/") {
+        if seeds().any(|s| s == link) || link.starts_with("/static/") {
             return true;
         }
         if let Some(id) = link.strip_prefix("/commit/") {
@@ -319,6 +302,13 @@ impl Allowed {
         for prefix in ["/tree/HEAD", "/blob/HEAD/", "/raw/HEAD/"] {
             if let Some(rest) = link.strip_prefix(prefix) {
                 let rel = rest.trim_matches('/');
+                // A static host serves an exported file by its extension, without the
+                // server's sandbox header: an SVG or HTML file from the repository would run
+                // its scripts on the export's origin. Only inert media leaves as raw bytes;
+                // its link 404s in the copy like any unexported page.
+                if prefix == "/raw/HEAD/" && !gitterrace_web::plain_media(rel) {
+                    return false;
+                }
                 return rel.is_empty() || self.tree.contains(rel);
             }
         }
@@ -391,26 +381,6 @@ fn decode_entities(s: &str) -> String {
 /// Inverse of the web's `fmt::enc`: `%XX` back to bytes, then UTF-8. Links are
 /// matched and written by their real name, so `a b.md` exports as `a b.md`, not
 /// `a%20b.md`, which a static server would decode and then miss.
-fn percent_decode(s: &str) -> String {
-    let b = s.as_bytes();
-    let mut out = Vec::with_capacity(b.len());
-    let mut i = 0;
-    while i < b.len() {
-        let hex = |c: u8| char::from(c).to_digit(16);
-        if b[i] == b'%'
-            && let (Some(&h), Some(&l)) = (b.get(i + 1), b.get(i + 2))
-            && let (Some(h), Some(l)) = (hex(h), hex(l))
-        {
-            out.push(u8::try_from(h * 16 + l).unwrap_or(b'?'));
-            i += 3;
-            continue;
-        }
-        out.push(b[i]);
-        i += 1;
-    }
-    String::from_utf8_lossy(&out).into_owned()
-}
-
 /// Style for the snapshot banner and the static page, written next to the pages. Kept out of
 /// the app's own CSS: only an export is ever static. Colours are the app's tokens, already on
 /// the page. A static copy has no server, so the chrome that needs one is hidden: search, the
@@ -439,7 +409,15 @@ fn snapshot_label(repo: &gitterrace_git::Repo, head: &str) -> anyhow::Result<Str
 /// right after `<body ...>`, outside the app's chrome, so no template has to know about export.
 fn mark_snapshot(html: &[u8], label: &str, project: Option<&Project>) -> Vec<u8> {
     let page = String::from_utf8_lossy(html);
-    let Some(open) = page.find("<body") else {
+    // Anchor after `</head>`: a `<body` inside a title, a meta value or a script string in the
+    // head is text, not the element.
+    let from = page.find("</head>").unwrap_or(0);
+    let Some(open) = ["<body ", "<body>"]
+        .iter()
+        .filter_map(|tag| page[from..].find(tag))
+        .min()
+        .map(|i| from + i)
+    else {
         return html.to_vec();
     };
     let Some(end) = page[open..].find('>').map(|i| open + i + 1) else {
@@ -480,21 +458,30 @@ fn escape(s: &str) -> String {
 }
 
 /// File the page lands in: HTML pages become `<path>/index.html` so their links
-/// resolve when the folder is served by any static server.
-fn target(out: &Path, path: &str, content_type: &str) -> PathBuf {
-    let rel = path.trim_start_matches('/');
+/// resolve when the folder is served by any static server. `None` for a path with a segment
+/// that is not a plain name (`.`, `..`, a separator or drive colon on some platform, NUL):
+/// such a page is skipped rather than written somewhere it was not named.
+fn target(out: &Path, path: &str, content_type: &str) -> Option<PathBuf> {
     let mut p = out.to_path_buf();
-    for seg in rel.split('/').filter(|s| !s.is_empty() && *s != "..") {
+    for seg in path.split('/').filter(|s| !s.is_empty()) {
+        let hostile = seg == "." || seg == ".." || seg.contains(['\\', ':', '\0']);
+        if hostile {
+            return None;
+        }
         p.push(seg);
     }
     if content_type.starts_with("text/html") {
         p.push("index.html");
     }
-    p
+    Some(p)
 }
 
-fn write_page(out: &Path, path: &str, content_type: &str, body: &[u8]) -> anyhow::Result<()> {
-    let file = target(out, path, content_type);
+/// Writes one page; `false` when its path is refused by `target` and the page is skipped.
+fn write_page(out: &Path, path: &str, content_type: &str, body: &[u8]) -> anyhow::Result<bool> {
+    let Some(file) = target(out, path, content_type) else {
+        eprintln!("skipping {path:?}: not a plain file name");
+        return Ok(false);
+    };
     let root = out
         .canonicalize()
         .with_context(|| format!("resolving {}", out.display()))?;
@@ -521,25 +508,56 @@ fn write_page(out: &Path, path: &str, content_type: &str, body: &[u8]) -> anyhow
         }
     }
     // The parents are real directories inside `out`; the leaf itself may still be a link.
-    if let Ok(m) = std::fs::symlink_metadata(&file) {
+    write_leaf(&file, body)?;
+    Ok(true)
+}
+
+/// Opens the leaf without following a symlink in the same call that creates it, so nothing
+/// can swap a link in between a check and the write.
+#[cfg(unix)]
+fn write_leaf(file: &Path, body: &[u8]) -> anyhow::Result<()> {
+    use std::{io::Write, os::unix::fs::OpenOptionsExt};
+
+    let mut f = std::fs::OpenOptions::new()
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .custom_flags(libc::O_NOFOLLOW)
+        .open(file)
+        .map_err(|e| {
+            anyhow::anyhow!(
+                "refusing to write {}: not a regular file ({e})",
+                file.display()
+            )
+        })?;
+    anyhow::ensure!(
+        f.metadata()?.is_file(),
+        "refusing to write {}: not a regular file",
+        file.display()
+    );
+    f.write_all(body)
+        .with_context(|| format!("writing {}", file.display()))
+}
+
+#[cfg(not(unix))]
+fn write_leaf(file: &Path, body: &[u8]) -> anyhow::Result<()> {
+    if let Ok(m) = std::fs::symlink_metadata(file) {
         anyhow::ensure!(
             m.is_file(),
             "refusing to write {}: not a regular file",
             file.display()
         );
     }
-    std::fs::write(&file, body).with_context(|| format!("writing {}", file.display()))
+    std::fs::write(file, body).with_context(|| format!("writing {}", file.display()))
 }
 
 #[cfg(test)]
 mod tests {
     use std::path::Path;
 
-    use gitterrace_git::percent_encode;
-
     #[cfg(unix)]
     use crate::export::write_page;
-    use crate::export::{links, percent_decode, target};
+    use crate::export::{links, mark_snapshot, target};
 
     #[test]
     fn encoded_names_round_trip_to_real_file_names() {
@@ -548,18 +566,6 @@ mod tests {
             links(html),
             vec!["/blob/HEAD/docs/a b#c.md", "/blob/HEAD/über.md"]
         );
-        for p in [
-            "/blob/HEAD/docs/a b#c.md",
-            "/blob/HEAD/über.md",
-            "/tree/HEAD/x%y",
-        ] {
-            assert_eq!(percent_decode(&percent_encode(p, true)), p);
-        }
-        assert_eq!(
-            percent_encode("/blob/HEAD/a b.md", true),
-            "/blob/HEAD/a%20b.md"
-        );
-        assert_eq!(percent_decode("bad%zz%4"), "bad%zz%4");
     }
 
     #[test]
@@ -579,24 +585,74 @@ mod tests {
     }
 
     #[test]
-    fn html_pages_become_index_files_and_dotdot_is_dropped() {
+    fn html_pages_become_index_files() {
         let out = Path::new("/o");
+        let t = |p, ct| target(out, p, ct).expect("plain path");
         assert_eq!(
-            target(out, "/", "text/html; charset=utf-8"),
+            t("/", "text/html; charset=utf-8"),
             Path::new("/o/index.html")
         );
         assert_eq!(
-            target(out, "/stats/files", "text/html"),
+            t("/stats/files", "text/html"),
             Path::new("/o/stats/files/index.html")
         );
         assert_eq!(
-            target(out, "/static/app.css", "text/css"),
+            t("/static/app.css", "text/css"),
             Path::new("/o/static/app.css")
         );
-        assert_eq!(
-            target(out, "/raw/HEAD/../../etc", "text/plain"),
-            Path::new("/o/raw/HEAD/etc")
-        );
+    }
+
+    /// Class: any segment that is not a plain name. Whatever a path holds, a target is either
+    /// refused or lies under `out` with nothing but Normal components below it.
+    #[test]
+    fn target_refuses_every_hostile_segment() {
+        let out = Path::new("/o");
+        let hostile = [
+            "/raw/HEAD/../../etc",
+            "/..",
+            "/./x",
+            "/a/./b",
+            "/blob/HEAD/a\\..\\..\\x",
+            "/blob/HEAD/C:/x",
+            "/blob/HEAD/c:x",
+            "/blob/HEAD/a\0b",
+            "/blob/HEAD/a/../../b",
+        ];
+        for path in hostile {
+            assert_eq!(
+                target(out, path, "text/plain"),
+                None,
+                "{path:?} was accepted"
+            );
+        }
+        for path in hostile
+            .iter()
+            .copied()
+            .chain(["/a b/c", "//x//y/", "/über"])
+        {
+            for ct in ["text/html", "text/plain"] {
+                if let Some(t) = target(out, path, ct) {
+                    let below = t.strip_prefix(out).expect("under out");
+                    assert!(
+                        below
+                            .components()
+                            .all(|c| matches!(c, std::path::Component::Normal(_))),
+                        "{path:?} -> {}",
+                        t.display()
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn mark_snapshot_anchors_on_the_body_element_after_head() {
+        let html = b"<html><head><title>&lt;body</title><meta content=\"<bodyx>\"></head>\
+            <body class=\"p\"><main>m</main></body></html>";
+        let out = String::from_utf8(mark_snapshot(html, "v1", None)).expect("utf8");
+        assert!(out.contains("<title>&lt;body</title>"), "{out}");
+        assert!(out.contains("content=\"<bodyx>\""), "{out}");
+        assert!(out.contains("<body class=\"p\" data-static><link"), "{out}");
     }
 
     #[cfg(unix)]
@@ -662,7 +718,7 @@ mod tests {
             .await
             .expect("export");
         for page in gitterrace_web::WARM_PAGES {
-            let file = target(&out, page, "text/html");
+            let file = target(&out, page, "text/html").expect("plain path");
             assert!(
                 file.is_file(),
                 "{page} was not exported (looked for {})",
@@ -707,12 +763,15 @@ mod tests {
                 "index does not link {name}"
             );
             for page in gitterrace_web::WARM_PAGES {
-                let file = target(&out, &format!("/r/{name}{page}"), "text/html");
+                let file =
+                    target(&out, &format!("/r/{name}{page}"), "text/html").expect("plain path");
                 assert!(file.is_file(), "/r/{name}{page} was not exported");
             }
         }
         // A repository's pages link only into itself, the index, or the shared assets.
-        let alpha = std::fs::read_to_string(target(&out, "/r/alpha/", "text/html")).expect("alpha");
+        let alpha =
+            std::fs::read_to_string(target(&out, "/r/alpha/", "text/html").expect("plain path"))
+                .expect("alpha");
         for link in links(&alpha) {
             assert!(
                 link.starts_with("/r/alpha")
@@ -722,5 +781,70 @@ mod tests {
                 "alpha links outside itself: {link}"
             );
         }
+    }
+
+    /// Class: a repository file a browser would run scripts in. A static host serves exported
+    /// bytes by extension without the server's sandbox, so every file under any raw/ directory
+    /// must be one `plain_media` allows. Driven by `plain_media` itself, so a scriptable type
+    /// added to media.rs is covered without touching this test.
+    #[tokio::test]
+    async fn export_ships_no_scriptable_raw_file() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let names = ["evil.svg", "x.html", "x.xhtml", "page.pdf", "a.png"];
+        let readme = names
+            .map(|n| format!("[{n}](/raw/HEAD/{n}) ![{n}](/raw/HEAD/{n})\n"))
+            .concat();
+        let mut fx = gitterrace_testkit::Fixture::init(&dir.path().join("r"))
+            .write("README.md", &readme)
+            .write(
+                "evil.svg",
+                "<svg xmlns=\"http://www.w3.org/2000/svg\"><script>alert(1)</script></svg>",
+            )
+            .write("x.html", "<script>alert(1)</script>")
+            .write(
+                "x.xhtml",
+                "<html xmlns=\"http://www.w3.org/1999/xhtml\"><script>alert(1)</script></html>",
+            )
+            .write("page.pdf", "%PDF-1.4");
+        // A minimal PNG signature: what matters is the name, but keep the bytes honest.
+        std::fs::write(fx.path().join("a.png"), b"\x89PNG\r\n\x1a\n").expect("png");
+        fx = fx.commit("files");
+        let out = dir.path().join("out");
+        let scope = crate::export::Scope {
+            commits: 5,
+            max_file: 64 * 1024,
+            projects: Vec::new(),
+        };
+        crate::export::export(&[fx.path().to_path_buf()], &out, &scope)
+            .await
+            .expect("export");
+        let mut raw = Vec::new();
+        let mut stack = vec![out.clone()];
+        while let Some(d) = stack.pop() {
+            for e in std::fs::read_dir(&d).expect("read_dir") {
+                let p = e.expect("entry").path();
+                if p.is_dir() {
+                    stack.push(p);
+                } else if p
+                    .strip_prefix(&out)
+                    .expect("under out")
+                    .components()
+                    .any(|c| c.as_os_str() == "raw")
+                {
+                    raw.push(p);
+                }
+            }
+        }
+        for p in &raw {
+            assert!(
+                gitterrace_web::plain_media(&p.to_string_lossy()),
+                "scriptable raw file exported: {}",
+                p.display()
+            );
+        }
+        assert!(
+            out.join("raw/HEAD/a.png").is_file(),
+            "inert media must still export; found {raw:?}"
+        );
     }
 }

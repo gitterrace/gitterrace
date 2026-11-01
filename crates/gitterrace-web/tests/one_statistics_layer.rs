@@ -97,7 +97,7 @@ async fn api_and_pages_give_the_same_numbers_for_the_same_filter() {
             num(&c["deletions"]),
         ];
         assert_eq!(now, want, "Activity against /insights/summary for {q:?}");
-        if !c["commits"].as_u64().is_some_and(|n| n > 0) {
+        if c["commits"].as_u64().is_none_or(|n| n == 0) {
             continue;
         }
 
@@ -111,7 +111,12 @@ async fn api_and_pages_give_the_same_numbers_for_the_same_filter() {
             .as_array()
             .expect("files")
             .iter()
-            .map(|h| (h["path"].as_str().expect("path").to_owned(), num(&h["changes"])))
+            .map(|h| {
+                (
+                    h["path"].as_str().expect("path").to_owned(),
+                    num(&h["changes"]),
+                )
+            })
             .collect();
         assert_eq!(web, api_rows, "Hotspots page against API for {q:?}");
 
@@ -138,7 +143,10 @@ async fn removed_pages_redirect_with_their_query() {
     let f = Fixture::standard(&root.path().join("repo"));
     let router = gitterrace_web::app_router(f.path()).expect("router");
     for (from, to) in [
-        ("/stats/pulse?period=1w&type=fix", "/stats?period=1w&type=fix"),
+        (
+            "/stats/pulse?period=1w&type=fix",
+            "/stats?period=1w&type=fix",
+        ),
         ("/stats/pulse", "/stats"),
         ("/stats/files?path=src", "/stats/hotspots?path=src"),
     ] {

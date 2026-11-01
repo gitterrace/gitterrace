@@ -892,6 +892,7 @@ dependencies = [
  "gitterrace-index",
  "gitterrace-testkit",
  "gitterrace-web",
+ "libc",
  "serde_json",
  "tempfile",
  "thiserror",

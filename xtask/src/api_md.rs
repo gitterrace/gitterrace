@@ -4,8 +4,8 @@
 use std::fmt::Write as _;
 
 use gitterrace_api::{
-    ENDPOINTS, MAX_BLAME_LINES, MAX_BLOB_BYTES, MAX_BLOB_LINES, MAX_PAGE, McpServer, insight_list,
-    Param,
+    ENDPOINTS, MAX_BLAME_LINES, MAX_BLOB_BYTES, MAX_BLOB_LINES, MAX_PAGE, McpServer, Param,
+    insight_list,
 };
 
 use crate::out::Out;

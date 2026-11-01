@@ -10,13 +10,13 @@ use axum::{
 use crate::{
     app::blocking,
     error::Result,
-    fmt::{self, ago, enc, href, sha_link},
+    fmt::{self, ago, enc_seg, href, sha_link},
     live::Mode,
     routes::Shared,
     views::{self, Chrome},
 };
 
-pub(crate) struct WorktreeRow {
+struct WorktreeRow {
     pub(crate) id: String,
     pub(crate) path: String,
     pub(crate) branch: String,
@@ -49,7 +49,7 @@ pub(crate) async fn worktrees(State(app): Shared) -> Result<Html<String>> {
                     log: if target.is_empty() {
                         String::new()
                     } else {
-                        href(&format!("/log/{}", enc(&target, false)))
+                        href(&format!("/log/{}", enc_seg(&target)))
                     },
                     branch: w.branch.unwrap_or_else(|| "detached".to_owned()),
                     commit: w.commit.as_deref().map(sha_link).unwrap_or_default(),
@@ -70,7 +70,7 @@ pub(crate) async fn worktrees(State(app): Shared) -> Result<Html<String>> {
     Ok(Html(html))
 }
 
-pub(crate) struct StashRow {
+struct StashRow {
     pub(crate) name: String,
     pub(crate) href: String,
     pub(crate) message: String,
@@ -136,7 +136,7 @@ pub(crate) async fn tag(State(app): Shared, Path(name): Path<String>) -> Result<
         Ok(TagPage {
             c: views::chrome(a, "refs").pinned(),
             commit: sha_link(&r.target),
-            tree_href: href(&format!("/tree/{}", enc(&r.name, false))),
+            tree_href: href(&format!("/tree/{}", enc_seg(&r.name))),
             tagger: note
                 .and_then(|n| n.tagger.as_ref())
                 .map(|t| t.name.clone())
@@ -183,11 +183,11 @@ pub(crate) fn branch_rows(a: &crate::app::App) -> Result<Vec<BranchRow>> {
         .map(|(s, c)| {
             let is_default = default.as_deref() == Some(s.name.as_str());
             let row = BranchRow {
-                log: href(&format!("/log/{}", enc(&s.name, false))),
+                log: href(&format!("/log/{}", enc_seg(&s.name))),
                 compare: href(&format!(
                     "/compare?base={}&head={}",
-                    enc(&base, false),
-                    enc(&s.name, false)
+                    enc_seg(&base),
+                    enc_seg(&s.name)
                 )),
                 commit: sha_link(&s.target),
                 subject: c.subject,

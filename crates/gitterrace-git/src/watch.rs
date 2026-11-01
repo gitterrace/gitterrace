@@ -97,6 +97,7 @@ struct Listed {
 }
 
 /// System calls one tick made. Tests assert on it; the watcher itself never reads it.
+#[cfg(test)]
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub struct Cost {
     pub stats: u64,
@@ -148,6 +149,7 @@ pub struct Watcher {
     common_dir: PathBuf,
     dirs: HashMap<PathBuf, Listed>,
     racy: Duration,
+    #[cfg(test)]
     cost: Cost,
 }
 
@@ -168,11 +170,13 @@ impl Watcher {
             common_dir,
             dirs: HashMap::new(),
             racy: RACY_WINDOW,
+            #[cfg(test)]
             cost: Cost::default(),
         }
     }
 
     /// System calls made by the last [`Watcher::fingerprint`].
+    #[cfg(test)]
     pub fn last_cost(&self) -> Cost {
         self.cost
     }
@@ -185,7 +189,10 @@ impl Watcher {
 
     /// The fingerprint split by kind of change. Same cost as [`Watcher::fingerprint`].
     pub fn parts(&mut self) -> Parts {
-        self.cost = Cost::default();
+        #[cfg(test)]
+        {
+            self.cost = Cost::default();
+        }
         let now = SystemTime::now();
         let hasher = || std::collections::hash_map::DefaultHasher::new();
         let (mut head, mut refs, mut stash, mut worktrees, mut index) =
@@ -218,8 +225,13 @@ impl Watcher {
         }
     }
 
+    // `self` carries the test-only cost counters; without them it is unused.
+    #[cfg_attr(not(test), allow(clippy::unused_self))]
     fn stamp(&mut self, path: &Path) -> Stamp {
-        self.cost.stats += 1;
+        #[cfg(test)]
+        {
+            self.cost.stats += 1;
+        }
         Stamp::of(fs::symlink_metadata(path).ok().as_ref())
     }
 
@@ -257,8 +269,13 @@ impl Watcher {
     }
 
     /// Subdirectories of `dir`, sorted, and for a racy directory a hash of its entries' stamps.
+    // `self` carries the test-only cost counters; without them it is unused.
+    #[cfg_attr(not(test), allow(clippy::unused_self))]
     fn list(&mut self, dir: &Path, with_entries: bool) -> (Vec<PathBuf>, u64) {
-        self.cost.dir_listings += 1;
+        #[cfg(test)]
+        {
+            self.cost.dir_listings += 1;
+        }
         let mut children = Vec::new();
         let mut entries: Vec<(std::ffi::OsString, Stamp)> = Vec::new();
         if let Ok(rd) = fs::read_dir(dir) {
@@ -267,7 +284,10 @@ impl Watcher {
                     children.push(e.path());
                 }
                 if with_entries {
-                    self.cost.stats += 1;
+                    #[cfg(test)]
+                    {
+                        self.cost.stats += 1;
+                    }
                     entries.push((e.file_name(), Stamp::of(e.metadata().ok().as_ref())));
                 }
             }

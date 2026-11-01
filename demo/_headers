@@ -9,5 +9,13 @@
   Strict-Transport-Security: max-age=63072000; includeSubDomains
   X-Robots-Tag: noindex
 
+# Defence in depth: export only ships inert media under raw/, but should anything else land
+# there, it renders sandboxed, without scripts or the site's origin.
+/raw/*
+  Content-Security-Policy: sandbox; default-src 'none'; style-src 'unsafe-inline'
+
+/r/*/raw/*
+  Content-Security-Policy: sandbox; default-src 'none'; style-src 'unsafe-inline'
+
 /static/*
   Cache-Control: public, max-age=3600

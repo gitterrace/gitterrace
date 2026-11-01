@@ -506,22 +506,22 @@ async fn log(
             let name = list
                 .first()
                 .map_or_else(|| w.to_owned(), |c| c.author.name.clone());
-            let mut back = fmt::href(&format!("/log/{}", fmt::enc(&rev, false)));
+            let mut back = fmt::href(&format!("/log/{}", fmt::enc_seg(&rev)));
             if !path.is_empty() {
-                let _ = write!(back, "?path={}", fmt::enc(&path, true));
+                let _ = write!(back, "?path={}", fmt::enc_path(&path));
             }
             (name, back)
         });
         list.shrink_to_fit();
         let now = fmt::now();
-        let rev_enc = fmt::enc(&rev, false);
+        let rev_enc = fmt::enc_seg(&rev);
         let link = |n: usize| {
             let mut q = format!("/log/{rev_enc}?page={n}");
             if !path.is_empty() {
-                let _ = write!(q, "&path={}", fmt::enc(&path, true));
+                let _ = write!(q, "&path={}", fmt::enc_path(&path));
             }
             if let Some(w) = who {
-                let _ = write!(q, "&author={}", fmt::enc(w, false));
+                let _ = write!(q, "&author={}", fmt::enc_seg(w));
             }
             fmt::href(&q)
         };
@@ -623,17 +623,17 @@ async fn tree(
         let id = a.repo.resolve(&rev)?;
         let path = path.trim_matches('/').to_owned();
         let list = a.repo.tree(&id, &path)?;
-        let rev_enc = fmt::enc(&rev, false);
+        let rev_enc = fmt::enc_seg(&rev);
         let up = path
             .rsplit_once('/')
-            .map(|(parent, _)| fmt::href(&format!("/tree/{rev_enc}/{}", fmt::enc(parent, true))));
+            .map(|(parent, _)| fmt::href(&format!("/tree/{rev_enc}/{}", fmt::enc_path(parent))));
         let up = match (up, path.is_empty()) {
             (Some(u), _) => Some(u),
             (None, false) => Some(fmt::href(&format!("/tree/{rev_enc}"))),
             (None, true) => None,
         };
         let docs = crate::about::find(&list);
-        let page = format!("/tree/{rev_enc}/{}", fmt::enc(&path, true));
+        let page = format!("/tree/{rev_enc}/{}", fmt::enc_path(&path));
         let about = crate::about::card(
             a,
             &id,
@@ -656,7 +656,7 @@ async fn tree(
             },
             crumbs: views::crumbs(&rev, &path, false),
             entries: views::entries(&rev, &path, &list),
-            path_enc: fmt::enc(&path, true),
+            path_enc: fmt::enc_path(&path),
             rev_enc,
             up,
         })
@@ -741,7 +741,7 @@ async fn blob(
             let dir = path.rsplit_once('/').map_or("", |(d, _)| d);
             markdown::render_with(t, markdown::Base::new(&rev, dir))
         });
-        let (r, pe) = (fmt::enc(&rev, false), fmt::enc(&path, true));
+        let (r, pe) = (fmt::enc_seg(&rev), fmt::enc_path(&path));
         Ok(BlobPage {
             c: Chrome {
                 md: rendered.is_some(),
@@ -787,16 +787,16 @@ async fn blame(
             lines.is_empty() && a.repo.blob(&id, &path)?.size > a.repo.text_limit();
         let raw = fmt::href(&format!(
             "/raw/{}/{}",
-            fmt::enc(&rev, false),
-            fmt::enc(&path, true)
+            fmt::enc_seg(&rev),
+            fmt::enc_path(&path)
         ));
         Ok(BlamePage {
             c: views::chrome_at(a, "files", &rev),
             crumbs: views::crumbs(&rev, &path, true),
             blob_href: fmt::href(&format!(
                 "/blob/{}/{}",
-                fmt::enc(&rev, false),
-                fmt::enc(&path, true)
+                fmt::enc_seg(&rev),
+                fmt::enc_path(&path)
             )),
             html: if too_large {
                 format!(
@@ -839,7 +839,7 @@ async fn refs(State(app): Shared) -> Result<Html<String>> {
             .iter()
             .filter(|r| r.kind == RefKind::Tag)
             .map(|r| TagRow {
-                href: fmt::href(&format!("/tag/{}", fmt::enc(&r.name, false))),
+                href: fmt::href(&format!("/tag/{}", fmt::enc_seg(&r.name))),
                 subject: r
                     .annotation
                     .as_ref()

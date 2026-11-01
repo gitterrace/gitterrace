@@ -23,6 +23,7 @@ mod stats;
 
 use std::sync::{Arc, OnceLock};
 
+pub(crate) use gitterrace_git::days_from_civil;
 use gitterrace_git::{IgnoreSet, civil_from_days as civil};
 
 use crate::{CommitRecord, FileStat};
@@ -303,17 +304,6 @@ pub(crate) fn year_of(r: &CommitRecord) -> i64 {
     civil(local_day(r)).0
 }
 
-/// Inverse of `civil`.
-pub(crate) fn days_from_civil(y: i64, m: i64, d: i64) -> i64 {
-    let y = y - i64::from(m <= 2);
-    let era = y.div_euclid(400);
-    let yoe = y.rem_euclid(400);
-    let mp = (m + 9) % 12;
-    let doy = (153 * mp + 2) / 5 + d - 1;
-    let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
-    era * 146_097 + doe - 719_468
-}
-
 #[cfg(test)]
 pub(crate) mod fixtures {
     use crate::{CommitRecord, FileStat};
@@ -346,8 +336,7 @@ pub(crate) mod fixtures {
 
 #[cfg(test)]
 mod tests {
-    use super::{bus_factor, days_from_civil};
-    use gitterrace_git::civil_from_days as civil;
+    use super::bus_factor;
 
     #[test]
     fn bus_factor_counts_who_hold_at_least_half() {
@@ -358,13 +347,5 @@ mod tests {
         assert_eq!(bus_factor([1.0, 4.0]), 1);
         assert_eq!(bus_factor([0.0, 0.0]), 0);
         assert_eq!(bus_factor(std::iter::empty()), 0);
-    }
-
-    #[test]
-    fn civil_round_trip() {
-        for d in [-1000, 0, 19_723, 19_782, 20_000] {
-            let (y, m, dd) = civil(d);
-            assert_eq!(days_from_civil(y, m, dd), d);
-        }
     }
 }

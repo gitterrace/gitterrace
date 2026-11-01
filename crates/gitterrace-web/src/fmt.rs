@@ -1,9 +1,11 @@
 //! Small formatting helpers shared by view models.
 
-use gitterrace_git::civil_from_days as civil;
+use gitterrace_git::{civil_from_days as civil, percent_decode};
 
-/// The one percent-encoding rule; `/` survives only when the flag is set.
-pub(crate) use gitterrace_git::percent_encode as enc;
+/// The one percent-encoding rule: `enc_path` keeps `/`, `enc_seg` encodes it.
+pub(crate) use gitterrace_git::{
+    percent_encode_path as enc_path, percent_encode_segment as enc_seg,
+};
 
 /// The favicon `<link>`, the same file the page templates include, for pages built as strings.
 pub(crate) const FAVICON: &str = include_str!("../templates/favicon.html");
@@ -119,7 +121,7 @@ fn with_selected(path: &str) -> std::borrow::Cow<'_, str> {
         return path.into();
     }
     let sep = if head.contains('?') { '&' } else { '?' };
-    let mut out = format!("{head}{sep}rev={}", enc(&rev, false));
+    let mut out = format!("{head}{sep}rev={}", enc_seg(&rev));
     if let Some(f) = frag {
         out.push('#');
         out.push_str(f);
@@ -134,7 +136,7 @@ pub(crate) fn selected() -> String {
 
 /// `selected` percent-encoded as one path segment, for `/log/{rev}`-style links.
 pub(crate) fn selected_seg() -> String {
-    enc(&selected(), false)
+    enc_seg(&selected())
 }
 
 /// Runs `f` with [`selected`] answering `rev`.
@@ -157,29 +159,6 @@ pub(crate) fn rev_param(query: Option<&str>) -> String {
         })
         .filter(|v| !v.is_empty())
         .unwrap_or_else(|| "HEAD".to_owned())
-}
-
-fn percent_decode(s: &str) -> String {
-    let b = s.as_bytes();
-    let mut out = Vec::with_capacity(b.len());
-    let mut i = 0;
-    while i < b.len() {
-        let hex = |c: u8| char::from(c).to_digit(16);
-        if b[i] == b'%'
-            && let (Some(h), Some(l)) = (
-                b.get(i + 1).copied().and_then(hex),
-                b.get(i + 2).copied().and_then(hex),
-            )
-        {
-            #[allow(clippy::cast_possible_truncation)]
-            out.push((h * 16 + l) as u8);
-            i += 3;
-        } else {
-            out.push(b[i]);
-            i += 1;
-        }
-    }
-    String::from_utf8_lossy(&out).into_owned()
 }
 
 /// Prefix `href` adds on this thread, for templates and the JS meta tag.
@@ -260,15 +239,12 @@ pub(crate) fn esc_text(s: &str) -> String {
 }
 
 pub(crate) fn esc(s: &str) -> String {
-    s.replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-        .replace('"', "&quot;")
+    esc_text(s).replace('"', "&quot;")
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::fmt::{ago, date, day_label, enc, size, thousands, with_dates};
+    use crate::fmt::{ago, date, day_label, size, thousands, with_dates};
 
     #[test]
     fn formats_epoch_and_offset() {
@@ -301,11 +277,5 @@ mod tests {
         assert_eq!(day_label(0, 0, 86_400), "Yesterday");
         assert_eq!(day_label(0, 0, 86_400 * 10), "Jan 1");
         assert_eq!(day_label(0, 0, 86_400 * 400), "Jan 1, 1970");
-    }
-
-    #[test]
-    fn encodes_paths() {
-        assert_eq!(enc("a b/c#", true), "a%20b/c%23");
-        assert_eq!(enc("a/b", false), "a%2Fb");
     }
 }

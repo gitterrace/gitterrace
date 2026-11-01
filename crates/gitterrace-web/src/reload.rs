@@ -12,7 +12,7 @@ use gitterrace_config::{Config, ConfigError};
 use crate::app::Env;
 
 /// How often `config.toml` is checked, the same beat as `actions.toml`.
-pub(crate) const POLL: Duration = Duration::from_secs(1);
+const POLL: Duration = Duration::from_secs(1);
 
 /// Re-reads the settings the way startup did, flags included, so a flag still beats the file.
 pub type Load = Box<dyn Fn() -> Result<Config, ConfigError> + Send + Sync>;

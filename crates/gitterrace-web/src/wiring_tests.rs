@@ -654,7 +654,10 @@ async fn hovers_use_the_shared_tip() {
     let r = router(&p, Config::default());
     let (_, body) = get(&r, "/refs").await;
     assert!(body.contains("data-tip="), "the page has a tip");
-    assert!(body.contains("/static/tip.js"), "a page with a tip loads tip.js");
+    assert!(
+        body.contains("/static/tip.js"),
+        "a page with a tip loads tip.js"
+    );
 }
 
 /// `links.style` decides what Copy permalink copies: the page tells the scripts which form.
@@ -742,7 +745,10 @@ async fn action_chords_are_wired_and_listed_in_the_help_sheet() {
         "menu carries the key"
     );
     let nav = include_str!("../static/nav.js");
-    assert!(nav.contains("\"a \" + a.key"), "the ? sheet lists `a <key>`");
+    assert!(
+        nav.contains("\"a \" + a.key"),
+        "the ? sheet lists `a <key>`"
+    );
 }
 
 #[tokio::test]

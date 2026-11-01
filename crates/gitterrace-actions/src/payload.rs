@@ -4,7 +4,7 @@
 
 use std::collections::BTreeMap;
 
-use gitterrace_git::{Repo, civil_from_days, percent_encode};
+use gitterrace_git::{Repo, civil_from_days, percent_encode_path};
 use serde::{Deserialize, Serialize};
 
 use crate::config::Kind;
@@ -336,11 +336,11 @@ pub fn permalink(
     let mut url = format!(
         "{}/go/{}/{sha}",
         origin.trim_end_matches('/'),
-        percent_encode(id.unwrap_or(name), true)
+        percent_encode_path(id.unwrap_or(name))
     );
     if let Some(p) = path {
         url.push('/');
-        url.push_str(&percent_encode(p, true));
+        url.push_str(&percent_encode_path(p));
     }
     if let Some(l) = lines {
         url = if l.start == l.end {

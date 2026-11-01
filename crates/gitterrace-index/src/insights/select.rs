@@ -213,7 +213,9 @@ mod tests {
             ["a", "c"]
         );
         assert!(out.iter().all(|r| r.files.len() == 1));
-        assert!(under("crates/web/a.rs", "crates/web") && !under("crates/webby/d.rs", "crates/web"));
+        assert!(
+            under("crates/web/a.rs", "crates/web") && !under("crates/webby/d.rs", "crates/web")
+        );
     }
 
     #[test]

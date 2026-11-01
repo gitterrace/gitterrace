@@ -25,7 +25,7 @@ use gitterrace_actions::{
 };
 use gitterrace_git::Repo;
 
-use crate::fmt::{enc, esc};
+use crate::fmt::{enc_path, esc};
 
 pub(crate) const RUN_PATH: &str = "/_actions/run";
 const STATUS_PATH: &str = "/_actions/status";
@@ -318,9 +318,9 @@ async fn go(State(site): State<Arc<Site>>, UrlPath(rest): UrlPath<String>) -> Re
         let url = match &path {
             None => format!("{}/commit/{sha}", t.base),
             Some(p) if t.repo.blob(&sha, p).is_ok() => {
-                format!("{}/blob/{sha}/{}", t.base, enc(p, true))
+                format!("{}/blob/{sha}/{}", t.base, enc_path(p))
             }
-            Some(p) => format!("{}/tree/{sha}/{}", t.base, enc(p, true)),
+            Some(p) => format!("{}/tree/{sha}/{}", t.base, enc_path(p)),
         };
         Some(url)
     })

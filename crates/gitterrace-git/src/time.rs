@@ -14,9 +14,28 @@ pub fn civil_from_days(days: i64) -> (i64, i64, i64) {
     (yoe + era * 400 + i64::from(m <= 2), m, d)
 }
 
+/// Inverse of `civil_from_days`.
+pub fn days_from_civil(y: i64, m: i64, d: i64) -> i64 {
+    let y = y - i64::from(m <= 2);
+    let era = y.div_euclid(400);
+    let yoe = y.rem_euclid(400);
+    let mp = (m + 9) % 12;
+    let doy = (153 * mp + 2) / 5 + d - 1;
+    let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
+    era * 146_097 + doe - 719_468
+}
+
 #[cfg(test)]
 mod tests {
-    use crate::civil_from_days;
+    use crate::{civil_from_days, days_from_civil};
+
+    #[test]
+    fn civil_round_trip() {
+        for d in [-1000, 0, 19_723, 19_782, 20_000] {
+            let (y, m, dd) = civil_from_days(d);
+            assert_eq!(days_from_civil(y, m, dd), d);
+        }
+    }
 
     #[test]
     fn pins_known_dates() {

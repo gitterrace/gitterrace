@@ -15,7 +15,7 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
 
-use gitterrace_git::percent_encode;
+use gitterrace_git::percent_encode_segment;
 
 use crate::config::{Action, Cwd, Piece, REPO_FIELDS, Stdin, field_parts, pieces};
 use crate::payload::Payload;
@@ -231,7 +231,7 @@ pub fn expand(template: &[String], payload: &Payload) -> Result<Vec<String>, Run
                     // The NUL check and the caps see the encoded value, the one passed on.
                     let v = match modifier {
                         None => raw,
-                        Some("url") => percent_encode(&raw, false),
+                        Some("url") => percent_encode_segment(&raw),
                         Some(m) => {
                             return Err(RunError::Refused(format!(
                                 "{{{name}}}: unknown modifier :{m}"

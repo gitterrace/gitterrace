@@ -16,8 +16,8 @@ use crate::{
     charts,
     error::Result,
     filter::{Dim, Filter, FilterBar, NO_SCOPE},
-    insights::{InsightsQuery, Kpi, OptLink, insights, period_of, scoped},
     fmt::{self, href},
+    insights::{InsightsQuery, Kpi, OptLink, insights, period_of, scoped},
     routes::Shared,
     views::{self, Chrome, CommitRow, Row, Tabs},
 };
@@ -85,7 +85,6 @@ struct TypesPage {
     newer: Option<String>,
     older: Option<String>,
 }
-
 
 fn label_rows(v: &[LabelCount], link: impl Fn(&str) -> String) -> Vec<Row> {
     let max = v.first().map_or(0, |l| l.commits as u64);
@@ -214,7 +213,10 @@ fn build(a: &crate::app::App, all: &[CommitRecord], c: Chrome, tq: &TypesQuery) 
         Kpi("Commits", fmt::thousands(n)),
         Kpi("Authors", fmt::thousands(sum.authors)),
         Kpi("Lines added", format!("+{}", fmt::thousands(sum.additions))),
-        Kpi("Lines removed", format!("-{}", fmt::thousands(sum.deletions))),
+        Kpi(
+            "Lines removed",
+            format!("-{}", fmt::thousands(sum.deletions)),
+        ),
         Kpi("Average commit", format!("{} lines", fmt::thousands(size))),
     ];
 
@@ -252,12 +254,11 @@ fn build(a: &crate::app::App, all: &[CommitRecord], c: Chrome, tq: &TypesQuery) 
 
     let mut groups = Vec::new();
     if f.scope().is_none() {
-        let scopes = &scope_counts;
         groups.push(Group {
             title: "Scopes",
             hint: "The part of the code a commit says it touches, from type(scope). Click one to narrow to it; none means no scope given.",
             lines: false,
-            rows: label_rows(scopes, |l| f.link(BASE, Dim::Scope, l)),
+            rows: label_rows(&scope_counts, |l| f.link(BASE, Dim::Scope, l)),
         });
     }
     let dirs = ins
@@ -297,7 +298,7 @@ fn build(a: &crate::app::App, all: &[CommitRecord], c: Chrome, tq: &TypesQuery) 
                 href(&format!(
                     "/blob/{}/{}",
                     fmt::selected_seg(),
-                    fmt::enc(&x.path, true)
+                    fmt::enc_path(&x.path)
                 )),
                 x.commits,
                 x.additions,

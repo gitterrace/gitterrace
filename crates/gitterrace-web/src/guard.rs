@@ -20,7 +20,7 @@ const CSP: &str = "default-src 'self'; img-src 'self' data:; media-src 'self'; s
 
 /// Host-header allowlist: loopback names plus, when bound elsewhere, the bound IP. A bind to
 /// an unspecified address (`0.0.0.0`, `::`) accepts any IP literal: rebinding needs a name.
-pub(crate) fn host_allowed(host: &str, bound: Option<IpAddr>) -> bool {
+fn host_allowed(host: &str, bound: Option<IpAddr>) -> bool {
     let name = match host.strip_prefix('[') {
         Some(rest) => match rest.split_once(']') {
             Some((ip, _)) => ip,

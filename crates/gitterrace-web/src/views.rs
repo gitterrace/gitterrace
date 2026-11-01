@@ -7,7 +7,7 @@ use gitterrace_git::{
     TreeEntryKind,
 };
 
-use crate::fmt::{ago, date, enc, esc, esc_text, href, sha_link};
+use crate::fmt::{ago, date, enc_path, enc_seg, esc, esc_text, href, sha_link};
 
 const MAX_BLOB_LINES: usize = 20_000;
 
@@ -172,13 +172,13 @@ pub(crate) fn chrome_at(app: &crate::app::App, active: &str, rev: &str) -> Chrom
         branch: app.repo.head_branch().unwrap_or_else(|| "HEAD".to_owned()),
         md: false,
         rev: rev.to_owned(),
-        rev_enc: enc(rev, false),
+        rev_enc: enc_seg(rev),
         commit: app.repo.resolve(rev).unwrap_or_default(),
         dirty: app.dirty(),
         nav: items
             .into_iter()
             .map(|(path, label, key)| Nav {
-                href: href(&path.replace("{rev}", &enc(rev, false))),
+                href: href(&path.replace("{rev}", &enc_seg(rev))),
                 label,
                 on: key == active,
             })
@@ -325,7 +325,7 @@ pub(crate) fn author_href(email: &str) -> String {
     href(&format!(
         "/log/{}?author={}",
         crate::fmt::selected_seg(),
-        enc(email, false)
+        enc_seg(email)
     ))
 }
 
@@ -345,7 +345,7 @@ pub(crate) fn commit_row(c: &CommitSummary, now: i64) -> CommitRow {
 
 /// Breadcrumbs for `path` under `rev`; `kind` is `tree` for every part but the last of a blob.
 pub(crate) fn crumbs(rev: &str, path: &str, last_is_file: bool) -> Vec<Crumb> {
-    let r = enc(rev, false);
+    let r = enc_seg(rev);
     let mut out = vec![Crumb {
         name: rev.to_owned(),
         href: href(&format!("/tree/{r}")),
@@ -364,7 +364,7 @@ pub(crate) fn crumbs(rev: &str, path: &str, last_is_file: bool) -> Vec<Crumb> {
         };
         out.push(Crumb {
             name: (*p).to_owned(),
-            href: href(&format!("/{kind}/{r}/{}", enc(&acc, true))),
+            href: href(&format!("/{kind}/{r}/{}", enc_path(&acc))),
         });
     }
     out
@@ -378,8 +378,8 @@ pub(crate) fn entries(rev: &str, path: &str, list: &[TreeEntry]) -> Vec<Entry> {
     };
     list.iter()
         .map(|e| {
-            let full = enc(&format!("{base}{}", e.name), true);
-            let r = enc(rev, false);
+            let full = enc_path(&format!("{base}{}", e.name));
+            let r = enc_seg(rev);
             let (href, kind) = match e.kind {
                 TreeEntryKind::Dir => (href(&format!("/tree/{r}/{full}")), "dir"),
                 TreeEntryKind::File => (
@@ -408,7 +408,7 @@ pub(crate) fn ref_rows(refs: &[RefInfo], kind: gitterrace_git::RefKind, now: i64
         .filter(|r| r.kind == kind)
         .map(|r| RefRow {
             name: r.name.clone(),
-            log: href(&format!("/log/{}", enc(&r.name, false))),
+            log: href(&format!("/log/{}", enc_seg(&r.name))),
             commit: sha_link(&r.target),
             when: ago(r.time, now),
         })
@@ -466,7 +466,7 @@ const TOTAL_DIFF_BYTES: usize = 250_000;
 const CHUNK_LINES: usize = 100;
 
 /// The hunks of one file as line blocks. Also the body of the fragment a folded file loads.
-pub(crate) fn diff_body_html(f: &FileDiff) -> String {
+fn diff_body_html(f: &FileDiff) -> String {
     let mut out = String::from("<div class=\"diffwrap\"><div class=\"diff\">");
     let mut in_chunk = 0usize;
     let total: usize = f
@@ -555,7 +555,7 @@ pub(crate) fn diff_html_with(
             let _ = write!(
                 out,
                 "<a href=\"{}\">{}</a>",
-                crate::fmt::href(&format!("/blob/{}/{}", enc(rev, false), enc(&f.path, true))),
+                crate::fmt::href(&format!("/blob/{}/{}", enc_seg(rev), enc_path(&f.path))),
                 esc(&file_label(f))
             );
         } else {
@@ -602,7 +602,7 @@ pub(crate) fn diff_html_with(
                     out,
                     "<p class=\"muted pad\"><button type=\"button\" class=\"linkbtn\" data-load-diff=\"{}/diff/{}/{i}\">Load diff ({} changed lines)</button></p>",
                     crate::fmt::base(),
-                    enc(rev, false),
+                    enc_seg(rev),
                     crate::fmt::thousands(changed)
                 );
             } else {

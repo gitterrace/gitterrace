@@ -3,7 +3,7 @@
 //! arrives from outside (a chat, a terminal, the OS handler) and drives a local lookup, so the
 //! parser is strict: anything it does not expect is refused, never repaired.
 
-use gitterrace_git::percent_encode;
+use gitterrace_git::percent_encode_path;
 
 use crate::payload::{Lines, permalink};
 
@@ -176,7 +176,7 @@ pub(crate) fn tail(sha: &str, path: Option<&str>, lines: Option<Lines>) -> Strin
     let mut s = format!("/{sha}");
     if let Some(p) = path {
         s.push('/');
-        s.push_str(&percent_encode(p, true));
+        s.push_str(&percent_encode_path(p));
     }
     match lines {
         Some(l) if l.start == l.end => {

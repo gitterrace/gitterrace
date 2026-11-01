@@ -46,7 +46,7 @@ pub(crate) struct Line {
     pub(crate) hit: bool,
 }
 
-pub(crate) struct FileHits {
+struct FileHits {
     pub(crate) path: String,
     pub(crate) href: String,
     pub(crate) count: usize,
@@ -147,11 +147,7 @@ fn run(a: &App, q: SearchQuery) -> Result<SearchPage> {
     Ok(page)
 }
 
-pub(crate) fn build_regex(
-    q: &str,
-    is_regex: bool,
-    case: bool,
-) -> std::result::Result<Regex, String> {
+fn build_regex(q: &str, is_regex: bool, case: bool) -> std::result::Result<Regex, String> {
     let pat = if is_regex {
         q.to_owned()
     } else {
@@ -172,7 +168,7 @@ pub(crate) fn build_regex(
 }
 
 /// Comma separated globs. Without a `/` a glob matches a file name at any depth.
-pub(crate) fn glob_regex(glob: &str) -> std::result::Result<Option<Regex>, String> {
+fn glob_regex(glob: &str) -> std::result::Result<Option<Regex>, String> {
     let parts: Vec<&str> = glob
         .split(',')
         .map(str::trim)
@@ -242,7 +238,7 @@ fn search_code(a: &App, rev: &str, re: &Regex, glob: Option<&Regex>) -> Result<C
     let workers = std::thread::available_parallelism()
         .map_or(2, usize::from)
         .min(8);
-    let rev_enc = fmt::enc(rev, false);
+    let rev_enc = fmt::enc_seg(rev);
     std::thread::scope(|s| {
         for _ in 0..workers {
             s.spawn(|| {
@@ -291,7 +287,7 @@ fn search_code(a: &App, rev: &str, re: &Regex, glob: Option<&Regex>) -> Result<C
 }
 
 /// Hit lines of one file, each with one line of context before and after.
-pub(crate) fn file_hits(path: &str, rev_enc: &str, text: &str, re: &Regex) -> FileHits {
+fn file_hits(path: &str, rev_enc: &str, text: &str, re: &Regex) -> FileHits {
     let lines: Vec<&str> = text.lines().collect();
     let mut hit_idx = Vec::new();
     for (i, l) in lines.iter().enumerate() {
@@ -331,7 +327,7 @@ pub(crate) fn file_hits(path: &str, rev_enc: &str, text: &str, re: &Regex) -> Fi
         last = Some(to);
     }
     FileHits {
-        href: fmt::href(&format!("/blob/{rev_enc}/{}", fmt::enc(path, true))),
+        href: fmt::href(&format!("/blob/{rev_enc}/{}", fmt::enc_path(path))),
         path: path.to_owned(),
         count: hit_idx.len(),
         lines: out,

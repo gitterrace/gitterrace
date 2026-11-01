@@ -23,7 +23,7 @@ impl Base {
     /// `rev` is the revision exactly as typed in the URL, `dir` the file's directory.
     pub(crate) fn new(rev: &str, dir: &str) -> Self {
         Self {
-            rev: crate::fmt::enc(rev, false),
+            rev: crate::fmt::enc_seg(rev),
             dir: dir.trim_matches('/').to_owned(),
         }
     }

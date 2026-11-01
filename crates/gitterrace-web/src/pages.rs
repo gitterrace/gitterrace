@@ -11,7 +11,7 @@ use crate::{
     charts,
     error::Result,
     filter::{Dim, FilterBar},
-    fmt::{self, enc, href},
+    fmt::{self, enc_path, enc_seg, href},
     insights::{
         InsightsQuery, Kpi, OptLink, cached, cached_keyed, head_lines, insights, period_of, scoped,
     },
@@ -25,7 +25,7 @@ const TOP_DIRS: usize = 40;
 const TOP_PAIRS: usize = 30;
 
 fn file_link(path: &str) -> String {
-    href(&format!("/history/{}", enc(path, true)))
+    href(&format!("/history/{}", enc_path(path)))
 }
 
 fn delta(now: u64, before: Option<u64>) -> (String, &'static str) {
@@ -418,7 +418,7 @@ pub(crate) async fn patterns(
             .rev()
             .take(15)
             .map(|rl| ReleaseRow {
-                href: href(&format!("/log/{}", enc(&rl.name, false))),
+                href: href(&format!("/log/{}", enc_seg(&rl.name))),
                 name: rl.name.clone(),
                 when: fmt::day(rl.time),
                 commits: fmt::thousands(rl.commits_since),
@@ -507,7 +507,7 @@ pub(crate) async fn compare(
             .map(|x| {
                 (
                     x.name.clone(),
-                    href(&format!("/compare?base={}&head=HEAD", enc(&x.name, false))),
+                    href(&format!("/compare?base={}&head=HEAD", enc_seg(&x.name))),
                 )
             })
             .take(12)
@@ -645,12 +645,12 @@ pub(crate) async fn history(
             blob_href: href(&format!(
                 "/blob/{}/{}",
                 fmt::selected_seg(),
-                enc(&path, true)
+                enc_path(&path)
             )),
             blame_href: href(&format!(
                 "/blame/{}/{}",
                 fmt::selected_seg(),
-                enc(&path, true)
+                enc_path(&path)
             )),
             path,
             rows,

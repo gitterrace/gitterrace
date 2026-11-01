@@ -9,7 +9,7 @@
 
 use std::collections::BTreeMap;
 
-use gitterrace_git::percent_encode;
+use gitterrace_git::percent_encode_segment;
 use serde::{Deserialize, Serialize};
 
 use crate::config::{Piece, pieces};
@@ -99,7 +99,7 @@ pub fn fill(parts: &[Part], values: &BTreeMap<String, String>) -> String {
         .iter()
         .map(|p| match p {
             Part::Lit(s) => s.clone(),
-            Part::Ph(n) => percent_encode(values.get(n).map_or("", String::as_str), false),
+            Part::Ph(n) => percent_encode_segment(values.get(n).map_or("", String::as_str)),
         })
         .collect()
 }

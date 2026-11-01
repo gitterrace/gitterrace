@@ -3,7 +3,7 @@
 
 use std::fmt::Write as _;
 
-use crate::fmt::{enc, esc, href, size};
+use crate::fmt::{enc_path, enc_seg, esc, href, size};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Kind {
@@ -60,7 +60,7 @@ pub(crate) fn content_type(path: &str) -> &'static str {
 
 /// Whether `/raw` may drop the sandbox. Only formats the browser renders without running
 /// author code: scripts live in SVG and HTML, so those keep the sandbox.
-pub(crate) fn plain_media(path: &str) -> bool {
+pub fn plain_media(path: &str) -> bool {
     matches!(kind(path), Some(Kind::Image | Kind::Audio | Kind::Video))
 }
 
@@ -131,7 +131,7 @@ fn webp(b: &[u8]) -> Option<(u32, u32)> {
 }
 
 /// Pixel size read from the file header, for the formats where that is a few bytes.
-pub(crate) fn dimensions(path: &str, b: &[u8]) -> Option<(u32, u32)> {
+fn dimensions(path: &str, b: &[u8]) -> Option<(u32, u32)> {
     match ext(path).as_str() {
         "png" if b.starts_with(b"\x89PNG") => Some((be32(b, 16)?, be32(b, 20)?)),
         "gif" if b.starts_with(b"GIF8") => Some((le16(b, 6)?, le16(b, 8)?)),
@@ -146,7 +146,7 @@ pub(crate) fn dimensions(path: &str, b: &[u8]) -> Option<(u32, u32)> {
 }
 
 fn raw_url(rev: &str, path: &str) -> String {
-    href(&format!("/raw/{}/{}", enc(rev, false), enc(path, true)))
+    href(&format!("/raw/{}/{}", enc_seg(rev), enc_path(path)))
 }
 
 /// One `<img>` (or media element) for `path` at `rev`.

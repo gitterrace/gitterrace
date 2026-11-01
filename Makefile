@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: build run fmt lint test doc theme actions docs-gen docs-check names check site-png help bench bench-large bench-report bench-clean bench-guard browser-check
+.PHONY: build run fmt lint test doc theme actions docs-gen docs-check names check site-png help bench bench-large bench-report bench-clean bench-guard browser-check site deploy stage shipped domains demo send-vectors
 
 ## build: Release binary
 build:

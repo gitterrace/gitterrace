@@ -299,7 +299,8 @@ mod tests {
                 assert!(a.contains(">41<"));
                 assert!(a.contains("demo"));
                 assert!(a.contains("alice"));
-                assert!(!a.contains("http://") || !a.contains("href"));
+                // The card is inert: no links, only the xmlns namespace URI.
+                assert!(!a.contains("href"));
                 usvg::Tree::from_str(&a, &usvg::Options::default()).expect("parses");
             }
         }
@@ -308,20 +309,20 @@ mod tests {
             wrapped_svg(&w, Layout::Landscape, Theme::Dark),
         );
         assert_ne!(l, d);
-    }
 
-    #[test]
-    fn escapes_names() {
-        let w = wrapped_stats("<b>&", &sample(), 2025);
-        let a = wrapped_svg(&w, Layout::Landscape, Theme::Light);
-        assert!(a.contains("&lt;b&gt;&amp;"));
-        usvg::Tree::from_str(&a, &usvg::Options::default()).expect("parses");
-    }
-
-    #[test]
-    fn empty_year_still_renders() {
-        let w = wrapped_stats("demo", &sample(), 1999);
-        let a = wrapped_svg(&w, Layout::Portrait, Theme::Dark);
-        usvg::Tree::from_str(&a, &usvg::Options::default()).expect("parses");
+        // Hostile names are escaped, and a year with no commits still renders.
+        let hostile = wrapped_svg(
+            &wrapped_stats("<b>&", &sample(), 2025),
+            Layout::Landscape,
+            Theme::Light,
+        );
+        assert!(hostile.contains("&lt;b&gt;&amp;"));
+        usvg::Tree::from_str(&hostile, &usvg::Options::default()).expect("parses");
+        let empty = wrapped_svg(
+            &wrapped_stats("demo", &sample(), 1999),
+            Layout::Portrait,
+            Theme::Dark,
+        );
+        usvg::Tree::from_str(&empty, &usvg::Options::default()).expect("parses");
     }
 }
