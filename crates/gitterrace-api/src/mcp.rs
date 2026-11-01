@@ -17,6 +17,38 @@ pub struct McpServer {
     state: ApiState,
 }
 
+/// One MCP tool parameter, from the tool's input schema.
+#[derive(Debug)]
+pub struct Param {
+    pub name: String,
+    pub ty: String,
+    pub required: bool,
+    pub description: String,
+}
+
+/// One MCP tool as the API reference shows it.
+#[derive(Debug)]
+pub struct ToolDoc {
+    pub name: String,
+    pub description: String,
+    pub params: Vec<Param>,
+    pub read_only: bool,
+}
+
+/// The JSON type of a schema property. `Option<T>` fields come as `["integer", "null"]`.
+fn schema_type(schema: &Value) -> String {
+    match schema.get("type") {
+        Some(Value::String(t)) => t.clone(),
+        Some(Value::Array(ts)) => ts
+            .iter()
+            .filter_map(Value::as_str)
+            .find(|t| *t != "null")
+            .unwrap_or("any")
+            .to_owned(),
+        _ => "any".to_owned(),
+    }
+}
+
 impl McpServer {
     pub fn new(state: ApiState) -> Self {
         Self { state }
@@ -31,6 +63,55 @@ impl McpServer {
             .collect();
         names.sort();
         names
+    }
+
+    /// Every tool as documentation data, sorted by name, read from the live registry.
+    pub fn tool_docs() -> Vec<ToolDoc> {
+        let mut docs: Vec<ToolDoc> = Self::tool_router()
+            .list_all()
+            .into_iter()
+            .map(|t| {
+                let required: Vec<&str> = t
+                    .input_schema
+                    .get("required")
+                    .and_then(Value::as_array)
+                    .map(|a| a.iter().filter_map(Value::as_str).collect())
+                    .unwrap_or_default();
+                let mut params: Vec<Param> = t
+                    .input_schema
+                    .get("properties")
+                    .and_then(Value::as_object)
+                    .map(|props| {
+                        props
+                            .iter()
+                            .map(|(name, schema)| Param {
+                                name: name.clone(),
+                                ty: schema_type(schema),
+                                required: required.contains(&name.as_str()),
+                                description: schema
+                                    .get("description")
+                                    .and_then(Value::as_str)
+                                    .unwrap_or_default()
+                                    .to_owned(),
+                            })
+                            .collect()
+                    })
+                    .unwrap_or_default();
+                params.sort_by(|a, b| a.name.cmp(&b.name));
+                ToolDoc {
+                    name: t.name.to_string(),
+                    description: t.description.as_deref().unwrap_or_default().to_owned(),
+                    params,
+                    read_only: t
+                        .annotations
+                        .as_ref()
+                        .and_then(|a| a.read_only_hint)
+                        .unwrap_or(false),
+                }
+            })
+            .collect();
+        docs.sort_by(|a, b| a.name.cmp(&b.name));
+        docs
     }
 
     async fn run<F>(&self, f: F) -> Result<CallToolResult, ErrorData>

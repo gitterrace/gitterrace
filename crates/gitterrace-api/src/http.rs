@@ -4,30 +4,22 @@ use axum::extract::{Path, Query, State};
 use axum::http::{HeaderValue, Request, StatusCode, header};
 use axum::middleware::{self, Next};
 use axum::response::{IntoResponse, Response};
-use axum::routing::get;
 use serde::Deserialize;
 use serde_json::{Value, json};
 
 use crate::core::ApiState;
+use crate::endpoints::{self, ENDPOINTS};
 use crate::error::ApiError;
 use crate::insights::{self, INSIGHTS};
 
 type Reply = Result<Json<Value>, ApiError>;
 
-/// The read-only JSON API. Nest it under `/api/v1`.
+/// The read-only JSON API. Nest it under `/api/v1`. Routes come from [`ENDPOINTS`], so an
+/// endpoint cannot exist without its documentation.
 pub fn router(state: ApiState) -> Router {
-    Router::new()
-        .route("/", get(index))
-        .route("/repo", get(repo))
-        .route("/refs", get(refs))
-        .route("/log", get(log))
-        .route("/commits/{id}", get(commit))
-        .route("/tree", get(tree))
-        .route("/blob", get(blob))
-        .route("/blame", get(blame))
-        .route("/contributors", get(contributors))
-        .route("/insights", get(insight_list))
-        .route("/insights/{name}", get(insight))
+    ENDPOINTS
+        .iter()
+        .fold(Router::new(), |r, e| r.route(e.path, (e.route)()))
         .layer(middleware::from_fn_with_state(state.clone(), etag))
         .with_state(state)
 }
@@ -74,35 +66,35 @@ async fn etag(
     res
 }
 
-async fn index() -> Json<Value> {
+pub(crate) async fn index() -> Json<Value> {
     let insights: Vec<Value> = INSIGHTS
         .iter()
         .map(|i| json!({ "name": i.name, "summary": i.summary }))
         .collect();
     Json(json!({
         "version": 1,
-        "endpoints": ["/repo", "/refs", "/log", "/commits/{id}", "/tree", "/blob", "/blame", "/contributors", "/insights", "/insights/{name}"],
+        "endpoints": endpoints::all(),
         "insights": insights,
     }))
 }
 
-async fn repo(State(s): State<ApiState>) -> Reply {
+pub(crate) async fn repo(State(s): State<ApiState>) -> Reply {
     blocking(&s, ApiState::repo_info).await
 }
 
-async fn refs(State(s): State<ApiState>) -> Reply {
+pub(crate) async fn refs(State(s): State<ApiState>) -> Reply {
     blocking(&s, ApiState::refs).await
 }
 
 #[derive(Deserialize)]
-struct LogQuery {
+pub(crate) struct LogQuery {
     rev: Option<String>,
     path: Option<String>,
     page: Option<usize>,
     per_page: Option<usize>,
 }
 
-async fn log(State(s): State<ApiState>, Query(q): Query<LogQuery>) -> Reply {
+pub(crate) async fn log(State(s): State<ApiState>, Query(q): Query<LogQuery>) -> Reply {
     blocking(&s, move |s| {
         s.log(
             q.rev.as_deref(),
@@ -115,13 +107,13 @@ async fn log(State(s): State<ApiState>, Query(q): Query<LogQuery>) -> Reply {
 }
 
 #[derive(Deserialize)]
-struct CommitQuery {
+pub(crate) struct CommitQuery {
     /// Include hunks. Defaults to true.
     diff: Option<bool>,
     max_lines: Option<usize>,
 }
 
-async fn commit(
+pub(crate) async fn commit(
     State(s): State<ApiState>,
     Path(id): Path<String>,
     Query(q): Query<CommitQuery>,
@@ -133,17 +125,17 @@ async fn commit(
 }
 
 #[derive(Deserialize)]
-struct TreeQuery {
+pub(crate) struct TreeQuery {
     rev: Option<String>,
     path: Option<String>,
 }
 
-async fn tree(State(s): State<ApiState>, Query(q): Query<TreeQuery>) -> Reply {
+pub(crate) async fn tree(State(s): State<ApiState>, Query(q): Query<TreeQuery>) -> Reply {
     blocking(&s, move |s| s.tree(q.rev.as_deref(), q.path.as_deref())).await
 }
 
 #[derive(Deserialize)]
-struct FileQuery {
+pub(crate) struct FileQuery {
     rev: Option<String>,
     path: Option<String>,
     start_line: Option<usize>,
@@ -157,7 +149,7 @@ fn need_path(q: &FileQuery) -> Result<String, ApiError> {
         .ok_or_else(|| ApiError::BadRequest("missing query parameter: path".into()))
 }
 
-async fn blob(State(s): State<ApiState>, Query(q): Query<FileQuery>) -> Reply {
+pub(crate) async fn blob(State(s): State<ApiState>, Query(q): Query<FileQuery>) -> Reply {
     let path = need_path(&q)?;
     blocking(&s, move |s| {
         s.blob(q.rev.as_deref(), &path, q.start_line, q.limit)
@@ -165,21 +157,21 @@ async fn blob(State(s): State<ApiState>, Query(q): Query<FileQuery>) -> Reply {
     .await
 }
 
-async fn blame(State(s): State<ApiState>, Query(q): Query<FileQuery>) -> Reply {
+pub(crate) async fn blame(State(s): State<ApiState>, Query(q): Query<FileQuery>) -> Reply {
     let path = need_path(&q)?;
     blocking(&s, move |s| s.blame(q.rev.as_deref(), &path)).await
 }
 
 #[derive(Deserialize)]
-struct RevQuery {
+pub(crate) struct RevQuery {
     rev: Option<String>,
 }
 
-async fn contributors(State(s): State<ApiState>, Query(q): Query<RevQuery>) -> Reply {
+pub(crate) async fn contributors(State(s): State<ApiState>, Query(q): Query<RevQuery>) -> Reply {
     blocking(&s, move |s| s.contributors(q.rev.as_deref())).await
 }
 
-async fn insight_list() -> Json<Value> {
+pub(crate) async fn insight_list() -> Json<Value> {
     let list: Vec<Value> = INSIGHTS
         .iter()
         .map(|i| json!({ "name": i.name, "summary": i.summary }))
@@ -188,7 +180,7 @@ async fn insight_list() -> Json<Value> {
 }
 
 #[derive(Deserialize)]
-struct InsightQuery {
+pub(crate) struct InsightQuery {
     rev: Option<String>,
     granularity: Option<String>,
     label: Option<String>,
@@ -196,7 +188,7 @@ struct InsightQuery {
     limit: Option<usize>,
 }
 
-async fn insight(
+pub(crate) async fn insight(
     State(s): State<ApiState>,
     Path(name): Path<String>,
     Query(q): Query<InsightQuery>,

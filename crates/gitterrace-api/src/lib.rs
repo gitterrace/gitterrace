@@ -5,17 +5,19 @@
 #![allow(clippy::unused_async_trait_impl)]
 
 mod core;
+mod endpoints;
 mod error;
 mod http;
 mod insights;
 mod json;
 mod mcp;
 
-pub use core::ApiState;
+pub use core::{ApiState, MAX_BLAME_LINES, MAX_BLOB_BYTES, MAX_BLOB_LINES, MAX_PAGE};
+pub use endpoints::{ENDPOINTS, Endpoint, Param};
 pub use error::ApiError;
 pub use http::router;
 pub use insights::{INSIGHTS, Insight, Params as InsightParams};
-pub use mcp::{McpServer, serve_mcp};
+pub use mcp::{McpServer, Param as ToolParam, ToolDoc, serve_mcp};
 
 #[cfg(test)]
 mod tests {
@@ -180,6 +182,25 @@ mod tests {
             earlier.len(),
             2,
             "another rev must not reuse the HEAD entry"
+        );
+    }
+
+    /// A route and a registry entry are one thing: every registered path answers (not 404/405).
+    #[tokio::test]
+    async fn every_registered_endpoint_is_routed() {
+        let (_d, s) = fixture();
+        for e in crate::ENDPOINTS {
+            let uri = e.path.replace("{id}", "HEAD").replace("{name}", "totals");
+            // A handler may refuse the probe path with a JSON error. An unrouted path answers
+            // with an empty body.
+            let query = if e.path == "/tree" { "src" } else { "a.txt" };
+            let (st, v) = get(&s, &format!("{uri}?path={query}")).await;
+            assert!(st == StatusCode::OK || !v.is_null(), "{} unrouted", e.path);
+        }
+        let (_, v) = get(&s, "/").await;
+        assert_eq!(
+            v["endpoints"].as_array().map(Vec::len),
+            Some(crate::ENDPOINTS.len())
         );
     }
 

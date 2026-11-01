@@ -12,11 +12,14 @@ use crate::error::ApiError;
 use crate::{insights, json};
 
 const DEFAULT_REV: &str = "HEAD";
-const MAX_PAGE: usize = 500;
-const MAX_BLOB_LINES: usize = 5000;
+/// Largest `per_page` the log accepts.
+pub const MAX_PAGE: usize = 500;
+/// Most lines one blob answer carries.
+pub const MAX_BLOB_LINES: usize = 5000;
 /// Lines alone do not bound an answer: one minified line can be megabytes.
-const MAX_BLOB_BYTES: usize = 256 * 1024;
-const MAX_BLAME_LINES: usize = 5000;
+pub const MAX_BLOB_BYTES: usize = 256 * 1024;
+/// Most lines one blame answer carries.
+pub const MAX_BLAME_LINES: usize = 5000;
 
 /// Shared handle on one repository and its insights cache.
 #[derive(Clone)]
