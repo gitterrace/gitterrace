@@ -505,8 +505,9 @@ fn range_card(ch: &Chain, view: View, subj: &Subjects) -> String {
     );
     let _ = write!(
         s,
-        r#"<div class="kpis"><div><b>{}</b><span>commits</span></div><div><b class="add">+{}</b><span>lines added</span></div><div><b class="del">&minus;{}</b><span>lines removed</span></div><div><b class="{}">{}</b><span>net</span></div></div>"#,
+        r#"<div class="kpis"><div><b>{}</b><span>{}</span></div><div><b class="add">+{}</b><span>lines added</span></div><div><b class="del">&minus;{}</b><span>lines removed</span></div><div><b class="{}">{}</b><span>net</span></div></div>"#,
         fmt::thousands(count),
+        fmt::noun(count, "commit", "commits"),
         fmt::thousands(added),
         fmt::thousands(removed),
         if net >= 0 { "add" } else { "del" },
@@ -533,8 +534,8 @@ fn range_card(ch: &Chain, view: View, subj: &Subjects) -> String {
     let shown = count.min(COMMIT_LIST);
     let _ = write!(
         s,
-        r#"<details class="rlist"><summary>{} commits in this range</summary><ul>"#,
-        fmt::thousands(count)
+        r#"<details class="rlist"><summary>{} in this range</summary><ul>"#,
+        fmt::count(count, "commit", "commits")
     );
     for i in (to + 1 - shown..=to).rev() {
         let _ = write!(
@@ -648,8 +649,8 @@ fn body(ch: &Chain, view: View, subj: &Subjects) -> String {
     );
     let total: i64 = ch.lines.last().map_or(0, |l| l.iter().sum());
     format!(
-        r#"{filters}<section class="card pad"><div class="chart-head"><div><h2>Lines of code by language</h2><p class="hint">Exact line count at every commit on the first-parent history, {} lines today. Drag across the chart to select a range.</p></div>{}</div>{}</section>{}{}"#,
-        fmt::thousands(total.max(0)),
+        r#"{filters}<section class="card pad"><div class="chart-head"><div><h2>Lines of code by language</h2><p class="hint">Exact line count at every commit on the first-parent history, {} today. Drag across the chart to select a range.</p></div>{}</div>{}</section>{}{}"#,
+        fmt::count(total.max(0), "line", "lines"),
         legend(ch),
         area_chart(ch, view, subj),
         range_card(ch, view, subj),

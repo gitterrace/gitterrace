@@ -49,13 +49,28 @@ pub fn render(ws: &Workspace, scripts: &[Script]) -> Vec<Out> {
     ]
 }
 
-/// The live demo link, from `demo/wrangler.toml`; nothing when there is no demo.
+/// The live demo link, from `demo/wrangler.toml`, naming what it shows from `demo/repos.txt`;
+/// nothing when there is no demo.
 pub fn demo_md(ws: &Workspace) -> String {
     if ws.demo.is_empty() {
         return String::new();
     }
+    let names: Vec<String> = ws
+        .demo_repos
+        .iter()
+        .map(|(name, tag)| {
+            // jq tags as `jq-1.8.2`: show `jq 1.8.2`, not the name twice.
+            let v = tag.strip_prefix(&format!("{name}-")).unwrap_or(tag);
+            format!("{name} {v}")
+        })
+        .collect();
+    let shows = match names.as_slice() {
+        [] => String::new(),
+        [one] => format!(": {one}, exported"),
+        [rest @ .., last] => format!(": {} and {last}, exported", rest.join(", ")),
+    };
     format!(
-        "Try it without installing: [the live demo]({0}) is this repository, exported.\n",
+        "Try it without installing: [the live demo]({}){shows}.\n",
         ws.demo
     )
 }

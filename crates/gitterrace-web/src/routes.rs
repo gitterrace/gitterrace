@@ -330,10 +330,14 @@ fn page<T: Template>(t: &T) -> Result<Html<String>> {
 
 struct Numbers {
     commits: String,
+    commits_noun: &'static str,
     authors: String,
+    authors_noun: &'static str,
     files: String,
+    files_noun: &'static str,
     additions: String,
     deletions: String,
+    lines_noun: &'static str,
 }
 
 /// `?doc=` picks the tab of the about card.
@@ -368,10 +372,14 @@ async fn overview(State(app): Shared, Query(q): Query<DocQuery>) -> Result<Html<
                 .current;
             Numbers {
                 commits: fmt::thousands(t.commits),
+                commits_noun: fmt::noun(t.commits, "commit", "commits"),
                 authors: fmt::thousands(t.authors),
+                authors_noun: fmt::noun(t.authors, "author", "authors"),
                 files: fmt::thousands(t.files),
+                files_noun: fmt::noun(t.files, "file touched", "files touched"),
                 additions: fmt::thousands(t.additions),
                 deletions: fmt::thousands(t.deletions),
+                lines_noun: fmt::noun(t.additions + t.deletions, "line", "lines"),
             }
         });
         Ok(OverviewPage {
@@ -553,6 +561,7 @@ struct CommitPage {
     author_href: String,
     date: String,
     parents: Vec<String>,
+    files_summary: String,
     files: Vec<FileStatRow>,
     /// `(label, url)`: "Find this commit in ..." links from the `lookup` of each Send to target.
     lookups: Vec<(String, String)>,
@@ -578,6 +587,7 @@ async fn commit(State(app): Shared, Path(id): Path<String>) -> Result<Html<Strin
             author_href: views::author_href(&d.summary.author.email),
             date: fmt::date(d.summary.author.time, d.summary.author.offset),
             parents: d.summary.parents.iter().map(|p| fmt::sha_link(p)).collect(),
+            files_summary: fmt::count(d.files.len(), "changed file", "changed files"),
             files: views::file_stats(&d),
             lookups: a.lookups(&id),
             diff: views::diff_html(
@@ -936,6 +946,7 @@ async fn progress(State(app): Shared) -> Json<ProgressBody> {
 #[template(path = "worktree.html")]
 struct WorktreePage {
     c: Chrome,
+    files_summary: String,
     files: Vec<FileStatRow>,
     diff: String,
     clean: bool,
@@ -949,7 +960,7 @@ async fn worktree(State(app): Shared) -> Result<Html<String>> {
         let (adds, dels) = files
             .iter()
             .fold((0, 0), |(x, y), f| (x + f.additions, y + f.deletions));
-        let stats = files
+        let stats: Vec<FileStatRow> = files
             .iter()
             .enumerate()
             .map(|(i, f)| FileStatRow {
@@ -965,6 +976,7 @@ async fn worktree(State(app): Shared) -> Result<Html<String>> {
             diff: views::diff_html_with(a.cfg().limits.diff_fold_lines, None, None, &files),
             adds: fmt::thousands(adds),
             dels: fmt::thousands(dels),
+            files_summary: fmt::count(stats.len(), "changed file", "changed files"),
             files: stats,
         })
     })

@@ -163,6 +163,35 @@ async fn display_theme_and_dates_change_the_page() {
     );
 }
 
+/// A count sits next to the noun that agrees with it: one commit by one author reads singular.
+#[tokio::test]
+async fn overview_counts_agree_with_their_noun() {
+    let dir = tempfile::tempdir().expect("tmp");
+    let p = Fixture::init(&dir.path().join("one"))
+        .write("a.txt", "x\n")
+        .commit("feat: only")
+        .path()
+        .to_owned();
+    let r = router(&p, Config::default());
+    let mut body = String::new();
+    for _ in 0..100 {
+        body = get(&r, "/").await.1;
+        if body.contains("class=\"facts\"") {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
+    assert!(body.contains("class=\"facts\""), "{body}");
+    for (want, wrong) in [
+        ("</b> commit<", "</b> commits<"),
+        ("</b> author<", "</b> authors<"),
+        ("</b> file touched<", "</b> files touched<"),
+    ] {
+        assert!(body.contains(want), "missing {want}: {body}");
+        assert!(!body.contains(wrong), "found {wrong}: {body}");
+    }
+}
+
 #[test]
 fn insights_defaults_follow_the_config_and_the_repo_override() {
     let dir = tempfile::tempdir().expect("tmp");

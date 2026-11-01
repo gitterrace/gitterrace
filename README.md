@@ -13,7 +13,7 @@ Agents write more of the code each month, and few people read their diffs. This 
 place to look again ([why](docs/why.md)).
 
 <!-- BEGIN GENERATED: demo -->
-Try it without installing: [the live demo](https://demo.gitterrace.dev) is this repository, exported.
+Try it without installing: [the live demo](https://demo.gitterrace.dev): jq 1.8.2 and ripgrep 15.2.0, exported.
 
 <!-- END GENERATED: demo -->
 

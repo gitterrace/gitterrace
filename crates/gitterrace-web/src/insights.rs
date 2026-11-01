@@ -258,7 +258,7 @@ struct CodeFrequencyPage {
     opts: Vec<OptLink>,
     kpis: Vec<Kpi>,
     unit: &'static str,
-    window: usize,
+    window: String,
     weekly: String,
     rework: String,
     verdict: String,
@@ -289,8 +289,8 @@ pub(crate) async fn code_frequency(
             || "No changes in this selection.".to_owned(),
             |s| {
                 format!(
-                    "Latest window of {} commits: {:.0}% of changed lines replaced existing code, {}.",
-                    rw.window,
+                    "Latest window of {}: {:.0}% of changed lines replaced existing code, {}.",
+                    fmt::count(rw.window, "commit", "commits"),
                     s * 100.0,
                     rework_verdict(s)
                 )
@@ -319,7 +319,7 @@ pub(crate) async fn code_frequency(
                 ),
             ],
             unit: unit.noun(),
-            window: rw.window,
+            window: fmt::count(rw.window, "commit", "commits"),
             weekly: charts::diverging(
                 &points,
                 &format!("Additions and deletions per {}", unit.noun()),

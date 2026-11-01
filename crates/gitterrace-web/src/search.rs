@@ -71,6 +71,7 @@ struct SearchPage {
     scanned: usize,
     skipped: usize,
     matches: usize,
+    summary: String,
     capped: bool,
     files: Vec<FileHits>,
     commits: Vec<CommitRow>,
@@ -107,6 +108,7 @@ fn run(a: &App, q: SearchQuery) -> Result<SearchPage> {
         scanned: 0,
         skipped: 0,
         matches: 0,
+        summary: String::new(),
         capped: false,
         files: Vec::new(),
         commits: Vec::new(),
@@ -144,6 +146,23 @@ fn run(a: &App, q: SearchQuery) -> Result<SearchPage> {
         page.files = out.files;
     }
     page.ms = start.elapsed().as_millis();
+    let plus = if page.capped { "+" } else { "" };
+    page.summary = if commits_mode {
+        format!(
+            "{}{plus} {}",
+            fmt::thousands(page.matches),
+            fmt::noun(page.matches, "commit", "commits")
+        )
+    } else {
+        format!(
+            "{}{plus} {} in {}, {} scanned, {} skipped (binary or over 2 MiB)",
+            fmt::thousands(page.matches),
+            fmt::noun(page.matches, "match", "matches"),
+            fmt::count(page.files.len(), "file", "files"),
+            fmt::count(page.scanned, "file", "files"),
+            page.skipped
+        )
+    };
     Ok(page)
 }
 

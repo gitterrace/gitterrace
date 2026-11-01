@@ -6,16 +6,16 @@
 <div class="card files-card"><table class="entries" data-last="{{ c.base }}/api/last/{{ c.rev_enc }}/">
 {% for e in entries %}<tr><td>{% if e.href.is_empty() %}<span class="ico {{ e.kind }}"></span>{{ e.name }}{% else %}<a href="{{ e.href }}"><span class="ico {{ e.kind }}"></span>{{ e.name }}</a>{% endif %}</td><td class="lc muted" data-name="{{ e.name }}"></td><td class="muted r">{{ e.size }}</td></tr>{% endfor %}
 </table></div>
-{% if let Some(a) = about %}<div class="card readme">{% if a.tabs.is_empty() %}<div class="readme-h">{{ a.label }}</div>{% else %}{% include "doctabs.html" %}{% endif %}<div class="markdown-body">{{ a.html|safe }}</div></div>{% endif %}
+{% if let Some(a) = about %}<div class="card readme" id="about">{% if a.tabs.is_empty() %}<div class="readme-h">{{ a.label }}</div>{% else %}{% include "doctabs.html" %}{% endif %}<div class="markdown-body">{{ a.html|safe }}</div></div>{% endif %}
 </article>
 <aside>
 <h2>About</h2>
 {% if let Some(t) = totals %}
 <ul class="facts">
-<li><b>{{ t.commits }}</b> commits</li>
-<li><b>{{ t.authors }}</b> authors</li>
-<li><b>{{ t.files }}</b> files touched</li>
-<li><b class="add">+{{ t.additions }}</b> <b class="del">-{{ t.deletions }}</b> lines</li>
+<li><b>{{ t.commits }}</b> {{ t.commits_noun }}</li>
+<li><b>{{ t.authors }}</b> {{ t.authors_noun }}</li>
+<li><b>{{ t.files }}</b> {{ t.files_noun }}</li>
+<li><b class="add">+{{ t.additions }}</b> <b class="del">-{{ t.deletions }}</b> {{ t.lines_noun }}</li>
 </ul>
 <p><a href="{{ insights_href }}">View insights</a></p>
 {% else %}

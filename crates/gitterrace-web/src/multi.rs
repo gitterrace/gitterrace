@@ -71,7 +71,7 @@ struct IndexRow {
     spark: String,
     /// Commits in the sparkline's window, and its busiest week (the line's top).
     total: u32,
-    peak: u32,
+    tip: String,
 }
 
 #[derive(serde::Serialize)]
@@ -342,7 +342,10 @@ async fn index(State(table): State<Arc<Table>>) -> crate::error::Result<Html<Str
                     ),
                     spark: spark(&r.weeks, peak),
                     total: r.weeks.iter().sum(),
-                    peak,
+                    tip: format!(
+                        "{} in 26 weeks, busiest week {peak}.",
+                        fmt::count(r.weeks.iter().sum::<u32>(), "commit", "commits")
+                    ),
                     href,
                 }
             })

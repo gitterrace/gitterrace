@@ -431,11 +431,12 @@ pub(crate) fn heatmap(cells: &[[u32; 24]; 7], max: u32) -> String {
             };
             let _ = write!(
                 svg,
-                r#"<rect class="h{level}" x="{}" y="{y}" width="{}" height="{}" rx="4" data-tip="{} {hr:02}:00, {v} commits"/>"#,
+                r#"<rect class="h{level}" x="{}" y="{y}" width="{}" height="{}" rx="4" data-tip="{} {hr:02}:00, {}"/>"#,
                 LEFT + hr * CELL,
                 CELL - 4,
                 CELL - 4,
-                DAYS[d]
+                DAYS[d],
+                crate::fmt::count(*v, "commit", "commits")
             );
         }
     }

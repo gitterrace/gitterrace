@@ -187,6 +187,21 @@ pub(crate) fn thousands(n: impl std::fmt::Display) -> String {
     out
 }
 
+/// The counted noun for `n`: `commit` for 1, `commits` otherwise. Spelled out, never `+s`.
+pub(crate) fn noun(
+    n: impl std::fmt::Display,
+    one: &'static str,
+    many: &'static str,
+) -> &'static str {
+    if n.to_string() == "1" { one } else { many }
+}
+
+/// `1 commit`, `2 commits`, `1,000 commits`: the number and its noun, always agreeing.
+pub(crate) fn count(n: impl std::fmt::Display + Copy, one: &str, many: &str) -> String {
+    let word = if n.to_string() == "1" { one } else { many };
+    format!("{} {word}", thousands(n))
+}
+
 const MONTHS: [&str; 12] = [
     "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
 ];
@@ -267,6 +282,20 @@ mod tests {
             "the mode does not leak out of its scope"
         );
         assert_eq!(size(1536), "1.5 KiB");
+    }
+
+    #[test]
+    fn count_agrees_with_its_noun() {
+        use crate::fmt::{count, noun};
+        assert_eq!(count(0_u32, "commit", "commits"), "0 commits");
+        assert_eq!(count(1_u32, "commit", "commits"), "1 commit");
+        assert_eq!(count(2_usize, "commit", "commits"), "2 commits");
+        assert_eq!(count(1000_i64, "commit", "commits"), "1,000 commits");
+        assert_eq!(count(1_u64, "repository", "repositories"), "1 repository");
+        assert_eq!(count(3_u64, "repository", "repositories"), "3 repositories");
+        assert_eq!(count(2_u64, "person", "people"), "2 people");
+        assert_eq!(noun(1_u8, "match", "matches"), "match");
+        assert_eq!(noun(11_u8, "match", "matches"), "matches");
     }
 
     #[test]

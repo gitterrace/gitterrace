@@ -216,7 +216,7 @@ fn build_multi(
                     multi::router(Arc::new(table)).merge(actions::router(site)),
                     extra,
                 ),
-                format!("{n} repositories"),
+                fmt::count(n, "repository", "repositories"),
             ))
         }
     }
@@ -313,6 +313,9 @@ mod tests {
         let (s, body) = get(&app, "/").await;
         assert_eq!(s, 200);
         assert_eq!(body.matches("class=\"tabs doctabs\"").count(), 1);
+        // A tab reloads the page; every one lands on the card it switches, not the top.
+        assert!(body.contains("id=\"about\""));
+        assert!(body.contains("?doc=license#about\""));
         let nav = body
             .split("tabs doctabs")
             .nth(1)

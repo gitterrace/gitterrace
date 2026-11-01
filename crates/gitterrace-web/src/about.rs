@@ -102,7 +102,8 @@ pub(crate) fn card(
     let tabs = if docs.len() > 1 {
         docs.iter()
             .map(|d| DocTab {
-                href: fmt::href(&format!("{page}?doc={}", d.slug)),
+                // `#about` lands the reload on the card, not the top of the page.
+                href: fmt::href(&format!("{page}?doc={}#about", d.slug)),
                 label: d.label,
                 on: d.slug == active.slug,
             })

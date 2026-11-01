@@ -2,7 +2,7 @@ use std::fmt::Write;
 
 use crate::palette::{Palette, Theme};
 use crate::stats::WrappedStats;
-use crate::svg::{MONO, SANS, area, clip, esc, group, n};
+use crate::svg::{MONO, SANS, area, clip, count, esc, group, n};
 
 const MONTHS: [&str; 12] = [
     "January",
@@ -66,10 +66,10 @@ pub fn wrapped_svg(w: &WrappedStats, layout: Layout, theme: Theme) -> String {
         s,
         r##"<svg xmlns="http://www.w3.org/2000/svg" width="{cw}" height="{ch}" viewBox="0 0 {cw} {ch}" role="img" aria-label="{label}"><title>{label}</title>"##,
         label = esc(&format!(
-            "{} in {}: {} commits",
+            "{} in {}: {}",
             w.repo,
             w.year,
-            group(w.commits as u64)
+            count(w.commits as u64, "commit", "commits")
         )),
     );
     let _ = write!(
@@ -157,7 +157,10 @@ fn tile(s: &mut String, x: f64, y: f64, label: &str, value: &str, p: &Palette, b
 fn facts(w: &WrappedStats) -> Vec<(&'static str, String)> {
     let mut v = vec![
         ("Active days", group(w.active_days as u64)),
-        ("Longest streak", format!("{} days", w.longest_streak)),
+        (
+            "Longest streak",
+            count(w.longest_streak as u64, "day", "days"),
+        ),
     ];
     if let Some(m) = w.busiest_month {
         v.push(("Busiest month", MONTHS[m].to_owned()));
@@ -169,7 +172,7 @@ fn facts(w: &WrappedStats) -> Vec<(&'static str, String)> {
         v.push(("Busiest hour", format!("{h:02}:00")));
     }
     if let Some(b) = &w.biggest_commit {
-        v.push(("Biggest commit", format!("{} lines", group(b.lines))));
+        v.push(("Biggest commit", count(b.lines, "line", "lines")));
     }
     v
 }

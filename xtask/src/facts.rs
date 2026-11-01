@@ -31,6 +31,8 @@ pub struct Workspace {
     /// The live demo's URL, from the custom-domain route in `demo/wrangler.toml`; empty when
     /// there is no demo. The deploy config is the one place it is written down.
     pub demo: String,
+    /// The repositories the demo shows, `(name, tag)` from `demo/repos.txt`, in file order.
+    pub demo_repos: Vec<(String, String)>,
 }
 
 pub fn load(root: &Path) -> Result<Workspace> {
@@ -102,7 +104,23 @@ pub fn load(root: &Path) -> Result<Workspace> {
         packages,
         tap,
         demo: demo_url(root),
+        demo_repos: demo_repos(root),
     })
+}
+
+/// `name url tag` rows of `demo/repos.txt`, comments and blank lines skipped.
+fn demo_repos(root: &Path) -> Vec<(String, String)> {
+    let text = std::fs::read_to_string(root.join("demo/repos.txt")).unwrap_or_default();
+    text.lines()
+        .filter(|l| !l.trim_start().starts_with('#'))
+        .filter_map(|l| {
+            let f: Vec<&str> = l.split_whitespace().collect();
+            match f[..] {
+                [name, _, tag] => Some((name.to_owned(), tag.to_owned())),
+                _ => None,
+            }
+        })
+        .collect()
 }
 
 /// `https://<pattern>` of the first `custom_domain` route in `demo/wrangler.toml`.

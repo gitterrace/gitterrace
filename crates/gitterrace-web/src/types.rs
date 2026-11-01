@@ -217,7 +217,7 @@ fn build(a: &crate::app::App, all: &[CommitRecord], c: Chrome, tq: &TypesQuery) 
             "Lines removed",
             format!("-{}", fmt::thousands(sum.deletions)),
         ),
-        Kpi("Average commit", format!("{} lines", fmt::thousands(size))),
+        Kpi("Average commit", fmt::count(size, "line", "lines")),
     ];
 
     let kind_counts = ins.label_breakdown(Label::Kind, period);

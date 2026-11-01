@@ -126,10 +126,10 @@ pub(crate) async fn activity(
         ];
         let span = match s.from {
             Some(from) => format!(
-                "{} to {}, against the {} days before",
+                "{} to {}, against the {} before",
                 fmt::day(from),
                 fmt::day(s.to - 1),
-                period.days().unwrap_or(0)
+                fmt::count(period.days().unwrap_or(0), "day", "days")
             ),
             None => format!("All history up to {}", fmt::day(s.to - 1)),
         };
@@ -204,11 +204,11 @@ pub(crate) async fn hotspots(
                 size: h.authors as u64,
                 href: file_link(&h.path),
                 title: format!(
-                    "{}: {} changes, {} lines, {} authors",
+                    "{}: {}, {}, {}",
                     h.path,
-                    h.changes,
-                    fmt::thousands(h.lines),
-                    h.authors
+                    fmt::count(h.changes, "change", "changes"),
+                    fmt::count(h.lines, "line", "lines"),
+                    fmt::count(h.authors, "author", "authors")
                 ),
             })
             .collect();
@@ -407,9 +407,13 @@ pub(crate) async fn patterns(
         let cad = ins.cadence(&tags);
         let cadence = match (cad.median_days_between, cad.days_since_last) {
             (Some(m), Some(d)) => {
-                format!("Median {m:.0} days between releases, {d} days since the last.")
+                format!(
+                    "Median {} between releases, {} since the last.",
+                    fmt::count(m.round() as i64, "day", "days"),
+                    fmt::count(d, "day", "days")
+                )
             }
-            (None, Some(d)) => format!("{d} days since the last release."),
+            (None, Some(d)) => format!("{} since the last release.", fmt::count(d, "day", "days")),
             _ => "No release tags.".to_owned(),
         };
         let releases = cad
@@ -605,6 +609,7 @@ struct HistoryPage {
     path: String,
     blob_href: String,
     blame_href: String,
+    total: String,
     rows: Vec<HistRow>,
 }
 
@@ -620,7 +625,7 @@ pub(crate) async fn history(
         let head = a.repo.resolve(&fmt::selected()).unwrap_or_default();
         let subjects = a.subjects(&head);
         let now = fmt::now();
-        let rows = ins
+        let rows: Vec<HistRow> = ins
             .file_history(&path)
             .into_iter()
             .map(|t| {
@@ -635,7 +640,7 @@ pub(crate) async fn history(
                     author_href: views::author_href(&email),
                     author: t.author,
                     when: fmt::ago(t.time, now),
-                    lines: fmt::thousands(t.lines),
+                    lines: fmt::count(t.lines, "line", "lines"),
                     renamed: (t.path != path).then_some(t.path),
                 }
             })
@@ -653,6 +658,7 @@ pub(crate) async fn history(
                 enc_path(&path)
             )),
             path,
+            total: fmt::count(rows.len(), "commit", "commits"),
             rows,
         }
     })

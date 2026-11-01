@@ -32,6 +32,11 @@ pub(crate) fn group(n: u64) -> String {
     o
 }
 
+/// `1 day`, `2 days`, `1,000 days`: the count and the noun that agrees with it.
+pub(crate) fn count(n: u64, one: &str, many: &str) -> String {
+    format!("{} {}", group(n), if n == 1 { one } else { many })
+}
+
 /// Shortens `s` to at most `max` characters with an ellipsis.
 pub(crate) fn clip(s: &str, max: usize) -> String {
     if s.chars().count() <= max {
@@ -82,4 +87,16 @@ pub(crate) fn area(values: &[u32], x: f64, y: f64, w: f64, h: f64) -> (String, S
         n(y + h)
     );
     (fill, line)
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::svg::count;
+
+    #[test]
+    fn count_agrees_with_its_noun() {
+        assert_eq!(count(0, "day", "days"), "0 days");
+        assert_eq!(count(1, "day", "days"), "1 day");
+        assert_eq!(count(1000, "line", "lines"), "1,000 lines");
+    }
 }

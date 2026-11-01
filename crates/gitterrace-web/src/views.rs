@@ -600,10 +600,10 @@ pub(crate) fn diff_html_with(
             if let (true, Some(rev)) = (over, rev) {
                 let _ = write!(
                     out,
-                    "<p class=\"muted pad\"><button type=\"button\" class=\"linkbtn\" data-load-diff=\"{}/diff/{}/{i}\">Load diff ({} changed lines)</button></p>",
+                    "<p class=\"muted pad\"><button type=\"button\" class=\"linkbtn\" data-load-diff=\"{}/diff/{}/{i}\">Load diff ({} changed)</button></p>",
                     crate::fmt::base(),
                     enc_seg(rev),
-                    crate::fmt::thousands(changed)
+                    crate::fmt::count(changed, "line", "lines")
                 );
             } else {
                 out.push_str(&diff_body_html(f));
