@@ -886,6 +886,7 @@ dependencies = [
  "clap",
  "gitterrace-api",
  "gitterrace-cards",
+ "gitterrace-config",
  "gitterrace-git",
  "gitterrace-index",
  "gitterrace-web",
@@ -893,6 +894,7 @@ dependencies = [
  "tempfile",
  "tokio",
  "tower",
+ "tracing",
  "tracing-subscriber",
 ]
 
@@ -936,6 +938,15 @@ dependencies = [
  "gitterrace-index",
  "schwarzwald",
  "usvg",
+]
+
+[[package]]
+name = "gitterrace-config"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "tempfile",
+ "toml",
 ]
 
 [[package]]
@@ -3578,6 +3589,7 @@ dependencies = [
  "anyhow",
  "clap",
  "gitterrace-api",
+ "gitterrace-config",
  "tempfile",
 ]
 

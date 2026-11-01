@@ -4,6 +4,7 @@
 )]
 
 mod api_page;
+mod config_page;
 mod out;
 
 use std::path::{Path, PathBuf};
@@ -30,7 +31,7 @@ enum Cmd {
 
 /// Every generator. A new one is checked by being listed here.
 fn generators() -> Vec<Out> {
-    vec![api_page::render()]
+    vec![api_page::render(), config_page::render()]
 }
 
 fn main() -> Result<()> {

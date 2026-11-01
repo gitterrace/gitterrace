@@ -20,6 +20,7 @@ workspace = true
 gitterrace-git.workspace = true
 gitterrace-index.workspace = true
 gitterrace-api.workspace = true
+gitterrace-config.workspace = true
 gitterrace-cards.workspace = true
 gitterrace-web.workspace = true
 axum.workspace = true
@@ -28,6 +29,7 @@ clap.workspace = true
 tokio.workspace = true
 anyhow.workspace = true
 serde_json.workspace = true
+tracing.workspace = true
 tracing-subscriber.workspace = true
 
 # `git terrace` works because git runs any `git-<name>` on PATH. `gitterrace` is

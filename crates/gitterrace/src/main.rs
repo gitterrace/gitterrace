@@ -13,9 +13,12 @@ struct Cli {
     /// Other commands use the first.
     #[arg(default_value = ".", global = true, num_args = 1..)]
     paths: Vec<PathBuf>,
-    /// Address to listen on. Local only by default.
-    #[arg(long, default_value = "127.0.0.1:4242")]
-    addr: SocketAddr,
+    /// Address to listen on. Local only by default. Overrides `server.addr`.
+    #[arg(long, global = true)]
+    addr: Option<SocketAddr>,
+    /// Folder holding `config.toml` (and `actions.toml`). Defaults to the XDG config folder.
+    #[arg(long, global = true)]
+    config: Option<PathBuf>,
     #[command(subcommand)]
     command: Option<Command>,
 }
@@ -24,6 +27,8 @@ struct Cli {
 enum Command {
     /// Serve the repository in the browser (the default).
     Serve,
+    /// Print the effective configuration and where each value comes from.
+    Config,
     /// Run a read-only MCP server over stdio for agents.
     Mcp,
     /// Write the year-in-review card for the repository.
@@ -64,9 +69,21 @@ async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt()
         .with_writer(std::io::stderr)
         .init();
+    let dir = gitterrace_config::config_dir(cli.config.as_deref());
+    let mut loaded = gitterrace_config::load(dir.as_deref()).context("reading config.toml")?;
+    for w in &loaded.warnings {
+        tracing::warn!("config: {w}");
+    }
+    if let Some(a) = cli.addr {
+        loaded.config.server.addr = a.to_string();
+        loaded.flagged("server.addr");
+    }
+    loaded.validate().context("config")?;
     match cli.command.unwrap_or(Command::Serve) {
+        Command::Config => print!("{}", loaded.describe()),
         Command::Serve => {
-            gitterrace_web::serve(gitterrace_web::discover_repos(&cli.paths), cli.addr).await?;
+            let addr: SocketAddr = loaded.config.server.addr.parse().context("server.addr")?;
+            gitterrace_web::serve(gitterrace_web::discover_repos(&cli.paths), addr).await?;
         }
         Command::Mcp => {
             gitterrace_api::serve_mcp(&path).await?;
