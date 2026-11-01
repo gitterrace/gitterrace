@@ -451,7 +451,7 @@ struct LangRow {
 
 struct Listed {
     href: String,
-    short: String,
+    sha: String,
     subject: String,
 }
 
@@ -548,7 +548,7 @@ pub(crate) async fn compare(
                         .take(COMPARE_LIST)
                         .map(|id| Listed {
                             href: href(&format!("/commit/{id}")),
-                            short: fmt::short(id),
+                            sha: fmt::sha_link(id),
                             subject: subjects.get(id).cloned().unwrap_or_default(),
                         })
                         .collect();
@@ -580,7 +580,7 @@ pub(crate) async fn compare(
 
 struct HistRow {
     href: String,
-    short: String,
+    sha: String,
     subject: String,
     author: String,
     author_href: String,
@@ -621,7 +621,7 @@ pub(crate) async fn history(
                     .map_or_else(String::new, |x| x.email.clone());
                 HistRow {
                     href: href(&format!("/commit/{}", t.commit)),
-                    short: fmt::short(&t.commit),
+                    sha: fmt::sha_link(&t.commit),
                     subject: subjects.get(&t.commit).cloned().unwrap_or_default(),
                     author_href: views::author_href(&email),
                     author: t.author,

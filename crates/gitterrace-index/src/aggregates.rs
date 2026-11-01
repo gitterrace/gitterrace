@@ -1,10 +1,11 @@
 //! Pure statistics over cached commit records. Times are bucketed in each commit's own UTC
 //! offset, so a commit made at 23:30 local counts as late evening whoever reads the page.
 
-use std::collections::{BTreeSet, HashMap, HashSet};
+use std::collections::{BTreeSet, HashMap};
 
 use gitterrace_git::civil_from_days as civil;
 
+use crate::insights::fasthash::{FastMap, FastSet};
 use crate::{CommitRecord, TimeAxis};
 
 pub(crate) const DAY: i64 = 86_400;
@@ -92,8 +93,8 @@ pub enum Label {
 
 pub fn totals(records: &[CommitRecord]) -> Totals {
     let mut t = Totals::default();
-    let mut authors = HashSet::new();
-    let mut files = HashSet::new();
+    let mut authors: FastSet<&str> = FastSet::default();
+    let mut files: FastSet<&str> = FastSet::default();
     for r in records {
         authors.insert(r.email.as_str());
         for f in &r.files {
@@ -226,27 +227,32 @@ pub fn hotspots(records: &[CommitRecord], since: i64, limit: usize) -> Vec<FileC
 
 /// Churn per containing directory, most commits first, then path.
 pub fn dir_churn(records: &[CommitRecord]) -> Vec<DirChurn> {
-    struct Acc<'a> {
+    struct Acc {
         commits: usize,
-        files: HashSet<&'a str>,
+        files: usize,
         additions: u64,
         deletions: u64,
     }
-    let mut map: HashMap<&str, Acc> = HashMap::new();
+    let mut map: FastMap<&str, Acc> = FastMap::default();
+    // A path belongs to one directory, so first sight of a path is a new file of its directory.
+    let mut paths: FastSet<&str> = FastSet::default();
     for r in records {
-        let mut touched: HashSet<&str> = HashSet::new();
+        let mut touched: Vec<&str> = Vec::new();
         for f in &r.files {
             let dir = f.path.rsplit_once('/').map_or(".", |(d, _)| d);
             let acc = map.entry(dir).or_insert_with(|| Acc {
                 commits: 0,
-                files: HashSet::new(),
+                files: 0,
                 additions: 0,
                 deletions: 0,
             });
-            if touched.insert(dir) {
+            if !touched.contains(&dir) {
+                touched.push(dir);
                 acc.commits += 1;
             }
-            acc.files.insert(f.path.as_str());
+            if paths.insert(f.path.as_str()) {
+                acc.files += 1;
+            }
             acc.additions += u64::from(f.additions);
             acc.deletions += u64::from(f.deletions);
         }
@@ -256,7 +262,7 @@ pub fn dir_churn(records: &[CommitRecord]) -> Vec<DirChurn> {
         .map(|(path, a)| DirChurn {
             path: path.to_owned(),
             commits: a.commits,
-            files: a.files.len(),
+            files: a.files,
             additions: a.additions,
             deletions: a.deletions,
         })
@@ -303,9 +309,10 @@ fn churn_since(
     since: i64,
     keep: impl Fn(&str) -> bool,
 ) -> Vec<FileChurn> {
-    let mut map: HashMap<&str, FileChurn> = HashMap::new();
+    let mut map: FastMap<&str, FileChurn> = FastMap::default();
     for r in records.iter().filter(|r| r.time >= since) {
-        let mut seen: HashSet<&str> = HashSet::new();
+        // A commit touches few files, so a scan beats hashing for the once-per-commit check.
+        let mut seen: Vec<&str> = Vec::new();
         for f in r.files.iter().filter(|f| keep(&f.path)) {
             let c = map.entry(f.path.as_str()).or_insert_with(|| FileChurn {
                 path: f.path.clone(),
@@ -314,7 +321,8 @@ fn churn_since(
                 deletions: 0,
                 last_commit: r.time,
             });
-            if seen.insert(f.path.as_str()) {
+            if !seen.contains(&f.path.as_str()) {
+                seen.push(f.path.as_str());
                 c.commits += 1;
             }
             c.additions += u64::from(f.additions);

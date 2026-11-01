@@ -3,6 +3,6 @@
 {% block content %}
 <div class="head"><h1>{{ path }}</h1><span class="muted"><a href="{{ blob_href }}">File</a> · <a href="{{ blame_href }}">Blame</a> · {{ rows.len() }} commits, following renames</span></div>
 {% if rows.is_empty() %}<p class="muted">No history found for this path.</p>{% else %}
-<ul class="list log">{% for r in rows %}<li class="crow"><div class="cmain"><a href="{{ r.href }}">{{ r.subject }}</a><span class="muted"><a class="who" href="{{ r.author_href }}"><b>{{ r.author }}</b></a> · {{ r.when }} · {{ r.lines }} lines changed{% if let Some(p) = r.renamed %} · as {{ p }}{% endif %}</span></div><a class="sha" href="{{ r.href }}">{{ r.short }}</a></li>{% endfor %}</ul>
+<ul class="list log">{% for r in rows %}<li class="crow"><div class="cmain"><a href="{{ r.href }}">{{ r.subject }}</a><span class="muted"><a class="who" href="{{ r.author_href }}"><b>{{ r.author }}</b></a> · {{ r.when }} · {{ r.lines }} lines changed{% if let Some(p) = r.renamed %} · as {{ p }}{% endif %}</span></div>{{ r.sha|safe }}</li>{% endfor %}</ul>
 {% endif %}
 {% endblock %}

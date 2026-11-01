@@ -30,13 +30,14 @@ Windows: use WSL.
 
 <!-- BEGIN GENERATED: commands -->
 ```
-git terrace [paths]       Browse a git repository in your browser, offline [--addr --poll --no-watch --config --no-actions]
-git terrace serve         Serve the repository in the browser (the default)
-git terrace config        Print the effective configuration and where each value comes from
-git terrace mcp           Run a read-only MCP server over stdio for agents
-git terrace wrapped       Write the year-in-review card for the repository [--year --layout --theme --out]
-git terrace open <link>   Open a `gitterrace://` or `/go` permalink in the browser, starting a server if needed [--print]
-git terrace export <out>  Write a static copy of the site to a folder, for sharing or hosting [--commits --max-file-kb]
+git terrace [paths]          Browse a git repository in your browser, offline [--addr --poll --no-watch --config --no-actions]
+git terrace serve            Serve the repository in the browser (the default)
+git terrace config           Print the effective configuration and where each value comes from
+git terrace mcp              Run a read-only MCP server over stdio for agents
+git terrace wrapped          Write the year-in-review card for the repository [--year --layout --theme --out]
+git terrace open <link>      Open a `gitterrace://` or `/go` permalink in the browser, starting a server if needed [--print]
+git terrace install-handler  Register (or with `--uninstall` remove) this program as the `gitterrace://` link handler [--uninstall]
+git terrace export <out>     Write a static copy of the site to a folder, for sharing or hosting [--commits --max-file-kb]
 ```
 
 <!-- END GENERATED: commands -->

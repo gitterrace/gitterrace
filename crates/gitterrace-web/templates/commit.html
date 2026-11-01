@@ -3,8 +3,8 @@
 {% block content %}
 <div class="head"><h1>{{ subject }}</h1></div>
 {% if !body.is_empty() %}<pre class="body">{{ body }}</pre>{% endif %}
-<p class="meta"><a class="who" href="{{ author_href }}"><b>{{ author }}</b></a> <span class="muted">{{ date }}</span> · <code>{{ id }}</code> <button type="button" class="copy" data-copy="{{ id }}" data-tip="Copy full sha">Copy</button>
-{% for p in parents %} · parent <a href="{{ c.base }}/commit/{{ p.full }}"><code>{{ p.short }}</code></a>{% endfor %}
+<p class="meta"><a class="who" href="{{ author_href }}"><b>{{ author }}</b></a> <span class="muted">{{ date }}</span> · {{ sha|safe }} <button type="button" class="copy" data-copy="{{ id }}" data-tip="Copy full sha">Copy</button>
+{% for p in parents %} · parent {{ p|safe }}{% endfor %}
 · <a href="{{ c.base }}/tree/{{ id }}">Browse files</a></p>
 <details class="card files" open><summary>{{ files.len() }} changed files</summary>
 <ul>{% for f in files %}<li><a href="#{{ f.anchor }}">{{ f.label }}</a><span class="counts"><b class="add">+{{ f.additions }}</b> <b class="del">-{{ f.deletions }}</b></span></li>{% endfor %}</ul></details>

@@ -42,6 +42,24 @@ pub(crate) fn changes(
     with_hunks: bool,
     text_limit: u64,
 ) -> Result<Vec<FileDiff>> {
+    let mut cache = resource_cache(repo)?;
+    changes_with(repo, commit, with_hunks, text_limit, &mut cache)
+}
+
+/// The blob cache a tree diff needs. Building it reads attributes and, in a bare clone,
+/// unpacks the whole HEAD tree into an index, so a worker builds it once for many commits.
+pub(crate) fn resource_cache(repo: &gix::Repository) -> Result<gix::diff::blob::Platform> {
+    repo.diff_resource_cache_for_tree_diff().map_err(git)
+}
+
+/// [`changes`] with a caller-owned blob cache, cleared here after every commit.
+pub(crate) fn changes_with(
+    repo: &gix::Repository,
+    commit: &gix::Commit<'_>,
+    with_hunks: bool,
+    text_limit: u64,
+    cache: &mut gix::diff::blob::Platform,
+) -> Result<Vec<FileDiff>> {
     let new_tree = commit.tree().map_err(git)?;
     let old_tree = match commit.parent_ids().next() {
         Some(parent) => Some(
@@ -54,10 +72,24 @@ pub(crate) fn changes(
         ),
         None => None,
     };
+    let empty = repo.empty_tree();
+    let old = old_tree.as_ref().unwrap_or(&empty);
     let opts = gix::diff::Options::default().with_rewrites(Some(gix::diff::Rewrites::default()));
-    let raw = repo
-        .diff_tree_to_tree(old_tree.as_ref(), Some(&new_tree), opts)
-        .map_err(git)?;
+    let mut raw = Vec::new();
+    let diffed = gix::diff::tree_with_rewrites(
+        gix::objs::TreeRefIter::from_bytes(&old.data, old.id.kind()),
+        gix::objs::TreeRefIter::from_bytes(&new_tree.data, new_tree.id.kind()),
+        cache,
+        &mut Default::default(),
+        &repo.objects,
+        |change| {
+            raw.push(change.into_owned());
+            Ok(std::ops::ControlFlow::Continue(()))
+        },
+        opts.into(),
+    );
+    cache.clear_resource_cache_keep_allocation();
+    diffed.map_err(git)?;
     let mut out = Vec::with_capacity(raw.len());
     for change in raw {
         if let Some(diff) = file_diff(repo, change, with_hunks, text_limit)? {

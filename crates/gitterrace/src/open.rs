@@ -39,11 +39,12 @@ pub(crate) struct Target {
     pub(crate) note: Option<String>,
 }
 
-/// Where a link points, among `known` clones (from the registry) and repositories found under
-/// `roots`. Every candidate's id is read again from its own history, never trusted.
+/// Where a link points, among `known` clones (registry `(id, path)` pairs) and repositories
+/// found under `roots`. A registry id only picks candidates, since reading an id walks the whole
+/// history (seconds on a large clone); every candidate's id is read again before it is used.
 pub(crate) fn resolve(
     input: &str,
-    known: &[PathBuf],
+    known: &[(String, PathBuf)],
     roots: &[PathBuf],
     depth: usize,
     skip: &[String],
@@ -52,6 +53,8 @@ pub(crate) fn resolve(
     let found = gitterrace_web::discover_repos(roots, depth, skip);
     let clones: Vec<Repo> = known
         .iter()
+        .filter(|(id, _)| *id == link.id)
+        .map(|(_, p)| p)
         .chain(
             found
                 .iter()
@@ -80,7 +83,7 @@ pub(crate) fn resolve(
             note = Some(format!(
                 "{} is not in commit {}; opening the commit",
                 l.path.as_deref().unwrap_or_default(),
-                &full[..7]
+                gitterrace_git::short_id(&full)
             ));
             l.path = None;
             l.lines = None;
@@ -111,14 +114,14 @@ pub(crate) fn run(
 ) -> anyhow::Result<()> {
     let cfg = &loaded.config;
     let state = gitterrace_web::state_dir();
-    let known: Vec<PathBuf> = state
+    let known: Vec<(String, PathBuf)> = state
         .as_deref()
-        .map(gitterrace_web::read_registry)
+        .map(gitterrace_web::registry_candidates)
         .transpose()
         .context("reading the served-repositories registry")?
         .unwrap_or_default()
         .into_iter()
-        .map(|e| e.path)
+        .map(|e| (e.id, e.path))
         .collect();
     let roots: Vec<PathBuf> = cfg.links.roots.iter().map(|r| expand(r)).collect();
     let target = resolve(input, &known, &roots, cfg.multi.depth, &cfg.multi.skip_dirs)?;
@@ -300,7 +303,7 @@ mod tests {
         let link = format!("gitterrace://{id}/{}/src/a.rs#L2-L3", &head[..10]);
         let want = format!("/go/{id}/{head}/src/a.rs#L2-L3");
 
-        let got = resolve(&link, std::slice::from_ref(&a), &[], 2, &[]).expect("registered");
+        let got = resolve(&link, &[(id.clone(), a.clone())], &[], 2, &[]).expect("registered");
         assert_eq!(
             (got.clone, got.path, got.note),
             (a.clone(), want.clone(), None)
@@ -311,7 +314,7 @@ mod tests {
 
         let go = format!("http://127.0.0.1:9/go/{id}/{head}/src/a.rs#L2-L3");
         assert_eq!(
-            resolve(&go, std::slice::from_ref(&a), &[], 2, &[])
+            resolve(&go, &[(id.clone(), a.clone())], &[], 2, &[])
                 .expect("go")
                 .path,
             want
@@ -326,7 +329,7 @@ mod tests {
         assert!(matches!(
             resolve(
                 &other,
-                std::slice::from_ref(&a),
+                &[("000000000000".to_owned(), a.clone())],
                 &[t.path().to_owned()],
                 2,
                 &[]
@@ -334,11 +337,11 @@ mod tests {
             Err(OpenError::Unknown(_))
         ));
         let behind = format!("gitterrace://{id}/{}", "f".repeat(40));
-        let got = resolve(&behind, std::slice::from_ref(&a), &[], 2, &[]).expect("behind");
+        let got = resolve(&behind, &[(id.clone(), a.clone())], &[], 2, &[]).expect("behind");
         assert_eq!(got.path, "/");
         assert!(got.note.is_some_and(|n| n.contains("behind")));
         let gone = format!("gitterrace://{id}/{head}/no/such.rs");
-        let got = resolve(&gone, &[a], &[], 2, &[]).expect("gone");
+        let got = resolve(&gone, &[(id.clone(), a)], &[], 2, &[]).expect("gone");
         assert_eq!(got.path, format!("/go/{id}/{head}"));
         assert!(matches!(
             resolve(&format!("gitterrace://{id}/{head}/../x"), &[], &[], 2, &[]),

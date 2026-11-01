@@ -384,7 +384,7 @@ fn build(a: &crate::app::App, all: &[CommitRecord], c: Chrome, q: &TypesQuery) -
         .skip(pg.saturating_mul(PAGE))
         .take(PAGE)
         .map(|r| CommitRow {
-            short: fmt::short(&r.id),
+            sha: fmt::sha_link(&r.id),
             initial: views::initial(&r.author),
             hue: views::hue(&r.author),
             href: href(&format!("/commit/{}", r.id)),

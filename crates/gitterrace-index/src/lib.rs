@@ -37,8 +37,10 @@ pub const CACHE_FILES: [(&str, &str); 3] = [
     ),
 ];
 
-/// Commits built per batch: enough to keep all cores busy, small enough for steady progress.
-const BATCH: usize = 256;
+/// Commits built per batch. Every batch pays a fixed cost per worker (the diff attribute setup
+/// unpacks the HEAD tree, 40% of the time at 256 on a 50k-file repository), so it is large
+/// enough to amortize that and still small enough for steady progress and bounded memory.
+const BATCH: usize = 2048;
 
 /// Per-commit facts the stats pages are built from.
 #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
@@ -200,6 +202,7 @@ mod tests {
     struct Fake {
         ids: RefCell<Vec<String>>,
         built: Cell<usize>,
+        batches: Cell<usize>,
     }
 
     impl Fake {
@@ -207,6 +210,7 @@ mod tests {
             Self {
                 ids: RefCell::new(ids.iter().map(|s| (*s).to_owned()).collect()),
                 built: Cell::new(0),
+                batches: Cell::new(0),
             }
         }
     }
@@ -214,6 +218,11 @@ mod tests {
     impl CommitSource for Fake {
         fn rev_list(&self, _rev: &str) -> io::Result<Vec<String>> {
             Ok(self.ids.borrow().clone())
+        }
+
+        fn records(&self, ids: &[String]) -> io::Result<Vec<CommitRecord>> {
+            self.batches.set(self.batches.get() + 1);
+            ids.iter().map(|id| self.record(id)).collect()
         }
 
         fn record(&self, id: &str) -> io::Result<CommitRecord> {
@@ -294,6 +303,21 @@ mod tests {
         assert_eq!(known.len(), 4000);
         let (parsed, _) = crate::store::read_records(idx.dir(), 0)?;
         assert_eq!(ids(&parsed), wanted);
+        Ok(())
+    }
+
+    /// The per-batch setup cost is fixed per worker, so the number of batches must stay small:
+    /// building N commits takes about N / BATCH calls, not one per few commits.
+    #[test]
+    fn update_builds_in_few_large_batches() -> io::Result<()> {
+        let dir = tempfile::tempdir()?;
+        let idx = Index::open_dir(dir.path().join("gitterrace"))?;
+        let names: Vec<String> = (0..5000).map(|i| format!("{i:040x}")).collect();
+        let wanted: Vec<&str> = names.iter().map(String::as_str).collect();
+        let src = Fake::new(&wanted);
+        idx.update(&src, "HEAD", &|_| {})?;
+        assert_eq!(src.batches.get(), 5000_usize.div_ceil(crate::BATCH));
+        assert!(src.batches.get() <= 3);
         Ok(())
     }
 

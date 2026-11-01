@@ -31,7 +31,7 @@
     if (banner && "banner" in c) {
       banner.hidden = !c.banner;
       var wrap = banner.querySelector(".wrap");
-      if (wrap) wrap.textContent = c.banner || "";
+      if (wrap) wrap.innerHTML = c.banner || ""; // server-escaped HTML: the commit is a sha link
     }
   }
 

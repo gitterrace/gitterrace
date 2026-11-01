@@ -17,6 +17,8 @@ use crate::{
 
 /// Decoded-object cache; trees and commits are re-read constantly by walks and diffs.
 const OBJECT_CACHE_BYTES: usize = 128 * 1024 * 1024;
+/// Object cache of one index worker thread.
+const INDEX_WORKER_CACHE_BYTES: usize = 16 * 1024 * 1024;
 
 /// A repository opened read-only.
 pub struct Repo {
@@ -282,7 +284,7 @@ impl Repo {
             std::collections::HashMap::new();
         ids.iter()
             .map(|id| {
-                let oid = Self::resolve_id(&repo, id)?;
+                let oid = Self::full_id(&repo, id)?;
                 let commit = repo.find_commit(oid).map_err(git)?;
                 let blob = ident::mailmap_blob(&repo, oid);
                 let map = maps
@@ -309,14 +311,24 @@ impl Repo {
                 .chunks(per)
                 .map(|chunk| {
                     scope.spawn(move || {
-                        let repo = self.repo();
+                        let mut repo = self.repo();
+                        // Ten workers each keeping the shared 128 MB cache cost over 1 GB; the
+                        // diffs of one commit touch few objects twice.
+                        repo.object_cache_size(INDEX_WORKER_CACHE_BYTES);
+                        let mut cache = crate::diff::resource_cache(&repo)?;
                         chunk
                             .iter()
                             .map(|id| {
-                                let oid = Self::resolve_id(&repo, id)?;
+                                let oid = Self::full_id(&repo, id)?;
                                 let commit = repo.find_commit(oid).map_err(git)?;
-                                Ok(crate::diff::changes(&repo, &commit, false, MAX_TEXT_BYTES)
-                                    .unwrap_or_default())
+                                Ok(crate::diff::changes_with(
+                                    &repo,
+                                    &commit,
+                                    false,
+                                    MAX_TEXT_BYTES,
+                                    &mut cache,
+                                )
+                                .unwrap_or_default())
                             })
                             .collect::<Result<Vec<_>>>()
                     })
@@ -543,6 +555,15 @@ impl Repo {
         let mut repo = self.inner.to_thread_local();
         repo.object_cache_size_if_unset(OBJECT_CACHE_BYTES);
         repo
+    }
+
+    /// A full 40-digit commit id parsed directly. Going through `rev_parse` costs a rescan of
+    /// the object database per commit, which dominated the index build on large repositories.
+    pub(crate) fn full_id(repo: &gix::Repository, id: &str) -> Result<gix::ObjectId> {
+        match gix::ObjectId::from_hex(id.as_bytes()) {
+            Ok(oid) => Ok(oid),
+            Err(_) => Self::resolve_id(repo, id),
+        }
     }
 
     pub(crate) fn resolve_id(repo: &gix::Repository, rev: &str) -> Result<gix::ObjectId> {

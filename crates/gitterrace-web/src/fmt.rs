@@ -229,8 +229,24 @@ pub(crate) fn day_label(time: i64, offset: i32, now: i64) -> String {
     }
 }
 
-pub(crate) fn short(id: &str) -> String {
-    id.chars().take(8).collect()
+/// The one rendering of a commit id: a link to its commit page showing the short form, the
+/// full id on hover. Returns finished HTML (ids are hex, still escaped), `""` for no id.
+pub(crate) fn sha_link(full: &str) -> String {
+    sha_link_at(&base(), full)
+}
+
+/// [`sha_link`] for code that runs outside a request (the watcher), with the URL prefix given.
+pub(crate) fn sha_link_at(base: &str, full: &str) -> String {
+    if full.is_empty() {
+        return String::new();
+    }
+    format!(
+        r#"<a class="sha" href="{}/commit/{}" data-tip="{}">{}</a>"#,
+        esc(base),
+        esc(full),
+        esc(full),
+        esc(gitterrace_git::short_id(full)),
+    )
 }
 
 /// Escapes element content only: quotes stay as they are, which keeps JSON-heavy sources small.

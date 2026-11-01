@@ -522,10 +522,8 @@ fn range_card(ch: &Chain, view: View) -> String {
     for i in (to + 1 - shown..=to).rev() {
         let _ = write!(
             s,
-            r#"<li><a class="sha" href="{}/commit/{}">{}</a> <span class="subj" title="{}">{}</span> <span class="muted">{}</span></li>"#,
-            fmt::base(),
-            ch.ids[i],
-            fmt::short(&ch.ids[i]),
+            r#"<li>{} <span class="subj" title="{}">{}</span> <span class="muted">{}</span></li>"#,
+            fmt::sha_link(&ch.ids[i]),
             esc(&ch.subjects[i]),
             esc(&ch.subjects[i]),
             fmt::day(ch.times[i])

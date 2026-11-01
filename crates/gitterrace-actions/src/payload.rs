@@ -170,7 +170,7 @@ impl Payload {
             author: cap(&s.author.name, MAX_SUBJECT_BYTES).0,
             date: rfc3339(s.author.time),
         });
-        let short = &sha[..7];
+        let short = gitterrace_git::short_id(&sha);
         let id = repo.id();
         let permalink = styled(
             style,
@@ -518,10 +518,10 @@ pub(crate) mod tests {
             gt.markdown.contains(&gt.permalink),
             "markdown carries the styled link"
         );
-        assert_eq!(p.title, format!("a.rs:2-3 @ {}", &sha[..7]));
+        assert_eq!(p.title, format!("a.rs:2-3 @ {}", gitterrace_git::short_id(&sha)));
         assert!(
             p.markdown
-                .starts_with(&format!("**a.rs:2-3** @ {}\n", &sha[..7]))
+                .starts_with(&format!("**a.rs:2-3** @ {}\n", gitterrace_git::short_id(&sha)))
         );
         assert!(p.markdown.contains("```rs\nline 2"));
         assert_eq!(

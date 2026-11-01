@@ -94,7 +94,6 @@ button:hover{border-color:var(--line-strong);background:var(--hover)}
 .latest+.files-card{border-radius:0 0 var(--radius) var(--radius)}
 .latest b{font-weight:var(--weight-semibold)}
 .latest .subj{color:var(--muted);overflow:hidden;text-overflow:ellipsis;flex:1;min-width:0}.latest .subj:hover{color:var(--accent-fg)}
-.latest code{font-size:var(--text-xs)}
 .latest .hist{font-weight:var(--weight-semibold);color:var(--fg)}
 .files-card{margin-bottom:var(--space-6)}
 /* The README below a file list sits apart from it on every page, not only the overview. */
@@ -176,7 +175,7 @@ progress::-moz-progress-bar{background:var(--accent);border-radius:var(--radius)
 :root{--page-pad:var(--space-4)}
 .branch{display:none}
 .cols{gap:var(--space-4)}
-.latest code,.latest .muted{display:none}
+.latest .sha,.latest .muted{display:none}
 .entries td{padding:var(--space-2) var(--space-3)}
 .entries td:first-child{min-width:140px}
 input{min-width:0;flex:1}.filter{width:100%}
@@ -253,7 +252,7 @@ body{background-image:radial-gradient(60rem 22rem at 80% -6rem,color-mix(in srgb
 h2,.readme-h,.files summary{font:var(--weight-regular) var(--text-2xs)/1.4 var(--mono);text-transform:uppercase;letter-spacing:.12em;color:var(--muted)}
 main h2{display:flex;align-items:center;gap:var(--space-3)}
 main h2::after{content:"";flex:1;border-top:var(--border)}
-.entries td.r,.facts b,.meta,.latest code,.latest .muted,.cmain .muted,td.ago{font-family:var(--mono);font-size:var(--text-sm)}
+.entries td.r,.facts b,.meta,.latest .muted,.cmain .muted,td.ago{font-family:var(--mono);font-size:var(--text-sm)}
 .latest .subj,td.lc{font-size:var(--text-sm)}
 .av{border-radius:var(--radius)}
 .entries .bar{height:2px;border-radius:0}

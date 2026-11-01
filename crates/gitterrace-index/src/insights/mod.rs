@@ -10,6 +10,7 @@
 
 mod axis;
 mod code;
+pub(crate) mod fasthash;
 mod files;
 mod filter;
 mod headfiles;
@@ -90,7 +91,7 @@ pub struct Insights<'a> {
     pub(crate) last_seen: Vec<i64>,
     /// Newest commit time overall: "now" for periods, so old repositories still show data.
     pub(crate) now: i64,
-    follow: OnceLock<files::Follow>,
+    follow: OnceLock<files::Follow<'a>>,
 }
 
 impl<'a> Insights<'a> {
@@ -174,7 +175,7 @@ impl<'a> Insights<'a> {
         }
     }
 
-    pub(crate) fn follow(&self) -> &files::Follow {
+    pub(crate) fn follow(&self) -> &files::Follow<'a> {
         self.follow.get_or_init(|| self.build_follow())
     }
 }

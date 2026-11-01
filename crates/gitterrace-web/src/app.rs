@@ -591,7 +591,7 @@ impl App {
             Ok(Change {
                 kinds,
                 v,
-                banner: crate::views::banner(&a.repo.head_state()),
+                banner: crate::views::banner(&a.repo.head_state(), &a.base),
                 dirty: a.dirty(),
             })
         })

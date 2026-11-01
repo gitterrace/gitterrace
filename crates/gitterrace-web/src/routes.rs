@@ -501,22 +501,18 @@ async fn log(
     page(&p)
 }
 
-struct Parent {
-    full: String,
-    short: String,
-}
-
 #[derive(Template)]
 #[template(path = "commit.html")]
 struct CommitPage {
     c: Chrome,
     id: String,
+    sha: String,
     subject: String,
     body: String,
     author: String,
     author_href: String,
     date: String,
-    parents: Vec<Parent>,
+    parents: Vec<String>,
     files: Vec<FileStatRow>,
     diff: String,
 }
@@ -533,6 +529,7 @@ async fn commit(State(app): Shared, Path(id): Path<String>) -> Result<Html<Strin
                 ..views::chrome(a, "log")
             }
             .pinned(),
+            sha: fmt::sha_link(&id),
             subject: d.summary.subject.clone(),
             body: d.body.trim().to_owned(),
             author: d.summary.author.name.clone(),
@@ -542,10 +539,7 @@ async fn commit(State(app): Shared, Path(id): Path<String>) -> Result<Html<Strin
                 .summary
                 .parents
                 .iter()
-                .map(|p| Parent {
-                    full: p.clone(),
-                    short: fmt::short(p),
-                })
+                .map(|p| fmt::sha_link(p))
                 .collect(),
             files: views::file_stats(&d),
             diff: views::diff_html(
@@ -809,7 +803,7 @@ async fn refs(State(app): Shared) -> Result<Html<String>> {
                     .as_ref()
                     .map(|n| n.subject.clone())
                     .unwrap_or_default(),
-                commit: fmt::short(&r.target),
+                commit: fmt::sha_link(&r.target),
                 when: fmt::ago(r.time, now),
                 name: r.name.clone(),
             })

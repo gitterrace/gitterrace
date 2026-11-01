@@ -7,7 +7,7 @@ use gitterrace_git::{
     TreeEntryKind,
 };
 
-use crate::fmt::{ago, date, enc, esc, esc_text, href, short};
+use crate::fmt::{ago, date, enc, esc, esc_text, href, sha_link};
 
 const MAX_BLOB_LINES: usize = 20_000;
 
@@ -96,7 +96,8 @@ pub(crate) struct Crumb {
 }
 
 pub(crate) struct CommitRow {
-    pub(crate) short: String,
+    /// The commit id as its link, finished HTML from `fmt::sha_link`.
+    pub(crate) sha: String,
     pub(crate) initial: String,
     pub(crate) hue: u32,
     pub(crate) href: String,
@@ -182,7 +183,7 @@ pub(crate) fn chrome_at(app: &crate::app::App, active: &str, rev: &str) -> Chrom
                 on: key == active,
             })
             .collect(),
-        banner: banner(&app.repo.head_state()),
+        banner: banner(&app.repo.head_state(), &app.base),
         actions_note: app.actions_note(),
         theme: match app.cfg().display.theme.as_str() {
             "system" => String::new(),
@@ -222,8 +223,9 @@ impl Chrome {
     }
 }
 
-/// What the banner says about HEAD. Nothing on a branch with no operation in progress.
-pub(crate) fn banner(h: &gitterrace_git::HeadState) -> Option<String> {
+/// What the banner says about HEAD, as HTML (the commit is a link). Nothing on a branch with no
+/// operation in progress.
+pub(crate) fn banner(h: &gitterrace_git::HeadState, base: &str) -> Option<String> {
     use gitterrace_git::InProgress as P;
     let op = h.in_progress.map(|p| match p {
         P::Rebase => "Rebase in progress",
@@ -233,11 +235,14 @@ pub(crate) fn banner(h: &gitterrace_git::HeadState) -> Option<String> {
         P::Bisect => "Bisect in progress",
         P::ApplyMailbox => "Applying patches (git am) in progress",
     });
-    let at = h.commit.as_deref().map(short).unwrap_or_default();
+    let at = h.commit
+        .as_deref()
+        .map(|c| crate::fmt::sha_link_at(base, c))
+        .unwrap_or_default();
     match (op, &h.branch) {
         (None, Some(_)) => None,
         (None, None) => Some(format!("HEAD is detached at {at}")),
-        (Some(op), Some(b)) => Some(format!("{op} on {b}")),
+        (Some(op), Some(b)) => Some(format!("{op} on {}", esc_text(b))),
         (Some(op), None) => Some(format!("{op}, HEAD detached at {at}")),
     }
 }
@@ -298,7 +303,7 @@ pub(crate) fn author_href(email: &str) -> String {
 
 pub(crate) fn commit_row(c: &CommitSummary, now: i64) -> CommitRow {
     CommitRow {
-        short: short(&c.id),
+        sha: sha_link(&c.id),
         initial: initial(&c.author.name),
         hue: hue(&c.author.name),
         href: href(&format!("/commit/{}", c.id)),
@@ -376,7 +381,7 @@ pub(crate) fn ref_rows(refs: &[RefInfo], kind: gitterrace_git::RefKind, now: i64
         .map(|r| RefRow {
             name: r.name.clone(),
             log: href(&format!("/log/{}", enc(&r.name, false))),
-            commit: short(&r.target),
+            commit: sha_link(&r.target),
             when: ago(r.time, now),
         })
         .collect()
@@ -732,10 +737,8 @@ pub(crate) fn blame_html(path: &str, lines: &[BlameLine], now: i64) -> String {
         if first {
             let _ = write!(
                 out,
-                "<td class=\"who\"><a href=\"{}/commit/{}\">{}</a> <a class=\"who\" href=\"{}\">{}</a> <span class=\"muted\">{}</span></td>",
-                crate::fmt::base(),
-                esc(&l.commit),
-                esc(&short(&l.commit)),
+                "<td class=\"who\">{} <a class=\"who\" href=\"{}\">{}</a> <span class=\"muted\">{}</span></td>",
+                sha_link(&l.commit),
                 esc(&author_href(&l.author)),
                 esc(&l.author),
                 ago(l.time, now)

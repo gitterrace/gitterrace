@@ -28,7 +28,7 @@
 {% endfor %}
 <div class="chart-head"><div><h2>Commits</h2><p class="hint">{{ commits_total }} matching, newest first.</p></div></div>
 <ul class="list log">
-{% for r in commits %}<li class="crow"><span class="av" style="--hue:{{ r.hue }}">{{ r.initial }}</span><div class="cmain"><a href="{{ r.href }}">{{ r.subject }}</a><span class="muted"><a class="who" href="{{ r.author_href }}"><b>{{ r.author }}</b></a> · <time data-tip="{{ r.date }}" tabindex="0">{{ r.when }}</time></span></div><a class="sha" href="{{ r.href }}">{{ r.short }}</a></li>{% endfor %}
+{% for r in commits %}{% include "commit_row.html" %}{% endfor %}
 </ul>
 <nav class="pager">
 {% if let Some(h) = newer %}<a href="{{ h }}">Newer</a>{% else %}<span></span>{% endif %}

@@ -17,6 +17,16 @@ mod worktree;
 
 pub use error::{Error, Result};
 
+/// How many hex digits of a commit id any surface shows. One constant, so a short id looks the
+/// same in the web pages, the action payloads and the CLI.
+pub const SHORT_ID_LEN: usize = 8;
+
+/// The abbreviated form of a commit id (or the whole string when it is already shorter).
+#[must_use]
+pub fn short_id(id: &str) -> &str {
+    id.get(..SHORT_ID_LEN).unwrap_or(id)
+}
+
 /// Largest blob read as text anywhere: blob views, blame, line counts and diffs. Checked
 /// against the object header before reading, so a huge blob never reaches memory; larger
 /// blobs are treated like binary ones.

@@ -1,11 +1,11 @@
 //! Which paths count: user excludes, generated files and ignore rules.
 
-use std::collections::HashMap;
 use std::sync::Mutex;
 
 use gitterrace_git::IgnoreSet;
 
 use super::Options;
+use crate::insights::fasthash::FastMap;
 
 /// Lock files and minified output: generated, not written.
 const GENERATED: [&str; 10] = [
@@ -34,7 +34,7 @@ pub fn is_generated(path: &str) -> bool {
 pub struct PathFilter {
     patterns: Vec<String>,
     ignore: Option<IgnoreSet>,
-    memo: Mutex<HashMap<String, bool>>,
+    memo: Mutex<FastMap<String, bool>>,
 }
 
 impl PathFilter {
@@ -46,7 +46,7 @@ impl PathFilter {
         Self {
             patterns,
             ignore: if opts.respect_ignore { ignore } else { None },
-            memo: Mutex::new(HashMap::new()),
+            memo: Mutex::new(FastMap::default()),
         }
     }
 

@@ -35,16 +35,11 @@ pub fn state_dir() -> Option<PathBuf> {
     std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".local/state/gitterrace"))
 }
 
-/// Entries whose folder still holds a repository with the recorded id. Stale ones are dropped
-/// here, not trusted: a path may now hold another project.
-pub fn read(dir: &Path) -> io::Result<Vec<Entry>> {
-    Ok(read_raw(dir)?
-        .into_iter()
-        .filter(|e| {
-            Repo::discover(&e.path)
-                .is_ok_and(|r| r.root() == e.path && r.id().as_deref() == Some(&e.id))
-        })
-        .collect())
+/// Every recorded entry, unchecked: a path may now hold another project, and reading an id
+/// walks the whole history (seconds on a large clone). A caller narrows by the recorded id,
+/// then reads the candidate's own id before trusting it.
+pub fn candidates(dir: &Path) -> io::Result<Vec<Entry>> {
+    read_raw(dir)
 }
 
 /// Records `repos` as served now. A repository without commits has no id and is skipped.
@@ -166,7 +161,7 @@ mod tests {
 
     use gitterrace_git::Repo;
 
-    use crate::registry::{Entry, FILE, read, read_raw, record};
+    use crate::registry::{FILE, candidates, record};
 
     /// A one-commit repository; `msg` makes its root commit, and so its id, distinct.
     pub(crate) fn repo(dir: &Path, msg: &str) -> Repo {
@@ -193,7 +188,7 @@ mod tests {
         let a = repo(&t.path().join("a"), "a");
         let b = repo(&t.path().join("b"), "b");
         record(&state, &[&a, &b]).expect("record");
-        let got = read(&state).expect("read");
+        let got = candidates(&state).expect("read");
         assert_eq!(got.len(), 2);
         assert!(
             got.iter()
@@ -217,12 +212,7 @@ mod tests {
         std::fs::remove_dir_all(b.root()).expect("rm");
         std::fs::remove_dir_all(a.root()).expect("rm");
         repo(&a.root(), "another project");
-        assert_eq!(read_raw(&state).expect("raw").len(), 2, "kept on disk");
-        assert_eq!(
-            read(&state).expect("read"),
-            Vec::<Entry>::new(),
-            "dropped on read"
-        );
+        assert_eq!(candidates(&state).expect("raw").len(), 2, "kept on disk");
     }
 
     #[cfg(unix)]
@@ -236,7 +226,7 @@ mod tests {
         std::os::unix::fs::symlink(&target, state.join(FILE)).expect("link");
         let a = repo(&t.path().join("a"), "a");
         assert!(record(&state, &[&a]).is_err(), "write refused");
-        assert!(read(&state).is_err(), "read refused");
+        assert!(candidates(&state).is_err(), "read refused");
         assert_eq!(
             std::fs::read_to_string(&target).expect("r"),
             "[]",

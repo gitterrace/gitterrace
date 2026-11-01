@@ -10,7 +10,7 @@ use axum::{
 use crate::{
     app::blocking,
     error::Result,
-    fmt::{self, ago, enc, href, short},
+    fmt::{self, ago, enc, href, sha_link},
     live::Mode,
     routes::Shared,
     views::{self, Chrome},
@@ -52,7 +52,7 @@ pub(crate) async fn worktrees(State(app): Shared) -> Result<Html<String>> {
                         href(&format!("/log/{}", enc(&target, false)))
                     },
                     branch: w.branch.unwrap_or_else(|| "detached".to_owned()),
-                    commit: w.commit.as_deref().map(short).unwrap_or_default(),
+                    commit: w.commit.as_deref().map(sha_link).unwrap_or_default(),
                     path: w.path.unwrap_or_default(),
                     id: w.id,
                     locked: w.locked,
@@ -116,7 +116,6 @@ struct TagPage {
     c: Chrome,
     name: String,
     commit: String,
-    commit_href: String,
     tree_href: String,
     tagger: String,
     when: String,
@@ -136,8 +135,7 @@ pub(crate) async fn tag(State(app): Shared, Path(name): Path<String>) -> Result<
         let note = r.annotation.as_ref();
         Ok(TagPage {
             c: views::chrome(a, "refs").pinned(),
-            commit: short(&r.target),
-            commit_href: href(&format!("/commit/{}", r.target)),
+            commit: sha_link(&r.target),
             tree_href: href(&format!("/tree/{}", enc(&r.name, false))),
             tagger: note
                 .and_then(|n| n.tagger.as_ref())
@@ -191,7 +189,7 @@ pub(crate) fn branch_rows(a: &crate::app::App) -> Result<Vec<BranchRow>> {
                     enc(&base, false),
                     enc(&s.name, false)
                 )),
-                commit: short(&s.target),
+                commit: sha_link(&s.target),
                 subject: c.subject,
                 author: c.author.name,
                 when: ago(c.committer.time, now),

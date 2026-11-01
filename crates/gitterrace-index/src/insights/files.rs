@@ -1,6 +1,7 @@
 use std::collections::{BTreeMap, HashMap, HashSet};
 
 use super::{HeadFile, Insights, Period, year_of};
+use crate::insights::fasthash::FastMap;
 
 /// Most files in one commit that still say something about coupling; bigger commits are
 /// sweeps (formatting, renames, vendoring).
@@ -20,8 +21,8 @@ pub(crate) struct TouchRaw {
 /// Every non-merge commit that touched a path, followed back through renames to the name the
 /// file has at the newest commit.
 #[derive(Default)]
-pub(crate) struct Follow {
-    pub touches: HashMap<String, Vec<TouchRaw>>,
+pub(crate) struct Follow<'a> {
+    pub touches: FastMap<&'a str, Vec<TouchRaw>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
@@ -120,10 +121,10 @@ pub struct AgeReport {
     pub total_lines: u64,
 }
 
-impl Insights<'_> {
-    pub(crate) fn build_follow(&self) -> Follow {
-        let mut alias: HashMap<&str, &str> = HashMap::new();
-        let mut touches: HashMap<String, Vec<TouchRaw>> = HashMap::new();
+impl<'a> Insights<'a> {
+    pub(crate) fn build_follow(&self) -> Follow<'a> {
+        let mut alias: FastMap<&str, &str> = FastMap::default();
+        let mut touches: FastMap<&str, Vec<TouchRaw>> = FastMap::default();
         for i in (0..self.records.len()).rev() {
             let r = &self.records[i];
             if r.merge {
@@ -138,7 +139,7 @@ impl Insights<'_> {
                     alias.insert(old.as_str(), path);
                 }
                 let l = self.lines_unfiltered(f);
-                touches.entry(path.to_owned()).or_default().push(TouchRaw {
+                touches.entry(path).or_default().push(TouchRaw {
                     commit: u32::try_from(i).unwrap_or(u32::MAX),
                     file: u32::try_from(fi).unwrap_or(u32::MAX),
                     lines: l.add + l.del,

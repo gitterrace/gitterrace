@@ -2,7 +2,7 @@
 {% block content %}
 <div class="cols">
 <article>
-{% if let Some(l) = latest %}<div class="card latest"><span class="av" style="--hue:{{ l.hue }}">{{ l.initial }}</span><a class="who" href="{{ l.author_href }}"><b>{{ l.author }}</b></a><a class="subj" href="{{ l.href }}">{{ l.subject }}</a><code>{{ l.short }}</code><span class="muted">{{ l.when }}</span><a class="hist" href="{{ c.base }}/log/{{ c.rev_enc }}">History</a></div>{% endif %}
+{% if let Some(l) = latest %}<div class="card latest"><span class="av" style="--hue:{{ l.hue }}">{{ l.initial }}</span><a class="who" href="{{ l.author_href }}"><b>{{ l.author }}</b></a><a class="subj" href="{{ l.href }}">{{ l.subject }}</a>{{ l.sha|safe }}<span class="muted">{{ l.when }}</span><a class="hist" href="{{ c.base }}/log/{{ c.rev_enc }}">History</a></div>{% endif %}
 <div class="card files-card"><table class="entries" data-last="{{ c.base }}/api/last/{{ c.rev_enc }}/">
 {% for e in entries %}<tr><td>{% if e.href.is_empty() %}<span class="ico {{ e.kind }}"></span>{{ e.name }}{% else %}<a href="{{ e.href }}"><span class="ico {{ e.kind }}"></span>{{ e.name }}</a>{% endif %}</td><td class="lc muted" data-name="{{ e.name }}"></td><td class="muted r">{{ e.size }}</td></tr>{% endfor %}
 </table></div>

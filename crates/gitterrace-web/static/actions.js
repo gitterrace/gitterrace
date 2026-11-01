@@ -122,7 +122,7 @@
   }
 
   // ---- built-ins ------------------------------------------------------------
-  function shortSha() { return commit.slice(0, 7); }
+  function shortSha() { return commit.slice(0, 8); }
   function ref(t) {
     var base = t.path ? t.path.slice(t.path.lastIndexOf("/") + 1) : "";
     if (!t.lines) return base;
