@@ -8,7 +8,8 @@ use gitterrace_actions::schema::{
     ACTION_KEYS, ENV_VARS, Item, KINDS, MODIFIERS, PAYLOAD_FIELDS, PLACEHOLDERS, SCRIPT_KEYS,
     SEND_KEYS, SEND_PLACEHOLDERS, kind_name,
 };
-use gitterrace_actions::send::{DENIED_SCHEMES, PRESETS};
+use gitterrace_actions::Config;
+use gitterrace_actions::send::DENIED_SCHEMES;
 
 use crate::facts::Workspace;
 use crate::out::Out;
@@ -27,6 +28,7 @@ pub fn render(root: &Path, ws: &Workspace, scripts: &[Script]) -> Result<Vec<Out
         Out::block(ACTIONS, "env", env()),
         Out::block(ACTIONS, "action-keys", action_keys()),
         Out::block(ACTIONS, "placeholders", placeholders()),
+        Out::block(ACTIONS, "starter", starter()),
         Out::block(ACTIONS, "send", send()),
         Out::block(ACTIONS, "scripts", script_table(scripts)),
         Out::block(ARCH, "crates", crate_diagram(ws)),
@@ -122,22 +124,85 @@ fn placeholders() -> String {
     s
 }
 
-fn send() -> String {
+/// One block of the starter file, read as text so the generator needs no second schema.
+pub struct Entry {
+    pub table: &'static str,
+    pub id: String,
+    pub enabled: bool,
+    pub label: String,
+    pub about: String,
+    pub vars: Vec<String>,
+}
+
+/// The blocks of `defaults/actions.toml`: a chunk is the comment lines right above a
+/// `[[send]]` or `[[action]]` header, down to the next blank line.
+pub fn starter_entries() -> Vec<Entry> {
+    let value = |text: &str, key: &str| {
+        text.lines().find_map(|l| {
+            let (k, v) = l.split_once('=')?;
+            (k.trim() == key).then(|| v.trim().trim_matches('"').to_owned())
+        })
+    };
+    Config::STARTER
+        .split("\n\n")
+        .filter_map(|chunk| {
+            let table = if chunk.contains("\n[[send]]") || chunk.starts_with("[[send]]") {
+                "send"
+            } else if chunk.contains("\n[[action]]") || chunk.starts_with("[[action]]") {
+                "action"
+            } else {
+                return None;
+            };
+            let about: Vec<&str> = chunk
+                .lines()
+                .filter_map(|l| l.strip_prefix("# "))
+                .collect();
+            let body: Vec<&str> = chunk.lines().filter(|l| !l.starts_with('#')).collect();
+            let text = body.join("\n");
+            let vars = value(&text, "vars")
+                .map(|v| {
+                    v.trim_matches(['{', '}', ' '])
+                        .split(',')
+                        .filter_map(|kv| kv.split_once('=').map(|(k, _)| format!("`{}`", k.trim())))
+                        .collect()
+                })
+                .unwrap_or_default();
+            Some(Entry {
+                table,
+                id: value(&text, "id")?,
+                enabled: value(&text, "enabled").is_none_or(|e| e == "true"),
+                label: value(&text, "label")?,
+                about: about.join(" "),
+                vars,
+            })
+        })
+        .collect()
+}
+
+fn starter() -> String {
     let mut s = String::from(
-        "| Preset | Opens | Needs in `vars` | Default label |\n| --- | --- | --- | --- |\n",
+        "| Entry | Kind | On | What it does | Needs in `vars` |\n| --- | --- | --- | --- | --- |\n",
     );
-    for p in &PRESETS {
-        let needs: Vec<String> = p.vars.iter().map(|v| format!("`{v}`")).collect();
+    let entries = starter_entries();
+    for e in &entries {
         let _ = writeln!(
             s,
-            "| `{}` | {} `{}` | {} | {} |",
-            p.name,
-            p.doc,
-            p.url,
-            needs.join(", "),
-            p.label
+            "| `{}` | {} | {} | {} | {} |",
+            e.id,
+            if e.table == "send" { "Send to" } else { "action" },
+            yes(e.enabled),
+            e.about,
+            e.vars.join(", ")
         );
     }
+    s.push_str("\nThe whole file, as `gitterrace actions-init` writes it:\n\n```toml\n");
+    s.push_str(Config::STARTER.trim_end());
+    s.push_str("\n```\n");
+    s
+}
+
+fn send() -> String {
+    let mut s = String::new();
     s.push_str("\n| Placeholder | Value |\n| --- | --- |\n");
     for (name, doc) in SEND_PLACEHOLDERS {
         let _ = writeln!(s, "| `{{{name}}}` | {doc} |");
@@ -146,7 +211,7 @@ fn send() -> String {
     let _ = writeln!(s, "\nRefused schemes: {}.\n", denied.join(", "));
     s.push_str(&key_table(
         "`[[send]]`",
-        "One Send to target: its own `url`, or a `preset`.",
+        "One Send to target: a `url` template.",
         &SEND_KEYS,
     ));
     s

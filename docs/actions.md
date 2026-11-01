@@ -16,9 +16,10 @@ read-only and holds no token.
 version = 1
 
 [[send]]
-id     = "issue"
-preset = "github-issue"
-vars   = { repo = "owner/name" }
+id    = "issue"
+label = "New issue"
+url   = "https://github.com/{var.repo}/issues/new?title={title}&body={notes}"
+vars  = { repo = "owner/name" }
 
 [[send]]
 id    = "notes"
@@ -31,6 +32,17 @@ Page values are always percent-encoded and can never reach the scheme or the hos
 before the first placeholder must hold the scheme and end the host. `https`, `mailto` and app
 schemes are allowed, `http` only for loopback. With no `[[send]]` entry, the window offers
 Copy as markdown.
+
+### The starter file
+
+`gitterrace actions-init` writes the file below to `actions.toml` in your config folder, unless
+one exists. It is an ordinary `actions.toml`. An entry with `enabled = false` is checked but
+not offered: switch on the ones you use and fill in their `vars`.
+
+<!-- BEGIN GENERATED: starter -->
+<!-- END GENERATED: starter -->
+
+### Reference
 
 <!-- BEGIN GENERATED: send -->
 | Preset | Opens | Needs in `vars` | Default label |

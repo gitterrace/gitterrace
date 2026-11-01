@@ -75,6 +75,10 @@ pub(crate) enum Command {
         #[arg(long)]
         uninstall: bool,
     },
+    /// Write the pre-filled `actions.toml` (Send to targets and example actions) to the config folder.
+    ///
+    /// Refuses to replace an existing file. Entries that need your settings start switched off.
+    ActionsInit,
     /// Write a static copy of the site to a folder, for sharing or hosting.
     Export {
         /// Folder to write into (created if missing).

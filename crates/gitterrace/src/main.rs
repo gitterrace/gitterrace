@@ -65,6 +65,7 @@ async fn main() -> anyhow::Result<()> {
                 return Err(e);
             }
         }
+        Command::ActionsInit => actions_init(cli.config.as_deref())?,
         Command::InstallHandler { uninstall } => handler::run(uninstall)?,
         Command::Wrapped {
             year,
@@ -85,6 +86,31 @@ async fn main() -> anyhow::Result<()> {
             println!("wrote {n} files to {}", out.display());
         }
     }
+    Ok(())
+}
+
+/// Writes the starter `actions.toml`, private to the user, never over an existing file.
+fn actions_init(config: Option<&std::path::Path>) -> anyhow::Result<()> {
+    use std::io::Write as _;
+    use std::os::unix::fs::{DirBuilderExt as _, OpenOptionsExt as _};
+
+    let path = gitterrace_actions::config::default_path(config)
+        .context("no config folder: set --config or HOME")?;
+    if let Some(dir) = path.parent() {
+        std::fs::DirBuilder::new()
+            .recursive(true)
+            .mode(0o700)
+            .create(dir)
+            .context("creating the config folder")?;
+    }
+    let mut file = std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .mode(0o600)
+        .open(&path)
+        .with_context(|| format!("writing {} (it may exist already)", path.display()))?;
+    file.write_all(gitterrace_actions::Config::STARTER.as_bytes())?;
+    println!("wrote {}", path.display());
     Ok(())
 }
 

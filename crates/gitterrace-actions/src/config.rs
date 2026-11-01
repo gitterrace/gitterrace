@@ -175,6 +175,9 @@ enum RawCommand {
 struct RawAction {
     id: String,
     label: String,
+    /// `false`: checked like any other, but not offered and its program need not exist yet.
+    #[serde(default = "yes")]
+    enabled: bool,
     kinds: Vec<Kind>,
     command: Option<RawCommand>,
     script: Option<String>,
@@ -190,7 +193,15 @@ struct RawAction {
     vars: BTreeMap<String, String>,
 }
 
+fn yes() -> bool {
+    true
+}
+
 impl Config {
+    /// The starter file `gitterrace actions-init` writes, parsed by the same rules as the
+    /// user's own file.
+    pub const STARTER: &'static str = include_str!("../defaults/actions.toml");
+
     pub fn get(&self, id: &str) -> Option<&Action> {
         self.actions.iter().find(|a| a.id == id)
     }
@@ -226,23 +237,30 @@ impl Config {
         let mut seen = HashSet::new();
         let mut actions = Vec::with_capacity(raw.action.len());
         for a in raw.action {
+            let enabled = a.enabled;
             let action = validate(a, &scripts, home)?;
             if !seen.insert(action.id.clone()) {
                 return Err(invalid(&action.id, "duplicate id"));
             }
-            actions.push(action);
+            if enabled {
+                actions.push(action);
+            }
         }
+        let mut seen_sends = HashSet::new();
         let mut sends = Vec::with_capacity(raw.send.len());
         for raw_send in raw.send {
             let id = raw_send.id().to_owned();
+            let enabled = raw_send.enabled;
             let target = crate::send::compile(raw_send).map_err(|why| send_err(&id, why))?;
             if !valid_id(&id) {
                 return Err(send_err(&id, "id must match [a-z0-9-]{1,32}"));
             }
-            if sends.iter().any(|t: &crate::send::Target| t.id == id) {
+            if !seen_sends.insert(id.clone()) {
                 return Err(send_err(&id, "duplicate id"));
             }
-            sends.push(target);
+            if enabled {
+                sends.push(target);
+            }
         }
         Ok(Self { actions, sends })
     }
@@ -397,8 +415,14 @@ fn validate(
     let argv = match (shell, command) {
         (false, RawCommand::Argv(v)) if !v.is_empty() => {
             let mut v = v;
-            v[0] = resolve_program(&v[0], home)
-                .ok_or_else(|| invalid(&id, format!("{} is not an executable file", v[0])))?;
+            match resolve_program(&v[0], home) {
+                Some(p) => v[0] = p,
+                // A disabled action may name a program not installed yet.
+                None if !a.enabled => {}
+                None => {
+                    return Err(invalid(&id, format!("{} is not an executable file", v[0])));
+                }
+            }
             v
         }
         (false, _) => {

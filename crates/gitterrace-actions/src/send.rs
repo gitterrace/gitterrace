@@ -38,48 +38,6 @@ pub const DENIED_SCHEMES: [&str; 8] = [
     "view-source",
 ];
 
-/// A built-in target: `preset = "<name>"` takes this template; `vars` lists the settings it
-/// needs in `[send.vars]`.
-pub struct Preset {
-    pub name: &'static str,
-    /// The label when the block sets none.
-    pub label: &'static str,
-    pub url: &'static str,
-    pub vars: &'static [&'static str],
-    pub doc: &'static str,
-}
-
-pub const PRESETS: [Preset; 4] = [
-    Preset {
-        name: "tendir",
-        label: "Send to tendir",
-        url: "tendir://new-task?title={title}&notes={notes}",
-        vars: &[],
-        doc: "tendir's new-task sheet, filled in.",
-    },
-    Preset {
-        name: "github-issue",
-        label: "New issue",
-        url: "https://github.com/{var.repo}/issues/new?title={title}&body={notes}",
-        vars: &["repo"],
-        doc: "A new issue on a hosted service. `repo` is `owner/name`.",
-    },
-    Preset {
-        name: "forgejo-issue",
-        label: "New issue",
-        url: "{var.base}/{var.repo}/issues/new?title={title}&body={notes}",
-        vars: &["base", "repo"],
-        doc: "A new issue on a self-hosted forge. `base` is the instance URL, `repo` is `owner/name`.",
-    },
-    Preset {
-        name: "mail",
-        label: "Mail draft",
-        url: "mailto:?subject={title}&body={notes}",
-        vars: &[],
-        doc: "A mail draft in your mail app.",
-    },
-];
-
 /// One part of a template as the page receives it: `{"lit": "..."}` is copied as is,
 /// `{"ph": "title"}` is replaced by the encoded value.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -101,9 +59,12 @@ pub struct Target {
 #[serde(deny_unknown_fields)]
 pub(crate) struct RawSend {
     id: String,
-    label: Option<String>,
-    url: Option<String>,
-    preset: Option<String>,
+    label: String,
+    url: String,
+    /// `false` keeps the block checked but not offered: how the shipped starter file lists
+    /// targets that need settings of yours.
+    #[serde(default = "yes")]
+    pub(crate) enabled: bool,
     #[serde(default)]
     vars: BTreeMap<String, String>,
 }
@@ -120,6 +81,10 @@ pub fn fill(parts: &[Part], values: &BTreeMap<String, String>) -> String {
         .collect()
 }
 
+fn yes() -> bool {
+    true
+}
+
 impl RawSend {
     pub(crate) fn id(&self) -> &str {
         &self.id
@@ -133,27 +98,7 @@ pub(crate) fn compile(raw: RawSend) -> Result<Target, String> {
             return Err(format!("vars.{name}: one line, at most 4 KiB"));
         }
     }
-    let (template, label) = match (&raw.url, &raw.preset) {
-        (Some(_), Some(_)) => return Err("set exactly one of url and preset".into()),
-        (None, None) => return Err("set url or preset".into()),
-        (Some(u), None) => (u.clone(), raw.label.clone()),
-        (None, Some(name)) => {
-            let p = PRESETS.iter().find(|p| p.name == name).ok_or_else(|| {
-                let known: Vec<_> = PRESETS.iter().map(|p| p.name).collect();
-                format!("unknown preset {name:?}; known: {}", known.join(", "))
-            })?;
-            for v in p.vars {
-                if !raw.vars.contains_key(*v) {
-                    return Err(format!("preset {name} needs vars.{v}"));
-                }
-            }
-            (
-                p.url.to_owned(),
-                raw.label.clone().or_else(|| Some(p.label.to_owned())),
-            )
-        }
-    };
-    let label = label.ok_or("label is required with url")?;
+    let (template, label) = (raw.url.as_str(), raw.label.as_str());
     if label.trim().is_empty() || label.chars().count() > 80 {
         return Err("label must be 1 to 80 characters".into());
     }
@@ -162,7 +107,7 @@ pub(crate) fn compile(raw: RawSend) -> Result<Target, String> {
         Some(Part::Lit(l)) => l.push_str(s),
         _ => parts.push(Part::Lit(s.to_owned())),
     };
-    for piece in pieces(&template)? {
+    for piece in pieces(template)? {
         match piece {
             Piece::Text(t) => push_lit(&mut parts, &t),
             Piece::Field(f) => {
@@ -190,7 +135,7 @@ pub(crate) fn compile(raw: RawSend) -> Result<Target, String> {
     check_prefix(prefix, parts.len() > 1)?;
     Ok(Target {
         id: raw.id,
-        label,
+        label: raw.label,
         parts,
     })
 }
@@ -314,38 +259,51 @@ mod tests {
         assert!(url("https://example.test/{path}").is_ok());
     }
 
+    /// The starter file, with every send switched on: the sends part is plain data.
+    fn starter_sends() -> Config {
+        let text = Config::STARTER
+            .split("# ---- Actions")
+            .next()
+            .expect("sends part")
+            .replace("enabled = false", "enabled = true");
+        Config::parse(&text, Path::new("/")).expect("starter sends load")
+    }
+
     #[test]
-    fn every_preset_loads_and_round_trips() {
-        for p in &PRESETS {
-            let vars: String = p
-                .vars
-                .iter()
-                .map(|v| [v, " = \"https://h.test\"\n"].concat())
-                .collect();
-            let body = format!("preset = \"{}\"\n[send.vars]\n{vars}", p.name);
-            let c = load(&body).unwrap_or_else(|e| panic!("{}: {e}", p.name));
-            let t = &c.sends[0];
-            let values: BTreeMap<String, String> = SEND_FIELDS
-                .iter()
-                .map(|f| ((*f).to_owned(), "a b".to_owned()))
-                .collect();
+    fn starter_file_loads_and_hides_the_unset() {
+        let c = Config::parse(Config::STARTER, Path::new("/")).expect("starter loads");
+        let ids: Vec<&str> = c.sends.iter().map(|t| t.id.as_str()).collect();
+        assert_eq!(ids, ["tendir", "mail"]);
+        assert!(c.actions.is_empty(), "nothing offered until you enable it");
+        assert!(starter_sends().sends.len() > 6);
+    }
+
+    #[test]
+    fn disabled_send_is_still_checked() {
+        let e = load("label = \"S\"\nenabled = false\nurl = \"javascript:x{title}\"\n")
+            .expect_err("bad url");
+        assert!(e.contains("refused"), "{e}");
+    }
+
+    #[test]
+    fn gitlab_urls_keep_each_value_in_its_parameter() {
+        let c = starter_sends();
+        let mut values = BTreeMap::new();
+        values.insert("title".to_owned(), "a&b #1 ?/ + \u{e9}\u{1f600}".to_owned());
+        values.insert("notes".to_owned(), "x=1&issue[title]=evil".to_owned());
+        for id in [
+            "gitlab-issue",
+            "gitlab-issue-self-hosted",
+            "gitlab-merge-request",
+        ] {
+            let t = c.sends.iter().find(|t| t.id == id).expect(id);
             let got = fill(&t.parts, &values);
-            let mut want = p
-                .url
-                .replace("{title}", "a%20b")
-                .replace("{notes}", "a%20b");
-            for v in p.vars {
-                want = want.replace(&format!("{{var.{v}}}"), "https://h.test");
-            }
-            assert_eq!(got, want, "{}", p.name);
-            if !p.vars.is_empty() {
-                let e =
-                    load(&format!("label = \"P\"\npreset = \"{}\"\n", p.name)).expect_err(p.name);
-                assert!(e.contains("needs vars."), "{e}");
-            }
+            let query = got.split_once('?').expect("query").1;
+            assert!(!query.contains(['#', '?', '/', ' ', '+']), "{id}: {got}");
+            let n = query.split('&').count();
+            assert_eq!(n, if id.ends_with("request") { 3 } else { 2 }, "{id}: {got}");
+            assert!(got.contains("a%26b%20%231%20%3F%2F%20%2B%20%C3%A9%F0%9F%98%80"));
         }
-        assert!(load("label = \"P\"\npreset = \"nope\"\n").is_err());
-        assert!(load("label = \"P\"\npreset = \"mail\"\nurl = \"https://x/\"\n").is_err());
     }
 
     #[derive(Deserialize)]
@@ -365,14 +323,12 @@ mod tests {
         for v in &vectors {
             assert_eq!(fill(&v.parts, &v.values), v.expected, "{}", v.name);
         }
-        for p in &PRESETS {
-            assert!(
-                vectors
-                    .iter()
-                    .any(|v| v.name == format!("preset {}", p.name)),
-                "{}",
-                p.name
-            );
+        // One vector per starter send, by id, so a new entry needs its vector.
+        for t in &starter_sends().sends {
+            let name = format!("starter {}", t.id);
+            assert!(vectors.iter().any(|v| v.name == name), "{name}");
+            let v = vectors.iter().find(|v| v.name == name).expect("vector");
+            assert_eq!(v.parts, t.parts, "{name}");
         }
     }
 

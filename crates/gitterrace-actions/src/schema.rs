@@ -247,24 +247,24 @@ pub const SEND_KEYS: [Item; 5] = [
     item(
         "label",
         "string",
-        false,
+        true,
         "",
-        "Text in the Send window, 1 to 80 characters. A preset has a default.",
+        "Text in the Send window, 1 to 80 characters.",
     ),
     item(
         "url",
         "string",
-        false,
+        true,
         "",
         "The URL template. The scheme and host are literal. Placeholders (below) fill the \
-         path, query or fragment, each percent-encoded. Set exactly one of `url` and `preset`.",
+         path, query or fragment, each percent-encoded.",
     ),
     item(
-        "preset",
-        "string",
+        "enabled",
+        "boolean",
         false,
-        "",
-        "A built-in target by name (below). Set exactly one of `url` and `preset`.",
+        "`true`",
+        "`false` checks the block but does not offer it. The starter file ships the ones that need your settings this way.",
     ),
     item(
         "vars",
@@ -272,7 +272,7 @@ pub const SEND_KEYS: [Item; 5] = [
         false,
         "`{}`",
         "`[send.vars]`: settings, inserted verbatim as `{var.<name>}`, one line each, at most \
-         4 KiB. A preset names the ones it needs.",
+         4 KiB.",
     ),
 ];
 
@@ -341,7 +341,7 @@ pub const SCRIPT_KEYS: [Item; 6] = [
 ];
 
 /// Keys of an `[[action]]` block.
-pub const ACTION_KEYS: [Item; 13] = [
+pub const ACTION_KEYS: [Item; 14] = [
     item(
         "id",
         "string",
@@ -355,6 +355,13 @@ pub const ACTION_KEYS: [Item; 13] = [
         true,
         "",
         "Menu text, 1 to 80 characters.",
+    ),
+    item(
+        "enabled",
+        "boolean",
+        false,
+        "`true`",
+        "`false` checks the block but does not offer it, and its program may be missing. The starter file ships the examples this way.",
     ),
     item(
         "kinds",

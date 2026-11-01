@@ -6,7 +6,6 @@ use std::fmt::Write as _;
 use std::path::Path;
 
 use anyhow::{Context as _, Result};
-use gitterrace_actions::send::PRESETS;
 use pulldown_cmark::{Options, Parser, html};
 
 use crate::facts::Workspace;
@@ -196,24 +195,16 @@ fn features() -> String {
         .map(|t| esc(&t.to_lowercase()))
         .collect();
     line(&mut s, "Insights.", format!("{}.", sentence(&tabs)));
-    let presets: Vec<String> = PRESETS
+    let mut presets: Vec<String> = Vec::new();
+    for e in crate::docs_md::starter_entries()
         .iter()
-        .map(|p| {
-            let shared = PRESETS.iter().filter(|q| q.label == p.label).count() > 1;
-            let first = p.doc.split('.').next().unwrap_or(p.doc);
-            if shared {
-                format!(
-                    "{} ({})",
-                    esc(p.label),
-                    esc(&lower_first(
-                        first.strip_prefix("A new issue ").unwrap_or(first)
-                    ))
-                )
-            } else {
-                esc(p.label)
-            }
-        })
-        .collect();
+        .filter(|e| e.table == "send")
+    {
+        let label = esc(&e.label);
+        if !presets.contains(&label) {
+            presets.push(label);
+        }
+    }
     line(
         &mut s,
         "Send to.",
@@ -254,13 +245,6 @@ fn sentence(items: &[String]) -> String {
         [one] => one.clone(),
         [head @ .., last] => format!("{}, and {last}", head.join(", ")),
     }
-}
-
-fn lower_first(s: &str) -> String {
-    let mut c = s.chars();
-    c.next().map_or_else(String::new, |f| {
-        f.to_lowercase().collect::<String>() + c.as_str()
-    })
 }
 
 /// Placeholders only: the screenshots are the owner's.

@@ -1017,7 +1017,7 @@ mod tests {
         let (status, body) = page(&router(&repo, None, None), "/_send/targets").await;
         assert_eq!((status, body.as_str()), (200, "[]"));
         let cfg = config_dir(
-            "version = 1\n[[send]]\nid = \"gh\"\npreset = \"github-issue\"\nvars = { repo = \"o/n\" }\n",
+            "version = 1\n[[send]]\nid = \"gh\"\nlabel = \"New issue\"\nurl = \"https://github.com/{var.repo}/issues/new?title={title}&body={notes}\"\nvars = { repo = \"o/n\" }\n",
         );
         let r = router(&repo, Some(cfg.path()), None);
         let (status, body) = page(&r, "/_send/targets").await;

@@ -228,6 +228,7 @@ pub fn hotspots(records: &[CommitRecord], since: i64, limit: usize) -> Vec<FileC
 /// Churn per containing directory, most commits first, then path.
 pub fn dir_churn(records: &[CommitRecord]) -> Vec<DirChurn> {
     struct Acc {
+        stamp: usize,
         commits: usize,
         files: usize,
         additions: u64,
@@ -236,18 +237,18 @@ pub fn dir_churn(records: &[CommitRecord]) -> Vec<DirChurn> {
     let mut map: FastMap<&str, Acc> = FastMap::default();
     // A path belongs to one directory, so first sight of a path is a new file of its directory.
     let mut paths: FastSet<&str> = FastSet::default();
-    for r in records {
-        let mut touched: Vec<&str> = Vec::new();
+    for (n, r) in records.iter().enumerate() {
         for f in &r.files {
             let dir = f.path.rsplit_once('/').map_or(".", |(d, _)| d);
             let acc = map.entry(dir).or_insert_with(|| Acc {
+                stamp: usize::MAX,
                 commits: 0,
                 files: 0,
                 additions: 0,
                 deletions: 0,
             });
-            if !touched.contains(&dir) {
-                touched.push(dir);
+            if acc.stamp != n {
+                acc.stamp = n;
                 acc.commits += 1;
             }
             if paths.insert(&*f.path) {
@@ -304,33 +305,51 @@ pub fn label_over_time(
         .collect()
 }
 
+/// Per-path state of [`churn_since`]. `keep` is decided once per distinct path.
+struct ChurnAcc {
+    keep: bool,
+    /// Index of the last commit counted, so a commit counts once per file in O(1).
+    stamp: usize,
+    churn: FileChurn,
+}
+
 fn churn_since(
     records: &[CommitRecord],
     since: i64,
     keep: impl Fn(&str) -> bool,
 ) -> Vec<FileChurn> {
-    let mut map: FastMap<&str, FileChurn> = FastMap::default();
-    for r in records.iter().filter(|r| r.time >= since) {
-        // A commit touches few files, so a scan beats hashing for the once-per-commit check.
-        let mut seen: Vec<&str> = Vec::new();
-        for f in r.files.iter().filter(|f| keep(&f.path)) {
-            let c = map.entry(&*f.path).or_insert_with(|| FileChurn {
-                path: f.path.to_string(),
-                commits: 0,
-                additions: 0,
-                deletions: 0,
-                last_commit: r.time,
+    let mut map: FastMap<&str, ChurnAcc> = FastMap::default();
+    for (n, r) in records.iter().enumerate().filter(|(_, r)| r.time >= since) {
+        for f in &r.files {
+            let c = map.entry(&*f.path).or_insert_with(|| ChurnAcc {
+                keep: keep(&f.path),
+                stamp: usize::MAX,
+                churn: FileChurn {
+                    path: f.path.to_string(),
+                    commits: 0,
+                    additions: 0,
+                    deletions: 0,
+                    last_commit: r.time,
+                },
             });
-            if !seen.contains(&&*f.path) {
-                seen.push(&*f.path);
-                c.commits += 1;
+            if !c.keep {
+                continue;
             }
+            if c.stamp != n {
+                c.stamp = n;
+                c.churn.commits += 1;
+            }
+            let c = &mut c.churn;
             c.additions += u64::from(f.additions);
             c.deletions += u64::from(f.deletions);
             c.last_commit = c.last_commit.max(r.time);
         }
     }
-    let mut out: Vec<FileChurn> = map.into_values().collect();
+    let mut out: Vec<FileChurn> = map
+        .into_values()
+        .filter(|a| a.keep)
+        .map(|a| a.churn)
+        .collect();
     out.sort_by(|a, b| b.commits.cmp(&a.commits).then_with(|| a.path.cmp(&b.path)));
     out
 }

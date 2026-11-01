@@ -33,7 +33,7 @@ EDITORS = re.compile(r"\b(Zed|VS Code|Visual Studio Code|IntelliJ)\b")
 # an email address is data, not a comparison.
 PROSE_FILES = (".md",)
 COMMENT = re.compile(r"^\s*(//|#|/\*|\*)|\s//\s|\bdescription\s*=|^\s*keywords\s*=")
-DATA = re.compile(r"[\w.-]*\.(com|io)\b|@[\w.-]+|\"[\w-]+-actions\"|\b(github|forgejo)-issue\b")
+DATA = re.compile(r"[\w.-]*\.(com|io)\b|@[\w.-]+|\"[\w-]+-actions\"|\b(github|gitlab|forgejo)-[a-z-]+\b")
 # Release tooling must name its CI host.
 PRODUCT_SKIP = ("Cargo.toml", ".github/")
 # Third-party code shipped as is.
