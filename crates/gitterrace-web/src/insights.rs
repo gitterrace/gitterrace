@@ -18,9 +18,6 @@ use crate::{
     views::{self, Chrome, Nav},
 };
 
-/// Commits in the rolling window of the rework ratio.
-const REWORK_WINDOW: usize = 100;
-
 #[derive(Deserialize, Default)]
 pub(crate) struct InsightsQuery {
     #[serde(flatten)]
@@ -218,6 +215,8 @@ struct CodeFrequencyPage {
     fb: FilterBar,
     opts: Vec<OptLink>,
     kpis: Vec<Kpi>,
+    unit: &'static str,
+    window: usize,
     weekly: String,
     rework: String,
     verdict: String,
@@ -231,22 +230,24 @@ pub(crate) async fn code_frequency(
     cached(&app, "cf", raw, move |a, r, c| {
         let f = &q.filter;
         let fb = f.bar("/stats/frequency", r);
-        let recs = f.apply(r);
+        let recs = scoped(f, r);
         let ins = insights(a, &recs, q.options());
-        let weeks = ins.code_frequency();
+        let period = f.period_value().unwrap_or(Period::All);
+        let (unit, weeks) = ins.code_frequency(period);
         let (add, del, rew) = weeks.iter().fold((0, 0, 0), |t, w| {
             (t.0 + w.additions, t.1 + w.deletions, t.2 + w.rewritten)
         });
         let points: Vec<_> = weeks
             .iter()
-            .map(|w| (w.key.clone(), w.additions, w.deletions))
+            .map(|w| (w.label.clone(), w.additions, w.deletions))
             .collect();
-        let rw = ins.rework(REWORK_WINDOW);
-        let verdict = rw.iter().rev().find_map(|p| p.share).map_or_else(
+        let rw = ins.rework(period);
+        let verdict = rw.points.iter().rev().find_map(|p| p.share).map_or_else(
             || "No changes in this selection.".to_owned(),
             |s| {
                 format!(
-                    "Latest window: {:.0}% of changed lines replaced existing code, {}.",
+                    "Latest window of {} commits: {:.0}% of changed lines replaced existing code, {}.",
+                    rw.window,
                     s * 100.0,
                     rework_verdict(s)
                 )
@@ -274,10 +275,16 @@ pub(crate) async fn code_frequency(
                         .map_or_else(|| "-".to_owned(), |s| format!("{:.0}%", s * 100.0)),
                 ),
             ],
-            weekly: charts::diverging(&points),
+            unit: unit.noun(),
+            window: rw.window,
+            weekly: charts::diverging(
+                &points,
+                &format!("Additions and deletions per {}", unit.noun()),
+            ),
             rework: charts::percent_line(
-                &rw.iter()
-                    .map(|p| (p.key.clone(), p.share))
+                &rw.points
+                    .iter()
+                    .map(|p| (p.label.clone(), p.share))
                     .collect::<Vec<_>>(),
             ),
             verdict,
@@ -305,6 +312,7 @@ struct PersonRow {
 #[derive(Template)]
 #[template(path = "contributors.html")]
 struct ContributorsPage {
+    unit: &'static str,
     c: Chrome,
     tabs: Vec<Nav>,
     fb: FilterBar,
@@ -345,7 +353,7 @@ pub(crate) async fn contributors(
                     deletions: fmt::thousands(p.deletions),
                     first: fmt::day(p.first_commit),
                     last: fmt::day(p.last_commit),
-                    spark: charts::sparkline(&p.weekly, "s1"),
+                    spark: charts::sparkline(&p.series, "s1"),
                     hue: views::hue(&p.name),
                     initial: views::initial(&p.name),
                 }
@@ -357,6 +365,7 @@ pub(crate) async fn contributors(
             .filter(|p| bots || !p.bot)
             .fold((0, 0), |t, p| (t.0 + p.additions, t.1 + p.deletions));
         ContributorsPage {
+            unit: report.unit.noun(),
             c,
             tabs: views::stats_tabs("co"),
             fb,

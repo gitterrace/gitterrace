@@ -67,6 +67,7 @@ struct PulsePage {
     opts: Vec<OptLink>,
     rows: Vec<PulseRow>,
     span: String,
+    unit: &'static str,
     weekly: String,
 }
 
@@ -128,11 +129,12 @@ pub(crate) async fn pulse(
             ),
             None => format!("all history up to {}", fmt::day(s.to - 1)),
         };
-        let weekly: Vec<_> = ins
-            .rhythm(period)
-            .weekly
+        let rhythm = ins.rhythm(period);
+        let unit = rhythm.unit.noun();
+        let weekly: Vec<_> = rhythm
+            .series
             .into_iter()
-            .map(|p| (p.key, u64::from(p.commits)))
+            .map(|p| (p.label, u64::from(p.commits)))
             .collect();
         PulsePage {
             c,
@@ -141,6 +143,7 @@ pub(crate) async fn pulse(
             opts: q.row("/stats/pulse"),
             rows,
             span,
+            unit,
             weekly: charts::bars(&weekly),
         }
     })

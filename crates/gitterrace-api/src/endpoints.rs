@@ -144,7 +144,11 @@ pub const ENDPOINTS: &[Endpoint] = &[
         summary: "One insight.",
         params: &[
             REV,
-            p("granularity", "string", "`day`, `week` or `month`."),
+            p(
+                "period",
+                "string",
+                "`1w`, `1m`, `3m`, `1y` or `all` (default). Sets the bucket unit.",
+            ),
             p("label", "string", "`kind` or `scope`."),
             p(
                 "since",

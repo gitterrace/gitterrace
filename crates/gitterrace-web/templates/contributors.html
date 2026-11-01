@@ -5,10 +5,10 @@
 {% include "filterbar.html" %}
 {% include "options.html" %}
 <div class="kpis">{% for k in kpis %}<div><b>{{ k.1 }}</b><span>{{ k.0 }}</span></div>{% endfor %}</div>
-<div class="chart-head"><div><h2>People</h2><p class="hint">Most commits first. The sparkline is commits per week over the period. Click a name to narrow the page to that person.</p></div></div>
+<div class="chart-head"><div><h2>People</h2><p class="hint">Most commits first. The sparkline is commits per {{ unit }} over the period. Click a name to narrow the page to that person.</p></div></div>
 {% if people.is_empty() %}<p class="muted">No contributors match these filters.</p>{% else %}
 <div class="card"><table class="entries">
-<tr class="th"><td>Contributor</td><td>Weekly</td><td class="r">Commits</td><td class="r">Lines</td><td class="r">First</td><td class="r">Last</td></tr>
+<tr class="th"><td>Contributor</td><td>Per {{ unit }}</td><td class="r">Commits</td><td class="r">Lines</td><td class="r">First</td><td class="r">Last</td></tr>
 {% for p in people %}<tr><td><span class="av" style="--hue:{{ p.hue }}">{{ p.initial }}</span> <a class="who" href="{{ p.href }}"><b>{{ p.name }}</b></a>{% if p.first_time %} <span class="tag">new</span>{% endif %}{% if p.bot %} <span class="tag">bot</span>{% endif %} <a class="muted" href="{{ p.log_href }}">log</a></td><td>{{ p.spark|safe }}</td><td class="r">{{ p.commits }}</td><td class="r"><b class="add">+{{ p.additions }}</b> <b class="del">-{{ p.deletions }}</b></td><td class="r muted">{{ p.first }}</td><td class="r muted">{{ p.last }}</td></tr>{% endfor %}
 </table></div>
 {% endif %}

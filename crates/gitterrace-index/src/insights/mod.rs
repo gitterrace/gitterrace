@@ -8,6 +8,7 @@
 //! branch). Line-level series that must add up exactly (language lines over time) follow the
 //! first-parent chain instead, where merge diffs are the only way a branch's lines arrive.
 
+mod axis;
 mod code;
 mod files;
 mod filter;
@@ -21,10 +22,13 @@ use std::sync::OnceLock;
 
 use gitterrace_git::IgnoreSet;
 
-use crate::aggregates::{civil, weekday};
-use crate::{CommitRecord, FileStat, Granularity};
+use crate::aggregates::civil;
+use crate::{CommitRecord, FileStat};
 
-pub use code::{CodeFrequency, LocPoint, LocSeries, ReworkPoint, rework_share, rework_verdict};
+pub use axis::{BucketUnit, TimeAxis};
+pub use code::{
+    CodeFrequency, LocPoint, LocSeries, Rework, ReworkPoint, rework_share, rework_verdict,
+};
 pub use files::{
     AgeBucket, AgeReport, Coupling, DirOwnership, FileCommit, Hotspot, HotspotReport, Owner,
     OwnershipReport, Touch,
@@ -172,6 +176,16 @@ impl<'a> Insights<'a> {
         out
     }
 
+    /// Buckets for a time chart of `period` (`None` and `All` span the records).
+    pub(crate) fn axis(&self, period: Option<Period>) -> TimeAxis {
+        let days = || self.records.iter().map(local_day);
+        let newest = self.records.iter().max_by_key(|r| r.time).map(local_day);
+        match (days().min(), newest) {
+            (Some(first), Some(last)) => TimeAxis::for_period(period, first, last),
+            _ => TimeAxis::for_period(period, 1, 0),
+        }
+    }
+
     pub(crate) fn follow(&self) -> &files::Follow {
         self.follow.get_or_init(|| self.build_follow())
     }
@@ -194,62 +208,6 @@ pub(crate) fn days_from_civil(y: i64, m: i64, d: i64) -> i64 {
     let doy = (153 * mp + 2) / 5 + d - 1;
     let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
     era * 146_097 + doe - 719_468
-}
-
-pub(crate) fn bucket_start(days: i64, g: Granularity) -> i64 {
-    match g {
-        Granularity::Day => days,
-        Granularity::Week => days - i64::try_from(weekday(days)).unwrap_or(0),
-        Granularity::Month => {
-            let (y, m, _) = civil(days);
-            days_from_civil(y, m, 1)
-        }
-    }
-}
-
-pub(crate) fn next_bucket(start: i64, g: Granularity) -> i64 {
-    match g {
-        Granularity::Day => start + 1,
-        Granularity::Week => start + 7,
-        Granularity::Month => {
-            let (y, m, _) = civil(start);
-            if m == 12 {
-                days_from_civil(y + 1, 1, 1)
-            } else {
-                days_from_civil(y, m + 1, 1)
-            }
-        }
-    }
-}
-
-pub(crate) fn bucket_label(start: i64, g: Granularity) -> String {
-    let (y, m, d) = civil(start);
-    match g {
-        Granularity::Month => format!("{y:04}-{m:02}"),
-        _ => format!("{y:04}-{m:02}-{d:02}"),
-    }
-}
-
-/// Dense series from sparse buckets: every bucket between the first and last exists.
-pub(crate) fn fill<T>(
-    mut map: std::collections::BTreeMap<i64, T>,
-    g: Granularity,
-    empty: impl Fn(String) -> T,
-) -> Vec<T> {
-    let (Some(first), Some(last)) = (map.keys().next().copied(), map.keys().next_back().copied())
-    else {
-        return Vec::new();
-    };
-    let mut out = Vec::new();
-    let mut at = first;
-    while at <= last {
-        out.push(
-            map.remove(&at)
-                .unwrap_or_else(|| empty(bucket_label(at, g))),
-        );
-        at = next_bucket(at, g);
-    }
-    out
 }
 
 #[cfg(test)]
@@ -284,7 +242,7 @@ pub(crate) mod fixtures {
 
 #[cfg(test)]
 mod tests {
-    use super::{Granularity, bucket_start, days_from_civil};
+    use super::days_from_civil;
     use crate::aggregates::civil;
 
     #[test]
@@ -293,16 +251,6 @@ mod tests {
             let (y, m, dd) = civil(d);
             assert_eq!(days_from_civil(y, m, dd), d);
         }
-        // 2024-01-03 is a Wednesday, its week starts Monday 2024-01-01.
-        let wed = days_from_civil(2024, 1, 3);
-        assert_eq!(
-            bucket_start(wed, Granularity::Week),
-            days_from_civil(2024, 1, 1)
-        );
-        assert_eq!(
-            bucket_start(wed, Granularity::Month),
-            days_from_civil(2024, 1, 1)
-        );
     }
 }
 
@@ -356,10 +304,10 @@ mod bench {
         println!("  {:?}", s.current);
         time!("rhythm", ins.rhythm(Period::All));
         time!("contributors", ins.contributors(Period::All));
-        time!("code_freq", ins.code_frequency());
-        let rw = time!("rework", ins.rework(200));
-        println!("  last {:?}", rw.last());
-        let loc = time!("loc_over_time", ins.loc_over_time(7));
+        time!("code_freq", ins.code_frequency(Period::All));
+        let rw = time!("rework", ins.rework(Period::All));
+        println!("  last {:?}", rw.points.last());
+        let loc = time!("loc_over_time", ins.loc_over_time(7, Period::All));
         println!("  {:?} {:?}", loc.languages, loc.points.last());
         time!("languages_now", ins.languages_now(&files));
         time!("follow(first)", ins.hotspots(&files, Period::All));

@@ -28,7 +28,7 @@ Answers are capped so one file cannot flood a client: `log` at 500 per page, `bl
 | `GET /blame` | `rev`, `path` | lines (commit, author, time), truncated |
 | `GET /contributors` | `rev` | authors, bus_factor |
 | `GET /insights` |  | insights |
-| `GET /insights/{name}` | `rev`, `granularity`, `label`, `since`, `limit` | {insight, data} |
+| `GET /insights/{name}` | `rev`, `period`, `label`, `since`, `limit` | {insight, data} |
 
 ### Parameters
 
@@ -82,7 +82,7 @@ Answers are capped so one file cannot flood a client: `log` at 500 per page, `bl
 | Name | Type | Required | Description |
 | --- | --- | --- | --- |
 | `rev` | string | no | Revision to read, default `HEAD`. |
-| `granularity` | string | no | `day`, `week` or `month`. |
+| `period` | string | no | `1w`, `1m`, `3m`, `1y` or `all` (default). Sets the bucket unit. |
 | `label` | string | no | `kind` or `scope`. |
 | `since` | integer | no | Unix seconds; only later activity counts. |
 | `limit` | integer | no | Cap on rows. |
@@ -94,14 +94,14 @@ Served at `GET /insights/{name}`.
 | Name | Summary |
 | --- | --- |
 | `totals` | Commit, author, file and line totals. |
-| `activity` | Commits and lines per day, week or month (granularity). |
+| `activity` | Commits and lines per bucket, empty ones included; the period sets the unit (period). |
 | `heatmap` | Commit counts by weekday and hour. |
 | `authors` | Per-author commits, lines and active days. |
 | `file_churn` | Per-file commits and lines changed, all time. |
 | `hotspots` | Most changed files since a timestamp (since, limit). |
 | `dir_churn` | Per-directory commits and lines changed. |
 | `label_breakdown` | Conventional-commit type or scope counts (label). |
-| `label_over_time` | Type or scope counts per bucket (label, granularity). |
+| `label_over_time` | Type or scope counts per bucket, empty ones included (label, period). |
 
 ## MCP (stdio)
 
@@ -109,7 +109,7 @@ Served at `GET /insights/{name}`.
 
 | Tool | Read-only | Description | Parameters |
 | --- | --- | --- | --- |
-| `activity` | yes | Commits and lines changed per day, week or month. Use for "how active is this project" and trend questions. | `granularity?` (string), `rev?` (string) |
+| `activity` | yes | Commits and lines changed per bucket (day, week, month, quarter or year, chosen by `period`). Use for "how active is this project" and trend questions. | `period?` (string), `rev?` (string) |
 | `blame` | yes | Per-line authorship of a file: the commit, author and time that last changed each line. Use to find who to ask about, or which commit introduced, a line; follow up with `show_commit` on the commit id. | `path` (string), `rev?` (string) |
 | `contributors` | yes | Contributors with commits, lines, first and last commit and active days, most active first, plus `bus_factor` (the fewest authors who made half of all commits). Use for ownership and knowledge-concentration questions. | `rev?` (string) |
 | `hotspots` | yes | Most frequently changed files (commits, additions, deletions, last change), from the stats cache. Use to find risky or central code and where to look first. Optional `since`. | `limit?` (integer), `rev?` (string), `since?` (integer) |

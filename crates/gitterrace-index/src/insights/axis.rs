@@ -1,0 +1,271 @@
+//! The one place that decides how a time chart is bucketed: the unit follows the selected
+//! period, and the bucket list is complete from the window start to its end, so quiet stretches
+//! show as zero instead of vanishing.
+
+use super::{Period, days_from_civil, local_day};
+use crate::CommitRecord;
+use crate::aggregates::{civil, format_date, weekday};
+
+/// Longest `All` span, in days, that still reads best as one bar per day (60 bars).
+const ALL_DAYS_MAX: i64 = 60;
+/// Longest `All` span shown per week (60 bars).
+const ALL_WEEKS_MAX: i64 = 420;
+/// Longest `All` span shown per month (60 bars). Longer histories fall to quarters, then years.
+const ALL_MONTHS_MAX: i64 = 1_800;
+/// Longest `All` span shown per quarter (60 bars).
+const ALL_QUARTERS_MAX: i64 = 5_460;
+
+const WEEKDAYS: [&str; 7] = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+const MONTHS: [&str; 12] = [
+    "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+];
+
+/// Width of one bucket.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+pub enum BucketUnit {
+    Day,
+    /// Starts on Monday.
+    Week,
+    Month,
+    Quarter,
+    Year,
+}
+
+impl BucketUnit {
+    /// For hints and titles: "per day", "per week".
+    pub fn noun(self) -> &'static str {
+        match self {
+            Self::Day => "day",
+            Self::Week => "week",
+            Self::Month => "month",
+            Self::Quarter => "quarter",
+            Self::Year => "year",
+        }
+    }
+
+    /// First day of the bucket holding `day`.
+    fn start(self, day: i64) -> i64 {
+        let (y, m, _) = civil(day);
+        match self {
+            Self::Day => day,
+            Self::Week => day - weekday(day) as i64,
+            Self::Month => days_from_civil(y, m, 1),
+            Self::Quarter => days_from_civil(y, (m - 1) / 3 * 3 + 1, 1),
+            Self::Year => days_from_civil(y, 1, 1),
+        }
+    }
+
+    /// Start of the bucket after the one starting at `start`.
+    fn next(self, start: i64) -> i64 {
+        let months = |n: i64| {
+            let (y, m, _) = civil(start);
+            let t = y * 12 + (m - 1) + n;
+            days_from_civil(t.div_euclid(12), t.rem_euclid(12) + 1, 1)
+        };
+        match self {
+            Self::Day => start + 1,
+            Self::Week => start + 7,
+            Self::Month => months(1),
+            Self::Quarter => months(3),
+            Self::Year => months(12),
+        }
+    }
+
+    fn label(self, start: i64) -> String {
+        let (y, m, d) = civil(start);
+        let month = MONTHS[usize::try_from(m - 1).unwrap_or(0)];
+        match self {
+            Self::Day => format!("{} {d}", WEEKDAYS[weekday(start)]),
+            Self::Week => format!("{d} {month}"),
+            Self::Month => format!("{month} {y}"),
+            Self::Quarter => format!("Q{} {y}", (m - 1) / 3 + 1),
+            Self::Year => y.to_string(),
+        }
+    }
+}
+
+/// Ordered buckets covering a window completely. Days are local day numbers (days since the
+/// epoch in each commit's own offset).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TimeAxis {
+    unit: BucketUnit,
+    starts: Vec<i64>,
+}
+
+impl TimeAxis {
+    fn empty() -> Self {
+        Self {
+            unit: BucketUnit::Day,
+            starts: Vec::new(),
+        }
+    }
+
+    /// The axis for `period` ending on local day `last`. A fixed period starts
+    /// `period.days()` before `last`; `All` (or `None`) starts at `first`.
+    ///
+    /// Week and month read best per day, a quarter per week (13 bars), a year per week (52
+    /// bars: a year per month would be 12 coarse bars, and 52 still fit 960px). `All` picks the
+    /// unit by span so a chart holds roughly 12 to 60 bars.
+    pub fn for_period(period: Option<Period>, first: i64, last: i64) -> Self {
+        let first = period
+            .and_then(Period::days)
+            .map_or(first, |d| last + 1 - d);
+        if last < first {
+            return Self::empty();
+        }
+        let span = last - first + 1;
+        let unit = match period {
+            Some(Period::Week | Period::Month) => BucketUnit::Day,
+            Some(Period::Quarter | Period::Year) => BucketUnit::Week,
+            Some(Period::All) | None => [
+                (ALL_DAYS_MAX, BucketUnit::Day),
+                (ALL_WEEKS_MAX, BucketUnit::Week),
+                (ALL_MONTHS_MAX, BucketUnit::Month),
+                (ALL_QUARTERS_MAX, BucketUnit::Quarter),
+            ]
+            .into_iter()
+            .find(|(max, _)| span <= *max)
+            .map_or(BucketUnit::Year, |(_, unit)| unit),
+        };
+        let mut starts = Vec::new();
+        let mut at = unit.start(first);
+        while at <= last {
+            starts.push(at);
+            at = unit.next(at);
+        }
+        Self { unit, starts }
+    }
+
+    /// The axis for the records on screen. A fixed period ends on the local day of the newest
+    /// record of `all` (the reference of the period filter); `All` spans `shown`.
+    pub fn covering(period: Option<Period>, all: &[CommitRecord], shown: &[CommitRecord]) -> Self {
+        if period.is_some_and(|p| p != Period::All) {
+            return all
+                .iter()
+                .max_by_key(|r| r.time)
+                .map_or_else(Self::empty, |r| {
+                    let last = local_day(r);
+                    Self::for_period(period, last, last)
+                });
+        }
+        let days = || shown.iter().map(local_day);
+        match (days().min(), days().max()) {
+            (Some(first), Some(last)) => Self::for_period(period, first, last),
+            _ => Self::empty(),
+        }
+    }
+
+    pub fn unit(&self) -> BucketUnit {
+        self.unit
+    }
+
+    pub fn len(&self) -> usize {
+        self.starts.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.starts.is_empty()
+    }
+
+    /// Bucket holding local day `day`. A day one outside the axis still lands in the edge
+    /// bucket: the window is cut in UTC, so a commit at its edge can sit a day off in its own
+    /// offset. Anything further out is `None`.
+    pub fn slot_day(&self, day: i64) -> Option<usize> {
+        let (first, last) = (*self.starts.first()?, *self.starts.last()?);
+        let end = self.unit.next(last);
+        (first - 1..=end)
+            .contains(&day)
+            .then(|| self.starts.partition_point(|s| *s <= day).saturating_sub(1))
+    }
+
+    pub fn slot(&self, r: &CommitRecord) -> Option<usize> {
+        self.slot_day(local_day(r))
+    }
+
+    /// Sortable key of bucket `i`: the date it starts on.
+    pub fn key(&self, i: usize) -> String {
+        format_date(self.starts[i])
+    }
+
+    /// Axis label of bucket `i`: "Mon 27", "27 Oct", "Oct 2026", "Q3 2026" or "2026".
+    pub fn label(&self, i: usize) -> String {
+        self.unit.label(self.starts[i])
+    }
+
+    /// Key and label of every bucket.
+    pub fn names(&self) -> impl Iterator<Item = (String, String)> + '_ {
+        (0..self.len()).map(|i| (self.key(i), self.label(i)))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{BucketUnit, TimeAxis};
+    use crate::Period;
+    use crate::insights::days_from_civil;
+
+    fn axis(period: Option<Period>, first: i64, last: i64) -> TimeAxis {
+        TimeAxis::for_period(period, first, last)
+    }
+
+    #[test]
+    fn fixed_periods_have_one_bucket_per_unit_including_empty_ones() {
+        // Sunday 2024-03-31, so the weeks line up.
+        let last = days_from_civil(2024, 3, 31);
+        let w = axis(Some(Period::Week), last, last);
+        assert_eq!((w.unit(), w.len()), (BucketUnit::Day, 7));
+        assert_eq!(w.label(0), "Mon 25");
+        assert_eq!(w.label(6), "Sun 31");
+        let m = axis(Some(Period::Month), last, last);
+        assert_eq!((m.unit(), m.len()), (BucketUnit::Day, 30));
+        let q = axis(Some(Period::Quarter), last, last);
+        assert_eq!((q.unit(), q.len()), (BucketUnit::Week, 13));
+        assert_eq!(q.label(0), "1 Jan");
+        let y = axis(Some(Period::Year), last, last);
+        assert_eq!(y.unit(), BucketUnit::Week);
+        assert!((52..=53).contains(&y.len()));
+        // The last bucket always holds `last`, the first holds the window start.
+        assert_eq!(y.slot_day(last), Some(y.len() - 1));
+        assert_eq!(y.slot_day(last - 364), Some(0));
+    }
+
+    #[test]
+    fn all_picks_the_unit_by_span() {
+        let day = days_from_civil(2020, 1, 1);
+        let unit = |span: i64| axis(None, day, day + span - 1);
+        assert_eq!((unit(3).unit(), unit(3).len()), (BucketUnit::Day, 3));
+        assert_eq!(unit(200).unit(), BucketUnit::Week);
+        assert_eq!(unit(1000).unit(), BucketUnit::Month);
+        assert_eq!(unit(4000).unit(), BucketUnit::Quarter);
+        assert_eq!(unit(9000).unit(), BucketUnit::Year);
+        for span in [90, 400, 1500, 5000, 20_000] {
+            let n = unit(span).len();
+            assert!((12..=61).contains(&n), "{span} days gave {n} buckets");
+        }
+    }
+
+    #[test]
+    fn labels_follow_the_unit() {
+        let first = days_from_civil(2025, 11, 20);
+        let q = axis(None, first, days_from_civil(2030, 6, 1));
+        assert_eq!(q.unit(), BucketUnit::Month);
+        assert_eq!(q.label(0), "Nov 2025");
+        let years = axis(None, first, days_from_civil(2045, 6, 1));
+        assert_eq!(years.unit(), BucketUnit::Year);
+        assert_eq!(years.label(0), "2025");
+        let quarters = axis(None, first, days_from_civil(2036, 6, 1));
+        assert_eq!(quarters.unit(), BucketUnit::Quarter);
+        assert_eq!(quarters.label(0), "Q4 2025");
+        assert_eq!(quarters.key(0), "2025-10-01");
+    }
+
+    #[test]
+    fn days_outside_clamp_and_an_empty_axis_has_no_slot() {
+        let last = days_from_civil(2024, 3, 31);
+        let w = axis(Some(Period::Week), last, last);
+        assert_eq!(w.slot_day(last + 1), Some(6));
+        assert_eq!(w.slot_day(last + 3), None);
+        assert_eq!(w.slot_day(last - 8), None);
+        assert_eq!(axis(None, 10, 5).slot_day(7), None);
+    }
+}

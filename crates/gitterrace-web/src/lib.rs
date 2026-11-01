@@ -434,6 +434,33 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn one_week_selection_renders_seven_day_columns() {
+        let dir = tempfile::tempdir().expect("tmp");
+        let p = dir.path();
+        git(p, &["init", "-q", "-b", "main"]);
+        std::fs::write(p.join("a.txt"), "x\n").expect("write");
+        git(p, &["add", "."]);
+        git(p, &["commit", "-q", "-m", "feat(core): first"]);
+        let repo = gitterrace_git::Repo::discover(p).expect("repo");
+        let index = gitterrace_index::Index::open(&repo).expect("index");
+        let app = Arc::new(App::new(repo, index));
+        app.index
+            .update(&app.repo, "HEAD", &|_| {})
+            .expect("update");
+        app.mark_ready();
+        for page in ["/stats", "/stats/frequency", "/stats/types", "/stats/pulse"] {
+            let (s, body) = get(&app, &format!("{page}?period=1w")).await;
+            assert_eq!(s, 200, "{page}");
+            let chart = body.split("<svg class=\"chart\"").nth(1).expect("chart");
+            let chart = chart.split("</svg>").next().unwrap_or_default();
+            assert_eq!(chart.matches("class=\"col\"").count(), 7, "{page}");
+            assert!(chart.contains("Mon ") || chart.contains("Sun "), "{page}");
+        }
+        let (_, body) = get(&app, "/stats/frequency?period=1w").await;
+        assert!(body.contains("per day"), "unit comes from the axis");
+    }
+
+    #[tokio::test]
     async fn stats_files_memo_follows_head() {
         let dir = tempfile::tempdir().expect("tmp");
         let p = dir.path();

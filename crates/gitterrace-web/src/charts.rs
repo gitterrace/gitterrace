@@ -175,7 +175,7 @@ pub(crate) fn stacked(buckets: &[gitterrace_index::LabelBucket]) -> String {
         #[allow(clippy::cast_precision_loss)]
         let x = LEFT + i as f64 * sl + (sl - bw) / 2.0;
         let mut y = TOP_PAD + plot;
-        let key = esc(&buckets[i].key);
+        let key = esc(&buckets[i].label);
         let total: u64 = col.iter().sum();
         fmt::push(
             &mut svg,
@@ -202,7 +202,7 @@ pub(crate) fn stacked(buckets: &[gitterrace_index::LabelBucket]) -> String {
         }
         svg.push_str("</g>");
     }
-    let keys: Vec<&str> = buckets.iter().map(|b| b.key.as_str()).collect();
+    let keys: Vec<&str> = buckets.iter().map(|b| b.label.as_str()).collect();
     svg.push_str(&x_labels(&keys));
     svg.push_str("</svg><div class=\"legend\">");
     for (k, n) in names.iter().enumerate() {
@@ -222,16 +222,16 @@ pub(crate) fn stacked(buckets: &[gitterrace_index::LabelBucket]) -> String {
     svg
 }
 
-/// Weekly additions above the axis and deletions below it, one column per bucket.
+/// Additions above the axis and deletions below it, one column per bucket.
 #[allow(clippy::many_single_char_names)]
-pub(crate) fn diverging(points: &[(String, u64, u64)]) -> String {
+pub(crate) fn diverging(points: &[(String, u64, u64)], title: &str) -> String {
     let max = points.iter().map(|p| p.1.max(p.2)).max().unwrap_or(0);
     let step = nice_step(max);
     #[allow(clippy::cast_precision_loss)]
     let top = (step * max.div_ceil(step).max(1)) as f64;
     let half = (H - TOP_PAD - BOTTOM) / 2.0;
     let mid = TOP_PAD + half;
-    let mut svg = open_svg("Additions and deletions per week");
+    let mut svg = open_svg(title);
     let mut v = 0;
     while (v as f64) <= top {
         #[allow(clippy::cast_precision_loss)]
@@ -530,7 +530,7 @@ mod tests {
         assert!(last_hit < path, "hover band drawn over the line");
         for svg in [
             bars(&[("a".to_owned(), 3), ("b".to_owned(), 1)]),
-            diverging(&[("a".to_owned(), 3, 1)]),
+            diverging(&[("a".to_owned(), 3, 1)], "t"),
         ] {
             for col in svg.split(r#"<g class="col">"#).skip(1) {
                 let hit = col.find(r#"class="hit""#).expect("hit");

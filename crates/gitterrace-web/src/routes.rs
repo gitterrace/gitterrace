@@ -11,7 +11,7 @@ use axum::{
     routing::get,
 };
 use gitterrace_git::RefKind;
-use gitterrace_index::Granularity;
+use gitterrace_index::TimeAxis;
 use serde::Deserialize;
 
 use crate::{
@@ -736,6 +736,7 @@ struct StatsPage {
     c: Chrome,
     tabs: Vec<Nav>,
     fb: FilterBar,
+    activity_title: String,
     activity: String,
     heatmap: String,
     authors: Vec<AuthorRow>,
@@ -767,9 +768,10 @@ async fn stats(State(app): Shared, Query(f): Query<Filter>) -> Result<Html<Strin
     with_records(&app, "a", move |_, all, c| {
         let fb = f.bar("/stats", all);
         let r = &*f.apply(all);
-        let points = gitterrace_index::activity(r, Granularity::Month)
+        let axis = TimeAxis::covering(f.period_value(), all, r);
+        let points = gitterrace_index::activity(r, &axis)
             .into_iter()
-            .map(|b| (b.key, b.commits as u64))
+            .map(|b| (b.label, b.commits as u64))
             .collect::<Vec<_>>();
         let h = gitterrace_index::heatmap(r);
         let authors = gitterrace_index::authors(r);
@@ -778,6 +780,7 @@ async fn stats(State(app): Shared, Query(f): Query<Filter>) -> Result<Html<Strin
             c,
             tabs: views::stats_tabs("a"),
             fb,
+            activity_title: format!("Commits per {}", axis.unit().noun()),
             activity: charts::bars(&points),
             heatmap: charts::heatmap(&h.cells, h.max),
             authors: authors

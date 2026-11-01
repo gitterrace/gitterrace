@@ -1,20 +1,11 @@
 //! Pure statistics over cached commit records. Times are bucketed in each commit's own UTC
 //! offset, so a commit made at 23:30 local counts as late evening whoever reads the page.
 
-use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+use std::collections::{BTreeSet, HashMap, HashSet};
 
-use crate::CommitRecord;
+use crate::{CommitRecord, TimeAxis};
 
 pub(crate) const DAY: i64 = 86_400;
-
-/// Bucket width for time series.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
-pub enum Granularity {
-    Day,
-    /// Keyed by the Monday that starts the week.
-    Week,
-    Month,
-}
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize)]
 pub struct Totals {
@@ -27,10 +18,12 @@ pub struct Totals {
     pub last_commit: Option<i64>,
 }
 
-/// One bucket of a time series. `key` is `YYYY-MM-DD` (day, week start) or `YYYY-MM`.
+/// One bucket of a time series. `key` is the `YYYY-MM-DD` the bucket starts on, `label` what an
+/// axis shows for it.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
 pub struct ActivityBucket {
     pub key: String,
+    pub label: String,
     pub commits: usize,
     pub additions: u64,
     pub deletions: u64,
@@ -84,6 +77,7 @@ pub struct LabelCount {
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
 pub struct LabelBucket {
     pub key: String,
+    pub label: String,
     pub counts: Vec<LabelCount>,
 }
 
@@ -114,23 +108,28 @@ pub fn totals(records: &[CommitRecord]) -> Totals {
     t
 }
 
-/// Buckets sorted by key. Empty buckets between the first and last are not filled.
-pub fn activity(records: &[CommitRecord], granularity: Granularity) -> Vec<ActivityBucket> {
-    let mut map: BTreeMap<String, ActivityBucket> = BTreeMap::new();
-    for r in records {
-        let key = bucket_key(r, granularity);
-        let b = map.entry(key.clone()).or_insert(ActivityBucket {
+/// One bucket per axis slot, empty ones included.
+pub fn activity(records: &[CommitRecord], axis: &TimeAxis) -> Vec<ActivityBucket> {
+    let mut out: Vec<ActivityBucket> = axis
+        .names()
+        .map(|(key, label)| ActivityBucket {
             key,
+            label,
             commits: 0,
             additions: 0,
             deletions: 0,
-        });
+        })
+        .collect();
+    for r in records {
+        let Some(b) = axis.slot(r).map(|i| &mut out[i]) else {
+            continue;
+        };
         b.commits += 1;
         let (a, d) = line_totals(r);
         b.additions += a;
         b.deletions += d;
     }
-    map.into_values().collect()
+    out
 }
 
 pub fn heatmap(records: &[CommitRecord]) -> Heatmap {
@@ -274,24 +273,23 @@ pub fn label_breakdown(records: &[CommitRecord], label: Label) -> Vec<LabelCount
     sorted_counts(map)
 }
 
-/// Type or scope counts per time bucket, buckets sorted by key.
+/// Type or scope counts per axis slot, empty slots included.
 pub fn label_over_time(
     records: &[CommitRecord],
     label: Label,
-    granularity: Granularity,
+    axis: &TimeAxis,
 ) -> Vec<LabelBucket> {
-    let mut map: BTreeMap<String, HashMap<&str, usize>> = BTreeMap::new();
+    let mut maps: Vec<HashMap<&str, usize>> = vec![HashMap::new(); axis.len()];
     for r in records {
-        if let Some(l) = label_of(r, label) {
-            *map.entry(bucket_key(r, granularity))
-                .or_default()
-                .entry(l)
-                .or_default() += 1;
+        if let (Some(l), Some(i)) = (label_of(r, label), axis.slot(r)) {
+            *maps[i].entry(l).or_default() += 1;
         }
     }
-    map.into_iter()
-        .map(|(key, counts)| LabelBucket {
+    axis.names()
+        .zip(maps)
+        .map(|((key, label), counts)| LabelBucket {
             key,
+            label,
             counts: sorted_counts(counts),
         })
         .collect()
@@ -360,18 +358,6 @@ pub(crate) fn weekday(days: i64) -> usize {
     usize::try_from((days + 3).rem_euclid(7)).unwrap_or(0)
 }
 
-pub(crate) fn bucket_key(r: &CommitRecord, granularity: Granularity) -> String {
-    let days = local_time(r).div_euclid(DAY);
-    match granularity {
-        Granularity::Day => format_date(days),
-        Granularity::Week => format_date(days - i64::try_from(weekday(days)).unwrap_or(0)),
-        Granularity::Month => {
-            let (y, m, _) = civil(days);
-            format!("{y:04}-{m:02}")
-        }
-    }
-}
-
 pub(crate) fn format_date(days: i64) -> String {
     let (y, m, d) = civil(days);
     format!("{y:04}-{m:02}-{d:02}")
@@ -394,10 +380,10 @@ pub(crate) fn civil(days: i64) -> (i64, i64, i64) {
 #[cfg(test)]
 mod tests {
     use crate::aggregates::{
-        Granularity, Label, activity, authors, bus_factor, dir_churn, file_churn, heatmap,
-        hotspots, label_breakdown, label_over_time, totals,
+        Label, activity, authors, bus_factor, dir_churn, file_churn, heatmap, hotspots,
+        label_breakdown, label_over_time, totals,
     };
-    use crate::{CommitRecord, FileStat};
+    use crate::{CommitRecord, FileStat, Period, TimeAxis};
 
     #[test]
     fn bus_factor_counts_who_hold_at_least_half() {
@@ -477,44 +463,52 @@ mod tests {
         assert_eq!(t.last_commit, Some(MON + DAYS(8) + 23 * HOUR));
     }
 
+    fn axis(r: &[CommitRecord], p: Option<Period>) -> TimeAxis {
+        TimeAxis::covering(p, r, r)
+    }
+
     #[test]
-    fn activity_day_week_month() {
+    fn activity_fills_the_axis_with_empty_buckets() {
         let r = sample();
-        let days = activity(&r, Granularity::Day);
+        // Commits on 2024-01-01, 01-02 and 01-09: ten days, one gap of six empty days.
+        let days = activity(&r, &axis(&r, None));
         let keys: Vec<_> = days.iter().map(|b| b.key.as_str()).collect();
-        assert_eq!(keys, ["2024-01-01", "2024-01-02", "2024-01-09"]);
-        let weeks = activity(&r, Granularity::Week);
-        let keys: Vec<_> = weeks.iter().map(|b| b.key.as_str()).collect();
-        assert_eq!(keys, ["2024-01-01", "2024-01-08"]);
-        assert_eq!(
-            (weeks[0].commits, weeks[0].additions, weeks[0].deletions),
-            (2, 14, 2)
-        );
-        let months = activity(&r, Granularity::Month);
-        assert_eq!(months.len(), 1);
-        assert_eq!(months[0].key, "2024-01");
-        assert_eq!(months[0].commits, 3);
+        assert_eq!(days.len(), 9);
+        assert_eq!((keys[0], keys[8]), ("2024-01-01", "2024-01-09"));
+        assert_eq!(days[0].label, "Mon 1");
+        let commits: Vec<_> = days.iter().map(|b| b.commits).collect();
+        assert_eq!(commits, [1, 1, 0, 0, 0, 0, 0, 0, 1]);
+        assert_eq!(days[0].additions, 11);
     }
 
     #[test]
-    fn week_starts_on_monday_even_for_sunday() {
-        let sunday = rec("s", "a", MON + DAYS(6) + HOUR, &[]);
-        assert_eq!(activity(&[sunday], Granularity::Week)[0].key, "2024-01-01");
+    fn a_week_selection_has_seven_day_columns() {
+        let r = sample();
+        let week = activity(&r, &axis(&r, Some(Period::Week)));
+        assert_eq!(week.len(), 7);
+        assert_eq!(week[6].commits, 1);
     }
 
     #[test]
-    fn offset_moves_commit_across_day_and_month() {
+    fn offset_moves_commit_across_the_day() {
         let mut r = rec("o", "a", MON - HOUR, &[]);
         assert_eq!(
-            activity(std::slice::from_ref(&r), Granularity::Month)[0].key,
-            "2023-12"
+            activity(
+                std::slice::from_ref(&r),
+                &axis(std::slice::from_ref(&r), None)
+            )[0]
+            .key,
+            "2023-12-31"
         );
         r.offset = 2 * 3600;
         assert_eq!(
-            activity(std::slice::from_ref(&r), Granularity::Month)[0].key,
-            "2024-01"
+            activity(
+                std::slice::from_ref(&r),
+                &axis(std::slice::from_ref(&r), None)
+            )[0]
+            .key,
+            "2024-01-01"
         );
-        assert_eq!(activity(&[r], Granularity::Day)[0].key, "2024-01-01");
     }
 
     #[test]
@@ -596,10 +590,11 @@ mod tests {
         assert_eq!(kinds.len(), 2);
         let scopes = label_breakdown(&r, Label::Scope);
         assert_eq!((scopes[0].label.as_str(), scopes[0].commits), ("web", 2));
-        let over = label_over_time(&r, Label::Kind, Granularity::Month);
-        assert_eq!(over.len(), 2);
-        assert_eq!(over[0].key, "2024-01");
-        assert_eq!(over[1].key, "2024-02");
-        assert_eq!(over[1].counts.len(), 2);
+        let over = label_over_time(&r, Label::Kind, &axis(&r, None));
+        assert_eq!(over.len(), 42);
+        assert_eq!(over[0].key, "2024-01-01");
+        assert_eq!(over[0].counts.len(), 1);
+        assert_eq!(over[1].counts.len(), 0);
+        assert_eq!(over[0].label, "Mon 1");
     }
 }

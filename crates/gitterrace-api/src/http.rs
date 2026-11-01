@@ -182,7 +182,7 @@ pub(crate) async fn insight_list() -> Json<Value> {
 #[derive(Deserialize)]
 pub(crate) struct InsightQuery {
     rev: Option<String>,
-    granularity: Option<String>,
+    period: Option<String>,
     label: Option<String>,
     since: Option<i64>,
     limit: Option<usize>,
@@ -194,7 +194,7 @@ pub(crate) async fn insight(
     Query(q): Query<InsightQuery>,
 ) -> Reply {
     let params = insights::Params {
-        granularity: q.granularity,
+        period: q.period,
         label: q.label,
         since: q.since,
         limit: q.limit,

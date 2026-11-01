@@ -1,7 +1,6 @@
-use std::collections::{BTreeMap, BTreeSet, HashSet};
+use std::collections::{BTreeSet, HashSet};
 
-use super::{Insights, bucket_label, bucket_start, fill, local_day, next_bucket};
-use crate::Granularity;
+use super::{BucketUnit, Insights, local_day};
 use crate::aggregates::weekday;
 
 const DAY: i64 = super::DAY;
@@ -71,6 +70,7 @@ pub struct PeriodSummary {
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
 pub struct SeriesPoint {
     pub key: String,
+    pub label: String,
     pub commits: u32,
     pub additions: u64,
     pub deletions: u64,
@@ -79,8 +79,9 @@ pub struct SeriesPoint {
 /// When work happens, in each commit's own timezone.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
 pub struct Rhythm {
-    pub weekly: Vec<SeriesPoint>,
-    pub monthly: Vec<SeriesPoint>,
+    /// One point per bucket of the period's axis, empty ones included.
+    pub series: Vec<SeriesPoint>,
+    pub unit: BucketUnit,
     /// `[weekday][hour]`, Monday is 0.
     pub punch_card: [[u32; 24]; 7],
     pub punch_max: u32,
@@ -99,16 +100,17 @@ pub struct Contributor {
     pub first_commit: i64,
     pub last_commit: i64,
     pub active_days: usize,
-    /// Commits per week, aligned with [`ContributorReport::weeks`].
-    pub weekly: Vec<u32>,
+    /// Commits per bucket, aligned with [`ContributorReport::labels`].
+    pub series: Vec<u32>,
     /// First commit ever falls inside the period.
     pub first_time: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
 pub struct ContributorReport {
-    /// Monday of every week of the period, `YYYY-MM-DD`.
-    pub weeks: Vec<String>,
+    /// Axis label of every bucket of the period.
+    pub labels: Vec<String>,
+    pub unit: BucketUnit,
     /// Most commits first. Bots are included and flagged; the caller toggles them.
     pub contributors: Vec<Contributor>,
 }
@@ -154,8 +156,17 @@ impl Insights<'_> {
 
     pub fn rhythm(&self, period: Period) -> Rhythm {
         let (from, to) = period.window(self.now);
-        let mut weeks: BTreeMap<i64, SeriesPoint> = BTreeMap::new();
-        let mut months: BTreeMap<i64, SeriesPoint> = BTreeMap::new();
+        let axis = self.axis(Some(period));
+        let mut series: Vec<SeriesPoint> = axis
+            .names()
+            .map(|(key, label)| SeriesPoint {
+                key,
+                label,
+                commits: 0,
+                additions: 0,
+                deletions: 0,
+            })
+            .collect();
         let mut punch = [[0u32; 24]; 7];
         let mut by_weekday = [0u32; 7];
         let mut by_hour = [0u32; 24];
@@ -165,14 +176,7 @@ impl Insights<'_> {
             }
             let day = local_day(r);
             let l = self.commit_lines(i);
-            for (map, g) in [
-                (&mut weeks, Granularity::Week),
-                (&mut months, Granularity::Month),
-            ] {
-                let start = bucket_start(day, g);
-                let p = map
-                    .entry(start)
-                    .or_insert_with(|| empty_point(bucket_label(start, g)));
+            if let Some(p) = axis.slot_day(day).map(|s| &mut series[s]) {
                 p.commits += 1;
                 p.additions += u64::from(l.add);
                 p.deletions += u64::from(l.del);
@@ -185,8 +189,8 @@ impl Insights<'_> {
             by_hour[hour] += 1;
         }
         Rhythm {
-            weekly: fill(weeks, Granularity::Week, empty_point),
-            monthly: fill(months, Granularity::Month, empty_point),
+            series,
+            unit: axis.unit(),
             punch_max: punch.iter().flatten().copied().max().unwrap_or(0),
             punch_card: punch,
             by_weekday,
@@ -203,33 +207,14 @@ impl Insights<'_> {
             }
             v
         };
-        // Weeks of the period, from the first counted commit when the period is open ended.
-        let mut in_period: Vec<usize> = (0..self.records.len())
+        let axis = self.axis(Some(period));
+        let in_period: Vec<usize> = (0..self.records.len())
             .filter(|i| {
                 let r = &self.records[*i];
                 r.time >= from && r.time < to && !r.merge
             })
             .collect();
-        in_period.sort_unstable();
-        let (Some(first), Some(last)) = (
-            in_period.iter().map(|i| local_day(&self.records[*i])).min(),
-            in_period.iter().map(|i| local_day(&self.records[*i])).max(),
-        ) else {
-            return ContributorReport {
-                weeks: Vec::new(),
-                contributors: Vec::new(),
-            };
-        };
-        let (w0, w1) = (
-            bucket_start(first, Granularity::Week),
-            bucket_start(last, Granularity::Week),
-        );
-        let mut weeks = Vec::new();
-        let mut at = w0;
-        while at <= w1 {
-            weeks.push(bucket_label(at, Granularity::Week));
-            at = next_bucket(at, Granularity::Week);
-        }
+        let labels: Vec<String> = (0..axis.len()).map(|i| axis.label(i)).collect();
         let mut acc: std::collections::HashMap<usize, Acc> = std::collections::HashMap::new();
         for i in in_period {
             let r = &self.records[i];
@@ -239,7 +224,7 @@ impl Insights<'_> {
                 first: r.time,
                 last: r.time,
                 days: BTreeSet::new(),
-                weekly: vec![0; weeks.len()],
+                series: vec![0; axis.len()],
             });
             let l = self.commit_lines(i);
             a.c.add += l.add;
@@ -249,8 +234,9 @@ impl Insights<'_> {
             a.last = a.last.max(r.time);
             let day = local_day(r);
             a.days.insert(day);
-            let w = usize::try_from((bucket_start(day, Granularity::Week) - w0) / 7).unwrap_or(0);
-            a.weekly[w] += 1;
+            if let Some(slot) = axis.slot_day(day) {
+                a.series[slot] += 1;
+            }
         }
         let mut contributors: Vec<(usize, Contributor)> = acc
             .into_iter()
@@ -268,7 +254,7 @@ impl Insights<'_> {
                         first_commit: a.first,
                         last_commit: a.last,
                         active_days: a.days.len(),
-                        weekly: a.weekly,
+                        series: a.series,
                         first_time: first_ever[p] >= from && period.days().is_some(),
                     },
                 )
@@ -280,7 +266,8 @@ impl Insights<'_> {
                 .then_with(|| a.1.name.cmp(&b.1.name))
         });
         ContributorReport {
-            weeks,
+            labels,
+            unit: axis.unit(),
             contributors: contributors.into_iter().map(|(_, c)| c).collect(),
         }
     }
@@ -292,16 +279,7 @@ struct Acc {
     first: i64,
     last: i64,
     days: BTreeSet<i64>,
-    weekly: Vec<u32>,
-}
-
-fn empty_point(key: String) -> SeriesPoint {
-    SeriesPoint {
-        key,
-        commits: 0,
-        additions: 0,
-        deletions: 0,
-    }
+    series: Vec<u32>,
 }
 
 #[cfg(test)]
@@ -344,12 +322,13 @@ mod tests {
         let mut recs = vec![rec("a", "Ann", 0, vec![]), rec("b", "Ann", 15, vec![])];
         recs[1].offset = 3600 * 13; // 12:00 UTC is 01:00 the next day locally
         let r = Insights::new(&recs, Options::default(), None).rhythm(Period::All);
-        assert_eq!(r.weekly.len(), 3);
-        assert_eq!(r.weekly[1].commits, 0);
+        // 16 local days from Mon 2024-01-01 to Tue 2024-01-16, per day.
+        assert_eq!(r.series.len(), 17);
+        assert_eq!(r.series[1].commits, 0);
+        assert_eq!(r.series[16].commits, 1);
         assert_eq!(r.punch_card[0][12], 1); // Monday noon
         assert_eq!(r.punch_card[2][1], 1); // day 15 is a Tuesday, 12:00 + 13h is Wednesday 01:00
         assert_eq!(r.punch_max, 1);
-        assert_eq!(r.monthly.len(), 1);
     }
 
     #[test]
@@ -362,12 +341,14 @@ mod tests {
         ];
         let ins = Insights::new(&recs, Options::default(), None);
         let rep = ins.contributors(Period::All);
-        assert_eq!(rep.weeks.len(), 3);
+        assert_eq!(rep.labels.len(), rep.contributors[0].series.len());
         assert_eq!(rep.contributors[0].name, "Ann");
-        assert_eq!(rep.contributors[0].weekly, vec![1, 0, 1]);
+        assert_eq!(rep.contributors[0].series.iter().sum::<u32>(), 2);
+        assert_eq!(rep.contributors[0].series[0], 1);
         assert_eq!(rep.contributors[0].additions, 6);
         assert!(rep.contributors.iter().any(|c| c.bot));
         let m = ins.contributors(Period::Week);
+        assert_eq!(m.labels.len(), 7);
         assert!(
             m.contributors
                 .iter()

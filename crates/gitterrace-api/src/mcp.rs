@@ -195,8 +195,9 @@ struct HotspotArgs {
 #[derive(Deserialize, JsonSchema)]
 struct ActivityArgs {
     rev: Option<String>,
-    /// `day`, `week` or `month`. Defaults to month.
-    granularity: Option<String>,
+    /// `1w`, `1m`, `3m`, `1y` or `all` (default). The period sets the bucket unit: days up to
+    /// a month, weeks up to a year, then months, quarters or years.
+    period: Option<String>,
 }
 
 #[tool_router(server_handler)]
@@ -304,7 +305,7 @@ impl McpServer {
         self.run(move |s| s.contributors(a.rev.as_deref())).await
     }
 
-    /// Commits and lines changed per day, week or month. Use for "how active is this project" and
+    /// Commits and lines changed per bucket (day, week, month, quarter or year, chosen by `period`). Use for "how active is this project" and
     /// trend questions.
     #[tool(name = "activity", annotations(read_only_hint = true))]
     async fn activity(
@@ -312,7 +313,7 @@ impl McpServer {
         Parameters(a): Parameters<ActivityArgs>,
     ) -> Result<CallToolResult, ErrorData> {
         let p = Params {
-            granularity: a.granularity,
+            period: a.period,
             ..Params::default()
         };
         self.run(move |s| s.insight("activity", a.rev.as_deref(), &p))

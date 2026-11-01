@@ -3,13 +3,13 @@
 
 #![allow(clippy::many_single_char_names, clippy::too_many_lines)]
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use askama::Template;
 use axum::extract::{Query, RawQuery, State};
 use axum::response::Html;
-use gitterrace_index::{CommitRecord, Granularity, LabelBucket, LabelCount};
+use gitterrace_index::{CommitRecord, LabelBucket, LabelCount, TimeAxis};
 use serde::Deserialize;
 
 use crate::{
@@ -81,17 +81,6 @@ struct TypesPage {
     commits: Vec<CommitRow>,
     newer: Option<String>,
     older: Option<String>,
-}
-
-/// Time bucket in the author's own offset: month `YYYY-MM`, or the Monday of the week.
-fn bucket_key(r: &CommitRecord, gran: Granularity) -> String {
-    let local = r.time + i64::from(r.offset);
-    if gran == Granularity::Month {
-        return fmt::date(local, 0)[..7].to_owned();
-    }
-    let days = local.div_euclid(86_400);
-    let monday = days - (days + 3).rem_euclid(7);
-    fmt::date(monday * 86_400, 0)[..10].to_owned()
 }
 
 fn line_totals(r: &CommitRecord) -> (u64, u64) {
@@ -217,17 +206,20 @@ fn matrix(recs: &[CommitRecord], f: &Filter) -> Matrix {
 }
 
 /// Commits per time bucket, split by type (or by scope once a type is chosen).
-fn over_time(recs: &[CommitRecord], by_scope: bool, gran: Granularity) -> String {
-    let mut map: BTreeMap<String, HashMap<&str, usize>> = BTreeMap::new();
+fn over_time(recs: &[CommitRecord], by_scope: bool, axis: &TimeAxis) -> String {
+    let mut maps: Vec<HashMap<&str, usize>> = vec![HashMap::new(); axis.len()];
     for r in recs {
-        let key = bucket_key(r, gran);
-        let label = if by_scope { scope_of(r) } else { kind_of(r) };
-        *map.entry(key).or_default().entry(label).or_default() += 1;
+        if let Some(i) = axis.slot(r) {
+            let label = if by_scope { scope_of(r) } else { kind_of(r) };
+            *maps[i].entry(label).or_default() += 1;
+        }
     }
-    let buckets: Vec<LabelBucket> = map
-        .into_iter()
-        .map(|(key, m)| LabelBucket {
+    let buckets: Vec<LabelBucket> = axis
+        .names()
+        .zip(maps)
+        .map(|((key, label), m)| LabelBucket {
             key,
+            label,
             counts: ranked(m),
         })
         .collect();
@@ -286,17 +278,9 @@ fn build(a: &crate::app::App, all: &[CommitRecord], c: Chrome, q: &TypesQuery) -
         matrix(recs, f)
     };
 
-    let gran = if matches!(f.period(), Some(p) if p.days().is_some_and(|d| d <= 90)) {
-        Granularity::Week
-    } else {
-        Granularity::Month
-    };
+    let axis = TimeAxis::covering(f.period_value(), all, recs);
     let by_scope = f.kind().is_some();
-    let unit = if gran == Granularity::Week {
-        "week"
-    } else {
-        "month"
-    };
+    let unit = axis.unit().noun();
     let (over_title, over_hint) = if by_scope {
         (
             format!("Scopes over time, per {unit}"),
@@ -417,7 +401,7 @@ fn build(a: &crate::app::App, all: &[CommitRecord], c: Chrome, q: &TypesQuery) -
         matrix: mx,
         over_title,
         over_hint,
-        over_time: over_time(recs, by_scope, gran),
+        over_time: over_time(recs, by_scope, &axis),
         groups,
         commits_total: n,
         commits,
