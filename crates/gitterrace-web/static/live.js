@@ -20,6 +20,7 @@
   var delay = 1000;
   var timer = null;
   var fetching = false;
+  var again = false;
 
   function shows(kinds) {
     return kinds.some(function (k) { return on.indexOf(k) >= 0; });
@@ -43,7 +44,8 @@
 
   // Swaps <main> for the fresh render, keeping scroll and open <details>.
   async function refresh() {
-    if (fetching) return;
+    // A change that lands mid-fetch may postdate the render being fetched: go round again.
+    if (fetching) { again = true; return; }
     fetching = true;
     try {
       var res = await fetch(location.href, { headers: { "X-Live": "1" }, cache: "no-store" });
@@ -60,6 +62,7 @@
       notice();
     } finally {
       fetching = false;
+      if (again) { again = false; refresh(); }
     }
   }
 
