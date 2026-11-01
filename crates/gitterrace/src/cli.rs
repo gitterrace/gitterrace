@@ -84,8 +84,14 @@ pub(crate) enum Command {
     Init,
     /// Write a static copy of the site to a folder, for sharing or hosting.
     Export {
-        /// Folder to write into (created if missing).
-        out: PathBuf,
+        /// Folder to write into (created if missing). Default: `./gitterrace-export`. Give it
+        /// first, before any repositories: `export site repo1 repo2`. A folder an earlier
+        /// export made is emptied first. Any other non-empty folder is refused without
+        /// `--force`.
+        out: Option<PathBuf>,
+        /// Write into a non-empty folder that no earlier export made, over what is there.
+        #[arg(long)]
+        force: bool,
         /// Newest commits to include as pages.
         #[arg(long, default_value_t = 500)]
         commits: usize,

@@ -80,13 +80,16 @@ async fn main() -> anyhow::Result<()> {
         } => wrapped(&path, year, &layout, &theme, out)?,
         Command::Export {
             out,
+            force,
             commits,
             max_file_kb,
             project,
         } => {
+            let out = out.unwrap_or_else(|| PathBuf::from(export::DEFAULT_OUT));
             let scope = export::Scope {
                 commits,
                 max_file: max_file_kb * 1024,
+                force,
                 projects: project
                     .iter()
                     .map(|p| export::Project::parse(p))

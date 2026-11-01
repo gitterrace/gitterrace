@@ -173,6 +173,27 @@ impl Repo {
         Ok(out)
     }
 
+    /// Adds `/<name>/` to `.git/info/exclude` unless the line is there already, so a folder
+    /// gitterrace writes into the worktree (an export) does not show as untracked. That file is
+    /// local to this clone and never committed. Returns whether a line was added.
+    pub fn exclude_locally(&self, name: &str) -> Result<bool> {
+        let line = format!("/{name}/");
+        let info = self.repo().common_dir().join("info");
+        let file = info.join("exclude");
+        let current = fs::read_to_string(&file).unwrap_or_default();
+        if current.lines().any(|l| l.trim() == line) {
+            return Ok(false);
+        }
+        fs::create_dir_all(&info).map_err(git)?;
+        let sep = if current.is_empty() || current.ends_with('\n') {
+            ""
+        } else {
+            "\n"
+        };
+        fs::write(&file, format!("{current}{sep}{line}\n")).map_err(git)?;
+        Ok(true)
+    }
+
     /// Stash entries from the `refs/stash` reflog, newest first.
     pub fn stashes(&self) -> Result<Vec<Stash>> {
         let repo = self.repo();
@@ -457,5 +478,26 @@ mod tests {
         assert!(!w[0].locked, "a symlinked locked file must read as absent");
         assert!(super::read_inside(&d.join(".git"), &["worktrees", "..", "HEAD"]).is_none());
         assert!(super::read_inside(&d.join(".git"), &["worktrees/etc", "HEAD"]).is_none());
+    }
+
+    #[test]
+    fn exclude_locally_hides_the_folder_once_and_keeps_existing_lines() {
+        let t = tempfile::tempdir().expect("tmp");
+        let d = t.path();
+        git(d, &["init", "-q"]);
+        commit(d, "a", "1");
+        fs::write(d.join(".git/info/exclude"), "# mine\n*.log").expect("seed");
+        let repo = Repo::discover(d).expect("repo");
+        assert!(repo.exclude_locally("gitterrace-export").expect("add"));
+        assert!(!repo.exclude_locally("gitterrace-export").expect("again"));
+        let text = fs::read_to_string(d.join(".git/info/exclude")).expect("read");
+        assert_eq!(text, "# mine\n*.log\n/gitterrace-export/\n");
+        fs::create_dir_all(d.join("gitterrace-export")).expect("mkdir");
+        fs::write(d.join("gitterrace-export/index.html"), "x").expect("page");
+        let status = git(d, &["status", "--porcelain"]);
+        assert!(
+            status.trim().is_empty(),
+            "export folder shows as untracked: {status}"
+        );
     }
 }

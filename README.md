@@ -54,7 +54,7 @@ git terrace wrapped          Write the year-in-review card for the repository [-
 git terrace open <link>      Open a `gitterrace://` or `/go` permalink in the browser, starting a server if needed [--print]
 git terrace install-handler  Register (or with `--uninstall` remove) this program as the `gitterrace://` link handler [--uninstall]
 git terrace init             Write a documented `config.toml` and the pre-filled `actions.toml` to the config folder
-git terrace export <out>     Write a static copy of the site to a folder, for sharing or hosting [--commits --max-file-kb --project]
+git terrace export [out]     Write a static copy of the site to a folder, for sharing or hosting [--force --commits --max-file-kb --project]
 ```
 
 <!-- END GENERATED: commands -->

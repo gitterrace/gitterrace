@@ -30,6 +30,8 @@ pub(crate) struct Scope {
     pub(crate) max_file: u64,
     /// Repositories that are someone else's project, credited in their banner by folder name.
     pub(crate) projects: Vec<Project>,
+    /// Write into a non-empty folder that no earlier export made.
+    pub(crate) force: bool,
 }
 
 /// Someone else's repository shown in an export, named and linked in the banner.
@@ -68,6 +70,106 @@ fn seeds() -> impl Iterator<Item = &'static str> {
     SEEDS.into_iter().chain(gitterrace_web::WARM_PAGES)
 }
 
+/// Where an export goes when no folder is named.
+pub(crate) const DEFAULT_OUT: &str = "gitterrace-export";
+/// Written into every export folder; its presence says an export made the folder.
+const MARKER: &str = ".gitterrace-export";
+
+/// Gets `out` ready: created if missing; a folder with the marker is emptied so no stale page
+/// survives; a non-empty folder without it is refused unless `force`.
+fn prepare_out(repos: &[PathBuf], out: &Path, force: bool) -> anyhow::Result<()> {
+    std::fs::create_dir_all(out).with_context(|| format!("creating {}", out.display()))?;
+    let marked = out.join(MARKER).is_file();
+    let empty = std::fs::read_dir(out)
+        .with_context(|| format!("reading {}", out.display()))?
+        .next()
+        .is_none();
+    if !marked && !empty && !force {
+        bail!(
+            "{} is not empty and was not made by an export (no {MARKER} file); \
+             choose another folder or pass --force to write into it",
+            out.display()
+        );
+    }
+    if marked {
+        // Clearing deletes, so it must never reach a served repository or the working folder.
+        let root = out.canonicalize().context("resolving the output folder")?;
+        let cwd = std::env::current_dir()
+            .ok()
+            .and_then(|d| d.canonicalize().ok());
+        let inside = repos
+            .iter()
+            .filter_map(|r| r.canonicalize().ok())
+            .chain(cwd)
+            .any(|p| p.starts_with(&root));
+        if inside {
+            bail!(
+                "{} holds a repository or the current folder. It cannot be cleared for a fresh export",
+                out.display()
+            );
+        }
+        clear(out)?;
+    }
+    let names: Vec<String> = repos
+        .iter()
+        .map(|r| {
+            r.file_name().map_or_else(
+                || r.display().to_string(),
+                |n| n.to_string_lossy().into_owned(),
+            )
+        })
+        .collect();
+    let line = format!(
+        "gitterrace {} {}\n",
+        env!("GITTERRACE_VERSION"),
+        names.join(",")
+    );
+    std::fs::write(out.join(MARKER), line).with_context(|| format!("writing {MARKER}"))?;
+    exclude_from_worktree(out);
+    Ok(())
+}
+
+/// An export written straight into a worktree (`export` run in a checkout) would show as
+/// untracked; list it in that clone's `.git/info/exclude`, which is local and never committed.
+/// Only a folder directly under the worktree root qualifies; anything else is left alone.
+#[expect(
+    clippy::print_stderr,
+    reason = "a CLI note: the user sees why their exclude file changed"
+)]
+fn exclude_from_worktree(out: &Path) {
+    let Ok(out) = out.canonicalize() else { return };
+    let (Some(parent), Some(name)) = (out.parent(), out.file_name()) else {
+        return;
+    };
+    let Ok(repo) = gitterrace_git::Repo::discover(parent) else {
+        return;
+    };
+    if repo.root() != parent {
+        return;
+    }
+    let name = name.to_string_lossy();
+    match repo.exclude_locally(&name) {
+        Ok(true) => eprintln!("listed /{name}/ in .git/info/exclude so the export stays untracked"),
+        Ok(false) => {}
+        Err(e) => eprintln!("could not list /{name}/ in .git/info/exclude: {e}"),
+    }
+}
+
+/// Removes everything inside `dir`. A symlink is removed as a link, never followed.
+fn clear(dir: &Path) -> anyhow::Result<()> {
+    for entry in std::fs::read_dir(dir).with_context(|| format!("reading {}", dir.display()))? {
+        let path = entry?.path();
+        let kind = std::fs::symlink_metadata(&path)?.file_type();
+        let done = if kind.is_dir() {
+            std::fs::remove_dir_all(&path)
+        } else {
+            std::fs::remove_file(&path)
+        };
+        done.with_context(|| format!("removing {}", path.display()))?;
+    }
+    Ok(())
+}
+
 /// Writes the scoped site to `out` and returns how many files were written. One repository
 /// exports at `/`; several export like the server serves them: an index at `/` and each
 /// repository under `/r/<name>/`, named by the server's own table.
@@ -80,7 +182,7 @@ pub(crate) async fn export(repos: &[PathBuf], out: &Path, scope: &Scope) -> anyh
             out.display()
         );
     }
-    std::fs::create_dir_all(out).with_context(|| format!("creating {}", out.display()))?;
+    prepare_out(repos, out, scope.force)?;
     let router = gitterrace_web::multi_router(repos.to_vec()).context("building the router")?;
     let sites = sites(&router, repos).await?;
 
@@ -690,6 +792,78 @@ mod tests {
         assert_eq!(std::fs::read_to_string(&victim).expect("read"), "keep");
     }
 
+    fn scope(force: bool) -> crate::export::Scope {
+        crate::export::Scope {
+            commits: 3,
+            max_file: 1024,
+            projects: Vec::new(),
+            force,
+        }
+    }
+
+    /// Class guard: export never writes into or clears a folder it did not create, unless
+    /// forced.
+    #[tokio::test]
+    async fn export_never_writes_into_or_clears_a_folder_it_did_not_create_unless_forced() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let repo = gitterrace_testkit::Fixture::standard(&dir.path().join("r"));
+        let repos = [repo.path().to_path_buf()];
+        let out = dir.path().join("foreign");
+        std::fs::create_dir(&out).expect("mkdir");
+        std::fs::write(out.join("mine.txt"), "keep").expect("write");
+        let err = crate::export::export(&repos, &out, &scope(false))
+            .await
+            .unwrap_err();
+        assert!(err.to_string().contains("not empty"), "{err}");
+        assert_eq!(std::fs::read_dir(&out).expect("read").count(), 1);
+        crate::export::export(&repos, &out, &scope(true))
+            .await
+            .expect("forced");
+        assert!(
+            out.join("mine.txt").is_file(),
+            "force writes over, not clears"
+        );
+        assert!(out.join(".gitterrace-export").is_file());
+        assert!(out.join("index.html").is_file());
+    }
+
+    #[tokio::test]
+    async fn re_export_removes_stale_pages_and_ignores_symlink_targets() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let repo = gitterrace_testkit::Fixture::standard(&dir.path().join("r"));
+        let repos = [repo.path().to_path_buf()];
+        let out = dir.path().join("out");
+        crate::export::export(&repos, &out, &scope(false))
+            .await
+            .expect("first");
+        std::fs::create_dir_all(out.join("old/page")).expect("mkdir");
+        std::fs::write(out.join("old/page/index.html"), "stale").expect("write");
+        let outside = dir.path().join("outside");
+        std::fs::create_dir(&outside).expect("mkdir");
+        std::fs::write(outside.join("precious"), "keep").expect("write");
+        #[cfg(unix)]
+        std::os::unix::fs::symlink(&outside, out.join("link")).expect("symlink");
+        crate::export::export(&repos, &out, &scope(false))
+            .await
+            .expect("second");
+        assert!(!out.join("old").exists(), "stale page survived");
+        assert!(!out.join("link").exists());
+        assert!(outside.join("precious").is_file(), "symlink was followed");
+        assert!(out.join("index.html").is_file());
+    }
+
+    #[tokio::test]
+    async fn default_folder_is_used_when_none_is_named() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let repo = gitterrace_testkit::Fixture::standard(&dir.path().join("r"));
+        let out = dir.path().join(crate::export::DEFAULT_OUT);
+        crate::export::export(&[repo.path().to_path_buf()], &out, &scope(false))
+            .await
+            .expect("export");
+        assert!(out.join("index.html").is_file());
+        assert_eq!(crate::export::DEFAULT_OUT, "gitterrace-export");
+    }
+
     #[tokio::test]
     async fn export_refuses_a_repository_root_as_output() {
         let repo = tempfile::tempdir().expect("tempdir");
@@ -698,6 +872,7 @@ mod tests {
             commits: 1,
             max_file: 1024,
             projects: Vec::new(),
+            force: false,
         };
         let err = crate::export::export(&[repo.path().to_path_buf()], repo.path(), &scope)
             .await
@@ -721,6 +896,7 @@ mod tests {
             commits: 5,
             max_file: 64 * 1024,
             projects: Vec::new(),
+            force: false,
         };
         crate::export::export(&[repo.path().to_path_buf()], &out, &scope)
             .await
@@ -756,6 +932,7 @@ mod tests {
             commits: 5,
             max_file: 64 * 1024,
             projects: Vec::new(),
+            force: false,
         };
         crate::export::export(
             &[a.path().to_path_buf(), b.path().to_path_buf()],
@@ -822,6 +999,7 @@ mod tests {
             commits: 5,
             max_file: 64 * 1024,
             projects: Vec::new(),
+            force: false,
         };
         crate::export::export(&[fx.path().to_path_buf()], &out, &scope)
             .await
