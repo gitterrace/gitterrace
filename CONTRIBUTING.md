@@ -44,7 +44,7 @@ If the build fails on a clean checkout, that is a bug worth reporting.
 it reports as missing.
 
 - typos (`_typos.toml`): misspellings in code and prose
-- vale (`.vale.ini`, `styles/Gitterrace`): American spelling, no praise or history words, rules stated outright
+- vale (`.vale.ini`, `styles/gitterrace`): American spelling, no praise or history words, rules stated outright
 - gitleaks (`.gitleaks.toml`): committed secrets
 - markdownlint-cli2 (`.markdownlint-cli2.jsonc`): Markdown structure
 - shellcheck and shfmt: `scripts/*.sh`

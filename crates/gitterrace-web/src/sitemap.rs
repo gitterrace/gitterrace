@@ -100,6 +100,11 @@ pub const PAGES: &[Page] = &[
         "Everything above under several repositories; the list the switcher reads",
         &["/r/{name}", "/r/{name}/", "/r/{name}/{*rest}", "/api/repos"],
     ),
+    page(
+        "`POST /_repos`",
+        "Adds a repository to the running server for `git terrace open`: loopback, no browser, secret from a 0600 file",
+        &["/_repos"],
+    ),
 ];
 
 #[cfg(test)]
@@ -126,6 +131,7 @@ mod tests {
             include_str!("routes.rs"),
             include_str!("multi.rs"),
             include_str!("actions.rs"),
+            include_str!("add.rs"),
         ] {
             routed.extend(literals(src));
         }

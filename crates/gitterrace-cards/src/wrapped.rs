@@ -130,7 +130,7 @@ fn header(
         700,
         p.accent,
         "m",
-        &format!("GITTERRACE  /  REPO WRAPPED {}", w.year),
+        &format!("gitterrace  /  REPO WRAPPED {}", w.year),
     );
     text(
         s,

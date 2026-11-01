@@ -1,0 +1,8 @@
+extends: existence
+message: "'%s': the name is always lowercase, gitterrace"
+level: error
+ignorecase: false
+# Any capitalized form of the name in prose. Code identifiers (the `Gitterrace` enum variant,
+# GITTERRACE_* variables) sit in backtick spans, which vale skips.
+tokens:
+  - '\b(?:Gitterrace|GITTERRACE|GitTerrace|Git-Terrace)\b'

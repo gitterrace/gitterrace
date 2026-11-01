@@ -4,6 +4,6 @@
 # Rendered from docs/brand at deploy (scripts/site-png.mjs); the SVGs are the source.
 /site/assets/*.png
 
-# Vale: `vale sync` downloads proselint into styles/. Only styles/Gitterrace is ours.
+# Vale: `vale sync` downloads proselint into styles/. Only styles/gitterrace is ours.
 /styles/*
-!/styles/Gitterrace/
+!/styles/gitterrace/

@@ -70,7 +70,51 @@ pub fn record(dir: &Path, repos: &[&Repo]) -> io::Result<()> {
     all.truncate(MAX_ENTRIES);
     let json = serde_json::to_vec_pretty(&all).map_err(io::Error::other)?;
     private_dir(dir)?;
-    write_atomic(dir, &json)
+    write_atomic(dir, FILE, &json)
+}
+
+/// The file holding the secret `POST /_repos` checks for the server on `port`.
+fn token_file(port: u16) -> String {
+    format!("add-token-{port}")
+}
+
+/// Writes the add secret for the server on `port`: 0600 in the 0700 folder, never through a
+/// symlink. Another user cannot read it, so cannot add a repository.
+pub(crate) fn write_add_token(dir: &Path, port: u16, token: &str) -> io::Result<()> {
+    private_dir(dir)?;
+    write_atomic(dir, &token_file(port), token.as_bytes())
+}
+
+/// Best effort at shutdown; a stale file only holds a secret no server checks.
+pub(crate) fn remove_add_token(dir: &Path, port: u16) {
+    drop(fs::remove_file(dir.join(token_file(port))));
+}
+
+/// The add secret of the server on `port`, read with the same refusals as the registry: a
+/// symlink, a non-file, or (on unix) a file another user owns or can read is refused.
+pub fn add_token(dir: &Path, port: u16) -> io::Result<String> {
+    let path = dir.join(token_file(port));
+    let f = no_follow(OpenOptions::new().read(true))
+        .open(&path)
+        .map_err(|e| if is_loop(&e) { refused(&path) } else { e })?;
+    let m = f.metadata()?;
+    if !m.is_file() {
+        return Err(refused(&path));
+    }
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::MetadataExt;
+        let me = rustix::process::getuid().as_raw();
+        if m.uid() != me || m.mode() & 0o077 != 0 {
+            return Err(io::Error::other(format!(
+                "refusing {}: not private to this user",
+                path.display()
+            )));
+        }
+    }
+    let mut s = String::new();
+    f.take(256).read_to_string(&mut s)?;
+    Ok(s.trim().to_owned())
 }
 
 /// Every entry as written, unchecked. A missing file is empty; a corrupt one is too, since
@@ -108,12 +152,12 @@ fn private_dir(dir: &Path) -> io::Result<()> {
 
 /// A fresh temp file (0600, `O_NOFOLLOW`, created new), then a rename over the old file. A
 /// symlink planted at the name is refused rather than replaced, so the user sees it.
-fn write_atomic(dir: &Path, bytes: &[u8]) -> io::Result<()> {
-    let path = dir.join(FILE);
+fn write_atomic(dir: &Path, file: &str, bytes: &[u8]) -> io::Result<()> {
+    let path = dir.join(file);
     if fs::symlink_metadata(&path).is_ok_and(|m| !m.is_file()) {
         return Err(refused(&path));
     }
-    let tmp = dir.join(format!(".{FILE}.{}.tmp", std::process::id()));
+    let tmp = dir.join(format!(".{file}.{}.tmp", std::process::id()));
     let mut o = OpenOptions::new();
     o.write(true).create_new(true);
     #[cfg(unix)]
@@ -166,7 +210,7 @@ mod tests {
     use gitterrace_git::Repo;
     use std::path::Path;
 
-    use crate::registry::{FILE, candidates, record};
+    use crate::registry::{FILE, add_token, candidates, record, write_add_token};
 
     /// A one-commit repository; `msg` makes its root commit, and so its id, distinct.
     pub(crate) fn repo(dir: &Path, msg: &str) -> Repo {
@@ -206,6 +250,34 @@ mod tests {
         std::fs::remove_dir_all(a.root()).expect("rm");
         repo(&a.root(), "another project");
         assert_eq!(candidates(&state).expect("raw").len(), 2, "kept on disk");
+    }
+
+    #[test]
+    fn add_token_round_trips_privately() {
+        let t = tempfile::tempdir().expect("tmp");
+        let state = t.path().join("s");
+        write_add_token(&state, 4321, "secret").expect("write");
+        assert_eq!(add_token(&state, 4321).expect("read"), "secret");
+        assert!(add_token(&state, 4322).is_err(), "per port");
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let f = state.join("add-token-4321");
+            assert_eq!(
+                std::fs::metadata(&f).expect("m").permissions().mode() & 0o777,
+                0o600
+            );
+            std::fs::set_permissions(&f, std::fs::Permissions::from_mode(0o644)).expect("chmod");
+            assert!(add_token(&state, 4321).is_err(), "readable by others");
+            std::fs::remove_file(&f).expect("rm");
+            let elsewhere = t.path().join("x");
+            std::fs::write(&elsewhere, "planted").expect("w");
+            std::fs::set_permissions(&elsewhere, std::fs::Permissions::from_mode(0o600))
+                .expect("chmod");
+            std::os::unix::fs::symlink(&elsewhere, &f).expect("link");
+            assert!(add_token(&state, 4321).is_err(), "symlink");
+            assert!(write_add_token(&state, 4321, "s").is_err(), "not replaced");
+        }
     }
 
     #[cfg(unix)]

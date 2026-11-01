@@ -1,12 +1,14 @@
-//! Several repositories on one server: a name table fixed at startup, one lazily built
-//! router per repository under `/r/NAME`, and a repository index at `/`.
+//! Several repositories on one server: a name table, one lazily built router per repository
+//! under `/r/NAME`, and a repository index at `/`. The table starts with the CLI paths and only
+//! grows (see `add.rs`); a single-repository server keeps its repository at `/` and serves
+//! added ones from the same table.
 
 use std::fmt::Write as _;
 use std::{
     collections::HashMap,
     io,
     path::{Path, PathBuf},
-    sync::{Arc, Mutex},
+    sync::{Arc, Mutex, RwLock},
 };
 
 use askama::Template;
@@ -32,6 +34,8 @@ const WEEK: i64 = 7 * 86_400;
 pub(crate) struct Served {
     pub(crate) name: String,
     pub(crate) path: PathBuf,
+    /// Canonical top folder, what an addition is compared against.
+    pub(crate) root: PathBuf,
     router: OnceCell<Router>,
     /// Newest commit and weekly commit counts at the HEAD they were read for, so the index page
     /// opens a repository once per HEAD move instead of once per hit.
@@ -46,14 +50,37 @@ struct Recent {
     weeks: Vec<u32>,
 }
 
-/// The startup repository table. A URL name resolves only through this map, never by
-/// joining it onto a filesystem path.
+/// The repository table. A URL name resolves only through this map, never by joining it
+/// onto a filesystem path.
 pub(crate) struct Table {
     env: Env,
-    order: Vec<Arc<Served>>,
-    by_name: HashMap<String, Arc<Served>>,
+    repos: RwLock<Repos>,
+    /// The repository a single-repository server shows at `/`: its name is taken and its root
+    /// is never added again.
+    primary: Option<Primary>,
     /// Actions, when on; each repository's pages embed its token.
     pub(crate) live: Option<Arc<crate::actions::Live>>,
+}
+
+#[derive(Default)]
+struct Repos {
+    order: Vec<Arc<Served>>,
+    by_name: HashMap<String, Arc<Served>>,
+}
+
+pub(crate) struct Primary {
+    pub(crate) name: String,
+    pub(crate) root: PathBuf,
+}
+
+/// What [`Table::add`] did: the name the repository is served under, and whether it was new.
+pub(crate) enum Added {
+    Fresh(Arc<Served>),
+    /// Already served: under this URL prefix (`/` for the primary).
+    Present {
+        name: String,
+        base: String,
+    },
 }
 
 #[derive(Template)]
@@ -84,46 +111,109 @@ struct RepoItem {
 impl Table {
     /// Names each repository after its folder, deduplicated with a numeric suffix.
     pub(crate) fn new(paths: Vec<PathBuf>, env: Env) -> io::Result<Self> {
-        let mut order = Vec::with_capacity(paths.len());
-        let mut by_name = HashMap::new();
+        let table = Self {
+            env,
+            repos: RwLock::default(),
+            primary: None,
+            live: None,
+        };
         for path in paths {
-            let stem = Repo::discover(&path).map_err(io::Error::other)?.name();
-            if !valid_name(&stem) {
-                return Err(io::Error::other(format!(
+            let repo = Repo::discover(&path).map_err(io::Error::other)?;
+            let mut g = table.write();
+            let name = table.allocate(&g, &repo.name()).map_err(|stem| {
+                io::Error::other(format!(
                     "unusable repository name {stem:?} for {}",
                     path.display()
-                )));
-            }
-            let mut name = stem.clone();
-            let mut n = 2;
-            while by_name.contains_key(&name) {
-                name = format!("{stem}-{n}");
-                n += 1;
-            }
-            let served = Arc::new(Served {
-                name: name.clone(),
-                path,
-                router: OnceCell::new(),
-                recent: Mutex::new(None),
-            });
-            by_name.insert(name, Arc::clone(&served));
-            order.push(served);
+                ))
+            })?;
+            g.insert(name, path, repo.root());
         }
-        Ok(Self {
-            env,
-            order,
-            by_name,
-            live: None,
-        })
+        Ok(table)
     }
 
-    pub(crate) fn get(&self, name: &str) -> Option<&Arc<Served>> {
-        self.by_name.get(name)
+    /// An empty table beside the repository a single-repository server shows at `/`.
+    pub(crate) fn beside(primary: Primary, env: Env) -> Self {
+        Self {
+            env,
+            repos: RwLock::default(),
+            primary: Some(primary),
+            live: None,
+        }
+    }
+
+    fn read(&self) -> std::sync::RwLockReadGuard<'_, Repos> {
+        self.repos
+            .read()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+    }
+
+    fn write(&self) -> std::sync::RwLockWriteGuard<'_, Repos> {
+        self.repos
+            .write()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+    }
+
+    /// A free URL name from the folder name, with a numeric suffix on collision; the stem back
+    /// when it is not URL-safe.
+    fn allocate(&self, repos: &Repos, stem: &str) -> Result<String, String> {
+        if !valid_name(stem) {
+            return Err(stem.to_owned());
+        }
+        let taken = |n: &str| {
+            repos.by_name.contains_key(n) || self.primary.as_ref().is_some_and(|p| p.name == n)
+        };
+        let mut name = stem.to_owned();
+        let mut n = 2;
+        while taken(&name) {
+            name = format!("{stem}-{n}");
+            n += 1;
+        }
+        Ok(name)
+    }
+
+    /// Adds the repository whose canonical top folder is `root`, named like the startup ones.
+    /// A root already served comes back as [`Added::Present`]; check and insert hold one lock,
+    /// so two racing additions of the same folder add it once.
+    pub(crate) fn add(&self, root: PathBuf, stem: &str) -> Result<Added, String> {
+        if let Some(p) = self.primary.as_ref().filter(|p| p.root == root) {
+            return Ok(Added::Present {
+                name: p.name.clone(),
+                base: "/".to_owned(),
+            });
+        }
+        let mut g = self.write();
+        if let Some(s) = g.order.iter().find(|s| s.root == root) {
+            return Ok(Added::Present {
+                name: s.name.clone(),
+                base: format!("/r/{}/", s.name),
+            });
+        }
+        let name = self.allocate(&g, stem)?;
+        Ok(Added::Fresh(g.insert(name, root.clone(), root)))
+    }
+
+    pub(crate) fn get(&self, name: &str) -> Option<Arc<Served>> {
+        self.read().by_name.get(name).cloned()
+    }
+
+    /// The served repositories in order, a copy so no lock is held while one is read.
+    fn snapshot(&self) -> Vec<Arc<Served>> {
+        self.read().order.clone()
+    }
+
+    /// The repository's router, built on first use. Building starts its index refresher and
+    /// warm-up, so an addition calls it at once rather than on the first visit.
+    pub(crate) async fn router_of(&self, served: &Served) -> io::Result<Router> {
+        served
+            .router
+            .get_or_try_init(|| async { repo_router(served, self.live.clone(), &self.env) })
+            .await
+            .cloned()
     }
 
     /// Each repository opened once, keyed by its URL name, for permalinks and run requests.
     pub(crate) fn targets(&self) -> io::Result<Vec<crate::actions::Target>> {
-        self.order
+        self.snapshot()
             .iter()
             .map(|s| {
                 Ok(crate::actions::Target {
@@ -133,6 +223,21 @@ impl Table {
                 })
             })
             .collect()
+    }
+}
+
+impl Repos {
+    fn insert(&mut self, name: String, path: PathBuf, root: PathBuf) -> Arc<Served> {
+        let served = Arc::new(Served {
+            name: name.clone(),
+            path,
+            root,
+            router: OnceCell::new(),
+            recent: Mutex::new(None),
+        });
+        self.by_name.insert(name, Arc::clone(&served));
+        self.order.push(Arc::clone(&served));
+        served
     }
 }
 
@@ -240,6 +345,17 @@ pub(crate) fn router(table: Arc<Table>) -> Router {
         .with_state(table)
 }
 
+/// What a single-repository server adds in front of its own pages: added repositories under
+/// `/r/NAME` and the switcher list. No index and no fallback: `/` stays the repository.
+pub(crate) fn added_router(table: Arc<Table>) -> Router {
+    Router::new()
+        .route("/api/repos", get(repos_json))
+        .route("/r/{name}", get(slash))
+        .route("/r/{name}/", axum::routing::any(dispatch))
+        .route("/r/{name}/{*rest}", axum::routing::any(dispatch))
+        .with_state(table)
+}
+
 async fn slash(uri: Uri) -> Redirect {
     Redirect::permanent(&format!("{}/", uri.path()))
 }
@@ -253,15 +369,11 @@ async fn dispatch(State(table): State<Arc<Table>>, req: Request) -> Response {
     let (seg, rest) = after.split_once('/').unwrap_or((after, ""));
     // The raw segment must match a table name byte for byte: an encoded `%2e%2e` or `%2F`
     // never equals a valid name, so it falls through to 404.
-    let Some(served) = table.get(seg).cloned() else {
+    let Some(served) = table.get(seg) else {
         return crate::error::not_found(&format!("No repository named {seg} is served here."));
     };
-    let router = match served
-        .router
-        .get_or_try_init(|| async { repo_router(&served, table.live.clone(), &table.env) })
-        .await
-    {
-        Ok(r) => r.clone(),
+    let router = match table.router_of(&served).await {
+        Ok(r) => r,
         Err(e) => {
             tracing::warn!("opening {}: {e}", served.name);
             return StatusCode::INTERNAL_SERVER_ERROR.into_response();
@@ -327,7 +439,7 @@ async fn index(State(table): State<Arc<Table>>) -> crate::error::Result<Html<Str
     let html = tokio::task::spawn_blocking(move || {
         let now = fmt::now();
         let rows = table
-            .order
+            .snapshot()
             .iter()
             .map(|s| {
                 let href = format!("/r/{}/", s.name);
@@ -361,19 +473,27 @@ async fn index(State(table): State<Arc<Table>>) -> crate::error::Result<Html<Str
 async fn repos_json(State(table): State<Arc<Table>>) -> Response {
     let items = tokio::task::spawn_blocking(move || {
         let now = fmt::now();
-        table
-            .order
-            .iter()
-            .map(|s| RepoItem {
-                name: s.name.clone(),
-                href: format!("/r/{}/", s.name),
-                when: s
-                    .recent(now)
-                    .last
-                    .as_ref()
-                    .map(|c| fmt::ago(c.author.time, now))
-                    .unwrap_or_default(),
-            })
+        // A single-repository server lists its own repository first, at `/`.
+        let primary = table.primary.as_ref().map(|p| RepoItem {
+            name: p.name.clone(),
+            href: "/".to_owned(),
+            when: String::new(),
+        });
+        let added = table.snapshot();
+        primary
+            .into_iter()
+            .chain(added.iter().map(|s| {
+                RepoItem {
+                    name: s.name.clone(),
+                    href: format!("/r/{}/", s.name),
+                    when: s
+                        .recent(now)
+                        .last
+                        .as_ref()
+                        .map(|c| fmt::ago(c.author.time, now))
+                        .unwrap_or_default(),
+                }
+            }))
             .collect::<Vec<_>>()
     })
     .await
@@ -410,7 +530,7 @@ mod tests {
             crate::app::Env::new(gitterrace_config::Config::default()),
         )
         .expect("table");
-        let s = table.order[0].clone();
+        let s = table.snapshot()[0].clone();
         let now = crate::fmt::now() + 60;
         let first = s.recent(now);
         assert!(

@@ -109,7 +109,8 @@ fn not_loaded(e: impl std::fmt::Display) -> String {
 
 /// Everything `/go` and the run route read.
 pub(crate) struct Site {
-    pub(crate) targets: Vec<Target>,
+    /// Grows when a repository is added to the running server, never shrinks.
+    pub(crate) targets: RwLock<Vec<Arc<Target>>>,
     pub(crate) live: Option<Arc<Live>>,
     pub(crate) status: Arc<Status>,
     /// The config `[[send]]` targets come from: the live, reloaded one when actions are on.
@@ -119,6 +120,21 @@ pub(crate) struct Site {
 }
 
 impl Site {
+    /// The targets now, a copy so no lock is held across git reads.
+    pub(crate) fn targets(&self) -> Vec<Arc<Target>> {
+        self.targets
+            .read()
+            .map_or_else(|e| e.into_inner().clone(), |g| g.clone())
+    }
+
+    pub(crate) fn push_target(&self, t: Target) {
+        let mut g = self
+            .targets
+            .write()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        g.push(Arc::new(t));
+    }
+
     fn link_style(&self) -> gitterrace_actions::LinkStyle {
         gitterrace_actions::LinkStyle::from_config(&self.env.cfg().links.style)
     }
@@ -314,7 +330,9 @@ async fn go(State(site): State<Arc<Site>>, UrlPath(rest): UrlPath<String>) -> Re
         .map(|p| p.trim_matches('/').to_owned())
         .filter(|p| !p.is_empty());
     let found = tokio::task::spawn_blocking(move || {
-        let t = gitterrace_git::resolve_permalink(&site.targets, &id, &sha, path.as_deref())?;
+        let targets = site.targets();
+        let refs: Vec<&Target> = targets.iter().map(AsRef::as_ref).collect();
+        let t = gitterrace_git::resolve_permalink(&refs, &id, &sha, path.as_deref())?;
         let url = match &path {
             None => format!("{}/commit/{sha}", t.base),
             Some(p) if t.repo.blob(&sha, p).is_ok() => {
@@ -413,12 +431,16 @@ async fn run(State(site): State<Arc<Site>>, req: Request) -> Response {
     if !action.kinds.contains(&rr.kind) {
         return bad("this action does not take that kind");
     }
-    let Some(idx) = site.targets.iter().position(|t| t.key == rr.locator.repo) else {
+    let Some(t) = site
+        .targets()
+        .into_iter()
+        .find(|t| t.key == rr.locator.repo)
+    else {
         return bad("unknown repository");
     };
     let origin = format!("http://{host}");
     let result =
-        tokio::task::spawn_blocking(move || run_blocking(&site, idx, &live, &action, &rr, &origin))
+        tokio::task::spawn_blocking(move || run_blocking(&site, &t, &live, &action, &rr, &origin))
             .await
             .unwrap_or(Err(Failed::Internal));
     match result {
@@ -457,13 +479,12 @@ async fn run(State(site): State<Arc<Site>>, req: Request) -> Response {
 
 fn run_blocking(
     site: &Site,
-    idx: usize,
+    t: &Target,
     live: &Live,
     action: &Action,
     rr: &RunRequest,
     origin: &str,
 ) -> Result<(gitterrace_actions::Outcome, Output), Failed> {
-    let t = site.targets.get(idx).ok_or(Failed::Internal)?;
     let style = site.link_style();
     let payload = Payload::build(&t.repo, &action.id, rr.kind, &rr.locator, origin, style)
         .map_err(|e| match e {

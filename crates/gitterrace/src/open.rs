@@ -241,8 +241,8 @@ fn spawn_server(
     Ok(())
 }
 
-/// Whether a gitterrace server, nothing, or something else listens on `addr`. Gitterrace is
-/// recognised by its `/_actions/status` JSON, which no other program answers alike.
+/// Whether a gitterrace server, nothing, or something else listens on `addr`. A gitterrace
+/// server is recognized by its `/_actions/status` JSON, which no other program answers alike.
 fn identify(addr: SocketAddr) -> Listener {
     let Ok(mut s) = TcpStream::connect_timeout(&addr, PROBE_TIMEOUT) else {
         return Listener::Free;

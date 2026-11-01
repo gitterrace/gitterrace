@@ -3,6 +3,7 @@
 mod about;
 mod actions;
 mod activity;
+mod add;
 mod app;
 mod charts;
 mod commit_types;
@@ -39,12 +40,15 @@ use std::{
     sync::Arc,
 };
 
+pub use add::TOKEN_HEADER as ADD_TOKEN_HEADER;
 use gitterrace_config::Config;
 use gitterrace_git::Repo;
 use gitterrace_index::Index;
 pub use media::plain_media;
 pub use multi::discover_repos;
-pub use registry::{Entry as RegistryEntry, candidates as registry_candidates, state_dir};
+pub use registry::{
+    Entry as RegistryEntry, add_token, candidates as registry_candidates, state_dir,
+};
 pub use reload::{Load, Watched};
 pub use views::stats_tab_labels;
 
@@ -172,25 +176,14 @@ fn build(
     actions_file: Option<&Path>,
     env: &Env,
 ) -> io::Result<(axum::Router, String)> {
-    let repo = Repo::discover(repo_path).map_err(io::Error::other)?;
-    let name = repo.name();
-    let (live, status) = actions::start(actions_file, &[repo.root()], extra.is_none());
-    env.set_actions_status(&status);
-    let sends = actions::sends(live.as_ref(), actions_file, &[repo.root()]);
-    env.set_sends(&sends);
-    let site = Arc::new(actions::Site {
-        targets: vec![actions::Target {
-            key: name.clone(),
-            base: String::new(),
-            repo,
-        }],
-        live: live.clone(),
-        status,
-        sends,
-        env: env.clone(),
-    });
-    let pages = repo_router(repo_path, String::new(), name.clone(), live, env)?;
-    Ok((guarded(pages.merge(actions::router(site)), extra), name))
+    build_server(
+        vec![repo_path.to_path_buf()],
+        extra,
+        actions_file,
+        env,
+        None,
+        None,
+    )
 }
 
 fn build_multi(
@@ -199,40 +192,93 @@ fn build_multi(
     actions_file: Option<&Path>,
     env: &Env,
 ) -> io::Result<(axum::Router, String)> {
-    match <[PathBuf; 1]>::try_from(paths) {
-        Ok([one]) => build(&one, extra, actions_file, env),
-        Err(paths) => {
-            let n = paths.len();
-            let mut table = multi::Table::new(paths, env.clone())?;
-            let targets = table.targets()?;
-            let roots: Vec<PathBuf> = targets.iter().map(|t| t.repo.root()).collect();
-            let (live, status) = actions::start(actions_file, &roots, extra.is_none());
-            env.set_actions_status(&status);
-            table.live.clone_from(&live);
-            let sends = actions::sends(live.as_ref(), actions_file, &roots);
-            env.set_sends(&sends);
-            let site = Arc::new(actions::Site {
-                targets,
-                live,
-                status,
-                sends,
-                env: env.clone(),
-            });
-            Ok((
-                guarded(
-                    multi::router(Arc::new(table)).merge(actions::router(site)),
-                    extra,
-                ),
-                fmt::count(n, "repository", "repositories"),
-            ))
+    build_server(paths, extra, actions_file, env, None, None)
+}
+
+/// The whole server. One path serves its repository at `/`, several get an index there; both
+/// keep a repository table, so `add` (the secret `POST /_repos` checks, `None` leaves the route
+/// unmounted) can grow either under `/r/NAME`. `state` is where an addition is recorded.
+fn build_server(
+    paths: Vec<PathBuf>,
+    extra: Option<IpAddr>,
+    actions_file: Option<&Path>,
+    env: &Env,
+    add: Option<gitterrace_actions::Token>,
+    state: Option<PathBuf>,
+) -> io::Result<(axum::Router, String)> {
+    let n = paths.len();
+    let single = match <[PathBuf; 1]>::try_from(paths) {
+        Ok([one]) => Ok(one),
+        Err(paths) => Err(paths),
+    };
+    let (mut table, targets, primary) = match single {
+        Ok(one) => {
+            let repo = Repo::discover(&one).map_err(io::Error::other)?;
+            let name = repo.name();
+            let primary = multi::Primary {
+                name: name.clone(),
+                root: repo.root(),
+            };
+            let target = actions::Target {
+                key: name.clone(),
+                base: String::new(),
+                repo,
+            };
+            (
+                multi::Table::beside(primary, env.clone()),
+                vec![target],
+                Some((one, name)),
+            )
         }
+        Err(paths) => {
+            let table = multi::Table::new(paths, env.clone())?;
+            let targets = table.targets()?;
+            (table, targets, None)
+        }
+    };
+    let roots: Vec<PathBuf> = targets.iter().map(|t| t.repo.root()).collect();
+    let (live, status) = actions::start(actions_file, &roots, extra.is_none());
+    env.set_actions_status(&status);
+    table.live.clone_from(&live);
+    let sends = actions::sends(live.as_ref(), actions_file, &roots);
+    env.set_sends(&sends);
+    let site = Arc::new(actions::Site {
+        targets: std::sync::RwLock::new(targets.into_iter().map(Arc::new).collect()),
+        live: live.clone(),
+        status,
+        sends,
+        env: env.clone(),
+    });
+    let table = Arc::new(table);
+    let (router, shown) = match primary {
+        Some((one, name)) => {
+            let pages = repo_router(&one, String::new(), name.clone(), live, env)?;
+            (pages.merge(multi::added_router(Arc::clone(&table))), name)
+        }
+        None => (
+            multi::router(Arc::clone(&table)),
+            fmt::count(n, "repository", "repositories"),
+        ),
+    };
+    let mut router = router.merge(actions::router(Arc::clone(&site)));
+    // A non-loopback bind never takes additions: the token is the only gate a remote client
+    // would face.
+    if let Some(token) = add.filter(|_| extra.is_none()) {
+        router = router.merge(add::router(Arc::new(add::Adder {
+            table,
+            site,
+            token,
+            actions_file: actions_file.map(Path::to_path_buf),
+            state,
+        })));
     }
+    Ok((guarded(router, extra), shown))
 }
 
 /// Records the served repositories for `git terrace open`. Best effort: a read-only or odd
 /// state folder must not stop the server, so a failure is only logged.
-fn remember(paths: &[PathBuf]) {
-    let Some(dir) = registry::state_dir() else {
+fn remember(dir: Option<&Path>, paths: &[PathBuf]) {
+    let Some(dir) = dir else {
         return;
     };
     let repos: Vec<Repo> = paths
@@ -240,7 +286,7 @@ fn remember(paths: &[PathBuf]) {
         .filter_map(|p| Repo::discover(p).ok())
         .collect();
     let refs: Vec<&Repo> = repos.iter().collect();
-    if let Err(e) = registry::record(&dir, &refs) {
+    if let Err(e) = registry::record(dir, &refs) {
         tracing::warn!(
             "not recording served repositories in {}: {e}",
             dir.display()
@@ -260,13 +306,49 @@ pub async fn serve(
     cfg: Config,
     watched: Option<Watched>,
 ) -> io::Result<()> {
+    serve_in(
+        repo_paths,
+        addr,
+        actions,
+        cfg,
+        watched,
+        registry::state_dir(),
+    )
+    .await
+}
+
+/// [`serve`] with the state folder (registry and add secret) named, `None` for none.
+pub async fn serve_in(
+    repo_paths: Vec<PathBuf>,
+    addr: SocketAddr,
+    actions: Option<PathBuf>,
+    cfg: Config,
+    watched: Option<Watched>,
+    state: Option<PathBuf>,
+) -> io::Result<()> {
     let extra = (!addr.ip().is_loopback()).then(|| addr.ip());
     tokio::task::spawn_blocking({
-        let paths = repo_paths.clone();
-        move || remember(&paths)
+        let (paths, state) = (repo_paths.clone(), state.clone());
+        move || remember(state.as_deref(), &paths)
     });
     let env = Env::new(cfg);
-    let (router, name) = build_multi(repo_paths, extra, actions.as_deref(), &env)?;
+    let listener = tokio::net::TcpListener::bind(addr).await?;
+    let addr = listener.local_addr()?;
+    // The secret `open` reads to add a repository. Without a state folder, or when it cannot
+    // be written, the route stays unmounted and `open` falls back to a server of its own.
+    let add = match (&state, extra) {
+        (Some(dir), None) => publish_add_token(dir, addr.port()),
+        _ => None,
+    };
+    let published = add.is_some();
+    let (router, name) = build_server(
+        repo_paths,
+        extra,
+        actions.as_deref(),
+        &env,
+        add,
+        state.clone(),
+    )?;
     if let Some(w) = watched {
         tokio::spawn(reload::run(reload::Reloader::new(w), env.clone()));
     }
@@ -275,9 +357,8 @@ pub async fn serve(
             "serving to the network: anyone who can reach this address can read the repository"
         );
     }
-    let listener = tokio::net::TcpListener::bind(addr).await?;
     tracing::info!("serving {name} on http://{addr}");
-    axum::serve(listener, router)
+    let served = axum::serve(listener, router)
         .with_graceful_shutdown(async move {
             if tokio::signal::ctrl_c().await.is_err() {
                 std::future::pending::<()>().await;
@@ -285,7 +366,25 @@ pub async fn serve(
             // Open tabs hold their streams; closing them lets the server stop.
             env.shut_down();
         })
-        .await
+        .await;
+    if let (true, Some(dir)) = (published, &state) {
+        registry::remove_add_token(dir, addr.port());
+    }
+    served
+}
+
+/// A fresh secret for `POST /_repos`, written where only this user can read it.
+fn publish_add_token(dir: &Path, port: u16) -> Option<gitterrace_actions::Token> {
+    let token = gitterrace_actions::Token::generate()
+        .map_err(|e| tracing::warn!("no add token: {e}"))
+        .ok()?;
+    match registry::write_add_token(dir, port, token.as_str()) {
+        Ok(()) => Some(token),
+        Err(e) => {
+            tracing::warn!("adding repositories is off: {}: {e}", dir.display());
+            None
+        }
+    }
 }
 
 #[cfg(test)]
