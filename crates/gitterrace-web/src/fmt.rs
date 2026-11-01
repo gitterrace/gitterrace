@@ -1,5 +1,7 @@
 //! Small formatting helpers shared by view models.
 
+use std::fmt::Write as _;
+
 /// Civil date from days since the epoch, proleptic Gregorian.
 fn civil(days: i64) -> (i64, u32, u32) {
     let z = days + 719_468;
@@ -80,7 +82,7 @@ pub(crate) fn enc(s: &str, keep_slash: bool) -> String {
         {
             out.push(char::from(b));
         } else {
-            push(&mut out, &format!("%{b:02X}"));
+            let _ = write!(out, "%{b:02X}");
         }
     }
     out
@@ -107,11 +109,6 @@ pub(crate) fn with_base<T>(base: &str, f: impl FnOnce() -> T) -> T {
     let out = f();
     BASE.with(|b| *b.borrow_mut() = prev);
     out
-}
-
-/// Appends an owned string; keeps `format!` call sites free of `push_str(&format!(..))`.
-pub(crate) fn push(out: &mut String, piece: &str) {
-    out.push_str(piece);
 }
 
 /// `13972` as `13,972`.

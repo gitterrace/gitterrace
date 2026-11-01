@@ -1,6 +1,8 @@
 //! Server-rendered SVG charts. Colors come from CSS classes mapped to the
 //! tokens in `static/tokens.css`, so a theme switch needs no re-render.
 
+use std::fmt::Write as _;
+
 use crate::fmt::{self, esc};
 
 const W: f64 = 960.0;
@@ -31,14 +33,12 @@ fn axis(max: u64) -> (String, f64) {
     while (v as f64) <= top {
         #[allow(clippy::cast_precision_loss)]
         let y = TOP_PAD + plot - v as f64 / top * plot;
-        fmt::push(
-            &mut svg,
-            &format!(
-                r#"<line class="grid" x1="{LEFT}" x2="{W}" y1="{y:.1}" y2="{y:.1}"/><text class="ax" x="{:.1}" y="{:.1}" text-anchor="end">{}</text>"#,
-                LEFT - 8.0,
-                y + 3.5,
-                fmt::thousands(v)
-            ),
+        let _ = write!(
+            svg,
+            r#"<line class="grid" x1="{LEFT}" x2="{W}" y1="{y:.1}" y2="{y:.1}"/><text class="ax" x="{:.1}" y="{:.1}" text-anchor="end">{}</text>"#,
+            LEFT - 8.0,
+            y + 3.5,
+            fmt::thousands(v)
         );
         v += step;
     }
@@ -73,20 +73,18 @@ fn x_labels(keys: &[&str]) -> String {
         } else {
             (cx, "middle")
         };
-        fmt::push(
-            &mut svg,
-            &format!(
-                r#"<text class="ax" x="{x:.1}" y="{:.1}" text-anchor="{anchor}">{}</text>"#,
-                H - 8.0,
-                esc(k)
-            ),
+        let _ = write!(
+            svg,
+            r#"<text class="ax" x="{x:.1}" y="{:.1}" text-anchor="{anchor}">{}</text>"#,
+            H - 8.0,
+            esc(k)
         );
     }
     svg
 }
 
 /// Categorical class for series `k` of `named`; anything past the named ones is "other".
-fn cat(k: usize, named: usize) -> String {
+pub(crate) fn cat(k: usize, named: usize) -> String {
     if k >= named {
         "c8".to_owned()
     } else {
@@ -116,14 +114,12 @@ pub(crate) fn bars(points: &[(String, u64)]) -> String {
         #[allow(clippy::cast_precision_loss)]
         let x = LEFT + i as f64 * sl + (sl - bw) / 2.0;
         let y = TOP_PAD + plot - h;
-        fmt::push(
-            &mut svg,
-            &format!(
-                r#"<g class="col"><title>{}: {}</title><rect class="hit" x="{:.1}" y="{TOP_PAD}" width="{sl:.1}" height="{plot:.1}"/><rect class="bar" x="{x:.1}" y="{y:.1}" width="{bw:.1}" height="{h:.1}" rx="2"/></g>"#,
-                esc(label),
-                fmt::thousands(v),
-                x - (sl - bw) / 2.0
-            ),
+        let _ = write!(
+            svg,
+            r#"<g class="col"><title>{}: {}</title><rect class="hit" x="{:.1}" y="{TOP_PAD}" width="{sl:.1}" height="{plot:.1}"/><rect class="bar" x="{x:.1}" y="{y:.1}" width="{bw:.1}" height="{h:.1}" rx="2"/></g>"#,
+            esc(label),
+            fmt::thousands(v),
+            x - (sl - bw) / 2.0
         );
     }
     let keys: Vec<&str> = points.iter().map(|p| p.0.as_str()).collect();
@@ -177,13 +173,11 @@ pub(crate) fn stacked(buckets: &[gitterrace_index::LabelBucket]) -> String {
         let mut y = TOP_PAD + plot;
         let key = esc(&buckets[i].label);
         let total: u64 = col.iter().sum();
-        fmt::push(
-            &mut svg,
-            &format!(
-                r#"<g class="col"><title>{key}: {}</title><rect class="hit" x="{:.1}" y="{TOP_PAD}" width="{sl:.1}" height="{plot:.1}"/>"#,
-                fmt::thousands(total),
-                x - (sl - bw) / 2.0
-            ),
+        let _ = write!(
+            svg,
+            r#"<g class="col"><title>{key}: {}</title><rect class="hit" x="{:.1}" y="{TOP_PAD}" width="{sl:.1}" height="{plot:.1}"/>"#,
+            fmt::thousands(total),
+            x - (sl - bw) / 2.0
         );
         for (k, v) in col.iter().enumerate() {
             if *v == 0 {
@@ -192,12 +186,10 @@ pub(crate) fn stacked(buckets: &[gitterrace_index::LabelBucket]) -> String {
             #[allow(clippy::cast_precision_loss)]
             let h = *v as f64 / top * plot;
             y -= h;
-            fmt::push(
-                &mut svg,
-                &format!(
-                    r#"<rect class="{}" x="{x:.1}" y="{y:.1}" width="{bw:.1}" height="{h:.1}"/>"#,
-                    cat(k, names.len())
-                ),
+            let _ = write!(
+                svg,
+                r#"<rect class="{}" x="{x:.1}" y="{y:.1}" width="{bw:.1}" height="{h:.1}"/>"#,
+                cat(k, names.len())
             );
         }
         svg.push_str("</g>");
@@ -206,17 +198,15 @@ pub(crate) fn stacked(buckets: &[gitterrace_index::LabelBucket]) -> String {
     svg.push_str(&x_labels(&keys));
     svg.push_str("</svg><div class=\"legend\">");
     for (k, n) in names.iter().enumerate() {
-        fmt::push(
-            &mut svg,
-            &format!(
-                r#"<span><i class="{}"></i>{}</span>"#,
-                cat(k, names.len()),
-                esc(n)
-            ),
+        let _ = write!(
+            svg,
+            r#"<span><i class="{}"></i>{}</span>"#,
+            cat(k, names.len()),
+            esc(n)
         );
     }
     if has_other {
-        fmt::push(&mut svg, r#"<span><i class="c8"></i>other</span>"#);
+        svg.push_str(r#"<span><i class="c8"></i>other</span>"#);
     }
     svg.push_str("</div>");
     svg
@@ -240,14 +230,12 @@ pub(crate) fn diverging(points: &[(String, u64, u64)], title: &str) -> String {
             if v == 0 && sign == "-" {
                 continue;
             }
-            fmt::push(
-                &mut svg,
-                &format!(
-                    r#"<line class="grid" x1="{LEFT}" x2="{W}" y1="{y:.1}" y2="{y:.1}"/><text class="ax" x="{:.1}" y="{:.1}" text-anchor="end">{sign}{}</text>"#,
-                    LEFT - 8.0,
-                    y + 3.5,
-                    fmt::thousands(v)
-                ),
+            let _ = write!(
+                svg,
+                r#"<line class="grid" x1="{LEFT}" x2="{W}" y1="{y:.1}" y2="{y:.1}"/><text class="ax" x="{:.1}" y="{:.1}" text-anchor="end">{sign}{}</text>"#,
+                LEFT - 8.0,
+                y + 3.5,
+                fmt::thousands(v)
             );
         }
         v += step;
@@ -259,17 +247,15 @@ pub(crate) fn diverging(points: &[(String, u64, u64)], title: &str) -> String {
         let x = LEFT + i as f64 * sl + (sl - bw) / 2.0;
         #[allow(clippy::cast_precision_loss)]
         let (ha, hd) = (*a as f64 / top * half, *d as f64 / top * half);
-        fmt::push(
-            &mut svg,
-            &format!(
-                r#"<g class="col"><title>{}: +{} / -{}</title><rect class="hit" x="{:.1}" y="{TOP_PAD}" width="{sl:.1}" height="{:.1}"/><rect class="up" x="{x:.1}" y="{:.1}" width="{bw:.1}" height="{ha:.1}"/><rect class="dn" x="{x:.1}" y="{mid:.1}" width="{bw:.1}" height="{hd:.1}"/></g>"#,
-                esc(label),
-                fmt::thousands(a),
-                fmt::thousands(d),
-                x - (sl - bw) / 2.0,
-                half * 2.0,
-                mid - ha
-            ),
+        let _ = write!(
+            svg,
+            r#"<g class="col"><title>{}: +{} / -{}</title><rect class="hit" x="{:.1}" y="{TOP_PAD}" width="{sl:.1}" height="{:.1}"/><rect class="up" x="{x:.1}" y="{:.1}" width="{bw:.1}" height="{ha:.1}"/><rect class="dn" x="{x:.1}" y="{mid:.1}" width="{bw:.1}" height="{hd:.1}"/></g>"#,
+            esc(label),
+            fmt::thousands(a),
+            fmt::thousands(d),
+            x - (sl - bw) / 2.0,
+            half * 2.0,
+            mid - ha
         );
     }
     let keys: Vec<&str> = points.iter().map(|p| p.0.as_str()).collect();
@@ -284,13 +270,11 @@ pub(crate) fn percent_line(points: &[(String, Option<f64>)]) -> String {
     let mut svg = open_svg("Rework share over time");
     for p in [0, 25, 50, 75, 100] {
         let y = TOP_PAD + plot - f64::from(p) / 100.0 * plot;
-        fmt::push(
-            &mut svg,
-            &format!(
-                r#"<line class="grid" x1="{LEFT}" x2="{W}" y1="{y:.1}" y2="{y:.1}"/><text class="ax" x="{:.1}" y="{:.1}" text-anchor="end">{p}%</text>"#,
-                LEFT - 8.0,
-                y + 3.5
-            ),
+        let _ = write!(
+            svg,
+            r#"<line class="grid" x1="{LEFT}" x2="{W}" y1="{y:.1}" y2="{y:.1}"/><text class="ax" x="{:.1}" y="{:.1}" text-anchor="end">{p}%</text>"#,
+            LEFT - 8.0,
+            y + 3.5
         );
     }
     let sl = slot(points.len());
@@ -301,14 +285,12 @@ pub(crate) fn percent_line(points: &[(String, Option<f64>)]) -> String {
             #[allow(clippy::cast_precision_loss)]
             let x = LEFT + i as f64 * sl;
             let y = TOP_PAD + plot - v.clamp(0.0, 1.0) * plot;
-            fmt::push(
-                &mut svg,
-                &format!(
-                    r#"<g class="col"><title>{}: {:.0}%</title><rect class="hit" x="{x:.1}" y="{TOP_PAD}" width="{sl:.1}" height="{plot:.1}"/><circle class="dot" cx="{:.1}" cy="{y:.1}" r="3.5"/></g>"#,
-                    esc(label),
-                    v * 100.0,
-                    x + sl / 2.0
-                ),
+            let _ = write!(
+                svg,
+                r#"<g class="col"><title>{}: {:.0}%</title><rect class="hit" x="{x:.1}" y="{TOP_PAD}" width="{sl:.1}" height="{plot:.1}"/><circle class="dot" cx="{:.1}" cy="{y:.1}" r="3.5"/></g>"#,
+                esc(label),
+                v * 100.0,
+                x + sl / 2.0
             );
         }
     }
@@ -322,13 +304,10 @@ pub(crate) fn percent_line(points: &[(String, Option<f64>)]) -> String {
         #[allow(clippy::cast_precision_loss)]
         let x = LEFT + i as f64 * sl + sl / 2.0;
         let y = TOP_PAD + plot - v.clamp(0.0, 1.0) * plot;
-        fmt::push(
-            &mut d,
-            &format!("{}{x:.1} {y:.1}", if pen { "L" } else { "M" }),
-        );
+        let _ = write!(d, "{}{x:.1} {y:.1}", if pen { "L" } else { "M" });
         pen = true;
     }
-    fmt::push(&mut svg, &format!(r#"<path class="line" d="{d}"/>"#));
+    let _ = write!(svg, r#"<path class="line" d="{d}"/>"#);
     let keys: Vec<&str> = points.iter().map(|p| p.0.as_str()).collect();
     svg.push_str(&x_labels(&keys));
     svg.push_str("</svg>");
@@ -344,7 +323,7 @@ pub(crate) fn sparkline(values: &[u32], class: &str) -> String {
         #[allow(clippy::cast_precision_loss)]
         let x = i as f64 * 120.0 / n as f64;
         let y = 20.0 - f64::from(*v) * 18.0 / f64::from(max);
-        fmt::push(&mut pts, &format!("{x:.1},{y:.1} "));
+        let _ = write!(pts, "{x:.1},{y:.1} ");
     }
     format!(
         r#"<svg class="spark {class}" viewBox="0 0 120 22" width="120" height="22" aria-hidden="true"><polyline points="{}"/></svg>"#,
@@ -386,13 +365,11 @@ pub(crate) fn scatter(dots: &[Dot], x_title: &str) -> String {
     while (v as f64) <= xtop {
         #[allow(clippy::cast_precision_loss)]
         let x = LEFT + v as f64 / xtop * (W - LEFT - 6.0);
-        fmt::push(
-            &mut svg,
-            &format!(
-                r#"<text class="ax" x="{x:.1}" y="{:.1}" text-anchor="middle">{}</text>"#,
-                H - 8.0,
-                fmt::thousands(v)
-            ),
+        let _ = write!(
+            svg,
+            r#"<text class="ax" x="{x:.1}" y="{:.1}" text-anchor="middle">{}</text>"#,
+            H - 8.0,
+            fmt::thousands(v)
         );
         v += xstep;
     }
@@ -403,22 +380,18 @@ pub(crate) fn scatter(dots: &[Dot], x_title: &str) -> String {
             TOP_PAD + plot - (d.y as f64 / ytop).min(1.0) * plot,
             3.0 + 5.0 * (d.size as f64 / smax as f64).sqrt(),
         );
-        fmt::push(
-            &mut svg,
-            &format!(
-                r#"<a href="{}"><circle class="dot-pt" cx="{cx:.1}" cy="{cy:.1}" r="{r:.1}"><title>{}</title></circle></a>"#,
-                esc(&d.href),
-                esc(&d.title)
-            ),
+        let _ = write!(
+            svg,
+            r#"<a href="{}"><circle class="dot-pt" cx="{cx:.1}" cy="{cy:.1}" r="{r:.1}"><title>{}</title></circle></a>"#,
+            esc(&d.href),
+            esc(&d.title)
         );
     }
-    fmt::push(
-        &mut svg,
-        &format!(
-            r#"<text class="ax" x="{W}" y="{:.1}" text-anchor="end">{}</text>"#,
-            TOP_PAD + 2.0,
-            esc(x_title)
-        ),
+    let _ = write!(
+        svg,
+        r#"<text class="ax" x="{W}" y="{:.1}" text-anchor="end">{}</text>"#,
+        TOP_PAD + 2.0,
+        esc(x_title)
     );
     svg.push_str("</svg>");
     svg
@@ -436,23 +409,19 @@ pub(crate) fn heatmap(cells: &[[u32; 24]; 7], max: u32) -> String {
         r#"<svg class="chart heat" viewBox="0 0 {w} {h}" role="img" aria-label="Commits by weekday and hour">"#
     );
     for hour in (0..24).step_by(3) {
-        fmt::push(
-            &mut svg,
-            &format!(
-                r#"<text class="ax" x="{}" y="12">{hour:02}</text>"#,
-                LEFT + hour * CELL
-            ),
+        let _ = write!(
+            svg,
+            r#"<text class="ax" x="{}" y="12">{hour:02}</text>"#,
+            LEFT + hour * CELL
         );
     }
     for (d, row) in cells.iter().enumerate() {
         let y = TOP + d * CELL;
-        fmt::push(
-            &mut svg,
-            &format!(
-                r#"<text class="ax" x="0" y="{}">{}</text>"#,
-                y + 22,
-                DAYS[d]
-            ),
+        let _ = write!(
+            svg,
+            r#"<text class="ax" x="0" y="{}">{}</text>"#,
+            y + 22,
+            DAYS[d]
         );
         for (hr, v) in row.iter().enumerate() {
             let level = if *v == 0 || max == 0 {
@@ -460,15 +429,13 @@ pub(crate) fn heatmap(cells: &[[u32; 24]; 7], max: u32) -> String {
             } else {
                 (*v * 4).div_ceil(max).min(4)
             };
-            fmt::push(
-                &mut svg,
-                &format!(
-                    r#"<rect class="h{level}" x="{}" y="{y}" width="{}" height="{}" rx="4"><title>{} {hr:02}:00, {v} commits</title></rect>"#,
-                    LEFT + hr * CELL,
-                    CELL - 4,
-                    CELL - 4,
-                    DAYS[d]
-                ),
+            let _ = write!(
+                svg,
+                r#"<rect class="h{level}" x="{}" y="{y}" width="{}" height="{}" rx="4"><title>{} {hr:02}:00, {v} commits</title></rect>"#,
+                LEFT + hr * CELL,
+                CELL - 4,
+                CELL - 4,
+                DAYS[d]
             );
         }
     }

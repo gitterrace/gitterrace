@@ -1,6 +1,7 @@
 //! Several repositories on one server: a name table fixed at startup, one lazily built
 //! router per repository under `/r/NAME`, and a repository index at `/`.
 
+use std::fmt::Write as _;
 use std::{
     collections::HashMap,
     io,
@@ -250,7 +251,7 @@ fn spark(path: &Path, now: i64) -> String {
         #[allow(clippy::cast_precision_loss)]
         let x = i as f64 * 90.0 / (SPARK_WEEKS - 1) as f64;
         let y = 19.0 - f64::from(*n) * 18.0 / f64::from(max);
-        fmt::push(&mut pts, &format!("{x:.1},{y:.1} "));
+        let _ = write!(pts, "{x:.1},{y:.1} ");
     }
     pts.trim_end().to_owned()
 }

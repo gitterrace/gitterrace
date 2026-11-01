@@ -14,7 +14,6 @@ mod markdown;
 mod media;
 mod multi;
 mod pages;
-pub mod palette;
 mod routes;
 mod search;
 mod types;

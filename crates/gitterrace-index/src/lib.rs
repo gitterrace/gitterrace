@@ -146,6 +146,14 @@ impl Index {
         out.flush()
     }
 
+    /// Commits reachable from `rev` that are not cached yet. Zero means [`Index::records`] for
+    /// `rev` is complete; insights for a branch other than HEAD call [`Index::update`] first.
+    pub fn pending(&self, source: &dyn CommitSource, rev: &str) -> io::Result<usize> {
+        let ids = source.rev_list(rev)?;
+        let (known, _) = store::stored_ids(&self.dir)?;
+        Ok(ids.iter().filter(|id| !known.contains(*id)).count())
+    }
+
     /// All cached records reachable from `rev`, oldest first.
     pub fn records(&self, source: &dyn CommitSource, rev: &str) -> io::Result<Vec<CommitRecord>> {
         let order = source.rev_list(rev)?;
@@ -193,6 +201,22 @@ mod tests {
 
     fn ids(rs: &[CommitRecord]) -> Vec<&str> {
         rs.iter().map(|r| r.id.as_str()).collect()
+    }
+
+    #[test]
+    fn pending_counts_uncached_commits_of_a_rev() -> io::Result<()> {
+        let dir = tempfile::tempdir()?;
+        let idx = Index::open_dir(dir.path().to_path_buf())?;
+        let src = Fake::new(&["a", "b"]);
+        idx.update(&src, "HEAD", &|_| {})?;
+        assert_eq!(idx.pending(&src, "HEAD")?, 0);
+        // Another branch shares a and b and adds c.
+        src.ids.borrow_mut().push("c".into());
+        assert_eq!(idx.pending(&src, "side")?, 1);
+        idx.update(&src, "side", &|_| {})?;
+        assert_eq!(idx.pending(&src, "side")?, 0);
+        assert_eq!(ids(&idx.records(&src, "side")?), ["a", "b", "c"]);
+        Ok(())
     }
 
     #[test]

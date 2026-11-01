@@ -9,6 +9,8 @@ use std::collections::HashMap;
 
 use pulldown_cmark::{BlockQuoteKind, CodeBlockKind, Event, Options, Parser, Tag, TagEnd, html};
 
+use crate::fmt::esc;
+
 /// Where a markdown file lives, so relative links can be resolved.
 pub(crate) struct Base {
     /// Revision as it should appear in URLs (already encoded).
@@ -27,14 +29,6 @@ impl Base {
     }
 }
 
-pub(crate) struct Rendered {
-    pub(crate) html: String,
-    /// True when a mermaid block is present. The page script also checks the DOM,
-    /// so this is informational for callers and tests.
-    #[cfg_attr(not(test), allow(dead_code))]
-    pub(crate) has_mermaid: bool,
-}
-
 /// Removes a leading `---` YAML block so it is not rendered as a setext heading.
 fn strip_front_matter(src: &str) -> &str {
     let Some(rest) = src
@@ -51,20 +45,6 @@ fn strip_front_matter(src: &str) -> &str {
         }
     }
     src
-}
-
-fn escape(s: &str) -> String {
-    let mut out = String::with_capacity(s.len());
-    for c in s.chars() {
-        match c {
-            '&' => out.push_str("&amp;"),
-            '<' => out.push_str("&lt;"),
-            '>' => out.push_str("&gt;"),
-            '"' => out.push_str("&quot;"),
-            _ => out.push(c),
-        }
-    }
-    out
 }
 
 /// GitHub heading slug: lowercase, keep letters, digits, `-` and `_`, spaces to `-`.
@@ -141,11 +121,11 @@ fn rewrite_url(base: &Base, url: &str, image: bool) -> String {
 
 fn code_block(code: &str, lang: &str) -> String {
     let lang = lang.split([' ', ',', '{']).next().unwrap_or("");
-    let body = crate::highlight::block(code, lang).unwrap_or_else(|| escape(code));
+    let body = crate::highlight::block(code, lang).unwrap_or_else(|| esc(code));
     let class = if lang.is_empty() {
         String::new()
     } else {
-        format!(" class=\"language-{}\"", escape(lang))
+        format!(" class=\"language-{}\"", esc(lang))
     };
     format!("<pre><code{class}>{body}</code></pre>\n")
 }
@@ -169,7 +149,7 @@ fn heading_level(level: pulldown_cmark::HeadingLevel) -> u8 {
 }
 
 /// Parser events with headings anchored, fences highlighted and alerts opened.
-fn transform<'a>(parser: Parser<'a>, has_mermaid: &mut bool) -> Vec<Event<'a>> {
+fn transform<'a>(parser: Parser<'a>) -> Vec<Event<'a>> {
     let mut out: Vec<Event<'a>> = Vec::new();
     let mut seen = HashMap::new();
     let mut heading: Option<(u8, Option<String>, Vec<Event<'a>>, String)> = None;
@@ -181,8 +161,7 @@ fn transform<'a>(parser: Parser<'a>, has_mermaid: &mut bool) -> Vec<Event<'a>> {
                 Event::Text(t) => code.push_str(&t),
                 Event::End(TagEnd::CodeBlock) => {
                     let html = if lang == "mermaid" {
-                        *has_mermaid = true;
-                        format!("<pre class=\"mermaid\">{}</pre>\n", escape(code))
+                        format!("<pre class=\"mermaid\">{}</pre>\n", esc(code))
                     } else {
                         code_block(code, lang)
                     };
@@ -212,7 +191,7 @@ fn transform<'a>(parser: Parser<'a>, has_mermaid: &mut bool) -> Vec<Event<'a>> {
             Event::End(TagEnd::Heading(_)) => {
                 if let Some((lvl, id, events, text)) = heading.take() {
                     let slug = unique_slug(&mut seen, id.unwrap_or_else(|| slugify(&text)));
-                    let slug = escape(&slug);
+                    let slug = esc(&slug);
                     out.push(Event::Html(
                         format!(
                             "<h{lvl} id=\"{slug}\"><a class=\"anchor\" href=\"#{slug}\" \
@@ -293,21 +272,17 @@ fn sanitizer(base: Base) -> ammonia::Builder<'static> {
     b
 }
 
-pub(crate) fn render_with(src: &str, base: Base) -> Rendered {
+pub(crate) fn render_with(src: &str, base: Base) -> String {
     let opts = Options::ENABLE_TABLES
         | Options::ENABLE_STRIKETHROUGH
         | Options::ENABLE_TASKLISTS
         | Options::ENABLE_FOOTNOTES
         | Options::ENABLE_GFM;
     let parser = Parser::new_ext(strip_front_matter(src), opts);
-    let mut has_mermaid = false;
-    let events = transform(parser, &mut has_mermaid);
+    let events = transform(parser);
     let mut raw = String::new();
     html::push_html(&mut raw, events.into_iter());
-    Rendered {
-        html: sanitizer(base).clean(&raw).to_string(),
-        has_mermaid,
-    }
+    sanitizer(base).clean(&raw).to_string()
 }
 
 #[cfg(test)]
@@ -317,7 +292,7 @@ mod tests {
             rev: "HEAD".to_owned(),
             dir: String::new(),
         };
-        render_with(src, base).html
+        render_with(src, base)
     }
 
     use crate::markdown::{Base, render_with, resolve_path, rewrite_url, slugify};
@@ -327,7 +302,7 @@ mod tests {
             rev: "abc123".to_owned(),
             dir: dir.to_owned(),
         };
-        render_with(src, base).html
+        render_with(src, base)
     }
 
     #[test]
@@ -449,21 +424,7 @@ mod tests {
                 dir: String::new(),
             },
         );
-        assert!(r.has_mermaid);
-        assert!(
-            r.html
-                .contains("<pre class=\"mermaid\">graph TD; A--&gt;B\n</pre>")
-        );
-        assert!(
-            !render_with(
-                "text",
-                Base {
-                    rev: "r".into(),
-                    dir: String::new()
-                }
-            )
-            .has_mermaid
-        );
+        assert!(r.contains("<pre class=\"mermaid\">graph TD; A--&gt;B\n</pre>"));
     }
 
     #[test]

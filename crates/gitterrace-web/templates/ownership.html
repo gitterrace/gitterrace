@@ -4,7 +4,7 @@
 {% include "tabs.html" %}
 {% include "filterbar.html" %}
 {% include "options.html" %}
-<div class="kpis">{% for k in kpis %}<div><b>{{ k.1 }}</b><span>{{ k.0 }}</span></div>{% endfor %}</div>
+{% include "kpis.html" %}
 <div class="chart-head"><div><h2>Owners by directory</h2><p class="hint">Share of the knowledge per person, from who changed the files and how much. Bus factor is how many people together hold at least half. Click a directory to filter every page to it.</p></div></div>
 <div class="card"><table class="entries own">
 <tr class="th"><td>Directory</td><td class="r">Lines</td><td class="r">Files</td><td>Owners</td><td class="r">Bus factor</td></tr>

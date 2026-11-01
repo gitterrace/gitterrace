@@ -118,6 +118,8 @@ pub struct RefInfo {
     pub kind: RefKind,
     pub target: String,
     pub time: i64,
+    /// Message and tagger, for annotated tags only.
+    pub annotation: Option<crate::TagAnnotation>,
 }
 
 #[derive(Debug, Clone)]

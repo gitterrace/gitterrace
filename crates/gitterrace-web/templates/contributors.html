@@ -4,7 +4,7 @@
 {% include "tabs.html" %}
 {% include "filterbar.html" %}
 {% include "options.html" %}
-<div class="kpis">{% for k in kpis %}<div><b>{{ k.1 }}</b><span>{{ k.0 }}</span></div>{% endfor %}</div>
+{% include "kpis.html" %}
 <div class="chart-head"><div><h2>People</h2><p class="hint">Most commits first. The sparkline is commits per {{ unit }} over the period. Click a name to narrow the page to that person.</p></div></div>
 {% if people.is_empty() %}<p class="muted">No contributors match these filters.</p>{% else %}
 <div class="card"><table class="entries">

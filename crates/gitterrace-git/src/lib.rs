@@ -3,6 +3,7 @@
 
 mod diff;
 mod error;
+mod gitdir;
 mod ident;
 mod ignore;
 mod repo;
@@ -16,6 +17,7 @@ pub use error::{Error, Result};
 /// against the object header before reading, so a huge blob never reaches memory; larger
 /// blobs are treated like binary ones.
 pub const MAX_TEXT_BYTES: u64 = 2 * 1024 * 1024;
+pub use gitdir::{BranchStatus, HeadState, InProgress, LinkedWorktree, Stash, TagAnnotation};
 pub use ignore::IgnoreSet;
 pub use repo::Repo;
 pub use types::{

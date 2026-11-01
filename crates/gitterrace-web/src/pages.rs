@@ -11,7 +11,7 @@ use crate::{
     error::Result,
     filter::{Dim, FilterBar},
     fmt::{self, enc, href},
-    insights::{InsightsQuery, Kpi, OptLink, cached, head_lines, insights, scoped},
+    insights::{InsightsQuery, Kpi, OptLink, cached, head_lines, insights, period_of, scoped},
     routes::Shared,
     views::{self, Chrome, Nav},
 };
@@ -20,10 +20,6 @@ const TOP_HOT: usize = 50;
 const SCATTER: usize = 400;
 const TOP_DIRS: usize = 40;
 const TOP_PAIRS: usize = 30;
-
-fn period_of(q: &InsightsQuery, default: Period) -> Period {
-    q.filter.period_value().unwrap_or(default)
-}
 
 fn file_link(path: &str) -> String {
     href(&format!("/history/{}", enc(path, true)))

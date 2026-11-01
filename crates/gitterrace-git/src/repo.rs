@@ -21,6 +21,8 @@ const OBJECT_CACHE_BYTES: usize = 128 * 1024 * 1024;
 pub struct Repo {
     inner: gix::ThreadSafeRepository,
     blame_cache: Mutex<BlameCache>,
+    /// Ahead and behind per (branch tip, base): immutable for a pair of commits.
+    pub(crate) divergence: Mutex<HashMap<(gix::ObjectId, gix::ObjectId), (usize, usize)>>,
 }
 
 /// Blame results kept per (commit id, path), bounded by approximate bytes.
@@ -78,6 +80,7 @@ impl Repo {
         Ok(Self {
             inner,
             blame_cache: Mutex::new(BlameCache::default()),
+            divergence: Mutex::new(HashMap::new()),
         })
     }
 
@@ -430,6 +433,10 @@ impl Repo {
             if short.ends_with("/HEAD") {
                 continue;
             }
+            let annotation = (kind == RefKind::Tag)
+                .then(|| reference.target().try_id().map(ToOwned::to_owned))
+                .flatten()
+                .and_then(|id| crate::gitdir::annotation(&repo, id));
             let Ok(commit) = reference.peel_to_commit() else {
                 continue;
             };
@@ -439,6 +446,7 @@ impl Repo {
                 kind,
                 target: commit.id.to_string(),
                 time,
+                annotation,
             });
         }
         out.sort_by_key(|r| Reverse(r.time));
@@ -451,13 +459,13 @@ impl Repo {
         Some(name.shorten().to_str_lossy().into_owned())
     }
 
-    fn repo(&self) -> gix::Repository {
+    pub(crate) fn repo(&self) -> gix::Repository {
         let mut repo = self.inner.to_thread_local();
         repo.object_cache_size_if_unset(OBJECT_CACHE_BYTES);
         repo
     }
 
-    fn resolve_id(repo: &gix::Repository, rev: &str) -> Result<gix::ObjectId> {
+    pub(crate) fn resolve_id(repo: &gix::Repository, rev: &str) -> Result<gix::ObjectId> {
         let not_found = || Error::RevNotFound(rev.to_string());
         let id = repo.rev_parse_single(rev).map_err(|_| not_found())?;
         let commit = id

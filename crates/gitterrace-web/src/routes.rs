@@ -1,5 +1,6 @@
 //! Route handlers. Each resolves its revision first, then reads only from that commit id.
 
+use std::fmt::Write as _;
 use std::sync::Arc;
 
 use askama::Template;
@@ -296,7 +297,6 @@ async fn overview(State(app): Shared) -> Result<Html<String>> {
                 .and_then(|b| b.text)
                 .map(|t| markdown::render_with(&t, markdown::Base::new("HEAD", "")))
         });
-        let readme = readme.map(|r| r.html);
         let totals = a.records(&head)?.map(|r| {
             let t = gitterrace_index::totals(&r);
             Numbers {
@@ -408,7 +408,7 @@ async fn log(
                 .map_or_else(|| w.to_owned(), |c| c.author.name.clone());
             let mut back = fmt::href(&format!("/log/{}", fmt::enc(&rev, false)));
             if !path.is_empty() {
-                fmt::push(&mut back, &format!("?path={}", fmt::enc(&path, true)));
+                let _ = write!(back, "?path={}", fmt::enc(&path, true));
             }
             (name, back)
         });
@@ -418,10 +418,10 @@ async fn log(
         let link = |n: usize| {
             let mut q = format!("/log/{rev_enc}?page={n}");
             if !path.is_empty() {
-                crate::fmt::push(&mut q, &format!("&path={}", fmt::enc(&path, true)));
+                let _ = write!(q, "&path={}", fmt::enc(&path, true));
             }
             if let Some(w) = who {
-                crate::fmt::push(&mut q, &format!("&author={}", fmt::enc(w, false)));
+                let _ = write!(q, "&author={}", fmt::enc(w, false));
             }
             fmt::href(&q)
         };
@@ -536,7 +536,10 @@ async fn tree(
                 format!("{path}/{n}")
             };
             let text = a.repo.blob(&id, &file).ok()?.text?;
-            Some(markdown::render_with(&text, markdown::Base::new(&rev, &path)).html)
+            Some(markdown::render_with(
+                &text,
+                markdown::Base::new(&rev, &path),
+            ))
         });
         Ok(TreePage {
             c: Chrome {
@@ -620,7 +623,7 @@ async fn blob(
         };
         let rendered = text.filter(|_| is_markdown(&path)).map(|t| {
             let dir = path.rsplit_once('/').map_or("", |(d, _)| d);
-            markdown::render_with(t, markdown::Base::new(&rev, dir)).html
+            markdown::render_with(t, markdown::Base::new(&rev, dir))
         });
         let (r, pe) = (fmt::enc(&rev, false), fmt::enc(&path, true));
         Ok(BlobPage {
@@ -832,19 +835,7 @@ async fn stats_files(
     RawQuery(raw): RawQuery,
     Query(f): Query<Filter>,
 ) -> Result<Html<String>> {
-    let key = blocking(&app, move |a| Ok(a.memo_key("f", raw.as_deref()))).await?;
-    if let Some(h) = app.memo_get(&key) {
-        return Ok(Html((*h).clone()));
-    }
-    let html = stats_files_render(&app, f).await?;
-    if app.ready() {
-        app.memo_put(key, Arc::new(html.0.clone()));
-    }
-    Ok(html)
-}
-
-async fn stats_files_render(app: &Arc<App>, f: Filter) -> Result<Html<String>> {
-    with_records(app, "f", move |_, all, c| {
+    crate::insights::cached(&app, "f", raw, move |_, all, c| {
         let fb = f.bar("/stats/files", all);
         let r = &*f.apply(all);
         let rows = |v: Vec<gitterrace_index::FileChurn>| {

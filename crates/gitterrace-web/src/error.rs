@@ -34,7 +34,7 @@ impl IntoResponse for Error {
         }
         let body = format!(
             "<!doctype html><meta charset=utf-8><meta name=viewport content=\"width=device-width\">\
-             <link rel=stylesheet href=/static/app.css><main class=wrap><h1>{}</h1><p class=muted>{}</p>\
+             <link rel=stylesheet href=/static/tokens.css><link rel=stylesheet href=/static/app.css><main class=wrap><h1>{}</h1><p class=muted>{}</p>\
              <p><a href=/>Back to overview</a></p></main>",
             status.as_u16(),
             esc(&self.to_string())

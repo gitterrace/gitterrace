@@ -78,23 +78,14 @@ impl InsightsQuery {
 
     /// Link to `base` with the current filters and options, `key` replaced by `value`
     /// (`None` removes it).
-    fn link(&self, base: &str, key: &str, value: Option<&str>) -> String {
+    fn link(&self, base: &str, key: &'static str, value: Option<&str>) -> String {
         let mut extra: Vec<(&str, String)> = self
             .pairs()
             .into_iter()
             .filter(|(k, _)| *k != key)
             .collect();
         if let Some(v) = value {
-            extra.push((
-                match key {
-                    "generated" => "generated",
-                    "ws" => "ws",
-                    "bots" => "bots",
-                    "ignore" => "ignore",
-                    _ => "exclude",
-                },
-                v.to_owned(),
-            ));
+            extra.push((key, v.to_owned()));
         }
         let pairs: Vec<(&str, &str)> = extra.iter().map(|(k, v)| (*k, v.as_str())).collect();
         fmt::href(&format!("{base}{}", self.filter.query(&pairs)))
@@ -205,6 +196,10 @@ pub(crate) async fn cached<T: askama::Template + Send + 'static>(
     Ok(html)
 }
 
+pub(crate) fn period_of(q: &InsightsQuery, default: Period) -> Period {
+    q.filter.period_value().unwrap_or(default)
+}
+
 pub(crate) struct Kpi(pub(crate) &'static str, pub(crate) String);
 
 #[derive(Template)]
@@ -232,7 +227,7 @@ pub(crate) async fn code_frequency(
         let fb = f.bar("/stats/frequency", r);
         let recs = scoped(f, r);
         let ins = insights(a, &recs, q.options());
-        let period = f.period_value().unwrap_or(Period::All);
+        let period = period_of(&q, Period::All);
         let (unit, weeks) = ins.code_frequency(period);
         let (add, del, rew) = weeks.iter().fold((0, 0, 0), |t, w| {
             (t.0 + w.additions, t.1 + w.deletions, t.2 + w.rewritten)
@@ -334,7 +329,7 @@ pub(crate) async fn contributors(
         // history that the other filters keep.
         let recs = scoped(f, r);
         let ins = insights(a, &recs, q.options());
-        let period = f.period_value().unwrap_or(Period::All);
+        let period = period_of(&q, Period::All);
         let report = ins.contributors(period);
         let people: Vec<PersonRow> = report
             .contributors

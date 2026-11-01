@@ -1,5 +1,7 @@
 //! View models and the HTML fragments too hot to loop over in templates.
 
+use std::fmt::Write as _;
+
 use gitterrace_git::{
     BlameLine, ChangeKind, CommitDetail, CommitSummary, FileDiff, LineKind, RefInfo, TreeEntry,
     TreeEntryKind,
@@ -333,10 +335,7 @@ pub(crate) fn diff_body_html(f: &FileDiff) -> String {
         if in_chunk == 0 {
             out.push_str("<div class=\"ch\">");
         }
-        crate::fmt::push(
-            &mut out,
-            &format!("<div class=\"hh\">{}</div>", esc(&h.header)),
-        );
+        let _ = write!(out, "<div class=\"hh\">{}</div>", esc(&h.header));
         in_chunk += 1;
         for l in &h.lines {
             if in_chunk == 0 {
@@ -353,13 +352,11 @@ pub(crate) fn diff_body_html(f: &FileDiff) -> String {
                 new_hl.as_mut()
             };
             let body = hl.map_or_else(|| esc_text(&l.text), |h| h.line(&l.text));
-            crate::fmt::push(
-                &mut out,
-                &format!(
-                    "<div class=\"{cls}\" data-o=\"{}\" data-n=\"{}\">{body}</div>",
-                    num(l.old_no),
-                    num(l.new_no),
-                ),
+            let _ = write!(
+                out,
+                "<div class=\"{cls}\" data-o=\"{}\" data-n=\"{}\">{body}</div>",
+                num(l.old_no),
+                num(l.new_no)
             );
             in_chunk += 1;
             if in_chunk >= CHUNK_LINES {
@@ -385,36 +382,30 @@ pub(crate) fn diff_html_with(
     let mut budget_used = 0usize;
     let mut bytes_used = 0usize;
     for (i, f) in files.iter().enumerate() {
-        crate::fmt::push(
-            &mut out,
-            &format!(
-                "<section class=\"file\" id=\"f{i}\"><header><span class=\"badge {k}\">{k}</span> ",
-                k = kind_name(f.kind)
-            ),
+        let _ = write!(
+            out,
+            "<section class=\"file\" id=\"f{i}\"><header><span class=\"badge {k}\">{k}</span> ",
+            k = kind_name(f.kind)
         );
         if f.kind == ChangeKind::Deleted {
             out.push_str(&esc(&f.path));
         } else if let Some(rev) = rev {
-            crate::fmt::push(
-                &mut out,
-                &format!(
-                    "<a href=\"{}/blob/{}/{}\">{}</a>",
-                    crate::fmt::base(),
-                    enc(rev, false),
-                    enc(&f.path, true),
-                    esc(&file_label(f))
-                ),
+            let _ = write!(
+                out,
+                "<a href=\"{}/blob/{}/{}\">{}</a>",
+                crate::fmt::base(),
+                enc(rev, false),
+                enc(&f.path, true),
+                esc(&file_label(f))
             );
         } else {
             out.push_str(&esc(&file_label(f)));
         }
-        crate::fmt::push(
-            &mut out,
-            &format!(
-                "<span class=\"counts\"><b class=\"add\">+{}</b> <b class=\"del\">-{}</b></span></header>",
-                crate::fmt::thousands(f.additions),
-                crate::fmt::thousands(f.deletions)
-            ),
+        let _ = write!(
+            out,
+            "<span class=\"counts\"><b class=\"add\">+{}</b> <b class=\"del\">-{}</b></span></header>",
+            crate::fmt::thousands(f.additions),
+            crate::fmt::thousands(f.deletions)
         );
         if f.binary && crate::media::is_image(&f.path) && rev.is_some() {
             let old_path = f.old_path.as_deref().unwrap_or(&f.path);
@@ -447,14 +438,12 @@ pub(crate) fn diff_html_with(
             budget_used += changed;
             bytes_used += bytes;
             if let (true, Some(rev)) = (over, rev) {
-                crate::fmt::push(
-                    &mut out,
-                    &format!(
-                        "<p class=\"muted pad\"><button type=\"button\" class=\"linkbtn\" data-load-diff=\"{}/diff/{}/{i}\">Load diff ({} changed lines)</button></p>",
-                        crate::fmt::base(),
-                        enc(rev, false),
-                        crate::fmt::thousands(changed)
-                    ),
+                let _ = write!(
+                    out,
+                    "<p class=\"muted pad\"><button type=\"button\" class=\"linkbtn\" data-load-diff=\"{}/diff/{}/{i}\">Load diff ({} changed lines)</button></p>",
+                    crate::fmt::base(),
+                    enc(rev, false),
+                    crate::fmt::thousands(changed)
                 );
             } else {
                 out.push_str(&diff_body_html(f));
@@ -527,19 +516,14 @@ fn code_html_uncached(path: &str, text: &str) -> (String, bool) {
             if open {
                 out.push_str("</div>");
             }
-            crate::fmt::push(
-                &mut out,
-                &format!("<div class=\"ch\" style=\"counter-reset:n {i}\">"),
-            );
+            let _ = write!(out, "<div class=\"ch\" style=\"counter-reset:n {i}\">");
             open = true;
         }
-        crate::fmt::push(
-            &mut out,
-            &format!(
-                "<div id=\"L{}\" class=\"l\">{}</div>",
-                i + 1,
-                hl.as_mut().map_or_else(|| esc_text(line), |h| h.line(line))
-            ),
+        let _ = write!(
+            out,
+            "<div id=\"L{}\" class=\"l\">{}</div>",
+            i + 1,
+            hl.as_mut().map_or_else(|| esc_text(line), |h| h.line(line))
         );
     }
     if open {
@@ -559,38 +543,32 @@ pub(crate) fn blame_html(path: &str, lines: &[BlameLine], now: i64) -> String {
     for l in lines {
         let first = l.commit != prev;
         prev = &l.commit;
-        crate::fmt::push(
-            &mut out,
-            &format!(
-                "<tr id=\"L{}\"{}>",
-                l.line_no,
-                if first { " class=\"run\"" } else { "" }
-            ),
+        let _ = write!(
+            out,
+            "<tr id=\"L{}\"{}>",
+            l.line_no,
+            if first { " class=\"run\"" } else { "" }
         );
         if first {
-            crate::fmt::push(
-                &mut out,
-                &format!(
-                    "<td class=\"who\"><a href=\"{}/commit/{}\">{}</a> <a class=\"who\" href=\"{}\">{}</a> <span class=\"muted\">{}</span></td>",
-                    crate::fmt::base(),
-                    esc(&l.commit),
-                    esc(&short(&l.commit)),
-                    esc(&author_href(&l.author)),
-                    esc(&l.author),
-                    ago(l.time, now)
-                ),
+            let _ = write!(
+                out,
+                "<td class=\"who\"><a href=\"{}/commit/{}\">{}</a> <a class=\"who\" href=\"{}\">{}</a> <span class=\"muted\">{}</span></td>",
+                crate::fmt::base(),
+                esc(&l.commit),
+                esc(&short(&l.commit)),
+                esc(&author_href(&l.author)),
+                esc(&l.author),
+                ago(l.time, now)
             );
         } else {
             out.push_str("<td class=\"who\"></td>");
         }
-        crate::fmt::push(
-            &mut out,
-            &format!(
-                "<td class=\"n\"><a href=\"#L{n}\">{n}</a></td><td class=\"c\">{}</td></tr>",
-                hl.as_mut()
-                    .map_or_else(|| esc(&l.text), |h| h.line(&l.text)),
-                n = l.line_no
-            ),
+        let _ = write!(
+            out,
+            "<td class=\"n\"><a href=\"#L{n}\">{n}</a></td><td class=\"c\">{}</td></tr>",
+            hl.as_mut()
+                .map_or_else(|| esc(&l.text), |h| h.line(&l.text)),
+            n = l.line_no
         );
     }
     out.push_str("</table>");

@@ -15,7 +15,6 @@ gitterrace-git.workspace = true
 gitterrace-index.workspace = true
 gitterrace-api.workspace = true
 gitterrace-cards.workspace = true
-schwarzwald.workspace = true
 axum.workspace = true
 askama.workspace = true
 tokio.workspace = true
@@ -34,4 +33,3 @@ tower-http.workspace = true
 [dev-dependencies]
 tempfile.workspace = true
 http-body-util = "0.1"
-serde_urlencoded = "0.7"

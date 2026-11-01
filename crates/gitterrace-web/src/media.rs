@@ -1,6 +1,8 @@
 //! Images, audio, video and PDFs: what the blob view and commit diffs show for them, and the
 //! content types `/raw` serves. Pure functions over a path and bytes, so they are testable.
 
+use std::fmt::Write as _;
+
 use crate::fmt::{enc, esc, href, size};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -191,12 +193,10 @@ pub(crate) fn blob_html(
         size(bytes.len() as u64),
     );
     if let Some(src) = svg_src {
-        crate::fmt::push(
-            &mut out,
-            &format!(
-                r#"<details class="media-src"><summary>Code</summary><pre class="body">{}</pre></details>"#,
-                esc(src)
-            ),
+        let _ = write!(
+            out,
+            r#"<details class="media-src"><summary>Code</summary><pre class="body">{}</pre></details>"#,
+            esc(src)
         );
     }
     out

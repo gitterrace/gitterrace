@@ -253,11 +253,7 @@ fn pct(f: f64) -> String {
 
 fn cat(k: usize, n: usize) -> String {
     // The last entry is "Other" whenever the chain folded languages.
-    if k >= 7 || (k + 1 == n && n > TOP) {
-        "c8".to_owned()
-    } else {
-        format!("c{}", k + 1)
-    }
+    crate::charts::cat(k, n.min(TOP))
 }
 
 fn cat_s(k: usize, n: usize) -> String {

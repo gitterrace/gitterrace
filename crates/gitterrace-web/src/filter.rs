@@ -271,7 +271,8 @@ mod tests {
     use super::{Dim, Filter, under};
 
     fn parse(q: &str) -> Filter {
-        serde_urlencoded::from_str(q).expect("parse")
+        let uri: axum::http::Uri = format!("/?{q}").parse().expect("uri");
+        axum::extract::Query::try_from_uri(&uri).expect("parse").0
     }
 
     fn rec(

@@ -17,7 +17,7 @@ use crate::{
     error::Result,
     filter::{Dim, Filter, FilterBar, NO_SCOPE, OTHER},
     fmt::{self, href},
-    routes::{Shared, with_records},
+    routes::Shared,
     views::{self, Chrome, CommitRow, Nav, Row},
 };
 
@@ -416,15 +416,7 @@ pub(crate) async fn page(
     Query(q): Query<TypesQuery>,
 ) -> Result<Html<String>> {
     let q = Arc::new(q);
-    let key = crate::app::blocking(&app, move |a| Ok(a.memo_key("t", raw.as_deref()))).await?;
-    if let Some(h) = app.memo_get(&key) {
-        return Ok(Html((*h).clone()));
-    }
-    let html = with_records(&app, "t", move |a, r, c| build(a, r, c, &q)).await?;
-    if app.ready() {
-        app.memo_put(key, Arc::new(html.0.clone()));
-    }
-    Ok(html)
+    crate::insights::cached(&app, "t", raw, move |a, r, c| build(a, r, c, &q)).await
 }
 
 #[cfg(test)]
