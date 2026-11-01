@@ -11,8 +11,8 @@ use gix::traverse::commit::simple::CommitTimeOrder;
 use crate::error::git;
 use crate::ident;
 use crate::{
-    BlameLine, Blob, CommitDetail, CommitSummary, Error, MAX_TEXT_BYTES, RefInfo, RefKind, Result,
-    TreeEntry, TreeEntryKind,
+    BlameLine, Blob, CommitDetail, CommitSummary, Error, MAX_TEXT_BYTES, RawBlob, RefInfo, RefKind,
+    Result, TreeEntry, TreeEntryKind,
 };
 
 /// Decoded-object cache; trees and commits are re-read constantly by walks and diffs.
@@ -393,6 +393,31 @@ impl Repo {
             dir(a).cmp(&dir(b)).then_with(|| a.name.cmp(&b.name))
         });
         Ok(out)
+    }
+
+    /// One resolve and one tree lookup for `/raw`: the blob id and size, plus the bytes unless
+    /// `skip(id_hex, size)` says they are not needed (too large, or the client has them).
+    pub fn raw_blob(
+        &self,
+        rev: &str,
+        path: &str,
+        skip: impl FnOnce(&str, u64) -> bool,
+    ) -> Result<RawBlob> {
+        let repo = self.repo();
+        let tip = Self::resolve_id(&repo, rev)?;
+        let id = Self::blob_id_at(&repo, tip, path.trim_matches('/'))?;
+        let size = repo.find_header(id).map_err(git)?.size();
+        let id_hex = id.to_string();
+        let bytes = if skip(&id_hex, size) {
+            None
+        } else {
+            Some(repo.find_object(id).map_err(git)?.detach().data)
+        };
+        Ok(RawBlob {
+            id: id_hex,
+            size,
+            bytes,
+        })
     }
 
     /// Raw bytes of the file at `path` in `rev`.

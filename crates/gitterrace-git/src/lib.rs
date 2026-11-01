@@ -38,7 +38,7 @@ pub use repo_id::resolve_permalink;
 pub use time::civil_from_days;
 pub use types::{
     BlameLine, Blob, ChangeKind, CodeCounts, CommitDetail, CommitSummary, FileDiff, Hunk, HunkLine,
-    LineKind, RefInfo, RefKind, Signature, TreeEntry, TreeEntryKind,
+    LineKind, RawBlob, RefInfo, RefKind, Signature, TreeEntry, TreeEntryKind,
 };
 pub use url::percent_encode;
 pub use walk::{

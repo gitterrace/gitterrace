@@ -92,11 +92,14 @@ async fn main() -> anyhow::Result<()> {
 /// Writes `config.toml` and `actions.toml` into the config folder, private to the user, never
 /// over an existing file. Prints one line per file.
 fn init(config: Option<&std::path::Path>) -> anyhow::Result<()> {
-    let dir = gitterrace_config::config_dir(config)
-        .context("no config folder: set --config or HOME")?;
+    let dir =
+        gitterrace_config::config_dir(config).context("no config folder: set --config or HOME")?;
     let files = [
         ("config.toml", gitterrace_config::template()),
-        ("actions.toml", gitterrace_actions::Config::STARTER.to_owned()),
+        (
+            "actions.toml",
+            gitterrace_actions::Config::STARTER.to_owned(),
+        ),
     ];
     for (path, state) in init_in(&dir, &files)? {
         println!("{} {state}", path.display());
@@ -216,7 +219,10 @@ mod tests {
     fn files() -> [(&'static str, String); 2] {
         [
             ("config.toml", gitterrace_config::template()),
-            ("actions.toml", gitterrace_actions::Config::STARTER.to_owned()),
+            (
+                "actions.toml",
+                gitterrace_actions::Config::STARTER.to_owned(),
+            ),
         ]
     }
 
@@ -245,7 +251,10 @@ mod tests {
         let done = init_in(tmp.path(), &files()).expect("init");
         assert!(done.iter().all(|(_, s)| *s == "kept"));
         for n in ["config.toml", "actions.toml"] {
-            assert_eq!(std::fs::read_to_string(tmp.path().join(n)).expect("read"), format!("mine {n}"));
+            assert_eq!(
+                std::fs::read_to_string(tmp.path().join(n)).expect("read"),
+                format!("mine {n}")
+            );
         }
     }
 
@@ -256,7 +265,10 @@ mod tests {
         let done = init_in(tmp.path(), &files()).expect("init");
         assert_eq!(done[0].1, "written");
         assert_eq!(done[1].1, "kept");
-        assert_eq!(std::fs::read_to_string(tmp.path().join("actions.toml")).expect("read"), "mine");
+        assert_eq!(
+            std::fs::read_to_string(tmp.path().join("actions.toml")).expect("read"),
+            "mine"
+        );
         assert_eq!(mode(&tmp.path().join("config.toml")), 0o600);
     }
 

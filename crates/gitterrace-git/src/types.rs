@@ -105,6 +105,14 @@ pub struct Blob {
     pub text: Option<String>,
 }
 
+/// A blob for `/raw`: `bytes` is `None` when the caller skipped reading it.
+#[derive(Debug, Clone)]
+pub struct RawBlob {
+    pub id: String,
+    pub size: u64,
+    pub bytes: Option<Vec<u8>>,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RefKind {
     Branch,

@@ -35,6 +35,10 @@ pub struct PathFilter {
     patterns: Vec<String>,
     ignore: Option<IgnoreSet>,
     memo: Mutex<FastMap<String, bool>>,
+    /// Answers by the address of a record's shared path. Records built by the loader share one
+    /// `Arc<str>` per distinct path, so the per-file hot loops hash a pointer, not the string.
+    /// The records outlive the filter, so an address never names a different path.
+    by_addr: Mutex<FastMap<usize, bool>>,
 }
 
 impl PathFilter {
@@ -47,7 +51,23 @@ impl PathFilter {
             patterns,
             ignore: if opts.respect_ignore { ignore } else { None },
             memo: Mutex::new(FastMap::default()),
+            by_addr: Mutex::new(FastMap::default()),
         }
+    }
+
+    /// [`PathFilter::skips`] for a path shared between records, memoized by address.
+    pub(crate) fn skips_shared(&self, path: &std::sync::Arc<str>) -> bool {
+        let key = std::sync::Arc::as_ptr(path).cast::<u8>() as usize;
+        if let Ok(m) = self.by_addr.lock()
+            && let Some(hit) = m.get(&key)
+        {
+            return *hit;
+        }
+        let skip = self.skips(path);
+        if let Ok(mut m) = self.by_addr.lock() {
+            m.insert(key, skip);
+        }
+        skip
     }
 
     /// True when `path` is excluded, generated or ignored.

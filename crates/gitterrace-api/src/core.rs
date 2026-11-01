@@ -21,6 +21,9 @@ pub const MAX_BLOB_LINES: usize = 5000;
 pub const MAX_BLOB_BYTES: usize = 256 * 1024;
 /// Most lines one blame answer carries.
 pub const MAX_BLAME_LINES: usize = 5000;
+/// Most diff lines one commit answer carries, whatever `max_lines` asks: a vendored-code
+/// commit can hold millions, each a JSON object.
+pub const MAX_DIFF_LINES: usize = 20_000;
 /// Deepest the log pages: a path filter walks every skipped commit with tree lookups.
 const MAX_LOG_SKIP: usize = 50_000;
 /// Rev syntax that searches history (`:/text`, `^{/text}`) or reads reflogs (`@{...}`): a
@@ -204,7 +207,8 @@ impl ApiState {
     ) -> Result<Value, ApiError> {
         let id = self.repo.resolve(checked(id)?)?;
         let detail = self.repo.commit(&id)?;
-        let mut v = json::detail(&detail, diff, max_lines);
+        let cap = max_lines.map_or(MAX_DIFF_LINES, |m| m.min(MAX_DIFF_LINES));
+        let mut v = json::detail(&detail, diff, Some(cap));
         self.put_links(&mut v, &id, None, None);
         if let Some(files) = v["files"].as_array_mut() {
             for f in files {

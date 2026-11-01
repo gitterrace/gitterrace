@@ -1,9 +1,9 @@
 use std::collections::{BTreeSet, HashSet};
 
-use super::{BucketUnit, Insights, local_day};
 use crate::aggregates::weekday;
+use crate::insights::{BucketUnit, Insights, local_day};
 
-const DAY: i64 = super::DAY;
+const DAY: i64 = crate::insights::DAY;
 
 /// Reporting window, ending at the newest commit.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]

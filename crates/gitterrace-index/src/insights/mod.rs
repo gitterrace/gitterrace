@@ -127,7 +127,7 @@ impl<'a> Insights<'a> {
     }
 
     pub(crate) fn lines(&self, f: &FileStat) -> Option<Lines> {
-        (!self.filter.skips(&f.path)).then(|| self.lines_unfiltered(f))
+        (!self.filter.skips_shared(&f.path)).then(|| self.lines_unfiltered(f))
     }
 
     /// Line counts of a file under the whitespace option, whether or not the path filter

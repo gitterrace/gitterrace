@@ -615,6 +615,37 @@ mod tests {
         assert!(hotspots(&sample(), i64::MAX, 5).is_empty());
     }
 
+    /// One commit touching tens of thousands of files, as a vendoring or tree-wide rename does.
+    /// The per-commit dedup must stay linear: a scan of the files already seen made this case
+    /// quadratic and cost seconds on a large repository. The test is sized so that a quadratic
+    /// version would run for minutes, and it also checks every file counts exactly once.
+    #[test]
+    fn a_commit_touching_very_many_files_stays_linear() {
+        let n = 60_000;
+        let files: Vec<FileStat> = (0..n)
+            .flat_map(|i| {
+                let path: std::sync::Arc<str> = format!("d{}/f{i}.rs", i % 50).into();
+                // Each file listed twice in the commit: still one commit for it.
+                (0..2).map(move |_| FileStat {
+                    path: std::sync::Arc::clone(&path),
+                    additions: 1,
+                    ..FileStat::default()
+                })
+            })
+            .collect();
+        let r = vec![CommitRecord {
+            id: "big".into(),
+            files,
+            ..CommitRecord::default()
+        }];
+        let churn = file_churn(&r);
+        assert_eq!(churn.len(), n);
+        assert!(churn.iter().all(|c| c.commits == 1 && c.additions == 2));
+        let dirs = dir_churn(&r);
+        assert_eq!(dirs.len(), 50);
+        assert!(dirs.iter().all(|d| d.commits == 1));
+    }
+
     #[test]
     fn type_and_scope_breakdown() {
         let r = vec![

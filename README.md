@@ -28,6 +28,14 @@ Installs `git-terrace` and `gitterrace` for one program; git runs `git-terrace` 
 
 <!-- END GENERATED: install -->
 Windows: use WSL.
+
+## Quickstart
+
+```bash
+cd path/to/any/git/repo
+git terrace          # serves on 127.0.0.1 and opens your browser
+```
+
 ## Commands
 
 <!-- BEGIN GENERATED: commands -->

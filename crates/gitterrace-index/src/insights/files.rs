@@ -343,56 +343,84 @@ impl<'a> Insights<'a> {
         limit: usize,
     ) -> Vec<Coupling> {
         let (from, to) = period.window(self.now);
-        let head: HashSet<&str> = files
+        let mut head: Vec<&str> = files
             .iter()
             .filter(|f| !self.filter.skips(&f.path))
             .map(|f| &*f.path)
             .collect();
-        // Commit -> its head files, from the follow index so renames are joined.
-        let mut per_commit: HashMap<u32, Vec<&str>> = HashMap::new();
-        let mut changes: HashMap<&str, usize> = HashMap::new();
-        for path in &head {
-            for t in self.touches_in(path, from, to) {
-                per_commit.entry(t.commit).or_default().push(path);
-                *changes.entry(path).or_default() += 1;
+        head.sort_unstable();
+        head.dedup();
+        // Flat (commit, file) pairs sorted by commit replace a map of vectors: one allocation
+        // and a sequential pass, where hashing every touch of every head file dominated.
+        let mut touches: Vec<(u32, u32)> = Vec::new();
+        let mut changes = vec![0_usize; head.len()];
+        // Whether a commit counts in the window is a property of the commit, not of each touch.
+        let live: Vec<bool> = (0..self.records.len())
+            .map(|c| {
+                let time = self.records[c].time;
+                time >= from && time < to && self.counted(c)
+            })
+            .collect();
+        for (i, path) in head.iter().enumerate() {
+            let id = u32::try_from(i).unwrap_or(u32::MAX);
+            for t in self.follow().touches.get(path).into_iter().flatten() {
+                if live[t.commit as usize] {
+                    touches.push((t.commit, id));
+                    changes[i] += 1;
+                }
             }
         }
-        let mut pairs: HashMap<(&str, &str), usize> = HashMap::new();
-        for mut group in per_commit.into_values() {
+        touches.sort_unstable();
+        // Pairs are keyed by the two file numbers, a < b because each group is sorted.
+        let mut pairs: FastMap<u64, usize> = FastMap::default();
+        for group in touches.chunk_by(|x, y| x.0 == y.0) {
             if group.len() < 2 || group.len() > COUPLING_MAX_FILES {
                 continue;
             }
-            group.sort_unstable();
             for (x, a) in group.iter().enumerate() {
                 for b in &group[x + 1..] {
-                    *pairs.entry((a, b)).or_default() += 1;
+                    *pairs
+                        .entry((u64::from(a.1) << 32) | u64::from(b.1))
+                        .or_default() += 1;
                 }
             }
         }
-        let mut out: Vec<Coupling> = pairs
+        // Cheap tuples first, strings only for the pairs that are shown.
+        let mut kept: Vec<(u32, u32, usize)> = pairs
             .into_iter()
             .filter(|(_, n)| *n >= min_together)
-            .map(|((a, b), together)| {
-                let (ac, bc) = (changes[a], changes[b]);
+            .map(|(key, together)| ((key >> 32) as u32, (key & 0xffff_ffff) as u32, together))
+            .collect();
+        let degree = |&(a, b, together): &(u32, u32, usize)| {
+            together as f64 / changes[a as usize].min(changes[b as usize]) as f64
+        };
+        let order = |x: &(u32, u32, usize), y: &(u32, u32, usize)| {
+            y.2.cmp(&x.2)
+                .then_with(|| degree(y).total_cmp(&degree(x)))
+                .then_with(|| head[x.0 as usize].cmp(head[y.0 as usize]))
+                .then_with(|| head[x.1 as usize].cmp(head[y.1 as usize]))
+        };
+        if kept.len() > limit {
+            if limit > 0 {
+                kept.select_nth_unstable_by(limit - 1, order);
+            }
+            kept.truncate(limit);
+        }
+        kept.sort_by(order);
+        kept.into_iter()
+            .map(|t| {
+                let (a, b, together) = t;
+                let (ac, bc) = (changes[a as usize], changes[b as usize]);
                 Coupling {
-                    a: a.to_owned(),
-                    b: b.to_owned(),
+                    a: head[a as usize].to_owned(),
+                    b: head[b as usize].to_owned(),
                     together,
                     a_changes: ac,
                     b_changes: bc,
-                    degree: together as f64 / ac.min(bc) as f64,
+                    degree: degree(&t),
                 }
             })
-            .collect();
-        out.sort_by(|x, y| {
-            y.together
-                .cmp(&x.together)
-                .then_with(|| y.degree.total_cmp(&x.degree))
-                .then_with(|| x.a.cmp(&y.a))
-                .then_with(|| x.b.cmp(&y.b))
-        });
-        out.truncate(limit);
-        out
+            .collect()
     }
 
     /// Lines now grouped by the year of the file's last change. See [`AgeReport`].

@@ -181,33 +181,75 @@ pub(crate) fn raw_refused(size: u64, raw_mb: u64) -> bool {
     size > raw_mb << 20
 }
 
+/// Whether an `If-None-Match` header lists `tag` (or `*`).
+fn tag_matches(headers: &axum::http::HeaderMap, tag: &str) -> bool {
+    headers.get(header::IF_NONE_MATCH).is_some_and(|v| {
+        v.as_bytes()
+            .split(|b| *b == b',')
+            .any(|t| t.trim_ascii() == tag.as_bytes() || t.trim_ascii() == b"*")
+    })
+}
+
+/// What `/raw` found: the blob is too large, the client's copy is current, or the bytes.
+enum Raw {
+    TooLarge,
+    Fresh(String),
+    Bytes(Vec<u8>, String),
+}
+
 /// Serves blob bytes for relative images. Content is untrusted, so scripts are disabled.
-async fn raw(State(app): Shared, Path((rev, path)): Path<(String, String)>) -> Result<Response> {
+/// The `ETag` is the blob id, so a repeat visit costs a 304 and no content read.
+async fn raw(
+    State(app): Shared,
+    headers: axum::http::HeaderMap,
+    Path((rev, path)): Path<(String, String)>,
+) -> Result<Response> {
+    let name = path.trim_matches('/').to_owned();
+    let limit = app.cfg().limits.raw_mb;
     let loaded = blocking(&app, move |a| {
-        let id = a.repo.resolve(&rev)?;
-        let path = path.trim_matches('/').to_owned();
-        // The header size comes first: `blob` reads nothing above the text cap.
-        if raw_refused(a.repo.blob(&id, &path)?.size, a.cfg().limits.raw_mb) {
-            return Ok(None);
-        }
-        let bytes = a.repo.blob_bytes(&id, &path)?;
-        // PDFs never open in the browser's viewer on this origin.
-        let disposition = if crate::media::kind(&path) == Some(crate::media::Kind::Pdf) {
-            "attachment"
-        } else {
-            "inline"
-        };
-        Ok(Some((
-            bytes,
-            crate::media::content_type(&path),
-            crate::media::plain_media(&path),
-            disposition,
-        )))
+        // One resolve and one tree walk; the header size comes before any content read.
+        let blob = a.repo.raw_blob(&rev, &name, |id, size| {
+            raw_refused(size, limit) || tag_matches(&headers, &format!("\"{id}\""))
+        })?;
+        let tag = format!("\"{}\"", blob.id);
+        Ok(match blob.bytes {
+            Some(bytes) => Raw::Bytes(bytes, tag),
+            None if raw_refused(blob.size, limit) => Raw::TooLarge,
+            None => Raw::Fresh(tag),
+        })
     })
     .await?;
-    let Some((bytes, kind, plain, disposition)) = loaded else {
-        return Ok((StatusCode::PAYLOAD_TOO_LARGE, "too large to serve\n").into_response());
+    let (bytes, tag) = match loaded {
+        Raw::TooLarge => {
+            return Ok((StatusCode::PAYLOAD_TOO_LARGE, "too large to serve\n").into_response());
+        }
+        Raw::Fresh(tag) => {
+            let tag =
+                HeaderValue::from_str(&tag).unwrap_or_else(|_| HeaderValue::from_static("\"0\""));
+            return Ok((
+                StatusCode::NOT_MODIFIED,
+                [
+                    (header::ETAG, tag),
+                    (
+                        header::CACHE_CONTROL,
+                        HeaderValue::from_static("private, max-age=300"),
+                    ),
+                ],
+            )
+                .into_response());
+        }
+        Raw::Bytes(bytes, tag) => (bytes, tag),
     };
+    // PDFs never open in the browser's viewer on this origin.
+    let disposition = if crate::media::kind(&path) == Some(crate::media::Kind::Pdf) {
+        "attachment"
+    } else {
+        "inline"
+    };
+    let (kind, plain) = (
+        crate::media::content_type(&path),
+        crate::media::plain_media(&path),
+    );
     // The sandbox keeps SVG and text scriptless. It also stops the browser's PDF viewer, so
     // formats that run no author code are served without it.
     let csp = if plain {
@@ -233,6 +275,10 @@ async fn raw(State(app): Shared, Path((rev, path)): Path<(String, String)>) -> R
             (
                 header::CACHE_CONTROL,
                 HeaderValue::from_static("private, max-age=300"),
+            ),
+            (
+                header::ETAG,
+                HeaderValue::from_str(&tag).unwrap_or_else(|_| HeaderValue::from_static("\"0\"")),
             ),
         ],
         bytes,

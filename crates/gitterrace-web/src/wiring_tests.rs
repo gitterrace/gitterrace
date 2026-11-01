@@ -101,6 +101,46 @@ async fn limits_text_kb_and_raw_mb_change_what_a_file_shows() {
 }
 
 #[tokio::test]
+async fn raw_etag_is_the_blob_id_and_honours_if_none_match() {
+    let dir = tempfile::tempdir().expect("tmp");
+    let p = dir.path().to_path_buf();
+    git(&p, &["init", "-q", "-b", "main"]);
+    std::fs::write(p.join("a.txt"), "hello\n").expect("write");
+    git(&p, &["add", "."]);
+    git(&p, &["commit", "-qm", "feat: a"]);
+    let r = router(&p, Config::default());
+    let send = |inm: Option<&'static str>| {
+        let r = r.clone();
+        async move {
+            let mut req = Request::get("/raw/HEAD/a.txt").header("host", "localhost");
+            if let Some(v) = inm {
+                req = req.header("if-none-match", v);
+            }
+            let res = r.oneshot(req.body(Body::empty()).expect("req")).await;
+            res.expect("res")
+        }
+    };
+    let first = send(None).await;
+    assert_eq!(first.status().as_u16(), 200);
+    let tag = first
+        .headers()
+        .get("etag")
+        .expect("etag")
+        .to_str()
+        .expect("ascii")
+        .to_owned();
+    // 40 hex chars of the blob id, quoted.
+    assert_eq!(tag.len(), 42, "{tag}");
+    let tag: &'static str = Box::leak(tag.into_boxed_str());
+    let hit = send(Some(tag)).await;
+    assert_eq!(hit.status().as_u16(), 304);
+    assert_eq!(hit.headers().get("etag").expect("etag"), tag);
+    let body = hit.into_body().collect().await.expect("body").to_bytes();
+    assert!(body.is_empty());
+    assert_eq!(send(Some("\"nope\"")).await.status().as_u16(), 200);
+}
+
+#[tokio::test]
 async fn limits_search_matches_caps_the_results() {
     let dir = tempfile::tempdir().expect("tmp");
     let p = repo(dir.path(), "r");

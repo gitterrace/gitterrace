@@ -1,4 +1,4 @@
-use super::{Insights, Period};
+use crate::insights::{Insights, Period};
 
 /// Additions and deletions of one bucket, moves and (by default) whitespace excluded.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]

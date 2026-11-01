@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 
 use gitterrace_git::{RefInfo, RefKind};
 
-use super::{Insights, language};
+use crate::insights::{Insights, language};
 
 /// Upper bounds (inclusive) of the commit size buckets, in changed lines.
 const SIZE_EDGES: [u32; 6] = [1, 5, 20, 100, 500, 2000];
