@@ -1,5 +1,5 @@
 //! `actions.toml`: the user's declared actions. Trust comes from where the file lives: the
-//! user's config dir (or `--actions <file>`), never the served repository, its `.git`, the
+//! user's config folder (or `--config <dir>`), never the served repository, its `.git`, the
 //! cwd or an env var a repo could set. Running a click must never be a property of the
 //! content being browsed.
 
@@ -168,19 +168,11 @@ impl Config {
     }
 }
 
-/// gitterrace's config directory: `$XDG_CONFIG_HOME/gitterrace`, else
-/// `~/.config/gitterrace` on every platform so dotfile repos carry it.
-pub fn config_dir() -> PathBuf {
-    std::env::var_os("XDG_CONFIG_HOME")
-        .map(PathBuf::from)
-        .filter(|p| p.is_absolute())
-        .unwrap_or_else(|| home().join(".config"))
-        .join("gitterrace")
-}
-
-/// The actions file: `--actions <file>` when given, else `actions.toml` in [`config_dir`].
-pub fn default_path(flag: Option<&Path>) -> PathBuf {
-    flag.map_or_else(|| config_dir().join("actions.toml"), Path::to_path_buf)
+/// `actions.toml` in gitterrace's config folder (`--config <dir>`, else the XDG folder). The
+/// folder rule lives in `gitterrace-config`, so no environment variable a repo could set
+/// moves it. `None` when there is no home to resolve against.
+pub fn default_path(config_flag: Option<&Path>) -> Option<PathBuf> {
+    gitterrace_config::config_dir(config_flag).map(|d| d.join("actions.toml"))
 }
 
 fn home() -> PathBuf {
@@ -547,8 +539,9 @@ command = 'printf %s "$GITTERRACE_TITLE"'
         );
         let roots = vec![repo.path().to_path_buf()];
         // The default path is the user's config dir, never relative to a repo or the cwd.
-        assert!(default_path(None).is_absolute());
-        assert!(!default_path(None).starts_with(repo.path()));
+        let default = default_path(None).expect("home");
+        assert!(default.is_absolute());
+        assert!(!default.starts_with(repo.path()));
         // Even named explicitly, a file inside a served repo is refused.
         for p in [
             repo.path().join("actions.toml"),
