@@ -41,3 +41,54 @@
     } catch (e) {}
   }, 1000);
 })();
+
+// One copy path for every script, so every copy shows the same confirmation: the button that
+// asked flips to a check for a moment, and a toast names what landed on the clipboard. A copy
+// that fails says so; a silent clipboard is the bug this exists to prevent.
+(function () {
+  var FLASH_MS = 1200;
+  function toast(msg, sticky) {
+    var old = document.querySelector(".toast");
+    if (old) old.remove();
+    var t = document.createElement("div");
+    t.className = "toast";
+    t.setAttribute("role", "status");
+    t.textContent = msg;
+    document.body.appendChild(t);
+    setTimeout(function () { t.classList.add("out"); }, sticky ? 4000 : 1400);
+    setTimeout(function () { t.remove(); }, sticky ? 4400 : 1800);
+  }
+  function flash(btn) {
+    if (!btn || !btn.classList) return;
+    clearTimeout(btn._gtCopied);
+    btn.classList.add("copied");
+    btn._gtCopied = setTimeout(function () { btn.classList.remove("copied"); }, FLASH_MS);
+  }
+  function fallback(text) {
+    var ta = document.createElement("textarea");
+    ta.value = text;
+    ta.setAttribute("readonly", "");
+    ta.style.position = "fixed";
+    ta.style.opacity = "0";
+    document.body.appendChild(ta);
+    ta.select();
+    var ok = false;
+    try { ok = document.execCommand("copy"); } catch (e) { ok = false; }
+    ta.remove();
+    return ok;
+  }
+  // copy(text, label, button): label is the toast ("Permalink copied"), button the element to
+  // flash; it defaults to the focused button, which is the one clicked or keyed.
+  function copy(text, label, btn) {
+    var target = btn || (document.activeElement && document.activeElement.closest &&
+      document.activeElement.closest("button,[role=menuitem]"));
+    var done = function () { flash(target); toast(label || "Copied"); return true; };
+    var fail = function () { toast("Copy failed"); return false; };
+    if (navigator.clipboard && window.isSecureContext !== false) {
+      return navigator.clipboard.writeText(text).then(done, function () { return fallback(text) ? done() : fail(); });
+    }
+    return Promise.resolve(fallback(text) ? done() : fail());
+  }
+  window.gtCopy = copy;
+  window.gtToast = toast;
+})();

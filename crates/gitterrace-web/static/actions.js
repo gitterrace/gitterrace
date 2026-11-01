@@ -50,17 +50,8 @@
     if (text != null) e.textContent = text;
     return e;
   }
-  function toast(msg, sticky) {
-    var t = el("div", "toast", msg);
-    document.body.appendChild(t);
-    setTimeout(function () { t.classList.add("out"); }, sticky ? 4000 : 1400);
-    setTimeout(function () { t.remove(); }, sticky ? 4400 : 1800);
-  }
-  function copy(text, done) {
-    var ok = function () { toast(done); };
-    if (navigator.clipboard) navigator.clipboard.writeText(text).then(ok, function () { toast("Copy failed"); });
-    else toast("Copy failed");
-  }
+  function toast(msg, sticky) { window.gtToast(msg, sticky); }
+  function copy(text, done) { return window.gtCopy(text, done, menuOpener); }
   function local() { var p = location.pathname; return B && p.indexOf(B + "/") === 0 ? p.slice(B.length) : p; }
   function encPath(p) { return p.split("/").map(encodeURIComponent).join("/"); }
 
@@ -183,8 +174,12 @@
   function closeMenu() {
     if (menu) { menu.back.remove(); if (menu.from) menu.from.focus(); menu = null; }
   }
+  // The button that opened the action menu: the menu closes on a copy, so the opener is what
+  // stays on screen to flash. Null when the menu was opened by keyboard with no anchor.
+  var menuOpener = null;
   function openMenu(t, anchor) {
     closeMenu();
+    menuOpener = anchor || null;
     var back = el("div", "ov-back actmenu-back");
     var box = el("div", "ov anchored actmenu");
     box.setAttribute("role", "menu");

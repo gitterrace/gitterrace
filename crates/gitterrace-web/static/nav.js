@@ -21,28 +21,8 @@
   function typing(t) {
     return t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT" || t.isContentEditable);
   }
-  function toast(msg) {
-    var t = el("div", "toast", msg);
-    document.body.appendChild(t);
-    setTimeout(function () { t.classList.add("out"); }, 1400);
-    setTimeout(function () { t.remove(); }, 1800);
-  }
-  function copy(text, done) {
-    function ok() { toast(done || "Copied"); }
-    if (navigator.clipboard && window.isSecureContext !== false) {
-      navigator.clipboard.writeText(text).then(ok, fallback);
-    } else fallback();
-    function fallback() {
-      var ta = el("textarea");
-      ta.value = text;
-      ta.style.position = "fixed";
-      ta.style.opacity = "0";
-      document.body.appendChild(ta);
-      ta.select();
-      try { document.execCommand("copy"); ok(); } catch (e) { toast("Copy failed"); }
-      ta.remove();
-    }
-  }
+  function toast(msg) { window.gtToast(msg); }
+  function copy(text, done, btn) { return window.gtCopy(text, done, btn); }
 
   // ---- overlays -----------------------------------------------------------
   function overlay(cls) {
@@ -365,7 +345,7 @@
     b.setAttribute("data-tip", "Copy file contents");
     b.addEventListener("click", function () {
       var cells = card.querySelectorAll(".src .l, td.c");
-      copy(Array.prototype.map.call(cells, function (c) { return c.textContent; }).join("\n") + "\n", "Copied file");
+      copy(Array.prototype.map.call(cells, function (c) { return c.textContent; }).join("\n") + "\n", "Copied file", b);
     });
     card.style.position = "relative";
     card.appendChild(b);
@@ -374,14 +354,19 @@
   Array.prototype.forEach.call(document.querySelectorAll(".markdown-body pre:not(.mermaid)"), function (pre) {
     var b = el("button", "copy float", "Copy");
     b.type = "button";
-    b.addEventListener("click", function () { copy(pre.textContent, "Copied"); });
+    // The button sits inside the pre, so its own label would ride along in textContent.
+    b.addEventListener("click", function () {
+      var c = pre.cloneNode(true);
+      Array.prototype.forEach.call(c.querySelectorAll(".copy"), function (x) { x.remove(); });
+      copy(c.textContent, "Copied", b);
+    });
     pre.style.position = "relative";
     pre.appendChild(b);
   });
   document.addEventListener("click", function (e) {
     var t = e.target.closest && e.target.closest("[data-copy],[data-copy-url]");
     if (!t) return;
-    if (t.dataset.copy) copy(t.dataset.copy, "Copied sha");
+    if (t.dataset.copy) copy(t.dataset.copy, "Copied sha", t);
     else {
       var parts = local(location.pathname).split("/");
       if (commit && parts.length > 2) parts[2] = commit;
@@ -389,10 +374,10 @@
       var rm = document.querySelector('meta[name="gt-repo"]');
       if (rm && rm.dataset.link === "gitterrace" && rm.dataset.id && commit && parts[1] === "blob") {
         var hash = /^#L\d+(-L\d+)?$/.test(location.hash) ? location.hash : "";
-        copy("gitterrace://" + rm.dataset.id + "/" + commit + "/" + parts.slice(3).join("/") + hash, "Permalink copied");
+        copy("gitterrace://" + rm.dataset.id + "/" + commit + "/" + parts.slice(3).join("/") + hash, "Permalink copied", t);
         return;
       }
-      copy(location.origin + B + parts.join("/") + location.search + location.hash, "Permalink copied");
+      copy(location.origin + B + parts.join("/") + location.search + location.hash, "Permalink copied", t);
     }
   });
 

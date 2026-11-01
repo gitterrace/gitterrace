@@ -107,8 +107,7 @@
       remember(id);
       if (id === COPY) {
         var text = title.value + "\n\n" + ctx.value;
-        var done = function () { close(); };
-        if (navigator.clipboard) navigator.clipboard.writeText(text).then(done, done); else done();
+        window.gtCopy(text, "Copied with context").then(function () { close(); });
         return;
       }
       var t = cur.targets.filter(function (x) { return x.id === id; })[0];

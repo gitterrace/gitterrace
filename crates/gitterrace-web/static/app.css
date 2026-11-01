@@ -218,11 +218,18 @@ kbd{font:var(--weight-semibold) var(--text-2xs)/1 var(--mono);color:var(--muted)
 .ov.help h2{margin:0 0 var(--space-3)}
 .keys{display:grid;grid-template-columns:auto 1fr;gap:var(--space-2) var(--space-5);margin:0;overflow:auto}
 .keys dt{white-space:nowrap}.keys dd{margin:0;color:var(--muted)}
-.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--fg);color:var(--bg);padding:8px 14px;border-radius:var(--radius);font-size:var(--text-sm);z-index:60;transition:opacity var(--dur-slow)}
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--fg);color:var(--bg);padding:8px 14px;border-radius:var(--radius);font-size:var(--text-sm);z-index:60;transition:opacity var(--dur-slow);animation:toast-in var(--dur-fast) ease-out}
 .toast.out{opacity:0}
+@keyframes toast-in{from{opacity:0;transform:translate(-50%,6px)}}
 .copy{height:24px;padding:0 var(--space-2);font-size:var(--text-xs)}
 .copy.float{position:absolute;top:8px;right:8px;opacity:0;transition:opacity var(--dur-fast)}
-[data-copyable]:hover .copy.float,.markdown-body pre:hover .copy.float,.copy.float:focus-visible{opacity:1}
+[data-copyable]:hover .copy.float,.markdown-body pre:hover .copy.float,.copy.float:focus-visible,.copy.float.copied{opacity:1}
+/* Copied: the button that asked shows a check for a moment, in the accent, then goes back. */
+.copied{color:var(--accent-ink);border-color:var(--accent-ink)}
+.copy.copied{font-size:0}
+.copy.copied::after{content:"\2713  Copied";font-size:var(--text-xs);white-space:pre}
+.linkbtn.copied::after{content:" \2713";color:var(--accent-ink)}
+.actbtn.copied::after{content:"\2713"}
 .linkbtn,.linkbtn:hover,.linkbtn:active{all:unset;color:var(--accent-fg);cursor:pointer}.linkbtn:hover{text-decoration:underline;text-underline-offset:3px}.linkbtn:focus-visible{outline:2px solid var(--accent-fg);outline-offset:2px}
 tr.sel td{background:var(--accent-soft)!important;box-shadow:none}
 tr.sel td.n{box-shadow:inset 2px 0 0 var(--accent)}

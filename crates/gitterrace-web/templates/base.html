@@ -17,7 +17,7 @@
 <body data-rev="{{ c.rev }}" data-commit="{{ c.commit }}"{% if c.live %} data-live="{{ c.live_how }}" data-live-on="{{ c.live_on }}" data-live-v="{{ c.version }}"{% endif %}>
 <header class="top"><div class="wrap">
 <div class="topbar">
-<a class="brand" href="/"><svg class="logo" viewBox="0 0 24 24" aria-hidden="true"><path class="stem" d="M8.25 4.25v10h5.5v5.5h3M4.25 9.25h11"/><rect class="tread" x="15.25" y="18.25" width="6" height="3" rx="1.5"/></svg><span class="wordmark">gitterrace</span></a>
+<a class="brand" href="/"><svg class="logo" viewBox="0 0 24 24" aria-hidden="true"><path class="stem" d="M8.25 4.25v10h5.5v5.5h3M4.25 9.25h11"/><path class="tread" d="M15.25 18.25h4.5a1.5 1.5 0 0 1 0 3h-4.5z"/></svg><span class="wordmark">gitterrace</span></a>
 <span class="sep" aria-hidden="true">/</span>
 <a class="reponame" href="{{ c.home }}">{{ c.name }}</a>
 {% if !c.base.is_empty() %}<div class="refswitch"><button class="branch" type="button" id="repobtn" aria-haspopup="true" aria-expanded="false" data-tip="Switch repository">repo<span class="caret" aria-hidden="true"></span></button></div>{% endif %}

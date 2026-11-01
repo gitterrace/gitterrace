@@ -62,44 +62,44 @@ repository to prove it still works.
 ## Results
 
 <!-- BEGIN GENERATED: results -->
-Run 2026-11-01T15:58:55 on Apple M1 Max, 10 cores, 64.0 GB, Darwin 25.6.0. git version 2.54.0 (Apple Git-157), gitterrace 0.1.0. 5 warm runs per page, 60 s idle windows.
+Run 2026-11-01T17:53:09 on Apple M1 Max, 10 cores, 64.0 GB, Darwin 25.6.0. git version 2.54.0 (Apple Git-157), gitterrace 0.1.0. 5 warm runs per page, 60 s idle windows.
 
 #### control
 
-small repository, pinned at `d2ef86fee2`. All 6 metrics are within budget. Against budget: warm page 9 ms of 300 ms, cold page 19 ms of 1500 ms, index build 0.2 s of 30 s, idle CPU 0.73 % of 1 %, peak memory 48 MB of 500 MB, export 1.9 s of 60 s.
+small repository, pinned at `d2ef86fee2`. All 6 metrics are within budget. Against budget: warm page 13 ms of 300 ms, cold page 47 ms of 1500 ms, index build 0.2 s of 30 s, idle CPU 0.93 % of 1 %, peak memory 49 MB of 500 MB, export 2.2 s of 60 s.
 
 #### git
 
-medium repository, pinned at `50fe5cc63f`. All 6 metrics are within budget. Against budget: warm page 30 ms of 300 ms, cold page 2376 ms of 3000 ms, index build 27.0 s of 300 s, idle CPU 0.48 % of 1 %, peak memory 1487 MB of 1500 MB, export 6.5 s of 300 s.
+medium repository, pinned at `50fe5cc63f`. 5 of 6 metrics are within budget. Against budget: warm page 29 ms of 300 ms, cold page 2359 ms of 3000 ms, index build 26.8 s of 300 s, idle CPU 0.10 % of 1 %, peak memory 1509 MB of 1500 MB, export 5.6 s of 300 s.
+
+- **Over budget:** peak memory is 1509 MB against a limit of 1500 MB (1.0x).
 
 #### rust
 
-large repository, pinned at `f90a2d27c2`. 4 of 5 metrics are within budget. Against budget: warm page 163 ms of 300 ms, cold page 6566 ms of 10000 ms, index build 276.7 s of 2400 s, idle CPU 4.71 % of 1 %, peak memory 2543 MB of 6000 MB.
-
-- **Over budget:** idle CPU is 4.71 % against a limit of 1 % (4.7x).
+large repository, pinned at `f90a2d27c2`. All 5 metrics are within budget. Against budget: warm page 182 ms of 300 ms, cold page 3920 ms of 10000 ms, index build 273.8 s of 2400 s, idle CPU 0.22 % of 1 %, peak memory 2768 MB of 6000 MB.
 
 | Repo | Class | Pin | Index | Peak RSS | Cache | RSS after pages | Idle CPU | Idle CPU with /events | Export |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| control | small | `d2ef86fee2` | 0.2 s | 46 MB | 0 MB | 48 MB | 0.05% | 0.73% | 1.9 s, 29 MB |
-| git | medium | `50fe5cc63f` | 27.0 s | 1149 MB | 43 MB | 1487 MB | 0.07% | 0.48% | 6.5 s, 154 MB |
-| rust | large | `f90a2d27c2` | 276.7 s | 2027 MB | 485 MB | 2543 MB | 0.07% | 4.71% | not run |
+| control | small | `d2ef86fee2` | 0.2 s | 45 MB | 0 MB | 49 MB | 0.07% | 0.93% | 2.2 s, 31 MB |
+| git | medium | `50fe5cc63f` | 26.8 s | 1189 MB | 43 MB | 1509 MB | 0.07% | 0.10% | 5.6 s, 154 MB |
+| rust | large | `f90a2d27c2` | 273.8 s | 1959 MB | 485 MB | 2768 MB | 0.22% | 0.12% | not run |
 
 <svg xmlns="http://www.w3.org/2000/svg" role="img" viewBox="0 0 640 154" width="640" aria-label="Warm page, slowest median per repository against its budget">
 <title>Warm page, slowest median (ms) against budget</title>
 <style>.ok{fill:#5f8a6e}.over{fill:#b5654a}@media(prefers-color-scheme:dark){.ok{fill:#8fb89c}.over{fill:#d98b72}}</style>
 <text x="8" y="16" fill="currentColor" font-family="sans-serif" font-size="13" font-weight="600">Warm page, slowest median (ms)</text>
 <text x="8" y="47" fill="currentColor" font-family="sans-serif" font-size="12">control</text>
-<rect class="ok" x="84" y="34" width="10.6" height="18" rx="2" fill="#5f8a6e"/>
+<rect class="ok" x="84" y="34" width="14.8" height="18" rx="2" fill="#5f8a6e"/>
 <line x1="435.9" y1="30" x2="435.9" y2="56" stroke="currentColor" stroke-width="1.5" stroke-dasharray="3 2"/>
-<text x="478" y="47" fill="currentColor" font-family="sans-serif" font-size="12">9 of 300</text>
+<text x="478" y="47" fill="currentColor" font-family="sans-serif" font-size="12">13 of 300</text>
 <text x="8" y="81" fill="currentColor" font-family="sans-serif" font-size="12">git</text>
-<rect class="ok" x="84" y="68" width="35.0" height="18" rx="2" fill="#5f8a6e"/>
+<rect class="ok" x="84" y="68" width="34.3" height="18" rx="2" fill="#5f8a6e"/>
 <line x1="435.9" y1="64" x2="435.9" y2="90" stroke="currentColor" stroke-width="1.5" stroke-dasharray="3 2"/>
-<text x="478" y="81" fill="currentColor" font-family="sans-serif" font-size="12">30 of 300</text>
+<text x="478" y="81" fill="currentColor" font-family="sans-serif" font-size="12">29 of 300</text>
 <text x="8" y="115" fill="currentColor" font-family="sans-serif" font-size="12">rust</text>
-<rect class="ok" x="84" y="102" width="191.2" height="18" rx="2" fill="#5f8a6e"/>
+<rect class="ok" x="84" y="102" width="212.9" height="18" rx="2" fill="#5f8a6e"/>
 <line x1="435.9" y1="98" x2="435.9" y2="124" stroke="currentColor" stroke-width="1.5" stroke-dasharray="3 2"/>
-<text x="478" y="115" fill="currentColor" font-family="sans-serif" font-size="12">163 of 300</text>
+<text x="478" y="115" fill="currentColor" font-family="sans-serif" font-size="12">182 of 300</text>
 <text x="84" y="148" fill="currentColor" font-family="sans-serif" font-size="11" opacity="0.7">dashed line: budget</text></svg>
 
 <svg xmlns="http://www.w3.org/2000/svg" role="img" viewBox="0 0 640 154" width="640" aria-label="Cold page, slowest per repository against its budget">
@@ -107,17 +107,17 @@ large repository, pinned at `f90a2d27c2`. 4 of 5 metrics are within budget. Agai
 <style>.ok{fill:#5f8a6e}.over{fill:#b5654a}@media(prefers-color-scheme:dark){.ok{fill:#8fb89c}.over{fill:#d98b72}}</style>
 <text x="8" y="16" fill="currentColor" font-family="sans-serif" font-size="13" font-weight="600">Cold page, slowest (ms)</text>
 <text x="8" y="47" fill="currentColor" font-family="sans-serif" font-size="12">control</text>
-<rect class="ok" x="84" y="34" width="1.5" height="18" rx="2" fill="#5f8a6e"/>
+<rect class="ok" x="84" y="34" width="1.7" height="18" rx="2" fill="#5f8a6e"/>
 <line x1="136.8" y1="30" x2="136.8" y2="56" stroke="currentColor" stroke-width="1.5" stroke-dasharray="3 2"/>
-<text x="478" y="47" fill="currentColor" font-family="sans-serif" font-size="12">19 of 1500</text>
+<text x="478" y="47" fill="currentColor" font-family="sans-serif" font-size="12">47 of 1500</text>
 <text x="8" y="81" fill="currentColor" font-family="sans-serif" font-size="12">git</text>
-<rect class="ok" x="84" y="68" width="83.6" height="18" rx="2" fill="#5f8a6e"/>
+<rect class="ok" x="84" y="68" width="83.0" height="18" rx="2" fill="#5f8a6e"/>
 <line x1="189.6" y1="64" x2="189.6" y2="90" stroke="currentColor" stroke-width="1.5" stroke-dasharray="3 2"/>
-<text x="478" y="81" fill="currentColor" font-family="sans-serif" font-size="12">2376 of 3000</text>
+<text x="478" y="81" fill="currentColor" font-family="sans-serif" font-size="12">2359 of 3000</text>
 <text x="8" y="115" fill="currentColor" font-family="sans-serif" font-size="12">rust</text>
-<rect class="ok" x="84" y="102" width="231.0" height="18" rx="2" fill="#5f8a6e"/>
+<rect class="ok" x="84" y="102" width="137.9" height="18" rx="2" fill="#5f8a6e"/>
 <line x1="435.9" y1="98" x2="435.9" y2="124" stroke="currentColor" stroke-width="1.5" stroke-dasharray="3 2"/>
-<text x="478" y="115" fill="currentColor" font-family="sans-serif" font-size="12">6566 of 10000</text>
+<text x="478" y="115" fill="currentColor" font-family="sans-serif" font-size="12">3920 of 10000</text>
 <text x="84" y="148" fill="currentColor" font-family="sans-serif" font-size="11" opacity="0.7">dashed line: budget</text></svg>
 
 <svg xmlns="http://www.w3.org/2000/svg" role="img" viewBox="0 0 640 154" width="640" aria-label="Index build per repository against its budget">
@@ -129,13 +129,13 @@ large repository, pinned at `f90a2d27c2`. 4 of 5 metrics are within budget. Agai
 <line x1="88.4" y1="30" x2="88.4" y2="56" stroke="currentColor" stroke-width="1.5" stroke-dasharray="3 2"/>
 <text x="478" y="47" fill="currentColor" font-family="sans-serif" font-size="12">0.2 of 30</text>
 <text x="8" y="81" fill="currentColor" font-family="sans-serif" font-size="12">git</text>
-<rect class="ok" x="84" y="68" width="4.0" height="18" rx="2" fill="#5f8a6e"/>
+<rect class="ok" x="84" y="68" width="3.9" height="18" rx="2" fill="#5f8a6e"/>
 <line x1="128.0" y1="64" x2="128.0" y2="90" stroke="currentColor" stroke-width="1.5" stroke-dasharray="3 2"/>
-<text x="478" y="81" fill="currentColor" font-family="sans-serif" font-size="12">27.0 of 300</text>
+<text x="478" y="81" fill="currentColor" font-family="sans-serif" font-size="12">26.8 of 300</text>
 <text x="8" y="115" fill="currentColor" font-family="sans-serif" font-size="12">rust</text>
-<rect class="ok" x="84" y="102" width="40.6" height="18" rx="2" fill="#5f8a6e"/>
+<rect class="ok" x="84" y="102" width="40.1" height="18" rx="2" fill="#5f8a6e"/>
 <line x1="435.9" y1="98" x2="435.9" y2="124" stroke="currentColor" stroke-width="1.5" stroke-dasharray="3 2"/>
-<text x="478" y="115" fill="currentColor" font-family="sans-serif" font-size="12">276.7 of 2400</text>
+<text x="478" y="115" fill="currentColor" font-family="sans-serif" font-size="12">273.8 of 2400</text>
 <text x="84" y="148" fill="currentColor" font-family="sans-serif" font-size="11" opacity="0.7">dashed line: budget</text></svg>
 
 <svg xmlns="http://www.w3.org/2000/svg" role="img" viewBox="0 0 640 154" width="640" aria-label="Idle CPU with /events client per repository against its budget">
@@ -143,17 +143,17 @@ large repository, pinned at `f90a2d27c2`. 4 of 5 metrics are within budget. Agai
 <style>.ok{fill:#5f8a6e}.over{fill:#b5654a}@media(prefers-color-scheme:dark){.ok{fill:#8fb89c}.over{fill:#d98b72}}</style>
 <text x="8" y="16" fill="currentColor" font-family="sans-serif" font-size="13" font-weight="600">Idle CPU with /events client (%)</text>
 <text x="8" y="47" fill="currentColor" font-family="sans-serif" font-size="12">control</text>
-<rect class="ok" x="84" y="34" width="54.7" height="18" rx="2" fill="#5f8a6e"/>
-<line x1="158.6" y1="30" x2="158.6" y2="56" stroke="currentColor" stroke-width="1.5" stroke-dasharray="3 2"/>
-<text x="478" y="47" fill="currentColor" font-family="sans-serif" font-size="12">0.73 of 1</text>
+<rect class="ok" x="84" y="34" width="328.2" height="18" rx="2" fill="#5f8a6e"/>
+<line x1="435.9" y1="30" x2="435.9" y2="56" stroke="currentColor" stroke-width="1.5" stroke-dasharray="3 2"/>
+<text x="478" y="47" fill="currentColor" font-family="sans-serif" font-size="12">0.93 of 1</text>
 <text x="8" y="81" fill="currentColor" font-family="sans-serif" font-size="12">git</text>
-<rect class="ok" x="84" y="68" width="36.1" height="18" rx="2" fill="#5f8a6e"/>
-<line x1="158.6" y1="64" x2="158.6" y2="90" stroke="currentColor" stroke-width="1.5" stroke-dasharray="3 2"/>
-<text x="478" y="81" fill="currentColor" font-family="sans-serif" font-size="12">0.48 of 1</text>
+<rect class="ok" x="84" y="68" width="35.2" height="18" rx="2" fill="#5f8a6e"/>
+<line x1="435.9" y1="64" x2="435.9" y2="90" stroke="currentColor" stroke-width="1.5" stroke-dasharray="3 2"/>
+<text x="478" y="81" fill="currentColor" font-family="sans-serif" font-size="12">0.10 of 1</text>
 <text x="8" y="115" fill="currentColor" font-family="sans-serif" font-size="12">rust</text>
-<rect class="over" x="84" y="102" width="351.9" height="18" rx="2" fill="#b5654a"/>
-<line x1="158.6" y1="98" x2="158.6" y2="124" stroke="currentColor" stroke-width="1.5" stroke-dasharray="3 2"/>
-<text x="478" y="115" fill="currentColor" font-family="sans-serif" font-size="12">4.71 of 1 (over)</text>
+<rect class="ok" x="84" y="102" width="76.2" height="18" rx="2" fill="#5f8a6e"/>
+<line x1="435.9" y1="98" x2="435.9" y2="124" stroke="currentColor" stroke-width="1.5" stroke-dasharray="3 2"/>
+<text x="478" y="115" fill="currentColor" font-family="sans-serif" font-size="12">0.22 of 1</text>
 <text x="84" y="148" fill="currentColor" font-family="sans-serif" font-size="11" opacity="0.7">dashed line: budget</text></svg>
 
 <svg xmlns="http://www.w3.org/2000/svg" role="img" viewBox="0 0 640 154" width="640" aria-label="Peak memory (RSS) per repository against its budget">
@@ -161,17 +161,17 @@ large repository, pinned at `f90a2d27c2`. 4 of 5 metrics are within budget. Agai
 <style>.ok{fill:#5f8a6e}.over{fill:#b5654a}@media(prefers-color-scheme:dark){.ok{fill:#8fb89c}.over{fill:#d98b72}}</style>
 <text x="8" y="16" fill="currentColor" font-family="sans-serif" font-size="13" font-weight="600">Peak memory (RSS) (MB)</text>
 <text x="8" y="47" fill="currentColor" font-family="sans-serif" font-size="12">control</text>
-<rect class="ok" x="84" y="34" width="2.8" height="18" rx="2" fill="#5f8a6e"/>
+<rect class="ok" x="84" y="34" width="2.9" height="18" rx="2" fill="#5f8a6e"/>
 <line x1="113.3" y1="30" x2="113.3" y2="56" stroke="currentColor" stroke-width="1.5" stroke-dasharray="3 2"/>
-<text x="478" y="47" fill="currentColor" font-family="sans-serif" font-size="12">48 of 500</text>
+<text x="478" y="47" fill="currentColor" font-family="sans-serif" font-size="12">49 of 500</text>
 <text x="8" y="81" fill="currentColor" font-family="sans-serif" font-size="12">git</text>
-<rect class="ok" x="84" y="68" width="87.2" height="18" rx="2" fill="#5f8a6e"/>
+<rect class="over" x="84" y="68" width="88.5" height="18" rx="2" fill="#b5654a"/>
 <line x1="172.0" y1="64" x2="172.0" y2="90" stroke="currentColor" stroke-width="1.5" stroke-dasharray="3 2"/>
-<text x="478" y="81" fill="currentColor" font-family="sans-serif" font-size="12">1487 of 1500</text>
+<text x="478" y="81" fill="currentColor" font-family="sans-serif" font-size="12">1509 of 1500 (over)</text>
 <text x="8" y="115" fill="currentColor" font-family="sans-serif" font-size="12">rust</text>
-<rect class="ok" x="84" y="102" width="149.1" height="18" rx="2" fill="#5f8a6e"/>
+<rect class="ok" x="84" y="102" width="162.3" height="18" rx="2" fill="#5f8a6e"/>
 <line x1="435.9" y1="98" x2="435.9" y2="124" stroke="currentColor" stroke-width="1.5" stroke-dasharray="3 2"/>
-<text x="478" y="115" fill="currentColor" font-family="sans-serif" font-size="12">2543 of 6000</text>
+<text x="478" y="115" fill="currentColor" font-family="sans-serif" font-size="12">2768 of 6000</text>
 <text x="84" y="148" fill="currentColor" font-family="sans-serif" font-size="11" opacity="0.7">dashed line: budget</text></svg>
 
 <svg xmlns="http://www.w3.org/2000/svg" role="img" viewBox="0 0 640 120" width="640" aria-label="Export per repository against its budget">
@@ -179,13 +179,13 @@ large repository, pinned at `f90a2d27c2`. 4 of 5 metrics are within budget. Agai
 <style>.ok{fill:#5f8a6e}.over{fill:#b5654a}@media(prefers-color-scheme:dark){.ok{fill:#8fb89c}.over{fill:#d98b72}}</style>
 <text x="8" y="16" fill="currentColor" font-family="sans-serif" font-size="13" font-weight="600">Export (s)</text>
 <text x="8" y="47" fill="currentColor" font-family="sans-serif" font-size="12">control</text>
-<rect class="ok" x="84" y="34" width="2.3" height="18" rx="2" fill="#5f8a6e"/>
+<rect class="ok" x="84" y="34" width="2.6" height="18" rx="2" fill="#5f8a6e"/>
 <line x1="154.4" y1="30" x2="154.4" y2="56" stroke="currentColor" stroke-width="1.5" stroke-dasharray="3 2"/>
-<text x="478" y="47" fill="currentColor" font-family="sans-serif" font-size="12">1.9 of 60</text>
+<text x="478" y="47" fill="currentColor" font-family="sans-serif" font-size="12">2.2 of 60</text>
 <text x="8" y="81" fill="currentColor" font-family="sans-serif" font-size="12">git</text>
-<rect class="ok" x="84" y="68" width="7.6" height="18" rx="2" fill="#5f8a6e"/>
+<rect class="ok" x="84" y="68" width="6.6" height="18" rx="2" fill="#5f8a6e"/>
 <line x1="435.9" y1="64" x2="435.9" y2="90" stroke="currentColor" stroke-width="1.5" stroke-dasharray="3 2"/>
-<text x="478" y="81" fill="currentColor" font-family="sans-serif" font-size="12">6.5 of 300</text>
+<text x="478" y="81" fill="currentColor" font-family="sans-serif" font-size="12">5.6 of 300</text>
 <text x="84" y="114" fill="currentColor" font-family="sans-serif" font-size="11" opacity="0.7">dashed line: budget</text></svg>
 
 <details><summary>control: every page</summary>
@@ -194,35 +194,35 @@ Probes: `crates/gitterrace-web/static/vendor/mermaid.min.js` (largest text file)
 
 | Page | Cold | Warm TTFB | Warm full (median) | min | max | Bytes |
 | --- | --- | --- | --- | --- | --- | --- |
-| overview | 3 ms | 3 ms | 3 ms | 2 ms | 6 ms | 13062 |
-| tree-root | 3 ms | 2 ms | 2 ms | 2 ms | 2 ms | 12351 |
-| log | 3 ms | 2 ms | 2 ms | 2 ms | 12 ms | 31195 |
-| refs | 8 ms | 4 ms | 4 ms | 3 ms | 5 ms | 5915 |
-| commit-largest | 7 ms | 7 ms | 7 ms | 4 ms | 7 ms | 19427 |
-| diff-fragment | 5 ms | 9 ms | 9 ms | 8 ms | 13 ms | 13232 |
-| search | 19 ms | 8 ms | 9 ms | 6 ms | 20 ms | 372822 |
-| tree-deep | 2 ms | 2 ms | 2 ms | 2 ms | 3 ms | 5711 |
-| blob-largest | 1 ms | 1 ms | 1 ms | 1 ms | 1 ms | 5578 |
-| blame-long-history | 1 ms | 1 ms | 1 ms | 1 ms | 1 ms | 5352 |
-| stats-overview | 1 ms | 1 ms | 1 ms | 1 ms | 1 ms | 24051 |
-| stats/files | 0 ms | 0 ms | 0 ms | 0 ms | 0 ms | 23080 |
-| stats/types | 0 ms | 0 ms | 0 ms | 0 ms | 0 ms | 34505 |
-| stats/languages | 2 ms | 2 ms | 2 ms | 2 ms | 2 ms | 164285 |
-| stats/frequency | 0 ms | 0 ms | 0 ms | 0 ms | 0 ms | 9632 |
-| stats/pulse | 0 ms | 0 ms | 0 ms | 0 ms | 0 ms | 13394 |
-| stats/hotspots | 0 ms | 0 ms | 0 ms | 0 ms | 0 ms | 67112 |
-| stats/ownership | 1 ms | 0 ms | 0 ms | 0 ms | 1 ms | 11509 |
-| stats/patterns | 0 ms | 0 ms | 0 ms | 0 ms | 0 ms | 17937 |
-| stats/contributors | 0 ms | 0 ms | 0 ms | 0 ms | 0 ms | 7057 |
+| overview | 3 ms | 3 ms | 3 ms | 2 ms | 5 ms | 14322 |
+| tree-root | 3 ms | 5 ms | 5 ms | 3 ms | 7 ms | 13596 |
+| log | 7 ms | 3 ms | 3 ms | 3 ms | 4 ms | 31702 |
+| refs | 1 ms | 4 ms | 4 ms | 1 ms | 5 ms | 5972 |
+| commit-largest | 47 ms | 13 ms | 13 ms | 12 ms | 16 ms | 117706 |
+| diff-fragment | 6 ms | 6 ms | 6 ms | 6 ms | 6 ms | 45538 |
+| search | 7 ms | 5 ms | 5 ms | 5 ms | 6 ms | 384272 |
+| tree-deep | 2 ms | 2 ms | 2 ms | 2 ms | 2 ms | 5710 |
+| blob-largest | 1 ms | 1 ms | 1 ms | 1 ms | 1 ms | 5577 |
+| blame-long-history | 1 ms | 1 ms | 1 ms | 1 ms | 2 ms | 5351 |
+| stats-overview | 1 ms | 1 ms | 1 ms | 1 ms | 1 ms | 24175 |
+| stats/files | 1 ms | 0 ms | 0 ms | 0 ms | 1 ms | 23121 |
+| stats/types | 0 ms | 0 ms | 0 ms | 0 ms | 1 ms | 34878 |
+| stats/languages | 2 ms | 2 ms | 2 ms | 2 ms | 2 ms | 169535 |
+| stats/frequency | 1 ms | 0 ms | 0 ms | 0 ms | 1 ms | 9631 |
+| stats/pulse | 0 ms | 0 ms | 0 ms | 0 ms | 1 ms | 13516 |
+| stats/hotspots | 0 ms | 0 ms | 0 ms | 0 ms | 0 ms | 68969 |
+| stats/ownership | 0 ms | 0 ms | 0 ms | 0 ms | 0 ms | 11730 |
+| stats/patterns | 0 ms | 0 ms | 0 ms | 0 ms | 0 ms | 17981 |
+| stats/contributors | 0 ms | 0 ms | 0 ms | 0 ms | 1 ms | 7056 |
 
 | Budget | Value | Limit | Status |
 | --- | --- | --- | --- |
-| page_warm_ms | 9.0 | 300 | pass |
-| page_cold_ms | 19.2 | 1500 | pass |
+| page_warm_ms | 12.6 | 300 | pass |
+| page_cold_ms | 47.4 | 1500 | pass |
 | index_secs | 0.2 | 30 | pass |
-| idle_cpu_pct | 0.7 | 1 | pass |
-| rss_mb | 48.4 | 500 | pass |
-| export_secs | 1.9 | 60 | pass |
+| idle_cpu_pct | 0.9 | 1 | pass |
+| rss_mb | 48.7 | 500 | pass |
+| export_secs | 2.2 | 60 | pass |
 
 </details>
 
@@ -232,35 +232,35 @@ Probes: `po/bg.po` (largest text file), commit `50fe5cc63f`.
 
 | Page | Cold | Warm TTFB | Warm full (median) | min | max | Bytes |
 | --- | --- | --- | --- | --- | --- | --- |
-| overview | 71 ms | 16 ms | 16 ms | 14 ms | 16 ms | 110386 |
-| tree-root | 4 ms | 3 ms | 3 ms | 3 ms | 3 ms | 109704 |
-| log | 2 ms | 2 ms | 2 ms | 2 ms | 2 ms | 31431 |
-| refs | 2 ms | 1 ms | 1 ms | 1 ms | 2 ms | 5857 |
-| commit-largest | 5 ms | 3 ms | 3 ms | 3 ms | 4 ms | 9375 |
-| diff-fragment | 3 ms | 3 ms | 3 ms | 3 ms | 3 ms | 3461 |
-| search | 16 ms | 13 ms | 13 ms | 13 ms | 14 ms | 378799 |
-| tree-deep | 3 ms | 2 ms | 2 ms | 2 ms | 2 ms | 5664 |
-| blob-largest | 9 ms | 9 ms | 10 ms | 9 ms | 10 ms | 1464847 |
-| blame-long-history | 2.38 s | 27 ms | 30 ms | 29 ms | 31 ms | 7241823 |
-| stats-overview | 15 ms | 15 ms | 15 ms | 15 ms | 16 ms | 37019 |
-| stats/files | 1 ms | 0 ms | 0 ms | 0 ms | 1 ms | 21838 |
-| stats/types | 0 ms | 0 ms | 0 ms | 0 ms | 0 ms | 46874 |
-| stats/languages | 3 ms | 3 ms | 3 ms | 3 ms | 3 ms | 383969 |
-| stats/frequency | 1 ms | 0 ms | 0 ms | 0 ms | 0 ms | 18995 |
-| stats/pulse | 0 ms | 0 ms | 0 ms | 0 ms | 0 ms | 13528 |
-| stats/hotspots | 0 ms | 0 ms | 0 ms | 0 ms | 0 ms | 88521 |
-| stats/ownership | 1 ms | 0 ms | 0 ms | 0 ms | 0 ms | 19073 |
-| stats/patterns | 0 ms | 0 ms | 0 ms | 0 ms | 0 ms | 19548 |
-| stats/contributors | 1 ms | 1 ms | 1 ms | 1 ms | 1 ms | 1735941 |
+| overview | 27 ms | 15 ms | 15 ms | 14 ms | 17 ms | 110393 |
+| tree-root | 3 ms | 3 ms | 3 ms | 3 ms | 3 ms | 109711 |
+| log | 2 ms | 2 ms | 2 ms | 2 ms | 2 ms | 32088 |
+| refs | 1 ms | 1 ms | 1 ms | 1 ms | 1 ms | 5907 |
+| commit-largest | 5 ms | 3 ms | 3 ms | 3 ms | 3 ms | 9382 |
+| diff-fragment | 3 ms | 3 ms | 3 ms | 2 ms | 3 ms | 3461 |
+| search | 12 ms | 11 ms | 11 ms | 11 ms | 11 ms | 366753 |
+| tree-deep | 2 ms | 2 ms | 2 ms | 2 ms | 2 ms | 5671 |
+| blob-largest | 10 ms | 9 ms | 9 ms | 9 ms | 10 ms | 1464854 |
+| blame-long-history | 2.36 s | 26 ms | 29 ms | 29 ms | 30 ms | 7241830 |
+| stats-overview | 17 ms | 15 ms | 15 ms | 15 ms | 17 ms | 37026 |
+| stats/files | 1 ms | 0 ms | 0 ms | 0 ms | 0 ms | 21845 |
+| stats/types | 0 ms | 0 ms | 0 ms | 0 ms | 0 ms | 47141 |
+| stats/languages | 3 ms | 3 ms | 3 ms | 3 ms | 3 ms | 359971 |
+| stats/frequency | 0 ms | 0 ms | 0 ms | 0 ms | 1 ms | 19002 |
+| stats/pulse | 0 ms | 0 ms | 0 ms | 0 ms | 0 ms | 13535 |
+| stats/hotspots | 0 ms | 0 ms | 0 ms | 0 ms | 0 ms | 88528 |
+| stats/ownership | 0 ms | 0 ms | 0 ms | 0 ms | 0 ms | 19080 |
+| stats/patterns | 0 ms | 0 ms | 0 ms | 0 ms | 0 ms | 19555 |
+| stats/contributors | 1 ms | 0 ms | 1 ms | 1 ms | 1 ms | 1735948 |
 
 | Budget | Value | Limit | Status |
 | --- | --- | --- | --- |
-| page_warm_ms | 29.8 | 300 | pass |
-| page_cold_ms | 2376.2 | 3000 | pass |
-| index_secs | 27.0 | 300 | pass |
-| idle_cpu_pct | 0.5 | 1 | pass |
-| rss_mb | 1487.2 | 1500 | pass |
-| export_secs | 6.5 | 300 | pass |
+| page_warm_ms | 29.3 | 300 | pass |
+| page_cold_ms | 2358.9 | 3000 | pass |
+| index_secs | 26.8 | 300 | pass |
+| idle_cpu_pct | 0.1 | 1 | pass |
+| rss_mb | 1509.3 | 1500 | over |
+| export_secs | 5.6 | 300 | pass |
 
 </details>
 
@@ -270,34 +270,34 @@ Probes: `src/doc/rustc-dev-guide/src/queries/example-0.html` (largest text file)
 
 | Page | Cold | Warm TTFB | Warm full (median) | min | max | Bytes |
 | --- | --- | --- | --- | --- | --- | --- |
-| overview | 1.43 s | 163 ms | 163 ms | 158 ms | 169 ms | 17215 |
-| tree-root | 3 ms | 3 ms | 3 ms | 3 ms | 3 ms | 16497 |
-| log | 3 ms | 3 ms | 3 ms | 2 ms | 3 ms | 31008 |
-| refs | 2 ms | 1 ms | 1 ms | 1 ms | 1 ms | 5890 |
-| commit-largest | 47 ms | 36 ms | 36 ms | 36 ms | 38 ms | 70705 |
-| diff-fragment | 29 ms | 29 ms | 29 ms | 29 ms | 29 ms | 12805 |
-| search | 55 ms | 56 ms | 56 ms | 55 ms | 61 ms | 387019 |
-| tree-deep | 6 ms | 5 ms | 5 ms | 4 ms | 6 ms | 6529 |
-| blob-largest | 2 ms | 1 ms | 1 ms | 1 ms | 2 ms | 5604 |
-| blame-long-history | 2 ms | 2 ms | 2 ms | 2 ms | 3 ms | 5378 |
-| stats-overview | 80 ms | 78 ms | 78 ms | 78 ms | 127 ms | 36672 |
-| stats/files | 6.57 s | 0 ms | 0 ms | 0 ms | 1 ms | 24347 |
-| stats/types | 6.29 s | 0 ms | 0 ms | 0 ms | 1 ms | 44685 |
-| stats/languages | 3 ms | 3 ms | 3 ms | 3 ms | 3 ms | 418627 |
-| stats/frequency | 0 ms | 0 ms | 0 ms | 0 ms | 0 ms | 16852 |
-| stats/pulse | 0 ms | 0 ms | 0 ms | 0 ms | 0 ms | 13467 |
-| stats/hotspots | 1.26 s | 0 ms | 0 ms | 0 ms | 1 ms | 111420 |
-| stats/ownership | 512 ms | 0 ms | 0 ms | 0 ms | 1 ms | 19448 |
-| stats/patterns | 1.39 s | 0 ms | 0 ms | 0 ms | 48 ms | 21283 |
-| stats/contributors | 2 ms | 1 ms | 2 ms | 2 ms | 2 ms | 5240986 |
+| overview | 1.53 s | 182 ms | 182 ms | 174 ms | 187 ms | 17222 |
+| tree-root | 2 ms | 2 ms | 2 ms | 2 ms | 2 ms | 16504 |
+| log | 2 ms | 2 ms | 2 ms | 2 ms | 3 ms | 31656 |
+| refs | 1 ms | 1 ms | 1 ms | 1 ms | 2 ms | 5940 |
+| commit-largest | 45 ms | 37 ms | 37 ms | 36 ms | 38 ms | 70712 |
+| diff-fragment | 30 ms | 30 ms | 30 ms | 29 ms | 30 ms | 12805 |
+| search | 55 ms | 54 ms | 54 ms | 52 ms | 80 ms | 387025 |
+| tree-deep | 3 ms | 3 ms | 3 ms | 3 ms | 5 ms | 6536 |
+| blob-largest | 3 ms | 1 ms | 1 ms | 1 ms | 1 ms | 5611 |
+| blame-long-history | 2 ms | 2 ms | 2 ms | 2 ms | 2 ms | 5385 |
+| stats-overview | 82 ms | 81 ms | 81 ms | 80 ms | 91 ms | 36679 |
+| stats/files | 1 ms | 0 ms | 0 ms | 0 ms | 1 ms | 24354 |
+| stats/types | 0 ms | 1 ms | 1 ms | 1 ms | 1 ms | 44952 |
+| stats/languages | 3.92 s | 5 ms | 5 ms | 5 ms | 6 ms | 380774 |
+| stats/frequency | 698 ms | 1 ms | 1 ms | 1 ms | 1 ms | 16859 |
+| stats/pulse | 164 ms | 0 ms | 0 ms | 0 ms | 1 ms | 13474 |
+| stats/hotspots | 1.30 s | 1 ms | 1 ms | 0 ms | 2 ms | 111427 |
+| stats/ownership | 529 ms | 1 ms | 1 ms | 0 ms | 1 ms | 19455 |
+| stats/patterns | 1.03 s | 2 ms | 2 ms | 1 ms | 2 ms | 21290 |
+| stats/contributors | 3 ms | 1 ms | 3 ms | 2 ms | 3 ms | 5240993 |
 
 | Budget | Value | Limit | Status |
 | --- | --- | --- | --- |
-| page_warm_ms | 163.0 | 300 | pass |
-| page_cold_ms | 6566.3 | 10000 | pass |
-| index_secs | 276.7 | 2400 | pass |
-| idle_cpu_pct | 4.7 | 1 | over |
-| rss_mb | 2543.1 | 6000 | pass |
+| page_warm_ms | 181.5 | 300 | pass |
+| page_cold_ms | 3919.6 | 10000 | pass |
+| index_secs | 273.8 | 2400 | pass |
+| idle_cpu_pct | 0.2 | 1 | pass |
+| rss_mb | 2768.0 | 6000 | pass |
 
 </details>
 

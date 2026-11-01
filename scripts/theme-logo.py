@@ -41,7 +41,8 @@ def contrast(a: str, b: str) -> float:
 
 def build(header: str) -> dict[str, str]:
     mark = MARK_GROUP.search(header)
-    paths = PATHS.findall(header)
+    # The mark draws paths of its own (the tread), so count the text outside the group.
+    paths = PATHS.findall(MARK_GROUP.sub("", header))
     if not mark or len(paths) != 3:
         raise SystemExit("header layout changed: expected the mark group and 3 text paths")
     git, terrace = (re.search(r'fill="(#[0-9a-f]{6})"', p).group(1) for p in paths[:2])
