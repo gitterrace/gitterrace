@@ -2,7 +2,7 @@
 
 A copy of the schwarzwald theme, written by its `sync.py`. Do not edit these files here.
 
-- From: schwarzwald, synced 2026-11-01T11:05:14Z
+- From: schwarzwald, synced 2026-11-01T11:50:47Z
 - Parts: fonts, rust, tokens
 - Change a colour or token: edit `source/` in schwarzwald, run `python3 build.py`, then
   `python3 sync.py <this repository>` there and commit the result here.
