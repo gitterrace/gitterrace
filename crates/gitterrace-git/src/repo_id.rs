@@ -90,26 +90,9 @@ impl AsRef<Repo> for Repo {
 
 #[cfg(test)]
 mod tests {
-    use std::path::Path;
-    use std::process::Command;
+    use gitterrace_testkit::git_at;
 
     use crate::{Repo, resolve_permalink};
-
-    fn git(dir: &Path, date: &str, args: &[&str]) -> String {
-        let out = Command::new("git")
-            .args(args)
-            .current_dir(dir)
-            .env("GIT_AUTHOR_DATE", date)
-            .env("GIT_COMMITTER_DATE", date)
-            .output()
-            .expect("run git");
-        assert!(
-            out.status.success(),
-            "{}",
-            String::from_utf8_lossy(&out.stderr)
-        );
-        String::from_utf8_lossy(&out.stdout).trim().to_string()
-    }
 
     /// Two histories merged: `old` root (2020) on a side branch, `new` root (2024) on main.
     fn two_roots() -> (tempfile::TempDir, String, String) {
@@ -117,22 +100,22 @@ mod tests {
         let d = tmp.path();
         let t24 = "2024-01-01T00:00:00+00:00";
         let t20 = "2020-01-01T00:00:00+00:00";
-        git(d, t24, &["init", "-q", "-b", "main"]);
-        git(d, t24, &["config", "user.name", "T"]);
-        git(d, t24, &["config", "user.email", "t@example.com"]);
+        git_at(d, t24, &["init", "-q", "-b", "main"]);
+        git_at(d, t24, &["config", "user.name", "T"]);
+        git_at(d, t24, &["config", "user.email", "t@example.com"]);
         std::fs::write(d.join("a.txt"), "a\n").expect("write");
-        git(d, t24, &["add", "-A"]);
-        git(d, t24, &["commit", "-q", "-m", "new root"]);
-        let new = git(d, t24, &["rev-parse", "HEAD"]);
-        git(d, t20, &["checkout", "-q", "--orphan", "side"]);
-        git(d, t20, &["rm", "-q", "-rf", "."]);
+        git_at(d, t24, &["add", "-A"]);
+        git_at(d, t24, &["commit", "-q", "-m", "new root"]);
+        let new = git_at(d, t24, &["rev-parse", "HEAD"]);
+        git_at(d, t20, &["checkout", "-q", "--orphan", "side"]);
+        git_at(d, t20, &["rm", "-q", "-rf", "."]);
         std::fs::create_dir(d.join("lib")).expect("mkdir");
         std::fs::write(d.join("lib/b.txt"), "b\n").expect("write");
-        git(d, t20, &["add", "-A"]);
-        git(d, t20, &["commit", "-q", "-m", "old root"]);
-        let old = git(d, t20, &["rev-parse", "HEAD"]);
-        git(d, t24, &["checkout", "-q", "main"]);
-        git(
+        git_at(d, t20, &["add", "-A"]);
+        git_at(d, t20, &["commit", "-q", "-m", "old root"]);
+        let old = git_at(d, t20, &["rev-parse", "HEAD"]);
+        git_at(d, t24, &["checkout", "-q", "main"]);
+        git_at(
             d,
             t24,
             &[
@@ -156,7 +139,7 @@ mod tests {
 
         let clone = tempfile::tempdir().expect("tempdir");
         let dst = clone.path().join("renamed");
-        git(
+        git_at(
             clone.path(),
             "2024-01-01T00:00:00+00:00",
             &[
@@ -172,7 +155,7 @@ mod tests {
     #[test]
     fn empty_repo_has_no_id() {
         let tmp = tempfile::tempdir().expect("tempdir");
-        git(tmp.path(), "2024-01-01T00:00:00+00:00", &["init", "-q"]);
+        git_at(tmp.path(), "2024-01-01T00:00:00+00:00", &["init", "-q"]);
         assert_eq!(Repo::discover(tmp.path()).expect("open").id(), None);
     }
 
@@ -180,13 +163,13 @@ mod tests {
     fn resolver_matches_id_sha_and_path() {
         let (tmp, _, old) = two_roots();
         let other = tempfile::tempdir().expect("tempdir");
-        git(other.path(), "2024-01-01T00:00:00+00:00", &["init", "-q"]);
+        git_at(other.path(), "2024-01-01T00:00:00+00:00", &["init", "-q"]);
         let repos = vec![
             Repo::discover(other.path()).expect("open"),
             Repo::discover(tmp.path()).expect("open"),
         ];
         let id = repos[1].id().expect("id");
-        let head = git(
+        let head = git_at(
             tmp.path(),
             "2024-01-01T00:00:00+00:00",
             &["rev-parse", "HEAD"],

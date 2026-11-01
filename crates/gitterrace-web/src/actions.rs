@@ -556,6 +556,7 @@ command = "cat >/dev/null; sleep 2"
 #[cfg(test)]
 #[allow(clippy::expect_used, clippy::too_many_lines)]
 mod tests {
+    use gitterrace_testkit::git;
     use std::path::{Path, PathBuf};
     use std::process::Command;
 
@@ -568,20 +569,6 @@ mod tests {
 
     /// Repo content aimed at the page and the shell: every field the menu touches.
     const XSS: &str = "<script>alert(1)</script>\"><img src=x onerror=alert(2)>";
-
-    fn git(dir: &Path, args: &[&str]) -> String {
-        let out = Command::new("git")
-            .args(args)
-            .current_dir(dir)
-            .output()
-            .expect("git");
-        assert!(
-            out.status.success(),
-            "{}",
-            String::from_utf8_lossy(&out.stderr)
-        );
-        String::from_utf8_lossy(&out.stdout).trim().to_owned()
-    }
 
     /// A repo whose subject, author, branch, path and content carry HTML and shell payloads,
     /// and which ships its own actions.toml (which must never load).
@@ -626,7 +613,7 @@ mod tests {
             .clone()
             .oneshot(
                 Request::get(uri)
-                    .header("host", "localhost:4242")
+                    .header("host", gitterrace_testkit::on_port("localhost"))
                     .body(Body::empty())
                     .expect("req"),
             )
@@ -648,8 +635,8 @@ mod tests {
     struct Req<'a> {
         token: Option<&'a str>,
         site: Option<&'a str>,
-        host: &'a str,
-        origin: Option<&'a str>,
+        host: String,
+        origin: Option<String>,
         ctype: &'a str,
         body: String,
     }
@@ -659,8 +646,11 @@ mod tests {
             Self {
                 token: Some(token),
                 site: Some("same-origin"),
-                host: "localhost:4242",
-                origin: Some("http://localhost:4242"),
+                host: gitterrace_testkit::on_port("localhost"),
+                origin: Some(format!(
+                    "http://{}",
+                    gitterrace_testkit::on_port("localhost")
+                )),
                 ctype: "application/json",
                 body,
             }
@@ -727,16 +717,9 @@ mod tests {
         for ip in ["0.0.0.0", "192.168.1.5"] {
             let lan = router(&repo, Some(cfg.path()), Some(ip.parse().expect("ip")));
             let mut q = Req::ok("x", body("echo", "page", ""));
-            q.host = if ip == "0.0.0.0" {
-                "127.0.0.1:4242"
-            } else {
-                "192.168.1.5:4242"
-            };
-            q.origin = Some(if ip == "0.0.0.0" {
-                "http://127.0.0.1:4242"
-            } else {
-                "http://192.168.1.5:4242"
-            });
+            let host = if ip == "0.0.0.0" { "127.0.0.1" } else { ip };
+            q.host = gitterrace_testkit::on_port(host);
+            q.origin = Some(format!("http://{}", q.host));
             assert_eq!(send(&lan, q).await.0, 404, "bound to {ip}");
         }
 
@@ -765,13 +748,13 @@ mod tests {
         }
         // 9. DNS rebinding.
         let mut q = ok();
-        q.host = "evil.example";
-        q.origin = Some("http://evil.example");
+        q.host = "evil.example".to_owned();
+        q.origin = Some("http://evil.example".to_owned());
         assert_eq!(send(&on, q).await.0, 403, "foreign host");
         // 10. another localhost origin, and no origin at all.
         for origin in [Some("http://localhost:5173"), Some("null"), None] {
             let mut q = ok();
-            q.origin = origin;
+            q.origin = origin.map(str::to_owned);
             assert_eq!(send(&on, q).await.0, 403, "origin {origin:?}");
         }
         // 11. not JSON.

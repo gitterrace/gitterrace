@@ -379,6 +379,7 @@ async fn repos_json(State(table): State<Arc<Table>>) -> Response {
 #[cfg(test)]
 mod tests {
     use super::valid_name;
+    use gitterrace_testkit::git;
 
     #[test]
     fn names() {
@@ -388,16 +389,6 @@ mod tests {
         for bad in ["", ".", "..", ".hidden", "a/b", "a b", "a%2e"] {
             assert!(!valid_name(bad), "{bad}");
         }
-    }
-
-    fn git(dir: &std::path::Path, args: &[&str]) {
-        let ok = std::process::Command::new("git")
-            .args(["-c", "user.name=T", "-c", "user.email=t@e.x"])
-            .args(args)
-            .current_dir(dir)
-            .status()
-            .is_ok_and(|s| s.success());
-        assert!(ok, "git {args:?}");
     }
 
     #[test]

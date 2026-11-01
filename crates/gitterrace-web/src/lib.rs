@@ -279,7 +279,8 @@ pub async fn serve(
 #[cfg(test)]
 #[allow(clippy::expect_used)]
 mod tests {
-    use std::{process::Command, sync::Arc};
+    use gitterrace_testkit::{Fixture, git};
+    use std::sync::Arc;
 
     use axum::{body::Body, http::Request};
     use http_body_util::BodyExt;
@@ -288,24 +289,8 @@ mod tests {
     use crate::actions::actions_tests;
     use crate::{app::App, routes};
 
-    fn git(dir: &std::path::Path, args: &[&str]) {
-        let ok = Command::new("git")
-            .args(["-c", "user.name=T", "-c", "user.email=t@e.x"])
-            .args(args)
-            .current_dir(dir)
-            .status()
-            .is_ok_and(|s| s.success());
-        assert!(ok, "git {args:?}");
-    }
-
     async fn get(app: &Arc<App>, uri: &str) -> (u16, String) {
-        let res = routes::router(Arc::clone(app))
-            .oneshot(Request::get(uri).body(Body::empty()).expect("request"))
-            .await
-            .expect("response");
-        let status = res.status().as_u16();
-        let bytes = res.into_body().collect().await.expect("body").to_bytes();
-        (status, String::from_utf8_lossy(&bytes).into_owned())
+        gitterrace_testkit::get(&routes::router(Arc::clone(app)), uri).await
     }
 
     #[tokio::test]
@@ -668,11 +653,12 @@ mod tests {
         git(p, &["add", "."]);
         git(p, &["commit", "-q", "-m", "init"]);
         let router = crate::app_router(p).expect("router");
+        let evil = gitterrace_testkit::on_port("evil.example");
         for (host, want) in [
-            (Some("evil.example:4242"), 403),
+            (Some(evil.as_str()), 403),
             (None, 403),
             (Some("localhost"), 200),
-            (Some("127.0.0.1:4242"), 200),
+            (Some(gitterrace_testkit::DEFAULT_ADDR), 200),
         ] {
             let mut b = Request::get("/api/v1/repo");
             if let Some(h) = host {
@@ -718,16 +704,7 @@ mod tests {
     }
 
     fn fixture(name: &str, root: &std::path::Path) -> std::path::PathBuf {
-        let p = root.join(name);
-        std::fs::create_dir_all(p.join("src")).expect("dir");
-        git(&p, &["init", "-q", "-b", "main"]);
-        std::fs::write(p.join("README.md"), "# Hi\n\n[a](src/a.rs) ![i](img.png)\n").expect("w");
-        std::fs::write(p.join("src/a.rs"), "fn main() {}\n").expect("w");
-        git(&p, &["add", "."]);
-        git(&p, &["commit", "-q", "-m", "feat(core): first"]);
-        std::fs::write(p.join("src/a.rs"), "fn main() {\n}\n").expect("w");
-        git(&p, &["commit", "-qam", "fix: second"]);
-        p
+        Fixture::standard(&root.join(name)).path().to_owned()
     }
 
     async fn fetch(router: &axum::Router, uri: &str, host: &str) -> (u16, String) {
@@ -861,12 +838,22 @@ mod tests {
             "/r/beta/api/files/HEAD",
             "/r/nope/",
         ] {
-            assert_eq!(fetch(&router, u, "evil.example:4242").await.0, 403, "{u}");
+            assert_eq!(
+                fetch(&router, u, &gitterrace_testkit::on_port("evil.example"))
+                    .await
+                    .0,
+                403,
+                "{u}"
+            );
         }
         assert_eq!(
-            fetch(&router, "/r/alpha/api/v1/repo", "127.0.0.1:4242")
-                .await
-                .0,
+            fetch(
+                &router,
+                "/r/alpha/api/v1/repo",
+                gitterrace_testkit::DEFAULT_ADDR
+            )
+            .await
+            .0,
             200
         );
     }
@@ -896,26 +883,16 @@ mod tests {
     }
 
     fn rev_fixture(root: &std::path::Path) -> std::path::PathBuf {
-        let p = fixture("solo", root);
-        git(&p, &["checkout", "-qb", "side"]);
-        std::fs::write(p.join("side.txt"), "s\n").expect("w");
-        git(&p, &["add", "."]);
-        git(&p, &["commit", "-q", "-m", "feat: only on side"]);
-        git(&p, &["checkout", "-q", "main"]);
-        git(&p, &["tag", "-a", "v1", "-m", "Release one\n\nnotes here"]);
-        git(
-            &p,
-            &[
-                "worktree",
-                "add",
-                "-q",
-                root.join("wt").to_str().expect("utf8"),
-                "side",
-            ],
-        );
-        std::fs::write(p.join("README.md"), "dirty\n").expect("w");
-        git(&p, &["stash", "push", "-q", "-m", "wip stash"]);
-        p
+        let f = Fixture::standard(&root.join("solo"))
+            .branch("side")
+            .write("side.txt", "s\n")
+            .commit("feat: only on side")
+            .checkout("main")
+            .tag("v1", "Release one\n\nnotes here")
+            .worktree(&root.join("wt"), "side")
+            .write("README.md", "dirty\n")
+            .stash("wip stash");
+        f.path().to_owned()
     }
 
     fn ready_app(p: &std::path::Path) -> Arc<App> {

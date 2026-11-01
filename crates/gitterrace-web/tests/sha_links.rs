@@ -2,32 +2,8 @@
 //! repository and checks that no 7-to-40 hex token in visible text sits outside one.
 #![allow(clippy::expect_used)]
 
-use std::{path::Path, process::Command, time::Duration};
-
-use axum::{Router, body::Body, http::Request};
-use http_body_util::BodyExt;
-use tower::ServiceExt;
-
-fn git(dir: &Path, args: &[&str]) {
-    let ok = Command::new("git")
-        .args(["-c", "user.name=T", "-c", "user.email=t@e.x"])
-        .args(args)
-        .current_dir(dir)
-        .status()
-        .is_ok_and(|s| s.success());
-    assert!(ok, "git {args:?}");
-}
-
-async fn get(router: &Router, uri: &str) -> (u16, String) {
-    let req = Request::get(uri)
-        .header("host", "localhost")
-        .body(Body::empty())
-        .expect("request");
-    let res = router.clone().oneshot(req).await.expect("response");
-    let status = res.status().as_u16();
-    let bytes = res.into_body().collect().await.expect("body").to_bytes();
-    (status, String::from_utf8_lossy(&bytes).into_owned())
-}
+use gitterrace_testkit::{get, git};
+use std::time::Duration;
 
 /// Hex runs of 7 to 40 digits in visible text (outside tags, scripts, styles and `a.sha`),
 /// bounded by non-word characters and holding both a digit and a letter, so counts and plain
@@ -135,17 +111,7 @@ async fn every_commit_id_is_a_sha_link() {
     git(&p, &["checkout", "-q", "--detach"]);
 
     let router = gitterrace_web::app_router(&p).expect("router");
-    let head = String::from_utf8(
-        Command::new("git")
-            .args(["rev-parse", "HEAD"])
-            .current_dir(&p)
-            .output()
-            .expect("rev-parse")
-            .stdout,
-    )
-    .expect("utf8")
-    .trim()
-    .to_owned();
+    let head = git(&p, &["rev-parse", "HEAD"]);
 
     // The index builds in the background: wait until commit search has rows.
     for _ in 0..100 {

@@ -261,7 +261,10 @@ mod tests {
         };
         for s in [
             format!("gitterrace://{ID}/{SHA}/src/a%20b.rs#L3-L7"),
-            format!("http://127.0.0.1:4242/go/{ID}/{SHA}/src/a%20b.rs#L3-L7"),
+            format!(
+                "{}/go/{ID}/{SHA}/src/a%20b.rs#L3-L7",
+                gitterrace_testkit::base_url()
+            ),
             format!("https://example.org/go/{ID}/{SHA}/src/a%20b.rs#L3-L7"),
             format!("/go/{ID}/{SHA}/src/a%20b.rs#L3-L7"),
         ] {

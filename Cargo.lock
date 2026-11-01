@@ -890,6 +890,7 @@ dependencies = [
  "gitterrace-config",
  "gitterrace-git",
  "gitterrace-index",
+ "gitterrace-testkit",
  "gitterrace-web",
  "serde_json",
  "tempfile",
@@ -907,6 +908,7 @@ dependencies = [
  "getrandom",
  "gitterrace-config",
  "gitterrace-git",
+ "gitterrace-testkit",
  "rustix",
  "serde",
  "serde_json",
@@ -924,6 +926,7 @@ dependencies = [
  "gitterrace-actions",
  "gitterrace-git",
  "gitterrace-index",
+ "gitterrace-testkit",
  "http-body-util",
  "rmcp",
  "schemars",
@@ -957,6 +960,7 @@ dependencies = [
 name = "gitterrace-git"
 version = "0.1.0"
 dependencies = [
+ "gitterrace-testkit",
  "gix",
  "tempfile",
  "thiserror",
@@ -975,6 +979,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "gitterrace-testkit"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "gitterrace-config",
+ "http-body-util",
+ "tower",
+]
+
+[[package]]
 name = "gitterrace-web"
 version = "0.1.0"
 dependencies = [
@@ -988,6 +1002,7 @@ dependencies = [
  "gitterrace-config",
  "gitterrace-git",
  "gitterrace-index",
+ "gitterrace-testkit",
  "http-body-util",
  "libc",
  "pulldown-cmark",

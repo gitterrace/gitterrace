@@ -46,4 +46,5 @@ name = "gitterrace"
 path = "src/main.rs"
 
 [dev-dependencies]
+gitterrace-testkit.workspace = true
 tempfile.workspace = true

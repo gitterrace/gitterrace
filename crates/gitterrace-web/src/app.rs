@@ -391,8 +391,7 @@ impl App {
         let ignore = gitterrace_git::IgnoreSet::at(&self.repo, head).ok();
         let ins =
             gitterrace_index::Insights::new(records, gitterrace_index::Options::default(), ignore);
-        let subjects = self.subjects(head);
-        let c = Arc::new(crate::languages::Chain::build(records, &ins, &subjects));
+        let c = Arc::new(crate::languages::Chain::build(records, &ins));
         if let Ok(mut g) = self.chain.lock() {
             *g = Some((head.to_owned(), Arc::clone(&c)));
         }
@@ -763,19 +762,9 @@ where
 #[cfg(test)]
 #[allow(clippy::expect_used)]
 mod tests {
-    use std::process::Command;
+    use gitterrace_testkit::git;
 
     use super::App;
-
-    fn git(dir: &std::path::Path, args: &[&str]) {
-        let ok = Command::new("git")
-            .args(["-c", "user.name=T", "-c", "user.email=t@e.x"])
-            .args(args)
-            .current_dir(dir)
-            .status()
-            .is_ok_and(|s| s.success());
-        assert!(ok, "git {args:?}");
-    }
 
     #[test]
     fn junk_and_order_do_not_make_new_memo_keys() {

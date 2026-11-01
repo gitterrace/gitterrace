@@ -20,7 +20,7 @@ const FONTS: [(&str, &str); 3] = [
     ),
     ("jetbrains-mono", "jetbrains-mono-latin-wght-normal.woff2"),
 ];
-const BRAND: [&str; 4] = ["logo-light", "logo-dark", "mark-light", "mark-dark"];
+const BRAND: [&str; 5] = ["logo-light", "logo-dark", "mark-light", "mark-dark", "mark"];
 const TOKENS: &str = "crates/gitterrace-web/static/tokens.css";
 /// RFC 9116 makes `Expires` mandatory in security.txt. Bump it with each release, at most a year
 /// out; a passed date tells reporters the contact may be dead.
@@ -95,7 +95,7 @@ pub fn render(root: &Path, ws: &Workspace) -> Result<Vec<Out>> {
          <meta property=\"og:description\" content=\"{desc}\">\n\
          <meta property=\"og:url\" content=\"{home}/\">\n\
          <meta property=\"og:type\" content=\"website\">\n\
-         <link rel=\"icon\" type=\"image/svg+xml\" href=\"assets/mark-light.svg\">\n\
+         <link rel=\"icon\" type=\"image/svg+xml\" href=\"assets/mark.svg\">\n\
          <link rel=\"stylesheet\" href=\"assets/site.css\">\n</head>\n<body>\n<main>\n",
         name = esc(&pkg.name),
         desc = esc(&pkg.description),
@@ -170,7 +170,7 @@ fn host_files(home: &str, repo: &str, name: &str) -> Vec<Out> {
          <meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">\n\
          <meta name=\"color-scheme\" content=\"light dark\">\n\
          <meta name=\"robots\" content=\"noindex\">\n<title>Not found - {n}</title>\n\
-         <link rel=\"icon\" type=\"image/svg+xml\" href=\"/assets/mark-light.svg\">\n\
+         <link rel=\"icon\" type=\"image/svg+xml\" href=\"/assets/mark.svg\">\n\
          <link rel=\"stylesheet\" href=\"/assets/site.css\">\n</head>\n<body>\n<main>\n\
          <h1>Not found</h1>\n<p>There is no page here. <a href=\"/\">Back to {n}</a>.</p>\n\
          </main>\n</body>\n</html>\n",

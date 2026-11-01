@@ -14,7 +14,7 @@ import re, subprocess, sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-AREAS = {"theme", "actions", "preview", "names", "send", "bench", "site", "live"}
+AREAS = {"theme", "actions", "preview", "names", "send", "bench", "site", "browser"}
 NAME = re.compile(r"^[a-z]+(-[a-z]+)+\.(sh|py|mjs)$")
 # Policy list of outside project names: this repo stands on its own and must not lean on
 # another repo's internals. Not a ban on any deleted name.

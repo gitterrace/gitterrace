@@ -21,8 +21,7 @@ pub use mcp::{McpServer, ToolDoc, serve_mcp};
 
 #[cfg(test)]
 mod tests {
-    use std::path::Path;
-    use std::process::Command;
+    use gitterrace_testkit::git;
 
     use axum::body::Body;
     use axum::http::{Request, StatusCode, header};
@@ -31,16 +30,6 @@ mod tests {
     use tower::ServiceExt;
 
     use crate::{ApiState, McpServer, router};
-
-    fn git(dir: &Path, args: &[&str]) {
-        let ok = Command::new("git")
-            .args(["-c", "user.name=T", "-c", "user.email=t@x.io"])
-            .args(args)
-            .current_dir(dir)
-            .status()
-            .is_ok_and(|s| s.success());
-        assert!(ok, "git {args:?} failed");
-    }
 
     fn fixture() -> (tempfile::TempDir, ApiState) {
         let dir = tempfile::tempdir().expect("tempdir");

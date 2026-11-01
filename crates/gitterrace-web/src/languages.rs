@@ -39,7 +39,6 @@ const COMMIT_LIST: usize = 500;
 /// Lines per language after each commit of the first-parent chain, oldest first.
 pub(crate) struct Chain {
     ids: Vec<String>,
-    subjects: Vec<String>,
     times: Vec<i64>,
     offsets: Vec<i32>,
     adds: Vec<u64>,
@@ -51,11 +50,7 @@ pub(crate) struct Chain {
 }
 
 impl Chain {
-    pub(crate) fn build(
-        records: &[CommitRecord],
-        ins: &Insights<'_>,
-        subjects: &HashMap<String, String>,
-    ) -> Self {
+    pub(crate) fn build(records: &[CommitRecord], ins: &Insights<'_>) -> Self {
         let by_id: HashMap<&str, usize> = records
             .iter()
             .enumerate()
@@ -134,10 +129,6 @@ impl Chain {
             .collect();
         Self {
             ids: chain.iter().map(|i| records[*i].id.clone()).collect(),
-            subjects: chain
-                .iter()
-                .map(|i| subjects.get(&records[*i].id).cloned().unwrap_or_default())
-                .collect(),
             times: chain.iter().map(|i| records[*i].time).collect(),
             offsets: chain.iter().map(|i| records[*i].offset).collect(),
             adds,
@@ -151,6 +142,23 @@ impl Chain {
         self.ids.len()
     }
 
+    /// Chain positions whose subject the page shows: the chart samples and the newest
+    /// commits of the range list. Everything else is never read, so it is never fetched.
+    fn shown(&self, view: View) -> Vec<usize> {
+        let n = self.len();
+        if n == 0 {
+            return Vec::new();
+        }
+        let keep: Vec<usize> = view.range.map_or(vec![], |(a, b)| vec![a, b]);
+        let mut v = sample(n, &keep);
+        let (from, to) = view.range.unwrap_or((0, n - 1));
+        let shown = (to - from + 1).min(COMMIT_LIST);
+        v.extend(to + 1 - shown..=to);
+        v.sort_unstable();
+        v.dedup();
+        v
+    }
+
     /// Lines per language before commit `i` (all zero before the first).
     fn before(&self, i: usize) -> Vec<i64> {
         if i == 0 {
@@ -158,6 +166,15 @@ impl Chain {
         } else {
             self.lines[i - 1].clone()
         }
+    }
+}
+
+/// Subjects of the chain positions the page shows, fetched for those commits only.
+struct Subjects(HashMap<usize, String>);
+
+impl Subjects {
+    fn of(&self, i: usize) -> String {
+        self.0.get(&i).cloned().unwrap_or_default()
     }
 }
 
@@ -273,7 +290,7 @@ fn sample(n: usize, keep: &[usize]) -> Vec<usize> {
     v
 }
 
-fn area_chart(ch: &Chain, view: View) -> String {
+fn area_chart(ch: &Chain, view: View, subj: &Subjects) -> String {
     let n = ch.len();
     if n == 0 {
         return r#"<p class="empty">No history yet.</p>"#.to_owned();
@@ -415,7 +432,7 @@ fn area_chart(ch: &Chain, view: View) -> String {
         "i": pts,
         "x": xs.iter().map(|x| (x * 10.0).round() / 10.0).collect::<Vec<_>>(),
         "d": pts.iter().map(|i| fmt::date(ch.times[*i], ch.offsets[*i])).collect::<Vec<_>>(),
-        "s": pts.iter().map(|i| ch.subjects[*i].clone()).collect::<Vec<_>>(),
+        "s": pts.iter().map(|i| subj.of(*i)).collect::<Vec<_>>(),
         "l": pts.iter().map(|i| ch.lines[*i].clone()).collect::<Vec<_>>(),
         "view": view.href(|v| v.range = None),
     });
@@ -435,7 +452,7 @@ fn legend(ch: &Chain) -> String {
     s
 }
 
-fn range_card(ch: &Chain, view: View) -> String {
+fn range_card(ch: &Chain, view: View, subj: &Subjects) -> String {
     let n = ch.len();
     if n == 0 {
         return String::new();
@@ -524,7 +541,7 @@ fn range_card(ch: &Chain, view: View) -> String {
             s,
             r#"<li>{} <span class="subj">{}</span> <span class="muted">{}</span></li>"#,
             fmt::sha_link(&ch.ids[i]),
-            esc(&ch.subjects[i]),
+            esc(&subj.of(i)),
             fmt::day(ch.times[i])
         );
     }
@@ -611,7 +628,7 @@ fn languages_now(ch: &Chain) -> String {
     s
 }
 
-fn body(ch: &Chain, view: View) -> String {
+fn body(ch: &Chain, view: View, subj: &Subjects) -> String {
     let filters = format!(
         r#"<div class="filters">{}{}</div>"#,
         seg(
@@ -634,8 +651,8 @@ fn body(ch: &Chain, view: View) -> String {
         r#"{filters}<section class="card pad"><div class="chart-head"><div><h2>Lines of code by language</h2><p class="hint">Exact line count at every commit on the first-parent history, {} lines today. Drag across the chart to select a range.</p></div>{}</div>{}</section>{}{}"#,
         fmt::thousands(total.max(0)),
         legend(ch),
-        area_chart(ch, view),
-        range_card(ch, view),
+        area_chart(ch, view, subj),
+        range_card(ch, view, subj),
         languages_now(ch),
     )
 }
@@ -654,10 +671,23 @@ pub(crate) async fn page(State(app): Shared, Query(q): Query<LocQuery>) -> Resul
         let head = a.repo.resolve(&crate::fmt::selected()).unwrap_or_default();
         let ch = a2.chain(&head, r);
         let view = View::parse(&q, ch.len());
+        let at = ch.shown(view);
+        let ids: Vec<String> = at.iter().map(|i| ch.ids[*i].clone()).collect();
+        let subj = match a.repo.summaries(&ids) {
+            Ok(sums) => Subjects(
+                at.into_iter()
+                    .zip(sums.into_iter().map(|s| s.subject))
+                    .collect(),
+            ),
+            Err(e) => {
+                tracing::warn!("subjects unavailable: {e}");
+                Subjects(HashMap::new())
+            }
+        };
         LanguagesPage {
             c,
             tabs: views::stats_tabs("l"),
-            body: body(&ch, view),
+            body: body(&ch, view, &subj),
         }
     })
     .await
@@ -691,6 +721,34 @@ mod tests {
         assert_eq!((s[0], *s.last().unwrap_or(&0)), (0, 9_999));
         assert!(s.contains(&1234) && s.contains(&5678));
         assert_eq!(sample(5, &[]), vec![0, 1, 2, 3, 4]);
+    }
+
+    /// The page reads a bounded set of subjects whatever the history length, so a cold
+    /// load never walks every commit message.
+    #[test]
+    fn subjects_fetched_are_bounded_by_what_the_page_shows() {
+        let ch = super::Chain {
+            ids: vec![String::new(); 400_000],
+            times: Vec::new(),
+            offsets: Vec::new(),
+            adds: Vec::new(),
+            dels: Vec::new(),
+            langs: Vec::new(),
+            lines: Vec::new(),
+        };
+        let view = View {
+            time: false,
+            share: false,
+            range: None,
+        };
+        assert!(ch.shown(view).len() <= 702 + 500);
+        let ranged = View {
+            range: Some((10, 399_990)),
+            ..view
+        };
+        let v = ch.shown(ranged);
+        assert!(v.len() <= 704 + 500);
+        assert!(v.contains(&10) && v.contains(&399_990) && v.contains(&399_500));
     }
 
     #[test]

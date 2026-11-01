@@ -1,0 +1,85 @@
+//! Test support shared by every crate, so a helper is written once and cannot drift.
+//!
+//! Dev-dependency only: nothing here ships. `tests/conventions.rs` refuses a second copy of
+//! the git helper or of the default address anywhere else in the workspace.
+#![allow(clippy::expect_used)]
+
+mod fixture;
+mod web;
+
+use std::path::Path;
+use std::process::Command;
+use std::sync::OnceLock;
+
+pub use fixture::Fixture;
+pub use gitterrace_config::DEFAULT_ADDR;
+pub use web::get;
+
+/// The port of [`DEFAULT_ADDR`], for tests that build a `Host` or `Origin` from it.
+#[must_use]
+pub fn port() -> &'static str {
+    DEFAULT_ADDR.rsplit(':').next().expect("addr has a port")
+}
+
+/// `http://` plus [`DEFAULT_ADDR`]: the base URL a default server hands out.
+#[must_use]
+pub fn base_url() -> String {
+    format!("http://{DEFAULT_ADDR}")
+}
+
+/// `host` with the default port appended, as a `Host` header carries it.
+#[must_use]
+pub fn on_port(host: &str) -> String {
+    format!("{host}:{}", port())
+}
+
+/// A global git config holding the identity and switches every fixture needs. It sits below a
+/// repository's own config, so a test that sets `user.name` still wins.
+fn global_config() -> &'static Path {
+    static CONFIG: OnceLock<std::path::PathBuf> = OnceLock::new();
+    CONFIG.get_or_init(|| {
+        let path = std::env::temp_dir().join(format!("gitterrace-testkit-{}.gitconfig", std::process::id()));
+        std::fs::write(
+            &path,
+            "[user]\n\tname = T\n\temail = t@e.x\n[commit]\n\tgpgsign = false\n[tag]\n\tgpgsign = false\n[init]\n\tdefaultBranch = main\n",
+        )
+        .expect("write git config");
+        path
+    })
+}
+
+fn try_run(dir: &Path, date: Option<&str>, args: &[&str]) -> Result<String, String> {
+    let mut cmd = Command::new("git");
+    cmd.args(args)
+        .current_dir(dir)
+        .env("GIT_CONFIG_GLOBAL", global_config())
+        .env("GIT_CONFIG_NOSYSTEM", "1");
+    if let Some(d) = date {
+        cmd.env("GIT_AUTHOR_DATE", d).env("GIT_COMMITTER_DATE", d);
+    }
+    let out = cmd.output().expect("run git");
+    if out.status.success() {
+        Ok(String::from_utf8_lossy(&out.stdout).trim().to_owned())
+    } else {
+        Err(String::from_utf8_lossy(&out.stderr).into_owned())
+    }
+}
+
+fn run(dir: &Path, date: Option<&str>, args: &[&str]) -> String {
+    try_run(dir, date, args).unwrap_or_else(|e| panic!("git {args:?}: {e}"))
+}
+
+/// Like [`git`], but a failing command is a value: stderr comes back as the error.
+pub fn try_git(dir: &Path, args: &[&str]) -> Result<String, String> {
+    try_run(dir, None, args)
+}
+
+/// Runs `git args` in `dir`, panics with git's stderr on failure, returns trimmed stdout.
+pub fn git(dir: &Path, args: &[&str]) -> String {
+    run(dir, None, args)
+}
+
+/// [`git`] with author and committer date pinned to `date` (RFC 3339).
+pub fn git_at(dir: &Path, date: &str, args: &[&str]) -> String {
+    run(dir, Some(date), args)
+}

@@ -16,6 +16,7 @@ Local, read-only git browser with insights. [Architecture](docs/architecture.md)
 | `gitterrace-cards` | SVG cards and badges, and the year-in-review card. |
 | `gitterrace-web` | axum server, askama templates, static assets and the request guard. |
 | `gitterrace` | Browse any git repository in your browser: code, history and insights, offline, in one binary Binaries `git-terrace` and `gitterrace`. |
+| `gitterrace-testkit` | Test support shared by every crate: the git helper, the fixture repository builder and the request helper. Dev-dependency only. |
 | `schwarzwald` | The theme as typed constants |
 
 <!-- END GENERATED: crates -->
@@ -59,7 +60,7 @@ outside `gitterrace-git` imports `gix`.
 
 - Gate: `make check` (theme, actions, docs-check, fmt, clippy `-D warnings`, test, doc).
   `cargo test -p <crate>` while working on one crate. `scripts/preview-run.sh` restarts the
-  preview on 4242.
+  preview on the default address.
 - Commits: `type(scope): subject`, scope is the crate without `gitterrace-`. Commit by
   pathspec, never `git add -A`.
 - Names: files in `scripts/` are `<area>-<verb>.<ext>`, make targets are single words,

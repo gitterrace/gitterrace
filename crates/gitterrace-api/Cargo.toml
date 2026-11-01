@@ -24,6 +24,7 @@ rmcp.workspace = true
 schemars.workspace = true
 
 [dev-dependencies]
+gitterrace-testkit.workspace = true
 tower.workspace = true
 tempfile.workspace = true
 http-body-util = "0.1"

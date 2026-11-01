@@ -18,6 +18,7 @@ use crate::{
 /// Decoded-object cache; trees and commits are re-read constantly by walks and diffs.
 const OBJECT_CACHE_BYTES: usize = 128 * 1024 * 1024;
 /// Object cache of one index worker thread.
+const BLAME_OBJECT_CACHE_BYTES: usize = 8 * 1024 * 1024;
 const INDEX_WORKER_CACHE_BYTES: usize = 16 * 1024 * 1024;
 /// Rev syntax that searches history (`:/text`, `^{/text}`) or reads reflogs (`@{...}`).
 /// Every caller passes URL input here, so the refusal lives at the one choke point.
@@ -474,7 +475,9 @@ impl Repo {
     }
 
     pub fn blame(&self, rev: &str, path: &str) -> Result<Vec<BlameLine>> {
-        let repo = self.repo();
+        let mut repo = self.repo();
+        // Blame touches every ancestor's trees once, so a big cache only adds resident memory.
+        repo.object_cache_size(BLAME_OBJECT_CACHE_BYTES);
         let tip = Self::resolve_id(&repo, rev)?;
         let path = path.trim_matches('/');
         let key = (tip, path.to_string());
@@ -652,29 +655,16 @@ fn path_id(commit: &gix::Commit<'_>, path: &str) -> Result<Option<gix::ObjectId>
 
 #[cfg(test)]
 mod tests {
+    /// Pinned author and committer date for every commit in this module.
+    const T0: &str = "2024-01-01T00:00:00+00:00";
+
+    use gitterrace_testkit::git_at;
     use std::collections::BTreeMap;
     use std::fs;
-    use std::process::Command;
     use std::sync::Arc;
 
     use super::BlameCache;
     use crate::{ChangeKind, LineKind, Repo};
-
-    fn git(dir: &std::path::Path, args: &[&str]) -> String {
-        let out = Command::new("git")
-            .args(args)
-            .current_dir(dir)
-            .env("GIT_AUTHOR_DATE", "2024-01-01T00:00:00+00:00")
-            .env("GIT_COMMITTER_DATE", "2024-01-01T00:00:00+00:00")
-            .output()
-            .expect("run git");
-        assert!(
-            out.status.success(),
-            "git {args:?}: {}",
-            String::from_utf8_lossy(&out.stderr)
-        );
-        String::from_utf8_lossy(&out.stdout).into_owned()
-    }
 
     fn write(dir: &std::path::Path, path: &str, body: &str) {
         let full = dir.join(path);
@@ -683,8 +673,8 @@ mod tests {
     }
 
     fn commit(dir: &std::path::Path, msg: &str) {
-        git(dir, &["add", "-A"]);
-        git(dir, &["commit", "-q", "-m", msg]);
+        git_at(dir, T0, &["add", "-A"]);
+        git_at(dir, T0, &["commit", "-q", "-m", msg]);
     }
 
     fn numbered(n: usize) -> String {
@@ -694,9 +684,9 @@ mod tests {
     fn fixture() -> tempfile::TempDir {
         let tmp = tempfile::tempdir().expect("tempdir");
         let d = tmp.path();
-        git(d, &["init", "-q", "-b", "main"]);
-        git(d, &["config", "user.name", "Old Name"]);
-        git(d, &["config", "user.email", "old@example.com"]);
+        git_at(d, T0, &["init", "-q", "-b", "main"]);
+        git_at(d, T0, &["config", "user.name", "Old Name"]);
+        git_at(d, T0, &["config", "user.email", "old@example.com"]);
         write(
             d,
             ".mailmap",
@@ -725,8 +715,9 @@ mod tests {
     fn reference(
         dir: &std::path::Path,
     ) -> BTreeMap<String, BTreeMap<String, (u32, u32, Option<String>)>> {
-        let raw = git(
+        let raw = git_at(
             dir,
+            T0,
             &[
                 "log",
                 "--numstat",
@@ -880,7 +871,7 @@ mod tests {
     fn tree_blob_blame_refs() {
         let tmp = fixture();
         let d = tmp.path();
-        git(d, &["tag", "v1"]);
+        git_at(d, T0, &["tag", "v1"]);
         let repo = Repo::discover(d).expect("open");
         let first = repo.log("HEAD", None, 0, 10).expect("log")[3].id.clone();
         let entries = repo.tree(&first, "").expect("tree");
@@ -952,9 +943,9 @@ mod tests {
             repo.blame(&second, "a.txt").expect("cached").len(),
             before.len()
         );
-        git(d, &["checkout", "-q", "-b", "other", &second]);
+        git_at(d, T0, &["checkout", "-q", "-b", "other", &second]);
         std::fs::write(d.join("a.txt"), "only\n").expect("write");
-        git(d, &["commit", "-qam", "shrink"]);
+        git_at(d, T0, &["commit", "-qam", "shrink"]);
         let after = repo.blame("other", "a.txt").expect("blame");
         assert_eq!((before.len(), after.len()), (41, 1));
         assert_eq!(repo.blame(&second, "a.txt").expect("old").len(), 41);
@@ -964,9 +955,9 @@ mod tests {
     fn blobs_over_the_text_cap_are_never_read_as_text() {
         let tmp = tempfile::tempdir().expect("tempdir");
         let d = tmp.path();
-        git(d, &["init", "-q", "-b", "main"]);
-        git(d, &["config", "user.name", "A"]);
-        git(d, &["config", "user.email", "a@x"]);
+        git_at(d, T0, &["init", "-q", "-b", "main"]);
+        git_at(d, T0, &["config", "user.name", "A"]);
+        git_at(d, T0, &["config", "user.email", "a@x"]);
         let size = crate::MAX_TEXT_BYTES as usize + 2;
         write(d, "big.txt", &"a\n".repeat(size / 2));
         commit(d, "add big");

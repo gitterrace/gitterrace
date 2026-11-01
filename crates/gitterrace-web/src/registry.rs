@@ -156,28 +156,14 @@ fn refused(path: &Path) -> io::Error {
 #[cfg(test)]
 #[allow(clippy::expect_used)]
 mod tests {
-    use std::path::Path;
-    use std::process::Command;
-
     use gitterrace_git::Repo;
+    use std::path::Path;
 
     use crate::registry::{FILE, candidates, record};
 
     /// A one-commit repository; `msg` makes its root commit, and so its id, distinct.
     pub(crate) fn repo(dir: &Path, msg: &str) -> Repo {
-        std::fs::create_dir_all(dir).expect("dir");
-        let id = ["-c", "user.name=T", "-c", "user.email=t@e.x"];
-        for args in [
-            &["init", "-q"][..],
-            &[&id[..], &["commit", "-q", "--allow-empty", "-m", msg]].concat(),
-        ] {
-            let ok = Command::new("git")
-                .args(args)
-                .current_dir(dir)
-                .status()
-                .is_ok_and(|s| s.success());
-            assert!(ok, "git {args:?}");
-        }
+        let _fixture = gitterrace_testkit::Fixture::init(dir).commit(msg);
         Repo::discover(dir).expect("repo")
     }
 

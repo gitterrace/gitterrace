@@ -95,11 +95,14 @@ pub struct RepoOverride {
     pub exclude: Vec<String>,
 }
 
+/// The address the server listens on when nothing overrides it: the one place it is written.
+pub const DEFAULT_ADDR: &str = "127.0.0.1:4242";
+
 settings! {
     server: Server {
         /// Address to listen on. Keep it local: pages show source code and there is no login. Needs a
         /// restart.
-        addr: String = "127.0.0.1:4242".to_owned(),
+        addr: String = DEFAULT_ADDR.to_owned(),
         /// Maximum open live-update streams per repository (one per browser tab).
         max_streams: usize = 32,
     }
@@ -178,7 +181,7 @@ impl Config {
         if self.server.addr.parse::<std::net::SocketAddr>().is_err() {
             return bad(
                 "server.addr",
-                "expected host:port, for example 127.0.0.1:4242",
+                &format!("expected host:port, for example {DEFAULT_ADDR}"),
             );
         }
         if self.server.max_streams == 0 {

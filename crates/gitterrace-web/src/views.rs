@@ -539,10 +539,8 @@ pub(crate) fn diff_html_with(
         } else if let Some(rev) = rev {
             let _ = write!(
                 out,
-                "<a href=\"{}/blob/{}/{}\">{}</a>",
-                crate::fmt::base(),
-                enc(rev, false),
-                enc(&f.path, true),
+                "<a href=\"{}\">{}</a>",
+                crate::fmt::href(&format!("/blob/{}/{}", enc(rev, false), enc(&f.path, true))),
                 esc(&file_label(f))
             );
         } else {
@@ -821,19 +819,12 @@ mod tests {
         use axum::extract::{Path, State};
         let dir = tempfile::tempdir().expect("tmp");
         let p = dir.path();
-        let git = |args: &[&str]| {
-            let ok = std::process::Command::new("git")
-                .args(["-c", "user.name=T", "-c", "user.email=t@e.x"])
-                .args(args)
-                .current_dir(p)
-                .status()
-                .is_ok_and(|s| s.success());
-            assert!(ok, "git {args:?}");
-        };
-        git(&["init", "-q", "-b", "main"]);
-        std::fs::write(p.join("a.txt"), "x\n").expect("write");
-        git(&["add", "."]);
-        git(&["commit", "-q", "-m", "feat: a"]);
+        let _fixture = gitterrace_testkit::Fixture::init(p)
+            .write(
+                "a.txt", "x
+",
+            )
+            .commit("feat: a");
         let repo = gitterrace_git::Repo::discover(p).expect("repo");
         let index = gitterrace_index::Index::open(&repo).expect("index");
         let app = std::sync::Arc::new(crate::app::App::new(repo, index));

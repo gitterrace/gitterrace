@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: build run fmt lint test doc theme actions docs-gen docs-check names check help bench bench-large bench-report bench-clean bench-guard
+.PHONY: build run fmt lint test doc theme actions docs-gen docs-check names check help bench bench-large bench-report bench-clean bench-guard browser-check
 
 ## build: Release binary
 build:
@@ -78,6 +78,10 @@ bench-clean:
 bench-guard:
 	cargo build -q -p gitterrace
 	python3 scripts/bench-run.py --synthetic --bin target/debug/git-terrace >/dev/null
+
+## browser-check: Real-browser checks of the served pages (BIN=path to git-terrace). Needs browsers, so not in check
+browser-check:
+	node scripts/browser-check.mjs $(if $(BIN),--bin $(BIN))
 
 ## site: Refuse to publish install lines before the repository, tap and release tag answer
 site: docs-check

@@ -109,7 +109,7 @@ fn bad(why: impl Into<String>) -> PayloadError {
 
 impl Payload {
     /// Builds the payload for `action` from git. `origin` is the page origin
-    /// (`http://127.0.0.1:4242`) a `/go` permalink is rooted at; `style` picks the form.
+    /// (for example the base URL of the default address) a `/go` permalink is rooted at; `style` picks the form.
     pub fn build(
         repo: &Repo,
         action: &str,
@@ -419,8 +419,9 @@ fn rfc3339(secs: i64) -> String {
 
 #[cfg(test)]
 pub(crate) mod tests {
-    use std::path::Path;
-    use std::process::Command;
+    use gitterrace_testkit::git_at;
+    /// Pinned author and committer date for every commit in this module.
+    const T0: &str = "2026-10-30T12:00:00+00:00";
 
     use gitterrace_git::Repo;
 
@@ -428,29 +429,13 @@ pub(crate) mod tests {
     use crate::link::LinkStyle;
     use crate::payload::{Lines, Locator, Payload, PayloadError, RunRequest, rfc3339};
 
-    pub(crate) fn git(dir: &Path, args: &[&str]) -> String {
-        let out = Command::new("git")
-            .args(args)
-            .current_dir(dir)
-            .env("GIT_AUTHOR_DATE", "2026-10-30T12:00:00+00:00")
-            .env("GIT_COMMITTER_DATE", "2026-10-30T12:00:00+00:00")
-            .output()
-            .expect("git");
-        assert!(
-            out.status.success(),
-            "{}",
-            String::from_utf8_lossy(&out.stderr)
-        );
-        String::from_utf8_lossy(&out.stdout).trim().to_string()
-    }
-
     /// One commit whose subject and file content carry shell and HTML payloads.
     pub(crate) fn hostile_repo() -> (tempfile::TempDir, String) {
         let t = tempfile::tempdir().expect("tempdir");
         let d = t.path();
-        git(d, &["init", "-q", "-b", "main"]);
-        git(d, &["config", "user.name", "Eve <script>"]);
-        git(d, &["config", "user.email", "e@example.com"]);
+        git_at(d, T0, &["init", "-q", "-b", "main"]);
+        git_at(d, T0, &["config", "user.name", "Eve <script>"]);
+        git_at(d, T0, &["config", "user.email", "e@example.com"]);
         std::fs::create_dir(d.join("src")).expect("mkdir");
         let body = (1..=500)
             .map(|i| format!("line {i} $(touch pwned)"))
@@ -458,9 +443,10 @@ pub(crate) mod tests {
             .join("\n")
             + "\n";
         std::fs::write(d.join("src/a.rs"), body).expect("write");
-        git(d, &["add", "-A"]);
-        git(
+        git_at(d, T0, &["add", "-A"]);
+        git_at(
             d,
+            T0,
             &[
                 "commit",
                 "-q",
@@ -468,7 +454,7 @@ pub(crate) mod tests {
                 "fix: $(touch pwned) `id` \"><img onerror=x>",
             ],
         );
-        let sha = git(d, &["rev-parse", "HEAD"]);
+        let sha = git_at(d, T0, &["rev-parse", "HEAD"]);
         (t, sha)
     }
 
@@ -492,7 +478,7 @@ pub(crate) mod tests {
             "x",
             Kind::Line,
             &loc(Some("src/a.rs"), Some((2, 3))),
-            "http://127.0.0.1:4242",
+            &gitterrace_testkit::base_url(),
             LinkStyle::Go,
         )
         .expect("build");
@@ -505,7 +491,10 @@ pub(crate) mod tests {
         let id = repo.id().expect("id");
         assert_eq!(
             p.permalink,
-            format!("http://127.0.0.1:4242/go/{id}/{sha}/src/a.rs#L2-L3")
+            format!(
+                "{}/go/{id}/{sha}/src/a.rs#L2-L3",
+                gitterrace_testkit::base_url()
+            )
         );
         let l = loc(Some("src/a.rs"), Some((2, 3)));
         let gt = Payload::build(&repo, "x", Kind::Line, &l, "o", LinkStyle::Gitterrace);

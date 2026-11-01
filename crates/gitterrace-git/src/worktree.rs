@@ -277,19 +277,9 @@ fn file_diff(path: String, kind: ChangeKind, old: &[u8], new: &[u8], big: bool) 
 
 #[cfg(test)]
 mod tests {
-    use std::process::Command;
+    use gitterrace_testkit::git;
 
     use crate::{ChangeKind, Repo, worktree_diff};
-
-    fn git(dir: &std::path::Path, args: &[&str]) {
-        let ok = Command::new("git")
-            .args(["-c", "user.name=T", "-c", "user.email=t@e.x"])
-            .args(args)
-            .current_dir(dir)
-            .status()
-            .is_ok_and(|s| s.success());
-        assert!(ok, "git {args:?}");
-    }
 
     #[test]
     fn a_bare_repository_is_never_dirty() {

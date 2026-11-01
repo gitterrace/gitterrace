@@ -11,7 +11,7 @@ use std::collections::BTreeMap;
 use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
 
-pub use schema::{Config, Key, RepoOverride, keys};
+pub use schema::{Config, DEFAULT_ADDR, Key, RepoOverride, keys};
 pub use value::Show;
 
 /// Where a value came from.
@@ -194,7 +194,7 @@ mod tests {
     fn defaults_keep_todays_behaviour() {
         let l = parse("").expect("parse");
         assert_eq!(l.config.watch.interval_ms, 1000);
-        assert_eq!(l.config.server.addr, "127.0.0.1:4242");
+        assert_eq!(l.config.server.addr, crate::DEFAULT_ADDR);
         assert!(l.config.watch.enabled);
         assert!(l.sources.is_empty());
     }

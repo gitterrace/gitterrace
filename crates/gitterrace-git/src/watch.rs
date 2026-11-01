@@ -332,25 +332,12 @@ fn is_racy(stamp: Stamp, now: SystemTime, window: Duration) -> bool {
 #[cfg(test)]
 #[allow(clippy::expect_used)]
 mod tests {
+    use gitterrace_testkit::git;
     use std::fs;
     use std::path::Path;
-    use std::process::Command;
 
     use super::Watcher;
     use crate::Repo;
-
-    fn git(dir: &Path, args: &[&str]) {
-        let out = Command::new("git")
-            .args(args)
-            .current_dir(dir)
-            .env("GIT_AUTHOR_NAME", "t")
-            .env("GIT_AUTHOR_EMAIL", "t@t")
-            .env("GIT_COMMITTER_NAME", "t")
-            .env("GIT_COMMITTER_EMAIL", "t@t")
-            .output()
-            .expect("git runs");
-        assert!(out.status.success(), "git {args:?}: {out:?}");
-    }
 
     fn commit(dir: &Path, file: &str, body: &str) {
         fs::write(dir.join(file), body).expect("write");
@@ -545,17 +532,9 @@ mod tests {
         }
         let (_tmp, dir) = base();
         let refs = dir.join(".git/refs/heads");
-        let id = String::from_utf8(
-            Command::new("git")
-                .args(["rev-parse", "HEAD"])
-                .current_dir(&dir)
-                .output()
-                .expect("git")
-                .stdout,
-        )
-        .expect("utf8");
+        let id = git(&dir, &["rev-parse", "HEAD"]);
         for i in 0..50_000 {
-            fs::write(refs.join(format!("b{i}")), &id).expect("ref");
+            fs::write(refs.join(format!("b{i}")), format!("{id}\n")).expect("ref");
         }
         measure("50k loose refs", &Repo::discover(&dir).expect("open"));
         git(&dir, &["pack-refs", "--all", "--prune"]);

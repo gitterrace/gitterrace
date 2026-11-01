@@ -91,22 +91,13 @@ pub(crate) async fn run(mut reloader: Reloader, env: Env) {
 #[cfg(test)]
 #[allow(clippy::expect_used)]
 mod tests {
-    use std::{path::Path, sync::Arc};
+    use gitterrace_testkit::git;
+    use std::sync::Arc;
 
     use gitterrace_config::Config;
 
     use super::{Reloader, Watched};
     use crate::app::{App, Env};
-
-    fn git(dir: &Path, args: &[&str]) {
-        let ok = std::process::Command::new("git")
-            .args(["-c", "user.name=T", "-c", "user.email=t@e.x"])
-            .args(args)
-            .current_dir(dir)
-            .status()
-            .is_ok_and(|s| s.success());
-        assert!(ok, "git {args:?}");
-    }
 
     struct Fixture {
         _repo: tempfile::TempDir,

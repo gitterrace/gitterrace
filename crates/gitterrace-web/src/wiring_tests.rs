@@ -1,37 +1,26 @@
 //! Every setting the server honours has a test here that changes it and sees behaviour change.
 
-use std::{path::Path, process::Command, sync::Arc, time::Duration};
+use std::{path::Path, sync::Arc, time::Duration};
 
 use axum::{Router, body::Body, http::Request};
 use gitterrace_config::Config;
+use gitterrace_testkit::{Fixture, get, git};
 use http_body_util::BodyExt;
 use tower::ServiceExt;
 
 use crate::app::{App, Env};
 
-fn git(dir: &Path, args: &[&str]) {
-    let ok = Command::new("git")
-        .args(["-c", "user.name=T", "-c", "user.email=t@e.x"])
-        .args(args)
-        .current_dir(dir)
-        .status()
-        .is_ok_and(|s| s.success());
-    assert!(ok, "git {args:?}");
-}
-
 /// A repository with a small file, a 3 KiB file and two commits.
 fn repo(root: &Path, name: &str) -> std::path::PathBuf {
-    let p = root.join(name);
-    std::fs::create_dir_all(&p).expect("dir");
-    git(&p, &["init", "-q", "-b", "main"]);
-    std::fs::write(p.join("small.txt"), "needle one\n").expect("write");
-    std::fs::write(p.join("mid.txt"), "needle\n".repeat(450)).expect("write");
-    std::fs::write(p.join("yarn.lock"), "lock\n").expect("write");
-    git(&p, &["add", "."]);
-    git(&p, &["commit", "-q", "-m", "feat: first"]);
-    std::fs::write(p.join("small.txt"), "needle two\n").expect("write");
-    git(&p, &["commit", "-qam", "fix: second"]);
-    p
+    Fixture::init(&root.join(name))
+        .write("small.txt", "needle one\n")
+        .write("mid.txt", &"needle\n".repeat(450))
+        .write("yarn.lock", "lock\n")
+        .commit("feat: first")
+        .write("small.txt", "needle two\n")
+        .commit("fix: second")
+        .path()
+        .to_owned()
 }
 
 fn with(f: impl FnOnce(&mut Config)) -> Config {
@@ -39,22 +28,6 @@ fn with(f: impl FnOnce(&mut Config)) -> Config {
     f(&mut c);
     c.validate().expect("valid");
     c
-}
-
-async fn get(r: &Router, uri: &str) -> (u16, String) {
-    let res = r
-        .clone()
-        .oneshot(
-            Request::get(uri)
-                .header("host", "localhost")
-                .body(Body::empty())
-                .expect("req"),
-        )
-        .await
-        .expect("res");
-    let s = res.status().as_u16();
-    let b = res.into_body().collect().await.expect("body").to_bytes();
-    (s, String::from_utf8_lossy(&b).into_owned())
 }
 
 fn router(p: &Path, cfg: Config) -> Router {

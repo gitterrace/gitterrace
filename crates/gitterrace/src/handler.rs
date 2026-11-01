@@ -139,9 +139,33 @@ fn macos(home: &Path, exe: &Path, uninstall: bool) -> anyhow::Result<()> {
 /// Content of the Linux `.desktop` file.
 pub(crate) fn desktop_entry(exe: &Path) -> String {
     let mut s = String::from("[Desktop Entry]\nType=Application\nName=gitterrace link opener\n");
-    let _ = writeln!(s, "Exec=\"{}\" open %u", exe.display());
+    let _ = writeln!(
+        s,
+        "Exec=\"{}\" open %u",
+        desktop_quote(&exe.display().to_string())
+    );
     s.push_str("NoDisplay=true\nTerminal=false\nMimeType=x-scheme-handler/gitterrace;\n");
     s
+}
+
+/// A path for inside `Exec="..."`: the Desktop Entry spec reads `"`, `` ` ``, `$` and `\`
+/// as special there and `%` as a field code anywhere, so each is escaped (the spec's double
+/// escaping: `\\"` in the file is `"` in the argument).
+fn desktop_quote(p: &str) -> String {
+    let mut out = String::with_capacity(p.len());
+    for c in p.chars() {
+        match c {
+            // Exec quoting wants `\c`; the key-file layer then doubles every backslash.
+            '\\' => out.push_str(r"\\\\"),
+            '"' | '`' | '$' => {
+                out.push_str(r"\\");
+                out.push(c);
+            }
+            '%' => out.push_str("%%"),
+            _ => out.push(c),
+        }
+    }
+    out
 }
 
 fn desktop_path(home: &Path) -> PathBuf {
@@ -202,6 +226,15 @@ mod tests {
         assert_eq!(
             desktop_entry(Path::new("/opt/bin/git-terrace")),
             "[Desktop Entry]\nType=Application\nName=gitterrace link opener\nExec=\"/opt/bin/git-terrace\" open %u\nNoDisplay=true\nTerminal=false\nMimeType=x-scheme-handler/gitterrace;\n"
+        );
+    }
+
+    #[test]
+    fn desktop_entry_escapes_exec_specials() {
+        let e = desktop_entry(Path::new("/o/100%/a\"b$c`d\\e/git-terrace"));
+        assert!(
+            e.contains(r#"Exec="/o/100%%/a\\"b\\$c\\`d\\\\e/git-terrace" open %u"#),
+            "{e}"
         );
     }
 

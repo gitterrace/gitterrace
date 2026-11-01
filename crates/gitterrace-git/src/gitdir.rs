@@ -285,34 +285,11 @@ fn read_inside(common: &Path, parts: &[&str]) -> Option<String> {
 
 #[cfg(test)]
 mod tests {
+    use gitterrace_testkit::git;
     use std::fs;
     use std::path::Path;
-    use std::process::Command;
 
     use crate::{InProgress, Repo};
-
-    fn git(dir: &Path, args: &[&str]) -> String {
-        let out = Command::new("git")
-            .args([
-                "-c",
-                "user.name=t",
-                "-c",
-                "user.email=t@x",
-                "-c",
-                "commit.gpgsign=false",
-            ])
-            .args(["-c", "tag.gpgsign=false", "-c", "init.defaultBranch=main"])
-            .args(args)
-            .current_dir(dir)
-            .output()
-            .expect("run git");
-        assert!(
-            out.status.success(),
-            "git {args:?}: {}",
-            String::from_utf8_lossy(&out.stderr)
-        );
-        String::from_utf8_lossy(&out.stdout).trim().to_owned()
-    }
 
     fn commit(dir: &Path, file: &str, body: &str) {
         fs::write(dir.join(file), body).expect("write");
@@ -358,19 +335,10 @@ mod tests {
         let repo = Repo::discover(&d).expect("open");
         assert_eq!(repo.head_state().branch.as_deref(), Some("main"));
         assert_eq!(repo.head_state().in_progress, None);
-        let out = Command::new("git")
-            .args([
-                "-c",
-                "user.name=t",
-                "-c",
-                "user.email=t@x",
-                "rebase",
-                "side",
-            ])
-            .current_dir(&d)
-            .output()
-            .expect("rebase");
-        assert!(!out.status.success(), "rebase must stop on the conflict");
+        assert!(
+            gitterrace_testkit::try_git(&d, &["rebase", "side"]).is_err(),
+            "rebase must stop on the conflict"
+        );
         let repo = Repo::discover(&d).expect("reopen");
         let s = repo.head_state();
         assert_eq!(s.branch, None);
@@ -393,7 +361,7 @@ mod tests {
             (note.subject.as_str(), note.body.as_str()),
             ("Release one", "body text")
         );
-        assert_eq!(note.tagger.as_ref().map(|t| t.name.as_str()), Some("t"));
+        assert_eq!(note.tagger.as_ref().map(|t| t.name.as_str()), Some("T"));
         let light = refs.iter().find(|r| r.name == "light").expect("light");
         assert!(light.annotation.is_none());
         let st = repo.stashes().expect("stashes");

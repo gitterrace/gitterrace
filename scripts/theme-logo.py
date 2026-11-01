@@ -14,6 +14,7 @@ mark alone, for each theme:
 """
 import re
 import sys
+import urllib.parse
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -65,12 +66,36 @@ def build(header: str) -> dict[str, str]:
     return {"logo": logo, "mark": square}
 
 
+def adaptive(light: str, dark: str) -> str:
+    """The mark for favicons: light ink by default, dark ink under a dark scheme. A tab bar
+    follows the system theme, and one fixed ink vanishes on one of them (dark stem on a dark
+    tab bar measured 1.09:1)."""
+    def inks(svg: str) -> tuple[str, str]:
+        stem = re.search(r'stroke="(#[0-9a-f]{6})"', svg).group(1)
+        tread = re.search(r'<rect fill="(#[0-9a-f]{6})"', svg).group(1)
+        return stem, tread
+    (ls, lt), (ds, dt) = inks(light), inks(dark)
+    body = re.search(r"<g>.*</g>", light, re.S).group(0)
+    body = body.replace(f'stroke="{ls}"', 'class="i"').replace(f'<rect fill="{lt}"', '<rect class="a"')
+    style = (
+        f"<style>.i{{stroke:{ls}}}.a{{fill:{lt}}}"
+        f"@media (prefers-color-scheme:dark){{.i{{stroke:{ds}}}.a{{fill:{dt}}}}}</style>"
+    )
+    return (
+        '<svg xmlns="http://www.w3.org/2000/svg" role="img" aria-label="gitterrace" '
+        f'viewBox="0 0 24 24" width="24" height="24"><title>gitterrace</title>{style}{body}</svg>\n'
+    )
+
+
 def main() -> int:
     check = "--check" in sys.argv
     stale = []
+    marks = {}
     for theme in ("light", "dark"):
         header = (BRAND / f"readme-header-{theme}.svg").read_text()
-        for name, svg in build(header).items():
+        built = build(header)
+        marks[theme] = built["mark"]
+        for name, svg in built.items():
             path = BRAND / f"{name}-{theme}.svg"
             if path.exists() and path.read_text() == svg:
                 continue
@@ -79,6 +104,19 @@ def main() -> int:
             else:
                 path.write_text(svg)
                 print(f"wrote {path.relative_to(ROOT)}")
+    path, svg = BRAND / "mark.svg", adaptive(marks["light"], marks["dark"])
+    if not (path.exists() and path.read_text() == svg):
+        if check:
+            stale.append(path.relative_to(ROOT))
+        else:
+            path.write_text(svg)
+            print(f"wrote {path.relative_to(ROOT)}")
+    # The app inlines the same mark as its favicon (the CSP refuses a separate request-free
+    # icon otherwise), so the template must carry exactly this SVG.
+    tpl = ROOT / "crates/gitterrace-web/templates/base.html"
+    m = re.search(r'<link rel="icon" href="data:image/svg\+xml,([^"]*)">', tpl.read_text())
+    if not m or urllib.parse.unquote(m.group(1)) != svg.strip():
+        stale.append(tpl.relative_to(ROOT))
     for s in stale:
         print(f"{s}: does not match the README header; run scripts/theme-logo.py")
     return 1 if stale else 0

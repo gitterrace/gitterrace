@@ -96,32 +96,34 @@ mod tests {
 
     #[test]
     fn host_allowlist() {
+        use gitterrace_testkit::{DEFAULT_ADDR, on_port};
         let ip: std::net::IpAddr = "192.168.1.5".parse().expect("ip");
         let any: std::net::IpAddr = "0.0.0.0".parse().expect("ip");
+        let port = gitterrace_testkit::port();
         for h in [
-            "localhost",
-            "localhost:4242",
-            "127.0.0.1:4242",
-            "[::1]:4242",
-            "LOCALHOST",
+            "localhost".to_owned(),
+            on_port("localhost"),
+            DEFAULT_ADDR.to_owned(),
+            format!("[::1]:{port}"),
+            "LOCALHOST".to_owned(),
         ] {
-            assert!(host_allowed(h, None), "{h}");
+            assert!(host_allowed(&h, None), "{h}");
         }
         for h in [
-            "evil.example:4242",
-            "192.168.1.5:80",
-            "[::1",
-            "",
-            "127.0.0.1:4242@evil",
-            "localhost:",
-            "localhost:80a",
+            on_port("evil.example"),
+            "192.168.1.5:80".to_owned(),
+            "[::1".to_owned(),
+            String::new(),
+            format!("{DEFAULT_ADDR}@evil"),
+            "localhost:".to_owned(),
+            "localhost:80a".to_owned(),
         ] {
-            assert!(!host_allowed(h, None), "{h}");
+            assert!(!host_allowed(&h, None), "{h}");
         }
-        assert!(host_allowed("192.168.1.5:4242", Some(ip)));
+        assert!(host_allowed(&on_port("192.168.1.5"), Some(ip)));
         assert!(!host_allowed("10.0.0.1", Some(ip)));
-        assert!(host_allowed("10.0.0.7:4242", Some(any)));
-        assert!(!host_allowed("evil.example:4242", Some(any)));
+        assert!(host_allowed(&on_port("10.0.0.7"), Some(any)));
+        assert!(!host_allowed(&on_port("evil.example"), Some(any)));
     }
 
     /// Every inline `<script>` in a template must have its hash in the CSP, or the browser

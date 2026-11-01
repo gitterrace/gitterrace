@@ -1,0 +1,18 @@
+[package]
+name = "gitterrace-testkit"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+description = "Test support shared by every crate: the git helper, the fixture repository builder and the request helper. Dev-dependency only."
+
+[lints]
+workspace = true
+
+[dependencies]
+gitterrace-config.workspace = true
+axum.workspace = true
+tower.workspace = true
+http-body-util = "0.1"

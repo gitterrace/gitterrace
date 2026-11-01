@@ -9,7 +9,7 @@
 {% if let Some((token, menu)) = c.actions %}<meta name="gitterrace-actions" content="{{ token }}" data-menu="{{ menu }}">{% endif %}
 <title>{% block title %}{{ c.name }}{% endblock %} · gitterrace</title>
 <script>(function(){try{var q=/[?&]theme=(light|dark)/.exec(location.search),t=q?q[1]:localStorage.getItem("gitterrace-theme");if(t==="light"||t==="dark")document.documentElement.dataset.theme=t}catch(e){}})()</script>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 role=%22img%22 aria-label=%22gitterrace%22%3E%3Cstyle%3E.i%7Bstroke:%2321272e%7D.a%7Bfill:%235b5e8d%7D%40media %28prefers-color-scheme:dark%29%7B.i%7Bstroke:%23e3ecf6%7D.a%7Bfill:%239ca1d4%7D%7D%3C/style%3E%3Cpath class=%22i%22 fill=%22none%22 stroke-width=%223%22 stroke-linejoin=%22round%22 stroke-linecap=%22square%22 d=%22M7.5 4.5V15h6v4.5h1.5M4.5 9h10.5%22/%3E%3Crect class=%22a%22 x=%2215%22 y=%2218%22 width=%226%22 height=%223%22/%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 role=%22img%22 aria-label=%22gitterrace%22 viewBox=%220 0 24 24%22 width=%2224%22 height=%2224%22%3E%3Ctitle%3Egitterrace%3C/title%3E%3Cstyle%3E.i%7Bstroke:#21272e%7D.a%7Bfill:#5b5e8d%7D%40media (prefers-color-scheme:dark)%7B.i%7Bstroke:#e3ecf6%7D.a%7Bfill:#9ca1d4%7D%7D%3C/style%3E%3Cg%3E%3Cpath fill=%22none%22 class=%22i%22 stroke-width=%223%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22 d=%22M8.25 4.25v10h5.5v5.5h3M4.25 9.25h11%22/%3E%3Crect class=%22a%22 x=%2213.75%22 y=%2218.25%22 width=%227.5%22 height=%223%22 rx=%221.5%22/%3E%3C/g%3E%3C/svg%3E">
 <link rel="stylesheet" href="{{ c.base }}/static/tokens.css">
 <link rel="stylesheet" href="{{ c.base }}/static/app.css">
 <link rel="stylesheet" href="{{ c.base }}/static/markdown.css">
@@ -17,7 +17,7 @@
 <body data-rev="{{ c.rev }}" data-commit="{{ c.commit }}"{% if c.live %} data-live="{{ c.live_how }}" data-live-on="{{ c.live_on }}" data-live-v="{{ c.version }}"{% endif %}>
 <header class="top"><div class="wrap">
 <div class="topbar">
-<a class="brand" href="/"><svg class="logo" viewBox="0 0 24 24" aria-hidden="true"><path class="stem" d="M8.25 4.25v10h5.5v5.5h3M4.25 9.25h11"/><path class="tread" d="M15.25 18.25h4.5a1.5 1.5 0 0 1 0 3h-4.5z"/></svg><span class="wordmark">gitterrace</span></a>
+<a class="brand" href="/"><svg class="logo" viewBox="0 0 24 24" aria-hidden="true"><path class="stem" d="M8.25 4.25v10h5.5v5.5h3M4.25 9.25h11"/><rect class="tread" x="13.75" y="18.25" width="7.5" height="3" rx="1.5"/></svg><span class="wordmark">gitterrace</span></a>
 <span class="sep" aria-hidden="true">/</span>
 <a class="reponame" href="{{ c.home }}">{{ c.name }}</a>
 {% if !c.base.is_empty() %}<div class="refswitch"><button class="branch" type="button" id="repobtn" aria-haspopup="true" aria-expanded="false" data-tip="Switch repository">repo<span class="caret" aria-hidden="true"></span></button></div>{% endif %}

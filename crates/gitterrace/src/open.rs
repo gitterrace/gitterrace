@@ -264,21 +264,10 @@ fn browse(url: &str) -> anyhow::Result<()> {
 #[cfg(test)]
 #[allow(clippy::expect_used)]
 mod tests {
+    use gitterrace_testkit::git;
     use std::path::Path;
-    use std::process::Command;
 
     use crate::open::{OpenError, resolve};
-
-    fn git(dir: &Path, args: &[&str]) -> String {
-        let out = Command::new("git")
-            .args(["-c", "user.name=T", "-c", "user.email=t@e.x"])
-            .args(args)
-            .current_dir(dir)
-            .output()
-            .expect("git");
-        assert!(out.status.success(), "git {args:?}");
-        String::from_utf8_lossy(&out.stdout).trim().to_owned()
-    }
 
     /// A repository with `src/a.rs`; returns (root, id, HEAD).
     fn repo(dir: &Path) -> (std::path::PathBuf, String, String) {
