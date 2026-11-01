@@ -19,6 +19,9 @@ use crate::{
 const OBJECT_CACHE_BYTES: usize = 128 * 1024 * 1024;
 /// Object cache of one index worker thread.
 const INDEX_WORKER_CACHE_BYTES: usize = 16 * 1024 * 1024;
+/// Rev syntax that searches history (`:/text`, `^{/text}`) or reads reflogs (`@{...}`).
+/// Every caller passes URL input here, so the refusal lives at the one choke point.
+const REJECTED_REV: [&str; 3] = [":/", "^{/", "@{"];
 
 /// A repository opened read-only.
 pub struct Repo {
@@ -593,6 +596,9 @@ impl Repo {
 
     pub(crate) fn resolve_id(repo: &gix::Repository, rev: &str) -> Result<gix::ObjectId> {
         let not_found = || Error::RevNotFound(rev.to_string());
+        if REJECTED_REV.iter().any(|p| rev.contains(p)) {
+            return Err(not_found());
+        }
         let id = repo.rev_parse_single(rev).map_err(|_| not_found())?;
         let commit = id
             .object()
@@ -850,6 +856,15 @@ mod tests {
             repo.resolve("nope"),
             Err(crate::Error::RevNotFound(_))
         ));
+        // History searches and reflog reads never resolve, whichever route passes them.
+        for rev in [":/first", "HEAD^{/first}", "main@{1}", "@{-1}"] {
+            assert!(
+                matches!(repo.resolve(rev), Err(crate::Error::RevNotFound(_))),
+                "{rev}"
+            );
+            assert!(repo.log(rev, None, 0, 1).is_err(), "{rev}");
+        }
+        assert!(repo.resolve("HEAD~1").is_ok());
     }
 
     #[test]

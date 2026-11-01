@@ -308,17 +308,17 @@ mod tests {
         let dir = tempfile::tempdir().expect("tempdir");
         let p = dir.path();
         git(p, &["init", "-q", "-b", "main"]);
-        let big: String = (0..crate::core::MAX_DIFF_LINES + 10)
-            .map(|i| format!("{i}\n"))
-            .collect();
+        let big = "x\n".repeat(crate::core::MAX_DIFF_LINES + 10);
         std::fs::write(p.join("big.txt"), big).expect("write");
         git(p, &["add", "."]);
         git(p, &["commit", "-q", "-m", "big"]);
         let s = ApiState::open(p).expect("open");
         let lines = |v: &serde_json::Value| -> usize {
-            v["files"][0]["hunks"]
-                .as_array()
-                .map_or(0, |hs| hs.iter().map(|h| h["lines"].as_array().map_or(0, Vec::len)).sum())
+            v["files"][0]["hunks"].as_array().map_or(0, |hs| {
+                hs.iter()
+                    .map(|h| h["lines"].as_array().map_or(0, Vec::len))
+                    .sum()
+            })
         };
         for asked in [None, Some(usize::MAX)] {
             let v = s.commit("HEAD", true, asked).expect("commit");

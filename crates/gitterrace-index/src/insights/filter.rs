@@ -4,7 +4,7 @@ use std::sync::Mutex;
 
 use gitterrace_git::IgnoreSet;
 
-use super::Options;
+use crate::insights::Options;
 use crate::insights::fasthash::FastMap;
 
 /// Lock files and minified output: generated, not written.

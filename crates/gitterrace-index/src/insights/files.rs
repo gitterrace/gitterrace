@@ -1,7 +1,7 @@
 use std::collections::{BTreeMap, HashMap, HashSet};
 
-use super::{HeadFile, Insights, Period, year_of};
 use crate::insights::fasthash::FastMap;
+use crate::insights::{HeadFile, Insights, Period, year_of};
 
 /// Most files in one commit that still say something about coupling; bigger commits are
 /// sweeps (formatting, renames, vendoring).

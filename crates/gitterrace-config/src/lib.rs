@@ -122,13 +122,13 @@ pub fn template() -> String {
     for k in schema::keys() {
         if k.section != section {
             section = k.section;
-            out.push_str(&format!("\n[{section}]\n"));
+            out.push_str(&["\n[", section, "]\n"].concat());
         }
         out.push('\n');
         for line in k.doc.lines() {
-            out.push_str(&format!("# {}\n", line.trim()));
+            out.push_str(&["# ", line.trim(), "\n"].concat());
         }
-        out.push_str(&format!("# {} = {}\n", k.name, k.default));
+        out.push_str(&["# ", k.name, " = ", &k.default, "\n"].concat());
     }
     out
 }
