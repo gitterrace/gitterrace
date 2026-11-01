@@ -14,6 +14,9 @@
 //   chip         the Working tree chip dot has no animation, in light and dark
 //   doctabs      the README/LICENSE/SECURITY tab row is one line at 360, 900 and 1440 px and the
 //                active tab has aria-current; shots into --shots (default target/shots)/doctabs-*.png
+//   header       from 1440 down to 320 px the top bar's tools (search, actions, theme) share one
+//                row and the page never scrolls sideways; where search is folded, its button opens
+//                the field with focus and Escape folds it again
 //
 // --from-disk serves crates/gitterrace-web/static/*.js from the working tree over the (possibly
 // older) binary's copies, to test edits before a rebuild. Playwright comes from $PLAYWRIGHT_CORE,
@@ -28,7 +31,7 @@ const bin = resolve(arg('--bin', join(root, 'target/debug/git-terrace')));
 const fromDisk = process.argv.includes('--from-disk');
 const tabCounts = arg('--tabs', '8,12').split(',').map(Number);
 const browsers = arg('--browsers', 'webkit,chromium').split(',');
-const ALL = ['truncation', 'live-tabs', 'mermaid', 'chip', 'doctabs', 'chords'];
+const ALL = ['truncation', 'live-tabs', 'mermaid', 'chip', 'doctabs', 'chords', 'header'];
 const wanted = arg('--checks', ALL.join(',')).split(',');
 for (const c of wanted) if (!ALL.includes(c)) { console.error(`unknown check ${c}; known: ${ALL.join(', ')}`); process.exit(2); }
 
@@ -261,7 +264,40 @@ async function chords() {
   await b.close();
 }
 
-const checks = { truncation, 'live-tabs': liveTabs, mermaid, chip, doctabs, chords };
+// ---- header -----------------------------------------------------------------------------------
+async function header() {
+  for (const name of ['chromium', 'webkit']) {
+    const { b, ctx } = await context(name);
+    const p = await ctx.newPage();
+    let folded = 0;
+    for (const width of [1440, 1100, 900, 760, 600, 480, 375, 320]) {
+      await p.setViewportSize({ width, height: 600 });
+      await p.goto(srv.base + '/', { waitUntil: 'load' });
+      const m = await p.evaluate(() => {
+        const tools = [...document.querySelectorAll('.topbar .tools>*')].filter((e) => getComputedStyle(e).display !== 'none' && e.getBoundingClientRect().width > 0);
+        // One row: every tool's box overlaps the first one vertically (heights differ).
+        const boxes = tools.map((e) => e.getBoundingClientRect());
+        const rows = boxes.every((x) => x.top < boxes[0].bottom && x.bottom > boxes[0].top) ? 1 : 2;
+        const btn = document.getElementById('searchbtn');
+        return { rows, n: tools.length, hscroll: document.documentElement.scrollWidth > innerWidth + 1, folded: !!btn && getComputedStyle(btn).display !== 'none' };
+      });
+      const where = `${name} ${width}`;
+      if (m.n < 2 || m.rows !== 1) r.fail(`header ${where}: tools split over ${m.rows} rows`);
+      else if (m.hscroll) r.fail(`header ${where}: page scrolls sideways`);
+      else r.ok(`header ${where}: tools on one row${m.folded ? ', search folded' : ''}`);
+      if (!m.folded || folded++) continue;
+      await p.click('#searchbtn');
+      const open = await p.evaluate(() => document.activeElement && document.activeElement.id === 'q' && getComputedStyle(document.querySelector('.topsearch')).display !== 'none');
+      await p.keyboard.press('Escape');
+      const shut = await p.evaluate(() => getComputedStyle(document.querySelector('.topsearch')).display === 'none');
+      if (open && shut) r.ok(`header ${where}: search button opens the field, Escape folds it`);
+      else r.fail(`header ${where}: search button open=${open} escape=${shut}`);
+    }
+    await b.close();
+  }
+}
+
+const checks = { truncation, 'live-tabs': liveTabs, mermaid, chip, doctabs, chords, header };
 try {
   for (const c of wanted) { console.log(`-- ${c}`); await checks[c](); }
 } finally {

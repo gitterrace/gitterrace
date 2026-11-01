@@ -26,6 +26,32 @@ main.wrap>h2:first-child,main.wrap>.tabs+h2{margin-top:var(--space-6)}
 .branch:hover{text-decoration:none;color:var(--fg);border-color:var(--line-strong)}
 .branch svg{width:12px;height:12px;fill:currentColor}
 .spacer{flex:1}
+/* The bar is two units: where you are (brand, repository, switchers, chip) and the tools.
+   Each wraps as a whole, never one control at a time. */
+.where{display:flex;align-items:center;flex-wrap:wrap;gap:var(--space-2) var(--space-3);min-width:0}
+/* The tools (search, actions, theme) are one unit that never wraps apart. Search gives way
+   first: it narrows, then folds into a button that opens it across the bar. */
+.tools{display:flex;align-items:center;gap:var(--space-1);flex:0 1 auto;min-width:0;margin-left:auto}
+.tools .topsearch{flex:0 1 260px;min-width:160px}
+.tools .topsearch input[type=search]{min-width:0;width:100%}
+.tool{width:32px;height:32px;padding:0;display:grid;place-items:center;background:transparent;border:1px solid transparent;border-radius:var(--radius);color:var(--muted);cursor:pointer}
+.tool:hover{background:var(--hover);color:var(--fg);border-color:var(--line)}
+.tool svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.75;stroke-linecap:round}
+.searchbtn{display:none}
+header.top>.wrap{container:topbar/inline-size}
+@container topbar (max-width:900px){
+  .tools .topsearch{display:none}
+  .searchbtn{display:grid}
+  .topbar.searching>:not(.tools){display:none}
+  .topbar.searching .tools{flex:1}
+  .topbar.searching .topsearch{display:flex;flex:1}
+  .topbar.searching .searchbtn{display:none}
+}
+/* Then the bar sheds words, never controls: the wordmark, then the chip's label, then the
+   ref name (the button keeps its icon and opens the same menu). Names are never cut. */
+@container topbar (max-width:700px){.wordmark,.sep{display:none}}
+@container topbar (max-width:560px){.wtchip .label{display:none}.wtchip{padding:5px 8px}}
+@container topbar (max-width:460px){#refbtn .name{display:none}}
 .theme{width:32px;height:32px;padding:0;display:grid;place-items:center;background:transparent;border:1px solid transparent;border-radius:var(--radius);color:var(--muted)}
 .theme:hover{background:var(--hover);color:var(--fg);border-color:var(--line)}
 .theme svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round;display:none}
@@ -187,7 +213,6 @@ progress::-moz-progress-bar{background:var(--accent);border-radius:var(--radius)
 
 @media (max-width:600px){
 :root{--page-pad:var(--space-4)}
-.branch{display:none}
 .cols{gap:var(--space-4)}
 .latest .sha,.latest .muted{display:none}
 .entries td{padding:var(--space-2) var(--space-3)}
@@ -262,7 +287,6 @@ td.ago{color:var(--faint);font-size:var(--text-xs);white-space:nowrap}
 .hits tr.hit td.c{background:var(--add-bg)}
 .hits tr.gap td{color:var(--faint)}
 mark{background:var(--warn-bg);color:var(--fg);box-shadow:0 0 0 1px var(--warn);border-radius:var(--radius);padding:0 1px}
-@media (max-width:600px){.topsearch{display:none}}
 .searchform input[type=radio],.searchform input[type=checkbox]{min-width:0;width:auto;height:auto;flex:none;margin:0}
 
 
@@ -282,7 +306,7 @@ svg.chart text{font-family:var(--mono)}
 .brand{gap:var(--space-2)}
 .sep{color:var(--faint)}
 .wordmark{font:600 17px/1 var(--serif);color:var(--fg)}
-@media (max-width:600px){.wordmark,.sep{display:none}.tabnav a,.tabs a{letter-spacing:.04em;padding-left:var(--space-2);padding-right:var(--space-2)}}
+@media (max-width:600px){.tabnav a,.tabs a{letter-spacing:.04em;padding-left:var(--space-2);padding-right:var(--space-2)}}
 .entries td{padding-top:6px;padding-bottom:6px}
 .head h1{font-size:28px}
 

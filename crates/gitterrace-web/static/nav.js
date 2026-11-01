@@ -24,6 +24,26 @@
   function toast(msg) { window.gtToast(msg); }
   function copy(text, done, btn) { return window.gtCopy(text, done, btn); }
 
+  // Search folds into a button when the top bar is narrow (CSS decides). Opening it takes the
+  // whole bar; Escape, or focus leaving it empty, folds it again. Returns false when there is
+  // no search box, so "/" falls through.
+  var bar = document.querySelector(".topbar");
+  var q = document.getElementById("q");
+  function openSearch() {
+    if (!q) return false;
+    if (bar) bar.classList.add("searching");
+    q.focus();
+    q.select();
+    return true;
+  }
+  function foldSearch() { if (bar) bar.classList.remove("searching"); }
+  var sbtn = document.getElementById("searchbtn");
+  if (sbtn) sbtn.addEventListener("click", openSearch);
+  if (q) {
+    q.addEventListener("keydown", function (e) { if (e.key === "Escape") { q.blur(); foldSearch(); } });
+    q.addEventListener("blur", function () { if (!q.value) foldSearch(); });
+  }
+
   // ---- overlays -----------------------------------------------------------
   function overlay(cls) {
     closeOverlay();
@@ -275,7 +295,7 @@
     }
     if (k === "g") { chord = true; chordTimer = setTimeout(function () { chord = false; }, 1200); }
     else if (k === "t") { openFinder(); e.preventDefault(); }
-    else if (k === "/") { var q = document.getElementById("q"); if (q) { q.focus(); q.select(); e.preventDefault(); } }
+    else if (k === "/") { if (openSearch()) e.preventDefault(); }
     else if (k === "y") { permalink(); }
     else if (k === "b") { openRefs(); e.preventDefault(); }
     else if (k === "?") { openHelp(); e.preventDefault(); }
