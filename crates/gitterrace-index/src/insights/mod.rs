@@ -20,9 +20,8 @@ mod period;
 
 use std::sync::OnceLock;
 
-use gitterrace_git::IgnoreSet;
+use gitterrace_git::{IgnoreSet, civil_from_days as civil};
 
-use crate::aggregates::civil;
 use crate::{CommitRecord, FileStat};
 
 pub use axis::{BucketUnit, TimeAxis};
@@ -232,7 +231,7 @@ pub(crate) mod fixtures {
 #[cfg(test)]
 mod tests {
     use super::days_from_civil;
-    use crate::aggregates::civil;
+    use gitterrace_git::civil_from_days as civil;
 
     #[test]
     fn civil_round_trip() {

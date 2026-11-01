@@ -6,9 +6,7 @@ use std::fmt::Write as _;
 use std::path::Path;
 
 use anyhow::{Context as _, Result};
-use gitterrace_actions::schema::{KINDS, kind_name};
 use gitterrace_actions::send::PRESETS;
-use gitterrace_api::INSIGHTS;
 use pulldown_cmark::{Options, Parser, html};
 
 use crate::facts::Workspace;
@@ -40,6 +38,8 @@ header img{display:block;max-width:100%;height:auto}
 pre,code{font-family:var(--mono);font-size:var(--text-sm)}
 pre{background:var(--soft);border:var(--border);border-radius:var(--radius);padding:var(--space-3) var(--space-4);overflow-x:auto}
 :not(pre)>code{background:var(--soft);padding:1px var(--space-1);border-radius:var(--radius)}
+.cmds{display:grid;grid-template-columns:max-content 1fr;gap:var(--space-1) var(--space-4);margin:0}.cmds dt code{background:none;padding:0;white-space:nowrap}.cmds dd{margin:0;color:var(--muted)}
+@media (max-width:640px){.cmds{grid-template-columns:1fr}.cmds dd{margin-bottom:var(--space-2)}}
 ul.features{list-style:none;padding:0;margin:0}
 ul.features li{padding:var(--space-2) 0;border-top:var(--border)}
 ul.features b{font-weight:var(--weight-semibold)}
@@ -98,9 +98,9 @@ pub fn render(root: &Path, ws: &Workspace) -> Result<Vec<Out>> {
         h,
         "<header>\n<img class=\"light\" src=\"assets/logo-light.svg\" alt=\"{n}\" width=\"540\" height=\"120\">\n\
          <img class=\"dark\" src=\"assets/logo-dark.svg\" alt=\"\" width=\"540\" height=\"120\" aria-hidden=\"true\">\n\
-         <p class=\"tag\">{desc}.</p>\n</header>\n",
+         <p class=\"tag\">{tag}</p>\n</header>\n",
         n = esc(&pkg.name),
-        desc = esc(pkg.description.trim_end_matches('.')),
+        tag = esc(&tagline(root)?),
     );
     let _ = write!(
         h,
@@ -109,8 +109,9 @@ pub fn render(root: &Path, ws: &Workspace) -> Result<Vec<Out>> {
     );
     let _ = write!(
         h,
-        "<section>\n<h2>What it does</h2>\n<ul class=\"features\">\n{}</ul>\n{}</section>\n",
+        "<section>\n<h2>What it does</h2>\n<ul class=\"features\">\n{}</ul>\n<h3>Commands</h3>\n{}{}</section>\n",
         features(),
+        commands(),
         shots()
     );
     let _ = write!(
@@ -135,6 +136,17 @@ pub fn render(root: &Path, ws: &Workspace) -> Result<Vec<Out>> {
     );
     outs.push(Out::file("site/index.html", h));
     Ok(outs)
+}
+
+/// `TAGLINE` from `scripts/theme-tagline.py`, so the page, the README header and the logo agree.
+fn tagline(root: &Path) -> Result<String> {
+    let src = std::fs::read_to_string(root.join("scripts/theme-tagline.py"))
+        .context("reading scripts/theme-tagline.py")?;
+    src.lines()
+        .find_map(|l| l.strip_prefix("TAGLINE = \""))
+        .and_then(|l| l.strip_suffix('"'))
+        .map(str::to_owned)
+        .context("TAGLINE in scripts/theme-tagline.py")
 }
 
 /// The generated block of the app's tokens, with the font paths pointed at `assets/fonts/`.
@@ -179,42 +191,76 @@ fn features() -> String {
     let line = |s: &mut String, head: &str, text: String| {
         let _ = writeln!(s, "<li><b>{head}</b> {text}</li>");
     };
-    let insights: Vec<String> = INSIGHTS
+    let tabs: Vec<String> = gitterrace_web::stats_tab_labels()
         .iter()
-        .map(|i| format!("<code>{}</code>", esc(i.name)))
+        .map(|t| esc(&t.to_lowercase()))
         .collect();
-    line(
-        &mut s,
-        "Insights.",
-        format!("{} views over the same repository.", insights.join(", ")),
-    );
+    line(&mut s, "Insights.", format!("{}.", sentence(&tabs)));
     let presets: Vec<String> = PRESETS
         .iter()
-        .map(|p| format!("{} (<code>{}</code>)", esc(p.label), esc(p.name)))
+        .map(|p| {
+            let shared = PRESETS.iter().filter(|q| q.label == p.label).count() > 1;
+            let first = p.doc.split('.').next().unwrap_or(p.doc);
+            if shared {
+                format!(
+                    "{} ({})",
+                    esc(p.label),
+                    esc(&lower_first(
+                        first.strip_prefix("A new issue ").unwrap_or(first)
+                    ))
+                )
+            } else {
+                esc(p.label)
+            }
+        })
         .collect();
     line(
         &mut s,
         "Send to.",
         format!(
             "Hand a selection on with its context: {}.",
-            presets.join(", ")
+            sentence(&presets)
         ),
     );
-    let kinds: Vec<String> = KINDS
-        .iter()
-        .map(|(k, _)| format!("<code>{}</code>", kind_name(*k)))
-        .collect();
     line(
         &mut s,
         "Actions.",
-        format!("Run your own program on a selection: {}.", kinds.join(", ")),
+        gitterrace_actions::schema::ACTION_SUMMARY.to_owned(),
     );
-    let subs: Vec<String> = readme_md::subcommands()
-        .into_iter()
-        .map(|(n, _)| format!("<code>git terrace {}</code>", esc(&n)))
-        .collect();
-    line(&mut s, "Commands.", format!("{}.", subs.join(", ")));
     s
+}
+
+/// One row per command, the README block's rows, as a definition list so long text wraps
+/// instead of running off the edge.
+fn commands() -> String {
+    let rows = readme_md::commands_rows();
+    let mut s = String::from("<dl class=\"cmds\">");
+    for (a, b) in rows {
+        let about = b.split(" [--").next().unwrap_or(&b);
+        let _ = write!(
+            s,
+            "<dt><code>{}</code></dt><dd>{}</dd>",
+            esc(&a),
+            esc(about)
+        );
+    }
+    s.push_str("</dl>\n");
+    s
+}
+
+fn sentence(items: &[String]) -> String {
+    match items {
+        [] => String::new(),
+        [one] => one.clone(),
+        [head @ .., last] => format!("{}, and {last}", head.join(", ")),
+    }
+}
+
+fn lower_first(s: &str) -> String {
+    let mut c = s.chars();
+    c.next().map_or_else(String::new, |f| {
+        f.to_lowercase().collect::<String>() + c.as_str()
+    })
 }
 
 /// Placeholders only: the screenshots are the owner's.

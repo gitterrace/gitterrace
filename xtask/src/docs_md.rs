@@ -135,6 +135,9 @@ fn send() -> String {
     s
 }
 
+/// What an `[[action]]` is, for the docs and the website.
+pub const ACTION_ABOUT: &str = "One menu entry. It runs either its own `command` or a `script`.";
+
 fn action_keys() -> String {
     [
         key_table(
@@ -142,11 +145,7 @@ fn action_keys() -> String {
             "A command line written once, for several actions.",
             &SCRIPT_KEYS,
         ),
-        key_table(
-            "`[[action]]`",
-            "One menu entry. It runs either its own `command` or a `script`.",
-            &ACTION_KEYS,
-        ),
+        key_table("`[[action]]`", ACTION_ABOUT, &ACTION_KEYS),
     ]
     .join("\n")
 }

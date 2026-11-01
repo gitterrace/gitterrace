@@ -1,21 +1,9 @@
 //! Small formatting helpers shared by view models.
 
-use std::fmt::Write as _;
+use gitterrace_git::civil_from_days as civil;
 
-/// Civil date from days since the epoch, proleptic Gregorian.
-fn civil(days: i64) -> (i64, u32, u32) {
-    let z = days + 719_468;
-    let era = z.div_euclid(146_097);
-    let doe = z.rem_euclid(146_097);
-    let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
-    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
-    let mp = (5 * doy + 2) / 153;
-    let day = doy - (153 * mp + 2) / 5 + 1;
-    let month = if mp < 10 { mp + 3 } else { mp - 9 };
-    let year = yoe + era * 400 + i64::from(month <= 2);
-    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-    (year, month as u32, day as u32)
-}
+/// The one percent-encoding rule; `/` survives only when the flag is set.
+pub(crate) use gitterrace_git::percent_encode as enc;
 
 /// `YYYY-MM-DD HH:MM` in the commit's own offset.
 pub(crate) fn date(time: i64, offset: i32) -> String {
@@ -86,22 +74,6 @@ pub(crate) fn size(bytes: u64) -> String {
     } else {
         format!("{v:.1} {}", UNITS[i])
     }
-}
-
-/// Percent-encodes a URL path segment or path; `/` survives only in paths.
-pub(crate) fn enc(s: &str, keep_slash: bool) -> String {
-    let mut out = String::with_capacity(s.len());
-    for b in s.bytes() {
-        if b.is_ascii_alphanumeric()
-            || matches!(b, b'-' | b'.' | b'_' | b'~')
-            || (keep_slash && b == b'/')
-        {
-            out.push(char::from(b));
-        } else {
-            let _ = write!(out, "%{b:02X}");
-        }
-    }
-    out
 }
 
 thread_local! {
@@ -247,7 +219,7 @@ pub(crate) fn day_label(time: i64, offset: i32, now: i64) -> String {
         _ => {
             let (y, m, day) = civil(d);
             let (ty, _, _) = civil(today);
-            let mon = MONTHS[(m as usize).saturating_sub(1).min(11)];
+            let mon = MONTHS[usize::try_from(m - 1).unwrap_or(0).min(11)];
             if y == ty {
                 format!("{mon} {day}")
             } else {

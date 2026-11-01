@@ -94,23 +94,6 @@ pub(crate) fn field_parts(raw: &str) -> (&str, Option<&str>) {
     }
 }
 
-/// Percent-encodes `v` for a URL query value: RFC 3986 unreserved bytes stay, every other
-/// byte becomes `%XX`, so the value cannot end its parameter or start another.
-pub(crate) fn url_encode(v: &str) -> String {
-    let mut out = String::with_capacity(v.len());
-    for b in v.bytes() {
-        if b.is_ascii_alphanumeric() || matches!(b, b'-' | b'.' | b'_' | b'~') {
-            out.push(char::from(b));
-        } else {
-            const HEX: &[u8; 16] = b"0123456789ABCDEF";
-            out.push('%');
-            out.push(char::from(HEX[usize::from(b >> 4)]));
-            out.push(char::from(HEX[usize::from(b & 15)]));
-        }
-    }
-    out
-}
-
 /// One piece of a `command` element: literal text or a `{name}` / `{name:modifier}` placeholder.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Piece {

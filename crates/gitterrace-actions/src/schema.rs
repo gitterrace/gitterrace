@@ -33,6 +33,9 @@ const fn item(
 }
 
 /// Every kind an action can be offered on, with what the selection is.
+/// What an action is, in one plain sentence, for the website and docs.
+pub const ACTION_SUMMARY: &str = "Run a program of yours on a selection, with no shell between: a task CLI, an editor, a script.";
+
 pub const KINDS: [(Kind, &str); 8] = [
     (Kind::Line, "A line or a range of lines in a file."),
     (Kind::File, "A whole file."),

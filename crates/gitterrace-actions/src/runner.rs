@@ -12,9 +12,10 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
 
+use gitterrace_git::percent_encode;
 use rustix::process::{Pid, Signal, kill_process_group};
 
-use crate::config::{Action, Cwd, Piece, REPO_FIELDS, Stdin, field_parts, pieces, url_encode};
+use crate::config::{Action, Cwd, Piece, REPO_FIELDS, Stdin, field_parts, pieces};
 use crate::payload::Payload;
 
 /// Captured per stream; the rest is read and dropped so the child never blocks on a pipe.
@@ -213,7 +214,7 @@ pub fn expand(template: &[String], payload: &Payload) -> Result<Vec<String>, Run
                     // The NUL check and the caps see the encoded value, the one passed on.
                     let v = match modifier {
                         None => raw,
-                        Some("url") => url_encode(&raw),
+                        Some("url") => percent_encode(&raw, false),
                         Some(m) => {
                             return Err(RunError::Refused(format!(
                                 "{{{name}}}: unknown modifier :{m}"

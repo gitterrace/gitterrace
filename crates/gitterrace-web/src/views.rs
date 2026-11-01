@@ -208,27 +208,35 @@ pub(crate) fn banner(h: &gitterrace_git::HeadState) -> Option<String> {
     }
 }
 
+/// Path, label and key of each insights tab.
+const STATS_TABS: [(&str, &str, &str); 11] = [
+    ("/stats", "Activity", "a"),
+    ("/stats/files", "Hot files", "f"),
+    ("/stats/types", "Commit types", "t"),
+    ("/stats/pulse", "Pulse", "pu"),
+    ("/stats/hotspots", "Hotspots", "ho"),
+    ("/stats/ownership", "Ownership", "ow"),
+    ("/stats/patterns", "Patterns", "pa"),
+    ("/compare", "Compare", "cm"),
+    ("/stats/languages", "Languages", "l"),
+    ("/stats/frequency", "Code frequency", "cf"),
+    ("/stats/contributors", "Contributors", "co"),
+];
+
+/// The labels of the insights tabs, in tab order.
+pub fn stats_tab_labels() -> Vec<&'static str> {
+    STATS_TABS.iter().map(|(_, label, _)| *label).collect()
+}
+
 pub(crate) fn stats_tabs(active: &str) -> Vec<Nav> {
-    [
-        ("/stats", "Activity", "a"),
-        ("/stats/files", "Hot files", "f"),
-        ("/stats/types", "Commit types", "t"),
-        ("/stats/pulse", "Pulse", "pu"),
-        ("/stats/hotspots", "Hotspots", "ho"),
-        ("/stats/ownership", "Ownership", "ow"),
-        ("/stats/patterns", "Patterns", "pa"),
-        ("/compare", "Compare", "cm"),
-        ("/stats/languages", "Languages", "l"),
-        ("/stats/frequency", "Code frequency", "cf"),
-        ("/stats/contributors", "Contributors", "co"),
-    ]
-    .into_iter()
-    .map(|(path, label, key)| Nav {
-        href: href(path),
-        label,
-        on: key == active,
-    })
-    .collect()
+    STATS_TABS
+        .into_iter()
+        .map(|(path, label, key)| Nav {
+            href: href(path),
+            label,
+            on: key == active,
+        })
+        .collect()
 }
 
 /// First letter of a name for the avatar disc.

@@ -9,9 +9,10 @@
 
 use std::collections::BTreeMap;
 
+use gitterrace_git::percent_encode;
 use serde::{Deserialize, Serialize};
 
-use crate::config::{Piece, pieces, url_encode};
+use crate::config::{Piece, pieces};
 
 /// Placeholders the page fills, in the order the docs list them.
 pub const SEND_FIELDS: [&str; 7] = [
@@ -61,7 +62,7 @@ pub const PRESETS: [Preset; 4] = [
         label: "New issue",
         url: "https://github.com/{var.repo}/issues/new?title={title}&body={notes}",
         vars: &["repo"],
-        doc: "A new issue on github.com. `repo` is `owner/name`.",
+        doc: "A new issue on a hosted service. `repo` is `owner/name`.",
     },
     Preset {
         name: "forgejo-issue",
@@ -114,7 +115,7 @@ pub fn fill(parts: &[Part], values: &BTreeMap<String, String>) -> String {
         .iter()
         .map(|p| match p {
             Part::Lit(s) => s.clone(),
-            Part::Ph(n) => url_encode(values.get(n).map_or("", String::as_str)),
+            Part::Ph(n) => percent_encode(values.get(n).map_or("", String::as_str), false),
         })
         .collect()
 }

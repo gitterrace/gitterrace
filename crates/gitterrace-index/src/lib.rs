@@ -14,6 +14,8 @@ use std::path::PathBuf;
 use gitterrace_git::Repo;
 
 pub use aggregates::*;
+/// Re-exported so the cards crate shares the one date rule without a new dependency.
+pub use gitterrace_git::civil_from_days;
 pub use insights::*;
 pub use source::CommitSource;
 pub use store::FORMAT_VERSION;

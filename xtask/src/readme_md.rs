@@ -72,17 +72,20 @@ pub fn install_md(ws: &Workspace) -> String {
     install
 }
 
-/// `(name, about)` of each subcommand, from the clap definition.
-pub fn subcommands() -> Vec<(String, String)> {
-    cli::Cli::command()
-        .get_subcommands()
-        .filter(|s| s.get_name() != "help")
-        .map(|s| (s.get_name().to_owned(), first_line(s)))
-        .collect()
-}
-
 /// One line per subcommand and flag, from the clap definition.
 fn commands() -> String {
+    let rows = commands_rows();
+    let width = rows.iter().map(|(a, _)| a.len()).max().unwrap_or(0);
+    let mut s = String::from("```\n");
+    for (a, b) in rows {
+        let _ = writeln!(s, "{a:width$}  {b}");
+    }
+    s.push_str("```\n");
+    s
+}
+
+/// `(usage, about)` of the root command and each subcommand.
+pub fn commands_rows() -> Vec<(String, String)> {
     let cmd = cli::Cli::command();
     let flags = |c: &clap::Command| -> String {
         let f: Vec<String> = c
@@ -140,13 +143,7 @@ fn commands() -> String {
             format!("{}{}", first_line(sub), own(sub)),
         ));
     }
-    let width = rows.iter().map(|(a, _)| a.len()).max().unwrap_or(0);
-    let mut s = String::from("```\n");
-    for (a, b) in rows {
-        let _ = writeln!(s, "{a:width$}  {b}");
-    }
-    s.push_str("```\n");
-    s
+    rows
 }
 
 fn positionals_no_global(c: &clap::Command) -> String {

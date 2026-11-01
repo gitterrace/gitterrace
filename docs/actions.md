@@ -36,7 +36,7 @@ Copy as markdown.
 | Preset | Opens | Needs in `vars` | Default label |
 | --- | --- | --- | --- |
 | `tendir` | tendir's new-task sheet, filled in. `tendir://new-task?title={title}&notes={notes}` |  | Send to tendir |
-| `github-issue` | A new issue on github.com. `repo` is `owner/name`. `https://github.com/{var.repo}/issues/new?title={title}&body={notes}` | `repo` | New issue |
+| `github-issue` | A new issue on a hosted service. `repo` is `owner/name`. `https://github.com/{var.repo}/issues/new?title={title}&body={notes}` | `repo` | New issue |
 | `forgejo-issue` | A new issue on a self-hosted forge. `base` is the instance URL, `repo` is `owner/name`. `{var.base}/{var.repo}/issues/new?title={title}&body={notes}` | `base`, `repo` | New issue |
 | `mail` | A mail draft in your mail app. `mailto:?subject={title}&body={notes}` |  | Mail draft |
 

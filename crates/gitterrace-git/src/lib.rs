@@ -8,7 +8,9 @@ mod ident;
 mod ignore;
 mod repo;
 mod repo_id;
+mod time;
 mod types;
+mod url;
 mod walk;
 mod watch;
 mod worktree;
@@ -23,10 +25,12 @@ pub use gitdir::{BranchStatus, HeadState, InProgress, LinkedWorktree, Stash, Tag
 pub use ignore::IgnoreSet;
 pub use repo::Repo;
 pub use repo_id::resolve_permalink;
+pub use time::civil_from_days;
 pub use types::{
     BlameLine, Blob, ChangeKind, CodeCounts, CommitDetail, CommitSummary, FileDiff, Hunk, HunkLine,
     LineKind, RefInfo, RefKind, Signature, TreeEntry, TreeEntryKind,
 };
+pub use url::percent_encode;
 pub use walk::{
     BlobId, BlobReader, FileRef, LastCommit, files, last_commits, scan_commits, tree_id,
 };

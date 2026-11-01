@@ -3,6 +3,8 @@
 
 use std::collections::{BTreeSet, HashMap, HashSet};
 
+use gitterrace_git::civil_from_days as civil;
+
 use crate::{CommitRecord, TimeAxis};
 
 pub(crate) const DAY: i64 = 86_400;
@@ -366,20 +368,6 @@ pub(crate) fn weekday(days: i64) -> usize {
 pub(crate) fn format_date(days: i64) -> String {
     let (y, m, d) = civil(days);
     format!("{y:04}-{m:02}-{d:02}")
-}
-
-/// Days since the epoch to (year, month, day), proleptic Gregorian.
-pub(crate) fn civil(days: i64) -> (i64, i64, i64) {
-    let z = days + 719_468;
-    let era = z.div_euclid(146_097);
-    let doe = z.rem_euclid(146_097);
-    let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
-    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
-    let mp = (5 * doy + 2) / 153;
-    let d = doy - (153 * mp + 2) / 5 + 1;
-    let m = if mp < 10 { mp + 3 } else { mp - 9 };
-    let y = yoe + era * 400 + i64::from(m <= 2);
-    (y, m, d)
 }
 
 #[cfg(test)]

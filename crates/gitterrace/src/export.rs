@@ -19,6 +19,7 @@ use axum::{
     body::{Body, to_bytes},
     http::{Request, StatusCode},
 };
+use gitterrace_git::percent_encode;
 use tower::ServiceExt;
 
 /// What to include in an export.
@@ -131,7 +132,7 @@ async fn wait_for_index(router: &Router) -> anyhow::Result<()> {
 async fn fetch(router: &Router, path: &str) -> anyhow::Result<(StatusCode, String, Vec<u8>)> {
     // The router refuses requests without a local Host (DNS-rebinding guard).
     // Paths travel decoded (they name files on disk); encode them for the URI.
-    let req = Request::get(percent_encode(path))
+    let req = Request::get(percent_encode(path, true))
         .header(axum::http::header::HOST, "localhost")
         .body(Body::empty())
         .context("building a request")?;
@@ -285,23 +286,6 @@ fn percent_decode(s: &str) -> String {
     String::from_utf8_lossy(&out).into_owned()
 }
 
-/// The web's `fmt::enc` with slashes kept: every byte outside `A-Za-z0-9-._~/`
-/// becomes `%XX`, so `percent_decode(percent_encode(p)) == p`.
-fn percent_encode(s: &str) -> String {
-    let mut out = String::with_capacity(s.len());
-    for b in s.bytes() {
-        if b.is_ascii_alphanumeric() || matches!(b, b'-' | b'.' | b'_' | b'~' | b'/') {
-            out.push(char::from(b));
-        } else {
-            const HEX: &[u8; 16] = b"0123456789ABCDEF";
-            out.push('%');
-            out.push(char::from(HEX[usize::from(b >> 4)]));
-            out.push(char::from(HEX[usize::from(b & 15)]));
-        }
-    }
-    out
-}
-
 /// File the page lands in: HTML pages become `<path>/index.html` so their links
 /// resolve when the folder is served by any static server.
 fn target(out: &Path, path: &str, content_type: &str) -> PathBuf {
@@ -358,7 +342,9 @@ fn write_page(out: &Path, path: &str, content_type: &str, body: &[u8]) -> anyhow
 mod tests {
     use std::path::Path;
 
-    use crate::export::{links, percent_decode, percent_encode, target, write_page};
+    use gitterrace_git::percent_encode;
+
+    use crate::export::{links, percent_decode, target, write_page};
 
     #[test]
     fn encoded_names_round_trip_to_real_file_names() {
@@ -372,9 +358,12 @@ mod tests {
             "/blob/HEAD/über.md",
             "/tree/HEAD/x%y",
         ] {
-            assert_eq!(percent_decode(&percent_encode(p)), p);
+            assert_eq!(percent_decode(&percent_encode(p, true)), p);
         }
-        assert_eq!(percent_encode("/blob/HEAD/a b.md"), "/blob/HEAD/a%20b.md");
+        assert_eq!(
+            percent_encode("/blob/HEAD/a b.md", true),
+            "/blob/HEAD/a%20b.md"
+        );
         assert_eq!(percent_decode("bad%zz%4"), "bad%zz%4");
     }
 

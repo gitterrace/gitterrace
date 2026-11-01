@@ -52,5 +52,6 @@ writes to your repository. MIT licensed. The one-page site is generated into [si
 
 ## Contributing
 
-Issues and pull requests are welcome. Built by AI coding agents and humans together; a human
-sets direction and decides ([why](docs/why.md)).
+Issues and pull requests are welcome: see [contributing](CONTRIBUTING.md), and report
+vulnerabilities privately as [SECURITY.md](SECURITY.md) describes. Built by AI coding agents
+and humans together. A human sets the direction and decides ([why](docs/why.md)).

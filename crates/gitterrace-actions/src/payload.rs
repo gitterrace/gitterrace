@@ -4,7 +4,7 @@
 
 use std::collections::BTreeMap;
 
-use gitterrace_git::Repo;
+use gitterrace_git::{Repo, civil_from_days, percent_encode};
 use serde::{Deserialize, Serialize};
 
 use crate::config::Kind;
@@ -319,23 +319,6 @@ fn lossy_line(s: &str, max: usize) -> String {
     cap(&flat, max).0
 }
 
-const HEX: &[u8; 16] = b"0123456789ABCDEF";
-
-/// Percent-encodes everything but unreserved characters and `/`.
-fn encode_path(p: &str) -> String {
-    let mut out = String::with_capacity(p.len());
-    for b in p.bytes() {
-        if b.is_ascii_alphanumeric() || b"-._~/".contains(&b) {
-            out.push(char::from(b));
-        } else {
-            out.push('%');
-            out.push(char::from(HEX[usize::from(b >> 4)]));
-            out.push(char::from(HEX[usize::from(b & 15)]));
-        }
-    }
-    out
-}
-
 /// `/go/<id>/<sha>[/<path>][#L<a>[-L<b>]]`. A repo without an id (no root commit) cannot
 /// have a sha, so the name fallback is only for completeness. Shared with the API, which
 /// passes an empty `origin` to get the path form.
@@ -350,11 +333,11 @@ pub fn permalink(
     let mut url = format!(
         "{}/go/{}/{sha}",
         origin.trim_end_matches('/'),
-        encode_path(id.unwrap_or(name))
+        percent_encode(id.unwrap_or(name), true)
     );
     if let Some(p) = path {
         url.push('/');
-        url.push_str(&encode_path(p));
+        url.push_str(&percent_encode(p, true));
     }
     if let Some(l) = lines {
         url = if l.start == l.end {
@@ -422,16 +405,7 @@ fn markdown(
 fn rfc3339(secs: i64) -> String {
     let days = secs.div_euclid(86_400);
     let rem = secs.rem_euclid(86_400);
-    // Civil-from-days (Hinnant), valid for the whole i64 day range used here.
-    let z = days + 719_468;
-    let era = z.div_euclid(146_097);
-    let doe = z - era * 146_097;
-    let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
-    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
-    let mp = (5 * doy + 2) / 153;
-    let d = doy - (153 * mp + 2) / 5 + 1;
-    let m = if mp < 10 { mp + 3 } else { mp - 9 };
-    let y = yoe + era * 400 + i64::from(m <= 2);
+    let (y, m, d) = civil_from_days(days);
     format!(
         "{y:04}-{m:02}-{d:02}T{:02}:{:02}:{:02}Z",
         rem / 3600,

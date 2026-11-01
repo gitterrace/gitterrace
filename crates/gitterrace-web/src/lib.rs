@@ -38,6 +38,7 @@ use gitterrace_git::Repo;
 use gitterrace_index::Index;
 pub use multi::discover_repos;
 pub use reload::{Load, Watched};
+pub use views::stats_tab_labels;
 
 use crate::app::{App, Env};
 

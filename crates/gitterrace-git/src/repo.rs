@@ -293,17 +293,9 @@ impl Repo {
             .collect()
     }
 
-    /// Per-file line counts against the first parent, without hunk text.
-    /// The indexer calls this once per commit, so it must stay cheap.
-    pub fn numstat(&self, id: &str) -> Result<Vec<crate::FileDiff>> {
-        let repo = self.repo();
-        let oid = Self::resolve_id(&repo, id)?;
-        let commit = repo.find_commit(oid).map_err(git)?;
-        crate::diff::changes(&repo, &commit, false, MAX_TEXT_BYTES)
-    }
-
-    /// [`Repo::numstat`] for many commits, spread over all cores. Results are in the order of
-    /// `ids`. Prefer this to a loop over `numstat`: the work is CPU bound and independent.
+    /// Per-file line counts against the first parent, without hunk text, for many commits
+    /// spread over all cores. Results are in the order of `ids`; the work is CPU bound and
+    /// independent, so the indexer batches it.
     /// A commit whose objects cannot be read (a shallow clone's boundary, a pruned or hostile
     /// object store) gets no file stats instead of failing the whole batch.
     pub fn numstat_many(&self, ids: &[String]) -> Result<Vec<Vec<crate::FileDiff>>> {
@@ -730,8 +722,9 @@ mod tests {
         assert_eq!(want.len(), 4);
         for id in repo.rev_list("HEAD").expect("rev_list") {
             let got: BTreeMap<_, _> = repo
-                .numstat(&id)
+                .numstat_many(std::slice::from_ref(&id))
                 .expect("numstat")
+                .remove(0)
                 .into_iter()
                 .map(|f| (f.path, (f.additions, f.deletions, f.old_path)))
                 .collect();
