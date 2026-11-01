@@ -5,6 +5,7 @@ use clap::Parser;
 
 mod cli;
 mod export;
+mod handler;
 mod open;
 
 use cli::{Cli, Command};
@@ -64,6 +65,7 @@ async fn main() -> anyhow::Result<()> {
                 return Err(e);
             }
         }
+        Command::InstallHandler { uninstall } => handler::run(uninstall)?,
         Command::Wrapped {
             year,
             layout,
