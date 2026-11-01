@@ -5,7 +5,7 @@
 <h2>Branches</h2>
 <div class="card"><table class="entries branches grow">
 <tr class="th"><td>Branch</td><td class="grow">Last commit</td><td class="r" data-tip="Commits behind the default branch">Behind</td><td class="r" data-tip="Commits ahead of the default branch">Ahead</td><td class="r">Updated</td></tr>
-{% for b in branches %}<tr><td><a href="{{ b.log }}">{{ b.name }}</a>{% if b.default %} <span class="tag">default</span>{% endif %}{% if b.merged %} <span class="tag merged">merged</span>{% endif %}</td><td class="grow"><div class="line">{{ b.commit|safe }}<span class="subj">{{ b.subject }}</span><span class="muted">{{ b.author }}</span></div></td>{% if b.default %}<td></td><td></td>{% else %}<td class="r muted">{{ b.behind }}</td><td class="r"><a href="{{ b.compare }}">{{ b.ahead }}</a></td>{% endif %}<td class="muted r">{{ b.when }}</td></tr>{% endfor %}
+{% for b in branches %}<tr><td><a href="{{ b.log }}">{{ b.name }}</a>{% if b.default %} <span class="tag">default</span>{% endif %}{% if b.merged %} <span class="tag merged">merged</span>{% endif %}</td><td class="grow"><div class="line">{{ b.commit|safe }}<span class="subj">{{ b.subject }}</span><span class="muted"><a class="who" href="{{ b.author_href }}">{{ b.author }}</a></span></div></td>{% if b.default %}<td></td><td></td>{% else %}<td class="r muted">{{ b.behind }}</td><td class="r"><a href="{{ b.compare }}">{{ b.ahead }}</a></td>{% endif %}<td class="muted r">{{ b.when }}</td></tr>{% endfor %}
 {% if branches.is_empty() %}<tr><td class="muted">None</td></tr>{% endif %}
 </table></div>
 <h2>Tags</h2>

@@ -32,7 +32,8 @@ main.wrap>h2:first-child,main.wrap>.tabs+h2{margin-top:var(--space-6)}
 /* The tools (search, actions, theme) are one unit that never wraps apart. Search gives way
    first: it narrows, then folds into a button that opens it across the bar. */
 .tools{display:flex;align-items:center;gap:var(--space-1);flex:0 1 auto;min-width:0;margin-left:auto}
-.tools .topsearch{flex:0 1 260px;min-width:160px}
+/* Wide enough for the whole placeholder beside the / hint at the body font. */
+.tools .topsearch{flex:0 1 320px;width:320px;min-width:160px}
 .tools .topsearch input[type=search]{min-width:0;width:100%}
 .tool{width:32px;height:32px;padding:0;display:grid;place-items:center;background:transparent;border:1px solid transparent;border-radius:var(--radius);color:var(--muted);cursor:pointer}
 .tool:hover{background:var(--hover);color:var(--fg);border-color:var(--line)}
@@ -239,7 +240,7 @@ button.branch{height:auto;cursor:pointer}
 /* Uncommitted work is a normal state: quiet label, only the dot carries the warn colour. No motion. */
 .wtchip .dot{width:6px;height:6px;border-radius:50%;background:var(--warn)}
 .topsearch{position:relative;display:flex;align-items:center}
-.topsearch input[type=search]{min-width:220px;width:260px;padding-right:32px;height:30px}
+.topsearch input[type=search]{min-width:220px;width:320px;padding-right:32px;height:30px}
 .topsearch kbd{position:absolute;right:8px;pointer-events:none}
 kbd{font:var(--weight-semibold) var(--text-2xs)/1 var(--mono);color:var(--muted);border:var(--border);border-bottom-width:2px;border-radius:var(--radius);padding:2px 5px;background:var(--soft)}
 .ov-back{position:fixed;inset:0;background:var(--scrim);z-index:50;display:flex;justify-content:center;align-items:flex-start;padding-top:12vh}

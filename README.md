@@ -7,6 +7,14 @@
 
 <p align="center"><b>Your repository's history, step by step. Run <code>git terrace</code> and read it in your browser.</b></p>
 
+<!-- BEGIN GENERATED: shots -->
+<picture>
+<source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/overview-dark.png">
+<img src="docs/screenshots/overview-light.png" alt="Browse: the repository page with README, last commit, file list and key numbers.">
+</picture>
+
+<!-- END GENERATED: shots -->
+
 Browse any git repository in your browser, offline, read-only: code, commits, blame,
 branches, worktrees, stashes, live updates and insights. No database, accounts or network.
 Agents write more of the code each month, and few people read their diffs. This is a calm
@@ -16,14 +24,6 @@ place to look again ([why](docs/why.md)).
 Try it without installing: [the live demo](https://demo.gitterrace.dev): jq 1.8.2 and ripgrep 15.2.0, exported.
 
 <!-- END GENERATED: demo -->
-
-<!-- BEGIN GENERATED: shots -->
-<picture>
-<source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/overview-dark.png">
-<img src="docs/screenshots/overview-light.png" alt="Browse: the repository page with README, last commit, file list and key numbers.">
-</picture>
-
-<!-- END GENERATED: shots -->
 
 ## Install
 

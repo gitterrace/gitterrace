@@ -162,6 +162,8 @@ pub(crate) struct BranchRow {
     pub(crate) commit: String,
     pub(crate) subject: String,
     pub(crate) author: String,
+    /// The author's commit log, as on every other page that names an author.
+    pub(crate) author_href: String,
     pub(crate) when: String,
     pub(crate) ahead: String,
     pub(crate) behind: String,
@@ -191,6 +193,7 @@ pub(crate) fn branch_rows(a: &crate::app::App) -> Result<Vec<BranchRow>> {
                 )),
                 commit: sha_link(&s.target),
                 subject: c.subject,
+                author_href: crate::views::author_href(&c.author.email),
                 author: c.author.name,
                 when: ago(c.committer.time, now),
                 ahead: fmt::thousands(s.ahead),
