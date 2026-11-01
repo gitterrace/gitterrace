@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: build run fmt clippy lint test doc theme actions docs-gen docs-check names check site-render help bench bench-large bench-report bench-clean bench-guard browser-check site deploy stage shipped domains demo send-vectors
+.PHONY: build run fmt clippy lint test doc theme actions docs-gen docs-check names check site-render help bench bench-large bench-report bench-clean bench-guard browser-check site deploy stage shipped domains send-vectors
 
 ## build: Release binary
 build:
@@ -111,11 +111,6 @@ shipped:
 ## domains: Check that gitterrace.dev serves and every other host redirects to it
 domains:
 	python3 scripts/site-check.py domains
-
-## demo: Export the repositories in demo/repos.txt and ship them to demo.gitterrace.dev
-demo:
-	scripts/site-export.sh
-	cd demo && npx wrangler@4 deploy
 
 ## help: This list
 help:

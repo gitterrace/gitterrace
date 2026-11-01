@@ -49,8 +49,8 @@ pub fn render(ws: &Workspace, scripts: &[Script]) -> Vec<Out> {
     ]
 }
 
-/// The live demo link, from `demo/wrangler.toml`, naming what it shows from `demo/repos.txt`;
-/// nothing when there is no demo.
+/// The live demo link and what it shows, from `[workspace.metadata.demo]`; nothing when there
+/// is no demo.
 pub fn demo_md(ws: &Workspace) -> String {
     if ws.demo.is_empty() {
         return String::new();

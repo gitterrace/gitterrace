@@ -83,6 +83,12 @@ strip = true
 [profile.dist]
 inherits = "release"
 
+# The live demo, built and deployed from github.com/gitterrace/demo. Read by xtask for the
+# README and site link; keep `repos` in step with that repository's repos.txt.
+[workspace.metadata.demo]
+url = "https://demo.gitterrace.dev"
+repos = ["jq jq-1.8.2", "ripgrep 15.2.0"]
+
 # Release automation (cargo-dist): GitHub releases with prebuilt binaries, a
 # shell installer and a formula in gitterrace/homebrew-tap, which the release job fills. Run `dist plan` to preview.
 [workspace.metadata.dist]
