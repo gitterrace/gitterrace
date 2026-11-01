@@ -1,0 +1,24 @@
+[package]
+name = "gitterrace-actions"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[dependencies]
+gitterrace-git.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+toml = { version = "1", default-features = false, features = ["std", "serde", "parse"] }
+getrandom = "0.4"
+rustix = { version = "1", default-features = false, features = ["std", "process"] }
+
+[dev-dependencies]
+tempfile.workspace = true
