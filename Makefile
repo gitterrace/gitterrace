@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: build run fmt lint test doc theme actions docs-gen docs-check names check help bench bench-large bench-report bench-clean bench-guard browser-check
+.PHONY: build run fmt lint test doc theme actions docs-gen docs-check names check site-png help bench bench-large bench-report bench-clean bench-guard browser-check
 
 ## build: Release binary
 build:
@@ -88,12 +88,16 @@ site: docs-check
 	python3 scripts/site-check.py release
 
 ## deploy: Ship site/ to gitterrace.dev (wrangler deploy, the Worker is in wrangler.toml)
-deploy: site shipped
+deploy: site shipped site-png
 	npx wrangler@4 deploy
 
 ## stage: Deploy without the release check, only while gitterrace.dev is blocked at the edge
-stage: docs-check shipped
+stage: docs-check shipped site-png
 	npx wrangler@4 deploy
+
+## site-png: Render the touch icon and link-preview image from docs/brand (ignored, never committed)
+site-png:
+	node scripts/site-png.mjs
 
 ## shipped: site/ and wrangler.toml are committed, so a deploy ships a known commit
 shipped:

@@ -1,3 +1,5 @@
 /target
 /.wt
 /.mcp.json
+# Rendered from docs/brand at deploy (scripts/site-png.mjs); the SVGs are the source.
+/site/assets/*.png

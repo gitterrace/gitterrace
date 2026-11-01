@@ -95,7 +95,13 @@ pub fn render(root: &Path, ws: &Workspace) -> Result<Vec<Out>> {
          <meta property=\"og:description\" content=\"{desc}\">\n\
          <meta property=\"og:url\" content=\"{home}/\">\n\
          <meta property=\"og:type\" content=\"website\">\n\
+         <meta property=\"og:image\" content=\"{home}/assets/og.png\">\n\
+         <meta property=\"og:image:width\" content=\"1200\">\n\
+         <meta property=\"og:image:height\" content=\"630\">\n\
+         <meta property=\"og:image:alt\" content=\"{name}\">\n\
+         <meta name=\"twitter:card\" content=\"summary_large_image\">\n\
          <link rel=\"icon\" type=\"image/svg+xml\" href=\"assets/mark.svg\">\n\
+         <link rel=\"apple-touch-icon\" href=\"assets/apple-touch-icon.png\">\n\
          <link rel=\"stylesheet\" href=\"assets/site.css\">\n</head>\n<body>\n<main>\n",
         name = esc(&pkg.name),
         desc = esc(&pkg.description),
