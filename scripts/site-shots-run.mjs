@@ -33,9 +33,13 @@ const SHOTS = [
       await p.waitForSelector('.send, dialog, [role=dialog]', { timeout: 5000 });
       // A narrow file view jumps sideways to the anchor; keep the code at its left edge.
       await p.evaluate(() => document.querySelectorAll('*').forEach((e) => { if (e.scrollLeft) e.scrollLeft = 0; }));
+      // The marked lines sit just below the window, so the shot shows what is being sent.
+      await p.evaluate(() => {
+        const d = document.querySelector('.send, dialog, [role=dialog]').getBoundingClientRect();
+        const l = document.getElementById('L108').getBoundingClientRect();
+        window.scrollBy(-window.scrollX, l.top - d.bottom - 24);
+      });
     },
-    // The dialog and the marked lines around it, so the small window reads at site width.
-    clip: '.send, dialog, [role=dialog]',
   },
 ];
 
@@ -52,15 +56,7 @@ for (const scheme of ['light', 'dark']) {
     if (s.prepare) await s.prepare(p);
     await p.waitForTimeout(400);
     const file = join(out, `${s.name}-${scheme}.png`);
-    let clip;
-    if (s.clip) {
-      const b = await p.locator(s.clip).first().boundingBox();
-      const pad = 48;
-      const x = Math.max(0, b.x - 160);
-      const y = Math.max(0, b.y - pad);
-      clip = { x, y, width: Math.min(1280 - x, b.width + 320), height: Math.min(800 - y, b.height + pad * 2) };
-    }
-    await p.screenshot({ path: file, clip });
+    await p.screenshot({ path: file });
     await p.close();
     console.log(`wrote docs/screenshots/${s.name}-${scheme}.png`);
   }

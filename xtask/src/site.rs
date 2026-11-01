@@ -45,8 +45,14 @@ pre{background:var(--soft);border:var(--border);border-radius:var(--radius);padd
 ul.features{list-style:none;padding:0;margin:0}
 ul.features li{padding:var(--space-2) 0;border-top:var(--border)}
 ul.features b{font-weight:var(--weight-semibold)}
-figure{margin:var(--space-6) 0}
-figure img{display:block;width:100%;height:auto;border:var(--border);border-radius:var(--radius)}
+ul.features li.shot{display:grid;grid-template-columns:1fr 1fr;gap:var(--space-4);align-items:center}
+@media (max-width:640px){ul.features li.shot{grid-template-columns:1fr}}
+figure{margin:0}
+figure img,.lightbox img{display:block;width:100%;height:auto;border:var(--border);border-radius:var(--radius)}
+.lightbox{display:none}
+.lightbox:target{display:flex;position:fixed;inset:0;z-index:10;align-items:center;justify-content:center;padding:var(--space-8);background:color-mix(in srgb,var(--bg) 97%,transparent);cursor:zoom-out}
+.lightbox:target picture{max-width:min(1280px,100%)}
+.demo{margin-top:var(--space-6)}
 figcaption{font-size:var(--text-xs);color:var(--faint);margin-top:var(--space-1)}
 nav.links,footer{display:flex;flex-wrap:wrap;gap:var(--space-4);font-size:var(--text-sm)}
 footer{margin-top:var(--space-16);padding-top:var(--space-4);border-top:var(--border);color:var(--faint)}
@@ -116,18 +122,19 @@ pub fn render(root: &Path, ws: &Workspace) -> Result<Vec<Out>> {
         h,
         "<header>\n<picture>\n<source media=\"(prefers-color-scheme: dark)\" srcset=\"assets/logo-dark.svg\">\n\
          <img src=\"assets/logo-light.svg\" alt=\"{n}\" width=\"540\" height=\"120\">\n</picture>\n\
-         <p class=\"tag\">{tag}</p>\n{demo}</header>\n",
+         <p class=\"tag\">{tag}</p>\n<nav class=\"links\"><a href=\"{r}\">Source on GitHub</a></nav>\n</header>\n",
+        r = esc(repo),
         n = esc(&pkg.name),
         tag = esc(&tagline(root)?),
-        demo = if ws.demo.is_empty() {
-            String::new()
-        } else {
-            format!(
-                "<p class=\"demo\"><a href=\"{}\">Try the live demo</a>, no install needed.</p>\n",
-                esc(&ws.demo)
-            )
-        },
     );
+    let demo = if ws.demo.is_empty() {
+        String::new()
+    } else {
+        format!(
+            "<p class=\"demo\"><a href=\"{}\">Try the live demo</a>, no install needed.</p>\n",
+            esc(&ws.demo)
+        )
+    };
     let _ = write!(
         h,
         "<section>\n<h2>Install</h2>\n{}</section>\n",
@@ -135,10 +142,9 @@ pub fn render(root: &Path, ws: &Workspace) -> Result<Vec<Out>> {
     );
     let _ = write!(
         h,
-        "<section>\n<h2>What it does</h2>\n<ul class=\"features\">\n{}</ul>\n<h3>Commands</h3>\n{}{}</section>\n",
-        features(),
+        "<section id=\"features\">\n<h2>What it does</h2>\n<ul class=\"features\">\n{}</ul>\n{demo}<h3>Commands</h3>\n{}</section>\n",
+        features(root)?,
         commands(),
-        shots(root)?
     );
     let _ = write!(
         h,
@@ -281,16 +287,24 @@ fn split_why(why: &str) -> (&str, (String, String)) {
     (lead, (why_body, made))
 }
 
-fn features() -> String {
-    let mut s = String::new();
-    let line = |s: &mut String, head: &str, text: String| {
-        let _ = writeln!(s, "<li><b>{head}</b> {text}</li>");
-    };
+/// One row per feature; a row whose head names a shot in `SHOTS` carries it as a tile.
+fn features(root: &Path) -> Result<String> {
+    let mut rows: Vec<(&str, String)> = vec![
+        (
+            "Browse.",
+            "Code, README, history and branches of any local repository, offline.".to_owned(),
+        ),
+        (
+            "Blame.",
+            "Who last changed each line, with the commit and its age beside the code.".to_owned(),
+        ),
+    ];
+    let mut line = |head: &'static str, text: String| rows.push((head, text));
     let tabs: Vec<String> = gitterrace_web::stats_tab_labels()
         .iter()
         .map(|t| esc(&t.to_lowercase()))
         .collect();
-    line(&mut s, "Insights.", format!("{}.", sentence(&tabs)));
+    line("Insights.", format!("{}.", sentence(&tabs)));
     let mut presets: Vec<String> = Vec::new();
     for e in crate::docs_md::starter_entries()
         .iter()
@@ -302,7 +316,6 @@ fn features() -> String {
         }
     }
     line(
-        &mut s,
         "Send to.",
         format!(
             "Hand a selection on with its context: {}.",
@@ -310,11 +323,28 @@ fn features() -> String {
         ),
     );
     line(
-        &mut s,
         "Actions.",
         gitterrace_actions::schema::ACTION_SUMMARY.to_owned(),
     );
-    s
+    let mut s = String::new();
+    for (head, text) in rows {
+        let shot = SHOTS
+            .iter()
+            .find(|(_, _, cap)| head.trim_end_matches('.') == *cap);
+        match shot {
+            Some(&(name, alt, _)) => {
+                let _ = writeln!(
+                    s,
+                    "<li class=\"shot\"><span><b>{head}</b> {text}</span>{}</li>",
+                    shot_html(root, name, alt)?
+                );
+            }
+            None => {
+                let _ = writeln!(s, "<li><b>{head}</b> {text}</li>");
+            }
+        }
+    }
+    Ok(s)
 }
 
 /// One row per command, the README block's rows, as a definition list so long text wraps
@@ -349,7 +379,7 @@ pub const SHOTS: [(&str, &str, &str); 4] = [
     (
         "overview",
         "Overview: the repository page with README, last commit, file list and key numbers.",
-        "Overview",
+        "Browse",
     ),
     (
         "blame",
@@ -358,8 +388,8 @@ pub const SHOTS: [(&str, &str, &str); 4] = [
     ),
     (
         "send",
-        "Send to window: a selected line with its context and the list of targets.",
-        "Send to window",
+        "Send to: the marked lines with their context, ready for tendir, mail, an issue or a merge request.",
+        "Send to",
     ),
     (
         "insights",
@@ -414,19 +444,32 @@ fn shot_size(root: &Path, file: &str) -> Result<(u32, u32)> {
     Ok((w / 2, h / 2))
 }
 
-fn shots(root: &Path) -> Result<String> {
-    let mut s = String::new();
-    for (name, alt, cap) in SHOTS {
-        let (w, h) = shot_size(root, &format!("{name}-light.png"))?;
-        let _ = writeln!(
-            s,
-            "<figure>\n<picture>\n<source media=\"(prefers-color-scheme: dark)\" srcset=\"assets/screenshots/{name}-dark.png\">\n\
-             <img src=\"assets/screenshots/{name}-light.png\" alt=\"{a}\" width=\"{w}\" height=\"{h}\" loading=\"lazy\">\n</picture>\n\
-             <figcaption>{cap}</figcaption>\n</figure>",
-            a = esc(alt)
+/// One shot as a tile that opens a full-size view. The view is a `:target` overlay, since the
+/// site CSP runs no script; clicking it goes back to `#features`.
+fn shot_html(root: &Path, name: &str, alt: &str) -> Result<String> {
+    // Every tile is the same size so the rows line up; a different size fails generation.
+    for c in ["light", "dark"] {
+        let got = shot_size(root, &format!("{name}-{c}.png"))?;
+        anyhow::ensure!(
+            got == (1280, 800),
+            "{SHOT_DIR}/{name}-{c}.png is {}x{} CSS px, the site needs 1280x800 (a 2560x1600 PNG)",
+            got.0,
+            got.1
         );
     }
-    Ok(s)
+    let pic = |lazy: &str| {
+        format!(
+            "<picture><source media=\"(prefers-color-scheme: dark)\" srcset=\"assets/screenshots/{name}-dark.png\">\
+             <img src=\"assets/screenshots/{name}-light.png\" alt=\"{a}\" width=\"1280\" height=\"800\"{lazy}></picture>",
+            a = esc(alt)
+        )
+    };
+    Ok(format!(
+        "<figure><a href=\"#shot-{name}\">{}</a></figure>\
+         <a class=\"lightbox\" id=\"shot-{name}\" href=\"#features\">{}</a>",
+        pic(" loading=\"lazy\""),
+        pic(" loading=\"lazy\"")
+    ))
 }
 
 fn md(text: &str) -> String {

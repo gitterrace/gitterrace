@@ -108,7 +108,12 @@ fn syntax_for_file(path: &str, first_line: &str) -> Option<&'static SyntaxRefere
         "Package.swift" => set.find_syntax_by_token("swift"),
         // Autoconf is shell under m4 macros, and the set has no m4 grammar.
         "configure.in" => set.find_syntax_by_token("sh"),
-        _ if name.ends_with(".ac") || name.ends_with(".m4") => set.find_syntax_by_token("sh"),
+        _ if name
+            .rsplit_once('.')
+            .is_some_and(|(_, e)| e.eq_ignore_ascii_case("ac") || e.eq_ignore_ascii_case("m4")) =>
+        {
+            set.find_syntax_by_token("sh")
+        }
         ".bashrc" | ".zshrc" | ".bash_profile" | ".zprofile" | ".profile" | ".zshenv" => {
             set.find_syntax_by_token("sh")
         }
