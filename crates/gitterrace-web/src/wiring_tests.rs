@@ -587,6 +587,39 @@ async fn a_refused_actions_file_is_in_the_first_paint() {
     assert!(strip.contains("actions.toml not loaded"), "{strip}");
 }
 
+/// Every page shell the server writes carries the favicon: the repository pages, the
+/// multi-repository index and the pages built as strings (errors, the `/go` miss). A shell
+/// with its own `<head>` that skips the shared include shows a blank tab icon.
+#[tokio::test]
+async fn every_page_shell_has_the_favicon() {
+    let dir = tempfile::tempdir().expect("tmp");
+    let a = repo(dir.path(), "a");
+    let b = repo(dir.path(), "b");
+    let icon = crate::fmt::FAVICON.trim();
+    let one = router(&a, Config::default());
+    let many = crate::multi_router(vec![a, b]).expect("multi");
+    for (r, path) in [
+        (&one, "/"),
+        (&one, "/blob/HEAD/no-such-file"),
+        (&many, "/"),
+        (&many, "/r/a/"),
+        (&many, "/go/nope/abc"),
+    ] {
+        let (_, html) = get(r, path).await;
+        assert!(html.contains(icon), "{path} has no favicon");
+        // Stylesheets and scripts are the server's, not a repository's: one URL each, cached
+        // once across every repository, never under `/r/NAME/`.
+        for (at, _) in html.match_indices("/static/") {
+            let before = &html[..at];
+            assert!(
+                before.ends_with('"') || before.ends_with('\''),
+                "{path} loads an asset under a prefix: {}",
+                &html[at.saturating_sub(30)..at + 20]
+            );
+        }
+    }
+}
+
 /// Every `/static/...` file a template asks for is served. A script added to a template but
 /// not to the asset table 404s, and the browser then refuses it for its empty MIME type.
 #[tokio::test]

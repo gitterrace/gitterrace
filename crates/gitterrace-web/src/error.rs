@@ -37,9 +37,10 @@ impl IntoResponse for Error {
             self.to_string()
         };
         let body = format!(
-            "<!doctype html><meta charset=utf-8><meta name=viewport content=\"width=device-width\">\
+            "<!doctype html><meta charset=utf-8><meta name=viewport content=\"width=device-width\">{}\
              <link rel=stylesheet href=/static/tokens.css><link rel=stylesheet href=/static/app.css><main class=wrap><h1>{}</h1><p class=muted>{}</p>\
              <p><a href=/>Back to overview</a></p></main>",
+            crate::fmt::FAVICON,
             status.as_u16(),
             esc(&shown)
         );

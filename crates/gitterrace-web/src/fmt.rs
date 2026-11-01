@@ -5,6 +5,9 @@ use gitterrace_git::civil_from_days as civil;
 /// The one percent-encoding rule; `/` survives only when the flag is set.
 pub(crate) use gitterrace_git::percent_encode as enc;
 
+/// The favicon `<link>`, the same file the page templates include, for pages built as strings.
+pub(crate) const FAVICON: &str = include_str!("../templates/favicon.html");
+
 /// `YYYY-MM-DD HH:MM` in the commit's own offset.
 pub(crate) fn date(time: i64, offset: i32) -> String {
     let local = time + i64::from(offset);

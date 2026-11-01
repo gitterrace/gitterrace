@@ -332,10 +332,11 @@ async fn go(State(site): State<Arc<Site>>, UrlPath(rest): UrlPath<String>) -> Re
     }
     let id = rest.split('/').next().unwrap_or_default();
     let body = format!(
-        "<!doctype html><meta charset=utf-8><link rel=stylesheet href=/static/tokens.css>\
+        "<!doctype html><meta charset=utf-8>{}<link rel=stylesheet href=/static/tokens.css>\
          <link rel=stylesheet href=/static/app.css><main class=wrap><h1>404</h1>\
          <p class=muted>Repository {} (or that commit) is not served here.</p>\
          <p><a href=/>Back to overview</a></p></main>",
+        crate::fmt::FAVICON,
         esc(id)
     );
     (StatusCode::NOT_FOUND, Html(body)).into_response()

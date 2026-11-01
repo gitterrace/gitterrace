@@ -39,7 +39,7 @@
     return window.matchMedia && matchMedia("(prefers-color-scheme: dark)").matches;
   }
   var s = document.createElement("script");
-  s.src = base() + "/static/vendor/mermaid-11.17.2.min.js";
+  s.src = "/static/vendor/mermaid-11.17.2.min.js";
   s.onload = function () {
     var n = 0;
     function draw() {

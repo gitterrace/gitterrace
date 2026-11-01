@@ -112,14 +112,23 @@ def main() -> int:
             path.write_text(svg)
             print(f"wrote {path.relative_to(ROOT)}")
     # The app inlines the same mark as its favicon (the CSP refuses a separate request-free
-    # icon otherwise), so the template must carry exactly this SVG.
-    tpl = ROOT / "crates/gitterrace-web/templates/base.html"
+    # icon otherwise), so the one include every page head uses must carry exactly this SVG.
+    tpl = ROOT / "crates/gitterrace-web/templates/favicon.html"
     m = re.search(r'<link rel="icon" href="data:image/svg\+xml,([^"]*)">', tpl.read_text())
     if not m or urllib.parse.unquote(m.group(1)) != svg.strip():
         stale.append(tpl.relative_to(ROOT))
     for s in stale:
         print(f"{s}: does not match the README header; run scripts/theme-logo.py")
-    return 1 if stale else 0
+    # Every template that writes its own <head> takes the icon from that include, so a new
+    # page shell cannot ship without a favicon.
+    bare = [
+        t.relative_to(ROOT)
+        for t in sorted(tpl.parent.glob("*.html"))
+        if "<head>" in t.read_text() and '{% include "favicon.html" %}' not in t.read_text()
+    ]
+    for t in bare:
+        print(f'{t}: has a <head> without {{% include "favicon.html" %}}')
+    return 1 if stale or bare else 0
 
 
 raise SystemExit(main())
