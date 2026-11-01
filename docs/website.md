@@ -43,3 +43,10 @@ credential than the task deserves, so `make domains` measures the result instead
 
 Bump `SECURITY_TXT_EXPIRES` in `xtask/src/site.rs`, `make docs-gen`, commit, then
 `make deploy`.
+
+## Before the release
+
+gitterrace.dev is blocked at the edge until the release, so nobody reads install lines that
+fail yet. `make stage` deploys behind that block: it runs every check `make deploy` runs except
+the release check. Both refuse uncommitted `site/` or `wrangler.toml`, so what ships is a
+commit. Never run `make stage` with the block lifted.

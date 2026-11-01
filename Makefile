@@ -84,8 +84,17 @@ site: docs-check
 	python3 scripts/site-check.py release
 
 ## deploy: Ship site/ to gitterrace.dev (wrangler deploy, the Worker is in wrangler.toml)
-deploy: site
+deploy: site shipped
 	npx wrangler@4 deploy
+
+## stage: Deploy without the release check, only while gitterrace.dev is blocked at the edge
+stage: docs-check shipped
+	npx wrangler@4 deploy
+
+## shipped: site/ and wrangler.toml are committed, so a deploy ships a known commit
+shipped:
+	@git diff --quiet HEAD -- site wrangler.toml || { echo "site/ or wrangler.toml has uncommitted changes"; exit 1; }
+	@test -s site/404.html || { echo "site/404.html missing: not_found_handling has nothing to serve"; exit 1; }
 
 ## domains: Check that gitterrace.dev serves and every other host redirects to it
 domains:
