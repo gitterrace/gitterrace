@@ -613,7 +613,7 @@ async fn blob(
         let text = b.text.as_deref().filter(|_| !too_large);
         let (html, cut) = match text {
             Some(t) => {
-                let (h, cut) = views::code_html(t);
+                let (h, cut) = views::code_html(&path, t);
                 (Some(h), cut)
             }
             None => (None, false),
@@ -671,7 +671,7 @@ async fn blame(
                 fmt::enc(&rev, false),
                 fmt::enc(&path, true)
             )),
-            html: views::blame_html(&lines, fmt::now()),
+            html: views::blame_html(&path, &lines, fmt::now()),
             title: path,
         })
     })

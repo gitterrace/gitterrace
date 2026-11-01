@@ -7,6 +7,7 @@ mod error;
 mod filter;
 mod fmt;
 mod guard;
+mod highlight;
 mod insights;
 mod languages;
 mod markdown;
@@ -223,7 +224,10 @@ mod tests {
         let (s, body) = get(&app, "/tree/HEAD/src").await;
         assert_eq!((s, body.contains("a.rs")), (200, true));
         let (s, body) = get(&app, "/blob/HEAD/src/a.rs").await;
-        assert_eq!((s, body.contains("fn main")), (200, true));
+        assert_eq!(
+            (s, body.contains("<span class=\"s-keyword\">fn</span>")),
+            (200, true)
+        );
         assert_eq!(get(&app, "/blame/HEAD/src/a.rs").await.0, 200);
         assert_eq!(get(&app, "/refs").await.0, 200);
         let (s, body) = get(&app, "/stats").await;

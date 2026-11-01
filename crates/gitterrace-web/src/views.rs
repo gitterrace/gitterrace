@@ -308,6 +308,27 @@ const CHUNK_LINES: usize = 100;
 pub(crate) fn diff_body_html(f: &FileDiff) -> String {
     let mut out = String::from("<div class=\"diffwrap\"><div class=\"diff\">");
     let mut in_chunk = 0usize;
+    let total: usize = f
+        .hunks
+        .iter()
+        .flat_map(|h| &h.lines)
+        .map(|l| l.text.len())
+        .sum();
+    let plain = total > crate::highlight::HIGHLIGHT_LIMIT;
+    let first = |k: LineKind| {
+        f.hunks
+            .iter()
+            .flat_map(|h| &h.lines)
+            .find(|l| l.kind == k)
+            .map_or("", |l| l.text.as_str())
+    };
+    let old_path = f.old_path.as_deref().unwrap_or(&f.path);
+    let mut new_hl = (!plain)
+        .then(|| crate::highlight::for_file(&f.path, first(LineKind::Added)))
+        .flatten();
+    let mut old_hl = (!plain)
+        .then(|| crate::highlight::for_file(old_path, first(LineKind::Removed)))
+        .flatten();
     for h in &f.hunks {
         if in_chunk == 0 {
             out.push_str("<div class=\"ch\">");
@@ -326,13 +347,18 @@ pub(crate) fn diff_body_html(f: &FileDiff) -> String {
                 LineKind::Removed => "del",
                 LineKind::Context => "ctx",
             };
+            let hl = if l.kind == LineKind::Removed {
+                old_hl.as_mut()
+            } else {
+                new_hl.as_mut()
+            };
+            let body = hl.map_or_else(|| esc_text(&l.text), |h| h.line(&l.text));
             crate::fmt::push(
                 &mut out,
                 &format!(
-                    "<div class=\"{cls}\" data-o=\"{}\" data-n=\"{}\">{}</div>",
+                    "<div class=\"{cls}\" data-o=\"{}\" data-n=\"{}\">{body}</div>",
                     num(l.old_no),
                     num(l.new_no),
-                    esc_text(&l.text)
                 ),
             );
             in_chunk += 1;
@@ -455,7 +481,39 @@ pub(crate) async fn diff_fragment(
 
 /// Returns the line blocks and whether it was cut at the line cap.
 /// One div per line: the number is a CSS counter, so it neither selects nor copies.
-pub(crate) fn code_html(text: &str) -> (String, bool) {
+pub(crate) fn code_html(path: &str, text: &str) -> (String, bool) {
+    use std::hash::{Hash, Hasher};
+    // Highlighting costs ~0.7 ms/KB, so a blob is rendered once per content.
+    type Memo = Option<(usize, std::collections::HashMap<u64, (String, bool)>)>;
+    static CACHE: std::sync::Mutex<Memo> = std::sync::Mutex::new(None);
+    const CACHE_BYTES: usize = 32 << 20;
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    (path, text).hash(&mut hasher);
+    let key = hasher.finish();
+    if let Some(hit) = CACHE
+        .lock()
+        .ok()
+        .and_then(|g| g.as_ref().and_then(|(_, m)| m.get(&key).cloned()))
+    {
+        return hit;
+    }
+    let built = code_html_uncached(path, text);
+    if let Ok(mut g) = CACHE.lock() {
+        let (size, map) = g.get_or_insert_with(Default::default);
+        if *size + built.0.len() > CACHE_BYTES {
+            map.clear();
+            *size = 0;
+        }
+        *size += built.0.len();
+        map.insert(key, built.clone());
+    }
+    built
+}
+
+fn code_html_uncached(path: &str, text: &str) -> (String, bool) {
+    let mut hl = (text.len() <= crate::highlight::HIGHLIGHT_LIMIT)
+        .then(|| crate::highlight::for_file(path, text.lines().next().unwrap_or("")))
+        .flatten();
     let mut out = String::with_capacity(text.len() + text.len() / 8 + 64);
     out.push_str("<div class=\"code src\">");
     let mut cut = false;
@@ -480,7 +538,7 @@ pub(crate) fn code_html(text: &str) -> (String, bool) {
             &format!(
                 "<div id=\"L{}\" class=\"l\">{}</div>",
                 i + 1,
-                esc_text(line)
+                hl.as_mut().map_or_else(|| esc_text(line), |h| h.line(line))
             ),
         );
     }
@@ -491,7 +549,11 @@ pub(crate) fn code_html(text: &str) -> (String, bool) {
     (out, cut)
 }
 
-pub(crate) fn blame_html(lines: &[BlameLine], now: i64) -> String {
+pub(crate) fn blame_html(path: &str, lines: &[BlameLine], now: i64) -> String {
+    let total: usize = lines.iter().map(|l| l.text.len()).sum();
+    let mut hl = (total <= crate::highlight::HIGHLIGHT_LIMIT)
+        .then(|| crate::highlight::for_file(path, lines.first().map_or("", |l| l.text.as_str())))
+        .flatten();
     let mut out = String::from("<table class=\"code blame\">");
     let mut prev = "";
     for l in lines {
@@ -525,7 +587,8 @@ pub(crate) fn blame_html(lines: &[BlameLine], now: i64) -> String {
             &mut out,
             &format!(
                 "<td class=\"n\"><a href=\"#L{n}\">{n}</a></td><td class=\"c\">{}</td></tr>",
-                esc(&l.text),
+                hl.as_mut()
+                    .map_or_else(|| esc(&l.text), |h| h.line(&l.text)),
                 n = l.line_no
             ),
         );
@@ -549,7 +612,7 @@ mod tests {
 
     #[test]
     fn code_escapes() {
-        let (h, cut) = code_html("<b>\nx");
+        let (h, cut) = code_html("x.txt", "<b>\nx");
         assert!(h.contains("&lt;b&gt;"));
         assert!(!cut);
         assert!(h.contains("id=\"L2\""));
@@ -559,7 +622,7 @@ mod tests {
     #[test]
     fn code_chunks_restart_the_counter() {
         let text = "l\n".repeat(250);
-        let (h, _) = code_html(&text);
+        let (h, _) = code_html("x.txt", &text);
         assert_eq!(h.matches("class=\"ch\"").count(), 3);
         assert!(h.contains("counter-reset:n 100"));
         assert!(h.contains("id=\"L250\""));

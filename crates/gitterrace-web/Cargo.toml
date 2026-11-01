@@ -24,6 +24,7 @@ tracing.workspace = true
 thiserror.workspace = true
 pulldown-cmark.workspace = true
 syntect.workspace = true
+two-face.workspace = true
 ammonia.workspace = true
 serde_json.workspace = true
 regex = "1"

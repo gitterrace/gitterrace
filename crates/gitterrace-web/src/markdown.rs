@@ -6,14 +6,8 @@
 
 use std::borrow::Cow;
 use std::collections::HashMap;
-use std::sync::OnceLock;
 
 use pulldown_cmark::{BlockQuoteKind, CodeBlockKind, Event, Options, Parser, Tag, TagEnd, html};
-use syntect::parsing::{ParseState, Scope, ScopeStack, SyntaxSet};
-use syntect::util::LinesWithEndings;
-
-/// Larger blocks are shown plain: highlighting must never dominate a request.
-const HIGHLIGHT_LIMIT: usize = 256 * 1024;
 
 /// Where a markdown file lives, so relative links can be resolved.
 pub(crate) struct Base {
@@ -145,98 +139,9 @@ fn rewrite_url(base: &Base, url: &str, image: bool) -> String {
     }
 }
 
-fn syntaxes() -> &'static SyntaxSet {
-    static SET: OnceLock<SyntaxSet> = OnceLock::new();
-    SET.get_or_init(SyntaxSet::load_defaults_newlines)
-}
-
-/// Colour categories the stylesheet knows, in stylesheet order: a later one wins within one scope.
-const CATEGORIES: [(&str, &str); 13] = [
-    ("comment", "s-comment"),
-    ("keyword", "s-keyword"),
-    ("storage", "s-keyword"),
-    ("string", "s-string"),
-    ("constant", "s-constant"),
-    ("support", "s-constant"),
-    ("entity", "s-entity"),
-    ("variable", "s-entity"),
-    ("tag", "s-tag"),
-    ("numeric", "s-numeric"),
-    ("invalid", "s-invalid"),
-    ("punctuation", "s-punctuation"),
-    ("parameter", "s-parameter"),
-];
-
-/// The colour class of one scope: among its atoms the stylesheet colours, the one whose rule comes last.
-fn scope_class(scope: Scope) -> Option<&'static str> {
-    let name = scope.build_string();
-    name.split('.')
-        .filter_map(|atom| CATEGORIES.iter().rposition(|(a, _)| *a == atom))
-        .max()
-        .map(|i| CATEGORIES[i].1)
-}
-
-/// Highlighted HTML with one span per run of equally coloured text and none for plain text.
-fn highlight(code: &str, lang: &str) -> Option<String> {
-    if code.len() > HIGHLIGHT_LIMIT {
-        return None;
-    }
-    let set = syntaxes();
-    let syntax = set.find_syntax_by_token(lang)?;
-    let mut state = ParseState::new(syntax);
-    let mut stack = ScopeStack::new();
-    let mut cache: HashMap<Scope, Option<&'static str>> = HashMap::new();
-    let mut out = String::with_capacity(code.len() + code.len() / 2);
-    let mut open: Option<&'static str> = None;
-    let emit = |out: &mut String,
-                open: &mut Option<&'static str>,
-                class: Option<&'static str>,
-                text: &str| {
-        if text.is_empty() {
-            return;
-        }
-        if *open != class {
-            if open.is_some() {
-                out.push_str("</span>");
-            }
-            if let Some(c) = class {
-                out.push_str("<span class=\"");
-                out.push_str(c);
-                out.push_str("\">");
-            }
-            *open = class;
-        }
-        out.push_str(&crate::fmt::esc_text(text));
-    };
-    for line in LinesWithEndings::from(code) {
-        let ops = state.parse_line(line, set).ok()?;
-        let mut prev = 0;
-        for (i, op) in ops {
-            let class = stack
-                .as_slice()
-                .iter()
-                .rev()
-                .find_map(|s| *cache.entry(*s).or_insert_with(|| scope_class(*s)));
-            emit(&mut out, &mut open, class, &line[prev..i]);
-            prev = i;
-            stack.apply(&op).ok()?;
-        }
-        let class = stack
-            .as_slice()
-            .iter()
-            .rev()
-            .find_map(|s| *cache.entry(*s).or_insert_with(|| scope_class(*s)));
-        emit(&mut out, &mut open, class, &line[prev..]);
-    }
-    if open.is_some() {
-        out.push_str("</span>");
-    }
-    Some(out)
-}
-
 fn code_block(code: &str, lang: &str) -> String {
     let lang = lang.split([' ', ',', '{']).next().unwrap_or("");
-    let body = highlight(code, lang).unwrap_or_else(|| escape(code));
+    let body = crate::highlight::block(code, lang).unwrap_or_else(|| escape(code));
     let class = if lang.is_empty() {
         String::new()
     } else {

@@ -1,6 +1,6 @@
 /* Rendered markdown. Everything is scoped to .markdown-body and themed
    through the app variables. Syntax classes carry the s- prefix. */
-.markdown-body{--md-note:var(--info);--md-tip:var(--add);--md-important:var(--done);--md-warning:var(--warn);--md-caution:var(--del);--md-k1:var(--syn-keyword);--md-k2:var(--syn-entity);--md-k3:var(--syn-constant);--md-k4:var(--syn-string);--md-k5:var(--syn-comment);--md-k6:var(--syn-tag);--md-k7:var(--syn-param);
+:is(.markdown-body,.code,.diff){--md-note:var(--info);--md-tip:var(--add);--md-important:var(--done);--md-warning:var(--warn);--md-caution:var(--del);--md-k1:var(--syn-keyword);--md-k2:var(--syn-entity);--md-k3:var(--syn-constant);--md-k4:var(--syn-string);--md-k5:var(--syn-comment);--md-k6:var(--syn-tag);--md-k7:var(--syn-param);
   color:var(--fg);font-size:16px;line-height:1.5;overflow-wrap:break-word}
 .markdown-body>:first-child{margin-top:0!important}
 .markdown-body>:last-child{margin-bottom:0!important}
@@ -58,16 +58,16 @@
 .markdown-body .markdown-alert-warning{--md-c:var(--md-warning);--md-i:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M6.457 1.047c.659-1.234 2.427-1.234 3.086 0l6.082 11.378A1.75 1.75 0 0 1 14.082 15H1.918a1.75 1.75 0 0 1-1.543-2.575Zm1.763.707a.25.25 0 0 0-.44 0L1.698 13.132a.25.25 0 0 0 .22.368h12.164a.25.25 0 0 0 .22-.368Zm.53 3.996v2.5a.75.75 0 0 1-1.5 0v-2.5a.75.75 0 0 1 1.5 0ZM9 11a1 1 0 1 1-2 0 1 1 0 0 1 2 0Z'/%3E%3C/svg%3E")}
 .markdown-body .markdown-alert-caution{--md-c:var(--md-caution);--md-i:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4.47.22A.749.749 0 0 1 5 0h6c.199 0 .389.079.53.22l4.25 4.25c.141.14.22.331.22.53v6a.749.749 0 0 1-.22.53l-4.25 4.25A.749.749 0 0 1 11 16H5a.749.749 0 0 1-.53-.22L.22 11.53A.749.749 0 0 1 0 11V5c0-.199.079-.389.22-.53Zm.84 1.28L1.5 5.31v5.38l3.81 3.81h5.38l3.81-3.81V5.31L10.69 1.5ZM8 4a.75.75 0 0 1 .75.75v3.5a.75.75 0 0 1-1.5 0v-3.5A.75.75 0 0 1 8 4Zm0 8a1 1 0 1 1 0-2 1 1 0 0 1 0 2Z'/%3E%3C/svg%3E")}
 /* syntax (syntect classes, prefix s-) */
-.markdown-body [class~=s-comment]{color:var(--md-k5)}
-.markdown-body [class~=s-keyword],.markdown-body [class~=s-storage]{color:var(--md-k1)}
-.markdown-body [class~=s-string]{color:var(--md-k4)}
-.markdown-body :is([class~=s-constant],[class~=s-support]){color:var(--md-k3)}
-.markdown-body :is([class~=s-entity],[class~=s-variable]){color:var(--md-k2)}
-.markdown-body [class~=s-tag]{color:var(--md-k6)}
-.markdown-body [class~=s-numeric]{color:var(--md-k3)}
-.markdown-body [class~=s-invalid]{color:var(--md-caution)}
-.markdown-body [class~=s-punctuation]{color:var(--fg)}
-.markdown-body [class~=s-parameter]{color:var(--md-k7)}
+:is(.markdown-body,.code,.diff) [class~=s-comment]{color:var(--md-k5)}
+:is(.markdown-body,.code,.diff) [class~=s-keyword],:is(.markdown-body,.code,.diff) [class~=s-storage]{color:var(--md-k1)}
+:is(.markdown-body,.code,.diff) [class~=s-string]{color:var(--md-k4)}
+:is(.markdown-body,.code,.diff) :is([class~=s-constant],[class~=s-support]){color:var(--md-k3)}
+:is(.markdown-body,.code,.diff) :is([class~=s-entity],[class~=s-variable]){color:var(--md-k2)}
+:is(.markdown-body,.code,.diff) [class~=s-tag]{color:var(--md-k6)}
+:is(.markdown-body,.code,.diff) [class~=s-numeric]{color:var(--md-k3)}
+:is(.markdown-body,.code,.diff) [class~=s-invalid]{color:var(--md-caution)}
+:is(.markdown-body,.code,.diff) [class~=s-punctuation]{color:var(--fg)}
+:is(.markdown-body,.code,.diff) [class~=s-parameter]{color:var(--md-k7)}
 /* blob Preview/Code toggle */
 .seg{display:flex;gap:4px}
 .seg button{font:inherit;color:var(--muted);background:none;border:0;border-radius:var(--radius);padding:2px 10px;cursor:pointer}
