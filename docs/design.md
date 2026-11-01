@@ -65,4 +65,4 @@ or chart. Charts come from `charts.rs` and colour marks by class (`.bar`,
 
 The mark is a lowercase t whose stem steps down in terraces; the last tread is
 HEAD. The stem is `--fg`, the tread `--accent`, so it follows the theme.
-Sources and wordmarks live in `assets/brand/`.
+The mark is inline SVG in `base.html` (header and favicon); the README header lives in `docs/brand/`.

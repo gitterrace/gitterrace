@@ -1,7 +1,7 @@
 <h1 align="center">
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="assets/brand/readme-header-dark.svg">
-  <img alt="gitterrace" src="assets/brand/readme-header-light.svg" width="600">
+  <source media="(prefers-color-scheme: dark)" srcset="docs/brand/readme-header-dark.svg">
+  <img alt="gitterrace" src="docs/brand/readme-header-light.svg" width="600">
 </picture>
 </h1>
 
@@ -17,6 +17,32 @@ git terrace                       # the repo you are in, on 127.0.0.1:4242
 git terrace ~/src/app ~/src/lib   # several repos on one port
 git terrace ~/src                 # every repo in a folder, two levels deep
 ```
+
+## Install
+
+**Homebrew** (macOS, Linux):
+
+```bash
+brew install timorunge/tap/gitterrace
+```
+
+**Shell installer** (prebuilt binary for macOS and Linux, x86_64 and arm64):
+
+```bash
+curl -LsSf https://github.com/timorunge/gitterrace/releases/latest/download/gitterrace-installer.sh | sh
+```
+
+**From source** (Rust 1.96 or newer):
+
+```bash
+cargo install --git https://github.com/timorunge/gitterrace gitterrace
+```
+
+Homebrew and the installer need a published release. Until then, build from a
+checkout with `cargo install --path crates/gitterrace`.
+
+Every route installs two names for one program: `git-terrace`, which git runs
+as `git terrace`, and `gitterrace`.
 
 ## What you get
 
@@ -42,7 +68,7 @@ git terrace ~/src                 # every repo in a folder, two levels deep
 |---|---|
 | `git terrace [paths]` | Serve in the browser (`--addr` to change the address) |
 | `git terrace export <out> [path]` | Write a static copy of the site (`--commits`, `--max-file-kb`) |
-| `git terrace wrapped [path]` | Write a year-in-review card (`--year`, `--layout`, `--theme`, `--png`) |
+| `git terrace wrapped [path]` | Write a year-in-review card as SVG (`--year`, `--layout`, `--theme`) |
 | `git terrace mcp [path]` | Run a read-only MCP server over stdio, for agents |
 
 `gitterrace` is the same binary under its own name. A JSON API lives at
@@ -56,16 +82,4 @@ Security Policy. It never changes your history, refs or working tree; its only
 write is a cache in `.git/gitterrace/`, built once in the background and safe
 to delete.
 
-## Install
-
-From source, with Rust 1.96 or newer:
-
-```bash
-cargo install --path crates/gitterrace
-```
-
-This installs `git-terrace`, which git runs as `git terrace`, and `gitterrace`.
-Release builds and a Homebrew formula (`timorunge/tap/gitterrace`) come with the
-first release. MIT licensed.
-
-More: [architecture](docs/architecture.md), [design](docs/design.md).
+MIT licensed. More: [architecture](docs/architecture.md), [design](docs/design.md).

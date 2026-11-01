@@ -46,19 +46,5 @@ fn main() {
     }
     for (n, svg) in files {
         std::fs::write(out.join(format!("{n}.svg")), &svg).unwrap();
-        #[cfg(feature = "png")]
-        if n.starts_with("badge") {
-            std::fs::write(
-                out.join(format!("{n}.png")),
-                gitterrace_cards::png::render_scaled(&svg, 4.0).unwrap(),
-            )
-            .unwrap();
-        } else {
-            std::fs::write(
-                out.join(format!("{n}.png")),
-                gitterrace_cards::png::render(&svg).unwrap(),
-            )
-            .unwrap();
-        }
     }
 }

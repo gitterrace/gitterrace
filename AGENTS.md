@@ -12,7 +12,7 @@ and guard; [design](docs/design.md) has the look and the theme pipeline.
 | `gitterrace-git` | All git reads via gix, pinned to commits. The worktree only in `worktree.rs`. |
 | `gitterrace-index` | Insights cache in `.git/gitterrace/`, append-only, rebuildable. |
 | `gitterrace-api` | JSON API (`/api/v1`) and the MCP server. |
-| `gitterrace-cards` | SVG/PNG cards and badges (`png` feature). |
+| `gitterrace-cards` | SVG cards and badges. |
 | `gitterrace-web` | axum server, askama templates, static assets, the request guard. |
 | `gitterrace` | CLI: binaries `git-terrace` and `gitterrace`. |
 

@@ -47,8 +47,6 @@ jobs:
       # The theme snapshot and its generated files (part of `make check` too).
       - run: make theme
       - run: make check
-      # The PNG feature is off by default; keep it compiling.
-      - run: cargo clippy -p gitterrace --all-targets --features png -- -D warnings
 
   deny:
     name: Cargo deny

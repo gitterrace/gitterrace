@@ -1,19 +1,21 @@
 # Architecture
 
-```
-               git objects
-                    |
-              gitterrace-git  (all reads, via gix)
-               /    |     \
- gitterrace-index   |      \
- .git/gitterrace/   |       \
-      |    \        |        \
-      |   gitterrace-api   gitterrace-cards
-      |    (JSON, MCP)     (SVG/PNG cards, badges)
-      \         |          /
-          gitterrace-web  (axum, askama, static assets)
-                |
-           gitterrace  (CLI: serve, export, wrapped, mcp)
+```mermaid
+flowchart TD
+  objects[(git objects)] --> git[gitterrace-git<br/>all reads, via gix]
+  git --> index[gitterrace-index<br/>cache in .git/gitterrace/]
+  git --> api[gitterrace-api<br/>JSON API, MCP]
+  git --> cards[gitterrace-cards<br/>SVG cards, badges]
+  index --> api
+  index --> cards
+  git --> web[gitterrace-web<br/>axum, askama, static assets]
+  index --> web
+  api --> web
+  cards --> web
+  web --> cli[gitterrace<br/>serve, export, wrapped, mcp]
+  api --> cli
+  cards --> cli
+  index --> cli
 ```
 
 Every crate below `gitterrace-web` is HTTP-free, and only `gitterrace-git`

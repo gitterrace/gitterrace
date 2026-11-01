@@ -35,10 +35,7 @@ enum Command {
         layout: Shape,
         #[arg(long, value_enum, default_value_t = Look::Dark)]
         theme: Look,
-        /// Write a PNG instead of an SVG (needs the `png` build feature).
-        #[arg(long)]
-        png: bool,
-        /// Output file. Defaults to `wrapped-YEAR.svg` or `.png`.
+        /// Output file. Defaults to `wrapped-YEAR.svg`.
         #[arg(long, short)]
         out: Option<PathBuf>,
     },
@@ -91,9 +88,8 @@ async fn main() -> anyhow::Result<()> {
             year,
             layout,
             theme,
-            png,
             out,
-        } => wrapped(&path, year, layout, theme, png, out)?,
+        } => wrapped(&path, year, layout, theme, out)?,
         Command::Export {
             out,
             commits,
@@ -115,7 +111,6 @@ fn wrapped(
     year: Option<i32>,
     layout: Shape,
     theme: Look,
-    png: bool,
     out: Option<PathBuf>,
 ) -> anyhow::Result<()> {
     let repo = gitterrace_git::Repo::discover(path).context("opening the repository")?;
@@ -137,25 +132,10 @@ fn wrapped(
         Look::Dark => gitterrace_cards::Theme::Dark,
     };
     let svg = gitterrace_cards::wrapped_svg(&stats, layout, theme);
-    let (bytes, ext) = if png {
-        (rasterize(&svg)?, "png")
-    } else {
-        (svg.into_bytes(), "svg")
-    };
-    let out = out.unwrap_or_else(|| PathBuf::from(format!("wrapped-{year}.{ext}")));
-    std::fs::write(&out, bytes).with_context(|| format!("writing {}", out.display()))?;
+    let out = out.unwrap_or_else(|| PathBuf::from(format!("wrapped-{year}.svg")));
+    std::fs::write(&out, svg).with_context(|| format!("writing {}", out.display()))?;
     println!("{}", out.display());
     Ok(())
-}
-
-#[cfg(feature = "png")]
-fn rasterize(svg: &str) -> anyhow::Result<Vec<u8>> {
-    Ok(gitterrace_cards::png::render_scaled(svg, 2.0)?)
-}
-
-#[cfg(not(feature = "png"))]
-fn rasterize(_svg: &str) -> anyhow::Result<Vec<u8>> {
-    anyhow::bail!("this build has no PNG support; rebuild with `--features png` or use the SVG")
 }
 
 /// Civil year of a Unix timestamp (UTC), without a date dependency.

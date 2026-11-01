@@ -10,15 +10,10 @@ publish = false
 [lints]
 workspace = true
 
-[features]
-# PNG export via resvg. Off by default: it adds a rasterizer and font stack to the binary.
-png = ["dep:resvg"]
-
 [dependencies]
 gitterrace-index.workspace = true
 schwarzwald.workspace = true
 thiserror.workspace = true
-resvg = { workspace = true, optional = true }
 
 [dev-dependencies]
 usvg = { version = "0.45", default-features = false }

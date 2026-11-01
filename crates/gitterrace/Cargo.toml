@@ -41,11 +41,5 @@ path = "src/main.rs"
 name = "gitterrace"
 path = "src/main.rs"
 
-[features]
-default = []
-# Rasterize cards to PNG (`git terrace wrapped --png`). Off by default: it adds
-# a text renderer to the binary.
-png = ["gitterrace-cards/png"]
-
 [dev-dependencies]
 tempfile.workspace = true
