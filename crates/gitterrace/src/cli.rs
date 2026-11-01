@@ -75,10 +75,13 @@ pub(crate) enum Command {
         #[arg(long)]
         uninstall: bool,
     },
-    /// Write the pre-filled `actions.toml` (Send to targets and example actions) to the config folder.
+    /// Write a documented `config.toml` and the pre-filled `actions.toml` to the config folder.
     ///
-    /// Refuses to replace an existing file. Entries that need your settings start switched off.
-    ActionsInit,
+    /// `config.toml` is a template with every setting commented out at its default. `actions.toml`
+    /// has the Send to targets and example actions. Those that need your own settings start
+    /// switched off. An existing file is kept as it is. To start over, move the file away and
+    /// run this again.
+    Init,
     /// Write a static copy of the site to a folder, for sharing or hosting.
     Export {
         /// Folder to write into (created if missing).

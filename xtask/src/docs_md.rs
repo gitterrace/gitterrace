@@ -196,7 +196,7 @@ fn starter() -> String {
             e.vars.join(", ")
         );
     }
-    s.push_str("\nThe whole file, as `git terrace actions-init` writes it:\n\n```toml\n");
+    s.push_str("\nThe whole file, as `git terrace init` writes it:\n\n```toml\n");
     s.push_str(Config::STARTER.trim_end());
     s.push_str("\n```\n");
     s

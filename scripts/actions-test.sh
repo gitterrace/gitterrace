@@ -65,6 +65,7 @@ profile xsel xsel xdg-open
 profile wsl clip.exe explorer.exe
 profile none
 profile ed vim nano subl mystery
+profile zedonly zed
 
 # clipboard: stdin = "markdown", so the text arrives raw and jq is not needed
 md='md $(touch PWNED) body'
@@ -95,6 +96,8 @@ TEST_EDITOR=VISUAL=vim runa ed editor.sh '' 7 "$f";  expect_rc vim 0; expect_log
 TEST_EDITOR=EDITOR=nano runa ed editor.sh '' 7 "$f"; expect_rc nano 0; expect_log nano "+7"
 TEST_EDITOR=EDITOR=subl runa ed editor.sh '' 7 "$f"; expect_rc subl 0; expect_log subl ".rs:7"
 TEST_EDITOR="EDITOR=vim -u NONE" runa ed editor.sh '' 7 "$f"; expect_rc vimflags 0; expect_log vimflags "NONE"
+TEST_EDITOR= runa zedonly editor.sh '' 7 "$f"; expect_rc zed-fallback 0; expect_log zed-fallback ".rs:7"
+TEST_EDITOR=EDITOR=zed runa zedonly editor.sh '' 7 "$f"; expect_rc zed 0; expect_log zed ".rs:7"
 TEST_EDITOR=EDITOR=mystery runa ed editor.sh '' 7 "$f"; expect_rc mystery 0
 case $log in *"+7"*|*":7"*) fail "mystery editor got a line: $log" ;; esac
 

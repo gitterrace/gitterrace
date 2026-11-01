@@ -65,7 +65,7 @@ async fn main() -> anyhow::Result<()> {
                 return Err(e);
             }
         }
-        Command::ActionsInit => actions_init(cli.config.as_deref())?,
+        Command::Init => init(cli.config.as_deref())?,
         Command::InstallHandler { uninstall } => handler::run(uninstall)?,
         Command::Wrapped {
             year,
@@ -89,29 +89,52 @@ async fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-/// Writes the starter `actions.toml`, private to the user, never over an existing file.
-fn actions_init(config: Option<&std::path::Path>) -> anyhow::Result<()> {
+/// Writes `config.toml` and `actions.toml` into the config folder, private to the user, never
+/// over an existing file. Prints one line per file.
+fn init(config: Option<&std::path::Path>) -> anyhow::Result<()> {
+    let dir = gitterrace_config::config_dir(config)
+        .context("no config folder: set --config or HOME")?;
+    let files = [
+        ("config.toml", gitterrace_config::template()),
+        ("actions.toml", gitterrace_actions::Config::STARTER.to_owned()),
+    ];
+    for (path, state) in init_in(&dir, &files)? {
+        println!("{} {state}", path.display());
+    }
+    Ok(())
+}
+
+/// The write step of `init`: `(path, "written" | "kept")` per file.
+fn init_in(
+    dir: &std::path::Path,
+    files: &[(&str, String)],
+) -> anyhow::Result<Vec<(PathBuf, &'static str)>> {
     use std::io::Write as _;
     use std::os::unix::fs::{DirBuilderExt as _, OpenOptionsExt as _};
 
-    let path = gitterrace_actions::config::default_path(config)
-        .context("no config folder: set --config or HOME")?;
-    if let Some(dir) = path.parent() {
-        std::fs::DirBuilder::new()
-            .recursive(true)
-            .mode(0o700)
-            .create(dir)
-            .context("creating the config folder")?;
+    std::fs::DirBuilder::new()
+        .recursive(true)
+        .mode(0o700)
+        .create(dir)
+        .context("creating the config folder")?;
+    let mut done = Vec::new();
+    for (name, text) in files {
+        let path = dir.join(name);
+        let opened = std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .mode(0o600)
+            .open(&path);
+        match opened {
+            Ok(mut f) => {
+                f.write_all(text.as_bytes())?;
+                done.push((path, "written"));
+            }
+            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => done.push((path, "kept")),
+            Err(e) => return Err(e).with_context(|| format!("writing {}", path.display())),
+        }
     }
-    let mut file = std::fs::OpenOptions::new()
-        .write(true)
-        .create_new(true)
-        .mode(0o600)
-        .open(&path)
-        .with_context(|| format!("writing {} (it may exist already)", path.display()))?;
-    file.write_all(gitterrace_actions::Config::STARTER.as_bytes())?;
-    println!("wrote {}", path.display());
-    Ok(())
+    Ok(done)
 }
 
 /// The command-line flags that beat `config.toml`, kept to load the file again on reload.
@@ -184,8 +207,58 @@ fn year_of(secs: i64) -> i32 {
 }
 
 #[cfg(test)]
+#[allow(clippy::expect_used)]
 mod tests {
-    use crate::year_of;
+    use std::os::unix::fs::PermissionsExt as _;
+
+    use crate::{init_in, year_of};
+
+    fn files() -> [(&'static str, String); 2] {
+        [
+            ("config.toml", gitterrace_config::template()),
+            ("actions.toml", gitterrace_actions::Config::STARTER.to_owned()),
+        ]
+    }
+
+    fn mode(p: &std::path::Path) -> u32 {
+        std::fs::metadata(p).expect("meta").permissions().mode() & 0o777
+    }
+
+    #[test]
+    fn init_writes_both_private_into_an_empty_folder() {
+        let tmp = tempfile::tempdir().expect("tmp");
+        let dir = tmp.path().join("gt");
+        let done = init_in(&dir, &files()).expect("init");
+        assert!(done.iter().all(|(_, s)| *s == "written"));
+        assert_eq!(mode(&dir), 0o700);
+        for n in ["config.toml", "actions.toml"] {
+            assert_eq!(mode(&dir.join(n)), 0o600);
+        }
+    }
+
+    #[test]
+    fn init_keeps_existing_files_byte_identical() {
+        let tmp = tempfile::tempdir().expect("tmp");
+        for n in ["config.toml", "actions.toml"] {
+            std::fs::write(tmp.path().join(n), format!("mine {n}")).expect("write");
+        }
+        let done = init_in(tmp.path(), &files()).expect("init");
+        assert!(done.iter().all(|(_, s)| *s == "kept"));
+        for n in ["config.toml", "actions.toml"] {
+            assert_eq!(std::fs::read_to_string(tmp.path().join(n)).expect("read"), format!("mine {n}"));
+        }
+    }
+
+    #[test]
+    fn init_writes_only_the_missing_config() {
+        let tmp = tempfile::tempdir().expect("tmp");
+        std::fs::write(tmp.path().join("actions.toml"), "mine").expect("write");
+        let done = init_in(tmp.path(), &files()).expect("init");
+        assert_eq!(done[0].1, "written");
+        assert_eq!(done[1].1, "kept");
+        assert_eq!(std::fs::read_to_string(tmp.path().join("actions.toml")).expect("read"), "mine");
+        assert_eq!(mode(&tmp.path().join("config.toml")), 0o600);
+    }
 
     #[test]
     fn year_of_known_dates() {

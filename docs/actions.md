@@ -35,7 +35,7 @@ Copy as markdown.
 
 ### The starter file
 
-`gitterrace actions-init` writes the file below to `actions.toml` in your config folder, unless
+`git terrace init` writes the file below to `actions.toml` in your config folder, unless
 one exists. It is an ordinary `actions.toml`. An entry with `enabled = false` is checked but
 not offered: switch on the ones you use and fill in their `vars`.
 
@@ -56,10 +56,10 @@ not offered: switch on the ones you use and fill in their `vars`.
 | `webhook` | action | no | Posts the payload as JSON to a webhook of yours. Set `url` in `vars`. | `url` |
 | `obsidian-new` | action | no | Writes a new note in an Obsidian vault. `vault` and `folder` pick where it lands. | `vault`, `folder` |
 
-The whole file, as `git terrace actions-init` writes it:
+The whole file, as `git terrace init` writes it:
 
 ```toml
-# gitterrace actions.toml, pre-filled. `git terrace actions-init` writes this file to your
+# gitterrace actions.toml, pre-filled. `git terrace init` writes this file to your
 # config folder. Edit it freely. It is a normal actions file, loaded by the same rules as
 # any other. An entry with `enabled = false` is checked at load but not offered, so switch on
 # only what you use: set `enabled = true` and fill in its `vars`.
@@ -421,7 +421,7 @@ daily note, a write with no Obsidian screen of its own.
 | Script | Does | Needs |
 | --- | --- | --- |
 | [`clipboard.sh`](actions/clipboard.sh) | Copy the selection as markdown, on any OS. | (first present wins): macOS:         pbcopy (built in) Linux Wayland: wl-copy (wl-clipboard) Linux X11:     xclip or xsel WSL:           clip.exe (built in) |
-| [`editor.sh`](actions/editor.sh) | Open a file at a line in the editor, on any OS. | (all OSes): an editor. Picks $VISUAL, then $EDITOR, then code, then vi. Line jump is known for code, vim/nvim/vi, nano, emacs, subl, zed and hx; any other editor opens the file without a line. |
+| [`editor.sh`](actions/editor.sh) | Open a file at a line in the editor, on any OS. | (all OSes): an editor. Picks $VISUAL, then $EDITOR, then the first of code, zed, zeditor found, then vi. Line jump is known for code, vim/nvim/vi, nano, emacs, subl, zed/zeditor and hx; any other editor opens the file without a line. |
 | [`obsidian.sh`](actions/obsidian.sh) | Append the selection to today's Obsidian daily note. | (all OSes): jq (brew install jq, apt install jq). date and mkdir are POSIX. |
 
 <!-- END GENERATED: scripts -->

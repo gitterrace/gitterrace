@@ -198,7 +198,7 @@ fn yes() -> bool {
 }
 
 impl Config {
-    /// The starter file `gitterrace actions-init` writes, parsed by the same rules as the
+    /// The starter file `git terrace init` writes, parsed by the same rules as the
     /// user's own file.
     pub const STARTER: &'static str = include_str!("../defaults/actions.toml");
 

@@ -112,6 +112,27 @@ pub fn load(dir: Option<&Path>) -> Result<Loaded, ConfigError> {
     }
 }
 
+/// A documented `config.toml` template: every key commented out at its default with its
+/// description above it, grouped by section. It changes nothing until a line is uncommented.
+pub fn template() -> String {
+    let mut out = String::from(
+        "# gitterrace config.toml. Every line is commented out at its default: uncomment to change.\n",
+    );
+    let mut section = "";
+    for k in schema::keys() {
+        if k.section != section {
+            section = k.section;
+            out.push_str(&format!("\n[{section}]\n"));
+        }
+        out.push('\n');
+        for line in k.doc.lines() {
+            out.push_str(&format!("# {}\n", line.trim()));
+        }
+        out.push_str(&format!("# {} = {}\n", k.name, k.default));
+    }
+    out
+}
+
 fn unreachable_defaults() -> Loaded {
     Loaded {
         config: Config::default(),
@@ -159,7 +180,15 @@ pub fn parse(text: &str) -> Result<Loaded, ConfigError> {
 #[cfg(test)]
 #[allow(clippy::expect_used)]
 mod tests {
-    use super::{Source, load, parse};
+    use super::{Source, load, parse, template};
+
+    #[test]
+    fn template_loads_to_the_defaults_without_warnings() {
+        let l = parse(&template()).expect("parse");
+        assert_eq!(l.config, crate::Config::default());
+        assert!(l.warnings.is_empty(), "{:?}", l.warnings);
+        assert!(l.sources.is_empty());
+    }
 
     #[test]
     fn defaults_keep_todays_behaviour() {

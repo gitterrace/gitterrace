@@ -1,4 +1,4 @@
-# gitterrace actions.toml, pre-filled. `git terrace actions-init` writes this file to your
+# gitterrace actions.toml, pre-filled. `git terrace init` writes this file to your
 # config folder. Edit it freely. It is a normal actions file, loaded by the same rules as
 # any other. An entry with `enabled = false` is checked at load but not offered, so switch on
 # only what you use: set `enabled = true` and fill in its `vars`.
