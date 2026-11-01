@@ -34,6 +34,8 @@ pub(crate) struct Chrome {
     pub(crate) nav: Vec<Nav>,
     /// HEAD detached or an operation half done, worded for the banner; `None` on a plain branch.
     pub(crate) banner: Option<String>,
+    /// Why `actions.toml` is not in force, shown under the bar from the first paint.
+    pub(crate) actions_note: Option<String>,
     /// The repository's overview, keeping the selected ref.
     pub(crate) home: String,
     /// Repo id for permalinks (`/go/<id>/...`); empty for a repo without commits.
@@ -148,6 +150,7 @@ pub(crate) fn chrome_at(app: &crate::app::App, active: &str, rev: &str) -> Chrom
             })
             .collect(),
         banner: banner(&app.repo.head_state()),
+        actions_note: app.actions_note(),
         theme: match app.cfg().display.theme.as_str() {
             "system" => String::new(),
             t => t.to_owned(),

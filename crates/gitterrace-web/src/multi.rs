@@ -26,8 +26,6 @@ use crate::fmt;
 
 /// Weeks shown in the index sparkline.
 const SPARK_WEEKS: usize = 26;
-/// Newest commits read per repository for the sparkline.
-const SPARK_COMMITS: usize = 2000;
 const WEEK: i64 = 7 * 86_400;
 
 /// One served repository: its URL name and where it lives.
@@ -35,9 +33,17 @@ pub(crate) struct Served {
     pub(crate) name: String,
     pub(crate) path: PathBuf,
     router: OnceCell<Router>,
-    /// Newest commits at the HEAD they were read for, so the index page opens a repository
-    /// once per HEAD move instead of once per hit.
-    recent: Mutex<Option<(String, Arc<Vec<CommitSummary>>)>>,
+    /// Newest commit and weekly commit counts at the HEAD they were read for, so the index page
+    /// opens a repository once per HEAD move instead of once per hit.
+    recent: Mutex<Option<(String, Arc<Recent>)>>,
+}
+
+/// What the index shows for one repository: its newest commit and commits per week.
+#[derive(Default)]
+struct Recent {
+    last: Option<CommitSummary>,
+    /// Oldest week first, `SPARK_WEEKS` long; the last entry is the current week.
+    weeks: Vec<u32>,
 }
 
 /// The startup repository table. A URL name resolves only through this map, never by
@@ -63,6 +69,9 @@ struct IndexRow {
     when: String,
     commit_href: String,
     spark: String,
+    /// Commits in the sparkline's window, and its busiest week (the line's top).
+    total: u32,
+    peak: u32,
 }
 
 #[derive(serde::Serialize)]
@@ -128,8 +137,10 @@ impl Table {
 }
 
 impl Served {
-    /// The newest `SPARK_COMMITS` commits, one discover and one log per HEAD.
-    fn recent(&self) -> Arc<Vec<CommitSummary>> {
+    /// The newest commit and the weekly counts, one discover and one bounded walk per HEAD.
+    /// The walk stops at the oldest week shown, so it counts every commit in the window
+    /// however busy the repository is.
+    fn recent(&self, now: i64) -> Arc<Recent> {
         let Ok(repo) = Repo::discover(&self.path) else {
             return Arc::default();
         };
@@ -137,16 +148,25 @@ impl Served {
             return Arc::default();
         };
         if let Ok(g) = self.recent.lock()
-            && let Some((at, list)) = g.as_ref()
+            && let Some((at, r)) = g.as_ref()
             && *at == head
         {
-            return Arc::clone(list);
+            return Arc::clone(r);
         }
-        let list = Arc::new(repo.log(&head, None, 0, SPARK_COMMITS).unwrap_or_default());
+        let times = repo
+            .commit_times_since(&head, now - WEEK * SPARK_WEEKS as i64)
+            .unwrap_or_default();
+        let r = Arc::new(Recent {
+            last: repo
+                .log(&head, None, 0, 1)
+                .ok()
+                .and_then(|l| l.into_iter().next()),
+            weeks: weekly(&times, now),
+        });
         if let Ok(mut g) = self.recent.lock() {
-            *g = Some((head, Arc::clone(&list)));
+            *g = Some((head, Arc::clone(&r)));
         }
-        list
+        r
     }
 }
 
@@ -274,18 +294,23 @@ fn repo_router(
     crate::repo_router(&served.path, base, served.name.clone(), live, env)
 }
 
-/// Commits per week over the last `SPARK_WEEKS` weeks as a polyline in a 90x20 box.
-fn spark(list: &[CommitSummary], now: i64) -> String {
-    let mut weeks = [0u32; SPARK_WEEKS];
-    for c in list {
-        let age = (now - c.author.time).max(0) / WEEK;
+/// Counts `times` (seconds) into `SPARK_WEEKS` buckets ending at `now`, oldest first.
+fn weekly(times: &[i64], now: i64) -> Vec<u32> {
+    let mut weeks = vec![0u32; SPARK_WEEKS];
+    for t in times {
+        let age = (now - t).max(0) / WEEK;
         if let Ok(i) = usize::try_from(age)
             && i < SPARK_WEEKS
         {
             weeks[SPARK_WEEKS - 1 - i] += 1;
         }
     }
-    let max = weeks.iter().copied().max().unwrap_or(0).max(1);
+    weeks
+}
+
+/// Weekly counts as a polyline in a 90x20 box, scaled to `max` so rows share one scale.
+fn spark(weeks: &[u32], max: u32) -> String {
+    let max = max.max(1);
     let mut pts = String::new();
     for (i, n) in weeks.iter().enumerate() {
         #[allow(clippy::cast_precision_loss)]
@@ -304,8 +329,9 @@ async fn index(State(table): State<Arc<Table>>) -> crate::error::Result<Html<Str
             .iter()
             .map(|s| {
                 let href = format!("/r/{}/", s.name);
-                let list = s.recent();
-                let c = list.first();
+                let r = s.recent(now);
+                let c = r.last.as_ref();
+                let peak = r.weeks.iter().copied().max().unwrap_or(0);
                 IndexRow {
                     name: s.name.clone(),
                     subject: c.map(|c| c.subject.clone()).unwrap_or_default(),
@@ -314,7 +340,9 @@ async fn index(State(table): State<Arc<Table>>) -> crate::error::Result<Html<Str
                         || href.clone(),
                         |c| format!("/r/{}/commit/{}", s.name, c.id),
                     ),
-                    spark: spark(&list, now),
+                    spark: spark(&r.weeks, peak),
+                    total: r.weeks.iter().sum(),
+                    peak,
                     href,
                 }
             })
@@ -335,8 +363,9 @@ async fn repos_json(State(table): State<Arc<Table>>) -> Response {
                 name: s.name.clone(),
                 href: format!("/r/{}/", s.name),
                 when: s
-                    .recent()
-                    .first()
+                    .recent(now)
+                    .last
+                    .as_ref()
                     .map(|c| fmt::ago(c.author.time, now))
                     .unwrap_or_default(),
             })
@@ -386,13 +415,30 @@ mod tests {
         )
         .expect("table");
         let s = table.order[0].clone();
-        let first = s.recent();
+        let now = crate::fmt::now() + 60;
+        let first = s.recent(now);
         assert!(
-            std::sync::Arc::ptr_eq(&first, &s.recent()),
+            std::sync::Arc::ptr_eq(&first, &s.recent(now)),
             "same HEAD reuses the read"
         );
         git(p, &["commit", "-q", "--allow-empty", "-m", "two"]);
-        let after = s.recent();
-        assert_eq!((first.len(), after.len()), (1, 2));
+        let after = s.recent(now);
+        let total = |r: &super::Recent| r.weeks.iter().sum::<u32>();
+        assert_eq!((total(&first), total(&after)), (1, 2));
+        assert_eq!(after.last.as_ref().map(|c| c.subject.as_str()), Some("two"));
+    }
+
+    /// The line counts every commit in the window, not the newest few thousand: a busy
+    /// repository must not show an empty tail.
+    #[test]
+    fn weekly_counts_the_whole_window() {
+        let now = 100 * super::WEEK;
+        // 5000 commits evenly over the 26 weeks, far more than the old 2000-commit read.
+        let step = super::WEEK * super::SPARK_WEEKS as i64 / 5000;
+        let times: Vec<i64> = (0..5000).map(|i| now - i * step).collect();
+        let weeks = super::weekly(&times, now);
+        assert_eq!(weeks.len(), super::SPARK_WEEKS);
+        assert!(weeks.iter().all(|n| *n > 0), "{weeks:?}");
+        assert_eq!(weeks.iter().sum::<u32>(), 5000);
     }
 }

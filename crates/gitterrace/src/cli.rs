@@ -4,7 +4,7 @@ use std::{net::SocketAddr, path::PathBuf};
 
 use clap::{Parser, Subcommand};
 
-/// A GitHub/GitLab-style view of a git repository, offline.
+/// Browse a git repository in your browser, offline.
 #[derive(Parser)]
 #[command(version = option_env!("GITTERRACE_VERSION").unwrap_or(env!("CARGO_PKG_VERSION")))]
 pub(crate) struct Cli {

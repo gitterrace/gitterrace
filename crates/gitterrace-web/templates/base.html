@@ -35,6 +35,7 @@
 <nav class="tabnav">{% for n in c.nav %}<a href="{{ n.href }}"{% if n.on %} class="on" aria-current="page"{% endif %}>{{ n.label }}</a>{% endfor %}</nav>
 </div></header>
 <div class="headstate" role="status" id="headstate"{% if c.banner.is_none() %} hidden{% endif %}><div class="wrap">{% if let Some(b) = c.banner %}{{ b }}{% endif %}</div></div>
+<div class="actnote" role="status" id="actnote"{% if c.actions_note.is_none() %} hidden{% endif %}><div class="wrap">{% if let Some(n) = c.actions_note %}{{ n }}{% endif %}</div></div>
 <main class="wrap" id="main">
 {% block content %}{% endblock %}
 </main>

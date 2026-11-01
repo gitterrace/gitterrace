@@ -301,6 +301,7 @@ svg.loc .xh{display:none;stroke:var(--fg);stroke-width:1;stroke-dasharray:3 3;po
 .rlist .subj{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .foot{color:var(--muted);font-size:var(--text-sm);margin:var(--space-2) 0 0}
 svg.spark{display:block;fill:none;stroke-width:1.6;stroke-linejoin:round}
+td.sparkcell{white-space:nowrap}td.sparkcell svg.spark{display:inline-block;vertical-align:middle;margin-right:var(--space-2)}td.sparkcell span{display:inline-block;min-width:6ch;text-align:right;font:var(--text-xs) var(--mono);font-variant-numeric:tabular-nums}
 svg.spark.s1{stroke:var(--cat-1)}svg.spark.s2{stroke:var(--cat-2)}svg.spark.s3{stroke:var(--cat-3)}svg.spark.s4{stroke:var(--cat-4)}svg.spark.s5{stroke:var(--cat-5)}svg.spark.s6{stroke:var(--cat-6)}svg.spark.s7{stroke:var(--cat-7)}svg.spark.s8{stroke:var(--cat-8)}
 
 /* last-commit column: the message fills the cell, the age has its own column */

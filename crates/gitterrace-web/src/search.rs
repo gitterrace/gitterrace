@@ -27,7 +27,7 @@ use crate::{
 /// Matching lines kept per search before the rest is reported as cut off.
 const MAX_PER_FILE: usize = 100;
 const MAX_COMMITS: usize = 200;
-/// Files above this are skipped, like GitHub does.
+/// Files above this are skipped: they are generated or vendored far more often than read.
 const MAX_LINE_CHARS: usize = 300;
 
 #[derive(Deserialize, Default)]

@@ -1,4 +1,4 @@
-//! GitHub-flavoured Markdown to HTML.
+//! Markdown to HTML, with tables, task lists, footnotes and alerts.
 //!
 //! Raw HTML in the source is allowed through only as far as `ammonia` permits;
 //! everything the parser or this module generates goes through the same
@@ -47,7 +47,7 @@ fn strip_front_matter(src: &str) -> &str {
     src
 }
 
-/// GitHub heading slug: lowercase, keep letters, digits, `-` and `_`, spaces to `-`.
+/// Heading slug as most Markdown hosts make it, so links written elsewhere still land: lowercase, keep letters, digits, `-` and `_`, spaces to `-`.
 fn slugify(text: &str) -> String {
     text.trim()
         .chars()
@@ -239,7 +239,7 @@ const SAFE_CLASS: [&str; 6] = [
 fn sanitizer(base: Base) -> ammonia::Builder<'static> {
     let mut b = ammonia::Builder::default();
     // `<picture>` with a `prefers-color-scheme` source is how READMEs ship a light and a
-    // dark image; GitHub and GitLab render it, so it is kept.
+    // dark image, so it is kept.
     b.add_tags(["input", "picture", "source"])
         .add_tag_attributes("input", ["type", "checked", "disabled"])
         .add_tag_attributes("source", ["media", "srcset", "type"])
@@ -364,7 +364,7 @@ mod tests {
     }
 
     #[test]
-    fn heading_anchors_follow_github_slugs() {
+    fn heading_anchors_use_the_common_slug_rule() {
         assert_eq!(slugify("Hello, World! v1.2_x"), "hello-world-v12_x");
         let out = render("## Same\n\n## Same\n\n## `Code` & more\n");
         assert!(out.contains("id=\"user-content-same\""));

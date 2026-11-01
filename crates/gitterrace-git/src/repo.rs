@@ -206,6 +206,27 @@ impl Repo {
         Ok(out)
     }
 
+    /// Author times of the commits reachable from `rev` with a commit time at or after `since`,
+    /// newest first. Reads only commit headers, so a busy history stays cheap.
+    pub fn commit_times_since(&self, rev: &str, since: i64) -> Result<Vec<i64>> {
+        let repo = self.repo();
+        let tip = Self::resolve_id(&repo, rev)?;
+        let walk = repo
+            .rev_walk([tip])
+            .sorting(Sorting::ByCommitTimeCutoff {
+                order: CommitTimeOrder::NewestFirst,
+                seconds: since,
+            })
+            .all()
+            .map_err(git)?;
+        let mut out = Vec::new();
+        for info in walk {
+            let commit = info.map_err(git)?.object().map_err(git)?;
+            out.push(commit.author().map_err(git)?.seconds());
+        }
+        Ok(out)
+    }
+
     /// Commit ids reachable from `rev`, oldest first. Used by the indexer.
     pub fn rev_list(&self, rev: &str) -> Result<Vec<String>> {
         let repo = self.repo();

@@ -542,3 +542,33 @@ async fn dirty_chip_follows_on_pages_without_the_worktree() {
     next(false).await;
     assert_eq!(a.wt_watchers.load(std::sync::atomic::Ordering::Acquire), 0);
 }
+
+/// A refused actions.toml is in the page's first HTML, so the note never arrives late and
+/// shifts the page down.
+#[tokio::test]
+async fn a_refused_actions_file_is_in_the_first_paint() {
+    use std::os::unix::fs::PermissionsExt;
+    let dir = tempfile::tempdir().expect("tmp");
+    let p = repo(dir.path(), "r");
+    let conf = dir.path().join("conf");
+    std::fs::create_dir(&conf).expect("dir");
+    std::fs::set_permissions(&conf, std::fs::Permissions::from_mode(0o700)).expect("chmod");
+    let file = conf.join("actions.toml");
+    std::fs::write(
+        &file,
+        "version = 1\n[[action]]\nid = \"x\"\nlabel = \"X\"\nkinds = [\"page\"]\ncommand = [\"true\"]\nenv = [\"\"]\n",
+    )
+    .expect("write");
+    std::fs::set_permissions(&file, std::fs::Permissions::from_mode(0o600)).expect("chmod");
+    let env = Env::new(Config::default());
+    let (r, _) = crate::build(&p, None, Some(&file), &env).expect("build");
+    let (code, html) = get(&r, "/").await;
+    assert_eq!(code, 200);
+    let strip = html
+        .split("id=\"actnote\"")
+        .nth(1)
+        .and_then(|s| s.split("</div></div>").next())
+        .expect("strip rendered");
+    assert!(!strip.starts_with(" hidden"), "{strip}");
+    assert!(strip.contains("actions.toml not loaded"), "{strip}");
+}

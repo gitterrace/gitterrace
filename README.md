@@ -5,7 +5,7 @@
 </picture>
 </h1>
 
-<p align="center"><b>Your repository's history, step by step. A GitHub-style view of any git repo, offline, in one binary. Run <code>git terrace</code>.</b></p>
+<p align="center"><b>Your repository's history, step by step. Run <code>git terrace</code> and read it in your browser.</b></p>
 
 Browse any git repository in your browser, offline, read-only: code, commits, blame,
 branches, worktrees, stashes, live updates and insights. No database, accounts or network.
@@ -29,7 +29,7 @@ Windows: use WSL.
 
 <!-- BEGIN GENERATED: commands -->
 ```
-git terrace [paths]       A GitHub/GitLab-style view of a git repository, offline [--addr --poll --no-watch --config --no-actions]
+git terrace [paths]       Browse a git repository in your browser, offline [--addr --poll --no-watch --config --no-actions]
 git terrace serve         Serve the repository in the browser (the default)
 git terrace config        Print the effective configuration and where each value comes from
 git terrace mcp           Run a read-only MCP server over stdio for agents

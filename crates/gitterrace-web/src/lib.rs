@@ -166,6 +166,7 @@ fn build(
     let repo = Repo::discover(repo_path).map_err(io::Error::other)?;
     let name = repo.name();
     let (live, status) = actions::start(actions_file, &[repo.root()], extra.is_none());
+    env.set_actions_status(&status);
     let site = Arc::new(actions::Site {
         targets: vec![actions::Target {
             key: name.clone(),
@@ -193,6 +194,7 @@ fn build_multi(
             let targets = table.targets()?;
             let roots: Vec<PathBuf> = targets.iter().map(|t| t.repo.root()).collect();
             let (live, status) = actions::start(actions_file, &roots, extra.is_none());
+            env.set_actions_status(&status);
             table.live.clone_from(&live);
             let site = Arc::new(actions::Site {
                 targets,

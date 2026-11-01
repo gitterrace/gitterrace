@@ -1,7 +1,7 @@
 # Design
 
-Like opening a repository on GitHub or GitLab, minus the social layer: same places, same
-words, calmer surface.
+A repository read like a well-kept document: the places and words people already know for
+code, commits and branches, on a calm surface, with nothing to sign in to.
 
 Colours, type, space and motion come only from `theme/schwarzwald/`, a vendored snapshot that
 is replaced as a whole, never edited by hand; its README says how to update it. gitterrace

@@ -19,22 +19,14 @@
   var DOCS = "https://github.com/timorunge/gitterrace/blob/main/docs/actions.md";
   var MD_LINES = 40;
 
-  // A refused actions.toml says so in a strip under the top bar, in full, and the strip goes
-  // when a later edit is fine.
-  var noteEl = null;
+  // The server renders the note into the page, so it is there at first paint. The poll only
+  // follows later edits of actions.toml, and touches the page only when the text changes.
+  var noteEl = document.getElementById("actnote");
   function showNote(text) {
-    if (!text) { if (noteEl) noteEl.hidden = true; return; }
-    if (!noteEl) {
-      var anchor = document.getElementById("headstate");
-      if (!anchor) return;
-      noteEl = document.createElement("div");
-      noteEl.className = "actnote";
-      noteEl.id = "actnote";
-      noteEl.setAttribute("role", "status");
-      noteEl.appendChild(document.createElement("div")).className = "wrap";
-      anchor.after(noteEl);
-    }
-    noteEl.firstChild.textContent = text;
+    if (!noteEl) return;
+    var line = noteEl.firstElementChild;
+    if (!text) { noteEl.hidden = true; return; }
+    if (line.textContent !== text) line.textContent = text;
     noteEl.hidden = false;
   }
   function pollNote() {

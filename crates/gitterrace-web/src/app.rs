@@ -43,6 +43,9 @@ pub(crate) struct Env {
     jobs: Arc<Semaphore>,
     jobs_cap: Arc<Mutex<usize>>,
     stop: Arc<watch::Sender<bool>>,
+    /// Why `actions.toml` is not in force; rendered into every page so the note is there
+    /// at first paint instead of arriving with a poll and pushing the page down.
+    actions_note: Arc<RwLock<Option<Arc<crate::actions::Status>>>>,
 }
 
 /// Page-building slots for `cfg`: 0 means one per core.
@@ -82,7 +85,20 @@ impl Env {
             jobs: Arc::new(Semaphore::new(jobs)),
             jobs_cap: Arc::new(Mutex::new(jobs)),
             stop: Arc::new(watch::channel(false).0),
+            actions_note: Arc::default(),
         }
+    }
+
+    /// Hands the actions status to every page this server renders.
+    pub(crate) fn set_actions_status(&self, status: &Arc<crate::actions::Status>) {
+        if let Ok(mut g) = self.actions_note.write() {
+            *g = Some(Arc::clone(status));
+        }
+    }
+
+    /// The actions note to render now, if any.
+    pub(crate) fn actions_note(&self) -> Option<String> {
+        self.actions_note.read().ok()?.as_ref()?.note()
     }
 
     /// The settings in force now.
@@ -238,6 +254,11 @@ impl App {
     /// The settings in force now; a reload can change them between two calls.
     pub(crate) fn cfg(&self) -> Arc<Config> {
         self.env.cfg()
+    }
+
+    /// The actions note for this page, rendered with it.
+    pub(crate) fn actions_note(&self) -> Option<String> {
+        self.env.actions_note()
     }
 
     /// Takes a reloaded config: limits, stream cap, rendered pages and open tabs.

@@ -5,9 +5,9 @@ edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
-description = "A GitHub/GitLab-style view of any git repository, offline, in one binary"
+description = "Browse any git repository in your browser: code, history and insights, offline, in one binary"
 homepage = "https://github.com/timorunge/gitterrace"
-keywords = ["git", "github", "insights", "repository", "offline"]
+keywords = ["git", "browser", "insights", "repository", "offline"]
 categories = ["command-line-utilities", "development-tools"]
 
 [package.metadata.dist]

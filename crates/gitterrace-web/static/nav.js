@@ -401,7 +401,7 @@
         a.href = B + "/commit/" + c.id;
         a.title = c.subject;
         td.appendChild(a);
-        // The age gets its own right-aligned column, like GitHub, so the
+        // The age gets its own right-aligned column, so the
         // message can use all the width between name and age.
         var age = el("td", "ago", c.when);
         td.parentNode.insertBefore(age, td.nextSibling);
