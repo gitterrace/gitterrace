@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}Stashes · {{ c.name }}{% endblock %}
+{% block content %}
+<nav class="tabs"><a href="{{ c.base }}/refs">Branches &amp; tags</a><a href="{{ c.base }}/worktrees">Worktrees</a><a href="{{ c.base }}/stashes" class="on">Stashes <span class="tag">{{ rows.len() }}</span></a></nav>
+<div class="card"><table class="entries grow">
+{% for s in rows %}<tr><td><a href="{{ s.href }}"><code>{{ s.name }}</code></a></td><td class="grow">{{ s.message }}</td><td class="muted r">{{ s.when }}</td></tr>{% endfor %}
+{% if rows.is_empty() %}<tr><td class="muted">No stashes.</td></tr>{% endif %}
+</table></div>
+{% endblock %}

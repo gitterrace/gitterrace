@@ -37,6 +37,9 @@ pub(crate) struct App {
     pub(crate) base: String,
     progress: Mutex<Progress>,
     ready: AtomicBool,
+    /// Selected commits outside HEAD's history, queued for the one indexer loop so the cache
+    /// file never has two writers.
+    wanted: Mutex<std::collections::BTreeSet<String>>,
     records: Mutex<Option<RecordsEntry>>,
     memo: Mutex<HashMap<String, (Instant, Arc<String>)>>,
     dirty: Mutex<Option<(Instant, bool)>>,
@@ -57,6 +60,7 @@ impl App {
             base: String::new(),
             progress: Mutex::new(Progress::default()),
             ready: AtomicBool::new(false),
+            wanted: Mutex::new(std::collections::BTreeSet::new()),
             records: Mutex::new(None),
             memo: Mutex::new(HashMap::new()),
             dirty: Mutex::new(None),
@@ -239,13 +243,16 @@ impl App {
         pairs.join("&")
     }
 
-    /// Key for a rendered page: moves with HEAD, the index file, the branch name, the dirty
-    /// chip and the query, so any of them changing yields a fresh render.
+    /// Key for a rendered page: moves with HEAD, the selected ref's commit, the index file, the
+    /// branch name, the dirty chip and the query, so any of them changing yields a fresh render.
     pub(crate) fn memo_key(&self, tab: &str, query: Option<&str>) -> String {
         format!(
-            "{tab}\u{0}{}\u{0}{}\u{0}{}\u{0}{}\u{0}{}\u{0}{}",
+            "{tab}\u{0}{}\u{0}{}\u{0}{}\u{0}{}\u{0}{}\u{0}{}\u{0}{}",
             self.base,
             self.repo.resolve("HEAD").unwrap_or_default(),
+            self.repo
+                .resolve(&crate::fmt::selected())
+                .unwrap_or_default(),
             self.index.generation(),
             self.repo.head_branch().unwrap_or_default(),
             self.dirty(),
@@ -273,7 +280,8 @@ impl App {
     }
 
     /// Records reachable from `head`, parsed once per index generation. `None` until the first
-    /// build finished.
+    /// build finished, and for a commit outside HEAD's history until its missing commits are
+    /// indexed; the indexer loop picks such a commit up from `wanted`.
     pub(crate) fn records(&self, head: &str) -> Result<Option<Arc<Vec<CommitRecord>>>> {
         if !self.ready() {
             return Ok(None);
@@ -284,6 +292,12 @@ impl App {
             && *k == key
         {
             return Ok(Some(Arc::clone(recs)));
+        }
+        if self.index.pending(&self.repo, head)? > 0 {
+            if let Ok(mut w) = self.wanted.lock() {
+                w.insert(head.to_owned());
+            }
+            return Ok(None);
         }
         let recs = Arc::new(self.index.records(&self.repo, head)?);
         if let Ok(mut g) = self.records.lock() {
@@ -299,7 +313,13 @@ pub(crate) async fn blocking<T: Send + 'static>(
     f: impl FnOnce(&App) -> Result<T> + Send + 'static,
 ) -> Result<T> {
     let app = Arc::clone(app);
-    tokio::task::spawn_blocking(move || crate::fmt::with_base(&app.base, || f(&app))).await?
+    let rev = crate::fmt::REQUEST_REV
+        .try_with(Clone::clone)
+        .unwrap_or_else(|_| "HEAD".to_owned());
+    tokio::task::spawn_blocking(move || {
+        crate::fmt::with_base(&app.base, || crate::fmt::with_rev(&rev, || f(&app)))
+    })
+    .await?
 }
 
 /// Re-indexes whenever HEAD moves. Browsing never waits on this task.
@@ -332,6 +352,21 @@ pub(crate) async fn keep_index_fresh(app: Arc<App>) {
             }
         }
         tokio::time::sleep(POLL).await;
+        let wanted = app
+            .wanted
+            .lock()
+            .map(|mut w| std::mem::take(&mut *w))
+            .unwrap_or_default();
+        for rev in wanted {
+            let a = Arc::clone(&app);
+            let run = tokio::task::spawn_blocking(move || {
+                a.index.update(&a.repo, &rev, &|p| a.set_progress(p))
+            })
+            .await;
+            if let Ok(Err(e)) | Err(e) = run.map_err(std::io::Error::other) {
+                tracing::warn!("index update for a selected ref failed: {e}");
+            }
+        }
     }
 }
 

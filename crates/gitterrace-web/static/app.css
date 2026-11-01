@@ -372,3 +372,10 @@ svg.chart .col:hover .dot{opacity:1}
 svg.chart .dot-pt{fill:var(--accent);fill-opacity:.55;stroke:var(--accent);stroke-width:1}svg.chart a:hover .dot-pt{fill-opacity:.95}
 .cmp{display:flex;flex-wrap:wrap;gap:var(--space-3);align-items:end;margin:var(--space-4) 0}.cmp label{display:flex;flex-direction:column;gap:4px;font-size:var(--text-sm);color:var(--muted)}.cmp input{border:var(--border);min-width:220px}.cmp button{font-weight:var(--weight-regular);padding:5px var(--space-4);background:var(--accent-soft)}
 table.own td{white-space:nowrap}table.own td:first-child{width:30%}
+.headstate{background:var(--warn-bg);color:var(--warn);border-bottom:var(--border);font:var(--weight-semibold) var(--text-sm)/1.4 var(--mono);padding:var(--space-2) 0}
+.branches td:first-child{white-space:nowrap}
+.entries.grow td:first-child{width:auto;white-space:nowrap}.entries td.grow{width:100%}
+.branches .subj{max-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.entries .th td{white-space:nowrap}
+.tag.merged{color:var(--accent-fg)}
+.tagmsg pre{margin:var(--space-3) 0 0;white-space:pre-wrap;font:var(--text-sm)/1.5 var(--mono)}

@@ -335,7 +335,11 @@ fn build(a: &crate::app::App, all: &[CommitRecord], c: Chrome, q: &TypesQuery) -
         .map(|x| {
             (
                 x.path.clone(),
-                href(&format!("/blob/HEAD/{}", fmt::enc(&x.path, true))),
+                href(&format!(
+                    "/blob/{}/{}",
+                    fmt::selected_seg(),
+                    fmt::enc(&x.path, true)
+                )),
                 x.commits,
                 x.additions,
                 x.deletions,
@@ -369,7 +373,7 @@ fn build(a: &crate::app::App, all: &[CommitRecord], c: Chrome, q: &TypesQuery) -
         });
     }
 
-    let head = a.repo.resolve("HEAD").unwrap_or_default();
+    let head = a.repo.resolve(&fmt::selected()).unwrap_or_default();
     let subjects = a.subjects(&head);
     let mut list: Vec<&CommitRecord> = recs.iter().collect();
     list.sort_by_key(|r| std::cmp::Reverse(r.time));

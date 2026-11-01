@@ -604,7 +604,7 @@ pub(crate) async fn history(
     let key = format!("{path}\0{}", App::canonical_query(raw.as_deref()));
     cached_keyed(&app, "hi", key, move |a, r, c| {
         let ins = insights(a, r, gitterrace_index::Options::default());
-        let head = a.repo.resolve("HEAD").unwrap_or_default();
+        let head = a.repo.resolve(&fmt::selected()).unwrap_or_default();
         let subjects = a.subjects(&head);
         let now = fmt::now();
         let rows = ins
@@ -629,8 +629,16 @@ pub(crate) async fn history(
             .collect();
         HistoryPage {
             c,
-            blob_href: href(&format!("/blob/HEAD/{}", enc(&path, true))),
-            blame_href: href(&format!("/blame/HEAD/{}", enc(&path, true))),
+            blob_href: href(&format!(
+                "/blob/{}/{}",
+                fmt::selected_seg(),
+                enc(&path, true)
+            )),
+            blame_href: href(&format!(
+                "/blame/{}/{}",
+                fmt::selected_seg(),
+                enc(&path, true)
+            )),
             path,
             rows,
         }

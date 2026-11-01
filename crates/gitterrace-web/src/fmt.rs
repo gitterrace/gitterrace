@@ -93,9 +93,102 @@ thread_local! {
     static BASE: std::cell::RefCell<String> = const { std::cell::RefCell::new(String::new()) };
 }
 
-/// The one place absolute in-app URLs are built: prefixes the current repository's base.
+thread_local! {
+    /// Ref chosen with `?rev=` for this request; `HEAD` when absent.
+    static REV: std::cell::RefCell<String> = std::cell::RefCell::new("HEAD".to_owned());
+}
+
+tokio::task_local! {
+    /// `?rev=` of the request being served, copied into [`REV`] by `app::blocking`.
+    pub(crate) static REQUEST_REV: String;
+}
+
+/// The one place absolute in-app URLs are built: prefixes the current repository's base and,
+/// on pages that follow the selected ref, carries `?rev=` along.
 pub(crate) fn href(path: &str) -> String {
+    let path = with_selected(path);
     BASE.with(|b| format!("{}{path}", b.borrow()))
+}
+
+/// Pages whose content is computed from the selected ref rather than a ref in the path.
+fn follows_rev(path: &str) -> bool {
+    let p = path.split(['?', '#']).next().unwrap_or_default();
+    p == "/" || p == "/stats" || p.starts_with("/stats/") || p.starts_with("/history/")
+}
+
+fn with_selected(path: &str) -> std::borrow::Cow<'_, str> {
+    let rev = selected();
+    if rev == "HEAD" || !follows_rev(path) {
+        return path.into();
+    }
+    let (head, frag) = path
+        .split_once('#')
+        .map_or((path, None), |(h, f)| (h, Some(f)));
+    if head.split(['?', '&']).any(|p| p.starts_with("rev=")) {
+        return path.into();
+    }
+    let sep = if head.contains('?') { '&' } else { '?' };
+    let mut out = format!("{head}{sep}rev={}", enc(&rev, false));
+    if let Some(f) = frag {
+        out.push('#');
+        out.push_str(f);
+    }
+    out.into()
+}
+
+/// The ref chosen with `?rev=`, `HEAD` when none was given.
+pub(crate) fn selected() -> String {
+    REV.with(|r| r.borrow().clone())
+}
+
+/// `selected` percent-encoded as one path segment, for `/log/{rev}`-style links.
+pub(crate) fn selected_seg() -> String {
+    enc(&selected(), false)
+}
+
+/// Runs `f` with [`selected`] answering `rev`.
+pub(crate) fn with_rev<T>(rev: &str, f: impl FnOnce() -> T) -> T {
+    let prev = REV.with(|r| r.replace(rev.to_owned()));
+    let out = f();
+    REV.with(|r| *r.borrow_mut() = prev);
+    out
+}
+
+/// `?rev=` of a raw query string, empty values and absence reading as `HEAD`.
+pub(crate) fn rev_param(query: Option<&str>) -> String {
+    query
+        .unwrap_or_default()
+        .split('&')
+        .find_map(|p| p.strip_prefix("rev="))
+        .map(|v| {
+            let v = v.replace('+', " ");
+            percent_decode(&v)
+        })
+        .filter(|v| !v.is_empty())
+        .unwrap_or_else(|| "HEAD".to_owned())
+}
+
+fn percent_decode(s: &str) -> String {
+    let b = s.as_bytes();
+    let mut out = Vec::with_capacity(b.len());
+    let mut i = 0;
+    while i < b.len() {
+        let hex = |c: u8| char::from(c).to_digit(16);
+        if b[i] == b'%'
+            && let (Some(h), Some(l)) = (
+                b.get(i + 1).copied().and_then(hex),
+                b.get(i + 2).copied().and_then(hex),
+            )
+        {
+            #[allow(clippy::cast_possible_truncation)]
+            out.push((h * 16 + l) as u8);
+            i += 3;
+        } else {
+            out.push(b[i]);
+            i += 1;
+        }
+    }
+    String::from_utf8_lossy(&out).into_owned()
 }
 
 /// Prefix `href` adds on this thread, for templates and the JS meta tag.

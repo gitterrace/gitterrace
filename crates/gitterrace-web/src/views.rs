@@ -32,6 +32,10 @@ pub(crate) struct Chrome {
     /// Worktree differs from HEAD: show the Working tree chip.
     pub(crate) dirty: bool,
     pub(crate) nav: Vec<Nav>,
+    /// HEAD detached or an operation half done, worded for the banner; `None` on a plain branch.
+    pub(crate) banner: Option<String>,
+    /// The repository's overview, keeping the selected ref.
+    pub(crate) home: String,
 }
 
 pub(crate) struct Crumb {
@@ -99,13 +103,13 @@ pub(crate) fn day_groups(list: &[CommitSummary], now: i64) -> Vec<crate::routes:
 }
 
 pub(crate) fn chrome(app: &crate::app::App, active: &str) -> Chrome {
-    chrome_at(app, active, "HEAD")
+    chrome_at(app, active, &crate::fmt::selected())
 }
 
 pub(crate) fn chrome_at(app: &crate::app::App, active: &str, rev: &str) -> Chrome {
     let items = [
         ("/", "Code", "files"),
-        ("/log/HEAD", "Commits", "log"),
+        ("/log/{rev}", "Commits", "log"),
         ("/refs", "Branches & Tags", "refs"),
         ("/stats", "Insights", "stats"),
     ];
@@ -121,11 +125,33 @@ pub(crate) fn chrome_at(app: &crate::app::App, active: &str, rev: &str) -> Chrom
         nav: items
             .into_iter()
             .map(|(path, label, key)| Nav {
-                href: href(path),
+                href: href(&path.replace("{rev}", &enc(rev, false))),
                 label,
                 on: key == active,
             })
             .collect(),
+        banner: banner(&app.repo.head_state()),
+        home: href("/"),
+    }
+}
+
+/// What the banner says about HEAD. Nothing on a branch with no operation in progress.
+pub(crate) fn banner(h: &gitterrace_git::HeadState) -> Option<String> {
+    use gitterrace_git::InProgress as P;
+    let op = h.in_progress.map(|p| match p {
+        P::Rebase => "Rebase in progress",
+        P::Merge => "Merge in progress",
+        P::CherryPick => "Cherry-pick in progress",
+        P::Revert => "Revert in progress",
+        P::Bisect => "Bisect in progress",
+        P::ApplyMailbox => "Applying patches (git am) in progress",
+    });
+    let at = h.commit.as_deref().map(short).unwrap_or_default();
+    match (op, &h.branch) {
+        (None, Some(_)) => None,
+        (None, None) => Some(format!("HEAD is detached at {at}")),
+        (Some(op), Some(b)) => Some(format!("{op} on {b}")),
+        (Some(op), None) => Some(format!("{op}, HEAD detached at {at}")),
     }
 }
 
@@ -168,7 +194,11 @@ pub(crate) fn hue(name: &str) -> u32 {
 
 /// Link to the commit list of one author.
 pub(crate) fn author_href(email: &str) -> String {
-    href(&format!("/log/HEAD?author={}", enc(email, false)))
+    href(&format!(
+        "/log/{}?author={}",
+        crate::fmt::selected_seg(),
+        enc(email, false)
+    ))
 }
 
 pub(crate) fn commit_row(c: &CommitSummary, now: i64) -> CommitRow {

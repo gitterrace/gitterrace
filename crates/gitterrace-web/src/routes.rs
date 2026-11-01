@@ -71,8 +71,18 @@ pub(crate) fn router(app: Arc<App>) -> Router {
         .route("/cards/wrapped/{year}", get(crate::cards::wrapped))
         .route("/badges/{name}", get(crate::cards::badge))
         .route("/api/progress", get(progress))
+        .route("/worktrees", get(crate::gitstate::worktrees))
+        .route("/stashes", get(crate::gitstate::stashes))
+        .route("/tag/{name}", get(crate::gitstate::tag))
+        .layer(axum::middleware::from_fn(selected_rev))
         .merge(assets())
         .with_state(app)
+}
+
+/// Makes `?rev=` the selected ref for everything the request renders.
+async fn selected_rev(req: axum::extract::Request, next: axum::middleware::Next) -> Response {
+    let rev = fmt::rev_param(req.uri().query());
+    fmt::REQUEST_REV.scope(rev, next.run(req)).await
 }
 
 /// Embedded stylesheets, scripts and fonts; stateless, so the multi-repo index serves them too.
@@ -291,11 +301,13 @@ struct OverviewPage {
     readme: Option<String>,
     entries: Vec<views::Entry>,
     latest: Option<CommitRow>,
+    insights_href: String,
 }
 
 async fn overview(State(app): Shared) -> Result<Html<String>> {
     let p = blocking(&app, |a| {
-        let head = a.repo.resolve("HEAD")?;
+        let rev = fmt::selected();
+        let head = a.repo.resolve(&rev)?;
         let now = fmt::now();
         let recent = a.repo.log(&head, None, 0, 1)?;
         let list = a.repo.tree(&head, "")?;
@@ -304,7 +316,7 @@ async fn overview(State(app): Shared) -> Result<Html<String>> {
                 .blob(&head, n)
                 .ok()
                 .and_then(|b| b.text)
-                .map(|t| markdown::render_with(&t, markdown::Base::new("HEAD", "")))
+                .map(|t| markdown::render_with(&t, markdown::Base::new(&rev, "")))
         });
         let totals = a.records(&head)?.map(|r| {
             let t = gitterrace_index::totals(&r);
@@ -323,8 +335,9 @@ async fn overview(State(app): Shared) -> Result<Html<String>> {
             },
             totals,
             readme,
-            entries: views::entries("HEAD", "", &list),
+            entries: views::entries(&rev, "", &list),
             latest: recent.first().map(|c| views::commit_row(c, now)),
+            insights_href: fmt::href("/stats"),
         })
     })
     .await?;
@@ -751,33 +764,51 @@ async fn blame(
     page(&p)
 }
 
-struct RefGroup {
-    title: &'static str,
-    rows: Vec<RefRow>,
+struct TagRow {
+    name: String,
+    href: String,
+    subject: String,
+    commit: String,
+    when: String,
 }
 
 #[derive(Template)]
 #[template(path = "refs.html")]
 struct RefsPage {
     c: Chrome,
-    groups: Vec<RefGroup>,
+    branches: Vec<crate::gitstate::BranchRow>,
+    tags: Vec<TagRow>,
+    remotes: Vec<RefRow>,
+    worktrees: usize,
+    stashes: usize,
 }
 
 async fn refs(State(app): Shared) -> Result<Html<String>> {
     let p = blocking(&app, |a| {
         let all = a.repo.refs()?;
         let now = fmt::now();
-        let group = |title, kind| RefGroup {
-            title,
-            rows: views::ref_rows(&all, kind, now),
-        };
+        let tags = all
+            .iter()
+            .filter(|r| r.kind == RefKind::Tag)
+            .map(|r| TagRow {
+                href: fmt::href(&format!("/tag/{}", fmt::enc(&r.name, false))),
+                subject: r
+                    .annotation
+                    .as_ref()
+                    .map(|n| n.subject.clone())
+                    .unwrap_or_default(),
+                commit: fmt::short(&r.target),
+                when: fmt::ago(r.time, now),
+                name: r.name.clone(),
+            })
+            .collect();
         Ok(RefsPage {
             c: views::chrome(a, "refs"),
-            groups: vec![
-                group("Branches", RefKind::Branch),
-                group("Tags", RefKind::Tag),
-                group("Remotes", RefKind::Remote),
-            ],
+            branches: crate::gitstate::branch_rows(a)?,
+            tags,
+            remotes: views::ref_rows(&all, RefKind::Remote, now),
+            worktrees: a.repo.linked_worktrees()?.len(),
+            stashes: a.repo.stashes()?.len(),
         })
     })
     .await?;
@@ -821,7 +852,7 @@ pub(crate) async fn with_records<T: Template + Send + 'static>(
     build: impl FnOnce(&App, &[gitterrace_index::CommitRecord], Chrome) -> T + Send + 'static,
 ) -> Result<Html<String>> {
     let html = blocking(app, move |a| {
-        let head = a.repo.resolve("HEAD")?;
+        let head = a.repo.resolve(&fmt::selected())?;
         let c = views::chrome(a, "stats");
         match a.records(&head)? {
             Some(r) => Ok(build(a, &r, c).render()?),
@@ -890,7 +921,11 @@ struct RowGroup {
 
 fn file_row(f: gitterrace_index::FileChurn, max: u64) -> Row {
     Row {
-        href: fmt::href(&format!("/blob/HEAD/{}", fmt::enc(&f.path, true))),
+        href: fmt::href(&format!(
+            "/blob/{}/{}",
+            fmt::selected_seg(),
+            fmt::enc(&f.path, true)
+        )),
         pct: charts::pct(f.commits as u64, max),
         label: f.path,
         commits: fmt::thousands(f.commits),
@@ -939,7 +974,11 @@ async fn stats_files(
                             href: if d.path == "." {
                                 String::new()
                             } else {
-                                fmt::href(&format!("/tree/HEAD/{}", fmt::enc(&d.path, true)))
+                                fmt::href(&format!(
+                                    "/tree/{}/{}",
+                                    fmt::selected_seg(),
+                                    fmt::enc(&d.path, true)
+                                ))
                             },
                             pct: charts::pct(d.commits as u64, dmax),
                             label: d.path,

@@ -124,7 +124,7 @@ impl Config {
         Self::parse(&text, &home())
     }
 
-    /// Parses and validates; argv[0] is resolved against `home` and `PATH` now, once.
+    /// Parses and validates; `argv[0]` is resolved against `home` and `PATH` now, once.
     pub fn parse(text: &str, home: &Path) -> Result<Self, ConfigError> {
         let raw: RawFile = toml::from_str(text).map_err(|e| ConfigError::Parse(e.to_string()))?;
         if raw.version != 1 {

@@ -654,7 +654,7 @@ struct LanguagesPage {
 pub(crate) async fn page(State(app): Shared, Query(q): Query<LocQuery>) -> Result<Html<String>> {
     let a2 = Arc::clone(&app);
     with_records(&app, "l", move |a, r, c| {
-        let head = a.repo.resolve("HEAD").unwrap_or_default();
+        let head = a.repo.resolve(&crate::fmt::selected()).unwrap_or_default();
         let ch = a2.chain(&head, r);
         let view = View::parse(&q, ch.len());
         LanguagesPage {

@@ -157,7 +157,7 @@ impl OptLink {
 /// Insights over `recs` with the options in force. The head ignore rules apply when asked.
 pub(crate) fn insights<'a>(a: &App, recs: &'a [CommitRecord], o: Options) -> Insights<'a> {
     let ignore = if o.respect_ignore {
-        let head = a.repo.resolve("HEAD").unwrap_or_default();
+        let head = a.repo.resolve(&crate::fmt::selected()).unwrap_or_default();
         gitterrace_git::IgnoreSet::at(&a.repo, &head).ok()
     } else {
         None
@@ -175,7 +175,7 @@ pub(crate) fn scoped<'a>(
 
 /// Text files of HEAD with line counts, the cache persisted under `.git/gitterrace`.
 pub(crate) fn head_lines(a: &App) -> Arc<Vec<gitterrace_index::HeadFile>> {
-    a.head_lines(&a.repo.resolve("HEAD").unwrap_or_default())
+    a.head_lines(&a.repo.resolve(&crate::fmt::selected()).unwrap_or_default())
 }
 
 /// Memoizes the rendered page per tip and the parameters it reads, building on a miss.

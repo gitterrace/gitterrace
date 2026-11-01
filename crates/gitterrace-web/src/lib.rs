@@ -6,6 +6,7 @@ mod charts;
 mod error;
 mod filter;
 mod fmt;
+mod gitstate;
 mod guard;
 mod highlight;
 mod insights;
@@ -641,7 +642,7 @@ mod tests {
                 let rest = &html[i + attr.len()..];
                 let v = &rest[..rest.find('"').unwrap_or(0)];
                 if v.starts_with('/') && !v.starts_with("//") {
-                    out.push(v.replace("&amp;", "&"));
+                    out.push(v.replace("&amp;", "&").replace("&#38;", "&"));
                 }
             }
         }
@@ -776,5 +777,202 @@ mod tests {
         assert!(body.contains("href=\"/log/HEAD\"") && !body.contains("/r/solo"));
         assert!(body.contains("<meta name=\"gt-base\" content=\"\">"));
         assert!(!body.contains("repobtn"));
+    }
+
+    fn rev_fixture(root: &std::path::Path) -> std::path::PathBuf {
+        let p = fixture("solo", root);
+        git(&p, &["checkout", "-qb", "side"]);
+        std::fs::write(p.join("side.txt"), "s\n").expect("w");
+        git(&p, &["add", "."]);
+        git(&p, &["commit", "-q", "-m", "feat: only on side"]);
+        git(&p, &["checkout", "-q", "main"]);
+        git(&p, &["tag", "-a", "v1", "-m", "Release one\n\nnotes here"]);
+        git(
+            &p,
+            &[
+                "worktree",
+                "add",
+                "-q",
+                root.join("wt").to_str().expect("utf8"),
+                "side",
+            ],
+        );
+        std::fs::write(p.join("README.md"), "dirty\n").expect("w");
+        git(&p, &["stash", "push", "-q", "-m", "wip stash"]);
+        p
+    }
+
+    fn ready_app(p: &std::path::Path) -> Arc<App> {
+        let repo = gitterrace_git::Repo::discover(p).expect("repo");
+        let index = gitterrace_index::Index::open(&repo).expect("index");
+        let app = Arc::new(App::new(repo, index));
+        app.index
+            .update(&app.repo, "HEAD", &|_| {})
+            .expect("update");
+        app.mark_ready();
+        app
+    }
+
+    #[tokio::test]
+    async fn git_state_pages_and_banner() {
+        let dir = tempfile::tempdir().expect("tmp");
+        let p = rev_fixture(dir.path());
+        let app = ready_app(&p);
+        let (s, body) = get(&app, "/refs").await;
+        assert_eq!(s, 200);
+        assert!(
+            body.contains(">side</a>") && body.contains("default"),
+            "{body}"
+        );
+        assert!(
+            body.contains("/compare?base=main&#38;head=side"),
+            "ahead links to compare"
+        );
+        assert!(body.contains("Release one") && body.contains("/tag/v1"));
+        let (s, body) = get(&app, "/tag/v1").await;
+        assert!(s == 200 && body.contains("notes here") && body.contains("Tagged by"));
+        assert_eq!(get(&app, "/tag/nope").await.0, 404);
+        let (s, body) = get(&app, "/worktrees").await;
+        assert!(
+            s == 200 && body.contains("/wt</code>") && body.contains("/log/side"),
+            "{body}"
+        );
+        let (s, body) = get(&app, "/stashes").await;
+        assert!(s == 200 && body.contains("stash@{0}") && body.contains("wip stash"));
+        assert!(
+            !body.contains("class=\"headstate\""),
+            "no banner on a branch"
+        );
+        let head = app.repo.resolve("HEAD").expect("head");
+        git(&p, &["checkout", "-q", "--detach"]);
+        let (_, body) = get(&app, "/").await;
+        let short = &head[..7];
+        assert!(
+            body.contains(&format!("class=\"headstate\" role=\"status\"><div class=\"wrap\">HEAD is detached at {short}")),
+            "{body}"
+        );
+    }
+
+    /// The selected ref survives every link to a page computed from it, and those pages read
+    /// the selected ref, not HEAD.
+    #[tokio::test]
+    async fn rev_is_preserved_by_every_link() {
+        let dir = tempfile::tempdir().expect("tmp");
+        let p = rev_fixture(dir.path());
+        let app = ready_app(&p);
+        let (s, body) = get(&app, "/stats?rev=side").await;
+        assert!(
+            s == 200 && body.contains("data-progress"),
+            "side is not indexed yet"
+        );
+        app.index
+            .update(&app.repo, "side", &|_| {})
+            .expect("update");
+        let (_, main) = get(&app, "/stats/types").await;
+        let (_, side) = get(&app, "/stats/types?rev=side").await;
+        assert!(side.contains("only on side") && !main.contains("only on side"));
+        let (_, side) = get(&app, "/?rev=side").await;
+        assert!(
+            side.contains("side.txt"),
+            "overview lists the selected ref's files"
+        );
+        let mut todo = vec!["/?rev=side".to_owned(), "/stats?rev=side".to_owned()];
+        let mut seen = std::collections::HashSet::new();
+        let mut lost = Vec::new();
+        while let Some(u) = todo.pop() {
+            if !seen.insert(u.clone()) || seen.len() > 300 {
+                continue;
+            }
+            let (st, body) = get(&app, &u).await;
+            assert!(st < 500, "{u}: {st}");
+            if !body.contains("<html") {
+                continue;
+            }
+            // The brand goes to the repository index on purpose, whatever ref is selected.
+            let body = body.replacen("class=\"brand\" href=\"/\"", "class=\"brand\"", 1);
+            for l in links(&body) {
+                let path = l.split(['?', '#']).next().unwrap_or_default().to_owned();
+                let follows = path == "/"
+                    || path == "/stats"
+                    || path.starts_with("/stats/")
+                    || path.starts_with("/history/");
+                if follows && !l.contains("rev=side") {
+                    lost.push(format!("{u} -> {l}"));
+                } else if follows {
+                    todo.push(l.split('#').next().unwrap_or_default().to_owned());
+                }
+            }
+        }
+        assert!(seen.len() > 10, "crawl too shallow: {}", seen.len());
+        assert!(lost.is_empty(), "links drop ?rev=:\n{}", lost.join("\n"));
+    }
+
+    /// Methods a route may answer besides GET and HEAD, as (path, method). gitterrace is
+    /// read-only, so a write route is an owner decision recorded here, never an accident.
+    const WRITE_ALLOWLIST: [(&str, &str); 0] = [];
+
+    /// Every page a crawl reaches, the API and the assets refuse any method but GET and HEAD.
+    #[tokio::test]
+    async fn every_route_is_read_only() {
+        let dir = tempfile::tempdir().expect("tmp");
+        let a = fixture("alpha", dir.path());
+        let b = fixture("beta", dir.path());
+        let router = crate::multi_router(vec![a, b]).expect("router");
+        let mut todo = vec![
+            "/".to_owned(),
+            "/r/alpha/".to_owned(),
+            "/api/repos".to_owned(),
+        ];
+        todo.extend(
+            [
+                "/api/v1/repo",
+                "/api/v1/refs",
+                "/api/progress",
+                "/api/refs",
+                "/api/files/HEAD",
+            ]
+            .map(|p| format!("/r/alpha{p}")),
+        );
+        let mut seen = std::collections::HashSet::new();
+        let mut writable = Vec::new();
+        while let Some(u) = todo.pop() {
+            if !seen.insert(u.clone()) || seen.len() > 300 {
+                continue;
+            }
+            let (get_status, body) = fetch(&router, &u, "localhost").await;
+            for l in links(&body) {
+                todo.push(l.split('#').next().unwrap_or_default().to_owned());
+            }
+            for m in ["POST", "PUT", "PATCH", "DELETE"] {
+                let res = router
+                    .clone()
+                    .oneshot(
+                        Request::builder()
+                            .method(m)
+                            .uri(&u)
+                            .header("host", "localhost")
+                            .body(Body::empty())
+                            .expect("req"),
+                    )
+                    .await
+                    .expect("res");
+                let path = u.split('?').next().unwrap_or_default();
+                let allowed = WRITE_ALLOWLIST.iter().any(|(p, am)| *p == path && *am == m);
+                // 405 is a route that exists for GET only. A URL that GET cannot find either
+                // (a `data-last` prefix) may answer 404; any other status means a handler took
+                // the write.
+                let code = res.status().as_u16();
+                let refused = code == 405 || (code == 404 && get_status == 404);
+                if !refused && !allowed {
+                    writable.push(format!("{m} {u}: {}", res.status()));
+                }
+            }
+        }
+        assert!(seen.len() > 20, "crawl too shallow: {}", seen.len());
+        assert!(
+            writable.is_empty(),
+            "routes accept writes:\n{}",
+            writable.join("\n")
+        );
     }
 }
