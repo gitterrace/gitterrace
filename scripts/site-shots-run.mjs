@@ -20,25 +20,24 @@ const SHOTS = [
   { name: 'overview', path: '/r/ripgrep/' },
   // Hotspots has the page header, tab bar, key numbers and the scatter above the fold.
   { name: 'insights', path: '/r/jq/stats/hotspots' },
+  // A commit page: message, changed files and a highlighted diff that fits one screen.
+  { name: 'commit', path: '/r/ripgrep/commit/068a63e' },
   // configure.ac from the top: 13 blocks and 8 authors in the first 28 lines (scanned over jq and ripgrep).
   { name: 'blame', path: '/r/jq/blame/release/configure.ac' },
+  // Bus factor, solo and stale lines, and the owners of each directory.
+  { name: 'ownership', path: '/r/jq/stats/ownership' },
   {
     name: 'send',
-    path: '/r/jq/blob/release/src/main.c#L108-L110',
+    // L14-17 sit below the window at the top of the page, so the marked band shows behind it.
+    path: '/r/ripgrep/blob/release/crates/core/main.rs#L14-L17',
     async prepare(p) {
       await p.waitForSelector('#actsel');
       await p.click('#actsel');
       await p.waitForSelector('.actmenu');
       await p.click('.actmenu li:has-text("Send to…") >> nth=0');
       await p.waitForSelector('.send, dialog, [role=dialog]', { timeout: 5000 });
-      // A narrow file view jumps sideways to the anchor; keep the code at its left edge.
-      await p.evaluate(() => document.querySelectorAll('*').forEach((e) => { if (e.scrollLeft) e.scrollLeft = 0; }));
-      // The marked lines sit just below the window, so the shot shows what is being sent.
-      await p.evaluate(() => {
-        const d = document.querySelector('.send, dialog, [role=dialog]').getBoundingClientRect();
-        const l = document.getElementById('L108').getBoundingClientRect();
-        window.scrollBy(-window.scrollX, l.top - d.bottom - 24);
-      });
+      // Same frame as the other shots: the app header at the top, the marked lines in view.
+      await p.evaluate(() => window.scrollTo(0, 0));
     },
   },
 ];

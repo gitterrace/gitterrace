@@ -45,15 +45,15 @@ pre{background:var(--soft);border:var(--border);border-radius:var(--radius);padd
 ul.features{list-style:none;padding:0;margin:0}
 ul.features li{padding:var(--space-2) 0;border-top:var(--border)}
 ul.features b{font-weight:var(--weight-semibold)}
-ul.features li.shot{display:grid;grid-template-columns:1fr 1fr;gap:var(--space-4);align-items:center}
-@media (max-width:640px){ul.features li.shot{grid-template-columns:1fr}}
+.shots{display:grid;grid-template-columns:1fr 1fr;gap:var(--space-6) var(--space-4);margin:var(--space-8) 0}
+@media (max-width:640px){.shots{grid-template-columns:1fr}}
 figure{margin:0}
 figure img,.lightbox img{display:block;width:100%;height:auto;border:var(--border);border-radius:var(--radius)}
 .lightbox{display:none}
 .lightbox:target{display:flex;position:fixed;inset:0;z-index:10;align-items:center;justify-content:center;padding:var(--space-8);background:color-mix(in srgb,var(--bg) 97%,transparent);cursor:zoom-out}
 .lightbox:target picture{max-width:min(1280px,100%)}
 .demo{margin-top:var(--space-6)}
-figcaption{font-size:var(--text-xs);color:var(--faint);margin-top:var(--space-1)}
+figcaption{font-size:var(--text-xs);color:var(--muted);margin-top:var(--space-2);line-height:1.4}figcaption b{color:var(--fg);font-weight:var(--weight-semibold)}
 nav.links,footer{display:flex;flex-wrap:wrap;gap:var(--space-4);font-size:var(--text-sm)}
 footer{margin-top:var(--space-16);padding-top:var(--space-4);border-top:var(--border);color:var(--faint)}
 ";
@@ -142,8 +142,9 @@ pub fn render(root: &Path, ws: &Workspace) -> Result<Vec<Out>> {
     );
     let _ = write!(
         h,
-        "<section id=\"features\">\n<h2>What it does</h2>\n<ul class=\"features\">\n{}</ul>\n{demo}<h3>Commands</h3>\n{}</section>\n",
-        features(root)?,
+        "<section id=\"features\">\n<h2>What it does</h2>\n<ul class=\"features\">\n{}</ul>\n{}{demo}<h3>Commands</h3>\n{}</section>\n",
+        features(),
+        gallery(root)?,
         commands(),
     );
     let _ = write!(
@@ -287,18 +288,9 @@ fn split_why(why: &str) -> (&str, (String, String)) {
     (lead, (why_body, made))
 }
 
-/// One row per feature; a row whose head names a shot in `SHOTS` carries it as a tile.
-fn features(root: &Path) -> Result<String> {
-    let mut rows: Vec<(&str, String)> = vec![
-        (
-            "Browse.",
-            "Code, README, history and branches of any local repository, offline.".to_owned(),
-        ),
-        (
-            "Blame.",
-            "Who last changed each line, with the commit and its age beside the code.".to_owned(),
-        ),
-    ];
+/// One row per feature.
+fn features() -> String {
+    let mut rows: Vec<(&str, String)> = Vec::new();
     let mut line = |head: &'static str, text: String| rows.push((head, text));
     let tabs: Vec<String> = gitterrace_web::stats_tab_labels()
         .iter()
@@ -328,22 +320,23 @@ fn features(root: &Path) -> Result<String> {
     );
     let mut s = String::new();
     for (head, text) in rows {
-        let shot = SHOTS
-            .iter()
-            .find(|(_, _, cap)| head.trim_end_matches('.') == *cap);
-        match shot {
-            Some(&(name, alt, _)) => {
-                let _ = writeln!(
-                    s,
-                    "<li class=\"shot\"><span><b>{head}</b> {text}</span>{}</li>",
-                    shot_html(root, name, alt)?
-                );
-            }
-            None => {
-                let _ = writeln!(s, "<li><b>{head}</b> {text}</li>");
-            }
-        }
+        let _ = writeln!(s, "<li><b>{head}</b> {text}</li>");
     }
+    s
+}
+
+/// The shots as a two-column gallery of equal tiles, each with its caption.
+fn gallery(root: &Path) -> Result<String> {
+    let mut s = String::from("<div class=\"shots\">\n");
+    for (name, alt, cap) in SHOTS {
+        let _ = writeln!(
+            s,
+            "<figure>{}<figcaption><b>{cap}.</b> {}</figcaption></figure>",
+            shot_html(root, name, alt)?,
+            esc(alt.split_once(": ").map_or(alt, |(_, rest)| rest))
+        );
+    }
+    s.push_str("</div>\n");
     Ok(s)
 }
 
@@ -373,13 +366,19 @@ fn sentence(items: &[String]) -> String {
     }
 }
 
-/// The screenshots in `docs/screenshots/`: file stem, alt text, caption. The site and the README
-/// both read this list, so a name here without its PNG, or a PNG not listed here, fails generation.
-pub const SHOTS: [(&str, &str, &str); 4] = [
+/// The screenshots in `docs/screenshots/`, in gallery order (pairs side by side): file stem,
+/// alt text ("Caption: what it shows"), caption. The site and the README both read this list,
+/// so a name here without its PNG, or a PNG not listed here, fails generation.
+pub const SHOTS: [(&str, &str, &str); 6] = [
     (
         "overview",
-        "Overview: the repository page with README, last commit, file list and key numbers.",
+        "Browse: the repository page with README, last commit, file list and key numbers.",
         "Browse",
+    ),
+    (
+        "commit",
+        "Commit: the message, the changed files and a highlighted diff.",
+        "Commit",
     ),
     (
         "blame",
@@ -388,13 +387,18 @@ pub const SHOTS: [(&str, &str, &str); 4] = [
     ),
     (
         "send",
-        "Send to: the marked lines with their context, ready for tendir, mail, an issue or a merge request.",
+        "Send to: marked lines with their context, ready for tendir, mail, an issue or a merge request.",
         "Send to",
     ),
     (
         "insights",
-        "Insights: activity, heatmap and hotspots for a repository.",
-        "Insights",
+        "Hotspots: the files that change most, against how many people touch them.",
+        "Hotspots",
+    ),
+    (
+        "ownership",
+        "Ownership: bus factor, solo and stale lines, and who holds each directory.",
+        "Ownership",
     ),
 ];
 

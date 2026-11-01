@@ -20,7 +20,7 @@ Try it without installing: [the live demo](https://demo.gitterrace.dev): jq 1.8.
 <!-- BEGIN GENERATED: shots -->
 <picture>
 <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/overview-dark.png">
-<img src="docs/screenshots/overview-light.png" alt="Overview: the repository page with README, last commit, file list and key numbers.">
+<img src="docs/screenshots/overview-light.png" alt="Browse: the repository page with README, last commit, file list and key numbers.">
 </picture>
 
 <!-- END GENERATED: shots -->

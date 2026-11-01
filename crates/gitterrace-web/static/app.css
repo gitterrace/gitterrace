@@ -180,6 +180,8 @@ div.diff .add,div.diff .del{color:inherit}
 .code tr:target td{background:var(--accent-soft);box-shadow:inset 2px 0 0 var(--accent)}
 .blame .who{width:1%;white-space:nowrap;font:var(--text-xs) var(--sans);min-width:280px;padding-right:var(--space-4);border-right:var(--border);color:var(--muted)}
 .blame .run td{border-top:var(--border)}.blame .who span{margin-left:6px}
+/* A blame row is one code line tall; the chip's own padding would spill over the row rules. */
+.blame .who .sha{padding:0 var(--space-1);line-height:inherit}
 
 /* charts: marks are colored by class so the theme switches without re-render */
 svg.chart{width:100%;height:auto;display:block;overflow:visible}
@@ -465,9 +467,10 @@ td:has(>.actbtn.float){position:relative}
 .send-ctx{border:0;border-radius:0;resize:none;flex:none;field-sizing:content;min-height:calc(1.5em*4 + var(--space-3)*2);max-height:60vh;overflow-y:auto;padding:var(--space-3) var(--space-4);font-family:var(--font-mono);font-size:var(--text-sm);line-height:1.5;background:transparent;color:var(--fg)}
 .send-ctx:focus{outline:0}
 .send-foot{display:flex;gap:var(--space-3);align-items:center;padding:var(--space-2) var(--space-4);border-top:var(--border);background:var(--soft);flex:none}
-.send-pick{min-width:0;max-width:50%}
+.send-pick{min-width:0;max-width:50%;height:28px;padding:0 var(--space-2);font:var(--text-sm) var(--sans);color:var(--fg);background:var(--bg);border:var(--border);border-radius:var(--radius)}
 .send-hint{margin-left:auto;color:var(--muted);font-size:var(--text-xs)}
-.send-go{background:var(--accent);color:var(--on-accent);border:0;border-radius:var(--radius);padding:4px var(--space-4);font-size:var(--text-sm);cursor:pointer}
+/* Same height and type as the picker beside it, so the footer reads as one row. */
+.send-go{height:28px;background:var(--accent);color:var(--on-accent);border:0;border-radius:var(--radius);padding:0 var(--space-3);font:var(--weight-semibold) var(--text-sm) var(--sans);cursor:pointer}
 .send-go:focus-visible{outline:2px solid var(--ring);outline-offset:2px}
 .tip,.loc-tip{background:var(--surface);border:var(--border);border-radius:var(--radius);box-shadow:var(--shadow-2);color:var(--fg)}
 .tip{position:fixed;left:0;top:0;z-index:50;box-sizing:border-box;max-width:320px;padding:var(--space-2) var(--space-3);font:var(--text-xs)/1.4 var(--sans);overflow-wrap:break-word;white-space:normal;pointer-events:none;opacity:0;visibility:hidden;transition:opacity var(--dur-fast) var(--ease),visibility 0s linear var(--dur-fast)}
