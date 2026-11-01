@@ -10,6 +10,7 @@ size and position and swaps it into both files, keeping each file's colour.
 `make theme` runs the check, so the outlined words cannot drift from TAGLINE, and the
 names check reads TAGLINE as prose.
 """
+
 import re
 from pathlib import Path
 
@@ -20,7 +21,10 @@ from fontTools.varLib.instancer import instantiateVariableFont
 
 TAGLINE = "Your repository's history, step by step. Offline, one binary."
 ROOT = Path(__file__).resolve().parent.parent
-FONT = ROOT / "theme/schwarzwald/fonts/bricolage-grotesque/bricolage-grotesque-latin-wght-normal.woff2"
+FONT = (
+    ROOT
+    / "theme/schwarzwald/fonts/bricolage-grotesque/bricolage-grotesque-latin-wght-normal.woff2"
+)
 X, BASELINE, SIZE, WEIGHT = 174.0, 150.0, 22.0, 400
 
 
@@ -47,7 +51,11 @@ def main() -> int:
         path = ROOT / f"docs/brand/readme-header-{theme}.svg"
         svg = path.read_text()
         last = list(re.finditer(r'<path fill="(#[0-9a-f]{6})" d="[^"]*"/>', svg))[-1]
-        new = svg[: last.start()] + f'<path fill="{last.group(1)}" d="{d}"/>' + svg[last.end() :]
+        new = (
+            svg[: last.start()]
+            + f'<path fill="{last.group(1)}" d="{d}"/>'
+            + svg[last.end() :]
+        )
         if new == svg:
             continue
         if check:

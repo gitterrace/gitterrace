@@ -1,0 +1,16 @@
+[files]
+# vendor and the theme snapshot are copies we do not edit; fonts and build output are not text.
+extend-exclude = ["**/vendor/**", "theme/schwarzwald/**", "site/assets/**", "target/**", ".wt/**", "node_modules/**"]
+
+[default]
+extend-ignore-re = [
+  # config.rs tests: a deliberately misspelt key or placeholder that validation must refuse
+  '"\\"comit\\""',
+  '\{titel[:}]',
+  # token.rs: RFC 4648 test vector "fo"
+  'b"fo"',
+]
+
+[default.extend-words]
+# gix names this field of its worktree status item
+rela = "rela"

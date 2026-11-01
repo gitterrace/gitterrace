@@ -5,7 +5,10 @@ Compares the sha256 of every file under theme/schwarzwald with manifest.json,
 and reports missing, changed and unlisted files. Refresh the snapshot with
 schwarzwald's sync.py, never by editing it.
 """
-import hashlib, json, sys
+
+import hashlib
+import json
+import sys
 from pathlib import Path
 
 SNAP = Path(__file__).resolve().parent.parent / "theme/schwarzwald"

@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: build run fmt lint test doc theme actions docs-gen docs-check names check site-png help bench bench-large bench-report bench-clean bench-guard browser-check site deploy stage shipped domains demo send-vectors
+.PHONY: build run fmt clippy lint test doc theme actions docs-gen docs-check names check site-png help bench bench-large bench-report bench-clean bench-guard browser-check site deploy stage shipped domains demo send-vectors
 
 ## build: Release binary
 build:
@@ -13,9 +13,13 @@ run:
 fmt:
 	cargo fmt --all -- --check
 
-## lint: Clippy, warnings are errors
-lint:
+## clippy: Clippy, warnings are errors
+clippy:
 	cargo clippy --workspace --all-targets -- -D warnings
+
+## lint: External linters (typos, vale, gitleaks, markdownlint, shellcheck, shfmt, ruff, machete)
+lint:
+	sh scripts/lint-run.sh
 
 ## test: All tests
 test:
@@ -51,7 +55,7 @@ names:
 	python3 scripts/names-check.py
 
 ## check: Every gate
-check: theme actions send-vectors names bench-guard docs-check fmt lint test doc
+check: theme actions send-vectors names bench-guard docs-check fmt clippy lint test doc
 
 ## send-vectors: Check send.js against the shared send vectors
 send-vectors:

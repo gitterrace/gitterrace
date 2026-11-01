@@ -12,6 +12,7 @@ mark alone, for each theme:
 
 `make theme` runs the check, so the logos cannot drift from the headers.
 """
+
 import re
 import sys
 import urllib.parse
@@ -22,7 +23,9 @@ BRAND = ROOT / "docs/brand"
 # The header's wordmark ends near x=545 and its tagline starts below y=128; the mark's group
 # draws in the 24x24 box scaled by 5.2 from (30, 22).
 LOGO_BOX = (24, 18, 540, 120)
-MARK_GROUP = re.compile(r"<g transform=\"translate\(30 22\) scale\(5\.2\)\">.*?</g>", re.S)
+MARK_GROUP = re.compile(
+    r"<g transform=\"translate\(30 22\) scale\(5\.2\)\">.*?</g>", re.S
+)
 PATHS = re.compile(r'<path fill="#[0-9a-f]{6}" d="[^"]*"/>')
 # The wordmark's two halves must stay visibly apart in every theme.
 MIN_SPLIT = 3.0
@@ -45,7 +48,9 @@ def build(header: str) -> dict[str, str]:
     # The mark draws paths of its own (the tread), so count the text outside the group.
     paths = PATHS.findall(MARK_GROUP.sub("", header))
     if not mark or len(paths) != 3:
-        raise SystemExit("header layout changed: expected the mark group and 3 text paths")
+        raise SystemExit(
+            "header layout changed: expected the mark group and 3 text paths"
+        )
     git, terrace = (re.search(r'fill="(#[0-9a-f]{6})"', p).group(1) for p in paths[:2])
     if contrast(git, terrace) < MIN_SPLIT:
         raise SystemExit(
@@ -70,13 +75,17 @@ def adaptive(light: str, dark: str) -> str:
     """The mark for favicons: light ink by default, dark ink under a dark scheme. A tab bar
     follows the system theme, and one fixed ink vanishes on one of them (dark stem on a dark
     tab bar measured 1.09:1)."""
+
     def inks(svg: str) -> tuple[str, str]:
         stem = re.search(r'stroke="(#[0-9a-f]{6})"', svg).group(1)
         tread = re.search(r'<rect fill="(#[0-9a-f]{6})"', svg).group(1)
         return stem, tread
+
     (ls, lt), (ds, dt) = inks(light), inks(dark)
     body = re.search(r"<g>.*</g>", light, re.S).group(0)
-    body = body.replace(f'stroke="{ls}"', 'class="i"').replace(f'<rect fill="{lt}"', '<rect class="a"')
+    body = body.replace(f'stroke="{ls}"', 'class="i"').replace(
+        f'<rect fill="{lt}"', '<rect class="a"'
+    )
     style = (
         f"<style>.i{{stroke:{ls}}}.a{{fill:{lt}}}"
         f"@media (prefers-color-scheme:dark){{.i{{stroke:{ds}}}.a{{fill:{dt}}}}}</style>"
@@ -114,7 +123,9 @@ def main() -> int:
     # The app inlines the same mark as its favicon (the CSP refuses a separate request-free
     # icon otherwise), so the one include every page head uses must carry exactly this SVG.
     tpl = ROOT / "crates/gitterrace-web/templates/favicon.html"
-    m = re.search(r'<link rel="icon" href="data:image/svg\+xml,([^"]*)">', tpl.read_text())
+    m = re.search(
+        r'<link rel="icon" href="data:image/svg\+xml,([^"]*)">', tpl.read_text()
+    )
     if not m or urllib.parse.unquote(m.group(1)) != svg.strip():
         stale.append(tpl.relative_to(ROOT))
     for s in stale:
@@ -124,7 +135,8 @@ def main() -> int:
     bare = [
         t.relative_to(ROOT)
         for t in sorted(tpl.parent.glob("*.html"))
-        if "<head>" in t.read_text() and '{% include "favicon.html" %}' not in t.read_text()
+        if "<head>" in t.read_text()
+        and '{% include "favicon.html" %}' not in t.read_text()
     ]
     for t in bare:
         print(f'{t}: has a <head> without {{% include "favicon.html" %}}')

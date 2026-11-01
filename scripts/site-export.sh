@@ -9,7 +9,11 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 out="${1:-target/demo}"
 commits="${2:-300}"
-case "$out" in target/*) ;; *) echo "OUT must be under target/ (it is replaced)"; exit 2 ;; esac
+case "$out" in target/*) ;; *)
+  echo "OUT must be under target/ (it is replaced)"
+  exit 2
+  ;;
+esac
 
 bin="${TEST_BIN:-./target/release/git-terrace}"
 [ -n "${TEST_BIN:-}" ] || cargo build -q --release -p gitterrace
@@ -19,14 +23,17 @@ mkdir -p "$src/repos"
 names=()
 credits=()
 while read -r name url tag; do
-  case "$name" in ''|'#'*) continue ;; esac
+  case "$name" in '' | '#'*) continue ;; esac
   # A full clone: gitterrace reads objects locally and never fetches missing blobs.
   git clone -q --no-checkout "$url" "$src/repos/$name"
   git -C "$src/repos/$name" checkout -q -B "$tag" "refs/tags/$tag"
   names+=("$name@$tag")
   credits+=(--project "$name=${url%.git}")
-done < demo/repos.txt
-[ "${#names[@]}" -gt 0 ] || { echo "demo/repos.txt lists no repositories"; exit 1; }
+done <demo/repos.txt
+[ "${#names[@]}" -gt 0 ] || {
+  echo "demo/repos.txt lists no repositories"
+  exit 1
+}
 
 rm -rf "$out"
 "$bin" export "$out" "$src/repos" --commits "$commits" --no-actions --no-watch \

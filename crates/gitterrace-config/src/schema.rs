@@ -118,7 +118,7 @@ settings! {
         /// repository, at its first visit when several share the server. Off waits for the first
         /// page that needs it (Insights).
         build_on_start: bool = true,
-        /// Threads used to parse the index. 0 means one per core, capped at 8. Needs a restart.
+        /// Threads that parse the index. 0 means one per core, capped at 8. Needs a restart.
         threads: usize = 0,
     }
     resources: Resources {

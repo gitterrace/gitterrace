@@ -155,7 +155,7 @@ impl Link {
 }
 
 /// The link Copy permalink and friends hand out in `style`. A repository without an id (no
-/// commits) has no `gitterrace://` form, so it falls back to `/go`.
+/// commits) has no `gitterrace://` form, so it uses `/go`.
 pub fn styled(
     style: LinkStyle,
     origin: &str,

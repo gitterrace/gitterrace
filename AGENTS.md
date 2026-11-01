@@ -36,7 +36,7 @@ outside `gitterrace-git` imports `gix`.
 - No inline scripts beyond the hashed theme snippet: the CSP refuses them. JS
   lives in `static/`.
 - Never edit `theme/schwarzwald` or the generated block in `tokens.css`. `make theme` fails on
-  drift. No raw colour outside `tokens.css`.
+  drift. No raw color outside `tokens.css`.
 - Logic lives in Rust. Templates render values, they do not compute them.
 - Docs: `api.md`, `configuration.md` and every `GENERATED` block come from code registries
   (`ENDPOINTS`, `INSIGHTS`, config keys, `actions::schema`, `web::sitemap`, `CACHE_FILES`,
@@ -58,7 +58,8 @@ outside `gitterrace-git` imports `gix`.
 
 ## Workflow
 
-- Gate: `make check` (theme, actions, docs-check, fmt, clippy `-D warnings`, test, doc).
+- Gate: `make check` (theme, actions, docs-check, fmt, clippy `-D warnings`, lint, test, doc).
+  `make lint` runs typos, vale, gitleaks, markdownlint, shellcheck, shfmt, ruff and cargo-machete.
   `cargo test -p <crate>` while working on one crate. `scripts/preview-run.sh` restarts the
   preview on the default address.
 - Commits: `type(scope): subject`, scope is the crate without `gitterrace-`. Commit by

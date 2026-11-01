@@ -74,7 +74,7 @@ fn bare_ids(html: &str) -> Vec<String> {
     found
 }
 
-/// Positive control: the markup the commit page used to have, a parent id as plain code in a
+/// Positive control: the markup an older commit page had, a parent id as plain code in a
 /// link, is flagged, and the shared link is not.
 #[test]
 fn scanner_flags_a_plain_id() {

@@ -14,7 +14,12 @@ docs/website.md), and scripting them needs a Zone:Edit token, too large a creden
   python3 scripts/site-check.py release
   python3 scripts/site-check.py domains
 """
-import re, sys, tomllib, urllib.error, urllib.request
+
+import re
+import sys
+import tomllib
+import urllib.error
+import urllib.request
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -33,7 +38,9 @@ OPENER = urllib.request.build_opener(NoRedirect)
 
 def fetch(url: str, method: str = "GET"):
     """(status, headers) without following redirects; status 0 when nothing answers."""
-    req = urllib.request.Request(url, method=method, headers={"User-Agent": "gitterrace-site-check"})
+    req = urllib.request.Request(
+        url, method=method, headers={"User-Agent": "gitterrace-site-check"}
+    )
     try:
         with OPENER.open(req, timeout=TIMEOUT) as r:
             return r.status, r.headers
@@ -65,7 +72,9 @@ def release() -> list[str]:
     bad = []
     for url, what in checks:
         status, _ = fetch(url, "HEAD")
-        print(f"  [{'+' if status == 200 else 'x'}] {what}: {url} ({status or 'no answer'})")
+        print(
+            f"  [{'+' if status == 200 else 'x'}] {what}: {url} ({status or 'no answer'})"
+        )
         if status != 200:
             bad.append(f"{what} does not answer at {url}")
     return bad
@@ -76,11 +85,17 @@ def domains() -> list[str]:
     status, headers = fetch(f"https://{CANONICAL}/")
     csp = headers.get("Content-Security-Policy", "") if headers else ""
     ok = status == 200 and "script-src 'none'" in csp
-    print(f"  [{'+' if ok else 'x'}] https://{CANONICAL}/ serves the page with the generated CSP ({status or 'no answer'})")
+    print(
+        f"  [{'+' if ok else 'x'}] https://{CANONICAL}/ serves the page with the generated CSP ({status or 'no answer'})"
+    )
     if not ok:
-        bad.append(f"https://{CANONICAL}/ answered {status or 'nothing'}, CSP {'present' if csp else 'missing'}")
+        bad.append(
+            f"https://{CANONICAL}/ answered {status or 'nothing'}, CSP {'present' if csp else 'missing'}"
+        )
     status, _ = fetch(f"https://{CANONICAL}/no-such-page")
-    print(f"  [{'+' if status == 404 else 'x'}] unknown paths answer 404 ({status or 'no answer'})")
+    print(
+        f"  [{'+' if status == 404 else 'x'}] unknown paths answer 404 ({status or 'no answer'})"
+    )
     if status != 404:
         bad.append(f"unknown path answered {status or 'nothing'}, want 404")
     for host in REDIRECTS:
@@ -88,9 +103,13 @@ def domains() -> list[str]:
             status, headers = fetch(f"{scheme}://{host}/")
             loc = (headers.get("Location", "") if headers else "").rstrip("/")
             good = status in (301, 308) and loc == f"https://{CANONICAL}"
-            print(f"  [{'+' if good else 'x'}] {scheme}://{host}/ -> {loc or '-'} ({status or 'no answer'})")
+            print(
+                f"  [{'+' if good else 'x'}] {scheme}://{host}/ -> {loc or '-'} ({status or 'no answer'})"
+            )
             if not good:
-                bad.append(f"{scheme}://{host}/ should redirect permanently to https://{CANONICAL}/")
+                bad.append(
+                    f"{scheme}://{host}/ should redirect permanently to https://{CANONICAL}/"
+                )
     return bad
 
 

@@ -952,7 +952,6 @@ dependencies = [
 name = "gitterrace-config"
 version = "0.1.0"
 dependencies = [
- "serde",
  "tempfile",
  "toml",
 ]
@@ -976,7 +975,6 @@ dependencies = [
  "serde",
  "serde_json",
  "tempfile",
- "thiserror",
 ]
 
 [[package]]

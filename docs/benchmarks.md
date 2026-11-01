@@ -1,6 +1,6 @@
 # Benchmarks
 
-gitterrace should feel instant on very large repositories. This page says what is measured,
+gitterrace should feel instant on large repositories. This page says what is measured,
 how, and what the latest run found. The harness is `scripts/bench-run.py`, the corpus is
 `bench/corpus.toml`, and results land in `bench/results/`.
 
@@ -27,7 +27,7 @@ Each is pinned to a sha in the corpus file, so a re-run measures the same histor
 
 - **control**: this repository, the floor.
 - **git/git**: medium, long-lived, a classic reference.
-- **rust-lang/rust**: very large history, many files and contributors.
+- **rust-lang/rust**: huge history, many files and contributors.
 - **torvalds/linux**: the extreme, opt-in with `BENCH_LARGE=1` (`make bench-large`). It needs
   about 30 GB and a long first index. Not yet run.
 
@@ -49,7 +49,7 @@ the worktree view, incremental index updates after new commits, and a spinning d
 
 ## Reproduce
 
-```
+```sh
 make bench          # control, git, rust. Needs the network and about 20 GB of disk
 make bench-large    # adds linux
 make bench-report   # rewrite the block below from the newest bench/results file
@@ -64,15 +64,15 @@ repository to prove it still works.
 <!-- BEGIN GENERATED: results -->
 Run 2026-11-01T20:11:08 on Apple M1 Max, 10 cores, 64.0 GB, Darwin 25.6.0. git version 2.54.0 (Apple Git-157), gitterrace 0.1.0. 5 warm runs per page, 60 s idle windows.
 
-#### control
+### control
 
 small repository, pinned at `d2ef86fee2`. All 6 metrics are within budget. Against budget: warm page 14 ms of 300 ms, cold page 25 ms of 1500 ms, index build 0.3 s of 30 s, idle CPU 0.57 % of 1 %, peak memory 56 MB of 500 MB, export 3.5 s of 60 s.
 
-#### git
+### git
 
 medium repository, pinned at `50fe5cc63f`. All 6 metrics are within budget. Against budget: warm page 85 ms of 300 ms, cold page 2476 ms of 3000 ms, index build 34.8 s of 300 s, idle CPU 0.10 % of 1 %, peak memory 1332 MB of 1500 MB, export 7.4 s of 300 s.
 
-#### rust
+### rust
 
 large repository, pinned at `f90a2d27c2`. 4 of 5 metrics are within budget. Against budget: warm page 398 ms of 300 ms, cold page 2099 ms of 10000 ms, index build 334.8 s of 2400 s, idle CPU 0.15 % of 1 %, peak memory 2633 MB of 6000 MB.
 

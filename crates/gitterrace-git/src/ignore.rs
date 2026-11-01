@@ -1,4 +1,4 @@
-//! Ignore rules (`.gitignore` and `.ignore`) as committed at a revision. Used to leave build
+//! Ignore rules (`.gitignore` and `.ignore`) as committed at a revision. Leaves build
 //! output and vendored paths out of statistics even when old commits tracked them.
 
 use std::path::{Path, PathBuf};

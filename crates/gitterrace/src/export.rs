@@ -5,7 +5,7 @@
 //! overview, the insights pages, branches and tags, the newest N commits with
 //! their log pages, and the file tree plus files at HEAD up to a size cap.
 //! Links to anything outside that set are left pointing at their original path
-//! and simply 404 in the exported copy, the same as a link to a page that was
+//! and 404 in the exported copy, the same as a link to a page that was
 //! never published.
 
 use std::{
@@ -56,7 +56,7 @@ impl Project {
 
 /// Largest response body read from the router.
 const MAX_BODY: usize = 64 * 1024 * 1024;
-/// Hard ceiling on pages, so a mis-scoped export fails instead of filling a disk.
+/// Hard ceiling on pages, so a wrongly scoped export fails instead of filling a disk.
 const MAX_PAGES: usize = 20_000;
 /// Pages the crawl starts from, beside every page the server prewarms; each is exported
 /// whatever links point at it.

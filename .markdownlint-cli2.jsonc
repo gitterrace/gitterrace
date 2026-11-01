@@ -1,0 +1,23 @@
+{
+  // markdownlint checks list and emphasis style and fenced code languages.
+  "config": {
+    "default": true,
+    "MD013": false,
+    "MD003": { "style": "atx" },
+    "MD004": { "style": "dash" },
+    "MD049": { "style": "underscore" },
+    "MD050": { "style": "asterisk" },
+    "MD046": { "style": "fenced" },
+    "MD040": true,
+    "MD022": true,
+    "MD031": { "list_items": false },
+    "MD038": false,
+    "MD024": { "siblings_only": true },
+    "MD033": false,
+    "MD034": false,
+    "MD036": false,
+    "MD060": false
+  },
+  "globs": ["docs/**/*.md", "README.md", "CONTRIBUTING.md", "SECURITY.md", "CHANGELOG.md", "AGENTS.md"],
+  "ignores": ["**/vendor/**", "target/**", "node_modules/**", ".wt/**", "styles/**", "site/**"]
+}

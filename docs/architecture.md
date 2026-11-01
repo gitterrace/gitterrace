@@ -28,8 +28,8 @@ flowchart TD
 
 <!-- END GENERATED: crates -->
 
-Each box is a crate. An arrow means "uses". `schwarzwald` is the vendored theme (colours, type,
-tokens, see [design](design.md)); `cards` reads its palette, called Kandel, to colour the year
+Each box is a crate. An arrow means "uses". `schwarzwald` is the vendored theme (colors, type,
+tokens, see [design](design.md)); `cards` reads its palette, called Kandel, to color the year
 card.
 
 ## Decisions

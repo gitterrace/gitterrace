@@ -38,6 +38,19 @@ If the build fails on a clean checkout, that is a bug worth reporting.
   without it.
 - Keep a change to one concern, and fix broken code you touch.
 
+## Lint
+
+`make lint` runs these, one pass or fail each, and `make check` includes it. Install any tool
+it reports as missing.
+
+- typos (`_typos.toml`): misspellings in code and prose
+- vale (`.vale.ini`, `styles/Gitterrace`): American spelling, no praise or history words, rules stated outright
+- gitleaks (`.gitleaks.toml`): committed secrets
+- markdownlint-cli2 (`.markdownlint-cli2.jsonc`): Markdown structure
+- shellcheck and shfmt: `scripts/*.sh`
+- ruff (`ruff.toml`): `scripts/*.py`
+- cargo-machete: unused dependencies
+
 ## Commits
 
 Conventional Commits, `type(scope): subject`, with the subject under 72 characters. The

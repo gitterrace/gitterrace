@@ -111,7 +111,7 @@ pub fn install_md(ws: &Workspace) -> String {
 fn commands() -> String {
     let rows = commands_rows();
     let width = rows.iter().map(|(a, _)| a.len()).max().unwrap_or(0);
-    let mut s = String::from("```\n");
+    let mut s = String::from("```text\n");
     for (a, b) in rows {
         let _ = writeln!(s, "{a:width$}  {b}");
     }

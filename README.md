@@ -44,7 +44,7 @@ git terrace          # serves on 127.0.0.1 and opens your browser
 ## Commands
 
 <!-- BEGIN GENERATED: commands -->
-```
+```text
 git terrace [paths]          Browse a git repository in your browser, offline [--addr --poll --no-watch --config --no-actions]
 git terrace serve            Serve the repository in the browser (the default)
 git terrace config           Print the effective configuration and where each value comes from

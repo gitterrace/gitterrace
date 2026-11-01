@@ -10,7 +10,7 @@ import { join } from 'node:path';
 import { root, loadPlaywright, launch } from './browser-lib.mjs';
 
 const brand = (f) => 'data:image/svg+xml,' + encodeURIComponent(readFileSync(join(root, 'docs/brand', f), 'utf8'));
-// The light page background, from the shared tokens, so the PNGs match the site.
+// The light page background, from the shared tokens, so the PNG files match the site.
 const bg = /--n-1:(#[0-9a-f]{6})/.exec(readFileSync(join(root, 'crates/gitterrace-web/static/tokens.css'), 'utf8'))[1];
 const out = join(root, 'site/assets');
 mkdirSync(out, { recursive: true });

@@ -1,0 +1,15 @@
+[extend]
+useDefault = true
+
+[allowlist]
+description = "known false positives, each as narrow as it can be"
+paths = [
+  # The schwarzwald snapshot manifest: a sha256 per file, public digests, no secret.
+  '''theme/schwarzwald/manifest\.json$''',
+]
+regexTarget = "line"
+regexes = [
+  # The bench results key `gitterrace_sha` holds a commit sha; the gitter-access-token rule
+  # matches the substring "gitter".
+  '''gitterrace_sha''',
+]

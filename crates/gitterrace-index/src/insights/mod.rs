@@ -340,7 +340,7 @@ mod tests {
 
     #[test]
     fn bus_factor_counts_who_hold_at_least_half() {
-        // The 50/50 split is the case the surfaces used to disagree on.
+        // The 50/50 split is the case where the surfaces disagreed.
         assert_eq!(bus_factor([5.0, 5.0]), 1);
         assert_eq!(bus_factor([6.0, 3.0, 1.0]), 1);
         assert_eq!(bus_factor([3.0, 3.0, 3.0, 1.0]), 2);

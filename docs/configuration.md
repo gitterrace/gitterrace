@@ -29,7 +29,7 @@ Actions live in their own file, `actions.toml`, because they run commands.
 | Key | Type | Default | Description |
 | --- | --- | --- | --- |
 | `build_on_start` | bool | `true` | Build the commit index as soon as a repository is served: at startup for one repository, at its first visit when several share the server. Off waits for the first page that needs it (Insights). |
-| `threads` | integer | `0` | Threads used to parse the index. 0 means one per core, capped at 8. Needs a restart. |
+| `threads` | integer | `0` | Threads that parse the index. 0 means one per core, capped at 8. Needs a restart. |
 
 ## `[resources]`
 

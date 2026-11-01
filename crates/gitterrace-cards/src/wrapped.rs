@@ -261,8 +261,8 @@ fn grid(
     clip_at: usize,
 ) {
     let mut f = facts(w);
-    if let Some(fo) = focus(w) {
-        f.push(fo);
+    if let Some(focus_fact) = focus(w) {
+        f.push(focus_fact);
     }
     for (i, (l, v)) in f.iter().enumerate() {
         let col = (i % cols) as f64;

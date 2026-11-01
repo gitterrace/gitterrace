@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """Run every shared send vector through the JS encoder in send.js (via node)."""
-import json, pathlib, subprocess, sys
+
+import pathlib
+import subprocess
+import sys
 
 root = pathlib.Path(__file__).resolve().parent.parent
 vectors = root / "crates/gitterrace-actions/testdata/send-vectors.json"

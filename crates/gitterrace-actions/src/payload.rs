@@ -323,7 +323,7 @@ fn lossy_line(s: &str, max: usize) -> String {
 }
 
 /// `/go/<id>/<sha>[/<path>][#L<a>[-L<b>]]`. A repo without an id (no root commit) cannot
-/// have a sha, so the name fallback is only for completeness. Shared with the API, which
+/// have a sha, so the name branch exists only for completeness. Shared with the API, which
 /// passes an empty `origin` to get the path form.
 pub fn permalink(
     origin: &str,

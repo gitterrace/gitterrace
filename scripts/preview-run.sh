@@ -18,7 +18,11 @@ pkill -f "target/release/git-terrace .*$ADDR" 2>/dev/null || true
 sleep 0.3
 nohup ./target/release/git-terrace "$@" --addr "$ADDR" >"$LOG" 2>&1 &
 for _ in $(seq 1 50); do
-  curl -s -o /dev/null -m 1 "$ADDR"/ && { echo "preview up: http://$ADDR ($(git rev-parse --short HEAD)), serving: $*"; exit 0; }
+  curl -s -o /dev/null -m 1 "$ADDR"/ && {
+    echo "preview up: http://$ADDR ($(git rev-parse --short HEAD)), serving: $*"
+    exit 0
+  }
   sleep 0.2
 done
-echo "preview did not come up; see $LOG" >&2; exit 1
+echo "preview did not come up; see $LOG" >&2
+exit 1
