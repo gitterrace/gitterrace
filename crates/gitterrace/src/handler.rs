@@ -15,6 +15,9 @@ use anyhow::{Context, bail};
 
 const APP_NAME: &str = "gitterrace-open.app";
 const BUNDLE_ID: &str = "dev.gitterrace.open";
+/// The app icon, the brand mark (`make app-icon` renders it from docs/brand/mark-dark.svg).
+/// It replaces osacompile's script icon, and the asset catalogue that would override it goes.
+const ICON: &[u8] = include_bytes!("../assets/gitterrace.icns");
 const DESKTOP_NAME: &str = "gitterrace-open.desktop";
 const LSREGISTER: &str = "/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister";
 
@@ -132,6 +135,16 @@ fn macos(home: &Path, exe: &Path, uninstall: bool) -> anyhow::Result<()> {
         &plist,
         &["-replace", "CFBundleURLTypes", "-json", url_types_json()],
     )?;
+    let res = app.join("Contents/Resources");
+    std::fs::write(res.join("gitterrace.icns"), ICON)?;
+    let _ = std::fs::remove_file(res.join("applet.icns"));
+    let _ = std::fs::remove_file(res.join("Assets.car"));
+    plist_set(
+        &plist,
+        &["-replace", "CFBundleIconFile", "-string", "gitterrace"],
+    )?;
+    // osacompile names its asset catalogue here; without the key the icon file above wins.
+    let _ = plist_set(&plist, &["-remove", "CFBundleIconName"]);
     // Editing the bundle invalidates osacompile's ad hoc signature, so sign it again.
     tool(
         Command::new("codesign")
@@ -236,6 +249,29 @@ pub(crate) fn windows_steps(exe: &Path) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Guard class: the embedded app icon is a real icns that holds the sizes Finder and the
+    /// Dock ask for, so a truncated or wrong-format asset never reaches a user's bundle.
+    #[test]
+    fn the_app_icon_is_an_icns_with_every_size() {
+        assert_eq!(&ICON[..4], b"icns");
+        let len = u32::from_be_bytes([ICON[4], ICON[5], ICON[6], ICON[7]]) as usize;
+        assert_eq!(len, ICON.len(), "icns length header");
+        let mut types = Vec::new();
+        let mut at = 8;
+        while at + 8 <= ICON.len() {
+            types.push(String::from_utf8_lossy(&ICON[at..at + 4]).into_owned());
+            let n = u32::from_be_bytes([ICON[at + 4], ICON[at + 5], ICON[at + 6], ICON[at + 7]]);
+            at += n as usize;
+        }
+        // 16, 32, 128, 256, 512 at 1x and @2x, as iconutil writes them (ic04 is 16, ic05 32,
+        // ic10 is 512@2x, 1024 px).
+        for t in [
+            "ic04", "ic11", "ic05", "ic12", "ic07", "ic13", "ic08", "ic14", "ic09", "ic10",
+        ] {
+            assert!(types.iter().any(|x| x == t), "missing {t} in {types:?}");
+        }
+    }
 
     #[test]
     fn golden_macos_content() {

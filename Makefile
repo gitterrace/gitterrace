@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: build install run fmt clippy lint test doc theme actions docs-gen docs-check names check site-render site-shots help bench bench-large bench-report bench-clean bench-guard browser-check site deploy stage shipped domains send-vectors preview
+.PHONY: app-icon build install run fmt clippy lint test doc theme actions docs-gen docs-check names check site-render site-shots help bench bench-large bench-report bench-clean bench-guard browser-check site deploy stage shipped domains send-vectors preview
 
 ## build: Release binary
 build:
@@ -116,6 +116,10 @@ deploy: site shipped site-render
 ## stage: Deploy without the release check, only while gitterrace.dev is blocked at the edge
 stage: docs-check shipped site-render
 	npx wrangler@4 deploy
+
+## app-icon: Render the macOS icon install-handler gives gitterrace-open.app, from docs/brand/mark-dark.svg (macOS, needs browsers)
+app-icon:
+	node scripts/icon-render.mjs
 
 ## site-render: Render the touch icon and link-preview image from docs/brand (ignored), and the site's WebPs from target/site-shots when present (needs cwebp then)
 site-render:
