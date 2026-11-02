@@ -234,6 +234,45 @@ mod tests {
         assert!(e.0.contains("watch.enabled"), "{e}");
     }
 
+    /// Every address another machine can reach needs `public`; loopback never does.
+    #[test]
+    fn a_reachable_address_needs_public() {
+        for addr in [
+            "0.0.0.0:4250",
+            "[::]:4250",
+            "192.168.1.5:4250",
+            "10.0.0.1:80",
+        ] {
+            let e = parse(&format!("[server]\naddr = \"{addr}\"\n")).expect_err(addr);
+            assert!(e.0.contains("server.public"), "{addr}: {e}");
+            parse(&format!("[server]\naddr = \"{addr}\"\npublic = true\n")).expect(addr);
+        }
+        for addr in ["127.0.0.1:4250", "[::1]:4250", "127.0.0.2:4250"] {
+            parse(&format!("[server]\naddr = \"{addr}\"\n")).expect(addr);
+        }
+    }
+
+    #[test]
+    fn hosts_are_plain_names_and_need_public() {
+        let e = parse("[server]\nhosts = [\"git.example.com\"]\n").expect_err("no public");
+        assert!(e.0.contains("server.hosts"), "{e}");
+        for h in ["git.example.com", "localhost", "203.0.113.4", "a-b.example"] {
+            parse(&format!("[server]\npublic = true\nhosts = [\"{h}\"]\n")).expect(h);
+        }
+        for h in [
+            "*.example.com",
+            "https://git.example.com",
+            "git.example.com:443",
+            "",
+            "git..example",
+            "-x.example",
+            "git.example.com/",
+        ] {
+            let e = parse(&format!("[server]\npublic = true\nhosts = [\"{h}\"]\n")).expect_err(h);
+            assert!(e.0.contains("server.hosts"), "{h}: {e}");
+        }
+    }
+
     #[test]
     fn missing_file_is_defaults_and_flag_wins() {
         let tmp = tempfile::tempdir().expect("tmp");

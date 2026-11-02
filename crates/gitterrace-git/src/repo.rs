@@ -1,7 +1,7 @@
 use std::cmp::Reverse;
 use std::collections::{HashMap, VecDeque};
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
 
 use gix::bstr::ByteSlice;
@@ -36,6 +36,8 @@ pub struct Repo {
     pub(crate) divergence: Mutex<HashMap<(gix::ObjectId, gix::ObjectId), (usize, usize)>>,
     /// The root-commit id, see `repo_id.rs`.
     pub(crate) id_cache: OnceLock<Option<String>>,
+    /// See [`Repo::committed_only`].
+    committed_only: AtomicBool,
 }
 
 /// Blame results kept per (commit id, path), bounded by approximate bytes.
@@ -107,7 +109,24 @@ impl Repo {
             workers: 0,
             divergence: Mutex::new(HashMap::new()),
             id_cache: OnceLock::new(),
+            committed_only: AtomicBool::new(false),
         })
+    }
+
+    /// From now on every revision this handle resolves is `HEAD`, a full commit id, or a
+    /// branch, tag or remote-tracking ref, optionally followed by `~N` / `^N`. Stashes, other
+    /// refs, reflogs and abbreviated ids (which enumerate the object store) stop resolving.
+    /// What a public server shows, enforced where every URL rev passes. One way: nothing
+    /// turns it off again, so a shared handle cannot be widened.
+    pub fn restrict_to_committed(&self) {
+        self.committed_only.store(true, Ordering::Relaxed);
+    }
+
+    /// [`Repo::restrict_to_committed`] as a builder.
+    #[must_use]
+    pub fn committed_only(self) -> Self {
+        self.restrict_to_committed();
+        self
     }
 
     /// Sets the largest blob this handle reads as text (blob views, blame, diffs with hunks)
@@ -170,7 +189,7 @@ impl Repo {
 
     /// Resolves a revision (branch, tag, sha, `HEAD`) to a full commit id.
     pub fn resolve(&self, rev: &str) -> Result<String> {
-        Ok(Self::resolve_id(&self.repo(), rev)?.to_string())
+        Ok(self.resolve_id(&self.repo(), rev)?.to_string())
     }
 
     /// Commits reachable from `rev`, newest first, optionally limited to `path`.
@@ -182,7 +201,7 @@ impl Repo {
         limit: usize,
     ) -> Result<Vec<CommitSummary>> {
         let repo = self.repo();
-        let tip = Self::resolve_id(&repo, rev)?;
+        let tip = self.resolve_id(&repo, rev)?;
         let path = path.map(|p| p.trim_matches('/')).filter(|p| !p.is_empty());
         let walk = repo
             .rev_walk([tip])
@@ -216,7 +235,7 @@ impl Repo {
     /// newest first. Reads only commit headers, so a busy history stays cheap.
     pub fn commit_times_since(&self, rev: &str, since: i64) -> Result<Vec<i64>> {
         let repo = self.repo();
-        let tip = Self::resolve_id(&repo, rev)?;
+        let tip = self.resolve_id(&repo, rev)?;
         let walk = repo
             .rev_walk([tip])
             .sorting(Sorting::ByCommitTimeCutoff {
@@ -236,7 +255,7 @@ impl Repo {
     /// Commit ids reachable from `rev`, oldest first. Used by the indexer.
     pub fn rev_list(&self, rev: &str) -> Result<Vec<String>> {
         let repo = self.repo();
-        let tip = Self::resolve_id(&repo, rev)?;
+        let tip = self.resolve_id(&repo, rev)?;
         let walk = repo
             .rev_walk([tip])
             .sorting(Sorting::ByCommitTime(CommitTimeOrder::NewestFirst))
@@ -253,7 +272,7 @@ impl Repo {
     /// One commit with its diff against the first parent.
     pub fn commit(&self, id: &str) -> Result<CommitDetail> {
         let repo = self.repo();
-        let oid = Self::resolve_id(&repo, id)?;
+        let oid = self.resolve_id(&repo, id)?;
         let commit = repo.find_commit(oid).map_err(git)?;
         let mailmap = ident::mailmap(&repo, oid);
         let message = commit
@@ -275,7 +294,7 @@ impl Repo {
     /// One file of [`Self::commit`]'s list, by index, without diffing the others.
     pub fn commit_file(&self, id: &str, index: usize) -> Result<Option<crate::FileDiff>> {
         let repo = self.repo();
-        let oid = Self::resolve_id(&repo, id)?;
+        let oid = self.resolve_id(&repo, id)?;
         let commit = repo.find_commit(oid).map_err(git)?;
         crate::diff::change_at(&repo, &commit, index, self.text_limit())
     }
@@ -288,7 +307,7 @@ impl Repo {
             std::collections::HashMap::new();
         ids.iter()
             .map(|id| {
-                let oid = Self::full_id(&repo, id)?;
+                let oid = self.full_id(&repo, id)?;
                 let commit = repo.find_commit(oid).map_err(git)?;
                 let blob = ident::mailmap_blob(&repo, oid);
                 let map = maps
@@ -323,7 +342,7 @@ impl Repo {
                         chunk
                             .iter()
                             .map(|id| {
-                                let oid = Self::full_id(&repo, id)?;
+                                let oid = self.full_id(&repo, id)?;
                                 let commit = repo.find_commit(oid).map_err(git)?;
                                 Ok(crate::diff::changes_with(
                                     &repo,
@@ -352,7 +371,7 @@ impl Repo {
     /// Entries of the directory at `path` in `rev`, dirs first then by name.
     pub fn tree(&self, rev: &str, path: &str) -> Result<Vec<TreeEntry>> {
         let repo = self.repo();
-        let tip = Self::resolve_id(&repo, rev)?;
+        let tip = self.resolve_id(&repo, rev)?;
         let root = repo.find_commit(tip).map_err(git)?.tree().map_err(git)?;
         let path = path.trim_matches('/');
         let tree = if path.is_empty() {
@@ -406,7 +425,7 @@ impl Repo {
         skip: impl FnOnce(&str, u64) -> bool,
     ) -> Result<RawBlob> {
         let repo = self.repo();
-        let tip = Self::resolve_id(&repo, rev)?;
+        let tip = self.resolve_id(&repo, rev)?;
         let id = Self::blob_id_at(&repo, tip, path.trim_matches('/'))?;
         let size = repo.find_header(id).map_err(git)?.size();
         let id_hex = id.to_string();
@@ -425,7 +444,7 @@ impl Repo {
     /// Raw bytes of the file at `path` in `rev`.
     pub fn blob_bytes(&self, rev: &str, path: &str) -> Result<Vec<u8>> {
         let repo = self.repo();
-        let tip = Self::resolve_id(&repo, rev)?;
+        let tip = self.resolve_id(&repo, rev)?;
         Self::blob_bytes_at(&repo, tip, path.trim_matches('/'))
     }
 
@@ -446,7 +465,7 @@ impl Repo {
     /// [`MAX_TEXT_BYTES`], which are never read.
     pub fn blob(&self, rev: &str, path: &str) -> Result<Blob> {
         let repo = self.repo();
-        let tip = Self::resolve_id(&repo, rev)?;
+        let tip = self.resolve_id(&repo, rev)?;
         let path = path.trim_matches('/');
         let id = Self::blob_id_at(&repo, tip, path)?;
         let size = repo.find_header(id).map_err(git)?.size();
@@ -471,7 +490,7 @@ impl Repo {
         let mut repo = self.repo();
         // Blame touches every ancestor's trees once, so a big cache only adds resident memory.
         repo.object_cache_size(BLAME_OBJECT_CACHE_BYTES);
-        let tip = Self::resolve_id(&repo, rev)?;
+        let tip = self.resolve_id(&repo, rev)?;
         let path = path.trim_matches('/');
         let key = (tip, path.to_string());
         if let Some(hit) = self.blame_cache.lock().ok().and_then(|mut c| c.get(&key)) {
@@ -583,23 +602,75 @@ impl Repo {
 
     /// A full 40-digit commit id parsed directly. Going through `rev_parse` costs a rescan of
     /// the object database per commit, which dominated the index build on large repositories.
-    pub(crate) fn full_id(repo: &gix::Repository, id: &str) -> Result<gix::ObjectId> {
-        gix::ObjectId::from_hex(id.as_bytes()).or_else(|_| Self::resolve_id(repo, id))
+    pub(crate) fn full_id(&self, repo: &gix::Repository, id: &str) -> Result<gix::ObjectId> {
+        gix::ObjectId::from_hex(id.as_bytes()).or_else(|_| self.resolve_id(repo, id))
     }
 
-    pub(crate) fn resolve_id(repo: &gix::Repository, rev: &str) -> Result<gix::ObjectId> {
+    pub(crate) fn resolve_id(&self, repo: &gix::Repository, rev: &str) -> Result<gix::ObjectId> {
         let not_found = || Error::RevNotFound(rev.to_string());
         if REJECTED_REV.iter().any(|p| rev.contains(p)) {
             return Err(not_found());
         }
-        let id = repo.rev_parse_single(rev).map_err(|_| not_found())?;
-        let commit = id
-            .object()
-            .map_err(git)?
-            .peel_to_commit()
-            .map_err(|_| not_found())?;
+        let id = if self.committed_only.load(Ordering::Relaxed) {
+            committed_rev(repo, rev).ok_or_else(not_found)?
+        } else {
+            repo.rev_parse_single(rev)
+                .map_err(|_| not_found())?
+                .detach()
+        };
+        let id = repo.find_object(id).map_err(|_| not_found())?;
+        let commit = id.peel_to_commit().map_err(|_| not_found())?;
         Ok(commit.id)
     }
+}
+
+/// [`Repo::committed_only`]'s resolver: a base (`HEAD`, a full id, a branch, tag or remote ref,
+/// short or full name) then `~N` / `^N` steps. Ref names cannot hold `~` or `^`, so the first
+/// one ends the base. `None` for anything else.
+fn committed_rev(repo: &gix::Repository, rev: &str) -> Option<gix::ObjectId> {
+    let cut = rev.find(['~', '^']).unwrap_or(rev.len());
+    let (base, mut steps) = rev.split_at(cut);
+    let mut id = if base == "HEAD" {
+        repo.head_id().ok()?.detach()
+    } else if base.len() == 40 {
+        gix::ObjectId::from_hex(base.as_bytes()).ok()?
+    } else {
+        let mut reference = ["refs/heads/", "refs/tags/", "refs/remotes/"]
+            .iter()
+            .find_map(|p| {
+                let full = if base.starts_with(p) {
+                    base.to_owned()
+                } else {
+                    format!("{p}{base}")
+                };
+                repo.try_find_reference(full.as_str()).ok().flatten()
+            })?;
+        reference.peel_to_id().ok()?.detach()
+    };
+    while let Some(op) = steps.chars().next() {
+        steps = &steps[1..];
+        let digits = steps.bytes().take_while(u8::is_ascii_digit).count();
+        let n: usize = if digits == 0 {
+            1
+        } else {
+            steps[..digits].parse().ok()?
+        };
+        steps = &steps[digits..];
+        let commit = repo.find_object(id).ok()?.peel_to_commit().ok()?;
+        id = match op {
+            '~' => {
+                let mut c = commit;
+                for _ in 0..n {
+                    let p = c.parent_ids().next()?.detach();
+                    c = repo.find_commit(p).ok()?;
+                }
+                c.id
+            }
+            _ if n == 0 => commit.id,
+            _ => commit.parent_ids().nth(n - 1)?.detach(),
+        };
+    }
+    Some(id)
 }
 
 fn summary(commit: &gix::Commit<'_>, mailmap: &gix::mailmap::Snapshot) -> Result<CommitSummary> {
@@ -669,6 +740,67 @@ mod tests {
 
     fn numbered(n: usize) -> String {
         (1..=n).fold(String::new(), |acc, i| acc + &format!("line {i}\n"))
+    }
+
+    /// A committed-only handle answers every committed form the pages link to and refuses
+    /// every rev that reaches local state or enumerates objects, through each public reader.
+    #[test]
+    fn committed_only_refuses_local_state() {
+        let tmp = tempfile::tempdir().expect("tmp");
+        let d = tmp.path();
+        git_at(d, T0, &["init", "-q", "-b", "main"]);
+        write(d, "a.txt", "one\n");
+        commit(d, "first");
+        write(d, "a.txt", "two\n");
+        commit(d, "second");
+        git_at(d, T0, &["tag", "v1"]);
+        git_at(d, T0, &["update-ref", "refs/remotes/origin/main", "HEAD"]);
+        git_at(d, T0, &["update-ref", "refs/notes/x", "HEAD"]);
+        write(d, "a.txt", "secret wip\n");
+        git_at(d, T0, &["stash", "-q"]);
+        let open = Repo::discover(d).expect("repo");
+        let head = open.resolve("HEAD").expect("head");
+        let stash = open.resolve("stash").expect("stash resolves locally");
+        let repo = Repo::discover(d).expect("repo").committed_only();
+        for ok in [
+            "HEAD",
+            "main",
+            "refs/heads/main",
+            "v1",
+            "refs/tags/v1",
+            "origin/main",
+            "HEAD~1",
+            "main^",
+            "HEAD^0",
+            head.as_str(),
+        ] {
+            assert!(repo.resolve(ok).is_ok(), "{ok} refused");
+        }
+        assert_eq!(
+            repo.resolve("HEAD~1").expect("restricted"),
+            open.resolve("HEAD~1").expect("open")
+        );
+        // A full id is accepted whatever it names: 160 bits nobody public was shown.
+        for bad in [
+            "stash",
+            "refs/stash",
+            &stash[..12],
+            &head[..7],
+            "refs/notes/x",
+            "main@{1}",
+            ":/second",
+            "HEAD:a.txt",
+            "main..HEAD",
+            "HEAD~9",
+            "ORIG_HEAD",
+            "FETCH_HEAD",
+            "",
+        ] {
+            assert!(repo.resolve(bad).is_err(), "{bad:?} resolved");
+            assert!(repo.blob(bad, "a.txt").is_err(), "{bad:?} blob");
+            assert!(repo.commit(bad).is_err(), "{bad:?} commit");
+            assert!(repo.log(bad, None, 0, 5).is_err(), "{bad:?} log");
+        }
     }
 
     fn fixture() -> tempfile::TempDir {

@@ -892,12 +892,17 @@ pub(crate) async fn with_records<T: Template + Send + 'static>(
                 c,
                 tabs: views::stats_tabs(tab),
                 newer: a.index.newer_format().map(|v| {
+                    // The cache folder is a path on the host; a public visitor gets no path.
+                    let dir = if a.public() {
+                        "its cache folder".to_owned()
+                    } else {
+                        a.index.dir().display().to_string()
+                    };
                     format!(
                         "The history cache was written by a newer gitterrace (format {v}, this \
                          build reads {}). It is left untouched: run the newer build, or delete \
-                         {} to rebuild it here.",
+                         {dir} to rebuild it here.",
                         gitterrace_index::FORMAT_VERSION,
-                        a.index.dir().display()
                     )
                 }),
             }

@@ -24,6 +24,7 @@ mod media;
 mod multi;
 mod ownership;
 mod patterns;
+mod public;
 mod registry;
 mod reload;
 mod routes;
@@ -90,6 +91,9 @@ fn repo_router(
         .map_err(io::Error::other)?
         .with_limits(text_bytes, blame_bytes)
         .with_workers(cfg.index.threads);
+    if env.public() {
+        repo.restrict_to_committed();
+    }
     let index = Index::open(&repo)?.with_threads(cfg.index.threads);
     let mut app = App::configured(repo, index, env);
     app.base = base;
@@ -103,7 +107,17 @@ fn repo_router(
         .map_err(io::Error::other)?
         .with_link_style(style)
         .with_defaults(app.defaults().into_options());
+    let api = if env.public() {
+        api.committed_only()
+    } else {
+        api
+    };
     let pages = routes::router(Arc::clone(&app)).nest("/api/v1", gitterrace_api::router(api));
+    let pages = if env.public() {
+        pages.route_layer(axum::middleware::from_fn(public::only_public))
+    } else {
+        pages
+    };
     tokio::spawn(prewarm(Arc::clone(&app), pages.clone()));
     Ok(pages)
 }
@@ -154,7 +168,7 @@ async fn prewarm(app: Arc<App>, pages: axum::Router) {
     .await;
 }
 
-fn guarded(router: axum::Router, extra: Option<IpAddr>) -> axum::Router {
+fn guarded(router: axum::Router, gate: guard::Gate) -> axum::Router {
     use tower_http::compression::{CompressionLayer, Predicate, predicate::NotForContentType};
     // Fonts and images are already compressed; the default predicate also skips tiny bodies.
     let worth_it = tower_http::compression::DefaultPredicate::new()
@@ -167,7 +181,10 @@ fn guarded(router: axum::Router, extra: Option<IpAddr>) -> axum::Router {
                 .br(true)
                 .compress_when(worth_it),
         )
-        .layer(axum::middleware::from_fn_with_state(extra, guard::guard))
+        .layer(axum::middleware::from_fn_with_state(
+            Arc::new(gate),
+            guard::guard,
+        ))
 }
 
 fn build(
@@ -237,7 +254,16 @@ fn build_server(
         }
     };
     let roots: Vec<PathBuf> = targets.iter().map(|t| t.repo.root()).collect();
-    let (live, status) = actions::start(actions_file, &roots, extra.is_none());
+    // A public server never reads actions.toml: no run route, no Send to targets.
+    let actions_file = actions_file.filter(|_| !env.public());
+    if env.public() {
+        for t in &targets {
+            t.repo.restrict_to_committed();
+        }
+    }
+    // Behind a proxy a public server sits on loopback and every request is remote.
+    let local = extra.is_none() && !env.public();
+    let (live, status) = actions::start(actions_file, &roots, local);
     env.set_actions_status(&status);
     table.live.clone_from(&live);
     let sends = actions::sends(live.as_ref(), actions_file, &roots);
@@ -261,9 +287,9 @@ fn build_server(
         ),
     };
     let mut router = router.merge(actions::router(Arc::clone(&site)));
-    // A non-loopback bind never takes additions: the token is the only gate a remote client
-    // would face.
-    if let Some(token) = add.filter(|_| extra.is_none()) {
+    // A non-loopback bind or a public server never takes additions: the token is the only
+    // gate a remote client would face.
+    if let Some(token) = add.filter(|_| local) {
         router = router.merge(add::router(Arc::new(add::Adder {
             table,
             site,
@@ -272,7 +298,13 @@ fn build_server(
             state,
         })));
     }
-    Ok((guarded(router, extra), shown))
+    let router = if env.public() {
+        router.route_layer(axum::middleware::from_fn(public::only_public))
+    } else {
+        router
+    };
+    let gate = guard::Gate::new(extra, &env.cfg());
+    Ok((guarded(router, gate), shown))
 }
 
 /// Records the served repositories for `git terrace open`. Best effort: a read-only or odd
@@ -327,6 +359,16 @@ pub async fn serve_in(
     state: Option<PathBuf>,
 ) -> io::Result<()> {
     let extra = (!addr.ip().is_loopback()).then(|| addr.ip());
+    // Also checked by `Config::validate`; repeated here because `serve` takes any `Config`.
+    if extra.is_some() && !cfg.server.public {
+        return Err(io::Error::new(
+            io::ErrorKind::PermissionDenied,
+            format!(
+                "{addr} is reachable from other machines. Pass --public (server.public = true) to serve read-only there"
+            ),
+        ));
+    }
+    let public = cfg.server.public;
     tokio::task::spawn_blocking({
         let (paths, state) = (repo_paths.clone(), state.clone());
         move || remember(state.as_deref(), &paths)
@@ -337,7 +379,7 @@ pub async fn serve_in(
     // The secret `open` reads to add a repository. Without a state folder, or when it cannot
     // be written, the route stays unmounted and `open` starts a server of its own.
     let add = match (&state, extra) {
-        (Some(dir), None) => publish_add_token(dir, addr.port()),
+        (Some(dir), None) if !public => publish_add_token(dir, addr.port()),
         _ => None,
     };
     let published = add.is_some();
@@ -352,9 +394,9 @@ pub async fn serve_in(
     if let Some(w) = watched {
         tokio::spawn(reload::run(reload::Reloader::new(w), env.clone()));
     }
-    if !addr.ip().is_loopback() {
+    if public {
         tracing::warn!(
-            "serving to the network: anyone who can reach this address can read the repository"
+            "public: anyone who can reach this address reads the committed history. Working tree, stashes, live updates and actions are off"
         );
     }
     tracing::info!("serving {name} on http://{addr}");
@@ -1311,5 +1353,137 @@ mod tests {
             "routes accept writes:\n{}",
             writable.join("\n")
         );
+    }
+
+    fn public_cfg() -> gitterrace_config::Config {
+        let mut c = gitterrace_config::Config::default();
+        c.server.public = true;
+        c.server.hosts = vec!["git.example.com".to_owned()];
+        c
+    }
+
+    /// A public server, crawled from `/` through every link it renders and seeded with every
+    /// local route: each answer is a classified public route, none names the host's folders or
+    /// local state, local routes are 404, writes are 405 before routing.
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn public_server_shows_committed_history_only() {
+        let dir = tempfile::tempdir().expect("tmp");
+        let p = fixture("alpha", dir.path());
+        std::fs::write(p.join("wip.txt"), "uncommitted-secret\n").expect("write");
+        git(&p, &["stash", "-q", "-u"]);
+        std::fs::write(p.join("dirty.txt"), "dirty-secret\n").expect("write");
+        let cfg = actions_tests::config_dir(actions_tests::ECHO);
+        let env = crate::app::Env::new(public_cfg());
+        let router = crate::build(&p, None, Some(&cfg.path().join("actions.toml")), &env)
+            .expect("router")
+            .0;
+        let root = std::fs::canonicalize(&p).expect("canon");
+        let leaks = [
+            root.to_string_lossy().into_owned(),
+            dir.path().to_string_lossy().into_owned(),
+            "uncommitted-secret".to_owned(),
+            "dirty-secret".to_owned(),
+        ];
+        let mut todo = vec![
+            "/".to_owned(),
+            "/api/v1/repo".to_owned(),
+            "/api/v1/refs".to_owned(),
+        ];
+        let mut seen = std::collections::HashSet::new();
+        let mut bad = Vec::new();
+        while let Some(u) = todo.pop() {
+            if !seen.insert(u.clone()) || seen.len() > 300 {
+                continue;
+            }
+            let (s, body) = fetch(&router, &u, "git.example.com").await;
+            if s == 200 {
+                for l in links(&body) {
+                    todo.push(l.split('#').next().unwrap_or_default().to_owned());
+                }
+            }
+            if let Some(l) = leaks.iter().find(|l| body.contains(l.as_str())) {
+                bad.push(format!("{u} shows {l}"));
+            }
+            for l in ["/worktree", "/stashes", "/events", "/_send", "/_actions"] {
+                if body.contains(&format!("href=\"{l}")) {
+                    bad.push(format!("{u} links {l}"));
+                }
+            }
+        }
+        assert!(seen.len() > 20, "crawl too shallow: {}", seen.len());
+        for u in [
+            "/worktree",
+            "/worktrees",
+            "/stashes",
+            "/events",
+            "/_actions/status",
+            "/_send/targets",
+            "/commit/stash",
+            "/log/refs/stash",
+            "/tree/stash",
+            "/api/v1/log?rev=stash",
+            "/api/v1/blob?rev=stash&path=wip.txt",
+        ] {
+            let (s, body) = fetch(&router, u, "git.example.com").await;
+            if s == 200 || body.contains("uncommitted-secret") {
+                bad.push(format!("{u}: {s}"));
+            }
+        }
+        for (m, u) in [
+            ("POST", crate::actions::RUN_PATH),
+            ("POST", "/_repos"),
+            ("PUT", "/"),
+        ] {
+            let res = router
+                .clone()
+                .oneshot(
+                    Request::builder()
+                        .method(m)
+                        .uri(u)
+                        .header("host", "git.example.com")
+                        .body(Body::empty())
+                        .expect("req"),
+                )
+                .await
+                .expect("res");
+            if res.status() != 405 {
+                bad.push(format!("{m} {u}: {}", res.status()));
+            }
+        }
+        assert!(bad.is_empty(), "public server leaks:\n{}", bad.join("\n"));
+        // The proxy name works, a cross-site link into it works, another name does not.
+        let res = router
+            .clone()
+            .oneshot(
+                Request::get("/")
+                    .header("host", "GIT.example.com:443")
+                    .header("sec-fetch-site", "cross-site")
+                    .body(Body::empty())
+                    .expect("req"),
+            )
+            .await
+            .expect("res");
+        assert_eq!(res.status(), 200);
+        assert_eq!(fetch(&router, "/", "evil.example.com").await.0, 403);
+    }
+
+    /// `serve` refuses a reachable address unless the server is public, before binding.
+    #[tokio::test]
+    async fn a_reachable_bind_needs_public() {
+        let dir = tempfile::tempdir().expect("tmp");
+        let p = fixture("alpha", dir.path());
+        let addr: std::net::SocketAddr = "0.0.0.0:0".parse().expect("addr");
+        let e = crate::serve_in(
+            vec![p],
+            addr,
+            None,
+            gitterrace_config::Config::default(),
+            None,
+            None,
+        )
+        .await
+        .expect_err("served without public");
+        assert!(e.to_string().contains("--public"), "{e}");
     }
 }

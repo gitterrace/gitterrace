@@ -33,6 +33,7 @@ async fn main() -> anyhow::Result<()> {
         addr: cli.addr,
         poll: cli.poll,
         no_watch: cli.no_watch,
+        public: cli.public,
     };
     let loaded = flags.load().context("reading config.toml")?;
     for w in &loaded.warnings {
@@ -173,6 +174,7 @@ struct Flags {
     addr: Option<SocketAddr>,
     poll: Option<u64>,
     no_watch: bool,
+    public: bool,
 }
 
 impl Flags {
@@ -190,6 +192,10 @@ impl Flags {
         if self.no_watch {
             loaded.config.watch.enabled = false;
             loaded.flagged("watch.enabled");
+        }
+        if self.public {
+            loaded.config.server.public = true;
+            loaded.flagged("server.public");
         }
         loaded.validate()?;
         Ok(loaded)

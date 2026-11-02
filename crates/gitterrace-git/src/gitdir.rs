@@ -139,7 +139,7 @@ impl Repo {
     /// (tip, base) pair, so only branches that moved are walked again.
     pub fn branch_status(&self, base: &str) -> Result<Vec<BranchStatus>> {
         let repo = self.repo();
-        let base_id = Self::resolve_id(&repo, base)?;
+        let base_id = self.resolve_id(&repo, base)?;
         let mut out = Vec::new();
         for r in self.refs()? {
             if r.kind != crate::RefKind::Branch {

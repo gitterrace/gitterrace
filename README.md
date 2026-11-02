@@ -54,7 +54,7 @@ git terrace          # serves on 127.0.0.1 and opens your browser
 
 <!-- BEGIN GENERATED: commands -->
 ```text
-git terrace [paths]          Browse a git repository in your browser, offline [--addr --poll --no-watch --config --no-actions]
+git terrace [paths]          Browse a git repository in your browser, offline [--addr --poll --no-watch --config --no-actions --public]
 git terrace serve            Serve the repository in the browser (the default)
 git terrace config           Print the effective configuration and where each value comes from
 git terrace mcp              Run a read-only MCP server over stdio for agents
@@ -75,7 +75,8 @@ Send a selection to a tracker, notes app or mail draft, or run your own program 
 
 Docs: [why](docs/why.md), [configuration](docs/configuration.md), [JSON API](docs/api.md),
 [architecture](docs/architecture.md), [benchmarks](docs/benchmarks.md). Binds to `127.0.0.1`, never
-writes to your repository. The one-page site is generated into [site/](site/index.html).
+writes to your repository. Serving it to others: [running it online](docs/online.md). The one-page
+site is generated into [site/](site/index.html).
 
 ## Contributing
 

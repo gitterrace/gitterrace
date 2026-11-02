@@ -41,11 +41,17 @@ pub(crate) fn ref_tabs(app: &crate::app::App, on: &str) -> crate::error::Result<
         count,
         on: key == on,
     };
-    Ok(vec![
-        tab("refs", "Branches & tags", local),
-        tab("worktrees", "Worktrees", app.repo.linked_worktrees()?.len()),
-        tab("stashes", "Stashes", app.repo.stashes()?.len()),
-    ])
+    let mut tabs = vec![tab("refs", "Branches & tags", local)];
+    // Worktrees and stashes are this machine's state, not history.
+    if !app.public() {
+        tabs.push(tab(
+            "worktrees",
+            "Worktrees",
+            app.repo.linked_worktrees()?.len(),
+        ));
+        tabs.push(tab("stashes", "Stashes", app.repo.stashes()?.len()));
+    }
+    Ok(tabs)
 }
 
 pub(crate) struct Chrome {
@@ -60,8 +66,9 @@ pub(crate) struct Chrome {
     pub(crate) rev_enc: String,
     /// Full commit id of `rev`, for permalinks.
     pub(crate) commit: String,
-    /// Worktree differs from HEAD: show the Working tree chip.
-    pub(crate) dirty: bool,
+    /// Worktree differs from HEAD: show the Working tree chip. `None` on a public server, where
+    /// the chip is not even rendered hidden, so no page links a local route.
+    pub(crate) dirty: Option<bool>,
     pub(crate) nav: Vec<Nav>,
     /// HEAD detached or an operation half done, worded for the banner; `None` on a plain branch.
     pub(crate) banner: Option<String>,
@@ -178,7 +185,7 @@ pub(crate) fn chrome_at(app: &crate::app::App, active: &str, rev: &str) -> Chrom
         rev: rev.to_owned(),
         rev_enc: enc_seg(rev),
         commit: app.repo.resolve(rev).unwrap_or_default(),
-        dirty: app.dirty(),
+        dirty: (!app.public()).then(|| app.dirty()),
         nav: items
             .into_iter()
             .map(|(path, label, key)| Nav {
@@ -187,13 +194,17 @@ pub(crate) fn chrome_at(app: &crate::app::App, active: &str, rev: &str) -> Chrom
                 on: key == active,
             })
             .collect(),
-        banner: banner(&app.repo.head_state(), &app.base),
+        banner: if app.public() {
+            None
+        } else {
+            banner(&app.repo.head_state(), &app.base)
+        },
         actions_note: app.actions_note(),
         theme: match app.cfg().display.theme.as_str() {
             "system" => String::new(),
             t => t.to_owned(),
         },
-        live: app.cfg().watch.enabled && !crate::live::Mode::pinned_to(rev),
+        live: !app.public() && app.cfg().watch.enabled && !crate::live::Mode::pinned_to(rev),
         live_how: "",
         live_on: "",
         version: app.version().to_string(),

@@ -23,7 +23,7 @@
 <a class="reponame" href="{{ c.home }}">{{ c.name }}</a>
 {% if !c.base.is_empty() %}<div class="refswitch"><button class="branch" type="button" id="repobtn" aria-haspopup="true" aria-expanded="false" data-tip="Switch repository">repo<span class="caret" aria-hidden="true"></span></button></div>{% endif %}
 <div class="refswitch"><button class="branch" type="button" id="refbtn" aria-haspopup="true" aria-expanded="false" data-tip="Switch branch or tag"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5 3.5a1.5 1.5 0 1 1-2 1.41v6.18a1.5 1.5 0 1 1 1.5 0V8.5H9a1 1 0 0 0 1-1V6.4a1.5 1.5 0 1 1 1.5 0V7.5A2.5 2.5 0 0 1 9 10H4.5v1.09A1.5 1.5 0 1 1 3 11.09V4.91A1.5 1.5 0 0 1 5 3.5z"/></svg><span class="name">{{ c.switcher_label() }}</span><span class="caret" aria-hidden="true"></span></button></div>
-<a class="wtchip" id="wtchip" href="{{ c.base }}/worktree" data-tip="Uncommitted changes in the working tree"{% if !c.dirty %} hidden{% endif %}><span class="dot"></span><span class="label">Working tree</span></a>
+{% if let Some(dirty) = c.dirty %}<a class="wtchip" id="wtchip" href="{{ c.base }}/worktree" data-tip="Uncommitted changes in the working tree"{% if !dirty %} hidden{% endif %}><span class="dot"></span><span class="label">Working tree</span></a>{% endif %}
 </div>
 <span class="livenote" id="livenote" hidden role="status"></span>
 <div class="tools">

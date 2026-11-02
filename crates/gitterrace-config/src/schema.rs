@@ -105,6 +105,13 @@ settings! {
         addr: String = DEFAULT_ADDR.to_owned(),
         /// Maximum open live-update streams per repository (one per browser tab).
         max_streams: usize = 32,
+        /// Serve read-only to anyone who can reach the address: committed history only, no
+        /// working tree, stashes, live updates, actions or additions. Required for any address
+        /// that is not loopback. Needs a restart.
+        public: bool = false,
+        /// Host names a reverse proxy forwards with, exact and without port, for example
+        /// `["git.example.com"]`. Needs `public`. Needs a restart.
+        hosts: Vec<String> = Vec::new(),
     }
     watch: Watch {
         /// Notice new commits and refs while running. Off means a restart or a reload is needed.
@@ -183,6 +190,9 @@ impl Config {
                 &format!("expected host:port, for example {DEFAULT_ADDR}"),
             );
         }
+        if let Some(why) = self.public_problem() {
+            return bad(why.0, &why.1);
+        }
         if self.server.max_streams == 0 {
             return bad("server.max_streams", "must be at least 1");
         }
@@ -215,4 +225,45 @@ impl Config {
         }
         Ok(())
     }
+
+    /// Why the online settings cannot be honoured: a non-loopback address without
+    /// `server.public` (fails closed, so a typo in `addr` never exposes the working tree), or a
+    /// `server.hosts` entry that is not one plain host name.
+    fn public_problem(&self) -> Option<(&'static str, String)> {
+        let s = &self.server;
+        let addr = s.addr.parse::<std::net::SocketAddr>().ok()?;
+        if !addr.ip().is_loopback() && !s.public {
+            return Some((
+                "server.addr",
+                format!(
+                    "{addr} is reachable from other machines. Set server.public = true (or pass --public) to serve read-only there"
+                ),
+            ));
+        }
+        if !s.hosts.is_empty() && !s.public {
+            return Some(("server.hosts", "needs server.public = true".to_owned()));
+        }
+        s.hosts.iter().find(|h| !plain_host(h)).map(|h| {
+            (
+                "server.hosts",
+                format!("{h:?}: expected a host name without scheme, port or wildcard"),
+            )
+        })
+    }
+}
+
+/// A DNS name or IP literal, nothing else: no `*`, scheme, port, path or empty label.
+fn plain_host(h: &str) -> bool {
+    if h.parse::<std::net::IpAddr>().is_ok() {
+        return true;
+    }
+    !h.is_empty()
+        && h.len() <= 253
+        && h.split('.').all(|l| {
+            !l.is_empty()
+                && l.len() <= 63
+                && !l.starts_with('-')
+                && !l.ends_with('-')
+                && l.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-')
+        })
 }

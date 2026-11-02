@@ -49,6 +49,9 @@ pub(crate) struct Env {
     /// The `actions.toml` Send to targets, reloaded with the file: the commit page reads their
     /// `lookup` links from here.
     sends: Arc<RwLock<Option<SharedActions>>>,
+    /// `server.public` at startup. Fixed for the process: a reload never widens what a
+    /// public server shows.
+    public: bool,
 }
 
 /// The live `actions.toml`, swapped whole on reload.
@@ -85,7 +88,9 @@ fn resize(sem: &Semaphore, cap: &Mutex<usize>, new: usize) {
 impl Env {
     pub(crate) fn new(cfg: Config) -> Self {
         let jobs = job_slots(&cfg);
+        let public = cfg.server.public;
         Self {
+            public,
             cfg: Arc::new(RwLock::new(Arc::new(cfg))),
             apps: Arc::new(Mutex::new(Vec::new())),
             jobs: Arc::new(Semaphore::new(jobs)),
@@ -94,6 +99,11 @@ impl Env {
             actions_note: Arc::default(),
             sends: Arc::default(),
         }
+    }
+
+    /// Whether this server is public: committed history only, see `public.rs`.
+    pub(crate) const fn public(&self) -> bool {
+        self.public
     }
 
     /// Hands the actions status to every page this server renders.
@@ -290,8 +300,16 @@ impl App {
         self.env.cfg()
     }
 
+    /// Whether the server is public; see `public.rs`.
+    pub(crate) const fn public(&self) -> bool {
+        self.env.public()
+    }
+
     /// The actions note for this page, rendered with it.
     pub(crate) fn lookups(&self, sha: &str) -> Vec<(String, String)> {
+        if self.public() {
+            return Vec::new();
+        }
         self.env.lookups(sha)
     }
 
@@ -317,6 +335,9 @@ impl App {
 
     /// Whether the worktree differs from HEAD, reused for a couple of seconds.
     pub(crate) fn dirty(&self) -> bool {
+        if self.public() {
+            return false;
+        }
         if let Ok(g) = self.dirty.lock()
             && let Some((at, v)) = *g
             && at.elapsed() < DIRTY_TTL

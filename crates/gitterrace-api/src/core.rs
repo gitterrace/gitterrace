@@ -71,6 +71,13 @@ impl ApiState {
         self
     }
 
+    /// Answers only for committed history, see [`Repo::restrict_to_committed`].
+    #[must_use]
+    pub fn committed_only(self) -> Self {
+        self.repo.restrict_to_committed();
+        self
+    }
+
     /// Opens the repository containing `path` and its cache.
     pub fn open(path: &Path) -> Result<Self, ApiError> {
         let repo = Repo::discover(path)?;

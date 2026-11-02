@@ -29,6 +29,10 @@ pub(crate) struct Cli {
     /// Never run user actions, even when `actions.toml` declares some.
     #[arg(long, global = true)]
     pub(crate) no_actions: bool,
+    /// Serve read-only to other machines: committed history only. Required with any `--addr`
+    /// that is not loopback. Overrides `server.public`.
+    #[arg(long, global = true)]
+    pub(crate) public: bool,
     #[command(subcommand)]
     pub(crate) command: Option<Command>,
 }

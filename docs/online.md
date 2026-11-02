@@ -1,0 +1,53 @@
+# Running it online
+
+gitterrace is built to run on your own machine, bound to `127.0.0.1`. That stays the
+recommendation. When you do want others to read a repository, use public mode; nothing else
+binds to another address.
+
+## Public mode
+
+`--public` (or `server.public = true` in `config.toml`) turns the server into a read-only
+viewer of committed history. Any `--addr` that is not loopback refuses to start without it.
+
+What a public server shows:
+
+- Files, commits, diffs, blame, history, compare, search and insights at `HEAD`, any branch,
+  tag or remote-tracking branch, or a full commit id.
+- The JSON API under `/api/v1` with the same revisions.
+- `/go/...` permalinks.
+
+What it never shows or does:
+
+- The working tree, uncommitted changes, stashes, linked worktrees, reflogs or any other ref.
+- Abbreviated commit ids: only full ids resolve, so the object store cannot be enumerated.
+- Paths of folders on the host, an in-progress rebase or merge.
+- Live updates (no `/events`), actions, Send to targets, and adding repositories.
+- Any method but `GET` and `HEAD`.
+
+Every request that takes longer than 30 seconds answers `503`. Pages that are slow on a large
+history (blame, insights) finish in the background and answer from the cache next time.
+
+## Behind a reverse proxy
+
+Run gitterrace on loopback and put a TLS reverse proxy in front of it. The proxy owns TLS, HSTS,
+connection limits, slow-client timeouts and, for a private repository, the login.
+
+```toml
+[server]
+addr = "127.0.0.1:4242"
+public = true
+hosts = ["git.example.com"]
+```
+
+`hosts` lists the exact names the proxy forwards in the `Host` header, without scheme or port.
+Wildcards are refused. Any other name answers `403`, which stops DNS rebinding. Forward the
+original `Host`; gitterrace reads no `X-Forwarded-*` header.
+
+## What not to do
+
+- Do not serve a clone with work you have not published: everything committed on any branch or
+  tag is readable, and history includes deleted files.
+- Do not expose it without TLS or without the proxy's login when the repository is private.
+  gitterrace has no accounts.
+- Do not bind `0.0.0.0` on a shared network for convenience: public mode makes it safe to
+  read, not private.

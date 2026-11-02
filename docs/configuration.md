@@ -16,6 +16,8 @@ Actions live in their own file, `actions.toml`, because they run commands.
 | --- | --- | --- | --- |
 | `addr` | string | `"127.0.0.1:4242"` | Address to listen on. Keep it local: pages show source code and there is no login. Needs a restart. |
 | `max_streams` | integer | `32` | Maximum open live-update streams per repository (one per browser tab). |
+| `public` | bool | `false` | Serve read-only to anyone who can reach the address: committed history only, no working tree, stashes, live updates, actions or additions. Required for any address that is not loopback. Needs a restart. |
+| `hosts` | list of strings | `[]` | Host names a reverse proxy forwards with, exact and without port, for example `["git.example.com"]`. Needs `public`. Needs a restart. |
 
 ## `[watch]`
 
