@@ -794,6 +794,34 @@ def no_hostname(paths: list[Path]) -> list[str]:
     return errs
 
 
+def unknown_ids() -> list[str]:
+    """Every gitterrace commit a result names must exist in this history. A shallow clone
+    cannot tell, so it is skipped there."""
+    shallow = subprocess.run(
+        ["git", "rev-parse", "--is-shallow-repository"],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    if shallow != "false":
+        return []
+    errs: list[str] = []
+    for p in runs():
+        run = load(p)
+        control = run["repos"].get("control", {})
+        ids = {run["machine"].get("gitterrace_sha"), control.get("sha")}
+        ids.add(control.get("probe", {}).get("commit"))
+        for i in sorted(x for x in ids if x):
+            ok = subprocess.run(
+                ["git", "cat-file", "-e", f"{i}^{{commit}}"],
+                cwd=ROOT,
+                capture_output=True,
+            )
+            if ok.returncode:
+                errs.append(f"{p.name}: commit {i[:10]} is not in this history")
+    return errs
+
+
 def check(text: str, new: str) -> None:
     want = expected()
     newest = published()[-1]
@@ -804,6 +832,7 @@ def check(text: str, new: str) -> None:
         if not NAME.fullmatch(p.name)
     ]
     errs += stray()
+    errs += unknown_ids()
     errs += no_hostname(sorted(actual()) + [DOC])
     for p, body in want.items():
         if not p.exists() or p.read_text() != body:
