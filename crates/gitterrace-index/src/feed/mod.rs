@@ -19,7 +19,9 @@
 //! - Object safe: pages take `&dyn InsightsSource`.
 
 pub(crate) mod disk;
+mod fresh;
 mod memory;
+mod reach;
 pub(crate) mod segments;
 
 use std::ops::Range;
@@ -29,7 +31,9 @@ pub use crate::seg::{IdentId, LabelId, Oid, PathId, Rank};
 #[doc(hidden)]
 pub use disk::testing as disk_testing;
 pub use disk::{DiskSource, IdentMap, RowWriter};
+pub use fresh::FRESH_CAP;
 pub use memory::{IdentPairs, MemorySource};
+pub use reach::{Reach, RevView, rev_view};
 pub use segments::SegmentSource;
 
 /// [`crate::reference_time`] over a source: the newest author time not after the wall clock.
