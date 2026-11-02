@@ -43,7 +43,7 @@ Actions live in their own file, `actions.toml`, because they run commands.
 
 | Key | Type | Default | Description |
 | --- | --- | --- | --- |
-| `cache_mb` | integer | `64` | Memory for the blame and highlighted-code caches together, in MB, shared half and half. The highlighted-code cache is per process, the blame cache per repository. |
+| `cache_mb` | integer | `32` | Memory for the serving caches of one repository together, in MB: a quarter each for blame and highlighted code, an eighth each for rendered pages, file lists, last commits and path logs. An entry over an eighth of its cache is not kept. |
 | `blocking_jobs` | integer | `0` | Most page-building git jobs running at once across all repositories. 0 means one per core. |
 
 ## `[limits]`

@@ -37,6 +37,11 @@ serde_json.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
 
+# The system allocator on macOS keeps freed pages: a server that drops an idle 800 MB record set
+# stayed at that footprint. jemalloc with decay 0 (`.cargo/config.toml`) hands them back.
+[target.'cfg(not(windows))'.dependencies]
+tikv-jemallocator = "0.7"
+
 # One binary: you run `git terrace`, because git runs any `git-<name>` on PATH.
 [[bin]]
 name = "git-terrace"

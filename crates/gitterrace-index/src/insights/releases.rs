@@ -1,6 +1,6 @@
 //! Release rhythm: tags as releases, the gaps between them and the time since the last.
 
-use std::collections::HashMap;
+use std::sync::Arc;
 
 use gitterrace_git::{RefInfo, RefKind};
 
@@ -36,33 +36,28 @@ pub fn release_tags(refs: &[RefInfo]) -> Vec<(String, String)> {
 impl Insights<'_> {
     /// Release rhythm from tags. Tags whose commit is not in the records are dropped.
     pub fn cadence(&self, tags: &[(String, String)]) -> Cadence {
-        let pos: HashMap<&str, usize> = self
-            .records
+        let src = self.source();
+        // (rank, time, id, tag name) of every tag whose commit is indexed.
+        let mut found: Vec<(usize, i64, Arc<str>, &str)> = tags
             .iter()
-            .enumerate()
-            .map(|(i, r)| (r.id.as_str(), i))
+            .filter_map(|(n, id)| {
+                let rank = src.find_commit(id)?;
+                let c = src.commit(rank)?;
+                Some((rank.0 as usize, c.time, src.commit_id(rank)?, n.as_str()))
+            })
             .collect();
-        let mut found: Vec<(usize, &str)> = tags
-            .iter()
-            .filter_map(|(n, id)| pos.get(id.as_str()).map(|i| (*i, n.as_str())))
-            .collect();
-        found.sort_by_key(|(i, n)| (self.records[*i].time, *i, *n));
+        found.sort_by_key(|(i, t, _, n)| (*t, *i, *n));
         let mut releases = Vec::new();
-        let mut prev: Option<usize> = None;
-        for (i, name) in found {
-            let r = &self.records[i];
+        let mut prev: Option<(usize, i64)> = None;
+        for (i, time, id, name) in found {
             releases.push(Release {
                 name: name.to_owned(),
-                commit: r.id.clone(),
-                time: r.time,
-                commits_since: prev.map_or(i + 1, |p| i.saturating_sub(p)),
-                days_since: prev.map(|p| {
-                    r.time
-                        .saturating_sub(self.records[p].time)
-                        .div_euclid(86_400)
-                }),
+                commit: id.to_string(),
+                time,
+                commits_since: prev.map_or(i + 1, |(p, _)| i.saturating_sub(p)),
+                days_since: prev.map(|(_, pt)| time.saturating_sub(pt).div_euclid(86_400)),
             });
-            prev = Some(i);
+            prev = Some((i, time));
         }
         let mut gaps: Vec<i64> = releases.iter().filter_map(|r| r.days_since).collect();
         gaps.sort_unstable();

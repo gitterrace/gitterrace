@@ -5,9 +5,8 @@ use std::sync::Arc;
 use askama::Template;
 use axum::extract::{Query, RawQuery, State};
 use axum::response::Html;
-use gitterrace_index::{
-    CommitRecord, Insights, OptionParams, Options, Period, rework_share, rework_verdict,
-};
+use gitterrace_index::feed::InsightsSource;
+use gitterrace_index::{Insights, OptionParams, Options, Period, rework_share, rework_verdict};
 use serde::Deserialize;
 
 use crate::{
@@ -188,23 +187,34 @@ impl OptLink {
     }
 }
 
-/// Insights over `recs` with the options in force. The head ignore rules apply when asked.
-pub(crate) fn insights<'a>(a: &App, recs: &'a [CommitRecord], o: Options) -> Insights<'a> {
-    let ignore = if o.respect_ignore {
-        let head = a.repo.resolve(&crate::fmt::selected()).unwrap_or_default();
-        a.ignore_set(&head)
+/// What every insights page reads: the tip's source, or a filtered view over it.
+pub(crate) type Src = Arc<dyn InsightsSource>;
+
+/// Insights over `src` with the options in force. The head ignore rules apply when asked.
+pub(crate) fn insights<'a>(a: &App, src: &'a Src, o: Options) -> Insights<'a> {
+    let head = a.repo.resolve(&crate::fmt::selected()).unwrap_or_default();
+    let respect = o.respect_ignore;
+    let ignore = |a: &App| respect.then(|| a.ignore_set(&head)).flatten();
+    // The full record set of the tip is what every unfiltered page reads: its derived tables
+    // (path filter decisions, rename-followed touches, per-commit lines) are built once per
+    // tip, index generation and options, not once per page. Filtered sets stay per request.
+    let full = a
+        .source(&head)
+        .ok()
+        .flatten()
+        .is_some_and(|tip| Arc::ptr_eq(&tip, src));
+    if full {
+        let key = format!("{}\u{0}{head}\u{0}{}", a.base, a.index.generation());
+        Insights::shared_source(&**src, o, &key, || ignore(a))
     } else {
-        None
-    };
-    Insights::new(recs, o, ignore)
+        Insights::from_source(&**src, o, ignore(a))
+    }
 }
 
-/// Records after every filter except the period, which the insights methods window themselves.
-pub(crate) fn scoped<'a>(
-    f: &Filter,
-    r: &'a [CommitRecord],
-) -> std::borrow::Cow<'a, [CommitRecord]> {
-    f.with(Dim::Period, None).apply(r)
+/// The source after every filter except the period, which the insights methods window
+/// themselves.
+pub(crate) fn scoped(f: &Filter, all: &Src) -> Src {
+    f.with(Dim::Period, None).apply(all)
 }
 
 /// Text files of HEAD with line counts, the cache persisted under `.git/gitterrace`.
@@ -217,7 +227,7 @@ pub(crate) async fn cached<T: askama::Template + Send + 'static>(
     app: &Arc<App>,
     tab: &'static str,
     raw: Option<String>,
-    build: impl FnOnce(&App, &[CommitRecord], Chrome) -> T + Send + 'static,
+    build: impl FnOnce(&App, &Src, Chrome) -> T + Send + 'static,
 ) -> Result<Html<String>> {
     let query = App::canonical_query(raw.as_deref());
     cached_keyed(app, tab, query, build).await
@@ -228,7 +238,7 @@ pub(crate) async fn cached_keyed<T: askama::Template + Send + 'static>(
     app: &Arc<App>,
     tab: &'static str,
     query: String,
-    build: impl FnOnce(&App, &[CommitRecord], Chrome) -> T + Send + 'static,
+    build: impl FnOnce(&App, &Src, Chrome) -> T + Send + 'static,
 ) -> Result<Html<String>> {
     let key = blocking(app, move |a| Ok(a.memo_key(tab, Some(&query)))).await?;
     if let Some(h) = app.memo_get(&key) {
@@ -271,7 +281,7 @@ pub(crate) async fn frequency(
     cached(&app, "cf", raw, move |a, r, c| {
         let d = a.defaults();
         let f = &q.filter;
-        let fb = f.bar("/stats/frequency", r);
+        let fb = f.bar("/stats/frequency", &**r);
         let recs = scoped(f, r);
         let ins = insights(a, &recs, q.options(&d));
         let period = period_of(&q, &d, Period::All);
@@ -383,7 +393,7 @@ pub(crate) async fn contributors(
         let f = &q.filter;
         let d = a.defaults();
         let bots = q.options(&d).include_bots;
-        let fb = f.bar("/stats/contributors", r);
+        let fb = f.bar("/stats/contributors", &**r);
         // The period is applied by Insights so first-time contributors are judged against all
         // history that the other filters keep.
         let recs = scoped(f, r);

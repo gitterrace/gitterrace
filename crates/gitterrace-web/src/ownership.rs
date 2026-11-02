@@ -36,6 +36,15 @@ struct OwnershipPage {
     rows: Vec<DirRow>,
 }
 
+/// The repository root's own files come keyed by an empty path: name them.
+fn dir_label(path: &str) -> String {
+    if path.is_empty() {
+        "(root)".to_owned()
+    } else {
+        path.to_owned()
+    }
+}
+
 pub(crate) async fn page(
     State(app): Shared,
     RawQuery(raw): RawQuery,
@@ -70,12 +79,12 @@ pub(crate) async fn page(
             rep.dirs
                 .iter()
                 .take(TOP_DIRS)
-                .map(|d| row(d, d.path.clone())),
+                .map(|d| row(d, dir_label(&d.path))),
         );
         OwnershipPage {
             c,
             tabs: views::stats_tabs("ow"),
-            fb: f.bar("/stats/ownership", r),
+            fb: f.bar("/stats/ownership", &**r),
             opts: q.row(&d, "/stats/ownership"),
             kpis: vec![
                 Kpi("Bus factor", fmt::thousands(rep.overall.bus_factor)),
@@ -90,4 +99,15 @@ pub(crate) async fn page(
         }
     })
     .await
+}
+
+#[cfg(test)]
+mod tests {
+    use super::dir_label;
+
+    #[test]
+    fn root_files_get_a_label() {
+        assert_eq!(dir_label(""), "(root)");
+        assert_eq!(dir_label("src"), "src");
+    }
 }

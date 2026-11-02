@@ -6,7 +6,8 @@ use std::sync::{Arc, Mutex, RwLock};
 
 use gitterrace_actions::{Lines, LinkStyle, styled};
 use gitterrace_git::Repo;
-use gitterrace_index::{CommitRecord, Index, Insights, Options};
+use gitterrace_index::feed::InsightsSource;
+use gitterrace_index::{Index, Insights, Options, Scoped};
 use serde_json::{Value, json};
 
 use crate::error::ApiError;
@@ -51,7 +52,7 @@ pub fn options_from(cfg: &gitterrace_config::Config, name: &str) -> Options {
 pub struct ApiState {
     pub(crate) repo: Arc<Repo>,
     pub(crate) index: Arc<Index>,
-    /// Parsed records of the last request, keyed by (resolved tip, index generation).
+    /// Insights source of the last request, keyed by (resolved tip, index generation).
     cache: Arc<Mutex<Option<RecordsCache>>>,
     /// `links.style` and the counting options a request leaves unset. Shared with every clone,
     /// so a config reload ([`ApiState::reconfigure`]) reaches routers already built.
@@ -68,7 +69,10 @@ struct Settings {
     defaults: Options,
 }
 
-type RecordsCache = ((String, u64), Arc<Vec<CommitRecord>>);
+/// What every statistic reads.
+pub(crate) type Src = Arc<dyn InsightsSource>;
+
+type RecordsCache = ((String, u64), Src);
 
 impl ApiState {
     pub fn new(repo: Arc<Repo>, index: Arc<Index>) -> Self {
@@ -176,9 +180,9 @@ impl ApiState {
         Some(format!("\"{head}-{h:016x}-{version}-{generation}\""))
     }
 
-    /// Records reachable from `rev`, shared between calls while the tip and the cache file are
-    /// unchanged.
-    pub(crate) fn records(&self, rev: &str) -> Result<Arc<Vec<CommitRecord>>, ApiError> {
+    /// The source over the history reachable from `rev`, shared between calls while the tip
+    /// and the cache file are unchanged.
+    pub(crate) fn records(&self, rev: &str) -> Result<Src, ApiError> {
         let tip = self.repo.resolve(rev)?;
         let key = (tip, self.index.generation());
         if let Ok(g) = self.cache.lock()
@@ -187,11 +191,22 @@ impl ApiState {
         {
             return Ok(Arc::clone(v));
         }
-        let recs = Arc::new(self.index.records(&*self.repo, rev)?);
+        let recs: Src = match self.index.disk_source(&*self.repo, rev)? {
+            Some(set) => set,
+            None => Index::memory_source(Arc::new(self.index.records(&*self.repo, rev)?)),
+        };
         if let Ok(mut g) = self.cache.lock() {
             *g = Some((key, Arc::clone(&recs)));
         }
         Ok(recs)
+    }
+
+    /// Drops the shared record set; the next call parses it again. The server calls this when
+    /// nobody browses, so an idle process does not keep a whole history parsed.
+    pub fn release_records(&self) {
+        if let Ok(mut g) = self.cache.lock() {
+            g.take();
+        }
     }
 
     fn rev(rev: Option<&str>) -> Result<&str, ApiError> {
@@ -236,7 +251,7 @@ impl ApiState {
         let head = self.repo.resolve(DEFAULT_REV).ok();
         let records = self.records(DEFAULT_REV)?;
         let totals = self
-            .insights(DEFAULT_REV, &records, self.settings().defaults)
+            .insights(DEFAULT_REV, &*records, self.settings().defaults)
             .period_summary(gitterrace_index::Period::All)
             .current;
         Ok(json!({
@@ -387,14 +402,14 @@ impl ApiState {
         Ok(v)
     }
 
-    /// Statistics over `records` under `opts`, with the ignore rules of `rev` when asked: what
+    /// Statistics over `src` under `opts`, with the ignore rules of `rev` when asked: what
     /// the web pages build for the same options.
-    fn insights<'a>(&self, rev: &str, records: &'a [CommitRecord], opts: Options) -> Insights<'a> {
+    fn insights<'a>(&self, rev: &str, src: &'a dyn InsightsSource, opts: Options) -> Insights<'a> {
         let ignore = opts
             .respect_ignore
             .then(|| gitterrace_git::IgnoreSet::at(&self.repo, rev).ok())
             .flatten();
-        Insights::new(records, opts, ignore)
+        Insights::from_source(src, opts, ignore)
     }
 
     /// One named statistic over the cached records reachable from `rev`, after the selection
@@ -408,9 +423,13 @@ impl ApiState {
         let rev = Self::rev(rev)?;
         let tip = self.repo.resolve(rev)?;
         let all = self.records(rev)?;
-        let records = params.select.apply(&all);
+        let records: Src = if params.select.is_empty() {
+            Arc::clone(&all)
+        } else {
+            Arc::new(Scoped::new(Arc::clone(&all), &params.select, None))
+        };
         let opts = params.options.apply(self.settings().defaults);
-        let ins = self.insights(&tip, &records, opts);
+        let ins = self.insights(&tip, &*records, opts);
         let mut data = insights::compute(name, &ins, params, || {
             let mut cache = gitterrace_index::LineCache::load(self.index.dir());
             gitterrace_index::head_files(&self.repo, &tip, &mut cache).unwrap_or_default()
@@ -436,7 +455,7 @@ impl ApiState {
         let opts = self.settings().defaults;
         let bots = opts.include_bots;
         let report = self
-            .insights(rev, &records, opts)
+            .insights(rev, &*records, opts)
             .contributors(gitterrace_index::Period::All);
         let people: Vec<_> = report
             .contributors

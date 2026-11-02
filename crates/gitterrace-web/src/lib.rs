@@ -106,6 +106,10 @@ fn repo_router(
     let app = Arc::new(app);
     env.register(&app);
     tokio::spawn(app::keep_index_fresh(Arc::clone(&app)));
+    tokio::spawn(app::release_when_idle(
+        Arc::downgrade(&app),
+        app::RECORDS_IDLE,
+    ));
     let api = gitterrace_api::ApiState::open(repo_path)
         .map_err(io::Error::other)?
         .configured(&env.cfg());
@@ -178,6 +182,7 @@ async fn prewarm(app: Arc<App>, pages: axum::Router) {
                     let _warm = pages.clone().oneshot(req).await;
                 }
             }
+            routes::prewarm_blame(app).await;
         }
     })
     .await;

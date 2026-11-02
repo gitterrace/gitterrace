@@ -10,6 +10,11 @@ mod open;
 
 use cli::{Cli, Command};
 
+// See Cargo.toml: the system allocator kept an idle server's freed record sets resident.
+#[cfg(not(windows))]
+#[global_allocator]
+static ALLOC: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
+
 #[expect(
     clippy::print_stderr,
     clippy::print_stdout,

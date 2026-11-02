@@ -19,6 +19,28 @@ pub trait CommitSource {
         ids.iter().map(|id| self.record(id)).collect()
     }
 
+    /// Builds records for `ids` and hands each to `emit` in the order of `ids`, skipping the
+    /// ones that cannot be read like [`CommitSource::records`]. `done` reports how many of
+    /// `ids` are finished, read or skipped. Sources that can stream work without batch
+    /// barriers override this; the default builds `chunk` commits at a time.
+    fn stream_records(
+        &self,
+        ids: &[String],
+        chunk: usize,
+        emit: &mut dyn FnMut(CommitRecord) -> io::Result<()>,
+        done: &mut dyn FnMut(usize),
+    ) -> io::Result<()> {
+        let mut n = 0;
+        for part in ids.chunks(chunk.max(1)) {
+            for record in self.records(part)? {
+                emit(record)?;
+            }
+            n += part.len();
+            done(n);
+        }
+        Ok(())
+    }
+
     /// Commits whose parents are missing (a shallow clone's boundary). Their records are diffed
     /// as roots and rebuilt when the boundary moves past them.
     fn shallow_ids(&self) -> Vec<String> {
@@ -78,7 +100,8 @@ fn build(summary: gitterrace_git::CommitSummary, files: Vec<FileStat>) -> Commit
 
 impl CommitSource for Repo {
     fn rev_list(&self, rev: &str) -> io::Result<Vec<String>> {
-        Self::rev_list(self, rev).map_err(io::Error::other)
+        // The canonical order, not the walk's: ordinals and string ids follow it.
+        gitterrace_git::canonical_order(self, rev).map_err(io::Error::other)
     }
 
     fn record(&self, id: &str) -> io::Result<CommitRecord> {
@@ -95,6 +118,27 @@ impl CommitSource for Repo {
             .zip(diffs)
             .filter_map(|(summary, d)| d.map(|d| build(summary, file_stats(d))))
             .collect())
+    }
+
+    fn stream_records(
+        &self,
+        ids: &[String],
+        chunk: usize,
+        emit: &mut dyn FnMut(CommitRecord) -> io::Result<()>,
+        done: &mut dyn FnMut(usize),
+    ) -> io::Result<()> {
+        let chunk = chunk.max(1);
+        self.numstat_stream(ids, |i, commit| {
+            if let Some((summary, files)) = commit {
+                emit(build(summary, file_stats(files)))
+                    .map_err(|e| gitterrace_git::Error::Git(e.to_string()))?;
+            }
+            if (i + 1) % chunk == 0 || i + 1 == ids.len() {
+                done(i + 1);
+            }
+            Ok(())
+        })
+        .map_err(io::Error::other)
     }
 
     fn shallow_ids(&self) -> Vec<String> {

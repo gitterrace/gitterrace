@@ -1,2 +1,7 @@
 [alias]
 xtask = "run -q -p xtask --"
+
+# Freed memory goes back to the OS at once, so an idle server sheds what a page or the index
+# build used. Baked into jemalloc at build time: setting it at run time needs unsafe code.
+[env]
+JEMALLOC_SYS_WITH_MALLOC_CONF = "dirty_decay_ms:0,muzzy_decay_ms:0"

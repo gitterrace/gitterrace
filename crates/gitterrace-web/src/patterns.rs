@@ -115,7 +115,7 @@ pub(crate) async fn page(
         PatternsPage {
             c,
             tabs: views::stats_tabs("pa"),
-            fb: f.bar("/stats/patterns", r),
+            fb: f.bar("/stats/patterns", &**r),
             opts: q.row(&d, "/stats/patterns"),
             empty: ins.period_summary(period).current.commits == 0,
             pairs,

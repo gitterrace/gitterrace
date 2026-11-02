@@ -3,7 +3,9 @@
 
 mod cache;
 mod conventional;
+pub mod feed;
 mod insights;
+pub mod seg;
 mod source;
 mod store;
 
@@ -44,9 +46,10 @@ pub const CACHE_FILES: [(&str, &str); 5] = [
     ),
 ];
 
-/// Commits built per batch. Every batch pays a fixed cost per worker (the diff attribute setup
-/// unpacks the HEAD tree, 40% of the time at 256 on a 50k-file repository), so it is large
-/// enough to amortize that and still small enough for steady progress and bounded memory.
+/// Commits per progress step, and per call for a source that builds in batches. A batching
+/// source pays a fixed cost per worker each batch (the diff attribute setup unpacks the HEAD
+/// tree), so this is large enough to amortize it. The git source streams instead: its workers
+/// set up once and never wait on a batch, so this only paces its progress reports.
 const BATCH: usize = 2048;
 
 /// Per-commit facts the stats pages are built from.
@@ -108,6 +111,15 @@ impl FileStat {
 pub struct Progress {
     pub done: usize,
     pub total: usize,
+}
+
+/// The source pages read when the segment set holds the shown rev.
+pub type DiskSet = feed::SegmentSource<feed::DiskSource>;
+
+/// The first store error `set` met while serving, from its tables or its rows. Some means the
+/// cache is unreadable: [`Index::rebuild`] it, never serve part of it.
+pub fn unreadable(set: &DiskSet) -> Option<String> {
+    set.unreadable().or_else(|| set.base().unreadable())
 }
 
 /// The cache for one repository.
@@ -173,7 +185,10 @@ impl Index {
     ) -> io::Result<()> {
         self.writable()?;
         let ids = source.rev_list(rev)?;
-        let shallow: HashSet<String> = source.shallow_ids().into_iter().collect();
+        let shallow_list = source.shallow_ids();
+        // A deepened or grafted clone changes topo ranks: same rule as an unreadable cache.
+        store::check_shallow(&self.dir, &shallow_list)?;
+        let shallow: HashSet<String> = shallow_list.iter().cloned().collect();
         // Everything below reads what another writer may be appending: lock first.
         let _lock = store::WriteLock::take(&self.dir)?;
         let stored = store::stored_ids(&self.dir)?;
@@ -181,16 +196,129 @@ impl Index {
         let total = todo.len();
         progress(Progress { done: 0, total });
         let mut out = store::Appender::open(&self.dir, stored.valid)?;
-        let mut done = 0;
-        for chunk in todo.chunks(BATCH) {
-            let ids: Vec<String> = chunk.iter().map(|id| (*id).clone()).collect();
-            for record in source.records(&ids)? {
-                out.push(&record, shallow.contains(&record.id))?;
-            }
-            done += chunk.len();
-            progress(Progress { done, total });
+        let order = ids.clone();
+        let ids: Vec<String> = todo.into_iter().cloned().collect();
+        let mut stored = 0_usize;
+        source.stream_records(
+            &ids,
+            BATCH,
+            &mut |record| {
+                stored += 1;
+                out.push(&record, shallow.contains(&record.id))
+            },
+            &mut |done| progress(Progress { done, total }),
+        )?;
+        out.flush()?;
+        // A skipped commit is retried later and then appended out of order, so the file is no
+        // longer the reference bytes: say so, or a mismatch has no trace.
+        if stored < ids.len() {
+            skipped(ids.len() - stored, &self.dir);
         }
-        out.flush()
+        self.build_segments(&order, &shallow_list)
+    }
+
+    /// Writes the segment set for `order` (canonical ids of the rev) when the manifest does not
+    /// already hold exactly that order. Runs under the writer lock. The records are read once
+    /// here: a peak while building is accepted, serving never holds them.
+    fn build_segments(&self, order: &[String], shallow: &[String]) -> io::Result<()> {
+        let seg = |e: seg::SegError| io::Error::other(e.to_string());
+        let previous = seg::manifest::Manifest::load(&self.dir).ok().flatten();
+        // The set already holds exactly this history (merged or not): nothing to write, and
+        // no record parse on a no-op update.
+        let held = seg::read::Store::open(&self.dir)
+            .ok()
+            .flatten()
+            .and_then(|s| store::load_order(&s).ok());
+        if let Some(h) = &held
+            && h.len() == order.len()
+        {
+            let h: HashSet<&seg::Oid> = h.iter().collect();
+            if order
+                .iter()
+                .all(|id| store::oid_of(id).is_some_and(|o| h.contains(&o)))
+            {
+                return Ok(());
+            }
+        }
+        let (records, _) = store::read_records(&self.dir, self.threads)?;
+        let records = store::select(records, order);
+        let oids: Vec<seg::Oid> = records
+            .iter()
+            .filter_map(|r| store::oid_of(&r.id))
+            .collect();
+        // A source whose ids are not oids (a test double) has no order file to write.
+        if oids.len() != records.len() {
+            return Ok(());
+        }
+        // Incremental when every commit the set holds is still reachable: the new ones become
+        // one more segment. Otherwise (first build, rewritten history) a fresh build.
+        if let Some(prev) = previous.as_ref()
+            && let Some(old) = held
+            && old.len() == prev.commits as usize
+            && old.len() < oids.len()
+        {
+            let old: HashSet<seg::Oid> = old.into_iter().collect();
+            let reach: HashSet<&seg::Oid> = oids.iter().collect();
+            if old.iter().all(|o| reach.contains(o)) {
+                let fresh = records
+                    .iter()
+                    .zip(&oids)
+                    .filter(|(_, o)| !old.contains(*o))
+                    .map(|(r, _)| r);
+                let after =
+                    store::append_segment(&self.dir, prev.clone(), shallow, fresh).map_err(seg)?;
+                drop(records);
+                let segments = after
+                    .live
+                    .iter()
+                    .filter(|f| f.kind == seg::format::Kind::Segment as u8)
+                    .count();
+                if segments > store::MAX_SEGMENTS {
+                    self.merge_in_background(order, shallow);
+                }
+                return Ok(());
+            }
+        }
+        let mut build =
+            store::SegmentBuild::new(&self.dir, previous.as_ref(), shallow).map_err(seg)?;
+        for r in &records {
+            build.push(r).map_err(seg)?;
+        }
+        drop(records);
+        build.finish(previous, Vec::new()).map_err(seg)?;
+        Ok(())
+    }
+
+    /// Folds the segments into one once there are more than 8, off the caller's thread, so a
+    /// request never waits on it. The merge takes the writer lock itself.
+    #[expect(
+        clippy::print_stderr,
+        reason = "the index crate has no logging facade: a cache warning goes to the user's stderr"
+    )]
+    fn merge_in_background(&self, order: &[String], shallow: &[String]) {
+        let (dir, threads) = (self.dir.clone(), self.threads);
+        let (order, shallow) = (order.to_vec(), shallow.to_vec());
+        let run = move || -> io::Result<bool> {
+            // Until the disk base lands a record comes from today's record file.
+            let (records, _) = store::read_records(&dir, threads)?;
+            let mut by_id: HashMap<String, CommitRecord> =
+                records.into_iter().map(|r| (r.id.clone(), r)).collect();
+            store::merge_if_needed(&dir, &order, &shallow, Vec::new(), &mut |id| {
+                by_id
+                    .remove(id)
+                    .ok_or_else(|| io::Error::other(format!("merge: {id} not stored")))
+            })
+        };
+        let spawned = std::thread::Builder::new()
+            .name("gitterrace-merge".into())
+            .spawn(move || {
+                if let Err(e) = run() {
+                    eprintln!("gitterrace: segment merge failed: {e}");
+                }
+            });
+        if let Err(e) = spawned {
+            eprintln!("gitterrace: segment merge not started: {e}");
+        }
     }
 
     /// Commits reachable from `rev` that [`Index::update`] would build. Zero means
@@ -200,6 +328,62 @@ impl Index {
         let ids = source.rev_list(rev)?;
         let shallow: HashSet<String> = source.shallow_ids().into_iter().collect();
         Ok(store::stored_ids(&self.dir)?.todo(&ids, &shallow).len())
+    }
+
+    /// What pages read for `rev`: the segment files alone (aggregates, postings, edges from
+    /// [`feed::SegmentSource`], commits, rows and strings from [`feed::DiskSource`]), so no
+    /// history is held. The set must be exactly `rev`'s canonical order (the manifest holds
+    /// one order, the last updated rev). `None` when it is not, or when there is no set yet:
+    /// the caller falls back to [`Index::records`] for that rev.
+    pub fn disk_source(
+        &self,
+        source: &dyn CommitSource,
+        rev: &str,
+    ) -> io::Result<Option<std::sync::Arc<DiskSet>>> {
+        let seg = |e: seg::SegError| io::Error::other(e.to_string());
+        let open = || seg::read::Store::open(&self.dir).map_err(seg);
+        let Some(store) = open()? else {
+            return Ok(None);
+        };
+        let order = source.rev_list(rev)?;
+        let m = &store.manifest;
+        // An unmerged set's order file is old order then new commits, not canonical, so the
+        // fingerprint only matches after a merge: compare the sets.
+        let same = m.commits as usize == order.len()
+            && store::load_order(&store).is_ok_and(|held| {
+                let held: HashSet<seg::Oid> = held.into_iter().collect();
+                order
+                    .iter()
+                    .all(|id| store::oid_of(id).is_some_and(|o| held.contains(&o)))
+            });
+        if !same {
+            return Ok(None);
+        }
+        let disk = feed::DiskSource::open(store, &mut |pairs| source.map_identities(rev, pairs))
+            .map_err(seg)?;
+        let Some(tables) = open()? else {
+            return Ok(None);
+        };
+        Ok(Some(std::sync::Arc::new(feed::SegmentSource::new(
+            disk,
+            tables.segments,
+        ))))
+    }
+
+    /// Deletes the whole cache (an unreadable one is never repaired in place), so the next update
+    /// rebuilds it. A newer build's cache is never touched.
+    pub fn rebuild(&self) -> io::Result<()> {
+        self.writable()?;
+        let _lock = store::WriteLock::take(&self.dir)?;
+        store::wipe(&self.dir)
+    }
+
+    /// The memory adapter over `records` (from [`Index::records`]), for a rev the segment set
+    /// does not hold. Holds that history while used.
+    pub fn memory_source(
+        records: std::sync::Arc<Vec<CommitRecord>>,
+    ) -> std::sync::Arc<dyn feed::InsightsSource> {
+        std::sync::Arc::new(feed::MemorySource::shared(records))
     }
 
     /// All cached records reachable from `rev`, oldest first, with authors mapped through the
@@ -217,8 +401,27 @@ impl Index {
     }
 }
 
+/// Tells the user that `n` commits could not be read and stay pending.
+#[expect(
+    clippy::print_stderr,
+    reason = "the index crate has no logging facade: a cache warning goes to the user's stderr"
+)]
+fn skipped(n: usize, dir: &std::path::Path) {
+    eprintln!(
+        "gitterrace: {n} commits could not be read and stay pending in {}",
+        dir.display()
+    );
+}
+
 /// Seconds since the epoch on this machine's clock.
 fn wall_clock() -> i64 {
+    // The equivalence oracle freezes the clock so period windows do not move between runs.
+    if let Some(t) = std::env::var("GITTERRACE_TEST_NOW")
+        .ok()
+        .and_then(|v| v.parse().ok())
+    {
+        return t;
+    }
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map_or(0, |d| i64::try_from(d.as_secs()).unwrap_or(i64::MAX))
@@ -465,6 +668,49 @@ mod tests {
             rx.recv_timeout(std::time::Duration::from_secs(10))
                 .map_err(io::Error::other)?
         })
+    }
+
+    /// A build killed at any byte of either file (a torn record, a torn path, paths written
+    /// but their records not) resumes to files byte-identical to an uninterrupted build. The
+    /// bench harness kills servers mid-index, so a resume that renumbered a path or reordered
+    /// a row would show as an index that differs from the reference.
+    #[test]
+    fn a_build_killed_at_any_byte_resumes_byte_identical() -> io::Result<()> {
+        let read = |d: &std::path::Path| -> io::Result<(Vec<u8>, Vec<u8>)> {
+            Ok((
+                std::fs::read(d.join(crate::store::COMMITS_FILE))?,
+                std::fs::read(d.join(crate::store::PATHS_FILE))?,
+            ))
+        };
+        let src = Paths::new("a", 600);
+        let whole = tempfile::tempdir()?;
+        let idx = Index::open_dir(whole.path().join("gitterrace"))?;
+        idx.update(&src, "HEAD", &|_| {})?;
+        let (commits, paths) = read(idx.dir())?;
+        let cuts = |len: usize| [0, 1, len / 3, len / 2 + 7, len - 1, len];
+        for c in cuts(commits.len()) {
+            for p in cuts(paths.len()) {
+                let dir = tempfile::tempdir()?;
+                let path = dir.path().join("gitterrace");
+                Index::open_dir(path.clone())?;
+                std::fs::write(path.join(crate::store::COMMITS_FILE), &commits[..c])?;
+                std::fs::write(path.join(crate::store::PATHS_FILE), &paths[..p])?;
+                // Commit i names path i, and paths are written before their records: fewer
+                // whole path lines than record lines is not a state a kill can leave.
+                let lines = |b: &[u8]| b.split(|&x| x == b'\n').count();
+                if lines(&commits[..c]) > lines(&paths[..p]) {
+                    continue;
+                }
+                let resumed = Index::open_dir(path)?;
+                resumed.update(&src, "HEAD", &|_| {})?;
+                let got = read(resumed.dir())?;
+                assert!(
+                    got.0 == commits && got.1 == paths,
+                    "resume after a cut at commits {c} / paths {p} differs"
+                );
+            }
+        }
+        Ok(())
     }
 
     /// A commit the source cannot read is not stored, stays pending and is built next time.

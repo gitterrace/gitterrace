@@ -12,6 +12,7 @@ use axum::{
     routing::get,
 };
 use gitterrace_git::RefKind;
+use gitterrace_index::feed::{CommitRange, IdentId, InsightsSource, Posting, Rank};
 use serde::Deserialize;
 
 use crate::{
@@ -335,6 +336,8 @@ fn page<T: Template>(t: &T) -> Result<Html<String>> {
 struct Numbers {
     commits: String,
     commits_noun: &'static str,
+    /// "(2 merges)" or empty: the overview counts every commit, insights leave merges out.
+    merges: String,
     authors: String,
     authors_noun: &'static str,
     files: String,
@@ -370,11 +373,15 @@ async fn overview(State(app): Shared, Query(q): Query<DocQuery>) -> Result<Html<
         let list = a.repo.tree(&head, "")?;
         let docs = crate::about::find(&list);
         let about = crate::about::card(a, &head, &rev, "", "/", &docs, q.doc.as_deref());
-        let totals = a.records(&head)?.map(|r| {
-            let t = a.totals(&head, &r, a.defaults().into_options());
+        let totals = a.source(&head)?.map(|src| {
+            let t = a.totals(&head, &*src, a.defaults().into_options());
             Numbers {
-                commits: fmt::thousands(t.commits),
-                commits_noun: fmt::noun(t.commits, "commit", "commits"),
+                commits: fmt::thousands(src.len()),
+                commits_noun: fmt::noun(src.len(), "commit", "commits"),
+                merges: match src.commits_in(CommitRange::All).filter(|c| c.merge).count() {
+                    0 => String::new(),
+                    n => format!("({})", fmt::count(n, "merge", "merges")),
+                },
                 authors: fmt::thousands(t.authors),
                 authors_noun: fmt::noun(t.authors, "author", "authors"),
                 files: fmt::thousands(t.files),
@@ -440,18 +447,39 @@ fn by(who: &str, author: &str, email: &str) -> bool {
     email.eq_ignore_ascii_case(who) || author == who
 }
 
-/// Ids of the commits by `who` touching `path`, newest first, from the index records
-/// (oldest first), so no history is walked.
-fn indexed_author_ids(
-    recs: &[gitterrace_index::CommitRecord],
-    who: &str,
-    path: Option<&str>,
-) -> Vec<String> {
-    recs.iter()
+/// Ids of the commits by `who` touching `path`, newest first, from the author postings of the
+/// index, so no history is walked.
+fn indexed_author_ids(src: &dyn InsightsSource, who: &str, path: Option<&str>) -> Vec<String> {
+    let mut ranks: Vec<Rank> = (0..src.idents())
+        .filter_map(|i| {
+            let id = IdentId(u32::try_from(i).ok()?);
+            let (name, email) = src.ident(id)?;
+            by(who, &name, &email).then_some(id)
+        })
+        .flat_map(|id| {
+            src.postings(Posting::Author(id))
+                .map(|h| h.rank)
+                .collect::<Vec<_>>()
+        })
+        .collect();
+    ranks.sort_unstable();
+    ranks.dedup();
+    if let Some(p) = path {
+        ranks = src
+            .rows_for(ranks)
+            .filter(|(_, rows)| {
+                rows.iter().any(|f| {
+                    src.path(f.path)
+                        .is_some_and(|n| crate::filter::under(&n, p))
+                })
+            })
+            .map(|(r, _)| r)
+            .collect();
+    }
+    ranks
+        .into_iter()
         .rev()
-        .filter(|r| by(who, &r.author, &r.email))
-        .filter(|r| path.is_none_or(|p| r.files.iter().any(|f| crate::filter::under(&f.path, p))))
-        .map(|r| r.id.clone())
+        .filter_map(|r| src.commit_id(r).map(|s| s.to_string()))
         .collect()
 }
 
@@ -465,8 +493,8 @@ fn author_page(
     pg: usize,
 ) -> Result<(Vec<gitterrace_git::CommitSummary>, bool)> {
     let from = pg * PAGE;
-    if let Some(recs) = a.records(id)? {
-        let ids = indexed_author_ids(&recs, who, path);
+    if let Some(src) = a.source(id)? {
+        let ids = indexed_author_ids(&*src, who, path);
         let more = ids.len() > from + PAGE;
         let slice: Vec<String> = ids.into_iter().skip(from).take(PAGE).collect();
         return Ok((a.repo.summaries(&slice)?, more));
@@ -506,6 +534,15 @@ async fn log(
         let who = author.as_deref().filter(|s| !s.is_empty());
         let (mut list, more) = if let Some(w) = who {
             author_page(a, &id, filter, w, pg)?
+        } else if let Some(p) = filter
+            && let Some(log) = a.path_log(&id, p)?
+            // One past the page decides `more`; a cut list must reach it to be trusted.
+            && (log.complete || log.ids.len() > pg.saturating_mul(PAGE) + PAGE)
+        {
+            let ids = &log.ids;
+            let from = pg.saturating_mul(PAGE).min(ids.len());
+            let to = (from + PAGE).min(ids.len());
+            (a.repo.summaries_at(&id, &ids[from..to])?, ids.len() > to)
         } else {
             let mut list = a.repo.log(&id, filter, pg.saturating_mul(PAGE), PAGE + 1)?;
             let more = list.len() > PAGE;
@@ -570,9 +607,18 @@ struct CommitPage {
     diff: String,
 }
 
+/// A commit never changes, so its page (diff and diffstat included) is rendered once per commit.
+/// The memo key still moves with HEAD and config, which shape the chrome and the diff folding.
 async fn commit(State(app): Shared, Path(id): Path<String>) -> Result<Html<String>> {
-    let p = blocking(&app, move |a| {
+    let (key, id) = blocking(&app, move |a| {
         let id = a.repo.resolve(&id)?;
+        Ok((a.memo_key("commit", Some(&id)), id))
+    })
+    .await?;
+    if let Some(h) = app.memo_get(&key) {
+        return Ok(Html((*h).clone()));
+    }
+    let p = blocking(&app, move |a| {
         let d = a.repo.commit(&id)?;
         Ok(CommitPage {
             c: Chrome {
@@ -602,7 +648,9 @@ async fn commit(State(app): Shared, Path(id): Path<String>) -> Result<Html<Strin
         })
     })
     .await?;
-    page(&p)
+    let html = p.render()?;
+    app.memo_put(key, Arc::new(html.clone()));
+    Ok(Html(html))
 }
 
 #[derive(Template)]
@@ -822,6 +870,77 @@ async fn blame(
     page(&p)
 }
 
+/// Files blamed ahead of the first visitor after each index move.
+const BLAME_WARM_FILES: usize = 20;
+
+/// The files whose first blame costs most: line count times lines changed over history. That
+/// tracks gix-blame's per-commit hunks x changes bookkeeping better than a commit count, and
+/// the cache only holds a few large blames. Largest first.
+pub(crate) fn blame_warm_list(
+    files: &[gitterrace_index::HeadFile],
+    src: &dyn InsightsSource,
+    n: usize,
+) -> Vec<String> {
+    // Every commit, merges included: a merge's rows cost blame work too.
+    let mut touches: std::collections::HashMap<gitterrace_index::feed::PathId, u64> =
+        std::collections::HashMap::new();
+    let all: Vec<Rank> = src.commits_in(CommitRange::All).map(|c| c.rank).collect();
+    for (_, rows) in src.rows_for(all) {
+        for f in rows {
+            *touches.entry(f.path).or_default() += u64::from(f.add + f.del);
+        }
+    }
+    let mut scored: Vec<(u64, &str)> = files
+        .iter()
+        .filter_map(|f| {
+            let t = src
+                .find_path(&f.path)
+                .and_then(|id| touches.get(&id).copied())
+                .unwrap_or(0);
+            (t > u64::from(f.lines) && f.lines > 0)
+                .then_some((u64::from(f.lines) * t, f.path.as_str()))
+        })
+        .collect();
+    scored.sort_unstable_by(|a, b| b.0.cmp(&a.0).then_with(|| a.1.cmp(b.1)));
+    scored
+        .into_iter()
+        .take(n)
+        .map(|(_, p)| p.to_owned())
+        .collect()
+}
+
+/// Blames the costliest files at HEAD into the repository's bounded blame cache, one at a time
+/// on one blocking thread and outside the request job slots, so it never makes a visitor wait.
+/// Stops when HEAD moves or when the cache is three quarters full, leaving room for what
+/// visitors open. A large translation catalog's blame is several MB.
+pub(crate) async fn prewarm_blame(app: Arc<App>) {
+    let work = tokio::task::spawn_blocking(move || {
+        let Ok(head) = app.repo.resolve("HEAD") else {
+            return;
+        };
+        let Ok(Some(src)) = app.source(&head) else {
+            return;
+        };
+        let files = app.head_lines(&head);
+        for path in blame_warm_list(&files, &*src, BLAME_WARM_FILES) {
+            let (used, limit) = app.repo.blame_cache_fill();
+            if used * 4 >= limit * 3 || app.repo.resolve("HEAD").ok().as_ref() != Some(&head) {
+                return;
+            }
+            if app.repo.blame_is_cached(&head, &path) {
+                continue;
+            }
+            // A failed blame only means the first visitor computes it.
+            if let Err(e) = app.repo.blame(&head, &path) {
+                tracing::debug!("blame prewarm of {path}: {e}");
+            }
+        }
+    });
+    if let Err(e) = work.await {
+        tracing::debug!("blame prewarm stopped: {e}");
+    }
+}
+
 struct TagRow {
     name: String,
     href: String,
@@ -880,17 +999,17 @@ struct PendingPage {
     newer: Option<String>,
 }
 
-/// Runs `build` over the cached records, or yields the progress page while none exist yet.
+/// Runs `build` over the tip's insights source, or yields the progress page while none exist yet.
 pub(crate) async fn with_records<T: Template + Send + 'static>(
     app: &Arc<App>,
     tab: &'static str,
-    build: impl FnOnce(&App, &[gitterrace_index::CommitRecord], Chrome) -> T + Send + 'static,
+    build: impl FnOnce(&App, &crate::insights::Src, Chrome) -> T + Send + 'static,
 ) -> Result<Html<String>> {
     let html = blocking(app, move |a| {
         let head = a.repo.resolve(&fmt::selected())?;
         let c = views::chrome(a, "stats").live(Mode::NOTICE);
-        match a.records(&head)? {
-            Some(r) => Ok(build(a, &r, c).render()?),
+        match a.source(&head)? {
+            Some(src) => Ok(build(a, &src, c).render()?),
             None => Ok(PendingPage {
                 c,
                 tabs: views::stats_tabs(tab),
@@ -1068,9 +1187,85 @@ async fn api_last(
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
+
+    use axum::extract::{Path, State};
     use gitterrace_index::{CommitRecord, FileStat};
 
-    use crate::routes::indexed_author_ids;
+    use crate::routes::{commit, indexed_author_ids};
+
+    /// Guard: after the index is ready, the costliest files are blamed off the request path, so
+    /// the first visitor reads the cache. Ranking is size times churn, and it stops at N.
+    #[tokio::test]
+    async fn blame_prewarm_fills_the_cache_for_the_costliest_files() {
+        let dir = tempfile::tempdir().expect("tmp");
+        let f = gitterrace_testkit::Fixture::init(dir.path())
+            .write("big.txt", "a\nb\nc\nd\n")
+            .write("once.txt", "x\n")
+            .write("small.txt", "1\n")
+            .commit("feat: a")
+            .write("big.txt", "a\nB\nc\nd\n")
+            .write("small.txt", "2\n")
+            .commit("fix: b");
+        let repo = gitterrace_git::Repo::discover(f.path()).expect("repo");
+        let index = gitterrace_index::Index::open(&repo).expect("index");
+        let env = crate::app::Env::new(gitterrace_config::Config::default());
+        let app = Arc::new(crate::app::App::configured(repo, index, &env));
+        app.index
+            .update(&app.repo, "HEAD", &|_| {})
+            .expect("update");
+        app.mark_ready();
+        let head = app.repo.resolve("HEAD").expect("head");
+        let src = app.source(&head).expect("source").expect("ready");
+        let files = app.head_lines(&head);
+        assert_eq!(
+            super::blame_warm_list(&files, &*src, 5),
+            ["big.txt", "small.txt"],
+            "never rewritten is cheap and skipped, the rest ranked by cost"
+        );
+        assert_eq!(super::blame_warm_list(&files, &*src, 1), ["big.txt"]);
+        assert!(!app.repo.blame_is_cached(&head, "big.txt"));
+        super::prewarm_blame(Arc::clone(&app)).await;
+        assert!(app.repo.blame_is_cached(&head, "big.txt"));
+        assert!(app.repo.blame_is_cached(&head, "small.txt"));
+        assert!(!app.repo.blame_is_cached(&head, "once.txt"));
+    }
+
+    /// Guard: the commit page (diff and diffstat) is rendered once per commit. The memo entry
+    /// is swapped for a marker; a handler that diffs again would not return it.
+    #[tokio::test]
+    async fn commit_page_is_memoized_per_commit() {
+        let dir = tempfile::tempdir().expect("tmp");
+        let f = gitterrace_testkit::Fixture::init(dir.path())
+            .write("a.txt", "one\n")
+            .commit("feat: a")
+            .write("a.txt", "two\n")
+            .commit("fix: b");
+        let repo = gitterrace_git::Repo::discover(f.path()).expect("repo");
+        let head = repo.resolve("HEAD").expect("head");
+        let index = gitterrace_index::Index::open(&repo).expect("index");
+        let env = crate::app::Env::new(gitterrace_config::Config::default());
+        let app = Arc::new(crate::app::App::configured(repo, index, &env));
+        let first = commit(State(Arc::clone(&app)), Path("HEAD".into()))
+            .await
+            .expect("page")
+            .0;
+        assert!(first.contains("fix: b"), "{first}");
+        app.memo_put(app.memo_key("commit", Some(&head)), Arc::new("memo".into()));
+        let again = commit(State(Arc::clone(&app)), Path(head.clone()))
+            .await
+            .expect("page")
+            .0;
+        assert_eq!(again, "memo", "the repeat must not diff again");
+        let parent = commit(State(app), Path("HEAD~1".into()))
+            .await
+            .expect("page")
+            .0;
+        assert!(
+            parent.contains("feat: a"),
+            "another commit renders its own page"
+        );
+    }
 
     fn rec(id: &str, author: &str, email: &str, path: &str) -> CommitRecord {
         CommitRecord {
@@ -1092,11 +1287,12 @@ mod tests {
 
     #[test]
     fn author_log_comes_from_the_records_newest_first() {
-        let recs = [
+        let list = [
             rec("a", "Ann", "ann@x.y", "src/a.rs"),
             rec("b", "Bob", "bob@x.y", "src/b.rs"),
             rec("c", "Ann", "ANN@x.y", "docs/c.md"),
         ];
+        let recs = gitterrace_index::feed::MemorySource::new(&list);
         assert_eq!(indexed_author_ids(&recs, "ann@x.y", None), ["c", "a"]);
         assert_eq!(indexed_author_ids(&recs, "Ann", Some("src")), ["a"]);
         assert!(indexed_author_ids(&recs, "nobody", None).is_empty());

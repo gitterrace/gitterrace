@@ -23,13 +23,15 @@ mod select;
 mod sizes;
 mod stats;
 
-use std::sync::{Arc, OnceLock};
+use std::sync::{Arc, Mutex, OnceLock};
 
 pub(crate) use gitterrace_git::days_from_civil;
 use gitterrace_git::{IgnoreSet, civil_from_days as civil};
 
-use crate::{CommitRecord, FileStat};
-use fasthash::FastMap;
+use crate::CommitRecord;
+use crate::feed::{
+    self, CommitRange, CommitRow, FileRow, IdentId, InsightsSource, MemorySource, PathId, Rank,
+};
 
 pub use axis::{BucketUnit, MAX_BUCKETS, TimeAxis};
 pub use code::{Frequency, Rework, ReworkPoint, rework_share, rework_verdict};
@@ -47,11 +49,17 @@ pub use period::{
     Contributor, ContributorReport, Period, PeriodStats, PeriodSummary, Rhythm, SeriesPoint,
 };
 pub use releases::{Cadence, Release, release_tags};
-pub use select::{OptionParams, Selection, under};
+pub use select::{OptionParams, Scoped, Selection, under};
 pub use sizes::SizeBucket;
 pub use stats::{DirChurn, FileChurn, Label, LabelBucket, LabelCount};
 
 pub(crate) const DAY: i64 = 86_400;
+
+/// Derived tables kept for this many (key, options) pairs: the unfiltered pages of a few tips.
+const SHARED_SETS: usize = 4;
+
+/// Derived tables of recent unfiltered record sets, see [`Insights::shared`].
+static SHARED: Mutex<Vec<SharedEntry>> = Mutex::new(Vec::new());
 
 /// Which paths and commits count.
 #[expect(
@@ -86,127 +94,237 @@ impl Default for Options {
 
 /// Added, removed and rewritten lines of one file change under the active [`Options`].
 #[derive(Debug, Clone, Copy, Default)]
-pub(crate) struct Lines {
+pub struct Lines {
     pub add: u32,
     pub del: u32,
     pub rewritten: u32,
 }
 
-/// The records plus everything derived once from them: identities, path filter, caches.
+/// One history read through an [`InsightsSource`], plus everything derived once from it:
+/// identities, path filter, caches. Pages read [`Insights::source`], never records.
 pub struct Insights<'a> {
-    pub(crate) records: &'a [CommitRecord],
+    src: Src<'a>,
     pub(crate) opts: Options,
-    pub(crate) filter: PathFilter,
-    pub(crate) people: People,
-    /// Person index per record.
-    pub(crate) person: Vec<usize>,
-    /// Newest commit time per person (all commits, bots included).
-    pub(crate) last_seen: Vec<i64>,
     /// [`crate::reference_time`]: "now" for periods, so old repositories still show data.
+    /// Read per instance: it moves with the wall clock, the tables below do not.
     pub(crate) now: i64,
-    /// Per record, per file: whether path statistics leave the file out. Built on first use and
-    /// decided once per distinct path, so no hot loop asks the filter (or its lock) again.
-    skip: OnceLock<SkipTable>,
+    d: Arc<Derived>,
+}
+
+enum Src<'a> {
+    Borrowed(&'a dyn InsightsSource),
+    Owned(Box<dyn InsightsSource + 'a>),
+}
+
+/// Everything derived from one source under one [`Options`]. Behind an `Arc`, so the
+/// insights pages of one tip share it instead of each rebuilding it (the lazy tables cost
+/// about a second on a 300k-commit history).
+struct Derived {
+    filter: PathFilter,
+    people: People,
+    /// Person index per raw identity id: sized by identities, not by history.
+    ident_person: Vec<usize>,
+    /// Newest commit time per person (all commits, bots included).
+    last_seen: Vec<i64>,
+    /// Per path id: whether path statistics leave the path out. Built on first use, each
+    /// path decided once, spread over the cores: the ignore rules are the expensive part.
+    skip: OnceLock<Vec<bool>>,
     /// Lines changed by each commit over counted files, computed on first use and shared by
     /// every statistic that sums a commit (sizes, rhythm, code frequency, contributors).
     commit_lines: OnceLock<Vec<Lines>>,
-    follow: OnceLock<files::Follow<'a>>,
+    follow: OnceLock<files::Follow>,
+}
+
+struct SharedEntry {
+    key: String,
+    opts: Options,
+    /// Address and length of what the tables index into: a hit must be the same set.
+    at: (usize, usize),
+    d: Arc<Derived>,
 }
 
 impl<'a> Insights<'a> {
-    /// `ignore` is the ignore set of the head revision, see [`IgnoreSet::at`]. It is only used
-    /// when `opts.respect_ignore` is set.
+    /// Over today's records, through a [`MemorySource`]. `ignore` is the ignore set of the
+    /// head revision, see [`IgnoreSet::at`], only used when `opts.respect_ignore` is set.
     pub fn new(records: &'a [CommitRecord], opts: Options, ignore: Option<IgnoreSet>) -> Self {
-        let people = People::build(records);
-        let person: Vec<usize> = records
-            .iter()
-            .map(|r| people.index_of(&r.author, &r.email))
-            .collect();
-        let mut last_seen = vec![i64::MIN; people.list.len()];
-        for (r, p) in records.iter().zip(&person) {
-            last_seen[*p] = last_seen[*p].max(r.time);
+        let src = Src::Owned(Box::new(MemorySource::new(records)));
+        let d = Arc::new(Derived::build(src.get(), &opts, ignore));
+        Self::with(src, opts, d)
+    }
+
+    /// Statistics over `src`.
+    pub fn from_source(
+        src: &'a dyn InsightsSource,
+        opts: Options,
+        ignore: Option<IgnoreSet>,
+    ) -> Self {
+        let d = Arc::new(Derived::build(src, &opts, ignore));
+        Self::with(Src::Borrowed(src), opts, d)
+    }
+
+    /// [`Insights::new`] whose derived tables are shared by every caller passing the same
+    /// `key`, options and record slice, bounded to the last few. `key` must name the record
+    /// set and the ignore rules, e.g. tip and index generation; `ignore` runs on a miss only.
+    pub fn shared(
+        records: &'a [CommitRecord],
+        opts: Options,
+        key: &str,
+        ignore: impl FnOnce() -> Option<IgnoreSet>,
+    ) -> Self {
+        let src = Src::Owned(Box::new(MemorySource::new(records)));
+        let at = (records.as_ptr() as usize, records.len());
+        let d = shared_tables(src.get(), &opts, key, at, ignore);
+        Self::with(src, opts, d)
+    }
+
+    /// [`Insights::from_source`] with the tables shared as [`Insights::shared`] does, keyed
+    /// by `key`, options and the address of `src`.
+    pub fn shared_source(
+        src: &'a dyn InsightsSource,
+        opts: Options,
+        key: &str,
+        ignore: impl FnOnce() -> Option<IgnoreSet>,
+    ) -> Self {
+        let at = (std::ptr::from_ref(src).cast::<u8>() as usize, src.len());
+        let d = shared_tables(src, &opts, key, at, ignore);
+        Self::with(Src::Borrowed(src), opts, d)
+    }
+
+    fn with(src: Src<'a>, opts: Options, d: Arc<Derived>) -> Self {
+        let now = feed::reference_time(src.get());
+        Self { src, opts, now, d }
+    }
+
+    /// Drops every shared table set whose key starts with `prefix`. A server releases them with
+    /// the records they index into once nobody browses, so an idle process holds neither; the
+    /// next page builds them again. Callers holding an `Insights` keep their own `Arc`.
+    pub fn release_shared(prefix: &str) {
+        if let Ok(mut g) = SHARED.lock() {
+            g.retain(|e| !e.key.starts_with(prefix));
         }
-        let now = crate::reference_time(records);
-        let filter = PathFilter::new(&opts, ignore);
-        Self {
-            records,
-            opts,
-            filter,
-            people,
-            person,
-            last_seen,
-            now,
-            skip: OnceLock::new(),
-            commit_lines: OnceLock::new(),
-            follow: OnceLock::new(),
-        }
+    }
+
+    /// Shared table sets whose key starts with `prefix` (a test hook for [`Insights::release_shared`]).
+    pub fn shared_sets(prefix: &str) -> usize {
+        SHARED.lock().map_or(0, |g| {
+            g.iter().filter(|e| e.key.starts_with(prefix)).count()
+        })
+    }
+
+    /// True when both share one set of derived tables (a test hook for [`Insights::shared`]).
+    pub fn shares_tables_with(&self, other: &Insights<'_>) -> bool {
+        Arc::ptr_eq(&self.d, &other.d)
+    }
+
+    /// The history every number is computed from.
+    pub fn source(&self) -> &dyn InsightsSource {
+        self.src.get()
     }
 
     /// True when path statistics leave `path` out.
     pub fn skips(&self, path: &str) -> bool {
-        self.filter.skips(path)
+        self.d.filter.skips(path)
     }
 
-    /// Lines of file `fi` of record `i`, `None` when path statistics leave the file out.
-    pub(crate) fn lines(&self, i: usize, fi: usize) -> Option<Lines> {
-        (!self
-            .skip
-            .get_or_init(|| SkipTable::new(self.records, &self.filter))
-            .get(i, fi))
-        .then(|| self.lines_unfiltered(&self.records[i].files[fi]))
+    /// True when path statistics leave path `id` out.
+    pub fn skips_id(&self, id: PathId) -> bool {
+        self.skip_table()
+            .get(id.0 as usize)
+            .copied()
+            .unwrap_or(false)
     }
 
-    /// Every counted file of record `i` with its lines.
-    pub(crate) fn files_of(&self, i: usize) -> impl Iterator<Item = (&'a FileStat, Lines)> + '_ {
-        let r = &self.records[i];
-        (0..r.files.len()).filter_map(move |fi| self.lines(i, fi).map(|l| (&r.files[fi], l)))
+    fn skip_table(&self) -> &[bool] {
+        self.d.skip.get_or_init(|| {
+            let src = self.source();
+            let paths: Vec<Arc<str>> = (0..src.paths())
+                .map(|i| {
+                    src.path(PathId(u32::try_from(i).unwrap_or(u32::MAX)))
+                        .unwrap_or_default()
+                })
+                .collect();
+            decide_all(&paths, &self.d.filter)
+        })
     }
 
-    /// Line counts of a file under the whitespace option, whether or not the path filter
+    /// Lines of one file row under the options, `None` when the path filter leaves it out.
+    pub fn row_lines(&self, row: &FileRow) -> Option<Lines> {
+        (!self.skips_id(row.path)).then(|| self.row_lines_unfiltered(row))
+    }
+
+    /// Lines of one file row under the whitespace option, whether or not the path filter
     /// would skip it.
-    pub(crate) fn lines_unfiltered(&self, f: &FileStat) -> Lines {
-        if self.opts.count_whitespace {
-            Lines {
-                add: f.additions,
-                del: f.deletions,
-                rewritten: f.rewritten,
-            }
+    pub fn row_lines_unfiltered(&self, row: &FileRow) -> Lines {
+        let (add, del, rewritten) = if self.opts.count_whitespace {
+            (row.add, row.del, row.rewritten)
         } else {
-            let c = f.code_stat();
-            Lines {
-                add: c.additions,
-                del: c.deletions,
-                rewritten: c.rewritten,
-            }
+            row.code()
+        };
+        Lines {
+            add,
+            del,
+            rewritten,
         }
     }
 
+    /// Person index of a raw identity.
+    pub fn person_of(&self, id: IdentId) -> usize {
+        self.d.ident_person.get(id.0 as usize).copied().unwrap_or(0)
+    }
+
+    /// Person index of the author of commit `rank`.
+    pub fn person(&self, rank: Rank) -> usize {
+        self.source()
+            .commit(rank)
+            .map_or(0, |c| self.person_of(c.ident))
+    }
+
     /// Non-merge commit by someone who counts under the options.
-    pub(crate) fn counted(&self, i: usize) -> bool {
-        !self.records[i].merge && (self.opts.include_bots || !self.people.list[self.person[i]].bot)
+    pub fn counted_row(&self, c: &CommitRow) -> bool {
+        !c.merge && (self.opts.include_bots || !self.d.people.list[self.person_of(c.ident)].bot)
     }
 
-    /// Lines changed by commit `i` over counted files.
-    pub(crate) fn commit_lines(&self, i: usize) -> Lines {
-        self.commit_lines.get_or_init(|| {
-            (0..self.records.len())
-                .map(|i| {
-                    self.files_of(i).fold(Lines::default(), |mut out, (_, l)| {
-                        out.add += l.add;
-                        out.del += l.del;
-                        out.rewritten += l.rewritten;
-                        out
+    /// [`Insights::counted_row`] by rank.
+    pub fn counted_rank(&self, rank: Rank) -> bool {
+        self.source()
+            .commit(rank)
+            .is_some_and(|c| self.counted_row(&c))
+    }
+
+    /// Lines changed by commit `rank` over counted files.
+    pub fn commit_sums(&self, rank: Rank) -> Lines {
+        self.d
+            .commit_lines
+            .get_or_init(|| {
+                let src = self.source();
+                let all: Vec<Rank> = (0..src.len()).map(rank_of).collect();
+                src.rows_for(all)
+                    .map(|(_, rows)| {
+                        rows.iter().filter_map(|r| self.row_lines(r)).fold(
+                            Lines::default(),
+                            |mut out, l| {
+                                out.add += l.add;
+                                out.del += l.del;
+                                out.rewritten += l.rewritten;
+                                out
+                            },
+                        )
                     })
-                })
-                .collect()
-        })[i]
+                    .collect()
+            })
+            .get(rank.0 as usize)
+            .copied()
+            .unwrap_or_default()
     }
 
-    /// Buckets for a time chart of `period` (`None` and `All` span the records).
+    /// Buckets for a time chart of `period` (`None` and `All` span the history).
     pub(crate) fn axis(&self, period: Option<Period>) -> TimeAxis {
-        let days = || self.records.iter().map(local_day);
-        let newest = reference_record(self.records).map(local_day);
-        match (days().min(), newest) {
+        let src = self.source();
+        let first = src
+            .commits_in(CommitRange::All)
+            .map(|c| feed::local_day_of(c.time, c.offset))
+            .min();
+        match (first, reference_day(src)) {
             (Some(first), Some(last)) => TimeAxis::for_period(period, first, last),
             _ => TimeAxis::for_period(period, 1, 0),
         }
@@ -217,63 +335,131 @@ impl<'a> Insights<'a> {
         self.axis(Some(period)).unit()
     }
 
-    pub(crate) fn follow(&self) -> &files::Follow<'a> {
-        self.follow.get_or_init(|| self.build_follow())
+    pub(crate) fn follow(&self) -> &files::Follow {
+        self.d.follow.get_or_init(|| self.build_follow())
     }
 }
 
-/// Whether path statistics leave each file of each record out, flat: record `i`'s files start
-/// at `start[i]`. Each distinct path is decided once, the decisions spread over the cores: on a
-/// large history the ignore rules cost more than everything else `Insights::new` does.
-struct SkipTable {
-    start: Vec<usize>,
-    skip: Vec<bool>,
+impl Src<'_> {
+    fn get(&self) -> &dyn InsightsSource {
+        match self {
+            Self::Borrowed(s) => *s,
+            Self::Owned(s) => s.as_ref(),
+        }
+    }
 }
 
-impl SkipTable {
-    fn new(records: &[CommitRecord], filter: &PathFilter) -> Self {
-        let mut start = Vec::with_capacity(records.len() + 1);
-        let mut slots: Vec<u32> = Vec::new();
-        let mut slot: FastMap<usize, u32> = FastMap::default();
-        let mut paths: Vec<&str> = Vec::new();
-        for r in records {
-            start.push(slots.len());
-            for f in &r.files {
-                // The loader shares one `Arc<str>` per distinct path: key by address.
-                let key = Arc::as_ptr(&f.path).cast::<u8>() as usize;
-                slots.push(*slot.entry(key).or_insert_with(|| {
-                    paths.push(&f.path);
-                    u32::try_from(paths.len() - 1).unwrap_or(u32::MAX)
-                }));
+impl Derived {
+    fn build(src: &dyn InsightsSource, opts: &Options, ignore: Option<IgnoreSet>) -> Self {
+        let mut per_ident = vec![0usize; src.idents()];
+        for c in src.commits_in(CommitRange::All) {
+            if let Some(n) = per_ident.get_mut(c.ident.0 as usize) {
+                *n += 1;
             }
         }
-        start.push(slots.len());
-        let threads = std::thread::available_parallelism().map_or(1, std::num::NonZero::get);
-        let chunk = paths.len().div_ceil(threads).max(1);
-        let decided: Vec<bool> = std::thread::scope(|s| {
-            #[expect(
-                clippy::needless_collect,
-                reason = "all threads must be spawned before the first join, or they would run one after another"
-            )]
-            let parts: Vec<_> = paths
-                .chunks(chunk)
-                .map(|c| s.spawn(move || c.iter().map(|p| filter.decide(p)).collect::<Vec<_>>()))
-                .collect();
-            parts
-                .into_iter()
-                .flat_map(|h| h.join().unwrap_or_default())
-                .collect()
-        });
-        let skip = slots
-            .into_iter()
-            .map(|s| decided.get(s as usize).copied().unwrap_or(false))
+        let names: Vec<(Arc<str>, Arc<str>)> = (0..per_ident.len())
+            .map(|i| {
+                src.ident(IdentId(u32::try_from(i).unwrap_or(u32::MAX)))
+                    .unwrap_or_default()
+            })
             .collect();
-        Self { start, skip }
+        let people = People::from_counts(
+            names
+                .iter()
+                .zip(&per_ident)
+                .filter(|(_, n)| **n > 0)
+                .map(|((a, e), n)| ((&**a, &**e), *n)),
+        );
+        let ident_person: Vec<usize> = names.iter().map(|(a, e)| people.index_of(a, e)).collect();
+        let mut last_seen = vec![i64::MIN; people.list.len()];
+        for c in src.commits_in(CommitRange::All) {
+            let p = ident_person.get(c.ident.0 as usize).copied().unwrap_or(0);
+            if let Some(t) = last_seen.get_mut(p) {
+                *t = (*t).max(c.time);
+            }
+        }
+        Self {
+            filter: PathFilter::new(opts, ignore),
+            people,
+            ident_person,
+            last_seen,
+            skip: OnceLock::new(),
+            commit_lines: OnceLock::new(),
+            follow: OnceLock::new(),
+        }
     }
+}
 
-    fn get(&self, i: usize, fi: usize) -> bool {
-        self.skip[self.start[i] + fi]
+fn shared_tables(
+    src: &dyn InsightsSource,
+    opts: &Options,
+    key: &str,
+    at: (usize, usize),
+    ignore: impl FnOnce() -> Option<IgnoreSet>,
+) -> Arc<Derived> {
+    let hit = SHARED.lock().ok().and_then(|g| {
+        g.iter()
+            .find(|e| e.key == key && e.opts == *opts && e.at == at)
+            .map(|e| Arc::clone(&e.d))
+    });
+    hit.unwrap_or_else(|| {
+        let d = Arc::new(Derived::build(src, opts, ignore()));
+        if let Ok(mut g) = SHARED.lock() {
+            g.retain(|e| !(e.key == key && e.opts == *opts));
+            if g.len() >= SHARED_SETS {
+                g.remove(0);
+            }
+            g.push(SharedEntry {
+                key: key.to_owned(),
+                opts: opts.clone(),
+                at,
+                d: Arc::clone(&d),
+            });
+        }
+        d
+    })
+}
+
+/// Decides every path once, spread over the cores.
+fn decide_all(paths: &[Arc<str>], filter: &PathFilter) -> Vec<bool> {
+    let threads = std::thread::available_parallelism().map_or(1, std::num::NonZero::get);
+    let chunk = paths.len().div_ceil(threads).max(1);
+    std::thread::scope(|s| {
+        #[expect(
+            clippy::needless_collect,
+            reason = "all threads must be spawned before the first join, or they would run one after another"
+        )]
+        let parts: Vec<_> = paths
+            .chunks(chunk)
+            .map(|c| s.spawn(move || c.iter().map(|p| filter.decide(p)).collect::<Vec<_>>()))
+            .collect();
+        parts
+            .into_iter()
+            .flat_map(|h| h.join().unwrap_or_default())
+            .collect()
+    })
+}
+
+pub(crate) fn rank_of(i: usize) -> Rank {
+    Rank(u32::try_from(i).unwrap_or(u32::MAX))
+}
+
+/// Local day of the commit that sets [`feed::reference_time`]: fixed-period axes end on it.
+/// The newest commit not after "now" (the last of equals), else the oldest (the first of
+/// equals), as `max_by_key` and `min_by_key` picked over the records.
+pub(crate) fn reference_day(src: &dyn InsightsSource) -> Option<i64> {
+    let now = feed::reference_time(src);
+    let (mut best, mut oldest): (Option<CommitRow>, Option<CommitRow>) = (None, None);
+    for c in src.commits_in(CommitRange::All) {
+        if c.time <= now && best.is_none_or(|b| c.time >= b.time) {
+            best = Some(c);
+        }
+        if oldest.is_none_or(|o| c.time < o.time) {
+            oldest = Some(c);
+        }
     }
+    best.or(oldest)
+        .map(|c| feed::local_day_of(c.time, c.offset))
 }
 
 /// The record that sets [`crate::reference_time`]: fixed-period axes end on its local day.
@@ -322,10 +508,6 @@ pub fn bus_factor(shares: impl IntoIterator<Item = f64>) -> usize {
         }
     }
     0
-}
-
-pub(crate) fn year_of(r: &CommitRecord) -> i64 {
-    civil(local_day(r)).0
 }
 
 #[cfg(test)]
@@ -379,7 +561,33 @@ pub(crate) mod fixtures {
 
 #[cfg(test)]
 mod tests {
-    use super::bus_factor;
+    use super::{Insights, Options, bus_factor, fixtures};
+
+    #[test]
+    fn derived_tables_are_built_once_per_key_and_options() {
+        let recs = fixtures::chain();
+        let built = std::cell::Cell::new(0);
+        let ignore = || {
+            built.set(built.get() + 1);
+            None
+        };
+        let a = Insights::shared(&recs, Options::default(), "t1\u{0}gen1", ignore);
+        let b = Insights::shared(&recs, Options::default(), "t1\u{0}gen1", ignore);
+        assert!(a.shares_tables_with(&b), "second page rebuilt the tables");
+        assert_eq!(built.get(), 1);
+        let gen2 = Insights::shared(&recs, Options::default(), "t1\u{0}gen2", ignore);
+        let bots = Options {
+            include_bots: true,
+            ..Options::default()
+        };
+        let other = Insights::shared(&recs, bots, "t1\u{0}gen1", ignore);
+        let copy = recs.clone();
+        let moved = Insights::shared(&copy, Options::default(), "t1\u{0}gen1", ignore);
+        for x in [&gen2, &other, &moved] {
+            assert!(!a.shares_tables_with(x), "stale tables reused");
+        }
+        assert_eq!(a.hotspots(&[], super::Period::All).files.len(), 0);
+    }
 
     #[test]
     fn bus_factor_counts_who_hold_at_least_half() {

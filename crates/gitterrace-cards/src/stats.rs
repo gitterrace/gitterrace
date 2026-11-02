@@ -1,8 +1,10 @@
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+use std::sync::Arc;
 
-use gitterrace_index::{
-    CommitRecord, civil_from_days as civil, days_from_civil, local_day, local_time, weekday,
+use gitterrace_index::feed::{
+    CommitRange, CommitRow, InsightsSource, MemorySource, PathId, local_day_of,
 };
+use gitterrace_index::{CommitRecord, civil_from_days as civil, days_from_civil, weekday};
 
 const DAY: i64 = 86_400;
 
@@ -35,25 +37,30 @@ pub struct BiggestCommit {
 }
 
 pub fn wrapped_stats(repo: &str, records: &[CommitRecord], year: i32) -> WrappedStats {
-    let rs: Vec<&CommitRecord> = records
-        .iter()
-        .filter(|r| civil(local_day(r)).0 == i64::from(year))
+    wrapped_stats_from(repo, &MemorySource::new(records), year)
+}
+
+/// [`wrapped_stats`] over any source: commit columns, then the file rows of that year's
+/// commits streamed, so memory is the year's tallies, never the rows.
+pub fn wrapped_stats_from(repo: &str, src: &dyn InsightsSource, year: i32) -> WrappedStats {
+    let rs: Vec<CommitRow> = src
+        .commits_in(CommitRange::All)
+        .filter(|c| civil(local_day_of(c.time, c.offset)).0 == i64::from(year))
         .collect();
     let mut days = BTreeSet::new();
     let mut months = [0u32; 12];
     let mut weekdays = [0u32; 7];
     let mut hours = [0u32; 24];
-    let mut authors: HashMap<&str, (&str, usize)> = HashMap::new();
-    let mut dirs: HashMap<&str, usize> = HashMap::new();
-    let mut biggest: Option<BiggestCommit> = None;
+    // Raw identity strings by email: the first name seen for an address names it.
+    let mut authors: HashMap<Arc<str>, (Arc<str>, usize)> = HashMap::new();
     let jan1 = days_from_civil(i64::from(year), 1, 1);
     let start = jan1 - weekday(jan1) as i64;
     let end = days_from_civil(i64::from(year), 12, 31);
     let weeks = usize::try_from((end - start) / 7 + 1).unwrap_or(53);
     let mut weekly = vec![0u32; weeks];
-    for r in &rs {
-        let l = local_time(r);
-        let d = local_day(r);
+    for c in &rs {
+        let l = c.time.saturating_add(i64::from(c.offset));
+        let d = local_day_of(c.time, c.offset);
         days.insert(d);
         months[usize::try_from(civil(d).1 - 1).unwrap_or(0)] += 1;
         weekdays[weekday(d)] += 1;
@@ -61,34 +68,48 @@ pub fn wrapped_stats(repo: &str, records: &[CommitRecord], year: i32) -> Wrapped
         if let Some(w) = usize::try_from((d - start) / 7).ok().filter(|w| *w < weeks) {
             weekly[w] += 1;
         }
-        let e = authors
-            .entry(r.email.as_str())
-            .or_insert((r.author.as_str(), 0));
-        e.1 += 1;
-        let mut seen = HashSet::new();
+        let (name, email) = src.ident(c.ident).unwrap_or_default();
+        authors.entry(email).or_insert((name, 0)).1 += 1;
+    }
+    let mut dirs: HashMap<String, usize> = HashMap::new();
+    let mut dir_of: HashMap<PathId, Arc<str>> = HashMap::new();
+    let mut langs: BTreeMap<&'static str, usize> = BTreeMap::new();
+    let mut biggest: Option<BiggestCommit> = None;
+    for (_, files) in src.rows_for(rs.iter().map(|c| c.rank).collect()) {
+        let mut seen: HashSet<Arc<str>> = HashSet::new();
         let mut lines = 0u64;
-        for f in &r.files {
-            lines += u64::from(f.additions) + u64::from(f.deletions);
-            let dir = f.path.rsplit_once('/').map_or(".", |(d, _)| d);
-            if seen.insert(dir) {
-                *dirs.entry(dir).or_default() += 1;
+        for f in &files {
+            lines += u64::from(f.add) + u64::from(f.del);
+            let dir = dir_of
+                .entry(f.path)
+                .or_insert_with(|| {
+                    let path = src.path(f.path).unwrap_or_default();
+                    path.rsplit_once('/').map_or(".", |(d, _)| d).into()
+                })
+                .clone();
+            if seen.insert(Arc::clone(&dir)) {
+                *dirs.entry(dir.to_string()).or_default() += 1;
             }
         }
-        if biggest.as_ref().is_none_or(|b| lines > b.lines) && !r.files.is_empty() {
+        for f in &files {
+            if let Some(l) = src.path(f.path).and_then(|p| language_of(&p)) {
+                *langs.entry(l).or_default() += 1;
+            }
+        }
+        if biggest.as_ref().is_none_or(|b| lines > b.lines) && !files.is_empty() {
             biggest = Some(BiggestCommit { lines });
         }
     }
     let mut top_authors: Vec<(String, usize)> = authors
         .into_values()
-        .map(|(n, c)| (n.to_owned(), c))
+        .map(|(n, c)| (n.to_string(), c))
         .collect();
     top_authors.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
     top_authors.truncate(3);
     let top_dir = dirs
         .into_iter()
-        .max_by(|a, b| a.1.cmp(&b.1).then_with(|| b.0.cmp(a.0)))
-        .map(|(d, c)| (d.to_owned(), c));
-    let langs = languages(rs.iter().copied());
+        .max_by(|a, b| a.1.cmp(&b.1).then_with(|| b.0.cmp(&a.0)));
+    let langs = languages(langs);
     WrappedStats {
         repo: repo.to_owned(),
         year,
@@ -107,17 +128,8 @@ pub fn wrapped_stats(repo: &str, records: &[CommitRecord], year: i32) -> Wrapped
 }
 
 /// Share of file touches per language, largest first, small ones folded into "Other".
-fn languages<'a>(records: impl Iterator<Item = &'a CommitRecord>) -> Vec<(String, f64)> {
-    let mut map: BTreeMap<&'static str, usize> = BTreeMap::new();
-    let mut total = 0usize;
-    for r in records {
-        for f in &r.files {
-            if let Some(l) = language_of(&f.path) {
-                *map.entry(l).or_default() += 1;
-                total += 1;
-            }
-        }
-    }
+fn languages(map: BTreeMap<&'static str, usize>) -> Vec<(String, f64)> {
+    let total: usize = map.values().sum();
     if total == 0 {
         return Vec::new();
     }

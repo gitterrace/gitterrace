@@ -1,3 +1,4 @@
+use crate::feed::{CommitRange, CommitRow};
 use crate::insights::{Insights, Period};
 
 /// Additions and deletions of one bucket, moves and (by default) whitespace excluded.
@@ -61,14 +62,14 @@ impl Insights<'_> {
                 rewritten: 0,
             })
             .collect();
-        for (i, r) in self.records.iter().enumerate() {
-            if r.time < from || r.time >= to || !self.counted(i) {
+        for c in self.source().commits_in(CommitRange::Time(from..to)) {
+            if !self.counted_row(&c) {
                 continue;
             }
-            let Some(w) = axis.slot(r).map(|s| &mut out[s]) else {
+            let Some(w) = axis.slot_row(&c).map(|s| &mut out[s]) else {
                 continue;
             };
-            let l = self.commit_lines(i);
+            let l = self.commit_sums(c.rank);
             w.additions += u64::from(l.add);
             w.deletions += u64::from(l.del);
             w.rewritten += u64::from(l.rewritten);
@@ -82,11 +83,13 @@ impl Insights<'_> {
     pub fn rework(&self, period: Period) -> Rework {
         let (from, to) = period.window(self.now);
         let axis = self.axis(Some(period));
-        let counted: Vec<usize> = (0..self.records.len())
-            .filter(|i| self.counted(*i) && (from..to).contains(&self.records[*i].time))
+        let counted: Vec<CommitRow> = self
+            .source()
+            .commits_in(CommitRange::Time(from..to))
+            .filter(|c| self.counted_row(c))
             .collect();
         let window = (counted.len() / 8).clamp(10, 100);
-        let lines: Vec<super::Lines> = counted.iter().map(|i| self.commit_lines(*i)).collect();
+        let lines: Vec<super::Lines> = counted.iter().map(|c| self.commit_sums(c.rank)).collect();
         // Prefix sums make every window O(1).
         let mut pre = vec![(0u64, 0u64, 0u64); lines.len() + 1];
         for (k, l) in lines.iter().enumerate() {
@@ -99,8 +102,8 @@ impl Insights<'_> {
         }
         // Counted commits up to and including each bucket.
         let mut upto = vec![0usize; axis.len()];
-        for (k, i) in counted.iter().enumerate() {
-            if let Some(b) = axis.slot(&self.records[*i]) {
+        for (k, c) in counted.iter().enumerate() {
+            if let Some(b) = axis.slot_row(c) {
                 upto[b] = k + 1;
             }
         }

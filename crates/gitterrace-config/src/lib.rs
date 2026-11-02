@@ -195,6 +195,15 @@ pub fn parse(text: &str) -> Result<Loaded, ConfigError> {
 mod tests {
     use super::{Config, Reload, Source, keys, load, parse, template};
 
+    /// The serving cache budget is the one the memory guard assumes (32 MB plus margin): a
+    /// larger default breaks the guard on every machine, not just a small one.
+    #[test]
+    fn cache_budget_default_matches_the_memory_design() {
+        let design = include_str!("../../../docs/design/streaming-insights.md");
+        assert!(design.contains("(default 32 MB"), "design moved its budget");
+        assert_eq!(Config::default().resources.cache_mb, 32);
+    }
+
     /// The docs page and the reload read the same field: a key documented as needing a
     /// restart is one the reload holds back, and the other way round.
     #[test]

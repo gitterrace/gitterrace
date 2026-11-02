@@ -40,20 +40,31 @@ color the year card.
   the role aliases, never a raw color, and charts are server-rendered SVG colored by class.
 - **Read-only, pinned.** Every read takes a resolved commit id, so a commit landing
   mid-request cannot tear a page. Only the uncommitted view reads the worktree.
-- **Browsing never waits on the cache**; insights show progress.
+- **Browsing never waits on the cache**, and insights show progress.
 - **One guard** (`gitterrace-web/src/guard.rs`): loopback Host, no cross-site requests, hashed
   inline script CSP.
-- **Live.** A watcher pushes changes over `/events`; config files reload on change.
+- **Live.** A watcher pushes changes over `/events`, and config files reload on change. A
+  repository that joins the server is announced the same way, so open pages show it in the
+  switcher without a reload.
 - **Send to opens a URL in your browser.** The server never calls the destination, so there is
   nothing to authenticate and nothing written ([how Send to works](actions.md)).
-- **Several repos** under `/r/{name}/`, resolved only through the repository table.
-- **A running server grows, it is never replaced.** Every server keeps a repository table, so
-  one started on a single repository keeps it at `/` and serves added ones under
-  `/r/{name}/`, which keeps every link valid. `git terrace open` adds a repository the
+- **Every repo under `/r/{name}/`**, also when it is the only one, resolved only through the
+  repository table. `/` forwards to a lone repository and lists several. A link never moves
+  when another repository joins. `/go/{repo-id}/{sha}` is the permalink and outlives names.
+- **A name is assigned once.** It is the folder name made URL-safe and lowercase. A folder
+  whose name another folder already holds gets `-` and six hex digits of its path. The first
+  to arrive keeps the plain name. The name is kept in `repos.json` in the state folder, so a
+  restart in any order serves each repository where it was. Without a state folder the
+  same rule runs against the table alone.
+- **A running server grows, it is never replaced.** Every server keeps a repository table and
+  serves added ones under `/r/{name}/` beside the rest. `git terrace open` adds a repository the
   server lacks through `POST /_repos` instead of starting a second server, and so does a
   second `git terrace` on an address a gitterrace server already holds: it hands over its
-  repositories and exits 0. When the port holds a foreign program, the secret is missing or
-  the add is refused, it binds as usual and reports the address in use. `--public` never
+  repositories and exits 0. Before it sends a path it asks `GET /_repos?nonce=N`, and the
+  server must answer the SHA-256 of its secret and that nonce. A listener that cannot, or a
+  missing secret, counts as foreign: `open` starts its own server and `serve` binds as usual.
+  A second `serve` opens every root before it adds any. Once adding starts, a refused add
+  is an error. It never falls through to a bind on the held address. `--public` never
   joins. That route makes the server read a path it was not started with, so a browser can
   never reach it: it exists only on a loopback bind, it refuses any `Origin` or
   `Sec-Fetch-Site`, and it needs a per-process secret the server writes 0600 into the state
@@ -85,12 +96,50 @@ The format version is `4`.
 
 Disposable: bump the format version instead of migrating.
 
+### How the index is stored
+
+The index is a set of immutable files. A segment holds a run of commits as columns, file rows,
+path and author postings, and the aggregates that insights pages read (author by day, path by
+author, month by path). A string file beside it holds the paths, identities and labels that
+segment introduced. Nothing is ever written to again once it is renamed into place.
+
+`MANIFEST` is the only entry point. It names every live file with its length and CRC32, and is
+swapped by rename, so a crash leaves the previous complete set. Files it does not name are
+ignored and swept. A new HEAD adds one small segment, and many segments are merged back into one.
+
+Pages never load the history. A reader opens a segment, checks its footer, and reads blocks with
+`pread`. Each block is checked against its CRC before any field in it is parsed, and every
+length and offset is bounded, since `.git/` may belong to someone else.
+
+One rule covers damage: if the cache cannot be read, it is deleted and rebuilt. That means a
+different format version, a torn manifest, a bad CRC, or a changed shallow set. It is never
+partly served. The page shows indexing until the rebuild is done. A cache written by a newer
+build is left alone and the page says so.
+
+### Memory
+
+While serving, resident memory is a budget of 32 MB for caches and rendered pages, plus 16 MB of
+margin. It does not grow with the history. A page folds the blocks of its time range through a
+small buffer into a result sized by the answer. The OS file cache is not counted. The peak
+during an index build is higher and is accepted.
+
+### The InsightsSource seam
+
+Pages read history through the `InsightsSource` trait in `gitterrace-index/src/feed/`. It gives
+commit columns for a range, file rows for chosen commits, the aggregates, postings and strings,
+all as streams. `feed/segments.rs` serves it from the files. `feed/memory.rs` serves it from
+records in memory and is the oracle that tests compare the segments against. A page does not know
+which one it has.
+
 ## Routes
+
+Every row from `/` to `/api/v1` is per repository and lives under `/r/{name}`, also when one
+repository is served. The rest are the server's own and never take the prefix.
 
 <!-- BEGIN GENERATED: routes -->
 | Route | Shows |
 | --- | --- |
-| `/` | README, last commit, file list, key numbers |
+| `/` | README, last commit, file list, key numbers. The server's own `/` forwards to the one repository, or lists several |
 | `/tree`, `/blob`, `/raw`, `/blame` `/{rev}/{path}` | Files: listing, highlighted view (large files load in chunks), bytes, authorship |
 | `/log/{rev}`, `/history/{path}`, `/compare` | Commits, one file's history, two revisions |
 | `/commit/{id}`, `/diff/{rev}/{index}` | A commit's diff, large files fold and load on demand |
@@ -101,7 +150,38 @@ Disposable: bump the format version instead of migrating.
 | `/api/v1/...` | JSON API, see [api.md](api.md) |
 | `/go/{repo-id}/{sha}/{path}` | Permalink: finds the served repository by id |
 | `/_send/targets` | Send to targets as JSON template parts, filled in by the page |
-| `/r/{name}/...`, `/api/repos` | Everything above under several repositories; the list the switcher reads |
-| `POST /_repos` | Adds a repository to the running server for `git terrace open`: loopback, no browser, secret from a 0600 file |
+| `/r/{name}/...`, `/api/repos` | The prefix of every per-repository row above, also when one is served; and the server-wide list the switcher reads |
+| `POST /_repos`, `GET /_repos?nonce=N` | Adds a repository to the running server for `git terrace open`: loopback, no browser, secret from a 0600 file. The GET proves the secret by hashing it with the nonce |
 
 <!-- END GENERATED: routes -->
+
+## Syntax highlighting
+
+Code, diffs, blame and fenced blocks in markdown are highlighted with the grammars of
+[bat](https://github.com/sharkdp/bat) (through `two-face` and `syntect`), compiled into the binary.
+A file is matched by name, then extension, then its `#!` line. Files over 256 KB show plain.
+These are the languages:
+
+<!-- BEGIN GENERATED: languages -->
+182 languages: ActionScript, Ada, Apache Conf, AppleScript, ARM Assembly, AsciiDoc (Asciidoctor),
+ASP, Authorized Keys, AWK, Batch File, BibTeX, Bourne Again Shell (bash), C, C#, C++, Cabal, CFML,
+Clojure, CMake, CMake C Header, CMake C++ Header, CMakeCache, CoffeeScript, Command Help, CpuInfo,
+Crontab, Crystal, CSS, D, Dart, debsources, Diff, Dockerfile, DotENV, Elixir, Elm, Email, Erlang,
+F#, Fish, Fortran (Fixed Form), Fortran (Modern), Fortran Namelist, fstab, GDScript (Godot Engine),
+Git Attributes, Git Commit, Git Config, Git Ignore, Git Link, Git Log, Git Mailmap, Git Rebase Todo,
+GLSL, gnuplot, Go, Gomod, Gosum, GraphQL, Graphviz (DOT), Groff/troff, Groovy, group, Haskell,
+Highlight non-printables, Hosts File, HTML, HTML (ASP), HTML (EEx), HTML (Erlang), HTML (Jinja2),
+HTML (Rails), HTML (Tcl), HTML (Twig), HTTP Request and Response, Idris, INI, Java, Java Properties,
+Java Server Page (JSP), JavaScript, JavaScript (Babel), JavaScript (Rails), Jinja2, JQ, JSON,
+jsonnet, Julia, Known Hosts, Kotlin, LaTeX, Lean 4, Less, Lisp, Literate Haskell, LiveScript, LLVM,
+log, Lua, Makefile, Manpage, Markdown, MATLAB, MediaWiki, MemInfo, NAnt Build File, nginx, Nim,
+Ninja, Nix, NSIS, Objective-C, Objective-C++, OCaml, OCamllex, OCamlyacc, Odin, orgmode, Pascal,
+passwd, Perl, PHP, PowerShell, Protocol Buffer, Protocol Buffer (TEXT), Puppet, PureScript, Python,
+QML, R, Racket, Rd (R Documentation), Rego, Regular Expression, Requirements.txt, resolv,
+reStructuredText, Robot Framework, Ruby, Ruby Haml, Ruby on Rails, Ruby Slim, Rust, Salt State
+(SLS), Sass, Scala, SCSS, Separated Values, SML, Solidity, SQL, SQL (Rails), SSH Config, SSHD
+Config, Strace, Stylus, Svelte, Swift, syslog, SystemVerilog, Tab Separated Values, Tcl, Terraform,
+TeX, Textile, Todo.txt, TOML, TypeScript, TypeScriptReact, Typst, varlink, Verilog, VHDL, VimHelp,
+VimL, Vue Component, Vyper, WGSL, x86_64 Assembly, XML, YAML, Zig.
+
+<!-- END GENERATED: languages -->

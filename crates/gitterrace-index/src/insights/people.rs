@@ -39,11 +39,19 @@ impl People {
     /// what it left apart: the same address under several names, the same name under several
     /// addresses.
     pub fn build(records: &[CommitRecord]) -> Self {
+        Self::from_counts(
+            records
+                .iter()
+                .map(|r| ((r.author.as_str(), r.email.as_str()), 1)),
+        )
+    }
+
+    /// Same as [`Self::build`] from commit counts per (name, e-mail) pair, so a source that
+    /// streams commits builds people without holding records. Repeated pairs add up.
+    pub fn from_counts<'s>(counts: impl IntoIterator<Item = ((&'s str, &'s str), usize)>) -> Self {
         let mut seen: HashMap<(&str, &str), usize> = HashMap::new();
-        for r in records {
-            *seen
-                .entry((r.author.as_str(), r.email.as_str()))
-                .or_default() += 1;
+        for (pair, n) in counts {
+            *seen.entry(pair).or_default() += n;
         }
         let mut dsu = Dsu::default();
         for (name, email) in seen.keys() {

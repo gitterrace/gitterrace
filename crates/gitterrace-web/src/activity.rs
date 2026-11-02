@@ -33,8 +33,12 @@ fn delta(now: u64, before: Option<u64>) -> (String, &'static str) {
     (format!("{pct:+.0}%"), if pct >= 0.0 { "up" } else { "dn" })
 }
 
+/// Label of the commit total: insights count non-merge commits, the overview counts all.
+const COMMITS: &str = "Commits without merges";
+
 struct PulseRow {
     label: &'static str,
+    tip: &'static str,
     now: String,
     before: String,
     delta: String,
@@ -72,10 +76,15 @@ pub(crate) async fn page(
         let period = period_of(&q, &d, Period::All);
         let s = ins.period_summary(period);
         let prev = s.previous.as_ref();
-        let row = |label, now: u64, before: Option<u64>| {
+        let row = |label: &'static str, now: u64, before: Option<u64>| {
             let (d, tone) = delta(now, before);
             PulseRow {
                 label,
+                tip: if label == COMMITS {
+                    "Merges are left out: a merge repeats the changes of its branch."
+                } else {
+                    ""
+                },
                 now: fmt::thousands(now),
                 before: before.map_or_else(|| "-".to_owned(), fmt::thousands),
                 delta: d,
@@ -84,7 +93,7 @@ pub(crate) async fn page(
         };
         let rows = vec![
             row(
-                "Commits",
+                COMMITS,
                 s.current.commits as u64,
                 prev.map(|p| p.commits as u64),
             ),
@@ -127,7 +136,7 @@ pub(crate) async fn page(
         ActivityPage {
             c,
             tabs: views::stats_tabs("a"),
-            fb: f.bar("/stats", r),
+            fb: f.bar("/stats", &**r),
             opts: q.row(&d, "/stats"),
             rows,
             span,

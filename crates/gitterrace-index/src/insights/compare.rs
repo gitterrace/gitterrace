@@ -2,6 +2,7 @@
 
 use std::collections::{HashMap, HashSet};
 
+use crate::feed::{PathId, Rank};
 use crate::insights::{Insights, language};
 
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
@@ -29,47 +30,43 @@ impl Insights<'_> {
     /// Per-language change between two revisions given as commit ids, from the cached
     /// non-merge commits in `a..b`. Unknown ids give an empty comparison.
     pub fn compare(&self, base_id: &str, head_id: &str) -> Comparison {
-        let by_id: HashMap<&str, usize> = self
-            .records
-            .iter()
-            .enumerate()
-            .map(|(i, r)| (r.id.as_str(), i))
-            .collect();
-        let reach = |from: &str| -> HashSet<usize> {
+        let src = self.source();
+        // Walk parents by id: state is the visited set of the two ranges, never the history.
+        let reach = |from: &str| -> HashSet<Rank> {
             let mut seen = HashSet::new();
-            let mut stack: Vec<usize> = by_id.get(from).copied().into_iter().collect();
-            while let Some(i) = stack.pop() {
-                if !seen.insert(i) {
+            let mut stack: Vec<Rank> = src.find_commit(from).into_iter().collect();
+            while let Some(r) = stack.pop() {
+                if !seen.insert(r) {
                     continue;
                 }
-                stack.extend(
-                    self.records[i]
-                        .parents
-                        .iter()
-                        .filter_map(|p| by_id.get(p.as_str()).copied()),
-                );
+                stack.extend(src.parent_ids(r).iter().filter_map(|p| src.find_commit(p)));
             }
             seen
         };
         let base = reach(base_id);
-        let mut range: Vec<usize> = reach(head_id)
+        let mut range: Vec<Rank> = reach(head_id)
             .into_iter()
             .filter(|i| !base.contains(i))
             .collect();
         range.sort_unstable();
         let mut langs: HashMap<String, (u64, u64, u64)> = HashMap::new();
         let mut people = HashSet::new();
-        let mut paths: HashSet<&str> = HashSet::new();
+        let mut paths: HashSet<PathId> = HashSet::new();
         let (mut added, mut removed) = (0, 0);
-        for &i in &range {
-            let rec = &self.records[i];
-            if rec.merge {
-                continue;
-            }
-            people.insert(self.person[i]);
-            for (file, l) in self.files_of(i) {
-                paths.insert(&*file.path);
-                let e = langs.entry(language(&file.path)).or_default();
+        let live: Vec<Rank> = range
+            .iter()
+            .copied()
+            .filter(|r| src.commit(*r).is_some_and(|c| !c.merge))
+            .collect();
+        for (rank, rows) in src.rows_for(live) {
+            people.insert(self.person(rank));
+            for row in &rows {
+                let Some(l) = self.row_lines(row) else {
+                    continue;
+                };
+                paths.insert(row.path);
+                let name = src.path(row.path).unwrap_or_default();
+                let e = langs.entry(language(&name)).or_default();
                 e.0 += u64::from(l.add);
                 e.1 += u64::from(l.del);
                 e.2 += u64::from(l.rewritten);
@@ -94,7 +91,10 @@ impl Insights<'_> {
                 .then_with(|| x.language.cmp(&y.language))
         });
         Comparison {
-            commits: range.iter().map(|i| self.records[*i].id.clone()).collect(),
+            commits: range
+                .iter()
+                .filter_map(|r| src.commit_id(*r).map(|s| s.to_string()))
+                .collect(),
             authors: people.len(),
             files_changed: paths.len(),
             added,

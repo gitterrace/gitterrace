@@ -12,7 +12,7 @@
 <h2>About</h2>
 {% if let Some(t) = totals %}
 <ul class="facts">
-<li><b>{{ t.commits }}</b> {{ t.commits_noun }}</li>
+<li><b>{{ t.commits }}</b> {{ t.commits_noun }}{% if !t.merges.is_empty() %} <span class="muted" data-tip="All commits, merges included. Insights leave merges out, since a merge repeats its branch.">{{ t.merges }}</span>{% endif %}</li>
 <li><b>{{ t.authors }}</b> {{ t.authors_noun }}</li>
 <li><b>{{ t.files }}</b> {{ t.files_noun }}</li>
 <li><b class="add">+{{ t.additions }}</b> <b class="del">-{{ t.deletions }}</b> {{ t.lines_noun }}</li>

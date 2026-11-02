@@ -1,6 +1,8 @@
-use std::collections::{BTreeSet, HashSet};
+use std::collections::BTreeSet;
 
-use crate::insights::{BucketUnit, Insights, local_day, weekday};
+use crate::feed::{CommitRange, PathId, local_day_of};
+use crate::insights::fasthash::{FastMap, FastSet};
+use crate::insights::{BucketUnit, Insights, weekday};
 
 const DAY: i64 = crate::insights::DAY;
 
@@ -119,17 +121,25 @@ pub struct ContributorReport {
 
 impl Insights<'_> {
     fn stats_between(&self, from: i64, to: i64) -> PeriodStats {
-        let mut people = HashSet::new();
-        let mut files: HashSet<&str> = HashSet::new();
+        let mut people: FastSet<usize> = FastSet::default();
+        let mut files: FastSet<PathId> = FastSet::default();
         let mut s = PeriodStats::default();
-        for (i, r) in self.records.iter().enumerate() {
-            if r.time < from || r.time >= to || !self.counted(i) {
+        let src = self.source();
+        let mut ranks = Vec::new();
+        for c in src.commits_in(CommitRange::Time(from..to)) {
+            if !self.counted_row(&c) {
                 continue;
             }
             s.commits += 1;
-            people.insert(self.person[i]);
-            for (f, l) in self.files_of(i) {
-                files.insert(&*f.path);
+            people.insert(self.person_of(c.ident));
+            ranks.push(c.rank);
+        }
+        for (_, rows) in src.rows_for(ranks) {
+            for f in &rows {
+                let Some(l) = self.row_lines(f) else {
+                    continue;
+                };
+                files.insert(f.path);
                 s.additions += u64::from(l.add);
                 s.deletions += u64::from(l.del);
             }
@@ -170,18 +180,18 @@ impl Insights<'_> {
         let mut punch = [[0u32; 24]; 7];
         let mut by_weekday = [0u32; 7];
         let mut by_hour = [0u32; 24];
-        for (i, r) in self.records.iter().enumerate() {
-            if r.time < from || r.time >= to || !self.counted(i) {
+        for c in self.source().commits_in(CommitRange::Time(from..to)) {
+            if !self.counted_row(&c) {
                 continue;
             }
-            let day = local_day(r);
-            let l = self.commit_lines(i);
+            let day = local_day_of(c.time, c.offset);
+            let l = self.commit_sums(c.rank);
             if let Some(p) = axis.slot_day(day).map(|s| &mut series[s]) {
                 p.commits += 1;
                 p.additions += u64::from(l.add);
                 p.deletions += u64::from(l.del);
             }
-            let local = crate::insights::local_time(r);
+            let local = c.time.saturating_add(i64::from(c.offset));
             let wd = weekday(day);
             let hour = usize::try_from(local.rem_euclid(DAY) / 3600).unwrap_or(0);
             punch[wd][hour] += 1;
@@ -200,39 +210,37 @@ impl Insights<'_> {
 
     pub fn contributors(&self, period: Period) -> ContributorReport {
         let (from, to) = period.window(self.now);
-        let first_ever: Vec<i64> = {
-            let mut v = vec![i64::MAX; self.people.list.len()];
-            for (r, p) in self.records.iter().zip(&self.person) {
-                v[*p] = v[*p].min(r.time);
-            }
-            v
-        };
+        let src = self.source();
+        // First commit ever per person, merges included, over the whole history.
+        let mut first_ever: FastMap<usize, i64> = FastMap::default();
+        for c in src.commits_in(CommitRange::All) {
+            let t = first_ever
+                .entry(self.person_of(c.ident))
+                .or_insert(i64::MAX);
+            *t = (*t).min(c.time);
+        }
         let axis = self.axis(Some(period));
-        let in_period: Vec<usize> = (0..self.records.len())
-            .filter(|i| {
-                let r = &self.records[*i];
-                r.time >= from && r.time < to && !r.merge
-            })
-            .collect();
         let labels: Vec<String> = (0..axis.len()).map(|i| axis.label(i)).collect();
         let mut acc: std::collections::HashMap<usize, Acc> = std::collections::HashMap::new();
-        for i in in_period {
-            let r = &self.records[i];
-            let a = acc.entry(self.person[i]).or_insert_with(|| Acc {
+        for c in src.commits_in(CommitRange::Time(from..to)) {
+            if c.merge {
+                continue;
+            }
+            let a = acc.entry(self.person_of(c.ident)).or_insert_with(|| Acc {
                 c: super::Lines::default(),
                 commits: 0,
-                first: r.time,
-                last: r.time,
+                first: c.time,
+                last: c.time,
                 days: BTreeSet::new(),
                 series: vec![0; axis.len()],
             });
-            let l = self.commit_lines(i);
+            let l = self.commit_sums(c.rank);
             a.c.add += l.add;
             a.c.del += l.del;
             a.commits += 1;
-            a.first = a.first.min(r.time);
-            a.last = a.last.max(r.time);
-            let day = local_day(r);
+            a.first = a.first.min(c.time);
+            a.last = a.last.max(c.time);
+            let day = local_day_of(c.time, c.offset);
             a.days.insert(day);
             if let Some(slot) = axis.slot_day(day) {
                 a.series[slot] += 1;
@@ -241,7 +249,7 @@ impl Insights<'_> {
         let mut contributors: Vec<(usize, Contributor)> = acc
             .into_iter()
             .map(|(p, a)| {
-                let person = &self.people.list[p];
+                let person = &self.d.people.list[p];
                 (
                     p,
                     Contributor {
@@ -255,7 +263,8 @@ impl Insights<'_> {
                         last_commit: a.last,
                         active_days: a.days.len(),
                         series: a.series,
-                        first_time: first_ever[p] >= from && period.days().is_some(),
+                        first_time: first_ever.get(&p).copied().unwrap_or(i64::MAX) >= from
+                            && period.days().is_some(),
                     },
                 )
             })

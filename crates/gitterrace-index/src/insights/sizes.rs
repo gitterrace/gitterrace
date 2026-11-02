@@ -1,5 +1,6 @@
 //! Commits bucketed by size, the histogram behind the commit-size chart.
 
+use crate::feed::CommitRange;
 use crate::insights::Insights;
 
 /// Upper bounds (inclusive) of the commit size buckets, in changed lines.
@@ -16,8 +17,11 @@ impl Insights<'_> {
     /// Commits by size (added plus removed lines over counted files).
     pub fn commit_sizes(&self) -> Vec<SizeBucket> {
         let mut counts = [0usize; 7];
-        for i in (0..self.records.len()).filter(|i| self.counted(*i)) {
-            let l = self.commit_lines(i);
+        for c in self.source().commits_in(CommitRange::All) {
+            if !self.counted_row(&c) {
+                continue;
+            }
+            let l = self.commit_sums(c.rank);
             let n = l.add + l.del;
             let slot = SIZE_EDGES
                 .iter()

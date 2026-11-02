@@ -70,12 +70,12 @@ impl<V: Clone + Weight> Bounded<V> {
         self.map.get(key).map(|(v, _)| v.clone())
     }
 
-    /// Stores `v`, evicting the oldest entries to make room. A value larger than the whole
-    /// budget is not kept: it would evict everything else and still not fit.
+    /// Stores `v`, evicting the oldest entries to make room. A value larger than an eighth of
+    /// the budget is not kept: it would flush most of the others for one entry.
     pub(crate) fn put(&mut self, key: String, v: V) {
         let w = v.weight() + key.len();
         self.remove(&key);
-        if w > self.budget {
+        if w > self.budget / 8 {
             return;
         }
         while self.used + w > self.budget {
@@ -98,6 +98,19 @@ impl<V: Clone + Weight> Bounded<V> {
         }
     }
 
+    /// Moves the budget, evicting the oldest entries when it shrank.
+    pub(crate) fn set_budget(&mut self, budget: usize) {
+        self.budget = budget;
+        while self.used > self.budget {
+            let Some(old) = self.order.pop_front() else {
+                break;
+            };
+            if let Some((_, ow)) = self.map.remove(&old) {
+                self.used -= ow;
+            }
+        }
+    }
+
     pub(crate) fn clear(&mut self) {
         self.map.clear();
         self.order.clear();
@@ -116,29 +129,41 @@ mod tests {
 
     #[test]
     fn evicts_oldest_first_by_bytes_not_count() {
-        let mut c: Bounded<String> = Bounded::new(30);
-        c.put("a".into(), "x".repeat(9));
-        c.put("b".into(), "x".repeat(9));
-        c.put("c".into(), "x".repeat(9));
-        assert!(c.get("a").is_some() && c.get("c").is_some());
-        c.put("d".into(), "x".repeat(9));
+        // Entries of 10 bytes in a budget of 80: eight fit, the ninth evicts the oldest.
+        let mut c: Bounded<String> = Bounded::new(80);
+        for k in ["a", "b", "c", "d", "e", "f", "g", "h"] {
+            c.put(k.into(), "x".repeat(9));
+        }
+        assert!(c.get("a").is_some() && c.get("h").is_some());
+        c.put("i".into(), "x".repeat(9));
         assert!(c.get("a").is_none(), "the oldest entry goes first");
-        assert!(c.get("b").is_some() && c.get("d").is_some());
-        assert!(c.used() <= 30);
+        assert!(c.get("b").is_some() && c.get("i").is_some());
+        assert!(c.used() <= 80);
     }
 
     #[test]
-    fn one_big_entry_does_not_flush_the_rest_and_is_not_kept() {
-        let mut c: Bounded<String> = Bounded::new(30);
+    fn an_entry_over_an_eighth_of_the_budget_is_not_kept_and_flushes_nothing() {
+        let mut c: Bounded<String> = Bounded::new(80);
         c.put("a".into(), "x".repeat(9));
-        c.put("big".into(), "x".repeat(100));
+        c.put("big".into(), "x".repeat(11));
         assert!(c.get("big").is_none());
         assert!(c.get("a").is_some());
     }
 
     #[test]
+    fn a_smaller_budget_evicts_down_to_it() {
+        let mut c: Bounded<String> = Bounded::new(80);
+        for k in ["a", "b", "c", "d"] {
+            c.put(k.into(), "x".repeat(9));
+        }
+        c.set_budget(20);
+        assert!(c.used() <= 20);
+        assert!(c.get("a").is_none() && c.get("d").is_some());
+    }
+
+    #[test]
     fn replacing_a_key_does_not_count_it_twice() {
-        let mut c: Bounded<String> = Bounded::new(30);
+        let mut c: Bounded<String> = Bounded::new(80);
         for _ in 0..10 {
             c.put("a".into(), "x".repeat(9));
         }

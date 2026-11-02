@@ -2,12 +2,14 @@
 //! the query string and applied to the records before any aggregate, so every number on a
 //! page respects every active chip.
 
-use std::borrow::Cow;
+use std::sync::Arc;
 
-use gitterrace_index::{CommitRecord, Period, Selection};
+use gitterrace_index::feed::{CommitRange, InsightsSource};
+use gitterrace_index::{Period, Scoped, Selection};
 use serde::Deserialize;
 
 use crate::fmt::{enc_seg, href};
+use crate::insights::Src;
 
 /// Value that selects commits without a scope (`none`).
 pub(crate) const NO_SCOPE: &str = Selection::NO_SCOPE;
@@ -161,24 +163,23 @@ impl Filter {
         }
     }
 
-    /// The records the filters keep, the period window included. With a path filter each kept
-    /// commit lists only the files under the path. Unfiltered input is borrowed.
-    pub(crate) fn apply<'a>(&self, records: &'a [CommitRecord]) -> Cow<'a, [CommitRecord]> {
-        let kept = self.selection().apply(records);
-        let Some(p) = self.period() else {
-            return kept;
-        };
-        let (from, to) = p.window(gitterrace_index::reference_time(records));
-        Cow::Owned(
-            kept.iter()
-                .filter(|r| r.time >= from && r.time < to)
-                .cloned()
-                .collect(),
-        )
+    /// The commits the filters keep, the period window included, measured from the whole
+    /// source. With a path filter each kept commit lists only the files under the path.
+    /// Unfiltered input comes back as the same source, so its shared tables still apply.
+    pub(crate) fn apply(&self, all: &Src) -> Src {
+        let sel = self.selection();
+        let window = self.period().map(|p| {
+            let (from, to) = p.window(gitterrace_index::feed::reference_time(&**all));
+            from..to
+        });
+        if sel.is_empty() && window.is_none() {
+            return Arc::clone(all);
+        }
+        Arc::new(Scoped::new(Arc::clone(all), &sel, window))
     }
 
     /// Chips and period picker for a page served at `base`.
-    pub(crate) fn bar(&self, base: &str, records: &[CommitRecord]) -> FilterBar {
+    pub(crate) fn bar(&self, base: &str, src: &dyn InsightsSource) -> FilterBar {
         let chips = DIMS
             .iter()
             .filter_map(|d| {
@@ -192,10 +193,7 @@ impl Filter {
                         _ => "all time".to_owned(),
                     },
                     Dim::Path => self.path()?.to_owned(),
-                    Dim::Author => records
-                        .iter()
-                        .find(|r| r.email.eq_ignore_ascii_case(v))
-                        .map_or_else(|| v.to_owned(), |r| r.author.clone()),
+                    Dim::Author => author_name(src, v),
                     _ => v.to_owned(),
                 };
                 Some(Chip {
@@ -225,11 +223,26 @@ impl Filter {
     }
 }
 
+/// Name of the oldest commit whose email is `email`, as the chip shows it, else `email`.
+fn author_name(src: &dyn InsightsSource, email: &str) -> String {
+    src.commits_in(CommitRange::All)
+        .find_map(|c| {
+            src.ident(c.ident)
+                .filter(|(_, e)| e.eq_ignore_ascii_case(email))
+                .map(|(n, _)| n.to_string())
+        })
+        .unwrap_or_else(|| email.to_owned())
+}
+
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
+
+    use gitterrace_index::feed::MemorySource;
     use gitterrace_index::{CommitRecord, FileStat};
 
     use super::{Dim, Filter, under};
+    use crate::insights::Src;
 
     fn parse(q: &str) -> Filter {
         let uri: axum::http::Uri = format!("/?{q}").parse().expect("uri");
@@ -266,7 +279,30 @@ mod tests {
         }
     }
 
-    fn sample() -> Vec<CommitRecord> {
+    fn sample() -> Src {
+        Arc::new(MemorySource::shared(Arc::new(sample_records())))
+    }
+
+    /// What a filtered source holds: each commit id with its kept rows' paths.
+    fn recs_of(s: &Src) -> Vec<CommitRecord> {
+        use gitterrace_index::feed::CommitRange;
+        let ranks: Vec<_> = s.commits_in(CommitRange::All).map(|c| c.rank).collect();
+        s.rows_for(ranks)
+            .map(|(rank, rows)| CommitRecord {
+                id: s.commit_id(rank).as_deref().unwrap_or_default().to_owned(),
+                files: rows
+                    .iter()
+                    .map(|r| gitterrace_index::FileStat {
+                        path: s.path(r.path).unwrap_or_default(),
+                        ..Default::default()
+                    })
+                    .collect(),
+                ..Default::default()
+            })
+            .collect()
+    }
+
+    fn sample_records() -> Vec<CommitRecord> {
         vec![
             rec("a", "ann", 1, Some("fix"), Some("web"), "crates/web/a.rs"),
             rec("b", "bob", 50, Some("feat"), None, "crates/git/b.rs"),
@@ -307,7 +343,7 @@ mod tests {
     fn filters_stack() {
         let recs = sample();
         let ids = |f: &Filter| {
-            f.apply(&recs)
+            recs_of(&f.apply(&recs))
                 .iter()
                 .map(|r| r.id.clone())
                 .collect::<Vec<_>>()
@@ -334,7 +370,7 @@ mod tests {
     #[test]
     fn path_filter_keeps_only_files_under_prefix() {
         let recs = sample();
-        let out = parse("path=crates/web").apply(&recs).into_owned();
+        let out = recs_of(&parse("path=crates/web").apply(&recs));
         assert_eq!(
             out.iter().map(|r| r.id.as_str()).collect::<Vec<_>>(),
             ["a", "c"]
@@ -347,7 +383,7 @@ mod tests {
 
     #[test]
     fn bar_chips_remove_one_filter() {
-        let bar = parse("type=fix&scope=web").bar("/stats/types", &[]);
+        let bar = parse("type=fix&scope=web").bar("/stats/types", &MemorySource::new(&[]));
         assert_eq!(bar.chips.len(), 2);
         assert_eq!(bar.chips[0].href, "/stats/types?scope=web");
         assert_eq!(bar.chips[1].href, "/stats/types?type=fix");

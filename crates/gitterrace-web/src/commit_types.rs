@@ -13,7 +13,8 @@ use std::sync::Arc;
 use askama::Template;
 use axum::extract::{Query, RawQuery, State};
 use axum::response::Html;
-use gitterrace_index::{CommitRecord, Label, LabelCount, Period};
+use gitterrace_index::feed::{CommitRow as SrcRow, InsightsSource, LabelId};
+use gitterrace_index::{Label, LabelCount, Period, Selection};
 use serde::Deserialize;
 
 use crate::{
@@ -21,7 +22,7 @@ use crate::{
     error::Result,
     filter::{Dim, Filter, FilterBar, NO_SCOPE},
     fmt::{self, href},
-    insights::{InsightsQuery, Kpi, OptLink, insights, period_of, scoped},
+    insights::{InsightsQuery, Kpi, OptLink, Src, insights, period_of, scoped},
     routes::Shared,
     views::{self, Chrome, CommitRow, Row, Tabs},
 };
@@ -115,7 +116,8 @@ fn level(n: usize, max: usize) -> u8 {
 }
 
 fn matrix(
-    recs: &[&CommitRecord],
+    src: &dyn InsightsSource,
+    recs: &[SrcRow],
     kinds: &[LabelCount],
     scopes: &[LabelCount],
     f: &Filter,
@@ -131,12 +133,24 @@ fn matrix(
         .take(TOP_SCOPES)
         .map(|l| l.label.clone())
         .collect();
-    let mut grid: HashMap<(&str, &str), usize> = HashMap::new();
+    let mut ids: HashMap<(Option<LabelId>, Option<LabelId>), usize> = HashMap::new();
     for r in recs {
-        *grid
-            .entry((Label::Kind.of(r), Label::Scope.of(r)))
-            .or_default() += 1;
+        *ids.entry((r.kind, r.scope)).or_default() += 1;
     }
+    let name = |id: Option<LabelId>, missing: &str| -> String {
+        id.and_then(|i| src.label(i))
+            .map_or_else(|| missing.to_owned(), |s| s.to_string())
+    };
+    let mut named: HashMap<(String, String), usize> = HashMap::new();
+    for ((k, sc), n) in ids {
+        *named
+            .entry((name(k, Selection::OTHER), name(sc, NO_SCOPE)))
+            .or_default() += n;
+    }
+    let grid: HashMap<(&str, &str), usize> = named
+        .iter()
+        .map(|((k, sc), n)| ((k.as_str(), sc.as_str()), *n))
+        .collect();
     let max = scopes
         .iter()
         .flat_map(|s| kinds.iter().map(move |k| (k, s)))
@@ -197,14 +211,15 @@ fn page_link(f: &Filter, n: usize) -> String {
     href(&format!("{BASE}{}", f.query(&[("page", &n.to_string())])))
 }
 
-fn build(a: &crate::app::App, all: &[CommitRecord], c: Chrome, tq: &TypesQuery) -> TypesPage {
+fn build(a: &crate::app::App, all: &Src, c: Chrome, tq: &TypesQuery) -> TypesPage {
     let q = &tq.q;
     let f = &q.filter;
     let d = a.defaults();
     let scoped = scoped(f, all);
     let ins = insights(a, &scoped, q.options(&d));
     let period = period_of(q, &d, Period::All);
-    let recs: Vec<&CommitRecord> = ins.counted_records(period).collect();
+    let src = ins.source();
+    let recs: Vec<SrcRow> = ins.counted_rows(period).collect();
     let n = recs.len();
     let sum = ins.period_summary(period).current;
     let people = ins.contributors(period).contributors;
@@ -214,7 +229,7 @@ fn build(a: &crate::app::App, all: &[CommitRecord], c: Chrome, tq: &TypesQuery) 
         (sum.additions + sum.deletions) / n as u64
     };
     let kpis = vec![
-        Kpi("Commits", fmt::thousands(n)),
+        Kpi("Commits without merges", fmt::thousands(n)),
         Kpi("Authors", fmt::thousands(sum.authors)),
         Kpi("Lines added", format!("+{}", fmt::thousands(sum.additions))),
         Kpi(
@@ -237,7 +252,7 @@ fn build(a: &crate::app::App, all: &[CommitRecord], c: Chrome, tq: &TypesQuery) 
     } else {
         (
             label_rows(&kind_counts, |l| f.link(BASE, Dim::Kind, l)),
-            matrix(&recs, &kind_counts, &scope_counts, f),
+            matrix(src, &recs, &kind_counts, &scope_counts, f),
         )
     };
 
@@ -268,6 +283,8 @@ fn build(a: &crate::app::App, all: &[CommitRecord], c: Chrome, tq: &TypesQuery) 
     let dirs = ins
         .dir_churn(period)
         .into_iter()
+        // Only the first LIST rows render: links for the rest cost most of a cold build.
+        .take(LIST)
         .map(|d| {
             let h = if d.path == "." {
                 String::new()
@@ -296,6 +313,7 @@ fn build(a: &crate::app::App, all: &[CommitRecord], c: Chrome, tq: &TypesQuery) 
     let files = ins
         .file_churn(period)
         .into_iter()
+        .take(LIST)
         .map(|x| {
             (
                 x.path.clone(),
@@ -319,6 +337,7 @@ fn build(a: &crate::app::App, all: &[CommitRecord], c: Chrome, tq: &TypesQuery) 
     if f.author().is_none() {
         let people = people
             .iter()
+            .take(LIST)
             .map(|p| {
                 let email = p.emails.first().map_or(p.name.as_str(), String::as_str);
                 (
@@ -339,18 +358,30 @@ fn build(a: &crate::app::App, all: &[CommitRecord], c: Chrome, tq: &TypesQuery) 
     }
 
     let mut list = recs;
-    list.sort_by_key(|r| std::cmp::Reverse(r.time));
+    // Equal times break by rank, never by storage order: the canonical order decides.
+    list.sort_by_key(|r| (std::cmp::Reverse(r.time), std::cmp::Reverse(r.rank)));
     let pg: usize = tq.page.as_deref().and_then(|p| p.parse().ok()).unwrap_or(0);
     let now = fmt::now();
-    let shown: Vec<&CommitRecord> = list
+    // (id, author, email, time, offset) of this page's commits.
+    let shown: Vec<(String, String, String, i64, i32)> = list
         .iter()
         .skip(pg.saturating_mul(PAGE))
         .take(PAGE)
-        .copied()
+        .map(|r| {
+            let (author, email) = src
+                .ident(r.ident)
+                .map(|(n, e)| (n.to_string(), e.to_string()))
+                .unwrap_or_default();
+            let id = src
+                .commit_id(r.rank)
+                .map(|s| s.to_string())
+                .unwrap_or_default();
+            (id, author, email, r.time, r.offset)
+        })
         .collect();
     // Only this page's subjects: scanning the whole history for 20 lines cost seconds on a
     // large repository.
-    let ids: Vec<String> = shown.iter().map(|r| r.id.clone()).collect();
+    let ids: Vec<String> = shown.iter().map(|r| r.0.clone()).collect();
     let subjects: HashMap<String, String> = a
         .repo
         .summaries(&ids)
@@ -360,23 +391,23 @@ fn build(a: &crate::app::App, all: &[CommitRecord], c: Chrome, tq: &TypesQuery) 
         .collect();
     let commits = shown
         .iter()
-        .map(|r| CommitRow {
-            sha: fmt::sha_link(&r.id),
-            initial: views::initial(&r.author),
-            hue: views::hue(&r.author),
-            href: href(&format!("/commit/{}", r.id)),
-            subject: subjects.get(&r.id).cloned().unwrap_or_default(),
-            author: r.author.clone(),
-            author_href: f.link(BASE, Dim::Author, &r.email),
-            when: fmt::ago(r.time, now),
-            date: fmt::date(r.time, r.offset),
+        .map(|(id, author, email, time, offset)| CommitRow {
+            sha: fmt::sha_link(id),
+            initial: views::initial(author),
+            hue: views::hue(author),
+            href: href(&format!("/commit/{id}")),
+            subject: subjects.get(id).cloned().unwrap_or_default(),
+            author: author.clone(),
+            author_href: f.link(BASE, Dim::Author, email),
+            when: fmt::ago(*time, now),
+            date: fmt::date(*time, *offset),
         })
         .collect();
 
     TypesPage {
         c,
         tabs: views::stats_tabs("t"),
-        fb: f.bar(BASE, all),
+        fb: f.bar(BASE, &**all),
         opts: q.row(&d, BASE),
         kpis,
         kinds,

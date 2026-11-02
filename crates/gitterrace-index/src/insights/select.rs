@@ -4,8 +4,15 @@
 //! parse these two structs, so the same URL parameters select the same commits everywhere.
 
 use std::borrow::Cow;
+use std::collections::BTreeMap;
+use std::ops::Range;
+use std::sync::Arc;
 
 use crate::CommitRecord;
+use crate::feed::{
+    AuthorDayRow, CommitRange, CommitRow, FileRow, Hit, IdentId, InsightsSource, LabelId,
+    PathAuthorRow, PathId, Posting, Rank, RenameEdge, Stream, Sums, local_day_of,
+};
 use crate::insights::Options;
 
 /// Which commits count. Empty strings count as unset.
@@ -98,6 +105,286 @@ impl Selection {
     }
 }
 
+/// A [`Selection`] and an optional author-time window applied to a source.
+///
+/// It keeps the commits
+/// [`Selection::apply`] plus a `[from, to)` time filter keep, renumbered to dense ranks, a path
+/// selection trimming each commit to its rows under the prefix. State is one entry per kept
+/// commit. Ids (paths, identities, labels) are the base's.
+pub struct Scoped<'a> {
+    base: Arc<dyn InsightsSource + 'a>,
+    /// Per scoped rank: the base rank and, with a path selection, the kept row indices.
+    kept: Vec<(Rank, Option<Vec<u32>>)>,
+    by_base: BTreeMap<Rank, u32>,
+}
+
+impl<'a> Scoped<'a> {
+    pub fn new(
+        base: Arc<dyn InsightsSource + 'a>,
+        sel: &Selection,
+        window: Option<Range<i64>>,
+    ) -> Self {
+        let label_is = |id: Option<LabelId>, want: &str, none: &str| {
+            id.and_then(|l| base.label(l)).as_deref().unwrap_or(none) == want
+        };
+        let mut cand: Vec<Rank> = Vec::new();
+        for c in base.commits_in(CommitRange::All) {
+            let keep = sel
+                .kind()
+                .is_none_or(|k| label_is(c.kind, k, Selection::OTHER))
+                && sel
+                    .scope()
+                    .is_none_or(|s| label_is(c.scope, s, Selection::NO_SCOPE))
+                && sel.author().is_none_or(|a| {
+                    base.ident(c.ident)
+                        .is_some_and(|(name, email)| email.eq_ignore_ascii_case(a) || &*name == a)
+                })
+                && window.as_ref().is_none_or(|w| w.contains(&c.time));
+            if keep {
+                cand.push(c.rank);
+            }
+        }
+        let kept: Vec<(Rank, Option<Vec<u32>>)> = match sel.path() {
+            None => cand.into_iter().map(|r| (r, None)).collect(),
+            Some(p) => base
+                .rows_for(cand)
+                .filter_map(|(r, rows)| {
+                    let rows: Vec<u32> = rows
+                        .iter()
+                        .enumerate()
+                        .filter(|(_, f)| base.path(f.path).is_some_and(|n| under(&n, p)))
+                        .map(|(i, _)| u32::try_from(i).unwrap_or(u32::MAX))
+                        .collect();
+                    (!rows.is_empty()).then_some((r, Some(rows)))
+                })
+                .collect(),
+        };
+        let by_base = kept
+            .iter()
+            .enumerate()
+            .map(|(i, (r, _))| (*r, u32::try_from(i).unwrap_or(u32::MAX)))
+            .collect();
+        Self {
+            base,
+            kept,
+            by_base,
+        }
+    }
+
+    fn base_rank(&self, r: Rank) -> Option<Rank> {
+        self.kept.get(r.0 as usize).map(|k| k.0)
+    }
+
+    fn rows(&self, r: Rank) -> Vec<FileRow> {
+        let Some((b, keep)) = self.kept.get(r.0 as usize) else {
+            return Vec::new();
+        };
+        let rows = self
+            .base
+            .rows_for(vec![*b])
+            .next()
+            .map(|x| x.1)
+            .unwrap_or_default();
+        match keep {
+            None => rows,
+            Some(k) => k
+                .iter()
+                .filter_map(|i| rows.get(*i as usize).copied())
+                .collect(),
+        }
+    }
+
+    /// The base row restated for this view: scoped rank, sums over the kept rows.
+    fn restate(&self, r: Rank, mut c: CommitRow) -> CommitRow {
+        c.rank = r;
+        if self.kept.get(r.0 as usize).is_some_and(|k| k.1.is_some()) {
+            let rows = self.rows(r);
+            c.files = u32::try_from(rows.len()).unwrap_or(u32::MAX);
+            c.sums = Sums::default();
+            for f in &rows {
+                c.sums.add_row(f);
+            }
+        }
+        c
+    }
+}
+
+fn dense(i: usize) -> Rank {
+    Rank(u32::try_from(i).unwrap_or(u32::MAX))
+}
+
+impl InsightsSource for Scoped<'_> {
+    fn len(&self) -> usize {
+        self.kept.len()
+    }
+
+    fn commit(&self, rank: Rank) -> Option<CommitRow> {
+        let b = self.base_rank(rank)?;
+        self.base.commit(b).map(|c| self.restate(rank, c))
+    }
+
+    fn commits_in(&self, range: CommitRange) -> Stream<'_, CommitRow> {
+        let len = self.kept.len();
+        let span = match &range {
+            CommitRange::Ranks(r) => (r.start as usize).min(len)..(r.end as usize).min(len),
+            _ => 0..len,
+        };
+        Box::new(span.filter_map(move |i| {
+            let c = self.commit(dense(i))?;
+            match &range {
+                CommitRange::Time(t) => t.contains(&c.time).then_some(c),
+                _ => Some(c),
+            }
+        }))
+    }
+
+    fn rows_for(&self, commits: Vec<Rank>) -> Stream<'_, (Rank, Vec<FileRow>)> {
+        Box::new(
+            commits
+                .into_iter()
+                .filter(|r| (r.0 as usize) < self.kept.len())
+                .map(|r| (r, self.rows(r))),
+        )
+    }
+
+    fn commit_id(&self, rank: Rank) -> Option<Arc<str>> {
+        self.base.commit_id(self.base_rank(rank)?)
+    }
+
+    fn parent_ids(&self, rank: Rank) -> Vec<Arc<str>> {
+        self.base_rank(rank)
+            .map(|b| self.base.parent_ids(b))
+            .unwrap_or_default()
+    }
+
+    fn find_commit(&self, id: &str) -> Option<Rank> {
+        let b = self.base.find_commit(id)?;
+        self.by_base.get(&b).map(|&i| Rank(i))
+    }
+
+    fn agg_author_day(&self, days: Range<i64>) -> Stream<'_, AuthorDayRow> {
+        let mut m: BTreeMap<(i64, IdentId), (u64, Sums)> = BTreeMap::new();
+        for c in self.commits_in(CommitRange::All).filter(|c| !c.merge) {
+            let day = local_day_of(c.time, c.offset);
+            if days.contains(&day) {
+                let e = m.entry((day, c.ident)).or_default();
+                e.0 += 1;
+                e.1.merge(&c.sums);
+            }
+        }
+        Box::new(
+            m.into_iter()
+                .map(|((day, ident), (commits, sums))| AuthorDayRow {
+                    day,
+                    ident,
+                    commits,
+                    sums,
+                }),
+        )
+    }
+
+    fn agg_path_author(&self, prefix: &str) -> Stream<'_, PathAuthorRow> {
+        let prefix = prefix.trim_matches('/');
+        let mut m: BTreeMap<(PathId, IdentId), (u64, Sums)> = BTreeMap::new();
+        for c in self.commits_in(CommitRange::All).filter(|c| !c.merge) {
+            for f in self.rows(c.rank) {
+                if prefix.is_empty() || self.base.path(f.path).is_some_and(|n| under(&n, prefix)) {
+                    let e = m.entry((f.path, c.ident)).or_default();
+                    e.0 += 1;
+                    e.1.add_row(&f);
+                }
+            }
+        }
+        Box::new(
+            m.into_iter()
+                .map(|((path, ident), (touches, sums))| PathAuthorRow {
+                    path,
+                    ident,
+                    touches,
+                    sums,
+                }),
+        )
+    }
+
+    fn postings(&self, key: Posting) -> Stream<'_, Hit> {
+        Box::new((0..self.kept.len()).flat_map(move |i| {
+            let r = dense(i);
+            let hits: Vec<Hit> = match key {
+                Posting::Author(a) => self
+                    .commit(r)
+                    .filter(|c| c.ident == a)
+                    .map(|_| Hit { rank: r, row: 0 })
+                    .into_iter()
+                    .collect(),
+                Posting::Path(p) => {
+                    if self.commit(r).is_none_or(|c| c.merge) {
+                        Vec::new()
+                    } else {
+                        self.rows(r)
+                            .iter()
+                            .enumerate()
+                            .filter(|(_, f)| f.path == p)
+                            .map(|(row, _)| Hit {
+                                rank: r,
+                                row: u32::try_from(row).unwrap_or(u32::MAX),
+                            })
+                            .collect()
+                    }
+                }
+            };
+            hits
+        }))
+    }
+
+    fn rename_edges(&self) -> Stream<'_, RenameEdge> {
+        Box::new((0..self.kept.len()).flat_map(move |i| {
+            let r = dense(i);
+            let edges: Vec<RenameEdge> = self
+                .rows(r)
+                .iter()
+                .enumerate()
+                .filter_map(|(row, f)| {
+                    f.old.map(|old| RenameEdge {
+                        rank: r,
+                        row: u32::try_from(row).unwrap_or(u32::MAX),
+                        old,
+                        new: f.path,
+                    })
+                })
+                .collect();
+            edges
+        }))
+    }
+
+    fn path(&self, id: PathId) -> Option<Arc<str>> {
+        self.base.path(id)
+    }
+
+    fn find_path(&self, path: &str) -> Option<PathId> {
+        self.base.find_path(path)
+    }
+
+    fn paths(&self) -> usize {
+        self.base.paths()
+    }
+
+    fn ident(&self, id: IdentId) -> Option<(Arc<str>, Arc<str>)> {
+        self.base.ident(id)
+    }
+
+    fn idents(&self) -> usize {
+        self.base.idents()
+    }
+
+    fn label(&self, id: LabelId) -> Option<Arc<str>> {
+        self.base.label(id)
+    }
+
+    fn find_label(&self, name: &str) -> Option<LabelId> {
+        self.base.find_label(name)
+    }
+}
+
 /// True when `path` is `prefix` itself or inside it.
 pub fn under(path: &str, prefix: &str) -> bool {
     path == prefix
@@ -155,7 +442,10 @@ impl OptionParams {
 
 #[cfg(test)]
 mod tests {
-    use super::{OptionParams, Selection, under};
+    use std::sync::Arc;
+
+    use super::{OptionParams, Scoped, Selection, under};
+    use crate::feed::{CommitRange, InsightsSource, MemorySource, Rank};
     use crate::insights::fixtures::{file, rec};
     use crate::{CommitRecord, Options};
 
@@ -237,5 +527,50 @@ mod tests {
         assert!(!o.include_bots && !o.respect_ignore && !o.include_generated);
         assert_eq!(o.exclude, ["docs/*", "*.md", "x/*"]);
         assert_eq!(OptionParams::default().apply(defaults.clone()), defaults);
+    }
+
+    /// The scoped view must keep exactly the commits and rows `Selection::apply` plus the
+    /// window keep, in order, with sums over the kept rows. Every selection of
+    /// `selections_stack` plus path and window cells.
+    #[test]
+    fn scoped_equals_apply() {
+        let recs = sample();
+        let base: Arc<dyn InsightsSource> = Arc::new(MemorySource::shared(Arc::new(recs.clone())));
+        let cells = [
+            Selection::default(),
+            sel(Some("fix"), None, None),
+            sel(Some("fix"), Some("web"), None),
+            sel(Some("other"), None, None),
+            sel(None, Some("none"), None),
+            sel(Some("fix"), None, Some("ANN@x.io")),
+            sel(None, None, Some("bob")),
+            Selection {
+                path: Some("/crates/web/".into()),
+                ..Selection::default()
+            },
+        ];
+        let t = |d: i64| crate::insights::fixtures::MON + d * crate::insights::fixtures::DAYS;
+        for s in &cells {
+            for w in [None, Some(t(40)..t(100)), Some(t(0)..t(1))] {
+                let want: Vec<_> = s
+                    .apply(&recs)
+                    .iter()
+                    .filter(|r| w.as_ref().is_none_or(|w| w.contains(&r.time)))
+                    .cloned()
+                    .collect();
+                let v = Scoped::new(Arc::clone(&base), s, w.clone());
+                assert_eq!(v.len(), want.len(), "{s:?} {w:?}");
+                let rows: Vec<_> = v.commits_in(CommitRange::All).collect();
+                for (i, (c, r)) in rows.iter().zip(&want).enumerate() {
+                    assert_eq!(c.rank, Rank(u32::try_from(i).unwrap_or(0)));
+                    assert_eq!(v.commit_id(c.rank).as_deref(), Some(r.id.as_str()));
+                    assert_eq!(c.files as usize, r.files.len(), "{s:?} {}", r.id);
+                    let add: u64 = r.files.iter().map(|f| u64::from(f.additions)).sum();
+                    assert_eq!(c.sums.add, add);
+                    assert_eq!(v.find_commit(&r.id), Some(c.rank));
+                }
+                assert_eq!(v.len(), want.len());
+            }
+        }
     }
 }

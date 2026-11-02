@@ -5,7 +5,10 @@
 use gitterrace_git::civil_from_days as civil;
 
 use crate::CommitRecord;
-use crate::insights::{Period, days_from_civil, format_date, local_day, reference_record, weekday};
+use crate::feed::{CommitRange, CommitRow, InsightsSource, local_day_of};
+use crate::insights::{
+    Period, days_from_civil, format_date, local_day, reference_day, reference_record, weekday,
+};
 
 /// Longest `All` span, in days, that still reads best as one bar per day (60 bars).
 const ALL_DAYS_MAX: i64 = 60;
@@ -169,6 +172,33 @@ impl TimeAxis {
         }
     }
 
+    /// [`TimeAxis::covering`] over sources: `all` is the unscoped history, `shown` the view.
+    pub fn covering_source(
+        period: Option<Period>,
+        all: &dyn InsightsSource,
+        shown: &dyn InsightsSource,
+    ) -> Self {
+        if period.is_some_and(|p| p != Period::All) {
+            return reference_day(all)
+                .map_or_else(Self::empty, |last| Self::for_period(period, last, last));
+        }
+        let (mut lo, mut hi) = (None::<i64>, None::<i64>);
+        for c in shown.commits_in(CommitRange::All) {
+            let d = local_day_of(c.time, c.offset);
+            lo = Some(lo.map_or(d, |x| x.min(d)));
+            hi = Some(hi.map_or(d, |x| x.max(d)));
+        }
+        match (lo, hi) {
+            (Some(first), Some(last)) => Self::for_period(period, first, last),
+            _ => Self::empty(),
+        }
+    }
+
+    /// Bucket of a commit, see [`TimeAxis::slot_day`].
+    pub fn slot_row(&self, c: &CommitRow) -> Option<usize> {
+        self.slot_day(local_day_of(c.time, c.offset))
+    }
+
     pub const fn unit(&self) -> BucketUnit {
         self.unit
     }
@@ -281,5 +311,52 @@ mod tests {
         assert_eq!(w.slot_day(last + 3), None);
         assert_eq!(w.slot_day(last - 8), None);
         assert_eq!(axis(None, 10, 5).slot_day(7), None);
+    }
+
+    /// The source axis equals the record axis on every period, with ties in time, a commit
+    /// after the wall clock and offsets that move the local day.
+    #[test]
+    fn source_axis_equals_record_axis() {
+        use crate::feed::{InsightsSource, MemorySource};
+        use crate::insights::fixtures::{file, rec};
+        use crate::insights::{local_day, reference_day, reference_record};
+        let mut recs = vec![
+            rec("a", "ann", 0, vec![file("x", 1, 0, 1)]),
+            rec("b", "bob", 400, vec![file("x", 1, 0, 1)]),
+            rec("c", "cy", 400, vec![file("y", 1, 0, 1)]),
+            rec("d", "di", 900_000, vec![file("y", 1, 0, 1)]),
+        ];
+        recs[1].offset = -13 * 3600;
+        recs[2].offset = 14 * 3600;
+        let shown = &recs[1..3];
+        let (all_src, shown_src) = (MemorySource::new(&recs), MemorySource::new(shown));
+        assert_eq!(
+            reference_day(&all_src),
+            reference_record(&recs).map(local_day),
+            "reference day"
+        );
+        for p in [
+            None,
+            Some(Period::Week),
+            Some(Period::Year),
+            Some(Period::All),
+        ] {
+            let want = TimeAxis::covering(p, &recs, shown);
+            let got = TimeAxis::covering_source(p, &all_src, &shown_src);
+            assert_eq!(
+                got.names().collect::<Vec<_>>(),
+                want.names().collect::<Vec<_>>()
+            );
+            assert_eq!(got.unit(), want.unit());
+        }
+        let c = all_src.commit(crate::feed::Rank(2));
+        assert_eq!(
+            c.and_then(|c| want_slot(&recs, &c)),
+            TimeAxis::covering(None, &recs, &recs).slot(&recs[2])
+        );
+    }
+
+    fn want_slot(recs: &[crate::CommitRecord], c: &crate::feed::CommitRow) -> Option<usize> {
+        TimeAxis::covering(None, recs, recs).slot_row(c)
     }
 }

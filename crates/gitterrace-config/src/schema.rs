@@ -158,9 +158,10 @@ settings! {
         threads: usize = 0 => Restart,
     }
     resources: Resources {
-        /// Memory for the blame and highlighted-code caches together, in MB, shared half and
-        /// half. The highlighted-code cache is per process, the blame cache per repository.
-        cache_mb: usize = 64 => Live,
+        /// Memory for the serving caches of one repository together, in MB: a quarter each for
+        /// blame and highlighted code, an eighth each for rendered pages, file lists, last
+        /// commits and path logs. An entry over an eighth of its cache is not kept.
+        cache_mb: usize = 32 => Live,
         /// Most page-building git jobs running at once across all repositories. 0 means one per
         /// core.
         blocking_jobs: usize = 0 => Live,

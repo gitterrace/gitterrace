@@ -5,6 +5,9 @@
 #![expect(clippy::expect_used, reason = "setup failures should panic")]
 
 mod fixture;
+pub mod matrix;
+pub mod oracle;
+pub mod synthetic;
 mod web;
 
 use std::io::Write;
@@ -14,7 +17,7 @@ use std::sync::OnceLock;
 
 pub use fixture::{Adversarial, FAR_FUTURE, Fixture};
 pub use gitterrace_config::DEFAULT_ADDR;
-pub use web::get;
+pub use web::{base, get, page};
 
 /// The port of [`DEFAULT_ADDR`], for tests that build a `Host` or `Origin` from it.
 #[must_use]

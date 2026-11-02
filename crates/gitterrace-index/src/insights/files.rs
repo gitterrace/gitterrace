@@ -1,7 +1,10 @@
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{BTreeMap, HashSet};
 
+use gitterrace_git::civil_from_days;
+
+use crate::feed::{CommitRow, InsightsSource, PathId, Posting, Rank, RenameEdge};
 use crate::insights::fasthash::FastMap;
-use crate::insights::{HeadFile, Insights, Period, year_of};
+use crate::insights::{DAY, HeadFile, Insights, Period};
 
 /// Most files in one commit that still say something about coupling; bigger commits are
 /// sweeps (formatting, renames, vendoring).
@@ -9,20 +12,78 @@ const COUPLING_MAX_FILES: usize = 30;
 const SOLO_SHARE: f64 = 0.8;
 const STALE_SECS: i64 = 365 * 86_400;
 
-/// One change to a file, kept per canonical (head) path.
+/// One change to a file, followed to its canonical (head) name.
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct TouchRaw {
-    pub commit: u32,
-    /// Index into the commit's `files`, which holds the name at that time.
-    pub file: u32,
+    pub commit: Rank,
+    /// Read by the postings cross-check only.
+    #[cfg_attr(
+        not(test),
+        expect(dead_code, reason = "read by the postings cross-check")
+    )]
+    pub row: u32,
+    /// The file row inside the commit, which holds the name at that time.
+    pub path: PathId,
     pub lines: u32,
 }
 
-/// Every non-merge commit that touched a path, followed back through renames to the name the
-/// file has at the newest commit.
+/// The rename aliases of the whole history, replayed newest first as the old in-memory follow
+/// did: a name maps to the name its file has at the newest commit. Only rename rows change an
+/// alias, so the log is sized by renames, not by history.
 #[derive(Default)]
-pub(crate) struct Follow<'a> {
-    pub touches: FastMap<&'a str, Vec<TouchRaw>>,
+pub(crate) struct Follow {
+    /// Per path id, every alias it took, in replay order: (rank, row, canonical id). A row
+    /// sees the aliases set by newer commits and by earlier rows of its own commit.
+    log: FastMap<PathId, Vec<(Rank, u32, PathId)>>,
+    /// Per canonical id, the other ids that ever aliased to it.
+    names: FastMap<PathId, Vec<PathId>>,
+}
+
+impl Follow {
+    /// Replays `edges` newest commit first, rows ascending, merges left out.
+    pub(crate) fn build(src: &dyn InsightsSource) -> Self {
+        let mut edges: Vec<RenameEdge> = src.rename_edges().collect();
+        edges.sort_by(|x, y| y.rank.cmp(&x.rank).then_with(|| x.row.cmp(&y.row)));
+        let mut alias: FastMap<PathId, PathId> = FastMap::default();
+        let mut out = Self::default();
+        let mut merge: Option<(Rank, bool)> = None;
+        for e in edges {
+            let is_merge = match merge {
+                Some((r, m)) if r == e.rank => m,
+                _ => {
+                    let m = src.commit(e.rank).is_some_and(|c| c.merge);
+                    merge = Some((e.rank, m));
+                    m
+                }
+            };
+            if is_merge {
+                continue;
+            }
+            let canon = alias.get(&e.new).copied().unwrap_or(e.new);
+            alias.insert(e.old, canon);
+            out.log
+                .entry(e.old)
+                .or_default()
+                .push((e.rank, e.row, canon));
+            let n = out.names.entry(canon).or_default();
+            if !n.contains(&e.old) {
+                n.push(e.old);
+            }
+        }
+        out
+    }
+
+    /// Canonical id of `path` as seen by row `row` of commit `rank`.
+    fn canonical(&self, path: PathId, rank: Rank, row: u32) -> PathId {
+        self.log
+            .get(&path)
+            .and_then(|l| {
+                l.iter()
+                    .take_while(|(r, w, _)| *r > rank || (*r == rank && *w < row))
+                    .last()
+            })
+            .map_or(path, |e| e.2)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
@@ -121,93 +182,162 @@ pub struct AgeReport {
     pub total_lines: u64,
 }
 
-impl<'a> Insights<'a> {
-    pub(crate) fn build_follow(&self) -> Follow<'a> {
-        let mut alias: FastMap<&str, &str> = FastMap::default();
-        let mut touches: FastMap<&str, Vec<TouchRaw>> = FastMap::default();
-        for i in (0..self.records.len()).rev() {
-            let r = &self.records[i];
-            if r.merge {
-                continue;
-            }
-            for (fi, f) in r.files.iter().enumerate() {
-                let path = alias.get(&*f.path).copied().unwrap_or(&*f.path);
-                if let Some(old) = &f.old {
-                    alias.insert(&**old, path);
-                }
-                let l = self.lines_unfiltered(f);
-                touches.entry(path).or_default().push(TouchRaw {
-                    commit: u32::try_from(i).unwrap_or(u32::MAX),
-                    file: u32::try_from(fi).unwrap_or(u32::MAX),
-                    lines: l.add + l.del,
-                });
-            }
-        }
-        Follow { touches }
+impl Insights<'_> {
+    pub(crate) fn build_follow(&self) -> Follow {
+        Follow::build(self.source())
     }
 
-    /// Touches of `path` in the period by counted commits, newest first.
-    fn touches_in(
+    /// Follow hits of `path` (the name at the newest commit), newest commit first, rows
+    /// ascending: the order the old full replay produced.
+    fn hits_of(&self, path: &str) -> Vec<(Rank, u32, PathId)> {
+        let src = self.source();
+        let Some(head) = src.find_path(path) else {
+            return Vec::new();
+        };
+        let follow = self.follow();
+        let mut hits: Vec<(Rank, u32, PathId)> = Vec::new();
+        let mut names = vec![head];
+        names.extend(follow.names.get(&head).into_iter().flatten().copied());
+        for p in names {
+            for h in src.postings(Posting::Path(p)) {
+                if follow.canonical(p, h.rank, h.row) == head {
+                    hits.push((h.rank, h.row, p));
+                }
+            }
+        }
+        hits.sort_unstable_by(|x, y| y.0.cmp(&x.0).then_with(|| x.1.cmp(&y.1)));
+        hits.dedup_by_key(|h| (h.0, h.1));
+        hits
+    }
+
+    /// Touches of every path in `paths`, one list per path. Each commit is read once for all
+    /// paths and the rows in one ascending pass, so the cost is the touches, not files x
+    /// commits. `keep` drops commits before their rows are read.
+    fn touches_many(
         &self,
-        path: &str,
-        from: i64,
-        to: i64,
-    ) -> impl Iterator<Item = &super::files::TouchRaw> {
-        self.follow()
-            .touches
-            .get(path)
-            .into_iter()
+        paths: &[&str],
+        keep: impl Fn(&CommitRow) -> bool,
+    ) -> Vec<Vec<(TouchRaw, CommitRow)>> {
+        let src = self.source();
+        let hits: Vec<Vec<(Rank, u32, PathId)>> = paths.iter().map(|p| self.hits_of(p)).collect();
+        let mut ranks: Vec<Rank> = hits.iter().flatten().map(|h| h.0).collect();
+        ranks.sort_unstable();
+        ranks.dedup();
+        let commits: FastMap<Rank, CommitRow> = ranks
+            .iter()
+            .filter_map(|r| src.commit(*r))
+            .filter(|c| keep(c))
+            .map(|c| (c.rank, c))
+            .collect();
+        ranks.retain(|r| commits.contains_key(r));
+        let want: HashSet<(Rank, u32)> = hits
+            .iter()
             .flatten()
-            .filter(move |t| {
-                let i = t.commit as usize;
-                let time = self.records[i].time;
-                time >= from && time < to && self.counted(i)
+            .filter(|h| commits.contains_key(&h.0))
+            .map(|h| (h.0, h.1))
+            .collect();
+        let mut lines: FastMap<(Rank, u32), u32> = FastMap::default();
+        for (rank, rows) in src.rows_for(ranks) {
+            for (i, r) in rows.iter().enumerate() {
+                let row = u32::try_from(i).unwrap_or(u32::MAX);
+                if want.contains(&(rank, row)) {
+                    let l = self.row_lines_unfiltered(r);
+                    lines.insert((rank, row), l.add + l.del);
+                }
+            }
+        }
+        hits.into_iter()
+            .map(|list| {
+                list.into_iter()
+                    .filter_map(|(commit, row, path)| {
+                        let c = *commits.get(&commit)?;
+                        let lines = lines.get(&(commit, row)).copied().unwrap_or(0);
+                        Some((
+                            TouchRaw {
+                                commit,
+                                row,
+                                path,
+                                lines,
+                            },
+                            c,
+                        ))
+                    })
+                    .collect()
             })
+            .collect()
+    }
+
+    /// Every non-merge touch of `path`, through renames, newest first.
+    fn touches_of(&self, path: &str) -> Vec<(TouchRaw, CommitRow)> {
+        self.touches_many(&[path], |_| true)
+            .pop()
+            .unwrap_or_default()
+    }
+
+    /// Touches of each head path in the period by counted commits, newest first.
+    fn touches_in(&self, paths: &[&str], from: i64, to: i64) -> Vec<Vec<(TouchRaw, CommitRow)>> {
+        self.touches_many(paths, |c| {
+            c.time >= from && c.time < to && self.counted_row(c)
+        })
+    }
+
+    /// (rank, row) of every follow touch of `path`, newest first: the old follow table's
+    /// entry, for cross-checks against the segment postings.
+    #[cfg(test)]
+    pub(crate) fn follow_hits(&self, path: &str) -> Vec<(u32, u32)> {
+        self.touches_of(path)
+            .iter()
+            .map(|(t, _)| (t.commit.0, t.row))
+            .collect()
     }
 
     /// Full history of a file as it is named at the newest commit, following renames.
     /// Includes bots and every non-merge commit, newest first.
     pub fn file_history(&self, path: &str) -> Vec<Touch> {
-        let mut out: Vec<Touch> = self
-            .follow()
-            .touches
-            .get(path)
+        let src = self.source();
+        let mut out: Vec<(Rank, Touch)> = self
+            .touches_of(path)
             .into_iter()
-            .flatten()
-            .map(|t| {
-                let r = &self.records[t.commit as usize];
-                Touch {
-                    commit: r.id.clone(),
-                    time: r.time,
-                    author: self.people.list[self.person[t.commit as usize]]
-                        .name
-                        .clone(),
-                    lines: t.lines,
-                    path: r.files[t.file as usize].path.to_string(),
-                }
+            .map(|(t, c)| {
+                (
+                    t.commit,
+                    Touch {
+                        commit: src
+                            .commit_id(t.commit)
+                            .map(|s| s.to_string())
+                            .unwrap_or_default(),
+                        time: c.time,
+                        author: self.d.people.list[self.person_of(c.ident)].name.clone(),
+                        lines: t.lines,
+                        path: src.path(t.path).map(|s| s.to_string()).unwrap_or_default(),
+                    },
+                )
             })
             .collect();
-        out.sort_by_key(|t| std::cmp::Reverse(t.time));
-        out
+        // Ties on time go to the newer rank: never the storage order.
+        out.sort_by_key(|(r, t)| (std::cmp::Reverse(t.time), std::cmp::Reverse(*r)));
+        out.into_iter().map(|(_, t)| t).collect()
     }
 
     /// Hotspots among `files` (the head tree) for the period.
     pub fn hotspots(&self, files: &[HeadFile], period: Period) -> HotspotReport {
         let (from, to) = period.window(self.now);
         let mut rows = Vec::new();
-        for f in files {
-            if f.lines == 0 || self.filter.skips(&f.path) {
-                continue;
-            }
+        let shown: Vec<&HeadFile> = files
+            .iter()
+            .filter(|f| f.lines != 0 && !self.d.filter.skips(&f.path))
+            .collect();
+        let names: Vec<&str> = shown.iter().map(|f| &*f.path).collect();
+        for (f, touches) in shown.into_iter().zip(self.touches_in(&names, from, to)) {
             let mut count = 0;
             let mut churn = 0u64;
             let mut last = i64::MIN;
             let mut who = HashSet::new();
-            for t in self.touches_in(&f.path, from, to) {
+            for (t, c) in touches {
                 count += 1;
                 churn += u64::from(t.lines);
-                last = last.max(self.records[t.commit as usize].time);
-                who.insert(self.person[t.commit as usize]);
+                last = last.max(c.time);
+                who.insert(self.person(t.commit));
             }
             if count == 0 {
                 continue;
@@ -253,14 +383,18 @@ impl<'a> Insights<'a> {
         let mut dirs: BTreeMap<String, Acc> = BTreeMap::new();
         let mut all = Acc::default();
         let (mut solo, mut stale, mut untracked) = (0u64, 0u64, 0u64);
-        for f in files {
-            if f.lines == 0 || self.filter.skips(&f.path) {
-                continue;
-            }
-            let mut who: HashMap<usize, u64> = HashMap::new();
+        let shown: Vec<&HeadFile> = files
+            .iter()
+            .filter(|f| f.lines != 0 && !self.d.filter.skips(&f.path))
+            .collect();
+        let names: Vec<&str> = shown.iter().map(|f| &*f.path).collect();
+        for (f, touches) in shown.into_iter().zip(self.touches_in(&names, from, to)) {
+            // Ordered by person (most commits first), so a tie for top owner and the float sums
+            // below come out the same on every run; a HashMap made "Stale lines" vary.
+            let mut who: BTreeMap<usize, u64> = BTreeMap::new();
             let mut changed = 0u64;
-            for t in self.touches_in(&f.path, from, to) {
-                *who.entry(self.person[t.commit as usize]).or_default() += u64::from(t.lines);
+            for (t, c) in touches {
+                *who.entry(self.person_of(c.ident)).or_default() += u64::from(t.lines);
                 changed += u64::from(t.lines);
             }
             if changed == 0 {
@@ -291,7 +425,7 @@ impl<'a> Insights<'a> {
             if top_w / f64::from(f.lines) >= SOLO_SHARE {
                 solo += u64::from(f.lines);
             }
-            if self.last_seen[top_p] < self.now.saturating_sub(STALE_SECS) {
+            if self.d.last_seen[top_p] < self.now.saturating_sub(STALE_SECS) {
                 stale += u64::from(f.lines);
             }
         }
@@ -312,7 +446,7 @@ impl<'a> Insights<'a> {
                 owners: owners
                     .into_iter()
                     .map(|(p, w)| Owner {
-                        name: self.people.list[p].name.clone(),
+                        name: self.d.people.list[p].name.clone(),
                         share: w / total,
                     })
                     .collect(),
@@ -345,29 +479,20 @@ impl<'a> Insights<'a> {
         let (from, to) = period.window(self.now);
         let mut head: Vec<&str> = files
             .iter()
-            .filter(|f| !self.filter.skips(&f.path))
+            .filter(|f| !self.d.filter.skips(&f.path))
             .map(|f| &*f.path)
             .collect();
         head.sort_unstable();
         head.dedup();
         // Flat (commit, file) pairs sorted by commit replace a map of vectors: one allocation
-        // and a sequential pass, where hashing every touch of every head file dominated.
+        // and a sequential pass. State is sized by the touches of head files in the window.
         let mut touches: Vec<(u32, u32)> = Vec::new();
         let mut changes = vec![0_usize; head.len()];
-        // Whether a commit counts in the window is a property of the commit, not of each touch.
-        let live: Vec<bool> = (0..self.records.len())
-            .map(|c| {
-                let time = self.records[c].time;
-                time >= from && time < to && self.counted(c)
-            })
-            .collect();
-        for (i, path) in head.iter().enumerate() {
+        for (i, list) in self.touches_in(&head, from, to).into_iter().enumerate() {
             let id = u32::try_from(i).unwrap_or(u32::MAX);
-            for t in self.follow().touches.get(path).into_iter().flatten() {
-                if live[t.commit as usize] {
-                    touches.push((t.commit, id));
-                    changes[i] += 1;
-                }
+            for (t, _) in list {
+                touches.push((t.commit.0, id));
+                changes[i] += 1;
             }
         }
         touches.sort_unstable();
@@ -427,16 +552,18 @@ impl<'a> Insights<'a> {
     pub fn code_age(&self, files: &[HeadFile]) -> AgeReport {
         let mut years: BTreeMap<i64, (u64, usize)> = BTreeMap::new();
         let mut total = 0;
-        for f in files {
-            if f.lines == 0 || self.filter.skips(&f.path) {
+        let shown: Vec<&HeadFile> = files
+            .iter()
+            .filter(|f| f.lines != 0 && !self.d.filter.skips(&f.path))
+            .collect();
+        let names: Vec<&str> = shown.iter().map(|f| &*f.path).collect();
+        let all = self.touches_in(&names, i64::MIN, i64::MAX);
+        for (f, touches) in shown.into_iter().zip(all) {
+            let Some((_, c)) = touches.into_iter().max_by_key(|t| t.0.commit) else {
                 continue;
-            }
-            let newest = self
-                .touches_in(&f.path, i64::MIN, i64::MAX)
-                .map(|t| t.commit)
-                .max();
-            let Some(c) = newest else { continue };
-            let e = years.entry(year_of(&self.records[c as usize])).or_default();
+            };
+            let day = c.time.saturating_add(i64::from(c.offset)).div_euclid(DAY);
+            let e = years.entry(civil_from_days(day).0).or_default();
             e.0 += u64::from(f.lines);
             e.1 += 1;
             total += u64::from(f.lines);
@@ -455,7 +582,7 @@ impl<'a> Insights<'a> {
 struct Acc {
     lines: u64,
     files: usize,
-    w: HashMap<usize, f64>,
+    w: BTreeMap<usize, f64>,
 }
 
 #[cfg(test)]
@@ -503,6 +630,34 @@ mod tests {
                 vec![file("new/x.rs", 3, 0, 14), file("keep.rs", 1, 0, 5)],
             ),
         ]
+    }
+
+    #[test]
+    fn ownership_is_the_same_on_every_build() {
+        // Ann and Bob tie on every file; Ann is stale, Bob is not. A hash-ordered pick of the
+        // top owner flipped "stale" between runs.
+        let mut recs = Vec::new();
+        for n in 0..40 {
+            let path = format!("f{n}.rs");
+            recs.push(rec(&format!("a{n}"), "Ann", 0, vec![file(&path, 5, 0, 5)]));
+            recs.push(rec(
+                &format!("b{n}"),
+                "Bob",
+                900,
+                vec![file(&path, 0, 5, 5)],
+            ));
+        }
+        let files: Vec<(String, u32)> = (0..40).map(|n| (format!("f{n}.rs"), 5)).collect();
+        let files: Vec<(&str, u32)> = files.iter().map(|(p, l)| (p.as_str(), *l)).collect();
+        let render = || {
+            let ins = Insights::new(&recs, Options::default(), None);
+            let r = ins.ownership(&head(&files), Period::All, 1);
+            format!("{} {} {:?}", r.stale_lines, r.solo_lines, r.overall)
+        };
+        let first = render();
+        for _ in 0..20 {
+            assert_eq!(render(), first);
+        }
     }
 
     #[test]

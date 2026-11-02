@@ -97,7 +97,7 @@ pub(crate) async fn page(
         HotspotsPage {
             c,
             tabs: views::stats_tabs("ho"),
-            fb: f.bar("/stats/hotspots", r),
+            fb: f.bar("/stats/hotspots", &**r),
             opts: q.row(&d, "/stats/hotspots"),
             empty: ins
                 .period_summary(period_of(&q, &d, Period::All))
