@@ -21,7 +21,8 @@ Agents write more of the code each month, and few people read their diffs. This 
 place to look again ([why](docs/why.md)).
 
 <!-- BEGIN GENERATED: demo -->
-Try it without installing: [the live demo](https://demo.gitterrace.dev): jq 1.8.2 and ripgrep 15.2.0, exported.
+Try it without installing: [the live demo](https://demo.gitterrace.dev): jq 1.8.2 and ripgrep
+15.2.0, exported.
 
 <!-- END GENERATED: demo -->
 
@@ -41,7 +42,10 @@ cargo install --locked --git https://github.com/gitterrace/gitterrace gitterrace
 Installs `git-terrace`; git runs it as `git terrace`.
 
 <!-- END GENERATED: install -->
-Windows: CI builds and tests `x86_64-pc-windows-msvc` and smoke-tests the binary on a Windows runner, and releases ship a zip. Runtime was also smoke-tested under Wine (`scripts/wine-run.sh`). Config lives in `%APPDATA%\gitterrace`, the repo registry in `%LOCALAPPDATA%\gitterrace`, and `install-handler` prints the `reg add` commands instead of writing the registry.
+Windows: CI builds and tests `x86_64-pc-windows-msvc` and smoke-tests the binary on a Windows
+runner, and releases ship a zip. Runtime was also smoke-tested under Wine (`scripts/wine-run.sh`).
+Config lives in `%APPDATA%\gitterrace`, the repo registry in `%LOCALAPPDATA%\gitterrace`, and
+`install-handler` prints the `reg add` commands instead of writing the registry.
 
 ## Quickstart
 
@@ -68,10 +72,12 @@ git terrace export [out]     Write a static copy of the site to a folder, for sh
 <!-- END GENERATED: commands -->
 
 <!-- BEGIN GENERATED: actions -->
-Run your own program on a selection (`line`, `file`, `commit`, `hunk`, `blame`, `search-hit`, `insight`, `page`). Examples in `docs/actions/`: `clipboard.sh`, `editor.sh`, `obsidian.sh`.
+Run your own program on a selection (`line`, `file`, `commit`, `hunk`, `blame`, `search-hit`,
+`insight`, `page`). Examples in `docs/actions/`: `clipboard.sh`, `editor.sh`, `obsidian.sh`.
 
 <!-- END GENERATED: actions -->
-Send a selection to a tracker, notes app or mail draft, or run your own program on it. Off until you write `actions.toml`: [how to set it up](docs/actions.md).
+Send a selection to a tracker, notes app or mail draft, or run your own program on it. Off until
+you write `actions.toml`: [how to set it up](docs/actions.md).
 
 Docs: [why](docs/why.md), [configuration](docs/configuration.md), [JSON API](docs/api.md),
 [architecture](docs/architecture.md), [benchmarks](docs/benchmarks.md). Binds to `127.0.0.1`, never

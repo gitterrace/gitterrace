@@ -3088,6 +3088,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "textwrap"
+version = "0.16.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6ecfad6c3abc80a577f2b91c1e412ee57e7a060d430b553c1b0c940974ebcd49"
+
+[[package]]
 name = "thiserror"
 version = "2.0.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3620,6 +3626,7 @@ dependencies = [
  "pulldown-cmark",
  "serde_json",
  "tempfile",
+ "textwrap",
 ]
 
 [[package]]

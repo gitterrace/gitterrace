@@ -2,11 +2,17 @@
 
 # Configuration
 
-One optional file, `config.toml`, in `$XDG_CONFIG_HOME/gitterrace` or `~/.config/gitterrace` (`--config DIR` picks another folder). It is never read from a served repository. A flag beats the file, the file beats the default. Unknown keys warn, invalid values stop startup naming the key. `git terrace config` prints what is in force and where each value came from.
+One optional file, `config.toml`, in `$XDG_CONFIG_HOME/gitterrace` or `~/.config/gitterrace`
+(`--config DIR` picks another folder). It is never read from a served repository. A flag beats the
+file, the file beats the default. Unknown keys warn, invalid values stop startup naming the key.
+`git terrace config` prints what is in force and where each value came from.
 
-A running server reloads `config.toml` within a second of an edit. An invalid edit is logged with the key and the old settings stay. Open pages show "Updated, refresh". Settings marked "Needs a restart" log a warning and keep their running value.
+A running server reloads `config.toml` within a second of an edit. An invalid edit is logged with
+the key and the old settings stay. Open pages show "Updated, refresh". Settings marked "Needs a
+restart" log a warning and keep their running value.
 
-Per-repository overrides go under `[repo.NAME]` (the repository's folder name) and take `exclude`, a list of path globs added to `insights.exclude`.
+Per-repository overrides go under `[repo.NAME]` (the repository's folder name) and take `exclude`, a
+list of path globs added to `insights.exclude`.
 
 Actions live in their own file, `actions.toml`, because they run commands.
 

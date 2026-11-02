@@ -11,7 +11,8 @@ JSON is `snake_case`. The same endpoints as `OpenAPI` 3.1: [openapi.json](openap
 
 Under several repositories the API of each lives at `/r/{name}/api/v1`.
 
-Rust: `gitterrace_api::router(ApiState)` (nest under `/api/v1`), `gitterrace_api::serve_mcp(path, config)`.
+Rust: `gitterrace_api::router(ApiState)` (nest under `/api/v1`),
+`gitterrace_api::serve_mcp(path, config)`.
 
 | Status | `code` | Meaning |
 |---|---|---|
@@ -24,7 +25,8 @@ Rust: `gitterrace_api::router(ApiState)` (nest under `/api/v1`), `gitterrace_api
 
 A 5xx `message` is always the same fixed text. The details go to the server log.
 
-Answers are capped so one file cannot flood a client: `log` at 500 per page, `blob` at 5000 lines and 256 KiB, `blame` at 5000 lines, each with `truncated` when cut.
+Answers are capped so one file cannot flood a client: `log` at 500 per page, `blob` at 5000 lines
+and 256 KiB, `blame` at 5000 lines, each with `truncated` when cut.
 
 ## HTTP (`/api/v1`)
 

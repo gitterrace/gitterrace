@@ -14,6 +14,7 @@ switch palette with prefers-color-scheme.
 import json
 import re
 import sys
+import textwrap
 from html import escape
 from pathlib import Path
 
@@ -182,13 +183,41 @@ def block(cur, old):
     return "\n".join(L).rstrip("\n") + "\n"
 
 
+# Prose width of every tracked page; scripts/markdownlint/prose-length.cjs enforces it, and
+# xtask's out::wrap_markdown applies the same rule to the Rust-generated blocks.
+WIDTH = 100
+
+
+def wrap(md):
+    """Wrap prose lines at WIDTH; tables, fences, headings, lists, HTML and SVG stay as written."""
+    out, fence = [], False
+    for line in md.split("\n"):
+        t = line.lstrip()
+        if t.startswith("```"):
+            fence = not fence
+        if (
+            fence
+            or t.startswith(("```", "|", "#", "<", "- ", "* ", ">"))
+            or len(line) <= WIDTH
+        ):
+            out.append(line)
+            continue
+        # A code span never breaks: protect its spaces while wrapping.
+        safe = re.sub(r"`[^`]*`", lambda m: m.group(0).replace(" ", "\0"), line)
+        lines = textwrap.wrap(
+            safe, WIDTH, break_long_words=False, break_on_hyphens=False
+        )
+        out.extend(x.replace("\0", " ") for x in lines)
+    return "\n".join(out)
+
+
 def render():
     files = sorted((ROOT / "bench/results").glob("*.json"))
     if not files:
         sys.exit("no results in bench/results; run `make bench` first")
     cur = json.loads(files[-1].read_text())
     old = json.loads(files[-2].read_text()) if len(files) > 1 else None
-    return block(cur, old), files[-1].name
+    return wrap(block(cur, old)), files[-1].name
 
 
 def main():

@@ -13,9 +13,11 @@ untimed read of the repository. Warm is the runs after it.
 1. **Index build.** Seconds from process start until `/api/progress` reports ready, from an
    empty cache, plus peak RSS sampled meanwhile and the size of the cache on disk.
 2. **Pages.** Time to first byte and full response for `/`, `/tree/HEAD`, a deep tree path,
-   `/blob` of the largest file under the text limit, `/blame` of that file, `/log/HEAD`, `/commit` and
-   `/diff` fragment of the newest commit, `/search` for a common identifier, `/refs`, and
-   every `/stats` page. The probes are discovered from the pinned tree. Every page must answer 200 or the run fails, and the server runs with an empty config directory so the developer's own settings never apply.
+   `/blob` of the largest file under the text limit, `/blame` of that file, `/log/HEAD`,
+   `/commit` and `/diff` fragment of the newest commit, `/search` for a common identifier,
+   `/refs`, and every `/stats` page. The probes are discovered from the pinned tree. Every page
+   must answer 200 or the run fails, and the server runs with an empty config directory so the
+   developer's own settings never apply.
 3. **Idle.** CPU percent over a 60 s window with no client, and again with one `/events`
    client open, which is the cost of the live watcher.
 4. **Memory.** RSS after the index is ready and after every page was visited.
@@ -68,19 +70,27 @@ repository to prove it still works.
 > pin was printed while HEAD was measured. Rerun `make bench` to replace them.
 
 <!-- BEGIN GENERATED: results -->
-Run 2026-11-01T20:11:08 on Apple M1 Max, 10 cores, 64.0 GB, Darwin 25.6.0. git version 2.54.0 (Apple Git-157), gitterrace 0.1.0. 5 warm runs per page, 60 s idle windows.
+Run 2026-11-01T20:11:08 on Apple M1 Max, 10 cores, 64.0 GB, Darwin 25.6.0. git version
+2.54.0 (Apple Git-157), gitterrace 0.1.0. 5 warm runs per page, 60 s idle
+windows.
 
 ### control
 
-small repository, pinned at `d2ef86fee2`. All 6 metrics are within budget. Against budget: warm page 14 ms of 300 ms, cold page 25 ms of 1500 ms, index build 0.3 s of 30 s, idle CPU 0.57 % of 1 %, peak memory 56 MB of 500 MB, export 3.5 s of 60 s.
+small repository, pinned at `d2ef86fee2`. All 6 metrics are within budget. Against budget: warm page
+14 ms of 300 ms, cold page 25 ms of 1500 ms, index build 0.3 s of 30 s, idle CPU 0.57 % of 1 %, peak
+memory 56 MB of 500 MB, export 3.5 s of 60 s.
 
 ### git
 
-medium repository, pinned at `50fe5cc63f`. All 6 metrics are within budget. Against budget: warm page 85 ms of 300 ms, cold page 2476 ms of 3000 ms, index build 34.8 s of 300 s, idle CPU 0.10 % of 1 %, peak memory 1332 MB of 1500 MB, export 7.4 s of 300 s.
+medium repository, pinned at `50fe5cc63f`. All 6 metrics are within budget. Against budget: warm
+page 85 ms of 300 ms, cold page 2476 ms of 3000 ms, index build 34.8 s of 300 s, idle CPU 0.10 % of
+1 %, peak memory 1332 MB of 1500 MB, export 7.4 s of 300 s.
 
 ### rust
 
-large repository, pinned at `f90a2d27c2`. 4 of 5 metrics are within budget. Against budget: warm page 398 ms of 300 ms, cold page 2099 ms of 10000 ms, index build 334.8 s of 2400 s, idle CPU 0.15 % of 1 %, peak memory 2633 MB of 6000 MB.
+large repository, pinned at `f90a2d27c2`. 4 of 5 metrics are within budget. Against budget: warm
+page 398 ms of 300 ms, cold page 2099 ms of 10000 ms, index build 334.8 s of 2400 s, idle CPU 0.15 %
+of 1 %, peak memory 2633 MB of 6000 MB.
 
 - **Over budget:** warm page is 398 ms against a limit of 300 ms (1.3x).
 
@@ -268,7 +278,8 @@ Probes: `po/bg.po` (largest text file), commit `50fe5cc63f`.
 
 <details><summary>rust: every page</summary>
 
-Probes: `src/doc/rustc-dev-guide/src/queries/example-0.html` (largest text file), commit `f90a2d27c2`.
+Probes: `src/doc/rustc-dev-guide/src/queries/example-0.html` (largest text file), commit
+`f90a2d27c2`.
 
 | Page | Cold | Warm TTFB | Warm full (median) | min | max | Bytes |
 | --- | --- | --- | --- | --- | --- | --- |

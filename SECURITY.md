@@ -25,11 +25,11 @@ repository.
 In scope:
 
 - **The local server and its guard.** It binds to `127.0.0.1` by default and refuses
-  requests whose Host is not loopback (or listed in `server.hosts`). It refuses cross-site requests, and pages carry a
-  strict content security policy. Scripts are locked to the app's own origin plus the hashes
-  of its inline theme snippets. Styles allow inline rules only because mermaid writes diagram
-  styles at runtime; the app's own markup carries no style attribute. A page from another
-  site or another local port reaching gitterrace is in scope.
+  requests whose Host is not loopback (or listed in `server.hosts`). It refuses cross-site
+  requests, and pages carry a strict content security policy. Scripts are locked to the app's
+  own origin plus the hashes of its inline theme snippets. Styles allow inline rules only
+  because mermaid writes diagram styles at runtime. The app's own markup carries no style
+  attribute. A page from another site or another local port reaching gitterrace is in scope.
 - **Public mode.** `--public` (or `server.public = true`) is the supported way to serve
   beyond loopback, and a non-loopback `--addr` refuses to start without it. The promises are
   listed in [running it online](docs/online.md): committed history only, full commit ids only,

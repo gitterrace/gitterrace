@@ -76,12 +76,22 @@ pub fn apply(root: &Path, outs: Vec<Out>, mode: Mode) -> Result<Vec<String>> {
         let (path, label, next, current) = match out {
             Out::File { path, body } => {
                 let current = read(&root.join(&path))?;
+                let body = if Path::new(&path).extension().is_some_and(|e| e == "md") {
+                    wrap_markdown(&body)
+                } else {
+                    body
+                };
                 (path.clone(), path, body, current)
             }
             Out::Bytes { .. } => continue,
             Out::Block { path, id, body } => {
                 let current =
                     read(&root.join(&path))?.with_context(|| format!("{path} does not exist"))?;
+                let body = if Path::new(&path).extension().is_some_and(|e| e == "md") {
+                    wrap_markdown(&body)
+                } else {
+                    body
+                };
                 let next = splice(&current, &id, &body).with_context(|| path.clone())?;
                 (path.clone(), format!("{path}#{id}"), next, Some(current))
             }
@@ -129,6 +139,64 @@ fn splice(text: &str, id: &str, body: &str) -> Result<String> {
         format!("{body}\n\n")
     };
     Ok(format!("{}{filled}{}", &text[..start], &text[stop..]))
+}
+
+/// Prose column limit for generated markdown, the same one `scripts/markdownlint/prose-length.cjs`
+/// enforces on every tracked page.
+pub const PROSE_WIDTH: usize = 100;
+
+/// Wraps the prose paragraphs of generated markdown at [`PROSE_WIDTH`]. Tables, fences, headings,
+/// HTML comments and list items stay as written: they cannot be reflowed without changing what
+/// they render. A word longer than the limit (a URL, a long code span) keeps its own line.
+pub fn wrap_markdown(md: &str) -> String {
+    let mut out = String::with_capacity(md.len());
+    let mut fence = false;
+    for line in md.split_inclusive('\n') {
+        let text = line.trim_end_matches('\n');
+        let trimmed = text.trim_start();
+        if trimmed.starts_with("```") {
+            fence = !fence;
+        }
+        let keep = fence
+            || trimmed.starts_with("```")
+            || trimmed.starts_with('|')
+            || trimmed.starts_with('#')
+            || trimmed.starts_with('<')
+            || trimmed.starts_with("- ")
+            || trimmed.starts_with("* ")
+            || trimmed.starts_with('>')
+            || text.chars().count() <= PROSE_WIDTH;
+        if keep {
+            out.push_str(line);
+            continue;
+        }
+        let indent = &text[..text.len() - trimmed.len()];
+        out.push_str(&wrap_line(trimmed, indent));
+        if line.ends_with('\n') {
+            out.push('\n');
+        }
+    }
+    out
+}
+
+/// Breaks one prose line at spaces. A code span never breaks: its spaces become no-break
+/// spaces while wrapping, which `textwrap` keeps inside a word, and turn back after.
+fn wrap_line(text: &str, indent: &str) -> String {
+    let mut guarded = String::with_capacity(text.len());
+    let mut in_code = false;
+    for ch in text.chars() {
+        if ch == '`' {
+            in_code = !in_code;
+        }
+        guarded.push(if in_code && ch == ' ' { '\u{a0}' } else { ch });
+    }
+    let opts = textwrap::Options::new(PROSE_WIDTH)
+        .initial_indent(indent)
+        .subsequent_indent(indent)
+        .break_words(false)
+        .word_splitter(textwrap::WordSplitter::NoHyphenation)
+        .word_separator(textwrap::WordSeparator::AsciiSpace);
+    textwrap::fill(&guarded, &opts).replace('\u{a0}', " ")
 }
 
 /// The sorted names of the files directly in `dir` with extension `ext`.
@@ -184,7 +252,28 @@ pub fn unowned_blocks(root: &Path, outs: &[Out]) -> Result<Vec<String>> {
 
 #[cfg(test)]
 mod tests {
-    use crate::out::{Mode, Out, apply, splice, unowned_blocks};
+    use crate::out::{Mode, Out, PROSE_WIDTH, apply, splice, unowned_blocks, wrap_markdown};
+
+    #[test]
+    fn generated_prose_wraps_and_structure_stays() {
+        let long = "word ".repeat(40);
+        let code = format!("`{}` tail", "x".repeat(120));
+        let table = format!("| {} |", "c".repeat(150));
+        let md = format!("{long}\n\n{table}\n\n```\n{long}\n```\n\n# {long}\n\n{code}\n");
+        let out = wrap_markdown(&md);
+        let fence = out.split("```").nth(1).expect("fence");
+        assert!(fence.contains(long.trim_end()), "fence kept");
+        assert!(out.contains(&table), "table kept");
+        assert!(out.contains(&format!("# {long}")), "heading kept");
+        assert!(
+            out.contains(&format!("`{}`", "x".repeat(120))),
+            "code span unbroken"
+        );
+        let prose = out.split("\n\n").next().expect("first paragraph");
+        assert!(prose.lines().count() > 1);
+        assert!(prose.lines().all(|l| l.chars().count() <= PROSE_WIDTH));
+        assert_eq!(wrap_markdown(&out), out, "idempotent");
+    }
 
     const PAGE: &str = "intro\n<!-- BEGIN GENERATED: a -->\nold\n<!-- END GENERATED: a -->\n\
                         middle\n<!-- BEGIN GENERATED: b -->\nkeep\n<!-- END GENERATED: b -->\n";

@@ -20,6 +20,7 @@ serde_json.workspace = true
 anyhow.workspace = true
 clap.workspace = true
 pulldown-cmark.workspace = true
+textwrap = { version = "0.16", default-features = false }
 
 [dev-dependencies]
 tempfile.workspace = true
