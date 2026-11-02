@@ -21,6 +21,8 @@ anyhow.workspace = true
 clap.workspace = true
 pulldown-cmark.workspace = true
 textwrap = { version = "0.16", default-features = false }
+sha2 = "0.10"
+base64 = "0.22"
 
 [dev-dependencies]
 tempfile.workspace = true

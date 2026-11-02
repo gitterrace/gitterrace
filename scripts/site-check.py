@@ -84,7 +84,7 @@ def domains() -> list[str]:
     bad = []
     status, headers = fetch(f"https://{CANONICAL}/")
     csp = headers.get("Content-Security-Policy", "") if headers else ""
-    ok = status == 200 and "script-src 'none'" in csp
+    ok = status == 200 and "script-src 'sha256-" in csp
     print(
         f"  [{'+' if ok else 'x'}] https://{CANONICAL}/ serves the page with the generated CSP ({status or 'no answer'})"
     )
