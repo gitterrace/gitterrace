@@ -9,15 +9,11 @@
 {% if let Some(a) = about %}<div class="card readme" id="about">{% if a.tabs.is_empty() %}<div class="readme-h">{{ a.label }}</div>{% else %}{% include "_doctabs.html" %}{% endif %}<div class="markdown-body">{{ a.html|safe }}</div></div>{% endif %}
 </article>
 <aside>
-<h2>About</h2>
 {% if let Some(t) = totals %}
-<ul class="facts">
-<li><b>{{ t.commits }}</b> {{ t.commits_noun }}{% if !t.merges.is_empty() %} <span class="muted" data-tip="All commits, merges included. Insights leave merges out, since a merge repeats its branch.">{{ t.merges }}</span>{% endif %}</li>
-<li><b>{{ t.authors }}</b> {{ t.authors_noun }}</li>
-<li><b>{{ t.files }}</b> {{ t.files_noun }}</li>
-<li><b class="add">+{{ t.additions }}</b> <b class="del">-{{ t.deletions }}</b> {{ t.lines_noun }}</li>
-</ul>
-<p><a href="{{ insights_href }}">View insights</a></p>
+{{ side|safe }}
+<section class="side"><h3>All time</h3>
+<p class="facts"><span><b>{{ t.commits }}</b> {{ t.commits_noun }}</span>{% if !t.merges.is_empty() %} <span class="muted" data-tip="All commits, merges included. Insights leave merges out, since a merge repeats its branch.">{{ t.merges }}</span>{% endif %} <span><b>{{ t.authors }}</b> {{ t.authors_noun }}</span> <span><b>{{ t.files }}</b> {{ t.files_noun }}</span> <span><b class="add">+{{ t.additions }}</b> <b class="del">-{{ t.deletions }}</b> {{ t.lines_noun }}</span></p>
+<p><a href="{{ insights_href }}">View insights</a></p></section>
 {% else %}
 <div class="progress" data-progress><span class="muted">Indexing history <b class="pct">0%</b></span><progress max="100" value="0"></progress></div>
 {% endif %}

@@ -24,6 +24,7 @@ mod live;
 mod markdown;
 mod media;
 mod multi;
+mod overview_side;
 mod ownership;
 mod patterns;
 mod public;

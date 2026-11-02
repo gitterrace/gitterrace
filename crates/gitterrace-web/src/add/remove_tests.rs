@@ -146,7 +146,11 @@ async fn a_public_server_refuses_remove() {
     let (s, _) = send(&r, req("DELETE", Some(&secret)), named("b")).await;
     assert!(s == 404 || s == 405, "public: {s}");
     // The secret routes are not mounted at all: the GET challenge reaches the guard.
-    assert_eq!(get(&r, "/_repos?nonce=n1").await.0, 404, "no challenge in public");
+    assert_eq!(
+        get(&r, "/_repos?nonce=n1").await.0,
+        404,
+        "no challenge in public"
+    );
     assert_eq!(get(&r, "/r/b/").await.0, 200, "still served");
 }
 

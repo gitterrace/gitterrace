@@ -33,7 +33,8 @@ main.wrap>h2:first-child,main.wrap>.tabs+h2{margin-top:var(--space-6)}
    first: it narrows, then folds into a button that opens it across the bar. */
 .tools{display:flex;align-items:center;gap:var(--space-1);flex:0 1 auto;min-width:0;margin-left:auto}
 /* Wide enough for the whole placeholder beside the / hint at the body font. */
-.tools .topsearch{flex:0 1 320px;width:320px;min-width:160px}
+.tools .topsearch{flex:0 1 auto;width:200px;min-width:140px;transition:width var(--dur-fast)}
+.tools .topsearch:focus-within{width:320px}
 .tools .topsearch input[type=search]{min-width:0;width:100%}
 .tool{width:32px;height:32px;padding:0;display:grid;place-items:center;background:transparent;border:1px solid transparent;border-radius:var(--radius);color:var(--muted);cursor:pointer}
 .tool:hover{background:var(--hover);color:var(--fg);border-color:var(--line)}
@@ -134,6 +135,11 @@ button:hover{border-color:var(--line-strong);background:var(--hover)}
 .doctabs{flex-wrap:nowrap;overflow-x:auto;margin:0;padding:0 var(--space-2);background:var(--soft)}.doctabs a{padding-top:var(--space-3)}
 .readme-h{display:flex;align-items:center;gap:var(--space-2);padding:var(--space-2) var(--space-4);min-height:44px;background:var(--soft);border-bottom:var(--border);font-size:var(--text-sm);font-weight:var(--weight-semibold);color:var(--fg)}
 .facts{list-style:none;margin:0 0 var(--space-4);padding:0;color:var(--muted)}.facts li{padding:var(--space-1) 0}.facts b{color:var(--fg);font-weight:var(--weight-semibold);font-variant-numeric:tabular-nums}.facts b.add{color:var(--add)}.facts b.del{color:var(--del)}
+.side{margin:0 0 var(--space-5);font-size:var(--text-sm)}.side h3{margin:0 0 var(--space-2);font-size:var(--text-xs);text-transform:uppercase;letter-spacing:.04em;color:var(--muted);font-weight:var(--weight-semibold)}.side h3 a{color:inherit}.side p{margin:0 0 var(--space-2)}p.facts{line-height:1.6;display:flex;flex-wrap:wrap;gap:0 var(--space-3)}
+.side b{font-variant-numeric:tabular-nums}.sparkwrap{display:inline-block}
+.sidelist{list-style:none;margin:0;padding:0}.sidelist li{display:flex;justify-content:space-between;gap:var(--space-3);padding:2px 0}.sidelist a{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:var(--mono)}.sidelist .muted{flex:none}
+.langbar{display:flex;height:6px;border-radius:var(--radius);overflow:hidden;margin:0 0 var(--space-2);background:var(--soft)}.langbar span{display:block;height:100%}
+.langs{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:var(--space-1) var(--space-3)}.langs i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:var(--space-1)}
 
 /* commit list */
 .list{list-style:none;margin:0;padding:0}
@@ -468,6 +474,26 @@ td:has(>.actbtn.float){position:relative}
 .actmenu .ov-list li.sep{height:0;padding:0;margin:var(--space-1) 0;border-top:var(--border);cursor:default}
 .actmenu .ov-list li.hint{cursor:default;font-size:var(--text-xs)}
 .actmenu .ov-list li.hint a{color:var(--muted)}
+.actmenu .ov-list li.grp{cursor:default;padding:6px var(--space-3) 2px;font:var(--weight-semibold) var(--text-2xs)/1.2 var(--sans);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.actmenu .ov-list li.sep+li.grp{padding-top:2px}
+/* The page menu: a labelled list glyph, not a bare ellipsis. */
+.actbtn.top::after{content:none}
+.actbtn.top::before{content:"";width:16px;height:16px;background:currentColor;-webkit-mask:var(--menu-ico) center/contain no-repeat;mask:var(--menu-ico) center/contain no-repeat}
+:root{--menu-ico:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round'%3E%3Cpath d='M4 7h16M4 12h16M4 17h10'/%3E%3C/svg%3E")}
+.permabtn.copied{color:var(--accent-ink)}
+/* Repository switcher: the name itself is the button, as on GitHub. One repository: a link. */
+.reposwitch{display:inline-flex}
+.reposwitch:not([hidden])+#repolink{display:none}
+button.reponame{display:inline-flex;align-items:center;gap:2px;background:transparent;border:1px solid transparent;border-radius:var(--radius);padding:2px 4px;margin:-3px -5px;min-height:32px;cursor:pointer}
+button.reponame:hover,button.reponame[aria-expanded=true]{background:var(--hover);border-color:var(--line)}
+button.reponame .tri{width:16px;height:16px;fill:var(--muted)}
+.ov-title{display:flex;align-items:center;justify-content:space-between;padding:var(--space-1) var(--space-1) var(--space-1) var(--space-4);border-bottom:var(--border)}
+.ov-title h2{margin:0}
+.repopanel .ov-list li{align-items:center}
+.repopanel .tick{width:16px;height:16px;flex:none}
+.repopanel .tick svg{width:16px;height:16px;fill:var(--accent-ink);display:block}
+.repopanel .two{display:flex;flex-direction:column;min-width:0;gap:2px}
+.repopanel .two .dir{margin-left:0}
 
 /* send */
 .ov.send{width:min(520px,94vw);max-height:80vh}

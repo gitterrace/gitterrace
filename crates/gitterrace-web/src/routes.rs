@@ -362,6 +362,8 @@ struct OverviewPage {
     entries: Vec<views::Entry>,
     latest: Option<CommitRow>,
     insights_href: String,
+    /// The memoized sidebar sections; empty while indexing.
+    side: String,
 }
 
 async fn overview(State(app): Shared, Query(q): Query<DocQuery>) -> Result<Html<String>> {
@@ -373,7 +375,12 @@ async fn overview(State(app): Shared, Query(q): Query<DocQuery>) -> Result<Html<
         let list = a.repo.tree(&head, "")?;
         let docs = crate::about::find(&list);
         let about = crate::about::card(a, &head, &rev, "", "/", &docs, q.doc.as_deref());
-        let totals = a.source(&head)?.map(|src| {
+        let src = a.source(&head)?;
+        let side = src
+            .as_ref()
+            .map(|s| crate::overview_side::html(a, &head, &**s))
+            .unwrap_or_default();
+        let totals = src.map(|src| {
             let t = a.totals(&head, &*src, a.defaults().into_options());
             Numbers {
                 commits: fmt::thousands(src.len()),
@@ -402,6 +409,7 @@ async fn overview(State(app): Shared, Query(q): Query<DocQuery>) -> Result<Html<
             entries: views::entries(&rev, "", &list),
             latest: recent.first().map(|c| views::commit_row(c, now)),
             insights_href: fmt::href("/stats"),
+            side,
         })
     })
     .await?;
