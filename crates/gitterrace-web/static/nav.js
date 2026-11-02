@@ -119,7 +119,7 @@
     return s - path.length * 0.05;
   }
 
-  function listPicker(box, placeholder, getItems, render, choose, hint) {
+  function listPicker(box, placeholder, getItems, render, choose, hint, none) {
     var input = el("input", "ov-input");
     input.placeholder = placeholder;
     input.setAttribute("aria-label", placeholder);
@@ -140,7 +140,7 @@
         li.addEventListener("mousemove", function () { if (sel !== i) { sel = i; mark(); } });
         list.appendChild(li);
       });
-      if (!shown.length) list.appendChild(el("li", "none", "No matches"));
+      if (!shown.length) list.appendChild(el("li", "none", none || "No matches"));
     }
     function mark() {
       var kids = list.children;
@@ -244,19 +244,48 @@
   // Repositories join and leave a running server, so the list is read on every page and again
   // on each live notice: the switcher shows, drops an entry or hides without a reload.
   var repos = null;
+  // A select panel as GitHub draws it: title row with a close button, a filter that holds
+  // focus, a check before the current repository and an empty slot before the others.
+  var TICK = "M13.8 4.2a.75.75 0 0 1 0 1.06l-6.5 6.5a.75.75 0 0 1-1.06 0l-3-3a.75.75 0 1 1 1.06-1.06L6.77 10.2l5.97-5.97a.75.75 0 0 1 1.06 0z";
+  function icon(d) {
+    var NS = "http://www.w3.org/2000/svg";
+    var s = document.createElementNS(NS, "svg");
+    s.setAttribute("viewBox", "0 0 16 16");
+    s.setAttribute("aria-hidden", "true");
+    var p = document.createElementNS(NS, "path");
+    p.setAttribute("d", d);
+    s.appendChild(p);
+    return s;
+  }
   function openRepos() {
     var btn = document.getElementById("repobtn");
-    var box = overlay("refs", "Switch repository", btn);
+    var box = overlay("refs repopanel", "Switch repository", btn);
     var r = btn.getBoundingClientRect();
     box.classList.add("anchored");
-    box.style.left = Math.max(8, r.left) + "px";
+    box.style.left = Math.max(8, Math.min(r.left, window.innerWidth - box.offsetWidth - 8)) + "px";
     box.style.top = r.bottom + 6 + "px";
+    var head = el("div", "ov-title");
+    head.appendChild(el("h2", "", "Switch repository"));
+    var x = el("button", "tool", null);
+    x.type = "button";
+    x.setAttribute("aria-label", "Close");
+    x.appendChild(icon("M4 4l8 8M12 4l-8 8"));
+    x.addEventListener("click", closeOverlay);
+    head.appendChild(x);
+    box.appendChild(head);
+    var here = B.replace(/\/$/, "") + "/";
     var p = listPicker(box, "Filter repositories", function (q) {
       return (repos || []).filter(function (x) { return !q || x.name.toLowerCase().indexOf(q) >= 0; });
     }, function (li, it) {
-      li.appendChild(el("span", "name", it.name));
-      li.appendChild(el("span", "dir", it.when));
-    }, function (it) { location.href = it.href; }, "Enter to open");
+      var on = it.href === here;
+      var slot = el("span", "tick");
+      if (on) { slot.appendChild(icon(TICK)); li.setAttribute("aria-current", "true"); }
+      li.appendChild(slot);
+      var txt = el("span", "two");
+      txt.appendChild(el("span", "name", it.name));
+      txt.appendChild(el("span", "dir", it.when));
+      li.appendChild(txt);
+    }, function (it) { location.href = it.href; }, "Enter to open", "No repositories match");
     if (repos) p.refresh();
     else fetch("/api/repos").then(function (r) { return r.json(); }).then(function (l) { repos = l; p.refresh(); });
   }

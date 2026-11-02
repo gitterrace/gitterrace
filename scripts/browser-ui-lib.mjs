@@ -175,6 +175,19 @@ async function repoSwitch() {
         await p.waitForFunction(() => { const s = document.getElementById('reposwitch'); return !!s && !s.hidden; }, null, { timeout: 5000 }).catch(() => {});
         const joined = await shown(p);
         const visits = [];
+        // The panel: filter focused, the current repository ticked, Escape hands focus back.
+        let panel = null;
+        if (joined) {
+          await p.focus('#repobtn');
+          await p.keyboard.press('Enter');
+          await p.waitForSelector('.repopanel li');
+          panel = await p.evaluate(() => ({ focus: document.activeElement?.className, cur: document.querySelectorAll('.repopanel li[aria-current] svg').length }));
+          await p.keyboard.type('zzzz');
+          panel.none = await p.textContent('.repopanel li.none');
+          await p.keyboard.press('Escape');
+          panel.back = await p.evaluate(() => document.activeElement?.id);
+        }
+        const panelOk = !!panel && panel.focus === 'ov-input' && panel.cur === 1 && panel.none === 'No repositories match' && panel.back === 'repobtn';
         for (const target of joined ? [two, dir] : []) {
           const want = target.split('/').pop().toLowerCase();
           await p.click('#repobtn');
@@ -190,9 +203,9 @@ async function repoSwitch() {
         await p.waitForFunction(() => { const s = document.getElementById('reposwitch'); return !s || s.hidden; }, null, { timeout: 5000 }).catch(() => {});
         const left = !(await shown(p));
         const gone = visits[0]?.pick ? (await fetch(`${one.origin}/r/${visits[0].pick}/`)).status : 0;
-        const ok = !alone && joined && visits.length === 2 && visits.every((v) => v.pick && v.at === `/r/${v.pick}/`) && left && gone === 404;
-        if (ok) r.ok(`repo-switch ${name}: hidden alone, shown after the join without a reload, lands on ${visits.map((v) => v.at).join(' then ')}, hidden again after remove`);
-        else r.fail(`repo-switch ${name}: ${JSON.stringify({ alone, joined, visits, left, gone })}`);
+        const ok = !alone && joined && panelOk && visits.length === 2 && visits.every((v) => v.pick && v.at === `/r/${v.pick}/`) && left && gone === 404;
+        if (ok) r.ok(`repo-switch ${name}: hidden alone, shown after the join without a reload, panel keyboard ok, lands on ${visits.map((v) => v.at).join(' then ')}, hidden again after remove`);
+        else r.fail(`repo-switch ${name}: ${JSON.stringify({ alone, joined, panel, visits, left, gone })}`);
       } finally {
         await b.close();
         one.stop();

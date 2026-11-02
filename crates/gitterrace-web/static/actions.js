@@ -228,15 +228,18 @@
       fns.push(fn);
       return li;
     }
+    function head(text) { var h = el("li", "grp", text); h.setAttribute("role", "presentation"); list.appendChild(h); }
+    head("Copy");
     add("Copy permalink", "p", function () { copy(permalink(t), "Permalink copied"); closeMenu(); });
     add("Copy as markdown", "m", function () { copy(markdown(t), "Markdown copied"); closeMenu(); });
+    head("Share");
     add("Send to\u2026", "s", function () {
       closeMenu();
       if (window.gtSend) window.gtSend.open({ kind: t.kind, path: t.path || "", lines: t.lines || null, subject: t.subject || "", sha: commit, link: permalink(t), markdown: markdown(t), text: t.text || "" });
     });
     var keys = { p: 0, m: 1, s: 2 };
     var usable = mine.filter(function (a) { return a.kinds.indexOf(t.kind) >= 0; });
-    if (usable.length) list.appendChild(el("li", "sep"));
+    if (usable.length) { list.appendChild(el("li", "sep")); head("Your actions"); }
     usable.forEach(function (a) {
       if (a.key && !(a.key in keys)) keys[a.key] = items.length;
       add(a.label, a.key, function (e, li) { run(a, t, e, li); });
@@ -292,6 +295,14 @@
     var top = button("Actions for this page (.)");
     top.classList.add("top");
     top.addEventListener("click", function () { openMenu(current(), top); });
+    // The most used item, one click away. Its menu entry stays for the p key.
+    var link = el("button", "tool permabtn", null);
+    link.type = "button";
+    link.setAttribute("aria-label", "Copy permalink");
+    link.setAttribute("data-tip", "Copy permalink");
+    link.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg>';
+    link.addEventListener("click", function () { menuOpener = link; copy(permalink(current()), "Permalink copied"); });
+    theme.parentNode.insertBefore(link, theme);
     theme.parentNode.insertBefore(top, theme);
   }
   // Commit page: next to the sha.
