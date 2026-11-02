@@ -45,6 +45,7 @@ pub use add::TOKEN_HEADER as ADD_TOKEN_HEADER;
 use gitterrace_config::Config;
 use gitterrace_git::Repo;
 use gitterrace_index::Index;
+pub use guard::CSP as PAGE_CSP;
 pub use media::plain_media;
 pub use multi::discover_repos;
 pub use registry::{

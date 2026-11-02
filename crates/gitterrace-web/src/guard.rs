@@ -12,9 +12,12 @@ use axum::{
     response::{IntoResponse, Response},
 };
 
-/// Hashes of the inline theme snippets in `_base.html` and `repos.html`; the
-/// `inline_scripts_are_hashed` test fails when a template changes without this.
-const CSP: &str = "default-src 'self'; img-src 'self' data:; media-src 'self'; style-src 'self' 'unsafe-inline'; \
+/// The page policy, also written into an export's `_headers`.
+///
+/// No inline styles: markup carries classes instead. The hashes are those of the inline theme
+/// snippets in `_base.html` and `repos.html`; the `inline_scripts_are_hashed` test fails when
+/// a template changes without this.
+pub const CSP: &str = "default-src 'self'; img-src 'self' data:; media-src 'self'; style-src 'self'; \
     script-src 'self' 'sha256-fYt56R17Pz3RaWQCK4ngD4kWxzR9lHjYqQRanR4kAxk=' \
     'sha256-Rbk1A+FIExFQ+koGhLey9hvtVuj90foK6DS83At6mms='; object-src 'self'; \
     frame-ancestors 'none'; base-uri 'none'; form-action 'self'";

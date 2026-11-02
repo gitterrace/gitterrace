@@ -740,19 +740,11 @@ fn code_html_uncached(path: &str, text: &str, lit_lines: usize) -> (String, bool
             out.push_str("<div class=\"ch\">");
             open = true;
         }
-        // `counter-reset` on the chunk would open a new counter scope there, which resets
-        // the number to 1 for each chunk. `counter-set` on the first line keeps a single
-        // counter; it applies after that line's own increment, so it names the line itself.
-        let set = if i > 0 && i % CHUNK_LINES == 0 {
-            format!(" style=\"counter-set:n {}\"", i + 1)
-        } else {
-            String::new()
-        };
         let _ = write!(
             out,
-            "<div id=\"L{}\" class=\"l\"{set}>{}</div>",
-            i + 1,
-            hl.as_mut().map_or_else(|| esc_text(line), |h| h.line(line))
+            "<div id=\"L{n}\" class=\"l\" data-n=\"{n}\">{}</div>",
+            hl.as_mut().map_or_else(|| esc_text(line), |h| h.line(line)),
+            n = i + 1
         );
     }
     if open {
@@ -886,14 +878,14 @@ mod tests {
     }
 
     #[test]
-    fn code_chunks_restart_the_counter() {
+    fn code_lines_carry_their_number() {
         let text = "l\n".repeat(250);
         let (h, _) = code_html(CACHE, "x.txt", &text);
         assert_eq!(h.matches("class=\"ch\"").count(), 3);
-        // A reset would open a new scope per chunk and number each one from 1.
-        assert!(!h.contains("counter-reset"));
-        assert!(h.contains("id=\"L101\" class=\"l\" style=\"counter-set:n 101\""));
+        // A strict CSP refuses inline styles, so each line names its own number.
+        assert!(h.contains("id=\"L101\" class=\"l\" data-n=\"101\""));
         assert!(h.contains("id=\"L250\""));
+        assert!(!h.contains("style="));
     }
 
     #[test]

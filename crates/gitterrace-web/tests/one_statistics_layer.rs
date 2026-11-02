@@ -122,7 +122,7 @@ async fn api_and_pages_give_the_same_numbers_for_the_same_filter() {
 
         let (_, page) = get(&router, &format!("/stats/contributors?{q}")).await;
         let people = api(&router, "contributors", q).await;
-        let web: Vec<String> = rows(&page, "class=\"av\"")
+        let web: Vec<String> = rows(&page, "class=\"av ")
             .into_iter()
             .map(|r| r[2].clone())
             .collect();

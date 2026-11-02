@@ -279,7 +279,8 @@ pub(crate) async fn export(repos: &[PathBuf], out: &Path, scope: &Scope) -> anyh
         }
     }
     write_page(out, "/snapshot.css", "text/css", SNAPSHOT_CSS.as_bytes())?;
-    Ok(written + 1)
+    write_page(out, "/_headers", "text/plain", headers_file().as_bytes())?;
+    Ok(written + 2)
 }
 
 /// One repository in an export: where its pages live and which of them are in scope.
@@ -373,6 +374,21 @@ async fn fetch(router: &Router, path: &str) -> anyhow::Result<(StatusCode, Strin
         .await
         .with_context(|| format!("reading {path}"))?;
     Ok((status, content_type, body.to_vec()))
+}
+
+/// Host headers for a static copy: the app's own page policy, since the pages are its HTML,
+/// so the two cannot drift. Raw files are sandboxed.
+fn headers_file() -> String {
+    let page = gitterrace_web::PAGE_CSP;
+    format!(
+        "/*\n  Content-Security-Policy: {page}\n  X-Content-Type-Options: nosniff\n  \
+         X-Frame-Options: DENY\n  Referrer-Policy: strict-origin-when-cross-origin\n  \
+         Strict-Transport-Security: max-age=63072000; includeSubDomains\n  \
+         X-Robots-Tag: noindex\n\n\
+         /raw/*\n  Content-Security-Policy: sandbox; default-src 'none'; style-src 'unsafe-inline'\n\n\
+         /r/*/raw/*\n  Content-Security-Policy: sandbox; default-src 'none'; style-src 'unsafe-inline'\n\n\
+         /static/*\n  Cache-Control: public, max-age=3600\n"
+    )
 }
 
 /// The set of paths an export follows.
@@ -668,6 +684,13 @@ mod tests {
     #[cfg(unix)]
     use crate::export::write_page;
     use crate::export::{links, mark_snapshot, target};
+
+    #[test]
+    fn headers_file_carries_the_page_policy() {
+        let h = super::headers_file();
+        assert!(h.contains(gitterrace_web::PAGE_CSP));
+        assert!(!h.contains("style-src 'self' 'unsafe-inline'"));
+    }
 
     #[test]
     fn encoded_names_round_trip_to_real_file_names() {

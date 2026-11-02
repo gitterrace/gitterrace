@@ -9,7 +9,7 @@
 {% if !kinds.is_empty() %}
 <div class="chart-head"><div><h2>Types</h2><p class="hint">Conventional-commit type of each subject line. Click a type to narrow every number on the page to it. Commits that do not follow the convention are grouped as other.</p></div></div>
 <div class="card"><table class="entries">
-{% for r in kinds %}<tr><td class="fill"><div class="bar" style="--w:{{ r.pct }}%"></div><a href="{{ r.href }}">{{ r.label }}</a></td><td class="r">{{ r.commits }}</td></tr>{% endfor %}
+{% for r in kinds %}<tr><td class="fill"><div class="bar w{{ r.pct }}"></div><a href="{{ r.href }}">{{ r.label }}</a></td><td class="r">{{ r.commits }}</td></tr>{% endfor %}
 </table></div>
 {% endif %}
 {% if !matrix.cols.is_empty() && !matrix.rows.is_empty() %}
@@ -24,7 +24,7 @@
 {% for g in groups %}
 <div class="chart-head"><div><h2>{{ g.title }}</h2><p class="hint">{{ g.hint }}</p></div></div>
 <div class="card"><table class="entries">
-{% for r in g.rows %}<tr><td class="fill"><div class="bar" style="--w:{{ r.pct }}%"></div><a href="{{ r.href }}">{{ r.label }}</a></td><td class="r">{{ r.commits }}</td>{% if g.lines %}<td class="r"><b class="add">+{{ r.additions }}</b> <b class="del">-{{ r.deletions }}</b></td>{% endif %}</tr>{% endfor %}
+{% for r in g.rows %}<tr><td class="fill"><div class="bar w{{ r.pct }}"></div><a href="{{ r.href }}">{{ r.label }}</a></td><td class="r">{{ r.commits }}</td>{% if g.lines %}<td class="r"><b class="add">+{{ r.additions }}</b> <b class="del">-{{ r.deletions }}</b></td>{% endif %}</tr>{% endfor %}
 </table></div>
 {% endfor %}
 <div class="chart-head"><div><h2>Commits</h2><p class="hint">{{ commits_total }} matching, newest first.</p></div></div>

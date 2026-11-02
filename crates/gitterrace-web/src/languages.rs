@@ -520,7 +520,7 @@ fn range_card(ch: &Chain, view: View, subj: &Subjects) -> String {
         let w = (d.unsigned_abs() * 100 / big).max(u64::from(d != 0));
         let _ = write!(
             s,
-            r#"<tr><td><i class="dot {}"></i>{}</td><td class="r">{}</td><td class="r">{} <span class="muted">{}</span></td><td class="r"><b class="{}">{}</b></td><td class="dcol"><span class="dbar"><b class="{}" style="width:{w}%"></b></span></td></tr>"#,
+            r#"<tr><td><i class="dot {}"></i>{}</td><td class="r">{}</td><td class="r">{} <span class="muted">{}</span></td><td class="r"><b class="{}">{}</b></td><td class="dcol"><span class="dbar"><b class="{} w{w}"></b></span></td></tr>"#,
             cat(i, k),
             esc(&ch.langs[i]),
             fmt::thousands(base[i].max(0)),
@@ -575,9 +575,9 @@ fn languages_now(ch: &Chain) -> String {
         if f > 0.0 {
             let _ = write!(
                 bar,
-                r#"<b class="{}" style="width:{:.3}%" data-tip="{} {}"></b>"#,
+                r#"<b class="{} w{}" data-tip="{} {}"></b>"#,
                 cat(i, k),
-                f * 100.0,
+                (f * 100.0).round().clamp(1.0, 100.0) as u32,
                 esc(&ch.langs[i]),
                 pct(f)
             );
