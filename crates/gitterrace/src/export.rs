@@ -562,13 +562,23 @@ fn mark_snapshot(html: &[u8], label: &str, project: Option<&Project>) -> Vec<u8>
     let banner = format!(
         "<link rel=\"stylesheet\" href=\"/snapshot.css\">\
          <div class=\"snapshot\" role=\"note\"><div class=\"wrap\">{what} \
+         Made with gitterrace {version}. \
          Search, live updates and actions need the real thing. \
-         <a href=\"https://gitterrace.dev\">Install gitterrace</a></div></div>"
+         <a href=\"https://gitterrace.dev\">Install gitterrace</a></div></div>",
+        version = env!("GITTERRACE_VERSION")
     );
-    let mut out = String::with_capacity(page.len() + banner.len() + 12);
+    // The same version as a generator tag, so a copy of a single page still says what made it.
+    let generator = format!(
+        "<meta name=\"generator\" content=\"gitterrace {}\">",
+        env!("GITTERRACE_VERSION")
+    );
+    let head_end = page.find("</head>").unwrap_or(0);
+    let mut out = String::with_capacity(page.len() + banner.len() + generator.len() + 12);
     // `data-static` tells the page scripts there is no server: they skip live updates and
     // the actions poll, and the snapshot CSS hides what needs one.
-    out.push_str(&page[..end - 1]);
+    out.push_str(&page[..head_end]);
+    out.push_str(&generator);
+    out.push_str(&page[head_end..end - 1]);
     out.push_str(" data-static>");
     out.push_str(&banner);
     out.push_str(&page[end..]);
@@ -743,6 +753,20 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn snapshot_names_the_gitterrace_version() {
+        let html = b"<html><head><title>t</title></head><body><main>m</main></body></html>";
+        let out = String::from_utf8(mark_snapshot(html, "v1", None)).expect("utf8");
+        let v = env!("GITTERRACE_VERSION");
+        assert!(out.contains(&format!("Made with gitterrace {v}.")), "{out}");
+        assert!(
+            out.contains(&format!(
+                "<meta name=\"generator\" content=\"gitterrace {v}\"></head>"
+            )),
+            "{out}"
+        );
     }
 
     #[test]
