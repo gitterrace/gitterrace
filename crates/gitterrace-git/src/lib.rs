@@ -17,7 +17,7 @@ mod walk;
 mod watch;
 mod worktree;
 
-pub use atomic::{read_no_follow, write_atomic};
+pub use atomic::{open_append_no_follow, read_no_follow, write_atomic};
 pub use error::{Error, Result};
 
 /// How many hex digits of a commit id any surface shows. One constant, so a short id looks the

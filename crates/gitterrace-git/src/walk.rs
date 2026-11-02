@@ -211,7 +211,12 @@ pub fn last_commits(
         }
         let commit = info.map_err(git)?.object().map_err(git)?;
         let here = dir_oid(&commit, dir)?;
-        let parents: Vec<_> = commit.parent_ids().collect();
+        // A shallow boundary lists parents it does not hold: it is a root here.
+        let parents: Vec<_> = if crate::diff::is_shallow_boundary(&r, commit.id) {
+            Vec::new()
+        } else {
+            commit.parent_ids().collect()
+        };
         // A root introduces exactly what its tree holds. Other roots (merged unrelated
         // histories) may still own the rest, so the walk goes on.
         if parents.is_empty() {

@@ -4,8 +4,8 @@
 //! served and their ids, never anything from a link. The file is 0600 in a 0700 folder,
 //! written whole through a temp file and a rename, and a symlink in its place is refused.
 
-use std::fs::{self, OpenOptions};
-use std::io::{self, Read};
+use std::fs;
+use std::io;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -93,17 +93,14 @@ pub(crate) fn remove_add_token(dir: &Path, port: u16) {
 /// The add secret of the server on `port`, read with the same refusals as the registry: a
 /// symlink, a non-file, or (on unix) a file another user owns or can read is refused.
 pub fn add_token(dir: &Path, port: u16) -> io::Result<String> {
-    let path = dir.join(token_file(port));
-    let f = no_follow(OpenOptions::new().read(true))
-        .open(&path)
-        .map_err(|e| if is_loop(&e) { refused(&path) } else { e })?;
-    let m = f.metadata()?;
-    if !m.is_file() {
-        return Err(refused(&path));
-    }
+    let name = token_file(port);
+    let path = dir.join(&name);
+    let bytes = gitterrace_git::read_no_follow(dir, &name)?
+        .ok_or_else(|| io::Error::from(io::ErrorKind::NotFound))?;
     #[cfg(unix)]
     {
         use std::os::unix::fs::MetadataExt;
+        let m = fs::symlink_metadata(&path)?;
         let me = rustix::process::getuid().as_raw();
         if m.uid() != me || m.mode() & 0o077 != 0 {
             return Err(io::Error::other(format!(
@@ -112,28 +109,16 @@ pub fn add_token(dir: &Path, port: u16) -> io::Result<String> {
             )));
         }
     }
-    let mut s = String::new();
-    f.take(256).read_to_string(&mut s)?;
-    Ok(s.trim().to_owned())
+    let head = &bytes[..bytes.len().min(256)];
+    Ok(String::from_utf8_lossy(head).trim().to_owned())
 }
 
 /// Every entry as written, unchecked. A missing file is empty; a corrupt one is too, since
 /// the next serve rewrites it.
 fn read_raw(dir: &Path) -> io::Result<Vec<Entry>> {
-    let path = dir.join(FILE);
-    match no_follow(OpenOptions::new().read(true)).open(&path) {
-        Ok(mut f) => {
-            if !f.metadata()?.is_file() {
-                return Err(refused(&path));
-            }
-            let mut s = String::new();
-            f.read_to_string(&mut s)?;
-            Ok(serde_json::from_str(&s).unwrap_or_default())
-        }
-        Err(e) if e.kind() == io::ErrorKind::NotFound => Ok(Vec::new()),
-        Err(e) if is_loop(&e) => Err(refused(&path)),
-        Err(e) => Err(e),
-    }
+    Ok(gitterrace_git::read_no_follow(dir, FILE)?
+        .map(|b| serde_json::from_slice(&b).unwrap_or_default())
+        .unwrap_or_default())
 }
 
 fn private_dir(dir: &Path) -> io::Result<()> {
@@ -154,28 +139,6 @@ fn private_dir(dir: &Path) -> io::Result<()> {
 /// refused rather than replaced, so the user sees it.
 fn write_atomic(dir: &Path, file: &str, bytes: &[u8]) -> io::Result<()> {
     gitterrace_git::write_atomic(dir, file, bytes, 0o600)
-}
-
-#[cfg(unix)]
-fn no_follow(o: &mut OpenOptions) -> &mut OpenOptions {
-    use std::os::unix::fs::OpenOptionsExt;
-    o.custom_flags(libc::O_NOFOLLOW)
-}
-
-#[cfg(not(unix))]
-fn no_follow(o: &mut OpenOptions) -> &mut OpenOptions {
-    o
-}
-
-/// `O_NOFOLLOW` on a symlink fails with `ELOOP`.
-#[cfg(unix)]
-fn is_loop(e: &io::Error) -> bool {
-    e.raw_os_error() == Some(libc::ELOOP)
-}
-
-#[cfg(not(unix))]
-fn is_loop(_: &io::Error) -> bool {
-    false
 }
 
 fn refused(path: &Path) -> io::Error {

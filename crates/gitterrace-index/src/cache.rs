@@ -4,10 +4,9 @@
 //! (removing a link never touches its target) and the cache is rebuilt; writes open with
 //! `O_NOFOLLOW` so a link planted between the check and the open still fails.
 
-use std::fs::{self, File, OpenOptions};
-use std::io::{self, Write};
+use std::fs::{self, File};
+use std::io;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicU64, Ordering};
 
 /// Makes `dir` a real directory, replacing a symlink or other non-directory entry.
 #[expect(
@@ -73,43 +72,20 @@ pub(crate) fn cache_file(dir: &Path, name: &str) -> io::Result<PathBuf> {
 
 /// Reads a cache file; a missing file reads as `None`.
 pub(crate) fn read(dir: &Path, name: &str) -> io::Result<Option<Vec<u8>>> {
-    let path = cache_file(dir, name)?;
-    match no_follow(OpenOptions::new().read(true)).open(path) {
-        Ok(mut f) => {
-            let mut out = Vec::new();
-            io::Read::read_to_end(&mut f, &mut out)?;
-            Ok(Some(out))
-        }
-        Err(e) if e.kind() == io::ErrorKind::NotFound => Ok(None),
-        Err(e) => Err(e),
-    }
+    cache_file(dir, name)?;
+    gitterrace_git::read_no_follow(dir, name)
 }
 
 /// Opens a cache file for appending, creating it.
 pub(crate) fn open_append(dir: &Path, name: &str) -> io::Result<File> {
-    let path = cache_file(dir, name)?;
-    no_follow(OpenOptions::new().create(true).append(true).read(true)).open(path)
+    cache_file(dir, name)?;
+    gitterrace_git::open_append_no_follow(dir, name, 0o644)
 }
 
-/// Replaces a cache file atomically: a fresh, uniquely named temp file, then a rename. The
-/// rename replaces a link planted at `name` instead of writing through it.
+/// Replaces a cache file atomically through the shared no-follow writer.
 pub(crate) fn write_atomic(dir: &Path, name: &str, bytes: &[u8]) -> io::Result<()> {
-    static SEQ: AtomicU64 = AtomicU64::new(0);
-    let path = cache_file(dir, name)?;
-    let tmp = dir.join(format!(
-        ".{name}.{}.{}.tmp",
-        std::process::id(),
-        SEQ.fetch_add(1, Ordering::Relaxed)
-    ));
-    let written = no_follow(OpenOptions::new().write(true).create_new(true))
-        .open(&tmp)
-        .and_then(|mut f| f.write_all(bytes))
-        .and_then(|()| fs::rename(&tmp, &path));
-    if written.is_err() {
-        // Best effort: the temp name is ours alone and only clutters the cache.
-        drop(fs::remove_file(&tmp));
-    }
-    written
+    cache_file(dir, name)?;
+    gitterrace_git::write_atomic(dir, name, bytes, 0o644)
 }
 
 /// Removes a cache file; a missing one is fine.
@@ -125,17 +101,6 @@ pub(crate) fn len(dir: &Path, name: &str) -> u64 {
     cache_file(dir, name)
         .and_then(fs::symlink_metadata)
         .map_or(0, |m| m.len())
-}
-
-#[cfg(unix)]
-fn no_follow(o: &mut OpenOptions) -> &mut OpenOptions {
-    use std::os::unix::fs::OpenOptionsExt;
-    o.custom_flags(libc::O_NOFOLLOW)
-}
-
-#[cfg(not(unix))]
-fn no_follow(o: &mut OpenOptions) -> &mut OpenOptions {
-    o
 }
 
 fn refused(path: &Path) -> io::Error {

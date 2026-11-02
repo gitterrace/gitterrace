@@ -750,7 +750,7 @@ fn summary(commit: &gix::Commit<'_>, mailmap: &gix::mailmap::Snapshot) -> Result
 fn touches_path(repo: &gix::Repository, commit: &gix::Commit<'_>, path: &str) -> Result<bool> {
     let here = path_id(commit, path)?;
     let mut parents = commit.parent_ids().peekable();
-    if parents.peek().is_none() {
+    if parents.peek().is_none() || crate::diff::is_shallow_boundary(repo, commit.id) {
         return Ok(here.is_some());
     }
     for parent in parents {

@@ -14,6 +14,10 @@ use std::sync::atomic::{AtomicU64, Ordering};
 /// # Errors
 /// When `dir` is not a real folder, `name` is not a regular file, or the read fails.
 pub fn read_no_follow(dir: &Path, name: &str) -> io::Result<Option<Vec<u8>>> {
+    // A folder not made yet holds no file: the same answer as a missing file.
+    if matches!(fs::symlink_metadata(dir), Err(e) if e.kind() == io::ErrorKind::NotFound) {
+        return Ok(None);
+    }
     let path = regular_entry(dir, name)?;
     match no_follow(OpenOptions::new().read(true)).open(&path) {
         Ok(mut f) => {
@@ -57,6 +61,25 @@ pub fn write_atomic(dir: &Path, name: &str, bytes: &[u8], mode: u32) -> io::Resu
         drop(fs::remove_file(&tmp));
     }
     written
+}
+
+/// Opens `dir/name` for appending and reading, creating it (`O_NOFOLLOW|O_APPEND`, `mode` on
+/// unix). A link at the name is refused rather than written through.
+///
+/// # Errors
+/// When `dir` is not a real folder, an entry at `name` is not a regular file, or the open fails.
+pub fn open_append_no_follow(dir: &Path, name: &str, mode: u32) -> io::Result<fs::File> {
+    let path = regular_entry(dir, name)?;
+    let mut o = OpenOptions::new();
+    o.create(true).append(true).read(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        o.mode(mode);
+    }
+    #[cfg(not(unix))]
+    let _ = mode;
+    no_follow(&mut o).open(&path)
 }
 
 /// `dir/name`, after checking `dir` is a real folder and `name`, when present, a regular file.
