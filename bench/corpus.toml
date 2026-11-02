@@ -1,20 +1,23 @@
-# Pinned corpus for `make bench`. Each repo is fetched at exactly this sha, so a re-run
-# measures the same history. Probe fields name the files and commit the page timings use;
-# a missing probe is discovered from the tree (largest file under the text limit, deepest
+# Pinned corpus for `make bench`. A local repo has no sha: it is measured at HEAD. Every other
+# repo is fetched at exactly this sha, so a re-run measures the same history. Probe fields name
+# the files and commit the page timings use.
+# A missing probe is discovered from the tree (largest file under the text limit, deepest
 # folder, HEAD). A blob or blame probe above that limit is the refusal page, so keep it under.
-# need_gb is the free disk the clone and its blobs need; the harness refuses below it.
+# why is the reason the repo is in the corpus. docs/benchmarks.md links it to url.
+# need_gb is the free disk the clone and its blobs need. The harness refuses below it.
 
 [[repo]]
 name = "control"
+why = "this repository, the floor."
 url = "https://github.com/gitterrace/gitterrace.git"
 local = "."
-sha = "d2ef86fee28d9b406509ac881352cfce09900181"
 class = "small"
 need_gb = 1
 search = "fn"
 
 [[repo]]
 name = "git"
+why = "medium, long-lived, a classic reference."
 url = "https://github.com/git/git.git"
 sha = "50fe5cc63f9cd6e89b87a2c9ccf96a444f4cfdb7"
 class = "medium"
@@ -23,6 +26,7 @@ search = "strbuf"
 
 [[repo]]
 name = "rust"
+why = "huge history, many files and contributors."
 url = "https://github.com/rust-lang/rust.git"
 sha = "f90a2d27c2a1e18f10f4fd84c0dcd02710c37de8"
 class = "large"
@@ -31,11 +35,14 @@ search = "Option"
 
 [[repo]]
 name = "linux"
+why = "the extreme, opt-in (`make bench LARGE=1`), about 30 GB."
 url = "https://github.com/torvalds/linux.git"
 sha = "cbbddb6b08cc9900a87cccaa9b22bbe06aa4f50a"
 class = "huge"
 need_gb = 30
 opt_in = true
+# One cold sample: a cold linux index takes too long to repeat. The doc marks it.
+cold_samples = 1
 search = "kmalloc"
 
 # Budgets per size class. First measured run plus headroom (see docs/benchmarks.md).
@@ -65,6 +72,7 @@ rss_mb = 6000
 [budgets.huge]
 page_warm_ms = 500
 page_cold_ms = 20000
-index_secs = 7200
+# Product goal: a cold linux index in about 10 minutes.
+index_secs = 600
 idle_cpu_pct = 1
 rss_mb = 8000
