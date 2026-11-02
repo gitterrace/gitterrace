@@ -24,10 +24,31 @@ repository.
 
 In scope:
 
-- **The local server and its guard.** It binds to `127.0.0.1` by default. It refuses
-  requests whose Host is not loopback and refuses cross-site requests, and pages carry a
-  strict content security policy. A page from another site or another local port reaching
-  gitterrace is in scope.
+- **The local server and its guard.** It binds to `127.0.0.1` by default and refuses
+  requests whose Host is not loopback (or listed in `server.hosts`). It refuses cross-site requests, and pages carry a
+  strict content security policy. Scripts are locked to the app's own origin plus the hashes
+  of its inline theme snippets. Styles allow inline rules only because mermaid writes diagram
+  styles at runtime; the app's own markup carries no style attribute. A page from another
+  site or another local port reaching gitterrace is in scope.
+- **Public mode.** `--public` (or `server.public = true`) is the supported way to serve
+  beyond loopback, and a non-loopback `--addr` refuses to start without it. The promises are
+  listed in [running it online](docs/online.md): committed history only, full commit ids only,
+  `GET` and `HEAD` only, no live updates, actions, Send to or adding repositories, and no
+  host paths. A Host that is not a loopback name, the bound address or listed in
+  `server.hosts` gets `403`, which stops DNS rebinding. Error bodies, including `5xx`, never carry host paths. Any
+  read beyond that list, any other method, or a Host outside `server.hosts` being answered
+  is in scope.
+- **Adding a repository.** `POST /_repos` lets `git terrace open` add a repository to a
+  running server. It answers only loopback binds, refuses any request with a browser
+  `Origin` or `Sec-Fetch-Site`, needs a per-process token, and accepts only the canonical
+  top folder of a git repository. The token lives in a file with mode `0600` in a state
+  folder with mode `0700`. On Windows those modes do not exist, so the token file's privacy
+  rests on the permissions of your user profile folder. Reaching this endpoint from a
+  page, another user or a public server is in scope.
+- **Static export.** `git terrace export` writes plain files only, and only below its
+  output folder. It refuses to write through a symlink, and it leaves out non-inert media
+  under `raw/`. A leak through an export, such as a working tree file, a host path or a
+  write outside the output folder, is in scope.
 - **Rendering repository content.** Markdown, code, diffs and SVG from the repository are
   sanitised before display. Script running from repository content is in scope.
 - **Actions.** Actions run programs you configure in `actions.toml` in your own config
@@ -47,8 +68,9 @@ In scope:
 
 Out of scope:
 
-- binding gitterrace to a public address on purpose (`--addr 0.0.0.0`). There is no login,
-  and the docs say to keep it local.
+- serving a private repository publicly without a login in front of it. gitterrace has no
+  accounts, so public mode is read-only, not private. Put a reverse proxy with a login in
+  front, as [running it online](docs/online.md) describes.
 - programs you configured yourself in `actions.toml`, doing what you told them to
 - vulnerabilities in dependencies, which belong upstream (tell us if gitterrace is affected)
 - scanner output without a realistic path to exploitation
