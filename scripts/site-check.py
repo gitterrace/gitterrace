@@ -4,6 +4,10 @@
 release: the page tells people to `brew install` from the tap and `cargo install` from the
   repository. Deploying that before both answer publishes an install line that fails, so the
   deploy refuses until the repository, the tap and the `v<version>` release tag exist.
+csp [DIR]: every inline <script> in DIR/index.html (default site/) has its exact sha256 in
+  the CSP of DIR/_headers and of any meta CSP, and no other script hash is listed. A changed
+  script or a stale _headers fails here instead of being blocked silently by the browser.
+  `release` runs it too, before a deploy.
 domains: gitterrace.dev serves the page over HTTPS with the generated headers, and every other
   host (www, gitterrace.com, www.gitterrace.com) redirects to it permanently. A www host that
   resolves to nothing looks like DNS propagation and goes unnoticed for weeks; this measures it.
@@ -12,12 +16,17 @@ Creates nothing: attaching custom domains and the redirect rule are Cloudflare d
 steps, and scripting them needs a Zone:Edit token, too large a credential for this.
 
   python3 scripts/site-check.py release
+  python3 scripts/site-check.py csp [DIR]
   python3 scripts/site-check.py domains
 """
 
+from __future__ import annotations
+
+import base64
+import email.message
+import hashlib
 import re
 import sys
-import tomllib
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -29,28 +38,96 @@ TIMEOUT = 15
 
 
 class NoRedirect(urllib.request.HTTPRedirectHandler):
-    def redirect_request(self, *args, **kwargs):
+    def redirect_request(self, *args: object, **kwargs: object) -> None:
         return None
 
 
 OPENER = urllib.request.build_opener(NoRedirect)
 
 
-def fetch(url: str, method: str = "GET"):
-    """(status, headers) without following redirects; status 0 when nothing answers."""
+Answer = tuple[int, email.message.Message, str]
+
+
+def fetch(url: str, method: str = "GET", body: bool = False) -> Answer:
+    """(status, headers, text) without following redirects. Status 0 and empty headers when
+    nothing answers. The text is read only with `body`, else it is empty."""
     req = urllib.request.Request(
         url, method=method, headers={"User-Agent": "gitterrace-site-check"}
     )
     try:
         with OPENER.open(req, timeout=TIMEOUT) as r:
-            return r.status, r.headers
+            text = r.read().decode("utf-8", "replace") if body else ""
+            return r.status, r.headers, text
     except urllib.error.HTTPError as e:
-        return e.code, e.headers
+        return e.code, e.headers, ""
     except (urllib.error.URLError, TimeoutError, OSError):
-        return 0, {}
+        return 0, email.message.Message(), ""
 
 
-def facts():
+INLINE_SCRIPT = re.compile(r"<script\b([^>]*)>(.*?)</script\s*>", re.S | re.I)
+META_CSP = re.compile(
+    r"<meta\s+http-equiv=[\"']content-security-policy[\"']\s+content=[\"']([^\"']*)[\"']",
+    re.I,
+)
+
+
+def script_hashes(html: str) -> set[str]:
+    """The CSP source of every inline script: 'sha256-<base64>' over its exact text."""
+    out = set()
+    for attrs, text in INLINE_SCRIPT.findall(html):
+        if re.search(r"\bsrc\s*=", attrs, re.I):
+            continue
+        digest = hashlib.sha256(text.encode("utf-8")).digest()
+        out.add(f"'sha256-{base64.b64encode(digest).decode()}'")
+    return out
+
+
+def csp_problems(where: str, csp: str, html: str) -> list[str]:
+    """What is wrong with `csp` for `html`: a missing policy, an inline script whose exact
+    hash it lacks, a hash for no script, or unsafe-inline."""
+    if not csp:
+        return [f"{where}: no Content-Security-Policy"]
+    m = re.search(r"script-src([^;]*)", csp)
+    listed = set(re.findall(r"'sha256-[A-Za-z0-9+/=]+'", m.group(1) if m else ""))
+    want = script_hashes(html)
+    bad = [
+        f"{where}: script-src lacks {h}, the inline script changed"
+        for h in sorted(want - listed)
+    ]
+    bad += [
+        f"{where}: script-src lists {h}, which no inline script has"
+        for h in sorted(listed - want)
+    ]
+    if "'unsafe-inline'" in csp:
+        bad.append(f"{where}: unsafe-inline")
+    return bad
+
+
+def headers_csp(text: str) -> str:
+    """The Content-Security-Policy of the `/*` block in a `_headers` file."""
+    m = re.search(r"^/\*\s*$((?:\n[ \t]+.*)*)", text, re.M)
+    block = m.group(1) if m else ""
+    m = re.search(r"^[ \t]+Content-Security-Policy:\s*(.*)$", block, re.M | re.I)
+    return m.group(1).strip() if m else ""
+
+
+def csp(directory: str | None = None) -> list[str]:
+    d = Path(directory) if directory else ROOT / "site"
+    html = (d / "index.html").read_text()
+    bad = csp_problems(f"{d}/_headers", headers_csp((d / "_headers").read_text()), html)
+    for meta in META_CSP.findall(html):
+        bad += csp_problems(f"{d}/index.html meta CSP", meta, html)
+    n = len(script_hashes(html))
+    print(
+        f"  [{'x' if bad else '+'}] {n} inline script(s) in {d}/index.html match the CSP"
+    )
+    return bad
+
+
+def facts() -> tuple[str, str, str]:
+    # tomllib is 3.11+, and `csp` runs on older ones, so only `release` imports it.
+    import tomllib  # pyright: ignore[reportMissingImports]
+
     ws = tomllib.loads((ROOT / "Cargo.toml").read_text())
     repo = ws["workspace"]["package"]["repository"].rstrip("/")
     version = ws["workspace"]["package"]["version"]
@@ -59,19 +136,19 @@ def facts():
 
 
 def release() -> list[str]:
+    bad = csp()
     repo, version, tap = facts()
     m = re.match(r"https://github\.com/([^/]+/[^/]+)$", repo)
     if not m:
-        return [f"repository {repo}: not a code-host URL this check knows"]
+        return bad + [f"repository {repo}: not a code-host URL this check knows"]
     host = "https://github.com"
     checks = [
         (f"{repo}", "repository"),
         (f"{host}/{tap}", "Homebrew tap"),
         (f"{repo}/releases/tag/v{version}", f"release tag v{version}"),
     ]
-    bad = []
     for url, what in checks:
-        status, _ = fetch(url, "HEAD")
+        status, _, _ = fetch(url, "HEAD")
         print(
             f"  [{'+' if status == 200 else 'x'}] {what}: {url} ({status or 'no answer'})"
         )
@@ -82,17 +159,19 @@ def release() -> list[str]:
 
 def domains() -> list[str]:
     bad = []
-    status, headers = fetch(f"https://{CANONICAL}/")
-    csp = headers.get("Content-Security-Policy", "") if headers else ""
-    ok = status == 200 and "script-src 'sha256-" in csp
+    status, headers, page = fetch(f"https://{CANONICAL}/", body=True)
+    policy = headers.get("Content-Security-Policy", "")
+    wrong = csp_problems(f"https://{CANONICAL}/", policy, page) if status == 200 else []
+    for meta in META_CSP.findall(page):
+        wrong += csp_problems(f"https://{CANONICAL}/ meta CSP", meta, page)
+    ok = status == 200 and not wrong
     print(
-        f"  [{'+' if ok else 'x'}] https://{CANONICAL}/ serves the page with the generated CSP ({status or 'no answer'})"
+        f"  [{'+' if ok else 'x'}] https://{CANONICAL}/ serves the page with a CSP holding its inline script hashes ({status or 'no answer'})"
     )
-    if not ok:
-        bad.append(
-            f"https://{CANONICAL}/ answered {status or 'nothing'}, CSP {'present' if csp else 'missing'}"
-        )
-    status, _ = fetch(f"https://{CANONICAL}/no-such-page")
+    if status != 200:
+        bad.append(f"https://{CANONICAL}/ answered {status or 'nothing'}")
+    bad += wrong
+    status, _, _ = fetch(f"https://{CANONICAL}/no-such-page")
     print(
         f"  [{'+' if status == 404 else 'x'}] unknown paths answer 404 ({status or 'no answer'})"
     )
@@ -100,8 +179,8 @@ def domains() -> list[str]:
         bad.append(f"unknown path answered {status or 'nothing'}, want 404")
     for host in REDIRECTS:
         for scheme in ("https", "http"):
-            status, headers = fetch(f"{scheme}://{host}/")
-            loc = (headers.get("Location", "") if headers else "").rstrip("/")
+            status, headers, _ = fetch(f"{scheme}://{host}/")
+            loc = headers.get("Location", "").rstrip("/")
             good = status in (301, 308) and loc == f"https://{CANONICAL}"
             print(
                 f"  [{'+' if good else 'x'}] {scheme}://{host}/ -> {loc or '-'} ({status or 'no answer'})"
@@ -115,11 +194,11 @@ def domains() -> list[str]:
 
 def main() -> int:
     cmd = sys.argv[1] if len(sys.argv) > 1 else ""
-    run = {"release": release, "domains": domains}.get(cmd)
+    run = {"release": release, "domains": domains, "csp": csp}.get(cmd)
     if not run:
         print(__doc__)
         return 2
-    bad = run()
+    bad = run(*sys.argv[2:3])
     for b in bad:
         print(f"site-check {cmd}: {b}", file=sys.stderr)
     if not bad:
@@ -127,4 +206,5 @@ def main() -> int:
     return 1 if bad else 0
 
 
-sys.exit(main())
+if __name__ == "__main__":
+    sys.exit(main())

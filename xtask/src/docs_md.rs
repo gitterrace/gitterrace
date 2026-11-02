@@ -32,15 +32,18 @@ pub fn render(root: &Path, ws: &Workspace, scripts: &[Script]) -> Result<Vec<Out
         Out::block(ACTIONS, "scripts", script_table(scripts)),
         Out::block(ARCH, "crates", crate_diagram(ws)?),
         Out::block(ARCH, "routes", routes()),
+        Out::block(ARCH, "languages", languages()),
         Out::block(ARCH, "cache", cache()),
-        Out::block(BENCH, "results", bench_results(root)?),
+        Out::block(BENCH, "corpus", bench_report(root, "--corpus")?),
+        Out::block(BENCH, "results", bench_report(root, "--print")?),
     ])
 }
 
-/// The benchmark results block: `scripts/bench-report.py --print` renders the newest result file.
-fn bench_results(root: &Path) -> Result<String> {
+/// A benchmark block from `scripts/bench-report.py`: `--corpus` lists the repos with their source
+/// links from `bench/corpus.toml`, `--print` renders the newest result file.
+fn bench_report(root: &Path, flag: &str) -> Result<String> {
     let out = std::process::Command::new("python3")
-        .args(["scripts/bench-report.py", "--print"])
+        .args(["scripts/bench-report.py", flag])
         .current_dir(root)
         .output()
         .context("running scripts/bench-report.py")?;
@@ -127,7 +130,6 @@ pub struct Entry {
     pub table: &'static str,
     pub id: String,
     pub enabled: bool,
-    pub label: String,
     pub about: String,
     pub vars: Vec<String>,
     /// The block has a `lookup` template.
@@ -168,7 +170,6 @@ pub fn starter_entries() -> Vec<Entry> {
                 table,
                 id: value(&text, "id")?,
                 enabled: value(&text, "enabled").is_none_or(|e| e == "true"),
-                label: value(&text, "label")?,
                 about: about.join(" "),
                 vars,
                 lookup: value(&text, "lookup").is_some(),
@@ -255,6 +256,13 @@ fn routes() -> String {
         let _ = writeln!(s, "| {} | {} |", p.shown, p.does);
     }
     s
+}
+
+/// The highlighted languages as one comma-separated paragraph, from the syntax set the binary
+/// ships, so the list cannot drift from what the code view does.
+fn languages() -> String {
+    let names = gitterrace_web::highlighted_languages();
+    format!("{} languages: {}.\n", names.len(), names.join(", "))
 }
 
 fn cache() -> String {

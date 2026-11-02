@@ -1,9 +1,10 @@
+#!/usr/bin/env node
 // Renders the two raster images the site needs from the brand SVGs, at deploy time, and the
 // site's WebP screenshots (below).
 // They are generated, not committed (.gitignore), because the SVGs are the single source:
 //   site/assets/apple-touch-icon.png  180x180, the mark on the page background (iOS home screen)
 //   site/assets/og.png                1200x630, the light README header (link previews)
-// Chromium draws the SVGs, since simpler renderers drop the stroked path of the mark.
+// Chromium draws the SVGs, the same renderer as the app icon.
 //
 //   node scripts/site-render.mjs
 import { existsSync, readFileSync, mkdirSync, readdirSync, rmSync } from 'node:fs';
@@ -51,7 +52,9 @@ if (!raw.length) {
   for (const f of readdirSync(siteShots)) rmSync(join(siteShots, f));
   for (const f of raw) {
     const src = join(rawDir, f);
-    for (const [args, ext] of [[[], '.webp'], [['-resize', '1280', '800'], '.thumb.webp']]) {
+    /** @type {[string[], string][]} */
+    const variants = [[[], '.webp'], [['-resize', '1280', '800'], '.thumb.webp']];
+    for (const [args, ext] of variants) {
       const r = spawnSync('cwebp', ['-quiet', '-q', '82', ...args, src, '-o', join(siteShots, f.replace(/\.png$/, ext))]);
       if (r.status !== 0) { console.error(`site-render: cwebp failed on ${f}`); process.exit(1); }
     }

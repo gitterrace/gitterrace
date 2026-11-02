@@ -16,6 +16,23 @@ fn syntaxes() -> &'static SyntaxSet {
     SET.get_or_init(two_face::syntax::extra_newlines)
 }
 
+/// Every language the code view highlights, by grammar name, sorted.
+///
+/// Only grammars a file can pick by its extension or name: the set also holds helper grammars
+/// other grammars embed, which no file opens. The docs list is generated from this.
+#[must_use]
+pub fn languages() -> Vec<&'static str> {
+    let mut names: Vec<&'static str> = syntaxes()
+        .syntaxes()
+        .iter()
+        .filter(|s| !s.file_extensions.is_empty() && !s.hidden && s.name != "Plain Text")
+        .map(|s| s.name.as_str())
+        .collect();
+    names.sort_unstable_by_key(|n| n.to_ascii_lowercase());
+    names.dedup();
+    names
+}
+
 /// Colour categories the stylesheet knows, in stylesheet order: a later one wins within one scope.
 const CATEGORIES: [(&str, &str); 13] = [
     ("comment", "s-comment"),

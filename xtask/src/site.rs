@@ -35,10 +35,11 @@ h1,h2{font-family:var(--serif);line-height:var(--leading-tight);font-weight:var(
 h2{font-size:var(--text-xl);margin:var(--space-16) 0 var(--space-3)}
 h3{font-size:var(--text-lg);margin:var(--space-8) 0 var(--space-2)}
 header{padding:var(--space-8) 0 var(--space-4);position:relative}
-.gh{position:absolute;top:var(--space-8);right:0;color:var(--muted);line-height:0}
+.gh{right:0;color:var(--muted)}
 .gh:hover,.gh:focus-visible{color:var(--fg)}
 .gh svg{fill:currentColor}
-header img{display:block;max-width:calc(100% - 40px);height:auto}
+header img{max-width:calc(100% - 72px);height:auto}
+header img.on-light{display:block}
 .tag{font-family:var(--serif);font-size:var(--text-lg);color:var(--muted);margin:var(--space-4) 0 0}
 pre,code{font-family:var(--mono);font-size:var(--text-sm)}
 pre{background:var(--soft);border:var(--border);border-radius:var(--radius);padding:var(--space-3) var(--space-4);overflow-x:auto}
@@ -51,13 +52,27 @@ ul.features b{font-weight:var(--weight-semibold)}
 .shots{display:grid;grid-template-columns:1fr 1fr;gap:var(--space-6) var(--space-4);margin:var(--space-8) 0}
 @media (max-width:640px){.shots{grid-template-columns:1fr}}
 figure{margin:0}
-figure img,.lightbox img{display:block;width:100%;height:auto;border:var(--border);border-radius:var(--radius)}
+figure img,.lightbox img{width:100%;height:auto;border:var(--border);border-radius:var(--radius)}
+figure img.on-light,.lightbox img.on-light{display:block}
 .lightbox{display:none}
 .lightbox:target{display:flex;position:fixed;inset:0;z-index:10;align-items:center;justify-content:center;padding:var(--space-8);background:color-mix(in srgb,var(--bg) 97%,transparent);cursor:zoom-out}
-.lightbox:target picture{max-width:min(1280px,100%)}
+.lightbox:target .shot{max-width:min(1280px,100%)}
 .demo{margin-top:var(--space-6)}
 figcaption{font-size:var(--text-xs);color:var(--muted);margin-top:var(--space-2);line-height:1.4}figcaption b{color:var(--fg);font-weight:var(--weight-semibold)}
 footer{display:flex;flex-wrap:wrap;gap:var(--space-4);font-size:var(--text-sm)}
+.gh,.theme{position:absolute;top:var(--space-8);line-height:0}
+.theme{right:40px;width:24px;height:24px;padding:0;display:grid;place-items:center;background:none;border:0;color:var(--muted);cursor:pointer}
+.theme:hover,.theme:focus-visible{color:var(--fg)}
+.theme svg{width:24px;height:24px;overflow:visible;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;display:none}
+.theme svg *{vector-effect:non-scaling-stroke}
+.theme .fill{fill:currentColor;stroke:none}
+.theme .i-auto{display:block}
+:root[data-theme=light] .theme .i-auto,:root[data-theme=dark] .theme .i-auto{display:none}
+:root[data-theme=light] .theme .i-light,:root[data-theme=dark] .theme .i-dark{display:block}
+.on-dark{display:none}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]) img.on-light{display:none}:root:not([data-theme=light]) img.on-dark{display:block}}
+:root[data-theme=dark] img.on-light{display:none}
+:root[data-theme=dark] img.on-dark{display:block}
 footer{margin-top:var(--space-16);padding-top:var(--space-4);border-top:var(--border);color:var(--faint)}
 ";
 
@@ -83,7 +98,7 @@ fn head(name: &str, desc: &str, home: &str) -> String {
          <meta name=\"twitter:card\" content=\"summary_large_image\">\n\
          <link rel=\"icon\" type=\"image/svg+xml\" href=\"assets/mark.svg\">\n\
          <link rel=\"apple-touch-icon\" href=\"assets/apple-touch-icon.png\">\n\
-         <link rel=\"stylesheet\" href=\"assets/site.css\">\n</head>\n<body>\n<main>\n",
+         <link rel=\"stylesheet\" href=\"assets/site.css\">\n<script>{THEME_INIT_JS}</script>\n</head>\n<body>\n<main>\n",
         name = esc(name),
         desc = esc(desc),
         home = esc(home),
@@ -126,9 +141,9 @@ pub fn render(root: &Path, ws: &Workspace) -> Result<Vec<Out>> {
     let mut h = head(&pkg.name, &pkg.description, home);
     let _ = write!(
         h,
-        "<header>\n<picture>\n<source media=\"(prefers-color-scheme: dark)\" srcset=\"assets/logo-dark.svg\">\n\
-         <img src=\"assets/logo-light.svg\" alt=\"{n}\" width=\"540\" height=\"120\">\n</picture>\n\
-         <p class=\"tag\">{tag}</p>\n<a class=\"gh\" href=\"{r}\" aria-label=\"{n} on GitHub\" title=\"GitHub\"><svg viewBox=\"0 0 16 16\" width=\"24\" height=\"24\" aria-hidden=\"true\"><path d=\"{GH_MARK}\"/></svg></a>\n</header>\n",
+        "<header>\n<img class=\"on-light\" src=\"assets/logo-light.svg\" alt=\"{n}\" width=\"540\" height=\"120\" loading=\"lazy\">\n\
+         <img class=\"on-dark\" src=\"assets/logo-dark.svg\" alt=\"\" width=\"540\" height=\"120\" loading=\"lazy\">\n\
+         <p class=\"tag\">{tag}</p>\n{THEME_BUTTON}\n<a class=\"gh\" href=\"{r}\" aria-label=\"{n} on GitHub\" title=\"GitHub\"><svg viewBox=\"0 0 16 16\" width=\"24\" height=\"24\" aria-hidden=\"true\"><path d=\"{GH_MARK}\"/></svg></a>\n</header>\n",
         r = esc(repo),
         n = esc(&pkg.name),
         tag = esc(&tagline(root)?),
@@ -168,7 +183,7 @@ pub fn render(root: &Path, ws: &Workspace) -> Result<Vec<Out>> {
         h,
         "<footer>\n<a href=\"{repo}\">Repository</a>\n<a href=\"{repo}/tree/main/docs\">Docs</a>\n\
          <a href=\"{repo}/blob/main/LICENSE\">{lic} license</a>\n<span>Version {ver}</span>\n</footer>\n\
-         </main>\n<script>{LIGHTBOX_JS}</script>\n</body>\n</html>\n",
+         </main>\n<script>{THEME_TOGGLE_JS}</script>\n<script>{LIGHTBOX_JS}</script>\n</body>\n</html>\n",
         repo = esc(repo),
         lic = esc(&pkg.license),
         ver = esc(&pkg.version),
@@ -182,21 +197,45 @@ pub fn render(root: &Path, ws: &Workspace) -> Result<Vec<Out>> {
 /// the same place a click on the overlay leads. Everything else works without it.
 const LIGHTBOX_JS: &str = "addEventListener('keydown',function(e){if(e.key==='Escape'&&location.hash.indexOf('#shot-')===0)location.hash='features'})";
 
-/// The CSP source for [`LIGHTBOX_JS`]: its sha256, so exactly that script runs and any other,
+/// In the head, before first paint: a theme the visitor picked earlier (the app's own key, so
+/// both remember one choice), else none and the system decides. No flash of the wrong scheme.
+const THEME_INIT_JS: &str = "(function(){try{var t=localStorage.getItem('gitterrace-theme');if(t==='light'||t==='dark')document.documentElement.dataset.theme=t}catch(e){}})()";
+
+/// The theme button cycles system, light and dark, as the app's does, and stores the choice.
+const THEME_TOGGLE_JS: &str = "(function(){var r=document.documentElement,b=document.getElementById('theme'),o=['system','light','dark'];if(!b)return;function c(){return r.dataset.theme||'system'}function l(){b.setAttribute('aria-label','Theme: '+c());b.title='Theme: '+c()}l();b.addEventListener('click',function(){var n=o[(o.indexOf(c())+1)%3];if(n==='system')delete r.dataset.theme;else r.dataset.theme=n;try{if(n==='system')localStorage.removeItem('gitterrace-theme');else localStorage.setItem('gitterrace-theme',n)}catch(e){}l()})})()";
+
+/// The theme button, the app's icons: half disc for system, sun, moon. Each viewBox is cropped
+/// to its own ink plus half the stroke, so at 24 px every icon fills the box as the GitHub mark
+/// beside it does.
+const THEME_BUTTON: &str = "<button class=\"theme\" type=\"button\" id=\"theme\" aria-label=\"Theme: system\" title=\"Theme: system\">\
+<svg class=\"i-auto\" viewBox=\"3.2 3.2 17.6 17.6\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"12\" r=\"8\"/><path d=\"M12 4a8 8 0 0 0 0 16z\" class=\"fill\"/></svg>\
+<svg class=\"i-light\" viewBox=\"1.2 1.2 21.6 21.6\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"12\" r=\"4\"/><path d=\"M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8\"/></svg>\
+<svg class=\"i-dark\" viewBox=\"3.85 3.2 16.95 16.95\" aria-hidden=\"true\"><path d=\"M20 14.5A8 8 0 0 1 9.5 4 8 8 0 1 0 20 14.5z\"/></svg></button>";
+
+/// Every inline script on the page, so the CSP lists exactly these by hash.
+const SCRIPTS: [&str; 3] = [THEME_INIT_JS, THEME_TOGGLE_JS, LIGHTBOX_JS];
+
+/// The CSP source for [`SCRIPTS`]: the sha256 of each, so exactly those run and any other,
 /// inline or loaded, fails loudly in the browser instead of quietly shipping.
-fn lightbox_hash() -> String {
+fn script_hashes() -> String {
     use base64::Engine as _;
     use sha2::Digest as _;
-    let sum = sha2::Sha256::digest(LIGHTBOX_JS.as_bytes());
-    format!(
-        "'sha256-{}'",
-        base64::engine::general_purpose::STANDARD.encode(sum)
-    )
+    SCRIPTS
+        .iter()
+        .map(|s| {
+            let sum = sha2::Sha256::digest(s.as_bytes());
+            format!(
+                "'sha256-{}'",
+                base64::engine::general_purpose::STANDARD.encode(sum)
+            )
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
 }
 
 /// The files the static host reads beside the page: response headers, the 404 page, the
 /// crawler files and the security contact. The CSP is tight because the page is static: the
-/// only script allowed is [`LIGHTBOX_JS`] by its hash.
+/// only scripts allowed are [`SCRIPTS`], by their hashes.
 fn host_files(home: &str, repo: &str, name: &str) -> Vec<Out> {
     let headers = format!("\
 # Generated by `cargo xtask generate` (xtask/src/site.rs). Do not edit.
@@ -215,7 +254,7 @@ fn host_files(home: &str, repo: &str, name: &str) -> Vec<Out> {
 /assets/screenshots/*
   Cache-Control: public, max-age=86400
 ",
-        script = lightbox_hash()
+        script = script_hashes()
     );
     let not_found = format!(
         "<!doctype html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n\
@@ -320,22 +359,13 @@ fn features() -> String {
         .map(|t| esc(&t.to_lowercase()))
         .collect();
     line("Insights.", format!("{}.", sentence(&tabs)));
-    let mut presets: Vec<String> = Vec::new();
-    for e in crate::docs_md::starter_entries()
-        .iter()
-        .filter(|e| e.table == "send")
-    {
-        let label = esc(&e.label);
-        if !presets.contains(&label) {
-            presets.push(label);
-        }
-    }
+    // Kinds of destination, not product names: the starter file names apps that may not be out
+    // yet, and the page should not lead with one of them.
     line(
         "Send to.",
-        format!(
-            "Hand a selection on with its context: {}.",
-            sentence(&presets)
-        ),
+        "Hand a selection on with its context: a mail draft, a new issue, discussion or merge \
+         request, a task or a note in the app you use."
+            .to_owned(),
     );
     line(
         "Actions.",
@@ -416,7 +446,7 @@ pub const SHOTS: [(&str, &str, &str); 6] = [
     ),
     (
         "send",
-        "Send to: marked lines with their context, ready for tendir, mail, an issue or a merge request.",
+        "Send to: marked lines with their context, ready for mail, an issue, a merge request or your task list.",
         "Send to",
     ),
     (
@@ -561,17 +591,18 @@ fn shot_size(root: &Path, file: &str) -> Result<(u32, u32)> {
 /// and `tabindex="-1"` lets the browser focus it when the fragment opens it.
 fn shot_html(name: &str, alt: &str, cap: &str) -> String {
     // Every tile is the same size so the rows line up; check_shots holds the WebPs to it.
-    // A tile shows only its thumbnail, so it never fetches the full-size file. Only the colour
-    // scheme's source loads.
-    let dark = " media=\"(prefers-color-scheme: dark)\"";
-    let thumb = format!(
-        "<picture><source{dark} srcset=\"assets/screenshots/{name}-dark.thumb.webp\"><img src=\"assets/screenshots/{name}-light.thumb.webp\" alt=\"{}\" width=\"1280\" height=\"800\" loading=\"lazy\" decoding=\"async\"></picture>",
-        esc(alt)
-    );
-    // The lightbox loads only the full-size WebP for the colour scheme.
-    let full = format!(
-        "<picture><source{dark} srcset=\"assets/screenshots/{name}-dark.webp\"><img src=\"assets/screenshots/{name}-light.webp\" alt=\"\" width=\"1280\" height=\"800\" loading=\"lazy\" decoding=\"async\"></picture>"
-    );
+    // A tile shows only its thumbnail, so it never fetches the full-size file. Light and dark
+    // are two lazy images, one hidden by the theme (the toggle or the system): a hidden lazy
+    // image is never fetched, so only the shown scheme loads. The dark copy is decorative.
+    let pair = |kind: &str, a: &str| {
+        format!(
+            "<span class=\"shot\"><img class=\"on-light\" src=\"assets/screenshots/{name}-light{kind}.webp\" alt=\"{a}\" width=\"1280\" height=\"800\" loading=\"lazy\" decoding=\"async\">\
+             <img class=\"on-dark\" src=\"assets/screenshots/{name}-dark{kind}.webp\" alt=\"\" width=\"1280\" height=\"800\" loading=\"lazy\" decoding=\"async\"></span>"
+        )
+    };
+    let thumb = pair(".thumb", &esc(alt));
+    // The lightbox loads only the full-size WebP for the colour scheme; its image is decorative.
+    let full = pair("", "");
     format!(
         "<a href=\"#shot-{name}\">{}</a>\
          <a class=\"lightbox\" id=\"shot-{name}\" href=\"#features\" aria-label=\"Close {}\" tabindex=\"-1\">{}</a>",
@@ -595,131 +626,4 @@ fn esc(s: &str) -> String {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    /// One figure per shot, a picture inside it, and a lightbox that is labelled, takes focus
-    /// and does not announce its image twice.
-    #[test]
-    fn gallery_has_one_figure_per_shot_and_an_accessible_lightbox() {
-        let g = gallery();
-        assert!(!g.contains("<figure><figure"), "nested figure");
-        assert_eq!(g.matches("<figure>").count(), SHOTS.len());
-        assert_eq!(g.matches("<picture>").count(), SHOTS.len() * 2);
-        assert_eq!(g.matches("tabindex=\"-1\"").count(), SHOTS.len());
-        assert_eq!(g.matches("aria-label=\"Close ").count(), SHOTS.len());
-    }
-
-    /// A tile loads only its thumbnail, and the full-size file is left to the lightbox.
-    #[test]
-    fn tiles_never_reference_the_full_size_screenshot() {
-        for (name, alt, cap) in SHOTS {
-            let h = shot_html(name, alt, cap);
-            let (tile, lightbox) = h.split_once("<a class=\"lightbox\"").expect("lightbox");
-            for c in ["light", "dark"] {
-                assert!(!tile.contains(&format!("screenshots/{name}-{c}.webp")));
-                assert!(!h.contains(".png"), "shot {name} links a PNG");
-                assert!(tile.contains(&format!("screenshots/{name}-{c}.thumb.webp")));
-                assert!(
-                    !lightbox.contains(".thumb."),
-                    "lightbox {name} loads a thumbnail"
-                );
-            }
-            assert!(lightbox.contains(&format!("screenshots/{name}-dark.webp")));
-            assert!(tile.contains("width=\"1280\" height=\"800\" loading=\"lazy\""));
-        }
-    }
-
-    #[test]
-    fn redirect_target_is_the_installer_url() {
-        let r = redirects("https://github.com/o/r", "r");
-        assert!(r.contains(
-            "/install.sh https://github.com/o/r/releases/latest/download/r-installer.sh 302"
-        ));
-    }
-
-    /// A VP8X header of the given canvas size, enough for `webp_size`.
-    fn webp(w: u32, h: u32) -> Vec<u8> {
-        let mut b = b"RIFF\0\0\0\0WEBPVP8X\x0a\0\0\0\0\0\0\0".to_vec();
-        b.extend_from_slice(&(w - 1).to_le_bytes()[..3]);
-        b.extend_from_slice(&(h - 1).to_le_bytes()[..3]);
-        b
-    }
-
-    /// A PNG header of the given size, enough for `shot_size`.
-    fn png(w: u32, h: u32) -> Vec<u8> {
-        let mut b = b"\x89PNG\r\n\x1a\n\0\0\0\rIHDR".to_vec();
-        b.extend_from_slice(&w.to_be_bytes());
-        b.extend_from_slice(&h.to_be_bytes());
-        b.push(0);
-        b
-    }
-
-    #[test]
-    fn readme_shots_are_the_linked_pngs() {
-        let r = "<img src=\"docs/screenshots/b-light.png\" alt=\"x\">\n\
-                 srcset=\"docs/screenshots/a-dark.png\" docs/screenshots/b-light.png docs/screenshots/x.svg";
-        assert_eq!(readme_shots(r), ["a-dark.png", "b-light.png"]);
-    }
-
-    #[test]
-    fn a_missing_unreferenced_or_wrongly_sized_screenshot_fails() {
-        let dir = std::env::temp_dir().join(format!("gt-shots-{}", std::process::id()));
-        let shots = dir.join(SHOT_DIR);
-        let site = dir.join(SITE_SHOT_DIR);
-        std::fs::create_dir_all(&shots).expect("mkdir");
-        std::fs::create_dir_all(&site).expect("mkdir");
-        std::fs::write(
-            dir.join("README.md"),
-            "<source srcset=\"docs/screenshots/overview-dark.png\">\n<img src=\"docs/screenshots/overview-light.png\">\n",
-        )
-        .expect("readme");
-        let err = check_shots(&dir)
-            .expect_err("empty folder fails")
-            .to_string();
-        assert!(
-            err.contains("overview-dark.png is linked by README.md"),
-            "{err}"
-        );
-        assert!(err.contains("make site-shots"), "{err}");
-        for c in ["light", "dark"] {
-            std::fs::write(shots.join(format!("overview-{c}.png")), png(2560, 1600))
-                .expect("write");
-        }
-        // A PNG the README does not link fails, though the site has a shot of that name.
-        std::fs::write(shots.join("blame-dark.png"), png(2560, 1600)).expect("write");
-        let err = check_shots(&dir)
-            .expect_err("unlinked png fails")
-            .to_string();
-        assert!(
-            err.contains("blame-dark.png is not referenced by README.md"),
-            "{err}"
-        );
-        assert!(err.contains("make site-shots"), "{err}");
-        std::fs::remove_file(shots.join("blame-dark.png")).expect("rm");
-        std::fs::write(shots.join("overview-dark.png"), png(1280, 800)).expect("write");
-        let err = check_shots(&dir).expect_err("small png fails").to_string();
-        assert!(err.contains("overview-dark.png is 1280x800"), "{err}");
-        std::fs::write(shots.join("overview-dark.png"), png(2560, 1600)).expect("write");
-        let err = check_shots(&dir).expect_err("no webp fails").to_string();
-        assert!(err.contains("is missing (make site-shots)"), "{err}");
-        for (n, ..) in SHOTS {
-            for c in ["light", "dark"] {
-                std::fs::write(site.join(format!("{n}-{c}.webp")), webp(2560, 1600))
-                    .expect("write");
-                std::fs::write(site.join(format!("{n}-{c}.thumb.webp")), webp(1280, 800))
-                    .expect("write");
-            }
-        }
-        check_shots(&dir).expect("complete set passes");
-        std::fs::write(site.join("blame-dark.thumb.webp"), webp(1200, 750)).expect("write");
-        let err = check_shots(&dir).expect_err("wrong size fails").to_string();
-        assert!(err.contains("blame-dark.thumb.webp is 1200x750"), "{err}");
-        assert!(err.contains("make site-shots"), "{err}");
-        std::fs::write(site.join("blame-dark.thumb.webp"), webp(1280, 800)).expect("write");
-        std::fs::write(site.join("blame-dark.png"), b"x").expect("write");
-        let err = check_shots(&dir).expect_err("site png fails").to_string();
-        assert!(err.contains("not referenced"), "{err}");
-        std::fs::remove_dir_all(&dir).expect("cleanup");
-    }
-}
+mod tests;

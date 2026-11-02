@@ -48,6 +48,7 @@ use gitterrace_config::Config;
 use gitterrace_git::Repo;
 use gitterrace_index::Index;
 pub use guard::CSP as PAGE_CSP;
+pub use highlight::languages as highlighted_languages;
 pub use media::plain_media;
 pub use multi::discover_repos;
 pub use registry::{
