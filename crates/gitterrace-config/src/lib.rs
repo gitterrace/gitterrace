@@ -11,7 +11,7 @@ use std::collections::BTreeMap;
 use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
 
-pub use schema::{Config, DEFAULT_ADDR, Key, RepoOverride, keys};
+pub use schema::{Config, DEFAULT_ADDR, Key, Reload, RepoOverride, keys};
 pub use value::Show;
 
 /// Where a value came from.
@@ -193,7 +193,43 @@ pub fn parse(text: &str) -> Result<Loaded, ConfigError> {
 
 #[cfg(test)]
 mod tests {
-    use super::{Source, load, parse, template};
+    use super::{Config, Reload, Source, keys, load, parse, template};
+
+    /// The docs page and the reload read the same field: a key documented as needing a
+    /// restart is one the reload holds back, and the other way round.
+    #[test]
+    fn restart_keys_match_their_docs_and_are_held_back() {
+        let mut changed = parse(
+            "[server]\naddr = \"127.0.0.1:9\"\npublic = true\nhosts = [\"h.example\"]\nmax_streams = 3\n\
+             [index]\nthreads = 3\n[multi]\ndepth = 4\nskip_dirs = [\"x\"]\n",
+        )
+        .expect("parse")
+        .config;
+        let old = Config::default();
+        let restart: Vec<&str> = keys()
+            .iter()
+            .filter(|k| k.reload == Reload::Restart)
+            .map(|k| k.id)
+            .collect();
+        for k in keys() {
+            let says = k
+                .doc
+                .split_whitespace()
+                .collect::<Vec<_>>()
+                .join(" ")
+                .contains("Needs a restart");
+            assert_eq!(
+                says,
+                k.reload == Reload::Restart,
+                "{}: doc and table disagree",
+                k.id
+            );
+        }
+        assert_eq!(old.restart_changes(&changed), restart);
+        changed.keep_restart(&old);
+        assert!(old.restart_changes(&changed).is_empty());
+        assert_eq!(changed.server.max_streams, 3, "live keys are not held back");
+    }
 
     #[test]
     fn template_loads_to_the_defaults_without_warnings() {

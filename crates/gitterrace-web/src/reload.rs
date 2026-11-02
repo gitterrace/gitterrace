@@ -54,7 +54,9 @@ impl Reloader {
         };
         let mut lines = vec!["config reloaded".to_owned()];
         for key in env.apply(cfg) {
-            lines.push(format!("config: {key} changed, restart to apply it"));
+            lines.push(format!(
+                "config: {key} changed but needs a restart. The running value stays in force"
+            ));
         }
         lines
     }
@@ -99,7 +101,7 @@ mod tests {
     use crate::app::{App, Env};
 
     struct Fixture {
-        _repo: tempfile::TempDir,
+        repo: tempfile::TempDir,
         dir: tempfile::TempDir,
         env: Env,
         app: Arc<App>,
@@ -126,7 +128,7 @@ mod tests {
             load: Box::new(load),
         });
         Fixture {
-            _repo: repo,
+            repo,
             dir,
             env,
             app,
@@ -181,17 +183,57 @@ mod tests {
         );
     }
 
+    /// `/api/v1` counts under the settings in force, the same ones the pages read.
+    #[tokio::test]
+    async fn an_insights_edit_reaches_the_api() {
+        // No background build, so the index generation in the tag stays put.
+        let quiet = "[index]\nbuild_on_start = false\n";
+        let mut f = fixture(quiet);
+        let router = crate::repo_router(f.repo.path(), String::new(), "r".into(), None, &f.env)
+            .expect("router");
+        // The entity tag folds in the counting defaults, so it moves exactly when the API's
+        // options do, whatever the background index has built so far.
+        let tag = |r: axum::Router| async move {
+            use tower::ServiceExt as _;
+            let req = axum::http::Request::get("/api/v1/repo")
+                .header("host", "localhost")
+                .body(axum::body::Body::empty())
+                .expect("req");
+            let res = r.oneshot(req).await.expect("res");
+            assert_eq!(res.status(), 200);
+            res.headers().get("etag").expect("etag").clone()
+        };
+        let before = tag(router.clone()).await;
+        let same = tag(router.clone()).await;
+        assert_eq!(before, same, "nothing changed, same tag");
+        edit(&f, &format!("{quiet}[insights]\nexclude = [\"a.txt\"]\n"));
+        f.reloader.poll(&f.env);
+        assert_ne!(
+            before,
+            tag(router).await,
+            "the API counts under the reloaded options"
+        );
+        assert_eq!(
+            f.app.defaults().exclude,
+            gitterrace_api::options_from(&f.env.cfg(), &f.app.name).exclude,
+            "pages and API read one options function"
+        );
+    }
+
     #[test]
     fn a_restart_only_key_warns_and_does_not_change() {
         let mut f = fixture("");
         edit(
             &f,
-            "[server]\naddr = \"127.0.0.1:9\"\n[index]\nthreads = 3\n[multi]\ndepth = 4\n\
+            "[server]\naddr = \"127.0.0.1:9\"\npublic = true\nhosts = [\"git.example.com\"]\n\
+             [index]\nthreads = 3\n[multi]\ndepth = 4\n\
              skip_dirs = [\"x\"]\n[display]\ndates = \"absolute\"\n",
         );
         let lines = f.reloader.poll(&f.env).join("\n");
         for key in [
             "server.addr",
+            "server.public",
+            "server.hosts",
             "index.threads",
             "multi.depth",
             "multi.skip_dirs",
@@ -200,7 +242,11 @@ mod tests {
         }
         let cfg = f.env.cfg();
         let d = Config::default();
-        assert_eq!(cfg.server.addr, d.server.addr);
+        assert_eq!(
+            cfg.server, d.server,
+            "addr, public and hosts keep their running value"
+        );
+        assert!(!f.app.public(), "public mode is fixed at startup");
         assert_eq!(cfg.index.threads, d.index.threads);
         assert_eq!(cfg.multi, d.multi);
         assert_eq!(

@@ -17,8 +17,9 @@ async fn an_empty_selection_reads_as_empty_on_every_insights_page() {
 
     let router = gitterrace_web::app_router(&p).expect("router");
     for _ in 0..100 {
-        let (_, body) = get(&router, "/stats").await;
-        if !body.contains("Indexing") {
+        // Commit search answers from the index, so a hit means the index is built.
+        let (_, body) = get(&router, "/search?q=first&kind=commits").await;
+        if body.contains("class=\"crow\"") {
             break;
         }
         tokio::time::sleep(Duration::from_millis(100)).await;

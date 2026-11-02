@@ -2,7 +2,7 @@
 //! so the two surfaces cannot drift apart. Everything here is blocking.
 
 use std::path::Path;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, RwLock};
 
 use gitterrace_actions::{Lines, LinkStyle, styled};
 use gitterrace_git::Repo;
@@ -53,7 +53,15 @@ pub struct ApiState {
     pub(crate) index: Arc<Index>,
     /// Parsed records of the last request, keyed by (resolved tip, index generation).
     cache: Arc<Mutex<Option<RecordsCache>>>,
-    /// Form of the `link` field (`links.style`); `permalink` is always `/go`.
+    /// `links.style` and the counting options a request leaves unset. Shared with every clone,
+    /// so a config reload ([`ApiState::reconfigure`]) reaches routers already built.
+    settings: Arc<RwLock<Settings>>,
+}
+
+/// What the configuration decides for the API.
+#[derive(Clone, Default)]
+struct Settings {
+    /// Form of the `link` field; `permalink` is always `/go`.
     style: LinkStyle,
     /// Counting options when a request names none: the `insights` configuration, the same
     /// defaults the web pages start from.
@@ -68,15 +76,14 @@ impl ApiState {
             repo,
             index,
             cache: Arc::default(),
-            style: LinkStyle::default(),
-            defaults: Options::default(),
+            settings: Arc::default(),
         }
     }
 
     /// Counting options from the configuration, used when a request leaves one unset.
     #[must_use]
-    pub fn with_defaults(mut self, defaults: Options) -> Self {
-        self.defaults = defaults;
+    pub fn with_defaults(self, defaults: Options) -> Self {
+        self.write_settings().defaults = defaults;
         self
     }
 
@@ -85,15 +92,36 @@ impl ApiState {
     /// build their state through here, so the two answer with the same numbers.
     #[must_use]
     pub fn configured(self, cfg: &gitterrace_config::Config) -> Self {
+        self.reconfigure(cfg);
+        self
+    }
+
+    /// Puts `cfg` in force for this state and every clone of it, such as a router built
+    /// earlier: a reloaded `config.toml` changes the next answer.
+    pub fn reconfigure(&self, cfg: &gitterrace_config::Config) {
         let defaults = options_from(cfg, &self.repo.name());
-        self.with_link_style(LinkStyle::from_config(&cfg.links.style))
-            .with_defaults(defaults)
+        let mut s = self.write_settings();
+        s.style = LinkStyle::from_config(&cfg.links.style);
+        s.defaults = defaults;
+    }
+
+    fn write_settings(&self) -> std::sync::RwLockWriteGuard<'_, Settings> {
+        self.settings
+            .write()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+    }
+
+    fn settings(&self) -> Settings {
+        self.settings
+            .read()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone()
     }
 
     /// The `link` field in `style` from now on.
     #[must_use]
-    pub const fn with_link_style(mut self, style: LinkStyle) -> Self {
-        self.style = style;
+    pub fn with_link_style(self, style: LinkStyle) -> Self {
+        self.write_settings().style = style;
         self
     }
 
@@ -139,7 +167,7 @@ impl ApiState {
                 h = (h ^ u64::from(b)).wrapping_mul(0x0100_0000_01b3);
             }
         }
-        let defaults = serde_json::to_string(&self.defaults).unwrap_or_default();
+        let defaults = serde_json::to_string(&self.settings().defaults).unwrap_or_default();
         for b in defaults.bytes().chain([0]) {
             h = (h ^ u64::from(b)).wrapping_mul(0x0100_0000_01b3);
         }
@@ -191,7 +219,15 @@ impl ApiState {
         });
         let name = self.repo.name();
         let go = gitterrace_actions::permalink("", Some(&id), &name, sha, path, lines);
-        let link = styled(self.style, "", Some(&id), &name, sha, path, lines);
+        let link = styled(
+            self.settings().style,
+            "",
+            Some(&id),
+            &name,
+            sha,
+            path,
+            lines,
+        );
         v["permalink"] = json!(go);
         v["link"] = json!(link);
     }
@@ -200,7 +236,7 @@ impl ApiState {
         let head = self.repo.resolve(DEFAULT_REV).ok();
         let records = self.records(DEFAULT_REV)?;
         let totals = self
-            .insights(DEFAULT_REV, &records, self.defaults.clone())
+            .insights(DEFAULT_REV, &records, self.settings().defaults)
             .period_summary(gitterrace_index::Period::All)
             .current;
         Ok(json!({
@@ -373,7 +409,7 @@ impl ApiState {
         let tip = self.repo.resolve(rev)?;
         let all = self.records(rev)?;
         let records = params.select.apply(&all);
-        let opts = params.options.apply(self.defaults.clone());
+        let opts = params.options.apply(self.settings().defaults);
         let ins = self.insights(&tip, &records, opts);
         let mut data = insights::compute(name, &ins, params, || {
             let mut cache = gitterrace_index::LineCache::load(self.index.dir());
@@ -397,7 +433,7 @@ impl ApiState {
     pub fn contributors(&self, rev: Option<&str>) -> Result<Value, ApiError> {
         let rev = Self::rev(rev)?;
         let records = self.records(rev)?;
-        let opts = self.defaults.clone();
+        let opts = self.settings().defaults;
         let bots = opts.include_bots;
         let report = self
             .insights(rev, &records, opts)

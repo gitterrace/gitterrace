@@ -14,11 +14,22 @@ pub struct Key {
     pub ty: &'static str,
     pub default: String,
     pub doc: &'static str,
+    /// Whether a running server takes a new value on reload.
+    pub reload: Reload,
+}
+
+/// How an edit to one setting reaches a running server.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Reload {
+    /// Applied on the next reload of `config.toml`.
+    Live,
+    /// Read once at startup: a reload keeps the running value and says a restart is needed.
+    Restart,
 }
 
 macro_rules! settings {
     ($( $field:ident : $sec:ident { $(
-        $(#[doc = $doc:literal])* $name:ident : $ty:ty = $default:expr ,
+        $(#[doc = $doc:literal])* $name:ident : $ty:ty = $default:expr => $reload:ident ,
     )* } )*) => {
         $(
             #[derive(Debug, Clone, PartialEq, Eq)]
@@ -46,6 +57,7 @@ macro_rules! settings {
                 ty: <$ty as Show>::TYPE,
                 default: Show::show(&d.$field.$name),
                 doc: concat!($($doc, "\n"),*).trim(),
+                reload: Reload::$reload,
             }, )* )* ]
         }
 
@@ -57,6 +69,23 @@ macro_rules! settings {
                         Show::show(&self.$field.$name), )* )*
                     _ => String::new(),
                 }
+            }
+
+            /// Ids of the [`Reload::Restart`] settings whose value differs in `new`.
+            pub fn restart_changes(&self, new: &Self) -> Vec<&'static str> {
+                let mut out = Vec::new();
+                $( $( if Reload::$reload == Reload::Restart && self.$field.$name != new.$field.$name {
+                    out.push(concat!(stringify!($field), ".", stringify!($name)));
+                } )* )*
+                out
+            }
+
+            /// Copies every [`Reload::Restart`] setting from `running`, so the result holds only
+            /// values a running server can put in force.
+            pub fn keep_restart(&mut self, running: &Self) {
+                $( $( if Reload::$reload == Reload::Restart {
+                    self.$field.$name.clone_from(&running.$field.$name);
+                } )* )*
             }
 
             pub(crate) fn from_table(mut t: toml::Table) -> Result<Self, String> {
@@ -102,81 +131,81 @@ settings! {
     server: Server {
         /// Address to listen on. Keep it local: pages show source code and there is no login. Needs a
         /// restart.
-        addr: String = DEFAULT_ADDR.to_owned(),
+        addr: String = DEFAULT_ADDR.to_owned() => Restart,
         /// Maximum open live-update streams per repository (one per browser tab).
-        max_streams: usize = 32,
+        max_streams: usize = 32 => Live,
         /// Serve read-only to anyone who can reach the address: committed history only, no
         /// working tree, stashes, live updates, actions or additions. Required for any address
         /// that is not loopback. Needs a restart.
-        public: bool = false,
+        public: bool = false => Restart,
         /// Host names a reverse proxy forwards with, exact and without port, for example
         /// `["git.example.com"]`. Needs `public`. Needs a restart.
-        hosts: Vec<String> = Vec::new(),
+        hosts: Vec<String> = Vec::new() => Restart,
     }
     watch: Watch {
         /// Notice new commits and refs while running. Off means a restart or a reload is needed.
-        enabled: bool = true,
+        enabled: bool = true => Live,
         /// How often to check each served repository for changes, in milliseconds. A check is a
         /// few `stat` calls. Minimum 250.
-        interval_ms: u64 = 1000,
+        interval_ms: u64 = 1000 => Live,
     }
     index: Index {
         /// Build the commit index as soon as a repository is served: at startup for one
         /// repository, at its first visit when several share the server. Off waits for the first
         /// page that needs it (Insights).
-        build_on_start: bool = true,
+        build_on_start: bool = true => Live,
         /// Threads that parse the index. 0 means one per core, capped at 8. Needs a restart.
-        threads: usize = 0,
+        threads: usize = 0 => Restart,
     }
     resources: Resources {
         /// Memory for the blame and highlighted-code caches together, in MB, shared half and
         /// half. The highlighted-code cache is per process, the blame cache per repository.
-        cache_mb: usize = 64,
+        cache_mb: usize = 64 => Live,
         /// Most page-building git jobs running at once across all repositories. 0 means one per
         /// core.
-        blocking_jobs: usize = 0,
+        blocking_jobs: usize = 0 => Live,
     }
     limits: Limits {
         /// Largest file shown as text, in KiB. Larger files are offered as raw downloads.
-        text_kb: u64 = 2048,
+        text_kb: u64 = 2048 => Live,
         /// Largest file served raw, in MB.
-        raw_mb: u64 = 256,
+        raw_mb: u64 = 256 => Live,
         /// Most matches a code search returns.
-        search_matches: usize = 500,
+        search_matches: usize = 500 => Live,
         /// Lines of one file's diff shown before it folds.
-        diff_fold_lines: usize = 400,
+        diff_fold_lines: usize = 400 => Live,
     }
     insights: Insights {
         /// Paths (globs) left out of every insight.
-        exclude: Vec<String> = Vec::new(),
+        exclude: Vec<String> = Vec::new() => Live,
         /// Count commits by bots.
-        bots: bool = false,
+        bots: bool = false => Live,
         /// Count lock files and minified output.
-        generated: bool = false,
+        generated: bool = false => Live,
         /// Period the insights pages use when the URL names none: 1w, 1m, 3m, 1y or all. The
         /// API and MCP default to all. Their `period` parameter picks one.
-        period: String = "all".to_owned(),
+        period: String = "all".to_owned() => Live,
     }
     display: Display {
         /// Color theme before the visitor picks one: system, light or dark.
-        theme: String = "system".to_owned(),
+        theme: String = "system".to_owned() => Live,
         /// How dates read: relative or absolute.
-        dates: String = "relative".to_owned(),
+        dates: String = "relative".to_owned() => Live,
     }
     multi: Multi {
         /// How many folder levels to search below a given folder for repositories. Needs a restart.
-        depth: usize = 2,
+        depth: usize = 2 => Restart,
         /// Folder names never searched, besides hidden ones. Needs a restart.
-        skip_dirs: Vec<String> = vec!["node_modules".to_owned(), "target".to_owned(), ".wt".to_owned()],
+        skip_dirs: Vec<String> = vec!["node_modules".to_owned(), "target".to_owned(), ".wt".to_owned()] => Restart,
     }
     links: Links {
         /// Form of the permalink Copy permalink, Send to, action payloads and the MCP hand out:
         /// gitterrace (`gitterrace://<id>/<sha>/<path>`, opened by `git terrace open` without a
         /// running server) or go (`http://<addr>/go/...`, needs this server running).
-        style: String = "gitterrace".to_owned(),
+        style: String = "gitterrace".to_owned() => Live,
         /// Folders `git terrace open` searches, `multi.depth` levels deep, for a clone a link
         /// names, besides every repository served before.
-        roots: Vec<String> = Vec::new(),
+        roots: Vec<String> = Vec::new() => Live,
     }
 }
 
@@ -226,7 +255,7 @@ impl Config {
         Ok(())
     }
 
-    /// Why the online settings cannot be honoured: a non-loopback address without
+    /// Why the online settings cannot be honored: a non-loopback address without
     /// `server.public` (fails closed, so a typo in `addr` never exposes the working tree), or a
     /// `server.hosts` entry that is not one plain host name.
     fn public_problem(&self) -> Option<(&'static str, String)> {

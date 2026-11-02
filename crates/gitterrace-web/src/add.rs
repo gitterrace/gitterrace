@@ -107,9 +107,17 @@ async fn add(State(adder): State<Arc<Adder>>, req: Request) -> Response {
         }
         Err(stem) => return bad(&format!("unusable repository name {stem:?}")),
     };
-    // Build now: starts the index refresher and the warm-up, as a startup repository gets.
+    // Build now: starts the index refresher and the warm-up, as a startup repository gets. A
+    // repository that will not open is taken out again and never remembered, so it does not
+    // come back on the next start. Only a local server takes additions, so the reason (which
+    // may name a host folder) goes back to the caller.
     if let Err(e) = adder.table.router_of(&served).await {
         tracing::warn!("opening added {}: {e}", served.name);
+        adder.table.remove(&served.name);
+        return reply(
+            StatusCode::UNPROCESSABLE_ENTITY,
+            &serde_json::json!({ "error": format!("cannot open the repository: {e}") }),
+        );
     }
     match Repo::discover(&root) {
         Ok(repo) => adder.site.push_target(crate::actions::Target {
@@ -308,6 +316,39 @@ mod tests {
     #[tokio::test]
     async fn multi_repository_server_adds() {
         adds_and_guards(true).await;
+    }
+
+    /// A repository that is found but will not open (its cache folder cannot be made) answers
+    /// 422, is not listed and is not written to the state file, so no restart brings it back.
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn an_addition_that_will_not_open_is_refused_and_forgotten() {
+        use std::os::unix::fs::PermissionsExt;
+        let t = tempfile::tempdir().expect("tmp");
+        let a = repo(&t.path().join("a"), "a root");
+        let b = repo(&t.path().join("b"), "b root");
+        let git_dir = b.join(".git");
+        std::fs::set_permissions(&git_dir, std::fs::Permissions::from_mode(0o555)).expect("chmod");
+        if std::fs::create_dir(git_dir.join("probe")).is_ok() {
+            // Running as a user that ignores permissions: nothing to observe.
+            return;
+        }
+        let state = t.path().join("state");
+        let token = gitterrace_actions::Token::generate().expect("token");
+        let secret = token.as_str().to_owned();
+        let env = crate::app::Env::new(gitterrace_config::Config::default());
+        let (server, _) =
+            crate::build_server(vec![a], None, None, &env, Some(token), Some(state.clone()))
+                .expect("r");
+        let (status, js) = send(&server, post(Some(&secret)), body(&b)).await;
+        std::fs::set_permissions(&git_dir, std::fs::Permissions::from_mode(0o755)).expect("chmod");
+        assert_eq!(status, 422, "{js}");
+        let (_, list) = get(&server, "/api/repos").await;
+        assert!(!list.contains("/r/b/"), "{list}");
+        assert_eq!(get(&server, "/r/b/").await.0, 404, "not served");
+        tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+        let recorded = std::fs::read_to_string(state.join("repos.json")).unwrap_or_default();
+        assert!(!recorded.contains(b.to_str().expect("utf8")), "{recorded}");
     }
 
     #[tokio::test]

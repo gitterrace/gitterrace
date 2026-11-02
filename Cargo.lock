@@ -1005,7 +1005,6 @@ dependencies = [
  "gitterrace-index",
  "gitterrace-testkit",
  "http-body-util",
- "libc",
  "pulldown-cmark",
  "regex",
  "rustix",

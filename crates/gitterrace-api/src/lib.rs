@@ -388,14 +388,17 @@ mod tests {
                 exclude: vec!["src/**".to_owned()],
             },
         );
-        let c = s.clone().configured(&cfg);
         let authors = |s: &ApiState| {
             s.contributors(None).expect("contributors")["authors"]
                 .as_array()
                 .map_or(0, Vec::len)
         };
         assert_eq!(authors(&s), 1, "bots hidden by default");
+        // Settings are shared by every clone, so a router built before a reload sees it.
+        let router_state = s.clone();
+        let c = s.configured(&cfg);
         assert_eq!(authors(&c), 2, "insights.bots = true");
+        assert_eq!(authors(&router_state), 2, "a reload reaches earlier clones");
         let hot = c
             .insight("hotspots", None, &crate::Params::default())
             .expect("hotspots");

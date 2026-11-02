@@ -113,6 +113,8 @@ fn repo_router(
     } else {
         api
     };
+    // A reload reaches the API through the app: both count with the same `insights.*`.
+    app.set_api(api.clone());
     let pages = routes::router(Arc::clone(&app)).nest("/api/v1", gitterrace_api::router(api));
     let pages = if env.public() {
         pages.route_layer(axum::middleware::from_fn(public::only_public))
@@ -121,6 +123,17 @@ fn repo_router(
     };
     tokio::spawn(prewarm(Arc::clone(&app), pages.clone()));
     Ok(pages)
+}
+
+/// A failed bind with the address and, when the port is taken, what to do about it. The kind
+/// is kept, so a caller can still tell the cases apart.
+fn bind_error(addr: SocketAddr, e: &io::Error) -> io::Error {
+    let hint = if e.kind() == io::ErrorKind::AddrInUse {
+        "; another git terrace or other server is using that port: stop it, or pass --addr with another port (127.0.0.1:0 picks a free one)"
+    } else {
+        ""
+    };
+    io::Error::new(e.kind(), format!("cannot listen on {addr}: {e}{hint}"))
 }
 
 /// Unfiltered pages rendered in the background whenever HEAD moves.
@@ -375,7 +388,9 @@ pub async fn serve_in(
         move || remember(state.as_deref(), &paths)
     });
     let env = Env::new(cfg);
-    let listener = tokio::net::TcpListener::bind(addr).await?;
+    let listener = tokio::net::TcpListener::bind(addr)
+        .await
+        .map_err(|e| bind_error(addr, &e))?;
     let addr = listener.local_addr()?;
     // The secret `open` reads to add a repository. Without a state folder, or when it cannot
     // be written, the route stays unmounted and `open` starts a server of its own.
@@ -1467,6 +1482,29 @@ mod tests {
             .expect("res");
         assert_eq!(res.status(), 200);
         assert_eq!(fetch(&router, "/", "evil.example.com").await.0, 403);
+    }
+
+    /// A taken port names the address and the way out, not a bare os error.
+    #[tokio::test]
+    async fn a_busy_port_names_the_address_and_a_hint() {
+        let dir = tempfile::tempdir().expect("tmp");
+        let p = fixture("alpha", dir.path());
+        let taken = std::net::TcpListener::bind("127.0.0.1:0").expect("bind");
+        let addr = taken.local_addr().expect("addr");
+        let e = crate::serve_in(
+            vec![p],
+            addr,
+            None,
+            gitterrace_config::Config::default(),
+            None,
+            None,
+        )
+        .await
+        .expect_err("bound a taken port");
+        let msg = e.to_string();
+        assert_eq!(e.kind(), std::io::ErrorKind::AddrInUse);
+        assert!(msg.contains(&addr.to_string()), "{msg}");
+        assert!(msg.contains("--addr"), "{msg}");
     }
 
     /// `serve` refuses a reachable address unless the server is public, before binding.

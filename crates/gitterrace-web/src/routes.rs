@@ -211,7 +211,12 @@ async fn raw(
     .await?;
     let (bytes, tag) = match loaded {
         Raw::TooLarge => {
-            return Ok((StatusCode::PAYLOAD_TOO_LARGE, "too large to serve\n").into_response());
+            // 413 names the request body, and 5xx reads as a server fault worth retrying: the
+            // file exists but this server does not hand it out, so 404 with the reason.
+            let why = format!(
+                "This file is larger than limits.raw_mb ({limit} MB) and is not served raw."
+            );
+            return Ok(crate::error::not_found(&why));
         }
         Raw::Fresh(tag) => {
             let tag =

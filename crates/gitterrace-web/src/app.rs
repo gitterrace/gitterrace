@@ -177,23 +177,11 @@ impl Env {
     /// open tabs.
     pub(crate) fn apply(&self, mut new: Config) -> Vec<&'static str> {
         let old = self.cfg();
-        let mut restart = Vec::new();
-        for (key, moved) in [
-            ("server.addr", new.server.addr != old.server.addr),
-            ("index.threads", new.index.threads != old.index.threads),
-            ("multi.depth", new.multi.depth != old.multi.depth),
-            (
-                "multi.skip_dirs",
-                new.multi.skip_dirs != old.multi.skip_dirs,
-            ),
-        ] {
-            if moved {
-                restart.push(key);
-            }
-        }
-        new.server.addr.clone_from(&old.server.addr);
-        new.index.threads = old.index.threads;
-        new.multi = old.multi.clone();
+        // The settings table says which keys are read once at startup (the bind, the Host
+        // gate, public mode, discovery). Keeping their running value means `cfg()` never
+        // shows a value that is not in force.
+        let restart = old.restart_changes(&new);
+        new.keep_restart(&old);
         if new == *old {
             return restart;
         }
@@ -266,6 +254,8 @@ pub(crate) struct App {
     dirty: Mutex<Option<(Instant, bool)>>,
     /// Open streams on a page that shows the working tree. Zero means no scan runs.
     pub(crate) wt_watchers: std::sync::atomic::AtomicUsize,
+    /// This repository's `/api/v1` state, so a reload reaches its settings.
+    api: std::sync::OnceLock<gitterrace_api::ApiState>,
     file_lists: Mutex<crate::bounded::Bounded<Arc<Vec<String>>>>,
     last_commits: Mutex<crate::bounded::Bounded<Arc<Vec<LastCommit>>>>,
     chain: Mutex<Option<(String, Arc<crate::languages::Chain>)>>,
@@ -311,6 +301,7 @@ impl App {
             memo: Mutex::new(crate::bounded::Bounded::new(CACHE_BYTES)),
             dirty: Mutex::new(None),
             wt_watchers: std::sync::atomic::AtomicUsize::new(0),
+            api: std::sync::OnceLock::new(),
             file_lists: Mutex::new(crate::bounded::Bounded::new(CACHE_BYTES)),
             last_commits: Mutex::new(crate::bounded::Bounded::new(CACHE_BYTES)),
             chain: Mutex::new(None),
@@ -342,7 +333,15 @@ impl App {
     }
 
     /// Takes a reloaded config: limits, stream cap, rendered pages and open tabs.
+    /// Hands the app its `/api/v1` state, once, so a reload reconfigures it too.
+    pub(crate) fn set_api(&self, api: gitterrace_api::ApiState) {
+        self.api.set(api).ok();
+    }
+
     fn reconfigure(&self, cfg: &Config) {
+        if let Some(api) = self.api.get() {
+            api.reconfigure(cfg);
+        }
         let (text_bytes, blame_bytes) = repo_limits(cfg);
         self.repo.set_limits(text_bytes, blame_bytes);
         resize(&self.streams, &self.streams_cap, cfg.server.max_streams);

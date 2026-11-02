@@ -192,6 +192,25 @@ impl Table {
         Ok(Added::Fresh(g.insert(name, root.clone(), root)))
     }
 
+    /// Drops `name` again, for an addition whose repository would not open.
+    pub(crate) fn remove(&self, name: &str) {
+        let mut g = self.write();
+        g.by_name.remove(name);
+        g.order.retain(|s| s.name != name);
+    }
+
+    /// The page for a repository that will not open. An io error names host folders, so only
+    /// a local server shows it; a public one says what failed and nothing more.
+    pub(crate) fn open_failed(&self, name: &str, e: &io::Error) -> Response {
+        let detail = if self.env.public() {
+            format!("The repository {name} could not be opened.")
+        } else {
+            format!("The repository {name} could not be opened: {e}")
+        };
+        let status = StatusCode::INTERNAL_SERVER_ERROR;
+        (status, crate::error::page(status, &detail)).into_response()
+    }
+
     pub(crate) fn get(&self, name: &str) -> Option<Arc<Served>> {
         self.read().by_name.get(name).cloned()
     }
@@ -357,7 +376,8 @@ pub(crate) fn added_router(table: Arc<Table>) -> Router {
 }
 
 async fn slash(uri: Uri) -> Redirect {
-    Redirect::permanent(&format!("{}/", uri.path()))
+    let q = uri.query().map_or_else(String::new, |q| format!("?{q}"));
+    Redirect::permanent(&format!("{}/{q}", uri.path()))
 }
 
 /// Hands the request to the repository's own router with the `/r/NAME` prefix removed.
@@ -376,7 +396,7 @@ async fn dispatch(State(table): State<Arc<Table>>, req: Request) -> Response {
         Ok(r) => r,
         Err(e) => {
             tracing::warn!("opening {}: {e}", served.name);
-            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+            return table.open_failed(&served.name, &e);
         }
     };
     let pq = req
@@ -504,6 +524,7 @@ async fn repos_json(State(table): State<Arc<Table>>) -> Response {
 #[cfg(test)]
 mod tests {
     use super::valid_name;
+    use axum::response::IntoResponse;
     use gitterrace_testkit::git;
 
     #[test]
@@ -556,5 +577,46 @@ mod tests {
         assert_eq!(weeks.len(), super::SPARK_WEEKS);
         assert!(weeks.iter().all(|n| *n > 0), "{weeks:?}");
         assert_eq!(weeks.iter().sum::<u32>(), 5000);
+    }
+
+    #[tokio::test]
+    async fn the_slash_redirect_keeps_the_query() {
+        let r = super::slash("/r/a?period=1y&bots=1".parse().expect("uri"))
+            .await
+            .into_response();
+        let to = r.headers().get("location").expect("location");
+        assert_eq!(to, "/r/a/?period=1y&bots=1");
+    }
+
+    /// A repository that will not open answers the error page; a public server never names a
+    /// host folder in it, a local one shows the reason.
+    #[test]
+    fn a_repository_that_will_not_open_hides_host_paths_when_public() {
+        let e = std::io::Error::other("cannot open /srv/private/repo/.git/gitterrace");
+        for (public, shows) in [(true, false), (false, true)] {
+            let mut cfg = gitterrace_config::Config::default();
+            cfg.server.public = public;
+            let table = super::Table::new(Vec::new(), crate::app::Env::new(cfg)).expect("table");
+            let r = table.open_failed("repo", &e);
+            assert_eq!(r.status(), 500);
+            let body = futures_body(r);
+            assert!(body.contains("repo could not be opened"), "{body}");
+            assert_eq!(
+                body.contains("/srv/private"),
+                shows,
+                "public={public}: {body}"
+            );
+        }
+    }
+
+    fn futures_body(r: axum::response::Response) -> String {
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .build()
+            .expect("rt");
+        let b = rt
+            .block_on(http_body_util::BodyExt::collect(r.into_body()))
+            .expect("body")
+            .to_bytes();
+        String::from_utf8_lossy(&b).into_owned()
     }
 }

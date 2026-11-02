@@ -66,11 +66,12 @@ async fn limits_text_kb_and_raw_mb_change_what_a_file_shows() {
     let (s, _) = get(&router(&p, Config::default()), "/raw/HEAD/big.txt").await;
     assert_eq!(s, 200);
     let tiny = with(|c| c.limits.raw_mb = 1);
+    let (s, body) = get(&router(&p, tiny), "/raw/HEAD/big.txt").await;
     assert_eq!(
-        get(&router(&p, tiny), "/raw/HEAD/big.txt").await.0,
-        413,
-        "1.2 MB is over 1 MiB"
+        s, 404,
+        "1.2 MB is over 1 MiB, and 413 would name the request"
     );
+    assert!(body.contains("limits.raw_mb"), "{body}");
 }
 
 #[tokio::test]

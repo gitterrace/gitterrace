@@ -53,17 +53,16 @@ impl Defaults {
 }
 
 impl App {
+    /// The counting options come from the function `/api/v1` and the MCP use, so a page and
+    /// the API agree on what the config leaves out.
     pub(crate) fn defaults(&self) -> Defaults {
-        let i = &self.cfg().insights;
-        let mut exclude = i.exclude.clone();
-        if let Some(o) = self.cfg().repo.get(&self.name) {
-            exclude.extend(o.exclude.iter().cloned());
-        }
+        let cfg = self.cfg();
+        let o = gitterrace_api::options_from(&cfg, &self.name);
         Defaults {
-            bots: i.bots,
-            generated: i.generated,
-            exclude,
-            period: Period::parse(&i.period).filter(|p| *p != Period::All),
+            bots: o.include_bots,
+            generated: o.include_generated,
+            exclude: o.exclude,
+            period: Period::parse(&cfg.insights.period).filter(|p| *p != Period::All),
         }
     }
 }
