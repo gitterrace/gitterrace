@@ -28,23 +28,27 @@ const BUDGET_MB: u64 = 32 + 16;
 const GROWTH_MB: u64 = 4;
 const SERVE_VAR: &str = "TEST_MEMORY_SERVE";
 
-/// The allocator the numbers depend on: jemalloc, returning freed pages at once. A build
-/// with other decay settings (no `.cargo/config.toml` env, another allocator) measures
-/// retained pages instead of held memory, so it fails here instead of reporting a number.
-fn assert_allocator() {
+/// The allocator the numbers depend on, as the shipped binary sets it at start
+/// (`crates/gitterrace/src/alloc.rs`): jemalloc, every arena handing freed pages back at once.
+/// The child server here starts from `serve_in`, not that `main`, so it applies the same
+/// setting, then this asserts the decay in effect. A run under another allocator or decay
+/// measures retained pages instead of held memory, so it fails here instead of reporting.
+fn apply_and_assert_allocator() {
     use tikv_jemalloc_ctl::{Access, AsName};
     let version: &str = b"version\0"
         .name()
         .read()
         .expect("jemalloc is the global allocator");
-    for key in [&b"opt.dirty_decay_ms\0"[..], &b"opt.muzzy_decay_ms\0"[..]] {
-        let ms: isize = key.name().read().expect("read decay");
-        assert_eq!(
-            ms,
-            0,
-            "jemalloc {version}: {} is {ms}, the server build sets 0 (JEMALLOC_SYS_WITH_MALLOC_CONF)",
-            String::from_utf8_lossy(&key[..key.len() - 1])
-        );
+    for key in ["dirty_decay_ms", "muzzy_decay_ms"] {
+        for at in ["arenas", "arena.0"] {
+            let name = format!("{at}.{key}\0");
+            name.as_str().name().write(0_isize).expect("set decay");
+            let ms: isize = name.as_str().name().read().expect("read decay");
+            assert_eq!(
+                ms, 0,
+                "jemalloc {version}: {at}.{key} is {ms}, the server sets 0"
+            );
+        }
     }
 }
 
@@ -53,7 +57,7 @@ fn serve_if_child() -> bool {
     let Ok(v) = std::env::var(SERVE_VAR) else {
         return false;
     };
-    assert_allocator();
+    apply_and_assert_allocator();
     let (addr, path) = v.split_once(' ').expect("addr and path");
     let addr: SocketAddr = addr.parse().expect("addr");
     let rt = tokio::runtime::Runtime::new().expect("runtime");
@@ -289,7 +293,7 @@ fn memory_stays_in_budget_at_every_size() {
     if serve_if_child() {
         return;
     }
-    assert_allocator();
+    apply_and_assert_allocator();
     if cfg!(not(any(target_os = "macos", target_os = "linux"))) {
         return;
     }

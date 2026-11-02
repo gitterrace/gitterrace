@@ -3,6 +3,8 @@ use std::{net::SocketAddr, path::PathBuf};
 use anyhow::Context;
 use clap::Parser;
 
+#[cfg(not(windows))]
+mod alloc;
 mod cli;
 mod export;
 mod handler;
@@ -22,6 +24,10 @@ static ALLOC: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 )]
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    #[cfg(not(windows))]
+    if alloc::start()? {
+        return Ok(());
+    }
     let cli = Cli::parse();
     let path = cli
         .paths

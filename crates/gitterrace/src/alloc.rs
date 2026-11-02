@@ -1,0 +1,62 @@
+//! The allocator hands freed pages back to the OS at once.
+//!
+//! An idle server should shrink to what it holds, not to the most it ever held. jemalloc keeps
+//! freed pages for ten seconds by default and the system allocator on macOS keeps them for
+//! good. The setting is applied at start, so it holds however the binary was built: a build
+//! flag only reaches builds run from the repository root.
+
+use tikv_jemalloc_ctl::{Access, AsName};
+
+/// Applies the decay. Returns true when the harness asked only for the decay in effect
+/// (`TEST_ALLOC_DECAY`, read by the guard in `tests/alloc.rs`), which is then printed.
+#[expect(
+    clippy::print_stdout,
+    reason = "the harness reads the answer from stdout"
+)]
+pub(crate) fn start() -> std::io::Result<bool> {
+    release_freed_pages()?;
+    if std::env::var_os("TEST_ALLOC_DECAY").is_none() {
+        return Ok(false);
+    }
+    let [dirty, muzzy, dirty0, muzzy0] = decay()?;
+    println!("{dirty} {muzzy} {dirty0} {muzzy0}");
+    Ok(true)
+}
+
+/// Sets dirty and muzzy page decay to zero for every arena, now and later.
+fn release_freed_pages() -> std::io::Result<()> {
+    for key in ["dirty_decay_ms", "muzzy_decay_ms"] {
+        // Arenas made from now on.
+        format!("arenas.{key}\0")
+            .as_str()
+            .name()
+            .write(0_isize)
+            .map_err(ctl)?;
+        // Before main only arena 0 exists (the others are made on a thread's first
+        // allocation and take the default above). jemalloc's "all arenas" index crashes on
+        // arenas not made yet, so name it.
+        format!("arena.0.{key}\0")
+            .as_str()
+            .name()
+            .write(0_isize)
+            .map_err(ctl)?;
+    }
+    Ok(())
+}
+
+/// The decay, in ms, of new arenas and of arena 0: `[dirty, muzzy]` each.
+fn decay() -> std::io::Result<[isize; 4]> {
+    let read = |key: &str| -> std::io::Result<isize> {
+        format!("{key}\0").as_str().name().read().map_err(ctl)
+    };
+    Ok([
+        read("arenas.dirty_decay_ms")?,
+        read("arenas.muzzy_decay_ms")?,
+        read("arena.0.dirty_decay_ms")?,
+        read("arena.0.muzzy_decay_ms")?,
+    ])
+}
+
+fn ctl(e: tikv_jemalloc_ctl::Error) -> std::io::Error {
+    std::io::Error::other(e.to_string())
+}
