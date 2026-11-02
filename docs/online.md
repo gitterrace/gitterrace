@@ -1,8 +1,32 @@
 # Running it online
 
 gitterrace is built to run on your own machine, bound to `127.0.0.1`. That stays the
-recommendation. When you do want others to read a repository, use public mode; nothing else
-binds to another address.
+recommendation. When you do want others to read a repository, publish a static export, or use
+public mode. Nothing else binds to another address.
+
+## A static export
+
+The safest way to put a repository online is no server at all. `git terrace export` writes the
+site as plain files: files, commits, diffs, blame, history and insights for the newest commits,
+and nothing else. Any static host or CDN can serve the folder. There is no process to attack,
+no working tree to leak and no action to run.
+
+```sh
+git terrace export site ~/src/project --commits 300 --no-actions --no-watch
+```
+
+It is a single command, so it scripts well: run it from CI or a cron job on each release and
+upload the folder. Several repositories go into one site (`export site repo1 repo2`), and
+`--project name=url` credits a repository that is someone else's work in every page's banner.
+
+The [live demo](https://demo.gitterrace.dev) is built this way. Its build script clones each
+repository at a release tag, exports them all into one folder with `--commits 300 --no-actions`,
+adds a header file that limits scripts and styles to the same origin, and deploys the folder.
+Bumping a tag and rerunning the script publishes the new release.
+
+An export is a snapshot. It shows what was committed when it ran and is updated only by running
+it again. It has no search, live updates or actions, since those need a server. When you need
+those, or any revision on demand, use public mode.
 
 ## Public mode
 
