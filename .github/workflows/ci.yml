@@ -92,7 +92,9 @@ jobs:
           toolchain: "1.96"
       # +1.96 beats rust-toolchain.toml, which pins a newer compiler; the -V line proves it.
       - run: cargo +1.96 -V | grep -q 'cargo 1\.96\.'
-      - run: cargo +1.96 check --workspace --all-features --locked
+      # The promise covers what users build. xtask is a dev tool on the pinned toolchain, and
+      # its lint expectations differ between compiler versions.
+      - run: cargo +1.96 check --workspace --exclude xtask --all-features --locked
 
   deny:
     name: Cargo deny
