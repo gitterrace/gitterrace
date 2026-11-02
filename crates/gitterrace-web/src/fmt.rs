@@ -29,20 +29,42 @@ pub(crate) fn day(time: i64) -> String {
 
 thread_local! {
     /// `display.dates = "absolute"` for the request rendered on this thread.
-    static ABSOLUTE: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    static ABSOLUTE: std::cell::RefCell<bool> = const { std::cell::RefCell::new(false) };
+}
+
+/// Runs `f` with the thread-local `key` set to `value`. A drop guard restores the previous
+/// value, so a panic inside `f` cannot leave one request's state on a pooled thread.
+fn scoped<V: 'static, T>(
+    key: &'static std::thread::LocalKey<std::cell::RefCell<V>>,
+    value: V,
+    f: impl FnOnce() -> T,
+) -> T {
+    struct Restore<V: 'static> {
+        key: &'static std::thread::LocalKey<std::cell::RefCell<V>>,
+        prev: Option<V>,
+    }
+    impl<V: 'static> Drop for Restore<V> {
+        fn drop(&mut self) {
+            if let Some(prev) = self.prev.take() {
+                self.key.with(|c| *c.borrow_mut() = prev);
+            }
+        }
+    }
+    let _restore = Restore {
+        key,
+        prev: Some(key.with(|c| c.replace(value))),
+    };
+    f()
 }
 
 /// Runs `f` with [`ago`] answering a date instead of a distance when `absolute`.
 pub(crate) fn with_dates<T>(absolute: bool, f: impl FnOnce() -> T) -> T {
-    let prev = ABSOLUTE.with(|a| a.replace(absolute));
-    let out = f();
-    ABSOLUTE.with(|a| a.set(prev));
-    out
+    scoped(&ABSOLUTE, absolute, f)
 }
 
 /// Coarse relative time such as `3 days ago`, or the date under `display.dates = "absolute"`.
 pub(crate) fn ago(time: i64, now: i64) -> String {
-    if ABSOLUTE.with(std::cell::Cell::get) {
+    if ABSOLUTE.with(|a| *a.borrow()) {
         return day(time);
     }
     let secs = now - time;
@@ -140,10 +162,7 @@ pub(crate) fn selected_seg() -> String {
 
 /// Runs `f` with [`selected`] answering `rev`.
 pub(crate) fn with_rev<T>(rev: &str, f: impl FnOnce() -> T) -> T {
-    let prev = REV.with(|r| r.replace(rev.to_owned()));
-    let out = f();
-    REV.with(|r| *r.borrow_mut() = prev);
-    out
+    scoped(&REV, rev.to_owned(), f)
 }
 
 /// `?rev=` of a raw query string, empty values and absence reading as `HEAD`.
@@ -167,10 +186,7 @@ pub(crate) fn base() -> String {
 
 /// Runs `f` with `href` prefixing `base`, restoring the previous prefix afterwards.
 pub(crate) fn with_base<T>(base: &str, f: impl FnOnce() -> T) -> T {
-    let prev = BASE.with(|b| b.replace(base.to_owned()));
-    let out = f();
-    BASE.with(|b| *b.borrow_mut() = prev);
-    out
+    scoped(&BASE, base.to_owned(), f)
 }
 
 /// `13972` as `13,972`.
@@ -295,6 +311,20 @@ mod tests {
         assert_eq!(count(2_u64, "person", "people"), "2 people");
         assert_eq!(noun(1_u8, "match", "matches"), "match");
         assert_eq!(noun(11_u8, "match", "matches"), "matches");
+    }
+
+    #[test]
+    fn request_state_is_restored_when_the_handler_panics() {
+        use crate::fmt::{base, selected, with_base, with_rev};
+        let caught = std::panic::catch_unwind(|| {
+            with_dates(true, || {
+                with_base("/r/x", || with_rev("dev", || panic!("handler")))
+            })
+        });
+        assert!(caught.is_err());
+        assert_eq!(selected(), "HEAD");
+        assert_eq!(base(), "");
+        assert_eq!(ago(0, 90), "1 minute ago");
     }
 
     #[test]

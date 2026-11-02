@@ -699,15 +699,17 @@ pub(crate) fn code_html_first(cache_bytes: usize, path: &str, text: &str) -> (St
     code_html_uncached(path, text, EAGER_CHUNKS * CHUNK_LINES)
 }
 
-/// The chunks `code_html_first` left plain, highlighted.
+/// The chunks `code_html_first` left plain, highlighted. Empty when the file has no chunk
+/// past the eager ones, which is also the answer for a direct request on a small file.
 pub(crate) fn code_tail_html(cache_bytes: usize, path: &str, text: &str) -> String {
     let (full, _) = code_html(cache_bytes, path, text);
     let marker = "<div class=\"ch\"";
+    let end = full.len() - "</div>".len();
     let from = full
         .match_indices(marker)
         .nth(EAGER_CHUNKS)
-        .map_or(full.len(), |m| m.0);
-    full[from..full.len() - "</div>".len()].to_owned()
+        .map_or(end, |m| m.0);
+    full[from..end].to_owned()
 }
 
 fn code_html_uncached(path: &str, text: &str, lit_lines: usize) -> (String, bool) {
@@ -818,6 +820,20 @@ mod tests {
         assert_eq!(c.len(), 3);
         assert_eq!(c[1].href, "/tree/main/a");
         assert_eq!(c[2].href, "/blob/main/a/b.rs");
+    }
+
+    #[test]
+    fn tail_of_a_file_without_late_chunks_is_empty() {
+        let ten = "fn main() {}\n".repeat(10);
+        let two_chunks = "fn main() {}\n".repeat(150);
+        for (path, text) in [
+            ("a.rs", ""),
+            ("a.rs", ten.as_str()),
+            ("a.rs", two_chunks.as_str()),
+            ("a.unknownext", ten.as_str()),
+        ] {
+            assert_eq!(code_tail_html(CACHE, path, text), "", "{path}");
+        }
     }
 
     #[test]

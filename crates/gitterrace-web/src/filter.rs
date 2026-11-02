@@ -7,7 +7,7 @@ use std::borrow::Cow;
 use gitterrace_index::{CommitRecord, Period, Selection};
 use serde::Deserialize;
 
-use crate::fmt::{enc_seg, esc, href};
+use crate::fmt::{enc_seg, href};
 
 /// Value that selects commits without a scope (`none`).
 pub(crate) const NO_SCOPE: &str = Selection::NO_SCOPE;
@@ -168,8 +168,7 @@ impl Filter {
         let Some(p) = self.period() else {
             return kept;
         };
-        let newest = records.iter().map(|r| r.time).max().unwrap_or(0);
-        let (from, to) = p.window(newest);
+        let (from, to) = p.window(gitterrace_index::reference_time(records));
         Cow::Owned(
             kept.iter()
                 .filter(|r| r.time >= from && r.time < to)
@@ -201,7 +200,8 @@ impl Filter {
                 };
                 Some(Chip {
                     dim: d.key(),
-                    label: esc(&label),
+                    // Plain text: the template escapes it.
+                    label,
                     href: href(&format!("{base}{}", self.with(*d, None).query(&[]))),
                 })
             })
