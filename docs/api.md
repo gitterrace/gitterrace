@@ -3,14 +3,26 @@
 # API
 
 Read-only. Everything is pinned to a revision (`rev`, default `HEAD`). Errors are
-`{"error": {"code", "message"}}` with 400 (`bad_request`) or 404 (`rev_not_found`,
-`path_not_found`). Every response carries an `ETag` built from HEAD, every ref's target and
-the cache format, so moving any branch or tag invalidates it; `If-None-Match` gets 304.
+`{"error": {"code", "message"}}`, codes listed below. Every response carries an `ETag`
+built from HEAD, every ref's target, the cache format, how far the cache is filled and the
+configured counting defaults, so moving any branch or tag, the cache catching up or a changed
+`insights` setting invalidates it. `If-None-Match` gets 304.
 JSON is `snake_case`. The same endpoints as `OpenAPI` 3.1: [openapi.json](openapi.json).
 
 Under several repositories the API of each lives at `/r/{name}/api/v1`.
 
-Rust: `gitterrace_api::router(ApiState)` (nest under `/api/v1`), `gitterrace_api::serve_mcp(path)`.
+Rust: `gitterrace_api::router(ApiState)` (nest under `/api/v1`), `gitterrace_api::serve_mcp(path, config)`.
+
+| Status | `code` | Meaning |
+|---|---|---|
+| 400 | `bad_request` | a parameter is missing or invalid |
+| 404 | `rev_not_found` | the revision does not exist |
+| 404 | `path_not_found` | the path does not exist at the revision |
+| 500 | `git` | reading the repository failed |
+| 500 | `index` | reading the insights cache failed |
+| 500 | `internal` | the server failed |
+
+A 5xx `message` is always the same fixed text. The details go to the server log.
 
 Answers are capped so one file cannot flood a client: `log` at 500 per page, `blob` at 5000 lines and 256 KiB, `blame` at 5000 lines, each with `truncated` when cut.
 

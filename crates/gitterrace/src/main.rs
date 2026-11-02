@@ -56,8 +56,7 @@ async fn main() -> anyhow::Result<()> {
             gitterrace_web::serve(repos, addr, actions, loaded.config, watched).await?;
         }
         Command::Mcp => {
-            let style = gitterrace_actions::LinkStyle::from_config(&loaded.config.links.style);
-            gitterrace_api::serve_mcp(&path, style).await?;
+            gitterrace_api::serve_mcp(&path, &loaded.config).await?;
         }
         Command::Open { link, print } => {
             let r = tokio::task::block_in_place(|| {

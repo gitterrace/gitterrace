@@ -103,11 +103,9 @@ fn repo_router(
     let app = Arc::new(app);
     env.register(&app);
     tokio::spawn(app::keep_index_fresh(Arc::clone(&app)));
-    let style = gitterrace_actions::LinkStyle::from_config(&env.cfg().links.style);
     let api = gitterrace_api::ApiState::open(repo_path)
         .map_err(io::Error::other)?
-        .with_link_style(style)
-        .with_defaults(app.defaults().into_options());
+        .configured(&env.cfg());
     let api = if env.public() {
         api.committed_only()
     } else {

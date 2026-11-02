@@ -924,6 +924,7 @@ version = "0.1.0"
 dependencies = [
  "axum",
  "gitterrace-actions",
+ "gitterrace-config",
  "gitterrace-git",
  "gitterrace-index",
  "gitterrace-testkit",
@@ -936,6 +937,7 @@ dependencies = [
  "thiserror",
  "tokio",
  "tower",
+ "tracing",
 ]
 
 [[package]]

@@ -9,7 +9,7 @@
             }
           }
         },
-        "description": "Bad request or not found."
+        "description": "Bad request, not found or server error. See `code`."
       }
     },
     "schemas": {
@@ -21,7 +21,10 @@
                 "enum": [
                   "bad_request",
                   "rev_not_found",
-                  "path_not_found"
+                  "path_not_found",
+                  "git",
+                  "index",
+                  "internal"
                 ],
                 "type": "string"
               },
@@ -89,6 +92,9 @@
           },
           "404": {
             "$ref": "#/components/responses/Error"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error"
           }
         },
         "summary": "Endpoint and insight list."
@@ -146,6 +152,9 @@
             "$ref": "#/components/responses/Error"
           },
           "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "500": {
             "$ref": "#/components/responses/Error"
           }
         },
@@ -225,6 +234,9 @@
           },
           "404": {
             "$ref": "#/components/responses/Error"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error"
           }
         },
         "summary": "File text at a revision."
@@ -294,6 +306,9 @@
           },
           "404": {
             "$ref": "#/components/responses/Error"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error"
           }
         },
         "summary": "One commit with its diff."
@@ -343,6 +358,9 @@
           },
           "404": {
             "$ref": "#/components/responses/Error"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error"
           }
         },
         "summary": "Authors and bus factor."
@@ -380,6 +398,9 @@
             "$ref": "#/components/responses/Error"
           },
           "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "500": {
             "$ref": "#/components/responses/Error"
           }
         },
@@ -547,6 +568,9 @@
           },
           "404": {
             "$ref": "#/components/responses/Error"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error"
           }
         },
         "summary": "One insight."
@@ -623,6 +647,9 @@
           },
           "404": {
             "$ref": "#/components/responses/Error"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error"
           }
         },
         "summary": "Paged history."
@@ -660,6 +687,9 @@
             "$ref": "#/components/responses/Error"
           },
           "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "500": {
             "$ref": "#/components/responses/Error"
           }
         },
@@ -701,6 +731,9 @@
             "$ref": "#/components/responses/Error"
           },
           "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "500": {
             "$ref": "#/components/responses/Error"
           }
         },
@@ -758,6 +791,9 @@
             "$ref": "#/components/responses/Error"
           },
           "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "500": {
             "$ref": "#/components/responses/Error"
           }
         },

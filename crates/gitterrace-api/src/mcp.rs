@@ -332,19 +332,17 @@ impl McpServer {
 /// Serves MCP on stdin/stdout for the repository containing `repo_path` until the client leaves.
 ///
 /// The insights cache is brought up to date first; when that fails the server still answers
-/// with whatever the cache holds, since browsing reads never need it. `style` is the form of
-/// each result's `link` field.
+/// with whatever the cache holds, since browsing reads never need it. `cfg` sets the `link`
+/// form and the counting defaults, the same way it does for the web's `/api/v1`.
 #[expect(
     clippy::print_stderr,
     reason = "a stdio MCP server owns stdout for the protocol, so its startup warning goes to stderr"
 )]
-pub async fn serve_mcp(
-    repo_path: &Path,
-    style: gitterrace_actions::LinkStyle,
-) -> Result<(), ApiError> {
+pub async fn serve_mcp(repo_path: &Path, cfg: &gitterrace_config::Config) -> Result<(), ApiError> {
     let path = repo_path.to_owned();
+    let cfg = cfg.clone();
     let state = tokio::task::spawn_blocking(move || {
-        let state = ApiState::open(&path)?.with_link_style(style);
+        let state = ApiState::open(&path)?.configured(&cfg);
         if let Err(e) = state.refresh_index() {
             eprintln!("gitterrace: insights index incomplete, serving anyway: {e}");
         }

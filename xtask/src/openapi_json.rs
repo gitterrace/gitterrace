@@ -2,7 +2,7 @@
 //! registry that builds the routes and `docs/api.md`, so the three cannot drift. Responses are
 //! described by their top-level fields only; the registry holds no response types.
 
-use gitterrace_api::{ENDPOINTS, Endpoint, Param, insight_list};
+use gitterrace_api::{ENDPOINTS, ERROR_CODES, Endpoint, Param, insight_list};
 use serde_json::{Map, Value, json};
 
 use crate::facts::Workspace;
@@ -18,6 +18,7 @@ pub fn render(ws: &Workspace) -> Out {
     for e in ENDPOINTS {
         paths.insert(e.path.to_owned(), json!({ "get": operation(e) }));
     }
+    let codes: Vec<&str> = ERROR_CODES.iter().map(|(c, _, _)| *c).collect();
     let doc = json!({
         "openapi": "3.1.0",
         "info": {
@@ -41,7 +42,7 @@ pub fn render(ws: &Workspace) -> Out {
                         "type": "object",
                         "required": ["code", "message"],
                         "properties": {
-                            "code": { "type": "string", "enum": ["bad_request", "rev_not_found", "path_not_found"] },
+                            "code": { "type": "string", "enum": codes },
                             "message": { "type": "string" }
                         }
                     }}
@@ -49,7 +50,7 @@ pub fn render(ws: &Workspace) -> Out {
             },
             "responses": {
                 "Error": {
-                    "description": "Bad request or not found.",
+                    "description": "Bad request, not found or server error. See `code`.",
                     "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
                 }
             }
@@ -71,7 +72,7 @@ fn operation(e: &Endpoint) -> Value {
     let fields: Map<String, Value> = top_fields(e.returns)
         .map(|f| (f.to_owned(), json!({})))
         .collect();
-    json!({
+    let mut op = json!({
         "summary": e.summary,
         "operationId": operation_id(e.path),
         "parameters": params,
@@ -81,11 +82,15 @@ fn operation(e: &Endpoint) -> Value {
                 "headers": { "ETag": { "schema": { "type": "string" } } },
                 "content": { "application/json": { "schema": { "type": "object", "properties": fields } } }
             },
-            "304": { "description": "Not modified (`If-None-Match` matched the `ETag`)." },
-            "400": { "$ref": "#/components/responses/Error" },
-            "404": { "$ref": "#/components/responses/Error" }
+            "304": { "description": "Not modified (`If-None-Match` matched the `ETag`)." }
         }
-    })
+    });
+    let mut statuses: Vec<u16> = ERROR_CODES.iter().map(|(_, s, _)| *s).collect();
+    statuses.dedup();
+    for s in statuses {
+        op["responses"][s.to_string()] = json!({ "$ref": "#/components/responses/Error" });
+    }
+    op
 }
 
 fn query_param(p: &Param) -> Value {

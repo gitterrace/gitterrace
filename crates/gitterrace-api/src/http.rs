@@ -36,8 +36,7 @@ where
         .map(Json)
 }
 
-/// Answers `If-None-Match` with 304 and tags every response. The `ETag` is the head
-/// commit plus the cache version, so any new commit invalidates all of it.
+/// Answers `If-None-Match` with 304 and tags every response with [`ApiState::etag`].
 async fn etag(
     State(state): State<ApiState>,
     req: Request<axum::body::Body>,

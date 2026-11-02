@@ -30,6 +30,22 @@ const MAX_LOG_SKIP: usize = 50_000;
 /// request could make one call walk every commit. Branch, tag, sha and `~`/`^` stay allowed.
 const REJECTED_REV: [&str; 3] = [":/", "^{/", "@{"];
 
+/// Counting options the configuration sets for the repository named `name`: `insights.*` plus
+/// `[repo.NAME] exclude`.
+pub fn options_from(cfg: &gitterrace_config::Config, name: &str) -> Options {
+    let i = &cfg.insights;
+    let mut exclude = i.exclude.clone();
+    if let Some(o) = cfg.repo.get(name) {
+        exclude.extend(o.exclude.iter().cloned());
+    }
+    Options {
+        exclude,
+        include_generated: i.generated,
+        include_bots: i.bots,
+        ..Options::default()
+    }
+}
+
 /// Shared handle on one repository and its insights cache.
 #[derive(Clone)]
 pub struct ApiState {
@@ -64,6 +80,16 @@ impl ApiState {
         self
     }
 
+    /// Link style and counting defaults from the configuration: `links.style`, `insights.*`
+    /// and this repository's `[repo.NAME] exclude`. The web's `/api/v1` and the MCP server both
+    /// build their state through here, so the two answer with the same numbers.
+    #[must_use]
+    pub fn configured(self, cfg: &gitterrace_config::Config) -> Self {
+        let defaults = options_from(cfg, &self.repo.name());
+        self.with_link_style(LinkStyle::from_config(&cfg.links.style))
+            .with_defaults(defaults)
+    }
+
     /// The `link` field in `style` from now on.
     #[must_use]
     pub const fn with_link_style(mut self, style: LinkStyle) -> Self {
@@ -92,9 +118,10 @@ impl ApiState {
         Ok(())
     }
 
-    /// Entity tag for every answer: HEAD, every ref's target and the cache format
-    /// version. Requests may name any `rev`, so moving any branch or tag must
-    /// invalidate, not only a new HEAD commit.
+    /// Entity tag for every answer: HEAD, every ref's target, the cache format version, the
+    /// cache generation and the counting defaults. Requests may name any `rev`, so moving any
+    /// branch or tag must invalidate, not only a new HEAD commit. Insights answers also change
+    /// while the cache fills and when the configured defaults change, with no ref moving.
     pub fn etag(&self) -> Option<String> {
         let head = self.repo.resolve(DEFAULT_REV).ok()?;
         let mut refs: Vec<(String, String)> = self
@@ -112,8 +139,13 @@ impl ApiState {
                 h = (h ^ u64::from(b)).wrapping_mul(0x0100_0000_01b3);
             }
         }
+        let defaults = serde_json::to_string(&self.defaults).unwrap_or_default();
+        for b in defaults.bytes().chain([0]) {
+            h = (h ^ u64::from(b)).wrapping_mul(0x0100_0000_01b3);
+        }
         let version = gitterrace_index::FORMAT_VERSION;
-        Some(format!("\"{head}-{h:016x}-{version}\""))
+        let generation = self.index.generation();
+        Some(format!("\"{head}-{h:016x}-{version}-{generation}\""))
     }
 
     /// Records reachable from `rev`, shared between calls while the tip and the cache file are

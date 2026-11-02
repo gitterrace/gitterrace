@@ -15,9 +15,9 @@ mod insights;
 mod json;
 mod mcp;
 
-pub use core::{ApiState, MAX_BLAME_LINES, MAX_BLOB_BYTES, MAX_BLOB_LINES, MAX_PAGE};
+pub use core::{ApiState, MAX_BLAME_LINES, MAX_BLOB_BYTES, MAX_BLOB_LINES, MAX_PAGE, options_from};
 pub use endpoints::{ENDPOINTS, Endpoint, Param};
-pub use error::ApiError;
+pub use error::{ApiError, ERROR_CODES, SERVER_ERROR_MESSAGE};
 pub use http::router;
 pub use insights::{
     HEAD_INSIGHTS, INSIGHTS, Insight, OWNERSHIP_DEPTH, Params, list as insight_list,
@@ -336,5 +336,95 @@ mod tests {
                 assert!(t.description.contains("untrusted"), "{}", t.name);
             }
         }
+    }
+
+    #[test]
+    fn etag_moves_with_cache_generation_and_defaults() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let p = dir.path();
+        git(p, &["init", "-q", "-b", "main"]);
+        std::fs::write(p.join("a.txt"), "one\n").expect("write");
+        git(p, &["add", "."]);
+        git(p, &["commit", "-q", "-m", "first"]);
+        let s = ApiState::open(p).expect("open");
+        let empty = s.etag().expect("tag");
+        s.refresh_index().expect("index");
+        let built = s.etag().expect("tag");
+        assert_ne!(empty, built, "the cache filled with no ref moving");
+        let bots = s.with_defaults(gitterrace_index::Options {
+            include_bots: true,
+            ..gitterrace_index::Options::default()
+        });
+        assert_ne!(built, bots.etag().expect("tag"), "other counting defaults");
+    }
+
+    /// The configuration reaches the answers: bots and excludes from `insights.*` and the
+    /// repository's own `[repo.NAME] exclude`.
+    #[test]
+    fn configured_state_counts_with_the_config() {
+        let (d, s) = fixture();
+        let p = d.path();
+        std::fs::write(p.join("a.txt"), "bot\n").expect("write");
+        git(p, &["add", "."]);
+        git(
+            p,
+            &[
+                "-c",
+                "user.name=dependabot[bot]",
+                "-c",
+                "user.email=bot@example.com",
+                "commit",
+                "-q",
+                "-m",
+                "chore: bump",
+            ],
+        );
+        s.refresh_index().expect("index");
+        let mut cfg = gitterrace_config::Config::default();
+        cfg.insights.bots = true;
+        cfg.repo.insert(
+            s.repo.name(),
+            gitterrace_config::RepoOverride {
+                exclude: vec!["src/**".to_owned()],
+            },
+        );
+        let c = s.clone().configured(&cfg);
+        let authors = |s: &ApiState| {
+            s.contributors(None).expect("contributors")["authors"]
+                .as_array()
+                .map_or(0, Vec::len)
+        };
+        assert_eq!(authors(&s), 1, "bots hidden by default");
+        assert_eq!(authors(&c), 2, "insights.bots = true");
+        let hot = c
+            .insight("hotspots", None, &crate::Params::default())
+            .expect("hotspots");
+        assert!(
+            !hot.to_string().contains("src/b.rs"),
+            "repo exclude ignored: {hot}"
+        );
+    }
+
+    /// 5xx bodies carry a fixed message: the inner error names files under the repository.
+    #[tokio::test]
+    async fn server_errors_hide_the_inner_message() {
+        let (d, s) = fixture();
+        let commits = d.path().join(".git/gitterrace/commits.jsonl");
+        let _ = std::fs::remove_file(&commits);
+        std::fs::create_dir(&commits).expect("mkdir");
+        let (st, v) = get(&s, "/repo").await;
+        assert_eq!(st, StatusCode::INTERNAL_SERVER_ERROR);
+        assert_eq!(v["error"]["code"], "index");
+        assert_eq!(v["error"]["message"], crate::SERVER_ERROR_MESSAGE);
+        let root = d.path().to_string_lossy().into_owned();
+        assert!(!v.to_string().contains(&root), "{v}");
+        let (st, v) = get(&s, "/blob?path=missing").await;
+        assert_eq!(st, StatusCode::NOT_FOUND);
+        assert!(
+            v["error"]["message"]
+                .as_str()
+                .is_some_and(|m| m.contains("missing")),
+            "4xx keep their text: {v}"
+        );
     }
 }
