@@ -1074,6 +1074,7 @@ dependencies = [
  "syntect",
  "tempfile",
  "thiserror",
+ "tikv-jemallocator",
  "tokio",
  "tower",
  "tower-http",

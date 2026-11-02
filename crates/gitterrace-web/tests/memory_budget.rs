@@ -1,6 +1,7 @@
 //! Memory budget: a server holds at most 32 MB (the cache budget) + 16 MB more dirty memory
 //! than it did just started, idle after indexing and after a sweep of every insights page and
-//! API insight over every period. The 100k-commit repository stays within 10% of the 2k one.
+//! API insight over every period, at HEAD and at a side branch HEAD lacks. The 100k-commit
+//! repository stays within 10% of the 2k one.
 //!
 //! Measured on a child server process: `phys_footprint` (macOS `footprint`), `Private_Dirty`
 //! of `/proc/PID/smaps_rollup` (Linux). File-backed page cache is not counted by either.
@@ -9,6 +10,9 @@
 //! `cargo test --release` and in CI. `TEST_RUSTGIT=<path>` adds a real history.
 #![cfg(not(debug_assertions))]
 #![expect(clippy::expect_used, reason = "setup failures should panic")]
+
+#[global_allocator]
+static ALLOC: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
 use std::io::{Read, Write};
 use std::net::{SocketAddr, TcpStream};
@@ -120,11 +124,10 @@ impl Server {
 
 impl Drop for Server {
     fn drop(&mut self) {
-        if let Err(e) = self.child.kill() {
-            eprintln!("kill server: {e}");
-        }
-        if let Err(e) = self.child.wait() {
-            eprintln!("wait server: {e}");
+        // A server that already exited is fine; one that cannot be killed fails the test.
+        if self.child.try_wait().ok().flatten().is_none() {
+            self.child.kill().expect("kill server");
+            self.child.wait().expect("wait server");
         }
     }
 }
@@ -170,28 +173,53 @@ fn dirty_of(_pid: u32) -> u64 {
 
 /// Every insights page under every period (languages included), every API insight, then the
 /// contributors endpoint. A page that answers non-200 fails: a sweep of errors proves nothing.
-fn sweep(s: &Server, base: &str) {
+fn sweep(s: &Server, base: &str, side: usize) {
     let names: Vec<&str> = gitterrace_api::insight_list().map(|(n, _)| n).collect();
-    for period in PERIODS {
-        for p in gitterrace_web::WARM_PAGES {
-            let path = format!("{base}{p}?period={period}");
-            let (status, _) = s.get(&path);
+    // A side branch past the fresh-commit cap is refused, not loaded: the API answers 409
+    // `needs_reindex`, the insights pages a 200 saying so. Under the cap every answer is a 200.
+    let far = side > gitterrace_index::feed::FRESH_CAP;
+    let api = |path: &str, rev: &str| {
+        let (status, body) = s.get(path);
+        if far && !rev.is_empty() {
+            assert!(
+                status == 409 && body.contains("needs_reindex"),
+                "{path}: {status}"
+            );
+        } else {
             assert_eq!(status, 200, "{path}");
         }
-        for n in &names {
-            let path = format!("{base}/api/v1/insights/{n}?period={period}");
-            let (status, _) = s.get(&path);
-            assert_eq!(status, 200, "{path}");
+    };
+    // HEAD, then the side branch, whose history HEAD lacks: a revision other than the one
+    // indexed for HEAD must also stay inside the budget. `side` 0 means no such branch.
+    let revs: &[&str] = if side == 0 { &[""] } else { &["", "&rev=side"] };
+    for &rev in revs {
+        for period in PERIODS {
+            for p in gitterrace_web::WARM_PAGES {
+                let path = format!("{base}{p}?period={period}{rev}");
+                let (status, body) = s.get(&path);
+                assert_eq!(status, 200, "{path}");
+                if far && !rev.is_empty() && p.starts_with("/stats") {
+                    assert!(body.contains("need a reindex"), "{path}: no reindex notice");
+                }
+            }
+            for n in &names {
+                api(
+                    &format!("{base}/api/v1/insights/{n}?period={period}{rev}"),
+                    rev,
+                );
+            }
         }
+        api(
+            &format!("{base}/api/v1/contributors?{}", rev.trim_start_matches('&')),
+            rev,
+        );
     }
-    let (status, _) = s.get(&format!("{base}/api/v1/contributors"));
-    assert_eq!(status, 200, "contributors");
 }
 
 const MB: u64 = 1024 * 1024;
 
 /// Returns (just started, idle, after sweep) in bytes, after asserting each against the budget.
-fn measure(repo: &Path, test: &str) -> (u64, u64, u64) {
+fn measure(repo: &Path, test: &str, side: usize) -> (u64, u64, u64) {
     // "Just started" is a server on a one-commit repository: on `repo` itself indexing begins
     // at once, so its first reading would already hold the build.
     let start = {
@@ -214,15 +242,18 @@ fn measure(repo: &Path, test: &str) -> (u64, u64, u64) {
     // Phase 1 releases the record set after 30 s idle: wait it out so idle means idle.
     std::thread::sleep(Duration::from_secs(35));
     let idle = s.dirty();
-    sweep(&s, &base);
+    sweep(&s, &base, side);
     let swept = s.dirty();
-    eprintln!(
+    // The measurements, for the record of a red run: stderr is the test's report channel.
+    writeln!(
+        std::io::stderr(),
         "{}: start {} MB, idle {} MB, after sweep {} MB",
         repo.display(),
         start / MB,
         idle / MB,
         swept / MB
-    );
+    )
+    .expect("stderr");
     for (what, v) in [("idle", idle), ("after sweep", swept)] {
         assert!(
             v <= start + BUDGET_MB * MB,
@@ -247,10 +278,21 @@ fn memory_stays_in_budget_at_every_size() {
     }
     let dir = tempfile::tempdir().expect("tmp");
     let mut swept = Vec::new();
-    for n in [2_000, 20_000, 100_000] {
+    // The side branch: under the fresh-commit cap at 2k (read from git directly), over it at
+    // 20k and 100k (the path that must not fall back to loading every record).
+    let over = gitterrace_index::feed::FRESH_CAP + 500;
+    for (n, side) in [(2_000, 300), (20_000, over), (100_000, over)] {
         let repo = dir.path().join(format!("r{n}"));
-        synthetic::build(&repo, Shape::sized(n));
-        swept.push(measure(&repo, "memory_stays_in_budget_at_every_size").2);
+        synthetic::build(
+            &repo,
+            Shape {
+                side,
+                ..Shape::sized(n)
+            },
+        );
+        let ahead = gitterrace_testkit::git(&repo, &["rev-list", "--count", "main..side"]);
+        assert_eq!(ahead, side.to_string(), "side branch length");
+        swept.push(measure(&repo, "memory_stays_in_budget_at_every_size", side).2);
     }
     let (small, large) = (swept[0], swept[2]);
     assert!(
@@ -268,6 +310,6 @@ fn memory_stays_in_budget_on_rust() {
         return;
     }
     if let Some(repo) = std::env::var_os("TEST_RUSTGIT") {
-        measure(Path::new(&repo), "memory_stays_in_budget_on_rust");
+        measure(Path::new(&repo), "memory_stays_in_budget_on_rust", 0);
     }
 }
