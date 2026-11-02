@@ -412,20 +412,33 @@ impl App {
         Ok(list)
     }
 
-    /// Last commit per entry of `dir`, cached by the directory's tree id.
+    /// Last commit per entry of `dir`, cached by the walk start and the directory.
+    ///
+    /// The key is the commit, not the directory's tree id: the same tree can sit in divergent
+    /// histories with different last commits. A walk cut short by its budget is returned but not
+    /// cached, so the next request walks again instead of serving the gaps forever.
     pub(crate) fn last_commits(&self, commit: &str, dir: &str) -> Result<Arc<Vec<LastCommit>>> {
-        let key = gitterrace_git::tree_id(&self.repo, commit, dir)?;
+        self.last_commits_within(commit, dir, Duration::from_secs(20))
+    }
+
+    fn last_commits_within(
+        &self,
+        commit: &str,
+        dir: &str,
+        budget: Duration,
+    ) -> Result<Arc<Vec<LastCommit>>> {
+        let dir = dir.trim_matches('/');
+        let key = format!("{commit}\0{dir}");
         if let Ok(g) = self.last_commits.lock()
             && let Some(v) = g.get(&key)
         {
             return Ok(Arc::clone(v));
         }
-        let v = Arc::new(gitterrace_git::last_commits(
-            &self.repo,
-            commit,
-            dir,
-            Duration::from_secs(20),
-        )?);
+        let (found, complete) = gitterrace_git::last_commits(&self.repo, commit, dir, budget)?;
+        let v = Arc::new(found);
+        if !complete {
+            return Ok(v);
+        }
         if let Ok(mut g) = self.last_commits.lock() {
             if g.len() >= CACHE_ENTRIES {
                 g.clear();
@@ -899,5 +912,37 @@ mod tests {
             sets.iter().all(|s| std::sync::Arc::ptr_eq(s, &sets[0])),
             "every racing caller must get the one parsed set"
         );
+    }
+
+    #[test]
+    fn last_commit_cache_follows_history_not_tree_and_skips_cut_walks() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path();
+        let commit = |msg: &str, date: &str| {
+            gitterrace_testkit::git_at(path, date, &["add", "-A"]);
+            gitterrace_testkit::git_at(path, date, &["commit", "-q", "-m", msg]);
+            git(path, &["rev-parse", "HEAD"])
+        };
+        git(path, &["init", "-q", "-b", "main"]);
+        std::fs::create_dir(path.join("d")).expect("mkdir");
+        std::fs::write(path.join("d/f"), "1\n").expect("write");
+        commit("feat: base", "2024-01-01T12:00:00Z");
+        git(path, &["checkout", "-q", "-b", "side"]);
+        std::fs::write(path.join("d/f"), "2\n").expect("write");
+        let on_side = commit("feat: side", "2024-02-01T12:00:00Z");
+        git(path, &["checkout", "-q", "main"]);
+        std::fs::write(path.join("d/f"), "2\n").expect("write");
+        let on_main = commit("feat: main", "2024-03-01T12:00:00Z");
+        let repo = gitterrace_git::Repo::discover(path).expect("repo");
+        let index = gitterrace_index::Index::open(&repo).expect("index");
+        let app = App::new(repo, index);
+        let cut = app
+            .last_commits_within(&on_main, "d", std::time::Duration::ZERO)
+            .expect("cut");
+        assert!(cut.is_empty());
+        let main = app.last_commits(&on_main, "d").expect("main");
+        assert_eq!(main.first().map(|c| c.id.as_str()), Some(on_main.as_str()));
+        let side = app.last_commits(&on_side, "d").expect("side");
+        assert_eq!(side.first().map(|c| c.id.as_str()), Some(on_side.as_str()));
     }
 }

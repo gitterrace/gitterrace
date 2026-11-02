@@ -175,16 +175,19 @@ fn entries(repo: &gix::Repository, id: Option<gix::ObjectId>) -> HashMap<Vec<u8>
     out
 }
 
-/// For each entry of the directory `dir` at `rev`, the newest commit that changed it.
+/// For each entry of the directory `dir` at `rev`, the newest commit that changed it, and whether
+/// the answer is final.
 ///
-/// One walk, stopping as soon as every entry is resolved or `budget` runs out (then the entries
-/// not yet resolved are missing from the result).
+/// One walk from `rev`, stopping as soon as every entry is resolved, history runs out, or
+/// `budget` runs out. Only the last case returns `false`: the missing entries might still be
+/// found by a longer walk, so callers must not cache that answer. An entry whose object no commit
+/// introduced (a rewritten history) stays missing from a final answer.
 pub fn last_commits(
     repo: &Repo,
     rev: &str,
     dir: &str,
     budget: Duration,
-) -> Result<Vec<LastCommit>> {
+) -> Result<(Vec<LastCommit>, bool)> {
     let start = Instant::now();
     let dir = dir.trim_matches('/');
     let tip = oid(&repo.resolve(rev)?)?;
@@ -197,16 +200,30 @@ pub fn last_commits(
         .all()
         .map_err(git)?;
     let mut found: Vec<(Vec<u8>, gix::ObjectId)> = Vec::new();
+    let mut complete = true;
     for info in walk {
-        if pending.is_empty() || start.elapsed() > budget {
+        if pending.is_empty() {
+            break;
+        }
+        if start.elapsed() >= budget {
+            complete = false;
             break;
         }
         let commit = info.map_err(git)?.object().map_err(git)?;
         let here = dir_oid(&commit, dir)?;
         let parents: Vec<_> = commit.parent_ids().collect();
+        // A root introduces exactly what its tree holds. Other roots (merged unrelated
+        // histories) may still own the rest, so the walk goes on.
         if parents.is_empty() {
-            found.extend(pending.drain().map(|(n, _)| (n, commit.id)));
-            break;
+            let cur = entries(&r, here);
+            pending.retain(|n, o| {
+                let mine = cur.get(n) == Some(o);
+                if mine {
+                    found.push((n.clone(), commit.id));
+                }
+                !mine
+            });
+            continue;
         }
         let mut parent_dirs = Vec::with_capacity(parents.len());
         for p in parents {
@@ -256,5 +273,5 @@ pub fn last_commits(
             time,
         });
     }
-    Ok(out)
+    Ok((out, complete))
 }
