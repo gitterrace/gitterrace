@@ -261,7 +261,7 @@ fn signed(n: i64) -> String {
     }
 }
 
-fn pct(f: f64) -> String {
+fn share_label(f: f64) -> String {
     if f > 0.0 && f < 0.001 {
         "<0.1%".to_owned()
     } else {
@@ -525,7 +525,7 @@ fn range_card(ch: &Chain, view: View, subj: &Subjects) -> String {
             esc(&ch.langs[i]),
             fmt::thousands(base[i].max(0)),
             fmt::thousands(end[i].max(0)),
-            pct(end[i].max(0) as f64 / end_total as f64),
+            share_label(end[i].max(0) as f64 / end_total as f64),
             if d >= 0 { "add" } else { "del" },
             signed(d),
             if d >= 0 { "up" } else { "dn" },
@@ -565,7 +565,7 @@ fn languages_now(ch: &Chain) -> String {
     }
     let k = ch.langs.len();
     let last = &ch.lines[n - 1];
-    let back = &ch.lines[n.saturating_sub(11)];
+    let back = ch.before(n.saturating_sub(10));
     let total: i64 = last.iter().map(|v| (*v).max(0)).sum::<i64>().max(1);
     let mut bar = String::from(
         r#"<div class="sharebar" role="img" aria-label="Share of lines by language">"#,
@@ -579,7 +579,7 @@ fn languages_now(ch: &Chain) -> String {
                 cat(i, k),
                 (f * 100.0).round().clamp(1.0, 100.0) as u32,
                 esc(&ch.langs[i]),
-                pct(f)
+                share_label(f)
             );
         }
     }
@@ -588,7 +588,15 @@ fn languages_now(ch: &Chain) -> String {
         r#"<section class="card pad"><div class="chart-head"><div><h2>Languages now</h2><p class="hint">Share of all lines at the newest commit, trend over the whole history, and change over the last 10 commits.</p></div></div>"#,
     );
     s.push_str(&bar);
-    s.push_str(r#"<div class="scroll"><table class="entries"><tr class="th"><td>Language</td><td class="r">Lines</td><td class="r">Share</td><td>Trend</td><td class="r">Last 10 commits</td></tr>"#);
+    let window = if n <= 10 {
+        format!("All {}", fmt::count(n, "commit", "commits"))
+    } else {
+        "Last 10 commits".to_owned()
+    };
+    let _ = write!(
+        s,
+        r#"<div class="scroll"><table class="entries"><tr class="th"><td>Language</td><td class="r">Lines</td><td class="r">Share</td><td>Trend</td><td class="r">{window}</td></tr>"#
+    );
     let step = (n / 40).max(1);
     for i in 0..k {
         let mut maxv = 1i64;
@@ -619,7 +627,7 @@ fn languages_now(ch: &Chain) -> String {
             cat(i, k),
             esc(&ch.langs[i]),
             fmt::thousands(last[i].max(0)),
-            pct(last[i].max(0) as f64 / total as f64),
+            share_label(last[i].max(0) as f64 / total as f64),
             cat_s(i, k),
             pts.join(" "),
             if d >= 0 { "add" } else { "del" },
@@ -631,6 +639,9 @@ fn languages_now(ch: &Chain) -> String {
 }
 
 fn body(ch: &Chain, view: View, subj: &Subjects) -> String {
+    if ch.len() == 0 {
+        return include_str!("../templates/_empty.html").to_owned();
+    }
     let filters = format!(
         r#"<div class="filters">{}{}</div>"#,
         seg(

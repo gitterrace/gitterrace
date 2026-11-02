@@ -158,12 +158,13 @@ fn run(a: &App, q: SearchQuery) -> Result<SearchPage> {
         )
     } else {
         format!(
-            "{}{plus} {} in {}, {} scanned, {} skipped (binary or over 2 MiB)",
+            "{}{plus} {} in {}, {} scanned, {} skipped (binary or over {})",
             fmt::thousands(page.matches),
             fmt::noun(page.matches, "match", "matches"),
             fmt::count(page.files.len(), "file", "files"),
             fmt::count(page.scanned, "file", "files"),
-            page.skipped
+            page.skipped,
+            fmt::size(a.repo.text_limit())
         )
     };
     Ok(page)

@@ -19,22 +19,11 @@ pub(crate) fn esc(s: &str) -> String {
     o
 }
 
+pub(crate) use gitterrace_index::count;
+
 /// Thousands separators: 12345 -> "12,345".
 pub(crate) fn group(n: u64) -> String {
-    let s = n.to_string();
-    let mut o = String::new();
-    for (i, c) in s.chars().enumerate() {
-        if i > 0 && (s.len() - i).is_multiple_of(3) {
-            o.push(',');
-        }
-        o.push(c);
-    }
-    o
-}
-
-/// `1 day`, `2 days`, `1,000 days`: the count and the noun that agrees with it.
-pub(crate) fn count(n: u64, one: &str, many: &str) -> String {
-    format!("{} {}", group(n), if n == 1 { one } else { many })
+    gitterrace_index::thousands(n)
 }
 
 /// Shortens `s` to at most `max` characters with an ellipsis.

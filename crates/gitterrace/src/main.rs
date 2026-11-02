@@ -220,8 +220,14 @@ fn wrapped(
         .update(&repo, "HEAD", &|_| {})
         .context("updating the cache")?;
     let records = index.records(&repo, "HEAD").context("reading the cache")?;
-    let newest = records.iter().map(|r| r.time).max().unwrap_or(0);
-    let year = year.unwrap_or_else(|| year_of(newest));
+    let year = year.unwrap_or_else(|| {
+        let newest = records
+            .iter()
+            .map(gitterrace_index::local_day)
+            .max()
+            .unwrap_or(0);
+        i32::try_from(gitterrace_git::civil_from_days(newest).0).unwrap_or(i32::MAX)
+    });
     let stats = gitterrace_cards::wrapped_stats(&repo.name(), &records, year);
     let layout = gitterrace_cards::Layout::parse(layout).context("unknown layout")?;
     let theme = gitterrace_cards::Theme::parse(theme).context("unknown theme")?;
@@ -230,12 +236,6 @@ fn wrapped(
     std::fs::write(&out, svg).with_context(|| format!("writing {}", out.display()))?;
     println!("{}", out.display());
     Ok(())
-}
-
-/// Civil year of a Unix timestamp (UTC).
-fn year_of(secs: i64) -> i32 {
-    let (year, _, _) = gitterrace_git::civil_from_days(secs.div_euclid(86_400));
-    i32::try_from(year).unwrap_or(i32::MAX)
 }
 
 #[cfg(test)]

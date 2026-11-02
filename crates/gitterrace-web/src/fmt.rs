@@ -189,18 +189,7 @@ pub(crate) fn with_base<T>(base: &str, f: impl FnOnce() -> T) -> T {
     scoped(&BASE, base.to_owned(), f)
 }
 
-/// `13972` as `13,972`.
-pub(crate) fn thousands(n: impl std::fmt::Display) -> String {
-    let digits = n.to_string();
-    let mut out = String::with_capacity(digits.len() + digits.len() / 3);
-    for (i, ch) in digits.chars().enumerate() {
-        if i > 0 && (digits.len() - i).is_multiple_of(3) {
-            out.push(',');
-        }
-        out.push(ch);
-    }
-    out
-}
+pub(crate) use gitterrace_index::{count, thousands};
 
 /// The counted noun for `n`: `commit` for 1, `commits` otherwise. Spelled out, never `+s`.
 pub(crate) fn noun(
@@ -209,12 +198,6 @@ pub(crate) fn noun(
     many: &'static str,
 ) -> &'static str {
     if n.to_string() == "1" { one } else { many }
-}
-
-/// `1 commit`, `2 commits`, `1,000 commits`: the number and its noun, always agreeing.
-pub(crate) fn count(n: impl std::fmt::Display + Copy, one: &str, many: &str) -> String {
-    let word = if n.to_string() == "1" { one } else { many };
-    format!("{} {word}", thousands(n))
 }
 
 const MONTHS: [&str; 12] = [
@@ -268,7 +251,8 @@ pub(crate) fn esc_text(s: &str) -> String {
         .replace('>', "&gt;")
 }
 
-pub(crate) fn esc(s: &str) -> String {
+/// Escapes text for an HTML attribute or element: `& < > "`.
+pub fn esc(s: &str) -> String {
     esc_text(s).replace('"', "&quot;")
 }
 

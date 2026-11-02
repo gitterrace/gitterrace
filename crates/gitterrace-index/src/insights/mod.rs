@@ -286,16 +286,18 @@ pub(crate) fn reference_record(records: &[CommitRecord]) -> Option<&CommitRecord
         .or_else(|| records.iter().min_by_key(|r| r.time))
 }
 
-pub(crate) fn local_time(r: &CommitRecord) -> i64 {
+/// Author time shifted into the author's own time zone.
+pub fn local_time(r: &CommitRecord) -> i64 {
     r.time.saturating_add(i64::from(r.offset))
 }
 
-pub(crate) fn local_day(r: &CommitRecord) -> i64 {
+/// Days since 1970-01-01 in the author's own time zone.
+pub fn local_day(r: &CommitRecord) -> i64 {
     local_time(r).div_euclid(DAY)
 }
 
 /// Monday is 0. Day 0 (1970-01-01) was a Thursday.
-pub(crate) fn weekday(days: i64) -> usize {
+pub fn weekday(days: i64) -> usize {
     usize::try_from((days + 3).rem_euclid(7)).unwrap_or(0)
 }
 
@@ -389,4 +391,23 @@ mod tests {
         assert_eq!(bus_factor([0.0, 0.0]), 0);
         assert_eq!(bus_factor(std::iter::empty()), 0);
     }
+}
+
+/// `13972` as `13,972`.
+pub fn thousands(n: impl std::fmt::Display) -> String {
+    let digits = n.to_string();
+    let mut out = String::with_capacity(digits.len() + digits.len() / 3);
+    for (i, ch) in digits.chars().enumerate() {
+        if i > 0 && (digits.len() - i).is_multiple_of(3) {
+            out.push(',');
+        }
+        out.push(ch);
+    }
+    out
+}
+
+/// `1 commit`, `2 commits`, `1,000 commits`: the number and its noun, always agreeing.
+pub fn count(n: impl std::fmt::Display + Copy, one: &str, many: &str) -> String {
+    let word = if n.to_string() == "1" { one } else { many };
+    format!("{} {word}", thousands(n))
 }

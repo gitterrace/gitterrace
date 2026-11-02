@@ -1,6 +1,8 @@
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
-use gitterrace_index::{CommitRecord, civil_from_days as civil, days_from_civil};
+use gitterrace_index::{
+    CommitRecord, civil_from_days as civil, days_from_civil, local_day, local_time, weekday,
+};
 
 const DAY: i64 = 86_400;
 
@@ -35,7 +37,7 @@ pub struct BiggestCommit {
 pub fn wrapped_stats(repo: &str, records: &[CommitRecord], year: i32) -> WrappedStats {
     let rs: Vec<&CommitRecord> = records
         .iter()
-        .filter(|r| civil(local(r).div_euclid(DAY)).0 == i64::from(year))
+        .filter(|r| civil(local_day(r)).0 == i64::from(year))
         .collect();
     let mut days = BTreeSet::new();
     let mut months = [0u32; 12];
@@ -50,8 +52,8 @@ pub fn wrapped_stats(repo: &str, records: &[CommitRecord], year: i32) -> Wrapped
     let weeks = usize::try_from((end - start) / 7 + 1).unwrap_or(53);
     let mut weekly = vec![0u32; weeks];
     for r in &rs {
-        let l = local(r);
-        let d = l.div_euclid(DAY);
+        let l = local_time(r);
+        let d = local_day(r);
         days.insert(d);
         months[usize::try_from(civil(d).1 - 1).unwrap_or(0)] += 1;
         weekdays[weekday(d)] += 1;
@@ -185,14 +187,6 @@ fn argmax(v: &[u32]) -> Option<usize> {
         .enumerate()
         .fold((0, 0), |a, (i, &x)| if x > a.1 { (i, x) } else { a });
     (m > 0).then_some(i)
-}
-
-fn local(r: &CommitRecord) -> i64 {
-    r.time + i64::from(r.offset)
-}
-
-fn weekday(days: i64) -> usize {
-    usize::try_from((days + 3).rem_euclid(7)).unwrap_or(0)
 }
 
 #[cfg(test)]

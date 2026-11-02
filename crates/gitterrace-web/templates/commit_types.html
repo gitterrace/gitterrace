@@ -4,8 +4,8 @@
 {% include "_tabs.html" %}
 {% include "_filterbar.html" %}
 {% include "_options.html" %}
+{% if commits_total == 0 %}{% include "_empty.html" %}{% else %}
 {% include "_kpis.html" %}
-{% if commits_total == 0 %}<p class="muted">No commits match these filters.</p>{% else %}
 {% if !kinds.is_empty() %}
 <div class="chart-head"><div><h2>Types</h2><p class="hint">Conventional-commit type of each subject line. Click a type to narrow every number on the page to it. Commits that do not follow the convention are grouped as other.</p></div></div>
 <div class="card"><table class="entries">

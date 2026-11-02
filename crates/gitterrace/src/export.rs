@@ -548,13 +548,16 @@ fn mark_snapshot(html: &[u8], label: &str, project: Option<&Project>) -> Vec<u8>
     let what = match project {
         Some(p) => format!(
             "Static snapshot of <a href=\"{}\">{}</a> at <b>{}</b>, shown in gitterrace.",
-            escape(&p.url),
-            escape(&p.name),
-            escape(label)
+            gitterrace_web::escape_html(&p.url),
+            gitterrace_web::escape_html(&p.name),
+            gitterrace_web::escape_html(label)
         ),
         // The index of several repositories names no revision of its own.
         None if label.is_empty() => "Static snapshot.".to_owned(),
-        None => format!("Static snapshot at <b>{}</b>.", escape(label)),
+        None => format!(
+            "Static snapshot at <b>{}</b>.",
+            gitterrace_web::escape_html(label)
+        ),
     };
     let banner = format!(
         "<link rel=\"stylesheet\" href=\"/snapshot.css\">\
@@ -570,13 +573,6 @@ fn mark_snapshot(html: &[u8], label: &str, project: Option<&Project>) -> Vec<u8>
     out.push_str(&banner);
     out.push_str(&page[end..]);
     out.into_bytes()
-}
-
-fn escape(s: &str) -> String {
-    s.replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-        .replace('"', "&quot;")
 }
 
 /// File the page lands in: HTML pages become `<path>/index.html` so their links

@@ -4,6 +4,7 @@
 {% include "_tabs.html" %}
 {% include "_filterbar.html" %}
 {% include "_options.html" %}
+{% if empty %}{% include "_empty.html" %}{% else %}
 <p class="hint">{{ span }}.</p>
 <div class="card"><table class="entries">
 <tr class="th"><td></td><td class="r">This period</td>{% if compared %}<td class="r">Before</td><td class="r">Change</td>{% endif %}</tr>
@@ -13,4 +14,5 @@
 <div class="card pad">{{ series|safe }}</div>
 <h2 data-tip="Commits by weekday and hour of day, in each commit's own time zone. Darker cells have more commits.">When commits happen</h2>
 <div class="card pad">{{ heatmap|safe }}</div>
+{% endif %}
 {% endblock %}
