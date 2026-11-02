@@ -1,6 +1,7 @@
 # Pinned corpus for `make bench`. Each repo is fetched at exactly this sha, so a re-run
 # measures the same history. Probe fields name the files and commit the page timings use;
-# a missing probe is discovered from the tree (largest text file, deepest folder, HEAD).
+# a missing probe is discovered from the tree (largest file under the text limit, deepest
+# folder, HEAD). A blob or blame probe above that limit is the refusal page, so keep it under.
 # need_gb is the free disk the clone and its blobs need; the harness refuses below it.
 
 [[repo]]

@@ -117,7 +117,7 @@ deploy: site shipped site-render
 stage: docs-check shipped site-render
 	npx wrangler@4 deploy
 
-## site-render: Render the touch icon and link-preview image from docs/brand (ignored, never committed)
+## site-render: Render the touch icon and link-preview image from docs/brand (ignored), and WebP screenshots when cwebp is installed
 site-render:
 	node scripts/site-render.mjs
 

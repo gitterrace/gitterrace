@@ -13,9 +13,9 @@ untimed read of the repository. Warm is the runs after it.
 1. **Index build.** Seconds from process start until `/api/progress` reports ready, from an
    empty cache, plus peak RSS sampled meanwhile and the size of the cache on disk.
 2. **Pages.** Time to first byte and full response for `/`, `/tree/HEAD`, a deep tree path,
-   `/blob` of the largest text file, `/blame` of that file, `/log/HEAD`, `/commit` and
+   `/blob` of the largest file under the text limit, `/blame` of that file, `/log/HEAD`, `/commit` and
    `/diff` fragment of the newest commit, `/search` for a common identifier, `/refs`, and
-   every `/stats` page. The probes are discovered from the pinned tree.
+   every `/stats` page. The probes are discovered from the pinned tree. Every page must answer 200 or the run fails, and the server runs with an empty config directory so the developer's own settings never apply.
 3. **Idle.** CPU percent over a 60 s window with no client, and again with one `/events`
    client open, which is the cost of the live watcher.
 4. **Memory.** RSS after the index is ready and after every page was visited.
@@ -60,6 +60,12 @@ make bench-clean    # print the path and size, then remove the clones
 repository to prove it still works.
 
 ## Results
+
+> **Known-false rows.** The committed results before this harness change picked a file over
+> the text limit for `blob-largest` and `blame-long-history`, so those two rows timed the
+> "too large" refusal page, not a render, and the page budgets that counted them are not
+> evidence for blob or blame. They also ran with the developer's own config, and the control
+> pin was printed while HEAD was measured. Rerun `make bench` to replace them.
 
 <!-- BEGIN GENERATED: results -->
 Run 2026-11-01T20:11:08 on Apple M1 Max, 10 cores, 64.0 GB, Darwin 25.6.0. git version 2.54.0 (Apple Git-157), gitterrace 0.1.0. 5 warm runs per page, 60 s idle windows.

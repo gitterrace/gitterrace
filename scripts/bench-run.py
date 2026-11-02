@@ -156,13 +156,34 @@ def free_port():
         return s.getsockname()[1]
 
 
+def isolated_config(logdir):
+    """An empty config dir, so no developer config.toml or actions.toml shapes a result."""
+    d = Path(logdir) / "config"
+    d.mkdir(exist_ok=True)
+    (d / "config.toml").write_text("")
+    return d
+
+
+def text_limit_bytes():
+    """The default text-file limit, read from the config schema so it has one source."""
+    schema = (ROOT / "crates/gitterrace-config/src/schema.rs").read_text()
+    return int(re.search(r"text_kb: u64 = (\d+)", schema).group(1)) * 1024
+
+
 class Server:
     def __init__(self, binary, repo, logdir):
         self.port = free_port()
         self.log = open(Path(logdir) / f"server-{self.port}.log", "w")
         self.t0 = time.perf_counter()
         self.proc = subprocess.Popen(
-            [binary, str(repo), "--addr", f"127.0.0.1:{self.port}"],
+            [
+                binary,
+                "--config",
+                str(isolated_config(logdir)),
+                str(repo),
+                "--addr",
+                f"127.0.0.1:{self.port}",
+            ],
             stdout=self.log,
             stderr=self.log,
             cwd=repo,
@@ -226,7 +247,10 @@ def ensure_clone(repo, base, logdir):
 
 
 def discover(repo_dir, rev):
-    """Probe defaults: largest text file, deepest folder, newest commit."""
+    """Probe defaults: largest file under the text limit, deepest folder, newest commit.
+
+    A larger file would make /blob and /blame answer with the refusal page."""
+    limit = text_limit_bytes()
     files = []
     for line in run(["git", "ls-tree", "-r", "-l", "-z", rev], cwd=repo_dir).split(
         "\0"
@@ -235,7 +259,11 @@ def discover(repo_dir, rev):
             continue
         meta, path = line.split("\t", 1)
         size = meta.split()[-1]
-        if size.isdigit() and Path(path).suffix.lower() not in TEXT_BAD:
+        if (
+            size.isdigit()
+            and int(size) <= limit
+            and Path(path).suffix.lower() not in TEXT_BAD
+        ):
             files.append((int(size), path))
     files.sort(reverse=True)
     deep = max(
@@ -274,10 +302,14 @@ def measure_pages(port, plan, runs):
     out = {}
     for label, path in plan.items():
         status, ttfb, total, size = get(port, path)
+        if status != 200:
+            raise RuntimeError(f"{label} {path} answered HTTP {status}, not 200")
         cold = {"ttfb_ms": ttfb, "total_ms": total}
         ttfbs, totals = [], []
         for _ in range(runs):
-            _, a, b, _ = get(port, path)
+            status, a, b, _ = get(port, path)
+            if status != 200:
+                raise RuntimeError(f"{label} {path} answered HTTP {status}, not 200")
             ttfbs.append(a)
             totals.append(b)
         out[label] = {
@@ -339,7 +371,13 @@ def bench_repo(repo, repo_dir, binary, runs, idle_secs, logdir):
     # One untimed read warms the OS cache so cold means the first request, not the disk.
     run(["git", "rev-list", "--count", rev], cwd=repo_dir)
     srv = Server(binary, repo_dir, logdir)
-    res = {"sha": repo["sha"], "class": repo["class"], "probe": probe}
+    # A local repo is measured at its HEAD, so report that, not the corpus pin.
+    res = {
+        "sha": probe["commit"] if repo.get("local") else repo["sha"],
+        "class": repo["class"],
+        "probe": probe,
+        "config": "empty config.toml, no actions.toml",
+    }
     try:
         secs, listen, peak = srv.wait_ready()
         res["index"] = {"secs": secs, "listen_secs": listen, "peak_rss_mb": peak}
@@ -368,7 +406,10 @@ def bench_repo(repo, repo_dir, binary, runs, idle_secs, logdir):
         out = Path(tempfile.mkdtemp(prefix="gt-export-", dir=logdir))
         t = time.perf_counter()
         r = subprocess.run(
-            [binary, "export", str(out)], cwd=repo_dir, capture_output=True, text=True
+            [binary, "--config", str(isolated_config(logdir)), "export", str(out)],
+            cwd=repo_dir,
+            capture_output=True,
+            text=True,
         )
         res["export"] = {
             "secs": time.perf_counter() - t,
