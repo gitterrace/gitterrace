@@ -117,13 +117,15 @@ deploy: site shipped site-render
 stage: docs-check shipped site-render
 	npx wrangler@4 deploy
 
-## site-render: Render the touch icon and link-preview image from docs/brand (ignored), and WebP screenshots when cwebp is installed
+## site-render: Render the touch icon and link-preview image from docs/brand (ignored), and the site's WebPs from target/site-shots when present (needs cwebp then)
 site-render:
 	node scripts/site-render.mjs
 
-## site-shots: Take docs/screenshots/*.png from a running preview (URL=http://127.0.0.1:4242). Needs browsers, so not in check
+## site-shots: Retake every screenshot from a running preview (URL=http://127.0.0.1:4242): raw PNG files to target/site-shots, the README's to docs/screenshots, the site WebPs, then generate. Needs browsers, so not in check
 site-shots:
 	node scripts/site-shots-run.mjs $(URL)
+	node scripts/site-render.mjs
+	cargo xtask generate
 
 ## shipped: site/ and wrangler.toml are committed, so a deploy ships a known commit
 shipped:

@@ -1,11 +1,12 @@
-// Renders the two raster images the site needs from the brand SVGs, at deploy time.
+// Renders the two raster images the site needs from the brand SVGs, at deploy time, and the
+// site's WebP screenshots (below).
 // They are generated, not committed (.gitignore), because the SVGs are the single source:
 //   site/assets/apple-touch-icon.png  180x180, the mark on the page background (iOS home screen)
 //   site/assets/og.png                1200x630, the light README header (link previews)
 // Chromium draws the SVGs, since simpler renderers drop the stroked path of the mark.
 //
 //   node scripts/site-render.mjs
-import { readFileSync, mkdirSync, readdirSync } from 'node:fs';
+import { existsSync, readFileSync, mkdirSync, readdirSync, rmSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { join } from 'node:path';
 import { root, loadPlaywright, launch } from './browser-lib.mjs';
@@ -31,18 +32,31 @@ for (const s of shots) {
 }
 await b.close();
 
-// WebP copies of docs/screenshots/*.png, next to them, when cwebp is installed. They are
-// committed, then `make docs-gen` copies them to the site and offers a WebP source only where
-// the file exists, so a missing tool just means PNG-only.
-const shotDir = join(root, 'docs/screenshots');
-if (spawnSync('cwebp', ['-version']).error) {
-  console.log('site-render: cwebp not installed, screenshots stay PNG-only');
+// The site's screenshots, from the raw PNG files `make site-shots` leaves in target/site-shots/
+// (ignored, 2560x1600): a full-size `{name}.webp` for the lightbox and a 1280x800
+// `{name}.thumb.webp` for the tile, both into site/assets/screenshots/ and committed. Without
+// raw PNG files (a fresh clone, a deploy) the committed WebPs stay as they are. `make docs-gen`
+// checks that the folder holds exactly these files at exactly these sizes.
+const rawDir = join(root, 'target/site-shots');
+const siteShots = join(out, 'screenshots');
+const raw = existsSync(rawDir) ? readdirSync(rawDir).filter((f) => f.endsWith('.png')) : [];
+if (!raw.length) {
+  console.log('site-render: no raw shots in target/site-shots, keeping the committed WebPs');
 } else {
-  for (const f of readdirSync(shotDir).filter((f) => f.endsWith('.png'))) {
-    const r = spawnSync('cwebp', ['-quiet', '-q', '82', join(shotDir, f), '-o', join(shotDir, f.replace(/\.png$/, '.webp'))]);
-    if (r.status !== 0) { console.error(`site-render: cwebp failed on ${f}`); process.exit(1); }
+  if (spawnSync('cwebp', ['-version']).error) {
+    console.error('site-render: cwebp is needed for the screenshots (brew install webp)');
+    process.exit(1);
   }
-  console.log('wrote screenshots/*.webp');
+  mkdirSync(siteShots, { recursive: true });
+  for (const f of readdirSync(siteShots)) rmSync(join(siteShots, f));
+  for (const f of raw) {
+    const src = join(rawDir, f);
+    for (const [args, ext] of [[[], '.webp'], [['-resize', '1280', '800'], '.thumb.webp']]) {
+      const r = spawnSync('cwebp', ['-quiet', '-q', '82', ...args, src, '-o', join(siteShots, f.replace(/\.png$/, ext))]);
+      if (r.status !== 0) { console.error(`site-render: cwebp failed on ${f}`); process.exit(1); }
+    }
+  }
+  console.log('wrote site/assets/screenshots/*.webp (2560x1600) and *.thumb.webp (1280x800)');
 }
 
 // Every .png the generated pages link must now exist, or the deploy ships a dead image.

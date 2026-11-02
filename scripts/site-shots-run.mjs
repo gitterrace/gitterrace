@@ -1,16 +1,19 @@
 // Takes the website and README screenshots from a running git-terrace that serves jq and
 // ripgrep (public MIT projects, the same as the demo). Light and dark images per shot, 1280x800
-// at 2x, into docs/screenshots/. A release asset: run it by hand (`make site-shots`), not in check.
+// at 2x, into target/site-shots/ (ignored). Then copies the PNG files README.md links into
+// docs/screenshots/ and deletes the rest there, so git tracks only those. `make site-shots`
+// follows this with site-render (the WebPs) and `cargo xtask generate`. Not in check: it needs
+// browsers and a running preview.
 //
 //   node scripts/site-shots-run.mjs [BASE_URL] [NAME...]   default http://127.0.0.1:4242, all shots
-import { mkdirSync, statSync } from 'node:fs';
+import { copyFileSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
 import { root, loadPlaywright, launch } from './browser-lib.mjs';
 
 const base = (process.argv[2] || 'http://127.0.0.1:4242').replace(/\/$/, '');
 const only = process.argv.slice(3);
-const out = join(root, 'docs/screenshots');
+const out = join(root, 'target/site-shots');
 mkdirSync(out, { recursive: true });
 
 // Stable frames: no animation, no caret, no live-update pulse.
@@ -57,7 +60,7 @@ for (const scheme of ['light', 'dark']) {
     const file = join(out, `${s.name}-${scheme}.png`);
     await p.screenshot({ path: file });
     await p.close();
-    console.log(`wrote docs/screenshots/${s.name}-${scheme}.png`);
+    console.log(`wrote target/site-shots/${s.name}-${scheme}.png`);
   }
   await ctx.close();
 }
@@ -73,3 +76,19 @@ for (const [tool, args] of [['oxipng', ['-q', '-o', '4', '--strip', 'safe']], ['
   } catch {}
 }
 for (const f of files) console.log(`${f.slice(root.length + 1)} ${(statSync(f).size / 1024).toFixed(0)} KiB`);
+
+// The README's PNG files, by the same rule as readme_shots in xtask/src/site.rs: every
+// docs/screenshots/*.png path README.md names. Only those are tracked.
+const docs = join(root, 'docs/screenshots');
+const readme = new Set([...readFileSync(join(root, 'README.md'), 'utf8').matchAll(/docs\/screenshots\/([\w.-]+?\.png)/g)].map((m) => m[1]));
+mkdirSync(docs, { recursive: true });
+for (const f of readdirSync(docs)) if (!readme.has(f)) rmSync(join(docs, f));
+for (const f of readme) {
+  try {
+    copyFileSync(join(out, f), join(docs, f));
+    console.log(`copied docs/screenshots/${f}`);
+  } catch {
+    console.error(`site-shots: README.md links docs/screenshots/${f}, but no shot made it`);
+    process.exit(1);
+  }
+}

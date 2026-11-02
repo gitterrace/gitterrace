@@ -119,7 +119,7 @@ pub fn render(root: &Path, ws: &Workspace) -> Result<Vec<Out>> {
         ));
     }
 
-    outs.extend(shot_files(root)?);
+    check_shots(root)?;
 
     let repo = &pkg.repository;
     let home = pkg.homepage.trim_end_matches('/');
@@ -150,7 +150,7 @@ pub fn render(root: &Path, ws: &Workspace) -> Result<Vec<Out>> {
         h,
         "<section id=\"features\">\n<h2>What it does</h2>\n<ul class=\"features\">\n{}</ul>\n{}{demo}<h3>Commands</h3>\n{}</section>\n",
         features(),
-        gallery(root)?,
+        gallery(),
         commands(),
     );
     let _ = write!(
@@ -332,18 +332,18 @@ fn features() -> String {
 }
 
 /// The shots as a two-column gallery of equal tiles, each with its caption.
-fn gallery(root: &Path) -> Result<String> {
+fn gallery() -> String {
     let mut s = String::from("<div class=\"shots\">\n");
     for (name, alt, cap) in SHOTS {
         let _ = writeln!(
             s,
             "<figure>{}<figcaption><b>{cap}.</b> {}</figcaption></figure>",
-            shot_html(root, name, alt, cap)?,
+            shot_html(name, alt, cap),
             esc(alt.split_once(": ").map_or(alt, |(_, rest)| rest))
         );
     }
     s.push_str("</div>\n");
-    Ok(s)
+    s
 }
 
 /// One row per command, the README block's rows, as a definition list so long text wraps
@@ -372,9 +372,9 @@ fn sentence(items: &[String]) -> String {
     }
 }
 
-/// The screenshots in `docs/screenshots/`, in gallery order (pairs side by side): file stem,
-/// alt text ("Caption: what it shows"), caption. The site and the README both read this list,
-/// so a name here without its PNG, or a PNG not listed here, fails generation.
+/// The screenshots, in gallery order (pairs side by side): file stem, alt text ("Caption: what
+/// it shows"), caption. The site has a WebP pair per entry; the README shows the first, and
+/// `docs/screenshots/` keeps only the PNG files the README links.
 pub const SHOTS: [(&str, &str, &str); 6] = [
     (
         "overview",
@@ -409,102 +409,153 @@ pub const SHOTS: [(&str, &str, &str); 6] = [
 ];
 
 const SHOT_DIR: &str = "docs/screenshots";
+const SITE_SHOT_DIR: &str = "site/assets/screenshots";
+/// Pixel size of the lightbox WebP and of the tile thumbnail.
+const FULL: (u32, u32) = (2560, 1600);
+const THUMB: (u32, u32) = (1280, 800);
 
-/// One `Out` per PNG, copied to `site/assets/screenshots/`. Fails on a missing file and on a PNG
-/// in the folder that nothing references.
-fn shot_files(root: &Path) -> Result<Vec<Out>> {
-    let mut want: Vec<String> = SHOTS
-        .iter()
-        .flat_map(|(n, ..)| ["light", "dark"].map(|c| format!("{n}-{c}.png")))
-        .collect();
-    want.sort();
-    let mut have: Vec<String> = std::fs::read_dir(root.join(SHOT_DIR))
-        .with_context(|| format!("reading {SHOT_DIR} (run `make site-shots`)"))?
-        .filter_map(|e| e.ok()?.file_name().into_string().ok())
-        .filter(|f| Path::new(f).extension().is_some_and(|e| e == "png"))
-        .collect();
-    have.sort();
-    if let Some(f) = want.iter().find(|f| !have.contains(f)) {
+/// Checks the screenshots without copying them. `docs/screenshots/` holds exactly the PNG files
+/// README.md links, each 2560x1600; `site/assets/screenshots/` holds exactly a full-size WebP at
+/// 2560x1600 and a 1280x800 thumbnail for every entry in `SHOTS`. All of them come from
+/// `make site-shots`; a missing, extra or wrongly sized file fails generation and names it.
+fn check_shots(root: &Path) -> Result<()> {
+    let readme = std::fs::read_to_string(root.join("README.md")).context("reading README.md")?;
+    let pngs = readme_shots(&readme);
+    let have = list(root, SHOT_DIR, "make site-shots")?;
+    if let Some(f) = pngs.iter().find(|f| !have.contains(f)) {
+        anyhow::bail!("{SHOT_DIR}/{f} is linked by README.md but does not exist (make site-shots)");
+    }
+    if let Some(f) = have.iter().find(|f| !pngs.contains(f)) {
         anyhow::bail!(
-            "{SHOT_DIR}/{f} is named by the site and README but does not exist (make site-shots)"
+            "{SHOT_DIR}/{f} is not referenced by README.md: delete it (make site-shots keeps only the README's PNG files)"
         );
     }
-    if let Some(f) = have.iter().find(|f| !want.contains(f)) {
-        anyhow::bail!(
-            "{SHOT_DIR}/{f} is not referenced: add it to SHOTS in xtask/src/site.rs or delete it"
+    for f in &pngs {
+        let got = shot_size(root, f)?;
+        anyhow::ensure!(
+            got == (2560, 1600),
+            "{SHOT_DIR}/{f} is {}x{}, the README needs 2560x1600 (make site-shots)",
+            got.0,
+            got.1
         );
     }
-    // A WebP made by `make site-render` is copied along when it sits next to its PNG.
-    let webps = want.iter().map(|f| f.replace(".png", ".webp"));
-    want.iter()
-        .cloned()
-        .chain(webps.filter(|f| root.join(SHOT_DIR).join(f).exists()))
-        .map(|f| {
-            let path = format!("{SHOT_DIR}/{f}");
-            let bytes =
-                std::fs::read(root.join(&path)).with_context(|| format!("reading {path}"))?;
-            Ok(Out::bytes(format!("site/assets/screenshots/{f}"), bytes))
-        })
-        .collect()
+    let mut want: Vec<(String, (u32, u32))> = Vec::new();
+    for (n, ..) in SHOTS {
+        for c in ["light", "dark"] {
+            want.push((format!("{n}-{c}.webp"), FULL));
+            want.push((format!("{n}-{c}.thumb.webp"), THUMB));
+        }
+    }
+    let have = list(root, SITE_SHOT_DIR, "make site-shots")?;
+    if let Some((f, _)) = want.iter().find(|(f, _)| !have.contains(f)) {
+        anyhow::bail!("{SITE_SHOT_DIR}/{f} is missing (make site-shots)");
+    }
+    if let Some(f) = have.iter().find(|f| !want.iter().any(|(w, _)| w == *f)) {
+        anyhow::bail!("{SITE_SHOT_DIR}/{f} is not referenced: delete it and run `make site-shots`");
+    }
+    for (f, size) in &want {
+        let path = format!("{SITE_SHOT_DIR}/{f}");
+        let got =
+            webp_size(&std::fs::read(root.join(&path)).with_context(|| format!("reading {path}"))?)
+                .with_context(|| format!("{path} is not a WebP (make site-shots)"))?;
+        anyhow::ensure!(
+            got == *size,
+            "{path} is {}x{}, the site needs {}x{} (make site-shots)",
+            got.0,
+            got.1,
+            size.0,
+            size.1
+        );
+    }
+    Ok(())
 }
 
-/// Width and height in CSS pixels of a 2x PNG, from its header.
+/// The `docs/screenshots/*.png` file names README.md links, sorted and deduplicated. The same
+/// rule as `scripts/site-shots-run.mjs`, which copies exactly these.
+fn readme_shots(readme: &str) -> Vec<String> {
+    let key = "docs/screenshots/";
+    let mut v: Vec<String> = readme
+        .match_indices(key)
+        .filter_map(|(i, _)| {
+            let rest = &readme[i + key.len()..];
+            let end = rest
+                .find(|c: char| !(c.is_ascii_alphanumeric() || c == '-' || c == '_' || c == '.'))?;
+            let f = rest[..end].trim_end_matches('.');
+            Path::new(f)
+                .extension()
+                .is_some_and(|e| e.eq_ignore_ascii_case("png"))
+                .then(|| f.to_string())
+        })
+        .collect();
+    v.sort();
+    v.dedup();
+    v
+}
+
+/// The file names in `dir`, sorted. A missing folder names the target that fills it.
+fn list(root: &Path, dir: &str, fix: &str) -> Result<Vec<String>> {
+    let mut v: Vec<String> = std::fs::read_dir(root.join(dir))
+        .with_context(|| format!("reading {dir} (run `{fix}`)"))?
+        .filter_map(|e| e.ok()?.file_name().into_string().ok())
+        .filter(|f| !f.starts_with('.'))
+        .collect();
+    v.sort();
+    Ok(v)
+}
+
+/// Width and height in pixels of a WebP, from its first chunk: lossy (VP8), lossless (VP8L)
+/// or extended (VP8X). None when the header is not one of those.
+fn webp_size(b: &[u8]) -> Option<(u32, u32)> {
+    if b.len() < 30 || &b[0..4] != b"RIFF" || &b[8..12] != b"WEBP" {
+        return None;
+    }
+    let le16 = |i: usize| u32::from(b[i]) | u32::from(b[i + 1]) << 8;
+    let le24 = |i: usize| le16(i) | u32::from(b[i + 2]) << 16;
+    match &b[12..16] {
+        b"VP8 " if b[23..26] == [0x9d, 0x01, 0x2a] => Some((le16(26) & 0x3fff, le16(28) & 0x3fff)),
+        b"VP8L" if b[20] == 0x2f => {
+            let bits = u32::from_le_bytes([b[21], b[22], b[23], b[24]]);
+            Some(((bits & 0x3fff) + 1, ((bits >> 14) & 0x3fff) + 1))
+        }
+        b"VP8X" => Some((le24(24) + 1, le24(27) + 1)),
+        _ => None,
+    }
+}
+
+/// Width and height in pixels of a PNG, from its header.
 fn shot_size(root: &Path, file: &str) -> Result<(u32, u32)> {
     let path = format!("{SHOT_DIR}/{file}");
     let b = std::fs::read(root.join(&path)).with_context(|| format!("reading {path}"))?;
     anyhow::ensure!(b.len() > 24 && &b[1..4] == b"PNG", "{path} is not a PNG");
     let w = u32::from_be_bytes([b[16], b[17], b[18], b[19]]);
     let h = u32::from_be_bytes([b[20], b[21], b[22], b[23]]);
-    Ok((w / 2, h / 2))
+    Ok((w, h))
 }
 
 /// One shot as a tile link plus a full-size view, for the caller's single `<figure>`. The view
 /// is a `:target` overlay, since the site CSP runs no script; clicking it goes back to
 /// `#features`. Its image is a decorative copy (empty alt) so the description is read once,
 /// and `tabindex="-1"` lets the browser focus it when the fragment opens it.
-fn shot_html(root: &Path, name: &str, alt: &str, cap: &str) -> Result<String> {
-    // Every tile is the same size so the rows line up; a different size fails generation.
-    for c in ["light", "dark"] {
-        let got = shot_size(root, &format!("{name}-{c}.png"))?;
-        anyhow::ensure!(
-            got == (1280, 800),
-            "{SHOT_DIR}/{name}-{c}.png is {}x{} CSS px, the site needs 1280x800 (a 2560x1600 PNG)",
-            got.0,
-            got.1
-        );
-    }
-    // A WebP next to the PNG is offered first; only the source matching the colour scheme loads.
-    let source = |c: &str, media: &str| {
-        let base = format!("assets/screenshots/{name}-{c}");
-        let webp = root
-            .join(SHOT_DIR)
-            .join(format!("{name}-{c}.webp"))
-            .exists();
-        let mut s = String::new();
-        if webp {
-            let _ = write!(
-                s,
-                "<source{media} type=\"image/webp\" srcset=\"{base}.webp\">"
-            );
-        }
-        let _ = write!(s, "<source{media} srcset=\"{base}.png\">");
-        s
-    };
-    let pic = |alt: &str| {
-        format!(
-            "<picture>{}{}<img src=\"assets/screenshots/{name}-light.png\" alt=\"{}\" width=\"1280\" height=\"800\" loading=\"lazy\"></picture>",
-            source("dark", " media=\"(prefers-color-scheme: dark)\""),
-            source("light", ""),
-            esc(alt)
-        )
-    };
-    Ok(format!(
+fn shot_html(name: &str, alt: &str, cap: &str) -> String {
+    // Every tile is the same size so the rows line up; check_shots holds the WebPs to it.
+    // A tile shows only its thumbnail, so it never fetches the full-size file. Only the colour
+    // scheme's source loads.
+    let dark = " media=\"(prefers-color-scheme: dark)\"";
+    let thumb = format!(
+        "<picture><source{dark} srcset=\"assets/screenshots/{name}-dark.thumb.webp\"><img src=\"assets/screenshots/{name}-light.thumb.webp\" alt=\"{}\" width=\"1280\" height=\"800\" loading=\"lazy\" decoding=\"async\"></picture>",
+        esc(alt)
+    );
+    // The lightbox loads only the full-size WebP for the colour scheme.
+    let full = format!(
+        "<picture><source{dark} srcset=\"assets/screenshots/{name}-dark.webp\"><img src=\"assets/screenshots/{name}-light.webp\" alt=\"\" width=\"1280\" height=\"800\" loading=\"lazy\" decoding=\"async\"></picture>"
+    );
+    format!(
         "<a href=\"#shot-{name}\">{}</a>\
          <a class=\"lightbox\" id=\"shot-{name}\" href=\"#features\" aria-label=\"Close {}\" tabindex=\"-1\">{}</a>",
-        pic(alt),
+        thumb,
         esc(cap),
-        pic("")
-    ))
+        full
+    )
 }
 
 fn md(text: &str) -> String {
@@ -528,13 +579,32 @@ mod tests {
     /// and does not announce its image twice.
     #[test]
     fn gallery_has_one_figure_per_shot_and_an_accessible_lightbox() {
-        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
-        let g = gallery(&root).expect("gallery");
+        let g = gallery();
         assert!(!g.contains("<figure><figure"), "nested figure");
         assert_eq!(g.matches("<figure>").count(), SHOTS.len());
         assert_eq!(g.matches("<picture>").count(), SHOTS.len() * 2);
         assert_eq!(g.matches("tabindex=\"-1\"").count(), SHOTS.len());
         assert_eq!(g.matches("aria-label=\"Close ").count(), SHOTS.len());
+    }
+
+    /// A tile loads only its thumbnail, and the full-size file is left to the lightbox.
+    #[test]
+    fn tiles_never_reference_the_full_size_screenshot() {
+        for (name, alt, cap) in SHOTS {
+            let h = shot_html(name, alt, cap);
+            let (tile, lightbox) = h.split_once("<a class=\"lightbox\"").expect("lightbox");
+            for c in ["light", "dark"] {
+                assert!(!tile.contains(&format!("screenshots/{name}-{c}.webp")));
+                assert!(!h.contains(".png"), "shot {name} links a PNG");
+                assert!(tile.contains(&format!("screenshots/{name}-{c}.thumb.webp")));
+                assert!(
+                    !lightbox.contains(".thumb."),
+                    "lightbox {name} loads a thumbnail"
+                );
+            }
+            assert!(lightbox.contains(&format!("screenshots/{name}-dark.webp")));
+            assert!(tile.contains("width=\"1280\" height=\"800\" loading=\"lazy\""));
+        }
     }
 
     #[test]
@@ -545,24 +615,87 @@ mod tests {
         ));
     }
 
+    /// A VP8X header of the given canvas size, enough for `webp_size`.
+    fn webp(w: u32, h: u32) -> Vec<u8> {
+        let mut b = b"RIFF\0\0\0\0WEBPVP8X\x0a\0\0\0\0\0\0\0".to_vec();
+        b.extend_from_slice(&(w - 1).to_le_bytes()[..3]);
+        b.extend_from_slice(&(h - 1).to_le_bytes()[..3]);
+        b
+    }
+
+    /// A PNG header of the given size, enough for `shot_size`.
+    fn png(w: u32, h: u32) -> Vec<u8> {
+        let mut b = b"\x89PNG\r\n\x1a\n\0\0\0\rIHDR".to_vec();
+        b.extend_from_slice(&w.to_be_bytes());
+        b.extend_from_slice(&h.to_be_bytes());
+        b.push(0);
+        b
+    }
+
     #[test]
-    fn a_missing_or_unreferenced_screenshot_fails() {
+    fn readme_shots_are_the_linked_pngs() {
+        let r = "<img src=\"docs/screenshots/b-light.png\" alt=\"x\">\n\
+                 srcset=\"docs/screenshots/a-dark.png\" docs/screenshots/b-light.png docs/screenshots/x.svg";
+        assert_eq!(readme_shots(r), ["a-dark.png", "b-light.png"]);
+    }
+
+    #[test]
+    fn a_missing_unreferenced_or_wrongly_sized_screenshot_fails() {
         let dir = std::env::temp_dir().join(format!("gt-shots-{}", std::process::id()));
         let shots = dir.join(SHOT_DIR);
+        let site = dir.join(SITE_SHOT_DIR);
         std::fs::create_dir_all(&shots).expect("mkdir");
-        let err = shot_files(&dir)
-            .err()
-            .expect("empty folder fails")
+        std::fs::create_dir_all(&site).expect("mkdir");
+        std::fs::write(
+            dir.join("README.md"),
+            "<source srcset=\"docs/screenshots/overview-dark.png\">\n<img src=\"docs/screenshots/overview-light.png\">\n",
+        )
+        .expect("readme");
+        let err = check_shots(&dir)
+            .expect_err("empty folder fails")
             .to_string();
-        assert!(err.contains("does not exist"), "{err}");
+        assert!(
+            err.contains("overview-dark.png is linked by README.md"),
+            "{err}"
+        );
+        assert!(err.contains("make site-shots"), "{err}");
+        for c in ["light", "dark"] {
+            std::fs::write(shots.join(format!("overview-{c}.png")), png(2560, 1600))
+                .expect("write");
+        }
+        // A PNG the README does not link fails, though the site has a shot of that name.
+        std::fs::write(shots.join("blame-dark.png"), png(2560, 1600)).expect("write");
+        let err = check_shots(&dir)
+            .expect_err("unlinked png fails")
+            .to_string();
+        assert!(
+            err.contains("blame-dark.png is not referenced by README.md"),
+            "{err}"
+        );
+        assert!(err.contains("make site-shots"), "{err}");
+        std::fs::remove_file(shots.join("blame-dark.png")).expect("rm");
+        std::fs::write(shots.join("overview-dark.png"), png(1280, 800)).expect("write");
+        let err = check_shots(&dir).expect_err("small png fails").to_string();
+        assert!(err.contains("overview-dark.png is 1280x800"), "{err}");
+        std::fs::write(shots.join("overview-dark.png"), png(2560, 1600)).expect("write");
+        let err = check_shots(&dir).expect_err("no webp fails").to_string();
+        assert!(err.contains("is missing (make site-shots)"), "{err}");
         for (n, ..) in SHOTS {
             for c in ["light", "dark"] {
-                std::fs::write(shots.join(format!("{n}-{c}.png")), b"x").expect("write");
+                std::fs::write(site.join(format!("{n}-{c}.webp")), webp(2560, 1600))
+                    .expect("write");
+                std::fs::write(site.join(format!("{n}-{c}.thumb.webp")), webp(1280, 800))
+                    .expect("write");
             }
         }
-        assert!(shot_files(&dir).is_ok());
-        std::fs::write(shots.join("stray.png"), b"x").expect("write");
-        let err = shot_files(&dir).err().expect("stray fails").to_string();
+        check_shots(&dir).expect("complete set passes");
+        std::fs::write(site.join("blame-dark.thumb.webp"), webp(1200, 750)).expect("write");
+        let err = check_shots(&dir).expect_err("wrong size fails").to_string();
+        assert!(err.contains("blame-dark.thumb.webp is 1200x750"), "{err}");
+        assert!(err.contains("make site-shots"), "{err}");
+        std::fs::write(site.join("blame-dark.thumb.webp"), webp(1280, 800)).expect("write");
+        std::fs::write(site.join("blame-dark.png"), b"x").expect("write");
+        let err = check_shots(&dir).expect_err("site png fails").to_string();
         assert!(err.contains("not referenced"), "{err}");
         std::fs::remove_dir_all(&dir).expect("cleanup");
     }
