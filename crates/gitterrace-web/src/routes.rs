@@ -366,9 +366,7 @@ async fn overview(State(app): Shared, Query(q): Query<DocQuery>) -> Result<Html<
         let docs = crate::about::find(&list);
         let about = crate::about::card(a, &head, &rev, "", "/", &docs, q.doc.as_deref());
         let totals = a.records(&head)?.map(|r| {
-            let t = crate::insights::insights(a, &r, a.defaults().into_options())
-                .period_summary(gitterrace_index::Period::All)
-                .current;
+            let t = a.totals(&head, &r, a.defaults().into_options());
             Numbers {
                 commits: fmt::thousands(t.commits),
                 commits_noun: fmt::noun(t.commits, "commit", "commits"),

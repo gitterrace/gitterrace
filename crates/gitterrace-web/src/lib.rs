@@ -5,6 +5,7 @@ mod actions;
 mod activity;
 mod add;
 mod app;
+mod bounded;
 mod charts;
 mod commit_types;
 mod compare;

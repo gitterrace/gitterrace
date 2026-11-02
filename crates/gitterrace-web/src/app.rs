@@ -19,19 +19,31 @@ use crate::live::Change;
 
 /// Rendered stats pages are reused this long; time-relative windows move slowly.
 const MEMO_TTL: Duration = Duration::from_secs(60);
-const MEMO_ENTRIES: usize = 64;
 /// How long a dirty-worktree answer is reused, so every page need not run a status.
 /// The working tree scan runs on every this-many-th watcher tick.
 const WORKTREE_EVERY: u64 = 1;
 const DIRTY_TTL: Duration = Duration::from_secs(2);
-/// Cap on cached directory listings and file lists; both are cheap to rebuild.
-const CACHE_ENTRIES: usize = 256;
+/// Bytes each of the file list, last commit and rendered page caches may hold. Every entry is
+/// cheap to rebuild, so the bound only has to keep a public visitor from pinning memory.
+const CACHE_BYTES: usize = 32 << 20;
+/// Record sets kept at once, one per selected commit. Each holds all of its history, so this
+/// stays small; a visitor cycling more commits than this pays a parse per switch, not a stall
+/// of every other page.
+const RECORD_SETS: usize = 4;
+/// Largest ignore file read: these are configuration, never megabytes.
+const MAX_IGNORE_BYTES: usize = 1 << 20;
 
 /// Commit subjects by full id.
 pub(crate) type Subjects = HashMap<String, String>;
 
-/// Parsed records keyed by (head, index generation).
-type RecordsEntry = ((String, u64), Arc<Vec<CommitRecord>>);
+/// One selected commit's records, filled once by whichever caller gets there first.
+type RecordSlot = Arc<Mutex<Option<Arc<Vec<CommitRecord>>>>>;
+
+/// Overview totals for one (commit, index generation, options).
+/// One commit and its ignore files as `(path, text)`.
+type IgnoreFiles = (String, Arc<Vec<(String, String)>>);
+
+type TotalsEntry = (String, gitterrace_index::PeriodStats);
 
 /// What every repository of one server shares: the settings in force, the cap on page-building
 /// jobs and the shutdown signal that ends live streams.
@@ -240,13 +252,22 @@ pub(crate) struct App {
     /// Selected commits outside HEAD's history, queued for the one indexer loop so the cache
     /// file never has two writers.
     wanted: Mutex<std::collections::BTreeSet<String>>,
-    records: Mutex<Option<RecordsEntry>>,
-    memo: Mutex<HashMap<String, (Instant, Arc<String>)>>,
+    /// Record sets by (commit, generation), oldest first. The map lock is held only to find a
+    /// slot; the parse runs under that slot's own lock, so one cold commit never stalls pages
+    /// on another.
+    records: Mutex<Vec<((String, u64), RecordSlot)>>,
+    /// Record file reads, so a test can tell a hit from a re-read.
+    record_loads: AtomicU64,
+    totals: Mutex<Option<TotalsEntry>>,
+    /// Ignore files of one commit, `(path, text)`. Building the rules from them is cheap; finding
+    /// them walks the whole tree.
+    ignores: Mutex<Option<IgnoreFiles>>,
+    memo: Mutex<crate::bounded::Bounded<(Instant, Arc<String>)>>,
     dirty: Mutex<Option<(Instant, bool)>>,
     /// Open streams on a page that shows the working tree. Zero means no scan runs.
     pub(crate) wt_watchers: std::sync::atomic::AtomicUsize,
-    file_lists: Mutex<HashMap<String, Arc<Vec<String>>>>,
-    last_commits: Mutex<HashMap<String, Arc<Vec<LastCommit>>>>,
+    file_lists: Mutex<crate::bounded::Bounded<Arc<Vec<String>>>>,
+    last_commits: Mutex<crate::bounded::Bounded<Arc<Vec<LastCommit>>>>,
     chain: Mutex<Option<(String, Arc<crate::languages::Chain>)>>,
     subjects: Mutex<Option<(String, Arc<Subjects>)>>,
     head_lines: Mutex<Option<(String, Arc<Vec<gitterrace_index::HeadFile>>)>>,
@@ -283,12 +304,15 @@ impl App {
             progress: Mutex::new(Progress::default()),
             ready: AtomicBool::new(false),
             wanted: Mutex::new(std::collections::BTreeSet::new()),
-            records: Mutex::new(None),
-            memo: Mutex::new(HashMap::new()),
+            records: Mutex::new(Vec::new()),
+            record_loads: AtomicU64::new(0),
+            totals: Mutex::new(None),
+            ignores: Mutex::new(None),
+            memo: Mutex::new(crate::bounded::Bounded::new(CACHE_BYTES)),
             dirty: Mutex::new(None),
             wt_watchers: std::sync::atomic::AtomicUsize::new(0),
-            file_lists: Mutex::new(HashMap::new()),
-            last_commits: Mutex::new(HashMap::new()),
+            file_lists: Mutex::new(crate::bounded::Bounded::new(CACHE_BYTES)),
+            last_commits: Mutex::new(crate::bounded::Bounded::new(CACHE_BYTES)),
             chain: Mutex::new(None),
             subjects: Mutex::new(None),
             head_lines: Mutex::new(None),
@@ -396,7 +420,7 @@ impl App {
         if let Ok(g) = self.file_lists.lock()
             && let Some(v) = g.get(commit)
         {
-            return Ok(Arc::clone(v));
+            return Ok(v);
         }
         let list: Vec<String> = gitterrace_git::files(&self.repo, commit)?
             .into_iter()
@@ -404,10 +428,7 @@ impl App {
             .collect();
         let list = Arc::new(list);
         if let Ok(mut g) = self.file_lists.lock() {
-            if g.len() >= CACHE_ENTRIES {
-                g.clear();
-            }
-            g.insert(commit.to_owned(), Arc::clone(&list));
+            g.put(commit.to_owned(), Arc::clone(&list));
         }
         Ok(list)
     }
@@ -432,7 +453,7 @@ impl App {
         if let Ok(g) = self.last_commits.lock()
             && let Some(v) = g.get(&key)
         {
-            return Ok(Arc::clone(v));
+            return Ok(v);
         }
         let (found, complete) = gitterrace_git::last_commits(&self.repo, commit, dir, budget)?;
         let v = Arc::new(found);
@@ -440,10 +461,7 @@ impl App {
             return Ok(v);
         }
         if let Ok(mut g) = self.last_commits.lock() {
-            if g.len() >= CACHE_ENTRIES {
-                g.clear();
-            }
-            g.insert(key, Arc::clone(&v));
+            g.put(key, Arc::clone(&v));
         }
         Ok(v)
     }
@@ -460,7 +478,7 @@ impl App {
         {
             return Arc::clone(c);
         }
-        let ignore = gitterrace_git::IgnoreSet::at(&self.repo, head).ok();
+        let ignore = self.ignore_set(head);
         let ins =
             gitterrace_index::Insights::new(records, gitterrace_index::Options::default(), ignore);
         let c = Arc::new(crate::languages::Chain::build(records, &ins));
@@ -516,24 +534,75 @@ impl App {
 
     /// A rendered page for `key`, if fresh.
     pub(crate) fn memo_get(&self, key: &str) -> Option<Arc<String>> {
-        let g = self.memo.lock().ok()?;
-        let (at, html) = g.get(key)?;
-        (at.elapsed() < MEMO_TTL).then(|| Arc::clone(html))
+        let (at, html) = self.memo.lock().ok()?.get(key)?;
+        (at.elapsed() < MEMO_TTL).then_some(html)
     }
 
     pub(crate) fn memo_put(&self, key: String, html: Arc<String>) {
         if let Ok(mut g) = self.memo.lock() {
-            if g.len() >= MEMO_ENTRIES {
-                g.clear();
-            }
-            g.insert(key, (Instant::now(), html));
+            g.put(key, (Instant::now(), html));
         }
+    }
+
+    /// The ignore rules committed at `commit`. The files are found once per commit; the walk
+    /// that finds them costs as much as everything else an insights page does.
+    pub(crate) fn ignore_set(&self, commit: &str) -> Option<gitterrace_git::IgnoreSet> {
+        if let Ok(g) = self.ignores.lock()
+            && let Some((id, found)) = g.as_ref()
+            && id == commit
+        {
+            return Some(gitterrace_git::IgnoreSet::from_files(found.iter().cloned()));
+        }
+        let paths = self.file_paths(commit).ok()?;
+        let mut found: Vec<(String, String)> = paths
+            .iter()
+            .filter(|p| matches!(p.rsplit('/').next(), Some(".gitignore" | ".ignore")))
+            .filter_map(|p| {
+                let bytes = self.repo.blob_bytes(commit, p).ok()?;
+                (bytes.len() <= MAX_IGNORE_BYTES)
+                    .then(|| (p.clone(), String::from_utf8_lossy(&bytes).into_owned()))
+            })
+            .collect();
+        // Shallow first: the search tries the last added list first, so deeper rules win.
+        found.sort_by_key(|(path, _)| path.matches('/').count());
+        let found = Arc::new(found);
+        if let Ok(mut g) = self.ignores.lock() {
+            *g = Some((commit.to_owned(), Arc::clone(&found)));
+        }
+        Some(gitterrace_git::IgnoreSet::from_files(found.iter().cloned()))
+    }
+
+    /// All-history totals of `commit` with `opts`, computed once per index generation.
+    pub(crate) fn totals(
+        &self,
+        commit: &str,
+        recs: &[CommitRecord],
+        opts: gitterrace_index::Options,
+    ) -> gitterrace_index::PeriodStats {
+        let key = format!("{commit}\0{}\0{opts:?}", self.index.generation());
+        if let Ok(g) = self.totals.lock()
+            && let Some((k, t)) = g.as_ref()
+            && *k == key
+        {
+            return t.clone();
+        }
+        let ignore = opts
+            .respect_ignore
+            .then(|| self.ignore_set(commit))
+            .flatten();
+        let t = gitterrace_index::Insights::new(recs, opts, ignore)
+            .period_summary(gitterrace_index::Period::All)
+            .current;
+        if let Ok(mut g) = self.totals.lock() {
+            *g = Some((key, t.clone()));
+        }
+        t
     }
 
     /// The query reduced to what the stats pages read, sorted: unknown parameters and the
     /// order of known ones must not make a new memo entry.
     pub(crate) fn canonical_query(raw: Option<&str>) -> String {
-        const KNOWN: [&str; 12] = [
+        const KNOWN: [&str; 13] = [
             "type",
             "scope",
             "author",
@@ -546,6 +615,7 @@ impl App {
             "ignore",
             "ws",
             "base",
+            "all",
         ];
         let mut pairs: Vec<&str> = raw
             .unwrap_or_default()
@@ -604,19 +674,14 @@ impl App {
             return Ok(None);
         }
         let key = (head.to_owned(), self.index.generation());
-        // Held across the load: callers racing on a cold holder wait for the one parse instead
-        // of each parsing the whole record file, which multiplied peak memory.
-        let Ok(mut g) = self.records.lock() else {
-            return Ok(None);
-        };
-        if let Some((k, recs)) = g.as_ref()
-            && *k == key
-        {
-            return Ok(Some(Arc::clone(recs)));
+        if let Some(recs) = self.record_slot(&key).and_then(|s| s.lock().ok()?.clone()) {
+            return Ok(Some(recs));
         }
         if self.index.newer_format().is_some() {
             return Ok(None);
         }
+        // Many distinct commits can land here on a public server; each is indexed once, so the
+        // work is bounded by the history, and the slots below stay at `RECORD_SETS`.
         if self.index.pending(&self.repo, head)? > 0 {
             if let Ok(mut w) = self.wanted.lock() {
                 w.insert(head.to_owned());
@@ -624,11 +689,49 @@ impl App {
             self.wake.notify_one();
             return Ok(None);
         }
-        // Drop the stale set first so the old and the new one are never alive together.
-        *g = None;
+        let slot = self.record_slot_or_new(key);
+        // Held across the load: callers racing on one cold commit wait for the one parse instead
+        // of each parsing the whole record file, which multiplied peak memory. Other commits
+        // have their own slot and do not wait.
+        let Ok(mut g) = slot.lock() else {
+            return Ok(None);
+        };
+        if let Some(recs) = g.as_ref() {
+            return Ok(Some(Arc::clone(recs)));
+        }
+        self.record_loads.fetch_add(1, Ordering::Relaxed);
         let recs = Arc::new(self.index.records(&self.repo, head)?);
-        *g = Some((key, Arc::clone(&recs)));
+        *g = Some(Arc::clone(&recs));
         Ok(Some(recs))
+    }
+
+    fn record_slot(&self, key: &(String, u64)) -> Option<RecordSlot> {
+        let g = self.records.lock().ok()?;
+        g.iter().find(|(k, _)| k == key).map(|(_, s)| Arc::clone(s))
+    }
+
+    /// The slot for `key`, made when missing. Sets of an older generation go first, then the
+    /// oldest, so at most `RECORD_SETS` stay alive.
+    fn record_slot_or_new(&self, key: (String, u64)) -> RecordSlot {
+        let Ok(mut g) = self.records.lock() else {
+            return Arc::default();
+        };
+        if let Some((_, s)) = g.iter().find(|(k, _)| *k == key) {
+            return Arc::clone(s);
+        }
+        g.retain(|(k, _)| k.1 == key.1);
+        while g.len() >= RECORD_SETS {
+            g.remove(0);
+        }
+        let slot = RecordSlot::default();
+        g.push((key, Arc::clone(&slot)));
+        slot
+    }
+
+    /// How often the record file was read, for tests.
+    #[cfg(test)]
+    pub(crate) fn record_loads(&self) -> u64 {
+        self.record_loads.load(Ordering::Relaxed)
     }
 }
 
@@ -912,6 +1015,38 @@ mod tests {
             sets.iter().all(|s| std::sync::Arc::ptr_eq(s, &sets[0])),
             "every racing caller must get the one parsed set"
         );
+    }
+
+    #[test]
+    fn alternating_selected_commits_reuse_their_parsed_records() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path();
+        git(path, &["init", "-q", "-b", "main"]);
+        std::fs::write(path.join("a.txt"), "1\n").expect("write");
+        git(path, &["add", "."]);
+        git(path, &["commit", "-q", "-m", "feat: one"]);
+        let first = git(path, &["rev-parse", "HEAD"]);
+        std::fs::write(path.join("a.txt"), "2\n").expect("write");
+        git(path, &["commit", "-qam", "fix: two"]);
+        let repo = gitterrace_git::Repo::discover(path).expect("repo");
+        let index = gitterrace_index::Index::open(&repo).expect("index");
+        let app = App::new(repo, index);
+        app.index
+            .update(&app.repo, "HEAD", &|_| {})
+            .expect("update");
+        app.mark_ready();
+        let head = app.repo.resolve("HEAD").expect("head");
+        for _ in 0..3 {
+            assert_eq!(
+                app.records(&head).expect("records").expect("ready").len(),
+                2
+            );
+            assert_eq!(
+                app.records(&first).expect("records").expect("ready").len(),
+                1
+            );
+        }
+        assert_eq!(app.record_loads(), 2, "each commit's records are read once");
     }
 
     #[test]

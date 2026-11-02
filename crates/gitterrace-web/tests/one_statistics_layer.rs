@@ -131,6 +131,8 @@ async fn api_and_pages_give_the_same_numbers_for_the_same_filter() {
             .expect("contributors")
             .iter()
             .filter(|p| p["bot"] != true)
+            // The page renders the top rows and links to the rest; the API lists every one.
+            .take(100)
             .map(|p| num(&p["commits"]))
             .collect();
         assert_eq!(web, api_rows, "Contributors page against API for {q:?}");

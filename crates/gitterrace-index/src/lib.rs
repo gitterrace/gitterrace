@@ -443,6 +443,30 @@ mod tests {
         Ok(())
     }
 
+    /// A format reset deletes the record files: it must wait for a writer that holds the lock.
+    #[test]
+    fn format_reset_waits_for_the_writer_lock() -> io::Result<()> {
+        let dir = tempfile::tempdir()?;
+        let path = dir.path().join("gitterrace");
+        let idx = Index::open_dir(path.clone())?;
+        idx.update(&Paths::new("a", 1), "HEAD", &|_| {})?;
+        std::fs::write(path.join(crate::store::VERSION_FILE), "0\n")?;
+        let held = crate::store::WriteLock::take(&path)?;
+        let (tx, rx) = std::sync::mpsc::channel();
+        std::thread::scope(|s| {
+            s.spawn(|| tx.send(Index::open_dir(path.clone()).map(drop)));
+            assert!(
+                rx.recv_timeout(std::time::Duration::from_millis(300))
+                    .is_err(),
+                "the reset ran under a held lock"
+            );
+            assert!(path.join(crate::store::COMMITS_FILE).exists());
+            drop(held);
+            rx.recv_timeout(std::time::Duration::from_secs(10))
+                .map_err(io::Error::other)?
+        })
+    }
+
     /// A commit the source cannot read is not stored, stays pending and is built next time.
     #[test]
     fn an_unreadable_commit_stays_pending_and_is_retried() -> io::Result<()> {

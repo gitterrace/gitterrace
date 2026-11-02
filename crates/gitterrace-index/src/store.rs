@@ -156,20 +156,37 @@ pub(crate) fn ensure_dir(dir: &Path) -> io::Result<Option<String>> {
         eprintln!("gitterrace: {}", newer_message(&found));
         return Ok(Some(found));
     }
+    if needs_reset(dir)? {
+        // Another process may be appending: deleting its files under it would tear them. The
+        // check is repeated under the lock, since the writer that held it may have reset too.
+        // Only a reset takes the lock, so a read-only cache that is current stays readable.
+        let _lock = WriteLock::take(dir)?;
+        if version_stale(dir)? {
+            cache::remove(dir, COMMITS_FILE)?;
+            cache::remove(dir, PATHS_FILE)?;
+            cache::write_atomic(dir, VERSION_FILE, format!("{FORMAT_VERSION}\n").as_bytes())?;
+        }
+        // Records without their path table cannot be read: start over.
+        if cache::len(dir, COMMITS_FILE) > 0 && cache::len(dir, PATHS_FILE) == 0 {
+            cache::remove(dir, COMMITS_FILE)?;
+        }
+    }
+    Ok(None)
+}
+
+/// Whether the stored format differs from ours.
+fn version_stale(dir: &Path) -> io::Result<bool> {
     let current = cache::read(dir, VERSION_FILE)?;
     let current = current
         .as_deref()
         .map(|b| String::from_utf8_lossy(b).trim().to_owned());
-    if current.as_deref() != Some(FORMAT_VERSION) {
-        cache::remove(dir, COMMITS_FILE)?;
-        cache::remove(dir, PATHS_FILE)?;
-        cache::write_atomic(dir, VERSION_FILE, format!("{FORMAT_VERSION}\n").as_bytes())?;
-    }
-    // Records without their path table cannot be read: start over.
-    if cache::len(dir, COMMITS_FILE) > 0 && cache::len(dir, PATHS_FILE) == 0 {
-        cache::remove(dir, COMMITS_FILE)?;
-    }
-    Ok(None)
+    Ok(current.as_deref() != Some(FORMAT_VERSION))
+}
+
+/// Whether `ensure_dir` has files to delete: a stale format, or records without paths.
+fn needs_reset(dir: &Path) -> io::Result<bool> {
+    Ok(version_stale(dir)?
+        || (cache::len(dir, COMMITS_FILE) > 0 && cache::len(dir, PATHS_FILE) == 0))
 }
 
 /// Fails instead of misreading a cache a newer build wrote.

@@ -193,7 +193,7 @@ impl OptLink {
 pub(crate) fn insights<'a>(a: &App, recs: &'a [CommitRecord], o: Options) -> Insights<'a> {
     let ignore = if o.respect_ignore {
         let head = a.repo.resolve(&crate::fmt::selected()).unwrap_or_default();
-        gitterrace_git::IgnoreSet::at(&a.repo, &head).ok()
+        a.ignore_set(&head)
     } else {
         None
     };
@@ -362,13 +362,24 @@ struct ContributorsPage {
     opts: Vec<OptLink>,
     kpis: Vec<Kpi>,
     people: Vec<PersonRow>,
+    /// "Show all N contributors" when the list was cut at `PEOPLE_SHOWN`.
+    more: Option<(String, String)>,
 }
+
+/// Rows the contributors page renders unless asked for all: one row carries an inline
+/// sparkline, so a large project's full list runs to megabytes. The API keeps every row.
+pub(crate) const PEOPLE_SHOWN: usize = 100;
 
 pub(crate) async fn contributors(
     State(app): Shared,
     RawQuery(raw): RawQuery,
     Query(q): Query<InsightsQuery>,
 ) -> Result<Html<String>> {
+    let all = raw
+        .as_deref()
+        .unwrap_or_default()
+        .split('&')
+        .any(|p| p == "all=1");
     cached(&app, "co", raw, move |a, r, c| {
         let f = &q.filter;
         let d = a.defaults();
@@ -380,10 +391,25 @@ pub(crate) async fn contributors(
         let ins = insights(a, &recs, q.options(&d));
         let period = period_of(&q, &d, Period::All);
         let report = ins.contributors(period);
-        let people: Vec<PersonRow> = report
+        let shown: Vec<_> = report
             .contributors
             .iter()
             .filter(|p| bots || !p.bot)
+            .collect();
+        let total = shown.len();
+        let new_total = shown.iter().filter(|p| p.first_time).count();
+        let more = (!all && total > PEOPLE_SHOWN).then(|| {
+            (
+                q.link(&d, "/stats/contributors", "all", Some("1")),
+                format!(
+                    "Show all {}",
+                    fmt::count(total, "contributor", "contributors")
+                ),
+            )
+        });
+        let people: Vec<PersonRow> = shown
+            .iter()
+            .take(if all { usize::MAX } else { PEOPLE_SHOWN })
             .map(|p| {
                 let email = p.emails.first().map_or(p.name.as_str(), String::as_str);
                 PersonRow {
@@ -415,15 +441,13 @@ pub(crate) async fn contributors(
             fb,
             opts: q.row(&d, "/stats/contributors"),
             kpis: vec![
-                Kpi("Contributors", fmt::thousands(people.len())),
-                Kpi(
-                    "New in period",
-                    fmt::thousands(people.iter().filter(|p| p.first_time).count()),
-                ),
+                Kpi("Contributors", fmt::thousands(total)),
+                Kpi("New in period", fmt::thousands(new_total)),
                 Kpi("Lines added", fmt::thousands(add)),
                 Kpi("Lines removed", fmt::thousands(del)),
             ],
             people,
+            more,
         }
     })
     .await
