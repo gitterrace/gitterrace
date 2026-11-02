@@ -8,6 +8,7 @@
 //! and 404 in the exported copy, the same as a link to a page that was
 //! never published.
 
+mod credit;
 mod snapshot;
 mod write;
 
@@ -25,6 +26,7 @@ use axum::{
 use gitterrace_git::{percent_decode, percent_encode_path};
 use tower::ServiceExt;
 
+use crate::export::credit::{Credit, add_footer};
 #[cfg(test)]
 use crate::export::snapshot::mark_snapshot_as;
 use crate::export::snapshot::{SNAPSHOT_CSS, mark_snapshot, snapshot_label};
@@ -216,6 +218,7 @@ pub(crate) async fn export(repos: &[PathBuf], out: &Path, scope: &Scope) -> anyh
             prefix: site.clone(),
             stamp: snapshot_label(&repo, &head)?,
             credit: scope.projects.iter().position(|p| p.name == name),
+            footer: footer_for(&repo, &head, &name, site, scope),
             allowed: Allowed::new(&repo, &head, scope)?,
         });
     }
@@ -269,7 +272,8 @@ pub(crate) async fn export(repos: &[PathBuf], out: &Path, scope: &Scope) -> anyh
                 // The index of several repositories names no revision.
                 let stamp = site.map_or("", |s| s.stamp.as_str());
                 let credit = site.and_then(|s| s.credit).map(|i| &scope.projects[i]);
-                mark_snapshot(&body, stamp, credit)
+                let marked = mark_snapshot(&body, stamp, credit);
+                site.map_or_else(|| marked.clone(), |s| add_footer(&marked, &s.footer))
             } else {
                 body
             };
@@ -288,6 +292,22 @@ pub(crate) async fn export(repos: &[PathBuf], out: &Path, scope: &Scope) -> anyh
     write_page(out, "/snapshot.css", "text/css", SNAPSHOT_CSS.as_bytes())?;
     write_page(out, "/_headers", "text/plain", headers_file().as_bytes())?;
     Ok(written + 2)
+}
+
+/// The credit line for one repository, using its project URL as origin when one was given.
+fn footer_for(
+    repo: &gitterrace_git::Repo,
+    head: &str,
+    name: &str,
+    prefix: &str,
+    scope: &Scope,
+) -> String {
+    let url = scope
+        .projects
+        .iter()
+        .find(|p| p.name == name)
+        .map(|p| p.url.as_str());
+    Credit::read(repo, head, name, url).footer(prefix)
 }
 
 /// The root of the export: the index of several, queued to fetch, or for one repository a page
@@ -319,6 +339,8 @@ struct Site {
     stamp: String,
     /// Index into `Scope::projects` when this repository is credited.
     credit: Option<usize>,
+    /// The credit line for the foot of each page.
+    footer: String,
     allowed: Allowed,
 }
 
