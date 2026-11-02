@@ -14,7 +14,7 @@ Local, read-only git browser with insights. [Architecture](docs/architecture.md)
 | `gitterrace-api` | JSON API (/api/v1) and the read-only MCP server, from one endpoint registry. |
 | `gitterrace-cards` | The year-in-review SVG card. |
 | `gitterrace-web` | axum server, askama templates, static assets and the request guard. |
-| `gitterrace` | Browse any git repository in your browser: code, history and insights, offline, in one binary. Binary `git-terrace`. |
+| `gitterrace` | A local, read-only git browser: code, history and insights, offline, in one binary. Binary `git-terrace`. |
 | `gitterrace-testkit` | Test support shared by every crate: the git helper, the fixture repository builder and the request helper. Dev-dependency only. |
 | `schwarzwald` | The theme as typed constants |
 

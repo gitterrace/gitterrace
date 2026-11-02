@@ -20,7 +20,7 @@ import re
 import sys
 from pathlib import Path
 
-TAGLINE = "Your repository's history, step by step. Offline, one binary."
+TAGLINE = "A local git browser. Your repository's history, step by step."
 ROOT = Path(__file__).resolve().parent.parent
 FONT = (
     ROOT

@@ -5,7 +5,7 @@
 </picture>
 </h1>
 
-<p align="center"><b>Your repository's history, step by step. Run <code>git terrace</code> and read it in your browser.</b></p>
+<p align="center"><b>A local git browser. Your repository's history, step by step. Run <code>git terrace</code> and read it in your browser.</b></p>
 
 <!-- BEGIN GENERATED: shots -->
 <picture>
