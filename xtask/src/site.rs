@@ -182,7 +182,7 @@ pub fn render(root: &Path, ws: &Workspace) -> Result<Vec<Out>> {
     let _ = write!(
         h,
         "<footer>\n<a href=\"{repo}\">Repository</a>\n<a href=\"{repo}/tree/main/docs\">Docs</a>\n\
-         <a href=\"{repo}/blob/main/LICENSE\">{lic} license</a>\n<span>Version {ver}</span>\n</footer>\n\
+         <a href=\"{repo}/blob/main/LICENSE\">{lic}</a>\n<a href=\"{repo}/releases/tag/v{ver}\">v{ver}</a>\n</footer>\n\
          </main>\n<script>{THEME_TOGGLE_JS}</script>\n<script>{LIGHTBOX_JS}</script>\n</body>\n</html>\n",
         repo = esc(repo),
         lic = esc(&pkg.license),
@@ -363,8 +363,8 @@ fn features() -> String {
     // yet, and the page should not lead with one of them.
     line(
         "Send to.",
-        "Hand a selection on with its context: a mail draft, a new issue, discussion or merge \
-         request, a task or a note in the app you use."
+        "Hand a selection on with its context: a mail draft, an issue or merge request, a task \
+         or a note."
             .to_owned(),
     );
     line(
