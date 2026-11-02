@@ -46,7 +46,8 @@ pub use types::{
 };
 pub use url::{percent_decode, percent_encode_path, percent_encode_segment};
 pub use walk::{
-    BlobId, BlobReader, FileRef, LastCommit, files, last_commits, scan_commits, tree_id,
+    BlobId, BlobReader, FileRef, LastCommit, canonical_order, files, last_commits,
+    last_commits_among, scan_commits, tree_id,
 };
 #[cfg(test)]
 pub use watch::Cost;

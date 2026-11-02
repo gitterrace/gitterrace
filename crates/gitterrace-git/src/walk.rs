@@ -1,7 +1,8 @@
 //! Bulk reads at a revision: file lists, blob scanning, commit scanning and per-entry last
 //! commits. Each call opens its own repository handle so callers can run them on many threads.
 
-use std::collections::HashMap;
+use std::cmp::Reverse;
+use std::collections::{BinaryHeap, HashMap};
 use std::time::{Duration, Instant};
 
 use gix::bstr::ByteSlice;
@@ -155,6 +156,74 @@ pub fn scan_commits(
     Ok(())
 }
 
+/// Commit ids reachable from `rev` in the canonical order: parents before children, ties among
+/// ready commits broken by (committer time, oid) ascending.
+///
+/// The order is a function of the commit graph alone, so a build numbers commits the same
+/// whatever the walk, the thread count or the build history. Parents outside the reachable set
+/// (a shallow boundary) do not hold a commit back.
+pub fn canonical_order(repo: &Repo, rev: &str) -> Result<Vec<String>> {
+    let tip = oid(&repo.resolve(rev)?)?;
+    let r = open(repo)?;
+    let walk = r
+        .rev_walk([tip])
+        .sorting(Sorting::ByCommitTime(CommitTimeOrder::NewestFirst))
+        .all()
+        .map_err(git)?;
+    let mut nodes: Vec<(i64, gix::ObjectId, Vec<gix::ObjectId>)> = Vec::new();
+    for info in walk {
+        let info = info.map_err(git)?;
+        let time = match info.commit_time {
+            Some(t) => t,
+            None => {
+                r.find_commit(info.id)
+                    .map_err(git)?
+                    .time()
+                    .map_err(git)?
+                    .seconds
+            }
+        };
+        nodes.push((time, info.id, info.parent_ids.to_vec()));
+    }
+    Ok(topo_sort(&nodes)
+        .into_iter()
+        .map(|i| nodes[i].1.to_string())
+        .collect())
+}
+
+/// Kahn's algorithm over `(time, id, parents)`, picking the smallest (time, id) among the ready
+/// commits. Returns positions into `nodes`.
+fn topo_sort(nodes: &[(i64, gix::ObjectId, Vec<gix::ObjectId>)]) -> Vec<usize> {
+    let pos: HashMap<gix::ObjectId, usize> =
+        nodes.iter().enumerate().map(|(i, n)| (n.1, i)).collect();
+    let mut waiting = vec![0usize; nodes.len()];
+    let mut children: Vec<Vec<usize>> = vec![Vec::new(); nodes.len()];
+    for (i, (_, _, parents)) in nodes.iter().enumerate() {
+        // A parent listed twice still releases its child once per listing, so count each.
+        for p in parents.iter().filter_map(|p| pos.get(p)) {
+            waiting[i] += 1;
+            children[*p].push(i);
+        }
+    }
+    let mut ready: BinaryHeap<Reverse<(i64, gix::ObjectId, usize)>> = waiting
+        .iter()
+        .enumerate()
+        .filter(|(_, w)| **w == 0)
+        .map(|(i, _)| Reverse((nodes[i].0, nodes[i].1, i)))
+        .collect();
+    let mut out = Vec::with_capacity(nodes.len());
+    while let Some(Reverse((_, _, i))) = ready.pop() {
+        out.push(i);
+        for &c in &children[i] {
+            waiting[c] -= 1;
+            if waiting[c] == 0 {
+                ready.push(Reverse((nodes[c].0, nodes[c].1, c)));
+            }
+        }
+    }
+    out
+}
+
 fn dir_oid(commit: &gix::Commit<'_>, dir: &str) -> Result<Option<gix::ObjectId>> {
     let tree = commit.tree().map_err(git)?;
     if dir.is_empty() {
@@ -175,6 +244,30 @@ fn entries(repo: &gix::Repository, id: Option<gix::ObjectId>) -> HashMap<Vec<u8>
     out
 }
 
+/// A commit to visit, with the entry names it touches when the index named them.
+type Step<'l> = Result<(gix::ObjectId, Option<&'l [String]>)>;
+
+/// The commits [`last_commits_among`] visits: `among` when given, else the whole history.
+fn steps<'l>(
+    r: &'l gix::Repository,
+    tip: gix::ObjectId,
+    among: Option<&'l [(String, Vec<String>)]>,
+) -> Result<Box<dyn Iterator<Item = Step<'l>> + 'l>> {
+    Ok(match among {
+        Some(list) => Box::new(
+            list.iter()
+                .map(|(id, names)| Ok((oid(id)?, Some(names.as_slice())))),
+        ),
+        None => Box::new(
+            r.rev_walk([tip])
+                .sorting(Sorting::ByCommitTime(CommitTimeOrder::NewestFirst))
+                .all()
+                .map_err(git)?
+                .map(|info| info.map(|i| (i.id, None)).map_err(git)),
+        ),
+    })
+}
+
 /// For each entry of the directory `dir` at `rev`, the newest commit that changed it, and whether
 /// the answer is final.
 ///
@@ -188,28 +281,50 @@ pub fn last_commits(
     dir: &str,
     budget: Duration,
 ) -> Result<(Vec<LastCommit>, bool)> {
+    last_commits_among(repo, rev, dir, None, budget)
+}
+
+/// [`last_commits`], visiting only the commits in `among` when given.
+///
+/// `among` holds `(id, names)` for commits reachable from `rev` in the walk's order (newest commit
+/// time first), where `names` are the entries of `dir` the commit's first-parent diff touches. It
+/// must hold every commit whose first-parent diff touches something under `dir`; the index records
+/// give that list. An entry is only ever resolved at a commit where it differs from the first
+/// parent, so skipping a commit that touches no pending entry gives the same answer as the full
+/// walk.
+pub fn last_commits_among(
+    repo: &Repo,
+    rev: &str,
+    dir: &str,
+    among: Option<&[(String, Vec<String>)]>,
+    budget: Duration,
+) -> Result<(Vec<LastCommit>, bool)> {
     let start = Instant::now();
     let dir = dir.trim_matches('/');
     let tip = oid(&repo.resolve(rev)?)?;
     let r = open(repo)?;
     let tip_commit = r.find_commit(tip).map_err(git)?;
-    let mut pending = entries(&r, dir_oid(&tip_commit, dir)?);
-    let walk = r
-        .rev_walk([tip])
-        .sorting(Sorting::ByCommitTime(CommitTimeOrder::NewestFirst))
-        .all()
-        .map_err(git)?;
+    // Ordered, so entries one commit resolves come out by name and not in a per-process
+    // random hash order.
+    let mut pending: std::collections::BTreeMap<_, _> = entries(&r, dir_oid(&tip_commit, dir)?)
+        .into_iter()
+        .collect();
+    let ids = steps(&r, tip, among)?;
     let mut found: Vec<(Vec<u8>, gix::ObjectId)> = Vec::new();
     let mut complete = true;
-    for info in walk {
+    for step in ids {
         if pending.is_empty() {
             break;
+        }
+        let (id, names) = step?;
+        if names.is_some_and(|ns| !ns.iter().any(|n| pending.contains_key(n.as_bytes()))) {
+            continue;
         }
         if start.elapsed() >= budget {
             complete = false;
             break;
         }
-        let commit = info.map_err(git)?.object().map_err(git)?;
+        let commit = r.find_commit(id).map_err(git)?;
         let here = dir_oid(&commit, dir)?;
         // A shallow boundary lists parents it does not hold: it is a root here.
         let parents: Vec<_> = if crate::diff::is_shallow_boundary(&r, commit.id) {
@@ -279,4 +394,93 @@ pub fn last_commits(
         });
     }
     Ok((out, complete))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::topo_sort;
+
+    fn id(n: u8) -> gix::ObjectId {
+        gix::ObjectId::from_bytes_or_panic(&[n; 20])
+    }
+
+    /// A merged branch dated before commits already on main, a skewed clock (child older than
+    /// its parent) and a tie on time: parents still come first, ties go by (time, oid).
+    #[test]
+    fn the_canonical_order_is_topological_then_time_then_oid() {
+        // 1 root at 10. 2 on main at 50. 3 on a branch at 20. 4 skewed child of 2 at 5.
+        // 5 and 6 tie at 60 as children of 4. 7 merges 6 and 3 at 70, 5 is a leaf.
+        let nodes = vec![
+            (70, id(7), vec![id(6), id(3)]),
+            (60, id(6), vec![id(4)]),
+            (60, id(5), vec![id(4)]),
+            (5, id(4), vec![id(2)]),
+            (50, id(2), vec![id(1)]),
+            (20, id(3), vec![id(1)]),
+            (10, id(1), vec![id(99)]),
+        ];
+        let got: Vec<u8> = topo_sort(&nodes)
+            .into_iter()
+            .map(|i| nodes[i].1.as_bytes()[0])
+            .collect();
+        assert_eq!(got, [1, 3, 2, 4, 5, 6, 7]);
+    }
+
+    fn order(nodes: &[(i64, gix::ObjectId, Vec<gix::ObjectId>)]) -> Vec<gix::ObjectId> {
+        topo_sort(nodes).into_iter().map(|i| nodes[i].1).collect()
+    }
+
+    /// A merged branch commit dated before its parent still follows it.
+    #[test]
+    fn parents_come_first_even_when_younger() {
+        let nodes = vec![
+            (100, id(1), vec![]),
+            (50, id(2), vec![id(1)]),
+            (60, id(3), vec![]),
+            (200, id(4), vec![id(2), id(3)]),
+        ];
+        assert_eq!(order(&nodes), [id(3), id(1), id(2), id(4)]);
+    }
+
+    /// Equal times break by oid, and the input order does not matter.
+    #[test]
+    fn ties_break_by_oid_and_input_order_does_not_matter() {
+        let a = vec![(5, id(9), vec![]), (5, id(1), vec![])];
+        let b = vec![(5, id(1), vec![]), (5, id(9), vec![])];
+        assert_eq!(order(&a), order(&b));
+        assert_eq!(order(&a)[0], id(1));
+    }
+
+    /// Build-time effect of the canonical order: walk order against canonical order, each
+    /// streamed through the diff pipeline. Opt-in: `TEST_ORDER_REPO=<path> cargo test --release
+    /// -- --ignored order_cost`.
+    #[test]
+    #[ignore = "opt-in measurement on a real repository"]
+    #[expect(clippy::print_stderr, reason = "measurement output")]
+    fn order_cost() {
+        let Ok(path) = std::env::var("TEST_ORDER_REPO") else {
+            return;
+        };
+        let repo = crate::Repo::discover(std::path::Path::new(&path)).expect("open");
+        let t = std::time::Instant::now();
+        let walk = repo.rev_list("HEAD").expect("walk");
+        let walk_list = t.elapsed();
+        let t = std::time::Instant::now();
+        let canon = super::canonical_order(&repo, "HEAD").expect("canonical");
+        let canon_list = t.elapsed();
+        eprintln!(
+            "list: walk {walk_list:?}, canonical {canon_list:?}, {} commits",
+            walk.len()
+        );
+        for (name, ids) in [("walk", &walk), ("canonical", &canon), ("walk", &walk)] {
+            let t = std::time::Instant::now();
+            let mut rows = 0_usize;
+            repo.numstat_stream(ids, |_, c| {
+                rows += c.map_or(0, |(_, f)| f.len());
+                Ok(())
+            })
+            .expect("stream");
+            eprintln!("stream {name}: {:?}, {rows} rows", t.elapsed());
+        }
+    }
 }
