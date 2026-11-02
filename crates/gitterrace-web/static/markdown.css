@@ -68,14 +68,3 @@
 :is(.markdown-body,.code,.diff) [class~=s-invalid]{color:var(--md-caution)}
 :is(.markdown-body,.code,.diff) [class~=s-punctuation]{color:var(--fg)}
 :is(.markdown-body,.code,.diff) [class~=s-parameter]{color:var(--md-k7)}
-/* blob Preview/Code toggle */
-.seg{display:flex;gap:4px}
-.seg button{font:inherit;color:var(--muted);background:none;border:0;border-radius:var(--radius);padding:2px 10px;cursor:pointer}
-.seg button.on{color:var(--fg);background:var(--hover)}
-.md-pane[data-pane=rendered]{padding:24px 32px}
-.md-pane[hidden]{display:none}
-.readme .markdown-body{padding:24px 32px}
-/* undo the app's global heading styles */
-.markdown-body h1,.markdown-body h2{text-transform:none;letter-spacing:normal;color:var(--fg)}
-.markdown-body h1{font-weight:600}
-.markdown-body h6{color:var(--muted)}

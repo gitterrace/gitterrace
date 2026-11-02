@@ -43,6 +43,7 @@ run ruff-format ruff "brew install ruff" ruff format --check scripts
 run actionlint actionlint "brew install actionlint" actionlint
 run ast-grep ast-grep "brew install ast-grep" ast-grep scan --error
 run ast-grep-test ast-grep "brew install ast-grep" ast-grep test --skip-snapshot-tests
+run css-scope python3 "install python3" python3 scripts/css-scope-check.py
 run machete cargo-machete "cargo install cargo-machete" cargo-machete
 
 [ "$fails" -eq 0 ] || {
