@@ -1,8 +1,11 @@
 //! Several repositories on one server: a name table, one lazily built router per repository
-//! under `/r/NAME`, and a repository index at `/`. The table starts with the CLI paths and only
-//! grows (see `add.rs`). Every repository lives under `/r/NAME`, also alone: a link handed out
-//! never changes when another repository joins. `/` forwards to the one repository while there
-//! is one. A name is assigned once and kept in the registry (see `registry::claim`).
+//! under `/r/NAME`, and a repository index at `/`. The table starts with the CLI paths, grows
+//! and shrinks only through the local secret route (see `add.rs`), and never empties. Every
+//! repository lives under `/r/NAME`, also alone: a link handed out never changes when another
+//! repository joins or leaves. `/` forwards to the one repository while there is one. A name is
+//! assigned once and kept in the registry (see `registry::claim`).
+
+mod discover;
 
 use std::fmt::Write as _;
 use std::{
@@ -26,6 +29,7 @@ use tower::ServiceExt;
 
 use crate::app::Env;
 use crate::fmt;
+pub use crate::multi::discover::discover_repos;
 
 /// Weeks shown in the index sparkline.
 const SPARK_WEEKS: usize = 26;
@@ -38,6 +42,8 @@ pub(crate) struct Served {
     /// Canonical top folder, what an addition is compared against.
     pub(crate) root: PathBuf,
     router: OnceCell<Router>,
+    /// The background tasks the router started, stopped when the repository is taken off.
+    tasks: Mutex<Vec<tokio::task::AbortHandle>>,
     /// Newest commit and weekly commit counts at the HEAD they were read for, so the index page
     /// opens a repository once per HEAD move instead of once per hit.
     recent: Mutex<Option<(String, Arc<Recent>)>>,
@@ -66,6 +72,13 @@ pub(crate) struct Table {
 struct Repos {
     order: Vec<Arc<Served>>,
     by_name: HashMap<String, Arc<Served>>,
+}
+
+/// Why [`Table::take`] left the table as it was.
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) enum Kept {
+    NotServed,
+    Last,
 }
 
 /// What [`Table::add`] did: the name the repository is served under, and whether it was new.
@@ -183,15 +196,40 @@ impl Table {
     /// Drops `name` again, for an addition whose repository would not open.
     /// Its name claim goes too, so it is not held for a repository that was never served.
     pub(crate) fn remove(&self, name: &str) {
-        let mut g = self.write();
-        let gone = g.by_name.remove(name);
-        g.order.retain(|s| s.name != name);
-        drop(g);
+        let gone = self.write().drop_name(name);
         if let (Some(dir), Some(s)) = (&self.state, gone)
             && let Err(e) = crate::registry::forget(dir, &s.root)
         {
             tracing::warn!("forgetting the name {name}: {e}");
         }
+    }
+
+    /// Takes the repository named `name`, or at canonical `root`, off the running server: its
+    /// URLs answer 404 from now on, and its index refresher, idle release and warm-up stop, so
+    /// its caches go with the last in-flight request. An index update already running in a
+    /// blocking thread finishes its batch first; nothing starts after. The on-disk index and the
+    /// name claim stay, so adding it again is fast and keeps its URL. The last repository stays.
+    pub(crate) fn take(&self, name: Option<&str>, root: Option<&Path>) -> Result<String, Kept> {
+        let mut g = self.write();
+        let found = g
+            .order
+            .iter()
+            .find(|s| {
+                name == Some(s.name.as_str())
+                    || root
+                        .is_some_and(|r| s.root == r || s.root.canonicalize().is_ok_and(|c| c == r))
+            })
+            .map(|s| s.name.clone())
+            .ok_or(Kept::NotServed)?;
+        if g.order.len() == 1 {
+            return Err(Kept::Last);
+        }
+        let gone = g.drop_name(&found);
+        drop(g);
+        if let Some(s) = gone {
+            s.stop();
+        }
+        Ok(found)
     }
 
     /// The page for a repository that will not open. An io error names host folders, so only
@@ -243,7 +281,13 @@ impl Table {
     pub(crate) async fn router_of(&self, served: &Served) -> io::Result<Router> {
         served
             .router
-            .get_or_try_init(|| async { repo_router(served, self.live.clone(), &self.env) })
+            .get_or_try_init(|| async {
+                let (router, tasks) = repo_router(served, self.live.clone(), &self.env)?;
+                if let Ok(mut g) = served.tasks.lock() {
+                    *g = tasks;
+                }
+                Ok::<_, io::Error>(router)
+            })
             .await
             .cloned()
     }
@@ -275,15 +319,30 @@ impl Repos {
             path,
             root,
             router: OnceCell::new(),
+            tasks: Mutex::default(),
             recent: Mutex::new(None),
         });
         self.by_name.insert(name, Arc::clone(&served));
         self.order.push(Arc::clone(&served));
         served
     }
+
+    fn drop_name(&mut self, name: &str) -> Option<Arc<Served>> {
+        self.order.retain(|s| s.name != name);
+        self.by_name.remove(name)
+    }
 }
 
 impl Served {
+    /// Stops the background tasks its router started.
+    fn stop(&self) {
+        if let Ok(mut g) = self.tasks.lock() {
+            for t in g.drain(..) {
+                t.abort();
+            }
+        }
+    }
+
     /// The newest commit and the weekly counts, one discover and one bounded walk per HEAD.
     /// The walk stops at the oldest week shown, so it counts every commit in the window
     /// however busy the repository is.
@@ -344,13 +403,6 @@ fn url_stem(folder: &str) -> String {
     }
 }
 
-/// A working tree (holding `.git`) or a bare repository (`HEAD`, `objects` and `refs` at its
-/// top). A bare clone has no `.git`, and searching it for repositories finds none.
-fn is_repo(dir: &Path) -> bool {
-    dir.join(".git").exists()
-        || (dir.join("HEAD").is_file() && dir.join("objects").is_dir() && dir.join("refs").is_dir())
-}
-
 /// A URL-safe name: no separator, no dot prefix (so never `.` or `..`), nothing to escape.
 fn valid_name(name: &str) -> bool {
     !name.is_empty()
@@ -358,54 +410,6 @@ fn valid_name(name: &str) -> bool {
         && name
             .bytes()
             .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'-' | b'_' | b'.'))
-}
-
-/// Expands the CLI paths.
-///
-/// A repository stays as is, a plain folder is searched `depth` levels
-/// down for repositories (skipping hidden folders and those in `skip`), and a folder with none
-/// is taken as a path inside one.
-pub fn discover_repos(paths: &[PathBuf], depth: usize, skip: &[String]) -> Vec<PathBuf> {
-    let mut out = Vec::new();
-    for p in paths {
-        if is_repo(p) {
-            out.push(p.clone());
-            continue;
-        }
-        let before = out.len();
-        walk(p, depth, skip, &mut out);
-        if out.len() == before {
-            out.push(p.clone());
-        }
-    }
-    out
-}
-
-fn walk(dir: &Path, depth: usize, skip: &[String], out: &mut Vec<PathBuf>) {
-    if depth == 0 {
-        return;
-    }
-    let Ok(rd) = std::fs::read_dir(dir) else {
-        return;
-    };
-    let mut dirs: Vec<PathBuf> = rd
-        .filter_map(std::result::Result::ok)
-        .filter(|e| e.file_type().is_ok_and(|t| t.is_dir()))
-        .filter(|e| {
-            let n = e.file_name();
-            let n = n.to_string_lossy();
-            !n.starts_with('.') && !skip.iter().any(|s| s.as_str() == n)
-        })
-        .map(|e| e.path())
-        .collect();
-    dirs.sort();
-    for d in dirs {
-        if is_repo(&d) {
-            out.push(d);
-        } else {
-            walk(&d, depth - 1, skip, out);
-        }
-    }
 }
 
 /// Index at `/`, the switcher list, shared assets, and every repository under `/r/NAME`.
@@ -436,7 +440,9 @@ async fn dispatch(State(table): State<Arc<Table>>, req: Request) -> Response {
     // The raw segment must match a table name byte for byte: an encoded `%2e%2e` or `%2F`
     // never equals a valid name, so it falls through to 404.
     let Some(served) = table.get(seg) else {
-        return crate::error::not_found(&format!("No repository named {seg} is served here."));
+        return crate::error::not_found(&format!(
+            "No repository named {seg} is served here. The overview lists the ones that are."
+        ));
     };
     let router = match table.router_of(&served).await {
         Ok(r) => r,
@@ -470,9 +476,9 @@ fn repo_router(
     served: &Served,
     live: Option<Arc<crate::actions::Live>>,
     env: &Env,
-) -> io::Result<Router> {
+) -> io::Result<(Router, Vec<tokio::task::AbortHandle>)> {
     let base = format!("/r/{}", served.name);
-    crate::repo_router(&served.path, base, served.name.clone(), live, env)
+    crate::repo_router_tasks(&served.path, base, served.name.clone(), live, env)
 }
 
 /// Counts `times` (seconds) into `SPARK_WEEKS` buckets ending at `now`, oldest first.

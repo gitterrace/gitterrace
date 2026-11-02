@@ -252,21 +252,121 @@ fn ensure_server(
     Ok(addr)
 }
 
-/// Asks the gitterrace server on `addr` to add the repository at `root` (canonical). The secret
-/// comes from the 0600 file that server wrote to `state`, so only its own user can ask. Already
+/// Asks the gitterrace server on `addr` to add the repository at `root` (canonical). Already
 /// served (409) counts as added.
 /// The `/r/NAME/` prefix the server serves `root` under, new or already there.
 fn add_repo(addr: SocketAddr, state: Option<&Path>, root: &Path) -> Result<String, String> {
+    let body = serde_json::json!({ "path": root });
+    match secret_request(addr, state, "POST", &body)? {
+        (201 | 409, v) => Ok(v
+            .get("base")
+            .and_then(|b| b.as_str().map(str::to_owned))
+            .unwrap_or_else(|| "/".to_owned())),
+        (404 | 405, _) => Err("it predates adding repositories or does not allow it".to_owned()),
+        (other, v) => Err(format!("HTTP {other}: {}", why(&v))),
+    }
+}
+
+#[expect(
+    clippy::print_stderr,
+    reason = "user-facing CLI output: this is the command's result or diagnostic, not a log line"
+)]
+/// `git terrace remove`: the current repository when no target is given.
+pub(crate) fn remove_cmd(addr: SocketAddr, target: Option<&str>) -> anyhow::Result<()> {
+    let state = gitterrace_web::state_dir();
+    let said = remove_running(addr, target.unwrap_or("."), state.as_deref())?;
+    eprintln!("gitterrace: {said}");
+    Ok(())
+}
+
+/// What `git terrace remove` did, for the one line it prints.
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) enum Removed {
+    Done(String),
+    NotServed,
+}
+
+/// `git terrace remove [PATH|NAME]`: finds and proves the server as [`join_running`] does, then
+/// asks it to take the repository off (`DELETE /_repos`). A target that is an existing path
+/// names a repository by its top folder, anything else is a URL name. No server, a refusal or
+/// the last repository is an error; one the server does not serve is a plain answer.
+pub(crate) fn remove_running(
+    addr: SocketAddr,
+    target: &str,
+    state: Option<&Path>,
+) -> anyhow::Result<String> {
+    let addr = loopback(addr);
+    let body = if Path::new(target).exists() {
+        let repo =
+            Repo::discover(Path::new(target)).with_context(|| format!("opening {target}"))?;
+        let root = repo.root();
+        serde_json::json!({ "path": root.canonicalize().unwrap_or(root) })
+    } else {
+        serde_json::json!({ "name": target })
+    };
+    match identify(addr, state) {
+        Listener::Gitterrace => {}
+        Listener::Free => anyhow::bail!("no gitterrace server is running on {addr}"),
+        Listener::Other => anyhow::bail!(
+            "{addr} is held by a program that is not a gitterrace server of this user, or one started with --public"
+        ),
+    }
+    Ok(
+        match remove_repo(addr, state, &body)
+            .map_err(|e| anyhow::anyhow!("the server on {addr} did not remove {target}: {e}"))?
+        {
+            Removed::Done(name) => {
+                format!("removed {name} from the server on {addr}; its index stays on disk")
+            }
+            Removed::NotServed => format!("{target} is not served on {addr}"),
+        },
+    )
+}
+
+fn remove_repo(
+    addr: SocketAddr,
+    state: Option<&Path>,
+    body: &serde_json::Value,
+) -> Result<Removed, String> {
+    match secret_request(addr, state, "DELETE", body)? {
+        (200, v) => Ok(Removed::Done(
+            v.get("name")
+                .and_then(|n| n.as_str())
+                .unwrap_or_default()
+                .to_owned(),
+        )),
+        (404, v) if v.get("error").is_some() => Ok(Removed::NotServed),
+        (404 | 405, _) => Err("it predates removing repositories".to_owned()),
+        (other, v) => Err(format!("HTTP {other}: {}", why(&v))),
+    }
+}
+
+/// The `error` of a JSON reply, or the reply itself.
+fn why(v: &serde_json::Value) -> String {
+    v.get("error")
+        .or_else(|| Some(v).filter(|v| v.is_string()))
+        .and_then(|e| e.as_str().map(str::to_owned))
+        .unwrap_or_else(|| v.to_string().chars().take(200).collect())
+}
+
+/// One `/_repos` request carrying the secret from the 0600 file the server on `addr` wrote to
+/// `state`, so only its own user can ask. The status and the JSON body (`null` when none).
+fn secret_request(
+    addr: SocketAddr,
+    state: Option<&Path>,
+    method: &str,
+    body: &serde_json::Value,
+) -> Result<(u16, serde_json::Value), String> {
     let state = state.ok_or("no state folder to read its secret from")?;
     let token = gitterrace_web::add_token(state, addr.port())
         .map_err(|e| format!("its secret is unreadable: {e}"))?;
-    let body = serde_json::json!({ "path": root }).to_string();
+    let body = body.to_string();
     let mut s = TcpStream::connect_timeout(&addr, PROBE_TIMEOUT).map_err(|e| e.to_string())?;
     // Building the repository's router opens its index; give it longer than a probe.
     s.set_read_timeout(Some(READY_WAIT))
         .map_err(|e| e.to_string())?;
     let req = format!(
-        "POST /_repos HTTP/1.1\r\nHost: {addr}\r\n{}: {token}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+        "{method} /_repos HTTP/1.1\r\nHost: {addr}\r\n{}: {token}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
         gitterrace_web::ADD_TOKEN_HEADER,
         body.len()
     );
@@ -275,28 +375,13 @@ fn add_repo(addr: SocketAddr, state: Option<&Path>, root: &Path) -> Result<Strin
     // A timeout after a partial read still leaves the status line to judge.
     let _partial = s.take(64 * 1024).read_to_end(&mut buf);
     let text = String::from_utf8_lossy(&buf);
-    let status = text.get(9..12).unwrap_or_default();
-    match status {
-        "201" | "409" => Ok(text
-            .split("\r\n\r\n")
-            .nth(1)
-            .and_then(|b| serde_json::from_str::<serde_json::Value>(b.trim()).ok())
-            .and_then(|v| v.get("base")?.as_str().map(str::to_owned))
-            .unwrap_or_else(|| "/".to_owned())),
-        "404" | "405" => Err("it predates adding repositories or does not allow it".to_owned()),
-        "" => Err("no answer".to_owned()),
-        other => {
-            let why = text
-                .split("\r\n\r\n")
-                .nth(1)
-                .unwrap_or_default()
-                .trim()
-                .chars()
-                .take(200)
-                .collect::<String>();
-            Err(format!("HTTP {other}: {why}"))
-        }
-    }
+    let Some(status) = text.get(9..12).and_then(|c| c.parse::<u16>().ok()) else {
+        return Err("no answer".to_owned());
+    };
+    let reply = text.split("\r\n\r\n").nth(1).unwrap_or_default().trim();
+    let v =
+        serde_json::from_str(reply).unwrap_or_else(|_| serde_json::Value::String(reply.to_owned()));
+    Ok((status, v))
 }
 
 /// Starts a detached `git-terrace <clone> --addr <addr> serve`, logging to `server.log`.

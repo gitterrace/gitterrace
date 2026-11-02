@@ -70,6 +70,14 @@ pub(crate) enum Command {
         #[arg(long)]
         print: bool,
     },
+    /// Take a repository off the running server; its pages then answer 404.
+    ///
+    /// The opposite of joining: the server on `server.addr` is found and proven the same way.
+    /// The on-disk index stays, so serving it again is fast. The last repository stays served.
+    Remove {
+        /// A path inside the repository, or its URL name. Default: the current repository.
+        target: Option<String>,
+    },
     /// Register (or with `--uninstall` remove) this program as the `gitterrace://` link handler.
     ///
     /// Opt-in. macOS writes `~/Applications/gitterrace-open.app`, Linux a `.desktop` file, and

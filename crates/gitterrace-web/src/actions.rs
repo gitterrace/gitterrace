@@ -109,7 +109,7 @@ fn not_loaded(e: impl std::fmt::Display) -> String {
 
 /// Everything `/go` and the run route read.
 pub(crate) struct Site {
-    /// Grows when a repository is added to the running server, never shrinks.
+    /// Follows the repositories added to and removed from the running server.
     pub(crate) targets: RwLock<Vec<Arc<Target>>>,
     pub(crate) live: Option<Arc<Live>>,
     pub(crate) status: Arc<Status>,
@@ -133,6 +133,15 @@ impl Site {
             .write()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
         g.push(Arc::new(t));
+    }
+
+    /// Drops the target of a repository taken off the server, so its permalinks stop resolving.
+    pub(crate) fn drop_target(&self, key: &str) {
+        let mut g = self
+            .targets
+            .write()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        g.retain(|t| t.key != key);
     }
 
     fn link_style(&self) -> gitterrace_actions::LinkStyle {

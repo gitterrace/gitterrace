@@ -20,10 +20,11 @@ struct FarPage {
 /// The sentence both the page and the API answer carry.
 pub(crate) fn why(read: usize) -> String {
     format!(
-        "Insights for this revision need a reindex: it has more than {} commits that the indexed \
-         branch does not (counted {read} before stopping), and loading them all would hold that \
-         much history in memory.",
-        gitterrace_index::thousands(gitterrace_index::feed::FRESH_CAP)
+        "Insights for this revision need a reindex: it has more than {} that the indexed branch \
+         does not (counted {} before stopping), and loading them all would hold that much \
+         history in memory.",
+        gitterrace_index::count(gitterrace_index::feed::FRESH_CAP, "commit", "commits"),
+        gitterrace_index::thousands(read)
     )
 }
 

@@ -80,6 +80,10 @@ async fn main() -> anyhow::Result<()> {
                 return Err(e);
             }
         }
+        Command::Remove { target } => {
+            let addr: SocketAddr = loaded.config.server.addr.parse().context("server.addr")?;
+            tokio::task::block_in_place(|| open::remove_cmd(addr, target.as_deref()))?;
+        }
         Command::Init => init(cli.config.as_deref())?,
         Command::InstallHandler { uninstall } => handler::run(uninstall)?,
         Command::Wrapped {

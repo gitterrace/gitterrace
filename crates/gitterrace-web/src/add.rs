@@ -4,7 +4,9 @@
 //! binds only, no browser (any `Origin` or `Sec-Fetch-Site` is refused, and there is no CORS,
 //! so a page cannot read a reply either), and a per-process secret the server writes to a 0600
 //! file in its 0700 state folder. The path must already be canonical and the top folder of a
-//! git repository; the name follows the startup rules.
+//! git repository; the name follows the startup rules. `DELETE /_repos` takes one off again
+//! (`git terrace remove`) under the same gate. There is no remove button: a page has no secret,
+//! and on a shared screen anyone could press it.
 
 use std::{
     path::{Path, PathBuf},
@@ -21,7 +23,7 @@ use axum::{
 use gitterrace_actions::Token;
 use gitterrace_git::Repo;
 
-use crate::multi::{Added, Table};
+use crate::multi::{Added, Kept, Table};
 
 /// Header carrying the secret from the token file.
 pub const TOKEN_HEADER: &str = "x-gitterrace-add-token";
@@ -45,7 +47,7 @@ struct AddRequest {
 /// Mounted only on a loopback bind with a token; elsewhere the route does not exist.
 pub(crate) fn router(adder: Arc<Adder>) -> Router {
     Router::new()
-        .route("/_repos", get(prove).post(add))
+        .route("/_repos", get(prove).post(add).delete(remove))
         .with_state(adder)
 }
 
@@ -169,6 +171,48 @@ async fn add(State(adder): State<Arc<Adder>>, req: Request) -> Response {
     )
 }
 
+/// What `DELETE /_repos` names: a URL name, or a canonical top folder.
+#[derive(serde::Deserialize)]
+struct RemoveRequest {
+    name: Option<String>,
+    path: Option<PathBuf>,
+}
+
+/// `DELETE /_repos`: takes a repository off the running server. Its pages then answer 404, its
+/// background tasks stop and open switchers drop it; the on-disk index and the name stay, so
+/// adding it again is fast and keeps its URL. The last repository stays: a server serving
+/// nothing has nothing at `/`, and stopping it is the user's call.
+async fn remove(State(adder): State<Arc<Adder>>, req: Request) -> Response {
+    if let Some(why) = refusal(req.headers(), &adder.token) {
+        return (StatusCode::FORBIDDEN, why).into_response();
+    }
+    let Ok(bytes) = axum::body::to_bytes(req.into_body(), BODY_LIMIT).await else {
+        return (StatusCode::PAYLOAD_TOO_LARGE, "body too large\n").into_response();
+    };
+    let Ok(rr) = serde_json::from_slice::<RemoveRequest>(&bytes) else {
+        return bad("malformed request");
+    };
+    if rr.name.is_none() && rr.path.is_none() {
+        return bad("name or path required");
+    }
+    match adder.table.take(rr.name.as_deref(), rr.path.as_deref()) {
+        Ok(name) => {
+            adder.site.drop_target(&name);
+            tracing::info!("removed {name}");
+            adder.table.announce();
+            reply(StatusCode::OK, &serde_json::json!({ "name": name }))
+        }
+        Err(Kept::NotServed) => reply(
+            StatusCode::NOT_FOUND,
+            &serde_json::json!({ "error": "not served" }),
+        ),
+        Err(Kept::Last) => reply(
+            StatusCode::CONFLICT,
+            &serde_json::json!({ "error": "the last repository stays; stop the server instead" }),
+        ),
+    }
+}
+
 /// The repository top folder `path` names, and its folder name. `path` must be absolute and
 /// canonical (no symlink, `..` or `.` anywhere), so the folder checked is the folder served.
 /// A folder inside a repository is not one: only its top folder is. A repository holding the
@@ -202,3 +246,7 @@ fn checked_root(path: &Path, actions_file: Option<&Path>) -> Result<(PathBuf, St
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+#[path = "add/remove_tests.rs"]
+mod remove_tests;

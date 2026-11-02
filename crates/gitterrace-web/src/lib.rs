@@ -83,6 +83,7 @@ pub fn multi_router(paths: Vec<PathBuf>) -> io::Result<axum::Router> {
 
 /// One repository's pages and `/api/v1`, with links under `base`. Starts its
 /// index refresher, so call it inside a tokio runtime.
+#[cfg(test)]
 fn repo_router(
     repo_path: &Path,
     base: String,
@@ -90,6 +91,19 @@ fn repo_router(
     live: Option<Arc<actions::Live>>,
     env: &Env,
 ) -> io::Result<axum::Router> {
+    Ok(repo_router_tasks(repo_path, base, key, live, env)?.0)
+}
+
+/// [`repo_router`] and the handles of the background tasks it started (index refresher, idle
+/// release, warm-up), so a repository taken off a running server stops them and its memory
+/// returns.
+fn repo_router_tasks(
+    repo_path: &Path,
+    base: String,
+    key: String,
+    live: Option<Arc<actions::Live>>,
+    env: &Env,
+) -> io::Result<(axum::Router, Vec<tokio::task::AbortHandle>)> {
     let cfg = env.cfg();
     let (text_bytes, blame_bytes) = app::repo_limits(&cfg);
     let repo = Repo::discover(repo_path)
@@ -106,11 +120,14 @@ fn repo_router(
     app.actions = live;
     let app = Arc::new(app);
     env.register(&app);
-    tokio::spawn(app::keep_index_fresh(Arc::clone(&app)));
-    tokio::spawn(app::release_when_idle(
-        Arc::downgrade(&app),
-        app::RECORDS_IDLE,
-    ));
+    let mut tasks = vec![
+        tokio::spawn(app::keep_index_fresh(Arc::clone(&app))).abort_handle(),
+        tokio::spawn(app::release_when_idle(
+            Arc::downgrade(&app),
+            app::RECORDS_IDLE,
+        ))
+        .abort_handle(),
+    ];
     let api = gitterrace_api::ApiState::open(repo_path)
         .map_err(io::Error::other)?
         .configured(&env.cfg());
@@ -127,8 +144,8 @@ fn repo_router(
     } else {
         pages
     };
-    tokio::spawn(prewarm(Arc::clone(&app), pages.clone()));
-    Ok(pages)
+    tasks.push(tokio::spawn(prewarm(Arc::clone(&app), pages.clone())).abort_handle());
+    Ok((pages, tasks))
 }
 
 /// A failed bind with the address and, when the port is taken, what to do about it. The kind
@@ -1249,14 +1266,12 @@ mod tests {
         let dir = tempfile::tempdir().expect("tmp");
         let p = rev_fixture(dir.path());
         let app = ready_app(&p);
+        // A ref a few commits off HEAD is served from the segments at once, no indexing page.
         let (s, body) = get(&app, "/stats?rev=side").await;
         assert!(
-            s == 200 && body.contains("data-progress"),
-            "side is not indexed yet"
+            s == 200 && !body.contains("data-progress"),
+            "side shows the indexing page: {body}"
         );
-        app.index
-            .update(&app.repo, "side", &|_| {})
-            .expect("update");
         let (_, main) = get(&app, "/stats/types").await;
         let (_, side) = get(&app, "/stats/types?rev=side").await;
         assert!(side.contains("only on side") && !main.contains("only on side"));
