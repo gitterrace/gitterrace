@@ -1,4 +1,4 @@
-// Checks of the interactive UI: marked text, gutter, overlays, tips, repo switcher. Imported by scripts/browser-check.mjs, not run on its own.
+// Checks of the interactive UI: marked text, the menu across views, gutter, overlays, tips, repo switcher. Imported by scripts/browser-check.mjs, not run on its own.
 import { writeFileSync, rmSync, mkdtempSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -54,6 +54,42 @@ async function marked() {
     const ctx2 = await p.$eval('.send-ctx', (e) => e.value);
     if (phrase && ctx2.includes('> ' + phrase)) r.ok(`marked ${name}: README prose arrives as a quote`);
     else r.fail(`marked ${name}: quote missing for ${JSON.stringify(phrase)}`);
+    await b.close();
+  }
+}
+
+// ---- menu-same --------------------------------------------------------------------------------
+// The action menu lists the same entries, in the same order, with the same labels in every view:
+// the rendered README, its code, a line selection in it, a blame line, a commit. An action the
+// selection does not fit stays in place, disabled, with a tip that says why.
+async function menuSame() {
+  const read = (p) => p.evaluate(() => [...document.querySelectorAll('.actmenu li[role=menuitem]')].map((li) => ({
+    label: li.querySelector('.name').textContent,
+    why: li.getAttribute('aria-disabled') === 'true' ? li.getAttribute('data-tip') || '(none)' : '',
+  })));
+  const open = async (p) => { await p.keyboard.press('.'); await p.waitForSelector('.actmenu li'); const e = await read(p); await p.keyboard.press('Escape'); return e; };
+  for (const name of browsers) {
+    const { b, ctx } = await context(name);
+    const p = await ctx.newPage();
+    const views = {};
+    await p.goto(srv.base + '/blob/HEAD/README.md', { waitUntil: 'load' });
+    views.preview = await open(p);
+    await p.click('[data-show=source]');
+    views.code = await open(p);
+    await p.goto(srv.base + '/blob/HEAD/README.md#L1', { waitUntil: 'load' });
+    await p.click('[data-show=source]');
+    await p.waitForSelector('#actsel');
+    await p.click('#actsel'); await p.waitForSelector('.actmenu li');
+    views.lines = await read(p); await p.keyboard.press('Escape');
+    await p.goto(srv.base + '/log', { waitUntil: 'load' });
+    views.log = await open(p);
+    const labels = (v) => v.map((e) => e.label).join(' | ');
+    const want = labels(views.preview);
+    const off = Object.entries(views).filter(([, v]) => labels(v) !== want).map(([k, v]) => `${k}: ${labels(v)}`);
+    const silent = Object.entries(views).flatMap(([k, v]) => v.filter((e) => e.why === '(none)').map((e) => `${k}: ${e.label}`));
+    const anyOff = Object.values(views).some((v) => v.some((e) => e.why));
+    if (!off.length && !silent.length && anyOff) r.ok(`menu-same ${name}: preview, code, lines and log list ${views.preview.length} entries alike`);
+    else r.fail(`menu-same ${name}: want ${want}; differ ${JSON.stringify(off)}; no reason ${JSON.stringify(silent)}; disabled seen ${anyOff}`);
     await b.close();
   }
 }
@@ -221,5 +257,5 @@ async function repoSwitch() {
 // The mark is two paths, ink and accent, meeting on one line. A renderer that antialiases each
 // path alone lets the background through there as a hairline (WebKit did). Paint every mark at
 // many sizes and offsets and compare the split rows with the solid rows just above and below.
-  return { marked, gutter, overlays, tips, repoSwitch };
+  return { marked, menuSame, gutter, overlays, tips, repoSwitch };
 }

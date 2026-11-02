@@ -67,23 +67,55 @@ impl Live {
             .map_or_else(|_| Arc::default(), |c| Arc::clone(&c))
     }
 
-    /// The menu entries the client renders: id, label, kinds and shortcut, in file order.
+    /// The menu entries the client renders, see [`menu_entries`].
     pub(crate) fn menu_json(&self) -> String {
-        let items: Vec<_> = self
-            .config()
-            .actions
-            .iter()
-            .map(|a| {
-                serde_json::json!({
-                    "id": a.id,
-                    "label": a.label,
-                    "kinds": a.kinds,
-                    "key": a.key.map(String::from),
-                })
-            })
-            .collect();
-        serde_json::Value::from(items).to_string()
+        menu_entries(&self.config())
     }
+}
+
+/// The one list every view's action menu is built from: every action in file order with its
+/// label, shortcut, kinds and `why`, the tip a disabled entry shows. The page never drops an
+/// entry: one the selection's kind does not fit stays in place, disabled, so the menu has the
+/// same entries in the same order on every view.
+pub(crate) fn menu_entries(config: &Config) -> String {
+    let items: Vec<_> = config
+        .actions
+        .iter()
+        .map(|a| {
+            serde_json::json!({
+                "id": a.id,
+                "label": a.label,
+                "kinds": a.kinds,
+                "key": a.key.map(String::from),
+                "why": why_off(&a.kinds),
+            })
+        })
+        .collect();
+    serde_json::Value::from(items).to_string()
+}
+
+/// "Works on lines or a commit": the tip of an entry the current selection does not fit.
+fn why_off(kinds: &[gitterrace_actions::Kind]) -> String {
+    use gitterrace_actions::Kind;
+    let names: Vec<&str> = kinds
+        .iter()
+        .map(|k| match k {
+            Kind::Line => "lines",
+            Kind::File => "a file",
+            Kind::Commit => "a commit",
+            Kind::Hunk => "a hunk",
+            Kind::Blame => "a blame line",
+            Kind::SearchHit => "a search hit",
+            Kind::Insight => "an insights row",
+            Kind::Page => "a page",
+        })
+        .collect();
+    let list = match names.split_last() {
+        None => String::new(),
+        Some((last, [])) => (*last).to_owned(),
+        Some((last, rest)) => format!("{} or {last}", rest.join(", ")),
+    };
+    format!("Works on {list}")
 }
 
 /// Why `actions.toml` is not in force, for the note pages show. Empty when it is fine.
@@ -522,3 +554,7 @@ pub(crate) mod actions_tests;
     reason = "one linear sequence, splitting it hides the flow"
 )]
 mod tests;
+
+#[cfg(test)]
+#[cfg(unix)]
+mod menu_tests;

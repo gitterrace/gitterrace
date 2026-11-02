@@ -199,6 +199,8 @@
       .then(function () { delete running[a.id]; closeMenu(); });
   }
 
+  function fits(a, t) { return a.kinds.indexOf(t.kind) >= 0; }
+
   // ---- the menu -------------------------------------------------------------
   var menu = null;
   var ov = window.gtOverlay;
@@ -238,11 +240,14 @@
       if (window.gtSend) window.gtSend.open({ kind: t.kind, path: t.path || "", lines: t.lines || null, subject: t.subject || "", sha: commit, link: permalink(t), markdown: markdown(t), text: t.text || "" });
     });
     var keys = { p: 0, m: 1, s: 2 };
-    var usable = mine.filter(function (a) { return a.kinds.indexOf(t.kind) >= 0; });
-    if (usable.length) { list.appendChild(el("li", "sep")); head("Your actions"); }
-    usable.forEach(function (a) {
+    // Every view lists the same entries in the same order (the server's one list); an action
+    // the selection does not fit stays, disabled, with the server's reason as its tip.
+    if (mine.length) { list.appendChild(el("li", "sep")); head("Your actions"); }
+    mine.forEach(function (a) {
       if (a.key && !(a.key in keys)) keys[a.key] = items.length;
-      add(a.label, a.key, function (e, li) { run(a, t, e, li); });
+      var on = fits(a, t);
+      var li = add(a.label, a.key, function (e, li) { if (on) run(a, t, e, li); else toast(a.label + ": " + a.why); });
+      if (!on) { li.classList.add("off"); li.setAttribute("aria-disabled", "true"); li.setAttribute("data-tip", a.why); }
     });
     if (!mine.length) {
       var hint = el("li", "hint");
@@ -395,8 +400,9 @@
       disarm();
       e.preventDefault();
       var tg = current();
-      var hit = mine.filter(function (a) { return a.key === e.key && a.kinds.indexOf(tg.kind) >= 0; })[0];
-      if (hit) run(hit, tg, e, null);
+      var hit = mine.filter(function (a) { return a.key === e.key; })[0];
+      if (hit && fits(hit, tg)) run(hit, tg, e, null);
+      else if (hit) toast(hit.label + ": " + hit.why);
       return;
     }
     // nav.js's "g" chord takes the next key, whatever it is, and nav.js arms it on "g".
