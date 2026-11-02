@@ -5,7 +5,7 @@
 //! written whole through a temp file and a rename, and a symlink in its place is refused.
 
 use std::fs::{self, OpenOptions};
-use std::io::{self, Read, Write};
+use std::io::{self, Read};
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -150,30 +150,10 @@ fn private_dir(dir: &Path) -> io::Result<()> {
     Ok(())
 }
 
-/// A fresh temp file (0600, `O_NOFOLLOW`, created new), then a rename over the old file. A
-/// symlink planted at the name is refused rather than replaced, so the user sees it.
+/// 0600, through the shared no-follow temp-and-rename writer. A symlink planted at the name is
+/// refused rather than replaced, so the user sees it.
 fn write_atomic(dir: &Path, file: &str, bytes: &[u8]) -> io::Result<()> {
-    let path = dir.join(file);
-    if fs::symlink_metadata(&path).is_ok_and(|m| !m.is_file()) {
-        return Err(refused(&path));
-    }
-    let tmp = dir.join(format!(".{file}.{}.tmp", std::process::id()));
-    let mut o = OpenOptions::new();
-    o.write(true).create_new(true);
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::OpenOptionsExt;
-        o.mode(0o600);
-    }
-    let written = no_follow(&mut o)
-        .open(&tmp)
-        .and_then(|mut f| f.write_all(bytes).and_then(|()| f.sync_all()))
-        .and_then(|()| fs::rename(&tmp, &path));
-    if written.is_err() {
-        // Best effort: the temp name is this process's alone.
-        drop(fs::remove_file(&tmp));
-    }
-    written
+    gitterrace_git::write_atomic(dir, file, bytes, 0o600)
 }
 
 #[cfg(unix)]

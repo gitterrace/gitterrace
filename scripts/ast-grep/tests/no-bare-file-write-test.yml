@@ -1,0 +1,9 @@
+id: no-bare-file-write
+valid:
+  - 'fn f() { gitterrace_git::write_atomic(dir, "f", b"x", 0o644); }'
+  - 'mod tests { fn f() { std::fs::write(p, "x").unwrap(); } }'
+  - 'pub(crate) mod actions_tests { fn f() { std::fs::write(p, "x").unwrap(); } }'
+invalid:
+  - 'fn f() { std::fs::write(&file, body)?; }'
+  - 'fn f() { fs::write(&file, body)?; }'
+  - 'fn f() { let f = File::create(&file)?; }'

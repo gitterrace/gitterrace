@@ -124,7 +124,7 @@ fn prepare_out(repos: &[PathBuf], out: &Path, force: bool) -> anyhow::Result<()>
         env!("GITTERRACE_VERSION"),
         names.join(",")
     );
-    std::fs::write(out.join(MARKER), line).with_context(|| format!("writing {MARKER}"))?;
+    write_leaf(&out.join(MARKER), line.as_bytes())?;
     exclude_from_worktree(out);
     Ok(())
 }
@@ -638,43 +638,14 @@ fn write_page(out: &Path, path: &str, content_type: &str, body: &[u8]) -> anyhow
     Ok(true)
 }
 
-/// Opens the leaf without following a symlink in the same call that creates it, so nothing
-/// can swap a link in between a check and the write.
-#[cfg(unix)]
+/// Through the shared no-follow temp-and-rename writer: a link at the leaf is refused, never
+/// written through, and a crash leaves the old page whole.
 fn write_leaf(file: &Path, body: &[u8]) -> anyhow::Result<()> {
-    use std::{io::Write, os::unix::fs::OpenOptionsExt};
-
-    let mut f = std::fs::OpenOptions::new()
-        .write(true)
-        .create(true)
-        .truncate(true)
-        .custom_flags(libc::O_NOFOLLOW)
-        .open(file)
-        .map_err(|e| {
-            anyhow::anyhow!(
-                "refusing to write {}: not a regular file ({e})",
-                file.display()
-            )
-        })?;
-    anyhow::ensure!(
-        f.metadata()?.is_file(),
-        "refusing to write {}: not a regular file",
-        file.display()
-    );
-    f.write_all(body)
-        .with_context(|| format!("writing {}", file.display()))
-}
-
-#[cfg(not(unix))]
-fn write_leaf(file: &Path, body: &[u8]) -> anyhow::Result<()> {
-    if let Ok(m) = std::fs::symlink_metadata(file) {
-        anyhow::ensure!(
-            m.is_file(),
-            "refusing to write {}: not a regular file",
-            file.display()
-        );
-    }
-    std::fs::write(file, body).with_context(|| format!("writing {}", file.display()))
+    let (Some(dir), Some(name)) = (file.parent(), file.file_name().and_then(|n| n.to_str())) else {
+        bail!("refusing to write {}: no file name", file.display());
+    };
+    gitterrace_git::write_atomic(dir, name, body, 0o644)
+        .with_context(|| format!("refusing to write {}", file.display()))
 }
 
 #[cfg(test)]
@@ -689,7 +660,7 @@ mod tests {
     fn headers_file_carries_the_page_policy() {
         let h = super::headers_file();
         assert!(h.contains(gitterrace_web::PAGE_CSP));
-        assert!(!h.contains("style-src 'self' 'unsafe-inline'"));
+        assert!(!h.contains("script-src 'self' 'unsafe-inline'"));
     }
 
     #[test]

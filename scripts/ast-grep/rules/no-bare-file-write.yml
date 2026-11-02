@@ -1,0 +1,22 @@
+id: no-bare-file-write
+language: rust
+severity: error
+message: Writes a file without the no-follow atomic writer.
+note: A repository can ship a symlink at any path gitterrace writes, and fs::write / File::create follow it and truncate in place. Use gitterrace_git::write_atomic (temp file with O_NOFOLLOW, then a rename in the same folder).
+files: [crates/**/*.rs]
+ignores:
+  - crates/gitterrace-testkit/**
+  - crates/*/tests/**
+  - crates/gitterrace-web/src/wiring_tests.rs
+  # Writes to a path the user named or to a per-user folder, not into a repository. Listed so
+  # they are moved onto the writer deliberately, not silently allowed.
+  - crates/gitterrace/src/main.rs
+  - crates/gitterrace/src/handler.rs
+rule:
+  any:
+    - pattern: fs::write($$$)
+    - pattern: std::fs::write($$$)
+    - pattern: File::create($$$)
+    - pattern: fs::File::create($$$)
+    - pattern: std::fs::File::create($$$)
+  not: {inside: {stopBy: end, kind: mod_item, regex: '^(pub(\(crate\))? )?mod \w*tests'}}

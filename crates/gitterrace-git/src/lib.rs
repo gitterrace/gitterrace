@@ -1,6 +1,7 @@
 //! Read-only access to a git repository. Every read is pinned to a commit;
 //! the working tree is never touched.
 
+mod atomic;
 mod diff;
 mod error;
 mod gitdir;
@@ -16,6 +17,7 @@ mod walk;
 mod watch;
 mod worktree;
 
+pub use atomic::{read_no_follow, write_atomic};
 pub use error::{Error, Result};
 
 /// How many hex digits of a commit id any surface shows. One constant, so a short id looks the

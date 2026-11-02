@@ -176,21 +176,29 @@ impl Repo {
     /// Adds `/<name>/` to `.git/info/exclude` unless the line is there already, so a folder
     /// gitterrace writes into the worktree (an export) does not show as untracked. That file is
     /// local to this clone and never committed. Returns whether a line was added.
+    ///
+    /// The file is kept byte for byte (it may hold any encoding) and replaced atomically, never
+    /// through a symlink at `info` or `info/exclude`. Any read failure other than a missing file
+    /// is an error, so an unreadable exclude file is never overwritten.
     pub fn exclude_locally(&self, name: &str) -> Result<bool> {
         let line = format!("/{name}/");
         let info = self.repo().common_dir().join("info");
-        let file = info.join("exclude");
-        let current = fs::read_to_string(&file).unwrap_or_default();
-        if current.lines().any(|l| l.trim() == line) {
+        if fs::symlink_metadata(&info).is_err() {
+            fs::create_dir(&info).map_err(git)?;
+        }
+        let current = crate::read_no_follow(&info, "exclude")
+            .map_err(git)?
+            .unwrap_or_default();
+        if current.lines().any(|l| l.trim() == line.as_bytes()) {
             return Ok(false);
         }
-        fs::create_dir_all(&info).map_err(git)?;
-        let sep = if current.is_empty() || current.ends_with('\n') {
-            ""
-        } else {
-            "\n"
-        };
-        fs::write(&file, format!("{current}{sep}{line}\n")).map_err(git)?;
+        let mut next = current;
+        if !next.is_empty() && !next.ends_with(b"\n") {
+            next.push(b'\n');
+        }
+        next.extend_from_slice(line.as_bytes());
+        next.push(b'\n');
+        crate::write_atomic(&info, "exclude", &next, 0o644).map_err(git)?;
         Ok(true)
     }
 
@@ -499,5 +507,45 @@ mod tests {
             status.trim().is_empty(),
             "export folder shows as untracked: {status}"
         );
+    }
+
+    #[test]
+    fn exclude_locally_keeps_a_non_utf8_exclude_file_byte_for_byte() {
+        let t = tempfile::tempdir().expect("tmp");
+        let d = t.path();
+        git(d, &["init", "-q"]);
+        commit(d, "a", "1");
+        let seed = b"# na\xefve\n*.log\n";
+        fs::write(d.join(".git/info/exclude"), seed).expect("seed");
+        let repo = Repo::discover(d).expect("repo");
+        assert!(repo.exclude_locally("gitterrace-export").expect("add"));
+        let mut want = seed.to_vec();
+        want.extend_from_slice(b"/gitterrace-export/\n");
+        assert_eq!(fs::read(d.join(".git/info/exclude")).expect("read"), want);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn exclude_locally_never_writes_through_a_symlinked_exclude_or_info() {
+        let t = tempfile::tempdir().expect("tmp");
+        let d = t.path().join("r");
+        fs::create_dir(&d).expect("mkdir");
+        git(&d, &["init", "-q"]);
+        commit(&d, "a", "1");
+        let victim = t.path().join("victim");
+        fs::write(&victim, "keep\n").expect("victim");
+        let info = d.join(".git/info");
+        fs::remove_dir_all(&info).expect("rm info");
+        fs::create_dir(&info).expect("info");
+        std::os::unix::fs::symlink(&victim, info.join("exclude")).expect("link");
+        let repo = Repo::discover(&d).expect("repo");
+        assert!(repo.exclude_locally("gitterrace-export").is_err());
+        fs::remove_dir_all(&info).expect("rm info");
+        let elsewhere = t.path().join("elsewhere");
+        fs::create_dir(&elsewhere).expect("dir");
+        std::os::unix::fs::symlink(&elsewhere, &info).expect("link info");
+        assert!(repo.exclude_locally("gitterrace-export").is_err());
+        assert!(!elsewhere.join("exclude").exists());
+        assert_eq!(fs::read_to_string(&victim).expect("read"), "keep\n");
     }
 }

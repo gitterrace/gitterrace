@@ -40,8 +40,10 @@ In scope:
   reaches a dangerous scheme (`javascript:`, `data:`, `file:`), is in scope.
 - **The MCP server.** It is read-only, over stdio. A way to read outside the served
   repository is in scope.
-- **The cache.** gitterrace writes only a disposable cache under `.git/gitterrace/`. Writing
-  outside it, or a symlink that redirects a cache write, is in scope.
+- **The cache.** Inside a repository gitterrace writes only a disposable cache under
+  `.git/gitterrace/`, plus one `/<folder>/` line in `.git/info/exclude` when you export into
+  the worktree. Every write is a temp file and a rename that refuses a symlink. Writing
+  anywhere else, or a symlink that redirects a write, is in scope.
 
 Out of scope:
 

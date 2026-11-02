@@ -892,7 +892,6 @@ dependencies = [
  "gitterrace-index",
  "gitterrace-testkit",
  "gitterrace-web",
- "libc",
  "serde_json",
  "tempfile",
  "thiserror",
@@ -962,6 +961,7 @@ version = "0.1.0"
 dependencies = [
  "gitterrace-testkit",
  "gix",
+ "libc",
  "tempfile",
  "thiserror",
 ]
