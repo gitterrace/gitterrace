@@ -22,524 +22,44 @@ from __future__ import annotations
 import argparse
 import contextlib
 import datetime
-import http.client
+import importlib
 import json
 import os
 import platform
 import re
 import shutil
-import socket
 import statistics
 import subprocess
 import sys
 import tempfile
-import threading
 import time
 from pathlib import Path
 from typing import Any
-from urllib.parse import quote
+
+bl = importlib.import_module("bench-lib")
+bq = importlib.import_module("bench-quiet-lib")
 
 Json = dict[str, Any]
-
-ROOT = Path(__file__).resolve().parent.parent
-STATS = [
-    "",
-    "/types",
-    "/languages",
-    "/frequency",
-    "/hotspots",
-    "/ownership",
-    "/patterns",
-    "/contributors",
-]
-TEXT_BAD = {
-    ".png",
-    ".jpg",
-    ".jpeg",
-    ".gif",
-    ".ico",
-    ".woff",
-    ".woff2",
-    ".pdf",
-    ".zip",
-    ".gz",
-    ".bin",
-    ".svg",
-    ".lock",
-    ".so",
-    ".a",
-    ".o",
-    ".wasm",
-    ".pack",
-    ".idx",
-    ".mp4",
-}
-
-
-def parse_toml(text: str) -> Json:
-    """The small TOML subset corpus.toml uses: [[array]], [a.b] tables, scalars."""
-    out: Json = {}
-    cur: Json | None = None
-    for raw in text.splitlines():
-        line = re.sub(r"\s+#.*$", "", raw).strip()
-        if not line or line.startswith("#"):
-            continue
-        if line.startswith("[["):
-            cur = {}
-            out.setdefault(line[2:-2].strip(), []).append(cur)
-        elif line.startswith("["):
-            table: Json = out
-            for part in line[1:-1].strip().split("."):
-                table = table.setdefault(part, {})
-            cur = table
-        elif cur is None:
-            sys.exit(f"corpus.toml: key outside a table: {line}")
-        else:
-            k, v = (s.strip() for s in line.split("=", 1))
-            cur[k] = json.loads(v) if v[0] in '"[0123456789' else v == "true"
-    return out
-
-
-def run(cmd: list[str], cwd: str | Path | None = None, check: bool = True) -> str:
-    return subprocess.run(
-        cmd, cwd=cwd, check=check, capture_output=True, text=True
-    ).stdout
-
-
-def free_gb(path: str | Path) -> float:
-    return shutil.disk_usage(path).free / 2**30
-
-
-def dir_mb(path: str | Path) -> float:
-    n = 0
-    for p in Path(path).rglob("*"):
-        try:
-            if p.is_file() and not p.is_symlink():
-                n += p.stat().st_size
-        except OSError:
-            pass
-    return n / 2**20
-
-
-def rss_mb(pid: int) -> float:
-    if Path(f"/proc/{pid}/status").exists():
-        for line in Path(f"/proc/{pid}/status").read_text().splitlines():
-            if line.startswith("VmRSS:"):
-                return int(line.split()[1]) / 1024
-    out = subprocess.run(
-        ["ps", "-o", "rss=", "-p", str(pid)], capture_output=True, text=True
-    ).stdout
-    return int(out.strip() or 0) / 1024
-
-
-def cpu_secs(pid: int) -> float:
-    """Total CPU seconds of a process, from /proc on Linux and ps on macOS."""
-    stat = Path(f"/proc/{pid}/stat")
-    if stat.exists():
-        f = stat.read_text().rsplit(")", 1)[1].split()
-        return (int(f[11]) + int(f[12])) / os.sysconf("SC_CLK_TCK")
-    t = subprocess.run(
-        ["ps", "-o", "time=", "-p", str(pid)], capture_output=True, text=True
-    ).stdout.strip()
-    secs = 0.0
-    for part in t.split(":"):
-        secs = secs * 60 + float(part)
-    return secs
-
-
-def stats(xs: list[float]) -> dict[str, float]:
-    return {
-        "median": statistics.median(xs),
-        "min": min(xs),
-        "max": max(xs),
-        "n": len(xs),
-    }
-
-
-def get(port: int, path: str, timeout: float = 600) -> tuple[int, float, float, int]:
-    c = http.client.HTTPConnection("127.0.0.1", port, timeout=timeout)
-    t0 = time.perf_counter()
-    c.request("GET", path)
-    r = c.getresponse()
-    t1 = time.perf_counter()
-    body = r.read()
-    t2 = time.perf_counter()
-    c.close()
-    return r.status, (t1 - t0) * 1000, (t2 - t0) * 1000, len(body)
-
-
-def site_prefix(port: int) -> str:
-    """Where the one served repo's pages live, from /api/repos (`/r/<name>`).
-
-    Asking the server keeps naming in one place. A probe built on it never times a redirect."""
-    c = http.client.HTTPConnection("127.0.0.1", port, timeout=30)
-    c.request("GET", "/api/repos")
-    items = json.loads(c.getresponse().read())
-    c.close()
-    if len(items) != 1:
-        raise RuntimeError(f"/api/repos lists {len(items)} repositories, expected 1")
-    return str(items[0]["href"]).rstrip("/")
-
-
-def free_port():
-    with socket.socket() as s:
-        s.bind(("127.0.0.1", 0))
-        return s.getsockname()[1]
-
-
-def isolated_config(logdir: str | Path) -> Path:
-    """An empty config dir, so no developer config.toml or actions.toml shapes a result."""
-    d = Path(logdir) / "config"
-    d.mkdir(exist_ok=True)
-    (d / "config.toml").write_text("")
-    return d
-
-
-def text_limit_bytes():
-    """The default text-file limit, read from the config schema so it has one source."""
-    schema = (ROOT / "crates/gitterrace-config/src/schema.rs").read_text()
-    m = re.search(r"text_kb: u64 = (\d+)", schema)
-    if m is None:
-        sys.exit("no text_kb default in crates/gitterrace-config/src/schema.rs")
-    return int(m.group(1)) * 1024
-
-
-class Server:
-    def __init__(self, binary: str, repo: str | Path, logdir: str | Path) -> None:
-        self.port = free_port()
-        # Held for the server's whole life and closed in stop(), so no with block fits.
-        self.log = open(Path(logdir) / f"server-{self.port}.log", "w")  # noqa: SIM115
-        self.t0 = time.perf_counter()
-        self.proc = subprocess.Popen(
-            [
-                binary,
-                "--config",
-                str(isolated_config(logdir)),
-                str(repo),
-                "--addr",
-                f"127.0.0.1:{self.port}",
-            ],
-            stdout=self.log,
-            stderr=self.log,
-            cwd=repo,
-        )
-        self.pid = self.proc.pid
-
-    def wait_ready(self, timeout: float = 14400) -> tuple[float, float | None, float]:
-        """Index build: seconds until the repo's api/progress says ready, and peak RSS meanwhile.
-
-        Progress lives under the repo prefix, which /api/repos names once the server listens."""
-        peak, listening = 0.0, None
-        prefix: str | None = None
-        while time.perf_counter() - self.t0 < timeout:
-            if self.proc.poll() is not None:
-                raise RuntimeError(f"server exited early, see {self.log.name}")
-            peak = max(peak, rss_mb(self.pid))
-            try:
-                if prefix is None:
-                    prefix = site_prefix(self.port)
-                    listening = time.perf_counter() - self.t0
-                c = http.client.HTTPConnection("127.0.0.1", self.port, timeout=30)
-                c.request("GET", f"{prefix}/api/progress")
-                r = c.getresponse()
-                if r.status != 200:
-                    raise RuntimeError(
-                        f"{prefix}/api/progress answered HTTP {r.status}"
-                    )
-                body = json.loads(r.read())
-                c.close()
-                if body.get("ready"):
-                    return time.perf_counter() - self.t0, listening, peak
-            except (OSError, ValueError):
-                pass
-            time.sleep(0.2)
-        raise RuntimeError("index did not become ready in time")
-
-    def stop(self):
-        self.proc.terminate()
-        try:
-            self.proc.wait(30)
-        except subprocess.TimeoutExpired:
-            self.proc.kill()
-        self.log.close()
-
-
-def ensure_clone(repo: Json, base: Path, logdir: Path) -> Path:
-    """Bare, blobless clone of the pinned sha, then every blob of its history.
-
-    A local repo is measured at its HEAD and has no pin: a sha there would only go stale."""
-    if repo.get("local"):
-        if "sha" in repo:
-            sys.exit(
-                f"{repo['name']} is local, measured at HEAD: drop its sha from the corpus"
-            )
-        return (ROOT / repo["local"]).resolve()
-    sha, dest = repo["sha"], Path(base) / f"{repo['name']}.git"
-    mark = dest / "bench-ready"
-    if mark.exists() and mark.read_text().strip() == sha:
-        return dest
-    need = repo.get("need_gb", 1)
-    if free_gb(base) < need:
-        sys.exit(
-            f"refusing to clone {repo['name']}: {free_gb(base):.1f} GB free in {base}, needs {need} GB"
-        )
-    if not dest.exists():
-        run(["git", "init", "-q", "--bare", str(dest)])
-        run(["git", "remote", "add", "origin", repo["url"]], cwd=dest)
-    print(f"fetching {repo['name']} @ {sha[:10]} into {dest}", flush=True)
-    run(["git", "fetch", "-q", "--filter=blob:none", "origin", sha], cwd=dest)
-    run(["git", "update-ref", "refs/heads/bench", sha], cwd=dest)
-    run(["git", "symbolic-ref", "HEAD", "refs/heads/bench"], cwd=dest)
-    print(f"backfilling blobs of {repo['name']}", flush=True)
-    run(["git", "backfill"], cwd=dest)
-    mark.write_text(sha + "\n")
-    return dest
-
-
-def discover(repo_dir: str | Path, rev: str) -> Json:
-    """Probe defaults: largest file under the text limit, deepest folder, newest commit.
-
-    A larger file would make /blob and /blame answer with the refusal page."""
-    limit = text_limit_bytes()
-    files = []
-    for line in run(["git", "ls-tree", "-r", "-l", "-z", rev], cwd=repo_dir).split(
-        "\0"
-    ):
-        if "\t" not in line:
-            continue
-        meta, path = line.split("\t", 1)
-        size = meta.split()[-1]
-        if (
-            size.isdigit()
-            and int(size) <= limit
-            and Path(path).suffix.lower() not in TEXT_BAD
-        ):
-            files.append((int(size), path))
-    files.sort(reverse=True)
-    deep = max(
-        (p.rsplit("/", 1)[0] for _, p in files if "/" in p),
-        key=lambda d: d.count("/"),
-        default="",
-    )
-    return {
-        "blob": files[0][1],
-        "blame": files[0][1],
-        "deep_tree": deep,
-        "commit": run(["git", "rev-parse", rev], cwd=repo_dir).strip(),
-    }
-
-
-def pages(probe: Json, search: str) -> dict[str, str]:
-    p = {
-        "overview": "/",
-        "tree-root": "/tree/HEAD",
-        "log": "/log/HEAD",
-        "refs": "/refs",
-        "commit-largest": f"/commit/{probe['commit']}",
-        "diff-fragment": f"/diff/{probe['commit']}/0",
-        "search": f"/search?q={quote(search)}",
-    }
-    if probe.get("deep_tree"):
-        p["tree-deep"] = f"/tree/HEAD/{quote(probe['deep_tree'])}"
-    p["blob-largest"] = f"/blob/HEAD/{quote(probe['blob'])}"
-    p["blame-long-history"] = f"/blame/HEAD/{quote(probe['blame'])}"
-    for s in STATS:
-        p["stats" + (s or "-overview")] = "/stats" + s
-    return p
-
-
-QUIET_SECS = 20
-# A published run uses these. Anything less is a smoke run, written to the cache.
-FULL_RUNS, FULL_IDLE_SECS = 5, 60
-# Cold metrics (index, cold page, export) per repo: fresh server and empty cache each time.
-# corpus.toml lowers it per repo (cold_samples = 1) where a cold index takes too long.
-COLD_SAMPLES = 3
-
-
-def max_load():
-    return float(os.environ.get("BENCH_MAX_LOAD", (os.cpu_count() or 2) / 2))
-
-
-# Seconds between load samples while a phase runs.
-SAMPLE_SECS = 5
-
-
-class LoadSampler:
-    """Samples foreign CPU every SAMPLE_SECS for the phase named last by quiet().
-
-    The guard checks load only when a phase starts, this catches work that arrives during it.
-    Load average cannot be used mid-phase: a linux index alone drives it past 30. So a sample
-    is the CPU, in cores, of every process outside the harness's own tree (the server and
-    git it spawns). finish() gives max and mean per phase, stored as load.sampled and judged
-    against the same limit as the load guard."""
-
-    def __init__(self) -> None:
-        self.phase: str | None = None
-        self.samples: dict[str, list[float]] = {}
-        self.stop_ev = threading.Event()
-        self.lock = threading.Lock()
-        self.thread = threading.Thread(target=self.loop, daemon=True)
-        self.thread.start()
-
-    def loop(self) -> None:
-        while not self.stop_ev.wait(SAMPLE_SECS):
-            self.sample()
-
-    def sample(self) -> None:
-        with self.lock:
-            phase = self.phase
-        if phase:
-            cores = foreign_cores()
-            with self.lock:
-                self.samples.setdefault(phase, []).append(cores)
-
-    def enter(self, phase: str) -> None:
-        with self.lock:
-            self.phase = phase
-        self.sample()
-
-    def pause(self) -> None:
-        """Between phases (waiting for quiet) nothing is timed, so nothing is sampled."""
-        with self.lock:
-            self.phase = None
-
-    def finish(self) -> Json:
-        self.stop_ev.set()
-        self.thread.join()
-        return {
-            p: {
-                "max": round(max(xs), 2),
-                "mean": round(statistics.mean(xs), 2),
-                "n": len(xs),
-            }
-            for p, xs in self.samples.items()
-        }
-
-
-def foreign_cores() -> float:
-    """CPU in cores of every process that is not this harness or its descendants."""
-    try:
-        out = run(["ps", "-Ao", "pid=,ppid=,pcpu="])
-    except (OSError, subprocess.CalledProcessError):
-        return 0.0
-    rows = [line.split() for line in out.splitlines() if len(line.split()) == 3]
-    parent = {int(p): int(pp) for p, pp, _ in rows}
-    me = os.getpid()
-
-    def ours(pid: int) -> bool:
-        seen = 0
-        while pid > 1 and seen < 64:
-            if pid == me:
-                return True
-            pid, seen = parent.get(pid, 1), seen + 1
-        return False
-
-    return sum(float(c) for p, _, c in rows if not ours(int(p))) / 100
-
-
-# Background daemons known to skew a run. Their CPU share is recorded when above 10%.
-NOISY = ("mediaanalysisd", "photoanalysisd", "mds_stores", "backupd")
-
-
-def busy_background():
-    """CPU percent of known noisy daemons above 10% right now, by process name."""
-    try:
-        out = run(["ps", "-Ao", "pcpu=,comm="])
-    except (OSError, subprocess.CalledProcessError):
-        return {}
-    seen = {}
-    for line in out.splitlines():
-        pct, _, comm = line.strip().partition(" ")
-        name = Path(comm.strip()).name
-        if name in NOISY and float(pct) > 10:
-            seen[name] = seen.get(name, 0) + float(pct)
-    return seen
-
-
-def quiet(
-    phase: str, loads: Json, wait: bool = True, sampler: LoadSampler | None = None
-) -> None:
-    """Wait until the machine is quiet, then record the load the phase starts under."""
-    if sampler:
-        sampler.pause()
-    limit, calm, start = max_load(), 0, time.monotonic()
-    while wait and calm < QUIET_SECS:
-        if time.monotonic() - start > 1800:
-            sys.exit(
-                f"machine not quiet for 30 min before {phase} (load limit {limit}), not timing"
-            )
-        if os.getloadavg()[0] < limit:
-            calm += 1
-        else:
-            if calm == 0 or calm % 60 == 0:
-                print(
-                    f"  waiting for load {os.getloadavg()[0]:.1f} < {limit:.1f} before {phase}",
-                    flush=True,
-                )
-            calm = 0
-        time.sleep(1)
-    loads[phase] = round(os.getloadavg()[0], 2)
-    noise = busy_background()
-    if noise:
-        loads.setdefault("background", {})[phase] = noise
-    if sampler:
-        sampler.enter(phase)
-
-
-def measure_pages(port: int, plan: dict[str, str], runs: int) -> Json:
-    """Cold and warm timings per page. Anything but 200, a redirect included, fails the run."""
-    out: Json = {}
-    prefix = site_prefix(port)
-    for label, page in plan.items():
-        path = prefix + page
-        status, ttfb, total, size = get(port, path)
-        if status != 200:
-            raise RuntimeError(f"{label} {path} answered HTTP {status}, not 200")
-        cold = {"ttfb_ms": ttfb, "total_ms": total}
-        ttfbs, totals = [], []
-        for _ in range(runs):
-            status, a, b, _ = get(port, path)
-            if status != 200:
-                raise RuntimeError(f"{label} {path} answered HTTP {status}, not 200")
-            ttfbs.append(a)
-            totals.append(b)
-        out[label] = {
-            "path": path,
-            "status": status,
-            "bytes": size,
-            "cold": cold,
-            "warm_ttfb_ms": stats(ttfbs),
-            "warm_total_ms": stats(totals),
-        }
-        print(
-            f"  {label:<22} {status} cold {total:8.0f} ms  warm {statistics.median(totals):7.0f} ms",
-            flush=True,
-        )
-    return out
-
-
-def idle_cpu(server: Server, secs: int, with_events: bool) -> float:
-    stop = threading.Event()
-    if with_events:
-
-        def hold():
-            try:
-                c = http.client.HTTPConnection("127.0.0.1", server.port, timeout=5)
-                c.request("GET", f"{site_prefix(server.port)}/events")
-                r = c.getresponse()
-                while not stop.is_set():
-                    with contextlib.suppress(OSError):
-                        r.fp.readline()
-            except OSError:
-                pass
-
-        threading.Thread(target=hold, daemon=True).start()
-        time.sleep(1)
-    a, t = cpu_secs(server.pid), time.perf_counter()
-    time.sleep(secs)
-    b, t2 = cpu_secs(server.pid), time.perf_counter()
-    stop.set()
-    return 100 * (b - a) / (t2 - t)
+LoadSampler = bq.LoadSampler
+Server = bl.Server
+parse_toml = bl.parse_toml
+run = bl.run
+dir_mb = bl.dir_mb
+rss_mb = bl.rss_mb
+get = bl.get
+site_prefix = bl.site_prefix
+isolated_config = bl.isolated_config
+ensure_clone = bl.ensure_clone
+discover = bl.discover
+pages = bl.pages
+ROOT = bl.ROOT
+FULL_RUNS = bq.FULL_RUNS
+FULL_IDLE_SECS = bq.FULL_IDLE_SECS
+COLD_SAMPLES = bq.COLD_SAMPLES
+max_load = bq.max_load
+quiet = bq.quiet
+measure_pages = bq.measure_pages
+idle_cpu = bq.idle_cpu
 
 
 def bench_repo(
@@ -606,7 +126,7 @@ def bench_phases(
     cache: Path,
     probe: Json,
     loads: Json,
-    sampler: LoadSampler,
+    sampler: Any,
 ) -> Json:
     """The timed phases of bench_repo, each started through quiet() so the sampler follows."""
     name = repo["name"]
@@ -697,7 +217,7 @@ def export(
     loads: Json,
     wait: bool,
     i: int,
-    sampler: LoadSampler | None = None,
+    sampler: Any | None = None,
 ) -> Json:
     """One timed export. The output can be gigabytes, so it goes under the bench dir."""
     out = Path(base) / f"export-{name}"

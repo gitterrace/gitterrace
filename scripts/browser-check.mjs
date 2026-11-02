@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 // Browser checks for the served pages, one harness. Serves a temp repository with a given binary
 // on a free port and runs the checks below in real browsers. Not in `make check`: it needs
 // browsers. Run it with `make browser-check BIN=target/debug/git-terrace`.
@@ -27,6 +28,19 @@
 //                Send to window opens small and grows with its text
 //   tips         closing ., .+s, t, ? or b with Escape leaves no tip on the opener they hand
 //                focus back to, while Tab onto a tipped button still shows its tip
+//   repo-switch  a server on one repository hides the switcher; when a second `git terrace`
+//                joins, the open page shows it without a reload, it lists both, and picking
+//                each lands on its /r/NAME/ page
+//   about-place  on the overview, About sits beside the files when there are two columns and
+//                above them when there is one, at every width from 1440 to 320 px
+//   mark-seam    every two-colour mark (docs/brand/mark-*.svg, the in-app header logo) at 16 to
+//                133 px, 1x and 2x, on light and dark: no pixel on the colour change is closer
+//                to the background than both colours are, in every browser
+//   site-theme   the generated site/ (served with its _headers CSP): first load follows the
+//                system scheme with the theme already set in the head, the button cycles system,
+//                light, dark, the choice survives a reload, the shown logo and screenshots are
+//                the theme's and the other scheme's are never fetched, no CSP violation, and each
+//                theme icon is the GitHub mark's size
 //
 // --from-disk serves crates/gitterrace-web/static/*.js from the working tree over the (possibly
 // older) binary's copies, to test edits before a rebuild. Playwright comes from $PLAYWRIGHT_CORE,
@@ -34,6 +48,9 @@
 import { readFileSync, readdirSync, writeFileSync, rmSync, mkdirSync, mkdtempSync, existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
+import { checks as pageChecks } from './browser-pages-lib.mjs';
+import { checks as uiChecks } from './browser-ui-lib.mjs';
+import { checks as siteChecks } from './browser-site-lib.mjs';
 import { root, loadPlaywright, launch, makeRepo, serve, openPage, reporter, sh } from './browser-lib.mjs';
 
 const arg = (k, d) => { const i = process.argv.indexOf(k); return i < 0 ? d : process.argv[i + 1]; };
@@ -41,7 +58,7 @@ const bin = resolve(arg('--bin', join(root, 'target/debug/git-terrace')));
 const fromDisk = process.argv.includes('--from-disk');
 const tabCounts = arg('--tabs', '8,12').split(',').map(Number);
 const browsers = arg('--browsers', 'webkit,chromium').split(',');
-const ALL = ['truncation', 'live-tabs', 'mermaid', 'chip', 'doctabs', 'chords', 'header', 'marked', 'gutter', 'overlays', 'tips'];
+const ALL = ['truncation', 'live-tabs', 'mermaid', 'chip', 'doctabs', 'chords', 'header', 'marked', 'gutter', 'overlays', 'tips', 'repo-switch', 'mark-seam', 'about-place', 'site-theme'];
 const wanted = arg('--checks', ALL.join(',')).split(',');
 for (const c of wanted) if (!ALL.includes(c)) { console.error(`unknown check ${c}; known: ${ALL.join(', ')}`); process.exit(2); }
 
@@ -59,407 +76,21 @@ console.log('serving', srv.base, 'with', bin);
 async function context(name) {
   const b = await launch(pw, name);
   const ctx = await b.newContext();
-  // Every script in the folder, read at run time, so a new or forgotten file is never served
-  // stale from the binary while the check claims to test the working tree.
-  if (fromDisk) for (const f of readdirSync(join(root, 'crates/gitterrace-web/static')).filter((n) => n.endsWith('.js'))) {
-    await ctx.route(`**/static/${f}`, (q) => q.fulfill({ contentType: 'text/javascript', body: readFileSync(join(root, 'crates/gitterrace-web/static', f)) }));
+  // Every script and stylesheet in the folder, read at run time, so a new or forgotten file is
+  // never served stale from the binary while the check claims to test the working tree.
+  if (fromDisk) for (const f of readdirSync(join(root, 'crates/gitterrace-web/static')).filter((n) => n.endsWith('.js') || n.endsWith('.css'))) {
+    const type = f.endsWith('.css') ? 'text/css' : 'text/javascript';
+    await ctx.route(`**/static/${f}`, (q) => q.fulfill({ contentType: type, body: readFileSync(join(root, 'crates/gitterrace-web/static', f)) }));
   }
   return { b, ctx };
 }
 
-// ---- truncation -------------------------------------------------------------------------------
-// Runs in the page. Returns what is cut, broken, sparse or scrolling.
-function measure() {
-  const out = { cut: [], broken: [], sparse: [], subj: [], name: '', full: true, hscroll: false };
-  const overflowing = (e) => {
-    const s = getComputedStyle(e);
-    const clips = (s.overflowX !== 'visible' && s.overflowX !== 'auto' && s.overflowX !== 'scroll') || s.textOverflow === 'ellipsis';
-    return clips && e.scrollWidth > e.clientWidth + 1 && e.clientWidth > 0 && !e.classList.contains('subj');
-  };
-  out.cut = [...document.querySelectorAll('body *')].filter(overflowing).map((e) => `${e.tagName}.${e.className}`);
-  const n = document.querySelector('.reponame');
-  if (n) {
-    const rc = n.getBoundingClientRect();
-    out.name = n.textContent;
-    out.full = n.scrollWidth <= n.clientWidth + 1 && rc.right <= innerWidth + 1 && rc.width > 0;
-  }
-  // A one-word link or cell spanning more than one line box was broken mid-word.
-  for (const e of document.querySelectorAll('table.entries td, table.entries td a, .rlist li a, .rlist li code, .cmain a, .cmain .muted, .reponame, .ov-list li, .tabs a')) {
-    const t = (e.textContent || '').trim();
-    if (!t || /\s/.test(t)) continue;
-    const walk = document.createTreeWalker(e, NodeFilter.SHOW_TEXT);
-    const tops = new Set();
-    let node;
-    while ((node = walk.nextNode())) {
-      if (!node.textContent.trim()) continue;
-      const g = document.createRange();
-      g.selectNodeContents(node);
-      for (const x of g.getClientRects()) tops.add(Math.round(x.top / 4));
-    }
-    if (tops.size > 1) out.broken.push(t);
-  }
-  // Density: no cell may hold more than 64 px of air while a sibling wraps past two lines.
-  for (const row of document.querySelectorAll('table.entries tr')) {
-    const info = [...row.cells].map((c) => {
-      const g = document.createRange();
-      g.selectNodeContents(c);
-      const rc = g.getBoundingClientRect();
-      const lh = parseFloat(getComputedStyle(c).lineHeight) || 20;
-      return { air: c.getBoundingClientRect().width - rc.width, lines: rc.height / lh, t: c.textContent.trim().slice(0, 20), has: !!c.textContent.trim() };
-    });
-    if (info.some((i) => i.lines > 2.5) && info.some((i) => i.has && i.air > 64 && i.lines <= 1.5)) {
-      out.sparse.push(info.map((i) => `${i.t}:${Math.round(i.air)}/${i.lines.toFixed(1)}`).join(' '));
-    }
-  }
-  // Commit messages: exactly one line, an ellipsis, and a tip whenever cut.
-  for (const e of document.querySelectorAll('.subj')) {
-    if (!e.offsetParent) continue;
-    const lh = parseFloat(getComputedStyle(e).lineHeight) || 20;
-    const t = e.textContent.trim().slice(0, 30);
-    if (e.getBoundingClientRect().height > lh * 1.6) out.subj.push(`wraps: ${t}`);
-    if (getComputedStyle(e).textOverflow !== 'ellipsis') out.subj.push(`no ellipsis: ${t}`);
-    e.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
-    if (e.scrollWidth > e.clientWidth + 1 && !e.getAttribute('data-tip')) out.subj.push(`cut without tip: ${t}`);
-  }
-  // A commit row never grows a line for its message: above the narrow breakpoint the subject
-  // and its author share one line (the subject is cut instead); below it, the author line sits
-  // under the subject and is itself one line. So no row is a line taller than the shortest.
-  const rows = [...document.querySelectorAll('li.crow')].filter((li) => li.offsetParent);
-  if (rows.length) {
-    const hs = rows.map((li) => li.getBoundingClientRect().height);
-    const min = Math.min(...hs);
-    const line = parseFloat(getComputedStyle(rows[0].querySelector('.subj')).lineHeight) || 20;
-    const tall = hs.filter((h) => h > min + line / 2).length;
-    if (tall) out.subj.push(`${tall} commit rows grow a line (shortest ${Math.round(min)}px, tallest ${Math.round(Math.max(...hs))}px)`);
-  }
-  out.hscroll = document.documentElement.scrollWidth > innerWidth;
-  return out;
-}
 
-async function truncation() {
-  const b = await launch(pw, 'chromium');
-  const paths = ['/', '/log', '/refs', '/tree/HEAD', '/tree/HEAD/src', '/stats', '/stats/hotspots', '/stats/types', '/worktree'];
-  for (const width of [360, 900, 1440]) for (const path of paths) {
-    const p = await openPage(b, srv.base + path, { width, wait: 'networkidle' });
-    const m = await p.evaluate(measure);
-    const bad = m.cut.length || !m.full || m.broken.length || m.sparse.length || m.subj.length || m.hscroll;
-    const line = `truncation ${width} ${path} cut=${JSON.stringify(m.cut)} subj=${JSON.stringify(m.subj.slice(0, 3))} sparse=${JSON.stringify(m.sparse.slice(0, 2))} broken=${JSON.stringify(m.broken.slice(0, 5))} hscroll=${m.hscroll}`;
-    bad ? r.fail(line) : r.ok(`truncation ${width} ${path}`);
-    await p.close();
-  }
-  await b.close();
-}
-
-// ---- live-tabs --------------------------------------------------------------------------------
-async function liveTabs() {
-  const url = srv.base + '/worktree';
-  for (const name of browsers) for (const n of tabCounts) {
-    const { b, ctx } = await context(name);
-    for (let i = 0; i < n; i++) {
-      const p = await ctx.newPage();
-      await p.goto(url, { waitUntil: 'load', timeout: 5000 }).catch(() => r.fail(`live-tabs ${name} ${n} tabs: tab ${i} did not load within 5 s`));
-    }
-    const last = await ctx.newPage();
-    const t = Date.now();
-    try {
-      await last.goto(url, { waitUntil: 'load', timeout: 10000 });
-      const ms = Date.now() - t;
-      ms > 1000 ? r.fail(`live-tabs ${name} ${n} tabs: next page ${ms} ms > 1000`) : r.ok(`live-tabs ${name} ${n} tabs: next page ${ms} ms`);
-    } catch { r.fail(`live-tabs ${name} ${n} tabs: next page did NOT load within 10 s`); }
-    await b.close();
-  }
-  for (const name of browsers) {
-    const { b, ctx } = await context(name);
-    const pages = [];
-    for (let i = 0; i < 3; i++) { const p = await ctx.newPage(); await p.goto(url, { waitUntil: 'load' }); pages.push(p); }
-    await new Promise((ok) => setTimeout(ok, 1000));
-    writeFileSync(join(dir, 'a.txt'), `one\ntwo ${name}\n`);
-    const t = Date.now();
-    const ms = await Promise.all(pages.map((p) => p.waitForSelector('#wtchip:not([hidden])', { timeout: 2000 }).then(() => Date.now() - t, () => null)));
-    ms.forEach((v, i) => { if (v == null) r.fail(`live-tabs ${name} tab ${i}: no working tree chip within 2 s`); });
-    if (ms.every((v) => v != null)) r.ok(`live-tabs ${name}: chip per tab (ms) ${ms.join(', ')}`);
-    await b.close();
-    sh(dir, 'git', 'checkout', '-q', '--', 'a.txt');
-    await new Promise((ok) => setTimeout(ok, 800));
-  }
-}
-
-// ---- mermaid ----------------------------------------------------------------------------------
-async function mermaid() {
-  const b = await launch(pw, 'webkit');
-  const p = await openPage(b, srv.base + '/', {});
-  await p.waitForSelector('pre.mermaid svg', { timeout: 10000 }).catch(() => {});
-  // Mermaid styles its nodes from a <style> it writes at runtime. A page policy that refuses
-  // inline styles leaves node shapes at the SVG default: a black fill.
-  const fill = await p.$eval('pre.mermaid svg .node rect, pre.mermaid svg .node path',
-    (n) => getComputedStyle(n).fill).catch(() => '');
-  if (!fill || fill === 'rgb(0, 0, 0)') r.fail(`mermaid: diagram unstyled (node fill ${fill || 'none'})`);
-  const labels = await p.$$eval('pre.mermaid .nodeLabel', (ns) => ns.map((n) => n.textContent.trim()));
-  if (!labels.length) r.fail('mermaid: no diagram nodes rendered');
-  else if (labels.includes('Copy')) r.fail(`mermaid: a Copy node leaked into the diagram: ${labels.join(', ')}`);
-  else r.ok(`mermaid: ${labels.length} nodes, no Copy node`);
-  await b.close();
-}
-
-// ---- chip -------------------------------------------------------------------------------------
-async function chip() {
-  writeFileSync(join(dir, 'a.txt'), 'one\ndirty\n');
-  await new Promise((ok) => setTimeout(ok, 600));
-  const b = await launch(pw, 'chromium');
-  for (const scheme of ['light', 'dark']) {
-    const p = await openPage(b, srv.base + '/', { scheme, height: 120 });
-    const anim = await p.$eval('#wtchip .dot', (d) => getComputedStyle(d).animationName).catch(() => 'no chip');
-    const hidden = await p.$eval('#wtchip', (d) => d.hidden).catch(() => 'no chip');
-    if (anim === 'no chip' || hidden) r.fail(`chip ${scheme}: chip missing or hidden on a dirty tree`);
-    else anim !== 'none' ? r.fail(`chip ${scheme}: dot animates (${anim})`) : r.ok(`chip ${scheme}: no animation`);
-    await p.close();
-  }
-  await b.close();
-  sh(dir, 'git', 'checkout', '-q', '--', 'a.txt');
-}
-
-// ---- doctabs ----------------------------------------------------------------------------------
-async function doctabs() {
-  writeFileSync(join(dir, 'LICENSE'), 'MIT License\n');
-  writeFileSync(join(dir, 'SECURITY.md'), '# Security\n');
-  writeFileSync(join(dir, 'contributing.md'), '# Contributing\n');
-  sh(dir, 'git', 'add', '-A');
-  sh(dir, 'git', 'commit', '-q', '-m', 'docs: about files');
-  await new Promise((ok) => setTimeout(ok, 600));
-  const shots = resolve(arg('--shots', join(root, 'target/shots')));
-  mkdirSync(shots, { recursive: true });
-  const b = await launch(pw, 'chromium');
-  for (const width of [360, 900, 1440]) {
-    const p = await openPage(b, srv.base + '/?doc=license', { width });
-    const m = await p.$eval('.doctabs', (n) => {
-      const tops = new Set([...n.children].map((a) => Math.round(a.getBoundingClientRect().top)));
-      return { n: n.children.length, lines: tops.size, on: n.querySelectorAll('a[aria-current]').length };
-    }).catch(() => null);
-    if (!m) r.fail(`doctabs ${width}: no tab row`);
-    else if (m.lines !== 1) r.fail(`doctabs ${width}: tab row wraps onto ${m.lines} lines`);
-    else if (m.on !== 1) r.fail(`doctabs ${width}: ${m.on} tabs marked aria-current`);
-    else r.ok(`doctabs ${width}: ${m.n} tabs on one line, active marked`);
-    await p.close();
-  }
-  for (const scheme of ['light', 'dark']) {
-    const p = await openPage(b, srv.base + '/?doc=license', { width: 900, scheme });
-    await (await p.$('.card.readme'))?.scrollIntoViewIfNeeded();
-    await p.screenshot({ path: join(shots, `doctabs-${scheme}.png`) });
-    await p.close();
-  }
-  await b.close();
-}
-
-// ---- chords -----------------------------------------------------------------------------------
-async function chords() {
-  const { b, ctx } = await context('chromium');
-  const p = await ctx.newPage();
-  await p.goto(srv.base + '/', { waitUntil: 'load' });
-  await p.keyboard.press('a');
-  await p.keyboard.press('x');
-  await new Promise((ok) => setTimeout(ok, 800));
-  if (existsSync(marker)) r.ok('chords: a then x opens the action'); else r.fail('chords: a then x did not run the action');
-  await p.keyboard.press('?');
-  const sheet = await p.$eval('.help, .ov', (n) => n.textContent).catch(() => '');
-  if (/Mark/.test(sheet)) r.ok('chords: the ? sheet lists a x'); else r.fail('chords: the ? sheet lacks the chord');
-  rmSync(marker, { force: true });
-  // A static export (body[data-static]) must ignore the chord.
-  await p.close();
-  const q = await ctx.newPage();
-  // Mark the page as an export does, in the HTML itself, so the flag is there before any script.
-  await q.route(srv.base + '/', async (rt) => {
-    const res = await rt.fetch();
-    rt.fulfill({ response: res, body: (await res.text()).replace(/<body/, '<body data-static') });
-  });
-  await q.goto(srv.base + '/', { waitUntil: 'load' });
-  if (await q.evaluate(() => document.body.dataset.static) === undefined) r.fail('chords: the static fixture is not marked');
-  await q.keyboard.press('a');
-  await q.keyboard.press('x');
-  await new Promise((ok) => setTimeout(ok, 800));
-  if (existsSync(marker)) r.fail('chords: a then x ran on a static page'); else r.ok('chords: a then x does nothing on a static page');
-  await q.close();
-  await b.close();
-}
-
-// ---- header -----------------------------------------------------------------------------------
-async function header() {
-  for (const name of browsers) {
-    const { b, ctx } = await context(name);
-    const p = await ctx.newPage();
-    let folded = 0;
-    for (const width of [1440, 1100, 900, 760, 600, 480, 375, 320]) {
-      await p.setViewportSize({ width, height: 600 });
-      await p.goto(srv.base + '/', { waitUntil: 'load' });
-      const m = await p.evaluate(() => {
-        const tools = [...document.querySelectorAll('.topbar .tools>*')].filter((e) => getComputedStyle(e).display !== 'none' && e.getBoundingClientRect().width > 0);
-        // One row: every tool's box overlaps the first one vertically (heights differ).
-        const boxes = tools.map((e) => e.getBoundingClientRect());
-        const rows = boxes.every((x) => x.top < boxes[0].bottom && x.bottom > boxes[0].top) ? 1 : 2;
-        const btn = document.getElementById('searchbtn');
-        return { rows, n: tools.length, hscroll: document.documentElement.scrollWidth > innerWidth + 1, folded: !!btn && getComputedStyle(btn).display !== 'none' };
-      });
-      const where = `${name} ${width}`;
-      if (m.n < 2 || m.rows !== 1) r.fail(`header ${where}: tools split over ${m.rows} rows`);
-      else if (m.hscroll) r.fail(`header ${where}: page scrolls sideways`);
-      else r.ok(`header ${where}: tools on one row${m.folded ? ', search folded' : ''}`);
-      if (!m.folded || folded++) continue;
-      await p.click('#searchbtn');
-      const open = await p.evaluate(() => document.activeElement && document.activeElement.id === 'q' && getComputedStyle(document.querySelector('.topsearch')).display !== 'none');
-      await p.keyboard.press('Escape');
-      const shut = await p.evaluate(() => getComputedStyle(document.querySelector('.topsearch')).display === 'none');
-      if (open && shut) r.ok(`header ${where}: search button opens the field, Escape folds it`);
-      else r.fail(`header ${where}: search button open=${open} escape=${shut}`);
-    }
-    await b.close();
-  }
-}
-
-// ---- marked -----------------------------------------------------------------------------------
-async function marked() {
-  writeFileSync(join(dir, 'marked.txt'), 'first line\nsecond line\nthird line\nfourth line\n');
-  writeFileSync(join(dir, 'README.md'), '# Fixture\n\nA sentence worth quoting.\n');
-  sh(dir, 'git', 'add', '-A');
-  sh(dir, 'git', 'commit', '-q', '-m', 'docs: text to mark');
-  await new Promise((ok) => setTimeout(ok, 600));
-  const mark = (sel) => (s) => {
-    const r = document.createRange();
-    if (s === 'lines') {
-      const a = document.getElementById('L2'), z = document.getElementById('L3');
-      r.setStart(a, 0); r.setEnd(z, z.childNodes.length);
-    } else {
-      const w = document.createTreeWalker(document.querySelector('.markdown-body'), NodeFilter.SHOW_TEXT);
-      let t; while ((t = w.nextNode())) if (t.textContent.trim().length > 3) break;
-      r.setStart(t, 0); r.setEnd(t, t.textContent.length);
-    }
-    const g = getSelection(); g.removeAllRanges(); g.addRange(r);
-    return r.toString().trim();
-  };
-  for (const name of browsers) {
-    const { b, ctx } = await context(name);
-    const p = await ctx.newPage();
-    await p.goto(srv.base + '/blob/HEAD/marked.txt', { waitUntil: 'load' });
-    const isCode = await p.$('#L3');
-    if (!isCode) { r.fail(`marked ${name}: no code lines to mark`); await b.close(); continue; }
-    await p.evaluate(mark(), 'lines');
-    await p.waitForTimeout(300);
-    const shown = await p.evaluate(() => { const m = document.getElementById('actmark'); return !!m && !m.hidden; });
-    if (!shown) { r.fail(`marked ${name}: no trigger appears for marked lines`); await b.close(); continue; }
-    await p.click('#actmark');
-    await p.keyboard.press('s');
-    await p.waitForSelector('.send-ctx');
-    const send = await p.evaluate(() => ({ title: document.querySelector('.send-title').value, ctx: document.querySelector('.send-ctx').value }));
-    const line3 = await p.$eval('#L3', (e) => e.textContent.trim());
-    if (shown && /:L2-3$/.test(send.title) && send.ctx.includes('#L2-L3') && send.ctx.includes(line3)) r.ok(`marked ${name}: lines 2-3 reach Send to`);
-    else r.fail(`marked ${name}: trigger=${shown} title=${send.title}`);
-    await p.keyboard.press('Escape');
-    await p.goto(srv.base + '/', { waitUntil: 'load' });
-    const phrase = await p.evaluate(mark(), 'prose');
-    await p.waitForTimeout(300);
-    await p.keyboard.press('.');
-    await p.keyboard.press('s');
-    await p.waitForSelector('.send-ctx');
-    const ctx2 = await p.$eval('.send-ctx', (e) => e.value);
-    if (phrase && ctx2.includes('> ' + phrase)) r.ok(`marked ${name}: README prose arrives as a quote`);
-    else r.fail(`marked ${name}: quote missing for ${JSON.stringify(phrase)}`);
-    await b.close();
-  }
-}
-
-// ---- gutter -----------------------------------------------------------------------------------
-async function gutter() {
-  writeFileSync(join(dir, 'long.txt'), Array.from({ length: 250 }, (_, i) => `line ${i + 1}`).join('\n') + '\n');
-  sh(dir, 'git', 'add', '-A');
-  sh(dir, 'git', 'commit', '-q', '-m', 'docs: a file across chunks');
-  await new Promise((ok) => setTimeout(ok, 600));
-  for (const name of browsers) {
-    const { b, ctx } = await context(name);
-    const p = await ctx.newPage();
-    await p.setViewportSize({ width: 1200, height: 900 });
-    await p.goto(srv.base + '/blob/HEAD/long.txt#L99-L103', { waitUntil: 'load' });
-    await p.waitForTimeout(300);
-    // The number shown before a line is its ::before content. Every number must equal its line.
-    const nums = await p.evaluate(() =>
-      [...document.querySelectorAll('.src .l')].map((l) =>
-        getComputedStyle(l, '::before').content.replace(/"/g, '')));
-    const wrong = nums.map((n, i) => [i + 1, n]).filter(([want, n]) => String(want) !== n);
-    const shown = await p.evaluate(() => !!document.getElementById('actsel'));
-    if (!wrong.length && nums.length === 250) r.ok(`gutter ${name}: 250 lines numbered 1..250 with the trigger shown=${shown}`);
-    else r.fail(`gutter ${name}: ${wrong.length} wrong, first ${JSON.stringify(wrong.slice(0, 3))}`);
-    // Send to opens small and grows with its text. Measured in Chromium: headless WebKit
-    // stalls on this menu-then-dialog sequence (the marked check covers its dialog).
-    if (name !== 'chromium') { await b.close(); continue; }
-    await p.click('#actsel');
-    await p.keyboard.press('s');
-    await p.waitForSelector('.send-ctx');
-    const size = await p.evaluate(async () => {
-      const box = document.querySelector('.ov.send'), t = document.querySelector('.send-ctx');
-      const before = { w: box.getBoundingClientRect().width, h: t.getBoundingClientRect().height };
-      t.value += '\n'.repeat(30) + 'end'; t.dispatchEvent(new Event('input'));
-      await new Promise((ok) => requestAnimationFrame(() => requestAnimationFrame(ok)));
-      return { ...before, grown: t.getBoundingClientRect().height, cap: innerHeight * 0.6 + 1 };
-    });
-    if (size.w <= 521 && size.h < 300 && size.grown > size.h && size.grown <= size.cap) r.ok(`gutter ${name}: Send to ${Math.round(size.w)}x${Math.round(size.h)} grows to ${Math.round(size.grown)}`);
-    else r.fail(`gutter ${name}: Send to size ${JSON.stringify(size)}`);
-    await b.close();
-  }
-}
-
-// ---- overlays ---------------------------------------------------------------------------------
-async function overlays() {
-  for (const name of browsers) {
-    const { b, ctx } = await context(name);
-    const p = await ctx.newPage();
-    await p.goto(srv.base + '/', { waitUntil: 'load' });
-    for (const key of ['t', '?', 'b']) {
-      // A page link holds focus first, so "returns" means back to it, not to <body>.
-      const opener = await p.evaluate(() => { const a = document.querySelector('main a[href], a[href]'); a.focus(); a.dataset.opener = '1'; return !!a; });
-      await p.keyboard.press(key);
-      await p.waitForSelector('.ov-back [role=dialog]');
-      const inside = () => p.evaluate(() => { const d = document.querySelector('.ov-back [role=dialog]'); return !!d && d.contains(document.activeElement); });
-      const named = await p.evaluate(() => !!document.querySelector('.ov-back [role=dialog]').getAttribute('aria-label'));
-      let kept = await inside();
-      for (let i = 0; i < 5; i++) { await p.keyboard.press('Tab'); kept = kept && await inside(); }
-      await p.keyboard.press('Shift+Tab'); kept = kept && await inside();
-      await p.keyboard.press('Escape');
-      const after = await p.evaluate(() => ({ open: !!document.querySelector('.ov-back'), back: document.activeElement && document.activeElement.dataset.opener === '1' }));
-      if (opener && named && kept && !after.open && after.back) r.ok(`overlays ${name} ${key}: named, focus kept inside, Escape closes and returns focus`);
-      else r.fail(`overlays ${name} ${key}: ${JSON.stringify({ named, kept, ...after })}`);
-    }
-    await b.close();
-  }
-}
-
-// ---- tips -------------------------------------------------------------------------------------
-// A closing overlay hands focus back to its opener. That focus is the script's, not the user's,
-// so no tip may follow it: for every key-opened overlay, closed by Escape, no tip is on screen.
-// Tab onto a tipped control still shows its tip at once.
-async function tips() {
-  for (const name of browsers) {
-    const { b, ctx } = await context(name);
-    const p = await ctx.newPage();
-    await p.goto(srv.base + '/', { waitUntil: 'load' });
-    const tipOn = () => p.evaluate(() => { const t = document.getElementById('gt-tip'); return !!t && t.classList.contains('on') ? t.textContent : ''; });
-    const bad = [];
-    for (const keys of [['.'], ['.', 's'], ['t'], ['?'], ['b']]) {
-      // The page-actions button holds focus first, as it does after a click on it.
-      await p.evaluate(() => { const t = document.querySelector('.actbtn.top'); if (t) t.focus(); });
-      for (const k of keys) await p.keyboard.press(k);
-      await p.waitForSelector('.ov-back');
-      await p.keyboard.press('Escape');
-      await p.waitForTimeout(50);
-      const on = await tipOn();
-      if (on) bad.push(`${keys.join('+')}: "${on}"`);
-    }
-    await p.evaluate(() => { document.activeElement && document.activeElement.blur(); const t = document.querySelector('.actbtn.top'); const all = [...document.querySelectorAll('a[href],button')]; const i = all.indexOf(t); if (i > 0) all[i - 1].focus(); });
-    await p.keyboard.press('Tab');
-    const tabbed = await tipOn();
-    if (!bad.length && tabbed) r.ok(`tips ${name}: no tip after an overlay closes, Tab still shows "${tabbed}"`);
-    else r.fail(`tips ${name}: ${JSON.stringify({ bad, tabbed })}`);
-    await b.close();
-  }
-}
-
-const checks = { truncation, 'live-tabs': liveTabs, mermaid, chip, doctabs, chords, header, marked, gutter, overlays, tips };
+const env = { pw, dir, srv, r, browsers, tabCounts, marker, context, arg, bin, cfg };
+const { truncation, liveTabs, mermaid, chip, doctabs, chords, header } = pageChecks(env);
+const { marked, gutter, overlays, tips, repoSwitch } = uiChecks(env);
+const { markSeam, aboutPlace, siteTheme } = siteChecks(env);
+const checks = { truncation, 'live-tabs': liveTabs, mermaid, chip, doctabs, chords, header, marked, gutter, overlays, tips, 'repo-switch': repoSwitch, 'mark-seam': markSeam, 'about-place': aboutPlace, 'site-theme': siteTheme };
 try {
   for (const c of wanted) { console.log(`-- ${c}`); await checks[c](); }
 } finally {

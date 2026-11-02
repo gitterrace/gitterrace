@@ -2,7 +2,7 @@
 """Steady-state memory guard: an idle server's memory must not grow with the history it serves.
 
 Builds synthetic repositories of growing size, serves each with the release binary, waits for
-the index, visits the bench's page set (`pages` in bench-run.py) and then leaves the server
+the index, visits the bench's page set (`pages` in bench-lib.py) and then leaves the server
 idle past its record release (`RECORDS_IDLE` in gitterrace-web/src/app.rs). It then reads RSS
 the way bench-run samples it (`ps -o rss`) and, on macOS, the dirty footprint (`footprint`).
 Fails when the idle footprint (RSS elsewhere) is over the bound at any size, or grows by more
@@ -23,6 +23,7 @@ import sys
 import tempfile
 import time
 from pathlib import Path
+from typing import Any
 
 ROOT = Path(__file__).resolve().parent.parent
 # RECORDS_IDLE is 30 s and the sweeper checks every quarter of it: 45 s covers both.
@@ -32,10 +33,10 @@ SLACK_MB = 25
 
 def bench():
     spec = importlib.util.spec_from_file_location(
-        "bench_run", ROOT / "scripts/bench-run.py"
+        "bench_lib", ROOT / "scripts/bench-lib.py"
     )
     if spec is None or spec.loader is None:
-        sys.exit("cannot load scripts/bench-run.py")
+        sys.exit("cannot load scripts/bench-lib.py")
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     return mod
@@ -80,7 +81,9 @@ def make_repo(d: Path, commits: int) -> None:
     subprocess.run(["git", "checkout", "-q", "main"], cwd=d, check=True)
 
 
-def measure(br, binary: str, repo: Path, logdir: Path) -> tuple[float, float | None]:
+def measure(
+    br: Any, binary: str, repo: Path, logdir: Path
+) -> tuple[float, float | None]:
     srv = br.Server(binary, repo, logdir)
     try:
         srv.wait_ready()

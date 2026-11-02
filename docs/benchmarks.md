@@ -2,7 +2,9 @@
 
 gitterrace should feel instant on large repositories. This page says what is measured,
 how, and what the latest run found. The harness is `scripts/bench-run.py`, the corpus is
-`bench/corpus.toml`, and results land in `bench/results/`.
+`bench/corpus.toml`, and results land in `bench/results/<date>-<machine>.json`, where the
+machine label comes from the CPU (for example `apple-m1-max`), never the hostname. Older files
+stay as history: the page compares each warm time with the previous run.
 
 ## What is measured
 
@@ -21,17 +23,21 @@ untimed read of the repository. Warm is the runs after it.
 3. **Idle.** CPU percent over a 60 s window with no client, and again with one `/events`
    client open, which is the cost of the live watcher.
 4. **Memory.** RSS after the index is ready and after every page was visited.
-5. **Export.** `git terrace export` time and output size, on the small and medium repos only.
+5. **Export.** `git terrace export` time and output size, on every repository. The output goes
+   to `export-<repo>` under the clone directory and is removed afterwards.
 
 ## Why these repositories
 
-Each is pinned to a sha in the corpus file, so a re-run measures the same history.
+Each is pinned to a sha in the corpus file, so a re-run measures the same history. The list
+comes from `bench/corpus.toml`, each name links to its public source.
 
-- **control**: this repository, the floor.
-- **git/git**: medium, long-lived, a classic reference.
-- **rust-lang/rust**: huge history, many files and contributors.
-- **torvalds/linux**: the extreme, opt-in with `BENCH_LARGE=1` (`make bench-large`). It needs
-  about 30 GB and a long first index. Not yet run.
+<!-- BEGIN GENERATED: corpus -->
+- [**control**](https://github.com/gitterrace/gitterrace): this repository, the floor.
+- [**git**](https://github.com/git/git): medium, long-lived, a classic reference.
+- [**rust**](https://github.com/rust-lang/rust): huge history, many files and contributors.
+- [**linux**](https://github.com/torvalds/linux): the extreme, opt-in (`make bench LARGE=1`), about 30 GB.
+
+<!-- END GENERATED: corpus -->
 
 Clones are bare, blobless fetches of the pinned sha followed by `git backfill`, kept in
 `$GITTERRACE_BENCH_DIR` (default `~/.cache/gitterrace-bench`), never in the repository. The
@@ -41,8 +47,21 @@ harness refuses to clone when free disk is under the corpus `need_gb`.
 
 Each size class has a target per metric (warm page, cold page, index time, idle CPU, RSS,
 export) in the corpus file. They come from the first measured run plus headroom, except the
-warm page target of 300 ms and the idle target of 1% CPU, which are product goals. A run
-marks each metric pass or over. Over budget does not fail the run unless `BENCH_STRICT=1`.
+warm page target of 300 ms, the idle target of 1% CPU and the huge index target of 600 s (a
+cold linux index in about 10 minutes), which are product goals. The large
+and huge export budgets come from the first run that exported those repos. A run marks each
+metric pass or over. Over budget does not fail the run unless `BENCH_STRICT=1`.
+
+Serving memory is a product goal: once the index is ready, a server that is browsed or idle
+holds some MB, not GB, and that amount does not grow with the history. The goal is at most the
+32 MB cache budget plus 16 MB of margin above a just-started server, on every repository size,
+also after a sweep of every insights page. Page cache for the index files is not counted. A
+peak during the index build is fine. `crates/gitterrace-web/tests/memory_budget.rs` guards it on
+synthetic repositories of growing size, and `make memory-check` measures it on a real clone.
+
+Timings need a quiet machine. Before each timed phase the harness waits until the 1-minute load
+average stays under `BENCH_MAX_LOAD` (default half the cores) for 20 s, and records the load per
+phase. `make docs-check` refuses results timed above that limit.
 
 ## Not measured
 
@@ -53,9 +72,9 @@ the worktree view, incremental index updates after new commits, and a spinning d
 
 ```sh
 make bench          # control, git, rust. Needs the network and about 20 GB of disk
-make bench-large    # adds linux
+make bench LARGE=1  # adds linux
 make bench-report   # rewrite the block below from the newest bench/results file
-make bench-clean    # print the path and size, then remove the clones
+make gc BENCH=1     # print the path and size, then remove the clones (DRY=1 only prints)
 ```
 
 `make check` runs only `bench-guard`, which drives the harness once against a tiny generated
@@ -63,11 +82,8 @@ repository to prove it still works.
 
 ## Results
 
-> **Known-false rows.** The committed results before this harness change picked a file over
-> the text limit for `blob-largest` and `blame-long-history`, so those two rows timed the
-> "too large" refusal page, not a render, and the page budgets that counted them are not
-> evidence for blob or blame. They also ran with the developer's own config, and the control
-> pin was printed while HEAD was measured. Rerun `make bench` to replace them.
+The newest run in full. Every kept run, with its raw numbers and charts, is in
+[bench/results](../bench/results/).
 
 <!-- BEGIN GENERATED: results -->
 Run 2026-11-01 on Apple M1 Max, 10 cores, 64 GB RAM, macOS 26 (arm64). git version 2.54.0 (Apple
