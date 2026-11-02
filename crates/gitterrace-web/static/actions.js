@@ -201,10 +201,8 @@
 
   // ---- the menu -------------------------------------------------------------
   var menu = null;
-  var ov = window.gtOverlay = window.gtOverlay || { name: null, back: null };
-  function closeMenu() {
-    if (menu) { menu.back.remove(); if (menu.from) menu.from.focus(); menu = null; ov.name = ov.back = null; }
-  }
+  var ov = window.gtOverlay;
+  function closeMenu() { if (menu) ov.close(); }
   // The button that opened the action menu: the menu closes on a copy, so the opener is what
   // stays on screen to flash. Null when the menu was opened by keyboard with no anchor.
   var menuOpener = null;
@@ -213,7 +211,6 @@
     menuOpener = anchor || null;
     var back = el("div", "ov-back actmenu-back");
     var box = el("div", "ov anchored actmenu");
-    box.setAttribute("role", "menu");
     var list = el("ul", "ov-list");
     box.appendChild(list);
     back.appendChild(box);
@@ -263,20 +260,19 @@
     // The key press itself is handed to the item, so a user action sees a trusted event.
     box.addEventListener("keydown", function (e) {
       e.stopPropagation();
-      if (e.key === "Escape") closeMenu();
-      else if (e.key === "ArrowDown") focus(sel + 1);
+      if (e.key === "Escape" || e.key === "Tab") return;
+      if (e.key === "ArrowDown") focus(sel + 1);
       else if (e.key === "ArrowUp") focus(sel - 1);
       else if (e.key === "Enter" || e.key === " ") fns[sel](e, items[sel]);
       else if (e.key in keys) { focus(keys[e.key]); fns[keys[e.key]](e, items[keys[e.key]]); }
       else return;
       e.preventDefault();
     });
-    document.body.appendChild(back);
+    menu = { back: back };
+    ov.open("actmenu", back, box, { menu: true, label: "Actions", from: anchor, onClose: function () { if (menu && menu.back === back) menu = null; } });
     var r = anchor.getBoundingClientRect();
     box.style.left = Math.max(8, Math.min(r.left, window.innerWidth - 300)) + "px";
     box.style.top = Math.min(r.bottom + 6, window.innerHeight - 200) + "px";
-    menu = { back: back, from: anchor };
-    ov.name = "actmenu"; ov.back = back;
     focus(0);
   }
 
@@ -378,7 +374,7 @@
   // that clash with the menu's, the page's or each other. This listener runs in the capture
   // phase and marks the armed second key handled, so nav.js never also acts on it; the arming
   // "a" is skipped when nav.js already took it as the second key of its own "g" chord.
-  var armed = false, armTimer = null, navChord = false, navTimer = null;
+  var armed = false, armTimer = null;
   function disarm() { armed = false; clearTimeout(armTimer); }
   document.addEventListener("keydown", function (e) {
     if (e.metaKey || e.ctrlKey || e.altKey || ov.name) return;
@@ -392,9 +388,8 @@
       if (hit) run(hit, tg, e, null);
       return;
     }
-    // nav.js's "g" chord takes the next key, whatever it is; mirror its window here.
-    if (navChord) { navChord = false; clearTimeout(navTimer); return; }
-    if (e.key === "g") { navChord = true; navTimer = setTimeout(function () { navChord = false; }, 1200); return; }
+    // nav.js's "g" chord takes the next key, whatever it is, and nav.js arms it on "g".
+    if (ov.chord || e.key === "g") return;
     if (e.key === "a" && token && mine.some(function (a) { return a.key; })) {
       armed = true;
       armTimer = setTimeout(disarm, 1200);

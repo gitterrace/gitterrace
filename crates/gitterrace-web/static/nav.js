@@ -10,9 +10,50 @@
   var meta = document.querySelector('meta[name="gt-base"]');
   var B = meta ? meta.content : "";
   function local(p) { return B && p.indexOf(B + "/") === 0 ? p.slice(B.length) : p; }
-  // The one record of which overlay is open, shared by every script that opens one; key
-  // handlers read it instead of their own copies. `name` labels it, `back` is its backdrop.
-  var ov = window.gtOverlay = window.gtOverlay || { name: null, back: null };
+  // The one record of which overlay is open, shared by every script that opens one (this file
+  // loads first); key handlers read it instead of their own copies. `name` labels it, `back` is
+  // its backdrop. open() names the box, moves focus in, keeps Tab inside a dialog (a menu closes
+  // on Tab instead, as WAI-ARIA menus do), closes on Escape and gives focus back to the opener
+  // (`o.from`, else whatever had focus).
+  var ov = window.gtOverlay = {
+    name: null, back: null, from: null, onClose: null,
+    open: function (name, back, box, o) {
+      ov.close();
+      o = o || {};
+      box.setAttribute("role", o.menu ? "menu" : "dialog");
+      if (!o.menu) box.setAttribute("aria-modal", "true");
+      box.setAttribute("aria-label", o.label);
+      if (!box.hasAttribute("tabindex")) box.tabIndex = -1;
+      box.addEventListener("keydown", function (e) {
+        if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); ov.close(); return; }
+        if (e.key !== "Tab") return;
+        e.preventDefault();
+        if (o.menu) { ov.close(); return; }
+        var f = Array.prototype.filter.call(box.querySelectorAll("a[href],button,input,textarea,select,[tabindex]:not([tabindex='-1'])"), function (x) { return !x.disabled && x.offsetParent !== null; });
+        if (!f.length) { box.focus(); return; }
+        var i = f.indexOf(document.activeElement);
+        f[e.shiftKey ? (i <= 0 ? f.length - 1 : i - 1) : (i < 0 || i === f.length - 1 ? 0 : i + 1)].focus();
+      });
+      ov.from = o.from || document.activeElement;
+      ov.onClose = o.onClose || null;
+      ov.name = name; ov.back = back;
+      document.body.appendChild(back);
+      box.focus();
+    },
+    close: function () {
+      if (!ov.back) return;
+      var from = ov.from, done = ov.onClose;
+      ov.back.remove();
+      ov.name = ov.back = ov.from = ov.onClose = null;
+      if (done) done();
+      if (from && from.focus && document.contains(from)) from.focus();
+    },
+    // The "g" chord: nav.js arms it, and actions.js (capture phase, runs first) leaves the
+    // armed second key to nav.js, so both read one timer.
+    chord: false, chordTimer: null,
+    armChord: function () { ov.chord = true; clearTimeout(ov.chordTimer); ov.chordTimer = setTimeout(function () { ov.chord = false; }, 1200); },
+    takeChord: function () { var c = ov.chord; ov.chord = false; clearTimeout(ov.chordTimer); return c; }
+  };
 
   function el(tag, cls, text) {
     var e = document.createElement(tag);
@@ -47,23 +88,17 @@
   }
 
   // ---- overlays -----------------------------------------------------------
-  function overlay(cls) {
-    closeOverlay();
+  // `btn` is the toggle whose aria-expanded follows the overlay, if any.
+  function overlay(cls, label, btn) {
     var back = el("div", "ov-back");
     var box = el("div", "ov " + cls);
-    box.setAttribute("role", "dialog");
-    box.setAttribute("aria-modal", "true");
     back.appendChild(box);
     back.addEventListener("mousedown", function (e) { if (e.target === back) closeOverlay(); });
-    document.body.appendChild(back);
-    ov.name = cls; ov.back = back;
+    ov.open(cls, back, box, { label: label, onClose: btn ? function () { btn.setAttribute("aria-expanded", "false"); } : null });
+    if (btn) btn.setAttribute("aria-expanded", "true");
     return box;
   }
-  function closeOverlay() {
-    if (ov.back && ov.name !== "actmenu") { ov.back.remove(); ov.name = ov.back = null; }
-    var rb = document.getElementById("refbtn");
-    if (rb) rb.setAttribute("aria-expanded", "false");
-  }
+  function closeOverlay() { ov.close(); }
 
   // Subsequence match with a score favoring file-name hits, word starts and short paths.
   function score(q, path) {
@@ -123,7 +158,6 @@
       if (e.key === "ArrowDown" || (e.ctrlKey && e.key === "n")) { sel = Math.min(sel + 1, shown.length - 1); mark(); e.preventDefault(); }
       else if (e.key === "ArrowUp" || (e.ctrlKey && e.key === "p")) { sel = Math.max(sel - 1, 0); mark(); e.preventDefault(); }
       else if (e.key === "Enter") { if (shown[sel]) choose(shown[sel], e); e.preventDefault(); }
-      else if (e.key === "Escape") { closeOverlay(); e.preventDefault(); }
     });
     input.focus();
     return { refresh: refresh, input: input };
@@ -139,7 +173,7 @@
     return filesPending;
   }
   function openFinder() {
-    var box = overlay("finder");
+    var box = overlay("finder", "Go to file");
     var p = listPicker(box, "Go to file", function (q) {
       if (!files) return [];
       if (!q) return files.slice(0, 50).map(function (f) { return { f: f, pos: [] }; });
@@ -188,9 +222,8 @@
   }
   function openRefs() {
     var btn = document.getElementById("refbtn");
-    var box = overlay("refs");
+    var box = overlay("refs", "Switch branch or tag", btn);
     if (btn) {
-      btn.setAttribute("aria-expanded", "true");
       var r = btn.getBoundingClientRect();
       box.classList.add("anchored");
       box.style.left = Math.max(8, r.left) + "px";
@@ -211,8 +244,7 @@
   var repos = null;
   function openRepos() {
     var btn = document.getElementById("repobtn");
-    var box = overlay("refs");
-    btn.setAttribute("aria-expanded", "true");
+    var box = overlay("refs", "Switch repository", btn);
     var r = btn.getBoundingClientRect();
     box.classList.add("anchored");
     box.style.left = Math.max(8, r.left) + "px";
@@ -243,7 +275,7 @@
     return list.filter(function (a) { return a.key; }).map(function (a) { return ["a " + a.key, a.label]; });
   }
   function openHelp() {
-    var box = overlay("help");
+    var box = overlay("help", "Keyboard shortcuts");
     box.appendChild(el("h2", "", "Keyboard shortcuts"));
     var dl = el("dl", "keys");
     SHORTCUTS.concat(actionChords()).forEach(function (s) {
@@ -284,24 +316,21 @@
   // ---- keys ---------------------------------------------------------------
   // Single page keys: g, t, /, y, b, ?, j, k, Enter. RESERVED_KEYS in the actions config
   // refuses the letters among them as action keys; a test pins the two lists together.
-  var chord = false, chordTimer = null;
   var goto = { c: B + "/", i: B + "/stats", b: B + "/refs", l: B + "/log/" + revEnc, s: B + "/search" };
   document.addEventListener("keydown", function (e) {
     if (e.metaKey || e.ctrlKey || e.altKey) return;
-    if (e.key === "Escape") { closeOverlay(); if (typing(e.target)) e.target.blur(); return; }
+    if (e.key === "Escape") { if (ov.name) closeOverlay(); else if (typing(e.target)) e.target.blur(); return; }
     // actions.js handles its "a" chord in the capture phase and marks the key handled; the
     // action menu is its own overlay.
     if (typing(e.target) || ov.name || e.defaultPrevented) return;
     var k = e.key;
-    if (chord) {
-      chord = false;
-      clearTimeout(chordTimer);
+    if (ov.takeChord()) {
       // The second key belongs to the chord even with no target, so "g a" never arms "a".
       e.preventDefault();
       if (goto[k]) location.href = goto[k];
       return;
     }
-    if (k === "g") { chord = true; chordTimer = setTimeout(function () { chord = false; }, 1200); }
+    if (k === "g") { ov.armChord(); }
     else if (k === "t") { openFinder(); e.preventDefault(); }
     else if (k === "/") { if (openSearch()) e.preventDefault(); }
     else if (k === "y") { permalink(); }

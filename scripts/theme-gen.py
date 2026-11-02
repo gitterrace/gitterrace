@@ -2,8 +2,9 @@
 """Generate gitterrace's theme files from the schwarzwald snapshot (stdlib only).
 
     scripts/theme-gen.py           write the files
-    scripts/theme-gen.py --check   exit 1 if the snapshot differs from its manifest, then if a
-                                   file differs from its generated form
+    scripts/theme-gen.py --check   exit 1 if the snapshot differs from its manifest, if a role
+                                   pair (PAIRS) is under its contrast minimum, or if a file
+                                   differs from its generated form
 
 The check compares the sha256 of every file under theme/schwarzwald with manifest.json
 (missing, changed and unlisted files). Refresh the snapshot with schwarzwald's sync.py, never
@@ -46,6 +47,42 @@ def mix(fg, bg, share):
     )
 
 
+def luminance(c):
+    def ch(x):
+        x = int(c[x : x + 2], 16) / 255
+        return x / 12.92 if x <= 0.04045 else ((x + 0.055) / 1.055) ** 2.4
+
+    return 0.2126 * ch(1) + 0.7152 * ch(3) + 0.0722 * ch(5)
+
+
+def contrast(a, b):
+    la, lb = sorted((luminance(a), luminance(b)), reverse=True)
+    return (la + 0.05) / (lb + 0.05)
+
+
+# (foreground, background, minimum) in resolved colours: text pairs need 4.5:1, the focus
+# ring (tokens.css role --focus, the accent) 3:1 against every surface it is drawn on.
+PAIRS = [
+    ("n-9", "n-1", 4.5),
+    ("n-7", "n-1", 4.5),
+    ("on-accent", "accent", 4.5),
+    ("accent", "n-1", 3),
+    ("accent", "raised", 3),
+    ("accent", "header", 3),
+]
+
+
+def contrast_problems(tokens):
+    bad = []
+    for mode in ("light", "dark"):
+        col = colours(tokens, mode)
+        for fg, bg, need in PAIRS:
+            got = contrast(col[fg], col[bg])
+            if got < need:
+                bad.append(f"{mode}: --{fg} on --{bg} is {got:.2f}:1, needs {need}:1")
+    return bad
+
+
 def colours(tokens, mode):
     t = tokens["themes"][THEME][mode]
 
@@ -72,7 +109,10 @@ def colours(tokens, mode):
             h("accent-ink"), h("surfaces.bg"), tokens["shares"]["selected-row"]
         ),
         "ring": h("accent-ink") + RING_ALPHA[mode],
-        "on-accent": "#ffffff",
+        # Text on an accent fill: whichever of white and the page ink reads better.
+        "on-accent": max(
+            ("#ffffff", h("surfaces.bg")), key=lambda c: contrast(c, h("accent-ink"))
+        ),
         "add": h("positive"),
         "add-bg": h("code.add-row"),
         "add-hl": h("code.add-word"),
@@ -187,6 +227,11 @@ def main():
     design = json.loads((SNAP / "tokens/design-tokens.json").read_text())
     want = {CSS: gen_css(tokens, design, CSS.read_text())}
     if "--check" in sys.argv:
+        low = contrast_problems(tokens)
+        for line in low:
+            print(line)
+        if low:
+            return 1
         bad = [str(p.relative_to(ROOT)) for p, s in want.items() if p.read_text() != s]
         for b in bad:
             print(f"differs from generated: {b}; run scripts/theme-gen.py")

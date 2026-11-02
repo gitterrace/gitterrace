@@ -23,7 +23,7 @@
 @media (prefers-color-scheme:dark){:root:not([data-theme=light]){color-scheme:dark;
 --n-0:#1e2023; --n-1:#1e2023; --n-2:#27292c; --n-3:#2d2f33; --n-4:#34363a; --n-5:#45494d; --n-6:#a1aab3; --n-7:#bbc4cd;
 --n-9:#e3ecf6; --header:#171a1c; --raised:#25272a; --scrim:#0000004d; --accent:#9ca1d4; --accent-fg:#9ca1d4; --accent-soft:#2d2f38; --ring:#9ca1d480;
---on-accent:#ffffff; --add:#78c9b7; --add-bg:#2b3838; --add-hl:#374f4c; --del:#ff7778; --del-bg:#3e2c2f; --del-hl:#5d383b; --warn:#e1a447;
+--on-accent:#1e2023; --add:#78c9b7; --add-bg:#2b3838; --add-hl:#374f4c; --del:#ff7778; --del-bg:#3e2c2f; --del-hl:#5d383b; --warn:#e1a447;
 --warn-bg:#393228; --info:#bbc4cd; --done:#78c9b7; --seq-0:#2d2f33; --seq-1:#474958; --seq-2:#62657f; --seq-3:#7e82a8; --seq-4:#9ca1d4;
 --cat-1:#66a6dd; --cat-2:#cf945f; --cat-3:#50b291; --cat-4:#d28caf; --cat-5:#4caeb8; --cat-6:#de898e; --cat-7:#aea25c; --cat-8:#45494d;
 --syn-comment:#a1aab3; --syn-keyword:#b992d2; --syn-string:#50b291; --syn-constant:#66a6dd; --syn-entity:#9ca1d4; --syn-tag:#4caeb8; --syn-param:#cf945f; --shadow-2:0 8px 28px rgba(0,0,0,.5);
@@ -31,7 +31,7 @@
 :root[data-theme=dark]{color-scheme:dark;
 --n-0:#1e2023; --n-1:#1e2023; --n-2:#27292c; --n-3:#2d2f33; --n-4:#34363a; --n-5:#45494d; --n-6:#a1aab3; --n-7:#bbc4cd;
 --n-9:#e3ecf6; --header:#171a1c; --raised:#25272a; --scrim:#0000004d; --accent:#9ca1d4; --accent-fg:#9ca1d4; --accent-soft:#2d2f38; --ring:#9ca1d480;
---on-accent:#ffffff; --add:#78c9b7; --add-bg:#2b3838; --add-hl:#374f4c; --del:#ff7778; --del-bg:#3e2c2f; --del-hl:#5d383b; --warn:#e1a447;
+--on-accent:#1e2023; --add:#78c9b7; --add-bg:#2b3838; --add-hl:#374f4c; --del:#ff7778; --del-bg:#3e2c2f; --del-hl:#5d383b; --warn:#e1a447;
 --warn-bg:#393228; --info:#bbc4cd; --done:#78c9b7; --seq-0:#2d2f33; --seq-1:#474958; --seq-2:#62657f; --seq-3:#7e82a8; --seq-4:#9ca1d4;
 --cat-1:#66a6dd; --cat-2:#cf945f; --cat-3:#50b291; --cat-4:#d28caf; --cat-5:#4caeb8; --cat-6:#de898e; --cat-7:#aea25c; --cat-8:#45494d;
 --syn-comment:#a1aab3; --syn-keyword:#b992d2; --syn-string:#50b291; --syn-constant:#66a6dd; --syn-entity:#9ca1d4; --syn-tag:#4caeb8; --syn-param:#cf945f; --shadow-2:0 8px 28px rgba(0,0,0,.5);
@@ -40,6 +40,7 @@
 /* roles: components use these, never the ramp directly */
 :root{
 --bg:var(--n-1);--surface:var(--n-0);--soft:var(--n-2);--hover:var(--n-3);--line:var(--n-4);--line-strong:var(--n-5);--accent-ink:var(--accent);
+--focus:var(--accent);
 --faint:var(--n-6);--muted:var(--n-7);--fg:var(--n-9);
 --serif:var(--font-title);--sans:var(--font-body);--mono:var(--font-mono);
 --leading-tight:1.25;--leading:1.6;--leading-code:20px;

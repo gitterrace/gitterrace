@@ -40,12 +40,7 @@
   function lastUsed() { try { return localStorage.getItem(KEY); } catch (e) { return null; } }
   function remember(id) { try { localStorage.setItem(KEY, id); } catch (e) {} }
 
-  function close() {
-    if (!cur) return;
-    cur.back.remove();
-    if (cur.from && cur.from.focus) cur.from.focus();
-    cur = null;
-  }
+  function close() { if (cur) window.gtOverlay.close(); }
   function load() {
     return fetch(B + "/_send/targets", { cache: "no-store" })
       .then(function (r) { return r.ok ? r.json() : []; })
@@ -53,13 +48,8 @@
   }
 
   function open(c) {
-    close();
-    var from = document.activeElement;
     var back = el("div", "ov-back send-back");
     var box = el("form", "ov send");
-    box.setAttribute("role", "dialog");
-    box.setAttribute("aria-modal", "true");
-    box.setAttribute("aria-label", "Send");
     var title = el("input", "send-title");
     title.type = "text";
     title.value = titleOf(c);
@@ -88,8 +78,8 @@
     box.appendChild(ctx);
     box.appendChild(foot);
     back.appendChild(box);
-    document.body.appendChild(back);
-    cur = { back: back, from: from, targets: [] };
+    cur = { back: back, targets: [] };
+    window.gtOverlay.open("send", back, box, { label: "Send", onClose: function () { if (cur && cur.back === back) cur = null; } });
     ctx.focus();
     ctx.setSelectionRange(0, 0);
 
@@ -132,14 +122,7 @@
     back.addEventListener("mousedown", function (e) { if (e.target === back) close(); });
     box.addEventListener("keydown", function (e) {
       e.stopPropagation();
-      if (e.key === "Escape") { e.preventDefault(); close(); }
-      else if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); send(); }
-      else if (e.key === "Tab") {
-        var f = box.querySelectorAll("input,textarea,select,button");
-        var first = f[0], last = f[f.length - 1];
-        if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
-        else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
-      }
+      if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); send(); }
     });
   }
 

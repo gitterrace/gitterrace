@@ -20,14 +20,18 @@
 //   marked       text marked with the mouse is what the menu acts on: marking lines 2-3 of a file
 //                shows a trigger, and Send to's title and context carry L2-3 and their text;
 //                marked README prose arrives as a > quote
+//   overlays     t, ? and b each open a named dialog that takes focus, keeps it through 5 Tabs
+//                (and Shift+Tab), closes on Escape and gives focus back to what had it
 //   gutter       in a 250-line file (three chunks) every line's gutter number equals its line,
 //                read from the CSS counter itself, with the selection trigger shown; and the
 //                Send to window opens small and grows with its text
+//   tips         closing ., .+s, t, ? or b with Escape leaves no tip on the opener they hand
+//                focus back to, while Tab onto a tipped button still shows its tip
 //
 // --from-disk serves crates/gitterrace-web/static/*.js from the working tree over the (possibly
 // older) binary's copies, to test edits before a rebuild. Playwright comes from $PLAYWRIGHT_CORE,
 // the repo's node_modules or the website checkout (see browser-lib.mjs).
-import { readFileSync, writeFileSync, rmSync, mkdirSync, mkdtempSync, existsSync } from 'node:fs';
+import { readFileSync, readdirSync, writeFileSync, rmSync, mkdirSync, mkdtempSync, existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { root, loadPlaywright, launch, makeRepo, serve, openPage, reporter, sh } from './browser-lib.mjs';
@@ -37,7 +41,7 @@ const bin = resolve(arg('--bin', join(root, 'target/debug/git-terrace')));
 const fromDisk = process.argv.includes('--from-disk');
 const tabCounts = arg('--tabs', '8,12').split(',').map(Number);
 const browsers = arg('--browsers', 'webkit,chromium').split(',');
-const ALL = ['truncation', 'live-tabs', 'mermaid', 'chip', 'doctabs', 'chords', 'header', 'marked', 'gutter'];
+const ALL = ['truncation', 'live-tabs', 'mermaid', 'chip', 'doctabs', 'chords', 'header', 'marked', 'gutter', 'overlays', 'tips'];
 const wanted = arg('--checks', ALL.join(',')).split(',');
 for (const c of wanted) if (!ALL.includes(c)) { console.error(`unknown check ${c}; known: ${ALL.join(', ')}`); process.exit(2); }
 
@@ -55,7 +59,9 @@ console.log('serving', srv.base, 'with', bin);
 async function context(name) {
   const b = await launch(pw, name);
   const ctx = await b.newContext();
-  if (fromDisk) for (const f of ['live.js', 'actions.js', 'app.js', 'nav.js', 'send.js', 'markdown.js']) {
+  // Every script in the folder, read at run time, so a new or forgotten file is never served
+  // stale from the binary while the check claims to test the working tree.
+  if (fromDisk) for (const f of readdirSync(join(root, 'crates/gitterrace-web/static')).filter((n) => n.endsWith('.js'))) {
     await ctx.route(`**/static/${f}`, (q) => q.fulfill({ contentType: 'text/javascript', body: readFileSync(join(root, 'crates/gitterrace-web/static', f)) }));
   }
   return { b, ctx };
@@ -398,7 +404,62 @@ async function gutter() {
   }
 }
 
-const checks = { truncation, 'live-tabs': liveTabs, mermaid, chip, doctabs, chords, header, marked, gutter };
+// ---- overlays ---------------------------------------------------------------------------------
+async function overlays() {
+  for (const name of browsers) {
+    const { b, ctx } = await context(name);
+    const p = await ctx.newPage();
+    await p.goto(srv.base + '/', { waitUntil: 'load' });
+    for (const key of ['t', '?', 'b']) {
+      // A page link holds focus first, so "returns" means back to it, not to <body>.
+      const opener = await p.evaluate(() => { const a = document.querySelector('main a[href], a[href]'); a.focus(); a.dataset.opener = '1'; return !!a; });
+      await p.keyboard.press(key);
+      await p.waitForSelector('.ov-back [role=dialog]');
+      const inside = () => p.evaluate(() => { const d = document.querySelector('.ov-back [role=dialog]'); return !!d && d.contains(document.activeElement); });
+      const named = await p.evaluate(() => !!document.querySelector('.ov-back [role=dialog]').getAttribute('aria-label'));
+      let kept = await inside();
+      for (let i = 0; i < 5; i++) { await p.keyboard.press('Tab'); kept = kept && await inside(); }
+      await p.keyboard.press('Shift+Tab'); kept = kept && await inside();
+      await p.keyboard.press('Escape');
+      const after = await p.evaluate(() => ({ open: !!document.querySelector('.ov-back'), back: document.activeElement && document.activeElement.dataset.opener === '1' }));
+      if (opener && named && kept && !after.open && after.back) r.ok(`overlays ${name} ${key}: named, focus kept inside, Escape closes and returns focus`);
+      else r.fail(`overlays ${name} ${key}: ${JSON.stringify({ named, kept, ...after })}`);
+    }
+    await b.close();
+  }
+}
+
+// ---- tips -------------------------------------------------------------------------------------
+// A closing overlay hands focus back to its opener. That focus is the script's, not the user's,
+// so no tip may follow it: for every key-opened overlay, closed by Escape, no tip is on screen.
+// Tab onto a tipped control still shows its tip at once.
+async function tips() {
+  for (const name of browsers) {
+    const { b, ctx } = await context(name);
+    const p = await ctx.newPage();
+    await p.goto(srv.base + '/', { waitUntil: 'load' });
+    const tipOn = () => p.evaluate(() => { const t = document.getElementById('gt-tip'); return !!t && t.classList.contains('on') ? t.textContent : ''; });
+    const bad = [];
+    for (const keys of [['.'], ['.', 's'], ['t'], ['?'], ['b']]) {
+      // The page-actions button holds focus first, as it does after a click on it.
+      await p.evaluate(() => { const t = document.querySelector('.actbtn.top'); if (t) t.focus(); });
+      for (const k of keys) await p.keyboard.press(k);
+      await p.waitForSelector('.ov-back');
+      await p.keyboard.press('Escape');
+      await p.waitForTimeout(50);
+      const on = await tipOn();
+      if (on) bad.push(`${keys.join('+')}: "${on}"`);
+    }
+    await p.evaluate(() => { document.activeElement && document.activeElement.blur(); const t = document.querySelector('.actbtn.top'); const all = [...document.querySelectorAll('a[href],button')]; const i = all.indexOf(t); if (i > 0) all[i - 1].focus(); });
+    await p.keyboard.press('Tab');
+    const tabbed = await tipOn();
+    if (!bad.length && tabbed) r.ok(`tips ${name}: no tip after an overlay closes, Tab still shows "${tabbed}"`);
+    else r.fail(`tips ${name}: ${JSON.stringify({ bad, tabbed })}`);
+    await b.close();
+  }
+}
+
+const checks = { truncation, 'live-tabs': liveTabs, mermaid, chip, doctabs, chords, header, marked, gutter, overlays, tips };
 try {
   for (const c of wanted) { console.log(`-- ${c}`); await checks[c](); }
 } finally {

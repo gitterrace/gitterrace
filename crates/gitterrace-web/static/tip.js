@@ -1,5 +1,7 @@
 // One hover for the whole page: any element with data-tip="..." shows it after the pointer
-// rests 300 ms, at once on keyboard focus, and drops it on leave, mouse-down, scroll and Esc.
+// rests 300 ms, at once when Tab moves focus onto it, and drops it on leave, mouse-down, scroll
+// and Esc. Focus a script puts back (a menu or dialog closing returns it to its opener) shows
+// nothing, or every closed overlay would leave its opener's tip on screen.
 (function () {
   var DELAY = 300;
   var GAP = 8;
@@ -7,6 +9,7 @@
   var current = null;
   var timer = 0;
   var mx = null;
+  var tabbed = false;
 
   function box() {
     if (tip) return tip;
@@ -93,15 +96,17 @@
   });
   document.addEventListener("focusin", function (e) {
     var el = target(e.target);
-    if (!el) return;
+    if (!el || !tabbed) return;
     mx = null;
     hide();
     show(el);
   });
   document.addEventListener("focusout", function () { hide(); pending = null; });
-  document.addEventListener("mousedown", function () { hide(); pending = null; }, true);
+  document.addEventListener("mousedown", function () { tabbed = false; hide(); pending = null; }, true);
   document.addEventListener("scroll", function () { hide(); pending = null; }, true);
+  // Capture phase, so the flag is set before any handler moves focus for this key.
   document.addEventListener("keydown", function (e) {
+    tabbed = e.key === "Tab";
     if (e.key === "Escape") { hide(); pending = null; }
-  });
+  }, true);
 })();
