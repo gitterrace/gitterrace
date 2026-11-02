@@ -1010,6 +1010,9 @@ pub(crate) async fn with_records<T: Template + Send + 'static>(
         let c = views::chrome(a, "stats").live(Mode::NOTICE);
         match a.source(&head)? {
             Some(src) => Ok(build(a, &src, c).render()?),
+            None if a.far(&head).is_some() => {
+                Ok(crate::far::render(c, tab, a.far(&head).unwrap_or(0))?)
+            }
             None => Ok(PendingPage {
                 c,
                 tabs: views::stats_tabs(tab),

@@ -15,6 +15,12 @@ pub enum ApiError {
     Index(#[from] io::Error),
     #[error("worker task failed: {0}")]
     Task(String),
+    /// The revision has more commits outside the index than one view reads from git.
+    #[error(
+        "insights for this revision need a reindex: more than {cap} commits are not in the \
+         indexed branch (counted {read})"
+    )]
+    NeedsReindex { read: usize, cap: usize },
 }
 
 /// Every `error.code` an answer can carry, with its HTTP status and meaning. The docs and the
@@ -30,6 +36,11 @@ pub const ERROR_CODES: &[(&str, u16, &str)] = &[
     ("git", 500, "reading the repository failed"),
     ("index", 500, "reading the insights cache failed"),
     ("internal", 500, "the server failed"),
+    (
+        "needs_reindex",
+        409,
+        "the revision is too far from the indexed branch to answer without a reindex",
+    ),
 ];
 
 /// Body text of every 5xx answer. The inner error names files on the host (cache and pack
@@ -43,6 +54,7 @@ impl ApiError {
             Self::Git(
                 gitterrace_git::Error::RevNotFound(_) | gitterrace_git::Error::PathNotFound(_),
             ) => StatusCode::NOT_FOUND,
+            Self::NeedsReindex { .. } => StatusCode::CONFLICT,
             Self::Git(_) | Self::Index(_) | Self::Task(_) => StatusCode::INTERNAL_SERVER_ERROR,
         }
     }
@@ -55,6 +67,7 @@ impl ApiError {
             Self::Git(_) => "git",
             Self::Index(_) => "index",
             Self::Task(_) => "internal",
+            Self::NeedsReindex { .. } => "needs_reindex",
         }
     }
 }
@@ -87,6 +100,7 @@ mod tests {
             ApiError::Git(gitterrace_git::Error::Git(String::new())),
             ApiError::Index(std::io::Error::other("x")),
             ApiError::Task(String::new()),
+            ApiError::NeedsReindex { read: 0, cap: 0 },
         ];
         for e in &all {
             assert!(

@@ -198,12 +198,29 @@ impl Index {
         let mut out = store::Appender::open(&self.dir, stored.valid)?;
         let order = ids.clone();
         let ids: Vec<String> = todo.into_iter().cloned().collect();
+        // A first build gets every commit of `order`, in order, from the stream: fold each into
+        // the segment as it passes, so the build never holds the whole history.
+        let fresh = ids.len() == order.len()
+            && seg::manifest::Manifest::load(&self.dir)
+                .ok()
+                .flatten()
+                .is_none()
+            && order.iter().all(|id| store::oid_of(id).is_some());
+        let seg = |e: seg::SegError| io::Error::other(e.to_string());
+        let mut build = if fresh {
+            Some(store::SegmentBuild::new(&self.dir, None, &shallow_list).map_err(seg)?)
+        } else {
+            None
+        };
         let mut stored = 0_usize;
         source.stream_records(
             &ids,
             BATCH,
             &mut |record| {
                 stored += 1;
+                if let Some(b) = build.as_mut() {
+                    b.push(&record).map_err(seg)?;
+                }
                 out.push(&record, shallow.contains(&record.id))
             },
             &mut |done| progress(Progress { done, total }),
@@ -214,7 +231,16 @@ impl Index {
         if stored < ids.len() {
             skipped(ids.len() - stored, &self.dir);
         }
-        self.build_segments(&order, &shallow_list)
+        match build {
+            // Complete: every commit of the rev is in the segment.
+            Some(b) if stored == ids.len() => {
+                b.finish(None, Vec::new()).map_err(seg)?;
+                Ok(())
+            }
+            // A skipped commit leaves a gap: the next update builds once it is readable.
+            Some(_) => Ok(()),
+            None => self.build_segments(&order, &shallow_list),
+        }
     }
 
     /// Writes the segment set for `order` (canonical ids of the rev) when the manifest does not
@@ -376,6 +402,28 @@ impl Index {
         self.writable()?;
         let _lock = store::WriteLock::take(&self.dir)?;
         store::wipe(&self.dir)
+    }
+
+    /// The view of a commit the set does not hold exactly: the set's commits it reaches plus
+    /// up to [`feed::FRESH_CAP`] it lacks, read from git. `tip` is `rev` resolved to a commit
+    /// id. Past the cap the answer is [`feed::RevView::NeedsReindex`]: building the set for
+    /// this commit would move it off HEAD, and holding its records would break the memory
+    /// bound. `None` when there is no set.
+    pub fn rev_source(
+        &self,
+        source: &dyn CommitSource,
+        rev: &str,
+        tip: &str,
+    ) -> io::Result<Option<feed::RevView<DiskSet>>> {
+        let seg = |e: seg::SegError| io::Error::other(e.to_string());
+        let open = || seg::read::Store::open(&self.dir).map_err(seg);
+        let (Some(rows), Some(tables)) = (open()?, open()?) else {
+            return Ok(None);
+        };
+        let disk = feed::DiskSource::open(rows, &mut |pairs| source.map_identities(rev, pairs))
+            .map_err(seg)?;
+        let set = feed::SegmentSource::new(disk, tables.segments);
+        feed::rev_view(set, source, rev, tip, feed::FRESH_CAP).map(Some)
     }
 
     /// The memory adapter over `records` (from [`Index::records`]), for a rev the segment set

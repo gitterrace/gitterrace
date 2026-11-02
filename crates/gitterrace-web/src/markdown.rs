@@ -6,6 +6,7 @@
 
 use std::borrow::Cow;
 use std::collections::HashMap;
+use std::fmt::Write as _;
 
 use pulldown_cmark::{BlockQuoteKind, CodeBlockKind, Event, Options, Parser, Tag, TagEnd, html};
 
@@ -62,7 +63,9 @@ fn parse_front_matter(block: &str) -> Option<Vec<(String, String)>> {
         }
         let (key, value) = line.split_once(':')?;
         let key = key.trim();
-        if key.is_empty() || key.contains(|c: char| c.is_whitespace() || "&*!|>{}[]#'\"".contains(c)) {
+        if key.is_empty()
+            || key.contains(|c: char| c.is_whitespace() || "&*!|>{}[]#'\"".contains(c))
+        {
             return None;
         }
         let value = value.trim();
@@ -95,17 +98,17 @@ fn unquote(v: &str) -> Option<String> {
 /// HTML for the front matter block: a key/value table, or the raw text as code.
 /// Built here and added after sanitizing, so every piece is escaped by hand.
 fn front_matter_html(block: &str) -> String {
-    match parse_front_matter(block) {
-        Some(rows) => {
+    parse_front_matter(block).map_or_else(
+        || format!("<pre><code>{}</code></pre>\n", esc(block)),
+        |rows| {
             let mut out = String::from("<table class=\"fm\">");
             for (k, v) in rows {
-                out.push_str(&format!("<tr><th>{}</th><td>{}</td></tr>", esc(&k), esc(&v)));
+                let _ = write!(out, "<tr><th>{}</th><td>{}</td></tr>", esc(&k), esc(&v));
             }
             out.push_str("</table>\n");
             out
-        }
-        None => format!("<pre><code>{}</code></pre>\n", esc(block)),
-    }
+        },
+    )
 }
 
 /// Heading slug as most Markdown hosts make it, so links written elsewhere still land: lowercase, keep letters, digits, `-` and `_`, spaces to `-`.
@@ -410,7 +413,10 @@ mod tests {
             "---\ntitle: Design contract\ndescription: \"The grammar: twelve rules\"\nname: 'q'\ntags:\n  - a\n  - b\n---\n# Doc\n",
         );
         assert!(out.contains("<table class=\"fm\">"), "{out}");
-        assert!(out.contains("<th>title</th><td>Design contract</td>"), "{out}");
+        assert!(
+            out.contains("<th>title</th><td>Design contract</td>"),
+            "{out}"
+        );
         assert!(out.contains("<td>The grammar: twelve rules</td>"), "{out}");
         assert!(out.contains("<td>q</td>"), "{out}");
         assert!(out.contains("<td>a, b</td>"), "{out}");

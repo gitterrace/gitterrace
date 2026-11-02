@@ -175,7 +175,7 @@ impl Filter {
         if sel.is_empty() && window.is_none() {
             return Arc::clone(all);
         }
-        Arc::new(Scoped::new(Arc::clone(all), &sel, window))
+        Arc::new(Scoped::new(all, &sel, window.as_ref()))
     }
 
     /// Chips and period picker for a page served at `base`.

@@ -1,13 +1,6 @@
 //! Languages page: lines of code per language at every first-parent commit, a brush that
 //! selects a commit range, and the range card the server renders from `?from&to`.
 
-#![expect(
-    clippy::many_single_char_names,
-    clippy::too_many_lines,
-    clippy::needless_range_loop,
-    reason = "geometry and colour math reads best with x, y, w, h; one linear sequence, splitting it hides the flow; the index is used for several parallel arrays"
-)]
-
 mod render;
 
 use std::collections::HashMap;

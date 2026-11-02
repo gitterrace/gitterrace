@@ -42,6 +42,9 @@ pub struct Shape {
     pub authors: usize,
     pub files_per_commit: usize,
     pub seed: u64,
+    /// Commits on branch `side`, forked from `main` nine tenths of the way along: history that
+    /// HEAD lacks, for pages served at another revision.
+    pub side: usize,
 }
 
 impl Shape {
@@ -54,13 +57,15 @@ impl Shape {
             authors: 300,
             files_per_commit: 4,
             seed: 7,
+            side: 0,
         }
     }
 }
 
 const KINDS: [&str; 6] = ["feat", "fix", "docs", "refactor", "chore", "update"];
 
-/// Builds a repository of `shape` at `dir` with `git fast-import`, one linear branch `main`.
+/// Builds a repository of `shape` at `dir` with `git fast-import`: a linear `main`, plus
+/// `side` when [`Shape::side`] is non-zero.
 /// Seconds even for 100k commits. Identical input gives identical oids.
 pub fn build(dir: &Path, shape: Shape) {
     std::fs::create_dir_all(dir).expect("create dir");
@@ -68,7 +73,14 @@ pub fn build(dir: &Path, shape: Shape) {
     let mut rng = Rng::new(shape.seed);
     let mut stream = String::new();
     let start: i64 = 1_420_070_400; // 2015-01-01
-    for i in 0..shape.commits {
+    let fork = shape.commits * 9 / 10;
+    for i in 0..shape.commits + shape.side {
+        // Marks 1..=commits are main, then the side branch, whose first parent is the fork.
+        let (branch, from) = match i.cmp(&shape.commits) {
+            std::cmp::Ordering::Less => ("main", i),
+            std::cmp::Ordering::Equal => ("side", fork.max(1)),
+            std::cmp::Ordering::Greater => ("side", i),
+        };
         let who = rng.below(shape.authors as u64);
         let (name, email) = if who % 10 == 9 {
             (
@@ -84,14 +96,14 @@ pub fn build(dir: &Path, shape: Shape) {
         let msg = format!("{kind}(s{scope}): change {i}\n");
         write!(
             stream,
-            "commit refs/heads/main\nmark :{}\nauthor {name} <{email}> {time} +0000\n\
+            "commit refs/heads/{branch}\nmark :{}\nauthor {name} <{email}> {time} +0000\n\
              committer {name} <{email}> {time} +0000\ndata {}\n{msg}",
             i + 1,
             msg.len()
         )
         .expect("write string");
-        if i > 0 {
-            writeln!(stream, "from :{i}").expect("write string");
+        if from > 0 {
+            writeln!(stream, "from :{from}").expect("write string");
         }
         for _ in 0..shape.files_per_commit {
             let p = rng.below(shape.paths as u64);
@@ -126,6 +138,29 @@ mod tests {
         let tip = |d: &std::path::Path| crate::git(d, &["rev-parse", "HEAD"]);
         assert_eq!(tip(&a), tip(&b));
         assert_eq!(crate::git(&a, &["rev-list", "--count", "HEAD"]), "50");
+        let c = tempfile_dir("c");
+        build(
+            &c,
+            Shape {
+                side: 7,
+                ..Shape::sized(50)
+            },
+        );
+        assert_eq!(crate::git(&c, &["rev-list", "--count", "main..side"]), "7");
+        // Past the fresh-commit cap of the index (2000): the length the guards rely on.
+        let d = tempfile_dir("d");
+        build(
+            &d,
+            Shape {
+                side: 2_500,
+                ..Shape::sized(100)
+            },
+        );
+        assert_eq!(
+            crate::git(&d, &["rev-list", "--count", "main..side"]),
+            "2500"
+        );
+        assert_eq!(crate::git(&c, &["rev-list", "--count", "HEAD"]), "50");
         std::fs::remove_dir_all(a.parent().expect("parent")).expect("clean");
         assert_ne!(Rng::new(1).next(), Rng::new(2).next());
     }

@@ -6,7 +6,7 @@ use std::sync::{Arc, Mutex, RwLock};
 
 use gitterrace_actions::{Lines, LinkStyle, styled};
 use gitterrace_git::Repo;
-use gitterrace_index::feed::InsightsSource;
+use gitterrace_index::feed::{FRESH_CAP, InsightsSource, RevView};
 use gitterrace_index::{Index, Insights, Options, Scoped};
 use serde_json::{Value, json};
 
@@ -184,16 +184,27 @@ impl ApiState {
     /// and the cache file are unchanged.
     pub(crate) fn records(&self, rev: &str) -> Result<Src, ApiError> {
         let tip = self.repo.resolve(rev)?;
-        let key = (tip, self.index.generation());
+        let key = (tip.clone(), self.index.generation());
         if let Ok(g) = self.cache.lock()
             && let Some((k, v)) = g.as_ref()
             && *k == key
         {
             return Ok(Arc::clone(v));
         }
+        // Another rev reads the same segments through a reach view. Without a segment set
+        // yet, the records are all there is.
         let recs: Src = match self.index.disk_source(&*self.repo, rev)? {
             Some(set) => set,
-            None => Index::memory_source(Arc::new(self.index.records(&*self.repo, rev)?)),
+            None => match self.index.rev_source(&*self.repo, rev, &tip)? {
+                Some(RevView::Ready(view)) => view,
+                Some(RevView::NeedsReindex { read }) => {
+                    return Err(ApiError::NeedsReindex {
+                        read,
+                        cap: FRESH_CAP,
+                    });
+                }
+                None => Index::memory_source(Arc::new(self.index.records(&*self.repo, rev)?)),
+            },
         };
         if let Ok(mut g) = self.cache.lock() {
             *g = Some((key, Arc::clone(&recs)));
@@ -426,7 +437,7 @@ impl ApiState {
         let records: Src = if params.select.is_empty() {
             Arc::clone(&all)
         } else {
-            Arc::new(Scoped::new(Arc::clone(&all), &params.select, None))
+            Arc::new(Scoped::new(&all, &params.select, None))
         };
         let opts = params.options.apply(self.settings().defaults);
         let ins = self.insights(&tip, &*records, opts);

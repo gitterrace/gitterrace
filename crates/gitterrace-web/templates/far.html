@@ -1,0 +1,5 @@
+{% extends "_base.html" %}
+{% block content %}
+{% include "_tabs.html" %}
+<div class="card pad"><p>{{ why }}</p>{% if let Some(h) = indexed %}<p><a href="{{ h }}">Show this page for the indexed branch</a></p>{% endif %}<p class="muted">The code, history and commit views of this revision work as usual.</p></div>
+{% endblock %}

@@ -120,9 +120,9 @@ pub struct Scoped<'a> {
 
 impl<'a> Scoped<'a> {
     pub fn new(
-        base: Arc<dyn InsightsSource + 'a>,
+        base: &Arc<dyn InsightsSource + 'a>,
         sel: &Selection,
-        window: Option<Range<i64>>,
+        window: Option<&Range<i64>>,
     ) -> Self {
         let label_is = |id: Option<LabelId>, want: &str, none: &str| {
             id.and_then(|l| base.label(l)).as_deref().unwrap_or(none) == want
@@ -139,7 +139,7 @@ impl<'a> Scoped<'a> {
                     base.ident(c.ident)
                         .is_some_and(|(name, email)| email.eq_ignore_ascii_case(a) || &*name == a)
                 })
-                && window.as_ref().is_none_or(|w| w.contains(&c.time));
+                && window.is_none_or(|w| w.contains(&c.time));
             if keep {
                 cand.push(c.rank);
             }
@@ -165,7 +165,7 @@ impl<'a> Scoped<'a> {
             .map(|(i, (r, _))| (*r, u32::try_from(i).unwrap_or(u32::MAX)))
             .collect();
         Self {
-            base,
+            base: Arc::clone(base),
             kept,
             by_base,
         }
@@ -558,7 +558,7 @@ mod tests {
                     .filter(|r| w.as_ref().is_none_or(|w| w.contains(&r.time)))
                     .cloned()
                     .collect();
-                let v = Scoped::new(Arc::clone(&base), s, w.clone());
+                let v = Scoped::new(&base, s, w.as_ref());
                 assert_eq!(v.len(), want.len(), "{s:?} {w:?}");
                 let rows: Vec<_> = v.commits_in(CommitRange::All).collect();
                 for (i, (c, r)) in rows.iter().zip(&want).enumerate() {

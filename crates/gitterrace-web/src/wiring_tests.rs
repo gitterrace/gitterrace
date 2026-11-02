@@ -449,7 +449,7 @@ async fn events_deliver_each_kind_and_respect_the_stream_cap() {
         }
         assert!(
             std::time::Instant::now() < deadline,
-            "no change event after {n} commits"
+            "no change event, {n} tries"
         );
     };
     assert!(got.contains("\"refs\""), "a commit moves the refs: {got}");

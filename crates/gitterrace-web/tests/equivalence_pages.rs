@@ -132,6 +132,51 @@ fn every_cell_matches_the_oracle() {
     oracle::check(&golden, &dump(&golden), &answers);
 }
 
+/// The pages and API for a revision other than HEAD: the tip of `topic`, a branch with commits
+/// HEAD lacks, and `HEAD~3`, an older ancestor. Selected by `?rev=`, as the pages link it. Each
+/// rev must answer from its own history: serving HEAD's set for either one is red.
+#[test]
+fn other_revisions_match_the_oracle() {
+    if !oracle::frozen("other_revisions_match_the_oracle") {
+        return;
+    }
+    let rt = tokio::runtime::Runtime::new().expect("runtime");
+    let answers = rt.block_on(async {
+        let dir = tempfile::tempdir().expect("tmp");
+        let (repo, values) = oracle::matrix_repo(dir.path(), Mailmap::AsIs);
+        let f = gitterrace_testkit::Fixture::init(&repo)
+            .checkout("HEAD~3")
+            .branch("topic")
+            .at("2024-03-07T09:00:00Z")
+            .write("topic/a.rs", "fn t() {}\n")
+            .commit("feat(topic): only on the branch")
+            .at("2024-03-07T11:00:00Z")
+            .write("src/lib.rs", "fn topic() {}\n")
+            .commit("fix(core): topic edit")
+            .checkout("main");
+        let router = gitterrace_web::app_router(f.path()).expect("router");
+        oracle::ready(&router).await;
+        let cells: Vec<_> = matrix::cells()
+            .into_iter()
+            .filter(|c| c.mailmap == Mailmap::AsIs && !c.ws && !c.bots)
+            .filter(|c| c.filter == matrix::PathFilter::None)
+            .collect();
+        let mut out = BTreeMap::new();
+        for rev in ["topic", "HEAD~3"] {
+            oracle::ready_at(&router, rev).await;
+            let got = oracle::capture_rev(&router, &targets(), &cells, &values, rev).await;
+            out.extend(
+                scrub(got, dir.path())
+                    .into_iter()
+                    .map(|(k, v)| (format!("[{rev}] {k}"), v)),
+            );
+        }
+        out
+    });
+    let golden = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/golden/revisions.txt");
+    oracle::check(&golden, &dump(&golden), &answers);
+}
+
 /// The frozen clock really reaches the pages: without it the 1w window of the fixture is empty,
 /// with it the week's commit shows. Red if any of the hooks reads the wall clock again.
 #[test]

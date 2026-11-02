@@ -282,7 +282,10 @@ pub(crate) struct App {
     source: Mutex<Option<((String, u64), crate::insights::Src)>>,
     /// The same source as [`App::source`] holds when it reads the segment files, typed, so a
     /// store error it met turns into a rebuild.
-    disk: Mutex<Option<Arc<gitterrace_index::DiskSet>>>,
+    disk: Mutex<Option<Unreadable>>,
+    /// Commits whose insights are past the reach of the segment set, with how many commits
+    /// were read to find out, keyed by (commit, generation).
+    far: Mutex<Option<((String, u64), usize)>>,
     totals: Mutex<Option<TotalsEntry>>,
     /// Ignore files of one commit, `(path, text)`. Building the rules from them is cheap; finding
     /// them walks the whole tree.
@@ -340,6 +343,7 @@ impl App {
             records_used: Mutex::new(Instant::now()),
             source: Mutex::new(None),
             disk: Mutex::new(None),
+            far: Mutex::new(None),
             totals: Mutex::new(None),
             ignores: Mutex::new(None),
             memo: Mutex::new(crate::bounded::Bounded::new(small)),
@@ -827,14 +831,41 @@ impl App {
             if let Ok(mut u) = self.records_used.lock() {
                 *u = Instant::now();
             }
+            let checked = Arc::clone(&set);
             if let Ok(mut d) = self.disk.lock() {
-                *d = Some(Arc::clone(&set));
+                *d = Some(Arc::new(move || gitterrace_index::unreadable(&checked)));
             }
             let src: crate::insights::Src = set;
             if let Ok(mut g) = self.source.lock() {
                 *g = Some((key, Arc::clone(&src)));
             }
             return Ok(Some(src));
+        }
+        if self.index.newer_format().is_none()
+            && let Some(view) = self.index.rev_source(&self.repo, head, head)?
+        {
+            match view {
+                gitterrace_index::feed::RevView::Ready(reach) => {
+                    let checked = Arc::clone(&reach);
+                    if let Ok(mut d) = self.disk.lock() {
+                        *d = Some(Arc::new(move || {
+                            gitterrace_index::unreadable(checked.base())
+                        }));
+                    }
+                    let src: crate::insights::Src = reach;
+                    if let Ok(mut g) = self.source.lock() {
+                        *g = Some((key, Arc::clone(&src)));
+                    }
+                    return Ok(Some(src));
+                }
+                // Too far from the set: no records load, no reindex, the page says so.
+                gitterrace_index::feed::RevView::NeedsReindex { read } => {
+                    if let Ok(mut f) = self.far.lock() {
+                        *f = Some((key, read));
+                    }
+                    return Ok(None);
+                }
+            }
         }
         let Some(recs) = self.records(head)? else {
             return Ok(None);
@@ -854,7 +885,8 @@ impl App {
             .disk
             .lock()
             .ok()
-            .and_then(|d| d.as_deref().and_then(gitterrace_index::unreadable));
+            .and_then(|d| d.as_ref().map(Arc::clone))
+            .and_then(|check| check());
         let Some(why) = bad else {
             return Ok(());
         };
@@ -872,6 +904,14 @@ impl App {
         self.wake.notify_one();
         self.demand();
         Ok(())
+    }
+
+    /// Commits read before `head` was found too far from the segment set, when its insights
+    /// are not served for that reason (the last [`App::source`] call for it said so).
+    pub(crate) fn far(&self, head: &str) -> Option<usize> {
+        let key = (head.to_owned(), self.index.generation());
+        let f = self.far.lock().ok()?;
+        f.as_ref().filter(|(k, _)| *k == key).map(|(_, n)| *n)
     }
 
     #[cfg(test)]
@@ -939,6 +979,9 @@ impl App {
         self.record_loads.load(Ordering::Relaxed)
     }
 }
+
+/// Whether the set behind a served source met a store error, and which.
+type Unreadable = Arc<dyn Fn() -> Option<String> + Send + Sync>;
 
 /// Runs git or index work off the async threads.
 pub(crate) async fn blocking<T: Send + 'static>(
@@ -1196,7 +1239,11 @@ fn touching_history(
                 .as_deref()
                 .unwrap_or_default()
                 .to_owned();
-            let parents = src.parent_ids(rank).iter().map(|p| p.to_string()).collect();
+            let parents = src
+                .parent_ids(rank)
+                .iter()
+                .map(ToString::to_string)
+                .collect();
             (id, parents, touched)
         })
         .collect();

@@ -412,9 +412,10 @@ mod tests {
     #[tokio::test]
     async fn server_errors_hide_the_inner_message() {
         let (d, s) = fixture();
-        let commits = d.path().join(".git/gitterrace/commits.jsonl");
-        let _ = std::fs::remove_file(&commits);
-        std::fs::create_dir(&commits).expect("mkdir");
+        // Pages read the segment set: a manifest that cannot be read is an index error.
+        let manifest = d.path().join(".git/gitterrace/MANIFEST");
+        std::fs::remove_file(&manifest).expect("rm manifest");
+        std::fs::create_dir(&manifest).expect("mkdir");
         let (st, v) = get(&s, "/repo").await;
         assert_eq!(st, StatusCode::INTERNAL_SERVER_ERROR);
         assert_eq!(v["error"]["code"], "index");

@@ -10,6 +10,7 @@ mod charts;
 mod commit_types;
 mod compare;
 mod error;
+mod far;
 mod filter;
 mod fmt;
 mod gitstate;
@@ -158,8 +159,8 @@ pub const WARM_PAGES: [&str; 9] = [
     "/stats/patterns",
 ];
 
-/// Parses the record set for HEAD each time the index moves, then renders the unfiltered pages
-/// once, so the first visit to any of them is served from the memo. Sleeps between moves.
+/// Opens the insights source for HEAD each time the index moves, then renders the unfiltered
+/// pages once, so the first visit to any of them is served from the memo. Sleeps between moves.
 async fn prewarm(app: Arc<App>, pages: axum::Router) {
     use tower::ServiceExt;
     let by = Arc::clone(&app);
@@ -168,7 +169,7 @@ async fn prewarm(app: Arc<App>, pages: axum::Router) {
         async move {
             let ready = app::blocking(&app, |a| {
                 let head = a.repo.resolve("HEAD")?;
-                Ok(a.records(&head)?.is_some())
+                Ok(a.source(&head)?.is_some())
             })
             .await
             .unwrap_or(false);

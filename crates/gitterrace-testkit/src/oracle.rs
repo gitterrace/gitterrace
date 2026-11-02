@@ -161,8 +161,15 @@ pub fn matrix_repo(dir: &Path, mailmap: Mailmap) -> (std::path::PathBuf, Values)
 
 /// Waits until the insights pages no longer show the indexing progress.
 pub async fn ready(router: &Router) {
+    ready_at(router, "HEAD").await;
+}
+
+/// Waits until the insights of `rev` no longer show the indexing progress: a revision other
+/// than HEAD loads its own record set on the first visit.
+pub async fn ready_at(router: &Router, rev: &str) {
+    let probe = format!("/stats?rev={}", crate::matrix::enc(rev));
     for _ in 0..600 {
-        let (_, body) = page(router, "/stats").await;
+        let (_, body) = page(router, &probe).await;
         if !body.contains("data-progress") {
             return;
         }
@@ -192,6 +199,32 @@ pub async fn capture(
     let mut out = BTreeMap::new();
     for cell in cells {
         let q = cell.query(values);
+        for t in targets {
+            let key = format!("{t}?{q}");
+            let (status, body) = page(router, &key).await;
+            let body = normalize(&body);
+            let v = if status == 200 {
+                body
+            } else {
+                format!("status {status}\n{body}")
+            };
+            out.insert(key, v);
+        }
+    }
+    out
+}
+
+/// [`capture`] with `rev=<rev>` appended to every query: the page or API for that revision.
+pub async fn capture_rev(
+    router: &Router,
+    targets: &[String],
+    cells: &[Cell],
+    values: &Values,
+    rev: &str,
+) -> BTreeMap<String, String> {
+    let mut out = BTreeMap::new();
+    for cell in cells {
+        let q = format!("{}&rev={}", cell.query(values), crate::matrix::enc(rev));
         for t in targets {
             let key = format!("{t}?{q}");
             let (status, body) = page(router, &key).await;
@@ -288,20 +321,11 @@ pub fn tie_only(old: &str, new: &str) -> bool {
     true
 }
 
-/// Keys whose digest differs between the golden text `prev` and `answers`, or that exist on
-/// one side only.
-fn moved_keys(prev: &str, answers: &BTreeMap<String, String>) -> Vec<String> {
-    let want: BTreeMap<&str, &str> = prev
-        .lines()
-        .filter(|l| !l.starts_with('#'))
-        .filter_map(|l| l.split_once(' ').map(|(d, k)| (k, d)))
-        .collect();
-    let mut keys: std::collections::BTreeSet<&str> = want.keys().copied().collect();
-    keys.extend(answers.keys().map(String::as_str));
-    keys.into_iter()
-        .filter(|k| want.get(k).copied() != answers.get(*k).map(|v| digest(v)).as_deref())
-        .map(str::to_owned)
-        .collect()
+/// One golden line: `exact canonical key`, the canonical digest being [`canonical`]'s.
+fn golden_line(l: &str) -> Option<(&str, (&str, &str))> {
+    let (exact, rest) = l.split_once(' ')?;
+    let (canon, key) = rest.split_once(' ')?;
+    Some((key, (exact, canon)))
 }
 
 /// Prints the tie-only count per page (the key without its option query).
@@ -318,27 +342,29 @@ fn report_ties(ties: &[String]) {
     }
 }
 
-/// Splits the keys whose digest moved into tie-only reorders and real differences.
-///
-/// Reads the old bodies from `old_dir` (a `TEST_ORACLE_DUMP` of the reference run). Returns
-/// (tie-only keys, other keys). A key without an old body counts as a real difference.
+/// The body with every run of consecutive rows of one sort key sorted: two bodies that differ
+/// only by order within equal-time runs have the same canonical form, and nothing else does.
 #[must_use]
-pub fn classify(
-    old_dir: &Path,
-    answers: &BTreeMap<String, String>,
-    moved: &[String],
-) -> (Vec<String>, Vec<String>) {
-    let (mut ties, mut real) = (Vec::new(), Vec::new());
-    for k in moved {
-        let old = std::fs::read_to_string(old_dir.join(digest(k)))
-            .ok()
-            .and_then(|b| b.split_once('\n').map(|(_, body)| normalize(body)));
-        match (old, answers.get(k)) {
-            (Some(o), Some(n)) if tie_only(&o, n) => ties.push(k.clone()),
-            _ => real.push(k.clone()),
+pub fn canonical(body: &str) -> String {
+    let all = units(body);
+    let mut out: Vec<&str> = Vec::with_capacity(all.len());
+    let mut at = 0;
+    while at < all.len() {
+        let Some(key) = row_key(all[at]) else {
+            out.push(all[at]);
+            at += 1;
+            continue;
+        };
+        let mut end = at;
+        while end < all.len() && row_key(all[end]) == Some(key) {
+            end += 1;
         }
+        let mut run = all[at..end].to_vec();
+        run.sort_unstable();
+        out.extend(run);
+        at = end;
     }
-    (ties, real)
+    out.join("\n")
 }
 
 /// FNV-1a 128: stable across platforms and releases, unlike `DefaultHasher`.
@@ -352,15 +378,16 @@ pub fn digest(body: &str) -> String {
     format!("{h:032x}")
 }
 
-/// Compares `answers` to the golden file at `golden` (one `digest key` line each).
+/// Compares `answers` to the golden file at `golden` (`exact canonical key` per line).
 ///
-/// Under `TEST_BLESS=1` writes the file instead. On a mismatch writes every differing body to
+/// An answer passes when its exact digest matches, or when only equal-time rows moved (the
+/// canonical digest matches); those are counted per page on stderr. Under `TEST_BLESS=1` writes the file instead. On a mismatch writes every differing body to
 /// `dump` (a folder under `target/`, the caller's `CARGO_TARGET_TMPDIR`) and panics with the
 /// first keys and that path. A green run removes a stale `dump`.
 pub fn check(golden: &Path, dump: &Path, answers: &BTreeMap<String, String>) {
     let mut text = String::new();
     for (k, v) in answers {
-        writeln!(text, "{} {k}", digest(v)).expect("write string");
+        writeln!(text, "{} {} {k}", digest(v), digest(&canonical(v))).expect("write string");
     }
     if let Some(dir) = std::env::var_os("TEST_ORACLE_DUMP") {
         // Every body, one file per answer, to diff two runs when a digest moves.
@@ -372,22 +399,9 @@ pub fn check(golden: &Path, dump: &Path, answers: &BTreeMap<String, String>) {
         }
     }
     if std::env::var_os("TEST_BLESS").is_some() {
-        // A re-bless over an existing golden must name the reference bodies, so only tie-only
-        // reorders can move a digest. A first bless (no golden yet) needs none.
-        if let Ok(prev) = std::fs::read_to_string(golden) {
-            let old = std::env::var_os("TEST_ORACLE_OLD").unwrap_or_else(|| {
-                panic!("re-bless needs TEST_ORACLE_OLD=<TEST_ORACLE_DUMP of the reference run>")
-            });
-            let moved = moved_keys(&prev, answers);
-            let (ties, real) = classify(Path::new(&old), answers, &moved);
-            report_ties(&ties);
-            assert!(
-                real.is_empty(),
-                "re-bless refused, {} real differences: {:?}",
-                real.len(),
-                &real[..real.len().min(5)]
-            );
-        }
+        // Only the reference build blesses: today's code, never the code under test. Each line
+        // keeps the exact digest and the digest of the body with equal-time runs sorted, so a
+        // later implementation may order ties differently and nothing else.
         let header: String = std::env::var("TEST_ORACLE_REASON")
             .map(|r| format!("# {r}\n"))
             .unwrap_or_default();
@@ -401,22 +415,26 @@ pub fn check(golden: &Path, dump: &Path, answers: &BTreeMap<String, String>) {
             golden.display()
         )
     });
-    let want: BTreeMap<&str, &str> = want
+    let want: BTreeMap<&str, (&str, &str)> = want
         .lines()
         .filter(|l| !l.starts_with('#'))
-        .filter_map(|l| l.split_once(' ').map(|(d, k)| (k, d)))
-        .collect();
-    let got: BTreeMap<&str, String> = answers
-        .iter()
-        .map(|(k, v)| (k.as_str(), digest(v)))
+        .filter_map(golden_line)
         .collect();
     let mut bad: Vec<String> = Vec::new();
-    let mut keys: std::collections::BTreeSet<&&str> = want.keys().collect();
-    keys.extend(got.keys());
+    let mut ties: Vec<String> = Vec::new();
+    let mut keys: std::collections::BTreeSet<&str> = want.keys().copied().collect();
+    keys.extend(answers.keys().map(String::as_str));
     for k in keys {
-        if want.get(k).copied() != got.get(k).map(String::as_str) {
-            bad.push((*k).to_owned());
+        match (want.get(k), answers.get(k)) {
+            (Some((exact, _)), Some(v)) if *exact == digest(v) => {}
+            (Some((_, canon)), Some(v)) if *canon == digest(&canonical(v)) => {
+                ties.push(k.to_owned());
+            }
+            _ => bad.push(k.to_owned()),
         }
+    }
+    if !ties.is_empty() {
+        report_ties(&ties);
     }
     if bad.is_empty() {
         if dump.exists() {
@@ -435,7 +453,7 @@ pub fn check(golden: &Path, dump: &Path, answers: &BTreeMap<String, String>) {
     panic!(
         "{} of {} answers differ from {} (bodies in {}), first: {:?}",
         bad.len(),
-        want.len().max(got.len()),
+        want.len().max(answers.len()),
         golden.display(),
         dump.display(),
         &bad[..bad.len().min(5)]
@@ -444,7 +462,7 @@ pub fn check(golden: &Path, dump: &Path, answers: &BTreeMap<String, String>) {
 
 #[cfg(test)]
 mod tests {
-    use crate::oracle::{digest, tie_only};
+    use crate::oracle::{canonical, digest, tie_only};
 
     fn row(time: &str, who: &str) -> String {
         format!(
@@ -521,6 +539,30 @@ mod tests {
         assert!(
             !tie_only(&old, &one(&[a, c, b])),
             "cross-time swap on one line"
+        );
+    }
+
+    /// The golden's canonical digest accepts exactly what `tie_only` accepts: equal-time swaps.
+    #[test]
+    fn canonical_form_folds_ties_and_nothing_else() {
+        let one = |rows: &[String]| format!("<ul>{}</ul>", rows.concat());
+        let (a, b, c) = (
+            row("2024-01-01 12:00", "a"),
+            row("2024-01-01 12:00", "b"),
+            row("2023-01-01 12:00", "c"),
+        );
+        let old = one(&[a.clone(), b.clone(), c.clone()]);
+        assert_eq!(
+            canonical(&old),
+            canonical(&one(&[b.clone(), a.clone(), c.clone()]))
+        );
+        assert_ne!(
+            canonical(&old),
+            canonical(&one(&[a.clone(), c.clone(), b.clone()]))
+        );
+        assert_ne!(
+            canonical(&old),
+            canonical(&one(&[a, b, row("2023-01-01 12:00", "z")]))
         );
     }
 
