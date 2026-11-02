@@ -55,7 +55,7 @@ async fn main() -> anyhow::Result<()> {
             let m = &loaded.config.multi;
             let repos = gitterrace_web::discover_repos(&cli.paths, m.depth, &m.skip_dirs);
             if !loaded.config.server.public
-                && open::join_running(addr, &repos, gitterrace_web::state_dir().as_deref())
+                && open::join_running(addr, &repos, gitterrace_web::state_dir().as_deref())?
             {
                 return Ok(());
             }

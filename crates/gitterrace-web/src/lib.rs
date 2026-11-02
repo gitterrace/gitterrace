@@ -74,8 +74,8 @@ pub fn app_router_with(repo_path: impl AsRef<Path>, cfg: Config) -> io::Result<a
     Ok(build(repo_path.as_ref(), None, None, &Env::new(cfg))?.0)
 }
 
-/// Router for several repositories: an index at `/`, each repository under `/r/NAME`.
-/// One path behaves exactly like [`app_router`]. Same Host rules.
+/// Router for one or more repositories, each under `/r/NAME`; `/` forwards to a lone one and
+/// indexes several. Same Host rules. Names come from folder names, not the registry.
 pub fn multi_router(paths: Vec<PathBuf>) -> io::Result<axum::Router> {
     Ok(build_multi(paths, None, None, &Env::new(Config::default()))?.0)
 }
@@ -232,9 +232,9 @@ fn build_multi(
     build_server(paths, extra, actions_file, env, None, None)
 }
 
-/// The whole server. One path serves its repository at `/`, several get an index there; both
-/// keep a repository table, so `add` (the secret `POST /_repos` checks, `None` leaves the route
-/// unmounted) can grow either under `/r/NAME`. `state` is where an addition is recorded.
+/// The whole server: a repository table, every repository under `/r/NAME`, so `add` (the secret
+/// `POST /_repos` checks, `None` leaves the route unmounted) grows it without moving a link.
+/// `state` is where names and additions are recorded.
 fn build_server(
     paths: Vec<PathBuf>,
     extra: Option<IpAddr>,
@@ -244,35 +244,8 @@ fn build_server(
     state: Option<PathBuf>,
 ) -> io::Result<(axum::Router, String)> {
     let n = paths.len();
-    let single = match <[PathBuf; 1]>::try_from(paths) {
-        Ok([one]) => Ok(one),
-        Err(paths) => Err(paths),
-    };
-    let (mut table, targets, primary) = match single {
-        Ok(one) => {
-            let repo = Repo::discover(&one).map_err(io::Error::other)?;
-            let name = repo.name();
-            let primary = multi::Primary {
-                name: name.clone(),
-                root: repo.root(),
-            };
-            let target = actions::Target {
-                key: name.clone(),
-                base: String::new(),
-                repo,
-            };
-            (
-                multi::Table::beside(primary, env.clone()),
-                vec![target],
-                Some((one, name)),
-            )
-        }
-        Err(paths) => {
-            let table = multi::Table::new(paths, env.clone())?;
-            let targets = table.targets()?;
-            (table, targets, None)
-        }
-    };
+    let mut table = multi::Table::new(paths, env.clone(), state.clone())?;
+    let targets = table.targets()?;
     let roots: Vec<PathBuf> = targets.iter().map(|t| t.repo.root()).collect();
     // A public server never reads actions.toml: no run route, no Send to targets.
     let actions_file = actions_file.filter(|_| !env.public());
@@ -296,16 +269,9 @@ fn build_server(
         env: env.clone(),
     });
     let table = Arc::new(table);
-    let (router, shown) = match primary {
-        Some((one, name)) => {
-            let pages = repo_router(&one, String::new(), name.clone(), live, env)?;
-            (pages.merge(multi::added_router(Arc::clone(&table))), name)
-        }
-        None => (
-            multi::router(Arc::clone(&table)),
-            fmt::count(n, "repository", "repositories"),
-        ),
-    };
+    table.start_all();
+    let router = multi::router(Arc::clone(&table));
+    let shown = fmt::count(n, "repository", "repositories");
     let mut router = router.merge(actions::router(Arc::clone(&site)));
     // A non-loopback bind or a public server never takes additions: the token is the only
     // gate a remote client would face.
@@ -454,7 +420,7 @@ fn publish_add_token(dir: &Path, port: u16) -> Option<gitterrace_actions::Token>
 #[cfg(test)]
 mod tests {
     use gitterrace_testkit::{Fixture, git};
-    use std::sync::Arc;
+    use std::{path::PathBuf, sync::Arc};
 
     use axum::{body::Body, http::Request};
     use http_body_util::BodyExt;
@@ -463,6 +429,7 @@ mod tests {
     #[cfg(unix)]
     use crate::actions::actions_tests;
     use crate::{app::App, routes};
+    use gitterrace_git::Repo;
 
     async fn get(app: &Arc<App>, uri: &str) -> (u16, String) {
         gitterrace_testkit::get(&routes::router(Arc::clone(app)), uri).await
@@ -803,8 +770,9 @@ mod tests {
         git(p, &["add", "."]);
         git(p, &["commit", "-q", "-m", "feat: first"]);
         let router = crate::app_router(p).expect("router");
+        let base = gitterrace_testkit::base(&router).await;
         let status = |uri: &'static str| {
-            let r = router.clone();
+            let (r, uri) = (router.clone(), format!("{base}{uri}"));
             async move {
                 r.oneshot(
                     Request::get(uri)
@@ -820,6 +788,7 @@ mod tests {
         };
         assert_eq!(status("/api/v1/repo").await, 200);
         assert_eq!(status("/").await, 200);
+        assert_eq!(status("/r/x/").await, 404, "no page under a page");
         assert_eq!(status("/badges/commits.svg").await, 404);
         assert_eq!(status("/cards/wrapped/2025.svg").await, 404);
     }
@@ -890,6 +859,7 @@ mod tests {
         git(p, &["add", "."]);
         git(p, &["commit", "-q", "-m", "init"]);
         let router = crate::app_router(p).expect("router");
+        let base = gitterrace_testkit::base(&router).await;
         let evil = gitterrace_testkit::on_port("evil.example");
         for (host, want) in [
             (Some(evil.as_str()), 403),
@@ -897,7 +867,7 @@ mod tests {
             (Some("localhost"), 200),
             (Some(gitterrace_testkit::DEFAULT_ADDR), 200),
         ] {
-            let mut b = Request::get("/api/v1/repo");
+            let mut b = Request::get(format!("{base}/api/v1/repo"));
             if let Some(h) = host {
                 b = b.header("host", h);
             }
@@ -925,7 +895,7 @@ mod tests {
             assert_eq!(res.headers()["cross-origin-resource-policy"], "same-origin");
         }
         for site in [Some("same-origin"), Some("none"), None] {
-            let res = send("/", site).await.expect("response");
+            let res = send(&format!("{base}/"), site).await.expect("response");
             assert_eq!(res.status().as_u16(), 200, "{site:?}");
             let h = res.headers();
             assert_eq!(h["cross-origin-resource-policy"], "same-origin");
@@ -933,7 +903,9 @@ mod tests {
             let csp = h["content-security-policy"].to_str().expect("ascii");
             assert!(csp.contains("frame-ancestors 'none'") && csp.contains("script-src 'self'"));
         }
-        let res = send("/api/v1/repo", None).await.expect("response");
+        let res = send(&format!("{base}/api/v1/repo"), None)
+            .await
+            .expect("response");
         assert_eq!(res.headers()["x-content-type-options"], "nosniff");
         assert!(!res.headers().contains_key("content-security-policy"));
     }
@@ -1095,28 +1067,77 @@ mod tests {
         );
     }
 
+    /// Guard (c): two repositories with one folder name. The first to arrive keeps the plain
+    /// name, the newcomer gets `-<hash6>`, and both names survive a restart in the other order:
+    /// they come from the registry, never from arrival order.
     #[test]
-    fn duplicate_folder_names_get_a_suffix() {
+    fn a_clashing_folder_name_is_first_come_and_frozen() {
         let dir = tempfile::tempdir().expect("tmp");
-        let a = fixture("same", &dir.path().join("x"));
-        let b = fixture("same", &dir.path().join("y"));
-        let t = crate::multi::Table::new(
-            vec![a, b],
-            crate::app::Env::new(gitterrace_config::Config::default()),
-        )
-        .expect("table");
-        assert!(t.get("same").is_some() && t.get("same-2").is_some());
+        let state = dir.path().join("state");
+        let z = fixture("app", &dir.path().join("z"));
+        let a = fixture("app", &dir.path().join("a"));
+        let env = || crate::app::Env::new(gitterrace_config::Config::default());
+        let names = |paths: Vec<PathBuf>| {
+            let t =
+                crate::multi::Table::new(paths.clone(), env(), Some(state.clone())).expect("table");
+            paths
+                .iter()
+                .map(|p| {
+                    let root = Repo::discover(p).expect("repo").root();
+                    t.name_of(&root).expect("served")
+                })
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(names(vec![z.clone()]), ["app"], "alone it is plain");
+        let both = names(vec![z.clone(), a.clone()]);
+        assert_eq!(both[0], "app", "the first come keeps it");
+        assert!(
+            both[1].starts_with("app-") && both[1].len() == 10,
+            "{both:?}"
+        );
+        let reversed = names(vec![a, z]);
+        assert_eq!(reversed, [both[1].clone(), both[0].clone()], "frozen");
+    }
+
+    /// Without a registry the same rule runs against the table: a clash still gets a stable
+    /// path-derived suffix, never a counter that depends on order.
+    #[test]
+    fn without_a_registry_a_clash_is_named_by_its_path() {
+        let dir = tempfile::tempdir().expect("tmp");
+        let x = fixture("same", &dir.path().join("x"));
+        let y = fixture("same", &dir.path().join("y"));
+        let env = || crate::app::Env::new(gitterrace_config::Config::default());
+        let t = crate::multi::Table::new(vec![x.clone(), y.clone()], env(), None).expect("t");
+        let y_root = Repo::discover(&y).expect("repo").root();
+        let y_name = t.name_of(&y_root).expect("served");
+        assert!(t.get("same").is_some() && y_name.starts_with("same-"));
+        let t = crate::multi::Table::new(vec![y, x], env(), None).expect("t");
+        assert_eq!(
+            t.name_of(&y_root).as_deref(),
+            Some("same"),
+            "no registry, no memory"
+        );
     }
 
     #[tokio::test]
-    async fn single_repo_urls_are_unprefixed() {
+    async fn a_single_repository_lives_under_its_name() {
         let dir = tempfile::tempdir().expect("tmp");
         let a = fixture("solo", dir.path());
         let router = crate::multi_router(vec![a]).expect("router");
-        let (_, body) = fetch(&router, "/", "localhost").await;
-        assert!(body.contains("href=\"/log/HEAD\"") && !body.contains("/r/solo"));
-        assert!(body.contains("<meta name=\"gt-base\" content=\"\">"));
-        assert!(!body.contains("repobtn"));
+        let (s, _) = fetch(&router, "/", "localhost").await;
+        assert_eq!(s, 302, "/ forwards to the one repository");
+        let (_, body) = fetch(&router, "/r/solo/", "localhost").await;
+        assert!(body.contains("href=\"/r/solo/log/HEAD\""));
+        assert!(body.contains("<meta name=\"gt-base\" content=\"/r/solo\">"));
+        assert!(
+            body.contains("id=\"reposwitch\" hidden"),
+            "one repository, no switcher"
+        );
+        assert_eq!(
+            fetch(&router, "/log/HEAD", "localhost").await.0,
+            404,
+            "no unprefixed pages"
+        );
     }
 
     fn rev_fixture(root: &std::path::Path) -> std::path::PathBuf {
@@ -1409,8 +1430,9 @@ mod tests {
         ];
         let mut todo = vec![
             "/".to_owned(),
-            "/api/v1/repo".to_owned(),
-            "/api/v1/refs".to_owned(),
+            "/r/alpha/".to_owned(),
+            "/r/alpha/api/v1/repo".to_owned(),
+            "/r/alpha/api/v1/refs".to_owned(),
         ];
         let mut seen = std::collections::HashSet::new();
         let mut bad = Vec::new();
@@ -1428,24 +1450,26 @@ mod tests {
                 bad.push(format!("{u} shows {l}"));
             }
             for l in ["/worktree", "/stashes", "/events", "/_send", "/_actions"] {
-                if body.contains(&format!("href=\"{l}")) {
+                if body.contains(&format!("href=\"{l}"))
+                    || body.contains(&format!("href=\"/r/alpha{l}"))
+                {
                     bad.push(format!("{u} links {l}"));
                 }
             }
         }
         assert!(seen.len() > 20, "crawl too shallow: {}", seen.len());
         for u in [
-            "/worktree",
-            "/worktrees",
-            "/stashes",
-            "/events",
+            "/r/alpha/worktree",
+            "/r/alpha/worktrees",
+            "/r/alpha/stashes",
+            "/r/alpha/events",
             "/_actions/status",
-            "/_send/targets",
-            "/commit/stash",
-            "/log/refs/stash",
-            "/tree/stash",
-            "/api/v1/log?rev=stash",
-            "/api/v1/blob?rev=stash&path=wip.txt",
+            "/r/alpha/_send/targets",
+            "/r/alpha/commit/stash",
+            "/r/alpha/log/refs/stash",
+            "/r/alpha/tree/stash",
+            "/r/alpha/api/v1/log?rev=stash",
+            "/r/alpha/api/v1/blob?rev=stash&path=wip.txt",
         ] {
             let (s, body) = fetch(&router, u, "git.example.com").await;
             if s == 200 || body.contains("uncommitted-secret") {
@@ -1478,7 +1502,7 @@ mod tests {
         let res = router
             .clone()
             .oneshot(
-                Request::get("/")
+                Request::get("/r/alpha/")
                     .header("host", "GIT.example.com:443")
                     .header("sec-fetch-site", "cross-site")
                     .body(Body::empty())

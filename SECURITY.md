@@ -18,9 +18,9 @@ You will get an acknowledgement within a few days. We aim for a fix or a mitigat
 ## What gitterrace does, and where the risk is
 
 gitterrace serves a git repository as web pages on your own machine. It reads the
-repository and never writes to it. What it shows (file contents, commit messages, branch
-names) comes from the repository, so treat it as untrusted input from whoever wrote the
-repository.
+repository and never changes its files or history. What it shows (file contents, commit
+messages, branch names) comes from the repository, so treat it as untrusted input from whoever
+wrote the repository.
 
 In scope:
 
@@ -45,6 +45,10 @@ In scope:
   folder with mode `0700`. On Windows those modes do not exist, so the token file's privacy
   rests on the permissions of your user profile folder. Reaching this endpoint from a
   page, another user or a public server is in scope.
+  Before it sends a path, `git terrace` checks who listens. `GET /_repos?nonce=N` must
+  answer the SHA-256 of the token and that fresh nonce, so the token itself never leaves
+  the server. A listener that cannot answer, such as another program or another user's
+  server, is never sent a path.
 - **Static export.** `git terrace export` writes plain files only, and only below its
   output folder. It refuses to write through a symlink, and it leaves out non-inert media
   under `raw/`. A leak through an export, such as a working tree file, a host path or a

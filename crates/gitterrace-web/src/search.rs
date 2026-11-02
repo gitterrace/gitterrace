@@ -3,7 +3,7 @@
 use std::{
     sync::{
         Arc, Mutex,
-        atomic::{AtomicBool, AtomicUsize, Ordering},
+        atomic::{AtomicUsize, Ordering},
     },
     time::Instant,
 };
@@ -29,6 +29,9 @@ const MAX_PER_FILE: usize = 100;
 const MAX_COMMITS: usize = 200;
 /// Files above this are skipped: they are generated or vendored far more often than read.
 const MAX_LINE_CHARS: usize = 300;
+/// Files scanned in parallel before their results are merged in order and the cap checked:
+/// large enough to keep every worker busy, small enough that a capped query stops early.
+const SCAN_CHUNK: usize = 256;
 
 #[derive(Deserialize, Default)]
 pub(crate) struct SearchQuery {
@@ -84,8 +87,29 @@ pub(crate) async fn search(
     State(app): State<Arc<App>>,
     Query(q): Query<SearchQuery>,
 ) -> Result<Html<String>> {
-    let p = blocking(&app, move |a| run(a, q)).await?;
-    Ok(Html(p.render()?))
+    let (key, q) = blocking(&app, move |a| Ok((memo_key(a, &q), q))).await?;
+    if let Some(h) = app.memo_get(&key) {
+        return Ok(Html((*h).clone()));
+    }
+    let html = blocking(&app, move |a| run(a, q)).await?.render()?;
+    app.memo_put(key, Arc::new(html.clone()));
+    Ok(Html(html))
+}
+
+/// Key for one rendered search: the memo key moves with HEAD, the index and config, and the
+/// query part pins the searched commit, so a repeat at the same tip skips the scan.
+fn memo_key(a: &App, q: &SearchQuery) -> String {
+    let rev = q.rev.as_deref().filter(|r| !r.is_empty()).unwrap_or("HEAD");
+    let commit = a.repo.resolve(rev).unwrap_or_default();
+    let query = format!(
+        "{rev}\0{commit}\0{}\0{:?}\0{}\0{}\0{}",
+        q.q.as_deref().unwrap_or_default(),
+        q.kind,
+        q.regex.is_some(),
+        q.case.is_some(),
+        q.glob.as_deref().unwrap_or_default(),
+    );
+    a.memo_key("search", Some(&query))
 }
 
 fn run(a: &App, q: SearchQuery) -> Result<SearchPage> {
@@ -236,6 +260,12 @@ fn glob_regex(glob: &str) -> std::result::Result<Option<Regex>, String> {
         .map_err(|e| e.to_string())
 }
 
+enum Scanned {
+    Skipped,
+    Miss,
+    Hits(FileHits),
+}
+
 struct CodeOut {
     files: Vec<FileHits>,
     matches: usize,
@@ -252,61 +282,70 @@ fn search_code(a: &App, rev: &str, re: &Regex, glob: Option<&Regex>) -> Result<C
         .filter(|f| glob.is_none_or(|g| g.is_match(&f.path)))
         .collect();
     let max_matches = a.cfg().limits.search_matches;
-    let next = AtomicUsize::new(0);
-    let total = AtomicUsize::new(0);
-    let scanned = AtomicUsize::new(0);
-    let skipped = AtomicUsize::new(0);
-    let stop = AtomicBool::new(false);
-    let found: Mutex<Vec<FileHits>> = Mutex::new(Vec::new());
     let workers = std::thread::available_parallelism()
         .map_or(2, usize::from)
         .min(8);
     let rev_enc = fmt::enc_seg(rev);
-    std::thread::scope(|s| {
-        for _ in 0..workers {
-            s.spawn(|| {
-                let Ok(reader) = BlobReader::open(&a.repo) else {
-                    return;
-                };
-                while !stop.load(Ordering::Relaxed) {
-                    let i = next.fetch_add(1, Ordering::Relaxed);
-                    let Some(f) = list.get(i) else { break };
-                    let Some(text) = reader.text(f.blob, a.repo.text_limit()) else {
-                        skipped.fetch_add(1, Ordering::Relaxed);
-                        continue;
-                    };
-                    scanned.fetch_add(1, Ordering::Relaxed);
-                    if !re.is_match(&text) {
-                        continue;
+    let mut readers: Vec<BlobReader> = (0..workers)
+        .filter_map(|_| BlobReader::open(&a.repo).ok())
+        .collect();
+    let mut out = CodeOut {
+        files: Vec::new(),
+        matches: 0,
+        scanned: 0,
+        skipped: 0,
+        capped: false,
+    };
+    // Chunks are scanned in parallel but merged in path order, so a capped result is always
+    // the same first files: the page is memoized, and a race must not decide what it keeps.
+    for chunk in list.chunks(SCAN_CHUNK) {
+        let next = AtomicUsize::new(0);
+        let slots: Vec<Mutex<Option<Scanned>>> = chunk.iter().map(|_| Mutex::new(None)).collect();
+        std::thread::scope(|s| {
+            for reader in &mut readers {
+                let (next, slots) = (&next, &slots);
+                let rev_enc = &rev_enc;
+                s.spawn(move || {
+                    loop {
+                        let i = next.fetch_add(1, Ordering::Relaxed);
+                        let (Some(f), Some(slot)) = (chunk.get(i), slots.get(i)) else {
+                            break;
+                        };
+                        let r = match reader.text(f.blob, a.repo.text_limit()) {
+                            None => Scanned::Skipped,
+                            Some(text) if re.is_match(&text) => {
+                                Scanned::Hits(file_hits(&f.path, rev_enc, &text, re))
+                            }
+                            Some(_) => Scanned::Miss,
+                        };
+                        if let Ok(mut g) = slot.lock() {
+                            *g = Some(r);
+                        }
                     }
-                    let mut hits = file_hits(&f.path, &rev_enc, &text, re);
+                });
+            }
+        });
+        for slot in slots {
+            match slot.into_inner().ok().flatten() {
+                Some(Scanned::Skipped) | None => out.skipped += 1,
+                Some(Scanned::Miss) => out.scanned += 1,
+                Some(Scanned::Hits(mut hits)) => {
+                    out.scanned += 1;
                     if hits.count == 0 {
                         continue;
                     }
-                    let room = max_matches.saturating_sub(total.load(Ordering::Relaxed));
-                    if hits.count > room {
-                        hits.count = room;
-                    }
-                    if total.fetch_add(hits.count, Ordering::Relaxed) + hits.count >= max_matches {
-                        stop.store(true, Ordering::Relaxed);
-                    }
-                    if let Ok(mut g) = found.lock() {
-                        g.push(hits);
+                    hits.count = hits.count.min(max_matches - out.matches);
+                    out.matches += hits.count;
+                    out.files.push(hits);
+                    if out.matches >= max_matches {
+                        out.capped = true;
+                        return Ok(out);
                     }
                 }
-            });
+            }
         }
-    });
-    let mut files = found.into_inner().unwrap_or_default();
-    files.sort_by(|x, y| x.path.cmp(&y.path));
-    let matches = files.iter().map(|f| f.count).sum();
-    Ok(CodeOut {
-        files,
-        matches,
-        scanned: scanned.load(Ordering::Relaxed),
-        skipped: skipped.load(Ordering::Relaxed),
-        capped: stop.load(Ordering::Relaxed),
-    })
+    }
+    Ok(out)
 }
 
 /// Hit lines of one file, each with one line of context before and after.
@@ -417,7 +456,82 @@ fn search_commits(
 
 #[cfg(test)]
 mod tests {
-    use crate::search::{build_regex, file_hits, glob_regex, highlight};
+    use std::sync::Arc;
+
+    use axum::extract::{Query, State};
+
+    use crate::search::{
+        SearchQuery, build_regex, file_hits, glob_regex, highlight, memo_key, search, search_code,
+    };
+
+    /// Guard: a repeat search at the same tip is served from the memo, not rescanned. The
+    /// memo entry is swapped for a marker; a handler that scans again would not return it.
+    #[tokio::test]
+    async fn repeat_search_at_one_tip_is_memoized() {
+        let dir = tempfile::tempdir().expect("tmp");
+        let f = gitterrace_testkit::Fixture::init(dir.path())
+            .write("a.txt", "needle\n")
+            .commit("feat: a");
+        let repo = gitterrace_git::Repo::discover(f.path()).expect("repo");
+        let index = gitterrace_index::Index::open(&repo).expect("index");
+        let env = crate::app::Env::new(gitterrace_config::Config::default());
+        let app = Arc::new(crate::app::App::configured(repo, index, &env));
+        let q = || SearchQuery {
+            q: Some("needle".into()),
+            ..SearchQuery::default()
+        };
+        let first = search(State(Arc::clone(&app)), Query(q()))
+            .await
+            .expect("page")
+            .0;
+        assert!(first.contains("1 match"), "{first}");
+        app.memo_put(memo_key(&app, &q()), Arc::new("memo".into()));
+        let again = search(State(Arc::clone(&app)), Query(q()))
+            .await
+            .expect("page")
+            .0;
+        assert_eq!(again, "memo", "the repeat must not scan again");
+        let other = SearchQuery {
+            case: Some("on".into()),
+            ..q()
+        };
+        let other = search(State(app), Query(other)).await.expect("page").0;
+        assert_ne!(other, "memo", "options are part of the key");
+    }
+
+    /// Guard: a capped code search keeps the first matching files in path order, whatever
+    /// the thread timing, so the memoized page is the same page a rescan would give.
+    #[test]
+    fn capped_search_keeps_the_first_files_in_path_order() {
+        let dir = tempfile::tempdir().expect("tmp");
+        let mut f = gitterrace_testkit::Fixture::init(dir.path());
+        for i in 0..600 {
+            f = f.write(&format!("f{i:04}.txt"), "needle\nneedle\n");
+        }
+        let f = f.commit("feat: many");
+        let repo = gitterrace_git::Repo::discover(f.path()).expect("repo");
+        let index = gitterrace_index::Index::open(&repo).expect("index");
+        let mut cfg = gitterrace_config::Config::default();
+        cfg.limits.search_matches = 501;
+        let app = crate::app::App::configured(repo, index, &crate::app::Env::new(cfg));
+        let re = build_regex("needle", false, false).expect("re");
+        for _ in 0..5 {
+            let out = search_code(&app, "HEAD", &re, None).expect("scan");
+            let paths: Vec<&str> = out.files.iter().map(|h| h.path.as_str()).collect();
+            let want: Vec<String> = (0..251).map(|i| format!("f{i:04}.txt")).collect();
+            assert_eq!(paths, want, "the first files, in order");
+            assert_eq!((out.matches, out.capped), (501, true));
+            assert_eq!(
+                out.files.last().map(|h| h.count),
+                Some(1),
+                "the last file is cut"
+            );
+            assert_eq!(
+                out.scanned, 251,
+                "files up to the one that hits the cap count as scanned"
+            );
+        }
+    }
 
     #[test]
     fn literal_is_escaped_and_case_folds() {

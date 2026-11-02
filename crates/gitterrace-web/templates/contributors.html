@@ -8,7 +8,7 @@
 <div class="chart-head"><div><h2>People</h2><p class="hint">Most commits first. The sparkline is commits per {{ unit }} over the period. Click a name to narrow the page to that person.</p></div></div>
 {% if people.is_empty() %}<p class="muted">No contributors match these filters.</p>{% else %}
 <div class="card"><table class="entries">
-<tr class="th"><td>Contributor</td><td>Per {{ unit }}</td><td class="r">Commits</td><td class="r">Lines</td><td class="r">First</td><td class="r">Last</td></tr>
+<tr class="th"><td>Contributor</td><td>Per {{ unit }}</td><td class="r" data-tip="Merges are left out: a merge repeats the changes of its branch.">Commits</td><td class="r">Lines</td><td class="r">First</td><td class="r">Last</td></tr>
 {% for p in people %}<tr><td><span class="av h{{ p.hue / 10 }}">{{ p.initial }}</span> <a class="who" href="{{ p.href }}"><b>{{ p.name }}</b></a>{% if p.first_time %} <span class="tag">new</span>{% endif %}{% if p.bot %} <span class="tag">bot</span>{% endif %} <a class="muted" href="{{ p.log_href }}">log</a></td><td>{{ p.spark|safe }}</td><td class="r">{{ p.commits }}</td><td class="r"><b class="add">+{{ p.additions }}</b> <b class="del">-{{ p.deletions }}</b></td><td class="r muted">{{ p.first }}</td><td class="r muted">{{ p.last }}</td></tr>{% endfor %}
 </table></div>
 {% if let Some((href, label)) = more %}<p><a href="{{ href }}">{{ label }}</a></p>{% endif %}

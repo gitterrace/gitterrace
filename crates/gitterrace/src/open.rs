@@ -137,6 +137,12 @@ pub(crate) fn run(
     let addr = ensure_server(&target.clone, configured, state.as_deref(), &mut |c, a| {
         spawn_server(c, a, state.as_deref(), config_dir)
     })?;
+    if let Some(hint) = std::env::current_exe()
+        .ok()
+        .and_then(|e| crate::handler::stale_hint(&e))
+    {
+        eprintln!("gitterrace: {hint}");
+    }
     let url = format!("http://{addr}{}", target.path);
     if print {
         println!("{url}");
@@ -158,29 +164,34 @@ enum Listener {
     reason = "user-facing CLI output: this is the command's result or diagnostic, not a log line"
 )]
 /// A second `git terrace` on an address a local gitterrace server already holds hands its
-/// repositories to that server and exits, instead of failing to bind. True when it did; false
-/// leaves the caller to bind (and report) as usual.
-pub(crate) fn join_running(addr: SocketAddr, roots: &[PathBuf], state: Option<&Path>) -> bool {
+/// repositories to that server and exits, instead of failing to bind. `Ok(true)` when it did;
+/// `Ok(false)` leaves the caller to bind (and report) as usual, and nothing was added. Every
+/// root is opened first, so a bad one stops before any is added. Once adding starts, a refusal
+/// is an error: falling through to bind would only fail on the held address, half joined.
+pub(crate) fn join_running(
+    addr: SocketAddr,
+    roots: &[PathBuf],
+    state: Option<&Path>,
+) -> anyhow::Result<bool> {
     let addr = loopback(addr);
-    if roots.is_empty() || identify(addr) != Listener::Gitterrace {
-        return false;
+    if roots.is_empty() || identify(addr, state) != Listener::Gitterrace {
+        return Ok(false);
     }
+    let mut repos = Vec::with_capacity(roots.len());
     for root in roots {
-        let Ok(repo) = Repo::discover(root) else {
-            return false;
-        };
-        if let Err(why) = add_repo(addr, state, &repo.root()) {
-            eprintln!(
-                "gitterrace: the server on {addr} could not add {}: {why}",
-                root.display()
-            );
-            return false;
-        }
+        let repo = Repo::discover(root).with_context(|| format!("opening {}", root.display()))?;
+        repos.push(repo.root());
     }
-    eprintln!(
-        "gitterrace: a server already runs on http://{addr}; added there, its switcher lists it"
-    );
-    true
+    for (root, repo) in roots.iter().zip(&repos) {
+        let base = add_repo(addr, state, repo).map_err(|why| {
+            anyhow::anyhow!(
+                "the server on {addr} could not add {}: {why}",
+                root.display()
+            )
+        })?;
+        eprintln!("gitterrace: added to the server already running: http://{addr}{base}");
+    }
+    Ok(true)
 }
 
 #[expect(
@@ -204,14 +215,14 @@ fn ensure_server(
     let id = repo.id().unwrap_or_default();
     let head = repo.resolve("HEAD").context("reading HEAD")?;
     let probe = format!("/go/{id}/{head}");
-    let addr = match identify(addr) {
+    let addr = match identify(addr, state) {
         Listener::Gitterrace if serves(addr, &probe) => return Ok(addr),
         Listener::Free => addr,
         found => {
             let what = if found == Listener::Gitterrace {
                 match add_repo(addr, state, &repo.root()) {
-                    Ok(()) if serves(addr, &probe) => return Ok(addr),
-                    Ok(()) => "a gitterrace server that added this repository but does not open it"
+                    Ok(_) if serves(addr, &probe) => return Ok(addr),
+                    Ok(_) => "a gitterrace server that added this repository but does not open it"
                         .to_owned(),
                     Err(why) => format!(
                         "a gitterrace server that does not serve this repository and could not add it ({why})"
@@ -244,7 +255,8 @@ fn ensure_server(
 /// Asks the gitterrace server on `addr` to add the repository at `root` (canonical). The secret
 /// comes from the 0600 file that server wrote to `state`, so only its own user can ask. Already
 /// served (409) counts as added.
-fn add_repo(addr: SocketAddr, state: Option<&Path>, root: &Path) -> Result<(), String> {
+/// The `/r/NAME/` prefix the server serves `root` under, new or already there.
+fn add_repo(addr: SocketAddr, state: Option<&Path>, root: &Path) -> Result<String, String> {
     let state = state.ok_or("no state folder to read its secret from")?;
     let token = gitterrace_web::add_token(state, addr.port())
         .map_err(|e| format!("its secret is unreadable: {e}"))?;
@@ -265,7 +277,12 @@ fn add_repo(addr: SocketAddr, state: Option<&Path>, root: &Path) -> Result<(), S
     let text = String::from_utf8_lossy(&buf);
     let status = text.get(9..12).unwrap_or_default();
     match status {
-        "201" | "409" => Ok(()),
+        "201" | "409" => Ok(text
+            .split("\r\n\r\n")
+            .nth(1)
+            .and_then(|b| serde_json::from_str::<serde_json::Value>(b.trim()).ok())
+            .and_then(|v| v.get("base")?.as_str().map(str::to_owned))
+            .unwrap_or_else(|| "/".to_owned())),
         "404" | "405" => Err("it predates adding repositories or does not allow it".to_owned()),
         "" => Err("no answer".to_owned()),
         other => {
@@ -322,15 +339,26 @@ fn spawn_server(
 }
 
 /// Whether a gitterrace server, nothing, or something else listens on `addr`. A gitterrace
-/// server is recognized by its `/_actions/status` JSON, which no other program answers alike.
-fn identify(addr: SocketAddr) -> Listener {
+/// server proves it holds the add secret from our 0600 token file: it answers a fresh nonce
+/// with `sha256(secret:nonce)`. A listener that cannot (another program, another user's
+/// server, a stale token) is `Other`, so it is never sent a repository path.
+fn identify(addr: SocketAddr, state: Option<&Path>) -> Listener {
     let Ok(mut s) = TcpStream::connect_timeout(&addr, PROBE_TIMEOUT) else {
         return Listener::Free;
+    };
+    let Some(secret) = state.and_then(|d| gitterrace_web::add_token(d, addr.port()).ok()) else {
+        return Listener::Other;
+    };
+    let Ok(nonce) = gitterrace_actions::Token::generate() else {
+        return Listener::Other;
     };
     if s.set_read_timeout(Some(PROBE_TIMEOUT)).is_err() {
         return Listener::Other;
     }
-    let req = format!("GET /_actions/status HTTP/1.1\r\nHost: {addr}\r\nConnection: close\r\n\r\n");
+    let req = format!(
+        "GET /_repos?nonce={} HTTP/1.1\r\nHost: {addr}\r\nConnection: close\r\n\r\n",
+        nonce.as_str()
+    );
     if s.write_all(req.as_bytes()).is_err() {
         return Listener::Other;
     }
@@ -338,7 +366,12 @@ fn identify(addr: SocketAddr) -> Listener {
     // A timeout after a partial read still leaves the bytes to judge.
     let _partial = s.take(64 * 1024).read_to_end(&mut buf);
     let text = String::from_utf8_lossy(&buf);
-    if text.starts_with("HTTP/1.1 200") && text.contains("{\"note\":") {
+    let want = format!(
+        "{{\"proof\":\"{}\"}}",
+        gitterrace_actions::token_proof(&secret, nonce.as_str())
+    );
+    let body = text.split("\r\n\r\n").nth(1).unwrap_or_default();
+    if text.starts_with("HTTP/1.1 200") && body.trim() == want {
         Listener::Gitterrace
     } else {
         Listener::Other
@@ -409,247 +442,4 @@ fn browse(url: &str) -> anyhow::Result<()> {
 }
 
 #[cfg(test)]
-mod tests {
-    use std::net::{SocketAddr, TcpListener};
-    use std::path::Path;
-    use std::time::{Duration, Instant};
-
-    use gitterrace_git::Repo;
-    use gitterrace_testkit::{Fixture, git};
-
-    use crate::open::{
-        Listener, OpenError, ensure_server, identify, join_running, resolve, serves,
-    };
-
-    /// A repository with `src/a.rs`; returns (root, id, HEAD).
-    fn repo(dir: &Path) -> (std::path::PathBuf, String, String) {
-        std::fs::create_dir_all(dir.join("src")).expect("dir");
-        git(dir, &["init", "-q"]);
-        std::fs::write(dir.join("src/a.rs"), "a\nb\nc\n").expect("w");
-        git(dir, &["add", "."]);
-        git(dir, &["commit", "-qm", "root"]);
-        let head = git(dir, &["rev-parse", "HEAD"]);
-        let root = git(dir, &["rev-list", "--max-parents=0", "HEAD"]);
-        (
-            dir.canonicalize().expect("canon"),
-            root[..12].to_owned(),
-            head,
-        )
-    }
-
-    #[test]
-    fn resolves_registered_and_root_clones() {
-        let t = tempfile::tempdir().expect("tmp");
-        let (a, id, head) = repo(&t.path().join("a"));
-        let link = format!("gitterrace://{id}/{}/src/a.rs#L2-L3", &head[..10]);
-        let want = format!("/go/{id}/{head}/src/a.rs#L2-L3");
-
-        let got = resolve(&link, &[(id.clone(), a.clone())], &[], 2, &[]).expect("registered");
-        assert_eq!(
-            (got.clone, got.path, got.note),
-            (a.clone(), want.clone(), None)
-        );
-
-        let got = resolve(&link, &[], &[t.path().to_owned()], 2, &[]).expect("root");
-        assert_eq!((got.clone, got.path), (a.clone(), want.clone()));
-
-        let go = format!("http://127.0.0.1:9/go/{id}/{head}/src/a.rs#L2-L3");
-        assert_eq!(
-            resolve(&go, &[(id, a)], &[], 2, &[]).expect("go").path,
-            want
-        );
-    }
-
-    #[test]
-    fn unknown_id_missing_commit_and_missing_path() {
-        let t = tempfile::tempdir().expect("tmp");
-        let (a, id, head) = repo(&t.path().join("a"));
-        let other = format!("gitterrace://000000000000/{head}");
-        assert!(matches!(
-            resolve(
-                &other,
-                &[("000000000000".to_owned(), a.clone())],
-                &[t.path().to_owned()],
-                2,
-                &[]
-            ),
-            Err(OpenError::Unknown(_))
-        ));
-        let behind = format!("gitterrace://{id}/{}", "f".repeat(40));
-        let got = resolve(&behind, &[(id.clone(), a.clone())], &[], 2, &[]).expect("behind");
-        assert_eq!(got.path, "/");
-        assert!(got.note.is_some_and(|n| n.contains("behind")));
-        let gone = format!("gitterrace://{id}/{head}/no/such.rs");
-        let got = resolve(&gone, &[(id.clone(), a)], &[], 2, &[]).expect("gone");
-        assert_eq!(got.path, format!("/go/{id}/{head}"));
-        assert!(matches!(
-            resolve(&format!("gitterrace://{id}/{head}/../x"), &[], &[], 2, &[]),
-            Err(OpenError::BadLink(_))
-        ));
-    }
-
-    /// Serves `repos` on `addr` from a thread that lives until the test process ends, with its
-    /// registry and add secret in `state` (never the user's own folder).
-    fn serve(repos: Vec<std::path::PathBuf>, addr: SocketAddr, state: Option<&Path>) {
-        let state = state.map(Path::to_path_buf);
-        std::thread::spawn(move || {
-            tokio::runtime::Builder::new_multi_thread()
-                .enable_all()
-                .build()
-                .expect("rt")
-                .block_on(gitterrace_web::serve_in(
-                    repos,
-                    addr,
-                    None,
-                    gitterrace_config::Config::default(),
-                    None,
-                    state,
-                ))
-                .expect("serve");
-        });
-        let t = Instant::now();
-        while identify(addr) != Listener::Gitterrace {
-            assert!(
-                t.elapsed() < Duration::from_secs(10),
-                "server never came up"
-            );
-            std::thread::sleep(Duration::from_millis(50));
-        }
-    }
-
-    fn free_addr() -> SocketAddr {
-        let l = TcpListener::bind("127.0.0.1:0").expect("bind");
-        l.local_addr().expect("addr")
-    }
-
-    /// Guard class: open never starts a second server when one answers on the address.
-    #[test]
-    fn open_never_starts_a_second_server_when_one_answers_on_the_address() {
-        let tmp = tempfile::tempdir().expect("tmp");
-        let a = Fixture::standard(&tmp.path().join("a")).path().to_owned();
-        let b = Fixture::init(&tmp.path().join("b"))
-            .write("x", "other\n")
-            .commit("other root")
-            .path()
-            .to_owned();
-        let c = Fixture::init(&tmp.path().join("c"))
-            .write("y", "third\n")
-            .commit("third root")
-            .path()
-            .to_owned();
-        let fourth = Fixture::init(&tmp.path().join("d"))
-            .write("z", "fourth\n")
-            .commit("fourth root")
-            .path()
-            .to_owned();
-        let state = tmp.path().join("state");
-        let addr = free_addr();
-        serve(vec![a.clone(), b], addr, Some(&state));
-        let probe_of = |p: &Path| {
-            let r = Repo::discover(p).expect("repo");
-            format!(
-                "/go/{}/{}",
-                r.id().expect("id"),
-                r.resolve("HEAD").expect("head")
-            )
-        };
-
-        // (1) a served repository is joined, in multi mode with its /r/<name>/ prefix.
-        let mut started = Vec::new();
-        let got = ensure_server(&a, addr, Some(&state), &mut |_, x| {
-            started.push(x);
-            Ok(())
-        })
-        .expect("join");
-        assert_eq!((got, started.len()), (addr, 0));
-        let repo = Repo::discover(&a).expect("repo");
-        let probe = format!(
-            "/go/{}/{}",
-            repo.id().expect("id"),
-            repo.resolve("HEAD").expect("head")
-        );
-        assert!(serves(addr, &probe));
-
-        // (2) a repository the server lacks is added to it: same address, nothing started,
-        // and its permalink now resolves there. Asking again is a join.
-        assert!(!serves(addr, &probe_of(&c)));
-        for _ in 0..2 {
-            let mut started = Vec::new();
-            let got = ensure_server(&c, addr, Some(&state), &mut |_, x| {
-                started.push(x);
-                Ok(())
-            })
-            .expect("added");
-            assert_eq!((got, started.len()), (addr, 0));
-            assert!(serves(addr, &probe_of(&c)));
-        }
-
-        // (2b) without the secret (another user, or no state folder) adding fails, and only
-        // then does the repository get a server of its own; the listener stays untouched.
-        let mut started = Vec::new();
-        let got = ensure_server(&fourth, addr, None, &mut |_, x| {
-            started.push(x);
-            serve(vec![fourth.clone()], x, None);
-            Ok(())
-        })
-        .expect("own server");
-        assert_eq!(started, vec![got]);
-        assert_ne!(got, addr);
-        assert_eq!(identify(addr), Listener::Gitterrace);
-        assert!(!serves(addr, &probe_of(&fourth)));
-
-        // A foreign listener is not replaced either.
-        let foreign = TcpListener::bind("127.0.0.1:0").expect("bind");
-        let faddr = foreign.local_addr().expect("addr");
-        assert_eq!(identify(faddr), Listener::Other);
-        let mut started = Vec::new();
-        let got = ensure_server(&c, faddr, Some(&state), &mut |_, x| {
-            started.push(x);
-            serve(vec![c.clone()], x, None);
-            Ok(())
-        })
-        .expect("beside foreign");
-        assert_ne!(got, faddr);
-        assert_eq!(started, vec![got]);
-
-        // (3) nothing listens: the server starts on the configured address.
-        let free = free_addr();
-        let mut started = Vec::new();
-        let got = ensure_server(&c, free, Some(&state), &mut |_, x| {
-            started.push(x);
-            serve(vec![c.clone()], x, None);
-            Ok(())
-        })
-        .expect("fresh");
-        assert_eq!((got, started), (free, vec![free]));
-    }
-
-    /// Guard class: a second `git terrace` on a held address ends up served there, never a
-    /// bind error, and only a local gitterrace server with its secret is joined.
-    #[test]
-    fn a_second_serve_joins_the_running_server() {
-        let tmp = tempfile::tempdir().expect("tmp");
-        let a = Fixture::standard(&tmp.path().join("a")).path().to_owned();
-        let b = Fixture::init(&tmp.path().join("b"))
-            .write("x", "other\n")
-            .commit("other root")
-            .path()
-            .to_owned();
-        let state = tmp.path().join("state");
-        let addr = free_addr();
-        assert!(!join_running(addr, std::slice::from_ref(&b), Some(&state)));
-        serve(vec![a], addr, Some(&state));
-        assert!(!join_running(addr, std::slice::from_ref(&b), None));
-        assert!(join_running(addr, std::slice::from_ref(&b), Some(&state)));
-        let r = Repo::discover(&b).expect("repo");
-        let probe = format!(
-            "/go/{}/{}",
-            r.id().expect("id"),
-            r.resolve("HEAD").expect("head")
-        );
-        assert!(serves(addr, &probe));
-        let foreign = TcpListener::bind("127.0.0.1:0").expect("bind");
-        let faddr = foreign.local_addr().expect("addr");
-        assert!(!join_running(faddr, &[b], Some(&state)));
-    }
-}
+mod tests;

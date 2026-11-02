@@ -1,7 +1,7 @@
 //! Every commit id on a page is the shared `a.sha` link. Renders the main pages of a fixture
 //! repository and checks that no 7-to-40 hex token in visible text sits outside one.
 
-use gitterrace_testkit::{get, git};
+use gitterrace_testkit::{git, page as get};
 use std::time::Duration;
 
 /// Hex runs of 7 to 40 digits in visible text (outside tags, scripts, styles and `a.sha`),

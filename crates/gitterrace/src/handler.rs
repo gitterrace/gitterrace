@@ -15,6 +15,12 @@ use anyhow::{Context, bail};
 
 const APP_NAME: &str = "gitterrace-open.app";
 const BUNDLE_ID: &str = "dev.gitterrace.open";
+/// An `Info.plist` key only install-handler writes. With the bundle id it marks the app as
+/// ours: an app that merely shares the id is a user's, and is never removed.
+const MARKER_KEY: &str = "GitterraceInstallHandler";
+/// The program the app runs, kept beside the marker so an upgrade and `open` can tell when
+/// it moved without reading the compiled script.
+const PROGRAM_KEY: &str = "GitterraceProgram";
 /// The app icon, the brand mark (`make app-icon` renders it from docs/brand/mark-dark.svg).
 /// It replaces osacompile's script icon, and the asset catalogue that would override it goes.
 const ICON: &[u8] = include_bytes!("../assets/gitterrace.icns");
@@ -94,12 +100,8 @@ fn macos(home: &Path, exe: &Path, uninstall: bool) -> anyhow::Result<()> {
             println!("nothing to remove: {} does not exist", app.display());
             return Ok(());
         }
-        let plist = std::fs::read_to_string(app.join("Contents/Info.plist")).unwrap_or_default();
-        if !plist.contains(BUNDLE_ID) {
-            bail!(
-                "{} was not written by install-handler, leaving it",
-                app.display()
-            );
+        if owner_of(&app) == Owner::Foreign {
+            bail!(not_ours(&app));
         }
         let _ = Command::new(LSREGISTER).arg("-u").arg(&app).output();
         std::fs::remove_dir_all(&app).with_context(|| format!("removing {}", app.display()))?;
@@ -109,12 +111,43 @@ fn macos(home: &Path, exe: &Path, uninstall: bool) -> anyhow::Result<()> {
         );
         return Ok(());
     }
+    // A marked app is ours and is rewritten in place: current icon, program path and
+    // signature. An unmarked one may be a user's, or from a build before the marker.
+    let previous = match owner_of(&app) {
+        Owner::Absent => None,
+        Owner::Ours(previous) => previous,
+        Owner::Foreign => bail!(not_ours(&app)),
+    };
+    write_app(&app, exe)?;
+    tool(Command::new(LSREGISTER).arg("-f").arg(&app))?;
+    if let Some(old) = previous.filter(|old| old != exe) {
+        println!(
+            "the handler pointed at {}, it now points at {}",
+            old.display(),
+            exe.display()
+        );
+    }
+    println!(
+        "wrote {} (runs: {} open <url>)\nregistered gitterrace:// with LaunchServices\nremove with: git terrace install-handler --uninstall",
+        app.display(),
+        exe.display()
+    );
+    Ok(())
+}
+
+fn not_ours(app: &Path) -> String {
+    format!(
+        "{} has no install-handler marker, leaving it. If it is an older gitterrace handler, \
+         remove it once by hand, then run install-handler again",
+        app.display()
+    )
+}
+
+/// Builds the handler app at `app` for `exe`, replacing one that is there. No
+/// `LaunchServices` call, so a test can build one in a fixture home.
+fn write_app(app: &Path, exe: &Path) -> anyhow::Result<()> {
     if app.exists() {
-        let plist = std::fs::read_to_string(app.join("Contents/Info.plist")).unwrap_or_default();
-        if !plist.contains(BUNDLE_ID) {
-            bail!("{} exists and is not ours, leaving it", app.display());
-        }
-        std::fs::remove_dir_all(&app)?;
+        std::fs::remove_dir_all(app).with_context(|| format!("replacing {}", app.display()))?;
     }
     std::fs::create_dir_all(app.parent().context("no parent")?)?;
     let script = std::env::temp_dir().join(format!(
@@ -122,7 +155,7 @@ fn macos(home: &Path, exe: &Path, uninstall: bool) -> anyhow::Result<()> {
         std::process::id()
     ));
     std::fs::write(&script, applescript(exe))?;
-    let made = tool(Command::new("osacompile").arg("-o").arg(&app).arg(&script));
+    let made = tool(Command::new("osacompile").arg("-o").arg(app).arg(&script));
     let _ = std::fs::remove_file(&script);
     made?;
     let plist = app.join("Contents/Info.plist");
@@ -131,6 +164,9 @@ fn macos(home: &Path, exe: &Path, uninstall: bool) -> anyhow::Result<()> {
         &["-replace", "CFBundleIdentifier", "-string", BUNDLE_ID],
     )?;
     plist_set(&plist, &["-replace", "LSUIElement", "-bool", "true"])?;
+    plist_set(&plist, &["-replace", MARKER_KEY, "-bool", "true"])?;
+    let program = exe.to_str().context("the program path is not UTF-8")?;
+    plist_set(&plist, &["-replace", PROGRAM_KEY, "-string", program])?;
     plist_set(
         &plist,
         &["-replace", "CFBundleURLTypes", "-json", url_types_json()],
@@ -149,15 +185,82 @@ fn macos(home: &Path, exe: &Path, uninstall: bool) -> anyhow::Result<()> {
     tool(
         Command::new("codesign")
             .args(["--force", "--sign", "-"])
-            .arg(&app),
-    )?;
-    tool(Command::new(LSREGISTER).arg("-f").arg(&app))?;
-    println!(
-        "wrote {} (runs: {} open <url>)\nregistered gitterrace:// with LaunchServices\nremove with: git terrace install-handler --uninstall",
-        app.display(),
-        exe.display()
-    );
-    Ok(())
+            .arg(app),
+    )
+}
+
+/// Who wrote the app at a path.
+#[derive(Debug, PartialEq, Eq)]
+enum Owner {
+    Absent,
+    /// install-handler did. Holds the program it runs, when the plist names one.
+    Ours(Option<PathBuf>),
+    Foreign,
+}
+
+fn owner_of(app: &Path) -> Owner {
+    if !app.exists() {
+        return Owner::Absent;
+    }
+    let plist = std::fs::read_to_string(app.join("Contents/Info.plist")).unwrap_or_default();
+    owner(&plist)
+}
+
+/// Ours needs the bundle id and the marker key in the `Info.plist` (XML, as plutil keeps
+/// it). The id alone is not enough: a user's app may share it.
+fn owner(plist: &str) -> Owner {
+    let id = format!("<key>CFBundleIdentifier</key>\n\t<string>{BUNDLE_ID}</string>");
+    let marker = format!("<key>{MARKER_KEY}</key>\n\t<true/>");
+    if !(plist.contains(&id) && plist.contains(&marker)) {
+        return Owner::Foreign;
+    }
+    let key = format!("<key>{PROGRAM_KEY}</key>\n\t<string>");
+    let program = plist.find(&key).and_then(|i| {
+        let rest = &plist[i + key.len()..];
+        rest.find("</string>")
+            .map(|j| PathBuf::from(unxml(&rest[..j])))
+    });
+    Owner::Ours(program)
+}
+
+/// The five XML entities plutil writes, back to text. `&amp;` goes last.
+fn unxml(s: &str) -> String {
+    s.replace("&lt;", "<")
+        .replace("&gt;", ">")
+        .replace("&quot;", "\"")
+        .replace("&apos;", "'")
+        .replace("&amp;", "&")
+}
+
+/// A hint for `git terrace open` when the macOS handler runs another program than `exe`, or
+/// one that is gone. It only tells: rewriting the handler is install-handler's job.
+pub(crate) fn stale_hint(exe: &Path) -> Option<String> {
+    if !cfg!(target_os = "macos") {
+        return None;
+    }
+    hint_for(&app_path(Path::new(&gitterrace_config::home_var()?)), exe)
+}
+
+fn hint_for(app: &Path, exe: &Path) -> Option<String> {
+    let Owner::Ours(Some(runs)) = owner_of(app) else {
+        return None;
+    };
+    let same = runs == exe
+        || runs
+            .canonicalize()
+            .is_ok_and(|r| exe.canonicalize().is_ok_and(|e| e == r));
+    if same {
+        return None;
+    }
+    let why = if runs.exists() {
+        "another"
+    } else {
+        "a missing"
+    };
+    Some(format!(
+        "gitterrace:// links run {why} program ({}). Run `git terrace install-handler` to point them here",
+        runs.display()
+    ))
 }
 
 /// Content of the Linux `.desktop` file.
@@ -314,6 +417,125 @@ mod tests {
         assert!(!desktop_path(&home).exists());
         assert!(other.exists());
         std::fs::remove_dir_all(&home).unwrap();
+    }
+
+    fn plist(body: &str) -> String {
+        format!("<plist version=\"1.0\">\n<dict>\n\t{body}\n</dict>\n</plist>\n")
+    }
+
+    fn id() -> String {
+        format!("<key>CFBundleIdentifier</key>\n\t<string>{BUNDLE_ID}</string>")
+    }
+
+    /// Guard class: ownership needs the bundle id and the marker, so uninstall and
+    /// reinstall never remove an unmarked app: a user's that shares the id, or one from a
+    /// build before the marker. The refusal names the path and the one-time removal.
+    #[test]
+    fn an_unmarked_app_is_refused() {
+        let marker = format!("<key>{MARKER_KEY}</key>\n\t<true/>");
+        assert_eq!(owner(&plist(&id())), Owner::Foreign, "id alone");
+        assert_eq!(owner(&plist(&marker)), Owner::Foreign, "marker alone");
+        let off = format!("{}\n\t<key>{MARKER_KEY}</key>\n\t<false/>", id());
+        assert_eq!(owner(&plist(&off)), Owner::Foreign, "marker false");
+        let program =
+            format!("<key>{PROGRAM_KEY}</key>\n\t<string>/a &amp; b/git-terrace</string>");
+        assert_eq!(
+            owner(&plist(&format!("{}\n\t{marker}\n\t{program}", id()))),
+            Owner::Ours(Some(PathBuf::from("/a & b/git-terrace")))
+        );
+
+        let tmp = tempfile::tempdir().expect("tmp");
+        let home = tmp.path();
+        let app = app_path(home);
+        std::fs::create_dir_all(app.join("Contents")).expect("dir");
+        std::fs::write(app.join("Contents/Info.plist"), plist(&id())).expect("w");
+        let why = macos(home, Path::new("/x"), false).expect_err("reinstall refused");
+        assert!(
+            why.to_string().contains(&app.display().to_string()),
+            "{why}"
+        );
+        assert!(why.to_string().contains("remove it once"), "{why}");
+        assert!(
+            macos(home, Path::new("/x"), true).is_err(),
+            "uninstall refused"
+        );
+        assert!(app.join("Contents/Info.plist").exists(), "left in place");
+    }
+
+    /// Guard class: a marked app is rewritten in place for the current program, with the
+    /// current icon and a valid signature. Built in a fixture home with the real tools,
+    /// without `LaunchServices`.
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn a_marked_app_is_upgraded_in_place() {
+        let tmp = tempfile::tempdir().expect("tmp");
+        let app = app_path(tmp.path());
+        let old = Path::new("/old/bin/git-terrace");
+        let new = Path::new("/new place/bin/git-terrace");
+        write_app(&app, old).expect("first");
+        assert_eq!(owner_of(&app), Owner::Ours(Some(old.to_path_buf())));
+        // An older icon, as a previous build would have left.
+        let icon = app.join("Contents/Resources/gitterrace.icns");
+        std::fs::write(&icon, b"old icon").expect("w");
+
+        let Owner::Ours(previous) = owner_of(&app) else {
+            panic!("marked app not ours");
+        };
+        write_app(&app, new).expect("upgrade");
+        assert_eq!(previous.as_deref(), Some(old));
+        assert_eq!(owner_of(&app), Owner::Ours(Some(new.to_path_buf())));
+        assert_eq!(std::fs::read(&icon).expect("icon"), ICON);
+        let main = app.join("Contents/Resources/Scripts/main.scpt");
+        let src = Command::new("osadecompile")
+            .arg(&main)
+            .output()
+            .expect("osadecompile");
+        let src = String::from_utf8_lossy(&src.stdout);
+        assert!(src.contains("/new place/bin/git-terrace"), "{src}");
+        tool(
+            Command::new("codesign")
+                .args(["--verify", "--strict"])
+                .arg(&app),
+        )
+        .expect("signature");
+    }
+
+    /// Guard class: `open` hints when the handler runs a missing or another program, stays
+    /// quiet when it runs this one, and never rewrites the app.
+    #[test]
+    fn open_hints_at_a_stale_handler_without_touching_it() {
+        let tmp = tempfile::tempdir().expect("tmp");
+        let app = app_path(tmp.path());
+        std::fs::create_dir_all(app.join("Contents")).expect("dir");
+        let here = tmp.path().join("git-terrace");
+        std::fs::write(&here, "").expect("exe");
+        let with = |p: &Path| {
+            let body = format!(
+                "{}\n\t<key>{MARKER_KEY}</key>\n\t<true/>\n\t<key>{PROGRAM_KEY}</key>\n\t<string>{}</string>",
+                id(),
+                p.display()
+            );
+            std::fs::write(app.join("Contents/Info.plist"), plist(&body)).expect("w");
+        };
+        with(&here);
+        assert_eq!(hint_for(&app, &here), None);
+        with(Path::new("/gone/git-terrace"));
+        let hint = hint_for(&app, &here).expect("hint");
+        assert!(
+            hint.contains("a missing program") && hint.contains("install-handler"),
+            "{hint}"
+        );
+        assert!(
+            std::fs::read_to_string(app.join("Contents/Info.plist"))
+                .expect("r")
+                .contains("/gone/git-terrace")
+        );
+        with(tmp.path());
+        assert!(
+            hint_for(&app, &here)
+                .expect("hint")
+                .contains("another program")
+        );
     }
 
     #[test]

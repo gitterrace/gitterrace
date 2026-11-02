@@ -49,6 +49,9 @@ jobs:
             ${{ runner.os }}-cargo-${{ steps.toolchain.outputs.cachekey }}-
       - uses: ./.github/actions/lint-tools
       - run: make check
+      # The memory budget guard indexes 100k commits: release only, debug is too slow.
+      - name: Memory budget (release)
+        run: cargo test --locked --release -p gitterrace-web --test memory_budget
 
   # The Windows binary builds, its tests pass and it serves a repository. The runtime smoke test is
   # the same script the release check and scripts/wine-run.sh use.
@@ -76,6 +79,10 @@ jobs:
             ${{ runner.os }}-cargo-${{ steps.toolchain.outputs.cachekey }}-
       - run: cargo build --locked -p gitterrace
       - run: cargo test --locked --workspace
+      # The segment store on Windows: the seek_read shim, rename over an open file, retired
+      # files that cannot be deleted while a reader holds them. Named, so a red one is visible.
+      - name: Segment store guards
+        run: cargo test --locked -p gitterrace-index --test unreadable --test hostile --test deterministic
       - name: Smoke test
         shell: bash
         run: bash scripts/smoke-check.sh target/debug/git-terrace.exe

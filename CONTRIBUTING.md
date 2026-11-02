@@ -20,8 +20,8 @@ Python 3. `uv` is only needed to regenerate the README header tagline.
 ```sh
 git clone https://github.com/gitterrace/gitterrace && cd gitterrace
 make build
-make run      # serves this checkout on 127.0.0.1
 make install  # puts git-terrace in ~/.cargo/bin, so `git terrace` works anywhere
+git terrace   # serves this checkout on 127.0.0.1 (make preview rebuilds and restarts it)
 ```
 
 If the build fails on a clean checkout, that is a bug worth reporting.
@@ -69,6 +69,8 @@ The local gate is the one that counts. The hosted workflows run a subset of it.
   `scripts/browser-check.mjs` for the checks and flags
 - `make bench` if you changed how pages, the index or the server do their work (see
   [benchmarks](docs/benchmarks.md))
+- Windows: CI builds and tests `x86_64-pc-windows-msvc` and smoke-tests the binary on a Windows
+  runner. To run it locally on macOS or Linux, use `scripts/wine-run.sh`
 
 ## Releasing (maintainers)
 
@@ -78,8 +80,6 @@ gitterrace.dev is generated into `site/` and shipped from a maintainer's machine
 1. Bump `SECURITY_TXT_EXPIRES` in `xtask/src/site.rs`, `make docs-gen`, commit.
 2. Tag and push. The release workflow builds the binaries, the installer and the formula.
 3. `make deploy` (it refuses until the tag, repository and tap answer), then `make domains`.
-   Before the tag, repository and tap exist, `make deploy` cannot run. `make stage` deploys
-   without that check and is only for that window; delete it in the commit that publishes.
 4. Refresh the demo from [gitterrace/demo](https://github.com/gitterrace/demo): `make deploy`
    there.
 

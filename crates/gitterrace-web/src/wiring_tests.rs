@@ -4,7 +4,7 @@ use std::{path::Path, sync::Arc, time::Duration};
 
 use axum::{Router, body::Body, http::Request};
 use gitterrace_config::Config;
-use gitterrace_testkit::{Fixture, get, git};
+use gitterrace_testkit::{Fixture, git, page as get};
 use http_body_util::BodyExt;
 use tower::ServiceExt;
 
@@ -83,10 +83,11 @@ async fn raw_etag_is_the_blob_id_and_honours_if_none_match() {
     git(&p, &["add", "."]);
     git(&p, &["commit", "-qm", "feat: a"]);
     let r = router(&p, Config::default());
+    let raw = format!("{}/raw/HEAD/a.txt", gitterrace_testkit::base(&r).await);
     let send = |inm: Option<&'static str>| {
-        let r = r.clone();
+        let (r, raw) = (r.clone(), raw.clone());
         async move {
-            let mut req = Request::get("/raw/HEAD/a.txt").header("host", "localhost");
+            let mut req = Request::get(raw).header("host", "localhost");
             if let Some(v) = inm {
                 req = req.header("if-none-match", v);
             }
@@ -352,13 +353,13 @@ fn resources_cache_mb_sizes_the_code_cache() {
     let p = repo(dir.path(), "r");
     assert_eq!(
         app(&p, with(|c| c.resources.cache_mb = 8)).code_cache_bytes(),
-        4 << 20
+        2 << 20
     );
     assert_eq!(
         app(&p, with(|c| c.resources.cache_mb = 64)).code_cache_bytes(),
-        32 << 20
+        16 << 20
     );
-    // A full cache drops what it held; a roomy one keeps both.
+    // A roomy cache keeps both; one file over an eighth of the cache is not kept at all.
     let text = "fn a() {}\n".repeat(200);
     let mut m = CodeMemo::default();
     let one = put(&mut m, 1 << 24, "size.rs", &text);
@@ -395,7 +396,9 @@ async fn read_until(body: &mut Body, want: &str, within: Duration) -> Option<Str
     None
 }
 
+/// Opens `uri` of the lone repository's event stream, under its prefix.
 async fn open_events(r: &Router, uri: &str) -> axum::response::Response {
+    let uri = format!("{}{uri}", gitterrace_testkit::base(r).await);
     r.clone()
         .oneshot(
             Request::get(uri)
@@ -432,12 +435,23 @@ async fn events_deliver_each_kind_and_respect_the_stream_cap() {
     );
     drop(second);
     drop(third);
-    // Let the watcher take its first reading before the change.
-    tokio::time::sleep(Duration::from_millis(600)).await;
-    std::fs::write(work.join("small.txt"), "needle three\n").expect("write");
-    git(&work, &["commit", "-qam", "fix: third"]);
-    let got = read_until(&mut first, "event: change", Duration::from_secs(5)).await;
-    let got = got.expect("a change event");
+    // The watcher's first reading is its baseline: a commit made before it lands is not a
+    // change. A loaded machine can delay that reading past any fixed sleep, so commit again
+    // until the stream reports one, bounded by a deadline.
+    let deadline = std::time::Instant::now() + Duration::from_secs(20);
+    let mut n = 0;
+    let got = loop {
+        n += 1;
+        std::fs::write(work.join("small.txt"), format!("needle {n}\n")).expect("write");
+        git(&work, &["commit", "-qam", "fix: next"]);
+        if let Some(g) = read_until(&mut first, "event: change", Duration::from_secs(2)).await {
+            break g;
+        }
+        assert!(
+            std::time::Instant::now() < deadline,
+            "no change event after {n} commits"
+        );
+    };
     assert!(got.contains("\"refs\""), "a commit moves the refs: {got}");
     // The slot of a closed stream is free again.
     assert_eq!(open_events(&server, "/events").await.status(), 200);
@@ -637,8 +651,9 @@ async fn every_page_shell_has_the_favicon() {
     let one = router(&a, Config::default());
     let many = crate::multi_router(vec![a, b]).expect("multi");
     for (r, path) in [
-        (&one, "/"),
-        (&one, "/blob/HEAD/no-such-file"),
+        (&one, "/r/a/"),
+        (&one, "/r/a/blob/HEAD/no-such-file"),
+        (&one, "/r/a/no-such-page"),
         (&one, "/no-such-page"),
         (&many, "/"),
         (&many, "/r/a/"),
@@ -647,7 +662,7 @@ async fn every_page_shell_has_the_favicon() {
         (&many, "/no-such-page"),
         (&many, "/go/nope/abc"),
     ] {
-        let (_, html) = get(r, path).await;
+        let (_, html) = gitterrace_testkit::get(r, path).await;
         assert!(html.contains(icon), "{path} has no favicon");
         // Stylesheets and scripts are the server's, not a repository's: one URL each, cached
         // once across every repository, never under `/r/NAME/`.
@@ -821,7 +836,7 @@ async fn commit_page_links_only_the_targets_with_a_lookup() {
         page.contains(&format!("https://alpha.test/s?q={id}&#38;s={}", &id[..7])),
         "{page}"
     );
-    assert!(page.contains(">Alpha</a>") && !page.contains("Beta"));
+    assert!(page.contains(">alpha.test</a>") && !page.contains("Alpha") && !page.contains("Beta"));
     let (_, plain) = get(&router(&p, Config::default()), &format!("/commit/{id}")).await;
     assert!(!plain.contains("Find this commit in"));
 }

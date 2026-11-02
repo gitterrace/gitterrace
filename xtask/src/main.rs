@@ -34,7 +34,7 @@ struct Cli {
 enum Cmd {
     /// Regenerate every generated file
     Generate,
-    /// Fail when a generated file is stale; writes nothing
+    /// Fail when a generated file is stale, writing nothing
     Check,
 }
 

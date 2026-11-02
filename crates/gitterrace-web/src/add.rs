@@ -16,7 +16,7 @@ use axum::{
     extract::{Request, State},
     http::{HeaderMap, StatusCode, header},
     response::{IntoResponse, Response},
-    routing::post,
+    routing::get,
 };
 use gitterrace_actions::Token;
 use gitterrace_git::Repo;
@@ -44,7 +44,38 @@ struct AddRequest {
 
 /// Mounted only on a loopback bind with a token; elsewhere the route does not exist.
 pub(crate) fn router(adder: Arc<Adder>) -> Router {
-    Router::new().route("/_repos", post(add)).with_state(adder)
+    Router::new()
+        .route("/_repos", get(prove).post(add))
+        .with_state(adder)
+}
+
+#[derive(serde::Deserialize)]
+struct Challenge {
+    nonce: String,
+}
+
+/// `GET /_repos?nonce=N`: proves this server holds the secret in the token file, without
+/// sending it, so `open` checks who listens before it sends a repository path. Browsers are
+/// refused as on the add route.
+async fn prove(
+    State(adder): State<Arc<Adder>>,
+    headers: HeaderMap,
+    axum::extract::Query(c): axum::extract::Query<Challenge>,
+) -> Response {
+    if headers.contains_key(header::ORIGIN) || headers.contains_key("sec-fetch-site") {
+        return (
+            StatusCode::FORBIDDEN,
+            "forbidden: browsers cannot add repositories\n",
+        )
+            .into_response();
+    }
+    if c.nonce.is_empty() || c.nonce.len() > 128 {
+        return bad("nonce must be 1 to 128 bytes");
+    }
+    reply(
+        StatusCode::OK,
+        &serde_json::json!({ "proof": adder.token.prove(&c.nonce) }),
+    )
 }
 
 /// Why a request is refused before its body is read. Any browser marker refuses: a fetch from
@@ -130,6 +161,8 @@ async fn add(State(adder): State<Arc<Adder>>, req: Request) -> Response {
     let state = adder.state.clone();
     tokio::task::spawn_blocking(move || crate::remember(state.as_deref(), &[root]));
     tracing::info!("added {} at /r/{}/", stem, served.name);
+    // Open pages show the switcher, or its new entry, without a reload.
+    adder.table.announce();
     reply(
         StatusCode::CREATED,
         &serde_json::json!({ "name": served.name, "base": format!("/r/{}/", served.name) }),
@@ -168,201 +201,4 @@ fn checked_root(path: &Path, actions_file: Option<&Path>) -> Result<(PathBuf, St
 }
 
 #[cfg(test)]
-mod tests {
-    use std::path::Path;
-
-    use axum::{body::Body, http::Request};
-    use gitterrace_testkit::Fixture;
-    use http_body_util::BodyExt;
-    use tower::ServiceExt;
-
-    use crate::add::TOKEN_HEADER;
-
-    const ADD_PATH: &str = "/_repos";
-
-    /// A two-file repository whose root commit is `msg`.
-    fn repo(dir: &Path, msg: &str) -> std::path::PathBuf {
-        Fixture::init(dir)
-            .write("src/a.rs", "fn a() {}\n")
-            .commit(msg)
-            .path()
-            .canonicalize()
-            .expect("canon")
-    }
-
-    async fn send(
-        r: &axum::Router,
-        req: axum::http::request::Builder,
-        body: String,
-    ) -> (u16, String) {
-        let res = r
-            .clone()
-            .oneshot(req.body(Body::from(body)).expect("req"))
-            .await
-            .expect("res");
-        let s = res.status().as_u16();
-        let b = res.into_body().collect().await.expect("body").to_bytes();
-        (s, String::from_utf8_lossy(&b).into_owned())
-    }
-
-    fn post(token: Option<&str>) -> axum::http::request::Builder {
-        let b = Request::post(ADD_PATH)
-            .header("host", gitterrace_testkit::on_port("localhost"))
-            .header("content-type", "application/json");
-        match token {
-            Some(t) => b.header(TOKEN_HEADER, t),
-            None => b,
-        }
-    }
-
-    fn body(p: &Path) -> String {
-        serde_json::json!({ "path": p }).to_string()
-    }
-
-    async fn get(r: &axum::Router, uri: &str) -> (u16, String) {
-        send(
-            r,
-            Request::get(uri).header("host", gitterrace_testkit::on_port("localhost")),
-            String::new(),
-        )
-        .await
-    }
-
-    /// Both server shapes: one repository (added ones beside `/`) and several.
-    async fn adds_and_guards(several: bool) {
-        let tmp = tempfile::tempdir().expect("tmp");
-        let first = repo(&tmp.path().join("a"), "a root");
-        let mut start = vec![first.clone()];
-        if several {
-            start.push(repo(&tmp.path().join("x"), "x root"));
-        }
-        // Same folder name as the first, so the suffix rule shows.
-        let b = repo(&tmp.path().join("other/a"), "b root");
-        let token = gitterrace_actions::Token::generate().expect("token");
-        let secret = token.as_str().to_owned();
-        let env = crate::app::Env::new(gitterrace_config::Config::default());
-        let (r, _) = crate::build_server(start, None, None, &env, Some(token), None).expect("r");
-        let tok = Some(secret.as_str());
-
-        assert_eq!(send(&r, post(None), body(&b)).await.0, 403, "no token");
-        assert_eq!(send(&r, post(Some("x")), body(&b)).await.0, 403, "bad");
-        let browser = post(tok).header("origin", "http://evil.example");
-        assert_eq!(send(&r, browser, body(&b)).await.0, 403, "origin");
-        let same = post(tok).header("sec-fetch-site", "same-origin");
-        assert_eq!(send(&r, same, body(&b)).await.0, 403, "fetch metadata");
-        assert_eq!(get(&r, "/r/a-2/").await.0, 404, "nothing added yet");
-
-        let plain = tmp.path().join("plain");
-        std::fs::create_dir_all(&plain).expect("dir");
-        let plain = plain.canonicalize().expect("canon");
-        assert_eq!(send(&r, post(tok), body(&plain)).await.0, 400, "no repo");
-        assert_eq!(
-            send(&r, post(tok), body(&b.join("src"))).await.0,
-            400,
-            "inside one"
-        );
-        assert_eq!(
-            send(&r, post(tok), body(Path::new("rel"))).await.0,
-            400,
-            "relative"
-        );
-        #[cfg(unix)]
-        {
-            let link = tmp.path().join("link");
-            std::os::unix::fs::symlink(&b, &link).expect("link");
-            let link = tmp.path().canonicalize().expect("c").join("link");
-            assert_eq!(send(&r, post(tok), body(&link)).await.0, 400, "symlink");
-        }
-        assert_eq!(
-            send(&r, post(tok), body(&b.join("../a"))).await.0,
-            400,
-            "dot-dot"
-        );
-
-        let (s, js) = send(&r, post(tok), body(&b)).await;
-        assert_eq!(s, 201, "{js}");
-        assert!(js.contains("\"base\":\"/r/a-2/\""), "{js}");
-        let (s, page) = get(&r, "/r/a-2/").await;
-        assert_eq!(s, 200);
-        assert!(page.contains("/r/a-2/tree/"), "links carry the prefix");
-        assert_eq!(get(&r, "/r/a-2/blob/HEAD/src/a.rs").await.0, 200);
-        let (_, list) = get(&r, "/api/repos").await;
-        assert!(list.contains("\"/r/a-2/\""), "{list}");
-        // A permalink to the added repository resolves.
-        let repo = gitterrace_git::Repo::discover(&b).expect("repo");
-        let go = format!(
-            "/go/{}/{}",
-            repo.id().expect("id"),
-            repo.resolve("HEAD").expect("head")
-        );
-        assert_eq!(get(&r, &go).await.0, 302);
-
-        let (s, js) = send(&r, post(tok), body(&b)).await;
-        assert_eq!((s, js.contains("\"name\":\"a-2\"")), (409, true), "{js}");
-        let (s, js) = send(&r, post(tok), body(&first)).await;
-        assert_eq!(s, 409, "a startup repository: {js}");
-        let base = if several { "/r/a/" } else { "/" };
-        assert!(js.contains(&format!("\"base\":\"{base}\"")), "{js}");
-        if !several {
-            assert_eq!(get(&r, "/").await.0, 200, "/ stays the repository");
-        }
-    }
-
-    #[tokio::test]
-    async fn single_repository_server_adds_beside_root() {
-        adds_and_guards(false).await;
-    }
-
-    #[tokio::test]
-    async fn multi_repository_server_adds() {
-        adds_and_guards(true).await;
-    }
-
-    /// A repository that is found but will not open (its cache folder cannot be made) answers
-    /// 422, is not listed and is not written to the state file, so no restart brings it back.
-    #[cfg(unix)]
-    #[tokio::test]
-    async fn an_addition_that_will_not_open_is_refused_and_forgotten() {
-        use std::os::unix::fs::PermissionsExt;
-        let t = tempfile::tempdir().expect("tmp");
-        let a = repo(&t.path().join("a"), "a root");
-        let b = repo(&t.path().join("b"), "b root");
-        let git_dir = b.join(".git");
-        std::fs::set_permissions(&git_dir, std::fs::Permissions::from_mode(0o555)).expect("chmod");
-        if std::fs::create_dir(git_dir.join("probe")).is_ok() {
-            // Running as a user that ignores permissions: nothing to observe.
-            return;
-        }
-        let state = t.path().join("state");
-        let token = gitterrace_actions::Token::generate().expect("token");
-        let secret = token.as_str().to_owned();
-        let env = crate::app::Env::new(gitterrace_config::Config::default());
-        let (server, _) =
-            crate::build_server(vec![a], None, None, &env, Some(token), Some(state.clone()))
-                .expect("r");
-        let (status, js) = send(&server, post(Some(&secret)), body(&b)).await;
-        std::fs::set_permissions(&git_dir, std::fs::Permissions::from_mode(0o755)).expect("chmod");
-        assert_eq!(status, 422, "{js}");
-        let (_, list) = get(&server, "/api/repos").await;
-        assert!(!list.contains("/r/b/"), "{list}");
-        assert_eq!(get(&server, "/r/b/").await.0, 404, "not served");
-        tokio::time::sleep(std::time::Duration::from_millis(200)).await;
-        let recorded = std::fs::read_to_string(state.join("repos.json")).unwrap_or_default();
-        assert!(!recorded.contains(b.to_str().expect("utf8")), "{recorded}");
-    }
-
-    #[tokio::test]
-    async fn no_token_no_route() {
-        let t = tempfile::tempdir().expect("tmp");
-        let a = repo(&t.path().join("a"), "a root");
-        let b = repo(&t.path().join("b"), "b root");
-        let env = crate::app::Env::new(gitterrace_config::Config::default());
-        let (r, _) = crate::build_server(vec![a], None, None, &env, None, None).expect("r");
-        // Unmounted, so the request reaches no handler: the page router's 404 (or 405).
-        let status = send(&r, post(Some("x")), body(&b)).await.0;
-        assert!(
-            status == 404 || status == 405,
-            "added without a token route: {status}"
-        );
-    }
-}
+mod tests;

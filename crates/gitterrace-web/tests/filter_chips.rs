@@ -3,7 +3,7 @@
 
 use std::time::Duration;
 
-use gitterrace_testkit::{get, git};
+use gitterrace_testkit::{git, page as get};
 
 #[tokio::test(flavor = "multi_thread")]
 async fn chip_labels_are_escaped_exactly_once() {

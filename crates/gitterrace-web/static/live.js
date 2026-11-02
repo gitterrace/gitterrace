@@ -73,6 +73,11 @@
     chrome(c);
     // A reload of config.toml can change any page, whatever kinds it follows.
     if ((c.kinds || []).indexOf("config") >= 0) { notice(); return; }
+    // A repository joined the server: the switcher (nav.js) re-reads the list in place.
+    if ((c.kinds || []).indexOf("repos") >= 0) {
+      document.dispatchEvent(new CustomEvent("gt:repos-changed"));
+      if (!shows(c.kinds)) return;
+    }
     if (!shows(c.kinds || [])) return;
     if (how === "refresh") refresh();
     else if (how === "notice") notice();
@@ -170,7 +175,7 @@
         peers[d.id] = d.wt;
         // A tab that was hidden may have missed changes: tell it everything may have moved.
         if (d.v !== latest) {
-          chan.postMessage({ t: "ev", data: JSON.stringify({ kinds: ["head", "refs", "stash", "worktrees", "index", "worktree"], v: latest }) });
+          chan.postMessage({ t: "ev", data: JSON.stringify({ kinds: ["head", "refs", "stash", "worktrees", "index", "worktree", "repos"], v: latest }) });
         }
         if (!before && streamWt() && source) open();
       } else if (leader && d.t === "bye") {

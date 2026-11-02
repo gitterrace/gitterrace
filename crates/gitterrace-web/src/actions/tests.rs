@@ -50,7 +50,15 @@ fn router(repo: &Path, cfg: Option<&Path>, bound: Option<std::net::IpAddr>) -> a
     .0
 }
 
+/// GETs `uri`; a repository page path is taken under the one repository's `/r/evil`, the
+/// server's own routes (`/go`, `/_send`, `/_actions`) as they are.
 async fn page(r: &axum::Router, uri: &str) -> (u16, String) {
+    let server = ["/go/", "/_"].iter().any(|p| uri.starts_with(p));
+    let uri = if server {
+        uri.to_owned()
+    } else {
+        format!("/r/evil{uri}")
+    };
     let res = r
         .clone()
         .oneshot(
@@ -395,14 +403,17 @@ async fn go_redirects_to_the_repo_holding_the_commit() {
             .map(|v| v.to_str().expect("ascii").to_owned())
     };
     for (uri, want) in [
-        (format!("/go/{id}/{sha}"), Some(format!("/commit/{sha}"))),
+        (
+            format!("/go/{id}/{sha}"),
+            Some(format!("/r/evil/commit/{sha}")),
+        ),
         (
             format!("/go/{id}/{sha}/src/a.rs"),
-            Some(format!("/blob/{sha}/src/a.rs")),
+            Some(format!("/r/evil/blob/{sha}/src/a.rs")),
         ),
         (
             format!("/go/{id}/{sha}/src"),
-            Some(format!("/tree/{sha}/src")),
+            Some(format!("/r/evil/tree/{sha}/src")),
         ),
         (format!("/go/{id}/{sha}/../../etc/passwd"), None),
         (format!("/go/000000000000/{sha}"), None),

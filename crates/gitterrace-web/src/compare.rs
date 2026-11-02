@@ -91,7 +91,7 @@ pub(crate) async fn page(
                     let subjects = a.subjects(&hi);
                     let net = cmp.added.abs_diff(cmp.removed);
                     let kpis = vec![
-                        Kpi("Commits", fmt::thousands(cmp.commits.len())),
+                        Kpi("Commits without merges", fmt::thousands(cmp.commits.len())),
                         Kpi("Authors", fmt::thousands(cmp.authors)),
                         Kpi("Files changed", fmt::thousands(cmp.files_changed)),
                         Kpi("Lines added", fmt::thousands(cmp.added)),

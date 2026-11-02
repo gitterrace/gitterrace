@@ -5,7 +5,7 @@
 
 use std::time::Duration;
 
-use gitterrace_testkit::{Fixture, get};
+use gitterrace_testkit::{Fixture, page as get};
 use serde_json::Value;
 
 /// Cells of the table rows of `html` holding `marker`, tags stripped, thousands separators gone.

@@ -9,7 +9,7 @@ configured counting defaults, so moving any branch or tag, the cache catching up
 `insights` setting invalidates it. `If-None-Match` gets 304.
 JSON is `snake_case`. The same endpoints as `OpenAPI` 3.1: [openapi.json](openapi.json).
 
-Under several repositories the API of each lives at `/r/{name}/api/v1`.
+The API of each repository lives at `/r/{name}/api/v1`.
 
 Rust: `gitterrace_api::router(ApiState)` (nest under `/api/v1`),
 `gitterrace_api::serve_mcp(path, config)`.

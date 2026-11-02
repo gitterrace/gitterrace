@@ -286,8 +286,15 @@ async fn export_writes_every_prewarmed_page() {
     crate::export::export(&[repo.path().to_path_buf()], &out, &scope)
         .await
         .expect("export");
+    let root =
+        std::fs::read_to_string(target(&out, "/", "text/html").expect("root")).expect("root page");
+    assert!(
+        root.contains("url=/r/r/"),
+        "/ forwards to the one repository: {root}"
+    );
     for page in gitterrace_web::WARM_PAGES {
-        let file = target(&out, page, "text/html").expect("plain path");
+        let page = format!("/r/r{page}");
+        let file = target(&out, &page, "text/html").expect("plain path");
         assert!(
             file.is_file(),
             "{page} was not exported (looked for {})",
@@ -333,8 +340,7 @@ async fn several_repositories_export_like_the_server_serves_them() {
             "index does not link {name}"
         );
         for page in gitterrace_web::WARM_PAGES {
-            let file =
-                target(&out, &format!("/r/{name}{page}"), "text/html").expect("plain path");
+            let file = target(&out, &format!("/r/{name}{page}"), "text/html").expect("plain path");
             assert!(file.is_file(), "/r/{name}{page} was not exported");
         }
     }
@@ -414,7 +420,7 @@ async fn export_ships_no_scriptable_raw_file() {
         );
     }
     assert!(
-        out.join("raw/HEAD/a.png").is_file(),
+        out.join("r/r/raw/HEAD/a.png").is_file(),
         "inert media must still export; found {raw:?}"
     );
 }

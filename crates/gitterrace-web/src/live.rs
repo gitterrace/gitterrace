@@ -28,6 +28,9 @@ const ALL: [&str; 6] = ["head", "refs", "stash", "worktrees", "index", "worktree
 /// The kind that says the settings changed, see `static/live.js`.
 const CONFIG: &str = "config";
 
+/// The kind that says a repository joined the server, see `static/live.js`.
+const REPOS: &str = "repos";
+
 /// What moved, and the state the chrome shows, read once for all listeners.
 pub(crate) struct Change {
     pub(crate) kinds: Vec<&'static str>,
@@ -43,6 +46,16 @@ impl Change {
     pub(crate) fn config(v: u64) -> Self {
         Self {
             kinds: vec![CONFIG],
+            v,
+            banner: None,
+            dirty: false,
+        }
+    }
+
+    /// A repository joined the server: the switcher has one more entry. Carries no chrome.
+    pub(crate) fn repos(v: u64) -> Self {
+        Self {
+            kinds: vec![REPOS],
             v,
             banner: None,
             dirty: false,
@@ -118,7 +131,7 @@ impl Drop for WorktreeWatch {
 }
 
 fn event(c: &Change) -> Event {
-    if c.kinds == [CONFIG] {
+    if c.kinds == [CONFIG] || c.kinds == [REPOS] {
         let body = serde_json::json!({ "kinds": c.kinds, "v": c.v.to_string() });
         return Event::default().event("change").data(body.to_string());
     }

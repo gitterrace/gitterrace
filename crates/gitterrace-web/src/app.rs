@@ -167,6 +167,22 @@ impl Env {
         self.actions_note.read().ok()?.as_ref()?.note()
     }
 
+    /// Tells every open tab that the set of served repositories changed, so the switcher shows
+    /// a repository that joined without a reload.
+    pub(crate) fn repos_changed(&self) {
+        let apps: Vec<Arc<App>> = self
+            .apps
+            .lock()
+            .map(|g| g.iter().filter_map(Weak::upgrade).collect())
+            .unwrap_or_default();
+        for app in apps {
+            // An error only says no tab is open.
+            app.changes
+                .send(Arc::new(Change::repos(app.version())))
+                .ok();
+        }
+    }
+
     /// The settings in force now.
     pub(crate) fn cfg(&self) -> Arc<Config> {
         self.cfg

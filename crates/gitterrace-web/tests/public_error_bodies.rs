@@ -52,12 +52,12 @@ async fn public_error_bodies_never_name_host_folders() {
     let commits = p.join(".git/gitterrace/commits.jsonl");
     std::fs::remove_file(&commits).ok();
     std::fs::create_dir_all(&commits).expect("mkdir");
-    let mut todo: Vec<String> = ["/", "/stats", "/api/v1/"]
+    let mut todo: Vec<String> = ["/", "/r/repo/", "/r/repo/stats", "/r/repo/api/v1/"]
         .into_iter()
         .map(str::to_owned)
         .chain(gitterrace_api::ENDPOINTS.iter().map(|e| {
             format!(
-                "/api/v1{}?path=src/a.rs",
+                "/r/repo/api/v1{}?path=src/a.rs",
                 e.path.replace("{id}", "HEAD").replace("{name}", "summary")
             )
         }))

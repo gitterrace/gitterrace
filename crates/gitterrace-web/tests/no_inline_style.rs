@@ -2,7 +2,7 @@
 //! stricter than the app's own (a host's, a proxy's) loses nothing. Renders the pages that
 //! once carried one.
 
-use gitterrace_testkit::{get, git};
+use gitterrace_testkit::{git, page as get};
 use std::time::Duration;
 
 #[tokio::test(flavor = "multi_thread")]

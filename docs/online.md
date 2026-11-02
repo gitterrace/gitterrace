@@ -65,7 +65,7 @@ hosts = ["git.example.com"]
 
 `hosts` lists the exact names the proxy forwards in the `Host` header, without scheme or port.
 Wildcards are refused. Any other name answers `403`, which stops DNS rebinding. Forward the
-original `Host`; gitterrace reads no `X-Forwarded-*` header.
+original `Host`, since gitterrace reads no `X-Forwarded-*` header.
 
 ## What not to do
 

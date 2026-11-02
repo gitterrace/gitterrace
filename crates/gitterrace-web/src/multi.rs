@@ -1,7 +1,8 @@
 //! Several repositories on one server: a name table, one lazily built router per repository
 //! under `/r/NAME`, and a repository index at `/`. The table starts with the CLI paths and only
-//! grows (see `add.rs`); a single-repository server keeps its repository at `/` and serves
-//! added ones from the same table.
+//! grows (see `add.rs`). Every repository lives under `/r/NAME`, also alone: a link handed out
+//! never changes when another repository joins. `/` forwards to the one repository while there
+//! is one. A name is assigned once and kept in the registry (see `registry::claim`).
 
 use std::fmt::Write as _;
 use std::{
@@ -55,9 +56,8 @@ struct Recent {
 pub(crate) struct Table {
     env: Env,
     repos: RwLock<Repos>,
-    /// The repository a single-repository server shows at `/`: its name is taken and its root
-    /// is never added again.
-    primary: Option<Primary>,
+    /// The registry folder names are kept in; `None` names from the table alone.
+    state: Option<PathBuf>,
     /// Actions, when on; each repository's pages embed its token.
     pub(crate) live: Option<Arc<crate::actions::Live>>,
 }
@@ -68,15 +68,10 @@ struct Repos {
     by_name: HashMap<String, Arc<Served>>,
 }
 
-pub(crate) struct Primary {
-    pub(crate) name: String,
-    pub(crate) root: PathBuf,
-}
-
 /// What [`Table::add`] did: the name the repository is served under, and whether it was new.
 pub(crate) enum Added {
     Fresh(Arc<Served>),
-    /// Already served: under this URL prefix (`/` for the primary).
+    /// Already served: under this URL prefix.
     Present {
         name: String,
         base: String,
@@ -109,36 +104,33 @@ struct RepoItem {
 }
 
 impl Table {
-    /// Names each repository after its folder, deduplicated with a numeric suffix.
-    pub(crate) fn new(paths: Vec<PathBuf>, env: Env) -> io::Result<Self> {
+    /// Names each repository after its folder (see [`Self::allocate`]). Two paths of one
+    /// repository are served once.
+    pub(crate) fn new(paths: Vec<PathBuf>, env: Env, state: Option<PathBuf>) -> io::Result<Self> {
         let table = Self {
             env,
             repos: RwLock::default(),
-            primary: None,
+            state,
             live: None,
         };
         for path in paths {
             let repo = Repo::discover(&path).map_err(io::Error::other)?;
+            let root = repo.root();
             let mut g = table.write();
-            let name = table.allocate(&g, &repo.name()).map_err(|stem| {
-                io::Error::other(format!(
-                    "unusable repository name {stem:?} for {}",
-                    path.display()
-                ))
-            })?;
-            g.insert(name, path, repo.root());
+            if g.order.iter().any(|s| s.root == root) {
+                continue;
+            }
+            let name = table
+                .allocate(&g, &url_stem(&repo.name()), &root)
+                .map_err(|stem| {
+                    io::Error::other(format!(
+                        "unusable repository name {stem:?} for {}",
+                        path.display()
+                    ))
+                })?;
+            g.insert(name, path, root);
         }
         Ok(table)
-    }
-
-    /// An empty table beside the repository a single-repository server shows at `/`.
-    pub(crate) fn beside(primary: Primary, env: Env) -> Self {
-        Self {
-            env,
-            repos: RwLock::default(),
-            primary: Some(primary),
-            live: None,
-        }
     }
 
     fn read(&self) -> std::sync::RwLockReadGuard<'_, Repos> {
@@ -153,34 +145,30 @@ impl Table {
             .unwrap_or_else(std::sync::PoisonError::into_inner)
     }
 
-    /// A free URL name from the folder name, with a numeric suffix on collision; the stem back
-    /// when it is not URL-safe.
-    fn allocate(&self, repos: &Repos, stem: &str) -> Result<String, String> {
+    /// The URL name of the repository at `root`: the one the registry keeps for it, else a
+    /// new one, first come first served (`registry::claim`). Without a registry, or when it
+    /// cannot be read or written, the same rule against the table alone, so a server always
+    /// starts. The stem back when it is not URL-safe.
+    fn allocate(&self, repos: &Repos, stem: &str, root: &Path) -> Result<String, String> {
         if !valid_name(stem) {
             return Err(stem.to_owned());
         }
-        let taken = |n: &str| {
-            repos.by_name.contains_key(n) || self.primary.as_ref().is_some_and(|p| p.name == n)
-        };
-        let mut name = stem.to_owned();
-        let mut n = 2;
-        while taken(&name) {
-            name = format!("{stem}-{n}");
-            n += 1;
+        let taken = |n: &str| repos.order.iter().any(|s| s.name.eq_ignore_ascii_case(n));
+        if let Some(dir) = &self.state {
+            match crate::registry::claim(dir, root, stem, &taken) {
+                // A recorded name is served only when no repository here holds it already.
+                Ok(name) if valid_name(&name) && !taken(&name) => return Ok(name),
+                Ok(name) => tracing::warn!("recorded name {name:?} unusable here"),
+                Err(e) => tracing::warn!("naming {}: {e}", root.display()),
+            }
         }
-        Ok(name)
+        Ok(crate::registry::pick(stem, root, &taken))
     }
 
     /// Adds the repository whose canonical top folder is `root`, named like the startup ones.
     /// A root already served comes back as [`Added::Present`]; check and insert hold one lock,
     /// so two racing additions of the same folder add it once.
     pub(crate) fn add(&self, root: PathBuf, stem: &str) -> Result<Added, String> {
-        if let Some(p) = self.primary.as_ref().filter(|p| p.root == root) {
-            return Ok(Added::Present {
-                name: p.name.clone(),
-                base: "/".to_owned(),
-            });
-        }
         let mut g = self.write();
         if let Some(s) = g.order.iter().find(|s| s.root == root) {
             return Ok(Added::Present {
@@ -188,15 +176,22 @@ impl Table {
                 base: format!("/r/{}/", s.name),
             });
         }
-        let name = self.allocate(&g, stem)?;
+        let name = self.allocate(&g, &url_stem(stem), &root)?;
         Ok(Added::Fresh(g.insert(name, root.clone(), root)))
     }
 
     /// Drops `name` again, for an addition whose repository would not open.
+    /// Its name claim goes too, so it is not held for a repository that was never served.
     pub(crate) fn remove(&self, name: &str) {
         let mut g = self.write();
-        g.by_name.remove(name);
+        let gone = g.by_name.remove(name);
         g.order.retain(|s| s.name != name);
+        drop(g);
+        if let (Some(dir), Some(s)) = (&self.state, gone)
+            && let Err(e) = crate::registry::forget(dir, &s.root)
+        {
+            tracing::warn!("forgetting the name {name}: {e}");
+        }
     }
 
     /// The page for a repository that will not open. An io error names host folders, so only
@@ -211,8 +206,31 @@ impl Table {
         (status, crate::error::page(status, &detail)).into_response()
     }
 
+    /// The URL name the repository at `root` is served under.
+    #[cfg(test)]
+    pub(crate) fn name_of(&self, root: &Path) -> Option<String> {
+        let g = self.read();
+        g.order
+            .iter()
+            .find(|s| s.root == root)
+            .map(|s| s.name.clone())
+    }
+
     pub(crate) fn get(&self, name: &str) -> Option<Arc<Served>> {
         self.read().by_name.get(name).cloned()
+    }
+
+    /// Builds every repository's router now, in the background: its index refresher and
+    /// warm-up start at once, as they did for a repository served at `/`, not on the first visit.
+    pub(crate) fn start_all(self: &Arc<Self>) {
+        for served in self.snapshot() {
+            let table = Arc::clone(self);
+            tokio::spawn(async move {
+                if let Err(e) = table.router_of(&served).await {
+                    tracing::warn!("opening {}: {e}", served.name);
+                }
+            });
+        }
     }
 
     /// The served repositories in order, a copy so no lock is held while one is read.
@@ -228,6 +246,11 @@ impl Table {
             .get_or_try_init(|| async { repo_router(served, self.live.clone(), &self.env) })
             .await
             .cloned()
+    }
+
+    /// Tells every open tab, of every repository, that the table changed.
+    pub(crate) fn announce(&self) {
+        self.env.repos_changed();
     }
 
     /// Each repository opened once, keyed by its URL name, for permalinks and run requests.
@@ -294,6 +317,40 @@ impl Served {
     }
 }
 
+/// The folder name made URL-safe: lowercase ASCII, anything else (a dot prefix, spaces,
+/// separators, control or non-ASCII characters) a `-`, trimmed of `-`; `repo` when nothing is
+/// left. Lowercase, so two folders differing in case only never share a URL on a
+/// case-insensitive disk.
+fn url_stem(folder: &str) -> String {
+    // A bare clone's folder is conventionally `name.git`: the repository is `name`.
+    let folder = folder
+        .strip_suffix(".git")
+        .filter(|f| !f.is_empty())
+        .unwrap_or(folder);
+    let mapped: String = folder
+        .trim_start_matches('.')
+        .chars()
+        .map(|c| match c {
+            'a'..='z' | '0'..='9' | '_' | '.' => c,
+            'A'..='Z' => c.to_ascii_lowercase(),
+            _ => '-',
+        })
+        .collect();
+    let trimmed = mapped.trim_matches(['-', '.']);
+    if trimmed.is_empty() {
+        "repo".to_owned()
+    } else {
+        trimmed.to_owned()
+    }
+}
+
+/// A working tree (holding `.git`) or a bare repository (`HEAD`, `objects` and `refs` at its
+/// top). A bare clone has no `.git`, and searching it for repositories finds none.
+fn is_repo(dir: &Path) -> bool {
+    dir.join(".git").exists()
+        || (dir.join("HEAD").is_file() && dir.join("objects").is_dir() && dir.join("refs").is_dir())
+}
+
 /// A URL-safe name: no separator, no dot prefix (so never `.` or `..`), nothing to escape.
 fn valid_name(name: &str) -> bool {
     !name.is_empty()
@@ -311,7 +368,7 @@ fn valid_name(name: &str) -> bool {
 pub fn discover_repos(paths: &[PathBuf], depth: usize, skip: &[String]) -> Vec<PathBuf> {
     let mut out = Vec::new();
     for p in paths {
-        if p.join(".git").exists() {
+        if is_repo(p) {
             out.push(p.clone());
             continue;
         }
@@ -343,7 +400,7 @@ fn walk(dir: &Path, depth: usize, skip: &[String], out: &mut Vec<PathBuf>) {
         .collect();
     dirs.sort();
     for d in dirs {
-        if d.join(".git").exists() {
+        if is_repo(&d) {
             out.push(d);
         } else {
             walk(&d, depth - 1, skip, out);
@@ -361,17 +418,6 @@ pub(crate) fn router(table: Arc<Table>) -> Router {
         .route("/r/{name}/{*rest}", axum::routing::any(dispatch))
         .merge(crate::routes::assets())
         .fallback(crate::error::fallback)
-        .with_state(table)
-}
-
-/// What a single-repository server adds in front of its own pages: added repositories under
-/// `/r/NAME` and the switcher list. No index and no catch-all: `/` stays the repository.
-pub(crate) fn added_router(table: Arc<Table>) -> Router {
-    Router::new()
-        .route("/api/repos", get(repos_json))
-        .route("/r/{name}", get(slash))
-        .route("/r/{name}/", axum::routing::any(dispatch))
-        .route("/r/{name}/{*rest}", axum::routing::any(dispatch))
         .with_state(table)
 }
 
@@ -455,7 +501,13 @@ fn spark(weeks: &[u32], max: u32) -> String {
     pts.trim_end().to_owned()
 }
 
-async fn index(State(table): State<Arc<Table>>) -> crate::error::Result<Html<String>> {
+/// `/`: the one repository while there is one (a 302, so the answer changes once another
+/// joins), else the index of all.
+async fn index(State(table): State<Arc<Table>>) -> crate::error::Result<Response> {
+    if let [one] = table.snapshot().as_slice() {
+        let to = format!("/r/{}/", one.name);
+        return Ok((StatusCode::FOUND, [(axum::http::header::LOCATION, to)]).into_response());
+    }
     let html = tokio::task::spawn_blocking(move || {
         let now = fmt::now();
         let rows = table
@@ -487,33 +539,25 @@ async fn index(State(table): State<Arc<Table>>) -> crate::error::Result<Html<Str
         IndexPage { rows }.render()
     })
     .await??;
-    Ok(Html(html))
+    Ok(Html(html).into_response())
 }
 
 async fn repos_json(State(table): State<Arc<Table>>) -> Response {
     let items = tokio::task::spawn_blocking(move || {
         let now = fmt::now();
-        // A single-repository server lists its own repository first, at `/`.
-        let primary = table.primary.as_ref().map(|p| RepoItem {
-            name: p.name.clone(),
-            href: "/".to_owned(),
-            when: String::new(),
-        });
-        let added = table.snapshot();
-        primary
-            .into_iter()
-            .chain(added.iter().map(|s| {
-                RepoItem {
-                    name: s.name.clone(),
-                    href: format!("/r/{}/", s.name),
-                    when: s
-                        .recent(now)
-                        .last
-                        .as_ref()
-                        .map(|c| fmt::ago(c.author.time, now))
-                        .unwrap_or_default(),
-                }
-            }))
+        table
+            .snapshot()
+            .iter()
+            .map(|s| RepoItem {
+                name: s.name.clone(),
+                href: format!("/r/{}/", s.name),
+                when: s
+                    .recent(now)
+                    .last
+                    .as_ref()
+                    .map(|c| fmt::ago(c.author.time, now))
+                    .unwrap_or_default(),
+            })
             .collect::<Vec<_>>()
     })
     .await
@@ -522,101 +566,4 @@ async fn repos_json(State(table): State<Arc<Table>>) -> Response {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::valid_name;
-    use axum::response::IntoResponse;
-    use gitterrace_testkit::git;
-
-    #[test]
-    fn names() {
-        for ok in ["tendir", "gitterrace-2", "a.b", "x_y"] {
-            assert!(valid_name(ok), "{ok}");
-        }
-        for bad in ["", ".", "..", ".hidden", "a/b", "a b", "a%2e"] {
-            assert!(!valid_name(bad), "{bad}");
-        }
-    }
-
-    #[test]
-    fn recent_is_memoised_by_head() {
-        let dir = tempfile::Builder::new()
-            .prefix("repo")
-            .tempdir()
-            .expect("tmp");
-        let p = dir.path();
-        git(p, &["init", "-q", "-b", "main"]);
-        git(p, &["commit", "-q", "--allow-empty", "-m", "one"]);
-        let table = super::Table::new(
-            vec![p.to_path_buf()],
-            crate::app::Env::new(gitterrace_config::Config::default()),
-        )
-        .expect("table");
-        let s = table.snapshot()[0].clone();
-        let now = crate::fmt::now() + 60;
-        let first = s.recent(now);
-        assert!(
-            std::sync::Arc::ptr_eq(&first, &s.recent(now)),
-            "same HEAD reuses the read"
-        );
-        git(p, &["commit", "-q", "--allow-empty", "-m", "two"]);
-        let after = s.recent(now);
-        let total = |r: &super::Recent| r.weeks.iter().sum::<u32>();
-        assert_eq!((total(&first), total(&after)), (1, 2));
-        assert_eq!(after.last.as_ref().map(|c| c.subject.as_str()), Some("two"));
-    }
-
-    /// The line counts every commit in the window, not the newest few thousand: a busy
-    /// repository must not show an empty tail.
-    #[test]
-    fn weekly_counts_the_whole_window() {
-        let now = 100 * super::WEEK;
-        // 5000 commits evenly over the 26 weeks, far more than the old 2000-commit read.
-        let step = super::WEEK * super::SPARK_WEEKS as i64 / 5000;
-        let times: Vec<i64> = (0..5000).map(|i| now - i * step).collect();
-        let weeks = super::weekly(&times, now);
-        assert_eq!(weeks.len(), super::SPARK_WEEKS);
-        assert!(weeks.iter().all(|n| *n > 0), "{weeks:?}");
-        assert_eq!(weeks.iter().sum::<u32>(), 5000);
-    }
-
-    #[tokio::test]
-    async fn the_slash_redirect_keeps_the_query() {
-        let r = super::slash("/r/a?period=1y&bots=1".parse().expect("uri"))
-            .await
-            .into_response();
-        let to = r.headers().get("location").expect("location");
-        assert_eq!(to, "/r/a/?period=1y&bots=1");
-    }
-
-    /// A repository that will not open answers the error page; a public server never names a
-    /// host folder in it, a local one shows the reason.
-    #[test]
-    fn a_repository_that_will_not_open_hides_host_paths_when_public() {
-        let e = std::io::Error::other("cannot open /srv/private/repo/.git/gitterrace");
-        for (public, shows) in [(true, false), (false, true)] {
-            let mut cfg = gitterrace_config::Config::default();
-            cfg.server.public = public;
-            let table = super::Table::new(Vec::new(), crate::app::Env::new(cfg)).expect("table");
-            let r = table.open_failed("repo", &e);
-            assert_eq!(r.status(), 500);
-            let body = futures_body(r);
-            assert!(body.contains("repo could not be opened"), "{body}");
-            assert_eq!(
-                body.contains("/srv/private"),
-                shows,
-                "public={public}: {body}"
-            );
-        }
-    }
-
-    fn futures_body(r: axum::response::Response) -> String {
-        let rt = tokio::runtime::Builder::new_current_thread()
-            .build()
-            .expect("rt");
-        let b = rt
-            .block_on(http_body_util::BodyExt::collect(r.into_body()))
-            .expect("body")
-            .to_bytes();
-        String::from_utf8_lossy(&b).into_owned()
-    }
-}
+mod tests;

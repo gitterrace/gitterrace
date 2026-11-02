@@ -26,10 +26,13 @@ pub fn render(ws: &Workspace) -> Out {
             "version": version,
             "license": { "name": license, "identifier": license },
             "description": "Read-only and local. Every answer is pinned to a revision (`rev`, \
-                default `HEAD`). Under several repositories each one's API lives at \
-                `/r/{name}/api/v1`."
+                default `HEAD`). Each repository's API lives at `/r/{name}/api/v1`."
         },
-        "servers": [{ "url": "http://127.0.0.1:4242/api/v1", "description": "the default address" }],
+        "servers": [{
+            "url": "http://127.0.0.1:4242/r/{name}/api/v1",
+            "description": "the default address",
+            "variables": { "name": { "default": "repo", "description": "the repository's URL name" } }
+        }],
         // Loopback only, read-only, no credentials: an empty requirement says so explicitly.
         "security": [],
         "paths": paths,

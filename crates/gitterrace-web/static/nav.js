@@ -240,7 +240,9 @@
     else fetch(B + "/api/refs").then(function (r) { return r.json(); }).then(function (l) { refs = l; p.refresh(); });
   }
 
-  // ---- repository switcher (only rendered when several repos are served) --
+  // ---- repository switcher (shown while the server holds several repos) --
+  // The table only grows, so the list is read on every page: a repository that joined since
+  // the last one shows the switcher on the next navigation or reload.
   var repos = null;
   function openRepos() {
     var btn = document.getElementById("repobtn");
@@ -259,7 +261,19 @@
     else fetch("/api/repos").then(function (r) { return r.json(); }).then(function (l) { repos = l; p.refresh(); });
   }
   var repoBtn = document.getElementById("repobtn");
-  if (repoBtn) repoBtn.addEventListener("click", openRepos);
+  function loadRepos() {
+    fetch("/api/repos", { cache: "no-store" }).then(function (r) { return r.json(); }).then(function (l) {
+      repos = l;
+      var box = document.getElementById("reposwitch");
+      if (box && l.length > 1) box.hidden = false;
+    }).catch(function () {});
+  }
+  if (repoBtn) {
+    repoBtn.addEventListener("click", openRepos);
+    loadRepos();
+    // live.js: a repository joined, so the switcher shows it without a reload.
+    document.addEventListener("gt:repos-changed", loadRepos);
+  }
 
   // ---- shortcut sheet -----------------------------------------------------
   var SHORTCUTS = [

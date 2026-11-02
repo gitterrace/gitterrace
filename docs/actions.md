@@ -71,7 +71,7 @@ The whole file, as `git terrace init` writes it:
 
 version = 1
 
-# ---- Send to: URL templates the browser opens; you confirm on the destination's own page.
+# ---- Send to: URL templates the browser opens, and you confirm on the destination's own page.
 
 # Opens tendir's new-task sheet, filled in. Needs the tendir app.
 [[send]]

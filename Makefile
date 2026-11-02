@@ -7,53 +7,54 @@ build:
 
 ## install: Install git-terrace into ~/.cargo/bin, so git runs it as git terrace
 install:
-	cargo install --locked --path crates/gitterrace
+	cargo +$(TOOLCHAIN) install --locked --path crates/gitterrace
 
-## run: Serve the current repository
-run:
-	cargo run -p gitterrace --bin git-terrace -- .
+# The compiler rust-toolchain.toml pins. `cargo install` warns when that file picks it implicitly,
+# so install names it.
+TOOLCHAIN := $(shell sed -n 's/^channel *= *"\(.*\)"/\1/p' rust-toolchain.toml)
 
-## fmt: Check formatting
+#: fmt: Check formatting
 fmt:
 	cargo fmt --all -- --check
 
-## clippy: Clippy, warnings are errors
+#: clippy: Clippy, warnings are errors
 clippy:
 	cargo clippy --workspace --all-targets -- -D warnings
 
-## lint: External linters (typos, vale, gitleaks, markdownlint, shellcheck, shfmt, ruff, machete)
+## lint: External linters (typos, vale, gitleaks, markdownlint, shellcheck, shfmt, ruff, pyright, tsc, actionlint, ast-grep, machete)
 lint:
 	sh scripts/lint-run.sh
 
 ## test: All tests
 test:
 	cargo test --workspace
+	cargo test --release -p gitterrace-web --test memory_budget
 
-## doc: Docs, warnings are errors
+#: doc: Docs, warnings are errors
 doc:
 	RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --workspace
 
-## theme: Snapshot matches its manifest, generated files match the snapshot
+#: theme: Snapshot matches its manifest, generated files match the snapshot
 theme:
 	python3 scripts/theme-gen.py --check
 	python3 scripts/theme-logo-gen.py --check
 	python3 scripts/theme-tagline-gen.py --check
 
-## actions: Example actions work per OS profile (stubbed PATH)
+#: actions: Example actions work per OS profile (stubbed PATH)
 actions:
 	sh scripts/actions-check.sh
 
-## docs-gen: Regenerate generated files (docs/api.md)
+## docs-gen: Regenerate every generated file (docs, README blocks, site)
 docs-gen:
 	cargo xtask generate
 
-## docs-check: Generated files are up to date
+#: docs-check: Generated files are up to date
 docs-check:
 	python3 scripts/bench-report.py --check
 	python3 scripts/make-targets-check.py
 	cargo xtask check
 
-## names: File, env and project names follow the conventions
+#: names: File, env and project names follow the conventions
 names:
 	python3 scripts/names-check.py
 
@@ -98,27 +99,25 @@ preview:
 	done; \
 	echo "preview did not come up, see $$log" >&2; exit 1
 
-## bench: Benchmark gitterrace on the pinned corpus (small, medium, rust). Needs the network
+## bench: Benchmark gitterrace on the pinned corpus (small, medium, rust). Needs the network. LARGE=1 adds the linux kernel (about 30 GB)
+BENCH_REPOS = --repos control,git,rust
 bench: build
-	python3 scripts/bench-run.py --bin target/release/git-terrace --repos control,git,rust
+	$(if $(LARGE),BENCH_LARGE=1 )python3 scripts/bench-run.py --bin target/release/git-terrace $(if $(LARGE),--large,$(BENCH_REPOS))
+	python3 scripts/bench-report.py
 
-## bench-large: As bench, plus the linux kernel (about 30 GB, opt-in)
-bench-large: build
-	BENCH_LARGE=1 python3 scripts/bench-run.py --bin target/release/git-terrace --large
-
-## bench-report: Write the newest results into docs/benchmarks.md
+#: bench-report: Write the newest results into docs/benchmarks.md
 bench-report:
 	python3 scripts/bench-report.py
 
-## bench-clean: Remove the cached benchmark clones
-bench-clean:
-	@d="$${GITTERRACE_BENCH_DIR:-$$HOME/.cache/gitterrace-bench}"; \
-	if [ -d "$$d" ]; then echo "removing $$d ($$(du -sh "$$d" | cut -f1))"; rm -rf "$$d"; else echo "nothing at $$d"; fi
-
-## bench-guard: The harness still works, on a tiny generated repo (part of check)
+#: bench-guard: The harness still works, on a tiny generated repo (part of check)
 bench-guard:
 	cargo build -q -p gitterrace
 	python3 scripts/bench-run.py --synthetic --bin target/debug/git-terrace >/dev/null
+	python3 scripts/bench-report.py --self-test
+
+## memory-check: An idle server's memory stays flat as the history grows (about 5 minutes, so not in check)
+memory-check: build
+	python3 scripts/memory-check.py --bin target/release/git-terrace
 
 ## browser-check: Real-browser checks of the served pages (BIN=path to git-terrace). Needs browsers, so not in check
 browser-check:
@@ -132,33 +131,29 @@ site: docs-check
 deploy: site shipped site-render
 	npx wrangler@4 deploy
 
-## stage: Deploy without the release check, only while gitterrace.dev is blocked at the edge
-stage: docs-check shipped site-render
-	npx wrangler@4 deploy
-
-## app-icon: Render the macOS icon install-handler gives gitterrace-open.app, from docs/brand/mark-dark.svg (macOS, needs browsers)
+#: app-icon: Render the macOS icon install-handler gives gitterrace-open.app, from docs/brand/mark-dark.svg (macOS, needs browsers)
 app-icon:
 	node scripts/icon-render.mjs
 
-## site-render: Render the touch icon and link-preview image from docs/brand (ignored), and the site's WebPs from target/site-shots when present (needs cwebp then)
+#: site-render: Render the touch icon and link-preview image from docs/brand (ignored), and the site's WebPs from target/site-shots when present (needs cwebp then)
 site-render:
 	node scripts/site-render.mjs
 
-## site-shots: Retake every screenshot from a running preview (URL=http://127.0.0.1:4242): raw PNG files to target/site-shots, the README's to docs/screenshots, the site WebPs, then generate. Needs browsers, so not in check
-site-shots:
-	node scripts/site-shots-run.mjs $(URL)
+## site-shots: Retake every screenshot: build, serve jq and ripgrep pinned in ~/.cache/gitterrace-shots with scripts/site-shots/config, shoot to target/site-shots and docs/screenshots, the site WebPs, then generate. Needs browsers, so not in check
+site-shots: build
+	node scripts/site-shots-run.mjs
 	node scripts/site-render.mjs
 	cargo xtask generate
 
-## shipped: site/ and wrangler.toml are committed, so a deploy ships a known commit
+#: shipped: site/ and wrangler.toml are committed, so a deploy ships a known commit
 shipped:
 	@git diff --quiet HEAD -- site wrangler.toml || { echo "site/ or wrangler.toml has uncommitted changes"; exit 1; }
 	@test -s site/404.html || { echo "site/404.html missing: not_found_handling has nothing to serve"; exit 1; }
 
-## domains: Check that gitterrace.dev serves and every other host redirects to it
+#: domains: Check that gitterrace.dev serves and every other host redirects to it
 domains:
 	python3 scripts/site-check.py domains
 
 ## help: This list
 help:
-	@grep -E '^## ' $(MAKEFILE_LIST) | sed 's/## //' | column -t -s ':'
+	@sed -n 's/^## \([^:]*\): \(.*\)/\1\t\2/p' $(MAKEFILE_LIST) | awk -F '\t' '{printf "%-14s %s\n", $$1, $$2}'

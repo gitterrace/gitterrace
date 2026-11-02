@@ -5,16 +5,6 @@
 </picture>
 </h1>
 
-<p align="center"><b>A local git browser. Your repository's history, step by step. Run <code>git terrace</code> and read it in your browser.</b></p>
-
-<!-- BEGIN GENERATED: shots -->
-<picture>
-<source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/overview-dark.png">
-<img src="docs/screenshots/overview-light.png" alt="Browse: the repository page with README, last commit, file list and key numbers.">
-</picture>
-
-<!-- END GENERATED: shots -->
-
 Browse any git repository in your browser, offline, read-only: code, commits, blame,
 branches, worktrees, stashes, live updates and insights. No database, accounts or network.
 Agents write more of the code each month, and few people read their diffs. This is a calm
@@ -25,6 +15,14 @@ Try it without installing: [the live demo](https://demo.gitterrace.dev): jq 1.8.
 15.2.0, exported.
 
 <!-- END GENERATED: demo -->
+
+<!-- BEGIN GENERATED: shots -->
+<picture>
+<source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/overview-dark.png">
+<img src="docs/screenshots/overview-light.png" alt="Browse: the repository page with README, last commit, file list and key numbers.">
+</picture>
+
+<!-- END GENERATED: shots -->
 
 ## Install
 
@@ -42,10 +40,9 @@ cargo install --locked --git https://github.com/gitterrace/gitterrace gitterrace
 Installs `git-terrace`; git runs it as `git terrace`.
 
 <!-- END GENERATED: install -->
-Windows: CI builds and tests `x86_64-pc-windows-msvc` and smoke-tests the binary on a Windows
-runner, and releases ship a zip. Runtime was also smoke-tested under Wine (`scripts/wine-run.sh`).
-Config lives in `%APPDATA%\gitterrace`, the repo registry in `%LOCALAPPDATA%\gitterrace`, and
-`install-handler` prints the `reg add` commands instead of writing the registry.
+Windows: releases ship a zip. Config lives in `%APPDATA%\gitterrace` and the repo registry in
+`%LOCALAPPDATA%\gitterrace`. `install-handler` prints the `reg add` commands instead of writing
+the registry.
 
 ## Quickstart
 
@@ -56,9 +53,11 @@ cd ../another/repo
 git terrace          # joins the server already running, no second port
 ```
 
-Run `git terrace` in a second repository while one is served and it joins that server: the
-repository appears under `/r/<name>/` and in the switcher, and the command exits. This works
-for the same user on a loopback address. `--public` servers never take repositories this way.
+Every repository lives under `/r/<name>/`, also the first, so its links stay valid as
+others join. Run `git terrace` in a second repository while one is served and it joins that
+server: the repository appears under `/r/<name>/` and in the switcher, and the command exits.
+This works for the same user on a loopback address. `--public` servers never take repositories
+this way.
 
 ## Commands
 
@@ -86,15 +85,17 @@ Send a selection to a tracker, notes app or mail draft, or run your own program 
 you write `actions.toml`: [how to set it up](docs/actions.md).
 
 Docs: [why](docs/why.md), [configuration](docs/configuration.md), [JSON API](docs/api.md),
-[architecture](docs/architecture.md), [benchmarks](docs/benchmarks.md). Binds to `127.0.0.1`, never
-writes to your repository. Serving it to others: [running it online](docs/online.md). The one-page
-site is generated into [site/](site/index.html).
+[architecture](docs/architecture.md),
+[highlighted languages](docs/architecture.md#syntax-highlighting),
+[benchmarks](docs/benchmarks.md). Binds to `127.0.0.1` and never changes your files or history.
+Serving it to others: [running it online](docs/online.md). The one-page site is generated into
+[site/](site/index.html).
 
 ## Contributing
 
 Issues and pull requests are welcome: see [contributing](CONTRIBUTING.md), and report
-vulnerabilities privately as [SECURITY.md](SECURITY.md) describes. Built by AI coding agents
-and humans together. A human sets the direction and decides ([why](docs/why.md)).
+vulnerabilities privately as [SECURITY.md](SECURITY.md) describes. A human sets the direction and
+decides ([how it is made](docs/why.md#how-it-is-made)).
 
 ## License
 

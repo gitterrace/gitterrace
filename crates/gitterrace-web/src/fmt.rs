@@ -10,9 +10,26 @@ pub(crate) use gitterrace_git::{
 /// The favicon `<link>`, the same file the page templates include, for pages built as strings.
 pub(crate) const FAVICON: &str = include_str!("../templates/_favicon.html");
 
+/// How a commit time renders when it is outside years 1 to 9999 (a corrupt or hostile
+/// timestamp, such as `i64::MIN`): never a wrapped or invented date.
+pub(crate) const UNKNOWN_DATE: &str = "unknown date";
+
+/// First and last second of years 1 to 9999, the range a date can be written in.
+const FIRST_SECOND: i64 = -62_135_596_800;
+const LAST_SECOND: i64 = 253_402_300_799;
+
+/// `time` shifted into its offset, or `None` when the sum overflows or leaves years 1 to
+/// 9999. Every date helper goes through this, so none does unchecked time arithmetic.
+fn local(time: i64, offset: i32) -> Option<i64> {
+    time.checked_add(i64::from(offset))
+        .filter(|t| (FIRST_SECOND..=LAST_SECOND).contains(t))
+}
+
 /// `YYYY-MM-DD HH:MM` in the commit's own offset.
 pub(crate) fn date(time: i64, offset: i32) -> String {
-    let local = time + i64::from(offset);
+    let Some(local) = local(time, offset) else {
+        return UNKNOWN_DATE.to_owned();
+    };
     let (y, m, d) = civil(local.div_euclid(86_400));
     let secs = local.rem_euclid(86_400);
     format!(
@@ -24,7 +41,11 @@ pub(crate) fn date(time: i64, offset: i32) -> String {
 
 /// `YYYY-MM-DD` in UTC.
 pub(crate) fn day(time: i64) -> String {
-    date(time, 0)[..10].to_owned()
+    let d = date(time, 0);
+    d.get(..10)
+        .filter(|_| d != UNKNOWN_DATE)
+        .unwrap_or(&d)
+        .to_owned()
 }
 
 thread_local! {
@@ -67,7 +88,11 @@ pub(crate) fn ago(time: i64, now: i64) -> String {
     if ABSOLUTE.with(|a| *a.borrow()) {
         return day(time);
     }
-    let secs = now - time;
+    if local(time, 0).is_none() {
+        return UNKNOWN_DATE.to_owned();
+    }
+    // A time in range and a `now` anywhere: saturate, a far future time reads as just now.
+    let secs = now.saturating_sub(time);
     if secs < 60 {
         return "just now".to_owned();
     }
@@ -82,6 +107,13 @@ pub(crate) fn ago(time: i64, now: i64) -> String {
 }
 
 pub(crate) fn now() -> i64 {
+    // The equivalence oracle freezes the clock so "3 days ago" does not move between runs.
+    if let Some(t) = std::env::var("GITTERRACE_TEST_NOW")
+        .ok()
+        .and_then(|v| v.parse().ok())
+    {
+        return t;
+    }
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map_or(0, |d| i64::try_from(d.as_secs()).unwrap_or(0))
@@ -206,8 +238,15 @@ const MONTHS: [&str; 12] = [
 
 /// Day header such as `Today`, `Yesterday` or `Oct 29`, in the commit's own offset.
 pub(crate) fn day_label(time: i64, offset: i32, now: i64) -> String {
-    let d = (time + i64::from(offset)).div_euclid(86_400);
-    let today = (now + i64::from(offset)).div_euclid(86_400);
+    let Some(t) = local(time, offset) else {
+        return UNKNOWN_DATE.to_owned();
+    };
+    let d = t.div_euclid(86_400);
+    // `now` comes from the clock (or a test), clamped into range so the subtraction is exact.
+    let today = now
+        .saturating_add(i64::from(offset))
+        .clamp(FIRST_SECOND, LAST_SECOND)
+        .div_euclid(86_400);
     match today - d {
         0 => "Today".to_owned(),
         1 => "Yesterday".to_owned(),
@@ -258,7 +297,7 @@ pub fn esc(s: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use crate::fmt::{ago, date, day_label, size, thousands, with_dates};
+    use crate::fmt::{UNKNOWN_DATE, ago, date, day, day_label, size, thousands, with_dates};
 
     #[test]
     fn formats_epoch_and_offset() {
@@ -319,5 +358,32 @@ mod tests {
         assert_eq!(day_label(0, 0, 86_400), "Yesterday");
         assert_eq!(day_label(0, 0, 86_400 * 10), "Jan 1");
         assert_eq!(day_label(0, 0, 86_400 * 400), "Jan 1, 1970");
+    }
+
+    /// A commit can carry any i64 time and any i32 offset (the adversarial fixture has
+    /// `i64::MIN`). No date helper may overflow, and a time outside years 1 to 9999 renders as
+    /// [`UNKNOWN_DATE`], never as a wrapped or garbage date.
+    #[test]
+    fn extreme_times_never_overflow_and_read_as_unknown() {
+        let times = [i64::MIN, i64::MIN + 1, -1, 0, i64::MAX - 1, i64::MAX];
+        let offsets = [i32::MIN, -1, 0, 1, i32::MAX];
+        for &t in &times {
+            for &o in &offsets {
+                for &now in &times {
+                    let _ = (date(t, o), day(t), day_label(t, o, now), ago(t, now));
+                    let _ = with_dates(true, || ago(t, now));
+                }
+            }
+        }
+        for t in [i64::MIN, i64::MAX] {
+            assert_eq!(date(t, 0), UNKNOWN_DATE);
+            assert_eq!(day(t), UNKNOWN_DATE);
+            assert_eq!(day_label(t, 0, 1_700_000_000), UNKNOWN_DATE);
+            assert_eq!(ago(t, 1_700_000_000), UNKNOWN_DATE);
+        }
+        // The edges of the range still read as dates.
+        assert_eq!(day(-62_135_596_800), "0001-01-01");
+        assert_eq!(day(253_402_300_799), "9999-12-31");
+        assert_eq!(day(253_402_300_800), UNKNOWN_DATE);
     }
 }

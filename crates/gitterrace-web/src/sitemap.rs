@@ -20,9 +20,13 @@ const fn page(shown: &'static str, does: &'static str, routes: &'static [&'stati
     }
 }
 
-/// Every route a repository serves, under `/` or `/r/{name}/`, then the ones outside it.
+/// Every route a repository serves, under its `/r/{name}/`, then the ones outside it.
 pub const PAGES: &[Page] = &[
-    page("`/`", "README, last commit, file list, key numbers", &["/"]),
+    page(
+        "`/`",
+        "README, last commit, file list, key numbers. The server's own `/` forwards to the one repository, or lists several",
+        &["/"],
+    ),
     page(
         "`/tree`, `/blob`, `/raw`, `/blame` `/{rev}/{path}`",
         "Files: listing, highlighted view (large files load in chunks), bytes, authorship",
@@ -97,12 +101,12 @@ pub const PAGES: &[Page] = &[
     ),
     page(
         "`/r/{name}/...`, `/api/repos`",
-        "Everything above under several repositories; the list the switcher reads",
+        "The prefix of every per-repository row above, also when one is served; and the server-wide list the switcher reads",
         &["/r/{name}", "/r/{name}/", "/r/{name}/{*rest}", "/api/repos"],
     ),
     page(
-        "`POST /_repos`",
-        "Adds a repository to the running server for `git terrace open`: loopback, no browser, secret from a 0600 file",
+        "`POST /_repos`, `GET /_repos?nonce=N`",
+        "Adds a repository to the running server for `git terrace open`: loopback, no browser, secret from a 0600 file. The GET proves the secret by hashing it with the nonce",
         &["/_repos"],
     ),
 ];

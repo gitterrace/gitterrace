@@ -47,7 +47,7 @@
     }
   },
   "info": {
-    "description": "Read-only and local. Every answer is pinned to a revision (`rev`, default `HEAD`). Under several repositories each one's API lives at `/r/{name}/api/v1`.",
+    "description": "Read-only and local. Every answer is pinned to a revision (`rev`, default `HEAD`). Each repository's API lives at `/r/{name}/api/v1`.",
     "license": {
       "identifier": "MIT",
       "name": "MIT"
@@ -805,7 +805,13 @@
   "servers": [
     {
       "description": "the default address",
-      "url": "http://127.0.0.1:4242/api/v1"
+      "url": "http://127.0.0.1:4242/r/{name}/api/v1",
+      "variables": {
+        "name": {
+          "default": "repo",
+          "description": "the repository's URL name"
+        }
+      }
     }
   ]
 }
