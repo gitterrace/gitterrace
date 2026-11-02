@@ -21,6 +21,7 @@ Python 3. `uv` is only needed to regenerate the README header tagline.
 git clone https://github.com/gitterrace/gitterrace && cd gitterrace
 make build
 make run      # serves this checkout on 127.0.0.1
+make install  # puts git-terrace in ~/.cargo/bin, so `git terrace` works anywhere
 ```
 
 If the build fails on a clean checkout, that is a bug worth reporting.

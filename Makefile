@@ -1,9 +1,13 @@
 .DEFAULT_GOAL := help
-.PHONY: build run fmt clippy lint test doc theme actions docs-gen docs-check names check site-render site-shots help bench bench-large bench-report bench-clean bench-guard browser-check site deploy stage shipped domains send-vectors preview
+.PHONY: build install run fmt clippy lint test doc theme actions docs-gen docs-check names check site-render site-shots help bench bench-large bench-report bench-clean bench-guard browser-check site deploy stage shipped domains send-vectors preview
 
 ## build: Release binary
 build:
 	cargo build --release -p gitterrace
+
+## install: Install git-terrace into ~/.cargo/bin, so git runs it as git terrace
+install:
+	cargo install --locked --path crates/gitterrace
 
 ## run: Serve the current repository
 run:
