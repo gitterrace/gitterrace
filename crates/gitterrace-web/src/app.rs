@@ -824,7 +824,7 @@ impl App {
             return Ok(None);
         }
         // HEAD (the rev the set was last built for) reads the segment files and holds no
-        // history. Another commit falls back to its records until it is the built one.
+        // history. Another commit reads the set plus what it lacks, read from git.
         if self.index.newer_format().is_none()
             && let Some(set) = self.index.disk_source(&self.repo, head)?
         {

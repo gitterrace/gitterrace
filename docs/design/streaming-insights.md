@@ -1,6 +1,6 @@
 # Streaming insights: a store that keeps the server at some MB
 
-Status: design, not implemented, revised after review. Builds on
+Status: design, not implemented. Builds on
 phase 1 (idle release after 30 s, one cache budget, prewarm not pinning). Delivered in two
 steps, see section 9.
 
@@ -8,7 +8,7 @@ steps, see section 9.
 
 Every insights page computes over `&[CommitRecord]`. On rust (345k commits, 4.9 M file rows) the
 parsed set is about 820 MB, plus `Derived` (people, skip table, commit lines, follow). Phase 1
-frees it when idle, but browsing one insights page brings it all back. The owner goal: resident
+frees it when idle, but browsing one insights page brings it all back. The goal: resident
 memory while serving is some MB, even during a page sweep. A peak during the index build is fine.
 
 Constraints: `unsafe_code = "forbid"` in our crates, so access is `pread` (`FileExt::read_at`).
@@ -67,13 +67,13 @@ Other criteria:
   a mix. Concurrent writers are already serialized by the existing `lock` flock.
 - mmap via a safe crate. Not needed: pread on a 1 MB block costs microseconds from the page
   cache, and the OS file cache is not our dirty memory. mmap would also count pages in RSS,
-  which is the measurement confusion mouse found in the build.
+  which confuses the measurement.
 - Build time. rusqlite bundled compiles C (about 40 s cold here). redb is pure Rust and light.
 
 **Pick: the custom immutable block file.** It is 10 to 40x faster to write, 5 to 40x faster to
 query, the smallest, needs one tiny dependency, and its crash model (immutable segments plus
 rename) is simpler than a transactional engine. We never update in place, so a DB's main
-strength (random writes) buys nothing. redb is the fallback if segment merging (section 5) proves
+strength (random writes) buys nothing. redb is the alternative if segment merging (section 5) proves
 fiddly.
 
 ## 3. On-disk format
@@ -138,7 +138,7 @@ at most 4096 entries, a string at most 64 KiB). No buffer is sized by a field be
 block CRC passed and the bound held. Arithmetic on offsets is checked. Any violation is
 `Unreadable`.
 
-### 3.1 Byte layout (part A, for review)
+### 3.1 Byte layout
 
 All integers little endian. CRC is CRC32 (IEEE, `crc32fast`). One container serves every kind
 of immutable file (segment, string delta, order list).
@@ -168,8 +168,8 @@ is checked when the block is read, before any field in it is parsed.
 
 Section ids are fixed and never reused. A dropped section keeps its slot, a reader skips ids it
 does not use: 1 commits, 2 file rows, 3 path postings, 4 rename edges, 5 author postings,
-6 author x day, 7 month x path (reserved, F serves hotspots from postings), 8 path x author,
-9 month x language (reserved until E and F pick its source), 16 paths, 17 identities, 18 labels,
+6 author x day, 7 month x path (reserved, hotspots are served from postings), 8 path x author,
+9 month x language (reserved until its source is chosen), 16 paths, 17 identities, 18 labels,
 32 order, 33 rank (per segment, u32 per local ordinal: its position in the order file, read by
 pread at index, never held as a map). A new section is a new id, a changed encoding is a
 `VERSION` bump.
@@ -179,12 +179,12 @@ encoded as u16 length plus UTF-8 bytes (a string at most 65535 B). Ids are posit
 concatenation of the deltas of segments 0..=n in manifest order, so a string id is stable once
 written and means the same in every segment that can see it. Commit ordinals stay segment-local.
 
-Accepted with three conditions. C1: a string delta is never retired on its own.
-Rewritten history retires a segment but keeps its delta live. Only a full merge compacts and
-renumbers strings by canonical first use. C2: on open, each segment's and delta's string base
-must equal the cumulative count of the deltas before it in manifest order, else `Unreadable`.
-C3: no oid to rank map in memory (section 33 above). A writer given a string over 65535 B
-returns an error, never truncates.
+Three rules on strings and ranks. A string delta is never retired on its own: rewritten
+history retires a segment but keeps its delta live, and only a full merge compacts and renumbers
+strings by canonical first use. On open, each segment's and delta's string base must equal the
+cumulative count of the deltas before it in manifest order, else `Unreadable`. No oid to rank
+map is held in memory (section 33 above). A writer given a string over 65535 B returns an
+error, never truncates.
 
 Order (kind 3, `ord-<gen>.gts`): the reachable oids in canonical order, 20 B each. It gives the
 topo rank that the canonical key needs across segments. Rewritten whole with every manifest.
@@ -210,8 +210,9 @@ Write sequence: each file to `<name>.tmp`, fsync, rename, then `MANIFEST.tmp`, f
 `MANIFEST`, fsync the directory. Then delete retired files, keeping a name in `retired` while its
 delete fails (Windows, open by a reader). Any crash leaves the previous manifest whole.
 
-Canonical order (the rule lanes B and C build on): Kahn's algorithm over the reachable commit
-graph, edges parent to child, where the ready set is a min-heap keyed by (committer time, oid).
+Canonical order (the rule the aggregates and the store build on): Kahn's algorithm over the
+reachable commit graph, edges parent to child, where the ready set is a min-heap keyed by
+(committer time, oid).
 Pop the least, append it, decrement its children. Commit ordinals are positions in that list.
 Topo rank is the position in the order file, so the canonical key is (rank, time, oid) and two
 commits of different segments compare by rank alone.
@@ -222,7 +223,7 @@ Totals (aggregates plus columns plus postings): git about 12 MB, rust about 120 
 Determinism: ordinals and ids follow the canonical order of section 5, sections are written in
 id order, all maps are sorted before writing, no hash iteration order reaches the file.
 
-### 3.2 Commit rows (part K, accepted with K1 to K5)
+### 3.2 Commit rows
 
 Three more sections in the segment container, so already named in `MANIFEST` with length and
 footer crc. Sections 1 and 2 stay reserved for the step 2 columnar tables, 7 and 9 untouched.
@@ -236,16 +237,20 @@ footer crc. Sections 1 and 2 stay reserved for the step 2 columnar tables, 7 and
 - 35 row index: u64 per local ordinal at `ordinal * 8`, the byte offset of the record in the
   concatenated payload of section 34. Read by pread, never loaded. Offsets strictly increase.
 - 36 oid index: 24 B per commit (oid, local ordinal u32), sorted by oid, binary searched by
-  pread (C3).
+  pread (never held as a map).
 
-Conditions. K1: no buffer is sized by a count: file entries are pushed one at a time as they
-parse, so a record claiming 2^24 files with a valid crc fails at the end of its bytes, never
-allocates for it. K2: a record's start block is found by binary search over the block offsets,
-only the following blocks it needs are read (each crc checked), and one record is at most
-64 MiB, past that `Unreadable`. K3: time is stored raw, `plausible_time` is applied at read, as
-the oracle does. K4: the writer spools rows to `rows-<gen>.gts.tmp` in the cache directory
-(sections must ascend, rows come after 33), never named in the manifest, swept after a crash.
-K5: the merge rewrites 34 to 36, and two-step-then-merge byte equality covers them.
+Rules for these sections:
+
+- No buffer is sized by a count. File entries are pushed one at a time as they parse, so a
+  record claiming 2^24 files with a valid crc fails at the end of its bytes, never allocates
+  for it.
+- A record's start block is found by binary search over the block offsets. Only the following
+  blocks it needs are read (each crc checked), and one record is at most 64 MiB, past that
+  `Unreadable`.
+- Time is stored raw and `plausible_time` is applied at read, as the oracle does.
+- The writer spools rows to `rows-<gen>.gts.tmp` in the cache directory (sections must ascend,
+  rows come after 33). The spool is never named in the manifest and is swept after a crash.
+- The merge rewrites 34 to 36, and two-step-then-merge byte equality covers them.
 
 Identity, one rule: segments key identities by the raw `name\0email` as written. The mailmap
 of the shown revision is applied at read through a per-identity vector (raw id to canonical
@@ -268,7 +273,7 @@ selected commit) is served in two parts, never by a second index or a resident r
 
 Guards: `memory_budget` sweeps every insights page for a non-HEAD rev (a side branch with
 unindexed commits) and stays in the budget, and the equivalence oracle has one cell for it.
-K implements the HEAD path first, this part after review.
+The HEAD path is built first, this part after it.
 
 ## 4. Memory model
 
@@ -295,31 +300,31 @@ Options without loading everything:
 - **period**: aggregates are day or month keyed and sorted by time, so a range is a seek.
   Partial months at a period edge come from the commit table for those days only.
 - **exclude, generated, ignore, whitespace**: per-path bit and the raw/code column choice. Commit
-  line sums under a non-default path filter cannot be precomputed: those pages fall back to
-  streaming file rows (rust 60 MB sequential from the page cache, about 150 ms measured), with the
+  line sums under a non-default path filter cannot be precomputed: those pages stream
+  file rows (rust 60 MB sequential from the page cache, about 150 ms measured), with the
   result memoized.
 - **selection chips**: postings give the commit ordinal set, rows are streamed for those only.
 
 Targets, as numbers:
 
 - **Memory**: `phys_footprint` on macOS, `Private_Dirty` from `/proc/self/smaps_rollup` on
-  Linux (`ru_maxrss` only as a fallback where smaps is missing). At most 32 MB budget + 16 MB
+  Linux (`ru_maxrss` only where smaps is missing). At most 32 MB budget + 16 MB
   margin above a just-started server, idle
   and after a full sweep of every insights page and API endpoint. File-backed page cache is not
   counted.
 - **Latency**: per page, today's measured numbers are the reference, warm and cold (cold means
   a fresh process with the OS file cache warm, as docs/benchmarks.md defines it). A page may be
   at most 1.5x today's time, and always under the 300 ms warm goal. Today's cold reference on
-  rust after owl: hotspots 152 ms, ownership 76 ms, frequency 32 ms. The full per-page table is
-  taken from the latest `bench/results` run for git and rust before part G starts and pinned in
-  `bench/corpus.toml`, so `make bench` marks a regression over. Aggregate pages read a few MB
+  rust: hotspots 152 ms, ownership 76 ms, frequency 32 ms. The full per-page table is
+  taken from the latest `bench/results` run for git and rust before the API work starts and pinned
+  in `bench/corpus.toml`, so `make bench` marks a regression over. Aggregate pages read a few MB
   and are expected well under today. The pages that stream rows (coupling, filtered views,
   chips) are the ones to watch: rust estimated 150 to 500 ms, which must still meet 1.5x of
   today or get a dedicated aggregate.
 
 ## 5. Build path
 
-The streamed writer (mosquito's in-order pipeline) already emits records in walk order. A new
+The streamed in-order pipeline already emits records in walk order. A new
 `SegmentWriter` in the index crate consumes them:
 
 - Commit columns and file rows are written block by block as they arrive (bounded buffer).
@@ -372,11 +377,11 @@ every segment footer (magic, version, CRCs). If anything is another version, ano
 truncated or corrupt, the whole cache directory content is deleted (through the existing safe
 `cache::remove`, which refuses links) and rebuilt. It is never partly served: the server answers
 the "indexing" page until the rebuild is done. A block that fails its CRC at page time is treated
-the same way: the request returns the indexing page, the index rebuilds. The failure class
-(a cache format error surfacing as HTTP 500) cannot reach a handler, because store errors of kind
+the same way: the request returns the indexing page, the index rebuilds. A cache format error
+surfacing as HTTP 500 cannot reach a handler, because store errors of kind
 `Unreadable` are mapped to rebuild in the index crate, not to an error.
 
-Exception kept from today: a cache written by a *newer* build is left untouched (two binaries
+Exception kept from today: a cache written by a _newer_ build is left untouched (two binaries
 would otherwise rebuild over each other). The older binary shows today's `newer_version` page
 with one sentence (which format it found, which it reads, how to proceed) and no statistics.
 
@@ -419,15 +424,8 @@ every `WARM_PAGES` path against each corrupted cache and asserts no 500.
   extensions, and fields set to `u32::MAX` / `u64::MAX` with recomputed CRCs. It requires
   `Unreadable` or a correct read, never a panic, and runs under a counting global allocator in
   the test binary that fails any single allocation over 2 MiB. A `cargo fuzz` target over the
-  same entry point is optional and outside `make check`.
 
-## 8. Work breakdown
-
-Scope: the full design (owner decision B), step 1 and step 2 together, before 0.1.0. About 30
-lane-days (the 24 of the first estimate plus 40% for the six review changes and integration),
-about 2 weeks with 3 lanes in parallel, plus 2 to 3 days of serial integration and bench.
-
-### The frozen seam: `InsightsSource`
+## 8. The `InsightsSource` seam
 
 Every page reads through one trait in `gitterrace-index/src/feed/mod.rs` (not `source/`:
 `src/source.rs` already exists and holds `CommitSource`, and both would clash as E0761), so a
@@ -442,103 +440,38 @@ page never knows whether data comes from memory or from segments:
 - `postings(Path | Author)`: commit ordinals, plus rename edges for a path.
 - `strings(ids)`: paths, identities, kinds and scopes for the ids a page shows.
 
-It is implemented twice: `feed/memory.rs`, an adapter over today's `Vec<CommitRecord>`
-(the oracle side, also used by tests), and `feed/segments.rs` over the segment reader. Pages
-are ported against the memory adapter first, so the switch to segments is one line in the
-integration lane. Part D freezes the trait at the end of its slice. After that, a change goes
-through D's owner only.
+It is implemented twice: `feed/memory.rs`, an adapter over today's `Vec<CommitRecord>` (the
+oracle side, also used by tests), and `feed/segments.rs` over the segment reader. Pages are
+ported against the memory adapter first, so the switch to segments is one line.
 
-### Gates
+The trait is frozen once the pages are written against it. Only the integration code touches
+`lib.rs` of the index crate and `app.rs` of the web crate.
 
-1. H lands the guards first, all red or skipped-with-reason against the new side, all green
-   against the oracle. Every later lane runs them before it reports.
-2. The footer and manifest layout (A) and the canonical-order rule get review before
-   B or C writes a byte. A posts the layout as a doc diff on the thread, not code.
-3. D's trait freeze is the gate for E, F and G.
-4. Only the integration lane (J) touches `lib.rs` of the index crate and `app.rs` of the web
-   crate.
+Risks:
 
-### Lanes, files and days
-
-No file is in two lanes. New files are marked new.
-
-| Lane | Owns (exact files) | Depends on | Days | Risk |
-| --- | --- | --- | --- | --- |
-| H. Guards and oracle | `gitterrace-index/tests/{equivalence,unreadable,hostile,deterministic}.rs` (deterministic extended with two-step-then-merge), `gitterrace-web/tests/{equivalence_pages,memory_budget}.rs` new, `gitterrace-testkit/src/{synthetic,matrix,oracle}.rs` new, `gitterrace-testkit/src/lib.rs`, `.github/workflows/ci.yml` (Windows job) | none | 5 | medium: the matrix generator and the frozen clock must not lie |
-| A. Format | `gitterrace-index/src/seg/{mod,format,io,manifest,strings,read,write,bounds}.rs` new, `gitterrace-index/Cargo.toml` (crc32fast) | none, review gate | 5 | high: irreversible layout, Windows shim |
-| D. Source trait | `gitterrace-index/src/feed/{mod,memory}.rs` new, `gitterrace-index/src/insights/{mod,select,filter,axis,fasthash}.rs` | A's types (ordinals, ids) | 4 | high: the freeze decides every page |
-| B. Aggregates and segment source | `gitterrace-index/src/seg/{agg,postings,merge,spill}.rs` new, `gitterrace-index/src/feed/segments.rs` new | A signed off, D frozen | 5 | high: spill and merge determinism, renumbering |
-| C. Store and build order | `gitterrace-index/src/store.rs`, `gitterrace-index/src/cache.rs`, `gitterrace-index/src/source.rs` (kept, no rename), `gitterrace-git/src/{walk,diff}.rs` (canonical order, emit in it) | A signed off | 4 | high: topo order under the streamed pipeline, unreadable rule, retired sweep |
-| E. Time pages | `gitterrace-index/src/insights/{period,stats,people,code,sizes,lang,releases}.rs`, `gitterrace-index/src/conventional.rs`, `gitterrace-web/src/{activity,commit_types,languages}.rs`, `gitterrace-cards/src/stats.rs` | D frozen | 4 | medium |
-| F. File pages | `gitterrace-index/src/insights/{files,compare,headfiles}.rs`, `gitterrace-web/src/{hotspots,ownership,patterns,compare,history}.rs` | D frozen | 4 | high: rename follow across segments, coupling scan latency |
-| G. API, export, web glue | `gitterrace-api/src/{core,insights}.rs`, `gitterrace/src/export.rs`, `gitterrace-web/src/{insights,filter,views,routes,sitemap}.rs` | D frozen | 3 | medium: routes.rs is large, keep the edit to the record-set call sites |
-| J. Integration | `gitterrace-index/src/lib.rs` (`Index`, `CACHE_FILES`, `FORMAT_VERSION`, the one-line switch), `gitterrace-web/src/{app,lib,bounded}.rs` (drop the records cache, budget, prewarm), `bench/corpus.toml` (per-page latency targets) | B, C, E, F, G | 3 serial | medium: the first time everything meets |
-| I. Docs | `docs/architecture.md`, `docs/benchmarks.md`, `docs/configuration.md` prose, then `make docs-gen` | J | 1 | low |
-
-Total: 38 listed lane-days of which about 8 overlap waiting time, so about 30 working lane-days.
-
-### Order and parallelism
-
-```mermaid
-graph LR
-  H[H guards + oracle] --> J
-  A[A format] --> S{review}
-  A --> D[D trait, frozen]
-  S --> B[B aggregates + segment source]
-  S --> C[C store + canonical order]
-  D --> B
-  D --> E[E time pages]
-  D --> F[F file pages]
-  D --> G[G api, export, glue]
-  B --> J[J integration]
-  C --> J
-  E --> J
-  F --> J
-  G --> J
-  J --> I[I docs]
-```
-
-- Days 1 to 5: H and A in parallel. D starts on day 3 against A's draft types.
-- Days 6 to 7: D finishes and freezes. Review of A's layout.
-- Days 8 to 12: three lanes at a time: B and C on the segment side, E, F, G on the pages
-  against the memory adapter (run as E+F first, then G, or with a fourth lane if build locks
-  allow).
-- Days 13 to 15: J serial (switch, bench, latency and memory guards green on git and rust
-  opt-in), then I.
-
-Guards, landed first by H, check every later lane: equivalence (generated matrix, JSON and HTML,
-frozen clock) against the memory adapter from day 1 and against segments once B lands;
-unreadable and hostile against A's reader as soon as it exists; memory budget red until J, then
-required green; determinism (threads and two-step-then-merge) once C lands.
-
-Risky parts, flagged:
-
-1. Non-default path filters (exclude, ignore) cannot use precomputed commit line sums: those pages
-   stream file rows. Fine on rust, about 1.5 s warm on linux before memo. Accept or precompute for
-   the default filter only (planned).
+1. Non-default path filters (exclude, ignore) cannot use precomputed commit line sums: those
+   pages stream file rows. Fine on rust, about 1.5 s warm on linux before memo. The plan is to
+   precompute for the default filter only.
 2. `reference_time` and `plausible_time` move with the wall clock: keep them read-time, never
    baked into aggregates.
 3. Rename follow across segment boundaries: the alias chain must be resolved newest first across
-   all segments. Equivalence test on the adversarial fixture covers it.
+   all segments. The equivalence test on the adversarial fixture covers it.
 4. Rewritten history with many small segments: rebuild from divergence must stay deterministic.
-5. Linux build peak with spill: measure after mouse and penguin land their build fixes.
+5. Linux build peak with spill: measure it once the build fixes land.
 6. Canonical order changes the build order: the streamed writer must emit in topo order, which
-   may change the reorder window's behavior on merges. Measure on rust before part C lands.
+   may change the reorder window's behavior on merges. Measure on rust before the segment
+   writer is wired in.
 
-## 9. Staged plan
+## 9. Delivery in two steps
 
-Both steps are in scope for 0.1.0 (owner decision B). The split stays as the order inside the
-lanes of section 8: each lane finishes its step 1 part first, so if time runs out, step 1 alone
-is a shippable state. Step 1 is about 12 of the 30 lane-days, step 2 about 18, after the 40%
-uplift.
+Both steps ship before 0.1.0. Step 1 alone is a shippable state.
 
 **Step 1: some MB on every common page.**
 
 - New format with the manifest, `VERSION` 5, the unreadable rule, the hostile-bytes bounds, the
-  Windows shim and the canonical order (part A, all of it: these are the irreversible parts and
-  are designed once).
+  Windows shim and the canonical order. These are the irreversible parts and are designed once.
 - Only the aggregates (author x day, month x path, path x author) and per-path postings with
-  rename edges are new segments (part B, without spill).
+  rename edges are new segments, without spill.
 - The records stay in today's row file (`commits.jsonl`, `paths.jsonl`), now named in the
   manifest and written in canonical order, on disk only, never resident. Coupling, compare and
   arbitrary chip selections stream it line by line with bounded state, reading only the commits
@@ -547,16 +480,7 @@ uplift.
   languages, hotspots, ownership, frequency, code age, path logs.
 - The memory, equivalence (generated matrix), unreadable, hostile and determinism guards in full.
 
-| Lane | Step 1 scope | Days before the 40% uplift |
-| --- | --- | --- |
-| A | format, manifest, strings deltas, io shim, bounds, canonical order | 3 |
-| B | aggregates + per-path postings, no spill | 1.5 |
-| C | writer wiring, unreadable rule | 1 |
-| D+E+F | query layer over aggregates, row streaming for coupling, compare, chips | 2 |
-| H | guards, oracle, option matrix, Windows CI | 1.5 (overlaps A) |
-
-**Step 2: no history-sized reads at all.** Lanes A (columnar sections), B (merge, spill, author
-postings), C (retired sweep) and F (coupling on columnar rows).
+**Step 2: no history-sized reads at all.**
 
 - Columnar commit table and varint file rows replace the JSON record files.
 - Author postings, segment merge in the background with renumbering, retired-file sweep.
@@ -564,5 +488,5 @@ postings), C (retired sweep) and F (coupling on columnar rows).
 - Coupling and filtered views move from the JSON rows to the columnar rows, which cuts their
   scan by about 5x on disk.
 
-Step 1 delivers the owner goal for every page a typical visitor opens. Step 2 is the cache size
-and the linux build peak.
+Step 1 serves every page a typical visitor opens. Step 2 is the cache size and the linux build
+peak.

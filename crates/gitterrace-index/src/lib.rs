@@ -360,7 +360,7 @@ impl Index {
     /// [`feed::SegmentSource`], commits, rows and strings from [`feed::DiskSource`]), so no
     /// history is held. The set must be exactly `rev`'s canonical order (the manifest holds
     /// one order, the last updated rev). `None` when it is not, or when there is no set yet:
-    /// the caller falls back to [`Index::records`] for that rev.
+    /// the caller then tries [`Index::rev_source`].
     pub fn disk_source(
         &self,
         source: &dyn CommitSource,

@@ -30,7 +30,8 @@
 //                focus back to, while Tab onto a tipped button still shows its tip
 //   repo-switch  a server on one repository hides the switcher; when a second `git terrace`
 //                joins, the open page shows it without a reload, it lists both, and picking
-//                each lands on its /r/NAME/ page
+//                each lands on its /r/NAME/ page; `git terrace remove` hides it again and
+//                the removed repository's page answers 404
 //   about-place  on the overview, About sits beside the files when there are two columns and
 //                above them when there is one, at every width from 1440 to 320 px
 //   mark-seam    every two-colour mark (docs/brand/mark-*.svg, the in-app header logo) at 16 to

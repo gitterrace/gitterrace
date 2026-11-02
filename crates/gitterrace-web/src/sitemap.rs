@@ -105,8 +105,8 @@ pub const PAGES: &[Page] = &[
         &["/r/{name}", "/r/{name}/", "/r/{name}/{*rest}", "/api/repos"],
     ),
     page(
-        "`POST /_repos`, `GET /_repos?nonce=N`",
-        "Adds a repository to the running server for `git terrace open`: loopback, no browser, secret from a 0600 file. The GET proves the secret by hashing it with the nonce",
+        "`POST /_repos`, `DELETE /_repos`, `GET /_repos?nonce=N`",
+        "Adds a repository to the running server for `git terrace open`, or takes one off for `git terrace remove`: loopback, no browser, secret from a 0600 file. The GET proves the secret by hashing it with the nonce",
         &["/_repos"],
     ),
 ];

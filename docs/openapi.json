@@ -24,7 +24,8 @@
                   "path_not_found",
                   "git",
                   "index",
-                  "internal"
+                  "internal",
+                  "needs_reindex"
                 ],
                 "type": "string"
               },
@@ -93,6 +94,9 @@
           "404": {
             "$ref": "#/components/responses/Error"
           },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
           "500": {
             "$ref": "#/components/responses/Error"
           }
@@ -152,6 +156,9 @@
             "$ref": "#/components/responses/Error"
           },
           "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
             "$ref": "#/components/responses/Error"
           },
           "500": {
@@ -235,6 +242,9 @@
           "404": {
             "$ref": "#/components/responses/Error"
           },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
           "500": {
             "$ref": "#/components/responses/Error"
           }
@@ -307,6 +317,9 @@
           "404": {
             "$ref": "#/components/responses/Error"
           },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
           "500": {
             "$ref": "#/components/responses/Error"
           }
@@ -359,6 +372,9 @@
           "404": {
             "$ref": "#/components/responses/Error"
           },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
           "500": {
             "$ref": "#/components/responses/Error"
           }
@@ -398,6 +414,9 @@
             "$ref": "#/components/responses/Error"
           },
           "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
             "$ref": "#/components/responses/Error"
           },
           "500": {
@@ -569,6 +588,9 @@
           "404": {
             "$ref": "#/components/responses/Error"
           },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
           "500": {
             "$ref": "#/components/responses/Error"
           }
@@ -648,6 +670,9 @@
           "404": {
             "$ref": "#/components/responses/Error"
           },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
           "500": {
             "$ref": "#/components/responses/Error"
           }
@@ -687,6 +712,9 @@
             "$ref": "#/components/responses/Error"
           },
           "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
             "$ref": "#/components/responses/Error"
           },
           "500": {
@@ -731,6 +759,9 @@
             "$ref": "#/components/responses/Error"
           },
           "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
             "$ref": "#/components/responses/Error"
           },
           "500": {
@@ -791,6 +822,9 @@
             "$ref": "#/components/responses/Error"
           },
           "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
             "$ref": "#/components/responses/Error"
           },
           "500": {

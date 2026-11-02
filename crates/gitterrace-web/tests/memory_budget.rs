@@ -1,7 +1,7 @@
 //! Memory budget: a server holds at most 32 MB (the cache budget) + 16 MB more dirty memory
 //! than it did just started, idle after indexing and after a sweep of every insights page and
-//! API insight over every period, at HEAD and at a side branch HEAD lacks. The 100k-commit
-//! repository stays within 10% of the 2k one.
+//! API insight over every period, at HEAD and at a side branch HEAD lacks. Idle memory may grow
+//! by at most `GROWTH_MB` from 2k commits to the largest repository.
 //!
 //! Measured on a child server process: `phys_footprint` (macOS `footprint`), `Private_Dirty`
 //! of `/proc/PID/smaps_rollup` (Linux). File-backed page cache is not counted by either.
@@ -24,13 +24,36 @@ use gitterrace_testkit::matrix::PERIODS;
 use gitterrace_testkit::synthetic::{self, Shape};
 
 const BUDGET_MB: u64 = 32 + 16;
+/// Most that idle memory may grow from 2k commits to the largest size measured.
+const GROWTH_MB: u64 = 4;
 const SERVE_VAR: &str = "TEST_MEMORY_SERVE";
+
+/// The allocator the numbers depend on: jemalloc, returning freed pages at once. A build
+/// with other decay settings (no `.cargo/config.toml` env, another allocator) measures
+/// retained pages instead of held memory, so it fails here instead of reporting a number.
+fn assert_allocator() {
+    use tikv_jemalloc_ctl::{Access, AsName};
+    let version: &str = b"version\0"
+        .name()
+        .read()
+        .expect("jemalloc is the global allocator");
+    for key in [&b"opt.dirty_decay_ms\0"[..], &b"opt.muzzy_decay_ms\0"[..]] {
+        let ms: isize = key.name().read().expect("read decay");
+        assert_eq!(
+            ms,
+            0,
+            "jemalloc {version}: {} is {ms}, the server build sets 0 (JEMALLOC_SYS_WITH_MALLOC_CONF)",
+            String::from_utf8_lossy(&key[..key.len() - 1])
+        );
+    }
+}
 
 /// Inside the child: serve the repository named by `TEST_MEMORY_SERVE=<addr> <path>`.
 fn serve_if_child() -> bool {
     let Ok(v) = std::env::var(SERVE_VAR) else {
         return false;
     };
+    assert_allocator();
     let (addr, path) = v.split_once(' ').expect("addr and path");
     let addr: SocketAddr = addr.parse().expect("addr");
     let rt = tokio::runtime::Runtime::new().expect("runtime");
@@ -218,7 +241,8 @@ fn sweep(s: &Server, base: &str, side: usize) {
 
 const MB: u64 = 1024 * 1024;
 
-/// Returns (just started, idle, after sweep) in bytes, after asserting each against the budget.
+/// Returns (just started, idle, after sweep) in bytes. The caller asserts, after every size
+/// is measured, so one red size never hides the others.
 fn measure(repo: &Path, test: &str, side: usize) -> (u64, u64, u64) {
     // "Just started" is a server on a one-commit repository: on `repo` itself indexing begins
     // at once, so its first reading would already hold the build.
@@ -254,14 +278,6 @@ fn measure(repo: &Path, test: &str, side: usize) -> (u64, u64, u64) {
         swept / MB
     )
     .expect("stderr");
-    for (what, v) in [("idle", idle), ("after sweep", swept)] {
-        assert!(
-            v <= start + BUDGET_MB * MB,
-            "{what}: {} MB above the just-started {} MB, budget {BUDGET_MB} MB",
-            v.saturating_sub(start) / MB,
-            start / MB
-        );
-    }
     (start, idle, swept)
 }
 
@@ -273,15 +289,23 @@ fn memory_stays_in_budget_at_every_size() {
     if serve_if_child() {
         return;
     }
+    assert_allocator();
     if cfg!(not(any(target_os = "macos", target_os = "linux"))) {
         return;
     }
     let dir = tempfile::tempdir().expect("tmp");
-    let mut swept = Vec::new();
     // The side branch: under the fresh-commit cap at 2k (read from git directly), over it at
-    // 20k and 100k (the path that must not fall back to loading every record).
+    // 20k and 100k (the path that must refuse, never load every record).
     let over = gitterrace_index::feed::FRESH_CAP + 500;
+    // `TEST_MEMORY_SIZES=2000,20000` measures a subset, for a quick look; CI runs all three.
+    let only: Option<Vec<usize>> = std::env::var("TEST_MEMORY_SIZES")
+        .ok()
+        .map(|v| v.split(',').filter_map(|n| n.trim().parse().ok()).collect());
+    let mut got = Vec::new();
     for (n, side) in [(2_000, 300), (20_000, over), (100_000, over)] {
+        if only.as_ref().is_some_and(|o| !o.contains(&n)) {
+            continue;
+        }
         let repo = dir.path().join(format!("r{n}"));
         synthetic::build(
             &repo,
@@ -292,15 +316,37 @@ fn memory_stays_in_budget_at_every_size() {
         );
         let ahead = gitterrace_testkit::git(&repo, &["rev-list", "--count", "main..side"]);
         assert_eq!(ahead, side.to_string(), "side branch length");
-        swept.push(measure(&repo, "memory_stays_in_budget_at_every_size", side).2);
+        got.push((
+            n,
+            measure(&repo, "memory_stays_in_budget_at_every_size", side),
+        ));
     }
-    let (small, large) = (swept[0], swept[2]);
-    assert!(
-        large * 10 <= small * 11,
-        "100k commits use {} MB after the sweep, 2k use {} MB: more than 10% apart",
-        large / MB,
-        small / MB
-    );
+    let mut bad = Vec::new();
+    for &(n, (start, idle, swept)) in &got {
+        for (what, v) in [("idle", idle), ("after sweep", swept)] {
+            if v > start + BUDGET_MB * MB {
+                bad.push(format!(
+                    "{n} commits, {what}: {} MB above the just-started {} MB, budget {BUDGET_MB} MB",
+                    v.saturating_sub(start) / MB,
+                    start / MB
+                ));
+            }
+        }
+    }
+    // Growth with history, idle: what a server keeps per commit while nobody asks anything.
+    // The budget alone allows 48 MB at any size, which hides a per-commit cost until a large
+    // repository (0.7 KB per commit is 12 MB at 20k but 1 GB on linux).
+    if let (Some(&(_, (_, small, _))), Some(&(n, (_, large, _)))) = (got.first(), got.last())
+        && n > 2_000
+        && large > small + GROWTH_MB * MB
+    {
+        bad.push(format!(
+            "idle grows with history: {} MB at {n} commits, {} MB at 2000, more than {GROWTH_MB} MB apart",
+            large / MB,
+            small / MB
+        ));
+    }
+    assert!(bad.is_empty(), "{}", bad.join("\n"));
 }
 
 /// Opt-in on a real history: `TEST_RUSTGIT=<path>`. A no-op without it.

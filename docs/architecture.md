@@ -68,7 +68,11 @@ color the year card.
   joins. That route makes the server read a path it was not started with, so a browser can
   never reach it: it exists only on a loopback bind, it refuses any `Origin` or
   `Sec-Fetch-Site`, and it needs a per-process secret the server writes 0600 into the state
-  folder. The path must be canonical and a repository's top folder. An added repository gets
+  folder. The path must be canonical and a repository's top folder. `git terrace remove`
+  sends `DELETE /_repos` through the same gate: its URLs answer 404, its refresher and warm-up
+  stop, open switchers drop it, and its on-disk index and name stay for a fast re-add. The
+  last repository stays, so `/` always has one (it forwards there when one is left). No page
+  offers remove, since a page has no secret and may be seen by others. An added repository gets
   what a startup one does: its own refresher and warm-up, permalinks, actions and the
   switcher. A repository holding `actions.toml` is refused, as at start.
 - **`gitterrace://` permalinks name what, not where.** `gitterrace://<repo-id>/<sha>/<path>`
@@ -151,7 +155,7 @@ repository is served. The rest are the server's own and never take the prefix.
 | `/go/{repo-id}/{sha}/{path}` | Permalink: finds the served repository by id |
 | `/_send/targets` | Send to targets as JSON template parts, filled in by the page |
 | `/r/{name}/...`, `/api/repos` | The prefix of every per-repository row above, also when one is served; and the server-wide list the switcher reads |
-| `POST /_repos`, `GET /_repos?nonce=N` | Adds a repository to the running server for `git terrace open`: loopback, no browser, secret from a 0600 file. The GET proves the secret by hashing it with the nonce |
+| `POST /_repos`, `DELETE /_repos`, `GET /_repos?nonce=N` | Adds a repository to the running server for `git terrace open`, or takes one off for `git terrace remove`: loopback, no browser, secret from a 0600 file. The GET proves the secret by hashing it with the nonce |
 
 <!-- END GENERATED: routes -->
 

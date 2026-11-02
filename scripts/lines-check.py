@@ -29,17 +29,31 @@ LABELS = re.compile(
     r"§"
     r"|\b[Ss]ection \d+\.\d+"
     r"|\bdesign (doc|section)"
-    r"|\b[Ll]ane [A-K]\b"
+    r"|\b[Ll]ane [A-Z]\b"
     r"|\b(C[1-3]|K[1-5]|N[1-4])\b"
 )
-# An agent name counts as a person when capitalised, or lowercase before a colon. A lowercase
-# `swan` or `rabbit` in plain prose stays legal.
-AGENTS = "snake|t-rex|squid|swan|tiger|turkey|whale|spider|parrot|jaguar|rabbit"
-PERSON = re.compile(
-    rf"\b({'|'.join(a.capitalize() if '-' not in a else 'T-[Rr]ex' for a in AGENTS.split('|'))})\b"
-    rf"|\b({AGENTS}):"
-    rf"|(?:@|\bby |\bask |\btold )({AGENTS})\b"
-)
+# Optional local list of extra names to refuse in comments, one per line. The file is gitignored,
+# so no such name ever lands in the repository.
+LOCAL = ROOT / ".lines-check.local"
+
+
+def local_names() -> list[str]:
+    try:
+        lines = LOCAL.read_text().splitlines()
+    except OSError:
+        return []
+    return [re.escape(n.strip()) for n in lines if n.strip() and not n.startswith("#")]
+
+
+def person_pattern(names: list[str]) -> re.Pattern[str] | None:
+    """A name counts when capitalised, or lowercase before a colon, after @, `by`, `ask`, `told`."""
+    if not names:
+        return None
+    alt = "|".join(names)
+    cap = "|".join(n[0].upper() + n[1:] for n in names)
+    return re.compile(rf"\b({cap})\b|\b({alt}):|(?:@|\bby |\bask |\btold )({alt})\b")
+
+
 # `//` and `#` start a comment after whitespace or at line start. `://` and `#[` are not.
 COMMENT = re.compile(r"(?:^|\s)(?://+!?|#)(?=\s|$)(.*)$|^\s*\*(?!/)\s?(.*)$")
 
@@ -67,7 +81,10 @@ def too_long(root: Path, names: list[str]) -> list[str]:
     return bad
 
 
-def label_hits(root: Path, names: list[str]) -> list[str]:
+def label_hits(
+    root: Path, names: list[str], extra: list[str] | None = None
+) -> list[str]:
+    person = person_pattern(local_names() if extra is None else extra)
     bad = []
     for n in names:
         if not n.endswith(COMMENT_EXTS) or n == "scripts/lines-check.py":
@@ -81,7 +98,7 @@ def label_hits(root: Path, names: list[str]) -> list[str]:
             if not m:
                 continue
             text = m.group(1) if m.group(1) is not None else m.group(2) or ""
-            if LABELS.search(text) or PERSON.search(text):
+            if LABELS.search(text) or (person and person.search(text)):
                 bad.append(f"{n}:{i}: process label in a comment: {text.strip()[:70]}")
     return bad
 
@@ -100,20 +117,25 @@ def self_test() -> None:
         green = [
             'let s = "%C3%A9"; // encodes e acute',
             'let u = "http://x"; // plain',
-            "# a rabbit in the garden",
+            "# a plain word in prose",
+            "// Lane is a word, lanes too",
             "#[derive(Debug)]",
-            "// the snake_case name",
+            "// the case_name field",
         ]
         red = [
             "// see design doc 4",
             "// per section 3.2",
             "// signed off as K3",
-            "# Squid wants this",
-            "// ask Tiger",
+            "// lane Q owns this",
+            "// signed off as N2",
             "// \u00a7 4",
         ]
         (root / "g.rs").write_text("\n".join(green) + "\n")
         assert label_hits(root, ["g.rs"]) == [], label_hits(root, ["g.rs"])
+        # The optional local name list is the only place a person name can come from.
+        (root / "n.rs").write_text("// ask Orca\n// orca: later\n// the orca swims\n")
+        assert label_hits(root, ["n.rs"], []) == [], "no list, no name rule"
+        assert len(label_hits(root, ["n.rs"], ["orca"])) == 2, "listed name must flag"
         for i, r in enumerate(red):
             (root / f"r{i}.rs").write_text(r + "\n")
             assert label_hits(root, [f"r{i}.rs"]), f"should flag: {r}"

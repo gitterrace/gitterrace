@@ -159,12 +159,12 @@ pub fn matrix_repo(dir: &Path, mailmap: Mailmap) -> (std::path::PathBuf, Values)
     (repo, values)
 }
 
-/// Waits until the insights pages no longer show the indexing progress.
+/// Waits until the insights pages show data instead of the indexing progress.
 pub async fn ready(router: &Router) {
     ready_at(router, "HEAD").await;
 }
 
-/// Waits until the insights of `rev` no longer show the indexing progress: a revision other
+/// Waits until the insights of `rev` show data instead of the indexing progress: a revision other
 /// than HEAD loads its own record set on the first visit.
 pub async fn ready_at(router: &Router, rev: &str) {
     let probe = format!("/stats?rev={}", crate::matrix::enc(rev));

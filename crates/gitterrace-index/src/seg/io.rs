@@ -42,15 +42,30 @@ pub(crate) fn sync_dir(dir: &Path) -> io::Result<()> {
     }
 }
 
+/// Creates or truncates `dir/name` for writing without following a link at that name: the
+/// cache folder can come from the repository, so a planted link must fail, never be written
+/// through. Every segment, order and manifest temp file opens here.
+pub(crate) fn create_no_follow(dir: &Path, name: &str) -> io::Result<File> {
+    let path = crate::cache::cache_file(dir, name)?;
+    let mut o = fs::OpenOptions::new();
+    o.write(true).create(true).truncate(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        o.mode(0o644).custom_flags(libc::O_NOFOLLOW);
+    }
+    o.open(path)
+}
+
 /// Writes `bytes` to `<name>.tmp`, fsyncs and renames it to `name`, then syncs `dir`.
 pub(crate) fn write_atomic(dir: &Path, name: &str, bytes: &[u8]) -> io::Result<()> {
-    let tmp = dir.join(format!("{name}.tmp"));
+    let tmp = format!("{name}.tmp");
     {
-        let mut f = File::create(&tmp)?;
+        let mut f = create_no_follow(dir, &tmp)?;
         io::Write::write_all(&mut f, bytes)?;
         f.sync_all()?;
     }
-    fs::rename(&tmp, dir.join(name))?;
+    fs::rename(dir.join(&tmp), dir.join(name))?;
     sync_dir(dir)
 }
 

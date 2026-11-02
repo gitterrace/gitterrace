@@ -12,7 +12,7 @@ use crate::seg::bounds::{MAX_BLOCK, MAX_TOC};
 use crate::seg::format::{
     FOOTER_LEN, Footer, HEADER_LEN, Kind, StringBase, TocEntry, encode_toc, header,
 };
-use crate::seg::io::sync_dir;
+use crate::seg::io::{create_no_follow, sync_dir};
 use crate::seg::manifest::{FileEntry, Step, check_name};
 use crate::seg::{Oid, SegError, SegResult};
 
@@ -33,7 +33,7 @@ impl ContainerWriter {
     /// `base` is the cumulative string count this file is written against (zero for order).
     pub fn new(dir: &Path, name: &str, kind: Kind, base: StringBase) -> SegResult<Self> {
         check_name(name)?;
-        let mut out = BufWriter::new(File::create(dir.join(format!("{name}.tmp")))?);
+        let mut out = BufWriter::new(create_no_follow(dir, &format!("{name}.tmp"))?);
         out.write_all(&header(kind))?;
         Ok(Self {
             dir: dir.to_path_buf(),

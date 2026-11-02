@@ -19,6 +19,13 @@ It is a single command, so it scripts well: run it from CI or a cron job on each
 upload the folder. Several repositories go into one site (`export site repo1 repo2`), and
 `--project name=url` credits a repository that is someone else's work in every page's banner.
 
+
+Every page ends with one credit line: `Source: name, MIT license, https://github.com/owner/name`.
+The license is recognised from the root `LICENSE` or `COPYING` file (a text that is not a common
+license links to the file instead). The link is the `origin` remote, or the `--project` URL, with
+any credentials removed, and only for public https and ssh hosts. Either part is left out when
+unknown.
+
 The [live demo](https://demo.gitterrace.dev) is built this way. Its build script clones each
 repository at a release tag, exports them all into one folder with `--commits 300 --no-actions`,
 adds a header file that limits scripts and styles to the same origin, and deploys the folder.

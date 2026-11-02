@@ -24,7 +24,7 @@ First public release.
   and a 30 second cap per request.
 - `git terrace open` and `install-handler` for `gitterrace://` links. Opening joins a
   running server and adds the repository to it. A second `git terrace` on the same
-  address does the same instead of failing to bind.
+  address does the same instead of failing to bind. `git terrace remove` takes one off again.
   `install-handler` marks the app it writes and updates a marked app in place, and says
   when the program path changed. An app from an older build has no mark: remove
   `~/Applications/gitterrace-open.app` once, after that `install-handler` updates it.

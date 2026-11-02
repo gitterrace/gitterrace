@@ -9,6 +9,8 @@ extend-ignore-re = [
   '\{titel[:}]',
   # token.rs: RFC 4648 test vector "fo"
   'b"fo"',
+  # lines-check.py: its comment-lint pattern spells the label it refuses
+  '\\b\[Ll\]ane \[A-Z\]\\b',
   # names-check.py: SHA-256 prefixes are hex, not words
   '"[0-9a-f]{16}"',
 ]
@@ -16,3 +18,4 @@ extend-ignore-re = [
 [default.extend-words]
 # gix names this field of its worktree status item
 rela = "rela"
+

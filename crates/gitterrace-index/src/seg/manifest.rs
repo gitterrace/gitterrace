@@ -10,7 +10,7 @@ use std::path::Path;
 
 use crate::seg::bounds::{Cursor, MAX_MANIFEST, MAX_TOC};
 use crate::seg::format::{FOOTER_LEN, VERSION};
-use crate::seg::io::{read_exact_at, sync_dir};
+use crate::seg::io::{create_no_follow, read_exact_at, sync_dir};
 use crate::seg::write::crashed;
 use crate::seg::{SegError, SegResult};
 
@@ -236,7 +236,7 @@ impl Manifest {
         self.retired.dedup();
         let tmp = dir.join(format!("{MANIFEST}.tmp"));
         {
-            let mut f = File::create(&tmp)?;
+            let mut f = create_no_follow(dir, &format!("{MANIFEST}.tmp"))?;
             io::Write::write_all(&mut f, &self.encode()?)?;
             f.sync_all()?;
         }

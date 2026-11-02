@@ -68,6 +68,7 @@ run tsc npm "install node, then npm fetches typescript" js_types
 run actionlint actionlint "brew install actionlint" actionlint
 run ast-grep ast-grep "brew install ast-grep" ast-grep scan --error
 run ast-grep-test ast-grep "brew install ast-grep" ast-grep test --skip-snapshot-tests
+run tests-cfg python3 "install python3" python3 scripts/tests-check.py
 run css-scope python3 "install python3" python3 scripts/css-scope-check.py
 run site-csp python3 "install python3" python3 scripts/site-check.py csp
 run machete cargo-machete "cargo install cargo-machete" cargo-machete

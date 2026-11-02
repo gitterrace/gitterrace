@@ -348,7 +348,7 @@ mod tests {
     fn string_base_mismatch_is_unreadable() -> SegResult<()> {
         let dir = tempfile::tempdir()?;
         let mut m = build(dir.path())?;
-        // Swap the two deltas: bases no longer accumulate in manifest order.
+        // Swap the two deltas: the bases then do not accumulate in manifest order.
         m.live.swap(1, 3);
         m.commit(dir.path())?;
         assert!(Store::open(dir.path()).is_err_and(|e| e.is_unreadable()));

@@ -38,6 +38,7 @@ rustix = { version = "1", default-features = false, features = ["std", "process"
 
 [dev-dependencies]
 tikv-jemallocator = "0.7"
+tikv-jemalloc-ctl = "0.7"
 gitterrace-testkit.workspace = true
 tempfile.workspace = true
 http-body-util = "0.1"

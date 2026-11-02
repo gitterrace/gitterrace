@@ -184,9 +184,15 @@ async function repoSwitch() {
           if (pick) await Promise.all([p.waitForURL(`**/r/${pick}/`), p.click(`.ov-back li:has(.name:text-is("${pick}"))`)]);
           visits.push({ names, pick, at: new URL(p.url()).pathname });
         }
-        const ok = !alone && joined && visits.length === 2 && visits.every((v) => v.pick && v.at === `/r/${v.pick}/`);
-        if (ok) r.ok(`repo-switch ${name}: hidden alone, shown after the join without a reload, lands on ${visits.map((v) => v.at).join(' then ')}`);
-        else r.fail(`repo-switch ${name}: ${JSON.stringify({ alone, joined, visits })}`);
+        // `git terrace remove` takes the second one off again: the open page hears it and the
+        // switcher hides (one repository left), and the removed one's pages answer 404.
+        sh(two, bin, '--addr', one.origin.replace('http://', ''), '--config', cfg, 'remove', two);
+        await p.waitForFunction(() => { const s = document.getElementById('reposwitch'); return !s || s.hidden; }, null, { timeout: 5000 }).catch(() => {});
+        const left = !(await shown(p));
+        const gone = visits[0]?.pick ? (await fetch(`${one.origin}/r/${visits[0].pick}/`)).status : 0;
+        const ok = !alone && joined && visits.length === 2 && visits.every((v) => v.pick && v.at === `/r/${v.pick}/`) && left && gone === 404;
+        if (ok) r.ok(`repo-switch ${name}: hidden alone, shown after the join without a reload, lands on ${visits.map((v) => v.at).join(' then ')}, hidden again after remove`);
+        else r.fail(`repo-switch ${name}: ${JSON.stringify({ alone, joined, visits, left, gone })}`);
       } finally {
         await b.close();
         one.stop();

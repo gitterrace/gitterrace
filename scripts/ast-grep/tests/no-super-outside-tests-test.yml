@@ -1,7 +1,11 @@
 id: no-super-outside-tests
 valid:
   - 'mod tests { use super::f; }'
+  - 'pub(crate) mod tests { use super::f; }'
+  - 'mod actions_tests { use super::f; }'
   - 'use crate::fmt::count;'
 invalid:
+  # Not a test module: `tests` inside a longer name is no exemption.
+  - 'mod mytests_helpers { use super::f; }'
   - 'use super::fmt;'
   - 'pub(crate) use super::Item;'

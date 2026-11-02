@@ -17,4 +17,3 @@ axum.workspace = true
 tower.workspace = true
 http-body-util = "0.1"
 tokio.workspace = true
-serde_json.workspace = true

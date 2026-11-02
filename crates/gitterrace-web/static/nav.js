@@ -241,8 +241,8 @@
   }
 
   // ---- repository switcher (shown while the server holds several repos) --
-  // The table only grows, so the list is read on every page: a repository that joined since
-  // the last one shows the switcher on the next navigation or reload.
+  // Repositories join and leave a running server, so the list is read on every page and again
+  // on each live notice: the switcher shows, drops an entry or hides without a reload.
   var repos = null;
   function openRepos() {
     var btn = document.getElementById("repobtn");
@@ -265,13 +265,13 @@
     fetch("/api/repos", { cache: "no-store" }).then(function (r) { return r.json(); }).then(function (l) {
       repos = l;
       var box = document.getElementById("reposwitch");
-      if (box && l.length > 1) box.hidden = false;
+      if (box) box.hidden = l.length < 2;
     }).catch(function () {});
   }
   if (repoBtn) {
     repoBtn.addEventListener("click", openRepos);
     loadRepos();
-    // live.js: a repository joined, so the switcher shows it without a reload.
+    // live.js: a repository joined or left, so the switcher follows without a reload.
     document.addEventListener("gt:repos-changed", loadRepos);
   }
 

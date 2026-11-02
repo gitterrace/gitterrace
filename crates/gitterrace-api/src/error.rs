@@ -17,8 +17,8 @@ pub enum ApiError {
     Task(String),
     /// The revision has more commits outside the index than one view reads from git.
     #[error(
-        "insights for this revision need a reindex: more than {cap} commits are not in the \
-         indexed branch (counted {read})"
+        "insights for this revision need a reindex: it is further from the indexed branch than \
+         one view reads from git (cap {cap}, counted {read})"
     )]
     NeedsReindex { read: usize, cap: usize },
 }

@@ -57,7 +57,8 @@ Every repository lives under `/r/<name>/`, also the first, so its links stay val
 others join. Run `git terrace` in a second repository while one is served and it joins that
 server: the repository appears under `/r/<name>/` and in the switcher, and the command exits.
 This works for the same user on a loopback address. `--public` servers never take repositories
-this way.
+this way. `git terrace remove [path|name]` takes one off again (the last one stays). There is
+no remove button in the page: a browser has no secret, and a page may be on someone's screen.
 
 ## Commands
 
@@ -69,6 +70,7 @@ git terrace config           Print the effective configuration and where each va
 git terrace mcp              Run a read-only MCP server over stdio for agents
 git terrace wrapped          Write the year-in-review card for the repository [--year --layout --theme --out]
 git terrace open <link>      Open a `gitterrace://` or `/go` permalink in the browser, starting a server if needed [--print]
+git terrace remove [target]  Take a repository off the running server; its pages then answer 404
 git terrace install-handler  Register (or with `--uninstall` remove) this program as the `gitterrace://` link handler [--uninstall]
 git terrace init             Write a documented `config.toml` and the pre-filled `actions.toml` to the config folder
 git terrace export [out]     Write a static copy of the site to a folder, for sharing or hosting [--force --commits --max-file-kb --project]

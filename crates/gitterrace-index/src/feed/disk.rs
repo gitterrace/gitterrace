@@ -509,8 +509,8 @@ impl DiskSource {
         Ok(v)
     }
 
-    /// Every file row with its rank, for the aggregate fallbacks (served from segments when
-    /// this source is wrapped).
+    /// Every file row with its rank, for the aggregates this source answers on its own (the
+    /// segments answer them when this source is wrapped).
     fn each_row(&self, mut f: impl FnMut(&CommitRow, &[FileRow])) {
         let mut files = Vec::new();
         for r in 0..self.len {

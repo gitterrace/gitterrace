@@ -24,10 +24,10 @@ const INDEX_WORKER_CACHE_BYTES: usize = 4 * 1024 * 1024;
 /// close to 1 GB over ten workers; at 24 MB git.git builds as fast with 400 MB less peak.
 const INDEX_WORKER_PACK_CACHE_BYTES: usize = 24 * 1024 * 1024;
 /// How far the index workers may run ahead of the oldest commit not yet handed on. A merge
-/// whose rename detection takes minutes (linux has many) used to stop all workers once they
-/// were 4096 commits past it: samples of the linux build showed workers waiting on the window
-/// for over half of their time. So the count is wide, and the held results are bounded by
-/// their estimated bytes instead, which a run of huge merges reaches long before the count.
+/// whose rename detection takes minutes (linux has many) holds that oldest slot: with a window
+/// of 4096 commits, samples of the linux build showed workers waiting on it for over half of
+/// their time. So the count is wide, and the held results are bounded by their estimated
+/// bytes instead, which a run of huge merges reaches long before the count.
 const NUMSTAT_WINDOW: crate::diff::Window = crate::diff::Window {
     items: 1 << 16,
     bytes: 64 * 1024 * 1024,

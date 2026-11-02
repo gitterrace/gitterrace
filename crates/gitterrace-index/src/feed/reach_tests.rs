@@ -2,9 +2,9 @@ use std::collections::HashMap;
 use std::io;
 use std::sync::Arc;
 
-use super::{RevView, rev_view};
 use crate::feed::disk_testing::write_cache;
 use crate::feed::{CommitRange, DiskSource, InsightsSource, MemorySource, Posting};
+use crate::feed::{RevView, rev_view};
 use crate::seg::read::Store;
 use crate::{CommitRecord, CommitSource, FileStat};
 

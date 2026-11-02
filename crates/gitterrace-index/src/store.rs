@@ -551,7 +551,7 @@ fn shallow_of(ids: &[String]) -> crate::seg::SegResult<u64> {
 }
 
 /// Wipes the cache when the clone's shallow boundary is not the one its segments were built
-/// against: deepening or grafting changes parents, so topo ranks and the order no longer hold.
+/// against: deepening or grafting changes parents, so topo ranks and the order are stale.
 /// Treated exactly as an unreadable cache, never partly served. Call before an update, under no
 /// lock. A newer build's cache is left alone. Returns whether it wiped.
 pub(crate) fn check_shallow(dir: &Path, shallow: &[String]) -> io::Result<bool> {
@@ -1117,7 +1117,7 @@ mod tests {
     }
 
     /// A deepened (or newly shallow) clone changes topo ranks: the shallow fingerprint in the
-    /// manifest no longer matches and the cache is wiped like an unreadable one.
+    /// manifest then differs and the cache is wiped like an unreadable one.
     #[test]
     fn a_changed_shallow_set_rebuilds() -> io::Result<()> {
         let tmp = tempfile::tempdir()?;
