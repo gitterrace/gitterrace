@@ -74,6 +74,16 @@ impl Target {
         ]);
         self.lookup.as_deref().map(|p| fill(p, &values))
     }
+
+    /// The name a lookup is shown under: the host of its filled URL, not the send's label
+    /// ("New issue" says nothing about where to search).
+    pub fn lookup_site(&self, sha: &str) -> Option<String> {
+        let url = self.lookup_url(sha)?;
+        let rest = url.split_once("://").map_or(url.as_str(), |(_, r)| r);
+        let auth = rest.split(['/', '?', '#']).next().unwrap_or_default();
+        let host = auth.rsplit('@').next().unwrap_or_default();
+        Some(host.to_owned()).filter(|h| !h.is_empty())
+    }
 }
 
 #[derive(Deserialize)]
@@ -434,6 +444,19 @@ mod tests {
         assert_eq!(
             url("mailto:x").expect("load").sends[0].lookup_url("abc"),
             None
+        );
+    }
+
+    #[test]
+    fn lookup_site_is_the_host_not_the_label() {
+        let c = load(
+            "label = \"New issue\"\nurl = \"mailto:x\"\n\
+             lookup = \"{var.base}/s?q={sha}\"\nvars = { base = \"https://u@h.test:8080\" }\n",
+        )
+        .expect("load");
+        assert_eq!(
+            c.sends[0].lookup_site("abc").as_deref(),
+            Some("h.test:8080")
         );
     }
 

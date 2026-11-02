@@ -345,6 +345,9 @@ async fn resources_blocking_jobs_bounds_concurrent_work() {
 
 #[test]
 fn resources_cache_mb_sizes_the_code_cache() {
+    // A memo of its own: the process-wide cache is shared with every test that renders a
+    // blob, and one of those flushing it between two lines here made this test flaky.
+    use crate::views::{CodeMemo, code_memo_has as has, code_memo_put as put};
     let dir = tempfile::tempdir().expect("tmp");
     let p = repo(dir.path(), "r");
     assert_eq!(
@@ -357,13 +360,18 @@ fn resources_cache_mb_sizes_the_code_cache() {
     );
     // A full cache drops what it held; a roomy one keeps both.
     let text = "fn a() {}\n".repeat(200);
-    let cached = |name: &str| crate::views::code_is_cached(name, &text);
-    crate::views::code_html(1, "wiring_tiny_a.rs", &text);
-    crate::views::code_html(1, "wiring_tiny_b.rs", &text);
-    assert!(!cached("wiring_tiny_a.rs") && cached("wiring_tiny_b.rs"));
-    crate::views::code_html(1 << 24, "wiring_roomy_a.rs", &text);
-    crate::views::code_html(1 << 24, "wiring_roomy_b.rs", &text);
-    assert!(cached("wiring_roomy_a.rs") && cached("wiring_roomy_b.rs"));
+    let mut m = CodeMemo::default();
+    let one = put(&mut m, 1 << 24, "size.rs", &text);
+    let mut m = CodeMemo::default();
+    put(&mut m, one * 8, "tiny_a.rs", &text);
+    put(&mut m, one * 8, "tiny_b.rs", &text);
+    assert!(has(&m, "tiny_a.rs", &text) && has(&m, "tiny_b.rs", &text));
+    put(&mut m, one * 8 - 1, "over_eighth.rs", &text);
+    assert!(!has(&m, "over_eighth.rs", &text));
+    let mut m = CodeMemo::default();
+    put(&mut m, 1 << 24, "roomy_a.rs", &text);
+    put(&mut m, 1 << 24, "roomy_b.rs", &text);
+    assert!(has(&m, "roomy_a.rs", &text) && has(&m, "roomy_b.rs", &text));
 }
 
 /// Reads SSE text from a response body until `want` appears or the time is up.

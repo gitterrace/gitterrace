@@ -20,4 +20,4 @@ pub use link::{Link, LinkError, LinkStyle, styled};
 pub use payload::{Lines, Locator, Payload, PayloadError, RunRequest, permalink};
 pub use runner::{Limits, Outcome, RunError, Runner};
 pub use send::{Part, fill};
-pub use token::Token;
+pub use token::{Token, proof as token_proof};

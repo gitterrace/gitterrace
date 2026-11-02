@@ -3,6 +3,8 @@
 
 use std::fmt;
 
+use sha2::{Digest, Sha256};
+
 /// Random bytes in the token. 32 is beyond guessing at any request rate.
 const TOKEN_BYTES: usize = 32;
 
@@ -29,6 +31,28 @@ impl Token {
         }
         a.iter().zip(b).fold(0u8, |acc, (x, y)| acc | (x ^ y)) == 0
     }
+
+    /// The answer to a challenge: proves the holder knows the secret without sending it.
+    pub fn prove(&self, nonce: &str) -> String {
+        proof(&self.0, nonce)
+    }
+}
+
+/// SHA-256 over `secret:nonce`, lowercase hex.
+///
+/// A client that read the secret from its 0600 file checks a server's answer before telling
+/// it anything, so a foreign listener that only mimics the replies never learns a path.
+pub fn proof(secret: &str, nonce: &str) -> String {
+    let digest = Sha256::new()
+        .chain_update(secret.as_bytes())
+        .chain_update(b":")
+        .chain_update(nonce.as_bytes())
+        .finalize();
+    digest.iter().fold(String::with_capacity(64), |mut s, b| {
+        s.push(char::from(b"0123456789abcdef"[usize::from(b >> 4)]));
+        s.push(char::from(b"0123456789abcdef"[usize::from(b & 15)]));
+        s
+    })
 }
 
 impl fmt::Debug for Token {
@@ -55,7 +79,18 @@ fn base64url(bytes: &[u8]) -> String {
 #[cfg(test)]
 mod tests {
     use crate::Token;
-    use crate::token::base64url;
+    use crate::token::{base64url, proof};
+
+    #[test]
+    fn proof_is_sha256_of_secret_and_nonce() {
+        // printf 'abc:n1' | shasum -a 256
+        assert_eq!(
+            proof("abc", "n1"),
+            "4fd321db886a203ea5ddbf0c3b79a25315577abda03f8cb75d3a09d32b18eef0"
+        );
+        assert_ne!(proof("abc", "n1"), proof("abx", "n1"));
+        assert_ne!(proof("abc", "n1"), proof("abc", "n2"));
+    }
 
     #[test]
     fn base64url_matches_known_vectors() {
