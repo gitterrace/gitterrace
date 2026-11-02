@@ -183,6 +183,11 @@ async function mermaid() {
   const b = await launch(pw, 'webkit');
   const p = await openPage(b, srv.base + '/', {});
   await p.waitForSelector('pre.mermaid svg', { timeout: 10000 }).catch(() => {});
+  // Mermaid styles its nodes from a <style> it writes at runtime. A page policy that refuses
+  // inline styles leaves node shapes at the SVG default: a black fill.
+  const fill = await p.$eval('pre.mermaid svg .node rect, pre.mermaid svg .node path',
+    (n) => getComputedStyle(n).fill).catch(() => '');
+  if (!fill || fill === 'rgb(0, 0, 0)') r.fail(`mermaid: diagram unstyled (node fill ${fill || 'none'})`);
   const labels = await p.$$eval('pre.mermaid .nodeLabel', (ns) => ns.map((n) => n.textContent.trim()));
   if (!labels.length) r.fail('mermaid: no diagram nodes rendered');
   else if (labels.includes('Copy')) r.fail(`mermaid: a Copy node leaked into the diagram: ${labels.join(', ')}`);
@@ -366,18 +371,10 @@ async function gutter() {
     await p.setViewportSize({ width: 1200, height: 900 });
     await p.goto(srv.base + '/blob/HEAD/long.txt#L99-L103', { waitUntil: 'load' });
     await p.waitForTimeout(300);
-    // Script cannot read a CSS counter's value, so replay the CSS rules the gutter uses over
-    // the real DOM: every line increments n by one, then a line's counter-set replaces it.
-    // The number shown before a line is the result. Every number must equal its line.
-    const nums = await p.evaluate(() => {
-      let n = 0;
-      return [...document.querySelectorAll('.src .l')].map((l) => {
-        n += 1;
-        const m = /counter-set:\s*n\s+(-?\d+)/.exec(l.getAttribute('style') || '');
-        if (m) n = +m[1];
-        return String(n);
-      });
-    });
+    // The number shown before a line is its ::before content. Every number must equal its line.
+    const nums = await p.evaluate(() =>
+      [...document.querySelectorAll('.src .l')].map((l) =>
+        getComputedStyle(l, '::before').content.replace(/"/g, '')));
     const wrong = nums.map((n, i) => [i + 1, n]).filter(([want, n]) => String(want) !== n);
     const shown = await p.evaluate(() => !!document.getElementById('actsel'));
     if (!wrong.length && nums.length === 250) r.ok(`gutter ${name}: 250 lines numbered 1..250 with the trigger shown=${shown}`);

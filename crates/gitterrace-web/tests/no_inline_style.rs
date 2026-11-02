@@ -1,5 +1,6 @@
-//! The page policy has no `unsafe-inline` for styles, so no page may rely on a `style`
-//! attribute: the browser would drop it. Renders the pages that once carried one.
+//! The app's own markup carries no `style` attribute: classes do that work, so a policy
+//! stricter than the app's own (a host's, a proxy's) loses nothing. Renders the pages that
+//! once carried one.
 
 use gitterrace_testkit::{get, git};
 use std::time::Duration;
