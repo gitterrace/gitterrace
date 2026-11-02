@@ -9,6 +9,9 @@
 # zeditor found, then vi. Line jump is known for code, vim/nvim/vi, nano, emacs, subl,
 # zed/zeditor and hx. Any other editor opens the file without a line.
 set -eu
+# pipefail is POSIX since 2024 but older dash lacks it, so it is set only where supported.
+# shellcheck disable=SC3040
+(set -o pipefail) 2>/dev/null && set -o pipefail
 if [ "$#" != 2 ]; then
   echo "gitterrace: editor.sh takes a line and a file: \"{line_start}\", \"{root}/{path}\"."
   exit 1
@@ -17,7 +20,7 @@ l=${1:-1}
 f=$2
 ed="${VISUAL:-${EDITOR:-}}"
 if [ -z "$ed" ]; then
-  ed=vi
+  ed="vi"
   for c in code zed zeditor; do
     if command -v "$c" >/dev/null 2>&1; then
       ed=$c
@@ -35,10 +38,10 @@ if ! command -v "$1" >/dev/null 2>&1; then
   exit 1
 fi
 case "$(basename "$1")" in
-  code|code-insiders|codium) "$@" --goto "$f:$l" ;;
-  vim|nvim|vi) "$@" "+$l" -- "$f" ;;
-  nano|emacs|emacsclient) "$@" "+$l" "$f" ;;
-  subl|zed|zeditor|hx) "$@" "$f:$l" ;;
-  *) "$@" "$f" ;;
+code | code-insiders | codium) "$@" --goto "$f:$l" ;;
+vim | nvim | vi) "$@" "+$l" -- "$f" ;;
+nano | emacs | emacsclient) "$@" "+$l" "$f" ;;
+subl | zed | zeditor | hx) "$@" "$f:$l" ;;
+*) "$@" "$f" ;;
 esac
 echo "opened $f"

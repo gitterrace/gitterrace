@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 // Runs every shared send vector through the JS encoder in send.js.
 //
 //   node scripts/send-vectors-check.mjs

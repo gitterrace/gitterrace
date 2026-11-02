@@ -1,0 +1,15 @@
+{
+  "compilerOptions": {
+    "checkJs": true,
+    "noEmit": true,
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "target": "es2023",
+    "strict": false,
+    "noImplicitAny": false,
+    "strictNullChecks": false,
+    "typeRoots": ["target/js-types/node_modules/@types"],
+    "types": ["node"]
+  },
+  "include": ["scripts/*.mjs"]
+}

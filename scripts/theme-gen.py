@@ -14,10 +14,16 @@ the vendored `schwarzwald` crate directly. Change the theme in schwarzwald, run 
 sync.py, then this; never edit the generated parts by hand.
 """
 
+from __future__ import annotations
+
 import hashlib
 import json
 import sys
 from pathlib import Path
+from typing import Any
+
+# Parsed JSON token files: nested dicts whose shape lives in schwarzwald, not here.
+Json = dict[str, Any]
 
 ROOT = Path(__file__).resolve().parent.parent
 SNAP = ROOT / "theme/schwarzwald"
@@ -35,11 +41,11 @@ SHADOW = {"light": "0 8px 28px rgba(16,20,28,.12)", "dark": "0 8px 28px rgba(0,0
 RING_ALPHA = {"light": "66", "dark": "80"}
 
 
-def hexv(tok, name):
-    return tok[name]["hex"].lower()
+def hexv(tok: Json, name: str) -> str:
+    return str(tok[name]["hex"]).lower()
 
 
-def mix(fg, bg, share):
+def mix(fg: str, bg: str, share: float) -> str:
     a = [int(fg[i : i + 2], 16) for i in (1, 3, 5)]
     b = [int(bg[i : i + 2], 16) for i in (1, 3, 5)]
     return "#" + "".join(
@@ -47,22 +53,22 @@ def mix(fg, bg, share):
     )
 
 
-def luminance(c):
-    def ch(x):
-        x = int(c[x : x + 2], 16) / 255
+def luminance(c: str) -> float:
+    def ch(i: int) -> float:
+        x = int(c[i : i + 2], 16) / 255
         return x / 12.92 if x <= 0.04045 else ((x + 0.055) / 1.055) ** 2.4
 
     return 0.2126 * ch(1) + 0.7152 * ch(3) + 0.0722 * ch(5)
 
 
-def contrast(a, b):
+def contrast(a: str, b: str) -> float:
     la, lb = sorted((luminance(a), luminance(b)), reverse=True)
     return (la + 0.05) / (lb + 0.05)
 
 
 # (foreground, background, minimum) in resolved colours: text pairs need 4.5:1, the focus
 # ring (tokens.css role --focus, the accent) 3:1 against every surface it is drawn on.
-PAIRS = [
+PAIRS: list[tuple[str, str, float]] = [
     ("n-9", "n-1", 4.5),
     ("n-7", "n-1", 4.5),
     ("on-accent", "accent", 4.5),
@@ -72,8 +78,8 @@ PAIRS = [
 ]
 
 
-def contrast_problems(tokens):
-    bad = []
+def contrast_problems(tokens: Json) -> list[str]:
+    bad: list[str] = []
     for mode in ("light", "dark"):
         col = colours(tokens, mode)
         for fg, bg, need in PAIRS:
@@ -83,10 +89,10 @@ def contrast_problems(tokens):
     return bad
 
 
-def colours(tokens, mode):
-    t = tokens["themes"][THEME][mode]
+def colours(tokens: Json, mode: str) -> dict[str, str]:
+    t: Json = tokens["themes"][THEME][mode]
 
-    def h(n):
+    def h(n: str) -> str:
         return hexv(t, n)
 
     # Order is the order in the stylesheet. Names are the roles app.css uses.
@@ -133,15 +139,15 @@ def colours(tokens, mode):
     return out
 
 
-def block(selector, mode, col, indent=""):
+def block(selector: str, mode: str, col: dict[str, str], indent: str = "") -> str:
     items = [f"--{k}:{v};" for k, v in col.items()] + [f"--shadow-2:{SHADOW[mode]};"]
     rows = [" ".join(items[i : i + 8]) for i in range(0, len(items), 8)]
     body = "\n".join(indent + r for r in rows)
     return f"{selector}{{color-scheme:{mode};\n{body}\n}}"
 
 
-def fonts(design):
-    f = design["font"]
+def fonts(design: Json) -> list[str]:
+    f: Json = design["font"]
     faces = [
         ("Fraunces", "fraunces", "100 900"),
         ("Bricolage Grotesque", "bricolage-grotesque", "200 800"),
@@ -158,7 +164,7 @@ def fonts(design):
         for fam, slug, w in faces
     ]
 
-    def stack(k):
+    def stack(k: str) -> str:
         return ",".join(
             f'"{x}"' if " " in x else x for x in [f[k]["web"]] + f[k]["fallback"]
         )
@@ -169,7 +175,7 @@ def fonts(design):
     return lines
 
 
-def scales(design):
+def scales(design: Json) -> str:
     d = design
     names = {11: "2xs", 12: "xs", 13: "sm", 15: "base", 16: "md", 20: "lg", 26: "xl"}
     t = "".join(f"--text-{names[p]}:{p}px;" for p in d["type"]["scalePx"])
@@ -186,7 +192,7 @@ def scales(design):
     return f":root{{{t}\n{s}\n--radius:{d['radius']['webPx']}px;\n{mo}}}"
 
 
-def gen_css(tokens, design, old):
+def gen_css(tokens: Json, design: Json, old: str) -> str:
     light, dark = colours(tokens, "light"), colours(tokens, "dark")
     parts = fonts(design) + [
         scales(design),
@@ -200,11 +206,11 @@ def gen_css(tokens, design, old):
     return old[:b] + BEGIN + "\n" + "\n".join(parts) + "\n" + old[e:]
 
 
-def snapshot_problems():
+def snapshot_problems() -> list[str]:
     manifest = SNAP / "manifest.json"
     if not manifest.is_file():
         return [f"no manifest: {manifest}"]
-    want = json.loads(manifest.read_text())["files"]
+    want: dict[str, str] = json.loads(manifest.read_text())["files"]
     have = {
         str(p.relative_to(SNAP)): hashlib.sha256(p.read_bytes()).hexdigest()
         for p in sorted(SNAP.rglob("*"))
@@ -216,7 +222,7 @@ def snapshot_problems():
     return bad
 
 
-def main():
+def main() -> int:
     if "--check" in sys.argv:
         bad = snapshot_problems()
         for line in bad:
@@ -241,4 +247,5 @@ def main():
     return 0
 
 
-sys.exit(main())
+if __name__ == "__main__":
+    sys.exit(main())

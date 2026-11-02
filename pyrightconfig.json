@@ -1,0 +1,11 @@
+{
+  "include": ["scripts"],
+  "pythonVersion": "3.9",
+  "typeCheckingMode": "standard",
+  "reportMissingParameterType": "error",
+  "reportMissingTypeArgument": "error",
+  "reportUnusedImport": "error",
+  "reportUnusedVariable": "error",
+  "reportPrivateUsage": "error",
+  "reportMissingImports": "error"
+}

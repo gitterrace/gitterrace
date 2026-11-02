@@ -3,7 +3,12 @@
 # dir holding the real basics (jq, cat, ...) plus recording stubs for the tools that
 # profile has, and nothing else. Not shipped to users.
 # shellcheck disable=SC2016  # single quotes hold payload text that must stay literal
+# No errexit: a failing action is the thing under test, its status is read from $? and
+# recorded by fail(), so the run goes on to report every case.
 set -u
+# pipefail is POSIX since 2024 but older dash lacks it, so it is set only where supported.
+# shellcheck disable=SC3040
+(set -o pipefail) 2>/dev/null && set -o pipefail
 root=$(cd "$(dirname "$0")/.." && pwd)
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
@@ -154,7 +159,10 @@ expect_rc zed 0
 expect_log zed ".rs:7"
 TEST_EDITOR=EDITOR=mystery runa ed editor.sh '' 7 "$f"
 expect_rc mystery 0
-case $log in *"+7"* | *":7"*) fail "mystery editor got a line: $log" ;; esac
+case $log in
+*"+7"* | *":7"*) fail "mystery editor got a line: $log" ;;
+*) ;;
+esac
 
 for p in mac x11 wayland xsel wsl none ed; do expect_clean "$p"; done
 

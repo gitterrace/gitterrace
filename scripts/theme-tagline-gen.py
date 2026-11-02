@@ -14,6 +14,8 @@ data-text (the words it spells) and data-sha (sha256 of its path data).
 names check reads TAGLINE as prose.
 """
 
+from __future__ import annotations
+
 import hashlib
 import html
 import re
@@ -30,10 +32,11 @@ X, BASELINE, SIZE, WEIGHT = 174.0, 150.0, 22.0, 400
 
 
 def outline(text: str) -> str:
-    from fontTools.pens.svgPathPen import SVGPathPen
-    from fontTools.pens.transformPen import TransformPen
-    from fontTools.ttLib import TTFont
-    from fontTools.varLib.instancer import instantiateVariableFont
+    # fontTools is only present under the `uv run --with fonttools` rewrite, never in lint.
+    from fontTools.pens.svgPathPen import SVGPathPen  # pyright: ignore[reportMissingImports]
+    from fontTools.pens.transformPen import TransformPen  # pyright: ignore[reportMissingImports]
+    from fontTools.ttLib import TTFont  # pyright: ignore[reportMissingImports]
+    from fontTools.varLib.instancer import instantiateVariableFont  # pyright: ignore[reportMissingImports]
 
     font = instantiateVariableFont(TTFont(FONT), {"wght": WEIGHT})
     scale = SIZE / font["head"].unitsPerEm
@@ -59,7 +62,7 @@ def sha(d: str) -> str:
 def main() -> int:
     check = "--check" in sys.argv
     d = None if check else outline(TAGLINE)
-    stale = []
+    stale: list[str] = []
     for theme in ("light", "dark"):
         path = ROOT / f"docs/brand/readme-header-{theme}.svg"
         svg = path.read_text()
@@ -70,6 +73,7 @@ def main() -> int:
             if text is None or html.unescape(text) != TAGLINE or digest != sha(cur):
                 stale.append(rel)
             continue
+        assert d is not None  # outlined above whenever not --check
         new = (
             svg[: last.start()]
             + f'<path fill="{last.group(1)}" data-text="{html.escape(TAGLINE)}" data-sha="{sha(d)}" d="{d}"/>'
@@ -83,4 +87,5 @@ def main() -> int:
     return 1 if stale else 0
 
 
-raise SystemExit(main())
+if __name__ == "__main__":
+    raise SystemExit(main())

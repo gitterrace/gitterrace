@@ -13,6 +13,8 @@
    header names what they write.
 """
 
+from __future__ import annotations
+
 import hashlib
 import re
 import subprocess
@@ -36,7 +38,7 @@ SKIP = ("theme/schwarzwald/", "Cargo.lock", ".mcp.json", "scripts/names-check.py
 WORD = re.compile(r"[A-Za-z_]{4,}")
 
 
-def outside(line):
+def outside(line: str) -> str | None:
     """The first word of the line whose lowercase SHA-256 prefix is an outside name."""
     for w in WORD.findall(line):
         if hashlib.sha256(w.lower().encode()).hexdigest()[:16] in OUTSIDE_HASHES:
@@ -218,6 +220,34 @@ def check_path_refs() -> list[str]:
     return bad
 
 
+# A Rust version written into a build file: `+1.98`, `toolchain: "1.98"`, `channel = "1.98.0"`.
+TOOLCHAIN_LITERAL = re.compile(
+    r"(?:\+|toolchain:\s*[\"']?|channel\s*=\s*\")(1\.\d+(?:\.\d+)?)"
+)
+
+
+def check_toolchain() -> list[str]:
+    """One compiler pin: rust-toolchain.toml. The Makefile and workflows read it, never repeat
+    it, so a bump cannot leave one of them on the old compiler. The only other version allowed
+    is the MSRV job's, and it must be the workspace `rust-version`."""
+    msrv = re.search(
+        r'^rust-version\s*=\s*"([^"]+)"', (ROOT / "Cargo.toml").read_text(), re.M
+    )
+    allowed = {msrv.group(1)} if msrv else set()
+    files = [ROOT / "Makefile", *sorted((ROOT / ".github/workflows").glob("*.yml"))]
+    bad = []
+    for f in files:
+        for n, line in enumerate(f.read_text().splitlines(), 1):
+            if line.lstrip().startswith("#"):
+                continue
+            for v in TOOLCHAIN_LITERAL.findall(line):
+                if v not in allowed:
+                    bad.append(
+                        f"{f.relative_to(ROOT)}:{n}: Rust {v} written in, read rust-toolchain.toml"
+                    )
+    return bad
+
+
 def main() -> int:
     bad = [
         *check_modules(),
@@ -225,6 +255,7 @@ def main() -> int:
         *check_headers(),
         *check_generators(),
         *check_path_refs(),
+        *check_toolchain(),
     ]
     bad += [
         f"Makefile: target `{t}` is not <area>[-<verb>]"
@@ -272,4 +303,5 @@ def main() -> int:
     return 0
 
 
-sys.exit(main())
+if __name__ == "__main__":
+    sys.exit(main())

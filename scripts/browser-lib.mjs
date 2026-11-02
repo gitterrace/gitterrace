@@ -48,7 +48,7 @@ export async function launch(pw, name) {
 
 export async function freePort() {
   return new Promise((ok) => {
-    const s = net.createServer().listen(0, '127.0.0.1', () => { const p = s.address().port; s.close(() => ok(p)); });
+    const s = net.createServer().listen(0, '127.0.0.1', () => { const p = /** @type {net.AddressInfo} */ (s.address()).port; s.close(() => ok(p)); });
   });
 }
 

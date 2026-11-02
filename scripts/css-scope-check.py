@@ -2,10 +2,16 @@
 """Fail when a markdown.css selector is not scoped to .markdown-body, .code or .diff.
 
 Rendered documents share the page with the app, so an unscoped class there (.seg once)
-restyles app widgets. Run by scripts/lint-run.sh as the css-scope hook."""
+restyles app widgets. Run by scripts/lint-run.sh as the css-scope hook.
+
+  python3 scripts/css-scope-check.py
+"""
+
+from __future__ import annotations
 
 import re
 import sys
+from collections.abc import Iterator
 from pathlib import Path
 
 CSS = (
@@ -16,7 +22,7 @@ SCOPED = re.compile(
 )
 
 
-def selectors(text):
+def selectors(text: str) -> Iterator[str]:
     text = re.sub(r"/\*.*?\*/", "", text, flags=re.S)
     text = re.sub(r"url\([^)]*\)", "url()", text)
     for prelude in re.findall(r"(?:^|[};])\s*([^{};]+)\{", text):
@@ -35,7 +41,14 @@ def selectors(text):
         yield cur.strip()
 
 
-bad = [s for s in selectors(CSS.read_text()) if not SCOPED.match(s)]
-for s in bad:
-    print(f"markdown.css: selector not scoped to .markdown-body, .code or .diff: {s}")
-sys.exit(1 if bad else 0)
+def main() -> int:
+    bad = [s for s in selectors(CSS.read_text()) if not SCOPED.match(s)]
+    for s in bad:
+        print(
+            f"markdown.css: selector not scoped to .markdown-body, .code or .diff: {s}"
+        )
+    return 1 if bad else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

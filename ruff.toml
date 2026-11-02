@@ -1,4 +1,9 @@
-# The classic ruff rule set (pycodestyle errors, pyflakes) plus import order. Newer ruff
-# defaults add style families that churn scripts without finding bugs.
+# Scripts run on the system python3 (3.9 on macOS), so pyupgrade targets 3.9.
+target-version = "py39"
+
 [lint]
-select = ["E4", "E7", "E9", "F", "I"]
+# Classic errors and import order, plus the families that find bugs: bugbear (B), pyupgrade (UP),
+# simplify (SIM) and ruff's own (RUF). RUF005 only prefers [*a, b] over a + [b], churn without
+# a bug behind it.
+select = ["E4", "E7", "E9", "F", "I", "B", "UP", "SIM", "RUF"]
+ignore = ["RUF005"]
