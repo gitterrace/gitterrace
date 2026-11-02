@@ -971,6 +971,7 @@ name = "gitterrace-index"
 version = "0.1.0"
 dependencies = [
  "gitterrace-git",
+ "gitterrace-testkit",
  "libc",
  "serde",
  "serde_json",

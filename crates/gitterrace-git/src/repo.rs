@@ -318,12 +318,66 @@ impl Repo {
             .collect()
     }
 
+    /// Summaries of exactly these commits, in order, with identities as written in the commit.
+    /// The indexer stores these, so a later `.mailmap` applies to cached history without a
+    /// rebuild, see [`Self::map_identities`].
+    pub fn raw_summaries(&self, ids: &[String]) -> Result<Vec<CommitSummary>> {
+        let repo = self.repo();
+        let none = gix::mailmap::Snapshot::default();
+        ids.iter()
+            .map(|id| {
+                summary(
+                    &repo.find_commit(self.full_id(&repo, id)?).map_err(git)?,
+                    &none,
+                )
+            })
+            .collect()
+    }
+
+    /// `(name, email)` pairs mapped through the `.mailmap` at the tip of `rev`, in order. The
+    /// tip's file applies to all of history, as in git and in [`Self::log`].
+    pub fn map_identities(
+        &self,
+        rev: &str,
+        pairs: &[(String, String)],
+    ) -> Result<Vec<(String, String)>> {
+        let repo = self.repo();
+        let map = ident::mailmap(&repo, self.resolve_id(&repo, rev)?);
+        Ok(pairs
+            .iter()
+            .map(|(name, email)| {
+                let sig = gix::actor::SignatureRef {
+                    name: name.as_bytes().as_bstr(),
+                    email: email.as_bytes().as_bstr(),
+                    time: "",
+                };
+                let got = map.resolve(sig);
+                (
+                    got.name.to_str_lossy().into_owned(),
+                    got.email.to_str_lossy().into_owned(),
+                )
+            })
+            .collect())
+    }
+
+    /// Ids in the shallow file: commits whose parents this clone does not have. Diffs treat
+    /// them as roots.
+    pub fn shallow_ids(&self) -> Vec<String> {
+        self.repo()
+            .shallow_commits()
+            .ok()
+            .flatten()
+            .map(|ids| ids.iter().map(ToString::to_string).collect())
+            .unwrap_or_default()
+    }
+
     /// Per-file line counts against the first parent, without hunk text, for many commits
     /// spread over all cores. Results are in the order of `ids`; the work is CPU bound and
     /// independent, so the indexer batches it.
-    /// A commit whose objects cannot be read (a shallow clone's boundary, a pruned or hostile
-    /// object store) gets no file stats instead of failing the whole batch.
-    pub fn numstat_many(&self, ids: &[String]) -> Result<Vec<Vec<crate::FileDiff>>> {
+    /// A commit whose objects cannot be read (a pruned or hostile object store) is `None`
+    /// instead of failing the whole batch, so the caller can leave it out and retry it later.
+    /// A shallow clone's boundary is diffed as a root.
+    pub fn numstat_many(&self, ids: &[String]) -> Result<Vec<Option<Vec<crate::FileDiff>>>> {
         let workers = match self.workers {
             0 => std::thread::available_parallelism().map_or(1, usize::from),
             n => n,
@@ -351,7 +405,7 @@ impl Repo {
                                     MAX_TEXT_BYTES,
                                     &mut cache,
                                 )
-                                .unwrap_or_default())
+                                .ok())
                             })
                             .collect::<Result<Vec<_>>>()
                     })
@@ -893,6 +947,7 @@ mod tests {
                 .numstat_many(std::slice::from_ref(&id))
                 .expect("numstat")
                 .remove(0)
+                .expect("readable")
                 .into_iter()
                 .map(|f| (f.path, (f.additions, f.deletions, f.old_path)))
                 .collect();

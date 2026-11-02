@@ -12,10 +12,27 @@ pub trait CommitSource {
     /// Builds the record for one commit.
     fn record(&self, id: &str) -> io::Result<CommitRecord>;
 
-    /// Builds records for many commits, in the order of `ids`. Sources that can do the work in
-    /// parallel override this.
+    /// Builds records for many commits, in the order of `ids`. A commit that cannot be read is
+    /// left out, never returned with empty stats: the index then keeps it pending and retries
+    /// it. Sources that can do the work in parallel override this.
     fn records(&self, ids: &[String]) -> io::Result<Vec<CommitRecord>> {
         ids.iter().map(|id| self.record(id)).collect()
+    }
+
+    /// Commits whose parents are missing (a shallow clone's boundary). Their records are diffed
+    /// as roots and rebuilt when the boundary moves past them.
+    fn shallow_ids(&self) -> Vec<String> {
+        Vec::new()
+    }
+
+    /// Maps `(name, email)` pairs as the tip of `rev` says (its `.mailmap`). Records are stored
+    /// with the identities as written, so this runs on every read.
+    fn map_identities(
+        &self,
+        _rev: &str,
+        pairs: &[(String, String)],
+    ) -> io::Result<Vec<(String, String)>> {
+        Ok(pairs.to_vec())
     }
 }
 
@@ -72,11 +89,23 @@ impl CommitSource for Repo {
 
     fn records(&self, ids: &[String]) -> io::Result<Vec<CommitRecord>> {
         let diffs = self.numstat_many(ids).map_err(io::Error::other)?;
-        let summaries = Self::summaries(self, ids).map_err(io::Error::other)?;
+        let summaries = self.raw_summaries(ids).map_err(io::Error::other)?;
         Ok(summaries
             .into_iter()
             .zip(diffs)
-            .map(|(summary, d)| build(summary, file_stats(d)))
+            .filter_map(|(summary, d)| d.map(|d| build(summary, file_stats(d))))
             .collect())
+    }
+
+    fn shallow_ids(&self) -> Vec<String> {
+        Self::shallow_ids(self)
+    }
+
+    fn map_identities(
+        &self,
+        rev: &str,
+        pairs: &[(String, String)],
+    ) -> io::Result<Vec<(String, String)>> {
+        Self::map_identities(self, rev, pairs).map_err(io::Error::other)
     }
 }

@@ -56,7 +56,11 @@ impl Insights<'_> {
                 commit: r.id.clone(),
                 time: r.time,
                 commits_since: prev.map_or(i + 1, |p| i.saturating_sub(p)),
-                days_since: prev.map(|p| (r.time - self.records[p].time).div_euclid(86_400)),
+                days_since: prev.map(|p| {
+                    r.time
+                        .saturating_sub(self.records[p].time)
+                        .div_euclid(86_400)
+                }),
             });
             prev = Some(i);
         }
@@ -70,7 +74,7 @@ impl Insights<'_> {
         Cadence {
             days_since_last: releases
                 .last()
-                .map(|r| (self.now - r.time).div_euclid(86_400)),
+                .map(|r| self.now.saturating_sub(r.time).div_euclid(86_400)),
             median_days_between: median,
             releases,
         }

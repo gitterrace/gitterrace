@@ -7,6 +7,7 @@ mod insights;
 mod source;
 mod store;
 
+use std::collections::{HashMap, HashSet};
 use std::io;
 use std::path::PathBuf;
 
@@ -20,18 +21,22 @@ pub use store::FORMAT_VERSION;
 
 /// Every file the cache keeps in `.git/gitterrace/`, with what it holds. The architecture page is
 /// rendered from this, and a test fails when the folder holds a file not listed here.
-pub const CACHE_FILES: [(&str, &str); 4] = [
+pub const CACHE_FILES: [(&str, &str); 5] = [
     (
         store::VERSION_FILE,
         "The cache format. A mismatch deletes the cache and rebuilds it. The format is never migrated.",
     ),
     (
         store::COMMITS_FILE,
-        "One record per commit, appended as the history is walked. Unreachable records are ignored, so rewritten history needs no cleanup, and a torn last line is dropped.",
+        "One record per commit, appended as the history is walked, with authors as written: the .mailmap of the revision shown is applied on read. Unreachable records are ignored, so rewritten history needs no cleanup, and a torn last line is dropped. A commit that cannot be read is not stored, so the next update retries it.",
     ),
     (
         store::PATHS_FILE,
         "Every file path any record mentions, one JSON string per line. Records refer to a path by its line number, so a path is stored once however many commits touch it.",
+    ),
+    (
+        store::LOCK_FILE,
+        "Empty. Held locked by whichever process is adding records, so two processes on one repository take turns instead of mixing up path numbers.",
     ),
     (
         insights::CACHE_FILE,
@@ -157,7 +162,9 @@ impl Index {
         store::file_len(&self.dir)
     }
 
-    /// Indexes commits reachable from `rev` that are not yet cached.
+    /// Indexes commits reachable from `rev` that are not yet cached, and rebuilds those stored
+    /// at a shallow boundary that has since been fetched. Waits for any other process doing the
+    /// same; a commit the source cannot read is skipped and stays pending.
     pub fn update(
         &self,
         source: &dyn CommitSource,
@@ -166,17 +173,19 @@ impl Index {
     ) -> io::Result<()> {
         self.writable()?;
         let ids = source.rev_list(rev)?;
-        let (known, valid) = store::stored_ids(&self.dir)?;
-        let mut seen = known;
-        let todo: Vec<&String> = ids.iter().filter(|id| seen.insert((*id).clone())).collect();
+        let shallow: HashSet<String> = source.shallow_ids().into_iter().collect();
+        // Everything below reads what another writer may be appending: lock first.
+        let _lock = store::WriteLock::take(&self.dir)?;
+        let stored = store::stored_ids(&self.dir)?;
+        let todo = stored.todo(&ids, &shallow);
         let total = todo.len();
         progress(Progress { done: 0, total });
-        let mut out = store::Appender::open(&self.dir, valid)?;
+        let mut out = store::Appender::open(&self.dir, stored.valid)?;
         let mut done = 0;
         for chunk in todo.chunks(BATCH) {
             let ids: Vec<String> = chunk.iter().map(|id| (*id).clone()).collect();
             for record in source.records(&ids)? {
-                out.push(&record)?;
+                out.push(&record, shallow.contains(&record.id))?;
             }
             done += chunk.len();
             progress(Progress { done, total });
@@ -184,20 +193,91 @@ impl Index {
         out.flush()
     }
 
-    /// Commits reachable from `rev` that are not cached yet. Zero means [`Index::records`] for
-    /// `rev` is complete; insights for a branch other than HEAD call [`Index::update`] first.
+    /// Commits reachable from `rev` that [`Index::update`] would build. Zero means
+    /// [`Index::records`] for `rev` is complete; insights for a branch other than HEAD call
+    /// [`Index::update`] first.
     pub fn pending(&self, source: &dyn CommitSource, rev: &str) -> io::Result<usize> {
         let ids = source.rev_list(rev)?;
-        let (known, _) = store::stored_ids(&self.dir)?;
-        Ok(ids.iter().filter(|id| !known.contains(*id)).count())
+        let shallow: HashSet<String> = source.shallow_ids().into_iter().collect();
+        Ok(store::stored_ids(&self.dir)?.todo(&ids, &shallow).len())
     }
 
-    /// All cached records reachable from `rev`, oldest first.
+    /// All cached records reachable from `rev`, oldest first, with authors mapped through the
+    /// `.mailmap` at the tip of `rev`.
     pub fn records(&self, source: &dyn CommitSource, rev: &str) -> io::Result<Vec<CommitRecord>> {
         let order = source.rev_list(rev)?;
         let (records, _) = store::read_records(&self.dir, self.threads)?;
-        Ok(store::select(records, &order))
+        let mut records = store::select(records, &order);
+        map_identities(source, rev, &mut records)?;
+        let latest = wall_clock().saturating_add(insights::DAY);
+        for r in &mut records {
+            r.time = plausible_time(r.time, latest);
+        }
+        Ok(records)
     }
+}
+
+/// Seconds since the epoch on this machine's clock.
+fn wall_clock() -> i64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |d| i64::try_from(d.as_secs()).unwrap_or(i64::MAX))
+}
+
+/// An author time every chart can place: from 1970 to `latest` (the wall clock plus a day).
+///
+/// Commit dates are free text from whoever wrote the commit; one dated in year 950 million or
+/// in 2099 would otherwise size every time axis and end every period window. Such a commit is
+/// still counted and listed, dated at the nearest edge. The wall clock is the bound because a
+/// rebased tip can carry a future committer date too.
+pub fn plausible_time(time: i64, latest: i64) -> i64 {
+    time.clamp(0, latest.max(0))
+}
+
+/// "Now" for period windows: the newest author time not after this machine's clock.
+///
+/// So an old repository still shows its last active stretch and a commit dated in the future (one
+/// [`plausible_time`] pinned to the edge, or a skewed clock) never empties every window. Every
+/// surface that cuts a period uses this one value.
+pub fn reference_time(records: &[CommitRecord]) -> i64 {
+    let wall = wall_clock();
+    records
+        .iter()
+        .map(|r| r.time)
+        .filter(|t| *t <= wall)
+        .max()
+        .unwrap_or(0)
+}
+
+/// Rewrites every record's author through the source's identity map, asking once per
+/// distinct pair.
+fn map_identities(
+    source: &dyn CommitSource,
+    rev: &str,
+    records: &mut [CommitRecord],
+) -> io::Result<()> {
+    let mut slot: HashMap<(String, String), usize> = HashMap::new();
+    let mut pairs = Vec::new();
+    for r in records.iter() {
+        let key = (r.author.clone(), r.email.clone());
+        if !slot.contains_key(&key) {
+            slot.insert(key.clone(), pairs.len());
+            pairs.push(key);
+        }
+    }
+    let mapped = source.map_identities(rev, &pairs)?;
+    if mapped.len() != pairs.len() {
+        return Err(io::Error::other(
+            "identity map returned the wrong number of pairs",
+        ));
+    }
+    for r in records.iter_mut() {
+        let key = (std::mem::take(&mut r.author), std::mem::take(&mut r.email));
+        let (name, email) = &mapped[slot[&key]];
+        r.author.clone_from(name);
+        r.email.clone_from(email);
+    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -246,6 +326,188 @@ mod tests {
 
     fn ids(rs: &[CommitRecord]) -> Vec<&str> {
         rs.iter().map(|r| r.id.as_str()).collect()
+    }
+
+    /// A source whose commits each touch their own paths, shareable across threads.
+    struct Paths {
+        ids: Vec<String>,
+        tag: &'static str,
+        fail: std::sync::Mutex<std::collections::HashSet<String>>,
+        shallow: std::sync::Mutex<Vec<String>>,
+    }
+
+    impl Paths {
+        fn new(tag: &'static str, n: usize) -> Self {
+            Self {
+                ids: (0..n).map(|i| format!("{tag}{i:039x}")).collect(),
+                tag,
+                fail: std::sync::Mutex::default(),
+                shallow: std::sync::Mutex::default(),
+            }
+        }
+    }
+
+    impl CommitSource for Paths {
+        fn rev_list(&self, _rev: &str) -> io::Result<Vec<String>> {
+            Ok(self.ids.clone())
+        }
+
+        fn record(&self, id: &str) -> io::Result<CommitRecord> {
+            Ok(CommitRecord {
+                id: id.to_owned(),
+                files: vec![crate::FileStat {
+                    path: format!("{}/{id}.rs", self.tag).into(),
+                    additions: u32::from(
+                        !self
+                            .shallow
+                            .lock()
+                            .map_err(|_| io::Error::other("poisoned"))?
+                            .contains(&id.to_owned()),
+                    ),
+                    ..crate::FileStat::default()
+                }],
+                ..CommitRecord::default()
+            })
+        }
+
+        fn records(&self, ids: &[String]) -> io::Result<Vec<CommitRecord>> {
+            let fail = self
+                .fail
+                .lock()
+                .map_err(|_| io::Error::other("poisoned"))?
+                .clone();
+            ids.iter()
+                .filter(|id| !fail.contains(*id))
+                .map(|id| self.record(id))
+                .collect()
+        }
+
+        fn shallow_ids(&self) -> Vec<String> {
+            self.shallow.lock().map(|s| s.clone()).unwrap_or_default()
+        }
+    }
+
+    /// Two processes indexing one repository (two `Index` handles on one folder, as `serve`
+    /// beside `mcp`) never hand one path id to two paths.
+    #[test]
+    fn two_writers_keep_every_path_with_its_record() -> io::Result<()> {
+        let dir = tempfile::tempdir()?;
+        let path = dir.path().join("gitterrace");
+        let (a, b) = (Paths::new("a", 3000), Paths::new("b", 3000));
+        std::thread::scope(|s| {
+            let one = s.spawn(|| Index::open_dir(path.clone())?.update(&a, "HEAD", &|_| {}));
+            let two = s.spawn(|| Index::open_dir(path.clone())?.update(&b, "HEAD", &|_| {}));
+            for h in [one, two] {
+                h.join()
+                    .map_err(|_| io::Error::other("writer panicked"))??;
+            }
+            Ok::<(), io::Error>(())
+        })?;
+        let idx = Index::open_dir(path)?;
+        for src in [&a, &b] {
+            let got = idx.records(src, "HEAD")?;
+            assert_eq!(got.len(), 3000);
+            for r in got {
+                assert_eq!(&*r.files[0].path, format!("{}/{}.rs", src.tag, r.id));
+            }
+        }
+        Ok(())
+    }
+
+    /// While another writer holds the lock, an update waits instead of appending.
+    #[test]
+    fn update_waits_for_the_writer_lock() -> io::Result<()> {
+        let dir = tempfile::tempdir()?;
+        let idx = Index::open_dir(dir.path().join("gitterrace"))?;
+        let held = crate::store::WriteLock::take(idx.dir())?;
+        let src = Paths::new("a", 1);
+        let (tx, rx) = std::sync::mpsc::channel();
+        std::thread::scope(|s| {
+            let writer = s.spawn(|| tx.send(idx.update(&src, "HEAD", &|_| {})));
+            assert!(
+                rx.recv_timeout(std::time::Duration::from_millis(300))
+                    .is_err(),
+                "update ran under a held lock"
+            );
+            drop(held);
+            let done = rx
+                .recv_timeout(std::time::Duration::from_secs(10))
+                .map_err(io::Error::other)?;
+            writer
+                .join()
+                .map_err(|_| io::Error::other("writer panicked"))?
+                .map_err(io::Error::other)?;
+            done
+        })?;
+        assert_eq!(idx.records(&src, "HEAD")?.len(), 1);
+        Ok(())
+    }
+
+    /// A commit the source cannot read is not stored, stays pending and is built next time.
+    #[test]
+    fn an_unreadable_commit_stays_pending_and_is_retried() -> io::Result<()> {
+        let dir = tempfile::tempdir()?;
+        let idx = Index::open_dir(dir.path().join("gitterrace"))?;
+        let src = Paths::new("a", 3);
+        let bad = src.ids[1].clone();
+        src.fail
+            .lock()
+            .map_err(|_| io::Error::other("poisoned"))?
+            .insert(bad.clone());
+        idx.update(&src, "HEAD", &|_| {})?;
+        assert_eq!(idx.pending(&src, "HEAD")?, 1);
+        assert_eq!(idx.records(&src, "HEAD")?.len(), 2);
+        src.fail
+            .lock()
+            .map_err(|_| io::Error::other("poisoned"))?
+            .clear();
+        idx.update(&src, "HEAD", &|_| {})?;
+        assert_eq!(idx.pending(&src, "HEAD")?, 0);
+        assert!(idx.records(&src, "HEAD")?.iter().any(|r| r.id == bad));
+        Ok(())
+    }
+
+    /// A row built at a shallow boundary is rebuilt once the clone has the parents.
+    #[test]
+    fn a_shallow_boundary_row_is_rebuilt_after_unshallow() -> io::Result<()> {
+        let dir = tempfile::tempdir()?;
+        let idx = Index::open_dir(dir.path().join("gitterrace"))?;
+        let src = Paths::new("a", 2);
+        let edge = src.ids[0].clone();
+        src.shallow
+            .lock()
+            .map_err(|_| io::Error::other("poisoned"))?
+            .push(edge.clone());
+        idx.update(&src, "HEAD", &|_| {})?;
+        assert_eq!(
+            idx.pending(&src, "HEAD")?,
+            0,
+            "a boundary row is done while shallow"
+        );
+        assert_eq!(idx.records(&src, "HEAD")?[0].files[0].additions, 0);
+        src.shallow
+            .lock()
+            .map_err(|_| io::Error::other("poisoned"))?
+            .clear();
+        assert_eq!(idx.pending(&src, "HEAD")?, 1);
+        idx.update(&src, "HEAD", &|_| {})?;
+        assert_eq!(idx.pending(&src, "HEAD")?, 0);
+        let got = idx.records(&src, "HEAD")?;
+        assert_eq!(got.len(), 2);
+        assert_eq!(
+            (got[0].id.as_str(), got[0].files[0].additions),
+            (edge.as_str(), 1)
+        );
+        Ok(())
+    }
+
+    /// Records dated outside what a calendar can chart are pinned to the edges on read.
+    #[test]
+    fn absurd_record_times_are_pinned_on_read() {
+        let latest = 1_800_000_000;
+        assert_eq!(crate::plausible_time(i64::MAX, latest), latest);
+        assert_eq!(crate::plausible_time(i64::MIN, latest), 0);
+        assert_eq!(crate::plausible_time(1_700_000_000, latest), 1_700_000_000);
     }
 
     /// The folder holds exactly the files `CACHE_FILES` documents.
@@ -307,8 +569,7 @@ mod tests {
         let wanted: Vec<&str> = names.iter().map(String::as_str).collect();
         let src = Fake::new(&wanted);
         idx.update(&src, "HEAD", &|_| {})?;
-        let (known, _) = crate::store::stored_ids(idx.dir())?;
-        assert_eq!(known.len(), 4000);
+        assert_eq!(crate::store::stored_ids(idx.dir())?.ids.len(), 4000);
         let (parsed, _) = crate::store::read_records(idx.dir(), 0)?;
         assert_eq!(ids(&parsed), wanted);
         Ok(())
@@ -350,7 +611,7 @@ mod tests {
         ] {
             let mut r = src.record(id)?;
             r.files = files;
-            out.push(&r)?;
+            out.push(&r, false)?;
         }
         out.flush()?;
         let paths = std::fs::read_to_string(idx.dir().join("paths.jsonl"))?;

@@ -291,7 +291,7 @@ impl<'a> Insights<'a> {
             if top_w / f64::from(f.lines) >= SOLO_SHARE {
                 solo += u64::from(f.lines);
             }
-            if self.last_seen[top_p] < self.now - STALE_SECS {
+            if self.last_seen[top_p] < self.now.saturating_sub(STALE_SECS) {
                 stale += u64::from(f.lines);
             }
         }

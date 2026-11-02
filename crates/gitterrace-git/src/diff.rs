@@ -61,17 +61,7 @@ pub(crate) fn changes_with(
     cache: &mut gix::diff::blob::Platform,
 ) -> Result<Vec<FileDiff>> {
     let new_tree = commit.tree().map_err(git)?;
-    let old_tree = match commit.parent_ids().next() {
-        Some(parent) => Some(
-            parent
-                .object()
-                .and_then(gix::Object::peel_to_commit)
-                .map_err(git)?
-                .tree()
-                .map_err(git)?,
-        ),
-        None => None,
-    };
+    let old_tree = first_parent_tree(repo, commit)?;
     let empty = repo.empty_tree();
     let old = old_tree.as_ref().unwrap_or(&empty);
     let opts = gix::diff::Options::default().with_rewrites(Some(gix::diff::Rewrites::default()));
@@ -99,6 +89,36 @@ pub(crate) fn changes_with(
     Ok(out)
 }
 
+/// Tree of the first parent, `None` for a root. A shallow clone's boundary commit is a root
+/// too: its parents are not in the object store, and git shows it as adding every file. Any
+/// other missing parent is an error, so the indexer retries the commit instead of caching it.
+fn first_parent_tree<'r>(
+    repo: &'r gix::Repository,
+    commit: &gix::Commit<'r>,
+) -> Result<Option<gix::Tree<'r>>> {
+    let Some(parent) = commit.parent_ids().next() else {
+        return Ok(None);
+    };
+    if is_shallow_boundary(repo, commit.id) {
+        return Ok(None);
+    }
+    let tree = parent
+        .object()
+        .and_then(gix::Object::peel_to_commit)
+        .map_err(git)?
+        .tree()
+        .map_err(git)?;
+    Ok(Some(tree))
+}
+
+/// Whether `id` is listed in the repository's shallow file.
+pub(crate) fn is_shallow_boundary(repo: &gix::Repository, id: gix::ObjectId) -> bool {
+    repo.shallow_commits()
+        .ok()
+        .flatten()
+        .is_some_and(|ids| ids.iter().any(|s| *s == id))
+}
+
 /// The `index`th file of [`changes`] with hunks, diffing only that one file's blobs.
 pub(crate) fn change_at(
     repo: &gix::Repository,
@@ -107,17 +127,7 @@ pub(crate) fn change_at(
     text_limit: u64,
 ) -> Result<Option<FileDiff>> {
     let new_tree = commit.tree().map_err(git)?;
-    let old_tree = match commit.parent_ids().next() {
-        Some(parent) => Some(
-            parent
-                .object()
-                .and_then(gix::Object::peel_to_commit)
-                .map_err(git)?
-                .tree()
-                .map_err(git)?,
-        ),
-        None => None,
-    };
+    let old_tree = first_parent_tree(repo, commit)?;
     let opts = gix::diff::Options::default().with_rewrites(Some(gix::diff::Rewrites::default()));
     let raw = repo
         .diff_tree_to_tree(old_tree.as_ref(), Some(&new_tree), opts)

@@ -5,7 +5,7 @@
 use gitterrace_git::civil_from_days as civil;
 
 use crate::CommitRecord;
-use crate::insights::{Period, days_from_civil, format_date, local_day, weekday};
+use crate::insights::{Period, days_from_civil, format_date, local_day, reference_record, weekday};
 
 /// Longest `All` span, in days, that still reads best as one bar per day (60 bars).
 const ALL_DAYS_MAX: i64 = 60;
@@ -15,6 +15,9 @@ const ALL_WEEKS_MAX: i64 = 420;
 const ALL_MONTHS_MAX: i64 = 1_800;
 /// Longest `All` span shown per quarter (60 bars).
 const ALL_QUARTERS_MAX: i64 = 5_460;
+/// Most buckets any axis holds, whatever the dates say. Past it the oldest buckets are dropped:
+/// the newest stretch is the one a reader looks for.
+pub const MAX_BUCKETS: usize = 400;
 
 const WEEKDAYS: [&str; 7] = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const MONTHS: [&str; 12] = [
@@ -110,11 +113,11 @@ impl TimeAxis {
     pub fn for_period(period: Option<Period>, first: i64, last: i64) -> Self {
         let first = period
             .and_then(Period::days)
-            .map_or(first, |d| last + 1 - d);
+            .map_or(first, |d| last.saturating_add(1).saturating_sub(d));
         if last < first {
             return Self::empty();
         }
-        let span = last - first + 1;
+        let span = last.saturating_sub(first).saturating_add(1);
         let unit = match period {
             Some(Period::Week | Period::Month) => BucketUnit::Day,
             Some(Period::Quarter | Period::Year) => BucketUnit::Week,
@@ -128,11 +131,24 @@ impl TimeAxis {
             .find(|(max, _)| span <= *max)
             .map_or(BucketUnit::Year, |(_, unit)| unit),
         };
+        // Bound the walk before it starts: no record date may size the loop.
+        let widest: i64 = match unit {
+            BucketUnit::Day => 1,
+            BucketUnit::Week => 7,
+            BucketUnit::Month => 31,
+            BucketUnit::Quarter => 92,
+            BucketUnit::Year => 366,
+        };
+        let room = i64::try_from(MAX_BUCKETS).map_or(i64::MAX, |n| n.saturating_add(1));
+        let floor = last.saturating_sub(widest.saturating_mul(room));
         let mut starts = Vec::new();
-        let mut at = unit.start(first);
+        let mut at = unit.start(first.max(floor));
         while at <= last {
             starts.push(at);
             at = unit.next(at);
+        }
+        if starts.len() > MAX_BUCKETS {
+            starts.drain(..starts.len() - MAX_BUCKETS);
         }
         Self { unit, starts }
     }
@@ -141,13 +157,10 @@ impl TimeAxis {
     /// record of `all` (the reference of the period filter); `All` spans `shown`.
     pub fn covering(period: Option<Period>, all: &[CommitRecord], shown: &[CommitRecord]) -> Self {
         if period.is_some_and(|p| p != Period::All) {
-            return all
-                .iter()
-                .max_by_key(|r| r.time)
-                .map_or_else(Self::empty, |r| {
-                    let last = local_day(r);
-                    Self::for_period(period, last, last)
-                });
+            return reference_record(all).map_or_else(Self::empty, |r| {
+                let last = local_day(r);
+                Self::for_period(period, last, last)
+            });
         }
         let days = || shown.iter().map(local_day);
         match (days().min(), days().max()) {

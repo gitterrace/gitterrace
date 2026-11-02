@@ -31,7 +31,7 @@ use gitterrace_git::{IgnoreSet, civil_from_days as civil};
 use crate::{CommitRecord, FileStat};
 use fasthash::FastMap;
 
-pub use axis::{BucketUnit, TimeAxis};
+pub use axis::{BucketUnit, MAX_BUCKETS, TimeAxis};
 pub use code::{Frequency, Rework, ReworkPoint, rework_share, rework_verdict};
 pub use compare::{Comparison, LangDelta};
 pub use files::{
@@ -102,7 +102,7 @@ pub struct Insights<'a> {
     pub(crate) person: Vec<usize>,
     /// Newest commit time per person (all commits, bots included).
     pub(crate) last_seen: Vec<i64>,
-    /// Newest commit time overall: "now" for periods, so old repositories still show data.
+    /// [`crate::reference_time`]: "now" for periods, so old repositories still show data.
     pub(crate) now: i64,
     /// Per record, per file: whether path statistics leave the file out. Built on first use and
     /// decided once per distinct path, so no hot loop asks the filter (or its lock) again.
@@ -126,7 +126,7 @@ impl<'a> Insights<'a> {
         for (r, p) in records.iter().zip(&person) {
             last_seen[*p] = last_seen[*p].max(r.time);
         }
-        let now = records.iter().map(|r| r.time).max().unwrap_or(0);
+        let now = crate::reference_time(records);
         let filter = PathFilter::new(&opts, ignore);
         Self {
             records,
@@ -205,7 +205,7 @@ impl<'a> Insights<'a> {
     /// Buckets for a time chart of `period` (`None` and `All` span the records).
     pub(crate) fn axis(&self, period: Option<Period>) -> TimeAxis {
         let days = || self.records.iter().map(local_day);
-        let newest = self.records.iter().max_by_key(|r| r.time).map(local_day);
+        let newest = reference_record(self.records).map(local_day);
         match (days().min(), newest) {
             (Some(first), Some(last)) => TimeAxis::for_period(period, first, last),
             _ => TimeAxis::for_period(period, 1, 0),
@@ -276,8 +276,18 @@ impl SkipTable {
     }
 }
 
+/// The record that sets [`crate::reference_time`]: fixed-period axes end on its local day.
+pub(crate) fn reference_record(records: &[CommitRecord]) -> Option<&CommitRecord> {
+    let now = crate::reference_time(records);
+    records
+        .iter()
+        .filter(|r| r.time <= now)
+        .max_by_key(|r| r.time)
+        .or_else(|| records.iter().min_by_key(|r| r.time))
+}
+
 pub(crate) fn local_time(r: &CommitRecord) -> i64 {
-    r.time + i64::from(r.offset)
+    r.time.saturating_add(i64::from(r.offset))
 }
 
 pub(crate) fn local_day(r: &CommitRecord) -> i64 {

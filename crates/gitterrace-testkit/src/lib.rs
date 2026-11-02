@@ -7,11 +7,12 @@
 mod fixture;
 mod web;
 
+use std::io::Write;
 use std::path::Path;
-use std::process::Command;
+use std::process::{Command, Stdio};
 use std::sync::OnceLock;
 
-pub use fixture::Fixture;
+pub use fixture::{Adversarial, FAR_FUTURE, Fixture};
 pub use gitterrace_config::DEFAULT_ADDR;
 pub use web::get;
 
@@ -49,6 +50,15 @@ fn global_config() -> &'static Path {
 }
 
 fn try_run(dir: &Path, date: Option<&str>, args: &[&str]) -> Result<String, String> {
+    try_run_with(dir, date, args, None)
+}
+
+fn try_run_with(
+    dir: &Path,
+    date: Option<&str>,
+    args: &[&str],
+    stdin: Option<&[u8]>,
+) -> Result<String, String> {
     let mut cmd = Command::new("git");
     cmd.args(args)
         .current_dir(dir)
@@ -57,7 +67,24 @@ fn try_run(dir: &Path, date: Option<&str>, args: &[&str]) -> Result<String, Stri
     if let Some(d) = date {
         cmd.env("GIT_AUTHOR_DATE", d).env("GIT_COMMITTER_DATE", d);
     }
-    let out = cmd.output().expect("run git");
+    let out = match stdin {
+        None => cmd.output().expect("run git"),
+        Some(input) => {
+            let mut child = cmd
+                .stdin(Stdio::piped())
+                .stdout(Stdio::piped())
+                .stderr(Stdio::piped())
+                .spawn()
+                .expect("run git");
+            child
+                .stdin
+                .take()
+                .expect("stdin")
+                .write_all(input)
+                .expect("write stdin");
+            child.wait_with_output().expect("wait git")
+        }
+    };
     if out.status.success() {
         Ok(String::from_utf8_lossy(&out.stdout).trim().to_owned())
     } else {
@@ -82,4 +109,9 @@ pub fn git(dir: &Path, args: &[&str]) -> String {
 /// [`git`] with author and committer date pinned to `date` (RFC 3339).
 pub fn git_at(dir: &Path, date: &str, args: &[&str]) -> String {
     run(dir, Some(date), args)
+}
+
+/// [`git`] with `input` on stdin, for plumbing such as `hash-object --stdin` and `mktree`.
+pub fn git_stdin(dir: &Path, args: &[&str], input: &[u8]) -> String {
+    try_run_with(dir, None, args, Some(input)).unwrap_or_else(|e| panic!("git {args:?}: {e}"))
 }

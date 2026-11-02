@@ -71,11 +71,12 @@ color the year card.
 | File | Holds |
 | --- | --- |
 | `VERSION` | The cache format. A mismatch deletes the cache and rebuilds it. The format is never migrated. |
-| `commits.jsonl` | One record per commit, appended as the history is walked. Unreachable records are ignored, so rewritten history needs no cleanup, and a torn last line is dropped. |
+| `commits.jsonl` | One record per commit, appended as the history is walked, with authors as written: the .mailmap of the revision shown is applied on read. Unreachable records are ignored, so rewritten history needs no cleanup, and a torn last line is dropped. A commit that cannot be read is not stored, so the next update retries it. |
 | `paths.jsonl` | Every file path any record mentions, one JSON string per line. Records refer to a path by its line number, so a path is stored once however many commits touch it. |
+| `lock` | Empty. Held locked by whichever process is adding records, so two processes on one repository take turns instead of mixing up path numbers. |
 | `lines.json` | Line counts per blob id for the language chart. A blob never changes, so the counts never go stale. |
 
-The format version is `3`.
+The format version is `4`.
 
 <!-- END GENERATED: cache -->
 

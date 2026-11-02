@@ -7,10 +7,11 @@ use std::sync::Arc;
 use crate::{CodeStat, CommitRecord, FileStat, cache};
 
 /// Cache format; a different one on disk discards the records.
-pub const FORMAT_VERSION: &str = "3";
+pub const FORMAT_VERSION: &str = "4";
 pub(crate) const VERSION_FILE: &str = "VERSION";
 pub(crate) const COMMITS_FILE: &str = "commits.jsonl";
 pub(crate) const PATHS_FILE: &str = "paths.jsonl";
+pub(crate) const LOCK_FILE: &str = "lock";
 
 #[expect(
     clippy::trivially_copy_pass_by_ref,
@@ -21,10 +22,15 @@ const fn is_zero(n: &u32) -> bool {
 }
 
 /// A record as stored: file paths are numbers into the paths file, so a path that thousands of
-/// commits touch is written once. `id` stays the first field, see [`stored_ids`].
+/// commits touch is written once. `id` stays the first field and `shallow` the second, see
+/// [`stored_ids`]. Author and e-mail are as written in the commit: the `.mailmap` is applied
+/// when records are read, so editing it never needs a rebuild.
 #[derive(serde::Serialize, serde::Deserialize)]
 struct Row {
     id: String,
+    /// Diffed as a root because the clone was shallow there; rebuilt after an unshallow.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    shallow: bool,
     author: String,
     email: String,
     time: i64,
@@ -271,25 +277,90 @@ pub(crate) fn file_len(dir: &Path) -> u64 {
 }
 
 const ID_PREFIX: &[u8] = b"{\"id\":\"";
+const SHALLOW_MARK: &[u8] = b"\",\"shallow\":true";
 
-/// Ids already stored, plus the valid prefix length. Reads each id from the line prefix
-/// without parsing the line; a line that is not a complete object is skipped as torn.
-pub(crate) fn stored_ids(dir: &Path) -> io::Result<(HashSet<String>, u64)> {
+/// What the commits file already holds, read from each line's prefix without parsing it.
+#[derive(Default)]
+pub(crate) struct Stored {
+    pub(crate) ids: HashSet<String>,
+    /// Ids whose newest row was diffed at a shallow boundary.
+    pub(crate) shallow: HashSet<String>,
+    /// Byte length of the valid prefix: a torn last line is cut there.
+    pub(crate) valid: u64,
+}
+
+impl Stored {
+    /// Of `ids`, those not stored, plus those stored as a shallow boundary that the clone no
+    /// longer has (`still_shallow` lists the current boundary): they need a fresh row.
+    pub(crate) fn todo<'a>(
+        &self,
+        ids: &'a [String],
+        still_shallow: &HashSet<String>,
+    ) -> Vec<&'a String> {
+        let mut seen = HashSet::new();
+        ids.iter()
+            .filter(|id| {
+                let fresh = !self.ids.contains(*id)
+                    || (self.shallow.contains(*id) && !still_shallow.contains(*id));
+                fresh && seen.insert(id.as_str())
+            })
+            .collect()
+    }
+}
+
+/// Ids already stored, which of them are shallow-boundary rows, and the valid prefix length.
+/// A line that is not a complete object is skipped as torn.
+pub(crate) fn stored_ids(dir: &Path) -> io::Result<Stored> {
     check_readable(dir)?;
     let Some(bytes) = cache::read(dir, COMMITS_FILE)? else {
-        return Ok((HashSet::new(), 0));
+        return Ok(Stored::default());
     };
     let end = bytes.iter().rposition(|&b| b == b'\n').map_or(0, |i| i + 1);
-    let ids = bytes[..end]
-        .split(|&b| b == b'\n')
-        .filter(|l| l.ends_with(b"}") && l.starts_with(ID_PREFIX))
-        .filter_map(|l| {
-            let rest = &l[ID_PREFIX.len()..];
-            let n = rest.iter().position(|&b| b == b'"')?;
-            std::str::from_utf8(&rest[..n]).ok().map(str::to_owned)
-        })
-        .collect();
-    Ok((ids, end as u64))
+    let mut out = Stored {
+        valid: end as u64,
+        ..Stored::default()
+    };
+    for l in bytes[..end].split(|&b| b == b'\n') {
+        if !(l.ends_with(b"}") && l.starts_with(ID_PREFIX)) {
+            continue;
+        }
+        let rest = &l[ID_PREFIX.len()..];
+        let Some(n) = rest.iter().position(|&b| b == b'"') else {
+            continue;
+        };
+        let Ok(id) = std::str::from_utf8(&rest[..n]) else {
+            continue;
+        };
+        // Rows for one id are read in file order and the last one counts, as in `select`.
+        if rest[n..].starts_with(SHALLOW_MARK) {
+            out.shallow.insert(id.to_owned());
+        } else {
+            out.shallow.remove(id);
+        }
+        out.ids.insert(id.to_owned());
+    }
+    Ok(out)
+}
+
+/// Holds the cache's writer lock until dropped. Every writer, in this process or another
+/// (`serve` beside `mcp`), takes it before reading what is stored and before the appender cuts
+/// a torn tail, so two writers never hand out the same path id or cut each other's rows.
+pub(crate) struct WriteLock(File);
+
+impl WriteLock {
+    /// Blocks until no other writer holds the lock.
+    pub(crate) fn take(dir: &Path) -> io::Result<Self> {
+        let file = cache::open_append(dir, LOCK_FILE)?;
+        file.lock()?;
+        Ok(Self(file))
+    }
+}
+
+impl Drop for WriteLock {
+    fn drop(&mut self) {
+        // Closing the handle releases the lock too; unlocking first only makes it prompt.
+        drop(self.0.unlock());
+    }
 }
 
 /// Appends records, first cutting any torn tail at `valid` bytes. New paths reach the paths
@@ -344,7 +415,8 @@ impl Appender {
         Ok(id)
     }
 
-    pub(crate) fn push(&mut self, record: &CommitRecord) -> io::Result<()> {
+    /// Appends `record`; `shallow` marks a commit diffed at a shallow boundary.
+    pub(crate) fn push(&mut self, record: &CommitRecord, shallow: bool) -> io::Result<()> {
         let mut files = Vec::with_capacity(record.files.len());
         for f in &record.files {
             files.push(FileRow {
@@ -363,6 +435,7 @@ impl Appender {
         }
         let row = Row {
             id: record.id.clone(),
+            shallow,
             author: record.author.clone(),
             email: record.email.clone(),
             time: record.time,
@@ -393,11 +466,12 @@ impl Appender {
     }
 }
 
-/// Stored records in `order`, skipping ids not stored and duplicates (first wins).
+/// Stored records in `order`, skipping ids not stored. Of several rows for one id the last
+/// wins: a shallow-boundary row is superseded by the one rebuilt after an unshallow.
 pub(crate) fn select(records: Vec<CommitRecord>, order: &[String]) -> Vec<CommitRecord> {
     let mut by_id: HashMap<String, CommitRecord> = HashMap::with_capacity(records.len());
     for r in records {
-        by_id.entry(r.id.clone()).or_insert(r);
+        by_id.insert(r.id.clone(), r);
     }
     order.iter().filter_map(|id| by_id.remove(id)).collect()
 }

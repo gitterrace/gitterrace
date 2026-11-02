@@ -40,8 +40,11 @@ impl Period {
     /// `[from, to)` in epoch seconds with `now` the newest commit. `All` starts at `i64::MIN`.
     pub const fn window(self, now: i64) -> (i64, i64) {
         match self.days() {
-            Some(d) => (now + 1 - d * DAY, now + 1),
-            None => (i64::MIN, now + 1),
+            Some(d) => (
+                now.saturating_add(1).saturating_sub(d * DAY),
+                now.saturating_add(1),
+            ),
+            None => (i64::MIN, now.saturating_add(1)),
         }
     }
 }
@@ -178,7 +181,7 @@ impl Insights<'_> {
                 p.additions += u64::from(l.add);
                 p.deletions += u64::from(l.del);
             }
-            let local = r.time + i64::from(r.offset);
+            let local = crate::insights::local_time(r);
             let wd = weekday(day);
             let hour = usize::try_from(local.rem_euclid(DAY) / 3600).unwrap_or(0);
             punch[wd][hour] += 1;
