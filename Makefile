@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: app-icon build install run fmt clippy lint test doc theme actions docs-gen docs-check names check site-render site-shots help bench bench-large bench-report bench-clean bench-guard browser-check site deploy stage shipped domains send-vectors preview
+.PHONY: app-icon build install fmt clippy lint test doc theme actions docs-gen docs-check names lines check site-render site-shots help bench bench-report bench-guard memory-check browser-check site deploy shipped domains send-vectors preview gc gc-guard
 
 ## build: Release binary
 build:
@@ -57,10 +57,29 @@ docs-check:
 names:
 	python3 scripts/names-check.py
 
-## check: Every gate
-check: theme actions send-vectors names bench-guard docs-check fmt clippy lint test doc
+#: lines: Source files stay under 600 lines, comments carry no process labels
+lines:
+	python3 scripts/lines-check.py
 
-## send-vectors: Check send.js against the shared send vectors
+## gc: Prune cargo units and site-shots/app-icon output unused for DAYS (default 7). DRY=1 only reports, BENCH=1 also removes the cached benchmark clones
+gc:
+	python3 scripts/target-run.py --days $(or $(DAYS),7) $(if $(filter 1,$(DRY)),--dry-run)
+	@if [ "$(BENCH)" = 1 ]; then \
+		d="$${GITTERRACE_BENCH_DIR:-$$HOME/.cache/gitterrace-bench}"; \
+		if [ ! -d "$$d" ]; then echo "no benchmark clones at $$d"; \
+		elif [ "$(DRY)" = 1 ]; then echo "would remove $$d ($$(du -sh "$$d" | cut -f1))"; \
+		else echo "removing $$d ($$(du -sh "$$d" | cut -f1))"; rm -rf "$$d"; fi; \
+	fi
+
+#: gc-guard: Daily silent gc, then the gc self-test on a fixture tree (part of check)
+gc-guard:
+	@python3 scripts/target-run.py --auto
+	@python3 scripts/target-run.py --self-test
+
+## check: Every gate (fmt, clippy, lint, test, doc, theme, actions, send-vectors, names, docs-check, gc-guard, bench-guard)
+check: gc-guard theme actions send-vectors names lines bench-guard docs-check fmt clippy lint test doc
+
+#: send-vectors: Check send.js against the shared send vectors
 send-vectors:
 	node scripts/send-vectors-check.mjs
 
@@ -105,7 +124,7 @@ bench-guard:
 browser-check:
 	node scripts/browser-check.mjs $(if $(BIN),--bin $(BIN))
 
-## site: Refuse to publish install lines before the repository, tap and release tag answer
+#: site: Refuse to publish install lines before the repository, tap and release tag answer
 site: docs-check
 	python3 scripts/site-check.py release
 

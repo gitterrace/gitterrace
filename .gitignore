@@ -9,3 +9,7 @@
 # Vale: `vale sync` downloads proselint into styles/. Only styles/gitterrace is ours.
 /styles/*
 !/styles/gitterrace/
+.DS_Store
+
+# Failure dumps from the equivalence oracle (debug output, never committed)
+*.actual/
