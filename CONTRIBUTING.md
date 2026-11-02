@@ -78,6 +78,8 @@ gitterrace.dev is generated into `site/` and shipped from a maintainer's machine
 1. Bump `SECURITY_TXT_EXPIRES` in `xtask/src/site.rs`, `make docs-gen`, commit.
 2. Tag and push. The release workflow builds the binaries, the installer and the formula.
 3. `make deploy` (it refuses until the tag, repository and tap answer), then `make domains`.
+   Before the tag, repository and tap exist, `make deploy` cannot run. `make stage` deploys
+   without that check and is only for that window; delete it in the commit that publishes.
 4. Refresh the demo from [gitterrace/demo](https://github.com/gitterrace/demo): `make deploy`
    there.
 

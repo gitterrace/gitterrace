@@ -35,7 +35,7 @@ Rust 1.96 or newer.
 ```bash
 curl -fsSL https://gitterrace.dev/install.sh | sh
 brew install gitterrace/tap/gitterrace
-cargo install --git https://github.com/gitterrace/gitterrace gitterrace
+cargo install --locked --git https://github.com/gitterrace/gitterrace gitterrace
 ```
 
 Installs `git-terrace`; git runs it as `git terrace`.

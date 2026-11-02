@@ -9,6 +9,9 @@ description = "A local, read-only git browser: code, history and insights, offli
 homepage = "https://gitterrace.dev"
 keywords = ["git", "browser", "insights", "repository", "offline"]
 categories = ["command-line-utilities", "development-tools"]
+# Ships as release binaries, the Homebrew tap and `cargo install --git`, not crates.io:
+# the binary needs eight workspace crates that are not published either.
+publish = false
 
 [package.metadata.dist]
 dist = true

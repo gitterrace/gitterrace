@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Website checks (stdlib only): `make site-release` before a deploy, `make domains` any time.
+"""Website checks (stdlib only): `make site` before a deploy, `make domains` any time.
 
 release: the page tells people to `brew install` from the tap and `cargo install` from the
   repository. Deploying that before both answer publishes an install line that fails, so the

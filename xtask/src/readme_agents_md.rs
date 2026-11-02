@@ -118,7 +118,11 @@ pub fn install_md(ws: &Workspace) -> String {
         if let Some(tap) = tap {
             let _ = writeln!(install, "brew install {tap}/{}", p.name);
         }
-        let _ = writeln!(install, "cargo install --git {} {}", p.repository, p.name);
+        let _ = writeln!(
+            install,
+            "cargo install --locked --git {} {}",
+            p.repository, p.name
+        );
         install.push_str("```\n\n");
         let names: Vec<String> = p.bins.iter().map(|b| format!("`{b}`")).collect();
         let _ = writeln!(
