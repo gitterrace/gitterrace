@@ -10,7 +10,9 @@
   var meta = document.querySelector('meta[name="gt-base"]');
   var B = meta ? meta.content : "";
   function local(p) { return B && p.indexOf(B + "/") === 0 ? p.slice(B.length) : p; }
-  var open = null;
+  // The one record of which overlay is open, shared by every script that opens one; key
+  // handlers read it instead of their own copies. `name` labels it, `back` is its backdrop.
+  var ov = window.gtOverlay = window.gtOverlay || { name: null, back: null };
 
   function el(tag, cls, text) {
     var e = document.createElement(tag);
@@ -54,11 +56,11 @@
     back.appendChild(box);
     back.addEventListener("mousedown", function (e) { if (e.target === back) closeOverlay(); });
     document.body.appendChild(back);
-    open = back;
+    ov.name = cls; ov.back = back;
     return box;
   }
   function closeOverlay() {
-    if (open) { open.remove(); open = null; }
+    if (ov.back && ov.name !== "actmenu") { ov.back.remove(); ov.name = ov.back = null; }
     var rb = document.getElementById("refbtn");
     if (rb) rb.setAttribute("aria-expanded", "false");
   }
@@ -280,17 +282,23 @@
   }
 
   // ---- keys ---------------------------------------------------------------
+  // Single page keys: g, t, /, y, b, ?, j, k, Enter. RESERVED_KEYS in the actions config
+  // refuses the letters among them as action keys; a test pins the two lists together.
   var chord = false, chordTimer = null;
   var goto = { c: B + "/", i: B + "/stats", b: B + "/refs", l: B + "/log/" + revEnc, s: B + "/search" };
   document.addEventListener("keydown", function (e) {
     if (e.metaKey || e.ctrlKey || e.altKey) return;
     if (e.key === "Escape") { closeOverlay(); if (typing(e.target)) e.target.blur(); return; }
-    if (typing(e.target) || open) return;
+    // actions.js handles its "a" chord in the capture phase and marks the key handled; the
+    // action menu is its own overlay.
+    if (typing(e.target) || ov.name || e.defaultPrevented) return;
     var k = e.key;
     if (chord) {
       chord = false;
       clearTimeout(chordTimer);
-      if (goto[k]) { location.href = goto[k]; e.preventDefault(); }
+      // The second key belongs to the chord even with no target, so "g a" never arms "a".
+      e.preventDefault();
+      if (goto[k]) location.href = goto[k];
       return;
     }
     if (k === "g") { chord = true; chordTimer = setTimeout(function () { chord = false; }, 1200); }

@@ -201,8 +201,9 @@
 
   // ---- the menu -------------------------------------------------------------
   var menu = null;
+  var ov = window.gtOverlay = window.gtOverlay || { name: null, back: null };
   function closeMenu() {
-    if (menu) { menu.back.remove(); if (menu.from) menu.from.focus(); menu = null; }
+    if (menu) { menu.back.remove(); if (menu.from) menu.from.focus(); menu = null; ov.name = ov.back = null; }
   }
   // The button that opened the action menu: the menu closes on a copy, so the opener is what
   // stays on screen to flash. Null when the menu was opened by keyboard with no anchor.
@@ -275,6 +276,7 @@
     box.style.left = Math.max(8, Math.min(r.left, window.innerWidth - 300)) + "px";
     box.style.top = Math.min(r.bottom + 6, window.innerHeight - 200) + "px";
     menu = { back: back, from: anchor };
+    ov.name = "actmenu"; ov.back = back;
     focus(0);
   }
 
@@ -363,7 +365,7 @@
   window.addEventListener("scroll", function () { if (!markBtn.hidden) placeMark(); }, { passive: true });
 
   document.addEventListener("keydown", function (e) {
-    if (e.key !== "." || e.metaKey || e.ctrlKey || e.altKey || menu) return;
+    if (e.key !== "." || e.metaKey || e.ctrlKey || e.altKey || ov.name) return;
     var t = e.target;
     if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return;
     var anchor = (!markBtn.hidden && markBtn) || document.getElementById("actsel") || document.querySelector(".actbtn.top");
@@ -372,26 +374,31 @@
     e.preventDefault();
   });
 
-  // Chords: "a" then an action's key runs it from the page, no menu. The loader has already
-  // refused keys that clash with the menu's own or with each other; "a" as prefix keeps the
-  // chord clear of the page keys (g, t, /, y, b, j, k, ?).
-  var armed = false, armTimer = null;
+  // Chords: "a" then an action's key runs it from the page, no menu. The loader refuses keys
+  // that clash with the menu's, the page's or each other. This listener runs in the capture
+  // phase and marks the armed second key handled, so nav.js never also acts on it; the arming
+  // "a" is skipped when nav.js already took it as the second key of its own "g" chord.
+  var armed = false, armTimer = null, navChord = false, navTimer = null;
   function disarm() { armed = false; clearTimeout(armTimer); }
   document.addEventListener("keydown", function (e) {
-    if (e.metaKey || e.ctrlKey || e.altKey || menu) return;
+    if (e.metaKey || e.ctrlKey || e.altKey || ov.name) return;
     var t = e.target;
     if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT" || t.isContentEditable)) return;
     if (armed) {
       disarm();
+      e.preventDefault();
       var tg = current();
       var hit = mine.filter(function (a) { return a.key === e.key && a.kinds.indexOf(tg.kind) >= 0; })[0];
-      if (hit) { run(hit, tg, e, null); e.preventDefault(); }
+      if (hit) run(hit, tg, e, null);
       return;
     }
+    // nav.js's "g" chord takes the next key, whatever it is; mirror its window here.
+    if (navChord) { navChord = false; clearTimeout(navTimer); return; }
+    if (e.key === "g") { navChord = true; navTimer = setTimeout(function () { navChord = false; }, 1200); return; }
     if (e.key === "a" && token && mine.some(function (a) { return a.key; })) {
       armed = true;
       armTimer = setTimeout(disarm, 1200);
       toast("a, then " + mine.filter(function (a) { return a.key; }).map(function (a) { return a.key + " " + a.label; }).join(", "));
     }
-  });
+  }, true);
 })();

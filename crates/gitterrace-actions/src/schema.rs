@@ -430,7 +430,7 @@ pub const ACTION_KEYS: [Item; 14] = [
         "string",
         false,
         "",
-        "One letter or digit: a shortcut inside the menu, and on the page press `a` then the key (`a t`). Not `p`, `m` or `s`, and unique among actions; either is a load error.",
+        "One letter or digit: a shortcut inside the menu, and on the page press `a` then the key (`a n`). Not a menu key (`p`, `m`, `s`) or a page key (`g`, `t`, `y`, `b`, `j`, `k`), and unique among actions. Either is a load error.",
     ),
     item(
         "env",

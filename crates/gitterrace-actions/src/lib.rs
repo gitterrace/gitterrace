@@ -15,7 +15,7 @@ pub mod schema;
 pub mod send;
 pub mod token;
 
-pub use config::{Action, Config, ConfigError, Cwd, Kind, Output, Reloader};
+pub use config::{Action, Config, ConfigError, Cwd, Kind, Output, RESERVED_KEYS, Reloader};
 pub use link::{Link, LinkError, LinkStyle, styled};
 pub use payload::{Lines, Locator, Payload, PayloadError, RunRequest, permalink};
 pub use runner::{Limits, Outcome, RunError, Runner};

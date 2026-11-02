@@ -104,7 +104,7 @@ label   = "Add to tendir"
 enabled = false
 kinds   = ["line", "hunk", "commit", "blame", "page"]
 command = ["tendir", "add", "--notes", "{markdown}", "--", "{title}"]
-key     = "t"
+key     = "n"
 
 # Posts the payload as JSON to a webhook of yours. Set `url` in `vars`.
 [[action]]

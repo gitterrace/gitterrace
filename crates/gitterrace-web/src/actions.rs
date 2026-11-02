@@ -508,6 +508,36 @@ pub(crate) mod actions_tests {
     use std::os::unix::fs::PermissionsExt;
     use std::path::Path;
 
+    /// The letters `nav.js` binds as single page keys are exactly the page keys the actions
+    /// loader refuses, so an action key never also fires a page command.
+    #[test]
+    fn reserved_keys_match_nav_js() {
+        let nav = include_str!("../static/nav.js");
+        let mut bound: Vec<char> = nav
+            .split("k === \"")
+            .skip(1)
+            .filter_map(|s| s.split('"').next())
+            .filter_map(|k| {
+                let mut c = k.chars();
+                c.next()
+                    .filter(|ch| ch.is_ascii_alphanumeric() && c.next().is_none())
+            })
+            .collect();
+        bound.sort_unstable();
+        bound.dedup();
+        let mut reserved: Vec<char> = gitterrace_actions::RESERVED_KEYS
+            .iter()
+            .filter(|(_, who)| who.starts_with("the page's"))
+            .map(|(k, _)| *k)
+            .collect();
+        reserved.sort_unstable();
+        assert!(bound.len() >= 6, "nav.js key table not found: {bound:?}");
+        assert_eq!(
+            bound, reserved,
+            "nav.js page keys and RESERVED_KEYS drifted"
+        );
+    }
+
     /// A shell action that records its stdin and environment next to the config, then
     /// prints a first line. Placeholder `{dir}` is the config folder.
     pub(crate) const ECHO: &str = r#"version = 1

@@ -115,13 +115,15 @@ pub enum Output {
 ///
 /// `argv` is a template: element 0 is a resolved, literal program and
 /// every other element is expanded on its own, so a value is always exactly one argument and
-/// never reaches a shell.
+/// never reaches a shell. A `shell` action's argv is `/bin/sh -c <script>`, passed verbatim:
+/// its braces are shell text (`${HOME}`, awk's `{print}`), never placeholders.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Action {
     pub id: String,
     pub label: String,
     pub kinds: Vec<Kind>,
     pub argv: Vec<String>,
+    pub shell: bool,
     pub stdin: Stdin,
     pub cwd: Cwd,
     pub timeout: Duration,
@@ -249,10 +251,10 @@ impl Config {
             }
             if enabled {
                 if let Some(k) = action.key {
-                    if let Some(who) = BUILTIN_KEYS.iter().find(|(b, _)| *b == k) {
+                    if let Some(who) = RESERVED_KEYS.iter().find(|(b, _)| *b == k) {
                         return Err(invalid(
                             &action.id,
-                            format!("key {k:?} is already used by the built-in {}", who.1),
+                            format!("key {k:?} is already used by {}", who.1),
                         ));
                     }
                     if let Some(other) = actions.iter().find(|o: &&Action| o.key == Some(k)) {
@@ -510,6 +512,7 @@ fn validate(
         label: a.label,
         kinds: a.kinds,
         argv,
+        shell,
         stdin,
         cwd,
         timeout,
@@ -655,12 +658,20 @@ fn check_command(
     Ok(())
 }
 
-/// Keys the action menu already owns. An action key is also its chord on the page ("a" then
-/// the key), so one table gates both.
-const BUILTIN_KEYS: [(char, &str); 3] = [
-    ('p', "Copy permalink"),
-    ('m', "Copy as markdown"),
-    ('s', "Send to\u{2026}"),
+/// Keys an action may not take: the action menu's own, and every single key the page binds.
+///
+/// The page keys come from `nav.js`. An action key is both its menu key and its page chord ("a" then the key), and
+/// a page key would fire its page command too. A web test pins this table to `nav.js`.
+pub const RESERVED_KEYS: [(char, &str); 9] = [
+    ('p', "the menu's Copy permalink"),
+    ('m', "the menu's Copy as markdown"),
+    ('s', "the menu's Send to\u{2026}"),
+    ('g', "the page's go-to chord"),
+    ('t', "the page's Go to file"),
+    ('y', "the page's Permalink"),
+    ('b', "the page's Branches and tags"),
+    ('j', "the page's next row"),
+    ('k', "the page's previous row"),
 ];
 
 fn parse_key(key: Option<&str>) -> Result<Option<char>, &'static str> {
@@ -899,7 +910,7 @@ command = 'printf %s "$GITTERRACE_TITLE"'
         let clash = Config::parse(&two("x", "s"), Path::new("/")).expect_err("clash");
         let msg = clash.to_string();
         assert!(msg.contains("two") && msg.contains("Send to"), "{msg}");
-        assert!(Config::parse(&two("x", "y"), Path::new("/")).is_ok());
+        assert!(Config::parse(&two("x", "z"), Path::new("/")).is_ok());
     }
 
     #[test]
@@ -941,6 +952,18 @@ command = 'printf %s "$GITTERRACE_TITLE"'
         );
         let upper = GOOD.replace("id = \"echo\"", "id = \"Echo\"");
         assert!(Config::parse(&upper, Path::new("/")).is_err());
+    }
+
+    #[test]
+    fn page_and_menu_keys_are_refused_as_action_keys() {
+        for (k, who) in crate::config::RESERVED_KEYS {
+            let e = err(&format!("{HEAD}key = \"{k}\"\n"));
+            assert!(
+                e.contains(&format!("key '{k}' is already used by {who}")),
+                "{e}"
+            );
+        }
+        assert!(Config::parse(&format!("{HEAD}key = \"n\"\n"), Path::new("/")).is_ok());
     }
 
     fn err(text: &str) -> String {

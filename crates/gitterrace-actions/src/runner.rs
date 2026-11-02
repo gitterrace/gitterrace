@@ -143,7 +143,7 @@ impl Runner {
         let _slot = self.acquire(&action.id)?;
         let mut payload = payload.clone();
         payload.vars.clone_from(&action.vars);
-        let argv = expand(&action.argv, &payload)?;
+        let argv = spawn_argv(action, &payload)?;
         let stdin = match action.stdin {
             Stdin::Json => Some(serde_json::to_vec(&payload)?),
             Stdin::Markdown => Some(payload.markdown.clone().into_bytes()),
@@ -206,6 +206,16 @@ impl Runner {
             state: Arc::clone(&self.state),
             id: id.to_string(),
         })
+    }
+}
+
+/// The argv `run` spawns for `action`. A shell script is passed verbatim: its braces are shell
+/// text, and the loader has already refused placeholders in it.
+pub fn spawn_argv(action: &Action, payload: &Payload) -> Result<Vec<String>, RunError> {
+    if action.shell {
+        Ok(action.argv.clone())
+    } else {
+        expand(&action.argv, payload)
     }
 }
 
@@ -464,7 +474,7 @@ mod tests {
     use crate::config::{Action, Cwd, Kind, Output, Stdin};
     use crate::link::LinkStyle;
     use crate::payload::{Lines, Locator, Payload};
-    use crate::runner::{Limits, RunError, Runner};
+    use crate::runner::{Limits, RunError, Runner, spawn_argv};
 
     fn shell(id: &str, script: &str, timeout: Duration) -> Action {
         Action {
@@ -472,6 +482,7 @@ mod tests {
             label: id.into(),
             kinds: vec![Kind::Line, Kind::Commit],
             argv: vec!["/bin/sh".into(), "-c".into(), script.into()],
+            shell: true,
             stdin: Stdin::Json,
             cwd: Cwd::Repo,
             timeout,
@@ -507,6 +518,77 @@ mod tests {
         let (t, _) = crate::payload::tests::hostile_repo();
         let r = Repo::discover(t.path()).expect("open");
         (t, r)
+    }
+
+    /// Shell text with braces runs: the script reaches `sh` untouched.
+    #[test]
+    fn shell_braces_run_verbatim() {
+        let (_t, repo) = fixture();
+        let p = payload(&repo, Kind::Line);
+        let a = shell(
+            "b",
+            "cat >/dev/null; echo ${HOME} | awk '{print}'; f() { :; }; f",
+            Duration::from_secs(5),
+        );
+        let r = Runner::new(Limits::default())
+            .run(&a, &p, &repo.root())
+            .expect("run");
+        assert!(r.ok, "{r:?}");
+        assert_eq!(r.first_line, std::env::var("HOME").expect("HOME"));
+    }
+
+    /// Whatever the loader accepts, the runner builds an argv for: load and run never
+    /// disagree on the template rules. The corpus is the shipped starter's enabled entries, every
+    /// placeholder and modifier, and shell text full of braces.
+    #[test]
+    fn every_loaded_action_builds_its_argv() {
+        let (_t, repo) = fixture();
+        let corpus = [
+            crate::config::Config::STARTER.to_string(),
+            r#"version = 1
+[[action]]
+id = "awk"
+label = "Awk"
+kinds = ["line"]
+shell = true
+command = 'echo ${HOME} | awk "{print}"; f() { x; }; echo {{ }} {'
+
+[[action]]
+id = "all"
+label = "All"
+kinds = ["line", "commit"]
+command = ["/bin/echo", "x{{y}}", "--", "{title}", "{markdown}", "{text}", "{path}", "{line_start}", "{line_end}", "{sha}", "{url}", "{url:url}", "{repo}", "{root}", "{kind}", "{var.u}"]
+[action.vars]
+u = "https://x/{y}"
+
+[[script]]
+id = "s"
+shell = true
+command = 'printf "%s" "${GITTERRACE_TITLE}" | sed "s/{a}/b/"'
+
+[[action]]
+id = "uses"
+label = "Uses"
+kinds = ["page"]
+script = "s"
+"#
+            .to_string(),
+        ];
+        let mut n = 0;
+        for text in &corpus {
+            let c = crate::config::Config::parse(text, Path::new("/")).expect("corpus loads");
+            for kind in [Kind::Line, Kind::Commit] {
+                let mut p = payload(&repo, kind);
+                for a in &c.actions {
+                    p.vars.clone_from(&a.vars);
+                    let argv = spawn_argv(a, &p)
+                        .unwrap_or_else(|e| panic!("{} loads but does not run: {e}", a.id));
+                    assert_eq!(argv.len(), a.argv.len(), "{}", a.id);
+                    n += 1;
+                }
+            }
+        }
+        assert!(n >= 6, "corpus too small: {n}");
     }
 
     #[test]
@@ -761,6 +843,9 @@ mod tests {
             out.display()
         );
         let mut a = shell("rec", &script, Duration::from_secs(5));
+        // A recorder: `sh -c` only prints the template arguments it is handed, so this is an
+        // argv template action, and its arguments are expanded.
+        a.shell = false;
         a.argv.push("rec".into());
         a.argv.extend(args.iter().map(|s| (*s).to_string()));
         a.stdin = stdin;

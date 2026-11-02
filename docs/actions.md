@@ -165,7 +165,7 @@ label   = "Add to tendir"
 enabled = false
 kinds   = ["line", "hunk", "commit", "blame", "page"]
 command = ["tendir", "add", "--notes", "{markdown}", "--", "{title}"]
-key     = "t"
+key     = "n"
 
 # Posts the payload as JSON to a webhook of yours. Set `url` in `vars`.
 [[action]]
@@ -375,7 +375,7 @@ One menu entry. It runs either its own `command` or a `script`.
 | `output` | string | no | `toast` | `toast` shows the first output line, `ignore` shows failures only. |
 | `stdin` | string | no | `json` | As in a script. Overrides the script's. |
 | `shell` | boolean | no | `false` | As in a script. |
-| `key` | string | no |  | One letter or digit: a shortcut inside the menu, and on the page press `a` then the key (`a t`). Not `p`, `m` or `s`, and unique among actions; either is a load error. |
+| `key` | string | no |  | One letter or digit: a shortcut inside the menu, and on the page press `a` then the key (`a n`). Not a menu key (`p`, `m`, `s`) or a page key (`g`, `t`, `y`, `b`, `j`, `k`), and unique among actions. Either is a load error. |
 | `env` | array of strings | no | `[]` | Variables passed through from gitterrace's environment. `GITTERRACE_*` names are refused. |
 | `vars` | table of strings | no | `{}` | `[action.vars]`: fixed settings, lowercase names `[a-z0-9_]{1,32}`, at most 32, each value at most 4 KiB. They reach the script as `GITTERRACE_VAR_<NAME>`, as `payload.vars` and as `{var.<name>}` in `command`. |
 
