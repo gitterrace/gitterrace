@@ -49,6 +49,11 @@ async fn main() -> anyhow::Result<()> {
                 .map(|d| d.join("actions.toml"));
             let m = &loaded.config.multi;
             let repos = gitterrace_web::discover_repos(&cli.paths, m.depth, &m.skip_dirs);
+            if !loaded.config.server.public
+                && open::join_running(addr, &repos, gitterrace_web::state_dir().as_deref())
+            {
+                return Ok(());
+            }
             let watched = dir.as_ref().map(|d| gitterrace_web::Watched {
                 file: d.join("config.toml"),
                 load: Box::new(move || flags.load().map(|l| l.config)),

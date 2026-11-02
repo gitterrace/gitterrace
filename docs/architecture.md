@@ -50,13 +50,16 @@ color the year card.
 - **A running server grows, it is never replaced.** Every server keeps a repository table, so
   one started on a single repository keeps it at `/` and serves added ones under
   `/r/{name}/`, which keeps every link valid. `git terrace open` adds a repository the
-  server lacks through `POST /_repos` instead of starting a second server. That route
-  makes the server read a path it was not started with, so a browser can never reach it:
-  it exists only on a loopback bind, it refuses any `Origin` or `Sec-Fetch-Site`, and it
-  needs a per-process secret the server writes 0600 into the state folder. The path
-  must be canonical and a repository's top folder. An added repository gets what a
-  startup one does: its own refresher and warm-up, permalinks, actions and the switcher. A
-  repository holding `actions.toml` is refused, as at start.
+  server lacks through `POST /_repos` instead of starting a second server, and so does a
+  second `git terrace` on an address a gitterrace server already holds: it hands over its
+  repositories and exits 0. When the port holds a foreign program, the secret is missing or
+  the add is refused, it binds as usual and reports the address in use. `--public` never
+  joins. That route makes the server read a path it was not started with, so a browser can
+  never reach it: it exists only on a loopback bind, it refuses any `Origin` or
+  `Sec-Fetch-Site`, and it needs a per-process secret the server writes 0600 into the state
+  folder. The path must be canonical and a repository's top folder. An added repository gets
+  what a startup one does: its own refresher and warm-up, permalinks, actions and the
+  switcher. A repository holding `actions.toml` is refused, as at start.
 - **`gitterrace://` permalinks name what, not where.** `gitterrace://<repo-id>/<sha>/<path>`
   is the `/go` tuple without a host, so it works with no server running and on another
   machine. `git terrace open` finds the clone among repositories served before (recorded in

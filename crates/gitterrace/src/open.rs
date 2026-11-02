@@ -157,6 +157,36 @@ enum Listener {
     clippy::print_stderr,
     reason = "user-facing CLI output: this is the command's result or diagnostic, not a log line"
 )]
+/// A second `git terrace` on an address a local gitterrace server already holds hands its
+/// repositories to that server and exits, instead of failing to bind. True when it did; false
+/// leaves the caller to bind (and report) as usual.
+pub(crate) fn join_running(addr: SocketAddr, roots: &[PathBuf], state: Option<&Path>) -> bool {
+    let addr = loopback(addr);
+    if roots.is_empty() || identify(addr) != Listener::Gitterrace {
+        return false;
+    }
+    for root in roots {
+        let Ok(repo) = Repo::discover(root) else {
+            return false;
+        };
+        if let Err(why) = add_repo(addr, state, &repo.root()) {
+            eprintln!(
+                "gitterrace: the server on {addr} could not add {}: {why}",
+                root.display()
+            );
+            return false;
+        }
+    }
+    eprintln!(
+        "gitterrace: a server already runs on http://{addr}; added there, its switcher lists it"
+    );
+    true
+}
+
+#[expect(
+    clippy::print_stderr,
+    reason = "user-facing CLI output: this is the command's result or diagnostic, not a log line"
+)]
 /// The address of a server serving `clone`. A gitterrace server on the configured address that
 /// serves it is joined; one that does not is asked to add it (`POST /_repos` with the secret
 /// it wrote to `state`) and then joined. Only when that fails, or a foreign program holds the
@@ -387,7 +417,9 @@ mod tests {
     use gitterrace_git::Repo;
     use gitterrace_testkit::{Fixture, git};
 
-    use crate::open::{Listener, OpenError, ensure_server, identify, resolve, serves};
+    use crate::open::{
+        Listener, OpenError, ensure_server, identify, join_running, resolve, serves,
+    };
 
     /// A repository with `src/a.rs`; returns (root, id, HEAD).
     fn repo(dir: &Path) -> (std::path::PathBuf, String, String) {
@@ -590,5 +622,34 @@ mod tests {
         })
         .expect("fresh");
         assert_eq!((got, started), (free, vec![free]));
+    }
+
+    /// Guard class: a second `git terrace` on a held address ends up served there, never a
+    /// bind error, and only a local gitterrace server with its secret is joined.
+    #[test]
+    fn a_second_serve_joins_the_running_server() {
+        let tmp = tempfile::tempdir().expect("tmp");
+        let a = Fixture::standard(&tmp.path().join("a")).path().to_owned();
+        let b = Fixture::init(&tmp.path().join("b"))
+            .write("x", "other\n")
+            .commit("other root")
+            .path()
+            .to_owned();
+        let state = tmp.path().join("state");
+        let addr = free_addr();
+        assert!(!join_running(addr, std::slice::from_ref(&b), Some(&state)));
+        serve(vec![a], addr, Some(&state));
+        assert!(!join_running(addr, std::slice::from_ref(&b), None));
+        assert!(join_running(addr, std::slice::from_ref(&b), Some(&state)));
+        let r = Repo::discover(&b).expect("repo");
+        let probe = format!(
+            "/go/{}/{}",
+            r.id().expect("id"),
+            r.resolve("HEAD").expect("head")
+        );
+        assert!(serves(addr, &probe));
+        let foreign = TcpListener::bind("127.0.0.1:0").expect("bind");
+        let faddr = foreign.local_addr().expect("addr");
+        assert!(!join_running(faddr, &[b], Some(&state)));
     }
 }

@@ -341,6 +341,12 @@ fn features() -> String {
         "Actions.",
         gitterrace_actions::schema::ACTION_SUMMARY.to_owned(),
     );
+    line(
+        "Many repositories.",
+        "Run <code>git terrace</code> in another repository and it joins the server already \
+         running: one address, a switcher between them, and every link stays valid."
+            .to_owned(),
+    );
     let mut s = String::new();
     for (head, text) in rows {
         let _ = writeln!(s, "<li><b>{head}</b> {text}</li>");

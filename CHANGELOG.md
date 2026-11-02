@@ -19,7 +19,8 @@ First public release.
   is safe to serve beyond loopback, with `server.hosts` limiting which Host names answer
   and a 30 second cap per request.
 - `git terrace open` and `install-handler` for `gitterrace://` links. Opening joins a
-  running server and adds the repository to it.
+  running server and adds the repository to it. A second `git terrace` on the same
+  address does the same instead of failing to bind.
 - Windows builds.
 
 ### Fixed

@@ -52,7 +52,13 @@ Config lives in `%APPDATA%\gitterrace`, the repo registry in `%LOCALAPPDATA%\git
 ```bash
 cd path/to/any/git/repo
 git terrace          # serves on 127.0.0.1 and opens your browser
+cd ../another/repo
+git terrace          # joins the server already running, no second port
 ```
+
+Run `git terrace` in a second repository while one is served and it joins that server: the
+repository appears under `/r/<name>/` and in the switcher, and the command exits. This works
+for the same user on a loopback address. `--public` servers never take repositories this way.
 
 ## Commands
 
