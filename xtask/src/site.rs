@@ -338,7 +338,7 @@ fn gallery(root: &Path) -> Result<String> {
         let _ = writeln!(
             s,
             "<figure>{}<figcaption><b>{cap}.</b> {}</figcaption></figure>",
-            shot_html(root, name, alt)?,
+            shot_html(root, name, alt, cap)?,
             esc(alt.split_once(": ").map_or(alt, |(_, rest)| rest))
         );
     }
@@ -434,7 +434,11 @@ fn shot_files(root: &Path) -> Result<Vec<Out>> {
             "{SHOT_DIR}/{f} is not referenced: add it to SHOTS in xtask/src/site.rs or delete it"
         );
     }
-    want.into_iter()
+    // A WebP made by `make site-render` is copied along when it sits next to its PNG.
+    let webps = want.iter().map(|f| f.replace(".png", ".webp"));
+    want.iter()
+        .cloned()
+        .chain(webps.filter(|f| root.join(SHOT_DIR).join(f).exists()))
         .map(|f| {
             let path = format!("{SHOT_DIR}/{f}");
             let bytes =
@@ -454,9 +458,11 @@ fn shot_size(root: &Path, file: &str) -> Result<(u32, u32)> {
     Ok((w / 2, h / 2))
 }
 
-/// One shot as a tile that opens a full-size view. The view is a `:target` overlay, since the
-/// site CSP runs no script; clicking it goes back to `#features`.
-fn shot_html(root: &Path, name: &str, alt: &str) -> Result<String> {
+/// One shot as a tile link plus a full-size view, for the caller's single `<figure>`. The view
+/// is a `:target` overlay, since the site CSP runs no script; clicking it goes back to
+/// `#features`. Its image is a decorative copy (empty alt) so the description is read once,
+/// and `tabindex="-1"` lets the browser focus it when the fragment opens it.
+fn shot_html(root: &Path, name: &str, alt: &str, cap: &str) -> Result<String> {
     // Every tile is the same size so the rows line up; a different size fails generation.
     for c in ["light", "dark"] {
         let got = shot_size(root, &format!("{name}-{c}.png"))?;
@@ -467,18 +473,37 @@ fn shot_html(root: &Path, name: &str, alt: &str) -> Result<String> {
             got.1
         );
     }
-    let pic = |lazy: &str| {
+    // A WebP next to the PNG is offered first; only the source matching the colour scheme loads.
+    let source = |c: &str, media: &str| {
+        let base = format!("assets/screenshots/{name}-{c}");
+        let webp = root
+            .join(SHOT_DIR)
+            .join(format!("{name}-{c}.webp"))
+            .exists();
+        let mut s = String::new();
+        if webp {
+            let _ = write!(
+                s,
+                "<source{media} type=\"image/webp\" srcset=\"{base}.webp\">"
+            );
+        }
+        let _ = write!(s, "<source{media} srcset=\"{base}.png\">");
+        s
+    };
+    let pic = |alt: &str| {
         format!(
-            "<picture><source media=\"(prefers-color-scheme: dark)\" srcset=\"assets/screenshots/{name}-dark.png\">\
-             <img src=\"assets/screenshots/{name}-light.png\" alt=\"{a}\" width=\"1280\" height=\"800\"{lazy}></picture>",
-            a = esc(alt)
+            "<picture>{}{}<img src=\"assets/screenshots/{name}-light.png\" alt=\"{}\" width=\"1280\" height=\"800\" loading=\"lazy\"></picture>",
+            source("dark", " media=\"(prefers-color-scheme: dark)\""),
+            source("light", ""),
+            esc(alt)
         )
     };
     Ok(format!(
-        "<figure><a href=\"#shot-{name}\">{}</a></figure>\
-         <a class=\"lightbox\" id=\"shot-{name}\" href=\"#features\">{}</a>",
-        pic(" loading=\"lazy\""),
-        pic(" loading=\"lazy\"")
+        "<a href=\"#shot-{name}\">{}</a>\
+         <a class=\"lightbox\" id=\"shot-{name}\" href=\"#features\" aria-label=\"Close {}\" tabindex=\"-1\">{}</a>",
+        pic(alt),
+        esc(cap),
+        pic("")
     ))
 }
 
@@ -498,6 +523,19 @@ fn esc(s: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// One figure per shot, a picture inside it, and a lightbox that is labelled, takes focus
+    /// and does not announce its image twice.
+    #[test]
+    fn gallery_has_one_figure_per_shot_and_an_accessible_lightbox() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+        let g = gallery(&root).expect("gallery");
+        assert!(!g.contains("<figure><figure"), "nested figure");
+        assert_eq!(g.matches("<figure>").count(), SHOTS.len());
+        assert_eq!(g.matches("<picture>").count(), SHOTS.len() * 2);
+        assert_eq!(g.matches("tabindex=\"-1\"").count(), SHOTS.len());
+        assert_eq!(g.matches("aria-label=\"Close ").count(), SHOTS.len());
+    }
 
     #[test]
     fn redirect_target_is_the_installer_url() {

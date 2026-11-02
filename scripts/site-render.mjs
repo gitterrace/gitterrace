@@ -5,7 +5,8 @@
 // Chromium draws the SVGs, since simpler renderers drop the stroked path of the mark.
 //
 //   node scripts/site-render.mjs
-import { readFileSync, mkdirSync } from 'node:fs';
+import { readFileSync, mkdirSync, readdirSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import { join } from 'node:path';
 import { root, loadPlaywright, launch } from './browser-lib.mjs';
 
@@ -29,6 +30,20 @@ for (const s of shots) {
   console.log(`wrote site/assets/${s.file} (${s.w}x${s.h})`);
 }
 await b.close();
+
+// WebP copies of docs/screenshots/*.png, next to them, when cwebp is installed. They are
+// committed, then `make docs-gen` copies them to the site and offers a WebP source only where
+// the file exists, so a missing tool just means PNG-only.
+const shotDir = join(root, 'docs/screenshots');
+if (spawnSync('cwebp', ['-version']).error) {
+  console.log('site-render: cwebp not installed, screenshots stay PNG-only');
+} else {
+  for (const f of readdirSync(shotDir).filter((f) => f.endsWith('.png'))) {
+    const r = spawnSync('cwebp', ['-quiet', '-q', '82', join(shotDir, f), '-o', join(shotDir, f.replace(/\.png$/, '.webp'))]);
+    if (r.status !== 0) { console.error(`site-render: cwebp failed on ${f}`); process.exit(1); }
+  }
+  console.log('wrote screenshots/*.webp');
+}
 
 // Every .png the generated pages link must now exist, or the deploy ships a dead image.
 const html = ['index.html', '404.html'].map((f) => readFileSync(join(root, 'site', f), 'utf8')).join('');
