@@ -68,3 +68,7 @@
 :is(.markdown-body,.code,.diff) [class~=s-invalid]{color:var(--md-caution)}
 :is(.markdown-body,.code,.diff) [class~=s-punctuation]{color:var(--fg)}
 :is(.markdown-body,.code,.diff) [class~=s-parameter]{color:var(--md-k7)}
+.markdown-body table.fm{display:table;width:auto;margin:0 0 16px;font-size:.9em}
+.markdown-body table.fm th,.markdown-body table.fm td{padding:2px 12px 2px 0;border:0;background:none;vertical-align:top}
+.markdown-body table.fm th{color:var(--muted);font-weight:400;text-align:left;white-space:nowrap}
+.markdown-body table.fm tr{background:none}

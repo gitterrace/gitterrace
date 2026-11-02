@@ -29,22 +29,83 @@ impl Base {
     }
 }
 
-/// Removes a leading `---` YAML block so it is not rendered as a setext heading.
-fn strip_front_matter(src: &str) -> &str {
-    let Some(rest) = src
+/// Splits a leading `---` block from the document. Returns the block body and the rest.
+/// An unterminated block is not front matter.
+fn split_front_matter(src: &str) -> Option<(&str, &str)> {
+    let rest = src
         .strip_prefix("---\n")
-        .or_else(|| src.strip_prefix("---\r\n"))
-    else {
-        return src;
-    };
+        .or_else(|| src.strip_prefix("---\r\n"))?;
     let mut offset = 0;
     for line in rest.split_inclusive('\n') {
-        offset += line.len();
         if line.trim_end() == "---" {
-            return &rest[offset..];
+            return Some((&rest[..offset], &rest[offset + line.len()..]));
+        }
+        offset += line.len();
+    }
+    None
+}
+
+/// Parses the simple `key: value` and `key:` + `- item` forms. None when any line
+/// is something else, so the caller shows the block verbatim.
+fn parse_front_matter(block: &str) -> Option<Vec<(String, String)>> {
+    let mut rows: Vec<(String, Vec<String>)> = Vec::new();
+    for line in block.lines() {
+        if line.trim().is_empty() {
+            continue;
+        }
+        if let Some(item) = line.trim_start().strip_prefix("- ") {
+            rows.last_mut()?.1.push(unquote(item.trim())?);
+            continue;
+        }
+        if line.starts_with(char::is_whitespace) {
+            return None;
+        }
+        let (key, value) = line.split_once(':')?;
+        let key = key.trim();
+        if key.is_empty() || key.contains(|c: char| c.is_whitespace() || "&*!|>{}[]#'\"".contains(c)) {
+            return None;
+        }
+        let value = value.trim();
+        if value.is_empty() {
+            rows.push((key.to_owned(), Vec::new()));
+        } else {
+            rows.push((key.to_owned(), vec![unquote(value)?]));
         }
     }
-    src
+    if rows.is_empty() {
+        return None;
+    }
+    Some(rows.into_iter().map(|(k, v)| (k, v.join(", "))).collect())
+}
+
+/// Plain, or wrapped in one matching pair of quotes. Anchors, aliases, block
+/// scalars and flow collections are not handled.
+fn unquote(v: &str) -> Option<String> {
+    for q in ['"', '\''] {
+        if let Some(inner) = v.strip_prefix(q) {
+            return inner.strip_suffix(q).map(str::to_owned);
+        }
+    }
+    if v.starts_with(['&', '*', '!', '|', '>', '{', '[', '#']) {
+        return None;
+    }
+    Some(v.to_owned())
+}
+
+/// HTML for the front matter block: a key/value table, or the raw text as code.
+/// Built here and added after sanitizing, so every piece is escaped by hand.
+fn front_matter_html(block: &str) -> String {
+    match parse_front_matter(block) {
+        Some(rows) => {
+            let mut out = String::from("<table class=\"fm\">");
+            for (k, v) in rows {
+                out.push_str(&format!("<tr><th>{}</th><td>{}</td></tr>", esc(&k), esc(&v)));
+            }
+            out.push_str("</table>\n");
+            out
+        }
+        None => format!("<pre><code>{}</code></pre>\n", esc(block)),
+    }
 }
 
 /// Heading slug as most Markdown hosts make it, so links written elsewhere still land: lowercase, keep letters, digits, `-` and `_`, spaces to `-`.
@@ -289,11 +350,15 @@ pub(crate) fn render_with(src: &str, base: Base) -> String {
         | Options::ENABLE_TASKLISTS
         | Options::ENABLE_FOOTNOTES
         | Options::ENABLE_GFM;
-    let parser = Parser::new_ext(strip_front_matter(src), opts);
+    let (head, body) = match split_front_matter(src) {
+        Some((block, rest)) => (front_matter_html(block), rest),
+        None => (String::new(), src),
+    };
+    let parser = Parser::new_ext(body, opts);
     let events = transform(parser);
     let mut raw = String::new();
     html::push_html(&mut raw, events.into_iter());
-    sanitizer(base).clean(&raw).to_string()
+    head + &sanitizer(base).clean(&raw).to_string()
 }
 
 #[cfg(test)]
@@ -332,11 +397,56 @@ mod tests {
     }
 
     #[test]
-    fn drops_front_matter_and_comments() {
+    fn drops_comments_after_front_matter() {
         let out = render("---\ntitle: x\n---\n\n<!-- note -->\n\n# Real\n");
-        assert!(!out.contains("title"));
         assert!(!out.contains("note"));
         assert!(out.contains("Real</h1>"));
+        assert!(!out.contains("<h2"));
+    }
+
+    #[test]
+    fn front_matter_becomes_a_table() {
+        let out = render(
+            "---\ntitle: Design contract\ndescription: \"The grammar: twelve rules\"\nname: 'q'\ntags:\n  - a\n  - b\n---\n# Doc\n",
+        );
+        assert!(out.contains("<table class=\"fm\">"), "{out}");
+        assert!(out.contains("<th>title</th><td>Design contract</td>"), "{out}");
+        assert!(out.contains("<td>The grammar: twelve rules</td>"), "{out}");
+        assert!(out.contains("<td>q</td>"), "{out}");
+        assert!(out.contains("<td>a, b</td>"), "{out}");
+        assert!(out.contains("Doc</h1>"));
+    }
+
+    #[test]
+    fn front_matter_values_are_escaped_text() {
+        let out = render("---\ntitle: <script>alert(1)</script> [x](http://e.com)\n---\nbody\n");
+        assert!(!out.contains("<script"), "{out}");
+        assert!(out.contains("&lt;script&gt;"), "{out}");
+        assert!(!out.contains("<a "), "{out}");
+    }
+
+    #[test]
+    fn nested_front_matter_falls_back_to_code() {
+        let out = render("---\nauthor:\n  name: x\n  mail: y\n---\nbody\n");
+        assert!(!out.contains("class=\"fm\""), "{out}");
+        assert!(out.contains("<pre><code>"), "{out}");
+        assert!(out.contains("  name: x"), "{out}");
+    }
+
+    #[test]
+    fn no_or_unterminated_front_matter_is_plain_markdown() {
+        let out = render("# T\n\ntext\n");
+        assert!(!out.contains("fm"), "{out}");
+        let out = render("---\ntitle: x\n\ntext\n");
+        assert!(!out.contains("class=\"fm\""), "{out}");
+        assert!(out.contains("<hr"), "{out}");
+    }
+
+    #[test]
+    fn front_matter_handles_crlf() {
+        let out = render("---\r\ntitle: Hi\r\n---\r\n# Doc\r\n");
+        assert!(out.contains("<th>title</th><td>Hi</td>"), "{out}");
+        assert!(out.contains("Doc</h1>"));
     }
 
     #[test]
