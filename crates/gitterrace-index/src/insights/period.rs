@@ -149,6 +149,15 @@ impl Insights<'_> {
         s
     }
 
+    /// Whether any counted commit falls in the period. Stops at the first one: a page that
+    /// only needs "is this empty" must not sum every file row of the period.
+    pub fn has_commits(&self, period: Period) -> bool {
+        let (from, to) = period.window(self.now);
+        self.source()
+            .commits_in(CommitRange::Time(from..to))
+            .any(|c| self.counted_row(&c))
+    }
+
     pub fn period_summary(&self, period: Period) -> PeriodSummary {
         let (from, to) = period.window(self.now);
         let current = self.stats_between(from, to);

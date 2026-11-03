@@ -60,6 +60,21 @@ impl Shape {
             side: 0,
         }
     }
+
+    /// A short history over a wide tree: 300 commits that together touch about `files`
+    /// distinct paths, most of them still at HEAD. Sizes what a server holds per tracked file,
+    /// apart from what it holds per commit.
+    #[must_use]
+    pub fn wide(files: usize) -> Self {
+        Self {
+            commits: 300,
+            paths: files,
+            authors: 30,
+            files_per_commit: (files / 100).max(1),
+            seed: 11,
+            side: 0,
+        }
+    }
 }
 
 const KINDS: [&str; 6] = ["feat", "fix", "docs", "refactor", "chore", "update"];

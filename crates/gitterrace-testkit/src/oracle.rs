@@ -244,9 +244,11 @@ pub async fn capture_rev(
     out
 }
 
-/// The page with its chrome cut out: the site `<header>`, and for the overview (`/`) the
-/// `<aside>` sidebar too. Header and sidebar change with navigation work, the insights never
-/// do, so a re-bless may move only what this removes.
+/// The page with its chrome cut out.
+///
+/// That is the site `<header>`, and for the overview (`/`) the `<aside>` sidebar too. Header
+/// and sidebar change with navigation work, the insights never do, so a re-bless may move only
+/// what this removes.
 #[must_use]
 pub fn without_chrome(key: &str, body: &str) -> String {
     let path = key.split_once("] ").map_or(key, |(_, k)| k);
@@ -269,9 +271,11 @@ fn cut(body: &str, open: &str, close: &str) -> String {
     format!("{}{}", &body[..at], &body[end..])
 }
 
-/// Keys whose body outside the chrome differs between two dumps (`TEST_ORACLE_DUMP` folders),
-/// plus keys on one side only. Empty when a change touched only header and sidebar. Equal-time
-/// row order is folded, as everywhere in the oracle.
+/// Keys whose body outside the chrome differs between two dumps.
+///
+/// The dumps are `TEST_ORACLE_DUMP` folders. Keys on one side only count too. Empty when a
+/// change touched only header and sidebar. Equal-time row order is folded, as everywhere in the
+/// oracle.
 #[must_use]
 pub fn chrome_only_diff(old_dir: &Path, new_dir: &Path) -> (usize, Vec<String>) {
     let read = |dir: &Path| -> BTreeMap<String, String> {
@@ -620,10 +624,7 @@ mod tests {
             canonical(&old),
             canonical(&one(&[b.clone(), a.clone(), c.clone()]))
         );
-        assert_ne!(
-            canonical(&old),
-            canonical(&one(&[a.clone(), c.clone(), b.clone()]))
-        );
+        assert_ne!(canonical(&old), canonical(&one(&[a.clone(), c, b.clone()])));
         assert_ne!(
             canonical(&old),
             canonical(&one(&[a, b, row("2023-01-01 12:00", "z")]))

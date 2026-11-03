@@ -82,7 +82,7 @@ One directory `.git/gitterrace/`, files listed in `CACHE_FILES` as today. Every 
 `MANIFEST`, `VERSION` and `lock` is immutable: written under a temp name, fsynced, never
 opened for writing again.
 
-- `VERSION`: `FORMAT_VERSION`, now `5`. Read first so a newer build's cache is recognized
+- `VERSION`: `FORMAT_VERSION`, now `5` (segment containers carry version `6`). Read first so a newer build's cache is recognized
   without parsing anything else.
 - `MANIFEST`: the only entry point. It names every live file with its length and CRC32, the
   generation, the canonical-order fingerprint (section 5), and a `retired` list. Written to
@@ -147,7 +147,7 @@ Container file:
 
 | Part | Bytes | Fields |
 | --- | --- | --- |
-| Header | 16 | magic `GTS1`, version u32 (`5`), kind u32 (1 segment, 2 strings, 3 order), zero u32 |
+| Header | 16 | magic `GTS1`, version u32 (`6`), kind u32 (1 segment, 2 strings, 3 order), zero u32 |
 | Blocks | each at most 1 MiB | payload only, back to back from offset 16 |
 | TOC | 24 per entry, at most 4096 | section u16, zero u16, items u32, offset u64, len u32, crc u32 (of the payload) |
 | Footer | 64, the last bytes | see below |
@@ -171,8 +171,18 @@ does not use: 1 commits, 2 file rows, 3 path postings, 4 rename edges, 5 author 
 6 author x day, 7 month x path (reserved, hotspots are served from postings), 8 path x author,
 9 month x language (reserved until its source is chosen), 16 paths, 17 identities, 18 labels,
 32 order, 33 rank (per segment, u32 per local ordinal: its position in the order file, read by
-pread at index, never held as a map). A new section is a new id, a changed encoding is a
-`VERSION` bump.
+pread at index, never held as a map), 34 rows, 35 row index, 36 oid index. A new section is a new
+id, a changed encoding is a `VERSION` bump.
+
+Section 1 (commit columns, container version 6): one fixed 80 B item per local ordinal, in
+ordinal order, so a pass over commits reads it alone and never the file rows of 34. Item: author
+id u32, time i64 and offset i32 exactly as in 34 (raw, clamped only at read), flags u8 (bit 0
+merge, other bits zero), zero u8, zero u16, kind + 1 u32 and scope + 1 u32 (0 none), file count
+u32, then six u64 sums (add, del, rewritten, and the same without whitespace), never clamped.
+Blocks hold whole items (`items * 80 == len`). On open the item count of 1 must equal those of
+33, 35 and 36, else `Unreadable`. Every read that sees both 1 and 34 for a commit compares them,
+and a disagreement is `Unreadable`. A merge rewrites 1 in the new canonical order like every
+other section.
 
 Strings (kind 2), one per segment: sections paths, identities, labels. Each block holds items
 encoded as u16 length plus UTF-8 bytes (a string at most 65535 B). Ids are positions in the
@@ -468,7 +478,8 @@ Both steps ship before 0.1.0. Step 1 alone is a shippable state.
 
 **Step 1: some MB on every common page.**
 
-- New format with the manifest, `VERSION` 5, the unreadable rule, the hostile-bytes bounds, the
+- New format with the manifest, `VERSION` 5 (containers 6 since the commit columns), the
+  unreadable rule, the hostile-bytes bounds, the
   Windows shim and the canonical order. These are the irreversible parts and are designed once.
 - Only the aggregates (author x day, month x path, path x author) and per-path postings with
   rename edges are new segments, without spill.

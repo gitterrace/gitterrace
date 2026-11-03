@@ -117,7 +117,7 @@ pub(crate) async fn page(
             tabs: views::stats_tabs("pa"),
             fb: f.bar("/stats/patterns", &**r),
             opts: q.row(&d, "/stats/patterns"),
-            empty: ins.period_summary(period).current.commits == 0,
+            empty: !ins.has_commits(period),
             pairs,
             age: charts::bars(&age),
             sizes: charts::bars(&sizes),

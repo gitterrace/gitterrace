@@ -27,6 +27,8 @@ const BUDGET_MB: u64 = 32 + 16;
 /// Most that idle memory may grow from 2k commits to the largest size measured.
 const GROWTH_MB: u64 = 4;
 const SERVE_VAR: &str = "TEST_MEMORY_SERVE";
+/// Longest wait for an idle release after the server is ready.
+const RELEASE_WAIT_SECS: u64 = 120;
 
 /// The allocator the numbers depend on, as the shipped binary sets it at start
 /// (`crates/gitterrace/src/alloc.rs`): jemalloc, every arena handing freed pages back at once.
@@ -141,6 +143,35 @@ impl Server {
             assert!(Instant::now() < end, "index never became ready");
             std::thread::sleep(Duration::from_millis(500));
         }
+    }
+
+    /// Waits until the server has released its idle caches at least once more than `before`,
+    /// as `/api/progress` counts them. A release that never comes fails here: an idle server
+    /// that keeps its caches is the red this test exists for, not a reading to take anyway.
+    fn wait_released(&self, base: &str, before: u64) {
+        // The release runs one idle period (30 s) after the last read, checked every quarter
+        // period: twice that and a margin is a server that does not release.
+        let end = Instant::now() + Duration::from_secs(RELEASE_WAIT_SECS);
+        loop {
+            if self.releases(base) > before {
+                return;
+            }
+            assert!(
+                Instant::now() < end,
+                "no idle release within {RELEASE_WAIT_SECS} s: the server keeps its caches"
+            );
+            std::thread::sleep(Duration::from_millis(500));
+        }
+    }
+
+    /// Idle releases so far, from `/api/progress`.
+    fn releases(&self, base: &str) -> u64 {
+        let (_, body) = self.get(&format!("{base}/api/progress"));
+        let json = body.split("\r\n\r\n").nth(1).unwrap_or_default();
+        let v: serde_json::Value = serde_json::from_str(json.trim()).expect("progress json");
+        v.get("releases")
+            .and_then(serde_json::Value::as_u64)
+            .expect("progress has a release count")
     }
 
     /// Dirty memory of the server in bytes.
@@ -267,8 +298,8 @@ fn measure(repo: &Path, test: &str, side: usize) -> (u64, u64, u64) {
     let s = Server::start(repo, test);
     let base = s.base();
     s.wait_ready(&base);
-    // Phase 1 releases the record set after 30 s idle: wait it out so idle means idle.
-    std::thread::sleep(Duration::from_secs(35));
+    // Idle means after the server released what it built: wait for that release, not a time.
+    s.wait_released(&base, 0);
     let idle = s.dirty();
     sweep(&s, &base, side);
     let swept = s.dirty();
@@ -367,4 +398,61 @@ fn memory_stays_in_budget_on_rust() {
     if let Some(repo) = std::env::var_os("TEST_RUSTGIT") {
         measure(Path::new(&repo), "memory_stays_in_budget_on_rust", 0);
     }
+}
+
+/// Idle memory is flat in the size of the tree, not only the history: 300 commits over 1k and
+/// over `TEST_MEMORY_WIDE` (default 50k) tracked files, read after the idle release. A cache
+/// sized by the tree (the HEAD index a blame or diff loads, a path list) that survives the
+/// release shows here and not in the commit sizes. The release gate runs 100k files.
+#[test]
+fn idle_memory_is_flat_in_tree_size() {
+    if serve_if_child() {
+        return;
+    }
+    apply_and_assert_allocator();
+    if cfg!(not(any(target_os = "macos", target_os = "linux"))) {
+        return;
+    }
+    let wide: usize = std::env::var("TEST_MEMORY_WIDE")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(50_000);
+    let dir = tempfile::tempdir().expect("tmp");
+    let mut idle = Vec::new();
+    for files in [1_000, wide] {
+        let repo = dir.path().join(format!("w{files}"));
+        synthetic::build(&repo, Shape::wide(files));
+        let s = Server::start(&repo, "idle_memory_is_flat_in_tree_size");
+        let base = s.base();
+        s.wait_ready(&base);
+        // A blame and a tree page are what a visitor reads first; both load tree-sized state.
+        let file = gitterrace_testkit::git(&repo, &["ls-files"])
+            .lines()
+            .next()
+            .expect("a tracked file")
+            .to_owned();
+        let before = s.releases(&base);
+        for path in [
+            format!("{base}/blame/HEAD/{file}"),
+            format!("{base}/tree/HEAD"),
+        ] {
+            assert_eq!(s.get(&path).0, 200, "{path}");
+        }
+        s.wait_released(&base, before);
+        let v = s.dirty();
+        writeln!(
+            std::io::stderr(),
+            "{files} files: idle after release {} MB",
+            v / MB
+        )
+        .expect("stderr");
+        idle.push((files, v));
+    }
+    let (small, large) = (idle[0].1, idle[1].1);
+    assert!(
+        large <= small + GROWTH_MB * MB,
+        "idle grows with the tree: {} MB at {wide} files, {} MB at 1000, more than {GROWTH_MB} MB apart",
+        large / MB,
+        small / MB
+    );
 }

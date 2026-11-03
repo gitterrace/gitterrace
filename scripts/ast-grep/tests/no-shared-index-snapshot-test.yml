@@ -1,0 +1,8 @@
+id: no-shared-index-snapshot
+valid:
+  - 'fn f(r: &Repo) { let c = resource_cache(r)?; }'
+  - 'mod tests { fn f(r: &Repo) { r.diff_resource_cache_for_tree_diff(); } }'
+invalid:
+  - 'fn f(r: &Repo) { let c = r.diff_resource_cache_for_tree_diff()?; }'
+  - 'fn f(r: &Repo) { let o = r.blame_file(p, tip, opts)?; }'
+  - 'fn f(r: &Repo) { let i = r.index_or_load_from_head_or_empty()?; }'

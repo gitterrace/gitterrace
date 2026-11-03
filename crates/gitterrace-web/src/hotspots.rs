@@ -99,11 +99,7 @@ pub(crate) async fn page(
             tabs: views::stats_tabs("ho"),
             fb: f.bar("/stats/hotspots", &**r),
             opts: q.row(&d, "/stats/hotspots"),
-            empty: ins
-                .period_summary(period_of(&q, &d, Period::All))
-                .current
-                .commits
-                == 0,
+            empty: !ins.has_commits(period_of(&q, &d, Period::All)),
             kpis: vec![
                 Kpi("Files changed", fmt::thousands(rep.files.len())),
                 Kpi("Changes", fmt::thousands(rep.total_changes)),
