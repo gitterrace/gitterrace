@@ -36,6 +36,7 @@ mod reload;
 mod routes;
 mod search;
 pub mod sitemap;
+mod spark;
 #[cfg(test)]
 mod state_tests;
 mod views;

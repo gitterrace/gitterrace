@@ -1,7 +1,7 @@
 //! Commit history: logs, path-limited walks, summaries and the index's numstat stream.
 
 use std::cmp::Reverse;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use gix::bstr::ByteSlice;
 use gix::revision::walk::Sorting;
@@ -103,8 +103,12 @@ impl Repo {
     }
 
     /// Author times of the commits reachable from `rev` with a commit time at or after `since`,
-    /// newest first. Reads only commit headers, so a busy history stays cheap.
-    pub fn commit_times_since(&self, rev: &str, since: i64) -> Result<Vec<i64>> {
+    /// newest first, and the oldest of them when the whole history is in the window. Reads only
+    /// commit headers, so a busy history stays cheap. The history is whole when the cutoff
+    /// dropped no parent: every parent named was walked. A root met inside the window is not
+    /// enough, a young orphan branch merged in is a root too. `None` when the history reaches
+    /// past `since`.
+    pub fn commit_times_since(&self, rev: &str, since: i64) -> Result<(Vec<i64>, Option<i64>)> {
         let repo = self.repo();
         let tip = self.resolve_id(&repo, rev)?;
         let walk = repo
@@ -116,11 +120,21 @@ impl Repo {
             .all()
             .map_err(git)?;
         let mut out = Vec::new();
+        let mut seen = HashSet::new();
+        let mut parents = Vec::new();
         for info in walk {
-            let commit = info.map_err(git)?.object().map_err(git)?;
-            out.push(commit.author().map_err(git)?.seconds());
+            let info = info.map_err(git)?;
+            seen.insert(info.id);
+            parents.extend(info.parent_ids.iter().copied());
+            out.push(info.object().map_err(git)?.author().map_err(git)?.seconds());
         }
-        Ok(out)
+        let whole = parents.iter().all(|p| seen.contains(p));
+        let first = if whole {
+            out.iter().copied().min()
+        } else {
+            None
+        };
+        Ok((out, first))
     }
 
     /// Commit ids reachable from `rev`, oldest first. Used by the indexer.

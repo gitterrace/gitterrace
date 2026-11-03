@@ -12,10 +12,12 @@ use gitterrace_index::feed::{CommitRange, InsightsSource, Rank};
 use crate::{
     app::App,
     fmt::{self, enc_path, enc_seg, href},
+    spark,
 };
 
 const DAY: i64 = 86_400;
-const WEEKS: usize = 12;
+/// The sidebar's longest sparkline window.
+const SPARK_CAP: i64 = 12 * spark::WEEK;
 const CHURN_DAYS: i64 = 30;
 const TOP_CHURN: usize = 3;
 const TOP_LOOSE: usize = 3;
@@ -61,6 +63,8 @@ pub(crate) struct Side {
     pub(crate) last: String,
     pub(crate) spark: String,
     pub(crate) spark_tip: String,
+    /// The sparkline's window, "9 days", beside the heading.
+    pub(crate) spark_span: String,
     pub(crate) hot: Vec<Hot>,
     pub(crate) hot_href: String,
     pub(crate) loose: Vec<Loose>,
@@ -120,16 +124,13 @@ pub(crate) fn build(a: &App, head: &str, src: &dyn InsightsSource, dirty: bool, 
     let offset = i64::from(latest.map_or(0, |c| c.offset));
     // Days start at local midnight of the latest commit's zone: the author's day, not UTC's.
     let today_start = (now + offset).div_euclid(DAY) * DAY - offset;
-    let from = today_start - (WEEKS as i64 * 7 - 1) * DAY;
+    let from = (now - SPARK_CAP).min(today_start - 6 * DAY);
     let churn_from = now - CHURN_DAYS * DAY;
-    let mut weeks = [0usize; WEEKS];
+    let mut times = Vec::new();
     let (mut today, mut week) = (0, 0);
     let mut recent: Vec<Rank> = Vec::new();
     for c in src.commits_in(CommitRange::Time(from..now + DAY)) {
-        let back = usize::try_from((today_start + DAY - 1 - c.time).div_euclid(7 * DAY))
-            .unwrap_or(0)
-            .min(WEEKS - 1);
-        weeks[WEEKS - 1 - back] += 1;
+        times.push(c.time);
         today += usize::from(c.time >= today_start);
         week += usize::from(c.time >= today_start - 6 * DAY);
         if c.time >= churn_from && !c.merge {
@@ -167,6 +168,12 @@ pub(crate) fn build(a: &App, head: &str, src: &dyn InsightsSource, dirty: bool, 
         .collect();
     let (loose, loose_total) = loose_ends(a, head, branch.as_deref(), now);
     let worktrees = a.repo.linked_worktrees().map_or(0, |w| w.len());
+    let series = spark::series(
+        times.iter().copied(),
+        first_time(src, from, &times),
+        spark::End::local(now, offset),
+        SPARK_CAP,
+    );
     Side {
         order: a.cfg().display.sidebar.clone(),
         branch_href: branch
@@ -178,15 +185,21 @@ pub(crate) fn build(a: &App, head: &str, src: &dyn InsightsSource, dirty: bool, 
         today,
         week,
         last: latest.map_or_else(String::new, |c| fmt::ago(c.time, now)),
-        spark: if weeks.iter().any(|&w| w > 0) {
-            spark(&weeks)
+        spark: if series.counts.iter().any(|&n| n > 0) {
+            line(&series.counts)
         } else {
             String::new()
         },
+        spark_span: series.span.clone(),
         spark_tip: format!(
-            "Commits per week, oldest first, last {}: {}",
-            fmt::count(WEEKS, "week", "weeks"),
-            weeks.map(|w| w.to_string()).join(", ")
+            "{}, oldest first: {}",
+            series.label(),
+            series
+                .counts
+                .iter()
+                .map(u32::to_string)
+                .collect::<Vec<_>>()
+                .join(", ")
         ),
         hot,
         hot_href: href("/stats/hotspots"),
@@ -283,30 +296,47 @@ fn langs(a: &App, head: &str) -> Vec<Lang> {
         .collect()
 }
 
+/// When the history began, as far as the window cares: the oldest commit time when every
+/// commit is inside `from..`, else a time before the cap, so the window is capped. Ranks are
+/// not in time order (several roots, skewed clocks), so not rank 0: one probe for any commit
+/// older than `from`, which stops at the first hit, and the window's own times otherwise.
+fn first_time(src: &dyn InsightsSource, from: i64, times: &[i64]) -> Option<i64> {
+    if src
+        .commits_in(CommitRange::Time(i64::MIN..from))
+        .next()
+        .is_some()
+    {
+        return Some(from - SPARK_CAP);
+    }
+    times.iter().copied().min()
+}
+
 fn path_filter(a: &App, head: &str) -> gitterrace_index::PathFilter {
     let opts = a.defaults().into_options();
     let ignore = opts.respect_ignore.then(|| a.ignore_set(head)).flatten();
     gitterrace_index::PathFilter::new(&opts, ignore)
 }
 
-/// A polyline over the weekly counts, scaled to the busiest week, over a baseline, with a dot
-/// on the latest week. One unit per week across, so CSS stretches it to the column's width;
+/// A polyline over the bucket counts, scaled to the busiest bucket, over a baseline, with a dot
+/// on the latest bucket. One unit per bucket across, so CSS stretches it to the column's width;
 /// the strokes keep their width (`vector-effect`) and the dot stays round (a zero-length
 /// path with round caps).
-#[expect(clippy::cast_precision_loss, reason = "counts far below 2^52")]
-fn spark(weeks: &[usize; WEEKS]) -> String {
-    let max = weeks.iter().copied().max().unwrap_or(0).max(1) as f64;
-    let y = |n: usize| (n as f64 / max).mul_add(-(SPARK_H - 6.0), SPARK_H - 3.0);
-    let pts: Vec<String> = weeks
+fn line(counts: &[u32]) -> String {
+    let max = f64::from(counts.iter().copied().max().unwrap_or(0).max(1));
+    let y = |n: u32| (f64::from(n) / max).mul_add(-(SPARK_H - 6.0), SPARK_H - 3.0);
+    // A repository under an hour old has one bucket: drawn flat across, not as a dot.
+    let one = [counts.first().copied().unwrap_or(0); 2];
+    let counts = if counts.len() < 2 { &one[..] } else { counts };
+    let pts: Vec<String> = counts
         .iter()
         .enumerate()
         .map(|(i, &n)| format!("{i},{:.1}", y(n)))
         .collect();
-    let last = WEEKS - 1;
+    let last = counts.len() - 1;
     format!(
         "<svg class=\"spark s1\" viewBox=\"0 0 {last} {SPARK_H}\" preserveAspectRatio=\"none\" aria-hidden=\"true\"><path class=\"base\" d=\"M0 {b}H{last}\"/><polyline points=\"{}\"/><path class=\"dot\" d=\"M{last} {:.1}h0\"/></svg>",
         pts.join(" "),
-        y(weeks[last]),
+        y(counts.last().copied().unwrap_or(0)),
         b = SPARK_H - 0.5,
     )
 }
@@ -399,7 +429,7 @@ mod tests {
         let s = build(&app, &head, &*src, false, fmt::now() + 200 * DAY);
         assert_eq!((s.today, s.week), (0, 0));
         assert!(s.hot.is_empty());
-        assert!(s.spark_tip.ends_with("0, 0, 0"));
+        assert!(s.spark_tip.ends_with("0, 0, 0"), "{}", s.spark_tip);
     }
 
     #[test]
@@ -427,10 +457,14 @@ mod tests {
             .skip(1)
             .map(|h| {
                 let h = h.split("</h3>").next().unwrap_or("");
-                let h = h
-                    .split('>')
-                    .nth(1)
-                    .map_or(h, |x| x.split('<').next().unwrap_or(x));
+                // A linked heading's text is inside its `<a>`; a plain one comes first.
+                let h = if h.starts_with('<') {
+                    h.split('>')
+                        .nth(1)
+                        .map_or(h, |x| x.split('<').next().unwrap_or(x))
+                } else {
+                    h.split('<').next().unwrap_or(h)
+                };
                 h.split(" <").next().unwrap_or(h)
             })
             .collect()
@@ -459,12 +493,64 @@ mod tests {
         );
     }
 
+    /// A two-day-old repository: the line starts at its first commit, so its first point is
+    /// above the baseline, and the heading and tooltip name the fitted window.
+    #[test]
+    fn a_two_day_repository_draws_no_leading_empty_buckets() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let f = gitterrace_testkit::Fixture::init(dir.path());
+        let f = f
+            .at("2024-03-08T00:30:00+00:00")
+            .write("a", "1")
+            .commit("one");
+        let f = f
+            .at("2024-03-09T12:00:00+00:00")
+            .write("a", "2")
+            .commit("two");
+        let _f = f
+            .at("2024-03-10T00:00:00+00:00")
+            .write("a", "3")
+            .commit("three");
+        let repo = gitterrace_git::Repo::discover(dir.path()).expect("repo");
+        let index = gitterrace_index::Index::open(&repo).expect("index");
+        let app = App::new(repo, index);
+        app.index
+            .update(&app.repo, "HEAD", &|_| {})
+            .expect("update");
+        app.mark_ready();
+        let head = app.repo.resolve("HEAD").expect("head");
+        let src = app.source(&head).expect("source").expect("ready");
+        // 2024-03-10T00:00:00Z, the frozen test clock.
+        let html = build(&app, &head, &*src, false, 1_710_028_800)
+            .render()
+            .expect("render");
+        let pts = html
+            .split("<polyline points=\"")
+            .nth(1)
+            .and_then(|p| p.split('"').next())
+            .expect("a sparkline");
+        let ys: Vec<&str> = pts.split(' ').filter_map(|p| p.split(',').nth(1)).collect();
+        assert!(ys.len() >= 6, "{pts}");
+        assert_ne!(
+            ys[0], "21.0",
+            "the first bucket is before the first commit: {pts}"
+        );
+        assert!(
+            html.contains("Recent<span class=\"muted\">, last 2 days</span>"),
+            "{html}"
+        );
+        assert!(
+            html.contains("Commits per 6 hours, last 2 days, oldest first: 1, "),
+            "{html}"
+        );
+    }
+
     #[test]
     fn the_sparkline_spans_its_column_with_a_baseline_and_a_latest_dot() {
-        let mut w = [0; WEEKS];
+        let mut w = [0; 12];
         w[3] = 4;
-        w[WEEKS - 1] = 2;
-        let s = spark(&w);
+        w[11] = 2;
+        let s = line(&w);
         assert!(!s.contains("width="), "CSS sizes it to the column: {s}");
         assert!(s.contains("preserveAspectRatio=\"none\""), "{s}");
         assert!(

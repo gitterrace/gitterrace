@@ -28,12 +28,11 @@ use tokio::sync::OnceCell;
 use tower::ServiceExt;
 
 use crate::app::Env;
-use crate::fmt;
 pub use crate::multi::discover::discover_repos;
+use crate::{fmt, spark};
 
-/// Weeks shown in the index sparkline.
-const SPARK_WEEKS: usize = 26;
-const WEEK: i64 = 7 * 86_400;
+/// The index sparkline's longest window, half a year.
+const SPARK_CAP: i64 = 26 * spark::WEEK;
 
 /// One served repository: its URL name and where it lives.
 pub(crate) struct Served {
@@ -44,17 +43,17 @@ pub(crate) struct Served {
     router: OnceCell<Router>,
     /// The background tasks the router started, stopped when the repository is taken off.
     tasks: Mutex<Vec<tokio::task::AbortHandle>>,
-    /// Newest commit and weekly commit counts at the HEAD they were read for, so the index page
+    /// Newest commit and the sparkline's counts at the HEAD they were read for, so the index page
     /// opens a repository once per HEAD move instead of once per hit.
     recent: Mutex<Option<(String, Arc<Recent>)>>,
 }
 
-/// What the index shows for one repository: its newest commit and commits per week.
+/// What the index shows for one repository: its newest commit and its recent commits,
+/// bucketed to fit its age.
 #[derive(Default)]
 struct Recent {
     last: Option<CommitSummary>,
-    /// Oldest week first, `SPARK_WEEKS` long; the last entry is the current week.
-    weeks: Vec<u32>,
+    series: spark::Series,
 }
 
 /// The repository table. A URL name resolves only through this map, never by joining it
@@ -104,7 +103,7 @@ struct IndexRow {
     when: String,
     commit_href: String,
     spark: String,
-    /// Commits in the sparkline's window, and its busiest week (the line's top).
+    /// Commits in the sparkline's window.
     total: u32,
     tip: String,
 }
@@ -343,9 +342,10 @@ impl Served {
         }
     }
 
-    /// The newest commit and the weekly counts, one discover and one bounded walk per HEAD.
-    /// The walk stops at the oldest week shown, so it counts every commit in the window
-    /// however busy the repository is.
+    /// The newest commit and the sparkline, one discover and one bounded walk per HEAD. The
+    /// walk stops at the window's cap, so it counts every commit in it however busy the
+    /// repository is. The repository's start comes from the same walk: when it dropped no
+    /// parent the whole history is inside the cap, else the window is capped.
     fn recent(&self, now: i64) -> Arc<Recent> {
         let Ok(repo) = Repo::discover(&self.path) else {
             return Arc::default();
@@ -359,15 +359,19 @@ impl Served {
         {
             return Arc::clone(r);
         }
-        let times = repo
-            .commit_times_since(&head, now - WEEK * SPARK_WEEKS as i64)
-            .unwrap_or_default();
+        let since = now - SPARK_CAP;
+        let (times, first) = repo.commit_times_since(&head, since).unwrap_or_default();
+        // HEAD resolved, so there is history: when it reaches past the cap, cap the window.
+        let first = first.or(Some(since - 1));
+        let last = repo
+            .log(&head, None, 0, 1)
+            .ok()
+            .and_then(|l| l.into_iter().next());
+        // Days end at local midnight of the newest commit's zone, as on the sidebar.
+        let offset = last.as_ref().map_or(0, |c| i64::from(c.author.offset));
         let r = Arc::new(Recent {
-            last: repo
-                .log(&head, None, 0, 1)
-                .ok()
-                .and_then(|l| l.into_iter().next()),
-            weeks: weekly(&times, now),
+            series: spark::series(times, first, spark::End::local(now, offset), SPARK_CAP),
+            last,
         });
         if let Ok(mut g) = self.recent.lock() {
             *g = Some((head, Arc::clone(&r)));
@@ -481,26 +485,14 @@ fn repo_router(
     crate::repo_router_tasks(&served.path, base, served.name.clone(), live, env)
 }
 
-/// Counts `times` (seconds) into `SPARK_WEEKS` buckets ending at `now`, oldest first.
-fn weekly(times: &[i64], now: i64) -> Vec<u32> {
-    let mut weeks = vec![0u32; SPARK_WEEKS];
-    for t in times {
-        let age = (now - t).max(0) / WEEK;
-        if let Ok(i) = usize::try_from(age)
-            && i < SPARK_WEEKS
-        {
-            weeks[SPARK_WEEKS - 1 - i] += 1;
-        }
-    }
-    weeks
-}
-
-/// Weekly counts as a polyline in a 90x20 box, scaled to `max` so rows share one scale.
-fn spark(weeks: &[u32], max: u32) -> String {
+/// Bucket counts as a polyline across a 90x20 box, scaled to `max`.
+fn polyline(counts: &[u32], max: u32) -> String {
     let max = max.max(1);
+    let one = [counts.first().copied().unwrap_or(0); 2];
+    let counts = if counts.len() < 2 { &one[..] } else { counts };
     let mut pts = String::new();
-    for (i, n) in weeks.iter().enumerate() {
-        let x = i as f64 * 90.0 / (SPARK_WEEKS - 1) as f64;
+    for (i, n) in counts.iter().enumerate() {
+        let x = i as f64 * 90.0 / (counts.len() - 1) as f64;
         let y = 19.0 - f64::from(*n) * 18.0 / f64::from(max);
         let _ = write!(pts, "{x:.1},{y:.1} ");
     }
@@ -523,7 +515,9 @@ async fn index(State(table): State<Arc<Table>>) -> crate::error::Result<Response
                 let href = format!("/r/{}/", s.name);
                 let r = s.recent(now);
                 let c = r.last.as_ref();
-                let peak = r.weeks.iter().copied().max().unwrap_or(0);
+                let counts = &r.series.counts;
+                let peak = counts.iter().copied().max().unwrap_or(0);
+                let total: u32 = counts.iter().sum();
                 IndexRow {
                     name: s.name.clone(),
                     subject: c.map(|c| c.subject.clone()).unwrap_or_default(),
@@ -532,12 +526,17 @@ async fn index(State(table): State<Arc<Table>>) -> crate::error::Result<Response
                         || href.clone(),
                         |c| format!("/r/{}/commit/{}", s.name, c.id),
                     ),
-                    spark: spark(&r.weeks, peak),
-                    total: r.weeks.iter().sum(),
-                    tip: format!(
-                        "{} in 26 weeks, busiest week {peak}.",
-                        fmt::count(r.weeks.iter().sum::<u32>(), "commit", "commits")
-                    ),
+                    spark: polyline(counts, peak),
+                    total,
+                    tip: if counts.is_empty() {
+                        "No commits yet.".to_owned()
+                    } else {
+                        format!(
+                            "{}: {}, busiest {peak}.",
+                            r.series.label(),
+                            fmt::count(total, "commit", "commits")
+                        )
+                    },
                     href,
                 }
             })

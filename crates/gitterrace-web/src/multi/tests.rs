@@ -46,7 +46,7 @@ fn recent_is_memoised_by_head() {
     );
     git(p, &["commit", "-q", "--allow-empty", "-m", "two"]);
     let after = s.recent(now);
-    let total = |r: &super::Recent| r.weeks.iter().sum::<u32>();
+    let total = |r: &super::Recent| r.series.counts.iter().sum::<u32>();
     assert_eq!((total(&first), total(&after)), (1, 2));
     assert_eq!(after.last.as_ref().map(|c| c.subject.as_str()), Some("two"));
 }
@@ -54,15 +54,78 @@ fn recent_is_memoised_by_head() {
 /// The line counts every commit in the window, not the newest few thousand: a busy
 /// repository must not show an empty tail.
 #[test]
-fn weekly_counts_the_whole_window() {
-    let now = 100 * super::WEEK;
+fn the_window_counts_every_commit_in_it() {
+    let now = 100 * super::SPARK_CAP;
     // 5000 commits evenly over the 26 weeks, far more than the old 2000-commit read.
-    let step = super::WEEK * super::SPARK_WEEKS as i64 / 5000;
+    // Weeks end at the end of today, a day past now: the commits stay a day inside the cap.
+    let step = (super::SPARK_CAP - 86_400) / 5000;
     let times: Vec<i64> = (0..5000).map(|i| now - i * step).collect();
-    let weeks = super::weekly(&times, now);
-    assert_eq!(weeks.len(), super::SPARK_WEEKS);
-    assert!(weeks.iter().all(|n| *n > 0), "{weeks:?}");
-    assert_eq!(weeks.iter().sum::<u32>(), 5000);
+    let s = crate::spark::series(
+        times,
+        Some(0),
+        crate::spark::End::local(now, 0),
+        super::SPARK_CAP,
+    );
+    assert_eq!(s.counts.len(), 26);
+    assert!(s.counts.iter().all(|n| *n > 0), "{:?}", s.counts);
+    assert_eq!(s.counts.iter().sum::<u32>(), 5000);
+}
+
+/// The list's line for a two-day-old repository starts at its first commit: the repository's
+/// start comes from the bounded walk meeting the root, so no bucket is time before it.
+#[test]
+fn a_young_repository_fits_its_window_to_its_age() {
+    let dir = tempfile::Builder::new()
+        .prefix("repo")
+        .tempdir()
+        .expect("tmp");
+    let f = gitterrace_testkit::Fixture::init(dir.path());
+    let f = f.at("2024-03-08T00:30:00+00:00").commit("one");
+    let _f = f.at("2024-03-10T00:00:00+00:00").commit("two");
+    let table = super::Table::new(
+        vec![dir.path().to_path_buf()],
+        crate::app::Env::new(gitterrace_config::Config::default()),
+        None,
+    )
+    .expect("table");
+    let r = table.snapshot()[0].recent(1_710_028_800);
+    assert_eq!(r.series.label(), "Commits per 6 hours, last 2 days");
+    assert_eq!(r.series.counts.first(), Some(&1), "{:?}", r.series.counts);
+    assert_eq!(r.series.counts.last(), Some(&1), "{:?}", r.series.counts);
+}
+
+/// An old repository with a young orphan branch merged in: the young root is not the start,
+/// so the window stays capped and nothing piles into its first bucket.
+#[test]
+fn a_young_merged_root_does_not_shrink_the_window() {
+    let dir = tempfile::Builder::new()
+        .prefix("repo")
+        .tempdir()
+        .expect("tmp");
+    let f = gitterrace_testkit::Fixture::init(dir.path());
+    let f = f.at("2022-01-01T00:00:00+00:00").commit("old");
+    let f = f.at("2024-03-01T00:00:00+00:00").commit("recent");
+    let f = f.at("2024-03-08T00:00:00+00:00");
+    f.git(&["checkout", "-q", "--orphan", "x"]);
+    let f = f.write("b", "1").commit("orphan").checkout("main");
+    let f = f.at("2024-03-09T00:00:00+00:00");
+    f.git(&[
+        "merge",
+        "-q",
+        "--allow-unrelated-histories",
+        "-m",
+        "merge x",
+        "x",
+    ]);
+    let table = super::Table::new(
+        vec![dir.path().to_path_buf()],
+        crate::app::Env::new(gitterrace_config::Config::default()),
+        None,
+    )
+    .expect("table");
+    let r = table.snapshot()[0].recent(1_710_028_800);
+    assert_eq!(r.series.label(), "Commits per week, last 26 weeks");
+    assert_eq!(r.series.counts.first(), Some(&0), "{:?}", r.series.counts);
 }
 
 #[tokio::test]
