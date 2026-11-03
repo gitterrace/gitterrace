@@ -1,0 +1,335 @@
+//! Hotspots, ownership, coupling and code age over the followed file history.
+
+use std::collections::{BTreeMap, HashSet};
+
+use gitterrace_git::civil_from_days;
+
+use crate::feed::PathId;
+use crate::insights::fasthash::FastMap;
+use crate::insights::files::{
+    AgeBucket, AgeReport, COUPLING_MAX_FILES, Coupling, DirOwnership, Hotspot, HotspotReport,
+    Owner, OwnershipReport, SOLO_SHARE, STALE_SECS,
+};
+use crate::insights::{DAY, HeadFile, Insights, Period};
+
+impl Insights<'_> {
+    /// Hotspots among `files` (the head tree) for the period.
+    pub fn hotspots(&self, files: &[HeadFile], period: Period) -> HotspotReport {
+        let (from, to) = period.window(self.now);
+        let mut rows = Vec::new();
+        let shown: Vec<&HeadFile> = files
+            .iter()
+            .filter(|f| f.lines != 0 && !self.skips_head(&f.path))
+            .collect();
+        let names: Vec<&str> = shown.iter().map(|f| &*f.path).collect();
+        for (f, touches) in shown.into_iter().zip(self.touches_in(&names, from, to)) {
+            let mut count = 0;
+            let mut churn = 0u64;
+            let mut last = i64::MIN;
+            let mut who = HashSet::new();
+            for (t, c) in touches {
+                count += 1;
+                churn += u64::from(t.lines);
+                last = last.max(c.time);
+                who.insert(self.person_of(c.ident));
+            }
+            if count == 0 {
+                continue;
+            }
+            rows.push(Hotspot {
+                path: f.path.clone(),
+                language: crate::insights::lang::language(&f.path),
+                lines: f.lines,
+                changes: count,
+                lines_changed: churn,
+                authors: who.len(),
+                last_change: last,
+                score: count as f64 * f64::from(f.lines).sqrt(),
+            });
+        }
+        rows.sort_by(|a, b| {
+            b.score
+                .total_cmp(&a.score)
+                .then_with(|| a.path.cmp(&b.path))
+        });
+        let total: usize = rows.iter().map(|r| r.changes).sum();
+        let tenth = rows.len().div_ceil(10).max(1);
+        let mut by_changes: Vec<usize> = rows.iter().map(|r| r.changes).collect();
+        by_changes.sort_unstable_by(|a, b| b.cmp(a));
+        let top: usize = by_changes.iter().take(tenth).sum();
+        HotspotReport {
+            concentration: if total == 0 {
+                0.0
+            } else {
+                top as f64 / total as f64
+            },
+            top_tenth: tenth,
+            single_author_files: rows.iter().filter(|r| r.authors == 1).count(),
+            total_changes: total,
+            files: rows,
+        }
+    }
+
+    /// Lines changed per person for each head file in the window, by counted commits.
+    ///
+    /// Over all history a file whose name never took part in a rename reads the path x author
+    /// aggregate: every row under that name is its own, so the sums are exact without a pass
+    /// over the file rows. Renamed files and windows go through the touches.
+    pub(super) fn owner_lines(
+        &self,
+        files: &[&HeadFile],
+        from: i64,
+        to: i64,
+    ) -> Vec<BTreeMap<usize, u64>> {
+        let src = self.source();
+        let follow = self.follow();
+        // The aggregate holds every commit: usable only when the window drops none.
+        let whole = from == i64::MIN && self.d.newest < to;
+        let plain = |f: &HeadFile| -> Option<PathId> {
+            let id = src.find_path(&f.path)?;
+            (!follow.log.contains_key(&id) && !follow.names.contains_key(&id)).then_some(id)
+        };
+        let ids: Vec<Option<PathId>> = files
+            .iter()
+            .map(|f| if whole { plain(f) } else { None })
+            .collect();
+        let mut out: Vec<BTreeMap<usize, u64>> = vec![BTreeMap::new(); files.len()];
+        // Ordered by person (most commits first), so a tie for top owner and the float sums
+        // come out the same on every run; a HashMap made "Stale lines" vary.
+        let at: FastMap<PathId, usize> = ids
+            .iter()
+            .enumerate()
+            .filter_map(|(i, id)| id.map(|id| (id, i)))
+            .collect();
+        if !at.is_empty() {
+            let bots = self.opts.include_bots;
+            for row in src.agg_path_author("") {
+                let Some(&i) = at.get(&row.path) else {
+                    continue;
+                };
+                let p = self.person_of(row.ident);
+                if !bots && self.d.people.list[p].bot {
+                    continue;
+                }
+                let s = &row.sums;
+                let lines = if self.opts.count_whitespace {
+                    s.add + s.del
+                } else {
+                    s.code_add + s.code_del
+                };
+                *out[i].entry(p).or_default() += lines;
+            }
+        }
+        let rest: Vec<usize> = (0..files.len()).filter(|&i| ids[i].is_none()).collect();
+        let names: Vec<&str> = rest.iter().map(|&i| &*files[i].path).collect();
+        for (&i, touches) in rest.iter().zip(self.touches_in(&names, from, to)) {
+            for (t, c) in touches {
+                *out[i].entry(self.person_of(c.ident)).or_default() += u64::from(t.lines);
+            }
+        }
+        // A person whose rows sum to zero lines still held the file in the touches; drop
+        // nobody, the touches kept zero entries too.
+        out
+    }
+
+    /// Knowledge share per file, weighted by its size now, summed per directory `depth` levels
+    /// deep (`depth` 1 groups by top-level directory; root files group under `""`).
+    pub fn ownership(&self, files: &[HeadFile], period: Period, depth: usize) -> OwnershipReport {
+        let (from, to) = period.window(self.now);
+        let mut dirs: BTreeMap<String, Acc> = BTreeMap::new();
+        let mut all = Acc::default();
+        let (mut solo, mut stale, mut untracked) = (0u64, 0u64, 0u64);
+        let shown: Vec<&HeadFile> = files
+            .iter()
+            .filter(|f| f.lines != 0 && !self.skips_head(&f.path))
+            .collect();
+        let per_file = self.owner_lines(&shown, from, to);
+        for (f, who) in shown.into_iter().zip(per_file) {
+            let changed: u64 = who.values().sum();
+            if changed == 0 {
+                untracked += u64::from(f.lines);
+                continue;
+            }
+            let parts: Vec<&str> = f.path.split('/').collect();
+            let key = if parts.len() > 1 {
+                parts[..depth.min(parts.len() - 1)].join("/")
+            } else {
+                String::new()
+            };
+            let d = dirs.entry(key).or_default();
+            let (mut top_p, mut top_w) = (0, 0.0);
+            for (p, c) in who {
+                let w = f64::from(f.lines) * c as f64 / changed as f64;
+                *d.w.entry(p).or_default() += w;
+                *all.w.entry(p).or_default() += w;
+                if w > top_w {
+                    top_w = w;
+                    top_p = p;
+                }
+            }
+            d.lines += u64::from(f.lines);
+            d.files += 1;
+            all.lines += u64::from(f.lines);
+            all.files += 1;
+            if top_w / f64::from(f.lines) >= SOLO_SHARE {
+                solo += u64::from(f.lines);
+            }
+            if self.d.last_seen[top_p] < self.now.saturating_sub(STALE_SECS) {
+                stale += u64::from(f.lines);
+            }
+        }
+        let finish = |path: String, a: Acc| -> DirOwnership {
+            let mut owners: Vec<(usize, f64)> = a.w.into_iter().collect();
+            owners.sort_by(|x, y| y.1.total_cmp(&x.1).then_with(|| x.0.cmp(&y.0)));
+            let total: f64 = owners
+                .iter()
+                .map(|o| o.1)
+                .sum::<f64>()
+                .max(f64::MIN_POSITIVE);
+            let bus = crate::insights::bus_factor(owners.iter().map(|o| o.1));
+            DirOwnership {
+                path,
+                lines: a.lines,
+                files: a.files,
+                bus_factor: bus,
+                owners: owners
+                    .into_iter()
+                    .map(|(p, w)| Owner {
+                        name: self.d.people.list[p].name.clone(),
+                        share: w / total,
+                    })
+                    .collect(),
+            }
+        };
+        let mut dirs: Vec<DirOwnership> = dirs.into_iter().map(|(k, a)| finish(k, a)).collect();
+        dirs.sort_by(|a, b| b.lines.cmp(&a.lines).then_with(|| a.path.cmp(&b.path)));
+        OwnershipReport {
+            dirs_with_bus_factor_one: dirs
+                .iter()
+                .filter(|d| d.bus_factor == 1 && !d.owners.is_empty())
+                .count(),
+            overall: finish(String::new(), all),
+            dirs,
+            solo_lines: solo,
+            stale_lines: stale,
+            untracked_lines: untracked,
+        }
+    }
+
+    /// Pairs of head files that changed in the same commits, strongest first. Pairs need at
+    /// least `min_together` shared commits. Commits touching more than 30 files are skipped.
+    pub fn coupling(
+        &self,
+        files: &[HeadFile],
+        period: Period,
+        min_together: usize,
+        limit: usize,
+    ) -> Vec<Coupling> {
+        let (from, to) = period.window(self.now);
+        let mut head: Vec<&str> = files
+            .iter()
+            .filter(|f| !self.skips_head(&f.path))
+            .map(|f| &*f.path)
+            .collect();
+        head.sort_unstable();
+        head.dedup();
+        // Flat (commit, file) pairs sorted by commit replace a map of vectors: one allocation
+        // and a sequential pass. State is sized by the touches of head files in the window.
+        let mut touches: Vec<(u32, u32)> = Vec::new();
+        let mut changes = vec![0_usize; head.len()];
+        for (i, list) in self.touches_in(&head, from, to).into_iter().enumerate() {
+            let id = u32::try_from(i).unwrap_or(u32::MAX);
+            for (t, _) in list {
+                touches.push((t.commit.0, id));
+                changes[i] += 1;
+            }
+        }
+        touches.sort_unstable();
+        // Pairs are keyed by the two file numbers, a < b because each group is sorted.
+        let mut pairs: FastMap<u64, usize> = FastMap::default();
+        for group in touches.chunk_by(|x, y| x.0 == y.0) {
+            if group.len() < 2 || group.len() > COUPLING_MAX_FILES {
+                continue;
+            }
+            for (x, a) in group.iter().enumerate() {
+                for b in &group[x + 1..] {
+                    *pairs
+                        .entry((u64::from(a.1) << 32) | u64::from(b.1))
+                        .or_default() += 1;
+                }
+            }
+        }
+        // Cheap tuples first, strings only for the pairs that are shown.
+        let mut kept: Vec<(u32, u32, usize)> = pairs
+            .into_iter()
+            .filter(|(_, n)| *n >= min_together)
+            .map(|(key, together)| ((key >> 32) as u32, (key & 0xffff_ffff) as u32, together))
+            .collect();
+        let degree = |&(a, b, together): &(u32, u32, usize)| {
+            together as f64 / changes[a as usize].min(changes[b as usize]) as f64
+        };
+        let order = |x: &(u32, u32, usize), y: &(u32, u32, usize)| {
+            y.2.cmp(&x.2)
+                .then_with(|| degree(y).total_cmp(&degree(x)))
+                .then_with(|| head[x.0 as usize].cmp(head[y.0 as usize]))
+                .then_with(|| head[x.1 as usize].cmp(head[y.1 as usize]))
+        };
+        if kept.len() > limit {
+            if limit > 0 {
+                kept.select_nth_unstable_by(limit - 1, order);
+            }
+            kept.truncate(limit);
+        }
+        kept.sort_by(order);
+        kept.into_iter()
+            .map(|t| {
+                let (a, b, together) = t;
+                let (ac, bc) = (changes[a as usize], changes[b as usize]);
+                Coupling {
+                    a: head[a as usize].to_owned(),
+                    b: head[b as usize].to_owned(),
+                    together,
+                    a_changes: ac,
+                    b_changes: bc,
+                    degree: degree(&t),
+                }
+            })
+            .collect()
+    }
+
+    /// Lines now grouped by the year of the file's last change. See [`AgeReport`].
+    pub fn code_age(&self, files: &[HeadFile]) -> AgeReport {
+        let mut years: BTreeMap<i64, (u64, usize)> = BTreeMap::new();
+        let mut total = 0;
+        let shown: Vec<&HeadFile> = files
+            .iter()
+            .filter(|f| f.lines != 0 && !self.skips_head(&f.path))
+            .collect();
+        let names: Vec<&str> = shown.iter().map(|f| &*f.path).collect();
+        let all = self.touches_in(&names, i64::MIN, i64::MAX);
+        for (f, touches) in shown.into_iter().zip(all) {
+            let Some((_, c)) = touches.into_iter().max_by_key(|t| t.0.commit) else {
+                continue;
+            };
+            let day = c.time.saturating_add(i64::from(c.offset)).div_euclid(DAY);
+            let e = years.entry(civil_from_days(day).0).or_default();
+            e.0 += u64::from(f.lines);
+            e.1 += 1;
+            total += u64::from(f.lines);
+        }
+        AgeReport {
+            buckets: years
+                .into_iter()
+                .map(|(year, (lines, files))| AgeBucket { year, lines, files })
+                .collect(),
+            total_lines: total,
+        }
+    }
+}
+
+#[derive(Default)]
+struct Acc {
+    lines: u64,
+    files: usize,
+    w: BTreeMap<usize, f64>,
+}

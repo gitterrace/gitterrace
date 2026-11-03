@@ -1,0 +1,40 @@
+//! Unit tests for the insights entry points.
+
+use super::{Insights, Options, bus_factor, fixtures};
+
+#[test]
+fn derived_tables_are_built_once_per_key_and_options() {
+    let recs = fixtures::chain();
+    let built = std::cell::Cell::new(0);
+    let ignore = || {
+        built.set(built.get() + 1);
+        None
+    };
+    let a = Insights::shared(&recs, Options::default(), "t1\u{0}gen1", ignore);
+    let b = Insights::shared(&recs, Options::default(), "t1\u{0}gen1", ignore);
+    assert!(a.shares_tables_with(&b), "second page rebuilt the tables");
+    assert_eq!(built.get(), 1);
+    let gen2 = Insights::shared(&recs, Options::default(), "t1\u{0}gen2", ignore);
+    let bots = Options {
+        include_bots: true,
+        ..Options::default()
+    };
+    let other = Insights::shared(&recs, bots, "t1\u{0}gen1", ignore);
+    let copy = recs.clone();
+    let moved = Insights::shared(&copy, Options::default(), "t1\u{0}gen1", ignore);
+    for x in [&gen2, &other, &moved] {
+        assert!(!a.shares_tables_with(x), "stale tables reused");
+    }
+    assert_eq!(a.hotspots(&[], super::Period::All).files.len(), 0);
+}
+
+#[test]
+fn bus_factor_counts_who_hold_at_least_half() {
+    // The 50/50 split is the case where the surfaces disagreed.
+    assert_eq!(bus_factor([5.0, 5.0]), 1);
+    assert_eq!(bus_factor([6.0, 3.0, 1.0]), 1);
+    assert_eq!(bus_factor([3.0, 3.0, 3.0, 1.0]), 2);
+    assert_eq!(bus_factor([1.0, 4.0]), 1);
+    assert_eq!(bus_factor([0.0, 0.0]), 0);
+    assert_eq!(bus_factor(std::iter::empty()), 0);
+}
