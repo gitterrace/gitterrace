@@ -1,3 +1,4 @@
+use super::shots::{SHOT_DIR, SITE_SHOT_DIR};
 use super::*;
 
 /// One figure per shot, a light/dark pair inside it, and a lightbox that is labelled, takes
