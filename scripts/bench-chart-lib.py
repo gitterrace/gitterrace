@@ -36,6 +36,7 @@ METRICS = {
     "index_secs": ("Index build", "s", "{:.1f}"),
     "idle_cpu_pct": ("Idle CPU with /events client", "%", "{:.2f}"),
     "rss_mb": ("Peak memory (RSS)", "MB", "{:.0f}"),
+    "footprint_idle_mb": ("Idle footprint above a fresh server", "MB", "{:.0f}"),
     "export_secs": ("Export", "s", "{:.1f}"),
 }
 SHORT = {
@@ -44,6 +45,7 @@ SHORT = {
     "index_secs": "index build",
     "idle_cpu_pct": "idle CPU",
     "rss_mb": "peak memory",
+    "footprint_idle_mb": "idle footprint above a fresh server",
     "export_secs": "export",
 }
 # Schwarzwald-style calm tones per scheme: (ok bar, over bar, text).
@@ -179,6 +181,7 @@ DIRECTION = {
     "export_secs": ("faster", "slower"),
     "idle_cpu_pct": ("less CPU", "more CPU"),
     "rss_mb": ("less memory", "more memory"),
+    "footprint_idle_mb": ("less memory", "more memory"),
 }
 
 

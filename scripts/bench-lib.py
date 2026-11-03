@@ -111,6 +111,46 @@ def rss_mb(pid: int) -> float:
     return int(out.strip() or 0) / 1024
 
 
+def footprint_mb(pid: int) -> float | None:
+    """Dirty memory the kernel charges the process: `footprint` on macOS, Private_Dirty from
+    smaps_rollup on Linux. Clean mapped pages (pack files, the index) are not counted."""
+    rollup = Path(f"/proc/{pid}/smaps_rollup")
+    if rollup.exists():
+        kb = sum(
+            int(line.split()[1])
+            for line in rollup.read_text().splitlines()
+            if line.startswith("Private_Dirty:")
+        )
+        return kb / 1024
+    if not shutil.which("footprint"):
+        return None
+    out = subprocess.run(["footprint", str(pid)], capture_output=True, text=True).stdout
+    m = re.search(r"Footprint:\s*([\d.]+)\s*(KB|MB|GB)", out)
+    if not m:
+        return None
+    return float(m.group(1)) * {"KB": 1 / 1024, "MB": 1.0, "GB": 1024.0}[m.group(2)]
+
+
+def releases(port: int, prefix: str) -> int:
+    """Idle releases so far, as the repo's /api/progress counts them."""
+    c = http.client.HTTPConnection("127.0.0.1", port, timeout=30)
+    c.request("GET", f"{prefix}/api/progress")
+    n = int(json.loads(c.getresponse().read()).get("releases", -1))
+    c.close()
+    return n
+
+
+def wait_released(port: int, timeout: float = 120) -> int:
+    """Blocks until the server has released its idle caches once. The release runs one idle
+    period (30 s) after the last read: a server that never releases fails here."""
+    prefix, end = site_prefix(port), time.time() + timeout
+    while (n := releases(port, prefix)) < 1:
+        if time.time() > end:
+            raise RuntimeError(f"no idle release within {timeout:.0f} s")
+        time.sleep(0.5)
+    return n
+
+
 def cpu_secs(pid: int) -> float:
     """Total CPU seconds of a process, from /proc on Linux and ps on macOS."""
     stat = Path(f"/proc/{pid}/stat")

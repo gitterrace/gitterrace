@@ -179,6 +179,11 @@ def comparison(cur: Json, old: Json) -> list[str]:
     return [*L, ""]
 
 
+def idle_footprint(r: Json) -> str:
+    fp = r["memory"].get("footprint_idle_mb")
+    return "not measured" if fp is None else f"{fp:.0f} MB"
+
+
 def block(cur: Json, old: Json | None) -> str:
     m = cur["machine"]
     L = [
@@ -194,9 +199,9 @@ def block(cur: Json, old: Json | None) -> str:
     for n, r in cur["repos"].items():
         L += summary(n, r)
     L += [
-        "| Repo | Class | Measured at | Index | Peak RSS | Cache | RSS after pages | Idle CPU "
+        "| Repo | Class | Measured at | Index | Peak RSS | Cache | RSS after pages | Idle footprint | Idle CPU "
         "| Idle CPU with /events | Export | Cold samples |",
-        "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
     ]
     for n, r in cur["repos"].items():
         ex = (
@@ -207,7 +212,8 @@ def block(cur: Json, old: Json | None) -> str:
         L.append(
             f"| {n} | {r['class']} | `{r['sha'][:10]}` | {r['index']['secs']:.1f} s | "
             f"{r['index']['peak_rss_mb']:.0f} MB | {r['index'].get('cache_mb', 0):.0f} MB | "
-            f"{r['memory']['rss_after_pages_mb']:.0f} MB | {r['idle']['cpu_pct']:.2f}% | "
+            f"{r['memory']['rss_after_pages_mb']:.0f} MB | {idle_footprint(r)} | "
+            f"{r['idle']['cpu_pct']:.2f}% | "
             f"{r['idle']['cpu_pct_events_client']:.2f}% | {ex} | {samples_note(r)} |"
         )
     L.append("")

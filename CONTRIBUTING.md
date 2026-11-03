@@ -78,9 +78,13 @@ gitterrace.dev is generated into `site/` and shipped from a maintainer's machine
 `make deploy`. There is no deploy workflow and no Cloudflare token in the repository.
 
 1. Bump `SECURITY_TXT_EXPIRES` in `xtask/src/site.rs`, `make docs-gen`, commit.
-2. Tag and push. The release workflow builds the binaries, the installer and the formula.
-3. `make deploy` (it refuses until the tag, repository and tap answer), then `make domains`.
-4. Refresh the demo from [gitterrace/demo](https://github.com/gitterrace/demo): `make deploy`
+2. On the release candidate commit, in a clean clone on a quiet machine, `make bench LARGE=1`
+   and commit the results. This is the only published run per release, never one in between.
+3. `make changelog VERSION=x.y.z` writes the release's CHANGELOG.md section from the commits
+   (git-cliff 2.14.2, `cliff.toml`), commit it. Never edit a released section by hand.
+4. Tag and push. The release workflow builds the binaries, the installer and the formula.
+5. `make deploy` (it refuses until the tag, repository and tap answer), then `make domains`.
+6. Refresh the demo from [gitterrace/demo](https://github.com/gitterrace/demo): `make deploy`
    there.
 
 ## Security

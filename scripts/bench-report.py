@@ -79,6 +79,7 @@ def self_test() -> None:
             sys.exit(f"bench-report self-test failed: {got}")
     loud_test()
     wrap_test()
+    footprint_test()
     print("bench-report self-test: ok")
 
 
@@ -111,6 +112,36 @@ def loud_test() -> None:
         sys.exit(f"bench-report self-test failed: loud phase published: {view}")
     if QUIET_NOTE not in "".join(withheld_lines(view)):
         sys.exit("bench-report self-test failed: withheld repo not named")
+
+
+def footprint_test() -> None:
+    """A new run without an idle footprint, or one read before any release, is refused."""
+
+    def run(memory: Json) -> Json:
+        return {
+            "harness": 2,
+            "when": "2026-01-01",
+            "machine": {"label": "t"},
+            "repos": {"r": {"memory": memory}},
+        }
+
+    good = {
+        "footprint_idle_mb": 40.0,
+        "footprint_start_mb": 9.0,
+        "footprint_releases": 1,
+    }
+    missing = {k: v for k, v in good.items() if k != "footprint_idle_mb"}
+    early = {**good, "footprint_releases": 0}
+    old = {
+        "when": "2025-01-01",
+        "machine": {"label": "t"},
+        "repos": {"r": {"memory": {}}},
+    }
+    bad = [m for m in (missing, early) if not footprint(run(m))]
+    if footprint(run(good)) or footprint(old) or bad:
+        sys.exit(
+            f"bench-report self-test failed: footprint guard passed {bad or 'a good run'}"
+        )
 
 
 # Guards -------------------------------------------------------------------------------------
@@ -148,6 +179,24 @@ def newest_ok(run: Json) -> list[str]:
         for phase, v in load["phases"].items():
             if phase != "background" and v >= load["limit"]:
                 errs.append(f"{n}: {phase} timed at load {v} (limit {load['limit']})")
+    return errs
+
+
+def footprint(run: Json) -> list[str]:
+    """A run from harness 2 on records, per repo, the dirty footprint after an idle release and
+    of a just-started server. Older runs predate it and are shown as not measured."""
+    if run.get("harness", 1) < 2:
+        return []
+    errs: list[str] = []
+    for n, r in run["repos"].items():
+        m = r.get("memory", {})
+        for key in ("footprint_idle_mb", "footprint_start_mb"):
+            if m.get(key) is None:
+                errs.append(f"{run_name(run)}: {n} recorded no memory.{key}")
+        if m.get("footprint_releases", 0) < 1:
+            errs.append(
+                f"{run_name(run)}: {n} read its footprint before an idle release"
+            )
     return errs
 
 
@@ -216,6 +265,7 @@ def check(text: str, new: str) -> None:
     want = expected()
     newest = published()[-1]
     errs = pins() + no_inline_svg() + newest_ok(newest) + cold_samples(newest)
+    errs += footprint(newest)
     errs += [
         f"{p.name}: name is not <date>-<machine>.json"
         for p in runs()

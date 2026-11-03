@@ -54,6 +54,7 @@ discover = bl.discover
 pages = bl.pages
 ROOT = bl.ROOT
 FULL_RUNS = bq.FULL_RUNS
+HARNESS = 2
 FULL_IDLE_SECS = bq.FULL_IDLE_SECS
 COLD_SAMPLES = bq.COLD_SAMPLES
 max_load = bq.max_load
@@ -160,6 +161,16 @@ def bench_phases(
             "cpu_pct": idle_cpu(srv, idle_secs, False),
             "cpu_pct_events_client": idle_cpu(srv, idle_secs, True),
         }
+        # Footprint is read after the server released what the pages built, never before.
+        res["memory"]["footprint_releases"] = bl.wait_released(srv.port)
+        res["memory"]["footprint_idle_mb"] = bl.footprint_mb(srv.pid)
+        res["memory"]["rss_idle_mb"] = rss_mb(srv.pid)
+        res["memory"]["footprint_start_mb"] = start_footprint(binary, logdir)
+        print(
+            f"  idle footprint {mb(res['memory']['footprint_idle_mb'])}, fresh server "
+            f"{mb(res['memory']['footprint_start_mb'])}, idle RSS {res['memory']['rss_idle_mb']:.0f} MB",
+            flush=True,
+        )
         print(
             f"  idle {res['idle']['cpu_pct']:.2f}% / with /events {res['idle']['cpu_pct_events_client']:.2f}%",
             flush=True,
@@ -206,6 +217,39 @@ def bench_phases(
     }
     res["cold_samples"] = samples
     return res
+
+
+def mb(x: float | None) -> str:
+    return "n/a" if x is None else f"{x:.0f} MB"
+
+
+def start_footprint(binary: str, logdir: Path) -> float | None:
+    """Footprint of a just-started server: one on a one-commit repo, once it is ready. The
+    serving-memory goal is measured above this, as memory_budget.rs does."""
+    d = Path(logdir) / "fresh"
+    if not d.exists():
+        run(["git", "init", "-q", str(d)])
+        (d / "a").write_text("a\n")
+        run(["git", "add", "a"], cwd=d)
+        run(
+            [
+                "git",
+                "-c",
+                "user.name=b",
+                "-c",
+                "user.email=b@example.com",
+                "commit",
+                "-qm",
+                "a",
+            ],
+            cwd=d,
+        )
+    srv = Server(binary, d, logdir)
+    try:
+        srv.wait_ready()
+        return bl.footprint_mb(srv.pid)
+    finally:
+        srv.stop()
 
 
 def export(
@@ -277,6 +321,14 @@ def judge(res: Json, budgets: Json) -> Json:
         b.get("idle_cpu_pct"),
     )
     put("rss_mb", res["memory"]["rss_after_pages_mb"], b.get("rss_mb"))
+    # The serving-memory goal: idle, after a release, at most the cache budget plus margin
+    # above a just-started server (docs/benchmarks.md, memory_budget.rs).
+    fp, start = (
+        res["memory"].get("footprint_idle_mb"),
+        res["memory"].get("footprint_start_mb"),
+    )
+    if fp is not None and start is not None:
+        put("footprint_idle_mb", fp - start, b.get("footprint_idle_mb"))
     if "export" in res:
         put(
             "export_secs",
@@ -408,6 +460,8 @@ def main():
         print("fetched: " + ", ".join(r["name"] for r, _ in todo))
         return 0
     result = {
+        # 2: every repo records memory.footprint_idle_mb after an idle release.
+        "harness": HARNESS,
         "when": str(datetime.date.today()),
         "runs": a.runs,
         "idle_secs": a.idle_secs,

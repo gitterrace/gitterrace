@@ -1,0 +1,60 @@
+# cliff.toml, git-cliff configuration for the gitterrace changelog.
+# https://git-cliff.org/docs/configuration
+#
+# CHANGELOG.md is generated at release time by `make changelog VERSION=x.y.z`. Do not edit a
+# released section by hand: `make docs-check` compares the file with this output.
+
+[changelog]
+header = """
+# Changelog
+
+All notable changes are listed here. The format follows
+[Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
+[Semantic Versioning](https://semver.org/).
+
+Release notes are generated from commit history by git-cliff (`cliff.toml`) as a step in the
+release process. See [CONTRIBUTING](CONTRIBUTING.md#releasing-maintainers) for the sequence.
+
+"""
+body = """
+{% if version %}\
+## [{{ version | trim_start_matches(pat="v") }}] - {{ timestamp | date(format="%Y-%m-%d") }}
+{% else %}\
+## [Unreleased]
+{% endif %}\
+{% for group, commits in commits | group_by(attribute="group") %}
+### {{ group | striptags | trim | upper_first }}
+
+{% for commit in commits %}\
+- {% if commit.scope %}{{ commit.scope }}: {{ commit.message }}{% else %}{{ commit.message | upper_first }}{% endif %}
+{% endfor %}\
+{% endfor %}
+"""
+trim = true
+footer = ""
+
+[git]
+conventional_commits = true
+# Non-conventional subjects (for example "wip: ...") never reach the changelog.
+filter_unconventional = true
+split_commits = false
+protect_breaking_commits = false
+filter_commits = false
+topo_order = false
+sort_commits = "oldest"
+tag_pattern = "v[0-9].*"
+
+commit_preprocessors = [
+  { pattern = '\.$', replace = "" },
+]
+
+# The order here is the order of the groups in the output (Keep a Changelog order).
+commit_parsers = [
+  { message = "^feat", group = "<!-- 0 -->Added" },
+  { message = "^refactor", group = "<!-- 1 -->Changed" },
+  { message = "^fix", group = "<!-- 2 -->Fixed" },
+  { message = "^perf", group = "<!-- 3 -->Performance" },
+  { message = "^(docs|test|chore|ci|build|style|revert)", skip = true },
+  { message = "(re-bless|lint)", skip = true },
+  { message = ".*", skip = true },
+]

@@ -22,7 +22,11 @@ untimed read of the repository. Warm is the runs after it.
    developer's own settings never apply.
 3. **Idle.** CPU percent over a 60 s window with no client, and again with one `/events`
    client open, which is the cost of the live watcher.
-4. **Memory.** RSS after the index is ready and after every page was visited.
+4. **Memory.** RSS after the index is ready and after every page was visited, then the dirty
+   footprint (`footprint` on macOS, `Private_Dirty` from `smaps_rollup` on Linux) once
+   `/api/progress` reports an idle release, and that of a just-started server. RSS includes the
+   mapped pack and index files and the working set not yet released, the footprint is the dirty
+   memory the server still holds after the idle release.
 5. **Export.** `git terrace export` time and output size, on every repository. The output goes
    to `export-<repo>` under the clone directory and is removed afterwards.
 
@@ -58,10 +62,15 @@ holds some MB, not GB, and that amount does not grow with the history. The goal 
 also after a sweep of every insights page. Page cache for the index files is not counted. A
 peak during the index build is fine. `crates/gitterrace-web/tests/memory_budget.rs` guards it on
 synthetic repositories of growing size, and `make memory-check` measures it on a real clone.
+Every bench run checks it too, as the `footprint_idle_mb` budget: idle footprint minus that
+of a just-started server, at most 48 MB on every class.
 
 Timings need a quiet machine. Before each timed phase the harness waits until the 1-minute load
 average stays under `BENCH_MAX_LOAD` (default half the cores) for 20 s, and records the load per
 phase. `make docs-check` refuses results timed above that limit.
+
+The published run is made once per release, on the release candidate commit, on a quiet
+machine, never as extra runs in between. The 0.1.0 run is the first baseline.
 
 ### File pages on a large history: target missed
 
@@ -132,9 +141,9 @@ large repository, measured at `f90a2d27c2`. All 5 metrics are within budget. Aga
 CPU 0.10 % of 1 %, index build 89.5 s (86.6 to 93.6) of 2400 s, cold page 1710 ms (1647 to 1817) of
 10000 ms, warm page 39 ms of 300 ms, peak memory 1166 MB of 6000 MB.
 
-| Repo | Class | Measured at | Index | Peak RSS | Cache | RSS after pages | Idle CPU | Idle CPU with /events | Export | Cold samples |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| rust | large | `f90a2d27c2` | 89.5 s | 1956 MB | 715 MB | 1166 MB | 0.03% | 0.10% | 361.7 s, 355 MB | median of 3 |
+| Repo | Class | Measured at | Index | Peak RSS | Cache | RSS after pages | Idle footprint | Idle CPU | Idle CPU with /events | Export | Cold samples |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| rust | large | `f90a2d27c2` | 89.5 s | 1956 MB | 715 MB | 1166 MB | not measured | 0.03% | 0.10% | 361.7 s, 355 MB | median of 3 |
 
 <picture>
 <source media="(prefers-color-scheme: dark)" srcset="../bench/results/2026-11-03-apple-m1-max/page_warm_ms-dark.svg">

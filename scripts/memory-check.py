@@ -3,8 +3,8 @@
 
 Builds synthetic repositories of growing size, serves each with the release binary, waits for
 the index, visits the bench's page set (`pages` in bench-lib.py) and then leaves the server
-idle until it reports an idle release in `/api/progress`. It then reads RSS
-the way bench-run samples it (`ps -o rss`) and, on macOS, the dirty footprint (`footprint`).
+idle until it reports an idle release in `/api/progress`. It then reads RSS and the dirty
+footprint the way bench-run samples them (`rss_mb` and `footprint_mb` in bench-lib.py).
 Fails when the idle footprint (RSS elsewhere) is over the bound at any size, or grows by more
 than the slack from the smallest repository to the largest: memory that scales with history
 while nobody browses is the bug this catches, whatever cache holds it.
@@ -15,15 +15,10 @@ while nobody browses is the bug this catches, whatever cache holds it.
 from __future__ import annotations
 
 import argparse
-import http.client
 import importlib.util
-import json
-import re
-import shutil
 import subprocess
 import sys
 import tempfile
-import time
 from pathlib import Path
 from typing import Any
 
@@ -43,17 +38,6 @@ def bench():
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     return mod
-
-
-def footprint_mb(pid: int) -> float | None:
-    """Dirty memory the kernel charges the process (macOS only); clean mapped pages excluded."""
-    if not shutil.which("footprint"):
-        return None
-    out = subprocess.run(["footprint", str(pid)], capture_output=True, text=True).stdout
-    m = re.search(r"Footprint:\s*([\d.]+)\s*(KB|MB|GB)", out)
-    if not m:
-        return None
-    return float(m.group(1)) * {"KB": 1 / 1024, "MB": 1.0, "GB": 1024.0}[m.group(2)]
 
 
 def make_repo(d: Path, commits: int) -> None:
@@ -94,14 +78,6 @@ def assert_zero_decay(binary: str) -> None:
         sys.exit(f"{binary} does not run with zero page decay: {out.stdout.strip()!r}")
 
 
-def releases(port: int, prefix: str) -> int:
-    c = http.client.HTTPConnection("127.0.0.1", port, timeout=30)
-    c.request("GET", f"{prefix}/api/progress")
-    n = int(json.loads(c.getresponse().read()).get("releases", -1))
-    c.close()
-    return n
-
-
 def measure(
     br: Any, binary: str, repo: Path, logdir: Path
 ) -> tuple[float, float | None]:
@@ -112,14 +88,11 @@ def measure(
         for path in br.pages(br.discover(repo, "HEAD"), "fn").values():
             br.get(srv.port, prefix + path)
         # Idle means after the server released what the pages built, not after a guessed time.
-        end = time.time() + RELEASE_WAIT_SECS
-        while releases(srv.port, prefix) < 1:
-            if time.time() > end:
-                sys.exit(
-                    f"no idle release within {RELEASE_WAIT_SECS} s: the server keeps its caches"
-                )
-            time.sleep(0.5)
-        return br.rss_mb(srv.pid), footprint_mb(srv.pid)
+        try:
+            br.wait_released(srv.port, RELEASE_WAIT_SECS)
+        except RuntimeError as e:
+            sys.exit(f"{e}: the server keeps its caches")
+        return br.rss_mb(srv.pid), br.footprint_mb(srv.pid)
     finally:
         srv.stop()
 

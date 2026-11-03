@@ -45,13 +45,16 @@ opt_in = true
 cold_samples = 1
 search = "kmalloc"
 
-# Budgets per size class. First measured run plus headroom (see docs/benchmarks.md).
+# Budgets per size class. First measured run plus headroom (see docs/benchmarks.md), except
+# footprint_idle_mb: the serving-memory goal, 32 MB cache budget plus 16 MB margin above a
+# just-started server, the same on every class.
 [budgets.small]
 page_warm_ms = 300
 page_cold_ms = 1500
 index_secs = 30
 idle_cpu_pct = 1
 rss_mb = 500
+footprint_idle_mb = 48
 export_secs = 60
 
 [budgets.medium]
@@ -60,6 +63,7 @@ page_cold_ms = 3000
 index_secs = 300
 idle_cpu_pct = 1
 rss_mb = 1500
+footprint_idle_mb = 48
 export_secs = 300
 
 [budgets.large]
@@ -68,6 +72,7 @@ page_cold_ms = 10000
 index_secs = 2400
 idle_cpu_pct = 1
 rss_mb = 6000
+footprint_idle_mb = 48
 
 [budgets.huge]
 page_warm_ms = 500
@@ -76,3 +81,4 @@ page_cold_ms = 20000
 index_secs = 600
 idle_cpu_pct = 1
 rss_mb = 8000
+footprint_idle_mb = 48

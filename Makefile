@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: app-icon build install fmt clippy lint test doc theme actions docs-gen docs-check names lines check site-render site-shots help bench bench-report bench-guard memory-check browser-check site deploy shipped domains send-vectors preview gc gc-guard
+.PHONY: app-icon build install fmt clippy lint test doc theme actions docs-gen docs-check names lines check site-render site-shots help bench bench-report bench-guard memory-check browser-check site deploy shipped domains send-vectors preview gc gc-guard changelog
 
 ## build: Release binary
 build:
@@ -53,6 +53,7 @@ docs-gen:
 docs-check:
 	python3 scripts/bench-report.py --check
 	python3 scripts/make-targets-check.py
+	python3 scripts/changelog-check.py --self-test && python3 scripts/changelog-check.py
 	cargo xtask check
 
 #: names: File, env and project names follow the conventions
@@ -79,6 +80,10 @@ gc:
 gc-guard:
 	@python3 scripts/target-run.py --auto
 	@python3 scripts/target-run.py --self-test
+
+## changelog: Prepend the section for the release about to be tagged to CHANGELOG.md, from the commits since the last tag (VERSION=x.y.z, needs git-cliff 2.14.2)
+changelog:
+	sh scripts/changelog-gen.sh $(or $(VERSION),$(error VERSION=x.y.z is required))
 
 ## check: Every gate (fmt, clippy, lint, test, doc, theme, actions, send-vectors, names, docs-check, gc-guard, bench-guard)
 check: gc-guard theme actions send-vectors names lines bench-guard docs-check fmt clippy lint test doc
