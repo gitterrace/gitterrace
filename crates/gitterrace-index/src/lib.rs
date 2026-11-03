@@ -23,7 +23,7 @@ pub use store::FORMAT_VERSION;
 
 /// Every file the cache keeps in `.git/gitterrace/`, with what it holds. The architecture page is
 /// rendered from this, and a test fails when the folder holds a file not listed here.
-pub const CACHE_FILES: [(&str, &str); 5] = [
+pub const CACHE_FILES: [(&str, &str); 6] = [
     (
         store::VERSION_FILE,
         "The cache format. A mismatch deletes the cache and rebuilds it. The format is never migrated.",
@@ -41,10 +41,17 @@ pub const CACHE_FILES: [(&str, &str); 5] = [
         "Empty. Held locked by whichever process is adding records, so two processes on one repository take turns instead of mixing up path numbers.",
     ),
     (
+        TIP_FILE,
+        "The commit id the segment files were last built for. Opening insights for that commit skips walking its history to check the files hold exactly it.",
+    ),
+    (
         insights::CACHE_FILE,
         "Line counts per blob id for the language chart. A blob never changes, so the counts never go stale.",
     ),
 ];
+
+/// See [`CACHE_FILES`].
+const TIP_FILE: &str = "tip";
 
 /// Commits per progress step, and per call for a source that builds in batches. A batching
 /// source pays a fixed cost per worker each batch (the diff attribute setup unpacks the HEAD
@@ -184,6 +191,7 @@ impl Index {
         progress: &dyn Fn(Progress),
     ) -> io::Result<()> {
         self.writable()?;
+        let tip = source.resolve(rev);
         let ids = source.rev_list(rev)?;
         let shallow_list = source.shallow_ids();
         // A deepened or grafted clone changes topo ranks: same rule as an unreadable cache.
@@ -191,6 +199,9 @@ impl Index {
         let shallow: HashSet<String> = shallow_list.iter().cloned().collect();
         // Everything below reads what another writer may be appending: lock first.
         let _lock = store::WriteLock::take(&self.dir)?;
+        // Gone before the set can change, written back once it holds exactly `tip`: a crash in
+        // between leaves no marker, so the next open checks the set the slow way.
+        cache::remove(&self.dir, TIP_FILE)?;
         let stored = store::stored_ids(&self.dir)?;
         let todo = stored.todo(&ids, &shallow);
         let total = todo.len();
@@ -231,16 +242,23 @@ impl Index {
         if stored < ids.len() {
             skipped(ids.len() - stored, &self.dir);
         }
-        match build {
+        let complete = match build {
             // Complete: every commit of the rev is in the segment.
             Some(b) if stored == ids.len() => {
                 b.finish(None, Vec::new()).map_err(seg)?;
-                Ok(())
+                true
             }
             // A skipped commit leaves a gap: the next update builds once it is readable.
-            Some(_) => Ok(()),
-            None => self.build_segments(&order, &shallow_list),
+            Some(_) => false,
+            None => {
+                self.build_segments(&order, &shallow_list)?;
+                stored == ids.len()
+            }
+        };
+        if complete && let Some(t) = tip {
+            cache::write_atomic(&self.dir, TIP_FILE, t.as_bytes())?;
         }
+        Ok(())
     }
 
     /// Writes the segment set for `order` (canonical ids of the rev) when the manifest does not
@@ -371,17 +389,27 @@ impl Index {
         let Some(store) = open()? else {
             return Ok(None);
         };
-        let order = source.rev_list(rev)?;
+        // The set was built for this exact commit: no history walk needed to prove it holds it.
+        let built = cache::read(&self.dir, TIP_FILE)
+            .ok()
+            .flatten()
+            .is_some_and(|t| t.trim_ascii() == rev.as_bytes() && store::oid_of(rev).is_some());
+        let order = if built {
+            Vec::new()
+        } else {
+            source.rev_list(rev)?
+        };
         let m = &store.manifest;
         // An unmerged set's order file is old order then new commits, not canonical, so the
         // fingerprint only matches after a merge: compare the sets.
-        let same = m.commits as usize == order.len()
-            && store::load_order(&store).is_ok_and(|held| {
-                let held: HashSet<seg::Oid> = held.into_iter().collect();
-                order
-                    .iter()
-                    .all(|id| store::oid_of(id).is_some_and(|o| held.contains(&o)))
-            });
+        let same = built
+            || m.commits as usize == order.len()
+                && store::load_order(&store).is_ok_and(|held| {
+                    let held: HashSet<seg::Oid> = held.into_iter().collect();
+                    order
+                        .iter()
+                        .all(|id| store::oid_of(id).is_some_and(|o| held.contains(&o)))
+                });
         if !same {
             return Ok(None);
         }
@@ -557,6 +585,10 @@ mod tests {
     impl CommitSource for Fake {
         fn rev_list(&self, _rev: &str) -> io::Result<Vec<String>> {
             Ok(self.ids.borrow().clone())
+        }
+
+        fn resolve(&self, _rev: &str) -> Option<String> {
+            self.ids.borrow().last().cloned()
         }
 
         fn records(&self, ids: &[String]) -> io::Result<Vec<CommitRecord>> {

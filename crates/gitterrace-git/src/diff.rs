@@ -113,8 +113,32 @@ pub(crate) fn changes(
 
 /// The blob cache a tree diff needs. Building it reads attributes and, in a bare clone,
 /// unpacks the whole HEAD tree into an index, so a worker builds it once for many commits.
+///
+/// The index the attributes come from is owned here and dropped with the cache. The gix
+/// shortcut keeps it in the repository's shared index snapshot, which every clone of the
+/// repository holds for the life of the server: the whole HEAD index, sized by the tree.
 pub(crate) fn resource_cache(repo: &gix::Repository) -> Result<gix::diff::blob::Platform> {
-    repo.diff_resource_cache_for_tree_diff().map_err(git)
+    let index = match repo.open_index() {
+        Ok(index) => index,
+        Err(_) => match repo.head_tree_id_or_empty() {
+            Ok(tree) => repo.index_from_tree(&tree).map_err(git)?,
+            Err(e) => return Err(git(e)),
+        },
+    };
+    let attrs = repo
+        .attributes_only(
+            &index,
+            gix::worktree::stack::state::attributes::Source::IdMapping,
+        )
+        .map_err(git)?
+        .detach();
+    gix::diff::resource_cache(
+        repo,
+        gix::diff::blob::pipeline::Mode::ToGit,
+        attrs,
+        gix::diff::blob::pipeline::WorktreeRoots::default(),
+    )
+    .map_err(git)
 }
 
 /// [`changes`] with a caller-owned blob cache, cleared here after every commit, and an optional
@@ -910,6 +934,58 @@ mod tests {
                     Some(&memo),
                 )?;
                 assert_eq!(format!("{memoized:?}"), format!("{plain:?}"), "commit {id}");
+            }
+        }
+        Ok(())
+    }
+
+    /// The cache built from an owned index reads the same attributes as the gix shortcut, so
+    /// every diff of a history with `binary`, `diff=`, `-diff` and `text` rules, renames and
+    /// edits across them is the same. Red when the attributes are dropped (an empty index).
+    #[test]
+    fn the_owned_index_cache_diffs_as_the_shared_one() -> crate::Result<()> {
+        let dir = tempfile::tempdir().map_err(crate::error::git)?;
+        let mut f = gitterrace_testkit::Fixture::init(dir.path());
+        let body = (0..40).fold(String::new(), |b, l| b + &format!("line {l}\n"));
+        f = f
+            .write(
+                ".gitattributes",
+                "*.dat binary\n*.md diff=markdown\n*.gen -diff\n*.txt text eol=crlf\n",
+            )
+            .write("a.dat", &body)
+            .write("b.md", &body)
+            .write("c.gen", &body)
+            .write("d.txt", &body)
+            .commit("attributes");
+        // Attributes reach the result through rename similarity: a `binary` or `-diff` file
+        // moved with an edit is no rename to compare by content, a text one is.
+        f.git(&["mv", "a.dat", "moved.dat"]);
+        f.git(&["mv", "c.gen", "moved.gen"]);
+        f.git(&["mv", "b.md", "moved.md"]);
+        f = f
+            .write("moved.dat", &format!("{body}more\n"))
+            .write("moved.gen", &format!("{body}more\n"))
+            .write("moved.md", &format!("{body}more\n"))
+            .write("d.txt", &format!("x\n{body}"))
+            .commit("renames and edits");
+        f.git(&["mv", "moved.gen", "e.txt"]);
+        let _done = f
+            .write("e.txt", &format!("{body}again\n"))
+            .commit("across rules");
+        let repo = crate::Repo::discover(dir.path())?;
+        let gix = repo.repo();
+        let mut owned = super::resource_cache(&gix)?;
+        let mut shared = gix
+            .diff_resource_cache_for_tree_diff()
+            .map_err(crate::error::git)?;
+        for id in repo.rev_list("HEAD")? {
+            let commit = gix
+                .find_commit(repo.full_id(&gix, &id)?)
+                .map_err(crate::error::git)?;
+            for hunks in [false, true] {
+                let a = super::changes_with(&gix, &commit, hunks, 1 << 20, &mut owned, None)?;
+                let b = super::changes_with(&gix, &commit, hunks, 1 << 20, &mut shared, None)?;
+                assert_eq!(format!("{a:?}"), format!("{b:?}"), "commit {id}");
             }
         }
         Ok(())

@@ -195,8 +195,9 @@ settings! {
         theme: String = "system".to_owned() => Live,
         /// How dates read: relative or absolute.
         dates: String = "relative".to_owned() => Live,
-        /// Overview sidebar sections, in the order shown: now, recent, churn, loose_ends and
-        /// languages. Leave one out to hide it. An empty list hides the sidebar.
+        /// Overview sidebar sections, in the order shown: `now`, `recent`, `churn`,
+        /// `loose_ends` and `languages`. Leave one out to hide it. An empty list hides the
+        /// sidebar.
         sidebar: Vec<String> = SIDEBAR.iter().map(|&s| s.to_owned()).collect() => Live,
     }
     multi: Multi {

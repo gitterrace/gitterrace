@@ -46,7 +46,7 @@ pub use types::{
 };
 pub use url::{percent_decode, percent_encode_path, percent_encode_segment};
 pub use walk::{
-    BlobId, BlobReader, FileRef, LastCommit, canonical_order, files, last_commits,
+    BlobId, BlobReader, FileRef, LastCommit, canonical_order, files, files_named, last_commits,
     last_commits_among, scan_commits, tree_id,
 };
 #[cfg(test)]

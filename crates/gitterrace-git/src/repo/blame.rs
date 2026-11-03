@@ -94,13 +94,7 @@ impl Repo {
         let Ok(text) = String::from_utf8(data) else {
             return Ok(Vec::new());
         };
-        let outcome = repo
-            .blame_file(
-                path.into(),
-                tip,
-                gix::repository::blame_file::Options::default(),
-            )
-            .map_err(git)?;
+        let outcome = blame_outcome(&repo, tip, path)?;
         let mailmap = ident::mailmap(&repo, tip);
         let mut commits: HashMap<gix::ObjectId, (String, i64)> = HashMap::new();
         let mut lines: Vec<BlameLine> = Vec::new();
@@ -151,5 +145,83 @@ impl Repo {
         self.blame_cache
             .lock()
             .map_or((0, 0), |c| (c.bytes, c.limit))
+    }
+}
+
+/// Blame of `path` at `tip` with the options `Repository::blame_file` uses by default. That
+/// shortcut builds its diff cache through the repository's shared index snapshot, which keeps
+/// the whole HEAD index alive for the life of the server; this one owns its index.
+pub(crate) fn blame_outcome(
+    repo: &gix::Repository,
+    tip: gix::ObjectId,
+    path: &str,
+) -> Result<gix::blame::Outcome> {
+    let mut cache = crate::diff::resource_cache(repo)?;
+    gix::blame::file(
+        &repo.objects,
+        gix::blame::Start::Commit(tip),
+        repo.commit_graph_if_enabled().map_err(git)?,
+        &mut cache,
+        path.into(),
+        gix::blame::Options {
+            diff_algorithm: repo.diff_algorithm().map_err(git)?,
+            ranges: gix::blame::BlameRanges::default(),
+            since: None,
+            rewrites: None,
+            debug_track_path: false,
+        },
+    )
+    .map_err(git)
+}
+
+#[cfg(test)]
+mod tests {
+    /// Blame through the owned index is gix's own blame, entry for entry, on a history with
+    /// moves, edits under `.gitattributes` rules and a merge. Red when an option differs from
+    /// the shortcut's default (rewrites, since, ranges, algorithm) or attributes are dropped.
+    #[test]
+    fn the_owned_index_blame_is_gix_blame() -> crate::Result<()> {
+        let dir = tempfile::tempdir().map_err(crate::error::git)?;
+        let p = dir.path();
+        let at = |args: &[&str]| gitterrace_testkit::git_at(p, "2024-01-02T12:00:00Z", args);
+        let body = |tag: &str| (0..30).fold(String::new(), |b, l| b + &format!("{tag} {l}\n"));
+        at(&["init", "-q", "-b", "main"]);
+        std::fs::write(
+            p.join(".gitattributes"),
+            "*.txt text eol=crlf\n*.md diff=markdown\n",
+        )
+        .map_err(crate::error::git)?;
+        std::fs::write(p.join("a.txt"), body("a")).map_err(crate::error::git)?;
+        std::fs::write(p.join("b.md"), body("b")).map_err(crate::error::git)?;
+        at(&["add", "-A"]);
+        at(&["commit", "-qm", "one"]);
+        at(&["mv", "a.txt", "moved.txt"]);
+        std::fs::write(p.join("moved.txt"), body("a") + "tail\n").map_err(crate::error::git)?;
+        at(&["commit", "-qam", "move and edit"]);
+        at(&["checkout", "-q", "-b", "side", "HEAD~1"]);
+        std::fs::write(p.join("b.md"), "side\n".to_owned() + &body("b"))
+            .map_err(crate::error::git)?;
+        at(&["commit", "-qam", "side edit"]);
+        at(&["checkout", "-q", "main"]);
+        at(&["merge", "-q", "--no-edit", "side"]);
+        let repo = crate::Repo::discover(p)?;
+        let gix = repo.repo();
+        let tip = repo.resolve_id(&gix, "HEAD")?;
+        for path in ["moved.txt", "b.md", ".gitattributes"] {
+            let ours = super::blame_outcome(&gix, tip, path)?;
+            let theirs = gix
+                .blame_file(
+                    path.into(),
+                    tip,
+                    gix::repository::blame_file::Options::default(),
+                )
+                .map_err(crate::error::git)?;
+            assert_eq!(
+                format!("{:?}", ours.entries),
+                format!("{:?}", theirs.entries),
+                "{path}"
+            );
+        }
+        Ok(())
     }
 }

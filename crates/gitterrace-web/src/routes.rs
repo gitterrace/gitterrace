@@ -1061,6 +1061,8 @@ struct ProgressBody {
     done: usize,
     total: usize,
     ready: bool,
+    /// Idle releases so far, see `App::release_idle`.
+    releases: u64,
 }
 
 async fn progress(State(app): Shared) -> Json<ProgressBody> {
@@ -1069,6 +1071,7 @@ async fn progress(State(app): Shared) -> Json<ProgressBody> {
         done: p.done,
         total: p.total,
         ready: app.ready(),
+        releases: app.releases(),
     })
 }
 

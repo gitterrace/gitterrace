@@ -9,6 +9,11 @@ pub trait CommitSource {
     /// Commit ids reachable from `rev`, oldest first.
     fn rev_list(&self, rev: &str) -> io::Result<Vec<String>>;
 
+    /// The commit id `rev` names, `None` when the source cannot say (test doubles).
+    fn resolve(&self, _rev: &str) -> Option<String> {
+        None
+    }
+
     /// Builds the record for one commit.
     fn record(&self, id: &str) -> io::Result<CommitRecord>;
 
@@ -102,6 +107,10 @@ impl CommitSource for Repo {
     fn rev_list(&self, rev: &str) -> io::Result<Vec<String>> {
         // The canonical order, not the walk's: ordinals and string ids follow it.
         gitterrace_git::canonical_order(self, rev).map_err(io::Error::other)
+    }
+
+    fn resolve(&self, rev: &str) -> Option<String> {
+        Self::resolve(self, rev).ok()
     }
 
     fn record(&self, id: &str) -> io::Result<CommitRecord> {

@@ -72,6 +72,40 @@ pub fn files(repo: &Repo, rev: &str) -> Result<Vec<FileRef>> {
     Ok(out)
 }
 
+/// Paths of the blobs at `rev` whose file name is one of `names`, sorted. Walks the whole tree
+/// but keeps only the matches, so the result is sized by them, not by the tree.
+pub fn files_named(repo: &Repo, rev: &str, names: &[&str]) -> Result<Vec<String>> {
+    let id = oid(&repo.resolve(rev)?)?;
+    let r = open(repo)?;
+    let root = r
+        .find_commit(id)
+        .map_err(git)?
+        .tree_id()
+        .map_err(git)?
+        .detach();
+    let mut out = Vec::new();
+    let mut todo: Vec<(String, gix::ObjectId)> = vec![(String::new(), root)];
+    while let Some((dir, tree)) = todo.pop() {
+        let tree = r.find_tree(tree).map_err(git)?;
+        for e in tree.iter() {
+            let e = e.map_err(git)?;
+            let name = e.filename().to_str_lossy();
+            let path = if dir.is_empty() {
+                name.to_string()
+            } else {
+                format!("{dir}/{name}")
+            };
+            if e.mode().is_tree() {
+                todo.push((path, e.object_id()));
+            } else if e.mode().is_blob() && names.contains(&&*name) {
+                out.push(path);
+            }
+        }
+    }
+    out.sort();
+    Ok(out)
+}
+
 /// Reads blobs on one thread. Make one per worker.
 pub struct BlobReader {
     repo: gix::Repository,

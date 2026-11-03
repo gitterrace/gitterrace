@@ -117,6 +117,10 @@ impl<V: Clone + Weight> Bounded<V> {
         self.used = 0;
     }
 
+    pub(crate) fn is_empty(&self) -> bool {
+        self.map.is_empty()
+    }
+
     #[cfg(test)]
     pub(crate) const fn used(&self) -> usize {
         self.used

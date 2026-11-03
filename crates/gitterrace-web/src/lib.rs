@@ -6,6 +6,7 @@ mod activity;
 mod add;
 mod app;
 mod bounded;
+mod caches;
 mod charts;
 mod commit_types;
 mod compare;
@@ -185,6 +186,8 @@ async fn prewarm(app: Arc<App>, pages: axum::Router) {
     app::on_refreshed(app, move || {
         let (app, pages) = (Arc::clone(&by), pages.clone());
         async move {
+            // The warm-up is no visitor: what it opens goes one idle period after it started.
+            let _warm = app.warming();
             let ready = app::blocking(&app, |a| {
                 let head = a.repo.resolve("HEAD")?;
                 Ok(a.source(&head)?.is_some())

@@ -41,19 +41,7 @@ pub(crate) const RECORDS_IDLE: Duration = Duration::from_secs(30);
 /// Largest ignore file read: these are configuration, never megabytes.
 const MAX_IGNORE_BYTES: usize = 1 << 20;
 
-/// Commit subjects by full id.
-pub(crate) type Subjects = HashMap<String, String>;
-
-/// One selected commit's records, filled once by whichever caller gets there first.
-type RecordSlot = Arc<Mutex<Option<Arc<Vec<CommitRecord>>>>>;
-
-/// Overview totals for one (commit, index generation, options).
-/// One commit and its ignore files as `(path, text)`.
-type IgnoreFiles = (String, Arc<Vec<(String, String)>>);
-
-type TotalsEntry = (String, gitterrace_index::PeriodStats);
-/// A head commit id and the index generation it was read at.
-type HeadGen = (String, u64);
+use crate::caches::RecordSlot;
 
 /// What every repository of one server shares: the settings in force, the cap on page-building
 /// jobs and the shutdown signal that ends live streams.
@@ -271,41 +259,23 @@ pub(crate) struct App {
     /// Selected commits outside HEAD's history, queued for the one indexer loop so the cache
     /// file never has two writers.
     wanted: Mutex<std::collections::BTreeSet<String>>,
-    /// Record sets by (commit, generation), oldest first. The map lock is held only to find a
-    /// slot; the parse runs under that slot's own lock, so one cold commit never stalls pages
-    /// on another.
-    records: Mutex<Vec<((String, u64), RecordSlot)>>,
     /// Record file reads, so a test can tell a hit from a re-read.
     record_loads: AtomicU64,
     /// Last time a page read the record sets, see [`App::release_idle`].
     records_used: Mutex<Instant>,
-    /// The insights source of one (commit, generation), so every page shares its derived
-    /// tables.
-    source: Mutex<Option<((String, u64), crate::insights::Src)>>,
-    /// The same source as [`App::source`] holds when it reads the segment files, typed, so a
-    /// store error it met turns into a rebuild.
-    disk: Mutex<Option<Unreadable>>,
-    /// Commits whose insights are past the reach of the segment set, with how many commits
-    /// were read to find out, keyed by (commit, generation).
-    far: Mutex<Option<((String, u64), usize)>>,
-    totals: Mutex<Option<TotalsEntry>>,
-    /// Ignore files of one commit, `(path, text)`. Building the rules from them is cheap; finding
-    /// them walks the whole tree.
-    ignores: Mutex<Option<IgnoreFiles>>,
+    /// Warm-up jobs running. Their reads are not a visitor's, so they do not keep the caches.
+    warming: std::sync::atomic::AtomicUsize,
+    /// Idle releases that freed something, served in `/api/progress` so a test can wait for
+    /// one instead of guessing its time.
+    releases: AtomicU64,
     memo: Mutex<crate::bounded::Bounded<(Instant, Arc<String>)>>,
     dirty: Mutex<Option<(Instant, bool)>>,
     /// Open streams on a page that shows the working tree. Zero means no scan runs.
     pub(crate) wt_watchers: std::sync::atomic::AtomicUsize,
     /// This repository's `/api/v1` state, so a reload reaches its settings.
     api: std::sync::OnceLock<gitterrace_api::ApiState>,
-    file_lists: Mutex<crate::bounded::Bounded<Arc<Vec<String>>>>,
-    last_commits: Mutex<crate::bounded::Bounded<Arc<Vec<LastCommit>>>>,
-    /// Ids of the commits `git log -- path` lists, by (tip, path, index generation).
-    path_logs: Mutex<crate::bounded::Bounded<Arc<PathLog>>>,
-    subjects: Mutex<Option<(String, Arc<Subjects>)>>,
-    /// The languages skeleton by (head, index generation). Flat in history length.
-    chain: Mutex<Option<(HeadGen, Arc<crate::languages::Skeleton>)>>,
-    head_lines: Mutex<Option<(String, Arc<Vec<gitterrace_index::HeadFile>>)>>,
+    /// Every per-request cache, dropped together when the repository is idle.
+    caches: crate::caches::Caches,
 }
 
 impl App {
@@ -341,24 +311,15 @@ impl App {
             progress: Mutex::new(Progress::default()),
             ready: AtomicBool::new(false),
             wanted: Mutex::new(std::collections::BTreeSet::new()),
-            records: Mutex::new(Vec::new()),
             record_loads: AtomicU64::new(0),
             records_used: Mutex::new(Instant::now()),
-            source: Mutex::new(None),
-            disk: Mutex::new(None),
-            far: Mutex::new(None),
-            totals: Mutex::new(None),
-            ignores: Mutex::new(None),
+            warming: std::sync::atomic::AtomicUsize::new(0),
+            releases: AtomicU64::new(0),
             memo: Mutex::new(crate::bounded::Bounded::new(small)),
             dirty: Mutex::new(None),
             wt_watchers: std::sync::atomic::AtomicUsize::new(0),
+            caches: crate::caches::Caches::new(small),
             api: std::sync::OnceLock::new(),
-            file_lists: Mutex::new(crate::bounded::Bounded::new(small)),
-            last_commits: Mutex::new(crate::bounded::Bounded::new(small)),
-            path_logs: Mutex::new(crate::bounded::Bounded::new(small)),
-            subjects: Mutex::new(None),
-            chain: Mutex::new(None),
-            head_lines: Mutex::new(None),
         }
     }
 
@@ -402,15 +363,7 @@ impl App {
             g.clear();
             g.set_budget(small);
         }
-        if let Ok(mut g) = self.file_lists.lock() {
-            g.set_budget(small);
-        }
-        if let Ok(mut g) = self.last_commits.lock() {
-            g.set_budget(small);
-        }
-        if let Ok(mut g) = self.path_logs.lock() {
-            g.set_budget(small);
-        }
+        self.caches.set_budget(small);
         // The watcher loop re-reads `watch.*` when woken.
         self.wake.notify_one();
         // An error only says no tab is open.
@@ -479,7 +432,7 @@ impl App {
 
     /// Paths of all files at a full commit id. Commits are immutable, so entries never expire.
     pub(crate) fn file_paths(&self, commit: &str) -> Result<Arc<Vec<String>>> {
-        if let Ok(g) = self.file_lists.lock()
+        if let Ok(g) = self.caches.file_lists.lock()
             && let Some(v) = g.get(commit)
         {
             return Ok(v);
@@ -489,7 +442,7 @@ impl App {
             .map(|f| f.path)
             .collect();
         let list = Arc::new(list);
-        if let Ok(mut g) = self.file_lists.lock() {
+        if let Ok(mut g) = self.caches.file_lists.lock() {
             g.put(commit.to_owned(), Arc::clone(&list));
         }
         Ok(list)
@@ -512,7 +465,7 @@ impl App {
     ) -> Result<Arc<Vec<LastCommit>>> {
         let dir = dir.trim_matches('/');
         let key = format!("{commit}\0{dir}");
-        if let Ok(g) = self.last_commits.lock()
+        if let Ok(g) = self.caches.last_commits.lock()
             && let Some(v) = g.get(&key)
         {
             return Ok(v);
@@ -526,7 +479,7 @@ impl App {
         if !complete {
             return Ok(v);
         }
-        if let Ok(mut g) = self.last_commits.lock() {
+        if let Ok(mut g) = self.caches.last_commits.lock() {
             g.put(key, Arc::clone(&v));
         }
         Ok(v)
@@ -540,7 +493,7 @@ impl App {
             return Ok(None);
         };
         let key = format!("{commit}\0{path}\0{}", self.index.generation());
-        if let Ok(g) = self.path_logs.lock()
+        if let Ok(g) = self.caches.path_logs.lock()
             && let Some(v) = g.get(&key)
         {
             return Ok(Some(v));
@@ -552,7 +505,7 @@ impl App {
             .collect();
         let (ids, complete) = self.repo.touching(path, &history);
         let ids = Arc::new(PathLog { ids, complete });
-        if let Ok(mut g) = self.path_logs.lock() {
+        if let Ok(mut g) = self.caches.path_logs.lock() {
             g.put(key, Arc::clone(&ids));
         }
         Ok(Some(ids))
@@ -566,14 +519,14 @@ impl App {
         filter: &gitterrace_index::PathFilter,
     ) -> Arc<crate::languages::Skeleton> {
         let key = (head.to_owned(), self.index.generation());
-        if let Ok(g) = self.chain.lock()
+        if let Ok(g) = self.caches.chain.lock()
             && let Some((k, s)) = g.as_ref()
             && *k == key
         {
             return Arc::clone(s);
         }
         let s = Arc::new(crate::languages::Skeleton::build(src, filter));
-        if let Ok(mut g) = self.chain.lock() {
+        if let Ok(mut g) = self.caches.chain.lock() {
             *g = Some((key, Arc::clone(&s)));
         }
         s
@@ -582,7 +535,7 @@ impl App {
     /// Line count of every file in `head`, built once per head. Reading the line cache,
     /// walking the tree and saving the cache cost tens of ms per insights page otherwise.
     pub(crate) fn head_lines(&self, head: &str) -> Arc<Vec<gitterrace_index::HeadFile>> {
-        if let Ok(g) = self.head_lines.lock()
+        if let Ok(g) = self.caches.head_lines.lock()
             && let Some((id, f)) = g.as_ref()
             && id == head
         {
@@ -595,7 +548,7 @@ impl App {
         if let Err(e) = cache.save(self.index.dir()) {
             tracing::warn!("line cache not saved: {e}");
         }
-        if let Ok(mut g) = self.head_lines.lock() {
+        if let Ok(mut g) = self.caches.head_lines.lock() {
             *g = Some((head.to_owned(), Arc::clone(&files)));
         }
         files
@@ -603,7 +556,7 @@ impl App {
 
     /// Commit subjects by id for everything reachable from `head`, scanned once per head.
     pub(crate) fn subjects(&self, head: &str) -> Arc<HashMap<String, String>> {
-        if let Ok(g) = self.subjects.lock()
+        if let Ok(g) = self.caches.subjects.lock()
             && let Some((id, m)) = g.as_ref()
             && id == head
         {
@@ -617,7 +570,7 @@ impl App {
             tracing::warn!("subjects unavailable: {e}");
         }
         let m = Arc::new(map);
-        if let Ok(mut g) = self.subjects.lock() {
+        if let Ok(mut g) = self.caches.subjects.lock() {
             *g = Some((head.to_owned(), Arc::clone(&m)));
         }
         m
@@ -638,16 +591,16 @@ impl App {
     /// The ignore rules committed at `commit`. The files are found once per commit; the walk
     /// that finds them costs as much as everything else an insights page does.
     pub(crate) fn ignore_set(&self, commit: &str) -> Option<gitterrace_git::IgnoreSet> {
-        if let Ok(g) = self.ignores.lock()
+        if let Ok(g) = self.caches.ignores.lock()
             && let Some((id, found)) = g.as_ref()
             && id == commit
         {
             return Some(gitterrace_git::IgnoreSet::from_files(found.iter().cloned()));
         }
-        let paths = self.file_paths(commit).ok()?;
+        let paths =
+            gitterrace_git::files_named(&self.repo, commit, &[".gitignore", ".ignore"]).ok()?;
         let mut found: Vec<(String, String)> = paths
             .iter()
-            .filter(|p| matches!(p.rsplit('/').next(), Some(".gitignore" | ".ignore")))
             .filter_map(|p| {
                 let bytes = self.repo.blob_bytes(commit, p).ok()?;
                 (bytes.len() <= MAX_IGNORE_BYTES)
@@ -657,7 +610,7 @@ impl App {
         // Shallow first: the search tries the last added list first, so deeper rules win.
         found.sort_by_key(|(path, _)| path.matches('/').count());
         let found = Arc::new(found);
-        if let Ok(mut g) = self.ignores.lock() {
+        if let Ok(mut g) = self.caches.ignores.lock() {
             *g = Some((commit.to_owned(), Arc::clone(&found)));
         }
         Some(gitterrace_git::IgnoreSet::from_files(found.iter().cloned()))
@@ -671,7 +624,7 @@ impl App {
         opts: gitterrace_index::Options,
     ) -> gitterrace_index::PeriodStats {
         let key = format!("{commit}\0{}\0{opts:?}", self.index.generation());
-        if let Ok(g) = self.totals.lock()
+        if let Ok(g) = self.caches.totals.lock()
             && let Some((k, t)) = g.as_ref()
             && *k == key
         {
@@ -684,7 +637,7 @@ impl App {
         let t = gitterrace_index::Insights::from_source(src, opts, ignore)
             .period_summary(gitterrace_index::Period::All)
             .current;
-        if let Ok(mut g) = self.totals.lock() {
+        if let Ok(mut g) = self.caches.totals.lock() {
             *g = Some((key, t.clone()));
         }
         t
@@ -764,9 +717,7 @@ impl App {
             self.demand();
             return Ok(None);
         }
-        if let Ok(mut g) = self.records_used.lock() {
-            *g = Instant::now();
-        }
+        self.touch();
         let key = (head.to_owned(), self.index.generation());
         if let Some(recs) = self.record_slot(&key).and_then(|s| s.lock().ok()?.clone()) {
             return Ok(Some(recs));
@@ -800,7 +751,7 @@ impl App {
     }
 
     fn record_slot(&self, key: &(String, u64)) -> Option<RecordSlot> {
-        let g = self.records.lock().ok()?;
+        let g = self.caches.records.lock().ok()?;
         g.iter().find(|(k, _)| k == key).map(|(_, s)| Arc::clone(s))
     }
 
@@ -809,13 +760,11 @@ impl App {
     pub(crate) fn source(&self, head: &str) -> Result<Option<crate::insights::Src>> {
         self.check_unreadable()?;
         let key = (head.to_owned(), self.index.generation());
-        if let Ok(g) = self.source.lock()
+        if let Ok(g) = self.caches.source.lock()
             && let Some((k, s)) = g.as_ref()
             && *k == key
         {
-            if let Ok(mut u) = self.records_used.lock() {
-                *u = Instant::now();
-            }
+            self.touch();
             return Ok(Some(Arc::clone(s)));
         }
         if !self.ready() {
@@ -827,15 +776,13 @@ impl App {
         if self.index.newer_format().is_none()
             && let Some(set) = self.index.disk_source(&self.repo, head)?
         {
-            if let Ok(mut u) = self.records_used.lock() {
-                *u = Instant::now();
-            }
+            self.touch();
             let checked = Arc::clone(&set);
-            if let Ok(mut d) = self.disk.lock() {
+            if let Ok(mut d) = self.caches.disk.lock() {
                 *d = Some(Arc::new(move || gitterrace_index::unreadable(&checked)));
             }
             let src: crate::insights::Src = set;
-            if let Ok(mut g) = self.source.lock() {
+            if let Ok(mut g) = self.caches.source.lock() {
                 *g = Some((key, Arc::clone(&src)));
             }
             return Ok(Some(src));
@@ -846,20 +793,20 @@ impl App {
             match view {
                 gitterrace_index::feed::RevView::Ready(reach) => {
                     let checked = Arc::clone(&reach);
-                    if let Ok(mut d) = self.disk.lock() {
+                    if let Ok(mut d) = self.caches.disk.lock() {
                         *d = Some(Arc::new(move || {
                             gitterrace_index::unreadable(checked.base())
                         }));
                     }
                     let src: crate::insights::Src = reach;
-                    if let Ok(mut g) = self.source.lock() {
+                    if let Ok(mut g) = self.caches.source.lock() {
                         *g = Some((key, Arc::clone(&src)));
                     }
                     return Ok(Some(src));
                 }
                 // Too far from the set: no records load, no reindex, the page says so.
                 gitterrace_index::feed::RevView::NeedsReindex { read } => {
-                    if let Ok(mut f) = self.far.lock() {
+                    if let Ok(mut f) = self.caches.far.lock() {
                         *f = Some((key, read));
                     }
                     return Ok(None);
@@ -870,7 +817,7 @@ impl App {
             return Ok(None);
         };
         let src = gitterrace_index::Index::memory_source(recs);
-        if let Ok(mut g) = self.source.lock() {
+        if let Ok(mut g) = self.caches.source.lock() {
             *g = Some((key, Arc::clone(&src)));
         }
         Ok(Some(src))
@@ -881,6 +828,7 @@ impl App {
     /// page, never data from a corrupt set.
     fn check_unreadable(&self) -> Result<()> {
         let bad = self
+            .caches
             .disk
             .lock()
             .ok()
@@ -890,10 +838,10 @@ impl App {
             return Ok(());
         };
         tracing::warn!("cache unreadable while serving, rebuilding: {why}");
-        if let Ok(mut d) = self.disk.lock() {
+        if let Ok(mut d) = self.caches.disk.lock() {
             d.take();
         }
-        if let Ok(mut g) = self.source.lock() {
+        if let Ok(mut g) = self.caches.source.lock() {
             g.take();
         }
         self.index.rebuild()?;
@@ -909,19 +857,19 @@ impl App {
     /// are not served for that reason (the last [`App::source`] call for it said so).
     pub(crate) fn far(&self, head: &str) -> Option<usize> {
         let key = (head.to_owned(), self.index.generation());
-        let f = self.far.lock().ok()?;
+        let f = self.caches.far.lock().ok()?;
         f.as_ref().filter(|(k, _)| *k == key).map(|(_, n)| *n)
     }
 
     #[cfg(test)]
     pub(crate) fn source_held(&self) -> bool {
-        self.source.lock().is_ok_and(|g| g.is_some())
+        self.caches.source.lock().is_ok_and(|g| g.is_some())
     }
 
     /// The slot for `key`, made when missing. Sets of an older generation go first, then the
     /// oldest, so at most `RECORD_SETS` stay alive.
     fn record_slot_or_new(&self, key: (String, u64)) -> RecordSlot {
-        let Ok(mut g) = self.records.lock() else {
+        let Ok(mut g) = self.caches.records.lock() else {
             return Arc::default();
         };
         if let Some((_, s)) = g.iter().find(|(k, _)| *k == key) {
@@ -936,38 +884,46 @@ impl App {
         slot
     }
 
-    /// Drops the record sets and everything built over them once no page read them for `idle`.
+    /// Idle releases that freed something so far.
+    pub(crate) fn releases(&self) -> u64 {
+        self.releases.load(Ordering::Relaxed)
+    }
+
+    /// Marks the caches used by a visitor. Warm-up reads do not count: a server that only
+    /// warmed itself is idle, and its caches go one idle period after the warm-up started.
+    fn touch(&self) {
+        if self.warming.load(Ordering::Relaxed) > 0 {
+            return;
+        }
+        if let Ok(mut g) = self.records_used.lock() {
+            *g = Instant::now();
+        }
+    }
+
+    /// Marks warm-up work until the guard drops: reads meanwhile do not delay
+    /// [`App::release_idle`]. A visitor's page during a warm-up is served as always, only the
+    /// release may come one period sooner and the next page builds again.
+    pub(crate) fn warming(self: &Arc<Self>) -> Warming {
+        self.warming.fetch_add(1, Ordering::Relaxed);
+        Warming(Arc::clone(self))
+    }
+
+    /// Drops the record sets and every per-request cache once no page read them for `idle`.
     /// Returns whether it released anything. A page in flight keeps its own `Arc`, so it is
-    /// never cut short; the next page parses again. Rendered pages, file lists and other small
-    /// byte-bounded caches stay.
+    /// never cut short; the next page builds again. Only the rendered-page memo stays.
     pub(crate) fn release_idle(&self, idle: Duration) -> bool {
         let quiet = self.records_used.lock().is_ok_and(|g| g.elapsed() >= idle);
         if !quiet {
             return false;
         }
-        let held = self.records.lock().map(|mut g| {
-            let n = g.len();
-            g.clear();
-            n
-        });
-        let mut released = matches!(held, Ok(n) if n > 0);
-        // A source over records (a commit the segment set does not hold) holds that history,
-        // and the segment one holds open files and block caches: both go.
-        released |= self.source.lock().is_ok_and(|mut g| g.take().is_some());
-        if let Ok(mut d) = self.disk.lock() {
-            d.take();
-        }
-        for done in [
-            self.subjects.lock().map(|mut g| g.take().is_some()).ok(),
-            self.chain.lock().map(|mut g| g.take().is_some()).ok(),
-            self.head_lines.lock().map(|mut g| g.take().is_some()).ok(),
-        ] {
-            released |= done.unwrap_or(false);
-        }
+        let released = self.caches.clear_all();
         gitterrace_index::Insights::release_shared(&format!("{}\u{0}", self.base));
         // The API parses its own set; a caller there is a client that can wait a second too.
         if let Some(api) = self.api.get() {
             api.release_records();
+        }
+        if released {
+            self.releases.fetch_add(1, Ordering::Relaxed);
         }
         released
     }
@@ -978,9 +934,6 @@ impl App {
         self.record_loads.load(Ordering::Relaxed)
     }
 }
-
-/// Whether the set behind a served source met a store error, and which.
-type Unreadable = Arc<dyn Fn() -> Option<String> + Send + Sync>;
 
 /// Runs git or index work off the async threads.
 pub(crate) async fn blocking<T: Send + 'static>(
@@ -1153,9 +1106,14 @@ async fn chip_flip(app: &Arc<App>, seen: &mut Option<bool>) -> Option<bool> {
 async fn refresh(app: &Arc<App>, rev: &str, warm: Option<&str>) {
     let a = Arc::clone(app);
     let spec = rev.to_owned();
-    let run =
-        tokio::task::spawn_blocking(move || a.index.update(&a.repo, &spec, &|p| a.set_progress(p)))
-            .await;
+    let run = tokio::task::spawn_blocking(move || {
+        a.index.update(&a.repo, &spec, &|p| a.set_progress(p))?;
+        // Every page's chrome shows the repo id, which walks the whole history once per
+        // process: walk it here, before ready, not inside the first page.
+        a.repo.id();
+        std::io::Result::Ok(())
+    })
+    .await;
     match run {
         Ok(Ok(())) => {}
         Ok(Err(e)) => return tracing::warn!("index update for {rev} failed: {e}"),
@@ -1167,6 +1125,7 @@ async fn refresh(app: &Arc<App>, rev: &str, warm: Option<&str>) {
     // The languages walk reads the whole first-parent chain, so it runs here, off the
     // request path. What it keeps is flat in history length.
     tokio::task::spawn_blocking(move || {
+        let _warm = a.warming();
         if let Ok(Some(r)) = a.source(&h) {
             a.chain(&h, &*r, &crate::languages::path_filter(&a, &h));
         }
@@ -1198,6 +1157,15 @@ pub(crate) async fn release_when_idle(app: Weak<App>, idle: Duration) {
         if a.release_idle(idle) {
             tracing::debug!("{}: released idle record sets", a.name);
         }
+    }
+}
+
+/// Warm-up in progress, see [`App::warming`].
+pub(crate) struct Warming(Arc<App>);
+
+impl Drop for Warming {
+    fn drop(&mut self) {
+        self.0.warming.fetch_sub(1, Ordering::Relaxed);
     }
 }
 
@@ -1438,7 +1406,7 @@ mod tests {
         let head = app.repo.resolve("HEAD").expect("head");
         let src = app.source(&head).expect("source").expect("ready");
         assert!(
-            app.disk.lock().is_ok_and(|d| d.is_some()),
+            app.caches.disk.lock().is_ok_and(|d| d.is_some()),
             "HEAD reads the segments"
         );
         let cache = app.index.dir().to_path_buf();
@@ -1563,6 +1531,69 @@ mod tests {
         let again = app.records(&head).expect("records").expect("ready");
         assert_eq!(again.len(), 1);
         assert_eq!(app.record_loads(), 2, "parsed again after the release");
+    }
+
+    fn one_commit_app() -> (tempfile::TempDir, Arc<App>, String) {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path();
+        git(path, &["init", "-q", "-b", "main"]);
+        std::fs::write(path.join("a.rs"), "fn a() {}\n").expect("write");
+        std::fs::write(path.join(".gitignore"), "target/\n").expect("write");
+        git(path, &["add", "."]);
+        git(path, &["commit", "-q", "-m", "feat: one"]);
+        let repo = gitterrace_git::Repo::discover(path).expect("repo");
+        let index = gitterrace_index::Index::open(&repo).expect("index");
+        let app = Arc::new(App::new(repo, index));
+        app.index
+            .update(&app.repo, "HEAD", &|_| {})
+            .expect("update");
+        app.mark_ready();
+        let head = app.repo.resolve("HEAD").expect("head");
+        (dir, app, head)
+    }
+
+    /// Every per-request cache is empty after an idle release, whichever page filled it. The
+    /// caches live in one struct whose clear names every field, so a new one cannot be left
+    /// out; this checks the release reaches that clear and that each filled cache empties.
+    #[test]
+    fn an_idle_release_empties_every_cache() {
+        let (_dir, app, head) = one_commit_app();
+        let src = app.source(&head).expect("source").expect("ready");
+        app.chain(&head, &*src, &crate::languages::path_filter(&app, &head));
+        let _ = app.records(&head).expect("records");
+        let _ = app.file_paths(&head).expect("files");
+        let _ = app.last_commits(&head, "").expect("last commits");
+        let _ = app.ignore_set(&head);
+        let _ = app.subjects(&head);
+        let _ = app.head_lines(&head);
+        drop(src);
+        assert!(app.caches.clear_all(), "the pages above filled some cache");
+        let _ = app.source(&head).expect("source");
+        let _ = app.file_paths(&head).expect("files");
+        assert!(app.release_idle(Duration::ZERO));
+        assert!(!app.caches.clear_all(), "a cache survived the idle release");
+    }
+
+    /// Warm-up work alone never postpones the release: a server that only warmed itself is
+    /// idle. A visitor's read does postpone it.
+    #[test]
+    fn warm_up_reads_do_not_delay_the_release() {
+        let (_dir, app, head) = one_commit_app();
+        std::thread::sleep(Duration::from_millis(30));
+        {
+            let _warm = app.warming();
+            let src = app.source(&head).expect("source").expect("ready");
+            app.chain(&head, &*src, &crate::languages::path_filter(&app, &head));
+        }
+        assert!(
+            app.release_idle(Duration::from_millis(20)),
+            "the warm-up kept the caches as if a visitor had read them"
+        );
+        let _ = app.source(&head).expect("source").expect("ready");
+        assert!(
+            !app.release_idle(Duration::from_millis(20)),
+            "a visitor's read did not count as use"
+        );
     }
 
     /// A history with renames, a dir rename, deletes, an untouched-path merge, a merge that
