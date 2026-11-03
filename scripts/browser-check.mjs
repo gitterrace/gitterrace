@@ -74,7 +74,7 @@ const bin = resolve(arg('--bin', join(root, 'target/debug/git-terrace')));
 const fromDisk = process.argv.includes('--from-disk');
 const tabCounts = arg('--tabs', '8,12').split(',').map(Number);
 const browsers = arg('--browsers', 'webkit,chromium').split(',');
-const ALL = ['truncation', 'live-tabs', 'mermaid', 'chip', 'doctabs', 'chords', 'header', 'marked', 'menu-same', 'gutter', 'overlays', 'tips', 'repo-switch', 'mark-seam', 'about-place', 'site-theme', 'side-width', 'calm-header', 'tabs-one-line', 'huge-diff'];
+const ALL = ['truncation', 'live-tabs', 'mermaid', 'chip', 'doctabs', 'chords', 'header', 'marked', 'menu-same', 'gutter', 'overlays', 'tips', 'repo-switch', 'mark-seam', 'about-place', 'site-theme', 'side-width', 'calm-header', 'tabs-one-line', 'huge-diff', 'sticky-heads'];
 const wanted = arg('--checks', ALL.join(',')).split(',');
 for (const c of wanted) if (!ALL.includes(c)) { console.error(`unknown check ${c}; known: ${ALL.join(', ')}`); process.exit(2); }
 
@@ -205,7 +205,72 @@ async function tabsOneLine() {
     await b.close();
   }
 }
-const checks = { 'tabs-one-line': tabsOneLine, 'calm-header': calmHeader, 'side-width': sideWidth, truncation, 'live-tabs': liveTabs, mermaid, chip, doctabs, chords, header, marked, 'menu-same': menuSame, gutter, overlays, tips, 'repo-switch': repoSwitch, 'mark-seam': markSeam, 'about-place': aboutPlace, 'site-theme': siteTheme, 'huge-diff': hugeDiff };
+// Sticky heads: on a commit with three 300-line files, scrolled halfway into the second, its
+// header is pinned at the top and the first's is not; a #L120 link on a source page lands
+// fully below the pinned path bar; at 375 px the site header never pins. The commit is made
+// with a private index on a side ref, so HEAD and the work tree the other checks use stay put.
+async function stickyHeads() {
+  const { execFileSync } = await import('node:child_process');
+  const env = { ...process.env, GIT_INDEX_FILE: join(cfg, 'sticky-index') };
+  const git = (...a) => execFileSync('git', a, { cwd: dir, env, encoding: 'utf8' }).trim();
+  git('read-tree', 'HEAD');
+  for (const n of ['one', 'two', 'three']) {
+    const body = Array.from({ length: 300 }, (_, i) => `${n} line ${i + 1}`).join('\n') + '\n';
+    const blob = execFileSync('git', ['hash-object', '-w', '--stdin'], { cwd: dir, input: body, encoding: 'utf8' }).trim();
+    git('update-index', '--add', '--cacheinfo', `100644,${blob},sticky/${n}.txt`);
+  }
+  const sha = git('commit-tree', git('write-tree'), '-p', 'HEAD', '-m', 'Three long files');
+  git('update-ref', 'refs/heads/sticky-check', sha);
+  for (const name of browsers) {
+    const { b, ctx } = await context(name);
+    for (const scheme of ['light', 'dark']) for (const width of [1440, 375]) {
+      const p = await ctx.newPage();
+      await p.emulateMedia({ colorScheme: scheme });
+      await p.setViewportSize({ width, height: 700 });
+      await p.goto(`${srv.base}/commit/${sha}`, { waitUntil: 'load' });
+      const m = await p.evaluate(() => {
+        const s = [...document.querySelectorAll('section.file')];
+        if (s.length < 2) return null;
+        const r = s[1].getBoundingClientRect();
+        scrollTo(0, scrollY + r.top + r.height / 2);
+        const top = (el) => el.getBoundingClientRect().top;
+        const site = document.querySelector('header.top');
+        return { second: top(s[1].querySelector('header')), first: top(s[0].querySelector('header')), site: site ? top(site) : 0 };
+      });
+      const where = `sticky-heads ${name} ${scheme} ${width}`;
+      const bad = [];
+      if (!m) bad.push('fewer than two files on the commit page');
+      else {
+        if (Math.abs(m.second) > 1) bad.push(`second file header at ${m.second.toFixed(1)} px, not pinned`);
+        if (Math.abs(m.first) <= 1) bad.push('first file header still pinned');
+        if (width <= 600 && Math.abs(m.site) <= 1) bad.push('site header pinned at 375');
+      }
+      await p.goto(`${srv.base}/blob/${sha}/sticky/two.txt#L120`, { waitUntil: 'load' });
+      await p.waitForTimeout(100);
+      const a = await p.evaluate(() => {
+        const l = document.getElementById('L120');
+        if (!l) return null;
+        const t = l.getBoundingClientRect();
+        let cover = 0;
+        for (const el of document.querySelectorAll('body *')) {
+          const st = getComputedStyle(el);
+          if (st.position !== 'sticky' && st.position !== 'fixed') continue;
+          const r = el.getBoundingClientRect();
+          if (r.height && r.top <= 1 && r.left < t.right && r.right > t.left) cover = Math.max(cover, r.bottom);
+        }
+        return { top: t.top, bottom: t.bottom, cover, h: innerHeight };
+      });
+      if (!a) bad.push('no #L120 on the source page');
+      else if (a.top < a.cover - 0.5 || a.bottom > a.h) bad.push(`#L120 at ${a.top.toFixed(1)} px, under a pinned bar ending at ${a.cover.toFixed(1)} px`);
+      if (width > 600 && a && a.cover < 1) bad.push('source path bar not pinned');
+      bad.length ? r.fail(`${where}: ${bad.join(', ')}`) : r.ok(`${where}: file header pinned and handed over, #L120 clear of the bar`);
+      if (arg('--shots')) { mkdirSync(arg('--shots'), { recursive: true }); await p.screenshot({ path: join(arg('--shots'), `sticky-blob-${name}-${scheme}-${width}.png`) }); await p.goto(`${srv.base}/commit/${sha}`); await p.evaluate(() => { const s = document.querySelectorAll('section.file')[1].getBoundingClientRect(); scrollTo(0, scrollY + s.top + s.height / 2); }); await p.screenshot({ path: join(arg('--shots'), `sticky-commit-${name}-${scheme}-${width}.png`) }); }
+      await p.close();
+    }
+    await b.close();
+  }
+}
+const checks = { 'sticky-heads': stickyHeads, 'tabs-one-line': tabsOneLine, 'calm-header': calmHeader, 'side-width': sideWidth, truncation, 'live-tabs': liveTabs, mermaid, chip, doctabs, chords, header, marked, 'menu-same': menuSame, gutter, overlays, tips, 'repo-switch': repoSwitch, 'mark-seam': markSeam, 'about-place': aboutPlace, 'site-theme': siteTheme, 'huge-diff': hugeDiff };
 try {
   for (const c of wanted) { console.log(`-- ${c}`); await checks[c](); }
 } finally {

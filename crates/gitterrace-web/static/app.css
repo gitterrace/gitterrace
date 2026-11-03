@@ -521,3 +521,19 @@ button.reponame .tri{width:16px;height:16px;fill:var(--muted)}
 .w0{--w:0%}.w1{--w:1%}.w2{--w:2%}.w3{--w:3%}.w4{--w:4%}.w5{--w:5%}.w6{--w:6%}.w7{--w:7%}.w8{--w:8%}.w9{--w:9%}.w10{--w:10%}.w11{--w:11%}.w12{--w:12%}.w13{--w:13%}.w14{--w:14%}.w15{--w:15%}.w16{--w:16%}.w17{--w:17%}.w18{--w:18%}.w19{--w:19%}.w20{--w:20%}.w21{--w:21%}.w22{--w:22%}.w23{--w:23%}.w24{--w:24%}.w25{--w:25%}.w26{--w:26%}.w27{--w:27%}.w28{--w:28%}.w29{--w:29%}.w30{--w:30%}.w31{--w:31%}.w32{--w:32%}.w33{--w:33%}.w34{--w:34%}.w35{--w:35%}.w36{--w:36%}.w37{--w:37%}.w38{--w:38%}.w39{--w:39%}.w40{--w:40%}.w41{--w:41%}.w42{--w:42%}.w43{--w:43%}.w44{--w:44%}.w45{--w:45%}.w46{--w:46%}.w47{--w:47%}.w48{--w:48%}.w49{--w:49%}.w50{--w:50%}.w51{--w:51%}.w52{--w:52%}.w53{--w:53%}.w54{--w:54%}.w55{--w:55%}.w56{--w:56%}.w57{--w:57%}.w58{--w:58%}.w59{--w:59%}.w60{--w:60%}.w61{--w:61%}.w62{--w:62%}.w63{--w:63%}.w64{--w:64%}.w65{--w:65%}.w66{--w:66%}.w67{--w:67%}.w68{--w:68%}.w69{--w:69%}.w70{--w:70%}.w71{--w:71%}.w72{--w:72%}.w73{--w:73%}.w74{--w:74%}.w75{--w:75%}.w76{--w:76%}.w77{--w:77%}.w78{--w:78%}.w79{--w:79%}.w80{--w:80%}.w81{--w:81%}.w82{--w:82%}.w83{--w:83%}.w84{--w:84%}.w85{--w:85%}.w86{--w:86%}.w87{--w:87%}.w88{--w:88%}.w89{--w:89%}.w90{--w:90%}.w91{--w:91%}.w92{--w:92%}.w93{--w:93%}.w94{--w:94%}.w95{--w:95%}.w96{--w:96%}.w97{--w:97%}.w98{--w:98%}.w99{--w:99%}.w100{--w:100%}
 .h0{--hue:0}.h1{--hue:10}.h2{--hue:20}.h3{--hue:30}.h4{--hue:40}.h5{--hue:50}.h6{--hue:60}.h7{--hue:70}.h8{--hue:80}.h9{--hue:90}.h10{--hue:100}.h11{--hue:110}.h12{--hue:120}.h13{--hue:130}.h14{--hue:140}.h15{--hue:150}.h16{--hue:160}.h17{--hue:170}.h18{--hue:180}.h19{--hue:190}.h20{--hue:200}.h21{--hue:210}.h22{--hue:220}.h23{--hue:230}.h24{--hue:240}.h25{--hue:250}.h26{--hue:260}.h27{--hue:270}.h28{--hue:280}.h29{--hue:290}.h30{--hue:300}.h31{--hue:310}.h32{--hue:320}.h33{--hue:330}.h34{--hue:340}.h35{--hue:350}
 .sharebar b,.dbar b{width:var(--w)}
+
+/* Sticky heads. CSS only: each diff file's header pins while its body scrolls and hands over to
+   the next (overflow:clip, unlike hidden, is no scroll box, so sticky still sees the page). On
+   wide screens the path bar of a source, blame or file history page and the head row of a
+   .entries table pin too. Calm like the top bar: page colours, no shadow. Anchors land below. */
+section.file{overflow:clip}
+section.file>header{position:sticky;top:0;z-index:2}
+[id^="L"]{scroll-margin-top:var(--space-2)}
+@media (min-width:601px){
+  main:has(>.card.scroll [id^="L"])>.head,main:has(>.head+ul.list.log)>.head{position:sticky;top:0;z-index:3;background:var(--bg);margin-bottom:0;padding-bottom:var(--space-4)}
+  main:has(>.card.scroll [id^="L"]) [id^="L"]{scroll-margin-top:calc(32px + var(--space-4) + var(--space-2))}
+}
+@media (min-width:1101px){
+  .card:has(>table.entries tr.th:first-child){overflow:clip}
+  .entries tr.th:first-child td{position:sticky;top:0;z-index:1;box-shadow:inset 0 -1px 0 var(--line)}
+}
