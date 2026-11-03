@@ -44,7 +44,7 @@
 //                system scheme with the theme already set in the head, the button cycles system,
 //                light, dark, the choice survives a reload, the shown logo and screenshots are
 //                the theme's and the other scheme's are never fetched, no CSP violation, and each
-//                theme icon is the GitHub mark's size
+//                theme icon is the source-link mark's size
 //   side-width   on the overview the Recent sparkline is exactly as wide as the language bar
 //                (within 1 px) and as tall, at 1440, 1100 and 360 px, light and dark
 //   calm-header  at rest the branch switcher and the Working tree chip have no visible border

@@ -486,7 +486,7 @@ td:has(>.actbtn.float){position:relative}
 .actbtn.top::before{content:"";width:16px;height:16px;background:currentColor;-webkit-mask:var(--menu-ico) center/contain no-repeat;mask:var(--menu-ico) center/contain no-repeat}
 :root{--menu-ico:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round'%3E%3Cpath d='M4 7h16M4 12h16M4 17h10'/%3E%3C/svg%3E")}
 .permabtn.copied{color:var(--accent-ink)}
-/* Repository switcher: the name itself is the button, as on GitHub. One repository: a link. */
+/* Repository switcher: the name itself is the button. One repository: a link. */
 .reposwitch{display:inline-flex}
 .reposwitch:not([hidden])+#repolink{display:none}
 button.reponame{display:inline-flex;align-items:center;gap:2px;background:transparent;border:1px solid transparent;border-radius:var(--radius);padding:2px 4px;margin:-3px -5px;min-height:32px;cursor:pointer}

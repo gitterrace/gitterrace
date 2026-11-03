@@ -48,7 +48,7 @@ pub(crate) struct Lang {
 
 /// Everything the sidebar shows, as display strings.
 #[derive(Template)]
-#[template(path = "_side.html")]
+#[template(path = "side.html")]
 pub(crate) struct Side {
     /// `display.sidebar`: which sections show, in order.
     pub(crate) order: Vec<String>,

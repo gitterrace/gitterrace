@@ -141,8 +141,8 @@ async function siteTheme() {
         else r.ok(`site-theme ${where}: ${pick} kept over a reload, set before the body rendered`);
         if (errors.length) r.fail(`site-theme ${where}: ${errors.join(' | ')}`);
         else r.ok(`site-theme ${where}: no CSP violation or script error`);
-        // Every theme icon is as large as the GitHub mark beside it: same box, and its painted
-        // extent (stroke included) within 1.5 px of the mark's on the longer side.
+        // Every theme icon is as large as the source-link mark beside it: same box, and its
+        // painted extent (stroke included) within 1.5 px of the mark's on the longer side.
         for (const t of ['system', 'light', 'dark']) {
           const m = await p.evaluate((t) => {
             const r = document.documentElement;

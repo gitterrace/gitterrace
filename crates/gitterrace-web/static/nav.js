@@ -244,7 +244,7 @@
   // Repositories join and leave a running server, so the list is read on every page and again
   // on each live notice: the switcher shows, drops an entry or hides without a reload.
   var repos = null;
-  // A select panel as GitHub draws it: title row with a close button, a filter that holds
+  // A select panel: title row with a close button, a filter that holds
   // focus, a check before the current repository and an empty slot before the others.
   var TICK = "M13.8 4.2a.75.75 0 0 1 0 1.06l-6.5 6.5a.75.75 0 0 1-1.06 0l-3-3a.75.75 0 1 1 1.06-1.06L6.77 10.2l5.97-5.97a.75.75 0 0 1 1.06 0z";
   function icon(d) {

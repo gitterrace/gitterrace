@@ -205,8 +205,8 @@ const THEME_INIT_JS: &str = "(function(){try{var t=localStorage.getItem('gitterr
 const THEME_TOGGLE_JS: &str = "(function(){var r=document.documentElement,b=document.getElementById('theme'),o=['system','light','dark'];if(!b)return;function c(){return r.dataset.theme||'system'}function l(){b.setAttribute('aria-label','Theme: '+c());b.title='Theme: '+c()}l();b.addEventListener('click',function(){var n=o[(o.indexOf(c())+1)%3];if(n==='system')delete r.dataset.theme;else r.dataset.theme=n;try{if(n==='system')localStorage.removeItem('gitterrace-theme');else localStorage.setItem('gitterrace-theme',n)}catch(e){}l()})})()";
 
 /// The theme button, the app's icons: half disc for system, sun, moon. Each viewBox is cropped
-/// to its own ink plus half the stroke, so at 24 px every icon fills the box as the GitHub mark
-/// beside it does.
+/// to its own ink plus half the stroke, so at 24 px every icon fills the box as the source-link
+/// mark beside it does.
 const THEME_BUTTON: &str = "<button class=\"theme\" type=\"button\" id=\"theme\" aria-label=\"Theme: system\" title=\"Theme: system\">\
 <svg class=\"i-auto\" viewBox=\"3.2 3.2 17.6 17.6\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"12\" r=\"8\"/><path d=\"M12 4a8 8 0 0 0 0 16z\" class=\"fill\"/></svg>\
 <svg class=\"i-light\" viewBox=\"1.2 1.2 21.6 21.6\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"12\" r=\"4\"/><path d=\"M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8\"/></svg>\
