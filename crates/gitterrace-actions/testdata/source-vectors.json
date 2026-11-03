@@ -1,0 +1,66 @@
+[
+  {
+    "name": "lines",
+    "repo": "gitterrace",
+    "sha": "a9b0c7c0123456789abcdef0123456789abcdef0",
+    "path": "docs/actions.md",
+    "lines": { "start": 12, "end": 14 },
+    "expected": "source: gitterrace@a9b0c7c0123456789abcdef0123456789abcdef0:docs/actions.md#L12-L14"
+  },
+  {
+    "name": "one line keeps the range form",
+    "repo": "r",
+    "sha": "abcdef1234",
+    "path": "a.rs",
+    "lines": { "start": 7, "end": 7 },
+    "expected": "source: r@abcdef1234:a.rs#L7-L7"
+  },
+  {
+    "name": "file without lines",
+    "repo": "r",
+    "sha": "abcdef1234",
+    "path": "README.md",
+    "lines": null,
+    "expected": "source: r@abcdef1234:README.md"
+  },
+  {
+    "name": "commit",
+    "repo": "r",
+    "sha": "abcdef1234",
+    "path": null,
+    "lines": null,
+    "expected": "source: r@abcdef1234"
+  },
+  {
+    "name": "hostile names",
+    "repo": "me@host",
+    "sha": "abcdef1234",
+    "path": "odd:dir/a@b #c.md",
+    "lines": { "start": 1, "end": 2 },
+    "expected": "source: me@host@abcdef1234:odd:dir/a@b %23c.md#L1-L2"
+  },
+  {
+    "name": "unicode path",
+    "repo": "r",
+    "sha": "abcdef1234",
+    "path": "docs/café ☃.md",
+    "lines": { "start": 3, "end": 9 },
+    "expected": "source: r@abcdef1234:docs/café ☃.md#L3-L9"
+  },
+  {
+    "name": "a path that looks like a range",
+    "repo": "r",
+    "sha": "abcdef1234",
+    "path": "a#L1-L2",
+    "lines": null,
+    "expected": "source: r@abcdef1234:a%23L1-L2"
+  },
+  {
+    "name": "percent in a path",
+    "repo": "r",
+    "sha": "abcdef1234",
+    "path": "100%.md",
+    "lines": { "start": 2, "end": 2 },
+    "expected": "source: r@abcdef1234:100%25.md#L2-L2"
+  }
+]

@@ -23,6 +23,8 @@
   var commit = body.dataset.commit || "";
   var DOCS = "https://github.com/gitterrace/gitterrace/blob/main/docs/actions.md";
   var MD_LINES = 40;
+  // A mark shorter than this many characters carries a line or two of context with it.
+  var SHORT = 20;
 
   // The server renders the note into the page, so it is there at first paint. Later edits of
   // actions.toml are fetched when the tab is shown or focused, and touches the page only when the text changes.
@@ -82,14 +84,85 @@
     }
     return out.join("\n");
   }
+  // A word character in any script: the selection snaps to whole words of these.
+  var WORD = /[\p{L}\p{N}_]/u;
+  // The range widened so neither end cuts a word in half. Only an end that falls between two
+  // word characters moves; one already at a space or punctuation stays.
+  function snap(range) {
+    var r = range.cloneRange();
+    var a = r.startContainer, i = r.startOffset;
+    if (a.nodeType === 3 && i > 0 && i < a.data.length && WORD.test(a.data[i - 1]) && WORD.test(a.data[i])) {
+      while (i > 0 && WORD.test(a.data[i - 1])) i--;
+      r.setStart(a, i);
+    }
+    var z = r.endContainer, j = r.endOffset;
+    if (z.nodeType === 3 && j > 0 && j < z.data.length && WORD.test(z.data[j - 1]) && WORD.test(z.data[j])) {
+      while (j < z.data.length && WORD.test(z.data[j])) j++;
+      r.setEnd(z, j);
+    }
+    return r;
+  }
+  // The source lines of rendered Markdown a range touches, read from the blocks' data-line
+  // spans. A block the range only grazes (its end at the block's very start) does not count.
+  // Each marked piece of text counts with its innermost block, so a list item or quote that
+  // holds the marked block does not widen the range to its own lines.
+  function mdLines(r, root) {
+    var lo = 0, hi = 0;
+    var walk = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    for (var t = walk.nextNode(); t; t = walk.nextNode()) {
+      if (!r.intersectsNode(t)) continue;
+      var a = t === r.startContainer ? r.startOffset : 0;
+      var z = t === r.endContainer ? r.endOffset : t.data.length;
+      if (!t.data.slice(a, z).trim()) continue;
+      var el = t.parentElement && t.parentElement.closest("[data-line]");
+      if (!el || !root.contains(el)) continue;
+      var m = /^(\d+)-(\d+)$/.exec(el.getAttribute("data-line"));
+      if (!m) continue;
+      if (!lo || +m[1] < lo) lo = +m[1];
+      if (+m[2] > hi) hi = +m[2];
+    }
+    return lo ? { start: lo, end: hi } : null;
+  }
+  // The raw text of a file at this commit, fetched once when prose of it is first marked, so
+  // the quote is the source and not the rendered text. Null until it arrives.
+  var raw = {};
+  function rawText(path) {
+    var key = (commit || rev) + ":" + path;
+    if (!(key in raw)) {
+      raw[key] = null;
+      fetch(B + "/raw/" + encodeURIComponent(commit || rev) + "/" + encPath(path), { credentials: "same-origin" })
+        .then(function (r) { return r.ok ? r.text() : null; })
+        .then(function (t) { raw[key] = t; }, function () {});
+    }
+    return raw[key];
+  }
+  // Lines start..end of the file exactly as stored, line ends left out, the end clamped to
+  // the last line. Null while the raw text is still on its way.
+  function sourceLines(path, l) {
+    var t = rawText(path);
+    if (t == null) return null;
+    var all = t.replace(/\r?\n$/, "").split(/\r?\n/);
+    return l.start <= all.length ? all.slice(l.start - 1, Math.min(l.end, all.length)).join("\n") : null;
+  }
+  // Fetched ahead, so the first mark already quotes the source.
+  var mdSrc = document.querySelector(".markdown-body[data-src]");
+  if (mdSrc) rawText(mdSrc.getAttribute("data-src"));
   // What the reader marked with the mouse, if anything: inside a code view the lines it spans
-  // and the exact text; elsewhere the text alone. Null when nothing is marked.
+  // and the exact text; in rendered Markdown the source lines; elsewhere the text alone. The
+  // ends snap to whole words. Null when nothing is marked.
   function marked() {
     var s = window.getSelection && window.getSelection();
     if (!s || s.isCollapsed || !s.rangeCount) return null;
-    var text = s.toString();
+    var r = snap(s.getRangeAt(0));
+    var text = r.toString();
     if (!text.trim()) return null;
-    var r = s.getRangeAt(0);
+    var md = r.commonAncestorContainer;
+    md = (md.nodeType === 1 ? md : md.parentElement);
+    md = md && md.closest && md.closest(".markdown-body[data-src]");
+    if (md) {
+      var ml = mdLines(r, md);
+      if (ml) return { md: md.getAttribute("data-src"), lines: ml, text: text };
+    }
     var line = function (n) {
       var e = n && (n.nodeType === 1 ? n : n.parentElement);
       return e && e.closest && e.closest(".src .l, table.code tr[id^=L], table.blame tr[id^=L]");
@@ -101,18 +174,35 @@
       var x = +a.id.slice(1), y = +b.id.slice(1);
       return { lines: { start: Math.min(x, y), end: Math.max(x, y) }, text: text.replace(/\n$/, "") };
     }
-    return { text: text };
+    // Prose outside Markdown: a short mark brings its block along as context.
+    var block = a || (r.startContainer.nodeType === 1 ? r.startContainer : r.startContainer.parentElement);
+    block = block && block.closest && block.closest("p, li, pre, td, h1, h2, h3, h4, h5, h6, blockquote");
+    var ctx = text.trim().length < SHORT && block ? block.textContent.trim() : "";
+    return { text: text, context: ctx && ctx !== text.trim() ? ctx : "" };
   }
+  // Lines around a short mark: one more on each side, clamped to the file's first line.
+  function widen(l) { return { start: Math.max(1, l.start - 1), end: l.end + 1 }; }
   function current() {
     var path = filePath(), lines = selection(), m = marked();
-    if (path && m && m.lines) return { kind: "line", path: path, lines: m.lines, text: m.text };
+    // Marked rendered Markdown: the link and the quote are the source lines it came from.
+    if (m && m.md) {
+      var short = m.text.trim().length < SHORT;
+      var quote = sourceLines(m.md, short ? widen(m.lines) : m.lines);
+      return { kind: "line", path: m.md, lines: m.lines, quote: quote || m.text, marked: m.text };
+    }
+    if (path && m && m.lines) {
+      var wide = m.text.trim().length < SHORT ? lineText(widen(m.lines)) : "";
+      // Across rows the selection's text has no line breaks, so the rows' own text names it.
+      var named = m.lines.end > m.lines.start ? lineText(m.lines) : m.text;
+      return { kind: "line", path: path, lines: m.lines, text: wide || m.text, marked: named };
+    }
     if (path && lines) return { kind: "line", path: path, lines: lines, text: lineText(lines) };
     var t;
     if (path) t = { kind: "file", path: path };
     else if (local().indexOf("/commit/") === 0) t = commitTarget();
     else t = { kind: "page" };
-    // Marked prose (a README, a commit message) travels as the quote, not the whole page.
-    if (m) t.quote = m.text;
+    // Marked prose (a commit message) travels as the quote, not the whole page.
+    if (m) { t.quote = m.context || m.text; t.marked = m.text; }
     return t;
   }
   function commitTarget() {
@@ -156,12 +246,15 @@
     if (t.lines) url += "#L" + t.lines.start + (t.lines.end !== t.lines.start ? "-L" + t.lines.end : "");
     return url;
   }
-  // The same string the payload's `markdown` field carries.
+  // The same string the payload's `markdown` field carries, ending in the machine source line.
   function markdown(t) {
     var link = permalink(t);
-    // Marked prose rides along as a quote under the link.
+    var src = window.gtSend ? window.gtSend.sourceLine(repoKey, commit, t.path || null, t.lines || null) + "\n" : "";
+    // Marked rendered Markdown is source text, fenced like code so its bytes arrive as stored.
+    if (t.path && t.text == null && t.lines && t.quote != null && t.marked != null) t = { path: t.path, lines: t.lines, text: t.quote, subject: t.subject };
+    // Other marked prose rides along as a quote under the link.
     var quote = t.quote ? "\n" + t.quote.split("\n").slice(0, MD_LINES).map(function (l) { return "> " + l; }).join("\n") + "\n" : "";
-    if (!t.path) return "**" + (t.subject || document.title) + "** @ " + shortSha() + "\n" + (t.author || "") + "\n" + link + "\n" + quote;
+    if (!t.path) return "**" + (t.subject || document.title) + "** @ " + shortSha() + "\n" + (t.author || "") + "\n" + link + "\n" + quote + src;
     var md = "**" + ref(t) + "** @ " + shortSha() + "\n" + link + "\n" + quote;
     if (t.text != null && t.lines) {
       var snippet = t.text.split("\n").slice(0, MD_LINES).join("\n");
@@ -172,7 +265,7 @@
       var lang = dot > t.path.lastIndexOf("/") ? t.path.slice(dot + 1) : "";
       md += fence + lang + "\n" + snippet + "\n" + fence + "\n";
     }
-    return md;
+    return md + src;
   }
 
   // ---- running a user action ------------------------------------------------
@@ -237,7 +330,7 @@
     head("Share");
     add("Send to\u2026", "s", function () {
       closeMenu();
-      if (window.gtSend) window.gtSend.open({ kind: t.kind, path: t.path || "", lines: t.lines || null, subject: t.subject || "", sha: commit, link: permalink(t), markdown: markdown(t), text: t.text || "" });
+      if (window.gtSend) window.gtSend.open({ kind: t.kind, path: t.path || "", lines: t.lines || null, subject: t.subject || "", sha: commit, link: permalink(t), markdown: markdown(t), text: t.text || "", marked: t.marked || t.quote || "" });
     });
     var keys = { p: 0, m: 1, s: 2 };
     // Every view lists the same entries in the same order (the server's one list); an action

@@ -95,6 +95,12 @@ fn line_payload_is_read_from_git() {
         gitterrace_git::short_id(&sha)
     )));
     assert!(p.markdown.contains("```rs\nline 2"));
+    // The last line is the machine line, and it reads back to this selection.
+    let last = p.markdown.lines().last().expect("a line");
+    let src = crate::parse_source(last).expect("source line");
+    assert_eq!(src.sha, sha);
+    assert_eq!(src.path.as_deref(), Some("src/a.rs"));
+    assert_eq!(src.lines, Some(Lines { start: 2, end: 3 }));
     assert_eq!(
         p.commit.as_ref().expect("commit").date,
         "2026-10-30T12:00:00Z"

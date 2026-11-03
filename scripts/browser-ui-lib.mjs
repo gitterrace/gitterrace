@@ -1,5 +1,5 @@
 // Checks of the interactive UI: marked text, the menu across views, gutter, overlays, tips, repo switcher. Imported by scripts/browser-check.mjs, not run on its own.
-import { writeFileSync, rmSync, mkdtempSync } from 'node:fs';
+import { readFileSync, writeFileSync, rmSync, mkdtempSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { makeRepo, serve, sh } from './browser-lib.mjs';
@@ -8,52 +8,115 @@ import { makeRepo, serve, sh } from './browser-lib.mjs';
 export function checks(env) {
   const { pw, dir, srv, r, browsers, tabCounts, marker, context, arg, bin, cfg } = env;
 // ---- marked -----------------------------------------------------------------------------------
+// Marked text is what the menu acts on. Code lines 2-3 reach Send to with their text; a
+// mid-word mark snaps to whole words; marked rendered Markdown (backticks, a link, a wrapped
+// paragraph) sends the raw file lines byte for byte with their range; the title is never the
+// bare path; the note ends in a source line that names the same lines.
+const GUIDE = '# Guide\n\nIntro line.\n\nRun `git terrace` with the [config](config.md) file\nand it reads ``a ` b`` from the\nwrapped *paragraph* here.\n\nLast.\n';
+const LIST = '- alpha\n  - bravo item\n    charlie line\n- delta\n';
 async function marked() {
+  // The shared README holds the mermaid diagram other checks read: put it back afterwards, so
+  // the checks pass in any order.
+  const readme = readFileSync(join(dir, 'README.md'));
+  try { await markedIn(); } finally {
+    writeFileSync(join(dir, 'README.md'), readme);
+    sh(dir, 'git', 'add', '-A');
+    sh(dir, 'git', 'commit', '-q', '-m', 'docs: restore the README');
+    await new Promise((ok) => setTimeout(ok, 600));
+  }
+}
+async function markedIn() {
   writeFileSync(join(dir, 'marked.txt'), 'first line\nsecond line\nthird line\nfourth line\n');
   writeFileSync(join(dir, 'README.md'), '# Fixture\n\nA sentence worth quoting.\n');
+  mkdirSync(join(dir, 'notes'), { recursive: true });
+  writeFileSync(join(dir, 'notes/guide.md'), GUIDE);
+  writeFileSync(join(dir, 'notes/list.md'), LIST);
   sh(dir, 'git', 'add', '-A');
   sh(dir, 'git', 'commit', '-q', '-m', 'docs: text to mark');
   await new Promise((ok) => setTimeout(ok, 600));
-  const mark = (sel) => (s) => {
+  const raw = (a, b) => GUIDE.split('\n').slice(a - 1, b).join('\n');
+  // Marks text in the page: whole code lines, a cut through a word, or a rendered block.
+  const mark = ([how, arg]) => {
     const r = document.createRange();
-    if (s === 'lines') {
+    const text = (root, has) => { const w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT); let t; while ((t = w.nextNode())) if (t.textContent.includes(has)) return t; return null; };
+    if (how === 'lines') {
       const a = document.getElementById('L2'), z = document.getElementById('L3');
       r.setStart(a, 0); r.setEnd(z, z.childNodes.length);
+    } else if (how === 'midword') {
+      const t = text(document.getElementById('L2'), 'second');
+      const i = t.textContent.indexOf('second');
+      r.setStart(t, i + 3); r.setEnd(t, i + 8);
+    } else if (how === 'word') {
+      // From one word to the end of its text node, inside whatever blocks hold it.
+      const t = text(document.querySelector('.markdown-body'), arg);
+      if (!t) return '';
+      r.setStart(t, t.textContent.indexOf(arg)); r.setEnd(t, t.textContent.length);
     } else {
-      const w = document.createTreeWalker(document.querySelector('.markdown-body'), NodeFilter.SHOW_TEXT);
-      let t; while ((t = w.nextNode())) if (t.textContent.trim().length > 3) break;
-      r.setStart(t, 0); r.setEnd(t, t.textContent.length);
+      const blocks = [...document.querySelectorAll('.markdown-body [data-line]')].filter((e) => e.textContent.includes(arg));
+      const el = blocks[blocks.length - 1];
+      if (!el) return '';
+      r.selectNodeContents(el);
     }
     const g = getSelection(); g.removeAllRanges(); g.addRange(r);
     return r.toString().trim();
   };
+  const sendOpen = async (p, via) => {
+    await p.waitForTimeout(300);
+    if (via === 'button') await p.click('#actmark'); else await p.keyboard.press('.');
+    await p.keyboard.press('s');
+    await p.waitForSelector('.send-ctx');
+    const v = await p.evaluate(() => ({ title: /** @type {HTMLInputElement} */ (document.querySelector('.send-title')).value, ctx: /** @type {HTMLTextAreaElement} */ (document.querySelector('.send-ctx')).value }));
+    await p.keyboard.press('Escape');
+    return v;
+  };
+  const lastLine = (s) => s.replace(/\n+$/, '').split('\n').pop();
   for (const name of browsers) {
     const { b, ctx } = await context(name);
     const p = await ctx.newPage();
     await p.goto(srv.base + '/blob/HEAD/marked.txt', { waitUntil: 'load' });
-    const isCode = await p.$('#L3');
-    if (!isCode) { r.fail(`marked ${name}: no code lines to mark`); await b.close(); continue; }
-    await p.evaluate(mark(), 'lines');
+    if (!(await p.$('#L3'))) { r.fail(`marked ${name}: no code lines to mark`); await b.close(); continue; }
+    await p.evaluate(mark, ['lines']);
     await p.waitForTimeout(300);
     const shown = await p.evaluate(() => { const m = document.getElementById('actmark'); return !!m && !m.hidden; });
     if (!shown) { r.fail(`marked ${name}: no trigger appears for marked lines`); await b.close(); continue; }
-    await p.click('#actmark');
-    await p.keyboard.press('s');
-    await p.waitForSelector('.send-ctx');
-    const send = await p.evaluate(() => ({ title: /** @type {HTMLInputElement} */ (document.querySelector('.send-title')).value, ctx: /** @type {HTMLTextAreaElement} */ (document.querySelector('.send-ctx')).value }));
+    const send = await sendOpen(p, 'button');
     const line3 = await p.$eval('#L3', (e) => e.textContent.trim());
-    if (shown && /:L2-3$/.test(send.title) && send.ctx.includes('#L2-L3') && send.ctx.includes(line3)) r.ok(`marked ${name}: lines 2-3 reach Send to`);
-    else r.fail(`marked ${name}: trigger=${shown} title=${send.title}`);
-    await p.keyboard.press('Escape');
-    await p.goto(srv.base + '/', { waitUntil: 'load' });
-    const phrase = await p.evaluate(mark(), 'prose');
-    await p.waitForTimeout(300);
-    await p.keyboard.press('.');
-    await p.keyboard.press('s');
-    await p.waitForSelector('.send-ctx');
-    const ctx2 = await p.$eval('.send-ctx', (e) => e.value);
-    if (phrase && ctx2.includes('> ' + phrase)) r.ok(`marked ${name}: README prose arrives as a quote`);
-    else r.fail(`marked ${name}: quote missing for ${JSON.stringify(phrase)}`);
+    if (send.ctx.includes('#L2-L3') && send.ctx.includes(line3) && send.title === 'marked.txt: second line third line') r.ok(`marked ${name}: lines 2-3 reach Send to, titled ${JSON.stringify(send.title)}`);
+    else r.fail(`marked ${name}: lines 2-3 title=${JSON.stringify(send.title)}`);
+    // A cut through "second line" snaps to the whole words.
+    await p.evaluate(mark, ['midword']);
+    const mid = await sendOpen(p);
+    if (mid.title === 'marked.txt: second line' && mid.ctx.includes('first line\nsecond line\nthird line')) r.ok(`marked ${name}: a mid-word mark snaps to "second line" with a line of context each side`);
+    else r.fail(`marked ${name}: mid-word mark gave title ${JSON.stringify(mid.title)}`);
+    // Rendered Markdown: the wrapped paragraph is lines 5-7 of the file.
+    await p.goto(srv.base + '/blob/HEAD/notes/guide.md', { waitUntil: 'networkidle' });
+    if (!(await p.evaluate(mark, ['prose', 'wrapped']))) { r.fail(`marked ${name}: rendered Markdown has no data-line blocks`); await b.close(); continue; }
+    const md = await sendOpen(p);
+    const want = raw(5, 7);
+    const src = lastLine(md.ctx);
+    const bad = [];
+    if (!md.ctx.includes('\n' + want + '\n')) bad.push('quote is not the raw lines 5-7');
+    if (!md.ctx.includes('notes/guide.md#L5-L7')) bad.push('link is not #L5-L7');
+    if (!/^source: [^\n]+@[0-9a-f]{40}:notes\/guide\.md#L5-L7$/.test(src)) bad.push(`source line ${JSON.stringify(src)}`);
+    if (md.title === 'notes/guide.md' || !md.title.startsWith('guide.md: Run git terrace')) bad.push(`title ${JSON.stringify(md.title)}`);
+    bad.length ? r.fail(`marked ${name}: rendered Markdown: ${bad.join(', ')}`) : r.ok(`marked ${name}: rendered Markdown sends raw lines 5-7 byte for byte, its range and source line`);
+    // A short mark in prose carries the line around it.
+    await p.evaluate(mark, ['prose', 'Last']);
+    const short = await sendOpen(p);
+    if (short.ctx.includes('#L9-L9') && short.ctx.includes('```md\n' + raw(8, 9) + '\n```')) r.ok(`marked ${name}: a short Markdown mark brings its neighbour lines`);
+    else r.fail(`marked ${name}: short mark context ${JSON.stringify(short.ctx)}`);
+    // A nested list item names its own lines, not those of the item that holds it.
+    await p.goto(srv.base + '/blob/HEAD/notes/list.md', { waitUntil: 'networkidle' });
+    await p.evaluate(mark, ['word', 'bravo']);
+    const nest = await sendOpen(p);
+    if (nest.ctx.includes('notes/list.md#L2-L3') && nest.ctx.includes(LIST.split('\n').slice(1, 3).join('\n'))) r.ok(`marked ${name}: a nested list item maps to its own lines 2-3`);
+    else r.fail(`marked ${name}: nested list item: ${JSON.stringify(nest.ctx)}`);
+    // README on the overview: the quote is its source line, the link names the file.
+    await p.goto(srv.base + '/', { waitUntil: 'networkidle' });
+    await p.evaluate(mark, ['prose', 'worth quoting']);
+    const ctx2 = (await sendOpen(p)).ctx;
+    if (ctx2.includes('\nA sentence worth quoting.\n') && ctx2.includes('README.md#L3-L3')) r.ok(`marked ${name}: README prose arrives as its source line`);
+    else r.fail(`marked ${name}: README quote missing in ${JSON.stringify(ctx2)}`);
     await b.close();
   }
 }
@@ -127,7 +190,7 @@ async function gutter() {
       await new Promise((ok) => requestAnimationFrame(() => requestAnimationFrame(ok)));
       return { ...before, grown: t.getBoundingClientRect().height, cap: innerHeight * 0.6 + 1 };
     });
-    if (size.w <= 521 && size.h < 300 && size.grown > size.h && size.grown <= size.cap) r.ok(`gutter ${name}: Send to ${Math.round(size.w)}x${Math.round(size.h)} grows to ${Math.round(size.grown)}`);
+    if (size.w <= 521 && size.h < 340 && size.grown > size.h && size.grown <= size.cap) r.ok(`gutter ${name}: Send to ${Math.round(size.w)}x${Math.round(size.h)} grows to ${Math.round(size.grown)}`);
     else r.fail(`gutter ${name}: Send to size ${JSON.stringify(size)}`);
     await b.close();
   }

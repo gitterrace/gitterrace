@@ -4,7 +4,7 @@
 // is remembered in localStorage. With no targets the only choice is "Copy as markdown".
 (function () {
   "use strict";
-  if (typeof document === "undefined") { module.exports = { enc: enc, fill: fill }; return; }
+  if (typeof document === "undefined") { module.exports = { enc: enc, fill: fill, sourceLine: sourceLine, titleOf: titleOf }; return; }
   var meta = document.querySelector('meta[name="gt-base"]');
   var B = meta ? meta.content : "";
   var KEY = "gitterrace-send-target";
@@ -31,11 +31,31 @@
     return e;
   }
   function range(l) { return l ? "L" + l.start + (l.end !== l.start ? "-L" + l.end : "") : ""; }
-  function titleOf(c) {
+  // Mirrors the Rust source_line(): the last, machine-read line of every note.
+  function sourceLine(repo, sha, path, lines) {
+    var flat = function (s) { return String(s).replace(/[\u0000-\u001f\u007f-\u009f]/g, " "); };
+    var out = "source: " + flat(repo) + "@" + sha;
+    if (path) {
+      // `%` and `#` encoded, so the only `#` on the line is the one before the range.
+      out += ":" + flat(path).replace(/%/g, "%25").replace(/#/g, "%23");
+      if (lines) out += "#L" + lines.start + "-L" + lines.end;
+    }
+    return out;
+  }
+  // The note's first line when there is one; else the file and the first words of what was
+  // marked; never the bare path, which every send from one file would share.
+  function titleOf(c, note) {
+    // Inside the function: under node the file returns before any var is set.
+    var TITLE_WORDS = 8;
+    var first = String(note || "").split("\n")[0].trim();
+    if (first) return first;
     if (c.kind === "commit" && c.subject) return c.subject;
-    if (!c.path) return document.title;
+    var words = String(c.marked || c.text || "").replace(/\s+/g, " ").trim().split(" ").filter(Boolean);
+    var what = words.slice(0, TITLE_WORDS).join(" ") + (words.length > TITLE_WORDS ? "\u2026" : "");
+    if (!c.path) return what || (typeof document === "undefined" ? "" : document.title);
+    var file = c.path.slice(c.path.lastIndexOf("/") + 1);
     var l = c.lines;
-    return c.path + (l ? ":L" + l.start + (l.end !== l.start ? "-" + l.end : "") : "");
+    return file + ": " + (what || (l ? "lines " + l.start + (l.end !== l.start ? "-" + l.end : "") : "whole file"));
   }
   function lastUsed() { try { return localStorage.getItem(KEY); } catch (e) { return null; } }
   function remember(id) { try { localStorage.setItem(KEY, id); } catch (e) {} }
@@ -82,6 +102,14 @@
     window.gtOverlay.open("send", back, box, { label: "Send", onClose: function () { if (cur && cur.back === back) cur = null; } });
     ctx.focus();
     ctx.setSelectionRange(0, 0);
+    // The title follows the note's first line until the user edits the title itself.
+    var auto = title.value;
+    ctx.addEventListener("input", function () {
+      if (title.value !== auto) return;
+      var top = ctx.value.slice(0, ctx.value.indexOf("\n") < 0 ? ctx.value.length : ctx.value.indexOf("\n"));
+      // The note is what sits above the prefilled context; that context is not a note.
+      auto = title.value = titleOf(c, ctx.value.indexOf(c.markdown) > 0 ? top : "");
+    });
 
     function fillPick(list) {
       cur.targets = list;
@@ -126,6 +154,6 @@
     });
   }
 
-  if (typeof module !== "undefined") module.exports = { enc: enc, fill: fill };
-  window.gtSend = { open: open, enc: enc, fill: fill };
+  if (typeof module !== "undefined") module.exports = { enc: enc, fill: fill, sourceLine: sourceLine, titleOf: titleOf };
+  window.gtSend = { open: open, enc: enc, fill: fill, sourceLine: sourceLine };
 })();

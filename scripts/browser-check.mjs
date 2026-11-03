@@ -19,8 +19,11 @@
 //                row and the page never scrolls sideways; where search is folded, its button opens
 //                the field with focus and Escape folds it again
 //   marked       text marked with the mouse is what the menu acts on: marking lines 2-3 of a file
-//                shows a trigger, and Send to's title and context carry L2-3 and their text;
-//                marked README prose arrives as a > quote
+//                shows a trigger and Send to carries L2-3, their text and a title that is not the
+//                bare path; a mid-word mark snaps to whole words with a line of context; marked
+//                rendered Markdown (backticks, a link, a wrapped paragraph) sends the raw lines
+//                5-7 byte for byte with #L5-L7 and a matching source: line; README prose arrives
+//                as its source line
 //   overlays     t, ? and b each open a named dialog that takes focus, keeps it through 5 Tabs
 //                (and Shift+Tab), closes on Escape and gives focus back to what had it
 //   menu-same    the action menu lists the same entries in the same order in the README preview,

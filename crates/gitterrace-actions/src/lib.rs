@@ -13,6 +13,7 @@ pub mod payload;
 pub mod runner;
 pub mod schema;
 pub mod send;
+pub mod source;
 pub mod token;
 
 pub use config::{Action, Config, ConfigError, Cwd, Kind, Output, RESERVED_KEYS, Reloader};
@@ -20,4 +21,5 @@ pub use link::{Link, LinkError, LinkStyle, styled};
 pub use payload::{Lines, Locator, Payload, PayloadError, RunRequest, permalink};
 pub use runner::{Limits, Outcome, RunError, Runner};
 pub use send::{Part, fill};
+pub use source::{SOURCE_PREFIX, Source, parse_source, source_line};
 pub use token::{Token, proof as token_proof};

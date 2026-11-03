@@ -38,6 +38,8 @@ pub(crate) struct About {
     pub(crate) tabs: Vec<DocTab>,
     pub(crate) html: String,
     pub(crate) markdown: bool,
+    /// The document's path in the repo, so marked prose maps to its source lines.
+    pub(crate) file: String,
 }
 
 /// Preference of `name` for a kind: (stem, extension, not upper-case), lower is better.
@@ -116,6 +118,7 @@ pub(crate) fn card(
         tabs,
         html,
         markdown: is_md,
+        file,
     })
 }
 

@@ -189,6 +189,7 @@ impl Payload {
             &permalink,
             text.as_deref(),
             commit.as_ref(),
+            &crate::source::source_line(&repo.name(), &sha, path.as_deref(), lines),
         );
 
         Ok(Self {
@@ -385,10 +386,11 @@ fn markdown(
     link: &str,
     text: Option<&str>,
     commit: Option<&CommitInfo>,
+    source: &str,
 ) -> String {
     let Some(p) = path else {
         let (subject, author) = commit.map_or(("", ""), |c| (&c.subject[..], &c.author[..]));
-        return format!("**{subject}** @ {short}\n{author}\n{link}\n");
+        return format!("**{subject}** @ {short}\n{author}\n{link}\n{source}\n");
     };
     let mut md = format!("**{}** @ {short}\n{link}\n", file_ref(p, lines));
     if let Some(t) = text {
@@ -403,7 +405,8 @@ fn markdown(
         let fence = "`".repeat(longest.max(2) + 1);
         md = format!("{md}{fence}{lang}\n{snippet}\n{fence}\n");
     }
-    md
+    // The machine line comes last, so a reader finds it on the final line.
+    format!("{md}{source}\n")
 }
 
 /// Seconds since the epoch as `YYYY-MM-DDTHH:MM:SSZ`.

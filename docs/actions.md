@@ -33,6 +33,26 @@ before the first placeholder must hold the scheme and end the host. `https`, `ma
 schemes are allowed, `http` only for loopback. With no `[[send]]` entry, the window offers
 Copy as markdown.
 
+### What a note carries
+
+Text marked with the mouse snaps to whole words. Marked code sends its lines. Marked prose in
+rendered Markdown (a README, a `.md` preview) sends the source lines it was rendered from,
+byte for byte, and the permalink names them as `#La-Lb`. A mark inside a table quotes the whole
+table. A mark shorter than about 20 characters brings one line on each side as context. The
+title is the first line you type above the context, else the file name and the first words of
+the mark.
+
+The last line of every note, and of Copy as markdown, is for machines:
+
+```text
+source: <repo>@<sha>:<path>#L<a>-L<b>
+```
+
+`<sha>` is the full commit id. A commit has no `:<path>` part, a whole file no `#L` part, and a
+single line is still `#L<a>-L<a>`. In the path `%` is written `%25` and `#` is written `%23`, so
+the only `#` on the line starts the range. The sha is the first `@` followed by hex and then `:`
+or the line end, so a repository name holding `@` still parses.
+
 ### The starter file
 
 `git terrace init` writes the file below to `actions.toml` in your config folder, unless

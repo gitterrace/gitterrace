@@ -4,13 +4,17 @@
 //! everything the parser or this module generates goes through the same
 //! sanitizer, so the output never carries scripts, event handlers or styles.
 
+mod front;
+mod lines;
+
 use std::borrow::Cow;
 use std::collections::HashMap;
-use std::fmt::Write as _;
 
 use pulldown_cmark::{BlockQuoteKind, CodeBlockKind, Event, Options, Parser, Tag, TagEnd, html};
 
 use crate::fmt::esc;
+use crate::markdown::front::{front_matter_html, split_front_matter};
+use crate::markdown::lines::{LineMap, mark, sentinel};
 
 /// Where a markdown file lives, so relative links can be resolved.
 pub(crate) struct Base {
@@ -28,87 +32,6 @@ impl Base {
             dir: dir.trim_matches('/').to_owned(),
         }
     }
-}
-
-/// Splits a leading `---` block from the document. Returns the block body and the rest.
-/// An unterminated block is not front matter.
-fn split_front_matter(src: &str) -> Option<(&str, &str)> {
-    let rest = src
-        .strip_prefix("---\n")
-        .or_else(|| src.strip_prefix("---\r\n"))?;
-    let mut offset = 0;
-    for line in rest.split_inclusive('\n') {
-        if line.trim_end() == "---" {
-            return Some((&rest[..offset], &rest[offset + line.len()..]));
-        }
-        offset += line.len();
-    }
-    None
-}
-
-/// Parses the simple `key: value` and `key:` + `- item` forms. None when any line
-/// is something else, so the caller shows the block verbatim.
-fn parse_front_matter(block: &str) -> Option<Vec<(String, String)>> {
-    let mut rows: Vec<(String, Vec<String>)> = Vec::new();
-    for line in block.lines() {
-        if line.trim().is_empty() {
-            continue;
-        }
-        if let Some(item) = line.trim_start().strip_prefix("- ") {
-            rows.last_mut()?.1.push(unquote(item.trim())?);
-            continue;
-        }
-        if line.starts_with(char::is_whitespace) {
-            return None;
-        }
-        let (key, value) = line.split_once(':')?;
-        let key = key.trim();
-        if key.is_empty()
-            || key.contains(|c: char| c.is_whitespace() || "&*!|>{}[]#'\"".contains(c))
-        {
-            return None;
-        }
-        let value = value.trim();
-        if value.is_empty() {
-            rows.push((key.to_owned(), Vec::new()));
-        } else {
-            rows.push((key.to_owned(), vec![unquote(value)?]));
-        }
-    }
-    if rows.is_empty() {
-        return None;
-    }
-    Some(rows.into_iter().map(|(k, v)| (k, v.join(", "))).collect())
-}
-
-/// Plain, or wrapped in one matching pair of quotes. Anchors, aliases, block
-/// scalars and flow collections are not handled.
-fn unquote(v: &str) -> Option<String> {
-    for q in ['"', '\''] {
-        if let Some(inner) = v.strip_prefix(q) {
-            return inner.strip_suffix(q).map(str::to_owned);
-        }
-    }
-    if v.starts_with(['&', '*', '!', '|', '>', '{', '[', '#']) {
-        return None;
-    }
-    Some(v.to_owned())
-}
-
-/// HTML for the front matter block: a key/value table, or the raw text as code.
-/// Built here and added after sanitizing, so every piece is escaped by hand.
-fn front_matter_html(block: &str) -> String {
-    parse_front_matter(block).map_or_else(
-        || format!("<pre><code>{}</code></pre>\n", esc(block)),
-        |rows| {
-            let mut out = String::from("<table class=\"fm\">");
-            for (k, v) in rows {
-                let _ = write!(out, "<tr><th>{}</th><td>{}</td></tr>", esc(&k), esc(&v));
-            }
-            out.push_str("</table>\n");
-            out
-        },
-    )
 }
 
 /// Heading slug as most Markdown hosts make it, so links written elsewhere still land: lowercase, keep letters, digits, `-` and `_`, spaces to `-`.
@@ -181,7 +104,7 @@ fn rewrite_url(base: &Base, url: &str, image: bool) -> String {
     }
 }
 
-fn code_block(code: &str, lang: &str) -> String {
+fn code_block(code: &str, lang: &str, span: &str) -> String {
     let lang = lang.split([' ', ',', '{']).next().unwrap_or("");
     let body = crate::highlight::block(code, lang).unwrap_or_else(|| esc(code));
     let class = if lang.is_empty() {
@@ -189,10 +112,10 @@ fn code_block(code: &str, lang: &str) -> String {
     } else {
         format!(" class=\"language-{}\"", esc(lang))
     };
-    format!("<pre><code{class}>{body}</code></pre>\n")
+    format!("{span}<pre><code{class}>{body}</code></pre>\n")
 }
 
-fn alert_open(kind: BlockQuoteKind) -> String {
+fn alert_open(kind: BlockQuoteKind, span: &str) -> String {
     let (class, title) = match kind {
         BlockQuoteKind::Note => ("note", "Note"),
         BlockQuoteKind::Tip => ("tip", "Tip"),
@@ -201,7 +124,7 @@ fn alert_open(kind: BlockQuoteKind) -> String {
         BlockQuoteKind::Caution => ("caution", "Caution"),
     };
     format!(
-        "<div class=\"markdown-alert markdown-alert-{class}\">\
+        "{span}<div class=\"markdown-alert markdown-alert-{class}\">\
          <p class=\"markdown-alert-title\">{title}</p>\n"
     )
 }
@@ -210,22 +133,27 @@ const fn heading_level(level: pulldown_cmark::HeadingLevel) -> u8 {
     level as u8
 }
 
-/// Parser events with headings anchored, fences highlighted and alerts opened.
-fn transform<'a>(parser: Parser<'a>) -> Vec<Event<'a>> {
+/// A heading being collected: level, explicit id, inner events, plain text, line span.
+type Heading<'a> = (u8, Option<String>, Vec<Event<'a>>, String, String);
+
+/// Parser events with headings anchored, fences highlighted, alerts opened and every block
+/// marked with its source lines.
+fn transform<'a>(body: &'a str, parser: Parser<'a>, map: &LineMap) -> Vec<Event<'a>> {
     let mut out: Vec<Event<'a>> = Vec::new();
     let mut seen = HashMap::new();
-    let mut heading: Option<(u8, Option<String>, Vec<Event<'a>>, String)> = None;
-    let mut fence: Option<(String, String)> = None;
+    let mut heading: Option<Heading<'a>> = None;
+    let mut fence: Option<(String, String, String)> = None;
 
-    for ev in parser {
-        if let Some((lang, code)) = fence.as_mut() {
+    for (ev, range) in parser.into_offset_iter() {
+        let span = || map.span(body, &range);
+        if let Some((lang, code, at)) = fence.as_mut() {
             match ev {
                 Event::Text(t) => code.push_str(&t),
                 Event::End(TagEnd::CodeBlock) => {
                     let html = if lang == "mermaid" {
-                        format!("<pre class=\"mermaid\">{}</pre>\n", esc(code))
+                        format!("{}<pre class=\"mermaid\">{}</pre>\n", mark(at), esc(code))
                     } else {
-                        code_block(code, lang)
+                        code_block(code, lang, &mark(at))
                     };
                     out.push(Event::Html(html.into()));
                     fence = None;
@@ -240,7 +168,7 @@ fn transform<'a>(parser: Parser<'a>) -> Vec<Event<'a>> {
                     CodeBlockKind::Fenced(l) => l.trim().to_owned(),
                     CodeBlockKind::Indented => String::new(),
                 };
-                fence = Some((lang, String::new()));
+                fence = Some((lang, String::new(), span()));
             }
             Event::Start(Tag::Heading { level, id, .. }) => {
                 heading = Some((
@@ -248,15 +176,17 @@ fn transform<'a>(parser: Parser<'a>) -> Vec<Event<'a>> {
                     id.map(|i| i.to_string()),
                     Vec::new(),
                     String::new(),
+                    span(),
                 ));
             }
             Event::End(TagEnd::Heading(_)) => {
-                if let Some((lvl, id, events, text)) = heading.take() {
+                if let Some((lvl, id, events, text, at)) = heading.take() {
                     let slug = unique_slug(&mut seen, id.unwrap_or_else(|| slugify(&text)));
                     let slug = esc(&slug);
+                    let at = mark(&at);
                     out.push(Event::Html(
                         format!(
-                            "<h{lvl} id=\"{slug}\"><a class=\"anchor\" href=\"#{slug}\" \
+                            "{at}<h{lvl} id=\"{slug}\"><a class=\"anchor\" href=\"#{slug}\" \
                              aria-label=\"Permalink\"></a>"
                         )
                         .into(),
@@ -266,13 +196,20 @@ fn transform<'a>(parser: Parser<'a>) -> Vec<Event<'a>> {
                 }
             }
             Event::Start(Tag::BlockQuote(Some(kind))) => {
-                out.push(Event::Html(alert_open(kind).into()));
+                out.push(Event::Html(alert_open(kind, &mark(&span())).into()));
             }
             Event::End(TagEnd::BlockQuote(Some(_))) => {
                 out.push(Event::Html("</div>\n".into()));
             }
+            // Tags the writer emits: the span rides in a sentinel right before the start tag.
+            Event::Start(Tag::Paragraph | Tag::Item | Tag::Table(_) | Tag::BlockQuote(None))
+                if heading.is_none() =>
+            {
+                out.push(sentinel(&span()));
+                out.push(ev);
+            }
             other => {
-                if let Some((_, _, events, text)) = heading.as_mut() {
+                if let Some((_, _, events, text, _)) = heading.as_mut() {
                     if let Event::Text(t) | Event::Code(t) = &other {
                         text.push_str(t);
                     }
@@ -353,15 +290,20 @@ pub(crate) fn render_with(src: &str, base: Base) -> String {
         | Options::ENABLE_TASKLISTS
         | Options::ENABLE_FOOTNOTES
         | Options::ENABLE_GFM;
+    // The sentinel characters cannot come from the file, so no span is forged through them.
+    let src = &*lines::neutralize(src);
     let (head, body) = match split_front_matter(src) {
         Some((block, rest)) => (front_matter_html(block), rest),
         None => (String::new(), src),
     };
+    // Spans count lines of the whole file, so the front matter's lines come first.
+    let map = LineMap::new(body, src[..src.len() - body.len()].matches('\n').count());
     let parser = Parser::new_ext(body, opts);
-    let events = transform(parser);
+    let events = transform(body, parser, &map);
     let mut raw = String::new();
     html::push_html(&mut raw, events.into_iter());
-    head + &sanitizer(base).clean(&raw).to_string()
+    // Spans are added after sanitizing, which drops every data-line the file wrote.
+    head + &lines::place(&sanitizer(base).clean(&raw).to_string())
 }
 
 #[cfg(test)]
@@ -555,7 +497,7 @@ mod tests {
         let out = render(
             "|a|b|\n|:-|-:|\n|1|2|\n\n- [x] done\n- [ ] todo\n\n~~gone~~\n\nnote[^1]\n\n[^1]: the note\n\nhttps://example.com\n",
         );
-        assert!(out.contains("<table>"));
+        assert!(out.contains("<table data-line=\"1-3\">"), "{out}");
         assert!(out.contains("text-align: left"));
         assert!(out.contains("type=\"checkbox\""));
         assert!(out.contains("<del>gone</del>"));
@@ -572,7 +514,10 @@ mod tests {
                 dir: String::new(),
             },
         );
-        assert!(r.contains("<pre class=\"mermaid\">graph TD; A--&gt;B\n</pre>"));
+        assert!(
+            r.contains("<pre class=\"mermaid\" data-line=\"1-3\">graph TD; A--&gt;B\n</pre>"),
+            "{r}"
+        );
     }
 
     #[test]
