@@ -4,6 +4,7 @@ severity: error
 message: Loads the worktree index into the repository's shared snapshot.
 note: These gix shortcuts keep the whole HEAD index alive for the life of the server, sized by the tree. Build the diff cache with `diff::resource_cache`, which owns its index.
 files: [crates/**/*.rs]
+ignores: ['**/tests.rs', '**/*_tests.rs', '**/tests/**']
 rule:
   any:
     - pattern: $R.diff_resource_cache_for_tree_diff()
