@@ -1,15 +1,16 @@
-<section class="side"><h3>Now</h3>
-<p>{% if branch_href.is_empty() %}<b>{{ branch }}</b>{% else %}On <a href="{{ branch_href }}"><b>{{ branch }}</b></a>{% endif %}{% if dirty %} <span class="muted">with</span> <a href="{{ worktree_href }}" data-tip="Files that differ from the last commit">uncommitted changes</a>{% else %} <span class="muted">clean</span>{% endif %}</p>
+{% for s in order %}{% match s.as_str() %}{% when "now" %}<section class="side"><h3>Now</h3>
+<p>{% if branch_href.is_empty() %}<b>{{ branch }}</b>{% else %}On <a href="{{ branch_href }}"><b>{{ branch }}</b></a>{% endif %}{% if dirty %}<span class="muted">, with</span> <a href="{{ worktree_href }}" data-tip="Files that differ from the last commit">uncommitted changes</a>{% else %}<span class="muted">, clean</span>{% endif %}</p>
 </section>
-<section class="side"><h3>Recent</h3>
-<p><b>{{ today }}</b> today <span class="muted">·</span> <b>{{ week }}</b> this week{% if !last.is_empty() %} <span class="muted">·</span> last {{ last }}{% endif %}</p>
-<span class="sparkwrap" data-tip="{{ spark_tip }}">{{ spark|safe }}</span></section>
-{% if !hot.is_empty() %}<section class="side"><h3><a href="{{ hot_href }}">Churn</a> <span class="muted">30 days</span></h3>
-<ul class="sidelist">{% for h in hot %}<li><a href="{{ h.href }}" data-tip="{{ h.path }}">{{ h.name }}</a><span class="muted">{{ h.changes }}</span></li>{% endfor %}</ul></section>{% endif %}
-{% if !loose.is_empty() || worktrees > 0 %}<section class="side"><h3>Loose ends</h3>
+{% when "recent" %}<section class="side"><h3>Recent</h3>
+<p><b>{{ today }}</b> today <span class="muted">·</span> <b>{{ week }}</b> this week{% if !last.is_empty() %} <span class="muted">·</span> last commit {{ last }}{% endif %}</p>
+{% if !spark.is_empty() %}<div class="sparkwrap" data-tip="{{ spark_tip }}">{{ spark|safe }}</div>{% endif %}</section>
+{% when "churn" %}{% if !hot.is_empty() %}<section class="side"><h3><a href="{{ hot_href }}">Churn</a> <span class="muted">30 days</span></h3>
+<ul class="sidelist">{% for h in hot %}<li><a href="{{ h.href }}" data-tip="{{ h.path }}">{{ h.name }}</a><span class="muted">{{ h.changes }}</span></li>{% endfor %}</ul></section>
+{% endif %}{% when "loose_ends" %}{% if !loose.is_empty() || worktrees > 0 %}<section class="side"><h3>Loose ends</h3>
 <ul class="sidelist">{% for l in loose %}<li><a href="{{ l.href }}" data-tip="{{ l.tip }}">{{ l.name }}</a><span class="muted">{{ l.when }}</span></li>{% endfor %}
 {% if !loose_more.is_empty() %}<li><a href="{{ refs_href }}">{{ loose_more }}</a></li>{% endif %}
-{% if worktrees > 0 %}<li><a href="{{ worktrees_href }}">{{ worktrees }} {% if worktrees == 1 %}worktree{% else %}worktrees{% endif %}</a></li>{% endif %}</ul></section>{% endif %}
-{% if !langs.is_empty() %}<section class="side"><h3><a href="{{ langs_href }}">Languages</a></h3>
+{% if worktrees > 0 %}<li><a href="{{ worktrees_href }}">{{ worktrees }} {% if worktrees == 1 %}worktree{% else %}worktrees{% endif %}</a></li>{% endif %}</ul></section>
+{% endif %}{% when "languages" %}{% if !langs.is_empty() %}<section class="side"><h3><a href="{{ langs_href }}">Languages</a></h3>
 <div class="langbar">{% for l in langs %}<span class="{{ l.class }}" style="width:{{ l.width }}%" data-tip="{{ l.name }} {{ l.pct }}"></span>{% endfor %}</div>
-<ul class="langs">{% for l in langs %}<li><i class="{{ l.class }}"></i>{{ l.name }} <span class="muted">{{ l.pct }}</span></li>{% endfor %}</ul></section>{% endif %}
+<ul class="langs">{% for l in langs %}<li><i class="{{ l.class }}"></i>{{ l.name }} <span class="muted">{{ l.pct }}</span></li>{% endfor %}</ul></section>
+{% endif %}{% else %}{% endmatch %}{% endfor %}

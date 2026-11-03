@@ -53,13 +53,19 @@ impl Insights<'_> {
         let mut people = HashSet::new();
         let mut paths: HashSet<PathId> = HashSet::new();
         let (mut added, mut removed) = (0, 0);
+        let mut who: std::collections::HashMap<Rank, usize> = std::collections::HashMap::new();
         let live: Vec<Rank> = range
             .iter()
             .copied()
-            .filter(|r| src.commit(*r).is_some_and(|c| !c.merge))
+            .filter(|r| {
+                src.commit(*r).is_some_and(|c| {
+                    who.insert(c.rank, self.person_of(c.ident));
+                    !c.merge
+                })
+            })
             .collect();
         for (rank, rows) in src.rows_for(live) {
-            people.insert(self.person(rank));
+            people.insert(who.get(&rank).copied().unwrap_or(0));
             for row in &rows {
                 let Some(l) = self.row_lines(row) else {
                     continue;

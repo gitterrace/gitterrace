@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, HashSet};
 
 use gitterrace_git::civil_from_days;
 
-use crate::feed::{CommitRow, InsightsSource, PathId, Posting, Rank, RenameEdge};
+use crate::feed::{CommitRange, CommitRow, InsightsSource, PathId, Posting, Rank, RenameEdge};
 use crate::insights::fasthash::FastMap;
 use crate::insights::{DAY, HeadFile, Insights, Period};
 
@@ -223,10 +223,11 @@ impl Insights<'_> {
         let mut ranks: Vec<Rank> = hits.iter().flatten().map(|h| h.0).collect();
         ranks.sort_unstable();
         ranks.dedup();
-        let commits: FastMap<Rank, CommitRow> = ranks
-            .iter()
-            .filter_map(|r| src.commit(*r))
-            .filter(|c| keep(c))
+        // One ascending pass over the commit table: random lookups per touched commit cost a
+        // block-cache probe and a decode each, hundreds of thousands on a large history.
+        let commits: FastMap<Rank, CommitRow> = src
+            .commits_in(CommitRange::All)
+            .filter(|c| ranks.binary_search(&c.rank).is_ok() && keep(c))
             .map(|c| (c.rank, c))
             .collect();
         ranks.retain(|r| commits.contains_key(r));
@@ -337,7 +338,7 @@ impl Insights<'_> {
                 count += 1;
                 churn += u64::from(t.lines);
                 last = last.max(c.time);
-                who.insert(self.person(t.commit));
+                who.insert(self.person_of(c.ident));
             }
             if count == 0 {
                 continue;

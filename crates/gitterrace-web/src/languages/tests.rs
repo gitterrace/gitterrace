@@ -1,4 +1,4 @@
-use super::{LocQuery, View, sample};
+use super::{LocQuery, View, sample, shown};
 
 #[test]
 fn range_is_clamped_and_ordered() {
@@ -30,26 +30,17 @@ fn sampling_keeps_ends_and_selection() {
 /// load never walks every commit message.
 #[test]
 fn subjects_fetched_are_bounded_by_what_the_page_shows() {
-    let ch = super::Chain {
-        ids: vec![String::new(); 400_000],
-        times: Vec::new(),
-        offsets: Vec::new(),
-        adds: Vec::new(),
-        dels: Vec::new(),
-        langs: Vec::new(),
-        lines: Vec::new(),
-    };
     let view = View {
         time: false,
         share: false,
         range: None,
     };
-    assert!(ch.shown(view).len() <= 702 + 500);
+    assert!(shown(400_000, view).len() <= 702 + 500);
     let ranged = View {
         range: Some((10, 399_990)),
         ..view
     };
-    let v = ch.shown(ranged);
+    let v = shown(400_000, ranged);
     assert!(v.len() <= 704 + 500);
     assert!(v.contains(&10) && v.contains(&399_990) && v.contains(&399_500));
 }

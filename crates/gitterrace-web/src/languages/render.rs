@@ -11,8 +11,9 @@ use std::fmt::Write as _;
 
 use crate::charts::nice_step;
 use crate::fmt::{self, esc};
+use crate::languages::chain::Chain;
 use crate::languages::{
-    BOTTOM, COMMIT_LIST, Chain, H, LEFT, RIGHT, SAMPLES, Subjects, TOP, TOP_PAD, View, W,
+    BOTTOM, COMMIT_LIST, H, LEFT, RIGHT, SAMPLES, Subjects, TOP, TOP_PAD, View, W,
 };
 
 fn seg(label: &str, items: &[(&str, bool, String)]) -> String {
@@ -78,22 +79,23 @@ fn area_chart(ch: &Chain, view: View, subj: &Subjects) -> String {
     }
     let keep: Vec<usize> = view.range.map_or(vec![], |(a, b)| vec![a, b]);
     let pts = sample(n, &keep);
-    let (t0, t1) = (ch.times[0], ch.times[n - 1].max(ch.times[0] + 1));
+    let (t0, t1) = (ch.time(0), ch.time(n - 1).max(ch.time(0) + 1));
     let pw = W - LEFT - RIGHT;
     let ph = H - TOP_PAD - BOTTOM;
     let mut xs: Vec<f64> = Vec::new();
     for &i in &pts {
         let frac = if view.time {
-            (ch.times[i] - t0) as f64 / (t1 - t0) as f64
+            (ch.time(i) - t0) as f64 / (t1 - t0) as f64
         } else {
             i as f64 / (n - 1).max(1) as f64
         };
         let x = frac.clamp(0.0, 1.0).mul_add(pw, LEFT);
         xs.push(xs.last().map_or(x, |p: &f64| p.max(x)));
     }
+    let rows: Vec<Vec<i64>> = pts.iter().map(|i| ch.lines(*i)).collect();
     let totals: Vec<i64> = pts
         .iter()
-        .map(|i| ch.lines[*i].iter().map(|v| (*v).max(0)).sum())
+        .map(|i| ch.lines(*i).iter().map(|v| (*v).max(0)).sum())
         .collect();
     let max = totals.iter().copied().max().unwrap_or(0).max(1);
     let (ymax_n, step) = if view.share {
@@ -127,12 +129,12 @@ fn area_chart(ch: &Chain, view: View, subj: &Subjects) -> String {
         v += step;
     }
     // Stack from the bottom: language 0 sits on the axis.
-    let k = ch.langs.len();
+    let k = ch.langs().len();
     let mut base = vec![0.0f64; pts.len()];
     for lang in 0..k {
         let mut top = Vec::with_capacity(pts.len());
-        for (j, &i) in pts.iter().enumerate() {
-            let raw = ch.lines[i][lang].max(0) as f64;
+        for j in 0..pts.len() {
+            let raw = rows[j][lang].max(0) as f64;
             let val = if view.share {
                 if totals[j] > 0 {
                     raw / totals[j] as f64 * 100.0
@@ -160,7 +162,7 @@ fn area_chart(ch: &Chain, view: View, subj: &Subjects) -> String {
             svg,
             r#"<path class="{}" d="{d}Z" data-tip="{}"/>"#,
             cat(lang, k),
-            esc(&ch.langs[lang])
+            esc(&ch.langs()[lang])
         );
         base = top;
     }
@@ -182,7 +184,7 @@ fn area_chart(ch: &Chain, view: View, subj: &Subjects) -> String {
             r#"<text class="ax" x="{:.1}" y="{:.1}" text-anchor="{anchor}">{}</text>"#,
             xs[j],
             H - 8.0,
-            fmt::day(ch.times[pts[j]])
+            fmt::day(ch.time(pts[j]))
         );
     }
     if let Some((a, b)) = view.range {
@@ -209,12 +211,12 @@ fn area_chart(ch: &Chain, view: View, subj: &Subjects) -> String {
     let data = serde_json::json!({
         "n": n,
         "share": view.share,
-        "names": ch.langs,
+        "names": ch.langs(),
         "i": pts,
         "x": xs.iter().map(|x| (x * 10.0).round() / 10.0).collect::<Vec<_>>(),
-        "d": pts.iter().map(|i| fmt::date(ch.times[*i], ch.offsets[*i])).collect::<Vec<_>>(),
+        "d": pts.iter().map(|i| fmt::date(ch.time(*i), ch.offset(*i))).collect::<Vec<_>>(),
         "s": pts.iter().map(|i| subj.of(*i)).collect::<Vec<_>>(),
-        "l": pts.iter().map(|i| ch.lines[*i].clone()).collect::<Vec<_>>(),
+        "l": rows,
         "view": view.href(|v| v.range = None),
     });
     let json = data.to_string().replace('<', "\\u003c");
@@ -224,9 +226,9 @@ fn area_chart(ch: &Chain, view: View, subj: &Subjects) -> String {
 }
 
 fn legend(ch: &Chain) -> String {
-    let k = ch.langs.len();
+    let k = ch.langs().len();
     let mut s = String::from(r#"<div class="legend">"#);
-    for (i, l) in ch.langs.iter().enumerate() {
+    for (i, l) in ch.langs().iter().enumerate() {
         let _ = write!(s, r#"<span><i class="{}"></i>{}</span>"#, cat(i, k), esc(l));
     }
     s.push_str("</div>");
@@ -240,12 +242,11 @@ fn range_card(ch: &Chain, view: View, subj: &Subjects) -> String {
     }
     let (from, to) = view.range.unwrap_or((0, n - 1));
     let base = ch.before(from);
-    let end = &ch.lines[to];
+    let end = &ch.lines(to);
     let count = to - from + 1;
-    let added: u64 = ch.adds[from..=to].iter().sum();
-    let removed: u64 = ch.dels[from..=to].iter().sum();
+    let (added, removed) = (ch.added, ch.removed);
     let net = added as i64 - removed as i64;
-    let k = ch.langs.len();
+    let k = ch.langs().len();
     let deltas: Vec<i64> = (0..k).map(|i| end[i] - base[i]).collect();
     let big = deltas
         .iter()
@@ -278,8 +279,8 @@ fn range_card(ch: &Chain, view: View, subj: &Subjects) -> String {
         } else {
             "Whole history"
         },
-        fmt::day(ch.times[from]),
-        fmt::day(ch.times[to]),
+        fmt::day(ch.time(from)),
+        fmt::day(ch.time(to)),
         preset("Last 10", Some(10)),
         preset("Last 25", Some(25)),
         preset("Whole history", None),
@@ -302,7 +303,7 @@ fn range_card(ch: &Chain, view: View, subj: &Subjects) -> String {
             s,
             r#"<tr><td><i class="dot {}"></i>{}</td><td class="r">{}</td><td class="r">{} <span class="muted">{}</span></td><td class="r"><b class="{}">{}</b></td><td class="dcol"><span class="dbar"><b class="{} w{w}"></b></span></td></tr>"#,
             cat(i, k),
-            esc(&ch.langs[i]),
+            esc(&ch.langs()[i]),
             fmt::thousands(base[i].max(0)),
             fmt::thousands(end[i].max(0)),
             share_label(end[i].max(0) as f64 / end_total as f64),
@@ -322,9 +323,9 @@ fn range_card(ch: &Chain, view: View, subj: &Subjects) -> String {
         let _ = write!(
             s,
             r#"<li>{} <span class="subj">{}</span> <span class="muted">{}</span></li>"#,
-            fmt::sha_link(&ch.ids[i]),
+            fmt::sha_link(ch.id(i)),
             esc(&subj.of(i)),
-            fmt::day(ch.times[i])
+            fmt::day(ch.time(i))
         );
     }
     s.push_str("</ul>");
@@ -343,8 +344,8 @@ fn languages_now(ch: &Chain) -> String {
     if n == 0 {
         return String::new();
     }
-    let k = ch.langs.len();
-    let last = &ch.lines[n - 1];
+    let k = ch.langs().len();
+    let last = &ch.lines(n - 1);
     let back = ch.before(n.saturating_sub(10));
     let total: i64 = last.iter().map(|v| (*v).max(0)).sum::<i64>().max(1);
     let mut bar = String::from(
@@ -358,7 +359,7 @@ fn languages_now(ch: &Chain) -> String {
                 r#"<b class="{} w{}" data-tip="{} {}"></b>"#,
                 cat(i, k),
                 (f * 100.0).round().clamp(1.0, 100.0) as u32,
-                esc(&ch.langs[i]),
+                esc(&ch.langs()[i]),
                 share_label(f)
             );
         }
@@ -382,7 +383,7 @@ fn languages_now(ch: &Chain) -> String {
         let mut maxv = 1i64;
         let mut series: Vec<i64> = (0..n)
             .step_by(step)
-            .map(|c| ch.lines[c][i].max(0))
+            .map(|c| ch.lines(c)[i].max(0))
             .collect();
         series.push(last[i].max(0));
         for v in &series {
@@ -405,7 +406,7 @@ fn languages_now(ch: &Chain) -> String {
             s,
             r#"<tr><td><i class="dot {}"></i>{}</td><td class="r">{}</td><td class="r">{}</td><td><svg class="spark {}" viewBox="0 0 90 20" width="90" height="20" aria-hidden="true"><polyline points="{}"/></svg></td><td class="r"><b class="{}">{}</b></td></tr>"#,
             cat(i, k),
-            esc(&ch.langs[i]),
+            esc(&ch.langs()[i]),
             fmt::thousands(last[i].max(0)),
             share_label(last[i].max(0) as f64 / total as f64),
             cat_s(i, k),
@@ -439,7 +440,7 @@ pub(super) fn body(ch: &Chain, view: View, subj: &Subjects) -> String {
             ]
         ),
     );
-    let total: i64 = ch.lines.last().map_or(0, |l| l.iter().sum());
+    let total: i64 = ch.lines(ch.len() - 1).iter().sum();
     format!(
         r#"{filters}<section class="card pad"><div class="chart-head"><div><h2>Lines of code by language</h2><p class="hint">Exact line count at every commit on the first-parent history, {} today. Drag across the chart to select a range.</p></div>{}</div>{}</section>{}{}"#,
         fmt::count(total.max(0), "line", "lines"),

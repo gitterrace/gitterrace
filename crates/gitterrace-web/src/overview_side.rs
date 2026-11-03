@@ -20,7 +20,6 @@ const CHURN_DAYS: i64 = 30;
 const TOP_CHURN: usize = 3;
 const TOP_LOOSE: usize = 3;
 const TOP_LANGS: usize = 4;
-const SPARK_W: f64 = 120.0;
 const SPARK_H: f64 = 24.0;
 
 /// Builds of the sidebar, so a test can tell a memo hit from a rebuild.
@@ -51,6 +50,8 @@ pub(crate) struct Lang {
 #[derive(Template)]
 #[template(path = "_side.html")]
 pub(crate) struct Side {
+    /// `display.sidebar`: which sections show, in order.
+    pub(crate) order: Vec<String>,
     pub(crate) branch: String,
     pub(crate) branch_href: String,
     pub(crate) dirty: bool,
@@ -75,10 +76,14 @@ pub(crate) struct Side {
 /// working tree are as last time.
 pub(crate) fn html(a: &App, head: &str, src: &dyn InsightsSource) -> String {
     let dirty = !a.public() && a.dirty();
+    // The section list joins the key: a Live reload of `display.sidebar` must not be
+    // answered with the old sidebar.
     let key = format!(
-        "side\0{}\0{head}\0{}\0{dirty}",
+        "side\0{}\0{}\0{head}\0{}\0{dirty}\0{}",
         fmt::base(),
-        a.index.generation()
+        fmt::selected(),
+        a.index.generation(),
+        a.cfg().display.sidebar.join(",")
     );
     if let Some(h) = a.memo_get(&key) {
         return (*h).clone();
@@ -91,6 +96,18 @@ pub(crate) fn html(a: &App, head: &str, src: &dyn InsightsSource) -> String {
         });
     a.memo_put(key, std::sync::Arc::new(out.clone()));
     out
+}
+
+/// Merge commits reachable from `head`. A pass over every commit (half a second on
+/// rust-lang/rust), so counted once per (tip, index generation).
+pub(crate) fn merges(a: &App, head: &str, src: &dyn InsightsSource) -> usize {
+    let key = format!("merges\0{}\0{head}\0{}", fmt::base(), a.index.generation());
+    if let Some(n) = a.memo_get(&key).and_then(|h| h.parse().ok()) {
+        return n;
+    }
+    let n = src.commits_in(CommitRange::All).filter(|c| c.merge).count();
+    a.memo_put(key, std::sync::Arc::new(n.to_string()));
+    n
 }
 
 pub(crate) fn build(a: &App, head: &str, src: &dyn InsightsSource, dirty: bool, now: i64) -> Side {
@@ -125,14 +142,24 @@ pub(crate) fn build(a: &App, head: &str, src: &dyn InsightsSource, dirty: bool, 
             *per.entry(r.path).or_default() += 1;
         }
     }
+    let filter = path_filter(a, head);
     let mut per: Vec<_> = per.into_iter().collect();
     per.sort_by(|x, y| y.1.cmp(&x.1).then(x.0.cmp(&y.0)));
     let hot = per
         .into_iter()
         .filter_map(|(p, n)| Some((src.path(p)?, n)))
+        .filter(|(p, _)| !filter.skips(p))
         .take(TOP_CHURN)
         .map(|(p, n)| Hot {
-            name: p.rsplit('/').next().unwrap_or(&p).to_owned(),
+            // The parent keeps the many `lib.rs` and `mod.rs` apart; the tooltip has the rest.
+            name: p
+                .rsplitn(3, '/')
+                .take(2)
+                .collect::<Vec<_>>()
+                .into_iter()
+                .rev()
+                .collect::<Vec<_>>()
+                .join("/"),
             href: href(&format!("/history/{}", enc_path(&p))),
             changes: fmt::count(n, "change", "changes"),
             path: p.to_string(),
@@ -141,6 +168,7 @@ pub(crate) fn build(a: &App, head: &str, src: &dyn InsightsSource, dirty: bool, 
     let (loose, loose_total) = loose_ends(a, head, branch.as_deref(), now);
     let worktrees = a.repo.linked_worktrees().map_or(0, |w| w.len());
     Side {
+        order: a.cfg().display.sidebar.clone(),
         branch_href: branch
             .as_deref()
             .map_or_else(String::new, |b| href(&format!("/log/{}", enc_seg(b)))),
@@ -150,9 +178,13 @@ pub(crate) fn build(a: &App, head: &str, src: &dyn InsightsSource, dirty: bool, 
         today,
         week,
         last: latest.map_or_else(String::new, |c| fmt::ago(c.time, now)),
-        spark: spark(&weeks),
+        spark: if weeks.iter().any(|&w| w > 0) {
+            spark(&weeks)
+        } else {
+            String::new()
+        },
         spark_tip: format!(
-            "Commits per week, last {}: {}",
+            "Commits per week, oldest first, last {}: {}",
             fmt::count(WEEKS, "week", "weeks"),
             weeks.map(|w| w.to_string()).join(", ")
         ),
@@ -211,9 +243,16 @@ fn loose_ends(a: &App, head: &str, current: Option<&str>, now: i64) -> (Vec<Loos
 
 /// The top languages by lines at the tip, with `Other` for the rest.
 fn langs(a: &App, head: &str) -> Vec<Lang> {
+    // The insights filter (excludes, generated, ignored) and only named languages: a bar of
+    // `.test` and `.prebuilt` says nothing about the code.
+    let filter = path_filter(a, head);
     let mut by: HashMap<String, u64> = HashMap::new();
-    for f in a.head_lines(head).iter() {
-        *by.entry(gitterrace_index::language(&f.path)).or_default() += u64::from(f.lines);
+    for f in a.head_lines(head).iter().filter(|f| !filter.skips(&f.path)) {
+        let l = gitterrace_index::language(&f.path);
+        if l.starts_with('.') || l.starts_with('(') {
+            continue;
+        }
+        *by.entry(l).or_default() += u64::from(f.lines);
     }
     let total: u64 = by.values().sum();
     if total == 0 {
@@ -244,22 +283,31 @@ fn langs(a: &App, head: &str) -> Vec<Lang> {
         .collect()
 }
 
-/// A polyline over the weekly counts, scaled to the busiest week.
+fn path_filter(a: &App, head: &str) -> gitterrace_index::PathFilter {
+    let opts = a.defaults().into_options();
+    let ignore = opts.respect_ignore.then(|| a.ignore_set(head)).flatten();
+    gitterrace_index::PathFilter::new(&opts, ignore)
+}
+
+/// A polyline over the weekly counts, scaled to the busiest week, over a baseline, with a dot
+/// on the latest week. One unit per week across, so CSS stretches it to the column's width;
+/// the strokes keep their width (`vector-effect`) and the dot stays round (a zero-length
+/// path with round caps).
 #[expect(clippy::cast_precision_loss, reason = "counts far below 2^52")]
 fn spark(weeks: &[usize; WEEKS]) -> String {
     let max = weeks.iter().copied().max().unwrap_or(0).max(1) as f64;
-    let step = SPARK_W / (WEEKS - 1) as f64;
+    let y = |n: usize| (n as f64 / max).mul_add(-(SPARK_H - 6.0), SPARK_H - 3.0);
     let pts: Vec<String> = weeks
         .iter()
         .enumerate()
-        .map(|(i, &n)| {
-            let y = (n as f64 / max).mul_add(-(SPARK_H - 2.0), SPARK_H - 1.0);
-            format!("{:.1},{y:.1}", i as f64 * step)
-        })
+        .map(|(i, &n)| format!("{i},{:.1}", y(n)))
         .collect();
+    let last = WEEKS - 1;
     format!(
-        "<svg class=\"spark s1\" viewBox=\"0 0 {SPARK_W} {SPARK_H}\" width=\"{SPARK_W}\" height=\"{SPARK_H}\" aria-hidden=\"true\"><polyline points=\"{}\"/></svg>",
-        pts.join(" ")
+        "<svg class=\"spark s1\" viewBox=\"0 0 {last} {SPARK_H}\" preserveAspectRatio=\"none\" aria-hidden=\"true\"><path class=\"base\" d=\"M0 {b}H{last}\"/><polyline points=\"{}\"/><path class=\"dot\" d=\"M{last} {:.1}h0\"/></svg>",
+        pts.join(" "),
+        y(weeks[last]),
+        b = SPARK_H - 0.5,
     )
 }
 
@@ -276,6 +324,10 @@ mod tests {
 
     /// A repo with an unmerged branch, a linked worktree and a dirty working tree.
     fn fixture() -> (tempfile::TempDir, App) {
+        fixture_with(&crate::app::Env::new(gitterrace_config::Config::default()))
+    }
+
+    fn fixture_with(env: &crate::app::Env) -> (tempfile::TempDir, App) {
         let dir = tempfile::tempdir().expect("tempdir");
         let p = dir.path().join("r");
         std::fs::create_dir(&p).expect("mkdir");
@@ -307,7 +359,7 @@ mod tests {
         std::fs::write(p.join("a.rs"), "changed\n").expect("write");
         let repo = gitterrace_git::Repo::discover(&p).expect("repo");
         let index = gitterrace_index::Index::open(&repo).expect("index");
-        let app = App::new(repo, index);
+        let app = App::configured(repo, index, env);
         app.index
             .update(&app.repo, "HEAD", &|_| {})
             .expect("update");
@@ -360,6 +412,64 @@ mod tests {
         assert_eq!(html(&app, &head, &*src), first);
         assert_eq!(builds(), n, "repeat must hit the memo");
         assert!(first.contains("uncommitted changes"));
+        let empty = gitterrace_index::feed::MemorySource::new(&[]);
+        assert_eq!(merges(&app, &head, &*src), 0);
+        assert_eq!(
+            html(&app, &head, &empty),
+            first,
+            "a repeat never reads the source"
+        );
         assert!(first.contains("side"));
+    }
+
+    fn headings(html: &str) -> Vec<&str> {
+        html.split("<h3>")
+            .skip(1)
+            .map(|h| {
+                let h = h.split("</h3>").next().unwrap_or("");
+                let h = h
+                    .split('>')
+                    .nth(1)
+                    .map_or(h, |x| x.split('<').next().unwrap_or(x));
+                h.split(" <").next().unwrap_or(h)
+            })
+            .collect()
+    }
+
+    #[test]
+    fn display_sidebar_picks_and_orders_the_sections_and_a_reload_applies() {
+        let env = crate::app::Env::new(gitterrace_config::Config::default());
+        let (_d, app) = fixture_with(&env);
+        let app = std::sync::Arc::new(app);
+        env.register(&app);
+        let head = app.repo.resolve("HEAD").expect("head");
+        let src = app.source(&head).expect("source").expect("ready");
+        assert_eq!(
+            headings(&html(&app, &head, &*src)),
+            ["Now", "Recent", "Churn", "Loose ends", "Languages"]
+        );
+        let mut c = (*env.cfg()).clone();
+        c.display.sidebar = vec!["languages".into(), "now".into()];
+        c.validate().expect("valid");
+        env.apply(c);
+        assert_eq!(
+            headings(&html(&app, &head, &*src)),
+            ["Languages", "Now"],
+            "a warm memo must not answer with the old list"
+        );
+    }
+
+    #[test]
+    fn the_sparkline_spans_its_column_with_a_baseline_and_a_latest_dot() {
+        let mut w = [0; WEEKS];
+        w[3] = 4;
+        w[WEEKS - 1] = 2;
+        let s = spark(&w);
+        assert!(!s.contains("width="), "CSS sizes it to the column: {s}");
+        assert!(s.contains("preserveAspectRatio=\"none\""), "{s}");
+        assert!(
+            s.contains("class=\"base\"") && s.contains("class=\"dot\""),
+            "{s}"
+        );
     }
 }

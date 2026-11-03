@@ -279,6 +279,20 @@ mod tests {
         assert!(e.0.contains("watch.enabled"), "{e}");
     }
 
+    /// A sidebar section name is checked, never silently dropped, and the error lists the
+    /// valid ones. An empty list is valid: it hides the sidebar.
+    #[test]
+    fn display_sidebar_names_are_checked() {
+        let e = parse("[display]\nsidebar = [\"now\", \"churm\"]\n").expect_err("typo");
+        assert!(
+            e.0.contains("display.sidebar") && e.0.contains("churm"),
+            "{e}"
+        );
+        assert!(e.0.contains("loose_ends"), "names the valid ones: {e}");
+        let l = parse("[display]\nsidebar = []\n").expect("empty is valid");
+        assert!(l.config.display.sidebar.is_empty());
+    }
+
     /// Every address another machine can reach needs `public`; loopback never does.
     #[test]
     fn a_reachable_address_needs_public() {

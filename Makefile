@@ -61,6 +61,7 @@ names:
 #: lines: Source files stay under 600 lines, comments carry no process labels
 lines:
 	python3 scripts/lines-check.py
+	python3 scripts/status-words-check.py
 
 ## gc: Prune cargo units and site-shots/app-icon output unused for DAYS (default 7). DRY=1 only reports, BENCH=1 also removes the cached benchmark clones
 gc:

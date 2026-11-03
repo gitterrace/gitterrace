@@ -146,7 +146,7 @@ fn init(config: Option<&std::path::Path>) -> anyhow::Result<()> {
         ),
     ];
     for (path, state) in init_in(&dir, &files)? {
-        println!("{} {state}", path.display());
+        println!("{}: {state}", path.display());
     }
     Ok(())
 }

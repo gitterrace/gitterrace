@@ -5,6 +5,9 @@ use std::collections::BTreeMap;
 
 use crate::value::Show;
 
+/// The overview sidebar's sections, in their default order.
+pub const SIDEBAR: [&str; 5] = ["now", "recent", "churn", "loose_ends", "languages"];
+
 /// One setting, for the loader, `git terrace config` and the docs page.
 pub struct Key {
     pub section: &'static str,
@@ -192,6 +195,9 @@ settings! {
         theme: String = "system".to_owned() => Live,
         /// How dates read: relative or absolute.
         dates: String = "relative".to_owned() => Live,
+        /// Overview sidebar sections, in the order shown: now, recent, churn, loose_ends and
+        /// languages. Leave one out to hide it. An empty list hides the sidebar.
+        sidebar: Vec<String> = SIDEBAR.iter().map(|&s| s.to_owned()).collect() => Live,
     }
     multi: Multi {
         /// How many folder levels to search below a given folder for repositories. Needs a restart.
@@ -246,6 +252,19 @@ impl Config {
         }
         if !["relative", "absolute"].contains(&self.display.dates.as_str()) {
             return bad("display.dates", "expected relative or absolute");
+        }
+        if let Some(s) = self
+            .display
+            .sidebar
+            .iter()
+            .find(|s| !SIDEBAR.contains(&s.as_str()))
+        {
+            return bad(
+                "display.sidebar",
+                &format!(
+                    "unknown section {s}, expected now, recent, churn, loose_ends or languages"
+                ),
+            );
         }
         if !["gitterrace", "go"].contains(&self.links.style.as_str()) {
             return bad("links.style", "expected gitterrace or go");

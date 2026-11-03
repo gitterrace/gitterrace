@@ -364,6 +364,8 @@ struct OverviewPage {
     insights_href: String,
     /// The memoized sidebar sections; empty while indexing.
     side: String,
+    /// `display.sidebar` is empty: no sidebar, the files take the full width.
+    no_side: bool,
 }
 
 async fn overview(State(app): Shared, Query(q): Query<DocQuery>) -> Result<Html<String>> {
@@ -385,7 +387,7 @@ async fn overview(State(app): Shared, Query(q): Query<DocQuery>) -> Result<Html<
             Numbers {
                 commits: fmt::thousands(src.len()),
                 commits_noun: fmt::noun(src.len(), "commit", "commits"),
-                merges: match src.commits_in(CommitRange::All).filter(|c| c.merge).count() {
+                merges: match crate::overview_side::merges(a, &head, &*src) {
                     0 => String::new(),
                     n => format!("({})", fmt::count(n, "merge", "merges")),
                 },
@@ -410,6 +412,7 @@ async fn overview(State(app): Shared, Query(q): Query<DocQuery>) -> Result<Html<
             latest: recent.first().map(|c| views::commit_row(c, now)),
             insights_href: fmt::href("/stats"),
             side,
+            no_side: a.cfg().display.sidebar.is_empty(),
         })
     })
     .await?;
@@ -1007,43 +1010,50 @@ struct PendingPage {
     newer: Option<String>,
 }
 
-/// Runs `build` over the tip's insights source, or yields the progress page while none exist yet.
+/// Runs `build` over the tip's insights source, or yields the progress page while none exist
+/// yet. The flag says the page was built from a source: only such a page may be memoized, as
+/// the indexing page can be rendered just before the index turns ready and would then be
+/// served after it.
 pub(crate) async fn with_records<T: Template + Send + 'static>(
     app: &Arc<App>,
     tab: &'static str,
     build: impl FnOnce(&App, &crate::insights::Src, Chrome) -> T + Send + 'static,
-) -> Result<Html<String>> {
-    let html = blocking(app, move |a| {
+) -> Result<(Html<String>, bool)> {
+    let (html, served) = blocking(app, move |a| {
         let head = a.repo.resolve(&fmt::selected())?;
         let c = views::chrome(a, "stats").live(Mode::NOTICE);
         match a.source(&head)? {
-            Some(src) => Ok(build(a, &src, c).render()?),
-            None if a.far(&head).is_some() => {
-                Ok(crate::far::render(c, tab, a.far(&head).unwrap_or(0))?)
-            }
-            None => Ok(PendingPage {
-                c,
-                tabs: views::stats_tabs(tab),
-                newer: a.index.newer_format().map(|v| {
-                    // The cache folder is a path on the host; a public visitor gets no path.
-                    let dir = if a.public() {
-                        "its cache folder".to_owned()
-                    } else {
-                        a.index.dir().display().to_string()
-                    };
-                    format!(
-                        "The history cache was written by a newer gitterrace (format {v}, this \
+            Some(src) => Ok((build(a, &src, c).render()?, true)),
+            None if a.far(&head).is_some() => Ok((
+                crate::far::render(c, tab, a.far(&head).unwrap_or(0))?,
+                false,
+            )),
+            None => Ok((
+                PendingPage {
+                    c,
+                    tabs: views::stats_tabs(tab),
+                    newer: a.index.newer_format().map(|v| {
+                        // The cache folder is a path on the host; a public visitor gets no path.
+                        let dir = if a.public() {
+                            "its cache folder".to_owned()
+                        } else {
+                            a.index.dir().display().to_string()
+                        };
+                        format!(
+                            "The history cache was written by a newer gitterrace (format {v}, this \
                          build reads {}). It is left untouched: run the newer build, or delete \
                          {dir} to rebuild it here.",
-                        gitterrace_index::FORMAT_VERSION,
-                    )
-                }),
-            }
-            .render()?),
+                            gitterrace_index::FORMAT_VERSION,
+                        )
+                    }),
+                }
+                .render()?,
+                false,
+            )),
         }
     })
     .await?;
-    Ok(Html(html))
+    Ok((Html(html), served))
 }
 
 #[derive(serde::Serialize)]

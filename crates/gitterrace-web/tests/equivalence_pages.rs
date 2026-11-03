@@ -132,6 +132,49 @@ fn every_cell_matches_the_oracle() {
     oracle::check(&golden, &dump(&golden), &answers);
 }
 
+/// The per-commit proof that the pairwise golden loses nothing: at this build, run the full
+/// product and the golden's cell set, then compare every shared key. Writes counts and the
+/// differences, classified chrome-only, tie-only or real, to `$TEST_GOLDEN_PROOF`, and fails
+/// when any is real. With `TEST_GOLDEN_FULL=<old full golden>` the full run is also compared to
+/// it by digest. Off unless `TEST_GOLDEN_PROOF` is set.
+#[test]
+fn the_pairwise_golden_agrees_with_the_full_matrix() {
+    let Some(out) = std::env::var_os("TEST_GOLDEN_PROOF") else {
+        return;
+    };
+    if !oracle::frozen("the_pairwise_golden_agrees_with_the_full_matrix") {
+        return;
+    }
+    let rt = tokio::runtime::Runtime::new().expect("runtime");
+    let all = matrix::cells();
+    let mut full = BTreeMap::new();
+    for mm in [Mailmap::AsIs, Mailmap::Edited, Mailmap::CaseFold] {
+        let cells: Vec<_> = all.iter().copied().filter(|c| c.mailmap == mm).collect();
+        full.extend(rt.block_on(run(mm, &cells)));
+    }
+    let small = rt.block_on(golden_answers());
+    let mut report = oracle::Proof::default();
+    for (k, v) in &small {
+        if let Some(w) = full.get(k) {
+            report.add(k, w, v);
+        } else {
+            report.only_small += 1;
+        }
+    }
+    report.full = full.len();
+    report.small = small.len();
+    if let Some(old) = std::env::var_os("TEST_GOLDEN_FULL") {
+        report.against_golden(&std::fs::read_to_string(old).expect("full golden"), &full);
+    }
+    let text = report.render(&format!(
+        "pairwise cells {}, named cells {}",
+        matrix::pairwise().len(),
+        matrix::named().len()
+    ));
+    std::fs::write(&out, &text).expect("proof file");
+    assert_eq!(report.real.len(), 0, "{text}");
+}
+
 /// The pages and API for a revision other than HEAD: the tip of `topic`, a branch with commits
 /// HEAD lacks, and `HEAD~3`, an older ancestor. Selected by `?rev=`, as the pages link it. Each
 /// rev must answer from its own history: serving HEAD's set for either one is red.
@@ -242,4 +285,36 @@ fn a_real_history_samples_match_the_oracle() {
         Into::into,
     );
     oracle::check(&golden, &dump(&golden), &answers);
+}
+
+/// The re-bless gate for a header or sidebar change: every answer of the current build, outside
+/// the site header (and the overview sidebar for `/`), equals the reference bodies byte for
+/// byte, equal-time order folded. Run it with the two dumps, then bless only when it passes:
+/// `TEST_CHROME_OLD=<reference dump> TEST_CHROME_NEW=<dump of this build>`.
+#[test]
+fn a_rebless_moves_only_chrome() {
+    let (Some(old), Some(new)) = (
+        std::env::var_os("TEST_CHROME_OLD"),
+        std::env::var_os("TEST_CHROME_NEW"),
+    ) else {
+        return;
+    };
+    let (moved, bad) = oracle::chrome_only_diff(Path::new(&old), Path::new(&new));
+    let mut per: BTreeMap<String, usize> = BTreeMap::new();
+    for k in &bad {
+        let page = k.split_once("] ").map_or(k.as_str(), |(_, p)| p);
+        *per.entry(page.split('?').next().unwrap_or(page).to_owned())
+            .or_default() += 1;
+    }
+    assert!(
+        bad.is_empty(),
+        "{} answers moved outside the chrome ({moved} chrome-only), per page {per:?}, first {:?}",
+        bad.len(),
+        &bad[..bad.len().min(5)]
+    );
+    std::io::Write::write_all(
+        &mut std::io::stderr(),
+        format!("chrome-only answers: {moved}\n").as_bytes(),
+    )
+    .expect("stderr");
 }

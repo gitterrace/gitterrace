@@ -108,6 +108,9 @@ pub struct SegmentSource<B> {
     segments: Vec<Container>,
     /// The first store error a stream met, so the index can rebuild (design 6).
     broken: std::sync::Mutex<Option<String>>,
+    /// Per segment, the first path id of each path postings block, read on first lookup: a
+    /// path's hits then cost the blocks that hold it, not the whole section.
+    path_index: std::sync::OnceLock<Vec<Vec<u32>>>,
 }
 
 impl<B: InsightsSource> SegmentSource<B> {
@@ -116,7 +119,29 @@ impl<B: InsightsSource> SegmentSource<B> {
             base,
             segments,
             broken: std::sync::Mutex::new(None),
+            path_index: std::sync::OnceLock::new(),
         }
+    }
+
+    /// First path id per path postings block, per segment. A block starts with an absolute
+    /// id (a delta from 0), so this reads one varint per block.
+    fn path_index(&self) -> SegResult<&[Vec<u32>]> {
+        if let Some(i) = self.path_index.get() {
+            return Ok(i);
+        }
+        let mut buf = Vec::new();
+        let mut all = Vec::with_capacity(self.segments.len());
+        for seg in &self.segments {
+            let mut firsts = Vec::new();
+            for e in seg.blocks(section::PATH_POSTINGS) {
+                let block = seg.read_block(e, &mut buf)?;
+                let mut c = Cursor::new(block, seg.name(), e.offset);
+                let first = c.varint()?;
+                firsts.push(u32::try_from(first).map_err(|_| c.err("id over u32"))?);
+            }
+            all.push(firsts);
+        }
+        Ok(self.path_index.get_or_init(|| all))
     }
 
     /// The base, for its own error state.
@@ -217,22 +242,30 @@ impl<B: InsightsSource> SegmentSource<B> {
         let mut out = Vec::new();
         match key {
             Posting::Path(want) => {
+                let index = self.path_index()?;
                 let mut local = Vec::new();
-                self.each_block(section::PATH_POSTINGS, |seg, c, n| {
-                    local.clear();
-                    postings::decode_path_postings(c, n, |id, hits| {
-                        if id == want.0 {
-                            local.extend_from_slice(hits);
+                let mut buf = Vec::new();
+                for (seg, firsts) in self.segments.iter().zip(index) {
+                    let blocks = seg.blocks(section::PATH_POSTINGS);
+                    // Blocks whose first id is at most `want`, from the last one that starts
+                    // below it (a long list continues across blocks with the same id).
+                    let end = firsts.partition_point(|&f| f <= want.0);
+                    let start = firsts[..end].iter().rposition(|&f| f < want.0).unwrap_or(0);
+                    for e in &blocks[start..end] {
+                        let block = seg.read_block(e, &mut buf)?;
+                        let mut c = Cursor::new(block, seg.name(), e.offset);
+                        local.clear();
+                        postings::decode_path_postings(&mut c, e.items, |id, hits| {
+                            if id == want.0 {
+                                local.extend_from_slice(hits);
+                            }
+                        })?;
+                        let ords: Vec<u32> = local.iter().map(|h| h.ordinal).collect();
+                        for (h, rank) in local.iter().zip(seg.ranks(&ords)?) {
+                            out.push(Hit { rank, row: h.row });
                         }
-                    })?;
-                    for h in &local {
-                        out.push(Hit {
-                            rank: Self::rank(seg, h.ordinal)?,
-                            row: h.row,
-                        });
                     }
-                    Ok(())
-                })?;
+                }
             }
             Posting::Author(want) => {
                 let mut local = Vec::new();
@@ -525,5 +558,70 @@ mod tests {
 
     fn segs_len<B>(s: &SegmentSource<B>) -> usize {
         s.segments.len()
+    }
+
+    /// A path's hits through the block index equal a scan of every block, with the section
+    /// spread over many blocks and one list longer than a chunk, so it continues across
+    /// blocks under the same id. Red when the lookup reads only the blocks starting at `want`.
+    #[test]
+    fn path_postings_through_the_block_index_equal_a_full_scan() -> SegResult<()> {
+        use crate::seg::postings::{Hit, decode_path_postings};
+        let paths = 200_000u32;
+        let mut by_path: Vec<Vec<Hit>> = (0..paths)
+            .map(|p| {
+                (0..(p % 7))
+                    .map(|i| Hit {
+                        ordinal: p * 8 + i,
+                        row: i,
+                    })
+                    .collect()
+            })
+            .collect();
+        // One long list in the middle: more than a chunk, so it spans blocks.
+        by_path[12_345] = (0..1_500_000u32)
+            .map(|i| Hit {
+                ordinal: 1_700_000 + i,
+                row: 0,
+            })
+            .collect();
+        let post = Postings::from_parts(by_path, Vec::new(), Vec::new());
+        let ranks: Vec<u32> = (0..3_200_000u32).collect();
+        let dir = tempfile::tempdir()?;
+        let name = "seg-1-0.gts";
+        let mut w = ContainerWriter::new(dir.path(), name, Kind::Segment, StringBase::default())?;
+        write_tables(&Aggregates::default(), &post, &ranks, &mut |s, n, b| {
+            w.block(s, n, b)
+        })?;
+        w.finish()?;
+        let seg = Container::open(dir.path(), name, Kind::Segment)?;
+        let blocks = seg.blocks(crate::seg::format::section::PATH_POSTINGS).len();
+        assert!(
+            blocks >= 3,
+            "the fixture must spread over blocks, got {blocks}"
+        );
+        let mut want: Vec<Vec<(u32, u32)>> = vec![Vec::new(); paths as usize];
+        let mut buf = Vec::new();
+        for e in seg.blocks(crate::seg::format::section::PATH_POSTINGS) {
+            let b = seg.read_block(e, &mut buf)?;
+            let mut c = crate::seg::bounds::Cursor::new(b, seg.name(), e.offset);
+            decode_path_postings(&mut c, e.items, |id, hits| {
+                want[id as usize].extend(hits.iter().map(|h| (h.ordinal, h.row)));
+            })?;
+        }
+        let src = SegmentSource::new(MemorySource::new(&[]), vec![seg]);
+        // The first and last path of every block, their neighbours, and the long list.
+        let firsts: Vec<u32> = src.path_index()?[0].clone();
+        let mut probe: Vec<u32> = vec![0, 12_344, 12_345, 12_346, paths - 1];
+        for f in firsts {
+            probe.extend([f.saturating_sub(1), f, f + 1]);
+        }
+        for p in probe.into_iter().filter(|p| *p < paths) {
+            let got: Vec<(u32, u32)> = src
+                .postings(Posting::Path(crate::feed::PathId(p)))
+                .map(|h| (h.rank.0, h.row))
+                .collect();
+            assert_eq!(got, want[p as usize], "path {p}");
+        }
+        Ok(())
     }
 }

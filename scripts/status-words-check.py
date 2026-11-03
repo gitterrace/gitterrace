@@ -1,0 +1,74 @@
+#!/usr/bin/env python3
+"""Flags two status facts run together without punctuation in user-visible strings.
+
+Example: "on main clean" should read "on main, clean". Checks Rust string literals, templates
+and JS UI text. Not a full parser, it looks for a status word right after a name or a
+placeholder.
+
+  python3 scripts/status-words-check.py              check the tree
+  python3 scripts/status-words-check.py --self-test  prove it goes red on a planted case
+"""
+
+from __future__ import annotations
+
+import re
+import subprocess
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+EXTS = (".rs", ".html", ".js", ".mjs", ".md")
+EXCLUDE = ("static/vendor/", "theme/schwarzwald/", "target/", "CHANGELOG.md")
+W = r"(?:clean|dirty|ahead|behind|detached|untracked|modified)"
+PATTERNS = [
+    # "on main clean", "branch {name} ahead 2"
+    re.compile(rf"\b(?:on|branch) (?:\{{\{{?[^}}]*\}}\}}?|(?!(?:a|an|the|any|this|that|no)\b)[\w./-]+) {W}\b(?! (?:tree|checkout|state))"),
+    # "{branch} clean", "{{ name }} dirty"
+    re.compile(rf"\{{[a-z_]+\}}\s+{W}(?=\s*(?:[\d\"'`<]|$))"),
+    # template: a name, endif, then a bare status word span with no separator
+    re.compile(rf"</(?:a|b)>(?:\{{% endif %\}}.*?)?\{{% else %\}} <span[^>]*>{W}<"),
+]
+SKIP = re.compile(r"^\s*(//|#|\*)")
+
+
+def scan(text: str, name: str) -> list[str]:
+    out = []
+    for i, line in enumerate(text.splitlines(), 1):
+        if SKIP.match(line):
+            continue
+        if any(p.search(line) for p in PATTERNS):
+            out.append(f"{name}:{i}: status facts run together, add a comma: {line.strip()[:90]}")
+    return out
+
+
+def files() -> list[Path]:
+    r = subprocess.run(
+        ["git", "ls-files", "-co", "--exclude-standard"],
+        cwd=ROOT, capture_output=True, text=True, check=True,
+    )
+    return [ROOT / f for f in r.stdout.split("\n")
+            if f.endswith(EXTS) and not any(x in f for x in EXCLUDE)
+            and f != "scripts/status-words-check.py"]
+
+
+def self_test() -> int:
+    bad = ['println!("on main clean");', 'format!("{branch} dirty")',
+           '</a>{% else %} <span class="muted">clean</span>']
+    good = ['println!("on main, clean");', 'format!("{branch}, dirty")', "a clean checkout"]
+    ok = all(scan(b, "x") for b in bad) and not any(scan(g, "x") for g in good)
+    print("self-test", "ok" if ok else "FAILED")
+    return 0 if ok else 1
+
+
+def main() -> int:
+    if "--self-test" in sys.argv:
+        return self_test()
+    hits = []
+    for f in files():
+        hits += scan(f.read_text(errors="ignore"), str(f.relative_to(ROOT)))
+    print("\n".join(hits) or "status-words: ok")
+    return 1 if hits else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -337,18 +337,23 @@ fn memory_stays_in_budget_at_every_size() {
             }
         }
     }
-    // Growth with history, idle: what a server keeps per commit while nobody asks anything.
-    // The budget alone allows 48 MB at any size, which hides a per-commit cost until a large
-    // repository (0.7 KB per commit is 12 MB at 20k but 1 GB on linux).
-    if let (Some(&(_, (_, small, _))), Some(&(n, (_, large, _)))) = (got.first(), got.last())
+    // Growth with history, idle and after the sweep (HEAD and the side branch): what a server
+    // keeps per commit. The budget alone allows 48 MB at any size, which hides a per-commit
+    // cost until a large repository (0.7 KB per commit is 12 MB at 20k but 1 GB on linux).
+    if let (Some(&(_, (_, idle0, swept0))), Some(&(n, (_, idle1, swept1)))) =
+        (got.first(), got.last())
         && n > 2_000
-        && large > small + GROWTH_MB * MB
     {
-        bad.push(format!(
-            "idle grows with history: {} MB at {n} commits, {} MB at 2000, more than {GROWTH_MB} MB apart",
-            large / MB,
-            small / MB
-        ));
+        for (what, small, large) in [("idle", idle0, idle1), ("after sweep", swept0, swept1)] {
+            if large > small + GROWTH_MB * MB {
+                bad.push(format!(
+                    "{what} grows with history: {} MB at {n} commits, {} MB at 2000, more than \
+                     {GROWTH_MB} MB apart",
+                    large / MB,
+                    small / MB
+                ));
+            }
+        }
     }
     assert!(bad.is_empty(), "{}", bad.join("\n"));
 }

@@ -1,6 +1,6 @@
 {% extends "_base.html" %}
 {% block content %}
-<div class="cols">
+<div class="cols{% if no_side %} wide{% endif %}">
 <article>
 {% if let Some(l) = latest %}<div class="card latest"><span class="av h{{ l.hue / 10 }}">{{ l.initial }}</span><a class="who" href="{{ l.author_href }}"><b>{{ l.author }}</b></a><a class="subj" href="{{ l.href }}">{{ l.subject }}</a>{{ l.sha|safe }}<span class="muted">{{ l.when }}</span><a class="hist" href="{{ c.base }}/log/{{ c.rev_enc }}">History</a></div>{% endif %}
 <div class="card files-card"><table class="entries" data-last="{{ c.base }}/api/last/{{ c.rev_enc }}/">
@@ -8,7 +8,7 @@
 </table></div>
 {% if let Some(a) = about %}<div class="card readme" id="about">{% if a.tabs.is_empty() %}<div class="readme-h">{{ a.label }}</div>{% else %}{% include "_doctabs.html" %}{% endif %}<div class="markdown-body">{{ a.html|safe }}</div></div>{% endif %}
 </article>
-<aside>
+{% if !no_side %}<aside>
 {% if let Some(t) = totals %}
 {{ side|safe }}
 <section class="side"><h3>All time</h3>
@@ -17,6 +17,6 @@
 {% else %}
 <div class="progress" data-progress><span class="muted">Indexing history <b class="pct">0%</b></span><progress max="100" value="0"></progress></div>
 {% endif %}
-</aside>
+</aside>{% endif %}
 </div>
 {% endblock %}

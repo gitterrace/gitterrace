@@ -144,6 +144,53 @@ impl Container {
         self.record_at(crate::seg::format::section::RANK, ordinal.0, 4, &mut b)?;
         Ok(Rank(u32::from_le_bytes(b)))
     }
+
+    /// Ranks of many ordinals, in the order given. Reads each rank block it needs once (crc
+    /// checked), instead of one pread per ordinal: a path's postings name hundreds of
+    /// thousands on a large history.
+    pub fn ranks(&self, ordinals: &[u32]) -> SegResult<Vec<Rank>> {
+        let blocks = self.blocks(crate::seg::format::section::RANK);
+        let mut starts = Vec::with_capacity(blocks.len());
+        let mut first = 0u32;
+        for e in blocks {
+            if u64::from(e.items) * 4 != u64::from(e.len) {
+                return Err(SegError::unreadable(
+                    &self.name,
+                    e.offset,
+                    "fixed-width block length",
+                ));
+            }
+            starts.push(first);
+            first = first.saturating_add(e.items);
+        }
+        let mut loaded: Option<(usize, Vec<u8>)> = None;
+        let mut out = Vec::with_capacity(ordinals.len());
+        for &o in ordinals {
+            let i = starts.partition_point(|&s| s <= o).checked_sub(1);
+            let Some(i) = i.filter(|&i| o < starts[i].saturating_add(blocks[i].items)) else {
+                return Err(SegError::unreadable(
+                    &self.name,
+                    0,
+                    "record index past the section",
+                ));
+            };
+            if loaded.as_ref().is_none_or(|(at, _)| *at != i) {
+                let mut buf = Vec::new();
+                self.read_block(&blocks[i], &mut buf)?;
+                loaded = Some((i, buf));
+            }
+            let Some((_, buf)) = loaded.as_ref() else {
+                return Err(SegError::unreadable(&self.name, 0, "rank block"));
+            };
+            let at = (o - starts[i]) as usize * 4;
+            let b: [u8; 4] = buf
+                .get(at..at + 4)
+                .and_then(|s| s.try_into().ok())
+                .ok_or_else(|| SegError::unreadable(&self.name, blocks[i].offset, "rank"))?;
+            out.push(Rank(u32::from_le_bytes(b)));
+        }
+        Ok(out)
+    }
 }
 
 /// The live set of a cache: manifest checked, every container's footer checked, and the string

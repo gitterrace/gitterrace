@@ -165,6 +165,18 @@ async fn display_theme_and_dates_change_the_page() {
     );
 }
 
+/// `display.sidebar = []` drops the sidebar and lets the files take the full width.
+#[tokio::test]
+async fn an_empty_sidebar_list_hides_the_sidebar() {
+    let dir = tempfile::tempdir().expect("tmp");
+    let p = repo(dir.path(), "r");
+    let (_, body) = get(&router(&p, with(|c| c.display.sidebar.clear())), "/").await;
+    assert!(!body.contains("<aside>"), "{body}");
+    assert!(body.contains("<div class=\"cols wide\">"), "{body}");
+    let (_, body) = get(&router(&p, Config::default()), "/").await;
+    assert!(body.contains("<aside>") && body.contains("<div class=\"cols\">"));
+}
+
 /// A count sits next to the noun that agrees with it: one commit by one author reads singular.
 #[tokio::test]
 async fn overview_counts_agree_with_their_noun() {

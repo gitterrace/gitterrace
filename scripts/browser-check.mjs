@@ -23,6 +23,9 @@
 //                marked README prose arrives as a > quote
 //   overlays     t, ? and b each open a named dialog that takes focus, keeps it through 5 Tabs
 //                (and Shift+Tab), closes on Escape and gives focus back to what had it
+//   menu-same    the action menu lists the same entries in the same order in the README preview,
+//                its code, a line selection and the log; an entry the selection does not fit is
+//                disabled with a tip saying why, never dropped
 //   gutter       in a 250-line file (three chunks) every line's gutter number equals its line,
 //                read from the CSS counter itself, with the selection trigger shown; and the
 //                Send to window opens small and grows with its text
@@ -42,6 +45,11 @@
 //                light, dark, the choice survives a reload, the shown logo and screenshots are
 //                the theme's and the other scheme's are never fetched, no CSP violation, and each
 //                theme icon is the GitHub mark's size
+//   side-width   on the overview the Recent sparkline is exactly as wide as the language bar
+//                (within 1 px) and as tall, at 1440, 1100 and 360 px, light and dark
+//   calm-header  at rest the branch switcher and the Working tree chip have no visible border
+//                and are not bold, and toggling the chip does not move the search field, at
+//                1440, 900 and 360 px, light and dark
 //
 // --from-disk serves crates/gitterrace-web/static/*.js from the working tree over the (possibly
 // older) binary's copies, to test edits before a rebuild. Playwright comes from $PLAYWRIGHT_CORE,
@@ -59,7 +67,7 @@ const bin = resolve(arg('--bin', join(root, 'target/debug/git-terrace')));
 const fromDisk = process.argv.includes('--from-disk');
 const tabCounts = arg('--tabs', '8,12').split(',').map(Number);
 const browsers = arg('--browsers', 'webkit,chromium').split(',');
-const ALL = ['truncation', 'live-tabs', 'mermaid', 'chip', 'doctabs', 'chords', 'header', 'marked', 'gutter', 'overlays', 'tips', 'repo-switch', 'mark-seam', 'about-place', 'site-theme'];
+const ALL = ['truncation', 'live-tabs', 'mermaid', 'chip', 'doctabs', 'chords', 'header', 'marked', 'menu-same', 'gutter', 'overlays', 'tips', 'repo-switch', 'mark-seam', 'about-place', 'site-theme', 'side-width', 'calm-header', 'tabs-one-line'];
 const wanted = arg('--checks', ALL.join(',')).split(',');
 for (const c of wanted) if (!ALL.includes(c)) { console.error(`unknown check ${c}; known: ${ALL.join(', ')}`); process.exit(2); }
 
@@ -69,7 +77,7 @@ const dir = makeRepo();
 // before the server starts (read at load) and outside the repository (refused inside one).
 const cfg = mkdtempSync(join(tmpdir(), 'gt-cfg-'));
 const marker = join(cfg, 'chord-ran');
-writeFileSync(join(cfg, 'actions.toml'), `version = 1\n[[action]]\nid = "mark"\nlabel = "Mark"\nkinds = ["page"]\ncommand = ["/usr/bin/touch", ${JSON.stringify(marker)}]\nkey = "x"\n`, { mode: 0o600 });
+writeFileSync(join(cfg, 'actions.toml'), `version = 1\n[[action]]\nid = "mark"\nlabel = "Mark"\nkinds = ["page"]\ncommand = ["/usr/bin/touch", ${JSON.stringify(marker)}]\nkey = "x"\n[[action]]\nid = "lines"\nlabel = "Lines only"\nkinds = ["line"]\ncommand = ["/usr/bin/true"]\n`, { mode: 0o600 });
 const srv = await serve(bin, dir, cfg);
 const r = reporter();
 console.log('serving', srv.base, 'with', bin);
@@ -89,9 +97,107 @@ async function context(name) {
 
 const env = { pw, dir, srv, r, browsers, tabCounts, marker, context, arg, bin, cfg };
 const { truncation, liveTabs, mermaid, chip, doctabs, chords, header } = pageChecks(env);
-const { marked, gutter, overlays, tips, repoSwitch } = uiChecks(env);
+const { marked, menuSame, gutter, overlays, tips, repoSwitch } = uiChecks(env);
 const { markSeam, aboutPlace, siteTheme } = siteChecks(env);
-const checks = { truncation, 'live-tabs': liveTabs, mermaid, chip, doctabs, chords, header, marked, gutter, overlays, tips, 'repo-switch': repoSwitch, 'mark-seam': markSeam, 'about-place': aboutPlace, 'site-theme': siteTheme };
+async function sideWidth() {
+  for (const name of browsers) {
+    const { b, ctx } = await context(name);
+    for (const scheme of ['light', 'dark']) for (const width of [1440, 1100, 360]) {
+      const p = await ctx.newPage();
+      await p.emulateMedia({ colorScheme: scheme });
+      await p.setViewportSize({ width, height: 900 });
+      // The sidebar appears once the index is built: reload until it does.
+      for (let i = 0; i < 40; i++) {
+        await p.goto(srv.base + '/', { waitUntil: 'load' });
+        if (await p.$('.side .langbar')) break;
+        await p.waitForTimeout(250);
+      }
+      const m = await p.evaluate(() => {
+        const s = document.querySelector('.side svg.spark'), l = document.querySelector('.side .langbar');
+        if (!s || !l) return null;
+        const a = s.getBoundingClientRect(), c = l.getBoundingClientRect();
+        return { sw: a.width, lw: c.width, sh: a.height, lh: c.height };
+      });
+      const where = `side-width ${name} ${scheme} ${width}`;
+      if (!m) r.fail(`${where}: no sparkline or language bar`);
+      else if (Math.abs(m.sw - m.lw) > 1) r.fail(`${where}: sparkline ${m.sw} px wide, language bar ${m.lw} px`);
+      else r.ok(`${where}: both ${Math.round(m.lw)} px wide`);
+      await p.close();
+    }
+    await b.close();
+  }
+}
+async function calmHeader() {
+  writeFileSync(join(dir, 'a.txt'), 'one\ndirty\n');
+  await new Promise((ok) => setTimeout(ok, 2600));
+  for (const name of browsers) {
+    const { b, ctx } = await context(name);
+    for (const scheme of ['light', 'dark']) for (const width of [1440, 900, 360]) {
+      const p = await ctx.newPage();
+      await p.emulateMedia({ colorScheme: scheme });
+      await p.setViewportSize({ width, height: 400 });
+      await p.goto(srv.base + '/', { waitUntil: 'load' });
+      await p.mouse.move(width - 1, 399);
+      const m = await p.evaluate(() => {
+        const look = (el) => { if (!el) return null; const s = getComputedStyle(el); const bw = ['Top', 'Right', 'Bottom', 'Left'].some((k) => parseFloat(s[`border${k}Width`]) > 0 && s[`border${k}Style`] !== 'none' && !/rgba\(.*, 0\)$|transparent/.test(s[`border${k}Color`])); return { border: bw, weight: Number(s.fontWeight) }; };
+        const chip = document.getElementById('wtchip'), q = document.querySelector('.topsearch');
+        const x = () => (q && q.offsetParent ? q.getBoundingClientRect().x : null);
+        const out = { branch: look(document.getElementById('refbtn')), chip: look(chip), shown: chip && !chip.hidden };
+        if (chip) { const a = x(); chip.hidden = !chip.hidden; const c = x(); chip.hidden = !chip.hidden; out.dx = a === null ? 0 : Math.abs(a - c); }
+        return out;
+      });
+      const where = `calm-header ${name} ${scheme} ${width}`;
+      const bad = [];
+      if (!m.branch) bad.push('no branch switcher');
+      else { if (m.branch.border) bad.push('switcher has a border at rest'); if (m.branch.weight >= 600) bad.push(`switcher weight ${m.branch.weight}`); }
+      if (!m.shown) bad.push('chip not shown on a dirty tree');
+      else { if (m.chip.border) bad.push('chip has a border at rest'); if (m.chip.weight >= 600) bad.push(`chip weight ${m.chip.weight}`); }
+      if (m.dx > 0.5) bad.push(`search moves ${m.dx.toFixed(1)} px when the chip toggles`);
+      bad.length ? r.fail(`${where}: ${bad.join(', ')}`) : r.ok(`${where}: quiet, search steady`);
+      await p.close();
+    }
+    await b.close();
+  }
+  sh(dir, 'git', 'checkout', '-q', '--', 'a.txt');
+}
+// The section tabs stay one row at every width: on a narrow screen they scroll sideways instead
+// of wrapping, the tab of the open section is fully in view, and an edge fade shows that more
+// tabs are off screen (the scroll bar is hidden).
+async function tabsOneLine() {
+  for (const name of browsers) {
+    const { b, ctx } = await context(name);
+    for (const scheme of ['light', 'dark']) for (const width of [1440, 900, 360, 320]) {
+      const p = await ctx.newPage();
+      await p.emulateMedia({ colorScheme: scheme });
+      await p.setViewportSize({ width, height: 600 });
+      await p.goto(srv.base + '/stats', { waitUntil: 'load' });
+      const m = await p.evaluate(() => {
+        const nav = document.querySelector('.tabnav');
+        if (!nav) return null;
+        const tabs = [...nav.querySelectorAll('a')];
+        const tops = new Set(tabs.map((a) => Math.round(a.getBoundingClientRect().top)));
+        const on = nav.querySelector('a[aria-current="page"]');
+        const n = nav.getBoundingClientRect(), o = on && on.getBoundingClientRect();
+        const over = nav.scrollWidth > nav.clientWidth + 1;
+        const mask = getComputedStyle(nav).maskImage || getComputedStyle(nav).webkitMaskImage || 'none';
+        return { rows: tops.size, over, fade: mask !== 'none', onIn: !!o && o.left >= n.left - 0.5 && o.right <= n.right + 0.5, page: document.documentElement.scrollWidth > innerWidth + 1 };
+      });
+      const where = `tabs-one-line ${name} ${scheme} ${width}`;
+      const bad = [];
+      if (!m) bad.push('no section tabs');
+      else {
+        if (m.rows !== 1) bad.push(`tabs in ${m.rows} rows`);
+        if (!m.onIn) bad.push('the open tab is not fully visible');
+        if (m.over && !m.fade) bad.push('tabs overflow with no edge fade');
+        if (m.page) bad.push('the page scrolls sideways');
+      }
+      bad.length ? r.fail(`${where}: ${bad.join(', ')}`) : r.ok(`${where}: one row${m.over ? ', scrolls with a fade' : ''}`);
+      await p.close();
+    }
+    await b.close();
+  }
+}
+const checks = { 'tabs-one-line': tabsOneLine, 'calm-header': calmHeader, 'side-width': sideWidth, truncation, 'live-tabs': liveTabs, mermaid, chip, doctabs, chords, header, marked, 'menu-same': menuSame, gutter, overlays, tips, 'repo-switch': repoSwitch, 'mark-seam': markSeam, 'about-place': aboutPlace, 'site-theme': siteTheme };
 try {
   for (const c of wanted) { console.log(`-- ${c}`); await checks[c](); }
 } finally {

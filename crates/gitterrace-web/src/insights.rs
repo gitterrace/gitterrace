@@ -244,8 +244,8 @@ pub(crate) async fn cached_keyed<T: askama::Template + Send + 'static>(
     if let Some(h) = app.memo_get(&key) {
         return Ok(Html((*h).clone()));
     }
-    let html = with_records(app, tab, build).await?;
-    if app.ready() {
+    let (html, served) = with_records(app, tab, build).await?;
+    if served {
         app.memo_put(key, Arc::new(html.0.clone()));
     }
     Ok(html)
@@ -460,4 +460,46 @@ pub(crate) async fn contributors(
         }
     })
     .await
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use askama::Template;
+
+    use crate::app::App;
+
+    #[derive(Template)]
+    #[template(source = "data", ext = "txt")]
+    struct Data;
+
+    /// The indexing page rendered just before the index turns ready is never memoized: the
+    /// next request after ready shows data, not a stale indexing page for the memo's minute.
+    #[tokio::test]
+    async fn the_indexing_page_is_never_memoized() {
+        let dir = tempfile::tempdir().expect("tmp");
+        let p = gitterrace_testkit::Fixture::init(dir.path())
+            .write("a.txt", "a\n")
+            .commit("feat: a")
+            .path()
+            .to_owned();
+        let repo = gitterrace_git::Repo::discover(&p).expect("repo");
+        let index = gitterrace_index::Index::open(&repo).expect("index");
+        let app = Arc::new(App::new(repo, index));
+        // The build has finished (the index generation moved) but the ready flag is not set
+        // yet: a request in that window renders the indexing page under the final memo key.
+        app.index
+            .update(&app.repo, "HEAD", &|_| {})
+            .expect("update");
+        let first = super::cached(&app, "a", None, |_, _, _| Data)
+            .await
+            .expect("page");
+        assert!(first.0.contains("data-progress"), "{}", first.0);
+        app.mark_ready();
+        let second = super::cached(&app, "a", None, |_, _, _| Data)
+            .await
+            .expect("page");
+        assert_eq!(second.0, "data");
+    }
 }

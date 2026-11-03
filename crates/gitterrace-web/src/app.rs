@@ -52,6 +52,8 @@ type RecordSlot = Arc<Mutex<Option<Arc<Vec<CommitRecord>>>>>;
 type IgnoreFiles = (String, Arc<Vec<(String, String)>>);
 
 type TotalsEntry = (String, gitterrace_index::PeriodStats);
+/// A head commit id and the index generation it was read at.
+type HeadGen = (String, u64);
 
 /// What every repository of one server shares: the settings in force, the cap on page-building
 /// jobs and the shutdown signal that ends live streams.
@@ -300,8 +302,9 @@ pub(crate) struct App {
     last_commits: Mutex<crate::bounded::Bounded<Arc<Vec<LastCommit>>>>,
     /// Ids of the commits `git log -- path` lists, by (tip, path, index generation).
     path_logs: Mutex<crate::bounded::Bounded<Arc<PathLog>>>,
-    chain: Mutex<Option<(String, Arc<crate::languages::Chain>)>>,
     subjects: Mutex<Option<(String, Arc<Subjects>)>>,
+    /// The languages skeleton by (head, index generation). Flat in history length.
+    chain: Mutex<Option<(HeadGen, Arc<crate::languages::Skeleton>)>>,
     head_lines: Mutex<Option<(String, Arc<Vec<gitterrace_index::HeadFile>>)>>,
 }
 
@@ -353,8 +356,8 @@ impl App {
             file_lists: Mutex::new(crate::bounded::Bounded::new(small)),
             last_commits: Mutex::new(crate::bounded::Bounded::new(small)),
             path_logs: Mutex::new(crate::bounded::Bounded::new(small)),
-            chain: Mutex::new(None),
             subjects: Mutex::new(None),
+            chain: Mutex::new(None),
             head_lines: Mutex::new(None),
         }
     }
@@ -555,29 +558,25 @@ impl App {
         Ok(Some(ids))
     }
 
-    /// Lines of code per language at every first-parent commit of `head`, built once per head.
+    /// The languages skeleton of `head`, built once per head and index generation.
     pub(crate) fn chain(
         &self,
         head: &str,
         src: &dyn gitterrace_index::feed::InsightsSource,
-    ) -> Arc<crate::languages::Chain> {
+        filter: &gitterrace_index::PathFilter,
+    ) -> Arc<crate::languages::Skeleton> {
+        let key = (head.to_owned(), self.index.generation());
         if let Ok(g) = self.chain.lock()
-            && let Some((id, c)) = g.as_ref()
-            && id == head
+            && let Some((k, s)) = g.as_ref()
+            && *k == key
         {
-            return Arc::clone(c);
+            return Arc::clone(s);
         }
-        let ignore = self.ignore_set(head);
-        let ins = gitterrace_index::Insights::from_source(
-            src,
-            gitterrace_index::Options::default(),
-            ignore,
-        );
-        let c = Arc::new(crate::languages::Chain::from_source(&ins));
+        let s = Arc::new(crate::languages::Skeleton::build(src, filter));
         if let Ok(mut g) = self.chain.lock() {
-            *g = Some((head.to_owned(), Arc::clone(&c)));
+            *g = Some((key, Arc::clone(&s)));
         }
-        c
+        s
     }
 
     /// Line count of every file in `head`, built once per head. Reading the line cache,
@@ -959,8 +958,8 @@ impl App {
             d.take();
         }
         for done in [
-            self.chain.lock().map(|mut g| g.take().is_some()).ok(),
             self.subjects.lock().map(|mut g| g.take().is_some()).ok(),
+            self.chain.lock().map(|mut g| g.take().is_some()).ok(),
             self.head_lines.lock().map(|mut g| g.take().is_some()).ok(),
         ] {
             released |= done.unwrap_or(false);
@@ -1165,10 +1164,11 @@ async fn refresh(app: &Arc<App>, rev: &str, warm: Option<&str>) {
     let Some(head) = warm else { return };
     app.mark_ready();
     let (a, h) = (Arc::clone(app), head.to_owned());
-    // Warm what the first visitor would otherwise pay for.
+    // The languages walk reads the whole first-parent chain, so it runs here, off the
+    // request path. What it keeps is flat in history length.
     tokio::task::spawn_blocking(move || {
         if let Ok(Some(r)) = a.source(&h) {
-            a.chain(&h, &*r);
+            a.chain(&h, &*r, &crate::languages::path_filter(&a, &h));
         }
     });
     app.refreshed.notify_one();
@@ -1511,7 +1511,7 @@ mod tests {
     }
 
     /// The parsed history is the bulk of a running server, so nothing may keep it alive once
-    /// nobody browses: not the record slots, the shared insights tables, the language chain or
+    /// nobody browses: not the record slots, the shared insights tables or
     /// any cache added later. The test holds only a weak reference, so whatever pins the set
     /// turns it red; a page in flight keeps its own `Arc` and the next page parses again.
     #[test]
@@ -1533,7 +1533,7 @@ mod tests {
         let recs = app.records(&head).expect("records").expect("ready");
         // Everything the pages build over the records, as the warm-up does.
         let src = app.source(&head).expect("source").expect("ready");
-        app.chain(&head, &*src);
+        app.chain(&head, &*src, &crate::languages::path_filter(&app, &head));
         crate::fmt::with_rev(&head, || {
             let _ins = crate::insights::insights(&app, &src, gitterrace_index::Options::default());
         });

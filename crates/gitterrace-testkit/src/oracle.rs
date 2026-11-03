@@ -4,6 +4,8 @@
 //! The golden file is the reference. A later implementation passes when every digest is the
 //! same. `TEST_BLESS=1` rewrites the file, which only today's implementation may do.
 
+mod proof;
+
 use std::collections::BTreeMap;
 use std::fmt::Write as _;
 use std::io::Write as _;
@@ -14,6 +16,8 @@ use axum::Router;
 
 use crate::matrix::{Cell, Mailmap, Values};
 use crate::web::page;
+
+pub use proof::Proof;
 
 /// The frozen "now": 2024-03-10T00:00:00Z, nine days after the adversarial tip.
 pub const FROZEN_NOW: i64 = 1_710_028_800;
@@ -240,6 +244,66 @@ pub async fn capture_rev(
     out
 }
 
+/// The page with its chrome cut out: the site `<header>`, and for the overview (`/`) the
+/// `<aside>` sidebar too. Header and sidebar change with navigation work, the insights never
+/// do, so a re-bless may move only what this removes.
+#[must_use]
+pub fn without_chrome(key: &str, body: &str) -> String {
+    let path = key.split_once("] ").map_or(key, |(_, k)| k);
+    let overview = path.split('?').next() == Some("/");
+    let mut out = cut(body, "<header", "</header>");
+    if overview {
+        out = cut(&out, "<aside", "</aside>");
+    }
+    out
+}
+
+/// `body` without its first `open ... close` span, unchanged when either is missing.
+fn cut(body: &str, open: &str, close: &str) -> String {
+    let Some(at) = body.find(open) else {
+        return body.to_owned();
+    };
+    let Some(end) = body[at..].find(close).map(|e| at + e + close.len()) else {
+        return body.to_owned();
+    };
+    format!("{}{}", &body[..at], &body[end..])
+}
+
+/// Keys whose body outside the chrome differs between two dumps (`TEST_ORACLE_DUMP` folders),
+/// plus keys on one side only. Empty when a change touched only header and sidebar. Equal-time
+/// row order is folded, as everywhere in the oracle.
+#[must_use]
+pub fn chrome_only_diff(old_dir: &Path, new_dir: &Path) -> (usize, Vec<String>) {
+    let read = |dir: &Path| -> BTreeMap<String, String> {
+        std::fs::read_dir(dir)
+            .expect("dump dir")
+            .filter_map(Result::ok)
+            .filter_map(|e| std::fs::read_to_string(e.path()).ok())
+            .filter_map(|t| {
+                t.split_once('\n')
+                    .map(|(k, b)| (k.to_owned(), normalize(b)))
+            })
+            .collect()
+    };
+    let (old, new) = (read(old_dir), read(new_dir));
+    let mut moved = 0;
+    let mut bad = Vec::new();
+    let mut keys: std::collections::BTreeSet<&String> = old.keys().collect();
+    keys.extend(new.keys());
+    for k in keys {
+        match (old.get(k), new.get(k)) {
+            (Some(a), Some(b)) if a == b => {}
+            (Some(a), Some(b))
+                if canonical(&without_chrome(k, a)) == canonical(&without_chrome(k, b)) =>
+            {
+                moved += 1;
+            }
+            _ => bad.push(k.clone()),
+        }
+    }
+    (moved, bad)
+}
+
 /// Blanks the one value that is not output of the insights but of the watcher: `data-live-v`,
 /// a hash of worktree file stamps that differs per checkout. Nothing else is touched.
 #[must_use]
@@ -322,7 +386,7 @@ pub fn tie_only(old: &str, new: &str) -> bool {
 }
 
 /// One golden line: `exact canonical key`, the canonical digest being [`canonical`]'s.
-fn golden_line(l: &str) -> Option<(&str, (&str, &str))> {
+pub(crate) fn golden_line(l: &str) -> Option<(&str, (&str, &str))> {
     let (exact, rest) = l.split_once(' ')?;
     let (canon, key) = rest.split_once(' ')?;
     Some((key, (exact, canon)))
@@ -563,6 +627,38 @@ mod tests {
         assert_ne!(
             canonical(&old),
             canonical(&one(&[a, b, row("2023-01-01 12:00", "z")]))
+        );
+    }
+
+    /// Header changes on any page, and the sidebar on `/`, are chrome. Anything in the body of a
+    /// stats page, or the sidebar of a stats page, is not.
+    #[test]
+    fn only_header_and_overview_sidebar_are_chrome() {
+        use crate::oracle::without_chrome;
+        let page = |head: &str, side: &str, main: &str| {
+            format!(
+                "<html><header class=\"top\">{head}</header><main>{main}</main><aside>{side}</aside></html>"
+            )
+        };
+        let (a, b) = (page("menu", "s1", "42"), page("menu2", "s2", "42"));
+        assert_eq!(
+            without_chrome("[as-is] /?period=1m", &a),
+            without_chrome("[as-is] /?period=1m", &b)
+        );
+        assert_ne!(
+            without_chrome("[as-is] /stats?period=1m", &a),
+            without_chrome("[as-is] /stats?period=1m", &b)
+        );
+        let c = page("menu2", "s1", "43");
+        assert_ne!(
+            without_chrome("/?x", &a),
+            without_chrome("/?x", &c),
+            "planted body change"
+        );
+        let d = page("menu2", "s1", "42");
+        assert_eq!(
+            without_chrome("/stats/types?x", &a),
+            without_chrome("/stats/types?x", &d)
         );
     }
 

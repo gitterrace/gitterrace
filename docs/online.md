@@ -19,7 +19,6 @@ It is a single command, so it scripts well: run it from CI or a cron job on each
 upload the folder. Several repositories go into one site (`export site repo1 repo2`), and
 `--project name=url` credits a repository that is someone else's work in every page's banner.
 
-
 Every page ends with one credit line: `Source: name, MIT license, https://github.com/owner/name`.
 The license is recognised from the root `LICENSE` or `COPYING` file (a text that is not a common
 license links to the file instead). The link is the `origin` remote, or the `--project` URL, with

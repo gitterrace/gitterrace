@@ -272,13 +272,6 @@ impl<'a> Insights<'a> {
         self.d.ident_person.get(id.0 as usize).copied().unwrap_or(0)
     }
 
-    /// Person index of the author of commit `rank`.
-    pub fn person(&self, rank: Rank) -> usize {
-        self.source()
-            .commit(rank)
-            .map_or(0, |c| self.person_of(c.ident))
-    }
-
     /// Non-merge commit by someone who counts under the options.
     pub fn counted_row(&self, c: &CommitRow) -> bool {
         !c.merge && (self.opts.include_bots || !self.d.people.list[self.person_of(c.ident)].bot)

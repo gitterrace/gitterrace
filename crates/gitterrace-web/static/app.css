@@ -23,9 +23,10 @@ main.wrap>h2:first-child,main.wrap>.tabs+h2{margin-top:var(--space-6)}
 .logo .i{fill:var(--fg)}.logo .a{fill:var(--accent-ink)}
 .reponame{font:var(--weight-semibold) 20px/1.3 var(--serif);letter-spacing:-.01em;color:var(--fg);min-width:0;overflow-wrap:break-word}
 .reponame:hover{text-decoration:none;color:var(--accent-fg)}
-.branch{display:inline-flex;align-items:center;gap:6px;font:var(--weight-semibold) var(--text-xs)/1 var(--mono);color:var(--muted);border:var(--border);border-radius:var(--radius);padding:5px 10px 5px 8px;background:transparent;white-space:nowrap;transition:color var(--dur-fast),border-color var(--dur-fast)}
-.branch:hover{text-decoration:none;color:var(--fg);border-color:var(--line-strong)}
-.branch svg{width:12px;height:12px;fill:currentColor}
+/* The branch is context, not an action: a quiet label at rest, a surface only on hover or focus. */
+.branch{display:inline-flex;align-items:center;gap:5px;font:var(--weight-regular) var(--text-xs)/1 var(--mono);color:var(--muted);border:1px solid transparent;border-radius:var(--radius);padding:5px 6px;background:transparent;white-space:nowrap;transition:color var(--dur-fast),border-color var(--dur-fast)}
+.branch:hover,.branch[aria-expanded=true]{text-decoration:none;color:var(--fg);border-color:var(--line)}
+.branch svg{width:12px;height:12px;fill:currentColor;opacity:.8}
 /* The bar is two units: where you are (brand, repository, switchers, chip) and the tools.
    Each wraps as a whole, never one control at a time. */
 .where{display:flex;align-items:center;flex-wrap:wrap;gap:var(--space-2) var(--space-3);min-width:0}
@@ -52,7 +53,7 @@ header.top>.wrap{container:topbar/inline-size}
 /* Then the bar sheds words, never controls: the wordmark, then the chip's label, then the
    ref name (the button keeps its icon and opens the same menu). Names are never cut. */
 @container topbar (max-width:700px){.wordmark,.sep{display:none}}
-@container topbar (max-width:560px){.wtchip .label{display:none}.wtchip{padding:5px 8px}}
+@container topbar (max-width:560px){.wtchip .label{display:none}.wtchip{padding:5px 4px}}
 @container topbar (max-width:460px){#refbtn .name{display:none}}
 .theme{width:32px;height:32px;padding:0;display:grid;place-items:center;background:transparent;border:1px solid transparent;border-radius:var(--radius);color:var(--muted)}
 .theme:hover{background:var(--hover);color:var(--fg);border-color:var(--line)}
@@ -64,7 +65,7 @@ header.top>.wrap{container:topbar/inline-size}
 
 /* tabs: header nav and in-page, same underline pattern */
 .tabnav,.tabs{display:flex;flex-wrap:wrap;gap:0 var(--space-1)}
-.tabnav{margin-bottom:-1px}
+.tabnav{margin-bottom:-1px;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}.tabnav::-webkit-scrollbar{display:none}
 .tabs{border-bottom:var(--border);margin-bottom:var(--space-2)}
 .tabnav a,.tabs a{position:relative;color:var(--muted);padding:var(--space-2) var(--space-3) 10px;font:var(--weight-regular) 12px/1.4 var(--mono);text-transform:uppercase;letter-spacing:.08em;white-space:nowrap;border-bottom:2px solid transparent;transition:color var(--dur-fast)}
 .tabs a{margin-bottom:-1px}
@@ -84,6 +85,7 @@ header.top>.wrap{container:topbar/inline-size}
 .card{border:var(--border);border-radius:var(--radius);overflow:hidden;overflow-x:auto;background:var(--bg)}
 .scroll{overflow-x:auto}
 .cols{display:grid;grid-template-columns:minmax(0,1fr) 280px;gap:var(--space-8)}
+.cols.wide{grid-template-columns:minmax(0,1fr)}
 @media (max-width:1100px){.cols{grid-template-columns:minmax(0,1fr);gap:var(--space-6)}aside{order:-1}}
 aside h2{margin-top:0}
 input{font:inherit;padding:5px var(--space-3);border:1px solid var(--line-strong);border-radius:var(--radius);background:var(--surface);color:var(--fg);min-width:240px;height:32px}
@@ -135,9 +137,9 @@ button:hover{border-color:var(--line-strong);background:var(--hover)}
 .doctabs{flex-wrap:nowrap;overflow-x:auto;margin:0;padding:0 var(--space-2);background:var(--soft)}.doctabs a{padding-top:var(--space-3)}
 .readme-h{display:flex;align-items:center;gap:var(--space-2);padding:var(--space-2) var(--space-4);min-height:44px;background:var(--soft);border-bottom:var(--border);font-size:var(--text-sm);font-weight:var(--weight-semibold);color:var(--fg)}
 .facts{list-style:none;margin:0 0 var(--space-4);padding:0;color:var(--muted)}.facts li{padding:var(--space-1) 0}.facts b{color:var(--fg);font-weight:var(--weight-semibold);font-variant-numeric:tabular-nums}.facts b.add{color:var(--add)}.facts b.del{color:var(--del)}
-.side{margin:0 0 var(--space-5);font-size:var(--text-sm)}.side h3{margin:0 0 var(--space-2);font-size:var(--text-xs);text-transform:uppercase;letter-spacing:.04em;color:var(--muted);font-weight:var(--weight-semibold)}.side h3 a{color:inherit}.side p{margin:0 0 var(--space-2)}p.facts{line-height:1.6;display:flex;flex-wrap:wrap;gap:0 var(--space-3)}
-.side b{font-variant-numeric:tabular-nums}.sparkwrap{display:inline-block}
-.sidelist{list-style:none;margin:0;padding:0}.sidelist li{display:flex;justify-content:space-between;gap:var(--space-3);padding:2px 0}.sidelist a{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:var(--mono)}.sidelist .muted{flex:none}
+.side{margin:0 0 var(--space-5);font-size:var(--text-sm)}.side>:last-child{margin-bottom:0}.side h3{margin:0 0 var(--space-2);font-size:var(--text-xs);text-transform:uppercase;letter-spacing:.04em;color:var(--muted);font-weight:var(--weight-semibold)}.side h3 a{color:inherit}.side p{margin:0 0 var(--space-2)}p.facts{line-height:1.6;display:flex;flex-wrap:wrap;gap:0 var(--space-3)}
+.side b{font-variant-numeric:tabular-nums}.sparkwrap{display:block;margin:0 0 var(--space-2)}.sparkwrap svg.spark{width:100%;height:24px;overflow:visible}.sparkwrap .base{stroke:var(--line);stroke-width:1}.sparkwrap .dot{stroke-width:5;stroke-linecap:round}
+.sidelist{list-style:none;margin:0;padding:0}.sidelist li{display:flex;justify-content:space-between;gap:var(--space-3);padding:2px 0}.sidelist a{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:var(--mono)}.sidelist .muted{flex:none;text-align:right;font-variant-numeric:tabular-nums}
 .langbar{display:flex;height:6px;border-radius:var(--radius);overflow:hidden;margin:0 0 var(--space-2);background:var(--soft)}.langbar span{display:block;height:100%}
 .langs{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:var(--space-1) var(--space-3)}.langs i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:var(--space-1)}
 
@@ -240,10 +242,11 @@ input{min-width:0;flex:1}.filter{width:100%}
 /* ---- navigation: finder, switcher, search, shortcuts (gitterrace-ux) ---- */
 .refswitch{display:inline-flex}
 button.branch{height:auto;cursor:pointer}
-.branch .caret{width:0;height:0;border:4px solid transparent;border-top-color:currentColor;margin:4px 0 0 2px}
+.branch .caret{width:0;height:0;border:3px solid transparent;border-top-color:currentColor;margin:3px 0 0 1px;opacity:.7}
 [hidden]{display:none!important}
-.wtchip{display:inline-flex;align-items:center;gap:6px;font:var(--weight-semibold) var(--text-xs)/1 var(--mono);color:var(--muted);background:transparent;border:var(--border);border-radius:var(--radius);padding:5px 10px 5px 8px;white-space:nowrap;transition:color var(--dur-fast),border-color var(--dur-fast)}
-.wtchip:hover{text-decoration:none;color:var(--fg);border-color:var(--warn)}
+/* Joined to the branch as one phrase ("main · Working tree"): information, not a second button. */
+.wtchip{display:inline-flex;align-items:center;gap:5px;font:var(--weight-regular) var(--text-xs)/1 var(--sans);color:var(--muted);background:transparent;border:1px solid transparent;border-radius:var(--radius);padding:5px 6px;margin-left:-4px;white-space:nowrap;transition:color var(--dur-fast)}
+.wtchip:hover{color:var(--fg);text-decoration:underline;text-underline-offset:3px}
 /* Uncommitted work is a normal state: quiet label, only the dot carries the warn colour. No motion. */
 .wtchip .dot{width:6px;height:6px;border-radius:50%;background:var(--warn)}
 .topsearch{position:relative;display:flex;align-items:center}
@@ -322,6 +325,7 @@ svg.chart text{font-family:var(--mono)}
 .sep{color:var(--faint)}
 .wordmark{font:600 17px/1 var(--serif);color:var(--fg)}
 @media (max-width:600px){.tabnav a,.tabs a{letter-spacing:.04em;padding-left:var(--space-2);padding-right:var(--space-2)}}
+@media (max-width:400px){.tabnav{gap:0}.tabnav a{letter-spacing:0;padding-left:4px;padding-right:4px}}
 .head h1{font-size:28px}
 
 /* languages: chart, brush, range card */
@@ -367,7 +371,7 @@ svg.loc .xh{display:none;stroke:var(--fg);stroke-width:1;stroke-dasharray:3 3;po
 .rlist li{display:flex;gap:var(--space-3);align-items:baseline;padding:3px 0;border-top:var(--border);min-width:0}
 .rlist .subj{flex:1}
 .foot{color:var(--muted);font-size:var(--text-sm);margin:var(--space-2) 0 0}
-svg.spark{display:block;fill:none;stroke-width:1.6;stroke-linejoin:round}
+svg.spark{display:block;fill:none;stroke-width:1.6;stroke-linejoin:round}svg.spark *{vector-effect:non-scaling-stroke}
 td.sparkcell{white-space:nowrap}td.sparkcell svg.spark{display:inline-block;vertical-align:middle;margin-right:var(--space-2)}td.sparkcell span{display:inline-block;min-width:6ch;text-align:right;font:var(--text-xs) var(--mono);font-variant-numeric:tabular-nums}
 svg.spark.s1{stroke:var(--cat-1)}svg.spark.s2{stroke:var(--cat-2)}svg.spark.s3{stroke:var(--cat-3)}svg.spark.s4{stroke:var(--cat-4)}svg.spark.s5{stroke:var(--cat-5)}svg.spark.s6{stroke:var(--cat-6)}svg.spark.s7{stroke:var(--cat-7)}svg.spark.s8{stroke:var(--cat-8)}
 
@@ -470,6 +474,7 @@ td:has(>.actbtn.float){position:relative}
 .actmenu .ov-list li{justify-content:space-between;align-items:center}
 .actmenu .ov-list li kbd{margin-left:auto}
 .actmenu .ov-list li.busy{opacity:.55;pointer-events:none}
+.actmenu .ov-list li.off{opacity:.5;cursor:default}
 .actmenu .ov-list li.busy .name::after{content:" \2026"}
 .actmenu .ov-list li.sep{height:0;padding:0;margin:var(--space-1) 0;border-top:var(--border);cursor:default}
 .actmenu .ov-list li.hint{cursor:default;font-size:var(--text-xs)}
