@@ -3,7 +3,7 @@
 
 Builds synthetic repositories of growing size, serves each with the release binary, waits for
 the index, visits the bench's page set (`pages` in bench-lib.py) and then leaves the server
-idle past its record release (`RECORDS_IDLE` in gitterrace-web/src/app.rs). It then reads RSS
+idle until it reports an idle release in `/api/progress`. It then reads RSS
 the way bench-run samples it (`ps -o rss`) and, on macOS, the dirty footprint (`footprint`).
 Fails when the idle footprint (RSS elsewhere) is over the bound at any size, or grows by more
 than the slack from the smallest repository to the largest: memory that scales with history
@@ -15,7 +15,9 @@ while nobody browses is the bug this catches, whatever cache holds it.
 from __future__ import annotations
 
 import argparse
+import http.client
 import importlib.util
+import json
 import re
 import shutil
 import subprocess
@@ -26,8 +28,9 @@ from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parent.parent
-# RECORDS_IDLE is 30 s and the sweeper checks every quarter of it: 45 s covers both.
-IDLE_SECS = 45
+# RECORDS_IDLE is 30 s and the sweeper checks every quarter of it: a release later than this
+# is a server that does not release.
+RELEASE_WAIT_SECS = 120
 SLACK_MB = 25
 
 
@@ -81,6 +84,24 @@ def make_repo(d: Path, commits: int) -> None:
     subprocess.run(["git", "checkout", "-q", "main"], cwd=d, check=True)
 
 
+def assert_zero_decay(binary: str) -> None:
+    """The footprint is honest only when freed pages go back at once: a binary running with
+    jemalloc's default decay shows pages it no longer holds, and they grow with the work done.
+    Read back what the binary runs with before measuring it."""
+    env = {"TEST_ALLOC_DECAY": "1", "PATH": "/usr/bin:/bin"}
+    out = subprocess.run([binary], env=env, capture_output=True, text=True)
+    if out.returncode != 0 or out.stdout.strip() != "0 0 0 0":
+        sys.exit(f"{binary} does not run with zero page decay: {out.stdout.strip()!r}")
+
+
+def releases(port: int, prefix: str) -> int:
+    c = http.client.HTTPConnection("127.0.0.1", port, timeout=30)
+    c.request("GET", f"{prefix}/api/progress")
+    n = int(json.loads(c.getresponse().read()).get("releases", -1))
+    c.close()
+    return n
+
+
 def measure(
     br: Any, binary: str, repo: Path, logdir: Path
 ) -> tuple[float, float | None]:
@@ -90,7 +111,14 @@ def measure(
         prefix = br.site_prefix(srv.port)
         for path in br.pages(br.discover(repo, "HEAD"), "fn").values():
             br.get(srv.port, prefix + path)
-        time.sleep(IDLE_SECS)
+        # Idle means after the server released what the pages built, not after a guessed time.
+        end = time.time() + RELEASE_WAIT_SECS
+        while releases(srv.port, prefix) < 1:
+            if time.time() > end:
+                sys.exit(
+                    f"no idle release within {RELEASE_WAIT_SECS} s: the server keeps its caches"
+                )
+            time.sleep(0.5)
         return br.rss_mb(srv.pid), footprint_mb(srv.pid)
     finally:
         srv.stop()
@@ -107,6 +135,7 @@ def main() -> int:
     binary = str(Path(a.bin).resolve())
     if not Path(binary).exists():
         sys.exit(f"no binary at {binary}, run `make build` first")
+    assert_zero_decay(binary)
     br = bench()
     seen = []
     with tempfile.TemporaryDirectory(prefix="gt-mem-") as tmp:

@@ -63,6 +63,35 @@ Timings need a quiet machine. Before each timed phase the harness waits until th
 average stays under `BENCH_MAX_LOAD` (default half the cores) for 20 s, and records the load per
 phase. `make docs-check` refuses results timed above that limit.
 
+### File pages on a large history: target missed
+
+The pages that read every change of every file (hotspots, ownership) have a cold target of
+at most 1.5 times the in-memory build they replaced: on rust, hotspots 230 ms and ownership
+115 ms for the first request after the index is ready. The streaming store misses it. Measured
+on rust (345k commits, 64k files at HEAD), release build, M1 Max, first request after ready,
+1-minute load 11 to 16:
+
+| Page | Period | Target | Measured |
+| --- | --- | --- | --- |
+| Hotspots | all | 230 ms | 950 to 1170 ms |
+| Hotspots | 1 year | 230 ms | 640 to 790 ms |
+| Ownership | all | 115 ms | 1050 to 1330 ms |
+| Ownership | 1 year | 115 ms | 520 to 640 ms |
+
+The server renders these pages right after the index is ready, so a visitor who arrives after
+that warm-up (about 10 s on rust) gets them from the page memo in a few milliseconds. The cold
+numbers are what a visitor pays inside that window, or for a filter combination that was not
+rendered before.
+
+The cost is reading every file row once per page with renames followed. A per-path aggregate
+cannot replace that read today: it is keyed by the name a file had in each commit, and a name
+that was renamed or reused belongs to two files at different times. On rust more than half the
+files at HEAD have such a name. Ownership over all history reads the aggregate for the files
+that were never renamed and the rows for the rest. An aggregate keyed by the name at the
+indexed tip, rebuilt when a new rename moves old rows, is the planned fix.
+`crates/gitterrace-index/tests/latency.rs` holds today's times on a 100k-commit synthetic
+history as ceilings, so the read path cannot get slower unnoticed.
+
 ## Not measured
 
 Browser rendering and JavaScript, network latency (the server is local), concurrent clients,

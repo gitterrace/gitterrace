@@ -29,6 +29,7 @@ lint:
 test:
 	cargo test --workspace
 	cargo test --release -p gitterrace-web --test memory_budget
+	cargo test --release -p gitterrace-index --test latency
 
 #: doc: Docs, warnings are errors
 doc:
@@ -62,6 +63,7 @@ names:
 lines:
 	python3 scripts/lines-check.py
 	python3 scripts/status-words-check.py
+	python3 scripts/stubs-check.py --self-test && python3 scripts/stubs-check.py
 
 ## gc: Prune cargo units and site-shots/app-icon output unused for DAYS (default 7). DRY=1 only reports, BENCH=1 also removes the cached benchmark clones
 gc:
@@ -116,9 +118,10 @@ bench-guard:
 	python3 scripts/bench-run.py --synthetic --bin target/debug/git-terrace >/dev/null
 	python3 scripts/bench-report.py --self-test
 
-## memory-check: An idle server's memory stays flat as the history grows (about 5 minutes, so not in check)
+## memory-check: An idle server's memory stays flat as the history and the tree grow (about 5 minutes, so not in check)
 memory-check: build
 	python3 scripts/memory-check.py --bin target/release/git-terrace
+	TEST_MEMORY_WIDE=100000 cargo test --release -p gitterrace-web --test memory_budget idle_memory_is_flat_in_tree_size
 
 ## browser-check: Real-browser checks of the served pages (BIN=path to git-terrace). Needs browsers, so not in check
 browser-check:

@@ -7,7 +7,7 @@ use std::sync::Arc;
 use crate::{CodeStat, CommitRecord, FileStat, cache};
 
 /// Cache format; a different one on disk discards the records.
-pub const FORMAT_VERSION: &str = "4";
+pub const FORMAT_VERSION: &str = "5";
 pub(crate) const VERSION_FILE: &str = "VERSION";
 pub(crate) const COMMITS_FILE: &str = "commits.jsonl";
 pub(crate) const PATHS_FILE: &str = "paths.jsonl";
@@ -264,10 +264,11 @@ impl SegmentBuild {
         let seg_name = format!("seg-{g}-0.gts");
         let mut w =
             ContainerWriter::new(&self.dir, &seg_name, Kind::Segment, StringBase::default())?;
+        let mut rows = self.rows;
+        rows.commits(&mut |sec, items, payload| w.block(sec, items, payload))?;
         self.builder
             .finish(&mut |sec, items, payload| w.block(sec, items, payload))?;
-        self.rows
-            .finish(&mut |sec, items, payload| w.block(sec, items, payload))?;
+        rows.finish(&mut |sec, items, payload| w.block(sec, items, payload))?;
         let seg = w.finish()?;
         drop(std::fs::remove_file(
             self.dir.join(format!("spill-{g}.gts.tmp")),
@@ -381,6 +382,7 @@ pub(crate) fn append_segment<'r>(
     }
     let seg_name = format!("seg-{g}-{n}.gts");
     let mut w = ContainerWriter::new(dir, &seg_name, Kind::Segment, base)?;
+    rows.commits(&mut |sec, items, payload| w.block(sec, items, payload))?;
     builder.finish(&mut |sec, items, payload| w.block(sec, items, payload))?;
     rows.finish(&mut |sec, items, payload| w.block(sec, items, payload))?;
     let seg = w.finish()?;

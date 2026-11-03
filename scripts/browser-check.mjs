@@ -140,7 +140,7 @@ async function calmHeader() {
       await p.mouse.move(width - 1, 399);
       const m = await p.evaluate(() => {
         const look = (el) => { if (!el) return null; const s = getComputedStyle(el); const bw = ['Top', 'Right', 'Bottom', 'Left'].some((k) => parseFloat(s[`border${k}Width`]) > 0 && s[`border${k}Style`] !== 'none' && !/rgba\(.*, 0\)$|transparent/.test(s[`border${k}Color`])); return { border: bw, weight: Number(s.fontWeight) }; };
-        const chip = document.getElementById('wtchip'), q = document.querySelector('.topsearch');
+        const chip = document.getElementById('wtchip'), q = /** @type {HTMLElement | null} */ (document.querySelector('.topsearch'));
         const x = () => (q && q.offsetParent ? q.getBoundingClientRect().x : null);
         const out = { branch: look(document.getElementById('refbtn')), chip: look(chip), shown: chip && !chip.hidden };
         if (chip) { const a = x(); chip.hidden = !chip.hidden; const c = x(); chip.hidden = !chip.hidden; out.dx = a === null ? 0 : Math.abs(a - c); }

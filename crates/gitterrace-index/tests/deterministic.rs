@@ -8,6 +8,9 @@ use std::path::Path;
 
 use gitterrace_git::Repo;
 use gitterrace_index::Index;
+use gitterrace_index::seg::format::{Kind, section};
+use gitterrace_index::seg::manifest::Manifest;
+use gitterrace_index::seg::read::Store;
 use gitterrace_testkit::{Adversarial, Fixture};
 
 /// Builds a fresh index of `repo` with `threads` workers, returns every file in it.
@@ -90,10 +93,92 @@ fn a_real_repository_indexes_the_same_on_any_thread_count() {
     }
 }
 
+/// Every live file of the cache in `dir`, in manifest order, with its kind. Names carry the
+/// generation that wrote them, so only kind and bytes are compared.
+fn live_files(dir: &Path) -> Vec<(u8, Vec<u8>)> {
+    let m = Manifest::load(dir)
+        .expect("manifest")
+        .expect("a segment set");
+    m.live
+        .iter()
+        .map(|f| (f.kind, std::fs::read(dir.join(&f.name)).expect("read live")))
+        .collect()
+}
+
+fn segments(dir: &Path) -> usize {
+    Manifest::load(dir).ok().flatten().map_or(0, |m| {
+        m.live
+            .iter()
+            .filter(|f| f.kind == Kind::Segment as u8)
+            .count()
+    })
+}
+
 /// Built at HEAD~k, updated to HEAD, then merged: every cache file byte for byte the one-step
 /// build's, because the merge renumbers strings and ordinals by first use in canonical order.
 #[test]
-#[ignore = "waits until the index builds through the segment merge"]
 fn two_steps_then_merge_equal_one_step_byte_for_byte() {
-    panic!("not wired yet");
+    let dir = tempfile::tempdir().expect("tempdir");
+    let mut f = Fixture::init(&dir.path().join("repo")).at("2024-01-01T00:00:00Z");
+    let mut tips = Vec::new();
+    for i in 0..14 {
+        // Paths and authors reused out of first-use order, so a merge that kept the step
+        // numbering would differ from the one-step build.
+        f = f
+            .write(&format!("src/f{}.rs", (13 - i) % 5), &format!("edit {i}\n"))
+            .write(&format!("docs/d{i}.md"), "x\n");
+        let who = format!("Dev{} <d{}@x.io>", i % 3, i % 3);
+        f.git(&["add", "-A"]);
+        f.git(&[
+            "commit",
+            "-q",
+            "--author",
+            &who,
+            "-m",
+            &format!("fix(core): step {i}"),
+        ]);
+        tips.push(f.git(&["rev-parse", "HEAD"]));
+    }
+    let head = tips.last().expect("tip").clone();
+    let source = Repo::discover(f.path()).expect("open");
+
+    let one_dir = dir.path().join("one");
+    let one = Index::open_dir(one_dir.clone()).expect("index");
+    one.update(&source, &head, &|_| {}).expect("one step");
+    let want = live_files(&one_dir);
+    assert_eq!(segments(&one_dir), 1);
+
+    // First at HEAD~8, then one commit per update: each adds a segment, and the last makes
+    // nine, more than the eight that start the merge.
+    let two_dir = dir.path().join("two");
+    let two = Index::open_dir(two_dir.clone()).expect("index");
+    for tip in &tips[5..] {
+        two.update(&source, tip, &|_| {}).expect("step");
+    }
+    // The merge runs on a background thread: wait until the set is one segment again.
+    for _ in 0..600 {
+        if segments(&two_dir) == 1 {
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(50));
+    }
+    assert_eq!(segments(&two_dir), 1, "the merge never ran");
+    let got = live_files(&two_dir);
+    assert_eq!(got.len(), want.len(), "live file count");
+    for (i, (g, w)) in got.iter().zip(&want).enumerate() {
+        assert_eq!(g.0, w.0, "kind of live file {i}");
+        assert!(
+            g.1 == w.1,
+            "live file {i} (kind {}) differs from the one-step build",
+            w.0
+        );
+    }
+    // The commit section is part of what was compared, not an empty one.
+    let store = Store::open(&two_dir).expect("open").expect("set");
+    let commits: u32 = store.segments[0]
+        .blocks(section::COMMITS)
+        .iter()
+        .map(|e| e.items)
+        .sum();
+    assert_eq!(commits as usize, tips.len(), "commit section items");
 }

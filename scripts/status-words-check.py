@@ -22,7 +22,9 @@ EXCLUDE = ("static/vendor/", "theme/schwarzwald/", "target/", "CHANGELOG.md")
 W = r"(?:clean|dirty|ahead|behind|detached|untracked|modified)"
 PATTERNS = [
     # "on main clean", "branch {name} ahead 2"
-    re.compile(rf"\b(?:on|branch) (?:\{{\{{?[^}}]*\}}\}}?|(?!(?:a|an|the|any|this|that|no)\b)[\w./-]+) {W}\b(?! (?:tree|checkout|state))"),
+    re.compile(
+        rf"\b(?:on|branch) (?:\{{\{{?[^}}]*\}}\}}?|(?!(?:a|an|the|any|this|that|no)\b)[\w./-]+) {W}\b(?! (?:tree|checkout|state))"
+    ),
     # "{branch} clean", "{{ name }} dirty"
     re.compile(rf"\{{[a-z_]+\}}\s+{W}(?=\s*(?:[\d\"'`<]|$))"),
     # template: a name, endif, then a bare status word span with no separator
@@ -37,24 +39,40 @@ def scan(text: str, name: str) -> list[str]:
         if SKIP.match(line):
             continue
         if any(p.search(line) for p in PATTERNS):
-            out.append(f"{name}:{i}: status facts run together, add a comma: {line.strip()[:90]}")
+            out.append(
+                f"{name}:{i}: status facts run together, add a comma: {line.strip()[:90]}"
+            )
     return out
 
 
 def files() -> list[Path]:
     r = subprocess.run(
         ["git", "ls-files", "-co", "--exclude-standard"],
-        cwd=ROOT, capture_output=True, text=True, check=True,
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        check=True,
     )
-    return [ROOT / f for f in r.stdout.split("\n")
-            if f.endswith(EXTS) and not any(x in f for x in EXCLUDE)
-            and f != "scripts/status-words-check.py"]
+    return [
+        ROOT / f
+        for f in r.stdout.split("\n")
+        if f.endswith(EXTS)
+        and not any(x in f for x in EXCLUDE)
+        and f != "scripts/status-words-check.py"
+    ]
 
 
 def self_test() -> int:
-    bad = ['println!("on main clean");', 'format!("{branch} dirty")',
-           '</a>{% else %} <span class="muted">clean</span>']
-    good = ['println!("on main, clean");', 'format!("{branch}, dirty")', "a clean checkout"]
+    bad = [
+        'println!("on main clean");',
+        'format!("{branch} dirty")',
+        '</a>{% else %} <span class="muted">clean</span>',
+    ]
+    good = [
+        'println!("on main, clean");',
+        'format!("{branch}, dirty")',
+        "a clean checkout",
+    ]
     ok = all(scan(b, "x") for b in bad) and not any(scan(g, "x") for g in good)
     print("self-test", "ok" if ok else "FAILED")
     return 0 if ok else 1

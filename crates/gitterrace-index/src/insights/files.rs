@@ -9,6 +9,9 @@ use crate::insights::{DAY, HeadFile, Insights, Period};
 /// Most files in one commit that still say something about coupling; bigger commits are
 /// sweeps (formatting, renames, vendoring).
 const COUPLING_MAX_FILES: usize = 30;
+/// Above this many paths a request scans the file rows once instead of looking each path up
+/// in the postings: a lookup reads its blocks, a scan reads every row once.
+const PER_PATH_MAX: usize = 64;
 const SOLO_SHARE: f64 = 0.8;
 const STALE_SECS: i64 = 365 * 86_400;
 
@@ -16,11 +19,7 @@ const STALE_SECS: i64 = 365 * 86_400;
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct TouchRaw {
     pub commit: Rank,
-    /// Read by the postings cross-check only.
-    #[cfg_attr(
-        not(test),
-        expect(dead_code, reason = "read by the postings cross-check")
-    )]
+    /// The file row index inside the commit.
     pub row: u32,
     /// The file row inside the commit, which holds the name at that time.
     pub path: PathId,
@@ -75,12 +74,14 @@ impl Follow {
 
     /// Canonical id of `path` as seen by row `row` of commit `rank`.
     fn canonical(&self, path: PathId, rank: Rank, row: u32) -> PathId {
+        // The log is in replay order: rank descending, rows ascending within a rank. The
+        // aliases a row sees are a prefix of it, so its last entry is found by bisection
+        // (hits of a busy path times a long rename log made the linear walk quadratic).
         self.log
             .get(&path)
             .and_then(|l| {
-                l.iter()
-                    .take_while(|(r, w, _)| *r > rank || (*r == rank && *w < row))
-                    .last()
+                let seen = l.partition_point(|(r, w, _)| *r > rank || (*r == rank && *w < row));
+                seen.checked_sub(1).map(|i| l[i])
             })
             .map_or(path, |e| e.2)
     }
@@ -218,6 +219,9 @@ impl Insights<'_> {
         paths: &[&str],
         keep: impl Fn(&CommitRow) -> bool,
     ) -> Vec<Vec<(TouchRaw, CommitRow)>> {
+        if paths.len() > PER_PATH_MAX {
+            return self.touches_scan(paths, keep);
+        }
         let src = self.source();
         let hits: Vec<Vec<(Rank, u32, PathId)>> = paths.iter().map(|p| self.hits_of(p)).collect();
         let mut ranks: Vec<Rank> = hits.iter().flatten().map(|h| h.0).collect();
@@ -266,6 +270,71 @@ impl Insights<'_> {
                     .collect()
             })
             .collect()
+    }
+
+    /// [`Insights::touches_many`] for many paths: one ascending pass over the kept commits
+    /// file rows instead of a postings lookup per path, which is tens of thousands of lookups
+    /// for the head files of a large tree. State is the lists themselves plus the head and
+    /// alias ids, never a table per commit.
+    fn touches_scan(
+        &self,
+        paths: &[&str],
+        keep: impl Fn(&CommitRow) -> bool,
+    ) -> Vec<Vec<(TouchRaw, CommitRow)>> {
+        let src = self.source();
+        let follow = self.follow();
+        // Every name a head file had, to the head files it can stand for.
+        let mut names: FastMap<PathId, Vec<(usize, PathId)>> = FastMap::default();
+        for (i, p) in paths.iter().enumerate() {
+            let Some(head) = src.find_path(p) else {
+                continue;
+            };
+            names.entry(head).or_default().push((i, head));
+            for &old in follow.names.get(&head).into_iter().flatten() {
+                names.entry(old).or_default().push((i, head));
+            }
+        }
+        let kept: Vec<CommitRow> = src
+            .commits_in(CommitRange::All)
+            .filter(|c| !c.merge && keep(c))
+            .collect();
+        let ranks: Vec<Rank> = kept.iter().map(|c| c.rank).collect();
+        let mut commits = kept.into_iter();
+        let mut out: Vec<Vec<(TouchRaw, CommitRow)>> = vec![Vec::new(); paths.len()];
+        for (rank, rows) in src.rows_for(ranks) {
+            let Some(c) = commits.by_ref().find(|c| c.rank == rank) else {
+                break;
+            };
+            for (i, r) in rows.iter().enumerate() {
+                let Some(heads) = names.get(&r.path) else {
+                    continue;
+                };
+                let row = u32::try_from(i).unwrap_or(u32::MAX);
+                for &(at, head) in heads {
+                    if follow.canonical(r.path, rank, row) != head {
+                        continue;
+                    }
+                    let l = self.row_lines_unfiltered(r);
+                    let touch = TouchRaw {
+                        commit: rank,
+                        row,
+                        path: r.path,
+                        lines: l.add + l.del,
+                    };
+                    out[at].push((touch, c));
+                }
+            }
+        }
+        // The order of the per-path lookup: newest commit first, rows ascending.
+        for list in &mut out {
+            list.sort_unstable_by(|x, y| {
+                y.0.commit
+                    .cmp(&x.0.commit)
+                    .then_with(|| x.0.row.cmp(&y.0.row))
+            });
+            list.dedup_by_key(|t| (t.0.commit, t.0.row));
+        }
+        out
     }
 
     /// Every non-merge touch of `path`, through renames, newest first.
@@ -326,7 +395,7 @@ impl Insights<'_> {
         let mut rows = Vec::new();
         let shown: Vec<&HeadFile> = files
             .iter()
-            .filter(|f| f.lines != 0 && !self.d.filter.skips(&f.path))
+            .filter(|f| f.lines != 0 && !self.skips_head(&f.path))
             .collect();
         let names: Vec<&str> = shown.iter().map(|f| &*f.path).collect();
         for (f, touches) in shown.into_iter().zip(self.touches_in(&names, from, to)) {
@@ -377,6 +446,63 @@ impl Insights<'_> {
         }
     }
 
+    /// Lines changed per person for each head file in the window, by counted commits.
+    ///
+    /// Over all history a file whose name never took part in a rename reads the path x author
+    /// aggregate: every row under that name is its own, so the sums are exact without a pass
+    /// over the file rows. Renamed files and windows go through the touches.
+    fn owner_lines(&self, files: &[&HeadFile], from: i64, to: i64) -> Vec<BTreeMap<usize, u64>> {
+        let src = self.source();
+        let follow = self.follow();
+        // The aggregate holds every commit: usable only when the window drops none.
+        let whole = from == i64::MIN && self.d.newest < to;
+        let plain = |f: &HeadFile| -> Option<PathId> {
+            let id = src.find_path(&f.path)?;
+            (!follow.log.contains_key(&id) && !follow.names.contains_key(&id)).then_some(id)
+        };
+        let ids: Vec<Option<PathId>> = files
+            .iter()
+            .map(|f| if whole { plain(f) } else { None })
+            .collect();
+        let mut out: Vec<BTreeMap<usize, u64>> = vec![BTreeMap::new(); files.len()];
+        // Ordered by person (most commits first), so a tie for top owner and the float sums
+        // come out the same on every run; a HashMap made "Stale lines" vary.
+        let at: FastMap<PathId, usize> = ids
+            .iter()
+            .enumerate()
+            .filter_map(|(i, id)| id.map(|id| (id, i)))
+            .collect();
+        if !at.is_empty() {
+            let bots = self.opts.include_bots;
+            for row in src.agg_path_author("") {
+                let Some(&i) = at.get(&row.path) else {
+                    continue;
+                };
+                let p = self.person_of(row.ident);
+                if !bots && self.d.people.list[p].bot {
+                    continue;
+                }
+                let s = &row.sums;
+                let lines = if self.opts.count_whitespace {
+                    s.add + s.del
+                } else {
+                    s.code_add + s.code_del
+                };
+                *out[i].entry(p).or_default() += lines;
+            }
+        }
+        let rest: Vec<usize> = (0..files.len()).filter(|&i| ids[i].is_none()).collect();
+        let names: Vec<&str> = rest.iter().map(|&i| &*files[i].path).collect();
+        for (&i, touches) in rest.iter().zip(self.touches_in(&names, from, to)) {
+            for (t, c) in touches {
+                *out[i].entry(self.person_of(c.ident)).or_default() += u64::from(t.lines);
+            }
+        }
+        // A person whose rows sum to zero lines still held the file in the touches; drop
+        // nobody, the touches kept zero entries too.
+        out
+    }
+
     /// Knowledge share per file, weighted by its size now, summed per directory `depth` levels
     /// deep (`depth` 1 groups by top-level directory; root files group under `""`).
     pub fn ownership(&self, files: &[HeadFile], period: Period, depth: usize) -> OwnershipReport {
@@ -386,18 +512,11 @@ impl Insights<'_> {
         let (mut solo, mut stale, mut untracked) = (0u64, 0u64, 0u64);
         let shown: Vec<&HeadFile> = files
             .iter()
-            .filter(|f| f.lines != 0 && !self.d.filter.skips(&f.path))
+            .filter(|f| f.lines != 0 && !self.skips_head(&f.path))
             .collect();
-        let names: Vec<&str> = shown.iter().map(|f| &*f.path).collect();
-        for (f, touches) in shown.into_iter().zip(self.touches_in(&names, from, to)) {
-            // Ordered by person (most commits first), so a tie for top owner and the float sums
-            // below come out the same on every run; a HashMap made "Stale lines" vary.
-            let mut who: BTreeMap<usize, u64> = BTreeMap::new();
-            let mut changed = 0u64;
-            for (t, c) in touches {
-                *who.entry(self.person_of(c.ident)).or_default() += u64::from(t.lines);
-                changed += u64::from(t.lines);
-            }
+        let per_file = self.owner_lines(&shown, from, to);
+        for (f, who) in shown.into_iter().zip(per_file) {
+            let changed: u64 = who.values().sum();
             if changed == 0 {
                 untracked += u64::from(f.lines);
                 continue;
@@ -480,7 +599,7 @@ impl Insights<'_> {
         let (from, to) = period.window(self.now);
         let mut head: Vec<&str> = files
             .iter()
-            .filter(|f| !self.d.filter.skips(&f.path))
+            .filter(|f| !self.skips_head(&f.path))
             .map(|f| &*f.path)
             .collect();
         head.sort_unstable();
@@ -555,7 +674,7 @@ impl Insights<'_> {
         let mut total = 0;
         let shown: Vec<&HeadFile> = files
             .iter()
-            .filter(|f| f.lines != 0 && !self.d.filter.skips(&f.path))
+            .filter(|f| f.lines != 0 && !self.skips_head(&f.path))
             .collect();
         let names: Vec<&str> = shown.iter().map(|f| &*f.path).collect();
         let all = self.touches_in(&names, i64::MIN, i64::MAX);
@@ -743,5 +862,235 @@ mod tests {
             None,
         );
         assert_eq!(with.hotspots(&hf, Period::All).files[0].changes, 2);
+    }
+
+    /// The one-pass scan over many head paths answers exactly as a postings lookup per path,
+    /// through renames, a name reused after it moved, and a file renamed twice.
+    #[test]
+    fn the_many_path_scan_equals_a_lookup_per_path() {
+        let mut recs = history();
+        recs.push(rec("e", "Bob", 500, vec![file("old/x.rs", 7, 0, 7)]));
+        recs.push(rec("f", "Ann", 501, vec![renamed("new/x.rs", "z.rs")]));
+        recs.push(rec("g", "Bob", 502, vec![file("z.rs", 1, 1, 14)]));
+        // Padding so the scan path is taken.
+        let mut names: Vec<String> = (0..super::PER_PATH_MAX + 5)
+            .map(|n| format!("pad/{n}.rs"))
+            .collect();
+        for (i, n) in names.iter().enumerate() {
+            recs.push(rec(&format!("p{i}"), "Cy", 600, vec![file(n, 1, 0, 1)]));
+        }
+        names.extend(["z.rs", "old/x.rs", "new/x.rs", "keep.rs", "missing.rs"].map(String::from));
+        let ins = Insights::new(&recs, Options::default(), None);
+        let paths: Vec<&str> = names.iter().map(String::as_str).collect();
+        let scan = ins.touches_scan(&paths, |_| true);
+        for (i, p) in paths.iter().enumerate() {
+            let one = ins.touches_many(&[p], |_| true).pop().unwrap_or_default();
+            let key = |l: &[(super::TouchRaw, crate::feed::CommitRow)]| {
+                l.iter()
+                    .map(|(t, c)| (t.commit, t.row, t.path, t.lines, c.rank))
+                    .collect::<Vec<_>>()
+            };
+            assert_eq!(key(&scan[i]), key(&one), "{p}");
+        }
+    }
+
+    /// A source that counts postings lookups, forwarding everything else.
+    struct Counting<'a> {
+        inner: crate::feed::MemorySource<'a>,
+        lookups: std::sync::atomic::AtomicUsize,
+    }
+
+    impl crate::feed::InsightsSource for Counting<'_> {
+        fn len(&self) -> usize {
+            self.inner.len()
+        }
+        fn commit(&self, r: crate::feed::Rank) -> Option<crate::feed::CommitRow> {
+            self.inner.commit(r)
+        }
+        fn commits_in(
+            &self,
+            r: crate::feed::CommitRange,
+        ) -> crate::feed::Stream<'_, crate::feed::CommitRow> {
+            self.inner.commits_in(r)
+        }
+        fn rows_for(
+            &self,
+            c: Vec<crate::feed::Rank>,
+        ) -> crate::feed::Stream<'_, (crate::feed::Rank, Vec<crate::feed::FileRow>)> {
+            self.inner.rows_for(c)
+        }
+        fn commit_id(&self, r: crate::feed::Rank) -> Option<std::sync::Arc<str>> {
+            self.inner.commit_id(r)
+        }
+        fn parent_ids(&self, r: crate::feed::Rank) -> Vec<std::sync::Arc<str>> {
+            self.inner.parent_ids(r)
+        }
+        fn find_commit(&self, id: &str) -> Option<crate::feed::Rank> {
+            self.inner.find_commit(id)
+        }
+        fn agg_author_day(
+            &self,
+            d: std::ops::Range<i64>,
+        ) -> crate::feed::Stream<'_, crate::feed::AuthorDayRow> {
+            self.inner.agg_author_day(d)
+        }
+        fn agg_path_author(&self, p: &str) -> crate::feed::Stream<'_, crate::feed::PathAuthorRow> {
+            self.inner.agg_path_author(p)
+        }
+        fn postings(&self, k: crate::feed::Posting) -> crate::feed::Stream<'_, crate::feed::Hit> {
+            self.lookups
+                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            self.inner.postings(k)
+        }
+        fn rename_edges(&self) -> crate::feed::Stream<'_, crate::feed::RenameEdge> {
+            self.inner.rename_edges()
+        }
+        fn path(&self, id: crate::feed::PathId) -> Option<std::sync::Arc<str>> {
+            self.inner.path(id)
+        }
+        fn find_path(&self, p: &str) -> Option<crate::feed::PathId> {
+            self.inner.find_path(p)
+        }
+        fn paths(&self) -> usize {
+            self.inner.paths()
+        }
+        fn ident(
+            &self,
+            id: crate::feed::IdentId,
+        ) -> Option<(std::sync::Arc<str>, std::sync::Arc<str>)> {
+            self.inner.ident(id)
+        }
+        fn idents(&self) -> usize {
+            self.inner.idents()
+        }
+        fn label(&self, id: crate::feed::LabelId) -> Option<std::sync::Arc<str>> {
+            self.inner.label(id)
+        }
+        fn find_label(&self, n: &str) -> Option<crate::feed::LabelId> {
+            self.inner.find_label(n)
+        }
+    }
+
+    /// Hotspots, ownership and code age over many head files read the postings a fixed number
+    /// of times, not once per file: a lookup per file is tens of thousands of block reads on a
+    /// large tree. Red on the per-file loop.
+    #[test]
+    fn file_pages_read_postings_a_fixed_number_of_times() {
+        let n = 500;
+        let recs: Vec<crate::CommitRecord> = (0..n)
+            .map(|i| {
+                rec(
+                    &format!("c{i}"),
+                    "Ann",
+                    i64::from(i),
+                    vec![file(&format!("f{i}.rs"), 1, 0, 1)],
+                )
+            })
+            .collect();
+        let hf: Vec<HeadFile> = (0..n)
+            .map(|i| HeadFile {
+                path: format!("f{i}.rs"),
+                lines: 1,
+            })
+            .collect();
+        let src = Counting {
+            inner: crate::feed::MemorySource::new(&recs),
+            lookups: std::sync::atomic::AtomicUsize::new(0),
+        };
+        let ins = Insights::from_source(&src, Options::default(), None);
+        let read = || src.lookups.swap(0, std::sync::atomic::Ordering::Relaxed);
+        assert_eq!(ins.hotspots(&hf, Period::All).files.len(), n as usize);
+        let hot = read();
+        drop(ins.ownership(&hf, Period::All, 1));
+        let own = read();
+        drop(ins.code_age(&hf));
+        let age = read();
+        assert!(hot + own + age <= 3, "postings lookups: {hot} {own} {age}");
+    }
+
+    /// Over all history, ownership read from the path x author aggregate equals ownership
+    /// from the file row touches, with renames, bots, whitespace and a file nobody renamed.
+    #[test]
+    fn ownership_from_the_aggregate_equals_the_touches() {
+        let mut recs = history();
+        recs.push(rec(
+            "e",
+            "dependabot[bot]",
+            403,
+            vec![file("keep.rs", 9, 2, 5)],
+        ));
+        // Whitespace-only lines: raw and code counts differ.
+        recs.push(rec(
+            "f",
+            "Bob",
+            404,
+            vec![FileStat {
+                code: Some(crate::CodeStat {
+                    additions: 1,
+                    deletions: 0,
+                    rewritten: 0,
+                }),
+                ..file("keep.rs", 6, 4, 5)
+            }],
+        ));
+        let hf = head(&[("new/x.rs", 14), ("keep.rs", 5), ("gone.rs", 3)]);
+        for (bots, ws) in [(false, false), (true, false), (false, true), (true, true)] {
+            let opts = Options {
+                include_bots: bots,
+                count_whitespace: ws,
+                ..Options::default()
+            };
+            let ins = Insights::new(&recs, opts, None);
+            let shown: Vec<&HeadFile> = hf.iter().collect();
+            let fast = ins.owner_lines(&shown, i64::MIN, i64::MAX);
+            let names: Vec<&str> = shown.iter().map(|f| &*f.path).collect();
+            let slow: Vec<std::collections::BTreeMap<usize, u64>> = ins
+                .touches_in(&names, i64::MIN, i64::MAX)
+                .into_iter()
+                .map(|t| {
+                    let mut m = std::collections::BTreeMap::new();
+                    for (t, c) in t {
+                        *m.entry(ins.person_of(c.ident)).or_default() += u64::from(t.lines);
+                    }
+                    m
+                })
+                .collect();
+            assert_eq!(fast, slow, "bots {bots} ws {ws}");
+        }
+    }
+
+    /// A name reused after a rename: `a.rs` moved to `b.rs`, then a new `a.rs` appeared.
+    /// The path x author aggregate holds the old file's rows under `a.rs`, so the hybrid must
+    /// not read it for `a.rs` (nor `b.rs`): both answer as the row touches do. Red when the
+    /// split only checks whether the head name itself was renamed away.
+    #[test]
+    fn a_reused_name_takes_the_touches_not_the_aggregate() {
+        let recs = vec![
+            rec("a", "Ann", 0, vec![file("a.rs", 10, 0, 10)]),
+            rec("b", "Ann", 10, vec![renamed("a.rs", "b.rs")]),
+            rec("c", "Bob", 20, vec![file("a.rs", 3, 0, 3)]),
+        ];
+        let hf = head(&[("a.rs", 3), ("b.rs", 10)]);
+        let ins = Insights::new(&recs, Options::default(), None);
+        let shown: Vec<&HeadFile> = hf.iter().collect();
+        let fast = ins.owner_lines(&shown, i64::MIN, i64::MAX);
+        let names: Vec<&str> = shown.iter().map(|f| &*f.path).collect();
+        let slow: Vec<std::collections::BTreeMap<usize, u64>> = ins
+            .touches_in(&names, i64::MIN, i64::MAX)
+            .into_iter()
+            .map(|t| {
+                let mut m = std::collections::BTreeMap::new();
+                for (t, c) in t {
+                    *m.entry(ins.person_of(c.ident)).or_default() += u64::from(t.lines);
+                }
+                m
+            })
+            .collect();
+        assert_eq!(fast, slow);
+        let ann = ins.person_of(crate::feed::IdentId(0));
+        assert!(
+            !fast[0].contains_key(&ann),
+            "the new a.rs has only Bob's lines"
+        );
     }
 }

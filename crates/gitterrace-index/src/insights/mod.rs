@@ -126,6 +126,8 @@ struct Derived {
     ident_person: Vec<usize>,
     /// Newest commit time per person (all commits, bots included).
     last_seen: Vec<i64>,
+    /// Newest commit time of the history (merges and bots included).
+    pub(crate) newest: i64,
     /// Per path id: whether path statistics leave the path out. Built on first use, each
     /// path decided once, spread over the cores: the ignore rules are the expensive part.
     skip: OnceLock<Vec<bool>>,
@@ -224,6 +226,15 @@ impl<'a> Insights<'a> {
     /// True when path statistics leave `path` out.
     pub fn skips(&self, path: &str) -> bool {
         self.d.filter.skips(path)
+    }
+
+    /// True when path statistics leave the head file `path` out. A path the history knows reads
+    /// the per-id table, decided once for all paths in parallel; a path it never saw (an
+    /// untracked or brand-new name) is decided on its own.
+    pub(crate) fn skips_head(&self, path: &str) -> bool {
+        self.source()
+            .find_path(path)
+            .map_or_else(|| self.d.filter.skips(path), |id| self.skips_id(id))
     }
 
     /// True when path statistics leave path `id` out.
@@ -344,10 +355,16 @@ impl Src<'_> {
 
 impl Derived {
     fn build(src: &dyn InsightsSource, opts: &Options, ignore: Option<IgnoreSet>) -> Self {
+        // One pass: commits and newest time per raw identity, folded into people below.
         let mut per_ident = vec![0usize; src.idents()];
+        let mut newest = vec![i64::MIN; src.idents()];
+        let mut latest = i64::MIN;
         for c in src.commits_in(CommitRange::All) {
-            if let Some(n) = per_ident.get_mut(c.ident.0 as usize) {
+            latest = latest.max(c.time);
+            let i = c.ident.0 as usize;
+            if let (Some(n), Some(t)) = (per_ident.get_mut(i), newest.get_mut(i)) {
                 *n += 1;
+                *t = (*t).max(c.time);
             }
         }
         let names: Vec<(Arc<str>, Arc<str>)> = (0..per_ident.len())
@@ -365,10 +382,10 @@ impl Derived {
         );
         let ident_person: Vec<usize> = names.iter().map(|(a, e)| people.index_of(a, e)).collect();
         let mut last_seen = vec![i64::MIN; people.list.len()];
-        for c in src.commits_in(CommitRange::All) {
-            let p = ident_person.get(c.ident.0 as usize).copied().unwrap_or(0);
-            if let Some(t) = last_seen.get_mut(p) {
-                *t = (*t).max(c.time);
+        for (i, &t) in newest.iter().enumerate() {
+            let p = ident_person.get(i).copied().unwrap_or(0);
+            if let Some(s) = last_seen.get_mut(p) {
+                *s = (*s).max(t);
             }
         }
         Self {
@@ -376,6 +393,7 @@ impl Derived {
             people,
             ident_person,
             last_seen,
+            newest: latest,
             skip: OnceLock::new(),
             commit_lines: OnceLock::new(),
             follow: OnceLock::new(),

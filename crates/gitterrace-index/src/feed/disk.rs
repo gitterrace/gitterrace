@@ -12,6 +12,9 @@
 //! answers as absent. The index maps a remembered error to a rebuild, so
 //! a corrupt block never serves wrong data.
 
+mod columns;
+mod scan;
+
 use std::collections::BTreeMap;
 use std::fs::File;
 use std::io::{BufWriter, Read, Write};
@@ -36,6 +39,8 @@ const CACHE_BYTES: usize = 12 << 20;
 /// make one read walk the whole file.
 const MAX_RECORD: usize = 64 << 20;
 const OID_ENTRY: usize = 24;
+/// From this many ranks on, `rows_for` scans instead of looking each rank up.
+const SCAN_FROM: usize = 256;
 
 /// Maps raw (name, email) pairs to the shown revision's (its `.mailmap`), one call for all.
 pub type IdentMap<'a> =
@@ -71,6 +76,8 @@ struct Seg {
     idx_first: Vec<u32>,
     /// First oid of each `OID_INDEX` block, checked against the block when it is read.
     oid_first: Vec<Oid>,
+    /// First ordinal of each `COMMITS` (section 1) block.
+    col_first: Vec<u32>,
 }
 
 /// Where the string blocks of one section start: (first id, delta, toc index in the delta).
@@ -450,18 +457,53 @@ impl DiskSource {
     }
 
     fn row(&self, rank: Rank) -> SegResult<CommitRow> {
-        let r = self.decode(rank, None)?;
-        Ok(CommitRow {
+        self.row_with(rank, None)
+    }
+
+    /// The commit at `rank` from section 1, checked against its record in `ROWS`, whose file
+    /// rows go to `files` when given.
+    fn row_with(&self, rank: Rank, files: Option<&mut Vec<FileRow>>) -> SegResult<CommitRow> {
+        let (s, o) = self
+            .seg_of(rank)
+            .ok_or_else(|| SegError::unreadable("columns", 0, "rank out of range"))?;
+        let seg = &self.segs[s];
+        let bi = seg.col_first.partition_point(|&f| f <= o) - 1;
+        let start = seg
+            .c
+            .toc()
+            .partition_point(|e| e.section < section::COMMITS);
+        let b = self.block(Key::Seg(s, start + bi))?;
+        let at = (o - seg.col_first[bi]) as usize * columns::ITEM;
+        let bytes = b
+            .bytes
+            .get(at..at + columns::ITEM)
+            .ok_or_else(|| SegError::unreadable(seg.c.name(), 0, "commit column short"))?;
+        let it = columns::decode(&mut Cursor::new(bytes, seg.c.name(), at as u64))?;
+        // A point lookup also reads the record: the two must agree, so a corrupt row block is
+        // caught here too, not only by pages that read file rows.
+        let rec = self.decode(rank, files)?;
+        if !it.agrees(&rec) {
+            return Err(SegError::unreadable(
+                seg.c.name(),
+                0,
+                "commit columns differ from rows",
+            ));
+        }
+        Ok(self.commit_row(rank, &it))
+    }
+
+    fn commit_row(&self, rank: Rank, it: &columns::Item) -> CommitRow {
+        CommitRow {
             rank,
-            ident: IdentId(r.ident),
-            time: crate::plausible_time(r.time, self.latest),
-            offset: r.offset,
-            merge: r.merge,
-            kind: r.kind.map(LabelId),
-            scope: r.scope.map(LabelId),
-            files: r.files,
-            sums: r.sums,
-        })
+            ident: IdentId(it.ident),
+            time: crate::plausible_time(it.time, self.latest),
+            offset: it.offset,
+            merge: it.merge,
+            kind: it.kind.map(LabelId),
+            scope: it.scope.map(LabelId),
+            files: it.files,
+            sums: it.sums,
+        }
     }
 
     fn rank_of(&self, oid: &Oid) -> SegResult<Option<Rank>> {
@@ -513,22 +555,8 @@ impl DiskSource {
     /// segments answer them when this source is wrapped).
     fn each_row(&self, mut f: impl FnMut(&CommitRow, &[FileRow])) {
         let mut files = Vec::new();
-        for r in 0..self.len {
-            files.clear();
-            let Some(rec) = self.ok(self.decode(Rank(r), Some(&mut files))) else {
-                return;
-            };
-            let row = CommitRow {
-                rank: Rank(r),
-                ident: IdentId(rec.ident),
-                time: crate::plausible_time(rec.time, self.latest),
-                offset: rec.offset,
-                merge: rec.merge,
-                kind: rec.kind.map(LabelId),
-                scope: rec.scope.map(LabelId),
-                files: rec.files,
-                sums: rec.sums,
-            };
+        let mut s = scan::Scan::new(self, 0, self.len, true);
+        while let Some(row) = s.next_row(&mut files) {
             f(&row, &files);
         }
     }
@@ -543,7 +571,10 @@ fn open_seg(c: Container, first_expected: u32, buf: &mut Vec<u8>) -> SegResult<S
     };
     let n = total(section::RANK);
     let bad = |what| SegError::unreadable(c.name(), 0, what);
-    if total(section::ROWS) != n || total(section::ROW_INDEX) != n || total(section::OID_INDEX) != n
+    if total(section::ROWS) != n
+        || total(section::ROW_INDEX) != n
+        || total(section::OID_INDEX) != n
+        || total(section::COMMITS) != n
     {
         return Err(bad("segment rows missing or miscounted"));
     }
@@ -595,6 +626,15 @@ fn open_seg(c: Container, first_expected: u32, buf: &mut Vec<u8>) -> SegResult<S
     if !oid_first.is_sorted() {
         return Err(bad("oid index not sorted"));
     }
+    let mut col_first = Vec::new();
+    let mut at = 0u32;
+    for e in c.blocks(section::COMMITS) {
+        if !fixed(e, columns::ITEM as u32) {
+            return Err(bad("commit column block length"));
+        }
+        col_first.push(at);
+        at += e.items;
+    }
     Ok(Seg {
         c,
         first: first_expected,
@@ -602,6 +642,7 @@ fn open_seg(c: Container, first_expected: u32, buf: &mut Vec<u8>) -> SegResult<S
         row_starts,
         idx_first,
         oid_first,
+        col_first,
     })
 }
 
@@ -758,6 +799,8 @@ fn report(e: &SegError) {
 pub struct RowWriter {
     path: PathBuf,
     spool: BufWriter<File>,
+    /// Section 1, one fixed item per commit, spooled until [`RowWriter::commits`].
+    cols: columns::Spool,
     offsets: Vec<u64>,
     oids: Vec<(Oid, u32)>,
     len: u64,
@@ -775,9 +818,11 @@ impl RowWriter {
                 .truncate(true)
                 .open(&path)?,
         );
+        let cols = columns::Spool::new(&dir.join(format!("cols-{generation}.gts.tmp")))?;
         Ok(Self {
             path,
             spool,
+            cols,
             offsets: Vec::new(),
             oids: Vec::new(),
             len: 0,
@@ -815,12 +860,19 @@ impl RowWriter {
                 max: MAX_RECORD,
             });
         }
+        self.cols.push(&columns::item(r, who, kind, scope))?;
         let ord = u32::try_from(self.offsets.len()).unwrap_or(u32::MAX);
         self.oids.push((oid(&r.id)?, ord));
         self.offsets.push(self.len);
         self.spool.write_all(&self.buf)?;
         self.len += self.buf.len() as u64;
         Ok(())
+    }
+
+    /// Writes section 1 (the commit columns) through `sink`. Call first, before any other
+    /// section of the segment: sections go in id order.
+    pub fn commits(&mut self, sink: &mut Sink<'_>) -> SegResult<()> {
+        self.cols.finish(sink)
     }
 
     /// Writes sections 34, 35 and 36 through `sink`, after section 33. Removes the spool.
@@ -898,19 +950,41 @@ impl InsightsSource for DiskSource {
             CommitRange::Time(t) => (0..n, Some(t)),
         };
         Box::new(
-            ranks
-                .map_while(move |r| self.commit(Rank(r)))
+            scan::Scan::new(self, ranks.start, ranks.end, false)
                 .filter(move |c| time.as_ref().is_none_or(|t| t.contains(&c.time))),
         )
     }
 
     fn rows_for(&self, commits: Vec<Rank>) -> Stream<'_, (Rank, Vec<FileRow>)> {
+        // Many ascending ranks that cover much of their span: one sequential pass beats a cache
+        // probe per commit. A sparse list (a few commits spread over history) would read the
+        // whole span, so it keeps the lookups.
+        let dense = |c: &[Rank]| {
+            let span = u64::from(c[c.len() - 1].0 - c[0].0) + 1;
+            (c.len() as u64).saturating_mul(4) >= span
+        };
+        if commits.len() > SCAN_FROM && commits.is_sorted() && dense(&commits) {
+            let (from, to) = (commits[0].0, commits[commits.len() - 1].0 + 1);
+            let mut s = scan::Scan::new(self, from, to, true);
+            let mut want = commits.into_iter().peekable();
+            return Box::new(std::iter::from_fn(move || {
+                let mut files = Vec::new();
+                loop {
+                    let next = *want.peek()?;
+                    let c = s.next_row(&mut files)?;
+                    if c.rank == next {
+                        want.next();
+                        return Some((c.rank, std::mem::take(&mut files)));
+                    }
+                }
+            }));
+        }
         Box::new(commits.into_iter().filter_map(move |r| {
             if r.0 >= self.len {
                 return None;
             }
             let mut files = Vec::new();
-            self.ok(self.decode(r, Some(&mut files)))
+            self.ok(self.row_with(r, Some(&mut files)))
                 .map(|_| (r, files))
         }))
     }
@@ -1130,6 +1204,7 @@ pub mod testing {
             }
             let name = format!("seg-1-{n}.gts");
             let mut cw = ContainerWriter::new(dir, &name, Kind::Segment, base)?;
+            rows.commits(&mut |sec, items, p| cw.block(sec, items, p))?;
             b.finish(&mut |sec, items, p| cw.block(sec, items, p))?;
             rows.finish(&mut |sec, items, p| cw.block(sec, items, p))?;
             live.push(cw.finish()?);
@@ -1446,15 +1521,36 @@ mod tests {
     }
 
     fn flip_in_rows(dir: &Path) -> SegResult<()> {
+        // Byte 24 of the first record is the low byte of its time.
+        flip_in(dir, crate::seg::format::section::ROWS, 24)
+    }
+
+    /// Flips byte `at` of the first block of `sec` in the first segment.
+    fn flip_in(dir: &Path, sec: u16, at: usize) -> SegResult<()> {
         let store =
             Store::open(dir)?.ok_or_else(|| crate::seg::SegError::BadName("none".into()))?;
         let seg = &store.segments[0];
-        let e = seg.blocks(crate::seg::format::section::ROWS)[0];
+        let e = seg.blocks(sec)[0];
         let path = dir.join(seg.name());
         let mut bytes = std::fs::read(&path)?;
-        // Byte 24 of the first record is the low byte of its time.
-        bytes[e.offset as usize + 24] ^= 1;
+        bytes[e.offset as usize + at] ^= 1;
         std::fs::write(path, bytes)?;
+        Ok(())
+    }
+
+    /// A flipped byte in the commit columns fails every commit read, never serves a wrong
+    /// time: a commit pass reads only the columns.
+    #[test]
+    fn corrupt_commit_columns_are_unreadable_never_wrong() -> SegResult<()> {
+        let _one = ONE_AT_A_TIME.lock();
+        let dir = tempfile::tempdir()?;
+        write_cache(dir.path(), &fixture(), &[])?;
+        // Byte 4 of the first item is the low byte of its time.
+        flip_in(dir.path(), crate::seg::format::section::COMMITS, 4)?;
+        let disk = open(dir.path(), &IdentPairs::new())?;
+        assert!(disk.commits_in(CommitRange::All).next().is_none());
+        assert!(disk.unreadable().is_some_and(|e| e.contains("crc")));
+        assert_eq!(disk.commit(Rank(0)), None);
         Ok(())
     }
 
@@ -1472,7 +1568,12 @@ mod tests {
         assert_eq!(disk.commit(Rank(0)), None);
         assert!(disk.unreadable().is_some_and(|e| e.contains("crc")));
         assert_eq!(disk.rows_for(vec![Rank(0)]).count(), 0);
-        assert!(disk.commits_in(CommitRange::All).next().is_none());
+        let all: Vec<Rank> = (0..disk.len()).map(|r| Rank(r as u32)).collect();
+        assert_eq!(
+            disk.rows_for(all).count(),
+            0,
+            "a scan with rows stops at the bad block"
+        );
         Ok(())
     }
 
@@ -1526,6 +1627,61 @@ mod tests {
             let rows = disk.rows_for(vec![Rank(0)]).count();
             assert_eq!((got, rows), (None, 0), "{what}");
             assert!(disk.unreadable().is_some(), "{what}");
+        }
+        Ok(())
+    }
+
+    /// Section 1 fields set behind a valid crc: a flag outside the defined ones, a reserved
+    /// byte, or a value that disagrees with `ROWS`. Every read that sees both sections (point
+    /// lookups, rows) reads it as absent plus `unreadable()`, and a malformed item also stops a
+    /// commit pass.
+    #[test]
+    fn hostile_commit_columns_are_unreadable() -> SegResult<()> {
+        let _one = ONE_AT_A_TIME.lock();
+        let recs = fixture();
+        // (byte offset in item 0, value): flags, reserved u8, time low byte, sums low byte.
+        for (at_item, val) in [(16usize, 7u8), (17, 1), (4, 0x5a), (32, 0xff)] {
+            let dir = tempfile::tempdir()?;
+            write_cache(dir.path(), &recs, &[])?;
+            let store = Store::open(dir.path())?
+                .ok_or_else(|| crate::seg::SegError::BadName("none".into()))?;
+            let seg = &store.segments[0];
+            let e = seg.blocks(crate::seg::format::section::COMMITS)[0];
+            let name = seg.name().to_owned();
+            let toc_at = seg.toc().iter().position(|t| *t == e).unwrap_or(0);
+            let mut entry = store.manifest.clone();
+            drop(store);
+            let path = dir.path().join(&name);
+            let mut b = std::fs::read(&path)?;
+            b[e.offset as usize + at_item] ^= val;
+            reseal(&mut b, toc_at, e.offset as usize, e.len as usize);
+            std::fs::write(&path, &b)?;
+            for f in &mut entry.live {
+                if f.name == name {
+                    f.footer_crc = crc32fast::hash(&b[b.len() - 64..]);
+                }
+            }
+            entry.commit(dir.path())?;
+            let disk = open(dir.path(), &IdentPairs::new())?;
+            assert_eq!(disk.commit(Rank(0)), None, "byte {at_item}");
+            assert!(disk.unreadable().is_some(), "byte {at_item}");
+            let disk = open(dir.path(), &IdentPairs::new())?;
+            let all: Vec<Rank> = (0..disk.len()).map(|r| Rank(r as u32)).collect();
+            assert!(
+                disk.rows_for(all).all(|(r, _)| r != Rank(0)),
+                "byte {at_item}: the bad commit is never served"
+            );
+            assert!(disk.unreadable().is_some(), "byte {at_item}");
+            // A commit pass reads section 1 alone: a malformed item stops it. A well-formed
+            // value behind a valid crc is, like a crafted `ROWS` value, not detectable there.
+            if (16..20).contains(&at_item) {
+                let disk = open(dir.path(), &IdentPairs::new())?;
+                assert!(
+                    disk.commits_in(CommitRange::All).next().is_none(),
+                    "byte {at_item}"
+                );
+                assert!(disk.unreadable().is_some(), "byte {at_item}");
+            }
         }
         Ok(())
     }

@@ -9,7 +9,7 @@ use crate::seg::{SegError, SegResult};
 pub(crate) const MAGIC: [u8; 4] = *b"GTS1";
 pub(crate) const FOOTER_MAGIC: [u8; 4] = *b"GTSF";
 /// The on-disk format, shared with `VERSION`.
-pub(crate) const VERSION: u32 = 5;
+pub(crate) const VERSION: u32 = 6;
 pub(crate) const HEADER_LEN: u64 = 16;
 pub(crate) const FOOTER_LEN: u64 = 64;
 pub(crate) const TOC_ENTRY_LEN: u64 = 24;
