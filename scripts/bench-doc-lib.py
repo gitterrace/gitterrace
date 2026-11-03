@@ -263,17 +263,24 @@ def wrap(md: str) -> str:
         t = line.lstrip()
         if t.startswith("```"):
             fence = not fence
+        item = t.startswith(("- ", "* ")) and line == t
         if (
             fence
-            or t.startswith(("```", "|", "#", "<", "- ", "* ", ">"))
+            or t.startswith(("```", "|", "#", "<", ">"))
+            or (t.startswith(("- ", "* ")) and not item)
             or len(line) <= WIDTH
         ):
             out.append(line)
             continue
-        # A code span never breaks: protect its spaces while wrapping.
+        # A code span never breaks: protect its spaces while wrapping. A top-level list item
+        # continues under its text with a 2-space hang, as Markdown reads it.
         safe = re.sub(r"`[^`]*`", lambda m: m.group(0).replace(" ", "\0"), line)
         lines = textwrap.wrap(
-            safe, WIDTH, break_long_words=False, break_on_hyphens=False
+            safe,
+            WIDTH,
+            subsequent_indent="  " if item else "",
+            break_long_words=False,
+            break_on_hyphens=False,
         )
         out.extend(x.replace("\0", " ") for x in lines)
     return "\n".join(out)

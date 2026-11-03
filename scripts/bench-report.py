@@ -78,7 +78,21 @@ def self_test() -> None:
         ] or actual(Path(d)) != {Path(d) / "a.json"}:
             sys.exit(f"bench-report self-test failed: {got}")
     loud_test()
+    wrap_test()
     print("bench-report self-test: ok")
+
+
+def wrap_test() -> None:
+    """A long list item wraps under 100 columns with a 2-space hang, words unchanged."""
+    item = "- **git:** " + " ".join(["word"] * 40)
+    got = bd.wrap(item).split("\n")
+    if (
+        len(got) < 2
+        or any(len(x) > bd.WIDTH for x in got)
+        or not all(x.startswith("  ") and not x.startswith("   ") for x in got[1:])
+        or " ".join(x.strip() for x in got) != item
+    ):
+        sys.exit(f"bench-report self-test failed: list item wrap {got}")
 
 
 def loud_test() -> None:
