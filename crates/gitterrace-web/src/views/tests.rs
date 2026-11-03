@@ -112,6 +112,7 @@ fn huge_diffs_fold_behind_a_load_button() {
         lines: n as u32,
         rewritten: 0,
         code: CodeCounts::default(),
+        modes: None,
     };
     let small = diff_html(400, "abc", None, &[file(10)]);
     assert!(!small.contains("data-load-diff"));

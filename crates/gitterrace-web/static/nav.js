@@ -436,14 +436,50 @@
   }
 
   // ---- folded diffs -----------------------------------------------------------
+  // A folded file is a link to its body. Clicking it (or Enter on it) swaps the body in; a file
+  // folded only for the page budget (data-lazy) also loads when it scrolls near the viewport,
+  // and an #fN anchor opens its file. Find in page sees loaded files only.
+  function loadDiff(b, scroll) {
+    if (b.dataset.busy) return;
+    b.dataset.busy = "1";
+    if (lazyObs) lazyObs.unobserve(b);
+    var section = b.closest("section");
+    fetch(b.dataset.loadDiff).then(function (r) { if (!r.ok) throw r; return r.text(); }).then(function (h) {
+      var p = b.parentNode, focused = document.activeElement === b;
+      p.insertAdjacentHTML("afterend", h);
+      var body = p.nextElementSibling;
+      p.remove();
+      if (focused && body) { body.tabIndex = -1; body.focus({ preventScroll: true }); }
+      // The body above the target grew or the target moved: put the file's top back in view.
+      if (scroll && section) section.scrollIntoView();
+    }, function () {
+      delete b.dataset.busy;
+      // Watched again, so a lazy file that failed once retries when it next scrolls near.
+      if (lazyObs && b.hasAttribute("data-lazy")) lazyObs.observe(b);
+    });
+  }
   document.addEventListener("click", function (e) {
     var b = e.target.closest && e.target.closest("[data-load-diff]");
-    if (!b) return;
-    b.disabled = true;
-    fetch(b.dataset.loadDiff).then(function (r) { return r.text(); }).then(function (h) {
-      b.parentNode.outerHTML = h;
-    }, function () { b.disabled = false; });
+    if (!b || e.button || e.metaKey || e.ctrlKey || e.shiftKey) return;
+    e.preventDefault();
+    loadDiff(b);
   });
+  var lazyObs = window.IntersectionObserver ? new IntersectionObserver(function (es) {
+    es.forEach(function (x) { if (x.isIntersecting) loadDiff(x.target); });
+  }, { rootMargin: "1500px 0px" }) : null;
+  function watchLazy() {
+    if (!lazyObs) return;
+    Array.prototype.forEach.call(document.querySelectorAll("[data-load-diff][data-lazy]"), function (b) { lazyObs.observe(b); });
+  }
+  function openHashed() {
+    var m = /^#(f\d+)$/.exec(location.hash), s = m && document.getElementById(m[1]);
+    var b = s && s.querySelector("[data-load-diff]");
+    if (b) loadDiff(b, true);
+  }
+  watchLazy();
+  openHashed();
+  window.addEventListener("hashchange", openHashed);
+  document.addEventListener("gt:live-refreshed", watchLazy);
 
   // ---- copy buttons ---------------------------------------------------------
   Array.prototype.forEach.call(document.querySelectorAll("[data-copyable]"), function (card) {

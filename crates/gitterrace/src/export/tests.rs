@@ -424,3 +424,26 @@ async fn export_ships_no_scriptable_raw_file() {
         "inert media must still export; found {raw:?}"
     );
 }
+
+/// A folded diff fragment is exported for an in-scope commit and a plain index only.
+#[test]
+fn diff_fragments_follow_the_commit_scope() {
+    let allowed = super::Allowed {
+        commits: std::iter::once("abc".to_owned()).collect(),
+        tree: std::collections::BTreeSet::new(),
+    };
+    assert!(allowed.contains("/diff/abc/0"));
+    assert!(allowed.contains("/diff/abc/1999"));
+    for bad in [
+        "/diff/other/0",
+        "/diff/abc/x",
+        "/diff/abc/",
+        "/diff/abc/+1",
+        "/diff/abc/1/../x",
+        "/diff/abc/1/2",
+    ] {
+        assert!(!allowed.contains(bad), "{bad}");
+    }
+    assert!(super::is_fragment("/r/name/diff/abc/0") && super::is_fragment("/diff/abc/0"));
+    assert!(!super::is_fragment("/r/name/commit/abc") && !super::is_fragment("/r/diff/commit/abc"));
+}

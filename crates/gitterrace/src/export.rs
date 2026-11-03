@@ -72,6 +72,9 @@ impl Project {
 const MAX_BODY: usize = 64 * 1024 * 1024;
 /// Hard ceiling on pages, so a wrongly scoped export fails instead of filling a disk.
 const MAX_PAGES: usize = 20_000;
+/// The same for folded diff fragments (`/diff/{id}/{n}`), counted apart: a commit that folds
+/// many files would otherwise spend the page cap on fragments and stop the export early.
+const MAX_FRAGMENTS: usize = 50_000;
 /// Pages the crawl starts from, beside every page the server prewarms; each is exported
 /// whatever links point at it.
 const SEEDS: [&str; 2] = ["/refs", "/log/HEAD"];
@@ -243,6 +246,7 @@ pub(crate) async fn export(repos: &[PathBuf], out: &Path, scope: &Scope) -> anyh
 
     let mut seen: BTreeSet<String> = queue.iter().cloned().collect();
     let mut written = 0usize;
+    let mut count = Caps::default();
     // Pages render on blocking threads, so one at a time leaves the cores idle.
     // Fetch a batch concurrently, then write and follow links in queue order so
     // the output and the page cap stay deterministic.
@@ -264,9 +268,7 @@ pub(crate) async fn export(repos: &[PathBuf], out: &Path, scope: &Scope) -> anyh
             if status != StatusCode::OK {
                 continue;
             }
-            if written >= MAX_PAGES {
-                bail!("export stopped at {MAX_PAGES} pages. Lower --commits or --max-file-kb");
-            }
+            count.take(&path)?;
             let site = site_for(&path);
             let body = if content_type.starts_with("text/html") {
                 // The index of several repositories names no revision.
@@ -292,6 +294,39 @@ pub(crate) async fn export(repos: &[PathBuf], out: &Path, scope: &Scope) -> anyh
     write_page(out, "/snapshot.css", "text/css", SNAPSHOT_CSS.as_bytes())?;
     write_page(out, "/_headers", "text/plain", headers_file().as_bytes())?;
     Ok(written + 2)
+}
+
+/// Pages and diff fragments written so far, each against its own cap.
+#[derive(Default)]
+struct Caps {
+    pages: usize,
+    fragments: usize,
+}
+
+impl Caps {
+    fn take(&mut self, path: &str) -> anyhow::Result<()> {
+        if is_fragment(path) {
+            if self.fragments >= MAX_FRAGMENTS {
+                bail!("export stopped at {MAX_FRAGMENTS} diff fragments. Lower --commits");
+            }
+            self.fragments += 1;
+        } else {
+            if self.pages >= MAX_PAGES {
+                bail!("export stopped at {MAX_PAGES} pages. Lower --commits or --max-file-kb");
+            }
+            self.pages += 1;
+        }
+        Ok(())
+    }
+}
+
+/// Whether `path` is a folded diff fragment, under any repository prefix.
+fn is_fragment(path: &str) -> bool {
+    let local = path
+        .strip_prefix("/r/")
+        .and_then(|r| r.split_once('/'))
+        .map_or(path, |(_, rest)| rest);
+    local.trim_start_matches('/').starts_with("diff/")
 }
 
 /// The credit line for one repository, using its project URL as origin when one was given.
@@ -461,6 +496,12 @@ impl Allowed {
         }
         if let Some(id) = link.strip_prefix("/commit/") {
             return self.commits.contains(id);
+        }
+        // A folded file's body, written as a static fragment so the page loads it offline.
+        if let Some((id, n)) = link.strip_prefix("/diff/").and_then(|r| r.split_once('/')) {
+            return self.commits.contains(id)
+                && !n.is_empty()
+                && n.bytes().all(|b| b.is_ascii_digit());
         }
         // Tree, file and raw pages are only exported at HEAD, the one revision
         // every "browse files" link in scope resolves to.

@@ -53,6 +53,9 @@
 //   calm-header  at rest the branch switcher and the Working tree chip have no visible border
 //                and are not bold, and toggling the chip does not move the search field, at
 //                1440, 900 and 360 px, light and dark
+//   huge-diff    a commit of 2,000 changed files (mostly pure renames) loads under a DOM bound,
+//                shows a rename as one line, loads the last files on scroll, opens #fN, opens a
+//                folded file with Enter, and prints scroll frame times and long tasks
 //
 // --from-disk serves crates/gitterrace-web/static/*.js from the working tree over the (possibly
 // older) binary's copies, to test edits before a rebuild. Playwright comes from $PLAYWRIGHT_CORE,
@@ -63,6 +66,7 @@ import { tmpdir } from 'node:os';
 import { checks as pageChecks } from './browser-pages-lib.mjs';
 import { checks as uiChecks } from './browser-ui-lib.mjs';
 import { checks as siteChecks } from './browser-site-lib.mjs';
+import { checks as diffChecks } from './browser-diff-lib.mjs';
 import { root, loadPlaywright, launch, makeRepo, serve, openPage, reporter, sh } from './browser-lib.mjs';
 
 const arg = (k, d) => { const i = process.argv.indexOf(k); return i < 0 ? d : process.argv[i + 1]; };
@@ -70,7 +74,7 @@ const bin = resolve(arg('--bin', join(root, 'target/debug/git-terrace')));
 const fromDisk = process.argv.includes('--from-disk');
 const tabCounts = arg('--tabs', '8,12').split(',').map(Number);
 const browsers = arg('--browsers', 'webkit,chromium').split(',');
-const ALL = ['truncation', 'live-tabs', 'mermaid', 'chip', 'doctabs', 'chords', 'header', 'marked', 'menu-same', 'gutter', 'overlays', 'tips', 'repo-switch', 'mark-seam', 'about-place', 'site-theme', 'side-width', 'calm-header', 'tabs-one-line'];
+const ALL = ['truncation', 'live-tabs', 'mermaid', 'chip', 'doctabs', 'chords', 'header', 'marked', 'menu-same', 'gutter', 'overlays', 'tips', 'repo-switch', 'mark-seam', 'about-place', 'site-theme', 'side-width', 'calm-header', 'tabs-one-line', 'huge-diff'];
 const wanted = arg('--checks', ALL.join(',')).split(',');
 for (const c of wanted) if (!ALL.includes(c)) { console.error(`unknown check ${c}; known: ${ALL.join(', ')}`); process.exit(2); }
 
@@ -102,6 +106,7 @@ const env = { pw, dir, srv, r, browsers, tabCounts, marker, context, arg, bin, c
 const { truncation, liveTabs, mermaid, chip, doctabs, chords, header } = pageChecks(env);
 const { marked, menuSame, gutter, overlays, tips, repoSwitch } = uiChecks(env);
 const { markSeam, aboutPlace, siteTheme } = siteChecks(env);
+const { hugeDiff } = diffChecks(env);
 async function sideWidth() {
   for (const name of browsers) {
     const { b, ctx } = await context(name);
@@ -200,7 +205,7 @@ async function tabsOneLine() {
     await b.close();
   }
 }
-const checks = { 'tabs-one-line': tabsOneLine, 'calm-header': calmHeader, 'side-width': sideWidth, truncation, 'live-tabs': liveTabs, mermaid, chip, doctabs, chords, header, marked, 'menu-same': menuSame, gutter, overlays, tips, 'repo-switch': repoSwitch, 'mark-seam': markSeam, 'about-place': aboutPlace, 'site-theme': siteTheme };
+const checks = { 'tabs-one-line': tabsOneLine, 'calm-header': calmHeader, 'side-width': sideWidth, truncation, 'live-tabs': liveTabs, mermaid, chip, doctabs, chords, header, marked, 'menu-same': menuSame, gutter, overlays, tips, 'repo-switch': repoSwitch, 'mark-seam': markSeam, 'about-place': aboutPlace, 'site-theme': siteTheme, 'huge-diff': hugeDiff };
 try {
   for (const c of wanted) { console.log(`-- ${c}`); await checks[c](); }
 } finally {

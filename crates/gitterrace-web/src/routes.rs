@@ -62,6 +62,7 @@ pub(crate) fn router(app: Arc<App>) -> Router {
         .route("/refs", get(refs))
         .route("/search", get(crate::search::search))
         .route("/worktree", get(worktree))
+        .route("/worktree/diff/{*path}", get(views::worktree_fragment))
         .route("/api/files/{rev}", get(api_files))
         .route("/api/refs", get(api_refs))
         .route("/api/last/{rev}", get(api_last_root))
@@ -338,7 +339,11 @@ async fn worktree(State(app): Shared) -> Result<Html<String>> {
         Ok(WorktreePage {
             c: views::chrome(a, "files").live(Mode::WORKTREE),
             clean: files.is_empty(),
-            diff: views::diff_html_with(a.cfg().limits.diff_fold_lines, None, None, &files),
+            diff: views::diff_html_with(
+                a.cfg().limits.diff_fold_lines,
+                views::DiffSource::Worktree,
+                &files,
+            ),
             adds: fmt::thousands(adds),
             dels: fmt::thousands(dels),
             files_summary: fmt::count(stats.len(), "changed file", "changed files"),

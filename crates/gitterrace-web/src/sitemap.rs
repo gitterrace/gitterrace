@@ -51,14 +51,15 @@ pub const PAGES: &[Page] = &[
         &["/commit/{id}", "/diff/{rev}/{index}"],
     ),
     page(
-        "`/refs`, `/tag/{name}`, `/worktrees`, `/stashes`, `/worktree`",
-        "Git state: branches, tags, linked worktrees, stashes, uncommitted changes",
+        "`/refs`, `/tag/{name}`, `/worktrees`, `/stashes`, `/worktree`, `/worktree/diff/{path}`",
+        "Git state: branches, tags, linked worktrees, stashes, uncommitted changes and their folded files",
         &[
             "/refs",
             "/tag/{name}",
             "/worktrees",
             "/stashes",
             "/worktree",
+            "/worktree/diff/{*path}",
         ],
     ),
     page("`/search`", "Code and commit search", &["/search"]),

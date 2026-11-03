@@ -469,3 +469,20 @@ fn blobs_over_the_text_cap_are_never_read_as_text() {
     assert!(file.binary && file.hunks.is_empty());
     assert_eq!((file.additions, file.deletions), (0, 0));
 }
+
+#[test]
+fn a_mode_only_change_carries_both_modes() {
+    let tmp = tempfile::tempdir().expect("tmp");
+    let d = tmp.path();
+    git_at(d, T0, &["init", "-q", "-b", "main"]);
+    write(d, "run.sh", "echo\n");
+    commit(d, "init");
+    git_at(d, T0, &["update-index", "--chmod=+x", "run.sh"]);
+    git_at(d, T0, &["commit", "-q", "-m", "chore: make it executable"]);
+    let repo = Repo::discover(d).expect("open");
+    let head = repo.resolve("HEAD").expect("head");
+    let c = repo.commit(&head).expect("commit");
+    assert_eq!(c.files.len(), 1);
+    assert_eq!(c.files[0].modes, Some((0o100_644, 0o100_755)));
+    assert!(c.files[0].hunks.is_empty());
+}

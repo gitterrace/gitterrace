@@ -476,3 +476,25 @@ async fn commit_page_links_only_the_targets_with_a_lookup() {
     let (_, plain) = get(&router(&p, Config::default()), &format!("/commit/{id}")).await;
     assert!(!plain.contains("Find this commit in"));
 }
+
+/// The folded-file route of the working tree answers changed files only: an ignored file and
+/// `.git/config` both exist on disk and still read as `No longer changed`.
+#[tokio::test]
+async fn worktree_fragments_refuse_ignored_and_git_paths() {
+    let dir = tempfile::tempdir().expect("tmp");
+    let p = repo(dir.path(), "r");
+    std::fs::write(p.join(".git/info/exclude"), "*.env\n").expect("exclude");
+    std::fs::write(p.join("prod.env"), "SECRET=hunter2\n").expect("write");
+    std::fs::write(p.join("small.txt"), "changed now\n").expect("write");
+    let r = router(&p, Config::default());
+    let (_, ok) = get(&r, "/worktree/diff/small.txt").await;
+    assert!(ok.contains("changed now"), "{ok}");
+    for bad in ["prod.env", ".git/config", "d/../small.txt"] {
+        let (_, body) = get(&r, &format!("/worktree/diff/{bad}")).await;
+        assert!(
+            !body.contains("SECRET") && !body.contains("[core]"),
+            "{bad}: {body}"
+        );
+        assert!(body.contains("No longer changed"), "{bad}: {body}");
+    }
+}

@@ -252,6 +252,24 @@ pub(crate) fn change_at(
     Ok(None)
 }
 
+/// Old and new mode of a change that altered it, e.g. a file made executable.
+fn mode_change(change: &ChangeDetached) -> Option<(u16, u16)> {
+    match change {
+        ChangeDetached::Modification {
+            previous_entry_mode,
+            entry_mode,
+            ..
+        } => Some((previous_entry_mode.value(), entry_mode.value())),
+        ChangeDetached::Rewrite {
+            source_entry_mode,
+            entry_mode,
+            ..
+        } => Some((source_entry_mode.value(), entry_mode.value())),
+        _ => None,
+    }
+    .filter(|(a, b)| a != b)
+}
+
 fn file_diff(
     repo: &gix::Repository,
     change: ChangeDetached,
@@ -272,6 +290,7 @@ fn file_diff(
         ChangeDetached::Rewrite { diff, .. } => Some(diff.as_ref().map(|_| ())),
         _ => None,
     };
+    let modes = mode_change(&change);
     let (path, old_path, kind, old_id, new_id, diffable) = match change {
         ChangeDetached::Addition {
             location,
@@ -350,6 +369,7 @@ fn file_diff(
         lines: counted.lines,
         rewritten: counted.rewritten,
         code: counted.code,
+        modes,
     }))
 }
 

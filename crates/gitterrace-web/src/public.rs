@@ -52,6 +52,7 @@ const PUBLIC: &[&str] = &[
 #[cfg(test)]
 const LOCAL: &[&str] = &[
     "/worktree",
+    "/worktree/diff/{*path}",
     "/worktrees",
     "/stashes",
     "/events",

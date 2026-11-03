@@ -52,4 +52,4 @@ pub use walk::{
 #[cfg(test)]
 pub use watch::Cost;
 pub use watch::{Parts, Watcher};
-pub use worktree::{is_dirty, worktree_diff, worktree_signature};
+pub use worktree::{is_dirty, worktree_diff, worktree_file_diff, worktree_signature};

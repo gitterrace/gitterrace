@@ -11,7 +11,9 @@ use crate::fmt::{ago, date, enc_path, enc_seg, esc_text, href, sha_link};
 #[cfg(test)]
 pub(crate) use crate::views::code::{CodeMemo, code_html, code_memo_has, code_memo_put};
 pub(crate) use crate::views::code::{blame_html, code_html_first, code_tail_html};
-pub(crate) use crate::views::diff::{diff_fragment, diff_html, diff_html_with};
+pub(crate) use crate::views::diff::{
+    DiffSource, diff_fragment, diff_html, diff_html_with, worktree_fragment,
+};
 
 const MAX_BLOB_LINES: usize = 20_000;
 

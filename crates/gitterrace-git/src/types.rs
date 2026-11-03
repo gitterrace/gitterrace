@@ -51,6 +51,8 @@ pub struct FileDiff {
     pub rewritten: u32,
     /// The same counts with whitespace-only and blank lines ignored.
     pub code: CodeCounts,
+    /// Old and new file mode (octal value, e.g. `0o100644`) when the change altered the mode.
+    pub modes: Option<(u16, u16)>,
 }
 
 /// Additions, deletions and rewritten lines once whitespace differences are ignored.

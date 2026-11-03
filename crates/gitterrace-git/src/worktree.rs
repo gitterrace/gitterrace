@@ -3,6 +3,8 @@
 //! This is the only module that reads the worktree. It never writes: no index refresh, no lock
 //! files. Files may change or vanish while we read, so every per-file failure skips that file.
 
+mod pair;
+
 use std::collections::BTreeSet;
 use std::path::Path;
 
@@ -147,32 +149,82 @@ pub fn is_dirty(repo: &Repo) -> bool {
         .is_ok_and(|p| !p.is_empty())
 }
 
-/// Every uncommitted file as a diff against HEAD. Renames are shown as delete plus add.
+/// Every uncommitted file as a diff against HEAD.
+///
+/// Only exact renames are paired, see `pair::exact_moves`. Files are read and diffed one at a
+/// time, so the bytes held at once are one file's old and new side, not the whole change.
 pub fn worktree_diff(repo: &Repo) -> Result<Vec<FileDiff>> {
     let r = open(repo)?;
     let paths = changed_paths(&r, MAX_FILES)?;
-    let work = r.workdir().map(Path::to_path_buf);
     let head = r.head_commit().ok().and_then(|c| c.tree().ok());
+    let root = r.workdir().and_then(|w| w.canonicalize().ok());
+    let moves = pair::exact_moves(&r, head.as_ref(), root.as_deref(), &paths);
     let mut out = Vec::new();
-    let root = work.as_deref().and_then(|w| w.canonicalize().ok());
-    for path in paths {
+    for path in &paths {
+        if moves.sources.contains(path.as_str()) {
+            continue;
+        }
+        if let Some(from) = moves.to.get(path.as_str()) {
+            out.push(FileDiff {
+                kind: ChangeKind::Renamed,
+                old_path: Some(from.clone()),
+                ..file_diff(path.clone(), ChangeKind::Renamed, &[], &[], false)
+            });
+            continue;
+        }
         let old = head
             .as_ref()
-            .map_or(Read::Missing, |t| head_blob(&r, t, &path));
+            .map_or(Read::Missing, |t| head_blob(&r, t, path));
         let new = root
             .as_deref()
-            .map_or(Read::Skip, |w| read_worktree(w, &path));
-        let kind = match (&old, &new) {
-            (Read::Skip, _) | (_, Read::Skip) | (Read::Missing, Read::Missing) => continue,
-            (Read::Missing, _) => ChangeKind::Added,
-            (_, Read::Missing) => ChangeKind::Deleted,
-            (Read::Data(a), Read::Data(b)) if a == b => continue,
-            _ => ChangeKind::Modified,
-        };
-        let big = matches!(old, Read::Big) || matches!(new, Read::Big);
-        out.push(file_diff(path, kind, old.bytes(), new.bytes(), big));
+            .map_or(Read::Skip, |w| read_worktree(w, path));
+        out.extend(classify(path, &old, &new));
     }
     Ok(out)
+}
+
+/// One uncommitted file against HEAD: the body a folded file of the working tree page loads.
+///
+/// `None` unless `path` is one of the page's changed files, so an ignored file, anything
+/// under `.git` or a path with `..` is never read, whatever the URL asks for.
+pub fn worktree_file_diff(repo: &Repo, path: &str) -> Result<Option<FileDiff>> {
+    let plain = path
+        .split('/')
+        .all(|c| !c.is_empty() && c != "." && c != ".." && !c.eq_ignore_ascii_case(".git"));
+    if !plain {
+        return Ok(None);
+    }
+    let r = open(repo)?;
+    if !changed_paths(&r, MAX_FILES)?.contains(path) {
+        return Ok(None);
+    }
+    let head = r.head_commit().ok().and_then(|c| c.tree().ok());
+    let root = r.workdir().and_then(|w| w.canonicalize().ok());
+    let old = head
+        .as_ref()
+        .map_or(Read::Missing, |t| head_blob(&r, t, path));
+    let new = root
+        .as_deref()
+        .map_or(Read::Skip, |w| read_worktree(w, path));
+    Ok(classify(path, &old, &new))
+}
+
+fn classify(path: &str, old: &Read, new: &Read) -> Option<FileDiff> {
+    let kind = match (old, new) {
+        (Read::Skip, _) | (_, Read::Skip) | (Read::Missing, Read::Missing) => return None,
+        (Read::Missing, _) => ChangeKind::Added,
+        (_, Read::Missing) => ChangeKind::Deleted,
+        (Read::Data(a), Read::Data(b)) if a == b => return None,
+        _ => ChangeKind::Modified,
+    };
+    let big = matches!(old, Read::Big) || matches!(new, Read::Big);
+    Some(file_diff(
+        path.to_owned(),
+        kind,
+        old.bytes(),
+        new.bytes(),
+        big,
+    ))
 }
 
 fn head_blob(repo: &gix::Repository, tree: &gix::Tree<'_>, path: &str) -> Read {
@@ -188,7 +240,7 @@ fn head_blob(repo: &gix::Repository, tree: &gix::Tree<'_>, path: &str) -> Read {
         Ok(h) if h.size() > MAX_DIFF_BYTES as u64 => Read::Big,
         Ok(_) => repo
             .find_object(id)
-            .map_or(Read::Skip, |o| Read::Data(o.detach().data)),
+            .map_or(Read::Skip, |o| Read::data(o.detach().data)),
         Err(_) => Read::Skip,
     }
 }
@@ -204,11 +256,56 @@ enum Read {
 }
 
 impl Read {
+    #[cfg_attr(
+        not(test),
+        expect(clippy::missing_const_for_fn, reason = "counts bytes in tests")
+    )]
+    fn data(d: Vec<u8>) -> Self {
+        #[cfg(test)]
+        held::add(d.len());
+        Self::Data(d)
+    }
+
     fn bytes(&self) -> &[u8] {
         match self {
             Self::Data(d) => d,
             Self::Big | Self::Missing | Self::Skip => &[],
         }
+    }
+}
+
+#[cfg(test)]
+impl Drop for Read {
+    fn drop(&mut self) {
+        if let Self::Data(d) = self {
+            held::sub(d.len());
+        }
+    }
+}
+
+/// Test-only count of file bytes alive at once, and its peak.
+#[cfg(test)]
+mod held {
+    use std::cell::Cell;
+
+    thread_local! {
+        static NOW: Cell<usize> = const { Cell::new(0) };
+        static PEAK: Cell<usize> = const { Cell::new(0) };
+    }
+
+    pub(super) fn add(n: usize) {
+        let now = NOW.get() + n;
+        NOW.set(now);
+        PEAK.set(PEAK.get().max(now));
+    }
+
+    pub(super) fn sub(n: usize) {
+        NOW.set(NOW.get().saturating_sub(n));
+    }
+
+    /// Resets the peak and returns the one before.
+    pub(super) fn take_peak() -> usize {
+        PEAK.replace(NOW.get())
     }
 }
 
@@ -226,7 +323,7 @@ fn read_worktree(work: &Path, rel: &str) -> Read {
     };
     if meta.is_symlink() {
         return std::fs::read_link(&full).map_or(Read::Skip, |t| {
-            Read::Data(t.to_string_lossy().into_owned().into_bytes())
+            Read::data(t.to_string_lossy().into_owned().into_bytes())
         });
     }
     if !meta.is_file() {
@@ -236,7 +333,7 @@ fn read_worktree(work: &Path, rel: &str) -> Read {
         return Read::Big;
     }
     match std::fs::read(&full) {
-        Ok(d) => Read::Data(d),
+        Ok(d) => Read::data(d),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Read::Missing,
         Err(_) => Read::Skip,
     }
@@ -255,6 +352,7 @@ fn file_diff(path: String, kind: ChangeKind, old: &[u8], new: &[u8], big: bool) 
             lines: 0,
             rewritten: 0,
             code: crate::CodeCounts::default(),
+            modes: None,
         };
     }
     let input = InternedInput::new(old, new);
@@ -272,9 +370,12 @@ fn file_diff(path: String, kind: ChangeKind, old: &[u8], new: &[u8], big: bool) 
         lines: 0,
         rewritten: 0,
         code: crate::CodeCounts::default(),
+        modes: None,
     }
 }
 
+#[cfg(test)]
+mod pair_tests;
 #[cfg(test)]
 mod tests {
     use gitterrace_testkit::git;

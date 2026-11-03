@@ -148,7 +148,7 @@ repository is served. The rest are the server's own and never take the prefix.
 | `/tree`, `/blob`, `/raw`, `/blame` `/{rev}/{path}` | Files: listing, highlighted view (large files load in chunks), bytes, authorship |
 | `/log/{rev}`, `/history/{path}`, `/compare` | Commits, one file's history, two revisions |
 | `/commit/{id}`, `/diff/{rev}/{index}` | A commit's diff, large files fold and load on demand |
-| `/refs`, `/tag/{name}`, `/worktrees`, `/stashes`, `/worktree` | Git state: branches, tags, linked worktrees, stashes, uncommitted changes |
+| `/refs`, `/tag/{name}`, `/worktrees`, `/stashes`, `/worktree`, `/worktree/diff/{path}` | Git state: branches, tags, linked worktrees, stashes, uncommitted changes and their folded files |
 | `/search` | Code and commit search |
 | `/stats`, `/stats/{page}` | Insights on the shared filter and period. `?rev=` follows any ref |
 | `/events`, `/api/{files,refs,last,progress}` | Live updates and the fragments pages fetch |
