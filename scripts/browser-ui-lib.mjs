@@ -286,15 +286,15 @@ async function outline() {
         await p.goto(`${srv.base}/blob/HEAD/outline.md`, { waitUntil: 'load' });
         res[scheme].railNarrow = await vis(p, '.outline.rail');
         res[scheme].menuNarrow = await vis(p, 'details.outline');
-        res[scheme].btnText = await p.evaluate(() => document.querySelector('details.outline summary').innerText.trim());
+        res[scheme].btnText = await p.evaluate(() => /** @type {HTMLElement} */ (document.querySelector('details.outline summary')).innerText.trim());
         await p.click('details.outline summary');
         await p.waitForTimeout(200);
         res[scheme].filterShown = await vis(p, '.outline-q');
         await p.keyboard.type('part 2');
-        res[scheme].filtered = await p.evaluate(() => [...document.querySelectorAll('details.outline li')].filter((l) => !l.hidden).length);
+        res[scheme].filtered = await p.evaluate(() => [...document.querySelectorAll('details.outline li')].filter((l) => !(/** @type {HTMLElement} */ (l)).hidden).length);
         await p.screenshot({ path: join(process.env.OUTLINE_SHOTS || tmpdir(), `outline-${name}-${scheme}-900.png`) });
         await p.keyboard.press('Escape');
-        res[scheme].closed = await p.evaluate(() => !document.querySelector('details.outline').open);
+        res[scheme].closed = await p.evaluate(() => !(/** @type {HTMLDetailsElement} */ (document.querySelector('details.outline'))).open);
         await p.close();
       }
       const bad = [];
@@ -318,7 +318,7 @@ async function outline() {
             if (!d || !s || !bar) return { missing: true };
             const sb = s.getBoundingClientRect(), bb = bar.getBoundingClientRect();
             const label = [...bar.childNodes].find((n) => n !== d && n.textContent.trim());
-            const lr = label ? (label.nodeType === 1 ? label : (() => { const g = document.createRange(); g.selectNodeContents(label); return g; })()).getBoundingClientRect() : null;
+            const lr = label ? (label.nodeType === 1 ? /** @type {Element} */ (label) : (() => { const g = document.createRange(); g.selectNodeContents(label); return g; })()).getBoundingClientRect() : null;
             return { inBar: bar.contains(d), rightGap: Math.round(bb.right - sb.right), afterLabel: !lr || sb.left >= lr.right, text: s.innerText.trim(), aria: s.getAttribute('aria-label'), tip: s.getAttribute('data-tip') };
           });
           if (o.missing || !o.inBar || o.rightGap > 24 || !o.afterLabel || o.text !== '' || o.aria !== 'On this page' || o.tip !== 'On this page') bad.push({ scheme, width, o });
@@ -326,7 +326,7 @@ async function outline() {
             await p.click('#about details.outline summary');
             await p.waitForTimeout(200);
             await p.keyboard.type('part 2');
-            const n = await p.evaluate(() => [...document.querySelectorAll('#about details.outline li')].filter((l) => !l.hidden).length);
+            const n = await p.evaluate(() => [...document.querySelectorAll('#about details.outline li')].filter((l) => !(/** @type {HTMLElement} */ (l)).hidden).length);
             if (n !== 1) bad.push({ filtered: n });
           }
           await p.close();
@@ -445,7 +445,7 @@ async function liveScroll() {
           ready = (await p.$$('section[data-path]')).length >= FILES;
           if (!ready) await p.waitForTimeout(250);
         }
-        await p.evaluate(() => { window.__refreshed = 0; document.addEventListener('gt:live-refreshed', () => { window.__refreshed++; }); });
+        await p.evaluate(() => { /** @type {any} */ (window).__refreshed = 0; document.addEventListener('gt:live-refreshed', () => { /** @type {any} */ (window).__refreshed++; }); });
         // Far down: a file the page budget folded, which loads as it comes near.
         await p.evaluate(() => document.getElementById('f70').scrollIntoView());
         await p.waitForFunction(() => !document.querySelector('#f70 [data-load-diff]'), null, { timeout: 8000 }).catch(() => {});
@@ -455,13 +455,13 @@ async function liveScroll() {
         const read = () => p.evaluate(() => ({ top: document.getElementById('f70').getBoundingClientRect().top, bodies: document.querySelectorAll('#main .diffwrap').length, f3: !document.querySelector('#f3 [data-load-diff]'), y: scrollY }));
         const before = await read();
         writeFileSync(join(repo, 's01.txt'), body('edited again'));
-        await p.waitForFunction(() => window.__refreshed > 0, null, { timeout: 8000 }).catch(() => {});
+        await p.waitForFunction(() => /** @type {any} */ (window).__refreshed > 0, null, { timeout: 8000 }).catch(() => {});
         await p.waitForTimeout(2500);
         const after = await read();
         const bad = [];
         if (!before.bodies) bad.push('no loaded bodies before the refresh');
         if (!before.f3) bad.push('#f3 was not open before the refresh');
-        if (!(await p.evaluate(() => window.__refreshed))) bad.push('no live refresh happened');
+        if (!(await p.evaluate(() => /** @type {any} */ (window).__refreshed))) bad.push('no live refresh happened');
         if (Math.abs(after.top - before.top) > 4) bad.push(`file moved ${Math.round(after.top - before.top)} px (scrollY ${Math.round(before.y)} to ${Math.round(after.y)})`);
         if (after.bodies < before.bodies) bad.push(`${before.bodies} loaded bodies before, ${after.bodies} after`);
         if (!after.f3) bad.push('#f3 folded again');
