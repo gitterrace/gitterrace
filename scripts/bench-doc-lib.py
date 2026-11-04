@@ -53,13 +53,27 @@ def samples_note(r: Json) -> str:
     return "1 sample" if n == 1 else f"median of {n}"
 
 
-def summary(name: str, r: Json) -> list[str]:
+# The control repository is gitterrace itself: its commits are never named on a page, the run
+# date stands for them. Corpus repositories keep their upstream sha.
+OWN = "control"
+
+
+def version(m: Json) -> str:
+    """`gitterrace v0.1.0`, without the build's own commit or dirty mark."""
+    return re.sub(r"(v\d+\.\d+\.\d+)\S*", r"\1", m["gitterrace"])
+
+
+def at(name: str, sha: str, when: str) -> str:
+    return f"the run of {when[:10]}" if name == OWN else f"`{sha[:10]}`"
+
+
+def summary(name: str, r: Json, when: str) -> list[str]:
     over = [(k, b) for k, b in r["budget"].items() if b["status"] != "pass"]
     n = len(r["budget"])
     L = [
         f"### {name}",
         "",
-        f"{r['class']} repository, measured at `{r['sha'][:10]}`. "
+        f"{r['class']} repository, measured at {at(name, r['sha'], when)}. "
         + (
             f"{n - len(over)} of {n} metrics are within budget."
             if over
@@ -225,7 +239,7 @@ def block(cur: Json, old: Json | None) -> str:
     m = cur["machine"]
     L = [
         f"Run {cur['when'][:10]} on {machine_line(m)}. "
-        f"{m['git']}, {m['gitterrace']} (repo at `{m['gitterrace_sha'][:10]}`). "
+        f"{m['git']}, {version(m)}. "
         f"{cur['runs']} warm runs per page, {cur['idle_secs']} s idle windows. "
         + load_note(cur),
         "",
@@ -234,7 +248,7 @@ def block(cur: Json, old: Json | None) -> str:
     if gone:
         L += [*gone, ""]
     for n, r in cur["repos"].items():
-        L += summary(n, r)
+        L += summary(n, r, cur["when"])
     L += [
         "| Repo | Class | Measured at | Index | Peak RSS | Cache | RSS after pages | Idle footprint, total | Idle CPU "
         "| Idle CPU with /events | Export | Cold samples |",
@@ -243,7 +257,7 @@ def block(cur: Json, old: Json | None) -> str:
     for n, r in cur["repos"].items():
         ex = export_cell(r)
         L.append(
-            f"| {n} | {r['class']} | `{r['sha'][:10]}` | {r['index']['secs']:.1f} s | "
+            f"| {n} | {r['class']} | {at(n, r['sha'], cur['when'])} | {r['index']['secs']:.1f} s | "
             f"{r['index']['peak_rss_mb']:.0f} MB | {r['index'].get('cache_mb', 0):.0f} MB | "
             f"{r['memory']['rss_after_pages_mb']:.0f} MB | {idle_footprint(r)} | "
             f"{r['idle']['cpu_pct']:.2f}% | "
@@ -251,7 +265,7 @@ def block(cur: Json, old: Json | None) -> str:
         )
     for n, r in cur.get("held", {}).items():
         L.append(
-            f"| {n} | {r['class']} | `{r['sha'][:10]}` | "
+            f"| {n} | {r['class']} | {at(n, r['sha'], cur['when'])} | "
             + " | ".join([HELD] * 8)
             + f" | {samples_note(r)} |"
         )
@@ -273,7 +287,7 @@ def block(cur: Json, old: Json | None) -> str:
             f"<details><summary>{n}: every page</summary>",
             "",
             f"Probes: `{r['probe']['blob']}` (largest text file), "
-            f"commit `{r['probe']['commit'][:10]}`.",
+            f"commit {at(n, r['probe']['commit'], cur['when'])}.",
             "",
             head,
             "| --- | --- | --- | --- | --- | --- | --- |" + (" --- |" if prev else ""),
@@ -361,8 +375,7 @@ def expected() -> dict[Path, str]:
 def header(run: Json) -> str:
     m = run["machine"]
     return (
-        f"Run {run['when'][:10]} on {machine_line(m)}. {m['gitterrace']} "
-        f"(repo at `{m['gitterrace_sha'][:10]}`), {m['git']}. "
+        f"Run {run['when'][:10]} on {machine_line(m)}. {version(m)}, {m['git']}. "
         + load_note(run)
         + (f" {run['note']}" if run.get("note") else "")
     )
@@ -408,7 +421,7 @@ def results_readme(kept: list[Json]) -> str:
         m, n = run["machine"], run_name(run)
         L.append(
             f"| {run['when'][:10]} | {m['cpu']}, {m['cpus']} cores, {m['ram_gb']:.0f} GB RAM, "
-            f"{m['os']} | {m['gitterrace']} `{m['gitterrace_sha'][:10]}` | "
+            f"{m['os']} | {version(m)} | "
             f"{', '.join(run['repos'])} | [json]({n}.json), [charts]({n}/) |"
         )
     L += [

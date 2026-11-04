@@ -1,5 +1,5 @@
-# CONV-INSIGHTS-LOCAL-DAY. REPORT-ONLY until the insights pages read Counted: severity
-# hint, so `ast-grep scan --error` in `make lint` does not fail on it. Run it by hand with
+# CONV-INSIGHTS-LOCAL-DAY. REPORT-ONLY until every insights page counts through CountContext:
+# severity hint, so `ast-grep scan --error` in `make lint` does not fail on it. Run it by hand with
 #   ast-grep scan -c sgconfig-report.yml
 # The red snapshot at introduction is tests/insights-local-day-snapshot.txt. It turns error
 # once every site routes day math through CountContext (insights/scope.rs).

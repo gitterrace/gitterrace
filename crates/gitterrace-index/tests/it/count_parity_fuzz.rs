@@ -1,13 +1,13 @@
 //! Parity fuzz for the one membership rule (`Scope::admits`) and the reducers over `Counted`.
 //!
-//! - P1: every `Accel` answer that is `Some` equals the stream (today only `NoAccel`, so the
+//! - Every `Accel` answer that is `Some` equals the stream (today only `NoAccel`, so the
 //!   property pins the contract before the first fast path is wired).
-//! - P2: per-person, per-label, per-bucket and punch/weekday/hour sums all equal the totals.
-//! - P3: the time span only prunes: the stream equals a full scan filtered by `admits`, and a
+//! - Per-person, per-label, per-bucket and punch/weekday/hour sums all equal the totals.
+//! - The time span only prunes: the stream equals a full scan filtered by `admits`, and a
 //!   scan over the span widened by one day each side filtered the same way.
-//! - P4: today's page functions equal the reducers over the same `Counted`. Red until the
-//!   insights pages read `Counted`: marked ignored, so `make check` stays
-//!   green while the red stays one `--include-ignored` away. The baseline red output is in
+//! - Today's page functions equal the reducers over the same `Counted`. Red until the
+//!   insights pages read `Counted`: marked ignored, so `make check` stays green while the
+//!   red stays one `--include-ignored` away. The baseline red output is in
 //!   `count_parity_fuzz.baseline.txt` beside this file. `make counting-parity` runs them.
 //!
 //! Edge times are generated, not fixed: ±1 s around the window bound, 23:59:59, 00:00:00 and
@@ -248,7 +248,7 @@ proptest! {
     #![proptest_config(cases())]
 
     #[test]
-    fn p1_accel_answers_equal_the_stream(gens in prop::collection::vec(gen_commit(), 0..40), q in query()) {
+    fn accel_answers_equal_the_stream(gens in prop::collection::vec(gen_commit(), 0..40), q in query()) {
         let recs = history(&gens);
         let s = scope(&q);
         let ins = Insights::new(&recs, s.options().clone(), None);
@@ -260,7 +260,7 @@ proptest! {
     }
 
     #[test]
-    fn p2_every_breakdown_sums_to_the_totals(gens in prop::collection::vec(gen_commit(), 0..40), q in query()) {
+    fn every_breakdown_sums_to_the_totals(gens in prop::collection::vec(gen_commit(), 0..40), q in query()) {
         let recs = history(&gens);
         let s = scope(&q);
         let ins = Insights::new(&recs, s.options().clone(), None);
@@ -298,7 +298,7 @@ proptest! {
     }
 
     #[test]
-    fn p3_the_span_only_prunes(gens in prop::collection::vec(gen_commit(), 0..40), q in query()) {
+    fn the_span_only_prunes(gens in prop::collection::vec(gen_commit(), 0..40), q in query()) {
         let recs = history(&gens);
         let s = scope(&q);
         let ins = Insights::new(&recs, s.options().clone(), None);
@@ -329,7 +329,7 @@ proptest! {
 
     /// The /stats KPI, per-day chart and punch card against the reducers.
     #[test]
-    fn p4_activity_pages_equal_the_reducers(gens in prop::collection::vec(gen_commit(), 0..40), q in no_chips()) {
+    fn activity_pages_equal_the_reducers(gens in prop::collection::vec(gen_commit(), 0..40), q in no_chips()) {
         let recs = history(&gens);
         let s = scope(&q);
         let ins = Insights::new(&recs, s.options().clone(), None);
@@ -345,7 +345,7 @@ proptest! {
 
     /// Contributors (bots by option), commit types and sizes against the reducers.
     #[test]
-    fn p4_people_labels_sizes_equal_the_reducers(gens in prop::collection::vec(gen_commit(), 0..40), q in no_chips()) {
+    fn people_labels_sizes_equal_the_reducers(gens in prop::collection::vec(gen_commit(), 0..40), q in no_chips()) {
         let recs = history(&gens);
         let s = scope(&q);
         let ins = Insights::new(&recs, s.options().clone(), None);
@@ -378,7 +378,7 @@ proptest! {
 
     /// Frequency, rework, types, churn and sizes against the reducers over one `Counted`.
     #[test]
-    fn p4_frequency_labels_churn_sizes_equal_the_reducers(gens in prop::collection::vec(gen_commit(), 0..40), q in no_chips()) {
+    fn frequency_labels_churn_sizes_equal_the_reducers(gens in prop::collection::vec(gen_commit(), 0..40), q in no_chips()) {
         let recs = history(&gens);
         let s = scope(&q);
         let ins = Insights::new(&recs, s.options().clone(), None);
@@ -408,7 +408,7 @@ proptest! {
     /// The activity and contributor views over one Counted, chips included, equal its reducers:
     /// one-pass activity == totals + series + when, and every person's row and sparkline add up.
     #[test]
-    fn p4_period_views_over_counted_equal_the_reducers(gens in prop::collection::vec(gen_commit(), 0..40), q in query()) {
+    fn period_views_over_counted_equal_the_reducers(gens in prop::collection::vec(gen_commit(), 0..40), q in query()) {
         let recs = history(&gens);
         let s = scope(&q);
         let ins = Insights::new(&recs, s.options().clone(), None);
@@ -452,10 +452,10 @@ proptest! {
 proptest! {
     #![proptest_config(cases())]
 
-    /// C4: hotspots count each counted commit's rows under the head files once, by the same
+    /// Hotspots count each counted commit's rows under the head files once, by the same
     /// membership as the reducers, and the period entry point equals the `Counted` one.
     #[test]
-    fn p5_file_reports_follow_counted(gens in prop::collection::vec(gen_commit(), 0..40), q in query()) {
+    fn file_reports_follow_counted(gens in prop::collection::vec(gen_commit(), 0..40), q in query()) {
         let recs = history(&gens);
         let s = scope(&q);
         let ins = Insights::new(&recs, s.options().clone(), None);

@@ -9,8 +9,9 @@ use gitterrace_testkit::synthetic::{self, Shape};
 use crate::{MB, Server, apply_and_assert_allocator, serve_if_child};
 
 /// Most one insights request may add over a warm idle: the reducer state of one request
-/// (people, files, buckets), never a per-commit list. Before C5 (100k synthetic, release) the
-/// first /stats/types?period=all added 12 MB and the API summary with a path 10 MB, both from
+/// (people, files, buckets), never a per-commit list. Before the pages read one `Counted`
+/// (100k synthetic, release) the first /stats/types?period=all added 12 MB and the API
+/// summary with a path 10 MB, both from
 /// filling shared state the server keeps by design, not from the request itself.
 const REQUEST_PEAK_MB: u64 = 8;
 /// Idle after the requests: what a just-started server may hold plus the cache budget. Warm
@@ -61,7 +62,7 @@ fn insights_request_peak() {
 /// After the idle release the server holds what a just-started one does, plus the page memo it
 /// keeps by design and 2 MB of slack. The block cache and the derived tables go with the source.
 #[test]
-#[ignore = "100k synthetic releases to start + 8 MB, memo explains 1 MB"]
+#[ignore = "red until an idle release returns to the start: 100k synthetic sits 8 MB over"]
 fn insights_release_returns_to_start() {
     if serve_if_child() {
         return;

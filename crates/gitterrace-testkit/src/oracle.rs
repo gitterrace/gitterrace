@@ -405,7 +405,7 @@ fn report_ties(ties: &[String]) {
         *per.entry(k.split('?').next().unwrap_or(k)).or_default() += 1;
     }
     let mut out = std::io::stderr().lock();
-    // The re-bless report a re-bless records with the golden: stderr is its channel.
+    // The tie-only summary goes to stderr, next to the per-cell report.
     writeln!(out, "tie-only reorders: {} cells", ties.len()).expect("stderr");
     for (page, n) in per {
         writeln!(out, "  {n:5} {page}").expect("stderr");

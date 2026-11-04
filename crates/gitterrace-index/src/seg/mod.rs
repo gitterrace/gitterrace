@@ -1,5 +1,5 @@
 //! The segment store: immutable container files named by one manifest.
-//! Shared ids live here so the feed trait and the aggregate lanes agree on them.
+//! Shared ids live here so the feed trait and the aggregates agree on them.
 
 pub(crate) mod agg;
 pub(crate) mod bounds;

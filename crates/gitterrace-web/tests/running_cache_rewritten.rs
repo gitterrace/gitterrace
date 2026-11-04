@@ -1,4 +1,4 @@
-//! A server already RUNNING while another gitterrace build moves
+//! The incident behind this test: a server already RUNNING while another build moves
 //! the cache to a newer format and a segment goes bad underneath it. No page, API path or
 //! repeat visit answers 5xx: the index says why or asks for an index instead.
 

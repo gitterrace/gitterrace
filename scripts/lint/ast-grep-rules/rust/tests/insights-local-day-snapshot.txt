@@ -1,7 +1,7 @@
-# Red snapshot of insights-local-day at introduction (main 4438738, lane C1), make counting-parity
+# Red snapshot of insights-local-day at introduction, make counting-parity
 # prints it. Every line must be gone, or allowed with a reason, before the rule turns error.
 # The six named sites: period.rs:205, files/reports.rs:314, releases.rs:58, releases.rs:72,
-# overview_side.rs:126, spark.rs:82. The rest: period.window( (10, the instant window R1, real),
+# overview_side.rs:126, spark.rs:82. The rest: period.window( (10, the instant window, real),
 # period.rs:203 (local time for the hour, real), axis.rs:164/226 (record local_day, real, a
 # second entry to the day rule).
 crates/gitterrace-index/src/insights/axis.rs:164:28: help[insights-local-day]: Day or hour math outside CountContext.

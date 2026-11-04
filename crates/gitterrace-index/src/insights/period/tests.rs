@@ -184,9 +184,9 @@ fn week_edges() -> Vec<crate::CommitRecord> {
     v
 }
 
-/// G1: the per-day bars hold exactly the 7 local days, the day before is not in bar 0.
+/// The per-day bars hold exactly the 7 local days, the day before is not in bar 0.
 #[test]
-fn g1_the_bars_leave_out_the_day_before_the_first() {
+fn the_bars_leave_out_the_day_before_the_first() {
     let recs = week_edges();
     let ins = Insights::new(&recs, Options::default(), None);
     let r = ins.rhythm(Period::Week);
@@ -195,9 +195,9 @@ fn g1_the_bars_leave_out_the_day_before_the_first() {
     assert_eq!(per, [1, 0, 0, 0, 0, 0, 1], "late on bar 0, early nowhere");
 }
 
-/// G2: the KPI, the punch card and the weekday split count the same local days.
+/// The KPI, the punch card and the weekday split count the same local days.
 #[test]
-fn g2_kpis_and_punch_count_the_local_days() {
+fn kpis_and_punch_count_the_local_days() {
     let recs = week_edges();
     let ins = Insights::new(&recs, Options::default(), None);
     let s = ins.period_summary(Period::Week);
@@ -210,9 +210,9 @@ fn g2_kpis_and_punch_count_the_local_days() {
     assert_eq!(s.previous.map(|p| p.commits), Some(1));
 }
 
-/// G4: bots=off leaves bots out of the contributor rows, as every other count does.
+/// bots=off leaves bots out of the contributor rows, as every other count does.
 #[test]
-fn g4_contributors_follow_the_bot_option() {
+fn contributors_follow_the_bot_option() {
     let recs = week_edges();
     let off = Insights::new(&recs, Options::default(), None);
     let names = |i: &Insights<'_>| -> Vec<String> {
@@ -235,10 +235,9 @@ fn g4_contributors_follow_the_bot_option() {
     assert!(names(&on).iter().any(|n| n.contains("[bot]")));
 }
 
-/// G5 (and the rows of G2): a person's commits are the local days of the period, and the
-/// sparkline adds up to them.
+/// A person's commits are the local days of the period, and the sparkline adds up to them.
 #[test]
-fn g5_sparklines_count_the_local_days() {
+fn sparklines_count_the_local_days() {
     let recs = week_edges();
     let ins = Insights::new(&recs, Options::default(), None);
     let rep = ins.contributors(Period::Week);
@@ -255,10 +254,10 @@ fn g5_sparklines_count_the_local_days() {
     assert_eq!(rep.contributors[1].series[0], 1);
 }
 
-/// G2b: a 1w summary with "now" at 12:00 UTC spans exactly the 7 counted local days, not the
+/// A 1w summary with "now" at 12:00 UTC spans exactly the 7 counted local days, not the
 /// instant window that touched 8 dates.
 #[test]
-fn g2b_the_summary_span_is_the_counted_days() {
+fn the_summary_span_is_the_counted_days() {
     let recs = week_edges();
     let ins = Insights::new(&recs, Options::default(), None);
     let s = ins.period_summary(Period::Week);
@@ -271,10 +270,10 @@ fn g2b_the_summary_span_is_the_counted_days() {
     assert_eq!(from / day, day0 + 14);
 }
 
-/// G2c: `All` counts every commit the scope admits over the whole history, dated after the
+/// `All` counts every commit the scope admits over the whole history, dated after the
 /// clock or not, and the clock reading does not change the result.
 #[test]
-fn g2c_all_counts_every_admitted_commit_whatever_the_clock() {
+fn all_counts_every_admitted_commit_whatever_the_clock() {
     use crate::feed::{CommitRange, FixedClock, MemorySource};
     use crate::insights::{CountContext, Scope, ScopeParams};
     let mut far = rec("far", "Fay", 0, vec![file("f.rs", 1, 0, 1)]);

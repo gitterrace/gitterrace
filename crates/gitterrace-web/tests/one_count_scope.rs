@@ -50,9 +50,9 @@ fn keys(v: &serde_json::Value) -> Vec<serde_json::Value> {
         .collect()
 }
 
-/// G3b: "last month" ends on the repository's newest day, with or without a chip.
+/// "Last month" ends on the repository's newest day, with or without a chip.
 #[test]
-fn g3b_a_chip_keeps_the_period_anchor() {
+fn a_chip_keeps_the_period_anchor() {
     let rt = tokio::runtime::Runtime::new().expect("runtime");
     rt.block_on(async {
         let dir = tempfile::tempdir().expect("tmp");
@@ -76,10 +76,10 @@ fn g3b_a_chip_keeps_the_period_anchor() {
     });
 }
 
-/// G17: Bob's first commit ever is before the month, so his fix in it does not make him new,
+/// Bob's first commit ever is before the month, so his fix in it does not make him new,
 /// even when the type chip hides that first commit.
 #[test]
-fn g17_new_is_judged_on_the_whole_history() {
+fn new_is_judged_on_the_whole_history() {
     let rt = tokio::runtime::Runtime::new().expect("runtime");
     rt.block_on(async {
         let dir = tempfile::tempdir().expect("tmp");
@@ -97,9 +97,9 @@ fn g17_new_is_judged_on_the_whole_history() {
     });
 }
 
-/// G18: under `path=src`, `docs/guide.md` is not a line of the path, tracked or not.
+/// Under `path=src`, `docs/guide.md` is not a line of the path, tracked or not.
 #[test]
-fn g18_a_path_covers_only_its_head_files() {
+fn a_path_covers_only_its_head_files() {
     let rt = tokio::runtime::Runtime::new().expect("runtime");
     rt.block_on(async {
         let dir = tempfile::tempdir().expect("tmp");

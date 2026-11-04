@@ -78,7 +78,7 @@ async fn src_dir(router: &axum::Router, query: &str) -> serde_json::Value {
         .unwrap_or(serde_json::Value::Null)
 }
 
-/// G20: an author selection must not change how a file's history is followed. Bob wrote
+/// An author selection must not change how a file's history is followed. Bob wrote
 /// `src/old.rs`, Jane renamed it to `src/new.rs`. With `author=bob` the renamed file is still
 /// Bob's: follow over the whole history, then count his commits.
 #[test]

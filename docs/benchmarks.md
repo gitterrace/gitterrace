@@ -125,18 +125,18 @@ The newest run in full. Every kept run, with its raw numbers and charts, is in
 
 <!-- BEGIN GENERATED: results -->
 Run 2026-11-03 on Apple M1 Max, 10 cores, 64 GB RAM, 4.0 TB SSD disk, macOS 26.6.2 (arm64). git
-version 2.54.0 (Apple Git-157), gitterrace 0.1.0. 5 warm runs
-per page, 60 s idle windows. Every timed phase started with the 1-minute load average under 5.
+version 2.54.0 (Apple Git-157), gitterrace v0.1.0. 5 warm runs per page, 60 s idle windows. Every
+timed phase started with the 1-minute load average under 5.
 
 - **rust:** not measured on a quiet machine (other processes used 5 or more cores during export,
   export#3, index), so its numbers are withheld.
 
 ### control
 
-small repository. 6 of 7 metrics are within budget. Against budget: export
-12.3 s (12.0 to 12.3) of 60 s, idle footprint above a fresh server 14 MB of 48 MB, idle CPU 1.03 %
-of 1 %, index build 0.2 s (0.2 to 0.3) of 30 s, cold page 23 ms (22 to 24) of 1500 ms, warm page 11
-ms of 300 ms, peak memory 40 MB of 500 MB.
+small repository, measured at the run of 2026-11-03. 6 of 7 metrics are within budget. Against
+budget: export 12.3 s (12.0 to 12.3) of 60 s, idle footprint above a fresh server 14 MB of 48 MB,
+idle CPU 1.03 % of 1 %, index build 0.2 s (0.2 to 0.3) of 30 s, cold page 23 ms (22 to 24) of 1500
+ms, warm page 11 ms of 300 ms, peak memory 40 MB of 500 MB.
 
 Idle CPU is the larger of two windows: 0.05 % with no client and 1.03 % with one /events client.
 
@@ -166,7 +166,7 @@ Idle CPU is the larger of two windows: 0.10 % with no client and 0.17 % with one
 
 | Repo | Class | Measured at | Index | Peak RSS | Cache | RSS after pages | Idle footprint, total | Idle CPU | Idle CPU with /events | Export | Cold samples |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| control | small | 0.1.0 | 0.2 s | 37 MB | 0 MB | 40 MB | 23 MB | 0.05% | 1.03% | 12.3 s, 92 MB | median of 3 |
+| control | small | the run of 2026-11-03 | 0.2 s | 37 MB | 0 MB | 40 MB | 23 MB | 0.05% | 1.03% | 12.3 s, 92 MB | median of 3 |
 | git | medium | `50fe5cc63f` | 10.8 s | 672 MB | 69 MB | 383 MB | 37 MB | 0.07% | 0.12% | 44.4 s, 189 MB | median of 3 |
 | linux | huge | `cbbddb6b08` | 1596.4 s | 8370 MB | 3595 MB | 6449 MB | 64 MB | 0.10% | 0.17% | failed (page cap reached) | 1 sample |
 | rust | large | `f90a2d27c2` | withheld (load) | withheld (load) | withheld (load) | withheld (load) | withheld (load) | withheld (load) | withheld (load) | withheld (load) | median of 3 |
@@ -212,7 +212,8 @@ and idle lower.
 
 <details><summary>control: every page</summary>
 
-Probes: `site/assets/screenshots/blame-light.webp` (largest text file).
+Probes: `site/assets/screenshots/blame-light.webp` (largest text file), commit the run of
+2026-11-03.
 
 | Page | Cold | Warm TTFB | Warm full (median) | min | max | Bytes |
 | --- | --- | --- | --- | --- | --- | --- |

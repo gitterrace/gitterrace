@@ -1,15 +1,15 @@
 # Streaming insights: a store that keeps the server at some MB
 
-Status: design, not implemented. Builds on
-phase 1 (idle release after 30 s, one cache budget, prewarm not pinning). Delivered in two
-steps, see section 9.
+Status: design. Builds on the idle release (after 30 s, one cache budget, prewarm not
+pinning). The store has two layers, see section 9.
 
 ## Problem
 
 Every insights page computes over `&[CommitRecord]`. On rust (345k commits, 4.9 M file rows) the
-parsed set is about 820 MB, plus `Derived` (people, skip table, commit lines, follow). Phase 1
-frees it when idle, but browsing one insights page brings it all back. The goal: resident
-memory while serving is some MB, even during a page sweep. A peak during the index build is fine.
+parsed set is about 820 MB, plus `Derived` (people, skip table, commit lines, follow). The
+idle release frees it when idle, but browsing one insights page brings it all back. The goal:
+resident memory while serving is some MB, even during a page sweep. A peak during the index
+build is fine.
 
 Constraints: `unsafe_code = "forbid"` in our crates, so access is `pread` (`FileExt::read_at`).
 No compatibility: 0.1.0 is the first release, a cache this binary cannot read is deleted and
@@ -236,7 +236,7 @@ id order, all maps are sorted before writing, no hash iteration order reaches th
 ### 3.2 Commit rows
 
 Three more sections in the segment container, so already named in `MANIFEST` with length and
-footer crc. Sections 1 and 2 stay reserved for the step 2 columnar tables, 7 and 9 untouched.
+footer crc. Sections 1 and 2 stay reserved for the columnar tables, 7 and 9 untouched.
 
 - 34 rows: one record per local ordinal, ordinal order, little endian: oid 20 B, raw identity
   id u32 (`name\0email`), time i64 as written, offset i32, flags u8 (bit 0 merge), kind u32 and
@@ -283,11 +283,10 @@ selected commit) is served in two parts, never by a second index or a resident r
 
 Guards: `memory_budget` sweeps every insights page for a non-HEAD rev (a side branch with
 unindexed commits) and stays in the budget, and the equivalence oracle has one cell for it.
-The HEAD path is built first, this part after it.
 
 ## 4. Memory model
 
-Resident, under one budget (default 32 MB, the phase 1 cache budget):
+Resident, under one budget (default 32 MB, the cache budget):
 
 - Footers and section tables of open segments: a few KB each.
 - The string tables for ids that a page shows: paths and identities are loaded per block on
@@ -444,7 +443,7 @@ page never knows whether data comes from memory or from segments:
 - `commits_in(range)`: commit columns (ordinal, identity, time, offset, flags, kind, scope,
   line sums) for an ordinal or time range, as a streaming iterator.
 - `rows_for(commits)`: file rows of the given commits, streamed in canonical order. Over the
-  JSONL records (step 1) it parses one record at a time, so memory is one record, never the
+  JSONL records it parses one record at a time, so memory is one record, never the
   file.
 - `agg_author_day(range)`, `agg_month_path(range)`, `agg_path_author(prefix)`: the aggregates.
 - `postings(Path | Author)`: commit ordinals, plus rename edges for a path.
@@ -467,37 +466,35 @@ Risks:
 3. Rename follow across segment boundaries: the alias chain must be resolved newest first across
    all segments. The equivalence test on the adversarial fixture covers it.
 4. Rewritten history with many small segments: rebuild from divergence must stay deterministic.
-5. Linux build peak with spill: measure it once the build fixes land.
+5. Linux build peak with spill: bounded by the spill, measured on the linux build.
 6. Canonical order changes the build order: the streamed writer must emit in topo order, which
-   may change the reorder window's behavior on merges. Measure on rust before the segment
-   writer is wired in.
+   may change the reorder window's behavior on merges, measured on rust.
 
-## 9. Delivery in two steps
+## 9. Two storage layers
 
-Both steps ship before 0.1.0. Step 1 alone is a shippable state.
+The store has two layers with one format, one manifest and one set of guards.
 
-**Step 1: some MB on every common page.**
+**Aggregates and postings: some MB on every common page.**
 
-- New format with the manifest, `VERSION` 5 (containers 6 since the commit columns), the
-  unreadable rule, the hostile-bytes bounds, the
-  Windows shim and the canonical order. These are the irreversible parts and are designed once.
-- Only the aggregates (author x day, month x path, path x author) and per-path postings with
-  rename edges are new segments, without spill.
-- The records stay in today's row file (`commits.jsonl`, `paths.jsonl`), now named in the
-  manifest and written in canonical order, on disk only, never resident. Coupling, compare and
-  arbitrary chip selections stream it line by line with bounded state, reading only the commits
-  the postings name where possible.
+- The manifest, `VERSION` 5 (containers 6 since the commit columns), the unreadable rule, the
+  hostile-bytes bounds, the Windows shim and the canonical order. These are the irreversible
+  parts of the format.
+- The aggregates (author x day, month x path, path x author) and per-path postings with rename
+  edges are segments.
+- The records sit in the row file (`commits.jsonl`, `paths.jsonl`), named in the manifest and
+  written in canonical order, on disk only, never resident. Coupling, compare and arbitrary
+  chip selections stream it line by line with bounded state, reading only the commits the
+  postings name where possible.
 - Served from aggregates: overview totals, period summary, rhythm, contributors, types,
   languages, hotspots, ownership, frequency, code age, path logs.
-- The memory, equivalence (generated matrix), unreadable, hostile and determinism guards in full.
+- The memory, equivalence (generated matrix), unreadable, hostile and determinism guards.
 
-**Step 2: no history-sized reads at all.**
+**Columnar rows: no history-sized reads at all.**
 
-- Columnar commit table and varint file rows replace the JSON record files.
+- A columnar commit table and varint file rows in place of the JSON record files.
 - Author postings, segment merge in the background with renumbering, retired-file sweep.
-- Linux spill to sorted runs during the build.
-- Coupling and filtered views move from the JSON rows to the columnar rows, which cuts their
-  scan by about 5x on disk.
+- Spill to sorted runs during the build of a large history such as linux.
+- Coupling and filtered views read the columnar rows, which cuts their scan by about 5x on disk.
 
-Step 1 serves every page a typical visitor opens. Step 2 is the cache size and the linux build
-peak.
+The first layer serves every page a typical visitor opens. The second bounds the cache size and
+the build peak of a large history.

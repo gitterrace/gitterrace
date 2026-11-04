@@ -395,7 +395,7 @@ fn a_reused_name_takes_the_touches_not_the_aggregate() {
     );
 }
 
-/// G10: hotspots, ownership and coupling count a commit by its author's local day, the rule
+/// Hotspots, ownership and coupling count a commit by its author's local day, the rule
 /// [`crate::Scope::admits`] uses, not by the instant window ending one second after "now".
 /// The newest commit is day 10 at noon UTC, so 1w is local days 4..=10. `late` is local
 /// day 3 23:30 at -0200 (inside the instant window, outside the days): it must not count.
@@ -476,7 +476,7 @@ fn file_reports_in_counted_match_the_period() {
     assert!(ins.coupling_in(&hf, &c, 1, 9).is_empty());
 }
 
-/// G19: a ranked list of people never depends on internal person ids. Ann and Yan share every
+/// A ranked list of people never depends on internal person ids. Ann and Yan share every
 /// file of `src` equally. In one history Yan has more commits elsewhere (so a lower person
 /// id), in the other Ann does. The owners must read the same, ties by name.
 #[test]

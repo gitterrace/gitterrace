@@ -34,6 +34,7 @@ from typing import Any
 
 bc = importlib.import_module("bench-chart-lib")
 bd = importlib.import_module("bench-doc-lib")
+bl = importlib.import_module("bench-lib")
 bq = importlib.import_module("bench-quiet-lib")
 
 Json = dict[str, Any]
@@ -88,15 +89,15 @@ def self_test() -> None:
     print("bench-report self-test: ok")
 
 
-# Six hex characters with a digit and a letter: a board id, not a word like "facade".
-BOARD_ID = re.compile(r"\b(?=[0-9a-f]*[0-9])(?=[0-9a-f]*[a-f])[0-9a-f]{6}\b")
+# Six hex characters with a digit and a letter: a tracker id, not a word like "facade".
+TRACKER_ID = re.compile(r"\b(?=[0-9a-f]*[0-9])(?=[0-9a-f]*[a-f])[0-9a-f]{6}\b")
 
 
 def page_problems(
     text: str, repos: list[str], files: set[str], dates: set[str]
 ) -> list[str]:
     """What is wrong with generated results pages: a measured repo missing from the table, a
-    results date or file named that is not kept, or a board id in the text."""
+    results date or file named that is not kept, or a tracker id in the text."""
     errs = [
         f"{n} is in the run but not in the table"
         for n in repos
@@ -110,13 +111,15 @@ def page_problems(
         f"names {f}, which is not in bench/results"
         for f in sorted(set(re.findall(r"[\w-]+\.json", text)) - files)
     ]
-    errs += [f"board id {m} in the text" for m in sorted(set(BOARD_ID.findall(text)))]
+    errs += [
+        f"tracker id {m} in the text" for m in sorted(set(TRACKER_ID.findall(text)))
+    ]
     return errs
 
 
 def page_test() -> None:
     """The pages show every measured repo (a withheld one as withheld) and name nothing that is
-    not kept, nor any board id."""
+    not kept, nor any tracker id."""
     raw = published()[-1]
     kept = shown(raw)
     names = [n for n in raw["repos"]]
@@ -124,6 +127,8 @@ def page_test() -> None:
     text = bd.results_readme([kept]) + bd.render()
     if got := page_problems(text, names, files, dates):
         sys.exit(f"bench-report self-test failed: a clean page was flagged: {got}")
+    # Built at run time so no id-shaped token sits in the source.
+    fake_id = "".join("0a" for _ in range(3))
     for label, tweak, want in [
         (
             "a stale date",
@@ -131,7 +136,7 @@ def page_test() -> None:
             "2026-01-01",
         ),
         ("a stale file", text + " see 2020-01-01-x.json", "2020-01-01-x.json"),
-        ("a board id", text + " see 0a0a0a for details", "0a0a0a"),
+        ("a tracker id", text + f" see {fake_id} for details", fake_id),
         ("a missing repo", text.replace("| " + names[0] + " |", "| x |"), names[0]),
     ]:
         if not any(want in e for e in page_problems(tweak, names, files, dates)):
@@ -270,7 +275,8 @@ def pins() -> list[str]:
 def newest_ok(run: Json) -> list[str]:
     """The newest run must come from a clean build, timed under its load limit."""
     errs: list[str] = []
-    if "dirty" in run["machine"].get("gitterrace", "") and not run.get("note"):
+    m = run["machine"]
+    if (m.get("dirty") or "dirty" in m.get("gitterrace", "")) and not run.get("note"):
         errs.append(f"{run_name(run)}: measured a -dirty build")
     for n, r in run["repos"].items():
         load = r.get("load")
@@ -334,31 +340,15 @@ def no_hostname(paths: list[Path]) -> list[str]:
     return errs
 
 
-def unknown_ids() -> list[str]:
-    """Every gitterrace commit a result names must exist in this history. A shallow clone
-    cannot tell, so it is skipped there."""
-    shallow = subprocess.run(
-        ["git", "rev-parse", "--is-shallow-repository"],
-        cwd=ROOT,
-        capture_output=True,
-        text=True,
-    ).stdout.strip()
-    if shallow != "false":
-        return []
+def own_ids() -> list[str]:
+    """No result names a commit of gitterrace's own history: the control repo is measured at
+    HEAD and the run date names it. Upstream corpus shas stay."""
+    own = bl.own_shas(ROOT)
     errs: list[str] = []
     for p in runs():
-        run = load(p)
-        control = run["repos"].get("control", {})
-        ids = {run["machine"].get("gitterrace_sha"), control.get("sha")}
-        ids.add(control.get("probe", {}).get("commit"))
-        for i in sorted(x for x in ids if x):
-            ok = subprocess.run(
-                ["git", "cat-file", "-e", f"{i}^{{commit}}"],
-                cwd=ROOT,
-                capture_output=True,
-            )
-            if ok.returncode:
-                errs.append(f"{p.name}: commit {i[:10]} is not in this history")
+        text = p.read_text()
+        if bl.scrub_own(text, own) != text:
+            errs.append(f"{p.name}: names a commit of this repository")
     return errs
 
 
@@ -373,7 +363,7 @@ def check(text: str, new: str) -> None:
         if not NAME.fullmatch(p.name)
     ]
     errs += stray()
-    errs += unknown_ids()
+    errs += own_ids()
     errs += no_hostname(sorted(actual()) + [DOC])
     for p, body in want.items():
         if not p.exists() or p.read_text() != body:

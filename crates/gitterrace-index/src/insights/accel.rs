@@ -8,7 +8,8 @@
 //! - `Some(Err(e))`: the tables could not be read. The caller reports the error and never
 //!   answers from the stream instead.
 //!
-//! No fast path is wired yet: `count_parity_fuzz` (P1) must hold before the first one is.
+//! No fast path is wired yet: the `count_parity_fuzz` property that accelerator answers equal
+//! the stream must hold before the first one is.
 
 use crate::insights::{
     CountContext, Label, LabelBucket, LabelCount, PeriodStats, PersonTally, Scope, SeriesPoint,

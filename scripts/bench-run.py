@@ -384,8 +384,11 @@ def machine(binary: str) -> Json:
         "cpus": os.cpu_count(),
         "ram_gb": round(ram, 1),
         "git": run(["git", "--version"]).strip(),
-        "gitterrace": run([binary, "--version"]).strip(),
-        "gitterrace_sha": run(["git", "rev-parse", "HEAD"], cwd=ROOT).strip(),
+        # The version only: the build's own commit is never recorded (dirty is its own flag).
+        "gitterrace": re.sub(
+            r"(v\d+\.\d+\.\d+)\S*", r"\1", run([binary, "--version"]).strip()
+        ),
+        "dirty": "dirty" in run([binary, "--version"]),
     }
 
 
@@ -501,6 +504,7 @@ def main():
     if path.exists():
         prev = json.loads(path.read_text())
         result["repos"] = {**prev.get("repos", {}), **result["repos"]}
+    result = bl.scrub_own(result, bl.own_shas(ROOT))
     path.write_text(json.dumps(result, indent=1, sort_keys=True) + "\n")
     print(f"wrote {path}")
     if a.synthetic:

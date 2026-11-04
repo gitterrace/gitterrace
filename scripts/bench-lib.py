@@ -79,6 +79,33 @@ def parse_toml(text: str) -> Json:
     return out
 
 
+def own_shas(root: str | Path) -> set[str]:
+    """Every commit of the repository at `root`: the control repository is gitterrace itself,
+    and a page never names its own commits."""
+    out = run(["git", "rev-list", "--all"], cwd=root, check=False)
+    return set(out.split())
+
+
+OWN_HEX = re.compile(r"\b[0-9a-f]{7,40}\b")
+
+
+def scrub_own(v: Any, own: set[str]) -> Any:
+    """`v` with every sha (or 7+ hex prefix) of `own` replaced by `HEAD`. The control repo is
+    measured at its HEAD, which is what the run date names."""
+    if isinstance(v, dict):
+        return {k: scrub_own(x, own) for k, x in v.items()}
+    if isinstance(v, list):
+        return [scrub_own(x, own) for x in v]
+    if isinstance(v, str):
+        return OWN_HEX.sub(
+            lambda m: (
+                "HEAD" if any(o.startswith(m.group(0)) for o in own) else m.group(0)
+            ),
+            v,
+        )
+    return v
+
+
 def run(cmd: list[str], cwd: str | Path | None = None, check: bool = True) -> str:
     return subprocess.run(
         cmd, cwd=cwd, check=check, capture_output=True, text=True

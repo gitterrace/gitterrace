@@ -318,7 +318,7 @@ fn measure(repo: &Path, test: &str, side: usize) -> (u64, u64, u64) {
 
 /// Red until the pages read from the segment store on disk: today the server holds the
 /// parsed history, 167 MB above a fresh one at 20k commits. Release builds only, debug is too
-/// slow to index 100k commits. Lanes that must not wait on it filter it out by name.
+/// slow to index 100k commits. Runs that must not wait on it filter it out by name.
 #[test]
 fn memory_stays_in_budget_at_every_size() {
     if serve_if_child() {
