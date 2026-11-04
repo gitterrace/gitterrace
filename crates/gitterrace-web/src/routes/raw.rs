@@ -9,9 +9,6 @@ use axum::{
 use crate::routes::Shared;
 use crate::{app::blocking, error::Result};
 
-/// Largest media file the blob page reads, for its pixel size; bigger ones show no facts.
-pub(crate) const MAX_PREVIEW_BYTES: u64 = 16 << 20;
-
 /// Whether a blob of `size` bytes is too big for `/raw` under `limits.raw_mb`.
 pub(crate) const fn raw_refused(size: u64, raw_mb: u64) -> bool {
     size > raw_mb << 20

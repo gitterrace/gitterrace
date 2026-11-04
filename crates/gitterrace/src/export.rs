@@ -19,22 +19,17 @@ use std::{
 };
 
 use anyhow::{Context, bail};
-use axum::{
-    Router,
-    body::{Body, to_bytes},
-    http::{Request, StatusCode},
-};
-use gitterrace_git::{percent_decode, percent_encode_path};
-use tower::ServiceExt;
+use axum::{Router, http::StatusCode};
+use gitterrace_git::percent_decode;
 
 use crate::export::credit::{Credit, add_footer};
 use crate::export::out::{Staging, check_out};
 #[cfg(test)]
 use crate::export::snapshot::mark_snapshot_as;
 use crate::export::snapshot::{SNAPSHOT_CSS, mark_snapshot, snapshot_label};
+use crate::export::write::{fetch, write_page};
 #[cfg(test)]
-use crate::export::write::target;
-use crate::export::write::write_page;
+use crate::export::write::{fetch_within, target};
 
 /// What to include in an export.
 pub(crate) struct Scope {
@@ -70,8 +65,6 @@ impl Project {
     }
 }
 
-/// Largest response body read from the router.
-const MAX_BODY: usize = 64 * 1024 * 1024;
 /// Pages the crawl starts from, beside every page the server prewarms; each is exported
 /// whatever links point at it.
 const SEEDS: [&str; 2] = ["/refs", "/log/HEAD"];
@@ -426,31 +419,6 @@ async fn wait_for_index(router: &Router, prefix: &str) -> anyhow::Result<()> {
         tokio::time::sleep(std::time::Duration::from_millis(250)).await;
     }
     bail!("the cache did not finish building within 15 minutes")
-}
-
-async fn fetch(router: &Router, path: &str) -> anyhow::Result<(StatusCode, String, Vec<u8>)> {
-    // The router refuses requests without a local Host (DNS-rebinding guard).
-    // Paths travel decoded (they name files on disk); encode them for the URI.
-    let req = Request::get(percent_encode_path(path))
-        .header(axum::http::header::HOST, "localhost")
-        .body(Body::empty())
-        .context("building a request")?;
-    let res = router
-        .clone()
-        .oneshot(req)
-        .await
-        .context("routing a request")?;
-    let status = res.status();
-    let content_type = res
-        .headers()
-        .get(axum::http::header::CONTENT_TYPE)
-        .and_then(|v| v.to_str().ok())
-        .unwrap_or("application/octet-stream")
-        .to_owned();
-    let body = to_bytes(res.into_body(), MAX_BODY)
-        .await
-        .with_context(|| format!("reading {path}"))?;
-    Ok((status, content_type, body.to_vec()))
 }
 
 /// Host headers for a static copy: the app's own page policy, since the pages are its HTML,

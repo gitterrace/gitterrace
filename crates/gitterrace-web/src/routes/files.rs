@@ -9,7 +9,7 @@ use axum::{
 };
 use gitterrace_index::feed::{CommitRange, InsightsSource, Rank};
 
-use crate::routes::{DocQuery, MAX_PREVIEW_BYTES, Shared, page};
+use crate::routes::{DocQuery, Shared, page};
 use crate::{
     app::{App, blocking},
     error::Result,
@@ -100,6 +100,8 @@ struct BlobPage {
     log_href: String,
     html: Option<String>,
     cut: bool,
+    /// The cut notice, naming `limits.blob_lines`.
+    cut_note: String,
     media: Option<String>,
     too_large: bool,
     raw_href: String,
@@ -124,7 +126,7 @@ pub(super) async fn highlight_tail(
         let id = a.repo.resolve(&rev)?;
         let path = path.trim_matches('/').to_owned();
         let text = a.repo.blob(&id, &path)?.text.unwrap_or_default();
-        Ok(views::code_tail_html(a.code_cache_bytes(), &path, &text))
+        Ok(views::code_tail_html(&views::Render::of(a), &path, &text))
     })
     .await?;
     Ok(Html(html))
@@ -141,7 +143,7 @@ pub(super) async fn blob(
         let media = match crate::media::kind(&path) {
             Some(k) => {
                 // One read, and only for files small enough to want facts about.
-                let bytes = if b.size <= MAX_PREVIEW_BYTES {
+                let bytes = if b.size <= a.cfg().limits.preview_mb << 20 {
                     a.repo.blob_bytes(&id, &path)?
                 } else {
                     Vec::new()
@@ -157,12 +159,15 @@ pub(super) async fn blob(
         let too_large = b.size > a.repo.text_limit();
         let text = b.text.as_deref().filter(|_| !too_large);
         let (html, cut) = text.map_or((None, false), |t| {
-            let (h, cut) = views::code_html_first(a.code_cache_bytes(), &path, t);
+            let (h, cut) = views::code_html_first(&views::Render::of(a), &path, t);
             (Some(h), cut)
         });
         let doc = text.filter(|_| is_markdown(&path)).map(|t| {
             let dir = path.rsplit_once('/').map_or("", |(d, _)| d);
-            markdown::render_doc(t, markdown::Base::new(&rev, dir))
+            markdown::render_doc(
+                t,
+                markdown::Base::new(&rev, dir).highlight(views::Render::of(a).highlight_bytes),
+            )
         });
         let outline_rail = doc
             .as_ref()
@@ -187,6 +192,7 @@ pub(super) async fn blob(
             title: path,
             html,
             cut,
+            cut_note: format!("Truncated after {} lines.", a.cfg().limits.blob_lines),
             media,
             too_large,
             raw_href: fmt::href(&format!("/raw/{r}/{pe}")),
@@ -236,7 +242,7 @@ pub(super) async fn blame(
                     fmt::esc(&raw)
                 )
             } else {
-                views::blame_html(&path, &lines, fmt::now())
+                views::blame_html(&views::Render::of(a), &path, &lines, fmt::now())
             },
             title: path,
         })

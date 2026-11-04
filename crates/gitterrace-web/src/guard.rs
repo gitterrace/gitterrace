@@ -25,10 +25,6 @@ pub const CSP: &str = "default-src 'self'; img-src 'self' data:; media-src 'self
     'sha256-Rbk1A+FIExFQ+koGhLey9hvtVuj90foK6DS83At6mms='; object-src 'self'; \
     frame-ancestors 'none'; base-uri 'none'; form-action 'self'";
 
-/// Longest a public request may take before it answers 503. Blame or insights on a huge
-/// history can run longer; their blocking job finishes and fills the cache for a retry.
-const PUBLIC_TIMEOUT: Duration = Duration::from_secs(30);
-
 /// What the guard checks, fixed at startup.
 pub(crate) struct Gate {
     /// The bound address when it is not loopback.
@@ -37,6 +33,10 @@ pub(crate) struct Gate {
     public: bool,
     /// `server.hosts`, lowercase.
     hosts: Vec<String>,
+    /// `server.public_timeout_secs`: longest a public request may take before it answers 503.
+    /// Blame or insights on a huge history can run longer; their blocking job finishes and
+    /// fills the cache for a retry.
+    timeout: Duration,
 }
 
 impl Gate {
@@ -46,7 +46,15 @@ impl Gate {
             bound,
             public: s.public,
             hosts: s.hosts.iter().map(|h| h.to_ascii_lowercase()).collect(),
+            timeout: Duration::from_secs(s.public_timeout_secs),
         }
+    }
+}
+
+#[cfg(test)]
+impl Gate {
+    pub(crate) const fn timeout_for_test(&self) -> Duration {
+        self.timeout
     }
 }
 
@@ -112,7 +120,7 @@ fn refusal(
 pub(crate) async fn guard(State(gate): State<Arc<Gate>>, req: Request, next: Next) -> Response {
     let mut res = match refusal(req.method(), req.headers(), &gate) {
         Some((code, why)) => (code, why).into_response(),
-        None if gate.public => tokio::time::timeout(PUBLIC_TIMEOUT, next.run(req))
+        None if gate.public => tokio::time::timeout(gate.timeout, next.run(req))
             .await
             .unwrap_or_else(|_| {
                 (
@@ -153,6 +161,7 @@ mod tests {
             bound: bound.map(|b| b.parse().expect("ip")),
             public: !hosts.is_empty(),
             hosts: hosts.iter().map(|h| (*h).to_owned()).collect(),
+            timeout: std::time::Duration::from_secs(30),
         }
     }
 

@@ -1,6 +1,9 @@
-use crate::views::{code_html, code_html_first, code_tail_html, crumbs, diff_html};
+use crate::views::{Render, code_html, code_html_first, code_tail_html, crumbs, diff_html};
 
-const CACHE: usize = 32 << 20;
+/// The default limits with a 32 MiB code cache.
+fn cache() -> crate::views::Render {
+    crate::views::Render::test(32 << 20)
+}
 use gitterrace_git::{ChangeKind, FileDiff, LineKind};
 
 #[test]
@@ -21,13 +24,13 @@ fn tail_of_a_file_without_late_chunks_is_empty() {
         ("a.rs", two_chunks.as_str()),
         ("a.unknownext", ten.as_str()),
     ] {
-        assert_eq!(code_tail_html(CACHE, path, text), "", "{path}");
+        assert_eq!(code_tail_html(&cache(), path, text), "", "{path}");
     }
 }
 
 #[test]
 fn code_escapes() {
-    let (h, cut) = code_html(CACHE, "x.txt", "<b>\nx");
+    let (h, cut) = code_html(&cache(), "x.txt", "<b>\nx");
     assert!(h.contains("&lt;b&gt;"));
     assert!(!cut);
     assert!(h.contains("id=\"L2\""));
@@ -37,12 +40,12 @@ fn code_escapes() {
 #[test]
 fn big_files_light_the_first_chunks_and_the_tail_completes_them() {
     let text = "fn f() { let x = 1; }\n".repeat(3_000);
-    let (first, _) = code_html_first(CACHE, "a.rs", &text);
+    let (first, _) = code_html_first(&cache(), "a.rs", &text);
     assert!(first.starts_with("<div class=\"code src\" data-hl>"));
     let lit = |h: &str| h.matches("s-keyword").count();
     assert!(lit(&first) > 0 && lit(&first) < 3_000 * 2);
-    let (full, _) = code_html(CACHE, "a.rs", &text);
-    let tail = code_tail_html(CACHE, "a.rs", &text);
+    let (full, _) = code_html(&cache(), "a.rs", &text);
+    let tail = code_tail_html(&cache(), "a.rs", &text);
     let head_end = first.match_indices("<div class=\"ch\"").nth(2).unwrap().0;
     let glued = format!(
         "{}{}</div>",
@@ -51,7 +54,7 @@ fn big_files_light_the_first_chunks_and_the_tail_completes_them() {
     );
     assert_eq!(glued.replace(" data-hl", ""), full);
     assert!(first[..head_end].contains("s-keyword"));
-    let (small, _) = code_html_first(CACHE, "a.rs", "fn f() {}\n");
+    let (small, _) = code_html_first(&cache(), "a.rs", "fn f() {}\n");
     assert!(!small.contains("data-hl"));
 }
 
@@ -77,7 +80,7 @@ async fn diff_fragment_out_of_range_is_not_found() {
 #[test]
 fn code_lines_carry_their_number() {
     let text = "l\n".repeat(250);
-    let (h, _) = code_html(CACHE, "x.txt", &text);
+    let (h, _) = code_html(&cache(), "x.txt", &text);
     assert_eq!(h.matches("class=\"ch\"").count(), 3);
     // A strict CSP refuses inline styles, so each line names its own number.
     assert!(h.contains("id=\"L101\" class=\"l\" data-n=\"101\""));
@@ -114,10 +117,10 @@ fn huge_diffs_fold_behind_a_load_button() {
         code: CodeCounts::default(),
         modes: None,
     };
-    let small = diff_html(400, "abc", None, &[file(10)]);
+    let small = diff_html(&Render::fold(400), "abc", None, &[file(10)]);
     assert!(!small.contains("data-load-diff"));
-    let big = diff_html(400, "abc", None, &[file(401)]);
-    assert!(!diff_html(500, "abc", None, &[file(401)]).contains("data-load-diff"));
+    let big = diff_html(&Render::fold(400), "abc", None, &[file(401)]);
+    assert!(!diff_html(&Render::fold(500), "abc", None, &[file(401)]).contains("data-load-diff"));
     assert!(big.contains("data-load-diff=\"/diff/abc/0\""));
     assert!(!big.contains("<div class=\"add\""));
 }

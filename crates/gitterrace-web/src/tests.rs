@@ -235,7 +235,7 @@ async fn huge_blobs_are_refused_before_they_are_loaded() {
     zeros(
         "big.png",
         &png,
-        crate::routes::MAX_PREVIEW_BYTES as usize >> 20,
+        gitterrace_config::Config::default().limits.preview_mb as usize,
     );
     std::fs::write(
         p.join("big.txt"),

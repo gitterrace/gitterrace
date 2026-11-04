@@ -19,6 +19,9 @@ pub struct Key {
     pub doc: &'static str,
     /// Whether a running server takes a new value on reload.
     pub reload: Reload,
+    /// Whether a larger value makes one request cost more (time or memory). A public server
+    /// logs a warning at start for each such key set above its default.
+    pub cost: bool,
 }
 
 /// How an edit to one setting reaches a running server.
@@ -32,7 +35,7 @@ pub enum Reload {
 
 macro_rules! settings {
     ($( $field:ident : $sec:ident { $(
-        $(#[doc = $doc:literal])* $name:ident : $ty:ty = $default:expr => $reload:ident ,
+        $(#[doc = $doc:literal])* $name:ident : $ty:ty = $default:expr => $reload:ident $(+ $cost:ident)? ,
     )* } )*) => {
         $(
             #[derive(Debug, Clone, PartialEq, Eq)]
@@ -61,6 +64,7 @@ macro_rules! settings {
                 default: Show::show(&d.$field.$name),
                 doc: concat!($($doc, "\n"),*).trim(),
                 reload: Reload::$reload,
+                cost: { let c: &[&str] = &[$(stringify!($cost)),*]; !c.is_empty() },
             }, )* )* ]
         }
 
@@ -72,6 +76,19 @@ macro_rules! settings {
                         Show::show(&self.$field.$name), )* )*
                     _ => String::new(),
                 }
+            }
+
+            /// Ids of the cost-tagged settings (see [`Key::cost`]) set above their default.
+            pub fn costs_above_default(&self) -> Vec<&'static str> {
+                let d = Self::default();
+                let mut out = Vec::new();
+                $( $( $(
+                    let num = |v: String| v.parse::<u64>().unwrap_or(0);
+                    if stringify!($cost) == "cost" && num(Show::show(&self.$field.$name)) > num(Show::show(&d.$field.$name)) {
+                        out.push(concat!(stringify!($field), ".", stringify!($name)));
+                    }
+                )? )* )*
+                out
             }
 
             /// Ids of the [`Reload::Restart`] settings whose value differs in `new`.
@@ -127,6 +144,30 @@ pub struct RepoOverride {
     pub exclude: Vec<String>,
 }
 
+/// Range of every bounded number: (id, least, most). The least is never 0, so a limit cannot
+/// switch its page off; the most keeps one request within a machine.
+pub const BOUNDS: &[(&str, u64, u64)] = &[
+    ("server.public_timeout_secs", 1, 3600),
+    ("limits.search_per_file", 1, 100_000),
+    ("limits.search_commits", 1, 100_000),
+    ("limits.blob_lines", 1, 10_000_000),
+    ("limits.highlight_kb", 1, 65_536),
+    ("limits.log_max_page", 1, 1_000_000),
+    ("limits.preview_mb", 1, 4096),
+    ("limits.worktree_files", 1, 100_000),
+    ("limits.worktree_diff_kb", 1, 262_144),
+    ("limits.fresh_commits", 1, 200_000),
+    ("limits.action_output_kb", 1, 65_536),
+    ("limits.registry_entries", 1, 100_000),
+    ("limits.export_pages", 1, 10_000_000),
+    ("api.log_page_size", 1, 100_000),
+    ("api.log_max_skip", 1, 100_000_000),
+    ("api.blob_lines", 1, 10_000_000),
+    ("api.blob_kb", 1, 1_048_576),
+    ("api.blame_lines", 1, 10_000_000),
+    ("api.diff_lines", 1, 10_000_000),
+];
+
 /// The address the server listens on when nothing overrides it: the one place it is written.
 pub const DEFAULT_ADDR: &str = "127.0.0.1:4242";
 
@@ -144,6 +185,10 @@ settings! {
         /// Host names a reverse proxy forwards with, exact and without port, for example
         /// `["git.example.com"]`. Needs `public`. Needs a restart.
         hosts: Vec<String> = Vec::new() => Restart,
+        /// Longest a request to a public server may take, in seconds. Past it the answer is 503
+        /// and the work it started finishes in the background, filling the cache for a retry.
+        /// Needs a restart.
+        public_timeout_secs: u64 = 30 => Restart + cost,
     }
     watch: Watch {
         /// Notice new commits and refs while running. Off means a restart or a reload is needed.
@@ -171,17 +216,62 @@ settings! {
     }
     limits: Limits {
         /// Largest file shown as text, in KiB. Larger files are offered as raw downloads.
-        text_kb: u64 = 2048 => Live,
-        /// Largest file served raw, in MB.
-        raw_mb: u64 = 256 => Live,
-        /// Most matches a code search returns.
-        search_matches: usize = 500 => Live,
-        /// Lines of one file's diff shown before it folds.
-        diff_fold_lines: usize = 400 => Live,
+        text_kb: u64 = 2048 => Live + cost,
+        /// Largest file served raw, in MB. A larger one is refused.
+        raw_mb: u64 = 256 => Live + cost,
+        /// Most matches a code search returns. Past it the search stops and says it was cut off.
+        search_matches: usize = 500 => Live + cost,
+        /// Matching lines one file keeps in a code search. Past it the file says more matched.
+        search_per_file: usize = 100 => Live + cost,
+        /// Most commits a commit search lists. Past it the search stops and says it was cut off.
+        search_commits: usize = 200 => Live + cost,
+        /// Lines of one file's diff shown before it folds. A folded file loads on demand.
+        diff_fold_lines: usize = 400 => Live + cost,
+        /// Lines a file page shows. Past it the page cuts the file and says so.
+        blob_lines: usize = 20_000 => Live + cost,
+        /// Largest text highlighted, in KiB: a file, its blame, one file's diff or a Markdown
+        /// code block. Larger text shows plain.
+        highlight_kb: usize = 256 => Live + cost,
+        /// Deepest page number of a history page. A later page number shows this page.
+        log_max_page: usize = 1000 => Live + cost,
+        /// Largest image whose pixel size a file page reads, in MB. A larger one shows no
+        /// pixel size.
+        preview_mb: u64 = 16 => Live + cost,
+        /// Changed files the Uncommitted view lists. Past it the rest are left out.
+        worktree_files: usize = 2000 => Live,
+        /// Largest working-tree file the Uncommitted view diffs, in KiB. A larger one is listed
+        /// without hunks.
+        worktree_diff_kb: usize = 1024 => Live,
+        /// Commits a view of a revision outside the indexed history reads from git per request.
+        /// Past it the view asks for a reindex instead. Needs a restart.
+        fresh_commits: usize = 2000 => Restart + cost,
+        /// Output kept from each stream (stdout, stderr) of an action, in KiB. The rest is read
+        /// and dropped. Needs a restart.
+        action_output_kb: usize = 64 => Restart,
+        /// Repositories remembered in `repos.json`, newest first. Past it the least recently
+        /// served are forgotten with their names. Needs a restart.
+        registry_entries: usize = 500 => Restart,
         /// Most pages `git terrace export` writes, folded diff fragments included. Past it the
         /// export stops and writes nothing. `export --max-pages` overrides it. Between 1 and
         /// 10000000.
         export_pages: usize = 20_000 => Live,
+    }
+    api: Api {
+        /// Most commits one `log` answer lists, whatever `per_page` asks.
+        log_page_size: usize = 500 => Live + cost,
+        /// Deepest a `log` answer pages, in commits skipped. A deeper page is refused.
+        log_max_skip: usize = 50_000 => Live + cost,
+        /// Most lines one `blob` answer carries, whatever `limit` asks. The rest is cut and
+        /// `truncated` says so.
+        blob_lines: usize = 5000 => Live + cost,
+        /// Most bytes one `blob` answer carries, in KiB: one minified line can be megabytes.
+        /// The rest is cut and `truncated` says so.
+        blob_kb: usize = 256 => Live + cost,
+        /// Most lines one `blame` answer carries. The rest is cut and `truncated` says so.
+        blame_lines: usize = 5000 => Live + cost,
+        /// Most diff lines one commit answer carries, whatever `max_lines` asks. The rest is
+        /// cut and `truncated` says so.
+        diff_lines: usize = 20_000 => Live + cost,
     }
     insights: Insights {
         /// Paths (globs) left out of every insight.
@@ -249,8 +339,14 @@ impl Config {
         if self.limits.text_kb == 0 || self.limits.raw_mb == 0 {
             return bad("limits", "text_kb and raw_mb must be at least 1");
         }
-        if self.limits.export_pages == 0 || self.limits.export_pages > 10_000_000 {
-            return bad("limits.export_pages", "must be between 1 and 10000000");
+        for (k, lo, hi) in BOUNDS {
+            let v = keys()
+                .iter()
+                .find(|x| x.id == *k)
+                .and_then(|x| self.show(x).parse::<u64>().ok());
+            if v.is_none_or(|v| v < *lo || v > *hi) {
+                return bad(k, &format!("must be between {lo} and {hi}"));
+            }
         }
         if !["1w", "1m", "3m", "1y", "all"].contains(&self.insights.period.as_str()) {
             return bad("insights.period", "expected 1w, 1m, 3m, 1y or all");

@@ -364,4 +364,25 @@ mod tests {
     fn want_slot(recs: &[crate::CommitRecord], c: &crate::feed::CommitRow) -> Option<usize> {
         TimeAxis::covering(None, recs, recs).slot_row(c)
     }
+
+    /// Every day of a history up to 399 years lands in a bucket, at every unit the span picks:
+    /// the cap never drops a commit from a real history, so totals stay the same at every
+    /// bucket count.
+    #[test]
+    fn the_bucket_cap_never_drops_a_real_day() {
+        let first = days_from_civil(1700, 1, 1);
+        for years in [0_i64, 1, 5, 40, 150, 399] {
+            let last = first + years * 365 + 30;
+            let a = axis(None, first, last);
+            assert!(a.len() <= super::MAX_BUCKETS);
+            let mut per = vec![0usize; a.len()];
+            for d in first..=last {
+                per[a
+                    .slot_day(d)
+                    .unwrap_or_else(|| panic!("{years}y: day {d} dropped"))] += 1;
+            }
+            let total: i64 = per.iter().map(|n| i64::try_from(*n).unwrap_or(0)).sum();
+            assert_eq!(total, last - first + 1, "{years}y: {:?}", a.unit());
+        }
+    }
 }

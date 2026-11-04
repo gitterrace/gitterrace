@@ -24,6 +24,7 @@ Actions live in their own file, `actions.toml`, because they run commands.
 | `max_streams` | integer | `32` | Maximum open live-update streams per repository (one per browser tab). |
 | `public` | bool | `false` | Serve read-only to anyone who can reach the address: committed history only, no working tree, stashes, live updates, actions or additions. Required for any address that is not loopback. Needs a restart. |
 | `hosts` | list of strings | `[]` | Host names a reverse proxy forwards with, exact and without port, for example `["git.example.com"]`. Needs `public`. Needs a restart. |
+| `public_timeout_secs` | integer | `30` | Longest a request to a public server may take, in seconds. Past it the answer is 503 and the work it started finishes in the background, filling the cache for a retry. Needs a restart. |
 
 ## `[watch]`
 
@@ -51,10 +52,32 @@ Actions live in their own file, `actions.toml`, because they run commands.
 | Key | Type | Default | Description |
 | --- | --- | --- | --- |
 | `text_kb` | integer | `2048` | Largest file shown as text, in KiB. Larger files are offered as raw downloads. |
-| `raw_mb` | integer | `256` | Largest file served raw, in MB. |
-| `search_matches` | integer | `500` | Most matches a code search returns. |
-| `diff_fold_lines` | integer | `400` | Lines of one file's diff shown before it folds. |
+| `raw_mb` | integer | `256` | Largest file served raw, in MB. A larger one is refused. |
+| `search_matches` | integer | `500` | Most matches a code search returns. Past it the search stops and says it was cut off. |
+| `search_per_file` | integer | `100` | Matching lines one file keeps in a code search. Past it the file says more matched. |
+| `search_commits` | integer | `200` | Most commits a commit search lists. Past it the search stops and says it was cut off. |
+| `diff_fold_lines` | integer | `400` | Lines of one file's diff shown before it folds. A folded file loads on demand. |
+| `blob_lines` | integer | `20000` | Lines a file page shows. Past it the page cuts the file and says so. |
+| `highlight_kb` | integer | `256` | Largest text highlighted, in KiB: a file, its blame, one file's diff or a Markdown code block. Larger text shows plain. |
+| `log_max_page` | integer | `1000` | Deepest page number of a history page. A later page number shows this page. |
+| `preview_mb` | integer | `16` | Largest image whose pixel size a file page reads, in MB. A larger one shows no pixel size. |
+| `worktree_files` | integer | `2000` | Changed files the Uncommitted view lists. Past it the rest are left out. |
+| `worktree_diff_kb` | integer | `1024` | Largest working-tree file the Uncommitted view diffs, in KiB. A larger one is listed without hunks. |
+| `fresh_commits` | integer | `2000` | Commits a view of a revision outside the indexed history reads from git per request. Past it the view asks for a reindex instead. Needs a restart. |
+| `action_output_kb` | integer | `64` | Output kept from each stream (stdout, stderr) of an action, in KiB. The rest is read and dropped. Needs a restart. |
+| `registry_entries` | integer | `500` | Repositories remembered in `repos.json`, newest first. Past it the least recently served are forgotten with their names. Needs a restart. |
 | `export_pages` | integer | `20000` | Most pages `git terrace export` writes, folded diff fragments included. Past it the export stops and writes nothing. `export --max-pages` overrides it. Between 1 and 10000000. |
+
+## `[api]`
+
+| Key | Type | Default | Description |
+| --- | --- | --- | --- |
+| `log_page_size` | integer | `500` | Most commits one `log` answer lists, whatever `per_page` asks. |
+| `log_max_skip` | integer | `50000` | Deepest a `log` answer pages, in commits skipped. A deeper page is refused. |
+| `blob_lines` | integer | `5000` | Most lines one `blob` answer carries, whatever `limit` asks. The rest is cut and `truncated` says so. |
+| `blob_kb` | integer | `256` | Most bytes one `blob` answer carries, in KiB: one minified line can be megabytes. The rest is cut and `truncated` says so. |
+| `blame_lines` | integer | `5000` | Most lines one `blame` answer carries. The rest is cut and `truncated` says so. |
+| `diff_lines` | integer | `20000` | Most diff lines one commit answer carries, whatever `max_lines` asks. The rest is cut and `truncated` says so. |
 
 ## `[insights]`
 

@@ -22,8 +22,6 @@ use gitterrace_git::percent_encode_segment;
 use crate::config::{Action, Cwd, Piece, REPO_FIELDS, Stdin, field_parts, pieces};
 use crate::payload::Payload;
 
-/// Captured per stream; the rest is read and dropped so the child never blocks on a pipe.
-const MAX_OUTPUT_BYTES: usize = 64 * 1024;
 /// The first output line returned to the browser. Full output never leaves the server.
 const MAX_FIRST_LINE: usize = 200;
 /// Between SIGTERM and SIGKILL on timeout.
@@ -55,14 +53,19 @@ const MAX_ARGV_BYTES: usize = 256 * 1024;
 pub struct Limits {
     pub max_running: usize,
     pub per_minute: usize,
+    /// Output kept per stream; the rest is read and dropped so the child never blocks on a
+    /// pipe (`limits.action_output_kb`).
+    pub output_bytes: usize,
 }
 
 impl Default for Limits {
-    /// 4 running process-wide (one per action id) and 30 starts a minute.
+    /// 4 running process-wide (one per action id), 30 starts a minute and 64 KiB of output kept
+    /// per stream.
     fn default() -> Self {
         Self {
             max_running: 4,
             per_minute: 30,
+            output_bytes: 64 * 1024,
         }
     }
 }
@@ -181,7 +184,12 @@ impl Runner {
         let child = cmd
             .spawn()
             .map_err(|e| RunError::Spawn(action.argv[0].clone(), e))?;
-        Ok(supervise(child, stdin, action.timeout))
+        Ok(supervise(
+            child,
+            stdin,
+            action.timeout,
+            self.limits.output_bytes,
+        ))
     }
 
     fn acquire(&self, id: &str) -> Result<Slot, RunError> {
@@ -284,7 +292,7 @@ pub fn expand(template: &[String], payload: &Payload) -> Result<Vec<String>, Run
     Ok(out)
 }
 
-fn supervise(mut child: Child, stdin: Option<Vec<u8>>, timeout: Duration) -> Outcome {
+fn supervise(mut child: Child, stdin: Option<Vec<u8>>, timeout: Duration, keep: usize) -> Outcome {
     let pgid = group_of(&child);
     // Writing on its own thread: a script that never reads stdin must not stall us.
     if let (Some(mut pipe), Some(stdin)) = (child.stdin.take(), stdin) {
@@ -294,8 +302,8 @@ fn supervise(mut child: Child, stdin: Option<Vec<u8>>, timeout: Duration) -> Out
             }
         });
     }
-    let out = child.stdout.take().map(capture);
-    let err = child.stderr.take().map(capture);
+    let out = child.stdout.take().map(|r| capture(r, keep));
+    let err = child.stderr.take().map(|r| capture(r, keep));
 
     let deadline = Instant::now() + timeout;
     let mut timed_out = false;
@@ -427,8 +435,8 @@ fn signal_group(pid: Group, sig: Sig) {
     }
 }
 
-/// Reads a stream to EOF on a thread, keeping the first [`MAX_OUTPUT_BYTES`].
-fn capture(mut r: impl Read + Send + 'static) -> mpsc::Receiver<Vec<u8>> {
+/// Reads a stream to EOF on a thread, keeping the first `keep` bytes.
+fn capture(mut r: impl Read + Send + 'static, keep: usize) -> mpsc::Receiver<Vec<u8>> {
     let (tx, rx) = mpsc::channel();
     thread::spawn(move || {
         let mut kept = Vec::new();
@@ -437,7 +445,7 @@ fn capture(mut r: impl Read + Send + 'static) -> mpsc::Receiver<Vec<u8>> {
             if n == 0 {
                 break;
             }
-            let room = MAX_OUTPUT_BYTES.saturating_sub(kept.len());
+            let room = keep.saturating_sub(kept.len());
             kept.extend_from_slice(&buf[..n.min(room)]);
         }
         if tx.send(kept).is_err() {

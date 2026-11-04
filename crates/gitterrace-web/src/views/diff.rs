@@ -5,19 +5,14 @@ use std::fmt::Write as _;
 use gitterrace_git::{ChangeKind, FileDiff, LineKind};
 
 use crate::fmt::{enc_path, enc_seg, esc, esc_text};
-use crate::views::{file_label, kind_name};
+use crate::views::{Render, file_label, kind_name};
 
 fn num(n: Option<u32>) -> String {
     n.map_or_else(String::new, |n| n.to_string())
 }
 
-pub(crate) fn diff_html(
-    fold_lines: usize,
-    rev: &str,
-    parent: Option<&str>,
-    files: &[FileDiff],
-) -> String {
-    diff_html_with(fold_lines, DiffSource::Commit { rev, parent }, files)
+pub(crate) fn diff_html(r: &Render, rev: &str, parent: Option<&str>, files: &[FileDiff]) -> String {
+    diff_html_with(r, DiffSource::Commit { rev, parent }, files)
 }
 
 /// Once the files before it changed this many lines in all, later files are folded too.
@@ -34,7 +29,7 @@ const TOTAL_DIFF_BYTES: usize = 250_000;
 pub(super) const CHUNK_LINES: usize = 100;
 
 /// The hunks of one file as line blocks. Also the body of the fragment a folded file loads.
-fn diff_body_html(f: &FileDiff) -> String {
+fn diff_body_html(r: &Render, f: &FileDiff) -> String {
     let mut out = String::from("<div class=\"diffwrap\"><div class=\"diff\">");
     let mut in_chunk = 0usize;
     let total: usize = f
@@ -43,7 +38,7 @@ fn diff_body_html(f: &FileDiff) -> String {
         .flat_map(|h| &h.lines)
         .map(|l| l.text.len())
         .sum();
-    let plain = total > crate::highlight::HIGHLIGHT_LIMIT;
+    let plain = total > r.highlight_bytes;
     let first = |k: LineKind| {
         f.hunks
             .iter()
@@ -152,8 +147,8 @@ fn no_hunks_line(f: &FileDiff) -> String {
 
 /// Every file of a page's diff as a section. The first files render in full until the page
 /// has spent one of its budgets (files, lines, bytes); every later file, and any file over
-/// `fold_lines`, is a header whose body loads on demand.
-pub(crate) fn diff_html_with(fold_lines: usize, src: DiffSource<'_>, files: &[FileDiff]) -> String {
+/// `r.fold_lines`, is a header whose body loads on demand.
+pub(crate) fn diff_html_with(r: &Render, src: DiffSource<'_>, files: &[FileDiff]) -> String {
     let mut out = String::new();
     let mut used = Spent::default();
     for (i, f) in files.iter().enumerate() {
@@ -182,7 +177,7 @@ pub(crate) fn diff_html_with(fold_lines: usize, src: DiffSource<'_>, files: &[Fi
             crate::fmt::thousands(f.additions),
             crate::fmt::thousands(f.deletions)
         );
-        out.push_str(&file_body(fold_lines, src, i, f, &mut used));
+        out.push_str(&file_body(r, src, i, f, &mut used));
         out.push_str("</section>");
     }
     out
@@ -213,13 +208,7 @@ struct Spent {
     bytes: usize,
 }
 
-fn file_body(
-    fold_lines: usize,
-    src: DiffSource<'_>,
-    i: usize,
-    f: &FileDiff,
-    used: &mut Spent,
-) -> String {
+fn file_body(r: &Render, src: DiffSource<'_>, i: usize, f: &FileDiff, used: &mut Spent) -> String {
     if f.binary {
         if let (true, DiffSource::Commit { rev, parent }) = (crate::media::is_image(&f.path), src) {
             let old_path = f.old_path.as_deref().unwrap_or(&f.path);
@@ -242,7 +231,7 @@ fn file_body(
         .flat_map(|h| &h.lines)
         .map(|l| l.text.len() + 48)
         .sum();
-    let alone = changed > fold_lines || bytes > FILE_DIFF_BYTES;
+    let alone = changed > r.fold_lines || bytes > FILE_DIFF_BYTES;
     let page_full = used.files >= TOTAL_DIFF_FILES
         || used.lines + changed > TOTAL_DIFF_BUDGET
         || used.bytes + bytes > TOTAL_DIFF_BYTES;
@@ -263,7 +252,7 @@ fn file_body(
             !alone,
         )
     } else {
-        diff_body_html(f)
+        diff_body_html(r, f)
     }
 }
 
@@ -274,7 +263,11 @@ pub(crate) async fn diff_fragment(
 ) -> crate::error::Result<axum::response::Html<String>> {
     let html = crate::app::blocking(&app, move |a| {
         let id = a.repo.resolve(&rev)?;
-        Ok(a.repo.commit_file(&id, index)?.as_ref().map(diff_body_html))
+        let r = Render::of(a);
+        Ok(a.repo
+            .commit_file(&id, index)?
+            .as_ref()
+            .map(|f| diff_body_html(&r, f)))
     })
     .await?;
     html.map(axum::response::Html)
@@ -287,12 +280,13 @@ pub(crate) async fn worktree_fragment(
     axum::extract::Path(path): axum::extract::Path<String>,
 ) -> crate::error::Result<axum::response::Html<String>> {
     let html = crate::app::blocking(&app, move |a| {
+        let r = Render::of(a);
         Ok(
             gitterrace_git::worktree_file_diff(&a.repo, &path)?.map(|f| {
                 if f.hunks.is_empty() {
                     no_hunks_line(&f)
                 } else {
-                    diff_body_html(&f)
+                    diff_body_html(&r, &f)
                 }
             }),
         )

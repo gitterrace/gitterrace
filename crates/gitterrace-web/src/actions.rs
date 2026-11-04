@@ -189,9 +189,13 @@ pub(crate) fn start(
     file: Option<&Path>,
     roots: &[PathBuf],
     loopback: bool,
+    output_kb: usize,
 ) -> (Option<Arc<Live>>, Arc<Status>) {
     let status = Arc::new(Status::default());
-    (start_live(file, roots, loopback, &status), status)
+    (
+        start_live(file, roots, loopback, output_kb, &status),
+        status,
+    )
 }
 
 /// Where `GET /_send/targets` reads from. Sending opens a URL in the browser and starts
@@ -215,6 +219,7 @@ fn start_live(
     file: Option<&Path>,
     roots: &[PathBuf],
     loopback: bool,
+    output_kb: usize,
     status: &Arc<Status>,
 ) -> Option<Arc<Live>> {
     let file = file?;
@@ -257,7 +262,10 @@ fn start_live(
     let live = Arc::new(Live {
         token,
         config: reloader.handle(),
-        runner: Runner::new(Limits::default()),
+        runner: Runner::new(Limits {
+            output_bytes: output_kb.saturating_mul(1024),
+            ..Limits::default()
+        }),
     });
     tokio::spawn(reload(reloader, Arc::clone(status)));
     Some(live)

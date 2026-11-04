@@ -19,7 +19,8 @@ const DAY: i64 = 86_400;
 pub(crate) const WEEK: i64 = 7 * DAY;
 /// Fewest buckets a window of `MIN` hours or more gets, so the line still has a shape.
 const MIN: i64 = 6;
-/// Most buckets: past this the line is too dense to read in a sidebar's width.
+/// Most buckets: past this the line is too dense to read in a sidebar's width. Not
+/// configurable: a chart definition, not a resource limit.
 const MAX: i64 = 7 * MIN;
 
 /// One bucket width and how a label names it: "per {per}".

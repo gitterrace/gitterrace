@@ -101,7 +101,11 @@ pub(crate) fn card(
     let mut outline = String::new();
     let html = match a.repo.blob(id, &file).ok().and_then(|b| b.text) {
         Some(t) if is_md => {
-            let doc = markdown::render_doc(&t, markdown::Base::new(rev, dir));
+            let doc = markdown::render_doc(
+                &t,
+                markdown::Base::new(rev, dir)
+                    .highlight(crate::views::Render::of(a).highlight_bytes),
+            );
             outline = markdown::outline_menu(&doc.outline, true);
             doc.html
         }

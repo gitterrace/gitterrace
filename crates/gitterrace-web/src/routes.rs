@@ -34,7 +34,6 @@ use commits::indexed_author_ids;
 use commits::{commit, log};
 pub(crate) use files::prewarm_blame;
 use files::{blame, blob, highlight_tail, tree, tree_root};
-pub(crate) use raw::MAX_PREVIEW_BYTES;
 use raw::raw;
 #[cfg(test)]
 pub(crate) use raw::raw_refused;
@@ -339,11 +338,7 @@ async fn worktree(State(app): Shared) -> Result<Html<String>> {
         Ok(WorktreePage {
             c: views::chrome(a, "files").live(Mode::WORKTREE),
             clean: files.is_empty(),
-            diff: views::diff_html_with(
-                a.cfg().limits.diff_fold_lines,
-                views::DiffSource::Worktree,
-                &files,
-            ),
+            diff: views::diff_html_with(&views::Render::of(a), views::DiffSource::Worktree, &files),
             adds: fmt::thousands(adds),
             dels: fmt::thousands(dels),
             files_summary: fmt::count(stats.len(), "changed file", "changed files"),

@@ -452,6 +452,8 @@ Environment (same values, plus `GITTERRACE_VAR_<NAME>`):
   `--no-actions`, and never offered to MCP.
 - No shell between gitterrace and the program: a placeholder is one argument, never parsed.
   Scrubbed environment, timeout, at most 4 runs at once, 30 a minute.
+- A `timeout` is at most 120 s. That ceiling is fixed and no setting raises it. Each stream of
+  output keeps its first `limits.action_output_kb` (default 64 KiB) and drops the rest.
 - Every field is untrusted repository text. In a script, quote it and never `eval` it.
 
 ## Scripts

@@ -10,7 +10,8 @@ use std::sync::Arc;
 use crate::feed::{CommitRow, FileRow, IdentId, InsightsSource, LabelId, PathId, Rank, Sums};
 use crate::{CommitRecord, CommitSource};
 
-/// Most commits one view reads from git. Past it the view asks for a reindex instead.
+/// Most commits one view reads from git by default (`limits.fresh_commits`). Past it the view
+/// asks for a reindex instead.
 pub const FRESH_CAP: usize = 2000;
 
 /// What the bounded read found.

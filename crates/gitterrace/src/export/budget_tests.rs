@@ -7,7 +7,7 @@ use std::time::{Duration, Instant};
 
 use gitterrace_testkit::Fixture;
 
-use crate::export::{Scope, export_capped, fetch};
+use crate::export::{Scope, export_capped, fetch, fetch_within};
 
 /// Files a commit page shows in full before the rest fold (`TOTAL_DIFF_FILES` in the web
 /// crate). Every file in these fixtures is small, so only this budget folds them.
@@ -262,6 +262,28 @@ async fn the_flag_beats_the_config_and_the_cap_error_names_both() {
     assert!(msg.contains("cap of 1 pages"), "{msg}");
     assert!(
         msg.contains("--max-pages") && msg.contains("limits.export_pages"),
+        "{msg}"
+    );
+}
+
+/// A page over the body limit fails with an error naming the settings that make pages larger,
+/// never a page cut short: raised blob or highlight limits must not write broken pages.
+#[tokio::test]
+async fn a_page_over_the_body_limit_fails_naming_the_knobs() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let fx = wide(&dir.path().join("r"), 1, 2);
+    let changes = std::sync::Arc::new(gitterrace_git::ChangeMemo::new());
+    let router =
+        gitterrace_web::export_router(vec![fx.path().to_path_buf()], &changes).expect("router");
+    let (_, _, whole) = fetch(&router, "/refs").await.expect("page");
+    assert!(whole.len() > 100);
+    let err = fetch_within(&router, "/refs", 100)
+        .await
+        .expect_err("a page over 100 bytes must fail");
+    let msg = err.to_string();
+    assert!(msg.contains("/refs is larger than"), "{msg}");
+    assert!(
+        msg.contains("limits.blob_lines") && msg.contains("limits.highlight_kb"),
         "{msg}"
     );
 }

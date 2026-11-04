@@ -8,8 +8,9 @@ use std::sync::OnceLock;
 
 use syntect::parsing::{ParseState, Scope, ScopeStack, SyntaxReference, SyntaxSet};
 
-/// Larger inputs are shown plain: highlighting must never dominate a request.
-pub(crate) const HIGHLIGHT_LIMIT: usize = 256 * 1024;
+/// Default of `limits.highlight_kb`, in bytes: larger inputs are shown plain, so highlighting
+/// never dominates a request.
+pub(crate) const HIGHLIGHT_BYTES: usize = 256 * 1024;
 
 fn syntaxes() -> &'static SyntaxSet {
     static SET: OnceLock<SyntaxSet> = OnceLock::new();
@@ -232,8 +233,8 @@ pub(crate) fn for_file(path: &str, first_line: &str) -> Option<Highlighter> {
 }
 
 /// Highlighted HTML of a whole block for a fence token; `None` when unknown or over the limit.
-pub(crate) fn block(code: &str, token: &str) -> Option<String> {
-    if code.len() > HIGHLIGHT_LIMIT {
+pub(crate) fn block(code: &str, token: &str, most: usize) -> Option<String> {
+    if code.len() > most {
         return None;
     }
     let mut h = Highlighter::new(syntax_for_token(token)?);
@@ -299,7 +300,12 @@ mod tests {
                 "{path}: {out}"
             );
         }
-        let md = block("# T\n\n```rust\nfn x() {}\n```\n", "md").expect("md");
+        let md = block(
+            "# T\n\n```rust\nfn x() {}\n```\n",
+            "md",
+            super::HIGHLIGHT_BYTES,
+        )
+        .expect("md");
         assert!(md.contains("s-"), "{md}");
     }
 

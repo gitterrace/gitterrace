@@ -6,7 +6,7 @@ mod objects;
 use std::cmp::Reverse;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, OnceLock, Weak};
 
 use gix::bstr::ByteSlice;
@@ -48,6 +48,10 @@ pub struct Repo {
     blame_cache: Mutex<BlameCache>,
     /// Largest blob read as text by this handle, see [`Repo::with_limits`].
     text_limit: AtomicU64,
+    /// Changed files the Uncommitted view lists, see [`Repo::set_worktree_limits`].
+    worktree_files: AtomicUsize,
+    /// Largest file the Uncommitted view diffs, in bytes.
+    worktree_diff_bytes: AtomicU64,
     /// Threads [`Repo::numstat_many`] uses; 0 means one per core.
     workers: usize,
     /// Ahead and behind per (branch tip, base): immutable for a pair of commits.
@@ -70,6 +74,8 @@ impl Repo {
             inner,
             blame_cache: Mutex::new(BlameCache::with_limit(BLAME_CACHE_BYTES)),
             text_limit: AtomicU64::new(MAX_TEXT_BYTES),
+            worktree_files: AtomicUsize::new(crate::worktree::WORKTREE_FILES),
+            worktree_diff_bytes: AtomicU64::new(crate::worktree::WORKTREE_DIFF_BYTES),
             workers: 0,
             divergence: Mutex::new(HashMap::new()),
             id_cache: OnceLock::new(),
@@ -128,6 +134,22 @@ impl Repo {
             c.limit = blame_cache_bytes;
             c.shrink(0);
         }
+    }
+
+    /// Sets how many changed files the Uncommitted view lists and the largest file it diffs,
+    /// in bytes (`limits.worktree_files`, `limits.worktree_diff_kb`).
+    pub fn set_worktree_limits(&self, files: usize, diff_bytes: u64) {
+        self.worktree_files.store(files, Ordering::Relaxed);
+        self.worktree_diff_bytes
+            .store(diff_bytes, Ordering::Relaxed);
+    }
+
+    pub(crate) fn worktree_files(&self) -> usize {
+        self.worktree_files.load(Ordering::Relaxed)
+    }
+
+    pub(crate) fn worktree_diff_bytes(&self) -> u64 {
+        self.worktree_diff_bytes.load(Ordering::Relaxed)
     }
 
     /// Sets the threads [`Repo::numstat_many`] spreads a batch over; 0 means one per core.

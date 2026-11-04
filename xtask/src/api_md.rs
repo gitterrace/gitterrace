@@ -3,10 +3,7 @@
 
 use std::fmt::Write as _;
 
-use gitterrace_api::{
-    ENDPOINTS, ERROR_CODES, MAX_BLAME_LINES, MAX_BLOB_BYTES, MAX_BLOB_LINES, MAX_PAGE, McpServer,
-    Param, insight_list,
-};
+use gitterrace_api::{ENDPOINTS, ERROR_CODES, McpServer, Param, insight_list};
 
 use crate::out::Out;
 
@@ -40,12 +37,13 @@ pub fn render() -> Out {
     s.push_str(
         "\nA 5xx `message` is always the same fixed text. The details go to the server log.\n",
     );
+    let a = gitterrace_config::Api::default();
     let _ = writeln!(
         s,
-        "\nAnswers are capped so one file cannot flood a client: `log` at {MAX_PAGE} per page, \
-         `blob` at {MAX_BLOB_LINES} lines and {} KiB, `blame` at {MAX_BLAME_LINES} lines, each \
-         with `truncated` when cut.",
-        MAX_BLOB_BYTES / 1024
+        "\nAnswers are capped so one file cannot flood a client: `log` at {} per page, \
+         `blob` at {} lines and {} KiB, `blame` at {} lines, each \
+         with `truncated` when cut. The `[api]` section of `config.toml` sets each cap.",
+        a.log_page_size, a.blob_lines, a.blob_kb, a.blame_lines
     );
 
     s.push_str("\n## HTTP (`/api/v1`)\n\n| Endpoint | Query | Returns |\n| --- | --- | --- |\n");

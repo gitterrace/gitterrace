@@ -134,6 +134,8 @@ pub struct Index {
     dir: PathBuf,
     /// Threads that parse the stored records; 0 means one per core, at most 8.
     threads: usize,
+    /// Commits a view outside the set reads from git, see [`Index::with_fresh_cap`].
+    fresh_cap: usize,
     /// The format of a cache written by a newer build. Such a cache is never read or written.
     newer: Option<String>,
 }
@@ -150,8 +152,22 @@ impl Index {
         Ok(Self {
             dir,
             threads: 0,
+            fresh_cap: feed::FRESH_CAP,
             newer,
         })
+    }
+
+    /// Sets how many commits a view outside the indexed set reads from git before it asks for a
+    /// reindex (`limits.fresh_commits`; default [`feed::FRESH_CAP`]).
+    #[must_use]
+    pub const fn with_fresh_cap(mut self, cap: usize) -> Self {
+        self.fresh_cap = cap;
+        self
+    }
+
+    /// The cap set by [`Index::with_fresh_cap`].
+    pub const fn fresh_cap(&self) -> usize {
+        self.fresh_cap
     }
 
     /// Sets the threads that parse stored records; 0 means one per core, at most 8.
@@ -433,7 +449,7 @@ impl Index {
     }
 
     /// The view of a commit the set does not hold exactly: the set's commits it reaches plus
-    /// up to [`feed::FRESH_CAP`] it lacks, read from git. `tip` is `rev` resolved to a commit
+    /// up to [`Index::fresh_cap`] it lacks, read from git. `tip` is `rev` resolved to a commit
     /// id. Past the cap the answer is [`feed::RevView::NeedsReindex`]: building the set for
     /// this commit would move it off HEAD, and holding its records would break the memory
     /// bound. `None` when there is no set.
@@ -451,7 +467,7 @@ impl Index {
         let disk = feed::DiskSource::open(rows, &mut |pairs| source.map_identities(rev, pairs))
             .map_err(seg)?;
         let set = feed::SegmentSource::new(disk, tables.segments);
-        feed::rev_view(set, source, rev, tip, feed::FRESH_CAP).map(Some)
+        feed::rev_view(set, source, rev, tip, self.fresh_cap).map(Some)
     }
 
     /// The memory adapter over `records` (from [`Index::records`]), for a rev the segment set

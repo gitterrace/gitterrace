@@ -21,6 +21,8 @@ mod history;
 mod hotspots;
 mod insights;
 mod languages;
+#[cfg(test)]
+mod limits_wiring_tests;
 mod live;
 mod markdown;
 mod media;
@@ -136,7 +138,13 @@ fn repo_router_tasks(
     if let Some(memo) = &env.changes {
         repo.use_change_memo(memo);
     }
-    let index = Index::open(&repo)?.with_threads(cfg.index.threads);
+    repo.set_worktree_limits(
+        cfg.limits.worktree_files,
+        (cfg.limits.worktree_diff_kb as u64) << 10,
+    );
+    let index = Index::open(&repo)?
+        .with_threads(cfg.index.threads)
+        .with_fresh_cap(cfg.limits.fresh_commits);
     let mut app = App::configured(repo, index, env);
     app.base = base;
     app.key = key;
@@ -299,7 +307,8 @@ fn build_server(
     }
     // Behind a proxy a public server sits on loopback and every request is remote.
     let local = extra.is_none() && !env.public();
-    let (live, status) = actions::start(actions_file, &roots, local);
+    let output_kb = env.cfg().limits.action_output_kb;
+    let (live, status) = actions::start(actions_file, &roots, local, output_kb);
     env.set_actions_status(&status);
     table.live.clone_from(&live);
     let sends = actions::sends(live.as_ref(), actions_file, &roots);
@@ -334,6 +343,18 @@ fn build_server(
     };
     let gate = guard::Gate::new(extra, &env.cfg());
     Ok((guarded(router, gate), shown))
+}
+
+/// One line per per-request cost setting raised above its default on a public server: config is
+/// the operator's, so this only says what a visitor can now make one request cost.
+fn public_cost_warnings(cfg: &Config) -> Vec<String> {
+    if !cfg.server.public {
+        return Vec::new();
+    }
+    cfg.costs_above_default()
+        .into_iter()
+        .map(|k| format!("public server: {k} is above its default, so one request may cost more"))
+        .collect()
 }
 
 /// Records the served repositories for `git terrace open`. Best effort: a read-only or odd
@@ -398,6 +419,10 @@ pub async fn serve_in(
         ));
     }
     let public = cfg.server.public;
+    for k in public_cost_warnings(&cfg) {
+        tracing::warn!("{k}");
+    }
+    registry::set_entries(cfg.limits.registry_entries);
     tokio::task::spawn_blocking({
         let (paths, state) = (repo_paths.clone(), state.clone());
         move || remember(state.as_deref(), &paths)

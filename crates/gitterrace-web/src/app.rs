@@ -189,6 +189,15 @@ impl Env {
             .map_or_else(|e| Arc::clone(&e.into_inner()), |g| Arc::clone(&g))
     }
 
+    /// Every live app built on this environment.
+    #[cfg(test)]
+    pub(crate) fn apps_for_test(&self) -> Vec<Arc<App>> {
+        self.apps
+            .lock()
+            .map(|g| g.iter().filter_map(Weak::upgrade).collect())
+            .unwrap_or_default()
+    }
+
     /// Lets a reload reach `app`.
     pub(crate) fn register(&self, app: &Arc<App>) {
         if let Ok(mut g) = self.apps.lock() {
@@ -366,6 +375,10 @@ impl App {
         }
         let (text_bytes, blame_bytes) = repo_limits(cfg);
         self.repo.set_limits(text_bytes, blame_bytes);
+        self.repo.set_worktree_limits(
+            cfg.limits.worktree_files,
+            (cfg.limits.worktree_diff_kb as u64) << 10,
+        );
         resize(&self.streams, &self.streams_cap, cfg.server.max_streams);
         let small = cache_share(cfg, SMALL_EIGHTHS);
         if let Ok(mut g) = self.memo.lock() {

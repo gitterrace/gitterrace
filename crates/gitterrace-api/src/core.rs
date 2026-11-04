@@ -6,7 +6,7 @@ use std::sync::{Arc, Mutex, RwLock};
 
 use gitterrace_actions::{Lines, LinkStyle, styled};
 use gitterrace_git::Repo;
-use gitterrace_index::feed::{FRESH_CAP, InsightsSource, RevView};
+use gitterrace_index::feed::{InsightsSource, RevView};
 use gitterrace_index::{Index, Insights, Options, Scoped};
 use serde_json::{Value, json};
 
@@ -14,19 +14,6 @@ use crate::error::ApiError;
 use crate::{insights, json};
 
 const DEFAULT_REV: &str = "HEAD";
-/// Largest `per_page` the log accepts.
-pub const MAX_PAGE: usize = 500;
-/// Most lines one blob answer carries.
-pub const MAX_BLOB_LINES: usize = 5000;
-/// Lines alone do not bound an answer: one minified line can be megabytes.
-pub const MAX_BLOB_BYTES: usize = 256 * 1024;
-/// Most lines one blame answer carries.
-pub const MAX_BLAME_LINES: usize = 5000;
-/// Most diff lines one commit answer carries, whatever `max_lines` asks: a vendored-code
-/// commit can hold millions, each a JSON object.
-pub const MAX_DIFF_LINES: usize = 20_000;
-/// Deepest the log pages: a path filter walks every skipped commit with tree lookups.
-const MAX_LOG_SKIP: usize = 50_000;
 /// Rev syntax that searches history (`:/text`, `^{/text}`) or reads reflogs (`@{...}`): a
 /// request could make one call walk every commit. Branch, tag, sha and `~`/`^` stay allowed.
 const REJECTED_REV: [&str; 3] = [":/", "^{/", "@{"];
@@ -67,6 +54,10 @@ struct Settings {
     /// Counting options when a request names none: the `insights` configuration, the same
     /// defaults the web pages start from.
     defaults: Options,
+    /// How much one answer may carry, from `[api]` (see `gitterrace_config::Api`): a vendored
+    /// commit holds millions of diff lines, one minified line can be megabytes, and a path
+    /// filter walks every skipped commit.
+    caps: gitterrace_config::Api,
 }
 
 /// What every statistic reads.
@@ -107,6 +98,7 @@ impl ApiState {
         let mut s = self.write_settings();
         s.style = LinkStyle::from_config(&cfg.links.style);
         s.defaults = defaults;
+        s.caps = cfg.api.clone();
     }
 
     fn write_settings(&self) -> std::sync::RwLockWriteGuard<'_, Settings> {
@@ -200,7 +192,7 @@ impl ApiState {
                 Some(RevView::NeedsReindex { read }) => {
                     return Err(ApiError::NeedsReindex {
                         read,
-                        cap: FRESH_CAP,
+                        cap: self.index.fresh_cap(),
                     });
                 }
                 None => Index::memory_source(Arc::new(self.index.records(&*self.repo, rev)?)),
@@ -287,12 +279,14 @@ impl ApiState {
         per_page: usize,
     ) -> Result<Value, ApiError> {
         let rev = Self::rev(rev)?;
-        let per_page = per_page.clamp(1, MAX_PAGE);
+        let caps = self.settings().caps;
+        let per_page = per_page.clamp(1, caps.log_page_size);
         let page = page.max(1);
         let skip = (page - 1).saturating_mul(per_page);
-        if skip > MAX_LOG_SKIP {
+        if skip > caps.log_max_skip {
             return Err(ApiError::BadRequest(format!(
-                "page too deep: at most {MAX_LOG_SKIP} commits can be skipped"
+                "page too deep: at most {} commits can be skipped (api.log_max_skip)",
+                caps.log_max_skip
             )));
         }
         // One extra row tells us whether another page exists.
@@ -321,7 +315,8 @@ impl ApiState {
     ) -> Result<Value, ApiError> {
         let id = self.repo.resolve(checked(id)?)?;
         let detail = self.repo.commit(&id)?;
-        let cap = max_lines.map_or(MAX_DIFF_LINES, |m| m.min(MAX_DIFF_LINES));
+        let most = self.settings().caps.diff_lines;
+        let cap = max_lines.map_or(most, |m| m.min(most));
         let mut v = json::detail(&detail, diff, Some(cap));
         self.put_links(&mut v, &id, None, None);
         if let Some(files) = v["files"].as_array_mut() {
@@ -359,16 +354,18 @@ impl ApiState {
         let rev = Self::rev(rev)?;
         let id = self.repo.resolve(rev)?;
         let blob = self.repo.blob(&id, path)?;
+        let caps = self.settings().caps;
+        let most_bytes = caps.blob_kb.saturating_mul(1024);
         let (text, total_lines, truncated) = blob.text.as_ref().map_or((None, None, false), |t| {
             let all: Vec<&str> = t.lines().collect();
             let start = start_line.unwrap_or(1).max(1) - 1;
-            let limit = limit.unwrap_or(MAX_BLOB_LINES).min(MAX_BLOB_LINES);
+            let limit = limit.unwrap_or(caps.blob_lines).min(caps.blob_lines);
             let end = all.len().min(start.saturating_add(limit));
             let slice = all.get(start..end).unwrap_or(&[]);
             let mut text = slice.join("\n");
-            let over = text.len() > MAX_BLOB_BYTES;
+            let over = text.len() > most_bytes;
             if over {
-                let mut cut = MAX_BLOB_BYTES;
+                let mut cut = most_bytes;
                 while !text.is_char_boundary(cut) {
                     cut -= 1;
                 }
@@ -400,14 +397,11 @@ impl ApiState {
         let rev = Self::rev(rev)?;
         let id = self.repo.resolve(rev)?;
         let all = self.repo.blame(&id, path)?;
-        let lines: Vec<Value> = all
-            .iter()
-            .take(MAX_BLAME_LINES)
-            .map(json::blame_line)
-            .collect();
+        let most = self.settings().caps.blame_lines;
+        let lines: Vec<Value> = all.iter().take(most).map(json::blame_line).collect();
         let mut v = json!({
             "rev": rev, "commit": id, "path": path,
-            "truncated": all.len() > MAX_BLAME_LINES, "lines": lines,
+            "truncated": all.len() > most, "lines": lines,
         });
         self.put_links(&mut v, &id, Some(path), None);
         Ok(v)

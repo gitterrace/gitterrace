@@ -1,8 +1,22 @@
-//! Writing pages under the output folder without escaping it.
+//! Reading pages from the router and writing them under the output folder without escaping it.
 
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, bail};
+use axum::{
+    Router,
+    body::{Body, to_bytes},
+    http::{Request, StatusCode},
+};
+use gitterrace_git::percent_encode_path;
+use tower::ServiceExt;
+
+/// Largest page read, in bytes. Not configurable: it bounds one page in memory; a page over it
+/// fails the export naming the settings that make pages larger.
+const MAX_BODY: usize = 64 * 1024 * 1024;
+/// The settings that make a page larger, named when one does not fit.
+const SHRINK: &str = "Lower limits.blob_lines, limits.highlight_kb, limits.text_kb or \
+                      limits.diff_fold_lines in config.toml";
 
 /// File the page lands in: HTML pages become `<path>/index.html` so their links
 /// resolve when the folder is served by any static server. `None` for a path with a segment
@@ -76,4 +90,44 @@ pub(super) fn write_leaf(file: &Path, body: &[u8]) -> anyhow::Result<()> {
     };
     gitterrace_git::write_atomic(dir, name, body, 0o644)
         .with_context(|| format!("refusing to write {}", file.display()))
+}
+
+pub(crate) async fn fetch(
+    router: &Router,
+    path: &str,
+) -> anyhow::Result<(StatusCode, String, Vec<u8>)> {
+    fetch_within(router, path, MAX_BODY).await
+}
+
+/// [`fetch`] with a body limit of `most` bytes, so a test can reach it with a small page.
+pub(crate) async fn fetch_within(
+    router: &Router,
+    path: &str,
+    most: usize,
+) -> anyhow::Result<(StatusCode, String, Vec<u8>)> {
+    // The router refuses requests without a local Host (DNS-rebinding guard).
+    // Paths travel decoded (they name files on disk); encode them for the URI.
+    let req = Request::get(percent_encode_path(path))
+        .header(axum::http::header::HOST, "localhost")
+        .body(Body::empty())
+        .context("building a request")?;
+    let res = router
+        .clone()
+        .oneshot(req)
+        .await
+        .context("routing a request")?;
+    let status = res.status();
+    let content_type = res
+        .headers()
+        .get(axum::http::header::CONTENT_TYPE)
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("application/octet-stream")
+        .to_owned();
+    let body = to_bytes(res.into_body(), most).await.map_err(|_| {
+        anyhow::anyhow!(
+            "{path} is larger than {} MiB, the most one exported page may be. {SHRINK}",
+            most >> 20
+        )
+    })?;
+    Ok((status, content_type, body.to_vec()))
 }

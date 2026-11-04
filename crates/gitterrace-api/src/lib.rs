@@ -15,7 +15,7 @@ mod insights;
 mod json;
 mod mcp;
 
-pub use core::{ApiState, MAX_BLAME_LINES, MAX_BLOB_BYTES, MAX_BLOB_LINES, MAX_PAGE, options_from};
+pub use core::{ApiState, options_from};
 pub use endpoints::{ENDPOINTS, Endpoint, Param};
 pub use error::{ApiError, ERROR_CODES, SERVER_ERROR_MESSAGE};
 pub use http::router;
@@ -24,6 +24,8 @@ pub use insights::{
 };
 pub use mcp::{McpServer, ToolDoc, serve_mcp};
 
+#[cfg(test)]
+mod limit_tests;
 #[cfg(test)]
 mod tests {
     use gitterrace_testkit::git;
@@ -302,7 +304,7 @@ mod tests {
         let dir = tempfile::tempdir().expect("tempdir");
         let p = dir.path();
         git(p, &["init", "-q", "-b", "main"]);
-        let big = "x\n".repeat(crate::core::MAX_DIFF_LINES + 10);
+        let big = "x\n".repeat(gitterrace_config::Api::default().diff_lines + 10);
         std::fs::write(p.join("big.txt"), big).expect("write");
         git(p, &["add", "."]);
         git(p, &["commit", "-q", "-m", "big"]);
@@ -316,11 +318,17 @@ mod tests {
         };
         for asked in [None, Some(usize::MAX)] {
             let v = s.commit("HEAD", true, asked).expect("commit");
-            assert!(lines(&v) <= crate::core::MAX_DIFF_LINES, "{asked:?}");
+            assert!(
+                lines(&v) <= gitterrace_config::Api::default().diff_lines,
+                "{asked:?}"
+            );
             assert_eq!(v["truncated"], true, "{asked:?}");
         }
         let v = s.log(None, None, 1, usize::MAX).expect("log");
-        assert!(v["commits"].as_array().map_or(0, Vec::len) <= crate::MAX_PAGE);
+        assert!(
+            v["commits"].as_array().map_or(0, Vec::len)
+                <= gitterrace_config::Api::default().log_page_size
+        );
     }
 
     /// Tools that return free text from the repository say it is untrusted, and so does the

@@ -24,10 +24,8 @@ use crate::{
     views::{self, Chrome, CommitRow},
 };
 
-/// Matching lines kept per search before the rest is reported as cut off.
-const MAX_PER_FILE: usize = 100;
-const MAX_COMMITS: usize = 200;
-/// Files above this are skipped: they are generated or vendored far more often than read.
+/// Characters of one result line shown; a longer line is clipped around its match. Not
+/// configurable: a layout choice (one line in the result card), not a resource limit.
 const MAX_LINE_CHARS: usize = 300;
 /// Files scanned in parallel before their results are merged in order and the cap checked:
 /// large enough to keep every worker busy, small enough that a capped query stops early.
@@ -282,6 +280,7 @@ fn search_code(a: &App, rev: &str, re: &Regex, glob: Option<&Regex>) -> Result<C
         .filter(|f| glob.is_none_or(|g| g.is_match(&f.path)))
         .collect();
     let max_matches = a.cfg().limits.search_matches;
+    let per_file = a.cfg().limits.search_per_file;
     let workers = std::thread::available_parallelism()
         .map_or(2, usize::from)
         .min(8);
@@ -314,7 +313,7 @@ fn search_code(a: &App, rev: &str, re: &Regex, glob: Option<&Regex>) -> Result<C
                         let r = match reader.text(f.blob, a.repo.text_limit()) {
                             None => Scanned::Skipped,
                             Some(text) if re.is_match(&text) => {
-                                Scanned::Hits(file_hits(&f.path, rev_enc, &text, re))
+                                Scanned::Hits(file_hits(&f.path, rev_enc, &text, re, per_file))
                             }
                             Some(_) => Scanned::Miss,
                         };
@@ -349,13 +348,13 @@ fn search_code(a: &App, rev: &str, re: &Regex, glob: Option<&Regex>) -> Result<C
 }
 
 /// Hit lines of one file, each with one line of context before and after.
-fn file_hits(path: &str, rev_enc: &str, text: &str, re: &Regex) -> FileHits {
+fn file_hits(path: &str, rev_enc: &str, text: &str, re: &Regex, per_file: usize) -> FileHits {
     let lines: Vec<&str> = text.lines().collect();
     let mut hit_idx = Vec::new();
     for (i, l) in lines.iter().enumerate() {
         if re.is_match(l) {
             hit_idx.push(i);
-            if hit_idx.len() >= MAX_PER_FILE {
+            if hit_idx.len() >= per_file {
                 break;
             }
         }
@@ -440,10 +439,11 @@ fn search_commits(
 ) -> Result<(Vec<gitterrace_git::CommitSummary>, bool)> {
     let mut rows = Vec::new();
     let mut capped = false;
+    let most = a.cfg().limits.search_commits;
     gitterrace_git::scan_commits(&a.repo, rev, |c, message| {
         let hay = format!("{message}\n{} <{}>", c.author.name, c.author.email);
         if re.is_match(&hay) {
-            if rows.len() >= MAX_COMMITS {
+            if rows.len() >= most {
                 capped = true;
                 return false;
             }
@@ -567,7 +567,7 @@ mod tests {
     fn hits_carry_context_and_gaps() {
         let re = build_regex("x", false, true).expect("re");
         let text = "x\n.\n.\n.\n.\nx\n.\n";
-        let h = file_hits("a", "HEAD", text, &re);
+        let h = file_hits("a", "HEAD", text, &re, 100);
         assert_eq!(h.count, 2);
         let ns: Vec<usize> = h.lines.iter().map(|l| l.n).collect();
         assert_eq!(ns, vec![1, 2, 0, 5, 6, 7]);

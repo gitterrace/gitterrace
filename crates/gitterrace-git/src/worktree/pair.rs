@@ -24,6 +24,7 @@ pub(super) fn exact_moves(
     head: Option<&gix::Tree<'_>>,
     root: Option<&Path>,
     paths: &BTreeSet<String>,
+    big: u64,
 ) -> Moves {
     let (Some(head), Some(root)) = (head, root) else {
         return Moves::default();
@@ -55,11 +56,11 @@ pub(super) fn exact_moves(
         .collect();
     for (path, len) in added {
         // Only a file of a deleted file's exact size can be its copy: no read for the rest.
-        if !sizes.contains(&len) || len > super::MAX_DIFF_BYTES as u64 {
+        if !sizes.contains(&len) || len > big {
             continue;
         }
         // The view's own reader: it refuses a path behind a symlinked directory.
-        let super::Read::Data(bytes) = &super::read_worktree(root, path) else {
+        let super::Read::Data(bytes) = &super::read_worktree(root, path, big) else {
             continue;
         };
         let Ok(id) = gix::objs::compute_hash(r.object_hash(), gix::objs::Kind::Blob, bytes) else {

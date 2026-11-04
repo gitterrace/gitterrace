@@ -48,8 +48,6 @@ struct LogPage {
     author_chip: Option<(String, String)>,
 }
 
-/// Pages past this are clamped: the walk behind a page costs its offset.
-const MAX_PAGE: usize = 1_000;
 /// Commits per read of the unindexed author walk.
 const CHUNK: usize = 500;
 /// Commits the unindexed author walk reads before it gives up with what it has.
@@ -142,7 +140,8 @@ pub(super) async fn log(
     Query(q): Query<LogQuery>,
 ) -> Result<Html<String>> {
     let path = q.path.unwrap_or_default().trim_matches('/').to_owned();
-    let pg = q.page.unwrap_or(0).min(MAX_PAGE);
+    // Pages past `limits.log_max_page` are clamped: the walk behind a page costs its offset.
+    let pg = q.page.unwrap_or(0).min(app.cfg().limits.log_max_page);
     let author = q.author;
     let p = blocking(&app, move |a| {
         let id = a.repo.resolve(&rev)?;
@@ -256,7 +255,7 @@ pub(super) async fn commit(State(app): Shared, Path(id): Path<String>) -> Result
             files: views::file_stats(&d),
             lookups: a.lookups(&id),
             diff: views::diff_html(
-                a.cfg().limits.diff_fold_lines,
+                &views::Render::of(a),
                 &id,
                 d.summary.parents.first().map(String::as_str),
                 &d.files,

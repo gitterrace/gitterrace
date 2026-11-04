@@ -27,7 +27,8 @@ Rust: `gitterrace_api::router(ApiState)` (nest under `/api/v1`),
 A 5xx `message` is always the same fixed text. The details go to the server log.
 
 Answers are capped so one file cannot flood a client: `log` at 500 per page, `blob` at 5000 lines
-and 256 KiB, `blame` at 5000 lines, each with `truncated` when cut.
+and 256 KiB, `blame` at 5000 lines, each with `truncated` when cut. The `[api]` section of
+`config.toml` sets each cap.
 
 ## HTTP (`/api/v1`)
 

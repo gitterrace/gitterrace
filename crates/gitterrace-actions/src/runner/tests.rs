@@ -306,6 +306,27 @@ fn output_is_capped() {
     assert_eq!(r.first_line.len(), 200);
 }
 
+/// `limits.action_output_kb` reaches the runner: a smaller setting keeps less.
+#[test]
+fn output_limit_is_the_configured_one() {
+    let (_t, repo) = fixture();
+    let r = Runner::new(Limits {
+        output_bytes: 1000,
+        ..Limits::default()
+    })
+    .run(
+        &shell(
+            "a",
+            "cat >/dev/null; head -c 300000 /dev/zero | tr '\\0' x",
+            Duration::from_secs(5),
+        ),
+        &payload(&repo, Kind::Commit),
+        &repo.root(),
+    )
+    .expect("run");
+    assert_eq!(r.stdout.len(), 1000);
+}
+
 #[test]
 fn concurrency_and_rate_limits() {
     let (_t, repo) = fixture();
@@ -352,8 +373,8 @@ fn concurrency_and_rate_limits() {
     }
 
     let limited = Runner::new(Limits {
-        max_running: 4,
         per_minute: 2,
+        ..Limits::default()
     });
     let quick = shell("q", "true", Duration::from_secs(5));
     assert!(limited.run(&quick, &p, Path::new("/")).is_ok());

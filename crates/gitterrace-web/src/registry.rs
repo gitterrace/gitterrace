@@ -13,9 +13,15 @@ use gitterrace_git::Repo;
 use serde::{Deserialize, Serialize};
 
 const FILE: &str = "repos.json";
-/// Entries kept. Each serve touches one per repository; past this the least recently served
-/// go, so a file a user never looks at cannot grow without bound.
-const MAX_ENTRIES: usize = 500;
+/// Default of `limits.registry_entries`. Each serve touches one per repository; past this the
+/// least recently served go, so a file a user never looks at cannot grow without bound.
+static ENTRIES: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(500);
+
+/// Sets how many repositories `repos.json` keeps (`limits.registry_entries`). Read once at
+/// startup: the file is shared by every server of this user.
+pub(crate) fn set_entries(n: usize) {
+    ENTRIES.store(n, std::sync::atomic::Ordering::Relaxed);
+}
 
 /// Held across every read-modify-write of the file in this process: a startup record and a
 /// name claim run on different threads, and the later write would drop the other's entry.
@@ -191,11 +197,17 @@ fn now() -> u64 {
         .map_or(0, |d| d.as_secs())
 }
 
-/// Newest first, capped. Past `MAX_ENTRIES` the least recently served go with their names, so a
-/// repository unseen for that long may come back under another name if its old one was taken.
-fn write_all(dir: &Path, mut all: Vec<Entry>) -> io::Result<()> {
+/// The `keep` most recently served entries, newest first.
+fn newest(mut all: Vec<Entry>, keep: usize) -> Vec<Entry> {
     all.sort_by_key(|e| std::cmp::Reverse(e.last_served));
-    all.truncate(MAX_ENTRIES);
+    all.truncate(keep);
+    all
+}
+
+/// Newest first, capped. Past `limits.registry_entries` the least recently served go with their names, so a
+/// repository unseen for that long may come back under another name if its old one was taken.
+fn write_all(dir: &Path, all: Vec<Entry>) -> io::Result<()> {
+    let all = newest(all, ENTRIES.load(std::sync::atomic::Ordering::Relaxed));
     let json = serde_json::to_vec_pretty(&all).map_err(io::Error::other)?;
     private_dir(dir)?;
     write_atomic(dir, FILE, &json)
@@ -281,7 +293,25 @@ mod tests {
     use gitterrace_git::Repo;
     use std::path::Path;
 
-    use crate::registry::{FILE, add_token, candidates, claim, record, write_add_token};
+    use crate::registry::{
+        Entry, FILE, add_token, candidates, claim, newest, record, write_add_token,
+    };
+
+    /// `limits.registry_entries` is how many entries the file keeps: the newest.
+    #[test]
+    fn registry_entries_keeps_the_newest() {
+        let e = |t: u64| Entry {
+            id: String::new(),
+            path: t.to_string().into(),
+            last_served: t,
+            name: String::new(),
+        };
+        let kept: Vec<u64> = newest(vec![e(1), e(3), e(2)], 2)
+            .iter()
+            .map(|x| x.last_served)
+            .collect();
+        assert_eq!(kept, [3, 2]);
+    }
 
     /// A one-commit repository; `msg` makes its root commit, and so its id, distinct.
     pub(crate) fn repo(dir: &Path, msg: &str) -> Repo {

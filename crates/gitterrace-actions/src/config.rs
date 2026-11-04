@@ -22,7 +22,8 @@ use crate::config::program::{expand_tilde, resolve_program};
 pub use crate::config::reload::Reloader;
 use crate::config::trust::check_file;
 
-/// Default and ceiling for an action's timeout.
+/// Default and ceiling for an action's timeout. Not configurable here: each action sets its
+/// own `timeout` in actions.toml.
 const DEFAULT_TIMEOUT: Duration = Duration::from_secs(10);
 const MAX_TIMEOUT: Duration = Duration::from_secs(120);
 /// A config larger than this is not hand-written; refuse instead of parsing it.

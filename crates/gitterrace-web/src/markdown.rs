@@ -4,6 +4,7 @@
 //! everything the parser or this module generates goes through the same
 //! sanitizer, so the output never carries scripts, event handlers or styles.
 
+mod base;
 mod front;
 mod lines;
 
@@ -13,26 +14,9 @@ use std::collections::HashMap;
 use pulldown_cmark::{BlockQuoteKind, CodeBlockKind, Event, Options, Parser, Tag, TagEnd, html};
 
 use crate::fmt::esc;
+pub(crate) use crate::markdown::base::Base;
 use crate::markdown::front::{front_matter_html, split_front_matter};
 use crate::markdown::lines::{LineMap, mark, sentinel};
-
-/// Where a markdown file lives, so relative links can be resolved.
-pub(crate) struct Base {
-    /// Revision as it should appear in URLs (already encoded).
-    pub(crate) rev: String,
-    /// Directory of the markdown file inside the repo, no slashes at the ends.
-    pub(crate) dir: String,
-}
-
-impl Base {
-    /// `rev` is the revision exactly as typed in the URL, `dir` the file's directory.
-    pub(crate) fn new(rev: &str, dir: &str) -> Self {
-        Self {
-            rev: crate::fmt::enc_seg(rev),
-            dir: dir.trim_matches('/').to_owned(),
-        }
-    }
-}
 
 /// Heading slug as most Markdown hosts make it, so links written elsewhere still land: lowercase, keep letters, digits, `-` and `_`, spaces to `-`.
 fn slugify(text: &str) -> String {
@@ -104,9 +88,9 @@ fn rewrite_url(base: &Base, url: &str, image: bool) -> String {
     }
 }
 
-fn code_block(code: &str, lang: &str, span: &str) -> String {
+fn code_block(code: &str, lang: &str, span: &str, most: usize) -> String {
     let lang = lang.split([' ', ',', '{']).next().unwrap_or("");
-    let body = crate::highlight::block(code, lang).unwrap_or_else(|| esc(code));
+    let body = crate::highlight::block(code, lang, most).unwrap_or_else(|| esc(code));
     let class = if lang.is_empty() {
         String::new()
     } else {
@@ -142,6 +126,7 @@ fn transform<'a>(
     body: &'a str,
     parser: Parser<'a>,
     map: &LineMap,
+    most: usize,
 ) -> (Vec<Event<'a>>, Vec<OutlineItem>) {
     let mut out: Vec<Event<'a>> = Vec::new();
     let mut items: Vec<OutlineItem> = Vec::new();
@@ -158,7 +143,7 @@ fn transform<'a>(
                     let html = if lang == "mermaid" {
                         format!("{}<pre class=\"mermaid\">{}</pre>\n", mark(at), esc(code))
                     } else {
-                        code_block(code, lang, &mark(at))
+                        code_block(code, lang, &mark(at), most)
                     };
                     out.push(Event::Html(html.into()));
                     fence = None;
@@ -400,7 +385,7 @@ pub(crate) fn render_doc(src: &str, base: Base) -> Doc {
     // Spans count lines of the whole file, so the front matter's lines come first.
     let map = LineMap::new(body, src[..src.len() - body.len()].matches('\n').count());
     let parser = Parser::new_ext(body, opts);
-    let (events, outline) = transform(body, parser, &map);
+    let (events, outline) = transform(body, parser, &map, base.highlight_bytes);
     let mut raw = String::new();
     html::push_html(&mut raw, events.into_iter());
     // Spans are added after sanitizing, which drops every data-line the file wrote.
@@ -416,6 +401,7 @@ mod tests {
         let base = Base {
             rev: "HEAD".to_owned(),
             dir: String::new(),
+            highlight_bytes: crate::highlight::HIGHLIGHT_BYTES,
         };
         render_with(src, base)
     }
@@ -426,6 +412,7 @@ mod tests {
         let base = Base {
             rev: "abc123".to_owned(),
             dir: dir.to_owned(),
+            highlight_bytes: crate::highlight::HIGHLIGHT_BYTES,
         };
         render_with(src, base)
     }
@@ -580,6 +567,7 @@ mod tests {
         let base = Base {
             rev: "r".into(),
             dir: String::new(),
+            highlight_bytes: crate::highlight::HIGHLIGHT_BYTES,
         };
         assert_eq!(
             rewrite_url(&base, "https://x/y.png", true),
@@ -616,6 +604,7 @@ mod tests {
             Base {
                 rev: "r".into(),
                 dir: String::new(),
+                highlight_bytes: crate::highlight::HIGHLIGHT_BYTES,
             },
         );
         assert!(

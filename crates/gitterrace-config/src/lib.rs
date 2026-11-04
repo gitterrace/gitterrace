@@ -13,7 +13,7 @@ use std::collections::BTreeMap;
 use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
 
-pub use schema::{Config, DEFAULT_ADDR, Key, Reload, RepoOverride, keys};
+pub use schema::{Api, BOUNDS, Config, DEFAULT_ADDR, Key, Reload, RepoOverride, keys};
 pub use value::Show;
 
 /// Where a value came from.
@@ -212,7 +212,9 @@ mod tests {
     fn restart_keys_match_their_docs_and_are_held_back() {
         let mut changed = parse(
             "[server]\naddr = \"127.0.0.1:9\"\npublic = true\nhosts = [\"h.example\"]\nmax_streams = 3\n\
-             [index]\nthreads = 3\n[multi]\ndepth = 4\nskip_dirs = [\"x\"]\n",
+             public_timeout_secs = 7\n\
+             [index]\nthreads = 3\n[multi]\ndepth = 4\nskip_dirs = [\"x\"]\n\
+             [limits]\nfresh_commits = 7\naction_output_kb = 7\nregistry_entries = 7\n",
         )
         .expect("parse")
         .config;

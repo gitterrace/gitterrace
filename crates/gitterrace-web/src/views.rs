@@ -15,7 +15,52 @@ pub(crate) use crate::views::diff::{
     DiffSource, diff_fragment, diff_html, diff_html_with, worktree_fragment,
 };
 
-const MAX_BLOB_LINES: usize = 20_000;
+/// The settings a rendered fragment depends on, read once per request from the config.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub(crate) struct Render {
+    /// Size of the highlighted-code cache, in bytes.
+    pub(crate) cache_bytes: usize,
+    /// Largest text highlighted, in bytes (`limits.highlight_kb`).
+    pub(crate) highlight_bytes: usize,
+    /// Lines a file page shows (`limits.blob_lines`).
+    pub(crate) blob_lines: usize,
+    /// Lines of one file's diff shown before it folds (`limits.diff_fold_lines`).
+    pub(crate) fold_lines: usize,
+}
+
+impl Render {
+    pub(crate) fn of(a: &crate::app::App) -> Self {
+        let c = a.cfg();
+        Self {
+            cache_bytes: a.code_cache_bytes(),
+            ..Self::from_config(&c, 0)
+        }
+    }
+
+    /// The defaults, with a cache of `cache_bytes`.
+    #[cfg(test)]
+    pub(crate) fn test(cache_bytes: usize) -> Self {
+        Self::from_config(&gitterrace_config::Config::default(), cache_bytes)
+    }
+
+    /// The defaults, folding at `fold_lines`.
+    #[cfg(test)]
+    pub(crate) fn fold(fold_lines: usize) -> Self {
+        Self {
+            fold_lines,
+            ..Self::test(32 << 20)
+        }
+    }
+
+    pub(crate) const fn from_config(c: &gitterrace_config::Config, cache_bytes: usize) -> Self {
+        Self {
+            cache_bytes,
+            highlight_bytes: c.limits.highlight_kb.saturating_mul(1024),
+            blob_lines: c.limits.blob_lines,
+            fold_lines: c.limits.diff_fold_lines,
+        }
+    }
+}
 
 pub(crate) struct Nav {
     pub(crate) href: String,

@@ -3,6 +3,8 @@
 //! This is the only module that reads the worktree. It never writes: no index refresh, no lock
 //! files. Files may change or vanish while we read, so every per-file failure skips that file.
 
+#[cfg(test)]
+mod limit_tests;
 mod pair;
 
 use std::collections::BTreeSet;
@@ -14,10 +16,12 @@ use gix::diff::blob::{Algorithm, Diff, InternedInput};
 use crate::error::git;
 use crate::{ChangeKind, FileDiff, Repo, Result};
 
-/// Untracked trees can be enormous (a forgotten `node_modules`), so the view stops here.
-const MAX_FILES: usize = 2000;
-/// Larger files are listed but shown without hunks.
-const MAX_DIFF_BYTES: usize = 1024 * 1024;
+/// Changed files the view lists by default (`limits.worktree_files`): untracked trees can be
+/// enormous (a forgotten `node_modules`), so the view stops there.
+pub const WORKTREE_FILES: usize = 2000;
+/// Largest file diffed by default (`limits.worktree_diff_kb`); larger ones are listed without
+/// hunks.
+pub const WORKTREE_DIFF_BYTES: u64 = 1024 * 1024;
 
 fn open(repo: &Repo) -> Result<gix::Repository> {
     gix::open(repo.git_dir()).map_err(git)
@@ -131,7 +135,7 @@ pub fn worktree_signature(repo: &Repo) -> Result<u64> {
                 (m.len(), t)
             });
         items.push((path, size, mtime));
-        if items.len() >= MAX_FILES {
+        if items.len() >= repo.worktree_files() {
             break;
         }
     }
@@ -155,10 +159,11 @@ pub fn is_dirty(repo: &Repo) -> bool {
 /// time, so the bytes held at once are one file's old and new side, not the whole change.
 pub fn worktree_diff(repo: &Repo) -> Result<Vec<FileDiff>> {
     let r = open(repo)?;
-    let paths = changed_paths(&r, MAX_FILES)?;
+    let big = repo.worktree_diff_bytes();
+    let paths = changed_paths(&r, repo.worktree_files())?;
     let head = r.head_commit().ok().and_then(|c| c.tree().ok());
     let root = r.workdir().and_then(|w| w.canonicalize().ok());
-    let moves = pair::exact_moves(&r, head.as_ref(), root.as_deref(), &paths);
+    let moves = pair::exact_moves(&r, head.as_ref(), root.as_deref(), &paths, big);
     let mut out = Vec::new();
     for path in &paths {
         if moves.sources.contains(path.as_str()) {
@@ -174,10 +179,10 @@ pub fn worktree_diff(repo: &Repo) -> Result<Vec<FileDiff>> {
         }
         let old = head
             .as_ref()
-            .map_or(Read::Missing, |t| head_blob(&r, t, path));
+            .map_or(Read::Missing, |t| head_blob(&r, t, path, big));
         let new = root
             .as_deref()
-            .map_or(Read::Skip, |w| read_worktree(w, path));
+            .map_or(Read::Skip, |w| read_worktree(w, path, big));
         out.extend(classify(path, &old, &new));
     }
     Ok(out)
@@ -195,17 +200,18 @@ pub fn worktree_file_diff(repo: &Repo, path: &str) -> Result<Option<FileDiff>> {
         return Ok(None);
     }
     let r = open(repo)?;
-    if !changed_paths(&r, MAX_FILES)?.contains(path) {
+    let big = repo.worktree_diff_bytes();
+    if !changed_paths(&r, repo.worktree_files())?.contains(path) {
         return Ok(None);
     }
     let head = r.head_commit().ok().and_then(|c| c.tree().ok());
     let root = r.workdir().and_then(|w| w.canonicalize().ok());
     let old = head
         .as_ref()
-        .map_or(Read::Missing, |t| head_blob(&r, t, path));
+        .map_or(Read::Missing, |t| head_blob(&r, t, path, big));
     let new = root
         .as_deref()
-        .map_or(Read::Skip, |w| read_worktree(w, path));
+        .map_or(Read::Skip, |w| read_worktree(w, path, big));
     Ok(classify(path, &old, &new))
 }
 
@@ -227,7 +233,7 @@ fn classify(path: &str, old: &Read, new: &Read) -> Option<FileDiff> {
     ))
 }
 
-fn head_blob(repo: &gix::Repository, tree: &gix::Tree<'_>, path: &str) -> Read {
+fn head_blob(repo: &gix::Repository, tree: &gix::Tree<'_>, path: &str, big: u64) -> Read {
     let Ok(Some(entry)) = crate::treepath::lookup(tree, path) else {
         return Read::Missing;
     };
@@ -237,7 +243,7 @@ fn head_blob(repo: &gix::Repository, tree: &gix::Tree<'_>, path: &str) -> Read {
     }
     let id = entry.object_id();
     match repo.find_header(id) {
-        Ok(h) if h.size() > MAX_DIFF_BYTES as u64 => Read::Big,
+        Ok(h) if h.size() > big => Read::Big,
         Ok(_) => repo
             .find_object(id)
             .map_or(Read::Skip, |o| Read::data(o.detach().data)),
@@ -247,7 +253,7 @@ fn head_blob(repo: &gix::Repository, tree: &gix::Tree<'_>, path: &str) -> Read {
 
 enum Read {
     Data(Vec<u8>),
-    /// Over [`MAX_DIFF_BYTES`]: listed without hunks, never read.
+    /// Over the diff size limit: listed without hunks, never read.
     Big,
     /// The file is gone, which for a tracked path means deleted.
     Missing,
@@ -311,7 +317,7 @@ mod held {
 
 /// `work` must be canonical. A path whose parent resolves outside it (a symlinked directory)
 /// is skipped, so the view never renders files from elsewhere on disk.
-fn read_worktree(work: &Path, rel: &str) -> Read {
+fn read_worktree(work: &Path, rel: &str, big: u64) -> Read {
     let full = work.join(rel);
     match full.parent().map(Path::canonicalize) {
         Some(Ok(parent)) if parent.starts_with(work) => {}
@@ -329,7 +335,7 @@ fn read_worktree(work: &Path, rel: &str) -> Read {
     if !meta.is_file() {
         return Read::Skip;
     }
-    if meta.len() > MAX_DIFF_BYTES as u64 {
+    if meta.len() > big {
         return Read::Big;
     }
     match std::fs::read(&full) {
@@ -482,7 +488,7 @@ mod tests {
         // the size cap ran on metadata alone.
         let big = p.join("dump.sql");
         std::fs::File::create(&big)
-            .and_then(|f| f.set_len(2 * super::MAX_DIFF_BYTES as u64))
+            .and_then(|f| f.set_len(2 * super::WORKTREE_DIFF_BYTES))
             .expect("sparse");
         std::fs::set_permissions(&big, std::fs::Permissions::from_mode(0o000)).expect("chmod");
         let d = worktree_diff(&Repo::discover(p).expect("repo")).expect("diff");

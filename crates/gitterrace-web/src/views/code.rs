@@ -6,7 +6,7 @@ use gitterrace_git::BlameLine;
 
 use crate::fmt::{ago, esc, esc_text, sha_link};
 use crate::views::diff::CHUNK_LINES;
-use crate::views::{MAX_BLOB_LINES, author_href};
+use crate::views::{Render, author_href};
 
 /// Chunks highlighted before first paint of a big file; the rest is plain until `code_tail_html`.
 const EAGER_CHUNKS: usize = 2;
@@ -43,10 +43,11 @@ impl CodeMemo {
 
 static CODE_CACHE: std::sync::Mutex<Option<CodeMemo>> = std::sync::Mutex::new(None);
 
-fn code_key(path: &str, text: &str) -> u64 {
+/// Keyed by the limits too: a reload that changes them must not serve the old rendering.
+fn code_key(r: &Render, path: &str, text: &str) -> u64 {
     use std::hash::{Hash, Hasher};
     let mut hasher = std::collections::hash_map::DefaultHasher::new();
-    (path, text).hash(&mut hasher);
+    (path, text, r.highlight_bytes, r.blob_lines).hash(&mut hasher);
     hasher.finish()
 }
 
@@ -54,14 +55,15 @@ fn code_key(path: &str, text: &str) -> u64 {
 /// it is kept: the cache policy without the process-wide state other tests also write.
 #[cfg(test)]
 pub(crate) fn code_memo_put(memo: &mut CodeMemo, cap: usize, path: &str, text: &str) -> usize {
-    let built = code_html_uncached(path, text, usize::MAX);
-    memo.put(cap, code_key(path, text), &built);
+    let r = Render::test(cap);
+    let built = code_html_uncached(&r, path, text, usize::MAX);
+    memo.put(cap, code_key(&r, path, text), &built);
     built.0.len()
 }
 
 #[cfg(test)]
 pub(crate) fn code_memo_has(memo: &CodeMemo, path: &str, text: &str) -> bool {
-    memo.get(code_key(path, text)).is_some()
+    memo.get(code_key(&Render::test(0), path, text)).is_some()
 }
 
 fn code_cached(key: u64) -> Option<(String, bool)> {
@@ -72,32 +74,32 @@ fn code_cached(key: u64) -> Option<(String, bool)> {
 /// Returns the line blocks and whether it was cut at the line cap.
 /// One div per line: the number is a CSS counter, so it neither selects nor copies.
 /// Highlighting costs ~0.7 ms/KB, so a blob is rendered once per content.
-pub(crate) fn code_html(cache_bytes: usize, path: &str, text: &str) -> (String, bool) {
-    let key = code_key(path, text);
+pub(crate) fn code_html(r: &Render, path: &str, text: &str) -> (String, bool) {
+    let key = code_key(r, path, text);
     if let Some(hit) = code_cached(key) {
         return hit;
     }
-    let built = code_html_uncached(path, text, usize::MAX);
+    let built = code_html_uncached(r, path, text, usize::MAX);
     if let Ok(mut g) = CODE_CACHE.lock() {
         g.get_or_insert_with(CodeMemo::default)
-            .put(cache_bytes, key, &built);
+            .put(r.cache_bytes, key, &built);
     }
     built
 }
 
 /// Like `code_html`, but a big uncached file highlights only its first chunks and marks the
 /// block `data-hl` so the page fetches the rest from `code_tail_html` after first paint.
-pub(crate) fn code_html_first(cache_bytes: usize, path: &str, text: &str) -> (String, bool) {
-    if text.len() <= EAGER_BYTES || code_cached(code_key(path, text)).is_some() {
-        return code_html(cache_bytes, path, text);
+pub(crate) fn code_html_first(r: &Render, path: &str, text: &str) -> (String, bool) {
+    if text.len() <= EAGER_BYTES || code_cached(code_key(r, path, text)).is_some() {
+        return code_html(r, path, text);
     }
-    code_html_uncached(path, text, EAGER_CHUNKS * CHUNK_LINES)
+    code_html_uncached(r, path, text, EAGER_CHUNKS * CHUNK_LINES)
 }
 
 /// The chunks `code_html_first` left plain, highlighted. Empty when the file has no chunk
 /// past the eager ones, which is also the answer for a direct request on a small file.
-pub(crate) fn code_tail_html(cache_bytes: usize, path: &str, text: &str) -> String {
-    let (full, _) = code_html(cache_bytes, path, text);
+pub(crate) fn code_tail_html(r: &Render, path: &str, text: &str) -> String {
+    let (full, _) = code_html(r, path, text);
     let marker = "<div class=\"ch\"";
     let end = full.len() - "</div>".len();
     let from = full
@@ -107,8 +109,8 @@ pub(crate) fn code_tail_html(cache_bytes: usize, path: &str, text: &str) -> Stri
     full[from..end].to_owned()
 }
 
-fn code_html_uncached(path: &str, text: &str, lit_lines: usize) -> (String, bool) {
-    let mut hl = (text.len() <= crate::highlight::HIGHLIGHT_LIMIT)
+fn code_html_uncached(r: &Render, path: &str, text: &str, lit_lines: usize) -> (String, bool) {
+    let mut hl = (text.len() <= r.highlight_bytes)
         .then(|| crate::highlight::for_file(path, text.lines().next().unwrap_or("")))
         .flatten();
     let lazy = hl.is_some() && lit_lines != usize::MAX;
@@ -121,7 +123,7 @@ fn code_html_uncached(path: &str, text: &str, lit_lines: usize) -> (String, bool
     let mut cut = false;
     let mut open = false;
     for (i, line) in text.lines().enumerate() {
-        if i >= MAX_BLOB_LINES {
+        if i >= r.blob_lines {
             cut = true;
             break;
         }
@@ -149,9 +151,9 @@ fn code_html_uncached(path: &str, text: &str, lit_lines: usize) -> (String, bool
     (out, cut)
 }
 
-pub(crate) fn blame_html(path: &str, lines: &[BlameLine], now: i64) -> String {
+pub(crate) fn blame_html(r: &Render, path: &str, lines: &[BlameLine], now: i64) -> String {
     let total: usize = lines.iter().map(|l| l.text.len()).sum();
-    let mut hl = (total <= crate::highlight::HIGHLIGHT_LIMIT)
+    let mut hl = (total <= r.highlight_bytes)
         .then(|| crate::highlight::for_file(path, lines.first().map_or("", |l| l.text.as_str())))
         .flatten();
     let mut out = String::from("<table class=\"code blame\">");
