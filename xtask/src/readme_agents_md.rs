@@ -208,6 +208,20 @@ pub fn commands_rows() -> Vec<(String, String)> {
     rows
 }
 
+/// Every long flag of the root command and its subcommands, from the clap definition.
+pub fn cli_flags() -> std::collections::BTreeSet<String> {
+    let cmd = cli::Cli::command();
+    let mut out = std::collections::BTreeSet::new();
+    for c in std::iter::once(&cmd).chain(cmd.get_subcommands()) {
+        out.extend(
+            c.get_arguments()
+                .filter_map(|a| a.get_long().map(str::to_owned)),
+        );
+    }
+    out.extend(["help".to_owned(), "version".to_owned()]);
+    out
+}
+
 fn positionals_no_global(c: &clap::Command) -> String {
     c.get_positionals()
         .filter(|a| !a.is_global_set())

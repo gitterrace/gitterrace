@@ -80,6 +80,15 @@ fn main() -> Result<()> {
                 std::process::exit(1);
             }
             println!("generated output: up to date");
+            let bad = docs_index::check(&root)?;
+            if !bad.is_empty() {
+                println!(
+                    "documents out of step with the code:\n  {}",
+                    bad.join("\n  ")
+                );
+                std::process::exit(1);
+            }
+            println!("documents: links, anchors, keys, flags and the index check out");
         }
     }
     Ok(())
