@@ -69,7 +69,8 @@ impl Proof {
             self.full, self.small
         ));
         line(format!(
-            "shared {}, equal {}, chrome-only {}, tie-only {}, real {}, golden-set only {}",
+            "completeness at one commit: shared {}, equal {}, chrome-only {}, tie-only {}, \
+             lost {}, golden-set only {}",
             self.shared,
             self.equal,
             self.chrome.len(),
@@ -89,7 +90,7 @@ impl Proof {
         for (name, keys) in [
             ("chrome", &self.chrome),
             ("tie", &self.ties),
-            ("real", &self.real),
+            ("lost", &self.real),
         ] {
             for k in keys {
                 line(format!("  {name} {k}"));

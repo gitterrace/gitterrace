@@ -136,3 +136,51 @@ fn digest_is_pinned() {
     assert_eq!(digest(""), "6c62272e07bb014262b821756295c58d");
     assert_ne!(digest("a"), digest("b"));
 }
+
+/// The re-bless guard: one real body change planted in one cell of a dump must come out of the
+/// old vs new proof as REAL, with its line. The completeness proof, which renders one commit,
+/// cannot see it, and a header-only or tie-only move must not be called real.
+#[test]
+fn a_planted_change_in_one_cell_is_real() {
+    use crate::oracle::{Change, read_dump};
+    let page = |head: &str, n: &str| {
+        format!("<html><header>{head}</header>\n<main>\n<p>{n} commits</p>\n</main></html>")
+    };
+    let write = |dir: &std::path::Path, cells: &[(&str, String)]| {
+        for (i, (k, b)) in cells.iter().enumerate() {
+            std::fs::write(dir.join(format!("{i}")), format!("{k}\n{b}")).expect("dump");
+        }
+    };
+    let base = std::env::temp_dir().join(format!("gt-change-{}", std::process::id()));
+    let (old, new) = (base.join("old"), base.join("new"));
+    std::fs::create_dir_all(&old).expect("mkdir");
+    std::fs::create_dir_all(&new).expect("mkdir");
+    write(
+        &old,
+        &[
+            ("[as-is] /stats?period=1m", page("a", "42")),
+            ("[as-is] /stats?period=1w", page("a", "7")),
+            ("[as-is] /stats?period=1y", page("a", "90")),
+        ],
+    );
+    write(
+        &new,
+        &[
+            ("[as-is] /stats?period=1m", page("b", "42")),
+            ("[as-is] /stats?period=1w", page("a", "8")),
+            ("[as-is] /stats?period=1y", page("a", "90")),
+        ],
+    );
+    let c = Change::of(&read_dump(&old), &read_dump(&new));
+    std::fs::remove_dir_all(&base).expect("cleanup");
+    assert_eq!((c.same, c.chrome.len(), c.ties.len()), (1, 1, 0));
+    assert_eq!(c.real.len(), 1, "{}", c.render(""));
+    let (k, was, now) = &c.real[0];
+    assert_eq!(k, "[as-is] /stats?period=1w");
+    assert_eq!(
+        (was.as_str(), now.as_str()),
+        ("<p>7 commits</p>", "<p>8 commits</p>")
+    );
+    assert!(c.render("").contains("REAL 1"));
+    assert_eq!(c.unexplained(), 1);
+}

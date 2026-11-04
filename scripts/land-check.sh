@@ -3,8 +3,9 @@
 # but over the crates the change touches. A path it cannot map (the Makefile, scripts/, a root
 # manifest, an unknown directory) widens the selection to the whole workspace and says so, so it
 # never narrows on ignorance. Order: fmt, clippy -D warnings, tests, lines, names, conventions,
-# lint, docs-check, then the subject of every commit. The crates have no cargo features, so one
-# clippy pass covers both feature shapes.
+# lint, docs-check, then the subject of every commit. When web or index is in scope the
+# equivalence oracle (equivalence_pages) runs again as its own named step. The crates have no
+# cargo features, so one clippy pass covers both feature shapes.
 #
 #   scripts/land-check.sh [--base REV] [--full] [--explain] [--paths P...] [--self-test]
 #
@@ -191,6 +192,11 @@ step cargo fmt --all -- --check
 if ((${#scope[@]})); then
   step cargo clippy "${scope[@]}" --all-targets -- -D warnings
   step cargo test "${scope[@]}"
+  # The output oracle: named on its own so a log shows it ran whenever the pages could move.
+  if [[ " ${scope[*]} " == *" --workspace "* || " ${scope[*]} " == *" gitterrace-web "* ||
+    " ${scope[*]} " == *" gitterrace-index "* ]]; then
+    step cargo test -p gitterrace-web --test equivalence_pages
+  fi
 fi
 step python3 scripts/lines-check.py
 step python3 scripts/status-words-check.py

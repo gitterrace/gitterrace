@@ -4,6 +4,7 @@
 //! The golden file is the reference. A later implementation passes when every digest is the
 //! same. `TEST_BLESS=1` rewrites the file, which only today's implementation may do.
 
+mod change;
 mod proof;
 
 use std::collections::BTreeMap;
@@ -17,6 +18,7 @@ use axum::Router;
 use crate::matrix::{Cell, Mailmap, Values};
 use crate::web::page;
 
+pub use change::{Change, read_dump};
 pub use proof::Proof;
 
 /// The frozen "now": 2024-03-10T00:00:00Z, nine days after the adversarial tip.

@@ -134,9 +134,10 @@ fn every_cell_matches_the_oracle() {
 
 /// The per-commit proof that the pairwise golden loses nothing: at this build, run the full
 /// product and the golden's cell set, then compare every shared key. Writes counts and the
-/// differences, classified chrome-only, tie-only or real, to `$TEST_GOLDEN_PROOF`, and fails
-/// when any is real. With `TEST_GOLDEN_FULL=<old full golden>` the full run is also compared to
-/// it by digest. Off unless `TEST_GOLDEN_PROOF` is set.
+/// differences, classified chrome-only, tie-only or lost, to `$TEST_GOLDEN_PROOF`, and fails
+/// when any is lost. It never compares two commits, so it says nothing about a re-bless: that is
+/// `a_rebless_proof_classifies_old_against_new`. With `TEST_GOLDEN_FULL=<old full golden>` the
+/// full run is also compared to it by digest. Off unless `TEST_GOLDEN_PROOF` is set.
 #[test]
 fn the_pairwise_golden_agrees_with_the_full_matrix() {
     let Some(out) = std::env::var_os("TEST_GOLDEN_PROOF") else {
@@ -334,34 +335,24 @@ fn a_real_history_samples_match_the_oracle() {
     oracle::check(&golden, &dump(&golden), &answers);
 }
 
-/// The re-bless gate for a header or sidebar change: every answer of the current build, outside
-/// the site header (and the overview sidebar for `/`), equals the reference bodies byte for
-/// byte, equal-time order folded. Run it with the two dumps, then bless only when it passes:
-/// `TEST_CHROME_OLD=<reference dump> TEST_CHROME_NEW=<dump of this build>`.
+/// The re-bless proof: two `TEST_ORACLE_DUMP` folders of the same cells, one per commit, compared
+/// per cell and classified unchanged, chrome-only, tie-only or real, each real cell with its
+/// first differing line. Writes `$TEST_CHANGE_REPORT` and fails on any real or one-sided cell.
+/// `scripts/golden-check.sh change OLD NEW` makes the dumps and runs it:
+/// `TEST_CHANGE_OLD=<dump> TEST_CHANGE_NEW=<dump> TEST_CHANGE_REPORT=<file>`.
 #[test]
-fn a_rebless_moves_only_chrome() {
-    let (Some(old), Some(new)) = (
-        std::env::var_os("TEST_CHROME_OLD"),
-        std::env::var_os("TEST_CHROME_NEW"),
+fn a_rebless_proof_classifies_old_against_new() {
+    let (Some(old), Some(new), Some(out)) = (
+        std::env::var_os("TEST_CHANGE_OLD"),
+        std::env::var_os("TEST_CHANGE_NEW"),
+        std::env::var_os("TEST_CHANGE_REPORT"),
     ) else {
         return;
     };
-    let (moved, bad) = oracle::chrome_only_diff(Path::new(&old), Path::new(&new));
-    let mut per: BTreeMap<String, usize> = BTreeMap::new();
-    for k in &bad {
-        let page = k.split_once("] ").map_or(k.as_str(), |(_, p)| p);
-        *per.entry(page.split('?').next().unwrap_or(page).to_owned())
-            .or_default() += 1;
-    }
-    assert!(
-        bad.is_empty(),
-        "{} answers moved outside the chrome ({moved} chrome-only), per page {per:?}, first {:?}",
-        bad.len(),
-        &bad[..bad.len().min(5)]
-    );
-    std::io::Write::write_all(
-        &mut std::io::stderr(),
-        format!("chrome-only answers: {moved}\n").as_bytes(),
-    )
-    .expect("stderr");
+    let (old, new) = (Path::new(&old), Path::new(&new));
+    let change = oracle::Change::of(&oracle::read_dump(old), &oracle::read_dump(new));
+    let head = std::env::var("TEST_CHANGE_HEAD").unwrap_or_default();
+    let text = change.render(&head);
+    std::fs::write(&out, &text).expect("change report");
+    assert_eq!(change.unexplained(), 0, "{text}");
 }
