@@ -201,7 +201,12 @@
       if (chan) chan.postMessage({ t: "ev", data: ev.data });
       handle(ev);
     });
-    source.onopen = function () { delay = 1000; };
+    source.onopen = function () {
+      delay = 1000;
+      // A repository may have joined or left before this stream was open (the version does not
+      // move for it, so no catch-up event comes): the switcher reads the list again.
+      document.dispatchEvent(new CustomEvent("gt:repos-changed"));
+    };
     source.onerror = function () {
       // The browser would retry on its own, but at a fixed short interval. Back off instead.
       // A refused stream (503, too many open pages) lands here too and retries slowly.
