@@ -467,6 +467,15 @@
             }
           },
           {
+            "description": "`contributors` only: `commits` (default), `added`, `deleted` or `net`. Sets the order and the per-bucket series.",
+            "in": "query",
+            "name": "metric",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
             "description": "Cap on rows.",
             "in": "query",
             "name": "limit",
