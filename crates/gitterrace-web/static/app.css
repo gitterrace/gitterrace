@@ -367,7 +367,9 @@ svg.loc .xh{display:none;stroke:var(--fg);stroke-width:1;stroke-dasharray:3 3;po
 .dot{display:inline-block;width:9px;height:9px;border-radius:var(--radius);margin-right:8px;flex:none}
 .loc-tip .dot{margin:0}
 .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:var(--space-4);margin:var(--space-2) 0 var(--space-4)}
-.kpis b{display:block;font:var(--weight-semibold) var(--text-xl)/1.2 var(--serif);font-variant-numeric:tabular-nums}
+/* KPI numerals share the tables' mono family; the sign already says add or remove, so the
+   number stays in the text colour. */
+.kpis b{display:block;font:var(--weight-semibold) var(--text-xl)/1.2 var(--mono);font-variant-numeric:tabular-nums;letter-spacing:-.02em;color:var(--fg)}
 .kpis span{color:var(--muted);font-size:var(--text-sm)}
 .card.pad+.card.pad,.filters+.card.pad{margin-top:var(--space-4)}
 .sharebar{display:flex;height:12px;border-radius:6px;overflow:hidden;margin:var(--space-2) 0 var(--space-4);background:var(--soft)}
