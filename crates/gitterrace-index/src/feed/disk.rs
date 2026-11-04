@@ -30,8 +30,9 @@ use crate::{CodeStat, CommitRecord, FileStat};
 
 pub use writer::RowWriter;
 
-/// Bytes of blocks kept between calls. With the small tables this stays inside the 32 MB
-/// budget whatever the history size.
+/// Bytes of blocks kept between calls, whatever the history size. A fixed amount outside
+/// `resources.cache_mb`: it lives as long as the source, which the server drops on its idle
+/// release, so it counts against the warm idle footprint.
 const CACHE_BYTES: usize = 12 << 20;
 /// One record may span blocks, but never more than this, so a hostile offset chain cannot
 /// make one read walk the whole file.
