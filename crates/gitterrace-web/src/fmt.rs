@@ -2,6 +2,8 @@
 
 use gitterrace_git::{civil_from_days as civil, percent_decode};
 
+use crate::when::When;
+
 /// The one percent-encoding rule: `enc_path` keeps `/`, `enc_seg` encodes it.
 pub(crate) use gitterrace_git::{
     percent_encode_path as enc_path, percent_encode_segment as enc_seg,
@@ -83,8 +85,18 @@ pub(crate) fn with_dates<T>(absolute: bool, f: impl FnOnce() -> T) -> T {
     scoped(&ABSOLUTE, absolute, f)
 }
 
-/// Coarse relative time such as `3 days ago`, or the date under `display.dates = "absolute"`.
-pub(crate) fn ago(time: i64, now: i64) -> String {
+/// Coarse relative time such as `3 days ago`, or the date under `display.dates = "absolute"`,
+/// as a [`When`] whose hover tip is the full UTC timestamp.
+pub(crate) fn ago(time: i64, now: i64) -> When {
+    ago_at(time, 0, now)
+}
+
+/// Like [`ago`], with the tip in the commit's own `offset`.
+pub(crate) fn ago_at(time: i64, offset: i32, now: i64) -> When {
+    When::new(relative(time, now), time, offset)
+}
+
+fn relative(time: i64, now: i64) -> String {
     if ABSOLUTE.with(|a| *a.borrow()) {
         return day(time);
     }
@@ -104,6 +116,21 @@ pub(crate) fn ago(time: i64, now: i64) -> String {
         s => (s / (86_400 * 365), "year"),
     };
     format!("{n} {unit}{} ago", if n == 1 { "" } else { "s" })
+}
+
+/// `YYYY-MM-DDTHH:MM:SSZ`, the instant a time element's datetime carries.
+pub(crate) fn iso(time: i64) -> String {
+    let Some(t) = local(time, 0) else {
+        return String::new();
+    };
+    let (y, m, d) = civil(t.div_euclid(86_400));
+    let secs = t.rem_euclid(86_400);
+    format!(
+        "{y:04}-{m:02}-{d:02}T{:02}:{:02}:{:02}Z",
+        secs / 3600,
+        secs % 3600 / 60,
+        secs % 60
+    )
 }
 
 pub(crate) fn now() -> i64 {
@@ -308,14 +335,14 @@ mod tests {
 
     #[test]
     fn relative_and_size() {
-        assert_eq!(ago(0, 90), "1 minute ago");
-        assert_eq!(ago(0, 86_400 * 3), "3 days ago");
+        assert_eq!(ago(0, 90).text, "1 minute ago");
+        assert_eq!(ago(0, 86_400 * 3).text, "3 days ago");
         assert_eq!(
-            with_dates(true, || ago(86_400 * 40, 86_400 * 43)),
+            with_dates(true, || ago(86_400 * 40, 86_400 * 43).text),
             "1970-02-10"
         );
         assert_eq!(
-            ago(0, 90),
+            ago(0, 90).text,
             "1 minute ago",
             "the mode does not leak out of its scope"
         );
@@ -347,7 +374,7 @@ mod tests {
         assert!(caught.is_err());
         assert_eq!(selected(), "HEAD");
         assert_eq!(base(), "");
-        assert_eq!(ago(0, 90), "1 minute ago");
+        assert_eq!(ago(0, 90).text, "1 minute ago");
     }
 
     #[test]
@@ -379,7 +406,7 @@ mod tests {
             assert_eq!(date(t, 0), UNKNOWN_DATE);
             assert_eq!(day(t), UNKNOWN_DATE);
             assert_eq!(day_label(t, 0, 1_700_000_000), UNKNOWN_DATE);
-            assert_eq!(ago(t, 1_700_000_000), UNKNOWN_DATE);
+            assert_eq!(ago(t, 1_700_000_000).text, UNKNOWN_DATE);
         }
         // The edges of the range still read as dates.
         assert_eq!(day(-62_135_596_800), "0001-01-01");

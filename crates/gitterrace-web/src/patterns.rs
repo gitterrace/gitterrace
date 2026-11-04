@@ -29,7 +29,7 @@ struct PairRow {
 struct ReleaseRow {
     name: String,
     href: String,
-    when: String,
+    when: crate::when::When,
     commits: String,
     days: String,
 }
@@ -105,7 +105,7 @@ pub(crate) async fn page(
             .map(|rl| ReleaseRow {
                 href: href(&format!("/log/{}", enc_seg(&rl.name))),
                 name: rl.name.clone(),
-                when: fmt::day(rl.time),
+                when: crate::when::When::new(fmt::day(rl.time), rl.time, 0),
                 commits: fmt::thousands(rl.commits_since),
                 days: rl
                     .days_since

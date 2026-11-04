@@ -189,7 +189,7 @@ struct TagRow {
     href: String,
     subject: String,
     commit: String,
-    when: String,
+    when: crate::when::When,
 }
 
 #[derive(Template)]
@@ -380,7 +380,7 @@ async fn api_files(State(app): Shared, Path(rev): Path<String>) -> Result<Respon
 struct RefBody {
     name: String,
     kind: &'static str,
-    when: String,
+    when: crate::when::When,
 }
 
 /// Branches and tags for the switcher. Remotes are left out to keep the list short.
@@ -411,7 +411,7 @@ struct LastBody {
     name: String,
     id: String,
     subject: String,
-    when: String,
+    when: crate::when::When,
 }
 
 async fn api_last_root(state: Shared, Path(rev): Path<String>) -> Result<Response> {

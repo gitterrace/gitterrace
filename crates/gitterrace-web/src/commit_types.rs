@@ -399,8 +399,7 @@ fn build(a: &crate::app::App, all: &Src, c: Chrome, tq: &TypesQuery) -> TypesPag
             subject: subjects.get(id).cloned().unwrap_or_default(),
             author: author.clone(),
             author_href: f.link(BASE, Dim::Author, email),
-            when: fmt::ago(*time, now),
-            date: fmt::date(*time, *offset),
+            when: fmt::ago_at(*time, *offset, now),
         })
         .collect();
 

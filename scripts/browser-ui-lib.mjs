@@ -251,6 +251,39 @@ async function tips() {
   }
 }
 
+// ---- date tips --------------------------------------------------------------------------------
+// A relative date shows its full date on hover and on keyboard focus: in the tree listing (filled
+// by JS from /api/last) and on the overview's latest commit card.
+async function dateTips() {
+  for (const name of browsers) {
+    const { b, ctx } = await context(name);
+    const p = await ctx.newPage();
+    const out = {};
+    for (const [label, path, sel] of [['tree', '/tree/HEAD', 'table.entries td.ago time[data-tip]'], ['overview', '/', '.latest time[data-tip]']]) {
+      await p.goto(srv.base + path, { waitUntil: 'load' });
+      await p.waitForSelector(sel, { timeout: 5000 }).catch(() => {});
+      const el = p.locator(sel).first();
+      if (!(await el.count())) { out[label] = 'no dated element'; continue; }
+      const want = await el.getAttribute('data-tip');
+      const shown = () => p.evaluate(() => { const t = document.getElementById('gt-tip'); return t && t.classList.contains('on') ? t.textContent : ''; });
+      await el.hover();
+      await p.waitForTimeout(700);
+      const hover = await shown();
+      await p.mouse.move(0, 0);
+      await p.waitForTimeout(100);
+      // The tip shows on focus reached by Tab, so mark the last key as Tab, then focus.
+      await p.evaluate(() => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true })));
+      await el.focus();
+      await p.waitForTimeout(100);
+      const focus = await shown();
+      out[label] = hover === want && focus === want && !!want ? 'ok' : { want, hover, focus };
+    }
+    if (Object.values(out).every((v) => v === 'ok')) r.ok(`date tips ${name}: hover and focus show the full date in the tree and on the overview`);
+    else r.fail(`date tips ${name}: ${JSON.stringify(out)}`);
+    await b.close();
+  }
+}
+
 // ---- outline ----------------------------------------------------------------------------------
 // "On this page": a sticky rail at 1400px, a menu at 900px, a click scrolls and sets the hash,
 // the active item follows the scroll, the Code tab hides both, light and dark.
@@ -483,5 +516,5 @@ async function liveScroll() {
 // The mark is two paths, ink and accent, meeting on one line. A renderer that antialiases each
 // path alone lets the background through there as a hairline (WebKit did). Paint every mark at
 // many sizes and offsets and compare the split rows with the solid rows just above and below.
-  return { marked, menuSame, gutter, overlays, tips, repoSwitch, liveScroll, outline };
+  return { marked, menuSame, gutter, overlays, tips, dateTips, repoSwitch, liveScroll, outline };
 }

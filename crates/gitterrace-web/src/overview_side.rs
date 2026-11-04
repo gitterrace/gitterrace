@@ -39,7 +39,7 @@ pub(crate) struct Loose {
     pub(crate) name: String,
     pub(crate) href: String,
     pub(crate) tip: String,
-    pub(crate) when: String,
+    pub(crate) when: crate::when::When,
 }
 
 pub(crate) struct Lang {
@@ -61,7 +61,7 @@ pub(crate) struct Side {
     pub(crate) worktree_href: String,
     pub(crate) today: usize,
     pub(crate) week: usize,
-    pub(crate) last: String,
+    pub(crate) last: crate::when::When,
     pub(crate) spark: String,
     pub(crate) spark_tip: String,
     /// The sparkline's window, "9 days", beside the heading.
@@ -185,7 +185,7 @@ pub(crate) fn build(a: &App, head: &str, src: &dyn InsightsSource, dirty: bool, 
         worktree_href: href("/worktree"),
         today,
         week,
-        last: latest.map_or_else(String::new, |c| fmt::ago(c.time, now)),
+        last: latest.map_or_else(crate::when::When::none, |c| fmt::ago(c.time, now)),
         spark: if series.counts.iter().any(|&n| n > 0) {
             line(&series.counts)
         } else {
@@ -407,7 +407,7 @@ mod tests {
         assert_eq!(s.branch, "main");
         assert!(s.dirty, "the edited a.rs makes the tree dirty");
         assert_eq!((s.today, s.week), (2, 2), "the side commit is not on main");
-        assert_eq!(s.last, "just now");
+        assert_eq!(s.last.text, "just now");
         assert!(s.spark.starts_with("<svg") && s.spark.contains("polyline"));
         assert_eq!(s.hot[0].path, "a.rs");
         assert_eq!(s.hot[0].changes, "2 changes");

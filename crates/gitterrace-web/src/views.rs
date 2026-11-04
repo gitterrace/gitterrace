@@ -7,7 +7,7 @@ use gitterrace_git::{
     ChangeKind, CommitDetail, CommitSummary, FileDiff, RefInfo, TreeEntry, TreeEntryKind,
 };
 
-use crate::fmt::{ago, date, enc_path, enc_seg, esc_text, href, sha_link};
+use crate::fmt::{ago, ago_at, enc_path, enc_seg, esc_text, href, sha_link};
 #[cfg(test)]
 pub(crate) use crate::views::code::{CodeMemo, code_html, code_memo_has, code_memo_put};
 pub(crate) use crate::views::code::{blame_html, code_html_first, code_tail_html};
@@ -163,8 +163,7 @@ pub(crate) struct CommitRow {
     pub(crate) author: String,
     /// Commit list narrowed to this author, matched by (mailmapped) email.
     pub(crate) author_href: String,
-    pub(crate) when: String,
-    pub(crate) date: String,
+    pub(crate) when: crate::when::When,
 }
 
 pub(crate) struct Entry {
@@ -178,7 +177,7 @@ pub(crate) struct RefRow {
     pub(crate) name: String,
     pub(crate) log: String,
     pub(crate) commit: String,
-    pub(crate) when: String,
+    pub(crate) when: crate::when::When,
 }
 
 pub(crate) struct FileStatRow {
@@ -404,8 +403,7 @@ pub(crate) fn commit_row(c: &CommitSummary, now: i64) -> CommitRow {
         subject: c.subject.clone(),
         author: c.author.name.clone(),
         author_href: author_href(&c.author.email),
-        when: ago(c.author.time, now),
-        date: date(c.author.time, c.author.offset),
+        when: ago_at(c.author.time, c.author.offset, now),
     }
 }
 

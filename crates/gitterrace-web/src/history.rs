@@ -21,7 +21,7 @@ struct HistRow {
     subject: String,
     author: String,
     author_href: String,
-    when: String,
+    when: crate::when::When,
     lines: String,
     renamed: Option<String>,
 }

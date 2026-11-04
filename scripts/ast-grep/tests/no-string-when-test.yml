@@ -1,0 +1,8 @@
+id: no-string-when
+valid:
+  - 'struct Row { when: When }'
+  - 'struct Row { subject: String }'
+invalid:
+  - 'struct Row { when: String }'
+  - 'struct Row { pub(crate) ago: String }'
+  - 'struct Row { when: Option<String> }'

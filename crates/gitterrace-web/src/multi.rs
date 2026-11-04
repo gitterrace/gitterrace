@@ -101,7 +101,7 @@ struct IndexRow {
     name: String,
     href: String,
     subject: String,
-    when: String,
+    when: crate::when::When,
     commit_href: String,
     spark: String,
     /// Commits in the sparkline's window.
@@ -113,7 +113,7 @@ struct IndexRow {
 struct RepoItem {
     name: String,
     href: String,
-    when: String,
+    when: crate::when::When,
 }
 
 impl Table {
@@ -522,7 +522,7 @@ async fn index(State(table): State<Arc<Table>>) -> crate::error::Result<Response
                 IndexRow {
                     name: s.name.clone(),
                     subject: c.map(|c| c.subject.clone()).unwrap_or_default(),
-                    when: c.map(|c| fmt::ago(c.author.time, now)).unwrap_or_default(),
+                    when: c.map_or_else(crate::when::When::none, |c| fmt::ago(c.author.time, now)),
                     commit_href: c.map_or_else(
                         || href.clone(),
                         |c| format!("/r/{}/commit/{}", s.name, c.id),
@@ -561,8 +561,7 @@ async fn repos_json(State(table): State<Arc<Table>>) -> Response {
                     .recent(now)
                     .last
                     .as_ref()
-                    .map(|c| fmt::ago(c.author.time, now))
-                    .unwrap_or_default(),
+                    .map_or_else(crate::when::When::none, |c| fmt::ago(c.author.time, now)),
             })
             .collect::<Vec<_>>()
     })

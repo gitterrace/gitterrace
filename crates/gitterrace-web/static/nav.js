@@ -61,6 +61,17 @@
     if (text != null) e.textContent = text;
     return e;
   }
+  // The one place JS writes a date: the relative text, with the full date as the hover tip.
+  // `w` is a When from the API: {text, datetime, tip}.
+  function whenEl(w, cls) {
+    var e = el(w.datetime ? "time" : "span", cls, w.text);
+    if (w.datetime) {
+      e.setAttribute("datetime", w.datetime);
+      e.setAttribute("data-tip", w.tip);
+      e.tabIndex = 0;
+    }
+    return e;
+  }
   function typing(t) {
     return t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT" || t.isContentEditable);
   }
@@ -234,7 +245,7 @@
     }, function (li, it) {
       li.appendChild(el("span", "name", it.name));
       li.appendChild(el("span", "tag " + it.kind, it.kind));
-      li.appendChild(el("span", "dir", it.when));
+      li.appendChild(whenEl(it.when, "dir"));
     }, function (it) { swapRev(it.name); }, "Enter to switch");
     if (refs) p.refresh();
     else fetch(B + "/api/refs").then(function (r) { return r.json(); }).then(function (l) { refs = l; p.refresh(); });
@@ -283,7 +294,7 @@
       li.appendChild(slot);
       var txt = el("span", "two");
       txt.appendChild(el("span", "name", it.name));
-      txt.appendChild(el("span", "dir", it.when));
+      txt.appendChild(whenEl(it.when, "dir"));
       li.appendChild(txt);
     }, function (it) { location.href = it.href; }, "Enter to open", "No repositories match");
     if (repos) p.refresh();
@@ -540,7 +551,8 @@
         td.appendChild(a);
         // The age gets its own right-aligned column, so the
         // message can use all the width between name and age.
-        var age = el("td", "ago", c.when);
+        var age = el("td", "ago");
+        age.appendChild(whenEl(c.when));
         td.parentNode.insertBefore(age, td.nextSibling);
       });
       table.classList.add("has-last");

@@ -1,0 +1,11 @@
+id: no-string-when
+language: rust
+severity: error
+message: A view model field named when or ago is a String.
+note: Hold a When (crate::when) so the date renders with its hover tip; fmt::ago returns one.
+files: [crates/gitterrace-web/src/**/*.rs]
+rule:
+  kind: field_declaration
+  all:
+    - has: {field: name, regex: '^(when|ago)$'}
+    - has: {field: type, regex: '^(String|Option<String>|&.*str)$'}

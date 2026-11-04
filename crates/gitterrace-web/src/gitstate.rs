@@ -74,7 +74,7 @@ struct StashRow {
     pub(crate) name: String,
     pub(crate) href: String,
     pub(crate) message: String,
-    pub(crate) when: String,
+    pub(crate) when: crate::when::When,
 }
 
 #[derive(Template)]
@@ -118,7 +118,7 @@ struct TagPage {
     commit: String,
     tree_href: String,
     tagger: String,
-    when: String,
+    when: crate::when::When,
     subject: String,
     body: String,
 }
@@ -164,7 +164,7 @@ pub(crate) struct BranchRow {
     pub(crate) author: String,
     /// The author's commit log, as on every other page that names an author.
     pub(crate) author_href: String,
-    pub(crate) when: String,
+    pub(crate) when: crate::when::When,
     pub(crate) ahead: String,
     pub(crate) behind: String,
     pub(crate) merged: bool,

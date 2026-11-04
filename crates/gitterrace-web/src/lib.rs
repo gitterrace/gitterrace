@@ -42,6 +42,7 @@ mod spark;
 #[cfg(test)]
 mod state_tests;
 mod views;
+mod when;
 #[cfg(test)]
 mod wiring_live_tests;
 #[cfg(test)]
