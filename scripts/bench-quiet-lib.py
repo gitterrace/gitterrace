@@ -92,15 +92,9 @@ class LoadSampler:
         }
 
 
-def foreign_cores() -> float:
-    """CPU in cores of every process that is not this harness or its descendants."""
-    try:
-        out = run(["ps", "-Ao", "pid=,ppid=,pcpu="])
-    except (OSError, subprocess.CalledProcessError):
-        return 0.0
-    rows = [line.split() for line in out.splitlines() if len(line.split()) == 3]
+def split_cores(rows: list[list[str]], me: int) -> tuple[float, float]:
+    """(own, foreign) CPU in cores from `pid ppid pcpu` rows: own is `me` and its descendants."""
     parent = {int(p): int(pp) for p, pp, _ in rows}
-    me = os.getpid()
 
     def ours(pid: int) -> bool:
         seen = 0
@@ -110,7 +104,29 @@ def foreign_cores() -> float:
             pid, seen = parent.get(pid, 1), seen + 1
         return False
 
-    return sum(float(c) for p, _, c in rows if not ours(int(p))) / 100
+    own = sum(float(c) for p, _, c in rows if ours(int(p)))
+    other = sum(float(c) for p, _, c in rows if not ours(int(p)))
+    return own / 100, other / 100
+
+
+def process_cores() -> tuple[float, float]:
+    try:
+        out = run(["ps", "-Ao", "pid=,ppid=,pcpu="])
+    except (OSError, subprocess.CalledProcessError):
+        return 0.0, 0.0
+    rows = [line.split() for line in out.splitlines() if len(line.split()) == 3]
+    return split_cores(rows, os.getpid())
+
+
+def foreign_cores() -> float:
+    """CPU in cores of every process that is not this harness or its descendants."""
+    return process_cores()[1]
+
+
+def load_now() -> float:
+    """The 1-minute load average without the harness's own tree: its server and git count as
+    load otherwise, and a run would wait for a quiet machine it is itself keeping busy."""
+    return max(0.0, os.getloadavg()[0] - process_cores()[0])
 
 
 # Background daemons known to skew a run. Their CPU share is recorded when above 10%.
@@ -144,17 +160,17 @@ def quiet(
             sys.exit(
                 f"machine not quiet for 30 min before {phase} (load limit {limit}), not timing"
             )
-        if os.getloadavg()[0] < limit:
+        if load_now() < limit:
             calm += 1
         else:
             if calm == 0 or calm % 60 == 0:
                 print(
-                    f"  waiting for load {os.getloadavg()[0]:.1f} < {limit:.1f} before {phase}",
+                    f"  waiting for load {load_now():.1f} < {limit:.1f} before {phase}",
                     flush=True,
                 )
             calm = 0
         time.sleep(1)
-    loads[phase] = round(os.getloadavg()[0], 2)
+    loads[phase] = round(load_now(), 2)
     noise = busy_background()
     if noise:
         loads.setdefault("background", {})[phase] = noise

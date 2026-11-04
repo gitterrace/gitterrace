@@ -33,6 +33,7 @@ from typing import Any
 
 bc = importlib.import_module("bench-chart-lib")
 bd = importlib.import_module("bench-doc-lib")
+bq = importlib.import_module("bench-quiet-lib")
 
 Json = dict[str, Any]
 ROOT = bc.ROOT
@@ -78,10 +79,19 @@ def self_test() -> None:
         ] or actual(Path(d)) != {Path(d) / "a.json"}:
             sys.exit(f"bench-report self-test failed: {got}")
     loud_test()
+    own_load_test()
     wrap_test()
     footprint_test()
     export_test()
     print("bench-report self-test: ok")
+
+
+def own_load_test() -> None:
+    """The load guard leaves the harness's own process tree out of the measure."""
+    rows = [["10", "1", "5"], ["11", "10", "150"], ["12", "11", "50"], ["20", "1", "30"]]
+    own, other = bq.split_cores(rows, 10)
+    if (round(own, 2), round(other, 2)) != (2.05, 0.3):
+        sys.exit(f"bench-report self-test failed: own pid tree counted as load {own} {other}")
 
 
 def wrap_test() -> None:
