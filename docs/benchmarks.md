@@ -125,25 +125,44 @@ The newest run in full. Every kept run, with its raw numbers and charts, is in
 
 <!-- BEGIN GENERATED: results -->
 Run 2026-11-03 on Apple M1 Max, 10 cores, 64 GB RAM, 4.0 TB SSD disk, macOS 26.6.2 (arm64). git
-version 2.54.0 (Apple Git-157), 0.1.0. 5 warm runs per page, 60
-s idle windows. Every timed phase started with the 1-minute load average under 5.
+version 2.54.0 (Apple Git-157), gitterrace 0.1.0. 5 warm runs
+per page, 60 s idle windows. Every timed phase started with the 1-minute load average under 5.
 
-- **control:** not measured on a quiet machine (other processes used 5 or more cores during
-  export#3), so its numbers are withheld.
-- **git:** not measured on a quiet machine (other processes used 5 or more cores during export#3,
-  idle, index#2), so its numbers are withheld.
-- **linux:** not measured on a quiet machine (other processes used 5 or more cores during export,
-  idle, index), so its numbers are withheld.
+- **rust:** not measured on a quiet machine (other processes used 5 or more cores during export,
+  export#3, index), so its numbers are withheld.
 
-### rust
+### control
 
-large repository, measured at `f90a2d27c2`. All 5 metrics are within budget. Against budget: idle
-CPU 0.10 % of 1 %, index build 89.5 s (86.6 to 93.6) of 2400 s, cold page 1710 ms (1647 to 1817) of
-10000 ms, warm page 39 ms of 300 ms, peak memory 1166 MB of 6000 MB.
+small repository. 6 of 7 metrics are within budget. Against budget: export
+12.3 s (12.0 to 12.3) of 60 s, idle footprint above a fresh server 14 MB of 48 MB, idle CPU 1.03 %
+of 1 %, index build 0.2 s (0.2 to 0.3) of 30 s, cold page 23 ms (22 to 24) of 1500 ms, warm page 11
+ms of 300 ms, peak memory 40 MB of 500 MB.
 
-| Repo | Class | Measured at | Index | Peak RSS | Cache | RSS after pages | Idle footprint | Idle CPU | Idle CPU with /events | Export | Cold samples |
+- **Over budget:** idle CPU is 1.03 % against a limit of 1 % (1.0x).
+
+### git
+
+medium repository, measured at `50fe5cc63f`. All 7 metrics are within budget. Against budget: export
+44.4 s (42.8 to 45.9) of 300 s, idle footprint above a fresh server 28 MB of 48 MB, idle CPU 0.12 %
+of 1 %, index build 10.8 s (10.5 to 11.3) of 300 s, cold page 2355 ms (2321 to 2381) of 3000 ms,
+warm page 27 ms of 300 ms, peak memory 383 MB of 1500 MB.
+
+### linux
+
+huge repository, measured at `cbbddb6b08`. 3 of 6 metrics are within budget. Against budget: idle
+footprint above a fresh server 55 MB of 48 MB, idle CPU 0.17 % of 1 %, index build 1596.4 s (1596.4
+to 1596.4) of 600 s, cold page 27674 ms (27674 to 27674) of 20000 ms, warm page 43 ms of 500 ms,
+peak memory 6449 MB of 8000 MB.
+
+- **Over budget:** idle footprint above a fresh server is 55 MB against a limit of 48 MB (1.2x).
+- **Over budget:** index build is 1596.4 s against a limit of 600 s (2.7x).
+- **Over budget:** cold page is 27674 ms against a limit of 20000 ms (1.4x).
+
+| Repo | Class | Measured at | Index | Peak RSS | Cache | RSS after pages | Idle footprint, total | Idle CPU | Idle CPU with /events | Export | Cold samples |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| rust | large | `f90a2d27c2` | 89.5 s | 1956 MB | 715 MB | 1166 MB | not measured | 0.03% | 0.10% | 361.7 s, 355 MB | median of 3 |
+| control | small | 0.1.0 | 0.2 s | 37 MB | 0 MB | 40 MB | 23 MB | 0.05% | 1.03% | 12.3 s, 92 MB | median of 3 |
+| git | medium | `50fe5cc63f` | 10.8 s | 672 MB | 69 MB | 383 MB | 37 MB | 0.07% | 0.12% | 44.4 s, 189 MB | median of 3 |
+| linux | huge | `cbbddb6b08` | 1596.4 s | 8370 MB | 3595 MB | 6449 MB | 64 MB | 0.10% | 0.17% | failed (page cap) | 1 sample |
 
 <picture>
 <source media="(prefers-color-scheme: dark)" srcset="../bench/results/2026-11-03-apple-m1-max/page_warm_ms-dark.svg">
@@ -170,53 +189,124 @@ CPU 0.10 % of 1 %, index build 89.5 s (86.6 to 93.6) of 2400 s, cold page 1710 m
 <img alt="Peak memory (RSS) per repository against its budget" src="../bench/results/2026-11-03-apple-m1-max/rss_mb.svg">
 </picture>
 
-### Compared with 2026-11-01
+<picture>
+<source media="(prefers-color-scheme: dark)" srcset="../bench/results/2026-11-03-apple-m1-max/footprint_idle_mb-dark.svg">
+<img alt="Idle footprint above a fresh server per repository against its budget" src="../bench/results/2026-11-03-apple-m1-max/footprint_idle_mb.svg">
+</picture>
 
-The previous run, on Apple M1 Max, 10 cores, 64 GB RAM, macOS 26 (arm64). This run predates the
-quiet-machine guard and recorded no load. Its charts stay beside its result file. On the charts
-above, a hollow marker shows its value.
+<picture>
+<source media="(prefers-color-scheme: dark)" srcset="../bench/results/2026-11-03-apple-m1-max/export_secs-dark.svg">
+<img alt="Export per repository against its budget" src="../bench/results/2026-11-03-apple-m1-max/export_secs.svg">
+</picture>
 
-| Repo | Metric | 2026-11-01 | 2026-11-03 | Change |
-| --- | --- | --- | --- | --- |
-| rust | idle CPU | 0.15 % | 0.10 % | 33% less CPU |
-| rust | index build | 334.8 s | 89.5 s | 73% faster |
-| rust | cold page | 2099 ms | 1710 ms | 19% faster |
-| rust | warm page | 398 ms | 39 ms | 90% faster |
-| rust | peak memory | 2633 MB | 1166 MB | 56% less memory |
+<details><summary>control: every page</summary>
 
-<details><summary>rust: every page</summary>
+Probes: `site/assets/screenshots/blame-light.webp` (largest text file).
 
-Probes: `library/stdarch/crates/core_arch/src/aarch64/neon/generated.rs` (largest text file), commit
-`f90a2d27c2`.
-
-| Page | Cold | Warm TTFB | Warm full (median) | min | max | Bytes | Previous warm |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| blame-long-history | 1.71 s | 35 ms | 39 ms | 38 ms | 47 ms | 9624164 | 1 ms |
-| blob-largest | 10 ms | 8 ms | 9 ms | 9 ms | 10 ms | 1796773 | 1 ms |
-| commit-largest | 47 ms | 1 ms | 1 ms | 1 ms | 1 ms | 71449 | 39 ms |
-| diff-fragment | 29 ms | 30 ms | 30 ms | 29 ms | 31 ms | 12805 | 30 ms |
-| log | 3 ms | 2 ms | 2 ms | 2 ms | 2 ms | 32574 | 2 ms |
-| overview | 747 ms | 3 ms | 3 ms | 3 ms | 3 ms | 20826 | 398 ms |
-| refs | 2 ms | 1 ms | 1 ms | 1 ms | 1 ms | 6691 | 1 ms |
-| search | 58 ms | 1 ms | 1 ms | 1 ms | 1 ms | 283295 | 53 ms |
-| stats-overview | 697 ms | 1 ms | 1 ms | 1 ms | 1 ms | 29165 | 0 ms |
-| stats/contributors | 158 ms | 1 ms | 1 ms | 1 ms | 1 ms | 76188 | 6 ms |
-| stats/frequency | 207 ms | 1 ms | 1 ms | 1 ms | 1 ms | 17694 | 2 ms |
-| stats/hotspots | 600 ms | 1 ms | 1 ms | 1 ms | 1 ms | 114853 | 1 ms |
-| stats/languages | 858 ms | 1 ms | 1 ms | 1 ms | 1 ms | 384830 | 47 ms |
-| stats/ownership | 635 ms | 1 ms | 1 ms | 1 ms | 1 ms | 20580 | 1 ms |
-| stats/patterns | 1.07 s | 1 ms | 1 ms | 1 ms | 1 ms | 22547 | 3 ms |
-| stats/types | 1.39 s | 1 ms | 1 ms | 1 ms | 2 ms | 45569 | 0 ms |
-| tree-deep | 2 ms | 1 ms | 1 ms | 1 ms | 1 ms | 7308 | 1 ms |
-| tree-root | 2 ms | 2 ms | 2 ms | 2 ms | 2 ms | 17706 | 2 ms |
+| Page | Cold | Warm TTFB | Warm full (median) | min | max | Bytes |
+| --- | --- | --- | --- | --- | --- | --- |
+| blame-long-history | 2 ms | 2 ms | 2 ms | 2 ms | 2 ms | 6020 |
+| blob-largest | 1 ms | 1 ms | 1 ms | 1 ms | 2 ms | 6611 |
+| commit-largest | 23 ms | 1 ms | 1 ms | 0 ms | 1 ms | 97470 |
+| diff-fragment | 11 ms | 11 ms | 11 ms | 10 ms | 12 ms | 48789 |
+| log | 1 ms | 1 ms | 1 ms | 1 ms | 1 ms | 33672 |
+| overview | 11 ms | 2 ms | 2 ms | 2 ms | 2 ms | 22538 |
+| refs | 1 ms | 1 ms | 1 ms | 1 ms | 1 ms | 7764 |
+| search | 7 ms | 0 ms | 1 ms | 0 ms | 1 ms | 321095 |
+| stats-overview | 1 ms | 0 ms | 0 ms | 0 ms | 0 ms | 26033 |
+| stats/contributors | 0 ms | 0 ms | 0 ms | 0 ms | 0 ms | 8234 |
+| stats/frequency | 0 ms | 0 ms | 0 ms | 0 ms | 0 ms | 11838 |
+| stats/hotspots | 0 ms | 0 ms | 0 ms | 0 ms | 1 ms | 108767 |
+| stats/languages | 0 ms | 0 ms | 0 ms | 0 ms | 1 ms | 127765 |
+| stats/ownership | 0 ms | 0 ms | 0 ms | 0 ms | 0 ms | 15391 |
+| stats/patterns | 0 ms | 0 ms | 0 ms | 0 ms | 0 ms | 19152 |
+| stats/types | 0 ms | 0 ms | 0 ms | 0 ms | 0 ms | 37391 |
+| tree-deep | 1 ms | 1 ms | 1 ms | 1 ms | 1 ms | 7814 |
+| tree-root | 1 ms | 1 ms | 1 ms | 1 ms | 1 ms | 19496 |
 
 | Budget | Value | Limit | Status |
 | --- | --- | --- | --- |
+| export_secs | 12.3 | 60 | pass |
+| footprint_idle_mb | 14.3 | 48 | pass |
+| idle_cpu_pct | 1.0 | 1 | over |
+| index_secs | 0.2 | 30 | pass |
+| page_cold_ms | 23.2 | 1500 | pass |
+| page_warm_ms | 10.9 | 300 | pass |
+| rss_mb | 39.6 | 500 | pass |
+
+</details>
+
+<details><summary>git: every page</summary>
+
+Probes: `po/bg.po` (largest text file), commit `50fe5cc63f`.
+
+| Page | Cold | Warm TTFB | Warm full (median) | min | max | Bytes |
+| --- | --- | --- | --- | --- | --- | --- |
+| blame-long-history | 2.36 s | 24 ms | 27 ms | 26 ms | 28 ms | 7787360 |
+| blob-largest | 10 ms | 8 ms | 9 ms | 9 ms | 10 ms | 1749049 |
+| commit-largest | 5 ms | 1 ms | 1 ms | 1 ms | 1 ms | 10146 |
+| diff-fragment | 3 ms | 3 ms | 3 ms | 3 ms | 3 ms | 3461 |
+| log | 2 ms | 1 ms | 1 ms | 1 ms | 2 ms | 34111 |
+| overview | 95 ms | 4 ms | 4 ms | 3 ms | 4 ms | 121493 |
+| refs | 1 ms | 1 ms | 1 ms | 1 ms | 1 ms | 6749 |
+| search | 20 ms | 1 ms | 1 ms | 1 ms | 1 ms | 222912 |
+| stats-overview | 87 ms | 0 ms | 0 ms | 0 ms | 1 ms | 29906 |
+| stats/contributors | 35 ms | 0 ms | 0 ms | 0 ms | 1 ms | 82058 |
+| stats/frequency | 46 ms | 0 ms | 0 ms | 0 ms | 1 ms | 19999 |
+| stats/hotspots | 55 ms | 0 ms | 0 ms | 0 ms | 1 ms | 94765 |
+| stats/languages | 167 ms | 0 ms | 1 ms | 1 ms | 1 ms | 367183 |
+| stats/ownership | 53 ms | 0 ms | 0 ms | 0 ms | 1 ms | 20618 |
+| stats/patterns | 96 ms | 0 ms | 0 ms | 0 ms | 1 ms | 21334 |
+| stats/types | 198 ms | 0 ms | 0 ms | 0 ms | 1 ms | 49269 |
+| tree-deep | 1 ms | 1 ms | 1 ms | 1 ms | 1 ms | 6527 |
+| tree-root | 3 ms | 3 ms | 3 ms | 3 ms | 3 ms | 118473 |
+
+| Budget | Value | Limit | Status |
+| --- | --- | --- | --- |
+| export_secs | 44.4 | 300 | pass |
+| footprint_idle_mb | 28.5 | 48 | pass |
 | idle_cpu_pct | 0.1 | 1 | pass |
-| index_secs | 89.5 | 2400 | pass |
-| page_cold_ms | 1709.8 | 10000 | pass |
-| page_warm_ms | 39.3 | 300 | pass |
-| rss_mb | 1165.6 | 6000 | pass |
+| index_secs | 10.8 | 300 | pass |
+| page_cold_ms | 2355.3 | 3000 | pass |
+| page_warm_ms | 27.5 | 300 | pass |
+| rss_mb | 382.8 | 1500 | pass |
+
+</details>
+
+<details><summary>linux: every page</summary>
+
+Probes: `drivers/gpu/drm/amd/include/asic_reg/nbio/nbio_6_1_default.h` (largest text file), commit
+`cbbddb6b08`.
+
+| Page | Cold | Warm TTFB | Warm full (median) | min | max | Bytes |
+| --- | --- | --- | --- | --- | --- | --- |
+| blame-long-history | 446 ms | 10 ms | 11 ms | 11 ms | 12 ms | 4395847 |
+| blob-largest | 8 ms | 8 ms | 9 ms | 8 ms | 9 ms | 2773300 |
+| commit-largest | 68 ms | 2 ms | 2 ms | 2 ms | 7 ms | 134956 |
+| diff-fragment | 48 ms | 43 ms | 43 ms | 42 ms | 45 ms | 1345 |
+| log | 4 ms | 3 ms | 3 ms | 3 ms | 4 ms | 35456 |
+| overview | 3.26 s | 4 ms | 4 ms | 3 ms | 4 ms | 22047 |
+| refs | 3 ms | 1 ms | 1 ms | 1 ms | 2 ms | 6784 |
+| search | 256 ms | 1 ms | 1 ms | 1 ms | 1 ms | 309720 |
+| stats-overview | 3.53 s | 1 ms | 1 ms | 0 ms | 2 ms | 36239 |
+| stats/contributors | 767 ms | 1 ms | 1 ms | 1 ms | 1 ms | 117120 |
+| stats/frequency | 1.02 s | 0 ms | 0 ms | 0 ms | 1 ms | 34321 |
+| stats/hotspots | 2.33 s | 0 ms | 1 ms | 0 ms | 2 ms | 102301 |
+| stats/languages | 27.67 s | 1 ms | 1 ms | 1 ms | 3 ms | 407201 |
+| stats/ownership | 2.18 s | 0 ms | 0 ms | 0 ms | 2 ms | 20344 |
+| stats/patterns | 4.20 s | 1 ms | 1 ms | 0 ms | 2 ms | 22614 |
+| stats/types | 7.15 s | 0 ms | 0 ms | 0 ms | 2 ms | 50470 |
+| tree-deep | 2 ms | 1 ms | 1 ms | 1 ms | 2 ms | 16079 |
+| tree-root | 3 ms | 2 ms | 2 ms | 2 ms | 3 ms | 18955 |
+
+| Budget | Value | Limit | Status |
+| --- | --- | --- | --- |
+| footprint_idle_mb | 55.4 | 48 | over |
+| idle_cpu_pct | 0.2 | 1 | pass |
+| index_secs | 1596.4 | 600 | over |
+| page_cold_ms | 27673.9 | 20000 | over |
+| page_warm_ms | 43.3 | 500 | pass |
+| rss_mb | 6448.9 | 8000 | pass |
 
 </details>
 

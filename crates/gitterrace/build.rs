@@ -1,10 +1,13 @@
 //! Stamps `GITTERRACE_VERSION`: `v0.1.0` on a release tag, else `v0.1.0-<sha>` with
-//! `-dirty` for uncommitted changes. Outside a git checkout it is just `v0.1.0`.
+//! `-dirty` for uncommitted changes outside bench/results.
+//! Outside a git checkout it is just `v0.1.0`.
 
 use std::{
     io::Write as _,
     process::{Command, Output},
 };
+
+mod stamp;
 
 fn git(args: &[&str]) -> Option<Output> {
     Command::new("git")
@@ -21,7 +24,7 @@ fn version(base: &str) -> String {
     let sha = git(&["rev-parse", "--short", "HEAD"])
         .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_owned())
         .filter(|s| !s.is_empty());
-    let dirty = git(&["status", "--porcelain"]).is_some_and(|o| !o.stdout.is_empty());
+    let dirty = stamp::is_dirty(std::path::Path::new("."));
     match (sha, dirty) {
         (Some(s), true) => format!("v{base}-{s}-dirty"),
         (Some(s), false) => format!("v{base}-{s}"),
@@ -42,6 +45,8 @@ fn main() {
         "cargo:rerun-if-changed=../../.git/HEAD".to_owned(),
         "cargo:rerun-if-changed=../../.git/refs/".to_owned(),
         "cargo:rerun-if-changed=../../.git/packed-refs".to_owned(),
+        "cargo:rerun-if-changed=../../.git/index".to_owned(),
+        "cargo:rerun-if-changed=stamp.rs".to_owned(),
     ] {
         let _ = writeln!(out, "{line}");
     }

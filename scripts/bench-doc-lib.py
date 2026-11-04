@@ -84,6 +84,16 @@ def summary(name: str, r: Json) -> list[str]:
     return L
 
 
+def export_cell(r: Json) -> str:
+    """An export that did not finish (ok false) is never shown as a time."""
+    e = r.get("export")
+    if not e:
+        return "not run"
+    if e.get("ok") is False:
+        return "failed (page cap)"
+    return f"{e['secs']:.1f} s, {e['out_mb']:.0f} MB"
+
+
 def machine_line(m: Json) -> str:
     """Every machine stat except its name: CPU, cores, RAM, disk, OS, arch."""
     parts = [m["cpu"], f"{m['cpus']} cores", f"{m['ram_gb']:.0f} GB RAM"]
@@ -199,16 +209,12 @@ def block(cur: Json, old: Json | None) -> str:
     for n, r in cur["repos"].items():
         L += summary(n, r)
     L += [
-        "| Repo | Class | Measured at | Index | Peak RSS | Cache | RSS after pages | Idle footprint | Idle CPU "
+        "| Repo | Class | Measured at | Index | Peak RSS | Cache | RSS after pages | Idle footprint, total | Idle CPU "
         "| Idle CPU with /events | Export | Cold samples |",
         "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
     ]
     for n, r in cur["repos"].items():
-        ex = (
-            f"{r['export']['secs']:.1f} s, {r['export']['out_mb']:.0f} MB"
-            if "export" in r
-            else "not run"
-        )
+        ex = export_cell(r)
         L.append(
             f"| {n} | {r['class']} | `{r['sha'][:10]}` | {r['index']['secs']:.1f} s | "
             f"{r['index']['peak_rss_mb']:.0f} MB | {r['index'].get('cache_mb', 0):.0f} MB | "
@@ -322,7 +328,9 @@ def header(run: Json) -> str:
     m = run["machine"]
     return (
         f"Run {run['when'][:10]} on {machine_line(m)}. {m['gitterrace']} "
-        f"(repo at `{m['gitterrace_sha'][:10]}`), {m['git']}. " + load_note(run)
+        f"(repo at `{m['gitterrace_sha'][:10]}`), {m['git']}. "
+        + load_note(run)
+        + (f" {run['note']}" if run.get("note") else "")
     )
 
 

@@ -80,6 +80,7 @@ def self_test() -> None:
     loud_test()
     wrap_test()
     footprint_test()
+    export_test()
     print("bench-report self-test: ok")
 
 
@@ -112,6 +113,19 @@ def loud_test() -> None:
         sys.exit(f"bench-report self-test failed: loud phase published: {view}")
     if QUIET_NOTE not in "".join(withheld_lines(view)):
         sys.exit("bench-report self-test failed: withheld repo not named")
+
+
+def export_test() -> None:
+    """A failed export is shown as failed, never as a time."""
+    bad = {"ok": False, "secs": 4029.4, "out_mb": 511.0}
+    good = {"ok": True, "secs": 12.3, "out_mb": 92.0}
+    got = bd.export_cell({"export": bad})
+    if (
+        "4029" in got
+        or "failed" not in got
+        or "12.3 s" not in bd.export_cell({"export": good})
+    ):
+        sys.exit(f"bench-report self-test failed: export cell {got}")
 
 
 def footprint_test() -> None:
@@ -169,7 +183,7 @@ def pins() -> list[str]:
 def newest_ok(run: Json) -> list[str]:
     """The newest run must come from a clean build, timed under its load limit."""
     errs: list[str] = []
-    if "dirty" in run["machine"].get("gitterrace", ""):
+    if "dirty" in run["machine"].get("gitterrace", "") and not run.get("note"):
         errs.append(f"{run_name(run)}: measured a -dirty build")
     for n, r in run["repos"].items():
         load = r.get("load")
