@@ -449,3 +449,39 @@ proptest! {
         prop_assert_eq!(t.authors, rep.contributors.len());
     }
 }
+
+proptest! {
+    #![proptest_config(cases())]
+
+    /// C4: hotspots count each counted commit's rows under the head files once, by the same
+    /// membership as the reducers, and the period entry point equals the `Counted` one.
+    #[test]
+    fn p5_file_reports_follow_counted(gens in prop::collection::vec(gen_commit(), 0..40), q in query()) {
+        let recs = history(&gens);
+        let s = scope(&q);
+        let ins = Insights::new(&recs, s.options().clone(), None);
+        let c = ins.counted(&s, cx(&recs));
+        let head: Vec<gitterrace_index::HeadFile> = PATHS
+            .iter()
+            .map(|p| gitterrace_index::HeadFile { path: (*p).into(), lines: 1 })
+            .collect();
+        let hot = ins.hotspots_in(&head, &c);
+        let shown: Vec<&str> = hot.files.iter().map(|h| h.path.as_str()).collect();
+        let src = ins.source();
+        let rows: usize = c
+            .rows()
+            .map(|(_, rows)| {
+                rows.iter()
+                    .filter(|r| src.path(r.path).is_some_and(|p| shown.contains(&&*p)))
+                    .count()
+            })
+            .sum();
+        prop_assert_eq!(hot.total_changes, rows);
+        if q.author.is_none() && q.path.is_none() && q.kind.is_none() {
+            let p = s.period();
+            prop_assert_eq!(&hot, &ins.hotspots(&head, p));
+            prop_assert_eq!(ins.coupling_in(&head, &c, 1, 50), ins.coupling(&head, p, 1, 50));
+            prop_assert_eq!(ins.ownership_in(&head, &c, 1), ins.ownership(&head, p, 1));
+        }
+    }
+}

@@ -1,10 +1,13 @@
 mod reports;
 
 use std::collections::HashSet;
+use std::ops::RangeInclusive;
 
-use crate::feed::{CommitRange, CommitRow, InsightsSource, PathId, Posting, Rank, RenameEdge};
-use crate::insights::Insights;
+use crate::feed::{
+    CommitRange, CommitRow, InsightsSource, PathId, Posting, Rank, RenameEdge, local_day_of,
+};
 use crate::insights::fasthash::FastMap;
+use crate::insights::{Insights, Period};
 
 /// Most files in one commit that still say something about coupling; bigger commits are
 /// sweeps (formatting, renames, vendoring).
@@ -15,7 +18,7 @@ pub(super) const COUPLING_MAX_FILES: usize = 30;
 /// Not configurable: a query plan threshold, the answer is the same either way.
 const PER_PATH_MAX: usize = 64;
 pub(super) const SOLO_SHARE: f64 = 0.8;
-pub(super) const STALE_SECS: i64 = 365 * 86_400;
+pub(super) const STALE_SECS: i64 = 365 * crate::insights::DAY;
 
 /// One change to a file, followed to its canonical (head) name.
 #[derive(Debug, Clone, Copy)]
@@ -346,11 +349,28 @@ impl Insights<'_> {
             .unwrap_or_default()
     }
 
-    /// Touches of each head path in the period by counted commits, newest first.
-    fn touches_in(&self, paths: &[&str], from: i64, to: i64) -> Vec<Vec<(TouchRaw, CommitRow)>> {
+    /// Touches of each head path by counted commits whose local day lies in `days` and that
+    /// `chips` keeps, newest first. The local day is the one rule [`crate::Scope::admits`]
+    /// uses: a commit at the edge of a period counts on the day its author saw.
+    pub(super) fn touches_in(
+        &self,
+        paths: &[&str],
+        days: &RangeInclusive<i64>,
+        chips: &impl Fn(&CommitRow) -> bool,
+    ) -> Vec<Vec<(TouchRaw, CommitRow)>> {
         self.touches_many(paths, |c| {
-            c.time >= from && c.time < to && self.counted_row(c)
+            days.contains(&local_day_of(c.time, c.offset)) && self.counted_row(c) && chips(c)
         })
+    }
+
+    /// The local days `period` covers, ending on this history's newest local day: the days
+    /// [`crate::CountContext::days`] gives the same period over the same history.
+    pub(super) fn period_days(&self, period: Period) -> RangeInclusive<i64> {
+        if period.days().is_none() {
+            return i64::MIN..=i64::MAX;
+        }
+        self.in_period(period, |c| c.days().clone())
+            .unwrap_or(RangeInclusive::new(1, 0))
     }
 
     /// (rank, row) of every follow touch of `path`, newest first: the old follow table's

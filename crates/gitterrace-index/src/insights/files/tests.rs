@@ -335,10 +335,14 @@ fn ownership_from_the_aggregate_equals_the_touches() {
         };
         let ins = Insights::new(&recs, opts, None);
         let shown: Vec<&HeadFile> = hf.iter().collect();
-        let fast = ins.owner_lines(&shown, i64::MIN, i64::MAX);
+        let fast = ins.owner_lines(&shown, &(i64::MIN..=i64::MAX), |_| true, true);
         let names: Vec<&str> = shown.iter().map(|f| &*f.path).collect();
         let slow: Vec<std::collections::BTreeMap<usize, u64>> = ins
-            .touches_in(&names, i64::MIN, i64::MAX)
+            .touches_in(
+                &names,
+                &(i64::MIN..=i64::MAX),
+                &|_: &crate::feed::CommitRow| true,
+            )
             .into_iter()
             .map(|t| {
                 let mut m = std::collections::BTreeMap::new();
@@ -366,10 +370,14 @@ fn a_reused_name_takes_the_touches_not_the_aggregate() {
     let hf = head(&[("a.rs", 3), ("b.rs", 10)]);
     let ins = Insights::new(&recs, Options::default(), None);
     let shown: Vec<&HeadFile> = hf.iter().collect();
-    let fast = ins.owner_lines(&shown, i64::MIN, i64::MAX);
+    let fast = ins.owner_lines(&shown, &(i64::MIN..=i64::MAX), |_| true, true);
     let names: Vec<&str> = shown.iter().map(|f| &*f.path).collect();
     let slow: Vec<std::collections::BTreeMap<usize, u64>> = ins
-        .touches_in(&names, i64::MIN, i64::MAX)
+        .touches_in(
+            &names,
+            &(i64::MIN..=i64::MAX),
+            &|_: &crate::feed::CommitRow| true,
+        )
         .into_iter()
         .map(|t| {
             let mut m = std::collections::BTreeMap::new();
@@ -385,4 +393,85 @@ fn a_reused_name_takes_the_touches_not_the_aggregate() {
         !fast[0].contains_key(&ann),
         "the new a.rs has only Bob's lines"
     );
+}
+
+/// G10: hotspots, ownership and coupling count a commit by its author's local day, the rule
+/// [`crate::Scope::admits`] uses, not by the instant window ending one second after "now".
+/// The newest commit is day 10 at noon UTC, so 1w is local days 4..=10. `late` is local
+/// day 3 23:30 at -0200 (inside the instant window, outside the days): it must not count.
+/// `early` is local day 4 01:00 at +1400 (before the instant window, inside the days): it
+/// must count. Red on the instant window: the counts are swapped.
+#[test]
+fn file_reports_count_by_local_day() {
+    use crate::insights::fixtures::{DAYS, MON};
+    let at = |id: &str, who: &str, local: i64, offset: i32| crate::CommitRecord {
+        time: MON + local - i64::from(offset),
+        offset,
+        ..rec(
+            id,
+            who,
+            0,
+            vec![file("a.rs", 1, 0, 9), file("b.rs", 1, 0, 9)],
+        )
+    };
+    let recs = vec![
+        at("late", "Lee", 3 * DAYS + 23 * 3600 + 1800, -7200),
+        at("early", "Eve", 4 * DAYS + 3600, 50_400),
+        rec(
+            "now",
+            "Ann",
+            10,
+            vec![file("a.rs", 1, 0, 9), file("b.rs", 1, 0, 9)],
+        ),
+    ];
+    let ins = Insights::new(&recs, Options::default(), None);
+    let hf = head(&[("a.rs", 9), ("b.rs", 9)]);
+    let hot = ins.hotspots(&hf, Period::Week);
+    assert_eq!(hot.total_changes, 4, "early and now on two files");
+    assert_eq!(hot.files[0].authors, 2);
+    let own = ins.ownership(&hf, Period::Week, 1);
+    let names: Vec<&str> = own.overall.owners.iter().map(|o| o.name.as_str()).collect();
+    assert!(
+        names.contains(&"Eve") && !names.contains(&"Lee"),
+        "{names:?}"
+    );
+    let pair = ins.coupling(&hf, Period::Week, 1, 5);
+    assert_eq!(pair.first().map(|c| c.together), Some(2));
+}
+
+/// The `_in` reports over a [`crate::Counted`] equal the period reports over the same
+/// unscoped history, and a path selection keeps only the files under it.
+#[test]
+fn file_reports_in_counted_match_the_period() {
+    use crate::feed::{FixedClock, MemorySource};
+    use crate::{CountContext, Scope, ScopeParams};
+    let recs = history();
+    let hf = head(&[("new/x.rs", 14), ("keep.rs", 5)]);
+    let ins = Insights::new(&recs, Options::default(), None);
+    let cx = CountContext::new(&MemorySource::new(&recs), &FixedClock(i64::MAX));
+    let scope = |path: Option<&str>| {
+        let mut p = ScopeParams {
+            period: Some("1w".to_owned()),
+            ..ScopeParams::default()
+        };
+        p.select.path = path.map(str::to_owned);
+        Scope::from_params(&p, Options::default(), Period::All).expect("scope")
+    };
+    let s = scope(None);
+    let c = ins.counted(&s, cx);
+    assert_eq!(ins.hotspots_in(&hf, &c), ins.hotspots(&hf, Period::Week));
+    assert_eq!(
+        ins.ownership_in(&hf, &c, 1),
+        ins.ownership(&hf, Period::Week, 1)
+    );
+    assert_eq!(
+        ins.coupling_in(&hf, &c, 1, 9),
+        ins.coupling(&hf, Period::Week, 1, 9)
+    );
+    let s = scope(Some("new"));
+    let c = ins.counted(&s, cx);
+    let hot = ins.hotspots_in(&hf, &c);
+    assert_eq!(hot.files.len(), 1);
+    assert_eq!(hot.files[0].path, "new/x.rs");
+    assert!(ins.coupling_in(&hf, &c, 1, 9).is_empty());
 }

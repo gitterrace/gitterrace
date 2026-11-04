@@ -137,8 +137,6 @@ struct Derived {
     ident_person: Vec<usize>,
     /// Newest commit time per person (all commits, bots included).
     last_seen: Vec<i64>,
-    /// Newest commit time of the history (merges and bots included).
-    pub(crate) newest: i64,
     /// Per path id: whether path statistics leave the path out. Built on first use, each
     /// path decided once, spread over the cores: the ignore rules are the expensive part.
     skip: OnceLock<Vec<bool>>,
@@ -369,9 +367,7 @@ impl Derived {
         // One pass: commits and newest time per raw identity, folded into people below.
         let mut per_ident = vec![0usize; src.idents()];
         let mut newest = vec![i64::MIN; src.idents()];
-        let mut latest = i64::MIN;
         for c in src.commits_in(CommitRange::All) {
-            latest = latest.max(c.time);
             let i = c.ident.0 as usize;
             if let (Some(n), Some(t)) = (per_ident.get_mut(i), newest.get_mut(i)) {
                 *n += 1;
@@ -404,7 +400,6 @@ impl Derived {
             people,
             ident_person,
             last_seen,
-            newest: latest,
             skip: OnceLock::new(),
             commit_lines: OnceLock::new(),
             follow: OnceLock::new(),

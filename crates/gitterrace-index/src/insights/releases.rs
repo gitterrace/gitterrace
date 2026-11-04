@@ -4,7 +4,8 @@ use std::sync::Arc;
 
 use gitterrace_git::{RefInfo, RefKind};
 
-use crate::insights::Insights;
+use crate::feed::FixedClock;
+use crate::insights::{CountContext, Insights};
 
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
 pub struct Release {
@@ -37,6 +38,7 @@ impl Insights<'_> {
     /// Release rhythm from tags. Tags whose commit is not in the records are dropped.
     pub fn cadence(&self, tags: &[(String, String)]) -> Cadence {
         let src = self.source();
+        let cx = CountContext::new(src, &FixedClock(self.now));
         // (rank, time, id, tag name) of every tag whose commit is indexed.
         let mut found: Vec<(usize, i64, Arc<str>, &str)> = tags
             .iter()
@@ -55,7 +57,7 @@ impl Insights<'_> {
                 commit: id.to_string(),
                 time,
                 commits_since: prev.map_or(i + 1, |(p, _)| i.saturating_sub(p)),
-                days_since: prev.map(|(_, pt)| time.saturating_sub(pt).div_euclid(86_400)),
+                days_since: prev.map(|(_, pt)| cx.days_between(pt, time)),
             });
             prev = Some((i, time));
         }
@@ -67,9 +69,7 @@ impl Insights<'_> {
             n => Some((gaps[n / 2 - 1] + gaps[n / 2]) as f64 / 2.0),
         };
         Cadence {
-            days_since_last: releases
-                .last()
-                .map(|r| self.now.saturating_sub(r.time).div_euclid(86_400)),
+            days_since_last: releases.last().map(|r| cx.days_between(r.time, self.now)),
             median_days_between: median,
             releases,
         }

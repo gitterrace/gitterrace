@@ -137,10 +137,10 @@ c059c060e4ac6a487890f0b0d3496204 c059c060e4ac6a487890f0b0d3496204 [as-is] /api/v
 e4d308dac9017ecc6a1c5c77ceca764b e4d308dac9017ecc6a1c5c77ceca764b [as-is] /api/v1/insights/hotspots?period=1m&bots=0&scope=core
 111a787e8e4f84a6f9deae1b0b279340 111a787e8e4f84a6f9deae1b0b279340 [as-is] /api/v1/insights/hotspots?period=1m&bots=1&exclude=vendor%2F%2A%2A&type=fix
 c059c060e4ac6a487890f0b0d3496204 c059c060e4ac6a487890f0b0d3496204 [as-is] /api/v1/insights/hotspots?period=1m&bots=1&exclude=vendor%2F%2A%2A&ws=1
-a6550acfca9bff6f5bc5abe8e4e183f9 a6550acfca9bff6f5bc5abe8e4e183f9 [as-is] /api/v1/insights/hotspots?period=1w&bots=0
-557d7998d5af6a113b0b5cb7240d3a62 557d7998d5af6a113b0b5cb7240d3a62 [as-is] /api/v1/insights/hotspots?period=1w&bots=0&exclude=vendor%2F%2A%2A&ws=1
+e4d308dac9017ecc6a1c5c77ceca764b e4d308dac9017ecc6a1c5c77ceca764b [as-is] /api/v1/insights/hotspots?period=1w&bots=0
+63f506e9d331031100068b7e0af63c82 63f506e9d331031100068b7e0af63c82 [as-is] /api/v1/insights/hotspots?period=1w&bots=0&exclude=vendor%2F%2A%2A&ws=1
 e4d308dac9017ecc6a1c5c77ceca764b e4d308dac9017ecc6a1c5c77ceca764b [as-is] /api/v1/insights/hotspots?period=1w&bots=0&generated=1&scope=core
-557d7998d5af6a113b0b5cb7240d3a62 557d7998d5af6a113b0b5cb7240d3a62 [as-is] /api/v1/insights/hotspots?period=1w&bots=1&exclude=vendor%2F%2A%2A&ws=1
+63f506e9d331031100068b7e0af63c82 63f506e9d331031100068b7e0af63c82 [as-is] /api/v1/insights/hotspots?period=1w&bots=1&exclude=vendor%2F%2A%2A&ws=1
 1ac1d4442aaabef744a836d219b5968a 1ac1d4442aaabef744a836d219b5968a [as-is] /api/v1/insights/hotspots?period=1y&bots=0&exclude=vendor%2F%2A%2A&ws=1
 504ecb7256589c3785a388d6e4863a3f 504ecb7256589c3785a388d6e4863a3f [as-is] /api/v1/insights/hotspots?period=1y&bots=0&generated=1
 0d3d31946fac2588a8bcd17a2510e138 0d3d31946fac2588a8bcd17a2510e138 [as-is] /api/v1/insights/hotspots?period=1y&bots=0&ignore=0&ws=1&path=src
@@ -201,7 +201,7 @@ cc248a29c20e5b2dd23ce4e5aa7eb4ae cc248a29c20e5b2dd23ce4e5aa7eb4ae [as-is] /api/v
 0904769b5c9e85974ce86e1eb4eb0d89 0904769b5c9e85974ce86e1eb4eb0d89 [as-is] /api/v1/insights/ownership?period=1m&bots=0&path=src
 0726e0fd789559246f90e9e50ed6d69b 0726e0fd789559246f90e9e50ed6d69b [as-is] /api/v1/insights/ownership?period=1m&bots=0&scope=core
 f53306434b042e150c3f9e55df9e9b7d f53306434b042e150c3f9e55df9e9b7d [as-is] /api/v1/insights/ownership?period=1m&bots=1&exclude=vendor%2F%2A%2A&type=fix
-3ba51636536e0a5f8ea1273ed1583187 3ba51636536e0a5f8ea1273ed1583187 [as-is] /api/v1/insights/ownership?period=1w&bots=0
+0726e0fd789559246f90e9e50ed6d69b 0726e0fd789559246f90e9e50ed6d69b [as-is] /api/v1/insights/ownership?period=1w&bots=0
 bab6dd3903b1949161054a77bb56eebb bab6dd3903b1949161054a77bb56eebb [as-is] /api/v1/insights/ownership?period=1w&bots=0&generated=1&scope=core
 a66971e8dc94e7ce40a9c12c2edc8caf a66971e8dc94e7ce40a9c12c2edc8caf [as-is] /api/v1/insights/ownership?period=1y&bots=0&generated=1
 e8d08f48bea5014107fd72d323c8a629 e8d08f48bea5014107fd72d323c8a629 [as-is] /api/v1/insights/ownership?period=1y&bots=0&ignore=0&ws=1&path=src
@@ -270,10 +270,10 @@ f5d1383cf6747e74fd8cc9f760c64391 415ff824e074b25ce5e53c980a74d2f3 [as-is] /stats
 bf4bb07c43b3ecda1ed6c0f92025c23b b4d17999dd8c5a3399fe49077d0916b7 [as-is] /stats/hotspots?period=1m&bots=0&scope=core
 b52933c0f2e5320a83323c6ca3e0154d bf58c6549504c16b16d4d6addf549095 [as-is] /stats/hotspots?period=1m&bots=1&exclude=vendor%2F%2A%2A&type=fix
 3cd3a8fad3b8fcbfd2216b8fbeb00a35 e7887f77180f78bd7075b68332c6402f [as-is] /stats/hotspots?period=1m&bots=1&exclude=vendor%2F%2A%2A&ws=1
-bfc74a84d29836c1aacca0e830c4f414 1743e58d84bc71079c8207bf25c3f0c4 [as-is] /stats/hotspots?period=1w&bots=0
-1f8f49a790e7dcaab3cc12186feac08f bf98152f86aff6388ea88767c3687d05 [as-is] /stats/hotspots?period=1w&bots=0&exclude=vendor%2F%2A%2A&ws=1
+e1886d4132658405399af79981ca0ad9 96140244162b5dfcde1afce16be98cc5 [as-is] /stats/hotspots?period=1w&bots=0
+73bc422530ecd4222967b3cc2db1f30e bff6566e44474e3373a6bba244d93136 [as-is] /stats/hotspots?period=1w&bots=0&exclude=vendor%2F%2A%2A&ws=1
 196ff908639eed51bd39b99c7817c8b2 be50433f9e2e27fb2771d0bd72d0fe6a [as-is] /stats/hotspots?period=1w&bots=0&generated=1&scope=core
-65dccfb341fc982932aabdd5398889b3 4e64c91374b578460e8cce174a410531 [as-is] /stats/hotspots?period=1w&bots=1&exclude=vendor%2F%2A%2A&ws=1
+e6669bddbc78cddf2dbfb51dab7151ea 6735adba0a5655b00d6c95218beb1dc2 [as-is] /stats/hotspots?period=1w&bots=1&exclude=vendor%2F%2A%2A&ws=1
 e24ee062df65698c3c040243a761819c bd6a9a03bb90e7ff7b488aac3ad9790c [as-is] /stats/hotspots?period=1y&bots=0&exclude=vendor%2F%2A%2A&ws=1
 cc463c861464af74b56f7d38276944f1 72d896d739d2e6ac135b305a0398687f [as-is] /stats/hotspots?period=1y&bots=0&generated=1
 90264708707d3c87e121ded65fcb0195 fe0a466c5b6643a4fa02f7f04ca2f6b7 [as-is] /stats/hotspots?period=1y&bots=0&ignore=0&ws=1&path=src
@@ -320,7 +320,7 @@ b929c0bf0190248082070e35c2bc4098 b929c0bf0190248082070e35c2bc4098 [as-is] /stats
 428b4cd406c46ada71860c79c39df895 428b4cd406c46ada71860c79c39df895 [as-is] /stats/ownership?period=1m&bots=0&path=src
 928100bc68ea2d618d308cf2c59edbe6 928100bc68ea2d618d308cf2c59edbe6 [as-is] /stats/ownership?period=1m&bots=0&scope=core
 4798f4ae7c9072ee8af997cccb96c473 4798f4ae7c9072ee8af997cccb96c473 [as-is] /stats/ownership?period=1m&bots=1&exclude=vendor%2F%2A%2A&type=fix
-45ca28f2a9e165c7c25d57c845a37ada 45ca28f2a9e165c7c25d57c845a37ada [as-is] /stats/ownership?period=1w&bots=0
+d01dae693da5bcdd5ffa2537bcd3ec90 d01dae693da5bcdd5ffa2537bcd3ec90 [as-is] /stats/ownership?period=1w&bots=0
 42751e3539955331250a9a74403a6381 42751e3539955331250a9a74403a6381 [as-is] /stats/ownership?period=1w&bots=0&generated=1&scope=core
 5cd5d3631f0286067961c90b00950ecb 5cd5d3631f0286067961c90b00950ecb [as-is] /stats/ownership?period=1y&bots=0&generated=1
 49e092bf404d46bdb1789c9f41ff99de 49e092bf404d46bdb1789c9f41ff99de [as-is] /stats/ownership?period=1y&bots=0&ignore=0&ws=1&path=src
@@ -578,7 +578,7 @@ c4bb364611aa00ba414191137fbb4f07 c4bb364611aa00ba414191137fbb4f07 [edited] /api/
 efde149b4661f890308eb6e8f0f99bed efde149b4661f890308eb6e8f0f99bed [edited] /api/v1/insights/frequency?period=3m&bots=0&ws=1&scope=core
 9ab722cae4b4f1266a756e2966dbaf60 9ab722cae4b4f1266a756e2966dbaf60 [edited] /api/v1/insights/frequency?period=all&bots=1&generated=1&path=src
 fba58bbf74c1a1bc3a09deaba80f19c0 fba58bbf74c1a1bc3a09deaba80f19c0 [edited] /api/v1/insights/hotspots?period=1m&bots=1&ignore=0
-65f809f99506ba64996e1583c7cb8b21 65f809f99506ba64996e1583c7cb8b21 [edited] /api/v1/insights/hotspots?period=1w&bots=0&ignore=0&type=fix
+270f5081e123608f4b7ca8c607455a09 270f5081e123608f4b7ca8c607455a09 [edited] /api/v1/insights/hotspots?period=1w&bots=0&ignore=0&type=fix
 142e45b1e226e934f966710e079ffaf0 142e45b1e226e934f966710e079ffaf0 [edited] /api/v1/insights/hotspots?period=1w&bots=1&exclude=vendor%2F%2A%2A&ws=1&author=bob%40y.io
 749a5c3618575d26229fa05682fcc371 749a5c3618575d26229fa05682fcc371 [edited] /api/v1/insights/hotspots?period=1y&bots=0&exclude=vendor%2F%2A%2A&scope=core
 ad02da14b599c310ada0673364b71fe9 ad02da14b599c310ada0673364b71fe9 [edited] /api/v1/insights/hotspots?period=3m&bots=0&ws=1&scope=core
@@ -600,7 +600,7 @@ f0285e3da6526648e6fb4d6b4a6d1c8f f0285e3da6526648e6fb4d6b4a6d1c8f [edited] /api/
 07a3a839bc27259da8ffe59be0441f89 07a3a839bc27259da8ffe59be0441f89 [edited] /api/v1/insights/ownership?period=1m&bots=1&ignore=0
 a1cd9082f249bf25f54f7e5fc0cbed43 a1cd9082f249bf25f54f7e5fc0cbed43 [edited] /api/v1/insights/ownership?period=1w&bots=0
 777d6cf9655f8de14b5ab9a7ba2f01f5 777d6cf9655f8de14b5ab9a7ba2f01f5 [edited] /api/v1/insights/ownership?period=1w&bots=0&author=bob%40y.io
-20549dd8f18d92228200751d832f781e 20549dd8f18d92228200751d832f781e [edited] /api/v1/insights/ownership?period=1w&bots=0&ignore=0&type=fix
+58f4468e39b569818fbdc8564e1eb471 58f4468e39b569818fbdc8564e1eb471 [edited] /api/v1/insights/ownership?period=1w&bots=0&ignore=0&type=fix
 6de2ad0921793d32c442d1e2f28981b8 6de2ad0921793d32c442d1e2f28981b8 [edited] /api/v1/insights/ownership?period=1w&bots=1&exclude=vendor%2F%2A%2A&ws=1&author=bob%40y.io
 aa393cbc3f5e99616854bdbd590f54f8 aa393cbc3f5e99616854bdbd590f54f8 [edited] /api/v1/insights/ownership?period=1y&bots=0&exclude=vendor%2F%2A%2A&scope=core
 2b58f716b346cb6263faacaeeec83452 2b58f716b346cb6263faacaeeec83452 [edited] /api/v1/insights/ownership?period=3m&bots=0&ws=1&scope=core
@@ -633,7 +633,7 @@ d03ecf333c7fc9863968f9f01003e132 930bb51daa5741254a2ca3ea362d5928 [edited] /stat
 1663e58558398fd6a5e445485bc29883 f2171e0355831587796fdb20b47b4bf5 [edited] /stats/frequency?period=3m&bots=0&ws=1&scope=core
 eba23fb76060ebde43a668569bca8e1c 4fb5a925781858342396d8e0c5dbc310 [edited] /stats/frequency?period=all&bots=1&generated=1&path=src
 a82c62a377fe700aac61bf7209a38f25 1b4112ca82d64a050285027665a5f9dd [edited] /stats/hotspots?period=1m&bots=1&ignore=0
-f9226651bb457806aa3c4e35e99543b7 f7b9d360a7e4ef2cec4d68b9a68b893f [edited] /stats/hotspots?period=1w&bots=0&ignore=0&type=fix
+f0b0f5aa7e83617f37dbd525b438a93e 66621fdb5694eb70095a9d4426aa603e [edited] /stats/hotspots?period=1w&bots=0&ignore=0&type=fix
 75980db44fb42ea52c944aaae7df5734 1cc847bb049a7c8932512f89ed7309d2 [edited] /stats/hotspots?period=1w&bots=1&exclude=vendor%2F%2A%2A&ws=1&author=bob%40y.io
 6ab2d5f9b47d9f834ce41b825a91c55d 6f22c0b8660e8ffc434eb876a3e63751 [edited] /stats/hotspots?period=1y&bots=0&exclude=vendor%2F%2A%2A&scope=core
 43f79cae9bf2c4770692f84fc9a0cc17 abbad065d9c0b2aecfe14072adec2b43 [edited] /stats/hotspots?period=3m&bots=0&ws=1&scope=core
@@ -645,7 +645,7 @@ f9226651bb457806aa3c4e35e99543b7 f7b9d360a7e4ef2cec4d68b9a68b893f [edited] /stat
 9253e8eb0f4a3dd8e8c7a68a3ef4a606 a9f0be9d0dc10a3ef132ec0c908a70f0 [edited] /stats/languages?period=3m&bots=0&ws=1&scope=core
 9253e8eb0f4a3dd8e8c7a68a3ef4a606 a9f0be9d0dc10a3ef132ec0c908a70f0 [edited] /stats/languages?period=all&bots=1&generated=1&path=src
 53f8f6c15925d02d1dc217777ceaefc2 53f8f6c15925d02d1dc217777ceaefc2 [edited] /stats/ownership?period=1m&bots=1&ignore=0
-452c0e6148833c2ce173ec116d83c196 452c0e6148833c2ce173ec116d83c196 [edited] /stats/ownership?period=1w&bots=0&ignore=0&type=fix
+ab8e3021aede5218748992041b58d02b ab8e3021aede5218748992041b58d02b [edited] /stats/ownership?period=1w&bots=0&ignore=0&type=fix
 091e1422b1ffc9759966352c9fc9413e 091e1422b1ffc9759966352c9fc9413e [edited] /stats/ownership?period=1w&bots=1&exclude=vendor%2F%2A%2A&ws=1&author=bob%40y.io
 c4704df27c24d9f9d5cba60d60229ea9 c4704df27c24d9f9d5cba60d60229ea9 [edited] /stats/ownership?period=1y&bots=0&exclude=vendor%2F%2A%2A&scope=core
 27d0e84b5c129ad4452fedbf8ffdb88f 27d0e84b5c129ad4452fedbf8ffdb88f [edited] /stats/ownership?period=3m&bots=0&ws=1&scope=core

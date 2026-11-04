@@ -4,25 +4,41 @@ use std::collections::{BTreeMap, HashSet};
 
 use gitterrace_git::civil_from_days;
 
-use crate::feed::PathId;
+use std::ops::RangeInclusive;
+
+use crate::feed::{CommitRow, PathId, local_day_of};
 use crate::insights::fasthash::FastMap;
 use crate::insights::files::{
     AgeBucket, AgeReport, COUPLING_MAX_FILES, Coupling, DirOwnership, Hotspot, HotspotReport,
     Owner, OwnershipReport, SOLO_SHARE, STALE_SECS,
 };
-use crate::insights::{DAY, HeadFile, Insights, Period};
+use crate::insights::{Counted, HeadFile, Insights, Period, under};
 
 impl Insights<'_> {
-    /// Hotspots among `files` (the head tree) for the period.
+    /// Hotspots among `files` (the head tree) for the period: [`Insights::hotspots_in`] over
+    /// the period's local days ending on this history's newest day.
     pub fn hotspots(&self, files: &[HeadFile], period: Period) -> HotspotReport {
-        let (from, to) = period.window(self.now);
+        self.hotspots_days(files, &self.period_days(period), |_| true)
+    }
+
+    /// Hotspots among `files` changed by the commits `c` counts.
+    pub fn hotspots_in(&self, files: &[HeadFile], c: &Counted<'_>) -> HotspotReport {
+        self.hotspots_days(&under_path(files, c), c.days(), |r| keeps(c, r))
+    }
+
+    fn hotspots_days(
+        &self,
+        files: &[HeadFile],
+        days: &RangeInclusive<i64>,
+        chips: impl Fn(&CommitRow) -> bool,
+    ) -> HotspotReport {
         let mut rows = Vec::new();
         let shown: Vec<&HeadFile> = files
             .iter()
             .filter(|f| f.lines != 0 && !self.skips_head(&f.path))
             .collect();
         let names: Vec<&str> = shown.iter().map(|f| &*f.path).collect();
-        for (f, touches) in shown.into_iter().zip(self.touches_in(&names, from, to)) {
+        for (f, touches) in shown.into_iter().zip(self.touches_in(&names, days, &chips)) {
             let mut count = 0;
             let mut churn = 0u64;
             let mut last = i64::MIN;
@@ -78,13 +94,14 @@ impl Insights<'_> {
     pub(super) fn owner_lines(
         &self,
         files: &[&HeadFile],
-        from: i64,
-        to: i64,
+        days: &RangeInclusive<i64>,
+        chips: impl Fn(&CommitRow) -> bool,
+        whole: bool,
     ) -> Vec<BTreeMap<usize, u64>> {
         let src = self.source();
         let follow = self.follow();
-        // The aggregate holds every commit: usable only when the window drops none.
-        let whole = from == i64::MIN && self.d.newest < to;
+        // The aggregate holds every commit: usable only when the days and chips drop none,
+        // which `whole` says.
         let plain = |f: &HeadFile| -> Option<PathId> {
             let id = src.find_path(&f.path)?;
             (!follow.log.contains_key(&id) && !follow.names.contains_key(&id)).then_some(id)
@@ -122,7 +139,7 @@ impl Insights<'_> {
         }
         let rest: Vec<usize> = (0..files.len()).filter(|&i| ids[i].is_none()).collect();
         let names: Vec<&str> = rest.iter().map(|&i| &*files[i].path).collect();
-        for (&i, touches) in rest.iter().zip(self.touches_in(&names, from, to)) {
+        for (&i, touches) in rest.iter().zip(self.touches_in(&names, days, &chips)) {
             for (t, c) in touches {
                 *out[i].entry(self.person_of(c.ident)).or_default() += u64::from(t.lines);
             }
@@ -135,7 +152,32 @@ impl Insights<'_> {
     /// Knowledge share per file, weighted by its size now, summed per directory `depth` levels
     /// deep (`depth` 1 groups by top-level directory; root files group under `""`).
     pub fn ownership(&self, files: &[HeadFile], period: Period, depth: usize) -> OwnershipReport {
-        let (from, to) = period.window(self.now);
+        let days = self.period_days(period);
+        let whole = period == Period::All;
+        let per_file = |shown: &[&HeadFile]| self.owner_lines(shown, &days, |_| true, whole);
+        self.ownership_with(files, depth, per_file)
+    }
+
+    /// [`Insights::ownership`] over the commits `c` counts.
+    pub fn ownership_in(
+        &self,
+        files: &[HeadFile],
+        c: &Counted<'_>,
+        depth: usize,
+    ) -> OwnershipReport {
+        let s = c.scope();
+        let whole = s.period() == Period::All && s.range().is_none() && s.selection().is_empty();
+        let per_file =
+            |shown: &[&HeadFile]| self.owner_lines(shown, c.days(), |r| keeps(c, r), whole);
+        self.ownership_with(&under_path(files, c), depth, per_file)
+    }
+
+    fn ownership_with(
+        &self,
+        files: &[HeadFile],
+        depth: usize,
+        per_file: impl FnOnce(&[&HeadFile]) -> Vec<BTreeMap<usize, u64>>,
+    ) -> OwnershipReport {
         let mut dirs: BTreeMap<String, Acc> = BTreeMap::new();
         let mut all = Acc::default();
         let (mut solo, mut stale, mut untracked) = (0u64, 0u64, 0u64);
@@ -143,7 +185,7 @@ impl Insights<'_> {
             .iter()
             .filter(|f| f.lines != 0 && !self.skips_head(&f.path))
             .collect();
-        let per_file = self.owner_lines(&shown, from, to);
+        let per_file = per_file(&shown);
         for (f, who) in shown.into_iter().zip(per_file) {
             let changed: u64 = who.values().sum();
             if changed == 0 {
@@ -225,7 +267,35 @@ impl Insights<'_> {
         min_together: usize,
         limit: usize,
     ) -> Vec<Coupling> {
-        let (from, to) = period.window(self.now);
+        self.coupling_days(
+            files,
+            &self.period_days(period),
+            |_| true,
+            min_together,
+            limit,
+        )
+    }
+
+    /// [`Insights::coupling`] over the commits `c` counts.
+    pub fn coupling_in(
+        &self,
+        files: &[HeadFile],
+        c: &Counted<'_>,
+        min_together: usize,
+        limit: usize,
+    ) -> Vec<Coupling> {
+        let files = under_path(files, c);
+        self.coupling_days(&files, c.days(), |r| keeps(c, r), min_together, limit)
+    }
+
+    fn coupling_days(
+        &self,
+        files: &[HeadFile],
+        days: &RangeInclusive<i64>,
+        chips: impl Fn(&CommitRow) -> bool,
+        min_together: usize,
+        limit: usize,
+    ) -> Vec<Coupling> {
         let mut head: Vec<&str> = files
             .iter()
             .filter(|f| !self.skips_head(&f.path))
@@ -237,7 +307,7 @@ impl Insights<'_> {
         // and a sequential pass. State is sized by the touches of head files in the window.
         let mut touches: Vec<(u32, u32)> = Vec::new();
         let mut changes = vec![0_usize; head.len()];
-        for (i, list) in self.touches_in(&head, from, to).into_iter().enumerate() {
+        for (i, list) in self.touches_in(&head, days, &chips).into_iter().enumerate() {
             let id = u32::try_from(i).unwrap_or(u32::MAX);
             for (t, _) in list {
                 touches.push((t.commit.0, id));
@@ -306,12 +376,12 @@ impl Insights<'_> {
             .filter(|f| f.lines != 0 && !self.skips_head(&f.path))
             .collect();
         let names: Vec<&str> = shown.iter().map(|f| &*f.path).collect();
-        let all = self.touches_in(&names, i64::MIN, i64::MAX);
+        let all = self.touches_in(&names, &(i64::MIN..=i64::MAX), &|_: &CommitRow| true);
         for (f, touches) in shown.into_iter().zip(all) {
             let Some((_, c)) = touches.into_iter().max_by_key(|t| t.0.commit) else {
                 continue;
             };
-            let day = c.time.saturating_add(i64::from(c.offset)).div_euclid(DAY);
+            let day = local_day_of(c.time, c.offset);
             let e = years.entry(civil_from_days(day).0).or_default();
             e.0 += u64::from(f.lines);
             e.1 += 1;
@@ -325,6 +395,23 @@ impl Insights<'_> {
             total_lines: total,
         }
     }
+}
+
+/// Whether `c` counts commit `r` before its file rows: options, selection by type, scope and
+/// author. The local day is checked by the touches, the path by [`under_path`].
+fn keeps(c: &Counted<'_>, r: &CommitRow) -> bool {
+    let ins = c.insights();
+    ins.counted_row(r) && c.scope().selects(ins.source(), r)
+}
+
+/// The head files a path selection keeps: a file outside it has no counted change.
+fn under_path(files: &[HeadFile], c: &Counted<'_>) -> Vec<HeadFile> {
+    let path = c.scope().selection().path();
+    files
+        .iter()
+        .filter(|f| path.is_none_or(|p| under(&f.path, p)))
+        .cloned()
+        .collect()
 }
 
 #[derive(Default)]
