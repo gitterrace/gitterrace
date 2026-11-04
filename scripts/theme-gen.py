@@ -66,16 +66,26 @@ def contrast(a: str, b: str) -> float:
     return (la + 0.05) / (lb + 0.05)
 
 
-# (foreground, background, minimum) in resolved colours: text pairs need 4.5:1, the focus
-# ring (tokens.css role --focus, the accent) 3:1 against every surface it is drawn on.
-PAIRS: list[tuple[str, str, float]] = [
-    ("n-9", "n-1", 4.5),
-    ("n-7", "n-1", 4.5),
-    ("on-accent", "accent", 4.5),
-    ("accent", "n-1", 3),
-    ("accent", "raised", 3),
-    ("accent", "header", 3),
+# (foreground, background, minimum) in resolved colours. Text needs 4.5:1 on every surface it
+# is drawn on, built from the lists below so a new token joins the matrix by name. Control
+# borders (--line-strong, drawn on inputs and buttons) need 3:1; the quiet divider --line only
+# has to stay visible (1.15:1) because rules are not a control edge.
+PAGE_SURFACES = ["n-1", "n-2", "n-3", "header", "raised"]
+TEXT = ["n-6", "n-7", "n-9", "info", "accent", "add", "del", "warn"]
+SYNTAX = [
+    f"syn-{r}"
+    for r in ("comment", "keyword", "string", "constant", "entity", "tag", "param")
 ]
+ROW_SURFACES = ["add-bg", "del-bg", "warn-bg", "accent-soft"]
+PAIRS: list[tuple[str, str, float]] = (
+    [(t, s, 4.5) for t in TEXT for s in PAGE_SURFACES]
+    + [(t, s, 4.5) for t in SYNTAX for s in ["n-1", "n-2", "raised"] + ROW_SURFACES]
+    + [(t, s, 4.5) for t in ("n-9", "n-7", "accent") for s in ROW_SURFACES]
+    + [("add", "add-hl", 4.5), ("del", "del-hl", 4.5), ("on-accent", "accent", 4.5)]
+    + [("accent", s, 3) for s in ("n-1", "raised", "header")]
+    + [("n-5", s, 3) for s in ("n-1", "n-2", "n-3", "header", "raised")]
+    + [("n-4", s, 1.15) for s in ("n-1", "n-2", "header", "raised")]
+)
 
 
 def contrast_problems(tokens: Json) -> list[str]:
