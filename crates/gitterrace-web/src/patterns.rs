@@ -80,7 +80,7 @@ pub(crate) async fn page(
             .map(|b| (b.year.to_string(), b.lines))
             .collect();
         let sizes: Vec<_> = ins
-            .commit_sizes()
+            .commit_sizes_in(period)
             .into_iter()
             .map(|b| (b.label, b.commits as u64))
             .collect();

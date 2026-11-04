@@ -345,7 +345,6 @@ proptest! {
 
     /// Contributors (bots by option), commit types and sizes against the reducers.
     #[test]
-    #[ignore = "red until the insights pages read Counted"]
     fn p4_people_labels_sizes_equal_the_reducers(gens in prop::collection::vec(gen_commit(), 0..40), q in no_chips()) {
         let recs = history(&gens);
         let s = scope(&q);
@@ -365,7 +364,7 @@ proptest! {
             prop_assert_eq!(ins.label_breakdown(l, p), counts, "label_breakdown");
             prop_assert_eq!(ins.label_over_time(l, p), buckets, "label_over_time");
         }
-        prop_assert_eq!(ins.commit_sizes(), c.sizes(), "commit_sizes");
+        prop_assert_eq!(ins.commit_sizes_in(p), c.sizes(), "commit_sizes_in");
         let (_, freq) = ins.frequency(p);
         let series = c.series();
         let page: Vec<(u64, u64)> = freq.iter().map(|f| (f.additions, f.deletions)).collect();
