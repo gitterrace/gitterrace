@@ -86,12 +86,10 @@ Run your own program on a selection (`line`, `file`, `commit`, `hunk`, `blame`, 
 Send a selection to a tracker, notes app or mail draft, or run your own program on it. Off until
 you write `actions.toml`: [how to set it up](docs/actions.md).
 
-Docs: [why](docs/why.md), [configuration](docs/configuration.md), [JSON API](docs/api.md),
-[architecture](docs/architecture.md),
-[highlighted languages](docs/architecture.md#syntax-highlighting),
-[benchmarks](docs/benchmarks.md). Binds to `127.0.0.1` and never changes your files or history.
-Serving it to others: [running it online](docs/online.md). The one-page site is generated into
-[site/](site/index.html).
+Every document, by what you need: [the docs index](docs/README.md). Most used:
+[configuration](docs/configuration.md), [JSON API](docs/api.md) and
+[running it online](docs/online.md). gitterrace binds to `127.0.0.1` and never changes your files
+or history. The one-page site is generated into [site/](site/index.html).
 
 ## Contributing
 

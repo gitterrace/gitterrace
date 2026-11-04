@@ -9,6 +9,7 @@
 mod action_scripts;
 mod api_md;
 mod config_md;
+mod docs_index;
 mod docs_md;
 mod facts;
 mod openapi_json;
@@ -45,6 +46,7 @@ fn generators(root: &Path) -> Result<Vec<Out>> {
     let mut outs = vec![
         api_md::render(),
         config_md::render(),
+        docs_index::render(),
         openapi_json::render(&ws),
     ];
     outs.extend(readme_agents_md::render(&ws, &scripts));
