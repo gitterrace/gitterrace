@@ -113,6 +113,19 @@ impl InsightsQuery {
         fmt::href(&format!("{base}{}", self.filter.query(&pairs)))
     }
 
+    /// Link to `base` with the current filters and options and the date range `from` to `to`.
+    pub(crate) fn unranged_link(&self, d: &Defaults, base: &str) -> String {
+        self.link(d, base, "from", None)
+    }
+
+    pub(crate) fn range_link(&self, d: &Defaults, base: &str, from: &str, to: &str) -> String {
+        let mut extra = self.pairs(d);
+        extra.push(("from", from.to_owned()));
+        extra.push(("to", to.to_owned()));
+        let pairs: Vec<(&str, &str)> = extra.iter().map(|(k, v)| (*k, v.as_str())).collect();
+        fmt::href(&format!("{base}{}", self.filter.query(&pairs)))
+    }
+
     /// The quiet options row under the filter bar.
     pub(crate) fn row(&self, d: &Defaults, base: &str) -> Vec<OptLink> {
         let o = self.options(d);

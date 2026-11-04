@@ -4,13 +4,14 @@ use askama::Template;
 use axum::extract::{Query, RawQuery, State};
 use axum::response::Html;
 use gitterrace_index::Period;
+use serde::Deserialize;
 
 use crate::{
     charts,
     error::Result,
-    filter::FilterBar,
+    filter::{Chip, FilterBar},
     fmt::{self},
-    insights::{InsightsQuery, OptLink, cached, insights, period_of, scoped},
+    insights::{InsightsQuery, OptLink, cached_keyed, insights, period_of, scoped},
     routes::Shared,
     views::{self, Chrome, Tabs},
 };
@@ -36,6 +37,43 @@ fn delta(now: u64, before: Option<u64>) -> (String, &'static str) {
 /// Label of the commit total: insights count non-merge commits, the overview counts all.
 const COMMITS: &str = "Commits without merges";
 
+/// The date range a bucket link narrows the page to: `?from=YYYY-MM-DD&to=YYYY-MM-DD`, both
+/// ends inclusive.
+#[derive(Debug, Default, Deserialize)]
+pub(crate) struct RangeQuery {
+    from: Option<String>,
+    to: Option<String>,
+}
+
+/// `YYYY-MM-DD` as days since the epoch.
+fn parse_day(s: &str) -> Option<i64> {
+    let mut it = s.splitn(3, '-');
+    let y: i64 = it.next()?.parse().ok()?;
+    let m: i64 = it.next()?.parse().ok()?;
+    let d: i64 = it.next()?.parse().ok()?;
+    ((1..=12).contains(&m) && (1..=31).contains(&d) && s.len() == 10)
+        .then(|| gitterrace_git::days_from_civil(y, m, d))
+}
+
+impl RangeQuery {
+    /// The range as `(from, to)` dates and days, or `None` when absent or malformed.
+    fn parsed(&self) -> Option<(&str, &str, i64, i64)> {
+        let (f, t) = (self.from.as_deref()?, self.to.as_deref()?);
+        let (a, b) = (parse_day(f)?, parse_day(t)?);
+        (a <= b).then_some((f, t, a, b))
+    }
+}
+
+const WEEKDAYS: [&str; 7] = [
+    "Monday",
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday",
+    "Saturday",
+    "Sunday",
+];
+
 struct PulseRow {
     label: &'static str,
     tip: &'static str,
@@ -59,6 +97,45 @@ struct ActivityPage {
     unit: &'static str,
     series: String,
     heatmap: String,
+    range: Option<RangeCard>,
+}
+
+struct RangeCard {
+    title: String,
+    total: String,
+    weekdays: String,
+}
+
+fn span_text(from: Option<i64>, to: i64, days: Option<i64>) -> String {
+    from.map_or_else(
+        || format!("All history up to {}", fmt::day(to - 1)),
+        |from| {
+            format!(
+                "{} to {}, against the {} before",
+                fmt::day(from),
+                fmt::day(to - 1),
+                fmt::count(days.unwrap_or(0), "day", "days")
+            )
+        },
+    )
+}
+
+/// The weekday split of the narrowed range.
+fn range_card(from: &str, to: &str, by_weekday: &[u32; 7]) -> RangeCard {
+    let days: Vec<(String, u64)> = WEEKDAYS
+        .iter()
+        .zip(by_weekday)
+        .map(|(n, v)| ((*n).to_owned(), u64::from(*v)))
+        .collect();
+    RangeCard {
+        title: format!("{from} to {to}"),
+        total: fmt::count(
+            by_weekday.iter().map(|v| u64::from(*v)).sum::<u64>(),
+            "commit",
+            "commits",
+        ),
+        weekdays: charts::bars(&days),
+    }
 }
 
 /// The landing insights page: the period against the one before it, commits per bucket and
@@ -67,14 +144,22 @@ pub(crate) async fn page(
     State(app): Shared,
     RawQuery(raw): RawQuery,
     Query(q): Query<InsightsQuery>,
+    Query(rq): Query<RangeQuery>,
 ) -> Result<Html<String>> {
-    cached(&app, "a", raw, move |a, r, c| {
+    // The memo key keeps only the shared parameters: the range is part of this page's key.
+    let mut key = crate::app::App::canonical_query(raw.as_deref());
+    if let Some((f, t, _, _)) = rq.parsed() {
+        key = format!("{key}&from={f}&to={t}");
+    }
+    cached_keyed(&app, "a", key, move |a, r, c| {
         let f = &q.filter;
         let recs = scoped(f, r);
         let d = a.defaults();
         let ins = insights(a, &recs, q.options(&d));
         let period = period_of(&q, &d, Period::All);
-        let s = ins.period_summary(period);
+        let sel = rq.parsed();
+        let days = sel.map(|(_, _, a, b)| (a, b));
+        let s = ins.period_summary_in(period, days);
         let prev = s.previous.as_ref();
         let row = |label: &'static str, now: u64, before: Option<u64>| {
             let (d, tone) = delta(now, before);
@@ -118,32 +203,41 @@ pub(crate) async fn page(
                 prev.map(|p| p.deletions),
             ),
         ];
-        let span = match s.from {
-            Some(from) => format!(
-                "{} to {}, against the {} before",
-                fmt::day(from),
-                fmt::day(s.to - 1),
-                fmt::count(period.days().unwrap_or(0), "day", "days")
-            ),
-            None => format!("All history up to {}", fmt::day(s.to - 1)),
-        };
-        let rhythm = ins.rhythm(period);
+        let span_days = sel.map_or_else(|| period.days(), |(_, _, a, b)| Some(b - a + 1));
+        let span = span_text(s.from, s.to, span_days);
+        let rhythm = ins.rhythm_in(period, days);
         let series: Vec<_> = rhythm
             .series
             .iter()
             .map(|p| (p.label.clone(), u64::from(p.commits)))
             .collect();
+        let links: Vec<String> = rhythm
+            .series
+            .iter()
+            .zip(&rhythm.ends)
+            .map(|(p, end)| q.range_link(&d, "/stats", &p.key, end))
+            .collect();
+        let mut fb = f.bar("/stats", &**r);
+        let range = sel.map(|(from, to, _, _)| {
+            fb.chips.push(Chip {
+                dim: "range",
+                label: format!("{from} to {to}"),
+                href: q.unranged_link(&d, "/stats"),
+            });
+            range_card(from, to, &rhythm.by_weekday)
+        });
         ActivityPage {
             c,
             tabs: views::stats_tabs("a"),
-            fb: f.bar("/stats", &**r),
+            fb,
             opts: q.row(&d, "/stats"),
             rows,
             span,
             empty: s.current.commits == 0,
             compared: prev.is_some(),
             unit: rhythm.unit.noun(),
-            series: charts::bars(&series),
+            series: charts::linked_bars(&series, &links),
+            range,
             heatmap: charts::heatmap(&rhythm.punch_card, rhythm.punch_max),
         }
     })

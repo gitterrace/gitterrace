@@ -97,6 +97,15 @@ fn open_svg(label: &str) -> String {
 
 /// Vertical bars, one per `(label, value)`, scaled to the full container width.
 pub(crate) fn bars(points: &[(String, u64)]) -> String {
+    bars_with(points, None)
+}
+
+/// [`bars`] with every bar a link to `links[i]`, for keyboard and pointer alike.
+pub(crate) fn linked_bars(points: &[(String, u64)], links: &[String]) -> String {
+    bars_with(points, Some(links))
+}
+
+fn bars_with(points: &[(String, u64)], links: Option<&[String]>) -> String {
     let max = points.iter().map(|p| p.1).max().unwrap_or(0);
     let (grid, top) = axis(max);
     let sl = slot(points.len());
@@ -108,6 +117,16 @@ pub(crate) fn bars(points: &[(String, u64)]) -> String {
         let h = (*v as f64 / top * plot).max(if *v > 0 { 1.0 } else { 0.0 });
         let x = (i as f64).mul_add(sl, LEFT) + (sl - bw) / 2.0;
         let y = TOP_PAD + plot - h;
+        let link = links.and_then(|l| l.get(i));
+        if let Some(href) = link {
+            let _ = write!(
+                svg,
+                r#"<a href="{}" aria-label="{}: {}, narrow to this range">"#,
+                esc(href),
+                esc(label),
+                fmt::count(*v, "commit", "commits")
+            );
+        }
         let _ = write!(
             svg,
             r#"<g class="col" data-tip="{}: {}"><rect class="hit" x="{:.1}" y="{TOP_PAD}" width="{sl:.1}" height="{plot:.1}"/><rect class="bar" x="{x:.1}" y="{y:.1}" width="{bw:.1}" height="{h:.1}" rx="2"/></g>"#,
@@ -115,6 +134,9 @@ pub(crate) fn bars(points: &[(String, u64)]) -> String {
             fmt::thousands(v),
             x - (sl - bw) / 2.0
         );
+        if link.is_some() {
+            svg.push_str("</a>");
+        }
     }
     let keys: Vec<&str> = points.iter().map(|p| p.0.as_str()).collect();
     svg.push_str(&x_labels(&keys));

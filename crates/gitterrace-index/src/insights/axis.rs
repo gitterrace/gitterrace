@@ -231,6 +231,11 @@ impl TimeAxis {
         format_date(self.starts[i])
     }
 
+    /// Date of the last day of bucket `i`, `YYYY-MM-DD`.
+    pub fn end_key(&self, i: usize) -> String {
+        format_date(self.unit.next(self.starts[i]) - 1)
+    }
+
     /// Axis label of bucket `i`: "Mon 27", "27 Oct", "Oct 2026", "Q3 2026" or "2026".
     pub fn label(&self, i: usize) -> String {
         self.unit.label(self.starts[i])

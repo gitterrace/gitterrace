@@ -9,7 +9,9 @@
 <div class="card"><table class="entries">
 <tr class="th"><td></td><td class="r">This period</td>{% if compared %}<td class="r">Before</td><td class="r">Change</td>{% endif %}</tr>
 {% for r in rows %}<tr><td{% if !r.tip.is_empty() %} data-tip="{{ r.tip }}"{% endif %}>{{ r.label }}</td><td class="r"><b>{{ r.now }}</b></td>{% if compared %}<td class="r muted">{{ r.before }}</td><td class="r delta {{ r.tone }}">{{ r.delta }}</td>{% endif %}</tr>{% endfor %}
-</table></div>
+</table></div>{% if let Some(r) = range %}
+<div class="chart-head"><div><h2>Commits by weekday</h2><p class="hint">{{ r.title }}: {{ r.total }}. Remove the range chip to see everything again.</p></div></div>
+<div class="card pad">{{ r.weekdays|safe }}</div>{% endif %}
 <div class="chart-head"><div><h2>Commits per {{ unit }}</h2><p class="hint">One column per {{ unit }}, empty ones included.</p></div></div>
 <div class="card pad">{{ series|safe }}</div>
 <h2 data-tip="Commits by weekday and hour of day, in each commit's own time zone. Darker cells have more commits.">When commits happen</h2>
