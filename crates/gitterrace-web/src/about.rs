@@ -3,6 +3,7 @@
 
 use gitterrace_git::{TreeEntry, TreeEntryKind};
 
+use crate::dochead::{DocAction, DocHead, DocTab};
 use crate::{fmt, markdown};
 
 /// The kinds, in tab order: slug, label, and the upper-case stems in order of preference.
@@ -25,21 +26,12 @@ pub(crate) struct Doc {
     pub(crate) file: String,
 }
 
-/// A tab of the card.
-pub(crate) struct DocTab {
-    pub(crate) href: String,
-    pub(crate) label: &'static str,
-    pub(crate) on: bool,
-}
-
-/// The card: the tab row (empty when one document is present) and the active document.
+/// The card: its header (the tab row, or the label when one document is present) and the
+/// active document.
 pub(crate) struct About {
-    pub(crate) label: &'static str,
-    pub(crate) tabs: Vec<DocTab>,
+    pub(crate) head: DocHead,
     pub(crate) html: String,
     pub(crate) markdown: bool,
-    /// The outline menu of a Markdown document, empty below three headings.
-    pub(crate) outline: String,
     /// The document's path in the repo, so marked prose maps to its source lines.
     pub(crate) file: String,
 }
@@ -125,11 +117,22 @@ pub(crate) fn card(
         Vec::new()
     };
     Some(About {
-        label: active.label,
-        tabs,
+        head: DocHead {
+            title: active.label.to_owned(),
+            tabs,
+            outline,
+            actions: vec![DocAction {
+                label: "Open file",
+                href: fmt::href(&format!(
+                    "/blob/{}/{}",
+                    fmt::enc_seg(rev),
+                    fmt::enc_path(&file)
+                )),
+            }],
+            ..DocHead::default()
+        },
         html,
         markdown: is_md,
-        outline,
         file,
     })
 }

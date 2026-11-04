@@ -10,6 +10,7 @@ use axum::{
 use gitterrace_config::Feature;
 use gitterrace_index::feed::{CommitRange, InsightsSource, Rank};
 
+use crate::dochead::DocHead;
 use crate::routes::{DocQuery, Shared, page};
 use crate::{
     app::{App, blocking},
@@ -108,7 +109,8 @@ struct BlobPage {
     raw_href: String,
     rendered: Option<String>,
     outline_rail: String,
-    outline_menu: String,
+    /// The header of the Markdown card; `None` for any other file.
+    head: Option<DocHead>,
 }
 
 fn is_markdown(path: &str) -> bool {
@@ -173,9 +175,12 @@ pub(super) async fn blob(
         let outline_rail = doc
             .as_ref()
             .map_or_else(String::new, |d| markdown::outline_rail(&d.outline));
-        let outline_menu = doc
-            .as_ref()
-            .map_or_else(String::new, |d| markdown::outline_menu(&d.outline, false));
+        let head = doc.as_ref().map(|d| DocHead {
+            title: path.rsplit('/').next().unwrap_or(&path).to_owned(),
+            views: true,
+            outline: markdown::outline_menu(&d.outline, true),
+            ..DocHead::default()
+        });
         let rendered = doc.map(|d| d.html);
         let (r, pe) = (fmt::enc_seg(&rev), fmt::enc_path(&path));
         Ok(BlobPage {
@@ -185,7 +190,7 @@ pub(super) async fn blob(
             },
             rendered,
             outline_rail,
-            outline_menu,
+            head,
             crumbs: views::crumbs(&rev, &path, true),
             size: fmt::size(b.size),
             blame_href: crate::features::href_if(Feature::Blame, &format!("/blame/{r}/{pe}")),

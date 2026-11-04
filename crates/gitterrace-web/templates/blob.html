@@ -3,8 +3,8 @@
 {% block content %}
 <div class="head"><nav class="crumbs">{% for k in crumbs %}{% if !loop.first %}<i>/</i>{% endif %}<a href="{{ k.href }}">{{ k.name }}</a>{% endfor %}</nav>
 <span class="muted">{{ size }} · {% if !blame_href.is_empty() %}<a href="{{ blame_href }}">Blame</a> · {% endif %}<a href="{{ log_href }}">History</a> · <button type="button" class="linkbtn" data-copy-url>Copy permalink</button></span></div>
-{% if let Some(m) = rendered %}<div{% if !outline_rail.is_empty() %} class="cols outline-cols"{% endif %}><div class="card" data-md-view>
-<div class="readme-h seg"><button type="button" class="on" data-show="rendered">Preview</button><button type="button" data-show="source">Code</button>{{ outline_menu|safe }}</div>
+{% if let Some(m) = rendered %}<div{% if !outline_rail.is_empty() %} class="cols outline-cols"{% endif %}><div class="card doccard" data-md-view>
+{% if let Some(h) = head %}{{ h }}{% endif %}
 <div class="markdown-body md-pane" data-pane="rendered" data-src="{{ title }}">{{ m|safe }}</div>
 <div class="scroll md-pane" data-pane="source" hidden>
 {% if let Some(h) = html %}{{ h|safe }}{% endif %}

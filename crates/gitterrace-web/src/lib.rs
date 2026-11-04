@@ -10,6 +10,7 @@ mod caches;
 mod charts;
 mod commit_types;
 mod compare;
+mod dochead;
 mod error;
 mod far;
 mod features;

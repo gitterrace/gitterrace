@@ -65,7 +65,7 @@ async fn readme_alone_has_no_tab_row() {
     let index = gitterrace_index::Index::open(&repo).expect("index");
     let app = Arc::new(App::new(repo, index));
     let (_, body) = get(&app, "/").await;
-    assert!(body.contains("readme-h") && !body.contains("doctabs"));
+    assert!(body.contains("data-dochead") && !body.contains("doctabs"));
 }
 
 #[tokio::test]

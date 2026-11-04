@@ -319,7 +319,7 @@ async function outline() {
         await p.goto(`${srv.base}/blob/HEAD/outline.md`, { waitUntil: 'load' });
         res[scheme].railNarrow = await vis(p, '.outline.rail');
         res[scheme].menuNarrow = await vis(p, 'details.outline');
-        res[scheme].btnText = await p.evaluate(() => /** @type {HTMLElement} */ (document.querySelector('details.outline summary')).innerText.trim());
+        res[scheme].btnText = await p.evaluate(() => { const s = /** @type {HTMLElement} */ (document.querySelector('details.outline summary')); return s.innerText.trim() || s.getAttribute('aria-label'); });
         await p.click('details.outline summary');
         await p.waitForTimeout(200);
         res[scheme].filterShown = await vis(p, '.outline-q');
@@ -338,7 +338,7 @@ async function outline() {
       sh(dir, 'git', 'commit', '-q', '-m', 'docs: outline README');
       await new Promise((ok) => setTimeout(ok, 600));
       try {
-        for (const scheme of ['light', 'dark']) for (const width of [1400, 360]) {
+        for (const scheme of ['light', 'dark']) for (const width of [1400, 900, 360]) {
           const p = await ctx.newPage();
           await p.emulateMedia({ colorScheme: scheme });
           await p.setViewportSize({ width, height: 800 });
@@ -347,12 +347,13 @@ async function outline() {
           await p.screenshot({ path: join(process.env.OUTLINE_SHOTS || tmpdir(), `overview-${name}-${scheme}-${width}.png`) });
           const o = await p.evaluate(() => {
             const d = document.querySelector('#about details.outline'), s = d?.querySelector('summary');
-            const bar = document.querySelector('#about .readme-h');
+            const bar = document.querySelector('#about [data-dochead]');
             if (!d || !s || !bar) return { missing: true };
             const sb = s.getBoundingClientRect(), bb = bar.getBoundingClientRect();
-            const label = [...bar.childNodes].find((n) => n !== d && n.textContent.trim());
-            const lr = label ? (label.nodeType === 1 ? /** @type {Element} */ (label) : (() => { const g = document.createRange(); g.selectNodeContents(label); return g; })()).getBoundingClientRect() : null;
-            return { inBar: bar.contains(d), rightGap: Math.round(bb.right - sb.right), afterLabel: !lr || sb.left >= lr.right, text: s.innerText.trim(), aria: s.getAttribute('aria-label'), tip: s.getAttribute('data-tip') };
+            const label = bar.querySelector('.doc-title,.doctabs');
+            const lr = label ? label.getBoundingClientRect() : null;
+            const inBox = sb.top >= bb.top && sb.bottom <= bb.bottom - 1 && sb.left >= bb.left && sb.right <= bb.right;
+            return { inBar: bar.contains(d) && inBox, rightGap: Math.round(bb.right - sb.right), afterLabel: !lr || sb.left >= lr.right, text: s.innerText.trim(), aria: s.getAttribute('aria-label'), tip: s.getAttribute('data-tip') };
           });
           if (o.missing || !o.inBar || o.rightGap > 24 || !o.afterLabel || o.text !== '' || o.aria !== 'On this page' || o.tip !== 'On this page') bad.push({ scheme, width, o });
           if (width === 1400 && scheme === 'light') {
