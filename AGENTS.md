@@ -64,5 +64,10 @@ outside `gitterrace-git` imports `gix`.
   preview on the default address.
 - Commits: `type(scope): subject`, scope is the crate without `gitterrace-`. Commit by
   pathspec, never `git add -A`.
+- One change, one commit. A change that spans several files or steps (a scaffold, a type moved
+  before its callers, a refactor) is built in its own worktree or clone, never in the shared
+  checkout, and lands on main as one squashed commit with its tests, docs and golden update.
+  Main never carries the partial steps. `scripts/land-check.sh --base <main>` must pass on the
+  squashed commit before it lands.
 - Names: files in `scripts/` are `<area>-<verb>.<ext>`, make targets are `<area>[-<verb>]`,
   harness-only env vars use a `TEST_` prefix. `make names` enforces it.
