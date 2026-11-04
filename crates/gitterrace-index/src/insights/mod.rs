@@ -433,6 +433,13 @@ fn shared_tables(
 
 /// Decides every path once, spread over the cores.
 fn decide_all(paths: &[Arc<str>], filter: &PathFilter) -> Vec<bool> {
+    decide_with(paths, |p| filter.decide(p))
+}
+
+/// [`decide_all`] with the decision passed in. A panic in any chunk is propagated: dropping
+/// the chunk would shorten the table and shift every later path's decision.
+fn decide_with(paths: &[Arc<str>], decide: impl Fn(&str) -> bool + Sync) -> Vec<bool> {
+    let decide = &decide;
     let threads = std::thread::available_parallelism().map_or(1, std::num::NonZero::get);
     let chunk = paths.len().div_ceil(threads).max(1);
     std::thread::scope(|s| {
@@ -442,12 +449,14 @@ fn decide_all(paths: &[Arc<str>], filter: &PathFilter) -> Vec<bool> {
         )]
         let parts: Vec<_> = paths
             .chunks(chunk)
-            .map(|c| s.spawn(move || c.iter().map(|p| filter.decide(p)).collect::<Vec<_>>()))
+            .map(|c| s.spawn(move || c.iter().map(|p| decide(p)).collect::<Vec<_>>()))
             .collect();
-        parts
+        let skip: Vec<bool> = parts
             .into_iter()
-            .flat_map(|h| h.join().unwrap_or_default())
-            .collect()
+            .flat_map(|h| h.join().unwrap_or_else(|e| std::panic::resume_unwind(e)))
+            .collect();
+        debug_assert_eq!(skip.len(), paths.len(), "skip table out of step with paths");
+        skip
     })
 }
 
@@ -572,6 +581,34 @@ pub(crate) mod fixtures {
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod decide_tests {
+    use super::decide_with;
+    use std::sync::Arc;
+
+    fn paths(n: usize) -> Vec<Arc<str>> {
+        (0..n).map(|i| Arc::from(format!("f{i}"))).collect()
+    }
+
+    #[test]
+    fn decisions_keep_the_order_and_length_of_the_paths() {
+        let p = paths(1000);
+        let got = decide_with(&p, |s| s.ends_with('7'));
+        assert_eq!(got.len(), p.len());
+        assert!(got.iter().zip(&p).all(|(g, s)| *g == s.ends_with('7')));
+    }
+
+    #[test]
+    #[should_panic(expected = "filter boom")]
+    fn a_panicking_filter_panics_the_call_instead_of_shortening_the_table() {
+        let p = paths(1000);
+        let _ = decide_with(&p, |s| {
+            assert!(s != "f500", "filter boom");
+            false
+        });
+    }
+}
 
 /// `13972` as `13,972`.
 pub fn thousands(n: impl std::fmt::Display) -> String {
