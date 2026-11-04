@@ -1,4 +1,7 @@
-use std::{net::SocketAddr, path::PathBuf};
+use std::{
+    net::SocketAddr,
+    path::{Path, PathBuf},
+};
 
 use anyhow::Context;
 use clap::Parser;
@@ -103,9 +106,9 @@ async fn main() -> anyhow::Result<()> {
             force,
             commits,
             max_file_kb,
+            max_pages,
             project,
         } => {
-            let out = out.unwrap_or_else(|| PathBuf::from(export::DEFAULT_OUT));
             let scope = export::Scope {
                 commits,
                 max_file: max_file_kb * 1024,
@@ -115,15 +118,8 @@ async fn main() -> anyhow::Result<()> {
                     .map(|p| export::Project::parse(p))
                     .collect::<anyhow::Result<_>>()?,
             };
-            // The same repositories `serve` would show for these paths, so an export of a
-            // folder of repos is the multi-repo site, index and all.
-            let m = &loaded.config.multi;
-            let repos = gitterrace_web::discover_repos(&cli.paths, m.depth, &m.skip_dirs);
-            if repos.is_empty() {
-                anyhow::bail!("no git repository found in {}", path.display());
-            }
-            let n = export::export(&repos, &out, &scope).await?;
-            println!("wrote {n} files to {}", out.display());
+            let pages = export::budget(max_pages, &loaded.config);
+            export_cmd(&cli.paths, &path, out, &scope, pages, &loaded.config).await?;
         }
     }
     Ok(())
@@ -255,6 +251,28 @@ fn wrapped(
     let out = out.unwrap_or_else(|| PathBuf::from(format!("wrapped-{year}.svg")));
     std::fs::write(&out, svg).with_context(|| format!("writing {}", out.display()))?;
     println!("{}", out.display());
+    Ok(())
+}
+
+/// Exports the repositories `serve` would show for `paths`, so an export of a folder of repos is
+/// the multi-repo site, index and all.
+#[expect(clippy::print_stdout, reason = "the command's result line")]
+async fn export_cmd(
+    paths: &[PathBuf],
+    path: &Path,
+    out: Option<PathBuf>,
+    scope: &export::Scope,
+    pages: usize,
+    config: &gitterrace_config::Config,
+) -> anyhow::Result<()> {
+    let out = out.unwrap_or_else(|| PathBuf::from(export::DEFAULT_OUT));
+    let m = &config.multi;
+    let repos = gitterrace_web::discover_repos(paths, m.depth, &m.skip_dirs);
+    if repos.is_empty() {
+        anyhow::bail!("no git repository found in {}", path.display());
+    }
+    let n = export::export(&repos, &out, scope, pages).await?;
+    println!("wrote {n} files to {}", out.display());
     Ok(())
 }
 

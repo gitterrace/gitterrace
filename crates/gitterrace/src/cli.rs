@@ -110,6 +110,10 @@ pub(crate) enum Command {
         /// Largest file to include as a page, in KiB.
         #[arg(long, default_value_t = 512)]
         max_file_kb: u64,
+        /// Most pages to write, folded diff fragments included. Overrides
+        /// `limits.export_pages`. Past it the export stops and writes nothing.
+        #[arg(long, value_name = "N", value_parser = clap::value_parser!(u64).range(1..=10_000_000))]
+        max_pages: Option<u64>,
         /// Credit a repository that is someone else's project (a demo), as `name=url`: its
         /// pages name and link it in the snapshot banner. `name` is the repository's folder
         /// name. Repeat it for several repositories.

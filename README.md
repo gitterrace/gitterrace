@@ -73,7 +73,7 @@ git terrace open <link>      Open a `gitterrace://` or `/go` permalink in the br
 git terrace remove [target]  Take a repository off the running server; its pages then answer 404
 git terrace install-handler  Register (or with `--uninstall` remove) this program as the `gitterrace://` link handler [--uninstall]
 git terrace init             Write a documented `config.toml` and the pre-filled `actions.toml` to the config folder
-git terrace export [out]     Write a static copy of the site to a folder, for sharing or hosting [--force --commits --max-file-kb --project]
+git terrace export [out]     Write a static copy of the site to a folder, for sharing or hosting [--force --commits --max-file-kb --max-pages --project]
 ```
 
 <!-- END GENERATED: commands -->

@@ -4,6 +4,9 @@ use std::path::Path;
 use crate::export::write_page;
 use crate::export::{links, mark_snapshot, mark_snapshot_as, target};
 
+/// The budget an export gets with no flag and no config: `limits.export_pages`'s default.
+const DEFAULT_PAGES: usize = 20_000;
+
 #[test]
 fn headers_file_carries_the_page_policy() {
     let h = super::headers_file();
@@ -196,12 +199,12 @@ async fn export_never_writes_into_or_clears_a_folder_it_did_not_create_unless_fo
     let out = dir.path().join("foreign");
     std::fs::create_dir(&out).expect("mkdir");
     std::fs::write(out.join("mine.txt"), "keep").expect("write");
-    let err = crate::export::export(&repos, &out, &scope(false))
+    let err = crate::export::export(&repos, &out, &scope(false), DEFAULT_PAGES)
         .await
         .unwrap_err();
     assert!(err.to_string().contains("not empty"), "{err}");
     assert_eq!(std::fs::read_dir(&out).expect("read").count(), 1);
-    crate::export::export(&repos, &out, &scope(true))
+    crate::export::export(&repos, &out, &scope(true), DEFAULT_PAGES)
         .await
         .expect("forced");
     assert!(
@@ -218,7 +221,7 @@ async fn re_export_removes_stale_pages_and_ignores_symlink_targets() {
     let repo = gitterrace_testkit::Fixture::standard(&dir.path().join("r"));
     let repos = [repo.path().to_path_buf()];
     let out = dir.path().join("out");
-    crate::export::export(&repos, &out, &scope(false))
+    crate::export::export(&repos, &out, &scope(false), DEFAULT_PAGES)
         .await
         .expect("first");
     std::fs::create_dir_all(out.join("old/page")).expect("mkdir");
@@ -228,7 +231,7 @@ async fn re_export_removes_stale_pages_and_ignores_symlink_targets() {
     std::fs::write(outside.join("precious"), "keep").expect("write");
     #[cfg(unix)]
     std::os::unix::fs::symlink(&outside, out.join("link")).expect("symlink");
-    crate::export::export(&repos, &out, &scope(false))
+    crate::export::export(&repos, &out, &scope(false), DEFAULT_PAGES)
         .await
         .expect("second");
     assert!(!out.join("old").exists(), "stale page survived");
@@ -242,9 +245,14 @@ async fn default_folder_is_used_when_none_is_named() {
     let dir = tempfile::tempdir().expect("tempdir");
     let repo = gitterrace_testkit::Fixture::standard(&dir.path().join("r"));
     let out = dir.path().join(crate::export::DEFAULT_OUT);
-    crate::export::export(&[repo.path().to_path_buf()], &out, &scope(false))
-        .await
-        .expect("export");
+    crate::export::export(
+        &[repo.path().to_path_buf()],
+        &out,
+        &scope(false),
+        DEFAULT_PAGES,
+    )
+    .await
+    .expect("export");
     assert!(out.join("index.html").is_file());
     assert_eq!(crate::export::DEFAULT_OUT, "gitterrace-export");
 }
@@ -259,9 +267,14 @@ async fn export_refuses_a_repository_root_as_output() {
         projects: Vec::new(),
         force: false,
     };
-    let err = crate::export::export(&[repo.path().to_path_buf()], repo.path(), &scope)
-        .await
-        .unwrap_err();
+    let err = crate::export::export(
+        &[repo.path().to_path_buf()],
+        repo.path(),
+        &scope,
+        DEFAULT_PAGES,
+    )
+    .await
+    .unwrap_err();
     assert!(
         err.to_string().contains("root of a git repository"),
         "{err}"
@@ -283,7 +296,7 @@ async fn export_writes_every_prewarmed_page() {
         projects: Vec::new(),
         force: false,
     };
-    crate::export::export(&[repo.path().to_path_buf()], &out, &scope)
+    crate::export::export(&[repo.path().to_path_buf()], &out, &scope, DEFAULT_PAGES)
         .await
         .expect("export");
     let root =
@@ -330,6 +343,7 @@ async fn several_repositories_export_like_the_server_serves_them() {
         &[a.path().to_path_buf(), b.path().to_path_buf()],
         &out,
         &scope,
+        DEFAULT_PAGES,
     )
     .await
     .expect("export");
@@ -392,7 +406,7 @@ async fn export_ships_no_scriptable_raw_file() {
         projects: Vec::new(),
         force: false,
     };
-    crate::export::export(&[fx.path().to_path_buf()], &out, &scope)
+    crate::export::export(&[fx.path().to_path_buf()], &out, &scope, DEFAULT_PAGES)
         .await
         .expect("export");
     let mut raw = Vec::new();

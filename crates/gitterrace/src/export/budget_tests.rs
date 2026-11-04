@@ -236,3 +236,32 @@ async fn a_capped_export_leaves_the_existing_folder_untouched() {
         .collect();
     assert_eq!(left.len(), 2, "left beside the sites: {left:?}");
 }
+
+/// The page budget comes from `--max-pages` when given, else from `limits.export_pages`, and the
+/// cap error names both, so a user who hits it knows which knob raises it.
+#[tokio::test]
+async fn the_flag_beats_the_config_and_the_cap_error_names_both() {
+    let mut c = gitterrace_config::Config::default();
+    assert_eq!(crate::export::budget(None, &c), 20_000);
+    c.limits.export_pages = 7;
+    assert_eq!(crate::export::budget(None, &c), 7);
+    assert_eq!(crate::export::budget(Some(3), &c), 3);
+
+    let dir = tempfile::tempdir().expect("tempdir");
+    let fx = wide(&dir.path().join("r"), 2, 2);
+    let out = dir.path().join("out");
+    let err = crate::export::export(
+        &[fx.path().to_path_buf()],
+        &out,
+        &scope(2),
+        crate::export::budget(Some(1), &c),
+    )
+    .await
+    .expect_err("one page cannot hold a site");
+    let msg = err.to_string();
+    assert!(msg.contains("cap of 1 pages"), "{msg}");
+    assert!(
+        msg.contains("--max-pages") && msg.contains("limits.export_pages"),
+        "{msg}"
+    );
+}

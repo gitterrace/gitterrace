@@ -4,6 +4,8 @@
 //! The settings are declared once in the `settings!` call in `schema.rs`. Its doc comments are
 //! the descriptions in `docs/configuration.md`, so the file, the loader and the page cannot drift.
 
+#[cfg(test)]
+mod limits_tests;
 mod schema;
 mod value;
 

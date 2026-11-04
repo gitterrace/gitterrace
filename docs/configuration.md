@@ -54,6 +54,7 @@ Actions live in their own file, `actions.toml`, because they run commands.
 | `raw_mb` | integer | `256` | Largest file served raw, in MB. |
 | `search_matches` | integer | `500` | Most matches a code search returns. |
 | `diff_fold_lines` | integer | `400` | Lines of one file's diff shown before it folds. |
+| `export_pages` | integer | `20000` | Most pages `git terrace export` writes, folded diff fragments included. Past it the export stops and writes nothing. `export --max-pages` overrides it. Between 1 and 10000000. |
 
 ## `[insights]`
 

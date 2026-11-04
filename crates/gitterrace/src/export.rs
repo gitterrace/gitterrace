@@ -72,10 +72,6 @@ impl Project {
 
 /// Largest response body read from the router.
 const MAX_BODY: usize = 64 * 1024 * 1024;
-/// Hard ceiling on pages written, folded diff fragments (`/diff/{id}/{n}`) included: one
-/// budget, so a wide commit costs pages like any other and the export's size is bounded by
-/// its scope, not by how many files its commits touch.
-const MAX_PAGES: usize = 20_000;
 /// Pages the crawl starts from, beside every page the server prewarms; each is exported
 /// whatever links point at it.
 const SEEDS: [&str; 2] = ["/refs", "/log/HEAD"];
@@ -120,8 +116,24 @@ fn exclude_from_worktree(out: &Path) {
 /// repository under `/r/<name>/`, named by the server's own table.
 /// The site is built in a folder beside `out` and moved into place only when complete: a failed
 /// or capped export leaves `out` as it was.
-pub(crate) async fn export(repos: &[PathBuf], out: &Path, scope: &Scope) -> anyhow::Result<usize> {
-    export_capped(repos, out, scope, MAX_PAGES).await
+/// `max_pages` is the ceiling on pages written, folded diff fragments (`/diff/{id}/{n}`)
+/// included: one budget, so a wide commit costs pages like any other and the export's size is
+/// bounded by its scope, not by how many files its commits touch. It comes from
+/// `export --max-pages`, else `limits.export_pages`.
+pub(crate) async fn export(
+    repos: &[PathBuf],
+    out: &Path,
+    scope: &Scope,
+    max_pages: usize,
+) -> anyhow::Result<usize> {
+    export_capped(repos, out, scope, max_pages).await
+}
+
+/// The export page budget: `--max-pages` wins over `limits.export_pages`.
+pub(crate) fn budget(flag: Option<u64>, config: &gitterrace_config::Config) -> usize {
+    flag.map_or(config.limits.export_pages, |n| {
+        usize::try_from(n).unwrap_or(usize::MAX)
+    })
 }
 
 /// [`export`] under a given page budget, so a test can reach the cap with a small fixture.
@@ -294,7 +306,8 @@ impl Caps {
             };
             bail!(
                 "export stopped at the cap of {} pages (diff fragments count) on {kind}, {path}; \
-                 nothing was written. Lower --commits (now {}) or --max-file-kb (now {})",
+                 nothing was written. Lower --commits (now {}) or --max-file-kb (now {}), or \
+                 raise --max-pages or limits.export_pages in config.toml",
                 self.max,
                 self.commits,
                 self.max_file_kb

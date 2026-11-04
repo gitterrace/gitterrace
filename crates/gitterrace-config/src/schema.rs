@@ -178,6 +178,10 @@ settings! {
         search_matches: usize = 500 => Live,
         /// Lines of one file's diff shown before it folds.
         diff_fold_lines: usize = 400 => Live,
+        /// Most pages `git terrace export` writes, folded diff fragments included. Past it the
+        /// export stops and writes nothing. `export --max-pages` overrides it. Between 1 and
+        /// 10000000.
+        export_pages: usize = 20_000 => Live,
     }
     insights: Insights {
         /// Paths (globs) left out of every insight.
@@ -244,6 +248,9 @@ impl Config {
         }
         if self.limits.text_kb == 0 || self.limits.raw_mb == 0 {
             return bad("limits", "text_kb and raw_mb must be at least 1");
+        }
+        if self.limits.export_pages == 0 || self.limits.export_pages > 10_000_000 {
+            return bad("limits.export_pages", "must be between 1 and 10000000");
         }
         if !["1w", "1m", "3m", "1y", "all"].contains(&self.insights.period.as_str()) {
             return bad("insights.period", "expected 1w, 1m, 3m, 1y or all");
