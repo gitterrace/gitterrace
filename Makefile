@@ -120,7 +120,7 @@ bench-report:
 #: bench-guard: The harness still works, on a tiny generated repo (part of check)
 bench-guard:
 	cargo build -q -p gitterrace
-	python3 scripts/bench-run.py --synthetic --bin target/debug/git-terrace >/dev/null
+	python3 scripts/bench-run.py --synthetic --bin $${CARGO_TARGET_DIR:-target}/debug/git-terrace >/dev/null
 	python3 scripts/bench-report.py --self-test
 
 ## counting-parity: The count parity fuzz including the pages-vs-reducers properties still red until the insights pages read Counted, and the report-only day-math lint. Not in check
