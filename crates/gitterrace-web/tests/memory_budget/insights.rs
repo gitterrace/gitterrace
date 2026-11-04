@@ -60,9 +60,10 @@ fn insights_request_peak() {
 }
 
 /// After the idle release the server holds what a just-started one does, plus the page memo it
-/// keeps by design and 2 MB of slack. The block cache and the derived tables go with the source.
+/// keeps by design and 2 MB of slack. The block cache and the derived tables go with the source,
+/// and the allocator runs one arena, so no per-core arena keeps freed slabs (red with one arena
+/// per core: 17 MB released against a 12 MB cap on a 100k history).
 #[test]
-#[ignore = "red until an idle release returns to the start: 100k synthetic sits 8 MB over"]
 fn insights_release_returns_to_start() {
     if serve_if_child() {
         return;

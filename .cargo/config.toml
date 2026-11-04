@@ -1,2 +1,10 @@
 [alias]
 xtask = "run -q -p xtask --"
+
+# One jemalloc arena instead of four per core. Each arena keeps partly used slabs and pages of
+# its own after a page frees its data, so an idle server sat 5 to 8 MB above a just-started one
+# with no data held. Measured on a 100k-commit history: warm pages and 8 concurrent clients as
+# fast, the index build as fast. A build setting, read when jemalloc is compiled: builds from
+# this repository (make install, the release builds) get it, `cargo install --git` does not.
+[env]
+JEMALLOC_SYS_WITH_MALLOC_CONF = "narenas:1"

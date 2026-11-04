@@ -26,6 +26,9 @@ git terrace   # serves this checkout on 127.0.0.1 (make preview rebuilds and res
 
 If the build fails on a clean checkout, that is a bug worth reporting.
 
+Builds from inside the checkout read `.cargo/config.toml`, which runs the allocator with one
+arena. `cargo install --git` builds elsewhere, misses it and keeps a few MB more while idle.
+
 ## Rules
 
 - Read [AGENTS.md](AGENTS.md) for the code conventions. It is short. `make check` enforces

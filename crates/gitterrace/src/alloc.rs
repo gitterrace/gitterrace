@@ -1,21 +1,37 @@
-//! The allocator hands freed pages back to the OS at once.
+//! The allocator hands freed pages back to the OS at once, from one arena.
 //!
 //! An idle server should shrink to what it holds, not to the most it ever held. jemalloc keeps
 //! freed pages for ten seconds by default and the system allocator on macOS keeps them for
-//! good. The setting is applied at start, so it holds however the binary was built: a build
-//! flag only reaches builds run from the repository root.
+//! good. The decay is applied at start, so it holds however the binary was built.
+//!
+//! The arena count can only be set before the first allocation, so it is a build setting
+//! (`.cargo/config.toml`). A build from outside the repository runs with one arena per core
+//! and says so at start: it works the same, idle memory is a few MB higher.
 
 use tikv_jemalloc_ctl::{Access, AsName};
 
-/// Applies the decay. Returns true when the harness asked only for the decay in effect
-/// (`TEST_ALLOC_DECAY`, read by the guard in `tests/alloc.rs`), which is then printed.
+/// Applies the decay and notes a build without the arena setting. Returns true when the
+/// harness asked only for the allocator settings in effect (`TEST_ALLOC_DECAY` for the decay,
+/// `TEST_ALLOC_ARENAS` for the arena count, read by the guards in `tests/alloc.rs`), which are
+/// then printed.
 #[expect(
     clippy::print_stdout,
-    reason = "the harness reads the answer from stdout"
+    clippy::print_stderr,
+    reason = "the harness reads the answer from stdout; the build note goes to stderr before logging starts"
 )]
 pub(crate) fn start() -> std::io::Result<bool> {
     release_freed_pages()?;
+    let arenas: u32 = "opt.narenas\0".name().read().map_err(ctl)?;
+    if std::env::var_os("TEST_ALLOC_ARENAS").is_some() {
+        println!("{arenas}");
+        return Ok(true);
+    }
     if std::env::var_os("TEST_ALLOC_DECAY").is_none() {
+        if arenas != 1 {
+            eprintln!(
+                "note: built without the repository's allocator setting, idle memory is a few MB higher"
+            );
+        }
         return Ok(false);
     }
     let [dirty, muzzy, dirty0, muzzy0] = decay()?;
