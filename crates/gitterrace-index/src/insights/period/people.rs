@@ -121,7 +121,12 @@ fn contributors(set: &Counted<'_>, metric: Metric) -> ContributorReport {
         })
         .collect();
     let key = |row: &Contributor| metric.of(row.commits, row.additions, row.deletions);
-    out.sort_by(|x, y| key(y).cmp(&key(x)).then_with(|| x.name.cmp(&y.name)));
+    out.sort_by(|x, y| {
+        key(y)
+            .cmp(&key(x))
+            .then_with(|| x.name.cmp(&y.name))
+            .then_with(|| x.emails.cmp(&y.emails))
+    });
     ContributorReport {
         labels: (0..axis.len()).map(|i| axis.label(i)).collect(),
         unit: axis.unit(),

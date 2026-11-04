@@ -204,7 +204,10 @@ impl Insights<'_> {
                 let w = f64::from(f.lines) * c as f64 / changed as f64;
                 *d.w.entry(p).or_default() += w;
                 *all.w.entry(p).or_default() += w;
-                if w > top_w {
+                if w.total_cmp(&top_w)
+                    .then_with(|| self.person_order(top_p, p))
+                    .is_gt()
+                {
                     top_w = w;
                     top_p = p;
                 }
@@ -222,7 +225,10 @@ impl Insights<'_> {
         }
         let finish = |path: String, a: Acc| -> DirOwnership {
             let mut owners: Vec<(usize, f64)> = a.w.into_iter().collect();
-            owners.sort_by(|x, y| y.1.total_cmp(&x.1).then_with(|| x.0.cmp(&y.0)));
+            owners.sort_by(|x, y| {
+                y.1.total_cmp(&x.1)
+                    .then_with(|| self.person_order(x.0, y.0))
+            });
             let total: f64 = owners
                 .iter()
                 .map(|o| o.1)
@@ -402,6 +408,15 @@ impl Insights<'_> {
 fn keeps(c: &Counted<'_>, r: &CommitRow) -> bool {
     let ins = c.insights();
     ins.counted_row(r) && c.scope().selects(ins.source(), r)
+}
+
+impl Insights<'_> {
+    /// Ties in a ranked list of people: display name, then the first e-mail. Never the person
+    /// index, which follows commit counts of whatever history the tables were built over.
+    fn person_order(&self, a: usize, b: usize) -> std::cmp::Ordering {
+        let (x, y) = (&self.d.people.list[a], &self.d.people.list[b]);
+        x.name.cmp(&y.name).then_with(|| x.emails.cmp(&y.emails))
+    }
 }
 
 /// The head files a path selection keeps: a file outside it has no counted change.

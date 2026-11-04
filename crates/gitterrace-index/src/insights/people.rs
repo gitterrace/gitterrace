@@ -98,6 +98,13 @@ impl People {
             b.1.commits
                 .cmp(&a.1.commits)
                 .then_with(|| display(&a.1).cmp(&display(&b.1)))
+                .then_with(|| {
+                    let mut x: Vec<&String> = a.1.emails.iter().collect();
+                    let mut y: Vec<&String> = b.1.emails.iter().collect();
+                    x.sort();
+                    y.sort();
+                    x.cmp(&y)
+                })
         });
         let mut list = Vec::with_capacity(ranked.len());
         let mut slot: HashMap<usize, usize> = HashMap::new();

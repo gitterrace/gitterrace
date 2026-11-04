@@ -475,3 +475,34 @@ fn file_reports_in_counted_match_the_period() {
     assert_eq!(hot.files[0].path, "new/x.rs");
     assert!(ins.coupling_in(&hf, &c, 1, 9).is_empty());
 }
+
+/// G19: a ranked list of people never depends on internal person ids. Ann and Yan share every
+/// file of `src` equally. In one history Yan has more commits elsewhere (so a lower person
+/// id), in the other Ann does. The owners must read the same, ties by name.
+#[test]
+fn owner_ties_do_not_follow_person_ids() {
+    let build = |extra: &str| {
+        let mut recs = vec![
+            rec("a", "Ann", 0, vec![file("src/x.rs", 5, 0, 10)]),
+            rec("z", "Yan", 1, vec![file("src/x.rs", 5, 0, 10)]),
+        ];
+        for n in 0..3 {
+            recs.push(rec(
+                &format!("e{n}"),
+                extra,
+                2 + n,
+                vec![file("other.rs", 1, 0, 1)],
+            ));
+        }
+        let ins = Insights::new(&recs, Options::default(), None);
+        let o = ins.ownership(&head(&[("src/x.rs", 10)]), Period::All, 1);
+        o.dirs
+            .iter()
+            .find(|d| d.path == "src")
+            .map(|d| d.owners.iter().map(|o| o.name.clone()).collect::<Vec<_>>())
+    };
+    let ann = build("Ann");
+    let zed = build("Yan");
+    assert_eq!(ann, zed);
+    assert_eq!(ann, Some(vec!["Ann".to_owned(), "Yan".to_owned()]));
+}
