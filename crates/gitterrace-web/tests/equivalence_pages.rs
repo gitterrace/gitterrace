@@ -220,6 +220,53 @@ fn other_revisions_match_the_oracle() {
     oracle::check(&golden, &dump(&golden), &answers);
 }
 
+/// The frozen clock is the only time input: the whole golden matrix, rendered under two local
+/// zones on opposite sides of the date line (14 hours east and 10 hours west of UTC), is byte
+/// identical. Red if any page reads the process zone, a local "today", or a clock the oracle
+/// does not freeze.
+#[test]
+fn the_matrix_does_not_depend_on_the_local_zone() {
+    let base = Path::new(env!("CARGO_TARGET_TMPDIR")).join("zone-guard");
+    let exe = std::env::current_exe().expect("test binary");
+    let run = |zone: &str| {
+        let out = base.join(zone.replace('/', "-"));
+        if out.exists() {
+            std::fs::remove_dir_all(&out).expect("remove old dump");
+        }
+        let status = std::process::Command::new(&exe)
+            .args([
+                "every_cell_matches_the_oracle",
+                "--exact",
+                "--test-threads=1",
+            ])
+            .env(oracle::NOW_VAR, oracle::FROZEN_NOW.to_string())
+            .env("TZ", zone)
+            .env("TEST_ORACLE_DUMP", &out)
+            .env_remove("TEST_BLESS")
+            .status()
+            .expect("run child");
+        assert!(status.success(), "the golden matrix fails under TZ={zone}");
+        out
+    };
+    let (east, west) = (run("Pacific/Kiritimati"), run("America/Adak"));
+    let mut names: Vec<_> = std::fs::read_dir(&east)
+        .expect("east dump")
+        .map(|e| e.expect("entry").file_name())
+        .collect();
+    names.sort();
+    assert!(!names.is_empty(), "the oracle dumped no answers");
+    let moved: Vec<_> = names
+        .iter()
+        .filter(|n| std::fs::read(east.join(n)).ok() != std::fs::read(west.join(n)).ok())
+        .collect();
+    assert!(
+        moved.is_empty(),
+        "{} answers depend on the local zone, first {:?}",
+        moved.len(),
+        moved.first()
+    );
+}
+
 /// The frozen clock really reaches the pages: without it the 1w window of the fixture is empty,
 /// with it the week's commit shows. Red if any of the hooks reads the wall clock again.
 #[test]

@@ -1,0 +1,7 @@
+id: no-unfrozen-clock
+valid:
+  - 'fn now() -> u64 { if let Some(t) = frozen() { return t; } SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |d| d.as_secs()) }'
+  - 'fn wall_clock() -> i64 { std::time::SystemTime::now(); 0 }'
+invalid:
+  - 'fn spark(a: &App) -> i64 { let t = SystemTime::now(); 0 }'
+  - 'fn today() -> i64 { std::time::SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |d| d.as_secs() as i64) }'

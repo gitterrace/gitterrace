@@ -1,0 +1,15 @@
+id: no-unfrozen-clock
+language: rust
+severity: error
+message: Reads the wall clock outside a clock function the oracle freezes.
+note: Every time a page shows must come from a clock that honors GITTERRACE_TEST_NOW, or the equivalence goldens move with the date. Call fmt::now, registry now or the index wall_clock instead. The git watcher compares file mtimes to the real clock and never renders a time, so it is exempt.
+files: [crates/**/*.rs, xtask/**/*.rs]
+ignores: [crates/gitterrace-git/src/watch.rs]
+rule:
+  kind: call_expression
+  has: {field: function, regex: '(^|::)SystemTime::now$'}
+  not:
+    inside:
+      stopBy: end
+      kind: function_item
+      has: {field: name, regex: '^(now|wall_clock)$'}
