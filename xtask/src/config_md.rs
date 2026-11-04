@@ -19,7 +19,14 @@ pub fn render() -> Out {
          logged with the key and the old settings stay. Open pages show \"Updated, refresh\". \
          Settings marked \"Needs a restart\" log a warning and keep their running value.\n\n\
          Per-repository overrides go under `[repo.NAME]` (the repository's folder name) and \
-         take `exclude`, a list of path globs added to `insights.exclude`.\n\n\
+         take `exclude`, a list of path globs added to `insights.exclude`. \
+         `[repo.NAME.features]` turns a feature off for that repository only, with the keys of \
+         `[features]` set to `false`. It never turns one on, and the server-wide ones \
+         (`repo_admin_enabled`, `picker_enabled`, `credit_enabled`, `api_enabled`) are refused \
+         there.\n\n\
+         A feature that shows this machine (working tree, live updates, actions, adding \
+         repositories) stays off on a public server whatever `[features]` says: the file can \
+         turn a feature off, never past what `--public` or the loopback check allows.\n\n\
          Actions live in their own file, `actions.toml`, because they run commands.\n",
     );
     s.push_str("\n## Names\n\nOne rule for every key and flag, from `gitterrace_config::naming`. A renamed key gets no alias: the old name warns as unknown and the default applies.\n\n");

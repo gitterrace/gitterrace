@@ -394,6 +394,7 @@ mod tests {
             s.repo.name(),
             gitterrace_config::RepoOverride {
                 exclude: vec!["src/**".to_owned()],
+                ..Default::default()
             },
         );
         let authors = |s: &ApiState| {

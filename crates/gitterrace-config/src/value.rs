@@ -19,6 +19,17 @@ impl Show for bool {
     }
 }
 
+/// A switch with no fixed default: unset leaves the choice to the server's mode.
+impl Show for Option<bool> {
+    const TYPE: &'static str = "bool";
+    fn show(&self) -> String {
+        self.map_or_else(|| "unset".to_owned(), |b| b.to_string())
+    }
+    fn from_toml(v: &toml::Value) -> Option<Self> {
+        v.as_bool().map(Some)
+    }
+}
+
 macro_rules! int {
     ($t:ty) => {
         impl Show for $t {

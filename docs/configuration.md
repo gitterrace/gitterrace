@@ -12,7 +12,14 @@ the key and the old settings stay. Open pages show "Updated, refresh". Settings 
 restart" log a warning and keep their running value.
 
 Per-repository overrides go under `[repo.NAME]` (the repository's folder name) and take `exclude`, a
-list of path globs added to `insights.exclude`.
+list of path globs added to `insights.exclude`. `[repo.NAME.features]` turns a feature off for that
+repository only, with the keys of `[features]` set to `false`. It never turns one on, and the
+server-wide ones (`repo_admin_enabled`, `picker_enabled`, `credit_enabled`, `api_enabled`) are
+refused there.
+
+A feature that shows this machine (working tree, live updates, actions, adding repositories) stays
+off on a public server whatever `[features]` says: the file can turn a feature off, never past what
+`--public` or the loopback check allows.
 
 Actions live in their own file, `actions.toml`, because they run commands.
 
@@ -27,6 +34,7 @@ old name warns as unknown and the default applies.
 | a duration | integer ending in `_ms` or `_secs` | `watch.interval_ms` |
 | a count | integer ending in the plural it counts | `api.blame_lines` |
 | a switch | bool with a predicate prefix (`is_`, `has_`, `needs_`, `include_`) or the `enabled` gate of its section | `insights.include_bots` |
+| a feature switch | `[features]` bool ending in `_enabled`: whether a feature or loop runs. `include_` only says what data counts | `features.blame_enabled` |
 | any key | snake_case, never `max` or `min`: the section already says it is a limit | `limits.log_pages` |
 | a flag that sets a key | the key's name with dashes, `--no-<section>` for an `enabled` gate | `--export-pages` sets `limits.export_pages` |
 
@@ -109,6 +117,7 @@ Exceptions, each on purpose:
 | `include_bots` | bool | `false` | Count commits by bots. |
 | `include_generated` | bool | `false` | Count lock files and minified output. |
 | `period` | string | `"all"` | Period the insights pages use when the URL names none: 1w, 1m, 3m, 1y or all. The API and MCP default to all. Their `period` parameter picks one. |
+| `pages` | list of strings | `["activity", "contributors", "hotspots", "languages", "ownership", "types", "frequency", "patterns"]` | Insights pages, in the order the tabs show them: `activity`, `contributors`, `hotspots`, `languages`, `ownership`, `types`, `frequency` and `patterns`. Leave one out to stop serving it. `features.insights_enabled` switches them all. |
 
 ## `[display]`
 
@@ -117,6 +126,26 @@ Exceptions, each on purpose:
 | `theme` | string | `"system"` | Color theme before the visitor picks one: system, light or dark. |
 | `dates` | string | `"relative"` | How dates read: relative or absolute. |
 | `sidebar` | list of strings | `["now", "recent", "churn", "loose_ends", "languages"]` | Overview sidebar sections, in the order shown: `now`, `recent`, `churn`, `loose_ends` and `languages`. Leave one out to hide it. An empty list hides the sidebar. |
+
+## `[features]`
+
+| Key | Type | Default | Description |
+| --- | --- | --- | --- |
+| `blame_enabled` | bool | `true` | Serve who last changed each line of a file (`/blame`) and its API endpoint. |
+| `search_enabled` | bool | `true` | Serve code and commit search (`/search`) and the search box. |
+| `raw_enabled` | bool | `true` | Serve the bytes of a file (`/raw`): downloads and images in rendered Markdown. |
+| `history_enabled` | bool | `true` | Serve the history of one file (`/history`). |
+| `compare_enabled` | bool | `true` | Serve the comparison of two revisions (`/compare`). |
+| `worktree_enabled` | bool | `true` | Serve the working tree, linked worktrees and stashes. Never on a public server. |
+| `insights_enabled` | bool | `true` | Serve the insights pages (`/stats`) and their API. `insights.pages` picks which. |
+| `live_enabled` | bool | `true` | Push changes to open pages (`/events`). Never on a public server. |
+| `actions_enabled` | bool | `true` | Run the actions of `actions.toml` and offer Send to. Never on a public server. |
+| `repo_admin_enabled` | bool | `true` | Let `git terrace open` and `remove` add and take off repositories of a running server. Never on a public server. Server-wide. |
+| `picker_enabled` | bool | `true` | Show the repository switcher and the list of served repositories. Server-wide. |
+| `front_matter_enabled` | bool | `true` | Show the front matter of a Markdown file as a table. |
+| `mermaid_enabled` | bool | `true` | Draw mermaid diagrams in Markdown; off shows their source. |
+| `credit_enabled` | bool | `true` | Write the credit line (source, license, origin) at the foot of exported pages. Server-wide. |
+| `api_enabled` | bool | `unset` | Serve the JSON API (`/api/v1`). Unset means on locally and off on a public server. Server-wide. |
 
 ## `[multi]`
 

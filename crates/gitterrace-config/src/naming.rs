@@ -58,6 +58,13 @@ pub const RULES: &[Rule] = &[
         example: "`insights.include_bots`",
     },
     Rule {
+        holds: "a feature switch",
+        form: "`[features]` bool ending in `_enabled`: whether a feature or loop runs. `include_` \
+               only says what data counts",
+        parts: &["_enabled"],
+        example: "`features.blame_enabled`",
+    },
+    Rule {
         holds: "any key",
         form: "snake_case, never `max` or `min`: the section already says it is a limit",
         parts: &[],
@@ -129,6 +136,24 @@ pub fn key_violations() -> Vec<String> {
                     k.id
                 ));
             }
+            // A feature gate: `_enabled`, never `include_`, which says what data counts.
+            _ if k.section == "features" => {
+                if k.ty != "bool" || !ends(rule("a feature switch")) {
+                    bad.push(format!(
+                        "{}: a feature switch is a bool ending in _enabled",
+                        k.id
+                    ));
+                }
+                if n.starts_with("include_") {
+                    bad.push(format!(
+                        "{}: include_ says what data counts, not a feature",
+                        k.id
+                    ));
+                }
+            }
+            _ if n.ends_with("_enabled") => {
+                bad.push(format!("{}: a _enabled switch lives in [features]", k.id));
+            }
             "bool" if !rule("a switch").iter().any(|p| n.starts_with(p) || n == *p) => {
                 bad.push(format!("{}: a bool takes a predicate prefix", k.id));
             }
@@ -186,6 +211,28 @@ mod tests {
             let key = if e.sets.is_empty() { e.name } else { e.sets };
             assert!(ids.contains(&key), "{}: no key {key}", e.name);
         }
+    }
+
+    /// `include_` (what data counts) and `_enabled` (whether a feature runs) never trade
+    /// places: a feature gate named `include_x`, or a counting switch named `x_enabled`,
+    /// breaks the rule.
+    #[test]
+    fn include_and_enabled_keep_their_meanings() {
+        let ks = keys();
+        for k in &ks {
+            let is_gate = k.section == "features";
+            assert!(
+                !(is_gate && k.name.starts_with("include_")),
+                "{}: include_ is for counted data",
+                k.id
+            );
+            assert!(
+                is_gate == k.name.ends_with("_enabled"),
+                "{}: _enabled is a feature gate in [features]",
+                k.id
+            );
+        }
+        assert!(ks.iter().any(|k| k.id == "features.blame_enabled"));
     }
 
     #[test]

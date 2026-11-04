@@ -3,6 +3,7 @@
 
 use std::collections::BTreeMap;
 
+use crate::features::{Feature, INSIGHT_PAGES};
 use crate::value::Show;
 
 /// The overview sidebar's sections, in their default order.
@@ -34,11 +35,12 @@ pub enum Reload {
 }
 
 macro_rules! settings {
-    ($( $field:ident : $sec:ident { $(
+    ($( $(#[$attr:meta])* $field:ident : $sec:ident { $(
         $(#[doc = $doc:literal])* $name:ident : $ty:ty = $default:expr => $reload:ident $(+ $cost:ident)? ,
     )* } )*) => {
         $(
             #[derive(Debug, Clone, PartialEq, Eq)]
+            $(#[$attr])*
             pub struct $sec { $( $(#[doc = $doc])* pub $name: $ty, )* }
             impl Default for $sec {
                 fn default() -> Self { Self { $( $name: $default, )* } }
@@ -128,7 +130,8 @@ macro_rules! settings {
                             <Vec<String> as Show>::from_toml(x)
                                 .ok_or_else(|| format!("repo.{name}.exclude: expected list of strings"))
                         })?;
-                        c.repo.insert(name.clone(), RepoOverride { exclude: ex });
+                        let off = repo_features(name, o.get("features"))?;
+                        c.repo.insert(name.clone(), RepoOverride { exclude: ex, features_off: off });
                     }
                 }
                 Ok(c)
@@ -142,6 +145,38 @@ macro_rules! settings {
 pub struct RepoOverride {
     /// Paths (globs) left out of every insight for this repository, added to `insights.exclude`.
     pub exclude: Vec<String>,
+    /// Features `[repo.NAME.features]` turns off for this repository. An override only turns
+    /// off: `true` is refused, so it never widens what the server-wide `[features]` serves.
+    pub features_off: Vec<Feature>,
+}
+
+/// The features `[repo.NAME.features]` turns off. Unknown, server-wide or `true` keys are
+/// errors naming the key.
+fn repo_features(name: &str, t: Option<&toml::Value>) -> Result<Vec<Feature>, String> {
+    let Some(t) = t else { return Ok(Vec::new()) };
+    let t = t
+        .as_table()
+        .ok_or_else(|| format!("repo.{name}.features: expected a table"))?;
+    let mut off = Vec::new();
+    for (k, v) in t {
+        let id = format!("repo.{name}.features.{k}");
+        let f = Feature::from_key(k).ok_or_else(|| format!("{id}: unknown feature"))?;
+        if f.is_global_only() {
+            return Err(format!(
+                "{id}: a server-wide feature, set it under [features]"
+            ));
+        }
+        match v.as_bool() {
+            Some(false) => off.push(f),
+            Some(true) => {
+                return Err(format!(
+                    "{id}: an override only turns a feature off, set it under [features]"
+                ));
+            }
+            None => return Err(format!("{id}: expected bool")),
+        }
+    }
+    Ok(off)
 }
 
 /// Range of every bounded number: (id, least, most). The least is never 0, so a limit cannot
@@ -284,6 +319,10 @@ settings! {
         /// Period the insights pages use when the URL names none: 1w, 1m, 3m, 1y or all. The
         /// API and MCP default to all. Their `period` parameter picks one.
         period: String = "all".to_owned() => Live,
+        /// Insights pages, in the order the tabs show them: `activity`, `contributors`,
+        /// `hotspots`, `languages`, `ownership`, `types`, `frequency` and `patterns`. Leave one
+        /// out to stop serving it. `features.insights_enabled` switches them all.
+        pages: Vec<String> = INSIGHT_PAGES.iter().map(|&s| s.to_owned()).collect() => Live,
     }
     display: Display {
         /// Color theme before the visitor picks one: system, light or dark.
@@ -294,6 +333,45 @@ settings! {
         /// `loose_ends` and `languages`. Leave one out to hide it. An empty list hides the
         /// sidebar.
         sidebar: Vec<String> = SIDEBAR.iter().map(|&s| s.to_owned()).collect() => Live,
+    }
+    #[expect(
+        clippy::struct_field_names,
+        reason = "gitterrace_config::naming: every feature switch ends in _enabled"
+    )]
+    features: Features {
+        /// Serve who last changed each line of a file (`/blame`) and its API endpoint.
+        blame_enabled: bool = true => Live,
+        /// Serve code and commit search (`/search`) and the search box.
+        search_enabled: bool = true => Live,
+        /// Serve the bytes of a file (`/raw`): downloads and images in rendered Markdown.
+        raw_enabled: bool = true => Live,
+        /// Serve the history of one file (`/history`).
+        history_enabled: bool = true => Live,
+        /// Serve the comparison of two revisions (`/compare`).
+        compare_enabled: bool = true => Live,
+        /// Serve the working tree, linked worktrees and stashes. Never on a public server.
+        worktree_enabled: bool = true => Live,
+        /// Serve the insights pages (`/stats`) and their API. `insights.pages` picks which.
+        insights_enabled: bool = true => Live,
+        /// Push changes to open pages (`/events`). Never on a public server.
+        live_enabled: bool = true => Live,
+        /// Run the actions of `actions.toml` and offer Send to. Never on a public server.
+        actions_enabled: bool = true => Live,
+        /// Let `git terrace open` and `remove` add and take off repositories of a running
+        /// server. Never on a public server. Server-wide.
+        repo_admin_enabled: bool = true => Live,
+        /// Show the repository switcher and the list of served repositories. Server-wide.
+        picker_enabled: bool = true => Live,
+        /// Show the front matter of a Markdown file as a table.
+        front_matter_enabled: bool = true => Live,
+        /// Draw mermaid diagrams in Markdown; off shows their source.
+        mermaid_enabled: bool = true => Live,
+        /// Write the credit line (source, license, origin) at the foot of exported pages.
+        /// Server-wide.
+        credit_enabled: bool = true => Live,
+        /// Serve the JSON API (`/api/v1`). Unset means on locally and off on a public server.
+        /// Server-wide.
+        api_enabled: Option<bool> = None => Live,
     }
     multi: Multi {
         /// How many folder levels to search below a given folder for repositories. Needs a restart.
@@ -370,6 +448,23 @@ impl Config {
                     "unknown section {s}, expected now, recent, churn, loose_ends or languages"
                 ),
             );
+        }
+        let pages = &self.insights.pages;
+        if let Some(p) = pages.iter().find(|p| !INSIGHT_PAGES.contains(&p.as_str())) {
+            return bad(
+                "insights.pages",
+                &format!(
+                    "unknown page {p}, expected one of {}",
+                    INSIGHT_PAGES.join(", ")
+                ),
+            );
+        }
+        if let Some(p) = pages
+            .iter()
+            .enumerate()
+            .find(|(i, p)| pages[..*i].contains(p))
+        {
+            return bad("insights.pages", &format!("{} is listed twice", p.1));
         }
         if !["gitterrace", "go"].contains(&self.links.style.as_str()) {
             return bad("links.style", "expected gitterrace or go");
