@@ -47,6 +47,16 @@ color the year card.
 - **Live.** A watcher pushes changes over `/events`, and config files reload on change. A
   repository that joins the server is announced the same way, so open pages show it in the
   switcher without a reload.
+- **Features switch off at the route.** Each `[features]` switch owns its routes
+  (`gitterrace-web/src/features.rs`), and one gate answers a route of an off feature with the
+  404 of an unknown page. Pages ask the same table, so an off feature leaves no link or menu
+  entry behind. Off always wins: the file narrows what public mode and the loopback checks
+  allow, never widens it.
+- **Markdown renders as the hosts do.** Heading anchors are the plain slugs most Markdown
+  hosts make (`#getting-started`), so links written for elsewhere land. Only an id the page
+  itself uses gets a prefix. Front matter shows as a table (`features.front_matter_enabled`),
+  and a long document gets an "On this page" outline from its headings.
+- **Dates read relative, the full date is a hover away** (`display.dates`).
 - **Send to opens a URL in your browser.** The server never calls the destination, so there is
   nothing to authenticate and nothing written ([how Send to works](actions.md)).
 - **Every repo under `/r/{name}/`**, also when it is the only one, resolved only through the
@@ -124,10 +134,15 @@ build is left alone and the page says so.
 
 ### Memory
 
-While serving, resident memory is a budget of 32 MB for caches and rendered pages, plus 16 MB of
-margin. It does not grow with the history. A page folds the blocks of its time range through a
-small buffer into a result sized by the answer. The OS file cache is not counted. The peak
-during an index build is higher and is accepted.
+While serving, resident memory is a budget of `resources.cache_mb` (default 32 MB) for caches
+and rendered pages, plus 16 MB of margin. It does not grow with the history. A page folds the
+blocks of its time range through a small buffer into a result sized by the answer. The OS file
+cache is not counted. The peak during an index build is higher and is accepted.
+
+After 30 s without a request the server drops every cache but the rendered pages, and the
+allocator hands freed pages back to the OS at once. Builds from this repository run jemalloc
+with one arena (`.cargo/config.toml`), so an idle server returns to about the footprint it
+started with. The [design](design/streaming-insights.md) has the full store.
 
 ### The InsightsSource seam
 
@@ -165,8 +180,8 @@ repository is served. The rest are the server's own and never take the prefix.
 
 Code, diffs, blame and fenced blocks in markdown are highlighted with the grammars of
 [bat](https://github.com/sharkdp/bat) (through `two-face` and `syntect`), compiled into the binary.
-A file is matched by name, then extension, then its `#!` line. Files over 256 KB show plain.
-These are the languages:
+A file is matched by name, then extension, then its `#!` line. Text over `limits.highlight_kb`
+(default 256 KiB) shows plain. These are the languages:
 
 <!-- BEGIN GENERATED: languages -->
 182 languages: ActionScript, Ada, Apache Conf, AppleScript, ARM Assembly, AsciiDoc (Asciidoctor),

@@ -30,20 +30,22 @@ In scope:
   own origin plus the hashes of its inline theme snippets. Styles allow inline rules only
   because mermaid writes diagram styles at runtime. The app's own markup carries no style
   attribute. A page from another site or another local port reaching gitterrace is in scope.
-- **Public mode.** `--public` (or `server.public = true`) is the supported way to serve
+- **Public mode.** `--public` (or `server.is_public = true`) is the supported way to serve
   beyond loopback, and a non-loopback `--addr` refuses to start without it. The promises are
   listed in [running it online](docs/online.md): committed history only, full commit ids only,
   `GET` and `HEAD` only, no live updates, actions, Send to or adding repositories, and no
   host paths. A Host that is not a loopback name, the bound address or listed in
-  `server.hosts` gets `403`, which stops DNS rebinding. Error bodies, including `5xx`, never carry host paths. Any
+  `server.hosts` gets `403`, which stops DNS rebinding. Error bodies, including `5xx`, never
+  carry host paths. Any
   read beyond that list, any other method, or a Host outside `server.hosts` being answered
   is in scope.
-- **Adding a repository.** `POST /_repos` lets `git terrace open` add a repository to a
-  running server. It answers only loopback binds, refuses any request with a browser
-  `Origin` or `Sec-Fetch-Site`, needs a per-process token, and accepts only the canonical
-  top folder of a git repository. The token lives in a file with mode `0600` in a state
+- **Adding and removing a repository.** `POST /_repos` lets `git terrace open` add a
+  repository to a running server, and `DELETE /_repos` lets `git terrace remove` take one off.
+  They answer only loopback binds, refuse any request with a browser
+  `Origin` or `Sec-Fetch-Site`, need a per-process token, and accept only a served name or the
+  canonical top folder of a git repository. The token lives in a file with mode `0600` in a state
   folder with mode `0700`. On Windows those modes do not exist, so the token file's privacy
-  rests on the permissions of your user profile folder. Reaching this endpoint from a
+  rests on the permissions of your user profile folder. Reaching these endpoints from a
   page, another user or a public server is in scope.
   Before it sends a path, `git terrace` checks who listens. `GET /_repos?nonce=N` must
   answer the SHA-256 of the token and that fresh nonce, so the token itself never leaves

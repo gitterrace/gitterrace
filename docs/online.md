@@ -43,7 +43,8 @@ What a public server shows:
 
 - Files, commits, diffs, blame, history, compare, search and insights at `HEAD`, any branch,
   tag or remote-tracking branch, or a full commit id.
-- The JSON API under `/api/v1` with the same revisions.
+- The JSON API under `/api/v1` with the same revisions, only when `features.api_enabled = true`
+  says so. It is off on a public server by default.
 - `/go/...` permalinks.
 
 What it never shows or does:
@@ -54,8 +55,13 @@ What it never shows or does:
 - Live updates (no `/events`), actions, Send to targets, and adding repositories.
 - Any method but `GET` and `HEAD`.
 
-Every request that takes longer than 30 seconds answers `503`. Pages that are slow on a large
-history (blame, insights) finish in the background and answer from the cache next time.
+Every request that takes longer than `server.public_timeout_secs` (default 30) answers `503`.
+Pages that are slow on a large history (blame, insights) finish in the background and answer
+from the cache next time.
+
+Any feature in `[features]` can be switched off for a public server as well, for example
+`blame_enabled = false` or `search_enabled = false`. A switched-off page answers 404 and its links
+are gone. The ones that show this machine stay off whatever the file says.
 
 ## Behind a reverse proxy
 
