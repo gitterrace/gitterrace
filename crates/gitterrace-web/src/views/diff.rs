@@ -159,9 +159,10 @@ pub(crate) fn diff_html_with(fold_lines: usize, src: DiffSource<'_>, files: &[Fi
     for (i, f) in files.iter().enumerate() {
         let _ = write!(
             out,
-            "<section class=\"file\" id=\"f{i}\" data-path=\"{p}\"><header><span class=\"badge {k}\">{k}</span> ",
+            "<section class=\"file\" id=\"f{i}\" data-path=\"{p}\" data-h=\"{h}\"><header><span class=\"badge {k}\">{k}</span> ",
             k = kind_name(f.kind),
-            p = esc(&f.path)
+            p = esc(&f.path),
+            h = content_tag(f)
         );
         match src {
             DiffSource::Commit { rev, .. } if f.kind != ChangeKind::Deleted => {
@@ -185,6 +186,23 @@ pub(crate) fn diff_html_with(fold_lines: usize, src: DiffSource<'_>, files: &[Fi
         out.push_str("</section>");
     }
     out
+}
+
+/// A short tag of a file's diff content. `live.js` carries a loaded body over a live refresh
+/// only while the tag is unchanged, and loads it again when it differs.
+fn content_tag(f: &FileDiff) -> String {
+    use std::hash::{Hash, Hasher};
+    let mut h = std::collections::hash_map::DefaultHasher::new();
+    f.path.hash(&mut h);
+    f.additions.hash(&mut h);
+    f.deletions.hash(&mut h);
+    for hunk in &f.hunks {
+        hunk.header.hash(&mut h);
+        for l in &hunk.lines {
+            (l.kind as u8, l.old_no, l.new_no, &l.text).hash(&mut h);
+        }
+    }
+    format!("{:x}", h.finish())
 }
 
 /// What the files rendered in full so far cost.

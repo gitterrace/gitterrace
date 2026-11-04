@@ -471,15 +471,16 @@
     if (!lazyObs) return;
     Array.prototype.forEach.call(document.querySelectorAll("[data-load-diff][data-lazy]"), function (b) { lazyObs.observe(b); });
   }
-  function openHashed() {
+  // `jump` brings the file into view once it loads; a live refresh opens it where it is.
+  function openHashed(jump) {
     var m = /^#(f\d+)$/.exec(location.hash), s = m && document.getElementById(m[1]);
     var b = s && s.querySelector("[data-load-diff]");
-    if (b) loadDiff(b, true);
+    if (b) loadDiff(b, jump !== false);
   }
   watchLazy();
   openHashed();
-  window.addEventListener("hashchange", openHashed);
-  document.addEventListener("gt:live-refreshed", watchLazy);
+  window.addEventListener("hashchange", function () { openHashed(true); });
+  document.addEventListener("gt:live-refreshed", function () { watchLazy(); openHashed(false); });
 
   // ---- copy buttons ---------------------------------------------------------
   Array.prototype.forEach.call(document.querySelectorAll("[data-copyable]"), function (card) {

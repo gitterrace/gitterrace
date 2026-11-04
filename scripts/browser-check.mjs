@@ -55,6 +55,9 @@
 //   calm-header  at rest the branch switcher and the Working tree chip have no visible border
 //                and are not bold, and toggling the chip does not move the search field, at
 //                1440, 900 and 360 px, light and dark
+//   live-scroll  on the working tree page with 90 changed files, open at #f3 and scrolled to a file far
+//                down, a live refresh keeps that file within 4 px of where it was, keeps the loaded
+//                bodies and keeps #f3 open
 //   huge-diff    a commit of 2,000 changed files (mostly pure renames) loads under a DOM bound,
 //                shows a rename as one line, loads the last files on scroll, opens #fN, opens a
 //                folded file with Enter, and prints scroll frame times and long tasks
@@ -76,7 +79,7 @@ const bin = resolve(arg('--bin', join(root, 'target/debug/git-terrace')));
 const fromDisk = process.argv.includes('--from-disk');
 const tabCounts = arg('--tabs', '8,12').split(',').map(Number);
 const browsers = arg('--browsers', 'webkit,chromium').split(',');
-const ALL = ['truncation', 'live-tabs', 'mermaid', 'chip', 'doctabs', 'chords', 'header', 'marked', 'menu-same', 'gutter', 'overlays', 'tips', 'repo-switch', 'mark-seam', 'about-place', 'site-theme', 'side-width', 'calm-header', 'tabs-one-line', 'huge-diff', 'sticky-heads', 'md-anchor'];
+const ALL = ['truncation', 'live-tabs', 'mermaid', 'chip', 'doctabs', 'chords', 'header', 'marked', 'menu-same', 'gutter', 'overlays', 'tips', 'repo-switch', 'mark-seam', 'about-place', 'site-theme', 'side-width', 'calm-header', 'tabs-one-line', 'huge-diff', 'sticky-heads', 'md-anchor', 'live-scroll'];
 const wanted = arg('--checks', ALL.join(',')).split(',');
 for (const c of wanted) if (!ALL.includes(c)) { console.error(`unknown check ${c}; known: ${ALL.join(', ')}`); process.exit(2); }
 
@@ -108,7 +111,7 @@ const env = { pw, dir, srv, r, browsers, tabCounts, marker, context, arg, bin, c
 const { checks: anchorChecks } = await import('./browser-anchor-lib.mjs');
 const { mdAnchor } = anchorChecks(env);
 const { truncation, liveTabs, mermaid, chip, doctabs, chords, header } = pageChecks(env);
-const { marked, menuSame, gutter, overlays, tips, repoSwitch } = uiChecks(env);
+const { marked, menuSame, gutter, overlays, tips, repoSwitch, liveScroll } = uiChecks(env);
 const { markSeam, aboutPlace, siteTheme } = siteChecks(env);
 const { hugeDiff } = diffChecks(env);
 async function sideWidth() {
@@ -274,7 +277,7 @@ async function stickyHeads() {
     await b.close();
   }
 }
-const checks = { 'sticky-heads': stickyHeads, 'tabs-one-line': tabsOneLine, 'calm-header': calmHeader, 'side-width': sideWidth, truncation, 'live-tabs': liveTabs, mermaid, chip, doctabs, chords, header, marked, 'menu-same': menuSame, gutter, overlays, tips, 'repo-switch': repoSwitch, 'mark-seam': markSeam, 'about-place': aboutPlace, 'site-theme': siteTheme, 'huge-diff': hugeDiff, 'md-anchor': mdAnchor };
+const checks = { 'sticky-heads': stickyHeads, 'tabs-one-line': tabsOneLine, 'calm-header': calmHeader, 'side-width': sideWidth, truncation, 'live-tabs': liveTabs, mermaid, chip, doctabs, chords, header, marked, 'menu-same': menuSame, gutter, overlays, tips, 'repo-switch': repoSwitch, 'mark-seam': markSeam, 'about-place': aboutPlace, 'site-theme': siteTheme, 'huge-diff': hugeDiff, 'md-anchor': mdAnchor, 'live-scroll': liveScroll };
 try {
   for (const c of wanted) { console.log(`-- ${c}`); await checks[c](); }
 } finally {

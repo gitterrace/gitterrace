@@ -317,8 +317,74 @@ async function repoSwitch() {
   }
 }
 
+// ---- live-scroll ------------------------------------------------------------------------------
+// A live refresh swaps <main> for a fresh render that folds every diff again. The reader's place
+// must survive it: on the working tree page with 90 changed files, open at #f3 and scrolled to a
+// file far down, an edit to another file refreshes the page, the file in view stays within 4 px
+// of where it was and the bodies that were loaded are still there.
+async function liveScroll() {
+  const FILES = 90;
+  const body = (tag) => Array.from({ length: 30 }, (_, k) => `line ${k} ${tag}`).join('\n') + '\n';
+  const repo = mkdtempSync(join(tmpdir(), 'gt-livescroll-'));
+  const state = mkdtempSync(join(tmpdir(), 'gt-state-'));
+  const saved = process.env.XDG_STATE_HOME;
+  process.env.XDG_STATE_HOME = state;
+  let one;
+  try {
+    sh(repo, 'git', 'init', '-q', '-b', 'main');
+    for (let i = 0; i < FILES; i++) writeFileSync(join(repo, `s${String(i).padStart(2, '0')}.txt`), body('base'));
+    sh(repo, 'git', 'add', '-A');
+    sh(repo, 'git', 'commit', '-q', '-m', 'base');
+    for (let i = 0; i < FILES; i++) writeFileSync(join(repo, `s${String(i).padStart(2, '0')}.txt`), body('edited'));
+    one = await serve(bin, repo, cfg);
+    for (const name of browsers) {
+      const { b, ctx } = await context(name);
+      try {
+        const p = await ctx.newPage();
+        await p.setViewportSize({ width: 1100, height: 800 });
+        let ready = false;
+        for (let i = 0; i < 40 && !ready; i++) {
+          await p.goto(`${one.base}/worktree#f3`, { waitUntil: 'load' });
+          ready = (await p.$$('section[data-path]')).length >= FILES;
+          if (!ready) await p.waitForTimeout(250);
+        }
+        await p.evaluate(() => { window.__refreshed = 0; document.addEventListener('gt:live-refreshed', () => { window.__refreshed++; }); });
+        // Far down: a file the page budget folded, which loads as it comes near.
+        await p.evaluate(() => document.getElementById('f70').scrollIntoView());
+        await p.waitForFunction(() => !document.querySelector('#f70 [data-load-diff]'), null, { timeout: 8000 }).catch(() => {});
+        await p.waitForTimeout(500);
+        await p.evaluate(() => window.scrollBy(0, -37));
+        await p.waitForTimeout(300);
+        const read = () => p.evaluate(() => ({ top: document.getElementById('f70').getBoundingClientRect().top, bodies: document.querySelectorAll('#main .diffwrap').length, f3: !document.querySelector('#f3 [data-load-diff]'), y: scrollY }));
+        const before = await read();
+        writeFileSync(join(repo, 's01.txt'), body('edited again'));
+        await p.waitForFunction(() => window.__refreshed > 0, null, { timeout: 8000 }).catch(() => {});
+        await p.waitForTimeout(2500);
+        const after = await read();
+        const bad = [];
+        if (!before.bodies) bad.push('no loaded bodies before the refresh');
+        if (!before.f3) bad.push('#f3 was not open before the refresh');
+        if (!(await p.evaluate(() => window.__refreshed))) bad.push('no live refresh happened');
+        if (Math.abs(after.top - before.top) > 4) bad.push(`file moved ${Math.round(after.top - before.top)} px (scrollY ${Math.round(before.y)} to ${Math.round(after.y)})`);
+        if (after.bodies < before.bodies) bad.push(`${before.bodies} loaded bodies before, ${after.bodies} after`);
+        if (!after.f3) bad.push('#f3 folded again');
+        bad.length ? r.fail(`live-scroll ${name}: ${bad.join(', ')}`) : r.ok(`live-scroll ${name}: file held within 4 px, ${after.bodies} bodies kept, #f3 open`);
+      } finally {
+        await b.close();
+      }
+    }
+  } catch (e) {
+    r.fail(`live-scroll: ${e && e.stack}`);
+  } finally {
+    if (one) one.stop();
+    if (saved === undefined) delete process.env.XDG_STATE_HOME; else process.env.XDG_STATE_HOME = saved;
+    rmSync(repo, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
+    rmSync(state, { recursive: true, force: true });
+  }
+}
+
 // The mark is two paths, ink and accent, meeting on one line. A renderer that antialiases each
 // path alone lets the background through there as a hairline (WebKit did). Paint every mark at
 // many sizes and offsets and compare the split rows with the solid rows just above and below.
-  return { marked, menuSame, gutter, overlays, tips, repoSwitch };
+  return { marked, menuSame, gutter, overlays, tips, repoSwitch, liveScroll };
 }

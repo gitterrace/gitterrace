@@ -42,7 +42,90 @@
     note.hidden = false;
   }
 
-  // Swaps <main> for the fresh render, keeping scroll and open <details>.
+  // ---- scroll anchoring across a swap -----------------------------------------------------------
+  // The fresh render folds every diff again, so it is shorter than the page the reader scrolled.
+  // Restoring window.scrollY would clamp upward and every lazy load would shift the page again.
+  // Instead the topmost visible element with a stable key (a file by its path, else an id) is
+  // remembered with its offset from the viewport top, and put back at that offset after the swap
+  // and after every body that loads, until the reader scrolls on their own.
+  var hold = null;      // { key, top } being kept in place
+  var watch = null;     // MutationObserver re-applying the anchor
+  var quiet = null;     // timer that ends the hold once nothing moves for a while
+
+  function keyOf(el) {
+    return el.dataset && el.dataset.path ? "p:" + el.dataset.path : "i:" + el.id;
+  }
+
+  function find(root, key) {
+    var list = root.querySelectorAll("section[data-path], [id]");
+    for (var i = 0; i < list.length; i++) if (keyOf(list[i]) === key) return list[i];
+    return null;
+  }
+
+  function anchor(root) {
+    var list = root.querySelectorAll("section[data-path], [id]");
+    for (var i = 0; i < list.length; i++) {
+      var el = list[i];
+      if (el === root) continue;
+      var r = el.getBoundingClientRect();
+      if (r.bottom > 0) return { key: keyOf(el), top: r.top };
+    }
+    return null;
+  }
+
+  function place() {
+    if (!hold) return;
+    var el = find(document, hold.key);
+    if (!el) return;
+    var d = el.getBoundingClientRect().top - hold.top;
+    if (Math.abs(d) >= 1) window.scrollBy(0, d);
+  }
+
+  function release() {
+    hold = null;
+    clearTimeout(quiet);
+    if (watch) { watch.disconnect(); watch = null; }
+    ["wheel", "touchstart", "mousedown", "keydown"].forEach(function (t) { window.removeEventListener(t, release, true); });
+  }
+
+  function keep(a) {
+    release();
+    hold = a;
+    ["wheel", "touchstart", "mousedown", "keydown"].forEach(function (t) { window.addEventListener(t, release, true); });
+    var main = document.getElementById("main");
+    var bump = function () { clearTimeout(quiet); quiet = setTimeout(release, 3000); };
+    if (window.MutationObserver && main) {
+      watch = new MutationObserver(function () { place(); bump(); });
+      watch.observe(main, { childList: true, subtree: true });
+    }
+    bump();
+  }
+
+  // Files whose body was loaded and is unchanged (same data-h) move into the fresh render as
+  // they are. A file whose content changed is loaded again through its own fold link.
+  function carry(cur, next) {
+    var loaded = {};
+    Array.prototype.forEach.call(cur.querySelectorAll("section[data-path]"), function (s) {
+      if (!s.querySelector("[data-load-diff]")) loaded[s.dataset.path] = s;
+    });
+    Array.prototype.forEach.call(next.querySelectorAll("section[data-path]"), function (s) {
+      var old = loaded[s.dataset.path];
+      var fold = s.querySelector("[data-load-diff]");
+      if (!old || !fold) return;
+      var pa = fold.closest(".fold") || fold.parentNode;
+      if (old.dataset.h && old.dataset.h === s.dataset.h) {
+        var head = old.querySelector("header");
+        var rest = [];
+        for (var n = head ? head.nextSibling : null; n; n = n.nextSibling) rest.push(n);
+        rest.forEach(function (n) { pa.parentNode.insertBefore(n, pa); });
+        pa.remove();
+      } else {
+        fold.setAttribute("data-reload", "");
+      }
+    });
+  }
+
+  // Swaps <main> for the fresh render, keeping the reader's place.
   async function refresh() {
     // A change that lands mid-fetch may postdate the render being fetched: go round again.
     if (fetching) { again = true; return; }
@@ -54,10 +137,15 @@
       var next = doc.getElementById("main");
       var cur = document.getElementById("main");
       if (!next || !cur) return;
+      var a = anchor(cur);
       var y = window.scrollY;
-      cur.replaceWith(document.importNode(next, true));
-      window.scrollTo(0, y);
+      var fresh = document.importNode(next, true);
+      carry(cur, fresh);
+      cur.replaceWith(fresh);
+      if (a) { keep(a); place(); } else window.scrollTo(0, y);
       document.dispatchEvent(new CustomEvent("gt:live-refreshed"));
+      // Changed files that were open load again; each load re-applies the anchor.
+      Array.prototype.forEach.call(fresh.querySelectorAll("[data-reload]"), function (b) { b.removeAttribute("data-reload"); b.click(); });
     } catch (e) {
       notice();
     } finally {
