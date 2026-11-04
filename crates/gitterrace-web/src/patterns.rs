@@ -10,7 +10,10 @@ use crate::{
     error::Result,
     filter::FilterBar,
     fmt::{self, enc_seg, href},
-    insights::{InsightsQuery, OptLink, cached, head_lines, insights, period_of, scoped},
+    insights::{
+        InsightsQuery, OptLink, cached, counted, head_lines, insights, page_scope, period_of,
+        scoped,
+    },
     routes::Shared,
     views::{self, Chrome, Tabs},
 };
@@ -56,13 +59,14 @@ pub(crate) async fn page(
 ) -> Result<Html<String>> {
     cached(&app, "pa", raw, move |a, r, c| {
         let f = &q.filter;
-        let recs = scoped(f, r);
         let d = a.defaults();
-        let ins = insights(a, &recs, q.options(&d));
-        let files = head_lines(a);
         let period = period_of(&q, &d, Period::All);
-        let pairs = ins
-            .coupling(&files, period, 3, TOP_PAIRS)
+        let scope = page_scope(&q, &d, period);
+        let whole = insights(a, r, scope.options().clone());
+        let set = counted(&whole, &scope, r);
+        let files = head_lines(a);
+        let pairs = whole
+            .coupling_in(&files, &set, 3, TOP_PAIRS)
             .into_iter()
             .map(|p| PairRow {
                 a_href: views::file_link(&p.a),
@@ -73,14 +77,17 @@ pub(crate) async fn page(
                 degree: format!("{:.0}%", p.degree * 100.0),
             })
             .collect();
+        // Code age and release cadence cover all history: no Counted reader yet.
+        let recs = scoped(f, r);
+        let ins = insights(a, &recs, q.options(&d));
         let age: Vec<_> = ins
             .code_age(&files)
             .buckets
             .into_iter()
             .map(|b| (b.year.to_string(), b.lines))
             .collect();
-        let sizes: Vec<_> = ins
-            .commit_sizes_in(period)
+        let sizes: Vec<_> = set
+            .sizes()
             .into_iter()
             .map(|b| (b.label, b.commits as u64))
             .collect();

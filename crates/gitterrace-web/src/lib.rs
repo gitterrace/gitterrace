@@ -15,6 +15,7 @@ mod far;
 mod features;
 mod filter;
 mod fmt;
+mod frequency;
 mod gitstate;
 mod guard;
 mod highlight;

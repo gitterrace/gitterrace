@@ -2,7 +2,9 @@
 //! pages read too. To expose a new one, add an entry to [`INSIGHTS`]; the HTTP route
 //! `/insights/{name}` and the docs list pick it up.
 
-use gitterrace_index::{Insights, Label, Metric, OptionParams, Period, Selection};
+use gitterrace_index::{
+    Counted, Label, Metric, OptionParams, Period, Scope, ScopeParams, Selection,
+};
 use serde::Deserialize;
 use serde_json::{Value, to_value};
 
@@ -29,7 +31,7 @@ pub struct Params {
     pub options: OptionParams,
 }
 
-type Compute = fn(&Insights<'_>, Period, &Params) -> Result<Value, ApiError>;
+type Compute = fn(&Counted<'_>, &Params) -> Result<Value, ApiError>;
 
 /// One named statistic.
 pub struct Insight {
@@ -43,22 +45,22 @@ pub const INSIGHTS: &[Insight] = &[
     Insight {
         name: "summary",
         summary: "Commits, authors, files and lines in the period, and in the period before it (period).",
-        compute: |i, p, _| val(&i.period_summary(p)),
+        compute: |c, _| val(&c.summary()),
     },
     Insight {
         name: "activity",
         summary: "Commits and lines per bucket, empty ones included, plus the weekday-by-hour punch card. The period sets the unit (period).",
-        compute: |i, p, _| val(&i.rhythm(p)),
+        compute: |c, _| val(&c.rhythm()),
     },
     Insight {
         name: "contributors",
         summary: "People with commits, lines, active days and a per-bucket series, bots flagged (period).",
-        compute: |i, p, q| {
+        compute: |c, q| {
             let m = q
                 .metric
                 .as_deref()
                 .map_or_else(Default::default, Metric::parse);
-            let mut r = i.contributors_by(p, m);
+            let mut r = c.contributors(m);
             r.contributors.truncate(q.limit.unwrap_or(usize::MAX));
             val(&r)
         },
@@ -66,27 +68,27 @@ pub const INSIGHTS: &[Insight] = &[
     Insight {
         name: "file_churn",
         summary: "Per-file commits and lines changed (period, limit).",
-        compute: |i, p, q| val(&limited(i.file_churn(p), q)),
+        compute: |c, q| val(&limited(c.per_file(), q)),
     },
     Insight {
         name: "dir_churn",
         summary: "Per-directory commits and lines changed (period, limit).",
-        compute: |i, p, q| val(&limited(i.dir_churn(p), q)),
+        compute: |c, q| val(&limited(c.per_dir(), q)),
     },
     Insight {
         name: "label_breakdown",
         summary: "Conventional-commit type or scope counts (label, period).",
-        compute: |i, p, q| val(&i.label_breakdown(label(q)?, p)),
+        compute: |c, q| val(&c.per_label(label(q)?).0),
     },
     Insight {
         name: "label_over_time",
         summary: "Type or scope counts per bucket, empty ones included (label, period).",
-        compute: |i, p, q| val(&i.label_over_time(label(q)?, p)),
+        compute: |c, q| val(&c.per_label(label(q)?).1),
     },
     Insight {
         name: "frequency",
         summary: "Lines added, removed and rewritten per bucket (period).",
-        compute: |i, p, _| val(&i.frequency(p).1),
+        compute: |c, _| val(&c.frequency().1),
     },
 ];
 
@@ -113,27 +115,40 @@ pub fn list() -> impl Iterator<Item = (&'static str, &'static str)> {
         .chain(HEAD_INSIGHTS.iter().copied())
 }
 
-/// Runs the named insight over `ins`. `head` is called only for the head-tree insights.
+/// The request's [`Scope`]: the period (default `all`), the selection and the options over
+/// `defaults`, through the one constructor the web pages use too.
+pub fn scope(params: &Params, defaults: gitterrace_index::Options) -> Result<Scope, ApiError> {
+    let p = ScopeParams {
+        period: params.period.clone(),
+        select: params.select.clone(),
+        options: params.options.clone(),
+        ..ScopeParams::default()
+    };
+    Scope::from_params(&p, defaults, Period::All).map_err(|e| ApiError::BadRequest(e.to_string()))
+}
+
+/// Runs the named insight over the commits `c` counts. `head` is called only for the
+/// head-tree insights.
 pub fn compute(
     name: &str,
-    ins: &Insights<'_>,
+    c: &Counted<'_>,
     params: &Params,
     head: impl FnOnce() -> Vec<gitterrace_index::HeadFile>,
 ) -> Result<Value, ApiError> {
-    let p = period(params)?;
+    let ins = c.insights();
     match name {
         "hotspots" => {
-            let mut r = ins.hotspots(&head(), p);
+            let mut r = ins.hotspots_in(&head(), c);
             r.files.truncate(params.limit.unwrap_or(20));
             val(&r)
         }
-        "ownership" => val(&ins.ownership(&head(), p, OWNERSHIP_DEPTH)),
+        "ownership" => val(&ins.ownership_in(&head(), c, OWNERSHIP_DEPTH)),
         _ => {
             let insight = INSIGHTS
                 .iter()
                 .find(|i| i.name == name)
                 .ok_or_else(|| ApiError::BadRequest(format!("unknown insight: {name}")))?;
-            (insight.compute)(ins, p, params)
+            (insight.compute)(c, params)
         }
     }
 }
@@ -163,17 +178,6 @@ fn number<'de, D: serde::Deserializer<'de>>(d: D) -> Result<Option<usize>, D::Er
         Some(N::S(s)) if s.is_empty() => Ok(None),
         Some(N::S(s)) => s.parse().map(Some).map_err(serde::de::Error::custom),
     }
-}
-
-fn period(p: &Params) -> Result<Period, ApiError> {
-    p.period
-        .as_deref()
-        .filter(|s| !s.is_empty())
-        .map_or(Ok(Period::All), |s| {
-            Period::parse(s).ok_or_else(|| {
-                ApiError::BadRequest(format!("period must be 1w, 1m, 3m, 1y or all, got {s}"))
-            })
-        })
 }
 
 fn label(p: &Params) -> Result<Label, ApiError> {

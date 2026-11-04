@@ -10,7 +10,9 @@ use crate::{
     error::Result,
     filter::FilterBar,
     fmt::{self},
-    insights::{InsightsQuery, Kpi, OptLink, cached, head_lines, insights, period_of, scoped},
+    insights::{
+        InsightsQuery, Kpi, OptLink, cached, counted, head_lines, insights, page_scope, period_of,
+    },
     routes::Shared,
     views::{self, Chrome, Tabs},
 };
@@ -50,11 +52,13 @@ pub(crate) async fn page(
 ) -> Result<Html<String>> {
     cached(&app, "ho", raw, move |a, r, c| {
         let f = &q.filter;
-        let recs = scoped(f, r);
         let d = a.defaults();
-        let ins = insights(a, &recs, q.options(&d));
+        let period = period_of(&q, &d, Period::All);
+        let scope = page_scope(&q, &d, period);
+        let ins = insights(a, r, scope.options().clone());
+        let set = counted(&ins, &scope, r);
         let files = head_lines(a);
-        let rep = ins.hotspots(&files, period_of(&q, &d, Period::All));
+        let rep = ins.hotspots_in(&files, &set);
         let max = rep.files.first().map_or(0.0, |h| h.score);
         let dots: Vec<_> = rep
             .files
@@ -99,7 +103,7 @@ pub(crate) async fn page(
             tabs: views::stats_tabs("ho"),
             fb: f.bar("/stats/hotspots", &**r),
             opts: q.row(&d, "/stats/hotspots"),
-            empty: !ins.has_commits(period_of(&q, &d, Period::All)),
+            empty: set.stream().next().is_none(),
             kpis: vec![
                 Kpi("Files changed", fmt::thousands(rep.files.len())),
                 Kpi("Changes", fmt::thousands(rep.total_changes)),

@@ -9,7 +9,9 @@ use crate::{
     error::Result,
     filter::{Dim, FilterBar},
     fmt::{self},
-    insights::{InsightsQuery, Kpi, OptLink, cached, head_lines, insights, period_of, scoped},
+    insights::{
+        InsightsQuery, Kpi, OptLink, cached, counted, head_lines, insights, page_scope, period_of,
+    },
     routes::Shared,
     views::{self, Chrome, Tabs},
 };
@@ -52,13 +54,13 @@ pub(crate) async fn page(
 ) -> Result<Html<String>> {
     cached(&app, "ow", raw, move |a, r, c| {
         let f = &q.filter;
-        let recs = scoped(f, r);
         let d = a.defaults();
-        let ins = insights(a, &recs, q.options(&d));
+        let scope = page_scope(&q, &d, period_of(&q, &d, Period::All));
+        let ins = insights(a, r, scope.options().clone());
         let files = head_lines(a);
-        let rep = ins.ownership(
+        let rep = ins.ownership_in(
             &files,
-            period_of(&q, &d, Period::All),
+            &counted(&ins, &scope, r),
             gitterrace_api::OWNERSHIP_DEPTH,
         );
         let row = |d: &gitterrace_index::DirOwnership, name: String| DirRow {

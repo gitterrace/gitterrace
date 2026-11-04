@@ -22,7 +22,7 @@ use crate::{
     error::Result,
     filter::{Dim, Filter, FilterBar, NO_SCOPE},
     fmt::{self, href},
-    insights::{InsightsQuery, Kpi, OptLink, Src, insights, period_of, scoped},
+    insights::{InsightsQuery, Kpi, OptLink, Src, counted, insights, page_scope, period_of},
     routes::Shared,
     views::{self, Chrome, CommitRow, Row, Tabs},
 };
@@ -215,14 +215,17 @@ fn build(a: &crate::app::App, all: &Src, c: Chrome, tq: &TypesQuery) -> TypesPag
     let q = &tq.q;
     let f = &q.filter;
     let d = a.defaults();
-    let scoped = scoped(f, all);
-    let ins = insights(a, &scoped, q.options(&d));
     let period = period_of(q, &d, Period::All);
+    let scope = page_scope(q, &d, period);
+    let ins = insights(a, all, scope.options().clone());
+    let set = counted(&ins, &scope, all);
     let src = ins.source();
-    let recs: Vec<SrcRow> = ins.counted_rows(period).collect();
+    let recs: Vec<SrcRow> = set.stream().collect();
     let n = recs.len();
-    let sum = ins.period_summary(period).current;
-    let people = ins.contributors(period).contributors;
+    let sum = set.totals();
+    let people = set
+        .contributors(gitterrace_index::Metric::Commits)
+        .contributors;
     let size = if n == 0 {
         0
     } else {
@@ -239,8 +242,8 @@ fn build(a: &crate::app::App, all: &Src, c: Chrome, tq: &TypesQuery) -> TypesPag
         Kpi("Average commit", fmt::count(size, "line", "lines")),
     ];
 
-    let kind_counts = ins.label_breakdown(Label::Kind, period);
-    let scope_counts = ins.label_breakdown(Label::Scope, period);
+    let kind_counts = set.per_label(Label::Kind).0;
+    let scope_counts = set.per_label(Label::Scope).0;
     let (kinds, mx) = if f.kind().is_some() {
         (
             Vec::new(),
@@ -257,8 +260,10 @@ fn build(a: &crate::app::App, all: &Src, c: Chrome, tq: &TypesQuery) -> TypesPag
     };
 
     let by_scope = f.kind().is_some();
-    let over = ins.label_over_time(if by_scope { Label::Scope } else { Label::Kind }, period);
-    let unit = ins.bucket_unit(period).noun();
+    let over = set
+        .per_label(if by_scope { Label::Scope } else { Label::Kind })
+        .1;
+    let unit = set.axis().unit().noun();
     let (over_title, over_hint) = if by_scope {
         (
             format!("Scopes over time, per {unit}"),
@@ -280,8 +285,8 @@ fn build(a: &crate::app::App, all: &Src, c: Chrome, tq: &TypesQuery) -> TypesPag
             rows: label_rows(&scope_counts, |l| f.link(BASE, Dim::Scope, l)),
         });
     }
-    let dirs = ins
-        .dir_churn(period)
+    let dirs = set
+        .per_dir()
         .into_iter()
         // Only the first LIST rows render: links for the rest cost most of a cold build.
         .take(LIST)
@@ -310,8 +315,8 @@ fn build(a: &crate::app::App, all: &Src, c: Chrome, tq: &TypesQuery) -> TypesPag
         lines: true,
         rows: churn_rows(dirs),
     });
-    let files = ins
-        .file_churn(period)
+    let files = set
+        .per_file()
         .into_iter()
         .take(LIST)
         .map(|x| {

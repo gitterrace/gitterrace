@@ -7,7 +7,7 @@ use std::sync::{Arc, Mutex, RwLock};
 use gitterrace_actions::{Lines, LinkStyle, styled};
 use gitterrace_git::Repo;
 use gitterrace_index::feed::{InsightsSource, RevView};
-use gitterrace_index::{Index, Insights, Options, Scoped};
+use gitterrace_index::{Index, Insights, Options};
 use serde_json::{Value, json};
 
 use crate::error::ApiError;
@@ -428,14 +428,11 @@ impl ApiState {
         let rev = Self::rev(rev)?;
         let tip = self.repo.resolve(rev)?;
         let all = self.records(rev)?;
-        let records: Src = if params.select.is_empty() {
-            Arc::clone(&all)
-        } else {
-            Arc::new(Scoped::new(&all, &params.select, None))
-        };
-        let opts = params.options.apply(self.settings().defaults);
-        let ins = self.insights(&tip, &*records, opts);
-        let mut data = insights::compute(name, &ins, params, || {
+        let scope = insights::scope(params, self.settings().defaults)?;
+        let ins = self.insights(&tip, &*all, scope.options().clone());
+        let cx = gitterrace_index::CountContext::new(&*all, &gitterrace_index::feed::SystemClock);
+        let counted = ins.counted(&scope, cx);
+        let mut data = insights::compute(name, &counted, params, || {
             let mut cache = gitterrace_index::LineCache::load(self.index.dir());
             gitterrace_index::head_files(&self.repo, &tip, &mut cache).unwrap_or_default()
         })?;

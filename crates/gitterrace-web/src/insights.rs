@@ -6,8 +6,9 @@ use askama::Template;
 use axum::extract::{Query, RawQuery, State};
 use axum::response::Html;
 use gitterrace_index::feed::InsightsSource;
+use gitterrace_index::feed::SystemClock;
 use gitterrace_index::{
-    Insights, Metric, OptionParams, Options, Period, rework_share, rework_verdict,
+    CountContext, Counted, Insights, Metric, OptionParams, Options, Period, Scope, ScopeParams,
 };
 use serde::Deserialize;
 
@@ -238,9 +239,27 @@ pub(crate) fn insights<'a>(a: &App, src: &'a Src, o: Options) -> Insights<'a> {
 }
 
 /// The source after every filter except the period, which the insights methods window
-/// themselves.
+/// themselves. Only for what has no [`Counted`] reader yet (code age, release cadence).
 pub(crate) fn scoped(f: &Filter, all: &Src) -> Src {
     f.with(Dim::Period, None).apply(all)
+}
+
+/// The page's [`Scope`]: its period, the URL's selection and options, through the constructor
+/// the API uses too. Count it with [`counted`] over the whole source.
+pub(crate) fn page_scope(q: &InsightsQuery, d: &Defaults, period: Period) -> Scope {
+    let params = ScopeParams {
+        period: Some(period.key().to_owned()),
+        select: q.filter.selection(),
+        options: q.opts.clone(),
+        ..ScopeParams::default()
+    };
+    Scope::from_params(&params, d.clone().into_options(), period)
+        .unwrap_or_else(|_| unreachable!("the period is parsed already"))
+}
+
+/// The commits `scope` counts in `ins`, anchored on the whole source `all`.
+pub(crate) fn counted<'a>(ins: &'a Insights<'a>, scope: &'a Scope, all: &Src) -> Counted<'a> {
+    ins.counted(scope, CountContext::new(&**all, &SystemClock))
 }
 
 /// Text files of HEAD with line counts, the cache persisted under `.git/gitterrace`.
@@ -283,93 +302,6 @@ pub(crate) fn period_of(q: &InsightsQuery, d: &Defaults, default: Period) -> Per
 }
 
 pub(crate) struct Kpi(pub(crate) &'static str, pub(crate) String);
-
-#[derive(Template)]
-#[template(path = "frequency.html")]
-struct FrequencyPage {
-    c: Chrome,
-    tabs: Tabs,
-    fb: FilterBar,
-    opts: Vec<OptLink>,
-    kpis: Vec<Kpi>,
-    unit: &'static str,
-    window: String,
-    weekly: String,
-    rework: String,
-    verdict: String,
-}
-
-pub(crate) async fn frequency(
-    State(app): Shared,
-    RawQuery(raw): RawQuery,
-    Query(q): Query<InsightsQuery>,
-) -> Result<Html<String>> {
-    cached(&app, "cf", raw, move |a, r, c| {
-        let d = a.defaults();
-        let f = &q.filter;
-        let fb = f.bar("/stats/frequency", &**r);
-        let recs = scoped(f, r);
-        let ins = insights(a, &recs, q.options(&d));
-        let period = period_of(&q, &d, Period::All);
-        let (unit, weeks) = ins.frequency(period);
-        let (add, del, rew) = weeks.iter().fold((0, 0, 0), |t, w| {
-            (t.0 + w.additions, t.1 + w.deletions, t.2 + w.rewritten)
-        });
-        let points: Vec<_> = weeks
-            .iter()
-            .map(|w| (w.label.clone(), w.additions, w.deletions))
-            .collect();
-        let rw = ins.rework(period);
-        let verdict = rw.points.iter().rev().find_map(|p| p.share).map_or_else(
-            || "No changes in this selection.".to_owned(),
-            |s| {
-                format!(
-                    "Latest window of {}: {:.0}% of changed lines replaced existing code, {}.",
-                    fmt::count(rw.window, "commit", "commits"),
-                    s * 100.0,
-                    rework_verdict(s)
-                )
-            },
-        );
-        FrequencyPage {
-            c,
-            tabs: views::stats_tabs("cf"),
-            fb,
-            opts: q.row(&d, "/stats/frequency"),
-            kpis: vec![
-                Kpi("Lines added", fmt::thousands(add)),
-                Kpi("Lines removed", fmt::thousands(del)),
-                Kpi(
-                    "Net",
-                    format!(
-                        "{}{}",
-                        if add >= del { "+" } else { "-" },
-                        fmt::thousands(add.abs_diff(del))
-                    ),
-                ),
-                Kpi(
-                    "Rework overall",
-                    rework_share(add, del, rew)
-                        .map_or_else(|| "-".to_owned(), |s| format!("{:.0}%", s * 100.0)),
-                ),
-            ],
-            unit: unit.noun(),
-            window: fmt::count(rw.window, "commit", "commits"),
-            weekly: charts::diverging(
-                &points,
-                &format!("Additions and deletions per {}", unit.noun()),
-            ),
-            rework: charts::percent_line(
-                &rw.points
-                    .iter()
-                    .map(|p| (p.label.clone(), p.share))
-                    .collect::<Vec<_>>(),
-            ),
-            verdict,
-        }
-    })
-    .await
-}
 
 struct PersonRow {
     name: String,
@@ -429,11 +361,11 @@ pub(crate) async fn contributors(
         let fb = f.bar("/stats/contributors", &**r);
         // The period is applied by Insights so first-time contributors are judged against all
         // history that the other filters keep.
-        let recs = scoped(f, r);
-        let ins = insights(a, &recs, q.options(&d));
         let period = period_of(&q, &d, Period::All);
+        let scope = page_scope(&q, &d, period);
+        let ins = insights(a, r, scope.options().clone());
         let metric = q.metric();
-        let report = ins.contributors_by(period, metric);
+        let report = counted(&ins, &scope, r).contributors(metric);
         let shown: Vec<_> = report
             .contributors
             .iter()

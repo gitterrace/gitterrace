@@ -128,11 +128,10 @@ fn peak_run(test: &str) -> Option<PeakRun> {
     }
     let mut bad = Vec::new();
     // The memo drops unknown parameters, so a second read of the same URL is a memo hit.
-    // Warm every page kind under another period: same shared state, another memo key.
+    // Warm every page as measured plus `bots=0`, the default: the same counts and shared
+    // state, another memo key. Another period would leave state that `all` reads unbuilt.
     for p in &pages {
-        let w = p
-            .replace("period=all", "period=3m")
-            .replace("period=1y", "period=3m");
+        let w = format!("{p}&bots=0");
         let (status, _) = s.get(&w);
         assert_eq!(status, 200, "{w}");
     }
