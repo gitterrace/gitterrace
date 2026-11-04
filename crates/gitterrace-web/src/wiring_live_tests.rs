@@ -53,7 +53,7 @@ async fn events_deliver_each_kind_and_respect_the_stream_cap() {
     let server = router(
         &work,
         with(|c| {
-            c.server.max_streams = 2;
+            c.server.live_streams = 2;
             c.watch.interval_ms = 250;
         }),
     );
@@ -67,7 +67,7 @@ async fn events_deliver_each_kind_and_respect_the_stream_cap() {
     assert_eq!(
         third.status(),
         503,
-        "server.max_streams = 2 refuses the third"
+        "server.live_streams = 2 refuses the third"
     );
     drop(second);
     drop(third);

@@ -18,7 +18,7 @@ pub(crate) struct Cli {
     /// Check for repository changes every N milliseconds (at least 250). Overrides
     /// `watch.interval_ms`.
     #[arg(long, global = true, value_name = "MS")]
-    pub(crate) poll: Option<u64>,
+    pub(crate) interval_ms: Option<u64>,
     /// Do not watch for changes: no live updates, and a restart or reload picks up new commits.
     /// Overrides `watch.enabled`.
     #[arg(long, global = true)]
@@ -30,7 +30,7 @@ pub(crate) struct Cli {
     #[arg(long, global = true)]
     pub(crate) no_actions: bool,
     /// Serve read-only to other machines: committed history only. Required with any `--addr`
-    /// that is not loopback. Overrides `server.public`.
+    /// that is not loopback. Overrides `server.is_public`.
     #[arg(long, global = true)]
     pub(crate) public: bool,
     #[command(subcommand)]
@@ -107,17 +107,54 @@ pub(crate) enum Command {
         /// Newest commits to include as pages.
         #[arg(long, default_value_t = 500)]
         commits: usize,
-        /// Largest file to include as a page, in KiB.
+        /// Largest file to include as a page, in KiB. Larger files are left out of the export.
         #[arg(long, default_value_t = 512)]
-        max_file_kb: u64,
+        file_kb: u64,
         /// Most pages to write, folded diff fragments included. Overrides
         /// `limits.export_pages`. Past it the export stops and writes nothing.
         #[arg(long, value_name = "N", value_parser = clap::value_parser!(u64).range(1..=10_000_000))]
-        max_pages: Option<u64>,
+        export_pages: Option<u64>,
         /// Credit a repository that is someone else's project (a demo), as `name=url`: its
         /// pages name and link it in the snapshot banner. `name` is the repository's folder
         /// name. Repeat it for several repositories.
         #[arg(long, value_name = "NAME=URL")]
         project: Vec<String>,
     },
+}
+
+#[cfg(test)]
+mod tests {
+    use clap::CommandFactory as _;
+
+    /// A flag that names a config key is that key with dashes, and no flag says `max`. A flag
+    /// naming a key under any other spelling, or a new `--max-*`, fails here.
+    #[test]
+    fn flags_mirror_their_config_keys() {
+        let keys = gitterrace_config::keys();
+        let mut bad = Vec::new();
+        let root = super::Cli::command();
+        let mut cmds = vec![root.clone()];
+        cmds.extend(root.get_subcommands().cloned());
+        for c in &cmds {
+            for a in c.get_arguments() {
+                let Some(long) = a.get_long() else { continue };
+                let help = a.get_help().map(ToString::to_string).unwrap_or_default();
+                if long.split('-').any(|w| w == "max" || w == "min") {
+                    bad.push(format!("--{long}: says max"));
+                }
+                // `Overrides `section.key`` in the help names the key the flag sets.
+                for k in keys
+                    .iter()
+                    .filter(|k| help.contains(&format!("`{}`", k.id)))
+                {
+                    if help.contains("Overrides")
+                        && !gitterrace_config::naming::flag_fits(long, k.id)
+                    {
+                        bad.push(format!("--{long} sets {} against the naming rule", k.id));
+                    }
+                }
+            }
+        }
+        assert!(bad.is_empty(), "{}", bad.join("\n"));
+    }
 }

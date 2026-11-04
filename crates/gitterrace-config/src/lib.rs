@@ -6,6 +6,7 @@
 
 #[cfg(test)]
 mod limits_tests;
+pub mod naming;
 mod schema;
 mod value;
 
@@ -211,10 +212,10 @@ mod tests {
     #[test]
     fn restart_keys_match_their_docs_and_are_held_back() {
         let mut changed = parse(
-            "[server]\naddr = \"127.0.0.1:9\"\npublic = true\nhosts = [\"h.example\"]\nmax_streams = 3\n\
+            "[server]\naddr = \"127.0.0.1:9\"\nis_public = true\nhosts = [\"h.example\"]\nlive_streams = 3\n\
              public_timeout_secs = 7\n\
              [index]\nthreads = 3\n[multi]\ndepth = 4\nskip_dirs = [\"x\"]\n\
-             [limits]\nfresh_commits = 7\naction_output_kb = 7\nregistry_entries = 7\n",
+             [limits]\nunindexed_commits = 7\naction_output_kb = 7\nregistry_entries = 7\n",
         )
         .expect("parse")
         .config;
@@ -241,7 +242,10 @@ mod tests {
         assert_eq!(old.restart_changes(&changed), restart);
         changed.keep_restart(&old);
         assert!(old.restart_changes(&changed).is_empty());
-        assert_eq!(changed.server.max_streams, 3, "live keys are not held back");
+        assert_eq!(
+            changed.server.live_streams, 3,
+            "live keys are not held back"
+        );
     }
 
     #[test]
@@ -307,8 +311,8 @@ mod tests {
             "10.0.0.1:80",
         ] {
             let e = parse(&format!("[server]\naddr = \"{addr}\"\n")).expect_err(addr);
-            assert!(e.0.contains("server.public"), "{addr}: {e}");
-            parse(&format!("[server]\naddr = \"{addr}\"\npublic = true\n")).expect(addr);
+            assert!(e.0.contains("server.is_public"), "{addr}: {e}");
+            parse(&format!("[server]\naddr = \"{addr}\"\nis_public = true\n")).expect(addr);
         }
         for addr in ["127.0.0.1:4250", "[::1]:4250", "127.0.0.2:4250"] {
             parse(&format!("[server]\naddr = \"{addr}\"\n")).expect(addr);
@@ -320,7 +324,7 @@ mod tests {
         let e = parse("[server]\nhosts = [\"git.example.com\"]\n").expect_err("no public");
         assert!(e.0.contains("server.hosts"), "{e}");
         for h in ["git.example.com", "localhost", "203.0.113.4", "a-b.example"] {
-            parse(&format!("[server]\npublic = true\nhosts = [\"{h}\"]\n")).expect(h);
+            parse(&format!("[server]\nis_public = true\nhosts = [\"{h}\"]\n")).expect(h);
         }
         for h in [
             "*.example.com",
@@ -331,7 +335,8 @@ mod tests {
             "-x.example",
             "git.example.com/",
         ] {
-            let e = parse(&format!("[server]\npublic = true\nhosts = [\"{h}\"]\n")).expect_err(h);
+            let e =
+                parse(&format!("[server]\nis_public = true\nhosts = [\"{h}\"]\n")).expect_err(h);
             assert!(e.0.contains("server.hosts"), "{h}: {e}");
         }
     }

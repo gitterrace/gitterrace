@@ -221,11 +221,7 @@ async fn a_capped_export_leaves_the_existing_folder_untouched() {
             .await
             .expect_err("capped");
         let msg = err.to_string();
-        for part in [
-            "cap of 3 pages",
-            "--commits (now 2)",
-            "--max-file-kb (now 64)",
-        ] {
+        for part in ["cap of 3 pages", "--commits (now 2)", "--file-kb (now 64)"] {
             assert!(msg.contains(part), "{part:?} missing from: {msg}");
         }
         assert_eq!(tree(out), before, "{} changed", out.display());
@@ -237,7 +233,7 @@ async fn a_capped_export_leaves_the_existing_folder_untouched() {
     assert_eq!(left.len(), 2, "left beside the sites: {left:?}");
 }
 
-/// The page budget comes from `--max-pages` when given, else from `limits.export_pages`, and the
+/// The page budget comes from `--export-pages` when given, else from `limits.export_pages`, and the
 /// cap error names both, so a user who hits it knows which knob raises it.
 #[tokio::test]
 async fn the_flag_beats_the_config_and_the_cap_error_names_both() {
@@ -261,7 +257,7 @@ async fn the_flag_beats_the_config_and_the_cap_error_names_both() {
     let msg = err.to_string();
     assert!(msg.contains("cap of 1 pages"), "{msg}");
     assert!(
-        msg.contains("--max-pages") && msg.contains("limits.export_pages"),
+        msg.contains("--export-pages") && msg.contains("limits.export_pages"),
         "{msg}"
     );
 }

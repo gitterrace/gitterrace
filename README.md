@@ -64,7 +64,7 @@ no remove button in the page: a browser has no secret, and a page may be on some
 
 <!-- BEGIN GENERATED: commands -->
 ```text
-git terrace [paths]          Browse a git repository in your browser, offline [--addr --poll --no-watch --config --no-actions --public]
+git terrace [paths]          Browse a git repository in your browser, offline [--addr --interval-ms --no-watch --config --no-actions --public]
 git terrace serve            Serve the repository in the browser (the default)
 git terrace config           Print the effective configuration and where each value comes from
 git terrace mcp              Run a read-only MCP server over stdio for agents
@@ -73,7 +73,7 @@ git terrace open <link>      Open a `gitterrace://` or `/go` permalink in the br
 git terrace remove [target]  Take a repository off the running server; its pages then answer 404
 git terrace install-handler  Register (or with `--uninstall` remove) this program as the `gitterrace://` link handler [--uninstall]
 git terrace init             Write a documented `config.toml` and the pre-filled `actions.toml` to the config folder
-git terrace export [out]     Write a static copy of the site to a folder, for sharing or hosting [--force --commits --max-file-kb --max-pages --project]
+git terrace export [out]     Write a static copy of the site to a folder, for sharing or hosting [--force --commits --file-kb --export-pages --project]
 ```
 
 <!-- END GENERATED: commands -->

@@ -327,7 +327,7 @@ mod tests {
         let v = s.log(None, None, 1, usize::MAX).expect("log");
         assert!(
             v["commits"].as_array().map_or(0, Vec::len)
-                <= gitterrace_config::Api::default().log_page_size
+                <= gitterrace_config::Api::default().log_page_commits
         );
     }
 
@@ -389,7 +389,7 @@ mod tests {
         );
         s.refresh_index().expect("index");
         let mut cfg = gitterrace_config::Config::default();
-        cfg.insights.bots = true;
+        cfg.insights.include_bots = true;
         cfg.repo.insert(
             s.repo.name(),
             gitterrace_config::RepoOverride {
@@ -405,7 +405,7 @@ mod tests {
         // Settings are shared by every clone, so a router built before a reload sees it.
         let router_state = s.clone();
         let c = s.configured(&cfg);
-        assert_eq!(authors(&c), 2, "insights.bots = true");
+        assert_eq!(authors(&c), 2, "insights.include_bots = true");
         assert_eq!(authors(&router_state), 2, "a reload reaches earlier clones");
         let hot = c
             .insight("hotspots", None, &crate::Params::default())

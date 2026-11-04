@@ -144,7 +144,7 @@ fn repo_router_tasks(
     );
     let index = Index::open(&repo)?
         .with_threads(cfg.index.threads)
-        .with_fresh_cap(cfg.limits.fresh_commits);
+        .with_fresh_cap(cfg.limits.unindexed_commits);
     let mut app = App::configured(repo, index, env);
     app.base = base;
     app.key = key;
@@ -348,7 +348,7 @@ fn build_server(
 /// One line per per-request cost setting raised above its default on a public server: config is
 /// the operator's, so this only says what a visitor can now make one request cost.
 fn public_cost_warnings(cfg: &Config) -> Vec<String> {
-    if !cfg.server.public {
+    if !cfg.server.is_public {
         return Vec::new();
     }
     cfg.costs_above_default()
@@ -410,15 +410,15 @@ pub async fn serve_in(
 ) -> io::Result<()> {
     let extra = (!addr.ip().is_loopback()).then(|| addr.ip());
     // Also checked by `Config::validate`; repeated here because `serve` takes any `Config`.
-    if extra.is_some() && !cfg.server.public {
+    if extra.is_some() && !cfg.server.is_public {
         return Err(io::Error::new(
             io::ErrorKind::PermissionDenied,
             format!(
-                "{addr} is reachable from other machines. Pass --public (server.public = true) to serve read-only there"
+                "{addr} is reachable from other machines. Pass --public (server.is_public = true) to serve read-only there"
             ),
         ));
     }
-    let public = cfg.server.public;
+    let public = cfg.server.is_public;
     for k in public_cost_warnings(&cfg) {
         tracing::warn!("{k}");
     }

@@ -36,7 +36,7 @@ those, or any revision on demand, use public mode.
 
 ## Public mode
 
-`--public` (or `server.public = true` in `config.toml`) turns the server into a read-only
+`--public` (or `server.is_public = true` in `config.toml`) turns the server into a read-only
 viewer of committed history. Any `--addr` that is not loopback refuses to start without it.
 
 What a public server shows:
@@ -65,7 +65,7 @@ connection limits, slow-client timeouts and, for a private repository, the login
 ```toml
 [server]
 addr = "127.0.0.1:4242"
-public = true
+is_public = true
 hosts = ["git.example.com"]
 ```
 

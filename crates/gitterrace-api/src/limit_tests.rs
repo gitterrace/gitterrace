@@ -32,14 +32,14 @@ fn count(v: &serde_json::Value, key: &str) -> usize {
 }
 
 #[test]
-fn log_page_size_caps_the_page() {
+fn log_page_commits_caps_the_page() {
     let dir = tempfile::tempdir().expect("tmp");
     let s = state(dir.path());
     assert_eq!(
         count(&s.log(None, None, 1, 100).expect("log"), "commits"),
         10
     );
-    let s = with(s, |c| c.api.log_page_size = 3);
+    let s = with(s, |c| c.api.log_page_commits = 3);
     assert_eq!(
         count(&s.log(None, None, 1, 100).expect("log"), "commits"),
         3
@@ -47,13 +47,13 @@ fn log_page_size_caps_the_page() {
 }
 
 #[test]
-fn log_max_skip_refuses_deeper_pages() {
+fn log_skip_commits_refuses_deeper_pages() {
     let dir = tempfile::tempdir().expect("tmp");
     let s = state(dir.path());
     assert!(s.log(None, None, 3, 2).is_ok());
-    let s = with(s, |c| c.api.log_max_skip = 3);
+    let s = with(s, |c| c.api.log_skip_commits = 3);
     let err = s.log(None, None, 3, 2).expect_err("skip 4 > 3");
-    assert!(err.to_string().contains("api.log_max_skip"), "{err}");
+    assert!(err.to_string().contains("api.log_skip_commits"), "{err}");
 }
 
 #[test]

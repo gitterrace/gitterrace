@@ -65,7 +65,7 @@ pub(crate) struct Env {
     /// The `actions.toml` Send to targets, reloaded with the file: the commit page reads their
     /// `lookup` links from here.
     sends: Arc<RwLock<Option<SharedActions>>>,
-    /// `server.public` at startup. Fixed for the process: a reload never widens what a
+    /// `server.is_public` at startup. Fixed for the process: a reload never widens what a
     /// public server shows.
     public: bool,
     /// An export run's memo of commit tree diffs, handed to every repository it opens. `None`
@@ -109,7 +109,7 @@ fn resize(sem: &Semaphore, cap: &Mutex<usize>, new: usize) {
 impl Env {
     pub(crate) fn new(cfg: Config) -> Self {
         let jobs = job_slots(&cfg);
-        let public = cfg.server.public;
+        let public = cfg.server.is_public;
         Self {
             public,
             cfg: Arc::new(RwLock::new(Arc::new(cfg))),
@@ -246,7 +246,7 @@ impl Env {
 pub(crate) struct App {
     pub(crate) repo: Repo,
     env: Env,
-    /// Open `/events` streams, capped by `server.max_streams`.
+    /// Open `/events` streams, capped by `server.live_streams`.
     pub(crate) streams: Arc<Semaphore>,
     streams_cap: Mutex<usize>,
     /// Change notices for the open streams. Nothing is sent while nobody listens.
@@ -306,15 +306,15 @@ impl App {
 
     pub(crate) fn configured(repo: Repo, index: Index, env: &Env) -> Self {
         let name = repo.name();
-        let max_streams = env.cfg().server.max_streams;
-        let streams = Arc::new(Semaphore::new(max_streams));
+        let live_streams = env.cfg().server.live_streams;
+        let streams = Arc::new(Semaphore::new(live_streams));
         let small = cache_share(&env.cfg(), SMALL_EIGHTHS);
         Self {
             repo,
             index,
             env: env.clone(),
             streams,
-            streams_cap: Mutex::new(max_streams),
+            streams_cap: Mutex::new(live_streams),
             changes: broadcast::channel(16).0,
             stop: env.stop.subscribe(),
             _stop_tx: Arc::clone(&env.stop),
@@ -380,7 +380,7 @@ impl App {
             cfg.limits.worktree_files,
             (cfg.limits.worktree_diff_kb as u64) << 10,
         );
-        resize(&self.streams, &self.streams_cap, cfg.server.max_streams);
+        resize(&self.streams, &self.streams_cap, cfg.server.live_streams);
         let small = cache_share(cfg, SMALL_EIGHTHS);
         if let Ok(mut g) = self.memo.lock() {
             g.clear();

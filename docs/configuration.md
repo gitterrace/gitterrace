@@ -16,13 +16,35 @@ list of path globs added to `insights.exclude`.
 
 Actions live in their own file, `actions.toml`, because they run commands.
 
+## Names
+
+One rule for every key and flag, from `gitterrace_config::naming`. A renamed key gets no alias: the
+old name warns as unknown and the default applies.
+
+| Holds | Form | Example |
+| --- | --- | --- |
+| a size | integer ending in `_kb` or `_mb` (KiB, MiB) | `limits.text_kb` |
+| a duration | integer ending in `_ms` or `_secs` | `watch.interval_ms` |
+| a count | integer ending in the plural it counts | `api.blame_lines` |
+| a switch | bool with a predicate prefix (`is_`, `has_`, `needs_`, `include_`) or the `enabled` gate of its section | `insights.include_bots` |
+| any key | snake_case, never `max` or `min`: the section already says it is a limit | `limits.log_pages` |
+| a flag that sets a key | the key's name with dashes, `--no-<section>` for an `enabled` gate | `--export-pages` sets `limits.export_pages` |
+
+Exceptions, each on purpose:
+
+| Name | Why |
+| --- | --- |
+| `multi.depth` | a level, not a count |
+| `index.build_on_start` | a predicate prefix hides what it does |
+| `--public` (sets `server.is_public`) | the terse surface of a precise key |
+
 ## `[server]`
 
 | Key | Type | Default | Description |
 | --- | --- | --- | --- |
 | `addr` | string | `"127.0.0.1:4242"` | Address to listen on. Keep it local: pages show source code and there is no login. Needs a restart. |
-| `max_streams` | integer | `32` | Maximum open live-update streams per repository (one per browser tab). |
-| `public` | bool | `false` | Serve read-only to anyone who can reach the address: committed history only, no working tree, stashes, live updates, actions or additions. Required for any address that is not loopback. Needs a restart. |
+| `live_streams` | integer | `32` | Maximum open live-update streams per repository (one per browser tab). |
+| `is_public` | bool | `false` | Serve read-only to anyone who can reach the address: committed history only, no working tree, stashes, live updates, actions or additions. Required for any address that is not loopback. Needs a restart. |
 | `hosts` | list of strings | `[]` | Host names a reverse proxy forwards with, exact and without port, for example `["git.example.com"]`. Needs `public`. Needs a restart. |
 | `public_timeout_secs` | integer | `30` | Longest a request to a public server may take, in seconds. Past it the answer is 503 and the work it started finishes in the background, filling the cache for a retry. Needs a restart. |
 
@@ -54,27 +76,27 @@ Actions live in their own file, `actions.toml`, because they run commands.
 | `text_kb` | integer | `2048` | Largest file shown as text, in KiB. Larger files are offered as raw downloads. |
 | `raw_mb` | integer | `256` | Largest file served raw, in MB. A larger one is refused. |
 | `search_matches` | integer | `500` | Most matches a code search returns. Past it the search stops and says it was cut off. |
-| `search_per_file` | integer | `100` | Matching lines one file keeps in a code search. Past it the file says more matched. |
+| `search_file_lines` | integer | `100` | Matching lines one file keeps in a code search. Past it the file says more matched. |
 | `search_commits` | integer | `200` | Most commits a commit search lists. Past it the search stops and says it was cut off. |
 | `diff_fold_lines` | integer | `400` | Lines of one file's diff shown before it folds. A folded file loads on demand. |
-| `blob_lines` | integer | `20000` | Lines a file page shows. Past it the page cuts the file and says so. |
+| `blob_lines` | integer | `20000` | Lines a file page shows. Past it the page cuts the file and says so. `api.blob_lines` is the API's own cut. |
 | `highlight_kb` | integer | `256` | Largest text highlighted, in KiB: a file, its blame, one file's diff or a Markdown code block. Larger text shows plain. |
-| `log_max_page` | integer | `1000` | Deepest page number of a history page. A later page number shows this page. |
+| `log_pages` | integer | `1000` | History pages a log reaches: a later page number shows the last of them. |
 | `preview_mb` | integer | `16` | Largest image whose pixel size a file page reads, in MB. A larger one shows no pixel size. |
 | `worktree_files` | integer | `2000` | Changed files the Uncommitted view lists. Past it the rest are left out. |
 | `worktree_diff_kb` | integer | `1024` | Largest working-tree file the Uncommitted view diffs, in KiB. A larger one is listed without hunks. |
-| `fresh_commits` | integer | `2000` | Commits a view of a revision outside the indexed history reads from git per request. Past it the view asks for a reindex instead. Needs a restart. |
+| `unindexed_commits` | integer | `2000` | Commits a view of a revision outside the indexed history reads from git per request. Past it the view asks for a reindex instead. Needs a restart. |
 | `action_output_kb` | integer | `64` | Output kept from each stream (stdout, stderr) of an action, in KiB. The rest is read and dropped. Needs a restart. |
 | `registry_entries` | integer | `500` | Repositories remembered in `repos.json`, newest first. Past it the least recently served are forgotten with their names. Needs a restart. |
-| `export_pages` | integer | `20000` | Most pages `git terrace export` writes, folded diff fragments included. Past it the export stops and writes nothing. `export --max-pages` overrides it. Between 1 and 10000000. |
+| `export_pages` | integer | `20000` | Most pages `git terrace export` writes, folded diff fragments included. Past it the export stops and writes nothing. `export --export-pages` overrides it. Between 1 and 10000000. |
 
 ## `[api]`
 
 | Key | Type | Default | Description |
 | --- | --- | --- | --- |
-| `log_page_size` | integer | `500` | Most commits one `log` answer lists, whatever `per_page` asks. |
-| `log_max_skip` | integer | `50000` | Deepest a `log` answer pages, in commits skipped. A deeper page is refused. |
-| `blob_lines` | integer | `5000` | Most lines one `blob` answer carries, whatever `limit` asks. The rest is cut and `truncated` says so. |
+| `log_page_commits` | integer | `500` | Most commits one `log` answer lists, whatever `per_page` asks. |
+| `log_skip_commits` | integer | `50000` | Commits a `log` answer may skip to reach its page. A deeper page is refused. |
+| `blob_lines` | integer | `5000` | Most lines one `blob` answer carries, whatever `limit` asks. The rest is cut and `truncated` says so. `limits.blob_lines` is the file page's own cut. |
 | `blob_kb` | integer | `256` | Most bytes one `blob` answer carries, in KiB: one minified line can be megabytes. The rest is cut and `truncated` says so. |
 | `blame_lines` | integer | `5000` | Most lines one `blame` answer carries. The rest is cut and `truncated` says so. |
 | `diff_lines` | integer | `20000` | Most diff lines one commit answer carries, whatever `max_lines` asks. The rest is cut and `truncated` says so. |
@@ -84,8 +106,8 @@ Actions live in their own file, `actions.toml`, because they run commands.
 | Key | Type | Default | Description |
 | --- | --- | --- | --- |
 | `exclude` | list of strings | `[]` | Paths (globs) left out of every insight. |
-| `bots` | bool | `false` | Count commits by bots. |
-| `generated` | bool | `false` | Count lock files and minified output. |
+| `include_bots` | bool | `false` | Count commits by bots. |
+| `include_generated` | bool | `false` | Count lock files and minified output. |
 | `period` | string | `"all"` | Period the insights pages use when the URL names none: 1w, 1m, 3m, 1y or all. The API and MCP default to all. Their `period` parameter picks one. |
 
 ## `[display]`

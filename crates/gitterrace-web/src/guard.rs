@@ -29,7 +29,7 @@ pub const CSP: &str = "default-src 'self'; img-src 'self' data:; media-src 'self
 pub(crate) struct Gate {
     /// The bound address when it is not loopback.
     bound: Option<IpAddr>,
-    /// `server.public`.
+    /// `server.is_public`.
     public: bool,
     /// `server.hosts`, lowercase.
     hosts: Vec<String>,
@@ -44,7 +44,7 @@ impl Gate {
         let s = &cfg.server;
         Self {
             bound,
-            public: s.public,
+            public: s.is_public,
             hosts: s.hosts.iter().map(|h| h.to_ascii_lowercase()).collect(),
             timeout: Duration::from_secs(s.public_timeout_secs),
         }

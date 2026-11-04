@@ -140,8 +140,8 @@ pub(super) async fn log(
     Query(q): Query<LogQuery>,
 ) -> Result<Html<String>> {
     let path = q.path.unwrap_or_default().trim_matches('/').to_owned();
-    // Pages past `limits.log_max_page` are clamped: the walk behind a page costs its offset.
-    let pg = q.page.unwrap_or(0).min(app.cfg().limits.log_max_page);
+    // Pages past `limits.log_pages` are clamped: the walk behind a page costs its offset.
+    let pg = q.page.unwrap_or(0).min(app.cfg().limits.log_pages);
     let author = q.author;
     let p = blocking(&app, move |a| {
         let id = a.repo.resolve(&rev)?;

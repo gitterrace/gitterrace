@@ -160,7 +160,7 @@ struct Stream {
     _wt: Option<WorktreeWatch>,
 }
 
-/// `GET /events`: one stream per tab. Refused with 503 past `server.max_streams`.
+/// `GET /events`: one stream per tab. Refused with 503 past `server.live_streams`.
 pub(crate) async fn events(State(app): State<Arc<App>>, Query(q): Query<EventsQuery>) -> Response {
     let Ok(slot) = Arc::clone(&app.streams).try_acquire_owned() else {
         return (

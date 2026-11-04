@@ -141,7 +141,7 @@ async fn a_public_server_refuses_remove() {
     let a = repo(&tmp.path().join("a"), "a root");
     let b = repo(&tmp.path().join("b"), "b root");
     let mut cfg = gitterrace_config::Config::default();
-    cfg.server.public = true;
+    cfg.server.is_public = true;
     let (r, secret) = server(vec![a, b], cfg);
     let (s, _) = send(&r, req("DELETE", Some(&secret)), named("b")).await;
     assert!(s == 404 || s == 405, "public: {s}");

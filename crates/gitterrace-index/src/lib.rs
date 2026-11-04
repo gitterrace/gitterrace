@@ -158,7 +158,7 @@ impl Index {
     }
 
     /// Sets how many commits a view outside the indexed set reads from git before it asks for a
-    /// reindex (`limits.fresh_commits`; default [`feed::FRESH_CAP`]).
+    /// reindex (`limits.unindexed_commits`; default [`feed::FRESH_CAP`]).
     #[must_use]
     pub const fn with_fresh_cap(mut self, cap: usize) -> Self {
         self.fresh_cap = cap;

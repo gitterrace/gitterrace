@@ -44,7 +44,7 @@ async fn public_error_bodies_never_name_host_folders() {
         .path()
         .to_owned();
     let mut cfg = gitterrace_config::Config::default();
-    cfg.server.public = true;
+    cfg.server.is_public = true;
     cfg.server.hosts = vec![HOST.to_owned()];
     let router = gitterrace_web::app_router_with(&p, cfg).expect("router");
     // A directory where the cache expects a file makes every cache read fail, and the error

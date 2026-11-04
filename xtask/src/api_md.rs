@@ -43,7 +43,7 @@ pub fn render() -> Out {
         "\nAnswers are capped so one file cannot flood a client: `log` at {} per page, \
          `blob` at {} lines and {} KiB, `blame` at {} lines, each \
          with `truncated` when cut. The `[api]` section of `config.toml` sets each cap.",
-        a.log_page_size, a.blob_lines, a.blob_kb, a.blame_lines
+        a.log_page_commits, a.blob_lines, a.blob_kb, a.blame_lines
     );
 
     s.push_str("\n## HTTP (`/api/v1`)\n\n| Endpoint | Query | Returns |\n| --- | --- | --- |\n");

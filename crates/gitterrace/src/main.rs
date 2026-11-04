@@ -45,7 +45,7 @@ async fn main() -> anyhow::Result<()> {
     let flags = Flags {
         dir: dir.clone(),
         addr: cli.addr,
-        poll: cli.poll,
+        interval_ms: cli.interval_ms,
         no_watch: cli.no_watch,
         public: cli.public,
     };
@@ -63,7 +63,7 @@ async fn main() -> anyhow::Result<()> {
                 .map(|d| d.join("actions.toml"));
             let m = &loaded.config.multi;
             let repos = gitterrace_web::discover_repos(&cli.paths, m.depth, &m.skip_dirs);
-            if !loaded.config.server.public
+            if !loaded.config.server.is_public
                 && open::join_running(addr, &repos, gitterrace_web::state_dir().as_deref())?
             {
                 return Ok(());
@@ -105,20 +105,20 @@ async fn main() -> anyhow::Result<()> {
             out,
             force,
             commits,
-            max_file_kb,
-            max_pages,
+            file_kb,
+            export_pages,
             project,
         } => {
             let scope = export::Scope {
                 commits,
-                max_file: max_file_kb * 1024,
+                max_file: file_kb * 1024,
                 force,
                 projects: project
                     .iter()
                     .map(|p| export::Project::parse(p))
                     .collect::<anyhow::Result<_>>()?,
             };
-            let pages = export::budget(max_pages, &loaded.config);
+            let pages = export::budget(export_pages, &loaded.config);
             export_cmd(&cli.paths, &path, out, &scope, pages, &loaded.config).await?;
         }
     }
@@ -187,7 +187,7 @@ fn init_in(
 struct Flags {
     dir: Option<PathBuf>,
     addr: Option<SocketAddr>,
-    poll: Option<u64>,
+    interval_ms: Option<u64>,
     no_watch: bool,
     public: bool,
 }
@@ -200,7 +200,7 @@ impl Flags {
             loaded.config.server.addr = a.to_string();
             loaded.flagged("server.addr");
         }
-        if let Some(ms) = self.poll {
+        if let Some(ms) = self.interval_ms {
             loaded.config.watch.interval_ms = ms;
             loaded.flagged("watch.interval_ms");
         }
@@ -209,8 +209,8 @@ impl Flags {
             loaded.flagged("watch.enabled");
         }
         if self.public {
-            loaded.config.server.public = true;
-            loaded.flagged("server.public");
+            loaded.config.server.is_public = true;
+            loaded.flagged("server.is_public");
         }
         loaded.validate()?;
         Ok(loaded)

@@ -6,7 +6,7 @@ use gitterrace_testkit::{Fixture, page as get};
 use crate::wiring_tests::{repo, router, with};
 
 #[tokio::test]
-async fn limits_search_per_file_caps_lines_per_file() {
+async fn limits_search_file_lines_caps_lines_per_file() {
     let dir = tempfile::tempdir().expect("tmp");
     let p = repo(dir.path(), "r");
     let mid = |b: &str| {
@@ -21,7 +21,7 @@ async fn limits_search_per_file_caps_lines_per_file() {
         Some("100"),
         "the default keeps 100 of 450"
     );
-    let capped = with(|c| c.limits.search_per_file = 3);
+    let capped = with(|c| c.limits.search_file_lines = 3);
     let (_, few) = get(&router(&p, capped), "/search?q=needle").await;
     assert_eq!(mid(&few).as_deref(), Some("3"));
 }
@@ -74,7 +74,7 @@ async fn limits_highlight_kb_shows_larger_text_plain() {
 }
 
 #[tokio::test]
-async fn limits_log_max_page_clamps_the_page_number() {
+async fn limits_log_pages_clamps_the_page_number() {
     let dir = tempfile::tempdir().expect("tmp");
     let p = repo(dir.path(), "r");
     let (_, far) = get(&router(&p, Config::default()), "/log/HEAD?page=5").await;
@@ -83,7 +83,7 @@ async fn limits_log_max_page_clamps_the_page_number() {
         "page 5 of a 2-commit log is empty"
     );
     let (_, clamped) = get(
-        &router(&p, with(|c| c.limits.log_max_page = 1)),
+        &router(&p, with(|c| c.limits.log_pages = 1)),
         "/log/HEAD?page=5",
     )
     .await;
@@ -140,10 +140,10 @@ async fn limits_worktree_files_reach_the_uncommitted_page() {
 }
 
 #[tokio::test]
-async fn limits_fresh_commits_reach_the_index() {
+async fn limits_unindexed_commits_reach_the_index() {
     let dir = tempfile::tempdir().expect("tmp");
     let p = repo(dir.path(), "r");
-    let cfg = with(|c| c.limits.fresh_commits = 7);
+    let cfg = with(|c| c.limits.unindexed_commits = 7);
     let a = crate::wiring_tests::app(&p, Config::default());
     assert_eq!(a.index.fresh_cap(), 2000);
     let env = crate::app::Env::new(cfg);
@@ -167,7 +167,7 @@ fn public_server_warns_about_raised_cost_keys() {
     c.api.diff_lines = 40_000;
     c.limits.search_matches = 10;
     assert!(crate::public_cost_warnings(&c).is_empty(), "not public");
-    c.server.public = true;
+    c.server.is_public = true;
     let w = crate::public_cost_warnings(&c);
     assert_eq!(w.len(), 1, "{w:?}");
     assert!(w[0].contains("api.diff_lines"), "{w:?}");

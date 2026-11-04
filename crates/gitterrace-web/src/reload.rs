@@ -225,14 +225,14 @@ mod tests {
         let mut f = fixture("");
         edit(
             &f,
-            "[server]\naddr = \"127.0.0.1:9\"\npublic = true\nhosts = [\"git.example.com\"]\n\
+            "[server]\naddr = \"127.0.0.1:9\"\nis_public = true\nhosts = [\"git.example.com\"]\n\
              [index]\nthreads = 3\n[multi]\ndepth = 4\n\
              skip_dirs = [\"x\"]\n[display]\ndates = \"absolute\"\n",
         );
         let lines = f.reloader.poll(&f.env).join("\n");
         for key in [
             "server.addr",
-            "server.public",
+            "server.is_public",
             "server.hosts",
             "index.threads",
             "multi.depth",

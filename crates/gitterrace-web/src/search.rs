@@ -280,7 +280,7 @@ fn search_code(a: &App, rev: &str, re: &Regex, glob: Option<&Regex>) -> Result<C
         .filter(|f| glob.is_none_or(|g| g.is_match(&f.path)))
         .collect();
     let max_matches = a.cfg().limits.search_matches;
-    let per_file = a.cfg().limits.search_per_file;
+    let per_file = a.cfg().limits.search_file_lines;
     let workers = std::thread::available_parallelism()
         .map_or(2, usize::from)
         .min(8);

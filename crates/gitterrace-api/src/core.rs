@@ -28,8 +28,8 @@ pub fn options_from(cfg: &gitterrace_config::Config, name: &str) -> Options {
     }
     Options {
         exclude,
-        include_generated: i.generated,
-        include_bots: i.bots,
+        include_generated: i.include_generated,
+        include_bots: i.include_bots,
         ..Options::default()
     }
 }
@@ -280,13 +280,13 @@ impl ApiState {
     ) -> Result<Value, ApiError> {
         let rev = Self::rev(rev)?;
         let caps = self.settings().caps;
-        let per_page = per_page.clamp(1, caps.log_page_size);
+        let per_page = per_page.clamp(1, caps.log_page_commits);
         let page = page.max(1);
         let skip = (page - 1).saturating_mul(per_page);
-        if skip > caps.log_max_skip {
+        if skip > caps.log_skip_commits {
             return Err(ApiError::BadRequest(format!(
-                "page too deep: at most {} commits can be skipped (api.log_max_skip)",
-                caps.log_max_skip
+                "page too deep: at most {} commits can be skipped (api.log_skip_commits)",
+                caps.log_skip_commits
             )));
         }
         // One extra row tells us whether another page exists.

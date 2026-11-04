@@ -109,20 +109,20 @@ fn exclude_from_worktree(out: &Path) {
 /// repository under `/r/<name>/`, named by the server's own table.
 /// The site is built in a folder beside `out` and moved into place only when complete: a failed
 /// or capped export leaves `out` as it was.
-/// `max_pages` is the ceiling on pages written, folded diff fragments (`/diff/{id}/{n}`)
+/// `export_pages` is the ceiling on pages written, folded diff fragments (`/diff/{id}/{n}`)
 /// included: one budget, so a wide commit costs pages like any other and the export's size is
 /// bounded by its scope, not by how many files its commits touch. It comes from
-/// `export --max-pages`, else `limits.export_pages`.
+/// `export --export-pages`, else `limits.export_pages`.
 pub(crate) async fn export(
     repos: &[PathBuf],
     out: &Path,
     scope: &Scope,
-    max_pages: usize,
+    export_pages: usize,
 ) -> anyhow::Result<usize> {
-    export_capped(repos, out, scope, max_pages).await
+    export_capped(repos, out, scope, export_pages).await
 }
 
-/// The export page budget: `--max-pages` wins over `limits.export_pages`.
+/// The export page budget: `--export-pages` wins over `limits.export_pages`.
 pub(crate) fn budget(flag: Option<u64>, config: &gitterrace_config::Config) -> usize {
     flag.map_or(config.limits.export_pages, |n| {
         usize::try_from(n).unwrap_or(usize::MAX)
@@ -134,7 +134,7 @@ async fn export_capped(
     repos: &[PathBuf],
     dest: &Path,
     scope: &Scope,
-    max_pages: usize,
+    export_pages: usize,
 ) -> anyhow::Result<usize> {
     // Swapped arguments (`export <repo> <out>`) would scatter pages over a
     // checkout. An ignored folder inside a repo is fine; its root is not.
@@ -146,18 +146,18 @@ async fn export_capped(
     }
     let existing = check_out(repos, dest, scope.force)?;
     let staging = Staging::new(dest)?;
-    let written = crawl(repos, staging.path(), scope, max_pages).await?;
+    let written = crawl(repos, staging.path(), scope, export_pages).await?;
     staging.finish(repos, dest, existing)?;
     exclude_from_worktree(dest);
     Ok(written)
 }
 
-/// Writes every page in scope under `out`, failing at `max_pages`.
+/// Writes every page in scope under `out`, failing at `export_pages`.
 async fn crawl(
     repos: &[PathBuf],
     out: &Path,
     scope: &Scope,
-    max_pages: usize,
+    export_pages: usize,
 ) -> anyhow::Result<usize> {
     // Owned by this run alone: dropped with the router when the crawl ends, so nothing the
     // export diffed outlives it.
@@ -211,7 +211,7 @@ async fn crawl(
 
     let mut seen: BTreeSet<String> = queue.iter().cloned().collect();
     let mut written = 0usize;
-    let mut count = Caps::new(max_pages, scope);
+    let mut count = Caps::new(export_pages, scope);
     // Pages render on blocking threads, so one at a time leaves the cores idle.
     // Fetch a batch concurrently, then write and follow links in queue order so
     // the output and the page cap stay deterministic.
@@ -277,7 +277,7 @@ struct Caps {
     pages: usize,
     max: usize,
     commits: usize,
-    max_file_kb: u64,
+    file_kb: u64,
 }
 
 impl Caps {
@@ -286,7 +286,7 @@ impl Caps {
             pages: 0,
             max,
             commits: scope.commits,
-            max_file_kb: scope.max_file / 1024,
+            file_kb: scope.max_file / 1024,
         }
     }
 
@@ -299,11 +299,11 @@ impl Caps {
             };
             bail!(
                 "export stopped at the cap of {} pages (diff fragments count) on {kind}, {path}; \
-                 nothing was written. Lower --commits (now {}) or --max-file-kb (now {}), or \
-                 raise --max-pages or limits.export_pages in config.toml",
+                 nothing was written. Lower --commits (now {}) or --file-kb (now {}), or \
+                 raise --export-pages or limits.export_pages in config.toml",
                 self.max,
                 self.commits,
-                self.max_file_kb
+                self.file_kb
             );
         }
         self.pages += 1;

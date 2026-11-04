@@ -144,7 +144,7 @@ fn a_repository_that_will_not_open_hides_host_paths_when_public() {
     let e = std::io::Error::other("cannot open /srv/private/repo/.git/gitterrace");
     for (public, shows) in [(true, false), (false, true)] {
         let mut cfg = gitterrace_config::Config::default();
-        cfg.server.public = public;
+        cfg.server.is_public = public;
         let table = super::Table::new(Vec::new(), crate::app::Env::new(cfg), None).expect("table");
         let r = table.open_failed("repo", &e);
         assert_eq!(r.status(), 500);

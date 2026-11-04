@@ -214,7 +214,7 @@ fn insights_defaults_follow_the_config_and_the_repo_override() {
     assert!(!none.bots && !none.generated && none.exclude.is_empty() && none.period.is_none());
 
     let cfg = gitterrace_config::parse(
-        "[insights]\nbots = true\ngenerated = true\nperiod = \"3m\"\nexclude = [\"*.lock\"]\n\n[repo.alpha]\nexclude = [\"docs/**\"]\n[repo.beta]\nexclude = [\"nope\"]\n",
+        "[insights]\ninclude_bots = true\ninclude_generated = true\nperiod = \"3m\"\nexclude = [\"*.lock\"]\n\n[repo.alpha]\nexclude = [\"docs/**\"]\n[repo.beta]\nexclude = [\"nope\"]\n",
     )
     .expect("parse")
     .config;
@@ -233,8 +233,8 @@ async fn insights_defaults_reach_the_pages() {
     let dir = tempfile::tempdir().expect("tmp");
     let p = repo(dir.path(), "r");
     let cfg = with(|c| {
-        c.insights.bots = true;
-        c.insights.generated = true;
+        c.insights.include_bots = true;
+        c.insights.include_generated = true;
         c.insights.exclude = vec!["small.txt".into()];
     });
     let r = router(&p, cfg);

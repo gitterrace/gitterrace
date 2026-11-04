@@ -1,4 +1,4 @@
-//! What a public server (`server.public`) answers: committed history and nothing of this
+//! What a public server (`server.is_public`) answers: committed history and nothing of this
 //! machine. Every route literal is classified below; a public server answers only the
 //! `PUBLIC` ones and 404s the rest, so a route added without a class stays dark there.
 

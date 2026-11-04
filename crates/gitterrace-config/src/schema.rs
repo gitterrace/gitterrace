@@ -148,20 +148,20 @@ pub struct RepoOverride {
 /// switch its page off; the most keeps one request within a machine.
 pub const BOUNDS: &[(&str, u64, u64)] = &[
     ("server.public_timeout_secs", 1, 3600),
-    ("limits.search_per_file", 1, 100_000),
+    ("limits.search_file_lines", 1, 100_000),
     ("limits.search_commits", 1, 100_000),
     ("limits.blob_lines", 1, 10_000_000),
     ("limits.highlight_kb", 1, 65_536),
-    ("limits.log_max_page", 1, 1_000_000),
+    ("limits.log_pages", 1, 1_000_000),
     ("limits.preview_mb", 1, 4096),
     ("limits.worktree_files", 1, 100_000),
     ("limits.worktree_diff_kb", 1, 262_144),
-    ("limits.fresh_commits", 1, 200_000),
+    ("limits.unindexed_commits", 1, 200_000),
     ("limits.action_output_kb", 1, 65_536),
     ("limits.registry_entries", 1, 100_000),
     ("limits.export_pages", 1, 10_000_000),
-    ("api.log_page_size", 1, 100_000),
-    ("api.log_max_skip", 1, 100_000_000),
+    ("api.log_page_commits", 1, 100_000),
+    ("api.log_skip_commits", 1, 100_000_000),
     ("api.blob_lines", 1, 10_000_000),
     ("api.blob_kb", 1, 1_048_576),
     ("api.blame_lines", 1, 10_000_000),
@@ -177,11 +177,11 @@ settings! {
         /// restart.
         addr: String = DEFAULT_ADDR.to_owned() => Restart,
         /// Maximum open live-update streams per repository (one per browser tab).
-        max_streams: usize = 32 => Live,
+        live_streams: usize = 32 => Live,
         /// Serve read-only to anyone who can reach the address: committed history only, no
         /// working tree, stashes, live updates, actions or additions. Required for any address
         /// that is not loopback. Needs a restart.
-        public: bool = false => Restart,
+        is_public: bool = false => Restart,
         /// Host names a reverse proxy forwards with, exact and without port, for example
         /// `["git.example.com"]`. Needs `public`. Needs a restart.
         hosts: Vec<String> = Vec::new() => Restart,
@@ -222,18 +222,19 @@ settings! {
         /// Most matches a code search returns. Past it the search stops and says it was cut off.
         search_matches: usize = 500 => Live + cost,
         /// Matching lines one file keeps in a code search. Past it the file says more matched.
-        search_per_file: usize = 100 => Live + cost,
+        search_file_lines: usize = 100 => Live + cost,
         /// Most commits a commit search lists. Past it the search stops and says it was cut off.
         search_commits: usize = 200 => Live + cost,
         /// Lines of one file's diff shown before it folds. A folded file loads on demand.
         diff_fold_lines: usize = 400 => Live + cost,
-        /// Lines a file page shows. Past it the page cuts the file and says so.
+        /// Lines a file page shows. Past it the page cuts the file and says so. `api.blob_lines`
+        /// is the API's own cut.
         blob_lines: usize = 20_000 => Live + cost,
         /// Largest text highlighted, in KiB: a file, its blame, one file's diff or a Markdown
         /// code block. Larger text shows plain.
         highlight_kb: usize = 256 => Live + cost,
-        /// Deepest page number of a history page. A later page number shows this page.
-        log_max_page: usize = 1000 => Live + cost,
+        /// History pages a log reaches: a later page number shows the last of them.
+        log_pages: usize = 1000 => Live + cost,
         /// Largest image whose pixel size a file page reads, in MB. A larger one shows no
         /// pixel size.
         preview_mb: u64 = 16 => Live + cost,
@@ -244,7 +245,7 @@ settings! {
         worktree_diff_kb: usize = 1024 => Live,
         /// Commits a view of a revision outside the indexed history reads from git per request.
         /// Past it the view asks for a reindex instead. Needs a restart.
-        fresh_commits: usize = 2000 => Restart + cost,
+        unindexed_commits: usize = 2000 => Restart + cost,
         /// Output kept from each stream (stdout, stderr) of an action, in KiB. The rest is read
         /// and dropped. Needs a restart.
         action_output_kb: usize = 64 => Restart,
@@ -252,17 +253,17 @@ settings! {
         /// served are forgotten with their names. Needs a restart.
         registry_entries: usize = 500 => Restart,
         /// Most pages `git terrace export` writes, folded diff fragments included. Past it the
-        /// export stops and writes nothing. `export --max-pages` overrides it. Between 1 and
+        /// export stops and writes nothing. `export --export-pages` overrides it. Between 1 and
         /// 10000000.
         export_pages: usize = 20_000 => Live,
     }
     api: Api {
         /// Most commits one `log` answer lists, whatever `per_page` asks.
-        log_page_size: usize = 500 => Live + cost,
-        /// Deepest a `log` answer pages, in commits skipped. A deeper page is refused.
-        log_max_skip: usize = 50_000 => Live + cost,
+        log_page_commits: usize = 500 => Live + cost,
+        /// Commits a `log` answer may skip to reach its page. A deeper page is refused.
+        log_skip_commits: usize = 50_000 => Live + cost,
         /// Most lines one `blob` answer carries, whatever `limit` asks. The rest is cut and
-        /// `truncated` says so.
+        /// `truncated` says so. `limits.blob_lines` is the file page's own cut.
         blob_lines: usize = 5000 => Live + cost,
         /// Most bytes one `blob` answer carries, in KiB: one minified line can be megabytes.
         /// The rest is cut and `truncated` says so.
@@ -277,9 +278,9 @@ settings! {
         /// Paths (globs) left out of every insight.
         exclude: Vec<String> = Vec::new() => Live,
         /// Count commits by bots.
-        bots: bool = false => Live,
+        include_bots: bool = false => Live,
         /// Count lock files and minified output.
-        generated: bool = false => Live,
+        include_generated: bool = false => Live,
         /// Period the insights pages use when the URL names none: 1w, 1m, 3m, 1y or all. The
         /// API and MCP default to all. Their `period` parameter picks one.
         period: String = "all".to_owned() => Live,
@@ -324,8 +325,8 @@ impl Config {
         if let Some(why) = self.public_problem() {
             return bad(why.0, &why.1);
         }
-        if self.server.max_streams == 0 {
-            return bad("server.max_streams", "must be at least 1");
+        if self.server.live_streams == 0 {
+            return bad("server.live_streams", "must be at least 1");
         }
         if self.watch.interval_ms < 250 {
             return bad("watch.interval_ms", "must be at least 250");
@@ -380,21 +381,21 @@ impl Config {
     }
 
     /// Why the online settings cannot be honored: a non-loopback address without
-    /// `server.public` (fails closed, so a typo in `addr` never exposes the working tree), or a
+    /// `server.is_public` (fails closed, so a typo in `addr` never exposes the working tree), or a
     /// `server.hosts` entry that is not one plain host name.
     fn public_problem(&self) -> Option<(&'static str, String)> {
         let s = &self.server;
         let addr = s.addr.parse::<std::net::SocketAddr>().ok()?;
-        if !addr.ip().is_loopback() && !s.public {
+        if !addr.ip().is_loopback() && !s.is_public {
             return Some((
                 "server.addr",
                 format!(
-                    "{addr} is reachable from other machines. Set server.public = true (or pass --public) to serve read-only there"
+                    "{addr} is reachable from other machines. Set server.is_public = true (or pass --public) to serve read-only there"
                 ),
             ));
         }
-        if !s.hosts.is_empty() && !s.public {
-            return Some(("server.hosts", "needs server.public = true".to_owned()));
+        if !s.hosts.is_empty() && !s.is_public {
+            return Some(("server.hosts", "needs server.is_public = true".to_owned()));
         }
         s.hosts.iter().find(|h| !plain_host(h)).map(|h| {
             (
