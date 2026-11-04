@@ -54,7 +54,9 @@ fn every_insight(repo: &Repo, ins: &Insights<'_>) {
         timed("hotspots", || ins.hotspots(&files, p));
         timed("ownership", || ins.ownership(&files, p, 2));
     }
-    timed("sizes", || ins.commit_sizes());
+    for p in PERIODS {
+        timed("sizes", || ins.commit_sizes_in(p));
+    }
     timed("age", || ins.code_age(&files));
     timed("history", || ins.file_history("a.txt"));
     timed("cadence", || ins.cadence(&[]));

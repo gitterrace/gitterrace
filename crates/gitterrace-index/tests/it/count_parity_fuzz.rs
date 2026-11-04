@@ -374,3 +374,36 @@ proptest! {
         prop_assert_eq!(page, want, "frequency");
     }
 }
+
+proptest! {
+    #![proptest_config(cases())]
+
+    /// Frequency, rework, types, churn and sizes against the reducers over one `Counted`.
+    #[test]
+    fn p4_frequency_labels_churn_sizes_equal_the_reducers(gens in prop::collection::vec(gen_commit(), 0..40), q in no_chips()) {
+        let recs = history(&gens);
+        let s = scope(&q);
+        let ins = Insights::new(&recs, s.options().clone(), None);
+        let c = ins.counted(&s, cx(&recs));
+        let p = s.period();
+        let (_, freq) = ins.frequency(p);
+        prop_assert_eq!(&freq, &c.frequency().1, "frequency");
+        let series = c.series();
+        let page: Vec<(u64, u64)> = freq.iter().map(|f| (f.additions, f.deletions)).collect();
+        let want: Vec<(u64, u64)> = series.iter().map(|f| (f.additions, f.deletions)).collect();
+        prop_assert_eq!(page, want, "frequency against series");
+        prop_assert_eq!(ins.rework(p), c.rework(), "rework");
+        for l in [Label::Kind, Label::Scope] {
+            let (counts, buckets) = c.per_label(l);
+            prop_assert_eq!(ins.label_breakdown(l, p), counts, "label_breakdown");
+            prop_assert_eq!(ins.label_over_time(l, p), buckets, "label_over_time");
+        }
+        let ranks: Vec<_> = ins.counted_rows(p).map(|r| r.rank).collect();
+        prop_assert_eq!(ranks, c.ranks(), "counted_rows");
+        prop_assert_eq!(ins.file_churn(p), c.per_file(), "file_churn");
+        prop_assert_eq!(ins.dir_churn(p), c.per_dir(), "dir_churn");
+        prop_assert_eq!(ins.commit_sizes_in(p), c.sizes(), "commit_sizes_in");
+        let t = c.totals();
+        prop_assert_eq!(t.commits, c.sizes().iter().map(|b| b.commits).sum::<usize>());
+    }
+}

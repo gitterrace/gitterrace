@@ -220,7 +220,7 @@ b563e93162498552ce5e3de76671db88 b563e93162498552ce5e3de76671db88 [HEAD~3] /api/
 8662b44df9a62f99f109cbc3421a146f 8662b44df9a62f99f109cbc3421a146f [HEAD~3] /api/v1/insights/label_breakdown?period=3m&bots=0&type=fix&rev=HEAD~3
 3fd04accdb0f3acdaa8983a12a825601 3fd04accdb0f3acdaa8983a12a825601 [HEAD~3] /api/v1/insights/label_breakdown?period=all&bots=0&author=bob%40y.io&rev=HEAD~3
 258ecbd41b49e5d2e8503a6d532fe0e3 258ecbd41b49e5d2e8503a6d532fe0e3 [HEAD~3] /api/v1/insights/label_breakdown?period=all&bots=0&path=src&rev=HEAD~3
-b134d35f442a1debbde5fd7aeaac2be4 b134d35f442a1debbde5fd7aeaac2be4 [HEAD~3] /api/v1/insights/label_breakdown?period=all&bots=0&rev=HEAD~3
+3ed9497be49b1f0de97b9cf275741f65 3ed9497be49b1f0de97b9cf275741f65 [HEAD~3] /api/v1/insights/label_breakdown?period=all&bots=0&rev=HEAD~3
 258ecbd41b49e5d2e8503a6d532fe0e3 258ecbd41b49e5d2e8503a6d532fe0e3 [HEAD~3] /api/v1/insights/label_breakdown?period=all&bots=0&scope=core&rev=HEAD~3
 8662b44df9a62f99f109cbc3421a146f 8662b44df9a62f99f109cbc3421a146f [HEAD~3] /api/v1/insights/label_breakdown?period=all&bots=0&type=fix&rev=HEAD~3
 9af693b9d61fbbb5e0fa9cc5bd75fff1 9af693b9d61fbbb5e0fa9cc5bd75fff1 [HEAD~3] /api/v1/insights/label_over_time?period=1m&bots=0&author=bob%40y.io&rev=HEAD~3
@@ -245,7 +245,7 @@ f09c9c483eea7ea99b3a32856a6e46e5 f09c9c483eea7ea99b3a32856a6e46e5 [HEAD~3] /api/
 6d9c43294479e16b6aaaeb4b6ffca1c5 6d9c43294479e16b6aaaeb4b6ffca1c5 [HEAD~3] /api/v1/insights/label_over_time?period=3m&bots=0&type=fix&rev=HEAD~3
 726926df87d3d411036ecf59dfe9a84c 726926df87d3d411036ecf59dfe9a84c [HEAD~3] /api/v1/insights/label_over_time?period=all&bots=0&author=bob%40y.io&rev=HEAD~3
 07735215f6bf0f148e7656c54c337867 07735215f6bf0f148e7656c54c337867 [HEAD~3] /api/v1/insights/label_over_time?period=all&bots=0&path=src&rev=HEAD~3
-777010cf8a7f3ef759168bccb4e695e1 777010cf8a7f3ef759168bccb4e695e1 [HEAD~3] /api/v1/insights/label_over_time?period=all&bots=0&rev=HEAD~3
+38e2e11a3a00340d95faaa7628f0a70a 38e2e11a3a00340d95faaa7628f0a70a [HEAD~3] /api/v1/insights/label_over_time?period=all&bots=0&rev=HEAD~3
 07735215f6bf0f148e7656c54c337867 07735215f6bf0f148e7656c54c337867 [HEAD~3] /api/v1/insights/label_over_time?period=all&bots=0&scope=core&rev=HEAD~3
 78ef23eaf0c1432b810e05d124fb80e0 78ef23eaf0c1432b810e05d124fb80e0 [HEAD~3] /api/v1/insights/label_over_time?period=all&bots=0&type=fix&rev=HEAD~3
 1a98ec4c75b3668946787af67bd4ae4e 1a98ec4c75b3668946787af67bd4ae4e [HEAD~3] /api/v1/insights/ownership?period=1m&bots=0&author=bob%40y.io&rev=HEAD~3
@@ -470,7 +470,7 @@ c23726092ca211dca23ee0691f86677b 3fb2a18e223a1e3ebf422dafa7dd0b5b [HEAD~3] /stat
 3b230b71144f2531b686c5e48dfa9c76 e69c664caddb1f282cae6131c07c5324 [HEAD~3] /stats/types?period=3m&bots=0&type=fix&rev=HEAD~3
 0f467645030e977598e835bea0ba9735 3044195ffbb60584a2cd7ccfed83e765 [HEAD~3] /stats/types?period=all&bots=0&author=bob%40y.io&rev=HEAD~3
 e134af60ff1a75c54655d27e0154b397 5a98fe7688f24c67f48e062eb69ad31f [HEAD~3] /stats/types?period=all&bots=0&path=src&rev=HEAD~3
-12a9319c02e587bb34f775b9ac9cfd5c e69f64e5d1936f0cb0ba8c90be24888a [HEAD~3] /stats/types?period=all&bots=0&rev=HEAD~3
+5878794321e311003e98e30eeba53362 6195b97e26ddde5fa83d472617c4e244 [HEAD~3] /stats/types?period=all&bots=0&rev=HEAD~3
 4185a13ee397900466ef32c9902f03de f588b1b200980b72a76fd56e0380e73a [HEAD~3] /stats/types?period=all&bots=0&scope=core&rev=HEAD~3
 69dafcf476856158046a30a452f9bd7a aee94d3627760119cbc76b89d4771c26 [HEAD~3] /stats/types?period=all&bots=0&type=fix&rev=HEAD~3
 bea1307a3734fffc30b3b9253aafe18d d2f6cdc827d10c9d58a0e29a0e228119 [HEAD~3] /stats?period=1m&bots=0&author=bob%40y.io&rev=HEAD~3
@@ -720,7 +720,7 @@ fc2c3b03418980e39d442962528b5cac fc2c3b03418980e39d442962528b5cac [topic] /api/v
 3b6b9c279fcb8820643c6e358d9dfe24 3b6b9c279fcb8820643c6e358d9dfe24 [topic] /api/v1/insights/label_breakdown?period=3m&bots=0&type=fix&rev=topic
 b8802b51f15ce73cf6d7e3d4c7db684b b8802b51f15ce73cf6d7e3d4c7db684b [topic] /api/v1/insights/label_breakdown?period=all&bots=0&author=bob%40y.io&rev=topic
 4b5b43894762ccf2bbce4257e1170b71 4b5b43894762ccf2bbce4257e1170b71 [topic] /api/v1/insights/label_breakdown?period=all&bots=0&path=src&rev=topic
-e6337f9893e2b95040f53a27a4a1210a e6337f9893e2b95040f53a27a4a1210a [topic] /api/v1/insights/label_breakdown?period=all&bots=0&rev=topic
+5a88e38df4fbfa0899dd8ac7ef1aa3c5 5a88e38df4fbfa0899dd8ac7ef1aa3c5 [topic] /api/v1/insights/label_breakdown?period=all&bots=0&rev=topic
 4b5b43894762ccf2bbce4257e1170b71 4b5b43894762ccf2bbce4257e1170b71 [topic] /api/v1/insights/label_breakdown?period=all&bots=0&scope=core&rev=topic
 3b6b9c279fcb8820643c6e358d9dfe24 3b6b9c279fcb8820643c6e358d9dfe24 [topic] /api/v1/insights/label_breakdown?period=all&bots=0&type=fix&rev=topic
 fa0fa1c34f7d2bbe46bcbd8ad68c91ef fa0fa1c34f7d2bbe46bcbd8ad68c91ef [topic] /api/v1/insights/label_over_time?period=1m&bots=0&author=bob%40y.io&rev=topic
@@ -745,7 +745,7 @@ ee93c49852fe7a5806b17a8aac2404b0 ee93c49852fe7a5806b17a8aac2404b0 [topic] /api/v
 15fe61b2b2584ebd14f11febb25eaa90 15fe61b2b2584ebd14f11febb25eaa90 [topic] /api/v1/insights/label_over_time?period=3m&bots=0&type=fix&rev=topic
 feaa3f57510e96d2080b6be8bfd74dc4 feaa3f57510e96d2080b6be8bfd74dc4 [topic] /api/v1/insights/label_over_time?period=all&bots=0&author=bob%40y.io&rev=topic
 590c7d8f8198912f78a04d1514c53654 590c7d8f8198912f78a04d1514c53654 [topic] /api/v1/insights/label_over_time?period=all&bots=0&path=src&rev=topic
-6895eeb6fe1ae74849d843fad626696b 6895eeb6fe1ae74849d843fad626696b [topic] /api/v1/insights/label_over_time?period=all&bots=0&rev=topic
+f881cc15335f11989867be54c0997ab2 f881cc15335f11989867be54c0997ab2 [topic] /api/v1/insights/label_over_time?period=all&bots=0&rev=topic
 590c7d8f8198912f78a04d1514c53654 590c7d8f8198912f78a04d1514c53654 [topic] /api/v1/insights/label_over_time?period=all&bots=0&scope=core&rev=topic
 5c6b496818dd859f025588573c484990 5c6b496818dd859f025588573c484990 [topic] /api/v1/insights/label_over_time?period=all&bots=0&type=fix&rev=topic
 8eec728a78213a4fe1eb71087752b84e 8eec728a78213a4fe1eb71087752b84e [topic] /api/v1/insights/ownership?period=1m&bots=0&author=bob%40y.io&rev=topic
@@ -845,7 +845,7 @@ dce1a252cac68285e4b3c2e9e85f4c0e a86091ecdf038624b8ffb47d94db480a [topic] /stats
 3ad9e62d00f7eb80472419e62e5ce56c 15a8466b78bed0e9b8c4a0ba33573e6a [topic] /stats/frequency?period=3m&bots=0&type=fix&rev=topic
 62a641d302b42eb1a259aa240e0e836d 37a2bf936744b9f827d6171d5f081107 [topic] /stats/frequency?period=all&bots=0&author=bob%40y.io&rev=topic
 8f316a8b7e882a100b96bc7933122eb4 89b5f5d21540c1e3391219dbf24fbb60 [topic] /stats/frequency?period=all&bots=0&path=src&rev=topic
-a13424f624a5f2d07376b613ef8692c7 ebe9e7a1172fc0e502cfb6bf412fc04d [topic] /stats/frequency?period=all&bots=0&rev=topic
+c4aa52584ca8549ea04207b19e9f9e25 1832cea0726ab24a91ea12dd7dd82aeb [topic] /stats/frequency?period=all&bots=0&rev=topic
 7bcedd930f59281b665b48a71b4f7573 8646d78831333afaa11d0a29bf3f2237 [topic] /stats/frequency?period=all&bots=0&scope=core&rev=topic
 339daa263a96c1a48495de8532bcf6c6 a335c2ebb4414200fe1293b1100bb6ac [topic] /stats/frequency?period=all&bots=0&type=fix&rev=topic
 4dcc0fbc40a0fde7772e8d8f982dd8b4 a92f529dc9bc6c98e74d98b383d68830 [topic] /stats/hotspots?period=1m&bots=0&author=bob%40y.io&rev=topic
@@ -970,7 +970,7 @@ f4dbdbcb08960542b6d13beed269932e 4d8aa107811b1b59ca0a9e9c89316c44 [topic] /stats
 0a0237eeb96b854b913ce1627f2e9630 2d75eb763b7689b245feb683f036a186 [topic] /stats/types?period=3m&bots=0&type=fix&rev=topic
 0e38a49e056abfd868328b2e9f640bc6 d627241c5409d54b574f83c4d5c614f0 [topic] /stats/types?period=all&bots=0&author=bob%40y.io&rev=topic
 301ac7d9853fac43cfec49ca17981eba 2e9f287341aee0521f09774970127d5e [topic] /stats/types?period=all&bots=0&path=src&rev=topic
-2033e131f4c1bdec36db27a9805e840b d648b7a1770cb928a94bb15a0c76e70d [topic] /stats/types?period=all&bots=0&rev=topic
+39821c0c990c139601cf1bf4e7ec6317 d078a87847bd43a6e8831ad7a61fd121 [topic] /stats/types?period=all&bots=0&rev=topic
 2b7b10f2422d2e6013015f151ed9a5f3 ab1a05a60189758d10cf4c566d34cbe9 [topic] /stats/types?period=all&bots=0&scope=core&rev=topic
 ae712396bb6e389107efd60e6196608d 7b4c82cb51162efdcfd58d0095e8d6ad [topic] /stats/types?period=all&bots=0&type=fix&rev=topic
 70a89418b42f9b36a13a152d833c1e60 469fba54d9b27f8fc6259d905f486ba8 [topic] /stats?period=1m&bots=0&author=bob%40y.io&rev=topic

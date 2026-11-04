@@ -1,5 +1,4 @@
-use crate::feed::{CommitRange, CommitRow};
-use crate::insights::{Insights, Period};
+use crate::insights::{BucketUnit, Counted, Insights, Item, Lines, Period, Reducer};
 
 /// Additions and deletions of one bucket, moves and (by default) whitespace excluded.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
@@ -28,7 +27,7 @@ pub struct ReworkPoint {
 pub struct Rework {
     /// Commits in the rolling window, scaled to the selection.
     pub window: usize,
-    pub unit: super::BucketUnit,
+    pub unit: BucketUnit,
     pub points: Vec<ReworkPoint>,
 }
 
@@ -48,10 +47,30 @@ pub fn rework_verdict(share: f64) -> &'static str {
     }
 }
 
+#[expect(
+    clippy::redundant_closure_for_method_calls,
+    reason = "a method path binds one Counted lifetime, in_period needs a closure over any"
+)]
 impl Insights<'_> {
-    pub fn frequency(&self, period: Period) -> (super::BucketUnit, Vec<Frequency>) {
-        let (from, to) = period.window(self.now);
-        let axis = self.axis(Some(period));
+    pub fn frequency(&self, period: Period) -> (BucketUnit, Vec<Frequency>) {
+        self.in_period(period, |c| c.frequency())
+            .unwrap_or((BucketUnit::Day, Vec::new()))
+    }
+
+    /// Rolling rework read at the end of every bucket of `period`, see [`Counted::rework`].
+    pub fn rework(&self, period: Period) -> Rework {
+        self.in_period(period, |c| c.rework()).unwrap_or(Rework {
+            window: 10,
+            unit: BucketUnit::Day,
+            points: Vec::new(),
+        })
+    }
+}
+
+impl Counted<'_> {
+    /// Lines per axis bucket over the counted commits.
+    pub fn frequency(&self) -> (BucketUnit, Vec<Frequency>) {
+        let axis = self.axis();
         let mut out: Vec<Frequency> = axis
             .names()
             .map(|(key, label)| Frequency {
@@ -62,37 +81,26 @@ impl Insights<'_> {
                 rewritten: 0,
             })
             .collect();
-        for c in self.source().commits_in(CommitRange::Time(from..to)) {
-            if !self.counted_row(&c) {
-                continue;
-            }
-            let Some(w) = axis.slot_row(&c).map(|s| &mut out[s]) else {
-                continue;
-            };
-            let l = self.commit_sums(c.rank);
-            w.additions += u64::from(l.add);
-            w.deletions += u64::from(l.del);
-            w.rewritten += u64::from(l.rewritten);
-        }
+        let mut r = Bucketed(&mut out);
+        self.reduce(&mut [&mut r]);
         (axis.unit(), out)
     }
 
-    /// Rolling rework read at the end of every bucket of `period`. The window is an eighth of
-    /// the commits in the selection, between 10 and 100: a week of a dozen commits must not
-    /// average over a hundred older ones, and a big history needs the 100 to smooth out.
-    pub fn rework(&self, period: Period) -> Rework {
-        let (from, to) = period.window(self.now);
-        let axis = self.axis(Some(period));
-        let counted: Vec<CommitRow> = self
-            .source()
-            .commits_in(CommitRange::Time(from..to))
-            .filter(|c| self.counted_row(c))
-            .collect();
+    /// Rolling rework read at the end of every bucket. The window is an eighth of the counted
+    /// commits, between 10 and 100: a week of a dozen commits must not average over a hundred
+    /// older ones, and a big history needs the 100 to smooth out.
+    pub fn rework(&self) -> Rework {
+        let axis = self.axis();
+        // Two passes over the counted list: its slot and lines per commit, 16 B each.
+        let counted: Vec<(Option<usize>, Lines)> = {
+            let mut c = Slots(Vec::new());
+            self.reduce(&mut [&mut c]);
+            c.0
+        };
         let window = (counted.len() / 8).clamp(10, 100);
-        let lines: Vec<super::Lines> = counted.iter().map(|c| self.commit_sums(c.rank)).collect();
         // Prefix sums make every window O(1).
-        let mut pre = vec![(0u64, 0u64, 0u64); lines.len() + 1];
-        for (k, l) in lines.iter().enumerate() {
+        let mut pre = vec![(0u64, 0u64, 0u64); counted.len() + 1];
+        for (k, (_, l)) in counted.iter().enumerate() {
             let p = pre[k];
             pre[k + 1] = (
                 p.0 + u64::from(l.add),
@@ -102,9 +110,9 @@ impl Insights<'_> {
         }
         // Counted commits up to and including each bucket.
         let mut upto = vec![0usize; axis.len()];
-        for (k, c) in counted.iter().enumerate() {
-            if let Some(b) = axis.slot_row(c) {
-                upto[b] = k + 1;
+        for (k, (slot, _)) in counted.iter().enumerate() {
+            if let Some(b) = slot.and_then(|b| upto.get_mut(b)) {
+                *b = k + 1;
             }
         }
         let mut seen = 0;
@@ -137,8 +145,30 @@ impl Insights<'_> {
     }
 }
 
+/// Lines into the bucket of each commit's local day.
+struct Bucketed<'o>(&'o mut [Frequency]);
+
+impl Reducer for Bucketed<'_> {
+    fn add(&mut self, c: &Counted<'_>, item: &Item) {
+        if let Some(w) = c.axis().slot_day(item.day).and_then(|s| self.0.get_mut(s)) {
+            w.additions += u64::from(item.lines.add);
+            w.deletions += u64::from(item.lines.del);
+            w.rewritten += u64::from(item.lines.rewritten);
+        }
+    }
+}
+
+/// Bucket and lines of every counted commit, in stream order.
+struct Slots(Vec<(Option<usize>, Lines)>);
+
+impl Reducer for Slots {
+    fn add(&mut self, c: &Counted<'_>, item: &Item) {
+        self.0.push((c.axis().slot_day(item.day), item.lines));
+    }
+}
+
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::{ReworkPoint, rework_share, rework_verdict};
     use crate::insights::fixtures::{file, rec};
     use crate::{BucketUnit, FileStat, Insights, Options, Period};
@@ -217,5 +247,42 @@ mod tests {
         assert_eq!(ins.rework(Period::All).window, 50);
         assert_eq!(ins.rework(Period::Week).window, 10);
         assert_eq!(ins.rework(Period::Week).points.len(), 7);
+    }
+
+    /// Week ending on day 20: local days 14..=20. Commit `e` sits on local day 13, one hour
+    /// after the old UTC window opened, so the old window counted it and folded it into bar 0.
+    pub(crate) fn edge_week() -> Vec<crate::CommitRecord> {
+        let mut e = rec("e", "Ann", 13, vec![edit("a.rs", 1000, 0, 0)]);
+        e.time += 3600;
+        vec![
+            e,
+            rec("i", "Ann", 17, vec![edit("a.rs", 10, 0, 0)]),
+            rec("n", "Bob", 20, vec![edit("a.rs", 5, 5, 5)]),
+        ]
+    }
+
+    /// The frequency bars hold only the week's own local days.
+    #[test]
+    fn frequency_counts_only_the_local_days_of_the_period() {
+        let recs = edge_week();
+        let ins = Insights::new(&recs, Options::default(), None);
+        let (_, f) = ins.frequency(Period::Week);
+        assert_eq!(f.len(), 7);
+        let add: u64 = f.iter().map(|b| b.additions).sum();
+        assert_eq!(
+            add, 15,
+            "commit on local day 13 counted in a week of days 14..=20"
+        );
+        assert_eq!(f[0].additions, 0);
+    }
+
+    /// The rework window holds only the week's own commits.
+    #[test]
+    fn rework_counts_only_the_local_days_of_the_period() {
+        let recs = edge_week();
+        let ins = Insights::new(&recs, Options::default(), None);
+        let rw = ins.rework(Period::Week);
+        let last = rw.points.last().expect("seven points");
+        assert_eq!((last.added, last.removed), (15, 5));
     }
 }

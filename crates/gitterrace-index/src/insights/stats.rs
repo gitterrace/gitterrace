@@ -2,11 +2,9 @@
 //! here they count non-merge commits by people who count under the options, over the files the
 //! path filter keeps, inside the period's window.
 
-use std::collections::HashMap;
-
-use crate::feed::{CommitRange, CommitRow, FileRow, LabelId, PathId, Rank, Stream};
+use crate::feed::{CommitRow, FileRow, FixedClock, PathId, Rank};
 use crate::insights::fasthash::FastMap;
-use crate::insights::{Insights, Period, Selection};
+use crate::insights::{CountContext, Counted, Insights, Period, Scope, ScopeParams, Selection};
 
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
 pub struct FileChurn {
@@ -57,41 +55,59 @@ impl Label {
             Self::Scope => r.scope.as_deref().unwrap_or(Selection::NO_SCOPE),
         }
     }
-
-    /// The label id of a commit's columns, `None` when it has none.
-    const fn id(self, c: &CommitRow) -> Option<LabelId> {
-        match self {
-            Self::Kind => c.kind,
-            Self::Scope => c.scope,
-        }
-    }
-
-    /// The name a commit without this label counts under.
-    const fn missing(self) -> &'static str {
-        match self {
-            Self::Kind => Selection::OTHER,
-            Self::Scope => Selection::NO_SCOPE,
-        }
-    }
 }
 
+#[expect(
+    clippy::redundant_closure_for_method_calls,
+    reason = "a method path binds one Counted lifetime, in_period needs a closure over any"
+)]
 impl Insights<'_> {
-    /// Columns of the counted commits inside the period's window, oldest first.
-    pub fn counted_rows(&self, period: Period) -> impl Iterator<Item = CommitRow> + '_ {
-        let (from, to) = period.window(self.now);
-        self.source()
-            .commits_in(CommitRange::Time(from..to))
-            .filter(move |c| self.counted_row(c))
+    /// `f` over the commits `period` counts in this whole history, under these options, with
+    /// the context anchored on this history: what the period-keyed page functions count.
+    /// `None` only if the scope were refused, which empty parameters never are.
+    pub(crate) fn in_period<T>(
+        &self,
+        period: Period,
+        f: impl FnOnce(&Counted<'_>) -> T,
+    ) -> Option<T> {
+        let s = Scope::from_params(&ScopeParams::default(), self.opts.clone(), period).ok()?;
+        let cx = CountContext::new(self.source(), &FixedClock(self.now));
+        Some(f(&self.counted(&s, cx)))
     }
 
-    /// File rows of the counted commits in the period, streamed, oldest first.
-    fn counted_files(&self, period: Period) -> Stream<'_, (Rank, Vec<FileRow>)> {
-        let ranks: Vec<Rank> = self.counted_rows(period).map(|c| c.rank).collect();
-        self.source().rows_for(ranks)
+    /// Columns of the counted commits of the period, oldest first.
+    pub fn counted_rows(&self, period: Period) -> impl Iterator<Item = CommitRow> {
+        self.in_period(period, |c| c.stream().collect::<Vec<_>>())
+            .unwrap_or_default()
+            .into_iter()
     }
 
     /// Every counted file with its churn, most commits first, then path.
     pub fn file_churn(&self, period: Period) -> Vec<FileChurn> {
+        self.in_period(period, |c| c.per_file()).unwrap_or_default()
+    }
+
+    /// Churn per containing directory, most commits first, then path.
+    pub fn dir_churn(&self, period: Period) -> Vec<DirChurn> {
+        self.in_period(period, |c| c.per_dir()).unwrap_or_default()
+    }
+
+    /// Commits per type or scope, most first.
+    pub fn label_breakdown(&self, label: Label, period: Period) -> Vec<LabelCount> {
+        self.in_period(period, |c| c.per_label(label).0)
+            .unwrap_or_default()
+    }
+
+    /// Type or scope counts per bucket of the period, empty buckets included.
+    pub fn label_over_time(&self, label: Label, period: Period) -> Vec<LabelBucket> {
+        self.in_period(period, |c| c.per_label(label).1)
+            .unwrap_or_default()
+    }
+}
+
+impl Counted<'_> {
+    /// Every counted file with its churn, most commits first, then path.
+    pub fn per_file(&self) -> Vec<FileChurn> {
         struct Acc {
             /// Last commit counted, so a commit counts once per file in O(1).
             stamp: Rank,
@@ -100,14 +116,12 @@ impl Insights<'_> {
             additions: u64,
             deletions: u64,
         }
-        let src = self.source();
+        let ins = self.insights();
+        let src = ins.source();
         let mut map: FastMap<PathId, Acc> = FastMap::default();
-        for (rank, rows) in self.counted_files(period) {
-            let Some(time) = src.commit(rank).map(|c| c.time) else {
-                continue;
-            };
+        for (rank, time, rows) in self.commit_rows() {
             for f in &rows {
-                let Some(l) = self.row_lines(f) else {
+                let Some(l) = ins.row_lines(f) else {
                     continue;
                 };
                 let a = map.entry(f.path).or_insert(Acc {
@@ -141,20 +155,21 @@ impl Insights<'_> {
     }
 
     /// Churn per containing directory, most commits first, then path.
-    pub fn dir_churn(&self, period: Period) -> Vec<DirChurn> {
+    pub fn per_dir(&self) -> Vec<DirChurn> {
         struct Acc {
             stamp: Rank,
             churn: DirChurn,
         }
-        let src = self.source();
+        let ins = self.insights();
+        let src = ins.source();
         let mut dirs: Vec<Acc> = Vec::new();
         let mut dir_slot: FastMap<String, usize> = FastMap::default();
         // Directory slot per path id, resolved once. A path belongs to one directory, so the
         // first sight of a path is a new file of its directory.
         let mut path_dir: FastMap<PathId, usize> = FastMap::default();
-        for (rank, rows) in self.counted_files(period) {
+        for (rank, _, rows) in self.commit_rows() {
             for f in &rows {
-                let Some(l) = self.row_lines(f) else {
+                let Some(l) = ins.row_lines(f) else {
                     continue;
                 };
                 #[expect(
@@ -201,62 +216,12 @@ impl Insights<'_> {
         out
     }
 
-    /// Commits per type or scope, most first.
-    pub fn label_breakdown(&self, label: Label, period: Period) -> Vec<LabelCount> {
-        let mut map: HashMap<Option<LabelId>, usize> = HashMap::new();
-        for c in self.counted_rows(period) {
-            *map.entry(label.id(&c)).or_default() += 1;
-        }
-        self.sorted_counts(label, map)
+    /// The counted commits with their kept rows and author time, streamed.
+    fn commit_rows(&self) -> impl Iterator<Item = (Rank, i64, Vec<FileRow>)> + '_ {
+        let src = self.insights().source();
+        self.rows()
+            .filter_map(move |(r, rows)| src.commit(r).map(|c| (r, c.time, rows)))
     }
-
-    /// Type or scope counts per bucket of the period, empty buckets included.
-    pub fn label_over_time(&self, label: Label, period: Period) -> Vec<LabelBucket> {
-        let axis = self.axis(Some(period));
-        let mut maps: Vec<HashMap<Option<LabelId>, usize>> = vec![HashMap::new(); axis.len()];
-        for c in self.counted_rows(period) {
-            if let Some(i) = axis.slot_row(&c) {
-                *maps[i].entry(label.id(&c)).or_default() += 1;
-            }
-        }
-        axis.names()
-            .zip(maps)
-            .map(|((key, name), counts)| LabelBucket {
-                key,
-                label: name,
-                counts: self.sorted_counts(label, counts),
-            })
-            .collect()
-    }
-
-    /// Label counts by name, most first. Ids resolve to names first: the sort is by name.
-    fn sorted_counts(&self, label: Label, map: HashMap<Option<LabelId>, usize>) -> Vec<LabelCount> {
-        let src = self.source();
-        let mut named: HashMap<String, usize> = HashMap::new();
-        for (id, n) in map {
-            let name = id
-                .and_then(|i| src.label(i))
-                .map_or_else(|| label.missing().to_owned(), |s| s.to_string());
-            *named.entry(name).or_default() += n;
-        }
-        sorted_counts(named.iter().map(|(k, v)| (k.as_str(), *v)).collect())
-    }
-}
-
-fn sorted_counts(map: HashMap<&str, usize>) -> Vec<LabelCount> {
-    let mut out: Vec<LabelCount> = map
-        .into_iter()
-        .map(|(label, commits)| LabelCount {
-            label: label.to_owned(),
-            commits,
-        })
-        .collect();
-    out.sort_by(|a, b| {
-        b.commits
-            .cmp(&a.commits)
-            .then_with(|| a.label.cmp(&b.label))
-    });
-    out
 }
 
 #[cfg(test)]
@@ -370,6 +335,34 @@ mod tests {
         let dirs = ins.dir_churn(Period::All);
         assert_eq!(dirs.len(), 50);
         assert!(dirs.iter().all(|d| d.commits == 1));
+    }
+
+    /// Types, scopes and churn count only the week's own local days.
+    #[test]
+    fn labels_and_churn_count_only_the_local_days_of_the_period() {
+        let recs = crate::insights::code::tests::edge_week();
+        let ins = Insights::new(&recs, Options::default(), None);
+        let p = Period::Week;
+        let n: usize = ins
+            .label_breakdown(Label::Kind, p)
+            .iter()
+            .map(|l| l.commits)
+            .sum();
+        assert_eq!(
+            n, 2,
+            "commit on local day 13 counted in a week of days 14..=20"
+        );
+        let over: usize = ins
+            .label_over_time(Label::Kind, p)
+            .iter()
+            .flat_map(|b| &b.counts)
+            .map(|l| l.commits)
+            .sum();
+        assert_eq!(over, 2);
+        assert_eq!(ins.counted_rows(p).count(), 2);
+        let f = ins.file_churn(p);
+        assert_eq!((f[0].commits, f[0].additions), (2, 15));
+        assert_eq!(ins.dir_churn(p)[0].commits, 2);
     }
 
     #[test]
