@@ -1,0 +1,58 @@
+# CONV-INSIGHTS-LOCAL-DAY. REPORT-ONLY until the insights pages read Counted: severity
+# hint, so `ast-grep scan --error` in `make lint` does not fail on it. Run it by hand with
+#   ast-grep scan -c sgconfig-report.yml
+# The red snapshot at introduction is tests/insights-local-day-snapshot.txt. It turns error
+# once every site routes day math through CountContext (insights/scope.rs).
+id: insights-local-day
+language: rust
+severity: hint
+message: Day or hour math outside CountContext.
+note: Local days, hours, day gaps and "now" come from CountContext in insights/scope.rs (local_day, local_hour, days_between) and feed::local_day_of. A second day rule is how per-day bars and the punch card disagreed.
+files:
+  - crates/gitterrace-index/src/insights/**/*.rs
+  - crates/gitterrace-web/src/activity.rs
+  - crates/gitterrace-web/src/insights.rs
+  - crates/gitterrace-web/src/commit_types.rs
+  - crates/gitterrace-web/src/hotspots.rs
+  - crates/gitterrace-web/src/ownership.rs
+  - crates/gitterrace-web/src/patterns.rs
+  - crates/gitterrace-web/src/overview_side.rs
+  - crates/gitterrace-web/src/spark.rs
+ignores:
+  - crates/gitterrace-index/src/insights/scope.rs
+  - crates/**/tests.rs
+  - crates/**/*_tests.rs
+rule:
+  all:
+    - not: {inside: {stopBy: end, kind: mod_item, regex: '^(pub(\(crate\))? )?mod \w*tests'}}
+    - any:
+        - pattern: $E.div_euclid(DAY)
+        - pattern: $E.div_euclid(86_400)
+        - pattern: $E.div_euclid(86400)
+        - pattern: $E.rem_euclid(DAY)
+        - pattern: $E.rem_euclid(86_400)
+        # `/ DAY` is left out: it also divides durations ("3 days ago"), which is not a
+        # calendar day. A calendar day needs a floor, which div_euclid is.
+        - all:
+            - any:
+                - pattern: $T.saturating_add(i64::from($C.offset))
+                - pattern: $T + i64::from($C.offset)
+            # One report per expression: inside a div_euclid/rem_euclid hit it is that hit.
+            - not:
+                inside:
+                  stopBy: end
+                  any:
+                    - pattern: $X.div_euclid(DAY)
+                    - pattern: $X.rem_euclid(DAY)
+                    - pattern: $X.div_euclid(86_400)
+        - pattern: $T + $O as i64
+        - pattern: local_time($R)
+        - pattern: local_day($R)
+        - pattern: wall_clock()
+        - pattern: crate::wall_clock()
+        - pattern: $P.window($N)
+        # Macro bodies are token trees, invisible to the patterns above (the tendir arm).
+        - kind: token_tree
+          inside: {kind: macro_invocation}
+          regex: 'div_euclid\s*\(\s*(DAY|86_?400)\s*\)|from\s*\(\s*\w+\.offset\s*\)|wall_clock\s*\(\s*\)'
+          not: {inside: {kind: token_tree, inside: {kind: macro_invocation}}}

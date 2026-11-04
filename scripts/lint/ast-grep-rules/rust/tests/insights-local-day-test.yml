@@ -1,0 +1,24 @@
+id: insights-local-day
+valid:
+  - 'let d = cx.local_day(c.time, c.offset);'
+  - 'let h = cx.local_hour(c.time, c.offset);'
+  - 'let gap = cx.days_between(a, b);'
+  - 'let d = feed::local_day_of(c.time, c.offset);'
+  - 'let n = total / 7;'
+  - 'let days = (n * s + DAY - 1) / DAY;'
+  - |
+    #[cfg(test)]
+    mod tests {
+        fn f() { let d = t.div_euclid(DAY); }
+    }
+invalid:
+  - 'let hour = local.rem_euclid(DAY) / 3600;'
+  - 'let day = c.time.saturating_add(i64::from(c.offset)).div_euclid(DAY);'
+  - 'let gap = time.saturating_sub(pt).div_euclid(86_400);'
+  - 'let start = (now + offset).div_euclid(DAY) * DAY - offset;'
+  - 'let l = t + i64::from(c.offset);'
+  - 'let d = local_day(r);'
+  - 'let now = crate::wall_clock();'
+  - 'let (from, to) = period.window(self.now);'
+  - 'let s = format!("{}", t.div_euclid(86_400));'
+  - 'assert_eq!(x, (t + i64::from(c.offset)) / 3600);'

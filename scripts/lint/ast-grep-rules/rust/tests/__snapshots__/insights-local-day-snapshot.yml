@@ -1,0 +1,70 @@
+id: insights-local-day
+snapshots:
+  "assert_eq!(x, (t + i64::from(c.offset)) / 3600);":
+    labels:
+    - source: (x, (t + i64::from(c.offset)) / 3600)
+      style: primary
+      start: 10
+      end: 47
+    - source: assert_eq!(x, (t + i64::from(c.offset)) / 3600)
+      style: secondary
+      start: 0
+      end: 47
+  "let (from, to) = period.window(self.now);":
+    labels:
+    - source: period.window(self.now)
+      style: primary
+      start: 17
+      end: 40
+  let d = local_day(r);:
+    labels:
+    - source: local_day(r)
+      style: primary
+      start: 8
+      end: 20
+  "let day = c.time.saturating_add(i64::from(c.offset)).div_euclid(DAY);":
+    labels:
+    - source: c.time.saturating_add(i64::from(c.offset)).div_euclid(DAY)
+      style: primary
+      start: 10
+      end: 68
+  let gap = time.saturating_sub(pt).div_euclid(86_400);:
+    labels:
+    - source: time.saturating_sub(pt).div_euclid(86_400)
+      style: primary
+      start: 10
+      end: 52
+  let hour = local.rem_euclid(DAY) / 3600;:
+    labels:
+    - source: local.rem_euclid(DAY)
+      style: primary
+      start: 11
+      end: 32
+  "let l = t + i64::from(c.offset);":
+    labels:
+    - source: t + i64::from(c.offset)
+      style: primary
+      start: 8
+      end: 31
+  "let now = crate::wall_clock();":
+    labels:
+    - source: crate::wall_clock()
+      style: primary
+      start: 10
+      end: 29
+  "let s = format!(\"{}\", t.div_euclid(86_400));":
+    labels:
+    - source: ("{}", t.div_euclid(86_400))
+      style: primary
+      start: 15
+      end: 43
+    - source: format!("{}", t.div_euclid(86_400))
+      style: secondary
+      start: 8
+      end: 43
+  let start = (now + offset).div_euclid(DAY) * DAY - offset;:
+    labels:
+    - source: (now + offset).div_euclid(DAY)
+      style: primary
+      start: 12
+      end: 42

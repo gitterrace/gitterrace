@@ -1,0 +1,6 @@
+# Report-only ast-grep rules (not in make lint): ast-grep scan -c sgconfig-report.yml. A rule
+# moves to sgconfig.yml once its sites are fixed.
+ruleDirs:
+  - scripts/lint/ast-grep-rules/rust/rules
+testConfigs:
+  - testDir: scripts/lint/ast-grep-rules/rust/tests
