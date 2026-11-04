@@ -90,7 +90,20 @@ export function checks(env) {
     const sum = (l) => Math.round(l.reduce((x, y) => x + y, 0));
     console.log(`     ${where}: load ${loadMs} ms, ${els} elements, long tasks at load ${atLoad.length} (${sum(atLoad)} ms, max ${Math.round(Math.max(0, ...atLoad))} ms); scroll ${frames.length} frames p50 ${pct(0.5)} ms p95 ${pct(0.95)} ms max ${pct(1)} ms, long tasks ${scrollLong.length} (${sum(scrollLong)} ms)`);
 
-    const tailOpen = await p.evaluate((id) => !!(id && document.querySelector(`#${id} .diff .add`)), await p.evaluate(lastEditId));
+    // The last file's fragment loads after the scroll ends, and how long that takes depends on
+    // the machine, so wait for the condition (keeping the end in view) instead of a fixed time.
+    const tailOpen = await p.waitForFunction(() => {
+      const s = [...document.querySelectorAll('section.file')].reverse().find((x) => x.querySelector('.counts .add')?.textContent !== '+0');
+      if (s && s.querySelector('.diff .add')) return true;
+      // Bring the file in view; every other poll step away first, because a fragment that
+      // failed to load is watched again only once it leaves the viewport and comes back.
+      const w = /** @type {any} */ (window);
+      w.__tailPoll = (w.__tailPoll || 0) + 1;
+      if (w.__tailPoll % 10 === 0) scrollTo(0, 0);
+      else if (s) s.scrollIntoView();
+      else scrollTo(0, document.documentElement.scrollHeight);
+      return false;
+    }, null, { timeout: 30000, polling: 100 }).then(() => true, () => false);
     tailOpen ? r.ok(`${where}: scrolling to the end loaded the last edited file`) : r.fail(`${where}: after scrolling to the end the last edited file is not open`);
 
     const last = await p.evaluate(lastEditId);
