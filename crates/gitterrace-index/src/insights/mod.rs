@@ -16,6 +16,7 @@ mod counted;
 pub(crate) mod fasthash;
 mod files;
 mod filter;
+mod format;
 mod headfiles;
 mod lang;
 mod people;
@@ -49,6 +50,7 @@ pub use files::{
     Touch,
 };
 pub use filter::{PathFilter, is_generated};
+pub use format::{count, thousands};
 pub(crate) use headfiles::CACHE_FILE;
 pub use headfiles::{HeadFile, LineCache, head_files};
 pub use lang::language;
@@ -579,50 +581,3 @@ pub(crate) mod fixtures {
 
 #[cfg(test)]
 mod tests;
-
-#[cfg(test)]
-mod decide_tests {
-    use super::decide_with;
-    use std::sync::Arc;
-
-    fn paths(n: usize) -> Vec<Arc<str>> {
-        (0..n).map(|i| Arc::from(format!("f{i}"))).collect()
-    }
-
-    #[test]
-    fn decisions_keep_the_order_and_length_of_the_paths() {
-        let p = paths(1000);
-        let got = decide_with(&p, |s| s.ends_with('7'));
-        assert_eq!(got.len(), p.len());
-        assert!(got.iter().zip(&p).all(|(g, s)| *g == s.ends_with('7')));
-    }
-
-    #[test]
-    #[should_panic(expected = "filter boom")]
-    fn a_panicking_filter_panics_the_call_instead_of_shortening_the_table() {
-        let p = paths(1000);
-        let _ = decide_with(&p, |s| {
-            assert!(s != "f500", "filter boom");
-            false
-        });
-    }
-}
-
-/// `13972` as `13,972`.
-pub fn thousands(n: impl std::fmt::Display) -> String {
-    let digits = n.to_string();
-    let mut out = String::with_capacity(digits.len() + digits.len() / 3);
-    for (i, ch) in digits.chars().enumerate() {
-        if i > 0 && (digits.len() - i).is_multiple_of(3) {
-            out.push(',');
-        }
-        out.push(ch);
-    }
-    out
-}
-
-/// `1 commit`, `2 commits`, `1,000 commits`: the number and its noun, always agreeing.
-pub fn count(n: impl std::fmt::Display + Copy, one: &str, many: &str) -> String {
-    let word = if n.to_string() == "1" { one } else { many };
-    format!("{} {word}", thousands(n))
-}

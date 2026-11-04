@@ -38,3 +38,30 @@ fn bus_factor_counts_who_hold_at_least_half() {
     assert_eq!(bus_factor([0.0, 0.0]), 0);
     assert_eq!(bus_factor(std::iter::empty()), 0);
 }
+
+mod decide {
+    use super::super::decide_with;
+    use std::sync::Arc;
+
+    fn paths(n: usize) -> Vec<Arc<str>> {
+        (0..n).map(|i| Arc::from(format!("f{i}"))).collect()
+    }
+
+    #[test]
+    fn decisions_keep_the_order_and_length_of_the_paths() {
+        let p = paths(1000);
+        let got = decide_with(&p, |s| s.ends_with('7'));
+        assert_eq!(got.len(), p.len());
+        assert!(got.iter().zip(&p).all(|(g, s)| *g == s.ends_with('7')));
+    }
+
+    #[test]
+    #[should_panic(expected = "filter boom")]
+    fn a_panicking_filter_panics_the_call_instead_of_shortening_the_table() {
+        let p = paths(1000);
+        let _ = decide_with(&p, |s| {
+            assert!(s != "f500", "filter boom");
+            false
+        });
+    }
+}
