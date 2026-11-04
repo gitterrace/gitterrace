@@ -4,6 +4,7 @@
 //! The settings are declared once in the `settings!` call in `schema.rs`. Its doc comments are
 //! the descriptions in `docs/configuration.md`, so the file, the loader and the page cannot drift.
 
+mod budget;
 mod features;
 #[cfg(test)]
 mod limits_tests;
@@ -15,6 +16,7 @@ use std::collections::BTreeMap;
 use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
 
+pub use budget::{Cache, PARTS, SHARES};
 pub use features::{Feature, INSIGHT_PAGES};
 pub use schema::{Api, BOUNDS, Config, DEFAULT_ADDR, Key, Reload, RepoOverride, keys};
 pub use value::Show;

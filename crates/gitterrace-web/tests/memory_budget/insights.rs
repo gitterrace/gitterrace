@@ -15,8 +15,8 @@ use crate::{MB, Server, apply_and_assert_allocator, serve_if_child};
 /// filling shared state the server keeps by design, not from the request itself.
 const REQUEST_PEAK_MB: u64 = 8;
 /// Idle after the requests: what a just-started server may hold plus the cache budget. Warm
-/// state counts here and not against one request: the disk block cache (`CACHE_BYTES`, 12 MB,
-/// feed/disk.rs) and the shared derived tables (skip, commit lines, follow maps).
+/// state counts here and not against one request: the disk block cache (its share of
+/// `resources.cache_mb`, `Cache::Blocks`) and the shared derived tables (skip, commit lines, follow maps).
 const FOOTPRINT_IDLE_MB: u64 = 48;
 
 /// What [`insights_request_peak`] and [`insights_release_returns_to_start`] read off one run.
@@ -29,10 +29,10 @@ struct PeakRun {
     bad: Vec<String>,
 }
 
-/// Rendered-page memo bytes kept across the idle release by design: one eighth of
-/// `resources.cache_mb` (web app.rs `SMALL_EIGHTHS`).
+/// Rendered-page memo bytes kept across the idle release by design: its share of
+/// `resources.cache_mb`.
 fn memo_budget() -> u64 {
-    gitterrace_config::Config::default().resources.cache_mb as u64 * MB / 8
+    gitterrace_config::Config::default().cache_bytes(gitterrace_config::Cache::Pages) as u64
 }
 
 /// One request's cost: /stats, /stats/types and the API summary at `all` and `1y`, with and

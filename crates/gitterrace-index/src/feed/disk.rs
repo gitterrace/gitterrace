@@ -30,10 +30,6 @@ use crate::{CodeStat, CommitRecord, FileStat};
 
 pub use writer::RowWriter;
 
-/// Bytes of blocks kept between calls, whatever the history size. A fixed amount outside
-/// `resources.cache_mb`: it lives as long as the source, which the server drops on its idle
-/// release, so it counts against the warm idle footprint.
-const CACHE_BYTES: usize = 12 << 20;
 /// One record may span blocks, but never more than this, so a hostile offset chain cannot
 /// make one read walk the whole file.
 /// Not configurable: an on-disk format bound against a corrupt or hostile cache.
@@ -99,6 +95,7 @@ struct Block {
 /// Least recently used blocks under a byte budget.
 #[derive(Debug, Default)]
 struct Cache {
+    limit: usize,
     tick: u64,
     bytes: usize,
     map: std::collections::HashMap<Key, (u64, Arc<Block>)>,
@@ -116,7 +113,7 @@ impl Cache {
 
     fn put(&mut self, k: Key, b: Arc<Block>) {
         let size = b.bytes.len() + b.starts.len() * 4;
-        while self.bytes + size > CACHE_BYTES && !self.map.is_empty() {
+        while self.bytes + size > self.limit && !self.map.is_empty() {
             let old = self.map.iter().min_by_key(|(_, v)| v.0).map(|(k, _)| *k);
             if let Some(old) = old
                 && let Some((_, v)) = self.map.remove(&old)
@@ -128,6 +125,14 @@ impl Cache {
         self.bytes += size;
         self.map.insert(k, (self.tick, b));
     }
+}
+
+/// Bytes of blocks kept between calls: the block share of the default `resources.cache_mb`.
+///
+/// Flat in history size. A server sets its own share with [`DiskSource::with_cache_bytes`].
+/// The cache lives as long as the source, which the server drops on its idle release.
+pub fn block_cache_default() -> usize {
+    gitterrace_config::Config::default().cache_bytes(gitterrace_config::Cache::Blocks)
 }
 
 /// The disk base. Build it with [`DiskSource::open`].
@@ -151,6 +156,15 @@ impl DiskSource {
     /// Opens the rows of `store`. `map` gets every raw identity once and returns the shown
     /// revision's pairs in the same order. Every segment must hold rows whose ranks are one
     /// contiguous run, together `0..commits`, else `Unreadable`.
+    /// Keeps at most `bytes` of blocks between calls.
+    #[must_use]
+    pub fn with_cache_bytes(self, bytes: usize) -> Self {
+        if let Ok(mut c) = self.cache.lock() {
+            c.limit = bytes;
+        }
+        self
+    }
+
     pub fn open(store: Store, map: IdentMap<'_>) -> SegResult<Self> {
         let Store {
             manifest,
@@ -206,7 +220,10 @@ impl DiskSource {
             labels: Vec::new(),
             len: next,
             latest: crate::wall_clock().saturating_add(crate::insights::DAY),
-            cache: Mutex::new(Cache::default()),
+            cache: Mutex::new(Cache {
+                limit: block_cache_default(),
+                ..Cache::default()
+            }),
             path_hash: OnceLock::new(),
             broken: Mutex::new(None),
         };

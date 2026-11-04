@@ -365,11 +365,11 @@ fn resources_cache_mb_sizes_the_code_cache() {
     let p = repo(dir.path(), "r");
     assert_eq!(
         app(&p, with(|c| c.resources.cache_mb = 8)).code_cache_bytes(),
-        2 << 20
+        3 << 19
     );
     assert_eq!(
         app(&p, with(|c| c.resources.cache_mb = 64)).code_cache_bytes(),
-        16 << 20
+        12 << 20
     );
     // A roomy cache keeps both; one file over an eighth of the cache is not kept at all.
     let text = "fn a() {}\n".repeat(200);

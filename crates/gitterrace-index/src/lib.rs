@@ -136,6 +136,8 @@ pub struct Index {
     threads: usize,
     /// Commits a view outside the set reads from git, see [`Index::with_fresh_cap`].
     fresh_cap: usize,
+    /// Bytes of segment blocks a source keeps, see [`Index::set_block_cache`].
+    block_cache: std::sync::atomic::AtomicUsize,
     /// The format of a cache written by a newer build. Such a cache is never read or written.
     newer: Option<String>,
 }
@@ -153,6 +155,7 @@ impl Index {
             dir,
             threads: 0,
             fresh_cap: feed::FRESH_CAP,
+            block_cache: std::sync::atomic::AtomicUsize::new(feed::block_cache_default()),
             newer,
         })
     }
@@ -163,6 +166,13 @@ impl Index {
     pub const fn with_fresh_cap(mut self, cap: usize) -> Self {
         self.fresh_cap = cap;
         self
+    }
+
+    /// Bytes of segment blocks each source opened from now on keeps between reads: the block
+    /// share of `resources.cache_mb`, set again on a reload.
+    pub fn set_block_cache(&self, bytes: usize) {
+        self.block_cache
+            .store(bytes, std::sync::atomic::Ordering::Relaxed);
     }
 
     /// The cap set by [`Index::with_fresh_cap`].
@@ -430,7 +440,8 @@ impl Index {
             return Ok(None);
         }
         let disk = feed::DiskSource::open(store, &mut |pairs| source.map_identities(rev, pairs))
-            .map_err(seg)?;
+            .map_err(seg)?
+            .with_cache_bytes(self.block_cache.load(std::sync::atomic::Ordering::Relaxed));
         let Some(tables) = open()? else {
             return Ok(None);
         };
@@ -465,7 +476,8 @@ impl Index {
             return Ok(None);
         };
         let disk = feed::DiskSource::open(rows, &mut |pairs| source.map_identities(rev, pairs))
-            .map_err(seg)?;
+            .map_err(seg)?
+            .with_cache_bytes(self.block_cache.load(std::sync::atomic::Ordering::Relaxed));
         let set = feed::SegmentSource::new(disk, tables.segments);
         feed::rev_view(set, source, rev, tip, self.fresh_cap).map(Some)
     }

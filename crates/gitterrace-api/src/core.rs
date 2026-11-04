@@ -94,6 +94,8 @@ impl ApiState {
     /// Puts `cfg` in force for this state and every clone of it, such as a router built
     /// earlier: a reloaded `config.toml` changes the next answer.
     pub fn reconfigure(&self, cfg: &gitterrace_config::Config) {
+        self.index
+            .set_block_cache(cfg.cache_bytes(gitterrace_config::Cache::Blocks));
         let defaults = options_from(cfg, &self.repo.name());
         let mut s = self.write_settings();
         s.style = LinkStyle::from_config(&cfg.links.style);

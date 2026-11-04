@@ -12,6 +12,7 @@ description = "Insights cache in .git/gitterrace/, append-only and rebuildable, 
 workspace = true
 
 [dependencies]
+gitterrace-config.workspace = true
 gitterrace-git.workspace = true
 serde.workspace = true
 serde_json.workspace = true

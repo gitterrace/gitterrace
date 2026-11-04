@@ -149,6 +149,7 @@ fn repo_router_tasks(
     let index = Index::open(&repo)?
         .with_threads(cfg.index.threads)
         .with_fresh_cap(cfg.limits.unindexed_commits);
+    index.set_block_cache(cfg.cache_bytes(gitterrace_config::Cache::Blocks));
     let mut app = App::configured(repo, index, env);
     app.base = base;
     app.key = key;

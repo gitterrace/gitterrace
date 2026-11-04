@@ -20,6 +20,7 @@ flowchart TD
   api --> index
   cards --> index
   cards --> schwarzwald
+  index --> config
   index --> git
   web --> api
 ```

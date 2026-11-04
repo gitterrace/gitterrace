@@ -297,6 +297,13 @@ Resident, under one budget (default 32 MB, the cache budget):
   188k paths, 24 KB. Per option set, at most 4 kept.
 - Rendered page memo: as today, inside the same budget.
 
+Every cache that keeps bytes between requests takes a named share of `resources.cache_mb`
+(`Cache` and `SHARES` in gitterrace-config `budget.rs`, which sum to the whole budget). The
+segment block cache is one of them (a quarter), not a fixed amount beside it. An ast-grep rule
+refuses a cache bound written as a constant. After the idle release only the page memo remains.
+What still separates a released server from a just-started one is allocator state, not data:
+jemalloc's per-core arenas each keep partly used slabs and a thread cache.
+
 Streamed: everything else. A page reads the aggregate blocks for its time range through a 1 MB
 block buffer, folds into a result sized by the answer (top-k heap, a per-bucket array), and drops
 the buffer.

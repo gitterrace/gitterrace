@@ -1,0 +1,7 @@
+id: cache-bound-from-budget
+valid:
+  - 'fn limit(cfg: &Config) -> usize { cfg.cache_bytes(Cache::Blocks) }'
+  - 'const MAX_RECORD: usize = 64 << 20;'
+invalid:
+  - 'const CACHE_BYTES: usize = 12 << 20;'
+  - 'pub(crate) const PAGE_MEMO_LIMIT: usize = 4 * 1024 * 1024;'

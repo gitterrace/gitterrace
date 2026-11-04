@@ -8,7 +8,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use gitterrace_config::Config;
+use gitterrace_config::{Cache, Config};
 use gitterrace_git::{LastCommit, Repo};
 use gitterrace_index::{Index, Progress};
 use tokio::sync::{Notify, Semaphore, broadcast, watch};
@@ -22,12 +22,6 @@ const MEMO_TTL: Duration = Duration::from_secs(60);
 /// The working tree scan runs on every this-many-th watcher tick.
 const WORKTREE_EVERY: u64 = 1;
 const DIRTY_TTL: Duration = Duration::from_secs(2);
-/// Shares of `resources.cache_mb`, in eighths: blame and highlighted code take two each; the
-/// rendered pages, file lists, last commits and path logs one each. Together they are the whole
-/// budget, so the setting bounds every byte-bounded serving cache of a repository.
-const BLAME_EIGHTHS: usize = 2;
-const CODE_EIGHTHS: usize = 2;
-const SMALL_EIGHTHS: usize = 1;
 /// Record sets kept at once, one per selected commit. Each holds all of its history, so this
 /// stays small; a visitor cycling more commits than this pays a parse per switch, not a stall
 /// of every other page.
@@ -85,13 +79,8 @@ fn job_slots(cfg: &Config) -> usize {
 }
 
 /// Text cap and blame cache size in bytes for a repository handle.
-pub(crate) const fn repo_limits(cfg: &Config) -> (u64, usize) {
-    (cfg.limits.text_kb << 10, cache_share(cfg, BLAME_EIGHTHS))
-}
-
-/// `eighths` of `resources.cache_mb`, in bytes.
-const fn cache_share(cfg: &Config, eighths: usize) -> usize {
-    (cfg.resources.cache_mb << 20) / 8 * eighths
+pub(crate) fn repo_limits(cfg: &Config) -> (u64, usize) {
+    (cfg.limits.text_kb << 10, cfg.cache_bytes(Cache::Blame))
 }
 
 /// Moves a semaphore to `new` slots. Slots in use are not taken back, so a lower cap settles as
@@ -308,7 +297,7 @@ impl App {
         let name = repo.name();
         let live_streams = env.cfg().server.live_streams;
         let streams = Arc::new(Semaphore::new(live_streams));
-        let small = cache_share(&env.cfg(), SMALL_EIGHTHS);
+        let cfg = env.cfg();
         Self {
             repo,
             index,
@@ -334,10 +323,10 @@ impl App {
             records_used: Mutex::new(Instant::now()),
             warming: std::sync::atomic::AtomicUsize::new(0),
             releases: AtomicU64::new(0),
-            memo: Mutex::new(crate::bounded::Bounded::new(small)),
+            memo: Mutex::new(crate::bounded::Bounded::new(cfg.cache_bytes(Cache::Pages))),
             dirty: Mutex::new(None),
             wt_watchers: std::sync::atomic::AtomicUsize::new(0),
-            caches: crate::caches::Caches::new(small),
+            caches: crate::caches::Caches::new(&cfg),
             api: std::sync::OnceLock::new(),
         }
     }
@@ -377,6 +366,7 @@ impl App {
         if let Some(api) = self.api.get() {
             api.reconfigure(cfg);
         }
+        self.index.set_block_cache(cfg.cache_bytes(Cache::Blocks));
         let (text_bytes, blame_bytes) = repo_limits(cfg);
         self.repo.set_limits(text_bytes, blame_bytes);
         self.repo.set_worktree_limits(
@@ -384,12 +374,11 @@ impl App {
             (cfg.limits.worktree_diff_kb as u64) << 10,
         );
         resize(&self.streams, &self.streams_cap, cfg.server.live_streams);
-        let small = cache_share(cfg, SMALL_EIGHTHS);
         if let Ok(mut g) = self.memo.lock() {
             g.clear();
-            g.set_budget(small);
+            g.set_budget(cfg.cache_bytes(Cache::Pages));
         }
-        self.caches.set_budget(small);
+        self.caches.set_budget(cfg);
         // The watcher loop re-reads `watch.*` when woken.
         self.wake.notify_one();
         // An error only says no tab is open.
@@ -439,9 +428,9 @@ impl App {
         }
     }
 
-    /// Size in bytes of the highlighted-code cache: a quarter of `resources.cache_mb`.
+    /// Size in bytes of the highlighted-code cache, its share of `resources.cache_mb`.
     pub(crate) fn code_cache_bytes(&self) -> usize {
-        cache_share(&self.cfg(), CODE_EIGHTHS)
+        self.cfg().cache_bytes(Cache::Code)
     }
 
     /// Marks that a page needs the commit index, which starts the build when it waits for one.

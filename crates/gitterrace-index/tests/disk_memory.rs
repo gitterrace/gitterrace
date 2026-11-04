@@ -93,7 +93,7 @@ fn footprint(n: usize) -> SegResult<(usize, usize)> {
 
 /// History grows 10x, resident memory does not pass a ceiling that is independent of it:
 /// the 12 MiB block cache plus 2 MiB of per-file tables, well inside the 32 MB budget plus
-/// 16 MB margin. Seen red with the cache unbounded (`CACHE_BYTES = usize::MAX`): the 400k
+/// 16 MB margin. Seen red with the cache unbounded (`block_cache_default` = `usize::MAX`): the 400k
 /// history then keeps every row block (about 40 MB).
 #[test]
 fn resident_memory_is_flat_with_history() -> SegResult<()> {

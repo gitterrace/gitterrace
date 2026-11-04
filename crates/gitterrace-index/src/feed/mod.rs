@@ -30,7 +30,7 @@ use std::sync::Arc;
 pub use crate::seg::{IdentId, LabelId, Oid, PathId, Rank};
 #[doc(hidden)]
 pub use disk::testing as disk_testing;
-pub use disk::{DiskSource, IdentMap, RowWriter};
+pub use disk::{DiskSource, IdentMap, RowWriter, block_cache_default};
 pub use fresh::FRESH_CAP;
 pub use memory::{IdentPairs, MemorySource};
 pub use reach::{Reach, RevView, rev_view};

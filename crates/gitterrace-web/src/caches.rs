@@ -6,6 +6,7 @@
 
 use std::sync::{Arc, Mutex};
 
+use gitterrace_config::{Cache, Config};
 use gitterrace_git::LastCommit;
 use gitterrace_index::CommitRecord;
 
@@ -53,7 +54,7 @@ pub(crate) struct Caches {
 }
 
 impl Caches {
-    pub(crate) fn new(small: usize) -> Self {
+    pub(crate) fn new(cfg: &Config) -> Self {
         Self {
             records: Mutex::new(Vec::new()),
             source: Mutex::new(None),
@@ -61,9 +62,9 @@ impl Caches {
             far: Mutex::new(None),
             totals: Mutex::new(None),
             ignores: Mutex::new(None),
-            file_lists: Mutex::new(Bounded::new(small)),
-            last_commits: Mutex::new(Bounded::new(small)),
-            path_logs: Mutex::new(Bounded::new(small)),
+            file_lists: Mutex::new(Bounded::new(cfg.cache_bytes(Cache::FileLists))),
+            last_commits: Mutex::new(Bounded::new(cfg.cache_bytes(Cache::LastCommits))),
+            path_logs: Mutex::new(Bounded::new(cfg.cache_bytes(Cache::PathLogs))),
             subjects: Mutex::new(None),
             chain: Mutex::new(None),
             head_lines: Mutex::new(None),
@@ -106,15 +107,15 @@ impl Caches {
     }
 
     /// Sets the byte budget of the bounded caches.
-    pub(crate) fn set_budget(&self, small: usize) {
+    pub(crate) fn set_budget(&self, cfg: &Config) {
         if let Ok(mut g) = self.file_lists.lock() {
-            g.set_budget(small);
+            g.set_budget(cfg.cache_bytes(Cache::FileLists));
         }
         if let Ok(mut g) = self.last_commits.lock() {
-            g.set_budget(small);
+            g.set_budget(cfg.cache_bytes(Cache::LastCommits));
         }
         if let Ok(mut g) = self.path_logs.lock() {
-            g.set_budget(small);
+            g.set_budget(cfg.cache_bytes(Cache::PathLogs));
         }
     }
 }
