@@ -3,12 +3,12 @@
 {% block content %}
 <div class="head"><nav class="crumbs">{% for k in crumbs %}{% if !loop.first %}<i>/</i>{% endif %}<a href="{{ k.href }}">{{ k.name }}</a>{% endfor %}</nav>
 <span class="muted">{{ size }} · <a href="{{ blame_href }}">Blame</a> · <a href="{{ log_href }}">History</a> · <button type="button" class="linkbtn" data-copy-url>Copy permalink</button></span></div>
-{% if let Some(m) = rendered %}<div class="card" data-md-view>
-<div class="readme-h seg"><button type="button" class="on" data-show="rendered">Preview</button><button type="button" data-show="source">Code</button></div>
+{% if let Some(m) = rendered %}<div{% if !outline_rail.is_empty() %} class="cols outline-cols"{% endif %}><div class="card" data-md-view>
+<div class="readme-h seg"><button type="button" class="on" data-show="rendered">Preview</button><button type="button" data-show="source">Code</button>{{ outline_menu|safe }}</div>
 <div class="markdown-body md-pane" data-pane="rendered" data-src="{{ title }}">{{ m|safe }}</div>
 <div class="scroll md-pane" data-pane="source" hidden>
 {% if let Some(h) = html %}{{ h|safe }}{% endif %}
-</div></div>
+</div></div>{{ outline_rail|safe }}</div>
 {% else if let Some(m) = media %}<div class="card">{{ m|safe }}</div>
 {% else %}<div class="card scroll" data-copyable>
 {% if let Some(h) = html %}{{ h|safe }}{% if cut %}<p class="muted pad">Truncated after 20000 lines.</p>{% endif %}{% else if too_large %}<p class="muted pad">File too large to display ({{ size }}). <a href="{{ raw_href }}">View raw</a>.</p>{% else %}<p class="muted pad">Binary file, {{ size }}.</p>{% endif %}

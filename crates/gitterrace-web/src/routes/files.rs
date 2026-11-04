@@ -104,6 +104,8 @@ struct BlobPage {
     too_large: bool,
     raw_href: String,
     rendered: Option<String>,
+    outline_rail: String,
+    outline_menu: String,
 }
 
 fn is_markdown(path: &str) -> bool {
@@ -158,10 +160,17 @@ pub(super) async fn blob(
             let (h, cut) = views::code_html_first(a.code_cache_bytes(), &path, t);
             (Some(h), cut)
         });
-        let rendered = text.filter(|_| is_markdown(&path)).map(|t| {
+        let doc = text.filter(|_| is_markdown(&path)).map(|t| {
             let dir = path.rsplit_once('/').map_or("", |(d, _)| d);
-            markdown::render_with(t, markdown::Base::new(&rev, dir))
+            markdown::render_doc(t, markdown::Base::new(&rev, dir))
         });
+        let outline_rail = doc
+            .as_ref()
+            .map_or_else(String::new, |d| markdown::outline_rail(&d.outline));
+        let outline_menu = doc
+            .as_ref()
+            .map_or_else(String::new, |d| markdown::outline_menu(&d.outline, false));
+        let rendered = doc.map(|d| d.html);
         let (r, pe) = (fmt::enc_seg(&rev), fmt::enc_path(&path));
         Ok(BlobPage {
             c: Chrome {
@@ -169,6 +178,8 @@ pub(super) async fn blob(
                 ..views::chrome_at(a, "files", &rev)
             },
             rendered,
+            outline_rail,
+            outline_menu,
             crumbs: views::crumbs(&rev, &path, true),
             size: fmt::size(b.size),
             blame_href: fmt::href(&format!("/blame/{r}/{pe}")),

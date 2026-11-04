@@ -38,6 +38,8 @@ pub(crate) struct About {
     pub(crate) tabs: Vec<DocTab>,
     pub(crate) html: String,
     pub(crate) markdown: bool,
+    /// The outline menu of a Markdown document, empty below three headings.
+    pub(crate) outline: String,
     /// The document's path in the repo, so marked prose maps to its source lines.
     pub(crate) file: String,
 }
@@ -96,8 +98,13 @@ pub(crate) fn card(
         .extension()
         .and_then(|e| e.to_str())
         .is_some_and(|e| e.eq_ignore_ascii_case("md") || e.eq_ignore_ascii_case("markdown"));
+    let mut outline = String::new();
     let html = match a.repo.blob(id, &file).ok().and_then(|b| b.text) {
-        Some(t) if is_md => markdown::render_with(&t, markdown::Base::new(rev, dir)),
+        Some(t) if is_md => {
+            let doc = markdown::render_doc(&t, markdown::Base::new(rev, dir));
+            outline = markdown::outline_menu(&doc.outline, true);
+            doc.html
+        }
         Some(t) => format!("<pre>{}</pre>", fmt::esc_text(&t)),
         None => "<p class=\"muted\">Too large or not text.</p>".to_owned(),
     };
@@ -118,6 +125,7 @@ pub(crate) fn card(
         tabs,
         html,
         markdown: is_md,
+        outline,
         file,
     })
 }

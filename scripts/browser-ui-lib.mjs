@@ -251,6 +251,103 @@ async function tips() {
   }
 }
 
+// ---- outline ----------------------------------------------------------------------------------
+// "On this page": a sticky rail at 1400px, a menu at 900px, a click scrolls and sets the hash,
+// the active item follows the scroll, the Code tab hides both, light and dark.
+async function outline() {
+  const doc = ['# Doc', ...[1, 2, 3, 4, 5].flatMap((i) => [`\n## Section ${i}\n`, ...Array.from({ length: 14 }, (_, j) => `Paragraph ${i}.${j} of filler text for scrolling.\n`), `### Part ${i}\n`, 'More text.\n'])].join('\n');
+  writeFileSync(join(dir, 'outline.md'), doc);
+  sh(dir, 'git', 'add', '-A');
+  sh(dir, 'git', 'commit', '-q', '-m', 'docs: outline fixture');
+  await new Promise((ok) => setTimeout(ok, 600));
+  const vis = (p, sel) => p.evaluate((s) => { const e = document.querySelector(s); return !!e && getComputedStyle(e).display !== 'none' && e.getClientRects().length > 0; }, sel);
+  for (const name of browsers) {
+    const { b, ctx } = await context(name);
+    try {
+      const res = {};
+      for (const scheme of ['light', 'dark']) {
+        const p = await ctx.newPage();
+        await p.emulateMedia({ colorScheme: scheme });
+        await p.setViewportSize({ width: 1400, height: 800 });
+        await p.goto(`${srv.base}/blob/HEAD/outline.md`, { waitUntil: 'load' });
+        res[scheme] = { railWide: await vis(p, '.outline.rail'), menuWide: await vis(p, 'details.outline') };
+        await p.screenshot({ path: join(process.env.OUTLINE_SHOTS || tmpdir(), `outline-${name}-${scheme}-1400.png`) });
+        if (scheme === 'light') {
+          await p.click('.outline.rail a[href="#user-content-section-3"]');
+          await p.waitForTimeout(400);
+          res.click = await p.evaluate(() => ({ hash: location.hash, top: document.getElementById('user-content-section-3').getBoundingClientRect().top, y: scrollY }));
+          await p.evaluate(() => document.getElementById('user-content-section-2').scrollIntoView());
+          await p.waitForTimeout(400);
+          res.active = await p.evaluate(() => document.querySelector('.outline.rail a.on')?.getAttribute('href'));
+          await p.click('[data-show=source]');
+          res.source = { rail: await vis(p, '.outline.rail'), menu: await vis(p, 'details.outline') };
+        }
+        await p.setViewportSize({ width: 900, height: 800 });
+        await p.goto(`${srv.base}/blob/HEAD/outline.md`, { waitUntil: 'load' });
+        res[scheme].railNarrow = await vis(p, '.outline.rail');
+        res[scheme].menuNarrow = await vis(p, 'details.outline');
+        res[scheme].btnText = await p.evaluate(() => document.querySelector('details.outline summary').innerText.trim());
+        await p.click('details.outline summary');
+        await p.waitForTimeout(200);
+        res[scheme].filterShown = await vis(p, '.outline-q');
+        await p.keyboard.type('part 2');
+        res[scheme].filtered = await p.evaluate(() => [...document.querySelectorAll('details.outline li')].filter((l) => !l.hidden).length);
+        await p.screenshot({ path: join(process.env.OUTLINE_SHOTS || tmpdir(), `outline-${name}-${scheme}-900.png`) });
+        await p.keyboard.press('Escape');
+        res[scheme].closed = await p.evaluate(() => !document.querySelector('details.outline').open);
+        await p.close();
+      }
+      const bad = [];
+      // Overview: the button lives in the README header bar, on its right, icon only.
+      const readme = readFileSync(join(dir, 'README.md'));
+      writeFileSync(join(dir, 'README.md'), '# Fixture\n\n## One\n\ntext\n\n## Two\n\ntext\n\n### Part 2\n\ntext\n');
+      sh(dir, 'git', 'add', '-A');
+      sh(dir, 'git', 'commit', '-q', '-m', 'docs: outline README');
+      await new Promise((ok) => setTimeout(ok, 600));
+      try {
+        for (const scheme of ['light', 'dark']) for (const width of [1400, 360]) {
+          const p = await ctx.newPage();
+          await p.emulateMedia({ colorScheme: scheme });
+          await p.setViewportSize({ width, height: 800 });
+          await p.goto(srv.base + '/', { waitUntil: 'load' });
+          await p.evaluate(() => document.getElementById('about').scrollIntoView());
+          await p.screenshot({ path: join(process.env.OUTLINE_SHOTS || tmpdir(), `overview-${name}-${scheme}-${width}.png`) });
+          const o = await p.evaluate(() => {
+            const d = document.querySelector('#about details.outline'), s = d?.querySelector('summary');
+            const bar = document.querySelector('#about .readme-h');
+            if (!d || !s || !bar) return { missing: true };
+            const sb = s.getBoundingClientRect(), bb = bar.getBoundingClientRect();
+            const label = [...bar.childNodes].find((n) => n !== d && n.textContent.trim());
+            const lr = label ? (label.nodeType === 1 ? label : (() => { const g = document.createRange(); g.selectNodeContents(label); return g; })()).getBoundingClientRect() : null;
+            return { inBar: bar.contains(d), rightGap: Math.round(bb.right - sb.right), afterLabel: !lr || sb.left >= lr.right, text: s.innerText.trim(), aria: s.getAttribute('aria-label'), tip: s.getAttribute('data-tip') };
+          });
+          if (o.missing || !o.inBar || o.rightGap > 24 || !o.afterLabel || o.text !== '' || o.aria !== 'On this page' || o.tip !== 'On this page') bad.push({ scheme, width, o });
+          if (width === 1400 && scheme === 'light') {
+            await p.click('#about details.outline summary');
+            await p.waitForTimeout(200);
+            await p.keyboard.type('part 2');
+            const n = await p.evaluate(() => [...document.querySelectorAll('#about details.outline li')].filter((l) => !l.hidden).length);
+            if (n !== 1) bad.push({ filtered: n });
+          }
+          await p.close();
+        }
+      } finally {
+        writeFileSync(join(dir, 'README.md'), readme);
+        sh(dir, 'git', 'add', '-A');
+        sh(dir, 'git', 'commit', '-q', '-m', 'docs: restore the README');
+        await new Promise((ok) => setTimeout(ok, 600));
+      }
+      if (bad.length) r.fail(`outline ${name} overview: ${JSON.stringify(bad)}`);
+      else r.ok(`outline ${name} overview: icon-only button inside the README bar, right-aligned, labelled, opens and filters`);
+      const ok = ['light', 'dark'].every((s) => { const x = res[s]; return x.railWide && !x.menuWide && !x.railNarrow && x.menuNarrow && x.btnText === 'On this page' && x.filterShown && x.filtered === 1 && x.closed; })
+        && res.click.hash === '#user-content-section-3' && res.click.y > 100 && res.click.top >= 0 && res.click.top < 200
+        && res.active === '#user-content-section-2' && !res.source.rail && !res.source.menu;
+      if (ok) r.ok(`outline ${name}: rail at 1400, menu at 900, click scrolls, active follows, filter and Escape ok, Code tab hides it, light and dark`);
+      else r.fail(`outline ${name}: ${JSON.stringify(res)}`);
+    } finally { await b.close(); }
+  }
+}
+
 // ---- repo-switch ------------------------------------------------------------------------------
 // A server and state folder per browser: the join reads the add secret from there, it must
 // start on one repository, and the shared server above must keep one for the other checks.
@@ -386,5 +483,5 @@ async function liveScroll() {
 // The mark is two paths, ink and accent, meeting on one line. A renderer that antialiases each
 // path alone lets the background through there as a hairline (WebKit did). Paint every mark at
 // many sizes and offsets and compare the split rows with the solid rows just above and below.
-  return { marked, menuSame, gutter, overlays, tips, repoSwitch, liveScroll };
+  return { marked, menuSame, gutter, overlays, tips, repoSwitch, liveScroll, outline };
 }

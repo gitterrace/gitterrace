@@ -36,6 +36,8 @@
 //                Send to window opens small and grows with its text
 //   tips         closing ., .+s, t, ? or b with Escape leaves no tip on the opener they hand
 //                focus back to, while Tab onto a tipped button still shows its tip
+//   outline      "On this page": a rail at 1400 px, a menu at 900 px, a click scrolls and sets the hash,
+//                the active item follows the scroll, filter and Escape work, the Code tab hides it
 //   repo-switch  a server on one repository hides the switcher; when a second `git terrace`
 //                joins, the open page shows it without a reload, it lists both, and picking
 //                each lands on its /r/NAME/ page; `git terrace remove` hides it again and
@@ -79,7 +81,7 @@ const bin = resolve(arg('--bin', join(root, 'target/debug/git-terrace')));
 const fromDisk = process.argv.includes('--from-disk');
 const tabCounts = arg('--tabs', '8,12').split(',').map(Number);
 const browsers = arg('--browsers', 'webkit,chromium').split(',');
-const ALL = ['truncation', 'live-tabs', 'mermaid', 'chip', 'doctabs', 'chords', 'header', 'marked', 'menu-same', 'gutter', 'overlays', 'tips', 'repo-switch', 'mark-seam', 'about-place', 'site-theme', 'side-width', 'calm-header', 'tabs-one-line', 'huge-diff', 'sticky-heads', 'md-anchor', 'live-scroll'];
+const ALL = ['truncation', 'live-tabs', 'mermaid', 'chip', 'doctabs', 'chords', 'header', 'marked', 'menu-same', 'gutter', 'overlays', 'tips', 'repo-switch', 'outline', 'mark-seam', 'about-place', 'site-theme', 'side-width', 'calm-header', 'tabs-one-line', 'huge-diff', 'sticky-heads', 'md-anchor', 'live-scroll'];
 const wanted = arg('--checks', ALL.join(',')).split(',');
 for (const c of wanted) if (!ALL.includes(c)) { console.error(`unknown check ${c}; known: ${ALL.join(', ')}`); process.exit(2); }
 
@@ -111,7 +113,7 @@ const env = { pw, dir, srv, r, browsers, tabCounts, marker, context, arg, bin, c
 const { checks: anchorChecks } = await import('./browser-anchor-lib.mjs');
 const { mdAnchor } = anchorChecks(env);
 const { truncation, liveTabs, mermaid, chip, doctabs, chords, header } = pageChecks(env);
-const { marked, menuSame, gutter, overlays, tips, repoSwitch, liveScroll } = uiChecks(env);
+const { marked, menuSame, gutter, overlays, tips, repoSwitch, liveScroll, outline } = uiChecks(env);
 const { markSeam, aboutPlace, siteTheme } = siteChecks(env);
 const { hugeDiff } = diffChecks(env);
 async function sideWidth() {
@@ -277,7 +279,7 @@ async function stickyHeads() {
     await b.close();
   }
 }
-const checks = { 'sticky-heads': stickyHeads, 'tabs-one-line': tabsOneLine, 'calm-header': calmHeader, 'side-width': sideWidth, truncation, 'live-tabs': liveTabs, mermaid, chip, doctabs, chords, header, marked, 'menu-same': menuSame, gutter, overlays, tips, 'repo-switch': repoSwitch, 'mark-seam': markSeam, 'about-place': aboutPlace, 'site-theme': siteTheme, 'huge-diff': hugeDiff, 'md-anchor': mdAnchor, 'live-scroll': liveScroll };
+const checks = { 'sticky-heads': stickyHeads, 'tabs-one-line': tabsOneLine, 'calm-header': calmHeader, 'side-width': sideWidth, truncation, 'live-tabs': liveTabs, mermaid, chip, doctabs, chords, header, marked, 'menu-same': menuSame, gutter, overlays, tips, 'repo-switch': repoSwitch, outline, 'mark-seam': markSeam, 'about-place': aboutPlace, 'site-theme': siteTheme, 'huge-diff': hugeDiff, 'md-anchor': mdAnchor, 'live-scroll': liveScroll };
 try {
   for (const c of wanted) { console.log(`-- ${c}`); await checks[c](); }
 } finally {

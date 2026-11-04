@@ -138,8 +138,13 @@ type Heading<'a> = (u8, Option<String>, Vec<Event<'a>>, String, String);
 
 /// Parser events with headings anchored, fences highlighted, alerts opened and every block
 /// marked with its source lines.
-fn transform<'a>(body: &'a str, parser: Parser<'a>, map: &LineMap) -> Vec<Event<'a>> {
+fn transform<'a>(
+    body: &'a str,
+    parser: Parser<'a>,
+    map: &LineMap,
+) -> (Vec<Event<'a>>, Vec<OutlineItem>) {
     let mut out: Vec<Event<'a>> = Vec::new();
+    let mut items: Vec<OutlineItem> = Vec::new();
     let mut seen = HashMap::new();
     let mut heading: Option<Heading<'a>> = None;
     let mut fence: Option<(String, String, String)> = None;
@@ -182,6 +187,11 @@ fn transform<'a>(body: &'a str, parser: Parser<'a>, map: &LineMap) -> Vec<Event<
             Event::End(TagEnd::Heading(_)) => {
                 if let Some((lvl, id, events, text, at)) = heading.take() {
                     let slug = unique_slug(&mut seen, id.unwrap_or_else(|| slugify(&text)));
+                    items.push(OutlineItem {
+                        level: lvl,
+                        id: slug.clone(),
+                        text: text.trim().to_owned(),
+                    });
                     let slug = esc(&slug);
                     let at = mark(&at);
                     out.push(Event::Html(
@@ -220,7 +230,87 @@ fn transform<'a>(body: &'a str, parser: Parser<'a>, map: &LineMap) -> Vec<Event<
             }
         }
     }
+    (out, items)
+}
+
+/// One heading of a document: level 1 to 6, its slug (without the `user-content-` prefix) and text.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct OutlineItem {
+    pub(crate) level: u8,
+    pub(crate) id: String,
+    pub(crate) text: String,
+}
+
+/// Fewest listed headings that make an outline worth showing.
+const OUTLINE_MIN: usize = 3;
+
+/// The headings an outline lists: h2 and h3, plus h1 only when the document has several.
+/// Empty when fewer than three remain.
+pub(crate) fn outline_items(all: &[OutlineItem]) -> Vec<&OutlineItem> {
+    let h1s = all.iter().filter(|h| h.level == 1).count();
+    let kept: Vec<&OutlineItem> = all
+        .iter()
+        .filter(|h| (2..=3).contains(&h.level) || (h.level == 1 && h1s > 1))
+        .collect();
+    if kept.len() < OUTLINE_MIN {
+        Vec::new()
+    } else {
+        kept
+    }
+}
+
+fn outline_list(items: &[&OutlineItem]) -> String {
+    let top = items.iter().map(|h| h.level).min().unwrap_or(2);
+    let mut out = String::from("<ol>");
+    for h in items {
+        out.push_str("<li class=\"d");
+        out.push(if h.level > top { '1' } else { '0' });
+        out.push_str("\"><a href=\"#");
+        out.push_str(USER_ID);
+        out.push_str(&esc(&h.id));
+        out.push_str("\" title=\"");
+        out.push_str(&esc(&h.text));
+        out.push_str("\">");
+        out.push_str(&esc(&h.text));
+        out.push_str("</a></li>");
+    }
+    out.push_str("</ol>");
     out
+}
+
+/// The wide-screen rail, "On this page". Empty below three headings.
+pub(crate) fn outline_rail(all: &[OutlineItem]) -> String {
+    let items = outline_items(all);
+    if items.is_empty() {
+        return String::new();
+    }
+    format!(
+        "<nav class=\"outline rail\" aria-label=\"On this page\" data-outline>\
+         <h2>On this page</h2>{}</nav>",
+        outline_list(&items)
+    )
+}
+
+/// The narrow-screen menu: a native `<details>`, so it opens without script. Empty below three
+/// headings. `icon_only` drops the visible text for a button in a header bar: the label moves to
+/// `aria-label` and `data-tip`.
+pub(crate) fn outline_menu(all: &[OutlineItem], icon_only: bool) -> String {
+    let items = outline_items(all);
+    if items.is_empty() {
+        return String::new();
+    }
+    let button = if icon_only {
+        "<summary class=\"outlinebtn icon\" aria-label=\"On this page\" data-tip=\"On this page\"></summary>"
+    } else {
+        "<summary class=\"outlinebtn\">On this page</summary>"
+    };
+    format!(
+        "<details class=\"outline menu\" data-outline>{button}\
+         <div class=\"outline-pop\"><input type=\"search\" class=\"outline-q\" \
+         placeholder=\"Filter headings\" aria-label=\"Filter headings\" hidden>{}\
+         <p class=\"muted outline-none\" hidden>No matching heading</p></div></details>",
+        outline_list(&items)
+    )
 }
 
 /// Ids from the document live under this prefix so they cannot collide with page anchors.
@@ -284,7 +374,18 @@ fn sanitizer(base: Base) -> ammonia::Builder<'static> {
     b
 }
 
+/// A rendered document with the outline of its headings.
+pub(crate) struct Doc {
+    pub(crate) html: String,
+    pub(crate) outline: Vec<OutlineItem>,
+}
+
+#[cfg(test)]
 pub(crate) fn render_with(src: &str, base: Base) -> String {
+    render_doc(src, base).html
+}
+
+pub(crate) fn render_doc(src: &str, base: Base) -> Doc {
     let opts = Options::ENABLE_TABLES
         | Options::ENABLE_STRIKETHROUGH
         | Options::ENABLE_TASKLISTS
@@ -299,11 +400,14 @@ pub(crate) fn render_with(src: &str, base: Base) -> String {
     // Spans count lines of the whole file, so the front matter's lines come first.
     let map = LineMap::new(body, src[..src.len() - body.len()].matches('\n').count());
     let parser = Parser::new_ext(body, opts);
-    let events = transform(body, parser, &map);
+    let (events, outline) = transform(body, parser, &map);
     let mut raw = String::new();
     html::push_html(&mut raw, events.into_iter());
     // Spans are added after sanitizing, which drops every data-line the file wrote.
-    head + &lines::place(&sanitizer(base).clean(&raw).to_string())
+    Doc {
+        html: head + &lines::place(&sanitizer(base).clean(&raw).to_string()),
+        outline,
+    }
 }
 
 #[cfg(test)]
@@ -527,5 +631,43 @@ mod tests {
         assert!(out.contains("class=\"s-"));
         assert!(!out.contains("style="));
         assert!(out.contains("&lt;b&gt;"));
+    }
+
+    #[test]
+    fn outline_lists_headings_in_order_with_ids_and_levels() {
+        let doc = crate::markdown::render_doc(
+            "# Title\n\n## Install\n\n### From source\n\n## Usage\n\n## Usage\n",
+            Base::new("HEAD", ""),
+        );
+        let rail = crate::markdown::outline_rail(&doc.outline);
+        let at = |needle: &str| {
+            rail.find(needle)
+                .unwrap_or_else(|| panic!("{needle} in {rail}"))
+        };
+        assert!(at("#user-content-install") < at("#user-content-from-source"));
+        assert!(at("#user-content-from-source") < at("#user-content-usage\""));
+        assert!(rail.contains("<li class=\"d1\"><a href=\"#user-content-from-source\""));
+        assert!(rail.contains("<li class=\"d0\"><a href=\"#user-content-install\""));
+        assert!(rail.contains("#user-content-usage-1"));
+        assert!(!rail.contains("Title"), "a lone h1 is not listed");
+        assert!(doc.html.contains("id=\"user-content-usage-1\""));
+    }
+
+    #[test]
+    fn outline_is_hidden_below_three_headings() {
+        let doc = crate::markdown::render_doc("## A\n\n## B\n\n#### C\n", Base::new("HEAD", ""));
+        assert!(crate::markdown::outline_rail(&doc.outline).is_empty());
+        assert!(crate::markdown::outline_menu(&doc.outline, false).is_empty());
+    }
+
+    #[test]
+    fn outline_lists_h1_only_when_several_and_escapes_text() {
+        let doc = crate::markdown::render_doc(
+            "# One\n\n# Two & <i>x</i>\n\n## Three\n",
+            Base::new("HEAD", ""),
+        );
+        let menu = crate::markdown::outline_menu(&doc.outline, false);
+        assert!(menu.contains(">One</a>") && menu.contains(">Two &amp; x</a>"));
+        assert!(!menu.contains("<i>"));
     }
 }

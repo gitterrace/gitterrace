@@ -542,3 +542,32 @@ section.file>header{position:sticky;top:0;z-index:2}
 }
 /* contributors: two-sided bar, deleted to the left and added to the right on one scale */
 .tsb{display:flex;width:160px;height:8px;gap:1px}.tsb i{display:flex;flex:1;background:var(--soft)}.tsb i.l{justify-content:flex-end;border-radius:var(--radius) 0 0 var(--radius)}.tsb i.r{border-radius:0 var(--radius) var(--radius) 0}.tsb b{display:block;height:100%;width:var(--w)}.tsb i.l b{background:var(--del)}.tsb i.r b{background:var(--add)}
+
+/* "On this page" outline of a Markdown document. Wide: a sticky rail beside the card. Narrow, or
+   where the overview side panel takes the right column: a menu (a native details) in the header
+   bar. Same 1100px break as the side panel. Nothing above the card is sticky on these pages. */
+.outline-cols{grid-template-columns:minmax(0,1fr) 220px;align-items:start}
+.outline ol{list-style:none;margin:0;padding:0}
+.outline.rail{position:sticky;top:var(--space-4);max-height:calc(100vh - 2 * var(--space-4));overflow:auto;font-size:var(--text-sm)}
+.outline.rail h2{margin:0 0 var(--space-2)}
+.outline.rail a{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;overflow:hidden;padding:3px var(--space-3);border-left:2px solid var(--line);color:var(--muted);overflow-wrap:anywhere}
+.outline li.d1>a{padding-left:var(--space-6)}
+.outline a:hover{color:var(--fg);text-decoration:none}
+.outline.rail a.on{color:var(--fg);font-weight:var(--weight-semibold);border-left-color:var(--accent)}
+.outline.menu{position:relative;margin-left:auto;display:none}
+.outlinebtn{display:inline-flex;align-items:center;gap:var(--space-2);height:32px;padding:0 var(--space-3);border:var(--border);border-radius:var(--radius);background:var(--soft);color:var(--fg);font-size:var(--text-sm);font-weight:var(--weight-semibold);text-transform:none;letter-spacing:0;cursor:pointer;list-style:none;white-space:nowrap}
+.outlinebtn::-webkit-details-marker{display:none}
+.outlinebtn::before{content:"";width:16px;height:16px;background:currentColor;-webkit-mask:var(--menu-ico) center/contain no-repeat;mask:var(--menu-ico) center/contain no-repeat}
+.outlinebtn:hover,.outline.menu[open]>.outlinebtn{background:var(--hover);border-color:var(--line-strong)}
+.outline-pop{position:absolute;right:0;top:calc(100% + var(--space-1));z-index:20;width:min(320px,92vw);max-height:60vh;overflow:auto;padding:var(--space-2);background:var(--raised);border:var(--border);border-radius:var(--radius);box-shadow:var(--shadow-2);font-size:var(--text-sm);text-transform:none;letter-spacing:0;font-family:var(--sans);font-weight:var(--weight-regular)}
+.outline-pop a{display:block;padding:5px var(--space-3);border-radius:var(--radius);color:var(--fg);overflow-wrap:anywhere}
+.outline-pop a:hover,.outline-pop a:focus-visible,.outline-pop a.on{background:var(--hover)}
+.outline-q{width:100%;min-width:0;margin-bottom:var(--space-2)}
+.outlinebtn.icon{width:32px;padding:0;justify-content:center}
+.outline-corner{position:absolute;top:var(--space-2);right:var(--space-3)}
+.card.readme:has(.outline-corner){position:relative}
+.readme-h .outline.menu,.outline-corner .outline.menu{display:block}
+.markdown-body :is(h1,h2,h3,h4,h5,h6){scroll-margin-top:var(--space-4)}
+@media (max-width:1100px){.outline-cols{grid-template-columns:minmax(0,1fr)}.outline.rail{display:none}.outline-cols .outline.menu{display:block}}
+@media (min-width:1101px){.outline-cols .outline.menu{display:none}}
+@media print{.outline{display:none!important}}
