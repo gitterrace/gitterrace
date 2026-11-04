@@ -11,6 +11,13 @@ use crate::{ChangeKind, CodeCounts, FileDiff, Hunk, Result};
 pub(crate) use hunks::build_hunks;
 pub(crate) use stream::{Window, stream};
 
+#[cfg(test)]
+thread_local! {
+    /// Tree diffs [`raw_changes`] ran on this thread, for the guard that one commit's page and
+    /// folded files share a single diff.
+    pub(crate) static TREE_DIFFS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+
 /// Same probe window as git: a NUL in the first 8000 bytes marks a blob binary.
 const BINARY_PROBE: usize = 8000;
 /// Blob buffers a worker's diff cache keeps between commits; see `changes_with`.
@@ -103,7 +110,9 @@ impl Counted {
     }
 }
 
-/// Changes of `commit` against its first parent (or the empty tree for a root).
+/// Changes of `commit` against its first parent (or the empty tree for a root). The app reads
+/// them through `Repo`'s change memo; the tests compare against this direct form.
+#[cfg(test)]
 pub(crate) fn changes(
     repo: &gix::Repository,
     commit: &gix::Commit<'_>,
@@ -144,6 +153,21 @@ pub(crate) fn resource_cache(repo: &gix::Repository) -> Result<gix::diff::blob::
     .map_err(git)
 }
 
+/// The files of an already computed [`raw_changes`], with hunks.
+pub(crate) fn files_of(
+    repo: &gix::Repository,
+    raw: &[ChangeDetached],
+    text_limit: u64,
+) -> Result<Vec<FileDiff>> {
+    let mut out = Vec::with_capacity(raw.len());
+    for change in raw {
+        if let Some(diff) = file_diff(repo, change.clone(), true, text_limit, None)? {
+            out.push(diff);
+        }
+    }
+    Ok(out)
+}
+
 /// [`changes`] with a caller-owned blob cache, cleared here after every commit, and an optional
 /// memo of counts per blob pair. The memo is only consulted without hunks, and all its users
 /// must pass the same `text_limit`.
@@ -155,6 +179,27 @@ pub(crate) fn changes_with(
     cache: &mut gix::diff::blob::Platform,
     memo: Option<&CountMemo>,
 ) -> Result<Vec<FileDiff>> {
+    let raw = raw_changes(repo, commit, cache)?;
+    let mut out = Vec::with_capacity(raw.len());
+    for change in raw {
+        let memo = memo.filter(|_| !with_hunks);
+        if let Some(diff) = file_diff(repo, change, with_hunks, text_limit, memo)? {
+            out.push(diff);
+        }
+    }
+    Ok(out)
+}
+
+/// The tree diff of `commit` against its first parent, renames detected, before any blob is
+/// read. The expensive part of a commit's diff: the commit page and each of its folded files
+/// share one result through `Repo`'s change memo instead of redoing it.
+pub(crate) fn raw_changes(
+    repo: &gix::Repository,
+    commit: &gix::Commit<'_>,
+    cache: &mut gix::diff::blob::Platform,
+) -> Result<Vec<ChangeDetached>> {
+    #[cfg(test)]
+    TREE_DIFFS.with(|n| n.set(n.get() + 1));
     let new_tree = commit.tree().map_err(git)?;
     let old_tree = first_parent_tree(repo, commit)?;
     let empty = repo.empty_tree();
@@ -180,14 +225,7 @@ pub(crate) fn changes_with(
         cache.clear_resource_cache();
     }
     diffed.map_err(git)?;
-    let mut out = Vec::with_capacity(raw.len());
-    for change in raw {
-        let memo = memo.filter(|_| !with_hunks);
-        if let Some(diff) = file_diff(repo, change, with_hunks, text_limit, memo)? {
-            out.push(diff);
-        }
-    }
-    Ok(out)
+    Ok(raw)
 }
 
 /// Tree of the first parent, `None` for a root. A shallow clone's boundary commit is a root
@@ -220,36 +258,29 @@ pub(crate) fn is_shallow_boundary(repo: &gix::Repository, id: gix::ObjectId) -> 
         .is_some_and(|ids| ids.iter().any(|s| *s == id))
 }
 
-/// The `index`th file of [`changes`] with hunks, diffing only that one file's blobs.
+/// The `index`th file of a commit's [`raw_changes`] with hunks, diffing only that file's blobs.
 pub(crate) fn change_at(
     repo: &gix::Repository,
-    commit: &gix::Commit<'_>,
+    raw: &[ChangeDetached],
     index: usize,
     text_limit: u64,
 ) -> Result<Option<FileDiff>> {
-    let new_tree = commit.tree().map_err(git)?;
-    let old_tree = first_parent_tree(repo, commit)?;
-    let opts = gix::diff::Options::default().with_rewrites(Some(gix::diff::Rewrites::default()));
-    let raw = repo
-        .diff_tree_to_tree(old_tree.as_ref(), Some(&new_tree), opts)
-        .map_err(git)?;
-    let mut seen = 0;
-    for change in raw {
-        let is_tree = match &change {
-            ChangeDetached::Addition { entry_mode, .. }
-            | ChangeDetached::Deletion { entry_mode, .. }
-            | ChangeDetached::Modification { entry_mode, .. }
-            | ChangeDetached::Rewrite { entry_mode, .. } => entry_mode.is_tree(),
-        };
-        if is_tree {
-            continue;
-        }
-        if seen == index {
-            return file_diff(repo, change, true, text_limit, None);
-        }
-        seen += 1;
+    raw.iter()
+        .filter(|c| !is_tree(c))
+        .nth(index)
+        .map_or(Ok(None), |c| {
+            file_diff(repo, c.clone(), true, text_limit, None)
+        })
+}
+
+/// Whether a change is to a tree entry, which the file list leaves out.
+const fn is_tree(change: &ChangeDetached) -> bool {
+    match change {
+        ChangeDetached::Addition { entry_mode, .. }
+        | ChangeDetached::Deletion { entry_mode, .. }
+        | ChangeDetached::Modification { entry_mode, .. }
+        | ChangeDetached::Rewrite { entry_mode, .. } => entry_mode.is_tree(),
     }
-    Ok(None)
 }
 
 /// Old and new mode of a change that altered it, e.g. a file made executable.
@@ -277,13 +308,7 @@ fn file_diff(
     text_limit: u64,
     memo: Option<&CountMemo>,
 ) -> Result<Option<FileDiff>> {
-    let is_tree = match &change {
-        ChangeDetached::Addition { entry_mode, .. }
-        | ChangeDetached::Deletion { entry_mode, .. }
-        | ChangeDetached::Modification { entry_mode, .. }
-        | ChangeDetached::Rewrite { entry_mode, .. } => entry_mode.is_tree(),
-    };
-    if is_tree {
+    if is_tree(&change) {
         return Ok(None);
     }
     let rewrite_stats = match &change {

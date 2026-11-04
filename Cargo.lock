@@ -946,6 +946,7 @@ dependencies = [
  "gitterrace-index",
  "gitterrace-testkit",
  "gitterrace-web",
+ "rustix",
  "serde_json",
  "tempfile",
  "thiserror",

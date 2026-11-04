@@ -37,7 +37,7 @@ pub fn short_id(id: &str) -> &str {
 pub const MAX_TEXT_BYTES: u64 = 2 * 1024 * 1024;
 pub use gitdir::{BranchStatus, HeadState, InProgress, LinkedWorktree, Stash, TagAnnotation};
 pub use ignore::IgnoreSet;
-pub use repo::Repo;
+pub use repo::{ChangeMemo, Repo};
 pub use repo_id::resolve_permalink;
 pub use time::{civil_from_days, days_from_civil};
 pub use types::{

@@ -90,6 +90,17 @@ pub fn multi_router(paths: Vec<PathBuf>) -> io::Result<axum::Router> {
     Ok(build_multi(paths, None, None, &Env::new(Config::default()))?.0)
 }
 
+/// [`multi_router`] for one export run: every repository shares commit tree diffs through
+/// `changes`, which the caller owns and drops when the run ends, freeing them all.
+pub fn export_router(
+    paths: Vec<PathBuf>,
+    changes: &Arc<gitterrace_git::ChangeMemo>,
+) -> io::Result<axum::Router> {
+    let mut env = Env::new(Config::default());
+    env.changes = Some(Arc::clone(changes));
+    Ok(build_multi(paths, None, None, &env)?.0)
+}
+
 /// One repository's pages and `/api/v1`, with links under `base`. Starts its
 /// index refresher, so call it inside a tokio runtime.
 #[cfg(test)]
@@ -121,6 +132,9 @@ fn repo_router_tasks(
         .with_workers(cfg.index.threads);
     if env.public() {
         repo.restrict_to_committed();
+    }
+    if let Some(memo) = &env.changes {
+        repo.use_change_memo(memo);
     }
     let index = Index::open(&repo)?.with_threads(cfg.index.threads);
     let mut app = App::configured(repo, index, env);

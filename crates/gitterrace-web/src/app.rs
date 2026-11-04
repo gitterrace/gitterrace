@@ -67,6 +67,9 @@ pub(crate) struct Env {
     /// `server.public` at startup. Fixed for the process: a reload never widens what a
     /// public server shows.
     public: bool,
+    /// An export run's memo of commit tree diffs, handed to every repository it opens. `None`
+    /// for a server, which keeps no per-commit state outside its budgeted caches.
+    pub(crate) changes: Option<Arc<gitterrace_git::ChangeMemo>>,
 }
 
 /// The live `actions.toml`, swapped whole on reload.
@@ -115,6 +118,7 @@ impl Env {
             stop: Arc::new(watch::channel(false).0),
             actions_note: Arc::default(),
             sends: Arc::default(),
+            changes: None,
         }
     }
 

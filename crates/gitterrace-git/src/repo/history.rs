@@ -172,16 +172,39 @@ impl Repo {
         Ok(CommitDetail {
             summary: summary(&commit, &mailmap)?,
             body,
-            files: crate::diff::changes(&repo, &commit, true, self.text_limit())?,
+            files: crate::diff::files_of(
+                &repo,
+                &self.raw_changes(&repo, &commit)?,
+                self.text_limit(),
+            )?,
         })
     }
 
-    /// One file of [`Self::commit`]'s list, by index, without diffing the others.
+    /// One file of [`Self::commit`]'s list, by index, diffing only that file's blobs. The tree
+    /// diff is shared with the commit page and the commit's other files.
     pub fn commit_file(&self, id: &str, index: usize) -> Result<Option<crate::FileDiff>> {
         let repo = self.repo();
         let oid = self.resolve_id(&repo, id)?;
         let commit = repo.find_commit(oid).map_err(git)?;
-        crate::diff::change_at(&repo, &commit, index, self.text_limit())
+        let raw = self.raw_changes(&repo, &commit)?;
+        crate::diff::change_at(&repo, &raw, index, self.text_limit())
+    }
+
+    /// The commit's tree diff against its first parent, through the run's change memo if one
+    /// is in force.
+    fn raw_changes(
+        &self,
+        repo: &gix::Repository,
+        commit: &gix::Commit<'_>,
+    ) -> Result<std::sync::Arc<Vec<gix::object::tree::diff::ChangeDetached>>> {
+        let diff = || {
+            let mut cache = crate::diff::resource_cache(repo)?;
+            crate::diff::raw_changes(repo, commit, &mut cache)
+        };
+        self.change_memo().map_or_else(
+            || diff().map(std::sync::Arc::new),
+            |memo| memo.get(commit.id, diff),
+        )
     }
 
     /// Summaries of exactly these commits, in order. Each commit is mapped through its own

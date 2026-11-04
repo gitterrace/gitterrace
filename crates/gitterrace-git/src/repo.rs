@@ -1,4 +1,5 @@
 mod blame;
+mod changes;
 mod history;
 mod objects;
 
@@ -6,12 +7,13 @@ use std::cmp::Reverse;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::{Mutex, OnceLock};
+use std::sync::{Arc, Mutex, OnceLock, Weak};
 
 use gix::bstr::ByteSlice;
 
 use crate::error::git;
 use crate::repo::blame::{BLAME_CACHE_BYTES, BlameCache};
+pub use crate::repo::changes::ChangeMemo;
 use crate::{Error, MAX_TEXT_BYTES, RefInfo, RefKind, Result};
 
 /// Decoded-object cache; trees and commits are re-read constantly by walks and diffs. One per
@@ -54,6 +56,9 @@ pub struct Repo {
     pub(crate) id_cache: OnceLock<Option<String>>,
     /// See [`Repo::committed_only`].
     committed_only: AtomicBool,
+    /// The export run's memo of tree diffs, see [`Repo::use_change_memo`]. Weak: the run owns
+    /// it, and a server handle (none set) keeps nothing.
+    changes: Mutex<Weak<ChangeMemo>>,
 }
 
 impl Repo {
@@ -69,6 +74,7 @@ impl Repo {
             divergence: Mutex::new(HashMap::new()),
             id_cache: OnceLock::new(),
             committed_only: AtomicBool::new(false),
+            changes: Mutex::new(Weak::new()),
         })
     }
 
@@ -79,6 +85,23 @@ impl Repo {
     /// turns it off again, so a shared handle cannot be widened.
     pub fn restrict_to_committed(&self) {
         self.committed_only.store(true, Ordering::Relaxed);
+    }
+
+    /// Shares commit tree diffs through `memo` while its owner keeps it: a commit page and its
+    /// folded files then diff the trees once. A memo whose run has ended is replaced, so a
+    /// handle reused for the next export shares that run's memo; a live one stays, and a
+    /// second run alongside it shares it.
+    pub fn use_change_memo(&self, memo: &Arc<ChangeMemo>) {
+        if let Ok(mut held) = self.changes.lock()
+            && held.upgrade().is_none()
+        {
+            *held = Arc::downgrade(memo);
+        }
+    }
+
+    /// The memo in force, if its owner still holds it.
+    pub(crate) fn change_memo(&self) -> Option<Arc<ChangeMemo>> {
+        self.changes.lock().ok()?.upgrade()
     }
 
     /// [`Repo::restrict_to_committed`] as a builder.

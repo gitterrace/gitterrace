@@ -9,6 +9,7 @@
 //! never published.
 
 mod credit;
+mod out;
 mod snapshot;
 mod write;
 
@@ -27,12 +28,13 @@ use gitterrace_git::{percent_decode, percent_encode_path};
 use tower::ServiceExt;
 
 use crate::export::credit::{Credit, add_footer};
+use crate::export::out::{Staging, check_out};
 #[cfg(test)]
 use crate::export::snapshot::mark_snapshot_as;
 use crate::export::snapshot::{SNAPSHOT_CSS, mark_snapshot, snapshot_label};
 #[cfg(test)]
 use crate::export::write::target;
-use crate::export::write::{write_leaf, write_page};
+use crate::export::write::write_page;
 
 /// What to include in an export.
 pub(crate) struct Scope {
@@ -70,11 +72,10 @@ impl Project {
 
 /// Largest response body read from the router.
 const MAX_BODY: usize = 64 * 1024 * 1024;
-/// Hard ceiling on pages, so a wrongly scoped export fails instead of filling a disk.
+/// Hard ceiling on pages written, folded diff fragments (`/diff/{id}/{n}`) included: one
+/// budget, so a wide commit costs pages like any other and the export's size is bounded by
+/// its scope, not by how many files its commits touch.
 const MAX_PAGES: usize = 20_000;
-/// The same for folded diff fragments (`/diff/{id}/{n}`), counted apart: a commit that folds
-/// many files would otherwise spend the page cap on fragments and stop the export early.
-const MAX_FRAGMENTS: usize = 50_000;
 /// Pages the crawl starts from, beside every page the server prewarms; each is exported
 /// whatever links point at it.
 const SEEDS: [&str; 2] = ["/refs", "/log/HEAD"];
@@ -87,62 +88,6 @@ fn seeds() -> impl Iterator<Item = &'static str> {
 
 /// Where an export goes when no folder is named.
 pub(crate) const DEFAULT_OUT: &str = "gitterrace-export";
-/// Written into every export folder; its presence says an export made the folder.
-const MARKER: &str = ".gitterrace-export";
-
-/// Gets `out` ready: created if missing; a folder with the marker is emptied so no stale page
-/// survives; a non-empty folder without it is refused unless `force`.
-fn prepare_out(repos: &[PathBuf], out: &Path, force: bool) -> anyhow::Result<()> {
-    std::fs::create_dir_all(out).with_context(|| format!("creating {}", out.display()))?;
-    let marked = out.join(MARKER).is_file();
-    let empty = std::fs::read_dir(out)
-        .with_context(|| format!("reading {}", out.display()))?
-        .next()
-        .is_none();
-    if !marked && !empty && !force {
-        bail!(
-            "{} is not empty and was not made by an export (no {MARKER} file); \
-             choose another folder or pass --force to write into it",
-            out.display()
-        );
-    }
-    if marked {
-        // Clearing deletes, so it must never reach a served repository or the working folder.
-        let root = out.canonicalize().context("resolving the output folder")?;
-        let cwd = std::env::current_dir()
-            .ok()
-            .and_then(|d| d.canonicalize().ok());
-        let inside = repos
-            .iter()
-            .filter_map(|r| r.canonicalize().ok())
-            .chain(cwd)
-            .any(|p| p.starts_with(&root));
-        if inside {
-            bail!(
-                "{} holds a repository or the current folder. It cannot be cleared for a fresh export",
-                out.display()
-            );
-        }
-        clear(out)?;
-    }
-    let names: Vec<String> = repos
-        .iter()
-        .map(|r| {
-            r.file_name().map_or_else(
-                || r.display().to_string(),
-                |n| n.to_string_lossy().into_owned(),
-            )
-        })
-        .collect();
-    let line = format!(
-        "gitterrace {} {}\n",
-        env!("GITTERRACE_VERSION"),
-        names.join(",")
-    );
-    write_leaf(&out.join(MARKER), line.as_bytes())?;
-    exclude_from_worktree(out);
-    Ok(())
-}
 
 /// An export written straight into a worktree (`export` run in a checkout) would show as
 /// untracked; list it in that clone's `.git/info/exclude`, which is local and never committed.
@@ -170,35 +115,50 @@ fn exclude_from_worktree(out: &Path) {
     }
 }
 
-/// Removes everything inside `dir`. A symlink is removed as a link, never followed.
-fn clear(dir: &Path) -> anyhow::Result<()> {
-    for entry in std::fs::read_dir(dir).with_context(|| format!("reading {}", dir.display()))? {
-        let path = entry?.path();
-        let kind = std::fs::symlink_metadata(&path)?.file_type();
-        let done = if kind.is_dir() {
-            std::fs::remove_dir_all(&path)
-        } else {
-            std::fs::remove_file(&path)
-        };
-        done.with_context(|| format!("removing {}", path.display()))?;
-    }
-    Ok(())
-}
-
 /// Writes the scoped site to `out` and returns how many files were written. One repository
 /// exports at `/`; several export like the server serves them: an index at `/` and each
 /// repository under `/r/<name>/`, named by the server's own table.
+/// The site is built in a folder beside `out` and moved into place only when complete: a failed
+/// or capped export leaves `out` as it was.
 pub(crate) async fn export(repos: &[PathBuf], out: &Path, scope: &Scope) -> anyhow::Result<usize> {
+    export_capped(repos, out, scope, MAX_PAGES).await
+}
+
+/// [`export`] under a given page budget, so a test can reach the cap with a small fixture.
+async fn export_capped(
+    repos: &[PathBuf],
+    dest: &Path,
+    scope: &Scope,
+    max_pages: usize,
+) -> anyhow::Result<usize> {
     // Swapped arguments (`export <repo> <out>`) would scatter pages over a
     // checkout. An ignored folder inside a repo is fine; its root is not.
-    if out.join(".git").exists() {
+    if dest.join(".git").exists() {
         bail!(
             "{} is the root of a git repository. Choose an output folder (usage: export <OUT> [REPO])",
-            out.display()
+            dest.display()
         );
     }
-    prepare_out(repos, out, scope.force)?;
-    let router = gitterrace_web::multi_router(repos.to_vec()).context("building the router")?;
+    let existing = check_out(repos, dest, scope.force)?;
+    let staging = Staging::new(dest)?;
+    let written = crawl(repos, staging.path(), scope, max_pages).await?;
+    staging.finish(repos, dest, existing)?;
+    exclude_from_worktree(dest);
+    Ok(written)
+}
+
+/// Writes every page in scope under `out`, failing at `max_pages`.
+async fn crawl(
+    repos: &[PathBuf],
+    out: &Path,
+    scope: &Scope,
+    max_pages: usize,
+) -> anyhow::Result<usize> {
+    // Owned by this run alone: dropped with the router when the crawl ends, so nothing the
+    // export diffed outlives it.
+    let changes = std::sync::Arc::new(gitterrace_git::ChangeMemo::new());
+    let router =
+        gitterrace_web::export_router(repos.to_vec(), &changes).context("building the router")?;
     let sites = sites(&router, repos).await?;
 
     let mut queue: VecDeque<String> = root_page(out, &sites)?.into_iter().collect();
@@ -246,7 +206,7 @@ pub(crate) async fn export(repos: &[PathBuf], out: &Path, scope: &Scope) -> anyh
 
     let mut seen: BTreeSet<String> = queue.iter().cloned().collect();
     let mut written = 0usize;
-    let mut count = Caps::default();
+    let mut count = Caps::new(max_pages, scope);
     // Pages render on blocking threads, so one at a time leaves the cores idle.
     // Fetch a batch concurrently, then write and follow links in queue order so
     // the output and the page cap stay deterministic.
@@ -281,12 +241,23 @@ pub(crate) async fn export(repos: &[PathBuf], out: &Path, scope: &Scope) -> anyh
             };
             written += usize::from(write_page(out, &path, &content_type, &body)?);
             if content_type.starts_with("text/html") || content_type.starts_with("text/css") {
+                let mut fragments = Vec::new();
                 for link in links(&String::from_utf8_lossy(&body)) {
                     let ok = link.starts_with("/static/")
                         || site_for(&link).is_some_and(|s| s.allows(&link));
                     if ok && seen.insert(link.clone()) {
-                        queue.push_back(link);
+                        if is_fragment(&link) {
+                            fragments.push(link);
+                        } else {
+                            queue.push_back(link);
+                        }
                     }
+                }
+                // A commit's folded files go next, in order, while the server still holds the
+                // commit's tree diff: queued last, they would come after hundreds of other
+                // commits and redo it.
+                for link in fragments.into_iter().rev() {
+                    queue.push_front(link);
                 }
             }
         }
@@ -296,26 +267,40 @@ pub(crate) async fn export(repos: &[PathBuf], out: &Path, scope: &Scope) -> anyh
     Ok(written + 2)
 }
 
-/// Pages and diff fragments written so far, each against its own cap.
-#[derive(Default)]
+/// Pages written so far against the one budget, diff fragments included.
 struct Caps {
     pages: usize,
-    fragments: usize,
+    max: usize,
+    commits: usize,
+    max_file_kb: u64,
 }
 
 impl Caps {
-    fn take(&mut self, path: &str) -> anyhow::Result<()> {
-        if is_fragment(path) {
-            if self.fragments >= MAX_FRAGMENTS {
-                bail!("export stopped at {MAX_FRAGMENTS} diff fragments. Lower --commits");
-            }
-            self.fragments += 1;
-        } else {
-            if self.pages >= MAX_PAGES {
-                bail!("export stopped at {MAX_PAGES} pages. Lower --commits or --max-file-kb");
-            }
-            self.pages += 1;
+    const fn new(max: usize, scope: &Scope) -> Self {
+        Self {
+            pages: 0,
+            max,
+            commits: scope.commits,
+            max_file_kb: scope.max_file / 1024,
         }
+    }
+
+    fn take(&mut self, path: &str) -> anyhow::Result<()> {
+        if self.pages >= self.max {
+            let kind = if is_fragment(path) {
+                "a diff fragment"
+            } else {
+                "a page"
+            };
+            bail!(
+                "export stopped at the cap of {} pages (diff fragments count) on {kind}, {path}; \
+                 nothing was written. Lower --commits (now {}) or --max-file-kb (now {})",
+                self.max,
+                self.commits,
+                self.max_file_kb
+            );
+        }
+        self.pages += 1;
         Ok(())
     }
 }
@@ -584,5 +569,7 @@ fn decode_entities(s: &str) -> String {
     percent_decode(&s)
 }
 
+#[cfg(test)]
+mod budget_tests;
 #[cfg(test)]
 mod tests;
