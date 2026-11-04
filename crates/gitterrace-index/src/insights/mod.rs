@@ -46,7 +46,7 @@ pub use headfiles::{HeadFile, LineCache, head_files};
 pub use lang::language;
 pub use people::{People, Person};
 pub use period::{
-    Contributor, ContributorReport, Period, PeriodStats, PeriodSummary, Rhythm, SeriesPoint,
+    Contributor, ContributorReport, Metric, Period, PeriodStats, PeriodSummary, Rhythm, SeriesPoint,
 };
 pub use releases::{Cadence, Release, release_tags};
 pub use select::{OptionParams, Scoped, Selection, under};

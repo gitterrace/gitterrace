@@ -6,7 +6,9 @@ use askama::Template;
 use axum::extract::{Query, RawQuery, State};
 use axum::response::Html;
 use gitterrace_index::feed::InsightsSource;
-use gitterrace_index::{Insights, OptionParams, Options, Period, rework_share, rework_verdict};
+use gitterrace_index::{
+    Insights, Metric, OptionParams, Options, Period, rework_share, rework_verdict,
+};
 use serde::Deserialize;
 
 use crate::{
@@ -26,6 +28,8 @@ pub(crate) struct InsightsQuery {
     /// `bots`, `generated`, `ignore`, `ws`, `exclude`: parsed as the API parses them.
     #[serde(flatten)]
     pub(crate) opts: OptionParams,
+    /// `commits` (default), `added`, `deleted` or `net`: what the contributors list follows.
+    pub(crate) metric: Option<String>,
 }
 
 /// What the options are when the URL says nothing: `insights.*` and `[repo.NAME]` of the config.
@@ -71,6 +75,12 @@ impl InsightsQuery {
         self.opts.own_exclude()
     }
 
+    pub(crate) fn metric(&self) -> Metric {
+        self.metric
+            .as_deref()
+            .map_or(Metric::Commits, Metric::parse)
+    }
+
     pub(crate) fn options(&self, d: &Defaults) -> Options {
         self.opts.apply(d.clone().into_options())
     }
@@ -94,6 +104,9 @@ impl InsightsQuery {
         }
         if !o.respect_ignore {
             v.push(("ignore", "0".to_owned()));
+        }
+        if self.metric() != Metric::Commits {
+            v.push(("metric", self.metric().key().to_owned()));
         }
         v
     }
@@ -372,6 +385,9 @@ struct PersonRow {
     spark: String,
     hue: u32,
     initial: String,
+    /// Share of the widest side, in percent: added to the right, deleted to the left.
+    bar_add: String,
+    bar_del: String,
 }
 
 #[derive(Template)]
@@ -386,6 +402,10 @@ struct ContributorsPage {
     people: Vec<PersonRow>,
     /// "Show all N contributors" when the list was cut at `PEOPLE_SHOWN`.
     more: Option<(String, String)>,
+    /// True for any metric but commits: the switch and the two-sided bar show.
+    alt: bool,
+    switch: Vec<OptLink>,
+    hint: String,
 }
 
 /// Rows the contributors page renders unless asked for all: one row carries an inline
@@ -412,7 +432,8 @@ pub(crate) async fn contributors(
         let recs = scoped(f, r);
         let ins = insights(a, &recs, q.options(&d));
         let period = period_of(&q, &d, Period::All);
-        let report = ins.contributors(period);
+        let metric = q.metric();
+        let report = ins.contributors_by(period, metric);
         let shown: Vec<_> = report
             .contributors
             .iter()
@@ -429,6 +450,15 @@ pub(crate) async fn contributors(
                 ),
             )
         });
+        let shown_rows = shown.len().min(if all { usize::MAX } else { PEOPLE_SHOWN });
+        let widest = shown
+            .iter()
+            .take(shown_rows)
+            .map(|p| p.additions.max(p.deletions))
+            .max()
+            .unwrap_or(0)
+            .max(1);
+        let pct = |v: u64| format!("{}", (v as f64 * 100.0 / widest as f64).round());
         let people: Vec<PersonRow> = shown
             .iter()
             .take(if all { usize::MAX } else { PEOPLE_SHOWN })
@@ -448,6 +478,8 @@ pub(crate) async fn contributors(
                     spark: charts::sparkline(&p.series, "s1"),
                     hue: views::hue(&p.name),
                     initial: views::initial(&p.name),
+                    bar_add: pct(p.additions),
+                    bar_del: pct(p.deletions),
                 }
             })
             .collect();
@@ -470,9 +502,49 @@ pub(crate) async fn contributors(
             ],
             people,
             more,
+            alt: metric != Metric::Commits,
+            switch: q.metric_switch(&d),
+            hint: metric_hint(metric).to_owned(),
         }
     })
     .await
+}
+
+/// The sentence start the page shows above the list for a non-default metric.
+const fn metric_hint(m: Metric) -> &'static str {
+    match m {
+        Metric::Commits => "",
+        Metric::Added => "Ordered by lines added. The sparkline is lines added",
+        Metric::Deleted => "Ordered by lines deleted. The sparkline is lines deleted",
+        Metric::Net => {
+            "Ordered by lines added minus lines deleted. The sparkline is that net, never below zero"
+        }
+    }
+}
+
+impl InsightsQuery {
+    /// One link per metric, the one in force marked.
+    fn metric_switch(&self, d: &Defaults) -> Vec<OptLink> {
+        [
+            (Metric::Commits, "Commits"),
+            (Metric::Added, "Lines added"),
+            (Metric::Deleted, "Lines deleted"),
+            (Metric::Net, "Net lines"),
+        ]
+        .into_iter()
+        .map(|(m, label)| OptLink {
+            label: "Show",
+            state: label.to_owned(),
+            href: self.link(
+                d,
+                "/stats/contributors",
+                "metric",
+                (m != Metric::Commits).then(|| m.key()),
+            ),
+            on: m == self.metric(),
+        })
+        .collect()
+    }
 }
 
 #[cfg(test)]

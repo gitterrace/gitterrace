@@ -35,8 +35,20 @@ async fn pages_carry_no_style_attribute() {
         "/stats/hotspots",
         "/stats/languages",
         "/stats/contributors",
+        "/stats/contributors?metric=added",
+        "/stats/contributors?metric=net",
     ] {
-        let (_, body) = get(&router, page).await;
+        let mut body = String::new();
+        for _ in 0..200 {
+            body = get(&router, page).await.1;
+            if !page.starts_with("/stats") || !body.contains("data-progress") {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(50)).await;
+        }
+        if page.contains("metric=") {
+            assert!(body.contains("class=\"tsb\""), "{page} shows its bars");
+        }
         assert!(!body.contains("style=\""), "{page} has an inline style");
     }
 }

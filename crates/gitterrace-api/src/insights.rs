@@ -2,7 +2,7 @@
 //! pages read too. To expose a new one, add an entry to [`INSIGHTS`]; the HTTP route
 //! `/insights/{name}` and the docs list pick it up.
 
-use gitterrace_index::{Insights, Label, OptionParams, Period, Selection};
+use gitterrace_index::{Insights, Label, Metric, OptionParams, Period, Selection};
 use serde::Deserialize;
 use serde_json::{Value, to_value};
 
@@ -19,6 +19,8 @@ pub struct Params {
     pub period: Option<String>,
     /// `kind` or `scope`.
     pub label: Option<String>,
+    /// `commits` (default), `added`, `deleted` or `net`: what `contributors` orders by.
+    pub metric: Option<String>,
     #[serde(default, deserialize_with = "number")]
     pub limit: Option<usize>,
     #[serde(flatten)]
@@ -52,7 +54,11 @@ pub const INSIGHTS: &[Insight] = &[
         name: "contributors",
         summary: "People with commits, lines, active days and a per-bucket series, bots flagged (period).",
         compute: |i, p, q| {
-            let mut r = i.contributors(p);
+            let m = q
+                .metric
+                .as_deref()
+                .map_or_else(Default::default, Metric::parse);
+            let mut r = i.contributors_by(p, m);
             r.contributors.truncate(q.limit.unwrap_or(usize::MAX));
             val(&r)
         },

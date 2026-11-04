@@ -16,6 +16,48 @@ pub enum Period {
     All,
 }
 
+/// What the contributors list is ordered and charted by.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum Metric {
+    #[default]
+    Commits,
+    Added,
+    Deleted,
+    Net,
+}
+
+impl Metric {
+    /// Parses `commits`, `added`, `deleted`, `net`. Anything else is the default.
+    pub fn parse(s: &str) -> Self {
+        match s {
+            "added" => Self::Added,
+            "deleted" => Self::Deleted,
+            "net" => Self::Net,
+            _ => Self::Commits,
+        }
+    }
+
+    pub const fn key(self) -> &'static str {
+        match self {
+            Self::Commits => "commits",
+            Self::Added => "added",
+            Self::Deleted => "deleted",
+            Self::Net => "net",
+        }
+    }
+
+    /// The person's value for ordering.
+    fn of(self, commits: usize, add: u64, del: u64) -> i64 {
+        let n = |v: u64| i64::try_from(v).unwrap_or(i64::MAX);
+        match self {
+            Self::Commits => i64::try_from(commits).unwrap_or(i64::MAX),
+            Self::Added => n(add),
+            Self::Deleted => n(del),
+            Self::Net => n(add).saturating_sub(n(del)),
+        }
+    }
+}
+
 impl Period {
     pub const fn days(self) -> Option<i64> {
         match self {
@@ -286,6 +328,12 @@ impl Insights<'_> {
     }
 
     pub fn contributors(&self, period: Period) -> ContributorReport {
+        self.contributors_by(period, Metric::Commits)
+    }
+
+    /// Contributors ordered by `metric`. The series carries that metric per bucket (net is
+    /// floored at zero), the other fields are the same.
+    pub fn contributors_by(&self, period: Period, metric: Metric) -> ContributorReport {
         let (from, to) = period.window(self.now);
         let src = self.source();
         // First commit ever per person, merges included, over the whole history.
@@ -310,6 +358,7 @@ impl Insights<'_> {
                 last: c.time,
                 days: BTreeSet::new(),
                 series: vec![0; axis.len()],
+                dels: vec![0; axis.len()],
             });
             let l = self.commit_sums(c.rank);
             a.c.add += l.add;
@@ -320,7 +369,14 @@ impl Insights<'_> {
             let day = local_day_of(c.time, c.offset);
             a.days.insert(day);
             if let Some(slot) = axis.slot_day(day) {
-                a.series[slot] += 1;
+                match metric {
+                    Metric::Commits => a.series[slot] += 1,
+                    Metric::Added | Metric::Net => {
+                        a.series[slot] = a.series[slot].saturating_add(l.add);
+                        a.dels[slot] = a.dels[slot].saturating_add(l.del);
+                    }
+                    Metric::Deleted => a.series[slot] = a.series[slot].saturating_add(l.del),
+                }
             }
         }
         let mut contributors: Vec<(usize, Contributor)> = acc
@@ -339,16 +395,25 @@ impl Insights<'_> {
                         first_commit: a.first,
                         last_commit: a.last,
                         active_days: a.days.len(),
-                        series: a.series,
+                        series: if metric == Metric::Net {
+                            a.series
+                                .iter()
+                                .zip(&a.dels)
+                                .map(|(x, y)| x.saturating_sub(*y))
+                                .collect()
+                        } else {
+                            a.series
+                        },
                         first_time: first_ever.get(&p).copied().unwrap_or(i64::MAX) >= from
                             && period.days().is_some(),
                     },
                 )
             })
             .collect();
+        let key = |c: &Contributor| metric.of(c.commits, c.additions, c.deletions);
         contributors.sort_by(|a, b| {
-            b.1.commits
-                .cmp(&a.1.commits)
+            key(&b.1)
+                .cmp(&key(&a.1))
                 .then_with(|| a.1.name.cmp(&b.1.name))
         });
         ContributorReport {
@@ -366,6 +431,8 @@ struct Acc {
     last: i64,
     days: BTreeSet<i64>,
     series: Vec<u32>,
+    /// Deleted lines per bucket, read for the net metric.
+    dels: Vec<u32>,
 }
 
 #[cfg(test)]
