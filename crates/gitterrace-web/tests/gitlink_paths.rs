@@ -74,7 +74,7 @@ fn a_former_submodule_path_answers_below_5xx_and_last_commits_are_exact() {
                 .and_then(|e| e["id"].as_str())
                 .map(str::to_owned)
         };
-        let first = head_of(p, &format!("{with_gitlink}"));
+        let first = head_of(p, &with_gitlink);
         assert_eq!(id_of("a.txt"), Some(first), "a.txt was never touched again");
         assert_eq!(
             id_of("sub"),

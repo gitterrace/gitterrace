@@ -2,6 +2,8 @@
 //! the cache to a newer format and a segment goes bad underneath it. No page, API path or
 //! repeat visit answers 5xx: the index says why or asks for an index instead.
 
+#![expect(clippy::expect_used, reason = "test setup")]
+
 use gitterrace_testkit::{Fixture, base, get};
 
 #[test]
@@ -116,10 +118,7 @@ fn a_truncated_or_garbage_segment_under_a_running_server_is_rebuilt() {
             }
             let segs = segments(&cache);
             assert!(!segs.is_empty(), "no segment to damage");
-            let before: Vec<Vec<u8>> = segs
-                .iter()
-                .map(|p| std::fs::read(p).expect("read"))
-                .collect();
+            let before = segs.len();
             for p in &segs {
                 let b = std::fs::read(p).expect("read");
                 let damaged = if garbage {
@@ -161,7 +160,7 @@ fn a_truncated_or_garbage_segment_under_a_running_server_is_rebuilt() {
             assert!(
                 healed,
                 "the damaged cache (garbage: {garbage}) was never rebuilt; had {} segments; now {:?}",
-                before.len(),
+                before,
                 std::fs::read_dir(&cache).unwrap().flatten().map(|e| (e.file_name(), e.metadata().unwrap().len())).collect::<Vec<_>>()
             );
         });
