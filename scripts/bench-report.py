@@ -88,10 +88,17 @@ def self_test() -> None:
 
 def own_load_test() -> None:
     """The load guard leaves the harness's own process tree out of the measure."""
-    rows = [["10", "1", "5"], ["11", "10", "150"], ["12", "11", "50"], ["20", "1", "30"]]
+    rows = [
+        ["10", "1", "5"],
+        ["11", "10", "150"],
+        ["12", "11", "50"],
+        ["20", "1", "30"],
+    ]
     own, other = bq.split_cores(rows, 10)
     if (round(own, 2), round(other, 2)) != (2.05, 0.3):
-        sys.exit(f"bench-report self-test failed: own pid tree counted as load {own} {other}")
+        sys.exit(
+            f"bench-report self-test failed: own pid tree counted as load {own} {other}"
+        )
 
 
 def wrap_test() -> None:
