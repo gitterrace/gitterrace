@@ -5,10 +5,26 @@
 # Optional second argument: an older full golden to compare the full run to.
 #
 #   scripts/golden-check.sh [commit] [full-golden]
+#   scripts/golden-check.sh --self-test    (a relative GOLDEN_PROOF_DIR must resolve absolute)
 set -euo pipefail
+# cargo runs the test from the crate dir, so the proof path must not depend on the cwd.
+resolve_out() {
+  mkdir -p "$1"
+  (cd "$1" && pwd)
+}
+if [[ ${1:-} == --self-test ]]; then
+  tmp=$(mktemp -d)
+  trap 'rm -rf "$tmp"' EXIT
+  got=$(cd "$tmp" && resolve_out rel/proof)
+  [[ $got == /* && -d $got ]] || {
+    echo "self-test: not absolute: $got" >&2
+    exit 1
+  }
+  echo "self-test ok: $got"
+  exit 0
+fi
 commit=$(git rev-parse --short "${1:-HEAD}")
-out=${GOLDEN_PROOF_DIR:-target/golden-proof}
-mkdir -p "$out"
+out=$(resolve_out "${GOLDEN_PROOF_DIR:-target/golden-proof}")
 export TEST_GOLDEN_PROOF="$out/$commit.txt"
 if [[ -n ${2:-} ]]; then
   TEST_GOLDEN_FULL=$(realpath "$2")
