@@ -273,10 +273,10 @@ async function outline() {
         res[scheme] = { railWide: await vis(p, '.outline.rail'), menuWide: await vis(p, 'details.outline') };
         await p.screenshot({ path: join(process.env.OUTLINE_SHOTS || tmpdir(), `outline-${name}-${scheme}-1400.png`) });
         if (scheme === 'light') {
-          await p.click('.outline.rail a[href="#user-content-section-3"]');
+          await p.click('.outline.rail a[href="#section-3"]');
           await p.waitForTimeout(400);
-          res.click = await p.evaluate(() => ({ hash: location.hash, top: document.getElementById('user-content-section-3').getBoundingClientRect().top, y: scrollY }));
-          await p.evaluate(() => document.getElementById('user-content-section-2').scrollIntoView());
+          res.click = await p.evaluate(() => ({ hash: location.hash, top: document.getElementById('section-3').getBoundingClientRect().top, y: scrollY }));
+          await p.evaluate(() => document.getElementById('section-2').scrollIntoView());
           await p.waitForTimeout(400);
           res.active = await p.evaluate(() => document.querySelector('.outline.rail a.on')?.getAttribute('href'));
           await p.click('[data-show=source]');
@@ -340,8 +340,8 @@ async function outline() {
       if (bad.length) r.fail(`outline ${name} overview: ${JSON.stringify(bad)}`);
       else r.ok(`outline ${name} overview: icon-only button inside the README bar, right-aligned, labelled, opens and filters`);
       const ok = ['light', 'dark'].every((s) => { const x = res[s]; return x.railWide && !x.menuWide && !x.railNarrow && x.menuNarrow && x.btnText === 'On this page' && x.filterShown && x.filtered === 1 && x.closed; })
-        && res.click.hash === '#user-content-section-3' && res.click.y > 100 && res.click.top >= 0 && res.click.top < 200
-        && res.active === '#user-content-section-2' && !res.source.rail && !res.source.menu;
+        && res.click.hash === '#section-3' && res.click.y > 100 && res.click.top >= 0 && res.click.top < 200
+        && res.active === '#section-2' && !res.source.rail && !res.source.menu;
       if (ok) r.ok(`outline ${name}: rail at 1400, menu at 900, click scrolls, active follows, filter and Escape ok, Code tab hides it, light and dark`);
       else r.fail(`outline ${name}: ${JSON.stringify(res)}`);
     } finally { await b.close(); }

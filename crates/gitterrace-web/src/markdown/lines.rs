@@ -134,7 +134,7 @@ mod tests {
         let src = "---\ntitle: x\n---\n# Head `code`\n\nA wrapped [link](a.md)\nparagraph with ``a ` b``.\n\n- one\n- two\n\n> quoted\n> twice\n\n```rs\nfn f() {}\n```\n\n| a |\n|---|\n| 1 |\n";
         let out = render(src);
         for want in [
-            "<h1 id=\"user-content-head-code\" data-line=\"4-4\">",
+            "<h1 id=\"head-code\" data-line=\"4-4\">",
             "<p data-line=\"6-7\">A wrapped",
             "<li data-line=\"9-9\">one",
             "<li data-line=\"10-10\">two",

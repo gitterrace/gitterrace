@@ -551,6 +551,8 @@ fn decode_entities(s: &str) -> String {
 }
 
 #[cfg(test)]
+mod anchor_tests;
+#[cfg(test)]
 mod budget_tests;
 #[cfg(test)]
 mod tests;

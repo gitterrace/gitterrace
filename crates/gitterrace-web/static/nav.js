@@ -548,22 +548,28 @@
   }
 
   // ---- #heading links into rendered Markdown --------------------------------
-  // Rendered ids carry the "user-content-" prefix so document content cannot clobber page ids.
-  // A link from another file, or a typed URL, has the plain fragment, which names nothing here:
-  // jump to the prefixed element instead, as GitHub does. #L line hashes are left alone.
+  // Document ids are plain, so #reference resolves by itself, with or without this script.
+  // Only an id that would clobber the page (main, q, location, ...) carries the
+  // "user-content-" prefix: a typed #main jumps there instead of to the page's own <main>.
+  // An old #user-content-x link lands on the now plain x. #L line hashes are left alone.
   function jumpUserAnchor() {
     var h = location.hash;
     if (h.length < 2 || /^#L\d+(-L?\d+)?$/.test(h)) return;
     var id;
     try { id = decodeURIComponent(h.slice(1)); } catch (e) { return; }
-    if (document.getElementById(id)) return;
     var t = document.getElementById("user-content-" + id);
+    if (!t && id.indexOf("user-content-") === 0 && !document.getElementById(id)) {
+      t = document.getElementById(id.slice(13));
+    }
     if (!t) return;
     t.scrollIntoView();
     if (!t.hasAttribute("tabindex")) t.tabIndex = -1;
     t.focus({ preventScroll: true });
   }
   window.addEventListener("hashchange", jumpUserAnchor);
+  // Again after load: for #main the browser's own scroll to the page's <main> comes later
+  // (webkit even after the load event), so the jump waits one task past it.
+  window.addEventListener("load", function () { setTimeout(jumpUserAnchor, 0); });
   jumpUserAnchor();
 
   // ---- screenshot hooks: ?open=finder|help|refs -------------------------------

@@ -1,12 +1,13 @@
 // The md-anchor check: a cross-file Markdown link with #heading lands on the heading. Imported by scripts/browser-check.mjs, not run on its own.
 import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
+import { launch } from './browser-lib.mjs';
 
 /** @param {any} env what browser-check.mjs set up (dir, srv, r, browsers, context, cfg, ...) */
 export function checks(env) {
   const { dir, srv, r, browsers, context, cfg } = env;
-  // The rendered heading ids carry a "user-content-" prefix, the link keeps the plain
-  // fragment. The commit goes on a side ref through a private index, so HEAD and the work tree
+  // Heading ids are plain, as a user writes them, so the link resolves with JS on and off. A
+  // heading named like a chrome id ("main") is prefixed and reached through nav.js. The commit goes on a side ref through a private index, so HEAD and the work tree
   // the other checks use stay put.
   async function mdAnchor() {
     const gitEnv = { ...process.env, GIT_INDEX_FILE: join(cfg, 'anchor-index') };
@@ -14,20 +15,20 @@ export function checks(env) {
     git(undefined, 'read-tree', 'HEAD');
     const filler = Array.from({ length: 80 }, (_, i) => `Paragraph ${i + 1} of filler text.\n`).join('\n');
     const files = {
-      'anchor/index.md': '# Index\n\n[syntax](guide.md#syntax-highlighting) [lines](guide.md#L2)\n',
-      'anchor/guide.md': `# Guide\n\n${filler}\n## Syntax highlighting\n\nThe target.\n\n${filler}`,
+      'anchor/index.md': '# Index\n\n[main](guide.md#main) [syntax](guide.md#syntax-highlighting) [lines](guide.md#L2)\n',
+      'anchor/guide.md': `# Guide\n\n${filler}\n## Syntax highlighting\n\nThe target.\n\n${filler}\n## main\n\nClobber bait.\n\n${filler}`,
     };
     for (const [path, body] of Object.entries(files)) {
       git(undefined, 'update-index', '--add', '--cacheinfo', `100644,${git(body, 'hash-object', '-w', '--stdin')},${path}`);
     }
     const sha = git(undefined, 'commit-tree', git(undefined, 'write-tree'), '-p', 'HEAD', '-m', 'Anchor fixtures');
     git(undefined, 'update-ref', 'refs/heads/anchor-check', sha);
-    const seen = async (p) => p.evaluate(() => {
-      const h = document.getElementById('user-content-syntax-highlighting');
+    const seen = async (p, id = 'syntax-highlighting') => p.evaluate((id) => {
+      const h = document.getElementById(id);
       if (!h) return null;
       const t = h.getBoundingClientRect().top;
       return { top: t, inView: t >= -2 && t < innerHeight, scrolled: scrollY > 0 };
-    });
+    }, id);
     for (const name of browsers) {
       const { b, ctx } = await context(name);
       const where = `md-anchor ${name}`;
@@ -54,7 +55,26 @@ export function checks(env) {
       await q.waitForTimeout(400);
       m = await seen(q);
       m && m.scrolled && m.inView ? r.ok(`${where}: hashchange lands on the heading`) : r.fail(`${where}: hashchange: ${m ? `heading at ${Math.round(m.top)} px` : 'no heading'}`);
+      // A heading named "main" must not clobber the page, and a typed #main still lands on it.
+      const c = await ctx.newPage();
+      await c.setViewportSize({ width: 900, height: 600 });
+      await c.goto(`${srv.base}/blob/${sha}/anchor/guide.md#main`, { waitUntil: 'load' });
+      await c.waitForTimeout(400);
+      const own = await c.evaluate(() => document.getElementById('main') && document.getElementById('main').tagName);
+      m = await seen(c, 'user-content-main');
+      own === 'MAIN' && m && m.scrolled && m.inView ? r.ok(`${where}: #main lands on the heading, page <main> intact`) : r.fail(`${where}: #main: own=${own} ${m ? `heading at ${Math.round(m.top)} px` : 'no heading'}`);
       await b.close();
+      // JS off, as an export may be opened: the plain fragment resolves by the browser alone.
+      const nb = await launch(env.pw, name);
+      const nctx = await nb.newContext({ javaScriptEnabled: false });
+      const n = await nctx.newPage();
+      await n.setViewportSize({ width: 900, height: 600 });
+      await n.goto(`${srv.base}/blob/${sha}/anchor/guide.md#syntax-highlighting`, { waitUntil: 'load' });
+      await n.waitForTimeout(400);
+      const pos = await n.evaluate(() => ({ y: scrollY }));
+      const box = await n.locator('[id="syntax-highlighting"]').boundingBox();
+      box && pos.y > 0 && box.y >= -2 && box.y < 600 ? r.ok(`${where}: JS off, plain #fragment lands on the heading`) : r.fail(`${where}: JS off: y=${pos.y} box=${box && Math.round(box.y)}`);
+      await nb.close();
     }
   }
   return { mdAnchor };

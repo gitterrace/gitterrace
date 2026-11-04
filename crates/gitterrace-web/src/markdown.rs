@@ -4,8 +4,11 @@
 //! everything the parser or this module generates goes through the same
 //! sanitizer, so the output never carries scripts, event handlers or styles.
 
+#[cfg(test)]
+mod anchor_tests;
 mod base;
 mod front;
+mod ids;
 mod lines;
 
 use std::borrow::Cow;
@@ -218,7 +221,7 @@ fn transform<'a>(
     (out, items)
 }
 
-/// One heading of a document: level 1 to 6, its slug (without the `user-content-` prefix) and text.
+/// One heading of a document: level 1 to 6, its slug (before `ids::doc_id`) and text.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct OutlineItem {
     pub(crate) level: u8,
@@ -251,8 +254,7 @@ fn outline_list(items: &[&OutlineItem]) -> String {
         out.push_str("<li class=\"d");
         out.push(if h.level > top { '1' } else { '0' });
         out.push_str("\"><a href=\"#");
-        out.push_str(USER_ID);
-        out.push_str(&esc(&h.id));
+        out.push_str(&esc(&ids::doc_id(&h.id)));
         out.push_str("\" title=\"");
         out.push_str(&esc(&h.text));
         out.push_str("\">");
@@ -298,8 +300,6 @@ pub(crate) fn outline_menu(all: &[OutlineItem], icon_only: bool) -> String {
     )
 }
 
-/// Ids from the document live under this prefix so they cannot collide with page anchors.
-const USER_ID: &str = "user-content-";
 /// Class prefixes the renderer itself emits; anything else could restyle the page chrome.
 const SAFE_CLASS: [&str; 6] = [
     "language-",
@@ -325,11 +325,11 @@ fn sanitizer(base: Base) -> ammonia::Builder<'static> {
             ("a", "href") => {
                 let url = rewrite_url(&base, value, false);
                 Some(Cow::Owned(match url.strip_prefix('#') {
-                    Some(frag) if !frag.is_empty() => format!("#{USER_ID}{frag}"),
+                    Some(frag) if !frag.is_empty() => format!("#{}", ids::doc_id(frag)),
                     _ => url,
                 }))
             }
-            (_, "id") => Some(Cow::Owned(format!("{USER_ID}{value}"))),
+            (_, "id") => Some(Cow::Owned(ids::doc_id(value))),
             (_, "class") => {
                 let kept: Vec<&str> = value
                     .split_whitespace()
@@ -514,10 +514,10 @@ mod tests {
     fn heading_anchors_use_the_common_slug_rule() {
         assert_eq!(slugify("Hello, World! v1.2_x"), "hello-world-v12_x");
         let out = render("## Same\n\n## Same\n\n## `Code` & more\n");
-        assert!(out.contains("id=\"user-content-same\""));
-        assert!(out.contains("id=\"user-content-same-1\""));
-        assert!(out.contains("id=\"user-content-code--more\""));
-        assert!(out.contains("class=\"anchor\" href=\"#user-content-same\""));
+        assert!(out.contains("id=\"same\""));
+        assert!(out.contains("id=\"same-1\""));
+        assert!(out.contains("id=\"code--more\""));
+        assert!(out.contains("class=\"anchor\" href=\"#same\""));
     }
 
     #[test]
@@ -526,13 +526,13 @@ mod tests {
         assert_eq!(resolve_path("docs", "/top.md"), "top.md");
         assert_eq!(resolve_path("", "../../x"), "x");
         let out = at(
-            "[a](../a.md#frag) [d](sub/) [x](https://e.com/a) [h](#top)",
+            "[a](../a.md#frag) [d](sub/) [x](https://e.com/a) [h](#intro)",
             "docs/guide",
         );
         assert!(out.contains("href=\"/blob/abc123/docs/a.md#frag\""));
         assert!(out.contains("href=\"/tree/abc123/docs/guide/sub\""));
         assert!(out.contains("href=\"https://e.com/a\""));
-        assert!(out.contains("href=\"#user-content-top\""));
+        assert!(out.contains("href=\"#intro\""));
     }
 
     #[test]
@@ -633,13 +633,13 @@ mod tests {
             rail.find(needle)
                 .unwrap_or_else(|| panic!("{needle} in {rail}"))
         };
-        assert!(at("#user-content-install") < at("#user-content-from-source"));
-        assert!(at("#user-content-from-source") < at("#user-content-usage\""));
-        assert!(rail.contains("<li class=\"d1\"><a href=\"#user-content-from-source\""));
-        assert!(rail.contains("<li class=\"d0\"><a href=\"#user-content-install\""));
-        assert!(rail.contains("#user-content-usage-1"));
+        assert!(at("#install") < at("#from-source"));
+        assert!(at("#from-source") < at("#usage\""));
+        assert!(rail.contains("<li class=\"d1\"><a href=\"#from-source\""));
+        assert!(rail.contains("<li class=\"d0\"><a href=\"#install\""));
+        assert!(rail.contains("#usage-1"));
         assert!(!rail.contains("Title"), "a lone h1 is not listed");
-        assert!(doc.html.contains("id=\"user-content-usage-1\""));
+        assert!(doc.html.contains("id=\"usage-1\""));
     }
 
     #[test]

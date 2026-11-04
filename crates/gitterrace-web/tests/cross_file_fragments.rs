@@ -1,6 +1,5 @@
-//! A link to a fragment of another file keeps the plain fragment. Only same-page fragments get
-//! the `user-content-` id prefix: the target page's own script maps a plain fragment to the
-//! prefixed id (static/nav.js), so this contract must not drift.
+//! A link to a fragment of another file keeps the plain fragment, and so does a same-page link:
+//! heading ids are the plain slug, so `#intro` lands without any script.
 
 use gitterrace_testkit::{git, git_at, page};
 
@@ -15,8 +14,8 @@ fn cross_file_fragments_stay_plain() {
         std::fs::create_dir_all(p.join("docs")).expect("mkdir");
         std::fs::write(
             p.join("docs/guide.md"),
-            "# Top\n\n[a](architecture.md#syntax-highlighting) [b](../other.md#top) \
-             [c](./sub/page.md#a-b) [d](#top)\n",
+            "# Intro\n\n[a](architecture.md#syntax-highlighting) [b](../other.md#top) \
+             [c](./sub/page.md#a-b) [d](#intro)\n",
         )
         .expect("write");
         git_at(p, d, &["add", "docs"]);
@@ -27,19 +26,19 @@ fn cross_file_fragments_stay_plain() {
         let (status, body) = page(&router, &format!("/blob/{sha}/docs/guide.md")).await;
         assert_eq!(status, 200, "{body}");
         for want in [
-            "/blob/{sha}/docs/architecture.md#syntax-highlighting",
-            "/blob/{sha}/other.md#top",
-            "/blob/{sha}/docs/sub/page.md#a-b",
+            "/blob/SHA/docs/architecture.md#syntax-highlighting",
+            "/blob/SHA/other.md#top",
+            "/blob/SHA/docs/sub/page.md#a-b",
         ] {
-            let want = format!("{}\"", want.replace("{sha}", &sha));
+            let want = format!("{}\"", want.replace("SHA", &sha));
             assert!(body.contains(&want), "{want} missing in {body}");
         }
         assert!(
-            body.contains("href=\"#user-content-top\""),
-            "same-page link keeps its prefix"
+            body.contains("href=\"#intro\"") && body.contains("id=\"intro\""),
+            "same-page link and its heading stay plain"
         );
         assert!(
-            !body.contains("#user-content-syntax"),
+            !body.contains("user-content-"),
             "cross-file fragment was prefixed"
         );
         assert!(

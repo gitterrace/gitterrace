@@ -25,7 +25,7 @@
 //                5-7 byte for byte with #L5-L7 and a matching source: line; README prose arrives
 //                as its source line
 //   md-anchor    a link to another file's #heading, a typed URL and a hash change land on the
-//                heading, whose rendered id carries the user-content- prefix
+//                heading, whose rendered id is the plain slug (JS on and off)
 //   overlays     t, ? and b each open a named dialog that takes focus, keeps it through 5 Tabs
 //                (and Shift+Tab), closes on Escape and gives focus back to what had it
 //   menu-same    the action menu lists the same entries in the same order in the README preview,
