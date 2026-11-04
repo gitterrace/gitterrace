@@ -44,7 +44,7 @@ pub(crate) struct Loose {
 pub(crate) struct Lang {
     pub(crate) name: String,
     pub(crate) pct: String,
-    pub(crate) width: String,
+    /// Space separated classes: the colour and the `w<N>` width step (`--w` in app.css).
     pub(crate) class: String,
 }
 
@@ -288,8 +288,8 @@ fn langs(a: &App, head: &str) -> Vec<Lang> {
                 } else {
                     format!("{share:.0}%")
                 },
-                width: format!("{share:.2}"),
-                class: format!("c{}", i + 1),
+                // Whole percent steps, at least 1 so a sliver stays visible.
+                class: format!("c{} w{}", i + 1, (share.round() as u32).clamp(1, 100)),
                 name,
             }
         })

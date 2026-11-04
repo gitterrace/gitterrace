@@ -52,3 +52,21 @@ async fn pages_carry_no_style_attribute() {
         assert!(!body.contains("style=\""), "{page} has an inline style");
     }
 }
+
+/// Every template, not only the pages above: a `style=` in any of them, including one behind
+/// a condition no fixture reaches, fails here.
+#[test]
+fn no_template_has_a_style_attribute() {
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("templates");
+    let mut bad = Vec::new();
+    for e in std::fs::read_dir(&dir).expect("templates") {
+        let path = e.expect("entry").path();
+        let src = std::fs::read_to_string(&path).expect("read");
+        for (n, line) in src.lines().enumerate() {
+            if line.contains("style=") {
+                bad.push(format!("{}:{}", path.display(), n + 1));
+            }
+        }
+    }
+    assert!(bad.is_empty(), "inline style in templates: {bad:?}");
+}

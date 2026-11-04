@@ -140,7 +140,7 @@ button:hover{border-color:var(--line-strong);background:var(--hover)}
 .side{margin:0 0 var(--space-5);font-size:var(--text-sm)}.side>:last-child{margin-bottom:0}.side h3{margin:0 0 var(--space-2);font-size:var(--text-xs);text-transform:uppercase;letter-spacing:.04em;color:var(--muted);font-weight:var(--weight-semibold)}.side h3 a{color:inherit}.side p{margin:0 0 var(--space-2)}p.facts{line-height:1.6;display:flex;flex-wrap:wrap;gap:0 var(--space-3)}
 .side b{font-variant-numeric:tabular-nums}.sparkwrap{display:block;margin:0 0 var(--space-2)}.sparkwrap svg.spark{width:100%;height:24px;overflow:visible}.sparkwrap .base{stroke:var(--line);stroke-width:1}.sparkwrap .dot{stroke-width:5;stroke-linecap:round}
 .sidelist{list-style:none;margin:0;padding:0}.sidelist li{display:flex;justify-content:space-between;gap:var(--space-3);padding:2px 0}.sidelist a{min-width:0;overflow-wrap:anywhere;font-family:var(--mono)}.sidelist .muted{flex:none;text-align:right;font-variant-numeric:tabular-nums}
-.langbar{display:flex;height:6px;border-radius:var(--radius);overflow:hidden;margin:0 0 var(--space-2);background:var(--soft)}.langbar span{display:block;height:100%}
+.langbar{display:flex;height:6px;border-radius:var(--radius);overflow:hidden;margin:0 0 var(--space-2);background:var(--soft)}.langbar span{display:block;height:100%;width:var(--w)}
 .langs{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:var(--space-1) var(--space-3)}.langs i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:var(--space-1)}
 
 /* commit list */
