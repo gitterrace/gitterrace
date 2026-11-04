@@ -92,5 +92,24 @@
     return Promise.resolve(fallback(text) ? done() : fail());
   }
   window.gtCopy = copy;
+
+  // Pinned heads: a head is stuck while it sits below the top of its box's content, which only
+  // happens when sticky moved it. The CSS draws the closing line from data-stuck.
+  var heads = document.querySelectorAll(".dochead,section.file>header,main>.head,.entries tr.th:first-child td");
+  function stuck() {
+    heads.forEach(function (h) {
+      if (getComputedStyle(h).position !== "sticky") { h.removeAttribute("data-stuck"); return; }
+      var box = h.closest(".card,section.file") || h.parentElement;
+      var natural = box.getBoundingClientRect().top + box.clientTop + parseFloat(getComputedStyle(box).paddingTop);
+      h.toggleAttribute("data-stuck", h.getBoundingClientRect().top > natural + 0.5);
+    });
+  }
+  if (heads.length) {
+    var queued = false;
+    var later = function () { if (!queued) { queued = true; requestAnimationFrame(function () { queued = false; stuck(); }); } };
+    window.addEventListener("scroll", later, { passive: true });
+    window.addEventListener("resize", later);
+    stuck();
+  }
   window.gtToast = toast;
 })();

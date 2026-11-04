@@ -36,6 +36,9 @@
 //                Send to window opens small and grows with its text
 //   tips         closing ., .+s, t, ? or b with Escape leaves no tip on the opener they hand
 //                focus back to, while Tab onto a tipped button still shows its tip
+//   sticky-line  scrolled past its top, each view's head (overview README, Markdown preview and
+//                code, blob, blame, diff file, table) is pinned with a 1 px closing line as wide as
+//                its content box, the outline button inside the bar, the Code view full width
 //   date-tips    hovering or focusing a relative date, in the tree listing and on the overview, shows
 //                its full date in the tip
 //   outline      "On this page": a rail at 1400 px, a menu at 900 px, a click scrolls and sets the hash,
@@ -83,7 +86,7 @@ const bin = resolve(arg('--bin', join(root, 'target/debug/git-terrace')));
 const fromDisk = process.argv.includes('--from-disk');
 const tabCounts = arg('--tabs', '8,12').split(',').map(Number);
 const browsers = arg('--browsers', 'webkit,chromium').split(',');
-const ALL = ['truncation', 'live-tabs', 'mermaid', 'chip', 'doctabs', 'chords', 'header', 'marked', 'menu-same', 'gutter', 'overlays', 'tips', 'date-tips', 'repo-switch', 'outline', 'mark-seam', 'about-place', 'site-theme', 'side-width', 'calm-header', 'tabs-one-line', 'huge-diff', 'sticky-heads', 'md-anchor', 'live-scroll'];
+const ALL = ['truncation', 'live-tabs', 'mermaid', 'chip', 'doctabs', 'chords', 'header', 'marked', 'menu-same', 'gutter', 'overlays', 'tips', 'date-tips', 'repo-switch', 'outline', 'mark-seam', 'about-place', 'site-theme', 'side-width', 'calm-header', 'tabs-one-line', 'huge-diff', 'sticky-heads', 'md-anchor', 'live-scroll', 'sticky-line'];
 const wanted = arg('--checks', ALL.join(',')).split(',');
 for (const c of wanted) if (!ALL.includes(c)) { console.error(`unknown check ${c}; known: ${ALL.join(', ')}`); process.exit(2); }
 
@@ -118,6 +121,8 @@ const { truncation, liveTabs, mermaid, chip, doctabs, chords, header } = pageChe
 const { marked, menuSame, gutter, overlays, tips, dateTips, repoSwitch, liveScroll, outline } = uiChecks(env);
 const { markSeam, aboutPlace, siteTheme } = siteChecks(env);
 const { hugeDiff } = diffChecks(env);
+const { checks: stickyChecks } = await import('./browser-sticky-lib.mjs');
+const { stickyLine } = stickyChecks(env);
 async function sideWidth() {
   for (const name of browsers) {
     const { b, ctx } = await context(name);
@@ -281,7 +286,7 @@ async function stickyHeads() {
     await b.close();
   }
 }
-const checks = { 'sticky-heads': stickyHeads, 'tabs-one-line': tabsOneLine, 'calm-header': calmHeader, 'side-width': sideWidth, truncation, 'live-tabs': liveTabs, mermaid, chip, doctabs, chords, header, marked, 'menu-same': menuSame, gutter, overlays, tips, 'date-tips': dateTips, 'repo-switch': repoSwitch, outline, 'mark-seam': markSeam, 'about-place': aboutPlace, 'site-theme': siteTheme, 'huge-diff': hugeDiff, 'md-anchor': mdAnchor, 'live-scroll': liveScroll };
+const checks = { 'sticky-heads': stickyHeads, 'tabs-one-line': tabsOneLine, 'calm-header': calmHeader, 'side-width': sideWidth, truncation, 'live-tabs': liveTabs, mermaid, chip, doctabs, chords, header, marked, 'menu-same': menuSame, gutter, overlays, tips, 'date-tips': dateTips, 'repo-switch': repoSwitch, outline, 'mark-seam': markSeam, 'about-place': aboutPlace, 'site-theme': siteTheme, 'huge-diff': hugeDiff, 'md-anchor': mdAnchor, 'live-scroll': liveScroll, 'sticky-line': stickyLine };
 try {
   for (const c of wanted) { console.log(`-- ${c}`); await checks[c](); }
 } finally {

@@ -535,8 +535,16 @@ button.reponame .tri{width:16px;height:16px;fill:var(--muted)}
    the next (overflow:clip, unlike hidden, is no scroll box, so sticky still sees the page). On
    wide screens the path bar of a source, blame or file history page and the head row of a
    .entries table pin too. Calm like the top bar: page colours, no shadow. Anchors land below. */
-section.file{overflow:clip}
-section.file>header{position:sticky;top:0;z-index:2}
+section.file,.card.doccard{overflow:clip}
+section.file>header,.dochead{position:sticky;top:0;z-index:2}
+/* One closing line for every pinned head: app.js sets data-stuck while a head sits above its
+   natural place, and the line spans the head's own box, which inside a card is the card's
+   content box. Unpinned, the card's border is the line, so it never doubles. */
+:is(.dochead,section.file>header,main>.head,.entries tr.th:first-child td)[data-stuck]::before{content:"";position:absolute;left:0;right:0;top:0;height:1px;background:var(--line);pointer-events:none}
+/* Focus and anchors inside a document card land below its pinned head. */
+html:has(.dochead){scroll-padding-top:calc(44px + var(--space-2))}
+html:has(section.file>header){scroll-padding-top:calc(40px + var(--space-2))}
+.doccard [id^="L"],.doccard .markdown-body :is(h1,h2,h3,h4,h5,h6){scroll-margin-top:calc(44px + var(--space-4))}
 [id^="L"]{scroll-margin-top:var(--space-2)}
 @media (min-width:601px){
   main:has(>.card.scroll [id^="L"])>.head,main:has(>.head+ul.list.log)>.head{position:sticky;top:0;z-index:3;background:var(--bg);margin-bottom:0;padding-bottom:var(--space-4)}
@@ -571,6 +579,8 @@ section.file>header{position:sticky;top:0;z-index:2}
 .outline-q{width:100%;min-width:0;margin-bottom:var(--space-2)}
 .outlinebtn.icon{width:32px;padding:0;justify-content:center}
 .markdown-body :is(h1,h2,h3,h4,h5,h6){scroll-margin-top:var(--space-4)}
+/* The Code view has no headings: it takes the rail's column too, the full content width. */
+.outline-cols:has([data-pane=source]:not([hidden])){grid-template-columns:minmax(0,1fr)}.outline-cols:has([data-pane=source]:not([hidden]))>.outline.rail{display:none}
 @media (max-width:1100px){.outline-cols{grid-template-columns:minmax(0,1fr)}.outline.rail{display:none}.outline-cols .outline.menu{display:block}}
 @media (min-width:1101px){.outline-cols .outline.menu{display:none}}
 @media print{.outline{display:none!important}}
