@@ -62,6 +62,8 @@ fn hits(dirs: &[&str], exts: &[&str], allowed: &[&str], bad: impl Fn(&str) -> bo
 
 /// A test helper that runs git belongs to `gitterrace-testkit`. Matches `fn git(` and
 /// `fn git_at(`, and a raw `Command::new("git")`, so a differently named copy is caught too.
+/// The build script and the test of its stamp module are exempt, like in the ast-grep rule
+/// `no-git-subprocess`: the stamp runs git at build time and its test must run the same way.
 #[test]
 fn no_git_test_helper_outside_the_testkit() {
     let defs = [concat!("fn ", "git("), concat!("fn ", "git_at(")];
@@ -69,7 +71,12 @@ fn no_git_test_helper_outside_the_testkit() {
     let found = hits(
         &["crates", "xtask"],
         &["rs"],
-        &["gitterrace-testkit/", "crates/gitterrace/build.rs"],
+        &[
+            "gitterrace-testkit/",
+            "crates/gitterrace/build.rs",
+            "crates/gitterrace/stamp.rs",
+            "crates/gitterrace/tests/stamp.rs",
+        ],
         |l| defs.iter().any(|d| l.contains(d)) || l.contains(raw),
     );
     assert!(
