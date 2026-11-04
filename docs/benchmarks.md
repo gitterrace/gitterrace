@@ -138,6 +138,8 @@ small repository. 6 of 7 metrics are within budget. Against budget: export
 of 1 %, index build 0.2 s (0.2 to 0.3) of 30 s, cold page 23 ms (22 to 24) of 1500 ms, warm page 11
 ms of 300 ms, peak memory 40 MB of 500 MB.
 
+Idle CPU is the larger of two windows: 0.05 % with no client and 1.03 % with one /events client.
+
 - **Over budget:** idle CPU is 1.03 % against a limit of 1 % (1.0x).
 
 ### git
@@ -147,12 +149,16 @@ medium repository, measured at `50fe5cc63f`. All 7 metrics are within budget. Ag
 of 1 %, index build 10.8 s (10.5 to 11.3) of 300 s, cold page 2355 ms (2321 to 2381) of 3000 ms,
 warm page 27 ms of 300 ms, peak memory 383 MB of 1500 MB.
 
+Idle CPU is the larger of two windows: 0.07 % with no client and 0.12 % with one /events client.
+
 ### linux
 
 huge repository, measured at `cbbddb6b08`. 3 of 6 metrics are within budget. Against budget: idle
 footprint above a fresh server 55 MB of 48 MB, idle CPU 0.17 % of 1 %, index build 1596.4 s (1596.4
 to 1596.4) of 600 s, cold page 27674 ms (27674 to 27674) of 20000 ms, warm page 43 ms of 500 ms,
 peak memory 6449 MB of 8000 MB.
+
+Idle CPU is the larger of two windows: 0.10 % with no client and 0.17 % with one /events client.
 
 - **Over budget:** idle footprint above a fresh server is 55 MB against a limit of 48 MB (1.2x).
 - **Over budget:** index build is 1596.4 s against a limit of 600 s (2.7x).
@@ -162,7 +168,12 @@ peak memory 6449 MB of 8000 MB.
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | control | small | 0.1.0 | 0.2 s | 37 MB | 0 MB | 40 MB | 23 MB | 0.05% | 1.03% | 12.3 s, 92 MB | median of 3 |
 | git | medium | `50fe5cc63f` | 10.8 s | 672 MB | 69 MB | 383 MB | 37 MB | 0.07% | 0.12% | 44.4 s, 189 MB | median of 3 |
-| linux | huge | `cbbddb6b08` | 1596.4 s | 8370 MB | 3595 MB | 6449 MB | 64 MB | 0.10% | 0.17% | failed (page cap) | 1 sample |
+| linux | huge | `cbbddb6b08` | 1596.4 s | 8370 MB | 3595 MB | 6449 MB | 64 MB | 0.10% | 0.17% | failed (page cap reached) | 1 sample |
+| rust | large | `f90a2d27c2` | withheld (load) | withheld (load) | withheld (load) | withheld (load) | withheld (load) | withheld (load) | withheld (load) | withheld (load) | median of 3 |
+
+control is a working checkout, so with a tab open the server also checks it for uncommitted changes
+every second. git, linux, rust are bare clones with no working tree, so they have nothing to check
+and idle lower.
 
 <picture>
 <source media="(prefers-color-scheme: dark)" srcset="../bench/results/2026-11-03-apple-m1-max/page_warm_ms-dark.svg">

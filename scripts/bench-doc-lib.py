@@ -74,6 +74,13 @@ def summary(name: str, r: Json) -> list[str]:
         + ".",
         "",
     ]
+    idle = r.get("idle")
+    if idle:
+        L += [
+            f"Idle CPU is the larger of two windows: {idle['cpu_pct']:.2f} % with no client and "
+            f"{idle['cpu_pct_events_client']:.2f} % with one /events client.",
+            "",
+        ]
     for k, b in over:
         L.append(
             f"- **Over budget:** {SHORT[k]} is {fmt(k, b['value'])} against a limit of "
@@ -84,13 +91,17 @@ def summary(name: str, r: Json) -> list[str]:
     return L
 
 
+FAILED_EXPORT = "failed (page cap reached)"
+HELD = "withheld (load)"
+
+
 def export_cell(r: Json) -> str:
     """An export that did not finish (ok false) is never shown as a time."""
     e = r.get("export")
     if not e:
         return "not run"
     if e.get("ok") is False:
-        return "failed (page cap)"
+        return FAILED_EXPORT
     return f"{e['secs']:.1f} s, {e['out_mb']:.0f} MB"
 
 
@@ -116,11 +127,12 @@ def loud_phases(r: Json) -> list[str]:
 
 def shown(run: Json) -> Json:
     """The publishable view of a run: a repo with a loud phase is withheld, never shown."""
-    out = {**run, "repos": {}, "withheld": {}}
+    out = {**run, "repos": {}, "withheld": {}, "held": {}}
     for n, r in run["repos"].items():
         loud = loud_phases(r)
         if loud:
             out["withheld"][n] = loud
+            out["held"][n] = r
         else:
             out["repos"][n] = r
     return out
@@ -189,6 +201,21 @@ def comparison(cur: Json, old: Json) -> list[str]:
     return [*L, ""]
 
 
+def idle_cause(run: Json) -> list[str]:
+    """Why idle CPU with a client differs between repos: only a working checkout is scanned."""
+    local = {r["name"] for r in bc.corpus_repos() if r.get("local")}
+    seen = [n for n in (*run["repos"], *run.get("held", {})) if n in local]
+    bare = [n for n in (*run["repos"], *run.get("held", {})) if n not in local]
+    if not seen or not bare:
+        return []
+    return [
+        f"{', '.join(seen)} is a working checkout, so with a tab open the server also checks it for "
+        f"uncommitted changes every second. {', '.join(bare)} are bare clones with no working tree, "
+        "so they have nothing to check and idle lower.",
+        "",
+    ]
+
+
 def idle_footprint(r: Json) -> str:
     fp = r["memory"].get("footprint_idle_mb")
     return "not measured" if fp is None else f"{fp:.0f} MB"
@@ -222,7 +249,14 @@ def block(cur: Json, old: Json | None) -> str:
             f"{r['idle']['cpu_pct']:.2f}% | "
             f"{r['idle']['cpu_pct_events_client']:.2f}% | {ex} | {samples_note(r)} |"
         )
+    for n, r in cur.get("held", {}).items():
+        L.append(
+            f"| {n} | {r['class']} | `{r['sha'][:10]}` | "
+            + " | ".join([HELD] * 8)
+            + f" | {samples_note(r)} |"
+        )
     L.append("")
+    L += idle_cause(cur)
     names = charts(cur, old)
     for key in METRICS:
         if f"{key}.svg" in names:
@@ -362,9 +396,10 @@ def results_readme(kept: list[Json]) -> str:
     L = [
         "# Benchmark results",
         "",
-        "Each run of `make bench LARGE=1` writes one `<date>-<machine>.json` here plus a folder with "
-        "its charts, and `scripts/bench-report.py` regenerates this page. The method, corpus and "
-        "budgets are in [docs/benchmarks.md](../../docs/benchmarks.md).",
+        "Each benchmark run (`make bench`, with `LARGE=1` to add the largest repository) writes one "
+        "`<date>-<machine>.json` here plus a folder with its charts, and `scripts/bench-report.py` "
+        "regenerates this page. The method, corpus and budgets are in "
+        "[docs/benchmarks.md](../../docs/benchmarks.md).",
         "",
         "| Date | Machine | gitterrace | Repos | Files |",
         "| --- | --- | --- | --- | --- |",
@@ -383,24 +418,33 @@ def results_readme(kept: list[Json]) -> str:
         header(cur),
         "",
         *[x + "\n" for x in withheld_lines(cur)],
-        "| Repo | Metric | Value | Budget | Status | Change against previous |",
-        "| --- | --- | --- | --- | --- | --- |",
+        "| Repo | Metric | Value | Budget | Status |"
+        + (" Change against previous |" if old else ""),
+        "| --- | --- | --- | --- | --- |" + (" --- |" if old else ""),
     ]
     for n, r in cur["repos"].items():
         prev = (old or {}).get("repos", {}).get(n, {}).get("budget", {})
         for k in HEADLINE:
             b = r["budget"].get(k)
             if not b:
+                if k == "export_secs" and r.get("export", {}).get("ok") is False:
+                    L.append(
+                        f"| {n} | {SHORT[k]} | {FAILED_EXPORT} | - | failed |"
+                        + (" - |" if old else "")
+                    )
                 continue
             p = prev.get(k)
-            ch = (
-                change(k, p["value"], b["value"])
-                if p
-                else ("new in this run" if old else "first kept run")
-            )
+            ch = change(k, p["value"], b["value"]) if p else "new in this run"
             L.append(
                 f"| {n} | {SHORT[k]} | {fmt(k, b['value'])}{spread(k, b)} | "
-                f"{b['limit']} {METRICS[k][1]} | {b['status']} | {ch} |"
+                f"{b['limit']} {METRICS[k][1]} | {b['status']} |"
+                + (f" {ch} |" if old else "")
+            )
+    for n in cur.get("held", {}):
+        for k in HEADLINE:
+            L.append(
+                f"| {n} | {SHORT[k]} | {HELD} | - | withheld |"
+                + (" - |" if old else "")
             )
     L.append("")
     for key in METRICS:

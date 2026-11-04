@@ -22,6 +22,7 @@ has an inline <svg>, and the newest run comes from a clean build timed on a quie
 from __future__ import annotations
 
 import importlib
+import json
 import os
 import platform
 import re
@@ -80,10 +81,79 @@ def self_test() -> None:
             sys.exit(f"bench-report self-test failed: {got}")
     loud_test()
     own_load_test()
+    page_test()
     wrap_test()
     footprint_test()
     export_test()
     print("bench-report self-test: ok")
+
+
+# Six hex characters with a digit and a letter: a board id, not a word like "facade".
+BOARD_ID = re.compile(r"\b(?=[0-9a-f]*[0-9])(?=[0-9a-f]*[a-f])[0-9a-f]{6}\b")
+
+
+def page_problems(
+    text: str, repos: list[str], files: set[str], dates: set[str]
+) -> list[str]:
+    """What is wrong with generated results pages: a measured repo missing from the table, a
+    results date or file named that is not kept, or a board id in the text."""
+    errs = [
+        f"{n} is in the run but not in the table"
+        for n in repos
+        if f"| {n} |" not in text
+    ]
+    errs += [
+        f"names the results of {d}, which are not kept"
+        for d in sorted(set(re.findall(r"\b20\d\d-\d\d-\d\d\b", text)) - dates)
+    ]
+    errs += [
+        f"names {f}, which is not in bench/results"
+        for f in sorted(set(re.findall(r"[\w-]+\.json", text)) - files)
+    ]
+    errs += [f"board id {m} in the text" for m in sorted(set(BOARD_ID.findall(text)))]
+    return errs
+
+
+def page_test() -> None:
+    """The pages show every measured repo (a withheld one as withheld) and name nothing that is
+    not kept, nor any board id."""
+    raw = published()[-1]
+    kept = shown(raw)
+    names = [n for n in raw["repos"]]
+    files, dates = {f"{run_name(raw)}.json"}, {raw["when"][:10]}
+    text = bd.results_readme([kept]) + bd.render()
+    if got := page_problems(text, names, files, dates):
+        sys.exit(f"bench-report self-test failed: a clean page was flagged: {got}")
+    for label, tweak, want in [
+        (
+            "a stale date",
+            text + " after the removal of the 2026-01-01 results",
+            "2026-01-01",
+        ),
+        ("a stale file", text + " see 2020-01-01-x.json", "2020-01-01-x.json"),
+        ("a board id", text + " see 0a0a0a for details", "0a0a0a"),
+        ("a missing repo", text.replace("| " + names[0] + " |", "| x |"), names[0]),
+    ]:
+        if not any(want in e for e in page_problems(tweak, names, files, dates)):
+            sys.exit(f"bench-report self-test failed: {label} passed the page guard")
+    withheld = shown({**raw, "repos": {n: _loud(r) for n, r in raw["repos"].items()}})
+    if not withheld["held"] or any(
+        n not in bd.results_readme([withheld]) for n in names
+    ):
+        sys.exit(
+            "bench-report self-test failed: a withheld repo vanished from the table"
+        )
+
+
+def _loud(r: Json) -> Json:
+    """A copy of a repo record whose sampled load reached its limit."""
+    out = json.loads(json.dumps(r))
+    out["load"] = {
+        "limit": 5.0,
+        "phases": {},
+        "sampled": {"index": {"max": 9.0, "mean": 2.0, "n": 3}},
+    }
+    return out
 
 
 def own_load_test() -> None:
@@ -312,6 +382,13 @@ def check(text: str, new: str) -> None:
         f"{p.relative_to(ROOT)}: left over from an older run"
         for p in actual() - set(want)
     ]
+    pages = "\n".join(body for p, body in want.items() if p.suffix == ".md") + new
+    errs += page_problems(
+        pages,
+        list(published()[-1]["repos"]),
+        {p.name for p in runs()},
+        {run["when"][:10] for run in published()},
+    )
     if new != text:
         errs.append("docs/benchmarks.md#results is stale")
     if errs:
