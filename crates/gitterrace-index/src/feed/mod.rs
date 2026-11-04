@@ -36,9 +36,41 @@ pub use memory::{IdentPairs, MemorySource};
 pub use reach::{Reach, RevView, rev_view};
 pub use segments::SegmentSource;
 
+/// Where "now" comes from. Serving reads [`SystemClock`]; tests pass a [`FixedClock`], so no
+/// count depends on when a test runs.
+pub trait Clock: Send + Sync {
+    /// Seconds since the epoch.
+    fn now(&self) -> i64;
+}
+
+/// This machine's clock (frozen by `GITTERRACE_TEST_NOW` for the equivalence oracle).
+#[derive(Debug, Clone, Copy, Default)]
+pub struct SystemClock;
+
+impl Clock for SystemClock {
+    fn now(&self) -> i64 {
+        crate::wall_clock()
+    }
+}
+
+/// A clock stopped at one instant.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct FixedClock(pub i64);
+
+impl Clock for FixedClock {
+    fn now(&self) -> i64 {
+        self.0
+    }
+}
+
 /// [`crate::reference_time`] over a source: the newest author time not after the wall clock.
 pub fn reference_time(src: &dyn InsightsSource) -> i64 {
-    let wall = crate::wall_clock();
+    reference_time_at(src, &SystemClock)
+}
+
+/// [`reference_time`] with the clock given.
+pub fn reference_time_at(src: &dyn InsightsSource, clock: &dyn Clock) -> i64 {
+    let wall = clock.now();
     src.commits_in(CommitRange::All)
         .map(|c| c.time)
         .filter(|t| *t <= wall)

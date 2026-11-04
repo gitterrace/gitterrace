@@ -25,3 +25,4 @@ libc.workspace = true
 gitterrace-testkit.workspace = true
 tempfile.workspace = true
 cap = "0.1"
+proptest = { version = "1.12", default-features = false, features = ["std"] }

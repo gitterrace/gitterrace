@@ -535,7 +535,12 @@ pub fn plausible_time(time: i64, latest: i64) -> i64 {
 /// [`plausible_time`] pinned to the edge, or a skewed clock) never empties every window. Every
 /// surface that cuts a period uses this one value.
 pub fn reference_time(records: &[CommitRecord]) -> i64 {
-    let wall = wall_clock();
+    reference_time_at(records, &feed::SystemClock)
+}
+
+/// [`reference_time`] with the clock given.
+pub fn reference_time_at(records: &[CommitRecord], clock: &dyn feed::Clock) -> i64 {
+    let wall = clock.now();
     records
         .iter()
         .map(|r| r.time)

@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: app-icon build install fmt clippy lint test doc theme actions docs-gen docs-check names lines check site-render site-shots help bench bench-report bench-guard memory-check browser-check site deploy shipped domains send-vectors preview gc gc-guard changelog
+.PHONY: counting-parity app-icon build install fmt clippy lint test doc theme actions docs-gen docs-check names lines check site-render site-shots help bench bench-report bench-guard memory-check browser-check site deploy shipped domains send-vectors preview gc gc-guard changelog
 
 ## build: Release binary
 build:
@@ -122,6 +122,11 @@ bench-guard:
 	cargo build -q -p gitterrace
 	python3 scripts/bench-run.py --synthetic --bin target/debug/git-terrace >/dev/null
 	python3 scripts/bench-report.py --self-test
+
+## counting-parity: The count parity fuzz including the pages-vs-reducers properties still red until the insights pages read Counted, and the report-only day-math lint. Not in check
+counting-parity:
+	cargo test -p gitterrace-index --test it count_parity -- --include-ignored
+	ast-grep scan -c sgconfig-report.yml
 
 ## memory-check: An idle server's memory stays flat as the history and the tree grow (about 5 minutes, so not in check)
 memory-check: build

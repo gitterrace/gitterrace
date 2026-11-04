@@ -8,9 +8,11 @@
 //! branch). Line-level series that must add up exactly (language lines over time) follow the
 //! first-parent chain instead, where merge diffs are the only way a branch's lines arrive.
 
+mod accel;
 mod axis;
 mod code;
 mod compare;
+mod counted;
 pub(crate) mod fasthash;
 mod files;
 mod filter;
@@ -19,6 +21,7 @@ mod lang;
 mod people;
 mod period;
 mod releases;
+mod scope;
 mod select;
 mod sizes;
 mod stats;
@@ -33,9 +36,14 @@ use crate::feed::{
     self, CommitRange, CommitRow, FileRow, IdentId, InsightsSource, MemorySource, PathId, Rank,
 };
 
+pub use accel::{Accel, NoAccel, ReducerKind, ReducerOut};
 pub use axis::{BucketUnit, MAX_BUCKETS, TimeAxis};
 pub use code::{Frequency, Rework, ReworkPoint, rework_share, rework_verdict};
 pub use compare::{Comparison, LangDelta};
+pub use counted::{
+    CHUNK, Counted, Item, LabelTally, PersonTallies, PersonTally, Reducer, Series, Sizes, Totals,
+    When,
+};
 pub use files::{
     AgeBucket, AgeReport, Coupling, DirOwnership, Hotspot, HotspotReport, Owner, OwnershipReport,
     Touch,
@@ -49,6 +57,7 @@ pub use period::{
     Contributor, ContributorReport, Metric, Period, PeriodStats, PeriodSummary, Rhythm, SeriesPoint,
 };
 pub use releases::{Cadence, Release, release_tags};
+pub use scope::{CountContext, Scope, ScopeError, ScopeParams};
 pub use select::{OptionParams, Scoped, Selection, under};
 pub use sizes::SizeBucket;
 pub use stats::{DirChurn, FileChurn, Label, LabelBucket, LabelCount};
@@ -468,18 +477,7 @@ pub(crate) fn rank_of(i: usize) -> Rank {
 /// The newest commit not after "now" (the last of equals), else the oldest (the first of
 /// equals), as `max_by_key` and `min_by_key` picked over the records.
 pub(crate) fn reference_day(src: &dyn InsightsSource) -> Option<i64> {
-    let now = feed::reference_time(src);
-    let (mut best, mut oldest): (Option<CommitRow>, Option<CommitRow>) = (None, None);
-    for c in src.commits_in(CommitRange::All) {
-        if c.time <= now && best.is_none_or(|b| c.time >= b.time) {
-            best = Some(c);
-        }
-        if oldest.is_none_or(|o| c.time < o.time) {
-            oldest = Some(c);
-        }
-    }
-    best.or(oldest)
-        .map(|c| feed::local_day_of(c.time, c.offset))
+    scope::reference_day_at(src, feed::reference_time(src))
 }
 
 /// The record that sets [`crate::reference_time`]: fixed-period axes end on its local day.
@@ -493,13 +491,13 @@ pub(crate) fn reference_record(records: &[CommitRecord]) -> Option<&CommitRecord
 }
 
 /// Author time shifted into the author's own time zone.
-pub fn local_time(r: &CommitRecord) -> i64 {
-    r.time.saturating_add(i64::from(r.offset))
+pub const fn local_time(r: &CommitRecord) -> i64 {
+    feed::local_time_of(r.time, r.offset)
 }
 
-/// Days since 1970-01-01 in the author's own time zone.
-pub fn local_day(r: &CommitRecord) -> i64 {
-    local_time(r).div_euclid(DAY)
+/// Days since 1970-01-01 in the author's own time zone, [`feed::local_day_of`] of a record.
+pub const fn local_day(r: &CommitRecord) -> i64 {
+    feed::local_day_of(r.time, r.offset)
 }
 
 /// Monday is 0. Day 0 (1970-01-01) was a Thursday.
