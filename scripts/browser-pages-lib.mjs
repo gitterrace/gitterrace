@@ -16,7 +16,8 @@ function measure() {
     return clips && e.scrollWidth > e.clientWidth + 1 && e.clientWidth > 0 && !e.classList.contains('subj');
   };
   out.cut = [...document.querySelectorAll('body *')].filter(overflowing).map((e) => `${e.tagName}.${e.className}`);
-  const n = document.querySelector('.reponame');
+  // The repo switcher button is `hidden` while one repository is served, so take the one shown.
+  const n = [...document.querySelectorAll('.reponame')].find((e) => /** @type {HTMLElement} */ (e).offsetParent);
   if (n) {
     const rc = n.getBoundingClientRect();
     out.name = n.textContent;
