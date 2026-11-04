@@ -46,6 +46,8 @@ mod state_tests;
 mod views;
 mod when;
 #[cfg(test)]
+mod wiring_fs_tests;
+#[cfg(test)]
 mod wiring_live_tests;
 #[cfg(test)]
 mod wiring_tests;

@@ -19,8 +19,6 @@ use crate::live::Change;
 /// Rendered stats pages are reused this long; time-relative windows move slowly.
 const MEMO_TTL: Duration = Duration::from_secs(60);
 /// How long a dirty-worktree answer is reused, so every page need not run a status.
-/// The working tree scan runs on every this-many-th watcher tick.
-const WORKTREE_EVERY: u64 = 1;
 const DIRTY_TTL: Duration = Duration::from_secs(2);
 /// Record sets kept at once, one per selected commit. Each holds all of its history, so this
 /// stays small; a visitor cycling more commits than this pays a parse per switch, not a stall
@@ -35,6 +33,7 @@ pub(crate) const RECORDS_IDLE: Duration = Duration::from_secs(30);
 /// Not configurable: a read bound on a file from the repository, which may be hostile.
 const MAX_IGNORE_BYTES: usize = 1 << 20;
 
+mod events;
 mod history;
 mod memo;
 mod records;
@@ -280,6 +279,10 @@ pub(crate) struct App {
     dirty: Mutex<Option<(Instant, bool)>>,
     /// Open streams on a page that shows the working tree. Zero means no scan runs.
     pub(crate) wt_watchers: std::sync::atomic::AtomicUsize,
+    /// Working tree scans run so far, so a test can tell an idle watcher from a busy one.
+    pub(crate) wt_scans: AtomicU64,
+    /// Off ignores OS file events, so a test can prove the safety rescan alone finds a change.
+    pub(crate) os_events: AtomicBool,
     /// This repository's `/api/v1` state, so a reload reaches its settings.
     api: std::sync::OnceLock<gitterrace_api::ApiState>,
     /// Every per-request cache, dropped together when the repository is idle.
@@ -326,6 +329,8 @@ impl App {
             memo: Mutex::new(crate::bounded::Bounded::new(cfg.cache_bytes(Cache::Pages))),
             dirty: Mutex::new(None),
             wt_watchers: std::sync::atomic::AtomicUsize::new(0),
+            wt_scans: AtomicU64::new(0),
+            os_events: AtomicBool::new(true),
             caches: crate::caches::Caches::new(&cfg),
             api: std::sync::OnceLock::new(),
         }

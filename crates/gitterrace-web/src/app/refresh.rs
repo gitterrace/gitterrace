@@ -5,7 +5,8 @@ use std::{
     time::Duration,
 };
 
-use crate::app::{App, WORKTREE_EVERY, blocking};
+use crate::app::events::Events;
+use crate::app::{App, blocking};
 use crate::live::Change;
 
 impl App {
@@ -34,8 +35,11 @@ impl App {
 }
 
 /// Keeps the commit index and the open tabs current. One fingerprint of cheap `stat` calls per
-/// `watch.interval_ms` says whether anything moved; only then is HEAD resolved again. With the
-/// watcher off nothing runs on a timer: a page that finds the index behind queues a refresh.
+/// `watch.interval_ms` says whether HEAD, a ref or the index moved; only then is HEAD resolved
+/// again. The working tree scans (a gix status) run only while a tab listens, and then only when
+/// the OS reports a file change or `watch.rescan_secs` passes. Where file events are unavailable
+/// they run every interval, as polling. With the watcher off nothing runs on a timer: a page that
+/// finds the index behind queues a refresh.
 pub(crate) async fn keep_index_fresh(app: Arc<App>) {
     let mut watcher: Option<gitterrace_git::Watcher> = None;
     let mut seen = None;
@@ -43,7 +47,7 @@ pub(crate) async fn keep_index_fresh(app: Arc<App>) {
     let mut check_head = true;
     let mut wt_seen: Option<u64> = None;
     let mut dirty_seen: Option<bool> = None;
-    let mut ticks: u64 = 0;
+    let mut events = Events::default();
     loop {
         // With `index.build_on_start` off the index waits for the first page that needs it;
         // the watcher below keeps running either way.
@@ -63,6 +67,8 @@ pub(crate) async fn keep_index_fresh(app: Arc<App>) {
             seen = Some(p);
             watcher = Some(w);
         }
+        let listening = every.is_some() && app.changes.receiver_count() > 0;
+        events.follow(&app, listening, cfg.watch.rescan_secs).await;
         if cfg.index.build_on_start || app.demanded.load(Ordering::Acquire) {
             if app.rebuild.swap(false, Ordering::AcqRel) {
                 check_head = true;
@@ -92,49 +98,53 @@ pub(crate) async fn keep_index_fresh(app: Arc<App>) {
             }
         };
         tokio::select! {
-            () = app.wake.notified() => {}
-            () = tick => {
-                let Some(w) = watcher.as_mut() else { continue };
-                let now = w.parts();
-                let mut kinds = seen
-                    .filter(|b| *b != now)
-                    .map(|before| now.changed_since(&before))
-                    .unwrap_or_default();
-                ticks = ticks.wrapping_add(1);
-                // The working tree scan runs only while a page shows it.
-                if app.wt_watchers.load(Ordering::Acquire) == 0 {
-                    wt_seen = None;
-                    // Any other page still shows the top bar chip: one early-exit check per
-                    // tick, and an event only when the answer flips.
-                    if let Some(flip) = chip_flip(&app, &mut dirty_seen).await
-                        && kinds.is_empty()
-                    {
-                        app.set_dirty(flip);
-                        kinds.push("dirty");
-                    }
-                } else if ticks.is_multiple_of(WORKTREE_EVERY) {
-                    dirty_seen = None;
-                    let a = Arc::clone(&app);
-                    let sig = tokio::task::spawn_blocking(move || {
-                        gitterrace_git::worktree_signature(&a.repo).ok()
-                    })
-                    .await
-                    .ok()
-                    .flatten();
-                    if wt_seen.is_some() && sig.is_some() && sig != wt_seen {
-                        kinds.push("worktree");
-                    }
-                    if sig.is_some() {
-                        wt_seen = sig;
-                    }
-                }
-                if !kinds.is_empty() {
-                    check_head |= kinds.iter().any(|k| matches!(*k, "head" | "refs"));
-                    app.changed(kinds, now.digest()).await;
-                }
-                seen = Some(now);
+            () = app.wake.notified() => continue,
+            () = events.nudged.notified() => {}
+            () = tick => {}
+        }
+        let Some(w) = watcher.as_mut() else { continue };
+        let now = w.parts();
+        let mut kinds = seen
+            .filter(|b| *b != now)
+            .map(|before| now.changed_since(&before))
+            .unwrap_or_default();
+        // A gix status runs only when something may have changed.
+        // A tab that just opened the worktree page needs a baseline scan.
+        let look =
+            events.take() | (wt_seen.is_none() && app.wt_watchers.load(Ordering::Acquire) > 0);
+        if app.wt_watchers.load(Ordering::Acquire) == 0 {
+            wt_seen = None;
+            // Any other page still shows the top bar chip: one early-exit check, and an event
+            // only when the answer flips.
+            if look
+                && let Some(flip) = chip_flip(&app, &mut dirty_seen).await
+                && kinds.is_empty()
+            {
+                app.set_dirty(flip);
+                kinds.push("dirty");
+            }
+        } else if look {
+            dirty_seen = None;
+            app.wt_scans.fetch_add(1, Ordering::Relaxed);
+            let a = Arc::clone(&app);
+            let sig = tokio::task::spawn_blocking(move || {
+                gitterrace_git::worktree_signature(&a.repo).ok()
+            })
+            .await
+            .ok()
+            .flatten();
+            if wt_seen.is_some() && sig.is_some() && sig != wt_seen {
+                kinds.push("worktree");
+            }
+            if sig.is_some() {
+                wt_seen = sig;
             }
         }
+        if !kinds.is_empty() {
+            check_head |= kinds.iter().any(|k| matches!(*k, "head" | "refs"));
+            app.changed(kinds, now.digest()).await;
+        }
+        seen = Some(now);
     }
 }
 
@@ -145,6 +155,7 @@ async fn chip_flip(app: &Arc<App>, seen: &mut Option<bool>) -> Option<bool> {
         *seen = None;
         return None;
     }
+    app.wt_scans.fetch_add(1, Ordering::Relaxed);
     let a = Arc::clone(app);
     let now = tokio::task::spawn_blocking(move || gitterrace_git::is_dirty(&a.repo))
         .await

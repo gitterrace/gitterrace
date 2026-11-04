@@ -4,9 +4,11 @@
 mod atomic;
 mod diff;
 mod error;
+mod fs_events;
 mod gitdir;
 mod ident;
 mod ignore;
+mod nudge;
 mod repo;
 mod repo_id;
 mod time;
@@ -39,6 +41,7 @@ pub fn short_id(id: &str) -> &str {
 pub const MAX_TEXT_BYTES: u64 = 2 * 1024 * 1024;
 pub use gitdir::{BranchStatus, HeadState, InProgress, LinkedWorktree, Stash, TagAnnotation};
 pub use ignore::IgnoreSet;
+pub use nudge::{Nudge, NudgeConfig, NudgeError, Nudger, Skip};
 pub use repo::{ChangeMemo, Repo};
 pub use repo_id::resolve_permalink;
 pub use time::{civil_from_days, days_from_civil};

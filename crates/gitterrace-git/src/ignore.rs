@@ -70,6 +70,11 @@ impl IgnoreSet {
         self.hit(path, false)
     }
 
+    /// Like [`IgnoreSet::is_ignored`] for a directory, so rules such as `dist/` apply.
+    pub fn is_ignored_dir(&self, path: &str) -> bool {
+        self.is_ignored(path) || self.hit(path, true)
+    }
+
     fn hit(&self, path: &str, is_dir: bool) -> bool {
         self.search
             .pattern_matching_relative_path(

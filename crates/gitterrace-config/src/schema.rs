@@ -228,9 +228,15 @@ settings! {
     watch: Watch {
         /// Notice new commits and refs while running. Off means a restart or a reload is needed.
         enabled: bool = true => Live,
-        /// How often to check each served repository for changes, in milliseconds. A check is a
-        /// few `stat` calls. Minimum 250.
+        /// How often to check each served repository's HEAD, refs and index for changes, in
+        /// milliseconds. A check is a few `stat` calls. Where OS file events are unavailable
+        /// (the watch limit, some network volumes) it is also how often the working tree is
+        /// scanned. Minimum 250.
         interval_ms: u64 = 1000 => Live,
+        /// The safety rescan of the working tree while a tab shows it, in seconds. Between them
+        /// the scan runs only when the OS reports a file change, so a missed event costs at most
+        /// this long. Minimum 5.
+        rescan_secs: u64 = 30 => Live,
     }
     index: Index {
         /// Build the commit index as soon as a repository is served: at startup for one
@@ -409,6 +415,9 @@ impl Config {
         }
         if self.watch.interval_ms < 250 {
             return bad("watch.interval_ms", "must be at least 250");
+        }
+        if self.watch.rescan_secs < 5 {
+            return bad("watch.rescan_secs", "must be at least 5");
         }
         if self.index.threads > 64 {
             return bad("index.threads", "must be at most 64");

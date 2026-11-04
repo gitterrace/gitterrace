@@ -80,7 +80,8 @@ async fn events_deliver_each_kind_and_respect_the_stream_cap() {
         n += 1;
         std::fs::write(work.join("small.txt"), format!("needle {n}\n")).expect("write");
         git(&work, &["commit", "-qam", "fix: next"]);
-        if let Some(g) = read_until(&mut first, "event: change", Duration::from_secs(2)).await {
+        // The edit can show as a dirty chip first; the commit then follows as refs.
+        if let Some(g) = read_until(&mut first, "\"refs\"", Duration::from_secs(2)).await {
             break g;
         }
         assert!(
@@ -149,10 +150,14 @@ async fn pages_carry_their_live_mode() {
 
 #[tokio::test]
 async fn watch_interval_sets_how_fast_a_change_is_seen() {
+    let _one = crate::wiring_fs_tests::SERIAL.lock().await;
     let dir = tempfile::tempdir().expect("tmp");
     let p = repo(dir.path(), "r");
     for (ms, fast) in [(250, true), (3000, false)] {
         let a = app(&p, with(|c| c.watch.interval_ms = ms));
+        // File events would report the commit at once, whatever the interval.
+        a.os_events
+            .store(false, std::sync::atomic::Ordering::Release);
         tokio::spawn(crate::app::keep_index_fresh(Arc::clone(&a)));
         let mut rx = a.changes.subscribe();
         tokio::time::sleep(Duration::from_millis(400)).await;
@@ -178,6 +183,7 @@ async fn watch_off_runs_no_timer() {
 
 #[tokio::test]
 async fn working_tree_is_scanned_only_for_a_subscriber() {
+    let _one = crate::wiring_fs_tests::SERIAL.lock().await;
     let dir = tempfile::tempdir().expect("tmp");
     let p = repo(dir.path(), "r");
     let a = app(&p, with(|c| c.watch.interval_ms = 250));
@@ -198,13 +204,13 @@ async fn working_tree_is_scanned_only_for_a_subscriber() {
     tokio::time::sleep(Duration::from_millis(600)).await;
     while rx.try_recv().is_ok() {}
     std::fs::write(p.join("small.txt"), "edited with a subscriber\n").expect("write");
-    let got = tokio::time::timeout(Duration::from_millis(1500), rx.recv())
+    let got = tokio::time::timeout(Duration::from_secs(10), rx.recv())
         .await
         .expect("event")
         .expect("open");
     assert!(kinds(got).contains(&"worktree"), "an edit is seen");
     std::fs::write(p.join("brand-new.txt"), "x\n").expect("write");
-    let got = tokio::time::timeout(Duration::from_millis(1500), rx.recv())
+    let got = tokio::time::timeout(Duration::from_secs(10), rx.recv())
         .await
         .expect("event")
         .expect("open");
@@ -218,17 +224,31 @@ async fn working_tree_is_scanned_only_for_a_subscriber() {
 
 #[tokio::test]
 async fn dirty_chip_follows_on_pages_without_the_worktree() {
+    let _one = crate::wiring_fs_tests::SERIAL.lock().await;
     let dir = tempfile::tempdir().expect("tmp");
     let p = repo(dir.path(), "r");
-    let a = app(&p, with(|c| c.watch.interval_ms = 250));
+    // A short safety rescan covers an event a loaded machine drops.
+    let a = app(
+        &p,
+        with(|c| {
+            c.watch.interval_ms = 250;
+            c.watch.rescan_secs = 5;
+        }),
+    );
     tokio::spawn(crate::app::keep_index_fresh(Arc::clone(&a)));
     // A listener, but no page that shows the working tree.
     let mut rx = a.changes.subscribe();
-    tokio::time::sleep(Duration::from_millis(600)).await;
+    // The first check is the baseline; an edit before it would be the baseline itself.
+    let end = std::time::Instant::now() + Duration::from_secs(20);
+    while a.wt_scans.load(std::sync::atomic::Ordering::Relaxed) == 0
+        && std::time::Instant::now() < end
+    {
+        tokio::time::sleep(Duration::from_millis(50)).await;
+    }
     while rx.try_recv().is_ok() {}
     let mut next = async |want: bool| {
         loop {
-            let c = tokio::time::timeout(Duration::from_millis(2000), rx.recv())
+            let c = tokio::time::timeout(Duration::from_secs(10), rx.recv())
                 .await
                 .expect("event")
                 .expect("open");
