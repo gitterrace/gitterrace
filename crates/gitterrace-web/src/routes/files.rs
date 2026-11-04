@@ -165,7 +165,8 @@ pub(super) async fn blob(
             let (h, cut) = views::code_html_first(&views::Render::of(a), &path, t);
             (Some(h), cut)
         });
-        let doc = text.filter(|_| is_markdown(&path)).map(|t| {
+        let preview = crate::features::on(Feature::MarkdownPreview);
+        let doc = text.filter(|_| preview && is_markdown(&path)).map(|t| {
             let dir = path.rsplit_once('/').map_or("", |(d, _)| d);
             markdown::render_doc(
                 t,

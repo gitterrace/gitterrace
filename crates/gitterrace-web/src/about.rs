@@ -89,7 +89,9 @@ pub(crate) fn card(
     let is_md = std::path::Path::new(&active.file)
         .extension()
         .and_then(|e| e.to_str())
-        .is_some_and(|e| e.eq_ignore_ascii_case("md") || e.eq_ignore_ascii_case("markdown"));
+        .is_some_and(|e| e.eq_ignore_ascii_case("md") || e.eq_ignore_ascii_case("markdown"))
+        // Preview off: a Markdown document shows as its text, as a LICENSE does.
+        && crate::features::on(gitterrace_config::Feature::MarkdownPreview);
     let mut outline = String::new();
     let html = match a.repo.blob(id, &file).ok().and_then(|b| b.text) {
         Some(t) if is_md => {

@@ -373,6 +373,8 @@ settings! {
         front_matter_enabled: bool = true => Live,
         /// Draw mermaid diagrams in Markdown; off shows their source.
         mermaid_enabled: bool = true => Live,
+        /// Render Markdown files and the README card; off shows them as their source.
+        markdown_preview_enabled: bool = true => Live,
         /// Write the credit line (source, license, origin) at the foot of exported pages.
         /// Server-wide.
         credit_enabled: bool = true => Live,

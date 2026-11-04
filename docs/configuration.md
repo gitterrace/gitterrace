@@ -145,6 +145,7 @@ Exceptions, each on purpose:
 | `picker_enabled` | bool | `true` | Show the repository switcher and the list of served repositories. Server-wide. |
 | `front_matter_enabled` | bool | `true` | Show the front matter of a Markdown file as a table. |
 | `mermaid_enabled` | bool | `true` | Draw mermaid diagrams in Markdown; off shows their source. |
+| `markdown_preview_enabled` | bool | `true` | Render Markdown files and the README card; off shows them as their source. |
 | `credit_enabled` | bool | `true` | Write the credit line (source, license, origin) at the foot of exported pages. Server-wide. |
 | `api_enabled` | bool | `unset` | Serve the JSON API (`/api/v1`). Unset means on locally and off on a public server. Server-wide. |
 

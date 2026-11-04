@@ -32,12 +32,13 @@ pub enum Feature {
     Picker,
     FrontMatter,
     Mermaid,
+    MarkdownPreview,
     Credit,
     Api,
 }
 
 impl Feature {
-    pub const ALL: [Self; 15] = [
+    pub const ALL: [Self; 16] = [
         Self::Blame,
         Self::Search,
         Self::Raw,
@@ -51,6 +52,7 @@ impl Feature {
         Self::Picker,
         Self::FrontMatter,
         Self::Mermaid,
+        Self::MarkdownPreview,
         Self::Credit,
         Self::Api,
     ];
@@ -71,6 +73,7 @@ impl Feature {
             Self::Picker => "picker_enabled",
             Self::FrontMatter => "front_matter_enabled",
             Self::Mermaid => "mermaid_enabled",
+            Self::MarkdownPreview => "markdown_preview_enabled",
             Self::Credit => "credit_enabled",
             Self::Api => "api_enabled",
         }
@@ -115,6 +118,7 @@ impl Config {
             Feature::Picker => s.picker_enabled,
             Feature::FrontMatter => s.front_matter_enabled,
             Feature::Mermaid => s.mermaid_enabled,
+            Feature::MarkdownPreview => s.markdown_preview_enabled,
             Feature::Credit => s.credit_enabled,
             // Public by choice only: a public server serves the API when the file says so.
             Feature::Api => s.api_enabled.unwrap_or(!self.server.is_public),

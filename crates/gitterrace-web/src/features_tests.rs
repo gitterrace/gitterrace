@@ -158,7 +158,7 @@ fn fixture(dir: &Path) -> std::path::PathBuf {
     Fixture::init(&dir.join("repo"))
         .write(
             "README.md",
-            "---\ntitle: front\n---\n# Hi\n\n[a](src/a.rs) ![i](img.png)\n\n```mermaid\ngraph TD; A-->B\n```\n",
+            "---\ntitle: front\n---\n# Hi\n\n[a](src/a.rs) ![i](img.png)\n\n```mermaid\ngraph TD; A-->B\n```\n\n## One\n\n## Two\n\n## Three\n",
         )
         .write("src/a.rs", "fn main() {}\n")
         .write("img.png", "\u{89}PNG\r\n")
@@ -257,6 +257,19 @@ async fn features_off_leave_no_trace() {
 
 /// The switches without a route of their own show in the page they change.
 fn check_inline(off: &Off, page: &str, html: &str) {
+    // The README shows on the overview card and on its own page.
+    if matches!(off, Off::Key(Feature::MarkdownPreview)) && page == "/" {
+        for trace in ["markdown-body", "data-outline"] {
+            assert!(
+                !html.contains(trace),
+                "preview off: the overview shows {trace}"
+            );
+        }
+        assert!(
+            html.contains("<pre>"),
+            "preview off: no plain README on the overview"
+        );
+    }
     if page != "/blob/HEAD/README.md" {
         return;
     }
@@ -266,6 +279,16 @@ fn check_inline(off: &Off, page: &str, html: &str) {
         }
         Off::Key(Feature::Mermaid) => {
             assert!(!html.contains("class=\"mermaid\""), "mermaid block kept");
+        }
+        Off::Key(Feature::MarkdownPreview) => {
+            for trace in [
+                "markdown-body",
+                "data-show=",
+                "data-outline",
+                "data-md-view",
+            ] {
+                assert!(!html.contains(trace), "preview off still shows {trace}");
+            }
         }
         _ => {}
     }

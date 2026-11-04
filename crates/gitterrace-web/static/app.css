@@ -349,7 +349,9 @@ svg.chart text{font-family:var(--mono)}
 .seg.views button{font:inherit;letter-spacing:inherit;text-transform:inherit;color:var(--muted);background:none;border:0;border-radius:var(--radius);padding:4px 10px;cursor:pointer}
 .seg.views button.on{color:var(--fg);background:var(--hover)}
 .md-pane[hidden]{display:none}
-.md-pane[data-pane=rendered],.readme .markdown-body{padding:24px 32px}
+.md-pane[data-pane=rendered],.readme .markdown-body,.readme .doc-plain{padding:24px 32px}
+/* A document shown as its text (a LICENSE, or any README with the preview off). */
+.doc-plain pre{margin:0;padding:16px;overflow:auto;font:85%/1.45 var(--mono);background:var(--soft);border-radius:var(--radius)}
 .chart-head{display:flex;justify-content:space-between;align-items:flex-start;gap:var(--space-4);flex-wrap:wrap;margin-bottom:var(--space-3)}
 .chart-head h2{margin:0 0 var(--space-1)}
 .hint{margin:0;color:var(--muted);font-size:var(--text-sm);max-width:70ch}
