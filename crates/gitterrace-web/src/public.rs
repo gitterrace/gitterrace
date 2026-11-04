@@ -9,7 +9,7 @@ use axum::{
 };
 
 /// Routes that show committed history, refs or static assets only.
-const PUBLIC: &[&str] = &[
+pub(crate) const PUBLIC: &[&str] = &[
     "/",
     "/log",
     "/log/{rev}",
@@ -50,7 +50,7 @@ const PUBLIC: &[&str] = &[
 /// Routes that show this machine (working tree, stashes, linked worktree paths, live
 /// change streams, actions and their targets) or change the server. Never public.
 #[cfg(test)]
-const LOCAL: &[&str] = &[
+pub(crate) const LOCAL: &[&str] = &[
     "/worktree",
     "/worktree/diff/{*path}",
     "/worktrees",

@@ -19,6 +19,7 @@ fn scope(commits: usize) -> Scope {
         max_file: 64 * 1024,
         projects: Vec::new(),
         force: false,
+        config: gitterrace_config::Config::default(),
     }
 }
 
@@ -159,8 +160,12 @@ async fn folded_files_cost_less_than_ten_commit_pages() {
     let id = repo.resolve("HEAD").expect("head");
     // The router an export builds, with the memo its run owns.
     let changes = std::sync::Arc::new(gitterrace_git::ChangeMemo::new());
-    let router =
-        gitterrace_web::export_router(vec![fx.path().to_path_buf()], &changes).expect("router");
+    let router = gitterrace_web::export_router(
+        vec![fx.path().to_path_buf()],
+        &changes,
+        gitterrace_config::Config::default(),
+    )
+    .expect("router");
     let site = format!("/r/{}", repo.name());
 
     let t = Instant::now();
@@ -269,8 +274,12 @@ async fn a_page_over_the_body_limit_fails_naming_the_knobs() {
     let dir = tempfile::tempdir().expect("tempdir");
     let fx = wide(&dir.path().join("r"), 1, 2);
     let changes = std::sync::Arc::new(gitterrace_git::ChangeMemo::new());
-    let router =
-        gitterrace_web::export_router(vec![fx.path().to_path_buf()], &changes).expect("router");
+    let router = gitterrace_web::export_router(
+        vec![fx.path().to_path_buf()],
+        &changes,
+        gitterrace_config::Config::default(),
+    )
+    .expect("router");
     let (_, _, whole) = fetch(&router, "/refs").await.expect("page");
     assert!(whole.len() > 100);
     let err = fetch_within(&router, "/refs", 100)

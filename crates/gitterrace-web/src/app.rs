@@ -354,13 +354,16 @@ impl App {
 
     /// The actions note for this page, rendered with it.
     pub(crate) fn lookups(&self, sha: &str) -> Vec<(String, String)> {
-        if self.public() {
+        if self.public() || !crate::features::on(gitterrace_config::Feature::Actions) {
             return Vec::new();
         }
         self.env.lookups(sha)
     }
 
     pub(crate) fn actions_note(&self) -> Option<String> {
+        if !crate::features::on(gitterrace_config::Feature::Actions) {
+            return None;
+        }
         self.env.actions_note()
     }
 
@@ -521,10 +524,15 @@ pub(crate) async fn blocking<T: Send + 'static>(
         .unwrap_or_else(|_| "HEAD".to_owned());
     // Held until the work ends: `resources.blocking_jobs` bounds git work, not waiting.
     let _slot = Arc::clone(&app.env.jobs).acquire_owned().await.ok();
-    let absolute = app.cfg().display.dates == "absolute";
+    let cfg = app.cfg();
+    let absolute = cfg.display.dates == "absolute";
+    // Every page is built here, so every page reads one table of what is switched on.
+    let on = crate::features::Effective::of(&cfg, Some(&app.name));
     tokio::task::spawn_blocking(move || {
-        crate::fmt::with_dates(absolute, || {
-            crate::fmt::with_base(&app.base, || crate::fmt::with_rev(&rev, || f(&app)))
+        crate::features::with(on, || {
+            crate::fmt::with_dates(absolute, || {
+                crate::fmt::with_base(&app.base, || crate::fmt::with_rev(&rev, || f(&app)))
+            })
         })
     })
     .await?

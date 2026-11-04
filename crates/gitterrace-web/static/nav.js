@@ -10,6 +10,10 @@
   var meta = document.querySelector('meta[name="gt-base"]');
   var B = meta ? meta.content : "";
   function local(p) { return B && p.indexOf(B + "/") === 0 ? p.slice(B.length) : p; }
+  // Features the config switched off (`gt-off`): no key, entry or fetch leads to them.
+  var offMeta = document.querySelector('meta[name="gt-off"]');
+  var OFF = offMeta ? offMeta.content.split(" ") : [];
+  function isOff(f) { return OFF.indexOf(f) >= 0; }
   // The one record of which overlay is open, shared by every script that opens one (this file
   // loads first); key handlers read it instead of their own copies. `name` labels it, `back` is
   // its backdrop. open() names the box, moves focus in, keeps Tab inside a dialog (a menu closes
@@ -308,7 +312,7 @@
       if (box) box.hidden = l.length < 2;
     }).catch(function () {});
   }
-  if (repoBtn) {
+  if (repoBtn && !isOff("picker")) {
     repoBtn.addEventListener("click", openRepos);
     loadRepos();
     // live.js: a repository joined or left, so the switcher follows without a reload.
@@ -332,7 +336,7 @@
     var box = overlay("help", "Keyboard shortcuts");
     box.appendChild(el("h2", "", "Keyboard shortcuts"));
     var dl = el("dl", "keys");
-    SHORTCUTS.concat(actionChords()).forEach(function (s) {
+    SHORTCUTS.filter(function (x) { return !(isOff("insights") && x[0] === "g i") && !(isOff("search") && (x[0] === "g s" || x[0] === "/")); }).concat(actionChords()).forEach(function (s) {
       var dt = el("dt");
       s[0].split(" ").forEach(function (k) { if (k !== "/" || s[0] === "/") { dt.appendChild(el("kbd", "", k)); dt.appendChild(document.createTextNode(" ")); } });
       dl.appendChild(dt);
@@ -371,6 +375,8 @@
   // Single page keys: g, t, /, y, b, ?, j, k, Enter. RESERVED_KEYS in the actions config
   // refuses the letters among them as action keys; a test pins the two lists together.
   var goto = { c: B + "/", i: B + "/stats", b: B + "/refs", l: B + "/log/" + revEnc, s: B + "/search" };
+  if (isOff("insights")) delete goto.i;
+  if (isOff("search")) delete goto.s;
   document.addEventListener("keydown", function (e) {
     if (e.metaKey || e.ctrlKey || e.altKey) return;
     if (e.key === "Escape") { if (ov.name) closeOverlay(); else if (typing(e.target)) e.target.blur(); return; }

@@ -46,6 +46,8 @@ async fn public_error_bodies_never_name_host_folders() {
     let mut cfg = gitterrace_config::Config::default();
     cfg.server.is_public = true;
     cfg.server.hosts = vec![HOST.to_owned()];
+    // A public server serves the API only when asked; this test reads its error bodies too.
+    cfg.features.api_enabled = Some(true);
     let router = gitterrace_web::app_router_with(&p, cfg).expect("router");
     // A directory where the cache expects a file makes every cache read fail, and the error
     // text of that failure names the full path.

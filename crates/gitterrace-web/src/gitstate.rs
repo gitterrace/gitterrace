@@ -186,11 +186,10 @@ pub(crate) fn branch_rows(a: &crate::app::App) -> Result<Vec<BranchRow>> {
             let is_default = default.as_deref() == Some(s.name.as_str());
             let row = BranchRow {
                 log: href(&format!("/log/{}", enc_seg(&s.name))),
-                compare: href(&format!(
-                    "/compare?base={}&head={}",
-                    enc_seg(&base),
-                    enc_seg(&s.name)
-                )),
+                compare: crate::features::href_if(
+                    gitterrace_config::Feature::Compare,
+                    &format!("/compare?base={}&head={}", enc_seg(&base), enc_seg(&s.name)),
+                ),
                 commit: sha_link(&s.target),
                 subject: c.subject,
                 author_href: crate::views::author_href(&c.author.email),

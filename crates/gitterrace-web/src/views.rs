@@ -94,7 +94,7 @@ pub(crate) fn ref_tabs(app: &crate::app::App, on: &str) -> crate::error::Result<
     };
     let mut tabs = vec![tab("refs", "Branches & tags", local)];
     // Worktrees and stashes are this machine's state, not history.
-    if !app.public() {
+    if !app.public() && crate::features::on(gitterrace_config::Feature::Worktree) {
         tabs.push(tab(
             "worktrees",
             "Worktrees",
@@ -146,6 +146,20 @@ pub(crate) struct Chrome {
     /// Per-process action token and the menu as JSON; `None` when actions are off, so pages
     /// carry neither.
     pub(crate) actions: Option<(String, String)>,
+    /// Which of the top bar's switchable tools the page shows.
+    pub(crate) tools: Tools,
+    /// The scripted features the config turned off, space separated, for the `gt-off` meta;
+    /// empty (and no meta) when every one is on.
+    pub(crate) off: String,
+}
+
+/// The top bar's tools a `[features]` switch can take away.
+#[derive(Clone, Copy)]
+pub(crate) struct Tools {
+    /// `features.search_enabled`: the search box and its button.
+    pub(crate) search: bool,
+    /// `features.picker_enabled`: the repository switcher.
+    pub(crate) picker: bool,
 }
 
 pub(crate) struct Crumb {
@@ -221,11 +235,13 @@ pub(crate) fn chrome(app: &crate::app::App, active: &str) -> Chrome {
     reason = "`{rev}` and `{dir}` are our own placeholders, not format arguments"
 )]
 pub(crate) fn chrome_at(app: &crate::app::App, active: &str, rev: &str) -> Chrome {
+    use gitterrace_config::Feature;
+    let insights = crate::features::insights_home();
     let items = [
-        ("/", "Code", "files"),
-        ("/log/{rev}", "Commits", "log"),
-        ("/refs", "Branches & Tags", "refs"),
-        ("/stats", "Insights", "stats"),
+        Some(("/", "Code", "files")),
+        Some(("/log/{rev}", "Commits", "log")),
+        Some(("/refs", "Branches & Tags", "refs")),
+        insights.map(|p| (p, "Insights", "stats")),
     ];
     Chrome {
         base: crate::fmt::base(),
@@ -235,9 +251,10 @@ pub(crate) fn chrome_at(app: &crate::app::App, active: &str, rev: &str) -> Chrom
         rev: rev.to_owned(),
         rev_enc: enc_seg(rev),
         commit: app.repo.resolve(rev).unwrap_or_default(),
-        dirty: (!app.public()).then(|| app.dirty()),
+        dirty: (!app.public() && crate::features::on(Feature::Worktree)).then(|| app.dirty()),
         nav: items
             .into_iter()
+            .flatten()
             .map(|(path, label, key)| Nav {
                 href: href(&path.replace("{rev}", &enc_seg(rev))),
                 label,
@@ -254,7 +271,10 @@ pub(crate) fn chrome_at(app: &crate::app::App, active: &str, rev: &str) -> Chrom
             "system" => String::new(),
             t => t.to_owned(),
         },
-        live: !app.public() && app.cfg().watch.enabled && !crate::live::Mode::pinned_to(rev),
+        live: !app.public()
+            && crate::features::on(Feature::Live)
+            && app.cfg().watch.enabled
+            && !crate::live::Mode::pinned_to(rev),
         live_how: "",
         live_on: "",
         version: app.version().to_string(),
@@ -265,7 +285,13 @@ pub(crate) fn chrome_at(app: &crate::app::App, active: &str, rev: &str) -> Chrom
         actions: app
             .actions
             .as_ref()
+            .filter(|_| crate::features::on(Feature::Actions))
             .map(|l| (l.token().to_owned(), l.menu_json())),
+        tools: Tools {
+            search: crate::features::on(Feature::Search),
+            picker: crate::features::on(Feature::Picker),
+        },
+        off: crate::features::scripted_off(),
     }
 }
 
@@ -355,15 +381,26 @@ pub(crate) struct Tabs {
 }
 
 pub(crate) fn stats_tabs(active: &str) -> Tabs {
-    let mut all: Vec<Nav> = STATS_TABS
-        .into_iter()
+    let served = crate::features::pages();
+    let compare = crate::features::on(gitterrace_config::Feature::Compare);
+    // `insights.pages` orders the tabs; Compare stays last.
+    let mut all: Vec<Nav> = served
+        .iter()
+        .filter_map(|p| crate::features::page_route(p))
+        .filter_map(|r| STATS_TABS.iter().find(|t| t.0 == r).copied())
+        .chain(
+            STATS_TABS
+                .iter()
+                .copied()
+                .filter(|t| t.0 == "/compare" && compare),
+        )
         .map(|(path, label, key)| Nav {
             href: href(path),
             label,
             on: key == active,
         })
         .collect();
-    let more = all.split_off(PRIMARY_TABS);
+    let more = all.split_off(PRIMARY_TABS.min(all.len()));
     Tabs {
         more_on: more.iter().any(|n| n.on),
         primary: all,
@@ -508,9 +545,17 @@ pub(crate) fn file_stats(d: &CommitDetail) -> Vec<FileStatRow> {
         .collect()
 }
 
-/// Link to the history page of one file.
+/// Link to the history page of one file, or to its plain view when file history is off.
 pub(crate) fn file_link(path: &str) -> String {
-    crate::fmt::href(&format!("/history/{}", crate::fmt::enc_path(path)))
+    if crate::features::on(gitterrace_config::Feature::History) {
+        crate::fmt::href(&format!("/history/{}", crate::fmt::enc_path(path)))
+    } else {
+        crate::fmt::href(&format!(
+            "/blob/{}/{}",
+            crate::fmt::selected_seg(),
+            crate::fmt::enc_path(path)
+        ))
+    }
 }
 
 #[cfg(test)]

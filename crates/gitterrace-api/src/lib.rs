@@ -18,7 +18,7 @@ mod mcp;
 pub use core::{ApiState, options_from};
 pub use endpoints::{ENDPOINTS, Endpoint, Param};
 pub use error::{ApiError, ERROR_CODES, SERVER_ERROR_MESSAGE};
-pub use http::router;
+pub use http::{index_body, router};
 pub use insights::{
     HEAD_INSIGHTS, INSIGHTS, Insight, OWNERSHIP_DEPTH, Params, list as insight_list,
 };

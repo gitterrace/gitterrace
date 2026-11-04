@@ -21,6 +21,7 @@ async fn exported_fragments_resolve_without_script() {
         max_file: 64 * 1024,
         projects: Vec::new(),
         force: false,
+        config: gitterrace_config::Config::default(),
     };
     crate::export::export(&[fx.path().to_path_buf()], &out, &scope, DEFAULT_PAGES)
         .await

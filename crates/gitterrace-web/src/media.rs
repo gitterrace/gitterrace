@@ -179,6 +179,21 @@ pub(crate) fn blob_html(
 ) -> String {
     let url = raw_url(rev, path);
     let dims = dimensions(path, bytes).map_or_else(String::new, |(w, h)| format!("{w} x {h} · "));
+    // Without `/raw` there is no byte to show or download, only the facts.
+    if !crate::features::on(gitterrace_config::Feature::Raw) {
+        let mut out = format!(
+            r#"<div class="media"><p class="media-facts muted">{dims}{}</p></div>"#,
+            size(len)
+        );
+        if let Some(src) = svg_src {
+            let _ = write!(
+                out,
+                r#"<details class="media-src"><summary>Code</summary><pre class="body">{}</pre></details>"#,
+                esc(src)
+            );
+        }
+        return out;
+    }
     let mut out = format!(
         r#"<div class="media"><div class="media-stage{}">{}</div><p class="media-facts muted">{dims}{} · <a href="{url}">Raw</a> · <a href="{url}" download>Download</a></p></div>"#,
         if matches!(k, Kind::Image | Kind::Svg) {

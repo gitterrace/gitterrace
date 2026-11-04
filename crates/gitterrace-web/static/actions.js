@@ -15,6 +15,8 @@
   // links.style: "gitterrace" hands out gitterrace://<id>/<sha>/..., opened by `git terrace
   // open` without a running server; "go" the /go URL of this server.
   var linkStyle = repoMeta ? repoMeta.dataset.link : "go";
+  var offMeta = meta("gt-off");
+  var OFF = offMeta ? offMeta.content.split(" ") : [];
   var act = meta("gitterrace-actions");
   var token = act ? act.content : "";
   var mine = [];
@@ -37,7 +39,7 @@
     noteEl.hidden = false;
   }
   function pollNote() {
-    if (document.hidden) return;
+    if (document.hidden || OFF.indexOf("actions") >= 0) return;
     fetch("/_actions/status", { cache: "no-store" })
       .then(function (r) { return r.ok ? r.json() : null; })
       .then(function (j) { if (j) showNote(j.note); })
@@ -128,7 +130,7 @@
   var raw = {};
   function rawText(path) {
     var key = (commit || rev) + ":" + path;
-    if (!(key in raw)) {
+    if (!(key in raw) && OFF.indexOf("raw") < 0) {
       raw[key] = null;
       fetch(B + "/raw/" + encodeURIComponent(commit || rev) + "/" + encPath(path), { credentials: "same-origin" })
         .then(function (r) { return r.ok ? r.text() : null; })
@@ -327,12 +329,16 @@
     head("Copy");
     add("Copy permalink", "p", function () { copy(permalink(t), "Permalink copied"); closeMenu(); });
     add("Copy as markdown", "m", function () { copy(markdown(t), "Markdown copied"); closeMenu(); });
-    head("Share");
-    add("Send to\u2026", "s", function () {
-      closeMenu();
-      if (window.gtSend) window.gtSend.open({ kind: t.kind, path: t.path || "", lines: t.lines || null, subject: t.subject || "", sha: commit, link: permalink(t), markdown: markdown(t), text: t.text || "", marked: t.marked || t.quote || "" });
-    });
-    var keys = { p: 0, m: 1, s: 2 };
+    var keys = { p: 0, m: 1 };
+    // Send to reads its targets from the actions routes: with actions off it is not offered.
+    if (OFF.indexOf("actions") < 0) {
+      head("Share");
+      add("Send to\u2026", "s", function () {
+        closeMenu();
+        if (window.gtSend) window.gtSend.open({ kind: t.kind, path: t.path || "", lines: t.lines || null, subject: t.subject || "", sha: commit, link: permalink(t), markdown: markdown(t), text: t.text || "", marked: t.marked || t.quote || "" });
+      });
+      keys.s = 2;
+    }
     // Every view lists the same entries in the same order (the server's one list); an action
     // the selection does not fit stays, disabled, with the server's reason as its tip.
     if (mine.length) { list.appendChild(el("li", "sep")); head("Your actions"); }

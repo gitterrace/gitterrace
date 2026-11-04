@@ -7,6 +7,7 @@ use axum::{
     extract::{Path, Query, State},
     response::Html,
 };
+use gitterrace_config::Feature;
 use gitterrace_index::feed::{CommitRange, InsightsSource, Rank};
 
 use crate::routes::{DocQuery, Shared, page};
@@ -187,7 +188,7 @@ pub(super) async fn blob(
             outline_menu,
             crumbs: views::crumbs(&rev, &path, true),
             size: fmt::size(b.size),
-            blame_href: fmt::href(&format!("/blame/{r}/{pe}")),
+            blame_href: crate::features::href_if(Feature::Blame, &format!("/blame/{r}/{pe}")),
             log_href: fmt::href(&format!("/log/{r}?path={pe}")),
             title: path,
             html,
@@ -195,7 +196,7 @@ pub(super) async fn blob(
             cut_note: format!("Truncated after {} lines.", a.cfg().limits.blob_lines),
             media,
             too_large,
-            raw_href: fmt::href(&format!("/raw/{r}/{pe}")),
+            raw_href: crate::features::href_if(Feature::Raw, &format!("/raw/{r}/{pe}")),
         })
     })
     .await?;
@@ -223,11 +224,10 @@ pub(super) async fn blame(
         // Blame is empty for binary and oversized files; say which, from the header size.
         let too_large =
             lines.is_empty() && a.repo.blob(&id, &path)?.size > a.repo.text_limit();
-        let raw = fmt::href(&format!(
-            "/raw/{}/{}",
-            fmt::enc_seg(&rev),
-            fmt::enc_path(&path)
-        ));
+        let raw = crate::features::href_if(
+            Feature::Raw,
+            &format!("/raw/{}/{}", fmt::enc_seg(&rev), fmt::enc_path(&path)),
+        );
         Ok(BlamePage {
             c: views::chrome_at(a, "files", &rev),
             crumbs: views::crumbs(&rev, &path, true),
@@ -236,7 +236,9 @@ pub(super) async fn blame(
                 fmt::enc_seg(&rev),
                 fmt::enc_path(&path)
             )),
-            html: if too_large {
+            html: if too_large && raw.is_empty() {
+                "<p class=\"muted pad\">File too large to blame.</p>".to_owned()
+            } else if too_large {
                 format!(
                     "<p class=\"muted pad\">File too large to blame. <a href=\"{}\">View raw</a>.</p>",
                     fmt::esc(&raw)

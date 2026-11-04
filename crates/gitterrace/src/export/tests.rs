@@ -186,6 +186,7 @@ fn scope(force: bool) -> crate::export::Scope {
         max_file: 1024,
         projects: Vec::new(),
         force,
+        config: gitterrace_config::Config::default(),
     }
 }
 
@@ -266,6 +267,7 @@ async fn export_refuses_a_repository_root_as_output() {
         max_file: 1024,
         projects: Vec::new(),
         force: false,
+        config: gitterrace_config::Config::default(),
     };
     let err = crate::export::export(
         &[repo.path().to_path_buf()],
@@ -295,6 +297,7 @@ async fn export_writes_every_prewarmed_page() {
         max_file: 64 * 1024,
         projects: Vec::new(),
         force: false,
+        config: gitterrace_config::Config::default(),
     };
     crate::export::export(&[repo.path().to_path_buf()], &out, &scope, DEFAULT_PAGES)
         .await
@@ -338,6 +341,7 @@ async fn several_repositories_export_like_the_server_serves_them() {
         max_file: 64 * 1024,
         projects: Vec::new(),
         force: false,
+        config: gitterrace_config::Config::default(),
     };
     crate::export::export(
         &[a.path().to_path_buf(), b.path().to_path_buf()],
@@ -405,6 +409,7 @@ async fn export_ships_no_scriptable_raw_file() {
         max_file: 64 * 1024,
         projects: Vec::new(),
         force: false,
+        config: gitterrace_config::Config::default(),
     };
     crate::export::export(&[fx.path().to_path_buf()], &out, &scope, DEFAULT_PAGES)
         .await
@@ -445,6 +450,7 @@ fn diff_fragments_follow_the_commit_scope() {
     let allowed = super::Allowed {
         commits: std::iter::once("abc".to_owned()).collect(),
         tree: std::collections::BTreeSet::new(),
+        seeds: Vec::new(),
     };
     assert!(allowed.contains("/diff/abc/0"));
     assert!(allowed.contains("/diff/abc/1999"));
@@ -460,4 +466,52 @@ fn diff_fragments_follow_the_commit_scope() {
     }
     assert!(super::is_fragment("/r/name/diff/abc/0") && super::is_fragment("/diff/abc/0"));
     assert!(!super::is_fragment("/r/name/commit/abc") && !super::is_fragment("/r/diff/commit/abc"));
+}
+
+/// An export serves what the server would: with insights and the credit line switched off it
+/// writes no insights page and no credit footer, and no written page links either.
+#[tokio::test]
+async fn export_skips_what_features_turn_off() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let repo = gitterrace_testkit::Fixture::standard(&dir.path().join("r"));
+    let out = dir.path().join("out");
+    let config =
+        gitterrace_config::parse("[features]\ninsights_enabled = false\ncredit_enabled = false\n")
+            .expect("parse")
+            .config;
+    let scope = crate::export::Scope {
+        commits: 5,
+        max_file: 64 * 1024,
+        projects: Vec::new(),
+        force: false,
+        config,
+    };
+    crate::export::export(&[repo.path().to_path_buf()], &out, &scope, DEFAULT_PAGES)
+        .await
+        .expect("export");
+    assert!(!out.join("r/r/stats").exists(), "insights exported");
+    let mut seen = 0;
+    let mut todo = vec![out.clone()];
+    while let Some(d) = todo.pop() {
+        for e in std::fs::read_dir(&d).expect("dir").flatten() {
+            let p = e.path();
+            if p.is_dir() {
+                todo.push(p);
+            } else if p.extension().is_some_and(|x| x == "html") {
+                let html = std::fs::read_to_string(&p).expect("read");
+                assert!(
+                    !html.contains("/r/r/stats"),
+                    "{} links insights",
+                    p.display()
+                );
+                assert!(
+                    !html.contains("snapshot credit"),
+                    "{} has a credit",
+                    p.display()
+                );
+                seen += 1;
+            }
+        }
+    }
+    assert!(seen > 3, "pages were written");
 }

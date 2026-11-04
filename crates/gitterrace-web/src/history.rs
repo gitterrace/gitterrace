@@ -89,11 +89,10 @@ pub(crate) async fn page(
                 fmt::selected_seg(),
                 enc_path(&path)
             )),
-            blame_href: href(&format!(
-                "/blame/{}/{}",
-                fmt::selected_seg(),
-                enc_path(&path)
-            )),
+            blame_href: crate::features::href_if(
+                gitterrace_config::Feature::Blame,
+                &format!("/blame/{}/{}", fmt::selected_seg(), enc_path(&path)),
+            ),
             path,
             total: fmt::count(rows.len(), "commit", "commits"),
             rows,

@@ -15,6 +15,7 @@ mod outline;
 use std::borrow::Cow;
 use std::collections::HashMap;
 
+use gitterrace_config::Feature;
 use pulldown_cmark::{BlockQuoteKind, CodeBlockKind, Event, Options, Parser, Tag, TagEnd, html};
 
 use crate::fmt::esc;
@@ -93,6 +94,14 @@ fn rewrite_url(base: &Base, url: &str, image: bool) -> String {
     }
 }
 
+/// An image target rewritten to `/raw`, or `None` (the attribute dropped) when an in-repository
+/// image would need `/raw` and it is off.
+fn image_url<'a>(base: &Base, value: &str) -> Option<Cow<'a, str>> {
+    let url = rewrite_url(base, value, true);
+    // An absolute URL or an anchor comes back unchanged: only a rewritten one needs `/raw`.
+    (url == value || crate::features::on(Feature::Raw)).then_some(Cow::Owned(url))
+}
+
 fn code_block(code: &str, lang: &str, span: &str, most: usize) -> String {
     let lang = lang.split([' ', ',', '{']).next().unwrap_or("");
     let body = crate::highlight::block(code, lang, most).unwrap_or_else(|| esc(code));
@@ -145,7 +154,8 @@ fn transform<'a>(
             match ev {
                 Event::Text(t) => code.push_str(&t),
                 Event::End(TagEnd::CodeBlock) => {
-                    let html = if lang == "mermaid" {
+                    // Mermaid off: the diagram shows as its source, and no page loads the bundle.
+                    let html = if lang == "mermaid" && crate::features::on(Feature::Mermaid) {
                         format!("{}<pre class=\"mermaid\">{}</pre>\n", mark(at), esc(code))
                     } else {
                         code_block(code, lang, &mark(at), most)
@@ -260,11 +270,13 @@ fn sanitizer(base: Base) -> ammonia::Builder<'static> {
                     .collect();
                 (!kept.is_empty()).then(|| Cow::Owned(kept.join(" ")))
             }
-            ("img", "src") => Some(Cow::Owned(rewrite_url(&base, value, true))),
+            // Without `/raw` an image of the repository has no URL; the `alt` text stays.
+            ("img", "src") => image_url(&base, value),
             // One candidate, as the README idiom writes it. A list with widths or densities
             // would need each URL rewritten, so it is dropped and the `<img>` shows instead.
             ("source", "srcset") => (!value.contains([',', ' ']))
-                .then(|| Cow::Owned(rewrite_url(&base, value.trim(), true))),
+                .then(|| image_url(&base, value.trim()))
+                .flatten(),
             // Only colour-scheme queries: they are what the page's theme switch can honour.
             ("source", "media") => matches!(
                 value.replace(' ', "").as_str(),
@@ -302,6 +314,8 @@ pub(crate) fn render_doc(src: &str, base: Base) -> Doc {
     // The sentinel characters cannot come from the file, so no span is forged through them.
     let src = &*lines::neutralize(src);
     let (head, body) = match split_front_matter(src) {
+        // Off: the block is left out of the page, its lines still counted below.
+        Some((_, rest)) if !crate::features::on(Feature::FrontMatter) => (String::new(), rest),
         Some((block, rest)) => (front_matter_html(block), rest),
         None => (String::new(), src),
     };

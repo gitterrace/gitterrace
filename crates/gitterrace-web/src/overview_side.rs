@@ -7,11 +7,12 @@ use std::collections::HashMap;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use askama::Template;
+use gitterrace_config::Feature;
 use gitterrace_index::feed::{CommitRange, InsightsSource, Rank};
 
 use crate::{
     app::App,
-    fmt::{self, enc_path, enc_seg, href},
+    fmt::{self, enc_seg, href},
     spark,
 };
 
@@ -80,7 +81,7 @@ pub(crate) struct Side {
 /// The sidebar's HTML for `head` over `src`, from the memo when the tip, the index and the
 /// working tree are as last time.
 pub(crate) fn html(a: &App, head: &str, src: &dyn InsightsSource) -> String {
-    let dirty = !a.public() && a.dirty();
+    let dirty = !a.public() && crate::features::on(Feature::Worktree) && a.dirty();
     // The section list joins the key: a Live reload of `display.sidebar` must not be
     // answered with the old sidebar.
     let key = format!(
@@ -162,13 +163,13 @@ pub(crate) fn build(a: &App, head: &str, src: &dyn InsightsSource, dirty: bool, 
                 .rev()
                 .collect::<Vec<_>>()
                 .join("/"),
-            href: href(&format!("/history/{}", enc_path(&p))),
+            href: crate::views::file_link(&p),
             changes: fmt::count(n, "change", "changes"),
             path: p.to_string(),
         })
         .collect();
     let (loose, loose_total) = loose_ends(a, head, branch.as_deref(), now);
-    let worktrees = a.repo.linked_worktrees().map_or(0, |w| w.len());
+    let worktrees = worktree_count(a);
     let series = spark::series(
         times.iter().copied(),
         first_time(src, from, &times),
@@ -203,7 +204,7 @@ pub(crate) fn build(a: &App, head: &str, src: &dyn InsightsSource, dirty: bool, 
                 .join(", ")
         ),
         hot,
-        hot_href: href("/stats/hotspots"),
+        hot_href: crate::features::page_href("hotspots"),
         loose_more: match loose_total.saturating_sub(loose.len()) {
             0 => String::new(),
             n => format!("{n} more"),
@@ -213,7 +214,16 @@ pub(crate) fn build(a: &App, head: &str, src: &dyn InsightsSource, dirty: bool, 
         worktrees_href: href("/worktrees"),
         refs_href: href("/refs"),
         langs: langs(a, head),
-        langs_href: href("/stats/languages"),
+        langs_href: crate::features::page_href("languages"),
+    }
+}
+
+/// Linked worktrees to list, none while `features.worktree_enabled` is off.
+fn worktree_count(a: &App) -> usize {
+    if crate::features::on(Feature::Worktree) {
+        a.repo.linked_worktrees().map_or(0, |w| w.len())
+    } else {
+        0
     }
 }
 
@@ -242,7 +252,11 @@ fn loose_ends(a: &App, head: &str, current: Option<&str>, now: i64) -> (Vec<Loos
         .into_iter()
         .take(TOP_LOOSE)
         .map(|(t, b)| Loose {
-            href: href(&format!("/compare?base={base}&head={}", enc_seg(&b.name))),
+            href: if crate::features::on(Feature::Compare) {
+                href(&format!("/compare?base={base}&head={}", enc_seg(&b.name)))
+            } else {
+                href(&format!("/log/{}", enc_seg(&b.name)))
+            },
             tip: format!(
                 "{} ahead, {} behind",
                 fmt::count(b.ahead, "commit", "commits"),

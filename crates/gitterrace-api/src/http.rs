@@ -72,11 +72,20 @@ fn insight_rows() -> Vec<Value> {
 }
 
 pub(crate) async fn index() -> Json<Value> {
-    Json(json!({
+    Json(index_body(|_| true, true))
+}
+
+/// The `GET /` answer listing only the endpoints `keep` serves, and the insights only when
+/// `insights` is set: a server with a feature off lists no endpoint of it.
+pub fn index_body(keep: impl Fn(&str) -> bool, insights: bool) -> Value {
+    let endpoints: Vec<&endpoints::Endpoint> =
+        endpoints::all().iter().filter(|e| keep(e.path)).collect();
+    let insights = if insights { insight_rows() } else { Vec::new() };
+    json!({
         "version": 1,
-        "endpoints": endpoints::all(),
-        "insights": insight_rows(),
-    }))
+        "endpoints": endpoints,
+        "insights": insights,
+    })
 }
 
 pub(crate) async fn repo(State(s): State<ApiState>) -> Reply {

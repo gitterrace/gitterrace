@@ -41,6 +41,8 @@ pub(crate) struct Scope {
     pub(crate) projects: Vec<Project>,
     /// Write into a non-empty folder that no earlier export made.
     pub(crate) force: bool,
+    /// The settings in force: an export serves what the server would, `[features]` included.
+    pub(crate) config: gitterrace_config::Config,
 }
 
 /// Someone else's repository shown in an export, named and linked in the banner.
@@ -70,9 +72,9 @@ impl Project {
 const SEEDS: [&str; 2] = ["/refs", "/log/HEAD"];
 
 /// Every seed: the extra ones, then the server's prewarmed pages (every unfiltered insights
-/// page), so a page added to the server is exported without touching this list.
-fn seeds() -> impl Iterator<Item = &'static str> {
-    SEEDS.into_iter().chain(gitterrace_web::WARM_PAGES)
+/// page `cfg` serves), so a page added to the server is exported without touching this list.
+fn seeds(cfg: &gitterrace_config::Config) -> impl Iterator<Item = &'static str> {
+    SEEDS.into_iter().chain(gitterrace_web::warm_pages(cfg))
 }
 
 /// Where an export goes when no folder is named.
@@ -162,8 +164,8 @@ async fn crawl(
     // Owned by this run alone: dropped with the router when the crawl ends, so nothing the
     // export diffed outlives it.
     let changes = std::sync::Arc::new(gitterrace_git::ChangeMemo::new());
-    let router =
-        gitterrace_web::export_router(repos.to_vec(), &changes).context("building the router")?;
+    let router = gitterrace_web::export_router(repos.to_vec(), &changes, scope.config.clone())
+        .context("building the router")?;
     let sites = sites(&router, repos).await?;
 
     let mut queue: VecDeque<String> = root_page(out, &sites)?.into_iter().collect();
@@ -172,7 +174,7 @@ async fn crawl(
         wait_for_index(&router, site).await?;
         let repo = gitterrace_git::Repo::discover(repo_path).context("opening the repository")?;
         let head = repo.resolve("HEAD").context("resolving HEAD")?;
-        for seed in seeds() {
+        for seed in seeds(&scope.config) {
             queue.push_back(format!("{site}{seed}"));
         }
         for c in repo
@@ -328,6 +330,13 @@ fn footer_for(
     prefix: &str,
     scope: &Scope,
 ) -> String {
+    // `features.credit_enabled = false`: no credit line at the foot of the pages.
+    if !scope
+        .config
+        .feature_on(gitterrace_config::Feature::Credit, None)
+    {
+        return String::new();
+    }
     let url = scope
         .projects
         .iter()
@@ -441,6 +450,8 @@ struct Allowed {
     commits: BTreeSet<String>,
     /// Paths (relative to the repo root) of files and directories at HEAD in scope.
     tree: BTreeSet<String>,
+    /// The seed pages, which are always in scope.
+    seeds: Vec<&'static str>,
 }
 
 impl Allowed {
@@ -453,11 +464,15 @@ impl Allowed {
             .collect();
         let mut tree = BTreeSet::new();
         walk(repo, head, "", scope.max_file, &mut tree)?;
-        Ok(Self { commits, tree })
+        Ok(Self {
+            commits,
+            tree,
+            seeds: seeds(&scope.config).collect(),
+        })
     }
 
     fn contains(&self, link: &str) -> bool {
-        if seeds().any(|s| s == link) || link.starts_with("/static/") {
+        if self.seeds.contains(&link) || link.starts_with("/static/") {
             return true;
         }
         if let Some(id) = link.strip_prefix("/commit/") {

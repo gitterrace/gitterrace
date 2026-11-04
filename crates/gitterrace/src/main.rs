@@ -100,7 +100,7 @@ async fn main() -> anyhow::Result<()> {
             layout,
             theme,
             out,
-        } => wrapped(&path, year, &layout, &theme, out)?,
+        } => wrapped(&path, year, &layout, &theme, out, &loaded.config)?,
         Command::Export {
             out,
             force,
@@ -117,6 +117,7 @@ async fn main() -> anyhow::Result<()> {
                     .iter()
                     .map(|p| export::Project::parse(p))
                     .collect::<anyhow::Result<_>>()?,
+                config: loaded.config.clone(),
             };
             let pages = export::budget(export_pages, &loaded.config);
             export_cmd(&cli.paths, &path, out, &scope, pages, &loaded.config).await?;
@@ -228,7 +229,12 @@ fn wrapped(
     layout: &str,
     theme: &str,
     out: Option<PathBuf>,
+    config: &gitterrace_config::Config,
 ) -> anyhow::Result<()> {
+    // The card is an insight: with insights off there is nothing it may show.
+    if !config.feature_on(gitterrace_config::Feature::Insights, None) {
+        anyhow::bail!("wrapped needs insights: features.insights_enabled is false");
+    }
     let repo = gitterrace_git::Repo::discover(path).context("opening the repository")?;
     let index = gitterrace_index::Index::open(&repo).context("opening the cache")?;
     eprintln!("updating the cache (first run reads every commit once)...");

@@ -210,7 +210,9 @@ struct Spent {
 
 fn file_body(r: &Render, src: DiffSource<'_>, i: usize, f: &FileDiff, used: &mut Spent) -> String {
     if f.binary {
-        if let (true, DiffSource::Commit { rev, parent }) = (crate::media::is_image(&f.path), src) {
+        let shown =
+            crate::media::is_image(&f.path) && crate::features::on(gitterrace_config::Feature::Raw);
+        if let (true, DiffSource::Commit { rev, parent }) = (shown, src) {
             let old_path = f.old_path.as_deref().unwrap_or(&f.path);
             let old = (f.kind != ChangeKind::Added)
                 .then_some(parent)

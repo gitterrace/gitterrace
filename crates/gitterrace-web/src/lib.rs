@@ -12,6 +12,7 @@ mod commit_types;
 mod compare;
 mod error;
 mod far;
+mod features;
 mod filter;
 mod fmt;
 mod gitstate;
@@ -98,8 +99,9 @@ pub fn multi_router(paths: Vec<PathBuf>) -> io::Result<axum::Router> {
 pub fn export_router(
     paths: Vec<PathBuf>,
     changes: &Arc<gitterrace_git::ChangeMemo>,
+    cfg: Config,
 ) -> io::Result<axum::Router> {
-    let mut env = Env::new(Config::default());
+    let mut env = Env::new(cfg);
     env.changes = Some(Arc::clone(changes));
     Ok(build_multi(paths, None, None, &env)?.0)
 }
@@ -170,7 +172,12 @@ fn repo_router_tasks(
     };
     // A reload reaches the API through the app: both count with the same `insights.*`.
     app.set_api(api.clone());
-    let pages = routes::router(Arc::clone(&app)).nest("/api/v1", gitterrace_api::router(api));
+    let pages = routes::router(Arc::clone(&app))
+        .nest("/api/v1", gitterrace_api::router(api))
+        .route_layer(axum::middleware::from_fn_with_state(
+            Arc::clone(&app),
+            features::repo_gate,
+        ));
     let pages = if env.public() {
         pages.route_layer(axum::middleware::from_fn(public::only_public))
     } else {
@@ -208,6 +215,11 @@ pub const WARM_PAGES: [&str; 9] = [
     "/stats/patterns",
 ];
 
+/// [`WARM_PAGES`] without the pages `cfg` switches off, for `export` to seed its crawl from.
+pub fn warm_pages(cfg: &Config) -> Vec<&'static str> {
+    features::warm(cfg, None)
+}
+
 /// Opens the insights source for HEAD each time the index moves, then renders the unfiltered
 /// pages once, so the first visit to any of them is served from the memo. Sleeps between moves.
 async fn prewarm(app: Arc<App>, pages: axum::Router) {
@@ -227,14 +239,17 @@ async fn prewarm(app: Arc<App>, pages: axum::Router) {
             if !ready {
                 return;
             }
-            for path in WARM_PAGES {
+            let cfg = app.cfg();
+            for path in features::warm(&cfg, Some(&app.name)) {
                 // Internal requests skip the Host and cross-site guard, which wraps the outer
                 // router; a failed warm-up only means the first visitor builds the page.
                 if let Ok(req) = axum::http::Request::get(path).body(axum::body::Body::empty()) {
                     let _warm = pages.clone().oneshot(req).await;
                 }
             }
-            routes::prewarm_blame(app).await;
+            if cfg.feature_on(gitterrace_config::Feature::Blame, Some(&app.name)) {
+                routes::prewarm_blame(app).await;
+            }
         }
     })
     .await;
@@ -337,6 +352,10 @@ fn build_server(
             state,
         })));
     }
+    let router = router.route_layer(axum::middleware::from_fn_with_state(
+        env.clone(),
+        features::server_gate,
+    ));
     let router = if env.public() {
         router.route_layer(axum::middleware::from_fn(public::only_public))
     } else {
