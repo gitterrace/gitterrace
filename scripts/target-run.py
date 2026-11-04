@@ -239,7 +239,12 @@ def run(
 def auto(
     target: Path, days: float, marker: Path, quiet: Callable[[], bool] = cargo_quiet
 ) -> str | None:
-    """At most once a day, stamped before the run so a crash cannot loop."""
+    """At most once a day, stamped before the run so a crash cannot loop.
+
+    Never in CI: actions/cache restores target/ with archived mtimes and no stamp, so
+    every run would prune the cache it just restored and then save nothing new."""
+    if os.environ.get("CI"):
+        return None
     try:
         if time.time() - marker.stat().st_mtime < DAY:
             return None
@@ -335,12 +340,22 @@ def self_test() -> int:
             fail.append(f"site-shots after prune {left}, want ['new.png']")
 
         marker = root / "stamp"
+        saved_ci = os.environ.pop("CI", None)
         seed()
+        os.environ["CI"] = "1"
+        out = auto(target, 7, root / "ci-stamp", yes)
+        if out is not None or f"libcrate-{old_h}.rlib" not in deps():
+            fail.append("--auto pruned the restored cache under CI=1")
+        if (root / "ci-stamp").exists():
+            fail.append("--auto stamped under CI=1")
+        del os.environ["CI"]
         if auto(target, 7, marker, yes) is None or f"libcrate-{old_h}.rlib" in deps():
             fail.append("--auto did not prune on its first run of the day")
         seed()
         if auto(target, 7, marker, yes) is not None:
             fail.append("--auto ran twice within a day")
+        if saved_ci is not None:
+            os.environ["CI"] = saved_ci
 
     for f in fail:
         print("FAIL:", f)
