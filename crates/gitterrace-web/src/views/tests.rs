@@ -38,10 +38,27 @@ fn code_escapes() {
 }
 
 #[test]
+fn number_column_width_follows_the_digit_count() {
+    let digits = |n: usize| {
+        let (h, _) = code_html(&cache(), "a.txt", &"x\n".repeat(n));
+        h.split("data-digits=\"")
+            .nth(1)
+            .unwrap()
+            .chars()
+            .next()
+            .unwrap()
+    };
+    assert_eq!(
+        (digits(5), digits(999), digits(1_000), digits(12_345)),
+        ('3', '3', '4', '5')
+    );
+}
+
+#[test]
 fn big_files_light_the_first_chunks_and_the_tail_completes_them() {
     let text = "fn f() { let x = 1; }\n".repeat(3_000);
     let (first, _) = code_html_first(&cache(), "a.rs", &text);
-    assert!(first.starts_with("<div class=\"code src\" data-hl>"));
+    assert!(first.starts_with("<div class=\"code src\" data-hl data-digits=\"4\">"));
     let lit = |h: &str| h.matches("s-keyword").count();
     assert!(lit(&first) > 0 && lit(&first) < 3_000 * 2);
     let (full, _) = code_html(&cache(), "a.rs", &text);

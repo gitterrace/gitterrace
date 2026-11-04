@@ -177,6 +177,15 @@ async function gutter() {
     const shown = await p.evaluate(() => !!document.getElementById('actsel'));
     if (!wrong.length && nums.length === 250) r.ok(`gutter ${name}: 250 lines numbered 1..250 with the trigger shown=${shown}`);
     else r.fail(`gutter ${name}: ${wrong.length} wrong, first ${JSON.stringify(wrong.slice(0, 3))}`);
+    // The number has the same space on its left (the cell's padding) as between it and the code
+    // (the line's padding minus the cell's width), and the column is no wider than needed.
+    const gap = await p.evaluate(() => {
+      const l = document.querySelector('.src .l'); const b = getComputedStyle(l, '::before');
+      const px = (v) => parseFloat(v);
+      return { left: px(b.paddingLeft), right: px(getComputedStyle(l).paddingLeft) - px(b.width) };
+    });
+    if (Math.abs(gap.left - gap.right) <= 1 && gap.left >= 8) r.ok(`gutter ${name}: ${gap.left}px left of the numbers, ${gap.right}px right`);
+    else r.fail(`gutter ${name}: numbers have ${gap.left}px left and ${gap.right}px right`);
     // Send to opens small and grows with its text. Measured in Chromium: headless WebKit
     // stalls on this menu-then-dialog sequence (the marked check covers its dialog).
     if (name !== 'chromium') { await b.close(); continue; }

@@ -115,11 +115,20 @@ fn code_html_uncached(r: &Render, path: &str, text: &str, lit_lines: usize) -> (
         .flatten();
     let lazy = hl.is_some() && lit_lines != usize::MAX;
     let mut out = String::with_capacity(text.len() + text.len() / 8 + 64);
-    out.push_str(if lazy {
-        "<div class=\"code src\" data-hl>"
-    } else {
-        "<div class=\"code src\">"
-    });
+    // The number column is sized by the widest line number shown, floored at three digits.
+    let digits = text
+        .lines()
+        .count()
+        .min(r.blob_lines)
+        .max(1)
+        .to_string()
+        .len()
+        .max(3);
+    let _ = write!(
+        out,
+        "<div class=\"code src\"{} data-digits=\"{digits}\">",
+        if lazy { " data-hl" } else { "" }
+    );
     let mut cut = false;
     let mut open = false;
     for (i, line) in text.lines().enumerate() {

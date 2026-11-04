@@ -415,14 +415,17 @@ main.wrap>.chart-head{margin-top:var(--space-8)}
 .kpis+.chart-head{margin-top:var(--space-6)}
 
 /* blob and diff lines: one block per line, numbers from data-n, chunks skipped while off screen */
+/* The number column is as wide as the file's longest line number (data-digits, at least 3),
+   with the same space left of the digits as between them and the code. */
+.src[data-digits="3"]{--nd:3}.src[data-digits="4"]{--nd:4}.src[data-digits="5"]{--nd:5}.src[data-digits="6"]{--nd:6}.src[data-digits="7"]{--nd:7}
 .src,.diff{font-family:var(--mono);font-size:var(--text-sm);line-height:var(--leading-code)}
 /* A content-visibility chunk clips to its own box, so it must be as wide as its longest line
    for the card to scroll sideways. The placeholder size is set for height only: a single
    contain-intrinsic-size value would also give every skipped chunk that width. */
 .src .ch,.diff .ch{content-visibility:auto;contain-intrinsic-block-size:auto calc(var(--leading-code)*100);width:max-content;min-width:100%}
-.src .l{white-space:pre;min-height:var(--leading-code);padding:0 var(--space-3) 0 0;min-width:max-content;position:relative;padding-left:calc(6ch + var(--space-3)*2)}
-.src .l::before{content:attr(data-n);position:absolute;left:0;width:calc(6ch + var(--space-3));text-align:right;color:var(--faint);user-select:none;cursor:pointer}
-.src .l:hover{background:var(--soft)}
+.src .l{white-space:pre;min-height:var(--leading-code);padding:0 var(--space-3) 0 0;min-width:max-content;position:relative;padding-left:calc(var(--nd,3)*1ch + var(--space-3)*3)}
+.src .l::before{content:attr(data-n);position:absolute;left:0;box-sizing:border-box;padding-left:var(--space-3);width:calc(var(--nd,3)*1ch + var(--space-3)*2);text-align:right;color:var(--faint);user-select:none;cursor:pointer}
+.src .l:hover::before{background:var(--soft)}
 .src .l:target{background:var(--accent-soft);box-shadow:inset 2px 0 0 var(--accent)}
 .src .l.sel{background:var(--accent-soft)!important}
 .src .l.sel::before{box-shadow:inset 2px 0 0 var(--accent)}
