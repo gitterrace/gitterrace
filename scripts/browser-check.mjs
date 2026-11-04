@@ -24,6 +24,8 @@
 //                rendered Markdown (backticks, a link, a wrapped paragraph) sends the raw lines
 //                5-7 byte for byte with #L5-L7 and a matching source: line; README prose arrives
 //                as its source line
+//   md-anchor    a link to another file's #heading, a typed URL and a hash change land on the
+//                heading, whose rendered id carries the user-content- prefix
 //   overlays     t, ? and b each open a named dialog that takes focus, keeps it through 5 Tabs
 //                (and Shift+Tab), closes on Escape and gives focus back to what had it
 //   menu-same    the action menu lists the same entries in the same order in the README preview,
@@ -74,7 +76,7 @@ const bin = resolve(arg('--bin', join(root, 'target/debug/git-terrace')));
 const fromDisk = process.argv.includes('--from-disk');
 const tabCounts = arg('--tabs', '8,12').split(',').map(Number);
 const browsers = arg('--browsers', 'webkit,chromium').split(',');
-const ALL = ['truncation', 'live-tabs', 'mermaid', 'chip', 'doctabs', 'chords', 'header', 'marked', 'menu-same', 'gutter', 'overlays', 'tips', 'repo-switch', 'mark-seam', 'about-place', 'site-theme', 'side-width', 'calm-header', 'tabs-one-line', 'huge-diff', 'sticky-heads'];
+const ALL = ['truncation', 'live-tabs', 'mermaid', 'chip', 'doctabs', 'chords', 'header', 'marked', 'menu-same', 'gutter', 'overlays', 'tips', 'repo-switch', 'mark-seam', 'about-place', 'site-theme', 'side-width', 'calm-header', 'tabs-one-line', 'huge-diff', 'sticky-heads', 'md-anchor'];
 const wanted = arg('--checks', ALL.join(',')).split(',');
 for (const c of wanted) if (!ALL.includes(c)) { console.error(`unknown check ${c}; known: ${ALL.join(', ')}`); process.exit(2); }
 
@@ -103,6 +105,8 @@ async function context(name) {
 
 
 const env = { pw, dir, srv, r, browsers, tabCounts, marker, context, arg, bin, cfg };
+const { checks: anchorChecks } = await import('./browser-anchor-lib.mjs');
+const { mdAnchor } = anchorChecks(env);
 const { truncation, liveTabs, mermaid, chip, doctabs, chords, header } = pageChecks(env);
 const { marked, menuSame, gutter, overlays, tips, repoSwitch } = uiChecks(env);
 const { markSeam, aboutPlace, siteTheme } = siteChecks(env);
@@ -270,7 +274,7 @@ async function stickyHeads() {
     await b.close();
   }
 }
-const checks = { 'sticky-heads': stickyHeads, 'tabs-one-line': tabsOneLine, 'calm-header': calmHeader, 'side-width': sideWidth, truncation, 'live-tabs': liveTabs, mermaid, chip, doctabs, chords, header, marked, 'menu-same': menuSame, gutter, overlays, tips, 'repo-switch': repoSwitch, 'mark-seam': markSeam, 'about-place': aboutPlace, 'site-theme': siteTheme, 'huge-diff': hugeDiff };
+const checks = { 'sticky-heads': stickyHeads, 'tabs-one-line': tabsOneLine, 'calm-header': calmHeader, 'side-width': sideWidth, truncation, 'live-tabs': liveTabs, mermaid, chip, doctabs, chords, header, marked, 'menu-same': menuSame, gutter, overlays, tips, 'repo-switch': repoSwitch, 'mark-seam': markSeam, 'about-place': aboutPlace, 'site-theme': siteTheme, 'huge-diff': hugeDiff, 'md-anchor': mdAnchor };
 try {
   for (const c of wanted) { console.log(`-- ${c}`); await checks[c](); }
 } finally {

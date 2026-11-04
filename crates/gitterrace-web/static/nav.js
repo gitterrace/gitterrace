@@ -546,6 +546,25 @@
     }).catch(function () {});
   }
 
+  // ---- #heading links into rendered Markdown --------------------------------
+  // Rendered ids carry the "user-content-" prefix so document content cannot clobber page ids.
+  // A link from another file, or a typed URL, has the plain fragment, which names nothing here:
+  // jump to the prefixed element instead, as GitHub does. #L line hashes are left alone.
+  function jumpUserAnchor() {
+    var h = location.hash;
+    if (h.length < 2 || /^#L\d+(-L?\d+)?$/.test(h)) return;
+    var id;
+    try { id = decodeURIComponent(h.slice(1)); } catch (e) { return; }
+    if (document.getElementById(id)) return;
+    var t = document.getElementById("user-content-" + id);
+    if (!t) return;
+    t.scrollIntoView();
+    if (!t.hasAttribute("tabindex")) t.tabIndex = -1;
+    t.focus({ preventScroll: true });
+  }
+  window.addEventListener("hashchange", jumpUserAnchor);
+  jumpUserAnchor();
+
   // ---- screenshot hooks: ?open=finder|help|refs -------------------------------
   var want = /[?&]open=(finder|help|refs)/.exec(location.search);
   if (want) {
