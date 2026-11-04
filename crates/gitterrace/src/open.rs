@@ -16,6 +16,7 @@ use gitterrace_git::Repo;
 /// How long a freshly started server gets to answer. Opening the index of a large repository
 /// takes a second or two; past this the browser opens anyway and shows its own error.
 const READY_WAIT: Duration = Duration::from_secs(8);
+/// Not configurable: a liveness probe of a server on this machine.
 const PROBE_TIMEOUT: Duration = Duration::from_millis(500);
 
 /// Why `open` stops before a browser opens. `Unknown` exits 2.

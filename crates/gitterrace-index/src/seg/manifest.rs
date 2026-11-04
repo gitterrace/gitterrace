@@ -16,6 +16,7 @@ use crate::seg::{SegError, SegResult};
 
 pub const MANIFEST: &str = "MANIFEST";
 const MAGIC: [u8; 4] = *b"GTM1";
+/// Not configurable: an on-disk format bound against a corrupt or hostile cache.
 const MAX_NAME: usize = 64;
 
 /// One step of the write sequence, seen by a test hook after it happened.

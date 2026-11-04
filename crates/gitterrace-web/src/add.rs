@@ -27,6 +27,7 @@ use crate::multi::{Added, Kept, Table};
 
 /// Header carrying the secret from the token file.
 pub const TOKEN_HEADER: &str = "x-gitterrace-add-token";
+/// Not configurable: a request body bound against hostile pages posting to the local server.
 const BODY_LIMIT: usize = 8 * 1024;
 
 /// What the route needs: the table to grow, the permalink and action targets to extend, the

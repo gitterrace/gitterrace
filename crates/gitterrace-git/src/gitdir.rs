@@ -16,6 +16,7 @@ use crate::error::git;
 use crate::{Repo, Result};
 
 /// HEAD, `locked` and `gitdir` are a few bytes. Anything bigger is not git's and is skipped.
+/// Not configurable: a read bound on files git writes, against corrupt or foreign bytes.
 const MAX_META_BYTES: u64 = 4096;
 
 /// An operation git is in the middle of.

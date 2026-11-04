@@ -14,10 +14,12 @@ pub const PAYLOAD_VERSION: u32 = 1;
 /// Prefix of the per-action var env names; no payload variable starts with it.
 const VAR_PREFIX: &str = "GITTERRACE_VAR_";
 /// `text` caps: past either one the script gets the head and `text_truncated`.
+/// Not configurable: payload v1 contract, scripts rely on these sizes.
 const MAX_TEXT_BYTES: usize = 64 * 1024;
 const MAX_TEXT_LINES: usize = 400;
 const MAX_SUBJECT_BYTES: usize = 1024;
 /// Env values are capped so no field can exhaust the argument space.
+/// Not configurable: an OS bound on the argument and environment space.
 const MAX_ENV_BYTES: usize = 4096;
 /// Lines in the markdown snippet, the same cap the client-side copy uses.
 const MARKDOWN_LINES: usize = 40;

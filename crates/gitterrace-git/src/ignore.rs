@@ -10,6 +10,7 @@ use gix::ignore::{Search, search::Ignore};
 use crate::{BlobReader, Repo, Result, files};
 
 /// Largest ignore or mailmap file read: these are configuration, never megabytes.
+/// Not configurable: a read bound on a file from the repository, which may be hostile.
 pub(crate) const MAX_CONFIG_BYTES: u64 = 1024 * 1024;
 const FILE_NAMES: [&str; 2] = [".gitignore", ".ignore"];
 

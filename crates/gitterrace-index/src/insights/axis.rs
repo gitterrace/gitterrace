@@ -10,6 +10,8 @@ use crate::insights::{
     Period, days_from_civil, format_date, local_day, reference_day, reference_record, weekday,
 };
 
+/// Not configurable, these four: they define chart resolution, so a setting would move every
+/// golden and make the same history read differently between machines.
 /// Longest `All` span, in days, that still reads best as one bar per day (60 bars).
 const ALL_DAYS_MAX: i64 = 60;
 /// Longest `All` span shown per week (60 bars).
@@ -20,6 +22,10 @@ const ALL_MONTHS_MAX: i64 = 1_800;
 const ALL_QUARTERS_MAX: i64 = 5_460;
 /// Most buckets any axis holds, whatever the dates say. Past it the oldest buckets are dropped:
 /// the newest stretch is the one a reader looks for.
+///
+/// Not configurable: resolution comes from the span thresholds above, so a real history (under
+/// 400 years) never reaches this. It only bounds the walk against corrupt or hostile dates, and a
+/// lower value would drop history from the totals.
 pub const MAX_BUCKETS: usize = 400;
 
 const WEEKDAYS: [&str; 7] = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];

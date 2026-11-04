@@ -11,9 +11,11 @@ use crate::payload::{Lines, permalink};
 const SCHEME: &str = "gitterrace://";
 /// Longest link accepted. A real one is an id, a sha and a path well under this; anything
 /// longer is not a link a person handed over.
+/// Not configurable: a parser bound on input from outside (a link someone pasted).
 const MAX_LEN: usize = 4096;
 const ID_LEN: usize = 12;
 const MIN_SHA: usize = 7;
+/// Not configurable: the length of a full sha, a format fact.
 const MAX_SHA: usize = 40;
 
 /// Which form Copy permalink, Send to, payloads and the MCP hand out (`links.style`).

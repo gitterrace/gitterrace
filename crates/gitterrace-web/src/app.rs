@@ -38,6 +38,7 @@ const RECORD_SETS: usize = 4;
 /// 350k commits. The page memo still answers the unfiltered pages in between.
 pub(crate) const RECORDS_IDLE: Duration = Duration::from_secs(30);
 /// Largest ignore file read: these are configuration, never megabytes.
+/// Not configurable: a read bound on a file from the repository, which may be hostile.
 const MAX_IGNORE_BYTES: usize = 1 << 20;
 
 mod history;

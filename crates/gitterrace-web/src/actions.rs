@@ -30,6 +30,7 @@ use crate::fmt::enc_path;
 pub(crate) const RUN_PATH: &str = "/_actions/run";
 const STATUS_PATH: &str = "/_actions/status";
 /// The request body is an id, a kind and a locator; anything near this is not a click.
+/// Not configurable: a request body bound against hostile pages posting to the local server.
 const BODY_LIMIT: usize = 8 * 1024;
 /// How often `actions.toml` is checked for edits.
 const RELOAD_POLL: Duration = Duration::from_secs(1);

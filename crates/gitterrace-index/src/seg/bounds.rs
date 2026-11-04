@@ -4,6 +4,8 @@
 use crate::seg::{SegError, SegResult};
 
 /// Largest block payload.
+/// Not configurable, any of these: on-disk format bounds against a corrupt or hostile cache.
+/// The writer and every reader must agree on them.
 pub(crate) const MAX_BLOCK: usize = 1 << 20;
 /// Most table of contents entries in one file, and most files in one manifest.
 pub(crate) const MAX_TOC: usize = 4096;

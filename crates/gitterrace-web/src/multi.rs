@@ -32,6 +32,7 @@ pub use crate::multi::discover::discover_repos;
 use crate::{fmt, spark};
 
 /// The index sparkline's longest window, half a year.
+/// Not configurable: a chart definition (the span a sparkline shows), not a resource limit.
 const SPARK_CAP: i64 = 26 * spark::WEEK;
 
 /// One served repository: its URL name and where it lives.

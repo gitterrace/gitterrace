@@ -17,6 +17,7 @@ use crate::{
 
 const DAY: i64 = 86_400;
 /// The sidebar's longest sparkline window.
+/// Not configurable: a chart definition (the span a sparkline shows), not a resource limit.
 const SPARK_CAP: i64 = 12 * spark::WEEK;
 const CHURN_DAYS: i64 = 30;
 const TOP_CHURN: usize = 3;

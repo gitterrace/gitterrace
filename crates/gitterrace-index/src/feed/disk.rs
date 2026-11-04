@@ -35,6 +35,7 @@ pub use writer::RowWriter;
 const CACHE_BYTES: usize = 12 << 20;
 /// One record may span blocks, but never more than this, so a hostile offset chain cannot
 /// make one read walk the whole file.
+/// Not configurable: an on-disk format bound against a corrupt or hostile cache.
 const MAX_RECORD: usize = 64 << 20;
 const OID_ENTRY: usize = 24;
 /// From this many ranks on, `rows_for` scans instead of looking each rank up.

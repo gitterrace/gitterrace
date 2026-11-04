@@ -25,10 +25,13 @@ use crate::config::trust::check_file;
 /// Default and ceiling for an action's timeout. Not configurable here: each action sets its
 /// own `timeout` in actions.toml.
 const DEFAULT_TIMEOUT: Duration = Duration::from_secs(10);
+/// Not configurable: the ceiling is part of the actions.toml contract (docs/actions.md).
 const MAX_TIMEOUT: Duration = Duration::from_secs(120);
 /// A config larger than this is not hand-written; refuse instead of parsing it.
+/// Not configurable: a size bound read before parsing, against a file that is not a config.
 const MAX_CONFIG_BYTES: u64 = 256 * 1024;
 /// Limits on `[action.vars]`: names `[a-z0-9_]{1,32}`, values are plain strings.
+/// Not configurable: part of the payload v1 contract, and they bound the argv a var fills.
 const MAX_VARS: usize = 32;
 const MAX_VAR_NAME: usize = 32;
 const MAX_VAR_BYTES: usize = 4 * 1024;

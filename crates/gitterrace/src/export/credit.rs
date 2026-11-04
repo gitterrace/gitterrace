@@ -5,6 +5,7 @@
 use gitterrace_git::{Repo, TreeEntryKind};
 
 /// Largest license file read; a real license text is far smaller.
+/// Not configurable: a read bound on a file from the repository, which may be hostile.
 const MAX_LICENSE: usize = 256 * 1024;
 /// How much of the text names the license; the GPL texts mention others further down.
 const TITLE_CHARS: usize = 400;

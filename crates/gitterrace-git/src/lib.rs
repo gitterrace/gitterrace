@@ -34,6 +34,8 @@ pub fn short_id(id: &str) -> &str {
 ///
 /// Checked against the object header before reading, so a huge blob never reaches memory; larger
 /// blobs are treated like binary ones.
+/// Not configurable itself: `limits.text_kb` sets the display cap per handle; this constant is
+/// the default and the index's fixed bound, so stored numbers never depend on a setting.
 pub const MAX_TEXT_BYTES: u64 = 2 * 1024 * 1024;
 pub use gitdir::{BranchStatus, HeadState, InProgress, LinkedWorktree, Stash, TagAnnotation};
 pub use ignore::IgnoreSet;

@@ -135,6 +135,7 @@ impl SegmentBuild {
 }
 
 /// Segments in a set before [`merge_if_needed`] folds them into one, so open files stay bounded.
+/// Not configurable: a storage layout bound on open files, not a user-visible limit.
 pub(crate) const MAX_SEGMENTS: usize = 8;
 
 /// Folds one record into a segment under construction: labels, aggregates and postings, then

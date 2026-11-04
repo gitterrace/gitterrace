@@ -23,6 +23,7 @@ use crate::config::{Action, Cwd, Piece, REPO_FIELDS, Stdin, field_parts, pieces}
 use crate::payload::Payload;
 
 /// The first output line returned to the browser. Full output never leaves the server.
+/// Not configurable: it is the size of a toast, part of the page contract.
 const MAX_FIRST_LINE: usize = 200;
 /// Between SIGTERM and SIGKILL on timeout.
 const KILL_GRACE: Duration = Duration::from_secs(2);
@@ -45,8 +46,10 @@ const KEEP_ENV: &[&str] = &[
     "PATHEXT",
 ];
 /// One expanded placeholder value. Larger values belong on stdin, not in argv.
+/// Not configurable: argv bounds keep a spawn under the OS `ARG_MAX`.
 const MAX_VALUE_BYTES: usize = 64 * 1024;
 /// The whole expanded argv, well under every OS's `ARG_MAX` with the environment beside it.
+/// Not configurable: an OS bound (`ARG_MAX`), not a preference.
 const MAX_ARGV_BYTES: usize = 256 * 1024;
 
 #[derive(Debug, Clone, Copy)]
