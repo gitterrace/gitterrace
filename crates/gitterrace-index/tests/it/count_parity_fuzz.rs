@@ -329,7 +329,6 @@ proptest! {
 
     /// The /stats KPI, per-day chart and punch card against the reducers.
     #[test]
-    #[ignore = "red until the insights pages read Counted"]
     fn p4_activity_pages_equal_the_reducers(gens in prop::collection::vec(gen_commit(), 0..40), q in no_chips()) {
         let recs = history(&gens);
         let s = scope(&q);
@@ -405,5 +404,48 @@ proptest! {
         prop_assert_eq!(ins.commit_sizes_in(p), c.sizes(), "commit_sizes_in");
         let t = c.totals();
         prop_assert_eq!(t.commits, c.sizes().iter().map(|b| b.commits).sum::<usize>());
+    }
+
+    /// The activity and contributor views over one Counted, chips included, equal its reducers:
+    /// one-pass activity == totals + series + when, and every person's row and sparkline add up.
+    #[test]
+    fn p4_period_views_over_counted_equal_the_reducers(gens in prop::collection::vec(gen_commit(), 0..40), q in query()) {
+        let recs = history(&gens);
+        let s = scope(&q);
+        let ins = Insights::new(&recs, s.options().clone(), None);
+        let c = ins.counted(&s, cx(&recs));
+        let (sum, r) = c.activity();
+        let t = c.totals();
+        prop_assert_eq!(&sum.current, &t, "activity totals");
+        prop_assert_eq!(&sum, &c.summary(), "activity summary");
+        prop_assert_eq!(&r, &c.rhythm(), "activity rhythm");
+        prop_assert_eq!(&r.series, &c.series(), "rhythm series");
+        let w = c.when();
+        prop_assert_eq!(r.punch_card, w.punch_card, "punch card");
+        prop_assert_eq!(r.by_hour, w.by_hour, "by hour");
+        let want: Vec<(String, usize, u64, u64, usize)> = c
+            .per_person()
+            .into_iter()
+            .map(|p| (p.name, p.commits, p.additions, p.deletions, p.active_days))
+            .collect();
+        for m in ["commits", "added", "deleted", "net"] {
+            let rep = c.contributors(gitterrace_index::Metric::parse(m));
+            let mut got: Vec<(String, usize, u64, u64, usize)> = rep
+                .contributors
+                .iter()
+                .map(|p| (p.name.clone(), p.commits, p.additions, p.deletions, p.active_days))
+                .collect();
+            let mut want = want.clone();
+            got.sort();
+            want.sort();
+            prop_assert_eq!(got, want, "contributors {}", m);
+            prop_assert!(rep.contributors.iter().all(|p| s.options().include_bots || !p.bot));
+        }
+        let rep = c.contributors(gitterrace_index::Metric::Commits);
+        for p in &rep.contributors {
+            prop_assert_eq!(p.commits, p.series.iter().map(|x| *x as usize).sum::<usize>());
+        }
+        prop_assert_eq!(t.commits, rep.contributors.iter().map(|p| p.commits).sum::<usize>());
+        prop_assert_eq!(t.authors, rep.contributors.len());
     }
 }

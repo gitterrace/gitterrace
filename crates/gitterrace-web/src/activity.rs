@@ -3,7 +3,8 @@
 use askama::Template;
 use axum::extract::{Query, RawQuery, State};
 use axum::response::Html;
-use gitterrace_index::Period;
+use gitterrace_index::feed::SystemClock;
+use gitterrace_index::{CountContext, Period, Scope, ScopeParams};
 use serde::Deserialize;
 
 use crate::{
@@ -11,7 +12,7 @@ use crate::{
     error::Result,
     filter::{Chip, FilterBar},
     fmt::{self},
-    insights::{InsightsQuery, OptLink, cached_keyed, insights, period_of, scoped},
+    insights::{InsightsQuery, OptLink, cached_keyed, insights, period_of},
     routes::Shared,
     views::{self, Chrome, Tabs},
 };
@@ -138,6 +139,25 @@ fn range_card(from: &str, to: &str, by_weekday: &[u32; 7]) -> RangeCard {
     }
 }
 
+/// One counted set over the whole history, anchored on its newest commit: a chip narrows the
+/// commits, never the days "last week" means. A bar's range replaces the period.
+fn scope_of(
+    q: &InsightsQuery,
+    d: &crate::insights::Defaults,
+    period: Period,
+    sel: Option<(&str, &str, i64, i64)>,
+) -> Scope {
+    let params = ScopeParams {
+        period: Some(sel.map_or(period, |_| Period::All).key().to_owned()),
+        from: sel.map(|(f, _, _, _)| f.to_owned()),
+        to: sel.map(|(_, t, _, _)| t.to_owned()),
+        select: q.filter.selection(),
+        options: q.opts.clone(),
+    };
+    Scope::from_params(&params, d.clone().into_options(), period)
+        .unwrap_or_else(|_| unreachable!("the period and the range are parsed already"))
+}
+
 /// The landing insights page: the period against the one before it, commits per bucket and
 /// when commits happen.
 pub(crate) async fn page(
@@ -153,13 +173,13 @@ pub(crate) async fn page(
     }
     cached_keyed(&app, "a", key, move |a, r, c| {
         let f = &q.filter;
-        let recs = scoped(f, r);
         let d = a.defaults();
-        let ins = insights(a, &recs, q.options(&d));
         let period = period_of(&q, &d, Period::All);
         let sel = rq.parsed();
-        let days = sel.map(|(_, _, a, b)| (a, b));
-        let s = ins.period_summary_in(period, days);
+        let scope = scope_of(&q, &d, period, sel);
+        let ins = insights(a, r, scope.options().clone());
+        let counted = ins.counted(&scope, CountContext::new(&**r, &SystemClock));
+        let (s, rhythm) = counted.activity();
         let prev = s.previous.as_ref();
         let row = |label: &'static str, now: u64, before: Option<u64>| {
             let (d, tone) = delta(now, before);
@@ -205,7 +225,6 @@ pub(crate) async fn page(
         ];
         let span_days = sel.map_or_else(|| period.days(), |(_, _, a, b)| Some(b - a + 1));
         let span = span_text(s.from, s.to, span_days);
-        let rhythm = ins.rhythm_in(period, days);
         let series: Vec<_> = rhythm
             .series
             .iter()
