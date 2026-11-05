@@ -462,7 +462,7 @@ svg.chart .col:hover .dot{opacity:1}
 .opts a{color:var(--muted)}.opts a b{font-weight:var(--weight-semibold);color:var(--fg)}.opts a.on b{color:var(--accent-fg)}.opts a:hover{text-decoration:none}.opts a:hover b{text-decoration:underline}
 .delta{font-size:var(--text-sm);color:var(--muted)}.delta.up{color:var(--add)}.delta.dn{color:var(--del)}
 svg.chart .dot-pt{fill:var(--accent);fill-opacity:.55;stroke:var(--accent);stroke-width:1}svg.chart a:hover .dot-pt{fill-opacity:.95}
-.cmp{display:flex;flex-wrap:wrap;gap:var(--space-3);align-items:end;margin:var(--space-4) 0}.cmp label{display:flex;flex-direction:column;gap:4px;font-size:var(--text-sm);color:var(--muted)}.cmp input{border:var(--border);min-width:220px}.cmp button{font-weight:var(--weight-regular);padding:5px var(--space-4);background:var(--accent-soft)}
+.cmp{display:flex;flex-wrap:wrap;gap:var(--space-3);align-items:end;margin:var(--space-4) 0}.cmp label{display:flex;flex-direction:column;gap:4px;font-size:var(--text-sm);color:var(--muted)}
 table.own td{white-space:nowrap}table.own td:first-child{width:30%}
 .livenote{font:var(--weight-semibold) var(--text-xs)/1 var(--mono);color:var(--muted);background:var(--soft);border:var(--border);border-radius:var(--radius);padding:5px 10px;white-space:nowrap;cursor:pointer}
 .livenote:hover{border-color:var(--line-strong)}
