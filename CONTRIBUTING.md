@@ -74,6 +74,8 @@ The local gate is the one that counts. The hosted workflows run a subset of it.
   [benchmarks](docs/benchmarks.md))
 - Windows: CI builds and tests `x86_64-pc-windows-msvc` and smoke-tests the binary on a Windows
   runner. To run it locally on macOS or Linux, use `scripts/wine-run.sh`
+- Linux: to check it locally in Docker, `scripts/linux-run.sh` builds and smoke-tests the binary
+  (a few minutes), and `scripts/linux-run.sh --full` runs `make check` as the ubuntu CI job does
 
 ## Releasing (maintainers)
 

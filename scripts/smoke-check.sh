@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Runtime smoke test of a built git-terrace binary. One script, three callers: the Windows CI job,
-# the release check job and scripts/wine-run.sh. Usage: smoke-check.sh <binary> [port].
+# Runtime smoke test of a built git-terrace binary. One script, many callers: the Windows CI job,
+# the release check job and the wine-run, linux-run and macos-run scripts. Usage: smoke-check.sh <binary> [port].
 # GT_WINE=1 runs the binary under Wine (the binary is a .exe, paths go through winepath).
 # shellcheck disable=SC2015  # `A && ok || bad` is meant: bad runs when the check fails
 set -euo pipefail
@@ -101,7 +101,15 @@ if [ "$up" = 1 ]; then ok "serve answers"; else
   exit 1
 fi
 
-page() { curl -sS -o "$tmp/body" -w '%{http_code}' "$base$1"; }
+# Every repository is served under /r/<name>/, the name the server lists.
+rname=$(curl -fsS "$base/api/repos" 2>/dev/null | sed -n 's/.*"name":"\([^"]*\)".*/\1/p' | head -1)
+rbase="$base/r/${rname:-fixture}"
+page() {
+  case "$1" in
+  /static/*) curl -sS -o "$tmp/body" -w '%{http_code}' "$base$1" ;;
+  *) curl -sS -o "$tmp/body" -w '%{http_code}' "$rbase$1" ;;
+  esac
+}
 for p in / /tree/HEAD /tree/HEAD/src/deep /blob/HEAD/README.md /blob/HEAD/src/deep/a.rs /log/HEAD "/commit/$sha" /refs /stats /static/app.css /static/nav.js; do
   code=$(page "$p")
   if [ "$code" = 200 ]; then ok "GET $p 200"; else bad "GET $p gave $code"; fi
@@ -118,7 +126,7 @@ exe --config "$(native "$cfg")" export "$(native "$out")" "$(native "$repo")" >/
 # An action past its timeout is killed, child included.
 page "/blob/HEAD/README.md" >/dev/null
 token=$(sed -n 's/.*name="gitterrace-actions" content="\([^"]*\)".*/\1/p' "$tmp/body" | head -1)
-name=$(curl -fsS "$base/api/repos" 2>/dev/null | sed -n 's/.*"name":"\([^"]*\)".*/\1/p' | head -1)
+name=$rname
 if [ -z "$token" ]; then
   bad "no action token in the page"
 else

@@ -55,6 +55,7 @@ docs-check:
 	python3 scripts/make-targets-check.py
 	bash scripts/land-check.sh --self-test
 	bash scripts/golden-check.sh --self-test
+	bash scripts/linux-run.sh --self-test
 	python3 scripts/changelog-check.py --self-test && python3 scripts/changelog-check.py
 	cargo xtask check
 
