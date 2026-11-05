@@ -71,7 +71,7 @@ pub(super) fn sample(n: usize, keep: &[usize]) -> Vec<usize> {
 fn area_chart(ch: &Chain, view: View, subj: &Subjects) -> String {
     let n = ch.len();
     if n == 0 {
-        return r#"<p class="empty">No history yet.</p>"#.to_owned();
+        return crate::empty::Empty::new("No history yet.").to_string();
     }
     let keep: Vec<usize> = view.range.map_or(vec![], |(a, b)| vec![a, b]);
     let pts = sample(n, &keep);
@@ -443,7 +443,7 @@ fn languages_now(ch: &Chain) -> String {
 
 pub(super) fn body(ch: &Chain, view: View, subj: &Subjects) -> String {
     if ch.len() == 0 {
-        return include_str!("../../templates/_empty.html").to_owned();
+        return crate::empty::Empty::new("No commits match these filters.").to_string();
     }
     let filters = format!(
         r#"<div class="filters">{}{}</div>"#,

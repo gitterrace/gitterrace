@@ -136,7 +136,7 @@ fn no_hunks_line(f: &FileDiff) -> String {
         parts.push(format!("mode changed from {} to {}", mode(a), mode(b)));
     }
     if parts.is_empty() {
-        return "<p class=\"muted pad\">No textual changes.</p>".to_owned();
+        return crate::empty::Empty::new("No textual changes.").to_string();
     }
     let mut line = parts.join(", ");
     if let Some(c) = line.get_mut(..1) {
@@ -296,7 +296,7 @@ pub(crate) async fn worktree_fragment(
     .await?;
     // A file committed or reverted since the page loaded has nothing left to show.
     Ok(axum::response::Html(html.unwrap_or_else(|| {
-        "<p class=\"muted pad\">No longer changed.</p>".to_owned()
+        crate::empty::Empty::new("No longer changed.").to_string()
     })))
 }
 

@@ -70,7 +70,8 @@ pub(crate) struct Nav {
 }
 
 /// The Branches & tags, Worktrees and Stashes tab bar, the same on all three pages: every tab
-/// shows its count, 0 included, so a count never appears on one page and vanishes on the next.
+/// shows its count. A tab with nothing in it is left out, unless it is the page being shown,
+/// so the bar never offers a page that only says it is empty.
 pub(crate) struct RefTab {
     pub(crate) href: String,
     pub(crate) label: &'static str,
@@ -103,6 +104,8 @@ pub(crate) fn ref_tabs(app: &crate::app::App, on: &str) -> crate::error::Result<
         ));
         tabs.push(tab("stashes", "Stashes", app.repo.stashes()?.len()));
     }
+    // Branches & tags always shows: it is the bar's heading as well as a tab.
+    tabs.retain(|t| t.count > 0 || t.on || t.label == "Branches & tags");
     Ok(tabs)
 }
 

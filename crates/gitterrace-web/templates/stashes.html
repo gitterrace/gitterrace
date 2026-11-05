@@ -2,8 +2,7 @@
 {% block title %}Stashes · {{ c.name }}{% endblock %}
 {% block content %}
 {% include "_reftabs.html" %}
-<div class="card"><table class="entries grow">
+{% if let Some(e) = empty %}{{ e }}{% else %}<div class="card"><table class="entries grow">
 {% for s in rows %}<tr><td><a href="{{ s.href }}"><code>{{ s.name }}</code></a></td><td class="grow">{{ s.message }}</td><td class="muted r">{{ s.when }}</td></tr>{% endfor %}
-{% if rows.is_empty() %}<tr><td class="muted">No stashes.</td></tr>{% endif %}
-</table></div>
+</table></div>{% endif %}
 {% endblock %}

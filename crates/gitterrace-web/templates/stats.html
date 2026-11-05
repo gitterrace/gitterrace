@@ -5,7 +5,7 @@
 {% include "_lead.html" %}
 {% include "_filterbar.html" %}
 {% include "_options.html" %}
-{% if empty %}{% include "_empty.html" %}{% else %}
+{% if empty %}{{ fb.nothing }}{% else %}
 <p class="hint">{{ span }}.</p>
 <div class="card"><table class="entries">
 <tr class="th"><td></td><td class="r">This period</td>{% if compared %}<td class="r">Before</td><td class="r">Change</td>{% endif %}</tr>

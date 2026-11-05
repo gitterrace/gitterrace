@@ -15,6 +15,7 @@ use serde::Deserialize;
 
 use crate::{
     app::{App, blocking},
+    empty::Empty,
     error::Result,
     fmt,
     live::Mode,
@@ -239,6 +240,9 @@ struct RefsPage {
     tags: Vec<TagRow>,
     remotes: Vec<RefRow>,
     reftabs: Vec<views::RefTab>,
+    no_branches: Option<Empty>,
+    no_tags: Option<Empty>,
+    no_remotes: Option<Empty>,
 }
 
 async fn refs(State(app): Shared) -> Result<Html<String>> {
@@ -259,12 +263,20 @@ async fn refs(State(app): Shared) -> Result<Html<String>> {
                 when: fmt::ago(r.time, now),
                 name: r.name.clone(),
             })
-            .collect();
+            .collect::<Vec<_>>();
+        let branches = crate::gitstate::branch_rows(a)?;
+        let remotes = views::ref_rows(&all, RefKind::Remote, now);
+        let log = fmt::href(&format!("/log/{}", fmt::selected_seg()));
         Ok(RefsPage {
             c: views::chrome(a, "refs").live(Mode::REFS),
-            branches: crate::gitstate::branch_rows(a)?,
+            no_branches: branches.is_empty().then(|| Empty::new("No branches.")),
+            no_tags: tags
+                .is_empty()
+                .then(|| Empty::new("No tags.").step("Browse the commits", log)),
+            no_remotes: remotes.is_empty().then(|| Empty::new("No remotes.")),
+            branches,
             tags,
-            remotes: views::ref_rows(&all, RefKind::Remote, now),
+            remotes,
             reftabs: views::ref_tabs(a, "refs")?,
         })
     })

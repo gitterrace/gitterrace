@@ -7,6 +7,7 @@ use gitterrace_index::{Period, Selection};
 use gitterrace_types::StringEnum;
 use serde::Deserialize;
 
+use crate::empty::Empty;
 use crate::fmt::{enc_seg, href};
 use crate::seg::{Choice, Seg};
 
@@ -59,6 +60,8 @@ pub(crate) struct FilterBar {
     pub(crate) chips: Vec<Chip>,
     pub(crate) period: Seg,
     pub(crate) clear: String,
+    /// What the page shows when the filters match no commit, with the way back.
+    pub(crate) nothing: Empty,
 }
 
 impl Filter {
@@ -144,7 +147,7 @@ impl Filter {
 
     /// Chips and period picker for a page served at `base`, with `period` the one in force.
     pub(crate) fn bar(&self, base: &str, src: &dyn InsightsSource, period: Period) -> FilterBar {
-        let chips = DIMS
+        let chips: Vec<Chip> = DIMS
             .iter()
             .filter_map(|d| {
                 let v = self.get(*d)?;
@@ -183,10 +186,18 @@ impl Filter {
             .collect();
         let period = Seg::links("Period", choices)
             .tip("Limits every chart and list on this page to this period");
+        let nothing = Empty::new("No commits match these filters.");
+        // With no filter set the period is what is narrowing; its own picker is the next step.
+        let nothing = if chips.is_empty() {
+            nothing
+        } else {
+            nothing.step("Clear all filters", href(base))
+        };
         FilterBar {
             chips,
             period,
             clear: href(base),
+            nothing,
         }
     }
 }

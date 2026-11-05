@@ -9,9 +9,9 @@
 <div class="card pad">{{ age|safe }}</div>
 <div class="chart-head" id="sizes"><div><h2>Commit sizes</h2><p class="hint">Commits by lines added plus removed.</p></div></div>
 <div class="card pad">{{ sizes|safe }}</div>
-<div class="chart-head" id="releases"><div><h2>Releases</h2><p class="hint">{{ cadence }}</p></div></div>
-<div class="card"><table class="entries">
+<div class="chart-head" id="releases"><div><h2>Releases</h2>{% if !cadence.is_empty() %}<p class="hint">{{ cadence }}</p>{% endif %}</div></div>
+{% if let Some(e) = no_releases %}{{ e }}{% else %}<div class="card"><table class="entries">
 <tr class="th"><td>Tag</td><td class="r">Date</td><td class="r">Commits since previous</td><td class="r">Days since previous</td></tr>
 {% for r in releases %}<tr><td><a href="{{ r.href }}">{{ r.name }}</a></td><td class="r muted">{{ r.when }}</td><td class="r">{{ r.commits }}</td><td class="r">{{ r.days }}</td></tr>{% endfor %}
-</table></div>
+</table></div>{% endif %}
 </section>

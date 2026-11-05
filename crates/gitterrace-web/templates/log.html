@@ -4,7 +4,7 @@
 <div class="head"><h1>Commits <span class="muted">{{ rev }}</span></h1>
 <form class="filter" method="get" action="{{ c.base }}/log/{{ rev_enc }}"><input name="path" value="{{ path }}" placeholder="Filter by path" aria-label="Filter by path"><button>Filter</button></form></div>
 {% if let Some(ch) = author_chip %}<p class="chips"><span class="chip">author: {{ ch.0 }} <a href="{{ ch.1 }}" aria-label="Remove author filter">×</a></span></p>{% endif %}
-{% if empty %}<p class="muted">No commits.</p>{% endif %}
+{% if let Some(e) = empty %}{{ e }}{% endif %}
 {% for d in days %}<h3 class="day">{{ d.label }}</h3>
 <ul class="list log">
 {% for r in d.rows %}{% include "_commit_row.html" %}{% endfor %}

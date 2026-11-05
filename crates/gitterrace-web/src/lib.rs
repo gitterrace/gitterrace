@@ -11,6 +11,7 @@ mod charts;
 mod commit_types;
 mod compare;
 mod dochead;
+mod empty;
 mod error;
 mod far;
 mod features;

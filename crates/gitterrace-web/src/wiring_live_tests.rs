@@ -429,43 +429,42 @@ async fn links_style_switches_copy_permalink() {
     );
 }
 
-/// The Branches & tags, Worktrees and Stashes pages share one tab bar: on every page each tab
-/// shows its count, 0 included, so a number never shows on one page and vanishes on the next.
+/// The Branches & tags, Worktrees and Stashes pages share one tab bar. A tab with nothing in it
+/// is left out, except on its own page, so the bar never offers a page that is only empty.
 #[tokio::test]
-async fn ref_tabs_show_every_count_on_every_page() {
+async fn ref_tabs_leave_out_empty_pages_but_keep_the_one_shown() {
     let dir = tempfile::tempdir().expect("tmp");
     let p = repo(dir.path(), "r");
     let r = router(&p, Config::default());
-    let mut bars = Vec::new();
-    for page in ["/refs", "/worktrees", "/stashes"] {
-        let (code, html) = get(&r, page).await;
-        assert_eq!(code, 200, "{page}");
-        let bar = html
-            .split("<nav class=\"tabs\">")
+    let bar_of = |html: &str| {
+        html.split("<nav class=\"tabs\">")
             .nth(1)
             .and_then(|s| s.split("</nav>").next())
             .expect("tab bar")
-            .replace(" class=\"on\" aria-current=\"page\"", "");
-        assert_eq!(
-            bar.matches("<span class=\"tag\">").count(),
-            3,
-            "{page}: {bar}"
-        );
-        // No linked worktrees and no stashes in this repo: both still say 0.
-        assert!(
-            bar.contains("Worktrees <span class=\"tag\">0</span>"),
-            "{page}: {bar}"
-        );
-        assert!(
-            bar.contains("Stashes <span class=\"tag\">0</span>"),
-            "{page}: {bar}"
-        );
-        bars.push(bar);
-    }
+            .to_owned()
+    };
+    // No linked worktrees and no stashes in this repo.
+    let (code, refs) = get(&r, "/refs").await;
+    assert_eq!(code, 200);
+    let bar = bar_of(&refs);
+    assert!(bar.contains("Branches "), "{bar}");
     assert!(
-        bars.windows(2).all(|w| w[0] == w[1]),
-        "the bar differs by page: {bars:?}"
+        !bar.contains("Worktrees") && !bar.contains("Stashes"),
+        "{bar}"
     );
+    for (page, label) in [("/worktrees", "Worktrees"), ("/stashes", "Stashes")] {
+        let (code, html) = get(&r, page).await;
+        assert_eq!(code, 200, "{page}");
+        let bar = bar_of(&html);
+        assert!(
+            bar.contains(&format!("{label} <span class=\"tag\">0</span>")),
+            "{page}: {bar}"
+        );
+        assert!(
+            html.contains("<div class=\"empty\""),
+            "{page}: no empty state"
+        );
+    }
 }
 
 /// "a" then an action's key fires the action from the page, and the `?` sheet lists the chord.

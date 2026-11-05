@@ -41,7 +41,7 @@ struct LogPage {
     rev_enc: String,
     path: String,
     days: Vec<DayGroup>,
-    empty: bool,
+    empty: Option<crate::empty::Empty>,
     newer: Option<String>,
     older: Option<String>,
     /// Removable chip for the active author filter: (name, href without it).
@@ -193,7 +193,14 @@ pub(super) async fn log(
             newer: (pg > 0).then(|| link(pg - 1)),
             older: more.then(|| link(pg + 1)),
             author_chip,
-            empty: list.is_empty(),
+            empty: list.is_empty().then(|| {
+                let e = crate::empty::Empty::new("No commits.");
+                if path.is_empty() && who.is_none() {
+                    e
+                } else {
+                    e.step("Show every commit", fmt::href(&format!("/log/{rev_enc}")))
+                }
+            }),
             days: views::day_groups(&list, now),
             rev,
             rev_enc,

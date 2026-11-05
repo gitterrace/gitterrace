@@ -6,6 +6,7 @@ use gitterrace_index::Period;
 
 use crate::{
     charts,
+    empty::Empty,
     fmt::{self, enc_seg, href},
     insights::{InsightsQuery, Src, counted, head_lines, insights, page_scope, period_of},
     views::{self},
@@ -38,6 +39,8 @@ struct PatternsSection {
     sizes: String,
     releases: Vec<ReleaseRow>,
     cadence: String,
+    /// Shown in place of the releases table when no tag reads as a release.
+    no_releases: Option<Empty>,
 }
 
 /// The sections' markup for the commits `q` selects.
@@ -87,9 +90,9 @@ pub(crate) fn section(a: &crate::app::App, r: &Src, q: &InsightsQuery) -> String
                 )
             }
             (None, Some(d)) => format!("{} since the last release.", fmt::count(d, "day", "days")),
-            _ => "No release tags.".to_owned(),
+            _ => String::new(),
         };
-        let releases = cad
+        let releases: Vec<ReleaseRow> = cad
             .releases
             .iter()
             .rev()
@@ -111,6 +114,9 @@ pub(crate) fn section(a: &crate::app::App, r: &Src, q: &InsightsQuery) -> String
             pairs,
             age: charts::bars(&age),
             sizes: charts::bars(&sizes),
+            no_releases: releases.is_empty().then(|| {
+                Empty::new("No release tags.").step("See all branches and tags", href("/refs"))
+            }),
             releases,
             cadence,
         }

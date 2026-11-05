@@ -35,6 +35,7 @@ struct HistoryPage {
     blame_href: String,
     total: String,
     rows: Vec<HistRow>,
+    empty: Option<crate::empty::Empty>,
 }
 
 pub(crate) async fn page(
@@ -93,6 +94,12 @@ pub(crate) async fn page(
                 gitterrace_config::Feature::Blame,
                 &format!("/blame/{}/{}", fmt::selected_seg(), enc_path(&path)),
             ),
+            empty: rows.is_empty().then(|| {
+                crate::empty::Empty::new("No history found for this path.").step(
+                    "Browse the files",
+                    href(&format!("/tree/{}", fmt::selected_seg())),
+                )
+            }),
             path,
             total: fmt::count(rows.len(), "commit", "commits"),
             rows,

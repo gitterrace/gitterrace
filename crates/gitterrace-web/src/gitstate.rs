@@ -9,6 +9,7 @@ use axum::{
 
 use crate::{
     app::blocking,
+    empty::Empty,
     error::Result,
     fmt::{self, ago, enc_seg, href, sha_link},
     live::Mode,
@@ -31,6 +32,7 @@ struct WorktreesPage {
     c: Chrome,
     reftabs: Vec<crate::views::RefTab>,
     rows: Vec<WorktreeRow>,
+    empty: Option<Empty>,
 }
 
 pub(crate) async fn worktrees(State(app): Shared) -> Result<Html<String>> {
@@ -58,8 +60,11 @@ pub(crate) async fn worktrees(State(app): Shared) -> Result<Html<String>> {
                     locked: w.locked,
                 }
             })
-            .collect();
+            .collect::<Vec<_>>();
         Ok(WorktreesPage {
+            empty: rows
+                .is_empty()
+                .then(|| Empty::new("No linked worktrees.").step("Branches & tags", href("/refs"))),
             c: views::chrome(a, "refs").live(Mode::WORKTREES),
             reftabs: views::ref_tabs(a, "worktrees")?,
             rows,
@@ -83,6 +88,7 @@ struct StashesPage {
     c: Chrome,
     reftabs: Vec<crate::views::RefTab>,
     rows: Vec<StashRow>,
+    empty: Option<Empty>,
 }
 
 pub(crate) async fn stashes(State(app): Shared) -> Result<Html<String>> {
@@ -98,8 +104,11 @@ pub(crate) async fn stashes(State(app): Shared) -> Result<Html<String>> {
                 message: s.message,
                 when: ago(s.time, now),
             })
-            .collect();
+            .collect::<Vec<_>>();
         Ok(StashesPage {
+            empty: rows
+                .is_empty()
+                .then(|| Empty::new("No stashes.").step("Branches & tags", href("/refs"))),
             c: views::chrome(a, "refs").live(Mode::STASHES),
             reftabs: views::ref_tabs(a, "stashes")?,
             rows,

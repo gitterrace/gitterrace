@@ -79,6 +79,8 @@ struct SearchPage {
     capped: bool,
     files: Vec<FileHits>,
     commits: Vec<CommitRow>,
+    /// Shown when the search ran and found nothing.
+    nothing: Option<crate::empty::Empty>,
 }
 
 pub(crate) async fn search(
@@ -137,6 +139,7 @@ fn run(a: &App, q: SearchQuery) -> Result<SearchPage> {
         capped: false,
         files: Vec::new(),
         commits: Vec::new(),
+        nothing: None,
     };
     if text.is_empty() {
         return Ok(page);
@@ -171,6 +174,21 @@ fn run(a: &App, q: SearchQuery) -> Result<SearchPage> {
         page.files = out.files;
     }
     page.ms = start.elapsed().as_millis();
+    if page.matches == 0 {
+        let e = crate::empty::Empty::new("No results.");
+        // The other kind of search is the next place to look.
+        let (label, kind) = if commits_mode {
+            ("Search the code instead", "code")
+        } else {
+            ("Search commit messages instead", "commits")
+        };
+        let next = format!(
+            "/search?q={}&kind={kind}&rev={}",
+            fmt::enc_seg(&text),
+            fmt::enc_seg(&rev)
+        );
+        page.nothing = Some(e.step(label, fmt::href(&next)));
+    }
     let plus = if page.capped { "+" } else { "" };
     page.summary = if commits_mode {
         format!(
