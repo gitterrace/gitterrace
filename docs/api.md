@@ -114,7 +114,8 @@ and 256 KiB, `blame` at 5000 lines, each with `truncated` when cut. The `[api]` 
 
 ## Insights
 
-Served at `GET /insights/{name}`.
+Served at `GET /insights/{name}`. Every number is counted by one rule, see
+[How numbers are counted](internals/counting.md).
 
 | Name | Summary |
 | --- | --- |

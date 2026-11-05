@@ -24,6 +24,7 @@ New here? [Install it and run it](../README.md#quickstart) in any git repository
 | --- | --- |
 | [architecture](architecture.md) | Crates, the decisions behind them, the cache, routes, highlighted languages |
 | [streaming-insights](design/streaming-insights.md) | The insights store on disk and how pages read it in some MB |
+| [counting](internals/counting.md) | How every insights number is counted: one membership rule and one local-day rule |
 
 ## Look something up
 
