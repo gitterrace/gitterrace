@@ -10,6 +10,9 @@ pub mod codec;
 pub mod config;
 pub mod git;
 
+#[cfg(test)]
+mod registry_tests;
+
 pub use card::{CardLayout, CardTheme};
 pub use codec::{ParseError, StringEnum};
 pub use config::{ColorScheme, DateStyle, LinkStyle, Period};

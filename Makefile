@@ -69,6 +69,7 @@ lines:
 	python3 scripts/lines-check.py
 	python3 scripts/status-words-check.py
 	python3 scripts/stubs-check.py --self-test && python3 scripts/stubs-check.py
+	python3 scripts/types-check.py --self-test && python3 scripts/types-check.py
 
 ## gc: Prune cargo units and site-shots/app-icon output unused for DAYS (default 7). DRY=1 only reports, BENCH=1 also removes the cached benchmark clones
 gc:

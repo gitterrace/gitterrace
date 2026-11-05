@@ -202,6 +202,9 @@ pub fn parse(text: &str) -> Result<Loaded, ConfigError> {
 }
 
 #[cfg(test)]
+mod enum_keys_tests;
+
+#[cfg(test)]
 mod tests {
     use super::{Config, Reload, Source, keys, load, parse, template};
 

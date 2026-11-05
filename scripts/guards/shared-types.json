@@ -1,0 +1,14 @@
+{
+  "types_src": "crates/gitterrace-types/src",
+  "scan_roots": ["crates", "xtask"],
+  "skip_path_parts": ["/target/", "/tests/"],
+  "skip_path_suffixes": ["tests.rs", "_tests.rs"],
+  "defining_macros": ["string_enum"],
+  "allowed_definitions": [],
+  "openapi": {
+    "file": "docs/openapi.json",
+    "enabled": false,
+    "disabled_reason": "insights responses are not typed yet, so their schema properties are still empty",
+    "skip_path_prefixes": []
+  }
+}

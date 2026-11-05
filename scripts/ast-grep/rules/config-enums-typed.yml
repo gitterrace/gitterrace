@@ -1,0 +1,18 @@
+id: config-enums-typed
+language: rust
+severity: error
+message: A config value compared with a string literal.
+note: >-
+  A setting that picks from a fixed set is an enum from gitterrace-types (Period, ColorScheme,
+  DateStyle, LinkStyle). Compare the variant, never its text, so a renamed value is a compile
+  error and not a silent miss.
+files:
+  - crates/gitterrace-web/src/**/*.rs
+  - crates/gitterrace-api/src/**/*.rs
+ignores: ['**/tests.rs', '**/*_tests.rs', '**/tests/**']
+rule:
+  kind: binary_expression
+  any:
+    - regex: '^[\w.()]*\b(config|cfg|conf)\b[\w.()]*\s*[!=]=\s*"'
+    - regex: '^[\w.()]*\b(config|cfg|conf)\b[\w.()]*\.as_str\(\)\s*[!=]=\s*"'
+  not: {inside: {stopBy: end, kind: mod_item, regex: '^(pub(\(crate\))? )?mod \w*tests'}}

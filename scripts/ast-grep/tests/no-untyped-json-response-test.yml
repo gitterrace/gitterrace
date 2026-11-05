@@ -1,0 +1,9 @@
+id: no-untyped-json-response
+valid:
+  - 'fn f() -> Reply { Reply { name: n } }'
+  - 'mod tests { fn f() { let v = serde_json::json!({"a": 1}); } }'
+invalid:
+  - 'fn f() { let v = serde_json::json!({"a": 1}); }'
+  - 'fn f() { let v = json!({"a": 1}); }'
+  - 'fn f(v: serde_json::Value) {}'
+  - 'fn f(v: Value) {}'

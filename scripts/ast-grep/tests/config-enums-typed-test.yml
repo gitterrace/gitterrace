@@ -1,0 +1,9 @@
+id: config-enums-typed
+valid:
+  - 'fn f(c: &Config) -> bool { c.display.dates == DateStyle::Absolute }'
+  - 'fn f(name: &str) -> bool { name == "absolute" }'
+  - 'mod tests { fn f(cfg: &Config) -> bool { cfg.display.dates.as_str() == "absolute" } }'
+invalid:
+  - 'fn f(cfg: &Config) -> bool { cfg.display.dates.as_str() == "absolute" }'
+  - 'fn f(config: &Config) -> bool { config.display.theme == "system" }'
+  - 'fn f(s: &S) -> bool { s.config.links.style.as_str() != "go" }'
