@@ -255,7 +255,7 @@ pub trait InsightsSource: Send + Sync {
     fn parent_ids(&self, rank: Rank) -> Vec<Arc<str>>;
 
     /// The commit with this id: `Ok(None)` when it is not indexed, `Err` when the store could
-    /// not tell. A caller that falls back on absence (a git walk) must not on an error.
+    /// not tell. A caller that walks git when a commit is absent must not walk on an error.
     fn find_commit(&self, id: &str) -> Result<Option<Rank>, SourceError>;
 
     /// Author x day rows with `day` in `days`, ascending (day, ident).
