@@ -3,7 +3,7 @@
 with a version comment. Local (./) actions are exempt.
 
 The Dockerfiles under ci/ follow the same rule: each FROM names its image by sha256 digest, and
-each `curl` that downloads a file also checks a sha256 in the same RUN, so nothing unpinned is
+each `curl` that downloads a file also has its own sha256 check in the same RUN, so nothing unpinned is
 fetched at build time.
 
   python3 scripts/actions-pin-check.py
@@ -49,9 +49,13 @@ def docker_problems(path: pathlib.Path | str, text: str) -> list[str]:
     # A RUN instruction ends at the first line that does not continue with a backslash.
     for m in re.finditer(r"^RUN\b(?:[^\n]*\\\n)*[^\n]*", text, re.M):
         run = m.group(0)
-        if re.search(r"\bcurl\b[^\n]*https?://", run) and "sha256sum" not in run:
+        fetches = len(re.findall(r"\bcurl\b", run))
+        sums = len(re.findall(r"\bsha256sum\b", run))
+        if fetches and re.search(r"https?://", run) and sums < fetches:
             n = text.count("\n", 0, m.start()) + 1
-            out.append(f"{path}:{n}: a download without a sha256 check")
+            out.append(
+                f"{path}:{n}: {fetches} downloads but {sums} sha256 checks, each needs its own"
+            )
     return out
 
 
@@ -64,7 +68,13 @@ def self_test() -> int:
         (
             docker_problems,
             "RUN curl -fsSL https://example.org/x -o /tmp/x\n",
-            "without a sha256",
+            "1 downloads but 0 sha256",
+        ),
+        (
+            docker_problems,
+            "RUN curl -fsSL https://e.org/a -o a \\\n && curl -fsSL https://e.org/b -o b \\\n"
+            " && echo 'x  a' | sha256sum -c -\n",
+            "2 downloads but 1 sha256",
         ),
     ]
     for fn, text, want in cases:
@@ -76,6 +86,11 @@ def self_test() -> int:
         (
             docker_problems,
             f"FROM ubuntu@sha256:{sha}\nRUN curl -fsSL https://e.org/x \\\n && sha256sum -c -\n",
+        ),
+        (
+            docker_problems,
+            "RUN curl -fsSL https://e.org/a -o a && echo 'x  a' | sha256sum -c - \\\n"
+            " && curl -fsSL https://e.org/b -o b && echo 'y  b' | sha256sum -c -\n",
         ),
     ]
     for fn, text in good:
