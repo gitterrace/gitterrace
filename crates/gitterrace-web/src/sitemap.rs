@@ -116,6 +116,14 @@ pub const PAGES: &[Page] = &[
         "Adds a repository to the running server for `git terrace open`, or takes one off for `git terrace remove`: loopback, no browser, secret from a 0600 file. The GET proves the secret by hashing it with the nonce",
         &["/_repos"],
     ),
+    page(
+        "`/_settings/file`, `POST /_settings/check`",
+        concat!(
+            "Reads, checks and saves `config.toml` and `actions.toml` for the settings page: ",
+            "local servers only, same-origin with the page token, never a path from the request"
+        ),
+        &["/_settings/file", "/_settings/check"],
+    ),
 ];
 
 #[cfg(test)]
@@ -143,6 +151,7 @@ mod tests {
             include_str!("multi.rs"),
             include_str!("actions.rs"),
             include_str!("add.rs"),
+            include_str!("settings.rs"),
         ] {
             routed.extend(literals(src));
         }

@@ -61,6 +61,8 @@ pub(crate) const LOCAL: &[&str] = &[
     "/_send/targets",
     "/r/{name}/_send/targets",
     "/_repos",
+    "/_settings/file",
+    "/_settings/check",
 ];
 
 /// Whether a matched route may answer on a public server. `/api/v1` is the read-only JSON
@@ -100,6 +102,7 @@ mod tests {
             include_str!("multi.rs"),
             include_str!("actions.rs"),
             include_str!("add.rs"),
+            include_str!("settings.rs"),
         ] {
             for rest in src.split(".route(").skip(1) {
                 let rest = rest.trim_start();

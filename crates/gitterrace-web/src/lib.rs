@@ -46,6 +46,7 @@ mod reload;
 mod routes;
 mod search;
 mod seg;
+mod settings;
 pub mod sitemap;
 mod spark;
 #[cfg(test)]
@@ -360,6 +361,21 @@ fn build_server(
             state,
         })));
     }
+    if settings::mountable(env.public(), local, env.settings_dir.is_some())
+        && let Some(dir) = env.settings_dir.clone()
+    {
+        match gitterrace_actions::Token::generate() {
+            Ok(token) => {
+                router = router.merge(settings::router(Arc::new(settings::Settings {
+                    dir,
+                    actions: actions_file.map(Path::to_path_buf),
+                    token,
+                    env: env.clone(),
+                })));
+            }
+            Err(e) => tracing::warn!("settings page off: no randomness for the token: {e}"),
+        }
+    }
     let router = router.route_layer(axum::middleware::from_fn_with_state(
         env.clone(),
         features::server_gate,
@@ -465,7 +481,11 @@ pub async fn serve_on(
         let (paths, state) = (repo_paths.clone(), state.clone());
         move || remember(state.as_deref(), &paths)
     });
-    let env = Env::new(cfg);
+    let mut env = Env::new(cfg);
+    // The settings page edits the folder `config.toml` is reloaded from, and nothing else.
+    env.settings_dir = watched
+        .as_ref()
+        .and_then(|w| w.file.parent().map(Path::to_path_buf));
     // The secret `open` reads to add a repository. Without a state folder, or when it cannot
     // be written, the route stays unmounted and `open` starts a server of its own.
     let add = match (&state, extra) {

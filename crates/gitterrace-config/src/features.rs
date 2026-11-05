@@ -29,6 +29,7 @@ pub enum Feature {
     Live,
     Actions,
     RepoAdmin,
+    Settings,
     Picker,
     FrontMatter,
     Mermaid,
@@ -38,7 +39,7 @@ pub enum Feature {
 }
 
 impl Feature {
-    pub const ALL: [Self; 16] = [
+    pub const ALL: [Self; 17] = [
         Self::Blame,
         Self::Search,
         Self::Raw,
@@ -49,6 +50,7 @@ impl Feature {
         Self::Live,
         Self::Actions,
         Self::RepoAdmin,
+        Self::Settings,
         Self::Picker,
         Self::FrontMatter,
         Self::Mermaid,
@@ -70,6 +72,7 @@ impl Feature {
             Self::Live => "live_enabled",
             Self::Actions => "actions_enabled",
             Self::RepoAdmin => "repo_admin_enabled",
+            Self::Settings => "settings_enabled",
             Self::Picker => "picker_enabled",
             Self::FrontMatter => "front_matter_enabled",
             Self::Mermaid => "mermaid_enabled",
@@ -87,7 +90,7 @@ impl Feature {
     pub const fn is_global_only(self) -> bool {
         matches!(
             self,
-            Self::RepoAdmin | Self::Picker | Self::Api | Self::Credit
+            Self::RepoAdmin | Self::Settings | Self::Picker | Self::Api | Self::Credit
         )
     }
 
@@ -95,7 +98,7 @@ impl Feature {
     pub const fn is_local_only(self) -> bool {
         matches!(
             self,
-            Self::Worktree | Self::Live | Self::Actions | Self::RepoAdmin
+            Self::Worktree | Self::Live | Self::Actions | Self::RepoAdmin | Self::Settings
         )
     }
 }
@@ -115,6 +118,7 @@ impl Config {
             Feature::Live => s.live_enabled,
             Feature::Actions => s.actions_enabled,
             Feature::RepoAdmin => s.repo_admin_enabled,
+            Feature::Settings => s.settings_enabled,
             Feature::Picker => s.picker_enabled,
             Feature::FrontMatter => s.front_matter_enabled,
             Feature::Mermaid => s.mermaid_enabled,

@@ -22,10 +22,11 @@ pub fn render() -> Out {
          take `exclude`, a list of path globs added to `insights.exclude`. \
          `[repo.NAME.features]` turns a feature off for that repository only, with the keys of \
          `[features]` set to `false`. It never turns one on, and the server-wide ones \
-         (`repo_admin_enabled`, `picker_enabled`, `credit_enabled`, `api_enabled`) are refused \
-         there.\n\n\
-         A feature that shows this machine (working tree, live updates, actions, adding \
-         repositories) stays off on a public server whatever `[features]` says: the file can \
+         (`repo_admin_enabled`, `settings_enabled`, `picker_enabled`, `credit_enabled`, \
+         `api_enabled`) are refused there.\n\n\
+         A feature that shows this machine or changes it (working tree, live updates, actions, \
+         adding repositories, the settings page) stays off on a public server whatever \
+         `[features]` says: the file can \
          turn a feature off, never past what `--public` or the loopback check allows.\n\n\
          Actions live in their own file, `actions.toml`, because they run commands.\n",
     );

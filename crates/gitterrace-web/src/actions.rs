@@ -431,28 +431,6 @@ async fn go(State(site): State<Arc<Site>>, UrlPath(rest): UrlPath<String>) -> Re
     ))
 }
 
-/// Why a run request is refused before its body is read. Fetch metadata must say
-/// same-origin (absent and `none` are refused, unlike GETs), `Origin` must be this host, and
-/// the token must match: only a page served here can read it.
-fn refusal(h: &HeaderMap, token: &Token) -> Option<&'static str> {
-    let get = |n: &str| h.get(n).and_then(|v| v.to_str().ok());
-    if !get("sec-fetch-site").is_some_and(|v| v.eq_ignore_ascii_case("same-origin")) {
-        return Some("forbidden: not a same-origin request\n");
-    }
-    let host = get("host").unwrap_or_default();
-    let origin_ok = get("origin").is_some_and(|o| {
-        o.strip_prefix("http://")
-            .is_some_and(|rest| !host.is_empty() && rest.eq_ignore_ascii_case(host))
-    });
-    if !origin_ok {
-        return Some("forbidden: foreign origin\n");
-    }
-    if !get("x-gitterrace-token").is_some_and(|t| token.verify(t)) {
-        return Some("forbidden: bad token\n");
-    }
-    None
-}
-
 fn is_json(h: &HeaderMap) -> bool {
     h.get(header::CONTENT_TYPE)
         .and_then(|v| v.to_str().ok())
@@ -488,7 +466,7 @@ async fn run(State(site): State<Arc<Site>>, req: Request) -> Response {
     let Some(live) = site.live.clone() else {
         return StatusCode::NOT_FOUND.into_response();
     };
-    if let Some(why) = refusal(req.headers(), &live.token) {
+    if let Some(why) = crate::guard::same_origin_write(req.headers(), &live.token) {
         return (StatusCode::FORBIDDEN, why).into_response();
     }
     if !is_json(req.headers()) {

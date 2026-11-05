@@ -394,6 +394,9 @@ settings! {
         /// Let `git terrace open` and `remove` add and take off repositories of a running
         /// server. Never on a public server. Server-wide.
         repo_admin_enabled: bool = true => Live,
+        /// Serve the settings page, which edits `config.toml` and `actions.toml` from the
+        /// browser. Never on a public server. Server-wide.
+        settings_enabled: bool = true => Live,
         /// Show the repository switcher and the list of served repositories. Server-wide.
         picker_enabled: bool = true => Live,
         /// Show the front matter of a Markdown file as a table.

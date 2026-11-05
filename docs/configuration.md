@@ -14,12 +14,12 @@ restart" log a warning and keep their running value.
 Per-repository overrides go under `[repo.NAME]` (the repository's folder name) and take `exclude`, a
 list of path globs added to `insights.exclude`. `[repo.NAME.features]` turns a feature off for that
 repository only, with the keys of `[features]` set to `false`. It never turns one on, and the
-server-wide ones (`repo_admin_enabled`, `picker_enabled`, `credit_enabled`, `api_enabled`) are
-refused there.
+server-wide ones (`repo_admin_enabled`, `settings_enabled`, `picker_enabled`, `credit_enabled`,
+`api_enabled`) are refused there.
 
-A feature that shows this machine (working tree, live updates, actions, adding repositories) stays
-off on a public server whatever `[features]` says: the file can turn a feature off, never past what
-`--public` or the loopback check allows.
+A feature that shows this machine or changes it (working tree, live updates, actions, adding
+repositories, the settings page) stays off on a public server whatever `[features]` says: the file
+can turn a feature off, never past what `--public` or the loopback check allows.
 
 Actions live in their own file, `actions.toml`, because they run commands.
 
@@ -142,6 +142,7 @@ Exceptions, each on purpose:
 | `live_enabled` | bool | `true` | Push changes to open pages (`/events`). Never on a public server. |
 | `actions_enabled` | bool | `true` | Run the actions of `actions.toml` and offer Send to. Never on a public server. |
 | `repo_admin_enabled` | bool | `true` | Let `git terrace open` and `remove` add and take off repositories of a running server. Never on a public server. Server-wide. |
+| `settings_enabled` | bool | `true` | Serve the settings page, which edits `config.toml` and `actions.toml` from the browser. Never on a public server. Server-wide. |
 | `picker_enabled` | bool | `true` | Show the repository switcher and the list of served repositories. Server-wide. |
 | `front_matter_enabled` | bool | `true` | Show the front matter of a Markdown file as a table. |
 | `mermaid_enabled` | bool | `true` | Draw mermaid diagrams in Markdown; off shows their source. |

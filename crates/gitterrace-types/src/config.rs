@@ -94,10 +94,19 @@ string_enum! {
     }
 }
 
+string_enum! {
+    /// A settings file the settings page reads and writes. A request names one of these, never
+    /// a path: the server maps it to the file it was started with.
+    pub enum SettingsFile [serde] {
+        Config => "config",
+        Actions => "actions",
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::codec::assert_round_trip;
-    use crate::{ColorScheme, DateStyle, LinkStyle, Period, StringEnum};
+    use crate::{ColorScheme, DateStyle, LinkStyle, Period, SettingsFile, StringEnum};
 
     #[test]
     fn every_config_value_round_trips() {
@@ -105,6 +114,7 @@ mod tests {
         assert_round_trip::<ColorScheme>();
         assert_round_trip::<DateStyle>();
         assert_round_trip::<LinkStyle>();
+        assert_round_trip::<SettingsFile>();
     }
 
     #[test]

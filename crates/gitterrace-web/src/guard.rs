@@ -117,6 +117,32 @@ fn refusal(
     foreign.then_some((StatusCode::FORBIDDEN, "forbidden: cross-site request\n"))
 }
 
+/// Why a state-changing request from a page is refused before its body is read, shared by every
+/// route that writes so they cannot drift apart. Fetch metadata must say same-origin (absent and
+/// `none` are refused, unlike GETs), `Origin` must be this host, and the per-process token must
+/// match: only a page served here can read it.
+pub(crate) fn same_origin_write(
+    h: &HeaderMap,
+    token: &gitterrace_actions::Token,
+) -> Option<&'static str> {
+    let get = |n: &str| h.get(n).and_then(|v| v.to_str().ok());
+    if !get("sec-fetch-site").is_some_and(|v| v.eq_ignore_ascii_case("same-origin")) {
+        return Some("forbidden: not a same-origin request\n");
+    }
+    let host = get("host").unwrap_or_default();
+    let origin_ok = get("origin").is_some_and(|o| {
+        o.strip_prefix("http://")
+            .is_some_and(|rest| !host.is_empty() && rest.eq_ignore_ascii_case(host))
+    });
+    if !origin_ok {
+        return Some("forbidden: foreign origin\n");
+    }
+    if !get("x-gitterrace-token").is_some_and(|t| token.verify(t)) {
+        return Some("forbidden: bad token\n");
+    }
+    None
+}
+
 pub(crate) async fn guard(State(gate): State<Arc<Gate>>, req: Request, next: Next) -> Response {
     let mut res = match refusal(req.method(), req.headers(), &gate) {
         Some((code, why)) => (code, why).into_response(),

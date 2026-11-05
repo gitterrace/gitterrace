@@ -59,6 +59,9 @@ pub(crate) struct Env {
     /// An export run's memo of commit tree diffs, handed to every repository it opens. `None`
     /// for a server, which keeps no per-commit state outside its budgeted caches.
     pub(crate) changes: Option<Arc<gitterrace_git::ChangeMemo>>,
+    /// The config folder the settings page edits. `None` (an export, a test, no config folder)
+    /// leaves its routes unmounted.
+    pub(crate) settings_dir: Option<std::path::PathBuf>,
 }
 
 /// The live `actions.toml`, swapped whole on reload.
@@ -103,6 +106,7 @@ impl Env {
             actions_note: Arc::default(),
             sends: Arc::default(),
             changes: None,
+            settings_dir: None,
         }
     }
 

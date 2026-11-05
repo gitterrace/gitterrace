@@ -17,7 +17,7 @@ mod registry_tests;
 
 pub use card::{CardLayout, CardTheme};
 pub use codec::{ParseError, StringEnum};
-pub use config::{ColorScheme, DateStyle, LinkStyle, Period};
+pub use config::{ColorScheme, DateStyle, LinkStyle, Period, SettingsFile};
 pub use git::{ChangeKind, LineKind, RefKind, TreeEntryKind};
 pub use markup::{esc, esc_text};
 
