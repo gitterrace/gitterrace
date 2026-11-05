@@ -1,6 +1,6 @@
-//! The year-in-review SVG card built from cached commit records.
+//! The year-in-review SVG card built from the insights cache.
 //!
-//! Every function is pure: records in, a self-contained SVG string out (inline styles, a system
+//! Every function is pure: a source in, a self-contained SVG string out (inline styles, a system
 //! font stack, no external references). Each takes a [`CardTheme`].
 
 #![expect(

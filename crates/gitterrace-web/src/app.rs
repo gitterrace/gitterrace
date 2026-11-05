@@ -20,14 +20,9 @@ use crate::live::Change;
 const MEMO_TTL: Duration = Duration::from_secs(60);
 /// How long a dirty-worktree answer is reused, so every page need not run a status.
 const DIRTY_TTL: Duration = Duration::from_secs(2);
-/// Record sets kept at once, one per selected commit. Each holds all of its history, so this
-/// stays small; a visitor cycling more commits than this pays a parse per switch, not a stall
-/// of every other page.
-const RECORD_SETS: usize = 4;
-/// Record sets and the tables built over them are dropped after this long without a page that
-/// reads them. They are the bulk of a running server (about 800 MB on a 345k commit history), so
-/// an idle server must not keep them; a page after the release parses them again, about 1 s per
-/// 350k commits. The page memo still answers the unfiltered pages in between.
+/// The source, its block cache and the tables built over it are dropped after this long without
+/// a page that reads them, so an idle server keeps none of them; a page after the release opens
+/// the set again. The page memo still answers the unfiltered pages in between.
 pub(crate) const RECORDS_IDLE: Duration = Duration::from_secs(30);
 /// Largest ignore file read: these are configuration, never megabytes.
 /// Not configurable: a read bound on a file from the repository, which may be hostile.
@@ -263,12 +258,7 @@ pub(crate) struct App {
     pub(crate) actions: Option<Arc<crate::actions::Live>>,
     progress: Mutex<Progress>,
     ready: AtomicBool,
-    /// Selected commits outside HEAD's history, queued for the one indexer loop so the cache
-    /// file never has two writers.
-    wanted: Mutex<std::collections::BTreeSet<String>>,
-    /// Record file reads, so a test can tell a hit from a re-read.
-    record_loads: AtomicU64,
-    /// Last time a page read the record sets, see [`App::release_idle`].
+    /// Last time a page read the insights source, see [`App::release_idle`].
     records_used: Mutex<Instant>,
     /// Warm-up jobs running. Their reads are not a visitor's, so they do not keep the caches.
     warming: std::sync::atomic::AtomicUsize,
@@ -322,8 +312,6 @@ impl App {
             actions: None,
             progress: Mutex::new(Progress::default()),
             ready: AtomicBool::new(false),
-            wanted: Mutex::new(std::collections::BTreeSet::new()),
-            record_loads: AtomicU64::new(0),
             records_used: Mutex::new(Instant::now()),
             warming: std::sync::atomic::AtomicUsize::new(0),
             releases: AtomicU64::new(0),

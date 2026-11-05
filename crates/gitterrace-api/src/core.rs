@@ -190,20 +190,15 @@ impl ApiState {
         {
             return Ok(Arc::clone(v));
         }
-        // Another rev reads the same segments through a reach view. Without a segment set
-        // yet, the records are all there is.
-        let recs: Src = match self.index.disk_source(&*self.repo, rev)? {
-            Some(set) => set,
-            None => match self.index.rev_source(&*self.repo, rev, &tip)? {
-                Some(RevView::Ready(view)) => view,
-                Some(RevView::NeedsReindex { read }) => {
-                    return Err(ApiError::NeedsReindex {
-                        read,
-                        cap: self.index.fresh_cap(),
-                    });
-                }
-                None => Index::memory_source(Arc::new(self.index.records(&*self.repo, rev)?)),
-            },
+        // Another rev reads the same segments through a reach view. Without a segment set yet
+        // HEAD's is built first: an answer never comes from anything but the set.
+        let recs: Src = if let Some(src) = self.view(rev, &tip)? {
+            src
+        } else {
+            self.refresh_index()?;
+            self.view(rev, &tip)?.ok_or_else(|| {
+                ApiError::Index(std::io::Error::other("no segment set after a build"))
+            })?
         };
         if let Ok(mut g) = self.cache.lock() {
             *g = Some((key, Arc::clone(&recs)));
@@ -211,8 +206,23 @@ impl ApiState {
         Ok(recs)
     }
 
-    /// Drops the shared record set; the next call parses it again. The server calls this when
-    /// nobody browses, so an idle process does not keep a whole history parsed.
+    /// The set when it holds `rev` exactly, else the reach view over it, `None` without a set.
+    fn view(&self, rev: &str, tip: &str) -> Result<Option<Src>, ApiError> {
+        if let Some(set) = self.index.disk_source(&*self.repo, rev)? {
+            return Ok(Some(set));
+        }
+        match self.index.rev_source(&*self.repo, rev, tip)? {
+            Some(RevView::Ready(view)) => Ok(Some(view)),
+            Some(RevView::NeedsReindex { read }) => Err(ApiError::NeedsReindex {
+                read,
+                cap: self.index.fresh_cap(),
+            }),
+            None => Ok(None),
+        }
+    }
+
+    /// Drops the shared source; the next call opens it again. The server calls this when
+    /// nobody browses, so an idle process keeps no block cache.
     pub fn release_records(&self) {
         if let Ok(mut g) = self.cache.lock() {
             g.take();

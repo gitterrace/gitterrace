@@ -38,6 +38,7 @@ tower-http.workspace = true
 rustix = { version = "1", default-features = false, features = ["std", "process"] }
 
 [dev-dependencies]
+gitterrace-index = { workspace = true, features = ["oracle"] }
 tikv-jemallocator = "0.7"
 tikv-jemalloc-ctl = "0.7"
 gitterrace-testkit.workspace = true

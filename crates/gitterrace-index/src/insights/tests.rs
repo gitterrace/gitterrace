@@ -5,23 +5,25 @@ use super::{Insights, Options, bus_factor, fixtures};
 #[test]
 fn derived_tables_are_built_once_per_key_and_options() {
     let recs = fixtures::chain();
+    let src = crate::feed::MemorySource::new(&recs);
+    let copy = crate::feed::MemorySource::new(&recs);
     let built = std::cell::Cell::new(0);
     let ignore = || {
         built.set(built.get() + 1);
         None
     };
-    let a = Insights::shared(&recs, Options::default(), "t1\u{0}gen1", ignore);
-    let b = Insights::shared(&recs, Options::default(), "t1\u{0}gen1", ignore);
+    let shared = |s, o, k| Insights::shared_source(s, o, k, ignore);
+    let a = shared(&src, Options::default(), "t1\u{0}gen1");
+    let b = shared(&src, Options::default(), "t1\u{0}gen1");
     assert!(a.shares_tables_with(&b), "second page rebuilt the tables");
     assert_eq!(built.get(), 1);
-    let gen2 = Insights::shared(&recs, Options::default(), "t1\u{0}gen2", ignore);
+    let gen2 = shared(&src, Options::default(), "t1\u{0}gen2");
     let bots = Options {
         include_bots: true,
         ..Options::default()
     };
-    let other = Insights::shared(&recs, bots, "t1\u{0}gen1", ignore);
-    let copy = recs.clone();
-    let moved = Insights::shared(&copy, Options::default(), "t1\u{0}gen1", ignore);
+    let other = shared(&src, bots, "t1\u{0}gen1");
+    let moved = shared(&copy, Options::default(), "t1\u{0}gen1");
     for x in [&gen2, &other, &moved] {
         assert!(!a.shares_tables_with(x), "stale tables reused");
     }

@@ -11,10 +11,24 @@ struct Fake {
     batches: Cell<usize>,
 }
 
+/// A 40-digit commit id for a short test name, so the set can store it.
+fn oid(name: &str) -> String {
+    const HEX: &[u8; 16] = b"0123456789abcdef";
+    if name.len() == 40 && name.bytes().all(|b| b.is_ascii_hexdigit()) {
+        return name.to_owned();
+    }
+    let hex: String = name
+        .bytes()
+        .flat_map(|b| [HEX[usize::from(b >> 4)], HEX[usize::from(b & 15)]])
+        .map(char::from)
+        .collect();
+    format!("{hex:0>40}")
+}
+
 impl Fake {
     fn new(ids: &[&str]) -> Self {
         Self {
-            ids: RefCell::new(ids.iter().map(|s| (*s).to_owned()).collect()),
+            ids: RefCell::new(ids.iter().map(|s| oid(s)).collect()),
             built: Cell::new(0),
             batches: Cell::new(0),
         }
@@ -46,8 +60,12 @@ impl CommitSource for Fake {
     }
 }
 
-fn ids(rs: &[CommitRecord]) -> Vec<&str> {
-    rs.iter().map(|r| r.id.as_str()).collect()
+fn ids(rs: &[CommitRecord]) -> Vec<String> {
+    rs.iter().map(|r| r.id.clone()).collect()
+}
+
+fn oids(names: &[&str]) -> Vec<String> {
+    names.iter().map(|n| oid(n)).collect()
 }
 
 /// A source whose commits each touch their own paths, shareable across threads.
@@ -110,9 +128,10 @@ impl CommitSource for Paths {
 }
 
 /// Two processes indexing one repository (two `Index` handles on one folder, as `serve`
-/// beside `mcp`) never hand one path id to two paths.
+/// beside `mcp`) take turns: the set ends up holding one history whole, every path with its
+/// own commit, never a mix of both writers' ids.
 #[test]
-fn two_writers_keep_every_path_with_its_record() -> io::Result<()> {
+fn two_writers_leave_one_whole_history() -> io::Result<()> {
     let dir = tempfile::tempdir()?;
     let path = dir.path().join("gitterrace");
     let (a, b) = (Paths::new("a", 3000), Paths::new("b", 3000));
@@ -126,12 +145,15 @@ fn two_writers_keep_every_path_with_its_record() -> io::Result<()> {
         Ok::<(), io::Error>(())
     })?;
     let idx = Index::open_dir(path)?;
-    for src in [&a, &b] {
-        let got = idx.records(src, "HEAD")?;
-        assert_eq!(got.len(), 3000);
-        for r in got {
-            assert_eq!(&*r.files[0].path, format!("{}/{}.rs", src.tag, r.id));
-        }
+    let whole: Vec<&Paths> = [&a, &b]
+        .into_iter()
+        .filter(|src| idx.pending(*src, "HEAD").is_ok_and(|n| n == 0))
+        .collect();
+    assert_eq!(whole.len(), 1, "exactly one history is held whole");
+    let got = idx.records(whole[0], "HEAD")?;
+    assert_eq!(got.len(), 3000);
+    for r in got {
+        assert_eq!(&*r.files[0].path, format!("{}/{}.rs", whole[0].tag, r.id));
     }
     Ok(())
 }
@@ -165,7 +187,7 @@ fn update_waits_for_the_writer_lock() -> io::Result<()> {
     Ok(())
 }
 
-/// A format reset deletes the record files: it must wait for a writer that holds the lock.
+/// A format reset deletes the segment set: it must wait for a writer that holds the lock.
 #[test]
 fn format_reset_waits_for_the_writer_lock() -> io::Result<()> {
     let dir = tempfile::tempdir()?;
@@ -182,54 +204,11 @@ fn format_reset_waits_for_the_writer_lock() -> io::Result<()> {
                 .is_err(),
             "the reset ran under a held lock"
         );
-        assert!(path.join(crate::store::COMMITS_FILE).exists());
+        assert!(path.join(crate::seg::manifest::MANIFEST).exists());
         drop(held);
         rx.recv_timeout(std::time::Duration::from_secs(10))
             .map_err(io::Error::other)?
     })
-}
-
-/// A build killed at any byte of either file (a torn record, a torn path, paths written
-/// but their records not) resumes to files byte-identical to an uninterrupted build. The
-/// bench harness kills servers mid-index, so a resume that renumbered a path or reordered
-/// a row would show as an index that differs from the reference.
-#[test]
-fn a_build_killed_at_any_byte_resumes_byte_identical() -> io::Result<()> {
-    let read = |d: &std::path::Path| -> io::Result<(Vec<u8>, Vec<u8>)> {
-        Ok((
-            std::fs::read(d.join(crate::store::COMMITS_FILE))?,
-            std::fs::read(d.join(crate::store::PATHS_FILE))?,
-        ))
-    };
-    let src = Paths::new("a", 600);
-    let whole = tempfile::tempdir()?;
-    let idx = Index::open_dir(whole.path().join("gitterrace"))?;
-    idx.update(&src, "HEAD", &|_| {})?;
-    let (commits, paths) = read(idx.dir())?;
-    let cuts = |len: usize| [0, 1, len / 3, len / 2 + 7, len - 1, len];
-    for c in cuts(commits.len()) {
-        for p in cuts(paths.len()) {
-            let dir = tempfile::tempdir()?;
-            let path = dir.path().join("gitterrace");
-            Index::open_dir(path.clone())?;
-            std::fs::write(path.join(crate::store::COMMITS_FILE), &commits[..c])?;
-            std::fs::write(path.join(crate::store::PATHS_FILE), &paths[..p])?;
-            // Commit i names path i, and paths are written before their records: fewer
-            // whole path lines than record lines is not a state a kill can leave.
-            let lines = |b: &[u8]| b.split(|&x| x == b'\n').count();
-            if lines(&commits[..c]) > lines(&paths[..p]) {
-                continue;
-            }
-            let resumed = Index::open_dir(path)?;
-            resumed.update(&src, "HEAD", &|_| {})?;
-            let got = read(resumed.dir())?;
-            assert!(
-                got.0 == commits && got.1 == paths,
-                "resume after a cut at commits {c} / paths {p} differs"
-            );
-        }
-    }
-    Ok(())
 }
 
 /// A commit the source cannot read is not stored, stays pending and is built next time.
@@ -278,7 +257,8 @@ fn a_shallow_boundary_row_is_rebuilt_after_unshallow() -> io::Result<()> {
         .lock()
         .map_err(|_| io::Error::other("poisoned"))?
         .clear();
-    assert_eq!(idx.pending(&src, "HEAD")?, 1);
+    // A moved boundary changes topo ranks, so the whole set is rebuilt.
+    assert_eq!(idx.pending(&src, "HEAD")?, 2);
     idx.update(&src, "HEAD", &|_| {})?;
     assert_eq!(idx.pending(&src, "HEAD")?, 0);
     let got = idx.records(&src, "HEAD")?;
@@ -313,7 +293,16 @@ fn cache_folder_holds_the_documented_files() -> io::Result<()> {
         .map(|e| e.map(|e| e.file_name().to_string_lossy().into_owned()))
         .collect::<io::Result<_>>()?;
     have.sort();
-    let mut want: Vec<&str> = crate::CACHE_FILES.iter().map(|(n, _)| *n).collect();
+    // The documented files plus the manifest and the files it names.
+    let mut want: Vec<String> = crate::CACHE_FILES
+        .iter()
+        .map(|(n, _)| (*n).to_owned())
+        .collect();
+    want.push(crate::seg::manifest::MANIFEST.to_owned());
+    let m = crate::seg::manifest::Manifest::load(idx.dir())
+        .map_err(io::Error::other)?
+        .ok_or_else(|| io::Error::other("no manifest"))?;
+    want.extend(m.live.into_iter().map(|f| f.name));
     want.sort_unstable();
     assert_eq!(have, want);
     Ok(())
@@ -327,11 +316,11 @@ fn pending_counts_uncached_commits_of_a_rev() -> io::Result<()> {
     idx.update(&src, "HEAD", &|_| {})?;
     assert_eq!(idx.pending(&src, "HEAD")?, 0);
     // Another branch shares a and b and adds c.
-    src.ids.borrow_mut().push("c".into());
+    src.ids.borrow_mut().push(oid("c"));
     assert_eq!(idx.pending(&src, "side")?, 1);
     idx.update(&src, "side", &|_| {})?;
     assert_eq!(idx.pending(&src, "side")?, 0);
-    assert_eq!(ids(&idx.records(&src, "side")?), ["a", "b", "c"]);
+    assert_eq!(ids(&idx.records(&src, "side")?), oids(&["a", "b", "c"]));
     Ok(())
 }
 
@@ -341,26 +330,12 @@ fn update_is_incremental_and_ordered() -> io::Result<()> {
     let idx = Index::open_dir(dir.path().join("gitterrace"))?;
     let src = Fake::new(&["a", "b"]);
     idx.update(&src, "HEAD", &|_| {})?;
-    src.ids.borrow_mut().push("c".into());
+    src.ids.borrow_mut().push(oid("c"));
     let last = Cell::new(Progress::default());
     idx.update(&src, "HEAD", &|p| last.set(p))?;
     assert_eq!(src.built.get(), 3);
     assert_eq!(last.get(), Progress { done: 1, total: 1 });
-    assert_eq!(ids(&idx.records(&src, "HEAD")?), ["a", "b", "c"]);
-    Ok(())
-}
-
-#[test]
-fn stored_ids_match_parsed_ids_and_parallel_parse_keeps_order() -> io::Result<()> {
-    let dir = tempfile::tempdir()?;
-    let idx = Index::open_dir(dir.path().join("gitterrace"))?;
-    let names: Vec<String> = (0..4000).map(|i| format!("{i:040x}")).collect();
-    let wanted: Vec<&str> = names.iter().map(String::as_str).collect();
-    let src = Fake::new(&wanted);
-    idx.update(&src, "HEAD", &|_| {})?;
-    assert_eq!(crate::store::stored_ids(idx.dir())?.ids.len(), 4000);
-    let (parsed, _) = crate::store::read_records(idx.dir(), 0)?;
-    assert_eq!(ids(&parsed), wanted);
+    assert_eq!(ids(&idx.records(&src, "HEAD")?), oids(&["a", "b", "c"]));
     Ok(())
 }
 
@@ -376,39 +351,6 @@ fn update_builds_in_few_large_batches() -> io::Result<()> {
     idx.update(&src, "HEAD", &|_| {})?;
     assert_eq!(src.batches.get(), 5000_usize.div_ceil(crate::BATCH));
     assert!(src.batches.get() <= 3);
-    Ok(())
-}
-
-/// A path is stored once however many records name it, and survives the round trip with
-/// renames, across a reopened cache.
-#[test]
-fn paths_are_interned_and_round_trip() -> io::Result<()> {
-    let dir = tempfile::tempdir()?;
-    let idx = Index::open_dir(dir.path().join("gitterrace"))?;
-    let src = Fake::new(&["a", "b", "c"]);
-    let stat = |p: &str, old: Option<&str>| crate::FileStat {
-        path: p.into(),
-        old: old.map(Into::into),
-        additions: 2,
-        ..crate::FileStat::default()
-    };
-    let mut out = crate::store::Appender::open(idx.dir(), 0)?;
-    for (id, files) in [
-        ("a", vec![stat("src/x.rs", None)]),
-        ("b", vec![stat("src/x.rs", None), stat("y.rs", None)]),
-        ("c", vec![stat("z.rs", Some("src/x.rs"))]),
-    ] {
-        let mut r = src.record(id)?;
-        r.files = files;
-        out.push(&r, false)?;
-    }
-    out.flush()?;
-    let paths = std::fs::read_to_string(idx.dir().join("paths.jsonl"))?;
-    assert_eq!(paths.lines().count(), 3, "{paths}");
-    let got = idx.records(&src, "HEAD")?;
-    assert_eq!(&*got[1].files[1].path, "y.rs");
-    assert_eq!(got[2].files[0].old.as_deref(), Some("src/x.rs"));
-    assert_eq!(got[0].files[0].additions, 2);
     Ok(())
 }
 
@@ -435,7 +377,7 @@ fn a_newer_cache_is_left_byte_identical() -> io::Result<()> {
     };
     // A newer build takes over while `idx` is open.
     std::fs::write(path.join("VERSION"), "99\n")?;
-    src.ids.borrow_mut().push("c".into());
+    src.ids.borrow_mut().push(oid("c"));
     let before = snapshot(&path)?;
     let err = idx.update(&src, "HEAD", &|_| {}).expect_err("must refuse");
     assert!(err.to_string().contains("newer"), "{err}");
@@ -450,61 +392,15 @@ fn a_newer_cache_is_left_byte_identical() -> io::Result<()> {
 }
 
 #[test]
-fn unreadable_rows_are_counted_not_silent() -> io::Result<()> {
-    let dir = tempfile::tempdir()?;
-    let path = dir.path().join("gitterrace");
-    let idx = Index::open_dir(path.clone())?;
-    let src = Fake::new(&["a", "b"]);
-    idx.update(&src, "HEAD", &|_| {})?;
-    let file = path.join("commits.jsonl");
-    let mut text = std::fs::read_to_string(&file)?;
-    text.push_str("{\"id\":\"z\",\"files\":[{\"path\":\"old/style.rs\"}]}\n");
-    std::fs::write(&file, text)?;
-    // The bad row is dropped, the good ones survive; the count goes to stderr.
-    assert_eq!(ids(&idx.records(&src, "HEAD")?), ["a", "b"]);
-    Ok(())
-}
-
-#[test]
 fn generation_moves_when_records_are_added() -> io::Result<()> {
     let dir = tempfile::tempdir()?;
     let idx = Index::open_dir(dir.path().join("gitterrace"))?;
     let src = Fake::new(&["a"]);
     idx.update(&src, "HEAD", &|_| {})?;
     let before = idx.generation();
-    src.ids.borrow_mut().push("b".into());
+    src.ids.borrow_mut().push(oid("b"));
     idx.update(&src, "HEAD", &|_| {})?;
     assert!(idx.generation() > before);
-    Ok(())
-}
-
-#[test]
-fn unreachable_records_are_ignored() -> io::Result<()> {
-    let dir = tempfile::tempdir()?;
-    let idx = Index::open_dir(dir.path().join("gitterrace"))?;
-    let src = Fake::new(&["a", "b", "c"]);
-    idx.update(&src, "HEAD", &|_| {})?;
-    src.ids.replace(vec!["a".into(), "c".into()]);
-    assert_eq!(ids(&idx.records(&src, "HEAD")?), ["a", "c"]);
-    Ok(())
-}
-
-#[test]
-fn torn_last_line_is_dropped_and_rebuilt() -> io::Result<()> {
-    let dir = tempfile::tempdir()?;
-    let path = dir.path().join("gitterrace");
-    let idx = Index::open_dir(path.clone())?;
-    let src = Fake::new(&["a", "b"]);
-    idx.update(&src, "HEAD", &|_| {})?;
-    let file = path.join("commits.jsonl");
-    let mut text = std::fs::read_to_string(&file)?;
-    text.pop();
-    text.truncate(text.len() - 5);
-    std::fs::write(&file, text)?;
-    assert_eq!(ids(&idx.records(&src, "HEAD")?), ["a"]);
-    idx.update(&src, "HEAD", &|_| {})?;
-    assert_eq!(ids(&idx.records(&src, "HEAD")?), ["a", "b"]);
-    assert_eq!(std::fs::read_to_string(&file)?.lines().count(), 2);
     Ok(())
 }
 
@@ -564,13 +460,7 @@ fn planted(name: &str) -> io::Result<()> {
 #[cfg(unix)]
 #[test]
 fn planted_links_never_write_outside() -> io::Result<()> {
-    for name in [
-        "",
-        "VERSION",
-        "commits.jsonl",
-        "lines.json",
-        "lines.json.tmp",
-    ] {
+    for name in ["", "VERSION", "MANIFEST", "lines.json", "lines.json.tmp"] {
         planted(name).map_err(|e| io::Error::other(format!("{name:?}: {e}")))?;
     }
     Ok(())

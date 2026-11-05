@@ -82,14 +82,6 @@ pub(crate) async fn keep_index_fresh(app: Arc<App>) {
                     last = head;
                 }
             }
-            let wanted = app
-                .wanted
-                .lock()
-                .map(|mut w| std::mem::take(&mut *w))
-                .unwrap_or_default();
-            for rev in wanted {
-                refresh(&app, &rev, None).await;
-            }
         }
         let tick = async {
             match every {

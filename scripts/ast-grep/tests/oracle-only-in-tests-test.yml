@@ -1,0 +1,12 @@
+id: oracle-only-in-tests
+valid:
+  - 'mod tests { fn t() { let m = MemorySource::new(&r); } }'
+  - "#[cfg(any(test, feature = \"oracle\"))]\npub fn records(&self) { let i = Insights::new(&r, o, None); }"
+  - "#[cfg(any(test, feature = \"oracle\"))]\npub use memory::MemorySource;"
+  - 'fn page(a: &App) { let s = a.index.disk_source(&a.repo, "HEAD"); }'
+invalid:
+  # A page, the API, the cards or the CLI reaching the oracle.
+  - 'fn page(r: &[CommitRecord]) { let s = MemorySource::new(r); }'
+  - 'fn card(r: &[CommitRecord]) { let i = Insights::new(r, o, None); }'
+  - 'fn cli(index: &Index, repo: &Repo) { let r = index.records(repo, "HEAD"); }'
+  - "#[cfg(feature = \"x\")]\nfn f() { let s = MemorySource::new(r); }"

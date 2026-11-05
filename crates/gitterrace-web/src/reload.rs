@@ -204,6 +204,9 @@ mod tests {
             assert_eq!(res.status(), 200);
             res.headers().get("etag").expect("etag").clone()
         };
+        // The first insights answer builds the segment set (the API serves from it alone),
+        // which moves the generation in the tag: warm it before comparing.
+        tag(router.clone()).await;
         let before = tag(router.clone()).await;
         let same = tag(router.clone()).await;
         assert_eq!(before, same, "nothing changed, same tag");

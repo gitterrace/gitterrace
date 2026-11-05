@@ -33,9 +33,7 @@ pub(crate) use gitterrace_git::days_from_civil;
 use gitterrace_git::{IgnoreSet, civil_from_days as civil};
 
 use crate::CommitRecord;
-use crate::feed::{
-    self, CommitRange, CommitRow, FileRow, IdentId, InsightsSource, MemorySource, PathId, Rank,
-};
+use crate::feed::{self, CommitRange, CommitRow, FileRow, IdentId, InsightsSource, PathId, Rank};
 
 pub use accel::{Accel, NoAccel, ReducerKind, ReducerOut};
 pub use axis::{BucketUnit, MAX_BUCKETS, TimeAxis};
@@ -69,7 +67,7 @@ pub(crate) const DAY: i64 = 86_400;
 /// Derived tables kept for this many (key, options) pairs: the unfiltered pages of a few tips.
 const SHARED_SETS: usize = 4;
 
-/// Derived tables of recent unfiltered record sets, see [`Insights::shared`].
+/// Derived tables of recent unfiltered sources, see [`Insights::shared_source`].
 static SHARED: Mutex<Vec<SharedEntry>> = Mutex::new(Vec::new());
 
 /// Which paths and commits count.
@@ -116,7 +114,7 @@ pub struct Lines {
 pub struct Insights<'a> {
     src: Src<'a>,
     pub(crate) opts: Options,
-    /// [`crate::reference_time`]: "now" for periods, so old repositories still show data.
+    /// [`feed::reference_time`]: "now" for periods, so old repositories still show data.
     /// Read per instance: it moves with the wall clock, the tables below do not.
     pub(crate) now: i64,
     d: Arc<Derived>,
@@ -124,6 +122,7 @@ pub struct Insights<'a> {
 
 enum Src<'a> {
     Borrowed(&'a dyn InsightsSource),
+    #[cfg(any(test, feature = "oracle"))]
     Owned(Box<dyn InsightsSource + 'a>),
 }
 
@@ -155,10 +154,13 @@ struct SharedEntry {
 }
 
 impl<'a> Insights<'a> {
-    /// Over today's records, through a [`MemorySource`]. `ignore` is the ignore set of the
-    /// head revision, see [`IgnoreSet::at`], only used when `opts.respect_ignore` is set.
+    /// Over records in memory, through the oracle adapter `feed::MemorySource`: the side
+    /// equivalence tests compare the segment set against, never served. `ignore` is the ignore
+    /// set of the head revision, see [`IgnoreSet::at`], only used when `opts.respect_ignore` is
+    /// set.
+    #[cfg(any(test, feature = "oracle"))]
     pub fn new(records: &'a [CommitRecord], opts: Options, ignore: Option<IgnoreSet>) -> Self {
-        let src = Src::Owned(Box::new(MemorySource::new(records)));
+        let src = Src::Owned(Box::new(feed::MemorySource::new(records)));
         let d = Arc::new(Derived::build(src.get(), &opts, ignore));
         Self::with(src, opts, d)
     }
@@ -173,23 +175,9 @@ impl<'a> Insights<'a> {
         Self::with(Src::Borrowed(src), opts, d)
     }
 
-    /// [`Insights::new`] whose derived tables are shared by every caller passing the same
-    /// `key`, options and record slice, bounded to the last few. `key` must name the record
-    /// set and the ignore rules, e.g. tip and index generation; `ignore` runs on a miss only.
-    pub fn shared(
-        records: &'a [CommitRecord],
-        opts: Options,
-        key: &str,
-        ignore: impl FnOnce() -> Option<IgnoreSet>,
-    ) -> Self {
-        let src = Src::Owned(Box::new(MemorySource::new(records)));
-        let at = (records.as_ptr() as usize, records.len());
-        let d = shared_tables(src.get(), &opts, key, at, ignore);
-        Self::with(src, opts, d)
-    }
-
-    /// [`Insights::from_source`] with the tables shared as [`Insights::shared`] does, keyed
-    /// by `key`, options and the address of `src`.
+    /// [`Insights::from_source`] whose derived tables are shared by every caller passing the
+    /// same `key`, options and source, bounded to the last few. `key` must name the set and the
+    /// ignore rules, e.g. tip and index generation; `ignore` runs on a miss only.
     pub fn shared_source(
         src: &'a dyn InsightsSource,
         opts: Options,
@@ -223,7 +211,8 @@ impl<'a> Insights<'a> {
         })
     }
 
-    /// True when both share one set of derived tables (a test hook for [`Insights::shared`]).
+    /// True when both share one set of derived tables (a test hook for
+    /// [`Insights::shared_source`]).
     pub fn shares_tables_with(&self, other: &Insights<'_>) -> bool {
         Arc::ptr_eq(&self.d, &other.d)
     }
@@ -358,6 +347,7 @@ impl Src<'_> {
     fn get(&self) -> &dyn InsightsSource {
         match self {
             Self::Borrowed(s) => *s,
+            #[cfg(any(test, feature = "oracle"))]
             Self::Owned(s) => s.as_ref(),
         }
     }

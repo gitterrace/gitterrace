@@ -154,9 +154,7 @@ fn repo_router_tasks(
         cfg.limits.worktree_files,
         (cfg.limits.worktree_diff_kb as u64) << 10,
     );
-    let index = Index::open(&repo)?
-        .with_threads(cfg.index.threads)
-        .with_fresh_cap(cfg.limits.unindexed_commits);
+    let index = Index::open(&repo)?.with_fresh_cap(cfg.limits.unindexed_commits);
     index.set_block_cache(cfg.cache_bytes(gitterrace_config::Cache::Blocks));
     let mut app = App::configured(repo, index, env);
     app.base = base;

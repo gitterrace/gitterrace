@@ -17,7 +17,7 @@ fn junk_and_order_do_not_make_new_memo_keys() {
 }
 
 #[test]
-fn memo_key_moves_with_head_and_index_and_records_follow() {
+fn memo_key_moves_with_head_and_index_and_the_source_follows() {
     let dir = tempfile::tempdir().expect("tempdir");
     let path = dir.path();
     git(path, &["init", "-q", "-b", "main"]);
@@ -36,7 +36,7 @@ fn memo_key_moves_with_head_and_index_and_records_follow() {
     assert_ne!(key, app.memo_key("t", Some("type=feat")));
     app.memo_put(key.clone(), std::sync::Arc::new("page".into()));
     assert!(app.memo_get(&key).is_some());
-    let first = app.records(&head).expect("records").expect("ready");
+    let first = app.source(&head).expect("source").expect("ready");
     assert_eq!(first.len(), 1);
 
     std::fs::write(path.join("a.txt"), "2\n").expect("write");
@@ -49,8 +49,8 @@ fn memo_key_moves_with_head_and_index_and_records_follow() {
         .expect("update");
     app.mark_ready();
     let head = app.repo.resolve("HEAD").expect("head");
-    let second = app.records(&head).expect("records").expect("ready");
-    assert_eq!(second.len(), 2, "records cache must follow the new tip");
+    let second = app.source(&head).expect("source").expect("ready");
+    assert_eq!(second.len(), 2, "the source must follow the new tip");
 }
 
 /// Overview totals are an all-history pass (about 400 ms per request on rust-lang/rust
@@ -97,39 +97,27 @@ fn overview_totals_are_computed_once_per_tip() {
 }
 
 #[test]
-fn racing_callers_share_one_parsed_record_set() {
-    let dir = tempfile::tempdir().expect("tempdir");
-    let path = dir.path();
-    git(path, &["init", "-q", "-b", "main"]);
-    std::fs::write(path.join("a.txt"), "1\n").expect("write");
-    git(path, &["add", "."]);
-    git(path, &["commit", "-q", "-m", "feat: one"]);
-    let repo = gitterrace_git::Repo::discover(path).expect("repo");
-    let index = gitterrace_index::Index::open(&repo).expect("index");
-    let app = std::sync::Arc::new(App::new(repo, index));
-    app.index
-        .update(&app.repo, "HEAD", &|_| {})
-        .expect("update");
-    app.mark_ready();
-    let head = app.repo.resolve("HEAD").expect("head");
+fn racing_callers_share_one_source() {
+    let (_dir, app, head) = one_commit_app();
     let sets: Vec<_> = (0..8)
         .map(|_| {
-            let (a, h) = (std::sync::Arc::clone(&app), head.clone());
-            std::thread::spawn(move || a.records(&h).expect("records").expect("ready"))
+            let (a, h) = (Arc::clone(&app), head.clone());
+            std::thread::spawn(move || a.source(&h).expect("source").expect("ready"))
         })
         .collect::<Vec<_>>()
         .into_iter()
         .map(|t| t.join().expect("join"))
         .collect();
     assert!(
-        sets.iter().all(|s| std::sync::Arc::ptr_eq(s, &sets[0])),
-        "every racing caller must get the one parsed set"
+        sets.iter().all(|s| s.len() == 1),
+        "every caller reads the set"
     );
+    // Racers may each open the set (it is a pread view, cheap); once one is kept, all share it.
+    let kept = app.source(&head).expect("source").expect("ready");
+    let again = app.source(&head).expect("source").expect("ready");
+    assert!(Arc::ptr_eq(&kept, &again), "a kept source is shared");
 }
 
-/// A block that fails its check while pages are served is never served
-/// as data. The next page deletes the cache, gets no source (the indexing page) and the
-/// loop rebuilds. Red without `check_unreadable`: the corrupt set keeps serving.
 #[test]
 fn a_block_corrupted_while_serving_rebuilds_the_cache() {
     use gitterrace_index::feed::CommitRange;
@@ -190,7 +178,7 @@ fn a_block_corrupted_while_serving_rebuilds_the_cache() {
 }
 
 #[test]
-fn alternating_selected_commits_reuse_their_parsed_records() {
+fn alternating_selected_commits_each_read_the_segment_set() {
     let dir = tempfile::tempdir().expect("tempdir");
     let path = dir.path();
     git(path, &["init", "-q", "-b", "main"]);
@@ -209,50 +197,27 @@ fn alternating_selected_commits_reuse_their_parsed_records() {
     app.mark_ready();
     let head = app.repo.resolve("HEAD").expect("head");
     for _ in 0..3 {
-        assert_eq!(
-            app.records(&head).expect("records").expect("ready").len(),
-            2
-        );
-        assert_eq!(
-            app.records(&first).expect("records").expect("ready").len(),
-            1
-        );
+        assert_eq!(app.source(&head).expect("source").expect("ready").len(), 2);
+        assert_eq!(app.source(&first).expect("source").expect("ready").len(), 1);
     }
-    assert_eq!(app.record_loads(), 2, "each commit's records are read once");
 }
 
-/// The parsed history is the bulk of a running server, so nothing may keep it alive once
-/// nobody browses: not the record slots, the shared insights tables or
-/// any cache added later. The test holds only a weak reference, so whatever pins the set
-/// turns it red; a page in flight keeps its own `Arc` and the next page parses again.
+/// Nothing may keep the insights source and the tables over it alive once nobody browses:
+/// not the source slot, the shared insights tables or any cache added later. The test holds
+/// only a weak reference, so whatever pins the source turns it red; a page in flight keeps its
+/// own `Arc` and the next page opens the set again.
 #[test]
-fn an_idle_app_lets_go_of_its_records_and_parses_them_again_on_use() {
-    let dir = tempfile::tempdir().expect("tempdir");
-    let path = dir.path();
-    git(path, &["init", "-q", "-b", "main"]);
-    std::fs::write(path.join("a.rs"), "fn a() {}\n").expect("write");
-    git(path, &["add", "."]);
-    git(path, &["commit", "-q", "-m", "feat: one"]);
-    let repo = gitterrace_git::Repo::discover(path).expect("repo");
-    let index = gitterrace_index::Index::open(&repo).expect("index");
-    let app = App::new(repo, index);
-    app.index
-        .update(&app.repo, "HEAD", &|_| {})
-        .expect("update");
-    app.mark_ready();
-    let head = app.repo.resolve("HEAD").expect("head");
-    let recs = app.records(&head).expect("records").expect("ready");
-    // Everything the pages build over the records, as the warm-up does.
+fn an_idle_app_lets_go_of_its_source_and_opens_it_again_on_use() {
+    let (_dir, app, head) = one_commit_app();
+    // Everything the pages build over the source, as the warm-up does.
     let src = app.source(&head).expect("source").expect("ready");
     app.chain(&head, &*src, &crate::languages::path_filter(&app, &head));
     crate::fmt::with_rev(&head, || {
         let _ins = crate::insights::insights(&app, &src, gitterrace_index::Options::default());
     });
+    let weak = Arc::downgrade(&src);
     drop(src);
     assert!(app.source_held());
-    let weak = Arc::downgrade(&recs);
-    drop(recs);
-    // The tables hold no `Arc` of the records (they index into them), so count them too.
     let tables = || gitterrace_index::Insights::shared_sets(&format!("\u{0}{head}"));
     assert_eq!(tables(), 1);
     assert!(!app.release_idle(Duration::from_secs(3600)), "in use");
@@ -260,20 +225,19 @@ fn an_idle_app_lets_go_of_its_records_and_parses_them_again_on_use() {
     assert!(app.release_idle(Duration::ZERO));
     assert!(
         weak.upgrade().is_none(),
-        "an idle app still holds its records"
+        "an idle app still holds its source"
     );
     assert_eq!(
         tables(),
         0,
-        "an idle app still holds the tables built over them"
+        "an idle app still holds the tables built over it"
     );
     assert!(
         !app.source_held(),
         "an idle app still holds its insights source"
     );
-    let again = app.records(&head).expect("records").expect("ready");
+    let again = app.source(&head).expect("source").expect("ready");
     assert_eq!(again.len(), 1);
-    assert_eq!(app.record_loads(), 2, "parsed again after the release");
 }
 
 fn one_commit_app() -> (tempfile::TempDir, Arc<App>, String) {
@@ -303,7 +267,6 @@ fn an_idle_release_empties_every_cache() {
     let (_dir, app, head) = one_commit_app();
     let src = app.source(&head).expect("source").expect("ready");
     app.chain(&head, &*src, &crate::languages::path_filter(&app, &head));
-    let _ = app.records(&head).expect("records");
     let _ = app.file_paths(&head).expect("files");
     let _ = app.last_commits(&head, "").expect("last commits");
     let _ = app.ignore_set(&head);

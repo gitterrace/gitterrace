@@ -1,0 +1,25 @@
+id: oracle-only-in-tests
+language: rust
+severity: error
+message: 'The in-memory oracle (`MemorySource`, `Insights::new`, `Index::records`) outside a test.'
+note: 'Pages, the API, cards and the CLI read the segment set (`Index::disk_source`). The oracle is what equivalence tests compare it against.'
+files: [crates/**/*.rs, xtask/**/*.rs]
+# Test files, the oracle itself and its cfg-gated entry points.
+ignores:
+  - crates/**/tests.rs
+  - crates/**/*_tests.rs
+  - crates/**/tests/**
+  - crates/gitterrace-testkit/**
+  - crates/gitterrace-index/src/feed/memory.rs
+rule:
+  any:
+    - pattern: MemorySource
+    - pattern: Insights::new($$$)
+    - pattern: $I.records($S, $R)
+  not:
+    any:
+      - inside: {stopBy: end, kind: mod_item, regex: '^(pub(\(crate\))? )?mod \w*(tests|fixtures)\b'}
+      - inside:
+          stopBy: end
+          any: [{kind: function_item}, {kind: use_declaration}, {kind: mod_item}]
+          follows: {kind: attribute_item, regex: '^#\[cfg\((test|any\(test, feature = "oracle"\))\)\]$'}

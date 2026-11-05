@@ -377,17 +377,21 @@ fn shallow_of(ids: &[String]) -> crate::seg::SegResult<u64> {
     Ok(crate::seg::manifest::shallow_fingerprint(&oids))
 }
 
+/// Whether the set was built against another shallow boundary than `shallow`: then every
+/// commit is pending, since the next update rebuilds the set whole.
+pub(crate) fn shallow_stale(dir: &Path, shallow: &[String]) -> bool {
+    match crate::seg::manifest::Manifest::load(dir) {
+        Ok(Some(m)) => shallow_of(shallow).map_or(true, |s| s != m.shallow),
+        _ => false,
+    }
+}
+
 /// Wipes the cache when the clone's shallow boundary is not the one its segments were built
 /// against: deepening or grafting changes parents, so topo ranks and the order are stale.
 /// Treated exactly as an unreadable cache, never partly served. Call before an update, under no
 /// lock. A newer build's cache is left alone. Returns whether it wiped.
 pub(crate) fn check_shallow(dir: &Path, shallow: &[String]) -> io::Result<bool> {
-    let stale = |dir: &Path| -> bool {
-        match crate::seg::manifest::Manifest::load(dir) {
-            Ok(Some(m)) => shallow_of(shallow).map_or(true, |s| s != m.shallow),
-            _ => false,
-        }
-    };
+    let stale = |dir: &Path| shallow_stale(dir, shallow);
     if !stale(dir) {
         return Ok(false);
     }

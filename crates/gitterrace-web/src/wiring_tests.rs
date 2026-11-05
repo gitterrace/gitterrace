@@ -297,7 +297,7 @@ async fn index_build_on_start_waits_for_demand_when_off() {
     assert!(!a.ready(), "nothing builds until a page needs the index");
     let head = a.repo.resolve("HEAD").expect("head");
     assert!(
-        a.records(&head).expect("records").is_none(),
+        a.source(&head).expect("source").is_none(),
         "asking is the demand"
     );
     for _ in 0..100 {

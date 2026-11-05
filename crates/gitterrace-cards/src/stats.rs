@@ -1,10 +1,8 @@
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::sync::Arc;
 
-use gitterrace_index::feed::{
-    CommitRange, CommitRow, InsightsSource, MemorySource, PathId, local_day_of,
-};
-use gitterrace_index::{CommitRecord, civil_from_days as civil, days_from_civil, weekday};
+use gitterrace_index::feed::{CommitRange, CommitRow, InsightsSource, PathId, local_day_of};
+use gitterrace_index::{civil_from_days as civil, days_from_civil, weekday};
 
 const DAY: i64 = 86_400;
 
@@ -36,13 +34,9 @@ pub struct BiggestCommit {
     pub lines: u64,
 }
 
-pub fn wrapped_stats(repo: &str, records: &[CommitRecord], year: i32) -> WrappedStats {
-    wrapped_stats_from(repo, &MemorySource::new(records), year)
-}
-
-/// [`wrapped_stats`] over any source: commit columns, then the file rows of that year's
+/// The card's numbers for `year` over `src`: commit columns, then the file rows of that year's
 /// commits streamed, so memory is the year's tallies, never the rows.
-pub fn wrapped_stats_from(repo: &str, src: &dyn InsightsSource, year: i32) -> WrappedStats {
+pub fn wrapped_stats(repo: &str, src: &dyn InsightsSource, year: i32) -> WrappedStats {
     let rs: Vec<CommitRow> = src
         .commits_in(CommitRange::All)
         .filter(|c| civil(local_day_of(c.time, c.offset)).0 == i64::from(year))
@@ -203,6 +197,7 @@ fn argmax(v: &[u32]) -> Option<usize> {
 
 #[cfg(test)]
 pub(crate) mod fixtures {
+    use gitterrace_index::feed::MemorySource;
     use gitterrace_index::{CommitRecord, FileStat};
 
     /// A record at `day` days after 2025-01-01 00:00 UTC plus `hour`.
@@ -229,7 +224,12 @@ pub(crate) mod fixtures {
         }
     }
 
-    pub fn sample() -> Vec<CommitRecord> {
+    /// The sample history, through the oracle adapter (the card reads any source).
+    pub fn sample() -> MemorySource<'static> {
+        MemorySource::shared(std::sync::Arc::new(records()))
+    }
+
+    fn records() -> Vec<CommitRecord> {
         let mut v = Vec::new();
         for i in 0..40 {
             let who = if i % 4 == 0 { "bob" } else { "alice" };

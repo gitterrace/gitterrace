@@ -1064,6 +1064,7 @@ dependencies = [
  "crc32fast",
  "gitterrace-config",
  "gitterrace-git",
+ "gitterrace-index",
  "gitterrace-testkit",
  "gitterrace-types",
  "libc",

@@ -16,7 +16,7 @@
     "crates/gitterrace-config/src/schema.rs": 7,
     "crates/gitterrace-index/src/insights/mod.rs": 1,
     "crates/gitterrace-index/src/insights/stats.rs": 1,
-    "crates/gitterrace-index/src/lib.rs": 6,
+    "crates/gitterrace-index/src/lib.rs": 4,
     "crates/gitterrace-index/src/store.rs": 2,
     "crates/gitterrace-index/tests/it/count_parity_fuzz.rs": 9,
     "crates/gitterrace-testkit/src/lib.rs": 2,

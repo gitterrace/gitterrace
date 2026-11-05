@@ -33,7 +33,7 @@ fn build(repo: &Path, threads: usize) -> BTreeMap<String, Vec<u8>> {
 fn assert_same_on_any_thread_count(repo: &Path) {
     let one = build(repo, 1);
     assert!(
-        one.get("commits.jsonl").is_some_and(|c| !c.is_empty()),
+        one.get("MANIFEST").is_some_and(|c| !c.is_empty()),
         "nothing was indexed"
     );
     for threads in [4, 10, 10] {

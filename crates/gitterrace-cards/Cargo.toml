@@ -17,4 +17,5 @@ gitterrace-index.workspace = true
 schwarzwald.workspace = true
 
 [dev-dependencies]
+gitterrace-index = { workspace = true, features = ["oracle"] }
 usvg = { version = "0.45", default-features = false }

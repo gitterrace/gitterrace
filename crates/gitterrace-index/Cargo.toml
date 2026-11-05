@@ -8,6 +8,11 @@ repository.workspace = true
 publish = false
 description = "Insights cache in .git/gitterrace/, append-only and rebuildable, and the aggregates over it."
 
+[features]
+# The in-memory oracle (MemorySource, Index::records, Insights::new) for equivalence tests.
+# Enabled from dev-dependencies only, so no shipped build can serve from it.
+oracle = []
+
 [lints]
 workspace = true
 
@@ -24,6 +29,7 @@ thiserror.workspace = true
 libc.workspace = true
 
 [dev-dependencies]
+gitterrace-index = { workspace = true, features = ["oracle"] }
 gitterrace-testkit.workspace = true
 tempfile.workspace = true
 cap = "0.1"

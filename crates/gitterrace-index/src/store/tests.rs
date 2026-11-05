@@ -5,9 +5,7 @@ use std::io;
 
 use crate::seg::format::section;
 
-use super::{
-    COMMITS_FILE, FORMAT_VERSION, LOCK_FILE, PATHS_FILE, VERSION_FILE, ensure_dir, split_lines,
-};
+use super::{FORMAT_VERSION, LOCK_FILE, VERSION_FILE, ensure_dir};
 
 fn names(dir: &std::path::Path) -> io::Result<Vec<String>> {
     let mut out: Vec<String> = fs::read_dir(dir)?
@@ -23,9 +21,10 @@ fn an_unreadable_cache_is_deleted_whole() -> io::Result<()> {
     let tmp = tempfile::tempdir()?;
     let dir = tmp.path().join("gitterrace");
     fs::create_dir(&dir)?;
-    fs::write(dir.join(VERSION_FILE), "3\n")?;
-    fs::write(dir.join(COMMITS_FILE), "{}\n")?;
-    fs::write(dir.join(PATHS_FILE), "\"a\"\n")?;
+    fs::write(dir.join(VERSION_FILE), "5\n")?;
+    // The record files of format 5 and before go with everything else.
+    fs::write(dir.join("commits.jsonl"), "{}\n")?;
+    fs::write(dir.join("paths.jsonl"), "\"a\"\n")?;
     fs::write(dir.join("seg-1-0.gts"), "old segment")?;
     assert_eq!(ensure_dir(&dir)?, None);
     assert_eq!(names(&dir)?, [VERSION_FILE, LOCK_FILE]);
@@ -285,30 +284,13 @@ fn the_sweep_removes_only_files_not_live() -> io::Result<()> {
     let dir = tmp.path().join("gitterrace");
     fs::create_dir(&dir)?;
     fs::write(dir.join(VERSION_FILE), format!("{FORMAT_VERSION}\n"))?;
-    fs::write(dir.join(COMMITS_FILE), "")?;
+    fs::write(dir.join(LOCK_FILE), "")?;
     fs::write(dir.join("retired-seg.gts"), "x")?;
     fs::write(dir.join(".lines.json.1.2.tmp"), "x")?;
     assert_eq!(ensure_dir(&dir)?, None);
     assert_eq!(
         names(&dir)?,
-        [".lines.json.1.2.tmp", VERSION_FILE, COMMITS_FILE, LOCK_FILE]
+        [".lines.json.1.2.tmp", VERSION_FILE, LOCK_FILE]
     );
     Ok(())
-}
-
-#[test]
-fn the_thread_setting_bounds_the_chunk_count() {
-    let data: Vec<u8> = (0..1000)
-        .flat_map(|i| format!("line {i}\n").into_bytes())
-        .collect();
-    for n in [2, 3, 5] {
-        let chunks = split_lines(&data, n);
-        assert!(
-            chunks.len() <= n && chunks.len() > 1,
-            "{n} threads: {}",
-            chunks.len()
-        );
-        assert_eq!(chunks.concat(), data, "no line is lost or cut");
-    }
-    assert_eq!(split_lines(&data, 1).len(), 1);
 }

@@ -258,9 +258,9 @@ fn the_index_rebuilds_an_unreadable_cache_to_a_fresh_build() {
 
     let cases: [Case<'_>; 7] = [
         ("older VERSION", &|d| {
-            fs::write(d.join("VERSION"), "3\n").expect("w");
+            fs::write(d.join("VERSION"), "5\n").expect("w");
         }),
-        ("VERSION 0 beside JSON files", &|d| {
+        ("VERSION 0 beside the old record files", &|d| {
             fs::write(d.join("VERSION"), "0\n").expect("w");
             fs::write(d.join("commits.jsonl"), "{\"id\":\"x\"}\n").expect("w");
         }),

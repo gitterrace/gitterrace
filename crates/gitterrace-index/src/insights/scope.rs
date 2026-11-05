@@ -216,7 +216,7 @@ impl CountContext {
         }
     }
 
-    /// The newest author time not after the clock: [`crate::reference_time`].
+    /// The newest author time not after the clock: [`crate::feed::reference_time`].
     pub const fn now(&self) -> i64 {
         self.now
     }

@@ -1,7 +1,8 @@
 //! The one seam every insights page reads through: [`InsightsSource`].
 //!
-//! A page never knows whether its data comes from today's records in memory ([`MemorySource`]) or
-//! from the segment files (`segments.rs`, `disk.rs`).
+//! Pages read the segment files (`segments.rs`, `disk.rs`). The memory adapter over records
+//! (`memory.rs`) exists only as the oracle the equivalence tests compare the segments against:
+//! it is compiled for tests and the `oracle` feature, which only dev-dependencies enable.
 //!
 //! Contract:
 //!
@@ -20,6 +21,7 @@
 
 pub(crate) mod disk;
 mod fresh;
+#[cfg(any(test, feature = "oracle"))]
 mod memory;
 mod reach;
 pub(crate) mod segments;
@@ -32,6 +34,7 @@ pub use crate::seg::{IdentId, LabelId, Oid, PathId, Rank};
 pub use disk::testing as disk_testing;
 pub use disk::{DiskSource, IdentMap, RowWriter, block_cache_default};
 pub use fresh::FRESH_CAP;
+#[cfg(any(test, feature = "oracle"))]
 pub use memory::{IdentPairs, MemorySource};
 pub use reach::{Reach, RevView, rev_view};
 pub use segments::SegmentSource;
@@ -63,7 +66,7 @@ impl Clock for FixedClock {
     }
 }
 
-/// [`crate::reference_time`] over a source: the newest author time not after the wall clock.
+/// "Now" for period windows over a source: the newest author time not after the wall clock.
 pub fn reference_time(src: &dyn InsightsSource) -> i64 {
     reference_time_at(src, &SystemClock)
 }

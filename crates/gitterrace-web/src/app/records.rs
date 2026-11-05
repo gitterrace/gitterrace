@@ -1,65 +1,18 @@
-//! Record sets, the insights source over them, and their release when idle.
+//! The insights source over the segment set, and its release when idle.
 
 use std::{
     sync::{Arc, atomic::Ordering},
     time::{Duration, Instant},
 };
 
-use gitterrace_index::CommitRecord;
-
-use crate::app::{App, RECORD_SETS};
-use crate::caches::RecordSlot;
+use crate::app::App;
 use crate::error::Result;
 
 impl App {
-    /// Records reachable from `head`, parsed once per index generation. `None` until the first
-    /// build finished, and for a commit outside HEAD's history until its missing commits are
-    /// indexed; the indexer loop picks such a commit up from `wanted`.
-    pub(crate) fn records(&self, head: &str) -> Result<Option<Arc<Vec<CommitRecord>>>> {
-        if !self.ready() {
-            self.demand();
-            return Ok(None);
-        }
-        self.touch();
-        let key = (head.to_owned(), self.index.generation());
-        if let Some(recs) = self.record_slot(&key).and_then(|s| s.lock().ok()?.clone()) {
-            return Ok(Some(recs));
-        }
-        if self.index.newer_format().is_some() {
-            return Ok(None);
-        }
-        // Many distinct commits can land here on a public server; each is indexed once, so the
-        // work is bounded by the history, and the slots below stay at `RECORD_SETS`.
-        if self.index.pending(&self.repo, head)? > 0 {
-            if let Ok(mut w) = self.wanted.lock() {
-                w.insert(head.to_owned());
-            }
-            self.wake.notify_one();
-            return Ok(None);
-        }
-        let slot = self.record_slot_or_new(key);
-        // Held across the load: callers racing on one cold commit wait for the one parse instead
-        // of each parsing the whole record file, which multiplied peak memory. Other commits
-        // have their own slot and do not wait.
-        let Ok(mut g) = slot.lock() else {
-            return Ok(None);
-        };
-        if let Some(recs) = g.as_ref() {
-            return Ok(Some(Arc::clone(recs)));
-        }
-        self.record_loads.fetch_add(1, Ordering::Relaxed);
-        let recs = Arc::new(self.index.records(&self.repo, head)?);
-        *g = Some(Arc::clone(&recs));
-        Ok(Some(recs))
-    }
-
-    fn record_slot(&self, key: &(String, u64)) -> Option<RecordSlot> {
-        let g = self.caches.records.lock().ok()?;
-        g.iter().find(|(k, _)| k == key).map(|(_, s)| Arc::clone(s))
-    }
-
-    /// What every insights page reads for `head`, `None` while [`App::records`] is. Kept for
-    /// one (commit, generation), so a HEAD move or a rebuild never serves a stale source.
+    /// What every insights page reads for `head`: the segment set, or the reach view over it
+    /// for another commit. `None` until the first build finished (the indexing page) and for a
+    /// commit too far from the set (the reindex page). Kept for one (commit, generation), so a
+    /// HEAD move or a rebuild never serves a stale source.
     pub(crate) fn source(&self, head: &str) -> Result<Option<crate::insights::Src>> {
         self.check_unreadable()?;
         let key = (head.to_owned(), self.index.generation());
@@ -116,14 +69,9 @@ impl App {
                 }
             }
         }
-        let Some(recs) = self.records(head)? else {
-            return Ok(None);
-        };
-        let src = gitterrace_index::Index::memory_source(recs);
-        if let Ok(mut g) = self.caches.source.lock() {
-            *g = Some((key, Arc::clone(&src)));
-        }
-        Ok(Some(src))
+        // Ready but no set holds or reaches it: a newer build owns the cache, or the set is
+        // being rebuilt. The indexing page, never data from anywhere else.
+        Ok(None)
     }
 
     /// A block that failed its check while serving deletes the cache, drops
@@ -169,24 +117,6 @@ impl App {
         self.caches.source.lock().is_ok_and(|g| g.is_some())
     }
 
-    /// The slot for `key`, made when missing. Sets of an older generation go first, then the
-    /// oldest, so at most `RECORD_SETS` stay alive.
-    fn record_slot_or_new(&self, key: (String, u64)) -> RecordSlot {
-        let Ok(mut g) = self.caches.records.lock() else {
-            return Arc::default();
-        };
-        if let Some((_, s)) = g.iter().find(|(k, _)| *k == key) {
-            return Arc::clone(s);
-        }
-        g.retain(|(k, _)| k.1 == key.1);
-        while g.len() >= RECORD_SETS {
-            g.remove(0);
-        }
-        let slot = RecordSlot::default();
-        g.push((key, Arc::clone(&slot)));
-        slot
-    }
-
     /// Idle releases that freed something so far.
     pub(crate) fn releases(&self) -> u64 {
         self.releases.load(Ordering::Relaxed)
@@ -211,7 +141,7 @@ impl App {
         Warming(Arc::clone(self))
     }
 
-    /// Drops the record sets and every per-request cache once no page read them for `idle`.
+    /// Drops the source and every per-request cache once no page read them for `idle`.
     /// Returns whether it released anything. A page in flight keeps its own `Arc`, so it is
     /// never cut short; the next page builds again. Only the rendered-page memo stays.
     pub(crate) fn release_idle(&self, idle: Duration) -> bool {
@@ -221,7 +151,7 @@ impl App {
         }
         let released = self.caches.clear_all();
         gitterrace_index::Insights::release_shared(&format!("{}\u{0}", self.base));
-        // The API parses its own set; a caller there is a client that can wait a second too.
+        // The API opens its own source; a caller there is a client that can wait a second too.
         if let Some(api) = self.api.get() {
             api.release_records();
         }
@@ -229,12 +159,6 @@ impl App {
             self.releases.fetch_add(1, Ordering::Relaxed);
         }
         released
-    }
-
-    /// How often the record file was read, for tests.
-    #[cfg(test)]
-    pub(crate) fn record_loads(&self) -> u64 {
-        self.record_loads.load(Ordering::Relaxed)
     }
 }
 

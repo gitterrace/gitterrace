@@ -1,5 +1,6 @@
-//! Incremental insights cache in `.git/gitterrace/`. One record per commit, appended;
-//! statistics are computed from the records on demand by [`Insights`].
+//! Incremental insights cache in `.git/gitterrace/`: the segment set, appended per update and
+//! merged in the background. Statistics read it through [`feed::InsightsSource`] on demand,
+//! by [`Insights`].
 
 mod cache;
 mod conventional;
@@ -9,7 +10,9 @@ pub mod seg;
 mod source;
 mod store;
 
-use std::collections::{HashMap, HashSet};
+#[cfg(any(test, feature = "oracle"))]
+use std::collections::HashMap;
+use std::collections::HashSet;
 use std::io;
 use std::path::PathBuf;
 
@@ -23,22 +26,14 @@ pub use store::FORMAT_VERSION;
 
 /// Every file the cache keeps in `.git/gitterrace/`, with what it holds. The architecture page is
 /// rendered from this, and a test fails when the folder holds a file not listed here.
-pub const CACHE_FILES: [(&str, &str); 6] = [
+pub const CACHE_FILES: [(&str, &str); 4] = [
     (
         store::VERSION_FILE,
         "The cache format. A mismatch deletes the cache and rebuilds it. The format is never migrated.",
     ),
     (
-        store::COMMITS_FILE,
-        "One record per commit, appended as the history is walked, with authors as written: the .mailmap of the revision shown is applied on read. Unreachable records are ignored, so rewritten history needs no cleanup, and a torn last line is dropped. A commit that cannot be read is not stored, so the next update retries it.",
-    ),
-    (
-        store::PATHS_FILE,
-        "Every file path any record mentions, one JSON string per line. Records refer to a path by its line number, so a path is stored once however many commits touch it.",
-    ),
-    (
         store::LOCK_FILE,
-        "Empty. Held locked by whichever process is adding records, so two processes on one repository take turns instead of mixing up path numbers.",
+        "Empty. Held locked by whichever process is extending the segment set, so two processes on one repository take turns instead of building on one manifest.",
     ),
     (
         TIP_FILE,
@@ -132,8 +127,6 @@ pub fn unreadable(set: &DiskSet) -> Option<String> {
 /// The cache for one repository.
 pub struct Index {
     dir: PathBuf,
-    /// Threads that parse the stored records; 0 means one per core, at most 8.
-    threads: usize,
     /// Commits a view outside the set reads from git, see [`Index::with_fresh_cap`].
     fresh_cap: usize,
     /// Bytes of segment blocks a source keeps, see [`Index::set_block_cache`].
@@ -153,7 +146,6 @@ impl Index {
         let newer = store::ensure_dir(&dir)?;
         Ok(Self {
             dir,
-            threads: 0,
             fresh_cap: feed::FRESH_CAP,
             block_cache: std::sync::atomic::AtomicUsize::new(feed::block_cache_default()),
             newer,
@@ -180,15 +172,8 @@ impl Index {
         self.fresh_cap
     }
 
-    /// Sets the threads that parse stored records; 0 means one per core, at most 8.
-    #[must_use]
-    pub const fn with_threads(mut self, threads: usize) -> Self {
-        self.threads = threads;
-        self
-    }
-
     /// The cache format found on disk when a newer build wrote it. Then [`Index::update`] and
-    /// [`Index::records`] fail with an explanation and leave the files alone.
+    /// [`Index::pending`] fail with an explanation and leave the files alone.
     pub fn newer_format(&self) -> Option<&str> {
         self.newer.as_deref()
     }
@@ -201,14 +186,19 @@ impl Index {
         &self.dir
     }
 
-    /// Size in bytes of the cache file. It changes whenever records are added, so a cache of
-    /// parsed records can key on it.
+    /// Changes whenever the segment set does (a build, an append, a merge, a wipe and
+    /// rebuild), so a cache of anything read from the set can key on it.
     pub fn generation(&self) -> u64 {
-        store::file_len(&self.dir)
+        seg::manifest::Manifest::load(&self.dir)
+            .ok()
+            .flatten()
+            .map_or(0, |m| m.fingerprint.rotate_left(17) ^ m.generation)
     }
 
-    /// Indexes commits reachable from `rev` that are not yet cached, and rebuilds those stored
-    /// at a shallow boundary that has since been fetched. Waits for any other process doing the
+    /// Indexes commits reachable from `rev` that the segment set lacks: one more segment when
+    /// every commit the set holds is still reachable, else a fresh build streamed from the
+    /// source. A deepened or grafted clone wipes the set first (see `check_shallow`), so a
+    /// boundary commit is diffed again with its parents. Waits for any other process doing the
     /// same; a commit the source cannot read is skipped and stays pending.
     pub fn update(
         &self,
@@ -218,164 +208,124 @@ impl Index {
     ) -> io::Result<()> {
         self.writable()?;
         let tip = source.resolve(rev);
-        let ids = source.rev_list(rev)?;
-        let shallow_list = source.shallow_ids();
+        let order = source.rev_list(rev)?;
+        let shallow = source.shallow_ids();
         // A deepened or grafted clone changes topo ranks: same rule as an unreadable cache.
-        store::check_shallow(&self.dir, &shallow_list)?;
-        let shallow: HashSet<String> = shallow_list.iter().cloned().collect();
-        // Everything below reads what another writer may be appending: lock first.
+        store::check_shallow(&self.dir, &shallow)?;
+        // Everything below reads the set another writer may be extending: lock first.
         let _lock = store::WriteLock::take(&self.dir)?;
         // Gone before the set can change, written back once it holds exactly `tip`: a crash in
         // between leaves no marker, so the next open checks the set the slow way.
         cache::remove(&self.dir, TIP_FILE)?;
-        let stored = store::stored_ids(&self.dir)?;
-        let todo = stored.todo(&ids, &shallow);
-        let total = todo.len();
-        progress(Progress { done: 0, total });
-        let mut out = store::Appender::open(&self.dir, stored.valid)?;
-        let order = ids.clone();
-        let ids: Vec<String> = todo.into_iter().cloned().collect();
-        // A first build gets every commit of `order`, in order, from the stream: fold each into
-        // the segment as it passes, so the build never holds the whole history.
-        let fresh = ids.len() == order.len()
-            && seg::manifest::Manifest::load(&self.dir)
-                .ok()
-                .flatten()
-                .is_none()
-            && order.iter().all(|id| store::oid_of(id).is_some());
         let seg = |e: seg::SegError| io::Error::other(e.to_string());
-        let mut build = if fresh {
-            Some(store::SegmentBuild::new(&self.dir, None, &shallow_list).map_err(seg)?)
-        } else {
-            None
-        };
-        let mut stored = 0_usize;
-        source.stream_records(
-            &ids,
-            BATCH,
-            &mut |record| {
-                stored += 1;
-                if let Some(b) = build.as_mut() {
-                    b.push(&record).map_err(seg)?;
-                }
-                out.push(&record, shallow.contains(&record.id))
-            },
-            &mut |done| progress(Progress { done, total }),
-        )?;
-        out.flush()?;
-        // A skipped commit is retried later and then appended out of order, so the file is no
-        // longer the reference bytes: say so, or a mismatch has no trace.
-        if stored < ids.len() {
-            skipped(ids.len() - stored, &self.dir);
-        }
-        let complete = match build {
-            // Complete: every commit of the rev is in the segment.
-            Some(b) if stored == ids.len() => {
-                b.finish(None, Vec::new()).map_err(seg)?;
-                true
-            }
-            // A skipped commit leaves a gap: the next update builds once it is readable.
-            Some(_) => false,
-            None => {
-                self.build_segments(&order, &shallow_list)?;
-                stored == ids.len()
-            }
-        };
-        if complete && let Some(t) = tip {
-            cache::write_atomic(&self.dir, TIP_FILE, t.as_bytes())?;
-        }
-        Ok(())
-    }
-
-    /// Writes the segment set for `order` (canonical ids of the rev) when the manifest does not
-    /// already hold exactly that order. Runs under the writer lock. The records are read once
-    /// here: a peak while building is accepted, serving never holds them.
-    fn build_segments(&self, order: &[String], shallow: &[String]) -> io::Result<()> {
-        let seg = |e: seg::SegError| io::Error::other(e.to_string());
-        let previous = seg::manifest::Manifest::load(&self.dir).ok().flatten();
-        // The set already holds exactly this history (merged or not): nothing to write, and
-        // no record parse on a no-op update.
-        let held = seg::read::Store::open(&self.dir)
-            .ok()
-            .flatten()
-            .and_then(|s| store::load_order(&s).ok());
-        if let Some(h) = &held
-            && h.len() == order.len()
-        {
-            let h: HashSet<&seg::Oid> = h.iter().collect();
-            if order
-                .iter()
-                .all(|id| store::oid_of(id).is_some_and(|o| h.contains(&o)))
+        let previous = seg::manifest::Manifest::load(&self.dir).map_err(seg)?;
+        let held = self.held()?;
+        let todo = todo(&order, &held);
+        if todo.is_empty() {
+            if held.len() == order.len()
+                && let Some(t) = tip
             {
-                return Ok(());
+                cache::write_atomic(&self.dir, TIP_FILE, t.as_bytes())?;
             }
-        }
-        let (records, _) = store::read_records(&self.dir, self.threads)?;
-        let records = store::select(records, order);
-        let oids: Vec<seg::Oid> = records
-            .iter()
-            .filter_map(|r| store::oid_of(&r.id))
-            .collect();
-        // A source whose ids are not oids (a test double) has no order file to write.
-        if oids.len() != records.len() {
             return Ok(());
         }
-        // Incremental when every commit the set holds is still reachable: the new ones become
-        // one more segment. Otherwise (first build, rewritten history) a fresh build.
-        if let Some(prev) = previous.as_ref()
-            && let Some(old) = held
-            && old.len() == prev.commits as usize
-            && old.len() < oids.len()
-        {
-            let old: HashSet<seg::Oid> = old.into_iter().collect();
-            let reach: HashSet<&seg::Oid> = oids.iter().collect();
-            if old.iter().all(|o| reach.contains(o)) {
-                let fresh = records
-                    .iter()
-                    .zip(&oids)
-                    .filter(|(_, o)| !old.contains(*o))
-                    .map(|(r, _)| r);
-                let after =
-                    store::append_segment(&self.dir, prev.clone(), shallow, fresh).map_err(seg)?;
-                drop(records);
+        let reach: HashSet<seg::Oid> = order.iter().filter_map(|id| store::oid_of(id)).collect();
+        // Incremental when the set is still part of this history: the new commits become one
+        // more segment. Otherwise (first build, rewritten history) everything is read again.
+        let extend = previous
+            .as_ref()
+            .filter(|_| !held.is_empty() && held.iter().all(|o| reach.contains(o)));
+        let ids: Vec<String> = if extend.is_some() {
+            todo.into_iter().cloned().collect()
+        } else {
+            order.clone()
+        };
+        let total = ids.len();
+        progress(Progress { done: 0, total });
+        let mut read = 0_usize;
+        if let Some(prev) = extend {
+            // Only the new commits are held, never the history.
+            let mut fresh = Vec::with_capacity(ids.len());
+            source.stream_records(
+                &ids,
+                BATCH,
+                &mut |r| {
+                    read += 1;
+                    fresh.push(r);
+                    Ok(())
+                },
+                &mut |done| progress(Progress { done, total }),
+            )?;
+            if !fresh.is_empty() {
+                let after = store::append_segment(&self.dir, prev.clone(), &shallow, &fresh)
+                    .map_err(seg)?;
                 let segments = after
                     .live
                     .iter()
                     .filter(|f| f.kind == seg::format::Kind::Segment as u8)
                     .count();
                 if segments > store::MAX_SEGMENTS {
-                    self.merge_in_background(order, shallow);
+                    self.merge_in_background(&order, &shallow);
                 }
-                return Ok(());
             }
+        } else {
+            // Each record folds into the segment as it passes: the build never holds history.
+            let mut build =
+                store::SegmentBuild::new(&self.dir, previous.as_ref(), &shallow).map_err(seg)?;
+            source.stream_records(
+                &ids,
+                BATCH,
+                &mut |r| {
+                    read += 1;
+                    build.push(&r).map_err(seg)
+                },
+                &mut |done| progress(Progress { done, total }),
+            )?;
+            build.finish(previous, Vec::new()).map_err(seg)?;
         }
-        let mut build =
-            store::SegmentBuild::new(&self.dir, previous.as_ref(), shallow).map_err(seg)?;
-        for r in &records {
-            build.push(r).map_err(seg)?;
+        // A skipped commit is not in the set, so it stays pending and the next update appends
+        // it; until then HEAD's pages read the reach view, and the tip marker is not written.
+        if read < total {
+            skipped(total - read, &self.dir);
+        } else if let Some(t) = tip {
+            cache::write_atomic(&self.dir, TIP_FILE, t.as_bytes())?;
         }
-        drop(records);
-        build.finish(previous, Vec::new()).map_err(seg)?;
         Ok(())
     }
 
+    /// The commits the segment set holds, empty without a set.
+    fn held(&self) -> io::Result<HashSet<seg::Oid>> {
+        let seg = |e: seg::SegError| io::Error::other(e.to_string());
+        let Some(store) = seg::read::Store::open(&self.dir).map_err(seg)? else {
+            return Ok(HashSet::new());
+        };
+        Ok(store::load_order(&store)
+            .map_err(seg)?
+            .into_iter()
+            .collect())
+    }
+
     /// Folds the segments into one once there are more than 8, off the caller's thread, so a
-    /// request never waits on it. The merge takes the writer lock itself.
+    /// request never waits on it. Records come from the set itself, raw as stored. The merge
+    /// takes the writer lock itself.
     #[expect(
         clippy::print_stderr,
         reason = "the index crate has no logging facade: a cache warning goes to the user's stderr"
     )]
     fn merge_in_background(&self, order: &[String], shallow: &[String]) {
-        let (dir, threads) = (self.dir.clone(), self.threads);
+        let dir = self.dir.clone();
         let (order, shallow) = (order.to_vec(), shallow.to_vec());
         let run = move || -> io::Result<bool> {
-            // Until the disk base lands a record comes from today's record file.
-            let (records, _) = store::read_records(&dir, threads)?;
-            let mut by_id: HashMap<String, CommitRecord> =
-                records.into_iter().map(|r| (r.id.clone(), r)).collect();
+            let seg = |e: seg::SegError| io::Error::other(e.to_string());
+            let Some(store) = seg::read::Store::open(&dir).map_err(seg)? else {
+                return Ok(false);
+            };
+            let rows = feed::DiskSource::open(store, &mut |p| Ok(p.to_vec())).map_err(seg)?;
             store::merge_if_needed(&dir, &order, &shallow, Vec::new(), &mut |id| {
-                by_id
-                    .remove(id)
+                let oid = store::oid_of(id)
+                    .ok_or_else(|| io::Error::other(format!("merge: {id} not an oid")))?;
+                rows.record_by_oid(&oid)
+                    .map_err(seg)?
                     .ok_or_else(|| io::Error::other(format!("merge: {id} not stored")))
             })
         };
@@ -391,13 +341,16 @@ impl Index {
         }
     }
 
-    /// Commits reachable from `rev` that [`Index::update`] would build. Zero means
-    /// [`Index::records`] for `rev` is complete; insights for a branch other than HEAD call
-    /// [`Index::update`] first.
+    /// Commits reachable from `rev` that [`Index::update`] would read: those the segment set
+    /// lacks, or all of them once the clone's shallow boundary moved. Fails on a newer build's
+    /// cache.
     pub fn pending(&self, source: &dyn CommitSource, rev: &str) -> io::Result<usize> {
-        let ids = source.rev_list(rev)?;
-        let shallow: HashSet<String> = source.shallow_ids().into_iter().collect();
-        Ok(store::stored_ids(&self.dir)?.todo(&ids, &shallow).len())
+        self.writable()?;
+        let order = source.rev_list(rev)?;
+        if store::shallow_stale(&self.dir, &source.shallow_ids()) {
+            return Ok(order.len());
+        }
+        Ok(todo(&order, &self.held()?).len())
     }
 
     /// What pages read for `rev`: the segment files alone (aggregates, postings, edges from
@@ -482,20 +435,26 @@ impl Index {
         feed::rev_view(set, source, rev, tip, self.fresh_cap).map(Some)
     }
 
-    /// The memory adapter over `records` (from [`Index::records`]), for a rev the segment set
-    /// does not hold. Holds that history while used.
-    pub fn memory_source(
-        records: std::sync::Arc<Vec<CommitRecord>>,
-    ) -> std::sync::Arc<dyn feed::InsightsSource> {
-        std::sync::Arc::new(feed::MemorySource::shared(records))
-    }
-
-    /// All cached records reachable from `rev`, oldest first, with authors mapped through the
-    /// `.mailmap` at the tip of `rev`.
+    /// Every commit reachable from `rev` as a record, read back from the segment set, oldest
+    /// first, with the identities of `rev`'s `.mailmap` and times pinned as pages see them. The
+    /// equivalence oracle's input: serving never holds the history.
+    #[cfg(any(test, feature = "oracle"))]
     pub fn records(&self, source: &dyn CommitSource, rev: &str) -> io::Result<Vec<CommitRecord>> {
+        self.writable()?;
+        let seg = |e: seg::SegError| io::Error::other(e.to_string());
         let order = source.rev_list(rev)?;
-        let (records, _) = store::read_records(&self.dir, self.threads)?;
-        let mut records = store::select(records, &order);
+        let Some(store) = seg::read::Store::open(&self.dir).map_err(seg)? else {
+            return Ok(Vec::new());
+        };
+        let rows = feed::DiskSource::open(store, &mut |p| Ok(p.to_vec())).map_err(seg)?;
+        let mut records = Vec::with_capacity(order.len());
+        for id in &order {
+            if let Some(oid) = store::oid_of(id)
+                && let Some(r) = rows.record_by_oid(&oid).map_err(seg)?
+            {
+                records.push(r);
+            }
+        }
         map_identities(source, rev, &mut records)?;
         let latest = wall_clock().saturating_add(insights::DAY);
         for r in &mut records {
@@ -503,6 +462,17 @@ impl Index {
         }
         Ok(records)
     }
+}
+
+/// Of `order`, the ids the set does not hold, once each.
+fn todo<'a>(order: &'a [String], held: &HashSet<seg::Oid>) -> Vec<&'a String> {
+    let mut seen = HashSet::new();
+    order
+        .iter()
+        .filter(|id| {
+            !store::oid_of(id).is_some_and(|o| held.contains(&o)) && seen.insert(id.as_str())
+        })
+        .collect()
 }
 
 /// Tells the user that `n` commits could not be read and stay pending.
@@ -541,16 +511,19 @@ pub fn plausible_time(time: i64, latest: i64) -> i64 {
     time.clamp(0, latest.max(0))
 }
 
-/// "Now" for period windows: the newest author time not after this machine's clock.
+/// "Now" for period windows over records, the oracle's twin of [`feed::reference_time`]: the
+/// newest author time not after this machine's clock.
 ///
 /// So an old repository still shows its last active stretch and a commit dated in the future (one
 /// [`plausible_time`] pinned to the edge, or a skewed clock) never empties every window. Every
 /// surface that cuts a period uses this one value.
+#[cfg(any(test, feature = "oracle"))]
 pub fn reference_time(records: &[CommitRecord]) -> i64 {
     reference_time_at(records, &feed::SystemClock)
 }
 
 /// [`reference_time`] with the clock given.
+#[cfg(any(test, feature = "oracle"))]
 pub fn reference_time_at(records: &[CommitRecord], clock: &dyn feed::Clock) -> i64 {
     let wall = clock.now();
     records
@@ -563,6 +536,7 @@ pub fn reference_time_at(records: &[CommitRecord], clock: &dyn feed::Clock) -> i
 
 /// Rewrites every record's author through the source's identity map, asking once per
 /// distinct pair.
+#[cfg(any(test, feature = "oracle"))]
 fn map_identities(
     source: &dyn CommitSource,
     rev: &str,

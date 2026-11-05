@@ -51,9 +51,9 @@ async fn public_error_bodies_never_name_host_folders() {
     let router = gitterrace_web::app_router_with(&p, cfg).expect("router");
     // A directory where the cache expects a file makes every cache read fail, and the error
     // text of that failure names the full path.
-    let commits = p.join(".git/gitterrace/commits.jsonl");
-    std::fs::remove_file(&commits).ok();
-    std::fs::create_dir_all(&commits).expect("mkdir");
+    let manifest = p.join(".git/gitterrace/MANIFEST");
+    std::fs::remove_file(&manifest).ok();
+    std::fs::create_dir_all(&manifest).expect("mkdir");
     let mut todo: Vec<String> = ["/", "/r/repo/", "/r/repo/stats", "/r/repo/api/v1/"]
         .into_iter()
         .map(str::to_owned)

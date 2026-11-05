@@ -96,13 +96,6 @@ pub(crate) fn remove(dir: &Path, name: &str) -> io::Result<()> {
     }
 }
 
-/// Length of a cache file, 0 when missing or refused.
-pub(crate) fn len(dir: &Path, name: &str) -> u64 {
-    cache_file(dir, name)
-        .and_then(fs::symlink_metadata)
-        .map_or(0, |m| m.len())
-}
-
 fn refused(path: &Path) -> io::Error {
     io::Error::other(format!(
         "refusing cache path {}: not a regular entry",

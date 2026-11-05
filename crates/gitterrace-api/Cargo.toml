@@ -27,6 +27,7 @@ rmcp.workspace = true
 schemars.workspace = true
 
 [dev-dependencies]
+gitterrace-index = { workspace = true, features = ["oracle"] }
 gitterrace-testkit.workspace = true
 tower.workspace = true
 tempfile.workspace = true

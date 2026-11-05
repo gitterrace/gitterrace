@@ -8,12 +8,9 @@ use std::sync::{Arc, Mutex};
 
 use gitterrace_config::{Cache, Config};
 use gitterrace_git::LastCommit;
-use gitterrace_index::CommitRecord;
 
 use crate::bounded::Bounded;
 
-/// One selected commit's records, filled once by whichever caller gets there first.
-pub(crate) type RecordSlot = Arc<Mutex<Option<Arc<Vec<CommitRecord>>>>>;
 /// A commit id and the index generation it was read at.
 pub(crate) type HeadGen = (String, u64);
 /// One commit and its ignore files as `(path, text)`.
@@ -24,10 +21,6 @@ pub(crate) type TotalsEntry = (String, gitterrace_index::PeriodStats);
 pub(crate) type Unreadable = Arc<dyn Fn() -> Option<String> + Send + Sync>;
 
 pub(crate) struct Caches {
-    /// Record sets by (commit, generation), oldest first. The map lock is held only to find a
-    /// slot; the parse runs under that slot's own lock, so one cold commit never stalls pages
-    /// on another.
-    pub(crate) records: Mutex<Vec<(HeadGen, RecordSlot)>>,
     /// The insights source of one (commit, generation), so every page shares its derived
     /// tables.
     pub(crate) source: Mutex<Option<(HeadGen, crate::insights::Src)>>,
@@ -53,7 +46,6 @@ pub(crate) struct Caches {
 impl Caches {
     pub(crate) fn new(cfg: &Config) -> Self {
         Self {
-            records: Mutex::new(Vec::new()),
             source: Mutex::new(None),
             disk: Mutex::new(None),
             far: Mutex::new(None),
@@ -71,7 +63,6 @@ impl Caches {
     /// own `Arc`, so it is never cut short; the next page builds again.
     pub(crate) fn clear_all(&self) -> bool {
         let Self {
-            records,
             source,
             disk,
             far,
@@ -84,7 +75,6 @@ impl Caches {
             head_lines,
         } = self;
         [
-            vec_held(records),
             take(source),
             take(disk),
             take(far),
@@ -116,14 +106,6 @@ impl Caches {
 
 fn take<T>(m: &Mutex<Option<T>>) -> bool {
     m.lock().is_ok_and(|mut g| g.take().is_some())
-}
-
-fn vec_held<T>(m: &Mutex<Vec<T>>) -> bool {
-    m.lock().is_ok_and(|mut g| {
-        let held = !g.is_empty();
-        g.clear();
-        held
-    })
 }
 
 fn bounded_held<V: Clone + crate::bounded::Weight>(m: &Mutex<Bounded<V>>) -> bool {

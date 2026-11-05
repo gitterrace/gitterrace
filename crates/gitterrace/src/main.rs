@@ -241,16 +241,20 @@ fn wrapped(
     index
         .update(&repo, "HEAD", &|_| {})
         .context("updating the cache")?;
-    let records = index.records(&repo, "HEAD").context("reading the cache")?;
+    let set = index
+        .disk_source(&repo, "HEAD")
+        .context("reading the cache")?
+        .context("the cache does not hold HEAD yet: a commit could not be read, run again")?;
     let year = year.unwrap_or_else(|| {
-        let newest = records
-            .iter()
-            .map(gitterrace_index::local_day)
+        use gitterrace_index::feed::{CommitRange, InsightsSource, local_day_of};
+        let newest = set
+            .commits_in(CommitRange::All)
+            .map(|c| local_day_of(c.time, c.offset))
             .max()
             .unwrap_or(0);
         i32::try_from(gitterrace_git::civil_from_days(newest).0).unwrap_or(i32::MAX)
     });
-    let stats = gitterrace_cards::wrapped_stats(&repo.name(), &records, year);
+    let stats = gitterrace_cards::wrapped_stats(&repo.name(), &*set, year);
     let layout: gitterrace_types::CardLayout = layout.parse().context("unknown layout")?;
     let theme: gitterrace_types::CardTheme = theme.parse().context("unknown theme")?;
     let svg = gitterrace_cards::wrapped_svg(&stats, layout, theme);
