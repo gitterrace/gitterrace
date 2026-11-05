@@ -40,6 +40,7 @@ mod registry;
 mod reload;
 mod routes;
 mod search;
+mod seg;
 pub mod sitemap;
 mod spark;
 #[cfg(test)]

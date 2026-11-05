@@ -122,7 +122,7 @@ pub(crate) async fn page(
         PatternsPage {
             c,
             tabs: views::stats_tabs("pa"),
-            fb: f.bar("/stats/patterns", &**r),
+            fb: f.bar("/stats/patterns", &**r, period),
             opts: q.row(&d, "/stats/patterns"),
             empty: set.stream().next().is_none(),
             pairs,

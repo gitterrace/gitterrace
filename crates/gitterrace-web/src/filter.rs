@@ -8,6 +8,7 @@ use gitterrace_types::StringEnum;
 use serde::Deserialize;
 
 use crate::fmt::{enc_seg, href};
+use crate::seg::{Choice, Seg};
 
 /// Value that selects commits without a scope (`none`).
 pub(crate) const NO_SCOPE: &str = Selection::NO_SCOPE;
@@ -53,16 +54,10 @@ pub(crate) struct Chip {
     pub(crate) href: String,
 }
 
-pub(crate) struct PeriodLink {
-    pub(crate) label: &'static str,
-    pub(crate) href: String,
-    pub(crate) on: bool,
-}
-
 /// What `_filterbar.html` renders: removable chips and the period picker.
 pub(crate) struct FilterBar {
     pub(crate) chips: Vec<Chip>,
-    pub(crate) periods: Vec<PeriodLink>,
+    pub(crate) period: Seg,
     pub(crate) clear: String,
 }
 
@@ -147,8 +142,8 @@ impl Filter {
         }
     }
 
-    /// Chips and period picker for a page served at `base`.
-    pub(crate) fn bar(&self, base: &str, src: &dyn InsightsSource) -> FilterBar {
+    /// Chips and period picker for a page served at `base`, with `period` the one in force.
+    pub(crate) fn bar(&self, base: &str, src: &dyn InsightsSource, period: Period) -> FilterBar {
         let chips = DIMS
             .iter()
             .filter_map(|d| {
@@ -173,20 +168,24 @@ impl Filter {
                 })
             })
             .collect();
-        let periods = <Period as StringEnum>::ALL
+        let choices = <Period as StringEnum>::ALL
             .iter()
-            .map(|p| PeriodLink {
-                label: p.label(),
-                href: href(&format!(
-                    "{base}{}",
-                    self.with(Dim::Period, Some(p.as_str())).query(&[])
-                )),
-                on: self.get(Dim::Period) == Some(p.as_str()),
+            .map(|p| {
+                Choice::new(
+                    p.label(),
+                    href(&format!(
+                        "{base}{}",
+                        self.with(Dim::Period, Some(p.as_str())).query(&[])
+                    )),
+                    *p == period,
+                )
             })
             .collect();
+        let period = Seg::links("Period", choices)
+            .tip("Limits every chart and list on this page to this period");
         FilterBar {
             chips,
-            periods,
+            period,
             clear: href(base),
         }
     }
@@ -210,7 +209,7 @@ mod tests {
     use gitterrace_index::feed::MemorySource;
     use gitterrace_index::{CommitRecord, FileStat};
 
-    use super::{Dim, Filter, under};
+    use super::{Dim, Filter, Period, under};
     use crate::insights::Src;
 
     fn parse(q: &str) -> Filter {
@@ -347,10 +346,12 @@ mod tests {
 
     #[test]
     fn bar_chips_remove_one_filter() {
-        let bar = parse("type=fix&scope=web").bar("/stats/types", &MemorySource::new(&[]));
+        let bar =
+            parse("type=fix&scope=web").bar("/stats/types", &MemorySource::new(&[]), Period::Month);
         assert_eq!(bar.chips.len(), 2);
         assert_eq!(bar.chips[0].href, "/stats/types?scope=web");
         assert_eq!(bar.chips[1].href, "/stats/types?type=fix");
-        assert!(bar.periods.iter().all(|p| !p.on));
+        // With no period asked for, the one in force is marked: the select never shows another.
+        assert_eq!(bar.period.choices.iter().filter(|p| p.on).count(), 1);
     }
 }

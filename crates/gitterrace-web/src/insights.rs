@@ -12,6 +12,7 @@ use gitterrace_index::{
 };
 use serde::Deserialize;
 
+use crate::seg::{Choice, Seg};
 use crate::{
     app::{App, blocking},
     charts,
@@ -330,7 +331,7 @@ struct ContributorsPage {
     more: Option<(String, String)>,
     /// True for any metric but commits: the switch and the two-sided bar show.
     alt: bool,
-    switch: Vec<OptLink>,
+    switch: Seg,
     hint: String,
 }
 
@@ -352,10 +353,10 @@ pub(crate) async fn contributors(
         let f = &q.filter;
         let d = a.defaults();
         let bots = q.options(&d).include_bots;
-        let fb = f.bar("/stats/contributors", &**r);
+        let period = period_of(&q, &d, Period::All);
+        let fb = f.bar("/stats/contributors", &**r, period);
         // The period is applied by Insights so first-time contributors are judged against all
         // history that the other filters keep.
-        let period = period_of(&q, &d, Period::All);
         let scope = page_scope(&q, &d, period);
         let ins = insights(a, r, scope.options().clone());
         let metric = q.metric();
@@ -449,27 +450,29 @@ const fn metric_hint(m: Metric) -> &'static str {
 }
 
 impl InsightsQuery {
-    /// One link per metric, the one in force marked.
-    fn metric_switch(&self, d: &Defaults) -> Vec<OptLink> {
-        [
+    /// One choice per metric, the one in force marked.
+    fn metric_switch(&self, d: &Defaults) -> Seg {
+        let choices = [
             (Metric::Commits, "Commits"),
             (Metric::Added, "Lines added"),
             (Metric::Deleted, "Lines deleted"),
             (Metric::Net, "Net lines"),
         ]
         .into_iter()
-        .map(|(m, label)| OptLink {
-            label: "Show",
-            state: label.to_owned(),
-            href: self.link(
-                d,
-                "/stats/contributors",
-                "metric",
-                (m != Metric::Commits).then(|| m.key()),
-            ),
-            on: m == self.metric(),
+        .map(|(m, label)| {
+            Choice::new(
+                label,
+                self.link(
+                    d,
+                    "/stats/contributors",
+                    "metric",
+                    (m != Metric::Commits).then(|| m.key()),
+                ),
+                m == self.metric(),
+            )
         })
-        .collect()
+        .collect();
+        Seg::links("Show", choices)
     }
 }
 

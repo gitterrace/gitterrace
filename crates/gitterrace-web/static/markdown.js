@@ -7,7 +7,7 @@
     var btns = box.querySelectorAll("[data-show]");
     btns.forEach(function (b) {
       b.addEventListener("click", function () {
-        btns.forEach(function (o) { o.classList.toggle("on", o === b); });
+        btns.forEach(function (o) { o.classList.toggle("on", o === b); o.setAttribute("aria-pressed", o === b ? "true" : "false"); });
         box.querySelectorAll("[data-pane]").forEach(function (p) {
           p.hidden = p.dataset.pane !== b.dataset.show;
         });

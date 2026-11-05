@@ -8,6 +8,7 @@ use std::fmt;
 use askama::filters::HtmlSafe;
 
 use crate::fmt::esc;
+use crate::seg::{Choice, Seg};
 
 /// A tab of the about documents (README, LICENSE and so on).
 #[derive(Debug)]
@@ -57,11 +58,16 @@ impl fmt::Display for DocHead {
             f.write_str("</nav>")?;
         }
         if self.views {
-            f.write_str(
-                "<span class=\"seg views\"><button type=\"button\" class=\"on\" \
-                 data-show=\"rendered\">Preview</button><button type=\"button\" \
-                 data-show=\"source\">Code</button></span>",
-            )?;
+            let views = Seg {
+                name: "View".to_owned(),
+                buttons: true,
+                choices: vec![
+                    Choice::new("Preview", "rendered", true),
+                    Choice::new("Code", "source", false),
+                ],
+                ..Seg::default()
+            };
+            write!(f, "{views}")?;
         }
         f.write_str("<span class=\"doc-tools\">")?;
         for a in &self.actions {

@@ -15,23 +15,17 @@ use crate::languages::chain::Chain;
 use crate::languages::{
     BOTTOM, COMMIT_LIST, H, LEFT, RIGHT, SAMPLES, Subjects, TOP, TOP_PAD, View, W,
 };
+use crate::seg::{Choice, Seg};
 
 fn seg(label: &str, items: &[(&str, bool, String)]) -> String {
-    let mut s =
-        format!(r#"<div class="seg" role="group" aria-label="{label}"><span>{label}</span>"#);
-    for (text, on, href) in items {
-        let _ = write!(
-            s,
-            r#"<a href="{href}"{}>{text}</a>"#,
-            if *on {
-                r#" class="on" aria-current="true""#
-            } else {
-                ""
-            }
-        );
-    }
-    s.push_str("</div>");
-    s
+    Seg::links(
+        label,
+        items
+            .iter()
+            .map(|(text, on, href)| Choice::new(*text, href.clone(), *on))
+            .collect(),
+    )
+    .to_string()
 }
 
 fn signed(n: i64) -> String {
@@ -287,15 +281,21 @@ fn range_card(ch: &Chain, view: View, subj: &Subjects) -> String {
             (Some(s), Some((a, b))) => b == n - 1 && a == n.saturating_sub(s),
             _ => false,
         };
-        format!(
-            r#"<a href="{href}"{}>{label}</a>"#,
-            if on { r#" class="on""# } else { "" }
-        )
+        Choice::new(label, href, on)
     };
+    let presets = Seg::links(
+        "Range",
+        vec![
+            preset("Last 10", Some(10)),
+            preset("Last 25", Some(25)),
+            preset("Whole history", None),
+        ],
+    )
+    .no_caption();
     let mut s = String::from(r#"<section class="card pad range" id="range">"#);
     let _ = write!(
         s,
-        r#"<div class="chart-head"><div><h2>{}</h2><p class="hint">{} to {}. Drag across the chart to pick another range.</p></div><div class="seg">{}{}{}</div></div>"#,
+        r#"<div class="chart-head"><div><h2>{}</h2><p class="hint">{} to {}. Drag across the chart to pick another range.</p></div>{}</div>"#,
         if view.range.is_some() {
             "Selected range"
         } else {
@@ -303,9 +303,7 @@ fn range_card(ch: &Chain, view: View, subj: &Subjects) -> String {
         },
         fmt::day(ch.time(from)),
         fmt::day(ch.time(to)),
-        preset("Last 10", Some(10)),
-        preset("Last 25", Some(25)),
-        preset("Whole history", None),
+        presets,
     );
     let _ = write!(
         s,

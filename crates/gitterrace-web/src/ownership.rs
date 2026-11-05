@@ -86,7 +86,7 @@ pub(crate) async fn page(
         OwnershipPage {
             c,
             tabs: views::stats_tabs("ow"),
-            fb: f.bar("/stats/ownership", &**r),
+            fb: f.bar("/stats/ownership", &**r, period_of(&q, &d, Period::All)),
             opts: q.row(&d, "/stats/ownership"),
             kpis: vec![
                 Kpi("Bus factor", fmt::thousands(rep.overall.bus_factor)),

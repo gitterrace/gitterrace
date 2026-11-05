@@ -65,6 +65,8 @@
 //   live-scroll  on the working tree page with 90 changed files, open at #f3 and scrolled to a file far
 //                down, a live refresh keeps that file within 4 px of where it was, keeps the loaded
 //                bodies and keeps #f3 open
+//   seg-one-row  every segmented control on the insights pages and a document shows one row of
+//                choices or its native select, never two rows, at 360 and 1440 px, light and dark
 //   huge-diff    a commit of 2,000 changed files (mostly pure renames) loads under a DOM bound,
 //                shows a rename as one line, loads the last files on scroll, opens #fN, opens a
 //                folded file with Enter, and prints scroll frame times and long tasks
@@ -86,7 +88,7 @@ const bin = resolve(arg('--bin', join(root, 'target/debug/git-terrace')));
 const fromDisk = process.argv.includes('--from-disk');
 const tabCounts = arg('--tabs', '8,12').split(',').map(Number);
 const browsers = arg('--browsers', 'webkit,chromium').split(',');
-const ALL = ['truncation', 'live-tabs', 'mermaid', 'chip', 'doctabs', 'chords', 'header', 'marked', 'menu-same', 'gutter', 'overlays', 'tips', 'date-tips', 'repo-switch', 'outline', 'mark-seam', 'about-place', 'site-theme', 'side-width', 'calm-header', 'tabs-one-line', 'huge-diff', 'sticky-heads', 'md-anchor', 'live-scroll', 'sticky-line'];
+const ALL = ['truncation', 'live-tabs', 'mermaid', 'chip', 'doctabs', 'chords', 'header', 'marked', 'menu-same', 'gutter', 'overlays', 'tips', 'date-tips', 'repo-switch', 'outline', 'mark-seam', 'about-place', 'site-theme', 'side-width', 'calm-header', 'tabs-one-line', 'huge-diff', 'sticky-heads', 'md-anchor', 'live-scroll', 'sticky-line', 'seg-one-row'];
 const wanted = arg('--checks', ALL.join(',')).split(',');
 for (const c of wanted) if (!ALL.includes(c)) { console.error(`unknown check ${c}; known: ${ALL.join(', ')}`); process.exit(2); }
 
@@ -221,6 +223,43 @@ async function tabsOneLine() {
     await b.close();
   }
 }
+// Segmented controls never break across lines: on every insights page and a document, at 360
+// and 1440 px, each control shows either one row of choices or its native select, never a
+// second row and never wider than the page.
+async function segOneRow() {
+  for (const name of browsers) {
+    const { b, ctx } = await context(name);
+    for (const scheme of ['light', 'dark']) for (const width of [1440, 360]) {
+      for (const path of ['/stats', '/stats/contributors', '/stats/hotspots', '/stats/ownership', '/stats/languages', '/blob/HEAD/README.md']) {
+        const p = await ctx.newPage();
+        await p.emulateMedia({ colorScheme: scheme });
+        await p.setViewportSize({ width, height: 700 });
+        await p.goto(srv.base + path, { waitUntil: 'load' });
+        // Measure the settled page: after the web fonts and the frame that refits the controls.
+        await p.evaluate(() => document.fonts.ready.then(() => new Promise((ok) => requestAnimationFrame(() => requestAnimationFrame(ok)))));
+        const m = await p.evaluate(() => [...document.querySelectorAll('.segctl')].map((box) => {
+          const segs = box.querySelector('.segs'), sel = box.querySelector('select');
+          const shown = (e) => !!e && getComputedStyle(e).display !== 'none' && e.getClientRects().length > 0;
+          const tops = new Set([...segs.children].map((c) => Math.round(c.getBoundingClientRect().top)));
+          const r = box.getBoundingClientRect();
+          return { name: box.getAttribute('aria-label'), segs: shown(segs), sel: shown(sel), rows: shown(segs) ? tops.size : 0, cut: segs.scrollWidth > segs.clientWidth + 1 && shown(segs), out: r.right > document.documentElement.clientWidth + 1 };
+        }));
+        const where = `seg-one-row ${name} ${scheme} ${width} ${path}`;
+        const bad = [];
+        for (const c of m) {
+          if (c.segs === c.sel) bad.push(`${c.name}: ${c.segs ? 'both' : 'neither'} row and select shown`);
+          if (c.rows > 1) bad.push(`${c.name}: ${c.rows} rows`);
+          if (c.cut) bad.push(`${c.name}: choices cut off`);
+          if (c.out) bad.push(`${c.name}: wider than the page`);
+        }
+        if (path.startsWith('/stats') && !m.length) bad.push('no segmented control');
+        bad.length ? r.fail(`${where}: ${bad.join(', ')}`) : r.ok(`${where}: ${m.length} controls, one row or a select`);
+        await p.close();
+      }
+    }
+    await b.close();
+  }
+}
 // Sticky heads: on a commit with three 300-line files, scrolled halfway into the second, its
 // header is pinned at the top and the first's is not; a #L120 link on a source page lands
 // fully below the pinned path bar; at 375 px the site header never pins. The commit is made
@@ -286,7 +325,7 @@ async function stickyHeads() {
     await b.close();
   }
 }
-const checks = { 'sticky-heads': stickyHeads, 'tabs-one-line': tabsOneLine, 'calm-header': calmHeader, 'side-width': sideWidth, truncation, 'live-tabs': liveTabs, mermaid, chip, doctabs, chords, header, marked, 'menu-same': menuSame, gutter, overlays, tips, 'date-tips': dateTips, 'repo-switch': repoSwitch, outline, 'mark-seam': markSeam, 'about-place': aboutPlace, 'site-theme': siteTheme, 'huge-diff': hugeDiff, 'md-anchor': mdAnchor, 'live-scroll': liveScroll, 'sticky-line': stickyLine };
+const checks = { 'sticky-heads': stickyHeads, 'tabs-one-line': tabsOneLine, 'calm-header': calmHeader, 'side-width': sideWidth, truncation, 'live-tabs': liveTabs, mermaid, chip, doctabs, chords, header, marked, 'menu-same': menuSame, gutter, overlays, tips, 'date-tips': dateTips, 'repo-switch': repoSwitch, outline, 'mark-seam': markSeam, 'about-place': aboutPlace, 'site-theme': siteTheme, 'huge-diff': hugeDiff, 'md-anchor': mdAnchor, 'live-scroll': liveScroll, 'sticky-line': stickyLine, 'seg-one-row': segOneRow };
 try {
   for (const c of wanted) { console.log(`-- ${c}`); await checks[c](); }
 } finally {

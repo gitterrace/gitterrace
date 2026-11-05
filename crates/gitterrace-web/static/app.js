@@ -24,6 +24,37 @@
       label();
     });
   }
+  // One rule for every segmented control: when its choices do not fit one row beside the
+  // caption, the native select takes their place.
+  var segBoxes = Array.prototype.slice.call(document.querySelectorAll("[data-seg-select]"));
+  function fitSegs() {
+    segBoxes.forEach(function (box) {
+      box.classList.remove("narrow");
+      // The row of choices, not its box: an inline box at full width lets the row spill.
+      var segs = box.querySelector(".segs");
+      var limit = Math.min(document.documentElement.clientWidth, box.parentElement.getBoundingClientRect().right);
+      var over = box.scrollWidth > box.clientWidth + 1 || segs.scrollWidth > segs.clientWidth + 1;
+      var out = segs.getBoundingClientRect().right > limit + 1;
+      if (over || out) box.classList.add("narrow");
+    });
+  }
+  segBoxes.forEach(function (box) {
+    var sel = box.querySelector("select");
+    sel.hidden = false;
+    sel.addEventListener("change", function () {
+      var btn = box.querySelector('button[data-show="' + sel.value + '"]');
+      if (btn) btn.click();
+      else location.href = sel.value;
+    });
+    // A button switch can change from elsewhere (a keyboard shortcut): keep the select in step.
+    box.querySelectorAll("button[data-show]").forEach(function (b) {
+      b.addEventListener("click", function () { sel.value = b.getAttribute("data-show"); });
+    });
+  });
+  fitSegs();
+  addEventListener("resize", fitSegs);
+  // Web fonts change the widths once they arrive.
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(fitSegs);
   var boxes = document.querySelectorAll("[data-progress]");
   if (!boxes.length) return;
   var timer = setInterval(async function () {

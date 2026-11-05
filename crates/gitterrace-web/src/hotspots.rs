@@ -101,7 +101,7 @@ pub(crate) async fn page(
         HotspotsPage {
             c,
             tabs: views::stats_tabs("ho"),
-            fb: f.bar("/stats/hotspots", &**r),
+            fb: f.bar("/stats/hotspots", &**r, period),
             opts: q.row(&d, "/stats/hotspots"),
             empty: set.stream().next().is_none(),
             kpis: vec![

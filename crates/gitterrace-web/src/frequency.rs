@@ -38,8 +38,8 @@ pub(crate) async fn page(
     cached(&app, "cf", raw, move |a, r, c| {
         let d = a.defaults();
         let f = &q.filter;
-        let fb = f.bar("/stats/frequency", &**r);
         let period = period_of(&q, &d, Period::All);
+        let fb = f.bar("/stats/frequency", &**r, period);
         let scope = page_scope(&q, &d, period);
         let ins = insights(a, r, scope.options().clone());
         let set = counted(&ins, &scope, r);

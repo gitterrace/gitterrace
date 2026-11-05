@@ -339,15 +339,19 @@ svg.chart text{font-family:var(--mono)}
 
 /* languages: chart, brush, range card */
 .filters{display:flex;flex-wrap:wrap;gap:var(--space-3) var(--space-6);margin:var(--space-4) 0}
-.seg{display:inline-flex;flex-wrap:wrap;align-items:center;gap:2px;max-width:100%;font-size:var(--text-sm)}
-.seg>span{color:var(--muted);margin-right:var(--space-2)}
-.seg a{padding:4px var(--space-3);border:var(--border);color:var(--muted);background:var(--surface);margin-left:-1px}
-.seg a:first-of-type{border-radius:var(--radius) 0 0 var(--radius);margin-left:0}.seg a:last-of-type{border-radius:0 var(--radius) var(--radius) 0}
-.seg a:hover{color:var(--fg);text-decoration:none;background:var(--soft)}
-.seg a.on{background:var(--accent-soft);color:var(--fg);border-color:var(--accent);position:relative}
-.seg.views{flex-wrap:nowrap;gap:4px;font:var(--weight-regular) var(--text-2xs)/1.4 var(--mono);text-transform:uppercase;letter-spacing:.12em}
-.seg.views button{font:inherit;letter-spacing:inherit;text-transform:inherit;color:var(--muted);background:none;border:0;border-radius:var(--radius);padding:4px 10px;cursor:pointer}
-.seg.views button.on{color:var(--fg);background:var(--hover)}
+.segctl{display:inline-flex;align-items:center;gap:var(--space-2);max-width:100%;min-width:0;font-size:var(--text-sm)}
+.segcap{color:var(--muted)}
+.segs{display:inline-flex;flex-wrap:nowrap;white-space:nowrap;min-width:0;max-width:100%;overflow:hidden;gap:2px;padding:2px;border:var(--border);border-radius:var(--radius);background:var(--soft)}
+.segs a,.segs button{display:inline-flex;align-items:center;min-height:32px;box-sizing:border-box;padding:var(--space-2) var(--space-3);border:1px solid transparent;border-radius:var(--radius);color:var(--muted);background:none;font:inherit;line-height:1;cursor:pointer}
+.segs a:hover,.segs button:hover{color:var(--fg);text-decoration:none;background:var(--hover)}
+.segs .on{background:var(--accent-soft);color:var(--accent-ink);border-color:var(--accent);font-weight:var(--weight-semibold)}
+.segs a:focus-visible,.segs button:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.segsel{font:inherit;min-height:44px;padding:0 var(--space-3);border:var(--border);border-radius:var(--radius);background:var(--surface);color:var(--fg)}
+.segrow{margin:0 0 var(--space-4)}
+.dochead .segctl{font-size:var(--text-xs)}.dochead .segs a,.dochead .segs button{min-height:28px;padding:var(--space-1) var(--space-3)}
+@media (pointer:coarse){.segs a,.segs button{min-height:44px}}
+[data-seg-select] .segsel,[data-seg-select].narrow .segs{display:none}
+[data-seg-select].narrow .segsel{display:inline-block}
 .md-pane[hidden]{display:none}
 .md-pane[data-pane=rendered],.readme .markdown-body,.readme .doc-plain{padding:24px 32px}
 /* A document shown as its text (a LICENSE, or any README with the preview off). */

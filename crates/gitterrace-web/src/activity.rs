@@ -236,7 +236,7 @@ pub(crate) async fn page(
             .zip(&rhythm.ends)
             .map(|(p, end)| q.range_link(&d, "/stats", &p.key, end))
             .collect();
-        let mut fb = f.bar("/stats", &**r);
+        let mut fb = f.bar("/stats", &**r, period);
         let range = sel.map(|(from, to, _, _)| {
             fb.chips.push(Chip {
                 dim: "range",

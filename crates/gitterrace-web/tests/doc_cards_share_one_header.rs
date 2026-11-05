@@ -117,12 +117,15 @@ fn only_dochead_writes_card_headers() {
                 stack.push(p);
                 continue;
             }
-            // The owner, the outline it embeds, and test files that read the markup back.
+            // The owner, the outline and the segmented control it embeds, and test files that read the markup back.
             let name = p.file_name().map(|n| n.to_string_lossy().into_owned());
-            if name
-                .as_deref()
-                .is_some_and(|n| n == "dochead.rs" || n == "outline.rs" || n.ends_with("tests.rs"))
-            {
+            if name.as_deref().is_some_and(|n| {
+                n == "dochead.rs"
+                    || n == "outline.rs"
+                    || n == "seg.rs"
+                    || n == "seg_control.html"
+                    || n.ends_with("tests.rs")
+            }) {
                 continue;
             }
             let Ok(text) = std::fs::read_to_string(&p) else {

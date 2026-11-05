@@ -411,7 +411,7 @@ fn build(a: &crate::app::App, all: &Src, c: Chrome, tq: &TypesQuery) -> TypesPag
     TypesPage {
         c,
         tabs: views::stats_tabs("t"),
-        fb: f.bar(BASE, &**all),
+        fb: f.bar(BASE, &**all, period),
         opts: q.row(&d, BASE),
         kpis,
         kinds,
