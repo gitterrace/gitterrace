@@ -28,6 +28,7 @@ mod lead;
 #[cfg(test)]
 mod limits_wiring_tests;
 mod live;
+mod lost;
 mod markdown;
 mod media;
 mod multi;

@@ -427,3 +427,29 @@ async fn a_reachable_bind_needs_public() {
     .expect_err("served without public");
     assert!(e.to_string().contains("--public"), "{e}");
 }
+
+/// A missing file or revision answers 404 inside the app shell, with the header nav and the
+/// next steps, and a script-read fragment still gets the bare answer.
+#[tokio::test]
+async fn not_found_keeps_the_shell_and_offers_next_steps() {
+    let dir = tempfile::tempdir().expect("tmp");
+    let p = rev_fixture(dir.path());
+    let app = ready_app(&p);
+    let (s, body) = get(&app, "/blob/v1/src/nope.c").await;
+    assert_eq!(s, 404);
+    assert!(
+        body.contains("class=\"tabnav\"") && body.contains("id=\"q\""),
+        "{body}"
+    );
+    assert!(body.contains("No file at src/nope.c on v1"), "{body}");
+    assert!(body.contains("Search for nope.c") && body.contains("/history/src/nope.c"));
+    assert!(body.contains("/tree/v1\">Back to the tree of v1"), "{body}");
+    let (s, body) = get(&app, "/log/nope").await;
+    assert!(s == 404 && body.contains("No revision nope") && body.contains("class=\"tabnav\""));
+    let (s, body) = get(&app, "/nothing/here").await;
+    assert!(
+        s == 404 && body.contains("Nothing at this address") && body.contains("class=\"tabnav\"")
+    );
+    let (s, body) = get(&app, "/diff/nope/0").await;
+    assert!(s == 404 && !body.contains("class=\"tabnav\""), "{body}");
+}

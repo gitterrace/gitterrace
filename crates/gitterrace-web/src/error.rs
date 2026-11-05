@@ -36,6 +36,9 @@ impl IntoResponse for Error {
         } else {
             self.to_string()
         };
+        if status == StatusCode::NOT_FOUND {
+            return not_found(&shown);
+        }
         (status, page(status, &shown)).into_response()
     }
 }
@@ -53,9 +56,13 @@ pub(crate) fn page(status: StatusCode, detail: &str) -> Html<String> {
     ))
 }
 
-/// A 404 with [`page`], for a path or repository nothing serves.
+/// A 404 with [`page`], for a path or repository nothing serves. It carries its detail, so a
+/// repository's router can show it inside the app shell (`lost::in_shell`).
 pub(crate) fn not_found(detail: &str) -> Response {
-    (StatusCode::NOT_FOUND, page(StatusCode::NOT_FOUND, detail)).into_response()
+    let mut res = (StatusCode::NOT_FOUND, page(StatusCode::NOT_FOUND, detail)).into_response();
+    res.extensions_mut()
+        .insert(crate::lost::Missing(detail.to_owned()));
+    res
 }
 
 /// Answers every path no route matches: the error page, never an empty body.

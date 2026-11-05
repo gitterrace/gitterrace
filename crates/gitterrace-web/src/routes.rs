@@ -85,7 +85,11 @@ pub(crate) fn router(app: Arc<App>) -> Router {
         .layer(axum::middleware::from_fn(selected_rev))
         .merge(assets())
         .fallback(crate::error::fallback)
-        .with_state(app)
+        .with_state(Arc::clone(&app))
+        .layer(axum::middleware::from_fn_with_state(
+            app,
+            crate::lost::in_shell,
+        ))
 }
 
 /// Makes `?rev=` the selected ref for everything the request renders.
