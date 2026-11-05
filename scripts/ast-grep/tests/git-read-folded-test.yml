@@ -1,0 +1,10 @@
+id: git-read-folded
+valid:
+  - 'fn f(a: &App) -> Result<()> { let ids = a.repo.range(b, h)?; Ok(()) }'
+  - 'fn f(a: &App) { match a.repo.summaries(&ids) { Ok(s) => s, Err(e) => return fail(e) }; }'
+  - 'fn f(a: &App) { let r = a.repo.refs().unwrap_or_default(); }'
+invalid:
+  - 'fn f(a: &App) { let ids = a.repo.range(b, h).unwrap_or_default(); }'
+  - 'fn f(a: &App) { let s = a.repo.summaries(&ids).ok(); }'
+  - 'fn f(a: &App) { let n = a.repo.numstat_many(&ids).unwrap_or_else(|_| vec![]); }'
+  - 'fn f(a: &App) { if let Ok(s) = a.repo.raw_summaries(&ids) { use_it(s) } }'

@@ -41,13 +41,13 @@ pub(crate) async fn page(
         // Only the listed commits are read: a subject per row, not a scan of all history, and
         // one id map instead of a search of every record per row.
         let ids: Vec<String> = touches.iter().map(|t| t.commit.clone()).collect();
-        let subjects: HashMap<String, String> = a
-            .repo
-            .raw_summaries(&ids)
-            .unwrap_or_default()
-            .into_iter()
-            .map(|s| (s.id, s.subject))
-            .collect();
+        let subjects: HashMap<String, String> = match a.repo.raw_summaries(&ids) {
+            Ok(s) => s.into_iter().map(|s| (s.id, s.subject)).collect(),
+            Err(e) => {
+                tracing::warn!("file history: subjects unavailable: {e}");
+                HashMap::new()
+            }
+        };
         // One lookup per listed commit, never a pass over the history.
         let emails: HashMap<&str, String> = ids
             .iter()

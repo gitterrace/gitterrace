@@ -154,9 +154,10 @@ impl Repo {
         Ok(ids)
     }
 
-    /// Commit ids reachable from `head` but not from `base` (`base..head`), newest first. Reads
-    /// commit headers only, so a branch the index never walked still has its commits.
-    pub fn range(&self, base: &str, head: &str) -> Result<Vec<String>> {
+    /// Commit ids reachable from `head` but not from `base` (`base..head`), newest first, at
+    /// most `limit` of them. Reads commit headers only, and stops at the limit, so a branch the
+    /// index never walked still has its commits and a huge range costs `limit` headers.
+    pub fn range(&self, base: &str, head: &str, limit: usize) -> Result<Vec<String>> {
         let repo = self.repo();
         let (b, h) = (self.resolve_id(&repo, base)?, self.resolve_id(&repo, head)?);
         let walk = repo
@@ -166,7 +167,7 @@ impl Repo {
             .all()
             .map_err(git)?;
         let mut ids = Vec::new();
-        for info in walk {
+        for info in walk.take(limit) {
             ids.push(info.map_err(git)?.id.to_string());
         }
         Ok(ids)

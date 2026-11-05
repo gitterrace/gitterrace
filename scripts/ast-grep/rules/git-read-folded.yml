@@ -1,0 +1,34 @@
+id: git-read-folded
+language: rust
+severity: error
+message: 'A git read of commits folded into an empty answer.'
+note: 'A failed read is not "no commits" or "no lines": a page shows it as a real, wrong answer. Propagate it with `?`, or show the error state the page has for it.'
+files: [crates/**/*.rs]
+ignores:
+  - crates/**/tests.rs
+  - crates/**/*_tests.rs
+  - crates/**/tests/**
+  - crates/gitterrace-git/**
+utils:
+  read:
+    any:
+      - pattern: $S.range($$$)
+      - pattern: $S.summaries($$$)
+      - pattern: $S.raw_summaries($$$)
+      - pattern: $S.numstat_many($$$)
+      - pattern: $S.rev_list($$$)
+rule:
+  any:
+    - all:
+        - kind: call_expression
+        - has:
+            field: function
+            all:
+              - has: {field: value, matches: read}
+              - has:
+                  field: field
+                  regex: '^(ok|unwrap_or|unwrap_or_default|unwrap_or_else|map_or|map_or_else|is_ok|is_err|into_iter|iter|flatten|unwrap_or_else)$'
+    - all:
+        - kind: let_condition
+        - has: {field: pattern, regex: '^Ok\('}
+        - has: {field: value, matches: read}
