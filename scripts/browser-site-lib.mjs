@@ -1,7 +1,9 @@
 // Checks of marks and the generated site: mark seam, about placement, site theme. Imported by scripts/browser-check.mjs, not run on its own.
-import { readFileSync, readdirSync, existsSync } from 'node:fs';
+import { readFileSync, readdirSync, existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
-import { root, launch } from './browser-lib.mjs';
+import { tmpdir } from 'node:os';
+import { pathToFileURL } from 'node:url';
+import { root, launch, sh } from './browser-lib.mjs';
 
 /** @param {any} env what browser-check.mjs set up (pw, dir, srv, r, bin, cfg, arg, ...) */
 export function checks(env) {
@@ -170,5 +172,41 @@ async function siteTheme() {
     }
   } finally { server.close(); }
 }
-  return { markSeam, aboutPlace, siteTheme };
+// An export opened from disk (a file:// URL, no server): the forwarding index lands on the
+// repository, the page shows its content, the stylesheets load, and a link reaches a
+// second page.
+async function exportFromDisk() {
+  const out = join(mkdtempSync(join(tmpdir(), 'gt-export-')), 'site');
+  sh(root, bin, 'export', out, dir);
+  for (const name of browsers) {
+    const b = await launch(pw, name);
+    const p = await b.newPage();
+    const where = `export-from-disk ${name}`;
+    try {
+      await p.goto(pathToFileURL(join(out, 'index.html')).href, { waitUntil: 'load' });
+      const bad = [];
+      await p.waitForURL(/\/r\/[^/]+\/index\.html$/, { timeout: 3000 }).catch(() => bad.push(`the forwarding page stays at ${p.url()}`));
+      const m = await p.evaluate(() => ({
+        text: document.body.innerText.length,
+        banner: getComputedStyle(document.querySelector('.snapshot') || document.body).backgroundColor,
+        sheets: [...document.styleSheets].every((s) => { try { return s.cssRules.length > 0; } catch { return true; } }),
+        links: [...document.querySelectorAll('a[href]')].filter((a) => /** @type {HTMLAnchorElement} */ (a).href.startsWith('file:')).length,
+      }));
+      if (m.text < 100) bad.push(`page shows ${m.text} characters`);
+      if (/rgba\(0, 0, 0, 0\)|transparent/.test(m.banner)) bad.push('snapshot style not applied');
+      if (!m.links) bad.push('no link stays on disk');
+      const link = await p.$('a[href$="/refs/index.html"], a[href*="/log/"]');
+      if (!link) bad.push('no link to a second page');
+      else {
+        await link.click({ timeout: 3000 }).catch(() => {});
+        await p.waitForLoadState('load');
+        const n = await p.evaluate(() => document.body.innerText.length);
+        if (n < 100 || !p.url().startsWith('file:')) bad.push(`a followed link shows ${n} characters at ${p.url()}`);
+      }
+      bad.length ? r.fail(`${where}: ${bad.join(', ')}`) : r.ok(`${where}: forwards, styled, a link opens a second page`);
+    } catch (e) { r.fail(`${where}: ${String(e.message).split('\n')[0]}`); } finally { await b.close(); }
+  }
+  rmSync(join(out, '..'), { recursive: true, force: true });
+}
+  return { markSeam, aboutPlace, siteTheme, exportFromDisk };
 }

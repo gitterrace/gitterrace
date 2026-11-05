@@ -305,7 +305,7 @@ async fn export_writes_every_prewarmed_page() {
     let root =
         std::fs::read_to_string(target(&out, "/", "text/html").expect("root")).expect("root page");
     assert!(
-        root.contains("url=/r/r/"),
+        root.contains("url=r/r/index.html"),
         "/ forwards to the one repository: {root}"
     );
     for page in gitterrace_web::WARM_PAGES {
@@ -366,15 +366,12 @@ async fn several_repositories_export_like_the_server_serves_them() {
     let alpha =
         std::fs::read_to_string(target(&out, "/r/alpha/", "text/html").expect("plain path"))
             .expect("alpha");
-    for link in links(&alpha) {
-        assert!(
-            link.starts_with("/r/alpha")
-                || link == "/"
-                || link == "/snapshot.css"
-                || link.starts_with("/static/"),
-            "alpha links outside itself: {link}"
-        );
-    }
+    // Written for disk, a page holds no root-absolute link at all.
+    assert!(
+        links(&alpha).is_empty(),
+        "absolute links: {:?}",
+        links(&alpha)
+    );
 }
 
 /// Class: a repository file a browser would run scripts in. A static host serves exported

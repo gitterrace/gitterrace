@@ -10,6 +10,7 @@
 
 mod credit;
 mod out;
+mod relative;
 mod snapshot;
 mod write;
 
@@ -24,6 +25,7 @@ use gitterrace_git::percent_decode;
 
 use crate::export::credit::{Credit, add_footer};
 use crate::export::out::{Staging, check_out};
+use crate::export::relative::relativize;
 #[cfg(test)]
 use crate::export::snapshot::mark_snapshot_as;
 use crate::export::snapshot::{SNAPSHOT_CSS, mark_snapshot, snapshot_label};
@@ -246,7 +248,7 @@ async fn crawl(
             } else {
                 body
             };
-            written += usize::from(write_page(out, &path, &content_type, &body)?);
+            written += usize::from(write_for_disk(out, &path, &content_type, &body)?);
             if content_type.starts_with("text/html") || content_type.starts_with("text/css") {
                 let mut fragments = Vec::new();
                 for link in links(&String::from_utf8_lossy(&body)) {
@@ -272,6 +274,17 @@ async fn crawl(
     write_page(out, "/snapshot.css", "text/css", SNAPSHOT_CSS.as_bytes())?;
     write_page(out, "/_headers", "text/plain", headers_file().as_bytes())?;
     Ok(written + 2)
+}
+
+/// Writes a page the way it must sit on disk: HTML and CSS links made relative, so the folder
+/// opens from a `file://` URL. Links are followed from the server's own bytes before this.
+fn write_for_disk(out: &Path, path: &str, content_type: &str, body: &[u8]) -> anyhow::Result<bool> {
+    let is_html = content_type.starts_with("text/html");
+    if is_html || content_type.starts_with("text/css") {
+        let text = relativize(&String::from_utf8_lossy(body), path, is_html);
+        return write_page(out, path, content_type, text.as_bytes());
+    }
+    write_page(out, path, content_type, body)
 }
 
 /// Pages written so far against the one budget, diff fragments included.
@@ -358,7 +371,8 @@ fn root_page(out: &Path, sites: &[String]) -> anyhow::Result<Option<String>> {
 /// The root page of a one-repository export: forwards to its pages. A meta refresh and a
 /// link, since the page policy refuses inline script.
 fn forward_page(prefix: &str) -> String {
-    let to = gitterrace_web::escape_html(&format!("{prefix}/"));
+    // Relative, so the forward works from disk as well as from a host.
+    let to = gitterrace_web::escape_html(&format!("{}/index.html", prefix.trim_start_matches('/')));
     format!(
         "<!doctype html>\n<html lang=\"en\"><head><meta charset=\"utf-8\">\
          <meta http-equiv=\"refresh\" content=\"0; url={to}\"><title>gitterrace</title></head>\
