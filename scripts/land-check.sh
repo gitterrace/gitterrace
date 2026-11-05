@@ -7,12 +7,14 @@
 # equivalence oracle (equivalence_pages) runs again as its own named step. The crates have no
 # cargo features, so one clippy pass covers both feature shapes.
 #
-#   scripts/land-check.sh [--base REV] [--full] [--explain] [--paths P...] [--self-test]
+#   scripts/land-check.sh [--base REV] [--full] [--explain] [--paths P...] [--messages BASE]
+#                         [--self-test]
 #
 #   --base REV    compare against REV (default main, else HEAD~1) plus uncommitted changes
 #   --full        run `make check` instead, the whole gate
 #   --explain     print the selection and exit
 #   --paths P...  use these paths instead of asking git
+#   --messages BASE  run only the message step (subjects and the shared lints) over BASE..HEAD
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -92,6 +94,32 @@ gate_commands_covered() {
   ((missing == 0))
 }
 
+# The shared lints read tomllib: the first python3 that is 3.11 or newer.
+py=""
+for c in python3 python3.15 python3.14 python3.13 python3.12 python3.11; do
+  if command -v "$c" >/dev/null && "$c" -c 'import sys; sys.exit(sys.version_info < (3, 11))'; then
+    py=$c
+    break
+  fi
+done
+[[ -n $py ]] || {
+  echo "land-check: needs python 3.11 or newer" >&2
+  exit 1
+}
+
+LINTS="$PWD/shared/schwarzwald/lint"
+
+# The message step: the shared lints over subject and body of every commit in $1..HEAD. Each
+# lint runs, so one log names every refusal; any refusal fails the step.
+message_lints() {
+  local rc=0 rule
+  for rule in internal-refs personal-data own-shas; do
+    echo "== $py shared/schwarzwald/lint/$rule.py --messages $1"
+    "$py" "$LINTS/$rule.py" --messages "$1" || rc=1
+  done
+  return "$rc"
+}
+
 self_test() {
   local got
   got=$(select_crates crates/gitterrace-git/src/repo.rs | tr '\n' ' ')
@@ -126,6 +154,20 @@ self_test() {
     echo "self-test: a subject without a type passed" >&2
     exit 1
   fi
+  # The message step, from this checkout over the scratch history: a body the shared deny list
+  # refuses fails it, and the commit before it passes.
+  git -C "$d" -c user.name=t -c user.email=t@example.invalid commit -q --allow-empty \
+    -m "fix(x): one rule" -m "The page no longer lists ties."
+  if (cd "$d" && message_lints HEAD~1) >/dev/null 2>&1; then
+    echo "self-test: the message step passed a body the shared deny list refuses" >&2
+    exit 1
+  fi
+  git -C "$d" reset -q --hard HEAD~1
+  (cd "$d" && message_lints HEAD~1) >/dev/null 2>&1 ||
+    {
+      echo "self-test: the message step refused a plain body" >&2
+      exit 1
+    }
   (cd "$d" && git reset -q --hard HEAD~1 && check_subjects HEAD) ||
     {
       echo "self-test: a well formed subject failed" >&2
@@ -174,6 +216,10 @@ while (($#)); do
   --self-test)
     self_test
     exit 0
+    ;;
+  --messages)
+    check_subjects "$2" && message_lints "$2"
+    exit
     ;;
   *)
     echo "unknown option: $1" >&2
@@ -229,14 +275,12 @@ if ((${#scope[@]})); then
   fi
 fi
 step make lines names
-step python3 scripts/ratchet-check.py --self-test
-step python3 scripts/ratchet-check.py --base "$base"
+step "$py" shared/schwarzwald/tools/ratchet-check.py --self-test
+step "$py" shared/schwarzwald/tools/ratchet-check.py --base "$base"
 step cargo test -p gitterrace-testkit --test conventions
 step sh scripts/lint-run.sh
 step make docs-check
 check_subjects "$base"
-# Subject and body of every commit landed, the rules the commit-msg hook runs plus own shas.
-step python3 scripts/lint/internal-refs.py --messages "$base"
-step python3 scripts/lint/personal-data.py --messages "$base"
-step python3 scripts/lint/own-shas.py --messages "$base"
+# Subject and body of every commit landed: the shared lints the commit-msg hook runs.
+message_lints "$base"
 echo "land-check: ok (a full gate is \`scripts/land-check.sh --full\`)"

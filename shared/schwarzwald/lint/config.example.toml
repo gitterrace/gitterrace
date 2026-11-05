@@ -1,0 +1,48 @@
+# config/schwarzwald/lint.toml in a product: what the shared lints read. Data only. Every key
+# is optional; the value shown is the default. A key no lint reads is an error.
+
+[product]
+# Filled into `{product}` in rules/deny.toml, e.g. "<product> 1a2b3c" as a tracker id.
+name = "product"
+
+[scope]
+# Globs over repository paths. `**` and `*` both cross folders.
+prose = ["README.md", "AGENTS.md", "docs/**.md", "bench/**.md"]
+code = ["*.rs", "*.py", "*.mjs", "*.js", "*.sh", "*.yml", "*.yaml", "*.toml"]
+make = ["Makefile"]
+design = ["docs/design/**.md"]
+golden = ["*/golden/*"]
+# The synced copy carries its own checks: keep shared/ out.
+exclude = ["shared/*", "target/*"]
+# Fewer files than this in a tree scan means the census is broken.
+min_files = 1
+
+[refs]
+# Extra patterns the product refuses, and English words its id patterns must skip.
+patterns = []
+not_id = []
+
+[personal]
+# Paths never scanned for personal data (a licence text, a legal page), and extra placeholder
+# home names fixtures use.
+exempt = []
+placeholder_homes = []
+
+[history]
+# Shas own-shas and the history tools must keep: upstream corpus pins that collide with own ones.
+keep = []
+# Regexes for value fields that hold a sha, group 1 the field, group 2 the sha.
+sha_fields = []
+# A file OUTSIDE the repository (e.g. under ~/Backups) listing one pre-rewrite bundle per line.
+# Never a committed path: the bundles hold the old history the rewrite removed.
+bundles = ""
+# [pattern, replacement] pairs applied in order to every text file and message (`{ids}`
+# is the real ids of .personal-denylist), and regexes of paths left untouched.
+rewrites = []
+skip = []
+# tools/id-scan.py reads the same skip list.
+
+[commit]
+types = ["feat", "fix", "docs", "style", "refactor", "perf", "test", "build", "ci", "chore", "revert"]
+# <prefix>ALLOW_FREE_SUBJECT=1 overrides the subject form.
+allow_prefix = "SCHWARZWALD_"

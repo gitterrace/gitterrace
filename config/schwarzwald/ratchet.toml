@@ -1,9 +1,11 @@
-# The one registry of allowlists and counts that may only fall. ratchet-check.py compares each
-# entry with the base revision, and land-check fails when one grows. A new guard declares its
+# The one registry of allowlists and counts that may only fall. shared/schwarzwald/tools/
+# ratchet-check.py compares each entry with the base revision, and land-check fails when one
+# grows or a ratchet of the base disappears. A new guard declares its
 # allowlist here and needs no change to the check.
 #
 # [[ratchet]]  file: a JSON file in the repo, path: dotted key of a dict of counts or a list
 # [counts]     named integers kept in this file itself
+# [retired]    entries = ["<file> <path>"]: a ratchet removed on purpose, its reason beside it
 
 [[ratchet]]
 file = "scripts/guards/wide-allowed.json"

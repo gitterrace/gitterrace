@@ -52,7 +52,8 @@ js_types() {
 # on every $var) and SC2292 ([[ ]] in bash) are style, SC2310 and SC2312 flag the deliberate
 # `check || fail` pattern the test scripts are built on.
 sh_files() {
-  git ls-files -z -- '*.sh' | xargs -0 "$@"
+  # The synced copy carries its own checks.
+  git ls-files -z -- '*.sh' ':!:shared/**' | xargs -0 "$@"
 }
 
 run typos typos "brew install typos-cli" typos
@@ -74,11 +75,25 @@ run tests-cfg python3 "install python3" python3 scripts/tests-check.py
 run css-scope python3 "install python3" python3 scripts/css-scope-check.py
 run site-csp python3 "install python3" python3 scripts/site-check.py csp
 run machete cargo-machete "cargo install cargo-machete" cargo-machete
-# The tree carries no task ids, labels, process words, personal data or own commits.
-run internal-refs python3 "install python3" python3 scripts/lint/internal-refs.py
-run personal-data python3 "install python3" python3 scripts/lint/personal-data.py
-run own-shas python3 "install python3" python3 scripts/lint/own-shas.py
-run commit-msg-hook bash "install bash" bash scripts/hooks/commit-msg_test.sh
+# The tree carries no task ids, labels, process words, personal data or own commits: the shared
+# lints (shared/schwarzwald/lint) with config/schwarzwald/lint.toml, each proved on its red case.
+# They need python 3.11 or newer for tomllib.
+py=python3
+for c in python3 python3.15 python3.14 python3.13 python3.12 python3.11; do
+  if command -v "$c" >/dev/null 2>&1 && "$c" -c 'import sys; sys.exit(sys.version_info < (3, 11))'; then
+    py=$c
+    break
+  fi
+done
+sw=shared/schwarzwald
+run schwarzwald-copy "$py" "install python 3.11" "$py" "$sw"/check.py
+run internal-refs "$py" "install python 3.11" "$py" "$sw"/lint/internal-refs.py
+run personal-data "$py" "install python 3.11" "$py" "$sw"/lint/personal-data.py
+run own-shas "$py" "install python 3.11" "$py" "$sw"/lint/own-shas.py
+run lint-red "$py" "install python 3.11" "$py" "$sw"/lint/red.py --repo .
+run commit-msg-hook bash "install bash" bash "$sw"/hooks/commit-msg_test.sh
+run commit-msg-shim bash "install bash" env HOOK=scripts/hooks/commit-msg bash "$sw"/hooks/commit-msg_test.sh
+run guards bash "install bash" bash "$sw"/guards/tests/suite.sh
 
 [ "$fails" -eq 0 ] || {
   echo "lint: $fails failed"

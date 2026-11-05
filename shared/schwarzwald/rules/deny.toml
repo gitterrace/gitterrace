@@ -1,0 +1,95 @@
+# What lands carries no provenance: the words and shapes every product refuses in its tree and
+# its commit messages. Data only, read with tomllib by the lint part and the tools part.
+# Each table has `patterns` (Python regexes, any one refuses), `hit` (lines that must be
+# refused) and `pass` (lines that must pass). build.py --check runs both lists, so a pattern
+# that stops matching, or starts matching product prose, fails here before any product sees it.
+# `{product}` in a pattern is replaced by the product name from the product's lint.toml.
+
+# A tracker id is refused only with context, so colours, digests and bare hex pass.
+[task_id]
+patterns = [
+  '''\b[Tt]asks?[ _]#?[`']?[0-9a-f]{6,}\b''',
+  '''\(#[0-9a-f]{6}\)''',
+  '''\([`'][0-9a-f]{6}[`']\)''',
+  '''\b(on|in|per|see|from|closing|filed as) +`[0-9a-f]{6}`''',
+  '''\b([Bb]oard|[Rr]ows?|[Ll]anes?|[Ss]ee|[Bb]ehind)[ :]+#?(?=[0-9a-f]*\d)[0-9a-f]{6}\b''',
+  '''\btask_[0-9a-f]{6,}\b''',
+  '''\b{product}[ _]+#?[`']?[0-9a-f]{6}\b''',
+]
+# Words after "task", "see" or "row" that are English, not ids.
+not_id = '''([Tt]asks?|[Ss]ee|[Rr]ows?)[ _](facade|decade|deface|defaced|accede|acceded|beaded|cabbed|debase|deeded)\b'''
+hit = ["// see task 1a2b3c", "// fixed in (#abc123)", "// filed as `abc123`", "// board 1a2b3c is open", "// row 4f4f4a"]
+pass = ["// digest deadbeefcafe", '// colour "#ffffff" is white', "// see facade for details", "// the task list"]
+
+# A planning label needs a number or a letter after the word, so "dashboard" and "steps" pass.
+[plan]
+patterns = [
+  '''\b[Pp]lan[ #]*[0-9]+\b''',
+  '''\b[Ww]ave[ #]+[0-9]+''',
+  '''\b[Pp]hase[ #]+[0-9]+''',
+  '''\b[Ss]tep[ #]+[0-9]+\b''',
+  '''\b[Ss]lice[ #]+[0-9]+''',
+  '''\b[Ll]ane[ #]+([A-Z]|[0-9]+)\b''',
+]
+hit = ["// done in wave 2", "Planned in phase 3.", "// lane B owns this", "// step 4 of the move"]
+pass = ["// the next steps", "// a planned change", "// the wave form"]
+
+# Label shapes: G12, G3b, P4, C5, C5a, K3, N2, rev2. A lower-case g12 is a variable.
+[label]
+# G, C, N and rev labels anywhere. P and K only in a label's shape (a heading `P3:`, `(P4)`,
+# "see P3"), because tests name fixtures P1, P2 or K1, K2 ("the task moves to P2"). A G-number
+# inside a certificate's proper name (Apple Root CA - G3, WWDR G6) is a name.
+patterns = [
+  '''(?<![%\w])(G[0-9]+[a-z]?|C[1-9][ab]?|N[1-4]|rev[0-9]+)\b''',
+  '''^\W*(P[1-9]|K[1-5])\s*[:(]|\((P[1-9]|K[1-5])\)|\b([Ss]ee|by|per)\s+(P[1-9]|K[1-5])\b''',
+]
+not_id = '''(Root ?CA( -)?|RootCA-|WWDR) ?G[0-9]+|`0x[0-9A-Fa-f]+` \+ `[0-9A-F]{2}`'''
+hit = ["// moved by G12", "// the C5a page", "// the rev2 table", "// see P3", "// P3: set the filter first", "// recipes (P4): one undo", "// P8 (THE GATE): drain"]
+pass = ["let g12 = 1;", "| `%C3%A9` | e acute |", "// a C program", "// the K-means step", "//! chained to Apple Root CA - G3 by fingerprint", "// Apple's root and WWDR G6 are P-384", "// Task lives in P2, the section in P1.", "// handed K1 over to K2", "// packs 200 as tag `0x0B` + `C8`, a varint"]
+
+# Who does the work and who approves it. Context keeps "dashboard", "keyboard" and
+# "board game" out: the words stand alone.
+[process]
+patterns = [
+  '''\b([Ll]anes?|[Cc]oordinators?|[Bb]oards?(?![- ]games?\b)|[Ss]ign-?offs?|[Ss]igned[- ]off)\b''',
+  '''\buntil (the |its |a )?[\w -]{0,30}\b(work|fix|change|patch|PR|branch|rewrite|refactor)e?s? lands?\b''',
+  '''\blands? (in|on) main\b''',
+  '''\bre-bless report\b''',
+]
+hit = ["// the coordinator records it", "// after sign-off", "// red until the counting work lands", "// the board says so", "// skipped until the fix lands", "// once this lands on main"]
+pass = ["// the dashboard and the keyboard", "// a board-game score", "// the board game rules", "// the clipboard", "// the landing page", "// empty until the first fetch lands", "// held off until the commit lands"]
+
+# Messages only: a bare `#` and six hex is a tracker id. A colour has no place in a message.
+# "No longer" tells the story of the change against an earlier state the reader never saw;
+# a message says what the product does now.
+[message]
+patterns = ['''#[0-9a-f]{6}(?![0-9A-Za-z])''', '''\b[Nn]o longer\b''']
+hit = ["See #a1b2c3.", "follows #abcdef", "The page no longer lists ties.", "No longer counted twice."]
+pass = ["chore: bump to deadbeefcafe", "fix: one rule", "a longer list", "the longest line"]
+
+# A design doc states the design: no section on who builds it, in what order or how long.
+[design_breakdown]
+patterns = ['''(?i)^#+ .*\b(work breakdown|lanes?|estimates?|owners?|milestones?|schedule|delivery)\b''']
+hit = ["## Work breakdown", "## Estimates", "### Owners"]
+pass = ["## On-disk format", "## Ownership cells"]
+
+# Incident stories with a date, and the owner's own data. A test states the invariant.
+[incident]
+patterns = [
+  '''(?i)\b(crash|incident|outage|regression|hang|trap)\s+(of\s+|on\s+)?20\d{2}-\d{2}-\d{2}''',
+  '''\bthe\s+owner[\u2019']s\s+(actual|real)\s+(repo|repository|data|machine)''',
+]
+hit = ["// a regression 2026-09-07 broke it", "// the owner's real repo"]
+pass = ["// the regression test", "// released 2026-09-07"]
+
+# A machine's name: a `.local` mDNS host.
+[host]
+patterns = ['''\b[a-z0-9][\w-]*\.local\b(?!/)''']
+hit = ["// served by mac-mini.local"]
+pass = ["~/.local/state/app"]
+
+# Commit subjects that are a partial step: they belong inside the change they finish.
+[partial_subject]
+patterns = ['''(?i)^(fixup!|squash!|wip\b|style:|style\(|chore\(fmt\)|re-?bless|fix clippy|satisfy clippy|make it (build|compile))''']
+hit = ["fixup! feat: x", "wip: scrolling", "style: rustfmt", "chore(fmt): run", "rebless goldens", "satisfy clippy", "make it build"]
+pass = ["feat(web): one rule", "fix: wipe the cache", "docs: the style guide"]

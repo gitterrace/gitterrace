@@ -1,0 +1,8 @@
+# gitterrace's red probes (GUARD_PRODUCT_PROBES), for its values in the shared rules. The shape
+# is the shared red-probes.tsv: id, file (relative to the product root), the literal, the case
+# that must go red, the replacement (empty means a string that matches nothing), the case files.
+vendor_glob	config/schwarzwald/guards.env	*/static/vendor/* 	vendored mermaid	*/zzz_vendor/* 	cases-rules
+golden_glob	config/schwarzwald/guards.env	*/tests/golden/* 	a golden file, written only via TEST_BLESS	*/zzz_golden/* 	cases-rules
+api_doc_glob	config/schwarzwald/guards.env	*/docs/api.md 	the generated api doc	*/zzz/api.md 	cases-rules
+script_feed	config/schwarzwald/guards.env	*/scripts/*.sh 	a script header feeds the scripts table	*/zzz/*.sh 	cases-state
+binary_app	config/schwarzwald/guards.env	[Gg]itterrace|git-terrace	a keystroke to the binary	[Gg]itterrace	cases-rules

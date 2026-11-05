@@ -19,5 +19,5 @@ __pycache__/
 .ruff_cache/
 node_modules/
 
-# Local denylist of names, hosts and ids (scripts/lint/personal-data.py, internal-refs.py)
+# Local denylist of names, hosts and ids (the shared lints in shared/schwarzwald/lint)
 /.personal-denylist

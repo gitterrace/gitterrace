@@ -1,0 +1,18 @@
+# What the shared lints read for gitterrace (shared/schwarzwald/lint). Data only.
+# The keys and their defaults: shared/schwarzwald/lint/config.example.toml.
+
+[product]
+name = "gitterrace"
+
+[scope]
+prose = ["README.md", "AGENTS.md", "docs/**.md", "bench/**.md"]
+code = ["*.rs", "*.py", "*.mjs", "*.js", "*.sh", "*.yml", "*.yaml", "*.toml"]
+make = ["Makefile"]
+design = ["docs/design/**.md"]
+golden = ["*/golden/*"]
+# Vendored code and the synced copy are not ours to reword.
+exclude = ["shared/*", "target/*", "*/static/vendor/*", ".wt/*"]
+
+[commit]
+types = ["feat", "fix", "docs", "style", "refactor", "perf", "test", "build", "ci", "chore", "revert"]
+allow_prefix = "GITTERRACE_"

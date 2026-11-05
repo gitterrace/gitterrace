@@ -2,6 +2,8 @@
 
 Local, read-only git browser with insights. [Architecture](docs/architecture.md).
 
+Shared rules: `shared/schwarzwald/rules/rules.md`. They apply here in full.
+
 ## Layout
 
 <!-- BEGIN GENERATED: crates -->
@@ -66,11 +68,8 @@ outside `gitterrace-git` imports `gix`.
 - Commits: `type(scope): subject`, scope is the crate without `gitterrace-`. Commit by
   pathspec, never `git add -A`. The message says what changed and how it is tested, in plain
   words. `git config core.hooksPath scripts/hooks` runs the message rules on every commit.
-- One change, one commit. A change that spans several files or steps (a scaffold, a type moved
-  before its callers, a refactor) is built in its own worktree or clone, never in the shared
-  checkout, and lands on main as one squashed commit with its tests, docs and golden update.
-  Main never carries the partial steps. `scripts/land-check.sh --base <main>` must pass on the
-  squashed commit before it lands.
+- One change, one commit, squashed in its own clone or worktree (shared rules, Commits). The
+  gate for a squashed commit here is `scripts/land-check.sh --base <main>`.
 - Names: files in `scripts/` are `<area>-<verb>.<ext>`, make targets are `<area>[-<verb>]`,
   harness-only env vars use a `TEST_` prefix. `make names` enforces it.
 
@@ -81,15 +80,17 @@ Task ids, plans and who did what belong on the tracker, never in the tree or a c
 ids for the checks go in the gitignored `.personal-denylist` (one case-insensitive regex per
 line), never in the repository.
 
-- `CONV-NO-INTERNAL-REFS` (`scripts/lint/internal-refs.py`): no task id with context (the
-  word task or a `#` before six hex digits), no planning label (a letter and a number, a
-  numbered wave or phase), no process word (who does the work and who approves it) in
-  comments, ignore reasons, Makefile help, docs or messages.
+- `CONV-NO-INTERNAL-REFS`, `CONV-PERSONAL-DATA`, `CONV-NO-OWN-SHAS`: the shared lints in
+  `shared/schwarzwald/lint`, with gitterrace's values in `config/schwarzwald/lint.toml` and the
+  refused words in `shared/schwarzwald/rules/deny.toml`. Each runs on its red and green case in
+  `make lint`.
   `docs/design/` holds product design only: no work breakdown, owner or estimate section.
-- `CONV-PERSONAL-DATA` (`scripts/lint/personal-data.py`): no home path, `.local` hostname,
-  dated incident story or denylisted name, in the tree or a message.
-- `CONV-NO-OWN-SHAS` (`scripts/lint/own-shas.py`): no prefix of a commit of this repository,
-  in the tree or a message. Upstream corpus shas pass.
 - `test-names-describe-behavior` (ast-grep): a test is named by its behavior, not a label.
-- `scripts/hooks/commit-msg`: the subject form plus the message rules above, before a commit
-  exists. `scripts/hooks/commit-msg_test.sh` proves it, `make lint` runs that test.
+- `scripts/hooks/commit-msg`: execs the shared hook, the subject form plus the message rules
+  above, before a commit exists. `make lint` runs the shared hook test through the shim.
+- Tool-use guards: `scripts/guards/adapters/*.sh` exec the shared guards
+  (`shared/schwarzwald/guards`), with gitterrace's values in `config/schwarzwald/guards.env`.
+  `make lint` runs their selftest and adapters, the red probes run with
+  `GUARDS_SELFTEST_PRODUCT=$PWD bash shared/schwarzwald/guards/tests/red.sh`.
+- Allowlists and counts only fall: `config/schwarzwald/ratchet.toml`, checked by
+  `shared/schwarzwald/tools/ratchet-check.py` in land-check.
