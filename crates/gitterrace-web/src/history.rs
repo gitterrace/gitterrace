@@ -80,7 +80,8 @@ pub(crate) async fn page(
             })
             .collect();
         HistoryPage {
-            c,
+            // Built through the insights helper, but one file's history is a code view.
+            c: c.active("files"),
             blob_href: href(&format!(
                 "/blob/{}/{}",
                 fmt::selected_seg(),
