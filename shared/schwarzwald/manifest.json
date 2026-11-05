@@ -1,7 +1,7 @@
 {
   "schwarzwald": null,
   "dirty": false,
-  "date": "2026-11-05T13:09:56Z",
+  "date": "2026-11-05T14:51:46Z",
   "parts": [
     "fonts",
     "guards",
@@ -13,8 +13,8 @@
     "tools"
   ],
   "files": {
-    "README.md": "6bc644266cadf2ce0a8d0c5df5218dbc186123cc164a08ea6ccf6e031ce8e31c",
-    "check.py": "2c561fbda409cf98f72c537bb4329bbecc79b02cc0445971d78ef525e1244b3d",
+    "README.md": "c12b532327809045ede90fdf6c6fc658a2b1161f3033f1b2c1b60cae9bdf6691",
+    "check.py": "08725ff45c367e1de526df791db14107a059b491d295523ebf2557122659df4a",
     "fonts/bricolage-grotesque/OFL.txt": "923f4ddf0fd39f9b7794ab0df7332f3d95dc43e8ad7ec2289d6d9e8491177f51",
     "fonts/bricolage-grotesque/bricolage-grotesque-latin-wght-normal.woff2": "a97804dc9fbe5fc972a08018c5eda4dab7ef2346f64c57e61419d05e6de4ea1c",
     "fonts/fonts.css": "3ca7dd03811b45842f2a4892e641761d21d5155bfdb3bcf691965f8b17ba9f02",
@@ -76,10 +76,10 @@
     "rules/deny.toml": "4a3f20ddfd2cf5560f922e0505a37fe1f1ff7f84f42bdd9eecf37667dac89a0f",
     "rules/rules.md": "e7de635cdf45b9de355cd06fd297024b1ef5340df07e1daa22e77a27d70c5e83",
     "rust/Cargo.toml": "0f6172d29dcc617d28d6fd8efe50c27feb0536041373a3b5dfabe7e5ae8a3f6e",
-    "rust/src/lib.rs": "e2772e73d4f8462c237d72a943e60dcb31a5defb2fcd82de093d7a38146d948f",
+    "rust/src/lib.rs": "2537b3234771cf2f68d56928950a73ded75a11504fd9b130b234614ff30e0bdc",
     "tokens/brand-tokens.json": "9166e00aba57b2069bce9a3918b4cd6abb38b66f36f082245ba94c391dc7b904",
     "tokens/design-tokens.json": "39b39ed41d5c6980af8f221260dc0a5e199aebb1f5f5bc4bf29628450ea1bd02",
-    "tokens/theme-tokens.json": "eba21db2965f82082c7b8c6824c5786e5a4fa29d97c29df3a4c11365aba70055",
+    "tokens/theme-tokens.json": "0826a8c8440be38917921555c621f6e997e837e78d6e9f3e977ba8873ea4abdd",
     "tools/id-scan.py": "ac9ab3dd3b4ef00a2d4745488ce1d92953be3ce4102561e0b10ba5cbeb4751ef",
     "tools/land.sh": "a815cd2b0de60df4eaf2ac26ed495e70878672dfd7f276a547b99d4352ba68c3",
     "tools/ratchet-check.py": "70725f77c9a276186aae91440d265f20cfd4a0e989e37fcb91fea96586e2c412",

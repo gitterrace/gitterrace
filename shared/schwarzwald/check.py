@@ -7,6 +7,8 @@ import hashlib, json, os, sys
 from pathlib import Path
 
 SKIP = {'manifest.json', 'Cargo.lock'}
+# Files that never leave schwarzwald: a copy that carries one fails, whatever its manifest says.
+SOURCE_ONLY = set()
 
 
 def files_of(d):
@@ -27,6 +29,9 @@ def check(d):
         print(f'no manifest: {mf}')
         return 1
     m, have = json.loads(mf.read_text()), files_of(d)
+    for rel in sorted(SOURCE_ONLY & set(have)):
+        print(f'source-only file in the copy: {rel}; it never leaves schwarzwald')
+        return 1
     for rel in sorted(set(m['files']) | set(have)):
         if have.get(rel) != m['files'].get(rel):
             state = 'missing' if rel not in have else 'not in manifest' if rel not in m['files'] else 'differs'

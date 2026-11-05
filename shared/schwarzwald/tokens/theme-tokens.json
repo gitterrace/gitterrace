@@ -294,11 +294,11 @@
           ]
         },
         "code.add-word": {
-          "hex": "#385049",
+          "hex": "#374F48",
           "oklch": [
-            0.4093,
+            0.4056,
             0.0317,
-            174.6861
+            174.6558
           ]
         },
         "code.del-row": {
@@ -310,11 +310,11 @@
           ]
         },
         "code.del-word": {
-          "hex": "#5E3937",
+          "hex": "#532F2D",
           "oklch": [
-            0.3883,
+            0.3499,
             0.0532,
-            23.1647
+            23.5575
           ]
         },
         "code.selection": {
@@ -670,11 +670,11 @@
           ]
         },
         "surfaces.line-strong": {
-          "hex": "#464A46",
+          "hex": "#757975",
           "oklch": [
-            0.404,
-            0.0084,
-            145.4176
+            0.5714,
+            0.0077,
+            145.4736
           ]
         },
         "surfaces.raised": {
@@ -960,11 +960,11 @@
           ]
         },
         "code.add-word": {
-          "hex": "#C4D6D1",
+          "hex": "#C9DBD6",
           "oklch": [
-            0.8611,
+            0.8765,
             0.0205,
-            177.3641
+            177.3797
           ]
         },
         "code.del-row": {
@@ -976,11 +976,11 @@
           ]
         },
         "code.del-word": {
-          "hex": "#E6CACA",
+          "hex": "#F4D8D8",
           "oklch": [
-            0.8625,
-            0.0316,
-            17.7808
+            0.9053,
+            0.0312,
+            17.742
           ]
         },
         "code.selection": {
@@ -992,11 +992,11 @@
           ]
         },
         "code.syntax.comment": {
-          "hex": "#66706A",
+          "hex": "#5E6862",
           "oklch": [
-            0.5348,
-            0.0152,
-            159.5653
+            0.5068,
+            0.0154,
+            159.5179
           ]
         },
         "code.syntax.constant": {
@@ -1208,11 +1208,11 @@
           ]
         },
         "ink.tertiary": {
-          "hex": "#707A74",
+          "hex": "#646D68",
           "oklch": [
-            0.5692,
-            0.015,
-            159.6164
+            0.5254,
+            0.0134,
+            161.707
           ]
         },
         "muted": {
@@ -1328,19 +1328,19 @@
           ]
         },
         "surfaces.line": {
-          "hex": "#DFE1E0",
+          "hex": "#DDDFDE",
           "oklch": [
-            0.9079,
+            0.9018,
             0.0025,
-            165.0698
+            165.0691
           ]
         },
         "surfaces.line-strong": {
-          "hex": "#C8CAC9",
+          "hex": "#868887",
           "oklch": [
-            0.8371,
-            0.0026,
-            165.062
+            0.6248,
+            0.0028,
+            165.0262
           ]
         },
         "surfaces.raised": {
@@ -1644,11 +1644,11 @@
           ]
         },
         "code.del-word": {
-          "hex": "#603836",
+          "hex": "#552E2C",
           "oklch": [
-            0.3889,
-            0.0576,
-            23.1321
+            0.3506,
+            0.0577,
+            23.5516
           ]
         },
         "code.selection": {
@@ -2004,11 +2004,11 @@
           ]
         },
         "surfaces.line-strong": {
-          "hex": "#4B4844",
+          "hex": "#7B7873",
           "oklch": [
-            0.4032,
-            0.0077,
-            75.3252
+            0.5738,
+            0.0084,
+            80.7091
           ]
         },
         "surfaces.raised": {
@@ -2294,11 +2294,11 @@
           ]
         },
         "code.add-word": {
-          "hex": "#C6D6D0",
+          "hex": "#CBDBD5",
           "oklch": [
-            0.8623,
-            0.0191,
-            171.4277
+            0.8776,
+            0.019,
+            171.4422
           ]
         },
         "code.del-row": {
@@ -2310,11 +2310,11 @@
           ]
         },
         "code.del-word": {
-          "hex": "#E7CACA",
+          "hex": "#F5D7D7",
           "oklch": [
-            0.8634,
-            0.0327,
-            17.8035
+            0.904,
+            0.0335,
+            17.7875
           ]
         },
         "code.selection": {
@@ -2326,11 +2326,11 @@
           ]
         },
         "code.syntax.comment": {
-          "hex": "#746D64",
+          "hex": "#6D665E",
           "oklch": [
-            0.5384,
-            0.0163,
-            74.2999
+            0.5143,
+            0.0152,
+            71.1693
           ]
         },
         "code.syntax.constant": {
@@ -2542,11 +2542,11 @@
           ]
         },
         "ink.tertiary": {
-          "hex": "#7D766D",
+          "hex": "#706A61",
           "oklch": [
-            0.5694,
-            0.0161,
-            74.3178
+            0.527,
+            0.0157,
+            78.1846
           ]
         },
         "muted": {
@@ -2662,19 +2662,19 @@
           ]
         },
         "surfaces.line": {
-          "hex": "#E2E1DE",
+          "hex": "#DFDEDB",
           "oklch": [
-            0.9097,
+            0.9005,
             0.0042,
-            91.4495
+            91.45
           ]
         },
         "surfaces.line-strong": {
-          "hex": "#CCCAC6",
+          "hex": "#898784",
           "oklch": [
-            0.8395,
-            0.0059,
-            84.5689
+            0.6242,
+            0.0051,
+            78.2864
           ]
         },
         "surfaces.raised": {
@@ -4312,11 +4312,11 @@
           ]
         },
         "code.del-word": {
-          "hex": "#5E3839",
+          "hex": "#532E30",
           "oklch": [
-            0.3869,
-            0.0544,
-            18.1718
+            0.3488,
+            0.0545,
+            16.7842
           ]
         },
         "code.selection": {
@@ -4328,57 +4328,57 @@
           ]
         },
         "code.syntax.comment": {
-          "hex": "#909090",
+          "hex": "#A1A1A1",
           "oklch": [
-            0.6534,
+            0.709,
             0.0,
             null
           ]
         },
         "code.syntax.constant": {
-          "hex": "#CCCCCC",
+          "hex": "#DEDEDE",
           "oklch": [
-            0.8452,
+            0.9006,
             0.0,
             null
           ]
         },
         "code.syntax.entity": {
-          "hex": "#BCBCBC",
+          "hex": "#CECECE",
           "oklch": [
-            0.7952,
+            0.8514,
             0.0,
             null
           ]
         },
         "code.syntax.keyword": {
-          "hex": "#EBEBEB",
+          "hex": "#FDFDFD",
           "oklch": [
-            0.9401,
+            0.994,
             0.0,
             null
           ]
         },
         "code.syntax.param": {
-          "hex": "#9E9E9E",
+          "hex": "#B0B0B0",
           "oklch": [
-            0.6993,
+            0.7572,
             0.0,
             null
           ]
         },
         "code.syntax.string": {
-          "hex": "#DBDBDB",
+          "hex": "#EDEDED",
           "oklch": [
-            0.8914,
+            0.9461,
             0.0,
             null
           ]
         },
         "code.syntax.tag": {
-          "hex": "#ADADAD",
+          "hex": "#BFBFBF",
           "oklch": [
-            0.7476,
+            0.8047,
             0.0,
             null
           ]
@@ -4672,9 +4672,9 @@
           ]
         },
         "surfaces.line-strong": {
-          "hex": "#494949",
+          "hex": "#787878",
           "oklch": [
-            0.4054,
+            0.5727,
             0.0,
             null
           ]
@@ -4962,11 +4962,11 @@
           ]
         },
         "code.add-word": {
-          "hex": "#C5D6D2",
+          "hex": "#CADBD7",
           "oklch": [
-            0.8621,
-            0.0191,
-            180.1942
+            0.8775,
+            0.019,
+            180.2082
           ]
         },
         "code.del-row": {
@@ -4978,11 +4978,11 @@
           ]
         },
         "code.del-word": {
-          "hex": "#E6CACB",
+          "hex": "#F4D7D8",
           "oklch": [
-            0.8628,
-            0.0316,
-            15.3252
+            0.9034,
+            0.0323,
+            15.3936
           ]
         },
         "code.selection": {
@@ -4994,57 +4994,57 @@
           ]
         },
         "code.syntax.comment": {
-          "hex": "#6D6D6D",
+          "hex": "#636363",
           "oklch": [
-            0.5348,
+            0.4997,
             0.0,
             null
           ]
         },
         "code.syntax.constant": {
-          "hex": "#3C3C3C",
+          "hex": "#2C2C2C",
           "oklch": [
-            0.3562,
+            0.2931,
             0.0,
             null
           ]
         },
         "code.syntax.entity": {
-          "hex": "#484848",
+          "hex": "#393939",
           "oklch": [
-            0.4017,
+            0.3446,
             0.0,
             null
           ]
         },
         "code.syntax.keyword": {
-          "hex": "#262626",
+          "hex": "#141414",
           "oklch": [
-            0.2686,
+            0.1913,
             0.0,
             null
           ]
         },
         "code.syntax.param": {
-          "hex": "#616161",
+          "hex": "#555555",
           "oklch": [
-            0.4926,
+            0.4495,
             0.0,
             null
           ]
         },
         "code.syntax.string": {
-          "hex": "#313131",
+          "hex": "#1F1F1F",
           "oklch": [
-            0.3132,
+            0.2393,
             0.0,
             null
           ]
         },
         "code.syntax.tag": {
-          "hex": "#545454",
+          "hex": "#474747",
           "oklch": [
-            0.4459,
+            0.3979,
             0.0,
             null
           ]
@@ -5210,9 +5210,9 @@
           ]
         },
         "ink.tertiary": {
-          "hex": "#777777",
+          "hex": "#6A6A6A",
           "oklch": [
-            0.5693,
+            0.5243,
             0.0,
             null
           ]
@@ -5330,17 +5330,17 @@
           ]
         },
         "surfaces.line": {
-          "hex": "#E1E1E1",
+          "hex": "#DEDEDE",
           "oklch": [
-            0.9097,
+            0.9006,
             0.0,
             null
           ]
         },
         "surfaces.line-strong": {
-          "hex": "#CACACA",
+          "hex": "#878787",
           "oklch": [
-            0.839,
+            0.6234,
             0.0,
             null
           ]
