@@ -8,8 +8,9 @@ use gitterrace_types::{ColorScheme, DateStyle, LinkStyle, Period};
 use crate::features::{Feature, INSIGHT_PAGES};
 use crate::value::{Control, Show};
 
-/// The overview sidebar's sections, in their default order.
-pub const SIDEBAR: [&str; 5] = ["now", "recent", "churn", "loose_ends", "languages"];
+/// The overview sidebar's sections, in their default order: what is open (the branch, then the
+/// work left on other branches) before the activity numbers.
+pub const SIDEBAR: [&str; 5] = ["now", "loose_ends", "recent", "churn", "languages"];
 
 /// One setting, for the loader, `git terrace config` and the docs page.
 pub struct Key {
@@ -363,8 +364,8 @@ settings! {
         theme: ColorScheme = ColorScheme::System => Live,
         /// How dates read: relative or absolute.
         dates: DateStyle = DateStyle::Relative => Live,
-        /// Overview sidebar sections, in the order shown: `now`, `recent`, `churn`,
-        /// `loose_ends` and `languages`. Leave one out to hide it. An empty list hides the
+        /// Overview sidebar sections, in the order shown: `now`, `loose_ends`, `recent`,
+        /// `churn` and `languages`. Leave one out to hide it. An empty list hides the
         /// sidebar.
         sidebar: Vec<String> = SIDEBAR.iter().map(|&s| s.to_owned()).collect() => Live,
     }
@@ -483,7 +484,7 @@ impl Config {
             return bad(
                 "display.sidebar",
                 &format!(
-                    "unknown section {s}, expected now, recent, churn, loose_ends or languages"
+                    "unknown section {s}, expected now, loose_ends, recent, churn or languages"
                 ),
             );
         }

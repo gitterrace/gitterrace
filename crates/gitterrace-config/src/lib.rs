@@ -375,6 +375,17 @@ mod tests {
         assert!(l.config.display.sidebar.is_empty());
     }
 
+    /// By default the open work (the branch, then loose ends) comes before the activity numbers.
+    #[test]
+    fn the_sidebar_shows_loose_ends_before_recent_by_default() {
+        let s = &parse("").expect("empty").config.display.sidebar;
+        let at = |n: &str| s.iter().position(|x| x == n).expect(n);
+        assert!(
+            at("now") < at("loose_ends") && at("loose_ends") < at("recent"),
+            "{s:?}"
+        );
+    }
+
     /// Every address another machine can reach needs `public`; loopback never does.
     #[test]
     fn a_reachable_address_needs_public() {

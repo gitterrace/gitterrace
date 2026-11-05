@@ -126,7 +126,7 @@ Exceptions, each on purpose:
 | --- | --- | --- | --- |
 | `theme` | string | `"system"` | Color theme before the visitor picks one: system, light or dark. |
 | `dates` | string | `"relative"` | How dates read: relative or absolute. |
-| `sidebar` | list of strings | `["now", "recent", "churn", "loose_ends", "languages"]` | Overview sidebar sections, in the order shown: `now`, `recent`, `churn`, `loose_ends` and `languages`. Leave one out to hide it. An empty list hides the sidebar. |
+| `sidebar` | list of strings | `["now", "loose_ends", "recent", "churn", "languages"]` | Overview sidebar sections, in the order shown: `now`, `loose_ends`, `recent`, `churn` and `languages`. Leave one out to hide it. An empty list hides the sidebar. |
 
 ## `[features]`
 

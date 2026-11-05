@@ -513,7 +513,7 @@ mod tests {
             .unchecked();
         assert_eq!(
             headings(&html(&app, &head, &*src)),
-            ["Now", "Recent", "Churn", "Loose ends", "Languages"]
+            ["Now", "Loose ends", "Recent", "Churn", "Languages"]
         );
         let mut c = (*env.cfg()).clone();
         c.display.sidebar = vec!["languages".into(), "now".into()];
