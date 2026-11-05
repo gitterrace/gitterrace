@@ -16,10 +16,16 @@ pub(crate) const CHANGES: Unit = Unit("change", "changes");
 /// A share as shown: whole percent, `<1%` for a sliver, never a rounded-away `0%`.
 pub(crate) fn share(part: u64, total: u64) -> String {
     if total == 0 {
-        return "0%".to_owned();
+        return percent(0.0);
     }
-    let p = part as f64 / total as f64 * 100.0;
-    if part > 0 && p < 0.5 {
+    percent(part as f64 / total as f64)
+}
+
+/// The one percent formatter of chart tips, for a fraction 0..=1: exactly 0 is `0%`, a sliver
+/// that would round to 0 is `<1%`, the rest is a whole percent.
+pub(crate) fn percent(f: f64) -> String {
+    let p = f.clamp(0.0, 1.0) * 100.0;
+    if p > 0.0 && p < 0.5 {
         "<1%".to_owned()
     } else {
         format!("{p:.0}%")
@@ -58,7 +64,7 @@ pub(crate) fn breakdown(mark: &str, parts: &[(&str, u64)], u: Unit) -> String {
 
 /// "mark: 42% of changed lines replaced existing code", for a rate that is its own share.
 pub(crate) fn rate(mark: &str, share: f64, of: &str) -> String {
-    format!("{mark}: {:.0}% {of}", share.clamp(0.0, 1.0) * 100.0)
+    format!("{mark}: {} {of}", percent(share))
 }
 
 /// The attribute that carries `text`, escaped: the only writer of a chart's `data-tip`.
@@ -90,6 +96,19 @@ mod tests {
             "Q1 2026: 40 commits: feat 30 (75%), fix 10 (25%)"
         );
         assert_eq!(breakdown("Q2", &[("feat", 0)], COMMITS), "Q2: 0 commits");
+    }
+
+    #[test]
+    fn rates_and_shares_read_percent_the_same_way() {
+        assert_eq!(percent(0.0), "0%");
+        assert_eq!(percent(0.001), "<1%");
+        assert_eq!(percent(0.006), "1%");
+        assert_eq!(percent(1.0), "100%");
+        assert_eq!(share(0, 10), "0%");
+        assert_eq!(share(1, 1000), "<1%");
+        assert_eq!(rate("May", 0.0, "rework"), "May: 0% rework");
+        assert_eq!(rate("May", 0.0001, "rework"), "May: <1% rework");
+        assert_eq!(rate("May", 0.42, "rework"), "May: 42% rework");
     }
 
     #[test]

@@ -66,6 +66,26 @@ pub(crate) fn ticks(max: u64, n: u64) -> (u64, u64) {
     }
 }
 
+/// Ticks for a chart with values `0..=up` above zero and `0..=down` below it: one nice step
+/// shared by both sides, each side ending at its own first multiple of the step (at least one
+/// step, so either side shows its scale), and at most `n` ticks in all, zero included. Returns
+/// `(step, top above, top below)`.
+pub(crate) fn split_ticks(up: u64, down: u64, n: u64) -> (u64, u64, u64) {
+    let n = n.max(3);
+    let side = |v: u64, step: u64| step * v.max(1).div_ceil(step);
+    let mut mag = 1u64;
+    loop {
+        for m in [1, 2, 5] {
+            let step = m * mag;
+            let (a, d) = (side(up, step), side(down, step));
+            if a / step + d / step < n {
+                return (step, a, d);
+            }
+        }
+        mag = mag.saturating_mul(10);
+    }
+}
+
 /// Bucket labels thinned so neighbours never collide, centred under their column. The plot
 /// keeps `LEFT` clear on the left so the first label is never clipped. The spacing is a calendar
 /// step: quarters every 1, 2 or 4 (a year, on Q1), other buckets every 1, 2 or 5 times a power of
@@ -299,20 +319,19 @@ pub(crate) fn stacked(buckets: &[gitterrace_index::LabelBucket]) -> String {
 
 /// Additions above the axis and deletions below it, one column per bucket.
 pub(crate) fn diverging(points: &[(String, u64, u64)], title: &str) -> String {
-    let max = points.iter().map(|p| p.1.max(p.2)).max().unwrap_or(0);
-    // Each half is half the height, so it gets half the ticks: zero, then one or two a side.
-    let (step, top_n) = ticks(max, 3);
-    let top = top_n as f64;
-    let half = (H - TOP_PAD - BOTTOM) / 2.0;
-    let mid = TOP_PAD + half;
+    let up = points.iter().map(|p| p.1).max().unwrap_or(0);
+    let down = points.iter().map(|p| p.2).max().unwrap_or(0);
+    // Each side reaches its own maximum on one shared step, so the zero line sits where the
+    // data puts it: a period of mostly additions gives the additions most of the height.
+    let (step, top_up, top_dn) = split_ticks(up, down, MAX_TICKS);
+    let plot = H - TOP_PAD - BOTTOM;
+    let px = plot / (top_up + top_dn) as f64;
+    let mid = (top_up as f64).mul_add(px, TOP_PAD);
     let mut svg = open_svg(title);
-    let mut v = 0;
-    while v <= top_n {
-        let dy = v as f64 / top * half;
-        for (sign, y) in [("", mid - dy), ("\u{2212}", mid + dy)] {
-            if v == 0 && !sign.is_empty() {
-                continue;
-            }
+    for (sign, top, dir) in [("", top_up, -1.0), ("\u{2212}", top_dn, 1.0)] {
+        let mut v = if sign.is_empty() { 0 } else { step };
+        while v <= top {
+            let y = (v as f64 * px).mul_add(dir, mid);
             let _ = write!(
                 svg,
                 r#"<line class="grid" x1="{LEFT}" x2="{W}" y1="{y:.1}" y2="{y:.1}"/><text class="ax" x="{:.1}" y="{:.1}" text-anchor="end">{sign}{}</text>"#,
@@ -320,14 +339,14 @@ pub(crate) fn diverging(points: &[(String, u64, u64)], title: &str) -> String {
                 y + 3.5,
                 fmt::thousands(v)
             );
+            v += step;
         }
-        v += step;
     }
     let sl = slot(points.len());
     let bw = (sl * 0.8).clamp(1.0, 48.0);
     for (i, (label, a, d)) in points.iter().enumerate() {
         let x = (i as f64).mul_add(sl, LEFT) + (sl - bw) / 2.0;
-        let (ha, hd) = (*a as f64 / top * half, *d as f64 / top * half);
+        let (ha, hd) = (*a as f64 * px, *d as f64 * px);
         let _ = write!(
             svg,
             r#"<g class="col"{}><rect class="hit" x="{:.1}" y="{TOP_PAD}" width="{sl:.1}" height="{:.1}"/><rect class="up" x="{x:.1}" y="{:.1}" width="{bw:.1}" height="{ha:.1}"/><rect class="dn" x="{x:.1}" y="{mid:.1}" width="{bw:.1}" height="{hd:.1}"/></g>"#,
@@ -337,7 +356,7 @@ pub(crate) fn diverging(points: &[(String, u64, u64)], title: &str) -> String {
                 charttip::LINES
             )),
             x - (sl - bw) / 2.0,
-            half * 2.0,
+            plot,
             mid - ha
         );
     }

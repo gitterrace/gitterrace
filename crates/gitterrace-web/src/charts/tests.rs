@@ -1,5 +1,6 @@
 use crate::charts::{
-    Dot, bars, diverging, heatmap, label_every, linked_bars, pct, percent_line, scatter, ticks,
+    Dot, bars, diverging, heatmap, label_every, linked_bars, pct, percent_line, scatter,
+    split_ticks, ticks,
 };
 use crate::charttip::COMMITS;
 
@@ -93,6 +94,40 @@ fn ticks_are_nice_cover_the_range_and_stay_few() {
             );
         }
     }
+}
+
+/// For every pair of side maxima: one nice step for both sides, each side covered with less
+/// than a step to spare, and at most 5 ticks in all.
+#[test]
+fn split_ticks_cover_both_sides_on_one_step() {
+    let maxes: Vec<u64> = (0..300u64)
+        .chain([999, 1_000, 1_001, 9_999, 30_000, 95_395, 184_815, 1 << 40])
+        .collect();
+    for &up in &maxes {
+        for &down in maxes.iter().step_by(7) {
+            let (step, a, d) = split_ticks(up, down, 5);
+            assert!(nice(step), "{up}/{down}: step {step}");
+            for (top, max) in [(a, up), (d, down)] {
+                assert_eq!(top % step, 0, "{up}/{down}");
+                assert!(
+                    top >= max.max(1) && top - max.max(1) < step,
+                    "{up}/{down}: top {top} for {max}"
+                );
+            }
+            // Ticks above zero, below it, and zero itself: at most 5.
+            assert!(a / step + d / step < 5, "{up}/{down}: too many ticks");
+        }
+    }
+}
+
+/// The zero line follows the data: with far more added than removed, the added side is taller.
+#[test]
+fn diverging_zero_line_follows_the_data() {
+    let svg = diverging(&[("a".to_owned(), 4_000, 900)], "t");
+    // One step of 2,000: added reaches 4,000, removed stops at its own first step.
+    assert!(svg.contains(">4,000<"), "{svg}");
+    assert!(svg.contains(">\u{2212}2,000<"), "{svg}");
+    assert!(!svg.contains(">\u{2212}4,000<"), "{svg}");
 }
 
 /// The code frequency chart once labelled every 10,000 on both sides, "-30,000" included.
