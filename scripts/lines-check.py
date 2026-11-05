@@ -10,6 +10,7 @@
 
 from __future__ import annotations
 
+import json
 import re
 import subprocess
 import sys
@@ -90,73 +91,9 @@ def too_long(root: Path, names: list[str]) -> list[str]:
 
 # Wide lines that predate the width rule: strings and macro bodies rustfmt leaves alone. A
 # count may only go down: a new wide line fails, and a fixed one must lower its count here.
-WIDE_ALLOWED: dict[str, int] = {
-    "crates/gitterrace-actions/src/config/tests.rs": 6,
-    "crates/gitterrace-actions/src/payload/tests.rs": 1,
-    "crates/gitterrace-actions/src/runner.rs": 1,
-    "crates/gitterrace-actions/src/schema.rs": 10,
-    "crates/gitterrace-api/src/endpoints.rs": 2,
-    "crates/gitterrace-api/src/insights.rs": 4,
-    "crates/gitterrace-api/src/mcp.rs": 2,
-    "crates/gitterrace-cards/src/lib.rs": 1,
-    "crates/gitterrace-cards/src/wrapped.rs": 8,
-    "crates/gitterrace-config/src/lib.rs": 2,
-    "crates/gitterrace-config/src/schema.rs": 7,
-    "crates/gitterrace-index/src/insights/mod.rs": 1,
-    "crates/gitterrace-index/src/insights/stats.rs": 1,
-    "crates/gitterrace-index/src/lib.rs": 6,
-    "crates/gitterrace-index/src/store.rs": 2,
-    "crates/gitterrace-index/tests/it/count_parity_fuzz.rs": 9,
-    "crates/gitterrace-testkit/src/lib.rs": 2,
-    "crates/gitterrace-testkit/src/oracle/tests.rs": 1,
-    "crates/gitterrace-types/src/codec.rs": 1,
-    "crates/gitterrace-web/src/actions/tests.rs": 1,
-    "crates/gitterrace-web/src/charts.rs": 12,
-    "crates/gitterrace-web/src/commit_types.rs": 4,
-    "crates/gitterrace-web/src/error.rs": 1,
-    "crates/gitterrace-web/src/features_tests.rs": 1,
-    "crates/gitterrace-web/src/insights.rs": 1,
-    "crates/gitterrace-web/src/languages/render.rs": 12,
-    "crates/gitterrace-web/src/lib.rs": 3,
-    "crates/gitterrace-web/src/markdown.rs": 5,
-    "crates/gitterrace-web/src/markdown/lines.rs": 1,
-    "crates/gitterrace-web/src/markdown/outline.rs": 1,
-    "crates/gitterrace-web/src/media.rs": 4,
-    "crates/gitterrace-web/src/overview_side.rs": 1,
-    "crates/gitterrace-web/src/routes/assets.rs": 2,
-    "crates/gitterrace-web/src/routes/files.rs": 1,
-    "crates/gitterrace-web/src/sitemap.rs": 4,
-    "crates/gitterrace-web/src/state_tests.rs": 1,
-    "crates/gitterrace-web/src/views/code.rs": 1,
-    "crates/gitterrace-web/src/views/diff.rs": 3,
-    "crates/gitterrace-web/src/views/diff/tests.rs": 1,
-    "crates/gitterrace-web/src/when.rs": 1,
-    "crates/gitterrace-web/src/wiring_live_tests.rs": 2,
-    "crates/gitterrace-web/src/wiring_tests.rs": 1,
-    "crates/gitterrace-web/tests/doc_cards_share_one_header.rs": 2,
-    "crates/gitterrace-web/tests/memory_budget.rs": 2,
-    "crates/gitterrace-web/tests/running_cache_rewritten.rs": 2,
-    "crates/gitterrace-web/tests/sha_links.rs": 1,
-    "crates/gitterrace-web/tests/theme.rs": 1,
-    "crates/gitterrace/src/alloc.rs": 2,
-    "crates/gitterrace/src/cli.rs": 1,
-    "crates/gitterrace/src/export.rs": 2,
-    "crates/gitterrace/src/export/credit.rs": 1,
-    "crates/gitterrace/src/export/credit/tests.rs": 1,
-    "crates/gitterrace/src/export/out.rs": 1,
-    "crates/gitterrace/src/export/snapshot.rs": 1,
-    "crates/gitterrace/src/handler.rs": 9,
-    "crates/gitterrace/src/open.rs": 5,
-    "crates/gitterrace/src/open/tests.rs": 1,
-    "xtask/src/api_md.rs": 2,
-    "xtask/src/config_md.rs": 2,
-    "xtask/src/docs_md.rs": 2,
-    "xtask/src/openapi_json.rs": 2,
-    "xtask/src/readme_agents_md.rs": 1,
-    "xtask/src/site.rs": 33,
-    "xtask/src/site/shots.rs": 1,
-    "xtask/src/site/tests.rs": 2,
-}
+WIDE_ALLOWED: dict[str, int] = json.loads(
+    (Path(__file__).resolve().parent / "guards" / "wide-allowed.json").read_text()
+)["wide_allowed"]
 
 RAW_OPEN = re.compile(r'r(#+)"')
 URL = re.compile(r"\bhttps?://\S{40,}")

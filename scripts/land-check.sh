@@ -229,6 +229,8 @@ if ((${#scope[@]})); then
   fi
 fi
 step make lines names
+step python3 scripts/ratchet-check.py --self-test
+step python3 scripts/ratchet-check.py --base "$base"
 step cargo test -p gitterrace-testkit --test conventions
 step sh scripts/lint-run.sh
 step make docs-check
