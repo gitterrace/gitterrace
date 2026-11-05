@@ -13,3 +13,8 @@
 .matrix .m3 a,.matrix .m4 a{color:var(--on-accent)}
 /* contributors: two-sided bar, deleted to the left and added to the right on one scale */
 .tsb{display:flex;width:160px;height:8px;gap:1px}.tsb i{display:flex;flex:1;background:var(--soft)}.tsb i.l{justify-content:flex-end;border-radius:var(--radius) 0 0 var(--radius)}.tsb i.r{border-radius:0 var(--radius) var(--radius) 0}.tsb b{display:block;height:100%;width:var(--w)}.tsb i.l b{background:var(--del)}.tsb i.r b{background:var(--add)}
+/* ownership: a bus factor of 1 is a risk, in the table and its figure. Narrow, the bus factor
+   stays beside its directory and the line and file counts give way. */
+table.own b.warn,.kpis b.warn{color:var(--warn);font-weight:var(--weight-semibold)}
+table.own td{white-space:nowrap}table.own td:first-child{width:30%}
+@media (max-width:600px){table.own td.n{display:none}table.own td:first-child{width:auto}}

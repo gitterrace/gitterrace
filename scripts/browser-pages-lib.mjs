@@ -23,8 +23,11 @@ function measure() {
     out.name = n.textContent;
     out.full = n.scrollWidth <= n.clientWidth + 1 && rc.right <= innerWidth + 1 && rc.width > 0;
   }
-  // A one-word link or cell spanning more than one line box was broken mid-word.
-  for (const e of document.querySelectorAll('table.entries td, table.entries td a, .rlist li a, .rlist li code, .cmain a, .cmain .muted, .reponame, .ov-list li, .tabs a')) {
+  // A one-word link or cell spanning more than one line box was broken mid-word. A path drawn by
+  // the path macro may break after a slash: there each part (.seg) must stay whole instead.
+  const words = [...document.querySelectorAll('table.entries td, table.entries td a, .rlist li a, .rlist li code, .cmain a, .cmain .muted, .reponame, .ov-list li, .tabs a')]
+    .flatMap((e) => (e.querySelector('.seg') ? [...e.querySelectorAll('.seg')] : [e]));
+  for (const e of new Set(words)) {
     const t = (e.textContent || '').trim();
     if (!t || /\s/.test(t)) continue;
     const walk = document.createTreeWalker(e, NodeFilter.SHOW_TEXT);

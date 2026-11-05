@@ -1,1 +1,1 @@
-<div class="kpis">{% for k in kpis %}<div><b>{{ k.1 }}</b><span>{{ k.0 }}</span></div>{% endfor %}</div>
+<div class="kpis">{% for k in kpis %}<div><b{% if k.warn() %} class="warn"{% endif %}>{{ k.1 }}</b><span>{{ k.0 }}</span></div>{% endfor %}</div>

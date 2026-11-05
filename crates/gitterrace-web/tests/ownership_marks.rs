@@ -51,8 +51,17 @@ async fn lone_owners_warn_and_empty_shares_are_left_out() {
         !table.contains("class=\"del\""),
         "bus factor shown as an error"
     );
+    assert!(!body.contains("data-solo"), "two owners named as one");
+    assert!(
+        table.contains("<td>Owners</td>"),
+        "the Owners column is gone"
+    );
     for row in table.split("<tr>").skip(2) {
-        let bus = row.rsplit("<td class=\"r\">").next().unwrap_or_default();
+        let bus = row
+            .split("<td class=\"r bus\">")
+            .nth(1)
+            .and_then(|c| c.split("</td>").next())
+            .unwrap_or_default();
         if bus.contains(">1</b>") {
             assert!(
                 bus.contains("class=\"warn\""),
@@ -66,4 +75,40 @@ async fn lone_owners_warn_and_empty_shares_are_left_out() {
         }
         assert!(!row.contains(">0%<"), "an owner at 0% is listed: {row}");
     }
+}
+
+#[tokio::test]
+async fn one_owner_everywhere_drops_the_owner_columns() {
+    let dir = tempfile::tempdir().expect("tmp");
+    let mut f = Fixture::init(dir.path());
+    f = f.write("src/a.txt", "a\n").write("docs/b.txt", "b\n");
+    f.git(&["add", "-A"]);
+    f.git(&[
+        "commit",
+        "-q",
+        "--author",
+        "Ann <ann@x.io>",
+        "-m",
+        "feat: ann",
+    ]);
+    let router = gitterrace_web::app_router(f.path()).expect("router");
+    gitterrace_testkit::oracle::ready(&router).await;
+    let (status, body) = page(&router, "/stats/ownership").await;
+    assert_eq!(status, 200);
+    assert!(
+        body.contains("Every directory has one owner, Ann."),
+        "no single-owner line"
+    );
+    let table = body.split("class=\"entries own\"").nth(1).expect("table");
+    let table = table.split("</table>").next().unwrap_or_default();
+    assert!(!table.contains("Owners"), "the Owners column is shown");
+    assert!(
+        !table.contains("Bus factor"),
+        "the Bus factor column is shown"
+    );
+    let kpis = body.split("class=\"kpis\"").nth(1).expect("kpis");
+    assert!(
+        kpis.contains("<b class=\"warn\">1</b><span>Bus factor</span>"),
+        "a bus factor of 1 is not in the warning color"
+    );
 }

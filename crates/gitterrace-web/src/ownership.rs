@@ -38,6 +38,18 @@ struct OwnershipPage {
     lead: String,
     kpis: Vec<Kpi>,
     rows: Vec<DirRow>,
+    /// The one person who owns every directory, when that is so: the table then leaves out the
+    /// Owners and Bus factor columns, which would repeat that name and a 1 on every row.
+    solo: Option<String>,
+}
+
+/// The single owner every row shares, if each row lists exactly one owner and it is the same
+/// person throughout.
+fn sole_owner(rows: &[DirRow]) -> Option<String> {
+    let first = rows.first()?.owners.first()?.0.clone();
+    rows.iter()
+        .all(|r| r.owners.len() == 1 && r.owners[0].0 == first)
+        .then_some(first)
 }
 
 /// The repository root's own files come keyed by an empty path: name them.
@@ -91,7 +103,9 @@ pub(crate) async fn page(
                 .take(TOP_DIRS)
                 .map(|d| row(d, dir_label(&d.path))),
         );
+        let solo = sole_owner(&rows);
         OwnershipPage {
+            solo,
             c,
             tabs: views::stats_tabs("ow"),
             fb: f.bar("/stats/ownership", &**r, period_of(&q, &d, Period::All)),
@@ -118,7 +132,36 @@ pub(crate) async fn page(
 
 #[cfg(test)]
 mod tests {
-    use super::dir_label;
+    use super::{DirRow, dir_label, sole_owner};
+
+    fn row(owners: &[&str]) -> DirRow {
+        DirRow {
+            path: Vec::new(),
+            href: String::new(),
+            lines: String::new(),
+            files: String::new(),
+            owners: owners
+                .iter()
+                .map(|o| ((*o).to_owned(), "100%".to_owned()))
+                .collect(),
+            bus: 1,
+        }
+    }
+
+    #[test]
+    fn one_owner_everywhere_is_named_once() {
+        assert_eq!(
+            sole_owner(&[row(&["Ann"]), row(&["Ann"])]).as_deref(),
+            Some("Ann")
+        );
+    }
+
+    #[test]
+    fn varied_ownership_keeps_the_columns() {
+        assert_eq!(sole_owner(&[row(&["Ann"]), row(&["Bob"])]), None);
+        assert_eq!(sole_owner(&[row(&["Ann"]), row(&["Ann", "Bob"])]), None);
+        assert_eq!(sole_owner(&[row(&[])]), None);
+    }
 
     #[test]
     fn root_files_get_a_label() {

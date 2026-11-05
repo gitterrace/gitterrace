@@ -302,6 +302,13 @@ pub(crate) fn period_of(q: &InsightsQuery, d: &Defaults, default: Period) -> Per
 
 pub(crate) struct Kpi(pub(crate) &'static str, pub(crate) String);
 
+impl Kpi {
+    /// A bus factor of 1 is a risk: the figure takes the warning color, as in the table.
+    pub(crate) fn warn(&self) -> bool {
+        self.0 == "Bus factor" && self.1 == "1"
+    }
+}
+
 struct PersonRow {
     name: String,
     href: String,
