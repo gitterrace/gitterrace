@@ -45,6 +45,9 @@
 //                its full date in the tip
 //   outline      "On this page": a rail at 1400 px, a menu at 900 px, a click scrolls and sets the hash,
 //                the active item follows the scroll, filter and Escape work, the Code tab hides it
+//   settings     the gear opens the settings page; a form edit shows in Plain as the server's
+//                text, an invalid plain edit marks its line in the gutter and keeps Save off, and
+//                Save writes the file and reloads with the new value, in each browser
 //   repo-switch  a server on one repository hides the switcher; when a second `git terrace`
 //                joins, the open page shows it without a reload, it lists both, and picking
 //                each lands on its /r/NAME/ page; `git terrace remove` hides it again and
@@ -107,7 +110,7 @@ const bin = resolve(arg('--bin', join(root, 'target/debug/git-terrace')));
 const fromDisk = process.argv.includes('--from-disk');
 const tabCounts = arg('--tabs', '8,12').split(',').map(Number);
 const browsers = arg('--browsers', 'webkit,chromium').split(',');
-const ALL = ['truncation', 'live-tabs', 'mermaid', 'chip', 'doctabs', 'chords', 'header', 'marked', 'menu-same', 'gutter', 'overlays', 'tips', 'date-tips', 'repo-switch', 'outline', 'mark-seam', 'about-place', 'site-theme', 'side-width', 'calm-header', 'tabs-one-line', 'tab-levels', 'huge-diff', 'sticky-heads', 'md-anchor', 'live-scroll', 'sticky-line', 'seg-one-row', 'period-steady', 'export-from-disk', 'inline-controls', 'section-gaps', 'path-cells', 'mark-flat', 'tab-stops', 'help-keys', 'side-order'];
+const ALL = ['truncation', 'live-tabs', 'mermaid', 'chip', 'doctabs', 'chords', 'header', 'marked', 'menu-same', 'gutter', 'overlays', 'tips', 'date-tips', 'repo-switch', 'outline', 'mark-seam', 'about-place', 'site-theme', 'side-width', 'calm-header', 'tabs-one-line', 'tab-levels', 'huge-diff', 'sticky-heads', 'md-anchor', 'live-scroll', 'sticky-line', 'seg-one-row', 'period-steady', 'export-from-disk', 'inline-controls', 'section-gaps', 'path-cells', 'mark-flat', 'tab-stops', 'help-keys', 'side-order', 'settings'];
 const wanted = arg('--checks', ALL.join(',')).split(',');
 for (const c of wanted) if (!ALL.includes(c)) { console.error(`unknown check ${c}; known: ${ALL.join(', ')}`); process.exit(2); }
 
@@ -411,7 +414,36 @@ async function stickyHeads() {
     await b.close();
   }
 }
-const checks = { 'sticky-heads': stickyHeads, 'tabs-one-line': tabsOneLine, 'tab-levels': tabLevels, 'calm-header': calmHeader, 'side-width': sideWidth, truncation, 'live-tabs': liveTabs, mermaid, chip, doctabs, chords, header, marked, 'menu-same': menuSame, gutter, overlays, tips, 'date-tips': dateTips, 'repo-switch': repoSwitch, outline, 'mark-seam': markSeam, 'about-place': aboutPlace, 'site-theme': siteTheme, 'huge-diff': hugeDiff, 'md-anchor': mdAnchor, 'live-scroll': liveScroll, 'sticky-line': stickyLine, 'seg-one-row': segOneRow, 'period-steady': periodSteady, 'export-from-disk': exportFromDisk, 'inline-controls': inlineControls, 'section-gaps': sectionGaps, 'path-cells': pathCells, 'mark-flat': markFlat, 'tab-stops': tabStops, 'help-keys': helpKeys, 'side-order': sideOrder };
+// ---- settings --------------------------------------------------------------------------------
+async function settings() {
+  for (const name of browsers) {
+    // Each browser starts from the same file, never the one the last browser saved.
+    rmSync(join(cfg, 'config.toml'), { force: true });
+    const { b, ctx } = await context(name);
+    const p = await ctx.newPage();
+    try {
+      await p.goto(srv.base + '/', { waitUntil: 'load' });
+      await p.click('#settingsbtn');
+      await p.waitForSelector('#setform');
+      await p.fill('#f-watch\\.interval_ms', '750');
+      await p.click('.segs [data-show="plain"]');
+      await p.waitForFunction(() => /interval_ms = 750/.test(/** @type {HTMLTextAreaElement} */ (document.getElementById('settext')).value), null, { timeout: 3000 });
+      await p.fill('#settext', '[watch]\ninterval_ms = 3\n');
+      await p.waitForSelector('#setgut .bad', { timeout: 3000 });
+      const off = await p.$eval('#setsave', (x) => /** @type {HTMLButtonElement} */ (x).disabled);
+      await p.fill('#settext', '[watch]\ninterval_ms = 800\n');
+      await p.waitForFunction(() => !/** @type {HTMLButtonElement} */ (document.getElementById('setsave')).disabled, null, { timeout: 3000 });
+      await Promise.all([p.waitForNavigation(), p.click('#setsave')]);
+      const saved = readFileSync(join(cfg, 'config.toml'), 'utf8');
+      const shown = await p.$eval('#f-watch\\.interval_ms', (x) => /** @type {HTMLInputElement} */ (x).value);
+      if (off && saved === '[watch]\ninterval_ms = 800\n' && shown === '800') r.ok(`settings ${name}: form, plain, error line and save`);
+      else r.fail(`settings ${name}: save off on error ${off}, file ${JSON.stringify(saved)}, form shows ${shown}`);
+    } catch (e) { r.fail(`settings ${name}: ${e.message.split('\n')[0]}`); }
+    await b.close();
+  }
+}
+
+const checks = { 'sticky-heads': stickyHeads, 'tabs-one-line': tabsOneLine, 'tab-levels': tabLevels, 'calm-header': calmHeader, 'side-width': sideWidth, truncation, 'live-tabs': liveTabs, mermaid, chip, doctabs, chords, header, marked, 'menu-same': menuSame, gutter, overlays, tips, 'date-tips': dateTips, 'repo-switch': repoSwitch, outline, 'mark-seam': markSeam, 'about-place': aboutPlace, 'site-theme': siteTheme, 'huge-diff': hugeDiff, 'md-anchor': mdAnchor, 'live-scroll': liveScroll, 'sticky-line': stickyLine, 'seg-one-row': segOneRow, 'period-steady': periodSteady, 'export-from-disk': exportFromDisk, 'inline-controls': inlineControls, 'section-gaps': sectionGaps, 'path-cells': pathCells, 'mark-flat': markFlat, 'tab-stops': tabStops, 'help-keys': helpKeys, 'side-order': sideOrder, settings };
 try {
   for (const c of wanted) { console.log(`-- ${c}`); await checks[c](); }
 } finally {

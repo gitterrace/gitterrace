@@ -62,6 +62,8 @@ pub(crate) struct Env {
     /// The config folder the settings page edits. `None` (an export, a test, no config folder)
     /// leaves its routes unmounted.
     pub(crate) settings_dir: Option<std::path::PathBuf>,
+    /// Whether the settings routes are mounted, so pages offer the settings link only then.
+    settings_on: Arc<AtomicBool>,
 }
 
 /// The live `actions.toml`, swapped whole on reload.
@@ -107,7 +109,18 @@ impl Env {
             sends: Arc::default(),
             changes: None,
             settings_dir: None,
+            settings_on: Arc::default(),
         }
+    }
+
+    /// Records that the settings routes are mounted.
+    pub(crate) fn set_settings_on(&self) {
+        self.settings_on.store(true, Ordering::Release);
+    }
+
+    /// Whether pages offer the settings page.
+    pub(crate) fn settings_on(&self) -> bool {
+        self.settings_on.load(Ordering::Acquire)
     }
 
     /// Whether this server is public: committed history only, see `public.rs`.
@@ -345,6 +358,11 @@ impl App {
             return Vec::new();
         }
         self.env.lookups(sha)
+    }
+
+    /// Whether pages offer the settings page: its routes are mounted on this server.
+    pub(crate) fn settings_on(&self) -> bool {
+        self.env.settings_on()
     }
 
     pub(crate) fn actions_note(&self) -> Option<String> {

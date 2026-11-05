@@ -33,7 +33,12 @@ pub(crate) struct Settings {
 }
 
 impl Settings {
-    fn path(&self, f: SettingsFile) -> Option<PathBuf> {
+    pub(crate) fn token(&self) -> &str {
+        self.token.as_str()
+    }
+
+    /// Where file `f` lives; `None` for actions.toml with actions off.
+    pub(crate) fn path(&self, f: SettingsFile) -> Option<PathBuf> {
         match f {
             SettingsFile::Config => Some(self.dir.join("config.toml")),
             SettingsFile::Actions => self.actions.clone(),
@@ -51,8 +56,9 @@ thread_local! {
 /// Mounted only on a local server; see the module comment.
 pub(crate) fn router(s: Arc<Settings>) -> Router {
     #[cfg(test)]
-    LAST_TOKEN.with(|t| *t.borrow_mut() = s.token.as_str().to_owned());
+    LAST_TOKEN.with(|t| *t.borrow_mut() = s.token().to_owned());
     Router::new()
+        .route("/_settings", get(crate::settings_page::page))
         .route("/_settings/file", get(read).put(write))
         .route("/_settings/check", post(check))
         .with_state(s)
@@ -97,9 +103,9 @@ struct ChangeIn {
 }
 
 #[derive(serde::Serialize, Default)]
-struct CheckReply {
-    ok: bool,
-    errors: Vec<ErrorOut>,
+pub(crate) struct CheckReply {
+    pub(crate) ok: bool,
+    pub(crate) errors: Vec<ErrorOut>,
     warnings: Vec<String>,
     restart: Vec<&'static str>,
     /// The text the edit produces, so the plain editor shows what a form edit wrote.
@@ -110,11 +116,11 @@ struct CheckReply {
 }
 
 #[derive(serde::Serialize)]
-struct ErrorOut {
-    line: usize,
+pub(crate) struct ErrorOut {
+    pub(crate) line: usize,
     col: usize,
     key: Option<String>,
-    msg: String,
+    pub(crate) msg: String,
 }
 
 impl From<Located> for ErrorOut {
@@ -230,14 +236,17 @@ fn resulting_text(path: &std::path::Path, e: &Edit) -> Result<String, Located> {
 }
 
 /// Loads `text` as file `f` would be loaded: the errors with their lines, the warnings, and
-/// for `config.toml` the restart keys it changes against the running settings.
-fn validate(f: SettingsFile, text: &str, env: &Env) -> CheckReply {
+/// for `config.toml` the restart keys it changes. `before` is the file as it is on disk: a key
+/// the edit leaves alone is never named, even when a flag holds the running value elsewhere.
+pub(crate) fn validate(f: SettingsFile, text: &str, before: &str, env: &Env) -> CheckReply {
     match f {
         SettingsFile::Config => match gitterrace_config::parse(text) {
             Ok(l) => CheckReply {
                 ok: true,
                 warnings: l.warnings,
-                restart: env.cfg().restart_changes(&l.config),
+                restart: gitterrace_config::parse(before)
+                    .map_or_else(|_| (*env.cfg()).clone(), |b| b.config)
+                    .restart_changes(&l.config),
                 ..CheckReply::default()
             },
             Err(e) => CheckReply {
@@ -285,7 +294,8 @@ async fn check(State(s): State<Arc<Settings>>, req: Request) -> Response {
     let env = s.env.clone();
     let r = tokio::task::spawn_blocking(move || match resulting_text(&path, &e) {
         Ok(text) => {
-            let mut reply = validate(e.f, &text, &env);
+            let before = std::fs::read_to_string(&path).unwrap_or_default();
+            let mut reply = validate(e.f, &text, &before, &env);
             reply.text = Some(text);
             reply
         }
@@ -320,7 +330,8 @@ async fn write(State(s): State<Arc<Settings>>, req: Request) -> Response {
     let env = s.env.clone();
     let r = tokio::task::spawn_blocking(move || {
         let text = resulting_text(&path, &e).map_err(SaveError::Invalid)?;
-        let reply = validate(e.f, &text, &env);
+        let before = std::fs::read_to_string(&path).unwrap_or_default();
+        let reply = validate(e.f, &text, &before, &env);
         let saved = gitterrace_config::save(&path, &text, expect, |t| match e.f {
             SettingsFile::Config => gitterrace_config::parse(t)
                 .map(drop)

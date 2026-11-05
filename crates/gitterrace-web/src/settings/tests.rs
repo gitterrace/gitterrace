@@ -256,3 +256,175 @@ async fn a_stale_or_invalid_save_leaves_the_file() {
     assert!(reply.contains("\"line\":2"), "{reply}");
     assert_eq!(std::fs::read_to_string(&file).expect("r"), "# mine\n");
 }
+
+/// GETs `uri` the way a browser on this server would.
+async fn page(r: &axum::Router, uri: &str) -> (u16, String) {
+    let mut req = Req::new("GET", uri, None);
+    req.site = None;
+    req.origin = None;
+    send(r, req).await
+}
+
+#[tokio::test]
+async fn form_and_plain_saves_produce_the_same_file() {
+    const START: &str =
+        "# my settings\n[watch]\n# fast\ninterval_ms = 500\n\n[display]\ntheme = \"dark\"\n";
+    let mut files = Vec::new();
+    for how in ["form", "plain"] {
+        let (root, dir) = (
+            tempfile::tempdir().expect("t"),
+            tempfile::tempdir().expect("t"),
+        );
+        let file = dir.path().join("config.toml");
+        std::fs::write(&file, START).expect("w");
+        let app = server(root.path(), dir.path(), false);
+        let token = token_of(&app);
+        let stamp = gitterrace_config::Stamp::tag(gitterrace_config::Stamp::of(&file).expect("s"));
+        let changes = serde_json::json!([
+            { "id": "watch.interval_ms", "value": "750" },
+            { "id": "insights.exclude", "value": "[\"vendor/**\"]" }
+        ]);
+        // Plain sends the text the check reply rendered for the same form edit: what the page
+        // puts in the editor when the user switches from Form to Plain.
+        let body = if how == "form" {
+            serde_json::json!({ "f": "config", "changes": changes, "stamp": stamp })
+        } else {
+            let mut req = Req::new("POST", "/_settings/check", Some(&token));
+            req.body = serde_json::json!({ "f": "config", "changes": changes }).to_string();
+            let (status, reply) = send(&app, req).await;
+            assert_eq!(status, 200, "{reply}");
+            let v: serde_json::Value = serde_json::from_str(&reply).expect("json");
+            let text = v["text"].as_str().expect("rendered text").to_owned();
+            serde_json::json!({ "f": "config", "text": text, "stamp": stamp })
+        };
+        let mut req = Req::new("PUT", "/_settings/file", Some(&token));
+        req.body = body.to_string();
+        let (status, reply) = send(&app, req).await;
+        assert_eq!(status, 200, "{how}: {reply}");
+        files.push(std::fs::read(&file).expect("r"));
+    }
+    assert_eq!(files[0], files[1], "form and plain wrote different files");
+    let text = String::from_utf8_lossy(&files[0]);
+    assert!(
+        text.starts_with("# my settings\n[watch]\n# fast\ninterval_ms = 750\n"),
+        "{text}"
+    );
+    assert!(text.contains("theme = \"dark\""), "{text}");
+}
+
+#[tokio::test]
+async fn check_reply_names_the_line() {
+    let (root, dir) = (
+        tempfile::tempdir().expect("t"),
+        tempfile::tempdir().expect("t"),
+    );
+    let app = server(root.path(), dir.path(), false);
+    let token = token_of(&app);
+    for (text, line, key) in [
+        (
+            "[watch]\nenabled = true\ninterval_ms = 3\n",
+            3,
+            Some("watch.interval_ms"),
+        ),
+        ("[watch]\nenabled = true\n[display\n", 3, None),
+        ("\n\n[server]\naddr = 4\n", 4, Some("server.addr")),
+    ] {
+        let mut req = Req::new("POST", "/_settings/check", Some(&token));
+        req.body = serde_json::json!({ "f": "config", "text": text }).to_string();
+        let (status, reply) = send(&app, req).await;
+        assert_eq!(status, 200, "{reply}");
+        let v: serde_json::Value = serde_json::from_str(&reply).expect("json");
+        assert_eq!(v["ok"], false, "{text:?}");
+        assert_eq!(v["errors"][0]["line"], line, "{text:?}: {reply}");
+        assert_eq!(v["errors"][0]["key"].as_str(), key, "{text:?}");
+    }
+    assert!(
+        !dir.path().join("config.toml").exists(),
+        "a check writes nothing"
+    );
+}
+
+#[tokio::test]
+async fn the_page_renders_the_schema_and_carries_its_token() {
+    let (root, dir) = (
+        tempfile::tempdir().expect("t"),
+        tempfile::tempdir().expect("t"),
+    );
+    std::fs::write(
+        dir.path().join("config.toml"),
+        "[watch]\ninterval_ms = 500\n",
+    )
+    .expect("w");
+    let app = server(root.path(), dir.path(), false);
+    let (s, html) = page(&app, "/_settings").await;
+    assert_eq!(s, 200, "{html}");
+    let token = token_of(&app);
+    assert!(html.contains(&format!("name=\"gitterrace-settings\" content=\"{token}\"")));
+    for k in gitterrace_config::keys() {
+        assert!(
+            html.contains(&format!("data-id=\"{}\"", k.id)),
+            "{} has no row",
+            k.id
+        );
+    }
+    assert!(html.contains("value=\"500\""), "the file's value is shown");
+    assert!(!html.contains("style=\""), "no inline style");
+    let (s, overview) = page(&app, "/r/r/").await;
+    assert_eq!(s, 200);
+    assert!(overview.contains("id=\"settingsbtn\""), "the gear shows");
+    assert!(
+        overview.contains("name=\"gt-settings\""),
+        "the menu entry is offered"
+    );
+    assert!(
+        !overview.contains(&token),
+        "only the settings page carries its token"
+    );
+}
+
+#[tokio::test]
+async fn without_the_routes_no_page_offers_settings() {
+    let root = tempfile::tempdir().expect("t");
+    let app = crate::multi_router(vec![repo(root.path())]).expect("r");
+    let (s, overview) = page(&app, "/r/r/").await;
+    assert_eq!(s, 200);
+    assert!(!overview.contains("settingsbtn") && !overview.contains("gt-settings"));
+    let (root2, dir) = (
+        tempfile::tempdir().expect("t"),
+        tempfile::tempdir().expect("t"),
+    );
+    let public = server(root2.path(), dir.path(), true);
+    let (s, overview) = page(&public, "/r/r/").await;
+    assert_eq!(s, 200);
+    assert!(
+        !overview.contains("settingsbtn"),
+        "a public server offers no settings"
+    );
+}
+
+#[tokio::test]
+async fn restart_keys_name_only_what_the_edit_changes() {
+    let (root, dir) = (
+        tempfile::tempdir().expect("t"),
+        tempfile::tempdir().expect("t"),
+    );
+    // The running server was started on another address by a flag; the file never names it.
+    let mut cfg = gitterrace_config::Config::default();
+    cfg.server.addr = "127.0.0.1:9".to_owned();
+    let mut env = Env::new(cfg);
+    env.settings_dir = Some(dir.path().to_path_buf());
+    let app = crate::build_server(vec![repo(root.path())], None, None, &env, None, None)
+        .expect("router")
+        .0;
+    let token = token_of(&app);
+    let mut req = Req::new("POST", "/_settings/check", Some(&token));
+    req.body = serde_json::json!({
+        "f": "config",
+        "changes": [{ "id": "watch.interval_ms", "value": "750" }]
+    })
+    .to_string();
+    let (status, reply) = send(&app, req).await;
+    assert_eq!(status, 200, "{reply}");
+    let v: serde_json::Value = serde_json::from_str(&reply).expect("json");
+    assert_eq!(v["restart"], serde_json::json!([]), "{reply}");
+}

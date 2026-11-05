@@ -39,6 +39,26 @@ pub enum Input {
     Select(Vec<&'static str>),
 }
 
+impl Field {
+    /// The value as an input shows it: text without its TOML quotes, a list one entry per line,
+    /// anything else as written.
+    pub fn plain(&self) -> String {
+        let v = toml::from_str::<toml::Table>(&format!("v = {}", self.value))
+            .ok()
+            .and_then(|mut t| t.remove("v"));
+        match v {
+            Some(toml::Value::String(s)) => s,
+            Some(toml::Value::Array(a)) => a
+                .iter()
+                .filter_map(toml::Value::as_str)
+                .collect::<Vec<_>>()
+                .join("\n"),
+            Some(_) => self.value.clone(),
+            None => String::new(),
+        }
+    }
+}
+
 /// The form's fields for `loaded`, in declaration order.
 pub fn fields(loaded: &Loaded) -> Vec<Field> {
     keys()
@@ -138,6 +158,17 @@ mod tests {
         assert_eq!(sel("server.is_public"), Input::Checkbox);
         assert_eq!(sel("server.hosts"), Input::List);
         assert_eq!(sel("server.addr"), Input::Text);
+    }
+
+    #[test]
+    fn an_input_shows_text_and_lists_without_toml_quoting() {
+        let l = parse("[insights]\nexclude = [\"a/**\", \"b/**\"]\n").expect("ok");
+        let f = fields(&l);
+        let get = |id: &str| f.iter().find(|x| x.id == id).expect(id).plain();
+        assert_eq!(get("insights.exclude"), "a/**\nb/**");
+        assert_eq!(get("server.addr"), crate::DEFAULT_ADDR);
+        assert_eq!(get("watch.interval_ms"), "1000");
+        assert_eq!(get("features.api_enabled"), "");
     }
 
     #[test]

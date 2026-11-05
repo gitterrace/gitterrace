@@ -37,12 +37,20 @@ pub(crate) struct DocHead {
     /// The outline menu (`markdown::outline_menu`, icon only), empty below three headings.
     pub(crate) outline: String,
     pub(crate) actions: Vec<DocAction>,
+    /// A switch of the card's own views in place of Preview/Code (the settings page's
+    /// Form/Plain), with a control of links before the title (its file switch).
+    pub(crate) switch: Option<(Seg, Seg)>,
+    /// The crate's own escaped markup at the right end, after the actions (a Save button).
+    pub(crate) tools: String,
 }
 
 impl fmt::Display for DocHead {
     /// The only place that writes a document card's header bar.
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str("<div class=\"dochead sticky\" data-dochead>")?;
+        if let Some((files, _)) = &self.switch {
+            write!(f, "{files}")?;
+        }
         if self.tabs.is_empty() {
             write!(f, "<span class=\"doc-title\">{}</span>", esc(&self.title))?;
         } else {
@@ -57,7 +65,9 @@ impl fmt::Display for DocHead {
             }
             f.write_str("</nav>")?;
         }
-        if self.views {
+        if let Some((_, views)) = &self.switch {
+            write!(f, "{views}")?;
+        } else if self.views {
             let views = Seg {
                 name: "View".to_owned(),
                 buttons: true,
@@ -73,8 +83,9 @@ impl fmt::Display for DocHead {
         for a in &self.actions {
             write!(f, "<a href=\"{}\">{}</a>", esc(&a.href), esc(a.label))?;
         }
-        // The outline menu is the crate's own escaped markup.
+        // The outline menu and the tools are the crate's own escaped markup.
         f.write_str(&self.outline)?;
+        f.write_str(&self.tools)?;
         f.write_str("</span></div>")
     }
 }
@@ -118,5 +129,25 @@ mod tests {
         .to_string();
         assert!(h.contains("<span class=\"doc-title\">&lt;x&gt;</span>"));
         assert!(h.contains("data-show=\"source\""));
+    }
+
+    #[test]
+    fn a_card_switch_replaces_preview_and_code() {
+        let views = Seg {
+            name: "Editor".into(),
+            buttons: true,
+            choices: vec![Choice::new("Form", "form", true)],
+            ..Seg::default()
+        };
+        let h = DocHead {
+            title: "~/x".into(),
+            switch: Some((Seg::links("File", vec![]), views)),
+            views: true,
+            tools: "<button>Save</button>".into(),
+            ..DocHead::default()
+        }
+        .to_string();
+        assert!(h.contains("data-show=\"form\"") && !h.contains("data-show=\"source\""));
+        assert!(h.ends_with("<button>Save</button></span></div>"));
     }
 }

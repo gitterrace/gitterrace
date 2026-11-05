@@ -117,12 +117,13 @@ pub const PAGES: &[Page] = &[
         &["/_repos"],
     ),
     page(
-        "`/_settings/file`, `POST /_settings/check`",
+        "`/_settings`, `/_settings/file`, `POST /_settings/check`",
         concat!(
-            "Reads, checks and saves `config.toml` and `actions.toml` for the settings page: ",
-            "local servers only, same-origin with the page token, never a path from the request"
+            "The settings page: a form and a plain editor for `config.toml` and `actions.toml`, ",
+            "read, checked and saved on local servers only, same-origin with the page token, ",
+            "never a path from the request"
         ),
-        &["/_settings/file", "/_settings/check"],
+        &["/_settings", "/_settings/file", "/_settings/check"],
     ),
 ];
 

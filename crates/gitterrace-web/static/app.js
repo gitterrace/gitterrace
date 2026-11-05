@@ -50,6 +50,13 @@
     box.querySelectorAll("button[data-show]").forEach(function (b) {
       b.addEventListener("click", function () { sel.value = b.getAttribute("data-show"); });
     });
+    // A switch that stays on the page (data-seg-own on an ancestor) is marked here, the one
+    // place a segmented control's state is written; its page listens for the click.
+    if (box.closest("[data-seg-own]")) box.querySelectorAll("button[data-show]").forEach(function (b, _, all) {
+      b.addEventListener("click", function () {
+        all.forEach(function (o) { o.classList.toggle("on", o === b); o.setAttribute("aria-pressed", o === b ? "true" : "false"); });
+      });
+    });
   });
   fitSegs();
   addEventListener("resize", fitSegs);

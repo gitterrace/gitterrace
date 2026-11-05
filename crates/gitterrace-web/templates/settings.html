@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<meta name="gt-base" content="">
+<meta name="gitterrace-settings" content="{{ token }}" data-file="{{ file }}" data-stamp="{{ stamp }}">
+<title>Settings · gitterrace</title>
+<script>(function(){try{var t=localStorage.getItem("gitterrace-theme");if(t==="light"||t==="dark")document.documentElement.dataset.theme=t}catch(e){}})()</script>
+{% include "_favicon.html" %}
+<link rel="stylesheet" href="/static/tokens.css">
+<link rel="stylesheet" href="/static/app.css">
+<link rel="stylesheet" href="/static/settings.css">
+</head>
+<body>
+<header class="top"><div class="wrap"><div class="topbar">
+<a class="brand" href="/"><svg class="logo" viewBox="2 2 28 28" aria-hidden="true"><path class="i" d="M9.5 24A1.5 1.5 0 0 1 8 22.5L8 15A1 1 0 0 0 7 14L3.5 14A1.5 1.5 0 0 1 2 12.5L2 9.5A1.5 1.5 0 0 1 3.5 8L7 8A1 1 0 0 0 8 7L8 3.5A1.5 1.5 0 0 1 9.5 2L12.5 2A1.5 1.5 0 0 1 14 3.5L14 7A1 1 0 0 0 15 8L18.5 8A1.5 1.5 0 0 1 20 9.5L20 12.5A1.5 1.5 0 0 1 18.5 14L15 14A1 1 0 0 0 14 15L14 17A1 1 0 0 0 15 18L22.5 18A1.5 1.5 0 0 1 24 19.5L24 23A1 1 0 0 0 25 24ZM13.7 24H24.4V24.25H13.7ZM14 24H28V27H14Z"/><path class="a" d="M28.5 24A1.5 1.5 0 0 1 30 25.5L30 28.5A1.5 1.5 0 0 1 28.5 30L15.5 30A1.5 1.5 0 0 1 14 28.5L14 25A1 1 0 0 0 13 24Z"/></svg><span class="wordmark">gitterrace</span></a>
+<span class="sep" aria-hidden="true">/</span>
+<span class="reponame">Settings</span>
+</div></div></header>
+<main class="wrap settings" id="main" data-seg-own>
+<div class="card">
+{{ head }}
+{% if let Some(e) = missing %}{{ e }}{% endif %}
+<section class="setform" id="setform" data-view="form"{% if form_off.is_some() %} hidden{% endif %}>
+{% for s in sections %}<fieldset class="setsec"><legend>[{{ s.name }}]</legend>
+{% for r in s.rows %}<div class="setrow" data-id="{{ r.id }}" data-kind="{{ r.kind }}" data-src="{{ r.source }}">
+<label class="setname" for="f-{{ r.id }}"><code>{{ r.name }}</code>{% if r.restart %} <span class="badge">Needs a restart</span>{% endif %}{% if r.source != "default" %} <span class="badge set-src">set in {{ r.source }}</span>{% endif %}</label>
+<div class="setin">{% match r.kind %}
+{% when "checkbox" %}<input type="checkbox" id="f-{{ r.id }}"{% if r.checked %} checked{% endif %}>
+{% when "tri" %}<select id="f-{{ r.id }}"><option value=""{% if r.tri == "unset" %} selected{% endif %}>Unset</option><option value="true"{% if r.tri == "true" %} selected{% endif %}>On</option><option value="false"{% if r.tri == "false" %} selected{% endif %}>Off</option></select>
+{% when "number" %}<input type="number" id="f-{{ r.id }}" value="{{ r.value }}" placeholder="{{ r.default }}"{% if !r.min.is_empty() %} min="{{ r.min }}"{% endif %}{% if !r.max.is_empty() %} max="{{ r.max }}"{% endif %} step="1">
+{% when "list" %}<textarea id="f-{{ r.id }}" rows="2" placeholder="one per line">{{ r.value }}</textarea>
+{% when "select" %}<select id="f-{{ r.id }}">{% for (o, on) in r.options %}<option value="{{ o }}"{% if *on %} selected{% endif %}>{{ o }}</option>{% endfor %}</select>
+{% else %}<input type="text" id="f-{{ r.id }}" value="{{ r.value }}" placeholder="{{ r.default }}">
+{% endmatch %}<p class="setdoc muted">{{ r.doc }}</p><p class="seterr" hidden></p></div>
+</div>{% endfor %}
+</fieldset>{% endfor %}
+{% if !overrides.is_empty() %}<fieldset class="setsec"><legend>Per repository</legend><p class="muted">Edited in Plain.</p>{% for o in overrides %}<p><code>{{ o }}</code></p>{% endfor %}</fieldset>{% endif %}
+</section>
+<section class="setplain" id="setplain" data-view="plain"{% if form_off.is_none() %} hidden{% endif %}>
+{% if let Some(why) = form_off %}<p class="seterr" id="formoff">{{ why }}</p>{% endif %}
+<div class="seted"><pre class="setgut" id="setgut" aria-hidden="true"></pre><textarea id="settext" spellcheck="false" autocomplete="off" aria-label="{{ file }} text">{{ text }}</textarea></div>
+<ul class="seterrs" id="seterrs"></ul>
+</section>
+</div>
+</main>
+<script src="/static/tip.js" defer></script>
+<script src="/static/app.js" defer></script>
+<script src="/static/settings.js" defer></script>
+</body>
+</html>

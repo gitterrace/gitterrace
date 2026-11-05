@@ -348,6 +348,14 @@
       var li = add(a.label, a.key, function (e, li) { if (on) run(a, t, e, li); else toast(a.label + ": " + a.why); });
       if (!on) { li.classList.add("off"); li.setAttribute("aria-disabled", "true"); li.setAttribute("data-tip", a.why); }
     });
+    // The server's own settings, offered where the page says the settings page exists.
+    var settings = document.querySelector('meta[name="gt-settings"]');
+    if (settings) {
+      list.appendChild(el("li", "sep"));
+      head("Server");
+      add("Settings\u2026", ",", function () { closeMenu(); location.href = settings.content; });
+      keys[","] = items.length - 1;
+    }
     if (!mine.length) {
       var hint = el("li", "hint");
       var link = el("a", "", "Add your own actions");

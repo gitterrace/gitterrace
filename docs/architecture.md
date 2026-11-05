@@ -176,7 +176,7 @@ repository is served. The rest are the server's own and never take the prefix.
 | `/_send/targets` | Send to targets as JSON template parts, filled in by the page |
 | `/r/{name}/...`, `/api/repos` | The prefix of every per-repository row above, also when one is served; and the server-wide list the switcher reads |
 | `POST /_repos`, `DELETE /_repos`, `GET /_repos?nonce=N` | Adds a repository to the running server for `git terrace open`, or takes one off for `git terrace remove`: loopback, no browser, secret from a 0600 file. The GET proves the secret by hashing it with the nonce |
-| `/_settings/file`, `POST /_settings/check` | Reads, checks and saves `config.toml` and `actions.toml` for the settings page: local servers only, same-origin with the page token, never a path from the request |
+| `/_settings`, `/_settings/file`, `POST /_settings/check` | The settings page: a form and a plain editor for `config.toml` and `actions.toml`, read, checked and saved on local servers only, same-origin with the page token, never a path from the request |
 
 <!-- END GENERATED: routes -->
 

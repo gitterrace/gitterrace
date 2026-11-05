@@ -59,7 +59,10 @@ pub(crate) const FEATURE_ROUTES: &[(Feature, &[&str])] = &[
         ],
     ),
     (Feature::RepoAdmin, &["/_repos"]),
-    (Feature::Settings, &["/_settings/file", "/_settings/check"]),
+    (
+        Feature::Settings,
+        &["/_settings", "/_settings/file", "/_settings/check"],
+    ),
     (Feature::Picker, &["/api/repos"]),
     (Feature::Mermaid, &[crate::MERMAID_JS]),
 ];

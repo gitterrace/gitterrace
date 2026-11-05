@@ -48,6 +48,7 @@ mod search;
 mod sections;
 mod seg;
 mod settings;
+mod settings_page;
 pub mod sitemap;
 mod spark;
 #[cfg(test)]
@@ -367,6 +368,7 @@ fn build_server(
     {
         match gitterrace_actions::Token::generate() {
             Ok(token) => {
+                env.set_settings_on();
                 router = router.merge(settings::router(Arc::new(settings::Settings {
                     dir,
                     actions: actions_file.map(Path::to_path_buf),

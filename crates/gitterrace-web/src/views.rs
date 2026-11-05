@@ -158,6 +158,8 @@ pub(crate) struct Chrome {
     /// The scripted features the config turned off, space separated, for the `gt-off` meta;
     /// empty (and no meta) when every one is on.
     pub(crate) off: String,
+    /// Whether this server serves the settings page: the gear in the bar and the menu entry.
+    pub(crate) settings: bool,
 }
 
 /// The top bar's tools a `[features]` switch can take away.
@@ -280,6 +282,7 @@ pub(crate) fn chrome_at(app: &crate::app::App, active: &str, rev: &str) -> Chrom
             picker: crate::features::on(Feature::Picker),
         },
         off: crate::features::scripted_off(),
+        settings: app.settings_on() && crate::features::on(Feature::Settings),
     }
 }
 

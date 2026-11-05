@@ -1,0 +1,26 @@
+/* Settings page: one field row per setting and a plain editor with a line gutter. */
+.settings .dochead{flex-wrap:wrap;height:auto;min-height:44px;padding-top:var(--space-1);padding-bottom:var(--space-1)}
+.settings .doc-title{font-family:var(--mono);font-size:var(--text-sm);min-width:0;overflow-wrap:anywhere;text-transform:none;letter-spacing:0}
+.settings .doc-tools{margin-left:auto;display:flex;align-items:center;gap:var(--space-3)}
+.settings button.primary{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.settings button.primary:disabled{opacity:.5;cursor:default}
+.setnote{font-size:var(--text-sm);color:var(--muted)}
+.setform,.setplain{padding:var(--space-4) var(--space-6) var(--space-6)}
+.setsec{border:0;margin:0 0 var(--space-6);padding:0}
+.setsec legend{font-family:var(--mono);font-weight:var(--weight-semibold);padding:0;margin-bottom:var(--space-2)}
+.setrow{display:grid;grid-template-columns:minmax(0,260px) minmax(0,1fr);gap:var(--space-4);padding:var(--space-3) 0;border-top:var(--border)}
+.setrow.changed .setname code{color:var(--accent-ink)}
+.setname{display:flex;flex-wrap:wrap;align-items:center;gap:var(--space-2);min-width:0}
+.setname code{overflow-wrap:anywhere}
+.setin input:not([type=checkbox]),.setin select,.setin textarea{width:100%;max-width:420px;min-width:0;box-sizing:border-box}
+.setin select,.setin textarea{font:inherit;padding:5px var(--space-3);border:1px solid var(--line-strong);border-radius:var(--radius);background:var(--surface);color:var(--fg)}
+.setdoc{margin:var(--space-2) 0 0;font-size:var(--text-sm)}
+.seterr{margin:var(--space-2) 0 0;color:var(--del);font-size:var(--text-sm)}
+.seted{display:flex;border:var(--border);border-radius:var(--radius);background:var(--surface);font:var(--text-sm)/var(--leading-code) var(--mono)}
+.setgut{margin:0;padding:var(--space-2) var(--space-2) var(--space-2) var(--space-3);text-align:right;color:var(--faint);background:var(--soft);border-right:var(--border);user-select:none;min-width:3ch;font:inherit;overflow:hidden}
+.setgut .bad{color:var(--del);font-weight:var(--weight-semibold)}
+#settext{flex:1;min-width:0;min-height:60vh;margin:0;padding:var(--space-2) var(--space-3);border:0;resize:vertical;background:none;color:var(--fg);font:inherit;white-space:pre;overflow:auto;tab-size:4}
+#settext:focus{outline:2px solid var(--focus);outline-offset:-2px}
+.seterrs{margin:var(--space-3) 0 0;padding:0;list-style:none;color:var(--del);font-size:var(--text-sm)}
+@media (max-width:700px){.setrow{grid-template-columns:minmax(0,1fr);gap:var(--space-2)}.setform,.setplain{padding:var(--space-3)}}
+.badge.set-src{color:var(--accent-ink);border-color:var(--accent);background:var(--accent-soft)}
