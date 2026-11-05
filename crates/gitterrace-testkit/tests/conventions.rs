@@ -62,8 +62,8 @@ fn hits(dirs: &[&str], exts: &[&str], allowed: &[&str], bad: impl Fn(&str) -> bo
 
 /// A test helper that runs git belongs to `gitterrace-testkit`. Matches `fn git(` and
 /// `fn git_at(`, and a raw `Command::new("git")`, so a differently named copy is caught too.
-/// The build script and the test of its stamp module are exempt, like in the ast-grep rule
-/// `no-git-subprocess`: the stamp runs git at build time and its test must run the same way.
+/// The build script and its stamp module are exempt, like in the ast-grep rule
+/// `no-git-subprocess`: the stamp runs git at build time.
 #[test]
 fn no_git_test_helper_outside_the_testkit() {
     let defs = [concat!("fn ", "git("), concat!("fn ", "git_at(")];
@@ -75,7 +75,6 @@ fn no_git_test_helper_outside_the_testkit() {
             "gitterrace-testkit/",
             "crates/gitterrace/build.rs",
             "crates/gitterrace/stamp.rs",
-            "crates/gitterrace/tests/stamp.rs",
         ],
         |l| defs.iter().any(|d| l.contains(d)) || l.contains(raw),
     );
@@ -197,5 +196,23 @@ fn every_limit_constant_is_classified() {
         bad.is_empty(),
         "limit constants without a classification:\n{}",
         bad.join("\n")
+    );
+}
+
+/// Escaping text for markup is written once, in `gitterrace-types`: a second definition
+/// of it in another crate would let pages and cards drift apart.
+#[test]
+fn one_markup_escape_definition() {
+    let def = concat!("fn ", "esc(");
+    let found = hits(
+        &["crates"],
+        &["rs"],
+        &["gitterrace-types/src/markup.rs"],
+        |l| l.contains(def),
+    );
+    assert!(
+        found.is_empty(),
+        "use gitterrace_types::esc instead:\n{}",
+        found.join("\n")
     );
 }

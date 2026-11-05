@@ -2,24 +2,14 @@ pub(crate) const SANS: &str =
     "ui-sans-serif,system-ui,-apple-system,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif";
 pub(crate) const MONO: &str =
     "ui-monospace,'SF Mono',SFMono-Regular,Menlo,Consolas,'Liberation Mono',monospace";
-
-pub(crate) fn esc(s: &str) -> String {
-    let mut o = String::with_capacity(s.len());
-    for c in s.chars() {
-        match c {
-            '&' => o.push_str("&amp;"),
-            '<' => o.push_str("&lt;"),
-            '>' => o.push_str("&gt;"),
-            '"' => o.push_str("&quot;"),
-            '\'' => o.push_str("&apos;"),
-            c if c.is_control() => {}
-            c => o.push(c),
-        }
-    }
-    o
-}
-
 pub(crate) use gitterrace_index::count;
+
+/// Escapes `s` for SVG text or an attribute. XML cannot carry control characters, so they are
+/// dropped first; the escaping itself is the one shared with the pages.
+pub(crate) fn svg_text(s: &str) -> String {
+    let clean: String = s.chars().filter(|c| !c.is_control()).collect();
+    gitterrace_types::esc(&clean)
+}
 
 /// Thousands separators: 12345 -> "12,345".
 pub(crate) fn group(n: u64) -> String {

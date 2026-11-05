@@ -26,7 +26,7 @@ struct License {
 impl License {
     /// The short name, or a link to the file when the text is not a common license.
     fn html(&self, prefix: &str) -> String {
-        let esc = gitterrace_web::escape_html;
+        let esc = gitterrace_types::esc;
         if let Some(id) = self.id {
             return format!("{} license", esc(id));
         }
@@ -55,7 +55,7 @@ impl Credit {
 
     /// The footer element to place at the end of a page of the site under `prefix`.
     pub(super) fn footer(&self, prefix: &str) -> String {
-        let esc = gitterrace_web::escape_html;
+        let esc = gitterrace_types::esc;
         let mut parts = vec![format!("Source: {}", esc(&self.name))];
         if let Some(l) = &self.license {
             parts.push(l.html(prefix));

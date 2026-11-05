@@ -10,6 +10,7 @@ pub mod card;
 pub mod codec;
 pub mod config;
 pub mod git;
+pub mod markup;
 
 #[cfg(test)]
 mod registry_tests;
@@ -18,6 +19,7 @@ pub use card::{CardLayout, CardTheme};
 pub use codec::{ParseError, StringEnum};
 pub use config::{ColorScheme, DateStyle, LinkStyle, Period};
 pub use git::{ChangeKind, LineKind, RefKind, TreeEntryKind};
+pub use markup::{esc, esc_text};
 
 // The codec macro names serde through this path, so a crate using it needs no serde of its own.
 #[doc(hidden)]

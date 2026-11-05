@@ -4,20 +4,9 @@
 #[path = "../stamp.rs"]
 mod stamp;
 
-use std::{fs, path::Path, process::Command};
+use std::fs;
 
-fn git(dir: &Path, args: &[&str]) {
-    let ok = Command::new("git")
-        .current_dir(dir)
-        .args(["-c", "user.name=t", "-c", "user.email=t@example.invalid"])
-        .args(["-c", "commit.gpgsign=false"])
-        .env("GIT_CONFIG_GLOBAL", "/dev/null")
-        .args(args)
-        .status()
-        .expect("git")
-        .success();
-    assert!(ok, "git {args:?}");
-}
+use gitterrace_testkit::git;
 
 /// A repo shaped like this workspace: a crate dir, a sibling crate and bench results.
 fn repo() -> tempfile::TempDir {

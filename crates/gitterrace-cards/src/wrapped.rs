@@ -4,7 +4,7 @@ use gitterrace_types::{CardLayout, CardTheme};
 
 use crate::palette::{Paint, Palette};
 use crate::stats::WrappedStats;
-use crate::svg::{MONO, SANS, area, clip, count, esc, group, n};
+use crate::svg::{MONO, SANS, area, clip, count, group, n, svg_text};
 
 const MONTHS: [&str; 12] = [
     "January",
@@ -38,7 +38,7 @@ pub fn wrapped_svg(w: &WrappedStats, layout: CardLayout, theme: CardTheme) -> St
     let _ = write!(
         s,
         r##"<svg xmlns="http://www.w3.org/2000/svg" width="{cw}" height="{ch}" viewBox="0 0 {cw} {ch}" role="img" aria-label="{label}"><title>{label}</title>"##,
-        label = esc(&format!(
+        label = svg_text(&format!(
             "{} in {}: {}",
             w.repo,
             w.year,
@@ -82,7 +82,7 @@ fn text(s: &mut String, x: f64, y: f64, size: u32, weight: u32, fill: &str, clas
         r##"<text x="{}" y="{}" font-size="{size}" font-weight="{weight}" fill="{fill}" class="{class}">{}</text>"##,
         n(x),
         n(y),
-        esc(t),
+        svg_text(t),
     );
 }
 

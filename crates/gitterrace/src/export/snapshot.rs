@@ -45,7 +45,7 @@ pub(super) fn mark_snapshot_as(
     project: Option<&Project>,
     version: &str,
 ) -> Vec<u8> {
-    let version = gitterrace_web::escape_html(version);
+    let version = gitterrace_types::esc(version);
     let page = String::from_utf8_lossy(html);
     // Anchor after `</head>`: a `<body` inside a title, a meta value or a script string in the
     // head is text, not the element.
@@ -64,15 +64,15 @@ pub(super) fn mark_snapshot_as(
     let what = match project {
         Some(p) => format!(
             "Static snapshot of <a href=\"{}\">{}</a> at <b>{}</b>, shown in gitterrace.",
-            gitterrace_web::escape_html(&p.url),
-            gitterrace_web::escape_html(&p.name),
-            gitterrace_web::escape_html(label)
+            gitterrace_types::esc(&p.url),
+            gitterrace_types::esc(&p.name),
+            gitterrace_types::esc(label)
         ),
         // The index of several repositories names no revision of its own.
         None if label.is_empty() => "Static snapshot.".to_owned(),
         None => format!(
             "Static snapshot at <b>{}</b>.",
-            gitterrace_web::escape_html(label)
+            gitterrace_types::esc(label)
         ),
     };
     let banner = format!(

@@ -372,7 +372,7 @@ fn root_page(out: &Path, sites: &[String]) -> anyhow::Result<Option<String>> {
 /// link, since the page policy refuses inline script.
 fn forward_page(prefix: &str) -> String {
     // Relative, so the forward works from disk as well as from a host.
-    let to = gitterrace_web::escape_html(&format!("{}/index.html", prefix.trim_start_matches('/')));
+    let to = gitterrace_types::esc(&format!("{}/index.html", prefix.trim_start_matches('/')));
     format!(
         "<!doctype html>\n<html lang=\"en\"><head><meta charset=\"utf-8\">\
          <meta http-equiv=\"refresh\" content=\"0; url={to}\"><title>gitterrace</title></head>\

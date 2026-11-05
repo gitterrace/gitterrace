@@ -67,7 +67,6 @@ use std::{
 };
 
 pub use add::TOKEN_HEADER as ADD_TOKEN_HEADER;
-pub use fmt::esc as escape_html;
 use gitterrace_config::Config;
 use gitterrace_git::Repo;
 use gitterrace_index::Index;

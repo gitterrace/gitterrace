@@ -310,17 +310,7 @@ pub(crate) fn sha_link_at(base: &str, full: &str) -> String {
     )
 }
 
-/// Escapes element content only: quotes stay as they are, which keeps JSON-heavy sources small.
-pub(crate) fn esc_text(s: &str) -> String {
-    s.replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-}
-
-/// Escapes text for an HTML attribute or element: `& < > "`.
-pub fn esc(s: &str) -> String {
-    esc_text(s).replace('"', "&quot;")
-}
+pub(crate) use gitterrace_types::{esc, esc_text};
 
 #[cfg(test)]
 mod tests {
