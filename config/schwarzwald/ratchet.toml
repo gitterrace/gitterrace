@@ -21,4 +21,4 @@ path = "openapi.skip_path_prefixes"
 
 [counts]
 # Markup built with format!/write! in crates/gitterrace-web/src instead of a template.
-web_format_html = 72
+web_format_html = 71

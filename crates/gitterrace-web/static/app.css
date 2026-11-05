@@ -5,6 +5,7 @@ body{margin:0;background:var(--bg);color:var(--fg);font:var(--text-base)/var(--l
 a{color:var(--accent-fg);text-decoration:none;text-underline-offset:3px}a:hover{text-decoration:underline}
 /* --focus is opaque (3:1 on every surface, theme-gen.py --check); --ring is a tint for fills. */
 :focus-visible{outline:2px solid var(--focus);outline-offset:2px;border-radius:var(--radius)}
+/* Skip link: the first stop on every page, shown while focused; main takes focus quietly. */.skip{position:absolute;left:var(--space-4);top:var(--space-2);z-index:70;padding:var(--space-2) var(--space-3);background:var(--surface);color:var(--fg);border:var(--border);border-radius:var(--radius);box-shadow:var(--shadow-2);transform:translateY(-200%)}.skip:focus{transform:none}main:focus{outline:none}svg.chart[data-marks]:focus-visible{outline-offset:4px}
 ::selection{background:var(--ring)}
 code,pre,.code,.diff{font-family:var(--mono);font-size:var(--text-sm)}
 code{color:var(--muted)}
@@ -312,8 +313,7 @@ td.ago{color:var(--faint);font-size:var(--text-xs);white-space:nowrap}
 .hits td.c{white-space:pre-wrap;word-break:break-all}
 .hits tr.hit td.c{background:var(--accent-soft)}
 .hits tr.gap td{color:var(--faint)}
-/* A match is one quiet background, no ring or padding: letters keep their places. */
-mark{background:var(--warn-bg);color:var(--fg);border-radius:var(--radius)}
+mark{/* one quiet background, no ring or padding: letters keep their places */background:var(--warn-bg);color:var(--fg);border-radius:var(--radius)}
 .searchform input[type=radio],.searchform input[type=checkbox]{min-width:0;width:auto;height:auto;flex:none;margin:0}
 
 /* ---- voice: serif display, grotesk body, mono metadata, hairlines ---- */
@@ -542,8 +542,7 @@ button.reponame .tri{width:16px;height:16px;fill:var(--muted)}
    .entries table pin too. Calm like the top bar: page colours, no shadow. Anchors land below. */
 section.file,.card.doccard{overflow:clip}
 section.file>header,.dochead{position:sticky;top:0;z-index:2}
-/* A pinned head is closed by a line on its bottom edge: card heads by their border, the path
-   bar (no border) by this line while app.js marks it data-stuck. */
+/* A pinned head's closing line: card heads use their border, the path bar this line. */
 main>.head[data-stuck]::after{content:"";position:absolute;left:0;right:0;bottom:0;height:1px;background:var(--line);pointer-events:none}
 /* Focus and anchors inside a document card land below its pinned head. */
 html:has(.dochead){scroll-padding-top:calc(44px + var(--space-2))}

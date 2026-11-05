@@ -15,6 +15,7 @@
 <link rel="stylesheet" href="/static/markdown.css">
 </head>
 <body data-rev="{{ c.rev }}" data-commit="{{ c.commit }}"{% if c.live %} data-live="{{ c.live_how }}" data-live-on="{{ c.live_on }}" data-live-v="{{ c.version }}"{% endif %}>
+<a class="skip" href="#main">Skip to content</a>
 <header class="top"><div class="wrap">
 <div class="topbar">
 <div class="where">
@@ -40,7 +41,7 @@
 </div></header>
 <div class="headstate" role="status" id="headstate"{% if c.banner.is_none() %} hidden{% endif %}><div class="wrap">{% if let Some(b) = c.banner %}{{ b|safe }}{% endif %}</div></div>
 <div class="actnote" role="status" id="actnote"{% if c.actions_note.is_none() %} hidden{% endif %}><div class="wrap">{% if let Some(n) = c.actions_note %}{{ n }}{% endif %}</div></div>
-<main class="wrap" id="main">
+<main class="wrap" id="main" tabindex="-1">
 {% block content %}{% endblock %}
 </main>
 <script src="/static/tip.js" defer></script>

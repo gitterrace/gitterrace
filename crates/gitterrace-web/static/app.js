@@ -166,6 +166,22 @@
     window.addEventListener("resize", later);
     stuck();
   }
+  // A chart of links is one tab stop: the arrow keys move between its marks, Home and End jump
+  // to the ends, Enter follows the focused mark and Tab leaves the chart.
+  document.addEventListener("keydown", function (e) {
+    var svg = e.target.closest && e.target.closest("svg[data-marks]");
+    var step = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key];
+    if (!svg || (!step && e.key !== "Home" && e.key !== "End")) return;
+    var marks = Array.prototype.slice.call(svg.querySelectorAll("a[href]"));
+    if (!marks.length) return;
+    var at = marks.indexOf(e.target);
+    var last = marks.length - 1, next;
+    if (e.key === "Home") next = 0;
+    else if (e.key === "End" || (at < 0 && step < 0)) next = last;
+    else next = at < 0 ? 0 : Math.max(0, Math.min(last, at + step));
+    marks[next].focus();
+    e.preventDefault();
+  });
   window.gtToast = toast;
 })();
 

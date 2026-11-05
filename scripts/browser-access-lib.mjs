@@ -1,4 +1,5 @@
-// Reading checks: how highlighted text looks. Each runs in every browser, light and dark, at 1400 and 900 px.
+// Reading and keyboard checks: highlighted text, the skip link and tab stops. Each runs in every
+// browser, light and dark, at 1400 and 900 px.
 // Imported by scripts/browser-check.mjs, not run on its own.
 
 const SCHEMES = ['light', 'dark'];
@@ -51,5 +52,41 @@ export function checks({ srv, r, browsers, context }) {
     }));
   }
 
-  return { markFlat };
+  // The first Tab on any page lands on a skip link to the content, which moves focus into
+  // <main>; a chart is one tab stop, never one per bar or dot.
+  // macOS WebKit skips links on a plain Tab unless the user turned that on, so there Alt+Tab is
+  // the keyboard move that reaches every control, as in Safari with the default setting.
+  const tab = (p) => p.keyboard.press(p.context().browser()?.browserType().name() === 'webkit' && process.platform === 'darwin' ? 'Alt+Tab' : 'Tab');
+  async function tabStops() {
+    for (const path of ['/', '/stats', '/stats/hotspots', '/log']) {
+      await each(`tab-stops ${path}`, path, async (p) => {
+        for (let i = 0; i < 40 && path !== '/' && !(await p.$('svg.chart')); i++) { await p.waitForTimeout(250); await p.reload(); }
+        const bad = [];
+        await tab(p);
+        const first = await p.evaluate(() => {
+          const a = document.activeElement;
+          return a && { text: a.textContent.trim(), href: a.getAttribute('href'), seen: a.getBoundingClientRect().height > 1 };
+        });
+        if (!first || first.href !== '#main') bad.push(`first stop is "${first?.text}", not a skip link`);
+        else {
+          if (!first.seen) bad.push('skip link not visible on focus');
+          await p.keyboard.press('Enter');
+          await tab(p);
+          const inMain = await p.evaluate(() => !!document.activeElement?.closest('main'));
+          if (!inMain) bad.push('Tab after the skip link leaves main');
+        }
+        // The chart itself may be the one stop; no mark inside it may add another.
+        const stops = await p.evaluate(() => [...document.querySelectorAll('svg')].map((s) => {
+          const f = s.querySelectorAll('a[href],[tabindex]');
+          return 1 + [...f].filter((e) => /** @type {HTMLElement} */ (e).tabIndex >= 0).length - (s.tabIndex >= 0 ? 0 : 1);
+        }).filter((n) => n > 1));
+        if (stops.length) bad.push(`a chart with ${Math.max(...stops)} tab stops`);
+        const charts = await p.$$eval('svg.chart', (l) => l.length);
+        if (path !== '/' && path !== '/log' && !charts) bad.push('no chart on the page');
+        return bad;
+      });
+    }
+  }
+
+  return { markFlat, tabStops };
 }

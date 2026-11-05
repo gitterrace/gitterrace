@@ -1,4 +1,6 @@
-use crate::charts::{bars, diverging, heatmap, label_every, pct, percent_line, ticks};
+use crate::charts::{
+    Dot, bars, diverging, heatmap, label_every, linked_bars, pct, percent_line, scatter, ticks,
+};
 use crate::charttip::COMMITS;
 
 #[test]
@@ -122,5 +124,36 @@ fn labels_step_by_calendar() {
     assert!(
         !shown.is_empty() && shown.iter().all(|t| t.starts_with("Q1")),
         "{shown:?}"
+    );
+}
+
+/// Every chart whose marks are links is one tab stop: the chart takes focus and each link is
+/// out of the tab order, reached with the arrow keys instead.
+#[test]
+fn a_chart_of_links_is_one_tab_stop() {
+    let pts: Vec<_> = (0..30).map(|i| (format!("w{i}"), i)).collect();
+    let links: Vec<_> = (0..30).map(|i| format!("/r?w={i}")).collect();
+    let dots: Vec<_> = (0..30)
+        .map(|i| Dot {
+            x: i,
+            y: i,
+            size: 1,
+            href: format!("/h/{i}"),
+            title: format!("f{i}"),
+        })
+        .collect();
+    for svg in [linked_bars(&pts, &links), scatter(&dots, "changes")] {
+        let open = svg.split('>').next().expect("svg tag");
+        assert!(
+            open.contains("tabindex=\"0\"") && open.contains("data-marks"),
+            "{open}"
+        );
+        let anchors = svg.matches("<a ").count();
+        assert_eq!(anchors, 30, "{svg}");
+        assert_eq!(svg.matches("<a tabindex=\"-1\" ").count(), anchors, "{svg}");
+    }
+    assert!(
+        !bars(&pts, COMMITS).contains("tabindex"),
+        "a chart without links takes no stop"
     );
 }

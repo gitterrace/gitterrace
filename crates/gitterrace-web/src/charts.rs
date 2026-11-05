@@ -141,6 +141,24 @@ fn open_svg(label: &str) -> String {
     )
 }
 
+/// [`open_svg`] for a chart whose marks are links: the chart is one tab stop and the arrow keys
+/// walk its marks (app.js), so a year of weekly bars is not fifty stops on the way down the page.
+fn open_linked_svg(label: &str) -> String {
+    format!(
+        concat!(
+            r#"<svg class="chart" viewBox="0 0 {W:.0} {H:.0}" role="group" tabindex="0" "#,
+            r#"data-marks aria-label="{label}, arrow keys move between marks" "#,
+            r#"preserveAspectRatio="xMidYMid meet">"#
+        ),
+        W = W,
+        H = H,
+        label = label
+    )
+}
+
+/// The opening tag of one linked mark: out of the tab order, reached with the arrow keys.
+const MARK_LINK: &str = r#"<a tabindex="-1" href=""#;
+
 /// Vertical bars, one per `(label, value)` counted in `unit`, scaled to the full container
 /// width. A bar's tip gives its share of all bars.
 pub(crate) fn bars(points: &[(String, u64)], unit: Unit) -> String {
@@ -159,7 +177,11 @@ fn bars_with(points: &[(String, u64)], links: Option<&[String]>, unit: Unit) -> 
     let sl = slot(points.len());
     let bw = (sl * 0.62).min(48.0);
     let plot = H - TOP_PAD - BOTTOM;
-    let mut svg = open_svg("Activity");
+    let mut svg = if links.is_some() {
+        open_linked_svg("Activity")
+    } else {
+        open_svg("Activity")
+    };
     svg.push_str(&grid);
     for (i, (label, v)) in points.iter().enumerate() {
         let h = (*v as f64 / top * plot).max(if *v > 0 { 1.0 } else { 0.0 });
@@ -169,7 +191,7 @@ fn bars_with(points: &[(String, u64)], links: Option<&[String]>, unit: Unit) -> 
         if let Some(href) = link {
             let _ = write!(
                 svg,
-                r#"<a href="{}" aria-label="{}: {}, narrow to this range">"#,
+                r#"{MARK_LINK}{}" aria-label="{}: {}, narrow to this range">"#,
                 esc(href),
                 esc(label),
                 fmt::count(*v, "commit", "commits")
@@ -418,7 +440,7 @@ pub(crate) fn scatter(dots: &[Dot], x_title: &str) -> String {
     let (xstep, xtop_n) = ticks(xmax, 6);
     let xtop = xtop_n as f64;
     let plot = H - TOP_PAD - BOTTOM;
-    let mut svg = open_svg("Change frequency against size");
+    let mut svg = open_linked_svg("Change frequency against size");
     svg.push_str(&grid);
     let mut v = 0;
     while v <= xtop_n {
@@ -439,8 +461,13 @@ pub(crate) fn scatter(dots: &[Dot], x_title: &str) -> String {
         );
         let _ = write!(
             svg,
-            r#"<a href="{}"><circle class="dot-pt" cx="{cx:.1}" cy="{cy:.1}" r="{r:.1}"{}/></a>"#,
+            r#"{MARK_LINK}{}" aria-label="{t}"><circle class="dot-pt" cx="{cx:.1}" "#,
             esc(&d.href),
+            t = esc(&d.title)
+        );
+        let _ = write!(
+            svg,
+            r#"cy="{cy:.1}" r="{r:.1}"{}/></a>"#,
             charttip::attr(&d.title)
         );
     }

@@ -119,5 +119,8 @@ fn hits_carry_context_and_gaps() {
 fn a_file_header_counts_its_matching_lines_with_the_noun() {
     let re = build_regex("x", false, true).expect("re");
     assert_eq!(file_hits("a", "HEAD", "x\n", &re, 100).matches(), "1 match");
-    assert_eq!(file_hits("a", "HEAD", "x\nx x\n.\n", &re, 100).matches(), "2 matches");
+    assert_eq!(
+        file_hits("a", "HEAD", "x\nx x\n.\n", &re, 100).matches(),
+        "2 matches"
+    );
 }
