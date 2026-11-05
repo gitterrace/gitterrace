@@ -433,16 +433,26 @@ pub async fn serve_in(
     watched: Option<Watched>,
     state: Option<PathBuf>,
 ) -> io::Result<()> {
+    refuse_lan(addr, &cfg)?;
+    let listener = tokio::net::TcpListener::bind(addr)
+        .await
+        .map_err(|e| bind_error(addr, &e))?;
+    serve_on(listener, repo_paths, actions, cfg, watched, state).await
+}
+
+/// [`serve_in`] on a listener already bound, so a caller that picked port 0 keeps the port
+/// it was given instead of racing another process for it.
+pub async fn serve_on(
+    listener: tokio::net::TcpListener,
+    repo_paths: Vec<PathBuf>,
+    actions: Option<PathBuf>,
+    cfg: Config,
+    watched: Option<Watched>,
+    state: Option<PathBuf>,
+) -> io::Result<()> {
+    let addr = listener.local_addr()?;
+    refuse_lan(addr, &cfg)?;
     let extra = (!addr.ip().is_loopback()).then(|| addr.ip());
-    // Also checked by `Config::validate`; repeated here because `serve` takes any `Config`.
-    if extra.is_some() && !cfg.server.is_public {
-        return Err(io::Error::new(
-            io::ErrorKind::PermissionDenied,
-            format!(
-                "{addr} is reachable from other machines. Pass --public (server.is_public = true) to serve read-only there"
-            ),
-        ));
-    }
     let public = cfg.server.is_public;
     for k in public_cost_warnings(&cfg) {
         tracing::warn!("{k}");
@@ -453,10 +463,6 @@ pub async fn serve_in(
         move || remember(state.as_deref(), &paths)
     });
     let env = Env::new(cfg);
-    let listener = tokio::net::TcpListener::bind(addr)
-        .await
-        .map_err(|e| bind_error(addr, &e))?;
-    let addr = listener.local_addr()?;
     // The secret `open` reads to add a repository. Without a state folder, or when it cannot
     // be written, the route stays unmounted and `open` starts a server of its own.
     let add = match (&state, extra) {
@@ -494,6 +500,20 @@ pub async fn serve_in(
         registry::remove_add_token(dir, addr.port());
     }
     served
+}
+
+/// Refuses an address other machines reach unless the config says public. Also checked by
+/// `Config::validate`; repeated here because `serve` takes any `Config`.
+fn refuse_lan(addr: SocketAddr, cfg: &Config) -> io::Result<()> {
+    if addr.ip().is_loopback() || cfg.server.is_public {
+        return Ok(());
+    }
+    Err(io::Error::new(
+        io::ErrorKind::PermissionDenied,
+        format!(
+            "{addr} is reachable from other machines. Pass --public (server.is_public = true) to serve read-only there"
+        ),
+    ))
 }
 
 /// A fresh secret for `POST /_repos`, written where only this user can read it.

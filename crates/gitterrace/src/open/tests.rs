@@ -77,22 +77,41 @@ fn unknown_id_missing_commit_and_missing_path() {
 /// Serves `repos` on `addr` from a thread that lives until the test process ends, with its
 /// registry and add secret in `state` (never the user's own folder).
 fn serve(repos: Vec<std::path::PathBuf>, addr: SocketAddr, state: Option<&Path>) {
+    serve_listener(repos, TcpListener::bind(addr).expect("bind"), state);
+}
+
+/// [`serve`] on a port the OS picks, bound before the server thread starts, so no other test
+/// can take the port between choosing it and serving on it.
+fn serve_fresh(repos: Vec<std::path::PathBuf>, state: Option<&Path>) -> SocketAddr {
+    let l = TcpListener::bind("127.0.0.1:0").expect("bind");
+    let addr = l.local_addr().expect("addr");
+    serve_listener(repos, l, state);
+    addr
+}
+
+fn serve_listener(repos: Vec<std::path::PathBuf>, l: TcpListener, state: Option<&Path>) {
+    let addr = l.local_addr().expect("addr");
+    l.set_nonblocking(true).expect("nonblocking");
     let held = state.map(Path::to_path_buf);
     let state = held.clone();
     std::thread::spawn(move || {
-        tokio::runtime::Builder::new_multi_thread()
+        let rt = tokio::runtime::Builder::new_multi_thread()
             .enable_all()
             .build()
-            .expect("rt")
-            .block_on(gitterrace_web::serve_in(
+            .expect("rt");
+        rt.block_on(async move {
+            let l = tokio::net::TcpListener::from_std(l).expect("listener");
+            gitterrace_web::serve_on(
+                l,
                 repos,
-                addr,
                 None,
                 gitterrace_config::Config::default(),
                 None,
                 state,
-            ))
-            .expect("serve");
+            )
+            .await
+        })
+        .expect("serve");
     });
     let t = Instant::now();
     // Without a state folder the server has no secret to prove, so only its port answers.
@@ -135,8 +154,7 @@ fn open_never_starts_a_second_server_when_one_answers_on_the_address() {
         .path()
         .to_owned();
     let state = tmp.path().join("state");
-    let addr = free_addr();
-    serve(vec![a.clone(), b], addr, Some(&state));
+    let addr = serve_fresh(vec![a.clone(), b], Some(&state));
     let probe_of = |p: &Path| {
         let r = Repo::discover(p).expect("repo");
         format!(
@@ -204,15 +222,26 @@ fn open_never_starts_a_second_server_when_one_answers_on_the_address() {
     assert_ne!(got, faddr);
     assert_eq!(started, vec![got]);
 
-    // (3) nothing listens: the server starts on the configured address.
-    let free = free_addr();
-    let mut started = Vec::new();
-    let got = ensure_server(&c, free, Some(&state), &mut |_, x| {
-        started.push(x);
-        serve(vec![c.clone()], x, None);
-        Ok(())
-    })
-    .expect("fresh");
+    // (3) nothing listens: the server starts on the configured address. A free port cannot be
+    // held for `ensure_server` to find free, so a parallel test may take it in between; that
+    // shows as a bind error in `start`, and only then is a new port tried.
+    let mut tries = 0;
+    let (got, free, started) = loop {
+        tries += 1;
+        let free = free_addr();
+        let mut started = Vec::new();
+        let got = ensure_server(&c, free, Some(&state), &mut |_, x| {
+            started.push(x);
+            let l = TcpListener::bind(x)?;
+            serve_listener(vec![c.clone()], l, None);
+            Ok(())
+        });
+        match got {
+            Ok(got) => break (got, free, started),
+            Err(e) if tries < 5 && e.downcast_ref::<std::io::Error>().is_some() => {}
+            Err(e) => panic!("fresh: {e:#}"),
+        }
+    };
     assert_eq!((got, started), (free, vec![free]));
 }
 
@@ -228,9 +257,8 @@ fn a_second_serve_joins_the_running_server() {
         .path()
         .to_owned();
     let state = tmp.path().join("state");
-    let addr = free_addr();
-    assert!(!join_running(addr, std::slice::from_ref(&b), Some(&state)).expect("free"));
-    serve(vec![a], addr, Some(&state));
+    assert!(!join_running(free_addr(), std::slice::from_ref(&b), Some(&state)).expect("free"));
+    let addr = serve_fresh(vec![a], Some(&state));
     assert!(!join_running(addr, std::slice::from_ref(&b), None).expect("no secret"));
     assert!(join_running(addr, std::slice::from_ref(&b), Some(&state)).expect("join"));
     let r = Repo::discover(&b).expect("repo");
@@ -269,8 +297,7 @@ fn a_partial_join_adds_nothing_and_never_binds() {
     let plain = tmp.path().join("plain");
     std::fs::create_dir_all(&plain).expect("dir");
     let state = tmp.path().join("state");
-    let addr = free_addr();
-    serve(vec![a], addr, Some(&state));
+    let addr = serve_fresh(vec![a], Some(&state));
 
     let err = join_running(addr, &[b.clone(), plain], Some(&state));
     assert!(err.is_err(), "a bad root is an error, not a bind");
