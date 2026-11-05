@@ -125,10 +125,9 @@ bench-guard:
 	python3 scripts/bench-run.py --synthetic --bin $${CARGO_TARGET_DIR:-target}/debug/git-terrace >/dev/null
 	python3 scripts/bench-report.py --self-test
 
-## counting-parity: The count parity fuzz including the pages-vs-reducers properties still red until every page reads one Counted, and the report-only day-math lint. Not in check
+## counting-parity: The count parity fuzz including the pages-vs-reducers properties still red until every page reads one Counted. Not in check
 counting-parity:
 	cargo test -p gitterrace-index --test it count_parity -- --include-ignored
-	ast-grep scan -c sgconfig-report.yml
 
 ## memory-check: An idle server's memory stays flat as the history and the tree grow (about 5 minutes, so not in check)
 memory-check: build

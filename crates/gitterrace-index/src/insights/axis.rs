@@ -4,11 +4,8 @@
 
 use gitterrace_git::civil_from_days as civil;
 
-use crate::CommitRecord;
 use crate::feed::{CommitRange, CommitRow, InsightsSource, local_day_of};
-use crate::insights::{
-    Period, days_from_civil, format_date, local_day, reference_day, reference_record, weekday,
-};
+use crate::insights::{Period, days_from_civil, format_date, reference_day, weekday};
 
 /// Not configurable, these four: they define chart resolution, so a setting would move every
 /// golden and make the same history read differently between machines.
@@ -162,23 +159,8 @@ impl TimeAxis {
         Self { unit, starts }
     }
 
-    /// The axis for the records on screen. A fixed period ends on the local day of the newest
-    /// record of `all` (the reference of the period filter); `All` spans `shown`.
-    pub fn covering(period: Option<Period>, all: &[CommitRecord], shown: &[CommitRecord]) -> Self {
-        if period.is_some_and(|p| p != Period::All) {
-            return reference_record(all).map_or_else(Self::empty, |r| {
-                let last = local_day(r);
-                Self::for_period(period, last, last)
-            });
-        }
-        let days = || shown.iter().map(local_day);
-        match (days().min(), days().max()) {
-            (Some(first), Some(last)) => Self::for_period(period, first, last),
-            _ => Self::empty(),
-        }
-    }
-
-    /// [`TimeAxis::covering`] over sources: `all` is the unscoped history, `shown` the view.
+    /// The axis for the commits on screen. A fixed period ends on the local day of the newest
+    /// commit of `all` (the unscoped history); `All` spans `shown`.
     pub fn covering_source(
         period: Option<Period>,
         all: &dyn InsightsSource,
@@ -226,10 +208,6 @@ impl TimeAxis {
         (first - 1..=end)
             .contains(&day)
             .then(|| self.starts.partition_point(|s| *s <= day).saturating_sub(1))
-    }
-
-    pub fn slot(&self, r: &CommitRecord) -> Option<usize> {
-        self.slot_day(local_day(r))
     }
 
     /// Sortable key of bucket `i`: the date it starts on.
@@ -324,6 +302,27 @@ mod tests {
         assert_eq!(axis(None, 10, 5).slot_day(7), None);
     }
 
+    /// The record axis the source axis must equal: a fixed period ends on the newest record's
+    /// local day, `All` spans `shown`.
+    fn covering(
+        period: Option<Period>,
+        all: &[crate::CommitRecord],
+        shown: &[crate::CommitRecord],
+    ) -> TimeAxis {
+        use crate::insights::{local_day, reference_record};
+        if period.is_some_and(|p| p != Period::All) {
+            return reference_record(all).map_or_else(TimeAxis::empty, |r| {
+                let last = local_day(r);
+                TimeAxis::for_period(period, last, last)
+            });
+        }
+        let days = || shown.iter().map(local_day);
+        match (days().min(), days().max()) {
+            (Some(first), Some(last)) => TimeAxis::for_period(period, first, last),
+            _ => TimeAxis::empty(),
+        }
+    }
+
     /// The source axis equals the record axis on every period, with ties in time, a commit
     /// after the wall clock and offsets that move the local day.
     #[test]
@@ -352,7 +351,7 @@ mod tests {
             Some(Period::Year),
             Some(Period::All),
         ] {
-            let want = TimeAxis::covering(p, &recs, shown);
+            let want = covering(p, &recs, shown);
             let got = TimeAxis::covering_source(p, &all_src, &shown_src);
             assert_eq!(
                 got.names().collect::<Vec<_>>(),
@@ -363,12 +362,12 @@ mod tests {
         let c = all_src.commit(crate::feed::Rank(2));
         assert_eq!(
             c.and_then(|c| want_slot(&recs, &c)),
-            TimeAxis::covering(None, &recs, &recs).slot(&recs[2])
+            covering(None, &recs, &recs).slot_day(local_day(&recs[2]))
         );
     }
 
     fn want_slot(recs: &[crate::CommitRecord], c: &crate::feed::CommitRow) -> Option<usize> {
-        TimeAxis::covering(None, recs, recs).slot_row(c)
+        covering(None, recs, recs).slot_row(c)
     }
 
     /// Every day of a history up to 399 years lands in a bucket, at every unit the span picks:

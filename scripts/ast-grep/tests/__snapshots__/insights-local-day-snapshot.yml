@@ -22,6 +22,12 @@ snapshots:
       style: primary
       start: 8
       end: 20
+  let day = c.time / 86_400;:
+    labels:
+    - source: c.time / 86_400
+      style: primary
+      start: 10
+      end: 25
   "let day = c.time.saturating_add(i64::from(c.offset)).div_euclid(DAY);":
     labels:
     - source: c.time.saturating_add(i64::from(c.offset)).div_euclid(DAY)

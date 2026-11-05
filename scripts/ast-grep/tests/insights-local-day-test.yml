@@ -12,6 +12,7 @@ valid:
         fn f() { let d = t.div_euclid(DAY); }
     }
 invalid:
+  - 'let day = c.time / 86_400;'
   - 'let hour = local.rem_euclid(DAY) / 3600;'
   - 'let day = c.time.saturating_add(i64::from(c.offset)).div_euclid(DAY);'
   - 'let gap = time.saturating_sub(pt).div_euclid(86_400);'

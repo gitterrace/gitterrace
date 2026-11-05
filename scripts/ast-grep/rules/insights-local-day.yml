@@ -1,11 +1,8 @@
-# CONV-INSIGHTS-LOCAL-DAY. REPORT-ONLY until every insights page counts through CountContext:
-# severity hint, so `ast-grep scan --error` in `make lint` does not fail on it. Run it by hand with
-#   ast-grep scan -c sgconfig-report.yml
-# The red snapshot at introduction is tests/insights-local-day-snapshot.txt. It turns error
-# once every site routes day math through CountContext (insights/scope.rs).
+# CONV-INSIGHTS-LOCAL-DAY: every count takes its day from one rule, so per-day bars and the
+# punch card never disagree again. `make lint` runs it with `ast-grep scan --error`.
 id: insights-local-day
 language: rust
-severity: hint
+severity: error
 message: Day or hour math outside CountContext.
 note: Local days, hours, day gaps and "now" come from CountContext in insights/scope.rs (local_day, local_hour, days_between) and feed::local_day_of. A second day rule is how per-day bars and the punch card disagreed.
 files:
@@ -31,6 +28,9 @@ rule:
         - pattern: $E.div_euclid(86400)
         - pattern: $E.rem_euclid(DAY)
         - pattern: $E.rem_euclid(86_400)
+        # A raw seconds-per-day literal: day math that skipped the named rule.
+        - pattern: $E / 86_400
+        - pattern: $E / 86400
         # `/ DAY` is left out: it also divides durations ("3 days ago"), which is not a
         # calendar day. A calendar day needs a floor, which div_euclid is.
         - all:

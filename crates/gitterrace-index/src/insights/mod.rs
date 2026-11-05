@@ -477,7 +477,9 @@ pub(crate) fn reference_day(src: &dyn InsightsSource) -> Option<i64> {
     scope::reference_day_at(src, feed::reference_time(src))
 }
 
-/// The record that sets [`crate::reference_time`]: fixed-period axes end on its local day.
+/// The record that sets [`crate::reference_time`]: the record-side oracle of
+/// [`reference_day`] in the axis tests.
+#[cfg(test)]
 pub(crate) fn reference_record(records: &[CommitRecord]) -> Option<&CommitRecord> {
     let now = crate::reference_time(records);
     records
