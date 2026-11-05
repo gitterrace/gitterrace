@@ -164,9 +164,11 @@ button:hover{border-color:var(--line-strong);background:var(--hover)}
 .cmain .muted{flex:0 0 auto;max-width:100%;overflow-wrap:break-word;margin-left:auto}
 .cmain .muted b{color:var(--muted);font-weight:var(--weight-regular)}
 .crow .sha{flex:none}
+.crow>.ref{flex:0 0 11rem;min-width:0;overflow-wrap:anywhere;font:var(--weight-semibold) var(--text-sm) var(--mono)}.crow>.ref .tag{font-weight:var(--weight-regular)}
+.crow>.cnums{flex:none;display:flex;gap:var(--space-3);font:var(--text-xs) var(--mono);color:var(--muted);font-variant-numeric:tabular-nums}
 /* Narrow screens: author and time always take their own row under the full-width subject, so
    every row has the same two lines whatever the subject's length. */
-@media (max-width:600px){.cmain{flex-wrap:wrap}.cmain>.subj{flex:1 0 100%}.cmain .muted{margin-left:0;white-space:nowrap}}
+@media (max-width:600px){.crow>.ref{flex-basis:6rem}.cmain{flex-wrap:wrap}.cmain>.subj{flex:1 0 100%}.cmain .muted{margin-left:0;white-space:nowrap}}
 
 /* commit page and diff */
 .meta{color:var(--muted);margin:var(--space-2) 0 var(--space-6)}.meta b{color:var(--fg)}
@@ -474,9 +476,7 @@ table.own td{white-space:nowrap}table.own td:first-child{width:30%}
 .livenote:hover{border-color:var(--line-strong)}
 .headstate{background:var(--warn-bg);color:var(--warn);border-bottom:var(--border);font:var(--weight-semibold) var(--text-sm)/1.4 var(--mono);padding:var(--space-2) 0}
 .actnote{background:var(--soft);color:var(--muted);border-bottom:var(--border);font:var(--text-xs)/1.5 var(--mono);padding:var(--space-2) 0;overflow-wrap:break-word}
-.branches td:first-child{white-space:nowrap}
 .entries.grow td:first-child{width:auto;white-space:nowrap}.entries td.grow{width:100%;max-width:0}
-.branches .line{display:flex;gap:var(--space-2);align-items:baseline;min-width:0}.branches .line>.subj{flex:0 1 auto}.branches .line>*:not(.subj){flex:none}
 .entries .th td{white-space:nowrap}
 .tag.merged{color:var(--accent-fg)}
 .tagmsg pre{margin:var(--space-3) 0 0;white-space:pre-wrap;font:var(--text-sm)/1.5 var(--mono)}

@@ -1,6 +1,6 @@
-//! Caches keyed by commit: file lists, path logs, head lines, subjects, ignore rules, totals.
+//! Caches keyed by commit: file lists, path logs, head lines, ignore rules, totals.
 
-use std::{collections::HashMap, sync::Arc};
+use std::sync::Arc;
 
 use crate::app::{App, MAX_IGNORE_BYTES};
 use crate::error::Result;
@@ -91,28 +91,6 @@ impl App {
             *g = Some((head.to_owned(), Arc::clone(&files)));
         }
         files
-    }
-
-    /// Commit subjects by id for everything reachable from `head`, scanned once per head.
-    pub(crate) fn subjects(&self, head: &str) -> Arc<HashMap<String, String>> {
-        if let Ok(g) = self.caches.subjects.lock()
-            && let Some((id, m)) = g.as_ref()
-            && id == head
-        {
-            return Arc::clone(m);
-        }
-        let mut map: HashMap<String, String> = HashMap::new();
-        if let Err(e) = gitterrace_git::scan_commits(&self.repo, head, |s, _| {
-            map.insert(s.id.clone(), s.subject.clone());
-            true
-        }) {
-            tracing::warn!("subjects unavailable: {e}");
-        }
-        let m = Arc::new(map);
-        if let Ok(mut g) = self.caches.subjects.lock() {
-            *g = Some((head.to_owned(), Arc::clone(&m)));
-        }
-        m
     }
 
     /// The ignore rules committed at `commit`. The files are found once per commit; the walk

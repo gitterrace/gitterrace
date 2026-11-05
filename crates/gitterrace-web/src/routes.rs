@@ -20,7 +20,7 @@ use crate::{
     fmt,
     live::Mode,
     views,
-    views::{Chrome, CommitRow, FileStatRow, RefRow},
+    views::{Chrome, CommitRow, FileStatRow},
 };
 
 mod assets;
@@ -224,21 +224,13 @@ async fn overview(State(app): Shared, Query(q): Query<DocQuery>) -> Result<Html<
     page(&p)
 }
 
-struct TagRow {
-    name: String,
-    href: String,
-    subject: String,
-    commit: String,
-    when: crate::when::When,
-}
-
 #[derive(Template)]
 #[template(path = "refs.html")]
 struct RefsPage {
     c: Chrome,
-    branches: Vec<crate::gitstate::BranchRow>,
-    tags: Vec<TagRow>,
-    remotes: Vec<RefRow>,
+    branches: Vec<CommitRow>,
+    tags: Vec<CommitRow>,
+    remotes: Vec<CommitRow>,
     reftabs: Vec<views::RefTab>,
     no_branches: Option<Empty>,
     no_tags: Option<Empty>,
@@ -249,23 +241,9 @@ async fn refs(State(app): Shared) -> Result<Html<String>> {
     let p = blocking(&app, |a| {
         let all = a.repo.refs()?;
         let now = fmt::now();
-        let tags = all
-            .iter()
-            .filter(|r| r.kind == RefKind::Tag)
-            .map(|r| TagRow {
-                href: fmt::href(&format!("/tag/{}", fmt::enc_seg(&r.name))),
-                subject: r
-                    .annotation
-                    .as_ref()
-                    .map(|n| n.subject.clone())
-                    .unwrap_or_default(),
-                commit: fmt::sha_link(&r.target),
-                when: fmt::ago(r.time, now),
-                name: r.name.clone(),
-            })
-            .collect::<Vec<_>>();
+        let tags = views::ref_rows(a, &all, RefKind::Tag, now)?;
         let branches = crate::gitstate::branch_rows(a)?;
-        let remotes = views::ref_rows(&all, RefKind::Remote, now);
+        let remotes = views::ref_rows(a, &all, RefKind::Remote, now)?;
         let log = fmt::href(&format!("/log/{}", fmt::selected_seg()));
         Ok(RefsPage {
             c: views::chrome(a, "refs").live(Mode::REFS),

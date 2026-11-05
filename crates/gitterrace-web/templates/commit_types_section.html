@@ -25,7 +25,7 @@
 {% endfor %}
 <div class="chart-head" id="commits"><div><h2>Commits</h2><p class="hint">{{ commits_total }} matching, newest first.</p></div></div>
 <ul class="list log">
-{% for r in commits %}{% include "_commit_row.html" %}{% endfor %}
+{% for r in commits %}{{ r }}{% endfor %}
 </ul>
 <nav class="pager">
 {% if let Some(h) = newer %}<a href="{{ h }}">Newer</a>{% else %}<span></span>{% endif %}

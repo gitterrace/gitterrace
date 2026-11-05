@@ -396,6 +396,7 @@ pub(crate) fn section(
             author: author.clone(),
             author_href: f.link(BASE, Dim::Author, email),
             when: fmt::ago_at(*time, *offset, now),
+            ..CommitRow::default()
         })
         .collect();
 

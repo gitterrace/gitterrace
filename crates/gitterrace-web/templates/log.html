@@ -7,7 +7,7 @@
 {% if let Some(e) = empty %}{{ e }}{% endif %}
 {% for d in days %}<h3 class="day">{{ d.label }}</h3>
 <ul class="list log">
-{% for r in d.rows %}{% include "_commit_row.html" %}{% endfor %}
+{% for r in d.rows %}{{ r }}{% endfor %}
 </ul>
 {% endfor %}
 <nav class="pager">

@@ -3,6 +3,6 @@
 {% block content %}
 <div class="head"><h1>{{ path }}</h1><span class="muted"><a href="{{ blob_href }}">File</a> · {% if !blame_href.is_empty() %}<a href="{{ blame_href }}">Blame</a> · {% endif %}{{ total }}, following renames</span></div>
 {% if let Some(e) = empty %}{{ e }}{% else %}
-<ul class="list log">{% for r in rows %}<li class="crow"><div class="cmain"><a class="subj" href="{{ r.href }}">{{ r.subject }}</a><span class="muted"><a class="who" href="{{ r.author_href }}"><b>{{ r.author }}</b></a> · {{ r.when }} · {{ r.lines }} changed{% if let Some(p) = r.renamed %} · as {{ p }}{% endif %}</span></div>{{ r.sha|safe }}</li>{% endfor %}</ul>
+<ul class="list log">{% for r in rows %}{{ r }}{% endfor %}</ul>
 {% endif %}
 {% endblock %}

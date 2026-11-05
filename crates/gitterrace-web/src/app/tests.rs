@@ -307,7 +307,6 @@ fn an_idle_release_empties_every_cache() {
     let _ = app.file_paths(&head).expect("files");
     let _ = app.last_commits(&head, "").expect("last commits");
     let _ = app.ignore_set(&head);
-    let _ = app.subjects(&head);
     let _ = app.head_lines(&head);
     drop(src);
     assert!(app.caches.clear_all(), "the pages above filled some cache");

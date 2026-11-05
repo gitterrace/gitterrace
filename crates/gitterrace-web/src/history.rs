@@ -15,17 +15,6 @@ use crate::{
     views::{self, Chrome},
 };
 
-struct HistRow {
-    href: String,
-    sha: String,
-    subject: String,
-    author: String,
-    author_href: String,
-    when: crate::when::When,
-    lines: String,
-    renamed: Option<String>,
-}
-
 #[derive(Template)]
 #[template(path = "history.html")]
 struct HistoryPage {
@@ -34,7 +23,7 @@ struct HistoryPage {
     blob_href: String,
     blame_href: String,
     total: String,
-    rows: Vec<HistRow>,
+    rows: Vec<views::CommitRow>,
     empty: Option<crate::empty::Empty>,
 }
 
@@ -67,20 +56,27 @@ pub(crate) async fn page(
                 Some((id.as_str(), r.ident(c.ident)?.1.to_string()))
             })
             .collect();
-        let rows: Vec<HistRow> = touches
+        let rows: Vec<views::CommitRow> = touches
             .into_iter()
             .map(|t| {
                 let email = emails.get(t.commit.as_str()).map_or("", String::as_str);
-                HistRow {
+                let mut note = format!("{} changed", fmt::count(t.lines, "line", "lines"));
+                if t.path != path {
+                    note.push_str(" · as ");
+                    note.push_str(&t.path);
+                }
+                views::CommitRow {
                     href: href(&format!("/commit/{}", t.commit)),
                     sha: fmt::sha_link(&t.commit),
+                    initial: views::initial(&t.author),
+                    hue: views::hue(&t.author),
                     subject: subjects.get(&t.commit).cloned().unwrap_or_default(),
                     author_href: views::author_href(email),
                     author: t.author,
                     when: fmt::ago(t.time, now),
-                    lines: fmt::count(t.lines, "line", "lines"),
-                    renamed: (t.path != path).then_some(t.path),
+                    ..views::CommitRow::default()
                 }
+                .note(note)
             })
             .collect();
         HistoryPage {

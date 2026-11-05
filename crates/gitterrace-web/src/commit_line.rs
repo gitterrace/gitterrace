@@ -1,0 +1,158 @@
+//! The one commit row: avatar, subject, author and time, then the commit id, in that order on
+//! every list of commits (the log, search, file history, compare, commit types) and on the refs
+//! and tag pages, where a ref name leads the row. Markup in `commit_line.html`. No template or
+//! other module writes the row by hand, so a commit reads the same wherever it is listed.
+
+use std::fmt;
+
+use askama::Template;
+use askama::filters::HtmlSafe;
+use gitterrace_git::CommitSummary;
+
+use crate::fmt::{ago_at, href, sha_link};
+use crate::views::{author_href, hue, initial};
+
+/// The ref that leads a row on the refs and tag pages: its name as a link and its badges.
+#[derive(Debug, Clone, Default)]
+pub(crate) struct Lead {
+    pub(crate) name: String,
+    pub(crate) href: String,
+    /// Badges after the name, such as `default` or `merged`.
+    pub(crate) badges: Vec<&'static str>,
+}
+
+/// A number at the end of a row (a branch's ahead and behind), linked when `href` is set.
+#[derive(Debug, Clone)]
+pub(crate) struct Count {
+    pub(crate) label: &'static str,
+    pub(crate) value: String,
+    pub(crate) href: String,
+    pub(crate) tip: &'static str,
+}
+
+/// One commit, as listed.
+#[derive(Debug, Clone, Default)]
+pub(crate) struct CommitRow {
+    /// The commit id as its link, finished HTML from `fmt::sha_link`.
+    pub(crate) sha: String,
+    pub(crate) initial: String,
+    pub(crate) hue: u32,
+    pub(crate) href: String,
+    pub(crate) subject: String,
+    pub(crate) author: String,
+    /// Commit list narrowed to this author, matched by (mailmapped) email.
+    pub(crate) author_href: String,
+    pub(crate) when: crate::when::When,
+    pub(crate) lead: Option<Lead>,
+    /// Muted text after the time, such as the lines a file history row changed.
+    pub(crate) note: String,
+    pub(crate) counts: Vec<Count>,
+}
+
+impl CommitRow {
+    /// The row of `c`, its time relative to `now`.
+    pub(crate) fn of(c: &CommitSummary, now: i64) -> Self {
+        Self {
+            sha: sha_link(&c.id),
+            initial: initial(&c.author.name),
+            hue: hue(&c.author.name),
+            href: href(&format!("/commit/{}", c.id)),
+            subject: c.subject.clone(),
+            author: c.author.name.clone(),
+            author_href: author_href(&c.author.email),
+            when: ago_at(c.author.time, c.author.offset, now),
+            lead: None,
+            note: String::new(),
+            counts: Vec::new(),
+        }
+    }
+
+    /// Puts `lead` before the commit, for a row that lists a ref.
+    #[must_use]
+    pub(crate) fn led_by(mut self, lead: Lead) -> Self {
+        self.lead = Some(lead);
+        self
+    }
+
+    #[must_use]
+    pub(crate) fn note(mut self, note: String) -> Self {
+        self.note = note;
+        self
+    }
+}
+
+/// The markup, from `commit_line.html`: the only place that writes a commit row.
+#[derive(Template)]
+#[template(path = "commit_line.html")]
+struct RowMarkup<'a> {
+    r: &'a CommitRow,
+}
+
+impl fmt::Display for CommitRow {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        RowMarkup { r: self }.render_into(f).map_err(|_| fmt::Error)
+    }
+}
+
+impl HtmlSafe for CommitRow {}
+
+#[cfg(test)]
+mod tests {
+    use gitterrace_git::Signature;
+
+    use super::*;
+
+    fn summary() -> CommitSummary {
+        let who = Signature {
+            name: "Ada <x>".to_owned(),
+            email: "ada@example.com".to_owned(),
+            time: 1_700_000_000,
+            offset: 0,
+        };
+        CommitSummary {
+            id: "0123456789abcdef0123456789abcdef01234567".to_owned(),
+            parents: Vec::new(),
+            author: who.clone(),
+            committer: who,
+            subject: "fix: a < b".to_owned(),
+        }
+    }
+
+    #[test]
+    fn a_row_shows_avatar_subject_author_time_then_id() {
+        let s = CommitRow::of(&summary(), 1_700_000_100).to_string();
+        let order = [
+            "class=\"av ",
+            "class=\"subj\"",
+            "class=\"who\"",
+            "datetime=",
+            "class=\"sha\"",
+        ];
+        let at: Vec<usize> = order.iter().map(|m| s.find(m).expect(m)).collect();
+        assert!(at.windows(2).all(|w| w[0] < w[1]), "{s}");
+        assert!(!s.contains("a < b") && !s.contains("Ada <x>"), "{s}");
+    }
+
+    #[test]
+    fn a_ref_leads_and_counts_close_the_row() {
+        let mut r = CommitRow::of(&summary(), 0).led_by(Lead {
+            name: "main".to_owned(),
+            href: "/log/main".to_owned(),
+            badges: vec!["default"],
+        });
+        r.counts.push(Count {
+            label: "ahead",
+            value: "3".to_owned(),
+            href: "/compare?base=a&head=b".to_owned(),
+            tip: "Commits ahead",
+        });
+        let s = r.to_string();
+        let lead = s.find("class=\"ref\"").expect("lead");
+        assert!(lead < s.find("class=\"av ").expect("avatar"), "{s}");
+        assert!(
+            s.contains("<span class=\"tag default\">default</span>"),
+            "{s}"
+        );
+        assert!(s.find("class=\"cnums\"").expect("counts") > s.find("class=\"sha\"").expect("id"));
+    }
+}

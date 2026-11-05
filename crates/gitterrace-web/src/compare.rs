@@ -27,16 +27,10 @@ struct LangRow {
     tone: &'static str,
 }
 
-struct Listed {
-    href: String,
-    sha: String,
-    subject: String,
-}
-
 struct Result2 {
     kpis: Vec<Kpi>,
     langs: Vec<LangRow>,
-    commits: Vec<Listed>,
+    commits: Vec<views::CommitRow>,
     more: usize,
     diff_href: String,
 }
@@ -88,7 +82,6 @@ pub(crate) async fn page(
                 (Ok(bi), Ok(hi)) => {
                     let ins = insights(a, r, a.defaults().into_options());
                     let cmp = ins.compare(&bi, &hi);
-                    let subjects = a.subjects(&hi);
                     let net = cmp.added.abs_diff(cmp.removed);
                     let kpis = vec![
                         Kpi("Commits without merges", fmt::thousands(cmp.commits.len())),
@@ -120,15 +113,15 @@ pub(crate) async fn page(
                             tone: if l.net >= 0 { "add" } else { "del" },
                         })
                         .collect();
-                    let commits = cmp
-                        .commits
+                    let shown: Vec<String> =
+                        cmp.commits.iter().take(COMPARE_LIST).cloned().collect();
+                    let now = fmt::now();
+                    let commits = a
+                        .repo
+                        .summaries(&shown)
+                        .unwrap_or_default()
                         .iter()
-                        .take(COMPARE_LIST)
-                        .map(|id| Listed {
-                            href: href(&format!("/commit/{id}")),
-                            sha: fmt::sha_link(id),
-                            subject: subjects.get(id).cloned().unwrap_or_default(),
-                        })
+                        .map(|s| views::CommitRow::of(s, now))
                         .collect();
                     result = Some(Result2 {
                         kpis,

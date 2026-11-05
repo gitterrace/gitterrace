@@ -16,7 +16,7 @@
 <p class="muted sum">{{ summary }} in {{ ms }} ms{% if capped %}. Showing the first results only, narrow the query to see more.{% endif %}</p>
 {% if commits_mode %}
 <ul class="list log">
-{% for r in commits %}{% include "_commit_row.html" %}{% endfor %}
+{% for r in commits %}{{ r }}{% endfor %}
 </ul>
 {% else %}
 {% for f in files %}<section class="card hits" data-path="{{ f.path }}"><header><a href="{{ f.href }}">{{ f.path }}</a><span class="muted">{{ f.count }}</span></header>

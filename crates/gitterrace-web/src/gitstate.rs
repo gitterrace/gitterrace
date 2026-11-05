@@ -124,7 +124,8 @@ pub(crate) async fn stashes(State(app): Shared) -> Result<Html<String>> {
 struct TagPage {
     c: Chrome,
     name: String,
-    commit: String,
+    /// The tagged commit, as every list shows a commit.
+    commit: views::CommitRow,
     tree_href: String,
     tagger: String,
     when: crate::when::When,
@@ -144,7 +145,12 @@ pub(crate) async fn tag(State(app): Shared, Path(name): Path<String>) -> Result<
         let note = r.annotation.as_ref();
         Ok(TagPage {
             c: views::chrome(a, "refs").pinned(),
-            commit: sha_link(&r.target),
+            commit: a
+                .repo
+                .summaries(std::slice::from_ref(&r.target))?
+                .first()
+                .map(|s| views::CommitRow::of(s, now))
+                .unwrap_or_default(),
             tree_href: href(&format!("/tree/{}", enc_seg(&r.name))),
             tagger: note
                 .and_then(|n| n.tagger.as_ref())
@@ -163,57 +169,56 @@ pub(crate) async fn tag(State(app): Shared, Path(name): Path<String>) -> Result<
     Ok(Html(html))
 }
 
-/// A local branch row on `/refs`: divergence from the default branch and its last commit.
-pub(crate) struct BranchRow {
-    pub(crate) name: String,
-    pub(crate) log: String,
-    pub(crate) compare: String,
-    pub(crate) commit: String,
-    pub(crate) subject: String,
-    pub(crate) author: String,
-    /// The author's commit log, as on every other page that names an author.
-    pub(crate) author_href: String,
-    pub(crate) when: crate::when::When,
-    pub(crate) ahead: String,
-    pub(crate) behind: String,
-    pub(crate) merged: bool,
-    pub(crate) default: bool,
-}
-
-/// Branch rows against HEAD's branch (or HEAD when detached), newest commit first.
-pub(crate) fn branch_rows(a: &crate::app::App) -> Result<Vec<BranchRow>> {
+/// Branch rows on `/refs`, against HEAD's branch (or HEAD when detached), default first and
+/// then newest commit first: the one commit row, led by the branch, closed by its divergence.
+pub(crate) fn branch_rows(a: &crate::app::App) -> Result<Vec<views::CommitRow>> {
     let default = a.repo.head_branch();
     let now = fmt::now();
     let base = default.clone().unwrap_or_else(|| "HEAD".to_owned());
     let status = a.repo.branch_status(&base)?;
     let ids: Vec<String> = status.iter().map(|s| s.target.clone()).collect();
     let summaries = a.repo.summaries(&ids)?;
-    let mut rows: Vec<(i64, BranchRow)> = status
+    let mut rows: Vec<(bool, i64, views::CommitRow)> = status
         .into_iter()
         .zip(summaries)
         .map(|(s, c)| {
             let is_default = default.as_deref() == Some(s.name.as_str());
-            let row = BranchRow {
-                log: href(&format!("/log/{}", enc_seg(&s.name))),
-                compare: crate::features::href_if(
-                    gitterrace_config::Feature::Compare,
-                    &format!("/compare?base={}&head={}", enc_seg(&base), enc_seg(&s.name)),
-                ),
-                commit: sha_link(&s.target),
-                subject: c.subject,
-                author_href: crate::views::author_href(&c.author.email),
-                author: c.author.name,
-                when: ago(c.committer.time, now),
-                ahead: fmt::thousands(s.ahead),
-                behind: fmt::thousands(s.behind),
-                // Merged means "in the default branch"; a detached HEAD is no such branch.
-                merged: s.merged() && !is_default && default.is_some(),
-                default: is_default,
-                name: s.name,
-            };
-            (c.committer.time, row)
+            let mut badges = Vec::new();
+            if is_default {
+                badges.push("default");
+            }
+            // Merged means "in the default branch"; a detached HEAD is no such branch.
+            if s.merged() && !is_default && default.is_some() {
+                badges.push("merged");
+            }
+            let mut row = views::CommitRow::of(&c, now).led_by(views::Lead {
+                href: href(&format!("/log/{}", enc_seg(&s.name))),
+                name: s.name.clone(),
+                badges,
+            });
+            // The default branch is the baseline: it is never ahead of or behind itself.
+            if !is_default {
+                row.counts = vec![
+                    views::Count {
+                        label: "behind",
+                        value: fmt::thousands(s.behind),
+                        href: String::new(),
+                        tip: "Commits behind the default branch",
+                    },
+                    views::Count {
+                        label: "ahead",
+                        value: fmt::thousands(s.ahead),
+                        href: crate::features::href_if(
+                            gitterrace_config::Feature::Compare,
+                            &format!("/compare?base={}&head={}", enc_seg(&base), enc_seg(&s.name)),
+                        ),
+                        tip: "Commits ahead of the default branch",
+                    },
+                ];
+            }
+            (is_default, c.committer.time, row)
         })
         .collect();
-    rows.sort_by_key(|(t, r)| (!r.default, std::cmp::Reverse(*t)));
-    Ok(rows.into_iter().map(|(_, r)| r).collect())
+    rows.sort_by_key(|(d, t, _)| (!*d, std::cmp::Reverse(*t)));
+    Ok(rows.into_iter().map(|(_, _, r)| r).collect())
 }

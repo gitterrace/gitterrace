@@ -8,7 +8,8 @@ use gitterrace_git::{
 };
 use gitterrace_types::ColorScheme;
 
-use crate::fmt::{ago, ago_at, enc_path, enc_seg, esc_text, href, sha_link};
+pub(crate) use crate::commit_line::{CommitRow, Count, Lead};
+use crate::fmt::{enc_path, enc_seg, esc_text, href};
 #[cfg(test)]
 pub(crate) use crate::views::code::{CodeMemo, code_html, code_memo_has, code_memo_put};
 pub(crate) use crate::views::code::{blame_html, code_html_first, code_tail_html};
@@ -171,31 +172,11 @@ pub(crate) struct Crumb {
     pub(crate) href: String,
 }
 
-pub(crate) struct CommitRow {
-    /// The commit id as its link, finished HTML from `fmt::sha_link`.
-    pub(crate) sha: String,
-    pub(crate) initial: String,
-    pub(crate) hue: u32,
-    pub(crate) href: String,
-    pub(crate) subject: String,
-    pub(crate) author: String,
-    /// Commit list narrowed to this author, matched by (mailmapped) email.
-    pub(crate) author_href: String,
-    pub(crate) when: crate::when::When,
-}
-
 pub(crate) struct Entry {
     pub(crate) name: String,
     pub(crate) href: String,
     pub(crate) kind: &'static str,
     pub(crate) size: String,
-}
-
-pub(crate) struct RefRow {
-    pub(crate) name: String,
-    pub(crate) log: String,
-    pub(crate) commit: String,
-    pub(crate) when: crate::when::When,
 }
 
 pub(crate) struct FileStatRow {
@@ -424,16 +405,7 @@ pub(crate) fn author_href(email: &str) -> String {
 }
 
 pub(crate) fn commit_row(c: &CommitSummary, now: i64) -> CommitRow {
-    CommitRow {
-        sha: sha_link(&c.id),
-        initial: initial(&c.author.name),
-        hue: hue(&c.author.name),
-        href: href(&format!("/commit/{}", c.id)),
-        subject: c.subject.clone(),
-        author: c.author.name.clone(),
-        author_href: author_href(&c.author.email),
-        when: ago_at(c.author.time, c.author.offset, now),
-    }
+    CommitRow::of(c, now)
 }
 
 /// Breadcrumbs for `path` under `rev`; `kind` is `tree` for every part but the last of a blob.
@@ -496,16 +468,39 @@ pub(crate) fn entries(rev: &str, path: &str, list: &[TreeEntry]) -> Vec<Entry> {
         .collect()
 }
 
-pub(crate) fn ref_rows(refs: &[RefInfo], kind: gitterrace_git::RefKind, now: i64) -> Vec<RefRow> {
-    refs.iter()
-        .filter(|r| r.kind == kind)
-        .map(|r| RefRow {
-            name: r.name.clone(),
-            log: href(&format!("/log/{}", enc_seg(&r.name))),
-            commit: sha_link(&r.target),
-            when: ago(r.time, now),
+/// The rows of the refs of `kind`, each led by its name: the one commit row, newest first.
+pub(crate) fn ref_rows(
+    app: &crate::app::App,
+    refs: &[RefInfo],
+    kind: gitterrace_git::RefKind,
+    now: i64,
+) -> crate::error::Result<Vec<CommitRow>> {
+    let picked: Vec<&RefInfo> = refs.iter().filter(|r| r.kind == kind).collect();
+    let ids: Vec<String> = picked.iter().map(|r| r.target.clone()).collect();
+    let page = if kind == gitterrace_git::RefKind::Tag {
+        "tag"
+    } else {
+        "log"
+    };
+    Ok(app
+        .repo
+        .summaries(&ids)?
+        .iter()
+        .zip(picked)
+        .map(|(c, r)| {
+            // An annotated tag's own subject says more about it than its commit's does.
+            let note = r
+                .annotation
+                .as_ref()
+                .map(|n| n.subject.clone())
+                .unwrap_or_default();
+            CommitRow::of(c, now).note(note).led_by(Lead {
+                name: r.name.clone(),
+                href: href(&format!("/{page}/{}", enc_seg(&r.name))),
+                badges: Vec::new(),
+            })
         })
-        .collect()
+        .collect())
 }
 
 pub(crate) fn file_label(f: &FileDiff) -> String {

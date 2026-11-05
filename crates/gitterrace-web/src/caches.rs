@@ -22,8 +22,6 @@ pub(crate) type IgnoreFiles = (String, Arc<Vec<(String, String)>>);
 pub(crate) type TotalsEntry = (String, gitterrace_index::PeriodStats);
 /// Whether the set behind a served source met a store error, and which.
 pub(crate) type Unreadable = Arc<dyn Fn() -> Option<String> + Send + Sync>;
-/// Commit subjects by full id.
-pub(crate) type Subjects = std::collections::HashMap<String, String>;
 
 pub(crate) struct Caches {
     /// Record sets by (commit, generation), oldest first. The map lock is held only to find a
@@ -47,7 +45,6 @@ pub(crate) struct Caches {
     pub(crate) last_commits: Mutex<Bounded<Arc<Vec<LastCommit>>>>,
     /// Ids of the commits `git log -- path` lists, by (tip, path, index generation).
     pub(crate) path_logs: Mutex<Bounded<Arc<crate::app::PathLog>>>,
-    pub(crate) subjects: Mutex<Option<(String, Arc<Subjects>)>>,
     /// The languages skeleton by (head, index generation). Flat in history length.
     pub(crate) chain: Mutex<Option<(HeadGen, Arc<crate::languages::Skeleton>)>>,
     pub(crate) head_lines: Mutex<Option<(String, Arc<Vec<gitterrace_index::HeadFile>>)>>,
@@ -65,7 +62,6 @@ impl Caches {
             file_lists: Mutex::new(Bounded::new(cfg.cache_bytes(Cache::FileLists))),
             last_commits: Mutex::new(Bounded::new(cfg.cache_bytes(Cache::LastCommits))),
             path_logs: Mutex::new(Bounded::new(cfg.cache_bytes(Cache::PathLogs))),
-            subjects: Mutex::new(None),
             chain: Mutex::new(None),
             head_lines: Mutex::new(None),
         }
@@ -84,7 +80,6 @@ impl Caches {
             file_lists,
             last_commits,
             path_logs,
-            subjects,
             chain,
             head_lines,
         } = self;
@@ -98,7 +93,6 @@ impl Caches {
             bounded_held(file_lists),
             bounded_held(last_commits),
             bounded_held(path_logs),
-            take(subjects),
             take(chain),
             take(head_lines),
         ]

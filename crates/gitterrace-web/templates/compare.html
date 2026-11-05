@@ -14,7 +14,7 @@
 {% for l in r.langs %}<tr><td>{{ l.language }}</td><td class="r"><b class="add">+{{ l.added }}</b></td><td class="r"><b class="del">-{{ l.removed }}</b></td><td class="r"><b class="{{ l.tone }}">{{ l.net }}</b></td></tr>{% endfor %}
 </table></div>
 <div class="chart-head"><div><h2>Commits</h2></div></div>
-<ul class="list log">{% for m in r.commits %}<li class="crow"><div class="cmain"><a class="subj" href="{{ m.href }}">{{ m.subject }}</a></div>{{ m.sha|safe }}</li>{% endfor %}</ul>
+<ul class="list log">{% for m in r.commits %}{{ m }}{% endfor %}</ul>
 {% if r.more > 0 %}<p class="muted">and {{ r.more }} more.</p>{% endif %}
 {% endif %}
 {% endblock %}
