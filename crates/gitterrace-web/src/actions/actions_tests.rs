@@ -47,33 +47,37 @@ id = "slow"
 label = "Slow"
 kinds = ["page", "commit"]
 shell = true
-command = 'cat >/dev/null; sh -c "echo \$\$ > \"{dir}/grandchild.pid\"; sleep 30" & sleep 30'
-timeout = "300ms"
+command = 'cat >/dev/null; sh -c "echo \$\$ > \"{dir}/grandchild.tmp\"; mv \"{dir}/grandchild.tmp\" \"{dir}/grandchild.pid\"; sleep 30" & while [ ! -e "{dir}/grandchild.pid" ]; do sleep 0.01; done; sleep 30'
+timeout = "2s"
 
 [[action]]
 id = "nap1"
 label = "Nap 1"
 kinds = ["page"]
 shell = true
-command = "cat >/dev/null; sleep 2"
+command = 'cat >/dev/null; touch "{dir}/nap1.up"; while [ ! -e "{dir}/release" ]; do sleep 0.02; done'
+timeout = "60s"
 [[action]]
 id = "nap2"
 label = "Nap 2"
 kinds = ["page"]
 shell = true
-command = "cat >/dev/null; sleep 2"
+command = 'cat >/dev/null; touch "{dir}/nap2.up"; while [ ! -e "{dir}/release" ]; do sleep 0.02; done'
+timeout = "60s"
 [[action]]
 id = "nap3"
 label = "Nap 3"
 kinds = ["page"]
 shell = true
-command = "cat >/dev/null; sleep 2"
+command = 'cat >/dev/null; touch "{dir}/nap3.up"; while [ ! -e "{dir}/release" ]; do sleep 0.02; done'
+timeout = "60s"
 [[action]]
 id = "nap4"
 label = "Nap 4"
 kinds = ["page"]
 shell = true
-command = "cat >/dev/null; sleep 2"
+command = 'cat >/dev/null; touch "{dir}/nap4.up"; while [ ! -e "{dir}/release" ]; do sleep 0.02; done'
+timeout = "60s"
 "#;
 
 /// A private folder holding `actions.toml` built from `template`.

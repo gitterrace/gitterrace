@@ -298,13 +298,20 @@ async fn run_route_security_table() {
             .contains("timed out")
     );
     let pid = std::fs::read_to_string(cfg.path().join("grandchild.pid")).expect("pid");
-    std::thread::sleep(std::time::Duration::from_millis(100));
-    let alive = Command::new("kill")
-        .args(["-0", pid.trim()])
-        .status()
-        .expect("kill")
-        .success();
-    assert!(!alive, "grandchild survived");
+    // The group was signalled; the kernel reaps the grandchild soon after, well before its
+    // own 30 s sleep would end it.
+    let alive = || {
+        Command::new("kill")
+            .args(["-0", pid.trim()])
+            .status()
+            .expect("kill")
+            .success()
+    };
+    let end = std::time::Instant::now() + std::time::Duration::from_secs(10);
+    while alive() && std::time::Instant::now() < end {
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+    }
+    assert!(!alive(), "grandchild survived");
 
     // 17. the 5th concurrent run is refused.
     let mut runs = Vec::new();
@@ -314,8 +321,20 @@ async fn run_route_security_table() {
             send(&r, Req::ok(&t, body(id, "page", ""))).await.0
         }));
     }
-    tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+    // Each nap marks itself started and runs until released, so all four hold a slot now.
+    let up = |id: &str| cfg.path().join(format!("{id}.up")).exists();
+    let end = std::time::Instant::now() + std::time::Duration::from_secs(20);
+    while !["nap1", "nap2", "nap3", "nap4"].iter().all(|id| up(id))
+        && std::time::Instant::now() < end
+    {
+        tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+    }
+    assert!(
+        ["nap1", "nap2", "nap3", "nap4"].iter().all(|id| up(id)),
+        "four runs started"
+    );
     let (s, res) = send(&on, Req::ok(&tok, body("echo", "page", ""))).await;
+    std::fs::write(cfg.path().join("release"), "").expect("release");
     assert_eq!(s, 429, "5th concurrent: {res}");
     for r in runs {
         assert_eq!(r.await.expect("join"), 200);
