@@ -174,6 +174,12 @@ impl Index {
         self.newer.as_deref()
     }
 
+    /// The format a newer build wrote the cache in, read from disk now: a newer build may take
+    /// the cache over while this one runs. Such a cache is never written by this build.
+    pub fn newer_owner(&self) -> Option<String> {
+        store::newer_version(&self.dir).ok().flatten()
+    }
+
     fn writable(&self) -> io::Result<()> {
         store::check_writable(&self.dir)
     }

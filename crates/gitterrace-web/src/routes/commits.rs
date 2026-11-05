@@ -110,8 +110,7 @@ fn author_page(
     pg: usize,
 ) -> Result<(Vec<gitterrace_git::CommitSummary>, bool)> {
     let from = pg * PAGE;
-    if let Some(src) = a.source(id)? {
-        let ids = src.run(|s| indexed_author_ids(&**s, who, path))?;
+    if let Some(ids) = a.accelerate(id, |s| indexed_author_ids(&**s, who, path))? {
         let more = ids.len() > from + PAGE;
         let slice: Vec<String> = ids.into_iter().skip(from).take(PAGE).collect();
         return Ok((a.repo.summaries(&slice)?, more));

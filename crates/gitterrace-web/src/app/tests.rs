@@ -305,6 +305,22 @@ fn one_commit_app() -> (tempfile::TempDir, Arc<App>, String) {
     (dir, app, head)
 }
 
+/// A page rendered while a read was failing (another request's sidebar, built just before its
+/// own read failed) is never served once the rebuild starts. The rebuilt cache gets the same
+/// index generation, so a memo entry would match it and show the broken page again.
+#[test]
+fn an_unreadable_cache_drops_every_memoized_page() {
+    let (_dir, app, _head) = one_commit_app();
+    let page = app.memo_key("overview", None);
+    app.memo_put(page.clone(), Arc::new("built over a failing read".into()));
+    assert!(app.memo_get(&page).is_some());
+    app.unreadable_now().expect("rebuild");
+    assert!(
+        app.memo_get(&page).is_none(),
+        "a page memo survived the rebuild"
+    );
+}
+
 /// Every per-request cache is empty after an idle release, whichever page filled it. The
 /// caches live in one struct whose clear names every field, so a new one cannot be left
 /// out; this checks the release reaches that clear and that each filled cache empties.

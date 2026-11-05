@@ -26,7 +26,7 @@ pub(crate) fn newer_message(found: &str) -> String {
 
 /// The stored format when it is newer than ours. Older, missing and unreadable versions are
 /// ours to reset; a newer one belongs to a newer build and must never be overwritten.
-fn newer_version(dir: &Path) -> io::Result<Option<String>> {
+pub(crate) fn newer_version(dir: &Path) -> io::Result<Option<String>> {
     let found = cache::read(dir, VERSION_FILE)?
         .map(|b| String::from_utf8_lossy(&b).trim().to_owned())
         .unwrap_or_default();

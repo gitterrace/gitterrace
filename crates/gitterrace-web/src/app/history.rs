@@ -28,16 +28,16 @@ impl App {
     /// not ready for `commit` (the caller walks then). Built once per
     /// (commit, path, index generation) from the records, so a repeat costs a map lookup.
     pub(crate) fn path_log(&self, commit: &str, path: &str) -> Result<Option<Arc<PathLog>>> {
-        let Some(src) = self.source(commit)? else {
-            return Ok(None);
-        };
         let key = format!("{commit}\0{path}\0{}", self.index.generation());
-        if let Ok(g) = self.caches.path_logs.lock()
+        if self.source(commit)?.is_some()
+            && let Ok(g) = self.caches.path_logs.lock()
             && let Some(v) = g.get(&key)
         {
             return Ok(Some(v));
         }
-        let owned = src.run(|s| touching_history(&**s, path))?;
+        let Some(owned) = self.accelerate(commit, |s| touching_history(&**s, path))? else {
+            return Ok(None);
+        };
         let history: Vec<(&str, &[String], bool)> = owned
             .iter()
             .map(|(id, parents, t)| (id.as_str(), parents.as_slice(), *t))

@@ -180,13 +180,18 @@ async fn overview(State(app): Shared, Query(q): Query<DocQuery>) -> Result<Html<
         let list = a.repo.tree(&head, "")?;
         let docs = crate::about::find(&list);
         let about = crate::about::card(a, &head, &rev, "", "/", &docs, q.doc.as_deref());
-        let (side, totals) = match a.source(&head)? {
-            Some(src) => src.run(|src| {
-                let side = crate::overview_side::html(a, &head, &**src);
-                (side, Some(overview_numbers(a, &head, src)))
-            })?,
+        // A failed read leaves out the numbers (the cache is rebuilt behind them); the code
+        // part of the overview needs no cache and still shows.
+        let built = match a.source(&head)? {
+            Some(src) => src
+                .run(|src| {
+                    let side = crate::overview_side::html(a, &head, &**src);
+                    (side, Some(overview_numbers(a, &head, src)))
+                })
+                .or_else(|e| a.unreadable(&e).map(|()| (String::new(), None)))?,
             None => (String::new(), None),
         };
+        let (side, totals) = built;
         Ok(OverviewPage {
             c: Chrome {
                 md: about.as_ref().is_some_and(|d| d.markdown),

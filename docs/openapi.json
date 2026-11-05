@@ -405,6 +405,7 @@
                   "index",
                   "internal",
                   "index_unreadable",
+                  "index_newer",
                   "needs_reindex"
                 ],
                 "type": "string"

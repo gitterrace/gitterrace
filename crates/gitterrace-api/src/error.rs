@@ -25,6 +25,9 @@ pub enum ApiError {
     /// answered from.
     #[error(transparent)]
     Unreadable(#[from] gitterrace_index::feed::SourceError),
+    /// A newer build owns the cache: this one never writes it, so it cannot rebuild it.
+    #[error("the insights cache has format {0}, written by a newer gitterrace")]
+    NewerCache(String),
 }
 
 /// Every `error.code` an answer can carry, with its HTTP status and meaning. The docs and the
@@ -46,11 +49,20 @@ pub const ERROR_CODES: &[(&str, u16, &str)] = &[
         "the insights cache failed a read and is being rebuilt; retry shortly",
     ),
     (
+        "index_newer",
+        503,
+        "a newer gitterrace owns the insights cache; run it, or delete the cache to rebuild",
+    ),
+    (
         "needs_reindex",
         409,
         "the revision is too far from the indexed branch to answer without a reindex",
     ),
 ];
+
+/// `Retry-After` of a 503, in seconds: a small repository rebuilds within it, and a client that
+/// comes back too early gets another 503.
+pub const RETRY_AFTER_SECS: &str = "2";
 
 /// Body text of every 5xx answer. The inner error names files on the host (cache and pack
 /// paths), so it goes to the server log only.
@@ -64,7 +76,7 @@ impl ApiError {
                 gitterrace_git::Error::RevNotFound(_) | gitterrace_git::Error::PathNotFound(_),
             ) => StatusCode::NOT_FOUND,
             Self::NeedsReindex { .. } => StatusCode::CONFLICT,
-            Self::Unreadable(_) => StatusCode::SERVICE_UNAVAILABLE,
+            Self::Unreadable(_) | Self::NewerCache(_) => StatusCode::SERVICE_UNAVAILABLE,
             Self::Git(_) | Self::Index(_) | Self::Task(_) => StatusCode::INTERNAL_SERVER_ERROR,
         }
     }
@@ -79,6 +91,7 @@ impl ApiError {
             Self::Task(_) => "internal",
             Self::NeedsReindex { .. } => "needs_reindex",
             Self::Unreadable(_) => "index_unreadable",
+            Self::NewerCache(_) => "index_newer",
         }
     }
 }
@@ -93,7 +106,15 @@ impl IntoResponse for ApiError {
             self.to_string()
         };
         let body = serde_json::json!({ "error": { "code": self.code(), "message": message } });
-        (status, Json(body)).into_response()
+        let mut res = (status, Json(body)).into_response();
+        // A 503 is a cache that cannot answer yet: a client retries instead of giving up.
+        if status == StatusCode::SERVICE_UNAVAILABLE {
+            res.headers_mut().insert(
+                axum::http::header::RETRY_AFTER,
+                axum::http::HeaderValue::from_static(RETRY_AFTER_SECS),
+            );
+        }
+        res
     }
 }
 
@@ -113,6 +134,7 @@ mod tests {
             ApiError::Task(String::new()),
             ApiError::NeedsReindex { read: 0, cap: 0 },
             ApiError::Unreadable(gitterrace_index::feed::SourceError(String::new())),
+            ApiError::NewerCache(String::new()),
         ];
         for e in &all {
             assert!(

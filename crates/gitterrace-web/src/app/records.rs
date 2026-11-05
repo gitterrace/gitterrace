@@ -100,6 +100,23 @@ impl App {
         self.unreadable_now()
     }
 
+    /// `f` over the source of `head`, for a page that only uses the index to go faster and
+    /// walks git without it: `None` while there is no source, and when a read fails (the cache
+    /// is rebuilt then, and the page walks git as if it had none).
+    pub(crate) fn accelerate<T>(
+        &self,
+        head: &str,
+        f: impl FnOnce(&crate::insights::Src) -> T,
+    ) -> Result<Option<T>> {
+        let Some(src) = self.source(head)? else {
+            return Ok(None);
+        };
+        match src.run(f) {
+            Ok(v) => Ok(Some(v)),
+            Err(e) => self.unreadable(&e).map(|()| None),
+        }
+    }
+
     /// A page met `e` while it was built: the cache goes, the visitor gets the indexing page.
     pub(crate) fn unreadable(&self, e: &gitterrace_index::feed::SourceError) -> Result<()> {
         tracing::warn!("cache unreadable while a page was built, rebuilding: {e}");
@@ -107,11 +124,14 @@ impl App {
     }
 
     /// Drops everything read from the cache, deletes it and starts the rebuild.
-    fn unreadable_now(&self) -> Result<()> {
+    pub(crate) fn unreadable_now(&self) -> Result<()> {
         // Everything built over the source goes with it: a rebuild of the same history gets
         // the same generation, so a table built while a read failed would be served again.
         self.caches.clear_all();
         gitterrace_index::Insights::release_shared(&format!("{}\u{0}", self.base));
+        // The page memo too: a sidebar or count rendered while a read failed would otherwise
+        // be served from the rebuilt cache, whose generation is the same.
+        self.clear_memo();
         self.index.rebuild()?;
         self.ready.store(false, Ordering::Release);
         // HEAD did not move, so the loop would not rebuild it on its own.

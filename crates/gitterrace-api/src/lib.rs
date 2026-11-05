@@ -15,9 +15,9 @@ mod insights;
 mod mcp;
 mod wire;
 
-pub use core::{ApiState, options_from};
+pub use core::{ApiState, Rebuild, options_from};
 pub use endpoints::{ENDPOINTS, Endpoint, Param, generator as schema_generator};
-pub use error::{ApiError, ERROR_CODES, SERVER_ERROR_MESSAGE};
+pub use error::{ApiError, ERROR_CODES, RETRY_AFTER_SECS, SERVER_ERROR_MESSAGE};
 pub use http::{index_body, router};
 pub use insights::{
     HEAD_INSIGHTS, INSIGHTS, Insight, OWNERSHIP_DEPTH, Params, list as insight_list,
@@ -28,6 +28,8 @@ pub use mcp::{McpServer, ToolDoc, serve_mcp, tool_on};
 mod limit_tests;
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
+
     use gitterrace_testkit::git;
 
     use axum::body::Body;
@@ -426,6 +428,69 @@ mod tests {
         assert!(
             !hot.to_string().contains("src/b.rs"),
             "repo exclude ignored: {hot}"
+        );
+    }
+
+    /// Flips one byte inside every segment of `dir`'s cache.
+    fn corrupt_segments(dir: &std::path::Path) {
+        let cache = dir.join(".git/gitterrace");
+        for e in std::fs::read_dir(&cache).expect("ls").flatten() {
+            if e.file_name().to_string_lossy().starts_with("seg-") {
+                let mut b = std::fs::read(e.path()).expect("read");
+                let mid = b.len() / 2;
+                b[mid] ^= 0xff;
+                std::fs::write(e.path(), b).expect("corrupt");
+            }
+        }
+    }
+
+    /// A cache that fails a read (a fresh state, so no block was read before) answers 503 with
+    /// `Retry-After` and is rebuilt by the API itself, with nothing else asking: 200 again
+    /// within the limit. Red when the API does not
+    /// start the rebuild: it answers 503 for good.
+    #[tokio::test]
+    async fn an_unreadable_cache_is_rebuilt_by_the_api_alone() {
+        let (d, built) = fixture();
+        drop(built);
+        corrupt_segments(d.path());
+        let s = ApiState::open(d.path()).expect("open");
+        let req = || Request::get("/repo").body(Body::empty()).expect("req");
+        let res = router(s.clone()).oneshot(req()).await.expect("res");
+        assert_eq!(res.status(), StatusCode::SERVICE_UNAVAILABLE);
+        assert_eq!(
+            res.headers()
+                .get("retry-after")
+                .and_then(|v| v.to_str().ok()),
+            Some(crate::RETRY_AFTER_SECS)
+        );
+        let t0 = std::time::Instant::now();
+        while get(&s, "/repo").await.0 != StatusCode::OK {
+            assert!(
+                t0.elapsed() < std::time::Duration::from_secs(10),
+                "the API never rebuilt its unreadable cache"
+            );
+            tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+        }
+    }
+
+    /// With a server's rebuild installed, an unreadable cache goes to it, not to a second
+    /// rebuild of the API's own: one rebuild for pages and API.
+    #[tokio::test]
+    async fn an_unreadable_cache_goes_to_the_installed_rebuild() {
+        let (d, built) = fixture();
+        drop(built);
+        corrupt_segments(d.path());
+        let s = ApiState::open(d.path()).expect("open");
+        let calls = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let seen = Arc::clone(&calls);
+        s.on_unreadable(Arc::new(move || {
+            seen.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        }));
+        assert_eq!(get(&s, "/repo").await.0, StatusCode::SERVICE_UNAVAILABLE);
+        assert_eq!(calls.load(std::sync::atomic::Ordering::Relaxed), 1);
+        assert!(
+            d.path().join(".git/gitterrace/MANIFEST").exists(),
+            "the API rebuilt on its own beside the installed rebuild"
         );
     }
 

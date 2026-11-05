@@ -23,6 +23,7 @@ Rust: `gitterrace_api::router(ApiState)` (nest under `/api/v1`),
 | 500 | `index` | reading the insights cache failed |
 | 500 | `internal` | the server failed |
 | 503 | `index_unreadable` | the insights cache failed a read and is being rebuilt; retry shortly |
+| 503 | `index_newer` | a newer gitterrace owns the insights cache; run it, or delete the cache to rebuild |
 | 409 | `needs_reindex` | the revision is too far from the indexed branch to answer without a reindex |
 
 A 5xx `message` is always the same fixed text. The details go to the server log.

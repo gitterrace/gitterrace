@@ -352,7 +352,17 @@ impl App {
 
     /// Takes a reloaded config: limits, stream cap, rendered pages and open tabs.
     /// Hands the app its `/api/v1` state, once, so a reload reconfigures it too.
-    pub(crate) fn set_api(&self, api: gitterrace_api::ApiState) {
+    /// Links this repository's `/api/v1` state. An API answer that meets an unreadable cache
+    /// starts the same rebuild a page does ([`App::unreadable_now`]), one for both.
+    pub(crate) fn set_api(self: &Arc<Self>, api: gitterrace_api::ApiState) {
+        let app = Arc::downgrade(self);
+        api.on_unreadable(Arc::new(move || {
+            if let Some(a) = app.upgrade()
+                && let Err(e) = a.unreadable_now()
+            {
+                tracing::warn!("rebuilding the unreadable cache for the API failed: {e}");
+            }
+        }));
         self.api.set(api).ok();
     }
 
@@ -463,10 +473,7 @@ impl App {
         }
         // A ready index names the commits that changed anything under `dir`; the walk visits
         // only those instead of every commit in history.
-        let among = self
-            .source(commit)?
-            .map(|src| src.run(|s| touched_names(&**s, dir)))
-            .transpose()?;
+        let among = self.accelerate(commit, |s| touched_names(&**s, dir))?;
         let (found, complete) =
             gitterrace_git::last_commits_among(&self.repo, commit, dir, among.as_deref(), budget)?;
         let v = Arc::new(found);

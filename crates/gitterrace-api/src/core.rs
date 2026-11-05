@@ -1,6 +1,8 @@
 //! Transport-neutral reads. Both the HTTP router and the MCP tools call these,
 //! so the two surfaces cannot drift apart. Everything here is blocking.
 
+mod rebuild;
+
 use std::path::Path;
 use std::sync::{Arc, Mutex, RwLock};
 
@@ -49,7 +51,16 @@ pub struct ApiState {
     /// `links.style` and the counting options a request leaves unset. Shared with every clone,
     /// so a config reload ([`ApiState::reconfigure`]) reaches routers already built.
     settings: Arc<RwLock<Settings>>,
+    /// What an unreadable cache sets off: the server's own rebuild when it runs the API, so the
+    /// pages and the API share one, else this state's ([`ApiState::rebuild_alone`]).
+    on_unreadable: Arc<RwLock<Option<Rebuild>>>,
+    /// A rebuild this state started itself is running.
+    rebuilding: Arc<std::sync::atomic::AtomicBool>,
 }
+
+/// Deletes an unreadable cache and starts its rebuild. Returns at once: the answer meanwhile
+/// is a 503 with `Retry-After`.
+pub type Rebuild = Arc<dyn Fn() + Send + Sync>;
 
 /// What the configuration decides for the API.
 #[derive(Clone, Default)]
@@ -74,6 +85,8 @@ impl ApiState {
             index,
             cache: Arc::default(),
             settings: Arc::default(),
+            on_unreadable: Arc::default(),
+            rebuilding: Arc::default(),
         }
     }
 
@@ -180,6 +193,8 @@ impl ApiState {
     /// [`Checked::run`]: an answer built while the cache failed a read is refused.
     /// Shared between calls while the tip and the cache are unchanged. A source that met a
     /// storage error is dropped, so the next call opens the cache again.
+    /// The checked source of `rev`, for [`ApiState::read`] and the cache tests: an answer
+    /// reads through `read`, which turns a storage error into the rebuild.
     pub(crate) fn records(&self, rev: &str) -> Result<Checked<dyn InsightsSource>, ApiError> {
         let tip = self.repo.resolve(rev)?;
         let key = (tip.clone(), self.index.generation());
@@ -281,7 +296,7 @@ impl ApiState {
 
     pub fn repo_info(&self) -> Result<RepoResponse, ApiError> {
         let head = self.repo.resolve(DEFAULT_REV).ok();
-        let totals = self.records(DEFAULT_REV)?.run(|records| {
+        let totals = self.read(DEFAULT_REV, |records| {
             self.insights(DEFAULT_REV, &**records, self.settings().defaults)
                 .period_summary(gitterrace_index::Period::All)
                 .current
@@ -490,9 +505,9 @@ impl ApiState {
         let rev = Self::rev(rev)?;
         let tip = self.repo.resolve(rev)?;
         let scope = insights::scope(params, self.settings().defaults)?;
-        let all = self.records(rev)?;
-        let commits_indexed = all.len();
-        let mut data = all.run(|all| {
+        let mut commits_indexed = 0;
+        let mut data = self.read(rev, |all| {
+            commits_indexed = all.len();
             let ins = self.insights(&tip, &**all, scope.options().clone());
             let cx =
                 gitterrace_index::CountContext::new(&**all, &gitterrace_index::feed::SystemClock);
@@ -523,7 +538,7 @@ impl ApiState {
         let rev = Self::rev(rev)?;
         let opts = self.settings().defaults;
         let bots = opts.include_bots;
-        let report = self.records(rev)?.run(|records| {
+        let report = self.read(rev, |records| {
             self.insights(rev, &**records, opts)
                 .contributors(gitterrace_index::Period::All)
         })?;

@@ -6,71 +6,151 @@
 
 use gitterrace_testkit::{Fixture, base, get};
 
+/// Asks only `/api/v1/repo` until it answers 200 again, at most `limit`: no page is asked
+/// meanwhile, so a page's own rebuild cannot stand in for the API's. Every answer before is a
+/// 503 with `Retry-After`. Returns how long it took and anything else seen.
+async fn until_api_answers(
+    router: &axum::Router,
+    prefix: &str,
+    limit: std::time::Duration,
+) -> (Option<std::time::Duration>, Vec<String>) {
+    let t0 = std::time::Instant::now();
+    let mut errors = Vec::new();
+    let mut round = 0;
+    while t0.elapsed() < limit {
+        let u = format!("{prefix}/api/v1/repo?author=probe{round}");
+        let (status, retry) = api(router, &u).await;
+        match status {
+            200 => return (Some(t0.elapsed()), errors),
+            503 if retry.is_some() => {}
+            s => errors.push(format!("{u} -> {s}, Retry-After {retry:?}")),
+        }
+        round += 1;
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+    }
+    (None, errors)
+}
+
+/// Status and `Retry-After` of one API answer.
+async fn api(router: &axum::Router, uri: &str) -> (u16, Option<String>) {
+    use tower::ServiceExt as _;
+    let req = axum::http::Request::get(uri)
+        .header("host", "localhost")
+        .body(axum::body::Body::empty())
+        .expect("request");
+    let res = router.clone().oneshot(req).await.expect("response");
+    let retry = res
+        .headers()
+        .get("retry-after")
+        .and_then(|v| v.to_str().ok())
+        .map(str::to_owned);
+    (res.status().as_u16(), retry)
+}
+
+/// Flips one byte in the middle of every segment.
+fn corrupt(cache: &std::path::Path) {
+    let segs = segments(cache);
+    assert!(!segs.is_empty(), "no segment to corrupt");
+    for p in segs {
+        let mut b = std::fs::read(&p).expect("read");
+        let mid = b.len() / 2;
+        b[mid] ^= 0xff;
+        std::fs::write(&p, b).expect("corrupt");
+    }
+}
+
+/// How long the API may answer 503 after its cache went bad. The fixture answers again after
+/// 80 to 210 ms on a machine at load 130 to 280, so this is fifty times the slowest seen.
+const REBUILT_WITHIN: std::time::Duration = std::time::Duration::from_secs(10);
+
+/// Segments corrupted under a running server: never a 500, a 503 with `Retry-After` while the
+/// cache is rebuilt, then 200 again, asked through the API alone. The API hands the failure to
+/// the server's one rebuild; that it starts a rebuild with nothing else asking is pinned in
+/// the API crate (`an_unreadable_cache_is_rebuilt_by_the_api_alone`), red without its trigger.
+#[test]
+fn a_running_server_rebuilds_a_cache_corrupted_underneath_for_the_api_too() {
+    let rt = tokio::runtime::Runtime::new().expect("runtime");
+    rt.block_on(async {
+        let tmp = tempfile::tempdir().expect("tmp");
+        let (repo, router, prefix) = built(tmp.path()).await;
+        let cache = repo.join(".git/gitterrace");
+        let (s, _) = api(&router, &format!("{prefix}/api/v1/repo")).await;
+        assert_eq!(s, 200, "the API answers before the corruption");
+        corrupt(&cache);
+        let (took, errors) = until_api_answers(&router, &prefix, REBUILT_WITHIN).await;
+        assert!(
+            errors.is_empty(),
+            "while rebuilding:\n{}",
+            errors.join("\n")
+        );
+        assert!(
+            took.is_some(),
+            "the API answers 200 again after the rebuild"
+        );
+        // The pages answer from the rebuilt cache too, and never with a 5xx.
+        for p in ["/", "/stats", "/log/HEAD"] {
+            let (s, _) = get(&router, &format!("{prefix}{p}?author=after")).await;
+            assert!(s < 500, "{p} -> {s} after the rebuild");
+        }
+    });
+}
+
+/// The incident behind this test: a server already RUNNING while another build moves the
+/// cache to a newer format and a segment goes bad underneath it. A newer build's cache is
+/// never written, so it is not rebuilt: no page or API answer is a 500, every API answer is a
+/// 503 `index_newer` with `Retry-After`, and the cache stays byte for byte as it was.
 #[test]
 fn a_running_server_survives_its_cache_being_rewritten_underneath() {
     let rt = tokio::runtime::Runtime::new().expect("runtime");
     rt.block_on(async {
         let tmp = tempfile::tempdir().expect("tmp");
-        let repo = Fixture::standard(&tmp.path().join("repo"))
-            .path()
-            .to_owned();
+        let (repo, router, prefix) = built(tmp.path()).await;
         let cache = repo.join(".git/gitterrace");
-        {
-            let r = gitterrace_git::Repo::discover(&repo).expect("repo");
-            let index = gitterrace_index::Index::open(&r).expect("index");
-            index.update(&r, "HEAD", &|_| {}).expect("build");
-        }
-        let router = gitterrace_web::app_router(&repo).expect("router");
-        let prefix = base(&router).await;
-        let pages = ["/", "/stats", "/log/HEAD", "/api/v1/repo"];
-        // Warm: the server is up and serving the built cache.
         for _ in 0..40 {
             let (s, _) = get(&router, &format!("{prefix}/stats")).await;
             assert!(s < 500, "/stats -> {s} before the rewrite");
             tokio::time::sleep(std::time::Duration::from_millis(50)).await;
         }
-
         // Another build rewrites the cache while the server runs.
         let newer = gitterrace_index::FORMAT_VERSION
             .parse::<u64>()
             .expect("numeric")
             + 1;
         std::fs::write(cache.join("VERSION"), format!("{newer}\n")).expect("w");
-        let mut hit = 0;
-        for e in std::fs::read_dir(&cache).expect("dir").flatten() {
-            let name = e.file_name().to_string_lossy().into_owned();
-            if name.starts_with("seg-")
-                && std::path::Path::new(&name)
-                    .extension()
-                    .is_some_and(|x| x == "gts")
-            {
-                let mut b = std::fs::read(e.path()).expect("read");
-                let mid = b.len() / 2;
-                b[mid] ^= 0xff;
-                std::fs::write(e.path(), b).expect("corrupt");
-                hit += 1;
-            }
-        }
-        assert!(hit > 0, "no segment to corrupt");
-
+        corrupt(&cache);
+        let before: Vec<_> = segments(&cache)
+            .iter()
+            .map(|p| std::fs::read(p).expect("read"))
+            .collect();
         let mut errors = Vec::new();
         for round in 0..20 {
-            for p in pages {
-                // A distinct memo-keyed query (author) per round: the page memo cannot
-                // answer, so every request must read the rewritten store.
+            for p in ["/", "/stats", "/log/HEAD"] {
                 let u = format!("{prefix}{p}?author=probe{round}");
                 let (s, _) = get(&router, &u).await;
                 if s >= 500 {
                     errors.push(format!("round {round}: {u} -> {s}"));
                 }
             }
+            let u = format!("{prefix}/api/v1/repo?author=probe{round}");
+            let (status, retry) = api(&router, &u).await;
+            let (_, body) = get(&router, &u).await;
+            if status != 503 || retry.is_none() || !body.contains("index_newer") {
+                errors.push(format!(
+                    "round {round}: {u} -> {status}, Retry-After {retry:?}"
+                ));
+            }
             tokio::time::sleep(std::time::Duration::from_millis(100)).await;
         }
         assert!(
             errors.is_empty(),
-            "5xx after the rewrite:\n{}",
+            "after the rewrite:\n{}",
             errors.join("\n")
         );
+        let after: Vec<_> = segments(&cache)
+            .iter()
+            .map(|p| std::fs::read(p).expect("read"))
+            .collect();
+        assert!(before == after, "a newer build's cache was written");
     });
 }
 
