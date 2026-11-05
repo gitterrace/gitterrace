@@ -200,26 +200,62 @@ async fn working_tree_is_scanned_only_for_a_subscriber() {
         );
     }
 
+    // The subscriber's first scan is its baseline; an edit before it finishes is the baseline.
+    let before = scans(&a);
     let _wt = crate::live::WorktreeWatch::new(&a);
-    tokio::time::sleep(Duration::from_millis(600)).await;
+    assert!(
+        scanned_after(&a, before, Duration::from_secs(20)).await,
+        "a subscriber gets a baseline scan"
+    );
     while rx.try_recv().is_ok() {}
     std::fs::write(p.join("small.txt"), "edited with a subscriber\n").expect("write");
-    let got = tokio::time::timeout(Duration::from_secs(10), rx.recv())
-        .await
-        .expect("event")
-        .expect("open");
-    assert!(kinds(got).contains(&"worktree"), "an edit is seen");
+    assert!(worktree_event(&mut rx).await, "an edit is seen");
     std::fs::write(p.join("brand-new.txt"), "x\n").expect("write");
-    let got = tokio::time::timeout(Duration::from_secs(10), rx.recv())
-        .await
-        .expect("event")
-        .expect("open");
-    assert!(
-        kinds(got).contains(&"worktree"),
-        "an untracked file is seen"
-    );
+    assert!(worktree_event(&mut rx).await, "an untracked file is seen");
+    // Late events from those writes may still rescan; once scans stop, nothing announces.
+    settle(&a).await;
+    while rx.try_recv().is_ok() {}
     let quiet = tokio::time::timeout(Duration::from_millis(900), rx.recv()).await;
     assert!(quiet.is_err(), "an untouched tree sends nothing");
+}
+
+fn scans(a: &crate::app::App) -> u64 {
+    a.wt_scans.load(std::sync::atomic::Ordering::Acquire)
+}
+
+/// Waits until a scan finished after the count read `before`.
+async fn scanned_after(a: &crate::app::App, before: u64, within: Duration) -> bool {
+    let end = std::time::Instant::now() + within;
+    while std::time::Instant::now() < end {
+        if scans(a) > before {
+            return true;
+        }
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    }
+    false
+}
+
+/// Returns once a second passes without a scan.
+async fn settle(a: &crate::app::App) {
+    let end = std::time::Instant::now() + Duration::from_secs(30);
+    let mut last = u64::MAX;
+    while scans(a) != last && std::time::Instant::now() < end {
+        last = scans(a);
+        tokio::time::sleep(Duration::from_secs(1)).await;
+    }
+}
+
+/// True once a change naming the worktree arrives; other kinds (the dirty chip) are skipped.
+async fn worktree_event(
+    rx: &mut tokio::sync::broadcast::Receiver<Arc<crate::live::Change>>,
+) -> bool {
+    let end = tokio::time::Instant::now() + Duration::from_secs(20);
+    while let Ok(Ok(c)) = tokio::time::timeout_at(end, rx.recv()).await {
+        if c.kinds.contains(&"worktree") {
+            return true;
+        }
+    }
+    false
 }
 
 #[tokio::test]
