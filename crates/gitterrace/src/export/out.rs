@@ -65,7 +65,7 @@ impl Staging {
         write_leaf(&self.dir.join(MARKER), marker_line(repos).as_bytes())?;
         match existing {
             Existing::Replace => {
-                let old = self.dir.with_extension("old");
+                let old = old_path(&self.dir);
                 let had = std::fs::symlink_metadata(out).is_ok();
                 if had {
                     std::fs::rename(out, &old)
@@ -153,6 +153,15 @@ pub(super) fn check_out(repos: &[PathBuf], out: &Path, force: bool) -> anyhow::R
 /// Name start of the staging folders for the target `name`; the process id follows.
 fn partial_prefix(name: &str) -> String {
     format!(".{name}.partial-")
+}
+
+/// Where the replaced site waits during the swap: the staging name plus `.old`, so a crash
+/// between the two renames leaves a folder `remove_stale` recognizes. (`with_extension` would
+/// swap the process id for `old` and lose the name it matches on.)
+fn old_path(staging: &Path) -> PathBuf {
+    let mut name = staging.as_os_str().to_owned();
+    name.push(".old");
+    PathBuf::from(name)
 }
 
 /// Removes the staging folders a crashed export left beside `parent/name`: only real folders
@@ -293,6 +302,26 @@ mod tests {
         }
         assert_eq!(left, want);
         assert!(Path::new(&p.join(".site.partial-222/page")).is_file());
+    }
+
+    /// Crash recovery of the swap: the old site set aside under the name `finish` uses is
+    /// removed by the next export's cleanup once its process is gone, and not before.
+    #[test]
+    fn a_site_left_aside_by_a_crashed_swap_is_cleaned_up() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let p = dir.path();
+        let staging = p.join(format!("{}111", super::partial_prefix("site")));
+        let old = super::old_path(&staging);
+        assert_eq!(
+            old.file_name().and_then(|n| n.to_str()),
+            Some(".site.partial-111.old")
+        );
+        std::fs::create_dir(&old).expect("mkdir");
+        std::fs::write(old.join("index.html"), "old site").expect("write");
+        super::remove_stale(p, "site", |_| true).expect("cleanup while alive");
+        assert!(old.is_dir(), "a running export's old site was removed");
+        super::remove_stale(p, "site", |_| false).expect("cleanup after the crash");
+        assert!(!old.exists(), "the old site of a crashed swap stayed");
     }
 
     #[cfg(unix)]
