@@ -11,9 +11,9 @@
   var B = meta ? meta.content : "";
   function local(p) { return B && p.indexOf(B + "/") === 0 ? p.slice(B.length) : p; }
   // Features the config switched off (`gt-off`): no key, entry or fetch leads to them.
-  var offMeta = document.querySelector('meta[name="gt-off"]');
-  var OFF = offMeta ? offMeta.content.split(" ") : [];
+  var offMeta = document.querySelector('meta[name="gt-off"]'), OFF = offMeta ? offMeta.content.split(" ") : [];
   function isOff(f) { return OFF.indexOf(f) >= 0; }
+  var STATIC = document.body.dataset.static !== undefined; // an export: no server, no /api
   // The one record of which overlay is open, shared by every script that opens one (this file
   // loads first); key handlers read it instead of their own copies. `name` labels it, `back` is
   // its backdrop. open() names the box, moves focus in, keeps Tab inside a dialog (a menu closes
@@ -183,7 +183,7 @@
   function loadFiles() {
     if (files) return Promise.resolve(files);
     if (!filesPending) {
-      filesPending = fetch(B + "/api/files/" + revEnc).then(function (r) { return r.json(); }).then(function (l) { files = l; return l; });
+      filesPending = STATIC ? Promise.resolve([]) : fetch(B + "/api/files/" + revEnc).then(function (r) { return r.json(); }).then(function (l) { files = l; return l; });
     }
     return filesPending;
   }
@@ -252,7 +252,7 @@
       li.appendChild(whenEl(it.when, "dir"));
     }, function (it) { swapRev(it.name); }, "Enter to switch");
     if (refs) p.refresh();
-    else fetch(B + "/api/refs").then(function (r) { return r.json(); }).then(function (l) { refs = l; p.refresh(); });
+    else if (!STATIC) fetch(B + "/api/refs").then(function (r) { return r.json(); }).then(function (l) { refs = l; p.refresh(); });
   }
 
   // ---- repository switcher (shown while the server holds several repos) --
@@ -312,7 +312,7 @@
       if (box) box.hidden = l.length < 2;
     }).catch(function () {});
   }
-  if (repoBtn && !isOff("picker")) {
+  if (repoBtn && !isOff("picker") && !STATIC) { // an export lists no repositories
     repoBtn.addEventListener("click", openRepos);
     loadRepos();
     // live.js: a repository joined or left, so the switcher follows without a reload.

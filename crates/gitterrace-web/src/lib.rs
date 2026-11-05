@@ -220,6 +220,9 @@ pub const WARM_PAGES: [&str; 6] = [
     "/stats/ownership",
 ];
 
+/// The diagram library: a page's script loads it by name, so no link names it.
+pub const MERMAID_JS: &str = "/static/vendor/mermaid-11.17.2.min.js";
+
 /// [`WARM_PAGES`] without the pages `cfg` switches off, for `export` to seed its crawl from.
 pub fn warm_pages(cfg: &Config) -> Vec<&'static str> {
     features::warm(cfg, None)

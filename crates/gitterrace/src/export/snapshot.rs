@@ -10,13 +10,15 @@ use crate::export::Project;
 /// Style for the snapshot banner and the static page, written next to the pages. Kept out of
 /// the app's own CSS: only an export is ever static. Colours are the app's tokens, already on
 /// the page. A static copy has no server, so the chrome that needs one is hidden: search, the
-/// action buttons (their menu runs scripts and Send to), the working-tree chip and live notes.
-/// Copy permalink stays: it needs nothing but the page.
+/// action buttons (their menu runs scripts and Send to), the working-tree chip and live notes,
+/// and every form (the log's path filter, compare, the search page): each asks the server for
+/// a page the export never wrote. Copy permalink stays: it needs nothing but the page.
 pub(super) const SNAPSHOT_CSS: &str = ".snapshot{background:var(--accent-soft);color:var(--fg);\
  border-bottom:1px solid var(--line-strong);font:var(--text-sm)/1.4 var(--sans);padding:var(--space-2) 0}\
  .snapshot a{color:var(--accent-fg);font-weight:var(--weight-semibold)}\
  body[data-static] .topsearch,body[data-static] .actbtn,body[data-static] .wtchip,\
- body[data-static] .livenote,body[data-static] .actnote{display:none!important}\n";
+ body[data-static] .livenote,body[data-static] .actnote,\
+ body[data-static] form{display:none!important}\n";
 
 /// What the snapshot banner names: the tag on HEAD when there is one, else the short commit id.
 pub(super) fn snapshot_label(repo: &gitterrace_git::Repo, head: &str) -> anyhow::Result<String> {

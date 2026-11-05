@@ -73,7 +73,9 @@
 //   period-steady the period control keeps its x and y with no filter, a period, and a period
 //                plus a path chip, at 360 and 1400 px
 //   export-from-disk  `export` output opened with a file:// URL: the forwarding index lands on the
-//                repository, content and styles show, and a link opens a second page
+//                repository, content and styles show, a link opens a second page, no form that
+//                needs the server shows on the overview, log, compare or search pages, and no
+//                script logs an error
 //   huge-diff    a commit of 2,000 changed files (mostly pure renames) loads under a DOM bound,
 //                shows a rename as one line, loads the last files on scroll, opens #fN, opens a
 //                folded file with Enter, and prints scroll frame times and long tasks

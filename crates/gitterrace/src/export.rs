@@ -11,6 +11,7 @@
 mod credit;
 mod out;
 mod relative;
+mod seeds;
 mod snapshot;
 mod write;
 
@@ -26,6 +27,7 @@ use gitterrace_git::percent_decode;
 use crate::export::credit::{Credit, add_footer};
 use crate::export::out::{Staging, check_out};
 use crate::export::relative::relativize;
+use crate::export::seeds::{queue_seeds, seeds};
 #[cfg(test)]
 use crate::export::snapshot::mark_snapshot_as;
 use crate::export::snapshot::{SNAPSHOT_CSS, mark_snapshot, snapshot_label};
@@ -67,16 +69,6 @@ impl Project {
             url: url.to_owned(),
         })
     }
-}
-
-/// Pages the crawl starts from, beside every page the server prewarms; each is exported
-/// whatever links point at it.
-const SEEDS: [&str; 2] = ["/refs", "/log/HEAD"];
-
-/// Every seed: the extra ones, then the server's prewarmed pages (every unfiltered insights
-/// page `cfg` serves), so a page added to the server is exported without touching this list.
-fn seeds(cfg: &gitterrace_config::Config) -> impl Iterator<Item = &'static str> {
-    SEEDS.into_iter().chain(gitterrace_web::warm_pages(cfg))
 }
 
 /// Where an export goes when no folder is named.
@@ -176,9 +168,7 @@ async fn crawl(
         wait_for_index(&router, site).await?;
         let repo = gitterrace_git::Repo::discover(repo_path).context("opening the repository")?;
         let head = repo.resolve("HEAD").context("resolving HEAD")?;
-        for seed in seeds(&scope.config) {
-            queue.push_back(format!("{site}{seed}"));
-        }
+        queue_seeds(&mut queue, site, &scope.config);
         for c in repo
             .log(&head, None, 0, scope.commits)
             .context("reading the log")?

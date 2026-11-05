@@ -60,7 +60,7 @@ pub(crate) const FEATURE_ROUTES: &[(Feature, &[&str])] = &[
     ),
     (Feature::RepoAdmin, &["/_repos"]),
     (Feature::Picker, &["/api/repos"]),
-    (Feature::Mermaid, &["/static/vendor/mermaid-11.17.2.min.js"]),
+    (Feature::Mermaid, &[crate::MERMAID_JS]),
 ];
 
 /// Every route no switch turns off: the pages a code browser is made of and their plumbing.

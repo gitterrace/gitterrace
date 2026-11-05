@@ -34,7 +34,7 @@ pub(crate) fn assets<S: Clone + Send + Sync + 'static>() -> Router<S> {
         .fold(Router::new(), |r, (name, kind, body)| {
             r.route(&format!("/static/{name}"), static_asset(kind, body))
         })
-        .route("/static/vendor/mermaid-11.17.2.min.js", get(mermaid_js))
+        .route(crate::MERMAID_JS, get(mermaid_js))
         .route("/static/fonts/{name}", get(font))
 }
 

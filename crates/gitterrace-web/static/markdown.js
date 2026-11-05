@@ -1,6 +1,8 @@
 // Rendered Markdown extras: mermaid diagrams drawn on demand and picture sources kept in sync
 // with the colour theme. Without it the Markdown still reads as plain text and images.
 (function () {
+  // This script's own URL, read while it runs: the diagram library lives beside it.
+  var HERE = document.currentScript ? document.currentScript.src : location.href;
   var root = document.documentElement;
   function base() { var m = document.querySelector('meta[name="gt-base"]'); return m ? m.content : ""; }
   document.querySelectorAll("[data-md-view]").forEach(function (box) {
@@ -109,7 +111,9 @@
     return window.matchMedia && matchMedia("(prefers-color-scheme: dark)").matches;
   }
   var s = document.createElement("script");
-  s.src = "/static/vendor/mermaid-11.17.2.min.js";
+  // Beside this script, not at the root: an export opened from disk has its static folder
+  // under the site, written with relative links, so `/static/` would leave the copy.
+  s.src = new URL("vendor/mermaid-11.17.2.min.js", HERE).href;
   s.onload = function () {
     var n = 0;
     function draw() {

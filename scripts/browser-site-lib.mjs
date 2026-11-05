@@ -174,14 +174,30 @@ async function siteTheme() {
 }
 // An export opened from disk (a file:// URL, no server): the forwarding index lands on the
 // repository, the page shows its content, the stylesheets load, and a link reaches a
-// second page.
+// second page. On every exported page with a form or a switcher (the overview, the log with
+// its path filter, compare and search when exported), no visible form submits to a server path
+// and no script logs an error or throws: a static copy cannot filter, search or list repos.
 async function exportFromDisk() {
   const out = join(mkdtempSync(join(tmpdir(), 'gt-export-')), 'site');
   sh(root, bin, 'export', out, dir);
+  // Every exported page under the repository folder whose name says it can hold a form.
+  const pages = [];
+  const walk = (d) => {
+    for (const e of readdirSync(d, { withFileTypes: true })) {
+      const f = join(d, e.name);
+      if (e.isDirectory()) walk(f);
+      else if (e.name === 'index.html' && /\/(log|compare|search)\//.test(f) && pages.length < 12) pages.push(f);
+    }
+  };
+  walk(out);
   for (const name of browsers) {
     const b = await launch(pw, name);
     const p = await b.newPage();
     const where = `export-from-disk ${name}`;
+    const errors = [];
+    p.on('console', (m) => { if (m.type() === 'error') errors.push(`${p.url().replace(/^.*\/site\//, '')}: ${m.text()}`); });
+    p.on('pageerror', (e) => errors.push(`${p.url().replace(/^.*\/site\//, '')}: ${String(e)}`));
+    p.on('requestfailed', (q) => errors.push(`${p.url().replace(/^.*\/site\//, '')}: no ${q.url().replace(/^.*\/site\//, '')}`));
     try {
       await p.goto(pathToFileURL(join(out, 'index.html')).href, { waitUntil: 'load' });
       const bad = [];
@@ -195,6 +211,21 @@ async function exportFromDisk() {
       if (m.text < 100) bad.push(`page shows ${m.text} characters`);
       if (/rgba\(0, 0, 0, 0\)|transparent/.test(m.banner)) bad.push('snapshot style not applied');
       if (!m.links) bad.push('no link stays on disk');
+      const forms = async () => p.evaluate(() => [...document.querySelectorAll('form')]
+        .filter((f) => f.getClientRects().length > 0 && getComputedStyle(f).visibility !== 'hidden')
+        .map((f) => `${f.className || 'form'} -> ${f.getAttribute('action') || '(none)'}`));
+      const shown = [...await forms()];
+      // The repository switcher reads its list when the page loads: give it the time a
+      // failed fetch takes to report.
+      await p.waitForTimeout(300);
+      for (const f of pages) {
+        await p.goto(pathToFileURL(f).href, { waitUntil: 'load' });
+        await p.waitForTimeout(300);
+        for (const x of await forms()) shown.push(`${f.replace(out, '')}: ${x}`);
+      }
+      if (!pages.some((f) => /\/log\//.test(f))) bad.push('the export has no log page to check');
+      if (shown.length) bad.push(`forms that need the server show: ${shown.join('; ')}`);
+      if (errors.length) bad.push(`script errors: ${errors.join('; ')}`);
       const link = await p.$('a[href$="/refs/index.html"], a[href*="/log/"]');
       if (!link) bad.push('no link to a second page');
       else {
@@ -203,7 +234,7 @@ async function exportFromDisk() {
         const n = await p.evaluate(() => document.body.innerText.length);
         if (n < 100 || !p.url().startsWith('file:')) bad.push(`a followed link shows ${n} characters at ${p.url()}`);
       }
-      bad.length ? r.fail(`${where}: ${bad.join(', ')}`) : r.ok(`${where}: forwards, styled, a link opens a second page`);
+      bad.length ? r.fail(`${where}: ${bad.join(', ')}`) : r.ok(`${where}: forwards, styled, a link opens a second page, no server form shows, no script error (${pages.length} form pages)`);
     } catch (e) { r.fail(`${where}: ${String(e.message).split('\n')[0]}`); } finally { await b.close(); }
   }
   rmSync(join(out, '..'), { recursive: true, force: true });
