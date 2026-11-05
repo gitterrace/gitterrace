@@ -1,7 +1,6 @@
 //! Every page marks the top tab of the section it belongs to: file views under Code, commit
 //! views under Commits, refs under Branches & Tags, and only the insights pages under Insights.
 //! A page built through a shared helper inherits that helper's tab unless it names its own.
-#![expect(clippy::expect_used, reason = "setup failures should panic")]
 
 use gitterrace_testkit::{Fixture, oracle, page};
 
