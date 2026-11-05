@@ -7,6 +7,7 @@ fn stylesheets_hold_no_raw_colors() {
     let sheets = [
         ("app.css", include_str!("../static/app.css")),
         ("markdown.css", include_str!("../static/markdown.css")),
+        ("insights.css", include_str!("../static/insights.css")),
     ];
     for (name, css) in sheets {
         for (i, line) in css.lines().enumerate() {
@@ -31,6 +32,7 @@ fn clipped_text_keeps_room_for_descenders() {
     for (name, css) in [
         ("app.css", include_str!("../static/app.css")),
         ("markdown.css", include_str!("../static/markdown.css")),
+        ("insights.css", include_str!("../static/insights.css")),
     ] {
         for rule in css.split('}') {
             let tight = rule.contains("/1 ") || rule.contains("line-height:1;");
@@ -73,6 +75,7 @@ fn only_commit_messages_truncate() {
     for (name, css) in [
         ("app.css", include_str!("../static/app.css")),
         ("markdown.css", include_str!("../static/markdown.css")),
+        ("insights.css", include_str!("../static/insights.css")),
     ] {
         for rule in css.split('}') {
             let squeezed: String = rule.split_whitespace().collect();
@@ -96,6 +99,7 @@ fn text_field_rules_skip_toggles() {
     let sheets = [
         ("app.css", include_str!("../static/app.css")),
         ("markdown.css", include_str!("../static/markdown.css")),
+        ("insights.css", include_str!("../static/insights.css")),
     ];
     for (name, css) in sheets {
         for rule in css.split('}') {

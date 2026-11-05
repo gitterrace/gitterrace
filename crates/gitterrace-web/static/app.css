@@ -65,8 +65,8 @@ header.top>.wrap{container:topbar/inline-size}
 
 /* Two tab levels that never look alike: header nav in mono caps, page tabs in sans. */
 .tabnav,.tabs{display:flex;flex-wrap:wrap;gap:0 var(--space-1)}
-.tabnav{margin-bottom:-1px;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}.tabnav::-webkit-scrollbar{display:none}
-.tabs{border-bottom:var(--border);margin-bottom:var(--space-2)}
+.tabnav,.tabs{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}.tabnav::-webkit-scrollbar,.tabs::-webkit-scrollbar{display:none}.tabnav{margin-bottom:-1px}
+.tabs{border-bottom:var(--border);margin-bottom:var(--space-2)}.tabs::after{content:"";flex:0 0 var(--space-1)}.tabs.over-r{--fr:transparent}.tabs.over-l{--fl:transparent}.tabs.over-l,.tabs.over-r{-webkit-mask-image:linear-gradient(90deg,var(--fl,black),black 32px,black calc(100% - 32px),var(--fr,black));mask-image:linear-gradient(90deg,var(--fl,black),black 32px,black calc(100% - 32px),var(--fr,black))}
 .tabnav a{position:relative;color:var(--muted);padding:var(--space-2) var(--space-3) 10px;font:var(--weight-regular) 12px/1.4 var(--mono);text-transform:uppercase;letter-spacing:.08em;white-space:nowrap;border-bottom:2px solid transparent;transition:color var(--dur-fast)}
 .tabs>a{position:relative;color:var(--muted);padding:var(--space-2) var(--space-3);font:var(--weight-regular) var(--text-sm)/1.4 var(--sans);white-space:nowrap;border-bottom:2px solid transparent;margin-bottom:-1px;transition:color var(--dur-fast)}
 .tabnav a:hover,.tabs>a:hover{color:var(--fg);text-decoration:none}
@@ -400,7 +400,7 @@ svg.spark.s1{stroke:var(--cat-1)}svg.spark.s2{stroke:var(--cat-2)}svg.spark.s3{s
 /* last-commit column: the message fills the cell, the age has its own column */
 @media (max-width:600px){table.entries[data-last] td.r,table.entries[data-last] td.ago{display:none}}
 
-/* insights filter: chips, matrix, author links */
+/* insights filter: chips and author links (the rest is in insights.css) */
 .fbar{display:flex;flex-direction:column;align-items:flex-start;gap:var(--space-2);margin:var(--space-4) 0}
 .chips{display:flex;flex-wrap:wrap;align-items:center;gap:var(--space-2);margin:var(--space-2) 0;min-height:28px}
 .chip{display:inline-flex;align-items:center;gap:6px;background:var(--accent-soft);border:var(--border);border-radius:var(--radius);padding:3px 4px 3px 12px;font-size:var(--text-sm);color:var(--fg)}
@@ -409,16 +409,6 @@ svg.spark.s1{stroke:var(--cat-1)}svg.spark.s2{stroke:var(--cat-2)}svg.spark.s3{s
 .chip a:hover{background:var(--hover);color:var(--fg);text-decoration:none}
 .chips .clear{font-size:var(--text-sm);color:var(--muted)}
 a.who{color:inherit}a.who:hover b{color:var(--accent-fg);text-decoration:underline}
-.matrix{overflow-x:auto}
-.matrix table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums}
-.matrix th{font-weight:var(--weight-semibold);font-size:var(--text-sm);padding:var(--space-2) var(--space-3);text-align:left;white-space:nowrap;color:var(--muted)}
-.matrix thead th,.matrix tr:first-child th{text-align:center}
-.matrix tr>th:first-child{text-align:right;color:var(--fg)}
-.matrix td{text-align:center;padding:0;border:2px solid var(--surface);min-width:44px}
-.matrix td a{display:block;padding:var(--space-2) var(--space-2);color:var(--fg)}
-.matrix td a:hover{text-decoration:none;outline:2px solid var(--fg);outline-offset:-2px}
-.matrix .m1{background:var(--seq-1)}.matrix .m2{background:var(--seq-2)}.matrix .m3{background:var(--seq-3)}.matrix .m4{background:var(--seq-4)}
-.matrix .m3 a,.matrix .m4 a{color:var(--on-accent)}
 .chart-head+.card,.chart-head+.card.pad{margin-top:0}
 :is(main.wrap,.fold)>.chart-head{margin-top:var(--space-8)}
 :is(main.wrap,.fold)>.kpis+.chart-head{margin-top:var(--space-6)}.fold>.fold-h+.chart-head{margin-top:var(--space-4)}
@@ -567,8 +557,6 @@ html:has(section.file>header){scroll-padding-top:calc(40px + var(--space-2))}
   .card:has(>table.entries tr.th:first-child){overflow:clip}
   .entries tr.th:first-child td{position:sticky;top:0;z-index:1;box-shadow:inset 0 -1px 0 var(--line)}
 }
-/* contributors: two-sided bar, deleted to the left and added to the right on one scale */
-.tsb{display:flex;width:160px;height:8px;gap:1px}.tsb i{display:flex;flex:1;background:var(--soft)}.tsb i.l{justify-content:flex-end;border-radius:var(--radius) 0 0 var(--radius)}.tsb i.r{border-radius:0 var(--radius) var(--radius) 0}.tsb b{display:block;height:100%;width:var(--w)}.tsb i.l b{background:var(--del)}.tsb i.r b{background:var(--add)}
 
 /* "On this page" outline of a Markdown document. Wide: a sticky rail beside the card. Narrow, or
    where the overview side panel takes the right column: a menu (a native details) in the header

@@ -188,11 +188,7 @@ fn transform<'a>(
             Event::End(TagEnd::Heading(_)) => {
                 if let Some((lvl, id, events, text, at)) = heading.take() {
                     let slug = unique_slug(&mut seen, id.unwrap_or_else(|| slugify(&text)));
-                    items.push(OutlineItem {
-                        level: lvl,
-                        id: slug.clone(),
-                        text: text.trim().to_owned(),
-                    });
+                    items.push(OutlineItem::heading(lvl, slug.clone(), text.trim()));
                     let slug = esc(&slug);
                     let at = mark(&at);
                     out.push(Event::Html(

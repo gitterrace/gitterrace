@@ -1,4 +1,4 @@
+<link rel="stylesheet" href="/static/insights.css">
 <div class="fbar">
 {{ fb.period }}
-{% if !fb.chips.is_empty() %}<div class="chips">{% for ch in fb.chips %}<span class="chip"><i>{{ ch.dim }}</i> {{ ch.label }} <a href="{{ ch.href }}" aria-label="Remove {{ ch.dim }} filter">×</a></span>{% endfor %}<a class="clear" href="{{ fb.clear }}">Clear all</a></div>{% endif %}
 </div>

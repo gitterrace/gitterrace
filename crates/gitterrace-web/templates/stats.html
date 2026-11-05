@@ -4,18 +4,20 @@
 {% include "_tabs.html" %}
 {% include "_filterbar.html" %}
 {% include "_options.html" %}
+{% include "_chips.html" %}
 {% include "_lead.html" %}
 {% if empty %}{{ fb.nothing }}{% else %}
-<p class="hint">{{ span }}.</p>
+{% if !jump.is_empty() %}<div class="jumprow">{{ jump|safe }}</div>{% endif %}
+<p class="hint" id="activity-counts">{{ span }}.</p>
 <div class="card"><table class="entries">
 <tr class="th"><td></td><td class="r">This period</td>{% if compared %}<td class="r">Before</td><td class="r">Change</td>{% endif %}</tr>
 {% for r in rows %}<tr><td{% if !r.tip.is_empty() %} data-tip="{{ r.tip }}"{% endif %}>{{ r.label }}</td><td class="r"><b>{{ r.now }}</b></td>{% if compared %}<td class="r muted">{{ r.before }}</td><td class="r delta {{ r.tone }}">{{ r.delta }}</td>{% endif %}</tr>{% endfor %}
 </table></div>{% if let Some(r) = range %}
 <div class="chart-head"><div><h2>Commits by weekday</h2><p class="hint">{{ r.title }}: {{ r.total }}. Remove the range chip to see everything again.</p></div></div>
 <div class="card pad">{{ r.weekdays|safe }}</div>{% endif %}
-<div class="chart-head"><div><h2>Commits per {{ unit }}</h2><p class="hint">One column per {{ unit }}, empty ones included.</p></div></div>
+<div class="chart-head" id="activity-series"><div><h2>Commits per {{ unit }}</h2><p class="hint">One column per {{ unit }}, empty ones included.</p></div></div>
 <div class="card pad">{{ series|safe }}</div>
-<h2 data-tip="Commits by weekday and hour of day, in each commit's own time zone. Darker cells have more commits.">When commits happen</h2>
+<h2 id="activity-hours" data-tip="Commits by weekday and hour of day, in each commit's own time zone. Darker cells have more commits.">When commits happen</h2>
 <div class="card pad">{{ heatmap|safe }}</div>
 {{ types|safe }}
 {{ frequency|safe }}

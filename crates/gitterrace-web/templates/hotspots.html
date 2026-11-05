@@ -5,12 +5,14 @@
 {% include "_tabs.html" %}
 {% include "_filterbar.html" %}
 {% include "_options.html" %}
+{% include "_chips.html" %}
 {% include "_lead.html" %}
 {% include "_kpis.html" %}
+{% if !jump.is_empty() %}<div class="jumprow">{{ jump|safe }}</div>{% endif %}
 {% if empty %}{{ fb.nothing }}{% else %}
-<div class="chart-head"><div><h2>Change frequency against size</h2><p class="hint">Each dot is a file: how often it changed against how many lines it has now. Dot size is the number of authors. Big files that change a lot are the risky ones. Click a dot for its history.</p></div></div>
+<div class="chart-head" id="hotspot-map"><div><h2>Change frequency against size</h2><p class="hint">Each dot is a file: how often it changed against how many lines it has now. Dot size is the number of authors. Big files that change a lot are the risky ones. Click a dot for its history.</p></div></div>
 <div class="card pad">{{ scatter|safe }}</div>
-<div class="chart-head"><div><h2>Hotspots</h2><p class="hint">Score is changes times the square root of lines. Click a file for its history.</p></div></div>
+<div class="chart-head" id="hotspot-files"><div><h2>Hotspots</h2><p class="hint">Score is changes times the square root of lines. Click a file for its history.</p></div></div>
 <div class="card"><table class="entries">
 <tr class="th"><td>File</td><td>Language</td><td class="r">Lines</td><td class="r">Changes</td><td class="r">Authors</td><td class="r">Last</td><td class="r">Score</td></tr>
 {% for r in rows %}<tr data-act="insight" data-path="{{ r.path }}"><td class="fill"><div class="bar w{{ r.pct }}"></div><a href="{{ r.href }}">{% call paths::path(&r.shown) %}{% endcall %}</a></td><td class="muted">{{ r.language }}</td><td class="r">{{ r.lines }}</td><td class="r">{{ r.changes }}</td><td class="r">{{ r.authors }}</td><td class="r muted">{{ r.last }}</td><td class="r"><b>{{ r.score }}</b></td></tr>{% endfor %}

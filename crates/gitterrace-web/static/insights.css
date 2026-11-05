@@ -1,0 +1,15 @@
+/* Insights pages only, loaded from the filter bar they all share: the "On this page" row, the
+   commit type matrix and the contributors two-sided bar. Colors come from tokens.css only. */
+.jumprow{display:flex;justify-content:flex-end;margin:0 0 var(--space-2)}.jumprow .outline.menu{display:block}
+.matrix{overflow-x:auto}
+.matrix table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums}
+.matrix th{font-weight:var(--weight-semibold);font-size:var(--text-sm);padding:var(--space-2) var(--space-3);text-align:left;white-space:nowrap;color:var(--muted)}
+.matrix thead th,.matrix tr:first-child th{text-align:center}
+.matrix tr>th:first-child{text-align:right;color:var(--fg)}
+.matrix td{text-align:center;padding:0;border:2px solid var(--surface);min-width:44px}
+.matrix td a{display:block;padding:var(--space-2) var(--space-2);color:var(--fg)}
+.matrix td a:hover{text-decoration:none;outline:2px solid var(--fg);outline-offset:-2px}
+.matrix .m1{background:var(--seq-1)}.matrix .m2{background:var(--seq-2)}.matrix .m3{background:var(--seq-3)}.matrix .m4{background:var(--seq-4)}
+.matrix .m3 a,.matrix .m4 a{color:var(--on-accent)}
+/* contributors: two-sided bar, deleted to the left and added to the right on one scale */
+.tsb{display:flex;width:160px;height:8px;gap:1px}.tsb i{display:flex;flex:1;background:var(--soft)}.tsb i.l{justify-content:flex-end;border-radius:var(--radius) 0 0 var(--radius)}.tsb i.r{border-radius:0 var(--radius) var(--radius) 0}.tsb b{display:block;height:100%;width:var(--w)}.tsb i.l b{background:var(--del)}.tsb i.r b{background:var(--add)}

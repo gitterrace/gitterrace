@@ -9,6 +9,21 @@ pub(crate) struct OutlineItem {
     pub(crate) level: u8,
     pub(crate) id: String,
     pub(crate) text: String,
+    /// A section of the page itself (an insights section), whose id is the page's own and is
+    /// linked as is; a document heading's id goes through `doc_id`.
+    pub(crate) chrome: bool,
+}
+
+impl OutlineItem {
+    /// A document heading, whose id goes through `doc_id`.
+    pub(crate) fn heading(level: u8, id: String, text: &str) -> Self {
+        Self {
+            level,
+            id,
+            text: text.to_owned(),
+            chrome: false,
+        }
+    }
 }
 
 /// Fewest listed headings that make an outline worth showing.
@@ -36,7 +51,11 @@ fn outline_list(items: &[&OutlineItem]) -> String {
         out.push_str("<li class=\"d");
         out.push(if h.level > top { '1' } else { '0' });
         out.push_str("\"><a href=\"#");
-        out.push_str(&esc(&crate::markdown::ids::doc_id(&h.id)));
+        if h.chrome {
+            out.push_str(&esc(&h.id));
+        } else {
+            out.push_str(&esc(&crate::markdown::ids::doc_id(&h.id)));
+        }
         out.push_str("\" title=\"");
         out.push_str(&esc(&h.text));
         out.push_str("\">");

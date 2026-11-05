@@ -53,8 +53,32 @@
   });
   fitSegs();
   addEventListener("resize", fitSegs);
+  // A tab row too wide for the screen scrolls sideways on one line: fade its edge and bring the
+  // open tab into view.
+  var tabRows = Array.prototype.slice.call(document.querySelectorAll(".tabs"));
+  function edge(row) {
+    // Measured on the tabs themselves: WebKit's scrollWidth can run a few pixels past the end.
+    var r = row.getBoundingClientRect();
+    row.classList.toggle("over-l", row.firstElementChild.getBoundingClientRect().left < r.left - 1);
+    row.classList.toggle("over-r", row.lastElementChild.getBoundingClientRect().right > r.right + 1);
+  }
+  function fitTabs() {
+    tabRows.forEach(function (row) {
+      var on = row.querySelector('[aria-current="page"]');
+      if (on) {
+        var r = row.getBoundingClientRect(), o = on.getBoundingClientRect();
+        // Past the open tab by a fade's width, but never past the row's end.
+        if (o.right > r.right) row.scrollLeft += o.right - r.right + 32;
+        else if (o.left < r.left) row.scrollLeft -= r.left - o.left + 32;
+      }
+      edge(row);
+    });
+  }
+  tabRows.forEach(function (row) { row.addEventListener("scroll", function () { edge(row); }, { passive: true }); });
+  fitTabs();
+  addEventListener("resize", fitTabs);
   // Web fonts change the widths once they arrive.
-  if (document.fonts && document.fonts.ready) document.fonts.ready.then(fitSegs);
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { fitSegs(); fitTabs(); });
   var boxes = document.querySelectorAll("[data-progress]");
   if (!boxes.length) return;
   var timer = setInterval(async function () {

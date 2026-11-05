@@ -45,6 +45,7 @@ mod registry;
 mod reload;
 mod routes;
 mod search;
+mod sections;
 mod seg;
 mod settings;
 pub mod sitemap;

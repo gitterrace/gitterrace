@@ -101,6 +101,8 @@ struct ActivityPage {
     series: String,
     heatmap: String,
     range: Option<RangeCard>,
+    /// "On this page": a jump list over the page's sections, empty below three.
+    jump: String,
     /// The commit types section, markup from `commit_types`.
     types: String,
     /// The code frequency section, markup from `frequency`.
@@ -256,7 +258,30 @@ pub(crate) async fn page(
             });
             range_card(from, to, &rhythm.by_weekday)
         });
+        let types_html = if crate::features::pages().contains(&"types") {
+            crate::commit_types::section(a, r, &q, lp.page.as_deref())
+        } else {
+            String::new()
+        };
+        let frequency_html = if crate::features::pages().contains(&"frequency") {
+            crate::frequency::section(a, r, &q)
+        } else {
+            String::new()
+        };
+        let jump = crate::markdown::outline_menu(
+            &crate::sections::jumps(&[
+                ("activity-counts", "Counts", true),
+                ("activity-series", "Over time", true),
+                ("activity-hours", "When commits happen", true),
+                ("types", "Commit types", !types_html.is_empty()),
+                ("frequency", "Code frequency", !frequency_html.is_empty()),
+            ]),
+            false,
+        );
         ActivityPage {
+            jump,
+            types: types_html,
+            frequency: frequency_html,
             c,
             tabs: views::stats_tabs("a"),
             fb,
@@ -271,16 +296,6 @@ pub(crate) async fn page(
             range,
             heatmap: charts::heatmap(&rhythm.punch_card, rhythm.punch_max),
             // `insights.pages` still names each section: one left out is not shown.
-            types: if crate::features::pages().contains(&"types") {
-                crate::commit_types::section(a, r, &q, lp.page.as_deref())
-            } else {
-                String::new()
-            },
-            frequency: if crate::features::pages().contains(&"frequency") {
-                crate::frequency::section(a, r, &q)
-            } else {
-                String::new()
-            },
         }
     })
     .await

@@ -72,7 +72,8 @@
 //   seg-one-row  every segmented control on the insights pages and a document shows one row of
 //                choices or its native select, never two rows, at 360 and 1440 px, light and dark
 //   period-steady the period control keeps its x and y with no filter, a period, and a period
-//                plus a path chip, at 360 and 1400 px
+//                plus a path chip, and the chips row sits below the counting line, at 360 and
+//                1400 px
 //   export-from-disk  `export` output opened with a file:// URL: the forwarding index lands on the
 //                repository, content and styles show, a link opens a second page, no form that
 //                needs the server shows on the overview, log, compare or search pages, and no
@@ -204,13 +205,14 @@ async function calmHeader() {
 async function tabsOneLine() {
   for (const name of browsers) {
     const { b, ctx } = await context(name);
-    for (const scheme of ['light', 'dark']) for (const width of [1440, 900, 360, 320]) {
+    for (const scheme of ['light', 'dark']) for (const width of [1440, 900, 360, 320]) for (const [row, path] of [['.tabnav', '/stats'], ['.tabs', '/stats/ownership']]) {
       const p = await ctx.newPage();
       await p.emulateMedia({ colorScheme: scheme });
       await p.setViewportSize({ width, height: 600 });
-      await p.goto(srv.base + '/stats', { waitUntil: 'load' });
-      const m = await p.evaluate(() => {
-        const nav = document.querySelector('.tabnav');
+      await p.goto(srv.base + path, { waitUntil: 'load' });
+      await p.evaluate(() => document.fonts.ready.then(() => new Promise((ok) => requestAnimationFrame(() => requestAnimationFrame(ok)))));
+      const m = await p.evaluate((sel) => {
+        const nav = document.querySelector(sel);
         if (!nav) return null;
         const tabs = [...nav.querySelectorAll('a')];
         const tops = new Set(tabs.map((a) => Math.round(a.getBoundingClientRect().top)));
@@ -219,8 +221,8 @@ async function tabsOneLine() {
         const over = nav.scrollWidth > nav.clientWidth + 1;
         const mask = getComputedStyle(nav).maskImage || getComputedStyle(nav).webkitMaskImage || 'none';
         return { rows: tops.size, over, fade: mask !== 'none', onIn: !!o && o.left >= n.left - 0.5 && o.right <= n.right + 0.5, page: document.documentElement.scrollWidth > innerWidth + 1 };
-      });
-      const where = `tabs-one-line ${name} ${scheme} ${width}`;
+      }, row);
+      const where = `tabs-one-line ${name} ${scheme} ${width} ${row}`;
       const bad = [];
       if (!m) bad.push('no section tabs');
       else {
@@ -300,7 +302,8 @@ async function tabLevels() {
 }
 // Period steady: the period control sits in one place whatever the filters are. With no
 // filter, a period, and a period plus a path chip, its box starts at the same x and y, at 360
-// and 1400 px, so choosing a period never moves the control under the pointer.
+// and 1400 px, so choosing a period never moves the control under the pointer; and the chips
+// row comes last, below the counting line, at both widths.
 async function periodSteady() {
   for (const name of browsers) {
     const { b, ctx } = await context(name);
@@ -315,7 +318,9 @@ async function periodSteady() {
           const c = document.querySelector('.segctl[aria-label="Period"]');
           if (!c) return null;
           const r = c.getBoundingClientRect();
-          return { q: location.search, x: Math.round(r.left), y: Math.round(r.top + scrollY), chip: !!document.querySelector('.chip') };
+          const opt = document.querySelector('.optline'), chips = document.querySelector('.chips');
+          const below = !chips || !opt || chips.getBoundingClientRect().top >= opt.getBoundingClientRect().bottom - 0.5;
+          return { q: location.search, x: Math.round(r.left), y: Math.round(r.top + scrollY), chip: !!document.querySelector('.chip'), below };
         }));
         await p.close();
       }
@@ -325,6 +330,7 @@ async function periodSteady() {
       else {
         for (const a of at.slice(1)) if (a.x !== at[0].x || a.y !== at[0].y) bad.push(`${a.q || 'none'} at ${a.x},${a.y}, not ${at[0].x},${at[0].y}`);
         if (!at[2].chip) bad.push('the path filter shows no chip');
+        if (at.some((a) => !a.below)) bad.push('the chips row sits above the counting line');
       }
       bad.length ? r.fail(`${where}: ${bad.join(', ')}`) : r.ok(`${where}: the control stays at ${at[0].x},${at[0].y}`);
     }
