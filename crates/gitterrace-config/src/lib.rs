@@ -5,21 +5,29 @@
 //! the descriptions in `docs/configuration.md`, so the file, the loader and the page cannot drift.
 
 mod budget;
+mod edit;
 mod features;
 #[cfg(test)]
 mod limits_tests;
+mod locate;
 pub mod naming;
 mod schema;
 mod value;
+mod write;
+#[cfg(test)]
+mod write_tests;
 
 use std::collections::BTreeMap;
 use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
 
 pub use budget::{Cache, PARTS, SHARES};
+pub use edit::{Change, apply};
 pub use features::{Feature, INSIGHT_PAGES};
+pub use locate::{Located, located, syntax};
 pub use schema::{Api, BOUNDS, Config, DEFAULT_ADDR, Key, Reload, RepoOverride, keys};
 pub use value::Show;
+pub use write::{MAX_FILE_BYTES, SaveError, Saved, Stamp, save, save_config};
 
 /// Where a value came from.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -42,9 +50,9 @@ impl Source {
 /// Why the config could not be used. Names the key so the user can fix it.
 #[derive(Debug, thiserror::Error)]
 pub enum ConfigError {
-    /// The text is not TOML.
-    #[error("{0}")]
-    Parse(String),
+    /// The text is not TOML. `at` is the byte offset of the error, when known.
+    #[error("{msg}")]
+    Parse { msg: String, at: Option<usize> },
     /// A value has the wrong type or is not one of the allowed names.
     #[error("{key}: expected {expected}")]
     Expected { key: String, expected: String },
@@ -187,7 +195,10 @@ fn unreachable_defaults() -> Loaded {
 pub fn parse(text: &str) -> Result<Loaded, ConfigError> {
     let table: toml::Table = text
         .parse()
-        .map_err(|e: toml::de::Error| ConfigError::Parse(e.to_string()))?;
+        .map_err(|e: toml::de::Error| ConfigError::Parse {
+            msg: e.to_string(),
+            at: e.span().map(|s| s.start),
+        })?;
     let mut warnings = Vec::new();
     let mut sources = BTreeMap::new();
     for (section, v) in &table {
@@ -248,7 +259,10 @@ mod tests {
         );
         let e = ConfigError::File {
             path: "/c/config.toml".into(),
-            source: Box::new(ConfigError::Parse("oops".into())),
+            source: Box::new(ConfigError::Parse {
+                msg: "oops".into(),
+                at: None,
+            }),
         };
         assert_eq!(e.to_string(), "/c/config.toml: oops");
         let e = parse("[repo.x.features]\nlive = true\n").expect_err("override");
