@@ -338,9 +338,9 @@ impl ApiState {
         let s = &detail.summary;
         let (permalink, link) = self.links(&id, None, None);
         Ok(CommitResponse {
-            author: wire::person(&s.author),
+            author: s.author.clone(),
             body: detail.body,
-            committer: wire::person(&s.committer),
+            committer: s.committer.clone(),
             files,
             id: s.id.clone(),
             link,

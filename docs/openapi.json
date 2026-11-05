@@ -160,13 +160,13 @@
         "description": "`GET /commits/{id}`.",
         "properties": {
           "author": {
-            "$ref": "#/components/schemas/Person"
+            "$ref": "#/components/schemas/Signature"
           },
           "body": {
             "type": "string"
           },
           "committer": {
-            "$ref": "#/components/schemas/Person"
+            "$ref": "#/components/schemas/Signature"
           },
           "files": {
             "items": {
@@ -555,10 +555,10 @@
         "description": "One commit of a log page.",
         "properties": {
           "author": {
-            "$ref": "#/components/schemas/Person"
+            "$ref": "#/components/schemas/Signature"
           },
           "committer": {
-            "$ref": "#/components/schemas/Person"
+            "$ref": "#/components/schemas/Signature"
           },
           "id": {
             "type": "string"
@@ -656,34 +656,6 @@
           "name",
           "required",
           "ty"
-        ],
-        "type": "object"
-      },
-      "Person": {
-        "description": "Who did something and when.",
-        "properties": {
-          "email": {
-            "type": "string"
-          },
-          "name": {
-            "type": "string"
-          },
-          "offset": {
-            "description": "Offset from UTC in seconds.",
-            "format": "int32",
-            "type": "integer"
-          },
-          "time": {
-            "description": "Seconds since the Unix epoch.",
-            "format": "int64",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "email",
-          "name",
-          "offset",
-          "time"
         ],
         "type": "object"
       },
@@ -804,6 +776,34 @@
           "commits",
           "deletions",
           "files"
+        ],
+        "type": "object"
+      },
+      "Signature": {
+        "description": "Who did something and when.",
+        "properties": {
+          "email": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "offset": {
+            "description": "Offset from UTC in seconds.",
+            "format": "int32",
+            "type": "integer"
+          },
+          "time": {
+            "description": "Seconds since the Unix epoch.",
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "email",
+          "name",
+          "offset",
+          "time"
         ],
         "type": "object"
       },

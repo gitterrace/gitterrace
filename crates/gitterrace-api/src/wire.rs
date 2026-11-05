@@ -1,28 +1,17 @@
 //! Maps the git reads onto the response types of `gitterrace_types::api`. The git types carry
 //! internal fields (modes, rewrite counts) the API never shows, so the mapping is explicit.
 
-use gitterrace_git::{
-    BlameLine, CommitDetail, CommitSummary, FileDiff, RefInfo, Signature, TreeEntry,
-};
+use gitterrace_git::{BlameLine, CommitDetail, CommitSummary, FileDiff, RefInfo, TreeEntry};
 use gitterrace_index::Contributor;
 use gitterrace_types::api::{
-    BlameItem, ContributorItem, DiffHunk, DiffLine, FileItem, LogCommit, Person, RefItem, TreeItem,
+    BlameItem, ContributorItem, DiffHunk, DiffLine, FileItem, LogCommit, RefItem, TreeItem,
 };
-
-pub(crate) fn person(s: &Signature) -> Person {
-    Person {
-        email: s.email.clone(),
-        name: s.name.clone(),
-        offset: s.offset,
-        time: s.time,
-    }
-}
 
 /// A log row without links: the caller fills `permalink` and `link`.
 pub(crate) fn log_commit(c: &CommitSummary) -> LogCommit {
     LogCommit {
-        author: person(&c.author),
-        committer: person(&c.committer),
+        author: c.author.clone(),
+        committer: c.committer.clone(),
         id: c.id.clone(),
         link: None,
         parents: c.parents.clone(),

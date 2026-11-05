@@ -5,14 +5,14 @@
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::api::person::Person;
+use crate::api::signature::Signature;
 use crate::git::{ChangeKind, LineKind};
 
 /// One commit of a log page.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
 pub struct LogCommit {
-    pub author: Person,
-    pub committer: Person,
+    pub author: Signature,
+    pub committer: Signature,
     pub id: String,
     pub link: Option<String>,
     pub parents: Vec<String>,
@@ -66,9 +66,9 @@ pub struct FileItem {
 /// `GET /commits/{id}`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
 pub struct CommitResponse {
-    pub author: Person,
+    pub author: Signature,
     pub body: String,
-    pub committer: Person,
+    pub committer: Signature,
     pub files: Vec<FileItem>,
     pub id: String,
     pub link: Option<String>,

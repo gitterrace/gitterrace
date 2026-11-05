@@ -6,13 +6,13 @@ use serde_json::json;
 use crate::api::{
     BlameItem, BlameResponse, BlobResponse, CommitResponse, ContributorItem, ContributorsResponse,
     DiffHunk, DiffLine, EndpointDoc, FileItem, IndexResponse, InsightList, InsightRow, LogCommit,
-    LogResponse, ParamDoc, Person, RefItem, RefsResponse, RepoResponse, RepoTotals, TreeItem,
+    LogResponse, ParamDoc, RefItem, RefsResponse, RepoResponse, RepoTotals, Signature, TreeItem,
     TreeResponse,
 };
 use crate::{ChangeKind, LineKind, RefKind, TreeEntryKind};
 
-fn person(name: &str) -> Person {
-    Person {
+fn person(name: &str) -> Signature {
+    Signature {
         email: format!("{name}@x.io"),
         name: name.into(),
         offset: 3600,

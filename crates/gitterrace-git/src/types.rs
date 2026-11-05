@@ -1,15 +1,5 @@
+pub use gitterrace_types::api::Signature;
 pub use gitterrace_types::{ChangeKind, LineKind, RefKind, TreeEntryKind};
-
-/// Author or committer identity, mailmap applied.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Signature {
-    pub name: String,
-    pub email: String,
-    /// Seconds since the Unix epoch.
-    pub time: i64,
-    /// Offset from UTC in seconds.
-    pub offset: i32,
-}
 
 /// One commit as shown in a log list.
 #[derive(Debug, Clone)]

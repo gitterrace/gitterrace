@@ -6,7 +6,7 @@ use serde::Serialize;
 
 /// Who did something and when.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
-pub struct Person {
+pub struct Signature {
     pub email: String,
     pub name: String,
     /// Offset from UTC in seconds.

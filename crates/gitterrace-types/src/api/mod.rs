@@ -9,9 +9,9 @@ mod blob;
 mod commit;
 mod contributors;
 mod index;
-mod person;
 mod refs;
 mod repo;
+mod signature;
 mod tree;
 
 #[cfg(test)]
@@ -22,7 +22,7 @@ pub use blob::BlobResponse;
 pub use commit::{CommitResponse, DiffHunk, DiffLine, FileItem, LogCommit, LogResponse};
 pub use contributors::{ContributorItem, ContributorsResponse};
 pub use index::{EndpointDoc, IndexResponse, InsightList, InsightRow, ParamDoc};
-pub use person::Person;
 pub use refs::{RefItem, RefsResponse};
 pub use repo::{RepoResponse, RepoTotals};
+pub use signature::Signature;
 pub use tree::{TreeItem, TreeResponse};
