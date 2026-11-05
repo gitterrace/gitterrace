@@ -118,7 +118,7 @@ Exceptions, each on purpose:
 | `include_bots` | bool | `false` | Count commits by bots. |
 | `include_generated` | bool | `false` | Count lock files and minified output. |
 | `period` | string | `"all"` | Period the insights pages use when the URL names none: 1w, 1m, 3m, 1y or all. The API and MCP default to all. Their `period` parameter picks one. |
-| `pages` | list of strings | `["activity", "contributors", "hotspots", "languages", "ownership", "types", "frequency", "patterns"]` | Insights pages, in the order the tabs show them: `activity`, `contributors`, `hotspots`, `languages`, `ownership`, `types`, `frequency` and `patterns`. Leave one out to stop serving it. `features.insights_enabled` switches them all. |
+| `pages` | list of strings | `["activity", "contributors", "hotspots", "languages", "ownership", "types", "frequency", "patterns"]` | Insights pages, in the order the tabs show them: `activity`, `contributors`, `hotspots`, `languages` and `ownership`, plus the sections `types` and `frequency` (on Activity) and `patterns` (on Hotspots). Leave one out to stop serving it. `features.insights_enabled` switches them all. |
 
 ## `[display]`
 

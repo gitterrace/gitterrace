@@ -1,4 +1,5 @@
-//! The hotspots page, `/stats/hotspots`: files ranked by changes and size.
+//! The hotspots page, `/stats/hotspots`: files ranked by changes and size, then the patterns
+//! sections (coupled files, code age, commit sizes, releases).
 
 use askama::Template;
 use axum::extract::{Query, RawQuery, State};
@@ -44,6 +45,8 @@ struct HotspotsPage {
     kpis: Vec<Kpi>,
     scatter: String,
     rows: Vec<HotRow>,
+    /// The patterns sections, markup from `patterns`.
+    patterns: String,
 }
 
 pub(crate) async fn page(
@@ -120,6 +123,11 @@ pub(crate) async fn page(
             ],
             scatter: charts::scatter(&dots, "changes"),
             rows,
+            patterns: if crate::features::pages().contains(&"patterns") {
+                crate::patterns::section(a, r, &q)
+            } else {
+                String::new()
+            },
         }
     })
     .await

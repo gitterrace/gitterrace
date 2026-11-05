@@ -348,8 +348,9 @@ settings! {
         /// API and MCP default to all. Their `period` parameter picks one.
         period: Period = Period::All => Live,
         /// Insights pages, in the order the tabs show them: `activity`, `contributors`,
-        /// `hotspots`, `languages`, `ownership`, `types`, `frequency` and `patterns`. Leave one
-        /// out to stop serving it. `features.insights_enabled` switches them all.
+        /// `hotspots`, `languages` and `ownership`, plus the sections `types` and `frequency`
+        /// (on Activity) and `patterns` (on Hotspots). Leave one out to stop serving it.
+        /// `features.insights_enabled` switches them all.
         pages: Vec<String> = INSIGHT_PAGES.iter().map(|&s| s.to_owned()).collect() => Live,
     }
     display: Display {

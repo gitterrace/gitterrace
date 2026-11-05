@@ -66,7 +66,7 @@ async fn a_newer_cache_is_explained_not_clobbered() {
     let app = Arc::new(App::new(repo, index));
     // The server marks the app ready once its update attempt ends, failed or not.
     app.mark_ready();
-    for uri in ["/stats", "/stats/types", "/stats/hotspots"] {
+    for uri in ["/stats", "/stats/languages", "/stats/hotspots"] {
         let (s, body) = get(&app, uri).await;
         assert_eq!(s, 200, "{uri}");
         assert!(body.contains("format 99"), "{uri}: {body}");
@@ -129,8 +129,8 @@ async fn rev_is_preserved_by_every_link() {
         s == 200 && !body.contains("data-progress"),
         "side shows the indexing page: {body}"
     );
-    let (_, main) = get(&app, "/stats/types").await;
-    let (_, side) = get(&app, "/stats/types?rev=side").await;
+    let (_, main) = get(&app, "/stats").await;
+    let (_, side) = get(&app, "/stats?rev=side").await;
     assert!(side.contains("only on side") && !main.contains("only on side"));
     let (_, side) = get(&app, "/?rev=side").await;
     assert!(

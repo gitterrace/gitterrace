@@ -1,11 +1,7 @@
-{% extends "_base.html" %}
-{% block title %}Commit types · {{ c.name }}{% endblock %}
-{% block content %}
-{% include "_tabs.html" %}
-{% include "_filterbar.html" %}
-{% include "_options.html" %}
-{% if commits_total == 0 %}{% include "_empty.html" %}{% else %}
-{% include "_kpis.html" %}
+<section class="fold" id="types">
+<h2 class="fold-h">Commit types</h2>
+{% if commits_total > 0 %}
+<div class="kpis">{% for k in kpis %}<div><b>{{ k.1 }}</b><span>{{ k.0 }}</span></div>{% endfor %}</div>
 {% if !kinds.is_empty() %}
 <div class="chart-head"><div><h2>Types</h2><p class="hint">Conventional-commit type of each subject line. Click a type to narrow every number on the page to it. Commits that do not follow the convention are grouped as other.</p></div></div>
 <div class="card"><table class="entries">
@@ -27,7 +23,7 @@
 {% for r in g.rows %}<tr><td class="fill"><div class="bar w{{ r.pct }}"></div><a href="{{ r.href }}">{{ r.label }}</a></td><td class="r">{{ r.commits }}</td>{% if g.lines %}<td class="r"><b class="add">+{{ r.additions }}</b> <b class="del">-{{ r.deletions }}</b></td>{% endif %}</tr>{% endfor %}
 </table></div>
 {% endfor %}
-<div class="chart-head"><div><h2>Commits</h2><p class="hint">{{ commits_total }} matching, newest first.</p></div></div>
+<div class="chart-head" id="commits"><div><h2>Commits</h2><p class="hint">{{ commits_total }} matching, newest first.</p></div></div>
 <ul class="list log">
 {% for r in commits %}{% include "_commit_row.html" %}{% endfor %}
 </ul>
@@ -36,4 +32,4 @@
 {% if let Some(h) = older %}<a href="{{ h }}">Older</a>{% endif %}
 </nav>
 {% endif %}
-{% endblock %}
+</section>

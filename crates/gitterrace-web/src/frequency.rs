@@ -1,27 +1,17 @@
-//! The code frequency page: lines added and removed per bucket, and rolling rework.
+//! The code frequency section of the activity page: lines added and removed per bucket, and
+//! rolling rework.
 
 use askama::Template;
-use axum::extract::{Query, RawQuery, State};
-use axum::response::Html;
 use gitterrace_index::{Period, rework_share, rework_verdict};
 
 use crate::{
-    charts,
-    error::Result,
-    filter::FilterBar,
-    fmt,
-    insights::{InsightsQuery, Kpi, OptLink, cached, counted, insights, page_scope, period_of},
-    routes::Shared,
-    views::{self, Chrome, Tabs},
+    charts, fmt,
+    insights::{InsightsQuery, Kpi, Src, counted, insights, page_scope, period_of},
 };
 
 #[derive(Template)]
-#[template(path = "frequency.html")]
-struct FrequencyPage {
-    c: Chrome,
-    tabs: Tabs,
-    fb: FilterBar,
-    opts: Vec<OptLink>,
+#[template(path = "frequency_section.html")]
+struct FrequencySection {
     kpis: Vec<Kpi>,
     unit: &'static str,
     window: String,
@@ -30,17 +20,12 @@ struct FrequencyPage {
     verdict: String,
 }
 
-pub(crate) async fn page(
-    State(app): Shared,
-    RawQuery(raw): RawQuery,
-    Query(q): Query<InsightsQuery>,
-) -> Result<Html<String>> {
-    cached(&app, "cf", raw, move |a, r, c| {
+/// The section's markup for the commits `q` selects.
+pub(crate) fn section(a: &crate::app::App, r: &Src, q: &InsightsQuery) -> String {
+    {
         let d = a.defaults();
-        let f = &q.filter;
-        let period = period_of(&q, &d, Period::All);
-        let fb = f.bar("/stats/frequency", &**r, period);
-        let scope = page_scope(&q, &d, period);
+        let period = period_of(q, &d, Period::All);
+        let scope = page_scope(q, &d, period);
         let ins = insights(a, r, scope.options().clone());
         let set = counted(&ins, &scope, r);
         let (unit, weeks) = set.frequency();
@@ -63,11 +48,7 @@ pub(crate) async fn page(
                 )
             },
         );
-        FrequencyPage {
-            c,
-            tabs: views::stats_tabs("cf"),
-            fb,
-            opts: q.row(&d, "/stats/frequency"),
+        FrequencySection {
             kpis: vec![
                 Kpi("Lines added", fmt::thousands(add)),
                 Kpi("Lines removed", fmt::thousands(del)),
@@ -99,6 +80,7 @@ pub(crate) async fn page(
             ),
             verdict,
         }
-    })
-    .await
+        .render()
+        .unwrap_or_default()
+    }
 }

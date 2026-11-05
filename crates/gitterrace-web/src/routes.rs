@@ -67,12 +67,12 @@ pub(crate) fn router(app: Arc<App>) -> Router {
         .route("/api/last/{rev}", get(api_last_root))
         .route("/api/last/{rev}/{*path}", get(api_last))
         .route("/stats", get(crate::activity::page))
-        .route("/stats/types", get(crate::commit_types::page))
+        .route("/stats/types", get(moved))
         .route("/stats/languages", get(crate::languages::page))
-        .route("/stats/frequency", get(crate::frequency::page))
+        .route("/stats/frequency", get(moved))
         .route("/stats/hotspots", get(crate::hotspots::page))
         .route("/stats/ownership", get(crate::ownership::page))
-        .route("/stats/patterns", get(crate::patterns::page))
+        .route("/stats/patterns", get(moved))
         .route("/compare", get(crate::compare::page))
         .route("/history/{*path}", get(crate::history::page))
         .route("/stats/contributors", get(crate::insights::contributors))
@@ -96,6 +96,39 @@ pub(crate) fn router(app: Arc<App>) -> Router {
 async fn selected_rev(req: axum::extract::Request, next: axum::middleware::Next) -> Response {
     let rev = fmt::rev_param(req.uri().query());
     fmt::REQUEST_REV.scope(rev, next.run(req)).await
+}
+
+/// Insights pages that became sections of another page: the old path, the new one and the
+/// section it lands on.
+pub(crate) const MOVED_PAGES: [(&str, &str, &str); 3] = [
+    ("/stats/types", "/stats", "types"),
+    ("/stats/frequency", "/stats", "frequency"),
+    ("/stats/patterns", "/stats/hotspots", "patterns"),
+];
+
+/// Where an old insights path lives now, with its query (period, chips, options) kept and the
+/// section as the fragment.
+pub(crate) fn moved_target(path: &str, query: Option<&str>) -> Option<String> {
+    let (_, to, anchor) = MOVED_PAGES.iter().find(|(from, _, _)| *from == path)?;
+    let q = query
+        .filter(|q| !q.is_empty())
+        .map(|q| format!("?{q}"))
+        .unwrap_or_default();
+    Some(format!("{to}{q}#{anchor}"))
+}
+
+/// A permanent redirect from a page that moved into a section of another page.
+async fn moved(State(app): Shared, uri: axum::http::Uri) -> Response {
+    let path = uri.path();
+    let own = MOVED_PAGES
+        .iter()
+        .map(|m| m.0)
+        .find(|p| path.ends_with(p))
+        .unwrap_or_default();
+    moved_target(own, uri.query()).map_or_else(
+        || axum::http::StatusCode::NOT_FOUND.into_response(),
+        |to| Redirect::permanent(&format!("{}{to}", app.base)).into_response(),
+    )
 }
 
 fn page<T: Template>(t: &T) -> Result<Html<String>> {

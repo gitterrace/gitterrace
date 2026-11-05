@@ -1,21 +1,14 @@
-//! The patterns page, `/stats/patterns`: files that change together, ages, sizes and release
-//! cadence.
+//! The patterns sections of the hotspots page: files that change together, code age, commit
+//! sizes and release cadence.
 
 use askama::Template;
-use axum::extract::{Query, RawQuery, State};
-use axum::response::Html;
 use gitterrace_index::Period;
 
 use crate::{
     charts,
-    error::Result,
-    filter::FilterBar,
     fmt::{self, enc_seg, href},
-    insights::{
-        InsightsQuery, OptLink, cached, counted, head_lines, insights, page_scope, period_of,
-    },
-    routes::Shared,
-    views::{self, Chrome, Tabs},
+    insights::{InsightsQuery, Src, counted, head_lines, insights, page_scope, period_of},
+    views::{self},
 };
 
 const TOP_PAIRS: usize = 30;
@@ -38,13 +31,8 @@ struct ReleaseRow {
 }
 
 #[derive(Template)]
-#[template(path = "patterns.html")]
-struct PatternsPage {
-    c: Chrome,
-    tabs: Tabs,
-    fb: FilterBar,
-    opts: Vec<OptLink>,
-    empty: bool,
+#[template(path = "patterns_section.html")]
+struct PatternsSection {
     pairs: Vec<PairRow>,
     age: String,
     sizes: String,
@@ -52,16 +40,12 @@ struct PatternsPage {
     cadence: String,
 }
 
-pub(crate) async fn page(
-    State(app): Shared,
-    RawQuery(raw): RawQuery,
-    Query(q): Query<InsightsQuery>,
-) -> Result<Html<String>> {
-    cached(&app, "pa", raw, move |a, r, c| {
-        let f = &q.filter;
-        let d = a.defaults();
-        let period = period_of(&q, &d, Period::All);
-        let scope = page_scope(&q, &d, period);
+/// The sections' markup for the commits `q` selects.
+pub(crate) fn section(a: &crate::app::App, r: &Src, q: &InsightsQuery) -> String {
+    {
+        let defaults = a.defaults();
+        let period = period_of(q, &defaults, Period::All);
+        let scope = page_scope(q, &defaults, period);
         let whole = insights(a, r, scope.options().clone());
         let set = counted(&whole, &scope, r);
         let files = head_lines(a);
@@ -79,7 +63,7 @@ pub(crate) async fn page(
             .collect();
         // Code age and release cadence are whole-history views: the same selection and
         // options over every day, counted by the same rule as the rest of the page.
-        let always = page_scope(&q, &d, Period::All);
+        let always = page_scope(q, &defaults, Period::All);
         let ever = counted(&whole, &always, r);
         let age: Vec<_> = whole
             .code_age_in(&files, &ever)
@@ -95,11 +79,11 @@ pub(crate) async fn page(
         let tags = gitterrace_index::release_tags(&a.repo.refs().unwrap_or_default());
         let cad = whole.cadence_in(&tags, &ever);
         let cadence = match (cad.median_days_between, cad.days_since_last) {
-            (Some(m), Some(d)) => {
+            (Some(median), Some(since)) => {
                 format!(
                     "Median {} between releases, {} since the last.",
-                    fmt::count(m.round() as i64, "day", "days"),
-                    fmt::count(d, "day", "days")
+                    fmt::count(median.round() as i64, "day", "days"),
+                    fmt::count(since, "day", "days")
                 )
             }
             (None, Some(d)) => format!("{} since the last release.", fmt::count(d, "day", "days")),
@@ -120,18 +104,17 @@ pub(crate) async fn page(
                     .map_or_else(|| "-".to_owned(), |d| d.to_string()),
             })
             .collect();
-        PatternsPage {
-            c,
-            tabs: views::stats_tabs("pa"),
-            fb: f.bar("/stats/patterns", &**r, period),
-            opts: q.row(&d, "/stats/patterns"),
-            empty: set.stream().next().is_none(),
+        if set.stream().next().is_none() {
+            return String::new();
+        }
+        PatternsSection {
             pairs,
             age: charts::bars(&age),
             sizes: charts::bars(&sizes),
             releases,
             cadence,
         }
-    })
-    .await
+        .render()
+        .unwrap_or_default()
+    }
 }

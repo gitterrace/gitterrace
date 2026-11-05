@@ -241,7 +241,7 @@ async fn insights_defaults_reach_the_pages() {
     // The options row shows the state in force; wait for the index to be ready first.
     let mut body = String::new();
     for _ in 0..100 {
-        body = get(&r, "/stats/frequency").await.1;
+        body = get(&r, "/stats/hotspots").await.1;
         if body.contains("Generated files") {
             break;
         }
@@ -257,7 +257,7 @@ async fn insights_defaults_reach_the_pages() {
             .contains(state)
     };
     assert!(on("Generated files", "counted") && on("Bots", "counted"));
-    let (_, plain) = get(&router(&p, Config::default()), "/stats/frequency").await;
+    let (_, plain) = get(&router(&p, Config::default()), "/stats/hotspots").await;
     assert!(
         !plain.contains("Exclude"),
         "the URL's own exclude row stays off"

@@ -1,23 +1,17 @@
-{% extends "_base.html" %}
-{% block title %}Patterns · {{ c.name }}{% endblock %}
-{% block content %}
-{% include "_tabs.html" %}
-{% include "_filterbar.html" %}
-{% include "_options.html" %}
-{% if empty %}{% include "_empty.html" %}{% else %}
-<div class="chart-head"><div><h2>Coupled files</h2><p class="hint">Pairs of files that change in the same commits. Degree is shared commits over the changes of the less-changed file.</p></div></div>
+<section class="fold" id="patterns">
+<h2 class="fold-h">Patterns</h2>
+<div class="chart-head" id="coupled"><div><h2>Coupled files</h2><p class="hint">Pairs of files that change in the same commits. Degree is shared commits over the changes of the less-changed file.</p></div></div>
 <div class="card"><table class="entries">
 <tr class="th"><td>File</td><td>Changes with</td><td class="r">Together</td><td class="r">Degree</td></tr>
 {% for p in pairs %}<tr><td><a href="{{ p.a_href }}">{{ p.a }}</a></td><td><a href="{{ p.b_href }}">{{ p.b }}</a></td><td class="r">{{ p.together }}</td><td class="r"><b>{{ p.degree }}</b></td></tr>{% endfor %}
 </table></div>
-<div class="chart-head"><div><h2>Code age</h2><p class="hint">Lines now by the year their file last changed.</p></div></div>
+<div class="chart-head" id="code-age"><div><h2>Code age</h2><p class="hint">Lines now by the year their file last changed.</p></div></div>
 <div class="card pad">{{ age|safe }}</div>
-<div class="chart-head"><div><h2>Commit sizes</h2><p class="hint">Commits by lines added plus removed.</p></div></div>
+<div class="chart-head" id="sizes"><div><h2>Commit sizes</h2><p class="hint">Commits by lines added plus removed.</p></div></div>
 <div class="card pad">{{ sizes|safe }}</div>
-<div class="chart-head"><div><h2>Releases</h2><p class="hint">{{ cadence }}</p></div></div>
+<div class="chart-head" id="releases"><div><h2>Releases</h2><p class="hint">{{ cadence }}</p></div></div>
 <div class="card"><table class="entries">
 <tr class="th"><td>Tag</td><td class="r">Date</td><td class="r">Commits since previous</td><td class="r">Days since previous</td></tr>
 {% for r in releases %}<tr><td><a href="{{ r.href }}">{{ r.name }}</a></td><td class="r muted">{{ r.when }}</td><td class="r">{{ r.commits }}</td><td class="r">{{ r.days }}</td></tr>{% endfor %}
 </table></div>
-{% endif %}
-{% endblock %}
+</section>

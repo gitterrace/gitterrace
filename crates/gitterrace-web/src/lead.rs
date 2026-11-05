@@ -28,9 +28,16 @@ pub(crate) fn activity(commits: u64, authors: u64, before: Option<u64>) -> Strin
         Some(0) => format!("{what}, after none in the period before."),
         Some(b) if b == commits => format!("{what}, as many as in the period before."),
         Some(b) => {
-            let pct = ((commits as f64 - b as f64) / b as f64 * 100.0).round();
-            let dir = if pct >= 0.0 { "more" } else { "fewer" };
-            format!("{what}, {:.0}% {dir} than the period before.", pct.abs())
+            let pct = (commits as f64 - b as f64) / b as f64 * 100.0;
+            // A change that rounds to 0% is no change worth a number.
+            if pct.abs() < 0.5 {
+                return format!("{what}, about as many as in the period before.");
+            }
+            let dir = if pct > 0.0 { "more" } else { "fewer" };
+            format!(
+                "{what}, {:.0}% {dir} than the period before.",
+                pct.abs().round()
+            )
         }
     }
 }
@@ -103,6 +110,11 @@ mod tests {
         assert_eq!(
             activity(4, 2, Some(4)),
             "4 commits by 2 authors, as many as in the period before."
+        );
+        // 1,001 against 1,000 is 0.1% more: never "0% more".
+        assert_eq!(
+            activity(1001, 2, Some(1000)),
+            "1,001 commits by 2 authors, about as many as in the period before."
         );
         assert_eq!(activity(1, 1, None), "1 commit by 1 author.");
         assert_eq!(activity(0, 0, Some(3)), "");

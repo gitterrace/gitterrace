@@ -66,7 +66,12 @@ pub const PAGES: &[Page] = &[
     page("`/search`", "Code and commit search", &["/search"]),
     page(
         "`/stats`, `/stats/{page}`",
-        "Insights on the shared filter and period. `?rev=` follows any ref",
+        concat!(
+            "Insights on the shared filter and period: activity (with commit types and code ",
+            "frequency), contributors, hotspots (with patterns), languages, ownership. ",
+            "`/stats/types`, `/stats/frequency` and `/stats/patterns` answer with a permanent ",
+            "redirect to their section, query kept. `?rev=` follows any ref",
+        ),
         &[
             "/stats",
             "/stats/types",

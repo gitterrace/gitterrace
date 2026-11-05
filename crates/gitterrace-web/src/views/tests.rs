@@ -143,10 +143,9 @@ fn huge_diffs_fold_behind_a_load_button() {
 }
 
 #[test]
-fn the_more_button_names_the_open_tab_behind_it() {
-    let t = crate::views::stats_tabs("pa");
-    assert!(t.more_on && t.more_label == "Patterns");
-    assert!(t.primary.iter().all(|n| !n.on));
-    let t = crate::views::stats_tabs("a");
-    assert!(!t.more_on && t.more_label == "More");
+fn every_insights_tab_is_in_the_row_and_the_open_one_is_marked() {
+    let t = crate::views::stats_tabs("ow");
+    let on: Vec<_> = t.primary.iter().filter(|n| n.on).map(|n| n.label).collect();
+    assert_eq!(on, ["Ownership"]);
+    assert!(t.primary.len() <= 6, "{} tabs", t.primary.len());
 }

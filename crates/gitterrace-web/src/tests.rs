@@ -156,20 +156,16 @@ async fn serves_every_page() {
         "/stats",
         "/stats?type=fix&period=1y",
         "/stats?author=t%40e.x&path=src",
-        "/stats/types",
-        "/stats/types?type=fix",
-        "/stats/types?type=fix&scope=none&period=3m",
-        "/stats/types?type=other&path=src&author=x",
+        "/stats?type=fix&scope=none&period=3m",
+        "/stats?type=other&path=src&author=x",
         "/stats/languages",
-        "/stats/frequency",
-        "/stats/frequency?type=fix&path=src&period=1y",
+        "/stats?type=fix&path=src&period=1y",
         "/stats/contributors",
         "/stats?period=1w&type=fix&bots=1&ws=1&generated=1&ignore=0&exclude=*.md",
-        "/stats/types?bots=1&ws=1&page=1",
+        "/stats?bots=1&ws=1&page=1",
         "/stats/hotspots",
         "/stats/hotspots?period=3m&path=src",
         "/stats/ownership",
-        "/stats/patterns",
         "/compare",
         "/compare?base=HEAD~1&head=HEAD",
         "/compare?base=nope",
@@ -183,11 +179,11 @@ async fn serves_every_page() {
         assert_eq!(s, 200, "{u}");
         assert!(!body.contains("data-progress"), "{u}");
     }
-    let (_, body) = get(&app, "/stats/types?type=fix").await;
+    let (_, body) = get(&app, "/stats?type=fix").await;
     assert!(body.contains("class=\"chip\"") && body.contains("fix: second"));
     assert!(!body.contains("feat: first"));
-    let (_, body) = get(&app, "/stats/types").await;
-    assert!(body.contains("/stats/types?type=feat"));
+    let (_, body) = get(&app, "/stats").await;
+    assert!(body.contains("/stats?type=feat"));
     let (_, body) = get(&app, "/stats/contributors").await;
     assert!(body.contains("/stats/contributors?author=") && body.contains("/log/HEAD?author="));
     let (_, body) = get(&app, "/blame/HEAD/src/a.rs").await;
@@ -382,16 +378,20 @@ async fn one_week_selection_renders_seven_day_columns() {
         .update(&app.repo, "HEAD", &|_| {})
         .expect("update");
     app.mark_ready();
-    for page in ["/stats", "/stats/frequency", "/stats/types"] {
-        let (s, body) = get(&app, &format!("{page}?period=1w")).await;
-        assert_eq!(s, 200, "{page}");
-        let chart = body.split("<svg class=\"chart\"").nth(1).expect("chart");
+    // The commits chart, then the code frequency section's chart, of the activity page.
+    let (s, body) = get(&app, "/stats?period=1w").await;
+    assert_eq!(s, 200);
+    let freq = body
+        .split("id=\"frequency\"")
+        .nth(1)
+        .expect("frequency section");
+    for (page, html) in [("commits", body.as_str()), ("frequency", freq)] {
+        let chart = html.split("<svg class=\"chart\"").nth(1).expect("chart");
         let chart = chart.split("</svg>").next().unwrap_or_default();
         assert_eq!(chart.matches("class=\"col\"").count(), 7, "{page}");
         assert!(chart.contains("Mon ") || chart.contains("Sun "), "{page}");
     }
-    let (_, body) = get(&app, "/stats/frequency?period=1w").await;
-    assert!(body.contains("per day"), "unit comes from the axis");
+    assert!(freq.contains("per day"), "unit comes from the axis");
 }
 
 #[tokio::test]

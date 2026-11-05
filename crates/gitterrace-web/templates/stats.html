@@ -17,5 +17,7 @@
 <div class="card pad">{{ series|safe }}</div>
 <h2 data-tip="Commits by weekday and hour of day, in each commit's own time zone. Darker cells have more commits.">When commits happen</h2>
 <div class="card pad">{{ heatmap|safe }}</div>
+{{ types|safe }}
+{{ frequency|safe }}
 {% endif %}
 {% endblock %}

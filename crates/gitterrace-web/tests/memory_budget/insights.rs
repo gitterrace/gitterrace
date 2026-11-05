@@ -10,7 +10,7 @@ use crate::{MB, Server, apply_and_assert_allocator, serve_if_child};
 
 /// Most one insights request may add over a warm idle: the reducer state of one request
 /// (people, files, buckets), never a per-commit list. Before the pages read one `Counted`
-/// (100k synthetic, release) the first /stats/types?period=all added 12 MB and the API
+/// (100k synthetic, release) the first commit types page at period=all added 12 MB and the API
 /// summary with a path 10 MB, both from
 /// filling shared state the server keeps by design, not from the request itself.
 const REQUEST_PEAK_MB: u64 = 8;
@@ -38,12 +38,12 @@ fn memo_budget() -> u64 {
     gitterrace_config::Config::default().cache_bytes(gitterrace_config::Cache::Pages) as u64
 }
 
-/// One request's cost: /stats, /stats/types and the API summary at `all` and `1y`, with and
-/// without a path selection. Every page is read once first, so the block cache and the derived
-/// tables are built. The warm idle must stay within the footprint budget, then each page is
-/// measured over that warm idle. Runs on `TEST_LINUX=<path>` (the bench corpus linux clone,
-/// 1.3M commits) when set, else on a 100k synthetic history. Afterwards the server must return
-/// to idle: nothing a request built stays.
+/// One request's cost: /stats (with the commit types section), /stats/hotspots and the API summary
+/// at `all` and `1y`, with and without a path selection. Every page is read once first, so the
+/// block cache and the derived tables are built. The warm idle must stay within the footprint
+/// budget, then each page is measured over that warm idle. Runs on `TEST_LINUX=<path>` (the bench
+/// corpus linux clone, 1.3M commits) when set, else on a 100k synthetic history. Afterwards the
+/// server must return to idle: nothing a request built stays.
 #[test]
 fn insights_request_peak() {
     if serve_if_child() {
@@ -128,7 +128,7 @@ fn peak_run(test: &str) -> Option<PeakRun> {
     for period in ["all", "1y"] {
         for sel in [String::new(), format!("&path={path}")] {
             pages.push(format!("{base}/stats?period={period}{sel}"));
-            pages.push(format!("{base}/stats/types?period={period}{sel}"));
+            pages.push(format!("{base}/stats/hotspots?period={period}{sel}"));
             pages.push(format!(
                 "{base}/api/v1/insights/summary?period={period}{sel}"
             ));

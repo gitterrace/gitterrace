@@ -211,16 +211,13 @@ fn bind_error(addr: SocketAddr, e: &io::Error) -> io::Error {
 /// Each costs 40-90 ms to
 /// build on a 14k-commit repo, then a few ms from the memo, so no visitor pays the build.
 /// `export` seeds its crawl from the same list, so a static copy has every insights page.
-pub const WARM_PAGES: [&str; 9] = [
+pub const WARM_PAGES: [&str; 6] = [
     "/",
     "/stats",
-    "/stats/types",
     "/stats/languages",
-    "/stats/frequency",
     "/stats/contributors",
     "/stats/hotspots",
     "/stats/ownership",
-    "/stats/patterns",
 ];
 
 /// [`WARM_PAGES`] without the pages `cfg` switches off, for `export` to seed its crawl from.

@@ -31,7 +31,6 @@ async fn pages_carry_no_style_attribute() {
         "/",
         "/log/HEAD",
         "/blob/HEAD/long.txt",
-        "/stats/types",
         "/stats/hotspots",
         "/stats/languages",
         "/stats/contributors",

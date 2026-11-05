@@ -269,8 +269,8 @@ pub fn named() -> Vec<Named> {
     use Chip as C;
     use Mailmap as M;
     use PathFilter as F;
-    const TIES: &str = "equal counts at equal times: the segment rewrite reordered 144 \
-                        /stats/types cells";
+    const TIES: &str = "equal counts at equal times: the segment rewrite once reordered 144 \
+                        commit types cells";
     const OWN: &str = "ownership over all time follows paths across their whole history, \
                        where a renamed and reused path would collide";
     const MAP: &str = "an edited or case-folded mailmap with bots off: identities merge after \
@@ -297,11 +297,7 @@ pub fn named() -> Vec<Named> {
             [C::None, C::Kind, C::Scope].map(|c| Cell::of(p, false, M::AsIs, F::None, false, c))
         })
         .collect();
-    add(
-        &["/stats/types", "/api/v1/insights/label_breakdown"],
-        &ties,
-        TIES,
-    );
+    add(&["/stats", "/api/v1/insights/label_breakdown"], &ties, TIES);
     let own: Vec<Cell> = MAILMAPS
         .iter()
         .flat_map(|m| {

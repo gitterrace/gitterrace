@@ -78,7 +78,7 @@ function measure() {
 
 async function truncation() {
   const b = await launch(pw, 'chromium');
-  const paths = ['/', '/log', '/refs', '/tree/HEAD', '/tree/HEAD/src', '/stats', '/stats/hotspots', '/stats/types', '/worktree'];
+  const paths = ['/', '/log', '/refs', '/tree/HEAD', '/tree/HEAD/src', '/stats', '/stats/hotspots', '/worktree'];
   for (const width of [360, 900, 1440]) for (const path of paths) {
     const p = await openPage(b, srv.base + path, { width, wait: 'networkidle' });
     const m = await p.evaluate(measure);

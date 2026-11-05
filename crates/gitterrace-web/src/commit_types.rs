@@ -1,5 +1,5 @@
-//! Commit types page: a pivot over type, scope, directory and author. Every row is a link that
-//! adds a filter, and every number respects all active filters.
+//! The commit types section of the activity page: a pivot over type, scope, directory and
+//! author. Every row is a link that adds a filter, and every number respects all active filters.
 
 #![expect(
     clippy::many_single_char_names,
@@ -8,38 +8,25 @@
 )]
 
 use std::collections::HashMap;
-use std::sync::Arc;
 
 use askama::Template;
-use axum::extract::{Query, RawQuery, State};
-use axum::response::Html;
 use gitterrace_index::feed::{CommitRow as SrcRow, InsightsSource, LabelId};
 use gitterrace_index::{Label, LabelCount, Period, Selection};
-use serde::Deserialize;
 
 use crate::{
     charts,
-    error::Result,
-    filter::{Dim, Filter, FilterBar, NO_SCOPE},
+    filter::{Dim, Filter, NO_SCOPE},
     fmt::{self, href},
-    insights::{InsightsQuery, Kpi, OptLink, Src, counted, insights, page_scope, period_of},
-    routes::Shared,
-    views::{self, Chrome, CommitRow, Row, Tabs},
+    insights::{InsightsQuery, Kpi, Src, counted, insights, page_scope, period_of},
+    views::{self, CommitRow, Row},
 };
 
-const BASE: &str = "/stats/types";
+/// The page the section lives on: every link it writes narrows that page.
+const BASE: &str = "/stats";
 const PAGE: usize = 20;
 const TOP_KINDS: usize = 10;
 const TOP_SCOPES: usize = 8;
 const LIST: usize = 12;
-
-#[derive(Deserialize, Default)]
-pub(crate) struct TypesQuery {
-    #[serde(flatten)]
-    q: InsightsQuery,
-    /// A string: inside a flattened query every value arrives as one.
-    page: Option<String>,
-}
 
 struct Group {
     title: &'static str,
@@ -72,12 +59,8 @@ struct Matrix {
 }
 
 #[derive(Template)]
-#[template(path = "commit_types.html")]
-struct TypesPage {
-    c: Chrome,
-    tabs: Tabs,
-    fb: FilterBar,
-    opts: Vec<OptLink>,
+#[template(path = "commit_types_section.html")]
+struct TypesSection {
     kpis: Vec<Kpi>,
     kinds: Vec<Row>,
     matrix: Matrix,
@@ -208,11 +191,19 @@ fn churn_rows(v: Vec<(String, String, usize, u64, u64)>) -> Vec<Row> {
 }
 
 fn page_link(f: &Filter, n: usize) -> String {
-    href(&format!("{BASE}{}", f.query(&[("page", &n.to_string())])))
+    href(&format!(
+        "{BASE}{}#commits",
+        f.query(&[("page", &n.to_string())])
+    ))
 }
 
-fn build(a: &crate::app::App, all: &Src, c: Chrome, tq: &TypesQuery) -> TypesPage {
-    let q = &tq.q;
+/// The section's markup for the commits `q` selects, at commit-list page `page`.
+pub(crate) fn section(
+    a: &crate::app::App,
+    all: &Src,
+    q: &InsightsQuery,
+    page: Option<&str>,
+) -> String {
     let f = &q.filter;
     let d = a.defaults();
     let period = period_of(q, &d, Period::All);
@@ -365,7 +356,7 @@ fn build(a: &crate::app::App, all: &Src, c: Chrome, tq: &TypesQuery) -> TypesPag
     let mut list = recs;
     // Equal times break by rank, never by storage order: the canonical order decides.
     list.sort_by_key(|r| (std::cmp::Reverse(r.time), std::cmp::Reverse(r.rank)));
-    let pg: usize = tq.page.as_deref().and_then(|p| p.parse().ok()).unwrap_or(0);
+    let pg: usize = page.and_then(|p| p.parse().ok()).unwrap_or(0);
     let now = fmt::now();
     // (id, author, email, time, offset) of this page's commits.
     let shown: Vec<(String, String, String, i64, i32)> = list
@@ -408,11 +399,7 @@ fn build(a: &crate::app::App, all: &Src, c: Chrome, tq: &TypesQuery) -> TypesPag
         })
         .collect();
 
-    TypesPage {
-        c,
-        tabs: views::stats_tabs("t"),
-        fb: f.bar(BASE, &**all, period),
-        opts: q.row(&d, BASE),
+    TypesSection {
         kpis,
         kinds,
         matrix: mx,
@@ -425,15 +412,8 @@ fn build(a: &crate::app::App, all: &Src, c: Chrome, tq: &TypesQuery) -> TypesPag
         newer: (pg > 0).then(|| page_link(f, pg - 1)),
         older: ((pg + 1) * PAGE < n).then(|| page_link(f, pg + 1)),
     }
-}
-
-pub(crate) async fn page(
-    State(app): Shared,
-    RawQuery(raw): RawQuery,
-    Query(q): Query<TypesQuery>,
-) -> Result<Html<String>> {
-    let q = Arc::new(q);
-    crate::insights::cached(&app, "t", raw, move |a, r, c| build(a, r, c, &q)).await
+    .render()
+    .unwrap_or_default()
 }
 
 #[cfg(test)]

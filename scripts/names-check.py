@@ -69,8 +69,6 @@ CATCH_ALL = {"misc", "util", "utils", "helpers", "common", "other", "pages", "st
 SRC_DIRS = ("crates/*/src", "xtask/src")
 TEMPLATES = "crates/gitterrace-web/templates"
 STEM = re.compile(r"^_?[a-z][a-z0-9_]*$")
-# R4: URL segments whose template carries a longer, clearer name.
-TEMPLATE_ALIAS = {"types": "commit_types"}
 # R5: `-lib` marks a library imported by other scripts, not a command.
 SCRIPT = re.compile(
     r"^[a-z]+(-[a-z]+)*-(check|gen|run|export|report|render|lib)\.(py|sh|mjs)$"
@@ -139,9 +137,10 @@ def check_templates() -> list[str]:
     routes = (src / "src/routes.rs").read_text()
     insights = (ROOT / "crates/gitterrace-api/src/insights.rs").read_text()
     ids = set(re.findall(r'name: "([a-z_]+)"', insights))
-    for seg in re.findall(r'\.route\("/stats/([a-z-]+)"', routes):
+    # A route that only redirects (to a section of another page) renders no template of its own.
+    for seg in re.findall(r'\.route\("/stats/([a-z-]+)",\s*get\((?!moved\))', routes):
         snake = seg.replace("-", "_")
-        want = TEMPLATE_ALIAS.get(snake, snake)
+        want = snake
         if want not in stems:
             bad.append(
                 f"/stats/{seg}: no template {want}.html, route and template share one name (R4)"

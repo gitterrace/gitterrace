@@ -27,8 +27,6 @@ async fn an_empty_selection_reads_as_empty_on_every_insights_page() {
     for page in [
         "/stats",
         "/stats/hotspots",
-        "/stats/patterns",
-        "/stats/types",
         "/stats/languages",
         "/stats/contributors",
     ] {

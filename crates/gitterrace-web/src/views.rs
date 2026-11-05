@@ -352,43 +352,33 @@ pub(crate) fn banner(h: &gitterrace_git::HeadState, base: &str) -> Option<String
     }
 }
 
-/// Path, label and key of each insights tab. The first [`PRIMARY_TABS`] are what a first visit
-/// needs (is it alive, who works on it, where the risk is, what it is made of); the rest sit
-/// behind one "More" disclosure.
-const STATS_TABS: [(&str, &str, &str); 9] = [
+/// Path, label and key of each insights tab, all in one row: is it alive, who works on it,
+/// where the risk is, what it is made of and who knows it. Commit types and code frequency are
+/// sections of Activity, patterns a section of Hotspots.
+const STATS_TABS: [(&str, &str, &str); 6] = [
     ("/stats", "Activity", "a"),
     ("/stats/contributors", "Contributors", "co"),
     ("/stats/hotspots", "Hotspots", "ho"),
     ("/stats/languages", "Languages", "l"),
     ("/stats/ownership", "Ownership", "ow"),
-    ("/stats/types", "Commit types", "t"),
-    ("/stats/frequency", "Code frequency", "cf"),
-    ("/stats/patterns", "Patterns", "pa"),
     ("/compare", "Compare", "cm"),
 ];
-const PRIMARY_TABS: usize = 4;
 
 /// The labels of the insights tabs, in tab order.
 pub fn stats_tab_labels() -> Vec<&'static str> {
     STATS_TABS.iter().map(|(_, label, _)| *label).collect()
 }
 
-/// The insights tab row: the primary tabs, then the rest in a "More" popover. When the current
-/// page is one of those, the popover's button is named after it, so the open tab is always
-/// visible and the row never reflows.
+/// The insights tab row, every tab visible.
 pub(crate) struct Tabs {
     pub(crate) primary: Vec<Nav>,
-    pub(crate) more: Vec<Nav>,
-    pub(crate) more_on: bool,
-    /// What the popover's button says: `More`, or the open tab's label.
-    pub(crate) more_label: &'static str,
 }
 
 pub(crate) fn stats_tabs(active: &str) -> Tabs {
     let served = crate::features::pages();
     let compare = crate::features::on(gitterrace_config::Feature::Compare);
     // `insights.pages` orders the tabs; Compare stays last.
-    let mut all: Vec<Nav> = served
+    let all: Vec<Nav> = served
         .iter()
         .filter_map(|p| crate::features::page_route(p))
         .filter_map(|r| STATS_TABS.iter().find(|t| t.0 == r).copied())
@@ -404,14 +394,7 @@ pub(crate) fn stats_tabs(active: &str) -> Tabs {
             on: key == active,
         })
         .collect();
-    let more = all.split_off(PRIMARY_TABS.min(all.len()));
-    let open = more.iter().find(|n| n.on).map(|n| n.label);
-    Tabs {
-        more_on: open.is_some(),
-        more_label: open.unwrap_or("More"),
-        primary: all,
-        more,
-    }
+    Tabs { primary: all }
 }
 
 /// First letter of a name for the avatar disc.

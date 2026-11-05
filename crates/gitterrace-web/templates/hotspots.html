@@ -15,4 +15,5 @@
 {% for r in rows %}<tr data-act="insight" data-path="{{ r.path }}"><td class="fill"><div class="bar w{{ r.pct }}"></div><a href="{{ r.href }}">{{ r.path }}</a></td><td class="muted">{{ r.language }}</td><td class="r">{{ r.lines }}</td><td class="r">{{ r.changes }}</td><td class="r">{{ r.authors }}</td><td class="r muted">{{ r.last }}</td><td class="r"><b>{{ r.score }}</b></td></tr>{% endfor %}
 </table></div>
 {% endif %}
+{{ patterns|safe }}
 {% endblock %}

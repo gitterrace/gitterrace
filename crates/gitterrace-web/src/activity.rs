@@ -1,4 +1,5 @@
-//! The activity page, `/stats`: totals against the period before, rhythm and the punch card.
+//! The activity page, `/stats`: totals against the period before, rhythm and the punch card,
+//! then the commit types and code frequency sections.
 
 use askama::Template;
 use axum::extract::{Query, RawQuery, State};
@@ -100,6 +101,16 @@ struct ActivityPage {
     series: String,
     heatmap: String,
     range: Option<RangeCard>,
+    /// The commit types section, markup from `commit_types`.
+    types: String,
+    /// The code frequency section, markup from `frequency`.
+    frequency: String,
+}
+
+/// `?page=` of the commit list in the commit types section.
+#[derive(Debug, Default, Deserialize)]
+pub(crate) struct ListPage {
+    page: Option<String>,
 }
 
 struct RangeCard {
@@ -200,6 +211,7 @@ pub(crate) async fn page(
     RawQuery(raw): RawQuery,
     Query(q): Query<InsightsQuery>,
     Query(rq): Query<RangeQuery>,
+    Query(lp): Query<ListPage>,
 ) -> Result<Html<String>> {
     // The memo key keeps only the shared parameters: the range is part of this page's key.
     let mut key = crate::app::App::canonical_query(raw.as_deref());
@@ -258,6 +270,17 @@ pub(crate) async fn page(
             series: charts::linked_bars(&series, &links),
             range,
             heatmap: charts::heatmap(&rhythm.punch_card, rhythm.punch_max),
+            // `insights.pages` still names each section: one left out is not shown.
+            types: if crate::features::pages().contains(&"types") {
+                crate::commit_types::section(a, r, &q, lp.page.as_deref())
+            } else {
+                String::new()
+            },
+            frequency: if crate::features::pages().contains(&"frequency") {
+                crate::frequency::section(a, r, &q)
+            } else {
+                String::new()
+            },
         }
     })
     .await
