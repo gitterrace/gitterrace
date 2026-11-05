@@ -205,6 +205,8 @@ step cargo test -p gitterrace-testkit --test conventions
 step sh scripts/lint-run.sh
 step make docs-check
 check_subjects "$base"
-# Subject and body of every commit landed: no process label, tracker id or local name.
-python3 scripts/lines-check.py --messages "$base"
+# Subject and body of every commit landed, the rules the commit-msg hook runs plus own shas.
+step python3 scripts/lint/internal-refs.py --messages "$base"
+step python3 scripts/lint/personal-data.py --messages "$base"
+step python3 scripts/lint/own-shas.py --messages "$base"
 echo "land-check: ok (a full gate is \`scripts/land-check.sh --full\`)"

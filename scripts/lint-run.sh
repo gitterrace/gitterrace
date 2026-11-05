@@ -72,6 +72,11 @@ run tests-cfg python3 "install python3" python3 scripts/tests-check.py
 run css-scope python3 "install python3" python3 scripts/css-scope-check.py
 run site-csp python3 "install python3" python3 scripts/site-check.py csp
 run machete cargo-machete "cargo install cargo-machete" cargo-machete
+# The tree carries no task ids, labels, process words, personal data or own commits.
+run internal-refs python3 "install python3" python3 scripts/lint/internal-refs.py
+run personal-data python3 "install python3" python3 scripts/lint/personal-data.py
+run own-shas python3 "install python3" python3 scripts/lint/own-shas.py
+run commit-msg-hook bash "install bash" bash scripts/hooks/commit-msg_test.sh
 
 [ "$fails" -eq 0 ] || {
   echo "lint: $fails failed"

@@ -1,0 +1,23 @@
+id: test-names-describe-behavior
+valid:
+  - |
+    #[test]
+    fn owner_ties_follow_names() {}
+  - 'fn g3b_helper() {}'
+  - |
+    #[test]
+    fn the_g12_hint() {}
+invalid:
+  - |
+    #[test]
+    fn g19_owner_ties() {}
+  - |
+    #[tokio::test]
+    async fn g3b_a_chip_keeps_the_anchor() {}
+  - |
+    #[test]
+    #[ignore = "slow"]
+    fn p4_pages_equal_the_reducers() {}
+  - |
+    #[test]
+    fn c5a_scope() {}

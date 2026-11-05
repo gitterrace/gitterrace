@@ -1,6 +1,6 @@
 //! [`InsightsSource`] over the segment files. Aggregates, postings
 //! and rename edges come from the segments. Commit columns, file rows and strings come from
-//! `base`, the record stream of step 1, whose ids must be the segments' ids (one numbering per
+//! `base`, the record stream, whose ids must be the segments' ids (one numbering per
 //! cache). A reader never compares ordinals of two segments: each segment's local
 //! ordinals become ranks through its own rank section, read by pread, never held in memory.
 

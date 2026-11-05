@@ -19,5 +19,5 @@ __pycache__/
 .ruff_cache/
 node_modules/
 
-# Optional local name list for scripts/lines-check.py
-/.lines-check.local
+# Local denylist of names, hosts and ids (scripts/lint/personal-data.py, internal-refs.py)
+/.personal-denylist

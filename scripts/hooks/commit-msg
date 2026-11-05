@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# Commit-msg (ported from tendir): the subject reads `type(scope): subject`, and subject and body
+# pass CONV-NO-INTERNAL-REFS (task ids such as #a1b2c3, planning labels, process words) and
+# CONV-PERSONAL-DATA (names, hosts, home paths). Lines git strips (starting with `#`) are
+# skipped. land-check runs these and CONV-NO-OWN-SHAS on every commit it lands, so the hook is
+# a convenience, never the only gate.
+#
+#   git config core.hooksPath scripts/hooks
+set -euo pipefail
+root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+
+subject=$(grep -v '^#' "$1" | sed -n '/[^[:space:]]/{p;q;}' || true)
+types='feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert'
+if [[ -n $subject ]] &&
+  ! printf '%s\n' "$subject" | grep -qE '^(Merge |Revert |fixup! |squash! )' &&
+  ! printf '%s\n' "$subject" | grep -qE "^(${types})(\([a-z0-9_-]+\))?!?: [^[:space:]]"; then
+  printf 'commit-msg: refused. The subject must be "type(scope): subject", type one of:\n  %s\n' "${types//|/ }" >&2
+  printf 'Got: %s\n' "${subject}" >&2
+  exit 1
+fi
+
+rc=0
+python3 "${root}/scripts/lint/internal-refs.py" --message "$1" >&2 || rc=1
+python3 "${root}/scripts/lint/personal-data.py" --message "$1" >&2 || rc=1
+exit "${rc}"

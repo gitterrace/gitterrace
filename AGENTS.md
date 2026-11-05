@@ -60,11 +60,12 @@ outside `gitterrace-git` imports `gix`.
 
 - Gate: `make check` (theme, actions, docs-check, fmt, clippy `-D warnings`, lint, test, doc).
   `make lint` runs typos, vale, gitleaks, markdownlint, shellcheck, shfmt, ruff, actionlint,
-  ast-grep and cargo-machete.
+  ast-grep, cargo-machete and the provenance checks below.
   `cargo test -p <crate>` while working on one crate. `make preview` restarts the
   preview on the default address.
 - Commits: `type(scope): subject`, scope is the crate without `gitterrace-`. Commit by
-  pathspec, never `git add -A`.
+  pathspec, never `git add -A`. The message says what changed and how it is tested, in plain
+  words. `git config core.hooksPath scripts/hooks` runs the message rules on every commit.
 - One change, one commit. A change that spans several files or steps (a scaffold, a type moved
   before its callers, a refactor) is built in its own worktree or clone, never in the shared
   checkout, and lands on main as one squashed commit with its tests, docs and golden update.
@@ -72,3 +73,23 @@ outside `gitterrace-git` imports `gix`.
   squashed commit before it lands.
 - Names: files in `scripts/` are `<area>-<verb>.<ext>`, make targets are `<area>[-<verb>]`,
   harness-only env vars use a `TEST_` prefix. `make names` enforces it.
+
+## Provenance stays out
+
+Task ids, plans and who did what belong on the tracker, never in the tree or a commit message.
+`make lint` enforces it on the tree, land-check on the messages it lands. Real names, hosts and
+ids for the checks go in the gitignored `.personal-denylist` (one case-insensitive regex per
+line), never in the repository.
+
+- `CONV-NO-INTERNAL-REFS` (`scripts/lint/internal-refs.py`): no task id with context (the
+  word task or a `#` before six hex digits), no planning label (a letter and a number, a
+  numbered wave or phase), no process word (who does the work and who approves it) in
+  comments, ignore reasons, Makefile help, docs or messages.
+  `docs/design/` holds product design only: no work breakdown, owner or estimate section.
+- `CONV-PERSONAL-DATA` (`scripts/lint/personal-data.py`): no home path, `.local` hostname,
+  dated incident story or denylisted name, in the tree or a message.
+- `CONV-NO-OWN-SHAS` (`scripts/lint/own-shas.py`): no prefix of a commit of this repository,
+  in the tree or a message. Upstream corpus shas pass.
+- `test-names-describe-behavior` (ast-grep): a test is named by its behavior, not a label.
+- `scripts/hooks/commit-msg`: the subject form plus the message rules above, before a commit
+  exists. `scripts/hooks/commit-msg_test.sh` proves it, `make lint` runs that test.
