@@ -175,11 +175,19 @@ fn run<W: Watcher>(
     let mut last = Instant::now();
     let mut rescan_at = Instant::now() + cfg.rescan;
     let mut clocks = (Instant::now(), wall_clock());
+    // An overloaded OS reports drops in a storm, one notice per delivered batch. Each asks to
+    // look now, but only the first is acted on at once: later ones wait until `max_delay`
+    // passed since the last nudge, so a storm costs one scan per `max_delay`, not per notice.
+    let mut nudged: Option<Instant> = None;
+    let mut owed = false;
     loop {
         let now = Instant::now();
-        let deadline = first.map_or(rescan_at, |f| {
+        let mut deadline = first.map_or(rescan_at, |f| {
             (last + cfg.debounce).min(f + cfg.max_delay).min(rescan_at)
         });
+        if owed && let Some(t) = nudged {
+            deadline = deadline.min(t + cfg.max_delay);
+        }
         let msg = rx.recv_timeout(deadline.saturating_duration_since(now));
         let mut urgent = slept(&mut clocks);
         match msg {
@@ -203,9 +211,13 @@ fn run<W: Watcher>(
             Err(RecvTimeoutError::Timeout) => {}
         }
         let now = Instant::now();
+        owed |= urgent;
+        let urgent_due = owed && nudged.is_none_or(|t| now >= t + cfg.max_delay);
         let settled = first.is_some_and(|f| now >= last + cfg.debounce || now >= f + cfg.max_delay);
-        if urgent || settled || now >= rescan_at {
+        if urgent_due || settled || now >= rescan_at {
             first = None;
+            owed = false;
+            nudged = Some(now);
             rescan_at = now + cfg.rescan;
             on_nudge(Nudge::Look);
         }
@@ -412,10 +424,14 @@ mod tests {
         let _w = Nudger::start(cfg(dir.path(), Duration::from_secs(60), true), f).expect("w");
         let base = settle(&n);
         let t0 = Instant::now();
-        for i in 0..5000 {
-            std::fs::write(dir.path().join(format!("f{i}")), "x").expect("write");
-        }
-        assert!(wait_for(&n, base + 1, PATIENCE), "burst seen");
+        // A stream that macOS starts late sees nothing of the first pass, so the burst is
+        // written again until one is seen, like the other tests that wait for an event.
+        let burst = || {
+            for i in 0..5000 {
+                std::fs::write(dir.path().join(format!("f{i}")), "x").expect("write");
+            }
+        };
+        assert!(again(&n, base + 1, burst), "burst seen");
         let got = settle(&n) - base;
         // `settle` returns a second after the last nudge, so this is how long nudges kept
         // coming. At most one per `max_delay` (600 ms) while events arrive, plus the tail and an
@@ -426,6 +442,51 @@ mod tests {
         assert!(
             got <= most,
             "{got} nudges for 5000 files over {busy:?}, most {most}"
+        );
+    }
+
+    #[test]
+    fn a_storm_of_drop_notices_nudges_at_most_once_per_max_delay() {
+        // Fed by hand, no OS stream: an overloaded machine sends a drop notice with every
+        // batch, and each one nudging at once was a scan storm. The gap between nudges is
+        // read from their own timestamps, so machine speed cannot change the verdict.
+        let dir = tempfile::tempdir().expect("tmp");
+        let c = cfg(dir.path(), Duration::from_secs(60), false);
+        let max_delay = c.max_delay;
+        let (tx, rx) = mpsc::channel();
+        let stamps = Arc::new(std::sync::Mutex::new(Vec::<Instant>::new()));
+        let sink = Arc::clone(&stamps);
+        let on_nudge = move |_| {
+            sink.lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .push(Instant::now());
+        };
+        let t = std::thread::spawn(move || run::<notify::NullWatcher>(&c, None, &rx, &on_nudge));
+        let rescan = || notify::Event::new(EventKind::Other).set_flag(notify::event::Flag::Rescan);
+        let storm_end = Instant::now() + max_delay * 3;
+        let mut sent = 0;
+        while Instant::now() < storm_end {
+            tx.send(Msg::Event(Ok(rescan()))).expect("send");
+            sent += 1;
+            std::thread::sleep(Duration::from_millis(5));
+        }
+        // A notice after the first is still answered, once its `max_delay` is up.
+        std::thread::sleep(max_delay * 2);
+        tx.send(Msg::Stop).expect("stop");
+        t.join().expect("join");
+        let at = stamps
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone();
+        assert!(
+            at.len() >= 2,
+            "the first nudge is at once and the owed one follows: {at:?}"
+        );
+        assert!(at.len() < sent, "{} nudges for {sent} notices", at.len());
+        let tightest = at.windows(2).map(|w| w[1] - w[0]).min().expect("a gap");
+        assert!(
+            tightest >= max_delay,
+            "nudges came {tightest:?} apart, less than the {max_delay:?} between them"
         );
     }
 
