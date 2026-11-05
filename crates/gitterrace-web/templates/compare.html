@@ -4,8 +4,11 @@
 <div class="head"><h1><a href="{{ log_href }}">Commits</a> <span class="muted">/ Compare</span></h1></div>
 <form class="cmp" action="{{ c.base }}/compare" method="get"><label>Base <input name="base" value="{{ base }}" placeholder="v1.0 or a commit" required></label><label>Head <input name="head" value="{{ head }}"></label><button type="submit">Compare</button></form>
 {% if !tags.is_empty() %}<p class="hint">Since a tag: {% for t in tags %}<a href="{{ t.1 }}">{{ t.0 }}</a>{% if !loop.last %} · {% endif %}{% endfor %}</p>{% endif %}
+{% if !branches.is_empty() %}<p class="hint">Against a branch: {% for t in branches %}<a href="{{ t.1 }}">{{ t.0 }}</a>{% if !loop.last %} · {% endif %}{% endfor %}</p>{% endif %}
+{% if let Some(e) = pick %}{{ e }}{% endif %}
 {% if let Some(e) = error %}<p class="muted">{{ e }}</p>{% endif %}
 {% if let Some(r) = result %}
+{% if let Some(e) = r.empty %}{{ e }}{% else %}
 <div class="kpis">{% for k in r.kpis %}<div><b>{{ k.1 }}</b><span>{{ k.0 }}</span></div>{% endfor %}</div>
 <p class="hint"><a href="{{ r.diff_href }}">Open the head commit</a></p>
 <div class="chart-head"><div><h2>Languages</h2><p class="hint">Lines added and removed per language between the two revisions, largest net change first.</p></div></div>
@@ -16,5 +19,6 @@
 <div class="chart-head"><div><h2>Commits</h2></div></div>
 <ul class="list log">{% for m in r.commits %}{{ m }}{% endfor %}</ul>
 {% if r.more > 0 %}<p class="muted">and {{ r.more }} more.</p>{% endif %}
+{% endif %}
 {% endif %}
 {% endblock %}

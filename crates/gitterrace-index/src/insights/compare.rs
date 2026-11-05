@@ -26,6 +26,72 @@ pub struct Comparison {
     pub languages: Vec<LangDelta>,
 }
 
+/// Lines of one commit as git reports them, for a range the index does not hold.
+pub struct RawCommit {
+    pub id: String,
+    /// The author, by email as the mailmap names them.
+    pub author: String,
+    pub merge: bool,
+    /// `(path, added, removed, rewritten)` per file.
+    pub files: Vec<(String, u64, u64, u64)>,
+}
+
+impl Comparison {
+    /// `a..b` from commits read straight from git, newest first: a branch the index never
+    /// walked (anything not reachable from the indexed head) still compares.
+    pub fn of_raw(commits: &[RawCommit]) -> Self {
+        let mut langs: HashMap<String, (u64, u64, u64)> = HashMap::new();
+        let mut people = HashSet::new();
+        let mut paths = HashSet::new();
+        let (mut added, mut removed) = (0, 0);
+        for c in commits.iter().filter(|c| !c.merge) {
+            people.insert(c.author.as_str());
+            for (path, a, d, r) in &c.files {
+                paths.insert(path.as_str());
+                let e = langs.entry(language(path)).or_default();
+                e.0 += a;
+                e.1 += d;
+                e.2 += r;
+                added += a;
+                removed += d;
+            }
+        }
+        Self {
+            commits: commits
+                .iter()
+                .filter(|c| !c.merge)
+                .map(|c| c.id.clone())
+                .collect(),
+            authors: people.len(),
+            files_changed: paths.len(),
+            added,
+            removed,
+            languages: sorted(langs),
+        }
+    }
+}
+
+/// Per-language totals, largest net change first.
+fn sorted(langs: HashMap<String, (u64, u64, u64)>) -> Vec<LangDelta> {
+    let mut languages: Vec<LangDelta> = langs
+        .into_iter()
+        .map(|(language, (added, removed, rewritten))| LangDelta {
+            language,
+            added,
+            removed,
+            net: added as i64 - removed as i64,
+            rewritten,
+        })
+        .collect();
+    languages.sort_by(|x, y| {
+        y.net
+            .abs()
+            .cmp(&x.net.abs())
+            .then_with(|| x.language.cmp(&y.language))
+    });
+    languages
+}
+
 impl Insights<'_> {
     /// Per-language change between two revisions given as commit ids, from the cached
     /// non-merge commits in `a..b`. Unknown ids give an empty comparison.
@@ -80,22 +146,7 @@ impl Insights<'_> {
                 removed += u64::from(l.del);
             }
         }
-        let mut languages: Vec<LangDelta> = langs
-            .into_iter()
-            .map(|(language, (added, removed, rewritten))| LangDelta {
-                language,
-                added,
-                removed,
-                net: added as i64 - removed as i64,
-                rewritten,
-            })
-            .collect();
-        languages.sort_by(|x, y| {
-            y.net
-                .abs()
-                .cmp(&x.net.abs())
-                .then_with(|| x.language.cmp(&y.language))
-        });
+        let languages = sorted(langs);
         Comparison {
             commits: range
                 .iter()
@@ -127,5 +178,31 @@ mod tests {
         assert_eq!(c.languages[0].net, 3200);
         assert_eq!(c.languages[1].net, -3);
         assert!(ins.compare("b", "nope").commits.is_empty());
+    }
+
+    #[test]
+    fn a_range_read_from_git_sums_like_the_index() {
+        use super::{Comparison, RawCommit};
+        let raw = |id: &str, who: &str, merge: bool, files: &[(&str, u64, u64)]| RawCommit {
+            id: id.to_owned(),
+            author: who.to_owned(),
+            merge,
+            files: files
+                .iter()
+                .map(|(p, a, d)| ((*p).to_owned(), *a, *d, 0))
+                .collect(),
+        };
+        let c = Comparison::of_raw(&[
+            raw("m", "x", true, &[("a.rs", 99, 99)]),
+            raw("d", "x", false, &[("a.rs", 5, 1), ("b.py", 2, 0)]),
+            raw("c", "y", false, &[("a.rs", 1, 0)]),
+        ]);
+        assert_eq!(c.commits, ["d", "c"], "merges are left out");
+        assert_eq!(
+            (c.authors, c.files_changed, c.added, c.removed),
+            (2, 2, 8, 1)
+        );
+        assert_eq!(c.languages[0].language, "Rust");
+        assert_eq!(c.languages[0].net, 5);
     }
 }

@@ -38,7 +38,7 @@ use crate::feed::{self, CommitRange, CommitRow, FileRow, IdentId, InsightsSource
 pub use accel::{Accel, NoAccel, ReducerKind, ReducerOut};
 pub use axis::{BucketUnit, MAX_BUCKETS, TimeAxis};
 pub use code::{Frequency, Rework, ReworkPoint, rework_share, rework_verdict};
-pub use compare::{Comparison, LangDelta};
+pub use compare::{Comparison, LangDelta, RawCommit};
 pub use counted::{
     CHUNK, Counted, Item, LabelTally, PersonTallies, PersonTally, Reducer, Series, Sizes, Totals,
     When,

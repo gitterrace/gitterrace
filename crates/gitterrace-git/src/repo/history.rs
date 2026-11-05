@@ -154,6 +154,24 @@ impl Repo {
         Ok(ids)
     }
 
+    /// Commit ids reachable from `head` but not from `base` (`base..head`), newest first. Reads
+    /// commit headers only, so a branch the index never walked still has its commits.
+    pub fn range(&self, base: &str, head: &str) -> Result<Vec<String>> {
+        let repo = self.repo();
+        let (b, h) = (self.resolve_id(&repo, base)?, self.resolve_id(&repo, head)?);
+        let walk = repo
+            .rev_walk([h])
+            .with_hidden([b])
+            .sorting(Sorting::ByCommitTime(CommitTimeOrder::NewestFirst))
+            .all()
+            .map_err(git)?;
+        let mut ids = Vec::new();
+        for info in walk {
+            ids.push(info.map_err(git)?.id.to_string());
+        }
+        Ok(ids)
+    }
+
     /// One commit with its diff against the first parent.
     pub fn commit(&self, id: &str) -> Result<CommitDetail> {
         let repo = self.repo();
