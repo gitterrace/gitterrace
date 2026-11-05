@@ -355,6 +355,67 @@ impl Chain {
     }
 }
 
+/// Extensions that name a file format, never a language: signatures, archives, binaries and
+/// build outputs. Their lines count under `Other`, so the legend lists only languages.
+const NOT_LANGUAGES: &[&str] = &[
+    ".asc",
+    ".sig",
+    ".gpg",
+    ".pgp",
+    ".minisig",
+    ".sha256",
+    ".sha512",
+    ".md5",
+    ".prebuilt",
+    ".bin",
+    ".exe",
+    ".dll",
+    ".so",
+    ".dylib",
+    ".a",
+    ".o",
+    ".obj",
+    ".lib",
+    ".class",
+    ".jar",
+    ".wasm",
+    ".pyc",
+    ".gz",
+    ".tgz",
+    ".bz2",
+    ".xz",
+    ".zst",
+    ".zip",
+    ".tar",
+    ".7z",
+    ".png",
+    ".jpg",
+    ".jpeg",
+    ".gif",
+    ".ico",
+    ".icns",
+    ".webp",
+    ".bmp",
+    ".pdf",
+    ".woff",
+    ".woff2",
+    ".ttf",
+    ".otf",
+    ".eot",
+    ".mp3",
+    ".mp4",
+    ".mov",
+    ".wav",
+    ".lock",
+    ".map",
+    ".snap",
+];
+
+/// Whether the slot `name` is a language the legend may name.
+pub(crate) fn is_language(name: &str) -> bool {
+    !NOT_LANGUAGES.contains(&name)
+}
+
 /// Which language slots the page shows, by their lines at the newest commit.
 struct Fold {
     langs: Vec<String>,
@@ -364,13 +425,17 @@ struct Fold {
 
 impl Fold {
     fn new(names: &[String], last: &[i64]) -> Self {
-        let mut order: Vec<usize> = (0..names.len()).filter(|s| last[*s] > 0).collect();
+        let mut order: Vec<usize> = (0..names.len())
+            .filter(|s| last[*s] > 0 && is_language(&names[*s]))
+            .collect();
         order.sort_by(|a, b| {
             last[*b]
                 .cmp(&last[*a])
                 .then_with(|| names[*a].cmp(&names[*b]))
         });
-        let keep: Vec<usize> = if order.len() <= TOP + 1 {
+        // Leaving out a format folds it, so "Other" must show even under the cut.
+        let formats = (0..names.len()).any(|s| last[s] != 0 && !is_language(&names[s]));
+        let keep: Vec<usize> = if order.len() <= TOP + usize::from(!formats) {
             order
         } else {
             order[..TOP].to_vec()

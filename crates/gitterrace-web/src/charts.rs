@@ -25,8 +25,7 @@ fn slot(n: usize) -> f64 {
 fn axis(max: u64) -> (String, f64) {
     let mut svg = String::new();
     let plot = H - TOP_PAD - BOTTOM;
-    let step = nice_step(max);
-    let top_n = step * max.div_ceil(step).max(1);
+    let (step, top_n) = ticks(max, MAX_TICKS);
     let top = top_n as f64;
     let mut v = 0;
     while v <= top_n {
@@ -43,27 +42,50 @@ fn axis(max: u64) -> (String, f64) {
     (svg, top)
 }
 
-/// A 1/2/5 step giving about four gridlines.
-pub(crate) fn nice_step(max: u64) -> u64 {
-    let raw = (max.max(1)).div_ceil(4);
-    let mut mag = 1;
-    while mag * 10 <= raw {
-        mag *= 10;
+/// Most value ticks a full-height axis shows, zero included. Not configurable: it follows the
+/// chart's fixed height, where more labels would collide.
+const MAX_TICKS: u64 = 5;
+
+/// Ticks for values `0..=max`: a step of 1, 2 or 5 times a power of ten, and the top tick, the
+/// first multiple of the step at or above `max`. At most `n` ticks, zero included, so the axis
+/// stays readable; never fewer than two, so a range always shows its scale.
+pub(crate) fn ticks(max: u64, n: u64) -> (u64, u64) {
+    let n = n.max(2);
+    let max = max.max(1);
+    let mut mag = 1u64;
+    loop {
+        for m in [1, 2, 5] {
+            let step = m * mag;
+            let top = step * max.div_ceil(step);
+            if top / step < n {
+                return (step, top);
+            }
+        }
+        mag = mag.saturating_mul(10);
     }
-    [1, 2, 5, 10]
-        .iter()
-        .map(|m| m * mag)
-        .find(|s| *s >= raw)
-        .unwrap_or(mag * 10)
 }
 
-/// Month labels thinned so neighbours never collide, centred under their column. The plot
-/// keeps `LEFT` clear on the left so the first label is never clipped.
+/// Bucket labels thinned so neighbours never collide, centred under their column. The plot
+/// keeps `LEFT` clear on the left so the first label is never clipped. The spacing is a calendar
+/// step: quarters every 1, 2 or 4 (a year, on Q1), other buckets every 1, 2 or 5 times a power of
+/// ten.
 fn x_labels(keys: &[&str]) -> String {
     let sl = slot(keys.len());
-    let every = (LABEL_PX / sl).ceil().max(1.0) as usize;
+    let need = (LABEL_PX / sl).ceil().max(1.0) as usize;
+    let quarters = keys.first().is_some_and(|k| k.starts_with('Q'));
+    let every = label_every(need, quarters);
+    // Quarter labels at a year step sit on Q1, so each one names a year.
+    let start = if quarters && every >= 4 {
+        keys.iter().position(|k| k.starts_with("Q1")).unwrap_or(0) % every
+    } else {
+        0
+    };
     let mut svg = String::new();
-    for (i, k) in keys.iter().enumerate().filter(|(i, _)| i % every == 0) {
+    for (i, k) in keys
+        .iter()
+        .enumerate()
+        .filter(|(i, _)| *i >= start && (i - start) % every == 0)
+    {
         let cx = (i as f64).mul_add(sl, LEFT) + sl / 2.0;
         let (x, anchor) = if cx > W - LABEL_PX / 2.0 {
             (W, "end")
@@ -78,6 +100,29 @@ fn x_labels(keys: &[&str]) -> String {
         );
     }
     svg
+}
+
+/// The label spacing at or above `need` columns: a whole number of years for quarters, a nice
+/// number for the rest.
+pub(crate) fn label_every(need: usize, quarters: bool) -> usize {
+    let need = need.max(1);
+    if quarters {
+        return match need {
+            1 => 1,
+            2 => 2,
+            3 | 4 => 4,
+            n => 4 * n.div_ceil(4),
+        };
+    }
+    let mut mag = 1usize;
+    loop {
+        for m in [1, 2, 5] {
+            if m * mag >= need {
+                return m * mag;
+            }
+        }
+        mag *= 10;
+    }
 }
 
 /// Categorical class for series `k` of `named`; anything past the named ones is "other".
@@ -228,8 +273,8 @@ pub(crate) fn stacked(buckets: &[gitterrace_index::LabelBucket]) -> String {
 /// Additions above the axis and deletions below it, one column per bucket.
 pub(crate) fn diverging(points: &[(String, u64, u64)], title: &str) -> String {
     let max = points.iter().map(|p| p.1.max(p.2)).max().unwrap_or(0);
-    let step = nice_step(max);
-    let top_n = step * max.div_ceil(step).max(1);
+    // Each half is half the height, so it gets half the ticks: zero, then one or two a side.
+    let (step, top_n) = ticks(max, 3);
     let top = top_n as f64;
     let half = (H - TOP_PAD - BOTTOM) / 2.0;
     let mid = TOP_PAD + half;
@@ -237,8 +282,8 @@ pub(crate) fn diverging(points: &[(String, u64, u64)], title: &str) -> String {
     let mut v = 0;
     while v <= top_n {
         let dy = v as f64 / top * half;
-        for (sign, y) in [("", mid - dy), ("-", mid + dy)] {
-            if v == 0 && sign == "-" {
+        for (sign, y) in [("", mid - dy), ("\u{2212}", mid + dy)] {
+            if v == 0 && !sign.is_empty() {
                 continue;
             }
             let _ = write!(
@@ -360,8 +405,7 @@ pub(crate) fn scatter(dots: &[Dot], x_title: &str) -> String {
         .unwrap_or(0);
     let smax = dots.iter().map(|d| d.size).max().unwrap_or(1).max(1);
     let (grid, ytop) = axis(ymax);
-    let xstep = nice_step(xmax);
-    let xtop_n = xstep * xmax.div_ceil(xstep).max(1);
+    let (xstep, xtop_n) = ticks(xmax, 6);
     let xtop = xtop_n as f64;
     let plot = H - TOP_PAD - BOTTOM;
     let mut svg = open_svg("Change frequency against size");
@@ -459,57 +503,4 @@ pub(crate) fn pct(v: u64, max: u64) -> u32 {
 }
 
 #[cfg(test)]
-mod tests {
-    use crate::charts::{bars, diverging, heatmap, pct, percent_line};
-
-    #[test]
-    fn bars_escape_labels_and_scale() {
-        let svg = bars(&[("<a>".to_owned(), 5), ("b".to_owned(), 0)]);
-        assert!(svg.contains("&lt;a&gt;"));
-        assert!(!svg.contains("<a>"));
-        assert_eq!(svg.matches(r#"class="bar""#).count(), 2);
-    }
-
-    #[test]
-    fn heatmap_has_all_cells() {
-        let mut cells = [[0; 24]; 7];
-        cells[0][0] = 3;
-        let svg = heatmap(&cells, 3);
-        assert_eq!(svg.matches("<rect").count(), 168);
-        assert!(svg.contains(r#"class="h4""#));
-    }
-
-    #[test]
-    fn pct_keeps_tiny_values_visible() {
-        assert_eq!(pct(1, 1000), 1);
-        assert_eq!(pct(0, 10), 0);
-        assert_eq!(pct(5, 10), 50);
-    }
-
-    /// A hover band is opaque on hover; drawn after a mark it hides the mark. In every
-    /// chart, the last hover band must come before the first data mark it could cover.
-    #[test]
-    fn hover_bands_paint_under_the_data() {
-        let line = percent_line(&[
-            ("a".to_owned(), Some(0.2)),
-            ("b".to_owned(), Some(0.5)),
-            ("c".to_owned(), None),
-        ]);
-        let last_hit = line.rfind(r#"class="hit""#).expect("hit");
-        let path = line.find(r#"class="line""#).expect("line");
-        assert!(last_hit < path, "hover band drawn over the line");
-        for svg in [
-            bars(&[("a".to_owned(), 3), ("b".to_owned(), 1)]),
-            diverging(&[("a".to_owned(), 3, 1)], "t"),
-        ] {
-            for col in svg.split(r#"<g class="col">"#).skip(1) {
-                let hit = col.find(r#"class="hit""#).expect("hit");
-                let mark = col
-                    .find(r#"class="bar""#)
-                    .or_else(|| col.find(r#"class="up""#))
-                    .expect("mark");
-                assert!(hit < mark, "hover band drawn over a bar");
-            }
-        }
-    }
-}
+mod tests;

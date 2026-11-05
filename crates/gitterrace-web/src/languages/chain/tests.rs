@@ -148,3 +148,32 @@ fn skeleton_size_is_flat_in_history_length() {
     assert!(b < 512 * 1024, "skeleton holds {b} bytes at 200k commits");
     assert!(b < a * 4, "skeleton grew from {a} to {b} bytes");
 }
+
+/// A tree with signatures, prebuilt binaries and files without an extension next to real
+/// languages: the legend names only languages, and every line still counts, under `Other`.
+#[test]
+fn formats_count_under_other_and_leave_the_legend() {
+    let names: Vec<String> = [
+        "Rust",
+        ".asc",
+        "Python",
+        ".prebuilt",
+        "(no extension)",
+        ".png",
+    ]
+    .map(str::to_owned)
+    .to_vec();
+    let last = [500, 40, 300, 70, 20, 9];
+    let f = Fold::new(&names, &last);
+    assert_eq!(f.langs, ["Rust", "Python", "(no extension)", "Other"]);
+    let row = f.apply(&last);
+    assert_eq!(row, [500, 300, 20, 40 + 70 + 9]);
+    assert_eq!(
+        row.iter().sum::<i64>(),
+        last.iter().sum::<i64>(),
+        "no line is lost"
+    );
+    // Languages alone fold nothing.
+    let f = Fold::new(&names[..1], &last[..1]);
+    assert_eq!(f.langs, ["Rust"]);
+}

@@ -11,7 +11,7 @@ use std::fmt::Write as _;
 
 use askama::Template;
 
-use crate::charts::nice_step;
+use crate::charts::ticks;
 use crate::fmt::{self, esc};
 use crate::languages::chain::Chain;
 use crate::languages::{
@@ -97,8 +97,8 @@ fn area_chart(ch: &Chain, view: View, subj: &Subjects) -> String {
     let (ymax_n, step) = if view.share {
         (100u64, 25u64)
     } else {
-        let step = nice_step(max as u64);
-        (step * (max as u64).div_ceil(step).max(1), step)
+        let (step, top) = ticks(max.max(0) as u64, 5);
+        (top, step)
     };
     let ymax = ymax_n as f64;
     let yat = |v: f64| (v / ymax).mul_add(-ph, TOP_PAD + ph);
