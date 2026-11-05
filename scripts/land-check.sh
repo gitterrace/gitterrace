@@ -74,6 +74,24 @@ check_subjects() {
   return "$bad"
 }
 
+# The commands `make lines names` runs, each of which this script must also run: through a
+# `step make ...` line, or as a literal `step` line. A check added to those targets then reaches
+# the gate by itself, and a copied command that falls behind the Makefile is caught here.
+# Optional $1 is the script text to inspect (the self-test default is this file).
+gate_commands_covered() {
+  local script=${1:-$0} want have missing=0 line targets
+  want=$(make -n lines names 2>/dev/null | grep -v '^echo ' || true)
+  [[ -n $want ]] || return 1
+  have=$(grep -E '^step ' "$script" | sed 's/^step //')
+  targets=$(grep -E '^step make ' "$script" | sed 's/^step make //' | tr '\n' ' ')
+  # shellcheck disable=SC2086
+  [[ -z $targets ]] || have="$have"$'\n'$(make -n $targets 2>/dev/null)
+  while IFS= read -r line; do
+    grep -qxF -- "$line" <<<"$have" || missing=1
+  done <<<"$want"
+  ((missing == 0))
+}
+
 self_test() {
   local got
   got=$(select_crates crates/gitterrace-git/src/repo.rs | tr '\n' ' ')
@@ -111,6 +129,18 @@ self_test() {
   (cd "$d" && git reset -q --hard HEAD~1 && check_subjects HEAD) ||
     {
       echo "self-test: a well formed subject failed" >&2
+      exit 1
+    }
+  # Today's script, before it called the targets: it copied three commands and lost two.
+  printf '%s\n' 'step python3 scripts/lines-check.py' 'step python3 scripts/status-words-check.py' \
+    'step python3 scripts/names-check.py' >"$d/copied.sh"
+  if gate_commands_covered "$d/copied.sh"; then
+    echo "self-test: a script that copies only three commands passed" >&2
+    exit 1
+  fi
+  gate_commands_covered ||
+    {
+      echo "self-test: a command of \`make lines names\` never runs in land-check" >&2
       exit 1
     }
   echo "land-check self-test: ok"
@@ -198,9 +228,7 @@ if ((${#scope[@]})); then
     step cargo test -p gitterrace-web --test equivalence_pages
   fi
 fi
-step python3 scripts/lines-check.py
-step python3 scripts/status-words-check.py
-step python3 scripts/names-check.py
+step make lines names
 step cargo test -p gitterrace-testkit --test conventions
 step sh scripts/lint-run.sh
 step make docs-check
