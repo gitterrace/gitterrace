@@ -12,13 +12,36 @@ ignores:
   - crates/**/*_tests.rs
   - crates/**/tests/**
   - crates/gitterrace-git/**
+utils:
+  finder:
+    any:
+      - pattern: $S.find_commit($$$)
+      - pattern: $S.find_path($$$)
+      - pattern: $S.find_label($$$)
 rule:
   any:
-    - pattern: $S.find_commit($$$).$F($$$)
-    - pattern: $S.find_path($$$).$F($$$)
-    - pattern: $S.find_label($$$).$F($$$)
-  has:
-    field: function
-    has:
-      field: field
-      regex: '^(ok|unwrap_or|unwrap_or_default|unwrap_or_else|map_or|map_or_else|is_ok|is_err|unwrap|expect|ok_or|and_then|map|into_iter|iter|flatten|is_some|is_none|is_some_and|is_none_or|is_ok_and|is_err_and)$'
+    # A combinator on the result that drops the error: unwrap_or, ok, map_or and the like.
+    - all:
+        - kind: call_expression
+        - has:
+            field: function
+            all:
+              - has: {field: value, matches: finder}
+              - has:
+                  field: field
+                  regex: '^(ok|unwrap_or|unwrap_or_default|unwrap_or_else|map_or|map_or_else|is_ok|is_err|unwrap|expect|ok_or|and_then|map|into_iter|iter|flatten|is_some|is_none|is_some_and|is_none_or|is_ok_and|is_err_and)$'
+    # `if let Ok(x) = s.find_*(..)`: the error takes the else branch, as absence would.
+    - all:
+        - kind: let_condition
+        - has: {field: pattern, regex: '^Ok\('}
+        - has: {field: value, matches: finder}
+    # `match s.find_*(..)` with an `Err(_)` arm that answers instead of propagating.
+    - all:
+        - kind: match_expression
+        - has: {field: value, matches: finder}
+        - has:
+            stopBy: end
+            kind: match_arm
+            all:
+              - has: {field: pattern, regex: '^Err\(_?\w*\)$'}
+              - not: {has: {field: value, stopBy: end, any: [{pattern: 'return Err($$$)'}, {pattern: 'Err($$$)'}, {kind: try_expression}]}}
