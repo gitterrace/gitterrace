@@ -326,7 +326,7 @@ fn insights_pages_order_the_tabs() {
         (l, crate::features::insights_home())
     });
     // A section name orders nothing: it lives on its page and adds no tab.
-    assert_eq!(labels, ["Hotspots", "Activity", "Compare"]);
+    assert_eq!(labels, ["Hotspots", "Activity"]);
     assert_eq!(home, Some("/stats/hotspots"));
 }
 

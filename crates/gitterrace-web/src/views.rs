@@ -67,6 +67,8 @@ impl Render {
 pub(crate) struct Nav {
     pub(crate) href: String,
     pub(crate) label: &'static str,
+    /// Which page the entry opens, as the page names itself when it asks to be marked.
+    pub(crate) key: &'static str,
     pub(crate) on: bool,
 }
 
@@ -243,6 +245,7 @@ pub(crate) fn chrome_at(app: &crate::app::App, active: &str, rev: &str) -> Chrom
             .map(|(path, label, key)| Nav {
                 href: href(&path.replace("{rev}", &enc_seg(rev))),
                 label,
+                key,
                 on: key == active,
             })
             .collect(),
@@ -302,6 +305,14 @@ impl Chrome {
         }
     }
 
+    /// Marks `key` as the open top nav entry, for a page that sits under another one.
+    pub(crate) fn active(mut self, key: &str) -> Self {
+        for n in &mut self.nav {
+            n.on = n.key == key;
+        }
+        self
+    }
+
     /// A page about a fixed commit or tag: nothing in the repository can change it.
     pub(crate) fn pinned(self) -> Self {
         Self {
@@ -338,14 +349,13 @@ pub(crate) fn banner(h: &gitterrace_git::HeadState, base: &str) -> Option<String
 
 /// Path, label and key of each insights tab, all in one row: is it alive, who works on it,
 /// where the risk is, what it is made of and who knows it. Commit types and code frequency are
-/// sections of Activity, patterns a section of Hotspots.
-const STATS_TABS: [(&str, &str, &str); 6] = [
+/// sections of Activity, patterns a section of Hotspots. Compare sits under Commits.
+const STATS_TABS: [(&str, &str, &str); 5] = [
     ("/stats", "Activity", "a"),
     ("/stats/contributors", "Contributors", "co"),
     ("/stats/hotspots", "Hotspots", "ho"),
     ("/stats/languages", "Languages", "l"),
     ("/stats/ownership", "Ownership", "ow"),
-    ("/compare", "Compare", "cm"),
 ];
 
 /// The labels of the insights tabs, in tab order.
@@ -359,22 +369,15 @@ pub(crate) struct Tabs {
 }
 
 pub(crate) fn stats_tabs(active: &str) -> Tabs {
-    let served = crate::features::pages();
-    let compare = crate::features::on(gitterrace_config::Feature::Compare);
-    // `insights.pages` orders the tabs; Compare stays last.
-    let all: Vec<Nav> = served
+    // `insights.pages` orders the tabs.
+    let all: Vec<Nav> = crate::features::pages()
         .iter()
         .filter_map(|p| crate::features::page_route(p))
         .filter_map(|r| STATS_TABS.iter().find(|t| t.0 == r).copied())
-        .chain(
-            STATS_TABS
-                .iter()
-                .copied()
-                .filter(|t| t.0 == "/compare" && compare),
-        )
         .map(|(path, label, key)| Nav {
             href: href(path),
             label,
+            key,
             on: key == active,
         })
         .collect();

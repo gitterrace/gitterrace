@@ -44,6 +44,8 @@ struct LogPage {
     empty: Option<crate::empty::Empty>,
     newer: Option<String>,
     older: Option<String>,
+    /// Compare from the latest tag to this revision, `""` when the page is off.
+    compare_href: String,
     /// Removable chip for the active author filter: (name, href without it).
     author_chip: Option<(String, String)>,
 }
@@ -188,8 +190,10 @@ pub(super) async fn log(
             }
             fmt::href(&q)
         };
+        let since = crate::compare::latest_tag(&a.repo.refs()?);
         Ok(LogPage {
             c: views::chrome_at(a, "log", &rev).live(Mode::NOTICE),
+            compare_href: crate::compare::compare_href(since.as_deref(), &rev),
             newer: (pg > 0).then(|| link(pg - 1)),
             older: more.then(|| link(pg + 1)),
             author_chip,

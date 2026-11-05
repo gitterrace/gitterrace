@@ -87,7 +87,7 @@ input::placeholder{color:var(--faint)}
 input:focus{outline:2px solid var(--focus);outline-offset:0;border-color:var(--accent)}
 button{font:inherit;font-weight:var(--weight-semibold);height:32px;padding:0 var(--space-4);border:var(--border);border-radius:var(--radius);background:var(--soft);color:var(--fg);cursor:pointer;transition:background var(--dur-fast),border-color var(--dur-fast)}
 button:hover{border-color:var(--line-strong);background:var(--hover)}
-.filter{display:flex;gap:var(--space-2)}
+.filter{display:flex;gap:var(--space-2)}.head .cmplink{font-size:var(--text-sm);border:var(--border);border-radius:var(--radius);padding:4px var(--space-3)}
 .pager{display:flex;justify-content:space-between;margin-top:var(--space-6)}
 .add{color:var(--add)}.del{color:var(--del)}
 .counts{font:var(--weight-semibold) var(--text-xs) var(--mono);font-variant-numeric:tabular-nums}

@@ -131,7 +131,7 @@ async fn every_old_section_renders_on_its_new_page() {
 }
 
 #[tokio::test]
-async fn five_insights_tabs_and_compare_stays_linked() {
+async fn five_insights_tabs_and_compare_sits_under_commits() {
     let dir = tempfile::tempdir().expect("tmp");
     let f = fixture(dir.path());
     let router = gitterrace_web::app_router(f.path()).expect("router");
@@ -155,14 +155,21 @@ async fn five_insights_tabs_and_compare_stays_linked() {
     ] {
         assert!(tabs.contains(&format!(">{kept}</a>")), "{kept} tab missing");
     }
-    // Compare is reachable from a navigation row on every insights page.
-    let navs: String = body
-        .split("<nav")
-        .skip(1)
-        .map(|n| n.split("</nav>").next().unwrap_or_default())
-        .collect();
+    // Compare sits under Commits: no insights tab, a link on the log, Commits marked there.
     assert!(
-        navs.contains(&format!("href=\"{root}/compare\"")),
-        "Compare is linked from no navigation"
+        !tabs.contains("Compare"),
+        "Compare is still an insights tab"
     );
+    let (_, log) = page(&router, "/log/HEAD").await;
+    assert!(
+        log.contains(&format!("href=\"{root}/compare?")),
+        "the log does not link to Compare"
+    );
+    let (_, cmp) = page(&router, "/compare").await;
+    let nav = cmp
+        .split("<nav class=\"tabnav\">")
+        .nth(1)
+        .unwrap_or_default();
+    let on = nav.split("class=\"on\"").nth(1).unwrap_or_default();
+    assert!(on.starts_with(" aria-current=\"page\">Commits<"), "{nav}");
 }

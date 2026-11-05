@@ -249,13 +249,13 @@ fn loose_ends(a: &App, head: &str, current: Option<&str>, now: i64) -> (Vec<Loos
         .collect();
     open.sort_by(|x, y| y.0.cmp(&x.0).then(x.1.name.cmp(&y.1.name)));
     let total = open.len();
-    let base = enc_seg(current.unwrap_or("HEAD"));
+    let base = current.unwrap_or("HEAD");
     let rows = open
         .into_iter()
         .take(TOP_LOOSE)
         .map(|(t, b)| Loose {
             href: if crate::features::on(Feature::Compare) {
-                href(&format!("/compare?base={base}&head={}", enc_seg(&b.name)))
+                crate::compare::compare_href(Some(base), &b.name)
             } else {
                 href(&format!("/log/{}", enc_seg(&b.name)))
             },

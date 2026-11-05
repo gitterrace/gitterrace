@@ -208,10 +208,7 @@ pub(crate) fn branch_rows(a: &crate::app::App) -> Result<Vec<views::CommitRow>> 
                     views::Count {
                         label: "ahead",
                         value: fmt::thousands(s.ahead),
-                        href: crate::features::href_if(
-                            gitterrace_config::Feature::Compare,
-                            &format!("/compare?base={}&head={}", enc_seg(&base), enc_seg(&s.name)),
-                        ),
+                        href: crate::compare::compare_href(Some(&base), &s.name),
                         tip: "Commits ahead of the default branch",
                     },
                 ];

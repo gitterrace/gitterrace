@@ -1,4 +1,7 @@
-//! The compare page, `/compare`: what changed between two revisions.
+//! The compare page, `/compare`: what changed between two revisions. It belongs to Commits: the
+//! top nav marks Commits, the log links here, and an empty form starts from the latest tag.
+//! Every link to the page comes from [`compare_href`], so the prefill and the feature switch
+//! hold on all of them.
 
 use askama::Template;
 use axum::extract::{Query, RawQuery, State};
@@ -10,7 +13,7 @@ use crate::{
     fmt::{self, enc_seg, href},
     insights::{Kpi, cached, insights},
     routes::Shared,
-    views::{self, Chrome, Tabs},
+    views::{self, Chrome},
 };
 
 #[derive(Deserialize, Default)]
@@ -39,7 +42,8 @@ struct Result2 {
 #[template(path = "compare.html")]
 struct ComparePage {
     c: Chrome,
-    tabs: Tabs,
+    /// The commits of the head, the page this one sits under.
+    log_href: String,
     base: String,
     head: String,
     tags: Vec<(String, String)>,
@@ -48,6 +52,22 @@ struct ComparePage {
 }
 
 const COMPARE_LIST: usize = 200;
+
+/// The link to compare `base` with `head`, or `""` when the compare page is turned off. With
+/// no `base` the page starts from the latest tag.
+pub(crate) fn compare_href(base: Option<&str>, head: &str) -> String {
+    let base = base.map_or_else(String::new, |b| format!("base={}&", enc_seg(b)));
+    let path = format!("/compare?{base}head={}", enc_seg(head));
+    crate::features::href_if(gitterrace_config::Feature::Compare, &path)
+}
+
+/// The newest tag, by its commit's time: where a comparison starts when none is asked for.
+pub(crate) fn latest_tag(refs: &[gitterrace_git::RefInfo]) -> Option<String> {
+    refs.iter()
+        .filter(|r| r.kind == gitterrace_git::RefKind::Tag)
+        .max_by_key(|r| r.time)
+        .map(|r| r.name.clone())
+}
 
 pub(crate) async fn page(
     State(app): Shared,
@@ -58,21 +78,19 @@ pub(crate) async fn page(
         q.base.unwrap_or_default(),
         q.head.unwrap_or_else(|| "HEAD".to_owned()),
     );
-    let b2 = base.clone();
     let h2 = head.clone();
     cached(&app, "cm", raw, move |a, r, c| {
-        let tags = a
-            .repo
-            .refs()
-            .unwrap_or_default()
-            .into_iter()
+        let c = c.active("log");
+        let refs = a.repo.refs().unwrap_or_default();
+        let b2 = if base.is_empty() {
+            latest_tag(&refs).unwrap_or_default()
+        } else {
+            base
+        };
+        let tags = refs
+            .iter()
             .filter(|x| x.kind == gitterrace_git::RefKind::Tag)
-            .map(|x| {
-                (
-                    x.name.clone(),
-                    href(&format!("/compare?base={}&head=HEAD", enc_seg(&x.name))),
-                )
-            })
+            .map(|x| (x.name.clone(), compare_href(Some(&x.name), "HEAD")))
             .take(12)
             .collect();
         let mut error = None;
@@ -135,8 +153,8 @@ pub(crate) async fn page(
             }
         }
         ComparePage {
+            log_href: href(&format!("/log/{}", enc_seg(&h2))),
             c,
-            tabs: views::stats_tabs("cm"),
             base: b2,
             head: h2,
             tags,
@@ -145,4 +163,45 @@ pub(crate) async fn page(
         }
     })
     .await
+}
+
+#[cfg(test)]
+mod tests {
+    use gitterrace_git::{RefInfo, RefKind};
+
+    use super::*;
+
+    fn r(name: &str, kind: RefKind, time: i64) -> RefInfo {
+        RefInfo {
+            name: name.to_owned(),
+            kind,
+            target: String::new(),
+            time,
+            annotation: None,
+        }
+    }
+
+    #[test]
+    fn the_latest_tag_is_the_newest_tag_not_the_newest_ref() {
+        let refs = [
+            r("main", RefKind::Branch, 30),
+            r("v1", RefKind::Tag, 10),
+            r("v2", RefKind::Tag, 20),
+        ];
+        assert_eq!(latest_tag(&refs).as_deref(), Some("v2"));
+        assert_eq!(latest_tag(&refs[..1]), None);
+    }
+
+    #[test]
+    fn a_link_without_a_base_leaves_the_prefill_to_the_page() {
+        let on = crate::features::Effective::of(&gitterrace_config::Config::default(), None);
+        let (with, without) = crate::features::with(on, || {
+            (
+                compare_href(Some("v 1"), "main"),
+                compare_href(None, "main"),
+            )
+        });
+        assert!(with.ends_with("/compare?base=v%201&head=main"), "{with}");
+        assert!(without.ends_with("/compare?head=main"), "{without}");
+    }
 }
