@@ -18,7 +18,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 EXTS = (".rs", ".html", ".js", ".mjs", ".md")
-EXCLUDE = ("static/vendor/", "theme/schwarzwald/", "target/", "CHANGELOG.md")
+EXCLUDE = ("static/vendor/", "shared/schwarzwald/", "target/", "CHANGELOG.md")
 W = r"(?:clean|dirty|ahead|behind|detached|untracked|modified)"
 PATTERNS = [
     # "on main clean", "branch {name} ahead 2"

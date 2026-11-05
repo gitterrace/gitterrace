@@ -35,7 +35,7 @@ outside `gitterrace-git` imports `gix`.
   (`cached` in `insights.rs`). Add unfiltered pages to `WARM_PAGES` in `lib.rs`.
 - No inline scripts beyond the hashed theme snippet: the CSP refuses them. JS
   lives in `static/`.
-- Never edit `theme/schwarzwald` or the generated block in `tokens.css`. `make theme` fails on
+- Never edit `shared/schwarzwald` or the generated block in `tokens.css`. `make theme` fails on
   drift. No raw color outside `tokens.css`.
 - Logic lives in Rust. Templates render values, they do not compute them.
 - Docs: `api.md`, `configuration.md` and every `GENERATED` block come from code registries

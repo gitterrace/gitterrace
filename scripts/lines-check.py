@@ -24,7 +24,7 @@ MAX_WIDTH = 100
 LENGTH_GLOBS = ("*.rs", "*.py", "*.mjs", "*.js", "*.sh", "*.css", "*.html")
 COMMENT_EXTS = (".rs", ".py", ".mjs", ".js", ".sh")
 # Vendored third-party files and the synced theme copy are not ours to split or reword.
-EXCLUDE = ("static/vendor/", "theme/schwarzwald/")
+EXCLUDE = ("static/vendor/", "shared/schwarzwald/")
 
 # Process labels in comments. Percent-encodings such as %C3 sit in code, not in comments, and
 # the whole-word match keeps a label inside longer tokens out.

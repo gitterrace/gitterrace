@@ -4,8 +4,9 @@ useDefault = true
 [allowlist]
 description = "known false positives, each as narrow as it can be"
 paths = [
-  # The schwarzwald snapshot manifest: a sha256 per file, public digests, no secret.
-  '''theme/schwarzwald/manifest\.json$''',
+  # The schwarzwald snapshot manifest: a sha256 per file, public digests, no secret. The scan
+  # reads history, so the copy's earlier theme/ path stays listed.
+  '''(shared|theme)/schwarzwald/manifest\.json$''',
 ]
 regexTarget = "line"
 regexes = [

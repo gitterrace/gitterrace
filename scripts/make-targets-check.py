@@ -27,7 +27,7 @@ def files() -> list[str]:
     return [
         f
         for f in out.stdout.split("\0")
-        if f.endswith(TEXT) and not f.startswith("theme/")
+        if f.endswith(TEXT) and not f.startswith("shared/")
     ]
 
 

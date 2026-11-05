@@ -44,19 +44,19 @@ const FONTS: [(&str, &[u8]); 3] = [
     (
         "fraunces.woff2",
         include_bytes!(
-            "../../../../theme/schwarzwald/fonts/fraunces/fraunces-latin-wght-normal.woff2"
+            "../../../../shared/schwarzwald/fonts/fraunces/fraunces-latin-wght-normal.woff2"
         ),
     ),
     (
         "bricolage-grotesque.woff2",
         include_bytes!(
-            "../../../../theme/schwarzwald/fonts/bricolage-grotesque/bricolage-grotesque-latin-wght-normal.woff2"
+            "../../../../shared/schwarzwald/fonts/bricolage-grotesque/bricolage-grotesque-latin-wght-normal.woff2"
         ),
     ),
     (
         "jetbrains-mono.woff2",
         include_bytes!(
-            "../../../../theme/schwarzwald/fonts/jetbrains-mono/jetbrains-mono-latin-wght-normal.woff2"
+            "../../../../shared/schwarzwald/fonts/jetbrains-mono/jetbrains-mono-latin-wght-normal.woff2"
         ),
     ),
 ];

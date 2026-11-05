@@ -34,7 +34,7 @@ OUTSIDE_HASHES = frozenset(
     }
 )
 # .mcp.json is local agent tooling config, not product content.
-SKIP = ("theme/schwarzwald/", "Cargo.lock", ".mcp.json", "scripts/names-check.py")
+SKIP = ("shared/schwarzwald/", "Cargo.lock", ".mcp.json", "scripts/names-check.py")
 WORD = re.compile(r"[A-Za-z_]{4,}")
 
 

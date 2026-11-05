@@ -35,7 +35,7 @@ HOST = re.compile(r"\b[a-z0-9][\w-]*\.local\b(?!/)")
 SKIP = (
     "target/",
     "static/vendor/",
-    "theme/schwarzwald/",
+    "shared/schwarzwald/",
     "scripts/lint/personal-data.py",
 )
 

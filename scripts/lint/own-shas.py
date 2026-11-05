@@ -22,7 +22,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 RULE = "CONV-NO-OWN-SHAS"
 SHA = re.compile(r"\b[0-9a-f]{7,40}\b")
-SKIP = ("target/", "static/vendor/", "theme/schwarzwald/", ".lock")
+SKIP = ("target/", "static/vendor/", "shared/schwarzwald/", ".lock")
 
 
 def notes(rel: str, text: str) -> str:

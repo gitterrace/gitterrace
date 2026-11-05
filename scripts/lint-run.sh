@@ -34,7 +34,7 @@ run() {
 vale_run() {
   [ -d styles/proselint ] || vale sync >/dev/null || return 1
   # Tracked files only: `.` would walk .wt/ worktrees and target/.
-  git ls-files -z -- '*.md' '*.rs' ':!:vendor/**' ':!:theme/schwarzwald/**' |
+  git ls-files -z -- '*.md' '*.rs' ':!:vendor/**' ':!:shared/schwarzwald/**' |
     xargs -0 vale --minAlertLevel=error
 }
 

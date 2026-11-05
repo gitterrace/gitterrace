@@ -42,6 +42,7 @@ doc:
 
 #: theme: Snapshot matches its manifest, generated files match the snapshot
 theme:
+	python3 shared/schwarzwald/check.py
 	python3 scripts/theme-gen.py --check
 	python3 scripts/theme-logo-gen.py --check
 	python3 scripts/theme-tagline-gen.py --check

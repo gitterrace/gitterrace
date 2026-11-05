@@ -26,7 +26,7 @@ TAGLINE = "A local git browser. Your repository's history, step by step."
 ROOT = Path(__file__).resolve().parent.parent
 FONT = (
     ROOT
-    / "theme/schwarzwald/fonts/bricolage-grotesque/bricolage-grotesque-latin-wght-normal.woff2"
+    / "shared/schwarzwald/fonts/bricolage-grotesque/bricolage-grotesque-latin-wght-normal.woff2"
 )
 X, BASELINE, SIZE, WEIGHT = 174.0, 150.0, 22.0, 400
 

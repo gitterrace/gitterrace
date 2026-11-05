@@ -68,7 +68,7 @@ IGNORE = re.compile(r'#\[ignore\s*=\s*"([^"]*)"')
 CODE = (".rs", ".py", ".mjs", ".js", ".sh", ".yml", ".yaml", ".toml")
 SKIP = (
     "static/vendor/",
-    "theme/schwarzwald/",
+    "shared/schwarzwald/",
     "scripts/lint/internal-refs.py",
 )
 GOLDEN = "/golden/"

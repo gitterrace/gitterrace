@@ -125,12 +125,12 @@ pub fn render(root: &Path, ws: &Workspace) -> Result<Vec<Out>> {
     let mut outs = Vec::new();
     outs.push(Out::file("site/assets/site.css", css(&read(TOKENS)?)?));
     for (dir, file) in FONTS {
-        let path = format!("theme/schwarzwald/fonts/{dir}/{file}");
+        let path = format!("shared/schwarzwald/fonts/{dir}/{file}");
         let bytes = std::fs::read(root.join(&path)).with_context(|| format!("reading {path}"))?;
         outs.push(Out::bytes(format!("site/assets/fonts/{dir}.woff2"), bytes));
         outs.push(Out::file(
             format!("site/assets/fonts/{dir}-OFL.txt"),
-            read(&format!("theme/schwarzwald/fonts/{dir}/OFL.txt"))?,
+            read(&format!("shared/schwarzwald/fonts/{dir}/OFL.txt"))?,
         ));
     }
     for name in BRAND {
