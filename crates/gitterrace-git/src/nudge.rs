@@ -411,13 +411,22 @@ mod tests {
         let (n, f) = counting();
         let _w = Nudger::start(cfg(dir.path(), Duration::from_secs(60), true), f).expect("w");
         let base = settle(&n);
+        let t0 = Instant::now();
         for i in 0..5000 {
             std::fs::write(dir.path().join(format!("f{i}")), "x").expect("write");
         }
         assert!(wait_for(&n, base + 1, PATIENCE), "burst seen");
         let got = settle(&n) - base;
-        // An overflow notice in the burst adds an urgent nudge; still nowhere near one per file.
-        assert!((1..=20).contains(&got), "{got} nudges for 5000 files");
+        // `settle` returns a second after the last nudge, so this is how long nudges kept
+        // coming. At most one per `max_delay` (600 ms) while events arrive, plus the tail and an
+        // overflow notice; a loaded machine delivering late earns a longer window, but one nudge
+        // per file (thousands) never fits it.
+        let busy = t0.elapsed().saturating_sub(Duration::from_secs(1));
+        let most = usize::try_from(busy.as_millis() / 600).unwrap_or(usize::MAX) + 6;
+        assert!(
+            got <= most,
+            "{got} nudges for 5000 files over {busy:?}, most {most}"
+        );
     }
 
     #[test]
