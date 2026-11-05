@@ -22,7 +22,7 @@ pub use http::{index_body, router};
 pub use insights::{
     HEAD_INSIGHTS, INSIGHTS, Insight, OWNERSHIP_DEPTH, Params, list as insight_list,
 };
-pub use mcp::{McpServer, ToolDoc, serve_mcp};
+pub use mcp::{McpServer, ToolDoc, serve_mcp, tool_on};
 
 #[cfg(test)]
 mod limit_tests;
@@ -238,6 +238,28 @@ mod tests {
             v["endpoints"].as_array().map(Vec::len),
             Some(crate::ENDPOINTS.len())
         );
+    }
+
+    /// A tool missing from the gate table would be refused for good, so every listed tool has
+    /// an entry, and an entry names a real tool.
+    #[test]
+    fn every_mcp_tool_has_a_feature_entry() {
+        let cfg = gitterrace_config::Config::default();
+        for t in McpServer::tool_docs() {
+            assert!(
+                crate::tool_on(&cfg, None, &t.name),
+                "{} is gated off",
+                t.name
+            );
+        }
+    }
+
+    #[test]
+    fn mcp_refuses_a_tool_switched_off() {
+        let off = gitterrace_config::parse("[features]\napi_enabled = false\n")
+            .expect("parse")
+            .config;
+        assert!(!crate::tool_on(&off, None, "log"));
     }
 
     #[test]

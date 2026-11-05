@@ -389,3 +389,52 @@ async fn a_public_server_keeps_its_gates() {
         assert_eq!(send(uri).await, 404, "{uri}");
     }
 }
+
+/// The web's `/api/v1` route each MCP tool answers the same question as.
+const TOOL_ROUTES: &[(&str, &str)] = &[
+    ("repo_overview", "/api/v1/repo"),
+    ("log", "/api/v1/log"),
+    ("show_commit", "/api/v1/commits/{id}"),
+    ("read_file", "/api/v1/blob"),
+    ("list_tree", "/api/v1/tree"),
+    ("blame", "/api/v1/blame"),
+    ("hotspots", "/api/v1/insights/{name}"),
+    ("contributors", "/api/v1/contributors"),
+    ("activity", "/api/v1/insights/{name}"),
+];
+
+/// Class guard: every surface honors the switches. Each MCP tool is on exactly when the web
+/// route it mirrors is, under every single `[features]` key and `insights.pages` entry off, and
+/// every tool the server lists is mapped here, so a new tool cannot skip the gate.
+#[test]
+fn mcp_tools_follow_the_switches_of_the_web_api() {
+    for doc in gitterrace_api::McpServer::tool_docs() {
+        assert!(
+            TOOL_ROUTES.iter().any(|(t, _)| *t == doc.name),
+            "map MCP tool {} to its web route in TOOL_ROUTES and in TOOL_NEEDS",
+            doc.name
+        );
+    }
+    for off in Off::all() {
+        let cfg = off.config();
+        for (tool, route) in TOOL_ROUTES {
+            assert_eq!(
+                gitterrace_api::tool_on(&cfg, None, tool),
+                route_on(&cfg, None, route),
+                "{tool} and {route} disagree with {off:?} off"
+            );
+        }
+    }
+}
+
+/// A public server serves no API unless the file asks, and MCP follows.
+#[test]
+fn mcp_tools_follow_the_public_api_policy() {
+    let public = parse("[server]\nis_public = true\n").expect("parse").config;
+    let asked = parse("[server]\nis_public = true\n[features]\napi_enabled = true\n")
+        .expect("parse")
+        .config;
+    assert!(!gitterrace_api::tool_on(&public, None, "log"));
+    assert!(gitterrace_api::tool_on(&asked, None, "log"));
+    assert!(!gitterrace_api::tool_on(&asked, None, "not_a_tool"));
+}
