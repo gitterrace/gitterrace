@@ -49,13 +49,29 @@
     return el.value === "" && row.dataset.src === "default" ? null : JSON.stringify(el.value);
   }
 
+  // An actions row sends what was typed and the server makes the literal from the schema's
+  // type; a removed row sends its id with no value. Removals go last, highest row first, so
+  // the row numbers of the other edits still hold.
+  function rowInput(row) {
+    var el = row.querySelector("input,select,textarea");
+    if (row.dataset.kind === "checkbox") return el.checked ? "true" : "false";
+    return el.value;
+  }
+
   function changes() {
     var out = [];
     if (!form) return out;
     form.querySelectorAll(".setrow").forEach(function (row) {
       if (!row.classList.contains("changed")) return;
-      out.push({ id: row.dataset.id, value: literal(row) });
+      var card = row.closest(".setcard");
+      if (card && card.dataset.removed) return;
+      if (row.hasAttribute("data-row-key")) out.push({ id: row.dataset.id, input: rowInput(row) });
+      else out.push({ id: row.dataset.id, value: literal(row) });
     });
+    var gone = [];
+    form.querySelectorAll(".setcard[data-removed]").forEach(function (c) { gone.push(c.dataset.row); });
+    gone.sort(function (a, b) { return Number(b.split(".")[1]) - Number(a.split(".")[1]); });
+    gone.forEach(function (id) { out.push({ id: id, value: null }); });
     return out;
   }
 
@@ -147,6 +163,19 @@
     b.addEventListener("click", function () { setView(b.dataset.show); });
   });
   if (form) {
+    form.addEventListener("click", function (e) {
+      var add = e.target.closest("[data-add]");
+      var rm = e.target.closest("[data-remove]");
+      if (add) {
+        var blank = form.querySelector('.setlist[data-list="' + add.dataset.add + '"] .setcard[data-blank]');
+        if (blank) { blank.hidden = false; add.hidden = true; blank.querySelector("input,textarea").focus(); }
+      } else if (rm) {
+        var card = rm.closest(".setcard");
+        card.dataset.removed = "1";
+        card.hidden = true;
+        check();
+      }
+    });
     form.addEventListener("input", function (e) {
       var row = e.target.closest(".setrow");
       if (row) row.classList.add("changed");

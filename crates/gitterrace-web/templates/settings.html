@@ -19,6 +19,18 @@
 <span class="sep" aria-hidden="true">/</span>
 <span class="reponame">Settings</span>
 </div></div></header>
+{% macro card(c, blank) %}<div class="setcard" data-row="{{ c.id }}"{% if blank %} data-blank hidden{% endif %}>
+<div class="setcardhead"><strong>{{ c.title }}</strong>{% if !blank %}<button type="button" data-remove="{{ c.id }}">Remove</button>{% endif %}</div>
+{% for f in c.fields %}<div class="setrow" data-id="{{ f.id }}" data-kind="{{ f.kind }}" data-row-key>
+<label class="setname" for="f-{{ f.id }}"><code>{{ f.name }}</code>{% if f.required %} <span class="badge">Required</span>{% endif %}</label>
+<div class="setin">{% match f.kind %}
+{% when "checkbox" %}<input type="checkbox" id="f-{{ f.id }}"{% if f.checked %} checked{% endif %}>
+{% when "list" %}<textarea id="f-{{ f.id }}" rows="2" placeholder="one per line">{{ f.value }}</textarea>
+{% when "text" %}<input type="text" id="f-{{ f.id }}" value="{{ f.value }}">
+{% else %}<code class="setro">{% if f.value.is_empty() %}edited in Plain{% else %}{{ f.value }}{% endif %}</code>
+{% endmatch %}<p class="setdoc muted">{{ f.doc }}</p><p class="seterr" hidden></p></div>
+</div>{% endfor %}
+</div>{% endmacro %}
 <main class="wrap settings" id="main" data-seg-own>
 <div class="card">
 {{ head }}
@@ -36,6 +48,10 @@
 {% else %}<input type="text" id="f-{{ r.id }}" value="{{ r.value }}" placeholder="{{ r.default }}">
 {% endmatch %}<p class="setdoc muted">{{ r.doc }}</p><p class="seterr" hidden></p></div>
 </div>{% endfor %}
+</fieldset>{% endfor %}
+{% for l in lists %}<fieldset class="setsec setlist" data-list="{{ l.name }}"><legend>[[{{ l.name }}]]</legend>
+{% for c in l.rows %}{% call card(c, false) %}{% endcall %}{% endfor %}{% call card(l.blank, true) %}{% endcall %}
+<button type="button" data-add="{{ l.name }}">Add {{ l.name }}</button>
 </fieldset>{% endfor %}
 {% if !overrides.is_empty() %}<fieldset class="setsec"><legend>Per repository</legend><p class="muted">Edited in Plain.</p>{% for o in overrides %}<p><code>{{ o }}</code></p>{% endfor %}</fieldset>{% endif %}
 </section>

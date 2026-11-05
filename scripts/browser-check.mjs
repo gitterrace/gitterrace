@@ -47,7 +47,8 @@
 //                the active item follows the scroll, filter and Escape work, the Code tab hides it
 //   settings     the gear opens the settings page; a form edit shows in Plain as the server's
 //                text, an invalid plain edit marks its line in the gutter and keeps Save off, and
-//                Save writes the file and reloads with the new value, in each browser
+//                Save writes the file and reloads with the new value, and an action card edit
+//                saves actions.toml in place, in each browser
 //   repo-switch  a server on one repository hides the switcher; when a second `git terrace`
 //                joins, the open page shows it without a reload, it lists both, and picking
 //                each lands on its /r/NAME/ page; `git terrace remove` hides it again and
@@ -438,6 +439,16 @@ async function settings() {
       const shown = await p.$eval('#f-watch\\.interval_ms', (x) => /** @type {HTMLInputElement} */ (x).value);
       if (off && saved === '[watch]\ninterval_ms = 800\n' && shown === '800') r.ok(`settings ${name}: form, plain, error line and save`);
       else r.fail(`settings ${name}: save off on error ${off}, file ${JSON.stringify(saved)}, form shows ${shown}`);
+      // actions.toml: rename the "Mark" action in its card; the comment-free rest stays.
+      const before = readFileSync(join(cfg, 'actions.toml'), 'utf8');
+      await p.goto(srv.origin + '/_settings?f=actions', { waitUntil: 'load' });
+      await p.fill('#f-action\\.0\\.label', 'Mark it');
+      await p.waitForFunction(() => !/** @type {HTMLButtonElement} */ (document.getElementById('setsave')).disabled, null, { timeout: 3000 });
+      await Promise.all([p.waitForNavigation(), p.click('#setsave')]);
+      const after = readFileSync(join(cfg, 'actions.toml'), 'utf8');
+      if (after === before.replace('label = "Mark"', 'label = "Mark it"')) r.ok(`settings ${name}: an action card edit saves in place`);
+      else r.fail(`settings ${name}: actions.toml became ${JSON.stringify(after)}`);
+      writeFileSync(join(cfg, 'actions.toml'), before, { mode: 0o600 });
     } catch (e) { r.fail(`settings ${name}: ${e.message.split('\n')[0]}`); }
     await b.close();
   }

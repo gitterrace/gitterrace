@@ -99,7 +99,13 @@ struct Edit {
 #[derive(serde::Deserialize)]
 struct ChangeIn {
     id: String,
+    /// A TOML literal, `None` to take the key out.
+    #[serde(default)]
     value: Option<String>,
+    /// For an actions row, the input as typed: the server makes the literal from the key's
+    /// type in the actions schema, so the browser never writes TOML.
+    #[serde(default)]
+    input: Option<String>,
 }
 
 #[derive(serde::Serialize, Default)]
@@ -224,14 +230,24 @@ fn resulting_text(path: &std::path::Path, e: &Edit) -> Result<String, Located> {
         return Ok(t.clone());
     }
     let current = std::fs::read_to_string(path).unwrap_or_default();
-    let changes: Vec<Change> = e
-        .changes
-        .iter()
-        .map(|c| Change {
+    let mut changes = Vec::new();
+    for c in &e.changes {
+        let value = match (&c.input, e.f) {
+            (Some(input), SettingsFile::Actions) => Some(
+                crate::settings_actions::literal(&c.id, input).ok_or_else(|| Located {
+                    line: 0,
+                    col: 0,
+                    key: Some(c.id.clone()),
+                    msg: format!("{}: not a value this key takes", c.id),
+                })?,
+            ),
+            _ => c.value.clone(),
+        };
+        changes.push(Change {
             id: c.id.clone(),
-            value: c.value.clone(),
-        })
-        .collect();
+            value,
+        });
+    }
     gitterrace_config::apply(&current, &changes)
 }
 

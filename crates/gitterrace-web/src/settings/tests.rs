@@ -428,3 +428,68 @@ async fn restart_keys_name_only_what_the_edit_changes() {
     let v: serde_json::Value = serde_json::from_str(&reply).expect("json");
     assert_eq!(v["restart"], serde_json::json!([]), "{reply}");
 }
+
+/// A server whose actions.toml is `text`, in `dir`.
+fn with_actions(root: &Path, dir: &Path, text: &str) -> axum::Router {
+    let file = dir.join("actions.toml");
+    std::fs::write(&file, text).expect("w");
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(&file, std::fs::Permissions::from_mode(0o600)).expect("mode");
+    }
+    let mut env = Env::new(gitterrace_config::Config::default());
+    env.settings_dir = Some(dir.to_path_buf());
+    crate::build_server(vec![repo(root)], None, Some(&file), &env, None, None)
+        .expect("router")
+        .0
+}
+
+#[tokio::test]
+async fn an_actions_form_edit_keeps_comments_and_is_checked() {
+    const FILE: &str = "version = 1\n# mine\n[[action]]\nid = \"e\"\nlabel = \"Edit\" # shown\n\
+                        kinds = [\"file\"]\ncommand = [\"/usr/bin/true\"]\n";
+    let (root, dir) = (
+        tempfile::tempdir().expect("t"),
+        tempfile::tempdir().expect("t"),
+    );
+    let app = with_actions(root.path(), dir.path(), FILE);
+    let token = token_of(&app);
+    let file = dir.path().join("actions.toml");
+    let (status, html) = page(&app, "/_settings?f=actions").await;
+    assert_eq!(status, 200, "{html}");
+    assert!(
+        html.contains("data-id=\"action.0.label\""),
+        "the row's fields show"
+    );
+    let stamp = gitterrace_config::Stamp::tag(gitterrace_config::Stamp::of(&file).expect("s"));
+    let mut req = Req::new("PUT", "/_settings/file", Some(&token));
+    req.body = serde_json::json!({
+        "f": "actions",
+        "changes": [
+            { "id": "action.0.label", "input": "Open \"it\"" },
+            { "id": "action.0.kinds", "input": "file\nline" }
+        ],
+        "stamp": stamp
+    })
+    .to_string();
+    let (status, reply) = send(&app, req).await;
+    assert_eq!(status, 200, "{reply}");
+    let saved = std::fs::read_to_string(&file).expect("r");
+    assert_eq!(
+        saved,
+        FILE.replace("\"Edit\"", "'Open \"it\"'")
+            .replace("[\"file\"]", "[\"file\", \"line\"]")
+    );
+    let stamp = gitterrace_config::Stamp::tag(gitterrace_config::Stamp::of(&file).expect("s"));
+    let mut req = Req::new("PUT", "/_settings/file", Some(&token));
+    req.body = serde_json::json!({
+        "f": "actions",
+        "changes": [{ "id": "action.0.kinds", "input": "" }],
+        "stamp": stamp
+    })
+    .to_string();
+    let (status, reply) = send(&app, req).await;
+    assert_eq!(status, 422, "an action with no kinds is refused: {reply}");
+    assert_eq!(std::fs::read_to_string(&file).expect("r"), saved);
+}

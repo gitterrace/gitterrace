@@ -22,3 +22,6 @@
 .seterrs{margin:var(--space-3) 0 0;padding:0;list-style:none;color:var(--del);font-size:var(--text-sm)}
 @media (max-width:700px){.setrow{grid-template-columns:minmax(0,1fr);gap:var(--space-2)}.setform,.setplain{padding:var(--space-3)}}
 .badge.set-src{color:var(--accent-ink);border-color:var(--accent);background:var(--accent-soft)}
+.setcard{border:var(--border);border-radius:var(--radius);padding:0 var(--space-4);margin:var(--space-3) 0}
+.setcardhead{display:flex;align-items:center;justify-content:space-between;gap:var(--space-3);padding:var(--space-3) 0}
+.setro{font-size:var(--text-sm);color:var(--muted);white-space:pre-wrap;overflow-wrap:anywhere}

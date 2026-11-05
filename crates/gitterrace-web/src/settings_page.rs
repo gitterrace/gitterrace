@@ -60,6 +60,8 @@ struct Page {
     /// Why the form is not offered: the first error of the file, with its line.
     form_off: Option<String>,
     missing: Option<Empty>,
+    /// The `[[send]]` and `[[action]]` cards, for actions.toml.
+    lists: Vec<crate::settings_actions::List>,
 }
 
 #[derive(serde::Deserialize)]
@@ -195,6 +197,10 @@ pub(crate) async fn page(
                 f == SettingsFile::Actions,
             ));
         }
+        let lists = match f {
+            SettingsFile::Actions => crate::settings_actions::lists(&text).unwrap_or_default(),
+            SettingsFile::Config => Vec::new(),
+        };
         let form_off = first_error(&check);
         Page {
             token,
@@ -231,6 +237,7 @@ pub(crate) async fn page(
             sections,
             overrides,
             form_off,
+            lists,
         }
         .render()
     })

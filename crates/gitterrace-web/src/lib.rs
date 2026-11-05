@@ -48,6 +48,7 @@ mod search;
 mod sections;
 mod seg;
 mod settings;
+mod settings_actions;
 mod settings_page;
 pub mod sitemap;
 mod spark;
