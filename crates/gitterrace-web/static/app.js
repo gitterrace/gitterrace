@@ -125,7 +125,7 @@
   window.gtCopy = copy;
 
   // Pinned heads: a head is stuck while it sits below the top of its box's content, which only
-  // happens when sticky moved it. The CSS draws the closing line from data-stuck.
+  // happens when sticky moved it. The CSS draws the line under a pinned page head from it.
   var heads = document.querySelectorAll(".dochead,section.file>header,main>.head,.entries tr.th:first-child td");
   function stuck() {
     heads.forEach(function (h) {

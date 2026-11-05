@@ -38,8 +38,9 @@
 //   tips         closing ., .+s, t, ? or b with Escape leaves no tip on the opener they hand
 //                focus back to, while Tab onto a tipped button still shows its tip
 //   sticky-line  scrolled past its top, each view's head (overview README, Markdown preview and
-//                code, blob, blame, diff file, table) is pinned with a 1 px closing line as wide as
-//                its content box, the outline button inside the bar, the Code view full width
+//                code, blob, blame, diff file, table) is pinned with a 1 px line under it, never
+//                over it, as wide as its content box, the outline button inside the bar, the
+//                Code view full width
 //   date-tips    hovering or focusing a relative date, in the tree listing and on the overview, shows
 //                its full date in the tip
 //   outline      "On this page": a rail at 1400 px, a menu at 900 px, a click scrolls and sets the hash,

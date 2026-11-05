@@ -551,10 +551,9 @@ button.reponame .tri{width:16px;height:16px;fill:var(--muted)}
    .entries table pin too. Calm like the top bar: page colours, no shadow. Anchors land below. */
 section.file,.card.doccard{overflow:clip}
 section.file>header,.dochead{position:sticky;top:0;z-index:2}
-/* One closing line for every pinned head: app.js sets data-stuck while a head sits above its
-   natural place, and the line spans the head's own box, which inside a card is the card's
-   content box. Unpinned, the card's border is the line, so it never doubles. */
-:is(.dochead,section.file>header,main>.head,.entries tr.th:first-child td)[data-stuck]::before{content:"";position:absolute;left:0;right:0;top:0;height:1px;background:var(--line);pointer-events:none}
+/* A pinned head is closed by a line on its bottom edge: card heads by their border, the path
+   bar (no border) by this line while app.js marks it data-stuck. */
+main>.head[data-stuck]::after{content:"";position:absolute;left:0;right:0;bottom:0;height:1px;background:var(--line);pointer-events:none}
 /* Focus and anchors inside a document card land below its pinned head. */
 html:has(.dochead){scroll-padding-top:calc(44px + var(--space-2))}
 html:has(section.file>header){scroll-padding-top:calc(40px + var(--space-2))}
