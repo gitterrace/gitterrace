@@ -54,7 +54,8 @@ impl Events {
             let on = move |n: Nudge| {
                 if n == Nudge::Degraded {
                     tracing::warn!(
-                        "file events stopped for {name}: the watch limit; polling instead"
+                        "file events stopped for {name}: too many folders or the watch limit; \
+                         relying on the periodic rescan"
                     );
                     degraded.store(true, Ordering::Release);
                 }

@@ -14,6 +14,9 @@ const DEBOUNCE: Duration = Duration::from_millis(150);
 /// Longest a build that keeps writing holds the scan back. Not configurable: it only trades a
 /// few scans against how soon a long build shows, and `watch.rescan_secs` bounds the rest.
 const MAX_DELAY: Duration = Duration::from_millis(500);
+/// Most inotify watches one repository may hold on Linux. A larger tree is watched by the
+/// periodic rescan alone, so a huge checkout cannot use up the user's shared watch budget.
+const MAX_WATCHES: usize = 8192;
 
 /// Folders under the git directory that never change HEAD, a ref, the index or the status:
 /// objects arrive before the ref that names them, and gitterrace's own cache lives here.
@@ -55,6 +58,7 @@ impl Repo {
             debounce: DEBOUNCE,
             max_delay: MAX_DELAY,
             rescan,
+            max_watches: MAX_WATCHES,
             os_events,
         };
         Nudger::start(cfg, on_nudge)
