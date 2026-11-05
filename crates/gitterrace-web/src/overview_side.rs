@@ -8,7 +8,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 use askama::Template;
 use gitterrace_config::Feature;
-use gitterrace_index::feed::{CommitRange, InsightsSource, Rank};
+use gitterrace_index::feed::{CommitRange, InsightsSource, Rank, local_day_of};
 
 use crate::{
     app::App,
@@ -123,9 +123,11 @@ pub(crate) fn build(a: &App, head: &str, src: &dyn InsightsSource, dirty: bool, 
         .len()
         .checked_sub(1)
         .and_then(|i| src.commit(Rank(u32::try_from(i).unwrap_or(u32::MAX))));
-    let offset = i64::from(latest.map_or(0, |c| c.offset));
+    let offset = latest.map_or(0, |c| c.offset);
     // Days start at local midnight of the latest commit's zone: the author's day, not UTC's.
-    let today_start = (now + offset).div_euclid(DAY) * DAY - offset;
+    // Unlike the insights pages the sidebar reads the wall clock ("today" is the viewer's)
+    // and counts every commit, merges included, as the overview's commit count does.
+    let today_start = local_day_of(now, offset) * DAY - i64::from(offset);
     let from = (now - SPARK_CAP).min(today_start - 6 * DAY);
     let churn_from = now - CHURN_DAYS * DAY;
     let mut times = Vec::new();

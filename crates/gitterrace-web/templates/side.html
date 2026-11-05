@@ -2,7 +2,7 @@
 <p>{% if branch_href.is_empty() %}<b>{{ branch }}</b>{% else %}On <a href="{{ branch_href }}"><b>{{ branch }}</b></a>{% endif %}{% if dirty %}<span class="muted">, with</span> <a href="{{ worktree_href }}" data-tip="Files that differ from the last commit">uncommitted changes</a>{% else %}<span class="muted">, clean</span>{% endif %}</p>
 </section>
 {% when "recent" %}<section class="side"><h3>Recent{% if !spark_span.is_empty() %}<span class="muted">, last {{ spark_span }}</span>{% endif %}</h3>
-<p><b>{{ today }}</b> today <span class="muted">·</span> <b>{{ week }}</b> this week{% if !last.is_empty() %} <span class="muted">·</span> last commit {{ last }}{% endif %}</p>
+<p data-tip="All commits, merges included, by the clock"><b>{{ today }}</b> today <span class="muted">·</span> <b>{{ week }}</b> this week{% if !last.is_empty() %} <span class="muted">·</span> last commit {{ last }}{% endif %}</p>
 {% if !spark.is_empty() %}<div class="sparkwrap" data-tip="{{ spark_tip }}">{{ spark|safe }}</div>{% endif %}</section>
 {% when "churn" %}{% if !hot.is_empty() %}<section class="side"><h3>{% if hot_href.is_empty() %}Churn{% else %}<a href="{{ hot_href }}">Churn</a>{% endif %} <span class="muted">30 days</span></h3>
 <ul class="sidelist">{% for h in hot %}<li><a href="{{ h.href }}" data-tip="{{ h.path }}">{{ h.name }}</a><span class="muted">{{ h.changes }}</span></li>{% endfor %}</ul></section>

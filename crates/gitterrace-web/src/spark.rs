@@ -12,6 +12,8 @@
 //! existed never draws a flat run. A time before the window is dropped, never piled into the
 //! first bucket.
 
+use gitterrace_index::feed::local_day_of;
+
 use crate::fmt;
 
 const HOUR: i64 = 3_600;
@@ -77,10 +79,10 @@ pub(crate) struct End {
 
 impl End {
     /// The end of the day holding `now` in a zone `offset` seconds east of UTC.
-    pub(crate) const fn local(now: i64, offset: i64) -> Self {
+    pub(crate) const fn local(now: i64, offset: i32) -> Self {
         Self {
             now,
-            day_end: (now + offset).div_euclid(DAY) * DAY - offset + DAY,
+            day_end: (local_day_of(now, offset) + 1) * DAY - offset as i64,
         }
     }
 
@@ -164,7 +166,7 @@ mod tests {
 
     /// Now at 14:00 local in a zone one hour east, so day buckets end at the next local
     /// midnight, ten hours after now.
-    const AT: End = End::local(NOW + 13 * HOUR, HOUR);
+    const AT: End = End::local(NOW + 13 * HOUR, 3_600);
 
     /// Fits a repository `age` old: the bucket count is in range, bucket 0 holds the first
     /// commit (nothing before it), the last bucket holds now, and every commit inside the

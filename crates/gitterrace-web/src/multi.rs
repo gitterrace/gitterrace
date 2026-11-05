@@ -369,7 +369,7 @@ impl Served {
             .ok()
             .and_then(|l| l.into_iter().next());
         // Days end at local midnight of the newest commit's zone, as on the sidebar.
-        let offset = last.as_ref().map_or(0, |c| i64::from(c.author.offset));
+        let offset = last.as_ref().map_or(0, |c| c.author.offset);
         let r = Arc::new(Recent {
             series: spark::series(times, first, spark::End::local(now, offset), SPARK_CAP),
             last,
