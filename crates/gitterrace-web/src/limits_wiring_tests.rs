@@ -10,9 +10,9 @@ async fn limits_search_file_lines_caps_lines_per_file() {
     let dir = tempfile::tempdir().expect("tmp");
     let p = repo(dir.path(), "r");
     let mid = |b: &str| {
-        b.split("mid.txt</a><span class=\"muted\">")
+        b.split("mid.txt</a><span class=\"tag\">")
             .nth(1)
-            .and_then(|r| r.split('<').next())
+            .and_then(|r| r.split(" match").next())
             .map(str::to_owned)
     };
     let (_, all) = get(&router(&p, Config::default()), "/search?q=needle").await;

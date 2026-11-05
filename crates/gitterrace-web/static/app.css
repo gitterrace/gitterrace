@@ -310,10 +310,11 @@ td.ago{color:var(--faint);font-size:var(--text-xs);white-space:nowrap}
 .hits{margin-bottom:var(--space-4)}
 .hits>header{display:flex;justify-content:space-between;padding:var(--space-2) var(--space-4);background:var(--soft);border-bottom:var(--border);font:var(--text-sm) var(--mono)}
 .hits td.c{white-space:pre-wrap;word-break:break-all}
-.hits tr.hit td.c{background:var(--add-bg)}
+.hits tr.hit td.c{background:var(--accent-soft)}
 .hits tr.gap td{color:var(--faint)}
-mark{background:var(--warn-bg);color:var(--fg);box-shadow:0 0 0 1px var(--warn);border-radius:var(--radius);padding:0 1px}
-
+/* A match is one quiet background, no ring or padding: letters keep their places. */
+mark{background:var(--warn-bg);color:var(--fg);border-radius:var(--radius)}
+.searchform input[type=radio],.searchform input[type=checkbox]{min-width:0;width:auto;height:auto;flex:none;margin:0}
 
 /* ---- voice: serif display, grotesk body, mono metadata, hairlines ---- */
 body{background-image:radial-gradient(60rem 22rem at 80% -6rem,color-mix(in srgb,var(--accent) 7%,transparent),transparent 70%);background-repeat:no-repeat}
