@@ -2,20 +2,28 @@
 """Every third-party `uses:` in workflows and composite actions is pinned by a full commit sha
 with a version comment. Local (./) actions are exempt.
 
+The Dockerfiles under ci/ follow the same rule: each FROM names its image by sha256 digest, and
+each `curl` that downloads a file also checks a sha256 in the same RUN, so nothing unpinned is
+fetched at build time.
+
   python3 scripts/actions-pin-check.py
+  python3 scripts/actions-pin-check.py --self-test   each rule goes red on a planted offender
 """
+
+from __future__ import annotations
 
 import pathlib
 import re
 import sys
+from collections.abc import Callable
 
 USES = re.compile(r"^\s*(?:-\s*)?uses:\s*(\S+)(.*)$")
 SHA = re.compile(r"^[^@\s]+@[0-9a-f]{40}$")
 COMMENT = re.compile(r"^\s*#\s*\S+")
 
 
-def problems(path, text):
-    out = []
+def problems(path: pathlib.Path | str, text: str) -> list[str]:
+    out: list[str] = []
     for n, line in enumerate(text.splitlines(), 1):
         m = USES.match(line)
         if not m or m.group(1).startswith("./"):
@@ -28,10 +36,65 @@ def problems(path, text):
     return out
 
 
-def main():
-    root = pathlib.Path(__file__).resolve().parent.parent / ".github"
-    files = sorted([*root.rglob("*.yml"), *root.rglob("*.yaml")])
-    bad = [p for f in files for p in problems(f.relative_to(root.parent), f.read_text())]
+FROM = re.compile(r"^FROM\s+(?:--\S+\s+)?(\S+)", re.M)
+
+
+def docker_problems(path: pathlib.Path | str, text: str) -> list[str]:
+    """Unpinned `FROM` lines and downloads with no checksum in the same RUN instruction."""
+    out: list[str] = []
+    for m in FROM.finditer(text):
+        ref = m.group(1)
+        if ref != "scratch" and "@sha256:" not in ref:
+            out.append(f"{path}: FROM {ref} is not pinned by a sha256 digest")
+    # A RUN instruction ends at the first line that does not continue with a backslash.
+    for m in re.finditer(r"^RUN\b(?:[^\n]*\\\n)*[^\n]*", text, re.M):
+        run = m.group(0)
+        if re.search(r"\bcurl\b[^\n]*https?://", run) and "sha256sum" not in run:
+            n = text.count("\n", 0, m.start()) + 1
+            out.append(f"{path}:{n}: a download without a sha256 check")
+    return out
+
+
+def self_test() -> int:
+    sha = "a" * 40
+    cases: list[tuple[Callable[[str, str], list[str]], str, str]] = [
+        (problems, "uses: x/y@v4\n", "not pinned"),
+        (problems, f"uses: x/y@{sha}\n", "lacks a version comment"),
+        (docker_problems, "FROM ubuntu:24.04\n", "not pinned by a sha256 digest"),
+        (
+            docker_problems,
+            "RUN curl -fsSL https://example.org/x -o /tmp/x\n",
+            "without a sha256",
+        ),
+    ]
+    for fn, text, want in cases:
+        if not any(want in p for p in fn("t", text)):
+            print(f"self-test: {text.strip()!r} was not reported as '{want}'")
+            return 1
+    good: list[tuple[Callable[[str, str], list[str]], str]] = [
+        (problems, f"uses: x/y@{sha} # v4\n"),
+        (
+            docker_problems,
+            f"FROM ubuntu@sha256:{sha}\nRUN curl -fsSL https://e.org/x \\\n && sha256sum -c -\n",
+        ),
+    ]
+    for fn, text in good:
+        if fn("t", text):
+            print(f"self-test: a pinned input was reported: {fn('t', text)}")
+            return 1
+    print("actions-pin self-test: ok")
+    return 0
+
+
+def main() -> int:
+    if "--self-test" in sys.argv:
+        return self_test()
+    root = pathlib.Path(__file__).resolve().parent.parent
+    gh = root / ".github"
+    files = sorted([*gh.rglob("*.yml"), *gh.rglob("*.yaml")])
+    bad = [p for f in files for p in problems(f.relative_to(root), f.read_text())]
+    for f in sorted((root / "ci").glob("*.Dockerfile")):
+        bad += docker_problems(f.relative_to(root), f.read_text())
     print("\n".join(bad))
     return 1 if bad else 0
 

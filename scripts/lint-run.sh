@@ -67,6 +67,7 @@ run pyright npx "install node, then npx fetches pyright" npx --yes pyright@1.1.4
 run tsc npm "install node, then npm fetches typescript" js_types
 run actionlint actionlint "brew install actionlint" actionlint
 run actions-pin python3 "install python3" python3 scripts/actions-pin-check.py
+run actions-pin-test python3 "install python3" python3 scripts/actions-pin-check.py --self-test
 run ast-grep ast-grep "brew install ast-grep" ast-grep scan --error
 run ast-grep-test ast-grep "brew install ast-grep" ast-grep test --skip-snapshot-tests
 run tests-cfg python3 "install python3" python3 scripts/tests-check.py
