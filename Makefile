@@ -56,6 +56,7 @@ docs-check:
 	bash scripts/land-check.sh --self-test
 	bash scripts/golden-check.sh --self-test
 	bash scripts/linux-run.sh --self-test
+	bash scripts/macos-run.sh --self-test
 	python3 scripts/changelog-check.py --self-test && python3 scripts/changelog-check.py
 	cargo xtask check
 

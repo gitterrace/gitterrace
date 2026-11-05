@@ -76,6 +76,11 @@ The local gate is the one that counts. The hosted workflows run a subset of it.
   runner. To run it locally on macOS or Linux, use `scripts/wine-run.sh`
 - Linux: to check it locally in Docker, `scripts/linux-run.sh` builds and smoke-tests the binary
   (a few minutes), and `scripts/linux-run.sh --full` runs `make check` as the ubuntu CI job does
+- macOS: `scripts/macos-run.sh` installs the binary and smoke-tests it with an empty HOME and a
+  minimal PATH, so a dependency that only exists on your machine fails. `scripts/macos-run.sh --full` runs `make check`
+  under the same clean HOME
+- The three scripts exit 2 on a bad argument, and each has a self-test, part of `make check`,
+  for its argument parsing
 
 ## Releasing (maintainers)
 
