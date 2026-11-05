@@ -482,7 +482,7 @@ table.own td{white-space:nowrap}table.own td:first-child{width:30%}
 .tag.merged{color:var(--accent-fg)}
 .tagmsg pre{margin:var(--space-3) 0 0;white-space:pre-wrap;font:var(--text-sm)/1.5 var(--mono)}
 /* Action menu: one trigger style, the overlay list reused as a popover. */
-.actbtn{display:inline-grid;place-items:center;width:24px;height:22px;padding:0;border:var(--border);border-radius:var(--radius);background:var(--raised);color:var(--muted);font:var(--weight-semibold) var(--text-sm)/1 var(--sans);cursor:pointer;vertical-align:middle}
+.actbtn{display:inline-grid;place-items:center;width:24px;height:24px;padding:0;border:var(--border);border-radius:var(--radius);background:var(--soft);color:var(--muted);font:var(--weight-semibold) var(--text-xs)/1 var(--sans);cursor:pointer;vertical-align:baseline}
 .actbtn::after{content:"\22EF"}
 .actbtn:hover,.actbtn:focus-visible{color:var(--fg);border-color:var(--line)}
 .actbtn.top{width:32px;height:32px;border-color:transparent;background:transparent}

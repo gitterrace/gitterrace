@@ -526,5 +526,36 @@ async function liveScroll() {
 // The mark is two paths, ink and accent, meeting on one line. A renderer that antialiases each
 // path alone lets the background through there as a hairline (WebKit did). Paint every mark at
 // many sizes and offsets and compare the split rows with the solid rows just above and below.
-  return { marked, menuSame, gutter, overlays, tips, dateTips, repoSwitch, liveScroll, outline };
+
+// A metadata line's controls (the sha chip, Copy, the actions trigger) are one size on one
+// line: a trigger that is a pixel shorter or lower than its neighbours reads as a different
+// control. The commit page in light and dark, after the actions script added its trigger.
+async function inlineControls() {
+  for (const name of browsers) {
+    const { b, ctx } = await context(name);
+    for (const scheme of ['light', 'dark']) {
+      const p = await ctx.newPage();
+      await p.emulateMedia({ colorScheme: scheme });
+      await p.setViewportSize({ width: 1400, height: 700 });
+      await p.goto(srv.base + '/commit/HEAD', { waitUntil: 'load' });
+      await p.waitForSelector('p.meta .actbtn', { timeout: 5000 }).catch(() => {});
+      const m = await p.$$eval('p.meta > :is(a.sha, button)', (els) => els.map((e) => {
+        const r = e.getBoundingClientRect(), s = getComputedStyle(e);
+        return { what: e.className || e.tagName, h: Math.round(r.height), top: Math.round(r.top), bg: s.backgroundColor };
+      }));
+      const where = `inline-controls ${name} ${scheme}`;
+      const bad = [];
+      if (!m.some((c) => c.what.includes('actbtn'))) bad.push('no actions trigger on the commit line');
+      const heights = new Set(m.map((c) => c.h)), tops = new Set(m.map((c) => c.top));
+      if (heights.size > 1) bad.push(`heights ${m.map((c) => `${c.what} ${c.h}`).join(', ')}`);
+      if (tops.size > 1) bad.push(`tops ${m.map((c) => `${c.what} ${c.top}`).join(', ')}`);
+      const buttons = m.filter((c) => c.what !== 'sha');
+      if (new Set(buttons.map((c) => c.bg)).size > 1) bad.push(`button fills ${buttons.map((c) => `${c.what} ${c.bg}`).join(', ')}`);
+      bad.length ? r.fail(`${where}: ${bad.join('; ')}`) : r.ok(`${where}: ${m.length} controls, one size on one line`);
+      await p.close();
+    }
+    await b.close();
+  }
+}
+  return { marked, menuSame, gutter, overlays, tips, dateTips, repoSwitch, liveScroll, outline, inlineControls };
 }
