@@ -125,7 +125,6 @@ pub(crate) async fn keep_index_fresh(app: Arc<App>) {
             }
         } else if look {
             dirty_seen = None;
-            app.wt_scans.fetch_add(1, Ordering::Relaxed);
             let a = Arc::clone(&app);
             let sig = tokio::task::spawn_blocking(move || {
                 gitterrace_git::worktree_signature(&a.repo).ok()
@@ -133,6 +132,7 @@ pub(crate) async fn keep_index_fresh(app: Arc<App>) {
             .await
             .ok()
             .flatten();
+            app.wt_scans.fetch_add(1, Ordering::Release);
             if wt_seen.is_some() && sig.is_some() && sig != wt_seen {
                 kinds.push("worktree");
             }
@@ -155,13 +155,17 @@ async fn chip_flip(app: &Arc<App>, seen: &mut Option<bool>) -> Option<bool> {
         *seen = None;
         return None;
     }
-    app.wt_scans.fetch_add(1, Ordering::Relaxed);
     let a = Arc::clone(app);
     let now = tokio::task::spawn_blocking(move || gitterrace_git::is_dirty(&a.repo))
         .await
-        .ok()?;
+        .ok();
+    let Some(now) = now else {
+        app.wt_scans.fetch_add(1, Ordering::Release);
+        return None;
+    };
     let flipped = seen.is_some_and(|b| b != now);
     *seen = Some(now);
+    app.wt_scans.fetch_add(1, Ordering::Release);
     flipped.then_some(now)
 }
 

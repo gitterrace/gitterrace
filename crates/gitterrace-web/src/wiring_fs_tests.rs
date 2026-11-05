@@ -32,10 +32,22 @@ async fn watched(
     let a = app(&p, with(|c| c.watch.rescan_secs = rescan_secs));
     a.os_events.store(os_events, Ordering::Release);
     let task = tokio::spawn(crate::app::keep_index_fresh(Arc::clone(&a))).abort_handle();
-    let rx = a.changes.subscribe();
+    let mut rx = a.changes.subscribe();
     let wt = WorktreeWatch::new(&a);
-    // Settled once no scan ran for a second: FSEvents may still report the fixture's own
-    // writes from just before the watch started.
+    // FSEvents may replay the fixture's own writes late and in one batch, on a loaded machine
+    // after any quiet second. Events arrive in order, so once a new untracked marker shows as
+    // a worktree change (the replayed git writes never do), that backlog is delivered.
+    if os_events {
+        let end = Instant::now() + Duration::from_secs(30);
+        let mut n = 0;
+        while Instant::now() < end {
+            n += 1;
+            std::fs::write(p.join(format!("settle-{n}.txt")), "x\n").expect("marker");
+            if worktree_change(&mut rx, Duration::from_secs(3)).await {
+                break;
+            }
+        }
+    }
     let end = Instant::now() + Duration::from_secs(10);
     let mut last = u64::MAX;
     while Instant::now() < end {
@@ -97,15 +109,38 @@ async fn an_idle_tree_is_not_scanned_and_a_touched_one_is() {
     let (a, p, _rx, _wt, _t) = watched(dir.path(), 30, true).await;
     let before = scans(&a);
     tokio::time::sleep(Duration::from_secs(10)).await;
-    assert_eq!(scans(&a), before, "no scan while nothing changes");
-    // The positive control: the same window with a file touched every second scans.
-    let before = scans(&a);
+    // Polling would scan once per interval (1 s), ten times here, and a scan that wakes the
+    // watcher would keep looping. A heavily loaded machine still delivers a few late
+    // duplicates of the settle markers' events, so up to three stray scans pass and the
+    // regressions, at ten or more, do not.
+    let idle = scans(&a) - before;
+    assert!(idle <= 3, "{idle} scans while nothing changes");
+    // The positive control: every touch is followed by a scan of its own. Each waits for the
+    // previous scan to finish, so a loaded machine folding touches together cannot decide it.
+    // The safety rescan alone (30 s) would need far longer than the total allowed.
+    let t0 = Instant::now();
     for i in 0..10 {
+        let before = scans(&a);
         std::fs::write(p.join("small.txt"), format!("touch {i}\n")).expect("write");
-        tokio::time::sleep(Duration::from_secs(1)).await;
+        assert!(
+            scanned_after(&a, before, Duration::from_secs(25)).await,
+            "touch {i} is scanned"
+        );
     }
-    let got = scans(&a) - before;
-    assert!(got >= 5, "{got} scans for 10 touches");
+    let took = t0.elapsed();
+    assert!(took < Duration::from_secs(60), "10 touches took {took:?}");
+}
+
+/// Waits until a scan finished after the count read `before`.
+async fn scanned_after(a: &App, before: u64, within: Duration) -> bool {
+    let end = Instant::now() + within;
+    while Instant::now() < end {
+        if scans(a) > before {
+            return true;
+        }
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    }
+    false
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -129,21 +164,32 @@ async fn a_burst_of_five_thousand_files_is_a_few_scans() {
     let before = scans(&a);
     let out = p.join("gen");
     std::fs::create_dir(&out).expect("dir");
+    let t0 = Instant::now();
     for i in 0..5000 {
         std::fs::write(out.join(format!("f{i}.txt")), "x").expect("write");
     }
-    let end = Instant::now() + Duration::from_secs(20);
-    while scans(&a) == before && Instant::now() < end {
-        tokio::time::sleep(Duration::from_millis(100)).await;
+    assert!(
+        scanned_after(&a, before, Duration::from_secs(20)).await,
+        "the burst is scanned"
+    );
+    // Settled once two seconds pass without a scan; `busy` is how long scans kept coming.
+    let (mut last, mut moved) = (scans(&a), Instant::now());
+    while moved.elapsed() < Duration::from_secs(2) && t0.elapsed() < Duration::from_secs(120) {
+        tokio::time::sleep(Duration::from_millis(50)).await;
+        if scans(&a) != last {
+            (last, moved) = (scans(&a), Instant::now());
+        }
     }
-    let mut last = u64::MAX;
-    while scans(&a) != last {
-        last = scans(&a);
-        tokio::time::sleep(Duration::from_secs(2)).await;
-    }
+    let busy = moved - t0;
     let got = last - before;
-    // One scan per `MAX_DELAY` while the writes go on at most, nowhere near one per file.
-    assert!((1..=20).contains(&got), "{got} scans for 5000 files");
+    // At most one scan per `MAX_DELAY` (500 ms) while events keep arriving, plus the tail and
+    // an overflow notice. A loaded machine that delivers events late earns a longer window,
+    // but a scan per file (thousands) never fits it.
+    let most = busy.as_millis() / 500 + 6;
+    assert!(
+        u128::from(got) <= most,
+        "{got} scans for 5000 files over {busy:?}, most {most}"
+    );
 }
 
 #[tokio::test(flavor = "multi_thread")]

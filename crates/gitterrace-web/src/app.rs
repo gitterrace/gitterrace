@@ -279,7 +279,8 @@ pub(crate) struct App {
     dirty: Mutex<Option<(Instant, bool)>>,
     /// Open streams on a page that shows the working tree. Zero means no scan runs.
     pub(crate) wt_watchers: std::sync::atomic::AtomicUsize,
-    /// Working tree scans run so far, so a test can tell an idle watcher from a busy one.
+    /// Working tree scans finished so far, counted once the result is recorded: a test that
+    /// sees the count move knows the baseline is in place, and can tell idle from busy.
     pub(crate) wt_scans: AtomicU64,
     /// Off ignores OS file events, so a test can prove the safety rescan alone finds a change.
     pub(crate) os_events: AtomicBool,
