@@ -7,6 +7,7 @@
 mod budget;
 mod edit;
 mod features;
+mod form;
 #[cfg(test)]
 mod limits_tests;
 mod locate;
@@ -24,9 +25,10 @@ use std::path::{Path, PathBuf};
 pub use budget::{Cache, PARTS, SHARES};
 pub use edit::{Change, apply};
 pub use features::{Feature, INSIGHT_PAGES};
+pub use form::{Field, Input, fields};
 pub use locate::{Located, located, syntax};
 pub use schema::{Api, BOUNDS, Config, DEFAULT_ADDR, Key, Reload, RepoOverride, keys};
-pub use value::Show;
+pub use value::{Control, Show};
 pub use write::{MAX_FILE_BYTES, SaveError, Saved, Stamp, save, save_config};
 
 /// Where a value came from.

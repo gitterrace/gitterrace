@@ -2,12 +2,30 @@
 
 use gitterrace_types::{ColorScheme, DateStyle, LinkStyle, Period, StringEnum};
 
+/// The input the settings form shows for a type. Derived from the type alone, so a new setting
+/// gets its input without a list to update.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Control {
+    Checkbox,
+    /// Unset, on or off: a switch whose default depends on the server's mode.
+    Tri,
+    /// A whole number. Its range, when it has one, comes from [`crate::BOUNDS`].
+    Number,
+    Text,
+    /// One string per row.
+    List,
+    /// One of the enum's canonical values, in declaration order.
+    Select(Vec<&'static str>),
+}
+
 /// A type a setting can have.
 pub trait Show: Sized {
     /// Display form, the TOML literal.
     fn show(&self) -> String;
     /// The type name for the docs.
     const TYPE: &'static str;
+    /// The input the settings form shows for this type.
+    fn control() -> Control;
     fn from_toml(v: &toml::Value) -> Option<Self>;
     /// What a value that [`Show::from_toml`] refuses should have been, for the error.
     #[must_use]
@@ -18,6 +36,9 @@ pub trait Show: Sized {
 
 impl Show for bool {
     const TYPE: &'static str = "bool";
+    fn control() -> Control {
+        Control::Checkbox
+    }
     fn show(&self) -> String {
         self.to_string()
     }
@@ -29,6 +50,9 @@ impl Show for bool {
 /// A switch with no fixed default: unset leaves the choice to the server's mode.
 impl Show for Option<bool> {
     const TYPE: &'static str = "bool";
+    fn control() -> Control {
+        Control::Tri
+    }
     fn show(&self) -> String {
         self.map_or_else(|| "unset".to_owned(), |b| b.to_string())
     }
@@ -41,6 +65,9 @@ macro_rules! int {
     ($t:ty) => {
         impl Show for $t {
             const TYPE: &'static str = "integer";
+            fn control() -> Control {
+                Control::Number
+            }
             fn show(&self) -> String {
                 self.to_string()
             }
@@ -55,6 +82,9 @@ int!(usize);
 
 impl Show for String {
     const TYPE: &'static str = "string";
+    fn control() -> Control {
+        Control::Text
+    }
     fn show(&self) -> String {
         format!("{self:?}")
     }
@@ -65,6 +95,9 @@ impl Show for String {
 
 impl Show for Vec<String> {
     const TYPE: &'static str = "list of strings";
+    fn control() -> Control {
+        Control::List
+    }
     fn show(&self) -> String {
         format!("{self:?}")
     }
@@ -82,6 +115,9 @@ macro_rules! one_of {
     ($($t:ty),+) => {$(
         impl Show for $t {
             const TYPE: &'static str = "string";
+            fn control() -> Control {
+                Control::Select(<$t as StringEnum>::ALL.iter().map(|v| v.as_str()).collect())
+            }
             fn show(&self) -> String {
                 format!("{:?}", self.as_str())
             }

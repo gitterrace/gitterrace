@@ -43,6 +43,7 @@ fn a_plain_string_that_lists_choices_is_reported() {
         doc: "Pick one: fast, slow or off.",
         reload: Reload::Live,
         cost: false,
+        control: crate::Control::Text,
     };
     assert_eq!(untyped_choices(&[planted], |_| true), ["server.addr"]);
     let all = keys();

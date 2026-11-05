@@ -51,3 +51,38 @@ pub fn render() -> Out {
     }
     Out::file(PATH, s)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::render;
+    use crate::out::Out;
+
+    /// The page's rows, the settings form and the schema list the same keys in the same order,
+    /// so a key the form leaves out (or the page) goes red here.
+    #[test]
+    fn page_rows_equal_form_field_ids() {
+        let Out::File { body, .. } = render() else {
+            panic!("the configuration page is a whole file")
+        };
+        let mut rows = Vec::new();
+        let mut section = "";
+        for line in body.lines() {
+            if let Some(s) = line
+                .strip_prefix("## `[")
+                .and_then(|s| s.strip_suffix("]`"))
+            {
+                section = s;
+            } else if let Some(name) = line.strip_prefix("| `").and_then(|l| l.split('`').next())
+                && !section.is_empty()
+            {
+                rows.push(format!("{section}.{name}"));
+            }
+        }
+        let loaded = gitterrace_config::parse("").expect("empty config");
+        let form: Vec<String> = gitterrace_config::fields(&loaded)
+            .iter()
+            .map(|f| f.id.to_owned())
+            .collect();
+        assert_eq!(rows, form);
+    }
+}

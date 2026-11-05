@@ -6,7 +6,7 @@ use std::collections::BTreeMap;
 use gitterrace_types::{ColorScheme, DateStyle, LinkStyle, Period};
 
 use crate::features::{Feature, INSIGHT_PAGES};
-use crate::value::Show;
+use crate::value::{Control, Show};
 
 /// The overview sidebar's sections, in their default order.
 pub const SIDEBAR: [&str; 5] = ["now", "recent", "churn", "loose_ends", "languages"];
@@ -25,6 +25,8 @@ pub struct Key {
     /// Whether a larger value makes one request cost more (time or memory). A public server
     /// logs a warning at start for each such key set above its default.
     pub cost: bool,
+    /// The input the settings form shows, from the value's type.
+    pub control: Control,
 }
 
 /// How an edit to one setting reaches a running server.
@@ -69,6 +71,7 @@ macro_rules! settings {
                 doc: concat!($($doc, "\n"),*).trim(),
                 reload: Reload::$reload,
                 cost: { let c: &[&str] = &[$(stringify!($cost)),*]; !c.is_empty() },
+                control: <$ty as Show>::control(),
             }, )* )* ]
         }
 
