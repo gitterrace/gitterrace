@@ -18,6 +18,52 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
+# The shared lints read tomllib: the first python3 that is 3.11 or newer.
+py=""
+for c in python3 python3.15 python3.14 python3.13 python3.12 python3.11; do
+  if command -v "$c" >/dev/null && "$c" -c 'import sys; sys.exit(sys.version_info < (3, 11))'; then
+    py=$c
+    break
+  fi
+done
+[[ -n $py ]] || {
+  echo "land-check: needs python 3.11 or newer" >&2
+  exit 1
+}
+
+# One value of config/schwarzwald/land.toml: `land_cfg oracle.crate`. A list prints one item
+# per line.
+land_cfg() {
+  "$py" - "$1" <<'PY'
+import sys, tomllib
+section, key = sys.argv[1].split(".")
+with open("config/schwarzwald/land.toml", "rb") as f:
+    v = tomllib.load(f)[section][key]
+print("\n".join(v) if isinstance(v, list) else v)
+PY
+}
+
+# Refuses when core.hooksPath of repo $1 does not resolve to the hooks directory $2: a fresh
+# clone would otherwise skip the commit-msg hook without a word.
+hooks_wired() {
+  local set top want have
+  set=$(git -C "$1" config core.hooksPath || true)
+  if [[ -z $set ]]; then
+    echo "land-check: core.hooksPath is unset, so the commit-msg hook never runs." >&2
+    echo "land-check: fix: git config core.hooksPath scripts/hooks" >&2
+    return 1
+  fi
+  top=$(git -C "$1" rev-parse --show-toplevel)
+  [[ $set == /* ]] || set="$top/$set"
+  have=$(cd "$set" 2>/dev/null && pwd -P || true)
+  want=$(cd "$2" 2>/dev/null && pwd -P || true)
+  if [[ -z $have || $have != "$want" ]]; then
+    echo "land-check: core.hooksPath is $set, not the repo's scripts/hooks." >&2
+    echo "land-check: fix: git config core.hooksPath scripts/hooks" >&2
+    return 1
+  fi
+}
+
 # type(scope): subject, the form the history already uses.
 SUBJECT='^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\([a-z0-9_-]+\))?!?: .+'
 
@@ -94,19 +140,6 @@ gate_commands_covered() {
   ((missing == 0))
 }
 
-# The shared lints read tomllib: the first python3 that is 3.11 or newer.
-py=""
-for c in python3 python3.15 python3.14 python3.13 python3.12 python3.11; do
-  if command -v "$c" >/dev/null && "$c" -c 'import sys; sys.exit(sys.version_info < (3, 11))'; then
-    py=$c
-    break
-  fi
-done
-[[ -n $py ]] || {
-  echo "land-check: needs python 3.11 or newer" >&2
-  exit 1
-}
-
 LINTS="$PWD/shared/schwarzwald/lint"
 
 # The message step: the shared lints over subject and body of every commit in $1..HEAD. Each
@@ -121,15 +154,19 @@ message_lints() {
 }
 
 self_test() {
-  local got
-  got=$(select_crates crates/gitterrace-git/src/repo.rs | tr '\n' ' ')
-  [[ $got == *gitterrace-git* && $got == *gitterrace-web* ]] ||
+  local got dep dep_path dependent leaf_path
+  dep=$(land_cfg selftest.dependency)
+  dep_path=$(land_cfg selftest.dependency_path)
+  dependent=$(land_cfg selftest.dependent)
+  leaf_path=$(land_cfg selftest.leaf_path)
+  got=$(select_crates "$dep_path" | tr '\n' ' ')
+  [[ $got == *"$dep"* && $got == *"$dependent"* ]] ||
     {
       echo "self-test: a git edit must reach its dependents: $got" >&2
       exit 1
     }
-  got=$(select_crates crates/gitterrace-cards/src/lib.rs | tr '\n' ' ')
-  [[ $got != *gitterrace-git* ]] ||
+  got=$(select_crates "$leaf_path" | tr '\n' ' ')
+  [[ $got != *"$dep"* ]] ||
     {
       echo "self-test: a cards edit must not select git: $got" >&2
       exit 1
@@ -148,6 +185,23 @@ self_test() {
   d=$(mktemp -d)
   trap 'rm -rf "$d"' RETURN
   git -C "$d" init -q -b main
+  # The hooks guard: unset is red, a path to another directory is red, the real one is green.
+  mkdir "$d/hooks" "$d/other"
+  if hooks_wired "$d" "$d/hooks" 2>/dev/null; then
+    echo "self-test: an unset core.hooksPath passed" >&2
+    exit 1
+  fi
+  git -C "$d" config core.hooksPath other
+  if hooks_wired "$d" "$d/hooks" 2>/dev/null; then
+    echo "self-test: a core.hooksPath at another directory passed" >&2
+    exit 1
+  fi
+  git -C "$d" config core.hooksPath hooks
+  hooks_wired "$d" "$d/hooks" 2>/dev/null ||
+    {
+      echo "self-test: a core.hooksPath at the hooks directory failed" >&2
+      exit 1
+    }
   git -C "$d" -c user.name=t -c user.email=t@example.invalid commit -q --allow-empty -m "feat(x): ok"
   git -C "$d" -c user.name=t -c user.email=t@example.invalid commit -q --allow-empty -m "wip stuff"
   if (cd "$d" && check_subjects HEAD~1) 2>/dev/null; then
@@ -218,7 +272,7 @@ while (($#)); do
     exit 0
     ;;
   --messages)
-    check_subjects "$2" && message_lints "$2"
+    hooks_wired . scripts/hooks && check_subjects "$2" && message_lints "$2"
     exit
     ;;
   *)
@@ -228,6 +282,7 @@ while (($#)); do
   esac
 done
 
+hooks_wired . scripts/hooks || exit 1
 if ((full)); then
   exec make check
 fi
@@ -269,15 +324,19 @@ if ((${#scope[@]})); then
   step cargo clippy "${scope[@]}" --all-targets -- -D warnings
   step cargo test "${scope[@]}"
   # The output oracle: named on its own so a log shows it ran whenever the pages could move.
-  if [[ " ${scope[*]} " == *" --workspace "* || " ${scope[*]} " == *" gitterrace-web "* ||
-    " ${scope[*]} " == *" gitterrace-index "* ]]; then
-    step cargo test -p gitterrace-web --test equivalence_pages
+  run_oracle=0
+  [[ " ${scope[*]} " == *" --workspace "* ]] && run_oracle=1
+  while IFS= read -r t; do
+    [[ " ${scope[*]} " == *" $t "* ]] && run_oracle=1
+  done < <(land_cfg oracle.triggers)
+  if ((run_oracle)); then
+    step cargo test -p "$(land_cfg oracle.crate)" --test "$(land_cfg oracle.test)"
   fi
 fi
 step make lines names
 step "$py" shared/schwarzwald/tools/ratchet-check.py --self-test
 step "$py" shared/schwarzwald/tools/ratchet-check.py --base "$base"
-step cargo test -p gitterrace-testkit --test conventions
+step cargo test -p "$(land_cfg conventions.crate)" --test "$(land_cfg conventions.test)"
 step sh scripts/lint-run.sh
 step make docs-check
 check_subjects "$base"

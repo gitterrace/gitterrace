@@ -16,6 +16,23 @@
 #   scripts/golden-check.sh --self-test   (a planted change in one cell must report REAL 1)
 set -euo pipefail
 cd "$(dirname "$0")/.."
+# The oracle crate and test target come from config/schwarzwald/land.toml (tomllib, python 3.11+).
+py=""
+for c in python3 python3.15 python3.14 python3.13 python3.12 python3.11; do
+  if command -v "$c" >/dev/null && "$c" -c 'import sys; sys.exit(sys.version_info < (3, 11))'; then
+    py=$c
+    break
+  fi
+done
+[[ -n $py ]] || {
+  echo "golden-check: needs python 3.11 or newer" >&2
+  exit 1
+}
+oracle_cfg() {
+  "$py" -c 'import sys, tomllib; print(tomllib.load(open("config/schwarzwald/land.toml", "rb"))["oracle"][sys.argv[1]])' "$1"
+}
+oracle_crate=$(oracle_cfg crate)
+oracle_test=$(oracle_cfg test)
 # cargo runs the test from the crate dir, so the proof path must not depend on the cwd.
 resolve_out() {
   mkdir -p "$1"
@@ -27,7 +44,7 @@ target=$(resolve_out "${CARGO_TARGET_DIR:-target}")
 # Runs the change classifier over two dump folders, writes the report to $3.
 classify() {
   TEST_CHANGE_OLD=$1 TEST_CHANGE_NEW=$2 TEST_CHANGE_REPORT=$3 TEST_CHANGE_HEAD=${4:-} \
-    cargo test --release -q -p gitterrace-web --test equivalence_pages \
+    cargo test --release -q -p "$oracle_crate" --test "$oracle_test" \
     a_rebless_proof_classifies_old_against_new -- --exact >/dev/null 2>&1 || true
   # A build that lacks the test writes nothing: that must never read as a pass.
   [[ -s $3 ]] || {
@@ -47,7 +64,7 @@ dump_at() {
     # A separate target dir: the old build must not replace the test binary this script
     # classifies with, which cargo would otherwise reuse as fresh.
     (cd "$wt" && CARGO_TARGET_DIR=$target/golden-check TEST_ORACLE_DUMP=$2 cargo test \
-      --release -q -p gitterrace-web --test equivalence_pages "$t" -- --exact >/dev/null 2>&1) || true
+      --release -q -p "$oracle_crate" --test "$oracle_test" "$t" -- --exact >/dev/null 2>&1) || true
   done
   git worktree remove --force "$wt"
   [[ -n $(ls "$2") ]] || {
@@ -100,7 +117,7 @@ completeness)
     TEST_GOLDEN_FULL=$(realpath "$3")
     export TEST_GOLDEN_FULL
   fi
-  cargo test --release -p gitterrace-web --test equivalence_pages \
+  cargo test --release -p "$oracle_crate" --test "$oracle_test" \
     the_pairwise_golden_agrees_with_the_full_matrix -- --exact --nocapture
   echo "completeness proof (not a re-bless proof): $TEST_GOLDEN_PROOF"
   ;;

@@ -1,0 +1,22 @@
+# The crate names scripts/land-check.sh and scripts/golden-check.sh run against. Data only,
+# read with tomllib. The scripts hold the steps, this file holds which crates they name.
+
+# The land-check self-test fixtures: an edit in `dependency_path` must select `dependency`
+# and `dependent`, and an edit in `leaf_path` must not select `dependency`.
+[selftest]
+dependency = "gitterrace-git"
+dependency_path = "crates/gitterrace-git/src/repo.rs"
+dependent = "gitterrace-web"
+leaf_path = "crates/gitterrace-cards/src/lib.rs"
+
+# The output oracle: the test target in `crate` that renders every page against its golden.
+# It runs again as its own step when the selection holds a `trigger` crate or the workspace.
+[oracle]
+crate = "gitterrace-web"
+test = "equivalence_pages"
+triggers = ["gitterrace-web", "gitterrace-index"]
+
+# The conventions test over the whole tree.
+[conventions]
+crate = "gitterrace-testkit"
+test = "conventions"

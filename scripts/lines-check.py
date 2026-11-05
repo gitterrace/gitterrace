@@ -2,7 +2,8 @@
 """Source hygiene guard (stdlib only), run by `make lines`, part of `make check`.
 
 1. No source file is longer than 600 lines.
-2. No code or test comment points at a design doc section or a process label.
+2. No code or test comment points at a design doc section or carries a label, process word,
+   id or name from shared/schwarzwald/rules/deny.toml and the local .personal-denylist.
 
   python3 scripts/lines-check.py              check the tree (tracked and untracked, not ignored)
   python3 scripts/lines-check.py --self-test  prove both rules go red and green on fixtures
@@ -10,12 +11,27 @@
 
 from __future__ import annotations
 
+import importlib
 import json
 import re
 import subprocess
 import sys
 import tempfile
 from pathlib import Path
+
+try:
+    tomllib = importlib.import_module("tomllib")
+except (
+    ModuleNotFoundError
+):  # python older than 3.11: run again under the first newer one
+    import os
+    import shutil
+
+    for _c in ("python3.15", "python3.14", "python3.13", "python3.12", "python3.11"):
+        _p = shutil.which(_c)
+        if _p:
+            os.execv(_p, [_p, *sys.argv])
+    sys.exit("lines-check: needs python 3.11 or newer (tomllib)")
 
 ROOT = Path(__file__).resolve().parent.parent
 MAX_LINES = 600
@@ -26,31 +42,48 @@ COMMENT_EXTS = (".rs", ".py", ".mjs", ".js", ".sh")
 # Vendored third-party files and the synced theme copy are not ours to split or reword.
 EXCLUDE = ("static/vendor/", "shared/schwarzwald/")
 
-# Process labels in comments. Percent-encodings such as %C3 sit in code, not in comments, and
-# the whole-word match keeps a label inside longer tokens out.
-LABELS = re.compile(
-    r"§"
-    r"|\b[Ss]ection \d+\.\d+"
-    r"|\bdesign (doc|section)"
-    r"|\b[Ll]ane [A-Z]\b"
-    r"|\b(C[1-3]|K[1-5]|N[1-4])\b"
-)
-# The local, gitignored denylist (CONV-PERSONAL-DATA reads it too): plain names here are refused
-# as people in comments. Regex lines and six-hex ids are the other scripts' part.
+# A pointer at a design doc section. The label, plan, process and id shapes are not here: they
+# come from shared/schwarzwald/rules/deny.toml, so every product refuses the same words.
+DOC_REF = re.compile(r"§|\b[Ss]ection \d+\.\d+|\bdesign (doc|section)")
+DENY_TABLES = ("task_id", "plan", "label", "process")
+DENY_FILE = ROOT / "shared" / "schwarzwald" / "rules" / "deny.toml"
+PRODUCT = "gitterrace"
+
+
+def deny_patterns() -> tuple[list[re.Pattern[str]], list[re.Pattern[str]]]:
+    """The shared deny patterns for comments, and the English the id patterns skip."""
+    raw = tomllib.loads(DENY_FILE.read_text(encoding="utf-8"))
+    pats, skip = [], []
+    for t in DENY_TABLES:
+        pats += [
+            re.compile(p.replace("{product}", re.escape(PRODUCT)))
+            for p in raw[t]["patterns"]
+        ]
+        if "not_id" in raw[t]:
+            skip.append(re.compile(raw[t]["not_id"]))
+    return pats, skip
+
+
+# The one local, gitignored list (the shared lints read it too): a bare six-hex line is a real
+# id, a plain word is a person's name, refused in comments. Regex lines are the other lints'.
 LOCAL = ROOT / ".personal-denylist"
 
 
-def local_names() -> list[str]:
+def local_lists() -> tuple[list[str], set[str]]:
+    """(names, ids) of the local denylist. Absent: both empty, and the gate says so."""
     try:
         lines = LOCAL.read_text().splitlines()
     except OSError:
-        return []
-    return [
-        re.escape(n.strip())
-        for n in lines
-        if re.fullmatch(r"[A-Za-z][\w-]*", n.strip())
-        and not re.fullmatch(r"[0-9a-f]{6}", n.strip())
+        print("denylist absent: generic patterns only")
+        return [], set()
+    items = [n.strip() for n in lines if n.strip() and not n.strip().startswith("#")]
+    ids = {n for n in items if re.fullmatch(r"[0-9a-f]{6}", n)}
+    names = [
+        re.escape(n)
+        for n in items
+        if re.fullmatch(r"[A-Za-z][\w-]*", n) and n not in ids
     ]
+    return names, ids
 
 
 def person_pattern(names: list[str]) -> re.Pattern[str] | None:
@@ -152,9 +185,17 @@ def too_wide(
 
 
 def label_hits(
-    root: Path, names: list[str], extra: list[str] | None = None
+    root: Path,
+    names: list[str],
+    extra: list[str] | None = None,
+    ids: set[str] | None = None,
 ) -> list[str]:
-    person = person_pattern(local_names() if extra is None else extra)
+    if extra is None:
+        extra, local_ids = local_lists()
+        ids = local_ids if ids is None else ids
+    person = person_pattern(extra)
+    ids = ids or set()
+    pats, skip = deny_patterns()
     bad = []
     for n in names:
         if not n.endswith(COMMENT_EXTS) or n == "scripts/lines-check.py":
@@ -168,7 +209,16 @@ def label_hits(
             if not m:
                 continue
             text = m.group(1) if m.group(1) is not None else m.group(2) or ""
-            if LABELS.search(text) or (person and person.search(text)):
+            plain = text
+            for k in skip:
+                plain = k.sub("", plain)
+            hit = (
+                DOC_REF.search(text)
+                or any(p.search(plain) for p in pats)
+                or (person and person.search(text))
+                or any(i in text for i in ids)
+            )
+            if hit:
                 bad.append(f"{n}:{i}: process label in a comment: {text.strip()[:70]}")
     return bad
 
@@ -199,7 +249,7 @@ def self_test() -> None:
             'let s = "%C3%A9"; // encodes e acute',
             'let u = "http://x"; // plain',
             "# a plain word in prose",
-            "// Lane is a word, lanes too",
+            "// the dashboard and the keyboard",
             "#[derive(Debug)]",
             "// the case_name field",
         ]
@@ -210,6 +260,9 @@ def self_test() -> None:
             "// lane Q owns this",
             "// signed off as N2",
             "// \u00a7 4",
+            "// the coordinator records it",
+            "// done in wave 2",
+            "// see task 1a2b3c",
         ]
         (root / "g.rs").write_text("\n".join(green) + "\n")
         assert label_hits(root, ["g.rs"]) == [], label_hits(root, ["g.rs"])
@@ -217,6 +270,9 @@ def self_test() -> None:
         (root / "n.rs").write_text("// ask Orca\n// orca: later\n// the orca swims\n")
         assert label_hits(root, ["n.rs"], []) == [], "no list, no name rule"
         assert len(label_hits(root, ["n.rs"], ["orca"])) == 2, "listed name must flag"
+        (root / "i.rs").write_text("// ref abc123 here\n")
+        assert label_hits(root, ["i.rs"], [], set()) == [], "no list, no id rule"
+        assert label_hits(root, ["i.rs"], [], {"abc123"}), "a listed id must flag"
         for i, r in enumerate(red):
             (root / f"r{i}.rs").write_text(r + "\n")
             assert label_hits(root, [f"r{i}.rs"]), f"should flag: {r}"
