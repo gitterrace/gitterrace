@@ -148,7 +148,7 @@ fn scope_of(
     sel: Option<(&str, &str, i64, i64)>,
 ) -> Scope {
     let params = ScopeParams {
-        period: Some(sel.map_or(period, |_| Period::All).key().to_owned()),
+        period: Some(sel.map_or(period, |_| Period::All).as_str().to_owned()),
         from: sel.map(|(f, _, _, _)| f.to_owned()),
         to: sel.map(|(_, t, _, _)| t.to_owned()),
         select: q.filter.selection(),

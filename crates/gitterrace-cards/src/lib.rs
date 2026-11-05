@@ -1,7 +1,7 @@
 //! The year-in-review SVG card built from cached commit records.
 //!
 //! Every function is pure: records in, a self-contained SVG string out (inline styles, a system
-//! font stack, no external references). Each takes a [`Theme`].
+//! font stack, no external references). Each takes a [`CardTheme`].
 
 #![expect(
     clippy::needless_raw_string_hashes,
@@ -16,6 +16,6 @@ mod stats;
 mod svg;
 mod wrapped;
 
-pub use palette::Theme;
+pub use gitterrace_types::{CardLayout, CardTheme};
 pub use stats::{WrappedStats, wrapped_stats};
-pub use wrapped::{Layout, wrapped_svg};
+pub use wrapped::wrapped_svg;

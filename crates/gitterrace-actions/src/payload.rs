@@ -5,10 +5,11 @@
 use std::collections::BTreeMap;
 
 use gitterrace_git::{Repo, civil_from_days, percent_encode_path};
+use gitterrace_types::LinkStyle;
 use serde::{Deserialize, Serialize};
 
 use crate::config::Kind;
-use crate::link::{LinkStyle, styled};
+use crate::link::styled;
 
 pub const PAYLOAD_VERSION: u32 = 1;
 /// Prefix of the per-action var env names; no payload variable starts with it.

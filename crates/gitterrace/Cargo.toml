@@ -20,6 +20,7 @@ dist = true
 workspace = true
 
 [dependencies]
+gitterrace-types.workspace = true
 gitterrace-git.workspace = true
 gitterrace-index.workspace = true
 gitterrace-api.workspace = true

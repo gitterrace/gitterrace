@@ -10,6 +10,7 @@ flowchart TD
   config["config: config.toml"]
   git["git: all git reads, via gix"]
   index["index: insights cache"]
+  types["types: shared types, each defined once"]
   web["web: server, pages, guard"]
   schwarzwald["schwarzwald: the theme and its palette"]
   gitterrace --> cards
@@ -20,6 +21,8 @@ flowchart TD
   api --> index
   cards --> index
   cards --> schwarzwald
+  config --> types
+  git --> types
   index --> config
   index --> git
   web --> api

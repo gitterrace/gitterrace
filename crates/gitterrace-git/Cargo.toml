@@ -12,6 +12,7 @@ description = "All git reads through gix, pinned to commits. The worktree is rea
 workspace = true
 
 [dependencies]
+gitterrace-types.workspace = true
 gix.workspace = true
 libc.workspace = true
 notify.workspace = true

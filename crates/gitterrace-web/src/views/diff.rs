@@ -5,7 +5,7 @@ use std::fmt::Write as _;
 use gitterrace_git::{ChangeKind, FileDiff, LineKind};
 
 use crate::fmt::{enc_path, enc_seg, esc, esc_text};
-use crate::views::{Render, file_label, kind_name};
+use crate::views::{Render, file_label};
 
 fn num(n: Option<u32>) -> String {
     n.map_or_else(String::new, |n| n.to_string())
@@ -155,7 +155,7 @@ pub(crate) fn diff_html_with(r: &Render, src: DiffSource<'_>, files: &[FileDiff]
         let _ = write!(
             out,
             "<section class=\"file\" id=\"f{i}\" data-path=\"{p}\" data-h=\"{h}\"><header><span class=\"badge {k}\">{k}</span> ",
-            k = kind_name(f.kind),
+            k = f.kind.as_str(),
             p = esc(&f.path),
             h = content_tag(f)
         );

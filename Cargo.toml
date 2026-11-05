@@ -18,6 +18,7 @@ gitterrace-config = { path = "crates/gitterrace-config", version = "0.1.0" }
 gitterrace-actions = { path = "crates/gitterrace-actions", version = "0.1.0" }
 gitterrace-testkit = { path = "crates/gitterrace-testkit" }
 gitterrace-cards = { path = "crates/gitterrace-cards", version = "0.1.0" }
+gitterrace-types = { path = "crates/gitterrace-types", version = "0.1.0" }
 schwarzwald = { path = "theme/schwarzwald/rust" }
 gix = { version = "0.90", default-features = false, features = ["max-performance", "sha1", "blob-diff", "blame", "revision", "index", "mailmap", "status"] }
 axum = "0.8"

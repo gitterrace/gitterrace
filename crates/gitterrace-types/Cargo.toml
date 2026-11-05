@@ -1,0 +1,22 @@
+[package]
+name = "gitterrace-types"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+description = "The types every crate shares: config values, git kinds and the JSON API shapes, each defined once."
+
+[lints]
+workspace = true
+
+[dependencies]
+serde.workspace = true
+
+[features]
+# The codec round-trip check, for other crates' tests; never on in a production build.
+test-utils = []
+
+[dev-dependencies]
+serde_json.workspace = true

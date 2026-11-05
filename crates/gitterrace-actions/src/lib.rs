@@ -17,7 +17,7 @@ pub mod source;
 pub mod token;
 
 pub use config::{Action, Config, ConfigError, Cwd, Kind, Output, RESERVED_KEYS, Reloader};
-pub use link::{Link, LinkError, LinkStyle, styled};
+pub use link::{Link, LinkError, styled};
 pub use payload::{Lines, Locator, Payload, PayloadError, RunRequest, permalink};
 pub use runner::{Limits, Outcome, RunError, Runner};
 pub use send::{Part, fill};

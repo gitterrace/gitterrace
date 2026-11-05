@@ -12,6 +12,7 @@ description = "config.toml: the settings table, loader, validation and where eac
 workspace = true
 
 [dependencies]
+gitterrace-types.workspace = true
 toml = { version = "1", default-features = false, features = ["std", "serde", "parse"] }
 
 [dev-dependencies]

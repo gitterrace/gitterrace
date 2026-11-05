@@ -246,6 +246,7 @@ fn first_line(c: &clap::Command) -> String {
 fn crate_table(ws: &Workspace) -> String {
     let mut s = String::from("| Crate | Owns |\n| --- | --- |\n");
     let order = [
+        "gitterrace-types",
         "gitterrace-git",
         "gitterrace-index",
         "gitterrace-config",
@@ -275,7 +276,7 @@ fn crate_table(ws: &Workspace) -> String {
 }
 
 /// One short label per crate for the diagram, so a box says what it is.
-const ROLES: [(&str, &str); 9] = [
+const ROLES: [(&str, &str); 10] = [
     ("gitterrace", "the binary and CLI"),
     ("web", "server, pages, guard"),
     ("api", "JSON API and MCP"),
@@ -284,6 +285,7 @@ const ROLES: [(&str, &str); 9] = [
     ("config", "config.toml"),
     ("index", "insights cache"),
     ("git", "all git reads, via gix"),
+    ("types", "shared types, each defined once"),
     ("schwarzwald", "the theme and its palette"),
 ];
 

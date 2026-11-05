@@ -3,6 +3,8 @@
 
 use std::collections::BTreeMap;
 
+use gitterrace_types::{ColorScheme, DateStyle, LinkStyle, Period};
+
 use crate::features::{Feature, INSIGHT_PAGES};
 use crate::value::Show;
 
@@ -118,7 +120,7 @@ macro_rules! settings {
                             $( if let Some(x) = sub.get(stringify!($name)) {
                                 c.$field.$name = <$ty as Show>::from_toml(x).ok_or_else(|| format!(
                                     "{}.{}: expected {}",
-                                    stringify!($field), stringify!($name), <$ty as Show>::TYPE))?;
+                                    stringify!($field), stringify!($name), <$ty as Show>::expected()))?;
                             } )*
                         }
                     }
@@ -325,7 +327,7 @@ settings! {
         include_generated: bool = false => Live,
         /// Period the insights pages use when the URL names none: 1w, 1m, 3m, 1y or all. The
         /// API and MCP default to all. Their `period` parameter picks one.
-        period: String = "all".to_owned() => Live,
+        period: Period = Period::All => Live,
         /// Insights pages, in the order the tabs show them: `activity`, `contributors`,
         /// `hotspots`, `languages`, `ownership`, `types`, `frequency` and `patterns`. Leave one
         /// out to stop serving it. `features.insights_enabled` switches them all.
@@ -333,9 +335,9 @@ settings! {
     }
     display: Display {
         /// Color theme before the visitor picks one: system, light or dark.
-        theme: String = "system".to_owned() => Live,
+        theme: ColorScheme = ColorScheme::System => Live,
         /// How dates read: relative or absolute.
-        dates: String = "relative".to_owned() => Live,
+        dates: DateStyle = DateStyle::Relative => Live,
         /// Overview sidebar sections, in the order shown: `now`, `recent`, `churn`,
         /// `loose_ends` and `languages`. Leave one out to hide it. An empty list hides the
         /// sidebar.
@@ -392,7 +394,7 @@ settings! {
         /// Form of the permalink Copy permalink, Send to, action payloads and the MCP hand out:
         /// gitterrace (`gitterrace://<id>/<sha>/<path>`, opened by `git terrace open` without a
         /// running server) or go (`http://<addr>/go/...`, needs this server running).
-        style: String = "gitterrace".to_owned() => Live,
+        style: LinkStyle = LinkStyle::Gitterrace => Live,
         /// Folders `git terrace open` searches, `multi.depth` levels deep, for a clone a link
         /// names, besides every repository served before.
         roots: Vec<String> = Vec::new() => Live,
@@ -439,15 +441,6 @@ impl Config {
                 return bad(k, &format!("must be between {lo} and {hi}"));
             }
         }
-        if !["1w", "1m", "3m", "1y", "all"].contains(&self.insights.period.as_str()) {
-            return bad("insights.period", "expected 1w, 1m, 3m, 1y or all");
-        }
-        if !["system", "light", "dark"].contains(&self.display.theme.as_str()) {
-            return bad("display.theme", "expected system, light or dark");
-        }
-        if !["relative", "absolute"].contains(&self.display.dates.as_str()) {
-            return bad("display.dates", "expected relative or absolute");
-        }
         if let Some(s) = self
             .display
             .sidebar
@@ -477,9 +470,6 @@ impl Config {
             .find(|(i, p)| pages[..*i].contains(p))
         {
             return bad("insights.pages", &format!("{} is listed twice", p.1));
-        }
-        if !["gitterrace", "go"].contains(&self.links.style.as_str()) {
-            return bad("links.style", "expected gitterrace or go");
         }
         if self.multi.depth == 0 || self.multi.depth > 6 {
             return bad("multi.depth", "must be between 1 and 6");

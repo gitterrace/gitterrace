@@ -12,6 +12,7 @@ description = "axum server, askama templates, static assets and the request guar
 workspace = true
 
 [dependencies]
+gitterrace-types.workspace = true
 gitterrace-git.workspace = true
 gitterrace-actions.workspace = true
 gitterrace-config.workspace = true

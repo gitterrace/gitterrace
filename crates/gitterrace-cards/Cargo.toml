@@ -12,6 +12,7 @@ description = "The year-in-review SVG card."
 workspace = true
 
 [dependencies]
+gitterrace-types.workspace = true
 gitterrace-index.workspace = true
 schwarzwald.workspace = true
 

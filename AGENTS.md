@@ -7,6 +7,7 @@ Local, read-only git browser with insights. [Architecture](docs/architecture.md)
 <!-- BEGIN GENERATED: crates -->
 | Crate | Owns |
 | --- | --- |
+| `gitterrace-types` | The types every crate shares: config values, git kinds and the JSON API shapes, each defined once. |
 | `gitterrace-git` | All git reads through gix, pinned to commits. The worktree is read only in worktree.rs. |
 | `gitterrace-index` | Insights cache in .git/gitterrace/, append-only and rebuildable, and the aggregates over it. |
 | `gitterrace-config` | config.toml: the settings table, loader, validation and where each value came from. |

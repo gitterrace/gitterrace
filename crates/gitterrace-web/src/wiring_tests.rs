@@ -154,8 +154,8 @@ async fn display_theme_and_dates_change_the_page() {
     let (_, body) = get(&router(&p, Config::default()), "/log/HEAD").await;
     assert!(!body.contains("data-theme") && body.contains("just now"));
     let dark = with(|c| {
-        c.display.theme = "dark".into();
-        c.display.dates = "absolute".into();
+        c.display.theme = gitterrace_types::ColorScheme::Dark;
+        c.display.dates = gitterrace_types::DateStyle::Absolute;
     });
     let (_, body) = get(&router(&p, dark), "/log/HEAD").await;
     assert!(body.contains("<html lang=\"en\" data-theme=\"dark\">"));

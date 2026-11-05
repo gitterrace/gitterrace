@@ -66,7 +66,7 @@ impl App {
             bots: o.include_bots,
             generated: o.include_generated,
             exclude: o.exclude,
-            period: Period::parse(&cfg.insights.period).filter(|p| *p != Period::All),
+            period: Some(cfg.insights.period).filter(|p| *p != Period::All),
         }
     }
 }
@@ -248,7 +248,7 @@ pub(crate) fn scoped(f: &Filter, all: &Src) -> Src {
 /// the API uses too. Count it with [`counted`] over the whole source.
 pub(crate) fn page_scope(q: &InsightsQuery, d: &Defaults, period: Period) -> Scope {
     let params = ScopeParams {
-        period: Some(period.key().to_owned()),
+        period: Some(period.as_str().to_owned()),
         select: q.filter.selection(),
         options: q.opts.clone(),
         ..ScopeParams::default()

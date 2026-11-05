@@ -6,6 +6,7 @@ mod diff;
 use gitterrace_git::{
     ChangeKind, CommitDetail, CommitSummary, FileDiff, RefInfo, TreeEntry, TreeEntryKind,
 };
+use gitterrace_types::ColorScheme;
 
 use crate::fmt::{ago, ago_at, enc_path, enc_seg, esc_text, href, sha_link};
 #[cfg(test)]
@@ -267,9 +268,9 @@ pub(crate) fn chrome_at(app: &crate::app::App, active: &str, rev: &str) -> Chrom
             banner(&app.repo.head_state(), &app.base)
         },
         actions_note: app.actions_note(),
-        theme: match app.cfg().display.theme.as_str() {
-            "system" => String::new(),
-            t => t.to_owned(),
+        theme: match app.cfg().display.theme {
+            ColorScheme::System => String::new(),
+            t => t.as_str().to_owned(),
         },
         live: !app.public()
             && crate::features::on(Feature::Live)
@@ -280,7 +281,7 @@ pub(crate) fn chrome_at(app: &crate::app::App, active: &str, rev: &str) -> Chrom
         version: app.version().to_string(),
         home: href("/"),
         repo_id: app.repo.id().unwrap_or_default(),
-        link_style: gitterrace_actions::LinkStyle::from_config(&app.cfg().links.style).as_str(),
+        link_style: app.cfg().links.style.as_str(),
         repo_key: app.key.clone(),
         actions: app
             .actions
@@ -520,15 +521,6 @@ pub(crate) fn file_label(f: &FileDiff) -> String {
     match &f.old_path {
         Some(old) if f.kind == ChangeKind::Renamed => format!("{old} -> {}", f.path),
         _ => f.path.clone(),
-    }
-}
-
-pub(super) const fn kind_name(k: ChangeKind) -> &'static str {
-    match k {
-        ChangeKind::Added => "added",
-        ChangeKind::Modified => "modified",
-        ChangeKind::Deleted => "deleted",
-        ChangeKind::Renamed => "renamed",
     }
 }
 

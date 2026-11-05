@@ -59,7 +59,7 @@ impl Scope {
     ) -> Result<Self, ScopeError> {
         let period = match set(p.period.as_deref()) {
             None => period,
-            Some(s) => Period::parse(s).ok_or_else(|| ScopeError::Period(s.to_owned()))?,
+            Some(s) => s.parse().map_err(|_| ScopeError::Period(s.to_owned()))?,
         };
         let day = |what: &'static str, v: Option<&str>| {
             set(v)

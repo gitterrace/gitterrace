@@ -2,9 +2,9 @@ use std::path::Path;
 use std::time::{Duration, Instant};
 
 use gitterrace_git::Repo;
+use gitterrace_types::LinkStyle;
 
 use crate::config::{Action, Cwd, Kind, Output, Stdin};
-use crate::link::LinkStyle;
 use crate::payload::{Lines, Locator, Payload};
 use crate::runner::{Limits, RunError, Runner, spawn_argv};
 

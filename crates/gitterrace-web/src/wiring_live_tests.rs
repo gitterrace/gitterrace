@@ -383,7 +383,7 @@ async fn links_style_switches_copy_permalink() {
         body.contains("data-link=\"gitterrace\""),
         "default gitterrace"
     );
-    let go = with(|c| c.links.style = "go".to_owned());
+    let go = with(|c| c.links.style = gitterrace_types::LinkStyle::Go);
     let (_, body) = get(&router(&p, go), "/blob/HEAD/small.txt").await;
     assert!(body.contains("data-link=\"go\""), "links.style = go");
     let js = include_str!("../static/actions.js");

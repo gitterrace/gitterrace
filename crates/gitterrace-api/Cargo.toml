@@ -12,6 +12,7 @@ description = "JSON API (/api/v1) and the read-only MCP server, from one endpoin
 workspace = true
 
 [dependencies]
+gitterrace-types.workspace = true
 gitterrace-git.workspace = true
 gitterrace-actions.workspace = true
 gitterrace-index.workspace = true

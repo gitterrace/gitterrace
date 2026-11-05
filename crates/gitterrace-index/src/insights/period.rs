@@ -6,15 +6,7 @@ use crate::insights::{
 
 mod people;
 
-/// Reporting window, ending at the newest commit.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub enum Period {
-    Week,
-    Month,
-    Quarter,
-    Year,
-    All,
-}
+pub use gitterrace_types::Period;
 
 /// What the contributors list is ordered and charted by.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -54,54 +46,6 @@ impl Metric {
             Self::Added => n(add),
             Self::Deleted => n(del),
             Self::Net => n(add).saturating_sub(n(del)),
-        }
-    }
-}
-
-impl Period {
-    pub const fn days(self) -> Option<i64> {
-        match self {
-            Self::Week => Some(7),
-            Self::Month => Some(30),
-            Self::Quarter => Some(90),
-            Self::Year => Some(365),
-            Self::All => None,
-        }
-    }
-
-    /// Parses `1w`, `1m`, `3m`, `1y`, `all`.
-    pub fn parse(s: &str) -> Option<Self> {
-        Some(match s {
-            "1w" | "week" => Self::Week,
-            "1m" | "month" => Self::Month,
-            "3m" | "quarter" => Self::Quarter,
-            "1y" | "year" => Self::Year,
-            "all" => Self::All,
-            _ => return None,
-        })
-    }
-
-    /// The URL value [`Period::parse`] reads back.
-    pub const fn key(self) -> &'static str {
-        match self {
-            Self::Week => "1w",
-            Self::Month => "1m",
-            Self::Quarter => "3m",
-            Self::Year => "1y",
-            Self::All => "all",
-        }
-    }
-
-    /// `[from, to)` in epoch seconds with `now` the newest commit. `All` starts at `i64::MIN`.
-    /// A superset of the period's local days, kept for the scans that still prune by instant.
-    pub const fn window(self, now: i64) -> (i64, i64) {
-        match self.days() {
-            Some(d) => (
-                now.saturating_add(1)
-                    .saturating_sub(d * crate::insights::DAY),
-                now.saturating_add(1),
-            ),
-            None => (i64::MIN, now.saturating_add(1)),
         }
     }
 }
@@ -185,7 +129,7 @@ fn scope_with(base: &Scope, period: Period, days: Option<(i64, i64)>) -> Scope {
     let p = ScopeParams {
         period: Some(
             if days.is_some() { Period::All } else { period }
-                .key()
+                .as_str()
                 .to_owned(),
         ),
         from: days.map(|(a, _)| format_date(a)),

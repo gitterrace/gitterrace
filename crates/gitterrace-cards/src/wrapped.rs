@@ -1,6 +1,8 @@
 use std::fmt::Write;
 
-use crate::palette::{Palette, Theme};
+use gitterrace_types::{CardLayout, CardTheme};
+
+use crate::palette::{Paint, Palette};
 use crate::stats::WrappedStats;
 use crate::svg::{MONO, SANS, area, clip, count, esc, group, n};
 
@@ -28,37 +30,8 @@ const DAYS: [&str; 7] = [
     "Sundays",
 ];
 
-/// Canvas shape of the Repo Wrapped card.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Layout {
-    /// 1200x630, the social preview size.
-    Landscape,
-    /// 1080x1350, for stories and phone feeds.
-    Portrait,
-}
-
-impl Layout {
-    /// `landscape` or `portrait`; anything else is `None`.
-    pub fn parse(s: &str) -> Option<Self> {
-        match s {
-            "landscape" => Some(Self::Landscape),
-            "portrait" => Some(Self::Portrait),
-            _ => None,
-        }
-    }
-}
-
-impl Layout {
-    pub const fn size(self) -> (u32, u32) {
-        match self {
-            Self::Landscape => (1200, 630),
-            Self::Portrait => (1080, 1350),
-        }
-    }
-}
-
 /// The year-in-review poster as a self-contained SVG.
-pub fn wrapped_svg(w: &WrappedStats, layout: Layout, theme: Theme) -> String {
+pub fn wrapped_svg(w: &WrappedStats, layout: CardLayout, theme: CardTheme) -> String {
     let p = theme.palette();
     let (cw, ch) = layout.size();
     let mut s = String::with_capacity(12_000);
@@ -81,7 +54,7 @@ pub fn wrapped_svg(w: &WrappedStats, layout: Layout, theme: Theme) -> String {
     );
     let _ = write!(s, r##"<rect width="{cw}" height="{ch}" fill="url(#bg)"/>"##);
     // Contour rings echo the "gitterrace" layers behind everything.
-    let (gx, gy) = if layout == Layout::Landscape {
+    let (gx, gy) = if layout == CardLayout::Landscape {
         (1020.0, 80.0)
     } else {
         (940.0, 120.0)
@@ -96,8 +69,8 @@ pub fn wrapped_svg(w: &WrappedStats, layout: Layout, theme: Theme) -> String {
         );
     }
     match layout {
-        Layout::Landscape => landscape(&mut s, w, p),
-        Layout::Portrait => portrait(&mut s, w, p),
+        CardLayout::Landscape => landscape(&mut s, w, p),
+        CardLayout::Portrait => portrait(&mut s, w, p),
     }
     s.push_str("</svg>");
     s
@@ -304,13 +277,13 @@ fn portrait(s: &mut String, w: &WrappedStats, p: &Palette) {
 #[cfg(test)]
 mod tests {
     use crate::stats::fixtures::sample;
-    use crate::{Layout, Theme, wrapped_stats, wrapped_svg};
+    use crate::{CardLayout, CardTheme, wrapped_stats, wrapped_svg};
 
     #[test]
     fn contains_numbers_and_is_deterministic() {
         let w = wrapped_stats("demo", &sample(), 2025);
-        for layout in [Layout::Landscape, Layout::Portrait] {
-            for theme in [Theme::Light, Theme::Dark] {
+        for layout in [CardLayout::Landscape, CardLayout::Portrait] {
+            for theme in [CardTheme::Light, CardTheme::Dark] {
                 let a = wrapped_svg(&w, layout, theme);
                 assert_eq!(a, wrapped_svg(&w, layout, theme));
                 assert!(a.contains(">41<"));
@@ -322,23 +295,23 @@ mod tests {
             }
         }
         let (l, d) = (
-            wrapped_svg(&w, Layout::Landscape, Theme::Light),
-            wrapped_svg(&w, Layout::Landscape, Theme::Dark),
+            wrapped_svg(&w, CardLayout::Landscape, CardTheme::Light),
+            wrapped_svg(&w, CardLayout::Landscape, CardTheme::Dark),
         );
         assert_ne!(l, d);
 
         // Hostile names are escaped, and a year with no commits still renders.
         let hostile = wrapped_svg(
             &wrapped_stats("<b>&", &sample(), 2025),
-            Layout::Landscape,
-            Theme::Light,
+            CardLayout::Landscape,
+            CardTheme::Light,
         );
         assert!(hostile.contains("&lt;b&gt;&amp;"));
         usvg::Tree::from_str(&hostile, &usvg::Options::default()).expect("parses");
         let empty = wrapped_svg(
             &wrapped_stats("demo", &sample(), 1999),
-            Layout::Portrait,
-            Theme::Dark,
+            CardLayout::Portrait,
+            CardTheme::Dark,
         );
         usvg::Tree::from_str(&empty, &usvg::Options::default()).expect("parses");
     }

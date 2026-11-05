@@ -177,8 +177,8 @@ impl Site {
         g.retain(|t| t.key != key);
     }
 
-    fn link_style(&self) -> gitterrace_actions::LinkStyle {
-        gitterrace_actions::LinkStyle::from_config(&self.env.cfg().links.style)
+    fn link_style(&self) -> gitterrace_types::LinkStyle {
+        self.env.cfg().links.style
     }
 }
 

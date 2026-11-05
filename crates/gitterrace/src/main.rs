@@ -251,8 +251,8 @@ fn wrapped(
         i32::try_from(gitterrace_git::civil_from_days(newest).0).unwrap_or(i32::MAX)
     });
     let stats = gitterrace_cards::wrapped_stats(&repo.name(), &records, year);
-    let layout = gitterrace_cards::Layout::parse(layout).context("unknown layout")?;
-    let theme = gitterrace_cards::Theme::parse(theme).context("unknown theme")?;
+    let layout: gitterrace_types::CardLayout = layout.parse().context("unknown layout")?;
+    let theme: gitterrace_types::CardTheme = theme.parse().context("unknown theme")?;
     let svg = gitterrace_cards::wrapped_svg(&stats, layout, theme);
     let out = out.unwrap_or_else(|| PathBuf::from(format!("wrapped-{year}.svg")));
     std::fs::write(&out, svg).with_context(|| format!("writing {}", out.display()))?;

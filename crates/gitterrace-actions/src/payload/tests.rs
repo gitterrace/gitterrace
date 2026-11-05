@@ -3,9 +3,9 @@ use gitterrace_testkit::git_at;
 const T0: &str = "2026-10-30T12:00:00+00:00";
 
 use gitterrace_git::Repo;
+use gitterrace_types::LinkStyle;
 
 use crate::config::Kind;
-use crate::link::LinkStyle;
 use crate::payload::{Lines, Locator, Payload, PayloadError, RunRequest, rfc3339};
 
 /// One commit whose subject and file content carry shell and HTML payloads.

@@ -6,6 +6,7 @@ use std::sync::Arc;
 
 use gitterrace_index::feed::{CommitRange, InsightsSource};
 use gitterrace_index::{Period, Scoped, Selection};
+use gitterrace_types::StringEnum;
 use serde::Deserialize;
 
 use crate::fmt::{enc_seg, href};
@@ -14,14 +15,6 @@ use crate::insights::Src;
 /// Value that selects commits without a scope (`none`).
 pub(crate) const NO_SCOPE: &str = Selection::NO_SCOPE;
 pub(crate) use gitterrace_index::under;
-
-const PERIODS: [(&str, &str); 5] = [
-    ("1w", "Week"),
-    ("1m", "Month"),
-    ("3m", "Quarter"),
-    ("1y", "Year"),
-    ("all", "All"),
-];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Dim {
@@ -109,13 +102,13 @@ impl Filter {
 
     pub(crate) fn period(&self) -> Option<Period> {
         self.get(Dim::Period)
-            .and_then(Period::parse)
+            .and_then(|s| s.parse().ok())
             .filter(|p| *p != Period::All)
     }
 
     /// The period including `All`, for pages that window themselves.
     pub(crate) fn period_value(&self) -> Option<Period> {
-        self.get(Dim::Period).and_then(Period::parse)
+        self.get(Dim::Period).and_then(|s| s.parse().ok())
     }
 
     /// This filter with one dimension replaced (or removed with `None`).
@@ -204,15 +197,15 @@ impl Filter {
                 })
             })
             .collect();
-        let periods = PERIODS
+        let periods = <Period as StringEnum>::ALL
             .iter()
-            .map(|(v, label)| PeriodLink {
-                label,
+            .map(|p| PeriodLink {
+                label: p.label(),
                 href: href(&format!(
                     "{base}{}",
-                    self.with(Dim::Period, Some(v)).query(&[])
+                    self.with(Dim::Period, Some(p.as_str())).query(&[])
                 )),
-                on: self.get(Dim::Period) == Some(v),
+                on: self.get(Dim::Period) == Some(p.as_str()),
             })
             .collect();
         FilterBar {

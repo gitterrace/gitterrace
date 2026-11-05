@@ -519,7 +519,7 @@ pub(crate) async fn blocking<T: Send + 'static>(
     // Held until the work ends: `resources.blocking_jobs` bounds git work, not waiting.
     let _slot = Arc::clone(&app.env.jobs).acquire_owned().await.ok();
     let cfg = app.cfg();
-    let absolute = cfg.display.dates == "absolute";
+    let absolute = cfg.display.dates == gitterrace_types::DateStyle::Absolute;
     // Every page is built here, so every page reads one table of what is switched on.
     let on = crate::features::Effective::of(&cfg, Some(&app.name));
     tokio::task::spawn_blocking(move || {

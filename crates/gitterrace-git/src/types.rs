@@ -1,3 +1,5 @@
+pub use gitterrace_types::{ChangeKind, LineKind, RefKind, TreeEntryKind};
+
 /// Author or committer identity, mailmap applied.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Signature {
@@ -25,14 +27,6 @@ pub struct CommitDetail {
     pub summary: CommitSummary,
     pub body: String,
     pub files: Vec<FileDiff>,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ChangeKind {
-    Added,
-    Modified,
-    Deleted,
-    Renamed,
 }
 
 /// Changes to one file. `hunks` is empty for binary files.
@@ -69,27 +63,12 @@ pub struct Hunk {
     pub lines: Vec<HunkLine>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum LineKind {
-    Context,
-    Added,
-    Removed,
-}
-
 #[derive(Debug, Clone)]
 pub struct HunkLine {
     pub kind: LineKind,
     pub old_no: Option<u32>,
     pub new_no: Option<u32>,
     pub text: String,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum TreeEntryKind {
-    Dir,
-    File,
-    Symlink,
-    Submodule,
 }
 
 #[derive(Debug, Clone)]
@@ -113,13 +92,6 @@ pub struct RawBlob {
     pub id: String,
     pub size: u64,
     pub bytes: Option<Vec<u8>>,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum RefKind {
-    Branch,
-    Tag,
-    Remote,
 }
 
 #[derive(Debug, Clone)]

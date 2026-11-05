@@ -5,6 +5,7 @@
 //! parser is strict: anything it does not expect is refused, never repaired.
 
 use gitterrace_git::percent_encode_path;
+use gitterrace_types::LinkStyle;
 
 use crate::payload::{Lines, permalink};
 
@@ -17,32 +18,6 @@ const ID_LEN: usize = 12;
 const MIN_SHA: usize = 7;
 /// Not configurable: the length of a full sha, a format fact.
 const MAX_SHA: usize = 40;
-
-/// Which form Copy permalink, Send to, payloads and the MCP hand out (`links.style`).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum LinkStyle {
-    #[default]
-    Gitterrace,
-    Go,
-}
-
-impl LinkStyle {
-    /// The style a validated `links.style` names; `go` or the default.
-    pub fn from_config(s: &str) -> Self {
-        if s == "go" {
-            Self::Go
-        } else {
-            Self::Gitterrace
-        }
-    }
-
-    pub const fn as_str(self) -> &'static str {
-        match self {
-            Self::Gitterrace => "gitterrace",
-            Self::Go => "go",
-        }
-    }
-}
 
 /// A parsed link. `sha` may be abbreviated (7 to 40 hex); `/go` needs the full one, so a
 /// caller resolves it in a clone before converting.
@@ -248,7 +223,9 @@ fn parse_lines(f: &str) -> Result<Lines, LinkError> {
 
 #[cfg(test)]
 mod tests {
-    use crate::link::{Link, LinkError, LinkStyle, styled};
+    use gitterrace_types::LinkStyle;
+
+    use crate::link::{Link, LinkError, styled};
     use crate::payload::Lines;
 
     const ID: &str = "0123456789ab";

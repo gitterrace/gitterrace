@@ -4,10 +4,11 @@
 use std::path::Path;
 use std::sync::{Arc, Mutex, RwLock};
 
-use gitterrace_actions::{Lines, LinkStyle, styled};
+use gitterrace_actions::{Lines, styled};
 use gitterrace_git::Repo;
 use gitterrace_index::feed::{InsightsSource, RevView};
 use gitterrace_index::{Index, Insights, Options};
+use gitterrace_types::LinkStyle;
 use serde_json::{Value, json};
 
 use crate::error::ApiError;
@@ -98,7 +99,7 @@ impl ApiState {
             .set_block_cache(cfg.cache_bytes(gitterrace_config::Cache::Blocks));
         let defaults = options_from(cfg, &self.repo.name());
         let mut s = self.write_settings();
-        s.style = LinkStyle::from_config(&cfg.links.style);
+        s.style = cfg.links.style;
         s.defaults = defaults;
         s.caps = cfg.api.clone();
     }

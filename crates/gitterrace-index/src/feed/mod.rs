@@ -173,7 +173,7 @@ pub enum CommitRange {
     All,
     /// Ranks `[start, end)`.
     Ranks(Range<u32>),
-    /// Author time `[from, to)` in epoch seconds (UTC, as [`crate::Period::window`]).
+    /// Author time `[from, to)` in epoch seconds (UTC, as [`gitterrace_types::Period::window`]).
     Time(Range<i64>),
 }
 

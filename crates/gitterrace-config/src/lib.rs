@@ -349,6 +349,32 @@ mod tests {
     }
 
     #[test]
+    fn a_value_outside_a_fixed_set_names_the_key_and_every_accepted_value() {
+        for (toml, msg) in [
+            (
+                "[insights]\nperiod = \"2y\"\n",
+                "insights.period: expected 1w, 1m, 3m, 1y or all",
+            ),
+            (
+                "[display]\ntheme = \"blue\"\n",
+                "display.theme: expected system, light or dark",
+            ),
+            (
+                "[display]\ndates = \"iso\"\n",
+                "display.dates: expected relative or absolute",
+            ),
+            (
+                "[links]\nstyle = \"http\"\n",
+                "links.style: expected gitterrace or go",
+            ),
+        ] {
+            assert_eq!(parse(toml).expect_err(toml).0, msg);
+        }
+        let c = parse("[insights]\nperiod = \"quarter\"\n").expect("long name");
+        assert_eq!(c.config.insights.period, gitterrace_types::Period::Quarter);
+    }
+
+    #[test]
     fn missing_file_is_defaults_and_flag_wins() {
         let tmp = tempfile::tempdir().expect("tmp");
         let mut l = load(Some(tmp.path())).expect("load");

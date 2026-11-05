@@ -1,8 +1,7 @@
 //! Stable `snake_case` JSON for the git types, which carry no serde impls themselves.
 
 use gitterrace_git::{
-    BlameLine, ChangeKind, CommitDetail, CommitSummary, FileDiff, LineKind, RefInfo, RefKind,
-    Signature, TreeEntry, TreeEntryKind,
+    BlameLine, CommitDetail, CommitSummary, FileDiff, RefInfo, Signature, TreeEntry,
 };
 use serde_json::{Value, json};
 
@@ -38,12 +37,7 @@ pub(crate) fn detail(d: &CommitDetail, diff: bool, max_lines: Option<usize>) -> 
 }
 
 fn file_diff(f: &FileDiff, diff: bool, budget: &mut usize, truncated: &mut bool) -> Value {
-    let kind = match f.kind {
-        ChangeKind::Added => "added",
-        ChangeKind::Modified => "modified",
-        ChangeKind::Deleted => "deleted",
-        ChangeKind::Renamed => "renamed",
-    };
+    let kind = f.kind.as_str();
     let mut v = json!({
         "path": f.path,
         "kind": kind,
@@ -66,12 +60,7 @@ fn file_diff(f: &FileDiff, diff: bool, budget: &mut usize, truncated: &mut bool)
             let lines: Vec<Value> = h.lines[..take]
                 .iter()
                 .map(|l| {
-                    let k = match l.kind {
-                        LineKind::Context => "context",
-                        LineKind::Added => "added",
-                        LineKind::Removed => "removed",
-                    };
-                    json!({ "kind": k, "old_no": l.old_no, "new_no": l.new_no, "text": l.text })
+                    json!({ "kind": l.kind.as_str(), "old_no": l.old_no, "new_no": l.new_no, "text": l.text })
                 })
                 .collect();
             hunks.push(json!({ "header": h.header, "lines": lines }));
@@ -82,22 +71,11 @@ fn file_diff(f: &FileDiff, diff: bool, budget: &mut usize, truncated: &mut bool)
 }
 
 pub(crate) fn tree_entry(e: &TreeEntry) -> Value {
-    let kind = match e.kind {
-        TreeEntryKind::Dir => "dir",
-        TreeEntryKind::File => "file",
-        TreeEntryKind::Symlink => "symlink",
-        TreeEntryKind::Submodule => "submodule",
-    };
-    json!({ "name": e.name, "kind": kind, "size": e.size })
+    json!({ "name": e.name, "kind": e.kind.as_str(), "size": e.size })
 }
 
 pub(crate) fn ref_info(r: &RefInfo) -> Value {
-    let kind = match r.kind {
-        RefKind::Branch => "branch",
-        RefKind::Tag => "tag",
-        RefKind::Remote => "remote",
-    };
-    json!({ "name": r.name, "kind": kind, "target": r.target, "time": r.time })
+    json!({ "name": r.name, "kind": r.kind.as_str(), "target": r.target, "time": r.time })
 }
 
 pub(crate) fn blame_line(b: &BlameLine) -> Value {

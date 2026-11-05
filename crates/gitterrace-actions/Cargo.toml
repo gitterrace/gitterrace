@@ -12,6 +12,7 @@ description = "User actions: actions.toml, the payload v1 contract and the sandb
 workspace = true
 
 [dependencies]
+gitterrace-types.workspace = true
 gitterrace-git.workspace = true
 gitterrace-config.workspace = true
 serde.workspace = true

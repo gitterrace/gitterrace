@@ -96,6 +96,7 @@ mod tests {
     use std::sync::Arc;
 
     use gitterrace_config::Config;
+    use gitterrace_types::Period;
 
     use super::{Reloader, Watched};
     use crate::app::{App, Env};
@@ -148,7 +149,7 @@ mod tests {
         f.app.memo_put("k".into(), Arc::new("page".into()));
         edit(&f, "[insights]\nperiod = \"1y\"\n[limits]\ntext_kb = 7\n");
         f.reloader.poll(&f.env);
-        assert_eq!(f.env.cfg().insights.period, "1y");
+        assert_eq!(f.env.cfg().insights.period, Period::Year);
         assert_eq!(f.app.cfg().limits.text_kb, 7);
         assert_eq!(
             f.app.repo.text_limit(),
@@ -169,7 +170,7 @@ mod tests {
             lines.iter().any(|l| l.contains("insights.period")),
             "{lines:?}"
         );
-        assert_eq!(f.env.cfg().insights.period, "1y");
+        assert_eq!(f.env.cfg().insights.period, Period::Year);
         assert!(
             f.reloader.poll(&f.env).is_empty(),
             "a bad file is not retried unchanged"
@@ -178,7 +179,7 @@ mod tests {
         f.reloader.poll(&f.env);
         assert_eq!(
             f.env.cfg().insights.period,
-            "3m",
+            Period::Quarter,
             "the next good edit applies"
         );
     }
@@ -250,7 +251,8 @@ mod tests {
         assert_eq!(cfg.index.threads, d.index.threads);
         assert_eq!(cfg.multi, d.multi);
         assert_eq!(
-            cfg.display.dates, "absolute",
+            cfg.display.dates,
+            gitterrace_types::DateStyle::Absolute,
             "safe keys in the same edit still apply"
         );
     }

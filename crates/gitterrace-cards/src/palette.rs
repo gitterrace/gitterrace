@@ -1,14 +1,7 @@
 use std::sync::OnceLock;
 
+use gitterrace_types::CardTheme;
 use schwarzwald::{KANDEL, Palette as Colours};
-
-/// Light or dark rendering. Colors come from the vendored schwarzwald crate (Kandel).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum Theme {
-    #[default]
-    Light,
-    Dark,
-}
 
 pub(crate) struct Palette {
     pub bg: &'static str,
@@ -20,17 +13,13 @@ pub(crate) struct Palette {
     pub accent: &'static str,
 }
 
-impl Theme {
-    /// `dark` or `light` (case-sensitive); anything else is `None`.
-    pub fn parse(s: &str) -> Option<Self> {
-        match s {
-            "light" => Some(Self::Light),
-            "dark" => Some(Self::Dark),
-            _ => None,
-        }
-    }
+/// Colors come from the vendored schwarzwald crate (Kandel).
+pub(crate) trait Paint {
+    fn palette(self) -> &'static Palette;
+}
 
-    pub(crate) fn palette(self) -> &'static Palette {
+impl Paint for CardTheme {
+    fn palette(self) -> &'static Palette {
         static LIGHT: OnceLock<Palette> = OnceLock::new();
         static DARK: OnceLock<Palette> = OnceLock::new();
         match self {
