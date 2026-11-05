@@ -60,7 +60,7 @@ fn a_reused_path_does_not_inherit_the_moved_file_history() {
         assert_eq!(status, 200);
         let row = html
             .split("<tr>")
-            .find(|r| r.contains(">src</a>"))
+            .find(|r| r.contains("<span class=\"seg\">src</span></a>"))
             .expect("src row");
         assert!(row.contains("Jane Doe") && !row.contains("Bob"), "{row}");
     });

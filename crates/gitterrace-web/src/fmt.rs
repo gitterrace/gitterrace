@@ -176,15 +176,10 @@ tokio::task_local! {
     pub(crate) static REQUEST_REV: String;
 }
 
-/// A repository path as HTML that a narrow cell may break only after a `/`: each segment sits
-/// in a span that never wraps inside, so `gitterrace-web` and `coupled-page.html` stay whole.
-/// Escaped; the template prints it unescaped.
-pub(crate) fn path_breaks(path: &str) -> String {
-    let parts: Vec<String> = path
-        .split('/')
-        .map(|s| format!("<span class=\"seg\">{}</span>", esc(s)))
-        .collect();
-    parts.join("/<wbr>")
+/// A repository path split at `/`, for the `_path.html` macro that lets a cell break only
+/// between its parts. Data, not markup: the template writes the spans and the escaping.
+pub(crate) fn path_parts(path: &str) -> Vec<String> {
+    path.split('/').map(str::to_owned).collect()
 }
 
 /// The one place absolute in-app URLs are built: prefixes the current repository's base and,
@@ -326,20 +321,16 @@ pub(crate) use gitterrace_types::{esc, esc_text};
 #[cfg(test)]
 mod tests {
     use crate::fmt::{
-        UNKNOWN_DATE, ago, date, day, day_label, path_breaks, size, thousands, with_dates,
+        UNKNOWN_DATE, ago, date, day, day_label, path_parts, size, thousands, with_dates,
     };
 
     #[test]
-    fn a_path_breaks_only_after_its_slashes_and_stays_escaped() {
+    fn a_path_splits_at_its_slashes_only() {
         assert_eq!(
-            path_breaks("crates/gitterrace-web/lib.rs"),
-            "<span class=\"seg\">crates</span>/<wbr><span class=\"seg\">gitterrace-web</span>/<wbr>\
-             <span class=\"seg\">lib.rs</span>"
+            path_parts("crates/gitterrace-web/lib.rs"),
+            ["crates", "gitterrace-web", "lib.rs"]
         );
-        assert_eq!(
-            path_breaks("a/<b>&c"),
-            "<span class=\"seg\">a</span>/<wbr><span class=\"seg\">&lt;b&gt;&amp;c</span>"
-        );
+        assert_eq!(path_parts("README.md"), ["README.md"]);
     }
 
     #[test]

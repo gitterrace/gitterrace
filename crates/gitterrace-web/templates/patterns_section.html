@@ -1,9 +1,10 @@
+{%- import "_path.html" as paths -%}
 <section class="fold" id="patterns">
 <h2 class="fold-h">Patterns</h2>
 <div class="chart-head" id="coupled"><div><h2>Coupled files</h2><p class="hint">Pairs of files that change in the same commits. Degree is shared commits over the changes of the less-changed file.</p></div></div>
 <div class="card"><table class="entries pair">
 <tr class="th"><td>File</td><td>Changes with</td><td class="r">Together</td><td class="r">Degree</td></tr>
-{% for p in pairs %}<tr><td><a href="{{ p.a_href }}">{{ p.a|safe }}</a></td><td><a href="{{ p.b_href }}">{{ p.b|safe }}</a></td><td class="r">{{ p.together }}</td><td class="r"><b>{{ p.degree }}</b></td></tr>{% endfor %}
+{% for p in pairs %}<tr><td><a href="{{ p.a_href }}">{% call paths::path(&p.a) %}{% endcall %}</a></td><td><a href="{{ p.b_href }}">{% call paths::path(&p.b) %}{% endcall %}</a></td><td class="r">{{ p.together }}</td><td class="r"><b>{{ p.degree }}</b></td></tr>{% endfor %}
 </table></div>
 <div class="chart-head" id="code-age"><div><h2>Code age</h2><p class="hint">Lines now by the year their file last changed.</p></div></div>
 <div class="card pad">{{ age|safe }}</div>

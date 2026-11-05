@@ -1,0 +1,5 @@
+{#- A repository path that breaks only between its parts: each folder or file name stays whole
+    and a break may follow each slash. `parts` is the path split at `/`. -#}
+{% macro path(parts) -%}
+{%- for s in parts %}{% if !loop.first %}/<wbr>{% endif %}<span class="seg">{{ s }}</span>{% endfor -%}
+{%- endmacro %}

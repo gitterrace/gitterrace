@@ -19,8 +19,8 @@ use crate::{
 const TOP_DIRS: usize = 40;
 
 struct DirRow {
-    /// The directory as HTML that breaks only after a slash.
-    path: String,
+    /// The directory split at `/`, for the `_path.html` macro.
+    path: Vec<String>,
     href: String,
     lines: String,
     files: String,
@@ -72,7 +72,7 @@ pub(crate) async fn page(
         );
         let row = |d: &gitterrace_index::DirOwnership, name: String| DirRow {
             href: f.link("/stats/ownership", Dim::Path, &d.path),
-            path: fmt::path_breaks(&name),
+            path: fmt::path_parts(&name),
             lines: fmt::thousands(d.lines),
             files: fmt::thousands(d.files),
             owners: d

@@ -93,9 +93,11 @@ fn only_the_shared_control_writes_a_switch() {
             }
             let name = p.file_name().map(|n| n.to_string_lossy().into_owned());
             // The owner, the stylesheet that styles it, the script that wires the narrow
-            // select and the document views, and test files that read the markup back.
+            // select and the document views, the path macro whose `seg` spans are path
+            // parts rather than a switch, and test files that read the markup back.
             if name.as_deref().is_some_and(|n| {
                 n == "seg.rs"
+                    || n == "_path.html"
                     || n == "seg_control.html"
                     || n == "app.css"
                     || n == "app.js"

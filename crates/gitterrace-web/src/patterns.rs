@@ -15,9 +15,9 @@ use crate::{
 const TOP_PAIRS: usize = 30;
 
 struct PairRow {
-    a: String,
+    a: Vec<String>,
     a_href: String,
-    b: String,
+    b: Vec<String>,
     b_href: String,
     together: String,
     degree: String,
@@ -58,8 +58,8 @@ pub(crate) fn section(a: &crate::app::App, r: &Src, q: &InsightsQuery) -> String
             .map(|p| PairRow {
                 a_href: views::file_link(&p.a),
                 b_href: views::file_link(&p.b),
-                a: fmt::path_breaks(&p.a),
-                b: fmt::path_breaks(&p.b),
+                a: fmt::path_parts(&p.a),
+                b: fmt::path_parts(&p.b),
                 together: fmt::thousands(p.together),
                 degree: format!("{:.0}%", p.degree * 100.0),
             })
