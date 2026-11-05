@@ -1,8 +1,13 @@
 .DEFAULT_GOAL := help
-.PHONY: counting-parity app-icon build install fmt clippy lint test doc theme actions docs-gen docs-check names lines check site-render site-shots help bench bench-report bench-guard memory-check browser-check site deploy shipped domains send-vectors preview gc gc-guard changelog
+.PHONY: setup counting-parity app-icon build install fmt clippy lint test doc theme actions docs-gen docs-check names lines check site-render site-shots help bench bench-report bench-guard memory-check browser-check site deploy shipped domains send-vectors preview gc gc-guard changelog
+
+## setup: Keep desktop search indexers out of build, bench and agent dirs (run once per machine)
+setup:
+	python3 scripts/indexing-run.py --apply
 
 ## build: Release binary
 build:
+	@python3 scripts/indexing-run.py --apply-dir "$${CARGO_TARGET_DIR:-target}"
 	cargo build --release -p gitterrace
 
 ## install: Install git-terrace into ~/.cargo/bin, so git runs it as git terrace
@@ -124,6 +129,7 @@ bench-report:
 
 #: bench-guard: The harness still works, on a tiny generated repo (part of check)
 bench-guard:
+	python3 scripts/indexing-run.py --self-test
 	cargo build -q -p gitterrace
 	python3 scripts/bench-run.py --synthetic --bin $${CARGO_TARGET_DIR:-target}/debug/git-terrace >/dev/null
 	python3 scripts/bench-report.py --self-test

@@ -412,6 +412,23 @@ def synthetic(base: str | Path) -> tuple[Json, Path]:
     }, d
 
 
+def preflight_index() -> None:
+    """Refuse to time anything while a desktop indexer can rescan the bench or target dirs.
+
+    A rescan burns CPU during a timed phase and skews the numbers, the same reason the quiet
+    check exists. The guard is a refusal, not a warning, because a published number is
+    permanent. `make setup` fixes it.
+    """
+    dis = importlib.import_module("indexing-run")
+    bad = dis.missing(dis.bench_dirs())
+    if bad:
+        sys.exit(
+            "not excluded from search indexing (it skews timings): "
+            + ", ".join(map(str, bad))
+            + "\nrun `make setup`"
+        )
+
+
 def main():
     ap = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
@@ -431,7 +448,17 @@ def main():
     ap.add_argument(
         "--synthetic", action="store_true", help="tiny generated repo, one run (guard)"
     )
+    ap.add_argument(
+        "--preflight",
+        action="store_true",
+        help="only check the indexer exclusion, then exit",
+    )
     a = ap.parse_args()
+    if a.preflight:
+        preflight_index()
+        return 0
+    if not a.synthetic and not a.fetch_only:
+        preflight_index()
     a.bin = str(Path(a.bin).resolve())
     if not Path(a.bin).exists():
         sys.exit(f"no binary at {a.bin}, run `make build` (release) first")

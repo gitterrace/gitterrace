@@ -24,6 +24,10 @@ make install  # puts git-terrace in ~/.cargo/bin, so `git terrace` works anywher
 git terrace   # serves this checkout on 127.0.0.1 (make preview rebuilds and restarts it)
 ```
 
+Run `make setup` once per machine. It keeps Spotlight, Windows Search and tracker or baloo out
+of your checkout, `target/` and the bench cache, because rescans cost CPU and skew `make bench`,
+which refuses to run until the exclusion is in place.
+
 If the build fails on a clean checkout, that is a bug worth reporting.
 
 Builds from inside the checkout read `.cargo/config.toml`, which runs the allocator with one
