@@ -82,7 +82,8 @@ header.top>.wrap{container:topbar/inline-size}
 .cols.wide{grid-template-columns:minmax(0,1fr)}
 @media (max-width:1100px){.cols{grid-template-columns:minmax(0,1fr);gap:var(--space-6)}aside{order:-1}}
 aside h2{margin-top:0}
-input{font:inherit;padding:5px var(--space-3);border:1px solid var(--line-strong);border-radius:var(--radius);background:var(--surface);color:var(--fg);min-width:240px;height:32px}
+input:not([type=checkbox],[type=radio]){font:inherit;padding:5px var(--space-3);border:1px solid var(--line-strong);border-radius:var(--radius);background:var(--surface);color:var(--fg);min-width:240px;height:32px}
+input[type=checkbox],input[type=radio]{width:16px;height:16px;margin:0;flex:none;accent-color:var(--accent);vertical-align:-3px}
 input::placeholder{color:var(--faint)}
 input:focus{outline:2px solid var(--focus);outline-offset:0;border-color:var(--accent)}
 button{font:inherit;font-weight:var(--weight-semibold);height:32px;padding:0 var(--space-4);border:var(--border);border-radius:var(--radius);background:var(--soft);color:var(--fg);cursor:pointer;transition:background var(--dur-fast),border-color var(--dur-fast)}
@@ -242,7 +243,7 @@ progress::-moz-progress-bar{background:var(--accent);border-radius:var(--radius)
 .cols{gap:var(--space-4)}
 .latest .sha,.latest .muted{display:none}
 .entries td:first-child{min-width:140px}
-input{min-width:0;flex:1}.filter{width:100%}
+input:not([type=checkbox],[type=radio]){min-width:0;flex:1}.filter{width:100%}
 .blame td.who{min-width:170px}.blame .bl{grid-template-columns:auto 1fr}.blame .bl .muted{display:none}
 }
 
@@ -312,7 +313,6 @@ td.ago{color:var(--faint);font-size:var(--text-xs);white-space:nowrap}
 .hits tr.hit td.c{background:var(--add-bg)}
 .hits tr.gap td{color:var(--faint)}
 mark{background:var(--warn-bg);color:var(--fg);box-shadow:0 0 0 1px var(--warn);border-radius:var(--radius);padding:0 1px}
-.searchform input[type=radio],.searchform input[type=checkbox]{min-width:0;width:auto;height:auto;flex:none;margin:0}
 
 
 /* ---- voice: serif display, grotesk body, mono metadata, hairlines ---- */

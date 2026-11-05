@@ -87,3 +87,35 @@ fn only_commit_messages_truncate() {
         }
     }
 }
+
+/// Text-field styling (a fixed height, a minimum width, padding, a field border) on a bare
+/// `input` selector reaches checkboxes and radios too, so a Markdown task list draws 240 px wide
+/// rounded boxes. Text-field rules name the inputs they style; toggles keep one shared rule.
+#[test]
+fn text_field_rules_skip_toggles() {
+    let sheets = [
+        ("app.css", include_str!("../static/app.css")),
+        ("markdown.css", include_str!("../static/markdown.css")),
+    ];
+    for (name, css) in sheets {
+        for rule in css.split('}') {
+            let Some((sel, body)) = rule.split_once('{') else {
+                continue;
+            };
+            let field = ["min-width:", "height:", "padding:"]
+                .iter()
+                .any(|p| body.contains(p));
+            for s in sel.split(',') {
+                // The whole selector is `input` (or `input:focus` and the like): nothing names
+                // which inputs, so toggles match too. A selector that picks inputs by place or
+                // parent (`.form>input:first-child`) or rules toggles out with `:not` is fine.
+                let s = s.trim();
+                let bare = s == "input" || s.starts_with("input:") && !s.contains("not(");
+                assert!(
+                    !(field && bare),
+                    "{name}: `{s}` gives text-field sizing to every input, checkboxes too"
+                );
+            }
+        }
+    }
+}
