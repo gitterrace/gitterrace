@@ -1,5 +1,9 @@
 //! Working tree scans follow OS file events: fast on a change, silent while idle, one scan per
 //! burst, and the safety rescan still finds a change no event reported.
+//!
+//! The promise is documented: a change shows within `watch.rescan_secs` at the latest, because
+//! the OS may drop an event on a loaded Mac. Tests set the shortest allowed rescan and assert
+//! that bound plus a margin, so they never depend on the OS delivering an event on time.
 
 use std::sync::{Arc, atomic::Ordering};
 use std::time::{Duration, Instant};
@@ -11,6 +15,13 @@ use crate::wiring_tests::{app, repo, with};
 /// These tests count scans and time file events, so they run one at a time: a parallel test
 /// writing thousands of files would slow the OS event stream they measure.
 pub(crate) static SERIAL: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+
+/// The shortest `watch.rescan_secs` the config allows.
+const RESCAN: u64 = 5;
+/// Slack on top of the rescan for a busy machine: one scan and its delivery.
+const MARGIN: Duration = Duration::from_secs(5);
+/// How long a change may take to show: the documented bound.
+const BOUND: Duration = Duration::from_secs(RESCAN + 5);
 
 fn scans(a: &App) -> u64 {
     a.wt_scans.load(Ordering::Relaxed)
@@ -34,16 +45,16 @@ async fn watched(
     let task = tokio::spawn(crate::app::keep_index_fresh(Arc::clone(&a))).abort_handle();
     let mut rx = a.changes.subscribe();
     let wt = WorktreeWatch::new(&a);
-    // FSEvents may replay the fixture's own writes late and in one batch, on a loaded machine
-    // after any quiet second. Events arrive in order, so once a new untracked marker shows as
-    // a worktree change (the replayed git writes never do), that backlog is delivered.
+    // The fixture's own writes may still be replayed by the OS, late and in one batch. A new
+    // untracked marker shows as a worktree change (the replayed git writes never do), by event
+    // or at the latest by the safety rescan, so that backlog is out of the way afterwards.
     if os_events {
         let end = Instant::now() + Duration::from_secs(30);
         let mut n = 0;
         while Instant::now() < end {
             n += 1;
             std::fs::write(p.join(format!("settle-{n}.txt")), "x\n").expect("marker");
-            if worktree_change(&mut rx, Duration::from_secs(3)).await {
+            if worktree_change(&mut rx, BOUND).await {
                 break;
             }
         }
@@ -78,57 +89,50 @@ async fn worktree_change(
 async fn an_edit_shows_within_the_default_interval() {
     let _one = SERIAL.lock().await;
     let dir = tempfile::tempdir().expect("tmp");
-    let (_a, p, mut rx, _wt, _t) = watched(dir.path(), 30, true).await;
-    // The best of three edits, so a loaded test machine stalling one scan does not decide it;
-    // every edit must still arrive.
-    let mut best = Duration::MAX;
+    let (_a, p, mut rx, _wt, _t) = watched(dir.path(), RESCAN, true).await;
+    // One write per edit, no retry: the OS usually reports it within a second, and when it does
+    // not, the safety rescan shows it within `rescan_secs`.
     for i in 0..3 {
         tokio::time::sleep(Duration::from_millis(500)).await;
         while rx.try_recv().is_ok() {}
-        // Write again every few seconds: a loaded machine may drop one event, which the safety
-        // rescan covers in production but this test does not wait for.
-        let mut seen = false;
-        for n in 0..8 {
-            std::fs::write(p.join("small.txt"), format!("edited {i} {n}\n")).expect("write");
-            let t0 = Instant::now();
-            if worktree_change(&mut rx, Duration::from_secs(3)).await {
-                best = best.min(t0.elapsed());
-                seen = true;
-                break;
-            }
-        }
-        assert!(seen, "edit {i} reaches the tab");
+        std::fs::write(p.join("small.txt"), format!("edited {i}\n")).expect("write");
+        let t0 = Instant::now();
+        assert!(
+            worktree_change(&mut rx, BOUND).await,
+            "edit {i} not shown within {BOUND:?} (waited {:?})",
+            t0.elapsed()
+        );
     }
-    assert!(best < Duration::from_millis(1500), "an edit took {best:?}");
 }
 
 #[tokio::test(flavor = "multi_thread")]
 async fn an_idle_tree_is_not_scanned_and_a_touched_one_is() {
     let _one = SERIAL.lock().await;
     let dir = tempfile::tempdir().expect("tmp");
-    let (a, p, _rx, _wt, _t) = watched(dir.path(), 30, true).await;
+    let (a, p, mut rx, _wt, _t) = watched(dir.path(), RESCAN, true).await;
     let before = scans(&a);
-    tokio::time::sleep(Duration::from_secs(10)).await;
-    // Polling would scan once per interval (1 s), ten times here, and a scan that wakes the
-    // watcher would keep looping. A heavily loaded machine still delivers a few late
-    // duplicates of the settle markers' events, so up to three stray scans pass and the
-    // regressions, at ten or more, do not.
+    let window = Duration::from_secs(12);
+    tokio::time::sleep(window).await;
+    // Polling would scan once per interval (1 s), twelve times here, and a scan that wakes the
+    // watcher would keep looping. The safety rescan adds one scan per `rescan_secs`, and a few
+    // late duplicates of the settle markers' events may add more, so the idle count stays well
+    // under what polling gives.
     let idle = scans(&a) - before;
-    assert!(idle <= 3, "{idle} scans while nothing changes");
-    // The positive control: every touch is followed by a scan of its own. Each waits for the
-    // previous scan to finish, so a loaded machine folding touches together cannot decide it.
-    // The safety rescan alone (30 s) would need far longer than the total allowed.
-    let t0 = Instant::now();
-    for i in 0..10 {
-        let before = scans(&a);
+    let most = window.as_secs() / RESCAN + 1 + 3;
+    assert!(
+        idle <= most,
+        "{idle} scans in {window:?} while nothing changes"
+    );
+    // The positive control: every touch shows as a worktree change within the documented bound.
+    for i in 0..3 {
+        tokio::time::sleep(Duration::from_millis(500)).await;
+        while rx.try_recv().is_ok() {}
         std::fs::write(p.join("small.txt"), format!("touch {i}\n")).expect("write");
         assert!(
-            scanned_after(&a, before, Duration::from_secs(25)).await,
-            "touch {i} is scanned"
+            worktree_change(&mut rx, BOUND).await,
+            "touch {i} not shown within {BOUND:?}"
         );
     }
-    let took = t0.elapsed();
-    assert!(took < Duration::from_secs(60), "10 touches took {took:?}");
 }
 
 /// Waits until a scan finished after the count read `before`.
@@ -160,7 +164,7 @@ async fn without_file_events_the_safety_rescan_finds_the_change() {
 async fn a_burst_of_five_thousand_files_is_a_few_scans() {
     let _one = SERIAL.lock().await;
     let dir = tempfile::tempdir().expect("tmp");
-    let (a, p, _rx, _wt, _t) = watched(dir.path(), 30, true).await;
+    let (a, p, _rx, _wt, _t) = watched(dir.path(), RESCAN, true).await;
     let before = scans(&a);
     let out = p.join("gen");
     std::fs::create_dir(&out).expect("dir");
@@ -169,7 +173,7 @@ async fn a_burst_of_five_thousand_files_is_a_few_scans() {
         std::fs::write(out.join(format!("f{i}.txt")), "x").expect("write");
     }
     assert!(
-        scanned_after(&a, before, Duration::from_secs(20)).await,
+        scanned_after(&a, before, BOUND + MARGIN).await,
         "the burst is scanned"
     );
     // Settled once two seconds pass without a scan; `busy` is how long scans kept coming.

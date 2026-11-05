@@ -49,7 +49,9 @@ color the year card.
   inline script CSP.
 - **Live.** A watcher pushes changes over `/events`, and config files reload on change. A
   repository that joins the server is announced the same way, so open pages show it in the
-  switcher without a reload.
+  switcher without a reload. A working tree change usually shows within about a second. On a
+  heavily loaded Mac the OS can drop a file change silently, and then it shows within
+  `watch.rescan_secs` (30 by default), the setting to lower for a tighter bound.
 - **Features switch off at the route.** Each `[features]` switch owns its routes
   (`gitterrace-web/src/features.rs`), and one gate answers a route of an off feature with the
   404 of an unknown page. Pages ask the same table, so an off feature leaves no link or menu

@@ -255,8 +255,10 @@ settings! {
         /// scanned. Minimum 250.
         interval_ms: u64 = 1000 => Live,
         /// The safety rescan of the working tree while a tab shows it, in seconds. Between them
-        /// the scan runs only when the OS reports a file change, so a missed event costs at most
-        /// this long. Minimum 5.
+        /// the scan runs only when the OS reports a file change. A change usually shows within
+        /// about a second. On a heavily loaded Mac the OS can drop a file change without a word,
+        /// and then it shows within this many seconds, so lower it for a tighter bound (each
+        /// rescan costs a full status). Minimum 5.
         rescan_secs: u64 = 30 => Live,
     }
     index: Index {

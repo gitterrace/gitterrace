@@ -62,7 +62,7 @@ Exceptions, each on purpose:
 | --- | --- | --- | --- |
 | `enabled` | bool | `true` | Notice new commits and refs while running. Off means a restart or a reload is needed. |
 | `interval_ms` | integer | `1000` | How often to check each served repository's HEAD, refs and index for changes, in milliseconds. A check is a few `stat` calls. Where OS file events are unavailable (the watch limit, some network volumes) it is also how often the working tree is scanned. Minimum 250. |
-| `rescan_secs` | integer | `30` | The safety rescan of the working tree while a tab shows it, in seconds. Between them the scan runs only when the OS reports a file change, so a missed event costs at most this long. Minimum 5. |
+| `rescan_secs` | integer | `30` | The safety rescan of the working tree while a tab shows it, in seconds. Between them the scan runs only when the OS reports a file change. A change usually shows within about a second. On a heavily loaded Mac the OS can drop a file change without a word, and then it shows within this many seconds, so lower it for a tighter bound (each rescan costs a full status). Minimum 5. |
 
 ## `[index]`
 

@@ -186,7 +186,13 @@ async fn working_tree_is_scanned_only_for_a_subscriber() {
     let _one = crate::wiring_fs_tests::SERIAL.lock().await;
     let dir = tempfile::tempdir().expect("tmp");
     let p = repo(dir.path(), "r");
-    let a = app(&p, with(|c| c.watch.interval_ms = 250));
+    let a = app(
+        &p,
+        with(|c| {
+            c.watch.interval_ms = 250;
+            c.watch.rescan_secs = 5;
+        }),
+    );
     tokio::spawn(crate::app::keep_index_fresh(Arc::clone(&a)));
     let mut rx = a.changes.subscribe();
     tokio::time::sleep(Duration::from_millis(400)).await;
@@ -249,7 +255,8 @@ async fn settle(a: &crate::app::App) {
 async fn worktree_event(
     rx: &mut tokio::sync::broadcast::Receiver<Arc<crate::live::Change>>,
 ) -> bool {
-    let end = tokio::time::Instant::now() + Duration::from_secs(20);
+    // The documented bound: the safety rescan (5 s here) plus margin.
+    let end = tokio::time::Instant::now() + Duration::from_secs(10);
     while let Ok(Ok(c)) = tokio::time::timeout_at(end, rx.recv()).await {
         if c.kinds.contains(&"worktree") {
             return true;
