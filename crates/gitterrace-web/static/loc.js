@@ -10,6 +10,8 @@
   var xh = svg.querySelector(".xh");
   var sel = svg.querySelector(".sel");
   var vb = svg.viewBox.baseVal;
+  // The crosshair tip shows the whole breakdown; the bands' own tips would cover it.
+  svg.querySelectorAll("path[data-tip]").forEach(function (p) { p.removeAttribute("data-tip"); });
   var drag = null;
 
   function fx(ev) {
@@ -34,15 +36,18 @@
     });
   }
   function show(j) {
-    var total = d.l[j].reduce(function (a, b) { return a + Math.max(b, 0); }, 0) || 1;
+    var sum = d.l[j].reduce(function (a, b) { return a + Math.max(b, 0); }, 0);
+    var total = sum || 1;
     var rows = d.names.map(function (n, k) {
       var v = Math.max(d.l[j][k], 0);
       var cls = k === d.names.length - 1 && d.names[k] === "Other" ? "c8" : "c" + Math.min(k + 1, 8);
-      return '<div><i class="dot ' + cls + '"></i><span>' + esc(n) + "</span><b>" +
-        (d.share ? ((v / total) * 100).toFixed(1) + "%" : num(v)) + "</b></div>";
+      var pct = v > 0 && v / total < 0.005 ? "<1%" : Math.round((v / total) * 100) + "%";
+      return '<div><i class="dot ' + cls + '"></i><span>' + esc(n) + "</span><b>" + num(v) +
+        ' <span class="muted">' + pct + "</span></b></div>";
     }).reverse().join("");
     tip.innerHTML = '<p class="s">' + esc(d.s[j] || "(no subject)") + '</p><p class="muted">' +
-      esc(d.d[j]) + " &middot; commit " + num(d.i[j] + 1) + " of " + num(d.n) + "</p>" + rows;
+      esc(d.d[j]) + " &middot; commit " + num(d.i[j] + 1) + " of " + num(d.n) + "</p>" + rows +
+      '<div class="tot"><span>Total</span><b>' + num(sum) + (sum === 1 ? " line" : " lines") + "</b></div>";
     tip.hidden = false;
     var r = svg.getBoundingClientRect();
     var px = (d.x[j] / vb.width) * r.width;

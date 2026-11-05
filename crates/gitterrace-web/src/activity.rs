@@ -147,7 +147,7 @@ fn range_card(from: &str, to: &str, by_weekday: &[u32; 7]) -> RangeCard {
             "commit",
             "commits",
         ),
-        weekdays: charts::bars(&days),
+        weekdays: charts::bars(&days, crate::charttip::COMMITS),
     }
 }
 

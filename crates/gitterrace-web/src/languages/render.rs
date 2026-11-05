@@ -12,6 +12,7 @@ use std::fmt::Write as _;
 use askama::Template;
 
 use crate::charts::ticks;
+use crate::charttip;
 use crate::fmt::{self, esc};
 use crate::languages::chain::Chain;
 use crate::languages::{
@@ -154,11 +155,19 @@ fn area_chart(ch: &Chain, view: View, subj: &Subjects) -> String {
         for (j, x) in xs.iter().enumerate().rev() {
             let _ = write!(d, "L{x:.1},{:.1}", yat(base[j]));
         }
+        // Without the script a band's tip reads the newest shown point; the script shows the
+        // hovered date's full breakdown instead.
+        let last = pts.len() - 1;
         let _ = write!(
             svg,
-            r#"<path class="{}" d="{d}Z" data-tip="{}"/>"#,
+            r#"<path class="{}" d="{d}Z"{}/>"#,
             cat(lang, k),
-            esc(&ch.langs()[lang])
+            charttip::attr(&charttip::part(
+                &format!("{}, {}", ch.langs()[lang], fmt::day(ch.time(pts[last]))),
+                rows[last][lang].max(0) as u64,
+                totals[last].max(0) as u64,
+                charttip::LINES
+            ))
         );
         base = top;
     }
@@ -378,11 +387,15 @@ fn languages_now(ch: &Chain) -> String {
         if f > 0.0 {
             let _ = write!(
                 bar,
-                r#"<b class="{} w{}" data-tip="{} {}"></b>"#,
+                r#"<b class="{} w{}"{}></b>"#,
                 cat(i, k),
                 (f * 100.0).round().clamp(1.0, 100.0) as u32,
-                esc(&ch.langs()[i]),
-                share_label(f)
+                charttip::attr(&charttip::part(
+                    &ch.langs()[i],
+                    last[i].max(0) as u64,
+                    total.max(0) as u64,
+                    charttip::LINES
+                ))
             );
         }
     }

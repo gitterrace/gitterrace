@@ -3,6 +3,7 @@
 
 use std::fmt::Write as _;
 
+use crate::charttip::{self, COMMITS, Unit};
 use crate::fmt::{self, esc};
 
 const W: f64 = 960.0;
@@ -140,18 +141,20 @@ fn open_svg(label: &str) -> String {
     )
 }
 
-/// Vertical bars, one per `(label, value)`, scaled to the full container width.
-pub(crate) fn bars(points: &[(String, u64)]) -> String {
-    bars_with(points, None)
+/// Vertical bars, one per `(label, value)` counted in `unit`, scaled to the full container
+/// width. A bar's tip gives its share of all bars.
+pub(crate) fn bars(points: &[(String, u64)], unit: Unit) -> String {
+    bars_with(points, None, unit)
 }
 
 /// [`bars`] with every bar a link to `links[i]`, for keyboard and pointer alike.
 pub(crate) fn linked_bars(points: &[(String, u64)], links: &[String]) -> String {
-    bars_with(points, Some(links))
+    bars_with(points, Some(links), COMMITS)
 }
 
-fn bars_with(points: &[(String, u64)], links: Option<&[String]>) -> String {
+fn bars_with(points: &[(String, u64)], links: Option<&[String]>, unit: Unit) -> String {
     let max = points.iter().map(|p| p.1).max().unwrap_or(0);
+    let all: u64 = points.iter().map(|p| p.1).sum();
     let (grid, top) = axis(max);
     let sl = slot(points.len());
     let bw = (sl * 0.62).min(48.0);
@@ -174,9 +177,8 @@ fn bars_with(points: &[(String, u64)], links: Option<&[String]>) -> String {
         }
         let _ = write!(
             svg,
-            r#"<g class="col" data-tip="{}: {}"><rect class="hit" x="{:.1}" y="{TOP_PAD}" width="{sl:.1}" height="{plot:.1}"/><rect class="bar" x="{x:.1}" y="{y:.1}" width="{bw:.1}" height="{h:.1}" rx="2"/></g>"#,
-            esc(label),
-            fmt::thousands(v),
+            r#"<g class="col"{}><rect class="hit" x="{:.1}" y="{TOP_PAD}" width="{sl:.1}" height="{plot:.1}"/><rect class="bar" x="{x:.1}" y="{y:.1}" width="{bw:.1}" height="{h:.1}" rx="2"/></g>"#,
+            charttip::attr(&charttip::part(label, *v, all, unit)),
             x - (sl - bw) / 2.0
         );
         if link.is_some() {
@@ -230,12 +232,15 @@ pub(crate) fn stacked(buckets: &[gitterrace_index::LabelBucket]) -> String {
     for (i, col) in cols.iter().enumerate() {
         let x = (i as f64).mul_add(sl, LEFT) + (sl - bw) / 2.0;
         let mut y = TOP_PAD + plot;
-        let key = esc(&buckets[i].label);
-        let total: u64 = col.iter().sum();
+        let parts: Vec<(&str, u64)> = col
+            .iter()
+            .enumerate()
+            .map(|(k, v)| (names.get(k).copied().unwrap_or("other"), *v))
+            .collect();
         let _ = write!(
             svg,
-            r#"<g class="col" data-tip="{key}: {}"><rect class="hit" x="{:.1}" y="{TOP_PAD}" width="{sl:.1}" height="{plot:.1}"/>"#,
-            fmt::thousands(total),
+            r#"<g class="col"{}><rect class="hit" x="{:.1}" y="{TOP_PAD}" width="{sl:.1}" height="{plot:.1}"/>"#,
+            charttip::attr(&charttip::breakdown(&buckets[i].label, &parts, COMMITS)),
             x - (sl - bw) / 2.0
         );
         for (k, v) in col.iter().enumerate() {
@@ -303,10 +308,12 @@ pub(crate) fn diverging(points: &[(String, u64, u64)], title: &str) -> String {
         let (ha, hd) = (*a as f64 / top * half, *d as f64 / top * half);
         let _ = write!(
             svg,
-            r#"<g class="col" data-tip="{}: +{} / -{}"><rect class="hit" x="{:.1}" y="{TOP_PAD}" width="{sl:.1}" height="{:.1}"/><rect class="up" x="{x:.1}" y="{:.1}" width="{bw:.1}" height="{ha:.1}"/><rect class="dn" x="{x:.1}" y="{mid:.1}" width="{bw:.1}" height="{hd:.1}"/></g>"#,
-            esc(label),
-            fmt::thousands(a),
-            fmt::thousands(d),
+            r#"<g class="col"{}><rect class="hit" x="{:.1}" y="{TOP_PAD}" width="{sl:.1}" height="{:.1}"/><rect class="up" x="{x:.1}" y="{:.1}" width="{bw:.1}" height="{ha:.1}"/><rect class="dn" x="{x:.1}" y="{mid:.1}" width="{bw:.1}" height="{hd:.1}"/></g>"#,
+            charttip::attr(&charttip::breakdown(
+                &format!("{label}, lines changed"),
+                &[("added", *a), ("removed", *d)],
+                charttip::LINES
+            )),
             x - (sl - bw) / 2.0,
             half * 2.0,
             mid - ha
@@ -340,9 +347,12 @@ pub(crate) fn percent_line(points: &[(String, Option<f64>)]) -> String {
             let y = v.clamp(0.0, 1.0).mul_add(-plot, TOP_PAD + plot);
             let _ = write!(
                 svg,
-                r#"<g class="col" data-tip="{}: {:.0}%"><rect class="hit" x="{x:.1}" y="{TOP_PAD}" width="{sl:.1}" height="{plot:.1}"/><circle class="dot" cx="{:.1}" cy="{y:.1}" r="3.5"/></g>"#,
-                esc(label),
-                v * 100.0,
+                r#"<g class="col"{}><rect class="hit" x="{x:.1}" y="{TOP_PAD}" width="{sl:.1}" height="{plot:.1}"/><circle class="dot" cx="{:.1}" cy="{y:.1}" r="3.5"/></g>"#,
+                charttip::attr(&charttip::rate(
+                    label,
+                    *v,
+                    "of changed lines replaced existing code"
+                )),
                 x + sl / 2.0
             );
         }
@@ -429,9 +439,9 @@ pub(crate) fn scatter(dots: &[Dot], x_title: &str) -> String {
         );
         let _ = write!(
             svg,
-            r#"<a href="{}"><circle class="dot-pt" cx="{cx:.1}" cy="{cy:.1}" r="{r:.1}" data-tip="{}"/></a>"#,
+            r#"<a href="{}"><circle class="dot-pt" cx="{cx:.1}" cy="{cy:.1}" r="{r:.1}"{}/></a>"#,
             esc(&d.href),
-            esc(&d.title)
+            charttip::attr(&d.title)
         );
     }
     let _ = write!(
@@ -452,6 +462,7 @@ pub(crate) fn heatmap(cells: &[[u32; 24]; 7], max: u32) -> String {
     const TOP: usize = 20;
     let w = LEFT + 24 * CELL;
     let h = TOP + 7 * CELL;
+    let all: u64 = cells.iter().flatten().map(|v| u64::from(*v)).sum();
     let mut svg = format!(
         r#"<svg class="chart heat" viewBox="0 0 {w} {h}" role="img" aria-label="Commits by weekday and hour">"#
     );
@@ -478,12 +489,16 @@ pub(crate) fn heatmap(cells: &[[u32; 24]; 7], max: u32) -> String {
             };
             let _ = write!(
                 svg,
-                r#"<rect class="h{level}" x="{}" y="{y}" width="{}" height="{}" rx="4" data-tip="{} {hr:02}:00, {}"/>"#,
+                r#"<rect class="h{level}" x="{}" y="{y}" width="{}" height="{}" rx="4"{}/>"#,
                 LEFT + hr * CELL,
                 CELL - 4,
                 CELL - 4,
-                DAYS[d],
-                crate::fmt::count(*v, "commit", "commits")
+                charttip::attr(&charttip::part(
+                    &format!("{} {hr:02}:00", DAYS[d]),
+                    u64::from(*v),
+                    all,
+                    COMMITS
+                ))
             );
         }
     }

@@ -1,0 +1,103 @@
+//! Every chart mark's hover names what it is, its value with a unit and, where it is part of a
+//! column, its share and the column total. Charts never write their own `data-tip`: one builder
+//! writes them all, so no chart can drop the total again.
+
+use std::path::Path;
+
+use gitterrace_testkit::{Fixture, page};
+
+/// The `data-tip` values inside the `<svg>` charts and share bars of `body`.
+fn chart_tips(body: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    let mut scopes: Vec<&str> = body
+        .split("<svg class=\"chart")
+        .skip(1)
+        .map(|c| c.split("</svg>").next().unwrap_or_default())
+        .collect();
+    scopes.extend(
+        body.split("class=\"sharebar\"")
+            .skip(1)
+            .map(|c| c.split("</div>").next().unwrap_or_default()),
+    );
+    for c in scopes {
+        for t in c.split("data-tip=\"").skip(1) {
+            out.push(t.split('"').next().unwrap_or_default().to_owned());
+        }
+    }
+    out
+}
+
+/// What a tip lacks: a number with a unit, and for a part of a column its share and total.
+fn lacks(tip: &str) -> Option<&'static str> {
+    if !tip.chars().any(|c| c.is_ascii_digit()) {
+        return Some("no number");
+    }
+    if !tip.contains('%') {
+        return Some("no share");
+    }
+    if !(tip.contains(" of ") || tip.contains(", ")) {
+        return Some("no total");
+    }
+    None
+}
+
+#[test]
+fn a_tip_naming_only_its_mark_is_caught() {
+    // The languages area once named the language alone, the share bar a name and a share.
+    assert_eq!(lacks("Rust"), Some("no number"));
+    assert_eq!(lacks("Rust 62.0%"), Some("no total"));
+    assert_eq!(
+        lacks("Rust, 4 May 2026: 41,230 lines (62%) of 66,500"),
+        None
+    );
+    assert_eq!(
+        lacks("Q1 2026: 40 commits: feat 30 (75%), fix 10 (25%)"),
+        None
+    );
+}
+
+#[tokio::test]
+async fn every_chart_tip_carries_value_share_and_total() {
+    let dir = tempfile::tempdir().expect("tmp");
+    let mut f = Fixture::init(dir.path())
+        .write("src/a.rs", "fn main() {}\n")
+        .write("x.py", "a = 1\n")
+        .commit("feat(core): first");
+    for n in 0..3 {
+        f = f
+            .write("src/a.rs", &format!("fn main() {{ {n} }}\n"))
+            .write("x.py", &format!("a = {n}\nb = 2\n"))
+            .commit("fix(core): next");
+    }
+    let router = gitterrace_web::app_router(f.path()).expect("router");
+    gitterrace_testkit::oracle::ready(&router).await;
+    let mut fails = Vec::new();
+    let mut seen = 0;
+    for p in ["/stats", "/stats/hotspots", "/stats/languages"] {
+        let (status, body) = page(&router, p).await;
+        assert_eq!(status, 200, "{p}");
+        for t in chart_tips(&body) {
+            seen += 1;
+            if let Some(why) = lacks(&t) {
+                fails.push(format!("{p}: {why}: {t}"));
+            }
+        }
+    }
+    assert!(seen > 20, "only {seen} chart tips");
+    assert!(fails.is_empty(), "{}", fails.join("\n"));
+}
+
+/// Only the builder writes a chart's `data-tip`.
+#[test]
+fn charts_write_no_tip_by_hand() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
+    let mut bad = Vec::new();
+    for f in ["charts.rs", "languages/render.rs"] {
+        let text = std::fs::read_to_string(root.join(f)).expect("read");
+        let code = text.split("#[cfg(test)]").next().unwrap_or_default();
+        if code.contains("data-tip=") {
+            bad.push(f);
+        }
+    }
+    assert!(bad.is_empty(), "hand-written chart tip in {bad:?}");
+}

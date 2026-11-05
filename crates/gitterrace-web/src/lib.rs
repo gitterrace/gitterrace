@@ -8,6 +8,7 @@ mod app;
 mod bounded;
 mod caches;
 mod charts;
+mod charttip;
 mod commit_line;
 mod commit_types;
 mod compare;

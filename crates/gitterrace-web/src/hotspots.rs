@@ -74,9 +74,13 @@ pub(crate) async fn page(
                 size: h.authors as u64,
                 href: views::file_link(&h.path),
                 title: format!(
-                    "{}: {}, {}, {}",
-                    h.path,
-                    fmt::count(h.changes, "change", "changes"),
+                    "{}, {}, {}",
+                    crate::charttip::part(
+                        &h.path,
+                        h.changes as u64,
+                        rep.total_changes as u64,
+                        crate::charttip::CHANGES
+                    ),
                     fmt::count(h.lines, "line", "lines"),
                     fmt::count(h.authors, "author", "authors")
                 ),

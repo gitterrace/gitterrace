@@ -1,8 +1,9 @@
 use crate::charts::{bars, diverging, heatmap, label_every, pct, percent_line, ticks};
+use crate::charttip::COMMITS;
 
 #[test]
 fn bars_escape_labels_and_scale() {
-    let svg = bars(&[("<a>".to_owned(), 5), ("b".to_owned(), 0)]);
+    let svg = bars(&[("<a>".to_owned(), 5), ("b".to_owned(), 0)], COMMITS);
     assert!(svg.contains("&lt;a&gt;"));
     assert!(!svg.contains("<a>"));
     assert_eq!(svg.matches(r#"class="bar""#).count(), 2);
@@ -37,7 +38,7 @@ fn hover_bands_paint_under_the_data() {
     let path = line.find(r#"class="line""#).expect("line");
     assert!(last_hit < path, "hover band drawn over the line");
     for svg in [
-        bars(&[("a".to_owned(), 3), ("b".to_owned(), 1)]),
+        bars(&[("a".to_owned(), 3), ("b".to_owned(), 1)], COMMITS),
         diverging(&[("a".to_owned(), 3, 1)], "t"),
     ] {
         for col in svg.split(r#"<g class="col">"#).skip(1) {
@@ -112,7 +113,7 @@ fn labels_step_by_calendar() {
         .map(|i| format!("Q{} {}", i % 4 + 1, 2016 + i / 4))
         .collect();
     let pts: Vec<(String, u64)> = keys.iter().map(|k| (k.clone(), 1)).collect();
-    let svg = bars(&pts);
+    let svg = bars(&pts, COMMITS);
     let shown: Vec<&str> = svg
         .split(r#"text-anchor="middle">"#)
         .skip(1)
