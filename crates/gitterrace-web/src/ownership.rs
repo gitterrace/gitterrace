@@ -48,6 +48,11 @@ fn dir_label(path: &str) -> String {
     }
 }
 
+/// An owner whose share rounds to 0% holds nothing the table can show, and is not counted.
+fn shown(o: &gitterrace_index::Owner) -> bool {
+    o.share * 100.0 >= 0.5
+}
+
 pub(crate) async fn page(
     State(app): Shared,
     RawQuery(raw): RawQuery,
@@ -72,6 +77,7 @@ pub(crate) async fn page(
             owners: d
                 .owners
                 .iter()
+                .filter(|o| shown(o))
                 .take(3)
                 .map(|o| (o.name.clone(), format!("{:.0}%", o.share * 100.0)))
                 .collect(),
@@ -89,7 +95,11 @@ pub(crate) async fn page(
             tabs: views::stats_tabs("ow"),
             fb: f.bar("/stats/ownership", &**r, period_of(&q, &d, Period::All)),
             opts: q.row(&d, "/stats/ownership"),
-            lead: crate::lead::ownership(rep.overall.bus_factor, rep.dirs_with_bus_factor_one),
+            lead: crate::lead::ownership(
+                rep.overall.bus_factor,
+                rep.overall.owners.iter().filter(|o| shown(o)).count(),
+                rep.dirs_with_bus_factor_one,
+            ),
             kpis: vec![
                 Kpi("Bus factor", fmt::thousands(rep.overall.bus_factor)),
                 Kpi("Solo lines", fmt::thousands(rep.solo_lines)),

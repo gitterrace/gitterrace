@@ -68,15 +68,21 @@ pub(crate) fn hotspots(files: usize, concentration: f64) -> String {
 }
 
 /// Ownership: how few people hold half of the code, and where one person holds it alone.
-pub(crate) fn ownership(bus_factor: usize, dirs_at_one: usize) -> String {
+/// `owners` counts everyone with a share of the code the page shows; when that is one person,
+/// the sentence says they wrote it all instead of the odd "1 person holds half".
+pub(crate) fn ownership(bus_factor: usize, owners: usize, dirs_at_one: usize) -> String {
     if bus_factor == 0 {
         return String::new();
     }
-    let hold = format!(
-        "{} {} half of the code",
-        count(bus_factor, "person", "people"),
-        noun(bus_factor, "holds", "hold")
-    );
+    let hold = if owners <= 1 {
+        "One person wrote all of the code".to_owned()
+    } else {
+        format!(
+            "{} {} half of the code",
+            count(bus_factor, "person", "people"),
+            noun(bus_factor, "holds", "hold")
+        )
+    };
     let dirs = match dirs_at_one {
         0 => "No directory has a single owner.".to_owned(),
         1 => "1 directory has a single owner.".to_owned(),
@@ -145,14 +151,22 @@ mod tests {
     #[test]
     fn ownership_counts_people_and_lone_directories() {
         assert_eq!(
-            ownership(3, 25),
+            ownership(3, 9, 25),
             "3 people hold half of the code. 25 directories have a single owner."
         );
         assert_eq!(
-            ownership(1, 1),
+            ownership(1, 4, 1),
             "1 person holds half of the code. 1 directory has a single owner."
         );
-        assert_eq!(ownership(0, 0), "");
+        assert_eq!(ownership(0, 0, 0), "");
+    }
+
+    #[test]
+    fn a_single_author_wrote_all_of_the_code() {
+        assert_eq!(
+            ownership(1, 1, 3),
+            "One person wrote all of the code. 3 directories have a single owner."
+        );
     }
 
     #[test]

@@ -369,6 +369,7 @@ svg.loc .xh{display:none;stroke:var(--fg);stroke-width:1;stroke-dasharray:3 3;po
 .fold{margin-top:var(--space-16);scroll-margin-top:calc(var(--header-h) + var(--space-4))}
 .fold-h{font-size:var(--text-lg);margin:0 0 var(--space-2);padding-top:var(--space-4);border-top:var(--border)}
 [id].chart-head{scroll-margin-top:calc(var(--header-h) + var(--space-4))}
+table.own b.warn{color:var(--warn);font-weight:var(--weight-semibold)}
 .lead{font-size:var(--text-md);line-height:var(--leading-tight);color:var(--fg);margin:var(--space-4) 0 var(--space-2)}
 .optline{font-size:var(--text-xs);color:var(--muted);margin:calc(-1 * var(--space-2)) 0 var(--space-4)}.optline a{color:var(--muted)}.optline a.on{color:var(--accent-fg)}.optline a:hover{color:var(--fg)}
 .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:var(--space-4);margin:var(--space-2) 0 var(--space-4)}

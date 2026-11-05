@@ -9,6 +9,6 @@
 <div class="chart-head"><div><h2>Owners by directory</h2><p class="hint">Share of the knowledge per person, from who changed the files and how much. Bus factor is how many people together hold at least half. Click a directory to filter every page to it.</p></div></div>
 <div class="card"><table class="entries own">
 <tr class="th"><td>Directory</td><td class="r">Lines</td><td class="r">Files</td><td>Owners</td><td class="r">Bus factor</td></tr>
-{% for r in rows %}<tr><td><a href="{{ r.href }}">{{ r.path }}</a></td><td class="r">{{ r.lines }}</td><td class="r">{{ r.files }}</td><td>{% for o in r.owners %}{% if !loop.first %} · {% endif %}{{ o.0 }} <span class="muted">{{ o.1 }}</span>{% endfor %}</td><td class="r"><b{% if r.bus == 1 %} class="del"{% endif %}>{{ r.bus }}</b></td></tr>{% endfor %}
+{% for r in rows %}<tr><td><a href="{{ r.href }}">{{ r.path }}</a></td><td class="r">{{ r.lines }}</td><td class="r">{{ r.files }}</td><td>{% for o in r.owners %}{% if !loop.first %} · {% endif %}{{ o.0 }} <span class="muted">{{ o.1 }}</span>{% endfor %}</td><td class="r">{% if r.bus == 1 %}<b class="warn" data-tip="One person holds half of this directory">1</b>{% else %}{{ r.bus }}{% endif %}</td></tr>{% endfor %}
 </table></div>
 {% endblock %}
