@@ -25,6 +25,57 @@ use gitterrace_git::Repo;
 
 use crate::multi::{Added, Kept, Table};
 
+/// Why a path cannot be added. The text goes back to the caller of `POST /_repos`.
+#[derive(Debug, thiserror::Error)]
+enum RootError {
+    #[error("path must be absolute")]
+    NotAbsolute,
+    #[error("cannot read {}: {source}", path.display())]
+    Unreadable {
+        path: PathBuf,
+        source: std::io::Error,
+    },
+    #[error("path must be canonical: no symlinks, `.` or `..`")]
+    NotCanonical,
+    #[error("not a folder")]
+    NotFolder,
+    #[error("not a git repository")]
+    NotRepo,
+    #[error("not the top folder of a git repository (that is {})", top.display())]
+    NotTop { top: PathBuf },
+    #[error("this repository holds actions.toml")]
+    HoldsActions,
+}
+
+/// Every body `/_repos` answers with. Absent keys stay absent.
+#[derive(serde::Serialize)]
+struct AddReply<'a> {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    base: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    error: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    name: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    proof: Option<&'a str>,
+}
+
+impl<'a> AddReply<'a> {
+    const NONE: Self = Self {
+        base: None,
+        error: None,
+        name: None,
+        proof: None,
+    };
+
+    const fn error(why: &'a str) -> Self {
+        Self {
+            error: Some(why),
+            ..Self::NONE
+        }
+    }
+}
+
 /// Header carrying the secret from the token file.
 pub const TOKEN_HEADER: &str = "x-gitterrace-add-token";
 /// Not configurable: a request body bound against hostile pages posting to the local server.
@@ -77,7 +128,10 @@ async fn prove(
     }
     reply(
         StatusCode::OK,
-        &serde_json::json!({ "proof": adder.token.prove(&c.nonce) }),
+        &AddReply {
+            proof: Some(&adder.token.prove(&c.nonce)),
+            ..AddReply::NONE
+        },
     )
 }
 
@@ -95,7 +149,7 @@ fn refusal(h: &HeaderMap, token: &Token) -> Option<&'static str> {
     None
 }
 
-fn reply(status: StatusCode, body: &serde_json::Value) -> Response {
+fn reply(status: StatusCode, body: &AddReply<'_>) -> Response {
     (
         status,
         [(header::CACHE_CONTROL, "no-store")],
@@ -105,10 +159,7 @@ fn reply(status: StatusCode, body: &serde_json::Value) -> Response {
 }
 
 fn bad(why: &str) -> Response {
-    reply(
-        StatusCode::BAD_REQUEST,
-        &serde_json::json!({ "error": why }),
-    )
+    reply(StatusCode::BAD_REQUEST, &AddReply::error(why))
 }
 
 async fn add(State(adder): State<Arc<Adder>>, req: Request) -> Response {
@@ -128,7 +179,7 @@ async fn add(State(adder): State<Arc<Adder>>, req: Request) -> Response {
     .await;
     let (root, stem) = match checked {
         Ok(Ok(found)) => found,
-        Ok(Err(why)) => return bad(&why),
+        Ok(Err(why)) => return bad(&why.to_string()),
         Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
     };
     let served = match adder.table.add(root.clone(), &stem) {
@@ -136,10 +187,15 @@ async fn add(State(adder): State<Arc<Adder>>, req: Request) -> Response {
         Ok(Added::Present { name, base }) => {
             return reply(
                 StatusCode::CONFLICT,
-                &serde_json::json!({ "name": name, "base": base, "error": "already served" }),
+                &AddReply {
+                    base: Some(&base),
+                    error: Some("already served"),
+                    name: Some(&name),
+                    proof: None,
+                },
             );
         }
-        Err(stem) => return bad(&format!("unusable repository name {stem:?}")),
+        Err(e) => return bad(&e.to_string()),
     };
     // Build now: starts the index refresher and the warm-up, as a startup repository gets. A
     // repository that will not open is taken out again and never remembered, so it does not
@@ -150,7 +206,7 @@ async fn add(State(adder): State<Arc<Adder>>, req: Request) -> Response {
         adder.table.remove(&served.name);
         return reply(
             StatusCode::UNPROCESSABLE_ENTITY,
-            &serde_json::json!({ "error": format!("cannot open the repository: {e}") }),
+            &AddReply::error(&format!("cannot open the repository: {e}")),
         );
     }
     match Repo::discover(&root) {
@@ -168,7 +224,11 @@ async fn add(State(adder): State<Arc<Adder>>, req: Request) -> Response {
     adder.table.announce();
     reply(
         StatusCode::CREATED,
-        &serde_json::json!({ "name": served.name, "base": format!("/r/{}/", served.name) }),
+        &AddReply {
+            base: Some(&format!("/r/{}/", served.name)),
+            name: Some(&served.name),
+            ..AddReply::NONE
+        },
     )
 }
 
@@ -201,15 +261,18 @@ async fn remove(State(adder): State<Arc<Adder>>, req: Request) -> Response {
             adder.site.drop_target(&name);
             tracing::info!("removed {name}");
             adder.table.announce();
-            reply(StatusCode::OK, &serde_json::json!({ "name": name }))
+            reply(
+                StatusCode::OK,
+                &AddReply {
+                    name: Some(&name),
+                    ..AddReply::NONE
+                },
+            )
         }
-        Err(Kept::NotServed) => reply(
-            StatusCode::NOT_FOUND,
-            &serde_json::json!({ "error": "not served" }),
-        ),
+        Err(Kept::NotServed) => reply(StatusCode::NOT_FOUND, &AddReply::error("not served")),
         Err(Kept::Last) => reply(
             StatusCode::CONFLICT,
-            &serde_json::json!({ "error": "the last repository stays; stop the server instead" }),
+            &AddReply::error("the last repository stays; stop the server instead"),
         ),
     }
 }
@@ -218,31 +281,73 @@ async fn remove(State(adder): State<Arc<Adder>>, req: Request) -> Response {
 /// canonical (no symlink, `..` or `.` anywhere), so the folder checked is the folder served.
 /// A folder inside a repository is not one: only its top folder is. A repository holding the
 /// actions file is refused, as at startup.
-fn checked_root(path: &Path, actions_file: Option<&Path>) -> Result<(PathBuf, String), String> {
+fn checked_root(path: &Path, actions_file: Option<&Path>) -> Result<(PathBuf, String), RootError> {
     if !path.is_absolute() {
-        return Err("path must be absolute".to_owned());
+        return Err(RootError::NotAbsolute);
     }
     let canon = path
         .canonicalize()
-        .map_err(|e| format!("cannot read {}: {e}", path.display()))?;
+        .map_err(|source| RootError::Unreadable {
+            path: path.to_owned(),
+            source,
+        })?;
     if canon != path {
-        return Err("path must be canonical: no symlinks, `.` or `..`".to_owned());
+        return Err(RootError::NotCanonical);
     }
     if !canon.is_dir() {
-        return Err("not a folder".to_owned());
+        return Err(RootError::NotFolder);
     }
-    let repo = Repo::discover(&canon).map_err(|_| "not a git repository".to_owned())?;
+    let repo = Repo::discover(&canon).map_err(|_| RootError::NotRepo)?;
     let root = repo.root();
     if root != canon {
-        return Err(format!(
-            "not the top folder of a git repository (that is {})",
-            root.display()
-        ));
+        return Err(RootError::NotTop { top: root });
     }
     if actions_file.is_some_and(|f| f.canonicalize().is_ok_and(|f| f.starts_with(&root))) {
-        return Err("this repository holds actions.toml".to_owned());
+        return Err(RootError::HoldsActions);
     }
     Ok((root, repo.name()))
+}
+
+#[cfg(test)]
+mod error_tests {
+    use super::*;
+
+    #[test]
+    fn root_errors_keep_their_text() {
+        assert_eq!(RootError::NotAbsolute.to_string(), "path must be absolute");
+        assert_eq!(
+            RootError::NotCanonical.to_string(),
+            "path must be canonical: no symlinks, `.` or `..`"
+        );
+        assert_eq!(RootError::NotFolder.to_string(), "not a folder");
+        assert_eq!(RootError::NotRepo.to_string(), "not a git repository");
+        assert_eq!(
+            RootError::NotTop { top: "/r".into() }.to_string(),
+            "not the top folder of a git repository (that is /r)"
+        );
+        assert_eq!(
+            RootError::HoldsActions.to_string(),
+            "this repository holds actions.toml"
+        );
+    }
+
+    #[test]
+    fn replies_omit_absent_keys_and_sort_the_rest() {
+        let body = serde_json::to_string(&AddReply {
+            base: Some("/r/a/"),
+            error: Some("already served"),
+            name: Some("a"),
+            proof: None,
+        })
+        .expect("json");
+        assert_eq!(
+            body,
+            serde_json::json!({ "name": "a", "base": "/r/a/", "error": "already served" })
+                .to_string()
+        );
+        let body = serde_json::to_string(&AddReply::error("x")).expect("json");
+        assert_eq!(body, r#"{"error":"x"}"#);
+    }
 }
 
 #[cfg(test)]

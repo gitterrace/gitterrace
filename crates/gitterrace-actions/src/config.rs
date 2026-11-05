@@ -16,8 +16,8 @@ use std::time::Duration;
 
 use serde::Deserialize;
 
-use crate::config::command::check_command;
-pub use crate::config::command::pieces;
+pub use crate::config::command::{PieceError, pieces};
+use crate::config::command::{StdinError, check_command};
 use crate::config::program::{expand_tilde, resolve_program};
 pub use crate::config::reload::Reloader;
 use crate::config::trust::check_file;
@@ -250,7 +250,8 @@ impl Config {
             if scripts.contains_key(&sc.id) {
                 return Err(script_err(&sc.id, "duplicate id"));
             }
-            check_command(&sc.command, sc.shell, None).map_err(|why| script_err(&sc.id, why))?;
+            check_command(&sc.command, sc.shell, None)
+                .map_err(|why| script_err(&sc.id, why.to_string()))?;
             scripts.insert(sc.id.clone(), sc);
         }
         let mut seen = HashSet::new();
@@ -284,7 +285,8 @@ impl Config {
         for raw_send in raw.send {
             let id = raw_send.id().to_owned();
             let enabled = raw_send.enabled;
-            let target = crate::send::compile(raw_send).map_err(|why| send_err(&id, why))?;
+            let target =
+                crate::send::compile(raw_send).map_err(|why| send_err(&id, why.to_string()))?;
             if !valid_id(&id) {
                 return Err(send_err(&id, "id must match [a-z0-9-]{1,32}"));
             }
@@ -402,8 +404,9 @@ fn validate(
             )
         }
     };
-    check_command(&command, shell, Some(&a.vars)).map_err(|why| invalid(&id, why))?;
-    let stdin = parse_stdin(a.stdin.or(base_stdin).as_deref()).map_err(|why| invalid(&id, why))?;
+    check_command(&command, shell, Some(&a.vars)).map_err(|why| invalid(&id, why.to_string()))?;
+    let stdin = parse_stdin(a.stdin.or(base_stdin).as_deref())
+        .map_err(|why| invalid(&id, why.to_string()))?;
     let argv = match (shell, command) {
         (false, RawCommand::Argv(v)) if !v.is_empty() => {
             let mut v = v;
@@ -499,12 +502,12 @@ fn parse_key(key: Option<&str>) -> Result<Option<char>, &'static str> {
     }
 }
 
-fn parse_stdin(value: Option<&str>) -> Result<Stdin, String> {
+fn parse_stdin(value: Option<&str>) -> Result<Stdin, StdinError> {
     match value {
         None | Some("json") => Ok(Stdin::Json),
         Some("markdown") => Ok(Stdin::Markdown),
         Some("none") => Ok(Stdin::None),
-        Some(other) => Err(format!("stdin = {other:?}: use json, markdown or none")),
+        Some(other) => Err(StdinError(other.to_owned())),
     }
 }
 

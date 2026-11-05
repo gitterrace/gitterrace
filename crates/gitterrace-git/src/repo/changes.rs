@@ -6,7 +6,7 @@ use std::sync::{Arc, Mutex, OnceLock};
 
 use gix::object::tree::diff::ChangeDetached;
 
-use crate::{Error, Result};
+use crate::Result;
 
 /// Commits whose change lists are kept. An export fetches a batch of commit pages at once (two
 /// per core) and their folded files right after, so this covers a batch on a large machine.
@@ -15,7 +15,7 @@ const KEEP_COMMITS: usize = 64;
 
 type Changes = Arc<Vec<ChangeDetached>>;
 /// Filled once; a thread asking while another computes it waits instead of diffing again.
-type Slot = Arc<OnceLock<std::result::Result<Changes, String>>>;
+type Slot = Arc<OnceLock<Result<Changes>>>;
 
 /// The newest commits' tree diffs, oldest first.
 ///
@@ -41,13 +41,13 @@ impl ChangeMemo {
         diff: impl FnOnce() -> Result<Vec<ChangeDetached>>,
     ) -> Result<Changes> {
         let slot = self.slot(commit);
-        let got = slot.get_or_init(|| diff().map(Arc::new).map_err(|e| e.to_string()));
+        let got = slot.get_or_init(|| diff().map(Arc::new));
         match got {
             Ok(changes) => Ok(Arc::clone(changes)),
             Err(e) => {
                 // A failure is not kept: the next request tries again.
                 self.forget(commit, &slot);
-                Err(Error::Git(e.clone()))
+                Err(e.clone())
             }
         }
     }

@@ -969,6 +969,7 @@ dependencies = [
  "gitterrace-types",
  "gitterrace-web",
  "rustix",
+ "serde",
  "serde_json",
  "tempfile",
  "thiserror",
@@ -1038,6 +1039,7 @@ version = "0.1.0"
 dependencies = [
  "gitterrace-types",
  "tempfile",
+ "thiserror",
  "toml",
 ]
 

@@ -145,7 +145,7 @@ fn run(a: &App, q: SearchQuery) -> Result<SearchPage> {
     let re = match build_regex(&text, regex, case) {
         Ok(r) => r,
         Err(e) => {
-            page.error = Some(e);
+            page.error = Some(e.to_string());
             return Ok(page);
         }
     };
@@ -192,7 +192,12 @@ fn run(a: &App, q: SearchQuery) -> Result<SearchPage> {
     Ok(page)
 }
 
-fn build_regex(q: &str, is_regex: bool, case: bool) -> std::result::Result<Regex, String> {
+/// The last line of the regex engine's complaint, which is the part a reader needs.
+#[derive(Debug, thiserror::Error)]
+#[error("{0}")]
+struct PatternError(String);
+
+fn build_regex(q: &str, is_regex: bool, case: bool) -> std::result::Result<Regex, PatternError> {
     let pat = if is_regex {
         q.to_owned()
     } else {
@@ -204,11 +209,13 @@ fn build_regex(q: &str, is_regex: bool, case: bool) -> std::result::Result<Regex
         .size_limit(8 * 1024 * 1024)
         .build()
         .map_err(|e| {
-            e.to_string()
-                .lines()
-                .last()
-                .unwrap_or("invalid pattern")
-                .to_owned()
+            PatternError(
+                e.to_string()
+                    .lines()
+                    .last()
+                    .unwrap_or("invalid pattern")
+                    .to_owned(),
+            )
         })
 }
 

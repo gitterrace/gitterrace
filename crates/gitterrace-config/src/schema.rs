@@ -112,25 +112,32 @@ macro_rules! settings {
                 } )* )*
             }
 
-            pub(crate) fn from_table(mut t: toml::Table) -> Result<Self, String> {
+            pub(crate) fn from_table(mut t: toml::Table) -> Result<Self, $crate::ConfigError> {
                 let mut c = Self::default();
                 $(
                     if let Some(v) = t.remove(stringify!($field)) {
                         if let Some(sub) = v.as_table() {
                             $( if let Some(x) = sub.get(stringify!($name)) {
-                                c.$field.$name = <$ty as Show>::from_toml(x).ok_or_else(|| format!(
-                                    "{}.{}: expected {}",
-                                    stringify!($field), stringify!($name), <$ty as Show>::expected()))?;
+                                c.$field.$name = <$ty as Show>::from_toml(x).ok_or_else(|| $crate::ConfigError::Expected {
+                                    key: format!("{}.{}", stringify!($field), stringify!($name)),
+                                    expected: <$ty as Show>::expected(),
+                                })?;
                             } )*
                         }
                     }
                 )*
                 if let Some(r) = t.remove("repo") {
-                    let tbl = r.as_table().ok_or("repo: expected a table of repositories")?;
+                    let tbl = r.as_table().ok_or_else(|| $crate::ConfigError::Expected {
+                        key: "repo".to_owned(),
+                        expected: "a table of repositories".to_owned(),
+                    })?;
                     for (name, o) in tbl {
                         let ex = o.get("exclude").map_or(Ok(Vec::new()), |x| {
                             <Vec<String> as Show>::from_toml(x)
-                                .ok_or_else(|| format!("repo.{name}.exclude: expected list of strings"))
+                                .ok_or_else(|| $crate::ConfigError::Expected {
+                                    key: format!("repo.{name}.exclude"),
+                                    expected: "list of strings".to_owned(),
+                                })
                         })?;
                         let off = repo_features(name, o.get("features"))?;
                         c.repo.insert(name.clone(), RepoOverride { exclude: ex, features_off: off });
@@ -154,28 +161,40 @@ pub struct RepoOverride {
 
 /// The features `[repo.NAME.features]` turns off. Unknown, server-wide or `true` keys are
 /// errors naming the key.
-fn repo_features(name: &str, t: Option<&toml::Value>) -> Result<Vec<Feature>, String> {
+fn repo_features(name: &str, t: Option<&toml::Value>) -> Result<Vec<Feature>, crate::ConfigError> {
+    use crate::ConfigError;
     let Some(t) = t else { return Ok(Vec::new()) };
-    let t = t
-        .as_table()
-        .ok_or_else(|| format!("repo.{name}.features: expected a table"))?;
+    let t = t.as_table().ok_or_else(|| ConfigError::Expected {
+        key: format!("repo.{name}.features"),
+        expected: "a table".to_owned(),
+    })?;
     let mut off = Vec::new();
     for (k, v) in t {
         let id = format!("repo.{name}.features.{k}");
-        let f = Feature::from_key(k).ok_or_else(|| format!("{id}: unknown feature"))?;
+        let f = Feature::from_key(k).ok_or_else(|| ConfigError::Invalid {
+            key: id.clone(),
+            why: "unknown feature".to_owned(),
+        })?;
         if f.is_global_only() {
-            return Err(format!(
-                "{id}: a server-wide feature, set it under [features]"
-            ));
+            return Err(ConfigError::Invalid {
+                key: id,
+                why: "a server-wide feature, set it under [features]".to_owned(),
+            });
         }
         match v.as_bool() {
             Some(false) => off.push(f),
             Some(true) => {
-                return Err(format!(
-                    "{id}: an override only turns a feature off, set it under [features]"
-                ));
+                return Err(ConfigError::Invalid {
+                    key: id,
+                    why: "an override only turns a feature off, set it under [features]".to_owned(),
+                });
             }
-            None => return Err(format!("{id}: expected bool")),
+            None => {
+                return Err(ConfigError::Expected {
+                    key: id,
+                    expected: "bool".to_owned(),
+                });
+            }
         }
     }
     Ok(off)
@@ -404,7 +423,12 @@ settings! {
 impl Config {
     /// Rejects values a running server cannot honour. Errors name the key.
     pub fn validate(&self) -> Result<(), crate::ConfigError> {
-        let bad = |k: &str, why: &str| Err(crate::ConfigError(format!("{k}: {why}")));
+        let bad = |k: &str, why: &str| {
+            Err(crate::ConfigError::Invalid {
+                key: k.to_owned(),
+                why: why.to_owned(),
+            })
+        };
         if self.server.addr.parse::<std::net::SocketAddr>().is_err() {
             return bad(
                 "server.addr",

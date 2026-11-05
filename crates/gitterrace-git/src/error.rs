@@ -1,5 +1,5 @@
 /// Errors from reading a repository.
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, Clone, thiserror::Error)]
 pub enum Error {
     #[error("not a git repository: {0}")]
     NotARepo(String),

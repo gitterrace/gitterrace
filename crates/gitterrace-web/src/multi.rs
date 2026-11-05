@@ -75,6 +75,11 @@ struct Repos {
 }
 
 /// Why [`Table::take`] left the table as it was.
+/// A folder name that cannot be a URL name; holds the name.
+#[derive(Debug, PartialEq, Eq, thiserror::Error)]
+#[error("unusable repository name {0:?}")]
+pub(crate) struct NameError(pub(crate) String);
+
 #[derive(Debug, PartialEq, Eq)]
 pub(crate) enum Kept {
     NotServed,
@@ -133,14 +138,15 @@ impl Table {
             if g.order.iter().any(|s| s.root == root) {
                 continue;
             }
-            let name = table
-                .allocate(&g, &url_stem(&repo.name()), &root)
-                .map_err(|stem| {
-                    io::Error::other(format!(
-                        "unusable repository name {stem:?} for {}",
-                        path.display()
-                    ))
-                })?;
+            let name =
+                table
+                    .allocate(&g, &url_stem(&repo.name()), &root)
+                    .map_err(|NameError(stem)| {
+                        io::Error::other(format!(
+                            "unusable repository name {stem:?} for {}",
+                            path.display()
+                        ))
+                    })?;
             g.insert(name, path, root);
         }
         Ok(table)
@@ -162,9 +168,9 @@ impl Table {
     /// new one, first come first served (`registry::claim`). Without a registry, or when it
     /// cannot be read or written, the same rule against the table alone, so a server always
     /// starts. The stem back when it is not URL-safe.
-    fn allocate(&self, repos: &Repos, stem: &str, root: &Path) -> Result<String, String> {
+    fn allocate(&self, repos: &Repos, stem: &str, root: &Path) -> Result<String, NameError> {
         if !valid_name(stem) {
-            return Err(stem.to_owned());
+            return Err(NameError(stem.to_owned()));
         }
         let taken = |n: &str| repos.order.iter().any(|s| s.name.eq_ignore_ascii_case(n));
         if let Some(dir) = &self.state {
@@ -181,7 +187,7 @@ impl Table {
     /// Adds the repository whose canonical top folder is `root`, named like the startup ones.
     /// A root already served comes back as [`Added::Present`]; check and insert hold one lock,
     /// so two racing additions of the same folder add it once.
-    pub(crate) fn add(&self, root: PathBuf, stem: &str) -> Result<Added, String> {
+    pub(crate) fn add(&self, root: PathBuf, stem: &str) -> Result<Added, NameError> {
         let mut g = self.write();
         if let Some(s) = g.order.iter().find(|s| s.root == root) {
             return Ok(Added::Present {

@@ -30,6 +30,40 @@ pub(crate) enum OpenError {
     Unknown(String),
 }
 
+/// Why a request to the running server's `/_repos` route failed. The text is shown after the
+/// command's own sentence.
+#[derive(Debug, thiserror::Error)]
+pub(crate) enum ServerError {
+    #[error("no state folder to read its secret from")]
+    NoState,
+    #[error("its secret is unreadable: {0}")]
+    Secret(std::io::Error),
+    #[error("{0}")]
+    Io(#[from] std::io::Error),
+    #[error("no answer")]
+    NoAnswer,
+    #[error("it predates adding repositories or does not allow it")]
+    NoAdding,
+    #[error("it predates removing repositories")]
+    NoRemoving,
+    #[error("HTTP {status}: {reason}")]
+    Status { status: u16, reason: String },
+}
+
+/// The body of `POST /_repos`.
+#[derive(serde::Serialize)]
+struct AddBody<'a> {
+    path: &'a Path,
+}
+
+/// The body of `DELETE /_repos`: a repository by top folder or by URL name.
+#[derive(serde::Serialize)]
+#[serde(untagged)]
+enum RemoveBody<'a> {
+    Path { path: PathBuf },
+    Name { name: &'a str },
+}
+
 /// The clone a link resolved to and the `/go` path to open on its server.
 #[derive(Debug, PartialEq, Eq)]
 pub(crate) struct Target {
@@ -256,15 +290,17 @@ fn ensure_server(
 /// Asks the gitterrace server on `addr` to add the repository at `root` (canonical). Already
 /// served (409) counts as added.
 /// The `/r/NAME/` prefix the server serves `root` under, new or already there.
-fn add_repo(addr: SocketAddr, state: Option<&Path>, root: &Path) -> Result<String, String> {
-    let body = serde_json::json!({ "path": root });
-    match secret_request(addr, state, "POST", &body)? {
+fn add_repo(addr: SocketAddr, state: Option<&Path>, root: &Path) -> Result<String, ServerError> {
+    match secret_request(addr, state, "POST", &AddBody { path: root })? {
         (201 | 409, v) => Ok(v
             .get("base")
             .and_then(|b| b.as_str().map(str::to_owned))
             .unwrap_or_else(|| "/".to_owned())),
-        (404 | 405, _) => Err("it predates adding repositories or does not allow it".to_owned()),
-        (other, v) => Err(format!("HTTP {other}: {}", why(&v))),
+        (404 | 405, _) => Err(ServerError::NoAdding),
+        (status, v) => Err(ServerError::Status {
+            status,
+            reason: why(&v),
+        }),
     }
 }
 
@@ -301,9 +337,11 @@ pub(crate) fn remove_running(
         let repo =
             Repo::discover(Path::new(target)).with_context(|| format!("opening {target}"))?;
         let root = repo.root();
-        serde_json::json!({ "path": root.canonicalize().unwrap_or(root) })
+        RemoveBody::Path {
+            path: root.canonicalize().unwrap_or(root),
+        }
     } else {
-        serde_json::json!({ "name": target })
+        RemoveBody::Name { name: target }
     };
     match identify(addr, state) {
         Listener::Gitterrace => {}
@@ -327,8 +365,8 @@ pub(crate) fn remove_running(
 fn remove_repo(
     addr: SocketAddr,
     state: Option<&Path>,
-    body: &serde_json::Value,
-) -> Result<Removed, String> {
+    body: &RemoveBody<'_>,
+) -> Result<Removed, ServerError> {
     match secret_request(addr, state, "DELETE", body)? {
         (200, v) => Ok(Removed::Done(
             v.get("name")
@@ -337,8 +375,11 @@ fn remove_repo(
                 .to_owned(),
         )),
         (404, v) if v.get("error").is_some() => Ok(Removed::NotServed),
-        (404 | 405, _) => Err("it predates removing repositories".to_owned()),
-        (other, v) => Err(format!("HTTP {other}: {}", why(&v))),
+        (404 | 405, _) => Err(ServerError::NoRemoving),
+        (status, v) => Err(ServerError::Status {
+            status,
+            reason: why(&v),
+        }),
     }
 }
 
@@ -356,28 +397,26 @@ fn secret_request(
     addr: SocketAddr,
     state: Option<&Path>,
     method: &str,
-    body: &serde_json::Value,
-) -> Result<(u16, serde_json::Value), String> {
-    let state = state.ok_or("no state folder to read its secret from")?;
-    let token = gitterrace_web::add_token(state, addr.port())
-        .map_err(|e| format!("its secret is unreadable: {e}"))?;
-    let body = body.to_string();
-    let mut s = TcpStream::connect_timeout(&addr, PROBE_TIMEOUT).map_err(|e| e.to_string())?;
+    body: &impl serde::Serialize,
+) -> Result<(u16, serde_json::Value), ServerError> {
+    let state = state.ok_or(ServerError::NoState)?;
+    let token = gitterrace_web::add_token(state, addr.port()).map_err(ServerError::Secret)?;
+    let body = serde_json::to_string(body).map_err(std::io::Error::from)?;
+    let mut s = TcpStream::connect_timeout(&addr, PROBE_TIMEOUT)?;
     // Building the repository's router opens its index; give it longer than a probe.
-    s.set_read_timeout(Some(READY_WAIT))
-        .map_err(|e| e.to_string())?;
+    s.set_read_timeout(Some(READY_WAIT))?;
     let req = format!(
         "{method} /_repos HTTP/1.1\r\nHost: {addr}\r\n{}: {token}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
         gitterrace_web::ADD_TOKEN_HEADER,
         body.len()
     );
-    s.write_all(req.as_bytes()).map_err(|e| e.to_string())?;
+    s.write_all(req.as_bytes())?;
     let mut buf = Vec::new();
     // A timeout after a partial read still leaves the status line to judge.
     let _partial = s.take(64 * 1024).read_to_end(&mut buf);
     let text = String::from_utf8_lossy(&buf);
     let Some(status) = text.get(9..12).and_then(|c| c.parse::<u16>().ok()) else {
-        return Err("no answer".to_owned());
+        return Err(ServerError::NoAnswer);
     };
     let reply = text.split("\r\n\r\n").nth(1).unwrap_or_default().trim();
     let v =
@@ -526,6 +565,9 @@ fn browse(url: &str) -> anyhow::Result<()> {
     anyhow::ensure!(ok, "{opener} could not open {url}");
     Ok(())
 }
+
+#[cfg(test)]
+mod error_tests;
 
 #[cfg(test)]
 mod tests;

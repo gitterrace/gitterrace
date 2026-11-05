@@ -211,23 +211,29 @@ mod tests {
         let e =
             parse("[features]\nblame_enabled = false\n[repo.a.features]\nblame_enabled = true\n")
                 .expect_err("on is refused");
-        assert!(e.0.contains("repo.a.features.blame_enabled"), "{e}");
+        assert!(
+            e.to_string().contains("repo.a.features.blame_enabled"),
+            "{e}"
+        );
         let e = parse("[repo.a.features]\napi_enabled = false\n").expect_err("global only");
-        assert!(e.0.contains("api_enabled"), "{e}");
+        assert!(e.to_string().contains("api_enabled"), "{e}");
         let e = parse("[repo.a.features]\nblam_enabled = false\n").expect_err("unknown");
-        assert!(e.0.contains("blam_enabled"), "{e}");
+        assert!(e.to_string().contains("blam_enabled"), "{e}");
     }
 
     #[test]
     fn insight_pages_are_checked_and_ordered() {
         let e = parse("[insights]\npages = [\"activity\", \"hotspot\"]\n").expect_err("typo");
         assert!(
-            e.0.contains("insights.pages") && e.0.contains("hotspot"),
+            e.to_string().contains("insights.pages") && e.to_string().contains("hotspot"),
             "{e}"
         );
-        assert!(e.0.contains("patterns"), "names the valid ones: {e}");
+        assert!(
+            e.to_string().contains("patterns"),
+            "names the valid ones: {e}"
+        );
         let e = parse("[insights]\npages = [\"types\", \"types\"]\n").expect_err("twice");
-        assert!(e.0.contains("insights.pages"), "{e}");
+        assert!(e.to_string().contains("insights.pages"), "{e}");
         let c = parse("[insights]\npages = [\"types\", \"activity\"]\n")
             .expect("parse")
             .config;

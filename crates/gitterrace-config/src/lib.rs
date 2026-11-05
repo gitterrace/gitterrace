@@ -40,16 +40,30 @@ impl Source {
 }
 
 /// Why the config could not be used. Names the key so the user can fix it.
-#[derive(Debug, PartialEq, Eq)]
-pub struct ConfigError(pub String);
-
-impl std::fmt::Display for ConfigError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(&self.0)
-    }
+#[derive(Debug, thiserror::Error)]
+pub enum ConfigError {
+    /// The text is not TOML.
+    #[error("{0}")]
+    Parse(String),
+    /// A value has the wrong type or is not one of the allowed names.
+    #[error("{key}: expected {expected}")]
+    Expected { key: String, expected: String },
+    /// A value is the right type but unusable.
+    #[error("{key}: {why}")]
+    Invalid { key: String, why: String },
+    /// The config file could not be read.
+    #[error("{}: {source}", path.display())]
+    Read {
+        path: std::path::PathBuf,
+        source: std::io::Error,
+    },
+    /// The config file holds a bad setting.
+    #[error("{}: {source}", path.display())]
+    File {
+        path: std::path::PathBuf,
+        source: Box<Self>,
+    },
 }
-
-impl std::error::Error for ConfigError {}
 
 /// Where the config directory is.
 ///
@@ -126,12 +140,15 @@ pub fn load(dir: Option<&Path>) -> Result<Loaded, ConfigError> {
         Some(p) => match std::fs::read_to_string(&p) {
             Ok(t) => Some((p, t)),
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => None,
-            Err(e) => return Err(ConfigError(format!("{}: {e}", p.display()))),
+            Err(source) => return Err(ConfigError::Read { path: p, source }),
         },
         None => None,
     };
     match text {
-        Some((p, t)) => parse(&t).map_err(|e| ConfigError(format!("{}: {}", p.display(), e.0))),
+        Some((path, t)) => parse(&t).map_err(|e| ConfigError::File {
+            path,
+            source: Box::new(e),
+        }),
         None => Ok(parse("").unwrap_or_else(|_| unreachable_defaults())),
     }
 }
@@ -169,7 +186,7 @@ fn unreachable_defaults() -> Loaded {
 pub fn parse(text: &str) -> Result<Loaded, ConfigError> {
     let table: toml::Table = text
         .parse()
-        .map_err(|e: toml::de::Error| ConfigError(e.to_string()))?;
+        .map_err(|e: toml::de::Error| ConfigError::Parse(e.to_string()))?;
     let mut warnings = Vec::new();
     let mut sources = BTreeMap::new();
     for (section, v) in &table {
@@ -192,7 +209,7 @@ pub fn parse(text: &str) -> Result<Loaded, ConfigError> {
             }
         }
     }
-    let config = Config::from_table(table).map_err(ConfigError)?;
+    let config = Config::from_table(table)?;
     config.validate()?;
     Ok(Loaded {
         config,
@@ -206,10 +223,37 @@ mod enum_keys_tests;
 
 #[cfg(test)]
 mod tests {
-    use super::{Config, Reload, Source, keys, load, parse, template};
+    use super::{Config, ConfigError, Reload, Source, keys, load, parse, template};
 
     /// The serving cache budget is the one the memory guard assumes (32 MB plus margin): a
     /// larger default breaks the guard on every machine, not just a small one.
+    #[test]
+    fn config_errors_keep_their_text() {
+        assert_eq!(
+            ConfigError::Expected {
+                key: "a.b".into(),
+                expected: "x or y".into()
+            }
+            .to_string(),
+            "a.b: expected x or y"
+        );
+        assert_eq!(
+            ConfigError::Invalid {
+                key: "a.b".into(),
+                why: "bad".into()
+            }
+            .to_string(),
+            "a.b: bad"
+        );
+        let e = ConfigError::File {
+            path: "/c/config.toml".into(),
+            source: Box::new(ConfigError::Parse("oops".into())),
+        };
+        assert_eq!(e.to_string(), "/c/config.toml: oops");
+        let e = parse("[repo.x.features]\nlive = true\n").expect_err("override");
+        assert!(e.to_string().starts_with("repo.x.features."), "{e}");
+    }
+
     #[test]
     fn cache_budget_default_matches_the_memory_design() {
         let design = include_str!("../../../docs/design/streaming-insights.md");
@@ -290,11 +334,11 @@ mod tests {
         let l = parse("[watch]\nbogus = 1\n[nope]\nx = 1\n").expect("parse");
         assert_eq!(l.warnings.len(), 2);
         let e = parse("[watch]\ninterval_ms = 10\n").expect_err("too fast");
-        assert!(e.0.contains("watch.interval_ms"), "{e}");
+        assert!(e.to_string().contains("watch.interval_ms"), "{e}");
         let e = parse("[server]\naddr = \"nope\"\n").expect_err("bad addr");
-        assert!(e.0.contains("server.addr"), "{e}");
+        assert!(e.to_string().contains("server.addr"), "{e}");
         let e = parse("[watch]\nenabled = 3\n").expect_err("type");
-        assert!(e.0.contains("watch.enabled"), "{e}");
+        assert!(e.to_string().contains("watch.enabled"), "{e}");
     }
 
     /// A sidebar section name is checked, never silently dropped, and the error lists the
@@ -303,10 +347,13 @@ mod tests {
     fn display_sidebar_names_are_checked() {
         let e = parse("[display]\nsidebar = [\"now\", \"churm\"]\n").expect_err("typo");
         assert!(
-            e.0.contains("display.sidebar") && e.0.contains("churm"),
+            e.to_string().contains("display.sidebar") && e.to_string().contains("churm"),
             "{e}"
         );
-        assert!(e.0.contains("loose_ends"), "names the valid ones: {e}");
+        assert!(
+            e.to_string().contains("loose_ends"),
+            "names the valid ones: {e}"
+        );
         let l = parse("[display]\nsidebar = []\n").expect("empty is valid");
         assert!(l.config.display.sidebar.is_empty());
     }
@@ -321,7 +368,7 @@ mod tests {
             "10.0.0.1:80",
         ] {
             let e = parse(&format!("[server]\naddr = \"{addr}\"\n")).expect_err(addr);
-            assert!(e.0.contains("server.is_public"), "{addr}: {e}");
+            assert!(e.to_string().contains("server.is_public"), "{addr}: {e}");
             parse(&format!("[server]\naddr = \"{addr}\"\nis_public = true\n")).expect(addr);
         }
         for addr in ["127.0.0.1:4250", "[::1]:4250", "127.0.0.2:4250"] {
@@ -332,7 +379,7 @@ mod tests {
     #[test]
     fn hosts_are_plain_names_and_need_public() {
         let e = parse("[server]\nhosts = [\"git.example.com\"]\n").expect_err("no public");
-        assert!(e.0.contains("server.hosts"), "{e}");
+        assert!(e.to_string().contains("server.hosts"), "{e}");
         for h in ["git.example.com", "localhost", "203.0.113.4", "a-b.example"] {
             parse(&format!("[server]\nis_public = true\nhosts = [\"{h}\"]\n")).expect(h);
         }
@@ -347,7 +394,7 @@ mod tests {
         ] {
             let e =
                 parse(&format!("[server]\nis_public = true\nhosts = [\"{h}\"]\n")).expect_err(h);
-            assert!(e.0.contains("server.hosts"), "{h}: {e}");
+            assert!(e.to_string().contains("server.hosts"), "{h}: {e}");
         }
     }
 
@@ -371,7 +418,7 @@ mod tests {
                 "links.style: expected gitterrace or go",
             ),
         ] {
-            assert_eq!(parse(toml).expect_err(toml).0, msg);
+            assert_eq!(parse(toml).expect_err(toml).to_string(), msg);
         }
         let c = parse("[insights]\nperiod = \"quarter\"\n").expect("long name");
         assert_eq!(c.config.insights.period, gitterrace_types::Period::Quarter);

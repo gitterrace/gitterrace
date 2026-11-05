@@ -14,7 +14,7 @@ use std::collections::BTreeMap;
 use gitterrace_git::percent_encode_segment;
 use serde::{Deserialize, Serialize};
 
-use crate::config::{Piece, pieces};
+use crate::config::{Piece, PieceError, pieces};
 
 /// Placeholders the page fills, in the order the docs list them.
 pub const SEND_FIELDS: [&str; 7] = [
@@ -126,16 +126,49 @@ impl RawSend {
     }
 }
 
+/// Why a `[[send]]` block is refused. The text is the reason, without the id.
+#[derive(Debug, thiserror::Error)]
+pub(crate) enum SendError {
+    #[error("vars.{0}: one line, at most 4 KiB")]
+    VarValue(String),
+    #[error("label must be 1 to 80 characters")]
+    Label,
+    #[error("{key}: {source}")]
+    Template { key: String, source: PieceError },
+    #[error("{key}: {{{field}}}: no vars.{var}")]
+    NoVar {
+        key: String,
+        field: String,
+        var: String,
+    },
+    #[error("{key}: unknown placeholder {{{field}}}, known: {known}, var.<name>")]
+    UnknownPlaceholder {
+        key: String,
+        field: String,
+        known: String,
+    },
+    #[error("{key}: the scheme must be literal, before any placeholder")]
+    SchemeNotLiteral { key: String },
+    #[error("{key}: bad scheme {scheme:?}")]
+    BadScheme { key: String, scheme: String },
+    #[error("{key}: scheme {scheme}: is refused")]
+    DeniedScheme { key: String, scheme: String },
+    #[error("{key}: a placeholder may not be part of the scheme or host")]
+    PlaceholderInHost { key: String },
+    #[error("{key}: http is allowed only for loopback. Use https")]
+    PlainHttp { key: String },
+}
+
 /// Validates one `[[send]]` block. The error is the reason, without the id.
-pub(crate) fn compile(raw: RawSend) -> Result<Target, String> {
+pub(crate) fn compile(raw: RawSend) -> Result<Target, SendError> {
     for (name, value) in &raw.vars {
         if value.len() > 4096 || value.contains(['\0', '\n', '\r']) {
-            return Err(format!("vars.{name}: one line, at most 4 KiB"));
+            return Err(SendError::VarValue(name.clone()));
         }
     }
     let label = raw.label.as_str();
     if label.trim().is_empty() || label.chars().count() > 80 {
-        return Err("label must be 1 to 80 characters".into());
+        return Err(SendError::Label);
     }
     let parts = template_parts(&raw.vars, "url", &raw.url, &SEND_FIELDS)?;
     let lookup = raw
@@ -158,28 +191,34 @@ fn template_parts(
     key: &str,
     template: &str,
     allowed: &[&str],
-) -> Result<Vec<Part>, String> {
+) -> Result<Vec<Part>, SendError> {
     let mut parts: Vec<Part> = Vec::new();
     let push_lit = |parts: &mut Vec<Part>, s: &str| match parts.last_mut() {
         Some(Part::Lit(l)) => l.push_str(s),
         _ => parts.push(Part::Lit(s.to_owned())),
     };
-    for piece in pieces(template).map_err(|e| format!("{key}: {e}"))? {
+    for piece in pieces(template).map_err(|source| SendError::Template {
+        key: key.to_owned(),
+        source,
+    })? {
         match piece {
             Piece::Text(t) => push_lit(&mut parts, &t),
             Piece::Field(f) => {
                 if let Some(v) = f.strip_prefix("var.") {
-                    let value = vars
-                        .get(v)
-                        .ok_or_else(|| format!("{key}: {{{f}}}: no vars.{v}"))?;
+                    let value = vars.get(v).ok_or_else(|| SendError::NoVar {
+                        key: key.to_owned(),
+                        field: f.clone(),
+                        var: v.to_owned(),
+                    })?;
                     push_lit(&mut parts, value);
                 } else if allowed.contains(&f.as_str()) {
                     parts.push(Part::Ph(f));
                 } else {
-                    return Err(format!(
-                        "{key}: unknown placeholder {{{f}}}, known: {}, var.<name>",
-                        allowed.join(", ")
-                    ));
+                    return Err(SendError::UnknownPlaceholder {
+                        key: key.to_owned(),
+                        field: f,
+                        known: allowed.join(", "),
+                    });
                 }
             }
         }
@@ -195,27 +234,35 @@ fn template_parts(
 /// The literal text before the first page placeholder must fix the scheme and, when a
 /// placeholder follows, end the host: a value can then only land in the path, query or
 /// fragment.
-fn check_prefix(key: &str, prefix: &str, has_placeholder: bool) -> Result<(), String> {
+fn check_prefix(key: &str, prefix: &str, has_placeholder: bool) -> Result<(), SendError> {
     let (scheme, rest) = prefix
         .split_once(':')
-        .ok_or_else(|| format!("{key}: the scheme must be literal, before any placeholder"))?;
+        .ok_or_else(|| SendError::SchemeNotLiteral {
+            key: key.to_owned(),
+        })?;
     let lower = scheme.to_ascii_lowercase();
     let well_formed = lower.bytes().next().is_some_and(|b| b.is_ascii_lowercase())
         && lower
             .bytes()
             .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b"+.-".contains(&b));
     if !well_formed {
-        return Err(format!("{key}: bad scheme {scheme:?}"));
+        return Err(SendError::BadScheme {
+            key: key.to_owned(),
+            scheme: scheme.to_owned(),
+        });
     }
     if DENIED_SCHEMES.contains(&lower.as_str()) {
-        return Err(format!("{key}: scheme {lower}: is refused"));
+        return Err(SendError::DeniedScheme {
+            key: key.to_owned(),
+            scheme: lower,
+        });
     }
     let after = rest.strip_prefix("//").unwrap_or(rest);
     let host_end = after.find(['/', '?', '#']);
     if has_placeholder && host_end.is_none() {
-        return Err(format!(
-            "{key}: a placeholder may not be part of the scheme or host"
-        ));
+        return Err(SendError::PlaceholderInHost {
+            key: key.to_owned(),
+        });
     }
     if lower == "http" {
         let authority = &after[..host_end.unwrap_or(after.len())];
@@ -229,9 +276,9 @@ fn check_prefix(key: &str, prefix: &str, has_placeholder: bool) -> Result<(), St
                 .parse::<std::net::IpAddr>()
                 .is_ok_and(|ip| ip.is_loopback());
         if !loopback {
-            return Err(format!(
-                "{key}: http is allowed only for loopback. Use https"
-            ));
+            return Err(SendError::PlainHttp {
+                key: key.to_owned(),
+            });
         }
     }
     Ok(())
@@ -245,18 +292,40 @@ mod tests {
     use serde::Deserialize;
 
     use super::*;
-    use crate::config::Config;
+    use crate::config::{Config, ConfigError};
 
-    fn load(body: &str) -> Result<Config, String> {
+    fn load(body: &str) -> Result<Config, ConfigError> {
         Config::parse(
             &format!("version = 1\n[[send]]\nid = \"s\"\n{body}"),
             Path::new("/"),
         )
-        .map_err(|e| e.to_string())
     }
 
-    fn url(u: &str) -> Result<Config, String> {
+    fn url(u: &str) -> Result<Config, ConfigError> {
         load(&format!("label = \"S\"\nurl = {u:?}\n"))
+    }
+
+    #[test]
+    fn send_errors_keep_their_text() {
+        assert_eq!(
+            SendError::VarValue("v".into()).to_string(),
+            "vars.v: one line, at most 4 KiB"
+        );
+        assert_eq!(
+            SendError::Label.to_string(),
+            "label must be 1 to 80 characters"
+        );
+        let e = SendError::NoVar {
+            key: "url".into(),
+            field: "var.v".into(),
+            var: "v".into(),
+        };
+        assert_eq!(e.to_string(), "url: {var.v}: no vars.v");
+        let e = SendError::PlainHttp { key: "url".into() };
+        assert_eq!(
+            e.to_string(),
+            "url: http is allowed only for loopback. Use https"
+        );
     }
 
     #[test]
@@ -273,7 +342,7 @@ mod tests {
             "view-source",
         ] {
             let e = url(&format!("{s}:x?t={{title}}")).expect_err(s);
-            assert!(e.contains("refused"), "{s}: {e}");
+            assert!(e.to_string().contains("refused"), "{s}: {e}");
             let upper = s.to_ascii_uppercase();
             assert!(url(&format!("{upper}:x?t={{title}}")).is_err(), "{upper}");
         }
@@ -310,7 +379,7 @@ mod tests {
             "https{title}://x",
         ] {
             let e = url(bad).expect_err(bad);
-            assert!(e.contains("url:"), "{bad}: {e}");
+            assert!(e.to_string().contains("url:"), "{bad}: {e}");
         }
         assert!(url("https://example.test/{path}").is_ok());
     }
@@ -338,7 +407,7 @@ mod tests {
     fn disabled_send_is_still_checked() {
         let e = load("label = \"S\"\nenabled = false\nurl = \"javascript:x{title}\"\n")
             .expect_err("bad url");
-        assert!(e.contains("refused"), "{e}");
+        assert!(e.to_string().contains("refused"), "{e}");
     }
 
     #[test]
@@ -416,10 +485,10 @@ mod tests {
             "no-scheme?q={sha}",
         ] {
             let e = ok(bad).expect_err(bad);
-            assert!(e.contains("lookup:"), "{bad}: {e}");
+            assert!(e.to_string().contains("lookup:"), "{bad}: {e}");
         }
         let e = ok("https://h.test/{var.nope}/{sha}").expect_err("var");
-        assert!(e.contains("lookup: {var.nope}"), "{e}");
+        assert!(e.to_string().contains("lookup: {var.nope}"), "{e}");
         // `sha` is a url placeholder but `short` is not: the two lists differ on purpose.
         assert!(url("https://h.test/s?q={short}").is_err());
     }

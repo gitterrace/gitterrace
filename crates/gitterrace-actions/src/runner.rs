@@ -241,7 +241,7 @@ pub fn expand(template: &[String], payload: &Payload) -> Result<Vec<String>, Run
             out.push(el.clone());
             continue;
         }
-        let ps = pieces(el).map_err(RunError::Refused)?;
+        let ps = pieces(el).map_err(|e| RunError::Refused(e.to_string()))?;
         let mut arg = String::new();
         for p in &ps {
             match p {

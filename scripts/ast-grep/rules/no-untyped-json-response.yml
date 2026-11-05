@@ -32,8 +32,6 @@ ignores:
   - crates/gitterrace-web/src/live.rs
   # Action run replies.
   - crates/gitterrace-web/src/actions.rs
-  # The add-repository replies.
-  - crates/gitterrace-web/src/add.rs
   # The requests the CLI sends to a running server.
   - crates/gitterrace/src/open.rs
 rule:
