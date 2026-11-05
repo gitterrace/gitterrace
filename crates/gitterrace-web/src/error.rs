@@ -17,6 +17,10 @@ pub(crate) enum Error {
     Render(#[from] askama::Error),
     #[error("task: {0}")]
     Join(#[from] tokio::task::JoinError),
+    /// The insights cache failed a read while a page was built from it. The page is never
+    /// shown: the cache is rebuilt and the visitor gets the indexing page meanwhile.
+    #[error("{0}")]
+    Source(#[from] gitterrace_index::feed::SourceError),
 }
 
 pub(crate) type Result<T> = std::result::Result<T, Error>;
@@ -27,10 +31,14 @@ impl IntoResponse for Error {
             Self::Git(
                 gitterrace_git::Error::RevNotFound(_) | gitterrace_git::Error::PathNotFound(_),
             ) => StatusCode::NOT_FOUND,
+            Self::Source(_) => StatusCode::SERVICE_UNAVAILABLE,
             _ => StatusCode::INTERNAL_SERVER_ERROR,
         };
         // Server-side detail (paths, gix internals) stays in the log.
-        let shown = if status == StatusCode::INTERNAL_SERVER_ERROR {
+        let shown = if status == StatusCode::SERVICE_UNAVAILABLE {
+            tracing::warn!("{self}");
+            "the insights cache is being rebuilt, try again in a moment".to_owned()
+        } else if status == StatusCode::INTERNAL_SERVER_ERROR {
             tracing::error!("{self}");
             "internal error".to_owned()
         } else {

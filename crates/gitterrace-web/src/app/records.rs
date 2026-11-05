@@ -13,7 +13,21 @@ impl App {
     /// for another commit. `None` until the first build finished (the indexing page) and for a
     /// commit too far from the set (the reindex page). Kept for one (commit, generation), so a
     /// HEAD move or a rebuild never serves a stale source.
-    pub(crate) fn source(&self, head: &str) -> Result<Option<crate::insights::Src>> {
+    pub(crate) fn source(&self, head: &str) -> Result<Option<crate::insights::CheckedSrc>> {
+        match self.open_source(head) {
+            // The set failed a read while opening: the same rebuild as one met while serving.
+            Err(crate::error::Error::Index(e))
+                if gitterrace_index::feed::SourceError::of(&e).is_some() =>
+            {
+                tracing::warn!("cache unreadable on open, rebuilding: {e}");
+                self.unreadable_now()?;
+                Ok(None)
+            }
+            other => other,
+        }
+    }
+
+    fn open_source(&self, head: &str) -> Result<Option<crate::insights::CheckedSrc>> {
         self.check_unreadable()?;
         let key = (head.to_owned(), self.index.generation());
         if let Ok(g) = self.caches.source.lock()
@@ -21,7 +35,7 @@ impl App {
             && *k == key
         {
             self.touch();
-            return Ok(Some(Arc::clone(s)));
+            return Ok(Some(s.share()));
         }
         if !self.ready() {
             self.demand();
@@ -33,32 +47,14 @@ impl App {
             && let Some(set) = self.index.disk_source(&self.repo, head)?
         {
             self.touch();
-            let checked = Arc::clone(&set);
-            if let Ok(mut d) = self.caches.disk.lock() {
-                *d = Some(Arc::new(move || gitterrace_index::unreadable(&checked)));
-            }
-            let src: crate::insights::Src = set;
-            if let Ok(mut g) = self.caches.source.lock() {
-                *g = Some((key, Arc::clone(&src)));
-            }
-            return Ok(Some(src));
+            return Ok(Some(self.keep(key, set.erased())));
         }
         if self.index.newer_format().is_none()
             && let Some(view) = self.index.rev_source(&self.repo, head, head)?
         {
             match view {
                 gitterrace_index::feed::RevView::Ready(reach) => {
-                    let checked = Arc::clone(&reach);
-                    if let Ok(mut d) = self.caches.disk.lock() {
-                        *d = Some(Arc::new(move || {
-                            gitterrace_index::unreadable(checked.base())
-                        }));
-                    }
-                    let src: crate::insights::Src = reach;
-                    if let Ok(mut g) = self.caches.source.lock() {
-                        *g = Some((key, Arc::clone(&src)));
-                    }
-                    return Ok(Some(src));
+                    return Ok(Some(self.keep(key, reach.erased())));
                 }
                 // Too far from the set: no records load, no reindex, the page says so.
                 gitterrace_index::feed::RevView::NeedsReindex { read } => {
@@ -74,27 +70,48 @@ impl App {
         Ok(None)
     }
 
+    /// Keeps `src` as the source of `key`, the one every page of that commit shares.
+    fn keep(
+        &self,
+        key: (String, u64),
+        src: crate::insights::CheckedSrc,
+    ) -> crate::insights::CheckedSrc {
+        if let Ok(mut g) = self.caches.source.lock() {
+            *g = Some((key, src.share()));
+        }
+        src
+    }
+
     /// A block that failed its check while serving deletes the cache, drops
     /// every source over it and rebuilds. Until the rebuild is done pages show the indexing
-    /// page, never data from a corrupt set.
+    /// page, never data from a corrupt set. The page that met the error was refused by
+    /// `Checked::run` already; this runs at the next request.
     fn check_unreadable(&self) -> Result<()> {
         let bad = self
             .caches
-            .disk
+            .source
             .lock()
             .ok()
-            .and_then(|d| d.as_ref().map(Arc::clone))
-            .and_then(|check| check());
+            .and_then(|g| g.as_ref().and_then(|(_, s)| s.failure()));
         let Some(why) = bad else {
             return Ok(());
         };
         tracing::warn!("cache unreadable while serving, rebuilding: {why}");
-        if let Ok(mut d) = self.caches.disk.lock() {
-            d.take();
-        }
-        if let Ok(mut g) = self.caches.source.lock() {
-            g.take();
-        }
+        self.unreadable_now()
+    }
+
+    /// A page met `e` while it was built: the cache goes, the visitor gets the indexing page.
+    pub(crate) fn unreadable(&self, e: &gitterrace_index::feed::SourceError) -> Result<()> {
+        tracing::warn!("cache unreadable while a page was built, rebuilding: {e}");
+        self.unreadable_now()
+    }
+
+    /// Drops everything read from the cache, deletes it and starts the rebuild.
+    fn unreadable_now(&self) -> Result<()> {
+        // Everything built over the source goes with it: a rebuild of the same history gets
+        // the same generation, so a table built while a read failed would be served again.
+        self.caches.clear_all();
+        gitterrace_index::Insights::release_shared(&format!("{}\u{0}", self.base));
         self.index.rebuild()?;
         self.ready.store(false, Ordering::Release);
         // HEAD did not move, so the loop would not rebuild it on its own.

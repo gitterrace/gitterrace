@@ -103,7 +103,7 @@ impl Insights<'_> {
         // The aggregate holds every commit: usable only when the days and chips drop none,
         // which `whole` says.
         let plain = |f: &HeadFile| -> Option<PathId> {
-            let id = src.find_path(&f.path)?;
+            let id = src.path_id(&f.path)?;
             (!follow.log.contains_key(&id) && !follow.names.contains_key(&id)).then_some(id)
         };
         let ids: Vec<Option<PathId>> = files

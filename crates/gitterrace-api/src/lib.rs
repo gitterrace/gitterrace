@@ -203,7 +203,7 @@ mod tests {
         let first = state.records("HEAD").expect("records");
         let second = state.records("HEAD").expect("records");
         assert!(
-            std::sync::Arc::ptr_eq(&first, &second),
+            std::sync::Arc::ptr_eq(&first.unchecked(), &second.unchecked()),
             "second call reparsed"
         );
         assert_eq!(first.len(), 2);
@@ -433,13 +433,14 @@ mod tests {
     #[tokio::test]
     async fn server_errors_hide_the_inner_message() {
         let (d, s) = fixture();
-        // Pages read the segment set: a manifest that cannot be read is an index error.
+        // Pages read the segment set: a manifest that cannot be read is an unreadable cache,
+        // answered while it is rebuilt.
         let manifest = d.path().join(".git/gitterrace/MANIFEST");
         std::fs::remove_file(&manifest).expect("rm manifest");
         std::fs::create_dir(&manifest).expect("mkdir");
         let (st, v) = get(&s, "/repo").await;
-        assert_eq!(st, StatusCode::INTERNAL_SERVER_ERROR);
-        assert_eq!(v["error"]["code"], "index");
+        assert_eq!(st, StatusCode::SERVICE_UNAVAILABLE);
+        assert_eq!(v["error"]["code"], "index_unreadable");
         assert_eq!(v["error"]["message"], crate::SERVER_ERROR_MESSAGE);
         let root = d.path().to_string_lossy().into_owned();
         assert!(!v.to_string().contains(&root), "{v}");

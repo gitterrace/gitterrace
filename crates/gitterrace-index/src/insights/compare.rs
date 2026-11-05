@@ -34,12 +34,12 @@ impl Insights<'_> {
         // Walk parents by id: state is the visited set of the two ranges, never the history.
         let reach = |from: &str| -> HashSet<Rank> {
             let mut seen = HashSet::new();
-            let mut stack: Vec<Rank> = src.find_commit(from).into_iter().collect();
+            let mut stack: Vec<Rank> = src.commit_of(from).into_iter().collect();
             while let Some(r) = stack.pop() {
                 if !seen.insert(r) {
                     continue;
                 }
-                stack.extend(src.parent_ids(r).iter().filter_map(|p| src.find_commit(p)));
+                stack.extend(src.parent_ids(r).iter().filter_map(|p| src.commit_of(p)));
             }
             seen
         };

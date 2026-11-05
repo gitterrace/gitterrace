@@ -17,16 +17,11 @@ pub(crate) type HeadGen = (String, u64);
 pub(crate) type IgnoreFiles = (String, Arc<Vec<(String, String)>>);
 /// Overview totals for one (commit, index generation, options).
 pub(crate) type TotalsEntry = (String, gitterrace_index::PeriodStats);
-/// Whether the set behind a served source met a store error, and which.
-pub(crate) type Unreadable = Arc<dyn Fn() -> Option<String> + Send + Sync>;
 
 pub(crate) struct Caches {
     /// The insights source of one (commit, generation), so every page shares its derived
     /// tables.
-    pub(crate) source: Mutex<Option<(HeadGen, crate::insights::Src)>>,
-    /// The same source as `source` holds when it reads the segment files, typed, so a store
-    /// error it met turns into a rebuild.
-    pub(crate) disk: Mutex<Option<Unreadable>>,
+    pub(crate) source: Mutex<Option<(HeadGen, crate::insights::CheckedSrc)>>,
     /// Commits whose insights are past the reach of the segment set, with how many commits
     /// were read to find out, keyed by (commit, generation).
     pub(crate) far: Mutex<Option<(HeadGen, usize)>>,
@@ -47,7 +42,6 @@ impl Caches {
     pub(crate) fn new(cfg: &Config) -> Self {
         Self {
             source: Mutex::new(None),
-            disk: Mutex::new(None),
             far: Mutex::new(None),
             totals: Mutex::new(None),
             ignores: Mutex::new(None),
@@ -64,7 +58,6 @@ impl Caches {
     pub(crate) fn clear_all(&self) -> bool {
         let Self {
             source,
-            disk,
             far,
             totals,
             ignores,
@@ -76,7 +69,6 @@ impl Caches {
         } = self;
         [
             take(source),
-            take(disk),
             take(far),
             take(totals),
             take(ignores),

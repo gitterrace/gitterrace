@@ -218,7 +218,7 @@ impl crate::feed::InsightsSource for Counting<'_> {
     fn parent_ids(&self, r: crate::feed::Rank) -> Vec<std::sync::Arc<str>> {
         self.inner.parent_ids(r)
     }
-    fn find_commit(&self, id: &str) -> Option<crate::feed::Rank> {
+    fn find_commit(&self, id: &str) -> Result<Option<crate::feed::Rank>, crate::feed::SourceError> {
         self.inner.find_commit(id)
     }
     fn agg_author_day(
@@ -241,7 +241,7 @@ impl crate::feed::InsightsSource for Counting<'_> {
     fn path(&self, id: crate::feed::PathId) -> Option<std::sync::Arc<str>> {
         self.inner.path(id)
     }
-    fn find_path(&self, p: &str) -> Option<crate::feed::PathId> {
+    fn find_path(&self, p: &str) -> Result<Option<crate::feed::PathId>, crate::feed::SourceError> {
         self.inner.find_path(p)
     }
     fn paths(&self) -> usize {
@@ -259,8 +259,14 @@ impl crate::feed::InsightsSource for Counting<'_> {
     fn label(&self, id: crate::feed::LabelId) -> Option<std::sync::Arc<str>> {
         self.inner.label(id)
     }
-    fn find_label(&self, n: &str) -> Option<crate::feed::LabelId> {
+    fn find_label(
+        &self,
+        n: &str,
+    ) -> Result<Option<crate::feed::LabelId>, crate::feed::SourceError> {
         self.inner.find_label(n)
+    }
+    fn failure(&self) -> Option<crate::feed::SourceError> {
+        self.inner.failure()
     }
 }
 

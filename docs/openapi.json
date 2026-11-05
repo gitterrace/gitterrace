@@ -404,6 +404,7 @@
                   "git",
                   "index",
                   "internal",
+                  "index_unreadable",
                   "needs_reindex"
                 ],
                 "type": "string"
@@ -916,6 +917,9 @@
           },
           "500": {
             "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
           }
         },
         "summary": "Endpoint and insight list."
@@ -975,6 +979,9 @@
             "$ref": "#/components/responses/Error"
           },
           "500": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
             "$ref": "#/components/responses/Error"
           }
         },
@@ -1054,6 +1061,9 @@
           },
           "500": {
             "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
           }
         },
         "summary": "File text at a revision."
@@ -1123,6 +1133,9 @@
           },
           "500": {
             "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
           }
         },
         "summary": "One commit with its diff."
@@ -1174,6 +1187,9 @@
           },
           "500": {
             "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
           }
         },
         "summary": "Authors and bus factor."
@@ -1214,6 +1230,9 @@
             "$ref": "#/components/responses/Error"
           },
           "500": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
             "$ref": "#/components/responses/Error"
           }
         },
@@ -1404,6 +1423,9 @@
           },
           "500": {
             "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
           }
         },
         "summary": "One insight."
@@ -1482,6 +1504,9 @@
           },
           "500": {
             "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
           }
         },
         "summary": "Paged history."
@@ -1523,6 +1548,9 @@
           },
           "500": {
             "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
           }
         },
         "summary": "Branches, tags and remotes."
@@ -1563,6 +1591,9 @@
             "$ref": "#/components/responses/Error"
           },
           "500": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
             "$ref": "#/components/responses/Error"
           }
         },
@@ -1623,6 +1654,9 @@
             "$ref": "#/components/responses/Error"
           },
           "500": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
             "$ref": "#/components/responses/Error"
           }
         },

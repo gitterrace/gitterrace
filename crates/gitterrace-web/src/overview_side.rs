@@ -418,7 +418,11 @@ mod tests {
     fn shows_now_recent_churn_loose_ends_and_languages() {
         let (_d, app) = fixture();
         let head = app.repo.resolve("HEAD").expect("head");
-        let src = app.source(&head).expect("source").expect("ready");
+        let src = app
+            .source(&head)
+            .expect("source")
+            .expect("ready")
+            .unchecked();
         let s = build(&app, &head, &*src, app.dirty(), fmt::now());
         assert_eq!(s.branch, "main");
         assert!(s.dirty, "the edited a.rs makes the tree dirty");
@@ -442,7 +446,11 @@ mod tests {
     fn old_commits_fall_out_of_today_and_churn() {
         let (_d, app) = fixture();
         let head = app.repo.resolve("HEAD").expect("head");
-        let src = app.source(&head).expect("source").expect("ready");
+        let src = app
+            .source(&head)
+            .expect("source")
+            .expect("ready")
+            .unchecked();
         let s = build(&app, &head, &*src, false, fmt::now() + 200 * DAY);
         assert_eq!((s.today, s.week), (0, 0));
         assert!(s.hot.is_empty());
@@ -453,7 +461,11 @@ mod tests {
     fn sidebar_is_built_once_per_tip_and_dirty_flag() {
         let (_d, app) = fixture();
         let head = app.repo.resolve("HEAD").expect("head");
-        let src = app.source(&head).expect("source").expect("ready");
+        let src = app
+            .source(&head)
+            .expect("source")
+            .expect("ready")
+            .unchecked();
         let first = html(&app, &head, &*src);
         let n = builds();
         assert_eq!(html(&app, &head, &*src), first);
@@ -494,7 +506,11 @@ mod tests {
         let app = std::sync::Arc::new(app);
         env.register(&app);
         let head = app.repo.resolve("HEAD").expect("head");
-        let src = app.source(&head).expect("source").expect("ready");
+        let src = app
+            .source(&head)
+            .expect("source")
+            .expect("ready")
+            .unchecked();
         assert_eq!(
             headings(&html(&app, &head, &*src)),
             ["Now", "Recent", "Churn", "Loose ends", "Languages"]
@@ -536,7 +552,11 @@ mod tests {
             .expect("update");
         app.mark_ready();
         let head = app.repo.resolve("HEAD").expect("head");
-        let src = app.source(&head).expect("source").expect("ready");
+        let src = app
+            .source(&head)
+            .expect("source")
+            .expect("ready")
+            .unchecked();
         // 2024-03-10T00:00:00Z, the frozen test clock.
         let html = build(&app, &head, &*src, false, 1_710_028_800)
             .render()

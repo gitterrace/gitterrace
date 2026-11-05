@@ -218,6 +218,10 @@ impl OptLink {
 /// What every insights page reads: the tip's source, or a filtered view over it.
 pub(crate) type Src = Arc<dyn InsightsSource>;
 
+/// The source as [`App::source`] hands it out: readable only through
+/// [`gitterrace_index::feed::Checked::run`], which refuses a build that met a storage error.
+pub(crate) type CheckedSrc = gitterrace_index::feed::Checked<dyn InsightsSource>;
+
 /// Insights over `src` with the options in force. The head ignore rules apply when asked.
 pub(crate) fn insights<'a>(a: &App, src: &'a Src, o: Options) -> Insights<'a> {
     let head = a.repo.resolve(&crate::fmt::selected()).unwrap_or_default();
@@ -230,7 +234,7 @@ pub(crate) fn insights<'a>(a: &App, src: &'a Src, o: Options) -> Insights<'a> {
         .source(&head)
         .ok()
         .flatten()
-        .is_some_and(|tip| Arc::ptr_eq(&tip, src));
+        .is_some_and(|tip| tip.holds(src));
     if full {
         let key = format!("{}\u{0}{head}\u{0}{}", a.base, a.index.generation());
         Insights::shared_source(&**src, o, &key, || ignore(a))

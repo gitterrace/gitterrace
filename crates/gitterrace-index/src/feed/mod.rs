@@ -18,6 +18,10 @@
 //! - Every iterator is streaming: memory is bounded by one block or one record, never by the
 //!   history. Results come in ascending rank order unless stated otherwise.
 //! - Object safe: pages take `&dyn InsightsSource`.
+//! - Storage errors are never absence: a finder (`find_*`) returns `Err`, and every call, a
+//!   finder's error included, records the error for [`InsightsSource::failure`]. Pages and
+//!   answers read a source only through [`Checked::run`], which refuses anything built while
+//!   an error happened.
 
 pub(crate) mod disk;
 mod fresh;
@@ -250,8 +254,9 @@ pub trait InsightsSource: Send + Sync {
     /// Parent ids, first parent first, as written (a parent may be outside the set).
     fn parent_ids(&self, rank: Rank) -> Vec<Arc<str>>;
 
-    /// The commit with this id, if indexed.
-    fn find_commit(&self, id: &str) -> Option<Rank>;
+    /// The commit with this id: `Ok(None)` when it is not indexed, `Err` when the store could
+    /// not tell. A caller that falls back on absence (a git walk) must not on an error.
+    fn find_commit(&self, id: &str) -> Result<Option<Rank>, SourceError>;
 
     /// Author x day rows with `day` in `days`, ascending (day, ident).
     fn agg_author_day(&self, days: Range<i64>) -> Stream<'_, AuthorDayRow>;
@@ -267,7 +272,9 @@ pub trait InsightsSource: Send + Sync {
     fn rename_edges(&self) -> Stream<'_, RenameEdge>;
 
     fn path(&self, id: PathId) -> Option<Arc<str>>;
-    fn find_path(&self, path: &str) -> Option<PathId>;
+    /// The id of `path`: `Ok(None)` when no indexed commit names it, `Err` when the store could
+    /// not tell.
+    fn find_path(&self, path: &str) -> Result<Option<PathId>, SourceError>;
     /// Number of path ids, so per-path bit vectors can be sized.
     fn paths(&self) -> usize;
 
@@ -277,5 +284,119 @@ pub trait InsightsSource: Send + Sync {
 
     /// Kind or scope name.
     fn label(&self, id: LabelId) -> Option<Arc<str>>;
-    fn find_label(&self, name: &str) -> Option<LabelId>;
+    /// The id of a kind or scope: `Ok(None)` when no commit carries it.
+    fn find_label(&self, name: &str) -> Result<Option<LabelId>, SourceError>;
+
+    /// [`InsightsSource::find_commit`] inside a build that [`Checked::run`] guards: an error is
+    /// already recorded for [`InsightsSource::failure`], so the build may treat it as absent.
+    /// Code that acts on absence outside such a build (a git walk instead) calls the finder.
+    fn commit_of(&self, id: &str) -> Option<Rank> {
+        self.find_commit(id).unwrap_or(None)
+    }
+
+    /// [`InsightsSource::find_path`] inside a guarded build, see [`InsightsSource::commit_of`].
+    fn path_id(&self, path: &str) -> Option<PathId> {
+        self.find_path(path).unwrap_or(None)
+    }
+
+    /// [`InsightsSource::find_label`] inside a guarded build, see [`InsightsSource::commit_of`].
+    fn label_id(&self, name: &str) -> Option<LabelId> {
+        self.find_label(name).unwrap_or(None)
+    }
+
+    /// The first storage error any call met, if any. Lookups and streams answer absent or
+    /// short after one, so nothing built from this source may be shown: [`Checked::run`] is how
+    /// a page or an answer reads a source, and it refuses the result then. No default, so a new
+    /// source has to say where its errors go.
+    fn failure(&self) -> Option<SourceError>;
+}
+
+/// A storage error a source met while answering. The cache it came from is unreadable: the
+/// caller rebuilds it and never shows what was built over it.
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[error("insights cache unreadable: {0}")]
+pub struct SourceError(pub String);
+
+impl SourceError {
+    /// The storage error inside `e`, when an open or a walk over the set failed on one (the
+    /// index wraps it in an `io::Error` there). Such an error means: rebuild, never show.
+    pub fn of(e: &std::io::Error) -> Option<Self> {
+        e.get_ref()?.downcast_ref::<Self>().cloned()
+    }
+
+    /// `e` as an `io::Error` that [`SourceError::of`] finds again.
+    pub(crate) fn io(e: impl std::fmt::Display) -> std::io::Error {
+        std::io::Error::other(Self(e.to_string()))
+    }
+}
+
+/// A source that can only be read through [`Checked::run`].
+///
+/// Whatever the closure builds is handed out only when the source met no storage error
+/// meanwhile. A page that skips the check does not compile, since there is no other way to the
+/// source.
+#[must_use = "a source is read through Checked::run, which checks it for storage errors"]
+pub struct Checked<S: ?Sized> {
+    src: Arc<S>,
+}
+
+impl<S: InsightsSource + ?Sized> Checked<S> {
+    pub const fn new(src: Arc<S>) -> Self {
+        Self { src }
+    }
+
+    /// Builds `f` over the source and hands the result out only when no storage error happened
+    /// before or during it. Consumes the handle: one check per build.
+    ///
+    /// # Errors
+    /// The first storage error the source met, before or during `f`.
+    pub fn run<T>(self, f: impl FnOnce(&Arc<S>) -> T) -> Result<T, SourceError> {
+        if let Some(e) = self.src.failure() {
+            return Err(e);
+        }
+        let out = f(&self.src);
+        self.src.failure().map_or(Ok(out), Err)
+    }
+
+    /// Commits in the set, a number that is never read from a block.
+    pub fn len(&self) -> usize {
+        self.src.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.src.is_empty()
+    }
+
+    /// The first storage error the source met, without reading anything: a holder drops a
+    /// failed source and rebuilds the cache.
+    pub fn failure(&self) -> Option<SourceError> {
+        self.src.failure()
+    }
+
+    /// The same source, checked again on its own.
+    pub fn share(&self) -> Self {
+        Self {
+            src: Arc::clone(&self.src),
+        }
+    }
+
+    /// The same handle over the trait object, so sources of different kinds share one slot.
+    pub fn erased(self) -> Checked<dyn InsightsSource>
+    where
+        S: Sized + 'static,
+    {
+        let src: Arc<dyn InsightsSource> = self.src;
+        Checked { src }
+    }
+
+    /// Whether `other` is this very source (the tip's tables are shared by address).
+    pub fn holds(&self, other: &Arc<S>) -> bool {
+        Arc::ptr_eq(&self.src, other)
+    }
+
+    /// The source without the check, for tests that probe it call by call.
+    #[cfg(any(test, feature = "oracle"))]
+    pub fn unchecked(&self) -> Arc<S> {
+        Arc::clone(&self.src)
+    }
 }

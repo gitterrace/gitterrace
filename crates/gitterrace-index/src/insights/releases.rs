@@ -61,7 +61,7 @@ impl Insights<'_> {
         let mut found: Vec<(usize, i64, Arc<str>, &str)> = tags
             .iter()
             .filter_map(|(n, id)| {
-                let rank = src.find_commit(id)?;
+                let rank = src.commit_of(id)?;
                 let c = src.commit(rank)?;
                 Some((rank.0 as usize, c.time, src.commit_id(rank)?, n.as_str()))
             })

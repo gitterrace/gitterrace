@@ -50,7 +50,8 @@ fn file_pages_stay_under_their_ceilings_at_100k_commits() {
             let src = index
                 .disk_source(&repo, &tip)
                 .expect("open")
-                .expect("the built tip reads the segment set");
+                .expect("the built tip reads the segment set")
+                .unchecked();
             let t = Instant::now();
             let ins = Insights::from_source(&*src, Options::default(), None);
             let hot = ins.hotspots(&files, period);
@@ -58,7 +59,8 @@ fn file_pages_stay_under_their_ceilings_at_100k_commits() {
             let src = index
                 .disk_source(&repo, &tip)
                 .expect("open")
-                .expect("the built tip reads the segment set");
+                .expect("the built tip reads the segment set")
+                .unchecked();
             let t = Instant::now();
             let ins = Insights::from_source(&*src, Options::default(), None);
             let own = ins.ownership(&files, period, 1);

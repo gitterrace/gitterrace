@@ -59,7 +59,11 @@ pub(crate) fn walk(
         if !seen.insert(id.clone()) {
             continue;
         }
-        if let Some(r) = base.find_commit(&id) {
+        // Absence reads the commit from git, so an error must not pass for it.
+        if let Some(r) = base
+            .find_commit(&id)
+            .map_err(crate::feed::SourceError::io)?
+        {
             met.push(r);
             continue;
         }
@@ -190,7 +194,7 @@ fn next_id(base: usize, extra: usize) -> u32 {
 
 impl Fresh {
     fn path_id(&mut self, base: &dyn InsightsSource, p: &str) -> PathId {
-        if let Some(id) = base.find_path(p) {
+        if let Some(id) = base.path_id(p) {
             return id;
         }
         if let Some(i) = self.paths.iter().position(|q| &**q == p) {
@@ -201,7 +205,7 @@ impl Fresh {
     }
 
     fn label_id(&mut self, base: &dyn InsightsSource, l: &str) -> LabelId {
-        if let Some(id) = base.find_label(l) {
+        if let Some(id) = base.label_id(l) {
             return id;
         }
         if let Some(i) = self.labels.iter().position(|q| &**q == l) {

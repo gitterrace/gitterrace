@@ -283,7 +283,7 @@ pub(crate) fn blame_warm_list(
         .iter()
         .filter_map(|f| {
             let t = src
-                .find_path(&f.path)
+                .path_id(&f.path)
                 .and_then(|id| touches.get(&id).copied())
                 .unwrap_or(0);
             (t > u64::from(f.lines) && f.lines > 0)
@@ -311,7 +311,11 @@ pub(crate) async fn prewarm_blame(app: Arc<App>) {
             return;
         };
         let files = app.head_lines(&head);
-        for path in blame_warm_list(&files, &*src, BLAME_WARM_FILES) {
+        // A list built while the cache failed a read is dropped: prewarming is best effort.
+        let Ok(list) = src.run(|s| blame_warm_list(&files, &**s, BLAME_WARM_FILES)) else {
+            return;
+        };
+        for path in list {
             let (used, limit) = app.repo.blame_cache_fill();
             if used * 4 >= limit * 3 || app.repo.resolve("HEAD").ok().as_ref() != Some(&head) {
                 return;

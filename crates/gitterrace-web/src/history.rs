@@ -52,7 +52,7 @@ pub(crate) async fn page(
         let emails: HashMap<&str, String> = ids
             .iter()
             .filter_map(|id| {
-                let c = r.commit(r.find_commit(id)?)?;
+                let c = r.commit(r.commit_of(id)?)?;
                 Some((id.as_str(), r.ident(c.ident)?.1.to_string()))
             })
             .collect();

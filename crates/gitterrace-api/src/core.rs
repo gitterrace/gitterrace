@@ -6,7 +6,7 @@ use std::sync::{Arc, Mutex, RwLock};
 
 use gitterrace_actions::{Lines, styled};
 use gitterrace_git::Repo;
-use gitterrace_index::feed::{InsightsSource, RevView};
+use gitterrace_index::feed::{Checked, InsightsSource, RevView};
 use gitterrace_index::{Index, Insights, Options};
 use gitterrace_types::LinkStyle;
 use gitterrace_types::api::{
@@ -65,10 +65,7 @@ struct Settings {
     caps: gitterrace_config::Api,
 }
 
-/// What every statistic reads.
-pub(crate) type Src = Arc<dyn InsightsSource>;
-
-type RecordsCache = ((String, u64), Src);
+type RecordsCache = ((String, u64), Checked<dyn InsightsSource>);
 
 impl ApiState {
     pub fn new(repo: Arc<Repo>, index: Arc<Index>) -> Self {
@@ -179,20 +176,26 @@ impl ApiState {
         Some(format!("\"{head}-{h:016x}-{version}-{generation}\""))
     }
 
-    /// The source over the history reachable from `rev`, shared between calls while the tip
-    /// and the cache file are unchanged.
-    pub(crate) fn records(&self, rev: &str) -> Result<Src, ApiError> {
+    /// The source over the history reachable from `rev`, readable only through
+    /// [`Checked::run`]: an answer built while the cache failed a read is refused.
+    /// Shared between calls while the tip and the cache are unchanged. A source that met a
+    /// storage error is dropped, so the next call opens the cache again.
+    pub(crate) fn records(&self, rev: &str) -> Result<Checked<dyn InsightsSource>, ApiError> {
         let tip = self.repo.resolve(rev)?;
         let key = (tip.clone(), self.index.generation());
-        if let Ok(g) = self.cache.lock()
-            && let Some((k, v)) = g.as_ref()
-            && *k == key
-        {
-            return Ok(Arc::clone(v));
+        if let Ok(mut g) = self.cache.lock() {
+            if g.as_ref().is_some_and(|(_, v)| v.failure().is_some()) {
+                g.take();
+            }
+            if let Some((k, v)) = g.as_ref()
+                && *k == key
+            {
+                return Ok(v.share());
+            }
         }
         // Another rev reads the same segments through a reach view. Without a segment set yet
         // HEAD's is built first: an answer never comes from anything but the set.
-        let recs: Src = if let Some(src) = self.view(rev, &tip)? {
+        let recs = if let Some(src) = self.view(rev, &tip)? {
             src
         } else {
             self.refresh_index()?;
@@ -201,18 +204,30 @@ impl ApiState {
             })?
         };
         if let Ok(mut g) = self.cache.lock() {
-            *g = Some((key, Arc::clone(&recs)));
+            *g = Some((key, recs.share()));
         }
         Ok(recs)
     }
 
     /// The set when it holds `rev` exactly, else the reach view over it, `None` without a set.
-    fn view(&self, rev: &str, tip: &str) -> Result<Option<Src>, ApiError> {
+    fn view(&self, rev: &str, tip: &str) -> Result<Option<Checked<dyn InsightsSource>>, ApiError> {
+        self.open_view(rev, tip).map_err(|e| match e {
+            ApiError::Index(io) => gitterrace_index::feed::SourceError::of(&io)
+                .map_or(ApiError::Index(io), ApiError::Unreadable),
+            other => other,
+        })
+    }
+
+    fn open_view(
+        &self,
+        rev: &str,
+        tip: &str,
+    ) -> Result<Option<Checked<dyn InsightsSource>>, ApiError> {
         if let Some(set) = self.index.disk_source(&*self.repo, rev)? {
-            return Ok(Some(set));
+            return Ok(Some(set.erased()));
         }
         match self.index.rev_source(&*self.repo, rev, tip)? {
-            Some(RevView::Ready(view)) => Ok(Some(view)),
+            Some(RevView::Ready(view)) => Ok(Some(view.erased())),
             Some(RevView::NeedsReindex { read }) => Err(ApiError::NeedsReindex {
                 read,
                 cap: self.index.fresh_cap(),
@@ -266,11 +281,11 @@ impl ApiState {
 
     pub fn repo_info(&self) -> Result<RepoResponse, ApiError> {
         let head = self.repo.resolve(DEFAULT_REV).ok();
-        let records = self.records(DEFAULT_REV)?;
-        let totals = self
-            .insights(DEFAULT_REV, &*records, self.settings().defaults)
-            .period_summary(gitterrace_index::Period::All)
-            .current;
+        let totals = self.records(DEFAULT_REV)?.run(|records| {
+            self.insights(DEFAULT_REV, &**records, self.settings().defaults)
+                .period_summary(gitterrace_index::Period::All)
+                .current
+        })?;
         Ok(RepoResponse {
             head,
             head_branch: self.repo.head_branch(),
@@ -474,15 +489,19 @@ impl ApiState {
     ) -> Result<Value, ApiError> {
         let rev = Self::rev(rev)?;
         let tip = self.repo.resolve(rev)?;
-        let all = self.records(rev)?;
         let scope = insights::scope(params, self.settings().defaults)?;
-        let ins = self.insights(&tip, &*all, scope.options().clone());
-        let cx = gitterrace_index::CountContext::new(&*all, &gitterrace_index::feed::SystemClock);
-        let counted = ins.counted(&scope, cx);
-        let mut data = insights::compute(name, &counted, params, || {
-            let mut cache = gitterrace_index::LineCache::load(self.index.dir());
-            gitterrace_index::head_files(&self.repo, &tip, &mut cache).unwrap_or_default()
-        })?;
+        let all = self.records(rev)?;
+        let commits_indexed = all.len();
+        let mut data = all.run(|all| {
+            let ins = self.insights(&tip, &**all, scope.options().clone());
+            let cx =
+                gitterrace_index::CountContext::new(&**all, &gitterrace_index::feed::SystemClock);
+            let counted = ins.counted(&scope, cx);
+            insights::compute(name, &counted, params, || {
+                let mut cache = gitterrace_index::LineCache::load(self.index.dir());
+                gitterrace_index::head_files(&self.repo, &tip, &mut cache).unwrap_or_default()
+            })
+        })??;
         let rows = match name {
             "file_churn" => data.as_array_mut(),
             "hotspots" => data["files"].as_array_mut(),
@@ -495,19 +514,19 @@ impl ApiState {
                 row["link"] = json!(link);
             }
         }
-        Ok(json!({ "rev": rev, "insight": name, "commits_indexed": all.len(), "data": data }))
+        Ok(json!({ "rev": rev, "insight": name, "commits_indexed": commits_indexed, "data": data }))
     }
 
     /// People with their commits, plus a commit-share bus factor: the fewest people who made
     /// half the commits. Bots are left out unless the configuration counts them.
     pub fn contributors(&self, rev: Option<&str>) -> Result<ContributorsResponse, ApiError> {
         let rev = Self::rev(rev)?;
-        let records = self.records(rev)?;
         let opts = self.settings().defaults;
         let bots = opts.include_bots;
-        let report = self
-            .insights(rev, &*records, opts)
-            .contributors(gitterrace_index::Period::All);
+        let report = self.records(rev)?.run(|records| {
+            self.insights(rev, &**records, opts)
+                .contributors(gitterrace_index::Period::All)
+        })?;
         let people: Vec<_> = report
             .contributors
             .into_iter()

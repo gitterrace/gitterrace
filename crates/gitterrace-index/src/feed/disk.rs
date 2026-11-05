@@ -317,6 +317,15 @@ impl DiskSource {
         r.map_or_else(|e| self.fail(&e), Some)
     }
 
+    /// [`DiskSource::ok`] for a finder: the error is remembered and returned, never absence.
+    fn checked<T>(&self, r: SegResult<T>) -> Result<T, crate::feed::SourceError> {
+        r.map_err(|e| {
+            let msg = e.to_string();
+            self.fail::<()>(&e);
+            crate::feed::SourceError(msg)
+        })
+    }
+
     fn block(&self, key: Key) -> SegResult<Arc<Block>> {
         let poisoned = || SegError::Io(std::io::Error::other("block cache lock poisoned"));
         let hit = self.cache.lock().map_err(|_| poisoned())?.get(key);

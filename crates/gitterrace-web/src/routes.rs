@@ -180,29 +180,13 @@ async fn overview(State(app): Shared, Query(q): Query<DocQuery>) -> Result<Html<
         let list = a.repo.tree(&head, "")?;
         let docs = crate::about::find(&list);
         let about = crate::about::card(a, &head, &rev, "", "/", &docs, q.doc.as_deref());
-        let src = a.source(&head)?;
-        let side = src
-            .as_ref()
-            .map(|s| crate::overview_side::html(a, &head, &**s))
-            .unwrap_or_default();
-        let totals = src.map(|src| {
-            let t = a.totals(&head, &*src, a.defaults().into_options());
-            Numbers {
-                commits: fmt::thousands(src.len()),
-                commits_noun: fmt::noun(src.len(), "commit", "commits"),
-                merges: match crate::overview_side::merges(a, &head, &*src) {
-                    0 => String::new(),
-                    n => format!("({})", fmt::count(n, "merge", "merges")),
-                },
-                authors: fmt::thousands(t.authors),
-                authors_noun: fmt::noun(t.authors, "author", "authors"),
-                files: fmt::thousands(t.files),
-                files_noun: fmt::noun(t.files, "file touched", "files touched"),
-                additions: fmt::thousands(t.additions),
-                deletions: fmt::thousands(t.deletions),
-                lines_noun: fmt::noun(t.additions + t.deletions, "line", "lines"),
-            }
-        });
+        let (side, totals) = match a.source(&head)? {
+            Some(src) => src.run(|src| {
+                let side = crate::overview_side::html(a, &head, &**src);
+                (side, Some(overview_numbers(a, &head, src)))
+            })?,
+            None => (String::new(), None),
+        };
         Ok(OverviewPage {
             c: Chrome {
                 md: about.as_ref().is_some_and(|d| d.markdown),
@@ -222,6 +206,26 @@ async fn overview(State(app): Shared, Query(q): Query<DocQuery>) -> Result<Html<
     })
     .await?;
     page(&p)
+}
+
+/// The overview's totals line over `src`.
+fn overview_numbers(a: &App, head: &str, src: &crate::insights::Src) -> Numbers {
+    let t = a.totals(head, &**src, a.defaults().into_options());
+    Numbers {
+        commits: fmt::thousands(src.len()),
+        commits_noun: fmt::noun(src.len(), "commit", "commits"),
+        merges: match crate::overview_side::merges(a, head, &**src) {
+            0 => String::new(),
+            n => format!("({})", fmt::count(n, "merge", "merges")),
+        },
+        authors: fmt::thousands(t.authors),
+        authors_noun: fmt::noun(t.authors, "author", "authors"),
+        files: fmt::thousands(t.files),
+        files_noun: fmt::noun(t.files, "file touched", "files touched"),
+        additions: fmt::thousands(t.additions),
+        deletions: fmt::thousands(t.deletions),
+        lines_noun: fmt::noun(t.additions + t.deletions, "line", "lines"),
+    }
 }
 
 #[derive(Template)]
@@ -283,35 +287,40 @@ pub(crate) async fn with_records<T: Template + Send + 'static>(
     let (html, served) = blocking(app, move |a| {
         let head = a.repo.resolve(&fmt::selected())?;
         let c = views::chrome(a, "stats").live(Mode::NOTICE);
-        match a.source(&head)? {
-            Some(src) => Ok((build(a, &src, c).render()?, true)),
-            None if a.far(&head).is_some() => Ok((
-                crate::far::render(c, tab, a.far(&head).unwrap_or(0))?,
-                false,
-            )),
-            None => Ok((
-                PendingPage {
-                    c,
-                    tabs: views::stats_tabs(tab),
-                    newer: a.index.newer_format().map(|v| {
-                        // The cache folder is a path on the host; a public visitor gets no path.
-                        let dir = if a.public() {
-                            "its cache folder".to_owned()
-                        } else {
-                            a.index.dir().display().to_string()
-                        };
-                        format!(
-                            "The history cache was written by a newer gitterrace (format {v}, this \
+        // The page is rendered inside the check: a storage error meanwhile refuses it, so it
+        // is neither shown nor memoized, and the cache is rebuilt behind the indexing page.
+        if let Some(src) = a.source(&head)? {
+            match src.run(|s| build(a, s, c).render()) {
+                Ok(html) => return Ok((html?, true)),
+                Err(e) => a.unreadable(&e)?,
+            }
+        }
+        let c = views::chrome(a, "stats").live(Mode::NOTICE);
+        if let Some(read) = a.far(&head) {
+            return Ok((crate::far::render(c, tab, read)?, false));
+        }
+        Ok((
+            PendingPage {
+                c,
+                tabs: views::stats_tabs(tab),
+                newer: a.index.newer_format().map(|v| {
+                    // The cache folder is a path on the host; a public visitor gets no path.
+                    let dir = if a.public() {
+                        "its cache folder".to_owned()
+                    } else {
+                        a.index.dir().display().to_string()
+                    };
+                    format!(
+                        "The history cache was written by a newer gitterrace (format {v}, this \
                          build reads {}). It is left untouched: run the newer build, or delete \
                          {dir} to rebuild it here.",
-                            gitterrace_index::FORMAT_VERSION,
-                        )
-                    }),
-                }
-                .render()?,
-                false,
-            )),
-        }
+                        gitterrace_index::FORMAT_VERSION,
+                    )
+                }),
+            }
+            .render()?,
+            false,
+        ))
     })
     .await?;
     Ok((Html(html), served))

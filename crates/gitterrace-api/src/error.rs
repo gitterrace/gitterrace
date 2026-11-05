@@ -21,6 +21,10 @@ pub enum ApiError {
          one view reads from git (cap {cap}, counted {read})"
     )]
     NeedsReindex { read: usize, cap: usize },
+    /// The insights cache failed a read while the answer was built: it is rebuilt, never
+    /// answered from.
+    #[error(transparent)]
+    Unreadable(#[from] gitterrace_index::feed::SourceError),
 }
 
 /// Every `error.code` an answer can carry, with its HTTP status and meaning. The docs and the
@@ -36,6 +40,11 @@ pub const ERROR_CODES: &[(&str, u16, &str)] = &[
     ("git", 500, "reading the repository failed"),
     ("index", 500, "reading the insights cache failed"),
     ("internal", 500, "the server failed"),
+    (
+        "index_unreadable",
+        503,
+        "the insights cache failed a read and is being rebuilt; retry shortly",
+    ),
     (
         "needs_reindex",
         409,
@@ -55,6 +64,7 @@ impl ApiError {
                 gitterrace_git::Error::RevNotFound(_) | gitterrace_git::Error::PathNotFound(_),
             ) => StatusCode::NOT_FOUND,
             Self::NeedsReindex { .. } => StatusCode::CONFLICT,
+            Self::Unreadable(_) => StatusCode::SERVICE_UNAVAILABLE,
             Self::Git(_) | Self::Index(_) | Self::Task(_) => StatusCode::INTERNAL_SERVER_ERROR,
         }
     }
@@ -68,6 +78,7 @@ impl ApiError {
             Self::Index(_) => "index",
             Self::Task(_) => "internal",
             Self::NeedsReindex { .. } => "needs_reindex",
+            Self::Unreadable(_) => "index_unreadable",
         }
     }
 }
@@ -101,6 +112,7 @@ mod tests {
             ApiError::Index(std::io::Error::other("x")),
             ApiError::Task(String::new()),
             ApiError::NeedsReindex { read: 0, cap: 0 },
+            ApiError::Unreadable(gitterrace_index::feed::SourceError(String::new())),
         ];
         for e in &all {
             assert!(

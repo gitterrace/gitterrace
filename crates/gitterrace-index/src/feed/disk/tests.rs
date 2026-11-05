@@ -125,7 +125,11 @@ fn assert_same(d: &dyn InsightsSource, m: &dyn InsightsSource, case: &str) {
             assert_eq!(d.find_commit(&id), m.find_commit(&id), "{case}: find {id}");
         }
     }
-    assert_eq!(d.find_commit(&oid(99_999)), None, "{case}: absent commit");
+    assert_eq!(
+        d.find_commit(&oid(99_999)),
+        Ok(None),
+        "{case}: absent commit"
+    );
     for range in [
         CommitRange::All,
         CommitRange::Ranks(3..17),
@@ -155,7 +159,7 @@ fn assert_same(d: &dyn InsightsSource, m: &dyn InsightsSource, case: &str) {
         let s = m.path(PathId(p));
         assert_eq!(d.path(PathId(p)), s, "{case}: path {p}");
         assert_eq!(
-            s.and_then(|s| d.find_path(&s)),
+            s.and_then(|s| d.path_id(&s)),
             Some(PathId(p)),
             "{case}: find {p}"
         );

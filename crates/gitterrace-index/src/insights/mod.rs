@@ -232,7 +232,7 @@ impl<'a> Insights<'a> {
     /// untracked or brand-new name) is decided on its own.
     pub(crate) fn skips_head(&self, path: &str) -> bool {
         self.source()
-            .find_path(path)
+            .path_id(path)
             .map_or_else(|| self.d.filter.skips(path), |id| self.skips_id(id))
     }
 

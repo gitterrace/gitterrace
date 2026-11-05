@@ -134,7 +134,7 @@ impl<'a> Tally<'a> {
 /// The first-parent chain from `rank`, newest first.
 fn walk(src: &dyn InsightsSource, rank: Option<Rank>) -> impl Iterator<Item = Rank> + '_ {
     std::iter::successors(rank, move |r| {
-        src.parent_ids(*r).first().and_then(|p| src.find_commit(p))
+        src.parent_ids(*r).first().and_then(|p| src.commit_of(p))
     })
 }
 

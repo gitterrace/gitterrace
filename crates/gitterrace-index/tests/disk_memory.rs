@@ -74,13 +74,13 @@ fn footprint(n: usize) -> SegResult<(usize, usize)> {
     probe();
     for p in 0..u32::try_from(disk.paths()).unwrap_or(u32::MAX) {
         if let Some(s) = disk.path(PathId(p)) {
-            sink += u64::from(disk.find_path(&s).is_some());
+            sink += u64::from(disk.path_id(&s).is_some());
         }
     }
     probe();
     for r in (0..len).step_by(97) {
         if let Some(id) = disk.commit_id(Rank(r)) {
-            sink += u64::from(disk.find_commit(&id).is_some());
+            sink += u64::from(disk.commit_of(&id).is_some());
         }
     }
     probe();

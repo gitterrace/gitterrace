@@ -10,7 +10,7 @@ use std::sync::Arc;
 
 use crate::feed::{
     AuthorDayRow, CommitRange, CommitRow, FileRow, Hit, IdentId, InsightsSource, LabelId,
-    PathAuthorRow, PathId, Posting, Rank, RenameEdge, Stream, Sums,
+    PathAuthorRow, PathId, Posting, Rank, RenameEdge, SourceError, Stream, Sums,
 };
 use crate::seg::agg::{self, Aggregates, Strings};
 use crate::seg::bounds::Cursor;
@@ -348,7 +348,7 @@ impl<B: InsightsSource> InsightsSource for SegmentSource<B> {
         self.base.parent_ids(rank)
     }
 
-    fn find_commit(&self, id: &str) -> Option<Rank> {
+    fn find_commit(&self, id: &str) -> Result<Option<Rank>, SourceError> {
         self.base.find_commit(id)
     }
 
@@ -372,7 +372,7 @@ impl<B: InsightsSource> InsightsSource for SegmentSource<B> {
         self.base.path(id)
     }
 
-    fn find_path(&self, path: &str) -> Option<PathId> {
+    fn find_path(&self, path: &str) -> Result<Option<PathId>, SourceError> {
         self.base.find_path(path)
     }
 
@@ -392,8 +392,14 @@ impl<B: InsightsSource> InsightsSource for SegmentSource<B> {
         self.base.label(id)
     }
 
-    fn find_label(&self, name: &str) -> Option<LabelId> {
+    fn find_label(&self, name: &str) -> Result<Option<LabelId>, SourceError> {
         self.base.find_label(name)
+    }
+
+    fn failure(&self) -> Option<SourceError> {
+        self.unreadable()
+            .map(SourceError)
+            .or_else(|| self.base.failure())
     }
 }
 

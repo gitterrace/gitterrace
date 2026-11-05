@@ -1,0 +1,11 @@
+id: store-result-folded
+valid:
+  - 'fn f(s: &dyn InsightsSource) -> Result<(), E> { let r = s.find_commit(id)?; Ok(()) }'
+  - 'fn f(s: &dyn InsightsSource) { let r = s.commit_of(id); }'
+  - 'fn f(s: &dyn InsightsSource) -> io::Result<()> { s.find_path(p).map_err(SourceError::io)?; Ok(()) }'
+invalid:
+  # An error becomes "not indexed" and the caller acts on it.
+  - 'fn f(s: &dyn InsightsSource) { let r = s.find_commit(id).unwrap_or(None); }'
+  - 'fn f(s: &dyn InsightsSource) { let r = s.find_path(p).ok().flatten(); }'
+  - 'fn f(s: &dyn InsightsSource) { let r = s.find_label(l).unwrap_or_default(); }'
+  - 'fn f(s: &dyn InsightsSource) { if s.find_commit(id).is_ok_and(|r| r.is_some()) {} }'

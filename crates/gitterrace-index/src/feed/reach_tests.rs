@@ -155,7 +155,7 @@ fn view(s: &dyn InsightsSource) -> Vec<String> {
     }
     for p in ["src/a.rs", "src/b.rs", "doc/b.md", "new/c.rs"] {
         let hits: Vec<_> = s
-            .find_path(p)
+            .path_id(p)
             .map(|id| s.postings(Posting::Path(id)).collect())
             .unwrap_or_default();
         out.push(format!("path {p} {hits:?}"));
@@ -224,6 +224,7 @@ fn a_rev_view_equals_a_fresh_load_of_that_rev() {
             RevView::Ready(v) => v,
             RevView::NeedsReindex { .. } => panic!("{tip}: under the cap"),
         };
+        let got = got.unchecked();
         assert_eq!(view(&*got), view(&mem), "tip {tip}");
         assert_eq!(got.fresh_len(), reads, "tip {tip}");
         assert_eq!(git.reads.load(std::sync::atomic::Ordering::Relaxed), reads);

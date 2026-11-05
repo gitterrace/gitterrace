@@ -245,16 +245,21 @@ fn wrapped(
         .disk_source(&repo, "HEAD")
         .context("reading the cache")?
         .context("the cache does not hold HEAD yet: a commit could not be read, run again")?;
-    let year = year.unwrap_or_else(|| {
-        use gitterrace_index::feed::{CommitRange, InsightsSource, local_day_of};
-        let newest = set
-            .commits_in(CommitRange::All)
-            .map(|c| local_day_of(c.time, c.offset))
-            .max()
-            .unwrap_or(0);
-        i32::try_from(gitterrace_git::civil_from_days(newest).0).unwrap_or(i32::MAX)
-    });
-    let stats = gitterrace_cards::wrapped_stats(&repo.name(), &*set, year);
+    let stats = set
+        .run(|set| {
+            use gitterrace_index::feed::{CommitRange, InsightsSource, local_day_of};
+            let year = year.unwrap_or_else(|| {
+                let newest = set
+                    .commits_in(CommitRange::All)
+                    .map(|c| local_day_of(c.time, c.offset))
+                    .max()
+                    .unwrap_or(0);
+                i32::try_from(gitterrace_git::civil_from_days(newest).0).unwrap_or(i32::MAX)
+            });
+            gitterrace_cards::wrapped_stats(&repo.name(), &**set, year)
+        })
+        .context("the cache failed a read: delete .git/gitterrace and run again")?;
+    let year = stats.year;
     let layout: gitterrace_types::CardLayout = layout.parse().context("unknown layout")?;
     let theme: gitterrace_types::CardTheme = theme.parse().context("unknown theme")?;
     let svg = gitterrace_cards::wrapped_svg(&stats, layout, theme);

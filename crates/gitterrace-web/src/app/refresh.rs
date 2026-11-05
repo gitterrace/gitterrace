@@ -187,7 +187,8 @@ async fn refresh(app: &Arc<App>, rev: &str, warm: Option<&str>) {
     tokio::task::spawn_blocking(move || {
         let _warm = a.warming();
         if let Ok(Some(r)) = a.source(&h) {
-            a.chain(&h, &*r, &crate::languages::path_filter(&a, &h));
+            // A walk that met a storage error is dropped: the next page rebuilds the cache.
+            drop(r.run(|r| a.chain(&h, &**r, &crate::languages::path_filter(&a, &h))));
         }
     });
     app.refreshed.notify_one();

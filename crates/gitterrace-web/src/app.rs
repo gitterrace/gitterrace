@@ -463,7 +463,10 @@ impl App {
         }
         // A ready index names the commits that changed anything under `dir`; the walk visits
         // only those instead of every commit in history.
-        let among = self.source(commit)?.map(|src| touched_names(&*src, dir));
+        let among = self
+            .source(commit)?
+            .map(|src| src.run(|s| touched_names(&**s, dir)))
+            .transpose()?;
         let (found, complete) =
             gitterrace_git::last_commits_among(&self.repo, commit, dir, among.as_deref(), budget)?;
         let v = Arc::new(found);

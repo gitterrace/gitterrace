@@ -8,7 +8,7 @@ use crate::feed::disk::record::{hash32, hex};
 use crate::feed::disk::{DiskSource, SCAN_FROM, scan};
 use crate::feed::{
     AuthorDayRow, CommitRange, CommitRow, FileRow, Hit, IdentId, InsightsSource, LabelId,
-    PathAuthorRow, PathId, Posting, Rank, RenameEdge, Stream, Sums,
+    PathAuthorRow, PathId, Posting, Rank, RenameEdge, SourceError, Stream, Sums,
 };
 
 impl InsightsSource for DiskSource {
@@ -87,9 +87,11 @@ impl InsightsSource for DiskSource {
             .unwrap_or_default()
     }
 
-    fn find_commit(&self, id: &str) -> Option<Rank> {
-        let oid = crate::store::oid_of(id)?;
-        self.ok(self.rank_of(&oid)).flatten()
+    fn find_commit(&self, id: &str) -> Result<Option<Rank>, SourceError> {
+        let Some(oid) = crate::store::oid_of(id) else {
+            return Ok(None);
+        };
+        self.checked(self.rank_of(&oid))
     }
 
     fn agg_author_day(&self, days: Range<i64>) -> Stream<'_, AuthorDayRow> {
@@ -193,20 +195,21 @@ impl InsightsSource for DiskSource {
         self.ok(self.string(0, id.0))
     }
 
-    fn find_path(&self, path: &str) -> Option<PathId> {
+    fn find_path(&self, path: &str) -> Result<Option<PathId>, SourceError> {
         let idx = if let Some(i) = self.path_hash.get() {
             i
         } else {
-            let built = self.ok(self.path_index())?;
+            let built = self.checked(self.path_index())?;
             self.path_hash.get_or_init(|| built)
         };
         let h = hash32(path);
         let start = idx.partition_point(|e| e.0 < h);
-        idx[start..]
-            .iter()
-            .take_while(|e| e.0 == h)
-            .find(|e| self.path(PathId(e.1)).as_deref() == Some(path))
-            .map(|e| PathId(e.1))
+        for e in idx[start..].iter().take_while(|e| e.0 == h) {
+            if *self.checked(self.string(0, e.1))? == *path {
+                return Ok(Some(PathId(e.1)));
+            }
+        }
+        Ok(None)
     }
 
     fn paths(&self) -> usize {
@@ -225,11 +228,16 @@ impl InsightsSource for DiskSource {
         self.labels.get(id.0 as usize).cloned()
     }
 
-    fn find_label(&self, name: &str) -> Option<LabelId> {
-        self.labels
+    fn find_label(&self, name: &str) -> Result<Option<LabelId>, SourceError> {
+        Ok(self
+            .labels
             .iter()
             .position(|l| &**l == name)
             .and_then(|i| u32::try_from(i).ok())
-            .map(LabelId)
+            .map(LabelId))
+    }
+
+    fn failure(&self) -> Option<SourceError> {
+        self.unreadable().map(SourceError)
     }
 }

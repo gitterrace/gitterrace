@@ -36,7 +36,11 @@ fn memo_key_moves_with_head_and_index_and_the_source_follows() {
     assert_ne!(key, app.memo_key("t", Some("type=feat")));
     app.memo_put(key.clone(), std::sync::Arc::new("page".into()));
     assert!(app.memo_get(&key).is_some());
-    let first = app.source(&head).expect("source").expect("ready");
+    let first = app
+        .source(&head)
+        .expect("source")
+        .expect("ready")
+        .unchecked();
     assert_eq!(first.len(), 1);
 
     std::fs::write(path.join("a.txt"), "2\n").expect("write");
@@ -49,7 +53,11 @@ fn memo_key_moves_with_head_and_index_and_the_source_follows() {
         .expect("update");
     app.mark_ready();
     let head = app.repo.resolve("HEAD").expect("head");
-    let second = app.source(&head).expect("source").expect("ready");
+    let second = app
+        .source(&head)
+        .expect("source")
+        .expect("ready")
+        .unchecked();
     assert_eq!(second.len(), 2, "the source must follow the new tip");
 }
 
@@ -73,7 +81,11 @@ fn overview_totals_are_computed_once_per_tip() {
     app.mark_ready();
     let opts = || app.defaults().into_options();
     let head = app.repo.resolve("HEAD").expect("head");
-    let src = app.source(&head).expect("source").expect("ready");
+    let src = app
+        .source(&head)
+        .expect("source")
+        .expect("ready")
+        .unchecked();
     assert_eq!(app.totals(&head, &*src, opts()).commits, 1);
     let empty = gitterrace_index::feed::MemorySource::new(&[]);
     assert_eq!(
@@ -88,7 +100,11 @@ fn overview_totals_are_computed_once_per_tip() {
         .update(&app.repo, "HEAD", &|_| {})
         .expect("update");
     let head = app.repo.resolve("HEAD").expect("head");
-    let src = app.source(&head).expect("source").expect("ready");
+    let src = app
+        .source(&head)
+        .expect("source")
+        .expect("ready")
+        .unchecked();
     assert_eq!(
         app.totals(&head, &*src, opts()).commits,
         2,
@@ -102,7 +118,7 @@ fn racing_callers_share_one_source() {
     let sets: Vec<_> = (0..8)
         .map(|_| {
             let (a, h) = (Arc::clone(&app), head.clone());
-            std::thread::spawn(move || a.source(&h).expect("source").expect("ready"))
+            std::thread::spawn(move || a.source(&h).expect("source").expect("ready").unchecked())
         })
         .collect::<Vec<_>>()
         .into_iter()
@@ -113,8 +129,16 @@ fn racing_callers_share_one_source() {
         "every caller reads the set"
     );
     // Racers may each open the set (it is a pread view, cheap); once one is kept, all share it.
-    let kept = app.source(&head).expect("source").expect("ready");
-    let again = app.source(&head).expect("source").expect("ready");
+    let kept = app
+        .source(&head)
+        .expect("source")
+        .expect("ready")
+        .unchecked();
+    let again = app
+        .source(&head)
+        .expect("source")
+        .expect("ready")
+        .unchecked();
     assert!(Arc::ptr_eq(&kept, &again), "a kept source is shared");
 }
 
@@ -135,11 +159,11 @@ fn a_block_corrupted_while_serving_rebuilds_the_cache() {
         .expect("update");
     app.mark_ready();
     let head = app.repo.resolve("HEAD").expect("head");
-    let src = app.source(&head).expect("source").expect("ready");
-    assert!(
-        app.caches.disk.lock().is_ok_and(|d| d.is_some()),
-        "HEAD reads the segments"
-    );
+    let src = app
+        .source(&head)
+        .expect("source")
+        .expect("ready")
+        .unchecked();
     let cache = app.index.dir().to_path_buf();
     let seg = std::fs::read_dir(&cache)
         .expect("ls")
@@ -197,8 +221,22 @@ fn alternating_selected_commits_each_read_the_segment_set() {
     app.mark_ready();
     let head = app.repo.resolve("HEAD").expect("head");
     for _ in 0..3 {
-        assert_eq!(app.source(&head).expect("source").expect("ready").len(), 2);
-        assert_eq!(app.source(&first).expect("source").expect("ready").len(), 1);
+        assert_eq!(
+            app.source(&head)
+                .expect("source")
+                .expect("ready")
+                .unchecked()
+                .len(),
+            2
+        );
+        assert_eq!(
+            app.source(&first)
+                .expect("source")
+                .expect("ready")
+                .unchecked()
+                .len(),
+            1
+        );
     }
 }
 
@@ -210,7 +248,11 @@ fn alternating_selected_commits_each_read_the_segment_set() {
 fn an_idle_app_lets_go_of_its_source_and_opens_it_again_on_use() {
     let (_dir, app, head) = one_commit_app();
     // Everything the pages build over the source, as the warm-up does.
-    let src = app.source(&head).expect("source").expect("ready");
+    let src = app
+        .source(&head)
+        .expect("source")
+        .expect("ready")
+        .unchecked();
     app.chain(&head, &*src, &crate::languages::path_filter(&app, &head));
     crate::fmt::with_rev(&head, || {
         let _ins = crate::insights::insights(&app, &src, gitterrace_index::Options::default());
@@ -236,7 +278,11 @@ fn an_idle_app_lets_go_of_its_source_and_opens_it_again_on_use() {
         !app.source_held(),
         "an idle app still holds its insights source"
     );
-    let again = app.source(&head).expect("source").expect("ready");
+    let again = app
+        .source(&head)
+        .expect("source")
+        .expect("ready")
+        .unchecked();
     assert_eq!(again.len(), 1);
 }
 
@@ -265,7 +311,11 @@ fn one_commit_app() -> (tempfile::TempDir, Arc<App>, String) {
 #[test]
 fn an_idle_release_empties_every_cache() {
     let (_dir, app, head) = one_commit_app();
-    let src = app.source(&head).expect("source").expect("ready");
+    let src = app
+        .source(&head)
+        .expect("source")
+        .expect("ready")
+        .unchecked();
     app.chain(&head, &*src, &crate::languages::path_filter(&app, &head));
     let _ = app.file_paths(&head).expect("files");
     let _ = app.last_commits(&head, "").expect("last commits");
@@ -287,14 +337,22 @@ fn warm_up_reads_do_not_delay_the_release() {
     std::thread::sleep(Duration::from_millis(30));
     {
         let _warm = app.warming();
-        let src = app.source(&head).expect("source").expect("ready");
+        let src = app
+            .source(&head)
+            .expect("source")
+            .expect("ready")
+            .unchecked();
         app.chain(&head, &*src, &crate::languages::path_filter(&app, &head));
     }
     assert!(
         app.release_idle(Duration::from_millis(20)),
         "the warm-up kept the caches as if a visitor had read them"
     );
-    let _ = app.source(&head).expect("source").expect("ready");
+    let _ = app
+        .source(&head)
+        .expect("source")
+        .expect("ready")
+        .unchecked();
     assert!(
         !app.release_idle(Duration::from_millis(20)),
         "a visitor's read did not count as use"

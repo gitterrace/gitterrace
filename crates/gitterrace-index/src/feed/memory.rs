@@ -10,7 +10,7 @@ use std::sync::{Arc, OnceLock};
 use crate::CommitRecord;
 use crate::feed::{
     AuthorDayRow, CommitRange, CommitRow, FileRow, Hit, IdentId, InsightsSource, LabelId,
-    PathAuthorRow, PathId, Posting, Rank, RenameEdge, Stream, Sums,
+    PathAuthorRow, PathId, Posting, Rank, RenameEdge, SourceError, Stream, Sums,
 };
 use crate::insights::fasthash::FastMap;
 use crate::insights::{local_day, under};
@@ -250,8 +250,8 @@ impl InsightsSource for MemorySource<'_> {
             .unwrap_or_default()
     }
 
-    fn find_commit(&self, id: &str) -> Option<Rank> {
-        self.t().commit_ids.get(id).map(|&i| Rank(i))
+    fn find_commit(&self, id: &str) -> Result<Option<Rank>, SourceError> {
+        Ok(self.t().commit_ids.get(id).map(|&i| Rank(i)))
     }
 
     fn agg_author_day(&self, days: Range<i64>) -> Stream<'_, AuthorDayRow> {
@@ -345,8 +345,8 @@ impl InsightsSource for MemorySource<'_> {
         self.t().paths.get(id.0 as usize).cloned()
     }
 
-    fn find_path(&self, path: &str) -> Option<PathId> {
-        self.t().path_ids.get(path).map(|&i| PathId(i))
+    fn find_path(&self, path: &str) -> Result<Option<PathId>, SourceError> {
+        Ok(self.t().path_ids.get(path).map(|&i| PathId(i)))
     }
 
     fn paths(&self) -> usize {
@@ -365,8 +365,13 @@ impl InsightsSource for MemorySource<'_> {
         self.t().labels.get(id.0 as usize).cloned()
     }
 
-    fn find_label(&self, name: &str) -> Option<LabelId> {
-        self.t().label_ids.get(name).map(|&i| LabelId(i))
+    fn find_label(&self, name: &str) -> Result<Option<LabelId>, SourceError> {
+        Ok(self.t().label_ids.get(name).map(|&i| LabelId(i)))
+    }
+
+    /// Records in memory meet no storage.
+    fn failure(&self) -> Option<SourceError> {
+        None
     }
 }
 
@@ -391,9 +396,9 @@ mod tests {
             s.ident(c.ident).map(|i| i.0.to_string()).as_deref(),
             Some("Bob")
         );
-        assert_eq!(s.find_commit("c"), Some(Rank(2)));
+        assert_eq!(s.find_commit("c"), Ok(Some(Rank(2))));
         assert_eq!(s.commits_in(CommitRange::Ranks(1..3)).count(), 2);
-        let x = s.find_path("x.rs").expect("x.rs");
+        let x = s.path_id("x.rs").expect("x.rs");
         let hits: Vec<u32> = s.postings(Posting::Path(x)).map(|h| h.rank.0).collect();
         assert_eq!(hits, [0, 1, 2]);
         let e: Vec<_> = s.rename_edges().collect();
@@ -407,6 +412,6 @@ mod tests {
         let owned: u64 = s.agg_path_author("").map(|r| r.touches).sum();
         assert_eq!(owned, 6);
         let shared = MemorySource::shared(std::sync::Arc::new(recs.clone()));
-        assert_eq!(shared.find_commit("c"), Some(Rank(2)));
+        assert_eq!(shared.find_commit("c"), Ok(Some(Rank(2))));
     }
 }

@@ -1,0 +1,24 @@
+id: store-result-folded
+language: rust
+severity: error
+message: 'A source finder or failure result folded into absence.'
+note: 'A storage error is not "not indexed". Propagate it with `?`, or inside a build guarded by `Checked::run` use the recorded helpers (`commit_of`, `path_id`, `label_id`).'
+# gitterrace-git's `find_commit` is gix's: a git read, not the insights cache.
+files: [crates/**/*.rs]
+# The recorded helpers themselves, and tests that probe a failure on purpose.
+ignores:
+  - crates/gitterrace-index/src/feed/mod.rs
+  - crates/**/tests.rs
+  - crates/**/*_tests.rs
+  - crates/**/tests/**
+  - crates/gitterrace-git/**
+rule:
+  any:
+    - pattern: $S.find_commit($$$).$F($$$)
+    - pattern: $S.find_path($$$).$F($$$)
+    - pattern: $S.find_label($$$).$F($$$)
+  has:
+    field: function
+    has:
+      field: field
+      regex: '^(ok|unwrap_or|unwrap_or_default|unwrap_or_else|map_or|map_or_else|is_ok|is_err|unwrap|expect|ok_or|and_then|map|into_iter|iter|flatten|is_some|is_none|is_some_and|is_none_or|is_ok_and|is_err_and)$'

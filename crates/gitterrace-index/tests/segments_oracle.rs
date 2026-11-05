@@ -131,11 +131,12 @@ fn check(repo_dir: &Path, case: &str) {
     let set = index
         .disk_source(&repo, "HEAD")
         .expect("open set")
-        .expect("the set holds HEAD");
+        .expect("the set holds HEAD")
+        .unchecked();
     let oracle = from_git(&repo, None, true);
     same_source(&*set, &oracle, &from_git(&repo, None, false), case);
     same_insights(&*set, &oracle, case);
-    assert_eq!(gitterrace_index::unreadable(&set), None, "{case}");
+    assert_eq!(set.failure(), None, "{case}");
 }
 
 /// Every golden corpus repository (the option matrix under each mailmap, the adversarial
@@ -183,7 +184,8 @@ fn an_appended_segment_answers_like_the_oracle() {
     let set = index
         .disk_source(&repo, "HEAD")
         .expect("open")
-        .expect("set");
+        .expect("set")
+        .unchecked();
     // The appended set ranks old order then new commits: the oracle follows the same order.
     let order: Vec<String> = (0..u32::try_from(set.len()).expect("len"))
         .filter_map(|r| set.commit_id(Rank(r)).map(|id| id.to_string()))

@@ -58,6 +58,7 @@ pub fn built(repo: &std::path::Path) -> std::sync::Arc<gitterrace_index::DiskSet
         .disk_source(&r, &tip)
         .expect("open")
         .expect("the built tip has a set")
+        .unchecked()
 }
 
 #[test]

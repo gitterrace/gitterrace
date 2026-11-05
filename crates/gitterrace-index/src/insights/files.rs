@@ -197,7 +197,7 @@ impl Insights<'_> {
     /// ascending: the order the old full replay produced.
     fn hits_of(&self, path: &str) -> Vec<(Rank, u32, PathId)> {
         let src = self.source();
-        let Some(head) = src.find_path(path) else {
+        let Some(head) = src.path_id(path) else {
             return Vec::new();
         };
         let follow = self.follow();
@@ -291,7 +291,7 @@ impl Insights<'_> {
         // Every name a head file had, to the head files it can stand for.
         let mut names: FastMap<PathId, Vec<(usize, PathId)>> = FastMap::default();
         for (i, p) in paths.iter().enumerate() {
-            let Some(head) = src.find_path(p) else {
+            let Some(head) = src.path_id(p) else {
                 continue;
             };
             names.entry(head).or_default().push((i, head));

@@ -11,7 +11,7 @@ use std::sync::Arc;
 use crate::CommitRecord;
 use crate::feed::{
     AuthorDayRow, CommitRange, CommitRow, FileRow, Hit, IdentId, InsightsSource, LabelId,
-    PathAuthorRow, PathId, Posting, Rank, RenameEdge, Stream, Sums, local_day_of,
+    PathAuthorRow, PathId, Posting, Rank, RenameEdge, SourceError, Stream, Sums, local_day_of,
 };
 use crate::insights::Options;
 
@@ -257,9 +257,11 @@ impl InsightsSource for Scoped<'_> {
             .unwrap_or_default()
     }
 
-    fn find_commit(&self, id: &str) -> Option<Rank> {
-        let b = self.base.find_commit(id)?;
-        self.by_base.get(&b).map(|&i| Rank(i))
+    fn find_commit(&self, id: &str) -> Result<Option<Rank>, SourceError> {
+        let Some(b) = self.base.find_commit(id)? else {
+            return Ok(None);
+        };
+        Ok(self.by_base.get(&b).map(|&i| Rank(i)))
     }
 
     fn agg_author_day(&self, days: Range<i64>) -> Stream<'_, AuthorDayRow> {
@@ -360,7 +362,7 @@ impl InsightsSource for Scoped<'_> {
         self.base.path(id)
     }
 
-    fn find_path(&self, path: &str) -> Option<PathId> {
+    fn find_path(&self, path: &str) -> Result<Option<PathId>, SourceError> {
         self.base.find_path(path)
     }
 
@@ -380,8 +382,12 @@ impl InsightsSource for Scoped<'_> {
         self.base.label(id)
     }
 
-    fn find_label(&self, name: &str) -> Option<LabelId> {
+    fn find_label(&self, name: &str) -> Result<Option<LabelId>, SourceError> {
         self.base.find_label(name)
+    }
+
+    fn failure(&self) -> Option<SourceError> {
+        self.base.failure()
     }
 }
 
@@ -567,7 +573,7 @@ mod tests {
                     assert_eq!(c.files as usize, r.files.len(), "{s:?} {}", r.id);
                     let add: u64 = r.files.iter().map(|f| u64::from(f.additions)).sum();
                     assert_eq!(c.sums.add, add);
-                    assert_eq!(v.find_commit(&r.id), Some(c.rank));
+                    assert_eq!(v.find_commit(&r.id), Ok(Some(c.rank)));
                 }
                 assert_eq!(v.len(), want.len());
             }

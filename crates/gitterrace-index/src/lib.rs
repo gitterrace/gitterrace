@@ -118,12 +118,6 @@ pub struct Progress {
 /// The source pages read when the segment set holds the shown rev.
 pub type DiskSet = feed::SegmentSource<feed::DiskSource>;
 
-/// The first store error `set` met while serving, from its tables or its rows. Some means the
-/// cache is unreadable: [`Index::rebuild`] it, never serve part of it.
-pub fn unreadable(set: &DiskSet) -> Option<String> {
-    set.unreadable().or_else(|| set.base().unreadable())
-}
-
 /// The cache for one repository.
 pub struct Index {
     dir: PathBuf,
@@ -362,8 +356,9 @@ impl Index {
         &self,
         source: &dyn CommitSource,
         rev: &str,
-    ) -> io::Result<Option<std::sync::Arc<DiskSet>>> {
-        let seg = |e: seg::SegError| io::Error::other(e.to_string());
+    ) -> io::Result<Option<feed::Checked<DiskSet>>> {
+        // A store error opening the set is an unreadable cache, which callers rebuild.
+        let seg = feed::SourceError::io;
         let open = || seg::read::Store::open(&self.dir).map_err(seg);
         let Some(store) = open()? else {
             return Ok(None);
@@ -398,9 +393,8 @@ impl Index {
         let Some(tables) = open()? else {
             return Ok(None);
         };
-        Ok(Some(std::sync::Arc::new(feed::SegmentSource::new(
-            disk,
-            tables.segments,
+        Ok(Some(feed::Checked::new(std::sync::Arc::new(
+            feed::SegmentSource::new(disk, tables.segments),
         ))))
     }
 
@@ -423,7 +417,8 @@ impl Index {
         rev: &str,
         tip: &str,
     ) -> io::Result<Option<feed::RevView<DiskSet>>> {
-        let seg = |e: seg::SegError| io::Error::other(e.to_string());
+        // A store error opening the set is an unreadable cache, which callers rebuild.
+        let seg = feed::SourceError::io;
         let open = || seg::read::Store::open(&self.dir).map_err(seg);
         let (Some(rows), Some(tables)) = (open()?, open()?) else {
             return Ok(None);

@@ -16,7 +16,7 @@ use crate::CommitSource;
 use crate::feed::fresh::{self, Fresh, FreshRow, Walk, label_count};
 use crate::feed::{
     AuthorDayRow, CommitRange, CommitRow, FileRow, Hit, IdentId, InsightsSource, LabelId,
-    PathAuthorRow, PathId, Posting, Rank, RenameEdge, Stream, Sums,
+    PathAuthorRow, PathId, Posting, Rank, RenameEdge, SourceError, Stream, Sums,
 };
 
 /// Commits per `rows_for` call while folding an aggregate, so one fold holds one chunk.
@@ -24,7 +24,7 @@ const CHUNK: usize = 256;
 
 /// What a rev other than the indexed tip gets.
 pub enum RevView<S> {
-    Ready(Arc<Reach<S>>),
+    Ready(crate::feed::Checked<Reach<S>>),
     /// The rev has more than the cap of commits the set lacks: reindex for it.
     NeedsReindex {
         read: usize,
@@ -51,7 +51,8 @@ pub fn rev_view<S: InsightsSource>(
     tip: &str,
     cap: usize,
 ) -> io::Result<RevView<S>> {
-    let (fresh, seeds) = match base.find_commit(tip) {
+    // Absence reads git, so an error must not pass for it.
+    let (fresh, seeds) = match base.find_commit(tip).map_err(SourceError::io)? {
         Some(r) => (Fresh::default(), vec![r]),
         None => match fresh::walk(&base, src, rev, tip, cap)? {
             Walk::Done(f, met) => (f, met),
@@ -61,7 +62,7 @@ pub fn rev_view<S: InsightsSource>(
     let mut reach = Reach::new(base, &seeds);
     reach.fresh = fresh;
     reach.shift_fresh();
-    Ok(RevView::Ready(Arc::new(reach)))
+    Ok(RevView::Ready(crate::feed::Checked::new(Arc::new(reach))))
 }
 
 fn bit(bits: &[u64], r: u32) -> bool {
@@ -84,7 +85,7 @@ impl<S: InsightsSource> Reach<S> {
                     continue;
                 }
                 for p in base.parent_ids(Rank(r)) {
-                    if let Some(pr) = base.find_commit(&p).filter(|pr| pr.0 < r) {
+                    if let Some(pr) = base.commit_of(&p).filter(|pr| pr.0 < r) {
                         bits[pr.0 as usize / 64] |= 1 << (pr.0 % 64);
                     }
                 }
@@ -225,11 +226,13 @@ impl<S: InsightsSource> InsightsSource for Reach<S> {
         )
     }
 
-    fn find_commit(&self, id: &str) -> Option<Rank> {
+    fn find_commit(&self, id: &str) -> Result<Option<Rank>, SourceError> {
         if let Some(&i) = self.fresh.ids.get(id) {
-            return Some(Rank(self.inner + u32::try_from(i).unwrap_or(u32::MAX)));
+            return Ok(Some(Rank(
+                self.inner + u32::try_from(i).unwrap_or(u32::MAX),
+            )));
         }
-        self.base.find_commit(id).and_then(|b| self.dense(b))
+        Ok(self.base.find_commit(id)?.and_then(|b| self.dense(b)))
     }
 
     fn agg_author_day(&self, days: Range<i64>) -> Stream<'_, AuthorDayRow> {
@@ -338,11 +341,14 @@ impl<S: InsightsSource> InsightsSource for Reach<S> {
             .map_or_else(|| self.base.path(id), |i| self.fresh.paths.get(i).cloned())
     }
 
-    fn find_path(&self, path: &str) -> Option<PathId> {
-        self.base.find_path(path).or_else(|| {
-            let i = self.fresh.paths.iter().position(|p| &**p == path)?;
-            u32::try_from(self.base.paths() + i).ok().map(PathId)
-        })
+    fn find_path(&self, path: &str) -> Result<Option<PathId>, SourceError> {
+        if let Some(p) = self.base.find_path(path)? {
+            return Ok(Some(p));
+        }
+        let Some(i) = self.fresh.paths.iter().position(|p| &**p == path) else {
+            return Ok(None);
+        };
+        Ok(u32::try_from(self.base.paths() + i).ok().map(PathId))
     }
 
     fn paths(&self) -> usize {
@@ -368,11 +374,18 @@ impl<S: InsightsSource> InsightsSource for Reach<S> {
         })
     }
 
-    fn find_label(&self, name: &str) -> Option<LabelId> {
-        self.base.find_label(name).or_else(|| {
-            let i = self.fresh.labels.iter().position(|l| &**l == name)?;
-            u32::try_from(label_count(&self.base) + i).ok().map(LabelId)
-        })
+    fn find_label(&self, name: &str) -> Result<Option<LabelId>, SourceError> {
+        if let Some(l) = self.base.find_label(name)? {
+            return Ok(Some(l));
+        }
+        let Some(i) = self.fresh.labels.iter().position(|l| &**l == name) else {
+            return Ok(None);
+        };
+        Ok(u32::try_from(label_count(&self.base) + i).ok().map(LabelId))
+    }
+
+    fn failure(&self) -> Option<SourceError> {
+        self.base.failure()
     }
 }
 

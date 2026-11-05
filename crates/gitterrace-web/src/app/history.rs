@@ -37,7 +37,7 @@ impl App {
         {
             return Ok(Some(v));
         }
-        let owned = touching_history(&*src, path);
+        let owned = src.run(|s| touching_history(&**s, path))?;
         let history: Vec<(&str, &[String], bool)> = owned
             .iter()
             .map(|(id, parents, t)| (id.as_str(), parents.as_slice(), *t))
