@@ -66,6 +66,9 @@
 //   live-scroll  on the working tree page with 90 changed files, open at #f3 and scrolled to a file far
 //                down, a live refresh keeps that file within 4 px of where it was, keeps the loaded
 //                bodies and keeps #f3 open
+//   tab-levels   at 1440 and 900 px a page's tabs never share the header nav's font and case, More
+//                opens as a popover without moving the row, Escape closes it, and on a page behind
+//                More its button names that page
 //   seg-one-row  every segmented control on the insights pages and a document shows one row of
 //                choices or its native select, never two rows, at 360 and 1440 px, light and dark
 //   huge-diff    a commit of 2,000 changed files (mostly pure renames) loads under a DOM bound,
@@ -89,7 +92,7 @@ const bin = resolve(arg('--bin', join(root, 'target/debug/git-terrace')));
 const fromDisk = process.argv.includes('--from-disk');
 const tabCounts = arg('--tabs', '8,12').split(',').map(Number);
 const browsers = arg('--browsers', 'webkit,chromium').split(',');
-const ALL = ['truncation', 'live-tabs', 'mermaid', 'chip', 'doctabs', 'chords', 'header', 'marked', 'menu-same', 'gutter', 'overlays', 'tips', 'date-tips', 'repo-switch', 'outline', 'mark-seam', 'about-place', 'site-theme', 'side-width', 'calm-header', 'tabs-one-line', 'huge-diff', 'sticky-heads', 'md-anchor', 'live-scroll', 'sticky-line', 'seg-one-row'];
+const ALL = ['truncation', 'live-tabs', 'mermaid', 'chip', 'doctabs', 'chords', 'header', 'marked', 'menu-same', 'gutter', 'overlays', 'tips', 'date-tips', 'repo-switch', 'outline', 'mark-seam', 'about-place', 'site-theme', 'side-width', 'calm-header', 'tabs-one-line', 'tab-levels', 'huge-diff', 'sticky-heads', 'md-anchor', 'live-scroll', 'sticky-line', 'seg-one-row'];
 const wanted = arg('--checks', ALL.join(',')).split(',');
 for (const c of wanted) if (!ALL.includes(c)) { console.error(`unknown check ${c}; known: ${ALL.join(', ')}`); process.exit(2); }
 
@@ -261,6 +264,40 @@ async function segOneRow() {
     await b.close();
   }
 }
+// Tab levels: a page's own tabs never share the header nav's type, and More opens over the
+// page without moving the tab row; Escape closes it. On a More page its button names the tab.
+async function tabLevels() {
+  for (const name of browsers) {
+    const { b, ctx } = await context(name);
+    for (const width of [1440, 900]) {
+      const p = await ctx.newPage();
+      await p.setViewportSize({ width, height: 600 });
+      await p.goto(srv.base + '/stats/patterns', { waitUntil: 'load' });
+      const where = `tab-levels ${name} ${width}`;
+      const look = await p.evaluate(() => {
+        const f = (s) => { const e = document.querySelector(s); if (!e) return null; const c = getComputedStyle(e); return c.fontFamily + '|' + c.textTransform; };
+        const sum = document.querySelector('.tabs .more>summary');
+        return { nav: f('.tabnav a'), page: f('.tabs>a'), label: sum ? sum.textContent.trim() : '', h: document.querySelector('.tabs').getBoundingClientRect().height };
+      });
+      const bad = [];
+      if (!look.nav || !look.page) bad.push('missing tab rows');
+      else if (look.nav === look.page) bad.push(`page tabs look like the header nav (${look.page})`);
+      if (!/^Patterns/.test(look.label)) bad.push(`More button reads "${look.label}" on Patterns`);
+      await p.click('.tabs .more>summary');
+      const open = await p.evaluate(() => {
+        const pop = document.querySelector('.tabs .more>.pop');
+        return { h: document.querySelector('.tabs').getBoundingClientRect().height, shown: !!pop && pop.getBoundingClientRect().height > 0, pos: pop ? getComputedStyle(pop).position : '' };
+      });
+      if (!open.shown) bad.push('More did not open');
+      if (open.pos !== 'absolute' || Math.abs(open.h - look.h) > 0.5) bad.push(`opening More moves the row (${look.h} -> ${open.h}, ${open.pos})`);
+      await p.keyboard.press('Escape');
+      if (await p.evaluate(() => !!document.querySelector('.tabs .more[open]'))) bad.push('Escape leaves More open');
+      bad.length ? r.fail(`${where}: ${bad.join(', ')}`) : r.ok(`${where}: two tab levels, More pops over`);
+      await p.close();
+    }
+    await b.close();
+  }
+}
 // Sticky heads: on a commit with three 300-line files, scrolled halfway into the second, its
 // header is pinned at the top and the first's is not; a #L120 link on a source page lands
 // fully below the pinned path bar; at 375 px the site header never pins. The commit is made
@@ -326,7 +363,7 @@ async function stickyHeads() {
     await b.close();
   }
 }
-const checks = { 'sticky-heads': stickyHeads, 'tabs-one-line': tabsOneLine, 'calm-header': calmHeader, 'side-width': sideWidth, truncation, 'live-tabs': liveTabs, mermaid, chip, doctabs, chords, header, marked, 'menu-same': menuSame, gutter, overlays, tips, 'date-tips': dateTips, 'repo-switch': repoSwitch, outline, 'mark-seam': markSeam, 'about-place': aboutPlace, 'site-theme': siteTheme, 'huge-diff': hugeDiff, 'md-anchor': mdAnchor, 'live-scroll': liveScroll, 'sticky-line': stickyLine, 'seg-one-row': segOneRow };
+const checks = { 'sticky-heads': stickyHeads, 'tabs-one-line': tabsOneLine, 'tab-levels': tabLevels, 'calm-header': calmHeader, 'side-width': sideWidth, truncation, 'live-tabs': liveTabs, mermaid, chip, doctabs, chords, header, marked, 'menu-same': menuSame, gutter, overlays, tips, 'date-tips': dateTips, 'repo-switch': repoSwitch, outline, 'mark-seam': markSeam, 'about-place': aboutPlace, 'site-theme': siteTheme, 'huge-diff': hugeDiff, 'md-anchor': mdAnchor, 'live-scroll': liveScroll, 'sticky-line': stickyLine, 'seg-one-row': segOneRow };
 try {
   for (const c of wanted) { console.log(`-- ${c}`); await checks[c](); }
 } finally {

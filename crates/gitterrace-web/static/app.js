@@ -144,3 +144,18 @@
   }
   window.gtToast = toast;
 })();
+
+// The More tab popover: a click outside or Escape closes it, as every other popover does.
+(function () {
+  function shut(except) {
+    document.querySelectorAll(".tabs .more[open]").forEach(function (d) { if (d !== except) d.open = false; });
+  }
+  document.addEventListener("click", function (e) { shut(e.target.closest && e.target.closest(".tabs .more")); });
+  document.addEventListener("keydown", function (e) {
+    if (e.key !== "Escape") return;
+    var open = document.querySelector(".tabs .more[open]");
+    if (!open) return;
+    open.open = false;
+    open.querySelector("summary").focus();
+  });
+})();

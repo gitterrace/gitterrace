@@ -373,12 +373,15 @@ pub fn stats_tab_labels() -> Vec<&'static str> {
     STATS_TABS.iter().map(|(_, label, _)| *label).collect()
 }
 
-/// The insights tab row: the primary tabs, then the rest under "More", open when one of them
-/// is the current page so the active tab is always visible.
+/// The insights tab row: the primary tabs, then the rest in a "More" popover. When the current
+/// page is one of those, the popover's button is named after it, so the open tab is always
+/// visible and the row never reflows.
 pub(crate) struct Tabs {
     pub(crate) primary: Vec<Nav>,
     pub(crate) more: Vec<Nav>,
     pub(crate) more_on: bool,
+    /// What the popover's button says: `More`, or the open tab's label.
+    pub(crate) more_label: &'static str,
 }
 
 pub(crate) fn stats_tabs(active: &str) -> Tabs {
@@ -402,8 +405,10 @@ pub(crate) fn stats_tabs(active: &str) -> Tabs {
         })
         .collect();
     let more = all.split_off(PRIMARY_TABS.min(all.len()));
+    let open = more.iter().find(|n| n.on).map(|n| n.label);
     Tabs {
-        more_on: more.iter().any(|n| n.on),
+        more_on: open.is_some(),
+        more_label: open.unwrap_or("More"),
         primary: all,
         more,
     }

@@ -141,3 +141,12 @@ fn huge_diffs_fold_behind_a_load_button() {
     assert!(big.contains("data-load-diff=\"/diff/abc/0\""));
     assert!(!big.contains("<div class=\"add\""));
 }
+
+#[test]
+fn the_more_button_names_the_open_tab_behind_it() {
+    let t = crate::views::stats_tabs("pa");
+    assert!(t.more_on && t.more_label == "Patterns");
+    assert!(t.primary.iter().all(|n| !n.on));
+    let t = crate::views::stats_tabs("a");
+    assert!(!t.more_on && t.more_label == "More");
+}
