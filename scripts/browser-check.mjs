@@ -88,6 +88,7 @@ import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { checks as pageChecks } from './browser-pages-lib.mjs';
 import { checks as uiChecks } from './browser-ui-lib.mjs';
+import { checks as layoutChecks } from './browser-layout-lib.mjs';
 import { checks as siteChecks } from './browser-site-lib.mjs';
 import { checks as diffChecks } from './browser-diff-lib.mjs';
 import { root, loadPlaywright, launch, makeRepo, serve, openPage, reporter, sh } from './browser-lib.mjs';
@@ -129,7 +130,8 @@ const env = { pw, dir, srv, r, browsers, tabCounts, marker, context, arg, bin, c
 const { checks: anchorChecks } = await import('./browser-anchor-lib.mjs');
 const { mdAnchor } = anchorChecks(env);
 const { truncation, liveTabs, mermaid, chip, doctabs, chords, header } = pageChecks(env);
-const { marked, menuSame, gutter, overlays, tips, dateTips, repoSwitch, liveScroll, outline, inlineControls, sectionGaps } = uiChecks(env);
+const { marked, menuSame, gutter, overlays, tips, dateTips, repoSwitch, liveScroll, outline } = uiChecks(env);
+const { inlineControls, sectionGaps } = layoutChecks(env);
 const { markSeam, aboutPlace, siteTheme, exportFromDisk } = siteChecks(env);
 const { hugeDiff } = diffChecks(env);
 const { checks: stickyChecks } = await import('./browser-sticky-lib.mjs');
