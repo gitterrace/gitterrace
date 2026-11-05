@@ -19,6 +19,7 @@ pub fn write_cache(dir: &Path, recs: &[CommitRecord], cuts: &[usize]) -> SegResu
     let mut labels = Interner::default();
     let mut base = StringBase::default();
     let mut live = Vec::new();
+    let mut lives = crate::seg::canon::Lives::default();
     let mut bounds = vec![0];
     bounds.extend_from_slice(cuts);
     bounds.push(recs.len());
@@ -32,6 +33,7 @@ pub fn write_cache(dir: &Path, recs: &[CommitRecord], cuts: &[usize]) -> SegResu
                 .truncate(true)
                 .open(&spill)
         });
+        b.continue_lives(std::mem::take(&mut lives));
         let mut rows = RowWriter::new(dir, n as u64 + 1)?;
         for (i, r) in recs.iter().enumerate().take(w[1]).skip(w[0]) {
             b.push(&mut s, r, i as u32)?;
@@ -48,7 +50,9 @@ pub fn write_cache(dir: &Path, recs: &[CommitRecord], cuts: &[usize]) -> SegResu
         let name = format!("seg-1-{n}.gts");
         let mut cw = ContainerWriter::new(dir, &name, Kind::Segment, base)?;
         rows.commits(&mut |sec, items, p| cw.block(sec, items, p))?;
-        b.finish(&mut |sec, items, p| cw.block(sec, items, p))?;
+        lives = b.finish(s.paths.list.len(), &mut |sec, items, p| {
+            cw.block(sec, items, p)
+        })?;
         rows.finish(&mut |sec, items, p| cw.block(sec, items, p))?;
         live.push(cw.finish()?);
         let tail = |l: &[Box<str>], from: u32| -> Vec<String> {

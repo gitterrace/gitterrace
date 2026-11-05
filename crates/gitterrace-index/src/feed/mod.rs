@@ -165,6 +165,8 @@ pub struct FileRow {
     /// (add, del, rewritten) ignoring whitespace, `None` when equal to the raw counts.
     pub code: Option<(u32, u32, u32)>,
     pub binary: bool,
+    /// The commit deleted the file.
+    pub deleted: bool,
 }
 
 impl FileRow {

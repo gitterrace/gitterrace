@@ -116,6 +116,7 @@ pub(crate) fn walk(
                 rewritten: s.rewritten,
                 code: s.code.map(|c| (c.additions, c.deletions, c.rewritten)),
                 binary: s.binary,
+                deleted: s.deleted,
             };
             sums.add_row(&row);
             files.push(row);

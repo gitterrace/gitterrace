@@ -239,3 +239,62 @@ fn a_cache_a_newer_build_owns_is_never_written_by_a_running_server() {
         );
     });
 }
+
+/// A cache written by the format before rename-aware aggregates (checked-in bytes of format
+/// 6, segment version 6, never produced by this build) is wiped and rebuilt: every insights page
+/// answers 200 or the building page, never a 5xx, and the rebuilt cache is the current format.
+/// Red when the previous version is still accepted: the page then reads a cache without lives.
+#[test]
+fn a_version_6_cache_is_rebuilt_to_7_without_a_500() {
+    let rt = tokio::runtime::Runtime::new().expect("runtime");
+    rt.block_on(async {
+        let tmp = tempfile::tempdir().expect("tmp");
+        let repo = Fixture::standard(&tmp.path().join("repo"))
+            .path()
+            .to_owned();
+        let cache = repo.join(".git/gitterrace");
+        let old = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/cache-v6");
+        std::fs::create_dir_all(&cache).expect("mkdir");
+        for e in std::fs::read_dir(&old).expect("fixture").flatten() {
+            std::fs::copy(e.path(), cache.join(e.file_name())).expect("copy");
+        }
+        let seg = std::fs::read(cache.join("seg-1-0.gts")).expect("v6 segment");
+        assert_eq!(
+            &seg[..8],
+            b"GTS1\x06\0\0\0",
+            "the fixture holds segment version 6"
+        );
+        assert_eq!(
+            std::fs::read_to_string(cache.join("VERSION")).expect("v"),
+            "6\n"
+        );
+
+        let router = gitterrace_web::app_router(&repo).expect("router");
+        let prefix = base(&router).await;
+        gitterrace_testkit::oracle::ready(&router).await;
+        let mut errors = Vec::new();
+        for p in gitterrace_web::WARM_PAGES
+            .iter()
+            .chain(&["/", "/api/v1/insights/hotspots"])
+        {
+            let (s, _) = get(&router, &format!("{prefix}{p}")).await;
+            if s != 200 {
+                errors.push(format!("{p} -> {s}"));
+            }
+        }
+        assert!(errors.is_empty(), "{}", errors.join("\n"));
+        let version = std::fs::read_to_string(cache.join("VERSION")).expect("version");
+        assert_eq!(version.trim(), gitterrace_index::FORMAT_VERSION);
+        let rebuilt = segments(&cache);
+        assert!(!rebuilt.is_empty(), "no segment after the rebuild");
+        for p in rebuilt {
+            let b = std::fs::read(&p).expect("read");
+            assert_eq!(
+                &b[..8],
+                b"GTS1\x07\0\0\0",
+                "{} is segment version 7",
+                p.display()
+            );
+        }
+    });
+}

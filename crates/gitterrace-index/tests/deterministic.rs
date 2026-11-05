@@ -182,3 +182,38 @@ fn two_steps_then_merge_equal_one_step_byte_for_byte() {
         .sum();
     assert_eq!(commits as usize, tips.len(), "commit section items");
 }
+
+/// The rename chain (a fork of one life included) built by the same appends with one worker,
+/// four and ten, the ten twice: every live file byte for byte the same, section 7 included.
+#[test]
+fn an_append_sequence_with_a_fork_indexes_the_same_on_any_thread_count() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let r = gitterrace_testkit::RenameChain::build(dir.path());
+    let stops = gitterrace_testkit::git(
+        &r.repo,
+        &["rev-list", "--first-parent", "--reverse", "HEAD"],
+    );
+    let stops: Vec<&str> = stops.lines().step_by(4).chain(["HEAD"]).collect();
+    let build = |threads: usize, n: usize| {
+        let source = Repo::discover(&r.repo).expect("open").with_workers(threads);
+        let cache = dir.path().join(format!("c{threads}-{n}"));
+        let index = Index::open_dir(cache.clone()).expect("index");
+        for s in &stops {
+            index.update(&source, s, &|_| {}).expect("append");
+        }
+        assert!(segments(&cache) > 1, "built by appends");
+        let store = Store::open(&cache).expect("open").expect("set");
+        let canon: u32 = store
+            .segments
+            .iter()
+            .flat_map(|s| s.blocks(section::CANON))
+            .map(|e| e.items)
+            .sum();
+        assert!(canon > 0, "section 7 is written");
+        live_files(&cache)
+    };
+    let one = build(1, 0);
+    for (threads, n) in [(4, 0), (10, 0), (10, 1)] {
+        assert!(build(threads, n) == one, "{threads} threads, run {n}");
+    }
+}

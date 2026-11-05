@@ -459,3 +459,5 @@ fn idle_memory_is_flat_in_tree_size() {
 
 #[path = "memory_budget/insights.rs"]
 mod insights;
+#[path = "memory_budget/renames.rs"]
+mod renames;

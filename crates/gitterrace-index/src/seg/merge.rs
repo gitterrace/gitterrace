@@ -162,7 +162,8 @@ mod tests {
         let mut uses = Vec::new();
         for r in recs {
             let (who, paths) = s.ids(r);
-            a.push(r, who, &paths);
+            let olds = crate::seg::canon::olds(s, r);
+            a.push(r, who, &paths, &olds);
             p.push(s, r, who, &paths);
             let mut u = vec![who];
             for (f, &id) in r.files.iter().zip(&paths) {

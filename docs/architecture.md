@@ -107,7 +107,7 @@ color the year card.
 | `tip` | The commit id the segment files were last built for. Opening insights for that commit skips walking its history to check the files hold exactly it. |
 | `lines.json` | Line counts per blob id for the language chart. A blob never changes, so the counts never go stale. |
 
-The format version is `6`.
+The format version is `7`.
 
 <!-- END GENERATED: cache -->
 

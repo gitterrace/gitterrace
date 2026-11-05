@@ -87,6 +87,8 @@ pub struct FileStat {
     /// Previous path when the file was renamed in this commit.
     pub old: Option<std::sync::Arc<str>>,
     pub binary: bool,
+    /// The commit deleted the file: its life ends here.
+    pub deleted: bool,
 }
 
 /// Line counts that ignore whitespace-only differences.

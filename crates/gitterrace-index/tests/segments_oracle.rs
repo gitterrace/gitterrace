@@ -136,7 +136,27 @@ fn check(repo_dir: &Path, case: &str) {
     let oracle = from_git(&repo, None, true);
     same_source(&*set, &oracle, &from_git(&repo, None, false), case);
     same_insights(&*set, &oracle, case);
+    same_lives(&cache.path().join("c"), &repo, None, case);
     assert_eq!(set.failure(), None, "{case}");
+}
+
+/// Lives (section 7), life x month (9), life x author (10) and merges per author day (6) of
+/// the set equal a replay of the records from git in the set's order.
+fn same_lives(cache: &Path, repo: &Repo, order: Option<&[String]>, case: &str) {
+    let walked = CommitSource::rev_list(repo, "HEAD").expect("rev list");
+    let order = order.unwrap_or(&walked);
+    let recs: Vec<CommitRecord> = CommitSource::records(repo, order).expect("records");
+    let store = gitterrace_index::seg::read::Store::open(cache)
+        .expect("store")
+        .expect("a set");
+    let (canon, _) = gitterrace_index::seg::canon::dump(&store).expect("canon");
+    let (want, _) = gitterrace_index::seg::canon::canon_of(&recs);
+    assert_eq!(canon, want, "{case}: lives");
+    let got = gitterrace_index::seg::canon::life_tables(&store).expect("life tables");
+    let want = gitterrace_index::seg::canon::life_tables_of(&recs);
+    assert_eq!(got.months, want.months, "{case}: life months");
+    assert_eq!(got.authors, want.authors, "{case}: life authors");
+    assert_eq!(got.merges, want.merges, "{case}: merges");
 }
 
 /// Every golden corpus repository (the option matrix under each mailmap, the adversarial
@@ -194,4 +214,5 @@ fn an_appended_segment_answers_like_the_oracle() {
     let raw = from_git(&repo, Some(&order), false);
     same_source(&*set, &oracle, &raw, "appended");
     same_insights(&*set, &oracle, "appended");
+    same_lives(&cache.path().join("c"), &repo, Some(&order), "appended");
 }

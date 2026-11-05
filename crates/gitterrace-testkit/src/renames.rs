@@ -40,6 +40,8 @@ fn by(f: Fixture, name: &str) -> Fixture {
 /// 10. Cy deletes `r.rs`. 11. Ann adds a new `r.rs` (a new life under a reused name).
 /// 12. Bob renames `Foo.rs` to `foo.rs` (case only).
 /// 13. Cy edits `foo.rs`, `r.rs` and `c.rs`.
+/// 14. Ann adds `x2.rs`. A branch renames it to `y2.rs`, main renames it to `z2.rs`, Cy merges
+///     keeping both, Ann edits both (a fork of one life).
 pub struct RenameChain {
     pub repo: std::path::PathBuf,
     /// The commit made at 23:30 -0800 on the last day of a month.
@@ -111,6 +113,34 @@ impl RenameChain {
             .write("r.rs", "a new r\nedited\n")
             .write("c.rs", &(c + "after copy\ntip\n"))
             .commit("fix: edit foo, r and c");
+        // A fork: side renames x2 to y2, main renames it to z2, the merge keeps both.
+        let f = by(f, "Ann")
+            .at("2024-02-14T10:00:00Z")
+            .write("x2.rs", &body("x2", 20))
+            .commit("feat: add x2")
+            .branch("fork");
+        let f = f.at("2024-02-15T10:00:00Z");
+        f.git(&["mv", "x2.rs", "y2.rs"]);
+        let f = f.commit("refactor: x2 to y2").checkout("main");
+        let f = by(f, "Bob").at("2024-02-16T10:00:00Z");
+        f.git(&["mv", "x2.rs", "z2.rs"]);
+        let f = f.commit("refactor: x2 to z2");
+        let f = by(f, "Cy").at("2024-02-17T10:00:00Z");
+        drop(crate::try_git(
+            f.path(),
+            &["merge", "-q", "--no-ff", "fork"],
+        ));
+        f.git(&["checkout", "fork", "--", "y2.rs"]);
+        f.git(&["rm", "-q", "--cached", "--ignore-unmatch", "x2.rs"]);
+        let f = f
+            .write("z2.rs", &body("x2", 20))
+            .commit("merge fork, keep y2 and z2");
+        f.git(&["branch", "-q", "-D", "fork"]);
+        let f = by(f, "Ann")
+            .at("2024-02-18T10:00:00Z")
+            .write("y2.rs", &(body("x2", 20) + "y2 edit\n"))
+            .write("z2.rs", &(body("x2", 20) + "z2 edit\n"))
+            .commit("fix: edit y2 and z2");
         let tip = f.git(&["rev-parse", "HEAD"]);
         Self {
             repo,

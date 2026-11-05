@@ -1,13 +1,15 @@
-//! The aggregates of a segment, built from records in canonical order: author x day and
-//! path x author. Keyed by raw identity and raw path ids, never by an
-//! option, so bots, mailmap, period and whitespace apply on read without a rebuild.
-//! Merges are left out: no page counts them.
+//! The aggregates of a segment, built from records in canonical order: author x day,
+//! path x author, and the rename-aware tables keyed by life (see `canon`): life x local month
+//! and life x author. Keyed by raw identity, raw path and life ids, never by an option, so
+//! bots, mailmap, period and whitespace apply on read without a rebuild. Merges count only in
+//! `AuthorDay::merges`: their rows repeat the branch's lines.
 
 use std::collections::BTreeMap;
 
 use crate::CommitRecord;
 use crate::insights::fasthash::FastMap;
 use crate::seg::bounds::{Cursor, MAX_BLOCK, put_varint, unzigzag, zigzag};
+use crate::seg::canon::Lives;
 use crate::seg::format::section;
 use crate::seg::{SegError, SegResult, Sink};
 
@@ -48,7 +50,9 @@ impl Sums {
 /// One author on one local day.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub(crate) struct AuthorDay {
+    /// Non-merge commits.
     pub commits: u64,
+    pub merges: u64,
     pub lines: Sums,
 }
 
@@ -57,6 +61,15 @@ pub(crate) struct AuthorDay {
 pub(crate) struct PathAuthor {
     pub touches: u64,
     pub lines: Sums,
+}
+
+/// One life in one local month (section 9). Whole-life numbers are the sum over months.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub(crate) struct LifeMonth {
+    pub touches: u64,
+    pub lines: Sums,
+    /// Newest author time of a touch.
+    pub last: i64,
 }
 
 /// First-use string ids, in the order the canonical stream introduces them.
@@ -110,28 +123,39 @@ impl Strings {
     }
 }
 
-/// The three tables, sorted by key so writing them is deterministic.
+/// The tables, sorted by key so writing them is deterministic.
 #[derive(Debug, Default)]
 pub(crate) struct Aggregates {
     /// (local day, identity).
     pub author_day: BTreeMap<(i64, u32), AuthorDay>,
     /// (path, identity).
     pub path_author: BTreeMap<(u32, u32), PathAuthor>,
+    /// (life, local month as year * 12 + month - 1).
+    pub life_month: BTreeMap<(u32, i64), LifeMonth>,
+    /// (life, identity).
+    pub life_author: BTreeMap<(u32, u32), PathAuthor>,
+    /// The life state, continued from the set's newest section 7 by an append.
+    pub lives: Lives,
 }
 
 impl Aggregates {
     /// Folds one record. Records must arrive in canonical order so ids are first-use ids.
     /// `who` and `paths` come from [`Strings::ids`].
-    pub(crate) fn push(&mut self, r: &CommitRecord, who: u32, paths: &[u32]) {
-        if r.merge {
-            return;
-        }
+    /// `olds` are the old-name ids of renamed rows.
+    pub(crate) fn push(&mut self, r: &CommitRecord, who: u32, paths: &[u32], olds: &[Option<u32>]) {
         let day = local_day(r);
         let ad = self.author_day.entry((day, who)).or_default();
+        if r.merge {
+            ad.merges += 1;
+            return;
+        }
         ad.commits += 1;
-        // A commit touches a path once even if a rename lists it twice.
+        let lives = self.lives.push(r, paths, olds);
+        let month = local_month(day);
+        // A commit touches a path, and a life, once even if a rename lists it twice.
         let mut seen: Vec<u32> = Vec::with_capacity(paths.len());
-        for (f, &p) in r.files.iter().zip(paths) {
+        let mut seen_life: Vec<u32> = Vec::with_capacity(paths.len());
+        for ((f, &p), &l) in r.files.iter().zip(paths).zip(&lives) {
             ad.lines.add_file(f);
             let first = !seen.contains(&p);
             if first {
@@ -141,6 +165,23 @@ impl Aggregates {
             pa.lines.add_file(f);
             if first {
                 pa.touches += 1;
+            }
+            let first = !seen_life.contains(&l);
+            if first {
+                seen_life.push(l);
+            }
+            let lm = self.life_month.entry((l, month)).or_default();
+            let la = self.life_author.entry((l, who)).or_default();
+            lm.lines.add_file(f);
+            la.lines.add_file(f);
+            if first {
+                lm.touches += 1;
+                la.touches += 1;
+                lm.last = if lm.touches == 1 {
+                    r.time
+                } else {
+                    lm.last.max(r.time)
+                };
             }
         }
     }
@@ -153,7 +194,8 @@ impl Aggregates {
         let mut a = Self::default();
         for r in records {
             let (who, paths) = s.ids(r);
-            a.push(r, who, &paths);
+            let olds = crate::seg::canon::olds(&s, r);
+            a.push(r, who, &paths, &olds);
         }
         (s, a)
     }
@@ -166,6 +208,12 @@ pub(crate) fn identity(r: &CommitRecord) -> String {
 /// Days since 1970-01-01 in the author's own time zone, as `insights::local_day`.
 pub(crate) fn local_day(r: &CommitRecord) -> i64 {
     r.time.saturating_add(i64::from(r.offset)).div_euclid(DAY)
+}
+
+/// The local month of a local day: year * 12 + month - 1.
+pub(crate) fn local_month(day: i64) -> i64 {
+    let (y, m, _) = gitterrace_git::civil_from_days(day);
+    y * 12 + m - 1
 }
 
 /// Groups encoded items into blocks of at most [`MAX_BLOCK`] bytes. Every block decodes on
@@ -271,8 +319,9 @@ fn u32_of(c: &Cursor<'_>, v: u64) -> SegResult<u32> {
 }
 
 impl Aggregates {
-    /// Writes sections author x day and path x author, sorted by key.
-    pub(crate) fn encode(&self, sink: &mut Sink<'_>) -> SegResult<()> {
+    /// Writes sections 6 to 10, sorted by key. `paths` is the set's path count after this
+    /// segment, the length of the per-name part of section 7.
+    pub(crate) fn encode(&self, paths: usize, sink: &mut Sink<'_>) -> SegResult<()> {
         pack(
             section::AUTHOR_DAY,
             self.author_day.iter(),
@@ -281,23 +330,48 @@ impl Aggregates {
                 put_varint(out, zigzag(day.wrapping_sub(base)));
                 put_varint(out, u64::from(who));
                 put_varint(out, v.commits);
+                put_varint(out, v.merges);
                 put_sums(out, &v.lines);
             },
             sink,
         )?;
+        self.lives.encode(paths, sink)?;
+        pack_path_author(section::PATH_AUTHOR, &self.path_author, sink)?;
         pack(
-            section::PATH_AUTHOR,
-            self.path_author.iter(),
-            |prev, (&(path, who), v), out| {
-                let base = prev.map_or(0, |(&(p, _), _)| p);
-                put_varint(out, u64::from(path.wrapping_sub(base)));
-                put_varint(out, u64::from(who));
+            section::PATH_TOUCH,
+            self.life_month.iter(),
+            |prev, (&(life, month), v), out| {
+                let base = prev.map_or(0, |(&(l, _), _)| l);
+                put_varint(out, u64::from(life.wrapping_sub(base)));
+                put_varint(out, zigzag(month));
                 put_varint(out, v.touches);
+                put_varint(out, zigzag(v.last));
                 put_sums(out, &v.lines);
             },
             sink,
-        )
+        )?;
+        pack_path_author(section::CANON_PATH_AUTHOR, &self.life_author, sink)
     }
+}
+
+/// Section 8 or 10: (key, identity) rows, key delta-coded.
+fn pack_path_author(
+    sec: u16,
+    rows: &BTreeMap<(u32, u32), PathAuthor>,
+    sink: &mut Sink<'_>,
+) -> SegResult<()> {
+    pack(
+        sec,
+        rows.iter(),
+        |prev, (&(path, who), v), out| {
+            let base = prev.map_or(0, |(&(p, _), _)| p);
+            put_varint(out, u64::from(path.wrapping_sub(base)));
+            put_varint(out, u64::from(who));
+            put_varint(out, v.touches);
+            put_sums(out, &v.lines);
+        },
+        sink,
+    )
 }
 
 /// Rows of one author x day block, ascending by (day, identity).
@@ -312,11 +386,13 @@ pub(crate) fn decode_author_day(
         let who = c.varint()?;
         let who = u32_of(c, who)?;
         let commits = c.varint()?;
+        let merges = c.varint()?;
         f(
             day,
             who,
             AuthorDay {
                 commits,
+                merges,
                 lines: get_sums(c)?,
             },
         );
@@ -328,7 +404,39 @@ pub(crate) fn decode_author_day(
     }
 }
 
-/// Rows of one path x author block, ascending by (path, identity).
+/// Rows of one life x month block (section 9), ascending by (life, month).
+pub(crate) fn decode_life_month(
+    c: &mut Cursor<'_>,
+    items: u32,
+    mut f: impl FnMut(u32, i64, LifeMonth),
+) -> SegResult<()> {
+    let mut life = 0u32;
+    for _ in 0..items {
+        let d = c.varint()?;
+        life = life
+            .checked_add(u32_of(c, d)?)
+            .ok_or_else(|| c.err("life id over u32"))?;
+        let month = unzigzag(c.varint()?);
+        let touches = c.varint()?;
+        let last = unzigzag(c.varint()?);
+        f(
+            life,
+            month,
+            LifeMonth {
+                touches,
+                lines: get_sums(c)?,
+                last,
+            },
+        );
+    }
+    if c.is_empty() {
+        Ok(())
+    } else {
+        Err(c.err("bytes after the last row"))
+    }
+}
+
+/// Rows of one path x author block (section 8, or 10 keyed by life), ascending by key.
 pub(crate) fn decode_path_author(
     c: &mut Cursor<'_>,
     items: u32,
@@ -364,136 +472,4 @@ pub(crate) fn decode_path_author(
     clippy::many_single_char_names,
     reason = "short names for the segment parts of a fixture"
 )]
-mod tests {
-    use std::collections::BTreeMap;
-
-    use super::Aggregates;
-    use crate::insights::fixtures::{chain, file, rec};
-    use crate::insights::{Insights, Options, Period};
-
-    fn fixture() -> Vec<crate::CommitRecord> {
-        let mut v = chain();
-        let mut renamed = file("z.rs", 2, 1, 30);
-        renamed.old = Some("x.rs".into());
-        let mut m = rec("e", "Cy", 50, vec![file("y.py", 9, 9, 9)]);
-        m.merge = true;
-        // y.py twice in one commit: still one touch.
-        v.push(rec(
-            "f",
-            "Cy",
-            45,
-            vec![renamed, file("y.py", 4, 0, 3204), file("y.py", 1, 0, 3205)],
-        ));
-        v.push(m);
-        v
-    }
-
-    /// Path x author summed over authors equals today's `file_churn` for every path.
-    #[test]
-    fn path_author_sums_equal_file_churn() {
-        let recs = fixture();
-        let (ids, agg) = Aggregates::build(&recs);
-        let ins = Insights::new(&recs, Options::default(), None);
-        let today = ins.file_churn(Period::All);
-        let ws = Options::default().count_whitespace;
-        let mut sums: BTreeMap<String, (usize, u64, u64)> = BTreeMap::new();
-        for ((p, _), v) in &agg.path_author {
-            let e = sums
-                .entry(ids.paths.list[*p as usize].to_string())
-                .or_default();
-            e.0 += usize::try_from(v.touches).unwrap_or(0);
-            let (a, d) = if ws {
-                (v.lines.add, v.lines.del)
-            } else {
-                (v.lines.code_add, v.lines.code_del)
-            };
-            e.1 += a;
-            e.2 += d;
-        }
-        sums.retain(|_, v| v.0 > 0);
-        assert_eq!(sums.len(), today.len());
-        for c in today {
-            assert_eq!(
-                sums[&c.path],
-                (c.commits, c.additions, c.deletions),
-                "{}",
-                c.path
-            );
-        }
-    }
-
-    /// Author x day commits equal today's counted commits per author.
-    #[test]
-    fn author_day_counts_equal_counted_commits() {
-        let recs = fixture();
-        let (ids, agg) = Aggregates::build(&recs);
-        let ins = Insights::new(&recs, Options::default(), None);
-        let mut today: BTreeMap<String, u64> = BTreeMap::new();
-        let src = ins.source();
-        for c in ins.counted_rows(Period::All) {
-            let (name, email) = src.ident(c.ident).unwrap_or_default();
-            *today.entry(format!("{name}\u{0}{email}")).or_default() += 1;
-        }
-        let mut ours: BTreeMap<String, u64> = BTreeMap::new();
-        for ((_, who), v) in &agg.author_day {
-            *ours
-                .entry(ids.identities.list[*who as usize].to_string())
-                .or_default() += v.commits;
-        }
-        assert_eq!(ours, today);
-    }
-
-    #[test]
-    fn path_author_and_ids_follow_first_use() {
-        let (ids, agg) = Aggregates::build(&fixture());
-        let names: Vec<&str> = ids.paths.list.iter().map(|s| &**s).collect();
-        assert_eq!(names, ["x.rs", "y.py", "z.rs"]);
-        let bob = ids.identities.get("Bob\u{0}bob@x.io");
-        let y = ids.paths.get("y.py");
-        let (Some(bob), Some(y)) = (bob, y) else {
-            panic!("ids missing");
-        };
-        let row = agg.path_author[&(y, bob)];
-        assert_eq!((row.touches, row.lines.add, row.lines.del), (2, 3300, 100));
-        // The merge counts nowhere.
-        assert!(ids.identities.get("Cy\u{0}cy@x.io").is_some());
-        assert_eq!(agg.author_day.values().map(|v| v.commits).sum::<u64>(), 5);
-    }
-
-    /// Encoded blocks decode to the same rows, for tiny blocks too (the sink is the only
-    /// writer, so this is the whole byte contract of sections 6 and 8).
-    #[test]
-    fn aggregates_round_trip_through_blocks() {
-        use crate::seg::bounds::Cursor;
-        let (_, agg) = Aggregates::build(&fixture());
-        let mut blocks: Vec<(u16, u32, Vec<u8>)> = Vec::new();
-        let r = agg.encode(&mut |s, n, b| {
-            blocks.push((s, n, b.to_vec()));
-            Ok(())
-        });
-        assert!(r.is_ok());
-        let mut back = Aggregates::default();
-        for (s, n, b) in &blocks {
-            let mut c = Cursor::new(b, "t", 0);
-            let r = if *s == crate::seg::format::section::AUTHOR_DAY {
-                super::decode_author_day(&mut c, *n, |d, w, v| {
-                    back.author_day.insert((d, w), v);
-                })
-            } else {
-                super::decode_path_author(&mut c, *n, |p, w, v| {
-                    back.path_author.insert((p, w), v);
-                })
-            };
-            assert!(r.is_ok(), "{r:?}");
-        }
-        assert_eq!(back.author_day, agg.author_day);
-        assert_eq!(back.path_author, agg.path_author);
-        // Truncated block: an error, never a panic.
-        let (s, n, b) = &blocks[0];
-        let mut c = Cursor::new(&b[..b.len() - 1], "t", 0);
-        assert!(
-            super::decode_author_day(&mut c, *n, |_, _, _| {}).is_err(),
-            "{s}"
-        );
-    }
-}
+mod tests;

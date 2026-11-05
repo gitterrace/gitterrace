@@ -39,7 +39,9 @@ fn encode(out: &mut Vec<u8>, r: &CommitRecord, w: &Ids<'_>) -> SegResult<()> {
         for v in [p, opt(o), f.additions, f.deletions, f.lines, f.rewritten] {
             out.extend_from_slice(&v.to_le_bytes());
         }
-        out.push(u8::from(f.binary) | (u8::from(f.code.is_some()) << 1));
+        out.push(
+            u8::from(f.binary) | (u8::from(f.code.is_some()) << 1) | (u8::from(f.deleted) << 2),
+        );
         if let Some(c) = &f.code {
             for v in [c.additions, c.deletions, c.rewritten] {
                 out.extend_from_slice(&v.to_le_bytes());

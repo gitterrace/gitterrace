@@ -20,7 +20,7 @@ use crate::seg::read::Container;
 use crate::seg::spill::Spill;
 use crate::seg::{Ordinal, SegResult, Sink};
 
-/// Writes the tables of one segment in section order: postings (3, 4, 5), aggregates (6, 8)
+/// Writes the tables of one segment in section order: postings (3, 4, 5), aggregates (6 to 10)
 /// and the rank of each local ordinal (33).
 #[cfg_attr(
     not(test),
@@ -30,10 +30,11 @@ pub(crate) fn write_tables(
     agg: &Aggregates,
     post: &Postings,
     ranks: &[u32],
+    paths: usize,
     sink: &mut Sink<'_>,
 ) -> SegResult<()> {
     post.encode(sink)?;
-    agg.encode(sink)?;
+    agg.encode(paths, sink)?;
     pack_ranks(ranks, sink)
 }
 
@@ -70,9 +71,10 @@ impl SegmentBuilder {
         rank: u32,
     ) -> SegResult<()> {
         let (who, paths) = strings.ids(r);
+        let olds = crate::seg::canon::olds(strings, r);
         let ord = u32::try_from(self.ranks.len()).unwrap_or(u32::MAX);
         self.ranks.push(rank);
-        self.agg.push(r, who, &paths);
+        self.agg.push(r, who, &paths, &olds);
         // Path hits go to the spill, the rest stays in the (small) in-memory tables.
         self.post.push_without_paths(strings, r, who, &paths);
         if !r.merge {
@@ -84,12 +86,24 @@ impl SegmentBuilder {
         Ok(())
     }
 
-    /// Writes sections 3, 4, 5, 6, 8 and 33 in id order.
-    pub(crate) fn finish(self, sink: &mut Sink<'_>) -> SegResult<()> {
+    /// Continues the life numbering of the set this segment is appended to.
+    pub(crate) fn continue_lives(&mut self, lives: crate::seg::canon::Lives) {
+        self.agg.lives = lives;
+    }
+
+    /// Writes sections 3 to 10 and 33 in id order. `paths` is the set's path count after
+    /// this segment.
+    /// Returns the life state after it, for a writer that goes on with another segment.
+    pub(crate) fn finish(
+        self,
+        paths: usize,
+        sink: &mut Sink<'_>,
+    ) -> SegResult<crate::seg::canon::Lives> {
         postings::encode_spilled(self.spill, sink)?;
         self.post.encode_rest(sink)?;
-        self.agg.encode(sink)?;
-        pack_ranks(&self.ranks, sink)
+        self.agg.encode(paths, sink)?;
+        pack_ranks(&self.ranks, sink)?;
+        Ok(self.agg.lives)
     }
 }
 
@@ -196,7 +210,8 @@ impl<B: InsightsSource> SegmentSource<B> {
         let mut out: BTreeMap<(i64, u32), AuthorDayRow> = BTreeMap::new();
         self.each_block(section::AUTHOR_DAY, |_, c, n| {
             agg::decode_author_day(c, n, |day, who, v| {
-                if !days.contains(&day) {
+                // A merge-only row: the commit counts leave merges out until they are opted in.
+                if !days.contains(&day) || v.commits == 0 {
                     return;
                 }
                 let e = out.entry((day, who)).or_insert_with(|| AuthorDayRow {

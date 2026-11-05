@@ -107,6 +107,7 @@ impl MemoryTables {
                     rewritten: f.rewritten,
                     code: f.code.map(|c| (c.additions, c.deletions, c.rewritten)),
                     binary: f.binary,
+                    deleted: f.deleted,
                 };
                 sums.add_row(&row);
                 t.rows.push(row);

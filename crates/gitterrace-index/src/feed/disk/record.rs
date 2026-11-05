@@ -117,7 +117,7 @@ pub(super) fn parse(c: &mut Cursor<'_>, mut files: Option<&mut Vec<FileRow>>) ->
         let old = opt(c.u32()?).map(PathId);
         let (add, del, lines, rewritten) = (c.u32()?, c.u32()?, c.u32()?, c.u32()?);
         let ff = c.u8()?;
-        if ff > 3 {
+        if ff > 7 {
             return Err(c.err("file flags"));
         }
         let code = if ff & 2 != 0 {
@@ -134,6 +134,7 @@ pub(super) fn parse(c: &mut Cursor<'_>, mut files: Option<&mut Vec<FileRow>>) ->
             rewritten,
             code,
             binary: ff & 1 != 0,
+            deleted: ff & 4 != 0,
         };
         sums.add_row(&f);
         if let Some(out) = files.as_deref_mut() {

@@ -287,6 +287,7 @@ impl DiskSource {
                 }),
                 old: f.old.map(|o| path(o.0)).transpose()?,
                 binary: f.binary,
+                deleted: f.deleted,
             });
         }
         Ok(CommitRecord {

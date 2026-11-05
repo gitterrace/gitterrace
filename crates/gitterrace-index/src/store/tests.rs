@@ -76,6 +76,7 @@ fn a_built_segment_set_is_kept_and_a_corrupt_one_wiped() -> io::Result<()> {
                 code: None,
                 old: None,
                 binary: false,
+                deleted: false,
             }],
         };
         b.push(&r).map_err(io::Error::other)?;
@@ -144,6 +145,7 @@ fn rec(i: usize, path: &str) -> crate::CommitRecord {
             code: None,
             old: None,
             binary: false,
+            deleted: false,
         }],
     }
 }

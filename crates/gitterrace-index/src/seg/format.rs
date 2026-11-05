@@ -9,7 +9,7 @@ use crate::seg::{SegError, SegResult};
 pub(crate) const MAGIC: [u8; 4] = *b"GTS1";
 pub(crate) const FOOTER_MAGIC: [u8; 4] = *b"GTSF";
 /// The on-disk format, shared with `VERSION`.
-pub(crate) const VERSION: u32 = 6;
+pub(crate) const VERSION: u32 = 7;
 pub(crate) const HEADER_LEN: u64 = 16;
 pub(crate) const FOOTER_LEN: u64 = 64;
 pub(crate) const TOC_ENTRY_LEN: u64 = 24;
@@ -41,11 +41,16 @@ pub mod section {
     pub const RENAMES: u16 = 4;
     pub const AUTHOR_POSTINGS: u16 = 5;
     pub const AUTHOR_DAY: u16 = 6;
-    /// Reserved, not written.
-    pub const MONTH_PATH: u16 = 7;
+    /// Path id to life and life to last name, fixed 4 B items (`seg::canon`). Reserved and
+    /// empty before format 7, when id 7 was named `MONTH_PATH`: the version bump allowed
+    /// reusing it.
+    pub const CANON: u16 = 7;
     pub const PATH_AUTHOR: u16 = 8;
-    /// Reserved, not written.
-    pub const MONTH_LANGUAGE: u16 = 9;
+    /// Life x local month: touches, line sums, last touch. Reserved and empty before format 7,
+    /// when id 9 was named `MONTH_LANGUAGE`.
+    pub const PATH_TOUCH: u16 = 9;
+    /// Life x identity, the rows of section 8 keyed by life.
+    pub const CANON_PATH_AUTHOR: u16 = 10;
     pub const PATHS: u16 = 16;
     pub const IDENTITIES: u16 = 17;
     pub const LABELS: u16 = 18;

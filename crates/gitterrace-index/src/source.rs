@@ -82,6 +82,7 @@ fn file_stats(diffs: Vec<gitterrace_git::FileDiff>) -> Vec<FileStat> {
                 }),
                 old: f.old_path.map(Into::into),
                 binary: f.binary,
+                deleted: f.kind == gitterrace_git::ChangeKind::Deleted,
             }
         })
         .collect()

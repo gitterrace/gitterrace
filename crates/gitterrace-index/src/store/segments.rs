@@ -90,8 +90,10 @@ impl SegmentBuild {
             ContainerWriter::new(&self.dir, &seg_name, Kind::Segment, StringBase::default())?;
         let mut rows = self.rows;
         rows.commits(&mut |sec, items, payload| w.block(sec, items, payload))?;
-        self.builder
-            .finish(&mut |sec, items, payload| w.block(sec, items, payload))?;
+        let paths = self.strings.paths.list.len();
+        self.builder.finish(paths, &mut |sec, items, payload| {
+            w.block(sec, items, payload)
+        })?;
         rows.finish(&mut |sec, items, payload| w.block(sec, items, payload))?;
         let seg = w.finish()?;
         drop(std::fs::remove_file(
@@ -199,6 +201,7 @@ pub(crate) fn append_segment<'r>(
         strings.identities.list.len(),
         labels.list.len(),
     );
+    builder.continue_lives(load_lives(&store, paths0)?);
     let mut rows = crate::feed::RowWriter::new(dir, g)?;
     for r in records {
         let rank = u32::try_from(oids.len()).map_err(|_| too_many())?;
@@ -208,7 +211,10 @@ pub(crate) fn append_segment<'r>(
     let seg_name = format!("seg-{g}-{n}.gts");
     let mut w = ContainerWriter::new(dir, &seg_name, Kind::Segment, base)?;
     rows.commits(&mut |sec, items, payload| w.block(sec, items, payload))?;
-    builder.finish(&mut |sec, items, payload| w.block(sec, items, payload))?;
+    let paths = strings.paths.list.len();
+    builder.finish(paths, &mut |sec, items, payload| {
+        w.block(sec, items, payload)
+    })?;
     rows.finish(&mut |sec, items, payload| w.block(sec, items, payload))?;
     let seg = w.finish()?;
     drop(std::fs::remove_file(&spill));
@@ -349,6 +355,24 @@ fn load_strings(
         labels: count(labels.list.len())?,
     };
     Ok((strings, labels, base))
+}
+
+/// The life state in the newest segment's section 7, written against `paths` path ids. An
+/// append continues it, so no life written before is renumbered. Read whole: a write.
+fn load_lives(
+    store: &crate::seg::read::Store,
+    paths: usize,
+) -> crate::seg::SegResult<crate::seg::canon::Lives> {
+    let Some(seg) = store.segments.last() else {
+        return Ok(crate::seg::canon::Lives::default());
+    };
+    let mut blocks = Vec::new();
+    let mut buf = Vec::new();
+    for e in seg.blocks(crate::seg::format::section::CANON) {
+        blocks.push(seg.read_block(e, &mut buf)?.to_vec());
+    }
+    let refs: Vec<&[u8]> = blocks.iter().map(Vec::as_slice).collect();
+    crate::seg::canon::Lives::decode(&refs, paths, seg.name())
 }
 
 /// The order file's oids, in order.

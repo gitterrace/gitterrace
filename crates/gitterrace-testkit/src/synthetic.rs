@@ -140,6 +140,73 @@ pub fn build(dir: &Path, shape: Shape) {
     git(dir, &["reset", "-q", "--hard", "main"]);
 }
 
+/// A history of `files` files, each renamed `rounds` times.
+///
+/// One commit per batch of 1000 renames, plus an edit of every file after each round:
+/// `files * (rounds + 1)` distinct paths and `files` lives, most of their names gone. Sizes what
+/// a server holds per path and per life, apart from history length.
+pub fn build_renames(dir: &Path, files: usize, rounds: usize) {
+    std::fs::create_dir_all(dir).expect("create dir");
+    git(dir, &["init", "-q", "-b", "main"]);
+    let mut stream = String::new();
+    let mut mark = 0usize;
+    let mut time: i64 = 1_420_070_400;
+    let mut commit = |stream: &mut String, ops: &str, msg: &str| {
+        mark += 1;
+        time += 3600;
+        let from = if mark > 1 {
+            format!("from :{}\n", mark - 1)
+        } else {
+            String::new()
+        };
+        write!(
+            stream,
+            "commit refs/heads/main\nmark :{mark}\nauthor P <p@example.org> {time} +0000\n\
+             committer P <p@example.org> {time} +0000\ndata {}\n{msg}\n{from}{ops}",
+            msg.len() + 1
+        )
+        .expect("write string");
+    };
+    let name = |f: usize, r: usize| format!("d{}/r{r}/f{f}.rs", f % 97);
+    for chunk in (0..files).collect::<Vec<_>>().chunks(1000) {
+        let mut ops = String::new();
+        for &f in chunk {
+            let body = format!("file {f}\nline\nline\n");
+            write!(
+                ops,
+                "M 100644 inline {}\ndata {}\n{body}\n",
+                name(f, 0),
+                body.len()
+            )
+            .expect("write string");
+        }
+        commit(&mut stream, &ops, "feat: add files");
+    }
+    for r in 1..=rounds {
+        for chunk in (0..files).collect::<Vec<_>>().chunks(1000) {
+            let mut ops = String::new();
+            for &f in chunk {
+                writeln!(ops, "R {} {}", name(f, r - 1), name(f, r)).expect("write string");
+            }
+            commit(&mut stream, &ops, "refactor: move files");
+            let mut ops = String::new();
+            for &f in chunk {
+                let body = format!("file {f}\nline\nline\nround {r}\n");
+                write!(
+                    ops,
+                    "M 100644 inline {}\ndata {}\n{body}\n",
+                    name(f, r),
+                    body.len()
+                )
+                .expect("write string");
+            }
+            commit(&mut stream, &ops, "fix: edit moved files");
+        }
+    }
+    git_stdin(dir, &["fast-import", "--quiet"], stream.as_bytes());
+    git(dir, &["reset", "-q", "--hard", "main"]);
+}
+
 #[cfg(test)]
 mod tests {
     use crate::synthetic::{Rng, Shape, build};

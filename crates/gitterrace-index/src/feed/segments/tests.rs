@@ -44,12 +44,16 @@ fn write(
     let (mut a, mut p) = (Aggregates::default(), Postings::default());
     for r in recs {
         let (who, paths) = s.ids(r);
-        a.push(r, who, &paths);
+        let olds = crate::seg::canon::olds(s, r);
+        a.push(r, who, &paths, &olds);
         p.push(s, r, who, &paths);
     }
     let name = format!("seg-1-{n}.gts");
     let mut w = ContainerWriter::new(dir, &name, Kind::Segment, StringBase::default())?;
-    write_tables(&a, &p, ranks, &mut |sec, items, b| w.block(sec, items, b))?;
+    let n_paths = s.paths.list.len();
+    write_tables(&a, &p, ranks, n_paths, &mut |sec, items, b| {
+        w.block(sec, items, b)
+    })?;
     w.finish()?;
     Container::open(dir, &name, Kind::Segment)
 }
@@ -121,11 +125,12 @@ fn builder_bytes_equal_table_bytes() {
     let mut s = Strings::default();
     for r in &recs {
         let (who, paths) = s.ids(r);
-        a.push(r, who, &paths);
+        let olds = crate::seg::canon::olds(&s, r);
+        a.push(r, who, &paths, &olds);
         p.push(&s, r, who, &paths);
     }
     assert!(
-        write_tables(&a, &p, &ranks, &mut |x, n, b| {
+        write_tables(&a, &p, &ranks, s.paths.list.len(), &mut |x, n, b| {
             want.push((x, n, b.to_vec()));
             Ok(())
         })
@@ -142,7 +147,7 @@ fn builder_bytes_equal_table_bytes() {
         }
         let mut got: Vec<(u16, u32, Vec<u8>)> = Vec::new();
         assert!(
-            b.finish(&mut |x, n, bytes| {
+            b.finish(s.paths.list.len(), &mut |x, n, bytes| {
                 got.push((x, n, bytes.to_vec()));
                 Ok(())
             })
@@ -186,7 +191,7 @@ fn path_postings_through_the_block_index_equal_a_full_scan() -> SegResult<()> {
     let dir = tempfile::tempdir()?;
     let name = "seg-1-0.gts";
     let mut w = ContainerWriter::new(dir.path(), name, Kind::Segment, StringBase::default())?;
-    write_tables(&Aggregates::default(), &post, &ranks, &mut |s, n, b| {
+    write_tables(&Aggregates::default(), &post, &ranks, 0, &mut |s, n, b| {
         w.block(s, n, b)
     })?;
     w.finish()?;

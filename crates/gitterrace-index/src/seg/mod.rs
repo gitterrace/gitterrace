@@ -3,6 +3,7 @@
 
 pub(crate) mod agg;
 pub(crate) mod bounds;
+pub mod canon;
 pub mod format;
 pub(crate) mod io;
 pub mod manifest;
