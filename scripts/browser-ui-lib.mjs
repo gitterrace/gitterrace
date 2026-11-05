@@ -557,5 +557,28 @@ async function inlineControls() {
     await b.close();
   }
 }
-  return { marked, menuSame, gutter, overlays, tips, dateTips, repoSwitch, liveScroll, outline, inlineControls };
+// Every section head on the insights pages keeps space above it: a heading flush against the
+// table before it reads as that table's footer. Sections folded into a page (types and
+// frequency in Activity, patterns in Hotspots) follow the same rule as the page's own.
+async function sectionGaps() {
+  for (const name of browsers) {
+    const { b, ctx } = await context(name);
+    for (const path of ['/stats', '/stats/hotspots', '/stats/contributors', '/stats/ownership', '/stats/languages']) {
+      const p = await ctx.newPage();
+      await p.setViewportSize({ width: 1400, height: 800 });
+      await p.goto(srv.base + path, { waitUntil: 'load' });
+      const tight = await p.$$eval('main .chart-head', (els) => els.flatMap((e) => {
+        const prev = e.previousElementSibling;
+        if (!prev) return [];
+        const gap = Math.round(e.getBoundingClientRect().top - prev.getBoundingClientRect().bottom);
+        return gap < 12 ? [`${e.querySelector('h2')?.textContent} ${gap}px under ${prev.className.split(' ')[0]}`] : [];
+      }));
+      const where = `section-gaps ${name} ${path}`;
+      tight.length ? r.fail(`${where}: ${tight.slice(0, 4).join('; ')}`) : r.ok(`${where}: every section head has room above it`);
+      await p.close();
+    }
+    await b.close();
+  }
+}
+  return { marked, menuSame, gutter, overlays, tips, dateTips, repoSwitch, liveScroll, outline, inlineControls, sectionGaps };
 }

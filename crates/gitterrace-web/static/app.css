@@ -420,8 +420,8 @@ a.who{color:inherit}a.who:hover b{color:var(--accent-fg);text-decoration:underli
 .matrix .m1{background:var(--seq-1)}.matrix .m2{background:var(--seq-2)}.matrix .m3{background:var(--seq-3)}.matrix .m4{background:var(--seq-4)}
 .matrix .m3 a,.matrix .m4 a{color:var(--on-accent)}
 .chart-head+.card,.chart-head+.card.pad{margin-top:0}
-main.wrap>.chart-head{margin-top:var(--space-8)}
-.kpis+.chart-head{margin-top:var(--space-6)}
+:is(main.wrap,.fold)>.chart-head{margin-top:var(--space-8)}
+:is(main.wrap,.fold)>.kpis+.chart-head{margin-top:var(--space-6)}.fold>.fold-h+.chart-head{margin-top:var(--space-4)}
 
 /* blob and diff lines: one block per line, numbers from data-n, chunks skipped while off screen */
 /* The number column is as wide as the file's longest line number (data-digits, at least 3),
