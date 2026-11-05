@@ -1,5 +1,5 @@
-// Reading and keyboard checks: highlighted text, the skip link and tab stops. Each runs in every
-// browser, light and dark, at 1400 and 900 px.
+// Reading and keyboard checks: highlighted text, the skip link and tab stops, the shortcut
+// sheet. Each runs in every browser, light and dark, at 1400 and 900 px.
 // Imported by scripts/browser-check.mjs, not run on its own.
 
 const SCHEMES = ['light', 'dark'];
@@ -88,5 +88,37 @@ export function checks({ srv, r, browsers, context }) {
     }
   }
 
-  return { markFlat, tabStops };
+  // In the shortcut sheet every key column starts at one x, at least 64 px wide, and every
+  // description at one x. A chord of several keys reads as one unit: no two keys stand bare
+  // side by side (a muted joiner such as "then" sits between), and its parts sit closer to
+  // each other than the key column sits to its description.
+  async function helpKeys() {
+    await each('help-keys', '/', async (p) => {
+      await p.keyboard.press('?');
+      await p.waitForSelector('.keys dt');
+      return p.evaluate(() => {
+        const dts = [...document.querySelectorAll('.keys dt')], dds = [...document.querySelectorAll('.keys dd')];
+        const xs = (els) => new Set(els.map((e) => Math.round(e.getBoundingClientRect().left)));
+        const bad = [];
+        if (xs(dds).size !== 1) bad.push(`descriptions start at ${[...xs(dds)].join(', ')} px`);
+        if (xs(dts).size !== 1) bad.push(`keys start at ${[...xs(dts)].join(', ')} px`);
+        const colW = dds[0].getBoundingClientRect().left - dts[0].getBoundingClientRect().left;
+        if (colW < 64) bad.push(`key column ${colW.toFixed(0)} px`);
+        const chords = dts.filter((d) => d.querySelectorAll('kbd').length > 1);
+        if (!chords.length) bad.push('no chord of several keys');
+        const col = dds[0].getBoundingClientRect().left - Math.max(...dts.map((d) => d.getBoundingClientRect().right));
+        for (const d of chords) {
+          const parts = [...d.children];
+          for (let i = 1; i < parts.length; i++) {
+            if (parts[i].tagName === 'KBD' && parts[i - 1].tagName === 'KBD') bad.push(`"${d.textContent.trim()}": two bare keys side by side`);
+            const gap = parts[i].getBoundingClientRect().left - parts[i - 1].getBoundingClientRect().right;
+            if (gap >= col) bad.push(`"${d.textContent.trim()}": parts ${gap.toFixed(0)} px apart, the column gap ${col.toFixed(0)} px`);
+          }
+        }
+        return [...new Set(bad)];
+      });
+    });
+  }
+
+  return { markFlat, tabStops, helpKeys };
 }

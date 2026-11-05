@@ -327,22 +327,22 @@
   ];
   // Action chords: "a" then the key the user gave an action in actions.toml.
   function actionChords() {
-    var m = document.querySelector('meta[name="gitterrace-actions"]');
-    var list = [];
+    var m = document.querySelector('meta[name="gitterrace-actions"]'), list = [];
     try { list = m ? JSON.parse(m.dataset.menu || "[]") : []; } catch (e) { list = []; }
     return list.filter(function (a) { return a.key; }).map(function (a) { return ["a " + a.key, a.label]; });
   }
   function openHelp() {
-    var box = overlay("help", "Keyboard shortcuts");
-    box.appendChild(el("h2", "", "Keyboard shortcuts"));
-    var dl = el("dl", "keys");
+    var box = overlay("help", "Keyboard shortcuts"), dl = el("dl", "keys");
+    box.append(el("h2", "", "Keyboard shortcuts"), dl);
+    // A chord is one unit: keys close together, joined by a muted "then" ("j / k" reads "or").
     SHORTCUTS.filter(function (x) { return !(isOff("insights") && x[0] === "g i") && !(isOff("search") && (x[0] === "g s" || x[0] === "/")); }).concat(actionChords()).forEach(function (s) {
-      var dt = el("dt");
-      s[0].split(" ").forEach(function (k) { if (k !== "/" || s[0] === "/") { dt.appendChild(el("kbd", "", k)); dt.appendChild(document.createTextNode(" ")); } });
-      dl.appendChild(dt);
+      var alt = s[0].indexOf(" / ") > 0, dt = dl.appendChild(el("dt"));
+      s[0].split(alt ? " / " : " ").forEach(function (k, i) {
+        if (i > 0) dt.appendChild(el("span", "muted", alt ? "or" : "then"));
+        dt.appendChild(el("kbd", "", k));
+      });
       dl.appendChild(el("dd", "", s[1]));
     });
-    box.appendChild(dl);
   }
 
   // ---- permalink ----------------------------------------------------------
