@@ -12,11 +12,11 @@ mod endpoints;
 mod error;
 mod http;
 mod insights;
-mod json;
 mod mcp;
+mod wire;
 
 pub use core::{ApiState, options_from};
-pub use endpoints::{ENDPOINTS, Endpoint, Param};
+pub use endpoints::{ENDPOINTS, Endpoint, Param, generator as schema_generator};
 pub use error::{ApiError, ERROR_CODES, SERVER_ERROR_MESSAGE};
 pub use http::{index_body, router};
 pub use insights::{
@@ -178,7 +178,8 @@ mod tests {
         git(p, &["add", "."]);
         git(p, &["commit", "-q", "-m", "chore: minified"]);
         let s = ApiState::open(p).expect("open");
-        let v = s.blob(None, "min.js", None, None).expect("blob");
+        let v =
+            serde_json::to_value(s.blob(None, "min.js", None, None).expect("blob")).expect("json");
         assert!(v["text"].as_str().expect("text").len() <= 256 * 1024);
         assert_eq!(v["truncated"], true);
     }
@@ -272,12 +273,7 @@ mod tests {
         let state = ApiState::open(&dir.path().join("c")).expect("open");
         state.refresh_index().expect("index");
         assert_eq!(state.records("HEAD").expect("records").len(), 1);
-        assert_eq!(
-            state.log(None, None, 1, 10).expect("log")["commits"]
-                .as_array()
-                .map(Vec::len),
-            Some(1)
-        );
+        assert_eq!(state.log(None, None, 1, 10).expect("log").commits.len(), 1);
     }
 
     #[test]
@@ -317,7 +313,8 @@ mod tests {
             })
         };
         for asked in [None, Some(usize::MAX)] {
-            let v = s.commit("HEAD", true, asked).expect("commit");
+            let v =
+                serde_json::to_value(s.commit("HEAD", true, asked).expect("commit")).expect("json");
             assert!(
                 lines(&v) <= gitterrace_config::Api::default().diff_lines,
                 "{asked:?}"
@@ -325,10 +322,7 @@ mod tests {
             assert_eq!(v["truncated"], true, "{asked:?}");
         }
         let v = s.log(None, None, 1, usize::MAX).expect("log");
-        assert!(
-            v["commits"].as_array().map_or(0, Vec::len)
-                <= gitterrace_config::Api::default().log_page_commits
-        );
+        assert!(v.commits.len() <= gitterrace_config::Api::default().log_page_commits);
     }
 
     /// Tools that return free text from the repository say it is untrusted, and so does the
@@ -397,11 +391,7 @@ mod tests {
                 ..Default::default()
             },
         );
-        let authors = |s: &ApiState| {
-            s.contributors(None).expect("contributors")["authors"]
-                .as_array()
-                .map_or(0, Vec::len)
-        };
+        let authors = |s: &ApiState| s.contributors(None).expect("contributors").authors.len();
         assert_eq!(authors(&s), 1, "bots hidden by default");
         // Settings are shared by every clone, so a router built before a reload sees it.
         let router_state = s.clone();

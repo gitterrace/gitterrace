@@ -118,6 +118,20 @@ macro_rules! string_enum {
                 s.parse().map_err(<D::Error as $crate::__serde::de::Error>::custom)
             }
         }
+
+        impl $crate::__schemars::JsonSchema for $name {
+            fn schema_name() -> std::borrow::Cow<'static, str> {
+                std::borrow::Cow::Borrowed(stringify!($name))
+            }
+
+            fn json_schema(_: &mut $crate::__schemars::SchemaGenerator) -> $crate::__schemars::Schema {
+                let values: Vec<&str> = <Self as $crate::StringEnum>::ALL
+                    .iter()
+                    .map(|v| v.as_str())
+                    .collect();
+                $crate::__schemars::json_schema!({ "type": "string", "enum": values })
+            }
+        }
     };
 }
 

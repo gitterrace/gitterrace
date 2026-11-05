@@ -27,6 +27,10 @@ fn with(s: ApiState, f: impl FnOnce(&mut Config)) -> ApiState {
     s.configured(&c)
 }
 
+fn json(v: &impl serde::Serialize) -> serde_json::Value {
+    serde_json::to_value(v).expect("json")
+}
+
 fn count(v: &serde_json::Value, key: &str) -> usize {
     v[key].as_array().map_or(0, Vec::len)
 }
@@ -36,12 +40,12 @@ fn log_page_commits_caps_the_page() {
     let dir = tempfile::tempdir().expect("tmp");
     let s = state(dir.path());
     assert_eq!(
-        count(&s.log(None, None, 1, 100).expect("log"), "commits"),
+        count(&json(&s.log(None, None, 1, 100).expect("log")), "commits"),
         10
     );
     let s = with(s, |c| c.api.log_page_commits = 3);
     assert_eq!(
-        count(&s.log(None, None, 1, 100).expect("log"), "commits"),
+        count(&json(&s.log(None, None, 1, 100).expect("log")), "commits"),
         3
     );
 }
@@ -61,7 +65,7 @@ fn blob_lines_and_blob_kb_cut_the_text() {
     let dir = tempfile::tempdir().expect("tmp");
     let s = state(dir.path());
     let text = |s: &ApiState| {
-        let v = s.blob(None, "a.txt", None, None).expect("blob");
+        let v = json(&s.blob(None, "a.txt", None, None).expect("blob"));
         (
             v["text"].as_str().unwrap_or_default().to_owned(),
             v["truncated"] == true,
@@ -83,7 +87,7 @@ fn blob_kb_cuts_by_bytes() {
     git(dir.path(), &["add", "."]);
     git(dir.path(), &["commit", "-q", "-m", "wide"]);
     let len = |s: &ApiState| {
-        let v = s.blob(None, "wide.txt", None, None).expect("blob");
+        let v = json(&s.blob(None, "wide.txt", None, None).expect("blob"));
         v["text"].as_str().map_or(0, str::len)
     };
     assert_eq!(len(&s), 3000);
@@ -95,9 +99,12 @@ fn blob_kb_cuts_by_bytes() {
 fn blame_lines_cut_the_blame() {
     let dir = tempfile::tempdir().expect("tmp");
     let s = state(dir.path());
-    assert_eq!(count(&s.blame(None, "a.txt").expect("blame"), "lines"), 10);
+    assert_eq!(
+        count(&json(&s.blame(None, "a.txt").expect("blame")), "lines"),
+        10
+    );
     let s = with(s, |c| c.api.blame_lines = 2);
-    let v = s.blame(None, "a.txt").expect("blame");
+    let v = json(&s.blame(None, "a.txt").expect("blame"));
     assert_eq!((count(&v, "lines"), v["truncated"] == true), (2, true));
 }
 
@@ -106,7 +113,7 @@ fn diff_lines_cut_the_commit_diff() {
     let dir = tempfile::tempdir().expect("tmp");
     let s = state(dir.path());
     let lines = |s: &ApiState| {
-        let v = s.commit("HEAD", true, None).expect("commit");
+        let v = json(&s.commit("HEAD", true, None).expect("commit"));
         v["files"][0]["hunks"].as_array().map_or(0, |hs| {
             hs.iter()
                 .map(|h| h["lines"].as_array().map_or(0, Vec::len))

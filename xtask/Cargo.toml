@@ -17,6 +17,7 @@ gitterrace-actions.workspace = true
 gitterrace-web.workspace = true
 gitterrace-index.workspace = true
 serde_json.workspace = true
+schemars.workspace = true
 anyhow.workspace = true
 clap.workspace = true
 pulldown-cmark.workspace = true

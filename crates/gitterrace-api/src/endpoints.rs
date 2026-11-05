@@ -2,6 +2,11 @@
 //! returns it and the generated API reference renders it, so the three cannot drift.
 
 use axum::routing::{MethodRouter, get};
+use gitterrace_types::api::{
+    BlameResponse, BlobResponse, CommitResponse, ContributorsResponse, IndexResponse, InsightList,
+    LogResponse, RefsResponse, RepoResponse, TreeResponse,
+};
+use schemars::{JsonSchema, Schema, SchemaGenerator, generate::SchemaSettings, json_schema};
 use serde::Serialize;
 
 use crate::core::ApiState;
@@ -22,9 +27,64 @@ pub struct Endpoint {
     pub path: &'static str,
     pub summary: &'static str,
     pub params: &'static [Param],
-    pub returns: &'static str,
+    /// The response type. It names its definition in the generator and returns a reference to it.
+    #[serde(skip)]
+    pub schema: fn(&mut SchemaGenerator) -> Schema,
     #[serde(skip)]
     pub(crate) route: fn() -> MethodRouter<ApiState>,
+}
+
+impl Endpoint {
+    /// The top-level fields of the answer, from its schema: the one source of what an endpoint
+    /// returns.
+    pub fn fields(&self, generator: &mut SchemaGenerator) -> Vec<String> {
+        let schema = (self.schema)(generator);
+        let object = schema.get("$ref").and_then(|r| r.as_str()).map_or_else(
+            || schema.clone().to_value(),
+            |r| {
+                r.rsplit('/')
+                    .next()
+                    .and_then(|name| generator.definitions().get(name))
+                    .cloned()
+                    .unwrap_or_default()
+            },
+        );
+        object
+            .get("properties")
+            .and_then(|p| p.as_object())
+            .map(|p| p.keys().cloned().collect())
+            .unwrap_or_default()
+    }
+
+    /// [`Endpoint::fields`] as a comma separated line.
+    pub fn returns(&self, generator: &mut SchemaGenerator) -> String {
+        self.fields(generator).join(", ")
+    }
+}
+
+/// A generator whose references point into `components/schemas`, where the `OpenAPI` document
+/// keeps the definitions.
+pub fn generator() -> SchemaGenerator {
+    SchemaGenerator::new(
+        SchemaSettings::draft2020_12().with(|s| s.definitions_path = "/components/schemas".into()),
+    )
+}
+
+fn of<T: JsonSchema>(g: &mut SchemaGenerator) -> Schema {
+    g.subschema_for::<T>()
+}
+
+/// The insight answer. Its `data` is typed per insight in a later change, so it is open for now.
+fn insight_schema(_: &mut SchemaGenerator) -> Schema {
+    json_schema!({
+        "type": "object",
+        "properties": {
+            "commits_indexed": { "type": "integer" },
+            "data": {},
+            "insight": { "type": "string" },
+            "rev": { "type": "string" }
+        }
+    })
 }
 
 const fn p(name: &'static str, ty: &'static str, description: &'static str) -> Param {
@@ -60,21 +120,21 @@ pub const ENDPOINTS: &[Endpoint] = &[
         path: "/",
         summary: "Endpoint and insight list.",
         params: &[],
-        returns: "version, endpoints, insights",
+        schema: of::<IndexResponse>,
         route: || get(http::index),
     },
     Endpoint {
         path: "/repo",
         summary: "Repository identity and totals.",
         params: &[],
-        returns: "name, head, head_branch, totals",
+        schema: of::<RepoResponse>,
         route: || get(http::repo),
     },
     Endpoint {
         path: "/refs",
         summary: "Branches, tags and remotes.",
         params: &[],
-        returns: "refs",
+        schema: of::<RefsResponse>,
         route: || get(http::refs),
     },
     Endpoint {
@@ -86,7 +146,7 @@ pub const ENDPOINTS: &[Endpoint] = &[
             p("page", "integer", "1-based page, default 1."),
             p("per_page", "integer", "Page size, default 50, capped."),
         ],
-        returns: "commits, has_more",
+        schema: of::<LogResponse>,
         route: || get(http::log),
     },
     Endpoint {
@@ -96,14 +156,14 @@ pub const ENDPOINTS: &[Endpoint] = &[
             p("diff", "boolean", "Include hunks, default true."),
             p("max_lines", "integer", "Cap on diff lines."),
         ],
-        returns: "message, files, hunks, truncated",
+        schema: of::<CommitResponse>,
         route: || get(http::commit),
     },
     Endpoint {
         path: "/tree",
         summary: "One directory level.",
         params: &[REV, PATH],
-        returns: "entries",
+        schema: of::<TreeResponse>,
         route: || get(http::tree),
     },
     Endpoint {
@@ -115,28 +175,28 @@ pub const ENDPOINTS: &[Endpoint] = &[
             p("start_line", "integer", "First line of the window."),
             p("limit", "integer", "Lines in the window, capped."),
         ],
-        returns: "text, total_lines, truncated, binary",
+        schema: of::<BlobResponse>,
         route: || get(http::blob),
     },
     Endpoint {
         path: "/blame",
         summary: "Per-line authorship.",
         params: &[REV, req("path", "string", "File to blame.")],
-        returns: "lines (commit, author, time), truncated",
+        schema: of::<BlameResponse>,
         route: || get(http::blame),
     },
     Endpoint {
         path: "/contributors",
         summary: "Authors and bus factor.",
         params: &[REV],
-        returns: "authors, bus_factor",
+        schema: of::<ContributorsResponse>,
         route: || get(http::contributors),
     },
     Endpoint {
         path: "/insights",
         summary: "Available insights.",
         params: &[],
-        returns: "insights",
+        schema: of::<InsightList>,
         route: || get(http::insight_list),
     },
     Endpoint {
@@ -186,7 +246,7 @@ pub const ENDPOINTS: &[Endpoint] = &[
             p("ws", "string", "`1` counts whitespace-only changes."),
             p("exclude", "string", "Comma separated globs left out."),
         ],
-        returns: "{insight, data}",
+        schema: insight_schema,
         route: || get(http::insight),
     },
 ];

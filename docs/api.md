@@ -34,17 +34,17 @@ and 256 KiB, `blame` at 5000 lines, each with `truncated` when cut. The `[api]` 
 
 | Endpoint | Query | Returns |
 | --- | --- | --- |
-| `GET /` |  | version, endpoints, insights |
-| `GET /repo` |  | name, head, head_branch, totals |
+| `GET /` |  | endpoints, insights, version |
+| `GET /repo` |  | head, head_branch, index_version, name, totals |
 | `GET /refs` |  | refs |
-| `GET /log` | `rev`, `path`, `page`, `per_page` | commits, has_more |
-| `GET /commits/{id}` | `diff`, `max_lines` | message, files, hunks, truncated |
-| `GET /tree` | `rev`, `path` | entries |
-| `GET /blob` | `rev`, `path`, `start_line`, `limit` | text, total_lines, truncated, binary |
-| `GET /blame` | `rev`, `path` | lines (commit, author, time), truncated |
-| `GET /contributors` | `rev` | authors, bus_factor |
+| `GET /log` | `rev`, `path`, `page`, `per_page` | commits, has_more, page, path, per_page, rev |
+| `GET /commits/{id}` | `diff`, `max_lines` | author, body, committer, files, id, link, parents, permalink, subject, truncated |
+| `GET /tree` | `rev`, `path` | commit, entries, path, rev |
+| `GET /blob` | `rev`, `path`, `start_line`, `limit` | binary, commit, link, path, permalink, rev, size, text, total_lines, truncated |
+| `GET /blame` | `rev`, `path` | commit, lines, link, path, permalink, rev, truncated |
+| `GET /contributors` | `rev` | authors, bus_factor, rev |
 | `GET /insights` |  | insights |
-| `GET /insights/{name}` | `rev`, `period`, `label`, `metric`, `limit`, `type`, `scope`, `author`, `path`, `bots`, `generated`, `ignore`, `ws`, `exclude` | {insight, data} |
+| `GET /insights/{name}` | `rev`, `period`, `label`, `metric`, `limit`, `type`, `scope`, `author`, `path`, `bots`, `generated`, `ignore`, `ws`, `exclude` | commits_indexed, data, insight, rev |
 
 ### Parameters
 

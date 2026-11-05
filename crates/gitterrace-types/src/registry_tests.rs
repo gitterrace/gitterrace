@@ -21,11 +21,13 @@ fn declared(text: &str) -> Vec<String> {
     out
 }
 
-fn sources() -> String {
-    let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
-    let mut all = String::new();
+fn collect(dir: &Path, all: &mut String) {
     for e in fs::read_dir(dir).expect("src") {
         let p = e.expect("entry").path();
+        if p.is_dir() {
+            collect(&p, all);
+            continue;
+        }
         if p.file_name()
             .is_some_and(|n| n == "codec.rs" || n == "registry_tests.rs")
         {
@@ -33,6 +35,11 @@ fn sources() -> String {
         }
         all.push_str(&fs::read_to_string(p).expect("read"));
     }
+}
+
+fn sources() -> String {
+    let mut all = String::new();
+    collect(&Path::new(env!("CARGO_MANIFEST_DIR")).join("src"), &mut all);
     all
 }
 

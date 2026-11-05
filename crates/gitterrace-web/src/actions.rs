@@ -79,20 +79,44 @@ impl Live {
 /// entry: one the selection's kind does not fit stays in place, disabled, so the menu has the
 /// same entries in the same order on every view.
 pub(crate) fn menu_entries(config: &Config) -> String {
-    let items: Vec<_> = config
+    let items: Vec<MenuEntry<'_>> = config
         .actions
         .iter()
-        .map(|a| {
-            serde_json::json!({
-                "id": a.id,
-                "label": a.label,
-                "kinds": a.kinds,
-                "key": a.key.map(String::from),
-                "why": why_off(&a.kinds),
-            })
+        .map(|a| MenuEntry {
+            id: &a.id,
+            key: a.key.map(String::from),
+            kinds: &a.kinds,
+            label: &a.label,
+            why: why_off(&a.kinds),
         })
         .collect();
-    serde_json::Value::from(items).to_string()
+    serde_json::to_string(&items).unwrap_or_default()
+}
+
+/// One entry of the action menu.
+// Fields are declared in alphabetical order: this was a serde_json map, which sorts keys.
+#[derive(serde::Serialize)]
+struct MenuEntry<'a> {
+    id: &'a str,
+    key: Option<String>,
+    kinds: &'a [gitterrace_actions::Kind],
+    label: &'a str,
+    why: String,
+}
+
+/// `GET /_actions/status`.
+#[derive(serde::Serialize)]
+struct StatusBody {
+    note: Option<String>,
+}
+
+/// The answer to a run request.
+// Fields are declared in alphabetical order: this was a serde_json map, which sorts keys.
+#[derive(serde::Serialize)]
+struct Outcome<'a> {
+    exit: Option<i32>,
+    first_line: &'a str,
+    ok: bool,
 }
 
 /// "Works on lines or a commit": the tip of an entry the current selection does not fit.
@@ -343,13 +367,16 @@ pub(crate) fn router(site: Arc<Site>) -> Router {
 
 /// `GET /_actions/status`: `{"note": string|null}`, fetched by `actions.js` on load, focus and tab show.
 async fn status(State(site): State<Arc<Site>>) -> Response {
-    let body = serde_json::json!({ "note": site.status.note() });
+    let body = serde_json::to_string(&StatusBody {
+        note: site.status.note(),
+    })
+    .unwrap_or_default();
     (
         [
             (header::CONTENT_TYPE, "application/json"),
             (header::CACHE_CONTROL, "no-store"),
         ],
-        body.to_string(),
+        body,
     )
         .into_response()
 }
@@ -434,7 +461,11 @@ fn is_json(h: &HeaderMap) -> bool {
 }
 
 fn reply(status: StatusCode, ok: bool, exit: Option<i32>, first_line: &str) -> Response {
-    let body = serde_json::json!({ "ok": ok, "exit": exit, "first_line": first_line });
+    let body = Outcome {
+        exit,
+        first_line,
+        ok,
+    };
     (
         status,
         [(header::CACHE_CONTROL, HeaderValue::from_static("no-store"))],

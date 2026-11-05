@@ -1,8 +1,9 @@
 //! `docs/openapi.json`: the HTTP API as `OpenAPI` 3.1, rendered from the same [`ENDPOINTS`]
-//! registry that builds the routes and `docs/api.md`, so the three cannot drift. Responses are
-//! described by their top-level fields only; the registry holds no response types.
+//! registry that builds the routes and `docs/api.md`, so the three cannot drift. Each response
+//! schema comes from the type its handler returns, under `components/schemas`.
 
-use gitterrace_api::{ENDPOINTS, ERROR_CODES, Endpoint, Param, insight_list};
+use gitterrace_api::{ENDPOINTS, ERROR_CODES, Endpoint, Param, insight_list, schema_generator};
+use schemars::SchemaGenerator;
 use serde_json::{Map, Value, json};
 
 use crate::facts::Workspace;
@@ -14,11 +15,18 @@ pub fn render(ws: &Workspace) -> Out {
     let bin = ws.packages.get("gitterrace");
     let version = bin.map_or("0.0.0", |p| p.version.as_str());
     let license = bin.map_or("", |p| p.license.as_str());
-    let mut paths = Map::new();
-    for e in ENDPOINTS {
-        paths.insert(e.path.to_owned(), json!({ "get": operation(e) }));
-    }
     let codes: Vec<&str> = ERROR_CODES.iter().map(|(c, _, _)| *c).collect();
+    let mut paths = Map::new();
+    let mut generator = schema_generator();
+    for e in ENDPOINTS {
+        paths.insert(
+            e.path.to_owned(),
+            json!({ "get": operation(e, &mut generator) }),
+        );
+    }
+    let mut schemas = Map::new();
+    schemas.insert("Error".to_owned(), error_schema(&codes));
+    schemas.extend(generator.take_definitions(false));
     let doc = json!({
         "openapi": "3.1.0",
         "info": {
@@ -37,20 +45,7 @@ pub fn render(ws: &Workspace) -> Out {
         "security": [],
         "paths": paths,
         "components": {
-            "schemas": {
-                "Error": {
-                    "type": "object",
-                    "required": ["error"],
-                    "properties": { "error": {
-                        "type": "object",
-                        "required": ["code", "message"],
-                        "properties": {
-                            "code": { "type": "string", "enum": codes },
-                            "message": { "type": "string" }
-                        }
-                    }}
-                }
-            },
+            "schemas": schemas,
             "responses": {
                 "Error": {
                     "description": "Bad request, not found or server error. See `code`.",
@@ -64,7 +59,22 @@ pub fn render(ws: &Workspace) -> Out {
     Out::file(PATH, body)
 }
 
-fn operation(e: &Endpoint) -> Value {
+fn error_schema(codes: &[&str]) -> Value {
+    json!({
+        "type": "object",
+        "required": ["error"],
+        "properties": { "error": {
+            "type": "object",
+            "required": ["code", "message"],
+            "properties": {
+                "code": { "type": "string", "enum": codes },
+                "message": { "type": "string" }
+            }
+        }}
+    })
+}
+
+fn operation(e: &Endpoint, generator: &mut SchemaGenerator) -> Value {
     let mut params: Vec<Value> = path_params(e.path)
         .map(|name| {
             json!({ "name": name, "in": "path", "required": true, "schema": { "type": "string" },
@@ -72,18 +82,17 @@ fn operation(e: &Endpoint) -> Value {
         })
         .collect();
     params.extend(e.params.iter().map(query_param));
-    let fields: Map<String, Value> = top_fields(e.returns)
-        .map(|f| (f.to_owned(), json!({})))
-        .collect();
+    let schema = (e.schema)(generator);
+    let returns = e.returns(generator);
     let mut op = json!({
         "summary": e.summary,
         "operationId": operation_id(e.path),
         "parameters": params,
         "responses": {
             "200": {
-                "description": e.returns,
+                "description": returns,
                 "headers": { "ETag": { "schema": { "type": "string" } } },
-                "content": { "application/json": { "schema": { "type": "object", "properties": fields } } }
+                "content": { "application/json": { "schema": schema } }
             },
             "304": { "description": "Not modified (`If-None-Match` matched the `ETag`)." }
         }
@@ -123,29 +132,6 @@ fn path_param_doc(name: &str) -> String {
     }
 }
 
-/// The field names of a `returns` line: `lines (commit, author, time), truncated` gives
-/// `lines` and `truncated`.
-fn top_fields(returns: &str) -> impl Iterator<Item = &str> {
-    let mut depth = 0u32;
-    let mut out = Vec::new();
-    let mut start = 0;
-    for (i, c) in returns.char_indices() {
-        match c {
-            '(' => depth += 1,
-            ')' => depth = depth.saturating_sub(1),
-            ',' if depth == 0 => {
-                out.push(&returns[start..i]);
-                start = i + 1;
-            }
-            _ => {}
-        }
-    }
-    out.push(&returns[start..]);
-    out.into_iter()
-        .map(|f| f.split('(').next().unwrap_or(f).trim())
-        .filter(|f| !f.is_empty())
-}
-
 /// `GET /commits/{id}` becomes `commits_id`; `/` becomes `index`.
 fn operation_id(path: &str) -> String {
     let id: String = path
@@ -166,12 +152,10 @@ fn operation_id(path: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use crate::openapi_json::{operation_id, path_params, top_fields};
+    use crate::openapi_json::{operation_id, path_params};
 
     #[test]
-    fn fields_ids_and_path_params() {
-        let f: Vec<&str> = top_fields("lines (commit, author, time), truncated").collect();
-        assert_eq!(f, ["lines", "truncated"]);
+    fn ids_and_path_params() {
         assert_eq!(operation_id("/"), "index");
         assert_eq!(operation_id("/commits/{id}"), "commits_id");
         assert_eq!(

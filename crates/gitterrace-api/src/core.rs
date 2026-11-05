@@ -9,10 +9,14 @@ use gitterrace_git::Repo;
 use gitterrace_index::feed::{InsightsSource, RevView};
 use gitterrace_index::{Index, Insights, Options};
 use gitterrace_types::LinkStyle;
+use gitterrace_types::api::{
+    BlameResponse, BlobResponse, CommitResponse, ContributorsResponse, LogResponse, RefsResponse,
+    RepoResponse, RepoTotals, TreeResponse,
+};
 use serde_json::{Value, json};
 
 use crate::error::ApiError;
-use crate::{insights, json};
+use crate::{insights, wire};
 
 const DEFAULT_REV: &str = "HEAD";
 /// Rev syntax that searches history (`:/text`, `^{/text}`) or reads reflogs (`@{...}`): a
@@ -219,20 +223,18 @@ impl ApiState {
         checked(rev.filter(|r| !r.is_empty()).unwrap_or(DEFAULT_REV))
     }
 
-    /// Sets `permalink` (`/go/<repo-id>/<sha>[/<path>][#Lx-Ly]`, the web's permalink in path
-    /// form, since the MCP has no server address) and `link` (the same in `links.style`, so
-    /// `gitterrace://` by default) on `v`. Both null for a repository without commits.
-    fn put_links(
+    /// `(permalink, link)`: `permalink` is `/go/<repo-id>/<sha>[/<path>][#Lx-Ly]`, the web's
+    /// permalink in path form (the MCP has no server address), and `link` the same in
+    /// `links.style`, so `gitterrace://` by default. Both `None` for a repository without
+    /// commits.
+    fn links(
         &self,
-        v: &mut Value,
         sha: &str,
         path: Option<&str>,
         lines: Option<(usize, usize)>,
-    ) {
+    ) -> (Option<String>, Option<String>) {
         let Some(id) = self.repo.id() else {
-            v["permalink"] = Value::Null;
-            v["link"] = Value::Null;
-            return;
+            return (None, None);
         };
         let lines = lines.map(|(a, b)| Lines {
             start: u32::try_from(a).unwrap_or(u32::MAX),
@@ -249,29 +251,34 @@ impl ApiState {
             path,
             lines,
         );
-        v["permalink"] = json!(go);
-        v["link"] = json!(link);
+        (Some(go), Some(link))
     }
 
-    pub fn repo_info(&self) -> Result<Value, ApiError> {
+    pub fn repo_info(&self) -> Result<RepoResponse, ApiError> {
         let head = self.repo.resolve(DEFAULT_REV).ok();
         let records = self.records(DEFAULT_REV)?;
         let totals = self
             .insights(DEFAULT_REV, &*records, self.settings().defaults)
             .period_summary(gitterrace_index::Period::All)
             .current;
-        Ok(json!({
-            "name": self.repo.name(),
-            "head": head,
-            "head_branch": self.repo.head_branch(),
-            "index_version": self.etag(),
-            "totals": totals,
-        }))
+        Ok(RepoResponse {
+            head,
+            head_branch: self.repo.head_branch(),
+            index_version: self.etag(),
+            name: self.repo.name(),
+            totals: RepoTotals {
+                additions: totals.additions,
+                authors: totals.authors,
+                commits: totals.commits,
+                deletions: totals.deletions,
+                files: totals.files,
+            },
+        })
     }
 
-    pub fn refs(&self) -> Result<Value, ApiError> {
-        let refs: Vec<Value> = self.repo.refs()?.iter().map(json::ref_info).collect();
-        Ok(json!({ "refs": refs }))
+    pub fn refs(&self) -> Result<RefsResponse, ApiError> {
+        let refs = self.repo.refs()?.iter().map(wire::ref_item).collect();
+        Ok(RefsResponse { refs })
     }
 
     pub fn log(
@@ -280,7 +287,7 @@ impl ApiState {
         path: Option<&str>,
         page: usize,
         per_page: usize,
-    ) -> Result<Value, ApiError> {
+    ) -> Result<LogResponse, ApiError> {
         let rev = Self::rev(rev)?;
         let caps = self.settings().caps;
         let per_page = per_page.clamp(1, caps.log_page_commits);
@@ -295,19 +302,23 @@ impl ApiState {
         // One extra row tells us whether another page exists.
         let rows = self.repo.log(rev, path, skip, per_page + 1)?;
         let has_more = rows.len() > per_page;
-        let commits: Vec<Value> = rows
+        let commits = rows
             .iter()
             .take(per_page)
             .map(|c| {
-                let mut v = json::summary(c);
-                self.put_links(&mut v, &c.id, None, None);
+                let mut v = wire::log_commit(c);
+                (v.permalink, v.link) = self.links(&c.id, None, None);
                 v
             })
             .collect();
-        Ok(json!({
-            "rev": rev, "path": path, "page": page, "per_page": per_page,
-            "has_more": has_more, "commits": commits,
-        }))
+        Ok(LogResponse {
+            commits,
+            has_more,
+            page,
+            path: path.map(str::to_owned),
+            per_page,
+            rev: rev.to_owned(),
+        })
     }
 
     pub fn commit(
@@ -315,34 +326,47 @@ impl ApiState {
         id: &str,
         diff: bool,
         max_lines: Option<usize>,
-    ) -> Result<Value, ApiError> {
+    ) -> Result<CommitResponse, ApiError> {
         let id = self.repo.resolve(checked(id)?)?;
         let detail = self.repo.commit(&id)?;
         let most = self.settings().caps.diff_lines;
         let cap = max_lines.map_or(most, |m| m.min(most));
-        let mut v = json::detail(&detail, diff, Some(cap));
-        self.put_links(&mut v, &id, None, None);
-        if let Some(files) = v["files"].as_array_mut() {
-            for f in files {
-                if let Some(p) = f["path"].as_str().map(str::to_owned) {
-                    self.put_links(f, &id, Some(&p), None);
-                }
-            }
+        let (mut files, truncated) = wire::files(&detail, diff, cap);
+        for f in &mut files {
+            (f.permalink, f.link) = self.links(&id, Some(&f.path), None);
         }
-        Ok(v)
+        let s = &detail.summary;
+        let (permalink, link) = self.links(&id, None, None);
+        Ok(CommitResponse {
+            author: wire::person(&s.author),
+            body: detail.body,
+            committer: wire::person(&s.committer),
+            files,
+            id: s.id.clone(),
+            link,
+            parents: s.parents.clone(),
+            permalink,
+            subject: s.subject.clone(),
+            truncated,
+        })
     }
 
-    pub fn tree(&self, rev: Option<&str>, path: Option<&str>) -> Result<Value, ApiError> {
+    pub fn tree(&self, rev: Option<&str>, path: Option<&str>) -> Result<TreeResponse, ApiError> {
         let rev = Self::rev(rev)?;
         let id = self.repo.resolve(rev)?;
         let path = path.unwrap_or("");
-        let entries: Vec<Value> = self
+        let entries = self
             .repo
             .tree(&id, path)?
             .iter()
-            .map(json::tree_entry)
+            .map(wire::tree_item)
             .collect();
-        Ok(json!({ "rev": rev, "commit": id, "path": path, "entries": entries }))
+        Ok(TreeResponse {
+            commit: id,
+            entries,
+            path: path.to_owned(),
+            rev: rev.to_owned(),
+        })
     }
 
     /// Text content of a file. Binary files report `binary: true` and no text.
@@ -353,7 +377,7 @@ impl ApiState {
         path: &str,
         start_line: Option<usize>,
         limit: Option<usize>,
-    ) -> Result<Value, ApiError> {
+    ) -> Result<BlobResponse, ApiError> {
         let rev = Self::rev(rev)?;
         let id = self.repo.resolve(rev)?;
         let blob = self.repo.blob(&id, path)?;
@@ -387,27 +411,37 @@ impl ApiState {
             }
             _ => None,
         };
-        let mut v = json!({
-            "rev": rev, "commit": id, "path": blob.path, "size": blob.size,
-            "binary": blob.text.is_none(), "total_lines": total_lines,
-            "truncated": truncated, "text": text,
-        });
-        self.put_links(&mut v, &id, Some(&blob.path), shown);
-        Ok(v)
+        let (permalink, link) = self.links(&id, Some(&blob.path), shown);
+        Ok(BlobResponse {
+            binary: blob.text.is_none(),
+            commit: id,
+            link,
+            path: blob.path,
+            permalink,
+            rev: rev.to_owned(),
+            size: blob.size,
+            text,
+            total_lines,
+            truncated,
+        })
     }
 
-    pub fn blame(&self, rev: Option<&str>, path: &str) -> Result<Value, ApiError> {
+    pub fn blame(&self, rev: Option<&str>, path: &str) -> Result<BlameResponse, ApiError> {
         let rev = Self::rev(rev)?;
         let id = self.repo.resolve(rev)?;
         let all = self.repo.blame(&id, path)?;
         let most = self.settings().caps.blame_lines;
-        let lines: Vec<Value> = all.iter().take(most).map(json::blame_line).collect();
-        let mut v = json!({
-            "rev": rev, "commit": id, "path": path,
-            "truncated": all.len() > most, "lines": lines,
-        });
-        self.put_links(&mut v, &id, Some(path), None);
-        Ok(v)
+        let lines = all.iter().take(most).map(wire::blame_item).collect();
+        let (permalink, link) = self.links(&id, Some(path), None);
+        Ok(BlameResponse {
+            commit: id,
+            lines,
+            link,
+            path: path.to_owned(),
+            permalink,
+            rev: rev.to_owned(),
+            truncated: all.len() > most,
+        })
     }
 
     /// Statistics over `src` under `opts`, with the ignore rules of `rev` when asked: what
@@ -446,7 +480,9 @@ impl ApiState {
         };
         for row in rows.into_iter().flatten() {
             if let Some(p) = row["path"].as_str().map(str::to_owned) {
-                self.put_links(row, &tip, Some(&p), None);
+                let (permalink, link) = self.links(&tip, Some(&p), None);
+                row["permalink"] = json!(permalink);
+                row["link"] = json!(link);
             }
         }
         Ok(json!({ "rev": rev, "insight": name, "commits_indexed": all.len(), "data": data }))
@@ -454,7 +490,7 @@ impl ApiState {
 
     /// People with their commits, plus a commit-share bus factor: the fewest people who made
     /// half the commits. Bots are left out unless the configuration counts them.
-    pub fn contributors(&self, rev: Option<&str>) -> Result<Value, ApiError> {
+    pub fn contributors(&self, rev: Option<&str>) -> Result<ContributorsResponse, ApiError> {
         let rev = Self::rev(rev)?;
         let records = self.records(rev)?;
         let opts = self.settings().defaults;
@@ -468,7 +504,11 @@ impl ApiState {
             .filter(|c| bots || !c.bot)
             .collect();
         let bus_factor = gitterrace_index::bus_factor(people.iter().map(|c| c.commits as f64));
-        Ok(json!({ "rev": rev, "bus_factor": bus_factor, "authors": people }))
+        Ok(ContributorsResponse {
+            authors: people.into_iter().map(wire::contributor).collect(),
+            bus_factor,
+            rev: rev.to_owned(),
+        })
     }
 }
 

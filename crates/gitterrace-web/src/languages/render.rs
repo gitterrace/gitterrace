@@ -208,21 +208,43 @@ fn area_chart(ch: &Chain, view: View, subj: &Subjects) -> String {
         TOP_PAD + ph
     );
 
-    let data = serde_json::json!({
-        "n": n,
-        "share": view.share,
-        "names": ch.langs(),
-        "i": pts,
-        "x": xs.iter().map(|x| (x * 10.0).round() / 10.0).collect::<Vec<_>>(),
-        "d": pts.iter().map(|i| fmt::date(ch.time(*i), ch.offset(*i))).collect::<Vec<_>>(),
-        "s": pts.iter().map(|i| subj.of(*i)).collect::<Vec<_>>(),
-        "l": rows,
-        "view": view.href(|v| v.range = None),
-    });
-    let json = data.to_string().replace('<', "\\u003c");
+    let data = PlotData {
+        d: pts
+            .iter()
+            .map(|i| fmt::date(ch.time(*i), ch.offset(*i)))
+            .collect(),
+        i: &pts,
+        l: rows,
+        n,
+        names: ch.langs(),
+        s: pts.iter().map(|i| subj.of(*i)).collect(),
+        share: view.share,
+        view: view.href(|v| v.range = None),
+        x: xs.iter().map(|x| (x * 10.0).round() / 10.0).collect(),
+    };
+    // Strings and numbers only: serialization cannot fail.
+    let json = serde_json::to_string(&data)
+        .unwrap_or_default()
+        .replace('<', "\\u003c");
     format!(
         r#"<div class="plot">{svg}<div class="loc-tip" hidden></div></div><script type="application/json" id="loc-data">{json}</script>"#
     )
+}
+
+/// What `loc.js` reads from the page: per sampled point its date, subject and per-language
+/// lines, and the x position of each.
+// Fields are declared in alphabetical order: this was a serde_json map, which sorts keys.
+#[derive(serde::Serialize)]
+struct PlotData<'a> {
+    d: Vec<String>,
+    i: &'a [usize],
+    l: Vec<Vec<i64>>,
+    n: usize,
+    names: &'a [String],
+    s: Vec<String>,
+    share: bool,
+    view: String,
+    x: Vec<f64>,
 }
 
 fn legend(ch: &Chain) -> String {

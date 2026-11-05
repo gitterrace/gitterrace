@@ -47,6 +47,7 @@ pub fn render() -> Out {
     );
 
     s.push_str("\n## HTTP (`/api/v1`)\n\n| Endpoint | Query | Returns |\n| --- | --- | --- |\n");
+    let mut generator = gitterrace_api::schema_generator();
     for e in ENDPOINTS {
         let query = e
             .params
@@ -54,7 +55,12 @@ pub fn render() -> Out {
             .map(|p| format!("`{}`", p.name))
             .collect::<Vec<_>>()
             .join(", ");
-        let _ = writeln!(s, "| `GET {}` | {query} | {} |", e.path, e.returns);
+        let _ = writeln!(
+            s,
+            "| `GET {}` | {query} | {} |",
+            e.path,
+            e.returns(&mut generator)
+        );
     }
     s.push_str("\n### Parameters\n");
     for e in ENDPOINTS.iter().filter(|e| !e.params.is_empty()) {

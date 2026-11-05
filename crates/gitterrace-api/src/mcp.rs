@@ -103,9 +103,10 @@ impl McpServer {
         docs
     }
 
-    async fn run<F>(&self, f: F) -> Result<CallToolResult, ErrorData>
+    async fn run<T, F>(&self, f: F) -> Result<CallToolResult, ErrorData>
     where
-        F: FnOnce(&ApiState) -> Result<Value, ApiError> + Send + 'static,
+        T: serde::Serialize + Send + 'static,
+        F: FnOnce(&ApiState) -> Result<T, ApiError> + Send + 'static,
     {
         let state = self.state.clone();
         let out = tokio::task::spawn_blocking(move || f(&state))
@@ -113,7 +114,11 @@ impl McpServer {
             .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
         // Tool failures are results the agent can read and react to, not protocol errors.
         Ok(match out {
-            Ok(v) => CallToolResult::success(vec![Content::text(v.to_string())]),
+            Ok(v) => {
+                let text = serde_json::to_string(&v)
+                    .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
+                CallToolResult::success(vec![Content::text(text)])
+            }
             Err(e) => CallToolResult::error(vec![Content::text(e.to_string())]),
         })
     }

@@ -13,7 +13,7 @@ use axum::{
     },
 };
 use futures_util::stream;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use tokio::sync::{OwnedSemaphorePermit, broadcast, watch};
 
 use crate::app::App;
@@ -130,24 +130,52 @@ impl Drop for WorktreeWatch {
     }
 }
 
+/// The body of a `change` event for a settings or repository-list change: no chrome.
+// Fields are declared in alphabetical order: this was a serde_json map, which sorts keys.
+#[derive(Serialize)]
+struct Bare<'a> {
+    kinds: &'a [&'static str],
+    v: String,
+}
+
+/// The body of a `change` event that also carries the chrome.
+// Fields are declared in alphabetical order: this was a serde_json map, which sorts keys.
+#[derive(Serialize)]
+struct Full<'a> {
+    banner: &'a Option<String>,
+    dirty: bool,
+    kinds: &'a [&'static str],
+    v: String,
+}
+
+fn change_event<T: Serialize>(body: &T) -> Event {
+    // Both bodies are plain strings and bools, which always serialize.
+    Event::default()
+        .event("change")
+        .data(serde_json::to_string(body).unwrap_or_default())
+}
+
 fn event(c: &Change) -> Event {
     if c.kinds == [CONFIG] || c.kinds == [REPOS] {
-        let body = serde_json::json!({ "kinds": c.kinds, "v": c.v.to_string() });
-        return Event::default().event("change").data(body.to_string());
+        return change_event(&Bare {
+            kinds: &c.kinds,
+            v: c.v.to_string(),
+        });
     }
-    let body = serde_json::json!({
-        "kinds": c.kinds,
-        "v": c.v.to_string(),
-        "banner": c.banner,
-        "dirty": c.dirty,
-    });
-    Event::default().event("change").data(body.to_string())
+    change_event(&Full {
+        banner: &c.banner,
+        dirty: c.dirty,
+        kinds: &c.kinds,
+        v: c.v.to_string(),
+    })
 }
 
 /// A change for a stream that missed some: everything may have moved, the chrome is unknown.
 fn everything(v: u64) -> Event {
-    let body = serde_json::json!({ "kinds": ALL, "v": v.to_string() });
-    Event::default().event("change").data(body.to_string())
+    change_event(&Bare {
+        kinds: &ALL,
+        v: v.to_string(),
+    })
 }
 
 struct Stream {

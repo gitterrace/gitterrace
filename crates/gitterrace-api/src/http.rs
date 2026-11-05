@@ -4,15 +4,19 @@ use axum::extract::{Path, Query, State};
 use axum::http::{HeaderValue, Request, StatusCode, header};
 use axum::middleware::{self, Next};
 use axum::response::{IntoResponse, Response};
-use serde::Deserialize;
-use serde_json::{Value, json};
+use gitterrace_types::api::{
+    BlameResponse, BlobResponse, CommitResponse, ContributorsResponse, EndpointDoc, IndexResponse,
+    InsightList, InsightRow, LogResponse, ParamDoc, RefsResponse, RepoResponse, TreeResponse,
+};
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
 
 use crate::core::ApiState;
 use crate::endpoints::{self, ENDPOINTS};
 use crate::error::ApiError;
 use crate::insights;
 
-type Reply = Result<Json<Value>, ApiError>;
+type Reply<T> = Result<Json<T>, ApiError>;
 
 /// The read-only JSON API. Nest it under `/api/v1`. Routes come from [`ENDPOINTS`], so an
 /// endpoint cannot exist without its documentation.
@@ -25,9 +29,10 @@ pub fn router(state: ApiState) -> Router {
 }
 
 /// Runs a blocking read off the async runtime.
-async fn blocking<F>(state: &ApiState, f: F) -> Reply
+async fn blocking<T, F>(state: &ApiState, f: F) -> Reply<T>
 where
-    F: FnOnce(&ApiState) -> Result<Value, ApiError> + Send + 'static,
+    T: Serialize + Send + 'static,
+    F: FnOnce(&ApiState) -> Result<T, ApiError> + Send + 'static,
 {
     let state = state.clone();
     tokio::task::spawn_blocking(move || f(&state))
@@ -65,34 +70,55 @@ async fn etag(
     res
 }
 
-fn insight_rows() -> Vec<Value> {
+fn insight_rows() -> Vec<InsightRow> {
     insights::list()
-        .map(|(name, summary)| json!({ "name": name, "summary": summary }))
+        .map(|(name, summary)| InsightRow {
+            name: name.to_owned(),
+            summary: summary.to_owned(),
+        })
         .collect()
 }
 
-pub(crate) async fn index() -> Json<Value> {
+pub(crate) async fn index() -> Json<IndexResponse> {
     Json(index_body(|_| true, true))
 }
 
 /// The `GET /` answer listing only the endpoints `keep` serves, and the insights only when
 /// `insights` is set: a server with a feature off lists no endpoint of it.
-pub fn index_body(keep: impl Fn(&str) -> bool, insights: bool) -> Value {
-    let endpoints: Vec<&endpoints::Endpoint> =
-        endpoints::all().iter().filter(|e| keep(e.path)).collect();
+pub fn index_body(keep: impl Fn(&str) -> bool, insights: bool) -> IndexResponse {
+    let mut generator = endpoints::generator();
+    let endpoints = endpoints::all()
+        .iter()
+        .filter(|e| keep(e.path))
+        .map(|e| EndpointDoc {
+            params: e
+                .params
+                .iter()
+                .map(|p| ParamDoc {
+                    description: p.description.to_owned(),
+                    name: p.name.to_owned(),
+                    required: p.required,
+                    ty: p.ty.to_owned(),
+                })
+                .collect(),
+            path: e.path.to_owned(),
+            returns: e.returns(&mut generator),
+            summary: e.summary.to_owned(),
+        })
+        .collect();
     let insights = if insights { insight_rows() } else { Vec::new() };
-    json!({
-        "version": 1,
-        "endpoints": endpoints,
-        "insights": insights,
-    })
+    IndexResponse {
+        endpoints,
+        insights,
+        version: 1,
+    }
 }
 
-pub(crate) async fn repo(State(s): State<ApiState>) -> Reply {
+pub(crate) async fn repo(State(s): State<ApiState>) -> Reply<RepoResponse> {
     blocking(&s, ApiState::repo_info).await
 }
 
-pub(crate) async fn refs(State(s): State<ApiState>) -> Reply {
+pub(crate) async fn refs(State(s): State<ApiState>) -> Reply<RefsResponse> {
     blocking(&s, ApiState::refs).await
 }
 
@@ -104,7 +130,10 @@ pub(crate) struct LogQuery {
     per_page: Option<usize>,
 }
 
-pub(crate) async fn log(State(s): State<ApiState>, Query(q): Query<LogQuery>) -> Reply {
+pub(crate) async fn log(
+    State(s): State<ApiState>,
+    Query(q): Query<LogQuery>,
+) -> Reply<LogResponse> {
     blocking(&s, move |s| {
         s.log(
             q.rev.as_deref(),
@@ -127,7 +156,7 @@ pub(crate) async fn commit(
     State(s): State<ApiState>,
     Path(id): Path<String>,
     Query(q): Query<CommitQuery>,
-) -> Reply {
+) -> Reply<CommitResponse> {
     blocking(&s, move |s| {
         s.commit(&id, q.diff.unwrap_or(true), q.max_lines)
     })
@@ -140,7 +169,10 @@ pub(crate) struct TreeQuery {
     path: Option<String>,
 }
 
-pub(crate) async fn tree(State(s): State<ApiState>, Query(q): Query<TreeQuery>) -> Reply {
+pub(crate) async fn tree(
+    State(s): State<ApiState>,
+    Query(q): Query<TreeQuery>,
+) -> Reply<TreeResponse> {
     blocking(&s, move |s| s.tree(q.rev.as_deref(), q.path.as_deref())).await
 }
 
@@ -159,7 +191,10 @@ fn need_path(q: &FileQuery) -> Result<String, ApiError> {
         .ok_or_else(|| ApiError::BadRequest("missing query parameter: path".into()))
 }
 
-pub(crate) async fn blob(State(s): State<ApiState>, Query(q): Query<FileQuery>) -> Reply {
+pub(crate) async fn blob(
+    State(s): State<ApiState>,
+    Query(q): Query<FileQuery>,
+) -> Reply<BlobResponse> {
     let path = need_path(&q)?;
     blocking(&s, move |s| {
         s.blob(q.rev.as_deref(), &path, q.start_line, q.limit)
@@ -167,7 +202,10 @@ pub(crate) async fn blob(State(s): State<ApiState>, Query(q): Query<FileQuery>) 
     .await
 }
 
-pub(crate) async fn blame(State(s): State<ApiState>, Query(q): Query<FileQuery>) -> Reply {
+pub(crate) async fn blame(
+    State(s): State<ApiState>,
+    Query(q): Query<FileQuery>,
+) -> Reply<BlameResponse> {
     let path = need_path(&q)?;
     blocking(&s, move |s| s.blame(q.rev.as_deref(), &path)).await
 }
@@ -177,12 +215,17 @@ pub(crate) struct RevQuery {
     rev: Option<String>,
 }
 
-pub(crate) async fn contributors(State(s): State<ApiState>, Query(q): Query<RevQuery>) -> Reply {
+pub(crate) async fn contributors(
+    State(s): State<ApiState>,
+    Query(q): Query<RevQuery>,
+) -> Reply<ContributorsResponse> {
     blocking(&s, move |s| s.contributors(q.rev.as_deref())).await
 }
 
-pub(crate) async fn insight_list() -> Json<Value> {
-    Json(json!({ "insights": insight_rows() }))
+pub(crate) async fn insight_list() -> Json<InsightList> {
+    Json(InsightList {
+        insights: insight_rows(),
+    })
 }
 
 #[derive(Deserialize)]
@@ -196,7 +239,7 @@ pub(crate) async fn insight(
     State(s): State<ApiState>,
     Path(name): Path<String>,
     Query(q): Query<InsightQuery>,
-) -> Reply {
+) -> Reply<Value> {
     let InsightQuery { rev, params } = q;
     blocking(&s, move |s| s.insight(&name, rev.as_deref(), &params)).await
 }

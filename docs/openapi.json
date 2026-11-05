@@ -13,6 +13,385 @@
       }
     },
     "schemas": {
+      "BlameItem": {
+        "description": "The commit that last changed one line.",
+        "properties": {
+          "author": {
+            "type": "string"
+          },
+          "commit": {
+            "type": "string"
+          },
+          "line_no": {
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "text": {
+            "type": "string"
+          },
+          "time": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "author",
+          "commit",
+          "line_no",
+          "text",
+          "time"
+        ],
+        "type": "object"
+      },
+      "BlameResponse": {
+        "description": "`GET /blame`.",
+        "properties": {
+          "commit": {
+            "type": "string"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/BlameItem"
+            },
+            "type": "array"
+          },
+          "link": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "path": {
+            "type": "string"
+          },
+          "permalink": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "rev": {
+            "type": "string"
+          },
+          "truncated": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "commit",
+          "lines",
+          "path",
+          "rev",
+          "truncated"
+        ],
+        "type": "object"
+      },
+      "BlobResponse": {
+        "description": "`GET /blob`. `text` and `total_lines` are null for a binary file.",
+        "properties": {
+          "binary": {
+            "type": "boolean"
+          },
+          "commit": {
+            "type": "string"
+          },
+          "link": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "path": {
+            "type": "string"
+          },
+          "permalink": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "rev": {
+            "type": "string"
+          },
+          "size": {
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "text": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "total_lines": {
+            "format": "uint",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "truncated": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "binary",
+          "commit",
+          "path",
+          "rev",
+          "size",
+          "truncated"
+        ],
+        "type": "object"
+      },
+      "ChangeKind": {
+        "enum": [
+          "added",
+          "modified",
+          "deleted",
+          "renamed"
+        ],
+        "type": "string"
+      },
+      "CommitResponse": {
+        "description": "`GET /commits/{id}`.",
+        "properties": {
+          "author": {
+            "$ref": "#/components/schemas/Person"
+          },
+          "body": {
+            "type": "string"
+          },
+          "committer": {
+            "$ref": "#/components/schemas/Person"
+          },
+          "files": {
+            "items": {
+              "$ref": "#/components/schemas/FileItem"
+            },
+            "type": "array"
+          },
+          "id": {
+            "type": "string"
+          },
+          "link": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "parents": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "permalink": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "subject": {
+            "type": "string"
+          },
+          "truncated": {
+            "description": "The diff was cut at the line cap.",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "author",
+          "body",
+          "committer",
+          "files",
+          "id",
+          "parents",
+          "subject",
+          "truncated"
+        ],
+        "type": "object"
+      },
+      "ContributorItem": {
+        "description": "One person with identities merged.",
+        "properties": {
+          "active_days": {
+            "format": "uint",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "additions": {
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "bot": {
+            "type": "boolean"
+          },
+          "commits": {
+            "format": "uint",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "deletions": {
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "emails": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "first_commit": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "first_time": {
+            "description": "The first commit ever falls inside the counted window. Never for the whole history.",
+            "type": "boolean"
+          },
+          "last_commit": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "series": {
+            "description": "Commits per bucket.",
+            "items": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "active_days",
+          "additions",
+          "bot",
+          "commits",
+          "deletions",
+          "emails",
+          "first_commit",
+          "first_time",
+          "last_commit",
+          "name",
+          "series"
+        ],
+        "type": "object"
+      },
+      "ContributorsResponse": {
+        "description": "`GET /contributors`.",
+        "properties": {
+          "authors": {
+            "items": {
+              "$ref": "#/components/schemas/ContributorItem"
+            },
+            "type": "array"
+          },
+          "bus_factor": {
+            "description": "The fewest people who made half the commits.",
+            "format": "uint",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "rev": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "authors",
+          "bus_factor",
+          "rev"
+        ],
+        "type": "object"
+      },
+      "DiffHunk": {
+        "description": "A run of changed lines under one header.",
+        "properties": {
+          "header": {
+            "type": "string"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/DiffLine"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "header",
+          "lines"
+        ],
+        "type": "object"
+      },
+      "DiffLine": {
+        "description": "One line of a diff hunk.",
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/LineKind"
+          },
+          "new_no": {
+            "format": "uint32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "old_no": {
+            "format": "uint32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "text": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "text"
+        ],
+        "type": "object"
+      },
+      "EndpointDoc": {
+        "description": "One endpoint, as `GET /` lists it.",
+        "properties": {
+          "params": {
+            "items": {
+              "$ref": "#/components/schemas/ParamDoc"
+            },
+            "type": "array"
+          },
+          "path": {
+            "type": "string"
+          },
+          "returns": {
+            "description": "The top-level fields of the answer.",
+            "type": "string"
+          },
+          "summary": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "params",
+          "path",
+          "returns",
+          "summary"
+        ],
+        "type": "object"
+      },
       "Error": {
         "properties": {
           "error": {
@@ -44,6 +423,449 @@
           "error"
         ],
         "type": "object"
+      },
+      "FileItem": {
+        "description": "One file a commit changed.",
+        "properties": {
+          "additions": {
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "binary": {
+            "type": "boolean"
+          },
+          "deletions": {
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "hunks": {
+            "description": "Absent unless the request asked for the diff.",
+            "items": {
+              "$ref": "#/components/schemas/DiffHunk"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "kind": {
+            "$ref": "#/components/schemas/ChangeKind"
+          },
+          "link": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "old_path": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "path": {
+            "type": "string"
+          },
+          "permalink": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "additions",
+          "binary",
+          "deletions",
+          "kind",
+          "path"
+        ],
+        "type": "object"
+      },
+      "IndexResponse": {
+        "description": "`GET /`.",
+        "properties": {
+          "endpoints": {
+            "items": {
+              "$ref": "#/components/schemas/EndpointDoc"
+            },
+            "type": "array"
+          },
+          "insights": {
+            "items": {
+              "$ref": "#/components/schemas/InsightRow"
+            },
+            "type": "array"
+          },
+          "version": {
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "endpoints",
+          "insights",
+          "version"
+        ],
+        "type": "object"
+      },
+      "InsightList": {
+        "description": "`GET /insights`.",
+        "properties": {
+          "insights": {
+            "items": {
+              "$ref": "#/components/schemas/InsightRow"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "insights"
+        ],
+        "type": "object"
+      },
+      "InsightRow": {
+        "description": "One available insight.",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "summary": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "summary"
+        ],
+        "type": "object"
+      },
+      "LineKind": {
+        "enum": [
+          "context",
+          "added",
+          "removed"
+        ],
+        "type": "string"
+      },
+      "LogCommit": {
+        "description": "One commit of a log page.",
+        "properties": {
+          "author": {
+            "$ref": "#/components/schemas/Person"
+          },
+          "committer": {
+            "$ref": "#/components/schemas/Person"
+          },
+          "id": {
+            "type": "string"
+          },
+          "link": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "parents": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "permalink": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "subject": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "author",
+          "committer",
+          "id",
+          "parents",
+          "subject"
+        ],
+        "type": "object"
+      },
+      "LogResponse": {
+        "description": "`GET /log`.",
+        "properties": {
+          "commits": {
+            "items": {
+              "$ref": "#/components/schemas/LogCommit"
+            },
+            "type": "array"
+          },
+          "has_more": {
+            "type": "boolean"
+          },
+          "page": {
+            "format": "uint",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "path": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "per_page": {
+            "format": "uint",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "rev": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "commits",
+          "has_more",
+          "page",
+          "per_page",
+          "rev"
+        ],
+        "type": "object"
+      },
+      "ParamDoc": {
+        "description": "One query parameter of an endpoint.",
+        "properties": {
+          "description": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "required": {
+            "type": "boolean"
+          },
+          "ty": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "description",
+          "name",
+          "required",
+          "ty"
+        ],
+        "type": "object"
+      },
+      "Person": {
+        "description": "Who did something and when.",
+        "properties": {
+          "email": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "offset": {
+            "description": "Offset from UTC in seconds.",
+            "format": "int32",
+            "type": "integer"
+          },
+          "time": {
+            "description": "Seconds since the Unix epoch.",
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "email",
+          "name",
+          "offset",
+          "time"
+        ],
+        "type": "object"
+      },
+      "RefItem": {
+        "description": "One branch, tag or remote.",
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/RefKind"
+          },
+          "name": {
+            "type": "string"
+          },
+          "target": {
+            "type": "string"
+          },
+          "time": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "kind",
+          "name",
+          "target",
+          "time"
+        ],
+        "type": "object"
+      },
+      "RefKind": {
+        "enum": [
+          "branch",
+          "tag",
+          "remote"
+        ],
+        "type": "string"
+      },
+      "RefsResponse": {
+        "description": "`GET /refs`.",
+        "properties": {
+          "refs": {
+            "items": {
+              "$ref": "#/components/schemas/RefItem"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "refs"
+        ],
+        "type": "object"
+      },
+      "RepoResponse": {
+        "description": "`GET /repo`.",
+        "properties": {
+          "head": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "head_branch": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "index_version": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "totals": {
+            "$ref": "#/components/schemas/RepoTotals"
+          }
+        },
+        "required": [
+          "name",
+          "totals"
+        ],
+        "type": "object"
+      },
+      "RepoTotals": {
+        "description": "Commits, authors, files and lines over the whole history.",
+        "properties": {
+          "additions": {
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "authors": {
+            "format": "uint",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "commits": {
+            "format": "uint",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "deletions": {
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "files": {
+            "format": "uint",
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "additions",
+          "authors",
+          "commits",
+          "deletions",
+          "files"
+        ],
+        "type": "object"
+      },
+      "TreeEntryKind": {
+        "enum": [
+          "dir",
+          "file",
+          "symlink",
+          "submodule"
+        ],
+        "type": "string"
+      },
+      "TreeItem": {
+        "description": "One entry of a directory.",
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/TreeEntryKind"
+          },
+          "name": {
+            "type": "string"
+          },
+          "size": {
+            "format": "uint64",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "name"
+        ],
+        "type": "object"
+      },
+      "TreeResponse": {
+        "description": "`GET /tree`.",
+        "properties": {
+          "commit": {
+            "type": "string"
+          },
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/TreeItem"
+            },
+            "type": "array"
+          },
+          "path": {
+            "type": "string"
+          },
+          "rev": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "commit",
+          "entries",
+          "path",
+          "rev"
+        ],
+        "type": "object"
       }
     }
   },
@@ -67,16 +889,11 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "properties": {
-                    "endpoints": {},
-                    "insights": {},
-                    "version": {}
-                  },
-                  "type": "object"
+                  "$ref": "#/components/schemas/IndexResponse"
                 }
               }
             },
-            "description": "version, endpoints, insights",
+            "description": "endpoints, insights, version",
             "headers": {
               "ETag": {
                 "schema": {
@@ -132,15 +949,11 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "properties": {
-                    "lines": {},
-                    "truncated": {}
-                  },
-                  "type": "object"
+                  "$ref": "#/components/schemas/BlameResponse"
                 }
               }
             },
-            "description": "lines (commit, author, time), truncated",
+            "description": "commit, lines, link, path, permalink, rev, truncated",
             "headers": {
               "ETag": {
                 "schema": {
@@ -214,17 +1027,11 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "properties": {
-                    "binary": {},
-                    "text": {},
-                    "total_lines": {},
-                    "truncated": {}
-                  },
-                  "type": "object"
+                  "$ref": "#/components/schemas/BlobResponse"
                 }
               }
             },
-            "description": "text, total_lines, truncated, binary",
+            "description": "binary, commit, link, path, permalink, rev, size, text, total_lines, truncated",
             "headers": {
               "ETag": {
                 "schema": {
@@ -289,17 +1096,11 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "properties": {
-                    "files": {},
-                    "hunks": {},
-                    "message": {},
-                    "truncated": {}
-                  },
-                  "type": "object"
+                  "$ref": "#/components/schemas/CommitResponse"
                 }
               }
             },
-            "description": "message, files, hunks, truncated",
+            "description": "author, body, committer, files, id, link, parents, permalink, subject, truncated",
             "headers": {
               "ETag": {
                 "schema": {
@@ -346,15 +1147,11 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "properties": {
-                    "authors": {},
-                    "bus_factor": {}
-                  },
-                  "type": "object"
+                  "$ref": "#/components/schemas/ContributorsResponse"
                 }
               }
             },
-            "description": "authors, bus_factor",
+            "description": "authors, bus_factor, rev",
             "headers": {
               "ETag": {
                 "schema": {
@@ -391,10 +1188,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "properties": {
-                    "insights": {}
-                  },
-                  "type": "object"
+                  "$ref": "#/components/schemas/InsightList"
                 }
               }
             },
@@ -572,14 +1366,22 @@
               "application/json": {
                 "schema": {
                   "properties": {
-                    "data}": {},
-                    "{insight": {}
+                    "commits_indexed": {
+                      "type": "integer"
+                    },
+                    "data": {},
+                    "insight": {
+                      "type": "string"
+                    },
+                    "rev": {
+                      "type": "string"
+                    }
                   },
                   "type": "object"
                 }
               }
             },
-            "description": "{insight, data}",
+            "description": "commits_indexed, data, insight, rev",
             "headers": {
               "ETag": {
                 "schema": {
@@ -653,15 +1455,11 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "properties": {
-                    "commits": {},
-                    "has_more": {}
-                  },
-                  "type": "object"
+                  "$ref": "#/components/schemas/LogResponse"
                 }
               }
             },
-            "description": "commits, has_more",
+            "description": "commits, has_more, page, path, per_page, rev",
             "headers": {
               "ETag": {
                 "schema": {
@@ -698,10 +1496,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "properties": {
-                    "refs": {}
-                  },
-                  "type": "object"
+                  "$ref": "#/components/schemas/RefsResponse"
                 }
               }
             },
@@ -742,17 +1537,11 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "properties": {
-                    "head": {},
-                    "head_branch": {},
-                    "name": {},
-                    "totals": {}
-                  },
-                  "type": "object"
+                  "$ref": "#/components/schemas/RepoResponse"
                 }
               }
             },
-            "description": "name, head, head_branch, totals",
+            "description": "head, head_branch, index_version, name, totals",
             "headers": {
               "ETag": {
                 "schema": {
@@ -808,14 +1597,11 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "properties": {
-                    "entries": {}
-                  },
-                  "type": "object"
+                  "$ref": "#/components/schemas/TreeResponse"
                 }
               }
             },
-            "description": "entries",
+            "description": "commit, entries, path, rev",
             "headers": {
               "ETag": {
                 "schema": {
