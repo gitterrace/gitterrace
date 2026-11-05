@@ -1,8 +1,9 @@
 //! The option matrix of the equivalence guard.
 //!
-//! The axes are period x bots x mailmap x path filter x whitespace x selection chip. [`cells`] is the full product (the per-commit proof and the
-//! revisions golden), [`pairwise`] a generated covering array of it (the equivalence golden),
-//! and [`named`] the high-risk cells real history broke, each with its reason.
+//! The axes are period x bots x mailmap x path filter x whitespace x selection chip. [`cells`] is
+//! the full product (the per-commit proof and the revisions golden), [`pairwise`] a generated
+//! covering array of it (the equivalence golden), and [`named`] the high-risk cells real history
+//! broke, each with its reason.
 
 /// Every period value the filter bar offers.
 pub const PERIODS: [&str; 5] = ["1w", "1m", "3m", "1y", "all"];
@@ -209,9 +210,10 @@ pub fn all_pairs() -> std::collections::BTreeSet<Pair> {
 
 /// A pairwise (2-wise) covering array of [`cells`].
 ///
-/// Every value of every axis meets every value of every other axis in at least one cell. Greedy and deterministic: each round takes
-/// the first product cell that covers the most uncovered pairs, then any cell whose pairs all
-/// others hold is dropped, so removing any one cell uncovers a pair. Sorted.
+/// Every value of every axis meets every value of every other axis in at least one cell. Greedy and
+/// deterministic: each round takes the first product cell that covers the most uncovered pairs,
+/// then any cell whose pairs all others hold is dropped, so removing any one cell uncovers a pair.
+/// Sorted.
 #[must_use]
 pub fn pairwise() -> Vec<Cell> {
     let all = cells();

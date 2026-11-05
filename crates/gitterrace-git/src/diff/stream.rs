@@ -23,12 +23,13 @@ struct Ahead {
 /// done. `setup` builds one worker's state (a repository handle, a blob cache) once. Commit cost
 /// is very uneven: one mass rename can take seconds while its neighbours take microseconds, so
 /// a fixed split per thread, or a barrier per batch, would leave the other cores idle behind
-/// the slowest share. Here a slow item holds back only the emitting, never the free workers. A worker may run at most `window` items ahead of the next one to
-/// emit, so results waiting in the reorder buffer stay bounded however slow one item is.
-/// The window is also bounded in bytes: `weight` estimates a result's size, and while the
-/// results held exceed `budget` only the item next to emit may start. So a run of huge results
-/// (a merge window's worth of large merges) cannot hold `window` times their size.
-/// The first error (from a worker or from `emit`) stops the run and is returned.
+/// the slowest share. Here a slow item holds back only the emitting, never the free workers. A
+/// worker may run at most `window` items ahead of the next one to emit, so results waiting in the
+/// reorder buffer stay bounded however slow one item is. The window is also bounded in bytes:
+/// `weight` estimates a result's size, and while the results held exceed `budget` only the item
+/// next to emit may start. So a run of huge results (a merge window's worth of large merges) cannot
+/// hold `window` times their size. The first error (from a worker or from `emit`) stops the run and
+/// is returned.
 pub(crate) fn stream<T: Sync, S, R: Send>(
     items: &[T],
     workers: usize,

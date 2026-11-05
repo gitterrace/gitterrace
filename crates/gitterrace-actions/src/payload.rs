@@ -112,7 +112,8 @@ fn bad(why: impl Into<String>) -> PayloadError {
 
 impl Payload {
     /// Builds the payload for `action` from git. `origin` is the page origin
-    /// (for example the base URL of the default address) a `/go` permalink is rooted at; `style` picks the form.
+    /// (for example the base URL of the default address) a `/go` permalink is rooted at; `style`
+    /// picks the form.
     pub fn build(
         repo: &Repo,
         action: &str,

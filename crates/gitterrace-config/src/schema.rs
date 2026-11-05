@@ -229,8 +229,8 @@ pub const DEFAULT_ADDR: &str = "127.0.0.1:4242";
 
 settings! {
     server: Server {
-        /// Address to listen on. Keep it local: pages show source code and there is no login. Needs a
-        /// restart.
+        /// Address to listen on. Keep it local: pages show source code and there is no login. Needs
+        /// a restart.
         addr: String = DEFAULT_ADDR.to_owned() => Restart,
         /// Maximum open live-update streams per repository (one per browser tab).
         live_streams: usize = 32 => Live,

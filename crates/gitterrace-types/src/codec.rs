@@ -124,7 +124,9 @@ macro_rules! string_enum {
                 std::borrow::Cow::Borrowed(stringify!($name))
             }
 
-            fn json_schema(_: &mut $crate::__schemars::SchemaGenerator) -> $crate::__schemars::Schema {
+            fn json_schema(
+                _: &mut $crate::__schemars::SchemaGenerator,
+            ) -> $crate::__schemars::Schema {
                 let values: Vec<&str> = <Self as $crate::StringEnum>::ALL
                     .iter()
                     .map(|v| v.as_str())

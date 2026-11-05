@@ -24,7 +24,8 @@ use crate::markdown::front::{front_matter_html, split_front_matter};
 use crate::markdown::lines::{LineMap, mark, sentinel};
 pub(crate) use crate::markdown::outline::{OutlineItem, outline_menu, outline_rail};
 
-/// Heading slug as most Markdown hosts make it, so links written elsewhere still land: lowercase, keep letters, digits, `-` and `_`, spaces to `-`.
+/// Heading slug as most Markdown hosts make it, so links written elsewhere still land: lowercase,
+/// keep letters, digits, `-` and `_`, spaces to `-`.
 fn slugify(text: &str) -> String {
     text.trim()
         .chars()

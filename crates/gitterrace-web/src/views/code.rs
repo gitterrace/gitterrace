@@ -10,7 +10,8 @@ use crate::views::{Render, author_href};
 
 /// Chunks highlighted before first paint of a big file; the rest is plain until `code_tail_html`.
 const EAGER_CHUNKS: usize = 2;
-/// Files up to this size are highlighted whole (about 20 ms): the fragment round trip is not worth it.
+/// Files up to this size are highlighted whole (about 20 ms): the fragment round trip is not worth
+/// it.
 const EAGER_BYTES: usize = 32 * 1024;
 
 /// Highlighted files by content, at most `cap` bytes in all. A file over an eighth of the cap

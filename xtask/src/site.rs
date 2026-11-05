@@ -308,7 +308,8 @@ fn redirects(repo: &str, name: &str) -> String {
     )
 }
 
-/// `TAGLINE` from `scripts/theme-tagline-gen.py`, so the page, the README header and the logo agree.
+/// `TAGLINE` from `scripts/theme-tagline-gen.py`, so the page, the README header and the logo
+/// agree.
 fn tagline(root: &Path) -> Result<String> {
     let src = std::fs::read_to_string(root.join("scripts/theme-tagline-gen.py"))
         .context("reading scripts/theme-tagline-gen.py")?;
@@ -469,8 +470,9 @@ pub const SHOTS: [(&str, &str, &str); 6] = [
 
 /// One shot as a tile link plus a full-size view, for the caller's single `<figure>`. The view
 /// is a `:target` overlay, so it works without script; clicking it (or Escape, through
-/// [`LIGHTBOX_JS`]) goes back to `#features`. Its image is a decorative copy (empty alt) so the description is read once,
-/// and `tabindex="-1"` lets the browser focus it when the fragment opens it.
+/// [`LIGHTBOX_JS`]) goes back to `#features`. Its image is a decorative copy (empty alt) so the
+/// description is read once, and `tabindex="-1"` lets the browser focus it when the fragment opens
+/// it.
 fn shot_html(name: &str, alt: &str, cap: &str) -> String {
     // Every tile is the same size so the rows line up; check_shots holds the WebPs to it.
     // A tile shows only its thumbnail, so it never fetches the full-size file. Light and dark

@@ -56,8 +56,9 @@ pub fn frozen(name: &str) -> bool {
 
 /// The adversarial history plus one commit per option axis, built at `dir/repo`.
 ///
-/// A bot, a lock file (generated), a tracked file `.gitignore` rules out, a whitespace-only change, a vendored
-/// directory (the exclude glob) and dates inside each period window before [`FROZEN_NOW`].
+/// A bot, a lock file (generated), a tracked file `.gitignore` rules out, a whitespace-only change,
+/// a vendored directory (the exclude glob) and dates inside each period window before
+/// [`FROZEN_NOW`].
 /// `Edited` adds a last commit that rewrites `.mailmap` to rename Bob. `CaseFold` also has Bob
 /// commit once as `Bob@Y.io` and maps `<BOB@y.IO>` to him: mailmap matches e-mails without
 /// regard to case, and a store that keys identities must agree.
@@ -348,9 +349,9 @@ fn units(body: &str) -> Vec<&str> {
 
 /// Whether `new` differs from `old` only by reordering rows inside runs of equal sort key.
 ///
-/// That is: the same unit count (lines, cut before each `<li`), every changed unit a dated row, the sequence of keys unchanged, and
-/// in each run of consecutive rows with one key the same multiset of rows. Anything else,
-/// including a row that moved across a different time, is `false`.
+/// That is: the same unit count (lines, cut before each `<li`), every changed unit a dated row, the
+/// sequence of keys unchanged, and in each run of consecutive rows with one key the same multiset
+/// of rows. Anything else, including a row that moved across a different time, is `false`.
 #[must_use]
 pub fn tie_only(old: &str, new: &str) -> bool {
     let before = units(old);
@@ -451,7 +452,8 @@ pub fn digest(body: &str) -> String {
 /// Compares `answers` to the golden file at `golden` (`exact canonical key` per line).
 ///
 /// An answer passes when its exact digest matches, or when only equal-time rows moved (the
-/// canonical digest matches); those are counted per page on stderr. Under `TEST_BLESS=1` writes the file instead. On a mismatch writes every differing body to
+/// canonical digest matches); those are counted per page on stderr. Under `TEST_BLESS=1` writes the
+/// file instead. On a mismatch writes every differing body to
 /// `dump` (a folder under `target/`, the caller's `CARGO_TARGET_TMPDIR`) and panics with the
 /// first keys and that path. A green run removes a stale `dump`.
 pub fn check(golden: &Path, dump: &Path, answers: &BTreeMap<String, String>) {

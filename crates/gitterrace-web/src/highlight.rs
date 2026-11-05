@@ -51,7 +51,8 @@ const CATEGORIES: [(&str, &str); 13] = [
     ("parameter", "s-parameter"),
 ];
 
-/// The colour class of one scope: among its atoms the stylesheet colours, the one whose rule comes last.
+/// The colour class of one scope: among its atoms the stylesheet colours, the one whose rule comes
+/// last.
 fn scope_class(scope: Scope) -> Option<&'static str> {
     let name = scope.build_string();
     name.split('.')

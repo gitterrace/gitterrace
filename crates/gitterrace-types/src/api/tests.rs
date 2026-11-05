@@ -266,7 +266,9 @@ fn index_and_insight_list_match_the_maps_they_replaced() {
         &json!({
             "version": 1,
             "endpoints": [{ "path": "/log", "summary": "Paged history.", "returns": "commits",
-                "params": [{ "name": "rev", "ty": "string", "required": false, "description": "d" }]}],
+                "params": [{
+                    "name": "rev", "ty": "string", "required": false, "description": "d"
+                }]}],
             "insights": [{ "name": "n", "summary": "s" }],
         }),
     );

@@ -17,7 +17,8 @@ pub enum PieceError {
 #[derive(Debug, thiserror::Error)]
 pub(super) enum CommandError {
     #[error(
-        "command: shell = true cannot take placeholders ({placeholder}). Write command as an array and drop shell"
+        "command: shell = true cannot take placeholders ({placeholder}). \
+         Write command as an array and drop shell"
     )]
     ShellPlaceholder { placeholder: String },
     #[error("command[{index}]: {source}")]
@@ -44,7 +45,8 @@ pub(super) enum CommandError {
     #[error("command[0]: the program is literal, {{{raw}}} is not allowed there")]
     ProgramPlaceholder { raw: String },
     #[error(
-        "command[{index}]: {element} comes from the repository and could start with `-`. Put a literal \"--\" before it, or give it a literal prefix (\"--flag={element}\")"
+        "command[{index}]: {element} comes from the repository and could start with `-`. \
+         Put a literal \"--\" before it, or give it a literal prefix (\"--flag={element}\")"
     )]
     NeedsGuard { index: usize, element: String },
 }

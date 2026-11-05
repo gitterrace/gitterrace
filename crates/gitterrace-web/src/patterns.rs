@@ -1,4 +1,5 @@
-//! The patterns page, `/stats/patterns`: files that change together, ages, sizes and release cadence.
+//! The patterns page, `/stats/patterns`: files that change together, ages, sizes and release
+//! cadence.
 
 use askama::Template;
 use axum::extract::{Query, RawQuery, State};

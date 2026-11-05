@@ -61,17 +61,20 @@ fn loose_switches(body: &str) -> Vec<String> {
 #[test]
 fn a_hand_written_switch_is_caught() {
     // The old period picker, and a metric switch under any other class name.
-    let period = "<div class=\"seg\"><span>Period</span><a href=\"a\" class=\"on\">Week</a><a href=\"b\">Month</a></div>";
+    let period = "<div class=\"seg\"><span>Period</span><a href=\"a\" class=\"on\">Week</a>\
+                  <a href=\"b\">Month</a></div>";
     assert_eq!(owned_in(period), ["class=\"seg\""]);
     let metric =
         "<div class=\"pick\"><a href=\"a\" class=\"on\">Commits</a><a href=\"b\">Lines</a></div>";
     assert_eq!(loose_switches(metric).len(), 1);
     assert!(owned_in("<div class=\"chips\"></div>").is_empty());
-    let shared = "<div class=\"segctl\" role=\"group\"><span class=\"segs\"><a class=\"on\">a</a><a>b</a></span></div>";
+    let shared = "<div class=\"segctl\" role=\"group\">\
+                  <span class=\"segs\"><a class=\"on\">a</a><a>b</a></span></div>";
     assert!(loose_switches(shared).is_empty());
 }
 
-/// The markup lives in `seg.rs` and its `seg_control.html` and nowhere else in the crate's code, templates or scripts.
+/// The markup lives in `seg.rs` and its `seg_control.html` and nowhere else in the crate's code,
+/// templates or scripts.
 #[test]
 fn only_the_shared_control_writes_a_switch() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));

@@ -1,5 +1,5 @@
-//! Screenshot checks: the README's PNG files and the site's WebP files exist, are linked and are the
-//! right size.
+//! Screenshot checks: the README's PNG files and the site's WebP files exist, are linked and are
+//! the right size.
 
 use std::path::Path;
 

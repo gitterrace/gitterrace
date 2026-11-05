@@ -479,8 +479,9 @@ fn validate(
 
 /// Keys an action may not take: the action menu's own, and every single key the page binds.
 ///
-/// The page keys come from `nav.js`. An action key is both its menu key and its page chord ("a" then the key), and
-/// a page key would fire its page command too. A web test pins this table to `nav.js`.
+/// The page keys come from `nav.js`. An action key is both its menu key and its page chord ("a"
+/// then the key), and a page key would fire its page command too. A web test pins this table to
+/// `nav.js`.
 pub const RESERVED_KEYS: [(char, &str); 9] = [
     ('p', "the menu's Copy permalink"),
     ('m', "the menu's Copy as markdown"),

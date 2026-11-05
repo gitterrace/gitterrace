@@ -91,8 +91,9 @@ fn staged_paths(repo: &gix::Repository, out: &mut BTreeSet<String>) -> Result<()
 
 /// A hash of the unstaged and untracked state.
 ///
-/// Which paths differ from the index and their size and mtime, so editing a modified file again moves it too. Reads only, like the rest of this
-/// module. Capped like the view, so a forgotten `node_modules` stays cheap.
+/// Which paths differ from the index and their size and mtime, so editing a modified file again
+/// moves it too. Reads only, like the rest of this module. Capped like the view, so a forgotten
+/// `node_modules` stays cheap.
 pub fn worktree_signature(repo: &Repo) -> Result<u64> {
     use gix::status::{UntrackedFiles, index_worktree::Item as Iw};
     use std::hash::{Hash, Hasher};
@@ -437,7 +438,8 @@ mod tests {
         assert!(!p.join(".git/index.lock").exists());
     }
 
-    /// `GITTERRACE_BENCH_REPO=<path> cargo test --release -p gitterrace-git -- --ignored --nocapture signature_cost`.
+    /// `GITTERRACE_BENCH_REPO=<path> cargo test --release -p gitterrace-git -- --ignored
+    /// --nocapture signature_cost`.
     #[test]
     #[ignore = "measurement, run by hand in release"]
     #[expect(clippy::print_stdout, reason = "a bench reports its measurement")]

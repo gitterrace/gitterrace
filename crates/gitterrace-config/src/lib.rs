@@ -68,7 +68,8 @@ pub enum ConfigError {
 /// Where the config directory is.
 ///
 /// On Windows `%APPDATA%\gitterrace`. Else `$XDG_CONFIG_HOME/gitterrace` when that is absolute,
-/// else `$HOME/.config/gitterrace` (also on macOS). `override_dir` is the `--config` flag. No other environment variable moves it.
+/// else `$HOME/.config/gitterrace` (also on macOS). `override_dir` is the `--config` flag. No other
+/// environment variable moves it.
 pub fn config_dir(override_dir: Option<&Path>) -> Option<PathBuf> {
     if let Some(d) = override_dir {
         return Some(d.to_path_buf());

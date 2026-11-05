@@ -1,7 +1,7 @@
 //! The one seam every insights page reads through: [`InsightsSource`].
 //!
-//! A page never knows whether its data comes from today's records in memory ([`MemorySource`]) or from the segment
-//! files (`segments.rs`, `disk.rs`).
+//! A page never knows whether its data comes from today's records in memory ([`MemorySource`]) or
+//! from the segment files (`segments.rs`, `disk.rs`).
 //!
 //! Contract:
 //!

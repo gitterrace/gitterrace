@@ -2,7 +2,8 @@
 
 use crate::fmt::esc;
 
-/// One heading of a document: level 1 to 6, its slug (before `crate::markdown::ids::doc_id`) and text.
+/// One heading of a document: level 1 to 6, its slug (before `crate::markdown::ids::doc_id`) and
+/// text.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct OutlineItem {
     pub(crate) level: u8,

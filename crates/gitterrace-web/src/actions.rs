@@ -365,7 +365,7 @@ pub(crate) fn router(site: Arc<Site>) -> Router {
     r.with_state(site)
 }
 
-/// `GET /_actions/status`: `{"note": string|null}`, fetched by `actions.js` on load, focus and tab show.
+/// `GET /_actions/status`: `{"note": string|null}`, fetched by `actions.js` on load, focus, show.
 async fn status(State(site): State<Arc<Site>>) -> Response {
     let body = serde_json::to_string(&StatusBody {
         note: site.status.note(),

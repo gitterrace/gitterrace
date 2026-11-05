@@ -16,7 +16,8 @@ use crate::{MB, Server, apply_and_assert_allocator, serve_if_child};
 const REQUEST_PEAK_MB: u64 = 8;
 /// Idle after the requests: what a just-started server may hold plus the cache budget. Warm
 /// state counts here and not against one request: the disk block cache (its share of
-/// `resources.cache_mb`, `Cache::Blocks`) and the shared derived tables (skip, commit lines, follow maps).
+/// `resources.cache_mb`, `Cache::Blocks`) and the shared derived tables (skip, commit lines, follow
+/// maps).
 const FOOTPRINT_IDLE_MB: u64 = 48;
 /// Run to run spread of the released idle above start plus memo (measured 0 to 3 MB).
 const SLACK_MB: u64 = 4;
@@ -53,7 +54,8 @@ fn insights_request_peak() {
     };
     if run.released > run.start + FOOTPRINT_IDLE_MB * MB {
         run.bad.push(format!(
-            "idle after the requests: {} MB above the just-started {} MB, budget {FOOTPRINT_IDLE_MB} MB",
+            "idle after the requests: {} MB above the just-started {} MB, \
+             budget {FOOTPRINT_IDLE_MB} MB",
             run.released.saturating_sub(run.start) / MB,
             run.start / MB
         ));
@@ -63,9 +65,10 @@ fn insights_request_peak() {
 
 /// After the idle release the server holds what a just-started one does, plus the page memo it
 /// keeps by design and 4 MB of slack: five runs on a 100k history released 11, 11, 12, 12 and 13 MB
-/// over a 6 MB start and a 4 MB memo, the high ones under heavy machine load. The block cache and the derived tables go with the source,
-/// and the allocator runs one arena, so no per-core arena keeps freed slabs (red with one arena
-/// per core: 17 MB released against a 12 MB cap on a 100k history).
+/// over a 6 MB start and a 4 MB memo, the high ones under heavy machine load. The block cache and
+/// the derived tables go with the source, and the allocator runs one arena, so no per-core arena
+/// keeps freed slabs (red with one arena per core: 17 MB released against a 12 MB cap on a 100k
+/// history).
 #[test]
 fn insights_release_returns_to_start() {
     if serve_if_child() {

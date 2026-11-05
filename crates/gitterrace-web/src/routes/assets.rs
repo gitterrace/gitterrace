@@ -106,7 +106,8 @@ fn etag(body: &str) -> HeaderValue {
         .unwrap_or_else(|_| HeaderValue::from_static("\"0\""))
 }
 
-/// Revalidating route for an embedded file: `no-cache` plus an `ETag`, so a repeat visit costs a 304.
+/// Revalidating route for an embedded file: `no-cache` plus an `ETag`, so a repeat visit costs a
+/// 304.
 fn static_asset<S: Clone + Send + Sync + 'static>(
     kind: &'static str,
     body: &'static str,

@@ -316,8 +316,8 @@ mod tests {
         })
     }
 
-    /// How long a test waits for an event. Generous: a loaded build machine delays macOS file events by
-    /// seconds, and how fast a change shows is proven by the web tests.
+    /// How long a test waits for an event. Generous: a loaded build machine delays macOS file
+    /// events by seconds, and how fast a change shows is proven by the web tests.
     const PATIENCE: Duration = Duration::from_secs(20);
 
     /// These tests time OS events, so they run one at a time.

@@ -204,8 +204,9 @@ fn newest(mut all: Vec<Entry>, keep: usize) -> Vec<Entry> {
     all
 }
 
-/// Newest first, capped. Past `limits.registry_entries` the least recently served go with their names, so a
-/// repository unseen for that long may come back under another name if its old one was taken.
+/// Newest first, capped. Past `limits.registry_entries` the least recently served go with their
+/// names, so a repository unseen for that long may come back under another name if its old one was
+/// taken.
 fn write_all(dir: &Path, all: Vec<Entry>) -> io::Result<()> {
     let all = newest(all, ENTRIES.load(std::sync::atomic::Ordering::Relaxed));
     let json = serde_json::to_vec_pretty(&all).map_err(io::Error::other)?;

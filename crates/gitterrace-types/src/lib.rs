@@ -2,8 +2,8 @@
 //! kinds) and, as they move here, the shapes of the JSON API. One definition each, so a value
 //! is spelled, parsed and documented in one place. A type used inside one crate stays there.
 //!
-//! Dependencies stay light (serde and schemars), so any later binding of these types adds a feature,
-//! not a rewrite.
+//! Dependencies stay light (serde and schemars), so any later binding of these types adds a
+//! feature, not a rewrite.
 
 pub mod api;
 pub mod card;

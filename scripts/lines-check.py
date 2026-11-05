@@ -18,6 +18,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 MAX_LINES = 600
+# rustfmt max_width. rustfmt never wraps a comment, so a wide one is caught here.
+MAX_WIDTH = 100
 LENGTH_GLOBS = ("*.rs", "*.py", "*.mjs", "*.js", "*.sh", "*.css", "*.html")
 COMMENT_EXTS = (".rs", ".py", ".mjs", ".js", ".sh")
 # Vendored third-party files and the synced theme copy are not ours to split or reword.
@@ -86,6 +88,132 @@ def too_long(root: Path, names: list[str]) -> list[str]:
     return bad
 
 
+# Wide lines that predate the width rule: strings and macro bodies rustfmt leaves alone. A
+# count may only go down: a new wide line fails, and a fixed one must lower its count here.
+WIDE_ALLOWED: dict[str, int] = {
+    "crates/gitterrace-actions/src/config/tests.rs": 6,
+    "crates/gitterrace-actions/src/payload/tests.rs": 1,
+    "crates/gitterrace-actions/src/runner.rs": 1,
+    "crates/gitterrace-actions/src/schema.rs": 10,
+    "crates/gitterrace-api/src/endpoints.rs": 2,
+    "crates/gitterrace-api/src/insights.rs": 4,
+    "crates/gitterrace-api/src/mcp.rs": 2,
+    "crates/gitterrace-cards/src/lib.rs": 1,
+    "crates/gitterrace-cards/src/wrapped.rs": 8,
+    "crates/gitterrace-config/src/lib.rs": 2,
+    "crates/gitterrace-config/src/schema.rs": 7,
+    "crates/gitterrace-index/src/insights/mod.rs": 1,
+    "crates/gitterrace-index/src/insights/stats.rs": 1,
+    "crates/gitterrace-index/src/lib.rs": 6,
+    "crates/gitterrace-index/src/store.rs": 2,
+    "crates/gitterrace-index/tests/it/count_parity_fuzz.rs": 9,
+    "crates/gitterrace-testkit/src/lib.rs": 2,
+    "crates/gitterrace-testkit/src/oracle/tests.rs": 1,
+    "crates/gitterrace-types/src/codec.rs": 1,
+    "crates/gitterrace-web/src/actions/tests.rs": 1,
+    "crates/gitterrace-web/src/charts.rs": 12,
+    "crates/gitterrace-web/src/commit_types.rs": 4,
+    "crates/gitterrace-web/src/error.rs": 1,
+    "crates/gitterrace-web/src/features_tests.rs": 1,
+    "crates/gitterrace-web/src/insights.rs": 1,
+    "crates/gitterrace-web/src/languages/render.rs": 12,
+    "crates/gitterrace-web/src/lib.rs": 3,
+    "crates/gitterrace-web/src/markdown.rs": 5,
+    "crates/gitterrace-web/src/markdown/lines.rs": 1,
+    "crates/gitterrace-web/src/markdown/outline.rs": 1,
+    "crates/gitterrace-web/src/media.rs": 4,
+    "crates/gitterrace-web/src/overview_side.rs": 1,
+    "crates/gitterrace-web/src/routes/assets.rs": 2,
+    "crates/gitterrace-web/src/routes/files.rs": 1,
+    "crates/gitterrace-web/src/sitemap.rs": 4,
+    "crates/gitterrace-web/src/state_tests.rs": 1,
+    "crates/gitterrace-web/src/views/code.rs": 1,
+    "crates/gitterrace-web/src/views/diff.rs": 3,
+    "crates/gitterrace-web/src/views/diff/tests.rs": 1,
+    "crates/gitterrace-web/src/when.rs": 1,
+    "crates/gitterrace-web/src/wiring_live_tests.rs": 2,
+    "crates/gitterrace-web/src/wiring_tests.rs": 1,
+    "crates/gitterrace-web/tests/doc_cards_share_one_header.rs": 2,
+    "crates/gitterrace-web/tests/memory_budget.rs": 2,
+    "crates/gitterrace-web/tests/running_cache_rewritten.rs": 2,
+    "crates/gitterrace-web/tests/sha_links.rs": 1,
+    "crates/gitterrace-web/tests/theme.rs": 1,
+    "crates/gitterrace/src/alloc.rs": 2,
+    "crates/gitterrace/src/cli.rs": 1,
+    "crates/gitterrace/src/export.rs": 2,
+    "crates/gitterrace/src/export/credit.rs": 1,
+    "crates/gitterrace/src/export/credit/tests.rs": 1,
+    "crates/gitterrace/src/export/out.rs": 1,
+    "crates/gitterrace/src/export/snapshot.rs": 1,
+    "crates/gitterrace/src/handler.rs": 9,
+    "crates/gitterrace/src/open.rs": 5,
+    "crates/gitterrace/src/open/tests.rs": 1,
+    "xtask/src/api_md.rs": 2,
+    "xtask/src/config_md.rs": 2,
+    "xtask/src/docs_md.rs": 2,
+    "xtask/src/openapi_json.rs": 2,
+    "xtask/src/readme_agents_md.rs": 1,
+    "xtask/src/site.rs": 33,
+    "xtask/src/site/shots.rs": 1,
+    "xtask/src/site/tests.rs": 2,
+}
+
+RAW_OPEN = re.compile(r'r(#+)"')
+URL = re.compile(r"\bhttps?://\S{40,}")
+
+
+def wide_lines(text: str) -> list[int]:
+    """Lines past MAX_WIDTH, except inside a raw string (fixture bytes such as SVG or TOML,
+    where a wrap would change the content) and lines carrying one long URL."""
+    out, close = [], None
+    for i, line in enumerate(text.splitlines(), 1):
+        inside = close is not None
+        if close is not None and close in line:
+            close = None
+        else:
+            for m in RAW_OPEN.finditer(line):
+                end = '"' + m.group(1)
+                if end not in line[m.end() :]:
+                    close = end
+                    break
+        raw = inside or close is not None
+        if len(line) > MAX_WIDTH and not raw and not URL.search(line):
+            out.append(i)
+    return out
+
+
+def too_wide(
+    root: Path, names: list[str], allowed: dict[str, int] | None = None
+) -> list[str]:
+    allowed = WIDE_ALLOWED if allowed is None else allowed
+    bad = []
+    for n in names:
+        if not n.endswith(".rs"):
+            continue
+        try:
+            text = (root / n).read_text(errors="replace")
+        except OSError:
+            continue
+        rows = wide_lines(text)
+        cap = allowed.get(n, 0)
+        lines = text.splitlines()
+        if len(rows) > cap:
+            for i in rows:
+                if cap == 0 or lines[i - 1].lstrip().startswith("//"):
+                    bad.append(
+                        f"{n}:{i}: {len(lines[i - 1])} columns, limit {MAX_WIDTH}"
+                    )
+            if cap:
+                bad.append(
+                    f"{n}: {len(rows)} wide lines, allowed {cap} (wrap the new one)"
+                )
+        elif len(rows) < cap:
+            bad.append(
+                f"{n}: {len(rows)} wide lines, allowed {cap}: lower WIDE_ALLOWED"
+            )
+    return bad
+
+
 def label_hits(
     root: Path, names: list[str], extra: list[str] | None = None
 ) -> list[str]:
@@ -109,7 +237,7 @@ def label_hits(
 
 
 def run(root: Path, names: list[str]) -> list[str]:
-    return too_long(root, names) + label_hits(root, names)
+    return too_long(root, names) + too_wide(root, names) + label_hits(root, names)
 
 
 def self_test() -> None:
@@ -119,6 +247,17 @@ def self_test() -> None:
         (root / "big601.rs").write_text("fn a() {}\n" * 601)
         assert too_long(root, ["ok600.rs"]) == [], "600 lines must pass"
         assert len(too_long(root, ["big601.rs"])) == 1, "601 lines must fail"
+        ok = "    /// " + "x" * 92 + "\n//! " + "y" * 96 + "\n"
+        (root / "w.rs").write_text(ok + 'let s = r#"\n' + "z" * 140 + '\n"#;\n')
+        (root / "w2.rs").write_text("    // " + "x" * 94 + "\n")
+        (root / "w3.rs").write_text('    let s = "' + "x" * 95 + '";\n')
+        assert too_wide(root, ["w.rs"], {}) == [], "100 columns and raw fixtures pass"
+        assert len(too_wide(root, ["w2.rs"], {})) == 1, "a 101 column comment fails"
+        assert len(too_wide(root, ["w3.rs"], {})) == 1, "a 101 column string fails"
+        assert too_wide(root, ["w3.rs"], {"w3.rs": 1}) == [], "an allowed count passes"
+        assert too_wide(root, ["w.rs"], {"w.rs": 1}), (
+            "an allowance above the count fails"
+        )
         green = [
             'let s = "%C3%A9"; // encodes e acute',
             'let u = "http://x"; // plain',

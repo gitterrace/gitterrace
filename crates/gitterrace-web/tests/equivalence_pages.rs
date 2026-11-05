@@ -1,7 +1,8 @@
 //! Output equivalence: every insights page (rendered HTML) and every API insight (JSON) under
-//! a pairwise covering array of the option matrix plus named high-risk cells, clock frozen, equals today's answer byte for byte.
-//! Today's in-memory implementation wrote `tests/golden/*.txt` (`TEST_BLESS=1`); any later
-//! implementation must reproduce it. A failure dumps the differing bodies beside the golden.
+//! a pairwise covering array of the option matrix plus named high-risk cells, clock frozen, equals
+//! today's answer byte for byte. Today's in-memory implementation wrote `tests/golden/*.txt`
+//! (`TEST_BLESS=1`); any later implementation must reproduce it. A failure dumps the differing
+//! bodies beside the golden.
 //!
 //! `TEST_GITGIT=/path/to/git` adds a seeded sample of 64 cells over a real history. Its golden is
 //! kept outside the repository, at `$TEST_GITGIT_GOLDEN` (default `target/gitgit-golden.txt`).
