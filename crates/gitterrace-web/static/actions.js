@@ -399,14 +399,7 @@
     var top = button("Actions for this page (.)");
     top.classList.add("top");
     top.addEventListener("click", function () { openMenu(current(), top); });
-    // The most used item, one click away. Its menu entry stays for the p key.
-    var link = el("button", "tool permabtn", null);
-    link.type = "button";
-    link.setAttribute("aria-label", "Copy permalink");
-    link.setAttribute("data-tip", "Copy permalink");
-    link.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg>';
-    link.addEventListener("click", function () { menuOpener = link; copy(permalink(current()), "Permalink copied"); });
-    theme.parentNode.insertBefore(link, theme);
+    // Copy permalink lives in this menu and on y: no separate icon competing for the bar.
     theme.parentNode.insertBefore(top, theme);
   }
   // Commit page: next to the sha.

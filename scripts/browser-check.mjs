@@ -17,7 +17,8 @@
 //                active tab has aria-current; shots into --shots (default target/shots)/doctabs-*.png
 //   header       from 1440 down to 320 px the top bar's tools (search, actions, theme) share one
 //                row and the page never scrolls sideways; where search is folded, its button opens
-//                the field with focus and Escape folds it again
+//                the field with focus and Escape folds it again; no tool repeats a menu action
+//                (a Copy ... button) and the search placeholder names what it searches
 //   marked       text marked with the mouse is what the menu acts on: marking lines 2-3 of a file
 //                shows a trigger and Send to carries L2-3, their text and a title that is not the
 //                bare path; a mid-word mark snaps to whole words with a line of context; marked

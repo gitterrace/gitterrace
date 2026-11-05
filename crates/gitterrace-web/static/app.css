@@ -34,7 +34,7 @@ main.wrap>h2:first-child,main.wrap>.tabs+h2{margin-top:var(--space-6)}
    first: it narrows, then folds into a button that opens it across the bar. */
 .tools{display:flex;align-items:center;gap:var(--space-1);flex:0 1 auto;min-width:0;margin-left:auto}
 /* Wide enough for the whole placeholder beside the / hint at the body font. */
-.tools .topsearch{flex:0 1 auto;width:200px;min-width:140px;transition:width var(--dur-fast)}
+.tools .topsearch{flex:0 1 auto;width:256px;min-width:140px;transition:width var(--dur-fast)}
 .tools .topsearch:focus-within{width:320px}
 .tools .topsearch input[type=search]{min-width:0;width:100%}
 .tool{width:32px;height:32px;padding:0;display:grid;place-items:center;background:transparent;border:1px solid transparent;border-radius:var(--radius);color:var(--muted);cursor:pointer}
@@ -509,7 +509,6 @@ td:has(>.actbtn.float){position:relative}
 .actbtn.top::after{content:none}
 .actbtn.top::before{content:"";width:16px;height:16px;background:currentColor;-webkit-mask:var(--menu-ico) center/contain no-repeat;mask:var(--menu-ico) center/contain no-repeat}
 :root{--menu-ico:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round'%3E%3Cpath d='M4 7h16M4 12h16M4 17h10'/%3E%3C/svg%3E")}
-.permabtn.copied{color:var(--accent-ink)}
 /* Repository switcher: the name itself is the button. One repository: a link. */
 .reposwitch{display:inline-flex}
 .reposwitch:not([hidden])+#repolink{display:none}

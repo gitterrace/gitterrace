@@ -238,11 +238,18 @@ async function header() {
         const boxes = tools.map((e) => e.getBoundingClientRect());
         const rows = boxes.every((x) => x.top < boxes[0].bottom && x.bottom > boxes[0].top) ? 1 : 2;
         const btn = document.getElementById('searchbtn');
-        return { rows, n: tools.length, hscroll: document.documentElement.scrollWidth > innerWidth + 1, folded: !!btn && getComputedStyle(btn).display !== 'none' };
+        // One way to each job in the bar: a tool that only repeats an action-menu entry is noise.
+        const labels = tools.map((e) => (e.getAttribute('aria-label') || '').toLowerCase());
+        const dup = labels.filter((l) => l && labels.indexOf(l) !== labels.lastIndexOf(l)).concat(labels.filter((l) => /^copy /.test(l)));
+        const q = /** @type {HTMLInputElement | null} */ (document.getElementById('q'));
+        const vague = !!q && !/\bcode\b/i.test(q.placeholder);
+        return { rows, n: tools.length, dup, vague, hscroll: document.documentElement.scrollWidth > innerWidth + 1, folded: !!btn && getComputedStyle(btn).display !== 'none' };
       });
       const where = `${name} ${width}`;
       if (m.n < 2 || m.rows !== 1) r.fail(`header ${where}: tools split over ${m.rows} rows`);
       else if (m.hscroll) r.fail(`header ${where}: page scrolls sideways`);
+      else if (m.dup.length) r.fail(`header ${where}: the bar repeats a menu action: ${m.dup.join(', ')}`);
+      else if (m.vague) r.fail(`header ${where}: the search placeholder does not say what it searches`);
       else r.ok(`header ${where}: tools on one row${m.folded ? ', search folded' : ''}`);
       if (!m.folded || folded++) continue;
       await p.click('#searchbtn');

@@ -27,7 +27,7 @@
 </div>
 <span class="livenote" id="livenote" hidden role="status"></span>
 <div class="tools">
-{% if c.tools.search %}<form class="topsearch" action="{{ c.base }}/search" method="get" role="search"><input id="q" name="q" type="search" placeholder="Search" aria-label="Search code and commits" autocomplete="off"><input type="hidden" name="rev" value="{{ c.rev }}"><kbd data-tip="Press / to search">/</kbd></form>
+{% if c.tools.search %}<form class="topsearch" action="{{ c.base }}/search" method="get" role="search"><input id="q" name="q" type="search" placeholder="Search code and commits" aria-label="Search code and commits" autocomplete="off"><input type="hidden" name="rev" value="{{ c.rev }}"><kbd data-tip="Press / to search">/</kbd></form>
 <button class="tool searchbtn" type="button" id="searchbtn" aria-label="Search" aria-controls="q" data-tip="Search (/)"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg></button>{% endif %}
 <button class="theme" type="button" id="theme" aria-label="Color theme" data-tip="Color theme">
 <svg class="i-auto" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 0 0 16z" class="fill"/></svg>
