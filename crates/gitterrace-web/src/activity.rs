@@ -4,7 +4,7 @@ use askama::Template;
 use axum::extract::{Query, RawQuery, State};
 use axum::response::Html;
 use gitterrace_index::feed::SystemClock;
-use gitterrace_index::{CountContext, Period, Scope, ScopeParams};
+use gitterrace_index::{CountContext, Period, PeriodStats, Scope, ScopeParams};
 use serde::Deserialize;
 
 use crate::{
@@ -91,6 +91,7 @@ struct ActivityPage {
     tabs: Tabs,
     fb: FilterBar,
     opts: Vec<OptLink>,
+    lead: String,
     rows: Vec<PulseRow>,
     span: String,
     empty: bool,
@@ -158,6 +159,40 @@ fn scope_of(
         .unwrap_or_else(|_| unreachable!("the period and the range are parsed already"))
 }
 
+/// The pulse table: each count of the period beside the one before it.
+fn pulse_rows(now: &PeriodStats, prev: Option<&PeriodStats>) -> Vec<PulseRow> {
+    let row = |label: &'static str, now: u64, before: Option<u64>| {
+        let (d, tone) = delta(now, before);
+        PulseRow {
+            label,
+            tip: if label == COMMITS {
+                "Merges are left out: a merge repeats the changes of its branch."
+            } else {
+                ""
+            },
+            now: fmt::thousands(now),
+            before: before.map_or_else(|| "-".to_owned(), fmt::thousands),
+            delta: d,
+            tone,
+        }
+    };
+    vec![
+        row(COMMITS, now.commits as u64, prev.map(|p| p.commits as u64)),
+        row(
+            "Authors",
+            now.authors as u64,
+            prev.map(|p| p.authors as u64),
+        ),
+        row(
+            "Files changed",
+            now.files as u64,
+            prev.map(|p| p.files as u64),
+        ),
+        row("Lines added", now.additions, prev.map(|p| p.additions)),
+        row("Lines removed", now.deletions, prev.map(|p| p.deletions)),
+    ]
+}
+
 /// The landing insights page: the period against the one before it, commits per bucket and
 /// when commits happen.
 pub(crate) async fn page(
@@ -181,48 +216,12 @@ pub(crate) async fn page(
         let counted = ins.counted(&scope, CountContext::new(&**r, &SystemClock));
         let (s, rhythm) = counted.activity();
         let prev = s.previous.as_ref();
-        let row = |label: &'static str, now: u64, before: Option<u64>| {
-            let (d, tone) = delta(now, before);
-            PulseRow {
-                label,
-                tip: if label == COMMITS {
-                    "Merges are left out: a merge repeats the changes of its branch."
-                } else {
-                    ""
-                },
-                now: fmt::thousands(now),
-                before: before.map_or_else(|| "-".to_owned(), fmt::thousands),
-                delta: d,
-                tone,
-            }
-        };
-        let rows = vec![
-            row(
-                COMMITS,
-                s.current.commits as u64,
-                prev.map(|p| p.commits as u64),
-            ),
-            row(
-                "Authors",
-                s.current.authors as u64,
-                prev.map(|p| p.authors as u64),
-            ),
-            row(
-                "Files changed",
-                s.current.files as u64,
-                prev.map(|p| p.files as u64),
-            ),
-            row(
-                "Lines added",
-                s.current.additions,
-                prev.map(|p| p.additions),
-            ),
-            row(
-                "Lines removed",
-                s.current.deletions,
-                prev.map(|p| p.deletions),
-            ),
-        ];
+        let rows = pulse_rows(&s.current, prev);
+        let lead = crate::lead::activity(
+            s.current.commits as u64,
+            s.current.authors as u64,
+            prev.map(|p| p.commits as u64),
+        );
         let span_days = sel.map_or_else(|| period.days(), |(_, _, a, b)| Some(b - a + 1));
         let span = span_text(s.from, s.to, span_days);
         let series: Vec<_> = rhythm
@@ -250,6 +249,7 @@ pub(crate) async fn page(
             tabs: views::stats_tabs("a"),
             fb,
             opts: q.row(&d, "/stats"),
+            lead,
             rows,
             span,
             empty: s.current.commits == 0,

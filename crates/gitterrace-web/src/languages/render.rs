@@ -9,6 +9,8 @@
 
 use std::fmt::Write as _;
 
+use askama::Template;
+
 use crate::charts::nice_step;
 use crate::fmt::{self, esc};
 use crate::languages::chain::Chain;
@@ -460,9 +462,25 @@ pub(super) fn body(ch: &Chain, view: View, subj: &Subjects) -> String {
             ]
         ),
     );
-    let total: i64 = ch.lines(ch.len() - 1).iter().sum();
+    let last = ch.lines(ch.len() - 1);
+    let total: i64 = last.iter().sum();
+    let positive: i64 = last.iter().map(|v| (*v).max(0)).sum::<i64>().max(1);
+    let lead = last
+        .iter()
+        .enumerate()
+        .filter(|(i, _)| ch.langs()[*i] != "Other")
+        .max_by_key(|(_, v)| **v)
+        .map(|(i, v)| {
+            crate::lead::languages(
+                &ch.langs()[i],
+                &share_label((*v).max(0) as f64 / positive as f64),
+                total,
+            )
+        })
+        .unwrap_or_default();
+    let lead = crate::lead::Lead { lead }.render().unwrap_or_default();
     format!(
-        r#"{filters}<section class="card pad"><div class="chart-head"><div><h2>Lines of code by language</h2><p class="hint">Exact line count at every commit on the first-parent history, {} today. Drag across the chart to select a range.</p></div>{}</div>{}</section>{}{}"#,
+        r#"{lead}{filters}<section class="card pad"><div class="chart-head"><div><h2>Lines of code by language</h2><p class="hint">Exact line count at every commit on the first-parent history, {} today. Drag across the chart to select a range.</p></div>{}</div>{}</section>{}{}"#,
         fmt::count(total.max(0), "line", "lines"),
         legend(ch),
         area_chart(ch, view, subj),

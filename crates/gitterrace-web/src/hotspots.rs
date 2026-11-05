@@ -40,6 +40,7 @@ struct HotspotsPage {
     fb: FilterBar,
     opts: Vec<OptLink>,
     empty: bool,
+    lead: String,
     kpis: Vec<Kpi>,
     scatter: String,
     rows: Vec<HotRow>,
@@ -104,6 +105,7 @@ pub(crate) async fn page(
             fb: f.bar("/stats/hotspots", &**r, period),
             opts: q.row(&d, "/stats/hotspots"),
             empty: set.stream().next().is_none(),
+            lead: crate::lead::hotspots(rep.files.len(), rep.concentration),
             kpis: vec![
                 Kpi("Files changed", fmt::thousands(rep.files.len())),
                 Kpi("Changes", fmt::thousands(rep.total_changes)),

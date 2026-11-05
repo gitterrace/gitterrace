@@ -24,6 +24,7 @@ mod history;
 mod hotspots;
 mod insights;
 mod languages;
+mod lead;
 #[cfg(test)]
 mod limits_wiring_tests;
 mod live;

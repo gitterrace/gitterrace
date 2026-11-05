@@ -1,1 +1,1 @@
-<div class="opts muted">{% for o in opts %}<a href="{{ o.href }}"{% if o.on %} class="on"{% endif %} data-tip="Toggle: {{ o.label }}">{{ o.label }}: <b>{{ o.state }}</b></a>{% endfor %}</div>
+<p class="optline">{% for o in opts %}{% if !loop.first %}<span aria-hidden="true"> · </span>{% endif %}<a href="{{ o.href }}"{% if o.on %} class="on"{% endif %} data-tip="Toggle: {{ o.label }}">{{ o.label }} {{ o.state }}</a>{% endfor %}</p>

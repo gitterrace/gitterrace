@@ -1,8 +1,9 @@
 //! The one segmented control: the period on every insights page, the contributors metric, the
 //! languages axis and scale, the languages range presets and a document's Preview/Code switch.
-//! Markup in `seg_control.html`. One container holds the choices, the one in force is filled and carries `aria-current`, and a
-//! control whose choices do not fit one row becomes a native select, by one rule for all. No template
-//! or other module writes the markup by hand, so the controls keep one size, spacing and focus.
+//! Markup in `seg_control.html`. One container holds the choices, the one in force is filled and
+//! carries `aria-current`, and a control whose choices do not fit one row becomes a native select,
+//! by one rule for all. No template or other module writes the markup by hand, so the controls keep
+//! one size, spacing and focus.
 
 use std::fmt;
 

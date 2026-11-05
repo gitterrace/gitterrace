@@ -34,6 +34,7 @@ struct OwnershipPage {
     tabs: Tabs,
     fb: FilterBar,
     opts: Vec<OptLink>,
+    lead: String,
     kpis: Vec<Kpi>,
     rows: Vec<DirRow>,
 }
@@ -88,6 +89,7 @@ pub(crate) async fn page(
             tabs: views::stats_tabs("ow"),
             fb: f.bar("/stats/ownership", &**r, period_of(&q, &d, Period::All)),
             opts: q.row(&d, "/stats/ownership"),
+            lead: crate::lead::ownership(rep.overall.bus_factor, rep.dirs_with_bus_factor_one),
             kpis: vec![
                 Kpi("Bus factor", fmt::thousands(rep.overall.bus_factor)),
                 Kpi("Solo lines", fmt::thousands(rep.solo_lines)),

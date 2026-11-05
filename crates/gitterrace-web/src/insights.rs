@@ -325,6 +325,7 @@ struct ContributorsPage {
     tabs: Tabs,
     fb: FilterBar,
     opts: Vec<OptLink>,
+    lead: String,
     kpis: Vec<Kpi>,
     people: Vec<PersonRow>,
     /// "Show all N contributors" when the list was cut at `PEOPLE_SHOWN`.
@@ -421,6 +422,7 @@ pub(crate) async fn contributors(
             tabs: views::stats_tabs("co"),
             fb,
             opts: q.row(&d, "/stats/contributors"),
+            lead: crate::lead::contributors(total, new_total),
             kpis: vec![
                 Kpi("Contributors", fmt::thousands(total)),
                 Kpi("New in period", fmt::thousands(new_total)),
@@ -472,7 +474,7 @@ impl InsightsQuery {
             )
         })
         .collect();
-        Seg::links("Show", choices)
+        Seg::links("Metric", choices)
     }
 }
 
