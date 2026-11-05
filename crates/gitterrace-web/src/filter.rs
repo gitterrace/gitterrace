@@ -149,16 +149,11 @@ impl Filter {
     pub(crate) fn bar(&self, base: &str, src: &dyn InsightsSource, period: Period) -> FilterBar {
         let chips: Vec<Chip> = DIMS
             .iter()
+            // The period has its own control, which shows it and resets it: never a chip.
+            .filter(|d| **d != Dim::Period)
             .filter_map(|d| {
                 let v = self.get(*d)?;
                 let label = match d {
-                    Dim::Period => match v {
-                        "1w" => "last week".to_owned(),
-                        "1m" => "last month".to_owned(),
-                        "3m" => "last 3 months".to_owned(),
-                        "1y" => "last year".to_owned(),
-                        _ => "all time".to_owned(),
-                    },
                     Dim::Path => self.path()?.to_owned(),
                     Dim::Author => author_name(src, v),
                     _ => v.to_owned(),
@@ -353,6 +348,16 @@ mod tests {
         assert!(
             under("crates/web/a.rs", "crates/web") && !under("crates/webby/d.rs", "crates/web")
         );
+    }
+
+    #[test]
+    fn the_bar_never_builds_a_period_chip() {
+        // The segmented control shows the period and All resets it: a chip would repeat it and
+        // push the control sideways each time a period is chosen.
+        for q in ["period=1w", "period=all&type=fix", "period=1y&path=src"] {
+            let bar = parse(q).bar("/stats", &MemorySource::new(&[]), Period::Week);
+            assert!(bar.chips.iter().all(|c| c.dim != "period"), "{q}");
+        }
     }
 
     #[test]

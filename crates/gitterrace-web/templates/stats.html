@@ -2,9 +2,9 @@
 {% block title %}Activity · {{ c.name }}{% endblock %}
 {% block content %}
 {% include "_tabs.html" %}
-{% include "_lead.html" %}
 {% include "_filterbar.html" %}
 {% include "_options.html" %}
+{% include "_lead.html" %}
 {% if empty %}{{ fb.nothing }}{% else %}
 <p class="hint">{{ span }}.</p>
 <div class="card"><table class="entries">

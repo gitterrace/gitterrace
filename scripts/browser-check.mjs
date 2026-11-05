@@ -70,6 +70,8 @@
 //                every insights page is a tab of the row (no More) and the open one is marked
 //   seg-one-row  every segmented control on the insights pages and a document shows one row of
 //                choices or its native select, never two rows, at 360 and 1440 px, light and dark
+//   period-steady the period control keeps its x and y with no filter, a period, and a period
+//                plus a path chip, at 360 and 1400 px
 //   huge-diff    a commit of 2,000 changed files (mostly pure renames) loads under a DOM bound,
 //                shows a rename as one line, loads the last files on scroll, opens #fN, opens a
 //                folded file with Enter, and prints scroll frame times and long tasks
@@ -91,7 +93,7 @@ const bin = resolve(arg('--bin', join(root, 'target/debug/git-terrace')));
 const fromDisk = process.argv.includes('--from-disk');
 const tabCounts = arg('--tabs', '8,12').split(',').map(Number);
 const browsers = arg('--browsers', 'webkit,chromium').split(',');
-const ALL = ['truncation', 'live-tabs', 'mermaid', 'chip', 'doctabs', 'chords', 'header', 'marked', 'menu-same', 'gutter', 'overlays', 'tips', 'date-tips', 'repo-switch', 'outline', 'mark-seam', 'about-place', 'site-theme', 'side-width', 'calm-header', 'tabs-one-line', 'tab-levels', 'huge-diff', 'sticky-heads', 'md-anchor', 'live-scroll', 'sticky-line', 'seg-one-row'];
+const ALL = ['truncation', 'live-tabs', 'mermaid', 'chip', 'doctabs', 'chords', 'header', 'marked', 'menu-same', 'gutter', 'overlays', 'tips', 'date-tips', 'repo-switch', 'outline', 'mark-seam', 'about-place', 'site-theme', 'side-width', 'calm-header', 'tabs-one-line', 'tab-levels', 'huge-diff', 'sticky-heads', 'md-anchor', 'live-scroll', 'sticky-line', 'seg-one-row', 'period-steady'];
 const wanted = arg('--checks', ALL.join(',')).split(',');
 for (const c of wanted) if (!ALL.includes(c)) { console.error(`unknown check ${c}; known: ${ALL.join(', ')}`); process.exit(2); }
 
@@ -289,6 +291,39 @@ async function tabLevels() {
     await b.close();
   }
 }
+// Period steady: the period control sits in one place whatever the filters are. With no
+// filter, a period, and a period plus a path chip, its box starts at the same x and y, at 360
+// and 1400 px, so choosing a period never moves the control under the pointer.
+async function periodSteady() {
+  for (const name of browsers) {
+    const { b, ctx } = await context(name);
+    for (const width of [1400, 360]) {
+      const at = [];
+      for (const q of ['', '?period=1w', '?period=1w&path=src']) {
+        const p = await ctx.newPage();
+        await p.setViewportSize({ width, height: 700 });
+        await p.goto(srv.base + '/stats' + q, { waitUntil: 'load' });
+        await p.evaluate(() => document.fonts.ready.then(() => new Promise((ok) => requestAnimationFrame(() => requestAnimationFrame(ok)))));
+        at.push(await p.evaluate(() => {
+          const c = document.querySelector('.segctl[aria-label="Period"]');
+          if (!c) return null;
+          const r = c.getBoundingClientRect();
+          return { q: location.search, x: Math.round(r.left), y: Math.round(r.top + scrollY), chip: !!document.querySelector('.chip') };
+        }));
+        await p.close();
+      }
+      const where = `period-steady ${name} ${width}`;
+      const bad = [];
+      if (at.some((a) => !a)) bad.push('no period control');
+      else {
+        for (const a of at.slice(1)) if (a.x !== at[0].x || a.y !== at[0].y) bad.push(`${a.q || 'none'} at ${a.x},${a.y}, not ${at[0].x},${at[0].y}`);
+        if (!at[2].chip) bad.push('the path filter shows no chip');
+      }
+      bad.length ? r.fail(`${where}: ${bad.join(', ')}`) : r.ok(`${where}: the control stays at ${at[0].x},${at[0].y}`);
+    }
+    await b.close();
+  }
+}
 // Sticky heads: on a commit with three 300-line files, scrolled halfway into the second, its
 // header is pinned at the top and the first's is not; a #L120 link on a source page lands
 // fully below the pinned path bar; at 375 px the site header never pins. The commit is made
@@ -354,7 +389,7 @@ async function stickyHeads() {
     await b.close();
   }
 }
-const checks = { 'sticky-heads': stickyHeads, 'tabs-one-line': tabsOneLine, 'tab-levels': tabLevels, 'calm-header': calmHeader, 'side-width': sideWidth, truncation, 'live-tabs': liveTabs, mermaid, chip, doctabs, chords, header, marked, 'menu-same': menuSame, gutter, overlays, tips, 'date-tips': dateTips, 'repo-switch': repoSwitch, outline, 'mark-seam': markSeam, 'about-place': aboutPlace, 'site-theme': siteTheme, 'huge-diff': hugeDiff, 'md-anchor': mdAnchor, 'live-scroll': liveScroll, 'sticky-line': stickyLine, 'seg-one-row': segOneRow };
+const checks = { 'sticky-heads': stickyHeads, 'tabs-one-line': tabsOneLine, 'tab-levels': tabLevels, 'calm-header': calmHeader, 'side-width': sideWidth, truncation, 'live-tabs': liveTabs, mermaid, chip, doctabs, chords, header, marked, 'menu-same': menuSame, gutter, overlays, tips, 'date-tips': dateTips, 'repo-switch': repoSwitch, outline, 'mark-seam': markSeam, 'about-place': aboutPlace, 'site-theme': siteTheme, 'huge-diff': hugeDiff, 'md-anchor': mdAnchor, 'live-scroll': liveScroll, 'sticky-line': stickyLine, 'seg-one-row': segOneRow, 'period-steady': periodSteady };
 try {
   for (const c of wanted) { console.log(`-- ${c}`); await checks[c](); }
 } finally {
