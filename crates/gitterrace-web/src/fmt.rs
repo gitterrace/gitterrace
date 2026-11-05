@@ -176,6 +176,17 @@ tokio::task_local! {
     pub(crate) static REQUEST_REV: String;
 }
 
+/// A repository path as HTML that a narrow cell may break only after a `/`: each segment sits
+/// in a span that never wraps inside, so `gitterrace-web` and `coupled-page.html` stay whole.
+/// Escaped; the template prints it unescaped.
+pub(crate) fn path_breaks(path: &str) -> String {
+    let parts: Vec<String> = path
+        .split('/')
+        .map(|s| format!("<span class=\"seg\">{}</span>", esc(s)))
+        .collect();
+    parts.join("/<wbr>")
+}
+
 /// The one place absolute in-app URLs are built: prefixes the current repository's base and,
 /// on pages that follow the selected ref, carries `?rev=` along.
 pub(crate) fn href(path: &str) -> String {
@@ -314,7 +325,22 @@ pub(crate) use gitterrace_types::{esc, esc_text};
 
 #[cfg(test)]
 mod tests {
-    use crate::fmt::{UNKNOWN_DATE, ago, date, day, day_label, size, thousands, with_dates};
+    use crate::fmt::{
+        UNKNOWN_DATE, ago, date, day, day_label, path_breaks, size, thousands, with_dates,
+    };
+
+    #[test]
+    fn a_path_breaks_only_after_its_slashes_and_stays_escaped() {
+        assert_eq!(
+            path_breaks("crates/gitterrace-web/lib.rs"),
+            "<span class=\"seg\">crates</span>/<wbr><span class=\"seg\">gitterrace-web</span>/<wbr>\
+             <span class=\"seg\">lib.rs</span>"
+        );
+        assert_eq!(
+            path_breaks("a/<b>&c"),
+            "<span class=\"seg\">a</span>/<wbr><span class=\"seg\">&lt;b&gt;&amp;c</span>"
+        );
+    }
 
     #[test]
     fn formats_epoch_and_offset() {

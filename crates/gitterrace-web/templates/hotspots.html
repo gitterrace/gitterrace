@@ -12,7 +12,7 @@
 <div class="chart-head"><div><h2>Hotspots</h2><p class="hint">Score is changes times the square root of lines. Click a file for its history.</p></div></div>
 <div class="card"><table class="entries">
 <tr class="th"><td>File</td><td>Language</td><td class="r">Lines</td><td class="r">Changes</td><td class="r">Authors</td><td class="r">Last</td><td class="r">Score</td></tr>
-{% for r in rows %}<tr data-act="insight" data-path="{{ r.path }}"><td class="fill"><div class="bar w{{ r.pct }}"></div><a href="{{ r.href }}">{{ r.path }}</a></td><td class="muted">{{ r.language }}</td><td class="r">{{ r.lines }}</td><td class="r">{{ r.changes }}</td><td class="r">{{ r.authors }}</td><td class="r muted">{{ r.last }}</td><td class="r"><b>{{ r.score }}</b></td></tr>{% endfor %}
+{% for r in rows %}<tr data-act="insight" data-path="{{ r.path }}"><td class="fill"><div class="bar w{{ r.pct }}"></div><a href="{{ r.href }}">{{ r.shown|safe }}</a></td><td class="muted">{{ r.language }}</td><td class="r">{{ r.lines }}</td><td class="r">{{ r.changes }}</td><td class="r">{{ r.authors }}</td><td class="r muted">{{ r.last }}</td><td class="r"><b>{{ r.score }}</b></td></tr>{% endfor %}
 </table></div>
 {% endif %}
 {{ patterns|safe }}

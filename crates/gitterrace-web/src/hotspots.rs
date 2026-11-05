@@ -23,6 +23,8 @@ const SCATTER: usize = 400;
 
 struct HotRow {
     path: String,
+    /// The path as HTML that breaks only after a slash.
+    shown: String,
     href: String,
     language: String,
     lines: String,
@@ -92,6 +94,7 @@ pub(crate) async fn page(
             .take(TOP_HOT)
             .map(|h| HotRow {
                 path: h.path.clone(),
+                shown: fmt::path_breaks(&h.path),
                 href: views::file_link(&h.path),
                 language: h.language.clone(),
                 lines: fmt::thousands(h.lines),

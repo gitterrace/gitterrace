@@ -1,9 +1,13 @@
 // Layout checks of the insights and commit pages: inline controls share one size, section heads
-// and keep room above them. Imported by
+// keep room above them, and file paths break only between folders. Imported by
 // scripts/browser-check.mjs, not run on its own.
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { sh } from './browser-lib.mjs';
+
 /** @param {any} env what browser-check.mjs set up (dir, srv, r, browsers, context, ...) */
 export function checks(env) {
-  const { srv, r, browsers, context } = env;
+  const { dir, srv, r, browsers, context } = env;
 // A metadata line's controls (the sha chip, Copy, the actions trigger) are one size on one
 // line: a trigger that is a pixel shorter or lower than its neighbours reads as a different
 // control. The commit page in light and dark, after the actions script added its trigger.
@@ -57,5 +61,56 @@ async function sectionGaps() {
     await b.close();
   }
 }
-  return { inlineControls, sectionGaps };
+// A file path in a table cell breaks only after a slash, never inside a name: gitterrace-web
+// split as "gitterrace-" and "web" reads as two files. Every path cell on the insights pages
+// with path tables, at a wide, a middle and a narrow width.
+async function pathCells() {
+  // Two deep, hyphenated paths that change together, so they show up as a coupled pair, in the
+  // hotspots table and as owned directories. Built from parts: they live in the fixture only.
+  const top = ['pkgs', 'long-package-name'].join('/');
+  const deep = [`${top}/src/coupled-module.rs`, `${top}/views/coupled-page.html`];
+  mkdirSync(join(dir, top, 'src'), { recursive: true });
+  mkdirSync(join(dir, top, 'views'), { recursive: true });
+  for (let i = 0; i < 4; i++) {
+    for (const f of deep) writeFileSync(join(dir, f), `${i}\n`);
+    sh(dir, 'git', 'add', '-A');
+    sh(dir, 'git', 'commit', '-q', '-m', `feat(web): coupled change ${i}`);
+  }
+  await new Promise((ok) => setTimeout(ok, 1500));
+  const pages = ['/stats/hotspots', '/stats/ownership'];
+  for (const name of browsers) {
+    const { b, ctx } = await context(name);
+    for (const width of [1440, 900, 360]) for (const path of pages) {
+      const p = await ctx.newPage();
+      await p.setViewportSize({ width, height: 700 });
+      await p.goto(srv.base + path, { waitUntil: 'load' });
+      await p.evaluate(() => document.fonts.ready);
+      const bad = await p.evaluate(() => {
+        const out = [];
+        for (const a of document.querySelectorAll('table.entries td a')) {
+          if (!a.textContent.includes('/')) continue;
+          const range = document.createRange();
+          const walk = document.createTreeWalker(a, NodeFilter.SHOW_TEXT);
+          let top = null, prev = '';
+          for (let node = walk.nextNode(); node; node = walk.nextNode()) {
+            const t = node.textContent;
+            for (let i = 0; i < t.length; i++) {
+              range.setStart(node, i); range.setEnd(node, i + 1);
+              const y = Math.round(range.getBoundingClientRect().top);
+              if (top !== null && y > top && prev !== '/') out.push(`${a.textContent} breaks before "${t.slice(i, i + 8)}"`);
+              top = y; prev = t[i];
+            }
+          }
+        }
+        return out.slice(0, 3);
+      });
+      const where = `path-cells ${name} ${width} ${path}`;
+      bad.length ? r.fail(`${where}: ${bad.join('; ')}`) : r.ok(`${where}: paths break only after a slash`);
+      await p.close();
+    }
+    await b.close();
+  }
+}
+
+  return { inlineControls, sectionGaps, pathCells };
 }

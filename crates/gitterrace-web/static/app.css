@@ -477,7 +477,7 @@ table.own td{white-space:nowrap}table.own td:first-child{width:30%}
 .livenote:hover{border-color:var(--line-strong)}
 .headstate{background:var(--warn-bg);color:var(--warn);border-bottom:var(--border);font:var(--weight-semibold) var(--text-sm)/1.4 var(--mono);padding:var(--space-2) 0}
 .actnote{background:var(--soft);color:var(--muted);border-bottom:var(--border);font:var(--text-xs)/1.5 var(--mono);padding:var(--space-2) 0;overflow-wrap:break-word}
-.entries.grow td:first-child{width:auto;white-space:nowrap}.entries td.grow{width:100%;max-width:0}
+.entries.grow td:first-child{width:auto;white-space:nowrap}.entries td.grow{width:100%;max-width:0}.entries.pair td:is(:first-child,:nth-child(2)){width:50%;max-width:0;min-width:11rem}.seg{white-space:nowrap}
 .entries .th td{white-space:nowrap}
 .tag.merged{color:var(--accent-fg)}
 .tagmsg pre{margin:var(--space-3) 0 0;white-space:pre-wrap;font:var(--text-sm)/1.5 var(--mono)}

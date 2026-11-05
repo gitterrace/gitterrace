@@ -98,7 +98,7 @@ const bin = resolve(arg('--bin', join(root, 'target/debug/git-terrace')));
 const fromDisk = process.argv.includes('--from-disk');
 const tabCounts = arg('--tabs', '8,12').split(',').map(Number);
 const browsers = arg('--browsers', 'webkit,chromium').split(',');
-const ALL = ['truncation', 'live-tabs', 'mermaid', 'chip', 'doctabs', 'chords', 'header', 'marked', 'menu-same', 'gutter', 'overlays', 'tips', 'date-tips', 'repo-switch', 'outline', 'mark-seam', 'about-place', 'site-theme', 'side-width', 'calm-header', 'tabs-one-line', 'tab-levels', 'huge-diff', 'sticky-heads', 'md-anchor', 'live-scroll', 'sticky-line', 'seg-one-row', 'period-steady', 'export-from-disk', 'inline-controls', 'section-gaps'];
+const ALL = ['truncation', 'live-tabs', 'mermaid', 'chip', 'doctabs', 'chords', 'header', 'marked', 'menu-same', 'gutter', 'overlays', 'tips', 'date-tips', 'repo-switch', 'outline', 'mark-seam', 'about-place', 'site-theme', 'side-width', 'calm-header', 'tabs-one-line', 'tab-levels', 'huge-diff', 'sticky-heads', 'md-anchor', 'live-scroll', 'sticky-line', 'seg-one-row', 'period-steady', 'export-from-disk', 'inline-controls', 'section-gaps', 'path-cells'];
 const wanted = arg('--checks', ALL.join(',')).split(',');
 for (const c of wanted) if (!ALL.includes(c)) { console.error(`unknown check ${c}; known: ${ALL.join(', ')}`); process.exit(2); }
 
@@ -131,7 +131,7 @@ const { checks: anchorChecks } = await import('./browser-anchor-lib.mjs');
 const { mdAnchor } = anchorChecks(env);
 const { truncation, liveTabs, mermaid, chip, doctabs, chords, header } = pageChecks(env);
 const { marked, menuSame, gutter, overlays, tips, dateTips, repoSwitch, liveScroll, outline } = uiChecks(env);
-const { inlineControls, sectionGaps } = layoutChecks(env);
+const { inlineControls, sectionGaps, pathCells } = layoutChecks(env);
 const { markSeam, aboutPlace, siteTheme, exportFromDisk } = siteChecks(env);
 const { hugeDiff } = diffChecks(env);
 const { checks: stickyChecks } = await import('./browser-sticky-lib.mjs');
@@ -395,7 +395,7 @@ async function stickyHeads() {
     await b.close();
   }
 }
-const checks = { 'sticky-heads': stickyHeads, 'tabs-one-line': tabsOneLine, 'tab-levels': tabLevels, 'calm-header': calmHeader, 'side-width': sideWidth, truncation, 'live-tabs': liveTabs, mermaid, chip, doctabs, chords, header, marked, 'menu-same': menuSame, gutter, overlays, tips, 'date-tips': dateTips, 'repo-switch': repoSwitch, outline, 'mark-seam': markSeam, 'about-place': aboutPlace, 'site-theme': siteTheme, 'huge-diff': hugeDiff, 'md-anchor': mdAnchor, 'live-scroll': liveScroll, 'sticky-line': stickyLine, 'seg-one-row': segOneRow, 'period-steady': periodSteady, 'export-from-disk': exportFromDisk , 'inline-controls': inlineControls , 'section-gaps': sectionGaps };
+const checks = { 'sticky-heads': stickyHeads, 'tabs-one-line': tabsOneLine, 'tab-levels': tabLevels, 'calm-header': calmHeader, 'side-width': sideWidth, truncation, 'live-tabs': liveTabs, mermaid, chip, doctabs, chords, header, marked, 'menu-same': menuSame, gutter, overlays, tips, 'date-tips': dateTips, 'repo-switch': repoSwitch, outline, 'mark-seam': markSeam, 'about-place': aboutPlace, 'site-theme': siteTheme, 'huge-diff': hugeDiff, 'md-anchor': mdAnchor, 'live-scroll': liveScroll, 'sticky-line': stickyLine, 'seg-one-row': segOneRow, 'period-steady': periodSteady, 'export-from-disk': exportFromDisk , 'inline-controls': inlineControls , 'section-gaps': sectionGaps , 'path-cells': pathCells };
 try {
   for (const c of wanted) { console.log(`-- ${c}`); await checks[c](); }
 } finally {

@@ -58,8 +58,8 @@ pub(crate) fn section(a: &crate::app::App, r: &Src, q: &InsightsQuery) -> String
             .map(|p| PairRow {
                 a_href: views::file_link(&p.a),
                 b_href: views::file_link(&p.b),
-                a: p.a,
-                b: p.b,
+                a: fmt::path_breaks(&p.a),
+                b: fmt::path_breaks(&p.b),
                 together: fmt::thousands(p.together),
                 degree: format!("{:.0}%", p.degree * 100.0),
             })
