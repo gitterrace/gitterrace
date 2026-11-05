@@ -238,12 +238,6 @@ pub(crate) fn insights<'a>(a: &App, src: &'a Src, o: Options) -> Insights<'a> {
     }
 }
 
-/// The source after every filter except the period, which the insights methods window
-/// themselves. Only for what has no [`Counted`] reader yet (code age, release cadence).
-pub(crate) fn scoped(f: &Filter, all: &Src) -> Src {
-    f.with(Dim::Period, None).apply(all)
-}
-
 /// The page's [`Scope`]: its period, the URL's selection and options, through the constructor
 /// the API uses too. Count it with [`counted`] over the whole source.
 pub(crate) fn page_scope(q: &InsightsQuery, d: &Defaults, period: Period) -> Scope {

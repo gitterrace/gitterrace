@@ -373,8 +373,24 @@ impl Insights<'_> {
             .collect()
     }
 
-    /// Lines now grouped by the year of the file's last change. See [`AgeReport`].
+    /// Lines now grouped by the year of the file's last counted change. See [`AgeReport`].
     pub fn code_age(&self, files: &[HeadFile]) -> AgeReport {
+        self.code_age_with(files, &(i64::MIN..=i64::MAX), |_| true)
+    }
+
+    /// [`Insights::code_age`] over the commits `c` counts: its days, selection and options. The
+    /// patterns page passes an all-time `c`, so a file's age is its last counted change, and a
+    /// merge or a filtered-out author never makes it younger.
+    pub fn code_age_in(&self, files: &[HeadFile], c: &Counted<'_>) -> AgeReport {
+        self.code_age_with(&under_path(files, c), c.days(), |r| keeps(c, r))
+    }
+
+    fn code_age_with(
+        &self,
+        files: &[HeadFile],
+        days: &RangeInclusive<i64>,
+        chips: impl Fn(&CommitRow) -> bool,
+    ) -> AgeReport {
         let mut years: BTreeMap<i64, (u64, usize)> = BTreeMap::new();
         let mut total = 0;
         let shown: Vec<&HeadFile> = files
@@ -382,7 +398,7 @@ impl Insights<'_> {
             .filter(|f| f.lines != 0 && !self.skips_head(&f.path))
             .collect();
         let names: Vec<&str> = shown.iter().map(|f| &*f.path).collect();
-        let all = self.touches_in(&names, &(i64::MIN..=i64::MAX), &|_: &CommitRow| true);
+        let all = self.touches_in(&names, days, &chips);
         for (f, touches) in shown.into_iter().zip(all) {
             let Some((_, c)) = touches.into_iter().max_by_key(|t| t.0.commit) else {
                 continue;

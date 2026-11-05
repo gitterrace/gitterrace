@@ -12,7 +12,6 @@ use crate::{
     fmt::{self, enc_seg, href},
     insights::{
         InsightsQuery, OptLink, cached, counted, head_lines, insights, page_scope, period_of,
-        scoped,
     },
     routes::Shared,
     views::{self, Chrome, Tabs},
@@ -77,11 +76,12 @@ pub(crate) async fn page(
                 degree: format!("{:.0}%", p.degree * 100.0),
             })
             .collect();
-        // Code age and release cadence cover all history: no Counted reader yet.
-        let recs = scoped(f, r);
-        let ins = insights(a, &recs, q.options(&d));
-        let age: Vec<_> = ins
-            .code_age(&files)
+        // Code age and release cadence are whole-history views: the same selection and
+        // options over every day, counted by the same rule as the rest of the page.
+        let always = page_scope(&q, &d, Period::All);
+        let ever = counted(&whole, &always, r);
+        let age: Vec<_> = whole
+            .code_age_in(&files, &ever)
             .buckets
             .into_iter()
             .map(|b| (b.year.to_string(), b.lines))
@@ -92,7 +92,7 @@ pub(crate) async fn page(
             .map(|b| (b.label, b.commits as u64))
             .collect();
         let tags = gitterrace_index::release_tags(&a.repo.refs().unwrap_or_default());
-        let cad = ins.cadence(&tags);
+        let cad = whole.cadence_in(&tags, &ever);
         let cadence = match (cad.median_days_between, cad.days_since_last) {
             (Some(m), Some(d)) => {
                 format!(
@@ -124,7 +124,7 @@ pub(crate) async fn page(
             tabs: views::stats_tabs("pa"),
             fb: f.bar("/stats/patterns", &**r),
             opts: q.row(&d, "/stats/patterns"),
-            empty: !ins.has_commits(period),
+            empty: set.stream().next().is_none(),
             pairs,
             age: charts::bars(&age),
             sizes: charts::bars(&sizes),

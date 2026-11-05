@@ -506,3 +506,34 @@ fn owner_ties_do_not_follow_person_ids() {
     assert_eq!(ann, zed);
     assert_eq!(ann, Some(vec!["Ann".to_owned(), "Yan".to_owned()]));
 }
+
+/// A file's age is its last counted change: a merge that repeats its lines a year later, or
+/// a commit the selection leaves out, never makes it younger.
+#[test]
+fn code_age_follows_the_membership_rule() {
+    use crate::feed::{FixedClock, MemorySource};
+    use crate::{CountContext, Scope, ScopeParams};
+    let mut recs = vec![
+        rec("a", "Ann", 0, vec![file("x.rs", 5, 0, 5)]),
+        rec("m", "Ann", 400, vec![file("x.rs", 5, 0, 5)]),
+        rec("b", "Bob", 410, vec![file("x.rs", 1, 0, 6)]),
+    ];
+    recs[1].merge = true;
+    let hf = head(&[("x.rs", 6)]);
+    let ins = Insights::new(&recs, Options::default(), None);
+    let cx = CountContext::new(&MemorySource::new(&recs), &FixedClock(i64::MAX));
+    let mut p = ScopeParams::default();
+    p.select.author = Some("ann@x.io".to_owned());
+    let s = Scope::from_params(&p, Options::default(), Period::All).expect("scope");
+    let years = |r: crate::AgeReport| r.buckets.iter().map(|b| b.year).collect::<Vec<_>>();
+    assert_eq!(
+        years(ins.code_age_in(&hf, &ins.counted(&s, cx))),
+        [2024],
+        "Ann's own, no merge"
+    );
+    assert_eq!(
+        years(ins.code_age(&hf)),
+        [2025],
+        "Bob's change counts without a selection"
+    );
+}

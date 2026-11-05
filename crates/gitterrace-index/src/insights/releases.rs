@@ -4,15 +4,16 @@ use std::sync::Arc;
 
 use gitterrace_git::{RefInfo, RefKind};
 
-use crate::feed::FixedClock;
-use crate::insights::{CountContext, Insights};
+use crate::feed::{CommitRange, FixedClock};
+use crate::insights::{CountContext, Counted, Insights};
 
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
 pub struct Release {
     pub name: String,
     pub commit: String,
     pub time: i64,
-    /// Commits since the previous release (first release: all commits up to it).
+    /// Commits since the previous release (first release: all commits up to it), counted by
+    /// the one membership rule: merges out, bots by option, the selection applied.
     pub commits_since: usize,
     pub days_since: Option<i64>,
 }
@@ -35,10 +36,27 @@ pub fn release_tags(refs: &[RefInfo]) -> Vec<(String, String)> {
 }
 
 impl Insights<'_> {
-    /// Release rhythm from tags. Tags whose commit is not in the records are dropped.
+    /// Release rhythm from tags over the whole history under this history's options. Tags
+    /// whose commit is not in the records are dropped.
     pub fn cadence(&self, tags: &[(String, String)]) -> Cadence {
+        let cx = CountContext::new(self.source(), &FixedClock(self.now));
+        self.cadence_with(tags, &cx, |c| self.counted_row(c))
+    }
+
+    /// [`Insights::cadence`] counting the commits between releases as `c` counts them. The
+    /// patterns page passes an all-time `c`: releases are a whole-history view.
+    pub fn cadence_in(&self, tags: &[(String, String)], c: &Counted<'_>) -> Cadence {
+        let kept: std::collections::HashSet<u32> = c.stream().map(|r| r.rank.0).collect();
+        self.cadence_with(tags, c.context(), |r| kept.contains(&r.rank.0))
+    }
+
+    fn cadence_with(
+        &self,
+        tags: &[(String, String)],
+        cx: &CountContext,
+        counts: impl Fn(&crate::feed::CommitRow) -> bool,
+    ) -> Cadence {
         let src = self.source();
-        let cx = CountContext::new(src, &FixedClock(self.now));
         // (rank, time, id, tag name) of every tag whose commit is indexed.
         let mut found: Vec<(usize, i64, Arc<str>, &str)> = tags
             .iter()
@@ -49,6 +67,20 @@ impl Insights<'_> {
             })
             .collect();
         found.sort_by_key(|(i, t, _, n)| (*t, *i, *n));
+        // Counted commits up to and including each rank: the gap between two releases is the
+        // difference, so it never counts a merge or a commit the selection leaves out.
+        let mut upto: Vec<usize> = Vec::new();
+        for c in src.commits_in(CommitRange::All) {
+            let i = c.rank.0 as usize;
+            if upto.len() <= i {
+                upto.resize(i + 1, 0);
+            }
+            upto[i] = usize::from(counts(&c));
+        }
+        for i in 1..upto.len() {
+            upto[i] += upto[i - 1];
+        }
+        let through = |i: usize| upto.get(i).or_else(|| upto.last()).copied().unwrap_or(0);
         let mut releases = Vec::new();
         let mut prev: Option<(usize, i64)> = None;
         for (i, time, id, name) in found {
@@ -56,7 +88,10 @@ impl Insights<'_> {
                 name: name.to_owned(),
                 commit: id.to_string(),
                 time,
-                commits_since: prev.map_or(i + 1, |(p, _)| i.saturating_sub(p)),
+                commits_since: prev.map_or_else(
+                    || through(i),
+                    |(p, _)| through(i).saturating_sub(through(p)),
+                ),
                 days_since: prev.map(|(_, pt)| cx.days_between(pt, time)),
             });
             prev = Some((i, time));
@@ -98,5 +133,48 @@ mod tests {
         assert_eq!(c.releases[1].days_since, Some(30));
         assert_eq!(c.median_days_between, Some(30.0));
         assert_eq!(c.days_since_last, Some(0));
+    }
+
+    /// The commits between two releases are counted by the one rule: a merge and, with
+    /// bots off, a bot commit are left out, and an author selection keeps only that author.
+    #[test]
+    fn commits_between_releases_follow_the_membership_rule() {
+        use crate::feed::{FixedClock, MemorySource};
+        use crate::insights::fixtures::{file, rec};
+        use crate::{CountContext, Period, Scope, ScopeParams};
+        let mut recs = vec![
+            rec("a", "Ann", 0, vec![file("x.rs", 1, 0, 1)]),
+            rec("b", "Bob", 1, vec![file("x.rs", 1, 0, 2)]),
+            rec("m", "Ann", 2, vec![file("x.rs", 1, 0, 3)]),
+            rec("bot", "dependabot[bot]", 3, vec![file("x.rs", 1, 0, 4)]),
+            rec("c", "Ann", 4, vec![file("x.rs", 1, 0, 5)]),
+        ];
+        recs[2].merge = true;
+        let tags = vec![
+            ("v1".to_owned(), "a".to_owned()),
+            ("v2".to_owned(), "c".to_owned()),
+        ];
+        let ins = Insights::new(&recs, Options::default(), None);
+        let since = |c: &super::Cadence| {
+            c.releases
+                .iter()
+                .map(|r| r.commits_since)
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(
+            since(&ins.cadence(&tags)),
+            [1, 2],
+            "b and c, never the merge or the bot"
+        );
+        let cx = CountContext::new(&MemorySource::new(&recs), &FixedClock(i64::MAX));
+        let mut p = ScopeParams::default();
+        p.select.author = Some("ann@x.io".to_owned());
+        let s = Scope::from_params(&p, Options::default(), Period::All).expect("scope");
+        let c = ins.counted(&s, cx);
+        assert_eq!(
+            since(&ins.cadence_in(&tags, &c)),
+            [1, 1],
+            "Ann's own: a, then c"
+        );
     }
 }

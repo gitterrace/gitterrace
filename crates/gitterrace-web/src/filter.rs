@@ -2,15 +2,12 @@
 //! the query string and applied to the records before any aggregate, so every number on a
 //! page respects every active chip.
 
-use std::sync::Arc;
-
 use gitterrace_index::feed::{CommitRange, InsightsSource};
-use gitterrace_index::{Period, Scoped, Selection};
+use gitterrace_index::{Period, Selection};
 use gitterrace_types::StringEnum;
 use serde::Deserialize;
 
 use crate::fmt::{enc_seg, href};
-use crate::insights::Src;
 
 /// Value that selects commits without a scope (`none`).
 pub(crate) const NO_SCOPE: &str = Selection::NO_SCOPE;
@@ -100,12 +97,6 @@ impl Filter {
             .filter(|p| !p.is_empty())
     }
 
-    pub(crate) fn period(&self) -> Option<Period> {
-        self.get(Dim::Period)
-            .and_then(|s| s.parse().ok())
-            .filter(|p| *p != Period::All)
-    }
-
     /// The period including `All`, for pages that window themselves.
     pub(crate) fn period_value(&self) -> Option<Period> {
         self.get(Dim::Period).and_then(|s| s.parse().ok())
@@ -154,21 +145,6 @@ impl Filter {
             author: own(Dim::Author),
             path: own(Dim::Path),
         }
-    }
-
-    /// The commits the filters keep, the period window included, measured from the whole
-    /// source. With a path filter each kept commit lists only the files under the path.
-    /// Unfiltered input comes back as the same source, so its shared tables still apply.
-    pub(crate) fn apply(&self, all: &Src) -> Src {
-        let sel = self.selection();
-        let window = self.period().map(|p| {
-            let (from, to) = p.window(gitterrace_index::feed::reference_time(&**all));
-            from..to
-        });
-        if sel.is_empty() && window.is_none() {
-            return Arc::clone(all);
-        }
-        Arc::new(Scoped::new(all, &sel, window.as_ref()))
     }
 
     /// Chips and period picker for a page served at `base`.
@@ -272,6 +248,11 @@ mod tests {
         }
     }
 
+    /// The commits a filter's selection keeps, as a scoped source.
+    fn kept(f: &Filter, all: &Src) -> Src {
+        Arc::new(gitterrace_index::Scoped::new(all, &f.selection(), None))
+    }
+
     fn sample() -> Src {
         Arc::new(MemorySource::shared(Arc::new(sample_records())))
     }
@@ -336,7 +317,7 @@ mod tests {
     fn filters_stack() {
         let recs = sample();
         let ids = |f: &Filter| {
-            recs_of(&f.apply(&recs))
+            recs_of(&kept(f, &recs))
                 .iter()
                 .map(|r| r.id.clone())
                 .collect::<Vec<_>>()
@@ -351,19 +332,9 @@ mod tests {
     }
 
     #[test]
-    fn period_is_relative_to_newest_commit() {
-        let recs = sample();
-        let n = |q: &str| parse(q).apply(&recs).len();
-        assert_eq!(n("period=1w"), 2);
-        assert_eq!(n("period=3m"), 3);
-        assert_eq!(n("period=1y"), 4);
-        assert_eq!(n("period=all"), 4);
-    }
-
-    #[test]
     fn path_filter_keeps_only_files_under_prefix() {
         let recs = sample();
-        let out = recs_of(&parse("path=crates/web").apply(&recs));
+        let out = recs_of(&kept(&parse("path=crates/web"), &recs));
         assert_eq!(
             out.iter().map(|r| r.id.as_str()).collect::<Vec<_>>(),
             ["a", "c"]

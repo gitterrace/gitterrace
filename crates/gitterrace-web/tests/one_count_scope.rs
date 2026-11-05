@@ -109,3 +109,20 @@ fn a_path_covers_only_its_head_files() {
         assert_eq!(o["untracked_lines"], 0, "{o}");
     });
 }
+
+/// The patterns page is empty when the period holds no selected commit, judged on the
+/// repository's newest day: Bob's last commit is ten days before Ann's, so his week is empty.
+#[test]
+fn patterns_empty_state_follows_the_period_anchor() {
+    let rt = tokio::runtime::Runtime::new().expect("runtime");
+    rt.block_on(async {
+        let dir = tempfile::tempdir().expect("tmp");
+        let router = gitterrace_web::app_router(repo(dir.path())).expect("router");
+        oracle::ready(&router).await;
+        let (status, body) = page(&router, "/stats/patterns?period=1w&author=bob%40y.io").await;
+        assert_eq!(status, 200, "{body}");
+        assert!(body.contains("No commits match these filters."), "{body}");
+        let (_, all) = page(&router, "/stats/patterns?period=all&author=bob%40y.io").await;
+        assert!(!all.contains("No commits match these filters."), "{all}");
+    });
+}
