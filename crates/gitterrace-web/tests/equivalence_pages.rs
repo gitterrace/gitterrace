@@ -32,8 +32,14 @@ fn scrub(answers: BTreeMap<String, String>, tmp: &Path) -> BTreeMap<String, Stri
     let t = tmp.to_string_lossy().into_owned();
     answers
         .into_iter()
-        .map(|(k, v)| (k, v.replace(&t, "<TMP>")))
+        .map(|(k, v)| (k, millis(&v.replace(&t, "<TMP>"))))
         .collect()
+}
+
+/// Blanks the elapsed time a search page prints (`in 8 ms`): wall clock, not output.
+fn millis(body: &str) -> String {
+    let re = regex::Regex::new(r" in \d+ ms").expect("regex");
+    re.replace_all(body, " in _ ms").into_owned()
 }
 
 const fn tag(mm: Mailmap) -> &'static str {
@@ -214,6 +220,176 @@ fn the_pairwise_golden_agrees_with_the_full_matrix() {
     ));
     std::fs::write(&out, &text).expect("proof file");
     assert_eq!(report.real.len(), 0, "{text}");
+}
+
+/// The browsing pages, one or more cells each, over the matrix repository at HEAD. Every page
+/// kind the router serves has a cell here or on an insights page, or is exempt below.
+const BROWSE: [&str; 33] = [
+    "/log",
+    "/log/HEAD",
+    "/log/HEAD?path=src",
+    "/history/src/lib.rs",
+    "/compare",
+    "/compare?base=HEAD~3&head=HEAD",
+    "/commit/HEAD",
+    "/commit/HEAD~1",
+    "/diff/HEAD/0",
+    "/tree/HEAD",
+    "/tree/HEAD/",
+    "/tree/HEAD/src",
+    "/tree/HEAD/docs",
+    "/blob/HEAD/src/lib.rs",
+    "/blob/HEAD/docs/x.md",
+    "/blob/HEAD/vendor/x.c",
+    "/hl/HEAD/src/lib.rs",
+    "/raw/HEAD/src/lib.rs",
+    "/blame/HEAD/src/lib.rs",
+    "/refs",
+    "/tag/v1",
+    "/worktrees",
+    "/stashes",
+    "/worktree",
+    "/worktree/diff/src/lib.rs",
+    "/search?q=fn",
+    "/search?q=feat&kind=commits",
+    "/search?q=nothing-matches-this",
+    "/stats/types",
+    "/stats/frequency",
+    "/stats/patterns",
+    "/api/refs",
+    "/api/files/HEAD",
+];
+
+/// Routes with no golden cell, each with the reason. A route listed here that does not exist
+/// fails, so the list can only follow the router.
+const EXEMPT: [(&str, &str); 15] = [
+    (
+        "/api/last/{rev}",
+        "a fragment the tree page fetches, filled by the file walk",
+    ),
+    ("/api/last/{rev}/{*path}", "same fragment, below the root"),
+    ("/api/progress", "indexing state, changes with timing"),
+    ("/events", "an event stream, never a page"),
+    ("/go/{*rest}", "a redirect to a served repository by id"),
+    ("/_send/targets", "targets from the user's actions file"),
+    (
+        "/r/{name}/_send/targets",
+        "same, under the repository prefix",
+    ),
+    ("/r/{name}", "forwards to the repository"),
+    ("/r/{name}/", "forwards to the repository"),
+    (
+        "/r/{name}/{*rest}",
+        "the repository prefix, covered by every cell",
+    ),
+    (
+        "/api/repos",
+        "the server's repository list, holds a temp path",
+    ),
+    (
+        "/_repos",
+        "adds and removes repositories, secret and loopback only",
+    ),
+    ("/_settings", "reads the user's config file"),
+    ("/_settings/file", "reads and writes the user's config file"),
+    (
+        "/_settings/check",
+        "checks a posted config file, never a page",
+    ),
+];
+
+/// Whether the route literal `route` (`/blob/{rev}/{*path}`) serves the concrete `path`.
+fn serves(route: &str, path: &str) -> bool {
+    let path = path.split('?').next().unwrap_or_default();
+    let (r, p): (Vec<&str>, Vec<&str>) = (route.split('/').collect(), path.split('/').collect());
+    for (i, seg) in r.iter().enumerate() {
+        if seg.starts_with("{*") {
+            return p.len() > i && !p[i].is_empty();
+        }
+        let ok = p.get(i).is_some_and(|q| {
+            if seg.starts_with('{') {
+                !q.is_empty()
+            } else {
+                seg == q
+            }
+        });
+        if !ok {
+            return false;
+        }
+    }
+    r.len() == p.len()
+}
+
+/// Every page kind the registry lists has a cell: an insights page of the matrix, a browsing
+/// page in [`BROWSE`], or an entry in [`EXEMPT`] that says why not. Red when a route is added
+/// with none of the three.
+#[test]
+fn every_routed_page_kind_has_a_golden_cell() {
+    assert!(serves("/blob/{rev}/{*path}", "/blob/HEAD/a/b.rs"));
+    assert!(!serves("/blob/{rev}/{*path}", "/blob/HEAD"));
+    assert!(serves("/tree/{rev}/", "/tree/HEAD/") && !serves("/tree/{rev}/", "/tree/HEAD"));
+    let routes: Vec<&str> = gitterrace_web::sitemap::PAGES
+        .iter()
+        .flat_map(|p| p.routes.iter().copied())
+        .collect();
+    let cells: Vec<&str> = gitterrace_web::WARM_PAGES
+        .iter()
+        .chain(&BROWSE)
+        .copied()
+        .collect();
+    let bare: Vec<&str> = routes
+        .iter()
+        .copied()
+        .filter(|r| !EXEMPT.iter().any(|(e, _)| e == r))
+        .filter(|r| !cells.iter().any(|c| serves(r, c)))
+        .collect();
+    assert!(bare.is_empty(), "routes with no golden cell: {bare:?}");
+    let stale: Vec<&str> = EXEMPT
+        .iter()
+        .map(|e| e.0)
+        .filter(|e| !routes.contains(e))
+        .collect();
+    assert!(
+        stale.is_empty(),
+        "EXEMPT names routes that do not exist: {stale:?}"
+    );
+    let orphans: Vec<&str> = BROWSE
+        .iter()
+        .copied()
+        .filter(|c| !routes.iter().any(|r| serves(r, c)))
+        .collect();
+    assert!(orphans.is_empty(), "cells no route serves: {orphans:?}");
+}
+
+/// The browsing pages against `tests/golden/pages.txt`: one repository, HEAD, frozen clock.
+#[test]
+fn browsing_pages_match_the_oracle() {
+    if !oracle::frozen("browsing_pages_match_the_oracle") {
+        return;
+    }
+    let rt = tokio::runtime::Runtime::new().expect("runtime");
+    let answers = rt.block_on(async {
+        let dir = tempfile::tempdir().expect("tmp");
+        let (repo, _) = oracle::matrix_repo(dir.path(), Mailmap::AsIs);
+        let f = gitterrace_testkit::Fixture::init(&repo);
+        f.git(&["tag", "v1"]);
+        let router = gitterrace_web::app_router(&repo).expect("router");
+        oracle::ready(&router).await;
+        let mut got = BTreeMap::new();
+        for uri in BROWSE {
+            let (status, body) = gitterrace_testkit::page(&router, uri).await;
+            let body = oracle::normalize(&body);
+            let v = if status == 200 {
+                body
+            } else {
+                format!("status {status}\n{body}")
+            };
+            got.insert(format!("[browse] {uri}"), v);
+        }
+        scrub(got, dir.path())
+    });
+    let golden = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/golden/pages.txt");
+    oracle::check(&golden, &dump(&golden), &answers);
 }
 
 /// The pages and API for a revision other than HEAD: the tip of `topic`, a branch with commits
