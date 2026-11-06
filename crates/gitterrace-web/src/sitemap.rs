@@ -1,8 +1,7 @@
 //! The registry of what the server answers, outside `/api/v1`.
 //!
-//! (That has its own in `gitterrace-api`.) The architecture page renders it, and the test below
-//! fails when a
-//! `.route(...)` is added or removed without an entry here.
+//! (That has its own in `gitterrace-api`.) The architecture page renders it, and
+//! `security_class_tests` fails when the built routers hold a route without an entry here.
 
 /// One row of the route table.
 pub struct Page {
@@ -135,43 +134,3 @@ pub const PAGES: &[Page] = &[
         &["/_settings", "/_settings/file", "/_settings/check"],
     ),
 ];
-
-#[cfg(test)]
-mod tests {
-    use std::collections::BTreeSet;
-
-    use crate::sitemap::PAGES;
-
-    /// Every `.route("<literal>"` in a router source file.
-    fn literals(src: &str) -> BTreeSet<String> {
-        src.split(".route(")
-            .skip(1)
-            .filter_map(|rest| rest.trim_start().strip_prefix('"'))
-            .filter_map(|rest| rest.split('"').next())
-            .filter(|r| !r.starts_with("/static") && !r.starts_with("/_actions"))
-            .map(str::to_owned)
-            .collect()
-    }
-
-    #[test]
-    fn every_route_is_documented_and_every_entry_is_a_route() {
-        let mut routed = BTreeSet::new();
-        for src in [
-            include_str!("routes.rs"),
-            include_str!("multi.rs"),
-            include_str!("actions.rs"),
-            include_str!("add.rs"),
-            include_str!("settings.rs"),
-        ] {
-            routed.extend(literals(src));
-        }
-        let documented: BTreeSet<String> = PAGES
-            .iter()
-            .flat_map(|p| p.routes.iter().map(|r| (*r).to_owned()))
-            .collect();
-        assert_eq!(
-            routed, documented,
-            "a route and the PAGES registry disagree: add or remove its entry in sitemap.rs"
-        );
-    }
-}

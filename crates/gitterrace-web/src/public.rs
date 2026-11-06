@@ -70,11 +70,13 @@ pub(crate) const LOCAL: &[&str] = &[
 
 /// Whether a matched route may answer on a public server. `/api/v1` is the read-only JSON
 /// registry, every endpoint of which reads committed objects through the restricted handle.
-fn public_route(route: &str) -> bool {
+/// Its index `/` nests as `/api/v1` itself.
+pub(crate) fn public_route(route: &str) -> bool {
     PUBLIC.contains(&route)
         || route.starts_with("/static/")
         || route
             .strip_prefix("/api/v1")
+            .map(|r| if r.is_empty() { "/" } else { r })
             .is_some_and(|r| gitterrace_api::ENDPOINTS.iter().any(|e| e.path == r))
 }
 
@@ -93,58 +95,7 @@ pub(crate) async fn only_public(req: Request, next: Next) -> Response {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::BTreeSet;
-
-    use super::{LOCAL, PUBLIC, public_route};
-
-    /// Every `.route("<literal>"` and route constant in the router sources, `/static` aside.
-    fn routed() -> BTreeSet<String> {
-        let mut out = BTreeSet::new();
-        for src in [
-            include_str!("routes.rs"),
-            include_str!("multi.rs"),
-            include_str!("actions.rs"),
-            include_str!("add.rs"),
-            include_str!("settings.rs"),
-        ] {
-            for rest in src.split(".route(").skip(1) {
-                let rest = rest.trim_start();
-                let lit = rest.strip_prefix('"').map_or_else(
-                    // A constant: resolve the ones the routers use.
-                    || match rest.split([',', ')']).next() {
-                        Some("STATUS_PATH") => Some("/_actions/status".to_owned()),
-                        Some("RUN_PATH") => Some(crate::actions::RUN_PATH.to_owned()),
-                        Some(other) if other.starts_with("&format!") => None,
-                        Some(other) => panic!("unclassifiable route expression {other}"),
-                        None => None,
-                    },
-                    |r| r.split('"').next().map(str::to_owned),
-                );
-                if let Some(l) = lit.filter(|l| !l.starts_with("/static")) {
-                    out.insert(l);
-                }
-            }
-        }
-        out
-    }
-
-    /// A route added to any router fails here until it is put in `PUBLIC` or `LOCAL`.
-    #[test]
-    fn every_route_is_classified_once() {
-        let public: BTreeSet<String> = PUBLIC.iter().map(|s| (*s).to_owned()).collect();
-        let local: BTreeSet<String> = LOCAL.iter().map(|s| (*s).to_owned()).collect();
-        assert!(
-            public.is_disjoint(&local),
-            "{:?}",
-            public.intersection(&local)
-        );
-        let classified: BTreeSet<String> = public.union(&local).cloned().collect();
-        assert_eq!(
-            routed(),
-            classified,
-            "classify the route in public.rs: PUBLIC shows committed history only"
-        );
-    }
+    use super::{LOCAL, public_route};
 
     #[test]
     fn local_routes_are_never_public() {
@@ -152,6 +103,7 @@ mod tests {
             assert!(!public_route(r), "{r}");
         }
         assert!(public_route("/api/v1/repo"));
+        assert!(public_route("/api/v1"));
         assert!(!public_route("/api/v1/nope"));
         assert!(public_route("/static/app.css"));
     }

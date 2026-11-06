@@ -47,6 +47,8 @@ mod routes;
 mod rule;
 mod search;
 mod sections;
+#[cfg(test)]
+mod security_class_tests;
 mod seg;
 mod settings;
 mod settings_actions;
