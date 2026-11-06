@@ -141,6 +141,7 @@ bench-guard:
 	cargo build -q -p gitterrace
 	python3 scripts/bench-run.py --synthetic --bin $${CARGO_TARGET_DIR:-target}/debug/git-terrace >/dev/null
 	python3 scripts/bench-report.py --self-test
+	python3 scripts/bench-quiet-lib.py
 
 ## counting-parity: The count parity fuzz including the pages-vs-reducers properties still red until every page reads one Counted. Not in check
 counting-parity:

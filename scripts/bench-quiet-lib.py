@@ -210,7 +210,43 @@ def measure_pages(port: int, plan: dict[str, str], runs: int) -> Json:
     return out
 
 
+CONTROL_MIN_PCT = 50
+_control_done = False
+
+
+def cpu_control(secs: float = 1.5) -> float:
+    """CPU percent the probe reads for a process that spins; it must read high.
+
+    A probe with the wrong pid or a cpu_secs stuck at 0 reports an idle server and passes, so
+    the idle numbers are trusted only after a known busy loop reads above CONTROL_MIN_PCT."""
+    spin = "while True: pass"
+    p = subprocess.Popen([sys.executable, "-c", spin])
+    try:
+        time.sleep(0.3)
+        a, t = cpu_secs(p.pid), time.perf_counter()
+        time.sleep(secs)
+        b, t2 = cpu_secs(p.pid), time.perf_counter()
+    finally:
+        p.kill()
+        p.wait()
+    return 100 * (b - a) / (t2 - t)
+
+
+def require_control() -> None:
+    global _control_done
+    if _control_done:
+        return
+    pct = cpu_control()
+    if pct < CONTROL_MIN_PCT:
+        raise RuntimeError(
+            f"idle CPU probe is broken: a busy loop read {pct:.0f}%, under "
+            f"{CONTROL_MIN_PCT}%, so a 0% server reading would mean nothing"
+        )
+    _control_done = True
+
+
 def idle_cpu(server: Any, secs: int, with_events: bool) -> float:
+    require_control()
     stop = threading.Event()
     if with_events:
 
@@ -232,3 +268,28 @@ def idle_cpu(server: Any, secs: int, with_events: bool) -> float:
     b, t2 = cpu_secs(server.pid), time.perf_counter()
     stop.set()
     return 100 * (b - a) / (t2 - t)
+
+
+def self_test() -> int:
+    """The control passes a probe that sees the spinner and fails one stuck at 0."""
+    global cpu_secs, _control_done
+    real = cpu_secs
+    verdicts = []
+    try:
+        for probe in (lambda _pid: time.perf_counter(), lambda _pid: 0.0):
+            cpu_secs, _control_done = probe, False
+            try:
+                require_control()
+                verdicts.append(True)
+            except RuntimeError as e:
+                verdicts.append("probe is broken" not in str(e))
+    finally:
+        cpu_secs = real
+        _control_done = False
+    ok = verdicts == [True, False]
+    print("self-test", "ok" if ok else "FAILED")
+    return 0 if ok else 1
+
+
+if __name__ == "__main__":
+    sys.exit(self_test())
