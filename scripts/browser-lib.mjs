@@ -11,6 +11,11 @@ import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import net from 'node:net';
 
+/** The shortest watch.rescan_secs the config allows: the checks serve with it. */
+export const RESCAN_SECS = 5;
+/** How long a working tree change may take to show: the documented rescan bound plus a margin. */
+export const WATCH_BOUND_MS = (RESCAN_SECS + 5) * 1000;
+
 export const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
 export async function loadPlaywright() {

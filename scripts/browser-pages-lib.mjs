@@ -1,7 +1,7 @@
 // Checks of the page layout: truncation, live tabs, mermaid, chip, doctabs, chords, header. Imported by scripts/browser-check.mjs, not run on its own.
 import { writeFileSync, rmSync, mkdirSync, existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { root, launch, openPage, sh } from './browser-lib.mjs';
+import { root, WATCH_BOUND_MS, launch, openPage, sh } from './browser-lib.mjs';
 
 /** @param {any} env what browser-check.mjs set up (pw, dir, srv, r, bin, cfg, arg, ...) */
 export function checks(env) {
@@ -118,8 +118,8 @@ async function liveTabs() {
     await new Promise((ok) => setTimeout(ok, 1000));
     writeFileSync(join(dir, 'a.txt'), `one\ntwo ${name}\n`);
     const t = Date.now();
-    const ms = await Promise.all(pages.map((p) => p.waitForSelector('#wtchip:not([hidden])', { timeout: 2000 }).then(() => Date.now() - t, () => null)));
-    ms.forEach((v, i) => { if (v == null) r.fail(`live-tabs ${name} tab ${i}: no working tree chip within 2 s`); });
+    const ms = await Promise.all(pages.map((p) => p.waitForSelector('#wtchip:not([hidden])', { timeout: WATCH_BOUND_MS }).then(() => Date.now() - t, () => null)));
+    ms.forEach((v, i) => { if (v == null) r.fail(`live-tabs ${name} tab ${i}: no working tree chip within the rescan bound of ${WATCH_BOUND_MS / 1000} s`); });
     if (ms.every((v) => v != null)) r.ok(`live-tabs ${name}: chip per tab (ms) ${ms.join(', ')}`);
     await b.close();
     sh(dir, 'git', 'checkout', '-q', '--', 'a.txt');

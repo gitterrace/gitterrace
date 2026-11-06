@@ -107,7 +107,7 @@ import { checks as uiChecks } from './browser-ui-lib.mjs';
 import { checks as layoutChecks } from './browser-layout-lib.mjs';
 import { checks as siteChecks } from './browser-site-lib.mjs';
 import { checks as diffChecks } from './browser-diff-lib.mjs';
-import { root, loadPlaywright, launch, makeRepo, serve, openPage, reporter, sh } from './browser-lib.mjs';
+import { root, RESCAN_SECS, loadPlaywright, launch, makeRepo, serve, openPage, reporter, sh } from './browser-lib.mjs';
 
 const arg = (k, d) => { const i = process.argv.indexOf(k); return i < 0 ? d : process.argv[i + 1]; };
 const bin = resolve(arg('--bin', join(root, 'target/debug/git-terrace')));
@@ -125,6 +125,7 @@ const dir = makeRepo();
 const cfg = mkdtempSync(join(tmpdir(), 'gt-cfg-'));
 const marker = join(cfg, 'chord-ran');
 writeFileSync(join(cfg, 'actions.toml'), `version = 1\n[[action]]\nid = "mark"\nlabel = "Mark"\nkinds = ["page"]\ncommand = ["/usr/bin/touch", ${JSON.stringify(marker)}]\nkey = "x"\n[[action]]\nid = "lines"\nlabel = "Lines only"\nkinds = ["line"]\ncommand = ["/usr/bin/true"]\n`, { mode: 0o600 });
+writeFileSync(join(cfg, 'config.toml'), `[watch]\nrescan_secs = ${RESCAN_SECS}\n`);
 const srv = await serve(bin, dir, cfg);
 const r = reporter();
 console.log('serving', srv.base, 'with', bin);
