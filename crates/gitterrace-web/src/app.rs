@@ -33,6 +33,7 @@ mod history;
 mod memo;
 mod records;
 mod refresh;
+mod touched;
 
 pub(crate) use history::PathLog;
 pub(crate) use refresh::{keep_index_fresh, on_refreshed, release_when_idle};
@@ -502,7 +503,7 @@ impl App {
         }
         // A ready index names the commits that changed anything under `dir`; the walk visits
         // only those instead of every commit in history.
-        let among = self.accelerate(commit, |s| touched_names(&**s, dir))?;
+        let among = self.accelerate(commit, |s| touched::touched_names(&**s, dir))?;
         let (found, complete) =
             gitterrace_git::last_commits_among(&self.repo, commit, dir, among.as_deref(), budget)?;
         let v = Arc::new(found);
@@ -558,42 +559,6 @@ pub(crate) async fn blocking<T: Send + 'static>(
         })
     })
     .await?
-}
-
-/// For each commit whose first-parent diff touches something under `dir`, newest first, the
-/// names of the entries of `dir` it touches (old and new side of a rename).
-fn touched_names(
-    src: &dyn gitterrace_index::feed::InsightsSource,
-    dir: &str,
-) -> Vec<(String, Vec<String>)> {
-    use gitterrace_index::feed::CommitRange;
-    let name = |p: &str| -> Option<String> {
-        let rest = if dir.is_empty() {
-            p
-        } else {
-            p.strip_prefix(dir)?.strip_prefix('/')?
-        };
-        Some(rest.split('/').next().unwrap_or(rest).to_owned())
-    };
-    let ranks: Vec<_> = src.commits_in(CommitRange::All).map(|c| c.rank).collect();
-    let mut out: Vec<(String, Vec<String>)> = src
-        .rows_for(ranks)
-        .filter_map(|(rank, rows)| {
-            let mut names: Vec<String> = rows
-                .iter()
-                .flat_map(|f| [Some(f.path), f.old])
-                .flatten()
-                .filter_map(|id| src.path(id))
-                .filter_map(|p| name(&p))
-                .collect();
-            names.sort_unstable();
-            names.dedup();
-            let id = src.commit_id(rank)?.to_string();
-            (!names.is_empty()).then_some((id, names))
-        })
-        .collect();
-    out.reverse();
-    out
 }
 
 #[cfg(test)]
