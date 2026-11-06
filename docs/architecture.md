@@ -172,7 +172,7 @@ repository is served. The rest are the server's own and never take the prefix.
 | `/tree`, `/blob`, `/raw`, `/blame` `/{rev}/{path}` | Files: listing, highlighted view (large files load in chunks), bytes, authorship |
 | `/log/{rev}`, `/history/{path}`, `/compare` | Commits, one file's history, two revisions |
 | `/commit/{id}`, `/diff/{rev}/{index}` | A commit's diff, large files fold and load on demand |
-| `/refs`, `/tag/{name}`, `/worktrees`, `/stashes`, `/worktree`, `/worktree/diff/{path}` | Git state: branches, tags, linked worktrees, stashes, uncommitted changes and their folded files |
+| `/refs`, `/tag/{name}`, `/worktrees`, `/stashes`, `/worktree`, `/worktree/diff/{path}`, `/worktree/raw/{path}` | Git state: branches, tags, linked worktrees, stashes, uncommitted changes, their folded files and changed images |
 | `/search` | Code and commit search |
 | `/stats`, `/stats/{page}` | Insights on the shared filter and period: activity (with commit types and code frequency), contributors, hotspots (with patterns), languages, ownership. `/stats/types`, `/stats/frequency` and `/stats/patterns` answer with a permanent redirect to their section, query kept, and `/insights` to `/stats`. `?rev=` follows any ref |
 | `/events`, `/api/{files,refs,last,progress}` | Live updates and the fragments pages fetch |

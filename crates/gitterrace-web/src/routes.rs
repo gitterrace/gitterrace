@@ -63,6 +63,7 @@ pub(crate) fn router(app: Arc<App>) -> Router {
         .route("/search", get(crate::search::search))
         .route("/worktree", get(worktree))
         .route("/worktree/diff/{*path}", get(views::worktree_fragment))
+        .route("/worktree/raw/{*path}", get(raw::worktree_raw))
         .route("/api/files/{rev}", get(api_files))
         .route("/api/refs", get(api_refs))
         .route("/api/last/{rev}", get(api_last_root))

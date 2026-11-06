@@ -235,16 +235,24 @@ struct Spent {
 }
 
 fn file_body(r: &Render, src: DiffSource<'_>, i: usize, f: &FileDiff, used: &mut Spent) -> String {
+    use crate::media::Side;
     if f.binary {
         let shown =
             crate::media::is_image(&f.path) && crate::features::on(gitterrace_config::Feature::Raw);
-        if let (true, DiffSource::Commit { rev, parent, .. }) = (shown, src) {
-            let old_path = f.old_path.as_deref().unwrap_or(&f.path);
-            let old = (f.kind != ChangeKind::Added)
-                .then_some(parent)
-                .flatten()
-                .map(|p| (p, old_path));
-            let new = (f.kind != ChangeKind::Deleted).then_some((rev, f.path.as_str()));
+        let old_path = f.old_path.as_deref().unwrap_or(&f.path);
+        let sides = match src {
+            DiffSource::Commit { rev, parent, .. } => Some((
+                parent.map(|p| Side::At(p, old_path)),
+                Side::At(rev, f.path.as_str()),
+            )),
+            // HEAD through `/raw`, the copy on disk through `/worktree/raw`.
+            DiffSource::Worktree => {
+                Some((Some(Side::At("HEAD", old_path)), Side::Worktree(&f.path)))
+            }
+        };
+        if let (true, Some((old, new))) = (shown, sides) {
+            let old = old.filter(|_| f.kind != ChangeKind::Added);
+            let new = (f.kind != ChangeKind::Deleted).then_some(new);
             return crate::media::diff_html(old, new);
         }
         return "<p class=\"muted pad\">Binary file not shown.</p>".to_owned();

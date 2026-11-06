@@ -37,7 +37,7 @@
     "crates/gitterrace-web/src/overview_side.rs": 1,
     "crates/gitterrace-web/src/routes/assets.rs": 2,
     "crates/gitterrace-web/src/routes/files.rs": 1,
-    "crates/gitterrace-web/src/sitemap.rs": 4,
+    "crates/gitterrace-web/src/sitemap.rs": 3,
     "crates/gitterrace-web/src/state_tests.rs": 1,
     "crates/gitterrace-web/src/views/code.rs": 1,
     "crates/gitterrace-web/src/views/diff.rs": 3,

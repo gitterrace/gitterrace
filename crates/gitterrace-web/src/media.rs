@@ -149,9 +149,35 @@ fn raw_url(rev: &str, path: &str) -> String {
     href(&format!("/raw/{}/{}", enc_seg(rev), enc_path(path)))
 }
 
+/// Where one side of an image diff loads from: a committed blob, or the working copy.
+#[derive(Debug, Clone, Copy)]
+pub(crate) enum Side<'a> {
+    At(&'a str, &'a str),
+    /// The file on disk, through the local-only `/worktree/raw` route.
+    Worktree(&'a str),
+}
+
+impl<'a> Side<'a> {
+    fn url(self) -> String {
+        match self {
+            Self::At(rev, path) => raw_url(rev, path),
+            Self::Worktree(path) => href(&format!("/worktree/raw/{}", enc_path(path))),
+        }
+    }
+
+    const fn file(self) -> &'a str {
+        match self {
+            Self::At(_, path) | Self::Worktree(path) => path,
+        }
+    }
+}
+
 /// One `<img>` (or media element) for `path` at `rev`.
 fn element(k: Kind, rev: &str, path: &str) -> String {
-    let url = raw_url(rev, path);
+    element_at(k, &raw_url(rev, path), path)
+}
+
+fn element_at(k: Kind, url: &str, path: &str) -> String {
     let name = esc(path.rsplit('/').next().unwrap_or(path));
     match k {
         Kind::Image | Kind::Svg => {
@@ -260,17 +286,20 @@ pub(crate) fn diff_counts(old: Option<Facts>, new: Option<Facts>) -> String {
 }
 
 /// Before and after of one changed image, side by side; one side for added or deleted files.
-pub(crate) fn diff_html(old: Option<(&str, &str)>, new: Option<(&str, &str)>) -> String {
-    let side = |label: &str, at: Option<(&str, &str)>| {
-        at.map_or_else(String::new, |(rev, path)| {
-            let k = kind(path).unwrap_or(Kind::Image);
+pub(crate) fn diff_html(old: Option<Side<'_>>, new: Option<Side<'_>>) -> String {
+    let img = |at: Side<'_>| {
+        let path = at.file();
+        element_at(kind(path).unwrap_or(Kind::Image), &at.url(), path)
+    };
+    let side = |label: &str, at: Option<Side<'_>>| {
+        at.map_or_else(String::new, |at| {
             format!(
                 r#"<figure class="media-side"><figcaption class="muted">{label}</figcaption><div class="media-stage checker">{}</div></figure>"#,
-                element(k, rev, path)
+                img(at)
             )
         })
     };
-    let (Some((orev, opath)), Some((nrev, npath))) = (old, new) else {
+    let (Some(o), Some(n)) = (old, new) else {
         return format!(
             r#"<div class="media-diff">{}{}</div>"#,
             side("Before", old),
@@ -288,7 +317,6 @@ pub(crate) fn diff_html(old: Option<(&str, &str)>, new: Option<(&str, &str)>) ->
         ],
         ..crate::seg::Seg::default()
     };
-    let k = |path| kind(path).unwrap_or(Kind::Image);
     format!(
         concat!(
             r#"<div class="media-view" data-media-view data-seg-own>"#,
@@ -304,15 +332,15 @@ pub(crate) fn diff_html(old: Option<(&str, &str)>, new: Option<(&str, &str)>) ->
         ),
         side("Before", old),
         side("After", new),
-        element(k(opath), orev, opath),
-        element(k(npath), nrev, npath),
+        img(o),
+        img(n),
         view = view,
     )
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{Facts, Kind, content_type, diff_counts, diff_html, dimensions, kind};
+    use super::{Facts, Kind, Side, content_type, diff_counts, diff_html, dimensions, kind};
 
     #[test]
     fn classifies_and_types() {
@@ -352,12 +380,12 @@ mod tests {
 
     #[test]
     fn diff_shows_one_or_two_sides() {
-        let both = diff_html(Some(("p", "a.png")), Some(("c", "a.png")));
+        let both = diff_html(Some(Side::At("p", "a.png")), Some(Side::At("c", "a.png")));
         // Side by side and the overlay each hold both pictures.
         assert_eq!(both.matches("<img").count(), 4);
         assert!(both.contains("/raw/p/a.png") && both.contains("/raw/c/a.png"));
         assert_eq!(
-            diff_html(None, Some(("c", "a.png")))
+            diff_html(None, Some(Side::At("c", "a.png")))
                 .matches("<img")
                 .count(),
             1
@@ -380,12 +408,12 @@ mod tests {
 
     #[test]
     fn a_modified_image_offers_side_by_side_and_overlay() {
-        let both = diff_html(Some(("p", "a.png")), Some(("c", "a.png")));
+        let both = diff_html(Some(Side::At("p", "a.png")), Some(Side::At("c", "a.png")));
         assert!(both.contains("aria-label=\"Image view\""), "{both}");
         assert!(both.contains("data-show=\"overlay\""), "{both}");
         assert!(both.contains("data-pane=\"overlay\" hidden"), "{both}");
         assert!(both.contains("data-media-cut"), "{both}");
-        let added = diff_html(None, Some(("c", "a.png")));
+        let added = diff_html(None, Some(Side::At("c", "a.png")));
         assert!(
             !added.contains("data-show"),
             "one side has nothing to compare: {added}"

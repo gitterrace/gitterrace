@@ -58,6 +58,6 @@ pub use walk::{
 pub use watch::Cost;
 pub use watch::{Parts, Watcher};
 pub use worktree::{
-    WORKTREE_DIFF_BYTES, WORKTREE_FILES, is_dirty, worktree_diff, worktree_file_diff,
-    worktree_signature,
+    WORKTREE_DIFF_BYTES, WORKTREE_FILES, is_dirty, worktree_bytes, worktree_diff,
+    worktree_file_diff, worktree_signature,
 };

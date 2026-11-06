@@ -189,6 +189,30 @@ pub fn worktree_diff(repo: &Repo) -> Result<Vec<FileDiff>> {
     Ok(out)
 }
 
+/// The working-tree bytes of one changed file, for the image previews of the working tree page.
+///
+/// The same guard as [`worktree_file_diff`]: `None` unless `path` is one of the changed files,
+/// so an ignored file, anything under `.git` or a path with `..` is never read. Also `None` for
+/// a deleted file and one over `max` bytes, which is never read.
+pub fn worktree_bytes(repo: &Repo, path: &str, max: u64) -> Result<Option<Vec<u8>>> {
+    let plain = path
+        .split('/')
+        .all(|c| !c.is_empty() && c != "." && c != ".." && !c.eq_ignore_ascii_case(".git"));
+    if !plain {
+        return Ok(None);
+    }
+    let r = open(repo)?;
+    if !changed_paths(&r, repo.worktree_files())?.contains(path) {
+        return Ok(None);
+    }
+    let Some(root) = r.workdir().and_then(|w| w.canonicalize().ok()) else {
+        return Ok(None);
+    };
+    // `Read` counts held bytes on drop in tests, so the bytes are copied out, not moved.
+    let read = read_worktree(&root, path, max);
+    Ok(matches!(read, Read::Data(_)).then(|| read.bytes().to_vec()))
+}
+
 /// One uncommitted file against HEAD: the body a folded file of the working tree page loads.
 ///
 /// `None` unless `path` is one of the page's changed files, so an ignored file, anything

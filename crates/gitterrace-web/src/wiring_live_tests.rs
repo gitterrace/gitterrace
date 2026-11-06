@@ -496,3 +496,65 @@ async fn worktree_fragments_refuse_ignored_and_git_paths() {
         assert!(body.contains("No longer changed"), "{bad}: {body}");
     }
 }
+
+/// A changed image on the working tree page shows HEAD and the copy on disk, the latter
+/// through `/worktree/raw`, which serves it with `/raw`'s content type and never caches it.
+#[tokio::test]
+async fn a_changed_image_in_the_working_tree_shows_both_sides() {
+    let dir = tempfile::tempdir().expect("tmp");
+    let p = repo(dir.path(), "r");
+    let png = |w: u8| {
+        let mut b = b"\x89PNG\r\n\x1a\n\0\0\0\rIHDR".to_vec();
+        b.extend([0, 0, 0, w, 0, 0, 0, 5, 8, 6, 0, 0, 0, 0]);
+        b
+    };
+    std::fs::write(p.join("a.png"), png(7)).expect("write");
+    gitterrace_testkit::git(&p, &["add", "a.png"]);
+    gitterrace_testkit::git(&p, &["commit", "-qm", "feat: image"]);
+    std::fs::write(p.join("a.png"), png(9)).expect("write");
+    let r = router(&p, Config::default());
+    let (_, page) = get(&r, "/worktree").await;
+    let at = page.find("data-path=\"a.png\"").expect("a.png section");
+    let sect = &page[at..at + page[at..].find("</section>").expect("end")];
+    assert!(!sect.contains("Binary file not shown"), "{sect}");
+    // Both sides load through the repository prefix the server mounts it under.
+    assert!(sect.contains("src=\"/r/r/raw/HEAD/a.png\""), "{sect}");
+    assert!(sect.contains("src=\"/r/r/worktree/raw/a.png\""), "{sect}");
+    let res = r
+        .clone()
+        .oneshot(
+            axum::http::Request::get("/r/r/worktree/raw/a.png")
+                .header("host", gitterrace_testkit::DEFAULT_ADDR)
+                .body(axum::body::Body::empty())
+                .expect("req"),
+        )
+        .await
+        .expect("res");
+    assert_eq!(res.status(), 200);
+    assert_eq!(res.headers()["content-type"], "image/png");
+    assert_eq!(res.headers()["cache-control"], "no-store");
+}
+
+/// `/worktree/raw` serves changed files only: an ignored file, `.git/config`, a `..` path and
+/// a clean tracked file all answer 404 with none of their bytes; a public server has no route.
+#[tokio::test]
+async fn worktree_raw_refuses_ignored_git_and_clean_paths() {
+    let dir = tempfile::tempdir().expect("tmp");
+    let p = repo(dir.path(), "r");
+    std::fs::write(p.join(".git/info/exclude"), "*.env\n").expect("exclude");
+    std::fs::write(p.join("prod.env"), "SECRET=hunter2\n").expect("write");
+    std::fs::write(p.join("small.txt"), "changed now\n").expect("write");
+    let r = router(&p, Config::default());
+    let (s, ok) = get(&r, "/worktree/raw/small.txt").await;
+    assert_eq!((s, ok.as_str()), (200, "changed now\n"));
+    for bad in ["prod.env", ".git/config", "d/../small.txt", "mid.txt"] {
+        let (s, body) = get(&r, &format!("/worktree/raw/{bad}")).await;
+        assert_eq!(s, 404, "{bad}: {body}");
+        assert!(
+            !body.contains("SECRET") && !body.contains("[core]") && !body.contains("needle"),
+            "{bad}: {body}"
+        );
+    }
+    let public = router(&p, with(|c| c.server.is_public = true));
+    assert_eq!(get(&public, "/worktree/raw/small.txt").await.0, 404);
+}

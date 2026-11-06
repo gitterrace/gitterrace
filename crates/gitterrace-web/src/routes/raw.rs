@@ -78,15 +78,21 @@ pub(super) async fn raw(
         }
         Raw::Bytes(bytes, tag) => (bytes, tag),
     };
+    Ok(media_response(&path, bytes, Some(&tag)))
+}
+
+/// Bytes of a file with the content type its name says, the sandbox for anything that could
+/// run (SVG, text) and `nosniff`: one answer for `/raw` and `/worktree/raw`.
+fn media_response(path: &str, bytes: Vec<u8>, tag: Option<&str>) -> Response {
     // PDFs never open in the browser's viewer on this origin.
-    let disposition = if crate::media::kind(&path) == Some(crate::media::Kind::Pdf) {
+    let disposition = if crate::media::kind(path) == Some(crate::media::Kind::Pdf) {
         "attachment"
     } else {
         "inline"
     };
     let (kind, plain) = (
-        crate::media::content_type(&path),
-        crate::media::plain_media(&path),
+        crate::media::content_type(path),
+        crate::media::plain_media(path),
     );
     // The sandbox keeps SVG and text scriptless. It also stops the browser's PDF viewer, so
     // formats that run no author code are served without it.
@@ -95,7 +101,7 @@ pub(super) async fn raw(
     } else {
         "sandbox; default-src 'none'; style-src 'unsafe-inline'"
     };
-    Ok((
+    let mut res = (
         [
             (header::CONTENT_TYPE, HeaderValue::from_static(kind)),
             (
@@ -110,16 +116,42 @@ pub(super) async fn raw(
                 header::X_CONTENT_TYPE_OPTIONS,
                 HeaderValue::from_static("nosniff"),
             ),
-            (
-                header::CACHE_CONTROL,
-                HeaderValue::from_static("private, max-age=300"),
-            ),
-            (
-                header::ETAG,
-                HeaderValue::from_str(&tag).unwrap_or_else(|_| HeaderValue::from_static("\"0\"")),
-            ),
         ],
         bytes,
     )
-        .into_response())
+        .into_response();
+    let h = res.headers_mut();
+    match tag {
+        Some(tag) => {
+            h.insert(
+                header::CACHE_CONTROL,
+                HeaderValue::from_static("private, max-age=300"),
+            );
+            h.insert(
+                header::ETAG,
+                HeaderValue::from_str(tag).unwrap_or_else(|_| HeaderValue::from_static("\"0\"")),
+            );
+        }
+        // The working copy changes under the same URL: never kept.
+        None => {
+            h.insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
+        }
+    }
+    res
+}
+
+/// `/worktree/raw/{path}`: the bytes on disk of one changed file, for the working tree page's
+/// image previews. Only a changed file is read, so an ignored file, `.git` and `..` paths read
+/// as not found; a public server never routes here (`public.rs`).
+pub(crate) async fn worktree_raw(State(app): Shared, Path(path): Path<String>) -> Result<Response> {
+    let name = path.trim_matches('/').to_owned();
+    let limit = app.cfg().limits.raw_mb << 20;
+    let bytes = blocking(&app, move |a| {
+        Ok(gitterrace_git::worktree_bytes(&a.repo, &name, limit)?)
+    })
+    .await?;
+    Ok(bytes.map_or_else(
+        || crate::error::not_found("This file is not a changed file of the working tree."),
+        |b| media_response(&path, b, None),
+    ))
 }
