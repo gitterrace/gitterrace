@@ -10,8 +10,8 @@
 # when it is stale, so what ships is what the gate checked.
 name = "gitterrace-web"
 compatibility_date = "2026-10-01"
-# The account's workers.dev subdomain belongs to the tendir site, so a default URL would read
-# <name>.tendir-web.workers.dev. Serve only on our own domain; the redirect hosts are rules.
+# The account's workers.dev subdomain is timorunge.workers.dev, so a default URL would read
+# <name>.timorunge.workers.dev. Serve only on our own domain; the redirect hosts are rules.
 workers_dev = false
 preview_urls = false
 routes = [{ pattern = "gitterrace.dev", custom_domain = true }]
