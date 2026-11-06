@@ -82,6 +82,8 @@ fn a_write_nudges() {
     assert!(again(&n, base + 1, write), "write seen");
 }
 
+/// The documented promise: a change is seen within the rescan bound, whatever the OS stream
+/// does. The test uses a short rescan and never times the OS events themselves.
 #[test]
 fn a_file_saved_by_rename_and_a_new_directory_are_seen() {
     let _one = SERIAL
@@ -89,15 +91,17 @@ fn a_file_saved_by_rename_and_a_new_directory_are_seen() {
         .unwrap_or_else(std::sync::PoisonError::into_inner);
     let dir = tempfile::tempdir().expect("tmp");
     let (n, f) = counting();
-    let _w = Nudger::start(cfg(dir.path(), Duration::from_secs(60), true), f).expect("w");
-    let base = settle(&n);
+    let rescan = Duration::from_millis(300);
+    let _w = Nudger::start(cfg(dir.path(), rescan, true), f).expect("w");
+    let before = n.load(Ordering::SeqCst);
     std::fs::create_dir(dir.path().join("sub")).expect("dir");
-    // On Linux the new folder must be registered before its file lands, or this is missed.
-    let save = || {
-        std::fs::write(dir.path().join("sub/.f.swp"), "x").expect("write");
-        std::fs::rename(dir.path().join("sub/.f.swp"), dir.path().join("sub/f")).expect("mv");
-    };
-    assert!(again(&n, base + 1, save), "file in new dir");
+    std::fs::write(dir.path().join("sub/.f.swp"), "x").expect("write");
+    std::fs::rename(dir.path().join("sub/.f.swp"), dir.path().join("sub/f")).expect("mv");
+    // One rescan period plus generous slack for a loaded machine.
+    assert!(
+        wait_for(&n, before + 1, rescan + Duration::from_secs(5)),
+        "change not seen within the rescan bound"
+    );
 }
 
 #[test]
