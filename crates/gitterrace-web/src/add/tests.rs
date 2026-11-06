@@ -10,7 +10,7 @@ use crate::add::TOKEN_HEADER;
 const ADD_PATH: &str = "/_repos";
 
 /// A two-file repository whose root commit is `msg`.
-fn repo(dir: &Path, msg: &str) -> std::path::PathBuf {
+pub(super) fn repo(dir: &Path, msg: &str) -> std::path::PathBuf {
     Fixture::init(dir)
         .write("src/a.rs", "fn a() {}\n")
         .commit(msg)
@@ -19,7 +19,11 @@ fn repo(dir: &Path, msg: &str) -> std::path::PathBuf {
         .expect("canon")
 }
 
-async fn send(r: &axum::Router, req: axum::http::request::Builder, body: String) -> (u16, String) {
+pub(super) async fn send(
+    r: &axum::Router,
+    req: axum::http::request::Builder,
+    body: String,
+) -> (u16, String) {
     let res = r
         .clone()
         .oneshot(req.body(Body::from(body)).expect("req"))

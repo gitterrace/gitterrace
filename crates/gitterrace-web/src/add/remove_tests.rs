@@ -1,31 +1,9 @@
 use std::{path::Path, time::Duration};
 
-use axum::{Router, body::Body, http::Request};
-use gitterrace_testkit::Fixture;
-use http_body_util::BodyExt;
-use tower::ServiceExt;
+use axum::{Router, http::Request};
 
+use super::tests::{repo, send};
 use crate::add::TOKEN_HEADER;
-
-fn repo(dir: &Path, msg: &str) -> std::path::PathBuf {
-    Fixture::init(dir)
-        .write("src/a.rs", "fn a() {}\n")
-        .commit(msg)
-        .path()
-        .canonicalize()
-        .expect("canon")
-}
-
-async fn send(r: &Router, req: axum::http::request::Builder, body: String) -> (u16, String) {
-    let res = r
-        .clone()
-        .oneshot(req.body(Body::from(body)).expect("req"))
-        .await
-        .expect("res");
-    let s = res.status().as_u16();
-    let b = res.into_body().collect().await.expect("body").to_bytes();
-    (s, String::from_utf8_lossy(&b).into_owned())
-}
 
 fn req(method: &str, token: Option<&str>) -> axum::http::request::Builder {
     let b = Request::builder()

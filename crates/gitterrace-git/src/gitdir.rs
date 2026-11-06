@@ -315,12 +315,13 @@ fn read_inside(common: &Path, parts: &[&str]) -> Option<String> {
 
 #[cfg(test)]
 mod tests {
-    use gitterrace_testkit::git;
+    use gitterrace_testkit::{Fixture, git};
     use std::fs;
     use std::path::Path;
 
     use crate::{InProgress, Repo};
 
+    /// Commits `body` as `file` in the repository at `dir`.
     fn commit(dir: &Path, file: &str, body: &str) {
         fs::write(dir.join(file), body).expect("write");
         git(dir, &["add", "-A"]);
@@ -330,9 +331,7 @@ mod tests {
     fn base() -> (tempfile::TempDir, std::path::PathBuf) {
         let tmp = tempfile::tempdir().expect("tempdir");
         let d = tmp.path().join("repo");
-        fs::create_dir(&d).expect("mkdir");
-        git(&d, &["init", "-q"]);
-        commit(&d, "a", "1\n");
+        let _repo = Fixture::init(&d).write("a", "1\n").commit("a");
         (tmp, d)
     }
 
@@ -493,8 +492,7 @@ mod tests {
     fn exclude_locally_hides_the_folder_once_and_keeps_existing_lines() {
         let t = tempfile::tempdir().expect("tmp");
         let d = t.path();
-        git(d, &["init", "-q"]);
-        commit(d, "a", "1");
+        let _repo = Fixture::init(d).write("a", "1").commit("a");
         fs::write(d.join(".git/info/exclude"), "# mine\n*.log").expect("seed");
         let repo = Repo::discover(d).expect("repo");
         assert!(repo.exclude_locally("gitterrace-export").expect("add"));
@@ -514,8 +512,7 @@ mod tests {
     fn exclude_locally_keeps_a_non_utf8_exclude_file_byte_for_byte() {
         let t = tempfile::tempdir().expect("tmp");
         let d = t.path();
-        git(d, &["init", "-q"]);
-        commit(d, "a", "1");
+        let _repo = Fixture::init(d).write("a", "1").commit("a");
         let seed = b"# na\xefve\n*.log\n";
         fs::write(d.join(".git/info/exclude"), seed).expect("seed");
         let repo = Repo::discover(d).expect("repo");
@@ -530,9 +527,7 @@ mod tests {
     fn exclude_locally_never_writes_through_a_symlinked_exclude_or_info() {
         let t = tempfile::tempdir().expect("tmp");
         let d = t.path().join("r");
-        fs::create_dir(&d).expect("mkdir");
-        git(&d, &["init", "-q"]);
-        commit(&d, "a", "1");
+        let _repo = Fixture::init(&d).write("a", "1").commit("a");
         let victim = t.path().join("victim");
         fs::write(&victim, "keep\n").expect("victim");
         let info = d.join(".git/info");

@@ -4,7 +4,7 @@
 
 use std::time::Duration;
 
-use gitterrace_testkit::{git, page as get};
+use gitterrace_testkit::{Fixture, page as get};
 
 async fn ready(router: &axum::Router, uri: &str) -> String {
     let mut body = String::new();
@@ -18,21 +18,23 @@ async fn ready(router: &axum::Router, uri: &str) -> String {
     body
 }
 
-fn commit(path: &std::path::Path, who: &str, file: &str, body: &str) {
-    std::fs::write(path.join(file), body).expect("write");
-    git(path, &["add", "."]);
+/// Commits `body` as `file` under the author `who`.
+fn commit(f: Fixture, who: &str, file: &str, body: &str) -> Fixture {
+    let f = f.write(file, body);
+    f.git(&["add", "-A"]);
     let (n, e) = (format!("user.name={who}"), format!("user.email={who}@e.x"));
-    git(path, &["-c", &n, "-c", &e, "commit", "-q", "-m", "feat: x"]);
+    f.git(&["-c", &n, "-c", &e, "commit", "-q", "-m", "feat: x"]);
+    f
 }
 
 fn router() -> (tempfile::TempDir, axum::Router) {
     let root = tempfile::tempdir().expect("tmp");
     let p = root.path();
-    git(p, &["init", "-q", "-b", "main"]);
+    let mut f = Fixture::init(p);
     for i in 0..3 {
-        commit(p, "Ann", "a.txt", &format!("{i}\n"));
+        f = commit(f, "Ann", "a.txt", &format!("{i}\n"));
     }
-    commit(p, "Bob", "b.txt", &"line\n".repeat(50));
+    commit(f, "Bob", "b.txt", &"line\n".repeat(50));
     let r = gitterrace_web::app_router(p).expect("router");
     (root, r)
 }
