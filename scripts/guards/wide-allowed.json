@@ -46,7 +46,6 @@
     "crates/gitterrace-web/tests/memory_budget.rs": 2,
     "crates/gitterrace-web/tests/running_cache_rewritten.rs": 2,
     "crates/gitterrace-web/tests/sha_links.rs": 1,
-    "crates/gitterrace-web/tests/theme.rs": 1,
     "crates/gitterrace/src/alloc.rs": 2,
     "crates/gitterrace/src/cli.rs": 1,
     "crates/gitterrace/src/export.rs": 2,

@@ -88,9 +88,11 @@ fn only_commit_messages_truncate() {
             if squeezed.contains("text-overflow:ellipsis") {
                 let sel = rule.rsplit_once('{').map(|(s, _)| s).unwrap_or_default();
                 let sel = sel.rsplit("*/").next().unwrap_or_default().trim();
+                // `.reporow .today` ends in the last commit's subject and carries the
+                // full line in its tooltip, so it is a commit message line too.
                 assert!(
-                    sel == ".subj",
-                    "{name}: `{sel}` truncates text with an ellipsis, only the commit message class `.subj` may"
+                    sel == ".subj" || sel == ".reporow .today",
+                    "{name}: `{sel}` truncates text with an ellipsis, only commit message lines may"
                 );
             }
         }
