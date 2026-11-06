@@ -119,7 +119,9 @@ def csp(directory: str | None = None) -> list[str]:
     # all of them: a script only docs pages carry is still one the policy must list.
     pages = sorted(d.rglob("*.html"))
     htmls = [p.read_text() for p in pages]
-    bad = csp_problems(f"{d}/_headers", headers_csp((d / "_headers").read_text()), htmls)
+    bad = csp_problems(
+        f"{d}/_headers", headers_csp((d / "_headers").read_text()), htmls
+    )
     for p, html in zip(pages, htmls):
         for meta in META_CSP.findall(html):
             bad += csp_problems(f"{p} meta CSP", meta, html)

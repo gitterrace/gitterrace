@@ -71,8 +71,16 @@ run actions-pin python3 "install python3" python3 scripts/actions-pin-check.py
 run actions-pin-test python3 "install python3" python3 scripts/actions-pin-check.py --self-test
 run ast-grep ast-grep "brew install ast-grep" ast-grep scan --error
 run ast-grep-test ast-grep "brew install ast-grep" ast-grep test --skip-snapshot-tests
-run ast-grep-macro python3 "install python3" python3 scripts/ast-grep-macro-check.py
-run ast-grep-macro-test python3 "install python3" python3 scripts/ast-grep-macro-check.py --self-test
+# The macro check reads the rule tests with PyYAML: the first python that has it, newest first.
+ypy=python3
+for c in python3.15 python3.14 python3.13 python3.12 python3.11 python3 /usr/bin/python3; do
+  if command -v "$c" >/dev/null 2>&1 && "$c" -c 'import yaml' 2>/dev/null; then
+    ypy=$c
+    break
+  fi
+done
+run ast-grep-macro "$ypy" "install PyYAML for python3" "$ypy" scripts/ast-grep-macro-check.py
+run ast-grep-macro-test "$ypy" "install PyYAML for python3" "$ypy" scripts/ast-grep-macro-check.py --self-test
 run super-ratchet python3 "install python3" python3 scripts/super-check.py
 run super-ratchet-test python3 "install python3" python3 scripts/super-check.py --self-test
 run tests-cfg python3 "install python3" python3 scripts/tests-check.py

@@ -112,8 +112,8 @@ impl Watch {
         }
     }
 
-    /// What the watcher thread calls on a nudge: mark it, fall back to polling on a degraded
-    /// watch, wake the refresher.
+    /// What the watcher thread calls on a nudge: mark it, switch to polling on a degraded watch,
+    /// wake the refresher.
     fn on_nudge(&self, name: String) -> impl Fn(Nudge) + Send + 'static {
         let (pending, nudged) = (Arc::clone(&self.pending), Arc::clone(&self.nudged));
         let (polling, what) = (Arc::clone(&self.polling), self.scope.what());
