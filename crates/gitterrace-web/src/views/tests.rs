@@ -149,3 +149,70 @@ fn every_insights_tab_is_in_the_row_and_the_open_one_is_marked() {
     assert_eq!(on, ["Ownership"]);
     assert!(t.primary.len() <= 6, "{} tabs", t.primary.len());
 }
+
+#[test]
+fn a_commit_landed_later_joins_the_day_it_landed() {
+    use gitterrace_git::CommitSummary;
+    use gitterrace_types::api::Signature;
+    const DAY: i64 = 86_400;
+    let now = 20 * DAY + 12 * 3600;
+    let sig = |time| Signature {
+        email: "a@x".to_owned(),
+        name: "A".to_owned(),
+        offset: 0,
+        time,
+    };
+    // Newest first, as the log lists them: today, a rebase written yesterday but landed today,
+    // then yesterday.
+    let c = |id: &str, wrote: i64, landed: i64| CommitSummary {
+        id: id.to_owned(),
+        parents: Vec::new(),
+        author: sig(wrote),
+        committer: sig(landed),
+        subject: id.to_owned(),
+    };
+    let list = [
+        c("a", now - 3600, now - 3600),
+        c("b", now - DAY, now - 7200),
+        c("c", now - 2 * 3600, now - 2 * 3600),
+        c("d", now - DAY - 3600, now - DAY - 3600),
+    ];
+    let labels: Vec<String> = crate::views::day_groups(&list, now)
+        .into_iter()
+        .map(|g| g.label)
+        .collect();
+    assert_eq!(labels, ["Today", "Yesterday"]);
+}
+
+#[test]
+fn no_day_heading_appears_twice_in_a_log() {
+    use gitterrace_git::CommitSummary;
+    use gitterrace_types::api::Signature;
+    const DAY: i64 = 86_400;
+    let now = 40 * DAY;
+    // A week in the order commits land: every third one was written two days before it landed
+    // (rebased), the rest the moment they landed.
+    let sig = |time| Signature {
+        email: String::new(),
+        name: String::new(),
+        offset: 0,
+        time,
+    };
+    let mut list = Vec::new();
+    for (i, landed) in (0..7 * 24).map(|h| now - h * 3600).enumerate() {
+        let wrote = if i % 3 == 0 { landed - 2 * DAY } else { landed };
+        list.push(CommitSummary {
+            id: landed.to_string(),
+            parents: Vec::new(),
+            author: sig(wrote),
+            committer: sig(landed),
+            subject: String::new(),
+        });
+    }
+    let labels: Vec<String> = crate::views::day_groups(&list, now)
+        .into_iter()
+        .map(|g| g.label)
+        .collect();
+    let mut seen = std::collections::HashSet::new();
+    assert!(labels.iter().all(|l| seen.insert(l.clone())), "{labels:?}");
+}

@@ -201,11 +201,14 @@ pub(crate) struct Row {
     pub(crate) pct: u32,
 }
 
-/// Consecutive commits sharing a calendar day (in the author's offset) form one group.
+/// Consecutive commits that landed on one calendar day form one group. The log runs in the order
+/// commits landed, so the committer date (in the committer's offset) follows it: a commit authored
+/// earlier and landed later (rebased, cherry-picked) joins the day it landed instead of opening a
+/// stray group. The row still shows when it was written.
 pub(crate) fn day_groups(list: &[CommitSummary], now: i64) -> Vec<crate::routes::DayGroup> {
     let mut out: Vec<crate::routes::DayGroup> = Vec::new();
     for c in list {
-        let label = crate::fmt::day_label(c.author.time, c.author.offset, now);
+        let label = crate::fmt::day_label(c.committer.time, c.committer.offset, now);
         match out.last_mut() {
             Some(g) if g.label == label => g.rows.push(commit_row(c, now)),
             _ => out.push(crate::routes::DayGroup {
