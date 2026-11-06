@@ -9,7 +9,6 @@ use gitterrace_types::api::{
     InsightList, InsightRow, LogResponse, ParamDoc, RefsResponse, RepoResponse, TreeResponse,
 };
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 
 use crate::core::ApiState;
 use crate::endpoints::{self, ENDPOINTS};
@@ -239,7 +238,7 @@ pub(crate) async fn insight(
     State(s): State<ApiState>,
     Path(name): Path<String>,
     Query(q): Query<InsightQuery>,
-) -> Reply<Value> {
+) -> Reply<insights::InsightResponse> {
     let InsightQuery { rev, params } = q;
     blocking(&s, move |s| s.insight(&name, rev.as_deref(), &params)).await
 }

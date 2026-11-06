@@ -292,14 +292,11 @@ fn ensure_server(
 /// The `/r/NAME/` prefix the server serves `root` under, new or already there.
 fn add_repo(addr: SocketAddr, state: Option<&Path>, root: &Path) -> Result<String, ServerError> {
     match secret_request(addr, state, "POST", &AddBody { path: root })? {
-        (201 | 409, v) => Ok(v
-            .get("base")
-            .and_then(|b| b.as_str().map(str::to_owned))
-            .unwrap_or_else(|| "/".to_owned())),
+        (201 | 409, v) => Ok(v.base.unwrap_or_else(|| "/".to_owned())),
         (404 | 405, _) => Err(ServerError::NoAdding),
         (status, v) => Err(ServerError::Status {
             status,
-            reason: why(&v),
+            reason: v.why(),
         }),
     }
 }
@@ -368,37 +365,50 @@ fn remove_repo(
     body: &RemoveBody<'_>,
 ) -> Result<Removed, ServerError> {
     match secret_request(addr, state, "DELETE", body)? {
-        (200, v) => Ok(Removed::Done(
-            v.get("name")
-                .and_then(|n| n.as_str())
-                .unwrap_or_default()
-                .to_owned(),
-        )),
-        (404, v) if v.get("error").is_some() => Ok(Removed::NotServed),
+        (200, v) => Ok(Removed::Done(v.name.unwrap_or_default())),
+        (404, v) if v.error.is_some() => Ok(Removed::NotServed),
         (404 | 405, _) => Err(ServerError::NoRemoving),
         (status, v) => Err(ServerError::Status {
             status,
-            reason: why(&v),
+            reason: v.why(),
         }),
     }
 }
 
-/// The `error` of a JSON reply, or the reply itself.
-fn why(v: &serde_json::Value) -> String {
-    v.get("error")
-        .or_else(|| Some(v).filter(|v| v.is_string()))
-        .and_then(|e| e.as_str().map(str::to_owned))
-        .unwrap_or_else(|| v.to_string().chars().take(200).collect())
+/// What `/_repos` answers, the fields the CLI reads. Absent keys and a body that is not JSON
+/// leave them `None`; `text` keeps the body for the message when nothing else explains it.
+#[derive(Debug, Default, serde::Deserialize)]
+struct RepoReply {
+    base: Option<String>,
+    error: Option<String>,
+    name: Option<String>,
+    #[serde(skip)]
+    text: String,
+}
+
+impl RepoReply {
+    fn parse(body: &str) -> Self {
+        let mut r: Self = serde_json::from_str(body).unwrap_or_default();
+        body.clone_into(&mut r.text);
+        r
+    }
+
+    /// The `error` of a JSON reply, or the start of the reply itself.
+    fn why(&self) -> String {
+        self.error
+            .clone()
+            .unwrap_or_else(|| self.text.chars().take(200).collect())
+    }
 }
 
 /// One `/_repos` request carrying the secret from the 0600 file the server on `addr` wrote to
-/// `state`, so only its own user can ask. The status and the JSON body (`null` when none).
+/// `state`, so only its own user can ask. The status and the reply body.
 fn secret_request(
     addr: SocketAddr,
     state: Option<&Path>,
     method: &str,
     body: &impl serde::Serialize,
-) -> Result<(u16, serde_json::Value), ServerError> {
+) -> Result<(u16, RepoReply), ServerError> {
     let state = state.ok_or(ServerError::NoState)?;
     let token = gitterrace_web::add_token(state, addr.port()).map_err(ServerError::Secret)?;
     let body = serde_json::to_string(body).map_err(std::io::Error::from)?;
@@ -419,9 +429,7 @@ fn secret_request(
         return Err(ServerError::NoAnswer);
     };
     let reply = text.split("\r\n\r\n").nth(1).unwrap_or_default().trim();
-    let v =
-        serde_json::from_str(reply).unwrap_or_else(|_| serde_json::Value::String(reply.to_owned()));
-    Ok((status, v))
+    Ok((status, RepoReply::parse(reply)))
 }
 
 /// Starts a detached `git-terrace <clone> --addr <addr> serve`, logging to `server.log`.

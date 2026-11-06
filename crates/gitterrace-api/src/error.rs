@@ -96,6 +96,18 @@ impl ApiError {
     }
 }
 
+/// Every error reply: `{"error": {"code", "message"}}`, the code from [`ApiError::code`].
+#[derive(serde::Serialize)]
+struct ErrorBody {
+    error: ErrorDetail,
+}
+
+#[derive(serde::Serialize)]
+struct ErrorDetail {
+    code: &'static str,
+    message: String,
+}
+
 impl IntoResponse for ApiError {
     fn into_response(self) -> Response {
         let status = self.status();
@@ -105,7 +117,12 @@ impl IntoResponse for ApiError {
         } else {
             self.to_string()
         };
-        let body = serde_json::json!({ "error": { "code": self.code(), "message": message } });
+        let body = ErrorBody {
+            error: ErrorDetail {
+                code: self.code(),
+                message,
+            },
+        };
         let mut res = (status, Json(body)).into_response();
         // A 503 is a cache that cannot answer yet: a client retries instead of giving up.
         if status == StatusCode::SERVICE_UNAVAILABLE {

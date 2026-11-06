@@ -12,22 +12,13 @@ files:
   - crates/gitterrace-web/src/add.rs
   - crates/gitterrace-web/src/live.rs
   - crates/gitterrace-web/src/actions.rs
-  - crates/gitterrace/src/open.rs
 ignores:
   - '**/tests.rs'
   - '**/*_tests.rs'
   - '**/tests/**'
   # Not typed yet, one line per file, each with why a user still sees untyped JSON.
-  # The insight reply and the HTTP and MCP envelopes that still carry it.
-  - crates/gitterrace-api/src/core.rs
-  - crates/gitterrace-api/src/http.rs
-  - crates/gitterrace-api/src/mcp.rs
-  # Error replies share one code table.
-  - crates/gitterrace-api/src/error.rs
   # Insights replies, typed together with their OpenAPI schemas.
   - crates/gitterrace-api/src/insights.rs
-  # The requests the CLI sends to a running server.
-  - crates/gitterrace/src/open.rs
 rule:
   any:
     - pattern: json!($$$)

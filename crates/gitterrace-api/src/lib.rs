@@ -426,8 +426,8 @@ mod tests {
             .insight("hotspots", None, &crate::Params::default())
             .expect("hotspots");
         assert!(
-            !hot.to_string().contains("src/b.rs"),
-            "repo exclude ignored: {hot}"
+            !hot.data.to_string().contains("src/b.rs"),
+            "repo exclude ignored: {hot:?}"
         );
     }
 

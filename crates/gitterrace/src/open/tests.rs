@@ -380,3 +380,16 @@ fn a_mimic_of_the_status_reply_is_not_gitterrace() {
     assert!(!seen.contains("POST"), "{seen}");
     assert!(!seen.contains(&b.display().to_string()), "{seen}");
 }
+
+/// A `/_repos` reply reads its fields when JSON, and keeps a plain-text body as the reason.
+#[test]
+fn repo_reply_reads_json_and_text() {
+    let r = super::RepoReply::parse(r#"{"base":"/r/a/","name":"a"}"#);
+    assert_eq!(r.base.as_deref(), Some("/r/a/"));
+    assert_eq!(r.name.as_deref(), Some("a"));
+    let r = super::RepoReply::parse(r#"{"error":"not served"}"#);
+    assert_eq!(r.why(), "not served");
+    let r = super::RepoReply::parse("forbidden: bad token");
+    assert!(r.error.is_none());
+    assert_eq!(r.why(), "forbidden: bad token");
+}

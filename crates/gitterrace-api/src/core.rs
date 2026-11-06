@@ -15,7 +15,6 @@ use gitterrace_types::api::{
     BlameResponse, BlobResponse, CommitResponse, ContributorsResponse, LogResponse, RefsResponse,
     RepoResponse, RepoTotals, TreeResponse,
 };
-use serde_json::{Value, json};
 
 use crate::error::ApiError;
 use crate::{insights, wire};
@@ -501,12 +500,12 @@ impl ApiState {
         name: &str,
         rev: Option<&str>,
         params: &insights::Params,
-    ) -> Result<Value, ApiError> {
+    ) -> Result<insights::InsightResponse, ApiError> {
         let rev = Self::rev(rev)?;
         let tip = self.repo.resolve(rev)?;
         let scope = insights::scope(params, self.settings().defaults)?;
         let mut commits_indexed = 0;
-        let mut data = self.read(rev, |all| {
+        let data = self.read(rev, |all| {
             commits_indexed = all.len();
             let ins = self.insights(&tip, &**all, scope.options().clone());
             let cx =
@@ -517,19 +516,13 @@ impl ApiState {
                 gitterrace_index::head_files(&self.repo, &tip, &mut cache).unwrap_or_default()
             })
         })??;
-        let rows = match name {
-            "file_churn" => data.as_array_mut(),
-            "hotspots" => data["files"].as_array_mut(),
-            _ => None,
-        };
-        for row in rows.into_iter().flatten() {
-            if let Some(p) = row["path"].as_str().map(str::to_owned) {
-                let (permalink, link) = self.links(&tip, Some(&p), None);
-                row["permalink"] = json!(permalink);
-                row["link"] = json!(link);
-            }
-        }
-        Ok(json!({ "rev": rev, "insight": name, "commits_indexed": commits_indexed, "data": data }))
+        let data = insights::with_links(name, data, |p| self.links(&tip, Some(p), None));
+        Ok(insights::InsightResponse {
+            commits_indexed,
+            data,
+            insight: name.to_owned(),
+            rev: rev.to_owned(),
+        })
     }
 
     /// People with their commits, plus a commit-share bus factor: the fewest people who made

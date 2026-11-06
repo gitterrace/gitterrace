@@ -153,6 +153,36 @@ pub fn compute(
     }
 }
 
+/// `GET /insights/{name}`. `data` is the insight's own shape, typed per insight later.
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct InsightResponse {
+    pub commits_indexed: usize,
+    pub data: Value,
+    pub insight: String,
+    pub rev: String,
+}
+
+/// Adds `permalink` and `link` from `links` to every row of the per-file insights.
+pub(crate) fn with_links(
+    name: &str,
+    mut data: Value,
+    links: impl Fn(&str) -> (Option<String>, Option<String>),
+) -> Value {
+    let rows = match name {
+        "file_churn" => data.as_array_mut(),
+        "hotspots" => data["files"].as_array_mut(),
+        _ => None,
+    };
+    for row in rows.into_iter().flatten() {
+        if let Some(p) = row["path"].as_str().map(str::to_owned) {
+            let (permalink, link) = links(&p);
+            row["permalink"] = Value::from(permalink);
+            row["link"] = Value::from(link);
+        }
+    }
+    data
+}
+
 fn val<T: serde::Serialize>(v: &T) -> Result<Value, ApiError> {
     to_value(v).map_err(|e| ApiError::Task(e.to_string()))
 }
