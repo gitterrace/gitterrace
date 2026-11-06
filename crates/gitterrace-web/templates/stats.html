@@ -5,11 +5,9 @@
 {% block content %}
 {% include "_tabs.html" %}
 {% include "_filterbar.html" %}
-{% include "_options.html" %}
 {% include "_chips.html" %}
 {% include "_lead.html" %}
 {% if empty %}{{ fb.nothing }}{% else %}
-{% if !jump.is_empty() %}<div class="jumprow">{{ jump|safe }}</div>{% endif %}
 <p class="hint" id="activity-counts">{{ span }}.</p>
 <div class="card"><table class="entries">
 <tr class="th"><td></td><td class="r">This period</td>{% if compared %}<td class="r">Before</td><td class="r">Change</td>{% endif %}</tr>

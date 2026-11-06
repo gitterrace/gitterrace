@@ -38,8 +38,6 @@ pub(crate) struct Seg {
     pub(crate) caption: String,
     /// Accessible name of the group.
     pub(crate) name: String,
-    /// Tip on the caption, empty for none.
-    pub(crate) tip: String,
     pub(crate) choices: Vec<Choice>,
     /// Buttons that switch panes in place instead of links that load a page.
     pub(crate) buttons: bool,
@@ -54,12 +52,6 @@ impl Seg {
             choices,
             ..Self::default()
         }
-    }
-
-    #[must_use]
-    pub(crate) fn tip(mut self, tip: &str) -> Self {
-        tip.clone_into(&mut self.tip);
-        self
     }
 
     /// Hides the caption; the group keeps its accessible name.

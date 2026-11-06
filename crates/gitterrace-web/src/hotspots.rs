@@ -47,8 +47,6 @@ struct HotspotsPage {
     kpis: Vec<Kpi>,
     scatter: String,
     rows: Vec<HotRow>,
-    /// "On this page": a jump list over the page's sections, empty below three.
-    jump: String,
     /// The patterns sections, markup from `patterns`.
     patterns: String,
 }
@@ -117,10 +115,23 @@ pub(crate) async fn page(
             String::new()
         };
         let empty = set.stream().next().is_none();
+        let jump = crate::markdown::outline_menu(
+            &crate::sections::jumps(&[
+                ("hotspot-map", "Frequency against size", !empty),
+                ("hotspot-files", "Hotspots", !empty),
+                ("coupled", "Coupled files", !patterns.is_empty()),
+                ("code-age", "Code age", !patterns.is_empty()),
+                ("sizes", "Commit sizes", !patterns.is_empty()),
+                ("releases", "Releases", !patterns.is_empty()),
+            ]),
+            false,
+        );
+        let mut fb = f.bar("/stats/hotspots", &**r, period);
+        fb.jump = jump;
         HotspotsPage {
             c,
             tabs: views::stats_tabs("ho"),
-            fb: f.bar("/stats/hotspots", &**r, period),
+            fb,
             opts: q.row(&d, "/stats/hotspots"),
             empty,
             lead: crate::lead::hotspots(rep.files.len(), rep.concentration),
@@ -138,17 +149,6 @@ pub(crate) async fn page(
             ],
             scatter: charts::scatter(&dots, "changes"),
             rows,
-            jump: crate::markdown::outline_menu(
-                &crate::sections::jumps(&[
-                    ("hotspot-map", "Frequency against size", !empty),
-                    ("hotspot-files", "Hotspots", !empty),
-                    ("coupled", "Coupled files", !patterns.is_empty()),
-                    ("code-age", "Code age", !patterns.is_empty()),
-                    ("sizes", "Commit sizes", !patterns.is_empty()),
-                    ("releases", "Releases", !patterns.is_empty()),
-                ]),
-                false,
-            ),
             patterns,
         }
     })

@@ -101,8 +101,6 @@ struct ActivityPage {
     series: String,
     heatmap: String,
     range: Option<RangeCard>,
-    /// "On this page": a jump list over the page's sections, empty below three.
-    jump: String,
     /// The commit types section, markup from `commit_types`.
     types: String,
     /// The code frequency section, markup from `frequency`.
@@ -268,7 +266,7 @@ pub(crate) async fn page(
         } else {
             String::new()
         };
-        let jump = crate::markdown::outline_menu(
+        fb.jump = crate::markdown::outline_menu(
             &crate::sections::jumps(&[
                 ("activity-counts", "Counts", true),
                 ("activity-series", "Over time", true),
@@ -279,7 +277,6 @@ pub(crate) async fn page(
             false,
         );
         ActivityPage {
-            jump,
             types: types_html,
             frequency: frequency_html,
             c,

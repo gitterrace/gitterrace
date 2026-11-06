@@ -346,7 +346,6 @@ svg.chart text{font-family:var(--mono)}
 .segs .on{background:var(--accent-soft);color:var(--accent-ink);border-color:var(--accent);font-weight:var(--weight-semibold)}
 .segs a:focus-visible,.segs button:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
 .segsel{font:inherit;min-height:44px;padding:0 var(--space-3);border:var(--border);border-radius:var(--radius);background:var(--surface);color:var(--fg)}
-.segrow{margin:0 0 var(--space-4)}
 .dochead .segctl{font-size:var(--text-xs)}.dochead .segs a,.dochead .segs button{min-height:28px;padding:var(--space-1) var(--space-3)}
 @media (pointer:coarse){.segs a,.segs button{min-height:44px}}
 [data-seg-select] .segsel,[data-seg-select].narrow .segs{display:none}
@@ -401,7 +400,13 @@ svg.spark.s1{stroke:var(--cat-1)}svg.spark.s2{stroke:var(--cat-2)}svg.spark.s3{s
 @media (max-width:600px){table.entries[data-last] td.r,table.entries[data-last] td.ago{display:none}}
 
 /* insights filter: chips and author links (the rest is in insights.css) */
-.fbar{display:flex;flex-direction:column;align-items:flex-start;gap:var(--space-2);margin:var(--space-4) 0}
+.fbar{display:flex;flex-wrap:nowrap;align-items:center;gap:var(--space-3);min-width:0;margin:var(--space-4) 0}
+.fbar>.segctl{flex:0 1 auto}.fbar .outline.menu{display:block;margin-left:0;flex:none;order:2}
+.fbar .optline{margin:0 0 0 auto;order:1}
+/* Narrower, the facts line drops under the row; on a phone the jump menu stays at the row's end
+   as an icon only, a second choice shows as its select and the period takes what is left. */
+@media (max-width:1100px){.fbar{flex-wrap:wrap;row-gap:var(--space-2)}.fbar .outline.menu{margin-left:auto}.fbar .optline{order:3;flex-basis:100%;margin:0}}
+@media (max-width:600px){.fbar{column-gap:var(--space-2)}.fbar>.segctl:first-child{flex:1 1 0;min-width:0}.fbar>.segctl+.segctl{flex:none}.fbar>.segctl+.segctl .segs{display:none}.fbar>.segctl+.segctl .segsel{display:inline-block}.fbar .outlinebtn{width:32px;padding:0;justify-content:center;font-size:0;gap:0}}
 .chips{display:flex;flex-wrap:wrap;align-items:center;gap:var(--space-2);margin:var(--space-2) 0;min-height:28px}
 .chip{display:inline-flex;align-items:center;gap:6px;background:var(--accent-soft);border:var(--border);border-radius:var(--radius);padding:3px 4px 3px 12px;font-size:var(--text-sm);color:var(--fg)}
 .chip i{font-style:normal;color:var(--muted)}

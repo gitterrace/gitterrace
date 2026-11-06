@@ -5,10 +5,6 @@
 // Pages red today, each with the change that fixes it, in words. A page listed here that is
 // green at every width and in every browser fails the check, so the list can only shrink.
 const KNOWN = {
-  'insights/activity': 'the insights toolbar row',
-  'insights/contributors': 'the insights toolbar row',
-  'insights/hotspots': 'the insights toolbar row',
-  'insights/ownership': 'the insights toolbar row',
   compare: 'the compare form in the title row',
   refs: 'the branches and tags page on one page',
 };

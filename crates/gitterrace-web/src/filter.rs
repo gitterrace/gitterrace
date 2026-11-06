@@ -55,10 +55,15 @@ pub(crate) struct Chip {
     pub(crate) href: String,
 }
 
-/// What `_filterbar.html` renders: removable chips and the period picker.
+/// What `_filterbar.html` renders: removable chips and the page's one toolbar row, which holds
+/// the period, the page's own choice and its "On this page" menu.
 pub(crate) struct FilterBar {
     pub(crate) chips: Vec<Chip>,
     pub(crate) period: Seg,
+    /// A second choice of the page (the contributors metric), after the period.
+    pub(crate) extra: Option<Seg>,
+    /// "On this page" (`markdown::outline_menu`), at the row's end; empty for none.
+    pub(crate) jump: String,
     pub(crate) clear: String,
     /// What the page shows when the filters match no commit, with the way back.
     pub(crate) nothing: Empty,
@@ -179,8 +184,8 @@ impl Filter {
                 )
             })
             .collect();
-        let period = Seg::links("Period", choices)
-            .tip("Limits every chart and list on this page to this period");
+        // The choices say what they are: the name stays for assistive tech only.
+        let period = Seg::links("Period", choices).no_caption();
         let nothing = Empty::new("No commits match these filters.");
         // With no filter set the period is what is narrowing; its own picker is the next step.
         let nothing = if chips.is_empty() {
@@ -191,6 +196,8 @@ impl Filter {
         FilterBar {
             chips,
             period,
+            extra: None,
+            jump: String::new(),
             clear: href(base),
             nothing,
         }

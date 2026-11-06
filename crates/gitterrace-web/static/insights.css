@@ -1,6 +1,5 @@
-/* Insights pages only, loaded from the filter bar they all share: the "On this page" row, the
-   commit type matrix and the contributors two-sided bar. Colors come from tokens.css only. */
-.jumprow{display:flex;justify-content:flex-end;margin:0 0 var(--space-2)}.jumprow .outline.menu{display:block}
+/* Insights pages only, loaded from the filter bar they all share: the commit
+   type matrix and the contributors two-sided bar. Colors come from tokens.css only. */
 .matrix{overflow-x:auto}
 .matrix table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums}
 .matrix th{font-weight:var(--weight-semibold);font-size:var(--text-sm);padding:var(--space-2) var(--space-3);text-align:left;white-space:nowrap;color:var(--muted)}

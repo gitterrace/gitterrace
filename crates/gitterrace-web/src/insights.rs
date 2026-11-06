@@ -341,9 +341,8 @@ struct ContributorsPage {
     people: Vec<PersonRow>,
     /// "Show all N contributors" when the list was cut at `PEOPLE_SHOWN`.
     more: Option<(String, String)>,
-    /// True for any metric but commits: the switch and the two-sided bar show.
+    /// True for any metric but commits: the two-sided bar shows.
     alt: bool,
-    switch: Seg,
     hint: String,
 }
 
@@ -366,7 +365,8 @@ pub(crate) async fn contributors(
         let d = a.defaults();
         let bots = q.options(&d).include_bots;
         let period = period_of(&q, &d, Period::All);
-        let fb = f.bar("/stats/contributors", &**r, period);
+        let mut fb = f.bar("/stats/contributors", &**r, period);
+        fb.extra = Some(q.metric_switch(&d));
         // The period is applied by Insights so first-time contributors are judged against all
         // history that the other filters keep.
         let scope = page_scope(&q, &d, period);
@@ -443,7 +443,6 @@ pub(crate) async fn contributors(
             people,
             more,
             alt: metric != Metric::Commits,
-            switch: q.metric_switch(&d),
             hint: metric_hint(metric).to_owned(),
         }
     })
@@ -467,9 +466,9 @@ impl InsightsQuery {
     fn metric_switch(&self, d: &Defaults) -> Seg {
         let choices = [
             (Metric::Commits, "Commits"),
-            (Metric::Added, "Lines added"),
-            (Metric::Deleted, "Lines deleted"),
-            (Metric::Net, "Net lines"),
+            (Metric::Added, "Added"),
+            (Metric::Deleted, "Deleted"),
+            (Metric::Net, "Net"),
         ]
         .into_iter()
         .map(|(m, label)| {
@@ -485,7 +484,7 @@ impl InsightsQuery {
             )
         })
         .collect();
-        Seg::links("Metric", choices)
+        Seg::links("Metric", choices).no_caption()
     }
 }
 
