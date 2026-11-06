@@ -50,8 +50,7 @@ pub(crate) struct Env {
     /// Why `actions.toml` is not in force; rendered into every page so the note is there
     /// at first paint instead of arriving with a poll and pushing the page down.
     actions_note: Arc<RwLock<Option<Arc<crate::actions::Status>>>>,
-    /// The `actions.toml` Send to targets, reloaded with the file: the commit page reads their
-    /// `lookup` links from here.
+    /// The `actions.toml` Send to targets, reloaded with the file, read by the commit page.
     sends: Arc<RwLock<Option<SharedActions>>>,
     /// `server.is_public` at startup. Fixed for the process: a reload never widens what a
     /// public server shows.
@@ -269,8 +268,7 @@ pub(crate) struct App {
     refreshed: Notify,
     /// A page that needs the index was asked for, see `index.build_on_start`.
     demanded: AtomicBool,
-    /// Set when the cache was deleted while serving: the loop rebuilds HEAD even if it did not
-    /// move.
+    /// Set when the cache was deleted while serving: the loop rebuilds HEAD even if unmoved.
     rebuild: AtomicBool,
     pub(crate) index: Index,
     pub(crate) name: String,
@@ -286,9 +284,10 @@ pub(crate) struct App {
     records_used: Mutex<Instant>,
     /// Warm-up jobs running. Their reads are not a visitor's, so they do not keep the caches.
     warming: std::sync::atomic::AtomicUsize,
-    /// Idle releases that freed something, served in `/api/progress` so a test can wait for
-    /// one instead of guessing its time.
+    /// Idle releases that freed something, served in `/api/progress` for tests to wait on.
     releases: AtomicU64,
+    /// Ranges read from git for a compare, so a test can tell a memo hit from a read.
+    pub(crate) git_ranges: AtomicU64,
     memo: Mutex<crate::bounded::Bounded<(Instant, Arc<String>)>>,
     dirty: Mutex<Option<(Instant, bool)>>,
     /// Open streams on a page that shows the working tree. Zero means no scan runs.
@@ -301,7 +300,7 @@ pub(crate) struct App {
     /// This repository's `/api/v1` state, so a reload reaches its settings.
     api: std::sync::OnceLock<gitterrace_api::ApiState>,
     /// Every per-request cache, dropped together when the repository is idle.
-    caches: crate::caches::Caches,
+    pub(crate) caches: crate::caches::Caches,
 }
 
 impl App {
@@ -339,6 +338,7 @@ impl App {
             records_used: Mutex::new(Instant::now()),
             warming: std::sync::atomic::AtomicUsize::new(0),
             releases: AtomicU64::new(0),
+            git_ranges: AtomicU64::new(0),
             memo: Mutex::new(crate::bounded::Bounded::new(cfg.cache_bytes(Cache::Pages))),
             dirty: Mutex::new(None),
             wt_watchers: std::sync::atomic::AtomicUsize::new(0),

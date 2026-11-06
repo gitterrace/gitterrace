@@ -34,6 +34,9 @@ pub(crate) struct Caches {
     /// Ids of the commits `git log -- path` lists, by (tip, path, index generation).
     pub(crate) path_logs: Mutex<Bounded<Arc<crate::app::PathLog>>>,
     /// The languages skeleton by (head, index generation). Flat in history length.
+    /// Comparisons read from git by (base id, head id). Ids never change, so no entry goes
+    /// stale; only a successful read is kept.
+    pub(crate) compares: Mutex<Bounded<Arc<gitterrace_index::Comparison>>>,
     pub(crate) chain: Mutex<Option<(HeadGen, Arc<crate::languages::Skeleton>)>>,
     pub(crate) head_lines: Mutex<Option<(String, Arc<Vec<gitterrace_index::HeadFile>>)>>,
 }
@@ -48,6 +51,7 @@ impl Caches {
             file_lists: Mutex::new(Bounded::new(cfg.cache_bytes(Cache::FileLists))),
             last_commits: Mutex::new(Bounded::new(cfg.cache_bytes(Cache::LastCommits))),
             path_logs: Mutex::new(Bounded::new(cfg.cache_bytes(Cache::PathLogs))),
+            compares: Mutex::new(Bounded::new(cfg.cache_bytes(Cache::Compares))),
             chain: Mutex::new(None),
             head_lines: Mutex::new(None),
         }
@@ -64,6 +68,7 @@ impl Caches {
             file_lists,
             last_commits,
             path_logs,
+            compares,
             chain,
             head_lines,
         } = self;
@@ -75,6 +80,7 @@ impl Caches {
             bounded_held(file_lists),
             bounded_held(last_commits),
             bounded_held(path_logs),
+            bounded_held(compares),
             take(chain),
             take(head_lines),
         ]
@@ -92,6 +98,9 @@ impl Caches {
         }
         if let Ok(mut g) = self.path_logs.lock() {
             g.set_budget(cfg.cache_bytes(Cache::PathLogs));
+        }
+        if let Ok(mut g) = self.compares.lock() {
+            g.set_budget(cfg.cache_bytes(Cache::Compares));
         }
     }
 }

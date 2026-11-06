@@ -23,19 +23,22 @@ pub enum Cache {
     LastCommits,
     /// `git log -- path` ids.
     PathLogs,
+    /// Compare results per (base id, head id) read from git.
+    Compares,
     /// Blocks of the index segment files, read by every insights page. Its source goes on
     /// the idle release, so it never counts against an idle server.
     Blocks,
 }
 
 /// Every cache and its parts of [`PARTS`]. Together they are the whole budget.
-pub const SHARES: [(Cache, usize); 7] = [
+pub const SHARES: [(Cache, usize); 8] = [
     (Cache::Blame, 3),
     (Cache::Code, 3),
     (Cache::Pages, 2),
-    (Cache::FileLists, 2),
+    (Cache::FileLists, 1),
     (Cache::LastCommits, 1),
     (Cache::PathLogs, 1),
+    (Cache::Compares, 1),
     (Cache::Blocks, 4),
 ];
 

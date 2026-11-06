@@ -3,6 +3,8 @@
 //! Every link to the page comes from [`compare_href`], so the prefill and the feature switch
 //! hold on all of them.
 
+use std::sync::Arc;
+
 use askama::Template;
 use axum::extract::{Query, RawQuery, State};
 use axum::response::Html;
@@ -109,7 +111,10 @@ pub(crate) async fn page(
     let h2 = head.clone();
     cached(&app, "cm", raw, move |a, r, c| {
         let c = c.active("log");
-        let refs = a.repo.refs().unwrap_or_default();
+        let refs = a.repo.refs().unwrap_or_else(|e| {
+            tracing::warn!("compare: refs unreadable, no default base: {e}");
+            Vec::new()
+        });
         let b2 = if base.is_empty() {
             latest_tag(&refs).unwrap_or_default()
         } else {
@@ -266,12 +271,24 @@ fn lookup(a: &App, r: &Src, base: &str, head: &str) -> std::result::Result<Range
     if a.public() {
         return Ok(Range::Unindexed);
     }
-    from_git(a, base, head).map_err(|e| e.to_string())
+    let key = format!("{base}..{head}");
+    if let Some(c) = a.caches.compares.lock().ok().and_then(|g| g.get(&key)) {
+        return Ok(Range::Counted((*c).clone()));
+    }
+    let range = from_git(a, base, head).map_err(|e| e.to_string())?;
+    if let Range::Counted(c) = &range
+        && let Ok(mut g) = a.caches.compares.lock()
+    {
+        g.put(key, Arc::new(c.clone()));
+    }
+    Ok(range)
 }
 
 /// [`comparison`] for a head the index lacks: at most [`GIT_RANGE_CAP`] commits, each
 /// diffed once, matched to its summary by id.
 fn from_git(a: &App, base: &str, head: &str) -> gitterrace_git::Result<Range> {
+    a.git_ranges
+        .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     let ids = a.repo.range(base, head, GIT_RANGE_CAP + 1)?;
     if ids.len() > GIT_RANGE_CAP {
         return Ok(Range::TooLarge);
@@ -316,6 +333,41 @@ mod tests {
             time,
             annotation: None,
         }
+    }
+
+    #[test]
+    fn a_repeated_range_reads_git_once_and_a_failure_is_not_kept() {
+        use std::sync::atomic::Ordering::Relaxed;
+        let dir = tempfile::tempdir().expect("tmp");
+        let root = dir.path();
+        let run = |args: &[&str]| gitterrace_testkit::git(root, args);
+        run(&["init", "-q", "-b", "main"]);
+        std::fs::write(root.join("a.txt"), "1\n").expect("write");
+        run(&["add", "."]);
+        run(&["commit", "-q", "-m", "feat: one"]);
+        run(&["checkout", "-q", "-b", "side"]);
+        std::fs::write(root.join("b.txt"), "x\ny\n").expect("write");
+        run(&["add", "."]);
+        run(&["commit", "-q", "-m", "feat: two"]);
+        let repo = gitterrace_git::Repo::discover(root).expect("repo");
+        let index = gitterrace_index::Index::open(&repo).expect("index");
+        let (base, head) = (
+            repo.resolve("main").expect("main"),
+            repo.resolve("side").expect("side"),
+        );
+        let app = App::new(repo, index);
+        let src: Src = Arc::new(gitterrace_index::feed::MemorySource::new(&[]));
+        let first = lookup(&app, &src, &base, &head).expect("first");
+        let second = lookup(&app, &src, &base, &head).expect("second");
+        assert_eq!(app.git_ranges.load(Relaxed), 1, "the repeat reads nothing");
+        match (first, second) {
+            (Range::Counted(one), Range::Counted(two)) => assert_eq!(one, two),
+            _ => panic!("both count"),
+        }
+        let missing = "0".repeat(40);
+        assert!(lookup(&app, &src, &base, &missing).is_err());
+        assert!(lookup(&app, &src, &base, &missing).is_err());
+        assert_eq!(app.git_ranges.load(Relaxed), 3, "a failed read is retried");
     }
 
     #[test]

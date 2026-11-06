@@ -41,6 +41,13 @@ impl Weight for std::time::Instant {
     }
 }
 
+impl Weight for gitterrace_index::Comparison {
+    fn weight(&self) -> usize {
+        let langs: usize = self.languages.iter().map(|l| l.language.len() + 48).sum();
+        self.commits.iter().map(|c| c.len() + 24).sum::<usize>() + langs + 64
+    }
+}
+
 impl Weight for gitterrace_git::LastCommit {
     fn weight(&self) -> usize {
         self.name.len() + self.id.len() + self.subject.len()
