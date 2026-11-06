@@ -49,7 +49,7 @@
 //                text, an invalid plain edit marks its line in the gutter and keeps Save off, and
 //                Save writes the file and reloads with the new value, and an action card edit
 //                saves actions.toml in place, in each browser
-//   repo-switch  a server on one repository hides the switcher; when a second `git terrace`
+//   repo-switch  a server on one repository hides the switcher (a fresh load paints it in place); when a second `git terrace`
 //                joins, the open page shows it without a reload, it lists both, and picking
 //                each lands on its /r/NAME/ page; `git terrace remove` hides it again and
 //                the removed repository's page answers 404
@@ -413,7 +413,23 @@ async function stickyHeads() {
       if (!a) bad.push('no #L120 on the source page');
       else if (a.top < a.cover - 0.5 || a.bottom > a.h) bad.push(`#L120 at ${a.top.toFixed(1)} px, under a pinned bar ending at ${a.cover.toFixed(1)} px`);
       if (width > 600 && a && a.cover < 1) bad.push('source path bar not pinned');
-      bad.length ? r.fail(`${where}: ${bad.join(', ')}`) : r.ok(`${where}: file header pinned and handed over, #L120 clear of the bar`);
+      // The pinned path bar sits balanced: as much room above the path as below it, and the
+      // links on the right centred on the path.
+      if (width > 600) {
+        const bal = await p.evaluate(() => {
+          const h = document.querySelector('main>.head');
+          const last = h && h.querySelector('.crumbs a:last-child'), side = h && h.querySelector('.muted');
+          if (!last || !side) return null;
+          const hr = h.getBoundingClientRect(), c = last.getBoundingClientRect(), s = side.getBoundingClientRect();
+          return { above: c.top - hr.top, below: hr.bottom - c.bottom, dy: (s.top + s.bottom) / 2 - (c.top + c.bottom) / 2 };
+        });
+        if (!bal) bad.push('no path or links in the pinned bar');
+        else {
+          if (Math.abs(bal.above - bal.below) > 2) bad.push(`path bar ${bal.above.toFixed(1)} px above the path, ${bal.below.toFixed(1)} px below`);
+          if (Math.abs(bal.dy) > 1.5) bad.push(`links ${bal.dy.toFixed(1)} px off the path's centre`);
+        }
+      }
+      bad.length ? r.fail(`${where}: ${bad.join(', ')}`) : r.ok(`${where}: file header pinned and handed over, #L120 clear of the bar, path bar balanced`);
       if (arg('--shots')) { mkdirSync(arg('--shots'), { recursive: true }); await p.screenshot({ path: join(arg('--shots'), `sticky-blob-${name}-${scheme}-${width}.png`) }); await p.goto(`${srv.base}/commit/${sha}`); await p.evaluate(() => { const s = document.querySelectorAll('section.file')[1].getBoundingClientRect(); scrollTo(0, scrollY + s.top + s.height / 2); }); await p.screenshot({ path: join(arg('--shots'), `sticky-commit-${name}-${scheme}-${width}.png`) }); }
       await p.close();
     }
