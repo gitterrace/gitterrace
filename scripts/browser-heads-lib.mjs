@@ -68,5 +68,16 @@ export function checks({ srv, r, browsers, context }) {
       return form && head && head.contains(form) ? [] : ['the form is not in the title row'];
     }), [390]);
   }
-  return { pageHeads, compareHeads };
+  async function commitHeads() {
+    await each('commit', '/commit/HEAD', (p) => p.evaluate(() => {
+      const bad = [];
+      const head = document.querySelector('main .head'), meta = document.querySelector('p.meta');
+      if (!meta || head?.nextElementSibling !== meta) bad.push('the meta line is not right under the title');
+      if (document.querySelector('p.meta button.copy')) bad.push('a Copy button is still on the meta line');
+      const sum = document.querySelector('details.files > summary');
+      if (!sum || !sum.querySelector('.counts .add') || !sum.querySelector('.counts .del')) bad.push('no totals in the changed-files header');
+      return bad;
+    }));
+  }
+  return { pageHeads, compareHeads, commitHeads };
 }

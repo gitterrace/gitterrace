@@ -175,9 +175,9 @@ button:hover{border-color:var(--line-strong);background:var(--hover)}button.prim
 @media (max-width:600px){.crow>.ref{flex-basis:6rem}.cmain{flex-wrap:wrap}.cmain>.subj{flex:1 0 100%}.cmain .muted{margin-left:0;white-space:nowrap}}
 
 /* commit page and diff */
-.meta{color:var(--muted);margin:var(--space-2) 0 var(--space-6)}.meta b{color:var(--fg)}
+.meta{color:var(--muted);margin:var(--space-2) 0 var(--space-6)}.head+.meta{margin-top:calc(-1 * var(--space-2));margin-bottom:var(--space-4)}.meta b{color:var(--fg)}
 .body{font:inherit;white-space:pre-wrap;margin:var(--space-3) 0;color:var(--muted);max-width:80ch}
-.files summary{padding:var(--space-3) var(--space-4);cursor:pointer;font-weight:var(--weight-semibold);background:var(--soft)}
+.files summary{display:flex;justify-content:space-between;gap:var(--space-4);padding:var(--space-3) var(--space-4);cursor:pointer;font-weight:var(--weight-semibold);background:var(--soft)}
 .files ul{list-style:none;margin:0;padding:0}
 .files li{display:flex;justify-content:space-between;gap:var(--space-4);padding:6px var(--space-4);border-top:var(--border);font-family:var(--mono);font-size:var(--text-sm)}
 .files li:hover{background:var(--soft)}
