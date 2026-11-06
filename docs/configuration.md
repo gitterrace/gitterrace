@@ -74,7 +74,7 @@ Exceptions, each on purpose:
 
 | Key | Type | Default | Description |
 | --- | --- | --- | --- |
-| `cache_mb` | integer | `32` | Memory for the serving caches of one repository together, in MB, in sixteenths: three each for blame and highlighted code, four for index blocks (insights pages), two each for rendered pages and file lists, one each for last commits and path logs. An entry over an eighth of its cache is not kept. An idle server keeps only the rendered pages. |
+| `cache_mb` | integer | `32` | Memory for the serving caches of one repository together, in MB, shared out in sixteenths between the caches. Parts of 16: blame 3, highlighted code 3, rendered pages 2, file lists 1, last commits 1, path logs 1, compares 1, index blocks 4. An entry over an eighth of its cache is not kept. An idle server keeps only the rendered pages. |
 | `blocking_jobs` | integer | `0` | Most page-building git jobs running at once across all repositories. 0 means one per core. |
 
 ## `[limits]`

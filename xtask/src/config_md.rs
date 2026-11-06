@@ -41,14 +41,16 @@ pub fn render() -> Out {
                 "\n## `[{section}]`\n\n| Key | Type | Default | Description |\n| --- | --- | --- | --- |\n"
             );
         }
-        let _ = writeln!(
-            s,
-            "| `{}` | {} | `{}` | {} |",
-            k.name,
-            k.ty,
-            k.default,
-            k.doc.split_whitespace().collect::<Vec<_>>().join(" ")
-        );
+        let mut doc = k.doc.split_whitespace().collect::<Vec<_>>().join(" ");
+        if k.section == "resources" && k.name == "cache_mb" {
+            // The shares come from the code's table, so the page cannot go stale.
+            doc = doc.replacen(
+                "between the caches.",
+                &format!("between the caches. {}", gitterrace_config::shares_doc()),
+                1,
+            );
+        }
+        let _ = writeln!(s, "| `{}` | {} | `{}` | {} |", k.name, k.ty, k.default, doc);
     }
     Out::file(PATH, s)
 }

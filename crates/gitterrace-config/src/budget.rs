@@ -42,6 +42,33 @@ pub const SHARES: [(Cache, usize); 8] = [
     (Cache::Blocks, 4),
 ];
 
+impl Cache {
+    /// The cache's name in the configuration page.
+    #[must_use]
+    pub const fn label(self) -> &'static str {
+        match self {
+            Self::Blame => "blame",
+            Self::Code => "highlighted code",
+            Self::Pages => "rendered pages",
+            Self::FileLists => "file lists",
+            Self::LastCommits => "last commits",
+            Self::PathLogs => "path logs",
+            Self::Compares => "compares",
+            Self::Blocks => "index blocks",
+        }
+    }
+}
+
+/// The shares as one sentence for the configuration page, in [`SHARES`] order.
+#[must_use]
+pub fn shares_doc() -> String {
+    let list: Vec<String> = SHARES
+        .iter()
+        .map(|(c, p)| format!("{} {p}", c.label()))
+        .collect();
+    format!("Parts of {PARTS}: {}.", list.join(", "))
+}
+
 impl Config {
     /// Bytes `cache` may keep: its share of `resources.cache_mb`.
     #[must_use]
@@ -65,6 +92,15 @@ mod tests {
         let cfg = Config::default();
         let all: usize = SHARES.iter().map(|(c, _)| cfg.cache_bytes(*c)).sum();
         assert_eq!(all, cfg.resources.cache_mb << 20);
+    }
+
+    /// The configuration page names every cache with its parts, so a new share shows there.
+    #[test]
+    fn shares_doc_lists_every_share() {
+        let doc = super::shares_doc();
+        for (c, p) in SHARES {
+            assert!(doc.contains(&format!("{} {p}", c.label())), "{c:?} missing");
+        }
     }
 
     /// Every cache is named once, so none has two bounds.

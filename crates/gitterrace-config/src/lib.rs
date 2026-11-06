@@ -23,7 +23,7 @@ use std::collections::BTreeMap;
 use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
 
-pub use budget::{Cache, PARTS, SHARES};
+pub use budget::{Cache, PARTS, SHARES, shares_doc};
 pub use edit::{Change, apply};
 pub use features::{Feature, INSIGHT_PAGES};
 pub use form::{Field, Input, fields};

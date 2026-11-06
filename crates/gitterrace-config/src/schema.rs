@@ -271,10 +271,9 @@ settings! {
         threads: usize = 0 => Restart,
     }
     resources: Resources {
-        /// Memory for the serving caches of one repository together, in MB, in sixteenths: three
-        /// each for blame and highlighted code, four for index blocks (insights pages), two each
-        /// for rendered pages and file lists, one each for last commits and path logs. An entry
-        /// over an eighth of its cache is not kept. An idle server keeps only the rendered pages.
+        /// Memory for the serving caches of one repository together, in MB, shared out in
+        /// sixteenths between the caches. An entry over an eighth of its cache is not kept. An idle
+        /// server keeps only the rendered pages.
         cache_mb: usize = 32 => Live,
         /// Most page-building git jobs running at once across all repositories. 0 means one per
         /// core.
