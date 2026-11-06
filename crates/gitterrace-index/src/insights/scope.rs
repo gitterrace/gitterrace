@@ -125,10 +125,13 @@ impl Scope {
     ) -> bool {
         self.admits_in(ins, days, c)
             && self.sel.path().is_none_or(|_| {
-                let src = ins.source();
-                src.rows_for(vec![c.rank])
-                    .next()
-                    .is_some_and(|(_, rows)| self.keeps_rows(src, &rows).next().is_some())
+                // A merge has no files of its own, so a path selection never keeps one.
+                !c.merge && {
+                    let src = ins.source();
+                    src.rows_for(vec![c.rank])
+                        .next()
+                        .is_some_and(|(_, rows)| self.keeps_rows(src, &rows).next().is_some())
+                }
             })
     }
 
@@ -391,5 +394,44 @@ mod tests {
         // A clock before the newest commit moves the anchor back.
         let early = CountContext::new(&src, &FixedClock(MON + 35 * 86_400));
         assert_eq!(early.anchor_day(), last - 10);
+    }
+}
+
+#[cfg(test)]
+mod merge_tests {
+    use super::{CountContext, Scope, ScopeParams};
+    use crate::feed::{CommitRange, FixedClock, InsightsSource, MemorySource};
+    use crate::insights::fixtures::{MON, chain};
+    use crate::insights::{Insights, Options, Period};
+
+    #[test]
+    fn admits_a_merge_only_with_the_option() {
+        let mut recs = chain();
+        recs[2].merge = true;
+        let src = MemorySource::new(&recs);
+        let cx = CountContext::new(&src, &FixedClock(MON + 1000 * 86_400));
+        let count = |merges: bool| {
+            let o = Options {
+                include_merges: merges,
+                include_bots: true,
+                ..Options::default()
+            };
+            let ins = Insights::new(&recs, o.clone(), None);
+            let s = Scope::from_params(&ScopeParams::default(), o, Period::All).expect("scope");
+            let n = src
+                .commits_in(CommitRange::All)
+                .filter(|c| s.admits(&ins, &cx, c))
+                .count();
+            let lines = ins.counted(&s, cx).totals();
+            (n, lines.commits, lines.additions, lines.files)
+        };
+        let (off, on) = (count(false), count(true));
+        assert_eq!(on.0, off.0 + 1, "the merge is admitted with the option");
+        assert_eq!(on.1, off.1 + 1, "and counted as a commit");
+        assert_eq!(
+            (on.2, on.3),
+            (off.2, off.3),
+            "lines and files are unchanged"
+        );
     }
 }

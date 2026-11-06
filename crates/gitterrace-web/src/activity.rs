@@ -38,6 +38,8 @@ fn delta(now: u64, before: Option<u64>) -> (String, &'static str) {
 
 /// Label of the commit total: insights count non-merge commits, the overview counts all.
 const COMMITS: &str = "Commits without merges";
+/// The same total with the merges option on.
+const COMMITS_WITH_MERGES: &str = "Commits";
 
 /// The date range a bucket link narrows the page to: `?from=YYYY-MM-DD&to=YYYY-MM-DD`, both
 /// ends inclusive.
@@ -171,12 +173,13 @@ fn scope_of(
 }
 
 /// The pulse table: each count of the period beside the one before it.
-fn pulse_rows(now: &PeriodStats, prev: Option<&PeriodStats>) -> Vec<PulseRow> {
+fn pulse_rows(now: &PeriodStats, prev: Option<&PeriodStats>, merges: bool) -> Vec<PulseRow> {
+    let commits = if merges { COMMITS_WITH_MERGES } else { COMMITS };
     let row = |label: &'static str, now: u64, before: Option<u64>| {
         let (d, tone) = delta(now, before);
         PulseRow {
             label,
-            tip: if label == COMMITS {
+            tip: if label == COMMITS && !merges {
                 "Merges are left out: a merge repeats the changes of its branch."
             } else {
                 ""
@@ -188,7 +191,7 @@ fn pulse_rows(now: &PeriodStats, prev: Option<&PeriodStats>) -> Vec<PulseRow> {
         }
     };
     vec![
-        row(COMMITS, now.commits as u64, prev.map(|p| p.commits as u64)),
+        row(commits, now.commits as u64, prev.map(|p| p.commits as u64)),
         row(
             "Authors",
             now.authors as u64,
@@ -228,7 +231,7 @@ pub(crate) async fn page(
         let counted = ins.counted(&scope, CountContext::new(&**r, &SystemClock));
         let (s, rhythm) = counted.activity();
         let prev = s.previous.as_ref();
-        let rows = pulse_rows(&s.current, prev);
+        let rows = pulse_rows(&s.current, prev, scope.options().include_merges);
         let lead = crate::lead::activity(
             s.current.commits as u64,
             s.current.authors as u64,

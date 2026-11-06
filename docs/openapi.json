@@ -1344,6 +1344,15 @@
             }
           },
           {
+            "description": "`1` counts merge commits as commits, never their lines or files.",
+            "in": "query",
+            "name": "merges",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
             "description": "`1` counts lock files and minified output.",
             "in": "query",
             "name": "generated",

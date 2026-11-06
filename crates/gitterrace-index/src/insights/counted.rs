@@ -249,7 +249,12 @@ impl<'a> Counted<'a> {
                     let Some(c) = by.find(|c| c.rank == r) else {
                         continue;
                     };
-                    let kept: Vec<FileRow> = self.scope.keeps_rows(src, &rows).copied().collect();
+                    // A merge counts as a commit only: no files, no lines.
+                    let kept: Vec<FileRow> = if c.merge {
+                        Vec::new()
+                    } else {
+                        self.scope.keeps_rows(src, &rows).copied().collect()
+                    };
                     if path && kept.is_empty() {
                         continue;
                     }

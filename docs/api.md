@@ -46,7 +46,7 @@ and 256 KiB, `blame` at 5000 lines, each with `truncated` when cut. The `[api]` 
 | `GET /blame` | `rev`, `path` | commit, lines, link, path, permalink, rev, truncated |
 | `GET /contributors` | `rev` | authors, bus_factor, rev |
 | `GET /insights` |  | insights |
-| `GET /insights/{name}` | `rev`, `period`, `label`, `metric`, `limit`, `type`, `scope`, `author`, `path`, `bots`, `generated`, `ignore`, `ws`, `exclude` | commits_indexed, data, insight, rev |
+| `GET /insights/{name}` | `rev`, `period`, `label`, `metric`, `limit`, `type`, `scope`, `author`, `path`, `bots`, `merges`, `generated`, `ignore`, `ws`, `exclude` | commits_indexed, data, insight, rev |
 
 ### Parameters
 
@@ -109,6 +109,7 @@ and 256 KiB, `blame` at 5000 lines, each with `truncated` when cut. The `[api]` 
 | `author` | string | no | Only commits by this e-mail or name. |
 | `path` | string | no | Only files under this directory. |
 | `bots` | string | no | `1` counts bot accounts, `0` leaves them out. |
+| `merges` | string | no | `1` counts merge commits as commits, never their lines or files. |
 | `generated` | string | no | `1` counts lock files and minified output. |
 | `ignore` | string | no | `0` counts paths that `.gitignore` rules out. |
 | `ws` | string | no | `1` counts whitespace-only changes. |

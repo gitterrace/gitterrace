@@ -408,6 +408,8 @@ pub struct OptionParams {
     pub generated: Option<String>,
     /// `0` counts paths that `.gitignore` rules out.
     pub ignore: Option<String>,
+    /// `1` counts merge commits as commits, never their lines or files.
+    pub merges: Option<String>,
     /// `1` counts whitespace-only changes.
     pub ws: Option<String>,
     /// Comma separated globs left out on top of the configured ones.
@@ -442,6 +444,7 @@ impl OptionParams {
             respect_ignore: flag(self.ignore.as_ref(), defaults.respect_ignore),
             count_whitespace: flag(self.ws.as_ref(), defaults.count_whitespace),
             include_bots: flag(self.bots.as_ref(), defaults.include_bots),
+            include_merges: flag(self.merges.as_ref(), defaults.include_merges),
         }
     }
 }

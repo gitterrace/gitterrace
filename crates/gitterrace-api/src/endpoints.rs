@@ -234,6 +234,11 @@ pub const ENDPOINTS: &[Endpoint] = &[
                 "`1` counts bot accounts, `0` leaves them out.",
             ),
             p(
+                "merges",
+                "string",
+                "`1` counts merge commits as commits, never their lines or files.",
+            ),
+            p(
                 "generated",
                 "string",
                 "`1` counts lock files and minified output.",

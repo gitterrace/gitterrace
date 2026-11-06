@@ -8,10 +8,16 @@ never disagree about which commits they cover.
 
 ## Merges
 
-Merges are left out of every insights number. A merge's diff against its first parent repeats
-the lines its branch already brought, so counting it would count those lines twice. The
-overview and the sidebar are the exception: they show every commit, merges included, and the
-overview says how many of them are merges.
+Merges are left out of every insights number by default. A merge's diff against its first
+parent repeats the lines its branch already brought, so counting it would count those lines
+twice. The overview and the sidebar are the exception: they show every commit, merges
+included, and the overview says how many of them are merges.
+
+The option `merges=1` in the URL (the "Merges" toggle on the options line, `merges` in the API)
+counts merges as commits. It is off by default and goes through the one membership rule,
+`Scope::admits`, so every section of every page follows it together. A merge only ever adds to
+commit counts: its lines and files are always zero, with the option on or off, and a path
+selection never keeps a merge.
 
 ## Bots
 

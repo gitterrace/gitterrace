@@ -27,7 +27,7 @@ use crate::{
 pub(crate) struct InsightsQuery {
     #[serde(flatten)]
     pub(crate) filter: Filter,
-    /// `bots`, `generated`, `ignore`, `ws`, `exclude`: parsed as the API parses them.
+    /// `bots`, `merges`, `generated`, `ignore`, `ws`, `exclude`: parsed as the API parses them.
     #[serde(flatten)]
     pub(crate) opts: OptionParams,
     /// `commits` (default), `added`, `deleted` or `net`: what the contributors list follows.
@@ -99,6 +99,7 @@ impl InsightsQuery {
             ("generated", o.include_generated, d.generated),
             ("ws", o.count_whitespace, false),
             ("bots", o.include_bots, d.bots),
+            ("merges", o.include_merges, false),
         ] {
             if on != default {
                 v.push((k, (if on { "1" } else { "0" }).to_owned()));
@@ -182,6 +183,13 @@ impl InsightsQuery {
                 "counted",
                 "left out",
                 flip("bots", o.include_bots, d.bots),
+            ),
+            OptLink::new(
+                "Merges",
+                o.include_merges,
+                "counted",
+                "left out",
+                flip("merges", o.include_merges, false),
             ),
         ];
         let own = self.own_exclude();

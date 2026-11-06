@@ -69,3 +69,17 @@ fn empties_mean_unset() {
     assert_eq!(a, direct("").expect("ok"));
     assert!(a.selection().is_empty());
 }
+
+#[test]
+fn merges_param_reads_the_same_everywhere_and_is_off_by_default() {
+    assert!(!direct("").expect("ok").options().include_merges);
+    for (q, on) in [
+        ("merges=1", true),
+        ("merges=0", false),
+        ("merges=junk", false),
+    ] {
+        let a = direct(q).expect("ok");
+        assert_eq!(a.options().include_merges, on, "{q}");
+        assert_eq!(Ok(a), via_api(q), "{q}");
+    }
+}

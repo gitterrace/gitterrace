@@ -87,6 +87,8 @@ pub struct Options {
     pub count_whitespace: bool,
     /// Count commits by bot accounts in per-file and per-period numbers.
     pub include_bots: bool,
+    /// Count merge commits as commits. A merge never adds lines or files.
+    pub include_merges: bool,
 }
 
 impl Default for Options {
@@ -97,6 +99,7 @@ impl Default for Options {
             respect_ignore: true,
             count_whitespace: false,
             include_bots: false,
+            include_merges: false,
         }
     }
 }
@@ -282,13 +285,17 @@ impl<'a> Insights<'a> {
         self.d.ident_person.get(id.0 as usize).copied().unwrap_or(0)
     }
 
-    /// Non-merge commit by someone who counts under the options.
+    /// Commit by someone who counts under the options: a merge only with `include_merges`.
     pub fn counted_row(&self, c: &CommitRow) -> bool {
-        !c.merge && (self.opts.include_bots || !self.d.people.list[self.person_of(c.ident)].bot)
+        (!c.merge || self.opts.include_merges)
+            && (self.opts.include_bots || !self.d.people.list[self.person_of(c.ident)].bot)
     }
 
     /// Lines changed by commit `rank` over counted files.
     pub fn commit_sums(&self, rank: Rank) -> Lines {
+        if self.source().commit(rank).is_some_and(|c| c.merge) {
+            return Lines::default();
+        }
         self.d
             .commit_lines
             .get_or_init(|| {
