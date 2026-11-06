@@ -19,7 +19,7 @@ JSON is `snake_case`. The same endpoints as `OpenAPI` 3.1: [openapi.json](openap
 
 The API of each repository lives at `/r/{name}/api/v1`.
 
-Rust: `gitterrace_api::router(ApiState)` (nest under `/api/v1`), `gitterrace_api::serve_mcp(path, config)`.
+Rust: `gitterrace_api::router(ApiState)` (nest under `/api/v1`), `gitterrace_api::serve_mcp(path, config)`, `gitterrace_api::serve_mcp_repos(scope, repos, config)`.
 ";
 
 #[expect(
@@ -86,7 +86,12 @@ pub fn render() -> Out {
     }
 
     s.push_str(
-        "\n## MCP (stdio)\n\n`git terrace mcp [path]` serves one repository.\n\n\
+        "\n## MCP (stdio)\n\n`git terrace mcp --served` reads every repository served \
+         before (those a running server shows) plus the current one. \
+         `git terrace mcp [paths]` reads only the repositories the paths name, \
+         `git terrace mcp` the current one. With several in scope, \
+         call `list_repos` and pass its `name` as `repo`. Stdio only: no port, read-only, and a \
+         name resolves only within the scope fixed at start.\n\n\
          | Tool | Read-only | Description | Parameters |\n| --- | --- | --- | --- |\n",
     );
     for t in McpServer::tool_docs() {

@@ -60,6 +60,10 @@ This works for the same user on a loopback address. `--public` servers never tak
 this way. `git terrace remove [path|name]` takes one off again (the last one stays). There is
 no remove button in the page: a browser has no secret, and a page may be on someone's screen.
 
+For agents, `git terrace mcp --served` runs a read-only MCP server over stdio that reads every
+repository served before, the ones a running server shows. `list_repos` names them, and every
+tool takes that name as `repo`. Without `--served` it reads only the paths given.
+
 ## Commands
 
 <!-- BEGIN GENERATED: commands -->
@@ -67,7 +71,7 @@ no remove button in the page: a browser has no secret, and a page may be on some
 git terrace [paths]          Browse a git repository in your browser, offline [--addr --no-watch --config --no-actions --public]
 git terrace serve            Serve the repository in the browser (the default)
 git terrace config           Print the effective configuration and where each value comes from
-git terrace mcp              Run a read-only MCP server over stdio for agents
+git terrace mcp              Run a read-only MCP server over stdio for agents [--served]
 git terrace wrapped          Write the year-in-review card for the repository [--year --layout --theme --out]
 git terrace open <link>      Open a `gitterrace://` or `/go` permalink in the browser, starting a server if needed [--print]
 git terrace remove [target]  Take a repository off the running server; its pages then answer 404
