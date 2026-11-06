@@ -13,5 +13,5 @@ rule:
         - inside: {stopBy: end, kind: macro_invocation, regex: '^proptest!'}
     # Macro bodies are bare tokens: a test attribute then the fn, or any fn in proptest!.
     - kind: token_tree
-      inside: {kind: macro_invocation}
+      inside: {stopBy: end, any: [{kind: macro_invocation}, {kind: macro_definition}]}
       regex: '#\[[^\]]*test[^\]]*\]\s*(#\[[^\]]*\]\s*)*(pub\s+)?(async\s+)?fn\s+[gpcGPC][0-9]+[a-z]?_'

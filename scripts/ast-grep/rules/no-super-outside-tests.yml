@@ -17,6 +17,6 @@ rule:
       regex: '^(pub(\([a-z ]+\))?\s+)?use\s+super::'
     # Macro bodies are bare tokens, invisible to the patterns above.
     - kind: token_tree
-      inside: {kind: macro_invocation}
+      inside: {stopBy: end, any: [{kind: macro_invocation}, {kind: macro_definition}]}
       regex: '\buse\s+super::'
   not: {inside: {stopBy: end, kind: mod_item, regex: '^(pub(\(crate\))? )?mod \w*tests\b'}}

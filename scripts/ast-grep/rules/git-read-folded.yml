@@ -34,8 +34,8 @@ rule:
         - has: {field: value, matches: read}
     # Macro bodies are bare tokens, invisible to the patterns above.
     - kind: token_tree
-      inside: {kind: macro_invocation}
+      inside: {stopBy: end, any: [{kind: macro_invocation}, {kind: macro_definition}]}
       regex: '\.(range|summaries|raw_summaries|numstat_many|rev_list)\s*\([^()]*(\([^()]*\)[^()]*)*\)\s*\.(ok|unwrap_or|unwrap_or_default|unwrap_or_else|map_or|map_or_else|is_ok|is_err|into_iter|iter|flatten)\b'
     - kind: token_tree
-      inside: {kind: macro_invocation}
+      inside: {stopBy: end, any: [{kind: macro_invocation}, {kind: macro_definition}]}
       regex: '\bOk\(\w*\)\s*=\s*[\w.&]*\.(range|summaries|raw_summaries|numstat_many|rev_list)\s*\('

@@ -53,6 +53,6 @@ rule:
         - pattern: $P.window($N)
         # Macro bodies are token trees, invisible to the patterns above (the tendir arm).
         - kind: token_tree
-          inside: {kind: macro_invocation}
+          inside: {stopBy: end, any: [{kind: macro_invocation}, {kind: macro_definition}]}
           regex: '(div_euclid|rem_euclid)\s*\(\s*(DAY|86_?400)\s*\)|from\s*\(\s*\w+\.offset\s*\)|wall_clock\s*\(\s*\)|/\s*86_?400\b|\blocal_(day|time)\s*\(|\.window\s*\('
-          not: {inside: {kind: token_tree, inside: {kind: macro_invocation}}}
+          not: {inside: {kind: token_tree, inside: {stopBy: end, any: [{kind: macro_invocation}, {kind: macro_definition}]}}}

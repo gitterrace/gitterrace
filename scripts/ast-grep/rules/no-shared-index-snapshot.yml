@@ -16,6 +16,6 @@ rule:
     - pattern: $R.index()
     # Macro bodies are bare tokens, invisible to the patterns above.
     - kind: token_tree
-      inside: {kind: macro_invocation}
+      inside: {stopBy: end, any: [{kind: macro_invocation}, {kind: macro_definition}]}
       regex: '\.(diff_resource_cache_for_tree_diff|index_or_load_from_head_or_empty|index_or_load_from_head|try_index|index)\s*\(\s*\)|\.(diff_resource_cache|blame_file)\s*\('
   not: {inside: {stopBy: end, kind: mod_item, regex: '^mod tests'}}

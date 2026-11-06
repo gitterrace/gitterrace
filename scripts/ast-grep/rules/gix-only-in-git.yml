@@ -12,5 +12,5 @@ rule:
     - {kind: scoped_type_identifier, regex: '^gix::'}
     # Macro bodies are bare tokens, invisible to the patterns above.
     - kind: token_tree
-      inside: {kind: macro_invocation}
+      inside: {stopBy: end, any: [{kind: macro_invocation}, {kind: macro_definition}]}
       regex: '\bgix::'

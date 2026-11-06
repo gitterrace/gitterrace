@@ -9,3 +9,7 @@ invalid:
   - 'mod mytests_helpers { use super::f; }'
   - 'use super::fmt;'
   - 'pub(crate) use super::Item;'
+  - |
+    macro_rules! m {
+        () => { use super::x; };
+    }

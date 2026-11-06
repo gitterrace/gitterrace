@@ -12,5 +12,5 @@ rule:
         - has: {field: type, regex: '^(String|Option<String>|&.*str)$'}
     # Macro bodies are bare tokens, invisible to the patterns above.
     - kind: token_tree
-      inside: {kind: macro_invocation}
+      inside: {stopBy: end, any: [{kind: macro_invocation}, {kind: macro_definition}]}
       regex: "\\b(when|ago)\\s*:\\s*(String|Option\\s*<\\s*String\\s*>|&\\s*('\\w+\\s+)?str)\\s*[,})]"
