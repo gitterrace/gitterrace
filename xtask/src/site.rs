@@ -80,6 +80,16 @@ footer{display:flex;flex-wrap:wrap;gap:var(--space-4);font-size:var(--text-sm)}
 @media (prefers-color-scheme:dark){:root:not([data-theme=light]) img.on-light{display:none}:root:not([data-theme=light]) img.on-dark{display:block}}
 :root[data-theme=dark] img.on-light{display:none}
 :root[data-theme=dark] img.on-dark{display:block}
+.tab-radio{position:absolute;opacity:0;pointer-events:none}
+.tab-label{display:inline-block;padding:var(--space-1) var(--space-3);border:var(--border)}
+.tab-label{border-bottom:0;border-radius:var(--radius) var(--radius) 0 0;color:var(--muted)}
+.tab-label{cursor:pointer;font-family:var(--mono);font-size:var(--text-sm)}
+.tab-radio:checked+.tab-label{color:var(--fg);background:var(--soft)}
+.tab-radio:focus-visible+.tab-label{outline:2px solid var(--accent-ink)}
+.tabs pre{margin-top:0;border-top-left-radius:0}
+.tab-panel{display:none}
+#install-curl:checked~#panel-curl,#install-brew:checked~#panel-brew{display:block}
+#install-cargo:checked~#panel-cargo{display:block}
 footer{margin-top:var(--space-16);padding-top:var(--space-4);border-top:var(--border);color:var(--faint)}
 ";
 
@@ -166,7 +176,7 @@ pub fn render(root: &Path, ws: &Workspace) -> Result<Vec<Out>> {
     let _ = write!(
         h,
         "<section>\n<h2>Install</h2>\n{}</section>\n",
-        md(&readme_agents_md::install_md(ws))
+        install_tabs(ws)
     );
     let _ = write!(
         h,
@@ -226,6 +236,42 @@ const SCRIPTS: [&str; 3] = [THEME_INIT_JS, THEME_TOGGLE_JS, LIGHTBOX_JS];
 
 /// The CSP source for [`SCRIPTS`]: the sha256 of each, so exactly those run and any other,
 /// inline or loaded, fails loudly in the browser instead of quietly shipping.
+/// The install block as tabs, one per way to install. Radio inputs and CSS switch them, so the
+/// page needs no script (the CSP allows only the hashed ones) and, with CSS off, every command
+/// still shows. The first tab is open.
+fn install_tabs(ws: &Workspace) -> String {
+    let lines = readme_agents_md::install_lines(ws);
+    let mut out = String::from("<div class=\"tabs\">\n");
+    for (i, (way, _)) in lines.iter().enumerate() {
+        let checked = if i == 0 { " checked" } else { "" };
+        let _ = writeln!(
+            out,
+            "<input type=\"radio\" name=\"install\" id=\"install-{way}\" \
+             class=\"tab-radio\"{checked}>\n\
+             <label for=\"install-{way}\" class=\"tab-label\">{way}</label>"
+        );
+    }
+    for (way, line) in &lines {
+        let _ = writeln!(
+            out,
+            "<div class=\"tab-panel\" id=\"panel-{way}\"><pre><code>{}</code></pre></div>",
+            esc(line)
+        );
+    }
+    out.push_str("</div>\n");
+    let names: Vec<String> = ws
+        .packages
+        .get("gitterrace")
+        .map(|p| p.bins.iter().map(|b| format!("<code>{b}</code>")).collect())
+        .unwrap_or_default();
+    let _ = writeln!(
+        out,
+        "<p>Installs {}; git runs it as <code>git terrace</code>.</p>",
+        names.join(" and ")
+    );
+    out
+}
+
 fn script_hashes() -> String {
     use base64::Engine as _;
     use sha2::Digest as _;

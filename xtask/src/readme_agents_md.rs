@@ -106,23 +106,10 @@ pub fn curl_install(home: &str) -> String {
 pub fn install_md(ws: &Workspace) -> String {
     let mut install = String::new();
     if let Some(p) = ws.packages.get("gitterrace") {
-        // `owner/homebrew-tap` installs as `owner/tap/<formula>`.
-        let tap = ws
-            .tap
-            .strip_suffix("/homebrew-tap")
-            .map(|o| format!("{o}/tap"));
         install.push_str("```bash\n");
-        if !p.homepage.is_empty() {
-            let _ = writeln!(install, "{}", curl_install(&p.homepage));
+        for (_, line) in install_lines(ws) {
+            let _ = writeln!(install, "{line}");
         }
-        if let Some(tap) = tap {
-            let _ = writeln!(install, "brew install {tap}/{}", p.name);
-        }
-        let _ = writeln!(
-            install,
-            "cargo install --locked --git {} {}",
-            p.repository, p.name
-        );
         install.push_str("```\n\n");
         let names: Vec<String> = p.bins.iter().map(|b| format!("`{b}`")).collect();
         let _ = writeln!(
@@ -132,6 +119,31 @@ pub fn install_md(ws: &Workspace) -> String {
         );
     }
     install
+}
+
+/// The install commands as (way, command): curl, brew and cargo, each only when its source
+/// exists. The README and the site both read this, so they cannot disagree.
+pub fn install_lines(ws: &Workspace) -> Vec<(&'static str, String)> {
+    let mut lines = Vec::new();
+    let Some(p) = ws.packages.get("gitterrace") else {
+        return lines;
+    };
+    if !p.homepage.is_empty() {
+        lines.push(("curl", curl_install(&p.homepage)));
+    }
+    // `owner/homebrew-tap` installs as `owner/tap/<formula>`.
+    if let Some(tap) = ws
+        .tap
+        .strip_suffix("/homebrew-tap")
+        .map(|o| format!("{o}/tap"))
+    {
+        lines.push(("brew", format!("brew install {tap}/{}", p.name)));
+    }
+    lines.push((
+        "cargo",
+        format!("cargo install --locked --git {} {}", p.repository, p.name),
+    ));
+    lines
 }
 
 /// One line per subcommand and flag, from the clap definition.

@@ -136,3 +136,12 @@ fn internals_pages_give_every_heading_its_slug_as_id() {
     assert!(html.contains("<h2 id=\"code-age-and-releases\">Code age and releases</h2>"));
     assert_eq!(docs::page_path("counting"), "docs/counting/");
 }
+
+/// The install tabs show every way, with the first open, and each way has a radio, a label
+/// and a panel the CSS can reach.
+#[test]
+fn install_tabs_pair_every_radio_with_a_panel() {
+    for way in ["curl", "brew", "cargo"] {
+        assert!(PAGE_CSS.contains(&format!("#install-{way}:checked~#panel-{way}")));
+    }
+}
