@@ -2,7 +2,7 @@ id: oracle-only-in-tests
 language: rust
 severity: error
 message: 'The in-memory oracle (`MemorySource`, `Insights::new`, `Index::records`) outside a test.'
-note: 'Pages, the API, cards and the CLI read the segment set (`Index::disk_source`). The oracle is what equivalence tests compare it against.'
+note: 'Pages, the API and the CLI read the segment set (`Index::disk_source`). The oracle is what equivalence tests compare it against.'
 files: [crates/**/*.rs, xtask/**/*.rs]
 # Test files, the oracle itself and its cfg-gated entry points.
 ignores:

@@ -6,21 +6,16 @@ flowchart TD
   gitterrace["gitterrace: the binary and CLI"]
   actions["actions: actions.toml and Send to"]
   api["api: JSON API and MCP"]
-  cards["cards: year card"]
   config["config: config.toml"]
   git["git: all git reads, via gix"]
   index["index: insights cache"]
   types["types: shared types, each defined once"]
   web["web: server, pages, guard"]
-  schwarzwald["schwarzwald: the theme and its palette"]
-  gitterrace --> cards
   gitterrace --> web
   actions --> config
   actions --> git
   api --> actions
   api --> index
-  cards --> index
-  cards --> schwarzwald
   config --> types
   git --> types
   index --> config
@@ -33,14 +28,13 @@ flowchart TD
 Each box is a crate the binary ships, and an arrow means "uses". An arrow already implied by a
 longer path is left out, so `web` and `api` use `config` too, though only `actions` points at
 it. `config` reads `config.toml` and knows nothing else. `testkit` is not drawn, since only
-tests use it. `schwarzwald` is the vendored theme. `cards` reads its palette, called Kandel, to
-color the year card.
+tests use it. `schwarzwald` is the vendored theme.
 
 ## Decisions
 
 - **The theme is a snapshot, not a design.** Colors, type, space and motion come only from
   `shared/schwarzwald/`, replaced as a whole, never edited. `scripts/theme-gen.py` writes the
-  block in `tokens.css` and the cards constants. `make theme` fails on drift. Components use
+  block in `tokens.css`. `make theme` fails on drift. Components use
   the role aliases, never a raw color, and charts are server-rendered SVG colored by class.
 - **Read-only, pinned.** Every read takes a resolved commit id, so a commit landing
   mid-request cannot tear a page. Only the uncommitted view reads the worktree.

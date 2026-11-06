@@ -104,12 +104,6 @@ async fn main() -> anyhow::Result<()> {
         }
         Command::Init => init(cli.config.as_deref())?,
         Command::InstallHandler { uninstall } => handler::run(uninstall)?,
-        Command::Wrapped {
-            year,
-            layout,
-            theme,
-            out,
-        } => wrapped(&path, year, &layout, &theme, out, &loaded.config)?,
         Command::Export {
             out,
             force,
@@ -220,57 +214,6 @@ impl Flags {
         loaded.validate()?;
         Ok(loaded)
     }
-}
-
-#[expect(
-    clippy::print_stderr,
-    clippy::print_stdout,
-    reason = "user-facing CLI output: this is the command's result or diagnostic, not a log line"
-)]
-fn wrapped(
-    path: &std::path::Path,
-    year: Option<i32>,
-    layout: &str,
-    theme: &str,
-    out: Option<PathBuf>,
-    config: &gitterrace_config::Config,
-) -> anyhow::Result<()> {
-    // The card is an insight: with insights off there is nothing it may show.
-    if !config.feature_on(gitterrace_config::Feature::Insights, None) {
-        anyhow::bail!("wrapped needs insights: features.insights_enabled is false");
-    }
-    let repo = gitterrace_git::Repo::discover(path).context("opening the repository")?;
-    let index = gitterrace_index::Index::open(&repo).context("opening the cache")?;
-    eprintln!("updating the cache (first run reads every commit once)...");
-    index
-        .update(&repo, "HEAD", &|_| {})
-        .context("updating the cache")?;
-    let set = index
-        .disk_source(&repo, "HEAD")
-        .context("reading the cache")?
-        .context("the cache does not hold HEAD yet: a commit could not be read, run again")?;
-    let stats = set
-        .run(|set| {
-            use gitterrace_index::feed::{CommitRange, InsightsSource, local_day_of};
-            let year = year.unwrap_or_else(|| {
-                let newest = set
-                    .commits_in(CommitRange::All)
-                    .map(|c| local_day_of(c.time, c.offset))
-                    .max()
-                    .unwrap_or(0);
-                i32::try_from(gitterrace_git::civil_from_days(newest).0).unwrap_or(i32::MAX)
-            });
-            gitterrace_cards::wrapped_stats(&repo.name(), &**set, year)
-        })
-        .context("the cache failed a read: delete .git/gitterrace and run again")?;
-    let year = stats.year;
-    let layout: gitterrace_types::CardLayout = layout.parse().context("unknown layout")?;
-    let theme: gitterrace_types::CardTheme = theme.parse().context("unknown theme")?;
-    let svg = gitterrace_cards::wrapped_svg(&stats, layout, theme);
-    let out = out.unwrap_or_else(|| PathBuf::from(format!("wrapped-{year}.svg")));
-    std::fs::write(&out, svg).with_context(|| format!("writing {}", out.display()))?;
-    println!("{}", out.display());
-    Ok(())
 }
 
 /// Exports the repositories `serve` would show for `paths`, so an export of a folder of repos is

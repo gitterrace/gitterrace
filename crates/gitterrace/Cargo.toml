@@ -22,10 +22,8 @@ workspace = true
 [dependencies]
 gitterrace-types.workspace = true
 gitterrace-git.workspace = true
-gitterrace-index.workspace = true
 gitterrace-api.workspace = true
 gitterrace-config.workspace = true
-gitterrace-cards.workspace = true
 gitterrace-web.workspace = true
 gitterrace-actions.workspace = true
 axum.workspace = true

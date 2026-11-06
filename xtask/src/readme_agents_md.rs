@@ -280,7 +280,6 @@ fn crate_table(ws: &Workspace) -> String {
         "gitterrace-config",
         "gitterrace-actions",
         "gitterrace-api",
-        "gitterrace-cards",
         "gitterrace-web",
         "gitterrace",
     ];
@@ -304,11 +303,10 @@ fn crate_table(ws: &Workspace) -> String {
 }
 
 /// One short label per crate for the diagram, so a box says what it is.
-const ROLES: [(&str, &str); 10] = [
+const ROLES: [(&str, &str); 9] = [
     ("gitterrace", "the binary and CLI"),
     ("web", "server, pages, guard"),
     ("api", "JSON API and MCP"),
-    ("cards", "year card"),
     ("actions", "actions.toml and Send to"),
     ("config", "config.toml"),
     ("index", "insights cache"),

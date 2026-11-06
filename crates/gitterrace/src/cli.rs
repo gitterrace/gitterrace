@@ -52,19 +52,6 @@ pub(crate) enum Command {
         #[arg(long)]
         served: bool,
     },
-    /// Write the year-in-review card for the repository.
-    Wrapped {
-        /// Year to summarize. Defaults to the year of the newest commit.
-        #[arg(long)]
-        year: Option<i32>,
-        #[arg(long, value_parser = ["landscape", "portrait"], default_value = "landscape")]
-        layout: String,
-        #[arg(long, value_parser = ["light", "dark"], default_value = "dark")]
-        theme: String,
-        /// Output file. Defaults to `wrapped-YEAR.svg`.
-        #[arg(long, short)]
-        out: Option<PathBuf>,
-    },
     /// Open a `gitterrace://` or `/go` permalink in the browser, starting a server if needed.
     ///
     /// The clone is found among repositories served before and under `links.roots`. An

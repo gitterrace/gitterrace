@@ -72,7 +72,6 @@ git terrace [paths]          Browse a git repository in your browser, offline [-
 git terrace serve            Serve the repository in the browser (the default)
 git terrace config           Print the effective configuration and where each value comes from
 git terrace mcp              Run a read-only MCP server over stdio for agents [--served]
-git terrace wrapped          Write the year-in-review card for the repository [--year --layout --theme --out]
 git terrace open <link>      Open a `gitterrace://` or `/go` permalink in the browser, starting a server if needed [--print]
 git terrace remove [target]  Take a repository off the running server; its pages then answer 404
 git terrace install-handler  Register (or with `--uninstall` remove) this program as the `gitterrace://` link handler [--uninstall]

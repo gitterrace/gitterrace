@@ -5,7 +5,7 @@ valid:
   - "#[cfg(any(test, feature = \"oracle\"))]\npub use memory::MemorySource;"
   - 'fn page(a: &App) { let s = a.index.disk_source(&a.repo, "HEAD"); }'
 invalid:
-  # A page, the API, the cards or the CLI reaching the oracle.
+  # A page, the API or the CLI reaching the oracle.
   - 'fn page(r: &[CommitRecord]) { let s = MemorySource::new(r); }'
   - 'fn card(r: &[CommitRecord]) { let i = Insights::new(r, o, None); }'
   - 'fn cli(index: &Index, repo: &Repo) { let r = index.records(repo, "HEAD"); }'

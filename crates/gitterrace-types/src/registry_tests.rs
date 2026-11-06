@@ -53,7 +53,8 @@ fn uncovered(text: &str) -> Vec<String> {
 #[test]
 fn every_string_enum_has_a_round_trip_test() {
     let text = sources();
-    assert!(declared(&text).len() >= 10, "the scan found the enums");
+    // A floor, so a scan that silently finds nothing fails: the crate declares 9 today.
+    assert!(declared(&text).len() >= 9, "the scan found the enums");
     assert_eq!(uncovered(&text), Vec::<String>::new());
 }
 

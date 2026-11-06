@@ -145,16 +145,12 @@ fn fixed_plural_in_code(src: &str) -> Option<String> {
     None
 }
 
-/// The text sources a page or card is built from: web and cards Rust, and the static JS.
+/// The text sources a page is built from: web Rust, and the static JS.
 /// An unreadable directory yields nothing, so the test below asserts it found sources.
 fn code_sources() -> Vec<std::path::PathBuf> {
     let web = Path::new(env!("CARGO_MANIFEST_DIR"));
     let mut out = Vec::new();
-    for dir in [
-        web.join("src"),
-        web.join("static"),
-        web.join("../gitterrace-cards/src"),
-    ] {
+    for dir in [web.join("src"), web.join("static")] {
         for entry in fs::read_dir(dir).into_iter().flatten().flatten() {
             let p = entry.path();
             if p.extension().is_some_and(|e| e == "rs" || e == "js") {

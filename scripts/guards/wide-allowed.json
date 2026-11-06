@@ -10,8 +10,6 @@
     "crates/gitterrace-api/src/endpoints.rs": 2,
     "crates/gitterrace-api/src/insights.rs": 4,
     "crates/gitterrace-api/src/mcp.rs": 2,
-    "crates/gitterrace-cards/src/lib.rs": 1,
-    "crates/gitterrace-cards/src/wrapped.rs": 8,
     "crates/gitterrace-config/src/lib.rs": 2,
     "crates/gitterrace-config/src/schema.rs": 7,
     "crates/gitterrace-index/src/insights/mod.rs": 1,

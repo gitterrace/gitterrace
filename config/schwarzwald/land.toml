@@ -7,7 +7,7 @@
 dependency = "gitterrace-git"
 dependency_path = "crates/gitterrace-git/src/repo.rs"
 dependent = "gitterrace-web"
-leaf_path = "crates/gitterrace-cards/src/lib.rs"
+leaf_path = "crates/gitterrace-web/src/lib.rs"
 
 # The output oracle: the test target in `crate` that renders every page against its golden.
 # It runs again as its own step when the selection holds a `trigger` crate or the workspace.

@@ -371,7 +371,7 @@ async fn media_renders_inline_and_in_diffs() {
 }
 
 #[tokio::test]
-async fn app_router_nests_api_and_drops_cards_and_badges() {
+async fn app_router_nests_api_and_drops_badges() {
     let dir = tempfile::tempdir().expect("tempdir");
     let p = dir.path();
     git(p, &["init", "-q", "-b", "main"]);
@@ -399,7 +399,6 @@ async fn app_router_nests_api_and_drops_cards_and_badges() {
     assert_eq!(status("/").await, 200);
     assert_eq!(status("/r/x/").await, 404, "no page under a page");
     assert_eq!(status("/badges/commits.svg").await, 404);
-    assert_eq!(status("/cards/wrapped/2025.svg").await, 404);
 }
 
 #[tokio::test]

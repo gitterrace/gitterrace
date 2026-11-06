@@ -6,7 +6,6 @@
 //! feature, not a rewrite.
 
 pub mod api;
-pub mod card;
 pub mod codec;
 pub mod config;
 pub mod git;
@@ -15,7 +14,6 @@ pub mod markup;
 #[cfg(test)]
 mod registry_tests;
 
-pub use card::{CardLayout, CardTheme};
 pub use codec::{ParseError, StringEnum};
 pub use config::{ColorScheme, DateStyle, LinkStyle, Period, SettingsFile};
 pub use git::{ChangeKind, LineKind, RefKind, TreeEntryKind};
