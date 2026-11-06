@@ -135,6 +135,8 @@ button:hover{border-color:var(--line-strong);background:var(--hover)}button.prim
    underline; the tools sit at the right end. */
 .dochead{display:flex;align-items:center;gap:var(--space-3);height:44px;box-sizing:border-box;padding:0 var(--space-2) 0 var(--space-4);background:var(--soft);border-bottom:var(--border)}
 .dochead .doctabs{flex:0 1 auto;min-width:0;align-self:stretch;flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;margin:0 0 -1px calc(-1 * var(--space-2));padding:0;border-bottom:0;background:none}.dochead .doctabs a{padding-top:var(--space-3)}
+.dochead .doc-path{font:var(--weight-semibold) var(--text-sm)/1.4 var(--mono);letter-spacing:0;min-width:0;flex:0 1 auto;flex-wrap:nowrap;overflow:hidden;white-space:nowrap}
+@media (max-width:600px){.dochead:has(.doc-path){flex-wrap:wrap;height:auto;min-height:44px;padding-top:var(--space-1);padding-bottom:var(--space-1)}.dochead .doc-path{flex:1 1 100%}.dochead .doc-tools{margin-left:auto}}
 .doc-tools{display:flex;align-items:center;gap:var(--space-3);margin-left:auto;flex:none;font-size:var(--text-sm)}
 .dochead .outline.menu{display:block;margin-left:0}
 .dochead .outlinebtn.icon{width:28px;height:28px;box-sizing:border-box}

@@ -25,11 +25,22 @@ pub(crate) struct DocAction {
     pub(crate) href: String,
 }
 
+/// One step of a path shown in place of the title: a folder or file name with its page.
+#[derive(Debug)]
+pub(crate) struct DocCrumb {
+    pub(crate) name: String,
+    pub(crate) href: String,
+}
+
 /// A document card's header, as shown.
 #[derive(Debug, Default)]
 pub(crate) struct DocHead {
     /// Shown when there are no tabs.
     pub(crate) title: String,
+    /// A file's path in place of the title, so the card's header is the page's only head row.
+    pub(crate) crumbs: Vec<DocCrumb>,
+    /// Muted facts before the actions (a file's size).
+    pub(crate) meta: String,
     /// The about documents; empty when one is present.
     pub(crate) tabs: Vec<DocTab>,
     /// Whether the Preview/Code switch shows: rendered Markdown with its source.
@@ -51,7 +62,20 @@ impl fmt::Display for DocHead {
         if let Some((files, _)) = &self.switch {
             write!(f, "{files}")?;
         }
-        if self.tabs.is_empty() {
+        if !self.crumbs.is_empty() {
+            f.write_str("<nav class=\"crumbs doc-path\">")?;
+            for (i, k) in self.crumbs.iter().enumerate() {
+                if i > 0 {
+                    f.write_str("<i>/</i>")?;
+                }
+                f.write_str("<a href=\"")?;
+                f.write_str(&esc(&k.href))?;
+                f.write_str("\">")?;
+                f.write_str(&esc(&k.name))?;
+                f.write_str("</a>")?;
+            }
+            f.write_str("</nav>")?;
+        } else if self.tabs.is_empty() {
             write!(f, "<span class=\"doc-title\">{}</span>", esc(&self.title))?;
         } else {
             f.write_str("<nav class=\"tabs doctabs\">")?;
@@ -80,6 +104,11 @@ impl fmt::Display for DocHead {
             write!(f, "{views}")?;
         }
         f.write_str("<span class=\"doc-tools\">")?;
+        if !self.meta.is_empty() {
+            f.write_str("<span class=\"muted\">")?;
+            f.write_str(&esc(&self.meta))?;
+            f.write_str("</span>")?;
+        }
         for a in &self.actions {
             write!(f, "<a href=\"{}\">{}</a>", esc(&a.href), esc(a.label))?;
         }

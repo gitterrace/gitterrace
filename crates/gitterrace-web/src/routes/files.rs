@@ -10,7 +10,7 @@ use axum::{
 use gitterrace_config::Feature;
 use gitterrace_index::feed::{CommitRange, InsightsSource, Rank};
 
-use crate::dochead::DocHead;
+use crate::dochead::{DocAction, DocCrumb, DocHead};
 use crate::routes::{DocQuery, Shared, page};
 use crate::{
     app::{App, blocking},
@@ -176,14 +176,33 @@ pub(super) async fn blob(
         let outline_rail = doc
             .as_ref()
             .map_or_else(String::new, |d| markdown::outline_rail(&d.outline));
+        let (r, pe) = (fmt::enc_seg(&rev), fmt::enc_path(&path));
+        let crumbs = views::crumbs(&rev, &path, true);
+        let blame_href = crate::features::href_if(Feature::Blame, &format!("/blame/{r}/{pe}"));
+        let log_href = fmt::href(&format!("/log/{r}?path={pe}"));
         let head = doc.as_ref().map(|d| DocHead {
             title: path.rsplit('/').next().unwrap_or(&path).to_owned(),
+            crumbs: crumbs
+                .iter()
+                .map(|k| DocCrumb {
+                    name: k.name.clone(),
+                    href: k.href.clone(),
+                })
+                .collect(),
+            meta: fmt::size(b.size),
+            actions: [("Blame", &blame_href), ("History", &log_href)]
+                .into_iter()
+                .filter(|(_, h)| !h.is_empty())
+                .map(|(label, h)| DocAction {
+                    label,
+                    href: h.clone(),
+                })
+                .collect(),
             views: true,
             outline: markdown::outline_menu(&d.outline, true),
             ..DocHead::default()
         });
         let rendered = doc.map(|d| d.html);
-        let (r, pe) = (fmt::enc_seg(&rev), fmt::enc_path(&path));
         Ok(BlobPage {
             c: Chrome {
                 md: rendered.is_some(),
@@ -192,17 +211,17 @@ pub(super) async fn blob(
             rendered,
             outline_rail,
             head,
-            crumbs: views::crumbs(&rev, &path, true),
+            crumbs,
             size: fmt::size(b.size),
-            blame_href: crate::features::href_if(Feature::Blame, &format!("/blame/{r}/{pe}")),
-            log_href: fmt::href(&format!("/log/{r}?path={pe}")),
+            blame_href,
+            log_href,
+            raw_href: crate::features::href_if(Feature::Raw, &format!("/raw/{r}/{pe}")),
             title: path,
             html,
             cut,
             cut_note: format!("Truncated after {} lines.", a.cfg().limits.blob_lines),
             media,
             too_large,
-            raw_href: crate::features::href_if(Feature::Raw, &format!("/raw/{r}/{pe}")),
         })
     })
     .await?;
