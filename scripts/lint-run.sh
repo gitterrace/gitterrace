@@ -73,6 +73,8 @@ run ast-grep ast-grep "brew install ast-grep" ast-grep scan --error
 run ast-grep-test ast-grep "brew install ast-grep" ast-grep test --skip-snapshot-tests
 run ast-grep-macro python3 "install python3" python3 scripts/ast-grep-macro-check.py
 run ast-grep-macro-test python3 "install python3" python3 scripts/ast-grep-macro-check.py --self-test
+run super-ratchet python3 "install python3" python3 scripts/super-check.py
+run super-ratchet-test python3 "install python3" python3 scripts/super-check.py --self-test
 run tests-cfg python3 "install python3" python3 scripts/tests-check.py
 run css-scope python3 "install python3" python3 scripts/css-scope-check.py
 run site-csp python3 "install python3" python3 scripts/site-check.py csp

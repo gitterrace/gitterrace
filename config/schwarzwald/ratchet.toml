@@ -19,6 +19,11 @@ path = "allowed_definitions"
 file = "scripts/guards/shared-types.json"
 path = "openapi.skip_path_prefixes"
 
+# `super::` paths outside tests (scripts/super-check.py), toward zero and then a hard rule.
+[[ratchet]]
+file = "scripts/guards/super-paths.json"
+path = "super_paths"
+
 [counts]
 # Markup built with format!/write! in crates/gitterrace-web/src instead of a template.
 web_format_html = 71
