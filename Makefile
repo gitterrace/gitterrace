@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: setup counting-parity app-icon build install fmt clippy lint test doc theme actions docs-gen docs-check names lines check site-render site-shots help bench bench-report bench-guard memory-check browser-check site deploy shipped domains send-vectors preview gc gc-guard changelog
+.PHONY: setup harness-links counting-parity app-icon build install fmt clippy lint test doc theme actions docs-gen docs-check names lines check site-render site-shots help bench bench-report bench-guard memory-check browser-check site deploy shipped domains send-vectors preview gc gc-guard changelog
 
 ## setup: Keep desktop search indexers out of build, bench and agent dirs (run once per machine)
 setup:
@@ -27,8 +27,15 @@ clippy:
 	cargo clippy --workspace --all-targets -- -D warnings
 
 ## lint: External linters (typos, vale, gitleaks, markdownlint, shellcheck, shfmt, ruff, pyright, tsc, actionlint, ast-grep, machete)
-lint:
+lint: harness-links
 	sh scripts/lint-run.sh
+
+#: harness-links: The shared skills and agents are linked and harness.env names every key
+harness-links:
+	@set -e; h="$${HARNESS_KIT:-$(CURDIR)/../harness-kit}/source/harness/tools"; \
+	if [ ! -d "$$h" ]; then echo "harness missing: set HARNESS_KIT to the shared kit checkout" >&2; exit 1; fi; \
+	python3 "$$h/harness-env-check.py" config/schwarzwald/harness.env; \
+	python3 "$$h/harness-link.py" --check || { echo "links missing: run python3 $$h/harness-link.py" >&2; exit 1; }
 
 ## test: All tests
 test:
