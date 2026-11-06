@@ -94,6 +94,13 @@ async fn serves_every_page() {
     assert!(body.contains("<h1 id=\"hello"));
     let (s, body) = get(&app, "/log/HEAD").await;
     assert_eq!((s, body.contains("fix: second")), (200, true));
+    // A lone input submits on Enter, so the log filter carries no button beside it.
+    let (_, form) = get(&app, "/log/HEAD").await;
+    let form = form
+        .split("<form class=\"filter\"")
+        .nth(1)
+        .and_then(|f| f.split("</form>").next());
+    assert!(form.is_some_and(|f| f.contains("name=\"path\"") && !f.contains("<button")));
     let (s, body) = get(&app, "/log/HEAD?path=src/a.rs&page=0").await;
     assert_eq!((s, body.contains("first")), (200, true));
     let (s, body) = get(&app, "/tree/HEAD/src").await;
