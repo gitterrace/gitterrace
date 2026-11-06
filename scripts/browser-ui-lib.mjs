@@ -427,6 +427,16 @@ async function repoSwitch() {
           panel.back = await p.evaluate(() => document.activeElement?.id);
         }
         const panelOk = !!panel && panel.focus === 'ov-input' && panel.cur === 1 && panel.none === 'No repositories match' && panel.back === 'repobtn';
+        // A fresh load paints the switcher in place, with no script: the header never shifts
+        // when the repository list arrives after a reload.
+        let firstPaint = false;
+        if (joined) {
+          const raw = await b.newContext({ javaScriptEnabled: false });
+          const q = await raw.newPage();
+          await q.goto(one.base + '/', { waitUntil: 'load' });
+          firstPaint = await shown(q);
+          await raw.close();
+        }
         for (const target of joined ? [two, dir] : []) {
           const want = target.split('/').pop().toLowerCase();
           await p.click('#repobtn');
@@ -442,9 +452,9 @@ async function repoSwitch() {
         await p.waitForFunction(() => { const s = document.getElementById('reposwitch'); return !s || s.hidden; }, null, { timeout: 5000 }).catch(() => {});
         const left = !(await shown(p));
         const gone = visits[0]?.pick ? (await fetch(`${one.origin}/r/${visits[0].pick}/`)).status : 0;
-        const ok = !alone && joined && panelOk && visits.length === 2 && visits.every((v) => v.pick && v.at === `/r/${v.pick}/`) && left && gone === 404;
-        if (ok) r.ok(`repo-switch ${name}: hidden alone, shown after the join without a reload, panel keyboard ok, lands on ${visits.map((v) => v.at).join(' then ')}, hidden again after remove`);
-        else r.fail(`repo-switch ${name}: ${JSON.stringify({ alone, joined, panel, visits, left, gone })}`);
+        const ok = !alone && joined && firstPaint && panelOk && visits.length === 2 && visits.every((v) => v.pick && v.at === `/r/${v.pick}/`) && left && gone === 404;
+        if (ok) r.ok(`repo-switch ${name}: hidden alone, shown after the join without a reload, painted in place on a fresh load, panel keyboard ok, lands on ${visits.map((v) => v.at).join(' then ')}, hidden again after remove`);
+        else r.fail(`repo-switch ${name}: ${JSON.stringify({ alone, joined, firstPaint, panel, visits, left, gone })}`);
       } finally {
         await b.close();
         one.stop();

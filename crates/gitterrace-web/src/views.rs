@@ -169,6 +169,8 @@ pub(crate) struct Tools {
     pub(crate) search: bool,
     /// `features.picker_enabled`: the repository switcher.
     pub(crate) picker: bool,
+    /// The server serves more than one repository, so the switcher shows from the first paint.
+    pub(crate) many: bool,
 }
 
 pub(crate) struct Crumb {
@@ -280,6 +282,7 @@ pub(crate) fn chrome_at(app: &crate::app::App, active: &str, rev: &str) -> Chrom
         tools: Tools {
             search: crate::features::on(Feature::Search),
             picker: crate::features::on(Feature::Picker),
+            many: app.env.served() > 1,
         },
         off: crate::features::scripted_off(),
         settings: app.settings_on() && crate::features::on(Feature::Settings),

@@ -199,6 +199,13 @@ impl Env {
             .unwrap_or_default()
     }
 
+    /// How many repositories are served: more than one shows the switcher from the first paint.
+    pub(crate) fn served(&self) -> usize {
+        self.apps
+            .lock()
+            .map_or(1, |g| g.iter().filter(|w| w.strong_count() > 0).count())
+    }
+
     /// Lets a reload reach `app`.
     pub(crate) fn register(&self, app: &Arc<App>) {
         if let Ok(mut g) = self.apps.lock() {
@@ -245,7 +252,7 @@ impl Env {
 
 pub(crate) struct App {
     pub(crate) repo: Repo,
-    env: Env,
+    pub(crate) env: Env,
     /// Open `/events` streams, capped by `server.live_streams`.
     pub(crate) streams: Arc<Semaphore>,
     streams_cap: Mutex<usize>,
