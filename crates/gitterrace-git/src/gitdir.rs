@@ -428,35 +428,6 @@ mod tests {
         assert!(w[1].path.as_deref().is_some_and(|p| p.ends_with("/wt")));
     }
 
-    /// Timing on a real repository: `GITTERRACE_BENCH_REPO=<path> cargo test --release -p
-    /// gitterrace-git bench_branch_status -- --ignored --nocapture`.
-    #[test]
-    #[ignore = "needs GITTERRACE_BENCH_REPO"]
-    #[expect(clippy::print_stdout, reason = "a bench reports its measurement")]
-    fn bench_branch_status() {
-        let Ok(path) = std::env::var("GITTERRACE_BENCH_REPO") else {
-            return;
-        };
-        let repo = Repo::discover(Path::new(&path)).expect("open");
-        let t = std::time::Instant::now();
-        let s = repo.branch_status("HEAD").expect("status");
-        let cold = t.elapsed();
-        let t = std::time::Instant::now();
-        repo.branch_status("HEAD").expect("status");
-        let warm = t.elapsed();
-        let t = std::time::Instant::now();
-        let w = repo.linked_worktrees().expect("worktrees");
-        let wt = t.elapsed();
-        let t = std::time::Instant::now();
-        let h = repo.head_state();
-        let hs = t.elapsed();
-        println!(
-            "branches={} cold={cold:?} warm={warm:?} worktrees={} in {wt:?} head={hs:?} {h:?}",
-            s.len(),
-            w.len()
-        );
-    }
-
     /// A hostile `.git/worktrees` must not make the reader leave the git directory: a symlinked
     /// entry, a symlinked HEAD and a `gitdir` naming `/etc` are all visible attacks.
     #[cfg(unix)]

@@ -484,37 +484,4 @@ mod tests {
         assert_eq!(order(&a), order(&b));
         assert_eq!(order(&a)[0], id(1));
     }
-
-    /// Build-time effect of the canonical order: walk order against canonical order, each
-    /// streamed through the diff pipeline. Opt-in: `TEST_ORDER_REPO=<path> cargo test --release
-    /// -- --ignored order_cost`.
-    #[test]
-    #[ignore = "opt-in measurement on a real repository"]
-    #[expect(clippy::print_stderr, reason = "measurement output")]
-    fn order_cost() {
-        let Ok(path) = std::env::var("TEST_ORDER_REPO") else {
-            return;
-        };
-        let repo = crate::Repo::discover(std::path::Path::new(&path)).expect("open");
-        let t = std::time::Instant::now();
-        let walk = repo.rev_list("HEAD").expect("walk");
-        let walk_list = t.elapsed();
-        let t = std::time::Instant::now();
-        let canon = super::canonical_order(&repo, "HEAD").expect("canonical");
-        let canon_list = t.elapsed();
-        eprintln!(
-            "list: walk {walk_list:?}, canonical {canon_list:?}, {} commits",
-            walk.len()
-        );
-        for (name, ids) in [("walk", &walk), ("canonical", &canon), ("walk", &walk)] {
-            let t = std::time::Instant::now();
-            let mut rows = 0_usize;
-            repo.numstat_stream(ids, |_, c| {
-                rows += c.map_or(0, |(_, f)| f.len());
-                Ok(())
-            })
-            .expect("stream");
-            eprintln!("stream {name}: {:?}, {rows} rows", t.elapsed());
-        }
-    }
 }

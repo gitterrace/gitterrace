@@ -462,22 +462,6 @@ mod tests {
         assert!(!p.join(".git/index.lock").exists());
     }
 
-    /// `GITTERRACE_BENCH_REPO=<path> cargo test --release -p gitterrace-git -- --ignored
-    /// --nocapture signature_cost`.
-    #[test]
-    #[ignore = "measurement, run by hand in release"]
-    #[expect(clippy::print_stdout, reason = "a bench reports its measurement")]
-    fn signature_cost() {
-        let p = std::env::var("GITTERRACE_BENCH_REPO").expect("GITTERRACE_BENCH_REPO");
-        let repo = Repo::discover(std::path::Path::new(&p)).expect("repo");
-        crate::worktree_signature(&repo).expect("warm");
-        let t = std::time::Instant::now();
-        for _ in 0..20 {
-            crate::worktree_signature(&repo).expect("sig");
-        }
-        println!("worktree signature: {:?} per tick", t.elapsed() / 20);
-    }
-
     #[test]
     fn signature_moves_on_edit_and_new_file_only() {
         let dir = tempfile::tempdir().expect("tempdir");

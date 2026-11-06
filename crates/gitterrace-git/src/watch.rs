@@ -537,41 +537,4 @@ mod tests {
         assert_ne!(w.fingerprint(), with);
         assert!(!w.dirs.keys().any(|p| p.ends_with("gone")));
     }
-
-    /// `cargo test --release -p gitterrace-git -- --ignored --nocapture watcher_cost`.
-    /// `GITTERRACE_BENCH_REPO` names a real repository; the synthetic one is built here.
-    #[test]
-    #[ignore = "measurement, run by hand in release"]
-    fn watcher_cost() {
-        #[expect(clippy::print_stdout, reason = "a bench reports its measurement")]
-        fn measure(label: &str, repo: &Repo) {
-            let mut w = repo.watcher();
-            w.racy = std::time::Duration::ZERO;
-            let t = std::time::Instant::now();
-            let first = w.fingerprint();
-            let cold = t.elapsed();
-            let n = 2000;
-            let t = std::time::Instant::now();
-            for _ in 0..n {
-                assert_eq!(w.fingerprint(), first);
-            }
-            let per = t.elapsed() / n;
-            println!(
-                "{label}: cold {cold:?}, warm {per:?} per tick, {:?} per tick",
-                w.last_cost()
-            );
-        }
-        if let Ok(p) = std::env::var("GITTERRACE_BENCH_REPO") {
-            measure("real", &Repo::discover(Path::new(&p)).expect("open"));
-        }
-        let (_tmp, dir) = base();
-        let refs = dir.join(".git/refs/heads");
-        let id = git(&dir, &["rev-parse", "HEAD"]);
-        for i in 0..50_000 {
-            fs::write(refs.join(format!("b{i}")), format!("{id}\n")).expect("ref");
-        }
-        measure("50k loose refs", &Repo::discover(&dir).expect("open"));
-        git(&dir, &["pack-refs", "--all", "--prune"]);
-        measure("50k packed refs", &Repo::discover(&dir).expect("open"));
-    }
 }
