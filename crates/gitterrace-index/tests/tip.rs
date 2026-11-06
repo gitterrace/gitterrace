@@ -7,7 +7,7 @@ use std::io;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use gitterrace_git::Repo;
-use gitterrace_index::{CommitRecord, CommitSource, Index};
+use gitterrace_index::{CommitRecord, CommitSource, Index, Selected};
 use gitterrace_testkit::git;
 
 /// The real repository, counting history walks.
@@ -73,4 +73,36 @@ fn the_built_tip_opens_without_a_history_walk() {
     let other = index.disk_source(&src, first.trim()).expect("open");
     assert!(other.is_none(), "an older commit is not the built set");
     assert!(src.walks.load(Ordering::Relaxed) > 0);
+}
+
+/// One selection for every reader: the built tip, an older commit through the reach view, and
+/// nothing before the first build.
+#[test]
+fn source_for_picks_the_set_then_the_reach_view() {
+    let dir = tempfile::tempdir().expect("tmp");
+    let path = dir.path();
+    git(path, &["init", "-q", "-b", "main"]);
+    for n in 0..3 {
+        std::fs::write(path.join("a.txt"), format!("{n}\n")).expect("write");
+        git(path, &["add", "."]);
+        git(path, &["commit", "-q", "-m", &format!("c{n}")]);
+    }
+    let repo = Repo::discover(path).expect("repo");
+    let index = Index::open_dir(dir.path().join("cache")).expect("index");
+    let tip = CommitSource::resolve(&repo, "HEAD").expect("tip");
+    let none = index.source_for(&repo, "HEAD", &tip).expect("select");
+    assert!(none.is_none(), "no set before the first build");
+    index.update(&repo, "HEAD", &|_| {}).expect("update");
+    let ready = |rev: &str, tip: &str| {
+        matches!(
+            index.source_for(&repo, rev, tip).expect("select"),
+            Some(Selected::Ready(_))
+        )
+    };
+    assert!(ready("HEAD", &tip), "the built tip");
+    let first = git(path, &["rev-list", "--max-parents=0", "HEAD"]);
+    assert!(
+        ready(first.trim(), first.trim()),
+        "an older commit reads the reach view"
+    );
 }

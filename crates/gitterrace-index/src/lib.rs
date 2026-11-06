@@ -8,6 +8,7 @@ pub mod feed;
 pub mod graph;
 mod insights;
 pub mod seg;
+mod select;
 mod source;
 mod store;
 
@@ -22,6 +23,7 @@ use gitterrace_git::Repo;
 /// Re-exported so the cards crate shares the one date rules without a new dependency.
 pub use gitterrace_git::{civil_from_days, days_from_civil};
 pub use insights::*;
+pub use select::Selected;
 pub use source::CommitSource;
 pub use store::FORMAT_VERSION;
 
@@ -356,87 +358,12 @@ impl Index {
         Ok(todo(&order, &self.held()?).len())
     }
 
-    /// What pages read for `rev`: the segment files alone (aggregates, postings, edges from
-    /// [`feed::SegmentSource`], commits, rows and strings from [`feed::DiskSource`]), so no
-    /// history is held. The set must be exactly `rev`'s canonical order (the manifest holds
-    /// one order, the last updated rev). `None` when it is not, or when there is no set yet:
-    /// the caller then tries [`Index::rev_source`].
-    pub fn disk_source(
-        &self,
-        source: &dyn CommitSource,
-        rev: &str,
-    ) -> io::Result<Option<feed::Checked<DiskSet>>> {
-        // A store error opening the set is an unreadable cache, which callers rebuild.
-        let seg = feed::SourceError::io;
-        let open = || seg::read::Store::open(&self.dir).map_err(seg);
-        let Some(store) = open()? else {
-            return Ok(None);
-        };
-        // The set was built for this exact commit: no history walk needed to prove it holds it.
-        let built = cache::read(&self.dir, TIP_FILE)
-            .ok()
-            .flatten()
-            .is_some_and(|t| t.trim_ascii() == rev.as_bytes() && store::oid_of(rev).is_some());
-        let order = if built {
-            Vec::new()
-        } else {
-            source.rev_list(rev)?
-        };
-        let m = &store.manifest;
-        // An unmerged set's order file is old order then new commits, not canonical, so the
-        // fingerprint only matches after a merge: compare the sets.
-        let same = built
-            || m.commits as usize == order.len()
-                && store::load_order(&store).is_ok_and(|held| {
-                    let held: HashSet<seg::Oid> = held.into_iter().collect();
-                    order
-                        .iter()
-                        .all(|id| store::oid_of(id).is_some_and(|o| held.contains(&o)))
-                });
-        if !same {
-            return Ok(None);
-        }
-        let disk = feed::DiskSource::open(store, &mut |pairs| source.map_identities(rev, pairs))
-            .map_err(seg)?
-            .with_cache_bytes(self.block_cache.load(std::sync::atomic::Ordering::Relaxed));
-        let Some(tables) = open()? else {
-            return Ok(None);
-        };
-        Ok(Some(feed::Checked::new(std::sync::Arc::new(
-            feed::SegmentSource::new(disk, tables.segments),
-        ))))
-    }
-
     /// Deletes the whole cache (an unreadable one is never repaired in place), so the next update
     /// rebuilds it. A newer build's cache is never touched.
     pub fn rebuild(&self) -> io::Result<()> {
         self.writable()?;
         let _lock = store::WriteLock::take(&self.dir)?;
         store::wipe(&self.dir)
-    }
-
-    /// The view of a commit the set does not hold exactly: the set's commits it reaches plus
-    /// up to [`Index::fresh_cap`] it lacks, read from git. `tip` is `rev` resolved to a commit
-    /// id. Past the cap the answer is [`feed::RevView::NeedsReindex`]: building the set for
-    /// this commit would move it off HEAD, and holding its records would break the memory
-    /// bound. `None` when there is no set.
-    pub fn rev_source(
-        &self,
-        source: &dyn CommitSource,
-        rev: &str,
-        tip: &str,
-    ) -> io::Result<Option<feed::RevView<DiskSet>>> {
-        // A store error opening the set is an unreadable cache, which callers rebuild.
-        let seg = feed::SourceError::io;
-        let open = || seg::read::Store::open(&self.dir).map_err(seg);
-        let (Some(rows), Some(tables)) = (open()?, open()?) else {
-            return Ok(None);
-        };
-        let disk = feed::DiskSource::open(rows, &mut |pairs| source.map_identities(rev, pairs))
-            .map_err(seg)?
-            .with_cache_bytes(self.block_cache.load(std::sync::atomic::Ordering::Relaxed));
-        let set = feed::SegmentSource::new(disk, tables.segments);
-        feed::rev_view(set, source, rev, tip, self.fresh_cap).map(Some)
     }
 
     /// Every commit reachable from `rev` as a record, read back from the segment set, oldest

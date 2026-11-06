@@ -43,26 +43,20 @@ impl App {
         }
         // HEAD (the rev the set was last built for) reads the segment files and holds no
         // history. Another commit reads the set plus what it lacks, read from git.
-        if self.index.newer_format().is_none()
-            && let Some(set) = self.index.disk_source(&self.repo, head)?
-        {
-            self.touch();
-            return Ok(Some(self.keep(key, set.erased())));
-        }
-        if self.index.newer_format().is_none()
-            && let Some(view) = self.index.rev_source(&self.repo, head, head)?
-        {
-            match view {
-                gitterrace_index::feed::RevView::Ready(reach) => {
-                    return Ok(Some(self.keep(key, reach.erased())));
+        if self.index.newer_format().is_none() {
+            match self.index.source_for(&self.repo, head, head)? {
+                Some(gitterrace_index::Selected::Ready(src)) => {
+                    self.touch();
+                    return Ok(Some(self.keep(key, src)));
                 }
                 // Too far from the set: no records load, no reindex, the page says so.
-                gitterrace_index::feed::RevView::NeedsReindex { read } => {
+                Some(gitterrace_index::Selected::NeedsReindex { read }) => {
                     if let Ok(mut f) = self.caches.far.lock() {
                         *f = Some((key, read));
                     }
                     return Ok(None);
                 }
+                None => {}
             }
         }
         // Ready but no set holds or reaches it: a newer build owns the cache, or the set is

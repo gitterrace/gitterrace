@@ -8,8 +8,8 @@ use std::sync::{Arc, Mutex, RwLock};
 
 use gitterrace_actions::{Lines, styled};
 use gitterrace_git::Repo;
-use gitterrace_index::feed::{Checked, InsightsSource, RevView};
-use gitterrace_index::{Index, Insights, Options};
+use gitterrace_index::feed::{Checked, InsightsSource};
+use gitterrace_index::{Index, Insights, Options, Selected};
 use gitterrace_types::LinkStyle;
 use gitterrace_types::api::{
     BlameResponse, BlobResponse, CommitResponse, ContributorsResponse, LogResponse, RefsResponse,
@@ -237,12 +237,9 @@ impl ApiState {
         rev: &str,
         tip: &str,
     ) -> Result<Option<Checked<dyn InsightsSource>>, ApiError> {
-        if let Some(set) = self.index.disk_source(&*self.repo, rev)? {
-            return Ok(Some(set.erased()));
-        }
-        match self.index.rev_source(&*self.repo, rev, tip)? {
-            Some(RevView::Ready(view)) => Ok(Some(view.erased())),
-            Some(RevView::NeedsReindex { read }) => Err(ApiError::NeedsReindex {
+        match self.index.source_for(&*self.repo, rev, tip)? {
+            Some(Selected::Ready(src)) => Ok(Some(src)),
+            Some(Selected::NeedsReindex { read }) => Err(ApiError::NeedsReindex {
                 read,
                 cap: self.index.fresh_cap(),
             }),
