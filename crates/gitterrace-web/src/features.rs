@@ -43,6 +43,7 @@ pub(crate) const FEATURE_ROUTES: &[(Feature, &[&str])] = &[
             "/stats/ownership",
             "/stats/patterns",
             "/stats/contributors",
+            "/insights",
             "/api/v1/contributors",
             "/api/v1/insights",
             "/api/v1/insights/{name}",

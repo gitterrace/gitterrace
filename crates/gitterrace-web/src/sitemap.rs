@@ -70,7 +70,8 @@ pub const PAGES: &[Page] = &[
             "Insights on the shared filter and period: activity (with commit types and code ",
             "frequency), contributors, hotspots (with patterns), languages, ownership. ",
             "`/stats/types`, `/stats/frequency` and `/stats/patterns` answer with a permanent ",
-            "redirect to their section, query kept. `?rev=` follows any ref",
+            "redirect to their section, query kept, and `/insights` to `/stats`. ",
+            "`?rev=` follows any ref",
         ),
         &[
             "/stats",
@@ -81,6 +82,7 @@ pub const PAGES: &[Page] = &[
             "/stats/ownership",
             "/stats/patterns",
             "/stats/contributors",
+            "/insights",
         ],
     ),
     page(

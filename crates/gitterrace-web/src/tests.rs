@@ -114,6 +114,18 @@ async fn serves_every_page() {
     assert_eq!(get(&app, "/refs").await.0, 200);
     let (s, body) = get(&app, "/stats").await;
     assert_eq!((s, body.contains("data-progress")), (200, true));
+    // The indexing page names itself, says what works meanwhile and links there.
+    assert!(
+        body.contains("<span class=\"doc-title\">Indexing history</span>"),
+        "{body}"
+    );
+    assert!(body.contains("Code and commits work now."), "{body}");
+    assert!(body.contains("/log/HEAD\">Commits</a>"), "{body}");
+    assert_eq!(
+        get(&app, "/insights").await.0,
+        303,
+        "the tab's name answers too"
+    );
     assert_eq!(get(&app, "/nope/x").await.0, 404);
     assert_eq!(get(&app, "/blob/HEAD/missing").await.0, 404);
     let (_, js) = get(&app, "/api/progress").await;

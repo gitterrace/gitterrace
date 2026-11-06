@@ -68,6 +68,11 @@ pub(crate) fn router(app: Arc<App>) -> Router {
         .route("/api/last/{rev}", get(api_last_root))
         .route("/api/last/{rev}/{*path}", get(api_last))
         .route("/stats", get(crate::activity::page))
+        // The tab reads "Insights": a typed or remembered /insights lands there too.
+        .route(
+            "/insights",
+            get(|State(a): Shared| async move { Redirect::to(&format!("{}/stats", a.base)) }),
+        )
         .route("/stats/types", get(moved))
         .route("/stats/languages", get(crate::languages::page))
         .route("/stats/frequency", get(moved))
@@ -286,6 +291,7 @@ struct PendingPage {
     tabs: views::Tabs,
     /// Set when a newer build owns the cache: this one leaves it alone instead of indexing.
     newer: Option<String>,
+    head: crate::dochead::DocHead,
 }
 
 /// Runs `build` over the tip's insights source, or yields the progress page while none exist
@@ -330,6 +336,10 @@ pub(crate) async fn with_records<T: Template + Send + 'static>(
                         gitterrace_index::FORMAT_VERSION,
                     )
                 }),
+                head: crate::dochead::DocHead {
+                    title: "Indexing history".to_owned(),
+                    ..crate::dochead::DocHead::default()
+                },
             }
             .render()?,
             false,

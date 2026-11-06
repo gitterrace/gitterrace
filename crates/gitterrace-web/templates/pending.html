@@ -1,5 +1,9 @@
 {% extends "_base.html" %}
 {% block content %}
 {% include "_tabs.html" %}
-{% if let Some(n) = newer %}<div class="card pad"><p>{{ n }}</p></div>{% else %}<div class="card pad progress" data-progress><p class="muted">Indexing history <b class="pct">0%</b>. This page fills in when the index is ready.</p><progress max="100" value="0"></progress></div>{% endif %}
+{% if let Some(n) = newer %}<div class="card pad"><p>{{ n }}</p></div>{% else %}<div class="card indexing">
+{{ head }}
+<div class="progress" data-progress><p class="muted">This page fills in when the index is ready. Code and commits work now.</p>
+<div class="bar"><progress max="100" value="0"></progress><b class="pct">0%</b></div>
+<p class="next"><a href="{{ c.base }}/">Code</a> <a href="{{ c.base }}/log/HEAD">Commits</a></p></div></div>{% endif %}
 {% endblock %}

@@ -262,7 +262,7 @@ const BROWSE: [&str; 33] = [
 
 /// Routes with no golden cell, each with the reason. A route listed here that does not exist
 /// fails, so the list can only follow the router.
-const EXEMPT: [(&str, &str); 15] = [
+const EXEMPT: [(&str, &str); 16] = [
     (
         "/api/last/{rev}",
         "a fragment the tree page fetches, filled by the file walk",
@@ -296,6 +296,7 @@ const EXEMPT: [(&str, &str); 15] = [
         "/_settings/check",
         "checks a posted config file, never a page",
     ),
+    ("/insights", "a permanent redirect to /stats"),
 ];
 
 /// Whether the route literal `route` (`/blob/{rev}/{*path}`) serves the concrete `path`.
