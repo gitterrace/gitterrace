@@ -5,8 +5,13 @@ message: A test named after a planning label.
 note: 'Name the test by the behavior it pins (owner_ties_follow_names), never by a label such as g19_ or p4_ (AGENTS.md, CONV-NO-INTERNAL-REFS).'
 files: [crates/**/*.rs, xtask/**/*.rs]
 rule:
-  kind: function_item
-  has: {field: name, regex: '^[gpcGPC][0-9]+[a-z]?_'}
   any:
-    - follows: {stopBy: {not: {kind: attribute_item}}, kind: attribute_item, regex: 'test'}
-    - inside: {stopBy: end, kind: macro_invocation, regex: '^proptest!'}
+    - kind: function_item
+      has: {field: name, regex: '^[gpcGPC][0-9]+[a-z]?_'}
+      any:
+        - follows: {stopBy: {not: {kind: attribute_item}}, kind: attribute_item, regex: 'test'}
+        - inside: {stopBy: end, kind: macro_invocation, regex: '^proptest!'}
+    # Macro bodies are bare tokens: a test attribute then the fn, or any fn in proptest!.
+    - kind: token_tree
+      inside: {kind: macro_invocation}
+      regex: '#\[[^\]]*test[^\]]*\]\s*(#\[[^\]]*\]\s*)*(pub\s+)?(async\s+)?fn\s+[gpcGPC][0-9]+[a-z]?_'

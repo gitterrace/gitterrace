@@ -6,5 +6,10 @@ note: gitterrace is read-only and reads through gix (AGENTS.md); only gitterrace
 files: [crates/**/*.rs, xtask/**/*.rs]
 ignores: [crates/gitterrace-testkit/**, crates/gitterrace/build.rs, crates/gitterrace/stamp.rs, crates/gitterrace/tests/stamp.rs]
 rule:
-  pattern: Command::new("git")
+  any:
+    - pattern: Command::new("git")
+    # Macro bodies are bare tokens, invisible to the patterns above.
+    - kind: token_tree
+      inside: {kind: macro_invocation}
+      regex: '\bCommand::new\s*\(\s*"git"\s*\)'
   not: {inside: {stopBy: end, kind: mod_item, regex: '^mod tests'}}

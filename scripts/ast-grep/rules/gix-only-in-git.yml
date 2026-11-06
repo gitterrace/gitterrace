@@ -10,3 +10,7 @@ rule:
     - {kind: use_declaration, regex: '\bgix\b'}
     - {kind: scoped_identifier, regex: '^gix::'}
     - {kind: scoped_type_identifier, regex: '^gix::'}
+    # Macro bodies are bare tokens, invisible to the patterns above.
+    - kind: token_tree
+      inside: {kind: macro_invocation}
+      regex: '\bgix::'

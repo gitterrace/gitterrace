@@ -20,6 +20,10 @@ utils:
       - pattern: $S.find_label($$$)
 rule:
   any:
+    # Macro bodies are bare tokens, invisible to the patterns below.
+    - kind: token_tree
+      inside: {kind: macro_invocation}
+      regex: '\.find_(commit|path|label)\s*\([^()]*\)\s*\.(ok|unwrap_or|unwrap_or_default|unwrap_or_else|map_or|map_or_else|is_ok|is_err|into_iter|iter|flatten|is_some_and|is_ok_and)\b|\bOk\(\w*\)\s*=\s*[\w.&]*\.find_(commit|path|label)\s*\(|\bmatch\s+[\w.&]*\.find_(commit|path|label)\s*\([^()]*\)\s*\{[^{}]*\bErr\(_?\w*\)\s*=>\s*(None|false|0|Vec::new\(\)|Default::default\(\))'
     # A combinator on the result that drops the error: unwrap_or, ok, map_or and the like.
     - all:
         - kind: call_expression

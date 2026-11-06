@@ -35,4 +35,8 @@ rule:
     - {kind: scoped_type_identifier, regex: '^serde_json::Value$'}
     - {kind: type_identifier, regex: '^Value$'}
     - {kind: scoped_identifier, regex: '^(serde_json::)?Value::'}
+    # Macro bodies are bare tokens, invisible to the patterns above.
+    - kind: token_tree
+      inside: {kind: macro_invocation}
+      regex: '\bjson!|\bValue\b'
   not: {inside: {stopBy: end, kind: mod_item, regex: '^(pub(\(crate\))? )?mod \w*tests'}}

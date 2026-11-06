@@ -23,4 +23,8 @@ rule:
     - pattern: File::create($$$)
     - pattern: fs::File::create($$$)
     - pattern: std::fs::File::create($$$)
+    # Macro bodies are bare tokens, invisible to the patterns above.
+    - kind: token_tree
+      inside: {kind: macro_invocation}
+      regex: '\b(fs::write|File::create)\s*\('
   not: {inside: {stopBy: end, kind: mod_item, regex: '^(pub(\(crate\))? )?mod \w*tests'}}

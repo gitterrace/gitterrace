@@ -23,26 +23,7 @@ ROOT = Path(__file__).resolve().parent.parent
 AST = ROOT / "scripts" / "ast-grep"
 
 # Rules known blind inside macro bodies: rule id -> why. Fill only with a reason.
-TOKENS = (
-    "ast-grep parses a macro body as bare tokens, so the pattern cannot match inside it"
-)
-BLIND: dict[str, str] = {
-    "cache-bound-from-budget": TOKENS,
-    "config-enums-typed": TOKENS,
-    "git-read-folded": TOKENS,
-    "gix-only-in-git": TOKENS,
-    "insights-local-day": TOKENS,
-    "no-bare-file-write": TOKENS,
-    "no-git-subprocess": TOKENS,
-    "no-shared-index-snapshot": TOKENS,
-    "no-string-when": TOKENS,
-    "no-super-outside-tests": TOKENS,
-    "no-unfrozen-clock": TOKENS,
-    "no-untyped-json-response": TOKENS,
-    "oracle-only-in-tests": TOKENS,
-    "store-result-folded": TOKENS,
-    "test-names-describe-behavior": TOKENS,
-}
+BLIND: dict[str, str] = {}
 
 
 def wrap(code: str) -> str:

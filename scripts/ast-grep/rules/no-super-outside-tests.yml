@@ -12,6 +12,11 @@ ignores:
   - xtask/**/tests.rs
   - xtask/**/*_tests.rs
 rule:
-  kind: use_declaration
-  regex: '^(pub(\([a-z ]+\))?\s+)?use\s+super::'
+  any:
+    - kind: use_declaration
+      regex: '^(pub(\([a-z ]+\))?\s+)?use\s+super::'
+    # Macro bodies are bare tokens, invisible to the patterns above.
+    - kind: token_tree
+      inside: {kind: macro_invocation}
+      regex: '\buse\s+super::'
   not: {inside: {stopBy: end, kind: mod_item, regex: '^(pub(\(crate\))? )?mod \w*tests\b'}}

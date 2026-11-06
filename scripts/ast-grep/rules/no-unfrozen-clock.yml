@@ -6,8 +6,13 @@ note: Every time a page shows must come from a clock that honors GITTERRACE_TEST
 files: [crates/**/*.rs, xtask/**/*.rs]
 ignores: [crates/gitterrace-git/src/watch.rs]
 rule:
-  kind: call_expression
-  has: {field: function, regex: '(^|::)SystemTime::now$'}
+  any:
+    - kind: call_expression
+      has: {field: function, regex: '(^|::)SystemTime::now$'}
+    # Macro bodies are bare tokens, invisible to the patterns above.
+    - kind: token_tree
+      inside: {kind: macro_invocation}
+      regex: '\bSystemTime::now\b'
   not:
     inside:
       stopBy: end

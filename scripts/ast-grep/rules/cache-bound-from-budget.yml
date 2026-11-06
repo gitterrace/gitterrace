@@ -7,8 +7,13 @@ note: >-
 files: [crates/**/*.rs]
 ignores: [crates/gitterrace-git/**, '**/tests.rs', '**/*_tests.rs', '**/tests/**']
 rule:
-  kind: const_item
-  all:
-    - has: {field: name, regex: '(CACHE|MEMO)'}
-    - has: {field: type, regex: '^(usize|u64)$'}
+  any:
+    - kind: const_item
+      all:
+        - has: {field: name, regex: '(CACHE|MEMO)'}
+        - has: {field: type, regex: '^(usize|u64)$'}
+    # Macro bodies are bare tokens, invisible to the patterns above.
+    - kind: token_tree
+      inside: {kind: macro_invocation}
+      regex: '\bconst\s+\w*(CACHE|MEMO)\w*\s*:\s*(usize|u64)\s*='
   not: {inside: {stopBy: end, kind: mod_item, regex: '^mod tests'}}

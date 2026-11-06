@@ -16,6 +16,10 @@ rule:
     - pattern: MemorySource
     - pattern: Insights::new($$$)
     - pattern: $I.records($S, $R)
+    # Macro bodies are bare tokens, invisible to the patterns above.
+    - kind: token_tree
+      inside: {kind: macro_invocation}
+      regex: '\bMemorySource\b|\bInsights::new\s*\(|\.records\s*\([^,()]*,[^,()]*\)'
   not:
     any:
       - inside: {stopBy: end, kind: mod_item, regex: '^(pub(\(crate\))? )?mod \w*(tests|fixtures)\b'}

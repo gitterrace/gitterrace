@@ -11,8 +11,13 @@ files:
   - crates/gitterrace-api/src/**/*.rs
 ignores: ['**/tests.rs', '**/*_tests.rs', '**/tests/**']
 rule:
-  kind: binary_expression
   any:
-    - regex: '^[\w.()]*\b(config|cfg|conf)\b[\w.()]*\s*[!=]=\s*"'
-    - regex: '^[\w.()]*\b(config|cfg|conf)\b[\w.()]*\.as_str\(\)\s*[!=]=\s*"'
+    - kind: binary_expression
+      any:
+        - regex: '^[\w.()]*\b(config|cfg|conf)\b[\w.()]*\s*[!=]=\s*"'
+        - regex: '^[\w.()]*\b(config|cfg|conf)\b[\w.()]*\.as_str\(\)\s*[!=]=\s*"'
+    # Macro bodies are bare tokens, invisible to the patterns above.
+    - kind: token_tree
+      inside: {kind: macro_invocation}
+      regex: '\b(config|cfg|conf)\b[\w.()]*\s*[!=]=\s*"'
   not: {inside: {stopBy: end, kind: mod_item, regex: '^(pub(\(crate\))? )?mod \w*tests'}}

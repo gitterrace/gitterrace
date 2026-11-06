@@ -5,7 +5,12 @@ message: A view model field named when or ago is a String.
 note: Hold a When (crate::when) so the date renders with its hover tip; fmt::ago returns one.
 files: [crates/gitterrace-web/src/**/*.rs]
 rule:
-  kind: field_declaration
-  all:
-    - has: {field: name, regex: '^(when|ago)$'}
-    - has: {field: type, regex: '^(String|Option<String>|&.*str)$'}
+  any:
+    - kind: field_declaration
+      all:
+        - has: {field: name, regex: '^(when|ago)$'}
+        - has: {field: type, regex: '^(String|Option<String>|&.*str)$'}
+    # Macro bodies are bare tokens, invisible to the patterns above.
+    - kind: token_tree
+      inside: {kind: macro_invocation}
+      regex: "\\b(when|ago)\\s*:\\s*(String|Option\\s*<\\s*String\\s*>|&\\s*('\\w+\\s+)?str)\\s*[,})]"
