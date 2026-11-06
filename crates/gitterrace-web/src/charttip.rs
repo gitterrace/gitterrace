@@ -3,7 +3,7 @@
 //! of 66,500"). A column of a stacked or area chart lists its whole breakdown. Charts never
 //! write `data-tip` themselves, so every tip reads the same way and none drops its total.
 
-use crate::fmt::{count, esc, thousands};
+use crate::fmt::{count, thousands};
 
 /// What a chart counts, singular and plural.
 #[derive(Debug, Clone, Copy)]
@@ -67,11 +67,6 @@ pub(crate) fn rate(mark: &str, share: f64, of: &str) -> String {
     format!("{mark}: {} {of}", percent(share))
 }
 
-/// The attribute that carries `text`, escaped: the only writer of a chart's `data-tip`.
-pub(crate) fn attr(text: &str) -> String {
-    format!(" data-tip=\"{}\"", esc(text))
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -113,9 +108,10 @@ mod tests {
 
     #[test]
     fn the_attribute_is_escaped() {
-        assert_eq!(
-            attr("a \"b\" <c>"),
-            " data-tip=\"a &quot;b&quot; &lt;c&gt;\""
+        let bars = crate::charts::bars(&[("a \"b\" <c>".to_owned(), 1)], COMMITS).to_string();
+        assert!(
+            bars.contains(" data-tip=\"a &quot;b&quot; &lt;c&gt;: 1 commit (100%) of 1\""),
+            "{bars}"
         );
     }
 }

@@ -3,6 +3,7 @@
 
 mod chain;
 mod render;
+mod view;
 
 pub(crate) use chain::Skeleton;
 
@@ -120,7 +121,7 @@ impl View {
 struct LanguagesPage {
     c: Chrome,
     tabs: Tabs,
-    body: String,
+    body: view::Body,
 }
 
 pub(crate) async fn page(State(app): Shared, Query(q): Query<LocQuery>) -> Result<Html<String>> {

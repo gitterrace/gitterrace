@@ -103,7 +103,7 @@ fn charts_write_no_tip_by_hand() {
 }
 
 /// A chart template prints a tip the builder made and writes none itself: every `data-tip`
-/// in a `chart_*.svg` holds one expression and no literal text.
+/// in a `chart_*.svg` or the languages body holds one expression and no literal text.
 #[test]
 fn chart_templates_print_built_tips_only() {
     let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("templates");
@@ -115,7 +115,7 @@ fn chart_templates_print_built_tips_only() {
             .extension()
             .is_some_and(|x| x.eq_ignore_ascii_case("svg"));
         let chart = name.starts_with("chart_") && svg;
-        if !chart {
+        if !(chart || name == "languages_body.html") {
             continue;
         }
         let text = std::fs::read_to_string(e.path()).expect("read");

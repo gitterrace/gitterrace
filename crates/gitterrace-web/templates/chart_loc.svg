@@ -1,0 +1,7 @@
+{#- The lines-of-code area chart (960 by 280, plot from x 72). loc.js reads data-left and data-right. -#}
+<svg class="chart loc" id="loc" viewBox="0 0 960 280" data-left="72" data-right="{{ right }}" role="img" aria-label="Lines of code by language over history">
+{%- for t in ticks %}<line class="grid" x1="72" x2="{{ right }}" y1="{{ t.y }}" y2="{{ t.y }}"/><text class="ax" x="64.0" y="{{ t.ty }}" text-anchor="end">{{ t.label }}</text>{% endfor -%}
+{%- for b in bands %}<path class="{{ b.class }}" d="{{ b.d }}Z" data-tip="{{ b.tip }}"/>{% endfor -%}
+{%- for l in dates %}<text class="ax" x="{{ l.x }}" y="272.0" text-anchor="{{ l.anchor }}">{{ l.text }}</text>{% endfor -%}
+{%- if none %}<rect class="sel" x="0" y="10" width="0" height="{{ ph }}"/>{% else %}<rect class="sel" x="{{ sel.0 }}" y="10" width="{{ sel.1 }}" height="{{ ph }}"/>{% endif -%}
+<line class="xh" x1="0" x2="0" y1="10" y2="{{ xh_y2 }}"/></svg>

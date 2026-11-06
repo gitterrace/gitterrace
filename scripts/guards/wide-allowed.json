@@ -27,7 +27,7 @@
     "crates/gitterrace-web/src/error.rs": 1,
     "crates/gitterrace-web/src/features_tests.rs": 1,
     "crates/gitterrace-web/src/insights.rs": 1,
-    "crates/gitterrace-web/src/languages/render.rs": 12,
+    "crates/gitterrace-web/src/languages/render.rs": 1,
     "crates/gitterrace-web/src/lib.rs": 3,
     "crates/gitterrace-web/src/markdown.rs": 5,
     "crates/gitterrace-web/src/markdown/lines.rs": 1,
