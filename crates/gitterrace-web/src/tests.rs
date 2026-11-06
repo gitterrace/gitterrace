@@ -188,6 +188,11 @@ async fn serves_every_page() {
     assert!(body.contains("/stats/contributors?author=") && body.contains("/log/HEAD?author="));
     let (_, body) = get(&app, "/blame/HEAD/src/a.rs").await;
     assert!(body.contains("class=\"who\" href=\"/log/HEAD?author="));
+    // The gutter names a run once and carries its age as a heat class on every line of it.
+    assert!(body.contains("class=\"who h"));
+    // Both lines of src/a.rs come from "fix: second": one run, two heat cells, one name.
+    assert_eq!(body.matches("<td class=\"who h").count(), 2);
+    assert_eq!(body.matches("<a class=\"who\"").count(), 1);
     // Every page that names an author links to their log, branch rows included.
     let (_, body) = get(&app, "/refs").await;
     assert!(

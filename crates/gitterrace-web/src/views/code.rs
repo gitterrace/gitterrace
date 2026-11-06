@@ -161,6 +161,18 @@ fn code_html_uncached(r: &Render, path: &str, text: &str, lit_lines: usize) -> (
     (out, cut)
 }
 
+/// How recent a line is, 0 (this month) to 4 (older than three years): the class of its heat bar.
+const fn heat_bucket(time: i64, now: i64) -> u8 {
+    const DAY: i64 = 86_400;
+    match (now - time) / DAY {
+        d if d < 30 => 0,
+        d if d < 365 => 1,
+        d if d < 3 * 365 => 2,
+        d if d < 6 * 365 => 3,
+        _ => 4,
+    }
+}
+
 pub(crate) fn blame_html(r: &Render, path: &str, lines: &[BlameLine], now: i64) -> String {
     let total: usize = lines.iter().map(|l| l.text.len()).sum();
     let mut hl = (total <= r.highlight_bytes)
@@ -168,9 +180,13 @@ pub(crate) fn blame_html(r: &Render, path: &str, lines: &[BlameLine], now: i64) 
         .flatten();
     let mut out = String::from("<table class=\"code blame\">");
     let mut prev = "";
+    let mut heat = 0;
     for l in lines {
         let first = l.commit != prev;
         prev = &l.commit;
+        if first {
+            heat = heat_bucket(l.time, now);
+        }
         let _ = write!(
             out,
             "<tr id=\"L{}\"{}>",
@@ -180,14 +196,14 @@ pub(crate) fn blame_html(r: &Render, path: &str, lines: &[BlameLine], now: i64) 
         if first {
             let _ = write!(
                 out,
-                "<td class=\"who\"><div class=\"bl\">{}<a class=\"who\" href=\"{}\">{}</a><span class=\"muted\">{}</span></div></td>",
+                "<td class=\"who h{heat}\"><div class=\"bl\">{}<a class=\"who\" href=\"{}\">{}</a><span class=\"muted\">{}</span></div></td>",
                 sha_link(&l.commit),
                 esc(&author_href(&l.author)),
                 esc(&l.author),
                 ago(l.time, now)
             );
         } else {
-            out.push_str("<td class=\"who\"></td>");
+            let _ = write!(out, "<td class=\"who h{heat}\"></td>");
         }
         let _ = write!(
             out,
@@ -199,4 +215,20 @@ pub(crate) fn blame_html(r: &Render, path: &str, lines: &[BlameLine], now: i64) 
     }
     out.push_str("</table>");
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::heat_bucket;
+
+    #[test]
+    fn heat_runs_from_this_month_to_old() {
+        let now = 10 * 365 * 86_400;
+        let ago = |d: i64| now - d * 86_400;
+        let got: Vec<u8> = [1, 100, 800, 2000, 4000]
+            .into_iter()
+            .map(|d| heat_bucket(ago(d), now))
+            .collect();
+        assert_eq!(got, [0, 1, 2, 3, 4]);
+    }
 }
