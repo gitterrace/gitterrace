@@ -54,7 +54,37 @@ export function checks(env) {
       else if (!red.get(key).length) r.fail(`lone-rows ${key}: green now, drop it (${row})`);
     }
   }
-  return { loneRows };
+  // Small layout: the tree's '..' row shows only at narrow widths (the breadcrumb does its job on
+  // wide ones), the sidebar's insights link sits in the Languages heading, and the nav names
+  // the refs tab 'Branches' at 390.
+  async function smallLayout() {
+    for (const name of browsers) {
+      const { b, ctx } = await context(name);
+      const p = await ctx.newPage();
+      /** @type {Array<[number, boolean, string]>} */
+      const cases = [[1440, false, 'Branches & Tags'], [390, true, 'Branches']];
+      for (const [width, up, label] of cases) {
+        await p.setViewportSize({ width, height: 900 });
+        await p.goto(srv.base + '/tree/HEAD/src', { waitUntil: 'load' });
+        const row = await p.$('tr.up a');
+        const seen = row ? await row.isVisible() : false;
+        const where = `small-layout ${name} ${width}`;
+        if (seen === up) r.ok(`${where}: '..' row ${up ? 'shown' : 'hidden'}`);
+        else r.fail(`${where}: '..' row visible=${seen}, want ${up}`);
+        const nav = await p.$eval('.tabnav a[href$="/refs"]', (a) => a.innerText.replace(/\s+/g, ' ').trim().toLowerCase());
+        if (nav === label.toLowerCase()) r.ok(`${where}: nav says ${label}`);
+        else r.fail(`${where}: nav says '${nav}', want '${label}'`);
+        await p.goto(srv.base + '/', { waitUntil: 'load' });
+        const text = await p.evaluate(() => document.body.innerText);
+        const inHead = await p.$('aside h3 a.more');
+        if (/View insights/.test(text)) r.fail(`${where}: a lone 'View insights' link remains`);
+        else if (!inHead) r.fail(`${where}: no insights link in the Languages heading`);
+        else r.ok(`${where}: insights link sits in the Languages heading`);
+      }
+      await b.close();
+    }
+  }
+  return { loneRows, smallLayout };
 }
 
 // Runs in the page. Walks main from the top down to the first content block. A row is the

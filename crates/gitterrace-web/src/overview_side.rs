@@ -76,6 +76,7 @@ pub(crate) struct Side {
     pub(crate) refs_href: String,
     pub(crate) langs: Vec<Lang>,
     pub(crate) langs_href: String,
+    pub(crate) insights_href: String,
 }
 
 /// The sidebar's HTML for `head` over `src`, from the memo when the tip, the index and the
@@ -217,6 +218,9 @@ pub(crate) fn build(a: &App, head: &str, src: &dyn InsightsSource, dirty: bool, 
         refs_href: href("/refs"),
         langs: langs(a, head),
         langs_href: crate::features::page_href("languages"),
+        insights_href: crate::features::insights_home()
+            .map(href)
+            .unwrap_or_default(),
     }
 }
 
@@ -481,20 +485,17 @@ mod tests {
         assert!(first.contains("side"));
     }
 
+    /// Each sidebar heading's first text, whatever tags wrap it.
     fn headings(html: &str) -> Vec<&str> {
-        html.split("<h3>")
+        html.split("<h3")
             .skip(1)
             .map(|h| {
                 let h = h.split("</h3>").next().unwrap_or("");
-                // A linked heading's text is inside its `<a>`; a plain one comes first.
-                let h = if h.starts_with('<') {
-                    h.split('>')
-                        .nth(1)
-                        .map_or(h, |x| x.split('<').next().unwrap_or(x))
-                } else {
-                    h.split('<').next().unwrap_or(h)
-                };
-                h.split(" <").next().unwrap_or(h)
+                h.split('>')
+                    .skip(1)
+                    .map(|t| t.split('<').next().unwrap_or("").trim())
+                    .find(|t| !t.is_empty())
+                    .unwrap_or("")
             })
             .collect()
     }

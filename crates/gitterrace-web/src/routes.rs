@@ -164,7 +164,6 @@ struct OverviewPage {
     about: Option<crate::about::About>,
     entries: Vec<views::Entry>,
     latest: Option<CommitRow>,
-    insights_href: String,
     /// The memoized sidebar sections; empty while indexing.
     side: String,
     /// `display.sidebar` is empty: no sidebar, the files take the full width.
@@ -202,9 +201,6 @@ async fn overview(State(app): Shared, Query(q): Query<DocQuery>) -> Result<Html<
             about,
             entries: views::entries(&rev, "", &list),
             latest: recent.first().map(|c| views::commit_row(c, now)),
-            insights_href: crate::features::insights_home()
-                .map(fmt::href)
-                .unwrap_or_default(),
             side,
             no_side: a.cfg().display.sidebar.is_empty(),
         })

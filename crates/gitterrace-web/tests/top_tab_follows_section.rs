@@ -36,7 +36,7 @@ async fn every_page_marks_its_own_section() {
         ("/log/HEAD", "Commits"),
         ("/compare", "Commits"),
         (commit.as_str(), "Commits"),
-        ("/refs", "Branches &#38; Tags"),
+        ("/refs", "Branches"),
         ("/stats", "Insights"),
         ("/stats/hotspots", "Insights"),
         ("/stats/languages", "Insights"),

@@ -12,8 +12,7 @@
 {% if let Some(t) = totals %}
 {{ side|safe }}
 <section class="side"><h3>All time</h3>
-<p class="facts"><span><b>{{ t.commits }}</b> {{ t.commits_noun }}</span>{% if !t.merges.is_empty() %} <span class="muted" data-tip="All commits, merges included. Insights leave merges out, since a merge repeats its branch.">{{ t.merges }}</span>{% endif %} <span><b>{{ t.authors }}</b> {{ t.authors_noun }}</span> <span><b>{{ t.files }}</b> {{ t.files_noun }}</span> <span><b class="add">+{{ t.additions }}</b> <b class="del">-{{ t.deletions }}</b> {{ t.lines_noun }}</span></p>
-{% if !insights_href.is_empty() %}<p><a href="{{ insights_href }}">View insights</a></p>{% endif %}</section>
+<p class="facts"><span><b>{{ t.commits }}</b> {{ t.commits_noun }}</span>{% if !t.merges.is_empty() %} <span class="muted" data-tip="All commits, merges included. Insights leave merges out, since a merge repeats its branch.">{{ t.merges }}</span>{% endif %} <span><b>{{ t.authors }}</b> {{ t.authors_noun }}</span> <span><b>{{ t.files }}</b> {{ t.files_noun }}</span> <span><b class="add">+{{ t.additions }}</b> <b class="del">-{{ t.deletions }}</b> {{ t.lines_noun }}</span></p></section>
 {% else %}
 <div class="progress" data-progress><span class="muted">Indexing history <b class="pct">0%</b></span><progress max="100" value="0"></progress></div>
 {% endif %}
