@@ -41,12 +41,22 @@ a{color:var(--accent-ink)}
 h1,h2{font-family:var(--serif);line-height:var(--leading-tight);font-weight:var(--weight-semibold)}
 h2{font-size:var(--text-xl);margin:var(--space-16) 0 var(--space-3)}
 h3{font-size:var(--text-lg);margin:var(--space-8) 0 var(--space-2)}
-header{padding:var(--space-8) 0 var(--space-4);position:relative}
-.gh{right:0;color:var(--muted)}
+.skip{position:absolute;left:var(--space-4);top:-100px;z-index:10;padding:var(--space-2) var(--space-3);background:var(--bg);color:var(--fg);border:var(--border);border-radius:var(--radius)}
+.skip:focus{top:var(--space-2)}
+.top{color-scheme:dark;background:var(--header);border-bottom:var(--border)}
+.bar{max-width:1200px;margin:0 auto;height:56px;padding:0 var(--space-6);display:flex;align-items:center;gap:var(--space-6)}
+.top a{color:var(--muted);font-size:var(--text-base);font-weight:500;text-decoration:none}
+.top a:hover{color:var(--fg)}
+.top .brand{display:flex;align-items:center;gap:var(--space-2);margin-right:auto;color:var(--fg);font-size:18px;font-weight:var(--weight-semibold);letter-spacing:-.01em}
+.top .brand img{width:24px;height:24px}
+.top :focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:var(--radius)}
+@media (max-width:640px){.bar{gap:var(--space-4);padding:0 var(--page-pad)}}
+.hero{padding:var(--space-4) 0}
+.gh{color:var(--muted)}
 .gh:hover,.gh:focus-visible{color:var(--fg)}
 .gh svg{fill:currentColor}
-header img{max-width:calc(100% - 72px);height:auto}
-header img.on-light{display:block}
+.hero img{max-width:100%;height:auto}
+.hero img.on-light{display:block}
 .tag{font-family:var(--serif);font-size:var(--text-lg);color:var(--muted);margin:var(--space-4) 0 0}
 pre,code{font-family:var(--mono);font-size:var(--text-sm)}
 pre{background:var(--soft);border:var(--border);border-radius:var(--radius);padding:var(--space-3) var(--space-4);overflow-x:auto}
@@ -67,8 +77,8 @@ figure img.on-light,.lightbox img.on-light{display:block}
 .demo{margin-top:var(--space-6)}
 figcaption{font-size:var(--text-xs);color:var(--muted);margin-top:var(--space-2);line-height:1.4}figcaption b{color:var(--fg);font-weight:var(--weight-semibold)}
 footer{display:flex;flex-wrap:wrap;gap:var(--space-4);font-size:var(--text-sm)}
-.gh,.theme{position:absolute;top:var(--space-8);line-height:0}
-.theme{right:40px;width:24px;height:24px;padding:0;display:grid;place-items:center;background:none;border:0;color:var(--muted);cursor:pointer}
+.gh,.theme{line-height:0}
+.theme{width:24px;height:24px;padding:0;display:grid;place-items:center;background:none;border:0;color:var(--muted);cursor:pointer}
 .theme:hover,.theme:focus-visible{color:var(--fg)}
 .theme svg{width:24px;height:24px;overflow:visible;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;display:none}
 .theme svg *{vector-effect:non-scaling-stroke}
@@ -91,6 +101,16 @@ footer{display:flex;flex-wrap:wrap;gap:var(--space-4);font-size:var(--text-sm)}
 #install-curl:checked~#panel-curl,#install-brew:checked~#panel-brew{display:block}
 #install-cargo:checked~#panel-cargo{display:block}
 footer{margin-top:var(--space-16);padding-top:var(--space-4);border-top:var(--border);color:var(--faint)}
+footer p{flex:0 0 100%;margin:0;font-size:var(--text-sm);color:var(--faint)}
+footer p a{color:var(--muted)}
+.outline{display:none}
+.outline-label{display:flex;align-items:center;gap:var(--space-3);margin:0 0 var(--space-2);font:var(--weight-regular) var(--text-2xs)/1.4 var(--mono);text-transform:uppercase;letter-spacing:.12em;color:var(--muted)}
+.outline-label::after{content:"";flex:1;border-top:var(--border)}
+.outline ol{list-style:none;margin:0;padding:0}
+.outline a{display:block;padding:3px var(--space-3);border-left:2px solid var(--line);color:var(--muted);overflow-wrap:anywhere;font-size:var(--text-sm);text-decoration:none}
+.outline a:hover{color:var(--fg)}
+.outline a.on{color:var(--fg);font-weight:var(--weight-semibold);border-left-color:var(--accent)}
+@media (min-width:1100px){.docgrid>main{max-width:none;margin:0}.docgrid{display:grid;grid-template-columns:minmax(0,760px) 220px;gap:var(--space-8);justify-content:center}.outline{display:block;position:sticky;top:var(--space-4);align-self:start;margin-top:var(--space-8);max-height:calc(100vh - 2*var(--space-4));overflow:auto}}
 ";
 
 /// The source host's mark (16x16 path), the link to the source in the top right corner.
@@ -115,7 +135,7 @@ fn head(name: &str, desc: &str, home: &str) -> String {
          <meta name=\"twitter:card\" content=\"summary_large_image\">\n\
          <link rel=\"icon\" type=\"image/svg+xml\" href=\"assets/mark.svg\">\n\
          <link rel=\"apple-touch-icon\" href=\"assets/apple-touch-icon.png\">\n\
-         <link rel=\"stylesheet\" href=\"assets/site.css\">\n<script>{THEME_INIT_JS}</script>\n</head>\n<body>\n<main>\n",
+         <link rel=\"stylesheet\" href=\"assets/site.css\">\n<script>{THEME_INIT_JS}</script>\n</head>\n<body>\n",
         name = esc(name),
         desc = esc(desc),
         home = esc(home),
@@ -156,12 +176,12 @@ pub fn render(root: &Path, ws: &Workspace) -> Result<Vec<Out>> {
     let repo = &pkg.repository;
     let home = pkg.homepage.trim_end_matches('/');
     let mut h = head(&pkg.name, &pkg.description, home);
+    h.push_str(&bar("assets/", &pkg.name, repo, &ws.demo));
     let _ = write!(
         h,
-        "<header>\n<img class=\"on-light\" src=\"assets/logo-light.svg\" alt=\"{n}\" width=\"540\" height=\"120\" loading=\"lazy\">\n\
+        "<main id=\"main\">\n<div class=\"hero\">\n<img class=\"on-light\" src=\"assets/logo-light.svg\" alt=\"{n}\" width=\"540\" height=\"120\" loading=\"lazy\">\n\
          <img class=\"on-dark\" src=\"assets/logo-dark.svg\" alt=\"\" width=\"540\" height=\"120\" loading=\"lazy\">\n\
-         <p class=\"tag\">{tag}</p>\n{THEME_BUTTON}\n<a class=\"gh\" href=\"{r}\" aria-label=\"{n} on GitHub\" title=\"GitHub\"><svg viewBox=\"0 0 16 16\" width=\"24\" height=\"24\" aria-hidden=\"true\"><path d=\"{GH_MARK}\"/></svg></a>\n</header>\n",
-        r = esc(repo),
+         <p class=\"tag\">{tag}</p>\n</div>\n",
         n = esc(&pkg.name),
         tag = esc(&tagline(root)?),
     );
@@ -199,16 +219,17 @@ pub fn render(root: &Path, ws: &Workspace) -> Result<Vec<Out>> {
     let _ = write!(
         h,
         "<footer>\n<a href=\"{repo}\">Repository</a>\n<a href=\"{repo}/tree/main/docs\">Docs</a>\n\
-         <a href=\"{repo}/blob/main/LICENSE\">{lic}</a>\n<a href=\"{repo}/releases/tag/v{ver}\">v{ver}</a>\n</footer>\n\
+         <a href=\"{repo}/blob/main/LICENSE\">{lic}</a>\n<a href=\"{repo}/releases/tag/v{ver}\">v{ver}</a>\n{fleet}</footer>\n\
          </main>\n<script>{THEME_TOGGLE_JS}</script>\n<script>{LIGHTBOX_JS}</script>\n</body>\n</html>\n",
         repo = esc(repo),
         lic = esc(&pkg.license),
         ver = esc(&pkg.version),
+        fleet = fleet(),
     );
     outs.push(Out::file("site/index.html", h));
-    let (pages, paths) = docs::pages(root, home, repo, &pkg.name)?;
+    let (pages, paths) = docs::pages(root, home, repo, &pkg.name, &ws.demo)?;
     outs.extend(pages);
-    outs.extend(host_files(home, repo, &pkg.name, &paths));
+    outs.extend(host_files(home, repo, &pkg.name, &ws.demo, &paths));
     Ok(outs)
 }
 
@@ -231,8 +252,53 @@ const THEME_BUTTON: &str = "<button class=\"theme\" type=\"button\" id=\"theme\"
 <svg class=\"i-light\" viewBox=\"1.2 1.2 21.6 21.6\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"12\" r=\"4\"/><path d=\"M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8\"/></svg>\
 <svg class=\"i-dark\" viewBox=\"3.85 3.2 16.95 16.95\" aria-hidden=\"true\"><path d=\"M20 14.5A8 8 0 0 1 9.5 4 8 8 0 1 0 20 14.5z\"/></svg></button>";
 
+/// Docs pages with an outline rail: the link of the heading in view gets the `on` class. The
+/// rail works without it, only the highlight is lost.
+const OUTLINE_JS: &str = "(function(){var n=document.querySelectorAll('.outline a');if(!n.length||!('IntersectionObserver' in window))return;var m={},c;n.forEach(function(a){m[a.hash.slice(1)]=a});var o=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){if(c)c.classList.remove('on');c=m[e.target.id];c.classList.add('on')}})},{rootMargin:'0px 0px -70% 0px'});Object.keys(m).forEach(function(i){var h=document.getElementById(i);if(h)o.observe(h)})})()";
+
+/// The sibling sites of the same maker, linked quietly in every footer. This site leaves
+/// itself out.
+const FLEET: [(&str, &str); 2] = [
+    ("tendir", "https://tendir.app"),
+    ("timorunge.com", "https://timorunge.com"),
+];
+
+/// The footer's two quiet lines: how the site is made, and the sibling sites.
+fn fleet() -> String {
+    let links: Vec<String> = FLEET
+        .iter()
+        .map(|(n, u)| format!("<a href=\"{u}\">{n}</a>"))
+        .collect();
+    format!(
+        "<p class=\"fleet\">Built with AI coding agents. A human sets direction and reviews.</p>\n\
+         <p class=\"fleet\">Also from the same fleet: {}</p>\n",
+        links.join(" &middot; ")
+    )
+}
+
+/// The slim dark bar on top of every page, before `<main>`: skip link, brand, links, source
+/// and theme buttons. `assets` is the path prefix of the site assets (`assets/` on the home page,
+/// `/assets/` elsewhere). The demo link is left out when there is no demo.
+fn bar(assets: &str, name: &str, repo: &str, demo: &str) -> String {
+    let demo_link = if demo.is_empty() {
+        String::new()
+    } else {
+        format!("<a href=\"{}\">Demo</a>\n", esc(demo))
+    };
+    format!(
+        "<a class=\"skip\" href=\"#main\">Skip to content</a>\n<header class=\"top\">\n\
+         <nav class=\"bar\" aria-label=\"Main\">\n\
+         <a class=\"brand\" href=\"/\"><img src=\"{assets}mark-dark.svg\" alt=\"\" width=\"24\" height=\"24\"><span>{n}</span></a>\n\
+         <a href=\"{r}/tree/main/docs\">Docs</a>\n{demo_link}\
+         <a class=\"gh\" href=\"{r}\" aria-label=\"{n} on GitHub\" title=\"GitHub\"><svg viewBox=\"0 0 16 16\" width=\"24\" height=\"24\" aria-hidden=\"true\"><path d=\"{GH_MARK}\"/></svg></a>\n\
+         {THEME_BUTTON}\n</nav>\n</header>\n",
+        n = esc(name),
+        r = esc(repo),
+    )
+}
+
 /// Every inline script on the page, so the CSP lists exactly these by hash.
-const SCRIPTS: [&str; 3] = [THEME_INIT_JS, THEME_TOGGLE_JS, LIGHTBOX_JS];
+const SCRIPTS: [&str; 4] = [THEME_INIT_JS, THEME_TOGGLE_JS, LIGHTBOX_JS, OUTLINE_JS];
 
 /// The CSP source for [`SCRIPTS`]: the sha256 of each, so exactly those run and any other,
 /// inline or loaded, fails loudly in the browser instead of quietly shipping.
@@ -291,7 +357,7 @@ fn script_hashes() -> String {
 /// The files the static host reads beside the page: response headers, the 404 page, the
 /// crawler files and the security contact. The CSP is tight because the page is static: the
 /// only scripts allowed are [`SCRIPTS`], by their hashes.
-fn host_files(home: &str, repo: &str, name: &str, pages: &[String]) -> Vec<Out> {
+fn host_files(home: &str, repo: &str, name: &str, demo: &str, pages: &[String]) -> Vec<Out> {
     let pages = pages.iter().fold(String::new(), |mut s, p| {
         let _ = writeln!(s, "<url><loc>{home}/{p}</loc></url>");
         s
@@ -321,10 +387,12 @@ fn host_files(home: &str, repo: &str, name: &str, pages: &[String]) -> Vec<Out> 
          <meta name=\"color-scheme\" content=\"light dark\">\n\
          <meta name=\"robots\" content=\"noindex\">\n<title>Not found - {n}</title>\n\
          <link rel=\"icon\" type=\"image/svg+xml\" href=\"/assets/mark.svg\">\n\
-         <link rel=\"stylesheet\" href=\"/assets/site.css\">\n</head>\n<body>\n<main>\n\
+         <link rel=\"stylesheet\" href=\"/assets/site.css\">\n<script>{THEME_INIT_JS}</script>\n</head>\n<body>\n{bar}<main id=\"main\">\n\
          <h1>Not found</h1>\n<p>There is no page here. <a href=\"/\">Back to {n}</a>.</p>\n\
-         </main>\n</body>\n</html>\n",
-        n = esc(name)
+         <footer>\n{fleet}</footer>\n</main>\n<script>{THEME_TOGGLE_JS}</script>\n</body>\n</html>\n",
+        n = esc(name),
+        bar = bar("/assets/", name, repo, demo),
+        fleet = fleet()
     );
     vec![
         Out::file("site/_headers", &headers),
