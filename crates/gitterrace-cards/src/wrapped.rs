@@ -1,10 +1,11 @@
 use std::fmt::Write;
 
+use gitterrace_index::thousands;
 use gitterrace_types::{CardLayout, CardTheme};
 
 use crate::palette::{Paint, Palette};
 use crate::stats::WrappedStats;
-use crate::svg::{MONO, SANS, area, clip, count, group, n, svg_text};
+use crate::svg::{MONO, SANS, area, clip, count, n, svg_text};
 
 const MONTHS: [&str; 12] = [
     "January",
@@ -118,7 +119,16 @@ fn header(
 }
 
 fn hero(s: &mut String, w: &WrappedStats, p: &Palette, x: f64, y: f64, size: u32) {
-    text(s, x, y, size, 800, p.accent, "s", &group(w.commits as u64));
+    text(
+        s,
+        x,
+        y,
+        size,
+        800,
+        p.accent,
+        "s",
+        &thousands(w.commits as u64),
+    );
     // The number is drawn large above, so the noun stands alone and must still agree with it.
     let noun = if w.commits == 1 {
         "commit this year"
@@ -135,7 +145,7 @@ fn tile(s: &mut String, x: f64, y: f64, label: &str, value: &str, p: &Palette, b
 
 fn facts(w: &WrappedStats) -> Vec<(&'static str, String)> {
     let mut v = vec![
-        ("Active days", group(w.active_days as u64)),
+        ("Active days", thousands(w.active_days as u64)),
         (
             "Longest streak",
             count(w.longest_streak as u64, "day", "days"),
@@ -178,7 +188,7 @@ fn authors(s: &mut String, w: &WrappedStats, p: &Palette, x: f64, y: f64, width:
             n(x + width),
             n(ry),
             p.muted,
-            group(*c as u64)
+            thousands(*c as u64)
         );
         let bw = (width * *c as f64 / max).max(6.0);
         let _ = write!(

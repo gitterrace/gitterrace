@@ -263,7 +263,7 @@ impl<'a> Counted<'a> {
     fn item(&self, c: CommitRow, rows: Vec<FileRow>, lines: Option<Lines>) -> Item {
         Item {
             person: self.ins.person_of(c.ident),
-            day: self.cx.local_day(c.time, c.offset),
+            day: crate::feed::local_day_of(c.time, c.offset),
             hour: self.cx.local_hour(c.time, c.offset),
             lines: lines.unwrap_or_else(|| self.ins.commit_sums(c.rank)),
             rows,

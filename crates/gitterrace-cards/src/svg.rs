@@ -11,11 +11,6 @@ pub(crate) fn svg_text(s: &str) -> String {
     gitterrace_types::esc(&clean)
 }
 
-/// Thousands separators: 12345 -> "12,345".
-pub(crate) fn group(n: u64) -> String {
-    gitterrace_index::thousands(n)
-}
-
 /// Shortens `s` to at most `max` characters with an ellipsis.
 pub(crate) fn clip(s: &str, max: usize) -> String {
     if s.chars().count() <= max {

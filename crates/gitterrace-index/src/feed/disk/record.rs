@@ -155,10 +155,6 @@ pub(super) fn parse(c: &mut Cursor<'_>, mut files: Option<&mut Vec<FileRow>>) ->
     })
 }
 
-pub(super) fn oid(id: &str) -> SegResult<Oid> {
-    oid_of(id)
-}
-
 pub(super) fn oid_of(id: &str) -> SegResult<Oid> {
     crate::store::oid_of(id).ok_or_else(|| SegError::BadName(format!("commit id {id:?}")))
 }

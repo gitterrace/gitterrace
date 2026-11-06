@@ -5,14 +5,14 @@ use std::io::{BufWriter, Read, Write};
 use std::path::{Path, PathBuf};
 
 use crate::CommitRecord;
-use crate::feed::disk::record::{oid, oid_of};
+use crate::feed::disk::record::oid_of;
 use crate::feed::disk::{MAX_RECORD, OID_ENTRY, Sink, columns};
 use crate::seg::bounds::MAX_BLOCK;
 use crate::seg::format::section;
 use crate::seg::{Oid, SegError, SegResult};
 
 fn encode(out: &mut Vec<u8>, r: &CommitRecord, w: &Ids<'_>) -> SegResult<()> {
-    let oid = oid(&r.id)?;
+    let oid = oid_of(&r.id)?;
     out.extend_from_slice(&oid);
     out.extend_from_slice(&w.who.to_le_bytes());
     out.extend_from_slice(&r.time.to_le_bytes());
@@ -131,7 +131,7 @@ impl RowWriter {
         }
         self.cols.push(&columns::item(r, who, kind, scope))?;
         let ord = u32::try_from(self.offsets.len()).unwrap_or(u32::MAX);
-        self.oids.push((oid(&r.id)?, ord));
+        self.oids.push((oid_of(&r.id)?, ord));
         self.offsets.push(self.len);
         self.spool.write_all(&self.buf)?;
         self.len += self.buf.len() as u64;

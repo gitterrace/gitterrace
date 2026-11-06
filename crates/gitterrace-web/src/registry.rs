@@ -74,8 +74,11 @@ pub fn state_dir() -> Option<PathBuf> {
 /// A path may now hold another project, and reading an id
 /// walks the whole history (seconds on a large clone). A caller narrows by the recorded id,
 /// then reads the candidate's own id before trusting it.
+/// A missing file is empty; a corrupt one is too, since the next serve rewrites it.
 pub fn candidates(dir: &Path) -> io::Result<Vec<Entry>> {
-    read_raw(dir)
+    Ok(gitterrace_git::read_no_follow(dir, FILE)?
+        .map(|b| serde_json::from_slice(&b).unwrap_or_default())
+        .unwrap_or_default())
 }
 
 /// Records `repos` as served now. A repository without commits has no id and is skipped.
@@ -88,7 +91,7 @@ pub fn record(dir: &Path, repos: &[&Repo]) -> io::Result<()> {
         .filter_map(|r| Some((r.id()?, r.root())))
         .collect();
     let _held = writing();
-    let mut all = read_raw(dir)?;
+    let mut all = candidates(dir)?;
     for (id, path) in ids {
         let name = all
             .iter()
@@ -120,7 +123,7 @@ pub(crate) fn claim(
     taken: &dyn Fn(&str) -> bool,
 ) -> io::Result<String> {
     let _held = writing();
-    let mut all = read_raw(dir)?;
+    let mut all = candidates(dir)?;
     if let Some(e) = all.iter().find(|e| e.path == root && !e.name.is_empty()) {
         return Ok(e.name.clone());
     }
@@ -148,7 +151,7 @@ pub(crate) fn claim(
 /// with no id recorded, so a served repository keeps its name.
 pub(crate) fn forget(dir: &Path, root: &Path) -> io::Result<()> {
     let _held = writing();
-    let mut all = read_raw(dir)?;
+    let mut all = candidates(dir)?;
     let before = all.len();
     all.retain(|e| e.path != root || !e.id.is_empty());
     if all.len() == before {
@@ -252,14 +255,6 @@ pub fn add_token(dir: &Path, port: u16) -> io::Result<String> {
     }
     let head = &bytes[..bytes.len().min(256)];
     Ok(String::from_utf8_lossy(head).trim().to_owned())
-}
-
-/// Every entry as written, unchecked. A missing file is empty; a corrupt one is too, since
-/// the next serve rewrites it.
-fn read_raw(dir: &Path) -> io::Result<Vec<Entry>> {
-    Ok(gitterrace_git::read_no_follow(dir, FILE)?
-        .map(|b| serde_json::from_slice(&b).unwrap_or_default())
-        .unwrap_or_default())
 }
 
 fn private_dir(dir: &Path) -> io::Result<()> {

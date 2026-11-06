@@ -87,7 +87,7 @@ fn contributors(set: &Counted<'_>, metric: Metric) -> ContributorReport {
             if !people.acc.contains_key(&who) {
                 continue;
             }
-            let day = set.context().local_day(row.time, row.offset);
+            let day = crate::feed::local_day_of(row.time, row.offset);
             let e = first_day.entry(who).or_insert(i64::MAX);
             *e = (*e).min(day);
         }

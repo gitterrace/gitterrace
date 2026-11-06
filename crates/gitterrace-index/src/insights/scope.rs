@@ -226,11 +226,6 @@ impl CountContext {
         self.anchor_day
     }
 
-    /// Days since 1970-01-01 in the commit's own offset.
-    pub const fn local_day(&self, time: i64, offset: i32) -> i64 {
-        feed::local_day_of(time, offset)
-    }
-
     /// Hour 0..24 in the commit's own offset.
     pub fn local_hour(&self, time: i64, offset: i32) -> usize {
         usize::try_from(feed::local_time_of(time, offset).rem_euclid(DAY) / 3600).unwrap_or(0)
