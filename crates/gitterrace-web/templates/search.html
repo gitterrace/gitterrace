@@ -9,6 +9,7 @@
 <label>Files <input name="glob" value="{{ glob }}" placeholder="*.rs, src/**" aria-label="Path glob"></label>
 <label>Rev <input name="rev" value="{{ rev }}" aria-label="Revision"></label>
 {% if searched && error.is_none() %}<span class="muted sum">{{ summary }} in {{ ms }} ms{% if capped %}. Showing the first results only, narrow the query to see more.{% endif %}</span>{% endif %}
+<button type="submit" hidden>Search</button>
 </div></form>
 {% if let Some(e) = error %}<p class="err">{{ e }}</p>{% endif %}
 {% if searched && error.is_none() %}

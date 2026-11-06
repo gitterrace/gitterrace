@@ -159,6 +159,16 @@ async fn serves_every_page() {
         .update(&app.repo, "HEAD", &|_| {})
         .expect("update");
     app.mark_ready();
+    // Forms with several fields only submit on Enter through a default button, kept hidden.
+    for (u, name) in [("/compare", "cmp"), ("/search", "searchbar")] {
+        let (_, page) = get(&app, u).await;
+        let f = page.split(&format!("<form class=\"{name}\"")).nth(1);
+        let f = f
+            .and_then(|f| f.split("</form>").next())
+            .unwrap_or_default();
+        assert!(f.contains("<button type=\"submit\" hidden>"), "{u}");
+        assert_eq!(f.matches("<button").count(), 1, "{u}");
+    }
     for u in [
         "/stats",
         "/stats?type=fix&period=1y",
