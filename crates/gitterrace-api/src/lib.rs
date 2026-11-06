@@ -22,7 +22,7 @@ pub use http::{index_body, router};
 pub use insights::{
     HEAD_INSIGHTS, INSIGHTS, Insight, OWNERSHIP_DEPTH, Params, list as insight_list,
 };
-pub use mcp::{McpServer, ToolDoc, serve_mcp, tool_on};
+pub use mcp::{McpRepo, McpServer, ToolDoc, serve_mcp, serve_mcp_repos, tool_on};
 
 #[cfg(test)]
 mod limit_tests;

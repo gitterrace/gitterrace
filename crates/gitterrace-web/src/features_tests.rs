@@ -392,6 +392,10 @@ async fn a_public_server_keeps_its_gates() {
 
 /// The web's `/api/v1` route each MCP tool answers the same question as.
 const TOOL_ROUTES: &[(&str, &str)] = &[
+    // A switch mapping, not a data one: list_repos answers what the server-wide `/api/repos`
+    // lists, but that route also needs `picker`, while the tool needs only `api_enabled`, the
+    // one switch `/api/v1/repo` needs too.
+    ("list_repos", "/api/v1/repo"),
     ("repo_overview", "/api/v1/repo"),
     ("log", "/api/v1/log"),
     ("show_commit", "/api/v1/commits/{id}"),
