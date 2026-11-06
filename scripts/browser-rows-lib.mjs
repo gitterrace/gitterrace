@@ -72,9 +72,23 @@ export function checks(env) {
         const where = `small-layout ${name} ${width}`;
         if (seen === up) r.ok(`${where}: '..' row ${up ? 'shown' : 'hidden'}`);
         else r.fail(`${where}: '..' row visible=${seen}, want ${up}`);
-        const nav = await p.$eval('.tabnav a[href$="/refs"]', (a) => a.innerText.replace(/\s+/g, ' ').trim().toLowerCase());
+        // The visible label: text of a part clipped to 1px (kept for the accessible name) is not
+        // shown, so it is left out here and checked through the accessible name below.
+        const nav = await p.$eval('.tabnav a[href$="/refs"]', (a) => {
+          const c = /** @type {HTMLElement} */ (a.cloneNode(true));
+          for (const m of Array.from(a.querySelectorAll('*'))) {
+            const s = getComputedStyle(m);
+            const hidden = s.display === 'none' || (s.position === 'absolute' && m.getBoundingClientRect().width <= 1);
+            if (hidden) c.querySelector(`.${Array.from(m.classList).join('.')}`)?.remove();
+          }
+          return (c.textContent || '').replace(/\s+/g, ' ').trim().toLowerCase();
+        });
         if (nav === label.toLowerCase()) r.ok(`${where}: nav says ${label}`);
         else r.fail(`${where}: nav says '${nav}', want '${label}'`);
+        // Hidden text stays in the accessible name: a narrow nav still reads 'Branches & Tags'.
+        const named = await p.getByRole('link', { name: 'Branches & Tags', exact: true }).count();
+        if (named === 1) r.ok(`${where}: refs tab is named Branches & Tags`);
+        else r.fail(`${where}: refs tab accessible name lost '& Tags' (${named} matches)`);
         await p.goto(srv.base + '/', { waitUntil: 'load' });
         const text = await p.evaluate(() => document.body.innerText);
         const inHead = await p.$('aside h3 a.more');

@@ -218,3 +218,29 @@ fn a_chart_of_links_is_one_tab_stop() {
         "a chart without links takes no stop"
     );
 }
+
+#[test]
+fn a_short_per_commit_axis_still_names_its_first_and_last_day() {
+    for n in 2..=9 {
+        let pts: Vec<(String, u64)> = (0..n)
+            .map(|i| (format!("2026-11-{:02}", 1 + i / 3), 1))
+            .collect();
+        let svg = bars(&pts, COMMITS).to_string();
+        let shown: Vec<&str> = svg
+            .split(r#"class="ax""#)
+            .skip(1)
+            .filter_map(|t| t.split('>').nth(1).and_then(|t| t.split('<').next()))
+            .filter(|t| t.starts_with("2026") || t.contains("Nov"))
+            .collect();
+        let first = &pts[0].0;
+        let last = &pts[pts.len() - 1].0;
+        let named = |d: &str| {
+            shown
+                .iter()
+                .any(|s| d.ends_with(&s[s.len().saturating_sub(2)..]))
+        };
+        assert!(!shown.is_empty(), "{n}: no day labels in {svg}");
+        assert!(named(first), "{n}: first day {first} unnamed in {shown:?}");
+        assert!(named(last), "{n}: last day {last} unnamed in {shown:?}");
+    }
+}
