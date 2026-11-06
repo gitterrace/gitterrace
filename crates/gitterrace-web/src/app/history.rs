@@ -13,12 +13,21 @@ impl App {
         {
             return Ok(v);
         }
-        let list: Vec<String> = gitterrace_git::files(&self.repo, commit)?
+        let mut list: Vec<String> = gitterrace_git::files(&self.repo, commit)?
             .into_iter()
             .map(|f| f.path)
             .collect();
+        // Without a ready index the list stays alphabetical and is not kept, so the next call
+        // looks again once the records exist.
+        let ranked = self.accelerate(commit, |s| last_touched(&**s))?;
+        if let Some(touched) = &ranked {
+            // Stable: files never touched, or tied, keep their alphabetical order.
+            list.sort_by_key(|p| std::cmp::Reverse(touched.get(p).copied()));
+        }
         let list = Arc::new(list);
-        if let Ok(mut g) = self.caches.file_lists.lock() {
+        if ranked.is_some()
+            && let Ok(mut g) = self.caches.file_lists.lock()
+        {
             g.put(commit.to_owned(), Arc::clone(&list));
         }
         Ok(list)
@@ -149,6 +158,31 @@ impl App {
     }
 }
 
+/// The author time of the newest commit whose diff names each path.
+fn last_touched(
+    src: &dyn gitterrace_index::feed::InsightsSource,
+) -> std::collections::HashMap<String, i64> {
+    use gitterrace_index::feed::CommitRange;
+    let times: std::collections::HashMap<_, _> = src
+        .commits_in(CommitRange::All)
+        .map(|c| (c.rank, c.time))
+        .collect();
+    let ranks: Vec<_> = times.keys().copied().collect();
+    let mut ranks = ranks;
+    ranks.sort_unstable();
+    let mut out = std::collections::HashMap::new();
+    for (rank, rows) in src.rows_for(ranks) {
+        let time = times.get(&rank).copied().unwrap_or_default();
+        for f in &rows {
+            if let Some(p) = src.path(f.path) {
+                let t = out.entry(p.to_string()).or_insert(time);
+                *t = (*t).max(time);
+            }
+        }
+    }
+    out
+}
+
 /// A path's log from the index: `ids` newest first. When not `complete`, an unreadable commit
 /// cut it short and only the pages inside `ids` may be served from it.
 pub(crate) struct PathLog {
@@ -197,4 +231,43 @@ fn touching_history(
         .collect();
     out.reverse();
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use gitterrace_testkit::git;
+
+    use crate::app::App;
+
+    /// The finder lists recently changed files first. Files changed at the same time, or never
+    /// touched since, keep their alphabetical order.
+    #[test]
+    fn file_paths_list_the_newest_touched_first() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let p = dir.path();
+        git(p, &["init", "-q", "-b", "main"]);
+        for (name, date) in [
+            ("a.txt", "2020-01-01T00:00:00"),
+            ("b.txt", "2020-01-02T00:00:00"),
+            ("c.txt", "2020-01-03T00:00:00"),
+        ] {
+            std::fs::write(p.join(name), "x\n").expect("write");
+            git(p, &["add", "."]);
+            git(p, &["commit", "-q", "-m", "feat: x", "--date", date]);
+        }
+        let repo = gitterrace_git::Repo::discover(p).expect("repo");
+        let index = gitterrace_index::Index::open(&repo).expect("index");
+        let app = Arc::new(App::new(repo, index));
+        let head = app.repo.resolve("HEAD").expect("head");
+        let before = app.file_paths(&head).expect("files");
+        assert_eq!(*before, ["a.txt", "b.txt", "c.txt"], "no index yet");
+        app.index
+            .update(&app.repo, "HEAD", &|_| {})
+            .expect("update");
+        app.mark_ready();
+        let after = app.file_paths(&head).expect("files");
+        assert_eq!(*after, ["c.txt", "b.txt", "a.txt"]);
+    }
 }
