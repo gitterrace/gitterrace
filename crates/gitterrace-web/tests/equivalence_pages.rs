@@ -133,6 +133,45 @@ fn every_cell_matches_the_oracle() {
     oracle::check(&golden, &dump(&golden), &answers);
 }
 
+/// Ids an HTML body gives more than once. A repeated id sends a `#fragment`, a label or a
+/// script to whichever element comes first.
+fn duplicate_ids(body: &str) -> Vec<String> {
+    let mut seen = std::collections::BTreeSet::new();
+    let mut twice = std::collections::BTreeSet::new();
+    for part in body.split(" id=\"").skip(1) {
+        let id = part.split('"').next().unwrap_or_default();
+        if !seen.insert(id) {
+            twice.insert(id.to_owned());
+        }
+    }
+    twice.into_iter().collect()
+}
+
+#[test]
+fn no_page_gives_an_id_twice() {
+    assert_eq!(
+        duplicate_ids(r#"<a id="x"></a><b id="y"></b><i id="x"></i>"#),
+        ["x"]
+    );
+    if !oracle::frozen("no_page_gives_an_id_twice") {
+        return;
+    }
+    let rt = tokio::runtime::Runtime::new().expect("runtime");
+    let bad: Vec<String> = rt
+        .block_on(golden_answers())
+        .iter()
+        .filter_map(|(key, body)| {
+            let d = duplicate_ids(body);
+            (!d.is_empty()).then(|| format!("{key}: {d:?}"))
+        })
+        .collect();
+    assert!(
+        bad.is_empty(),
+        "pages with a repeated id:\n{}",
+        bad.join("\n")
+    );
+}
+
 /// The per-commit proof that the pairwise golden loses nothing: at this build, run the full
 /// product and the golden's cell set, then compare every shared key. Writes counts and the
 /// differences, classified chrome-only, tie-only or lost, to `$TEST_GOLDEN_PROOF`, and fails
