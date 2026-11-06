@@ -287,3 +287,47 @@ async fn a_dropped_event_still_shows_within_the_rescan() {
         "a change showed between rescans with events off"
     );
 }
+
+/// Guard class: a commit and a working tree edit reach an open tab's event stream within
+/// `watch.rescan_secs`, with OS file events on and with them off (the rescan alone). Red when
+/// the refresher sleeps through a git or worktree change, whatever wake path broke.
+#[tokio::test]
+async fn an_open_tab_hears_a_commit_and_an_edit_within_the_rescan() {
+    let _one = SERIAL.lock().await;
+    for os in [true, false] {
+        let dir = tempfile::tempdir().expect("tmp");
+        let p = repo(dir.path(), "r");
+        let a = app(&p, with(|c| c.watch.rescan_secs = 5));
+        a.os_events.store(os, std::sync::atomic::Ordering::Release);
+        let task = tokio::spawn(crate::app::keep_index_fresh(Arc::clone(&a)));
+        // The tab opens on an idle refresher, as a browser does: it must wake for the tab.
+        tokio::time::sleep(Duration::from_millis(1500)).await;
+        // What `/events?wt=1` holds: a subscription and a worktree watch.
+        let mut rx = a.changes.subscribe();
+        let _wt = crate::live::WorktreeWatch::new(&a);
+        tokio::time::sleep(Duration::from_millis(300)).await;
+        let bound = Duration::from_secs(5 + 5);
+        let mut hears = async |kind: &str| {
+            let end = tokio::time::Instant::now() + bound;
+            while let Ok(Ok(c)) = tokio::time::timeout_at(end, rx.recv()).await {
+                if c.kinds.contains(&kind) {
+                    return true;
+                }
+            }
+            false
+        };
+        // The edit comes first: a scan that starts late takes it as its baseline and the tab
+        // never hears it.
+        std::fs::write(p.join("small.txt"), "edited\n").expect("write");
+        assert!(
+            hears("worktree").await,
+            "events {os}: no edit within {bound:?}"
+        );
+        git(&p, &["commit", "-q", "--allow-empty", "-m", "chore: live"]);
+        assert!(
+            hears("refs").await,
+            "events {os}: no commit within {bound:?}"
+        );
+        task.abort();
+    }
+}

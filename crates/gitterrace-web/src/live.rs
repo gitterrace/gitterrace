@@ -110,6 +110,7 @@ impl WorktreeWatch {
     pub(crate) fn new(app: &Arc<App>) -> Self {
         app.wt_watchers
             .fetch_add(1, std::sync::atomic::Ordering::AcqRel);
+        app.wake.notify_one();
         Self(Arc::clone(app))
     }
 }
@@ -191,6 +192,7 @@ pub(crate) async fn events(State(app): State<Arc<App>>, Query(q): Query<EventsQu
             .into_response();
     };
     let rx = app.changes.subscribe();
+    app.wake.notify_one();
     // A page that was rendered before the newest change missed it, which also covers a
     // reconnect after a pause.
     let now = app.version();

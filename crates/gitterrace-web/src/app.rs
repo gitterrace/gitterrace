@@ -262,8 +262,8 @@ pub(crate) struct App {
     _stop_tx: Arc<watch::Sender<bool>>,
     /// Digest of the last fingerprint, so a stream that reconnects can tell it missed something.
     version: AtomicU64,
-    /// Wakes the refresher: a revision was queued, or a page asked for the index.
-    wake: Notify,
+    /// Wakes the refresher: a revision was queued, the index is needed, or a tab started.
+    pub(crate) wake: Notify,
     /// Tells the warm-up that the index moved.
     refreshed: Notify,
     /// A page that needs the index was asked for, see `index.build_on_start`.

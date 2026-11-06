@@ -82,6 +82,11 @@ impl Events {
         self.pending.swap(false, Ordering::AcqRel) || self.polling()
     }
 
+    /// Whether a scan is owed, without clearing it.
+    pub(crate) fn pending(&self) -> bool {
+        self.pending.load(Ordering::Acquire)
+    }
+
     /// Whether working tree scans run on a timer because events are unavailable.
     pub(crate) fn polling(&self) -> bool {
         self.polling.load(Ordering::Acquire)

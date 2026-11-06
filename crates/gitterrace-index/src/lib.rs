@@ -222,7 +222,7 @@ impl Index {
         // Gone before the set can change, written back once it holds exactly `tip`: a crash in
         // between leaves no marker, so the next open checks the set the slow way.
         cache::remove(&self.dir, TIP_FILE)?;
-        let seg = |e: seg::SegError| io::Error::other(e.to_string());
+        let seg = seg_io;
         let previous = seg::manifest::Manifest::load(&self.dir).map_err(seg)?;
         let held = self.held()?;
         let todo = todo(&order, &held);
@@ -300,7 +300,7 @@ impl Index {
 
     /// The commits the segment set holds, empty without a set.
     fn held(&self) -> io::Result<HashSet<seg::Oid>> {
-        let seg = |e: seg::SegError| io::Error::other(e.to_string());
+        let seg = seg_io;
         let Some(store) = seg::read::Store::open(&self.dir).map_err(seg)? else {
             return Ok(HashSet::new());
         };
@@ -321,7 +321,7 @@ impl Index {
         let dir = self.dir.clone();
         let (order, shallow) = (order.to_vec(), shallow.to_vec());
         let run = move || -> io::Result<bool> {
-            let seg = |e: seg::SegError| io::Error::other(e.to_string());
+            let seg = seg_io;
             let Some(store) = seg::read::Store::open(&dir).map_err(seg)? else {
                 return Ok(false);
             };
@@ -372,7 +372,7 @@ impl Index {
     #[cfg(any(test, feature = "oracle"))]
     pub fn records(&self, source: &dyn CommitSource, rev: &str) -> io::Result<Vec<CommitRecord>> {
         self.writable()?;
-        let seg = |e: seg::SegError| io::Error::other(e.to_string());
+        let seg = seg_io;
         let order = source.rev_list(rev)?;
         let Some(store) = seg::read::Store::open(&self.dir).map_err(seg)? else {
             return Ok(Vec::new());
@@ -392,6 +392,15 @@ impl Index {
             r.time = plausible_time(r.time, latest);
         }
         Ok(records)
+    }
+}
+
+/// A store error as an `io::Error`. An unreadable file stays a [`feed::SourceError`], so a
+/// caller of [`Index::update`] can tell "rebuild" from any other failure.
+fn seg_io(e: seg::SegError) -> io::Error {
+    match e {
+        seg::SegError::Unreadable { .. } => feed::SourceError::io(e),
+        e => io::Error::other(e.to_string()),
     }
 }
 

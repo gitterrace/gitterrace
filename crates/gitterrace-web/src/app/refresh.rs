@@ -89,7 +89,13 @@ pub(crate) async fn keep_index_fresh(app: Arc<App>) {
         // Only a poll for missing events runs on this loop's own timer; otherwise the events (and
         // their safety timers) are the only wakes, so an idle server sleeps for `rescan_secs`.
         let poll = on && (git_events.polling() || (listening && events.polling()));
+        // A new tab's baseline is owed now: taken at the next event, that change is never heard.
+        let owed = events.pending()
+            || (listening && wt_seen.is_none() && app.wt_watchers.load(Ordering::Acquire) > 0);
         let tick = async {
+            if owed {
+                return;
+            }
             if poll {
                 tokio::time::sleep(POLL_FALLBACK).await;
             } else {
@@ -136,9 +142,8 @@ pub(crate) async fn keep_index_fresh(app: Arc<App>) {
             if wt_seen.is_some() && sig.is_some() && sig != wt_seen {
                 kinds.push("worktree");
             }
-            if sig.is_some() {
-                wt_seen = sig;
-            }
+            // A failed scan still counts as the baseline, so an owed baseline never spins.
+            wt_seen = sig.or(wt_seen).or(Some(0));
         }
         if !kinds.is_empty() {
             check_head |= kinds.iter().any(|k| matches!(*k, "head" | "refs"));
@@ -184,6 +189,15 @@ async fn refresh(app: &Arc<App>, rev: &str, warm: Option<&str>) {
     .await;
     match run {
         Ok(Ok(())) => {}
+        // A damaged cache met while updating: the loop sleeps until an event, so start the
+        // rebuild here rather than wait for a page to meet it too.
+        Ok(Err(e)) if gitterrace_index::feed::SourceError::of(&e).is_some() => {
+            tracing::warn!("cache unreadable while updating {rev}, rebuilding: {e}");
+            if let Err(e) = app.unreadable_now() {
+                tracing::warn!("rebuilding the unreadable cache failed: {e}");
+            }
+            return;
+        }
         Ok(Err(e)) => return tracing::warn!("index update for {rev} failed: {e}"),
         Err(e) => return tracing::warn!("index task failed: {e}"),
     }
