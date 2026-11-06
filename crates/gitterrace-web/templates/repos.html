@@ -19,10 +19,12 @@
 <span class="reponame">Repositories</span>
 </div></div></header>
 <main class="wrap" id="main" tabindex="-1">
-<div class="card files-card"><table class="entries" data-last>
-<tr class="th"><td>Repository</td><td>Last commit</td><td class="r">Updated</td><td class="r">Recent commits</td></tr>
-{% for r in rows %}<tr><td><a href="{{ r.href }}"><span class="ico dir"></span>{{ r.name }}</a></td><td class="lc muted"><a class="subj" href="{{ r.commit_href }}">{{ r.subject }}</a></td><td class="muted r">{{ r.when }}</td><td class="sparkcell r" data-tip="{{ r.tip }}"><svg class="spark s1" viewBox="0 0 90 20" width="90" height="20" aria-hidden="true"><polyline points="{{ r.spark }}"/></svg><span class="muted">{{ r.total }}</span></td></tr>{% endfor %}
-</table></div>
+<div class="card repolist">
+{{ head }}
+<ul class="repos">
+{% for r in rows %}<li class="reporow"><div class="rtop"><a class="rname" href="{{ r.href }}">{{ r.name }}</a>{% if let Some(d) = r.dirty %}{% if d %}<a class="wtchip" href="{{ r.href }}worktree" data-tip="Uncommitted changes in the working tree"><span class="dot"></span><span class="label">Uncommitted</span></a>{% endif %}{% endif %}<span class="rmeta"><span class="muted">{{ r.when }}</span><span class="sparkcell" data-tip="{{ r.tip }}"><svg class="spark s1" viewBox="0 0 90 20" width="90" height="20" aria-hidden="true"><polyline points="{{ r.spark }}"/></svg><span class="muted">{{ r.total }}</span></span></span></div>
+<a class="today" href="{{ r.commit_href }}" data-tip="{{ r.today }}">{{ r.today }}</a></li>
+{% endfor %}</ul></div>
 </main>
 </body>
 </html>

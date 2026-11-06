@@ -199,3 +199,40 @@ async fn a_single_repository_lives_under_its_name() {
         "no unprefixed pages"
     );
 }
+
+/// The repositories home leads with today: a repository with a commit from this hour says how
+/// many landed and the newest subject, a quiet one says so, and uncommitted work shows its dot.
+#[tokio::test]
+async fn the_repositories_home_says_what_changed_today() {
+    let dir = tempfile::tempdir().expect("tmp");
+    let a = fixture("alpha", dir.path());
+    // The fixture commits now; beta is rebuilt with one commit years ago, so it is quiet.
+    let b = dir.path().join("beta");
+    std::fs::create_dir_all(b.join("src")).expect("mkdir");
+    gitterrace_testkit::git(&b, &["init", "-q", "-b", "main"]);
+    std::fs::write(b.join("src/a.rs"), "fn main() {}\n").expect("write");
+    gitterrace_testkit::git(&b, &["add", "-A"]);
+    gitterrace_testkit::git_at(&b, "2020-01-01T12:00:00Z", &["commit", "-qm", "feat: old"]);
+    std::fs::write(b.join("src/a.rs"), "// edited, not committed\n").expect("write");
+    let router = crate::multi_router(vec![a, b]).expect("router");
+    let (s, body) = fetch(&router, "/", "localhost").await;
+    assert_eq!(s, 200);
+    assert!(
+        body.contains("2 commits today, last: fix: second"),
+        "{body}"
+    );
+    assert!(body.contains("Quiet today. Last commit"), "{body}");
+    assert!(body.contains("2 repositories, 2 commits today"), "{body}");
+    let beta = &body[body.find("href=\"/r/beta/\"").expect("beta row")..];
+    let beta = &beta[..beta.find("</li>").expect("row end")];
+    assert!(
+        beta.contains("class=\"wtchip\""),
+        "beta has uncommitted work: {beta}"
+    );
+    let alpha = &body[body.find("href=\"/r/alpha/\"").expect("alpha row")..];
+    let alpha = &alpha[..alpha.find("</li>").expect("row end")];
+    assert!(
+        !alpha.contains("class=\"wtchip\""),
+        "alpha is clean: {alpha}"
+    );
+}

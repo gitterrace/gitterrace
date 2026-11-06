@@ -6,8 +6,8 @@
 //! assigned once and kept in the registry (see `registry::claim`).
 
 mod discover;
+mod home;
 
-use std::fmt::Write as _;
 use std::{
     collections::HashMap,
     io,
@@ -15,12 +15,11 @@ use std::{
     sync::{Arc, Mutex, RwLock},
 };
 
-use askama::Template;
 use axum::{
     Router,
     extract::{Request, State},
     http::{StatusCode, Uri},
-    response::{Html, IntoResponse, Redirect, Response},
+    response::{IntoResponse, Redirect, Response},
     routing::get,
 };
 use gitterrace_git::{CommitSummary, Repo};
@@ -34,6 +33,7 @@ use crate::{fmt, spark};
 /// The index sparkline's longest window, half a year.
 /// Not configurable: a chart definition (the span a sparkline shows), not a resource limit.
 const SPARK_CAP: i64 = 26 * spark::WEEK;
+const DAY: i64 = 86_400;
 
 /// One served repository: its URL name and where it lives.
 pub(crate) struct Served {
@@ -55,6 +55,8 @@ pub(crate) struct Served {
 struct Recent {
     last: Option<CommitSummary>,
     series: spark::Series,
+    /// Commits since the local midnight of the newest commit's zone.
+    today: u32,
 }
 
 /// The repository table. A URL name resolves only through this map, never by joining it
@@ -94,24 +96,6 @@ pub(crate) enum Added {
         name: String,
         base: String,
     },
-}
-
-#[derive(Template)]
-#[template(path = "repos.html")]
-struct IndexPage {
-    rows: Vec<IndexRow>,
-}
-
-struct IndexRow {
-    name: String,
-    href: String,
-    subject: String,
-    when: crate::when::When,
-    commit_href: String,
-    spark: String,
-    /// Commits in the sparkline's window.
-    total: u32,
-    tip: String,
 }
 
 #[derive(serde::Serialize)]
@@ -376,7 +360,10 @@ impl Served {
             .and_then(|l| l.into_iter().next());
         // Days end at local midnight of the newest commit's zone, as on the sidebar.
         let offset = last.as_ref().map_or(0, |c| c.author.offset);
+        let day_start = spark::End::local(now, offset).day_end - DAY;
+        let today = u32::try_from(times.iter().filter(|t| **t >= day_start).count()).unwrap_or(0);
         let r = Arc::new(Recent {
+            today,
             series: spark::series(times, first, spark::End::local(now, offset), SPARK_CAP),
             last,
         });
@@ -426,7 +413,7 @@ fn valid_name(name: &str) -> bool {
 /// Index at `/`, the switcher list, shared assets, and every repository under `/r/NAME`.
 pub(crate) fn router(table: Arc<Table>) -> Router {
     Router::new()
-        .route("/", get(index))
+        .route("/", get(home::index))
         .route("/api/repos", get(repos_json))
         .route("/r/{name}", get(slash))
         .route("/r/{name}/", axum::routing::any(dispatch))
@@ -490,68 +477,6 @@ fn repo_router(
 ) -> io::Result<(Router, Vec<tokio::task::AbortHandle>)> {
     let base = format!("/r/{}", served.name);
     crate::repo_router_tasks(&served.path, base, served.name.clone(), live, env)
-}
-
-/// Bucket counts as a polyline across a 90x20 box, scaled to `max`.
-fn polyline(counts: &[u32], max: u32) -> String {
-    let max = max.max(1);
-    let one = [counts.first().copied().unwrap_or(0); 2];
-    let counts = if counts.len() < 2 { &one[..] } else { counts };
-    let mut pts = String::new();
-    for (i, n) in counts.iter().enumerate() {
-        let x = i as f64 * 90.0 / (counts.len() - 1) as f64;
-        let y = 19.0 - f64::from(*n) * 18.0 / f64::from(max);
-        let _ = write!(pts, "{x:.1},{y:.1} ");
-    }
-    pts.trim_end().to_owned()
-}
-
-/// `/`: the one repository while there is one (a 302, so the answer changes once another
-/// joins), else the index of all.
-async fn index(State(table): State<Arc<Table>>) -> crate::error::Result<Response> {
-    if let [one] = table.snapshot().as_slice() {
-        let to = format!("/r/{}/", one.name);
-        return Ok((StatusCode::FOUND, [(axum::http::header::LOCATION, to)]).into_response());
-    }
-    let html = tokio::task::spawn_blocking(move || {
-        let now = fmt::now();
-        let rows = table
-            .snapshot()
-            .iter()
-            .map(|s| {
-                let href = format!("/r/{}/", s.name);
-                let r = s.recent(now);
-                let c = r.last.as_ref();
-                let counts = &r.series.counts;
-                let peak = counts.iter().copied().max().unwrap_or(0);
-                let total: u32 = counts.iter().sum();
-                IndexRow {
-                    name: s.name.clone(),
-                    subject: c.map(|c| c.subject.clone()).unwrap_or_default(),
-                    when: c.map_or_else(crate::when::When::none, |c| fmt::ago(c.author.time, now)),
-                    commit_href: c.map_or_else(
-                        || href.clone(),
-                        |c| format!("/r/{}/commit/{}", s.name, c.id),
-                    ),
-                    spark: polyline(counts, peak),
-                    total,
-                    tip: if counts.is_empty() {
-                        "No commits yet.".to_owned()
-                    } else {
-                        format!(
-                            "{}: {}, busiest {peak}.",
-                            r.series.label(),
-                            fmt::count(total, "commit", "commits")
-                        )
-                    },
-                    href,
-                }
-            })
-            .collect();
-        IndexPage { rows }.render()
-    })
-    .await??;
-    Ok(Html(html).into_response())
 }
 
 async fn repos_json(State(table): State<Arc<Table>>) -> Response {
