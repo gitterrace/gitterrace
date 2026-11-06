@@ -41,6 +41,9 @@ struct Result2 {
     commits: Vec<views::CommitRow>,
     more: usize,
     diff_href: String,
+    /// The head commit's short id, the link to it.
+    /// The head commit as the shared sha chip.
+    head_sha: String,
 }
 
 #[derive(Template)]
@@ -243,6 +246,7 @@ fn outcome(
         commits,
         more: cmp.commits.len().saturating_sub(COMPARE_LIST),
         diff_href: href(&format!("/commit/{hi}")),
+        head_sha: fmt::sha_link(hi),
     })
 }
 

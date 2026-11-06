@@ -339,6 +339,12 @@
       });
       keys.s = 2;
     }
+    // A page may name one place its menu opens (compare: the head commit).
+    var open = document.querySelector('meta[name="gt-open"]');
+    if (open) {
+      head("Open");
+      add(open.dataset.label || "Open", "", function () { closeMenu(); location.href = open.content; });
+    }
     // Every view lists the same entries in the same order (the server's one list); an action
     // the selection does not fit stays, disabled, with the server's reason as its tip.
     if (mine.length) { list.appendChild(el("li", "sep")); head("Your actions"); }

@@ -42,5 +42,31 @@ export function checks({ srv, r, browsers, context }) {
       return bad;
     }, HEADS));
   }
-  return { pageHeads };
+  /** Rows of controls: how many direct rows of `root`'s children hold only `n` controls. */
+  const CTL = 'a[href], button, input:not([type=hidden]), select, summary';
+
+
+
+  async function compareHeads() {
+    await each('compare', '/compare?base=HEAD~2&head=HEAD', (p) => p.evaluate((ctl) => {
+      const bad = [];
+      const form = document.querySelector('form.cmp');
+      const head = document.querySelector('main .head');
+      if (!form || !head || !head.contains(form)) bad.push('the form is not in the title row');
+      // No row of one control: every direct child of main that holds controls holds more than one,
+      // except the KPI row, whose head sha is a link in a row of figures.
+      for (const e of document.querySelectorAll('main > p.hint')) {
+        if (e.querySelectorAll(ctl).length === 1 && /Open the head commit/.test(e.textContent)) bad.push('Open the head commit has a row of its own');
+      }
+      if (!document.querySelector('.kpis a[href*="/commit/"]')) bad.push('no link on the head sha');
+      const h = head && head.getBoundingClientRect(), f = form && form.getBoundingClientRect();
+      if (h && f && innerWidth > 600 && f.top - h.top > h.height) bad.push('the form wraps below the title');
+      return bad;
+    }, CTL), [1440, 900]);
+    await each('compare phone', '/compare?base=HEAD~2&head=HEAD', (p) => p.evaluate(() => {
+      const form = document.querySelector('form.cmp'), head = document.querySelector('main .head');
+      return form && head && head.contains(form) ? [] : ['the form is not in the title row'];
+    }), [390]);
+  }
+  return { pageHeads, compareHeads };
 }
