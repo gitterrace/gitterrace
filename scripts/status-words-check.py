@@ -56,11 +56,13 @@ def scan_comments(text: str, name: str, marker: str) -> list[str]:
         at = line.find(marker)
         if at < 0 or (marker == "#" and line.startswith("#!")):
             continue
-        if at > 0 and not line[:at].strip() == "" and f" {marker}" not in line[at - 1 :]:
+        if at > 0 and line[:at].strip() != "" and f" {marker}" not in line[at - 1 :]:
             continue
         m = HISTORY.search(line[at:])
         if m and f"{name}:{i}" not in ALLOW:
-            out.append(f"{name}:{i}: comment looks back ('{m.group(0)}'), say what holds now")
+            out.append(
+                f"{name}:{i}: comment looks back ('{m.group(0)}'), say what holds now"
+            )
     return out
 
 
@@ -93,10 +95,16 @@ def self_test() -> int:
         "a clean checkout",
     ]
     ok = all(scan(b, "x") for b in bad) and not any(scan(g, "x") for g in good)
-    red = ["// no longer needed", "    /// used to be slow", "let a = 1; // previously 2"]
+    red = [
+        "// no longer needed",
+        "    /// used to be slow",
+        "let a = 1; // previously 2",
+    ]
     ok = ok and all(scan_comments(c, "x", "//") for c in red)
     ok = ok and bool(scan_comments("# was changed", "x", "#"))
-    ok = ok and not scan_comments("// the cache holds now\nlet s = \"no longer\";", "x", "//")
+    ok = ok and not scan_comments(
+        '// the cache holds now\nlet s = "no longer";', "x", "//"
+    )
     ok = ok and not scan_comments("#!/bin/sh -e", "x", "#")
     print("self-test", "ok" if ok else "FAILED")
     return 0 if ok else 1
@@ -110,7 +118,9 @@ def main() -> int:
         text = f.read_text(errors="ignore")
         hits += scan(text, str(f.relative_to(ROOT)))
         if f.suffix in COMMENT_EXTS:
-            hits += scan_comments(text, str(f.relative_to(ROOT)), COMMENT_EXTS[f.suffix])
+            hits += scan_comments(
+                text, str(f.relative_to(ROOT)), COMMENT_EXTS[f.suffix]
+            )
     print("\n".join(hits) or "status-words: ok")
     return 1 if hits else 0
 
