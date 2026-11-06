@@ -17,8 +17,8 @@ import { join } from 'node:path';
 import { root, loadPlaywright, launch } from './browser-lib.mjs';
 
 const mark = 'data:image/svg+xml,' + encodeURIComponent(readFileSync(join(root, 'docs/brand/mark-dark.svg'), 'utf8'));
-// The dark page background: the second --n-1 in tokens.css, the dark theme's.
-const bg = [...readFileSync(join(root, 'crates/gitterrace-web/static/tokens.css'), 'utf8').matchAll(/--n-1:(#[0-9a-f]{6})/g)][1][1];
+// The dark page background: the dark side of --n-1 in tokens.css.
+const bg = /--n-1:light-dark\(#[0-9a-f]{6},(#[0-9a-f]{6})\)/.exec(readFileSync(join(root, 'crates/gitterrace-web/static/tokens.css'), 'utf8'))[1];
 // The art box is 560 for the 28-unit stair, so the 32-unit image is 560 * 32 / 28.
 const ART = (560 * 32) / 28;
 const set = join(root, 'target/app-icon/gitterrace.iconset');

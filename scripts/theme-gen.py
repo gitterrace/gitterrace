@@ -147,11 +147,24 @@ def colours(tokens: Json, mode: str) -> dict[str, str]:
     return out
 
 
-def block(selector: str, mode: str, col: dict[str, str], indent: str = "") -> str:
-    items = [f"--{k}:{v};" for k, v in col.items()] + [f"--shadow-2:{SHADOW[mode]};"]
-    rows = [" ".join(items[i : i + 8]) for i in range(0, len(items), 8)]
-    body = "\n".join(indent + r for r in rows)
-    return f"{selector}{{color-scheme:{mode};\n{body}\n}}"
+def palette(light: dict[str, str], dark: dict[str, str]) -> str:
+    """Every colour once, as light-dark(); color-scheme on :root picks the side."""
+    both = {**light, "shadow-2": SHADOW["light"]}
+    other = {**dark, "shadow-2": SHADOW["dark"]}
+    items = [
+        f"--{k}:{v};" if v == other[k] else f"--{k}:{pair(v, other[k])};"
+        for k, v in both.items()
+    ]
+    rows = [" ".join(items[i : i + 6]) for i in range(0, len(items), 6)]
+    return ":root{\n" + "\n".join(rows) + "\n}"
+
+
+def pair(light: str, dark: str) -> str:
+    """light-dark() takes colours only, so a shadow keeps its shape and pairs its colour."""
+    lp, dp = light.rsplit(" ", 1), dark.rsplit(" ", 1)
+    if len(lp) == 2 and lp[0] == dp[0]:
+        return f"{lp[0]} light-dark({lp[1]},{dp[1]})"
+    return f"light-dark({light},{dark})"
 
 
 def fonts(design: Json) -> list[str]:
@@ -204,11 +217,10 @@ def gen_css(tokens: Json, design: Json, old: str) -> str:
     light, dark = colours(tokens, "light"), colours(tokens, "dark")
     parts = fonts(design) + [
         scales(design),
-        block(":root", "light", light),
-        "@media (prefers-color-scheme:dark){"
-        + block(":root:not([data-theme=light])", "dark", dark)
-        + "}",
-        block(":root[data-theme=dark]", "dark", dark),
+        ":root{color-scheme:light}",
+        "@media (prefers-color-scheme:dark){:root:not([data-theme=light]){color-scheme:dark}}",
+        ":root[data-theme=dark]{color-scheme:dark}",
+        palette(light, dark),
     ]
     b, e = old.index(BEGIN), old.index(END)
     return old[:b] + BEGIN + "\n" + "\n".join(parts) + "\n" + old[e:]

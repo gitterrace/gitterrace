@@ -39,7 +39,6 @@ main.wrap>h2:first-child,main.wrap>.tabs+h2{margin-top:var(--space-6)}
 .tools .topsearch:focus-within{width:320px}
 .tools .topsearch input[type=search]{min-width:0;width:100%}
 .tool{width:32px;height:32px;padding:0;display:grid;place-items:center;background:transparent;border:1px solid transparent;border-radius:var(--radius);color:var(--muted);cursor:pointer}
-.tool:hover{background:var(--hover);color:var(--fg);border-color:var(--line)}
 .tool svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.75;stroke-linecap:round}
 .searchbtn{display:none}
 header.top>.wrap{container:topbar/inline-size}
@@ -57,7 +56,7 @@ header.top>.wrap{container:topbar/inline-size}
 @container topbar (max-width:560px){.wtchip .label{display:none}.wtchip{padding:5px 4px}}
 @container topbar (max-width:460px){#refbtn .name{display:none}}
 .theme{width:32px;height:32px;padding:0;display:grid;place-items:center;background:transparent;border:1px solid transparent;border-radius:var(--radius);color:var(--muted)}
-.theme:hover{background:var(--hover);color:var(--fg);border-color:var(--line)}
+.tool:hover,.theme:hover{background:var(--hover);color:var(--fg);border-color:var(--line)}
 .theme svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round;display:none}
 .theme .fill{fill:currentColor;stroke:none}
 .theme .i-auto{display:block}
@@ -140,7 +139,7 @@ button:hover{border-color:var(--line-strong);background:var(--hover)}button.prim
 .doc-tools{display:flex;align-items:center;gap:var(--space-3);margin-left:auto;flex:none;font-size:var(--text-sm)}
 .dochead .outline.menu{display:block;margin-left:0}
 .dochead .outlinebtn.icon{width:28px;height:28px;box-sizing:border-box}
-.facts{list-style:none;margin:0 0 var(--space-4);padding:0;color:var(--muted)}.facts li{padding:var(--space-1) 0}.facts b{color:var(--fg);font-weight:var(--weight-semibold);font-variant-numeric:tabular-nums}.facts b.add{color:var(--add)}.facts b.del{color:var(--del)}
+.facts{list-style:none;margin:0 0 var(--space-4);padding:0;color:var(--muted)}.facts li{padding:var(--space-1) 0}.facts b,.progress b{color:var(--fg);font-weight:var(--weight-semibold);font-variant-numeric:tabular-nums}.facts b.add{color:var(--add)}.facts b.del{color:var(--del)}
 .side{margin:0 0 var(--space-5);font-size:var(--text-sm)}.side>:last-child{margin-bottom:0}.side h3{margin:0 0 var(--space-2);font-size:var(--text-xs);text-transform:uppercase;letter-spacing:.04em;color:var(--muted);font-weight:var(--weight-semibold)}.side h3 a{color:inherit}.side p{margin:0 0 var(--space-2)}p.facts{line-height:1.6;display:flex;flex-wrap:wrap;gap:0 var(--space-3)}
 .side b{font-variant-numeric:tabular-nums}.sparkwrap{display:block;margin:0 0 var(--space-2)}.sparkwrap svg.spark{width:100%;height:24px;overflow:visible}.sparkwrap .base{stroke:var(--line);stroke-width:1}.sparkwrap .dot{stroke-width:5;stroke-linecap:round}
 .sidelist{list-style:none;margin:0;padding:0}.sidelist li{display:flex;justify-content:space-between;gap:var(--space-3);padding:2px 0}.sidelist a{min-width:0;overflow-wrap:anywhere;font-family:var(--mono)}.sidelist .muted{flex:none;text-align:right;font-variant-numeric:tabular-nums}
@@ -196,7 +195,7 @@ table.code{border-collapse:collapse;width:100%}
 .n a{color:inherit}.n a:hover{color:var(--accent-fg)}
 div.diff .add,div.diff .del{color:inherit}
 .code tr:hover td{background:var(--soft)}
-.code tr:target td{background:var(--accent-soft);box-shadow:inset 2px 0 0 var(--accent)}
+.code tr:target td,.src .l:target{background:var(--accent-soft);box-shadow:inset 2px 0 0 var(--accent)}
 /* The gutter: inside each cell a grid of sha, author and age. The column takes its widest
    cell, so the three line up down the page. The grid sits in a div, since a grid td leaves
    the table layout. Names are never cut (theme test), a long one widens the column. */
@@ -252,7 +251,6 @@ progress::-webkit-progress-value{background:var(--accent);border-radius:var(--ra
 progress::-moz-progress-bar{background:var(--accent);border-radius:var(--radius)}
 .progress{display:flex;flex-direction:column;gap:var(--space-2);max-width:460px}
 .progress p{margin:0}
-.progress b{color:var(--fg);font-weight:var(--weight-semibold);font-variant-numeric:tabular-nums}
 .card.progress{max-width:none;padding:var(--space-6)}
 .progress .bar{display:flex;align-items:center;gap:var(--space-3)}.progress .bar progress{flex:1;min-width:0}.progress .bar .pct{min-width:4ch;text-align:right}
 .indexing .dochead{position:static}.indexing .progress{max-width:none;padding:var(--space-5) var(--space-4)}.indexing .next{display:flex;gap:var(--space-5)}
@@ -418,7 +416,7 @@ svg.loc .xh{display:none;stroke:var(--fg);stroke-width:1;stroke-dasharray:3 3;po
 .dbar b{display:block;height:100%}.dbar b.up{background:var(--add)}.dbar b.dn{background:var(--del)}
 /* Tables in a card keep their outer cell padding: the header band and the row hover reach the
    card's inner edge, and text flush against them reads as cut off. */
-.rlist{margin-top:var(--space-4)}.rlist summary{cursor:pointer;color:var(--muted);font-size:var(--text-sm)}
+.rlist{margin-top:var(--space-4)}.rlist summary,.media-src summary{cursor:pointer;color:var(--muted);font-size:var(--text-sm)}
 .rlist ul{list-style:none;margin:var(--space-3) 0 0;padding:0;max-height:360px;overflow:auto}
 .rlist li{display:flex;gap:var(--space-3);align-items:baseline;padding:3px 0;border-top:var(--border);min-width:0}
 .rlist .subj{flex:1}
@@ -461,7 +459,6 @@ a.who{color:inherit}a.who:hover b{color:var(--accent-fg);text-decoration:underli
 .src .l{white-space:pre;min-height:var(--leading-code);padding:0 var(--space-3) 0 0;min-width:max-content;position:relative;padding-left:calc(var(--nd,3)*1ch + var(--space-3)*3)}
 .src .l::before{content:attr(data-n);position:absolute;left:0;box-sizing:border-box;padding-left:var(--space-3);width:calc(var(--nd,3)*1ch + var(--space-3)*2);text-align:right;color:var(--faint);user-select:none;cursor:pointer}
 .src .l:hover::before{background:var(--soft)}
-.src .l:target{background:var(--accent-soft);box-shadow:inset 2px 0 0 var(--accent)}
 .src .l.sel{background:var(--accent-soft)!important}
 .src .l.sel::before{box-shadow:inset 2px 0 0 var(--accent)}
 div.diff .add,div.diff .del,div.diff .ctx,div.diff .hh{white-space:pre;min-height:var(--leading-code);min-width:max-content;position:relative;padding:0 var(--space-3) 0 calc(12ch + var(--space-3)*3)}
@@ -488,7 +485,7 @@ svg.chart .col:hover .dot{opacity:1}
 .media-file{padding:var(--space-4)}
 .media-av{max-width:100%;display:block}
 .media-facts{margin:var(--space-3) 0 0;font-size:var(--text-sm)}
-.media-src{margin-top:var(--space-4)}.media-src summary{cursor:pointer;color:var(--muted);font-size:var(--text-sm)}
+.media-src{margin-top:var(--space-4)}
 .media-diff{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:var(--space-4);padding:var(--space-4)}
 .media-bar{display:flex;justify-content:flex-end;padding:var(--space-3) var(--space-4) 0}
 .media-overlay{padding:var(--space-4)}.media-stack{position:relative;display:inline-block;max-width:100%}.media-stack img{display:block;max-width:100%}
@@ -516,7 +513,6 @@ svg.chart .dot-pt{fill:var(--accent);fill-opacity:.55;stroke:var(--accent);strok
 .actbtn::after{content:"\22EF"}
 .actbtn:hover,.actbtn:focus-visible{color:var(--fg);border-color:var(--line)}
 .actbtn.top{width:32px;height:32px;border-color:transparent;background:transparent}
-.actbtn.top:hover{background:var(--hover);border-color:var(--line)}
 .actbtn.float{position:absolute;right:var(--space-2);top:50%;transform:translateY(-50%);z-index:2;opacity:0;transition:opacity var(--dur-fast)}
 td:has(>.actbtn.float){position:relative}
 :hover>.actbtn.float,.actbtn.float:focus-visible,.actbtn.float.sel{opacity:1}
@@ -536,13 +532,13 @@ td:has(>.actbtn.float){position:relative}
 .actmenu .ov-list li.sep+li.grp{padding-top:2px}
 /* The page menu: a labelled list glyph, not a bare ellipsis. */
 .actbtn.top::after{content:none}
-.actbtn.top::before{content:"";width:16px;height:16px;background:currentColor;-webkit-mask:var(--menu-ico) center/contain no-repeat;mask:var(--menu-ico) center/contain no-repeat}
+.actbtn.top::before,.outlinebtn::before{content:"";width:16px;height:16px;background:currentColor;-webkit-mask:var(--menu-ico) center/contain no-repeat;mask:var(--menu-ico) center/contain no-repeat}
 :root{--menu-ico:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round'%3E%3Cpath d='M4 7h16M4 12h16M4 17h10'/%3E%3C/svg%3E")}
 /* Repository switcher: the name itself is the button. One repository: a link. */
 .reposwitch{display:inline-flex}
 .reposwitch:not([hidden])+#repolink{display:none}
 button.reponame{display:inline-flex;align-items:center;gap:2px;background:transparent;border:1px solid transparent;border-radius:var(--radius);padding:2px 4px;margin:-3px -5px;min-height:32px;cursor:pointer}
-button.reponame:hover,button.reponame[aria-expanded=true]{background:var(--hover);border-color:var(--line)}
+.actbtn.top:hover,button.reponame:hover,button.reponame[aria-expanded=true]{background:var(--hover);border-color:var(--line)}
 button.reponame .tri{width:16px;height:16px;fill:var(--muted)}
 .ov-title{display:flex;align-items:center;justify-content:space-between;padding:var(--space-1) var(--space-1) var(--space-1) var(--space-4);border-bottom:var(--border)}
 .ov-title h2{margin:0}
@@ -616,7 +612,6 @@ html:has(section.file>header){scroll-padding-top:calc(40px + var(--space-2))}
 .outline.menu{position:relative;margin-left:auto;display:none}
 .outlinebtn{display:inline-flex;align-items:center;gap:var(--space-2);height:32px;padding:0 var(--space-3);border:var(--border);border-radius:var(--radius);background:var(--soft);color:var(--fg);font-size:var(--text-sm);font-weight:var(--weight-semibold);text-transform:none;letter-spacing:0;cursor:pointer;list-style:none;white-space:nowrap}
 .outlinebtn::-webkit-details-marker{display:none}
-.outlinebtn::before{content:"";width:16px;height:16px;background:currentColor;-webkit-mask:var(--menu-ico) center/contain no-repeat;mask:var(--menu-ico) center/contain no-repeat}
 .outlinebtn:hover,.outline.menu[open]>.outlinebtn{background:var(--hover);border-color:var(--line-strong)}
 .outline-pop{position:absolute;right:0;top:calc(100% + var(--space-1));z-index:20;width:min(320px,92vw);max-height:60vh;overflow:auto;padding:var(--space-2);background:var(--raised);border:var(--border);border-radius:var(--radius);box-shadow:var(--shadow-2);font-size:var(--text-sm);text-transform:none;letter-spacing:0;font-family:var(--sans);font-weight:var(--weight-regular)}
 .outline-pop a{display:block;padding:5px var(--space-3);border-radius:var(--radius);color:var(--fg);overflow-wrap:anywhere}
