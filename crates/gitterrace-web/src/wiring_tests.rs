@@ -289,8 +289,7 @@ fn multi_depth_and_skip_dirs_change_discovery() {
 async fn index_build_on_start_waits_for_demand_when_off() {
     let dir = tempfile::tempdir().expect("tmp");
     let p = repo(dir.path(), "r");
-    let mut cfg = with(|c| c.index.build_on_start = false);
-    cfg.watch.interval_ms = 250;
+    let cfg = with(|c| c.index.build_on_start = false);
     let a = app(&p, cfg);
     tokio::spawn(crate::app::keep_index_fresh(Arc::clone(&a)));
     tokio::time::sleep(Duration::from_millis(700)).await;

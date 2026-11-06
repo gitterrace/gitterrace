@@ -45,13 +45,15 @@ async fn main() -> anyhow::Result<()> {
     let flags = Flags {
         dir: dir.clone(),
         addr: cli.addr,
-        interval_ms: cli.interval_ms,
         no_watch: cli.no_watch,
         public: cli.public,
     };
     let loaded = flags.load().context("reading config.toml")?;
     for w in &loaded.warnings {
         tracing::warn!("config: {w}");
+    }
+    if cli.interval_ms.is_some() {
+        tracing::warn!("--interval-ms is ignored: changes come from file events");
     }
     match cli.command.unwrap_or(Command::Serve) {
         Command::Config => print!("{}", loaded.describe()),
@@ -188,7 +190,6 @@ fn init_in(
 struct Flags {
     dir: Option<PathBuf>,
     addr: Option<SocketAddr>,
-    interval_ms: Option<u64>,
     no_watch: bool,
     public: bool,
 }
@@ -200,10 +201,6 @@ impl Flags {
         if let Some(a) = self.addr {
             loaded.config.server.addr = a.to_string();
             loaded.flagged("server.addr");
-        }
-        if let Some(ms) = self.interval_ms {
-            loaded.config.watch.interval_ms = ms;
-            loaded.flagged("watch.interval_ms");
         }
         if self.no_watch {
             loaded.config.watch.enabled = false;

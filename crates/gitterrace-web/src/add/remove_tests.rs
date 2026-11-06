@@ -162,7 +162,7 @@ async fn a_removed_repository_stops_indexing() {
     let a = repo(&tmp.path().join("a"), "a root");
     let b = repo(&tmp.path().join("b"), "b root");
     let mut cfg = gitterrace_config::Config::default();
-    cfg.watch.interval_ms = 50;
+    cfg.watch.rescan_secs = 5;
     let (r, secret) = server(vec![a, b.clone()], cfg);
     let cache = b.join(".git/gitterrace");
     // Let its first index build land.

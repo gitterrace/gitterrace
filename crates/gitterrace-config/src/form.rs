@@ -133,7 +133,7 @@ mod tests {
                 "{id}"
             );
         }
-        let free = f.iter().find(|x| x.id == "watch.interval_ms").expect("key");
+        let free = f.iter().find(|x| x.id == "watch.rescan_secs").expect("key");
         assert_eq!(
             free.input,
             Input::Number {
@@ -167,16 +167,16 @@ mod tests {
         let get = |id: &str| f.iter().find(|x| x.id == id).expect(id).plain();
         assert_eq!(get("insights.exclude"), "a/**\nb/**");
         assert_eq!(get("server.addr"), crate::DEFAULT_ADDR);
-        assert_eq!(get("watch.interval_ms"), "1000");
+        assert_eq!(get("watch.rescan_secs"), "30");
         assert_eq!(get("features.api_enabled"), "");
     }
 
     #[test]
     fn a_field_shows_the_file_value_and_its_source() {
-        let f = fields(&parse("[watch]\ninterval_ms = 500\n").expect("ok"));
-        let x = f.iter().find(|x| x.id == "watch.interval_ms").expect("key");
-        assert_eq!((x.value.as_str(), x.source), ("500", crate::Source::File));
-        assert_eq!(x.default, "1000");
+        let f = fields(&parse("[watch]\nrescan_secs = 50\n").expect("ok"));
+        let x = f.iter().find(|x| x.id == "watch.rescan_secs").expect("key");
+        assert_eq!((x.value.as_str(), x.source), ("50", crate::Source::File));
+        assert_eq!(x.default, "30");
         let addr = f.iter().find(|x| x.id == "server.addr").expect("key");
         assert!(addr.restart);
         assert_eq!(addr.source, crate::Source::Default);

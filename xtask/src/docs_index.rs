@@ -10,7 +10,7 @@ use anyhow::{Context as _, Result};
 use pulldown_cmark::{CodeBlockKind, Event, Options, Parser, Tag, TagEnd};
 
 use crate::out::{Out, files_in};
-use crate::readme_agents_md::cli_flags;
+use crate::readme_agents_md::{cli_flags, shown_flags};
 
 const INDEX: &str = "docs/README.md";
 const CONFIG: &str = "docs/configuration.md";
@@ -306,6 +306,8 @@ struct Keys {
     sections: BTreeSet<&'static str>,
     ids: BTreeSet<&'static str>,
     flags: BTreeSet<String>,
+    /// [`Self::flags`] without the hidden ones, the flags the README must list.
+    shown: BTreeSet<String>,
 }
 
 impl Keys {
@@ -315,6 +317,7 @@ impl Keys {
             sections: keys.iter().map(|k| k.section).collect(),
             ids: keys.iter().map(|k| k.id).collect(),
             flags: cli_flags(),
+            shown: shown_flags(),
         }
     }
 
@@ -394,7 +397,7 @@ impl Keys {
         }
         if let Some(readme) = texts.get("README.md") {
             for f in self
-                .flags
+                .shown
                 .iter()
                 .filter(|f| !GLOBAL_CLAP.contains(&f.as_str()))
             {

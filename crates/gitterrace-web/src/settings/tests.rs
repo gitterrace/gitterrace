@@ -137,7 +137,7 @@ async fn cross_site_or_tokenless_put_is_refused_and_file_unchanged() {
     let app = server(root.path(), dir.path(), false);
     let token = token_of(&app);
     let stamp = gitterrace_config::Stamp::tag(gitterrace_config::Stamp::of(&file).expect("s"));
-    let text = "[watch]\ninterval_ms = 500\n";
+    let text = "[watch]\nrescan_secs = 50\n";
     let body = serde_json::json!({ "f": "config", "text": text, "stamp": stamp }).to_string();
     let foreign = Some("http://evil.example".to_owned());
     for (why, tok, site, origin) in [
@@ -172,7 +172,7 @@ async fn cross_site_or_tokenless_put_is_refused_and_file_unchanged() {
     assert_eq!(status, 200, "{reply}");
     assert_eq!(
         std::fs::read_to_string(&file).expect("r"),
-        "[watch]\ninterval_ms = 500\n"
+        "[watch]\nrescan_secs = 50\n"
     );
 }
 
@@ -217,7 +217,7 @@ async fn put_reports_restart_keys() {
         "f": "config",
         "changes": [
             { "id": "multi.depth", "value": "3" },
-            { "id": "watch.interval_ms", "value": "500" }
+            { "id": "watch.rescan_secs", "value": "50" }
         ],
         "stamp": "none"
     })
@@ -249,7 +249,7 @@ async fn a_stale_or_invalid_save_leaves_the_file() {
     let stamp = gitterrace_config::Stamp::tag(gitterrace_config::Stamp::of(&file).expect("s"));
     let mut req = Req::new("PUT", "/_settings/file", Some(&token));
     req.body =
-        serde_json::json!({ "f": "config", "text": "[watch]\ninterval_ms = 1\n", "stamp": stamp })
+        serde_json::json!({ "f": "config", "text": "[watch]\nrescan_secs = 1\n", "stamp": stamp })
             .to_string();
     let (status, reply) = send(&app, req).await;
     assert_eq!(status, 422, "{reply}");
@@ -268,7 +268,7 @@ async fn page(r: &axum::Router, uri: &str) -> (u16, String) {
 #[tokio::test]
 async fn form_and_plain_saves_produce_the_same_file() {
     const START: &str =
-        "# my settings\n[watch]\n# fast\ninterval_ms = 500\n\n[display]\ntheme = \"dark\"\n";
+        "# my settings\n[watch]\n# fast\nrescan_secs = 50\n\n[display]\ntheme = \"dark\"\n";
     let mut files = Vec::new();
     for how in ["form", "plain"] {
         let (root, dir) = (
@@ -281,7 +281,7 @@ async fn form_and_plain_saves_produce_the_same_file() {
         let token = token_of(&app);
         let stamp = gitterrace_config::Stamp::tag(gitterrace_config::Stamp::of(&file).expect("s"));
         let changes = serde_json::json!([
-            { "id": "watch.interval_ms", "value": "750" },
+            { "id": "watch.rescan_secs", "value": "75" },
             { "id": "insights.exclude", "value": "[\"vendor/**\"]" }
         ]);
         // Plain sends the text the check reply rendered for the same form edit: what the page
@@ -306,7 +306,7 @@ async fn form_and_plain_saves_produce_the_same_file() {
     assert_eq!(files[0], files[1], "form and plain wrote different files");
     let text = String::from_utf8_lossy(&files[0]);
     assert!(
-        text.starts_with("# my settings\n[watch]\n# fast\ninterval_ms = 750\n"),
+        text.starts_with("# my settings\n[watch]\n# fast\nrescan_secs = 75\n"),
         "{text}"
     );
     assert!(text.contains("theme = \"dark\""), "{text}");
@@ -322,9 +322,9 @@ async fn check_reply_names_the_line() {
     let token = token_of(&app);
     for (text, line, key) in [
         (
-            "[watch]\nenabled = true\ninterval_ms = 3\n",
+            "[watch]\nenabled = true\nrescan_secs = 3\n",
             3,
-            Some("watch.interval_ms"),
+            Some("watch.rescan_secs"),
         ),
         ("[watch]\nenabled = true\n[display\n", 3, None),
         ("\n\n[server]\naddr = 4\n", 4, Some("server.addr")),
@@ -352,7 +352,7 @@ async fn the_page_renders_the_schema_and_carries_its_token() {
     );
     std::fs::write(
         dir.path().join("config.toml"),
-        "[watch]\ninterval_ms = 500\n",
+        "[watch]\nrescan_secs = 50\n",
     )
     .expect("w");
     let app = server(root.path(), dir.path(), false);
@@ -367,7 +367,7 @@ async fn the_page_renders_the_schema_and_carries_its_token() {
             k.id
         );
     }
-    assert!(html.contains("value=\"500\""), "the file's value is shown");
+    assert!(html.contains("value=\"50\""), "the file's value is shown");
     assert!(!html.contains("style=\""), "no inline style");
     let (s, overview) = page(&app, "/r/r/").await;
     assert_eq!(s, 200);
@@ -420,7 +420,7 @@ async fn restart_keys_name_only_what_the_edit_changes() {
     let mut req = Req::new("POST", "/_settings/check", Some(&token));
     req.body = serde_json::json!({
         "f": "config",
-        "changes": [{ "id": "watch.interval_ms", "value": "750" }]
+        "changes": [{ "id": "watch.rescan_secs", "value": "75" }]
     })
     .to_string();
     let (status, reply) = send(&app, req).await;

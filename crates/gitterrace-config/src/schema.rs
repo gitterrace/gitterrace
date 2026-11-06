@@ -253,16 +253,13 @@ settings! {
     watch: Watch {
         /// Notice new commits and refs while running. Off means a restart or a reload is needed.
         enabled: bool = true => Live,
-        /// How often to check each served repository's HEAD, refs and index for changes, in
-        /// milliseconds. A check is a few `stat` calls. Where OS file events are unavailable
-        /// (the watch limit, some network volumes) it is also how often the working tree is
-        /// scanned. Minimum 250.
-        interval_ms: u64 = 1000 => Live,
-        /// The safety rescan of the working tree while a tab shows it, in seconds. Between them
-        /// the scan runs only when the OS reports a file change. A change usually shows within
-        /// about a second. On a heavily loaded Mac the OS can drop a file change without a word,
-        /// and then it shows within this many seconds, so lower it for a tighter bound (each
-        /// rescan costs a full status). Minimum 5.
+        /// The safety rescan, in seconds. The OS reports file changes, so a new commit, a ref or
+        /// a staged file usually shows within about a second, and the working tree is scanned
+        /// only while a tab shows it. On a heavily loaded Mac the OS can drop a file change
+        /// without a word, and then it shows within this many seconds, so lower it for a tighter
+        /// bound (each rescan checks HEAD, refs and index with a few `stat` calls, plus a full
+        /// status while a tab shows the working tree). With no tab open nothing runs more often.
+        /// Minimum 5.
         rescan_secs: u64 = 30 => Live,
     }
     index: Index {
@@ -450,9 +447,6 @@ impl Config {
         }
         if self.server.live_streams == 0 {
             return bad("server.live_streams", "must be at least 1");
-        }
-        if self.watch.interval_ms < 250 {
-            return bad("watch.interval_ms", "must be at least 250");
         }
         if self.watch.rescan_secs < 5 {
             return bad("watch.rescan_secs", "must be at least 5");

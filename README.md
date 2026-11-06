@@ -64,7 +64,7 @@ no remove button in the page: a browser has no secret, and a page may be on some
 
 <!-- BEGIN GENERATED: commands -->
 ```text
-git terrace [paths]          Browse a git repository in your browser, offline [--addr --interval-ms --no-watch --config --no-actions --public]
+git terrace [paths]          Browse a git repository in your browser, offline [--addr --no-watch --config --no-actions --public]
 git terrace serve            Serve the repository in the browser (the default)
 git terrace config           Print the effective configuration and where each value comes from
 git terrace mcp              Run a read-only MCP server over stdio for agents

@@ -6,7 +6,7 @@ use std::path::Path;
 
 use crate::{Change, SaveError, Stamp, apply, save_config};
 
-const GOOD: &str = "# mine\n[watch]\n# fast\ninterval_ms = 500\n";
+const GOOD: &str = "# mine\n[watch]\n# fast\nrescan_secs = 50\n";
 
 fn dir_with(text: &str) -> tempfile::TempDir {
     let d = tempfile::tempdir().expect("tmp");
@@ -38,7 +38,7 @@ fn invalid_toml_is_refused_and_the_file_is_unchanged() {
     let before = (bytes(d.path()), stamp(d.path()), entries(d.path()));
     for bad in [
         "[watch\n",
-        "[watch]\ninterval_ms = 10\n",
+        "[watch]\nrescan_secs = 1\n",
         "[server]\naddr = \"nope\"\n",
     ] {
         let e = save_config(d.path(), bad, before.1).expect_err(bad);
@@ -54,11 +54,11 @@ fn invalid_toml_is_refused_and_the_file_is_unchanged() {
 #[test]
 fn a_bad_value_names_its_line() {
     let d = dir_with(GOOD);
-    let text = "[watch]\nenabled = true\ninterval_ms = 10\n";
+    let text = "[watch]\nenabled = true\nrescan_secs = 1\n";
     let Err(SaveError::Invalid(l)) = save_config(d.path(), text, stamp(d.path())) else {
         panic!("accepted");
     };
-    assert_eq!((l.line, l.key.as_deref()), (3, Some("watch.interval_ms")));
+    assert_eq!((l.line, l.key.as_deref()), (3, Some("watch.rescan_secs")));
 }
 
 #[test]
@@ -67,13 +67,13 @@ fn a_form_save_keeps_comments_and_key_order() {
     let text = apply(
         GOOD,
         &[Change {
-            id: "watch.interval_ms".into(),
-            value: Some("750".into()),
+            id: "watch.rescan_secs".into(),
+            value: Some("75".into()),
         }],
     )
     .expect("apply");
     save_config(d.path(), &text, stamp(d.path())).expect("save");
-    assert_eq!(bytes(d.path()), GOOD.replace("500", "750").as_bytes());
+    assert_eq!(bytes(d.path()), GOOD.replace("50", "75").as_bytes());
 }
 
 #[test]
@@ -121,11 +121,11 @@ fn a_symlinked_config_is_not_written() {
 #[test]
 fn save_leaves_one_backup() {
     let d = dir_with(GOOD);
-    let second = "[watch]\ninterval_ms = 600\n";
+    let second = "[watch]\nrescan_secs = 60\n";
     save_config(d.path(), second, stamp(d.path())).expect("save");
     let bak = d.path().join("config.toml.bak");
     assert_eq!(fs::read(&bak).expect("bak"), GOOD.as_bytes());
-    save_config(d.path(), "[watch]\ninterval_ms = 700\n", stamp(d.path())).expect("save");
+    save_config(d.path(), "[watch]\nrescan_secs = 70\n", stamp(d.path())).expect("save");
     assert_eq!(fs::read(&bak).expect("bak"), second.as_bytes());
     assert_eq!(entries(d.path()), ["config.toml", "config.toml.bak"]);
 }

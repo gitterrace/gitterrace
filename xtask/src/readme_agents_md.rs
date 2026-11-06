@@ -234,6 +234,22 @@ pub fn cli_flags() -> std::collections::BTreeSet<String> {
     out
 }
 
+/// The [`cli_flags`] a user is shown: a hidden flag (kept so old scripts start) is accepted
+/// in the docs but not owed a line in the README command list.
+pub fn shown_flags() -> std::collections::BTreeSet<String> {
+    let cmd = cli::Cli::command();
+    let hidden: std::collections::BTreeSet<String> = std::iter::once(&cmd)
+        .chain(cmd.get_subcommands())
+        .flat_map(clap::Command::get_arguments)
+        .filter(|a| a.is_hide_set())
+        .filter_map(|a| a.get_long().map(str::to_owned))
+        .collect();
+    cli_flags()
+        .into_iter()
+        .filter(|f| !hidden.contains(f))
+        .collect()
+}
+
 fn positionals_no_global(c: &clap::Command) -> String {
     c.get_positionals()
         .filter(|a| !a.is_global_set())

@@ -5,7 +5,7 @@ use std::{
     time::Duration,
 };
 
-use crate::app::events::Events;
+use crate::app::events::{Events, GitEvents, POLL_FALLBACK};
 use crate::app::{App, blocking};
 use crate::live::Change;
 
@@ -34,12 +34,14 @@ impl App {
     }
 }
 
-/// Keeps the commit index and the open tabs current. One fingerprint of cheap `stat` calls per
-/// `watch.interval_ms` says whether HEAD, a ref or the index moved; only then is HEAD resolved
-/// again. The working tree scans (a gix status) run only while a tab listens, and then only when
-/// the OS reports a file change or `watch.rescan_secs` passes. Where file events are unavailable
-/// they run every interval, as polling. With the watcher off nothing runs on a timer: a page that
-/// finds the index behind queues a refresh.
+/// Keeps the commit index and the open tabs current. OS file events on the git directories wake
+/// it, and a fingerprint of cheap `stat` calls then says whether HEAD, a ref or the index moved;
+/// only then is HEAD resolved again. A burst of git writes is one wake after the debounce. The
+/// events' safety timer wakes it every `watch.rescan_secs` anyway, so a dropped event shows
+/// within that bound. The working tree scans (a gix status) run only while a tab listens, and
+/// then only when the OS reports a file change or `watch.rescan_secs` passes. Where file events
+/// are unavailable both checks run every [`POLL_FALLBACK`]. With the watcher off nothing runs on
+/// a timer: a page that finds the index behind queues a refresh.
 pub(crate) async fn keep_index_fresh(app: Arc<App>) {
     let mut watcher: Option<gitterrace_git::Watcher> = None;
     let mut seen = None;
@@ -48,16 +50,14 @@ pub(crate) async fn keep_index_fresh(app: Arc<App>) {
     let mut wt_seen: Option<u64> = None;
     let mut dirty_seen: Option<bool> = None;
     let mut events = Events::default();
+    let mut git_events = GitEvents::default();
     loop {
         // With `index.build_on_start` off the index waits for the first page that needs it;
         // the watcher below keeps running either way.
-        // `watch.*` can change while running: the interval and the on switch are read per round.
+        // `watch.*` can change while running: the rescan and the on switch are read per round.
         let cfg = app.cfg();
-        let every = cfg
-            .watch
-            .enabled
-            .then(|| Duration::from_millis(cfg.watch.interval_ms));
-        if every.is_none() {
+        let on = cfg.watch.enabled;
+        if !on {
             watcher = None;
             seen = None;
         } else if watcher.is_none() {
@@ -67,7 +67,10 @@ pub(crate) async fn keep_index_fresh(app: Arc<App>) {
             seen = Some(p);
             watcher = Some(w);
         }
-        let listening = every.is_some() && app.changes.receiver_count() > 0;
+        git_events
+            .follow(&app, on.then_some(cfg.watch.rescan_secs))
+            .await;
+        let listening = on && app.changes.receiver_count() > 0;
         events.follow(&app, listening, cfg.watch.rescan_secs).await;
         if cfg.index.build_on_start || app.demanded.load(Ordering::Acquire) {
             if app.rebuild.swap(false, Ordering::AcqRel) {
@@ -83,15 +86,20 @@ pub(crate) async fn keep_index_fresh(app: Arc<App>) {
                 }
             }
         }
+        // Only a poll for missing events runs on this loop's own timer; otherwise the events (and
+        // their safety timers) are the only wakes, so an idle server sleeps for `rescan_secs`.
+        let poll = on && (git_events.polling() || (listening && events.polling()));
         let tick = async {
-            match every {
-                Some(d) => tokio::time::sleep(d).await,
-                None => std::future::pending().await,
+            if poll {
+                tokio::time::sleep(POLL_FALLBACK).await;
+            } else {
+                std::future::pending::<()>().await;
             }
         };
         tokio::select! {
             () = app.wake.notified() => continue,
             () = events.nudged.notified() => {}
+            () = git_events.nudged.notified() => {}
             () = tick => {}
         }
         let Some(w) = watcher.as_mut() else { continue };

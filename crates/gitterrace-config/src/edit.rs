@@ -122,23 +122,26 @@ mod tests {
         }
     }
 
-    const FILE: &str = "# my settings\n\n[watch]\n# how often\ninterval_ms = 500 # fast\n\
-                        enabled = true\n\n[display]\ntheme = \"dark\"\n";
+    const FILE: &str = "# my settings\n\n[server]\n# how many\nlive_streams = 5 # few\n\
+                        is_public = false\n\n[display]\ntheme = \"dark\"\n";
 
     #[test]
     fn a_save_keeps_comments_and_key_order() {
-        let out = apply(FILE, &[set("watch.interval_ms", "2000")]).expect("apply");
-        assert_eq!(out, FILE.replace("500", "2000"));
+        let out = apply(FILE, &[set("server.live_streams", "9")]).expect("apply");
+        assert_eq!(out, FILE.replace("= 5 ", "= 9 "));
         let out = apply(
             FILE,
-            &[set("watch.rescan_secs", "60"), set("links.style", "\"go\"")],
+            &[set("server.hosts", "[\"h\"]"), set("links.style", "\"go\"")],
         )
         .expect("apply");
         assert!(
             out.starts_with(FILE.split("\n[display]").next().expect("head")),
             "{out}"
         );
-        assert!(out.contains("enabled = true\nrescan_secs = 60\n"), "{out}");
+        assert!(
+            out.contains("is_public = false\nhosts = [\"h\"]\n"),
+            "{out}"
+        );
         assert!(out.ends_with("[links]\nstyle = \"go\"\n"), "{out}");
     }
 
@@ -147,12 +150,12 @@ mod tests {
         let out = apply(
             FILE,
             &[Change {
-                id: "watch.enabled".into(),
+                id: "server.is_public".into(),
                 value: None,
             }],
         )
         .expect("apply");
-        assert_eq!(out, FILE.replace("enabled = true\n", ""));
+        assert_eq!(out, FILE.replace("is_public = false\n", ""));
     }
 
     const ACTIONS: &str = "version = 1\n\n# mine\n[[action]]\nid = \"a\"\nlabel = \"A\" # first\n\n\

@@ -92,7 +92,7 @@ mod tests {
 
     #[test]
     fn a_syntax_error_names_its_line() {
-        let (line, _, key) = place("[watch]\nenabled = true\ninterval_ms = = 5\n");
+        let (line, _, key) = place("[watch]\nenabled = true\nrescan_secs = = 5\n");
         assert_eq!((line, key), (3, None));
     }
 
@@ -100,8 +100,8 @@ mod tests {
     fn a_bad_value_names_the_line_of_its_key() {
         let text = "# top\n[server]\nlive_streams = 4\n\naddr = \"nope\"\n";
         assert_eq!(place(text), (5, 1, Some("server.addr".into())));
-        let text = "[watch]\n\n  interval_ms = 10\n";
-        assert_eq!(place(text), (3, 3, Some("watch.interval_ms".into())));
+        let text = "[watch]\n\n  rescan_secs = 1\n";
+        assert_eq!(place(text), (3, 3, Some("watch.rescan_secs".into())));
         let text = "[repo.x.features]\nlive = true\n";
         assert_eq!(place(text).0, 2);
     }

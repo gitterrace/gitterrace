@@ -35,13 +35,36 @@ impl Repo {
         os_events: bool,
         on_nudge: impl Fn(Nudge) + Send + 'static,
     ) -> Result<Nudger, NudgeError> {
-        let inner = self.repo();
-        let work = inner.workdir().map(canon);
-        let git = canon(inner.git_dir());
-        let common = canon(inner.common_dir());
+        let work = self.repo().workdir().map(canon);
         // Committed rules only: an unreadable or empty HEAD means no rules, which only costs
         // extra scans.
         let ignore = IgnoreSet::at(self, "HEAD").ok();
+        self.events(work, ignore, rescan, os_events, on_nudge)
+    }
+
+    /// Starts OS file events for the git directories alone: HEAD, refs, `packed-refs`, the index
+    /// and the operation markers, the parts [`crate::Watcher`] fingerprints. Cheap enough to run
+    /// while nobody looks; `rescan` is its safety timer.
+    pub fn git_events(
+        &self,
+        rescan: Duration,
+        os_events: bool,
+        on_nudge: impl Fn(Nudge) + Send + 'static,
+    ) -> Result<Nudger, NudgeError> {
+        self.events(None, None, rescan, os_events, on_nudge)
+    }
+
+    fn events(
+        &self,
+        work: Option<PathBuf>,
+        ignore: Option<IgnoreSet>,
+        rescan: Duration,
+        os_events: bool,
+        on_nudge: impl Fn(Nudge) + Send + 'static,
+    ) -> Result<Nudger, NudgeError> {
+        let inner = self.repo();
+        let git = canon(inner.git_dir());
+        let common = canon(inner.common_dir());
         let mut roots: Vec<PathBuf> = work.iter().cloned().collect();
         for extra in [&git, &common] {
             if !roots.iter().any(|r| extra.starts_with(r)) {

@@ -332,7 +332,7 @@ mod tests {
     #[test]
     fn defaults_keep_todays_behaviour() {
         let l = parse("").expect("parse");
-        assert_eq!(l.config.watch.interval_ms, 1000);
+        assert_eq!(l.config.watch.rescan_secs, 30);
         assert_eq!(l.config.server.addr, crate::DEFAULT_ADDR);
         assert!(l.config.watch.enabled);
         assert!(l.sources.is_empty());
@@ -340,20 +340,20 @@ mod tests {
 
     #[test]
     fn file_sets_values_and_source() {
-        let l = parse("[watch]\ninterval_ms = 500\n[repo.example]\nexclude = [\"vendor/**\"]\n")
+        let l = parse("[watch]\nrescan_secs = 50\n[repo.example]\nexclude = [\"vendor/**\"]\n")
             .expect("parse");
-        assert_eq!(l.config.watch.interval_ms, 500);
-        assert_eq!(l.sources["watch.interval_ms"], Source::File);
+        assert_eq!(l.config.watch.rescan_secs, 50);
+        assert_eq!(l.sources["watch.rescan_secs"], Source::File);
         assert_eq!(l.config.repo["example"].exclude, ["vendor/**"]);
-        assert!(l.describe().contains("watch.interval_ms = 500  (file)"));
+        assert!(l.describe().contains("watch.rescan_secs = 50  (file)"));
     }
 
     #[test]
     fn unknown_keys_warn_and_invalid_values_name_the_key() {
         let l = parse("[watch]\nbogus = 1\n[nope]\nx = 1\n").expect("parse");
         assert_eq!(l.warnings.len(), 2);
-        let e = parse("[watch]\ninterval_ms = 10\n").expect_err("too fast");
-        assert!(e.to_string().contains("watch.interval_ms"), "{e}");
+        let e = parse("[watch]\nrescan_secs = 1\n").expect_err("too fast");
+        assert!(e.to_string().contains("watch.rescan_secs"), "{e}");
         let e = parse("[server]\naddr = \"nope\"\n").expect_err("bad addr");
         assert!(e.to_string().contains("server.addr"), "{e}");
         let e = parse("[watch]\nenabled = 3\n").expect_err("type");

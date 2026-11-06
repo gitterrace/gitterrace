@@ -39,7 +39,7 @@ pub const RULES: &[Rule] = &[
         holds: "a duration",
         form: "integer ending in `_ms` or `_secs`",
         parts: &["_ms", "_secs"],
-        example: "`watch.interval_ms`",
+        example: "`watch.rescan_secs`",
     },
     Rule {
         holds: "a count",
@@ -241,7 +241,7 @@ mod tests {
         assert!(flag_fits("no-watch", "watch.enabled"));
         assert!(flag_fits("public", "server.is_public"));
         assert!(!flag_fits("max-pages", "limits.export_pages"));
-        assert!(!flag_fits("poll", "watch.interval_ms"));
+        assert!(!flag_fits("rescan", "watch.rescan_secs"));
     }
 
     /// Renamed keys have no alias: each old name is an unknown key, which warns and leaves the
@@ -258,6 +258,7 @@ mod tests {
             ("limits", "search_per_file"),
             ("api", "log_page_size"),
             ("api", "log_max_skip"),
+            ("watch", "interval_ms"),
         ] {
             let v = if ["public", "bots", "generated"].contains(&old) {
                 "true"

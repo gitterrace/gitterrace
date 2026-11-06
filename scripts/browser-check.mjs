@@ -460,18 +460,18 @@ async function settings() {
       await p.goto(srv.base + '/', { waitUntil: 'load' });
       await p.click('#settingsbtn');
       await p.waitForSelector('#setform');
-      await p.fill('#f-watch\\.interval_ms', '750');
+      await p.fill('#f-watch\\.rescan_secs', '75');
       await p.click('.segs [data-show="plain"]');
-      await p.waitForFunction(() => /interval_ms = 750/.test(/** @type {HTMLTextAreaElement} */ (document.getElementById('settext')).value), null, { timeout: 3000 });
-      await p.fill('#settext', '[watch]\ninterval_ms = 3\n');
+      await p.waitForFunction(() => /rescan_secs = 75/.test(/** @type {HTMLTextAreaElement} */ (document.getElementById('settext')).value), null, { timeout: 3000 });
+      await p.fill('#settext', '[watch]\nrescan_secs = 3\n');
       await p.waitForSelector('#setgut .bad', { timeout: 3000 });
       const off = await p.$eval('#setsave', (x) => /** @type {HTMLButtonElement} */ (x).disabled);
-      await p.fill('#settext', '[watch]\ninterval_ms = 800\n');
+      await p.fill('#settext', '[watch]\nrescan_secs = 80\n');
       await p.waitForFunction(() => !/** @type {HTMLButtonElement} */ (document.getElementById('setsave')).disabled, null, { timeout: 3000 });
       await Promise.all([p.waitForNavigation(), p.click('#setsave')]);
       const saved = readFileSync(join(cfg, 'config.toml'), 'utf8');
-      const shown = await p.$eval('#f-watch\\.interval_ms', (x) => /** @type {HTMLInputElement} */ (x).value);
-      if (off && saved === '[watch]\ninterval_ms = 800\n' && shown === '800') r.ok(`settings ${name}: form, plain, error line and save`);
+      const shown = await p.$eval('#f-watch\\.rescan_secs', (x) => /** @type {HTMLInputElement} */ (x).value);
+      if (off && saved === '[watch]\nrescan_secs = 80\n' && shown === '80') r.ok(`settings ${name}: form, plain, error line and save`);
       else r.fail(`settings ${name}: save off on error ${off}, file ${JSON.stringify(saved)}, form shows ${shown}`);
       // actions.toml: rename the "Mark" action in its card; the comment-free rest stays.
       const before = readFileSync(join(cfg, 'actions.toml'), 'utf8');

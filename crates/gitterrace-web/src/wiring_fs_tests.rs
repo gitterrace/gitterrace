@@ -11,6 +11,7 @@ use std::time::{Duration, Instant};
 use crate::app::App;
 use crate::live::WorktreeWatch;
 use crate::wiring_tests::{app, repo, with};
+use gitterrace_testkit::git;
 
 /// These tests count scans and time file events, so they run one at a time: a parallel test
 /// writing thousands of files would slow the OS event stream they measure.
@@ -216,4 +217,73 @@ async fn a_removed_repository_leaves_nothing_running() {
     std::fs::write(p.join("small.txt"), "after removal\n").expect("write");
     tokio::time::sleep(Duration::from_secs(1)).await;
     assert_eq!(scans(&a), before, "no scan after removal");
+}
+
+/// A served repository's refresher with no tab open, its first fingerprint taken.
+async fn refresher(p: &std::path::Path, rescan_secs: u64, os_events: bool) -> Arc<crate::app::App> {
+    let a = app(p, with(|c| c.watch.rescan_secs = rescan_secs));
+    a.os_events
+        .store(os_events, std::sync::atomic::Ordering::Release);
+    tokio::spawn(crate::app::keep_index_fresh(Arc::clone(&a)));
+    let end = Instant::now() + Duration::from_secs(20);
+    while a.version() == 0 && Instant::now() < end {
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    }
+    a
+}
+
+/// Guard class: HEAD and refs follow OS file events, not a timer. The safety rescan is an hour
+/// here, so only an event can announce the new branch; red when the git directories go
+/// unwatched. Retried, since a loaded machine may drop one event.
+#[tokio::test]
+async fn a_ref_update_shows_from_file_events_without_a_timer() {
+    let _one = SERIAL.lock().await;
+    let dir = tempfile::tempdir().expect("tmp");
+    let p = repo(dir.path(), "r");
+    let a = refresher(&p, 3600, true).await;
+    let start = a.version();
+    let deadline = Instant::now() + Duration::from_secs(20);
+    let mut n = 0;
+    while a.version() == start {
+        assert!(Instant::now() < deadline, "no event in {n} tries");
+        n += 1;
+        git(&p, &["branch", &format!("b{n}")]);
+        tokio::time::sleep(Duration::from_secs(2)).await;
+    }
+}
+
+/// Guard class: a change no event reports still shows within `watch.rescan_secs`. Events are
+/// off, so only the safety rescan can find the commit; red without it, and red if something
+/// polls faster than the rescan while no tab is open.
+#[tokio::test]
+async fn a_dropped_event_still_shows_within_the_rescan() {
+    let _one = SERIAL.lock().await;
+    let dir = tempfile::tempdir().expect("tmp");
+    let p = repo(dir.path(), "r");
+    let rescan = 5;
+    let a = refresher(&p, rescan, false).await;
+    // Align with a rescan: the version moves only when one finds the commit.
+    let start = a.version();
+    git(
+        &p,
+        &["commit", "-q", "--allow-empty", "-m", "chore: unseen"],
+    );
+    let t0 = Instant::now();
+    let bound = Duration::from_secs(rescan + 5);
+    while a.version() == start && t0.elapsed() < bound {
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    }
+    assert_ne!(a.version(), start, "not shown within {bound:?}");
+    // The next commit waits for the next rescan: nothing polls in between.
+    let seen = a.version();
+    git(
+        &p,
+        &["commit", "-q", "--allow-empty", "-m", "chore: unseen 2"],
+    );
+    tokio::time::sleep(Duration::from_millis(1500)).await;
+    assert_eq!(
+        a.version(),
+        seen,
+        "a change showed between rescans with events off"
+    );
 }

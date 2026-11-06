@@ -15,9 +15,8 @@ pub(crate) struct Cli {
     /// Address to listen on. Local only by default. Overrides `server.addr`.
     #[arg(long, global = true)]
     pub(crate) addr: Option<SocketAddr>,
-    /// Check for repository changes every N milliseconds (at least 250). Overrides
-    /// `watch.interval_ms`.
-    #[arg(long, global = true, value_name = "MS")]
+    /// Retired: changes come from OS file events. Accepted with a warning so old scripts start.
+    #[arg(long, global = true, value_name = "MS", hide = true)]
     pub(crate) interval_ms: Option<u64>,
     /// Do not watch for changes: no live updates, and a restart or reload picks up new commits.
     /// Overrides `watch.enabled`.

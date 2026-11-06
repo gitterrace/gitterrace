@@ -54,7 +54,7 @@ async fn events_deliver_each_kind_and_respect_the_stream_cap() {
         &work,
         with(|c| {
             c.server.live_streams = 2;
-            c.watch.interval_ms = 250;
+            c.watch.rescan_secs = 5;
         }),
     );
     let first = open_events(&server, "/events").await;
@@ -98,7 +98,7 @@ async fn events_deliver_each_kind_and_respect_the_stream_cap() {
 async fn a_stream_that_missed_a_change_hears_it_on_connect() {
     let dir = tempfile::tempdir().expect("tmp");
     let p = repo(dir.path(), "r");
-    let r = router(&p, with(|c| c.watch.interval_ms = 250));
+    let r = router(&p, Config::default());
     tokio::time::sleep(Duration::from_millis(600)).await;
     let mut body = open_events(&r, "/events?v=1").await.into_body();
     let got = read_until(&mut body, "event: change", Duration::from_secs(2)).await;
@@ -145,26 +145,6 @@ async fn pages_carry_their_live_mode() {
 }
 
 #[tokio::test]
-async fn watch_interval_sets_how_fast_a_change_is_seen() {
-    let _one = crate::wiring_fs_tests::SERIAL.lock().await;
-    let dir = tempfile::tempdir().expect("tmp");
-    let p = repo(dir.path(), "r");
-    for (ms, fast) in [(250, true), (3000, false)] {
-        let a = app(&p, with(|c| c.watch.interval_ms = ms));
-        // File events would report the commit at once, whatever the interval.
-        a.os_events
-            .store(false, std::sync::atomic::Ordering::Release);
-        tokio::spawn(crate::app::keep_index_fresh(Arc::clone(&a)));
-        let mut rx = a.changes.subscribe();
-        tokio::time::sleep(Duration::from_millis(400)).await;
-        std::fs::write(p.join("small.txt"), format!("needle {ms}\n")).expect("write");
-        git(&p, &["commit", "-qam", &format!("chore: {ms}")]);
-        let got = tokio::time::timeout(Duration::from_millis(1200), rx.recv()).await;
-        assert_eq!(got.is_ok(), fast, "interval {ms} ms");
-    }
-}
-
-#[tokio::test]
 async fn watch_off_runs_no_timer() {
     let dir = tempfile::tempdir().expect("tmp");
     let p = repo(dir.path(), "r");
@@ -185,7 +165,6 @@ async fn working_tree_is_scanned_only_for_a_subscriber() {
     let a = app(
         &p,
         with(|c| {
-            c.watch.interval_ms = 250;
             c.watch.rescan_secs = 5;
         }),
     );
@@ -270,7 +249,6 @@ async fn dirty_chip_follows_on_pages_without_the_worktree() {
     let a = app(
         &p,
         with(|c| {
-            c.watch.interval_ms = 250;
             c.watch.rescan_secs = 5;
         }),
     );
