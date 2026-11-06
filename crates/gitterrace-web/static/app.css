@@ -477,21 +477,6 @@ svg.chart .dot{fill:var(--accent);stroke:var(--surface);stroke-width:2;opacity:0
 svg.chart .col:hover .dot{opacity:1}
 .tag{font-size:var(--text-2xs);color:var(--muted);border:var(--border);border-radius:var(--radius);padding:0 5px}
 
-/* media: checkerboard stage, before/after diff, image icon */
-.media{padding:var(--space-4)}
-.media-stage{display:flex;justify-content:center;align-items:center;padding:var(--space-4);border:var(--border);border-radius:var(--radius);overflow:auto}
-.media-stage.checker{background:conic-gradient(var(--soft) 25%,var(--surface) 0 50%,var(--soft) 0 75%,var(--surface) 0) 0 0/16px 16px}
-.media-img{max-width:100%;max-height:70vh;width:auto;height:auto;display:block}
-.media-file{padding:var(--space-4)}
-.media-av{max-width:100%;display:block}
-.media-facts{margin:var(--space-3) 0 0;font-size:var(--text-sm)}
-.media-src{margin-top:var(--space-4)}
-.media-diff{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:var(--space-4);padding:var(--space-4)}
-.media-bar{display:flex;justify-content:flex-end;padding:var(--space-3) var(--space-4) 0}
-.media-overlay{padding:var(--space-4)}.media-stack{position:relative;display:inline-block;max-width:100%}.media-stack img{display:block;max-width:100%}
-.media-after{position:absolute;inset:0;clip-path:inset(0 0 0 var(--cut,50%))}.media-after img{width:100%;height:100%;object-fit:contain}
-.media-cut{display:flex;align-items:center;gap:var(--space-3);margin-top:var(--space-3);font-size:var(--text-sm)}.media-cut input{flex:1;min-width:0}
-.media-side{margin:0;min-width:0}.media-side figcaption{font-size:var(--text-sm);margin-bottom:var(--space-2)}
 .ico.img{background:var(--accent);opacity:.75;--i:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M1.75 2h12.5c.966 0 1.75.784 1.75 1.75v8.5A1.75 1.75 0 0 1 14.25 14H1.75A1.75 1.75 0 0 1 0 12.25v-8.5C0 2.784.784 2 1.75 2zM1.5 12.25c0 .138.112.25.25.25h.04l6.6-6.6a.75.75 0 0 1 1.06 0l3.3 3.3.9-.9a.75.75 0 0 1 1.06 0l.79.79V3.75a.25.25 0 0 0-.25-.25H1.75a.25.25 0 0 0-.25.25zM5 4.5a1.25 1.25 0 1 1 0 2.5 1.25 1.25 0 0 1 0-2.5z'/%3E%3C/svg%3E")}
 .ov-list .ico{flex:none;align-self:center}
 .opts{display:flex;flex-wrap:wrap;gap:var(--space-1) var(--space-5);font-size:var(--text-xs);margin:0 0 var(--space-4)}
@@ -547,23 +532,6 @@ button.reponame .tri{width:16px;height:16px;fill:var(--muted)}
 .repopanel .tick svg{width:16px;height:16px;fill:var(--accent-ink);display:block}
 .repopanel .two{display:flex;flex-direction:column;min-width:0;gap:2px}
 .repopanel .two .dir{margin-left:0}
-
-/* send */
-.ov.send{width:min(520px,94vw);max-height:80vh}
-.send-title{border:0;border-bottom:var(--border);border-radius:0;height:40px;padding:0 var(--space-4);font-size:var(--text-md);width:100%;background:transparent;flex:none}
-/* The context box starts a few lines tall and grows with what is in it (field-sizing where the
-   browser has it, send.js elsewhere), up to most of the window, then scrolls. */
-.send-ctx{border:0;border-radius:0;resize:none;flex:none;field-sizing:content;min-height:calc(1.5em*4 + var(--space-3)*2);max-height:60vh;overflow-y:auto;padding:var(--space-3) var(--space-4);font-family:var(--font-mono);font-size:var(--text-sm);line-height:1.5;background:transparent;color:var(--fg)}
-.send-foot{display:flex;gap:var(--space-3);align-items:center;padding:var(--space-2) var(--space-4);border-top:var(--border);background:var(--soft);flex:none}
-.send-pick{min-width:0;max-width:50%;height:28px;padding:0 var(--space-2);font:var(--text-sm) var(--sans);color:var(--fg);background:var(--bg);border:var(--border);border-radius:var(--radius)}
-.send-hint{margin-left:auto;color:var(--muted);font-size:var(--text-xs)}
-.send-head{margin:0;padding:var(--space-3) var(--space-4) 0;font-size:var(--text-base);font-weight:var(--weight-semibold);color:var(--fg);flex:none}
-.send-lab{display:block;padding:var(--space-3) var(--space-4) 0;font-size:var(--text-xs);color:var(--muted);flex:none}
-.send-cancel{height:28px;background:none;color:var(--fg);border:var(--border);border-radius:var(--radius);padding:0 var(--space-3);font:var(--text-sm) var(--sans);cursor:pointer}
-/* On a phone the window is a sheet along the bottom edge, its footer always in reach. */
-@media (max-width:600px){.send-back{align-items:flex-end;padding-top:0}.ov.send{width:100vw;max-width:none;max-height:90vh;margin:0;border-radius:var(--radius) var(--radius) 0 0}.send-foot{position:sticky;bottom:0}.send-hint{display:none}.send-pick{max-width:none;flex:1}}
-/* Same height and type as the picker beside it, so the footer reads as one row. */
-.send-go{height:28px;background:var(--accent);color:var(--on-accent);border:0;border-radius:var(--radius);padding:0 var(--space-3);font:var(--weight-semibold) var(--text-sm) var(--sans);cursor:pointer}
 .tip,.loc-tip{background:var(--surface);border:var(--border);border-radius:var(--radius);box-shadow:var(--shadow-2);color:var(--fg)}
 .tip{position:fixed;left:0;top:0;z-index:50;box-sizing:border-box;max-width:320px;padding:var(--space-2) var(--space-3);font:var(--text-xs)/1.4 var(--sans);overflow-wrap:break-word;white-space:normal;pointer-events:none;opacity:0;visibility:hidden;transition:opacity var(--dur-fast) var(--ease),visibility 0s linear var(--dur-fast)}
 .tip.on{opacity:1;visibility:visible;transition:opacity var(--dur-fast) var(--ease)}
