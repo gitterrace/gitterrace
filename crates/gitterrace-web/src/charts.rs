@@ -102,11 +102,17 @@ fn x_labels(keys: &[&str]) -> String {
         0
     };
     let mut svg = String::new();
+    let mut last = None;
     for (i, k) in keys
         .iter()
         .enumerate()
         .filter(|(i, _)| *i >= start && (i - start) % every == 0)
     {
+        // Per-commit axes name a day many times over: a label never repeats its neighbour.
+        if last == Some(*k) {
+            continue;
+        }
+        last = Some(*k);
         let cx = (i as f64).mul_add(sl, LEFT) + sl / 2.0;
         let (x, anchor) = if cx > W - LABEL_PX / 2.0 {
             (W, "end")

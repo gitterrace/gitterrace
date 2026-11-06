@@ -162,6 +162,27 @@ fn labels_step_by_calendar() {
     );
 }
 
+#[test]
+fn a_repeated_day_is_labelled_once() {
+    let pts: Vec<(String, u64)> = (0..12)
+        .map(|i| (format!("2026-11-{:02}", 1 + i / 4), 1))
+        .collect();
+    let svg = bars(&pts, COMMITS);
+    let shown: Vec<&str> = svg
+        .split(r#"class="ax""#)
+        .skip(1)
+        .map(|t| {
+            t.split('>')
+                .nth(1)
+                .and_then(|t| t.split('<').next())
+                .unwrap_or_default()
+        })
+        .collect();
+    let mut uniq = shown.clone();
+    uniq.dedup();
+    assert!(!shown.is_empty() && uniq == shown, "{shown:?}");
+}
+
 /// Every chart whose marks are links is one tab stop: the chart takes focus and each link is
 /// out of the tab order, reached with the arrow keys instead.
 #[test]
