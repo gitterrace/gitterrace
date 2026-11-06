@@ -17,6 +17,10 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+COMMENT_EXTS = {".rs": "//", ".mjs": "//", ".py": "#", ".sh": "#"}
+HISTORY = re.compile(r"\b(?:no longer|used to|previously|was changed)\b", re.I)
+# Existing comments with history wording, `path:line` entries. Only shrinks.
+ALLOW: set[str] = {"crates/gitterrace-web/src/wiring_live_tests.rs:543"}
 EXTS = (".rs", ".html", ".js", ".mjs", ".md")
 EXCLUDE = ("static/vendor/", "shared/schwarzwald/", "target/", "CHANGELOG.md")
 W = r"(?:clean|dirty|ahead|behind|detached|untracked|modified)"
@@ -45,6 +49,21 @@ def scan(text: str, name: str) -> list[str]:
     return out
 
 
+def scan_comments(text: str, name: str, marker: str) -> list[str]:
+    """Comments state what is true now, not what the code used to do."""
+    out = []
+    for i, line in enumerate(text.splitlines(), 1):
+        at = line.find(marker)
+        if at < 0 or (marker == "#" and line.startswith("#!")):
+            continue
+        if at > 0 and not line[:at].strip() == "" and f" {marker}" not in line[at - 1 :]:
+            continue
+        m = HISTORY.search(line[at:])
+        if m and f"{name}:{i}" not in ALLOW:
+            out.append(f"{name}:{i}: comment looks back ('{m.group(0)}'), say what holds now")
+    return out
+
+
 def files() -> list[Path]:
     r = subprocess.run(
         ["git", "ls-files", "-co", "--exclude-standard"],
@@ -56,7 +75,7 @@ def files() -> list[Path]:
     return [
         ROOT / f
         for f in r.stdout.split("\n")
-        if f.endswith(EXTS)
+        if f.endswith(EXTS + tuple(COMMENT_EXTS))
         and not any(x in f for x in EXCLUDE)
         and f != "scripts/status-words-check.py"
     ]
@@ -74,6 +93,11 @@ def self_test() -> int:
         "a clean checkout",
     ]
     ok = all(scan(b, "x") for b in bad) and not any(scan(g, "x") for g in good)
+    red = ["// no longer needed", "    /// used to be slow", "let a = 1; // previously 2"]
+    ok = ok and all(scan_comments(c, "x", "//") for c in red)
+    ok = ok and bool(scan_comments("# was changed", "x", "#"))
+    ok = ok and not scan_comments("// the cache holds now\nlet s = \"no longer\";", "x", "//")
+    ok = ok and not scan_comments("#!/bin/sh -e", "x", "#")
     print("self-test", "ok" if ok else "FAILED")
     return 0 if ok else 1
 
@@ -83,7 +107,10 @@ def main() -> int:
         return self_test()
     hits = []
     for f in files():
-        hits += scan(f.read_text(errors="ignore"), str(f.relative_to(ROOT)))
+        text = f.read_text(errors="ignore")
+        hits += scan(text, str(f.relative_to(ROOT)))
+        if f.suffix in COMMENT_EXTS:
+            hits += scan_comments(text, str(f.relative_to(ROOT)), COMMENT_EXTS[f.suffix])
     print("\n".join(hits) or "status-words: ok")
     return 1 if hits else 0
 
