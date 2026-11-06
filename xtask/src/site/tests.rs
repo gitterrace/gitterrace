@@ -126,3 +126,13 @@ fn a_missing_unreferenced_or_wrongly_sized_screenshot_fails() {
     assert!(err.contains("not referenced"), "{err}");
     std::fs::remove_dir_all(&dir).expect("cleanup");
 }
+
+/// Every heading of an internals doc is an id on its page, so a link can name the rule.
+#[test]
+fn internals_pages_give_every_heading_its_slug_as_id() {
+    let text = "# Title\n\n## Code age and releases\n\ntext\n";
+    assert_eq!(docs::anchors(text), ["title", "code-age-and-releases"]);
+    let html = docs::body(text);
+    assert!(html.contains("<h2 id=\"code-age-and-releases\">Code age and releases</h2>"));
+    assert_eq!(docs::page_path("counting"), "docs/counting/");
+}
