@@ -193,6 +193,8 @@ async fn serves_every_page() {
     // Both lines of src/a.rs come from "fix: second": one run, two heat cells, one name.
     assert_eq!(body.matches("<td class=\"who h").count(), 2);
     assert_eq!(body.matches("<a class=\"who\"").count(), 1);
+    let (_, css) = get(&app, "/static/app.css").await;
+    assert!(css.contains(".blame td.who .sha{border-color:transparent}"));
     // Every page that names an author links to their log, branch rows included.
     let (_, body) = get(&app, "/refs").await;
     assert!(
