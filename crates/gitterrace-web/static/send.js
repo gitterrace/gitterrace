@@ -70,13 +70,22 @@
   function open(c) {
     var back = el("div", "ov-back send-back");
     var box = el("form", "ov send");
+    // Named fields under a named head: with targets set up the window is a small form, and a
+    // bare input and text box gave no hint which was the title and which the notes.
+    var head = el("h2", "send-head", "Send to");
+    head.id = "send-head";
+    box.setAttribute("aria-labelledby", "send-head");
     var title = el("input", "send-title");
     title.type = "text";
+    title.id = "send-title";
     title.value = titleOf(c);
-    title.setAttribute("aria-label", "Title");
+    var titleLab = el("label", "send-lab", "Title");
+    titleLab.htmlFor = "send-title";
     var ctx = el("textarea", "send-ctx");
+    ctx.id = "send-ctx";
     ctx.value = "\n" + c.markdown;
-    ctx.setAttribute("aria-label", "Context");
+    var ctxLab = el("label", "send-lab", "Notes");
+    ctxLab.htmlFor = "send-ctx";
     ctx.spellcheck = false;
     // Grows with its content up to the CSS max-height. Browsers with field-sizing do this in CSS.
     if (!CSS.supports || !CSS.supports("field-sizing", "content")) {
@@ -89,12 +98,18 @@
     pick.setAttribute("aria-label", "Target");
     var go = el("button", "send-go", "Send");
     go.type = "submit";
-    var hint = el("span", "send-hint");
-    hint.appendChild(el("kbd", "", (/Mac|iP/.test(navigator.platform) ? "\u2318" : "Ctrl") + "\u21B5"));
+    var cancel = el("button", "send-cancel", "Cancel");
+    cancel.type = "button";
+    cancel.addEventListener("click", function () { close(); });
+    var hint = el("span", "send-hint", (/Mac|iP/.test(navigator.platform) ? "Cmd" : "Ctrl") + "+Enter to send");
     foot.appendChild(pick);
     foot.appendChild(hint);
+    foot.appendChild(cancel);
     foot.appendChild(go);
+    box.appendChild(head);
+    box.appendChild(titleLab);
     box.appendChild(title);
+    box.appendChild(ctxLab);
     box.appendChild(ctx);
     box.appendChild(foot);
     back.appendChild(box);

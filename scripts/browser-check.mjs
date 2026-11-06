@@ -102,6 +102,9 @@
 //   lone-rows    on every page the goldens cover, at 1440 and 390 px, no control row above the
 //                first content block holds a single control using under 40% of its width;
 //                pages red today are listed as known with the change that fixes them
+//   send-dialog  the Send to window has a "Send to" head, Title and Notes labels, a Cancel that
+//                closes it and the shortcut in words; at 390 px it is a bottom sheet with its
+//                footer in view
 //   huge-diff    a commit of 2,000 changed files (mostly pure renames) loads under a DOM bound,
 //                shows a rename as one line, loads the last files on scroll, opens #fN, opens a
 //                folded file with Enter, and prints scroll frame times and long tasks
@@ -124,7 +127,7 @@ const bin = resolve(arg('--bin', join(root, 'target/debug/git-terrace')));
 const fromDisk = process.argv.includes('--from-disk');
 const tabCounts = arg('--tabs', '8,12').split(',').map(Number);
 const browsers = arg('--browsers', 'webkit,chromium').split(',');
-const ALL = ['truncation', 'live-tabs', 'mermaid', 'chip', 'doctabs', 'chords', 'header', 'marked', 'menu-same', 'gutter', 'overlays', 'tips', 'date-tips', 'repo-switch', 'outline', 'mark-seam', 'about-place', 'site-theme', 'side-width', 'calm-header', 'tabs-one-line', 'tab-levels', 'huge-diff', 'sticky-heads', 'md-anchor', 'live-scroll', 'sticky-line', 'seg-one-row', 'period-steady', 'export-from-disk', 'inline-controls', 'section-gaps', 'path-cells', 'mark-flat', 'tab-stops', 'help-keys', 'side-order', 'settings', 'lone-rows', 'page-heads', 'compare-head', 'commit-head', 'search-head', 'small-layout'];
+const ALL = ['truncation', 'live-tabs', 'mermaid', 'chip', 'doctabs', 'chords', 'header', 'marked', 'menu-same', 'gutter', 'overlays', 'tips', 'date-tips', 'repo-switch', 'outline', 'mark-seam', 'about-place', 'site-theme', 'side-width', 'calm-header', 'tabs-one-line', 'tab-levels', 'huge-diff', 'sticky-heads', 'md-anchor', 'live-scroll', 'sticky-line', 'seg-one-row', 'period-steady', 'export-from-disk', 'inline-controls', 'section-gaps', 'path-cells', 'mark-flat', 'tab-stops', 'help-keys', 'side-order', 'settings', 'lone-rows', 'page-heads', 'compare-head', 'commit-head', 'search-head', 'small-layout', 'send-dialog'];
 const wanted = arg('--checks', ALL.join(',')).split(',');
 for (const c of wanted) if (!ALL.includes(c)) { console.error(`unknown check ${c}; known: ${ALL.join(', ')}`); process.exit(2); }
 
@@ -169,6 +172,8 @@ const { checks: a11yChecks } = await import('./browser-access-lib.mjs');
 const { markFlat, tabStops, helpKeys, sideOrder } = a11yChecks(env);
 const { checks: rowChecks } = await import('./browser-rows-lib.mjs');
 const { loneRows, smallLayout } = rowChecks(env);
+const { checks: sendChecks } = await import('./browser-send-lib.mjs');
+const { sendDialog } = sendChecks(env);
 async function sideWidth() {
   for (const name of browsers) {
     const { b, ctx } = await context(name);
@@ -488,7 +493,7 @@ async function settings() {
   }
 }
 
-const checks = { 'sticky-heads': stickyHeads, 'tabs-one-line': tabsOneLine, 'tab-levels': tabLevels, 'calm-header': calmHeader, 'side-width': sideWidth, truncation, 'live-tabs': liveTabs, mermaid, chip, doctabs, chords, header, marked, 'menu-same': menuSame, gutter, overlays, tips, 'date-tips': dateTips, 'repo-switch': repoSwitch, outline, 'mark-seam': markSeam, 'about-place': aboutPlace, 'site-theme': siteTheme, 'huge-diff': hugeDiff, 'md-anchor': mdAnchor, 'live-scroll': liveScroll, 'sticky-line': stickyLine, 'seg-one-row': segOneRow, 'period-steady': periodSteady, 'export-from-disk': exportFromDisk, 'inline-controls': inlineControls, 'section-gaps': sectionGaps, 'path-cells': pathCells, 'mark-flat': markFlat, 'tab-stops': tabStops, 'help-keys': helpKeys, 'side-order': sideOrder, settings, 'lone-rows': loneRows, 'page-heads': pageHeads, 'compare-head': compareHeads, 'commit-head': commitHeads, 'search-head': searchHeads, 'small-layout': smallLayout };
+const checks = { 'sticky-heads': stickyHeads, 'tabs-one-line': tabsOneLine, 'tab-levels': tabLevels, 'calm-header': calmHeader, 'side-width': sideWidth, truncation, 'live-tabs': liveTabs, mermaid, chip, doctabs, chords, header, marked, 'menu-same': menuSame, gutter, overlays, tips, 'date-tips': dateTips, 'repo-switch': repoSwitch, outline, 'mark-seam': markSeam, 'about-place': aboutPlace, 'site-theme': siteTheme, 'huge-diff': hugeDiff, 'md-anchor': mdAnchor, 'live-scroll': liveScroll, 'sticky-line': stickyLine, 'seg-one-row': segOneRow, 'period-steady': periodSteady, 'export-from-disk': exportFromDisk, 'inline-controls': inlineControls, 'section-gaps': sectionGaps, 'path-cells': pathCells, 'mark-flat': markFlat, 'tab-stops': tabStops, 'help-keys': helpKeys, 'side-order': sideOrder, settings, 'lone-rows': loneRows, 'page-heads': pageHeads, 'compare-head': compareHeads, 'commit-head': commitHeads, 'search-head': searchHeads, 'small-layout': smallLayout, 'send-dialog': sendDialog };
 try {
   for (const c of wanted) { console.log(`-- ${c}`); await checks[c](); }
 } finally {
