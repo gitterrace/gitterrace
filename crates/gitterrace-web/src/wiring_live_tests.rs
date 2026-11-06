@@ -540,7 +540,7 @@ async fn commit_page_links_only_the_targets_with_a_lookup() {
 }
 
 /// The folded-file route of the working tree answers changed files only: an ignored file and
-/// `.git/config` both exist on disk and still read as `No longer changed`.
+/// `.git/config` both exist on disk and still get the unchanged-file answer.
 #[tokio::test]
 async fn worktree_fragments_refuse_ignored_and_git_paths() {
     let dir = tempfile::tempdir().expect("tmp");

@@ -20,7 +20,7 @@ ROOT = Path(__file__).resolve().parent.parent
 COMMENT_EXTS = {".rs": "//", ".mjs": "//", ".py": "#", ".sh": "#"}
 HISTORY = re.compile(r"\b(?:no longer|used to|previously|was changed)\b", re.I)
 # Existing comments with history wording, `path:line` entries. Only shrinks.
-ALLOW: set[str] = {"crates/gitterrace-web/src/wiring_live_tests.rs:543"}
+ALLOW: set[str] = set()
 EXTS = (".rs", ".html", ".js", ".mjs", ".md")
 EXCLUDE = ("static/vendor/", "shared/schwarzwald/", "target/", "CHANGELOG.md")
 W = r"(?:clean|dirty|ahead|behind|detached|untracked|modified)"
