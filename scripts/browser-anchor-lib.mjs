@@ -63,6 +63,20 @@ export function checks(env) {
       const own = await c.evaluate(() => document.getElementById('main') && document.getElementById('main').tagName);
       m = await seen(c, 'user-content-main');
       own === 'MAIN' && m && m.scrolled && m.inView ? r.ok(`${where}: #main lands on the heading, page <main> intact`) : r.fail(`${where}: #main: own=${own} ${m ? `heading at ${Math.round(m.top)} px` : 'no heading'}`);
+      // A busy machine: the browser's own scroll to the page's <main> comes well after load.
+      // Played here as a late scroll 150 ms after load; the jump must still win.
+      const late = await ctx.newPage();
+      await late.setViewportSize({ width: 900, height: 600 });
+      await late.addInitScript(() => {
+        addEventListener('load', () => setTimeout(() => {
+          const el = document.querySelector('main');
+          if (el) el.scrollIntoView();
+        }, 150));
+      });
+      await late.goto(`${srv.base}/blob/${sha}/anchor/guide.md#main`, { waitUntil: 'load' });
+      await late.waitForTimeout(1200);
+      m = await seen(late, 'user-content-main');
+      m && m.scrolled && m.inView ? r.ok(`${where}: #main still lands on the heading after a late load scroll`) : r.fail(`${where}: #main after a late load scroll: ${m ? `heading at ${Math.round(m.top)} px` : 'no heading'}`);
       await b.close();
       // JS off, as an export may be opened: the plain fragment resolves by the browser alone.
       const nb = await launch(env.pw, name);
