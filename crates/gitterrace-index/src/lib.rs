@@ -5,6 +5,7 @@
 mod cache;
 mod conventional;
 pub mod feed;
+pub mod graph;
 mod insights;
 pub mod seg;
 mod source;
