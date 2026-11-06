@@ -10,7 +10,7 @@
 {% include "_lead.html" %}
 {% if let Some(who) = solo %}<p class="hint" data-solo>Every directory has one owner, {{ who }}.</p>{% endif %}
 {% include "_kpis.html" %}
-<div class="chart-head"><div><h2>Owners by directory</h2><p class="hint">{% if solo.is_none() %}Share of the knowledge per person, from who changed the files and how much. Bus factor is how many people together hold at least half. {% endif %}Click a directory to filter every page to it.</p></div></div>
+<div class="chart-head"><div><h2>Owners by directory</h2><p class="hint">{% if solo.is_none() %}Share of the knowledge per person, from who changed the files and how much. Bus factor is how many people together hold at least half. {% endif %}Click a directory to filter every page to it. {{ crate::rule::link(crate::rule::RENAMES)|safe }}</p></div></div>
 <div class="card"><table class="entries own">
 <tr class="th"><td>Directory</td>{% if solo.is_none() %}<td class="r bus">Bus factor</td>{% endif %}<td class="r n">Lines</td><td class="r n">Files</td>{% if solo.is_none() %}<td>Owners</td>{% endif %}</tr>
 {% for r in rows %}<tr><td><a href="{{ r.href }}">{% call paths::path(&r.path) %}{% endcall %}</a></td>{% if solo.is_none() %}<td class="r bus">{% if r.bus == 1 %}<b class="warn" data-tip="One person holds half of this directory">1</b>{% else %}{{ r.bus }}{% endif %}</td>{% endif %}<td class="r n">{{ r.lines }}</td><td class="r n">{{ r.files }}</td>{% if solo.is_none() %}<td>{% for o in r.owners %}{% if !loop.first %} · {% endif %}{{ o.0 }} <span class="muted">{{ o.1 }}</span>{% endfor %}</td>{% endif %}</tr>{% endfor %}

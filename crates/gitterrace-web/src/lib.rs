@@ -44,6 +44,7 @@ mod public;
 mod registry;
 mod reload;
 mod routes;
+mod rule;
 mod search;
 mod sections;
 mod seg;
