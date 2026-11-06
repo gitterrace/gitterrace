@@ -287,13 +287,6 @@ impl<'a> Insights<'a> {
         !c.merge && (self.opts.include_bots || !self.d.people.list[self.person_of(c.ident)].bot)
     }
 
-    /// [`Insights::counted_row`] by rank.
-    pub fn counted_rank(&self, rank: Rank) -> bool {
-        self.source()
-            .commit(rank)
-            .is_some_and(|c| self.counted_row(&c))
-    }
-
     /// Lines changed by commit `rank` over counted files.
     pub fn commit_sums(&self, rank: Rank) -> Lines {
         self.d
@@ -318,24 +311,6 @@ impl<'a> Insights<'a> {
             .get(rank.0 as usize)
             .copied()
             .unwrap_or_default()
-    }
-
-    /// Buckets for a time chart of `period` (`None` and `All` span the history).
-    pub(crate) fn axis(&self, period: Option<Period>) -> TimeAxis {
-        let src = self.source();
-        let first = src
-            .commits_in(CommitRange::All)
-            .map(|c| feed::local_day_of(c.time, c.offset))
-            .min();
-        match (first, reference_day(src)) {
-            (Some(first), Some(last)) => TimeAxis::for_period(period, first, last),
-            _ => TimeAxis::for_period(period, 1, 0),
-        }
-    }
-
-    /// Bucket width of every time chart for `period`.
-    pub fn bucket_unit(&self, period: Period) -> BucketUnit {
-        self.axis(Some(period)).unit()
     }
 
     pub(crate) fn follow(&self) -> &files::Follow {

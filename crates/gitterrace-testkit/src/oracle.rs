@@ -274,43 +274,6 @@ fn cut(body: &str, open: &str, close: &str) -> String {
     format!("{}{}", &body[..at], &body[end..])
 }
 
-/// Keys whose body outside the chrome differs between two dumps.
-///
-/// The dumps are `TEST_ORACLE_DUMP` folders. Keys on one side only count too. Empty when a
-/// change touched only header and sidebar. Equal-time row order is folded, as everywhere in the
-/// oracle.
-#[must_use]
-pub fn chrome_only_diff(old_dir: &Path, new_dir: &Path) -> (usize, Vec<String>) {
-    let read = |dir: &Path| -> BTreeMap<String, String> {
-        std::fs::read_dir(dir)
-            .expect("dump dir")
-            .filter_map(Result::ok)
-            .filter_map(|e| std::fs::read_to_string(e.path()).ok())
-            .filter_map(|t| {
-                t.split_once('\n')
-                    .map(|(k, b)| (k.to_owned(), normalize(b)))
-            })
-            .collect()
-    };
-    let (old, new) = (read(old_dir), read(new_dir));
-    let mut moved = 0;
-    let mut bad = Vec::new();
-    let mut keys: std::collections::BTreeSet<&String> = old.keys().collect();
-    keys.extend(new.keys());
-    for k in keys {
-        match (old.get(k), new.get(k)) {
-            (Some(a), Some(b)) if a == b => {}
-            (Some(a), Some(b))
-                if canonical(&without_chrome(k, a)) == canonical(&without_chrome(k, b)) =>
-            {
-                moved += 1;
-            }
-            _ => bad.push(k.clone()),
-        }
-    }
-    (moved, bad)
-}
-
 /// Blanks the one value that is not output of the insights but of the watcher: `data-live-v`,
 /// a hash of worktree file stamps that differs per checkout. Nothing else is touched.
 #[must_use]
