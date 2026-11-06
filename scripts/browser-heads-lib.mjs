@@ -79,5 +79,21 @@ export function checks({ srv, r, browsers, context }) {
       return bad;
     }));
   }
-  return { pageHeads, compareHeads, commitHeads };
+  async function searchHeads() {
+    await each('search', '/search?q=one', (p) => p.evaluate(() => {
+      const bad = [];
+      const form = document.querySelector('main form[action$="/search"]');
+      if (!form) return ['no search form'];
+      if (form.classList.contains('card') || getComputedStyle(form).borderTopWidth !== '0px') bad.push('the bar is a card');
+      const rows = [...form.querySelectorAll('.srow')];
+      if (rows.length !== 2) bad.push(`${rows.length} rows, want 2`);
+      const r1 = rows[0];
+      if (r1 && (!r1.querySelector('input[name=q]') || !r1.querySelector('.segctl'))) bad.push('row 1 lacks the query or the Code/Commits switch');
+      if (form.querySelector('input[type=radio]')) bad.push('radio buttons for the kind');
+      if (!rows[1]?.querySelector('.sum')) bad.push('the summary is not in row 2');
+      if (form.nextElementSibling?.classList.contains('sum')) bad.push('a separate summary line');
+      return bad;
+    }));
+  }
+  return { pageHeads, compareHeads, commitHeads, searchHeads };
 }

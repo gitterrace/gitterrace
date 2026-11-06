@@ -302,13 +302,13 @@ table.entries[data-last] td:first-child{width:1%;min-width:0;white-space:nowrap}
 td.lc{font-size:var(--text-sm);overflow-wrap:break-word}
 td.lc a{color:var(--muted)!important}td.lc a:hover{color:var(--accent-fg)!important}
 td.ago{color:var(--faint);font-size:var(--text-xs);white-space:nowrap}
-.searchform{padding:var(--space-4);margin-bottom:var(--space-4)}
-.searchform .srow{display:flex;gap:var(--space-3);align-items:center;flex-wrap:wrap}
-.searchform .srow+.srow{margin-top:var(--space-3)}
-.searchform .srow>input:first-child{flex:1;min-width:200px}
-.searchform label{display:inline-flex;gap:6px;align-items:center;color:var(--muted);font-size:var(--text-sm)}
-.searchform label input:not([type=radio]):not([type=checkbox]){min-width:120px;width:140px}
-.sum{margin:0 0 var(--space-4);font-size:var(--text-sm)}
+.searchbar{margin-bottom:var(--space-4)}
+.searchbar .srow{display:flex;gap:var(--space-3);align-items:center;flex-wrap:wrap}
+.searchbar .srow+.srow{margin-top:var(--space-3)}
+.searchbar .srow>input:first-child{flex:1;min-width:200px}
+.searchbar label{display:inline-flex;gap:6px;align-items:center;color:var(--muted);font-size:var(--text-sm)}
+.searchbar label input:not([type=radio]):not([type=checkbox]){min-width:120px;width:140px}
+.sum{margin:0;font-size:var(--text-sm)}.searchbar .sum{margin-left:auto;text-align:right}
 .err{color:var(--del);font-family:var(--mono);font-size:var(--text-sm)}
 .hits{margin-bottom:var(--space-4)}
 .hits>header{display:flex;justify-content:space-between;padding:var(--space-2) var(--space-4);background:var(--soft);border-bottom:var(--border);font:var(--text-sm) var(--mono)}
@@ -316,7 +316,7 @@ td.ago{color:var(--faint);font-size:var(--text-xs);white-space:nowrap}
 .hits tr.hit td.c{background:var(--accent-soft)}
 .hits tr.gap td{color:var(--faint)}
 mark{/* one quiet background, no ring or padding: letters keep their places */background:var(--warn-bg);color:var(--fg);border-radius:var(--radius)}
-.searchform input[type=radio],.searchform input[type=checkbox]{min-width:0;width:auto;height:auto;flex:none;margin:0}
+.searchbar input[type=radio],.searchbar input[type=checkbox]{min-width:0;width:auto;height:auto;flex:none;margin:0}
 
 /* ---- voice: serif display, grotesk body, mono metadata, hairlines ---- */
 body{background-image:radial-gradient(60rem 22rem at 80% -6rem,color-mix(in srgb,var(--accent) 7%,transparent),transparent 70%);background-repeat:no-repeat}

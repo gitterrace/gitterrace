@@ -73,6 +73,8 @@ struct SearchPage {
     q: String,
     rev: String,
     commits_mode: bool,
+    /// Code/Commits, each a link to the same search with the other kind.
+    kinds: crate::seg::Seg,
     regex: bool,
     case: bool,
     glob: String,
@@ -119,6 +121,40 @@ fn memo_key(a: &App, q: &SearchQuery) -> String {
     a.memo_key("search", Some(&query))
 }
 
+/// Code/Commits as the page's one switch: each choice is this search with the other kind.
+fn kinds_seg(
+    text: &str,
+    rev: &str,
+    glob: &str,
+    (regex, case): (bool, bool),
+    commits: bool,
+) -> crate::seg::Seg {
+    use crate::seg::{Choice, Seg};
+    let link = |kind: &str| {
+        let mut u = format!(
+            "/search?q={}&kind={kind}&rev={}&glob={}",
+            fmt::enc_seg(text),
+            fmt::enc_seg(rev),
+            fmt::enc_seg(glob)
+        );
+        if regex {
+            u.push_str("&regex=1");
+        }
+        if case {
+            u.push_str("&case=1");
+        }
+        fmt::href(&u)
+    };
+    Seg::links(
+        "Search in",
+        vec![
+            Choice::new("Code", link("code"), !commits),
+            Choice::new("Commits", link("commits"), commits),
+        ],
+    )
+    .no_caption()
+}
+
 fn run(a: &App, q: SearchQuery) -> Result<SearchPage> {
     let rev = q
         .rev
@@ -134,6 +170,7 @@ fn run(a: &App, q: SearchQuery) -> Result<SearchPage> {
         q: text.clone(),
         rev: rev.clone(),
         commits_mode,
+        kinds: kinds_seg(&text, &rev, &glob, (regex, case), commits_mode),
         regex,
         case,
         glob: glob.clone(),
