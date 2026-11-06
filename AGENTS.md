@@ -70,6 +70,9 @@ outside `gitterrace-git` imports `gix`.
   words. `git config core.hooksPath scripts/hooks` runs the message rules on every commit.
 - One change, one commit, squashed in its own clone or worktree (shared rules, Commits). The
   gate for a squashed commit here is `scripts/land-check.sh --base <main>`.
+- Accepting commits written without a build: `python3 scripts/commits-check.py --range <base>..<tip>` prints the
+  files and diffstat and runs the cargo-free gates those file types need, with the message step
+  when the tip is checked out. `scripts/land-check.sh` still builds and tests afterwards.
 - Names: files in `scripts/` are `<area>-<verb>.<ext>`, make targets are `<area>[-<verb>]`,
   harness-only env vars use a `TEST_` prefix. `make names` enforces it.
 
