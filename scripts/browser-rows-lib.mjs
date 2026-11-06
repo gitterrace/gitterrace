@@ -2,15 +2,15 @@
 // width empty reads as a stray and pushes the content down. Imported by
 // scripts/browser-check.mjs, not run on its own.
 
-// Pages red today, each with the id of the change that fixes it. A page listed here that is
+// Pages red today, each with the change that fixes it, in words. A page listed here that is
 // green at every width and in every browser fails the check, so the list can only shrink.
 const KNOWN = {
-  'insights/activity': '017038',
-  'insights/contributors': '017038',
-  'insights/hotspots': '017038',
-  'insights/ownership': '017038',
-  compare: 'd6a9f8',
-  refs: '98c6cb',
+  'insights/activity': 'the insights toolbar row',
+  'insights/contributors': 'the insights toolbar row',
+  'insights/hotspots': 'the insights toolbar row',
+  'insights/ownership': 'the insights toolbar row',
+  compare: 'the compare form in the title row',
+  refs: 'the branches and tags page on one page',
 };
 
 /** @param {any} env what browser-check.mjs set up (srv, r, browsers, context, ...) */
@@ -48,7 +48,7 @@ export function checks(env) {
         if (!red.has(key)) red.set(key, []);
         const where = `lone-rows ${name} ${width} ${key}`;
         if (!lone.length) r.ok(`${where}: no lone control row above the content`);
-        else if (KNOWN[key]) r.ok(`${where}: known, row ${KNOWN[key]} fixes it (${lone[0]})`);
+        else if (KNOWN[key]) r.ok(`${where}: known, ${KNOWN[key]} fixes it (${lone[0]})`);
         else r.fail(`${where}: ${lone.join('; ')}`);
         red.get(key).push(...lone);
       }
