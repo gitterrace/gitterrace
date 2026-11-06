@@ -378,7 +378,7 @@ impl Served {
 /// separators, control or non-ASCII characters) a `-`, trimmed of `-`; `repo` when nothing is
 /// left. Lowercase, so two folders differing in case only never share a URL on a
 /// case-insensitive disk.
-fn url_stem(folder: &str) -> String {
+pub(crate) fn url_stem(folder: &str) -> String {
     // A bare clone's folder is conventionally `name.git`: the repository is `name`.
     let folder = folder
         .strip_suffix(".git")
@@ -402,7 +402,7 @@ fn url_stem(folder: &str) -> String {
 }
 
 /// A URL-safe name: no separator, no dot prefix (so never `.` or `..`), nothing to escape.
-fn valid_name(name: &str) -> bool {
+pub(crate) fn valid_name(name: &str) -> bool {
     !name.is_empty()
         && !name.starts_with('.')
         && name

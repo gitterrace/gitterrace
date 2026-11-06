@@ -33,6 +33,7 @@ mod limits_wiring_tests;
 mod live;
 mod lost;
 mod markdown;
+mod mcp_scope;
 mod media;
 mod multi;
 #[cfg(test)]
@@ -79,6 +80,7 @@ use gitterrace_git::Repo;
 use gitterrace_index::Index;
 pub use guard::CSP as PAGE_CSP;
 pub use highlight::languages as highlighted_languages;
+pub use mcp_scope::mcp_scope;
 pub use media::plain_media;
 pub use multi::discover_repos;
 pub use registry::{

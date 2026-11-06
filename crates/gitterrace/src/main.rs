@@ -76,8 +76,15 @@ async fn main() -> anyhow::Result<()> {
             });
             gitterrace_web::serve(repos, addr, actions, loaded.config, watched).await?;
         }
-        Command::Mcp => {
-            gitterrace_api::serve_mcp(&path, &loaded.config).await?;
+        Command::Mcp { served } => {
+            let m = &loaded.config.multi;
+            let repos = gitterrace_web::discover_repos(&cli.paths, m.depth, &m.skip_dirs);
+            if served || repos.len() > 1 {
+                let (scope, list) = gitterrace_web::mcp_scope(&repos, served);
+                gitterrace_api::serve_mcp_repos(&scope, list, &loaded.config).await?;
+            } else {
+                gitterrace_api::serve_mcp(&path, &loaded.config).await?;
+            }
         }
         Command::Open { link, print } => {
             let r = tokio::task::block_in_place(|| {

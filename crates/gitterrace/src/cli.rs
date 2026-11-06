@@ -43,7 +43,15 @@ pub(crate) enum Command {
     /// Print the effective configuration and where each value comes from.
     Config,
     /// Run a read-only MCP server over stdio for agents.
-    Mcp,
+    ///
+    /// Reads the repositories the paths name (folders are searched as for `serve`). With
+    /// `--served` it also reads every repository served before, such as those of a running
+    /// server. Tools then take a `repo` name from `list_repos`.
+    Mcp {
+        /// Also read the repositories served before (the registry a running server keeps).
+        #[arg(long)]
+        served: bool,
+    },
     /// Write the year-in-review card for the repository.
     Wrapped {
         /// Year to summarize. Defaults to the year of the newest commit.
