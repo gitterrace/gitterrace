@@ -5,7 +5,7 @@ use std::{
     time::Duration,
 };
 
-use crate::app::events::{Events, GitEvents, POLL_FALLBACK};
+use crate::app::events::{POLL_FALLBACK, Scope, Watch};
 use crate::app::{App, blocking};
 use crate::live::Change;
 
@@ -49,8 +49,8 @@ pub(crate) async fn keep_index_fresh(app: Arc<App>) {
     let mut check_head = true;
     let mut wt_seen: Option<u64> = None;
     let mut dirty_seen: Option<bool> = None;
-    let mut events = Events::default();
-    let mut git_events = GitEvents::default();
+    let mut events = Watch::new(Scope::Tree);
+    let mut git_events = Watch::new(Scope::Git);
     loop {
         // With `index.build_on_start` off the index waits for the first page that needs it;
         // the watcher below keeps running either way.
@@ -71,7 +71,9 @@ pub(crate) async fn keep_index_fresh(app: Arc<App>) {
             .follow(&app, on.then_some(cfg.watch.rescan_secs))
             .await;
         let listening = on && app.changes.receiver_count() > 0;
-        events.follow(&app, listening, cfg.watch.rescan_secs).await;
+        events
+            .follow(&app, listening.then_some(cfg.watch.rescan_secs))
+            .await;
         if cfg.index.build_on_start || app.demanded.load(Ordering::Acquire) {
             if app.rebuild.swap(false, Ordering::AcqRel) {
                 check_head = true;
@@ -91,23 +93,17 @@ pub(crate) async fn keep_index_fresh(app: Arc<App>) {
         let poll = on && (git_events.polling() || (listening && events.polling()));
         // A new tab's baseline is owed now: taken at the next event, that change is never heard.
         let owed = events.pending()
+            || git_events.pending()
             || (listening && wt_seen.is_none() && app.wt_watchers.load(Ordering::Acquire) > 0);
-        let tick = async {
-            if owed {
-                return;
-            }
-            if poll {
-                tokio::time::sleep(POLL_FALLBACK).await;
-            } else {
-                std::future::pending::<()>().await;
-            }
-        };
+        let tick = tick(owed, poll);
         tokio::select! {
             () = app.wake.notified() => continue,
             () = events.nudged.notified() => {}
             () = git_events.nudged.notified() => {}
             () = tick => {}
         }
+        // The git digest below is read every round, so the git nudge only needs clearing.
+        git_events.take();
         let Some(w) = watcher.as_mut() else { continue };
         let now = w.parts();
         let mut kinds = seen
@@ -150,6 +146,18 @@ pub(crate) async fn keep_index_fresh(app: Arc<App>) {
             app.changed(kinds, now.digest()).await;
         }
         seen = Some(now);
+    }
+}
+
+/// The loop's own wake: at once for owed work, a poll interval for missing events, else never.
+async fn tick(owed: bool, poll: bool) {
+    if owed {
+        return;
+    }
+    if poll {
+        tokio::time::sleep(POLL_FALLBACK).await;
+    } else {
+        std::future::pending::<()>().await;
     }
 }
 
