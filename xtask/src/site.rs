@@ -105,7 +105,7 @@ footer p{flex:0 0 100%;margin:0;font-size:var(--text-sm);color:var(--faint)}
 footer p a{color:var(--muted)}
 .outline{display:none}
 .outline-label{display:flex;align-items:center;gap:var(--space-3);margin:0 0 var(--space-2);font:var(--weight-regular) var(--text-2xs)/1.4 var(--mono);text-transform:uppercase;letter-spacing:.12em;color:var(--muted)}
-.outline-label::after{content:"";flex:1;border-top:var(--border)}
+.outline-label::after{content:\"\";flex:1;border-top:var(--border)}
 .outline ol{list-style:none;margin:0;padding:0}
 .outline a{display:block;padding:3px var(--space-3);border-left:2px solid var(--line);color:var(--muted);overflow-wrap:anywhere;font-size:var(--text-sm);text-decoration:none}
 .outline a:hover{color:var(--fg)}
