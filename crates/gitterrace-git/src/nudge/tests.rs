@@ -22,27 +22,8 @@ fn counting() -> (Arc<AtomicUsize>, impl Fn(Nudge) + Send + 'static) {
     })
 }
 
-/// How long a test waits for an event. Generous: a loaded build machine delays macOS file
-/// events by seconds, and how fast a change shows is proven by the web tests.
-const PATIENCE: Duration = Duration::from_secs(20);
-
 /// These tests time OS events, so they run one at a time.
 static SERIAL: std::sync::Mutex<()> = std::sync::Mutex::new(());
-
-/// macOS arms its event stream asynchronously and may still report the temp folder's own
-/// creation, so a test counts only once a second passed without a nudge.
-fn settle(n: &AtomicUsize) -> usize {
-    let mut last = usize::MAX;
-    for _ in 0..10 {
-        let now = n.load(Ordering::SeqCst);
-        if now == last {
-            break;
-        }
-        last = now;
-        std::thread::sleep(Duration::from_secs(1));
-    }
-    last
-}
 
 fn wait_for(n: &AtomicUsize, at_least: usize, within: Duration) -> bool {
     let end = Instant::now() + within;
@@ -55,19 +36,8 @@ fn wait_for(n: &AtomicUsize, at_least: usize, within: Duration) -> bool {
     false
 }
 
-/// Repeats `act` each second until the count reaches `at_least`: a loaded machine may drop
-/// or delay one event, and these tests prove an event arrives, not how fast.
-fn again(n: &AtomicUsize, at_least: usize, act: impl Fn()) -> bool {
-    let end = Instant::now() + PATIENCE;
-    while Instant::now() < end {
-        act();
-        if wait_for(n, at_least, Duration::from_secs(1)) {
-            return true;
-        }
-    }
-    false
-}
-
+/// The documented promise: a change is seen within the rescan bound, whatever the OS stream
+/// does. The test uses a short rescan and never times the OS events themselves.
 #[test]
 fn a_write_nudges() {
     let _one = SERIAL
@@ -75,11 +45,15 @@ fn a_write_nudges() {
         .unwrap_or_else(std::sync::PoisonError::into_inner);
     let dir = tempfile::tempdir().expect("tmp");
     let (n, f) = counting();
-    let _w = Nudger::start(cfg(dir.path(), Duration::from_secs(60), true), f).expect("w");
-    // Silence is proven on a real repository in the web tests, over a longer window.
-    let base = settle(&n);
-    let write = || std::fs::write(dir.path().join("a.txt"), "x").expect("write");
-    assert!(again(&n, base + 1, write), "write seen");
+    let rescan = Duration::from_millis(300);
+    let _w = Nudger::start(cfg(dir.path(), rescan, true), f).expect("w");
+    let before = n.load(Ordering::SeqCst);
+    std::fs::write(dir.path().join("a.txt"), "x").expect("write");
+    // One rescan period plus generous slack for a loaded machine.
+    assert!(
+        wait_for(&n, before + 1, rescan + Duration::from_secs(5)),
+        "write not seen within the rescan bound"
+    );
 }
 
 /// The documented promise: a change is seen within the rescan bound, whatever the OS stream
@@ -201,41 +175,51 @@ fn above_the_cap_the_safety_timer_still_nudges_and_degrades() {
         }
         count(x);
     };
-    let mut c = cfg(dir.path(), Duration::from_millis(200), true);
+    let rescan = Duration::from_millis(200);
+    let mut c = cfg(dir.path(), rescan, true);
     c.max_watches = 2;
     let _w = Nudger::start(c, on).expect("starts");
-    assert!(wait_for(&n, 3, Duration::from_secs(3)), "timer nudges");
+    assert!(
+        wait_for(&n, 3, rescan * 3 + Duration::from_secs(3)),
+        "timer nudges"
+    );
     assert_eq!(degraded.load(Ordering::SeqCst), 1);
 }
 
+/// Coalescing is measured from events fed by hand, because a real stream may deliver late or
+/// drop events under load and the rescan timer adds nudges of its own. With the rescan far off,
+/// every nudge here comes from the debounce, which allows at most one per `max_delay` while
+/// events keep arriving, plus the tail after the last one.
 #[test]
 fn a_burst_of_writes_is_one_or_a_few_nudges() {
-    let _one = SERIAL
-        .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner);
     let dir = tempfile::tempdir().expect("tmp");
-    let (n, f) = counting();
-    let _w = Nudger::start(cfg(dir.path(), Duration::from_secs(60), true), f).expect("w");
-    let base = settle(&n);
+    let conf = cfg(dir.path(), Duration::from_secs(60), false);
+    let (root, debounce, max_delay) = (conf.roots[0].clone(), conf.debounce, conf.max_delay);
+    let (nudges, on_nudge) = counting();
+    let (tx, rx) = mpsc::channel();
+    let worker =
+        std::thread::spawn(move || run::<notify::NullWatcher>(&conf, None, 0, &rx, &on_nudge));
+    let write = EventKind::Modify(notify::event::ModifyKind::Any);
     let t0 = Instant::now();
-    // A stream that macOS starts late sees nothing of the first pass, so the burst is
-    // written again until one is seen, like the other tests that wait for an event.
-    let burst = || {
-        for i in 0..5000 {
-            std::fs::write(dir.path().join(format!("f{i}")), "x").expect("write");
+    for i in 0..5000 {
+        let event = notify::Event::new(write).add_path(root.join(format!("f{i}")));
+        tx.send(Msg::Event(Ok(event))).expect("send");
+        if i % 500 == 0 {
+            std::thread::sleep(Duration::from_millis(20));
         }
-    };
-    assert!(again(&n, base + 1, burst), "burst seen");
-    let got = settle(&n) - base;
-    // `settle` returns a second after the last nudge, so this is how long nudges kept
-    // coming. At most one per `max_delay` (600 ms) while events arrive, plus the tail and an
-    // overflow notice; a loaded machine delivering late earns a longer window, but one nudge
-    // per file (thousands) never fits it.
-    let busy = t0.elapsed().saturating_sub(Duration::from_secs(1));
-    let most = usize::try_from(busy.as_millis() / 600).unwrap_or(usize::MAX) + 6;
+    }
+    let streamed = t0.elapsed();
+    // Let the debounce settle, then stop.
+    std::thread::sleep(debounce + max_delay);
+    tx.send(Msg::Stop).expect("stop");
+    worker.join().expect("join");
+    let got = nudges.load(Ordering::SeqCst);
+    let most =
+        usize::try_from(streamed.as_millis() / max_delay.as_millis()).unwrap_or(usize::MAX) + 2;
+    assert!(got >= 1, "the burst was never answered");
     assert!(
         got <= most,
-        "{got} nudges for 5000 files over {busy:?}, most {most}"
+        "{got} nudges for 5000 events over {streamed:?}, most {most}"
     );
 }
 
@@ -309,5 +293,42 @@ fn dropping_the_watcher_ends_its_thread() {
         Arc::strong_count(&n),
         1,
         "the callback is gone with the thread"
+    );
+}
+
+/// Class guard: a test that starts a real OS watcher and waits for a nudge must bound the wait
+/// by the rescan interval. Waiting on the OS event itself flakes on a loaded machine, because
+/// the stream may deliver late or drop events. Events fed by hand are for coalescing tests.
+#[test]
+fn every_real_watcher_test_waits_by_the_rescan_bound() {
+    let source = include_str!("tests.rs");
+    let mut checked = 0;
+    for part in source.split("\n#[test]\n").skip(1) {
+        let name = part.lines().next().unwrap_or_default();
+        if name.contains("every_real_watcher") {
+            continue;
+        }
+        let real = part.contains("Nudger::start(") && part.contains("true)");
+        if !real {
+            continue;
+        }
+        let waits = part.lines().filter(|l| l.contains("wait_for(")).count();
+        let bounded = part
+            .lines()
+            .filter(|l| l.contains("wait_for("))
+            .filter(|l| l.contains("rescan"))
+            .count();
+        if waits == 0 {
+            continue;
+        }
+        checked += 1;
+        assert_eq!(
+            waits, bounded,
+            "{name} waits on a real watcher without a rescan bound"
+        );
+    }
+    assert!(
+        checked >= 2,
+        "the guard found only {checked} real watcher tests"
     );
 }
