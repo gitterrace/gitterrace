@@ -88,14 +88,6 @@ impl Mode {
         how: "refresh",
         on: "head refs index worktree",
     };
-    pub(crate) const STASHES: Self = Self {
-        how: "refresh",
-        on: "stash",
-    };
-    pub(crate) const WORKTREES: Self = Self {
-        how: "refresh",
-        on: "worktrees head refs",
-    };
 
     /// A page about a full commit id never changes.
     pub(crate) fn pinned_to(rev: &str) -> bool {

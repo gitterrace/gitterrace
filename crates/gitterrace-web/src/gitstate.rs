@@ -4,20 +4,18 @@
 use askama::Template;
 use axum::{
     extract::{Path, State},
-    response::Html,
+    response::{Html, Redirect},
 };
 
 use crate::{
     app::blocking,
-    empty::Empty,
     error::Result,
     fmt::{self, ago, enc_seg, href, sha_link},
-    live::Mode,
     routes::Shared,
     views::{self, Chrome},
 };
 
-struct WorktreeRow {
+pub(crate) struct WorktreeRow {
     pub(crate) id: String,
     pub(crate) path: String,
     pub(crate) branch: String,
@@ -26,97 +24,66 @@ struct WorktreeRow {
     pub(crate) locked: bool,
 }
 
-#[derive(Template)]
-#[template(path = "worktrees.html")]
-struct WorktreesPage {
-    c: Chrome,
-    reftabs: Vec<crate::views::RefTab>,
-    rows: Vec<WorktreeRow>,
-    empty: Option<Empty>,
+/// Linked worktrees and stashes are this machine's state, not history: never on a public
+/// server, and only with the worktree feature on.
+pub(crate) fn local_state(a: &crate::app::App) -> bool {
+    !a.public() && crate::features::on(gitterrace_config::Feature::Worktree)
 }
 
-pub(crate) async fn worktrees(State(app): Shared) -> Result<Html<String>> {
-    let html = blocking(&app, |a| {
-        let rows = a
-            .repo
-            .linked_worktrees()?
-            .into_iter()
-            .map(|w| {
-                let target = w
-                    .branch
-                    .clone()
-                    .or_else(|| w.commit.clone())
-                    .unwrap_or_default();
-                WorktreeRow {
-                    log: if target.is_empty() {
-                        String::new()
-                    } else {
-                        href(&format!("/log/{}", enc_seg(&target)))
-                    },
-                    branch: w.branch.unwrap_or_else(|| "detached".to_owned()),
-                    commit: w.commit.as_deref().map(sha_link).unwrap_or_default(),
-                    path: w.path.unwrap_or_default(),
-                    id: w.id,
-                    locked: w.locked,
-                }
-            })
-            .collect::<Vec<_>>();
-        Ok(WorktreesPage {
-            empty: rows
-                .is_empty()
-                .then(|| Empty::new("No linked worktrees.").step("Branches & tags", href("/refs"))),
-            c: views::chrome(a, "refs").live(Mode::WORKTREES),
-            reftabs: views::ref_tabs(a, "worktrees")?,
-            rows,
-        }
-        .render()?)
-    })
-    .await?;
-    Ok(Html(html))
+pub(crate) fn worktree_rows(a: &crate::app::App) -> Result<Vec<WorktreeRow>> {
+    Ok(a.repo
+        .linked_worktrees()?
+        .into_iter()
+        .map(|w| {
+            let target = w
+                .branch
+                .clone()
+                .or_else(|| w.commit.clone())
+                .unwrap_or_default();
+            WorktreeRow {
+                log: if target.is_empty() {
+                    String::new()
+                } else {
+                    href(&format!("/log/{}", enc_seg(&target)))
+                },
+                branch: w.branch.unwrap_or_else(|| "detached".to_owned()),
+                commit: w.commit.as_deref().map(sha_link).unwrap_or_default(),
+                path: w.path.unwrap_or_default(),
+                id: w.id,
+                locked: w.locked,
+            }
+        })
+        .collect())
 }
 
-struct StashRow {
+pub(crate) struct StashRow {
     pub(crate) name: String,
     pub(crate) href: String,
     pub(crate) message: String,
     pub(crate) when: crate::when::When,
 }
 
-#[derive(Template)]
-#[template(path = "stashes.html")]
-struct StashesPage {
-    c: Chrome,
-    reftabs: Vec<crate::views::RefTab>,
-    rows: Vec<StashRow>,
-    empty: Option<Empty>,
+pub(crate) fn stash_rows(a: &crate::app::App) -> Result<Vec<StashRow>> {
+    let now = fmt::now();
+    Ok(a.repo
+        .stashes()?
+        .into_iter()
+        .map(|s| StashRow {
+            name: format!("stash@{{{}}}", s.index),
+            href: href(&format!("/commit/{}", s.commit)),
+            message: s.message,
+            when: ago(s.time, now),
+        })
+        .collect())
 }
 
-pub(crate) async fn stashes(State(app): Shared) -> Result<Html<String>> {
-    let html = blocking(&app, |a| {
-        let now = fmt::now();
-        let rows = a
-            .repo
-            .stashes()?
-            .into_iter()
-            .map(|s| StashRow {
-                name: format!("stash@{{{}}}", s.index),
-                href: href(&format!("/commit/{}", s.commit)),
-                message: s.message,
-                when: ago(s.time, now),
-            })
-            .collect::<Vec<_>>();
-        Ok(StashesPage {
-            empty: rows
-                .is_empty()
-                .then(|| Empty::new("No stashes.").step("Branches & tags", href("/refs"))),
-            c: views::chrome(a, "refs").live(Mode::STASHES),
-            reftabs: views::ref_tabs(a, "stashes")?,
-            rows,
-        }
-        .render()?)
-    })
-    .await?;
-    Ok(Html(html))
+/// The old pages for worktrees and stashes, now sections of `/refs`.
+pub(crate) async fn worktrees(State(app): Shared) -> Redirect {
+    Redirect::permanent(&format!("{}/refs#worktrees", app.base))
+}
+
+pub(crate) async fn stashes(State(app): Shared) -> Redirect {
+    Redirect::permanent(&format!("{}/refs#stashes", app.base))
 }
 
 #[derive(Template)]

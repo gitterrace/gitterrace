@@ -122,10 +122,6 @@ async fn pages_carry_their_live_mode() {
     let (_, wt) = get(&r, "/worktree").await;
     assert_eq!(attr(&wt).as_deref(), Some("refresh"));
     assert!(wt.contains("/static/live.js"));
-    let (_, st) = get(&r, "/stashes").await;
-    assert_eq!(attr(&st).as_deref(), Some("refresh"));
-    let (_, wts) = get(&r, "/worktrees").await;
-    assert_eq!(attr(&wts).as_deref(), Some("refresh"));
     for notice in ["/log/HEAD", "/refs", "/stats", "/"] {
         assert_eq!(
             attr(&get(&r, notice).await.1).as_deref(),
@@ -434,44 +430,6 @@ async fn links_style_switches_copy_permalink() {
         js.contains("dataset.link") && js.contains("\"gitterrace://\""),
         "actions.js reads the style"
     );
-}
-
-/// The Branches & tags, Worktrees and Stashes pages share one tab bar. A tab with nothing in it
-/// is left out, except on its own page, so the bar never offers a page that is only empty.
-#[tokio::test]
-async fn ref_tabs_leave_out_empty_pages_but_keep_the_one_shown() {
-    let dir = tempfile::tempdir().expect("tmp");
-    let p = repo(dir.path(), "r");
-    let r = router(&p, Config::default());
-    let bar_of = |html: &str| {
-        html.split("<nav class=\"tabs\">")
-            .nth(1)
-            .and_then(|s| s.split("</nav>").next())
-            .expect("tab bar")
-            .to_owned()
-    };
-    // No linked worktrees and no stashes in this repo.
-    let (code, refs) = get(&r, "/refs").await;
-    assert_eq!(code, 200);
-    let bar = bar_of(&refs);
-    assert!(bar.contains("Branches "), "{bar}");
-    assert!(
-        !bar.contains("Worktrees") && !bar.contains("Stashes"),
-        "{bar}"
-    );
-    for (page, label) in [("/worktrees", "Worktrees"), ("/stashes", "Stashes")] {
-        let (code, html) = get(&r, page).await;
-        assert_eq!(code, 200, "{page}");
-        let bar = bar_of(&html);
-        assert!(
-            bar.contains(&format!("{label} <span class=\"tag\">0</span>")),
-            "{page}: {bar}"
-        );
-        assert!(
-            html.contains("<div class=\"empty\""),
-            "{page}: no empty state"
-        );
-    }
 }
 
 /// "a" then an action's key fires the action from the page, and the `?` sheet lists the chord.

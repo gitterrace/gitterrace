@@ -72,46 +72,6 @@ pub(crate) struct Nav {
     pub(crate) on: bool,
 }
 
-/// The Branches & tags, Worktrees and Stashes tab bar, the same on all three pages: every tab
-/// shows its count. A tab with nothing in it is left out, unless it is the page being shown,
-/// so the bar never offers a page that only says it is empty.
-pub(crate) struct RefTab {
-    pub(crate) href: String,
-    pub(crate) label: &'static str,
-    pub(crate) count: usize,
-    pub(crate) on: bool,
-}
-
-/// The counts come from the same repository reads on every page.
-pub(crate) fn ref_tabs(app: &crate::app::App, on: &str) -> crate::error::Result<Vec<RefTab>> {
-    // Branches and tags together, as the tab is labelled; remotes have their own section.
-    let local = app
-        .repo
-        .refs()?
-        .iter()
-        .filter(|r| r.kind != gitterrace_git::RefKind::Remote)
-        .count();
-    let tab = |key: &str, label, count| RefTab {
-        href: crate::fmt::href(&format!("/{key}")),
-        label,
-        count,
-        on: key == on,
-    };
-    let mut tabs = vec![tab("refs", "Branches & tags", local)];
-    // Worktrees and stashes are this machine's state, not history.
-    if !app.public() && crate::features::on(gitterrace_config::Feature::Worktree) {
-        tabs.push(tab(
-            "worktrees",
-            "Worktrees",
-            app.repo.linked_worktrees()?.len(),
-        ));
-        tabs.push(tab("stashes", "Stashes", app.repo.stashes()?.len()));
-    }
-    // Branches & tags always shows: it is the bar's heading as well as a tab.
-    tabs.retain(|t| t.count > 0 || t.on || t.label == "Branches & tags");
-    Ok(tabs)
-}
-
 pub(crate) struct Chrome {
     /// Prefix for absolute links; empty for a single repository.
     pub(crate) base: String,

@@ -236,10 +236,11 @@ struct RefsPage {
     branches: Vec<CommitRow>,
     tags: Vec<CommitRow>,
     remotes: Vec<CommitRow>,
-    reftabs: Vec<views::RefTab>,
+    worktrees: Vec<crate::gitstate::WorktreeRow>,
+    stashes: Vec<crate::gitstate::StashRow>,
     no_branches: Option<Empty>,
-    no_tags: Option<Empty>,
-    no_remotes: Option<Empty>,
+    /// Set only when the whole page has nothing to show.
+    nothing: Option<Empty>,
 }
 
 async fn refs(State(app): Shared) -> Result<Html<String>> {
@@ -249,18 +250,29 @@ async fn refs(State(app): Shared) -> Result<Html<String>> {
         let tags = views::ref_rows(a, &all, RefKind::Tag, now)?;
         let branches = crate::gitstate::branch_rows(a)?;
         let remotes = views::ref_rows(a, &all, RefKind::Remote, now)?;
-        let log = fmt::href(&format!("/log/{}", fmt::selected_seg()));
+        let (worktrees, stashes) = if crate::gitstate::local_state(a) {
+            (
+                crate::gitstate::worktree_rows(a)?,
+                crate::gitstate::stash_rows(a)?,
+            )
+        } else {
+            (Vec::new(), Vec::new())
+        };
+        let nothing = (branches.is_empty()
+            && tags.is_empty()
+            && remotes.is_empty()
+            && worktrees.is_empty()
+            && stashes.is_empty())
+        .then(|| Empty::new("No branches, tags or remotes."));
         Ok(RefsPage {
             c: views::chrome(a, "refs").live(Mode::REFS),
             no_branches: branches.is_empty().then(|| Empty::new("No branches.")),
-            no_tags: tags
-                .is_empty()
-                .then(|| Empty::new("No tags.").step("Browse the commits", log)),
-            no_remotes: remotes.is_empty().then(|| Empty::new("No remotes.")),
+            nothing,
             branches,
             tags,
             remotes,
-            reftabs: views::ref_tabs(a, "refs")?,
+            worktrees,
+            stashes,
         })
     })
     .await?;

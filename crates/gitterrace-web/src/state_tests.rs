@@ -93,13 +93,12 @@ async fn git_state_pages_and_banner() {
     let (s, body) = get(&app, "/tag/v1").await;
     assert!(s == 200 && body.contains("notes here") && body.contains("Tagged by"));
     assert_eq!(get(&app, "/tag/nope").await.0, 404);
-    let (s, body) = get(&app, "/worktrees").await;
+    let (_, body) = get(&app, "/refs").await;
     assert!(
-        s == 200 && body.contains("/wt</code>") && body.contains("/log/side"),
+        body.contains("/wt</code>") && body.contains("/log/side"),
         "{body}"
     );
-    let (s, body) = get(&app, "/stashes").await;
-    assert!(s == 200 && body.contains("stash@{0}") && body.contains("wip stash"));
+    assert!(body.contains("stash@{0}") && body.contains("wip stash"));
     assert!(
         body.contains("id=\"headstate\" hidden>"),
         "the banner is hidden on a branch"

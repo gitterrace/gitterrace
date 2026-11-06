@@ -106,8 +106,6 @@ async fn empty_pages_offer_a_next_step() {
     for p in [
         "/log/HEAD?path=nope",
         "/history/nope.rs",
-        "/stashes",
-        "/worktrees",
         "/search?q=zzzqqq",
         "/stats?author=nobody%40example.com",
     ] {
@@ -121,10 +119,6 @@ async fn empty_pages_offer_a_next_step() {
         if !state.contains("class=\"next\"><a href=") {
             fails.push(format!("{p}: no next step in {state}"));
         }
-    }
-    let (_, refs) = page(&router, "/refs").await;
-    if refs.contains(">Stashes <") || refs.contains(">Worktrees <") {
-        fails.push("/refs offers an empty tab".to_owned());
     }
     assert!(fails.is_empty(), "{}", fails.join("\n"));
 }

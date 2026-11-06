@@ -1,8 +1,0 @@
-{% extends "_base.html" %}
-{% block title %}Stashes · {{ c.name }}{% endblock %}
-{% block content %}
-{% include "_reftabs.html" %}
-{% if let Some(e) = empty %}{{ e }}{% else %}<div class="card"><table class="entries grow">
-{% for s in rows %}<tr><td><a href="{{ s.href }}"><code>{{ s.name }}</code></a></td><td class="grow">{{ s.message }}</td><td class="muted r">{{ s.when }}</td></tr>{% endfor %}
-</table></div>{% endif %}
-{% endblock %}

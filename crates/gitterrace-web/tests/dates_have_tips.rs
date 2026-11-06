@@ -89,9 +89,8 @@ fn every_relative_date_has_its_tip() {
         pages.extend(
             [
                 "/log/HEAD",
+                // Worktrees and stashes are sections of /refs; their old paths redirect there.
                 "/refs",
-                "/stashes",
-                "/worktrees",
                 "/tree/HEAD",
                 "/tree/HEAD/src",
                 "/blame/HEAD/src/lib.rs",

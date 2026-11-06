@@ -131,8 +131,6 @@ async fn every_commit_id_is_a_sha_link() {
         "/blame/HEAD/src/a.rs".to_owned(),
         "/refs".to_owned(),
         "/tag/v1".to_owned(),
-        "/worktrees".to_owned(),
-        "/stashes".to_owned(),
         "/stats".to_owned(),
         "/stats/languages".to_owned(),
         "/stats/hotspots".to_owned(),
