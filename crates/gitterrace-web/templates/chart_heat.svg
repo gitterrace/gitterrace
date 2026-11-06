@@ -1,0 +1,7 @@
+<svg class="chart heat" viewBox="0 0 {{ w }} {{ h }}" role="img" aria-label="Commits by weekday and hour">
+{%- for (x, hour) in hours %}<text class="ax" x="{{ x }}" y="12">{{ hour }}</text>{% endfor -%}
+{%- for r in rows -%}
+<text class="ax" x="0" y="{{ r.ly }}">{{ r.day }}</text>
+{%- for c in r.cells %}<rect class="h{{ c.level }}" x="{{ c.x }}" y="{{ r.y }}" width="{{ side }}" height="{{ side }}" rx="4" data-tip="{{ c.tip }}"/>{% endfor -%}
+{%- endfor -%}
+</svg><div class="heat-legend">Less<i></i><i></i><i></i><i></i><i></i>More</div>

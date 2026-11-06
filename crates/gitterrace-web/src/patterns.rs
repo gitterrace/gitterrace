@@ -35,8 +35,8 @@ struct ReleaseRow {
 #[template(path = "patterns_section.html")]
 struct PatternsSection {
     pairs: Vec<PairRow>,
-    age: String,
-    sizes: String,
+    age: crate::charts::view::Bars,
+    sizes: crate::charts::view::Bars,
     releases: Vec<ReleaseRow>,
     cadence: String,
     /// Shown in place of the releases table when no tag reads as a release.

@@ -320,7 +320,7 @@ struct PersonRow {
     deletions: String,
     first: String,
     last: String,
-    spark: String,
+    spark: crate::charts::view::Spark,
     hue: u32,
     initial: String,
     /// Share of the widest side, in percent: added to the right, deleted to the left.

@@ -1,0 +1,12 @@
+{%- import "_chart.svg" as ch -%}
+{%- call ch::open(f) %}{% endcall -%}
+{%- for c in cols -%}
+<g class="col" data-tip="{{ c.tip }}"><rect class="hit" x="{{ c.hx }}" y="10" width="{{ f.sl }}" height="{{ f.plot }}"/>
+{%- for s in c.segs %}<rect class="{{ s.class }}" x="{{ c.x }}" y="{{ s.y }}" width="{{ f.bw }}" height="{{ s.h }}"/>{% endfor -%}
+</g>
+{%- endfor -%}
+{%- call ch::labels(f) %}{% endcall -%}
+</svg><div class="legend">
+{%- for (class, name) in legend %}<span><i class="{{ class }}"></i>{{ name }}</span>{% endfor -%}
+{%- if other %}<span><i class="c8"></i>other</span>{% endif -%}
+</div>

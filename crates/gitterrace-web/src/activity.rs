@@ -98,8 +98,8 @@ struct ActivityPage {
     empty: bool,
     compared: bool,
     unit: &'static str,
-    series: String,
-    heatmap: String,
+    series: crate::charts::view::Bars,
+    heatmap: crate::charts::view::Heatmap,
     range: Option<RangeCard>,
     /// The commit types section, markup from `commit_types`.
     types: String,
@@ -116,7 +116,7 @@ pub(crate) struct ListPage {
 struct RangeCard {
     title: String,
     total: String,
-    weekdays: String,
+    weekdays: crate::charts::view::Bars,
 }
 
 fn span_text(from: Option<i64>, to: i64, days: Option<i64>) -> String {

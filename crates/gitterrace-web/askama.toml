@@ -1,0 +1,4 @@
+# Chart templates escape with the crate's own `& < > "` set, the bytes `fmt::esc` writes.
+[[escaper]]
+path = "crate::charts::view::Esc"
+extensions = ["svg"]

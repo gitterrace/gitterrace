@@ -23,7 +23,6 @@
     "crates/gitterrace-testkit/src/oracle/tests.rs": 1,
     "crates/gitterrace-types/src/codec.rs": 1,
     "crates/gitterrace-web/src/actions/tests.rs": 1,
-    "crates/gitterrace-web/src/charts.rs": 10,
     "crates/gitterrace-web/src/commit_types.rs": 4,
     "crates/gitterrace-web/src/error.rs": 1,
     "crates/gitterrace-web/src/features_tests.rs": 1,

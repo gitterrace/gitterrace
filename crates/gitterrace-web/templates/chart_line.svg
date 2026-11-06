@@ -1,0 +1,9 @@
+{#- Hover columns first, so they paint under the line; each carries its dot, shown on hover. -#}
+{%- import "_chart.svg" as ch -%}
+{%- call ch::open(f) %}{% endcall -%}
+{%- for p in points -%}
+<g class="col" data-tip="{{ p.tip }}"><rect class="hit" x="{{ p.x }}" y="10" width="{{ f.sl }}" height="{{ f.plot }}"/><circle class="dot" cx="{{ p.cx }}" cy="{{ p.cy }}" r="3.5"/></g>
+{%- endfor -%}
+<path class="line" d="{{ d }}"/>
+{%- call ch::labels(f) %}{% endcall -%}
+</svg>

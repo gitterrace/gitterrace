@@ -15,8 +15,8 @@ struct FrequencySection {
     kpis: Vec<Kpi>,
     unit: &'static str,
     window: String,
-    weekly: String,
-    rework: String,
+    weekly: crate::charts::view::Diverging,
+    rework: crate::charts::view::PercentLine,
     verdict: String,
 }
 

@@ -101,3 +101,33 @@ fn charts_write_no_tip_by_hand() {
     }
     assert!(bad.is_empty(), "hand-written chart tip in {bad:?}");
 }
+
+/// A chart template prints a tip the builder made and writes none itself: every `data-tip`
+/// in a `chart_*.svg` holds one expression and no literal text.
+#[test]
+fn chart_templates_print_built_tips_only() {
+    let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("templates");
+    let mut seen = 0;
+    let mut bad = Vec::new();
+    for e in std::fs::read_dir(dir).expect("templates").flatten() {
+        let name = e.file_name().to_string_lossy().into_owned();
+        let svg = std::path::Path::new(&name)
+            .extension()
+            .is_some_and(|x| x.eq_ignore_ascii_case("svg"));
+        let chart = name.starts_with("chart_") && svg;
+        if !chart {
+            continue;
+        }
+        let text = std::fs::read_to_string(e.path()).expect("read");
+        for v in text.split("data-tip=\"").skip(1) {
+            seen += 1;
+            let v = v.split('"').next().unwrap_or_default();
+            let one = v.starts_with("{{ ") && v.ends_with(" }}") && v.matches("{{").count() == 1;
+            if !one {
+                bad.push(format!("{name}: {v}"));
+            }
+        }
+    }
+    assert!(seen >= 5, "the scan found the chart tips: {seen}");
+    assert!(bad.is_empty(), "literal text in a chart tip: {bad:?}");
+}

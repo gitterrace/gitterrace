@@ -66,7 +66,7 @@ struct TypesSection {
     matrix: Matrix,
     over_title: String,
     over_hint: String,
-    over_time: String,
+    over_time: crate::charts::view::Stacked,
     groups: Vec<Group>,
     commits_total: usize,
     commits: Vec<CommitRow>,

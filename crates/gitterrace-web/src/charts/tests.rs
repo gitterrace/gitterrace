@@ -6,7 +6,8 @@ use crate::charttip::COMMITS;
 
 #[test]
 fn bars_escape_labels_and_scale() {
-    let svg = bars(&[("<a>".to_owned(), 5), ("b".to_owned(), 0)], COMMITS);
+    let svg = bars(&[("<a>\"&".to_owned(), 5), ("b".to_owned(), 0)], COMMITS).to_string();
+    assert!(svg.contains("&lt;a&gt;&quot;&amp;"), "{svg}");
     assert!(svg.contains("&lt;a&gt;"));
     assert!(!svg.contains("<a>"));
     assert_eq!(svg.matches(r#"class="bar""#).count(), 2);
@@ -16,7 +17,7 @@ fn bars_escape_labels_and_scale() {
 fn heatmap_has_all_cells() {
     let mut cells = [[0; 24]; 7];
     cells[0][0] = 3;
-    let svg = heatmap(&cells, 3);
+    let svg = heatmap(&cells, 3).to_string();
     assert_eq!(svg.matches("<rect").count(), 168);
     assert!(svg.contains(r#"class="h4""#));
 }
@@ -36,13 +37,14 @@ fn hover_bands_paint_under_the_data() {
         ("a".to_owned(), Some(0.2)),
         ("b".to_owned(), Some(0.5)),
         ("c".to_owned(), None),
-    ]);
+    ])
+    .to_string();
     let last_hit = line.rfind(r#"class="hit""#).expect("hit");
     let path = line.find(r#"class="line""#).expect("line");
     assert!(last_hit < path, "hover band drawn over the line");
     for svg in [
-        bars(&[("a".to_owned(), 3), ("b".to_owned(), 1)], COMMITS),
-        diverging(&[("a".to_owned(), 3, 1)], "t"),
+        bars(&[("a".to_owned(), 3), ("b".to_owned(), 1)], COMMITS).to_string(),
+        diverging(&[("a".to_owned(), 3, 1)], "t").to_string(),
     ] {
         for col in svg.split(r#"<g class="col">"#).skip(1) {
             let hit = col.find(r#"class="hit""#).expect("hit");
@@ -123,7 +125,7 @@ fn split_ticks_cover_both_sides_on_one_step() {
 /// The zero line follows the data: with far more added than removed, the added side is taller.
 #[test]
 fn diverging_zero_line_follows_the_data() {
-    let svg = diverging(&[("a".to_owned(), 4_000, 900)], "t");
+    let svg = diverging(&[("a".to_owned(), 4_000, 900)], "t").to_string();
     // One step of 2,000: added reaches 4,000, removed stops at its own first step.
     assert!(svg.contains(">4,000<"), "{svg}");
     assert!(svg.contains(">\u{2212}2,000<"), "{svg}");
@@ -133,7 +135,7 @@ fn diverging_zero_line_follows_the_data() {
 /// The code frequency chart once labelled every 10,000 on both sides, "-30,000" included.
 #[test]
 fn diverging_axis_has_few_labels() {
-    let svg = diverging(&[("a".to_owned(), 184_815, 95_395)], "t");
+    let svg = diverging(&[("a".to_owned(), 184_815, 95_395)], "t").to_string();
     let labels = svg.matches(r#"text-anchor="end""#).count();
     assert!(labels <= 5, "{labels} labels");
     assert!(!svg.contains("-30,000"));
@@ -150,7 +152,7 @@ fn labels_step_by_calendar() {
         .map(|i| format!("Q{} {}", i % 4 + 1, 2016 + i / 4))
         .collect();
     let pts: Vec<(String, u64)> = keys.iter().map(|k| (k.clone(), 1)).collect();
-    let svg = bars(&pts, COMMITS);
+    let svg = bars(&pts, COMMITS).to_string();
     let shown: Vec<&str> = svg
         .split(r#"text-anchor="middle">"#)
         .skip(1)
@@ -167,7 +169,7 @@ fn a_repeated_day_is_labelled_once() {
     let pts: Vec<(String, u64)> = (0..12)
         .map(|i| (format!("2026-11-{:02}", 1 + i / 4), 1))
         .collect();
-    let svg = bars(&pts, COMMITS);
+    let svg = bars(&pts, COMMITS).to_string();
     let shown: Vec<&str> = svg
         .split(r#"class="ax""#)
         .skip(1)
@@ -198,7 +200,10 @@ fn a_chart_of_links_is_one_tab_stop() {
             title: format!("f{i}"),
         })
         .collect();
-    for svg in [linked_bars(&pts, &links), scatter(&dots, "changes")] {
+    for svg in [
+        linked_bars(&pts, &links).to_string(),
+        scatter(&dots, "changes").to_string(),
+    ] {
         let open = svg.split('>').next().expect("svg tag");
         assert!(
             open.contains("tabindex=\"0\"") && open.contains("data-marks"),
@@ -209,7 +214,7 @@ fn a_chart_of_links_is_one_tab_stop() {
         assert_eq!(svg.matches("<a tabindex=\"-1\" ").count(), anchors, "{svg}");
     }
     assert!(
-        !bars(&pts, COMMITS).contains("tabindex"),
+        !bars(&pts, COMMITS).to_string().contains("tabindex"),
         "a chart without links takes no stop"
     );
 }

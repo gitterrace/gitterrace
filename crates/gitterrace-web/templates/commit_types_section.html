@@ -16,7 +16,7 @@
 </table></div>
 {% endif %}
 <div class="chart-head"><div><h2>{{ over_title }}</h2><p class="hint">{{ over_hint }}</p></div></div>
-<div class="card pad">{{ over_time|safe }}</div>
+<div class="card pad">{{ over_time }}</div>
 {% for g in groups %}
 <div class="chart-head"><div><h2>{{ g.title }}</h2><p class="hint">{{ g.hint }}</p></div></div>
 <div class="card"><table class="entries">

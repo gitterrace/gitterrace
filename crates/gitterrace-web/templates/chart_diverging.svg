@@ -1,0 +1,7 @@
+{%- import "_chart.svg" as ch -%}
+{%- call ch::open(f) %}{% endcall -%}
+{%- for c in cols -%}
+<g class="col" data-tip="{{ c.tip }}"><rect class="hit" x="{{ c.hx }}" y="10" width="{{ f.sl }}" height="{{ f.plot }}"/><rect class="up" x="{{ c.x }}" y="{{ c.up_y }}" width="{{ f.bw }}" height="{{ c.ha }}"/><rect class="dn" x="{{ c.x }}" y="{{ mid }}" width="{{ f.bw }}" height="{{ c.hd }}"/></g>
+{%- endfor -%}
+{%- call ch::labels(f) %}{% endcall -%}
+</svg>

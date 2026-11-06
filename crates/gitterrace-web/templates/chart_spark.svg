@@ -1,0 +1,1 @@
+<svg class="spark {{ class }}" viewBox="0 0 120 22" width="120" height="22" aria-hidden="true"><polyline points="{{ points }}"/></svg>
