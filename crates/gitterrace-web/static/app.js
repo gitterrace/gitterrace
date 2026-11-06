@@ -190,5 +190,28 @@
     e.preventDefault();
   });
   window.gtToast = toast;
+  // Image diffs: side by side or one over the other. The choice is kept per browser; on a
+  // phone, where the sides stack anyway, the overlay is the default.
+  var mediaViews = document.querySelectorAll("[data-media-view]");
+  if (mediaViews.length) {
+    var KEY = "gitterrace-media-view", saved = null;
+    try { saved = localStorage.getItem(KEY); } catch (e) {}
+    var first = saved || (matchMedia("(max-width:600px)").matches ? "overlay" : "sides");
+    mediaViews.forEach(function (box) {
+      var btns = box.querySelectorAll("[data-show]");
+      function show(v) {
+        box.querySelectorAll("[data-pane]").forEach(function (p) { p.hidden = p.dataset.pane !== v; });
+      }
+      btns.forEach(function (b) {
+        b.addEventListener("click", function () {
+          show(b.dataset.show);
+          try { localStorage.setItem(KEY, b.dataset.show); } catch (e) {}
+        });
+        if (b.dataset.show === first && first !== "sides") b.click();
+      });
+      var cut = box.querySelector("[data-media-cut]");
+      if (cut) cut.addEventListener("input", function () { box.style.setProperty("--cut", cut.value + "%"); });
+    });
+  }
 })();
 

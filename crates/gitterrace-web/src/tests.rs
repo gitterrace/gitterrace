@@ -315,8 +315,11 @@ async fn media_renders_inline_and_in_diffs() {
     assert!(body.contains("media-file") && !body.contains("<object"));
     let head = app.repo.resolve("HEAD").expect("head");
     let (_, body) = get(&app, &format!("/commit/{head}")).await;
+    // A modified image: both sides, and the same two again stacked in the overlay pane.
     assert!(
-        body.contains("media-diff") && body.matches("<img").count() == 2,
+        body.contains("media-diff")
+            && body.contains("data-pane=\"overlay\"")
+            && body.matches("<img").count() == 4,
         "{body}"
     );
     let res = routes::router(Arc::clone(&app))

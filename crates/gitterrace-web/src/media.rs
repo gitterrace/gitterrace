@@ -270,10 +270,43 @@ pub(crate) fn diff_html(old: Option<(&str, &str)>, new: Option<(&str, &str)>) ->
             )
         })
     };
+    let (Some((orev, opath)), Some((nrev, npath))) = (old, new) else {
+        return format!(
+            r#"<div class="media-diff">{}{}</div>"#,
+            side("Before", old),
+            side("After", new)
+        );
+    };
+    // Both sides: side by side, or one over the other with a slider, where a small change
+    // between two near-identical pictures is easier to find.
+    let view = crate::seg::Seg {
+        name: "Image view".to_owned(),
+        buttons: true,
+        choices: vec![
+            crate::seg::Choice::new("Side by side", "sides", true),
+            crate::seg::Choice::new("Overlay", "overlay", false),
+        ],
+        ..crate::seg::Seg::default()
+    };
+    let k = |path| kind(path).unwrap_or(Kind::Image);
     format!(
-        r#"<div class="media-diff">{}{}</div>"#,
+        concat!(
+            r#"<div class="media-view" data-media-view data-seg-own>"#,
+            r#"<div class="media-bar">{view}</div>"#,
+            r#"<div class="media-diff" data-pane="sides">{}{}</div>"#,
+            r#"<div class="media-overlay" data-pane="overlay" hidden>"#,
+            r#"<div class="media-stage checker"><div class="media-stack">"#,
+            r#"<div class="media-before">{}</div><div class="media-after">{}</div>"#,
+            r#"</div></div><label class="media-cut muted">Before"#,
+            r#"<input type="range" min="0" max="100" value="50""#,
+            r#" aria-label="Before and after split" data-media-cut>After</label>"#,
+            r#"</div></div>"#,
+        ),
         side("Before", old),
-        side("After", new)
+        side("After", new),
+        element(k(opath), orev, opath),
+        element(k(npath), nrev, npath),
+        view = view,
     )
 }
 
@@ -320,7 +353,8 @@ mod tests {
     #[test]
     fn diff_shows_one_or_two_sides() {
         let both = diff_html(Some(("p", "a.png")), Some(("c", "a.png")));
-        assert_eq!(both.matches("<img").count(), 2);
+        // Side by side and the overlay each hold both pictures.
+        assert_eq!(both.matches("<img").count(), 4);
         assert!(both.contains("/raw/p/a.png") && both.contains("/raw/c/a.png"));
         assert_eq!(
             diff_html(None, Some(("c", "a.png")))
@@ -342,5 +376,19 @@ mod tests {
         assert!(!both.contains("+0"));
         let png = b"\x89PNG\r\n\x1a\n\0\0\0\rIHDR\0\0\x05\x78\0\0\x03\x84";
         assert_eq!(Facts::of("a.png", png).dims, Some((1400, 900)));
+    }
+
+    #[test]
+    fn a_modified_image_offers_side_by_side_and_overlay() {
+        let both = diff_html(Some(("p", "a.png")), Some(("c", "a.png")));
+        assert!(both.contains("aria-label=\"Image view\""), "{both}");
+        assert!(both.contains("data-show=\"overlay\""), "{both}");
+        assert!(both.contains("data-pane=\"overlay\" hidden"), "{both}");
+        assert!(both.contains("data-media-cut"), "{both}");
+        let added = diff_html(None, Some(("c", "a.png")));
+        assert!(
+            !added.contains("data-show"),
+            "one side has nothing to compare: {added}"
+        );
     }
 }
