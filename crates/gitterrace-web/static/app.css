@@ -187,6 +187,8 @@ button:hover{border-color:var(--line-strong);background:var(--hover)}button.prim
 section.file{border:var(--border);border-radius:var(--radius);margin-top:var(--space-4);overflow:hidden;background:var(--bg)}
 section.file>header{display:flex;gap:var(--space-3);align-items:center;padding:var(--space-2) var(--space-4);background:var(--soft);border-bottom:var(--border);font-family:var(--mono);font-size:var(--text-sm)}
 section.file>header a{color:var(--fg)}section.file>header .counts{margin-left:auto}
+section.file>header .media-counts{white-space:nowrap;font-variant-numeric:tabular-nums}
+@media (max-width:600px){section.file>header{flex-wrap:wrap}section.file>header>a{overflow-wrap:anywhere;min-width:0}}
 table.code{border-collapse:collapse;width:100%}
 .diffwrap{overflow-x:auto}
 .code td{padding:0 var(--space-3);line-height:var(--leading-code);white-space:pre;vertical-align:top}

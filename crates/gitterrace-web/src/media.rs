@@ -214,6 +214,51 @@ pub(crate) fn blob_html(
     out
 }
 
+/// What one side of a changed image weighs: its size in bytes and its pixel size when the
+/// header says.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct Facts {
+    pub(crate) len: u64,
+    pub(crate) dims: Option<(u32, u32)>,
+}
+
+impl Facts {
+    pub(crate) fn of(path: &str, bytes: &[u8]) -> Self {
+        Self {
+            len: bytes.len() as u64,
+            dims: dimensions(path, bytes),
+        }
+    }
+}
+
+/// The header line of a changed image in place of `+0 -0`, which says nothing about a picture:
+/// "1400 x 900, 213 KiB to 208 KiB", "new, 1400 x 900, 213 KiB" or "removed, 213 KiB". The
+/// pixel size shows once when both sides agree, else as "w x h to w x h".
+pub(crate) fn diff_counts(old: Option<Facts>, new: Option<Facts>) -> String {
+    let px = |d: Option<(u32, u32)>| d.map(|(w, h)| format!("{w} x {h}"));
+    let line = match (old, new) {
+        (Some(o), Some(n)) => {
+            let dims = match (px(o.dims), px(n.dims)) {
+                (Some(a), Some(b)) if a == b => format!("{a}, "),
+                (Some(a), Some(b)) => format!("{a} to {b}, "),
+                (_, Some(b)) => format!("{b}, "),
+                _ => String::new(),
+            };
+            format!("{dims}{} to {}", size(o.len), size(n.len))
+        }
+        (None, Some(n)) => px(n.dims).map_or_else(
+            || format!("new, {}", size(n.len)),
+            |d| format!("new, {d}, {}", size(n.len)),
+        ),
+        (Some(o), None) => format!("removed, {}", size(o.len)),
+        (None, None) => return String::new(),
+    };
+    format!(
+        "<span class=\"counts media-counts muted\">{}</span>",
+        esc(&line)
+    )
+}
+
 /// Before and after of one changed image, side by side; one side for added or deleted files.
 pub(crate) fn diff_html(old: Option<(&str, &str)>, new: Option<(&str, &str)>) -> String {
     let side = |label: &str, at: Option<(&str, &str)>| {
@@ -234,7 +279,7 @@ pub(crate) fn diff_html(old: Option<(&str, &str)>, new: Option<(&str, &str)>) ->
 
 #[cfg(test)]
 mod tests {
-    use super::{Kind, content_type, diff_html, dimensions, kind};
+    use super::{Facts, Kind, content_type, diff_counts, diff_html, dimensions, kind};
 
     #[test]
     fn classifies_and_types() {
@@ -283,5 +328,19 @@ mod tests {
                 .count(),
             1
         );
+    }
+
+    #[test]
+    fn a_changed_image_header_says_pixels_and_bytes() {
+        let f = |len, dims| Some(Facts { len, dims });
+        let both = diff_counts(f(2048, Some((1400, 900))), f(1024, Some((1400, 900))));
+        assert!(both.contains(">1400 x 900, 2.0 KiB to 1.0 KiB<"), "{both}");
+        let resized = diff_counts(f(10, Some((10, 10))), f(20, Some((20, 20))));
+        assert!(resized.contains(">10 x 10 to 20 x 20, "), "{resized}");
+        assert!(diff_counts(None, f(10, Some((4, 2)))).contains(">new, 4 x 2, "));
+        assert!(diff_counts(f(10, None), None).contains(">removed, "));
+        assert!(!both.contains("+0"));
+        let png = b"\x89PNG\r\n\x1a\n\0\0\0\rIHDR\0\0\x05\x78\0\0\x03\x84";
+        assert_eq!(Facts::of("a.png", png).dims, Some((1400, 900)));
     }
 }

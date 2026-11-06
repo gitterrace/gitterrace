@@ -172,3 +172,27 @@ fn public_server_warns_about_raised_cost_keys() {
     assert_eq!(w.len(), 1, "{w:?}");
     assert!(w[0].contains("api.diff_lines"), "{w:?}");
 }
+
+/// A changed image's diff header names pixels and bytes, not `+0 -0`.
+#[tokio::test]
+async fn a_changed_image_header_says_its_size() {
+    let dir = tempfile::tempdir().expect("tmp");
+    let png = |w: u8, h: u8, pad: usize| {
+        let mut b = b"\x89PNG\r\n\x1a\n\0\0\0\rIHDR".to_vec();
+        b.extend([0, 0, 0, w, 0, 0, 0, h, 8, 6, 0, 0, 0]);
+        b.extend(vec![0u8; pad]);
+        b
+    };
+    let root = dir.path().join("r");
+    std::fs::create_dir_all(&root).expect("mkdir");
+    let f = Fixture::init(&root);
+    std::fs::write(root.join("a.png"), png(7, 5, 10)).expect("write");
+    let f = f.commit("feat: image");
+    std::fs::write(root.join("a.png"), png(7, 5, 2000)).expect("write");
+    let p = f.commit("fix: heavier image").path().to_owned();
+    let (_, page) = get(&router(&p, Config::default()), "/commit/HEAD").await;
+    let at = page.find("data-path=\"a.png\"").expect("a.png section");
+    let head = &page[at..at + page[at..].find("</header>").expect("header")];
+    assert!(head.contains(">7 x 5, 39 B to 2.0 KiB<"), "{head}");
+    assert!(!head.contains("+0"), "{head}");
+}

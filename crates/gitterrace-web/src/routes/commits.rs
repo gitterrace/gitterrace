@@ -269,12 +269,19 @@ pub(super) async fn commit(State(app): Shared, Path(id): Path<String>) -> Result
             total_del: fmt::thousands(d.files.iter().map(|f| u64::from(f.deletions)).sum::<u64>()),
             files: views::file_stats(&d),
             lookups: a.lookups(&id),
-            diff: views::diff_html(
-                &views::Render::of(a),
-                &id,
-                d.summary.parents.first().map(String::as_str),
-                &d.files,
-            ),
+            diff: {
+                let parent = d.summary.parents.first().map(String::as_str);
+                let media = media_facts(a, &id, parent, &d.files);
+                views::diff_html_with(
+                    &views::Render::of(a),
+                    views::DiffSource::Commit {
+                        rev: &id,
+                        parent,
+                        media: &media,
+                    },
+                    &d.files,
+                )
+            },
             id,
         })
     })
@@ -282,4 +289,40 @@ pub(super) async fn commit(State(app): Shared, Path(id): Path<String>) -> Result
     let html = p.render()?;
     app.memo_put(key, Arc::new(html.clone()));
     Ok(Html(html))
+}
+
+/// Bytes and pixel size of both sides of each changed image, for its diff header. Only the
+/// image files of the commit are read, and a side that cannot be read is left out.
+fn media_facts(
+    a: &App,
+    rev: &str,
+    parent: Option<&str>,
+    files: &[gitterrace_git::FileDiff],
+) -> views::MediaFacts {
+    use gitterrace_git::ChangeKind;
+    // Like the file page, only images under `limits.preview_mb` are read for their pixel size.
+    let cap = a.cfg().limits.preview_mb << 20;
+    let read = |at: &str, path: &str| {
+        let len = a.repo.blob(at, path).ok()?.size;
+        if len > cap {
+            return Some(crate::media::Facts { len, dims: None });
+        }
+        let b = a.repo.blob_bytes(at, path).ok()?;
+        Some(crate::media::Facts::of(path, &b))
+    };
+    files
+        .iter()
+        .filter(|f| f.binary && crate::media::is_image(&f.path))
+        .map(|f| {
+            let old_path = f.old_path.as_deref().unwrap_or(&f.path);
+            let old = (f.kind != ChangeKind::Added)
+                .then_some(parent)
+                .flatten()
+                .and_then(|p| read(p, old_path));
+            let new = (f.kind != ChangeKind::Deleted)
+                .then(|| read(rev, &f.path))
+                .flatten();
+            (f.path.clone(), (old, new))
+        })
+        .collect()
 }

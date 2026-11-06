@@ -14,7 +14,7 @@ use crate::fmt::{enc_path, enc_seg, esc_text, href};
 pub(crate) use crate::views::code::{CodeMemo, code_html, code_memo_has, code_memo_put};
 pub(crate) use crate::views::code::{blame_html, code_html_first, code_tail_html};
 pub(crate) use crate::views::diff::{
-    DiffSource, diff_fragment, diff_html, diff_html_with, worktree_fragment,
+    DiffSource, MediaFacts, diff_fragment, diff_html_with, worktree_fragment,
 };
 
 /// The settings a rendered fragment depends on, read once per request from the config.

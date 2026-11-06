@@ -1,4 +1,5 @@
-use crate::views::{Render, code_html, code_html_first, code_tail_html, crumbs, diff_html};
+use crate::views::diff::diff_html;
+use crate::views::{Render, code_html, code_html_first, code_tail_html, crumbs};
 
 /// The default limits with a 32 MiB code cache.
 fn cache() -> crate::views::Render {

@@ -11,9 +11,25 @@ fn num(n: Option<u32>) -> String {
     n.map_or_else(String::new, |n| n.to_string())
 }
 
+/// A commit's diff without image facts, for tests of the layout.
+#[cfg(test)]
 pub(crate) fn diff_html(r: &Render, rev: &str, parent: Option<&str>, files: &[FileDiff]) -> String {
-    diff_html_with(r, DiffSource::Commit { rev, parent }, files)
+    let none = MediaFacts::new();
+    diff_html_with(
+        r,
+        DiffSource::Commit {
+            rev,
+            parent,
+            media: &none,
+        },
+        files,
+    )
 }
+
+/// Before and after facts of each changed image, by path: read by the route, which has the
+/// repository, so the header can say pixels and bytes instead of `+0 -0`.
+pub(crate) type MediaFacts =
+    std::collections::HashMap<String, (Option<crate::media::Facts>, Option<crate::media::Facts>)>;
 
 /// Once the files before it changed this many lines in all, later files are folded too.
 const TOTAL_DIFF_BUDGET: usize = 2_000;
@@ -100,6 +116,7 @@ pub(crate) enum DiffSource<'a> {
     Commit {
         rev: &'a str,
         parent: Option<&'a str>,
+        media: &'a MediaFacts,
     },
     /// The working tree: no blob URLs, folded files load from `/worktree/diff/{path}`.
     Worktree,
@@ -171,12 +188,21 @@ pub(crate) fn diff_html_with(r: &Render, src: DiffSource<'_>, files: &[FileDiff]
             _ if f.kind == ChangeKind::Deleted => out.push_str(&esc(&f.path)),
             _ => out.push_str(&esc(&file_label(f))),
         }
-        let _ = write!(
-            out,
-            "<span class=\"counts\"><b class=\"add\">+{}</b> <b class=\"del\">-{}</b></span></header>",
-            crate::fmt::thousands(f.additions),
-            crate::fmt::thousands(f.deletions)
-        );
+        let facts = match src {
+            DiffSource::Commit { media, .. } if f.binary => media.get(&f.path),
+            _ => None,
+        };
+        if let Some((old, new)) = facts {
+            out.push_str(&crate::media::diff_counts(*old, *new));
+            out.push_str("</header>");
+        } else {
+            let _ = write!(
+                out,
+                "<span class=\"counts\"><b class=\"add\">+{}</b> <b class=\"del\">-{}</b></span></header>",
+                crate::fmt::thousands(f.additions),
+                crate::fmt::thousands(f.deletions)
+            );
+        }
         out.push_str(&file_body(r, src, i, f, &mut used));
         out.push_str("</section>");
     }
@@ -212,7 +238,7 @@ fn file_body(r: &Render, src: DiffSource<'_>, i: usize, f: &FileDiff, used: &mut
     if f.binary {
         let shown =
             crate::media::is_image(&f.path) && crate::features::on(gitterrace_config::Feature::Raw);
-        if let (true, DiffSource::Commit { rev, parent }) = (shown, src) {
+        if let (true, DiffSource::Commit { rev, parent, .. }) = (shown, src) {
             let old_path = f.old_path.as_deref().unwrap_or(&f.path);
             let old = (f.kind != ChangeKind::Added)
                 .then_some(parent)
