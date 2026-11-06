@@ -2,7 +2,7 @@
 import { readFileSync, writeFileSync, rmSync, mkdtempSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { makeRepo, serve, sh } from './browser-lib.mjs';
+import { WATCH_BOUND_MS, makeRepo, serve, sh } from './browser-lib.mjs';
 
 /** @param {any} env what browser-check.mjs set up (pw, dir, srv, r, bin, cfg, arg, ...) */
 export function checks(env) {
@@ -508,7 +508,7 @@ async function liveScroll() {
         const read = () => p.evaluate(() => ({ top: document.getElementById('f70').getBoundingClientRect().top, bodies: document.querySelectorAll('#main .diffwrap').length, f3: !document.querySelector('#f3 [data-load-diff]'), y: scrollY }));
         const before = await read();
         writeFileSync(join(repo, 's01.txt'), body('edited again'));
-        await p.waitForFunction(() => /** @type {any} */ (window).__refreshed > 0, null, { timeout: 8000 }).catch(() => {});
+        await p.waitForFunction(() => /** @type {any} */ (window).__refreshed > 0, null, { timeout: WATCH_BOUND_MS }).catch(() => {});
         await p.waitForTimeout(2500);
         const after = await read();
         const bad = [];
