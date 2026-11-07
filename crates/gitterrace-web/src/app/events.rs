@@ -4,7 +4,7 @@
 //! watcher is on, tab or not. A nudge only says "check again"; the check stays the truth.
 
 use std::sync::{
-    Arc,
+    Arc, Mutex,
     atomic::{AtomicBool, Ordering},
 };
 use std::time::Duration;
@@ -55,7 +55,8 @@ impl Scope {
 /// The nudge state of one watch of one repository's refresher.
 pub(crate) struct Watch {
     scope: Scope,
-    nudger: Option<Nudger>,
+    /// The running or starting watcher of the current settings.
+    run: Option<Arc<Run>>,
     /// Set by a nudge, cleared by the check that answers it.
     pending: Arc<AtomicBool>,
     /// Wakes the refresher on a nudge.
@@ -66,11 +67,49 @@ pub(crate) struct Watch {
     started: Option<(u64, bool)>,
 }
 
+/// One start of a watcher. Registering the OS watches took up to twenty seconds on a loaded
+/// Mac, so it runs off the refresher: until it is up the refresher polls, and a start that
+/// finishes after its watch was stopped is retired at once.
+#[derive(Default)]
+struct Run {
+    nudger: Mutex<Option<Nudger>>,
+    /// The start is still registering its watches: no event can arrive yet.
+    starting: AtomicBool,
+    /// Stopped or restarted meanwhile: whatever the start returns is retired.
+    stopped: AtomicBool,
+}
+
+impl Run {
+    /// Keeps the started `nudger`, or retires it when the watch was stopped meanwhile.
+    fn up(&self, nudger: Option<Nudger>) {
+        if let Ok(mut g) = self.nudger.lock() {
+            if self.stopped.load(Ordering::Acquire) {
+                retire(nudger);
+            } else {
+                *g = nudger;
+            }
+        }
+        self.starting.store(false, Ordering::Release);
+    }
+
+    fn stop(&self) {
+        if let Ok(mut g) = self.nudger.lock() {
+            self.stopped.store(true, Ordering::Release);
+            retire(g.take());
+        }
+    }
+
+    #[cfg(test)]
+    fn running(&self) -> bool {
+        self.nudger.lock().is_ok_and(|g| g.is_some())
+    }
+}
+
 impl Watch {
     pub(crate) fn new(scope: Scope) -> Self {
         Self {
             scope,
-            nudger: None,
+            run: None,
             pending: Arc::default(),
             nudged: Arc::default(),
             polling: Arc::default(),
@@ -79,36 +118,56 @@ impl Watch {
     }
 
     /// Runs the watcher with `rescan_secs`, or stops it for `None`. A change of settings
-    /// restarts it. Starting walks the folders once (one watch each on Linux), so it runs off
-    /// the async threads.
-    pub(crate) async fn follow(&mut self, app: &Arc<App>, rescan_secs: Option<u64>) {
+    /// restarts it. Starting walks the folders once (one watch each on Linux) and registers
+    /// the OS stream, which a busy machine took seconds for: it runs on a thread of its own and
+    /// the refresher polls until it is up, so a change meanwhile still shows within the bound.
+    pub(crate) fn follow(&mut self, app: &Arc<App>, rescan_secs: Option<u64>) {
         let os = app.os_events.load(Ordering::Acquire);
         let want = rescan_secs.map(|s| (s, os));
         if want == self.started {
             return;
         }
-        retire(self.nudger.take());
+        if let Some(r) = self.run.take() {
+            r.stop();
+        }
         self.polling.store(false, Ordering::Release);
         self.started = want;
         let Some((secs, os)) = want else { return };
+        let scope = self.scope;
+        self.start(app, os, move |a, on| {
+            scope.start(&a.repo, Duration::from_secs(secs), os, on)
+        });
+    }
+
+    /// Runs `start` on a blocking thread. With OS events (`os`) the watch polls until it is
+    /// up and looks once more then; without, the safety timer is the only check, as before.
+    fn start<F>(&mut self, app: &Arc<App>, os: bool, start: F)
+    where
+        F: FnOnce(&App, Box<dyn Fn(Nudge) + Send>) -> Result<Nudger, NudgeError> + Send + 'static,
+    {
         // The first check after a start sets the baseline.
         self.pending.store(true, Ordering::Release);
-        let (a, scope, on) = (Arc::clone(app), self.scope, self.on_nudge(app.repo.name()));
-        let polling = Arc::clone(&self.polling);
-        let started = tokio::task::spawn_blocking(move || {
-            let r = scope.start(&a.repo, Duration::from_secs(secs), os, on);
+        let run = Arc::new(Run::default());
+        run.starting.store(os, Ordering::Release);
+        self.run = Some(Arc::clone(&run));
+        let (a, scope) = (Arc::clone(app), self.scope);
+        let on: Box<dyn Fn(Nudge) + Send> = Box::new(self.on_nudge(app.repo.name()));
+        let (polling, pending) = (Arc::clone(&self.polling), Arc::clone(&self.pending));
+        let nudged = Arc::clone(&self.nudged);
+        tokio::task::spawn_blocking(move || {
+            let r = start(&a, on);
             if let Err(e) = &r {
                 let (what, name) = (scope.what(), a.repo.name());
                 tracing::warn!("{e}; checking {name} for {what} by polling");
                 polling.store(true, Ordering::Release);
             }
-            r.ok()
-        })
-        .await;
-        match started {
-            Ok(n) => self.nudger = n,
-            Err(_) => self.polling.store(true, Ordering::Release),
-        }
+            run.up(r.ok());
+            if os {
+                // A change between the last poll and the first watch has no event: look again.
+                pending.store(true, Ordering::Release);
+                nudged.notify_one();
+            }
+        });
     }
 
     /// What the watcher thread calls on a nudge: mark it, switch to polling on a degraded watch,
@@ -142,12 +201,18 @@ impl Watch {
     /// Whether checks run on a timer because events are unavailable.
     pub(crate) fn polling(&self) -> bool {
         self.polling.load(Ordering::Acquire)
+            || self
+                .run
+                .as_ref()
+                .is_some_and(|r| r.starting.load(Ordering::Acquire))
     }
 }
 
 impl Drop for Watch {
     fn drop(&mut self) {
-        retire(self.nudger.take());
+        if let Some(r) = self.run.take() {
+            r.stop();
+        }
     }
 }
 
@@ -198,6 +263,14 @@ mod tests {
         assert_ne!(on, std::thread::current().id(), "dropped on the caller");
     }
 
+    /// Whether `w`'s watcher finished starting and is up.
+    async fn up(w: &Watch) -> bool {
+        gitterrace_testkit::wait::within(gitterrace_testkit::wait::DEADLINE, || async {
+            w.run.as_ref().is_some_and(|r| r.running()) && !w.polling()
+        })
+        .await
+    }
+
     /// Guard class: the two watches drifting apart. Each kind runs the same start, restart,
     /// stop and nudge steps; a kind that skipped one (kept polling after a stop, ignored a
     /// degraded nudge, did not restart on new settings) fails here for that kind.
@@ -208,8 +281,8 @@ mod tests {
         a.os_events.store(false, Ordering::Release);
         for scope in BOTH {
             let mut w = Watch::new(scope);
-            w.follow(&a, Some(5)).await;
-            assert!(w.nudger.is_some(), "{scope:?} did not start");
+            w.follow(&a, Some(5));
+            assert!(up(&w).await, "{scope:?} did not start");
             assert!(w.take(), "{scope:?}: the first check is the baseline");
             assert!(!w.take(), "{scope:?}: the nudge was not cleared");
             let on = w.on_nudge("r".into());
@@ -220,11 +293,54 @@ mod tests {
             tokio::time::timeout(std::time::Duration::from_secs(1), woke.notified())
                 .await
                 .unwrap_or_else(|_| panic!("{scope:?} did not wake the refresher"));
-            w.follow(&a, Some(6)).await;
+            w.follow(&a, Some(6));
             assert_eq!(w.started, Some((6, false)), "{scope:?} kept old settings");
-            assert!(!w.polling(), "{scope:?} kept polling after a restart");
-            w.follow(&a, None).await;
-            assert!(w.nudger.is_none() && !w.polling(), "{scope:?} did not stop");
+            assert!(up(&w).await, "{scope:?} kept polling after a restart");
+            w.follow(&a, None);
+            assert!(w.run.is_none() && !w.polling(), "{scope:?} did not stop");
+        }
+    }
+
+    /// Guard class: the refresher waiting on a watcher start. Registering the OS watches took
+    /// twenty seconds on a loaded Mac, and every change made meanwhile waited for it. A start
+    /// that blocks here must leave `follow` returned at once and the watch polling, so a check
+    /// still runs every poll interval; a start that is stopped before it is up is never kept.
+    #[tokio::test]
+    async fn a_slow_watcher_start_polls_until_it_is_up() {
+        let dir = tempfile::tempdir().expect("tmp");
+        let a = app(&repo(dir.path(), "r"), with(|_| {}));
+        for scope in BOTH {
+            let mut w = Watch::new(scope);
+            let (go, wait) = std::sync::mpsc::channel::<()>();
+            w.start(&a, true, move |a, on| {
+                wait.recv().ok();
+                a.repo
+                    .git_events(std::time::Duration::from_secs(5), false, on)
+            });
+            assert!(
+                w.polling(),
+                "{scope:?}: no check runs while the start is slow"
+            );
+            go.send(()).expect("release the start");
+            assert!(up(&w).await, "{scope:?}: the start never came up");
+            assert!(w.take(), "{scope:?}: no look once the watch is up");
+            let (go, wait) = std::sync::mpsc::channel::<()>();
+            w.start(&a, true, move |a, on| {
+                wait.recv().ok();
+                a.repo
+                    .git_events(std::time::Duration::from_secs(5), false, on)
+            });
+            let late = w.run.clone().expect("a run");
+            // As if `follow` had started it: the stop below is a change of settings.
+            w.started = Some((5, false));
+            w.follow(&a, None);
+            go.send(()).expect("release the start");
+            let kept =
+                gitterrace_testkit::wait::within(std::time::Duration::from_secs(2), || async {
+                    late.running()
+                })
+                .await;
+            assert!(!kept, "{scope:?}: a start stopped meanwhile was kept");
         }
     }
 }

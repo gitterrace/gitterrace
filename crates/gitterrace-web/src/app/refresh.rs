@@ -67,13 +67,9 @@ pub(crate) async fn keep_index_fresh(app: Arc<App>) {
             seen = Some(p);
             watcher = Some(w);
         }
-        git_events
-            .follow(&app, on.then_some(cfg.watch.rescan_secs))
-            .await;
+        git_events.follow(&app, on.then_some(cfg.watch.rescan_secs));
         let listening = on && app.changes.receiver_count() > 0;
-        events
-            .follow(&app, listening.then_some(cfg.watch.rescan_secs))
-            .await;
+        events.follow(&app, listening.then_some(cfg.watch.rescan_secs));
         if cfg.index.build_on_start || app.demanded.load(Ordering::Acquire) {
             if app.rebuild.swap(false, Ordering::AcqRel) {
                 check_head = true;
