@@ -232,3 +232,79 @@ fn a_planted_inline_script_or_widened_policy_is_reported() {
     assert!(bad.contains("https://cdn.example"), "{bad}");
     assert!(bad.contains("style-src is not exactly 'self'"), "{bad}");
 }
+
+/// Every external font or stylesheet reference of the pages and CSS, and every `@font-face` src
+/// that is not a built file. Fonts are self-hosted, so nothing may name another origin.
+fn font_problems(css: &str, pages: &[(String, String)], files: &[String]) -> Vec<String> {
+    let mut bad = Vec::new();
+    for (path, html) in pages {
+        for tag in html.split("<link").skip(1) {
+            let tag = tag.split('>').next().unwrap_or("");
+            let external = attrs(&format!("<link{tag}"), "href")
+                .iter()
+                .any(|h| h.contains("://") || h.starts_with("//"));
+            if external && !tag.contains("rel=\"canonical\"") {
+                bad.push(format!("{path}: external link:{tag}"));
+            }
+        }
+    }
+    for needle in ["@import", "fonts.googleapis", "fonts.gstatic", "://"] {
+        if css.contains(needle) {
+            bad.push(format!("assets/site.css names {needle}"));
+        }
+    }
+    let faces = css.matches("@font-face").count();
+    if faces == 0 {
+        bad.push("assets/site.css has no @font-face".to_owned());
+    }
+    for face in css.split("@font-face").skip(1) {
+        let block = face.split('}').next().unwrap_or("");
+        let srcs: Vec<&str> = block
+            .split("url(")
+            .skip(1)
+            .filter_map(|u| u.split(')').next())
+            .collect();
+        if srcs.is_empty() {
+            bad.push("assets/site.css: an @font-face without a url()".to_owned());
+        }
+        for src in srcs {
+            let src = src.trim_matches(['"', '\'']);
+            if !files.contains(&format!("assets/{src}")) {
+                bad.push(format!(
+                    "assets/site.css: @font-face src {src} is not built"
+                ));
+            }
+        }
+    }
+    bad
+}
+
+/// The class this guards: a font or stylesheet fetched from a third party, or a face whose file
+/// the build does not write.
+#[test]
+fn fonts_are_self_hosted_and_every_font_face_src_is_built() {
+    let (pages, files) = generated();
+    let bad = font_problems(&text_of("assets/site.css"), &pages, &files);
+    assert!(bad.is_empty(), "{}", bad.join("\n"));
+}
+
+#[test]
+fn a_planted_external_font_or_missing_face_file_is_reported() {
+    let (mut pages, files) = generated();
+    pages[0]
+        .1
+        .push_str("<link rel=\"stylesheet\" href=\"https://fonts.googleapis.com/css2?family=X\">");
+    let css = "@import url(https://x.example/a.css);\
+               @font-face{font-family:\"A\";src:url(fonts/nope.woff2)}";
+    let bad = font_problems(css, &pages, &files).join("\n");
+    assert!(bad.contains("external link"), "{bad}");
+    assert!(
+        bad.contains("names @import") && bad.contains("names ://"),
+        "{bad}"
+    );
+    assert!(bad.contains("src fonts/nope.woff2 is not built"), "{bad}");
+    assert!(
+        !font_problems("", &[], &files).is_empty(),
+        "no @font-face is red"
+    );
+}
