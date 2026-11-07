@@ -63,6 +63,7 @@ pub(crate) const LOCAL: &[&str] = &[
     "/_send/targets",
     "/r/{name}/_send/targets",
     "/_repos",
+    "/_dirty",
     "/_settings",
     "/_settings/file",
     "/_settings/check",

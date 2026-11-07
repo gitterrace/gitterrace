@@ -223,16 +223,14 @@ async fn the_repositories_home_says_what_changed_today() {
     );
     assert!(body.contains("Quiet today. Last commit"), "{body}");
     assert!(body.contains("2 repositories, 2 commits today"), "{body}");
-    let beta = &body[body.find("href=\"/r/beta/\"").expect("beta row")..];
-    let beta = &beta[..beta.find("</li>").expect("row end")];
+    // The chips fill in after the rows: a cold page renders every one hidden.
     assert!(
-        beta.contains("class=\"wtchip\""),
-        "beta has uncommitted work: {beta}"
+        !body.contains("working tree\"><"),
+        "no chip before a scan: {body}"
     );
-    let alpha = &body[body.find("href=\"/r/alpha/\"").expect("alpha row")..];
-    let alpha = &alpha[..alpha.find("</li>").expect("row end")];
-    assert!(
-        !alpha.contains("class=\"wtchip\""),
-        "alpha is clean: {alpha}"
+    let (_, dirty) = fetch(&router, "/_dirty", "localhost").await;
+    assert_eq!(
+        dirty, r#"{"beta":true}"#,
+        "beta has uncommitted work, alpha is clean"
     );
 }

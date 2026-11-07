@@ -122,6 +122,12 @@ pub const PAGES: &[Page] = &[
         &["/r/{name}", "/r/{name}/", "/r/{name}/{*rest}", "/api/repos"],
     ),
     page(
+        "`/_dirty`",
+        "The repositories with uncommitted work, as JSON the home page fetches to fill its chips \
+         after the rows render",
+        &["/_dirty"],
+    ),
+    page(
         "`POST /_repos`, `DELETE /_repos`, `GET /_repos?nonce=N`",
         "Adds a repository to the running server for `git terrace open`, or takes one off for `git \
         terrace remove`: loopback, no browser, secret from a 0600 file. The GET proves the secret \

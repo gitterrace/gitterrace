@@ -385,10 +385,7 @@ impl Served {
     /// own chip: the home page then scans each tree at most once per bound, however often it
     /// is reloaded, and a change shows within the bound.
     fn dirty(&self) -> bool {
-        if let Ok(g) = self.dirty.lock()
-            && let Some((at, v)) = *g
-            && at.elapsed() < crate::app::DIRTY_TTL
-        {
+        if let Some(v) = self.known_dirty() {
             return v;
         }
         let v = Repo::discover(&self.path).is_ok_and(|r| gitterrace_git::is_dirty(&r));
@@ -396,6 +393,14 @@ impl Served {
             *g = Some((std::time::Instant::now(), v));
         }
         v
+    }
+
+    /// The dirty answer when one inside the bound is at hand, without scanning: what the home
+    /// page renders at once, leaving the rest to `/_dirty`.
+    fn known_dirty(&self) -> Option<bool> {
+        let g = self.dirty.lock().ok()?;
+        let (at, v) = (*g)?;
+        (at.elapsed() < crate::app::DIRTY_TTL).then_some(v)
     }
 }
 
@@ -440,6 +445,7 @@ pub(crate) fn router(table: Arc<Table>) -> Router {
     Router::new()
         .route("/", get(home::index))
         .route("/api/repos", get(repos_json))
+        .route("/_dirty", get(home::dirty))
         .route("/r/{name}", get(slash))
         .route("/r/{name}/", axum::routing::any(dispatch))
         .route("/r/{name}/{*rest}", axum::routing::any(dispatch))

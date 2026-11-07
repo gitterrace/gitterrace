@@ -38,7 +38,8 @@ struct IndexRow {
     /// What changed today, the line a returning reader looks for first.
     today: String,
     commits_today: u32,
-    /// Uncommitted work in the working tree; `None` where the tree is not shown.
+    /// Uncommitted work in the working tree: `None` where the tree is not shown, else whether
+    /// the chip shows at once; a row without a fresh answer starts hidden and `home.js` fills it.
     dirty: Option<bool>,
 }
 
@@ -111,10 +112,11 @@ pub(super) async fn index(State(table): State<Arc<Table>>) -> crate::error::Resu
     }
     let html = tokio::task::spawn_blocking(move || {
         let now = fmt::now();
-        let show_tree =
-            !table.env.public() && crate::features::on(gitterrace_config::Feature::Worktree);
+        let show_tree = shows_tree(&table);
         let served = table.snapshot();
-        let reads = in_order(&served, |s| (s.recent(now), show_tree.then(|| s.dirty())));
+        let reads = in_order(&served, |s| {
+            (s.recent(now), show_tree.then(|| s.known_dirty()))
+        });
         let rows: Vec<IndexRow> = served
             .iter()
             .zip(reads)
@@ -135,7 +137,7 @@ pub(super) async fn index(State(table): State<Arc<Table>>) -> crate::error::Resu
                     total,
                     today: today_line(r.today, c, now),
                     commits_today: r.today,
-                    dirty,
+                    dirty: dirty.map(|d| d.unwrap_or(false)),
                     tip: if counts.is_empty() {
                         "No commits yet.".to_owned()
                     } else {
@@ -171,6 +173,42 @@ pub(super) async fn index(State(table): State<Arc<Table>>) -> crate::error::Resu
     })
     .await??;
     Ok(Html(html).into_response())
+}
+
+/// Whether the home page shows working tree chips: never on a public server.
+fn shows_tree(table: &Table) -> bool {
+    !table.env.public() && crate::features::on(gitterrace_config::Feature::Worktree)
+}
+
+/// `/_dirty`, fetched by `home.js` after the rows render, so a cold status scan of every
+/// tree never holds the page: `{"name": true}` for every repository with uncommitted work,
+/// read on the home page's threads. Each answer is reused for `DIRTY_TTL`. Not public: it
+/// describes trees.
+pub(super) async fn dirty(State(table): State<Arc<Table>>) -> Response {
+    let names = tokio::task::spawn_blocking(move || {
+        if !shows_tree(&table) {
+            return Vec::new();
+        }
+        let served = table.snapshot();
+        let flags = in_order(&served, |s| s.dirty());
+        served
+            .iter()
+            .zip(flags)
+            .filter(|(_, d)| *d)
+            .map(|(s, _)| s.name.clone())
+            .collect::<Vec<_>>()
+    })
+    .await
+    .unwrap_or_default();
+    let map: serde_json::Map<String, serde_json::Value> = names
+        .into_iter()
+        .map(|n| (n, serde_json::Value::Bool(true)))
+        .collect();
+    (
+        [(axum::http::header::CACHE_CONTROL, "no-store")],
+        axum::Json(map),
+    )
+        .into_response()
 }
 
 #[cfg(test)]

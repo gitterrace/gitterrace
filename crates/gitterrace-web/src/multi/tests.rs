@@ -301,6 +301,26 @@ fn the_dirty_chip_follows_the_tree_within_the_bound() {
     assert!(!s.dirty(), "a revert shows within the bound");
 }
 
+/// The home page never scans a tree: a cold dirty repository renders a hidden chip, and
+/// `/_dirty` names it, so the chip fills in after the rows.
+#[tokio::test]
+async fn the_home_page_renders_before_the_dirty_scan() {
+    let dir = tempfile::tempdir().expect("tmp");
+    let clean = crate::tests::fixture("clean", dir.path());
+    let messy = crate::tests::fixture("messy", dir.path());
+    std::fs::write(messy.join("README.md"), "edited\n").expect("write");
+    let router = crate::multi_router(vec![clean, messy]).expect("router");
+    let (s, page) = crate::tests::fetch(&router, "/", "localhost").await;
+    assert_eq!(s, 200);
+    assert!(page.contains(r#"data-repo="messy""#), "{page}");
+    assert!(
+        !page.contains("Uncommitted changes in the working tree\"><"),
+        "a cold page shows no chip it did not scan: {page}"
+    );
+    let (s, dirty) = crate::tests::fetch(&router, "/_dirty", "localhost").await;
+    assert_eq!((s, dirty.as_str()), (200, r#"{"messy":true}"#));
+}
+
 /// The home page over many repositories, a fifth of them dirty: every row is read, the dirty
 /// ones are found, and repeated renders serve. The timing run lives in the bench corpus.
 #[test]

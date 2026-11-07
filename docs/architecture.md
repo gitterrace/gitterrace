@@ -196,6 +196,7 @@ the prefix.
 | `/go/{repo-id}/{sha}/{path}` | Permalink: finds the served repository by id |
 | `/_send/targets` | Send to targets as JSON template parts, filled in by the page |
 | `/r/{name}/...`, `/api/repos` | The prefix of every per-repository row above, also when one is served; and the server-wide list the switcher reads |
+| `/_dirty` | The repositories with uncommitted work, as JSON the home page fetches to fill its chips after the rows render |
 | `POST /_repos`, `DELETE /_repos`, `GET /_repos?nonce=N` | Adds a repository to the running server for `git terrace open`, or takes one off for `git terrace remove`: loopback, no browser, secret from a 0600 file. The GET proves the secret by hashing it with the nonce |
 | `/_settings`, `/_settings/file`, `POST /_settings/check` | The settings page: a form and a plain editor for `config.toml` and `actions.toml`, read, checked and saved on local servers only, same-origin with the page token, never a path from the request |
 
