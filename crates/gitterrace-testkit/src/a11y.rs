@@ -7,8 +7,16 @@
 #[must_use]
 pub fn problems(body: &str) -> Vec<String> {
     let mut out = Vec::new();
+    out.extend(top_heading(body));
     out.extend(tables(body));
     out
+}
+
+/// A page has exactly one h1, so a screen reader's first heading is the page's name. A page
+/// with none starts at its section headings, one with two leaves the reader to guess.
+fn top_heading(body: &str) -> Option<String> {
+    let n = elements(body, "h1").count();
+    (n != 1).then(|| format!("the page has {n} h1 headings, not one"))
 }
 
 /// Every table has a header cell, each header cell the app writes says what it heads
@@ -67,22 +75,29 @@ fn elements<'a>(html: &'a str, tag: &'a str) -> impl Iterator<Item = &'a str> + 
 
 #[cfg(test)]
 mod tests {
-    use super::problems;
+    use super::{problems, tables};
+
+    #[test]
+    fn a_page_needs_exactly_one_h1() {
+        assert!(problems("<main><h2>x</h2></main>")[0].contains("0 h1"));
+        let two = "<h1>Page</h1><div class=\"markdown-body\"><h1>Doc</h1></div>";
+        assert!(problems(two)[0].contains("2 h1"));
+        assert!(problems("<h1 class=\"vh\">Page</h1><hr><header></header>").is_empty());
+    }
 
     #[test]
     fn a_table_without_header_cells_is_flagged() {
-        let p =
-            problems("<table class=\"entries\"><caption>x</caption><tr><td>a</td></tr></table>");
+        let p = tables("<table class=\"entries\"><caption>x</caption><tr><td>a</td></tr></table>");
         assert_eq!(p.len(), 1, "{p:?}");
         assert!(p[0].contains("no header cell"), "{p:?}");
         // A thead alone holds no header cell.
-        let p = problems("<table><caption>x</caption><thead><tr><td>a</td></tr></thead></table>");
+        let p = tables("<table><caption>x</caption><thead><tr><td>a</td></tr></thead></table>");
         assert!(p.iter().any(|m| m.contains("no header cell")), "{p:?}");
     }
 
     #[test]
     fn an_app_table_needs_a_caption_and_scoped_headers() {
-        let p = problems("<table><tr><th>a</th></tr><tr><td>1</td></tr></table>");
+        let p = tables("<table><tr><th>a</th></tr><tr><td>1</td></tr></table>");
         assert!(p.iter().any(|m| m.contains("no caption")), "{p:?}");
         assert!(p.iter().any(|m| m.contains("without a scope")), "{p:?}");
     }
@@ -90,15 +105,15 @@ mod tests {
     #[test]
     fn a_headed_table_passes_and_a_markdown_table_needs_only_headers() {
         let app = "<table><caption>x</caption><tr><th scope=\"col\">a</th></tr></table>";
-        assert!(problems(app).is_empty(), "{:?}", problems(app));
+        assert!(tables(app).is_empty(), "{:?}", tables(app));
         let md = "<table data-line=\"1-3\"><thead><tr><th>a</th></tr></thead></table>";
-        assert!(problems(md).is_empty(), "{:?}", problems(md));
+        assert!(tables(md).is_empty(), "{:?}", tables(md));
     }
 
     #[test]
     fn a_thead_tag_is_not_taken_for_a_header_cell_with_no_scope() {
         let t =
             "<table><caption>x</caption><thead><tr><th scope=\"col\">a</th></tr></thead></table>";
-        assert!(problems(t).is_empty(), "{:?}", problems(t));
+        assert!(tables(t).is_empty(), "{:?}", tables(t));
     }
 }

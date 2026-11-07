@@ -9,6 +9,7 @@ mod anchor_tests;
 mod base;
 mod front;
 mod ids;
+mod levels;
 mod lines;
 mod outline;
 
@@ -323,8 +324,9 @@ pub(crate) fn render_doc(src: &str, base: Base) -> Doc {
     let mut raw = String::new();
     html::push_html(&mut raw, events.into_iter());
     // Spans are added after sanitizing, which drops every data-line the file wrote.
+    let clean = levels::demote(&sanitizer(base).clean(&raw).to_string());
     Doc {
-        html: head + &lines::place(&sanitizer(base).clean(&raw).to_string()),
+        html: head + &lines::place(&clean),
         outline,
     }
 }
@@ -345,7 +347,7 @@ mod tests {
     #[test]
     fn renders_and_neutralizes_html() {
         let out = render("# Hi\n\n<script>alert(1)</script>\n\n<img src=x onerror=alert(1)>\n");
-        assert!(out.contains("Hi</h1>"));
+        assert!(out.contains("Hi</h2>"));
         assert!(!out.contains("<script"));
         assert!(!out.contains("onerror"));
         assert!(!out.contains("alert"));
@@ -361,8 +363,8 @@ mod tests {
     fn drops_comments_after_front_matter() {
         let out = render("---\ntitle: x\n---\n\n<!-- note -->\n\n# Real\n");
         assert!(!out.contains("note"));
-        assert!(out.contains("Real</h1>"));
-        assert!(!out.contains("<h2"));
+        assert!(out.contains("Real</h2>"));
+        assert!(!out.contains("<h3"));
     }
 
     #[test]
@@ -377,7 +379,7 @@ mod tests {
             "<td>The grammar: twelve rules</td>",
             "<td>q</td>",
             "<td>a, b</td>",
-            "Doc</h1>",
+            "Doc</h2>",
         ] {
             assert!(out.contains(want), "{want} in {out}");
         }
@@ -411,11 +413,8 @@ mod tests {
     #[test]
     fn front_matter_handles_crlf() {
         let out = render("---\r\ntitle: Hi\r\n---\r\n# Doc\r\n");
-        assert!(
-            out.contains("<th scope=\"row\">title</th><td>Hi</td>"),
-            "{out}"
-        );
-        assert!(out.contains("Doc</h1>"));
+        let row = "<th scope=\"row\">title</th><td>Hi</td>";
+        assert!(out.contains(row) && out.contains("Doc</h2>"), "{out}");
     }
 
     #[test]

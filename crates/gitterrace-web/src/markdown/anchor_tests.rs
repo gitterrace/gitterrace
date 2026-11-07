@@ -14,7 +14,12 @@ fn doc(src: &str) -> crate::markdown::Doc {
 #[test]
 fn heading_pilcrow_and_outline_hrefs_are_plain() {
     let d = doc("# Reference\n\n## Two\n\n## Three\n\n## Four\n\n[r](#reference)\n");
-    assert!(d.html.contains("<h1 id=\"reference\""), "{}", d.html);
+    assert!(
+        d.html
+            .contains("<h2 class=\"markdown-h1\" id=\"reference\""),
+        "{}",
+        d.html
+    );
     assert!(
         d.html.contains("class=\"anchor\" href=\"#reference\""),
         "{}",

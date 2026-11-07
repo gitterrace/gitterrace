@@ -3,6 +3,7 @@
 {%- import "_avatar.html" as avatars -%}
 {%- import "_table.html" as t -%}
 {% block content %}
+<h1 class="vh">{{ c.name }}</h1>
 <div class="cols{% if no_side %} wide{% endif %}">
 <article>
 {% if let Some(l) = latest %}<div class="card latest">{% call avatars::avatar(l.hue, l.initial) %}{% endcall %}<a class="who" href="{{ l.author_href }}"><b>{{ l.author }}</b></a><a class="subj" href="{{ l.href }}">{{ l.subject }}</a>{{ l.sha|safe }}<span class="muted">{{ l.when }}</span><a class="hist" href="{{ c.base }}/log/{{ c.rev_enc }}">History</a></div>{% endif %}

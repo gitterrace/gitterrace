@@ -3,6 +3,7 @@
 {%- import "_table.html" as t -%}
 {% block title %}Refs · {{ c.name }}{% endblock %}
 {% block content %}
+<h1 class="vh">Branches and tags</h1>
 {% if let Some(e) = nothing %}{{ e }}{% else %}
 <h2 id="branches">Branches</h2>
 {% if let Some(e) = no_branches %}{{ e }}{% else %}<ul class="list log refrows">{% for b in branches %}{{ b }}{% endfor %}</ul>{% endif %}

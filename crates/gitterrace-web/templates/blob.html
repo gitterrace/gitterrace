@@ -1,7 +1,8 @@
 {% extends "_base.html" %}
+{%- import "_path.html" as paths -%}
 {% block title %}{{ title }} · {{ c.name }}{% endblock %}
 {% block content %}
-{% if rendered.is_none() %}<div class="head"><nav class="crumbs">{% for k in crumbs %}{% if !loop.first %}<i>/</i>{% endif %}<a href="{{ k.href }}">{{ k.name }}</a>{% endfor %}</nav>
+{% if rendered.is_none() %}<div class="head">{% call paths::crumbs(crumbs) %}{% endcall %}
 <span class="muted">{{ size }} · {% if !blame_href.is_empty() %}<a href="{{ blame_href }}">Blame</a> · {% endif %}<a href="{{ log_href }}">History</a> · <button type="button" class="linkbtn" data-copy-url>Copy permalink</button></span></div>{% endif %}
 {% if let Some(m) = rendered %}<div{% if !outline_rail.is_empty() %} class="cols outline-cols"{% endif %}><div class="card doccard" data-md-view>
 {% if let Some(h) = head %}{{ h }}{% endif %}

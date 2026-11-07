@@ -1,7 +1,8 @@
 {% extends "_base.html" %}
+{%- import "_path.html" as paths -%}
 {% block title %}Blame {{ title }} · {{ c.name }}{% endblock %}
 {% block content %}
-<div class="head"><nav class="crumbs">{% for k in crumbs %}{% if !loop.first %}<i>/</i>{% endif %}<a href="{{ k.href }}">{{ k.name }}</a>{% endfor %}</nav>
+<div class="head">{% call paths::crumbs(crumbs) %}{% endcall %}
 <a href="{{ blob_href }}">Plain view</a></div>
 <div class="card scroll">{{ html|safe }}</div>
 {% endblock %}

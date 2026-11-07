@@ -181,6 +181,7 @@ pub(super) async fn blob(
         let blame_href = crate::features::href_if(Feature::Blame, &format!("/blame/{r}/{pe}"));
         let log_href = fmt::href(&format!("/log/{r}?path={pe}"));
         let head = doc.as_ref().map(|d| DocHead {
+            page_head: true,
             title: path.rsplit('/').next().unwrap_or(&path).to_owned(),
             crumbs: crumbs
                 .iter()

@@ -1,8 +1,8 @@
 {#- A document card's header bar (dochead.rs), escaped with the crate's `& < > "` set. Each |safe is the crate's own escaped markup: the switch and Preview/Code are `Seg` (rendered by seg_control.html, which escapes every value), `outline` is `markdown::outline_menu` and `tools` a fixed button. -#}
 <div class="dochead sticky" data-dochead>
 {%- if let Some((files, _)) = h.switch %}{{ files|safe }}{% endif -%}
-{%- if !h.crumbs.is_empty() %}<nav class="crumbs doc-path">{% for k in h.crumbs %}{% if !loop.first %}<i>/</i>{% endif %}<a href="{{ k.href }}">{{ k.name }}</a>{% endfor %}</nav>
-{%- else if h.tabs.is_empty() %}<span class="doc-title">{{ h.title }}</span>
+{%- if !h.crumbs.is_empty() %}{% if h.page_head %}<h1 class="crumbs doc-path">{% else %}<nav class="crumbs doc-path">{% endif %}{% for k in h.crumbs %}{% if !loop.first %}<i>/</i>{% endif %}<a href="{{ k.href }}">{{ k.name }}</a>{% endfor %}{% if h.page_head %}</h1>{% else %}</nav>{% endif %}
+{%- else if h.tabs.is_empty() %}{% if h.page_head %}<h1 class="doc-title">{{ h.title }}</h1>{% else %}<span class="doc-title">{{ h.title }}</span>{% endif %}
 {%- else %}<nav class="tabs doctabs">{% for t in h.tabs %}<a href="{{ t.href }}"{% if t.on %} class="on" aria-current="page"{% endif %}>{{ t.label }}</a>{% endfor %}</nav>
 {%- endif -%}
 {%- if let Some((_, views)) = h.switch %}{{ views|safe }}{% else if let Some(v) = views %}{{ v|safe }}{% endif -%}

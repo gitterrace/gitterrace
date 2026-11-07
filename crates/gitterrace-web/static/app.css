@@ -367,7 +367,7 @@ svg.chart text{font-family:var(--mono)}
 .wordmark{font:600 17px/1 var(--serif);color:var(--fg)}
 @media (max-width:600px){.tabnav a,.tabs>a{letter-spacing:.04em;padding-left:var(--space-2);padding-right:var(--space-2)}}
 @media (max-width:400px){.tabnav{gap:0}.tabnav a{letter-spacing:0;padding-left:4px;padding-right:4px}}
-.head h1{font-size:28px}
+.head h1:not(.crumbs){font-size:28px}
 
 /* languages: chart, brush, range card */
 .filters{display:flex;flex-wrap:wrap;gap:var(--space-3) var(--space-6);margin:var(--space-4) 0}

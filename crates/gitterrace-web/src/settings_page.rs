@@ -206,6 +206,7 @@ pub(crate) async fn page(
             token,
             file: f.as_str(),
             head: crate::dochead::DocHead {
+                page_head: true,
                 title: shorten(&path),
                 switch: Some((
                     Seg::links("File", files).no_caption(),

@@ -136,7 +136,7 @@ mod tests {
             |\n|---|\n| 1 |\n";
         let out = render(src);
         for want in [
-            "<h1 id=\"head-code\" data-line=\"4-4\">",
+            "<h2 class=\"markdown-h1\" id=\"head-code\" data-line=\"4-4\">",
             "<p data-line=\"6-7\">A wrapped",
             "<li data-line=\"9-9\">one",
             "<li data-line=\"10-10\">two",

@@ -163,6 +163,7 @@ pub(super) async fn index(State(table): State<Arc<Table>>) -> crate::error::Resu
             head: crate::dochead::DocHead {
                 title: "Repositories".to_owned(),
                 meta: sub,
+                page_head: true,
                 ..crate::dochead::DocHead::default()
             },
         }

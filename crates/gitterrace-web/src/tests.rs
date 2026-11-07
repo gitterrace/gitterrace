@@ -91,7 +91,7 @@ async fn serves_every_page() {
 
     let (s, body) = get(&app, "/").await;
     assert_eq!(s, 200);
-    assert!(body.contains("<h1 id=\"hello"));
+    assert!(body.contains("<h2 class=\"markdown-h1\" id=\"hello"));
     let (s, body) = get(&app, "/log/HEAD").await;
     assert_eq!((s, body.contains("fix: second")), (200, true));
     // A lone input submits on Enter, so the log filter carries no button beside it.

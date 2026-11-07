@@ -1,8 +1,9 @@
 {% extends "_base.html" %}
+{%- import "_path.html" as paths -%}
 {%- import "_table.html" as t -%}
 {% block title %}{{ title }} · {{ c.name }}{% endblock %}
 {% block content %}
-<div class="head"><nav class="crumbs">{% for k in crumbs %}{% if !loop.first %}<i>/</i>{% endif %}<a href="{{ k.href }}">{{ k.name }}</a>{% endfor %}</nav>
+<div class="head">{% call paths::crumbs(crumbs) %}{% endcall %}
 <a href="{{ c.base }}/log/{{ rev_enc }}?path={{ path_enc }}">History</a></div>
 <div class="card"><table class="entries" data-last="{{ c.base }}/api/last/{{ c.rev_enc }}/{{ path_enc }}">{% call t::files_head("Files") %}{% endcall %}
 {% if let Some(up) = up %}<tr class="up"><td colspan="3"><a href="{{ up }}">..</a></td></tr>{% endif %}
