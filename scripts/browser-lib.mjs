@@ -86,17 +86,34 @@ export function makeRepo() {
   return dir;
 }
 
+/** Every server still running. A `finally` never runs on a signal, an exit or a crash. */
+const servers = new Set();
+
+/** Stops every server this process started; the exit hook below and its signals call it. */
+export function stopAll() {
+  for (const c of servers) c.kill();
+  servers.clear();
+}
+
+process.on('exit', stopAll);
+const SIGNALS = { SIGINT: 130, SIGTERM: 143, SIGHUP: 129 };
+for (const [sig, code] of Object.entries(SIGNALS)) {
+  process.on(sig, () => { stopAll(); process.exit(code); });
+}
+process.on('uncaughtException', (e) => { stopAll(); console.error(e); process.exit(1); });
+process.on('unhandledRejection', (e) => { stopAll(); console.error(e); process.exit(1); });
+
 /**
  * Serves `dir` with `bin` on a free port. Returns { origin, base, stop }, where `base` is the
- * repository's own root, wherever it is mounted.
- */
-/**
- * Serves `dir` with `bin`. `cfg` is the config folder; it must sit outside `dir`, since
- * actions.toml inside a served repository is refused.
+ * repository's own root, wherever it is mounted. `cfg` is the config folder; it must sit outside
+ * `dir`, since actions.toml inside a served repository is refused. The server is stopped when
+ * this process ends, however it ends.
  */
 export async function serve(bin, dir, cfg = mkdtempSync(join(tmpdir(), 'gt-cfg-'))) {
   const port = await freePort();
   const child = spawn(bin, ['serve', '--addr', `127.0.0.1:${port}`, '--config', cfg, dir], { stdio: 'ignore' });
+  servers.add(child);
+  child.on('exit', () => servers.delete(child));
   const origin = `http://127.0.0.1:${port}`;
   let up = false;
   for (let i = 0; i < 100 && !up; i++) {

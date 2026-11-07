@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: setup harness-links counting-parity app-icon build install fmt clippy lint test doc theme actions docs-gen docs-check names lines check site-render site-shots help bench bench-report bench-guard memory-check browser-check site deploy shipped domains send-vectors preview gc gc-guard changelog keep
+.PHONY: setup harness-links counting-parity app-icon build install fmt clippy lint test doc theme actions docs-gen docs-check names lines check site-render site-shots help bench bench-report bench-guard memory-check browser-check browser-reap site deploy shipped domains send-vectors preview gc gc-guard changelog keep
 
 ## setup: Keep desktop search indexers out of build, bench and agent dirs (run once per machine)
 setup:
@@ -158,8 +158,12 @@ memory-check: build
 	TEST_MEMORY_WIDE=100000 cargo test --release -p gitterrace-web --test memory_budget idle_memory_is_flat_in_tree_size
 
 ## browser-check: Real-browser checks of the served pages (BIN=path to git-terrace). Needs browsers, so not in check
-browser-check:
+browser-check: browser-reap
 	node scripts/browser-check.mjs $(if $(BIN),--bin $(BIN))
+
+## browser-reap: A browser check killed mid-run or one that throws leaves no test server (BIN=path to git-terrace)
+browser-reap:
+	node scripts/browser-reap-check.mjs $(if $(BIN),--bin $(BIN))
 
 # site: Refuse to publish install lines before the repository, tap and release tag answer
 site: docs-check
