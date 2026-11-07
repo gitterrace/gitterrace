@@ -106,7 +106,7 @@ async fn without_a_range_there_is_no_range_markup() {
 /// The commit total of the pulse table.
 fn kpi_commits(page: &str) -> u64 {
     let row = page
-        .split("Commits without merges</td>")
+        .split("Commits without merges</th>")
         .nth(1)
         .expect("commits row");
     let b = row.split("<b>").nth(1).expect("value");

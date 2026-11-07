@@ -1,5 +1,6 @@
 {%- import "_kpis.html" as kp -%}
 {#- The languages page under its tabs. Raw values: sha links are finished HTML from fmt::sha_link, and the plot data is JSON for a script element, `<` written as \u003c, where entities would not decode. -#}
+{%- import "_table.html" as t -%}
 {%- if let Some(e) = empty %}{{ e }}{% endif -%}
 {%- if let Some(s) = shown -%}
 {%- let lead = s.lead.clone() %}{% include "_lead.html" -%}
@@ -7,15 +8,15 @@
 {%- for (class, name) in s.legend %}<span><i class="{{ class }}"></i>{{ name }}</span>{% endfor -%}
 </div></div><div class="plot">{{ s.area }}<div class="loc-tip" hidden></div></div><script type="application/json" id="loc-data">{{ s.json|safe }}</script></section>
 {%- let r = &s.range -%}
-<section class="card pad range" id="range"><div class="chart-head"><div><h2>{{ r.title }}</h2><p class="hint">{{ r.from }} to {{ r.to }}. Drag across the chart to pick another range.</p></div>{{ r.presets }}</div>{% call kp::cells() %}<div><b>{{ r.count }}</b><span>{{ r.count_noun }}</span></div><div><b class="add">+{{ r.added }}</b><span>lines added</span></div><div><b class="del">&minus;{{ r.removed }}</b><span>lines removed</span></div><div><b class="{% if r.net_up %}add{% else %}del{% endif %}">{{ r.net }}</b><span>net</span></div>{% endcall %}<div class="scroll"><table class="entries"><tr class="th"><td>Language</td><td class="r">Before</td><td class="r">After</td><td class="r">Change</td><td class="dcol"></td></tr>
-{%- for l in r.rows %}<tr><td><i class="dot {{ l.class }}"></i>{{ l.name }}</td><td class="r">{{ l.before }}</td><td class="r">{{ l.after }} <span class="muted">{{ l.share }}</span></td><td class="r"><b class="{% if l.up %}add{% else %}del{% endif %}">{{ l.change }}</b></td><td class="dcol"><span class="dbar"><b class="{% if l.up %}up{% else %}dn{% endif %} w{{ l.w }}"></b></span></td></tr>{% endfor -%}
+<section class="card pad range" id="range"><div class="chart-head"><div><h2>{{ r.title }}</h2><p class="hint">{{ r.from }} to {{ r.to }}. Drag across the chart to pick another range.</p></div>{{ r.presets }}</div>{% call kp::cells() %}<div><b>{{ r.count }}</b><span>{{ r.count_noun }}</span></div><div><b class="add">+{{ r.added }}</b><span>lines added</span></div><div><b class="del">&minus;{{ r.removed }}</b><span>lines removed</span></div><div><b class="{% if r.net_up %}add{% else %}del{% endif %}">{{ r.net }}</b><span>net</span></div>{% endcall %}<div class="scroll"><table class="entries">{% call t::caption("Change by language") %}{% endcall %}<tr class="th"><th scope="col">Language</th><th scope="col" class="r">Before</th><th scope="col" class="r">After</th><th scope="col" class="r">Change</th><th scope="col" class="dcol"><span class="vh">Change bar</span></th></tr>
+{%- for l in r.rows %}<tr><th scope="row"><i class="dot {{ l.class }}"></i>{{ l.name }}</th><td class="r">{{ l.before }}</td><td class="r">{{ l.after }} <span class="muted">{{ l.share }}</span></td><td class="r"><b class="{% if l.up %}add{% else %}del{% endif %}">{{ l.change }}</b></td><td class="dcol"><span class="dbar"><b class="{% if l.up %}up{% else %}dn{% endif %} w{{ l.w }}"></b></span></td></tr>{% endfor -%}
 </table></div><details class="rlist"><summary>{{ r.list_title }} in this range</summary><ul>
 {%- for c in r.commits %}<li>{{ c.sha|safe }} <span class="subj">{{ c.subject }}</span> <span class="muted">{{ c.day }}</span></li>{% endfor -%}
 </ul>{% if let Some(n) = r.cut %}<p class="foot">Showing the newest {{ n }}. Narrow the range to see the rest.</p>{% endif %}</details></section>
 {%- let n = &s.now -%}
 <section class="card pad"><div class="chart-head"><div><h2>Languages now</h2><p class="hint">Share of all lines at the newest commit, trend over the whole history, and change over the last 10 commits.</p></div></div><div class="sharebar" role="img" aria-label="Share of lines by language">
 {%- for p in n.bar %}<b class="{{ p.class }} w{{ p.w }}" data-tip="{{ p.tip }}"></b>{% endfor -%}
-</div><div class="scroll"><table class="entries"><tr class="th"><td>Language</td><td class="r">Lines</td><td class="r">Share</td><td>Trend</td><td class="r">{{ n.window }}</td></tr>
-{%- for l in n.rows %}<tr><td><i class="dot {{ l.class }}"></i>{{ l.name }}</td><td class="r">{{ l.lines }}</td><td class="r">{{ l.share }}</td><td><svg class="spark {{ l.spark_class }}" viewBox="0 0 90 20" width="90" height="20" aria-hidden="true"><polyline points="{{ l.points }}"/></svg></td><td class="r"><b class="{% if l.up %}add{% else %}del{% endif %}">{{ l.change }}</b></td></tr>{% endfor -%}
+</div><div class="scroll"><table class="entries">{% call t::caption("Languages now") %}{% endcall %}<tr class="th"><th scope="col">Language</th><th scope="col" class="r">Lines</th><th scope="col" class="r">Share</th><th scope="col">Trend</th><th scope="col" class="r">{{ n.window }}</th></tr>
+{%- for l in n.rows %}<tr><th scope="row"><i class="dot {{ l.class }}"></i>{{ l.name }}</th><td class="r">{{ l.lines }}</td><td class="r">{{ l.share }}</td><td><svg class="spark {{ l.spark_class }}" viewBox="0 0 90 20" width="90" height="20" aria-hidden="true"><polyline points="{{ l.points }}"/></svg></td><td class="r"><b class="{% if l.up %}add{% else %}del{% endif %}">{{ l.change }}</b></td></tr>{% endfor -%}
 </table></div></section>
 {%- endif -%}

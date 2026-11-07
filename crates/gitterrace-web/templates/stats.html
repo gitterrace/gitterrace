@@ -2,6 +2,7 @@
 {% block title %}Activity · {{ c.name }}{% endblock %}
 {% block head %}
 <link rel="stylesheet" href="/static/insights.css">{% endblock %}
+{%- import "_table.html" as t -%}
 {% block content %}
 {% include "_tabs.html" %}
 {% include "_filterbar.html" %}
@@ -9,9 +10,9 @@
 {% include "_lead.html" %}
 {% if empty %}{{ fb.nothing }}{% else %}
 <p class="hint" id="activity-counts">{{ span }}.</p>
-<div class="card"><table class="entries">
-<tr class="th"><td></td><td class="r">This period</td>{% if compared %}<td class="r">Before</td><td class="r">Change</td>{% endif %}</tr>
-{% for r in rows %}<tr><td{% if !r.tip.is_empty() %} data-tip="{{ r.tip }}"{% endif %}>{{ r.label }}</td><td class="r"><b>{{ r.now }}</b></td>{% if compared %}<td class="r muted">{{ r.before }}</td><td class="r delta {{ r.tone }}">{{ r.delta }}</td>{% endif %}</tr>{% endfor %}
+<div class="card"><table class="entries">{% call t::caption("Activity counts") %}{% endcall %}
+<tr class="th"><th scope="col"><span class="vh">Count</span></th><th scope="col" class="r">This period</th>{% if compared %}<th scope="col" class="r">Before</th><th scope="col" class="r">Change</th>{% endif %}</tr>
+{% for r in rows %}<tr><th scope="row"{% if !r.tip.is_empty() %} data-tip="{{ r.tip }}"{% endif %}>{{ r.label }}</th><td class="r"><b>{{ r.now }}</b></td>{% if compared %}<td class="r muted">{{ r.before }}</td><td class="r delta {{ r.tone }}">{{ r.delta }}</td>{% endif %}</tr>{% endfor %}
 </table></div>{% if let Some(r) = range %}
 <div class="chart-head"><div><h2>Commits by weekday</h2><p class="hint">{{ r.title }}: {{ r.total }}. Remove the range chip to see everything again. {{ crate::rule::link(crate::rule::PERIODS)|safe }}</p></div></div>
 <div class="card pad">{{ r.weekdays }}</div>{% endif %}

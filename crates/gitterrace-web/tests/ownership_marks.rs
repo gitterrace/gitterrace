@@ -53,7 +53,7 @@ async fn lone_owners_warn_and_empty_shares_are_left_out() {
     );
     assert!(!body.contains("data-solo"), "two owners named as one");
     assert!(
-        table.contains("<td>Owners</td>"),
+        table.contains("<th scope=\"col\">Owners</th>"),
         "the Owners column is gone"
     );
     for row in table.split("<tr>").skip(2) {
@@ -101,7 +101,10 @@ async fn one_owner_everywhere_drops_the_owner_columns() {
     );
     let table = body.split("class=\"entries own\"").nth(1).expect("table");
     let table = table.split("</table>").next().unwrap_or_default();
-    assert!(!table.contains("Owners"), "the Owners column is shown");
+    assert!(
+        !table.contains(">Owners</th>"),
+        "the Owners column is shown"
+    );
     assert!(
         !table.contains("Bus factor"),
         "the Bus factor column is shown"

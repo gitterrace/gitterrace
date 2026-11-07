@@ -61,6 +61,20 @@ pub fn repeated_header_destinations(body: &str) -> Vec<String> {
     twice.into_iter().collect()
 }
 
+/// Ids an HTML body gives more than once. A repeated id sends a `#fragment`, a label or a
+/// script to whichever element comes first.
+pub fn duplicate_ids(body: &str) -> Vec<String> {
+    let mut seen = std::collections::BTreeSet::new();
+    let mut twice = std::collections::BTreeSet::new();
+    for part in body.split(" id=\"").skip(1) {
+        let id = part.split('"').next().unwrap_or_default();
+        if !seen.insert(id) {
+            twice.insert(id.to_owned());
+        }
+    }
+    twice.into_iter().collect()
+}
+
 #[cfg(test)]
 mod tests {
     #[test]
@@ -70,5 +84,11 @@ mod tests {
             r#"<a id="settingsbtn" href="/_settings"></a></div></header>"#
         );
         assert_eq!(super::repeated_header_destinations(gear), ["/_settings"]);
+    }
+
+    #[test]
+    fn an_id_given_twice_is_reported_once() {
+        let body = r#"<a id="x"></a><b id="y"></b><i id="x"></i>"#;
+        assert_eq!(super::duplicate_ids(body), ["x"]);
     }
 }

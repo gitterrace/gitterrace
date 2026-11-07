@@ -12,7 +12,7 @@ use std::collections::BTreeMap;
 use std::path::Path;
 
 use gitterrace_testkit::matrix::{self, Mailmap};
-use gitterrace_testkit::oracle;
+use gitterrace_testkit::{a11y, oracle};
 
 /// Where a failing run writes the differing bodies: under `target/`, never the source tree.
 fn dump(golden: &Path) -> std::path::PathBuf {
@@ -139,67 +139,38 @@ fn every_cell_matches_the_oracle() {
     oracle::check(&golden, &dump(&golden), &answers);
 }
 
-/// Ids an HTML body gives more than once. A repeated id sends a `#fragment`, a label or a
-/// script to whichever element comes first.
-fn duplicate_ids(body: &str) -> Vec<String> {
-    let mut seen = std::collections::BTreeSet::new();
-    let mut twice = std::collections::BTreeSet::new();
-    for part in body.split(" id=\"").skip(1) {
-        let id = part.split('"').next().unwrap_or_default();
-        if !seen.insert(id) {
-            twice.insert(id.to_owned());
+/// Every golden page passes the page checks: no header names a destination twice, no id is
+/// given twice, and (HTML only) the static screen reader checks of `gitterrace_testkit::a11y`.
+/// The golden cells reach each insights page under every option, so a table only one filter
+/// shows is checked too. `tests/pages_read_well.rs` runs the reader checks on the other pages.
+#[test]
+fn every_golden_page_passes_the_page_checks() {
+    if !oracle::frozen("every_golden_page_passes_the_page_checks") {
+        return;
+    }
+    let rt = tokio::runtime::Runtime::new().expect("runtime");
+    let mut bad = Vec::new();
+    for (key, body) in rt.block_on(golden_answers()) {
+        let reads = if key.contains("/api/") {
+            Vec::new()
+        } else {
+            a11y::problems(&body)
+        };
+        let found = [
+            (
+                "repeated header destination",
+                gitterrace_testkit::repeated_header_destinations(&body),
+            ),
+            ("id given twice", gitterrace_testkit::duplicate_ids(&body)),
+            ("unreadable", reads),
+        ];
+        for (what, d) in found.into_iter().filter(|(_, d)| !d.is_empty()) {
+            bad.push(format!("{key}: {what}: {d:?}"));
         }
     }
-    twice.into_iter().collect()
-}
-
-#[test]
-fn no_page_header_names_a_destination_twice() {
-    let gear = r#"<meta name="gt-settings" content="/_settings"><header><div class="tools"><a id="settingsbtn" href="/_settings"></a></div></header>"#;
-    assert_eq!(
-        gitterrace_testkit::repeated_header_destinations(gear),
-        ["/_settings"]
-    );
-    if !oracle::frozen("no_page_header_names_a_destination_twice") {
-        return;
-    }
-    let rt = tokio::runtime::Runtime::new().expect("runtime");
-    let bad: Vec<String> = rt
-        .block_on(golden_answers())
-        .iter()
-        .filter_map(|(key, body)| {
-            let d = gitterrace_testkit::repeated_header_destinations(body);
-            (!d.is_empty()).then(|| format!("{key}: {d:?}"))
-        })
-        .collect();
     assert!(
         bad.is_empty(),
-        "headers with a repeated destination:\n{}",
-        bad.join("\n")
-    );
-}
-
-#[test]
-fn no_page_gives_an_id_twice() {
-    assert_eq!(
-        duplicate_ids(r#"<a id="x"></a><b id="y"></b><i id="x"></i>"#),
-        ["x"]
-    );
-    if !oracle::frozen("no_page_gives_an_id_twice") {
-        return;
-    }
-    let rt = tokio::runtime::Runtime::new().expect("runtime");
-    let bad: Vec<String> = rt
-        .block_on(golden_answers())
-        .iter()
-        .filter_map(|(key, body)| {
-            let d = duplicate_ids(body);
-            (!d.is_empty()).then(|| format!("{key}: {d:?}"))
-        })
-        .collect();
-    assert!(
-        bad.is_empty(),
-        "pages with a repeated id:\n{}",
+        "pages failing a page check:\n{}",
         bad.join("\n")
     );
 }

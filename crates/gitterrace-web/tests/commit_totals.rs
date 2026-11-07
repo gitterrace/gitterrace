@@ -54,7 +54,7 @@ async fn overview_total_is_stats_total_plus_merges_and_both_say_so() {
     let (_, stats) = get(&router, "/stats").await;
 
     let shown_all = first_bold(&overview, "class=\"facts\"");
-    let shown_stats = first_bold(&stats, "Commits without merges</td>");
+    let shown_stats = first_bold(&stats, "Commits without merges</th>");
     assert_eq!(shown_all, shown_stats + merges, "overview = stats + merges");
     assert!(
         overview.contains(&format!("{merges} merge")),

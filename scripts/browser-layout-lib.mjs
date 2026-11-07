@@ -87,7 +87,7 @@ async function pathCells() {
       await p.evaluate(() => document.fonts.ready);
       const bad = await p.evaluate(() => {
         const out = [];
-        for (const a of document.querySelectorAll('table.entries td a')) {
+        for (const a of document.querySelectorAll('table.entries :is(td,th) a')) {
           if (!a.textContent.includes('/')) continue;
           const range = document.createRange();
           const walk = document.createTreeWalker(a, NodeFilter.SHOW_TEXT);

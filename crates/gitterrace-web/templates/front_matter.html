@@ -1,6 +1,6 @@
 {#- A Markdown file's front matter (markdown/front.rs): its key/value table, or the raw block as code. Escaped with the crate's `& < > "` set; added after sanitizing, so nothing here is raw. -#}
 {%- if let Some(rows) = rows -%}
-<table class="fm">{% for (k, v) in rows %}<tr><th>{{ k }}</th><td>{{ v }}</td></tr>{% endfor %}</table>
+<table class="fm"><caption class="vh">Front matter</caption>{% for (k, v) in rows %}<tr><th scope="row">{{ k }}</th><td>{{ v }}</td></tr>{% endfor %}</table>
 {% else -%}
 <pre><code>{{ block }}</code></pre>
 {% endif -%}

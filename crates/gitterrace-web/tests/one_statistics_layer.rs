@@ -9,11 +9,14 @@ use gitterrace_testkit::{Fixture, page as get};
 use serde_json::Value;
 
 /// Cells of the table rows of `html` holding `marker`, tags stripped, thousands separators gone.
+/// A row's header cell (`th`) is its first cell.
 fn rows(html: &str, marker: &str) -> Vec<Vec<String>> {
     html.split("<tr")
         .filter(|r| r.contains(marker))
         .map(|r| {
-            r.split("<td")
+            r.replace("<th", "<td")
+                .replace("</th>", "</td>")
+                .split("<td")
                 .skip(1)
                 .map(|c| {
                     let cell = c.split("</td>").next().unwrap_or_default();

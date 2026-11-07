@@ -11,7 +11,7 @@ const VIEWS = [
   { name: 'blob', path: '/blob/HEAD/guide/long.txt', head: 'main>.head', box: 'main' },
   { name: 'blame', path: '/blame/HEAD/guide/long.txt', head: 'main>.head', box: 'main' },
   { name: 'diff file', path: '/commit/HEAD', head: 'section.file>header', box: 'section.file' },
-  { name: 'table', path: '/stats/hotspots', head: '.entries tr.th:first-child td',
+  { name: 'table', path: '/stats/hotspots', head: '.entries tr.th:first-child th',
     box: '.card:has(>table.entries tr.th:first-child)' },
 ];
 
@@ -64,7 +64,7 @@ export function checks({ pw, dir, srv, r, browsers, context }) {
           // 1 px ::after there. A line on the top edge (a ::before or a border) reads as over it.
           let lineW = 0, lineH = 0, topLine = false;
           // A table's head cells together make one line; any other view has one head per box.
-          for (const e of h.tagName === 'TD' ? [...h.parentElement.children] : [h]) {
+          for (const e of h.tagName === 'TD' || h.tagName === 'TH' ? [...h.parentElement.children] : [h]) {
             const st = getComputedStyle(e), af = getComputedStyle(e, '::after');
             const w = e.getBoundingClientRect().width;
             const be = getComputedStyle(e, '::before');

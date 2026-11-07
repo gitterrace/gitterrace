@@ -37,11 +37,11 @@ async fn page(r: &axum::Router, uri: &str) -> String {
     b
 }
 
-/// The first number in the `<b>` of the pulse row `label`.
+/// The first number in the `<b>` of the pulse row `label`, whose label cell is a row header.
 fn row(page: &str, label: &str) -> u64 {
-    let cell = page
-        .split(&format!("{label}</td>"))
-        .nth(1)
+    let cell = [format!("{label}</th>"), format!("{label}</td>")]
+        .iter()
+        .find_map(|end| page.split(end.as_str()).nth(1))
         .expect("row")
         .split("<b>")
         .nth(1)

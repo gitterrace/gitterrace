@@ -1,11 +1,12 @@
 {% extends "_base.html" %}
+{%- import "_table.html" as t -%}
 {% block title %}{{ title }} · {{ c.name }}{% endblock %}
 {% block content %}
 <div class="head"><nav class="crumbs">{% for k in crumbs %}{% if !loop.first %}<i>/</i>{% endif %}<a href="{{ k.href }}">{{ k.name }}</a>{% endfor %}</nav>
 <a href="{{ c.base }}/log/{{ rev_enc }}?path={{ path_enc }}">History</a></div>
-<div class="card"><table class="entries" data-last="{{ c.base }}/api/last/{{ c.rev_enc }}/{{ path_enc }}">
+<div class="card"><table class="entries" data-last="{{ c.base }}/api/last/{{ c.rev_enc }}/{{ path_enc }}">{% call t::files_head("Files") %}{% endcall %}
 {% if let Some(up) = up %}<tr class="up"><td colspan="3"><a href="{{ up }}">..</a></td></tr>{% endif %}
-{% for e in entries %}<tr><td>{% if e.href.is_empty() %}<span class="ico {{ e.kind }}"></span>{{ e.name }}{% else %}<a href="{{ e.href }}"><span class="ico {{ e.kind }}"></span>{{ e.name }}</a>{% endif %}</td><td class="lc muted" data-name="{{ e.name }}"></td><td class="muted r">{{ e.size }}</td></tr>{% endfor %}
+{% for e in entries %}<tr><th scope="row">{% if e.href.is_empty() %}<span class="ico {{ e.kind }}"></span>{{ e.name }}{% else %}<a href="{{ e.href }}"><span class="ico {{ e.kind }}"></span>{{ e.name }}</a>{% endif %}</th><td class="lc muted" data-name="{{ e.name }}"></td><td class="muted r" headers="files-size">{{ e.size }}</td></tr>{% endfor %}
 </table></div>
 {% if let Some(a) = about %}<div class="card readme doccard" id="about">{{ a.head }}<div class="{% if a.markdown %}markdown-body" data-src="{{ a.file }}"{% else %}doc-plain"{% endif %}>{{ a.html|safe }}</div></div>{% endif %}
 {% endblock %}

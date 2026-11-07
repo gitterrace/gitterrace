@@ -1,6 +1,7 @@
 {% extends "_base.html" %}
 {%- import "_kpis.html" as kp -%}
 {% block title %}Compare · {{ c.name }}{% endblock %}
+{%- import "_table.html" as t -%}
 {% block content %}
 <div class="head cmphead"><h1><a href="{{ log_href }}">Commits</a> <span class="muted">/ Compare</span></h1>
 <form class="cmp" action="{{ c.base }}/compare" method="get"><input name="base" value="{{ base }}" placeholder="Base: v1.0 or a commit" aria-label="Base" required><i aria-hidden="true">…</i><input name="head" value="{{ head }}" placeholder="Head" aria-label="Head"><button type="submit" hidden>Compare</button></form></div>
@@ -13,9 +14,9 @@
 {% call kp::kpis(&r.kpis) %}<div><b>{{ r.head_sha|safe }}</b><span>Head commit</span></div>{% endcall %}
 <meta name="gt-open" content="{{ r.diff_href }}" data-label="Open the head commit">
 <div class="chart-head"><div><h2>Languages</h2><p class="hint">Lines added and removed per language between the two revisions, largest net change first.</p></div></div>
-<div class="card"><table class="entries">
-<tr class="th"><td>Language</td><td class="r">Added</td><td class="r">Removed</td><td class="r">Net</td></tr>
-{% for l in r.langs %}<tr><td>{{ l.language }}</td><td class="r"><b class="add">+{{ l.added }}</b></td><td class="r"><b class="del">-{{ l.removed }}</b></td><td class="r"><b class="{{ l.tone }}">{{ l.net }}</b></td></tr>{% endfor %}
+<div class="card"><table class="entries">{% call t::caption("Languages") %}{% endcall %}
+<tr class="th"><th scope="col">Language</th><th scope="col" class="r">Added</th><th scope="col" class="r">Removed</th><th scope="col" class="r">Net</th></tr>
+{% for l in r.langs %}<tr><th scope="row">{{ l.language }}</th><td class="r"><b class="add">+{{ l.added }}</b></td><td class="r"><b class="del">-{{ l.removed }}</b></td><td class="r"><b class="{{ l.tone }}">{{ l.net }}</b></td></tr>{% endfor %}
 </table></div>
 <div class="chart-head"><div><h2>Commits</h2></div></div>
 <ul class="list log">{% for m in r.commits %}{{ m }}{% endfor %}</ul>

@@ -178,7 +178,15 @@ pub(crate) fn blame_html(r: &Render, path: &str, lines: &[BlameLine], now: i64) 
     let mut hl = (total <= r.highlight_bytes)
         .then(|| crate::highlight::for_file(path, lines.first().map_or("", |l| l.text.as_str())))
         .flatten();
-    let mut out = String::from("<table class=\"code blame\">");
+    // The same caption and quiet header row as `_table.html` writes for a table the design
+    // shows without a header row.
+    let mut out = String::from(
+        "<table class=\"code blame\"><caption class=\"vh\">Blame</caption>\
+         <thead class=\"quiet\"><tr>\
+         <th scope=\"col\"><span class=\"vh\">Commit</span></th>\
+         <th scope=\"col\"><span class=\"vh\">Line</span></th>\
+         <th scope=\"col\"><span class=\"vh\">Code</span></th></tr></thead>",
+    );
     let mut prev = "";
     let mut heat = 0;
     for l in lines {

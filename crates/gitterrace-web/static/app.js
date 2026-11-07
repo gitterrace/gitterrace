@@ -157,7 +157,7 @@
 
   // Pinned heads: a head is stuck while it sits below the top of its box's content, which only
   // happens when sticky moved it. The CSS draws the line under a pinned page head from it.
-  var heads = document.querySelectorAll(".dochead,section.file>header,main>.head,.entries tr.th:first-child td");
+  var heads = document.querySelectorAll(".dochead,section.file>header,main>.head,.entries tr.th:first-child th");
   function stuck() {
     heads.forEach(function (h) {
       if (getComputedStyle(h).position !== "sticky") { h.removeAttribute("data-stuck"); return; }

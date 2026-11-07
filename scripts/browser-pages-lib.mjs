@@ -10,10 +10,11 @@ export function checks(env) {
 // Runs in the page. Returns what is cut, broken, sparse or scrolling.
 function measure() {
   const out = { cut: [], broken: [], sparse: [], subj: [], name: '', full: true, hscroll: false };
+  // `.vh` is text for screen readers only, clipped to 1px on purpose.
   const overflowing = (e) => {
     const s = getComputedStyle(e);
     const clips = (s.overflowX !== 'visible' && s.overflowX !== 'auto' && s.overflowX !== 'scroll') || s.textOverflow === 'ellipsis';
-    return clips && e.scrollWidth > e.clientWidth + 1 && e.clientWidth > 0 && !e.classList.contains('subj');
+    return clips && e.scrollWidth > e.clientWidth + 1 && e.clientWidth > 0 && !e.classList.contains('subj') && !e.classList.contains('vh');
   };
   out.cut = [...document.querySelectorAll('body *')].filter(overflowing).map((e) => `${e.tagName}.${e.className}`);
   // The repo switcher button is `hidden` while one repository is served, so take the one shown.
@@ -25,7 +26,7 @@ function measure() {
   }
   // A one-word link or cell spanning more than one line box was broken mid-word. A path drawn by
   // the path macro may break after a slash: there each part (.seg) must stay whole instead.
-  const words = [...document.querySelectorAll('table.entries td, table.entries td a, .rlist li a, .rlist li code, .cmain a, .cmain .muted, .reponame, .ov-list li, .tabs a')]
+  const words = [...document.querySelectorAll('table.entries :is(td,th), table.entries :is(td,th) a, .rlist li a, .rlist li code, .cmain a, .cmain .muted, .reponame, .ov-list li, .tabs a')]
     .flatMap((e) => (e.querySelector('.seg') ? [...e.querySelectorAll('.seg')] : [e]));
   for (const e of new Set(words)) {
     const t = (e.textContent || '').trim();

@@ -1,5 +1,6 @@
 {% extends "_base.html" %}
 {%- import "_badge.html" as bd -%}
+{%- import "_table.html" as t -%}
 {% block title %}Refs · {{ c.name }}{% endblock %}
 {% block content %}
 {% if let Some(e) = nothing %}{{ e }}{% else %}
@@ -9,13 +10,13 @@
 <ul class="list log refrows">{% for t in tags %}{{ t }}{% endfor %}</ul>{% endif %}
 {% if !worktrees.is_empty() %}<h2 id="worktrees">Worktrees</h2>
 <p class="hint">Linked worktrees recorded in this repository's git directory. Paths are shown as written, and gitterrace does not open them.</p>
-<div class="card"><table class="entries">
-<tr class="th"><td>Path</td><td>Name</td><td>Checked out</td><td>Commit</td></tr>
-{% for w in worktrees %}<tr><td class="wrap"><code>{{ w.path }}</code>{% if w.locked %} {% call bd::tag("", "locked") %}{% endcall %}{% endif %}</td><td><code>{{ w.id }}</code></td><td>{% if w.log.is_empty() %}{{ w.branch }}{% else %}<a href="{{ w.log }}">{{ w.branch }}</a>{% endif %}</td><td>{{ w.commit|safe }}</td></tr>{% endfor %}
+<div class="card"><table class="entries">{% call t::caption("Worktrees") %}{% endcall %}
+<tr class="th"><th scope="col">Path</th><th scope="col">Name</th><th scope="col">Checked out</th><th scope="col">Commit</th></tr>
+{% for w in worktrees %}<tr><th scope="row" class="wrap"><code>{{ w.path }}</code>{% if w.locked %} {% call bd::tag("", "locked") %}{% endcall %}{% endif %}</th><td><code>{{ w.id }}</code></td><td>{% if w.log.is_empty() %}{{ w.branch }}{% else %}<a href="{{ w.log }}">{{ w.branch }}</a>{% endif %}</td><td>{{ w.commit|safe }}</td></tr>{% endfor %}
 </table></div>{% endif %}
 {% if !stashes.is_empty() %}<h2 id="stashes">Stashes</h2>
-<div class="card"><table class="entries grow">
-{% for s in stashes %}<tr><td><a href="{{ s.href }}"><code>{{ s.name }}</code></a></td><td class="grow">{{ s.message }}</td><td class="muted r">{{ s.when }}</td></tr>{% endfor %}
+<div class="card"><table class="entries grow">{% call t::caption("Stashes") %}{% endcall %}<thead class="quiet"><tr>{% call t::quiet("Stash") %}{% endcall %}{% call t::quiet("Message") %}{% endcall %}{% call t::quiet("Made") %}{% endcall %}</tr></thead>
+{% for s in stashes %}<tr><th scope="row"><a href="{{ s.href }}"><code>{{ s.name }}</code></a></th><td class="grow">{{ s.message }}</td><td class="muted r">{{ s.when }}</td></tr>{% endfor %}
 </table></div>{% endif %}
 {% if !remotes.is_empty() %}<h2 id="remotes">Remotes</h2>
 <ul class="list log refrows">{% for r in remotes %}{{ r }}{% endfor %}</ul>{% endif %}

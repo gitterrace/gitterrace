@@ -371,15 +371,16 @@ mod tests {
             "---\ntitle: Design contract\ndescription: \"The grammar: twelve rules\"\nname: \
             'q'\ntags:\n  - a\n  - b\n---\n# Doc\n",
         );
-        assert!(out.contains("<table class=\"fm\">"), "{out}");
-        assert!(
-            out.contains("<th>title</th><td>Design contract</td>"),
-            "{out}"
-        );
-        assert!(out.contains("<td>The grammar: twelve rules</td>"), "{out}");
-        assert!(out.contains("<td>q</td>"), "{out}");
-        assert!(out.contains("<td>a, b</td>"), "{out}");
-        assert!(out.contains("Doc</h1>"));
+        for want in [
+            "<table class=\"fm\"><caption class=\"vh\">Front matter</caption>",
+            "<th scope=\"row\">title</th><td>Design contract</td>",
+            "<td>The grammar: twelve rules</td>",
+            "<td>q</td>",
+            "<td>a, b</td>",
+            "Doc</h1>",
+        ] {
+            assert!(out.contains(want), "{want} in {out}");
+        }
     }
 
     #[test]
@@ -410,7 +411,10 @@ mod tests {
     #[test]
     fn front_matter_handles_crlf() {
         let out = render("---\r\ntitle: Hi\r\n---\r\n# Doc\r\n");
-        assert!(out.contains("<th>title</th><td>Hi</td>"), "{out}");
+        assert!(
+            out.contains("<th scope=\"row\">title</th><td>Hi</td>"),
+            "{out}"
+        );
         assert!(out.contains("Doc</h1>"));
     }
 

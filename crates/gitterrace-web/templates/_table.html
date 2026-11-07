@@ -1,0 +1,11 @@
+{#- The parts every data table shares, so a screen reader can name the table and each column.
+    `caption` names the table without showing it: the heading above already says it.
+    `quiet` is a column header for a table that shows no header row: it sits in a
+    `<thead class="quiet">`, which the stylesheet folds to no height. -#}
+{% macro caption(text) -%}<caption class="vh">{{ text }}</caption>{%- endmacro %}
+{% macro quiet(text) -%}<th scope="col"><span class="vh">{{ text }}</span></th>{%- endmacro %}
+{#- The file list of the overview and of a folder: name, last commit and size. The page
+    script fills the last commit in as a subject cell and an age cell, so that header spans
+    two. The size cell names its header (`headers="files-size"`), so it reads right both
+    before and after the script adds the age cell. -#}
+{% macro files_head(name) -%}<caption class="vh">{{ name }}</caption><thead class="quiet"><tr><th scope="col"><span class="vh">Name</span></th><th scope="col" colspan="2"><span class="vh">Last commit</span></th><th scope="col" id="files-size"><span class="vh">Size</span></th></tr></thead>{%- endmacro %}

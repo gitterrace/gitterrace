@@ -34,7 +34,10 @@ fn a_side_branch_compares_and_an_empty_range_says_so() {
             html.contains("<b>1</b><span>Commits without merges"),
             "one commit counted"
         );
-        assert!(html.contains("<td>Python</td>"), "its language is counted");
+        assert!(
+            html.contains("<th scope=\"row\">Python</th>"),
+            "its language is counted"
+        );
 
         let (_, same) = page(&router, "/compare?base=main&head=main").await;
         assert!(
