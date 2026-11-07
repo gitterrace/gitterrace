@@ -8,7 +8,7 @@
 # [retired]    entries = ["<file> <path>"]: a ratchet removed on purpose, its reason beside it
 
 [[ratchet]]
-file = "scripts/guards/wide-allowed.json"
+file = "config/schwarzwald/wide-allowed.json"
 path = "wide_allowed"
 
 [[ratchet]]
@@ -27,3 +27,8 @@ path = "super_paths"
 [counts]
 # Markup built with format!/write! in crates/gitterrace-web/src instead of a template.
 web_format_html = 17
+
+[retired]
+# The Rust-only wide-line count moved to the kit's file-length lint, which counts code lines
+# in every source glob (CSS, JS and HTML too) from config/schwarzwald/wide-allowed.json.
+entries = ["scripts/guards/wide-allowed.json wide_allowed"]

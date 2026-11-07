@@ -29,6 +29,9 @@ not_id = ['consumer arbitration board']
 max_lines = 600
 # Comment lines wrap at rustfmt's max_width, which never wraps a comment.
 max_width = 100
+# Code lines too: rustfmt leaves strings, macro bodies and comments alone, so a wide one is
+# caught here. Allowances in config/schwarzwald/wide-allowed.json only fall.
+max_code_width = 100
 globs = ["*.rs", "*.py", "*.mjs", "*.js", "*.sh", "*.css", "*.html"]
 # Vendored third-party files are not ours to split.
 exclude = ["*/static/vendor/*"]
@@ -42,9 +45,8 @@ tag_prefix = "v"
 [scripts]
 dirs = ["scripts"]
 readers = ["Makefile", "*.md", "*.yml", "*.yaml", "*.toml", "scripts/*"]
-# Called by name from a tool or another script's module import, not from a text the lint reads.
+# Called by name from a tool, not from a text the lint reads. Python imports are followed.
 exempt = [
-  "scripts/bench-*-lib.py",
   "scripts/guards/adapters/*.sh",
   "scripts/guards/tests/cases-*.sh",
 ]
