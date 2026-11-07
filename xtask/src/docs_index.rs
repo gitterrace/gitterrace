@@ -195,20 +195,7 @@ fn relative(path: &str) -> String {
 /// or flags. Empty when all is well.
 pub fn check(root: &Path) -> Result<Vec<String>> {
     let docs = documents(root)?;
-    let listed: BTreeSet<&str> = DOCS.iter().map(|d| d.0).collect();
-    let mut bad = Vec::new();
-    for d in &docs {
-        if d != INDEX && !listed.contains(d.as_str()) {
-            bad.push(format!(
-                "{d}: not listed in {INDEX} (add it to DOCS in xtask)"
-            ));
-        }
-    }
-    for l in &listed {
-        if !docs.iter().any(|d| d == l) {
-            bad.push(format!("{INDEX}: lists {l}, which does not exist"));
-        }
-    }
+    let mut bad = registry_problems(&docs, DOCS.iter().map(|d| d.0));
     let mut texts = BTreeMap::new();
     for d in &docs {
         let text = std::fs::read_to_string(root.join(d)).with_context(|| d.clone())?;
@@ -222,6 +209,26 @@ pub fn check(root: &Path) -> Result<Vec<String>> {
     }
     bad.extend(keys.reverse(&texts));
     Ok(bad)
+}
+
+/// Both directions of the registry: a document on disk that is not listed, and a listed
+/// document that is not on disk.
+fn registry_problems<'a>(docs: &[String], listed: impl Iterator<Item = &'a str>) -> Vec<String> {
+    let listed: BTreeSet<&str> = listed.collect();
+    let mut bad = Vec::new();
+    for d in docs {
+        if d != INDEX && !listed.contains(d.as_str()) {
+            bad.push(format!(
+                "{d}: not listed in {INDEX} (add it to DOCS in xtask)"
+            ));
+        }
+    }
+    for l in &listed {
+        if !docs.iter().any(|d| d == l) {
+            bad.push(format!("{INDEX}: lists {l}, which does not exist"));
+        }
+    }
+    bad
 }
 
 /// The Markdown files of the root and of `docs/` (with its subfolders), as repo paths.
@@ -499,6 +506,20 @@ impl Keys {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The registry is checked both ways: a file nobody listed and a listing nobody wrote.
+    #[test]
+    fn a_listed_document_missing_on_disk_and_an_unlisted_one_both_fail() {
+        let on_disk = vec!["docs/a.md".to_owned(), "docs/new.md".to_owned()];
+        let bad = registry_problems(&on_disk, ["docs/a.md", "docs/gone.md"].into_iter());
+        assert_eq!(bad.len(), 2, "{bad:?}");
+        assert!(bad[0].contains("docs/new.md: not listed"), "{bad:?}");
+        assert!(
+            bad[1].contains("lists docs/gone.md, which does not exist"),
+            "{bad:?}"
+        );
+        assert!(registry_problems(&on_disk, ["docs/a.md", "docs/new.md"].into_iter()).is_empty());
+    }
 
     /// The index and the checks read the same list: an unlisted page, a dead link, a missing
     /// anchor, an unknown key and an unknown flag each go red.
