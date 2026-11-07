@@ -250,7 +250,7 @@ fn the_pairwise_golden_agrees_with_the_full_matrix() {
 
 /// The browsing pages, one or more cells each, over the matrix repository at HEAD. Every page
 /// kind the router serves has a cell here or on an insights page, or is exempt below.
-const BROWSE: [&str; 50] = [
+const BROWSE: [&str; 57] = [
     "/log",
     "/log/HEAD",
     "/log/HEAD?path=src",
@@ -303,11 +303,19 @@ const BROWSE: [&str; 50] = [
     "/blame/HEAD/missing.rs",
     "/compare?base=nope&head=HEAD",
     "/tag/nope",
+    // An older revision, an empty compare, the worktree file route and the insights alias.
+    "/blob/HEAD~1/src/lib.rs",
+    "/blame/HEAD~1/src/lib.rs",
+    "/tree/HEAD~1/src",
+    "/compare?base=HEAD&head=HEAD",
+    "/worktree/raw/src/lib.rs",
+    "/worktree/raw/missing.rs",
+    "/insights",
 ];
 
 /// Routes with no golden cell, each with the reason. A route listed here that does not exist
 /// fails, so the list can only follow the router.
-const EXEMPT: [(&str, &str); 17] = [
+const EXEMPT: [(&str, &str); 15] = [
     (
         "/api/last/{rev}",
         "a fragment the tree page fetches, filled by the file walk",
@@ -340,11 +348,6 @@ const EXEMPT: [(&str, &str); 17] = [
     (
         "/_settings/check",
         "checks a posted config file, never a page",
-    ),
-    ("/insights", "a permanent redirect to /stats"),
-    (
-        "/worktree/raw/{*path}",
-        "image bytes of a changed file, none in the clean matrix repo",
     ),
 ];
 
