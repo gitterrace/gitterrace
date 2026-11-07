@@ -1,6 +1,6 @@
 //! The "On this page" outline: the headings a document lists, as a rail and as a menu.
 
-use crate::fmt::esc;
+use askama::Template;
 
 /// One heading of a document: level 1 to 6, its slug (before `crate::markdown::ids::doc_id`) and
 /// text.
@@ -44,59 +44,59 @@ pub(crate) fn outline_items(all: &[OutlineItem]) -> Vec<&OutlineItem> {
     }
 }
 
-fn outline_list(items: &[&OutlineItem]) -> String {
-    let top = items.iter().map(|h| h.level).min().unwrap_or(2);
-    let mut out = String::from("<ol>");
-    for h in items {
-        out.push_str("<li class=\"d");
-        out.push(if h.level > top { '1' } else { '0' });
-        out.push_str("\"><a href=\"#");
-        if h.chrome {
-            out.push_str(&esc(&h.id));
-        } else {
-            out.push_str(&esc(&crate::markdown::ids::doc_id(&h.id)));
-        }
-        out.push_str("\" title=\"");
-        out.push_str(&esc(&h.text));
-        out.push_str("\">");
-        out.push_str(&esc(&h.text));
-        out.push_str("</a></li>");
-    }
-    out.push_str("</ol>");
-    out
+/// One listed heading, as the template shows it: indent 0 or 1, the target id and the text.
+struct OutlineLink<'a> {
+    depth: u8,
+    id: String,
+    text: &'a str,
 }
 
-/// The wide-screen rail, "On this page". Empty below three headings.
-pub(crate) fn outline_rail(all: &[OutlineItem]) -> String {
+/// The markup, from `outline.html`: the only place that writes an outline.
+/// `escape = "svg"` picks the crate's `& < > "` escaper, the bytes `fmt::esc` wrote before.
+#[derive(Template)]
+#[template(path = "outline.html", escape = "svg")]
+struct OutlineMarkup<'a> {
+    rail: bool,
+    icon_only: bool,
+    links: Vec<OutlineLink<'a>>,
+}
+
+/// The outline as the rail or the menu, empty below three headings.
+fn outline_html(all: &[OutlineItem], rail: bool, icon_only: bool) -> String {
     let items = outline_items(all);
     if items.is_empty() {
         return String::new();
     }
-    format!(
-        "<nav class=\"outline rail\" aria-label=\"On this page\" data-outline>\
-         <h2>On this page</h2>{}</nav>",
-        outline_list(&items)
-    )
+    let top = items.iter().map(|h| h.level).min().unwrap_or(2);
+    let links = items
+        .iter()
+        .map(|h| OutlineLink {
+            depth: u8::from(h.level > top),
+            id: if h.chrome {
+                h.id.clone()
+            } else {
+                crate::markdown::ids::doc_id(&h.id)
+            },
+            text: &h.text,
+        })
+        .collect();
+    OutlineMarkup {
+        rail,
+        icon_only,
+        links,
+    }
+    .render()
+    .unwrap_or_default()
+}
+
+/// The wide-screen rail, "On this page". Empty below three headings.
+pub(crate) fn outline_rail(all: &[OutlineItem]) -> String {
+    outline_html(all, true, false)
 }
 
 /// The narrow-screen menu: a native `<details>`, so it opens without script. Empty below three
 /// headings. `icon_only` drops the visible text for a button in a header bar: the label moves to
 /// `aria-label` and `data-tip`.
 pub(crate) fn outline_menu(all: &[OutlineItem], icon_only: bool) -> String {
-    let items = outline_items(all);
-    if items.is_empty() {
-        return String::new();
-    }
-    let button = if icon_only {
-        "<summary class=\"outlinebtn icon\" aria-label=\"On this page\" data-tip=\"On this page\"></summary>"
-    } else {
-        "<summary class=\"outlinebtn\">On this page</summary>"
-    };
-    format!(
-        "<details class=\"outline menu\" data-outline>{button}\
-         <div class=\"outline-pop\"><input type=\"search\" class=\"outline-q\" \
-         placeholder=\"Filter headings\" aria-label=\"Filter headings\" hidden>{}\
-         <p class=\"muted outline-none\" hidden>No matching heading</p></div></details>",
-        outline_list(&items)
-    )
+    outline_html(all, false, icon_only)
 }

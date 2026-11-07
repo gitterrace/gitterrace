@@ -1,0 +1,11 @@
+{#- The "On this page" outline (markdown/outline.rs) as the rail or the menu, escaped with the crate's `& < > "` set. -#}
+{%- if rail -%}
+<nav class="outline rail" aria-label="On this page" data-outline><h2>On this page</h2>
+{%- else -%}
+<details class="outline menu" data-outline>
+{%- if icon_only %}<summary class="outlinebtn icon" aria-label="On this page" data-tip="On this page"></summary>
+{%- else %}<summary class="outlinebtn">On this page</summary>{% endif -%}
+<div class="outline-pop"><input type="search" class="outline-q" placeholder="Filter headings" aria-label="Filter headings" hidden>
+{%- endif -%}
+<ol>{% for l in links %}<li class="d{{ l.depth }}"><a href="#{{ l.id }}" title="{{ l.text }}">{{ l.text }}</a></li>{% endfor %}</ol>
+{%- if rail %}</nav>{% else %}<p class="muted outline-none" hidden>No matching heading</p></div></details>{% endif -%}

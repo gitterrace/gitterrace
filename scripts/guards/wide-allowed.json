@@ -29,7 +29,6 @@
     "crates/gitterrace-web/src/lib.rs": 3,
     "crates/gitterrace-web/src/markdown.rs": 5,
     "crates/gitterrace-web/src/markdown/lines.rs": 1,
-    "crates/gitterrace-web/src/markdown/outline.rs": 1,
     "crates/gitterrace-web/src/media.rs": 4,
     "crates/gitterrace-web/src/overview_side.rs": 1,
     "crates/gitterrace-web/src/routes/assets.rs": 2,
