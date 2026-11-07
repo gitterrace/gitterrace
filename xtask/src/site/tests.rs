@@ -245,6 +245,25 @@ fn every_link_and_anchor_of_every_page_resolves() {
     assert!(bad.is_empty(), "unresolved:\n{}", bad.join("\n"));
 }
 
+/// The class this guards: two elements of one page with the same id.
+#[test]
+fn no_generated_page_repeats_an_id() {
+    let (pages, _) = generated();
+    for (path, html) in &pages {
+        docs::check_unique_ids(path, html).expect("unique ids");
+    }
+}
+
+#[test]
+fn a_planted_duplicate_heading_id_is_reported() {
+    let html = "<h2 id=\"a\">A</h2><h3 id=\"b\">B</h3><h2 id=\"a\">A</h2>";
+    let err = docs::check_unique_ids("docs/x/", html)
+        .expect_err("duplicate")
+        .to_string();
+    assert!(err.contains("docs/x/") && err.contains("id a"), "{err}");
+    assert!(docs::check_unique_ids("docs/x/", "<h2 id=\"a\"></h2>").is_ok());
+}
+
 #[test]
 fn a_planted_bad_link_or_anchor_is_reported() {
     let (mut pages, files) = generated();

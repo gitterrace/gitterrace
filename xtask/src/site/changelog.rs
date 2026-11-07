@@ -15,8 +15,9 @@ fn release_id(heading: &str) -> String {
         .split(']')
         .next()
         .unwrap_or(heading);
-    if version.starts_with(|c: char| c.is_ascii_digit()) {
-        format!("v{version}")
+    let bare = version.strip_prefix('v').unwrap_or(version);
+    if bare.starts_with(|c: char| c.is_ascii_digit()) {
+        format!("v{bare}")
     } else {
         slug(version)
     }

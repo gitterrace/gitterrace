@@ -104,6 +104,21 @@ pub fn slug(heading: &str) -> String {
     out.trim_end_matches('-').to_owned()
 }
 
+/// Fails when two elements of one page share an id, so a link cannot mean two places.
+pub fn check_unique_ids(path: &str, html: &str) -> Result<()> {
+    let mut seen = std::collections::BTreeSet::new();
+    for id in html
+        .split(" id=\"")
+        .skip(1)
+        .filter_map(|r| r.split_once('"').map(|v| v.0))
+    {
+        if !seen.insert(id) {
+            anyhow::bail!("{path}: more than one heading has the id {id}");
+        }
+    }
+    Ok(())
+}
+
 /// The site path of a page, from its file stem.
 pub fn page_path(stem: &str) -> String {
     format!("docs/{stem}/")
@@ -285,6 +300,7 @@ pub fn pages(root: &Path, home: &str, repo: &str, name: &str) -> Result<(Vec<Out
         }
         let inner = body(&text, rel, &links, &mut |_, h| slug(h));
         let page = shell(&site, &title, &path, &inner, &source_link(&site, rel));
+        check_unique_ids(&path, &page)?;
         outs.push(Out::file(format!("site/{path}index.html"), page));
         paths.push(path);
         titles.push((rel.to_owned(), title));
@@ -294,7 +310,11 @@ pub fn pages(root: &Path, home: &str, repo: &str, name: &str) -> Result<(Vec<Out
         "site/docs/index.html",
         shell(&site, "Documentation", "docs/", &inner, ""),
     ));
-    outs.push(changelog::page(&site, &links, &read(CHANGELOG)?));
+    let log = changelog::page(&site, &links, &read(CHANGELOG)?);
+    if let Out::File { body, .. } = &log {
+        check_unique_ids(changelog::PATH, body)?;
+    }
+    outs.push(log);
     paths.push(changelog::PATH.to_owned());
     paths.sort();
     Ok((outs, paths))
