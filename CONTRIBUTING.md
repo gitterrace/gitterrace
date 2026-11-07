@@ -52,7 +52,8 @@ arena. `cargo install --git` builds elsewhere, misses it and keeps a few MB more
 it reports as missing.
 
 - typos (`_typos.toml`): misspellings in code and prose
-- vale (`.vale.ini`, `styles/gitterrace`): American spelling, no praise or history words, rules stated outright
+- vale (`.vale.ini`, `styles/gitterrace`): American spelling, no praise or history words, rules
+  stated outright
 - gitleaks (`.gitleaks.toml`): committed secrets
 - markdownlint-cli2 (`.markdownlint-cli2.jsonc`): Markdown structure
 - shellcheck and shfmt: `scripts/*.sh`
@@ -60,11 +61,16 @@ it reports as missing.
 - cargo-machete: unused dependencies
 - ast-grep (`sgconfig.yml`, `scripts/ast-grep/`): structural rules from AGENTS.md (gix only in
   gitterrace-git, no git subprocess, no `use super::` outside tests), each with a test
+- the shared house checks (personal data, own commit ids, internal references, the theme copy,
+  the commit message hook), plus the repository's own: pinned actions, CSS scope, the site's
+  content security policy, test configuration
+- tsc and pyright: types for the scripts, actionlint: the workflows
 
 ## Commits
 
 Conventional Commits, `type(scope): subject`, with the subject under 72 characters. The
-scope is the crate name without `gitterrace-`.
+scope is the crate name without `gitterrace-`. The body says why the change was made. Run
+`git config core.hooksPath scripts/hooks` once so the message rules run on every commit.
 
 ## Before a pull request
 
@@ -81,8 +87,8 @@ The local gate is the one that counts. The hosted workflows run a subset of it.
 - Linux: to check it locally in Docker, `scripts/linux-run.sh` builds and smoke-tests the binary
   (a few minutes), and `scripts/linux-run.sh --full` runs `make check` as the ubuntu CI job does
 - macOS: `scripts/macos-run.sh` installs the binary and smoke-tests it with an empty HOME and a
-  minimal PATH, so a dependency that only exists on your machine fails. `scripts/macos-run.sh --full` runs `make check`
-  under the same clean HOME
+  minimal PATH, so a dependency that only exists on your machine fails.
+  `scripts/macos-run.sh --full` runs `make check` under the same clean HOME
 - The three scripts exit 2 on a bad argument, and each has a self-test, part of `make check`,
   for its argument parsing
 
