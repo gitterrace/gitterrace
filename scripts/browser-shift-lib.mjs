@@ -102,5 +102,61 @@ export function checks(env) {
       await b.close();
     }
   }
-  return { layoutShift };
+  /**
+   * In the page: head-row faults. Every visible child of a head row that is or holds a control
+   * shares one vertical centre with the others on its flex line, within 1 px.
+   */
+  function headAlign(ctl) {
+    const bad = [];
+    for (const h of document.querySelectorAll('main .head, [data-dochead]')) {
+      if (!h.getClientRects().length) continue;
+      const kids = [...h.children].filter((e) => e.getClientRects().length
+        && (e.matches(ctl) || e.querySelector(ctl)));
+      const lines = [];
+      for (const e of kids) {
+        const b = e.getBoundingClientRect();
+        const line = lines.find((l) => b.top < l.bottom && b.bottom > l.top);
+        const it = { e, mid: b.top + b.height / 2 };
+        if (!line) { lines.push({ top: b.top, bottom: b.bottom, items: [it] }); continue; }
+        line.items.push(it);
+        line.top = Math.min(line.top, b.top);
+        line.bottom = Math.max(line.bottom, b.bottom);
+      }
+      const name = (e) => {
+        const c = String(e.className).split(' ')[0];
+        return e.tagName.toLowerCase() + (c ? '.' + c : '');
+      };
+      for (const l of lines) {
+        const mids = l.items.map((i) => i.mid);
+        if (Math.max(...mids) - Math.min(...mids) > 1) {
+          bad.push(l.items.map((i) => `${name(i.e)}@${i.mid.toFixed(1)}`).join(' '));
+        }
+      }
+    }
+    return bad;
+  }
+  async function headAlignCheck() {
+    const CTL = 'a[href], button, input:not([type=hidden]), select, summary';
+    for (const name of browsers) {
+      const { b, ctx } = await context(name);
+      const p = await ctx.newPage();
+      const all = await pages(p);
+      // The log's switch and Compare link only show with a rev and the graph view.
+      Object.assign(all, { 'log-graph': '/log/HEAD?view=graph' });
+      for (const width of [1440, 390]) {
+        await p.setViewportSize({ width, height: 900 });
+        const bad = [];
+        for (const [key, path] of Object.entries(all)) {
+          await p.goto(path.startsWith('http') ? path : srv.base + path, { waitUntil: 'load' });
+          await p.evaluate(() => document.fonts.ready);
+          for (const f of await p.evaluate(headAlign, CTL)) bad.push(`${key}: ${f}`);
+        }
+        const where = `head-align ${name} ${width}`;
+        bad.length ? r.fail(`${where}: ${bad.join('; ')}`)
+          : r.ok(`${where}: every head row's controls share one centre`);
+      }
+      await b.close();
+    }
+  }
+  return { layoutShift, headAlign: headAlignCheck };
 }
