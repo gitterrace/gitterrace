@@ -154,13 +154,24 @@ pub fn tree_id(repo: &Repo, rev: &str, path: &str) -> Result<String> {
         .unwrap_or_default())
 }
 
-/// Visits commits reachable from `rev`, newest first, with the full message. `f` returns
-/// `false` to stop.
+/// Work done by one [`scan_commits`]: commits walked, and summaries built for the visitor.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct CommitScan {
+    pub walked: usize,
+    pub built: usize,
+}
+
+/// Visits commits reachable from `rev`, newest first.
+///
+/// `keep` sees the full message and the author as the mailmap names them, and only a kept
+/// commit gets a summary built and passed to `f`, so a commit nobody wants costs no id,
+/// parent or committer formatting. `f` returns `false` to stop.
 pub fn scan_commits(
     repo: &Repo,
     rev: &str,
-    mut f: impl FnMut(&CommitSummary, &str) -> bool,
-) -> Result<()> {
+    mut keep: impl FnMut(&str, &str, &str) -> bool,
+    mut f: impl FnMut(CommitSummary, &str) -> bool,
+) -> Result<CommitScan> {
     let tip = oid(&repo.resolve(rev)?)?;
     let r = open(repo)?;
     let mailmap = ident::mailmap(&r, tip);
@@ -169,25 +180,34 @@ pub fn scan_commits(
         .sorting(Sorting::ByCommitTime(CommitTimeOrder::NewestFirst))
         .all()
         .map_err(git)?;
+    let mut scan = CommitScan::default();
     for info in walk {
         let commit = info.map_err(git)?.object().map_err(git)?;
-        let message = commit
-            .message_raw()
-            .map_err(git)?
-            .to_str_lossy()
-            .into_owned();
+        scan.walked += 1;
+        let raw = commit.message_raw().map_err(git)?.to_str_lossy();
+        let author = commit.author().map_err(git)?;
+        let named = mailmap.resolve_cow(author);
+        if !keep(
+            &raw,
+            &named.name.to_str_lossy(),
+            &named.email.to_str_lossy(),
+        ) {
+            continue;
+        }
+        scan.built += 1;
+        let message = raw.into_owned();
         let summary = CommitSummary {
             id: commit.id.to_string(),
             parents: commit.parent_ids().map(|p| p.to_string()).collect(),
-            author: ident::signature(&mailmap, commit.author().map_err(git)?),
+            author: ident::signature(&mailmap, author),
             committer: ident::signature(&mailmap, commit.committer().map_err(git)?),
             subject: message.lines().next().unwrap_or_default().trim().to_owned(),
         };
-        if !f(&summary, &message) {
+        if !f(summary, &message) {
             break;
         }
     }
-    Ok(())
+    Ok(scan)
 }
 
 /// Commit ids reachable from `rev` in the canonical order: parents before children, ties among

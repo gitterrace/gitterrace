@@ -506,21 +506,47 @@ fn search_commits(
     rev: &str,
     re: &Regex,
 ) -> Result<(Vec<gitterrace_git::CommitSummary>, bool)> {
+    search_commits_counted(a, rev, re).map(|(rows, capped, _)| (rows, capped))
+}
+
+/// [`search_commits`] with the work the walk did, so a test can hold a miss to the cost of
+/// the walk alone: only a matching commit has its summary built.
+fn search_commits_counted(
+    a: &App,
+    rev: &str,
+    re: &Regex,
+) -> Result<(
+    Vec<gitterrace_git::CommitSummary>,
+    bool,
+    gitterrace_git::CommitScan,
+)> {
     let mut rows = Vec::new();
     let mut capped = false;
     let most = a.cfg().limits.search_commits;
-    gitterrace_git::scan_commits(&a.repo, rev, |c, message| {
-        let hay = format!("{message}\n{} <{}>", c.author.name, c.author.email);
-        if re.is_match(&hay) {
+    let mut hay = String::new();
+    let scan = gitterrace_git::scan_commits(
+        &a.repo,
+        rev,
+        |message, name, email| {
+            hay.clear();
+            hay.push_str(message);
+            hay.push('\n');
+            hay.push_str(name);
+            hay.push_str(" <");
+            hay.push_str(email);
+            hay.push('>');
+            re.is_match(&hay)
+        },
+        |c, _| {
             if rows.len() >= most {
                 capped = true;
                 return false;
             }
-            rows.push(c.clone());
-        }
-        true
-    })?;
-    Ok((rows, capped))
+            rows.push(c);
+            true
+        },
+    )?;
+    Ok((rows, capped, scan))
 }
 
 #[cfg(test)]

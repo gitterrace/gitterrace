@@ -4,6 +4,7 @@ use axum::extract::{Query, State};
 
 use crate::search::{
     SearchQuery, build_regex, file_hits, glob_regex, highlight, memo_key, search, search_code,
+    search_commits_counted,
 };
 
 /// Guard: a repeat search at the same tip is served from the memo, not rescanned. The
@@ -123,4 +124,44 @@ fn a_file_header_counts_its_matching_lines_with_the_noun() {
         file_hits("a", "HEAD", "x\nx x\n.\n", &re, 100).matches(),
         "2 matches"
     );
+}
+
+/// Guard: a commit search that matches nothing builds no summary, so a miss costs the walk
+/// alone and never more than a hit over the same history. A search that builds the summary
+/// of every commit before testing it fails here; so does one that rereads a commit per match.
+#[test]
+fn a_commit_miss_builds_no_more_than_a_hit() {
+    let dir = tempfile::tempdir().expect("tmp");
+    let mut f = gitterrace_testkit::Fixture::init(dir.path());
+    for i in 0..30 {
+        f = f
+            .write("a.txt", &format!("{i}\n"))
+            .commit(&format!("chore: step {i}"));
+    }
+    let f = f.write("a.txt", "end\n").commit("feat: needle");
+    let repo = gitterrace_git::Repo::discover(f.path()).expect("repo");
+    let index = gitterrace_index::Index::open(&repo).expect("index");
+    let env = crate::app::Env::new(gitterrace_config::Config::default());
+    let app = crate::app::App::configured(repo, index, &env);
+    let run = |q: &str| {
+        let re = build_regex(q, false, false).expect("re");
+        search_commits_counted(&app, "HEAD", &re).expect("scan")
+    };
+    let (hit_rows, _, hit) = run("needle");
+    let (miss_rows, capped, miss) = run("zzqq-nothing");
+    assert_eq!(hit_rows.len(), 1);
+    assert_eq!(
+        hit_rows.first().map(|c| c.subject.as_str()),
+        Some("feat: needle")
+    );
+    assert!(miss_rows.is_empty() && !capped);
+    assert_eq!(
+        (hit.walked, miss.walked),
+        (31, 31),
+        "both walk the whole history"
+    );
+    assert_eq!(miss.built, 0, "a miss builds no summary");
+    assert!(miss.built <= hit.built, "{miss:?} vs {hit:?}");
+    let (rows, _, all) = run("step");
+    assert_eq!((rows.len(), all.built), (30, 30), "one summary per match");
 }
