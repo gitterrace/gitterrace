@@ -1,4 +1,6 @@
+# Build output, including a target dir with a suffix (a separate CARGO_TARGET_DIR for one run).
 /target
+/target-*/
 /.wt
 /.mcp.json
 # wrangler's local state (dev sessions, deploy cache); never part of the repository.
