@@ -110,12 +110,19 @@ fn x_labels(keys: &[&str]) -> Vec<XLabel> {
     } else {
         0
     };
-    // Per-commit axes name a day many times over: a label never repeats its neighbour.
-    let mut last = None;
-    keys.iter()
-        .enumerate()
-        .filter(|(i, _)| *i >= start && (i - start) % every == 0)
-        .filter(|(_, k)| last.replace(**k) != Some(**k))
+    // Per-commit axes name a day many times over: only the first column of a run is a
+    // candidate, and every k-th candidate is kept so the labels stay evenly spaced.
+    let firsts = (0..keys.len()).filter(|&i| i == 0 || keys[i] != keys[i - 1]);
+    let picked: Vec<usize> = if firsts.clone().count() == keys.len() {
+        (start..keys.len()).step_by(every).collect()
+    } else {
+        let per = keys.len() as f64 / firsts.clone().count() as f64;
+        let k = (need as f64 / per).ceil().max(1.0) as usize;
+        firsts.step_by(k).collect()
+    };
+    picked
+        .into_iter()
+        .map(|i| (i, keys[i]))
         .map(|(i, k)| {
             let cx = (i as f64).mul_add(sl, LEFT) + sl / 2.0;
             let (x, anchor) = if cx > W - LABEL_PX / 2.0 {

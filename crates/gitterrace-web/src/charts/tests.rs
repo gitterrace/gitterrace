@@ -185,6 +185,33 @@ fn a_repeated_day_is_labelled_once() {
     assert!(!shown.is_empty() && uniq == shown, "{shown:?}");
 }
 
+/// Dropping a repeated day must not leave the kept labels unevenly spaced.
+#[test]
+fn labels_after_dropping_repeats_are_evenly_spaced() {
+    for (days, run) in [(9, 3), (13, 4), (20, 5), (11, 7)] {
+        let pts: Vec<(String, u64)> = (0..days * run)
+            .map(|i| (format!("2026-11-{:02}", 1 + i / run), 1))
+            .collect();
+        let svg = bars(&pts, COMMITS).to_string();
+        let xs: Vec<f64> = svg
+            .split(r#"<text class="ax" x=""#)
+            .skip(1)
+            .filter(|t| t.contains(r#"y="212.0""#))
+            .filter_map(|t| t.split('"').next()?.parse().ok())
+            .collect();
+        let gaps: Vec<i64> = xs
+            .windows(2)
+            .map(|w| (w[1] - w[0]).round() as i64)
+            .collect();
+        let (lo, hi) = (gaps.iter().min(), gaps.iter().max());
+        let step = (pts.len() as f64 / xs.len().max(1) as f64).ceil() as i64;
+        assert!(
+            xs.len() < 2 || hi.zip(lo).is_some_and(|(h, l)| h - l <= step),
+            "{days}x{run}: {xs:?}"
+        );
+    }
+}
+
 /// Every chart whose marks are links is one tab stop: the chart takes focus and each link is
 /// out of the tab order, reached with the arrow keys instead.
 #[test]
