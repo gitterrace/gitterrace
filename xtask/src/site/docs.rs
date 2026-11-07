@@ -13,6 +13,7 @@ use pulldown_cmark::{CowStr, Event, HeadingLevel, Options, Parser, Tag, TagEnd, 
 
 use crate::docs_index::{normalize, on_site};
 use crate::out::Out;
+use crate::site::changelog;
 use crate::site::{THEME_INIT_JS, esc};
 
 pub(super) const CHANGELOG: &str = "CHANGELOG.md";
@@ -257,6 +258,8 @@ pub fn pages(root: &Path, home: &str, repo: &str, name: &str) -> Result<(Vec<Out
         "site/docs/index.html",
         shell(&site, "Documentation", "docs/", &inner, ""),
     ));
+    outs.push(changelog::page(&site, &links, &read(CHANGELOG)?));
+    paths.push(changelog::PATH.to_owned());
     paths.sort();
     Ok((outs, paths))
 }

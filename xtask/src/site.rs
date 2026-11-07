@@ -12,6 +12,7 @@ use crate::facts::Workspace;
 use crate::out::Out;
 use crate::readme_agents_md;
 
+mod changelog;
 mod docs;
 mod shots;
 
