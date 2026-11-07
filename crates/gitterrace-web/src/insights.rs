@@ -371,7 +371,6 @@ pub(crate) async fn contributors(
     cached(&app, "co", raw, move |a, r, c| {
         let f = &q.filter;
         let d = a.defaults();
-        let bots = q.options(&d).include_bots;
         let period = period_of(&q, &d, Period::All);
         let mut fb = f.bar("/stats/contributors", &**r, period);
         fb.extra = Some(q.metric_switch(&d));
@@ -381,11 +380,7 @@ pub(crate) async fn contributors(
         let ins = insights(a, r, scope.options().clone());
         let metric = q.metric();
         let report = counted(&ins, &scope, r).contributors(metric);
-        let shown: Vec<_> = report
-            .contributors
-            .iter()
-            .filter(|p| bots || !p.bot)
-            .collect();
+        let shown: Vec<_> = report.contributors.iter().collect();
         let total = shown.len();
         let new_total = shown.iter().filter(|p| p.first_time).count();
         let more = (!all && total > PEOPLE_SHOWN).then(|| {
@@ -433,7 +428,6 @@ pub(crate) async fn contributors(
         let (add, del): (u64, u64) = report
             .contributors
             .iter()
-            .filter(|p| bots || !p.bot)
             .fold((0, 0), |t, p| (t.0 + p.additions, t.1 + p.deletions));
         ContributorsPage {
             unit: report.unit.noun(),

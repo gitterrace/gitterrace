@@ -527,16 +527,11 @@ impl ApiState {
     pub fn contributors(&self, rev: Option<&str>) -> Result<ContributorsResponse, ApiError> {
         let rev = Self::rev(rev)?;
         let opts = self.settings().defaults;
-        let bots = opts.include_bots;
         let report = self.read(rev, |records| {
             self.insights(rev, &**records, opts)
                 .contributors(gitterrace_index::Period::All)
         })?;
-        let people: Vec<_> = report
-            .contributors
-            .into_iter()
-            .filter(|c| bots || !c.bot)
-            .collect();
+        let people = report.contributors;
         let bus_factor = gitterrace_index::bus_factor(people.iter().map(|c| c.commits as f64));
         Ok(ContributorsResponse {
             authors: people.into_iter().map(wire::contributor).collect(),

@@ -28,10 +28,8 @@ pub(crate) fn section(a: &crate::app::App, r: &Src, q: &InsightsQuery) -> String
         let scope = page_scope(q, &d, period);
         let ins = insights(a, r, scope.options().clone());
         let set = counted(&ins, &scope, r);
-        let (unit, weeks) = set.frequency();
-        let (add, del, rew) = weeks.iter().fold((0, 0, 0), |t, w| {
-            (t.0 + w.additions, t.1 + w.deletions, t.2 + w.rewritten)
-        });
+        let (unit, weeks, sum) = set.frequency_totals();
+        let (add, del, rew) = (sum.additions, sum.deletions, sum.rewritten);
         let points: Vec<_> = weeks
             .iter()
             .map(|w| (w.label.clone(), w.additions, w.deletions))

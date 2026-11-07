@@ -290,8 +290,8 @@ pub(crate) fn section(
     let set = counted(&ins, &scope, all);
     let src = ins.source();
     let recs: Vec<SrcRow> = set.stream().collect();
-    let n = recs.len();
     let sum = set.totals();
+    let n = sum.commits;
     let people = set
         .contributors(gitterrace_index::Metric::Commits)
         .contributors;

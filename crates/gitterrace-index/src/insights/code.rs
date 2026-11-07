@@ -10,6 +10,14 @@ pub struct Frequency {
     pub rewritten: u64,
 }
 
+/// Lines of every counted commit, whatever bucket it falls in: the KPIs next to the bars.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, serde::Serialize)]
+pub struct LineTotals {
+    pub additions: u64,
+    pub deletions: u64,
+    pub rewritten: u64,
+}
+
 /// Rework over a rolling window of commits, read at the end of each bucket.
 #[derive(Debug, Clone, PartialEq, serde::Serialize)]
 pub struct ReworkPoint {
@@ -65,6 +73,13 @@ impl Insights<'_> {
 impl Counted<'_> {
     /// Lines per axis bucket over the counted commits.
     pub fn frequency(&self) -> (BucketUnit, Vec<Frequency>) {
+        let (unit, out, _) = self.frequency_totals();
+        (unit, out)
+    }
+
+    /// [`Counted::frequency`] and the lines of every counted commit, in one pass. The totals
+    /// never come from the buckets: a commit outside the axis still counts in them.
+    pub fn frequency_totals(&self) -> (BucketUnit, Vec<Frequency>, LineTotals) {
         let axis = self.axis();
         let mut out: Vec<Frequency> = axis
             .names()
@@ -77,8 +92,9 @@ impl Counted<'_> {
             })
             .collect();
         let mut r = Bucketed(&mut out);
-        self.reduce(&mut [&mut r]);
-        (axis.unit(), out)
+        let mut t = Summed(LineTotals::default());
+        self.reduce(&mut [&mut r, &mut t]);
+        (axis.unit(), out, t.0)
     }
 
     /// Rolling rework read at the end of every bucket. The window is an eighth of the counted
@@ -150,6 +166,17 @@ impl Reducer for Bucketed<'_> {
             w.deletions += u64::from(item.lines.del);
             w.rewritten += u64::from(item.lines.rewritten);
         }
+    }
+}
+
+/// Lines of every counted commit.
+struct Summed(LineTotals);
+
+impl Reducer for Summed {
+    fn add(&mut self, _: &Counted<'_>, item: &Item) {
+        self.0.additions += u64::from(item.lines.add);
+        self.0.deletions += u64::from(item.lines.del);
+        self.0.rewritten += u64::from(item.lines.rewritten);
     }
 }
 
@@ -279,5 +306,21 @@ pub(crate) mod tests {
         let rw = ins.rework(Period::Week);
         let last = rw.points.last().expect("seven points");
         assert_eq!((last.added, last.removed), (15, 5));
+    }
+
+    /// The lines beside the frequency bars are the period's lines, read from their own
+    /// reducer: the same as the totals of the period, never a sum over buckets.
+    #[test]
+    fn frequency_totals_are_the_period_lines() {
+        let recs = edge_week();
+        let ins = Insights::new(&recs, Options::default(), None);
+        for p in [Period::Week, Period::Month, Period::All] {
+            let (sum, totals) = ins.in_period(p, |c| (c.frequency_totals().2, c.totals()));
+            assert_eq!(
+                (sum.additions, sum.deletions),
+                (totals.additions, totals.deletions),
+                "{p:?}"
+            );
+        }
     }
 }
