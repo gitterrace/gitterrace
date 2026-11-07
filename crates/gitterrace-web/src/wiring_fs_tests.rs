@@ -302,10 +302,14 @@ async fn an_open_tab_hears_a_commit_and_an_edit_within_the_rescan() {
         let task = tokio::spawn(crate::app::keep_index_fresh(Arc::clone(&a)));
         // The tab opens on an idle refresher, as a browser does: it must wake for the tab.
         tokio::time::sleep(Duration::from_millis(1500)).await;
+        // As a browser does: render the page, open its stream, and the user saves at once,
+        // before the tab's first scan. The page shows the tree before the edit, so the edit is
+        // a change the tab must hear, however late that scan runs.
+        let (code, _) = crate::tests::get(&a, "/worktree").await;
+        assert_eq!(code, 200, "the worktree page renders");
         // What `/events?wt=1` holds: a subscription and a worktree watch.
         let mut rx = a.changes.subscribe();
         let _wt = crate::live::WorktreeWatch::new(&a);
-        tokio::time::sleep(Duration::from_millis(300)).await;
         let bound = Duration::from_secs(5 + 5);
         let mut hears = async |kind: &str| {
             let end = tokio::time::Instant::now() + bound;
@@ -316,8 +320,8 @@ async fn an_open_tab_hears_a_commit_and_an_edit_within_the_rescan() {
             }
             false
         };
-        // The edit comes first: a scan that starts late takes it as its baseline and the tab
-        // never hears it.
+        // The edit comes first: a baseline taken from the first scan, not the render, would
+        // swallow it and the tab would never hear it.
         std::fs::write(p.join("small.txt"), "edited\n").expect("write");
         assert!(
             hears("worktree").await,
@@ -330,4 +334,34 @@ async fn an_open_tab_hears_a_commit_and_an_edit_within_the_rescan() {
         );
         task.abort();
     }
+}
+
+/// Guard class: a page rendered before an edit hears it, whatever other pages render before
+/// the first scan. Tab A renders, the user saves, tab B renders, then both streams open: B's
+/// render already holds the edit, so a baseline from the newest render hides it from A.
+#[tokio::test]
+async fn an_edit_between_two_renders_reaches_the_older_tab() {
+    let _one = SERIAL.lock().await;
+    let dir = tempfile::tempdir().expect("tmp");
+    let p = repo(dir.path(), "r");
+    let a = app(&p, with(|c| c.watch.rescan_secs = 5));
+    let task = tokio::spawn(crate::app::keep_index_fresh(Arc::clone(&a)));
+    tokio::time::sleep(Duration::from_millis(1500)).await;
+    let (code, _) = crate::tests::get(&a, "/worktree").await;
+    assert_eq!(code, 200, "tab A renders");
+    std::fs::write(p.join("small.txt"), "edited\n").expect("write");
+    let (code, _) = crate::tests::get(&a, "/worktree").await;
+    assert_eq!(code, 200, "tab B renders");
+    let mut rx = a.changes.subscribe();
+    let _wt = WorktreeWatch::new(&a);
+    let end = tokio::time::Instant::now() + BOUND;
+    let mut heard = false;
+    while let Ok(Ok(c)) = tokio::time::timeout_at(end, rx.recv()).await {
+        if c.kinds.contains(&"worktree") {
+            heard = true;
+            break;
+        }
+    }
+    assert!(heard, "tab A never heard the edit made after it rendered");
+    task.abort();
 }

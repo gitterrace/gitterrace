@@ -383,6 +383,15 @@ struct WorktreePage {
 
 async fn worktree(State(app): Shared) -> Result<Html<String>> {
     let p = blocking(&app, |a| {
+        // Taken before the diff: an edit in between shows once more, never not at all. The
+        // oldest render not yet compared stays: a newer one may already hold an edit an older
+        // tab has not seen.
+        let sig = gitterrace_git::worktree_signature(&a.repo).ok();
+        if let Ok(mut g) = a.wt_rendered.lock()
+            && g.is_none()
+        {
+            *g = sig;
+        }
         let files = gitterrace_git::worktree_diff(&a.repo)?;
         let (adds, dels) = files
             .iter()

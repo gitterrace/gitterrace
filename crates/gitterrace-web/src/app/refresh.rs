@@ -127,19 +127,9 @@ pub(crate) async fn keep_index_fresh(app: Arc<App>) {
             }
         } else if look {
             dirty_seen = None;
-            let a = Arc::clone(&app);
-            let sig = tokio::task::spawn_blocking(move || {
-                gitterrace_git::worktree_signature(&a.repo).ok()
-            })
-            .await
-            .ok()
-            .flatten();
-            app.wt_scans.fetch_add(1, Ordering::Release);
-            if wt_seen.is_some() && sig.is_some() && sig != wt_seen {
+            if worktree_moved(&app, &mut wt_seen).await {
                 kinds.push("worktree");
             }
-            // A failed scan still counts as the baseline, so an owed baseline never spins.
-            wt_seen = sig.or(wt_seen).or(Some(0));
         }
         if !kinds.is_empty() {
             check_head |= kinds.iter().any(|k| matches!(*k, "head" | "refs"));
@@ -159,6 +149,27 @@ async fn tick(owed: bool, poll: bool) {
     } else {
         std::future::pending::<()>().await;
     }
+}
+
+/// One working tree scan for the open tabs: whether the tree moved since `seen`, which it then
+/// updates. A new tab's baseline is the state its page was rendered from, not this scan, so an
+/// edit made after the render and before this scan is still a change.
+async fn worktree_moved(app: &Arc<App>, seen: &mut Option<u64>) -> bool {
+    let a = Arc::clone(app);
+    let sig = tokio::task::spawn_blocking(move || gitterrace_git::worktree_signature(&a.repo).ok())
+        .await
+        .ok()
+        .flatten();
+    app.wt_scans.fetch_add(1, Ordering::Release);
+    // Every scan consumes the render slot: a render before this scan is covered by it.
+    let rendered = app.wt_rendered.lock().ok().and_then(|mut g| g.take());
+    if seen.is_none() {
+        *seen = rendered;
+    }
+    let moved = seen.is_some() && sig.is_some() && sig != *seen;
+    // A failed scan still counts as the baseline, so an owed baseline never spins.
+    *seen = sig.or(*seen).or(Some(0));
+    moved
 }
 
 /// The early-exit dirty check for the top bar chip, run only while a tab listens. Returns the
