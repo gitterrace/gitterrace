@@ -59,14 +59,16 @@ mod tests {
 
     #[test]
     fn base64_matches_known_vectors() {
-        for (raw, want) in [
-            ("", ""),
-            ("f", "Zg=="),
-            ("fo", "Zm8="),
-            ("foo", "Zm9v"),
-            ("foob", "Zm9vYg=="),
-        ] {
-            assert_eq!(base64(raw.as_bytes()), want);
+        // RFC 4648 section 10 vectors, as bytes like token.rs writes them.
+        let cases: [(&[u8], &str); 5] = [
+            (b"", ""),
+            (b"f", "Zg=="),
+            (b"fo", "Zm8="),
+            (b"foo", "Zm9v"),
+            (b"foob", "Zm9vYg=="),
+        ];
+        for (raw, want) in cases {
+            assert_eq!(base64(raw), want);
         }
     }
 
