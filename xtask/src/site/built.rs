@@ -447,3 +447,64 @@ fn a_planted_site_link_to_a_source_file_is_reported() {
     let bad = site_links_to_files(&pages);
     assert_eq!(bad.len(), 1, "{bad:?}");
 }
+
+/// The footer's version link of the landing page must name a heading id that the changelog page
+/// has, and the link text must be that version.
+fn version_link_problems(landing: &str, changelog: &str, version: &str) -> Vec<String> {
+    let mut bad = Vec::new();
+    let foot = footer_of(landing).unwrap_or("");
+    let want = format!(">v{version}</a>");
+    let Some(link) = foot.split("<a ").find(|a| a.contains(&want)) else {
+        return vec![format!("the landing footer has no link to v{version}")];
+    };
+    let tagged = format!(" {link}");
+    let href = attrs(&tagged, "href").first().copied().unwrap_or("");
+    let Some(anchor) = href.strip_prefix("/changelog/#") else {
+        // An unreleased version has no heading yet, and the link then names the page.
+        let released = attrs(changelog, "id").contains(&format!("v{version}").as_str());
+        return if href == "/changelog/" && !released {
+            Vec::new()
+        } else {
+            vec![format!(
+                "the version link {href} is not the anchor of v{version}"
+            )]
+        };
+    };
+    if !attrs(changelog, "id").contains(&anchor) {
+        bad.push(format!("the changelog has no id {anchor} for v{version}"));
+    }
+    bad
+}
+
+/// The class this guards: a footer version that links to a release the changelog page does not
+/// have, or to nothing.
+#[test]
+fn the_footer_version_links_to_its_changelog_release() {
+    let (pages, _) = generated();
+    let page = |p: &str| {
+        pages
+            .iter()
+            .find(|x| x.0 == p)
+            .map(|x| x.1.clone())
+            .expect(p)
+    };
+    let ws = crate::facts::load(&crate::repo_root()).expect("facts");
+    let version = ws.packages["gitterrace"].version.clone();
+    let bad = version_link_problems(&page("index.html"), &page("changelog/index.html"), &version);
+    assert!(bad.is_empty(), "{}", bad.join("\n"));
+}
+
+#[test]
+fn a_footer_version_without_its_changelog_heading_is_reported() {
+    let landing = "<footer><a href=\"/changelog/#v9.9.9\">v9.9.9</a></footer>";
+    let changelog = "<h2 id=\"v0.1.0\">x</h2>";
+    let bad = version_link_problems(landing, changelog, "9.9.9");
+    assert!(bad[0].contains("no id v9.9.9"), "{bad:?}");
+    let released = "<h2 id=\"v9.9.9\">x</h2>";
+    let page = "<footer><a href=\"/changelog/\">v9.9.9</a></footer>";
+    let bad = version_link_problems(page, released, "9.9.9");
+    assert!(bad[0].contains("not the anchor of v9.9.9"), "{bad:?}");
+    assert!(version_link_problems(page, changelog, "9.9.9").is_empty());
+    let bad = version_link_problems(landing, changelog, "1.0.0");
+    assert!(bad[0].contains("no link to v1.0.0"), "{bad:?}");
+}
