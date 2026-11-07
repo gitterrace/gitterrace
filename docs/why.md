@@ -35,11 +35,22 @@ How a project moves is part of the same reading: its rhythm, what churns, where 
 spots are, who touches what. We find that interesting, at least while doing this kind of work,
 so it lives beside the history and is built from the same repository.
 
+## What it does with your code
+
+- It serves on `127.0.0.1:4242` by default, so only your machine can reach it. Serving beyond
+  loopback needs `--public`, which is read-only, as [running it online](online.md) describes.
+- It sends nothing anywhere: no telemetry and no update check. Its pages load nothing from
+  outside, and their content security policy allows only the server itself.
+- It reads the repository and never changes its files or history.
+- It writes a disposable cache under `.git/gitterrace/`, plus one line in `.git/info/exclude`
+  when you export into the worktree. Outside the repository it writes only your config and a
+  state folder: the repositories you served and the token that guards adding one.
+
+[SECURITY.md](../SECURITY.md) lists each promise and what counts as a vulnerability.
+
 ## What it is not
 
 - Not a host. There is nothing to sign in to and no network it needs.
-- Not a writer. It never changes your repository. Its only files are a disposable cache under
-  `.git/gitterrace/` and your own config.
 - Not a replacement for git or your editor. It is a place to read.
 - Not a terminal UI. For that, use lazygit, tig or gitui.
 

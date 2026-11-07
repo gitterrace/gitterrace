@@ -45,22 +45,104 @@ pub(crate) fn install_tabs(ws: &Workspace) -> String {
     out
 }
 
-/// The text before the first `##`, the body of "What it is not" style sections, and the
-/// "How it is made" section, from `docs/why.md`.
-pub(crate) fn split_why(why: &str) -> (&str, (String, String)) {
+/// The section of `docs/why.md` the page shows on its own, after the features.
+pub(crate) const SAFETY: &str = "What it does with your code";
+/// The section that closes the page, after the rest of `docs/why.md`.
+pub(crate) const MADE: &str = "How it is made";
+/// The folder under `.git/` the cache lives in (`Index::open`). The files in it are
+/// `CACHE_FILES`, so the prose may name only those.
+const CACHE_DIR: &str = ".git/gitterrace/";
+
+/// `docs/why.md` cut at its `##` headings: the lead, then `(title, body)` per section.
+pub(crate) fn split_why(why: &str) -> (&str, Vec<(&str, &str)>) {
     let mut parts = why.split("\n## ");
     let head = parts.next().unwrap_or_default();
     let lead = head.split_once('\n').map_or("", |(_, rest)| rest);
-    let (mut why_body, mut made) = (String::new(), String::new());
-    for p in parts {
-        let (title, body) = p.split_once('\n').unwrap_or((p, ""));
-        if title.starts_with("How it is made") {
-            made.push_str(body);
-        } else {
-            let _ = write!(why_body, "\n### {title}\n{body}\n");
+    let sections = parts
+        .map(|p| p.split_once('\n').unwrap_or((p, "")))
+        .collect();
+    (lead, sections)
+}
+
+/// The sections not shown on their own, as `###` subsections of "Why".
+pub(crate) fn why_body(sections: &[(&str, &str)]) -> String {
+    let mut s = String::new();
+    for (title, body) in sections {
+        if ![SAFETY, MADE].contains(title) {
+            let _ = write!(s, "\n### {title}\n{body}\n");
         }
     }
-    (lead, (why_body, made))
+    s
+}
+
+/// The body of one section, or an error naming it, so a renamed heading fails the build
+/// instead of dropping the section from the page.
+pub(crate) fn section<'a>(sections: &[(&str, &'a str)], title: &str) -> anyhow::Result<&'a str> {
+    sections
+        .iter()
+        .find(|(t, _)| *t == title)
+        .map(|(_, b)| *b)
+        .ok_or_else(|| anyhow::anyhow!("docs/why.md has no '## {title}' section"))
+}
+
+/// Fails when the prose names a fact the code owns and gets it wrong: an `ip:port` in code that
+/// is not the default address, or a path under `.git/` that is not the cache folder, a file the
+/// cache lists, or the `info/exclude` line an export adds.
+pub(crate) fn check_facts(text: &str) -> anyhow::Result<()> {
+    let mut wrong = Vec::new();
+    for span in text.split('`').skip(1).step_by(2) {
+        let addr = span.rsplit_once(':').is_some_and(|(host, port)| {
+            port.parse::<u16>().is_ok() && host.split('.').count() == 4
+        });
+        if addr && span != gitterrace_config::DEFAULT_ADDR {
+            wrong.push(format!(
+                "`{span}` is not the default address {}",
+                gitterrace_config::DEFAULT_ADDR
+            ));
+        }
+        if let Some(rest) = span.strip_prefix(".git/")
+            && rest != "info/exclude"
+        {
+            let file = span.strip_prefix(CACHE_DIR);
+            let known = file.is_some_and(|f| {
+                f.is_empty() || gitterrace_index::CACHE_FILES.iter().any(|(n, _)| *n == f)
+            });
+            if !known {
+                wrong.push(format!(
+                    "`{span}` is not the cache folder {CACHE_DIR} or a file in it"
+                ));
+            }
+        }
+    }
+    if wrong.is_empty() {
+        Ok(())
+    } else {
+        anyhow::bail!("docs/why.md: {}", wrong.join("; "))
+    }
+}
+
+/// Relative links in `docs/why.md` point at files beside it; on the page they point at the
+/// repository, so `](online.md)` becomes `]({repo}/blob/main/docs/online.md)`.
+pub(crate) fn site_links(text: &str, repo: &str) -> String {
+    let mut out = String::new();
+    let mut rest = text;
+    while let Some(i) = rest.find("](") {
+        let (before, after) = rest.split_at(i + 2);
+        out.push_str(before);
+        let end = after.find(')').unwrap_or(after.len());
+        let target = &after[..end];
+        if target.contains("://") || target.starts_with('#') {
+            out.push_str(target);
+        } else {
+            let path = target
+                .strip_prefix("../")
+                .map_or_else(|| format!("docs/{target}"), str::to_owned);
+            let _ = write!(out, "{repo}/blob/main/{path}");
+        }
+        rest = &after[end..];
+    }
+    out.push_str(rest);
+    out
 }
 
 /// One row per feature.
@@ -211,4 +293,45 @@ pub(crate) fn md(text: &str) -> String {
     let mut out = String::new();
     html::push_html(&mut out, Parser::new_ext(text, Options::empty()));
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The safety section names the default address the code uses, and a wrong address, cache
+    /// folder or cache file fails the build.
+    #[test]
+    fn why_prose_that_names_a_wrong_address_or_cache_path_fails() {
+        let path = concat!(env!("CARGO_MANIFEST_DIR"), "/../docs/why.md");
+        let why = std::fs::read_to_string(path).expect("why.md");
+        let (_, sections) = split_why(&why);
+        let safety = section(&sections, SAFETY).expect("safety section");
+        check_facts(safety).expect("why.md agrees with the code");
+        assert!(safety.contains(&format!("`{}`", gitterrace_config::DEFAULT_ADDR)));
+        for bad in [
+            "`127.0.0.1:8080`",
+            "`.git/terrace/`",
+            "`.git/gitterrace/blobs`",
+        ] {
+            let err = check_facts(&format!("serves on {bad}"))
+                .expect_err(bad)
+                .to_string();
+            assert!(err.contains(bad), "{err}");
+        }
+        check_facts("`.git/gitterrace/`, `.git/info/exclude` and `127.0.0.1:4242`").expect("ok");
+    }
+
+    /// A relative doc link on the landing page points at the file in the repository.
+    #[test]
+    fn why_links_point_at_the_repository() {
+        let s = site_links(
+            "[a](online.md) [b](../SECURITY.md#x) [c](https://e.org)",
+            "R",
+        );
+        assert_eq!(
+            s,
+            "[a](R/blob/main/docs/online.md) [b](R/blob/main/SECURITY.md#x) [c](https://e.org)"
+        );
+    }
 }

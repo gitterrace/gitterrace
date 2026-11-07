@@ -18,7 +18,10 @@ mod shots;
 pub use landing::SHOTS;
 #[cfg(test)]
 use landing::shot_html;
-use landing::{commands, features, gallery, install_tabs, md, split_why};
+use landing::{
+    MADE, SAFETY, check_facts, commands, features, gallery, install_tabs, md, section, site_links,
+    split_why, why_body,
+};
 use shots::check_shots;
 #[cfg(test)]
 use shots::readme_shots;
@@ -136,6 +139,8 @@ pub fn render(root: &Path, ws: &Workspace) -> Result<Vec<Out>> {
         .context("package gitterrace")?;
     let why = read("docs/why.md")?;
     let (lead, sections) = split_why(&why);
+    let safety = section(&sections, SAFETY)?;
+    check_facts(safety)?;
 
     let mut outs = Vec::new();
     outs.push(Out::file("site/assets/site.css", css(&read(TOKENS)?)?));
@@ -191,14 +196,19 @@ pub fn render(root: &Path, ws: &Workspace) -> Result<Vec<Out>> {
     );
     let _ = write!(
         h,
-        "<section>\n<h2>Why</h2>\n{}{}</section>\n",
-        md(lead),
-        md(&sections.0)
+        "<section>\n<h2>{SAFETY}</h2>\n{}</section>\n",
+        md(&site_links(safety, repo))
     );
     let _ = write!(
         h,
-        "<section>\n<h2>How it is made</h2>\n{}</section>\n",
-        md(&sections.1)
+        "<section>\n<h2>Why</h2>\n{}{}</section>\n",
+        md(lead),
+        md(&site_links(&why_body(&sections), repo))
+    );
+    let _ = write!(
+        h,
+        "<section>\n<h2>{MADE}</h2>\n{}</section>\n",
+        md(section(&sections, MADE)?)
     );
     let _ = write!(
         h,
