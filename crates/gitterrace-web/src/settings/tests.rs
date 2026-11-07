@@ -502,3 +502,25 @@ async fn an_actions_form_edit_keeps_comments_and_is_checked() {
     assert_eq!(status, 422, "an action with no kinds is refused: {reply}");
     assert_eq!(std::fs::read_to_string(&file).expect("r"), saved);
 }
+
+#[tokio::test]
+async fn each_field_links_to_its_error_and_the_page_has_an_alert_summary() {
+    let (root, dir) = (
+        tempfile::tempdir().expect("t"),
+        tempfile::tempdir().expect("t"),
+    );
+    let app = server(root.path(), dir.path(), false);
+    let (_, html) = page(&app, "/_settings").await;
+    let fields = html.matches("id=\"f-").count();
+    assert!(fields > 0);
+    assert_eq!(html.matches("aria-describedby=\"d-").count(), fields);
+    for k in gitterrace_config::keys() {
+        let id = k.id;
+        assert!(
+            html.contains(&format!("aria-describedby=\"d-{id} e-{id}\"")),
+            "{id} is not linked"
+        );
+        assert!(html.contains(&format!("class=\"seterr\" id=\"e-{id}\"")));
+    }
+    assert!(html.contains("id=\"seterrsum\" role=\"alert\""));
+}

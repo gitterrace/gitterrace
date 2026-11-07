@@ -10,7 +10,7 @@ pub(crate) const USER_ID: &str = "user-content-";
 
 /// Every literal id the page chrome uses: templates, static scripts and Rust views. The
 /// `chrome_ids_match_the_sources` test fails when this list and the sources disagree.
-pub(crate) const CHROME_IDS: [&str; 48] = [
+pub(crate) const CHROME_IDS: [&str; 49] = [
     "about",
     "activity-counts",
     "activity-hours",
@@ -46,6 +46,7 @@ pub(crate) const CHROME_IDS: [&str; 48] = [
     "send-head",
     "send-title",
     "seterrs",
+    "seterrsum",
     "setform",
     "setgut",
     "setnote",

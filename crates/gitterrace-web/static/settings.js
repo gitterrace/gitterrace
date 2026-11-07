@@ -15,6 +15,8 @@
   var errs = document.getElementById("seterrs");
   var note = document.getElementById("setnote");
   var save = document.getElementById("setsave");
+  var summary = document.getElementById("seterrsum");
+  var saving = false;
   var view = form && !form.hidden ? "form" : "plain";
   var saved = text ? text.value : "";
   var timer = 0;
@@ -93,14 +95,27 @@
 
   function show(reply) {
     errs.textContent = "";
-    if (form) form.querySelectorAll(".seterr").forEach(function (p) { p.hidden = true; p.textContent = ""; });
+    if (form) {
+      form.querySelectorAll(".seterr").forEach(function (p) { p.hidden = true; p.textContent = ""; });
+      form.querySelectorAll("[aria-invalid]").forEach(function (el) { el.removeAttribute("aria-invalid"); });
+    }
+    var first = null;
     (reply.errors || []).forEach(function (e) {
       var li = document.createElement("li");
       li.textContent = (e.line ? "Line " + e.line + ": " : "") + e.msg;
       if (e.line) li.dataset.line = String(e.line);
       errs.appendChild(li);
-      var row = e.key && form && form.querySelector('.setrow[data-id="' + e.key + '"] .seterr');
-      if (row) { row.textContent = e.msg; row.hidden = false; }
+      var row = e.key && form && form.querySelector('.setrow[data-id="' + e.key + '"]');
+      var msg = row && row.querySelector(".seterr");
+      if (msg) {
+        msg.textContent = e.msg;
+        msg.hidden = false;
+        var field = row.querySelector("input,select,textarea");
+        if (field) {
+          field.setAttribute("aria-invalid", "true");
+          if (!first) first = field;
+        }
+      }
     });
     (reply.warnings || []).forEach(function (w) {
       var li = document.createElement("li");
@@ -109,6 +124,8 @@
       errs.appendChild(li);
     });
     lines();
+    summary.textContent = reply.ok ? "" : "Not saved: " + (reply.errors || []).length + " error(s) to fix.";
+    if (!reply.ok && saving && first) first.focus();
     var restart = reply.restart && reply.restart.length ? " Needs a restart: " + reply.restart.join(", ") + "." : "";
     note.textContent = reply.ok ? (dirty() ? "Unsaved changes." + restart : "") : "Not saved: fix the errors.";
     save.disabled = !reply.ok || !dirty();
@@ -194,7 +211,9 @@
   save.addEventListener("click", function () {
     save.disabled = true;
     note.textContent = "Saving\u2026";
+    saving = true;
     call("PUT", "/_settings/file", edit()).then(function (r) {
+      saving = false;
       if (r.status === 200 && r.json) {
         // Reload so the form shows the saved file and its new stamp.
         var restart = r.json.restart && r.json.restart.length > 0;

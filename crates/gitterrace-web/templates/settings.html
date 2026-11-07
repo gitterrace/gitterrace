@@ -25,29 +25,30 @@
 {% for f in c.fields %}<div class="setrow" data-id="{{ f.id }}" data-kind="{{ f.kind }}" data-row-key>
 <label class="setname" for="f-{{ f.id }}"><code>{{ f.name }}</code>{% if f.required %} {% call bd::badge("", "Required") %}{% endcall %}{% endif %}</label>
 <div class="setin">{% match f.kind %}
-{% when "checkbox" %}<input type="checkbox" id="f-{{ f.id }}"{% if f.checked %} checked{% endif %}>
-{% when "list" %}<textarea id="f-{{ f.id }}" rows="2" placeholder="one per line">{{ f.value }}</textarea>
-{% when "text" %}<input type="text" id="f-{{ f.id }}" value="{{ f.value }}">
+{% when "checkbox" %}<input type="checkbox" id="f-{{ f.id }}" aria-describedby="d-{{ f.id }} e-{{ f.id }}"{% if f.checked %} checked{% endif %}>
+{% when "list" %}<textarea id="f-{{ f.id }}" aria-describedby="d-{{ f.id }} e-{{ f.id }}" rows="2" placeholder="one per line">{{ f.value }}</textarea>
+{% when "text" %}<input type="text" id="f-{{ f.id }}" aria-describedby="d-{{ f.id }} e-{{ f.id }}" value="{{ f.value }}">
 {% else %}<code class="setro">{% if f.value.is_empty() %}edited in Plain{% else %}{{ f.value }}{% endif %}</code>
-{% endmatch %}<p class="setdoc muted">{{ f.doc }}</p><p class="seterr" hidden></p></div>
+{% endmatch %}<p class="setdoc muted" id="d-{{ f.id }}">{{ f.doc }}</p><p class="seterr" id="e-{{ f.id }}" hidden></p></div>
 </div>{% endfor %}
 </div>{% endmacro %}
 <main class="wrap settings" id="main" data-seg-own>
 <div class="card">
 {{ head }}
+<p class="seterrsum" id="seterrsum" role="alert" tabindex="-1"></p>
 {% if let Some(e) = missing %}{{ e }}{% endif %}
 <section class="setform" id="setform" data-view="form"{% if form_off.is_some() %} hidden{% endif %}>
 {% for s in sections %}<fieldset class="setsec"><legend>[{{ s.name }}]</legend>
 {% for r in s.rows %}<div class="setrow" data-id="{{ r.id }}" data-kind="{{ r.kind }}" data-src="{{ r.source }}">
 <label class="setname" for="f-{{ r.id }}"><code>{{ r.name }}</code>{% if r.restart %} {% call bd::badge("", "Needs a restart") %}{% endcall %}{% endif %}{% if r.source != "default" %} {% call bd::badge("set-src", "set in " ~ r.source) %}{% endcall %}{% endif %}</label>
 <div class="setin">{% match r.kind %}
-{% when "checkbox" %}<input type="checkbox" id="f-{{ r.id }}"{% if r.checked %} checked{% endif %}>
-{% when "tri" %}<select id="f-{{ r.id }}"><option value=""{% if r.tri == "unset" %} selected{% endif %}>Unset</option><option value="true"{% if r.tri == "true" %} selected{% endif %}>On</option><option value="false"{% if r.tri == "false" %} selected{% endif %}>Off</option></select>
-{% when "number" %}<input type="number" id="f-{{ r.id }}" value="{{ r.value }}" placeholder="{{ r.default }}"{% if !r.min.is_empty() %} min="{{ r.min }}"{% endif %}{% if !r.max.is_empty() %} max="{{ r.max }}"{% endif %} step="1">
-{% when "list" %}<textarea id="f-{{ r.id }}" rows="2" placeholder="one per line">{{ r.value }}</textarea>
-{% when "select" %}<select id="f-{{ r.id }}">{% for (o, on) in r.options %}<option value="{{ o }}"{% if *on %} selected{% endif %}>{{ o }}</option>{% endfor %}</select>
-{% else %}<input type="text" id="f-{{ r.id }}" value="{{ r.value }}" placeholder="{{ r.default }}">
-{% endmatch %}<p class="setdoc muted">{{ r.doc }}</p><p class="seterr" hidden></p></div>
+{% when "checkbox" %}<input type="checkbox" id="f-{{ r.id }}" aria-describedby="d-{{ r.id }} e-{{ r.id }}"{% if r.checked %} checked{% endif %}>
+{% when "tri" %}<select id="f-{{ r.id }}" aria-describedby="d-{{ r.id }} e-{{ r.id }}"><option value=""{% if r.tri == "unset" %} selected{% endif %}>Unset</option><option value="true"{% if r.tri == "true" %} selected{% endif %}>On</option><option value="false"{% if r.tri == "false" %} selected{% endif %}>Off</option></select>
+{% when "number" %}<input type="number" id="f-{{ r.id }}" aria-describedby="d-{{ r.id }} e-{{ r.id }}" value="{{ r.value }}" placeholder="{{ r.default }}"{% if !r.min.is_empty() %} min="{{ r.min }}"{% endif %}{% if !r.max.is_empty() %} max="{{ r.max }}"{% endif %} step="1">
+{% when "list" %}<textarea id="f-{{ r.id }}" aria-describedby="d-{{ r.id }} e-{{ r.id }}" rows="2" placeholder="one per line">{{ r.value }}</textarea>
+{% when "select" %}<select id="f-{{ r.id }}" aria-describedby="d-{{ r.id }} e-{{ r.id }}">{% for (o, on) in r.options %}<option value="{{ o }}"{% if *on %} selected{% endif %}>{{ o }}</option>{% endfor %}</select>
+{% else %}<input type="text" id="f-{{ r.id }}" aria-describedby="d-{{ r.id }} e-{{ r.id }}" value="{{ r.value }}" placeholder="{{ r.default }}">
+{% endmatch %}<p class="setdoc muted" id="d-{{ r.id }}">{{ r.doc }}</p><p class="seterr" id="e-{{ r.id }}" hidden></p></div>
 </div>{% endfor %}
 </fieldset>{% endfor %}
 {% for l in lists %}<fieldset class="setsec setlist" data-list="{{ l.name }}"><legend>[[{{ l.name }}]]</legend>
