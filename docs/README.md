@@ -32,6 +32,7 @@ New here? [Install it and run it](../README.md#quickstart) in any git repository
 | Document | Covers |
 | --- | --- |
 | [configuration](configuration.md) | Every `config.toml` key, its default and the naming rule |
+| [cli](cli.md) | Every command and flag of `git terrace` |
 | [api](api.md) | The JSON API and the MCP tools |
 | [benchmarks](benchmarks.md) | What is measured, the budgets and the newest results |
 

@@ -92,6 +92,11 @@ const DOCS: &[(&str, Kind, &str)] = &[
         "Every `config.toml` key, its default and the naming rule",
     ),
     (
+        "docs/cli.md",
+        Kind::Reference,
+        "Every command and flag of `git terrace`",
+    ),
+    (
         "docs/api.md",
         Kind::Reference,
         "The JSON API and the MCP tools",
