@@ -44,7 +44,8 @@ html:has(section.file>header){scroll-padding-top:calc(40px + var(--space-2))}
 .outline-pop{position:absolute;right:0;top:calc(100% + var(--space-1));z-index:20;width:min(320px,92vw);max-height:60vh;overflow:auto;padding:var(--space-2);background:var(--raised);border:var(--border);border-radius:var(--radius);box-shadow:var(--shadow-2);font-size:var(--text-sm);text-transform:none;letter-spacing:0;font-family:var(--sans);font-weight:var(--weight-regular)}
 .outline-pop a{display:block;padding:5px var(--space-3);border-radius:var(--radius);color:var(--fg);overflow-wrap:anywhere}
 .outline-pop a:hover,.outline-pop a:focus-visible,.outline-pop a.on{background:var(--hover)}
-.outline-q{width:100%;min-width:0;margin-bottom:var(--space-2)}
+/* Two classes, so the global input floor (min-width:240px) cannot widen the 220 px rail. */
+.outline .outline-q{width:100%;min-width:0;margin-bottom:var(--space-2)}
 .outlinebtn.icon{width:32px;padding:0;justify-content:center}
 .markdown-body :is(h1,h2,h3,h4,h5,h6){scroll-margin-top:var(--space-4)}
 /* The Code view has no headings: it takes the rail's column too, the full content width. */

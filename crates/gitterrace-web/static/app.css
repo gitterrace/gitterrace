@@ -502,7 +502,7 @@ svg.chart .col:hover .dot{opacity:1}
 .delta{font-size:var(--text-sm);color:var(--muted)}.delta.up{color:var(--add)}.delta.dn{color:var(--del)}
 svg.chart .dot-pt{fill:var(--accent);fill-opacity:.55;stroke:var(--accent);stroke-width:1}svg.chart a:hover .dot-pt{fill-opacity:.95}
 .cmp{display:flex;gap:var(--space-2);align-items:center;flex:1 1 360px;justify-content:flex-end;margin:0}.cmp input{flex:1 1 140px;min-width:0;max-width:240px}.cmp i{font-style:normal;color:var(--faint)}
-@media (max-width:600px){.cmphead .cmp{flex:1 1 100%;flex-wrap:wrap;justify-content:stretch}.cmphead .cmp input{flex:1 1 40%;max-width:none}}
+@media (max-width:600px){.cmphead .cmp{flex:1 1 100%;flex-wrap:wrap;justify-content:stretch}.cmphead .cmp input{flex:1 1 100%;max-width:none}.cmphead .cmp i{display:none}}
 .livenote{font:var(--weight-semibold) var(--text-xs)/1 var(--mono);color:var(--muted);background:var(--soft);border:var(--border);border-radius:var(--radius);padding:5px 10px;white-space:nowrap;cursor:pointer}
 .livenote:hover{border-color:var(--line-strong)}
 .headstate{background:var(--warn-bg);color:var(--warn);border-bottom:var(--border);font:var(--weight-semibold) var(--text-sm)/1.4 var(--mono);padding:var(--space-2) 0}
