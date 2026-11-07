@@ -206,16 +206,20 @@ pub(crate) fn chrome_at(app: &crate::app::App, active: &str, rev: &str) -> Chrom
         rev_enc: enc_seg(rev),
         commit: app.repo.resolve(rev).unwrap_or_default(),
         dirty: (!app.public() && crate::features::on(Feature::Worktree)).then(|| app.dirty()),
-        nav: items
-            .into_iter()
-            .flatten()
-            .map(|(path, label, key)| Nav {
-                href: href(&path.replace("{rev}", &enc_seg(rev))),
-                label,
-                key,
-                on: key == active,
-            })
-            .collect(),
+        // Links to pages computed from the selected ref carry the page's ref, whether it came
+        // from the path (`/tree/dev`) or `?rev=`, so a tab change keeps the branch.
+        nav: crate::fmt::with_rev(rev, || {
+            items
+                .into_iter()
+                .flatten()
+                .map(|(path, label, key)| Nav {
+                    href: href(&path.replace("{rev}", &enc_seg(rev))),
+                    label,
+                    key,
+                    on: key == active,
+                })
+                .collect()
+        }),
         banner: if app.public() {
             None
         } else {
@@ -233,7 +237,7 @@ pub(crate) fn chrome_at(app: &crate::app::App, active: &str, rev: &str) -> Chrom
         live_how: "",
         live_on: "",
         version: app.version().to_string(),
-        home: href("/"),
+        home: crate::fmt::with_rev(rev, || href("/")),
         repo_id: app.repo.id().unwrap_or_default(),
         link_style: app.cfg().links.style.as_str(),
         repo_key: app.key.clone(),

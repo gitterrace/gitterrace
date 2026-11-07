@@ -158,6 +158,9 @@ pub(crate) fn branch_rows(a: &crate::app::App) -> Result<Vec<views::CommitRow>> 
             if s.merged() && !is_default && default.is_some() {
                 badges.push("merged");
             }
+            if !is_default && fmt::selected() == s.name {
+                badges.push("selected");
+            }
             let mut row = views::CommitRow::of(&c, now).led_by(views::Lead {
                 href: href(&format!("/log/{}", enc_seg(&s.name))),
                 name: s.name.clone(),

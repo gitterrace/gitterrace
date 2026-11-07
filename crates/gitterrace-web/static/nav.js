@@ -225,7 +225,7 @@
     if (["tree", "blob", "blame", "log", "raw"].indexOf(parts[1]) >= 0 && parts.length > 2) {
       parts[2] = encodeURIComponent(name);
       location.href = B + parts.join("/") + location.search;
-    } else if (path === "/" || path === "/stats" || path.indexOf("/stats/") === 0 || path.indexOf("/history/") === 0) {
+    } else if (path === "/" || path === "/refs" || path === "/stats" || path.indexOf("/stats/") === 0 || path.indexOf("/history/") === 0) {
       // Pages computed from the selected ref keep their place and their filters.
       var q = new URLSearchParams(location.search);
       if (name === "HEAD") q.delete("rev"); else q.set("rev", name);

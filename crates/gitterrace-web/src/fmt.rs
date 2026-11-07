@@ -192,7 +192,11 @@ pub(crate) fn href(path: &str) -> String {
 /// Pages whose content is computed from the selected ref rather than a ref in the path.
 fn follows_rev(path: &str) -> bool {
     let p = path.split(['?', '#']).next().unwrap_or_default();
-    p == "/" || p == "/stats" || p.starts_with("/stats/") || p.starts_with("/history/")
+    p == "/"
+        || p == "/refs"
+        || p == "/stats"
+        || p.starts_with("/stats/")
+        || p.starts_with("/history/")
 }
 
 fn with_selected(path: &str) -> std::borrow::Cow<'_, str> {
