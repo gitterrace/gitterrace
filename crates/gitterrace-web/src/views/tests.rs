@@ -185,6 +185,47 @@ fn a_commit_landed_later_joins_the_day_it_landed() {
     assert_eq!(labels, ["Today", "Yesterday"]);
 }
 
+/// The log groups by the day a commit landed, every count by its author's local day. A commit
+/// written Monday 23:30 in Berlin and committed on Tuesday sits under Tuesday and counts Monday.
+#[test]
+fn a_monday_night_commit_lands_under_tuesday_and_counts_on_monday() {
+    use gitterrace_git::CommitSummary;
+    use gitterrace_types::api::Signature;
+    const DAY: i64 = 86_400;
+    const BERLIN: i32 = 3600;
+    // 2026-11-02 is a Monday.
+    let monday = 20_759 * DAY;
+    let sig = |time| Signature {
+        email: "a@x".to_owned(),
+        name: "A".to_owned(),
+        offset: BERLIN,
+        time,
+    };
+    // Local 23:30 Monday is 22:30 UTC Monday; the commit landed Tuesday 10:00 local.
+    let wrote = monday + 22 * 3600 + 1800;
+    let landed = monday + DAY + 9 * 3600;
+    let c = CommitSummary {
+        id: "a".to_owned(),
+        parents: Vec::new(),
+        author: sig(wrote),
+        committer: sig(landed),
+        subject: "a".to_owned(),
+    };
+    let now = landed + 3600;
+    let labels: Vec<String> = crate::views::day_groups(std::slice::from_ref(&c), now)
+        .into_iter()
+        .map(|g| g.label)
+        .collect();
+    assert_eq!(labels, ["Today"]);
+    let counted = gitterrace_index::feed::local_day_of(c.author.time, c.author.offset);
+    assert_eq!(counted, 20_759, "the bars count the author's Monday");
+    assert_eq!(
+        gitterrace_index::feed::local_day_of(c.committer.time, c.committer.offset),
+        20_760,
+        "the log heading is the committer's Tuesday"
+    );
+}
+
 #[test]
 fn no_day_heading_appears_twice_in_a_log() {
     use gitterrace_git::CommitSummary;

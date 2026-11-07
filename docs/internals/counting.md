@@ -37,6 +37,11 @@ A commit's day is its local day: the date its author saw, in the author's own of
 at 23:30 in Berlin on a Monday counts on Monday, whatever day it was in UTC. The bars, the
 punch card, the weekday split and every total use this same day.
 
+One exception, named: the commit log groups commits by the day they landed, the committer's
+local day, so its order and its day headings agree. A commit written on Monday at 23:30 in
+Berlin and committed on Tuesday sits under Tuesday in the log and counts on Monday in the bars.
+Every count still uses the author's day.
+
 ## Periods
 
 A period is the last 7, 30, 90 or 365 local days, ending on the local day of the repository's
