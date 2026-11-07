@@ -21,6 +21,9 @@ main.wrap>.vh+h2{margin-top:0}
 /* header */
 .top{background:var(--header);border-bottom:var(--border)}
 .topbar{display:flex;align-items:center;flex-wrap:wrap;gap:var(--space-2) var(--space-3);min-height:var(--header-h);padding-block:var(--space-2)}
+/* A bare page (settings) has no tools, but its bar keeps the two rows the narrow bar of the other
+   pages has, so the nav and the content do not move. */
+@media (max-width:600px){body.bare .topbar{min-height:calc(var(--header-h) + 26px)}}
 .brand{display:flex;align-items:center;color:var(--fg)}
 .brand:hover{text-decoration:none}
 .logo{width:24px;height:24px;display:block}
@@ -73,7 +76,7 @@ header.top>.wrap{container:topbar/inline-size}
 .tabnav a{position:relative;color:var(--muted);padding:var(--space-2) var(--space-3) 10px;font:var(--weight-regular) 12px/1.4 var(--mono);text-transform:uppercase;letter-spacing:.08em;white-space:nowrap;border-bottom:2px solid transparent;transition:color var(--dur-fast)}
 .tabs>a{position:relative;color:var(--muted);padding:var(--space-2) var(--space-3);font:var(--weight-regular) var(--text-sm)/1.4 var(--sans);white-space:nowrap;border-bottom:2px solid transparent;margin-bottom:-1px;transition:color var(--dur-fast)}
 .tabnav a:hover,.tabs>a:hover{color:var(--fg);text-decoration:none}
-.tabnav a.on{color:var(--fg);font-weight:600;border-bottom:1px solid var(--fg)}.tabs>a.on{color:var(--fg);font-weight:var(--weight-semibold);border-bottom-color:var(--accent)}
+.tabnav a.on{color:var(--fg);font-weight:600;border-bottom:1px solid var(--fg);padding-bottom:11px}.tabs>a.on{color:var(--fg);font-weight:var(--weight-semibold);border-bottom-color:var(--accent)}
 
 /* primitives */
 .muted{color:var(--muted)}.r{text-align:right}.pad{padding:var(--space-4)}
