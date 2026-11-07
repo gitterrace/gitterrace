@@ -310,7 +310,7 @@ def block(cur: Json, old: Json | None) -> str:
     return "\n".join(L).rstrip("\n") + "\n"
 
 
-# Prose width of every tracked page. scripts/markdownlint/prose-length.cjs enforces it, and
+# Prose width of every tracked page. The kit's markdownlint prose-length rule enforces it, and
 # xtask's out::wrap_markdown applies the same rule to the Rust-generated blocks.
 WIDTH = 100
 

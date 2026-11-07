@@ -141,8 +141,8 @@ fn splice(text: &str, id: &str, body: &str) -> Result<String> {
     Ok(format!("{}{filled}{}", &text[..start], &text[stop..]))
 }
 
-/// Prose column limit for generated markdown, the same one `scripts/markdownlint/prose-length.cjs`
-/// enforces on every tracked page.
+/// Prose column limit for generated markdown, the same one the kit's markdownlint prose-length
+/// rule enforces on every tracked page.
 pub const PROSE_WIDTH: usize = 100;
 
 /// Wraps the prose paragraphs of generated markdown at [`PROSE_WIDTH`]. Tables, fences, headings,

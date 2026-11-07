@@ -1,8 +1,8 @@
 {
   // markdownlint checks list and emphasis style, fenced code languages and prose width. Prose
-  // wraps at 100 columns (scripts/markdownlint/prose-length.cjs); code spans, tables, fences,
+  // wraps at 80 columns (the kit's prose-length rule, limit below); code spans, tables, fences,
   // headings and link definitions are exempt, since they cannot wrap. Rewrap hand-written prose
-  // with `npx prettier --prose-wrap always --print-width 100 --write FILE`, then `make docs-gen`.
+  // with `npx prettier --write FILE` (.prettierrc.json is the kit's base), then `make docs-gen`.
   "config": {
     "default": true,
     "MD013": false,
@@ -21,7 +21,8 @@
     "MD036": false,
     "MD060": false
   },
-  "customRules": ["./scripts/markdownlint/prose-length.cjs"],
+  "customRules": ["./shared/schwarzwald/configs/markdownlint/prose-length.cjs"],
+  "prose-length": { "line_length": 80 },
   // Every markdown file in the tree, so a new page is linted without a list to update. Only
   // vendored and generated-elsewhere trees are left out.
   "globs": ["**/*.md"],
