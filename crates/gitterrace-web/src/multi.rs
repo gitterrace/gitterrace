@@ -7,6 +7,7 @@
 
 mod discover;
 mod home;
+pub(crate) mod sweep;
 
 use std::{
     collections::HashMap,
@@ -27,7 +28,7 @@ use tokio::sync::OnceCell;
 use tower::ServiceExt;
 
 use crate::app::Env;
-pub use crate::multi::discover::discover_repos;
+pub use crate::multi::discover::{discover_repos, search_roots};
 use crate::{fmt, spark};
 
 /// The index sparkline's longest window, half a year.
@@ -196,6 +197,15 @@ impl Table {
         {
             tracing::warn!("forgetting the name {name}: {e}");
         }
+    }
+
+    /// Takes `name` off the running server, as [`Self::take`] does: its URLs answer 404. For a
+    /// repository whose folder or git directory is gone from disk, so the last one goes too: a
+    /// ghost would answer an empty page, and the next sweep brings it back when it returns.
+    /// False when it was not served.
+    pub(crate) fn drop_gone(&self, name: &str) -> bool {
+        let gone = self.write().drop_name(name);
+        gone.inspect(|s| s.stop()).is_some()
     }
 
     /// Takes the repository named `name`, or at canonical `root`, off the running server: its

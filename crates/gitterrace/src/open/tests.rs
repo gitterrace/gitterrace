@@ -107,6 +107,7 @@ fn serve_listener(repos: Vec<std::path::PathBuf>, l: TcpListener, state: Option<
                 gitterrace_config::Config::default(),
                 None,
                 state,
+                &[],
             )
             .await
         })

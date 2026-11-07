@@ -62,6 +62,9 @@ pub(crate) struct Env {
     /// The config folder the settings page edits. `None` (an export, a test, no config folder)
     /// leaves its routes unmounted.
     pub(crate) settings_dir: Option<std::path::PathBuf>,
+    /// The folders the server was started on to search for repositories. A sweep keeps the
+    /// table in step with them (see `multi/sweep.rs`); empty for named repositories only.
+    pub(crate) search: Vec<std::path::PathBuf>,
     /// Whether the settings routes are mounted, so pages offer the settings link only then.
     settings_on: Arc<AtomicBool>,
 }
@@ -109,6 +112,7 @@ impl Env {
             sends: Arc::default(),
             changes: None,
             settings_dir: None,
+            search: Vec::new(),
             settings_on: Arc::default(),
         }
     }

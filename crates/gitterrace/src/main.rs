@@ -77,7 +77,7 @@ async fn main() -> anyhow::Result<()> {
                 file: d.join("config.toml"),
                 load: Box::new(move || flags.load().map(|l| l.config)),
             });
-            gitterrace_web::serve(repos, addr, actions, loaded.config, watched).await?;
+            gitterrace_web::serve(repos, addr, actions, loaded.config, watched, &cli.paths).await?;
         }
         Command::Mcp { served } => {
             let m = &loaded.config.multi;

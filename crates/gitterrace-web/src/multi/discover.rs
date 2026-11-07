@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 
 /// A working tree (holding `.git`) or a bare repository (`HEAD`, `objects` and `refs` at its
 /// top). A bare clone has no `.git`, and searching it for repositories finds none.
-fn is_repo(dir: &Path) -> bool {
+pub(super) fn is_repo(dir: &Path) -> bool {
     dir.join(".git").exists()
         || (dir.join("HEAD").is_file() && dir.join("objects").is_dir() && dir.join("refs").is_dir())
 }
@@ -28,6 +28,24 @@ pub fn discover_repos(paths: &[PathBuf], depth: usize, skip: &[String]) -> Vec<P
         }
     }
     out
+}
+
+/// The CLI paths [`discover_repos`] searches as folders.
+///
+/// Those that are no repository and hold at least one. A server keeps watching them, so a
+/// repository deleted or added there leaves or joins without a restart.
+pub fn search_roots(paths: &[PathBuf], depth: usize, skip: &[String]) -> Vec<PathBuf> {
+    paths
+        .iter()
+        .filter(|p| {
+            let mut found = Vec::new();
+            !is_repo(p) && {
+                walk(p, depth, skip, &mut found);
+                !found.is_empty()
+            }
+        })
+        .cloned()
+        .collect()
 }
 
 fn walk(dir: &Path, depth: usize, skip: &[String], out: &mut Vec<PathBuf>) {

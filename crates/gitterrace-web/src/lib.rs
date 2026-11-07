@@ -86,7 +86,7 @@ pub use guard::CSP as PAGE_CSP;
 pub use highlight::languages as highlighted_languages;
 pub use mcp_scope::mcp_scope;
 pub use media::plain_media;
-pub use multi::discover_repos;
+pub use multi::{discover_repos, search_roots};
 pub use registry::{
     Entry as RegistryEntry, add_token, candidates as registry_candidates, state_dir,
 };
@@ -361,6 +361,7 @@ fn build_server(
     });
     let table = Arc::new(table);
     table.start_all();
+    multi::sweep::spawn(Arc::clone(&table), Arc::clone(&site));
     let router = multi::router(Arc::clone(&table));
     let shown = fmt::count(n, "repository", "repositories");
     let mut router = router.merge(actions::router(Arc::clone(&site)));
@@ -439,21 +440,24 @@ fn remember(dir: Option<&Path>, paths: &[PathBuf]) {
 ///
 /// `actions` is the user's `actions.toml`; `None` (no config
 /// folder, or `--no-actions`) leaves the run route unmounted, as does a non-loopback bind.
-/// `watched` is the `config.toml` to reload while running, see [`Watched`].
+/// `watched` is the `config.toml` to reload while running, see [`Watched`]. `cli_paths` are the
+/// paths as given: those that are folders searched for repositories ([`search_roots`]) stay
+/// watched, so a repository deleted there leaves and one made there joins without a restart.
 pub async fn serve(
     repo_paths: Vec<PathBuf>,
     addr: SocketAddr,
     actions: Option<PathBuf>,
     cfg: Config,
     watched: Option<Watched>,
+    cli_paths: &[PathBuf],
 ) -> io::Result<()> {
-    serve_in(
-        repo_paths,
-        addr,
-        actions,
-        cfg,
-        watched,
-        registry::state_dir(),
+    refuse_lan(addr, &cfg)?;
+    let listener = tokio::net::TcpListener::bind(addr)
+        .await
+        .map_err(|e| bind_error(addr, &e))?;
+    let state = registry::state_dir();
+    serve_on(
+        listener, repo_paths, actions, cfg, watched, state, cli_paths,
     )
     .await
 }
@@ -471,11 +475,11 @@ pub async fn serve_in(
     let listener = tokio::net::TcpListener::bind(addr)
         .await
         .map_err(|e| bind_error(addr, &e))?;
-    serve_on(listener, repo_paths, actions, cfg, watched, state).await
+    serve_on(listener, repo_paths, actions, cfg, watched, state, &[]).await
 }
 
 /// [`serve_in`] on a listener already bound, so a caller that picked port 0 keeps the port
-/// it was given instead of racing another process for it.
+/// it was given instead of racing another process for it. `search` as for [`serve`].
 pub async fn serve_on(
     listener: tokio::net::TcpListener,
     repo_paths: Vec<PathBuf>,
@@ -483,6 +487,7 @@ pub async fn serve_on(
     cfg: Config,
     watched: Option<Watched>,
     state: Option<PathBuf>,
+    search: &[PathBuf],
 ) -> io::Result<()> {
     let addr = listener.local_addr()?;
     refuse_lan(addr, &cfg)?;
@@ -496,7 +501,10 @@ pub async fn serve_on(
         let (paths, state) = (repo_paths.clone(), state.clone());
         move || remember(state.as_deref(), &paths)
     });
+    let m = &cfg.multi;
+    let search = multi::search_roots(search, m.depth, &m.skip_dirs);
     let mut env = Env::new(cfg);
+    env.search = search;
     // The settings page edits the folder `config.toml` is reloaded from, and nothing else.
     env.settings_dir = watched
         .as_ref()
