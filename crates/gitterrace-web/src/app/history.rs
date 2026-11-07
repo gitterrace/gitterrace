@@ -74,7 +74,11 @@ impl App {
             return Arc::clone(s);
         }
         let s = Arc::new(crate::languages::Skeleton::build(src, filter));
-        if let Ok(mut g) = self.caches.chain.lock() {
+        // Built over a read that failed: the caller refuses it, and a rebuild keeps the
+        // generation, so a kept copy would be served over the clean cache.
+        if src.failure().is_none()
+            && let Ok(mut g) = self.caches.chain.lock()
+        {
             *g = Some((key, Arc::clone(&s)));
         }
         s
@@ -151,7 +155,9 @@ impl App {
         let t = gitterrace_index::Insights::from_source(src, opts, ignore)
             .period_summary(gitterrace_index::Period::All)
             .current;
-        if let Ok(mut g) = self.caches.totals.lock() {
+        if src.failure().is_none()
+            && let Ok(mut g) = self.caches.totals.lock()
+        {
             *g = Some((key, t.clone()));
         }
         t
@@ -269,5 +275,67 @@ mod tests {
         app.mark_ready();
         let after = app.file_paths(&head).expect("files");
         assert_eq!(*after, ["c.txt", "b.txt", "a.txt"]);
+    }
+
+    /// Guard class: a table derived from the source and kept by (head, generation) while a
+    /// read failed. The rebuild of the same history keeps the generation, so a walk that
+    /// finished after the rebuild cleared the caches (the warm-up's languages walk) was
+    /// served as data over the clean cache. Every such table is refused here.
+    #[test]
+    fn nothing_built_over_a_failed_read_is_kept() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let p = dir.path();
+        git(p, &["init", "-q", "-b", "main"]);
+        std::fs::write(p.join("a.rs"), "fn a() {}\n").expect("write");
+        git(p, &["add", "."]);
+        git(p, &["commit", "-q", "-m", "feat: one"]);
+        let repo = gitterrace_git::Repo::discover(p).expect("repo");
+        let index = gitterrace_index::Index::open(&repo).expect("index");
+        let app = Arc::new(App::new(repo, index));
+        app.index
+            .update(&app.repo, "HEAD", &|_| {})
+            .expect("update");
+        app.mark_ready();
+        let head = app.repo.resolve("HEAD").expect("head");
+        let src = app
+            .source(&head)
+            .expect("source")
+            .expect("ready")
+            .unchecked();
+        zero_blocks(app.index.dir());
+        let filter = crate::languages::path_filter(&app, &head);
+        app.chain(&head, &*src, &filter);
+        app.totals(&head, &*src, gitterrace_index::Options::default());
+        assert!(src.failure().is_some(), "the walks met the zeroed blocks");
+        let kept_in = |c: &crate::caches::Caches| {
+            [
+                ("languages chain", c.chain.lock().is_ok_and(|g| g.is_some())),
+                ("totals", c.totals.lock().is_ok_and(|g| g.is_some())),
+            ]
+        };
+        for (what, kept) in kept_in(&app.caches) {
+            assert!(!kept, "the {what} built over a failed read was kept");
+        }
+    }
+
+    /// Zeroes every block byte of each segment in `cache`. Same length, so the set still
+    /// opens; a read of any block fails its check.
+    fn zero_blocks(cache: &std::path::Path) {
+        for e in std::fs::read_dir(cache).expect("ls").flatten() {
+            let seg = e.path();
+            let name = e.file_name().to_string_lossy().into_owned();
+            let is_seg = seg.extension().is_some_and(|x| x == "gts");
+            if !(name.starts_with("seg-") && is_seg) {
+                continue;
+            }
+            let mut bytes = std::fs::read(&seg).expect("read");
+            let end = bytes.len() - 64;
+            let toc = usize::try_from(u64::from_le_bytes(
+                bytes[end + 16..end + 24].try_into().expect("8 bytes"),
+            ))
+            .expect("toc");
+            bytes[16..toc].fill(0);
+            std::fs::write(&seg, &bytes).expect("corrupt");
+        }
     }
 }
