@@ -4,7 +4,7 @@
 
 #![expect(clippy::expect_used, reason = "test setup")]
 
-use gitterrace_testkit::{Fixture, base, get};
+use gitterrace_testkit::{Fixture, base, get, wait};
 
 /// Asks only `/api/v1/repo` until it answers 200 again, at most `limit`: no page is asked
 /// meanwhile, so a page's own rebuild cannot stand in for the API's. Every answer before is a
@@ -190,52 +190,53 @@ fn a_truncated_or_garbage_segment_under_a_running_server_is_rebuilt() {
             let tmp = tempfile::tempdir().expect("tmp");
             let (repo, router, prefix) = built(tmp.path()).await;
             let cache = repo.join(".git/gitterrace");
-            // Warm: the stats page reads the segments, so the server holds them.
-            for i in 0..5 {
-                let (s, _) = get(&router, &format!("{prefix}/stats?author=warm{i}")).await;
-                assert!(s < 500, "/stats -> {s} while warming");
-                tokio::time::sleep(std::time::Duration::from_millis(50)).await;
-            }
+            // The start finished: damage met by the startup update is another path, and the
+            // stats page then reads the segments, so the server holds them.
+            gitterrace_testkit::oracle::ready(&router).await;
+            let (st, _) = get(&router, &format!("{prefix}/stats?author=warm")).await;
+            assert!(st < 500, "/stats -> {st} while warming");
             let segs = segments(&cache);
             assert!(!segs.is_empty(), "no segment to damage");
             let before = segs.len();
+            // Kept as written: the server may meet the damage and rebuild before a read-back.
+            let mut damaged = Vec::new();
             for p in &segs {
                 let b = std::fs::read(p).expect("read");
-                let damaged = if garbage {
+                let bad = if garbage {
                     vec![0xa5; b.len()]
                 } else {
                     b[..20.min(b.len())].to_vec()
                 };
-                std::fs::write(p, damaged).expect("damage");
+                std::fs::write(p, &bad).expect("damage");
+                damaged.push(bad);
             }
-            let damaged: Vec<Vec<u8>> = segs
-                .iter()
-                .map(|p| std::fs::read(p).expect("read"))
-                .collect();
-            let mut errors = Vec::new();
-            let mut healed = false;
-            for round in 0..60 {
-                for p in ["/stats", "/", "/log/HEAD"] {
-                    let u = format!("{prefix}{p}?author=probe{round}");
-                    let (s, _) = get(&router, &u).await;
-                    if s >= 500 {
-                        errors.push(format!("round {round}: {u} -> {s}"));
+            let errors = std::sync::Mutex::new(Vec::new());
+            let mut round = 0;
+            // Each round asks the pages, so a page may meet the damage and start the rebuild.
+            let healed = wait::within(wait::DEADLINE, || {
+                round += 1;
+                let (router, prefix, cache, damaged, errors) =
+                    (&router, &prefix, &cache, &damaged, &errors);
+                async move {
+                    for p in ["/stats", "/", "/log/HEAD"] {
+                        let u = format!("{prefix}{p}?author=probe{round}");
+                        let (s, _) = get(router, &u).await;
+                        if s >= 500 {
+                            errors.lock().expect("errors").push(format!("{u} -> {s}"));
+                        }
                     }
-                }
-                let now: Vec<Option<Vec<u8>>> = segments(&cache)
-                    .iter()
-                    .map(|p| std::fs::read(p).ok())
-                    .collect();
-                if !now.is_empty()
-                    && now
+                    let now: Vec<Option<Vec<u8>>> = segments(cache)
                         .iter()
-                        .all(|n| n.as_ref().is_some_and(|n| !damaged.contains(n)))
-                {
-                    healed = true;
-                    break;
+                        .map(|p| std::fs::read(p).ok())
+                        .collect();
+                    !now.is_empty()
+                        && now
+                            .iter()
+                            .all(|n| n.as_ref().is_some_and(|n| !damaged.contains(n)))
                 }
-                tokio::time::sleep(std::time::Duration::from_millis(100)).await;
-            }
+            })
+            .await;
+            let errors = errors.into_inner().expect("errors");
             assert!(errors.is_empty(), "5xx:\n{}", errors.join("\n"));
             assert!(
                 healed,
