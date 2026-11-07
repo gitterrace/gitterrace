@@ -17,6 +17,12 @@ exclude = ["shared/*", "target/*"]
 # Fewer files than this in a tree scan means the census is broken.
 min_files = 1
 
+[a11y]
+# docs-a11y: the markdown it reads (heading order, one h1, alt text, link text, fence languages).
+docs = ["README.md", "docs/**.md"]
+# A page with headings but no h1 fails. False allows pages without one.
+h1_required = true
+
 [refs]
 # Extra patterns the product refuses, and English words its id patterns must skip.
 patterns = []
@@ -31,18 +37,35 @@ placeholder_homes = []
 [history]
 # Shas own-shas and the history tools must keep: upstream corpus pins that collide with own ones.
 keep = []
-# Regexes for value fields that hold a sha, group 1 the field, group 2 the sha.
+# Regexes for value fields that hold a sha (a history rewrite writes HEAD there), group 1 the
+# field, group 2 the sha.
 sha_fields = []
 # A file OUTSIDE the repository (e.g. under ~/Backups) listing one pre-rewrite bundle per line.
 # Never a committed path: the bundles hold the old history the rewrite removed.
 bundles = ""
-# [pattern, replacement] pairs applied in order to every text file and message (`{ids}`
-# is the real ids of .personal-denylist), and regexes of paths left untouched.
+# The history rewrite: [pattern, replacement] pairs applied in order to every text file and
+# message (`{ids}` is the real ids of .personal-denylist), and regexes of paths it never touches.
 rewrites = []
 skip = []
 # tools/id-scan.py reads the same skip list.
+
+[disk]
+# tools/disk-floor.py and disk-floor.sh: a build, gate or red run refuses to start below this
+# many GiB free. DISK_FLOOR_GIB in the environment wins (0 turns the check off for one run).
+floor_gib = 50
 
 [commit]
 types = ["feat", "fix", "docs", "style", "refactor", "perf", "test", "build", "ci", "chore", "revert"]
 # <prefix>ALLOW_FREE_SUBJECT=1 overrides the subject form.
 allow_prefix = "SCHWARZWALD_"
+
+[denylist]
+# The local .personal-denylist is seeded once and the tracker grows: past max_age_hours (0 = never)
+# or when missing, internal-refs prints `refresh` and, in mode "refuse", fails. mode: warn | refuse.
+max_age_hours = 168
+mode = "warn"
+# The product's command that rewrites the list. It must MERGE (tools/denylist-merge.py: the union
+# of the current list, the tracker's every code, closed and deleted rows too, and history_ids).
+refresh = ""
+# A file outside the repository of ids from old history, merged in on every refresh.
+history_ids = ""

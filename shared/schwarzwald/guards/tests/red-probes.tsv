@@ -59,7 +59,7 @@ live_desktop_keystroke	rules/14-live-desktop-input.sh	(keystroke|key code) 	a ke
 protected_shared	rules/20-file-edits.sh	*/shared/schwarzwald/*)	the synced shared copy	*/zzz_shared/*)	cases-rules
 process_table_pressure	rules/60-machine-capacity.sh	[ "$n" -lt "$threshold" ] && return 0	a saturated process table warns	return 0	cases-state
 cargo_lock_contention	rules/30-build-workflow.sh	if [ "${n:-0}" -ge 2 ]; then	a foreground build while two cargos	if false; then	cases-state
-config_refuses_code	config.sh	if [[ $line =~ $_GUARD_CFG_SET ]]; then	a config line that is code is refused	if [[ $line =~ ^([A-Z][A-Z0-9_]*)=(.*)$ ]]; then	cases-state
+config_refuses_code	config.sh	if [[ $line =~ $_GUARD_CFG_SET ]] || [[ $line =~ $_GUARD_CFG_DQ ]] || [[ $line =~ $_GUARD_CFG_BARE ]]; then	a config line that is code is refused	if [[ $line =~ ^([A-Z][A-Z0-9_]*)=(.*)$ ]]; then	cases-state
 config_refuses_unknown_key	config.sh	*" $name "*) ;;	a config key the guards do not read	*) ;;	cases-state
 config_missing_no_verdict	engine.sh	if [ -z "$GUARD_CONFIG_LOADED" ]; then	no config: no verdict	if false; then	cases-state
 product_rule_dirs	engine.sh	for dir in ${GUARD_PRODUCT_RULE_DIRS:-}; do	a product rule dir named in the config is loaded	for dir in ; do	cases-state
@@ -74,3 +74,8 @@ app_name_keystroke	rules/14-live-desktop-input.sh	guard_match "$src" "${GUARD_AP
 opus_class_config	rules/49-lane-model-tier.sh	local prompt classes="${GUARD_OPUS_CLASS_RE:-schema|migration|security|irreversible}"	an install.s own class list	local prompt classes="schema|migration|security|irreversible"	cases-rules
 scratch_roots_config	config.example.env	GUARD_SCRATCH_ROOTS="${GUARD_SCRATCH_ROOTS:-$HOME/.jcode/scratch}"	inside the org or scratch: rm -rf ~/.jcode/scratch/zz	GUARD_SCRATCH_ROOTS='/nonexistent-zz'	cases-rules
 product_rule_root	engine.sh	for f in "${GUARD_PRODUCT_ROOT:-$GUARD_REPO}/$dir"/*.sh; do	product rules load from the install's product, whatever GUARD_REPO says	for f in "$GUARD_REPO/$dir"/*.sh; do	cases-state
+read_size_whole	rules/64-read-size.sh	[ -n "$n" ] && [ "$n" -gt "$max" ] && _read_size_report "$GUARD_FILE"	a 2000-line file read whole	[ -n "$n" ] && [ "$n" -gt 99999999 ] && _read_size_report "$GUARD_FILE"	cases-rules
+read_size_bounded	rules/64-read-size.sh	[ -z "${GUARD_READ_BOUND:-}" ] || return 0	a read with a limit	:	cases-rules
+read_size_cat	rules/64-read-size.sh	[ "$verb" = cat ] || return 0	cat of a 2000-line file	return 0	cases-rules
+read_size_pipe	rules/64-read-size.sh	guard_match "$head" '[|;&<>$`(]' && return 0	a piped cat	:	cases-rules
+read_size_lane_accept	rules/64-read-size.sh	guard_match "$head" 'lane-accept' && return 0	a command naming lane-accept output	:	cases-rules

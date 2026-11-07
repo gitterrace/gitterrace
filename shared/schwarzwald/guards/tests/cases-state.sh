@@ -171,7 +171,7 @@ _assert BLOCK "$([ "$pr_rc" -eq 1 ] && grep -q 'the product rule spoke' <<<"$pr_
 rm -rf "$other"
 rm -f "$prod/rules/90-probe.sh"
 pr_out=$(env "${UNSET_ENV[@]}" -u GUARD_CONFIG bash "$prod_g/adapters/cli.sh" --cwd "$prod" --command 'git status' 2>&1)
-_assert INCOMPLETE "$(grep -q 'INCOMPLETE -- 14 shared and 0 product' <<<"$pr_out" && echo INCOMPLETE || echo silent)" \
+_assert INCOMPLETE "$(grep -q 'INCOMPLETE -- 15 shared and 0 product' <<<"$pr_out" && echo INCOMPLETE || echo silent)" \
     "a missing PRODUCT rule file says INCOMPLETE" product_rules
 rm -rf "$prod"
 
@@ -190,6 +190,22 @@ _assert REFUSED "$(grep -q 'line not data' <<<"$cf_out" && [ ! -e "$cfg/ran" ] &
     "a config line that is code is refused and never run" config_shape
 printf '%s\n' "GUARD_NOT_A_KEY='x'" >"$cfg/config/schwarzwald/guards.env"
 cf_out=$(env "${UNSET_ENV[@]}" -u GUARD_CONFIG bash "$cfg_g/adapters/cli.sh" --cwd "$cfg" --command 'git status' 2>&1)
-_assert REFUSED "$(grep -q 'unknown key GUARD_NOT_A_KEY' <<<"$cf_out" && echo REFUSED || echo accepted)" \
-    "a config key the guards do not read is refused" config_shape
+_assert NAMED "$(grep -q 'unknown key GUARD_NOT_A_KEY' <<<"$cf_out" && echo NAMED || echo silent)" \
+    "a config key the guards do not read is named on every call" config_shape
+# One stray key must not degrade every guard to the fallback: the ENGINE still blocks, with
+# rules the fallback does not hold (git add -A), and the key is named.
+{ cat "$REPO/config/schwarzwald/guards.env"; printf '%s\n' "GUARD_NOT_A_KEY='x'"; } >"$cfg/config/schwarzwald/guards.env"
+cf_out=$(env "${UNSET_ENV[@]}" -u GUARD_CONFIG bash "$cfg_g/adapters/cli.sh" --cwd "$cfg" --command 'git stash' 2>&1)
+cf_rc=$?
+_assert BLOCK "$([ "$cf_rc" -eq 1 ] && grep -q 'unknown key GUARD_NOT_A_KEY' <<<"$cf_out" && ! grep -q 'NOT running' <<<"$cf_out" && echo BLOCK || echo "rc=$cf_rc")" \
+    "an unknown key keeps the engine's BLOCK for git stash and names the key" config_shape
+cf_out=$(env "${UNSET_ENV[@]}" -u GUARD_CONFIG bash "$cfg_g/adapters/cli.sh" --cwd "$cfg" --command 'git add -A' 2>&1)
+cf_rc=$?
+_assert BLOCK "$([ "$cf_rc" -eq 1 ] && grep -q 'unknown key GUARD_NOT_A_KEY' <<<"$cf_out" && echo BLOCK || echo "rc=$cf_rc")" \
+    "an unknown key does not degrade the guards: git add -A is still blocked" config_shape
+{ cat "$REPO/config/schwarzwald/guards.env"; printf '%s\n' "MAIN_CHECKOUT_LANDS_ONLY='1'"; } >"$cfg/config/schwarzwald/guards.env"
+cf_out=$(env "${UNSET_ENV[@]}" -u GUARD_CONFIG bash "$cfg_g/adapters/cli.sh" --cwd "$cfg" --command 'git add -A' 2>&1)
+cf_rc=$?
+_assert BLOCK "$([ "$cf_rc" -eq 1 ] && ! grep -q 'unknown key\|NOT running\|no usable config' <<<"$cf_out" && echo BLOCK || echo "rc=$cf_rc")" \
+    "MAIN_CHECKOUT_LANDS_ONLY set does not degrade the guards" config_shape
 rm -rf "$cfg"

@@ -90,6 +90,6 @@ pass = ["~/.local/state/app"]
 
 # Commit subjects that are a partial step: they belong inside the change they finish.
 [partial_subject]
-patterns = ['''(?i)^(fixup!|squash!|wip\b|style:|style\(|chore\(fmt\)|re-?bless|fix clippy|satisfy clippy|make it (build|compile))''']
+patterns = ['''(?i)(^(fixup!|squash!|amend!|style:|style\(|chore\(fmt\)|fix clippy)|\bwip\b|re-?bless|satisfy clippy|make it (build|compile))''']
 hit = ["fixup! feat: x", "wip: scrolling", "style: rustfmt", "chore(fmt): run", "rebless goldens", "satisfy clippy", "make it build"]
 pass = ["feat(web): one rule", "fix: wipe the cache", "docs: the style guide"]

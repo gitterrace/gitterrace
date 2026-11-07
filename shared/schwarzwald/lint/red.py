@@ -26,6 +26,7 @@ SCRIPTS = {
     "personal-data": "CONV-PERSONAL-DATA",
     "own-shas": "CONV-NO-OWN-SHAS",
     "commit-subject": "CONV-COMMIT-SUBJECT",
+    "docs-a11y": "CONV-DOCS-A11Y",
 }
 
 
@@ -42,11 +43,15 @@ def run_case(rule: str, case: Path, product: Path | None) -> int:
         root = Path(d)
         git(root, "init", "-q")
         shutil.copytree(case, root, dirs_exist_ok=True)
-        if product and (product / "config/schwarzwald/lint.toml").exists():
+        if product and (product / "config/schwarzwald/lint.toml").exists() and not (root / "config").exists():
             (root / "config/schwarzwald").mkdir(parents=True)
             shutil.copy(product / "config/schwarzwald/lint.toml", root / "config/schwarzwald/lint.toml")
         git(root, "add", "-A")
         git(root, "-c", "user.name=t", "-c", "user.email=t@example.invalid", "commit", "-qm", "case")
+        old = root / "stale-denylist.marker"  # marker: the case wants a stale .personal-denylist
+        if old.exists():
+            old.unlink()
+            os.utime(root / ".personal-denylist", (1, 1))
         head = git(root, "rev-parse", "HEAD").strip()
         for f in root.rglob("*"):
             if f.is_file() and ".git" not in f.parts and "{HEAD}" in f.read_text(errors="replace"):
@@ -68,15 +73,26 @@ def main(argv: list[str]) -> int:
     if "--repo" in argv:
         i = argv.index("--repo")
         product, argv = Path(argv[i + 1]).resolve(), argv[:i] + argv[i + 2 :]
+    # Below the disk floor a case dir can be half written and pass for the wrong reason. The
+    # floor is in the tools part, checked when the product took it.
+    floor_py = HERE.parent / "tools/disk-floor.py"
+    if floor_py.exists():
+        floor = subprocess.run([sys.executable, str(floor_py), "--quiet",
+                                *(["--repo", str(product)] if product else []), tempfile.gettempdir()])
+        if floor.returncode:
+            return floor.returncode
     rules = argv or sorted(SCRIPTS)
     bad = [f"{d.name}: a case dir for no rule" for d in CASES.iterdir() if d.is_dir() and d.name not in SCRIPTS]
     bad += [f"{r}: no red case" for r in SCRIPTS if not (CASES / r / "red").is_dir()]
     for rule in rules:
         if not (CASES / rule / "red").is_dir():
             continue
-        red, green = run_case(rule, CASES / rule / "red", product), run_case(rule, CASES / rule / "green", product)
-        if red != 1:
-            bad.append(f"{rule}: its red case exits {red}, must fail with 1")
+        reds = {d.name: run_case(rule, d, product) for d in sorted((CASES / rule).glob("red*")) if d.is_dir()}
+        green = run_case(rule, CASES / rule / "green", product)
+        for name, code in reds.items():
+            if code != 1:
+                bad.append(f"{rule}: its {name} case exits {code}, must fail with 1")
+        red = 1 if all(c == 1 for c in reds.values()) else sorted(c for c in reds.values() if c != 1)[0]
         if green != 0:
             bad.append(f"{rule}: its green case exits {green}, must pass")
         print(f"{'OK ' if red == 1 and green == 0 else 'RED'} {SCRIPTS[rule]}: red exits {red}, green exits {green}")

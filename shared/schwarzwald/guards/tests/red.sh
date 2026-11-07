@@ -18,7 +18,18 @@
 SUITE="$GUARDS_TESTS/selftest.sh"
 PROBES=("$GUARDS_TESTS/red-probes.tsv")
 JOBS="${GUARDS_RED_JOBS:-4}"
-WORK="$(mktemp -d "${TMPDIR:-/tmp}/guards-red.XXXXXX")"
+# A product that is not there would load no config and no probes, and the run would pass over the
+# shared probes alone while claiming to have checked the product.
+if [ -n "${GUARDS_SELFTEST_PRODUCT:-}" ] && [ ! -f "$GUARDS_SELFTEST_PRODUCT/config/schwarzwald/guards.env" ]; then
+    echo "guards-red: GUARDS_SELFTEST_PRODUCT=$GUARDS_SELFTEST_PRODUCT has no config/schwarzwald/guards.env" >&2
+    exit 2
+fi
+# The disk floor next: a copy made on a full disk can neuter nothing and still look red.
+if [ -f "$GUARDS_SRC/../tools/disk-floor.sh" ]; then
+    . "$GUARDS_SRC/../tools/disk-floor.sh"
+    disk_floor "${GUARDS_SELFTEST_PRODUCT:-$PWD}" "${TMPDIR:-/tmp}" || exit 1
+fi
+WORK="$(mktemp -d "${TMPDIR:-/tmp}/guards-red.XXXXXX")" || { echo "red.sh: refused, cannot make a work dir under ${TMPDIR:-/tmp}" >&2; exit 1; }
 trap 'rm -rf "$WORK"' EXIT
 
 # The product's probes name files relative to the product root: those are neutered in a copy

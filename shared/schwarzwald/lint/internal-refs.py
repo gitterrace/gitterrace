@@ -6,6 +6,10 @@ A reader of the tree cannot open a tracker row. Say what the row says instead. T
 product's `[refs] patterns` from lint.toml. Real ids come from the local `.personal-denylist`
 (its bare six-hex lines), refused as bare tokens.
 
+A denylisted id is refused anywhere on a code line (a string literal too); labels and process
+words only in comments. A missing or old `.personal-denylist` is reported (lint.toml [denylist]
+max_age_hours, mode warn|refuse, refresh = the command to print).
+
 Scope, from lint.toml [scope]: markdown read whole (`prose`), comments and ignore reasons in
 code (`code`), `## ` help lines of a Makefile (`make`), only the `#` note lines of golden files
 (`golden`). Files under `design` also carry no work breakdown, owner or estimate section.
@@ -68,7 +72,9 @@ class Refs:
         for n, line in enumerate(body.splitlines(), 1):
             if design and any(p.search(line) for p in self.breakdown):
                 bad.append(f"{path}:{n}: a design doc section on who, when or how long: {line}")
-            elif any(self.hit(t, self.tree) for t in texts(kind, line)):
+            elif any(self.hit(t, self.tree) for t in texts(kind, line)) or (
+                kind == "code" and self.hit(line, [])  # a denylisted id is refused anywhere on a code line
+            ):
                 bad.append(f"{path}:{n}: {line.strip()[:140]}")
         return bad
 
@@ -125,6 +131,13 @@ def self_test(cfg: dict[str, dict]) -> bool:
     if not r.scan("a.rs", "// the id 9e9e9e"):
         print(f"FAIL [{RULE}] self-test: a denylisted id must flag", file=sys.stderr)
         ok = False
+    for path, line in [("a.rs", 'let c = "9e9e9e";'), ("a.mjs", "compare: '9e9e9e',"), ("a.py", 'x = "9e9e9e"')]:
+        if not r.scan(path, line):
+            print(f"FAIL [{RULE}] self-test: a denylisted id in a string in {path} must flag", file=sys.stderr)
+            ok = False
+    if r.scan("a.rs", 'let c = "9e9e9f";'):
+        print(f"FAIL [{RULE}] self-test: an id not on the denylist passes in code", file=sys.stderr)
+        ok = False
     r.ids = set()
     if r.message_hits("fix(web): hint\n\nThe page reads one rule.\n") or not r.message_hits("fix: x\n\nSee #a1b2c3."):
         print(f"FAIL [{RULE}] self-test: message rules", file=sys.stderr)
@@ -151,6 +164,11 @@ def main(argv: list[str]) -> int:
     cfg = config.load(root)
     if not self_test(cfg):
         return 2
+    problems, refuse = config.denylist_problems(root, cfg)
+    for p in problems:
+        print(f"{'FAIL' if refuse else 'WARN'} [{RULE}] {p}", file=sys.stderr)
+    if problems and refuse:
+        return 1
     _, ids = config.denylist(root)
     r = Refs(cfg, ids)
     if args[:1] == ["--messages"]:

@@ -15,10 +15,39 @@ import subprocess
 import sys
 from pathlib import Path
 
+_REEXEC = "SCHWARZWALD_PY311_REEXEC"
+
+
+def _newest_python311() -> str | None:
+    """The newest `python3.N` with N >= 11 on PATH or in the Homebrew and /usr/local bins."""
+    import os
+
+    best: tuple[int, str] | None = None
+    for d in [*os.environ.get("PATH", "").split(os.pathsep), "/opt/homebrew/bin", "/usr/local/bin"]:
+        try:
+            names = os.listdir(d)
+        except OSError:
+            continue
+        for name in names:
+            m = re.fullmatch(r"python3\.(\d+)", name)
+            path = os.path.join(d, name)
+            if m and int(m.group(1)) >= 11 and os.access(path, os.X_OK):
+                if best is None or int(m.group(1)) > best[0]:
+                    best = (int(m.group(1)), path)
+    return best[1] if best else None
+
+
 try:
     import tomllib
-except ImportError:  # pragma: no cover
-    sys.exit(f"the shared lints need python 3.11 or newer for tomllib, this is {sys.version.split()[0]}")
+except ImportError:  # pragma: no cover - only on a python older than 3.11
+    import os
+
+    newer = None if os.environ.get(_REEXEC) == "1" else _newest_python311()
+    if newer:
+        os.environ[_REEXEC] = "1"
+        os.execv(newer, [newer, sys.argv[0], *sys.argv[1:]])
+    sys.exit(f"the shared lints need python 3.11 or newer for tomllib, this is {sys.version.split()[0]}"
+             " and no python3.11+ was found on PATH, in /opt/homebrew/bin or in /usr/local/bin")
 
 PART = Path(__file__).resolve().parents[2]  # the folder holding lint/, rules/, hooks/
 DENY_FILE = PART / "rules" / "deny.toml"
@@ -35,9 +64,12 @@ DEFAULTS: dict[str, dict] = {
         "exclude": ["shared/*", "target/*"],
         "min_files": 1,
     },
+    "a11y": {"docs": ["README.md", "docs/**.md"], "h1_required": True, "known": []},
     "refs": {"patterns": [], "not_id": []},
     "personal": {"exempt": [], "placeholder_homes": []},
     "history": {"keep": [], "sha_fields": [], "bundles": "", "rewrites": [], "skip": []},
+    "disk": {"floor_gib": 50},
+    "denylist": {"max_age_hours": 168, "mode": "warn", "refresh": "", "history_ids": ""},
     "commit": {
         "types": ["feat", "fix", "docs", "style", "refactor", "perf", "test", "build", "ci", "chore", "revert"],
         "allow_prefix": "SCHWARZWALD_",
@@ -71,6 +103,27 @@ def deny(product: str) -> dict[str, list[re.Pattern[str]]]:
     out = {t: [re.compile(p.replace("{product}", re.escape(product))) for p in v["patterns"]] for t, v in raw.items()}
     out["not_id"] = [re.compile(v["not_id"]) for v in raw.values() if "not_id" in v]
     return out
+
+
+def denylist_problems(root: Path, cfg: dict[str, dict], now: float | None = None) -> tuple[list[str], bool]:
+    """A missing or stale `.personal-denylist` as lines to print, and whether the mode refuses.
+
+    The list is local and seeded once; the board grows and the guard goes blind without a sound.
+    Settings: lint.toml [denylist] max_age_hours (0 = never stale), mode (warn|refuse), refresh
+    (the product's refresh command, printed), history_ids (a file the refresh merges in)."""
+    import time
+
+    s = cfg["denylist"]
+    if s["mode"] not in ("warn", "refuse"):
+        sys.exit(f"lint.toml [denylist] mode must be warn or refuse, not {s['mode']!r}")
+    path = root / ".personal-denylist"
+    how = f" Refresh it: {s['refresh']}" if s["refresh"] else " Set [denylist] refresh in lint.toml to name the refresh command."
+    if not path.exists():
+        return [f".personal-denylist is missing: bare ids are not checked.{how}"], s["mode"] == "refuse"
+    age = ((now if now is not None else time.time()) - path.stat().st_mtime) / 3600
+    if s["max_age_hours"] and age > s["max_age_hours"]:
+        return [f".personal-denylist is {age:.0f}h old (max {s['max_age_hours']}h): new ids are not checked.{how}"], s["mode"] == "refuse"
+    return [], False
 
 
 def denylist(root: Path) -> tuple[list[re.Pattern[str]], set[str]]:

@@ -844,15 +844,6 @@ pub mod design {
     pub const MOTION_EASING: &str = "cubic-bezier(0.2, 0.7, 0.2, 1)";
 }
 
-/// The brand: app icon, favicon and social images, the same in every theme.
-pub mod brand {
-    use super::Colour;
-    pub const BACKGROUND_TOP: Colour = Colour::new("#25272A", 37, 39, 42);
-    pub const BACKGROUND_BOTTOM: Colour = Colour::new("#1E2023", 30, 32, 35);
-    pub const MARK_TILDE: Colour = Colour::new("#88B79A", 136, 183, 154);
-    pub const MARK_LINE: Colour = Colour::new("#5E8D6D", 94, 141, 109);
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

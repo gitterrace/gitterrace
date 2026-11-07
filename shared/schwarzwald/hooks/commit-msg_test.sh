@@ -10,8 +10,10 @@ set -euo pipefail
 # Run from a hook, GIT_DIR and GIT_INDEX_FILE are set: the scratch repo would be the real one.
 unset GIT_DIR GIT_INDEX_FILE GIT_WORK_TREE GIT_PREFIX GIT_COMMON_DIR
 HOOK="${HOOK:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/commit-msg}"
-d=$(mktemp -d)
-trap 'rm -rf "${d}"' EXIT
+. "$(dirname "${BASH_SOURCE[0]}")/../tools/test-sandbox.sh"
+sandbox_make commit-msg-test
+sandbox_enter --multi
+d=$SANDBOX_REPO
 git -C "${d}" init -q
 git -C "${d}" -c user.name=t -c user.email=t@example.invalid commit -q --allow-empty -m "init"
 own=$(git -C "${d}" rev-parse --short=9 HEAD)

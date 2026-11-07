@@ -3,8 +3,10 @@
 
   land.sh        lands a clean commit with a fresh date and the same message, refuses a partial
                  step (exit 3), a dirty main (exit 1), and skips a change already on main
-  id-scan        finds an id and an own sha in the history
+  id-scan        finds the id and the own sha in an old history
   ratchet-check  its own self-test: growth, a raised count and a dropped ratchet go red
+  disk guard     disk-selftest.py: the floor refuses, an ENOSPC worktree fails the run, the sweep
+                 lists only stale, closed build output
 
     selftest.py      exit 0 when every case holds, else one line per broken case
 """
@@ -12,6 +14,7 @@
 from __future__ import annotations
 
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -71,12 +74,12 @@ def land_cases(d: Path) -> list[str]:
     return bad
 
 
-def history_cases(d: Path) -> list[str]:
-    bad = []
+def history_repo(d: Path) -> tuple[Path, str, str, str]:
+    """A throwaway history with an id in an old commit and an own sha in a sha field: repo, base, old, tip."""
     repo = d / "hist"
     repo.mkdir()
     git(repo, "init", "-q", "-b", "main")
-    commit(repo, "a.md", "start\n", "docs: start")
+    base = commit(repo, "a.md", "start\n", "docs: start")
     old = commit(repo, "a.md", "start\nThe rule, see 4f4f4a for details.\n", "docs: the rule, see 4f4f4a")
     commit(repo, "r.json", f'{{"sha": "{old[:10]}"}}\n', "docs: results")
     commit(repo, "a.md", "start\nThe rule.\n", "docs: the rule")
@@ -88,19 +91,87 @@ def history_cases(d: Path) -> list[str]:
         "[history]\n"
         "rewrites = [[',? ?see (?:{ids})( for details)?', ''], ['\\\\b(?:{ids})\\\\b', 'the rule']]\n"
         "sha_fields = ['(\"sha\": \")([0-9a-f]{7,40})(\")']\n")
-    scan = [sys.executable, str(HERE / "id-scan.py"), str(repo)]
-    r = run(*scan, tip)
+    return repo, base, old, tip
+
+
+def id_scan(repo: Path, rev: str) -> subprocess.CompletedProcess[str]:
+    return run(sys.executable, str(HERE / "id-scan.py"), str(repo), rev)
+
+
+def history_cases(d: Path) -> list[str]:
+    repo, _, old, tip = history_repo(d)
+    r = id_scan(repo, tip)
     if r.returncode != 1 or "4f4f4a" not in r.stdout or f"own sha {old[:10]}" not in r.stdout:
-        bad.append(f"id-scan missed the id or the own sha in the old history: {r.stdout.strip()}")
+        return [f"id-scan missed the id or the own sha in the old history: {r.stdout.strip()}"]
+    return []
+
+
+GIT_WRITE = re.compile(
+    r"(^|[^\w./-])git\s+(-c\s+\S+\s+|-C\s+\S+\s+)*"
+    r"(init|commit|add|reset|checkout|rm|apply|stash|clean|switch|merge|rebase|tag|branch|"
+    r"update-ref|read-tree|commit-tree|config|worktree|clone)(\s|$)")
+MAKE_RUN = re.compile(r"(^|[\s;&|(]|\$\()([A-Z_]+=\S+\s+)*make([\s>]|$)")
+
+
+def sandbox_cases(root: Path) -> list[str]:
+    """Every *_test.sh under root that writes to a git repo or runs make sources tools/test-sandbox.sh."""
+    tests = sorted(root.rglob("*_test.sh"))
+    if not tests:
+        return [f"sandbox scan found ZERO *_test.sh under {root}; a check that cannot look has not passed"]
+    bad = []
+    for f in tests:
+        text = f.read_text()
+        if "test-sandbox.sh" in text:
+            continue
+        for n, line in enumerate(text.splitlines(), 1):
+            code = line.strip()
+            if code and not code.startswith("#") and (GIT_WRITE.search(code) or MAKE_RUN.search(code)):
+                bad.append(f"{f.relative_to(root)}:{n} mutates a repo or runs make without sourcing test-sandbox.sh")
+                break
+    return bad
+
+
+def merge_cases() -> list[str]:
+    """denylist-merge.py unions and never shrinks: a refresh with fewer ids keeps every old entry."""
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("denylist_merge", HERE / "denylist-merge.py")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    cur = "aaaaaa\nbbbbbb\nsecret-name\n"
+    out = mod.merge(cur, "cccccc and nothing else\n", "dddddd\n").split()
+    bad = [f"denylist-merge dropped {x!r}" for x in ("aaaaaa", "bbbbbb", "secret-name") if x not in out]
+    bad += [f"denylist-merge lost the new id {x!r}" for x in ("cccccc", "dddddd") if x not in out]
+    js = '[{"code": "eeeeee", "title": "see abc123 in the note"}]'
+    if "abc123" in mod.merge("", js).split() or "eeeeee" not in mod.merge("", js).split():
+        bad.append("denylist-merge took a hex word from a JSON title, or missed its code field")
+    if mod.merge(cur, "").split() != cur.split():
+        bad.append("denylist-merge with an empty refresh changed the list")
     return bad
 
 
 def main() -> int:
     with tempfile.TemporaryDirectory() as d:
-        bad = land_cases(Path(d)) + history_cases(Path(d))
+        bad = land_cases(Path(d)) + history_cases(Path(d)) + sandbox_cases(HERE.parent) + merge_cases()
     r = run(sys.executable, str(HERE / "ratchet-check.py"), "--self-test")
     if r.returncode != 0:
         bad.append(f"ratchet-check self-test failed: {(r.stdout + r.stderr).strip()[-300:]}")
+    r = run(sys.executable, str(HERE / "disk-selftest.py"))
+    if r.returncode != 0:
+        bad.append(f"disk guard self-test failed: {(r.stdout + r.stderr).strip()[-600:]}")
+    r = run(sys.executable, str(HERE / "bulk-read-selftest.py"))
+    if r.returncode != 0:
+        bad.append(f"bulk-read self-test failed: {(r.stdout + r.stderr).strip()[-600:]}")
+    old = Path("/usr/bin/python3")
+    if old.exists() and run(str(old), "-c", "import tomllib").returncode != 0:
+        with tempfile.TemporaryDirectory() as d:
+            probe = Path(d) / "probe.py"
+            probe.write_text("import sys; sys.path.insert(0, sys.argv[1]); import config; "
+                             "print(config.tomllib.__name__)\n")
+            r = run(str(old), str(probe), str(HERE.parent / "lint" / "lib"))
+        if r.returncode != 0 or "tomllib" not in r.stdout:
+            bad.append(f"lint config on {old} (no tomllib) did not re-exec under python 3.11+: "
+                       f"{(r.stdout + r.stderr).strip()[-200:]}")
     for b in bad:
         print(f"FAIL {b}")
     print("ok" if not bad else f"{len(bad)} broken")

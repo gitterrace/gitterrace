@@ -382,11 +382,11 @@ t BLOCK protected_files "$REPO" write '{"file_path":"'"$REPO"'/.env"}' ".env"   
 t BLOCK protected_files "$REPO" write '{"file_path":"'"$REPO"'/.env.local"}' ".env.local"                                       # lint-path-ok
 t BLOCK protected_files "$REPO" write '{"file_path":"'"$REPO"'/certs/zz.pem"}' "*.pem"                                          # lint-path-ok
 t BLOCK protected_files "$REPO" write '{"file_path":"'"$REPO"'/zz.key"}' "*.key"                                                # lint-path-ok
-t BLOCK protected_files "$REPO" write '{"file_path":"'"$REPO"'/docs/generated/api.md"}' "a generated doc (GUARD_PROTECTED_GLOBS)" GUARD_PROTECTED_GLOBS='*/docs/generated/* */vendor/* */tests/golden/*'
+t BLOCK protected_files "$REPO" write '{"file_path":"'"$REPO"'/docs/generated/api.md"}' "a generated doc (GUARD_PROTECTED_GLOBS)" GUARD_PROTECTED_GLOBS='*/docs/generated/* */vendor/* */tests/golden/*'  # lint-path-ok
 t BLOCK protected_files "$REPO" edit '{"file_path":"'"$REPO"'/web/vendor/mermaid.min.js"}' "vendored code" GUARD_PROTECTED_GLOBS='*/docs/generated/* */vendor/* */tests/golden/*'
 t BLOCK protected_files "$REPO" write '{"file_path":"'"$REPO"'/crates/core/tests/golden/revisions.txt"}' "a golden file" GUARD_PROTECTED_GLOBS='*/docs/generated/* */vendor/* */tests/golden/*'
 t BLOCK protected_files "$REPO" edit '{"file_path":"'"$REPO"'/shared/schwarzwald/tokens/theme-tokens.json"}' "the synced shared copy"
-t BLOCK protected_files "$REPO" edit '{"file_path":"'"$REPO"'/docs/notes.md"}' "an install's own glob" GUARD_PROTECTED_GLOBS='*/docs/notes.md'
+t BLOCK protected_files "$REPO" edit '{"file_path":"'"$REPO"'/docs/notes.md"}' "an install's own glob" GUARD_PROTECTED_GLOBS='*/docs/notes.md'  # lint-path-ok
 t ALLOW protected_files "$REPO" edit '{"file_path":"'"$REPO"'/docs/generated/api.md"}' "an install that protects nothing" GUARD_PROTECTED_GLOBS=' '
 t ALLOW protected_files "$REPO" edit '{"file_path":"'"$REPO"'/web/static/app.js"}' "a static file that is not vendored" GUARD_PROTECTED_GLOBS='*/docs/generated/* */vendor/* */tests/golden/*'
 t ALLOW protected_files "$REPO" edit '{"file_path":"'"$REPO"'/docs/architecture.md"}' "a hand-written doc" GUARD_PROTECTED_GLOBS='*/docs/generated/* */vendor/* */tests/golden/*'
@@ -514,3 +514,35 @@ t ALLOW cwd_has_marker "$REPO" bash '{"command":"make fmt"}' "make in the repo"
 t ALLOW cwd_has_marker "$ORG" bash '{"command":"cd '"$REPO"' && make fmt"}' "explicit cd"
 t ALLOW cwd_has_marker "$ORG" bash '{"command":"git -C '"$REPO"' commit -m x"}' "git -C is self-locating"
 
+
+echo
+echo "read size -- an unbounded read of a big file is reported, a bounded one is not"
+# 2000 lines is over the default of 400, 50 is under it.
+seq 1 2000 >"$REPO/big.log"
+seq 1 50 >"$REPO/small.log"
+printf '\211PNG\r\n\032\n' >"$REPO/shot.png"
+seq 1 2000 >"$REPO/lane-accept-diff.txt"
+t ADVISE read_size "$REPO" read '{"file_path":"'"$REPO"'/big.log"}' "read-size: a 2000-line file read whole"
+t ADVISE read_size "$REPO" read '{"file_path":"big.log"}' "read-size: a relative path resolves against the cwd"
+t ALLOW read_size "$REPO" read '{"file_path":"'"$REPO"'/small.log"}' "read-size: a small file read whole"
+t ALLOW read_size "$REPO" read '{"file_path":"'"$REPO"'/big.log","limit":100}' "read-size: a read with a limit"
+t ALLOW read_size "$REPO" read '{"file_path":"'"$REPO"'/big.log","offset":500}' "read-size: a read with an offset"
+t ALLOW read_size "$REPO" read '{"file_path":"'"$REPO"'/big.log","start_line":500}' "read-size: a read with a start line"
+t ALLOW read_size "$REPO" read '{"file_path":"'"$REPO"'/no-such-file.log"}' "read-size: a missing file is the tool's error to give"
+t ALLOW read_size "$REPO" read '{"file_path":"'"$REPO"'/shot.png"}' "read-size: an image is not text lines"
+t ALLOW read_size "$REPO" read '{"file_path":"'"$REPO"'/lane-accept-diff.txt"}' "read-size: a lane-accept diff is read whole"
+t ADVISE read_size "$REPO" read '{"file_path":"'"$REPO"'/small.log"}' "read-size: the threshold is a key" GUARD_READ_MAX_LINES=10
+t ALLOW read_size "$REPO" read '{"file_path":"'"$REPO"'/big.log"}' "read-size: a raised threshold" GUARD_READ_MAX_LINES=5000
+t BLOCK read_size "$REPO" read '{"file_path":"'"$REPO"'/big.log"}' "read-size: block mode refuses" GUARD_READ_MODE=block
+t ALLOW read_size "$REPO" read '{"file_path":"'"$REPO"'/big.log","limit":100}' "read-size: block mode still lets a limit through" GUARD_READ_MODE=block
+t ADVISE read_size "$REPO" bash '{"command":"cat big.log"}' "read-size: cat of a 2000-line file"
+t ALLOW read_size "$REPO" bash '{"command":"head big.log"}' "read-size: head with no count shows ten lines"
+t ADVISE read_size "$REPO" bash '{"command":"cd '"$REPO"' && cat big.log"}' "read-size: cat after a cd"
+t ALLOW read_size "$REPO" bash '{"command":"cat small.log"}' "read-size: cat of a small file"
+t ALLOW read_size "$REPO" bash '{"command":"cat big.log | grep 7"}' "read-size: a piped cat"
+t ALLOW read_size "$REPO" bash '{"command":"head -n 20 big.log"}' "read-size: head with a count"
+t ALLOW read_size "$REPO" bash '{"command":"tail -50 big.log"}' "read-size: tail with a count"
+t ALLOW read_size "$REPO" bash '{"command":"cat big.log > /tmp/zz-copy"}' "read-size: cat redirected away from the session"
+t ALLOW read_size "$REPO" bash '{"command":"cat big.log lane-accept-out.txt"}' "read-size: a command naming lane-accept output"
+t ALLOW read_size "$REPO" bash '{"command":"cat lane-accept-diff.txt"}' "read-size: a lane-accept diff file by cat"
+t ALLOW read_size "$REPO" bash '{"command":"echo cat big.log"}' "read-size: the verb as data"

@@ -151,6 +151,7 @@ guard_parse() {
              GUARD_SCRIPT=\(.input.script // "")
              GUARD_FILE=\(.input.file_path // "")
              GUARD_ACTION=\(.input.action // "")
+             GUARD_READ_BOUND=\(if (.input | type) == "object" and (.input | has("offset") or has("limit") or has("start_line")) then "1" else "" end)
              GUARD_MODEL=\(.input.model // "")
              GUARD_PROMPT=\(.input.prompt // .input.initial_message // "")
              GUARD_BACKGROUND=\(.input.run_in_background // false | tostring)"
@@ -172,7 +173,7 @@ GUARD_MIN_RULES=10
 # Must EQUAL the shared file count in rules/: the selftest's degradation case deletes
 # exactly one file, so a lower floor cannot see it go. A product's own rule files are
 # counted apart, against GUARD_PRODUCT_RULE_FILES, so a missing one of THOSE is seen too.
-GUARD_SHARED_RULE_FILES=14
+GUARD_SHARED_RULE_FILES=15
 
 # Shared rules first, then each product rule dir (space-separated, relative to the product root:
 # the install's own product, never GUARD_REPO, which a caller may point at another checkout).
@@ -212,6 +213,10 @@ guard_main() {
     if [ -z "$GUARD_CONFIG_LOADED" ]; then
         guard_advise "WARNING: $GUARD_PRODUCT guards have no usable config: $GUARD_CONFIG_PROBLEM"
         return 0
+    fi
+    if [ -n "${GUARD_CONFIG_UNKNOWN:-}" ]; then
+        guard_advise "WARNING: $GUARD_PRODUCT guard config ${GUARD_CONFIG:-} names a key the guards do not know:$GUARD_CONFIG_UNKNOWN" \
+            "         The key is ignored and every guard still judges. Fix the config: a misspelt key leaves its default in force."
     fi
     if [ -z "$GUARD_FALLBACK_LOADED" ]; then
         guard_advise "WARNING: $GUARD_PRODUCT guards cannot load rules/fallback/fail-closed.sh, the shared deny list."

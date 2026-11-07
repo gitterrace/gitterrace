@@ -13,7 +13,7 @@
 A="$GUARDS_HOME/adapters"
 cd "$REPO" || exit 1
 
-for f in "$A/jcode-pre.sh" "$A/jcode-post.sh" "$A/cli.sh"; do
+for f in "$A/jcode-pre.sh" "$A/jcode-post.sh" "$A/claude-pre.sh" "$A/cli.sh"; do
     [ -f "$f" ] || {
         echo "FAIL  [CONV-GUARD-ADAPTERS] missing adapter: $f -- this check cannot run, which is not the same as passing"
         exit 1
@@ -250,6 +250,32 @@ if [ -n "$engine_leak" ]; then
     echo "FAIL  [CONV-GUARD-ADAPTERS] the ENGINE reads a harness-specific variable:"
     printf '%s\n' "$engine_leak" | sed 's/^/  /'
     echo "  Only adapters may know about a harness. Move this into an adapter."
+    exit 1
+fi
+
+# The Read tool reaches the read-size rule through both agent adapters, in block mode so the
+# exit code carries it: an unbounded read of a big file stops, a bounded one does not.
+seq 1 2000 >"$REPO/adapter-big.log"
+read_bad=0
+for mode in 'claude-pre:2:{"tool_name":"Read","cwd":"'"$REPO"'","tool_input":{"file_path":"'"$REPO"'/adapter-big.log"}}' \
+    'claude-pre:0:{"tool_name":"Read","cwd":"'"$REPO"'","tool_input":{"file_path":"'"$REPO"'/adapter-big.log","limit":50}}' \
+    'jcode-pre:2:{"file_path":"'"$REPO"'/adapter-big.log"}' \
+    'jcode-pre:0:{"file_path":"'"$REPO"'/adapter-big.log","limit":50}'; do
+    ad="${mode%%:*}"
+    rest="${mode#*:}"
+    want="${rest%%:*}"
+    in="${rest#*:}"
+    printf '%s' "$in" | GUARD_READ_MODE=block JCODE_HOOK_CWD="$REPO" JCODE_HOOK_TOOL_NAME=read \
+        JCODE_HOOK_TOOL_INPUT="$in" bash "$A/$ad.sh" >/dev/null 2>&1
+    got=$?
+    checked=$((checked + 1))
+    if [ "$got" -ne "$want" ]; then
+        echo "  [read] $ad exited $got, wanted $want   $in"
+        read_bad=$((read_bad + 1))
+    fi
+done
+if [ "$read_bad" -ne 0 ]; then
+    echo "FAIL  [CONV-GUARD-ADAPTERS] $read_bad Read case(s) where an adapter does not reach the read-size rule"
     exit 1
 fi
 
