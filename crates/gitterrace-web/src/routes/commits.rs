@@ -189,7 +189,12 @@ pub(super) async fn log(
             }
             fmt::href(&q)
         };
-        let since = crate::compare::latest_tag(&a.repo.refs()?);
+        // Every ref is peeled to find the newest tag, so skip it when the link is not shown.
+        let since = if crate::features::on(gitterrace_config::Feature::Compare) {
+            crate::compare::latest_tag(&a.repo.refs()?)
+        } else {
+            None
+        };
         Ok(LogPage {
             c: views::chrome_at(a, "log", &rev).live(Mode::NOTICE),
             compare_href: crate::compare::compare_href(since.as_deref(), &rev),

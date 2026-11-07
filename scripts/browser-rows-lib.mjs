@@ -5,7 +5,6 @@
 // Pages red today, each with the change that fixes it, in words. A page listed here that is
 // green at every width and in every browser fails the check, so the list can only shrink.
 const KNOWN = {
-  compare: 'one branch link alone in the Against a branch hint, a hint row that wraps its links',
   search: 'the Regex and Match case boxes each alone at 390, one options row that wraps as a unit',
 };
 
