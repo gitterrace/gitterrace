@@ -1,4 +1,4 @@
-// "On this page" outline: scroll highlight, menu filter and keyboard. The lists are plain links
+// "On this page" outline: scroll highlight, filter and keyboard (menu and rail). The lists are plain links
 // without this. Loaded on every page: with no [data-outline] it does nothing.
 (function () {
   var navs = Array.prototype.slice.call(document.querySelectorAll("[data-outline]"));
@@ -40,8 +40,10 @@
       document.querySelectorAll("[data-outline]").forEach(function (n) { n.hidden = !rendered; });
     });
   });
-  document.querySelectorAll("details[data-outline]").forEach(function (d) {
+  navs.forEach(function (d) {
     var q = d.querySelector(".outline-q"), none = d.querySelector(".outline-none");
+    if (!q) return;
+    var menu = d.tagName === "DETAILS";
     var items = Array.prototype.slice.call(d.querySelectorAll("li"));
     function shown() { return items.filter(function (li) { return !li.hidden; }).map(function (li) { return li.firstChild; }); }
     q.hidden = false;
@@ -50,10 +52,14 @@
       items.forEach(function (li) { li.hidden = t !== "" && li.textContent.toLowerCase().indexOf(t) < 0; });
       none.hidden = shown().length > 0;
     });
-    d.addEventListener("toggle", function () { if (d.open) q.focus(); });
+    if (menu) d.addEventListener("toggle", function () { if (d.open) q.focus(); });
     function close() { d.open = false; d.querySelector("summary").focus(); }
     d.addEventListener("keydown", function (e) {
-      if (e.key === "Escape" && d.open) { e.preventDefault(); close(); return; }
+      if (e.key === "Escape") {
+        if (menu && d.open) { e.preventDefault(); close(); }
+        else if (!menu && q.value) { e.preventDefault(); q.value = ""; q.dispatchEvent(new Event("input")); }
+        return;
+      }
       if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
       var list = shown(), i = list.indexOf(document.activeElement);
       if (!list.length) return;
@@ -61,6 +67,7 @@
       var n = e.key === "ArrowDown" ? i + 1 : i - 1;
       if (n < 0) { q.focus(); } else { list[Math.min(n, list.length - 1)].focus(); }
     });
+    if (!menu) return;
     d.addEventListener("click", function (e) { if (e.target.closest && e.target.closest("a")) d.open = false; });
     document.addEventListener("click", function (e) { if (d.open && !d.contains(e.target)) d.open = false; });
   });
