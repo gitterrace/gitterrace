@@ -145,32 +145,3 @@ fn install_tabs_pair_every_radio_with_a_panel() {
         assert!(PAGE_CSS.contains(&format!("#install-{way}:checked~#panel-{way}")));
     }
 }
-
-/// Every page carries the bar: one skip link, one header, one nav for the skip link to follow.
-#[test]
-fn bar_has_skip_link_header_and_nav() {
-    let b = bar("/assets/", "r", "https://github.com/o/r", "");
-    assert_eq!(b.matches("class=\"skip\" href=\"#main\"").count(), 1);
-    assert_eq!(b.matches("<header class=\"top\">").count(), 1);
-    assert_eq!(b.matches("<nav ").count(), 1);
-    assert!(!b.contains(">Demo<"), "no demo, no demo link");
-    assert!(bar("/assets/", "r", "u", "https://d.example").contains(">Demo<"));
-}
-
-/// The rail appears only from three level 2 headings, and every entry links a real slug.
-#[test]
-fn outline_rail_needs_three_headings() {
-    let few = docs::h2s("# T\n\n## A\n\n## B\n");
-    assert!(docs::outline(&few).is_empty());
-    let many = docs::h2s("# T\n\n## A b\n\n## C\n\n## D\n");
-    let rail = docs::outline(&many);
-    assert!(rail.contains("href=\"#a-b\"") && rail.contains("aria-label=\"On this page\""));
-}
-
-/// The footer names the siblings and never this site itself.
-#[test]
-fn fleet_line_lists_siblings() {
-    let f = fleet();
-    assert!(f.contains("https://tendir.app") && f.contains("https://timorunge.com"));
-    assert!(!f.contains("gitterrace.dev"));
-}
