@@ -123,8 +123,8 @@ when cut. The `[api]` section of `config.toml` sets each cap.
 
 ## Insights
 
-Served at `GET /insights/{name}`. Every number is counted by one rule, see
-[How numbers are counted](internals/counting.md).
+Served at `GET /insights/{name}`. Each page's hints say what its numbers leave
+out.
 
 | Name | Summary |
 | --- | --- |

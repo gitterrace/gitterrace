@@ -80,8 +80,8 @@ pub fn render() -> Out {
     }
 
     s.push_str(
-        "\n## Insights\n\nServed at `GET /insights/{name}`. Every number is counted by one rule, \
-        see\n[How numbers are counted](internals/counting.md).\n\n| Name | Summary |\n| --- | --- \
+        "\n## Insights\n\nServed at `GET /insights/{name}`. Each page's hints say what its \
+        numbers leave out.\n\n| Name | Summary |\n| --- | --- \
         |\n",
     );
     for (name, summary) in insight_list() {

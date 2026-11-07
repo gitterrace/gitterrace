@@ -86,11 +86,6 @@ const DOCS: &[(&str, Kind, &str)] = &[
         "The insights store on disk and how pages read it in some MB",
     ),
     (
-        "docs/internals/counting.md",
-        Kind::Explain,
-        "How every insights number is counted: one membership rule and one local-day rule",
-    ),
-    (
         "docs/configuration.md",
         Kind::Reference,
         "Every `config.toml` key, its default and the naming rule",

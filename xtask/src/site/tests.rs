@@ -139,7 +139,7 @@ fn internals_pages_give_every_heading_its_slug_as_id() {
         docs::slug(h)
     });
     assert!(html.contains("<h2 id=\"code-age-and-releases\">Code age and releases</h2>"));
-    assert_eq!(docs::page_path("counting"), "docs/counting/");
+    assert_eq!(docs::page_path("architecture"), "docs/architecture/");
 }
 
 /// The install tabs show every way, with the first open, and each way has a radio, a label

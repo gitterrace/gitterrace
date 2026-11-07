@@ -5,6 +5,34 @@
 //! its local day (the author's own offset) lies in the scope's days.
 //!
 //! Day math lives here and in [`crate::feed::local_day_of`], nowhere else.
+//!
+//! # Counting rules
+//!
+//! Each page reads one `Counted` per request, so two numbers on one page never disagree about
+//! which commits they cover. The rules every count follows:
+//!
+//! - Merges are left out by default: a merge's diff against its first parent repeats the lines
+//!   its branch already brought. `merges=1` counts them as commits, through [`Scope::admits`],
+//!   so every section follows it together. A merge's lines and files are always zero, and a
+//!   path selection never keeps a merge. The overview and the sidebar show every commit,
+//!   merges included, and the overview says how many are merges.
+//! - A bot's commit (name or e-mail marks a bot, such as `dependabot[bot]`) counts only with
+//!   `insights.include_bots` or `bots=1`, on every page and list.
+//! - Authors are people after `.mailmap`. Ranked people with equal values order by display
+//!   name, then e-mail, never by the order the index first met them.
+//! - A commit's day is its author's local day, in the author's own offset, for bars, punch
+//!   card, weekday split and totals. The commit log alone groups by the committer's local day,
+//!   so its order and headings agree, while its counts still use the author's day.
+//! - A period is the last 7, 30, 90 or 365 local days ending on the newest commit's local day.
+//!   A selection never moves that end. `from` and `to` are inclusive local days.
+//! - `all` is every commit: one dated after the server's clock still counts, at most a day
+//!   ahead of the clock that indexed it, so the same history gives the same totals.
+//! - Code age and release cadence cover the whole history whatever the period. A file's age is
+//!   its last counted change, and the commits between releases are the counted ones.
+//! - A binary file changes with 0 lines but still counts as a changed file and a hotspot change.
+//! - Ownership and the per-file pages follow a renamed file across its earlier names, as
+//!   `git log --follow` does. Hotspots, the all-time ownership totals and "Files changed" count
+//!   each name on its own.
 
 use std::ops::{Range, RangeInclusive};
 

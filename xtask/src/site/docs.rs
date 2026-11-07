@@ -1,7 +1,7 @@
 //! Every document the docs index publishes as a page of the site, one per file at
 //! `/docs/<name>/`, plus the index at `/docs/` and the changelog. Every heading carries a stable
 //! id (its slug), so a link can name the exact rule it means, for instance
-//! `/docs/counting/#merges`. A relative link to another document becomes that page's path, and
+//! `/docs/architecture/#cache`. A relative link to another document becomes that page's path, and
 //! one to a file the site does not publish points at the file in the repository.
 
 use std::collections::BTreeMap;
