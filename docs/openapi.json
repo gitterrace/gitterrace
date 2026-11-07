@@ -744,7 +744,7 @@
         "type": "object"
       },
       "RepoTotals": {
-        "description": "Commits, authors, files and lines over the whole history.",
+        "description": "Commits, authors, files and lines over the whole history. Every field but `every_commits`\ncounts the counted commits.",
         "properties": {
           "additions": {
             "format": "uint64",
@@ -757,11 +757,18 @@
             "type": "integer"
           },
           "commits": {
+            "description": "The counted commits: no merges, bots as the options say.",
             "format": "uint",
             "minimum": 0,
             "type": "integer"
           },
           "deletions": {
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "every_commits": {
+            "description": "Every reachable commit, merges and bots included: the overview's \"N commits\".",
             "format": "uint64",
             "minimum": 0,
             "type": "integer"
@@ -777,6 +784,7 @@
           "authors",
           "commits",
           "deletions",
+          "every_commits",
           "files"
         ],
         "type": "object"

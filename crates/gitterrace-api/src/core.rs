@@ -292,10 +292,12 @@ impl ApiState {
 
     pub fn repo_info(&self) -> Result<RepoResponse, ApiError> {
         let head = self.repo.resolve(DEFAULT_REV).ok();
-        let totals = self.read(DEFAULT_REV, |records| {
-            self.insights(DEFAULT_REV, &**records, self.settings().defaults)
-                .period_summary(gitterrace_index::Period::All)
-                .current
+        let (totals, every) = self.read(DEFAULT_REV, |records| {
+            let ins = self.insights(DEFAULT_REV, &**records, self.settings().defaults);
+            (
+                ins.period_summary(gitterrace_index::Period::All).current,
+                ins.every_totals().commits.value(),
+            )
         })?;
         Ok(RepoResponse {
             head,
@@ -307,6 +309,7 @@ impl ApiState {
                 authors: totals.authors,
                 commits: totals.commits,
                 deletions: totals.deletions,
+                every_commits: every,
                 files: totals.files,
             },
         })

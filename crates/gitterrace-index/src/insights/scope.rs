@@ -15,7 +15,9 @@
 //!   its branch already brought. `merges=1` counts them as commits, through [`Scope::admits`],
 //!   so every section follows it together. A merge's lines and files are always zero, and a
 //!   path selection never keeps a merge. The overview and the sidebar show every commit,
-//!   merges included, and the overview says how many are merges.
+//!   merges and bots included. The overview says how many are merges, how many bots wrote
+//!   and how many count, and the API's `/repo` gives both: `every_commits` for every commit,
+//!   `commits` for the counted ones.
 //! - A bot's commit (name or e-mail marks a bot, such as `dependabot[bot]`) counts only with
 //!   `insights.include_bots` or `bots=1`, on every page and list.
 //! - Authors are people after `.mailmap`. Ranked people with equal values order by display

@@ -36,8 +36,10 @@ impl Figure {
     }
 }
 
-/// Every reachable commit, and how many of them are merges and how many bots wrote: the
-/// counts of [`Population::Every`], from one pass.
+/// Every reachable commit, how many are merges and how many other commits bots wrote.
+///
+/// The counts of [`Population::Every`], from one pass. A merge by a bot counts as a merge
+/// only, so the two parts never overlap.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct EveryTotals {
     pub commits: Figure,
@@ -60,7 +62,7 @@ impl Insights<'_> {
         for c in self.source().commits_in(CommitRange::All) {
             all += 1;
             merges += u64::from(c.merge);
-            bots += u64::from(self.d.people.list[self.person_of(c.ident)].bot);
+            bots += u64::from(!c.merge && self.d.people.list[self.person_of(c.ident)].bot);
         }
         EveryTotals {
             commits: Figure::new(all, Population::Every),

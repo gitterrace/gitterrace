@@ -151,6 +151,7 @@ fn tree_refs_and_repo_match_the_maps_they_replaced() {
             authors: 1,
             commits: 3,
             deletions: 4,
+            every_commits: 5,
             files: 2,
         },
     };
@@ -158,7 +159,10 @@ fn tree_refs_and_repo_match_the_maps_they_replaced() {
         &repo,
         &json!({
             "name": "r", "head": "h", "head_branch": null, "index_version": "\"v\"",
-            "totals": { "commits": 3, "authors": 1, "files": 2, "additions": 9, "deletions": 4 },
+            "totals": {
+                "commits": 3, "authors": 1, "files": 2, "additions": 9, "deletions": 4,
+                "every_commits": 5,
+            },
         }),
     );
 }

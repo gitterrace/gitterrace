@@ -4,13 +4,17 @@
 use schemars::JsonSchema;
 use serde::Serialize;
 
-/// Commits, authors, files and lines over the whole history.
+/// Commits, authors, files and lines over the whole history. Every field but `every_commits`
+/// counts the counted commits.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
 pub struct RepoTotals {
     pub additions: u64,
     pub authors: usize,
+    /// The counted commits: no merges, bots as the options say.
     pub commits: usize,
     pub deletions: u64,
+    /// Every reachable commit, merges and bots included: the overview's "N commits".
+    pub every_commits: u64,
     pub files: usize,
 }
 

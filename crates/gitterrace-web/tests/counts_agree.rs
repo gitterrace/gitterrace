@@ -332,9 +332,10 @@ async fn the_overview_counts_the_log() {
     assert_eq!(shown, listed as u64, "{ov}");
 }
 
-/// The overview and `/repo` describe the same history with the same numbers.
+/// The overview and `/repo` describe the same history with the same numbers: every commit
+/// next to every commit, the counted ones next to the counted ones. Ann's three commits, one
+/// merge and two bot commits: six in all, three counted.
 #[tokio::test]
-#[ignore = "red: the overview counts every commit, the API only the counted ones"]
 async fn the_overview_and_the_api_agree() {
     let dir = tempfile::tempdir().expect("tmp");
     let router = gitterrace_web::app_router(mixed(dir.path())).expect("router");
@@ -342,12 +343,19 @@ async fn the_overview_and_the_api_agree() {
     let (_, ov) = page(&router, "/").await;
     let repo = json(&router, "/api/v1/repo").await;
     let t = &repo["totals"];
+    assert_eq!((n(&t["every_commits"]), n(&t["commits"])), (6, 3), "{repo}");
     assert_eq!(count_before(&ov, " author"), Some(n(&t["authors"])), "{ov}");
     assert_eq!(
         count_before(&ov, " commits"),
+        Some(n(&t["every_commits"])),
+        "{ov}"
+    );
+    assert_eq!(
+        count_before(&ov, " counted"),
         Some(n(&t["commits"])),
         "{ov} {repo}"
     );
+    assert_eq!(count_before(&ov, " by bots"), Some(2), "{ov}");
 }
 
 /// A file's history says how many commits it lists, and the commit search how many it found.

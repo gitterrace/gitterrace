@@ -149,7 +149,8 @@ struct Numbers {
     counted: &'static str,
     commits: String,
     commits_noun: &'static str,
-    /// "(2 merges)" or empty: the overview counts every commit, insights leave merges out.
+    /// "(2 merges, 3 counted)" or empty: the overview counts every commit, the rest of the
+    /// line and the insights only the counted ones.
     merges: String,
     authors: String,
     authors_noun: &'static str,
@@ -219,6 +220,24 @@ async fn overview(State(app): Shared, Query(q): Query<DocQuery>) -> Result<Html<
     page(&p)
 }
 
+/// "(1 merge, 2 by bots, 3 counted)": what sets every commit apart from the counted ones, and
+/// how many those are. Empty when every commit counts. Bots are named only when the options
+/// leave them out.
+fn apart(merges: u64, bots: u64, counted: usize, every: u64, bots_count: bool) -> String {
+    if counted as u64 == every {
+        return String::new();
+    }
+    let mut parts = Vec::new();
+    if merges > 0 {
+        parts.push(fmt::count(merges, "merge", "merges"));
+    }
+    if bots > 0 && !bots_count {
+        parts.push(format!("{} by bots", fmt::thousands(bots)));
+    }
+    parts.push(format!("{} counted", fmt::thousands(counted)));
+    format!("({})", parts.join(", "))
+}
+
 /// The overview's totals line over `src`.
 fn overview_numbers(a: &App, head: &str, src: &crate::insights::Src) -> Numbers {
     let all = a.totals(head, &**src, a.defaults().into_options());
@@ -229,10 +248,13 @@ fn overview_numbers(a: &App, head: &str, src: &crate::insights::Src) -> Numbers 
         counted: t.commits_figure().population().as_str(),
         commits: fmt::thousands(commits),
         commits_noun: fmt::noun(commits, "commit", "commits"),
-        merges: match merges {
-            0 => String::new(),
-            n => format!("({})", fmt::count(n, "merge", "merges")),
-        },
+        merges: apart(
+            merges,
+            e.bots.value(),
+            t.commits,
+            commits,
+            a.defaults().bots,
+        ),
         authors: fmt::thousands(t.authors),
         authors_noun: fmt::noun(t.authors, "author", "authors"),
         files: fmt::thousands(t.files),
