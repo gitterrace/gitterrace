@@ -148,3 +148,115 @@ fn install_tabs_pair_every_radio_with_a_panel() {
         assert!(PAGE_CSS.contains(&format!("#install-{way}:checked~#panel-{way}")));
     }
 }
+
+/// Every `attr="value"` of `html`, in order.
+fn attrs<'a>(html: &'a str, attr: &str) -> Vec<&'a str> {
+    let pat = format!(" {attr}=\"");
+    html.split(&pat)
+        .skip(1)
+        .filter_map(|r| r.split_once('"').map(|v| v.0))
+        .collect()
+}
+
+/// Every relative link, image and `#anchor` of the generated pages that does not resolve to a
+/// generated file or to an id on the page it names. `pages` is (site path, content).
+fn unresolved(pages: &[(String, String)], files: &[String]) -> Vec<String> {
+    let mut bad = Vec::new();
+    for (path, html) in pages {
+        let dir = path.rsplit_once('/').map_or("", |d| d.0);
+        for attr in ["href", "src"] {
+            for dest in attrs(html, attr) {
+                if dest.contains("://") || dest.starts_with("mailto:") {
+                    continue;
+                }
+                let (file, anchor) = dest.split_once('#').unwrap_or((dest, ""));
+                let target = if file.is_empty() {
+                    path.clone()
+                } else {
+                    let abs = file.strip_prefix('/').map_or_else(
+                        || crate::docs_index::normalize(&Path::new(dir).join(file)),
+                        str::to_owned,
+                    );
+                    // normalize drops a trailing `/`, so a directory link is read off `file`.
+                    if abs.is_empty() || abs.ends_with('/') {
+                        format!("{abs}index.html")
+                    } else if file.ends_with('/') {
+                        format!("{abs}/index.html")
+                    } else {
+                        abs
+                    }
+                };
+                if !files.contains(&target) {
+                    bad.push(format!("{path}: {dest}: no generated file {target}"));
+                } else if !anchor.is_empty() {
+                    let ids = pages.iter().find(|p| p.0 == target).map(|p| &p.1);
+                    if ids.is_some_and(|h| !attrs(h, "id").contains(&anchor)) {
+                        bad.push(format!("{path}: {dest}: no id {anchor} in {target}"));
+                    }
+                }
+            }
+        }
+    }
+    bad
+}
+
+/// The generated site, as (site path, content) of every page and the paths of every file.
+fn generated() -> (Vec<(String, String)>, Vec<String>) {
+    let root = crate::repo_root();
+    let ws = crate::facts::load(&root).expect("facts");
+    let outs = render(&root, &ws).expect("render");
+    let mut pages = Vec::new();
+    let mut files = Vec::new();
+    for out in outs {
+        match out {
+            Out::File { path, body } => {
+                let rel = path.strip_prefix("site/").unwrap_or(&path).to_owned();
+                if rel.ends_with(".html") {
+                    pages.push((rel.clone(), body));
+                }
+                files.push(rel);
+            }
+            Out::Bytes { path, .. } => {
+                files.push(path.strip_prefix("site/").unwrap_or(&path).to_owned());
+            }
+            Out::Block { .. } => {}
+        }
+    }
+    // The screenshots are made by `make site-shots` and checked on disk. The touch icon is
+    // ignored by git and rendered by `make site`, so it is known by name.
+    files.push("assets/apple-touch-icon.png".to_owned());
+    for dir in ["assets/screenshots"] {
+        let entries = std::fs::read_dir(root.join("site").join(dir)).expect("site dir");
+        for e in entries.flatten() {
+            files.push(format!("{dir}/{}", e.file_name().to_string_lossy()));
+        }
+    }
+    (pages, files)
+}
+
+/// The class this guards: a page that links to a page, file or heading the site does not have.
+#[test]
+fn every_link_and_anchor_of_every_page_resolves() {
+    let (pages, files) = generated();
+    assert!(pages.len() > 10, "{} pages", pages.len());
+    let bad = unresolved(&pages, &files);
+    assert!(bad.is_empty(), "unresolved:\n{}", bad.join("\n"));
+}
+
+#[test]
+fn a_planted_bad_link_or_anchor_is_reported() {
+    let (mut pages, files) = generated();
+    pages[0].1.push_str(
+        "<a href=\"/docs/nope/#x\">a</a><a href=\"/docs/why/#nope\">b</a><a href=\"#nope\">c</a>",
+    );
+    let bad = unresolved(&pages, &files).join("\n");
+    assert!(
+        bad.contains("/docs/nope/#x: no generated file docs/nope/index.html"),
+        "{bad}"
+    );
+    assert!(
+        bad.contains("#nope: no id nope in docs/why/index.html"),
+        "{bad}"
+    );
+    assert!(bad.contains("#nope: no id nope in "), "{bad}");
+}

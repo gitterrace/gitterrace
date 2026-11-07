@@ -41,8 +41,9 @@ impl<'a> Links<'a> {
         Self { pages, repo }
     }
 
-    /// `dest`, written in the document at `from`, as a link that works on the site.
-    pub(super) fn rewrite(&self, from: &str, dest: &str) -> String {
+    /// `dest`, written in the document at `from`, as a link that works on the site. An image the
+    /// site does not carry is loaded from the repository, as raw bytes.
+    pub(super) fn rewrite(&self, from: &str, dest: &str, image: bool) -> String {
         if dest.contains("://") || dest.starts_with("mailto:") || dest.starts_with('#') {
             return dest.to_owned();
         }
@@ -56,9 +57,31 @@ impl<'a> Links<'a> {
         };
         match self.pages.get(&target) {
             Some(page) => format!("/{page}{hash}"),
+            None if image => format!("{}/raw/main/{target}", self.repo),
             None if file.ends_with('/') => format!("{}/tree/main/{target}{hash}", self.repo),
             None => format!("{}/blob/main/{target}{hash}", self.repo),
         }
+    }
+}
+
+impl Links<'_> {
+    /// Raw HTML (a `<picture>`) with each `src` and `srcset` pointed at where the file is.
+    fn rewrite_html(&self, from: &str, html: &str) -> String {
+        let mut out = html.to_owned();
+        for attr in ["src", "srcset"] {
+            let pat = format!(" {attr}=\"");
+            let mut done = String::new();
+            let mut rest = out.as_str();
+            while let Some((before, after)) = rest.split_once(&pat) {
+                let (value, tail) = after.split_once('"').unwrap_or((after, ""));
+                done.push_str(before);
+                let _ = write!(done, "{pat}{}\"", self.rewrite(from, value, true));
+                rest = tail;
+            }
+            done.push_str(rest);
+            out = done;
+        }
+        out
     }
 }
 
@@ -126,10 +149,22 @@ pub(super) fn body(
                 id,
             }) => Event::Start(Tag::Link {
                 link_type,
-                dest_url: CowStr::from(links.rewrite(from, &dest_url)),
+                dest_url: CowStr::from(links.rewrite(from, &dest_url, false)),
                 title,
                 id,
             }),
+            Event::Start(Tag::Image {
+                link_type,
+                dest_url,
+                title,
+                id,
+            }) => Event::Start(Tag::Image {
+                link_type,
+                dest_url: CowStr::from(links.rewrite(from, &dest_url, true)),
+                title,
+                id,
+            }),
+            Event::Html(h) => Event::Html(CowStr::from(links.rewrite_html(from, &h))),
             ev => ev,
         };
         match (&mut heading, ev) {
