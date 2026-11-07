@@ -129,6 +129,21 @@ const DOCS: &[(&str, Kind, &str)] = &[
     ),
 ];
 
+/// The documents the site publishes: every kind but the project's own files, as repo path,
+/// the heading of its group and what it covers, in index order. The README is the landing
+/// page's own source and has raw HTML for its header, so it is not a page of its own.
+pub fn on_site() -> Vec<(&'static str, &'static str, &'static str)> {
+    Kind::ALL
+        .iter()
+        .filter(|k| **k != Kind::Project)
+        .flat_map(|k| {
+            DOCS.iter()
+                .filter(move |d| d.1 == *k && d.0 != "README.md")
+                .map(move |d| (d.0, k.heading(), d.2))
+        })
+        .collect()
+}
+
 pub fn render() -> Out {
     let mut s = String::new();
     for kind in Kind::ALL {
@@ -317,7 +332,7 @@ fn check_paths(root: &Path, path: &str, text: &str) -> Vec<String> {
 }
 
 /// `a/b/../c` as `a/c`, with `/` separators.
-fn normalize(p: &Path) -> String {
+pub fn normalize(p: &Path) -> String {
     let mut parts: Vec<String> = Vec::new();
     for c in p.components() {
         match c {

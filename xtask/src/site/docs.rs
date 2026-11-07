@@ -1,16 +1,70 @@
-//! The user-facing internals docs (`docs/internals/*.md`) as pages of the site, one per file at
-//! `/docs/<name>/`. Every heading carries a stable id (its slug), so a link can name the exact
-//! rule it means, for instance `/docs/counting/#merges`.
+//! Every document the docs index publishes as a page of the site, one per file at
+//! `/docs/<name>/`, plus the index at `/docs/` and the changelog. Every heading carries a stable
+//! id (its slug), so a link can name the exact rule it means, for instance
+//! `/docs/counting/#merges`. A relative link to another document becomes that page's path, and
+//! one to a file the site does not publish points at the file in the repository.
 
+use std::collections::BTreeMap;
+use std::fmt::Write as _;
 use std::path::Path;
 
 use anyhow::{Context as _, Result};
 use pulldown_cmark::{CowStr, Event, HeadingLevel, Options, Parser, Tag, TagEnd, html};
 
+use crate::docs_index::{normalize, on_site};
 use crate::out::Out;
 use crate::site::{THEME_INIT_JS, esc};
 
-const DIR: &str = "docs/internals";
+pub(super) const CHANGELOG: &str = "CHANGELOG.md";
+
+/// Where pages live and what they are called, for the shell and the links.
+pub(super) struct Site<'a> {
+    pub home: &'a str,
+    pub repo: &'a str,
+    pub name: &'a str,
+}
+
+/// Where each published document is, so a relative link can be rewritten.
+pub(super) struct Links<'a> {
+    pages: BTreeMap<String, String>,
+    repo: &'a str,
+}
+
+impl<'a> Links<'a> {
+    pub(super) fn new(repo: &'a str) -> Self {
+        let mut pages: BTreeMap<String, String> = on_site()
+            .into_iter()
+            .map(|(path, ..)| (path.to_owned(), page_path(stem(path))))
+            .collect();
+        pages.insert(CHANGELOG.to_owned(), "changelog/".to_owned());
+        Self { pages, repo }
+    }
+
+    /// `dest`, written in the document at `from`, as a link that works on the site.
+    pub(super) fn rewrite(&self, from: &str, dest: &str) -> String {
+        if dest.contains("://") || dest.starts_with("mailto:") || dest.starts_with('#') {
+            return dest.to_owned();
+        }
+        let (file, anchor) = dest.split_once('#').unwrap_or((dest, ""));
+        let dir = Path::new(from).parent().unwrap_or_else(|| Path::new(""));
+        let target = normalize(&dir.join(file));
+        let hash = if anchor.is_empty() {
+            String::new()
+        } else {
+            format!("#{anchor}")
+        };
+        match self.pages.get(&target) {
+            Some(page) => format!("/{page}{hash}"),
+            None if file.ends_with('/') => format!("{}/tree/main/{target}{hash}", self.repo),
+            None => format!("{}/blob/main/{target}{hash}", self.repo),
+        }
+    }
+}
+
+fn stem(path: &str) -> &str {
+    let name = path.rsplit('/').next().unwrap_or(path);
+    name.strip_suffix(".md").unwrap_or(name)
+}
 
 /// The slug of a heading: lowercase words joined by `-`, so "Code age and releases" is
 /// `code-age-and-releases`.
@@ -51,21 +105,40 @@ pub fn anchors(text: &str) -> Vec<String> {
     out
 }
 
-/// The markdown as HTML, each heading with its slug as id.
-pub fn body(text: &str) -> String {
+/// The markdown of the document at `from` as HTML: each heading with the id `id` gives it (given
+/// its level and text) and each relative link pointed at its page.
+pub(super) fn body(
+    text: &str,
+    from: &str,
+    links: &Links,
+    id: &mut dyn FnMut(usize, &str) -> String,
+) -> String {
     let mut events: Vec<Event> = Vec::new();
     let mut pending: Vec<Event> = Vec::new();
     let mut heading: Option<(HeadingLevel, String)> = None;
     for ev in Parser::new_ext(text, Options::empty()) {
+        let ev = match ev {
+            Event::Start(Tag::Link {
+                link_type,
+                dest_url,
+                title,
+                id,
+            }) => Event::Start(Tag::Link {
+                link_type,
+                dest_url: CowStr::from(links.rewrite(from, &dest_url)),
+                title,
+                id,
+            }),
+            ev => ev,
+        };
         match (&mut heading, ev) {
             (None, Event::Start(Tag::Heading { level, .. })) => {
                 heading = Some((level, String::new()));
             }
             (Some((level, text)), Event::End(TagEnd::Heading(_))) => {
-                let id = slug(text);
                 events.push(Event::Start(Tag::Heading {
                     level: *level,
-                    id: Some(CowStr::from(id)),
+                    id: Some(CowStr::from(id(*level as usize, text))),
                     classes: vec![],
                     attrs: vec![],
                 }));
@@ -87,51 +160,103 @@ pub fn body(text: &str) -> String {
     out
 }
 
-/// One page per `docs/internals/*.md`, sorted by name.
-pub fn pages(root: &Path, home: &str, repo: &str, site: &str) -> Result<(Vec<Out>, Vec<String>)> {
-    let dir = root.join(DIR);
-    let mut stems = Vec::new();
-    for entry in std::fs::read_dir(&dir).with_context(|| format!("reading {DIR}"))? {
-        let p = entry?.path();
-        if p.extension().is_some_and(|e| e == "md")
-            && let Some(s) = p.file_stem().and_then(|s| s.to_str())
-        {
-            stems.push(s.to_owned());
+/// A whole page: the head, a way back, `inner` and a footer with `foot` (HTML, may be empty).
+pub(super) fn shell(site: &Site, title: &str, path: &str, inner: &str, foot: &str) -> String {
+    let footer = if foot.is_empty() {
+        String::new()
+    } else {
+        format!("<footer>\n{foot}\n</footer>\n")
+    };
+    format!(
+        "<!doctype html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n\
+         <meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">\n\
+         <meta name=\"color-scheme\" content=\"light dark\">\n\
+         <title>{t} - {s}</title>\n<link rel=\"canonical\" href=\"{home}/{path}\">\n\
+         <link rel=\"icon\" type=\"image/svg+xml\" href=\"/assets/mark.svg\">\n\
+         <link rel=\"stylesheet\" href=\"/assets/site.css\">\n\
+         <script>{THEME_INIT_JS}</script>\n</head>\n<body>\n<main>\n\
+         <p><a href=\"/\">{s}</a> / <a href=\"/docs/\">Docs</a></p>\n{inner}{footer}\
+         </main>\n</body>\n</html>\n",
+        t = esc(title),
+        s = esc(site.name),
+        home = esc(site.home),
+    )
+}
+
+/// The link to a file in the repository, as a footer entry.
+pub(super) fn source_link(site: &Site, rel: &str) -> String {
+    format!(
+        "<a href=\"{}/blob/main/{rel}\">Source of this page</a>",
+        esc(site.repo)
+    )
+}
+
+/// The docs index: every published document under the heading of its kind.
+fn index(docs: &[(String, String)]) -> String {
+    let mut out = String::from("<h1>Documentation</h1>\n");
+    let mut group = "";
+    for (path, title, heading, what) in on_site()
+        .into_iter()
+        .map(|(p, h, w)| (p, docs.iter().find(|d| d.0 == p), h, w))
+        .filter_map(|(p, d, h, w)| d.map(|d| (p, d.1.as_str(), h, w)))
+    {
+        if group != heading {
+            if !group.is_empty() {
+                out.push_str("</ul>\n");
+            }
+            let _ = writeln!(
+                out,
+                "<h2 id=\"{}\">{}</h2>\n<ul>",
+                slug(heading),
+                esc(heading)
+            );
+            group = heading;
         }
+        let _ = writeln!(
+            out,
+            "<li><a href=\"/{}\">{}</a>: {}</li>",
+            page_path(stem(path)),
+            esc(title),
+            esc(&what.replace('`', "")),
+        );
     }
-    stems.sort();
+    out.push_str("</ul>\n");
+    out
+}
+
+/// One page per published document, the docs index and the changelog. Returns the files and
+/// every page path, for the sitemap and the link check.
+pub fn pages(root: &Path, home: &str, repo: &str, name: &str) -> Result<(Vec<Out>, Vec<String>)> {
+    let site = Site { home, repo, name };
+    let links = Links::new(repo);
+    let read = |rel: &str| {
+        std::fs::read_to_string(root.join(rel)).with_context(|| format!("reading {rel}"))
+    };
     let mut outs = Vec::new();
-    let mut paths = Vec::new();
-    for stem in stems {
-        let rel = format!("{DIR}/{stem}.md");
-        let text =
-            std::fs::read_to_string(root.join(&rel)).with_context(|| format!("reading {rel}"))?;
+    let mut paths = vec!["docs/".to_owned()];
+    let mut titles = Vec::new();
+    for (rel, ..) in on_site() {
+        let text = read(rel)?;
         let title = text
             .lines()
             .find_map(|l| l.strip_prefix("# "))
-            .with_context(|| format!("{rel} has no title"))?;
-        let path = page_path(&stem);
-        paths.push(path.clone());
-        outs.push(Out::file(
-            format!("site/{path}index.html"),
-            format!(
-                "<!doctype html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n\
-                 <meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">\n\
-                 <meta name=\"color-scheme\" content=\"light dark\">\n\
-                 <title>{t} - {s}</title>\n<link rel=\"canonical\" href=\"{home}/{path}\">\n\
-                 <link rel=\"icon\" type=\"image/svg+xml\" href=\"/assets/mark.svg\">\n\
-                 <link rel=\"stylesheet\" href=\"/assets/site.css\">\n\
-                 <script>{THEME_INIT_JS}</script>\n</head>\n<body>\n<main>\n\
-                 <p><a href=\"/\">{s}</a></p>\n{b}\
-                 <footer>\n<a href=\"{repo}/blob/main/{rel}\">Source of this page</a>\n</footer>\n\
-                 </main>\n</body>\n</html>\n",
-                t = esc(title),
-                s = esc(site),
-                home = esc(home),
-                repo = esc(repo),
-                b = body(&text),
-            ),
-        ));
+            .with_context(|| format!("{rel} has no title"))?
+            .to_owned();
+        let path = page_path(stem(rel));
+        if paths.contains(&path) {
+            anyhow::bail!("{rel}: another document is already the page {path}");
+        }
+        let inner = body(&text, rel, &links, &mut |_, h| slug(h));
+        let page = shell(&site, &title, &path, &inner, &source_link(&site, rel));
+        outs.push(Out::file(format!("site/{path}index.html"), page));
+        paths.push(path);
+        titles.push((rel.to_owned(), title));
     }
+    let inner = index(&titles);
+    outs.push(Out::file(
+        "site/docs/index.html",
+        shell(&site, "Documentation", "docs/", &inner, ""),
+    ));
+    paths.sort();
     Ok((outs, paths))
 }

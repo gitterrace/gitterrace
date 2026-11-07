@@ -132,7 +132,10 @@ fn a_missing_unreferenced_or_wrongly_sized_screenshot_fails() {
 fn internals_pages_give_every_heading_its_slug_as_id() {
     let text = "# Title\n\n## Code age and releases\n\ntext\n";
     assert_eq!(docs::anchors(text), ["title", "code-age-and-releases"]);
-    let html = docs::body(text);
+    let links = docs::Links::new("https://r");
+    let html = docs::body(text, "docs/internals/x.md", &links, &mut |_, h| {
+        docs::slug(h)
+    });
     assert!(html.contains("<h2 id=\"code-age-and-releases\">Code age and releases</h2>"));
     assert_eq!(docs::page_path("counting"), "docs/counting/");
 }
