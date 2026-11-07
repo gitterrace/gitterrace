@@ -4,14 +4,6 @@
 //! overview costs one lookup.
 
 mod lists;
-/// The file name with its parent: the parent keeps the many `lib.rs` and `mod.rs` apart, the
-/// tooltip has the rest.
-fn short_name(p: &str) -> String {
-    let mut parts: Vec<_> = p.rsplitn(3, '/').take(2).collect();
-    parts.reverse();
-    parts.join("/")
-}
-
 #[cfg(test)]
 mod tests;
 
@@ -131,11 +123,12 @@ pub(crate) fn build(a: &App, head: &str, src: &dyn InsightsSource, dirty: bool, 
     let today_start = local_day_of(now, offset) * DAY - i64::from(offset);
     let from = (now - SPARK_CAP).min(today_start - 6 * DAY);
     let churn_from = now - CHURN_DAYS * DAY;
+    let (window, start) = spark_times(src, from, now + DAY);
     let mut times = Vec::new();
     let (mut today, mut week) = (0, 0);
     let mut recent: Vec<Rank> = Vec::new();
     let counts = gitterrace_index::Insights::from_source(src, a.defaults().into_options(), None);
-    for c in src.commits_in(CommitRange::Time(from..now + DAY)) {
+    for c in window {
         times.push(c.time);
         today += usize::from(c.time >= today_start);
         week += usize::from(c.time >= today_start - 6 * DAY);
@@ -143,32 +136,12 @@ pub(crate) fn build(a: &App, head: &str, src: &dyn InsightsSource, dirty: bool, 
             recent.push(c.rank);
         }
     }
-    let mut per: HashMap<_, usize> = HashMap::new();
-    for (_, rows) in src.rows_for(recent) {
-        for r in rows {
-            *per.entry(r.path).or_default() += 1;
-        }
-    }
-    let filter = path_filter(a, head);
-    let mut per: Vec<_> = per.into_iter().collect();
-    per.sort_by(|x, y| y.1.cmp(&x.1).then(x.0.cmp(&y.0)));
-    let hot = per
-        .into_iter()
-        .filter_map(|(p, n)| Some((src.path(p)?, n)))
-        .filter(|(p, _)| !filter.skips(p))
-        .take(TOP_CHURN)
-        .map(|(p, n)| Hot {
-            name: short_name(&p),
-            href: crate::views::file_link(&p),
-            changes: fmt::count(n, "change", "changes"),
-            path: p.to_string(),
-        })
-        .collect();
+    let hot = hot_files(a, head, src, recent);
     let (loose, loose_total) = loose_ends(a, head, branch.as_deref(), now);
     let worktrees = worktree_count(a);
     let series = spark::series(
         times.iter().copied(),
-        first_time(src, from, &times),
+        start.or(Some(from - SPARK_CAP)),
         spark::End::local(now, offset),
         SPARK_CAP,
     );
@@ -217,19 +190,58 @@ pub(crate) fn build(a: &App, head: &str, src: &dyn InsightsSource, dirty: bool, 
     }
 }
 
-/// When the history began, as far as the window cares: the oldest commit time when every
-/// commit is inside `from..`, else a time before the cap, so the window is capped. Ranks are
-/// not in time order (several roots, skewed clocks), so not rank 0: one probe for any commit
-/// older than `from`, which stops at the first hit, and the window's own times otherwise.
-fn first_time(src: &dyn InsightsSource, from: i64, times: &[i64]) -> Option<i64> {
-    if src
+/// The most changed files among the `recent` commits, which the caller picked by the counted
+/// rule, so a file's "N changes" is its hotspots row over the same days.
+fn hot_files(a: &App, head: &str, src: &dyn InsightsSource, recent: Vec<Rank>) -> Vec<Hot> {
+    let mut per: HashMap<_, usize> = HashMap::new();
+    for (_, rows) in src.rows_for(recent) {
+        for r in rows {
+            *per.entry(r.path).or_default() += 1;
+        }
+    }
+    let filter = path_filter(a, head);
+    let mut per: Vec<_> = per.into_iter().collect();
+    per.sort_by(|x, y| y.1.cmp(&x.1).then(x.0.cmp(&y.0)));
+    per.into_iter()
+        .filter_map(|(p, n)| Some((src.path(p)?, n)))
+        .filter(|(p, _)| !filter.skips(p))
+        .take(TOP_CHURN)
+        .map(|(p, n)| Hot {
+            name: short_name(&p),
+            href: crate::views::file_link(&p),
+            changes: fmt::count(n, "change", "changes"),
+            path: p.to_string(),
+        })
+        .collect()
+}
+/// The file name with its parent: the parent keeps the many `lib.rs` and `mod.rs` apart, the
+/// tooltip has the rest.
+fn short_name(p: &str) -> String {
+    let mut parts: Vec<_> = p.rsplitn(3, '/').take(2).collect();
+    parts.reverse();
+    parts.join("/")
+}
+
+/// The commits of the window `from..until` and when the history began: the oldest commit
+/// time when every commit is inside the window, else `None` (the window is capped). The same
+/// contract as `Repo::commit_times_since`, which the repository list reads from git, so the
+/// two sparklines of one repository count the same commits. Ranks are not in time order
+/// (several roots, skewed clocks), so not rank 0: one probe for any commit older than `from`,
+/// which stops at the first hit.
+pub(crate) fn spark_times(
+    src: &dyn InsightsSource,
+    from: i64,
+    until: i64,
+) -> (Vec<gitterrace_index::feed::CommitRow>, Option<i64>) {
+    let window: Vec<_> = src.commits_in(CommitRange::Time(from..until)).collect();
+    let capped = src
         .commits_in(CommitRange::Time(i64::MIN..from))
         .next()
-        .is_some()
-    {
-        return Some(from - SPARK_CAP);
-    }
-    times.iter().copied().min()
+        .is_some();
+    let start = (!capped)
+        .then(|| window.iter().map(|c| c.time).min())
+        .flatten();
+    (window, start)
 }
 
 pub(crate) fn path_filter(a: &App, head: &str) -> gitterrace_index::PathFilter {

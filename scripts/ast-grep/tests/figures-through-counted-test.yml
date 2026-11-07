@@ -1,7 +1,7 @@
 id: figures-through-counted
 valid:
   - 'fn page(c: &Counted) -> usize { c.totals().commits }'
-  - 'fn first_time(src: &dyn InsightsSource, from: i64) -> bool { src.commits_in(CommitRange::Time(i64::MIN..from)).next().is_some() }'
+  - 'fn spark_times(src: &dyn InsightsSource, from: i64) -> bool { src.commits_in(CommitRange::Time(i64::MIN..from)).next().is_some() }'
   - 'mod tests { fn t(s: &Src) { s.commits_in(CommitRange::All).count(); } }'
 invalid:
   - 'fn merges(src: &dyn InsightsSource) -> usize { src.commits_in(CommitRange::All).filter(|c| c.merge).count() }'

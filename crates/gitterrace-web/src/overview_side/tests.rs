@@ -224,3 +224,59 @@ fn the_sparkline_spans_its_column_with_a_baseline_and_a_latest_dot() {
         "{s}"
     );
 }
+
+/// The sidebar's sparkline reads the index, the repository list's reads git: over one
+/// repository and one window both count the same commits, merges included, and agree on
+/// whether the window holds the whole history.
+#[test]
+fn both_sparklines_count_the_same_commits() {
+    use gitterrace_testkit::git_at;
+    let dir = tempfile::tempdir().expect("tempdir");
+    let p = dir.path();
+    git(p, &["init", "-q", "-b", "main"]);
+    let mut at = 1_700_000_000_i64;
+    let commit = |p: &std::path::Path, msg: &str, at: i64| {
+        git_at(
+            p,
+            &format!("@{at} +0000"),
+            &["commit", "-q", "--allow-empty", "-m", msg],
+        );
+    };
+    for n in 0..4 {
+        commit(p, &format!("feat: {n}"), at);
+        at += 10 * DAY;
+    }
+    git(p, &["checkout", "-q", "-b", "side"]);
+    commit(p, "feat: side", at);
+    git(p, &["checkout", "-q", "main"]);
+    commit(p, "feat: main", at + 1);
+    git_at(
+        p,
+        &format!("@{} +0000", at + 2),
+        &["merge", "-q", "--no-ff", "-m", "merge", "side"],
+    );
+    let repo = gitterrace_git::Repo::discover(p).expect("repo");
+    let index = gitterrace_index::Index::open(&repo).expect("index");
+    let env = crate::app::Env::new(gitterrace_config::Config::default());
+    let app = App::configured(repo, index, &env);
+    app.index
+        .update(&app.repo, "HEAD", &|_| {})
+        .expect("update");
+    app.mark_ready();
+    let head = app.repo.resolve("HEAD").expect("head");
+    let src = app
+        .source(&head)
+        .expect("source")
+        .expect("ready")
+        .unchecked();
+    let until = at + DAY;
+    for from in [at - 15 * DAY, 0] {
+        let (rows, start) = spark_times(&*src, from, until);
+        let mut ours: Vec<i64> = rows.iter().map(|c| c.time).collect();
+        let (mut git_times, git_start) = app.repo.commit_times_since(&head, from).expect("walk");
+        ours.sort_unstable();
+        git_times.sort_unstable();
+        assert_eq!(ours, git_times, "from {from}");
+        assert_eq!(start, git_start, "from {from}");
+    }
+}

@@ -7,7 +7,8 @@ note: >-
   Counted (insights/counted.rs) or from Insights::every_totals, so its population is the one it
   says. Reading commits_in or rows_for here counts by a rule of its own: the sidebar hot files
   did. The sidebar's spark and today/this week count every commit by the
-  wall clock, a documented exception, and are the only functions exempt.
+  wall clock, a documented exception, and the hot files tally the commits the caller kept by
+  the counted rule: these are the only functions exempt.
 files:
   - crates/gitterrace-web/src/activity.rs
   - crates/gitterrace-web/src/insights.rs
@@ -37,4 +38,4 @@ rule:
       - inside:
           stopBy: end
           kind: function_item
-          has: {field: name, regex: '^(build|first_time)$'}
+          has: {field: name, regex: '^(build|spark_times|hot_files)$'}
