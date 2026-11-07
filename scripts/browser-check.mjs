@@ -463,8 +463,12 @@ async function settings() {
     const p = await ctx.newPage();
     try {
       await p.goto(srv.base + '/', { waitUntil: 'load' });
-      await p.click('#settingsbtn');
+      const gear = await p.$('#settingsbtn');
+      await p.click('.actbtn.top');
+      await p.waitForSelector('.actmenu li >> text=Settings…');
+      await p.click('.actmenu li >> text=Settings…');
       await p.waitForSelector('#setform');
+      if (gear) r.fail(`settings ${name}: a header gear duplicates the menu entry`);
       await p.fill('#f-watch\\.rescan_secs', '75');
       await p.click('.segs [data-show="plain"]');
       await p.waitForFunction(() => /rescan_secs = 75/.test(/** @type {HTMLTextAreaElement} */ (document.getElementById('settext')).value), null, { timeout: 3000 });

@@ -371,11 +371,20 @@ async fn the_page_renders_the_schema_and_carries_its_token() {
     assert!(!html.contains("style=\""), "no inline style");
     let (s, overview) = page(&app, "/r/r/").await;
     assert_eq!(s, 200);
-    assert!(overview.contains("id=\"settingsbtn\""), "the gear shows");
     assert!(
         overview.contains("name=\"gt-settings\""),
         "the menu entry is offered"
     );
+    assert!(!overview.contains("settingsbtn"), "no second header entry");
+    for uri in ["/r/r/", "/r/r/log/HEAD", "/r/r/tree/HEAD/"] {
+        let (s, body) = page(&app, uri).await;
+        assert_eq!(s, 200, "{uri}");
+        assert_eq!(
+            gitterrace_testkit::repeated_header_destinations(&body),
+            Vec::<String>::new(),
+            "{uri}: a header destination appears twice with settings on"
+        );
+    }
     assert!(
         !overview.contains(&token),
         "only the settings page carries its token"

@@ -154,6 +154,32 @@ fn duplicate_ids(body: &str) -> Vec<String> {
 }
 
 #[test]
+fn no_page_header_names_a_destination_twice() {
+    let gear = r#"<meta name="gt-settings" content="/_settings"><header><div class="tools"><a id="settingsbtn" href="/_settings"></a></div></header>"#;
+    assert_eq!(
+        gitterrace_testkit::repeated_header_destinations(gear),
+        ["/_settings"]
+    );
+    if !oracle::frozen("no_page_header_names_a_destination_twice") {
+        return;
+    }
+    let rt = tokio::runtime::Runtime::new().expect("runtime");
+    let bad: Vec<String> = rt
+        .block_on(golden_answers())
+        .iter()
+        .filter_map(|(key, body)| {
+            let d = gitterrace_testkit::repeated_header_destinations(body);
+            (!d.is_empty()).then(|| format!("{key}: {d:?}"))
+        })
+        .collect();
+    assert!(
+        bad.is_empty(),
+        "headers with a repeated destination:\n{}",
+        bad.join("\n")
+    );
+}
+
+#[test]
 fn no_page_gives_an_id_twice() {
     assert_eq!(
         duplicate_ids(r#"<a id="x"></a><b id="y"></b><i id="x"></i>"#),

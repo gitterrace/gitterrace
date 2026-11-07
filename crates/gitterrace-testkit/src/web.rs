@@ -34,3 +34,41 @@ pub async fn base(router: &Router) -> String {
         .expect("/ forwards to the one repository");
     to.trim_end_matches('/').to_owned()
 }
+
+/// Header destinations a page gives more than once: every `href` in the header's tool area plus
+/// the `gt-settings` menu meta, which the actions menu turns into an entry.
+pub fn repeated_header_destinations(body: &str) -> Vec<String> {
+    let head = body
+        .split("<header")
+        .nth(1)
+        .and_then(|h| h.split("</header>").next())
+        .and_then(|h| h.split("class=\"tools\"").nth(1))
+        .unwrap_or_default();
+    let meta = body
+        .split("name=\"gt-settings\" content=\"")
+        .nth(1)
+        .and_then(|m| m.split('"').next());
+    let dests = head
+        .split(" href=\"")
+        .skip(1)
+        .filter_map(|p| p.split('"').next())
+        .chain(meta);
+    let mut seen = std::collections::BTreeSet::new();
+    let twice: std::collections::BTreeSet<String> = dests
+        .filter(|d| !d.is_empty() && !seen.insert(*d))
+        .map(str::to_owned)
+        .collect();
+    twice.into_iter().collect()
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn a_settings_link_beside_the_settings_meta_is_a_repeat() {
+        let gear = concat!(
+            r#"<meta name="gt-settings" content="/_settings"><header><div class="tools">"#,
+            r#"<a id="settingsbtn" href="/_settings"></a></div></header>"#
+        );
+        assert_eq!(super::repeated_header_destinations(gear), ["/_settings"]);
+    }
+}
