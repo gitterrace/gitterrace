@@ -310,7 +310,7 @@ export function checks({ dir, srv, r, browsers, context }) {
           }
         }
         const running = document.getAnimations().filter((a) => a.playState === 'running'
-          && (a.effect?.getComputedTiming().duration ?? 0) > 0);
+          && Number(a.effect?.getComputedTiming().duration ?? 0) > 0);
         if (running.length) bad.add(`${running.length} animations running`);
         return [...bad].slice(0, 6);
       });

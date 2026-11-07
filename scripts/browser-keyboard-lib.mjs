@@ -72,7 +72,7 @@ export function checks(env) {
     }, async (p) => {
       const found = [];
       await p.evaluate(() => {
-        document.activeElement && document.activeElement.blur();
+        /** @type {HTMLElement} */ (document.activeElement)?.blur();
         scrollTo(0, 0);
       });
       const first = await p.evaluate(() => 0);
@@ -169,7 +169,8 @@ export function checks(env) {
           'a[href], button, input:not([type=hidden]), select, textarea, summary, '
             + '[tabindex="0"], [role=button], [role=tab]';
         const box = [];
-        for (const e of document.querySelectorAll(sel)) {
+        const all = /** @type {NodeListOf<HTMLButtonElement>} */ (document.querySelectorAll(sel));
+        for (const e of all) {
           const cs = getComputedStyle(e), q = e.getBoundingClientRect();
           if (cs.visibility === 'hidden' || q.width === 0 || q.height === 0 || e.disabled) continue;
           // An inline link inside a sentence is exempt.
@@ -249,7 +250,7 @@ export function checks(env) {
 
 // Runs in the page after each Tab. Describes the focused element and what is wrong with its ring.
 function ringProbe() {
-  const e = document.activeElement;
+  const e = /** @type {HTMLElement} */ (document.activeElement);
   if (!e || e === document.body || e === document.documentElement) return null;
   const q = e.getBoundingClientRect();
   const what = `${e.tagName.toLowerCase()}${e.id ? '#' + e.id : ''} "${
