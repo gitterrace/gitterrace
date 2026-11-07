@@ -1,8 +1,6 @@
 //! YAML-style front matter: a leading `---` block shown as a key/value table, or verbatim.
 
-use std::fmt::Write as _;
-
-use crate::fmt::esc;
+use askama::Template;
 
 /// Splits a leading `---` block from the document. Returns the block body and the rest.
 /// An unterminated block is not front matter.
@@ -69,18 +67,22 @@ fn unquote(v: &str) -> Option<String> {
     Some(v.to_owned())
 }
 
+/// The markup, from `front_matter.html`. `escape = "svg"` picks the crate's `& < > "` escaper,
+/// the bytes `fmt::esc` wrote before.
+#[derive(Template)]
+#[template(path = "front_matter.html", escape = "svg")]
+struct FrontMatter<'a> {
+    rows: Option<Vec<(String, String)>>,
+    block: &'a str,
+}
+
 /// HTML for the front matter block: a key/value table, or the raw text as code.
-/// Built here and added after sanitizing, so every piece is escaped by hand.
+/// Added after sanitizing, so the template escapes every piece.
 pub(super) fn front_matter_html(block: &str) -> String {
-    parse_front_matter(block).map_or_else(
-        || format!("<pre><code>{}</code></pre>\n", esc(block)),
-        |rows| {
-            let mut out = String::from("<table class=\"fm\">");
-            for (k, v) in rows {
-                let _ = write!(out, "<tr><th>{}</th><td>{}</td></tr>", esc(&k), esc(&v));
-            }
-            out.push_str("</table>\n");
-            out
-        },
-    )
+    FrontMatter {
+        rows: parse_front_matter(block),
+        block,
+    }
+    .render()
+    .unwrap_or_default()
 }

@@ -26,4 +26,4 @@ path = "super_paths"
 
 [counts]
 # Markup built with format!/write! in crates/gitterrace-web/src instead of a template.
-web_format_html = 20
+web_format_html = 18
