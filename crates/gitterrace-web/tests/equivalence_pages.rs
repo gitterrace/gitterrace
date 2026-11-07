@@ -221,7 +221,7 @@ fn the_pairwise_golden_agrees_with_the_full_matrix() {
 
 /// The browsing pages, one or more cells each, over the matrix repository at HEAD. Every page
 /// kind the router serves has a cell here or on an insights page, or is exempt below.
-const BROWSE: [&str; 57] = [
+const BROWSE: [&str; 59] = [
     "/log",
     "/log/HEAD",
     "/log/HEAD?path=src",
@@ -258,6 +258,8 @@ const BROWSE: [&str; 57] = [
     // Filters and paging on the log, and the search switches.
     "/log/HEAD?author=bob%40y.io",
     "/log/HEAD?page=2",
+    "/log/HEAD?view=graph",
+    "/log/HEAD?view=graph&page=2",
     "/log/HEAD?path=src&author=bob%40y.io",
     "/search",
     "/search?q=fn.%2A&regex=1",
@@ -306,10 +308,7 @@ const EXEMPT: [(&str, &str); 16] = [
         "/r/{name}/{*rest}",
         "the repository prefix, covered by every cell",
     ),
-    (
-        "/api/repos",
-        "the server's repository list, holds a temp path",
-    ),
+    ("/api/repos", "the repository list, holds a temp path"),
     ("/_dirty", "live working tree state, tested in multi::tests"),
     (
         "/_repos",

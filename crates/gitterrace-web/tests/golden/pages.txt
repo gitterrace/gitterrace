@@ -22,11 +22,13 @@ f39587292883f92dc0d5b1d72bb21a35 3a077106272843ebc9d1af9036f84b77 [browse] /comp
 6c62272e07bb014262b821756295c58d 6c62272e07bb014262b821756295c58d [browse] /hl/HEAD/src/lib.rs
 b3d230dde44c7fe2ee263a6af7e825ff 3d8063d75a148f70df6f7606d756e207 [browse] /insights
 b3d230dde44c7fe2ee263a6af7e825ff 3d8063d75a148f70df6f7606d756e207 [browse] /log
-7becfe5ee33dde12b699c894afcd14ca 733ab847890817711feea98f28e2c046 [browse] /log/HEAD
+f04fa3184d3e0b8a3f64377a066c1479 c8e489659b0ca7245ed3c2b960170cb7 [browse] /log/HEAD
 3a253d8aee52ea6edaea120ce27d464a 3a253d8aee52ea6edaea120ce27d464a [browse] /log/HEAD?author=bob%40y.io
-c873dbc996e05b813188ca2c484d57a3 c873dbc996e05b813188ca2c484d57a3 [browse] /log/HEAD?page=2
+108dcc9c5213fca9bbe6aaa357e73970 108dcc9c5213fca9bbe6aaa357e73970 [browse] /log/HEAD?page=2
 8767fcc21cbb36042e0e954c274b9ca8 8767fcc21cbb36042e0e954c274b9ca8 [browse] /log/HEAD?path=src
 cd44cc3cf208b219021cb88aa60ad50f cd44cc3cf208b219021cb88aa60ad50f [browse] /log/HEAD?path=src&author=bob%40y.io
+d8a66b1624694a69b82542abf1147e9e fc6218bbfbb9179f30793455ba1b2e9a [browse] /log/HEAD?view=graph
+c5149dc98bb7478e2bb9f3b65e43c4e7 c5149dc98bb7478e2bb9f3b65e43c4e7 [browse] /log/HEAD?view=graph&page=2
 1f8ba53834dcc23a33970f810da3fc86 4e714764e3db5de1ea4a86011d410176 [browse] /log/nope
 c14ea64926a034b019ce0031df8c9d82 38f00e02d1ea7b0b0f274f4e9d4ae47c [browse] /raw/HEAD/missing.rs
 87a341eef398c071bc0aba64aae6b78f d00ea85271236e53419ce2859a247db7 [browse] /raw/HEAD/src/lib.rs
