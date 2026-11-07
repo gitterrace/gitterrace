@@ -250,14 +250,19 @@ pub fn render(root: &Path, ws: &Workspace) -> Result<Vec<Out>> {
         std::fs::read_to_string(root.join("CHANGELOG.md")).context("read CHANGELOG.md")?;
     let _ = write!(
         h,
-        "<footer>\n<a href=\"{repo}\">Repository</a>\n<a href=\"docs/\">Docs</a>\n\
-         <a href=\"{repo}/blob/main/LICENSE\">{lic}</a>\n<a href=\"{log}\">v{ver}</a>\n</footer>\n\
+        "{footer}\
          </main>\n<script>{THEME_TOGGLE_JS}</script>\n<script>{LIGHTBOX_JS}</script>\n</body>\
          \n</html>\n",
-        repo = esc(repo),
-        lic = esc(&pkg.license),
-        ver = esc(&pkg.version),
-        log = changelog::version_href(&changelog_text, &pkg.version),
+        footer = footer(
+            repo,
+            &format!(
+                "<a href=\"{r}/blob/main/LICENSE\">{lic}</a>\n<a href=\"/{log}\">v{ver}</a>",
+                r = esc(repo),
+                lic = esc(&pkg.license),
+                ver = esc(&pkg.version),
+                log = changelog::version_href(&changelog_text, &pkg.version),
+            ),
+        ),
     );
     outs.push(Out::file("site/index.html", h));
     let (pages, paths) = docs::pages(root, home, repo, &pkg.name)?;
@@ -270,6 +275,21 @@ pub fn render(root: &Path, ws: &Workspace) -> Result<Vec<Out>> {
 pub(crate) fn nav() -> &'static str {
     "<nav aria-label=\"Site\"><a href=\"/\">Home</a> <a href=\"/docs/\">Docs</a> \
      <a href=\"/changelog/\">Changelog</a></nav>\n"
+}
+
+/// The footer of every page: the links all pages share, then `extra` (HTML, may be empty) for
+/// what only this page has. One builder, so a page cannot drift from the others.
+pub(crate) fn footer(repo: &str, extra: &str) -> String {
+    let repo = esc(repo);
+    let extra = if extra.is_empty() {
+        String::new()
+    } else {
+        format!("{extra}\n")
+    };
+    format!(
+        "<footer>\n<a href=\"{repo}\">Repository</a>\n<a href=\"/docs/\">Docs</a>\n\
+         <a href=\"/changelog/\">Changelog</a>\n{extra}</footer>\n"
+    )
 }
 
 /// Every page opens its body the same way: a skip link as the first Tab stop, then the main
@@ -368,8 +388,9 @@ fn host_files(home: &str, repo: &str, name: &str, pages: &[String]) -> Vec<Out> 
          <link rel=\"icon\" type=\"image/svg+xml\" href=\"/assets/mark.svg\">\n\
          <link rel=\"stylesheet\" href=\"/assets/site.css\">\n</head>\n{BODY_OPEN}\
          <h1>Not found</h1>\n<p>There is no page here. <a href=\"/\">Back to {n}</a>.</p>\n\
-         </main>\n</body>\n</html>\n",
-        n = esc(name)
+         {footer}</main>\n</body>\n</html>\n",
+        n = esc(name),
+        footer = footer(repo, ""),
     );
     vec![
         Out::file("site/_headers", &headers),

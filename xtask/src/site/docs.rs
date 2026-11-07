@@ -14,7 +14,7 @@ use pulldown_cmark::{CowStr, Event, HeadingLevel, Options, Parser, Tag, TagEnd, 
 use crate::docs_index::{normalize, on_site};
 use crate::out::Out;
 use crate::site::changelog;
-use crate::site::{BODY_OPEN, THEME_INIT_JS, esc, nav};
+use crate::site::{BODY_OPEN, THEME_INIT_JS, esc, footer, nav};
 
 pub(super) const CHANGELOG: &str = "CHANGELOG.md";
 
@@ -213,11 +213,7 @@ pub(super) fn body(
 
 /// A whole page: the head, a way back, `inner` and a footer with `foot` (HTML, may be empty).
 pub(super) fn shell(site: &Site, title: &str, path: &str, inner: &str, foot: &str) -> String {
-    let footer = if foot.is_empty() {
-        String::new()
-    } else {
-        format!("<footer>\n{foot}\n</footer>\n")
-    };
+    let footer = footer(site.repo, foot);
     format!(
         "<!doctype html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n\
          <meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">\n\

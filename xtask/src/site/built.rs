@@ -308,3 +308,57 @@ fn a_planted_external_font_or_missing_face_file_is_reported() {
         "no @font-face is red"
     );
 }
+
+/// The `<footer>` of a page, if it has exactly one.
+fn footer_of(html: &str) -> Option<&str> {
+    let (_, rest) = html.split_once("<footer>")?;
+    let (inner, tail) = rest.split_once("</footer>")?;
+    (!tail.contains("<footer>")).then_some(inner)
+}
+
+/// Pages whose footer does not open with the shared links as `footer` builds them, or that lack
+/// the shared nav (every page but the 404, which is a dead end with a way back).
+fn chrome_problems(pages: &[(String, String)]) -> Vec<String> {
+    let mut bad = Vec::new();
+    for (path, html) in pages {
+        let Some(foot) = footer_of(html) else {
+            bad.push(format!("{path}: not exactly one footer"));
+            continue;
+        };
+        let repo = attrs(foot, "href").first().copied().unwrap_or("");
+        let shared = footer(repo, "");
+        let shared = shared
+            .strip_prefix("<footer>")
+            .and_then(|s| s.strip_suffix("</footer>\n"))
+            .unwrap_or("");
+        if !foot.starts_with(shared) {
+            bad.push(format!("{path}: the footer is not the shared one"));
+        }
+        if path != "404.html" && !html.contains(nav()) {
+            bad.push(format!("{path}: the shared nav is missing or changed"));
+        }
+    }
+    bad
+}
+
+/// The class this guards: one page whose footer or nav drifted from the single builder.
+#[test]
+fn every_built_page_has_the_shared_footer_and_nav() {
+    let (pages, _) = generated();
+    assert!(pages.iter().any(|p| p.0 == "404.html"));
+    let bad = chrome_problems(&pages);
+    assert!(bad.is_empty(), "{}", bad.join("\n"));
+}
+
+#[test]
+fn a_page_with_an_altered_footer_or_nav_is_reported() {
+    let (mut pages, _) = generated();
+    assert!(chrome_problems(&pages).is_empty());
+    pages[1].1 = pages[1]
+        .1
+        .replacen("\n<a href=\"/docs/\">Docs</a>\n", "\n", 1);
+    pages[2].1 = pages[2].1.replacen("<nav ", "<nav class=\"x\" ", 1);
+    let bad = chrome_problems(&pages).join("\n");
+    assert!(bad.contains("not the shared one"), "{bad}");
+    assert!(bad.contains("shared nav is missing"), "{bad}");
+}
