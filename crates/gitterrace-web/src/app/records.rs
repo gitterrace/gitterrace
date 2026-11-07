@@ -172,7 +172,8 @@ impl App {
         Warming(Arc::clone(self))
     }
 
-    /// Drops the source and every per-request cache once no page read them for `idle`.
+    /// Drops the source, every per-request cache, the blame cache and the highlighted-code memo
+    /// once no page read them for `idle`.
     /// Returns whether it released anything. A page in flight keeps its own `Arc`, so it is
     /// never cut short; the next page builds again. Only the rendered-page memo stays.
     pub(crate) fn release_idle(&self, idle: Duration) -> bool {
@@ -180,7 +181,10 @@ impl App {
         if !quiet {
             return false;
         }
-        let released = self.caches.clear_all();
+        // Bitwise or: every cache empties, even after one reported that it held something.
+        let released = self.caches.clear_all()
+            | self.repo.clear_blame_cache()
+            | crate::views::clear_code_memo();
         gitterrace_index::Insights::release_shared(&format!("{}\u{0}", self.base));
         // The API opens its own source; a caller there is a client that can wait a second too.
         if let Some(api) = self.api.get() {

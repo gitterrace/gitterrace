@@ -345,6 +345,32 @@ fn an_idle_release_empties_every_cache() {
     assert!(!app.caches.clear_all(), "a cache survived the idle release");
 }
 
+/// The caches that live outside the per-request set empty on the idle release too: the line
+/// blame the git handle keeps and the highlighted files the code view shares across the
+/// process. Each holds up to its share of the cache budget, and an idle server kept both.
+/// The code memo is shared with other tests, so only its state after the release is checked.
+#[test]
+fn an_idle_release_empties_blame_and_highlighted_code() {
+    let (_dir, app, head) = one_commit_app();
+    let _ = app.repo.blame(&head, "a.rs").expect("blame");
+    assert!(
+        app.repo.blame_is_cached(&head, "a.rs"),
+        "the blame was kept"
+    );
+    let r = crate::views::Render::test(1 << 20);
+    let text = "fn released_on_idle() {}\n";
+    let _ = crate::views::code_html(&r, "idle.rs", text);
+    assert!(app.release_idle(Duration::ZERO));
+    assert!(
+        !app.repo.blame_is_cached(&head, "a.rs"),
+        "the blame survived the idle release"
+    );
+    assert!(
+        !crate::views::code_is_cached(&r, "idle.rs", text),
+        "a highlighted file survived the idle release"
+    );
+}
+
 /// Warm-up work alone never postpones the release: a server that only warmed itself is
 /// idle. A visitor's read does postpone it.
 #[test]

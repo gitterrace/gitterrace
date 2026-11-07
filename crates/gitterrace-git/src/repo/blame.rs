@@ -140,6 +140,18 @@ impl Repo {
             .is_ok_and(|c| c.map.contains_key(&key))
     }
 
+    /// Empties the blame cache and returns whether it held anything. A server calls this when
+    /// nobody browses, so an idle process keeps no blame.
+    pub fn clear_blame_cache(&self) -> bool {
+        self.blame_cache.lock().is_ok_and(|mut c| {
+            let held = !c.map.is_empty();
+            c.map = HashMap::new();
+            c.order = VecDeque::new();
+            c.bytes = 0;
+            held
+        })
+    }
+
     /// Bytes the blame cache holds and may hold, so a prewarm can leave room for visitors.
     pub fn blame_cache_fill(&self) -> (usize, usize) {
         self.blame_cache

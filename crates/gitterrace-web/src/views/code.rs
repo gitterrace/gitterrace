@@ -67,6 +67,20 @@ pub(crate) fn code_memo_has(memo: &CodeMemo, path: &str, text: &str) -> bool {
     memo.get(code_key(&Render::test(0), path, text)).is_some()
 }
 
+/// Drops every highlighted file and returns whether any was kept. The memo is shared by the
+/// whole process, so the idle release empties it.
+pub(crate) fn clear_code_memo() -> bool {
+    CODE_CACHE
+        .lock()
+        .is_ok_and(|mut g| g.take().is_some_and(|m| !m.map.is_empty()))
+}
+
+/// True when `code_html` of `path` with `text` would be served from the memo.
+#[cfg(test)]
+pub(crate) fn code_is_cached(r: &Render, path: &str, text: &str) -> bool {
+    code_cached(code_key(r, path, text)).is_some()
+}
+
 fn code_cached(key: u64) -> Option<(String, bool)> {
     let g = CODE_CACHE.lock().ok()?;
     g.as_ref()?.get(key)
