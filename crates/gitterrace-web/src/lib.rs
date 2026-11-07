@@ -59,6 +59,9 @@ pub mod sitemap;
 mod spark;
 #[cfg(test)]
 mod state_tests;
+mod symbols;
+#[cfg(test)]
+mod symbols_wiring_tests;
 mod views;
 mod when;
 #[cfg(test)]

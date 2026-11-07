@@ -233,6 +233,12 @@ pub(crate) fn for_file(path: &str, first_line: &str) -> Option<Highlighter> {
     syntax_for_file(path, first_line).map(Highlighter::new)
 }
 
+/// The grammar name a file highlights with (`Rust`, `Go`, ...), or `None` when unknown: the
+/// one language detector, so the symbol outline and the colours agree on a file's language.
+pub(crate) fn language(path: &str, first_line: &str) -> Option<&'static str> {
+    syntax_for_file(path, first_line).map(|s| s.name.as_str())
+}
+
 /// Highlighted HTML of a whole block for a fence token; `None` when unknown or over the limit.
 pub(crate) fn block(code: &str, token: &str, most: usize) -> Option<String> {
     if code.len() > most {

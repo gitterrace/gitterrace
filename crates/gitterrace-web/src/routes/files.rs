@@ -108,7 +108,11 @@ struct BlobPage {
     too_large: bool,
     raw_href: String,
     rendered: Option<String>,
+    /// "On this page" as the rail: the document's headings, or a source file's symbols.
     outline_rail: String,
+    /// A source file's symbols as the narrow-screen menu in the path bar; empty for a
+    /// document, whose menu is in its card header.
+    symbol_menu: String,
     /// The header of the Markdown card; `None` for any other file.
     head: Option<DocHead>,
 }
@@ -173,9 +177,17 @@ pub(super) async fn blob(
                 markdown::Base::new(&rev, dir).highlight(views::Render::of(a).highlight_bytes),
             )
         });
-        let outline_rail = doc
-            .as_ref()
-            .map_or_else(String::new, |d| markdown::outline_rail(&d.outline));
+        let symbols = match (&doc, text, media.is_some()) {
+            (None, Some(t), false) => {
+                crate::symbols::outline(&path, t, views::Render::of(a).blob_lines)
+            }
+            _ => Vec::new(),
+        };
+        let outline_rail = doc.as_ref().map_or_else(
+            || markdown::outline_rail(&symbols),
+            |d| markdown::outline_rail(&d.outline),
+        );
+        let symbol_menu = markdown::outline_menu(&symbols, false);
         let (r, pe) = (fmt::enc_seg(&rev), fmt::enc_path(&path));
         let crumbs = views::crumbs(&rev, &path, true);
         let blame_href = crate::features::href_if(Feature::Blame, &format!("/blame/{r}/{pe}"));
@@ -211,6 +223,7 @@ pub(super) async fn blob(
             },
             rendered,
             outline_rail,
+            symbol_menu,
             head,
             crumbs,
             size: fmt::size(b.size),

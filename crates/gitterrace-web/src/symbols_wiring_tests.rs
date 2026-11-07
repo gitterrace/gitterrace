@@ -1,0 +1,77 @@
+//! The file page lists a source file's symbols in the "On this page" outline, each a link to a
+//! line the page shows.
+
+use gitterrace_config::Config;
+use gitterrace_testkit::{Fixture, page as get};
+
+use crate::wiring_tests::{router, with};
+
+const SOURCE: &str = "\
+pub struct Point;
+
+impl Point {
+    pub fn new() -> Self { Point }
+}
+
+pub fn distance() -> f64 { 0.0 }
+";
+
+/// The `href`s of the outline links on a page, in order, from each `[data-outline]` block.
+fn outline_links(body: &str) -> Vec<Vec<&str>> {
+    body.split("data-outline")
+        .skip(1)
+        .map(|block| {
+            let end = block.find("</ol>").unwrap_or(block.len());
+            block[..end]
+                .split("<a href=\"#")
+                .skip(1)
+                .filter_map(|a| a.split('"').next())
+                .collect()
+        })
+        .collect()
+}
+
+#[tokio::test]
+async fn a_source_page_outlines_its_symbols_as_rail_and_menu_linked_to_shown_lines() {
+    let dir = tempfile::tempdir().expect("tmp");
+    let p = Fixture::init(&dir.path().join("r"))
+        .write("src/geo.rs", SOURCE)
+        .write(
+            "notes.txt",
+            "fn not_code() {}\nfn still_not() {}\nfn nope() {}\n",
+        )
+        .commit("feat: geometry")
+        .path()
+        .to_owned();
+    let (status, body) = get(&router(&p, Config::default()), "/blob/HEAD/src/geo.rs").await;
+    assert_eq!(status, 200);
+    let want = ["L1", "L3", "L4", "L7"];
+    assert_eq!(outline_links(&body), [want, want], "rail and menu: {body}");
+    for id in want {
+        assert!(body.contains(&format!("id=\"{id}\"")), "{id} has no line");
+    }
+    assert!(body.contains("title=\"impl Point\""), "{body}");
+    assert!(body.contains("src=\"/static/outline.js\""));
+
+    // Lines past `limits.blob_lines` are not on the page, so their symbols are not listed.
+    let cut = router(&p, with(|c| c.limits.blob_lines = 4));
+    let (_, short) = get(&cut, "/blob/HEAD/src/geo.rs").await;
+    let short_want = ["L1", "L3", "L4"];
+    assert_eq!(outline_links(&short), [short_want, short_want]);
+
+    let (_, text) = get(&router(&p, Config::default()), "/blob/HEAD/notes.txt").await;
+    assert!(!text.contains("data-outline"), "plain text has no outline");
+}
+
+#[tokio::test]
+async fn a_source_file_with_too_few_symbols_has_no_outline() {
+    let dir = tempfile::tempdir().expect("tmp");
+    let p = Fixture::init(&dir.path().join("r"))
+        .write("a.py", "def one():\n    pass\n\ndef two():\n    pass\n")
+        .commit("feat: two")
+        .path()
+        .to_owned();
+    let (_, body) = get(&router(&p, Config::default()), "/blob/HEAD/a.py").await;
+    assert!(!body.contains("data-outline"), "two symbols: {body}");
+    assert!(!body.contains("outline-cols"), "{body}");
+}

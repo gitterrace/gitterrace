@@ -1,0 +1,236 @@
+//! The scanners against hand-checked sources: each case is a class of declaration a real
+//! parser lists (or does not) that a naive keyword scan gets wrong.
+
+use crate::symbols::{outline, symbols};
+
+/// `(line, name, depth)` of each symbol of `src` read as `path`.
+fn listed(path: &str, src: &str) -> Vec<(u32, String, u8)> {
+    symbols(path, src)
+        .into_iter()
+        .map(|s| (s.line, s.name, s.depth))
+        .collect()
+}
+
+fn names(path: &str, src: &str) -> Vec<String> {
+    listed(path, src).into_iter().map(|s| s.1).collect()
+}
+
+#[test]
+fn rust_items_impls_and_methods_are_listed_with_their_lines() {
+    let src = "\
+//! fn not_a_doc_item() {}
+pub struct Point { x: i32 }
+enum Shape { Dot }
+pub(crate) trait Area {
+    fn area(&self) -> f64;
+}
+impl<T: Clone> Area for Wrapper<T> where T: Copy {
+    fn area(&self) -> f64 { fn inner() {} 0.0 }
+}
+mod geo {
+    pub fn far() {}
+}
+macro_rules! square { ($x:expr) => { $x * $x }; }
+const S: &str = \"fn fake() {}\";
+fn r#match() {}
+";
+    assert_eq!(
+        listed("a.rs", src),
+        [
+            (2, "Point".into(), 0),
+            (3, "Shape".into(), 0),
+            (4, "Area".into(), 0),
+            (5, "area".into(), 1),
+            (7, "impl Area for Wrapper<T>".into(), 0),
+            (8, "area".into(), 1),
+            (10, "geo".into(), 0),
+            (11, "far".into(), 1),
+            (13, "square".into(), 0),
+            (15, "match".into(), 0),
+        ]
+    );
+}
+
+#[test]
+fn rust_impl_in_a_return_type_or_an_argument_is_not_an_impl_block() {
+    let src = "fn it() -> impl Iterator<Item = u8> { [].into_iter() }\n\
+               fn take(x: impl Fn()) {}\n";
+    assert_eq!(names("a.rs", src), ["it", "take"]);
+}
+
+#[test]
+fn rust_impl_headers_with_brackets_still_open_a_container() {
+    // `[u8]`, `[T; N]` and `Fn()` in the header must not cancel the body that follows.
+    let src = "\
+impl AsRef<[u8]> for B { fn as_ref(&self) -> &[u8] { &[] } }
+impl<T, const N: usize> S for [T; N] { fn s() {} }
+impl<F> W<F> where F: Fn() -> u8 { fn w() {} }
+";
+    let got = listed("a.rs", src);
+    let methods: Vec<_> = got
+        .iter()
+        .filter(|s| s.2 == 1)
+        .map(|s| s.1.as_str())
+        .collect();
+    assert_eq!(methods, ["as_ref", "s", "w"]);
+}
+
+#[test]
+fn rust_raw_strings_chars_and_lifetimes_hide_nothing() {
+    let src = "\
+const A: &str = r#\"\" fn in_raw() {} \"#;
+const B: char = '{';
+fn life<'a>(x: &'a str) -> &'a str { x }
+const C: &[u8] = b\"fn in_bytes() {}\";
+fn after() {}
+";
+    assert_eq!(names("a.rs", src), ["life", "after"]);
+}
+
+#[test]
+fn go_functions_methods_and_types_are_listed() {
+    let src = "\
+package p
+type (
+\tA struct{ f func() int }
+\tB = int
+)
+type C interface{ M() }
+func F() {}
+func (c *C) M() {}
+func (g G[T]) N() {}
+func (fd *netFD) addr() func(int) error { return nil }
+var s = `func Fake() {}`
+";
+    assert_eq!(
+        names("a.go", src),
+        ["A", "B", "C", "F", "C.M", "G.N", "netFD.addr"]
+    );
+}
+
+#[test]
+fn python_lists_defs_and_classes_but_not_nested_functions_or_strings() {
+    let src = "\
+import os
+class A(Base):
+    \"\"\"def not_a_def(): pass\"\"\"
+    def m(self):
+        def helper(): pass
+        return 1
+    async def am(self): pass
+def f(x,
+      y): pass
+x = '''
+def in_string(): pass
+'''
+if os.name == \"nt\":
+    def windows(): pass
+try:
+    from fast import Thing
+except ImportError:
+    class Thing:
+        def __init__(self): pass
+";
+    assert_eq!(
+        listed("a.py", src),
+        [
+            (2, "A".into(), 0),
+            (4, "m".into(), 1),
+            (7, "am".into(), 1),
+            (8, "f".into(), 0),
+            (14, "windows".into(), 0),
+            (18, "Thing".into(), 0),
+            (19, "__init__".into(), 1),
+        ]
+    );
+}
+
+#[test]
+fn typescript_declarations_and_class_members_are_listed() {
+    let src = "\
+export interface Opts { a: number }
+export type Id<T> = T;
+enum E { A }
+export abstract class Box<T extends { k: 1 }> extends Base<T> implements I {
+  #secret = 1;
+  private readonly x: number = 2;
+  static async make(): Promise<Box<number>> { return null!; }
+  get size(): number { return 1; }
+  [Symbol.dispose](): void {}
+  constructor(private y: number) { super(); }
+  abstract get id(): string;
+  run = () => { function inner() {} };
+}
+export function top<T>(x: T): T { return x; }
+const arrow = async (a: number): Promise<void> => {};
+const typed: () => number = () => 1;
+const notFn = compute(1);
+declare global { interface Window { x: 1 } }
+";
+    assert_eq!(
+        names("a.ts", src),
+        [
+            "Opts",
+            "Id",
+            "E",
+            "Box",
+            "make",
+            "size",
+            "[Symbol.dispose]",
+            "constructor",
+            "id",
+            "top",
+            "arrow",
+            "typed",
+            "global",
+            "Window",
+        ]
+    );
+}
+
+#[test]
+fn script_regex_and_template_literals_hide_nothing() {
+    let src = "\
+const re = /function fake() {}/g;
+const t = `class Fake { ${ (() => { return 1; })() } }`;
+function real() { return 6 / 2 / 1; }
+";
+    assert_eq!(names("a.js", src), ["real"]);
+}
+
+#[test]
+fn javascript_class_expressions_and_declarator_lists_are_listed() {
+    let src = "\
+var a = 1, B = class extends A {
+  m() {}
+}, c = (x) => x;
+const mixin = (S) => class Mixin extends S { n() {} };
+module.exports.f = function f() {};
+const TYPE = <const> { ALL: 0 };
+";
+    assert_eq!(names("a.js", src), ["B", "m", "c", "mixin"]);
+}
+
+#[test]
+fn files_in_other_languages_have_no_symbols() {
+    assert!(symbols("a.c", "int main() { return 0; }\n").is_empty());
+    assert!(symbols("notes.txt", "fn main() {}\n").is_empty());
+}
+
+#[test]
+fn the_outline_links_each_symbol_to_its_line_and_stops_at_the_shown_lines() {
+    let src = "struct A;\nimpl A {\n    fn b() {}\n}\nfn c() {}\n";
+    let items = outline("a.rs", src, 4);
+    let got: Vec<_> = items
+        .iter()
+        .map(|i| (i.level, i.id.as_str(), i.text.as_str(), i.chrome))
+        .collect();
+    assert_eq!(
+        got,
+        [
+            (2, "L1", "A", true),
+            (2, "L2", "impl A", true),
+            (3, "L3", "b", true)
+        ]
+    );
+}
