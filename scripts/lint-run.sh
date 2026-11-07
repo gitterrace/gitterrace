@@ -102,9 +102,10 @@ run schwarzwald-copy "$py" "install python 3.11" "$py" "$sw"/check.py
 run internal-refs "$py" "install python 3.11" "$py" "$sw"/lint/internal-refs.py
 run personal-data "$py" "install python 3.11" "$py" "$sw"/lint/personal-data.py
 run own-shas "$py" "install python 3.11" "$py" "$sw"/lint/own-shas.py
+run docs-a11y "$py" "install python 3.11" "$py" "$sw"/lint/docs-a11y.py --repo .
 run lint-red "$py" "install python 3.11" "$py" "$sw"/lint/red.py --repo .
 run commit-msg-hook bash "install bash" bash "$sw"/hooks/commit-msg_test.sh
-run commit-msg-shim bash "install bash" env HOOK=scripts/hooks/commit-msg bash "$sw"/hooks/commit-msg_test.sh
+run commit-msg-shim bash "install bash" env HOOK="$PWD/scripts/hooks/commit-msg" bash "$sw"/hooks/commit-msg_test.sh
 run guards bash "install bash" bash "$sw"/guards/tests/suite.sh
 
 [ "$fails" -eq 0 ] || {

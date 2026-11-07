@@ -16,3 +16,10 @@ exclude = ["shared/*", "target/*", "*/static/vendor/*", ".wt/*"]
 [commit]
 types = ["feat", "fix", "docs", "style", "refactor", "perf", "test", "build", "ci", "chore", "revert"]
 allow_prefix = "GITTERRACE_"
+
+[a11y]
+# README.md opens with a raw html h1 (a picture header) that the markdown-only lint cannot see,
+# so it is out of scope here. known stays empty: the red runner copies this file into its green
+# case, where any entry reads as stale.
+docs = ["docs/**.md"]
+known = []
