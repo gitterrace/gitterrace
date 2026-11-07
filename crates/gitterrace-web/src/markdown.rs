@@ -332,23 +332,14 @@ pub(crate) fn render_doc(src: &str, base: Base) -> Doc {
 #[cfg(test)]
 mod tests {
     fn render(src: &str) -> String {
-        let base = Base {
-            rev: "HEAD".to_owned(),
-            dir: String::new(),
-            highlight_bytes: crate::highlight::HIGHLIGHT_BYTES,
-        };
+        let base = Base::new("HEAD", "");
         render_with(src, base)
     }
 
     use crate::markdown::{Base, render_with, resolve_path, rewrite_url, slugify};
 
     fn at(src: &str, dir: &str) -> String {
-        let base = Base {
-            rev: "abc123".to_owned(),
-            dir: dir.to_owned(),
-            highlight_bytes: crate::highlight::HIGHLIGHT_BYTES,
-        };
-        render_with(src, base)
+        render_with(src, Base::new("abc123", dir))
     }
 
     #[test]
