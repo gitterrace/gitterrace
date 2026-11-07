@@ -52,7 +52,16 @@ so it lives beside the history and is built from the same repository.
 
 - Not a host. There is nothing to sign in to and no network it needs.
 - Not a replacement for git or your editor. It is a place to read.
-- Not a terminal UI. For that, use lazygit, tig or gitui.
+
+## Compared with
+
+- A code host's web view: similar pages, but only for what was pushed there. gitterrace
+  reads the clone on your disk, including branches and worktrees nobody pushed.
+- gitk, tig, lazygit and gitui: a desktop window or a terminal, and most of them also stage
+  and commit. gitterrace runs in a browser and only reads.
+- A self-hosted code server: a service to install and keep running. gitterrace is one binary
+  you start in a repository and stop when you are done.
+- Your editor's git view: part of that editor. gitterrace works beside any of them.
 
 ## How it is made
 

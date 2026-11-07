@@ -49,6 +49,8 @@ pub(crate) fn install_tabs(ws: &Workspace) -> String {
 pub(crate) const SAFETY: &str = "What it does with your code";
 /// The section that closes the page, after the rest of `docs/why.md`.
 pub(crate) const MADE: &str = "How it is made";
+/// The section shown on its own after "Why": how gitterrace differs from tools a reader knows.
+pub(crate) const COMPARED: &str = "Compared with";
 /// The folder under `.git/` the cache lives in (`Index::open`). The files in it are
 /// `CACHE_FILES`, so the prose may name only those.
 const CACHE_DIR: &str = ".git/gitterrace/";
@@ -68,7 +70,7 @@ pub(crate) fn split_why(why: &str) -> (&str, Vec<(&str, &str)>) {
 pub(crate) fn why_body(sections: &[(&str, &str)]) -> String {
     let mut s = String::new();
     for (title, body) in sections {
-        if ![SAFETY, MADE].contains(title) {
+        if ![SAFETY, COMPARED, MADE].contains(title) {
             let _ = write!(s, "\n### {title}\n{body}\n");
         }
     }

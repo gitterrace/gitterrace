@@ -19,8 +19,8 @@ pub use landing::SHOTS;
 #[cfg(test)]
 use landing::shot_html;
 use landing::{
-    MADE, SAFETY, check_facts, commands, features, gallery, install_tabs, md, section, site_links,
-    split_why, why_body,
+    COMPARED, MADE, SAFETY, check_facts, commands, features, gallery, install_tabs, md, section,
+    site_links, split_why, why_body,
 };
 use shots::check_shots;
 #[cfg(test)]
@@ -204,6 +204,11 @@ pub fn render(root: &Path, ws: &Workspace) -> Result<Vec<Out>> {
         "<section>\n<h2>Why</h2>\n{}{}</section>\n",
         md(lead),
         md(&site_links(&why_body(&sections), repo))
+    );
+    let _ = write!(
+        h,
+        "<section>\n<h2>{COMPARED}</h2>\n{}</section>\n",
+        md(section(&sections, COMPARED)?)
     );
     let _ = write!(
         h,
