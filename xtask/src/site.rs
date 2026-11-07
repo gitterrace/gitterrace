@@ -45,6 +45,10 @@ const PAGE_CSS: &str = "\
 body{margin:0;background:var(--bg);color:var(--fg);font:var(--text-md)/var(--leading) var(--sans)}
 main{max-width:760px;margin:0 auto;padding:var(--space-8) var(--page-pad) var(--space-16)}
 a{color:var(--accent-ink)}
+main:focus{outline:none}
+.skip{position:absolute;left:var(--space-2);top:-100px;padding:var(--space-2) var(--space-3)}
+.skip{background:var(--bg);border:var(--border);border-radius:var(--radius);z-index:20}
+.skip:focus{top:var(--space-2)}
 h1,h2{font-family:var(--serif);line-height:var(--leading-tight);font-weight:var(--weight-semibold)}
 h2{font-size:var(--text-xl);margin:var(--space-16) 0 var(--space-3)}
 h3{font-size:var(--text-lg);margin:var(--space-8) 0 var(--space-2)}
@@ -122,7 +126,7 @@ fn head(name: &str, desc: &str, home: &str) -> String {
          <meta name=\"twitter:card\" content=\"summary_large_image\">\n\
          <link rel=\"icon\" type=\"image/svg+xml\" href=\"assets/mark.svg\">\n\
          <link rel=\"apple-touch-icon\" href=\"assets/apple-touch-icon.png\">\n\
-         <link rel=\"stylesheet\" href=\"assets/site.css\">\n<script>{THEME_INIT_JS}</script>\n</head>\n<body>\n<main>\n",
+         <link rel=\"stylesheet\" href=\"assets/site.css\">\n<script>{THEME_INIT_JS}</script>\n</head>\n{BODY_OPEN}",
         name = esc(name),
         desc = esc(desc),
         home = esc(home),
@@ -234,6 +238,11 @@ pub fn render(root: &Path, ws: &Workspace) -> Result<Vec<Out>> {
     Ok(outs)
 }
 
+/// Every page opens its body the same way: a skip link as the first Tab stop, then the main
+/// landmark it targets. `tabindex="-1"` lets the browser move focus there, not only scroll.
+pub(crate) const BODY_OPEN: &str = "<body>\n<a class=\"skip\" href=\"#main\">Skip to content</a>\n\
+                                    <main id=\"main\" tabindex=\"-1\">\n";
+
 /// The one script on the page: Escape closes an open screenshot by going back to `#features`,
 /// the same place a click on the overlay leads. Everything else works without it.
 const LIGHTBOX_JS: &str = "addEventListener('keydown',function(e){if(e.key==='Escape'&&location.hash.indexOf('#shot-')===0)location.hash='features'})";
@@ -307,7 +316,7 @@ fn host_files(home: &str, repo: &str, name: &str, pages: &[String]) -> Vec<Out> 
          <meta name=\"color-scheme\" content=\"light dark\">\n\
          <meta name=\"robots\" content=\"noindex\">\n<title>Not found - {n}</title>\n\
          <link rel=\"icon\" type=\"image/svg+xml\" href=\"/assets/mark.svg\">\n\
-         <link rel=\"stylesheet\" href=\"/assets/site.css\">\n</head>\n<body>\n<main>\n\
+         <link rel=\"stylesheet\" href=\"/assets/site.css\">\n</head>\n{BODY_OPEN}\
          <h1>Not found</h1>\n<p>There is no page here. <a href=\"/\">Back to {n}</a>.</p>\n\
          </main>\n</body>\n</html>\n",
         n = esc(name)

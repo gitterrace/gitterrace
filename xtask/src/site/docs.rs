@@ -14,7 +14,7 @@ use pulldown_cmark::{CowStr, Event, HeadingLevel, Options, Parser, Tag, TagEnd, 
 use crate::docs_index::{normalize, on_site};
 use crate::out::Out;
 use crate::site::changelog;
-use crate::site::{THEME_INIT_JS, esc};
+use crate::site::{BODY_OPEN, THEME_INIT_JS, esc};
 
 pub(super) const CHANGELOG: &str = "CHANGELOG.md";
 
@@ -210,7 +210,7 @@ pub(super) fn shell(site: &Site, title: &str, path: &str, inner: &str, foot: &st
          <title>{t} - {s}</title>\n<link rel=\"canonical\" href=\"{home}/{path}\">\n\
          <link rel=\"icon\" type=\"image/svg+xml\" href=\"/assets/mark.svg\">\n\
          <link rel=\"stylesheet\" href=\"/assets/site.css\">\n\
-         <script>{THEME_INIT_JS}</script>\n</head>\n<body>\n<main>\n\
+         <script>{THEME_INIT_JS}</script>\n</head>\n{BODY_OPEN}\
          <p><a href=\"/\">{s}</a> / <a href=\"/docs/\">Docs</a></p>\n{inner}{footer}\
          </main>\n</body>\n</html>\n",
         t = esc(title),
