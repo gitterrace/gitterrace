@@ -12,6 +12,7 @@ mod charttip;
 mod commit_line;
 mod commit_types;
 mod compare;
+mod delta;
 mod dochead;
 mod empty;
 mod error;

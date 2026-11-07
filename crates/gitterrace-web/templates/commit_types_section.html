@@ -1,4 +1,4 @@
-<section class="fold" id="types">
+{%- import "_delta.html" as deltas -%}<section class="fold" id="types">
 <h2 class="fold-h">Commit types</h2>
 {% if commits_total > 0 %}
 <div class="kpis">{% for k in kpis %}<div><b>{{ k.1 }}</b><span>{{ k.0 }}</span></div>{% endfor %}</div>
@@ -20,7 +20,7 @@
 {% for g in groups %}
 <div class="chart-head"><div><h2>{{ g.title }}</h2><p class="hint">{{ g.hint }}</p></div></div>
 <div class="card"><table class="entries">
-{% for r in g.rows %}<tr><td class="fill"><div class="bar w{{ r.pct }}"></div><a href="{{ r.href }}">{{ r.label }}</a></td><td class="r">{{ r.commits }}</td>{% if g.lines %}<td class="r"><b class="add">+{{ r.additions }}</b> <b class="del">-{{ r.deletions }}</b></td>{% endif %}</tr>{% endfor %}
+{% for r in g.rows %}<tr><td class="fill"><div class="bar w{{ r.pct }}"></div><a href="{{ r.href }}">{{ r.label }}</a></td><td class="r">{{ r.commits }}</td>{% if g.lines %}<td class="r">{% call deltas::delta(r.additions, r.deletions) %}{% endcall %}</td>{% endif %}</tr>{% endfor %}
 </table></div>
 {% endfor %}
 <div class="chart-head" id="commits"><div><h2>Commits</h2><p class="hint">{{ commits_total }} matching, newest first.</p></div></div>

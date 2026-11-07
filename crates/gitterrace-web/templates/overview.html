@@ -1,4 +1,5 @@
 {% extends "_base.html" %}
+{%- import "_delta.html" as deltas -%}
 {%- import "_avatar.html" as avatars -%}
 {% block content %}
 <div class="cols{% if no_side %} wide{% endif %}">
@@ -13,7 +14,7 @@
 {% if let Some(t) = totals %}
 {{ side|safe }}
 <section class="side"><h3>All time</h3>
-<p class="facts"><span><b>{{ t.commits }}</b> {{ t.commits_noun }}</span>{% if !t.merges.is_empty() %} <span class="muted" data-tip="All commits, merges included. Insights leave merges out, since a merge repeats its branch.">{{ t.merges }}</span>{% endif %} <span><b>{{ t.authors }}</b> {{ t.authors_noun }}</span> <span><b>{{ t.files }}</b> {{ t.files_noun }}</span> <span><b class="add">+{{ t.additions }}</b> <b class="del">-{{ t.deletions }}</b> {{ t.lines_noun }}</span></p></section>
+<p class="facts"><span><b>{{ t.commits }}</b> {{ t.commits_noun }}</span>{% if !t.merges.is_empty() %} <span class="muted" data-tip="All commits, merges included. Insights leave merges out, since a merge repeats its branch.">{{ t.merges }}</span>{% endif %} <span><b>{{ t.authors }}</b> {{ t.authors_noun }}</span> <span><b>{{ t.files }}</b> {{ t.files_noun }}</span> <span>{% call deltas::delta(t.additions, t.deletions) %}{% endcall %} {{ t.lines_noun }}</span></p></section>
 {% else %}
 <section class="side progress" data-progress><h3>Indexing history</h3><div class="bar"><progress max="100" value="0"></progress><b class="pct">0%</b></div><p class="muted">Insights fill in when the index is ready.</p></section>
 {% endif %}

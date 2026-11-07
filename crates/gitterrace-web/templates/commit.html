@@ -1,4 +1,5 @@
 {% extends "_base.html" %}
+{%- import "_delta.html" as deltas -%}
 {% block title %}{{ subject }} · {{ c.name }}{% endblock %}
 {% block content %}
 <div class="head"><h1>{{ subject }}</h1></div>
@@ -7,7 +8,7 @@
 · <a href="{{ c.base }}/tree/{{ id }}">Browse files</a></p>
 {% if !body.is_empty() %}<pre class="body">{{ body }}</pre>{% endif %}
 {% if !lookups.is_empty() %}<p class="meta lookups">Find this commit in {% for (label, url) in lookups %}{% if !loop.first %} · {% endif %}<a href="{{ url }}" rel="noopener noreferrer">{{ label }}</a>{% endfor %}</p>
-{% endif %}<details class="card files" open><summary>{{ files_summary }}<span class="counts"><b class="add">+{{ total_add }}</b> <b class="del">-{{ total_del }}</b></span></summary>
-<ul>{% for f in files %}<li><a href="#{{ f.anchor }}">{{ f.label }}</a><span class="counts"><b class="add">+{{ f.additions }}</b> <b class="del">-{{ f.deletions }}</b></span></li>{% endfor %}</ul></details>
+{% endif %}<details class="card files" open><summary>{{ files_summary }}<span class="counts">{% call deltas::delta(total_add, total_del) %}{% endcall %}</span></summary>
+<ul>{% for f in files %}<li><a href="#{{ f.anchor }}">{{ f.label }}</a><span class="counts">{% call deltas::delta(f.additions, f.deletions) %}{% endcall %}</span></li>{% endfor %}</ul></details>
 {{ diff|safe }}
 {% endblock %}

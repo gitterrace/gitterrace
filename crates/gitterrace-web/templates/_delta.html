@@ -1,0 +1,5 @@
+{#- Lines added and removed, `+a -d` in their colours. The one place a template writes them;
+    `delta.rs` writes the same markup for pages built in Rust. -#}
+{% macro delta(add, del) -%}
+<b class="add">+{{ add }}</b> <b class="del">-{{ del }}</b>
+{%- endmacro %}
