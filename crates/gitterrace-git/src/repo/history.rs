@@ -58,6 +58,26 @@ impl Repo {
         Ok(out)
     }
 
+    /// The first `limit` commits [`Self::log`] lists without a path, in its order, as
+    /// `(id, parents)`. Reads commit headers only, so the graph can look past the page for the
+    /// parents its lines run to at little cost.
+    pub fn parents(&self, rev: &str, limit: usize) -> Result<Vec<(String, Vec<String>)>> {
+        let repo = self.repo();
+        let tip = self.resolve_id(&repo, rev)?;
+        let walk = repo
+            .rev_walk([tip])
+            .sorting(Sorting::ByCommitTime(CommitTimeOrder::NewestFirst))
+            .all()
+            .map_err(git)?;
+        let mut out = Vec::new();
+        for info in walk.take(limit) {
+            let info = info.map_err(git)?;
+            let parents = info.parent_ids.iter().map(ToString::to_string).collect();
+            out.push((info.id.to_string(), parents));
+        }
+        Ok(out)
+    }
+
     /// The ids [`Self::log`] with `path` lists, in its order, from `history`: every commit
     /// reachable from the tip (tip first) as `(id, parents, touched)`. `touched` must be true
     /// for every commit whose first-parent diff touches `path` (the index knows). The others
