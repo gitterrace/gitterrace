@@ -28,6 +28,7 @@ import config  # noqa: E402
 
 RULE = "CONV-DOCS-A11Y"
 FENCE = re.compile(r"^ {0,3}(`{3,}|~{3,})\s*(.*)$")
+HTML_H = re.compile(r"^\s*<h([1-6])\b", re.I)
 HEADING = re.compile(r"^ {0,3}(#{1,6})(?:\s+(.*?))?\s*#*\s*$")
 IMAGE = re.compile(r"!\[([^\]]*)\]\(([^)\s]*)[^)]*\)")
 HTML_IMG = re.compile(r"<img\b[^>]*>", re.I)
@@ -90,8 +91,9 @@ def scan(path: str, body: str, h1_required: bool = True) -> list[str]:
                 bad.append(f"{path}:{n}: a fenced code block with no language")
             continue
         h = HEADING.match(line)
-        if h:
-            level = len(h.group(1))
+        hh = HTML_H.match(line)
+        if h or hh:
+            level = len(h.group(1)) if h else int(hh.group(1))
             if level == 1:
                 h1s.append(n)
             if level > prev + 1:
@@ -133,6 +135,7 @@ def self_test() -> bool:
         "placeholder alt": f"{page}\n![screenshot](a.png)\n",
         "html empty alt": f'{page}\n<img src="a.png" alt="">\n',
         "link here": f"{page}\nSee [here](x.md).\n",
+        "link this": f"{page}\nSee [this link](x.md).\n",
         "link click here": f"{page}\n[Click here](x.md)\n",
         "link bare url": f"{page}\n[https://example.invalid/a](https://example.invalid/a)\n",
         "autolink": f"{page}\n<https://example.invalid/a>\n",
@@ -148,6 +151,7 @@ def self_test() -> bool:
         "code span": f"{page}\nThe syntax is `[here](x)`.\n",
         "html alt": f'{page}\n<img src="a.png" alt="Graph of load over a day">\n',
         "no heading at all": "just text\n",
+        "an html h1": '<h1 align="center"><picture><img src="l.svg" alt="The tendir logo"></picture></h1>\n\n## A\n',
         "a frontmatter title is the h1": "---\ntitle: T\ndescription: d\n---\n\ntext\n\n## A\n",
     }
     for why, body in must_hit.items():

@@ -8,6 +8,7 @@
 set -euo pipefail
 unset GIT_DIR GIT_INDEX_FILE GIT_WORK_TREE GIT_PREFIX GIT_COMMON_DIR LAND_TOOL
 HOOK="${HOOK:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/pre-commit}"
+HOOK="$(cd "$(dirname "${HOOK}")" && pwd)/$(basename "${HOOK}")"  # absolute: the cases cd away
 . "$(dirname "${BASH_SOURCE[0]}")/../tools/test-sandbox.sh"
 sandbox_make pre-commit-test
 sandbox_enter --multi

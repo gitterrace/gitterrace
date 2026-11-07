@@ -18,8 +18,5 @@ types = ["feat", "fix", "docs", "style", "refactor", "perf", "test", "build", "c
 allow_prefix = "GITTERRACE_"
 
 [a11y]
-# README.md opens with a raw html h1 (a picture header) that the markdown-only lint cannot see,
-# so it is out of scope here. known stays empty: the red runner copies this file into its green
-# case, where any entry reads as stale.
-docs = ["docs/**.md"]
+docs = ["README.md", "CONTRIBUTING.md", "SECURITY.md", "docs/**.md"]
 known = []

@@ -1,7 +1,7 @@
 {
   "schwarzwald": null,
   "dirty": true,
-  "date": "2026-11-06T14:35:33Z",
+  "date": "2026-11-06T14:44:17Z",
   "parts": [
     "fonts",
     "guards",
@@ -13,7 +13,7 @@
     "tools"
   ],
   "files": {
-    "README.md": "0af4a168f7c09d80c7873482b9593180b4e9c4f84db16b7c39fa4d3f82e81381",
+    "README.md": "61ebc0e05579cdaf956105cddc0cfb6ae367b4895f4f7754cda1d88387b90562",
     "check.py": "521d3f8928d8a779688264aa380f1155efe6d9c98792fb80e0a65cc0e3bc792d",
     "fonts/bricolage-grotesque/OFL.txt": "923f4ddf0fd39f9b7794ab0df7332f3d95dc43e8ad7ec2289d6d9e8491177f51",
     "fonts/bricolage-grotesque/bricolage-grotesque-latin-wght-normal.woff2": "a97804dc9fbe5fc972a08018c5eda4dab7ef2346f64c57e61419d05e6de4ea1c",
@@ -59,12 +59,12 @@
     "guards/tests/suite.sh": "82483c03993d3a6e41e59895c3f4bb4daf066f44387159b7e9dc9f81f73f4dfc",
     "guards/tests/wiring.sh": "1f43548ef25d745f254bf2f030a101612ba787cc2d80647ee58d72828241e91b",
     "hooks/commit-msg": "a953a5ed27a8c26b6e23a185e8def003bd6df59f9946aac383e1bc2d57c2f8f3",
-    "hooks/commit-msg_test.sh": "a6ffe593c1d5e3330867f9eaeb470c2b857e87a1f08c2c32b12ea8cd7d92a1c0",
+    "hooks/commit-msg_test.sh": "ff13f1a56111ae44377f4de2ee6478bcad846a24744e910d11d70a795a762236",
     "hooks/pre-commit": "2a8b061e8bb6c3b1ab843ff21711376de40129ae153227b4d820bb375efb805a",
-    "hooks/pre-commit_test.sh": "11b0ec378607c1e04a83092157ef6fa1fa71e2685e3ed8388e46e6e2af83cff3",
+    "hooks/pre-commit_test.sh": "ade631452d596bfe28b51263f6ce4ffa9b5adfb0f3ecf126b932764989e02e58",
     "lint/commit-subject.py": "df19f440e5c348f78e14d58007d74e7498a85e7bef80583cbd1e50e0ad6569b0",
     "lint/config.example.toml": "f384430d2518c70fce45a3fe8a72487b40cf6509ec5ae20585561e1d2517cc48",
-    "lint/docs-a11y.py": "04b8bd76293d647b7be4f121cbfee2a99d8bfbeb37fc01be730a863942404678",
+    "lint/docs-a11y.py": "511a27709ad81db5735661b88ad6f25ca34ed0d1ee777ca804057ae9d89dcbaa",
     "lint/internal-refs.py": "ec7202be88f0daef3949a3d77fbe1ffa239e775457eaba83c63d3ce5a1322490",
     "lint/lib/config.py": "f6ce8b565fbbd15904fa938cd2b4d78ff7bcccd702a7bbfe9e9862760e6c218e",
     "lint/own-shas.py": "168a7fb49a3c4e801851146e5cb1d14989e8beb23b7a757b0175b6f057909bb3",
@@ -94,7 +94,7 @@
     "lint/red-cases/own-shas/red/a.md": "1a53f857ee44bebdecbb38fc3d69ba1479241654a35c64ab89cdb90d076e0015",
     "lint/red-cases/personal-data/green/a.rs": "c6a1ce20349767458c009c7e638e40cfd3c484e154e6ccc4f19fe8d8a7cf2f2a",
     "lint/red-cases/personal-data/red/a.rs": "4bcce6cf3deae7c32475cd87b2f66f5074e51aae957be1be74689b6ddd7aeb61",
-    "lint/red.py": "7a5be181fcd2804f6f2d8453e0b2ca4833d37526f6cb58c4836c129184b5c8c3",
+    "lint/red.py": "dee0a8bb4bdaf971233bb2457db6cafb3156f22114d40e22bbb2ca3eba0c2c68",
     "rules/deny.toml": "402e46b1d95c9f0dcb4369bcd8e2e91fee1aef1baab09dec8a4e3fa0560b40ab",
     "rules/rules.md": "e7de635cdf45b9de355cd06fd297024b1ef5340df07e1daa22e77a27d70c5e83",
     "rust/Cargo.toml": "0f6172d29dcc617d28d6fd8efe50c27feb0536041373a3b5dfabe7e5ae8a3f6e",

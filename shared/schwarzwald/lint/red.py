@@ -13,6 +13,7 @@ rest as the tree. A rule that passes its red case is a dead guard.
 from __future__ import annotations
 
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -45,7 +46,10 @@ def run_case(rule: str, case: Path, product: Path | None) -> int:
         shutil.copytree(case, root, dirs_exist_ok=True)
         if product and (product / "config/schwarzwald/lint.toml").exists() and not (root / "config").exists():
             (root / "config/schwarzwald").mkdir(parents=True)
-            shutil.copy(product / "config/schwarzwald/lint.toml", root / "config/schwarzwald/lint.toml")
+            # A product's known-problem lists name its own files, which a case does not have.
+            text = (product / "config/schwarzwald/lint.toml").read_text(encoding="utf-8")
+            text = re.sub(r"(?ms)^known\s*=\s*\[.*?\]\s*$", "", text)
+            (root / "config/schwarzwald/lint.toml").write_text(text, encoding="utf-8")
         git(root, "add", "-A")
         git(root, "-c", "user.name=t", "-c", "user.email=t@example.invalid", "commit", "-qm", "case")
         old = root / "stale-denylist.marker"  # marker: the case wants a stale .personal-denylist
