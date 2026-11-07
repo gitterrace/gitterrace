@@ -106,7 +106,6 @@
     "scripts/stubs-check.py": 1,
     "scripts/tests-check.py": 1,
     "scripts/theme-gen.py": 1,
-    "scripts/theme-logo-gen.py": 1,
     "scripts/theme-tagline-gen.py": 2,
     "site/assets/site.css": 24,
     "site/changelog/index.html": 3,

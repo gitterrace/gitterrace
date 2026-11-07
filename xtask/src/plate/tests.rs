@@ -47,3 +47,41 @@ fn tree_matches_generator_and_a_changed_color_is_stale() {
     let red = apply(&root, outs(&root, "#ff0000").expect("outs"), Mode::Check).expect("check");
     assert_eq!(red.len(), 3, "every plated file must notice: {red:?}");
 }
+
+/// Every path the script `scripts/theme-logo-gen.py` writes, as it lists them.
+fn script_outputs() -> Vec<String> {
+    let root = crate::repo_root();
+    let run = std::process::Command::new("python3")
+        .args(["scripts/theme-logo-gen.py", "--list-outputs"])
+        .current_dir(root)
+        .output()
+        .expect("run scripts/theme-logo-gen.py");
+    assert!(run.status.success(), "--list-outputs failed");
+    String::from_utf8(run.stdout)
+        .expect("utf8")
+        .lines()
+        .map(str::to_string)
+        .collect()
+}
+
+/// A file is written by one generator. Two writers with different output leave whichever ran
+/// last in place, so the other one's check fails.
+#[test]
+fn no_file_has_two_writers() {
+    let root = crate::repo_root();
+    let ours: Vec<String> = outs(&root, PLATE_COLOR)
+        .expect("outs")
+        .iter()
+        .map(|o| match o {
+            Out::File { path, .. } | Out::Bytes { path, .. } | Out::Block { path, .. } => {
+                path.clone()
+            }
+        })
+        .collect();
+    let theirs = script_outputs();
+    let both: Vec<&String> = theirs.iter().filter(|p| ours.contains(p)).collect();
+    assert!(
+        both.is_empty(),
+        "written by xtask and by theme-logo-gen.py: {both:?}"
+    );
+}

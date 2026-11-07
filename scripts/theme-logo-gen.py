@@ -8,7 +8,7 @@ mark alone, for each theme:
     logo-{light,dark}.svg   mark and wordmark, cropped
     mark-{light,dark}.svg   the mark alone, square
 
-    python3 scripts/theme-logo-gen.py [--check]
+    python3 scripts/theme-logo-gen.py [--check | --list-outputs]
 
 `make theme` runs the check, so the logos cannot drift from the headers.
 """
@@ -19,7 +19,6 @@ import math
 import re
 import sys
 from pathlib import Path
-from urllib.parse import quote as urlquote
 
 ROOT = Path(__file__).resolve().parent.parent
 BRAND = ROOT / "docs/brand"
@@ -105,31 +104,6 @@ def app_logo() -> str:
     )
 
 
-def quote(svg: str) -> str:
-    """Percent-encode an SVG for a data: URL, keeping it readable (spaces, slashes, colons)."""
-    return urlquote(svg, safe=" /:=;,.-()'")
-
-
-def favicon() -> str:
-    """The tab icon: the outline at half scale with square corners, so every edge lands on a
-    whole pixel at 16 px, light ink by default and dark ink under a dark scheme."""
-    top, bottom = halves(0.5, round_=False)
-    return (
-        '<svg xmlns="http://www.w3.org/2000/svg" role="img" aria-label="gitterrace" '
-        f'viewBox="0 0 16 16" width="16" height="16"><title>gitterrace</title>{style()}'
-        f'<path class="i" d="{top}"/><path class="a" d="{bottom}"/></svg>'
-    )
-
-
-def style() -> str:
-    """Ink and accent classes that follow the system colour scheme."""
-    (li, la), (di, da) = INKS["light"], INKS["dark"]
-    return (
-        f"<style>.i{{fill:{li}}}.a{{fill:{la}}}"
-        f"@media (prefers-color-scheme:dark){{.i{{fill:{di}}}.a{{fill:{da}}}}}</style>"
-    )
-
-
 def contrast(a: str, b: str) -> float:
     """WCAG contrast ratio of two #rrggbb colours."""
 
@@ -178,22 +152,14 @@ def build(header: str) -> dict[str, str]:
     return {"logo": logo, "mark": square}
 
 
-def adaptive(light: str) -> str:
-    """The mark for the site's icon: light ink by default, dark ink under a dark scheme. A
-    tab bar follows the system theme, and one fixed ink vanishes on one of them (dark stem on
-    a dark tab bar measured 1.09:1)."""
-    (li, la), body = INKS["light"], find(r"<g>.*</g>", light, re.S).group(0)
-    body = body.replace(f'fill="{li}"', 'class="i"').replace(
-        f'fill="{la}"', 'class="a"'
-    )
-    return (
-        '<svg xmlns="http://www.w3.org/2000/svg" role="img" aria-label="gitterrace" '
-        f'viewBox="0 0 32 32" width="32" height="32"><title>gitterrace</title>{style()}{body}</svg>\n'
-    )
+LISTING = "--list-outputs" in sys.argv
 
 
 def sync(path: Path, text: str, check: bool, stale: list[Path]) -> None:
     """Write `text` to `path`, or under --check record the path when it differs."""
+    if LISTING:
+        print(path.relative_to(ROOT))
+        return
     if path.exists() and path.read_text() == text:
         return
     if check:
@@ -206,7 +172,6 @@ def sync(path: Path, text: str, check: bool, stale: list[Path]) -> None:
 def main() -> int:
     check = "--check" in sys.argv
     stale: list[Path] = []
-    marks: dict[str, str] = {}
     for theme in ("light", "dark"):
         path = BRAND / f"readme-header-{theme}.svg"
         header = path.read_text()
@@ -215,20 +180,17 @@ def main() -> int:
         header = MARK_GROUP.sub(lambda _: mark_group(theme), header, count=1)  # noqa: B023
         sync(path, header, check, stale)
         built = build(header)
-        marks[theme] = built["mark"]
         for name, svg in built.items():
             sync(BRAND / f"{name}-{theme}.svg", svg, check, stale)
-    sync(BRAND / "mark.svg", adaptive(marks["light"]), check, stale)
-    # The app inlines its favicon (the CSP refuses a separate request-free icon otherwise),
-    # so the one include every page head uses carries exactly this SVG.
+    # docs/brand/mark.svg and the _favicon.html include are the plated icon, written by xtask.
     tpl = TEMPLATES / "_favicon.html"
-    link = f'<link rel="icon" href="data:image/svg+xml,{quote(favicon())}">\n'
-    sync(tpl, link, check, stale)
     # Every page header draws the same mark inline.
     for page in sorted(TEMPLATES.glob("*.html")):
         text = page.read_text()
         if APP_LOGO.search(text):
             sync(page, APP_LOGO.sub(lambda _: app_logo(), text), check, stale)
+    if LISTING:
+        return 0
     for s in stale:
         print(f"{s}: does not match the README header; run scripts/theme-logo-gen.py")
     # Every template that writes its own <head> takes the icon from that include, so a new
