@@ -42,7 +42,34 @@ pub(crate) fn install_tabs(ws: &Workspace) -> String {
         "<p>Installs {}; git runs it as <code>git terrace</code>.</p>",
         names.join(" and ")
     );
+    out.push_str(&requirements(ws));
     out
+}
+
+/// One line under the tabs: what the release ships for Windows and the Rust a `cargo install`
+/// needs, both from cargo metadata. There is no git version to name: every read goes through
+/// gix, and git itself only dispatches `git terrace`.
+pub(crate) fn requirements(ws: &Workspace) -> String {
+    let mut parts = Vec::new();
+    let windows = ws.targets.iter().any(|t| t.contains("windows"));
+    if windows && !ws.windows_archive.is_empty() {
+        parts.push(format!(
+            "Windows: a <code>{}</code> from the release",
+            esc(ws.windows_archive.trim_start_matches('.'))
+        ));
+    }
+    if let Some(msrv) = ws
+        .packages
+        .get("gitterrace")
+        .map(|p| p.rust_version.as_str())
+        .filter(|v| !v.is_empty())
+    {
+        parts.push(format!("With cargo, Rust {} or newer", esc(msrv)));
+    }
+    if parts.is_empty() {
+        return String::new();
+    }
+    format!("<p>{}.</p>\n", parts.join(". "))
 }
 
 /// The section of `docs/why.md` the page shows on its own, after the features.
@@ -322,6 +349,22 @@ mod tests {
             assert!(err.contains(bad), "{err}");
         }
         check_facts("`.git/gitterrace/`, `.git/info/exclude` and `127.0.0.1:4242`").expect("ok");
+    }
+
+    /// The requirements line names the Windows archive and the MSRV from cargo metadata, so a
+    /// bump in Cargo.toml shows on the page without an edit.
+    #[test]
+    fn requirements_come_from_cargo_metadata() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+        let ws = crate::facts::load(&root).expect("metadata");
+        let msrv = &ws.packages["gitterrace"].rust_version;
+        assert_eq!(
+            requirements(&ws),
+            format!(
+                "<p>Windows: a <code>zip</code> from the release. \
+                 With cargo, Rust {msrv} or newer.</p>\n"
+            )
+        );
     }
 
     /// A relative doc link on the landing page points at the file in the repository.

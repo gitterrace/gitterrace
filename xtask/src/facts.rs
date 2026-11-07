@@ -28,6 +28,11 @@ pub struct Workspace {
     /// The Homebrew tap the release publishes to (`owner/homebrew-tap`), from
     /// `[workspace.metadata.dist]`; empty when there is none.
     pub tap: String,
+    /// The release's target triples, from `[workspace.metadata.dist] targets`.
+    pub targets: Vec<String>,
+    /// The archive Windows releases ship as (`.zip`), from `[workspace.metadata.dist]
+    /// windows-archive`; empty when there is none.
+    pub windows_archive: String,
     /// The live demo's URL, from `[workspace.metadata.demo]`; empty when there is none. The
     /// demo itself is built in github.com/gitterrace/demo.
     pub demo: String,
@@ -100,10 +105,23 @@ pub fn load(root: &Path) -> Result<Workspace> {
         .as_str()
         .unwrap_or_default()
         .to_owned();
+    let dist = &meta["metadata"]["dist"];
+    let targets = dist["targets"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(Value::as_str)
+        .map(str::to_owned)
+        .collect();
     let demo = &meta["metadata"]["demo"];
     Ok(Workspace {
         packages,
         tap,
+        targets,
+        windows_archive: dist["windows-archive"]
+            .as_str()
+            .unwrap_or_default()
+            .to_owned(),
         demo: demo["url"].as_str().unwrap_or_default().to_owned(),
         demo_repos: demo_repos(demo),
     })
