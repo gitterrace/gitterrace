@@ -418,11 +418,11 @@
     theme.parentNode.insertBefore(top, theme);
   }
   // Commit page: next to the sha.
-  var shaCopy = document.querySelector(".meta [data-copy]");
-  if (shaCopy && local().indexOf("/commit/") === 0) {
+  var sha = document.querySelector("p.meta > a.sha");
+  if (sha && local().indexOf("/commit/") === 0) {
     var cb = button("Actions for this commit");
     cb.addEventListener("click", function () { openMenu(commitTarget(), cb); });
-    shaCopy.parentNode.insertBefore(cb, shaCopy.nextSibling);
+    sha.parentNode.insertBefore(cb, sha.nextSibling);
   }
   // One floating trigger follows the hovered hunk header, blame line, search hit or
   // hotspot row, so a long page does not carry thousands of buttons.
