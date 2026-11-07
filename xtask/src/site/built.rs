@@ -400,3 +400,50 @@ fn a_page_without_a_legal_link_is_reported() {
     assert_eq!(bad.len(), 1, "{bad:?}");
     assert!(bad[0].contains("/legal/privacy/"), "{bad:?}");
 }
+
+/// Links that stay on the site but name a source file, not a page: the site publishes pages, so
+/// a file it does not publish must be linked in the repository.
+fn site_links_to_files(pages: &[(String, String)]) -> Vec<String> {
+    let mut bad = Vec::new();
+    for (path, html) in pages {
+        for dest in attrs(html, "href") {
+            let file = dest.split('#').next().unwrap_or("");
+            let on_site = !file.contains("://") && !file.starts_with("mailto:");
+            let source = [".md", ".rs", ".toml", ".sh", ".py", ".json", ".yml"]
+                .iter()
+                .any(|e| file.ends_with(e));
+            if on_site && source {
+                bad.push(format!(
+                    "{path}: {dest} names a file the site does not publish"
+                ));
+            }
+        }
+    }
+    bad
+}
+
+/// The class this guards: a docs link to a file with no page that points at a site path and so
+/// dies, instead of at the repository.
+#[test]
+fn docs_links_to_unpublished_files_point_at_the_repository() {
+    let (pages, _) = generated();
+    let bad = site_links_to_files(&pages);
+    assert!(bad.is_empty(), "{}", bad.join("\n"));
+    let links = docs::Links::new("https://github.com/o/r");
+    let to = |d: &str| links.rewrite("docs/why.md", d, false);
+    assert_eq!(
+        to("../src/main.rs"),
+        "https://github.com/o/r/blob/main/src/main.rs"
+    );
+    assert_eq!(to("api.md#x"), "/docs/api/#x");
+}
+
+#[test]
+fn a_planted_site_link_to_a_source_file_is_reported() {
+    let (mut pages, _) = generated();
+    pages[0]
+        .1
+        .push_str("<a href=\"/src/main.rs\">x</a><a href=\"https://h/x.md\">y</a>");
+    let bad = site_links_to_files(&pages);
+    assert_eq!(bad.len(), 1, "{bad:?}");
+}
