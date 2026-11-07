@@ -201,9 +201,11 @@ fn starter() -> String {
             yes(e.lookup)
         );
     }
-    s.push_str("\nThe whole file, as `git terrace init` writes it:\n\n```toml\n");
-    s.push_str(Config::STARTER.trim_end());
-    s.push_str("\n```\n");
+    // Linked, not copied: `git terrace init` writes the real file, a copy doubled the page.
+    s.push_str(
+        "\nThe whole file, as `git terrace init` writes it: \
+         [defaults/actions.toml](../crates/gitterrace-actions/defaults/actions.toml).\n",
+    );
     s
 }
 
