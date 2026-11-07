@@ -26,6 +26,7 @@ pub(super) struct LogQuery {
     path: Option<String>,
     page: Option<usize>,
     author: Option<String>,
+    view: Option<String>,
 }
 
 pub(crate) struct DayGroup {
@@ -48,6 +49,10 @@ struct LogPage {
     compare_href: String,
     /// Removable chip for the active author filter: (name, href without it).
     author_chip: Option<(String, String)>,
+    /// The List | Graph switch; `None` on a filtered log, which has no graph.
+    views: Option<crate::seg::Seg>,
+    /// The Graph view's rows, one list without day headers, so the lines run unbroken.
+    graph: Vec<CommitRow>,
 }
 
 /// Commits per read of the unindexed author walk.
@@ -144,6 +149,8 @@ pub(super) async fn log(
     // Pages past `limits.log_pages` are clamped: the walk behind a page costs its offset.
     let pg = q.page.unwrap_or(0).min(app.cfg().limits.log_pages);
     let author = q.author;
+    let filtered = !path.is_empty() || author.as_deref().is_some_and(|s| !s.is_empty());
+    let graph = q.view.as_deref() == Some("graph") && !filtered;
     let p = blocking(&app, move |a| {
         let id = a.repo.resolve(&rev)?;
         let filter = (!path.is_empty()).then_some(path.as_str());
@@ -187,6 +194,9 @@ pub(super) async fn log(
             if let Some(w) = who {
                 let _ = write!(q, "&author={}", fmt::enc_seg(w));
             }
+            if graph {
+                q.push_str("&view=graph");
+            }
             fmt::href(&q)
         };
         // Every ref is peeled to find the newest tag, so skip it when the link is not shown.
@@ -209,7 +219,17 @@ pub(super) async fn log(
                     e.step("Show every commit", fmt::href(&format!("/log/{rev_enc}")))
                 }
             }),
-            days: views::day_groups(&list, now),
+            views: (!filtered).then(|| view_seg(&rev_enc, graph)),
+            graph: if graph {
+                graph_rows(a, &id, &list, pg, now)?
+            } else {
+                Vec::new()
+            },
+            days: if graph {
+                Vec::new()
+            } else {
+                views::day_groups(&list, now)
+            },
             rev,
             rev_enc,
             path,
@@ -217,6 +237,62 @@ pub(super) async fn log(
     })
     .await?;
     page(&p)
+}
+
+/// The List | Graph switch in the log's head.
+fn view_seg(rev_enc: &str, graph: bool) -> crate::seg::Seg {
+    use crate::seg::{Choice, Seg};
+    let list = fmt::href(&format!("/log/{rev_enc}"));
+    let g = fmt::href(&format!("/log/{rev_enc}?view=graph"));
+    Seg::links(
+        "View",
+        vec![
+            Choice::new("List", list, !graph),
+            Choice::new("Graph", g, graph),
+        ],
+    )
+    .no_caption()
+}
+
+/// The rows of page `pg` with their graph cells and ref chips. The layout replays the rows of
+/// the pages above and reads `FAR_ROWS` past this one, commit headers only.
+fn graph_rows(
+    a: &App,
+    id: &str,
+    list: &[gitterrace_git::CommitSummary],
+    pg: usize,
+    now: i64,
+) -> Result<Vec<CommitRow>> {
+    use gitterrace_index::graph::FAR_ROWS;
+    let from = pg.saturating_mul(PAGE);
+    let to = from + list.len();
+    let reach = to + FAR_ROWS as usize + 1;
+    let history = a.repo.parents(id, reach)?;
+    let placed = crate::graph_view::place(&history, from, to);
+    let width = crate::graph_view::columns(&placed);
+    let mut refs: std::collections::HashMap<String, Vec<(String, bool)>> =
+        std::collections::HashMap::new();
+    let head = a.repo.head_branch();
+    for r in a.repo.refs()? {
+        if r.kind == gitterrace_git::RefKind::Remote {
+            continue;
+        }
+        let is_head = r.kind == gitterrace_git::RefKind::Branch && head.as_deref() == Some(&r.name);
+        refs.entry(r.target).or_default().push((r.name, is_head));
+    }
+    Ok(list
+        .iter()
+        .zip(&placed)
+        .map(|(c, p)| {
+            let mut row = views::commit_row(c, now);
+            row.graph = Some(crate::graph_view::cell(p, width, c.parents.len() > 1));
+            if let Some(mut r) = refs.remove(&c.id) {
+                r.sort_by_key(|(_, h)| !*h);
+                row.refs = r;
+            }
+            row
+        })
+        .collect())
 }
 
 #[derive(Template)]

@@ -22,6 +22,7 @@ mod filter;
 mod fmt;
 mod frequency;
 mod gitstate;
+mod graph_view;
 mod guard;
 mod highlight;
 mod history;

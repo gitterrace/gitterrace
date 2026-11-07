@@ -47,6 +47,10 @@ pub(crate) struct CommitRow {
     /// Muted text after the time, such as the lines a file history row changed.
     pub(crate) note: String,
     pub(crate) counts: Vec<Count>,
+    /// The Graph view's cell; `None` in every other list.
+    pub(crate) graph: Option<crate::graph_view::Cell>,
+    /// Refs pointing at the commit, shown as chips in the Graph view: `(name, is HEAD's)`.
+    pub(crate) refs: Vec<(String, bool)>,
 }
 
 impl CommitRow {
@@ -64,6 +68,8 @@ impl CommitRow {
             lead: None,
             note: String::new(),
             counts: Vec::new(),
+            graph: None,
+            refs: Vec::new(),
         }
     }
 
