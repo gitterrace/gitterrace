@@ -122,7 +122,9 @@ fn only_dochead_writes_card_headers() {
             let name = p.file_name().map(|n| n.to_string_lossy().into_owned());
             if name.as_deref().is_some_and(|n| {
                 n == "dochead.rs"
+                    || n == "dochead.html"
                     || n == "outline.rs"
+                    || n == "outline.html"
                     || n == "seg.rs"
                     || n == "seg_control.html"
                     || n.ends_with("tests.rs")

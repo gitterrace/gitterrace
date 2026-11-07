@@ -5,9 +5,9 @@
 
 use std::fmt;
 
+use askama::Template;
 use askama::filters::HtmlSafe;
 
-use crate::fmt::esc;
 use crate::seg::{Choice, Seg};
 
 /// A tab of the about documents (README, LICENSE and so on).
@@ -55,67 +55,30 @@ pub(crate) struct DocHead {
     pub(crate) tools: String,
 }
 
+/// The markup, from `dochead.html`: the only place that writes a document card's header bar.
+/// `escape = "svg"` picks the crate's `& < > "` escaper, the bytes `fmt::esc` wrote here before.
+#[derive(Template)]
+#[template(path = "dochead.html", escape = "svg")]
+struct DocHeadMarkup<'a> {
+    h: &'a DocHead,
+    /// Preview/Code, when the card shows it and has no switch of its own.
+    views: Option<Seg>,
+}
+
 impl fmt::Display for DocHead {
-    /// The only place that writes a document card's header bar.
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str("<div class=\"dochead sticky\" data-dochead>")?;
-        if let Some((files, _)) = &self.switch {
-            write!(f, "{files}")?;
-        }
-        if !self.crumbs.is_empty() {
-            f.write_str("<nav class=\"crumbs doc-path\">")?;
-            for (i, k) in self.crumbs.iter().enumerate() {
-                if i > 0 {
-                    f.write_str("<i>/</i>")?;
-                }
-                f.write_str("<a href=\"")?;
-                f.write_str(&esc(&k.href))?;
-                f.write_str("\">")?;
-                f.write_str(&esc(&k.name))?;
-                f.write_str("</a>")?;
-            }
-            f.write_str("</nav>")?;
-        } else if self.tabs.is_empty() {
-            write!(f, "<span class=\"doc-title\">{}</span>", esc(&self.title))?;
-        } else {
-            f.write_str("<nav class=\"tabs doctabs\">")?;
-            for t in &self.tabs {
-                let on = if t.on {
-                    " class=\"on\" aria-current=\"page\""
-                } else {
-                    ""
-                };
-                write!(f, "<a href=\"{}\"{on}>{}</a>", esc(&t.href), esc(t.label))?;
-            }
-            f.write_str("</nav>")?;
-        }
-        if let Some((_, views)) = &self.switch {
-            write!(f, "{views}")?;
-        } else if self.views {
-            let views = Seg {
-                name: "View".to_owned(),
-                buttons: true,
-                choices: vec![
-                    Choice::new("Preview", "rendered", true),
-                    Choice::new("Code", "source", false),
-                ],
-                ..Seg::default()
-            };
-            write!(f, "{views}")?;
-        }
-        f.write_str("<span class=\"doc-tools\">")?;
-        if !self.meta.is_empty() {
-            f.write_str("<span class=\"muted\">")?;
-            f.write_str(&esc(&self.meta))?;
-            f.write_str("</span>")?;
-        }
-        for a in &self.actions {
-            write!(f, "<a href=\"{}\">{}</a>", esc(&a.href), esc(a.label))?;
-        }
-        // The outline menu and the tools are the crate's own escaped markup.
-        f.write_str(&self.outline)?;
-        f.write_str(&self.tools)?;
-        f.write_str("</span></div>")
+        let views = (self.switch.is_none() && self.views).then(|| Seg {
+            name: "View".to_owned(),
+            buttons: true,
+            choices: vec![
+                Choice::new("Preview", "rendered", true),
+                Choice::new("Code", "source", false),
+            ],
+            ..Seg::default()
+        });
+        DocHeadMarkup { h: self, views }
+            .render_into(f)
+            .map_err(|_| fmt::Error)
     }
 }
 
