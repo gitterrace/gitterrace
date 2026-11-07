@@ -71,6 +71,7 @@ DEFAULTS: dict[str, dict] = {
     "lines": {
         "max_lines": 600,
         "max_width": 0,
+        "max_code_width": 0,
         "globs": ["*.rs", "*.py", "*.mjs", "*.js", "*.sh", "*.css", "*.html"],
         "exclude": [],
     },

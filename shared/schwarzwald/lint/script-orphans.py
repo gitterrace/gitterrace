@@ -3,7 +3,9 @@
 
 A script wired to nothing (no Makefile target, no gate, no doc) is cited as coverage and rots. A
 script counts as reached when its file name appears in another tracked file matched by
-lint.toml `[scripts] readers`. A truly manual tool says `manual-only` in its first 15 lines and
+lint.toml `[scripts] readers`, or when a reached python script imports it (`import x`,
+`from x import`, `importlib.import_module("x")` by literal name, matched on the file stem, so a
+`*-lib.py` helper follows its caller). A truly manual tool says `manual-only` in its first 15 lines and
 is exempt. The scripts are the `.sh` and `.py` files under `[scripts] dirs`, minus `exempt`
 (hook entry points that the VCS calls by name). An empty scan fails: it reads like a clean one.
 
@@ -12,6 +14,7 @@ is exempt. The scripts are the `.sh` and `.py` files under `[scripts] dirs`, min
 
 from __future__ import annotations
 
+import ast
 import sys
 from pathlib import Path
 
@@ -21,6 +24,45 @@ import config  # noqa: E402
 
 RULE = "CONV-SCRIPT-ORPHANS"
 MARKER = "manual-only"
+
+
+def imported(text: str) -> set[str]:
+    """Module names a python source imports by literal name, every dotted part included."""
+    try:
+        tree = ast.parse(text)
+    except SyntaxError:
+        return set()
+    out: set[str] = set()
+    for node in ast.walk(tree):
+        names: list[str] = []
+        if isinstance(node, ast.Import):
+            names = [a.name for a in node.names]
+        elif isinstance(node, ast.ImportFrom) and node.module:
+            names = [node.module] + [f"{node.module}.{a.name}" for a in node.names]
+        elif (isinstance(node, ast.Call) and node.args and isinstance(node.args[0], ast.Constant)
+              and isinstance(node.args[0].value, str)
+              and getattr(node.func, "attr", getattr(node.func, "id", "")) in ("import_module", "__import__")):
+            names = [node.args[0].value]
+        for n in names:
+            out.update(n.split("."))
+    return out
+
+
+def import_reached(scripts: list[str], reached: set[str], root: Path) -> set[str]:
+    """Grow reached with every script a reached python script imports, until nothing is added."""
+    by_stem: dict[str, list[str]] = {}
+    for n in scripts:
+        if n.endswith(".py"):
+            by_stem.setdefault(Path(n).stem, []).append(n)
+    todo = [n for n in reached if n.endswith(".py")]
+    while todo:
+        text = (root / todo.pop()).read_text(encoding="utf-8", errors="replace")
+        for mod in imported(text):
+            for n in by_stem.get(mod, []):
+                if n not in reached:
+                    reached.add(n)
+                    todo.append(n)
+    return reached
 
 
 def main(argv: list[str]) -> int:
@@ -40,14 +82,14 @@ def main(argv: list[str]) -> int:
                 texts[n] = (root / n).read_text(encoding="utf-8")
             except (OSError, UnicodeDecodeError):
                 pass
-    orphans = []
+    reached = set()
     for n in scripts:
         head = "\n".join((root / n).read_text(encoding="utf-8", errors="replace").splitlines()[:15])
-        if MARKER in head:
-            continue
         base = Path(n).name
-        if not any(base in t for other, t in texts.items() if other != n):
-            orphans.append(n)
+        if MARKER in head or any(base in t for other, t in texts.items() if other != n):
+            reached.add(n)
+    reached = import_reached(scripts, reached, root)
+    orphans = [n for n in scripts if n not in reached]
     if orphans:
         print(f"FAIL [{RULE}] {len(orphans)} script(s) nothing calls")
         for o in orphans:

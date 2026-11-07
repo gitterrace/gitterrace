@@ -9,6 +9,7 @@ The owner forbids the em dash and anything standing in for it. Three shapes fail
      code, inline code spans, BEGIN/END GENERATED blocks, a section banner (`// -- name ---`).
   3. A floating mark in a comment or in prose: `,` `:` or `;` with one space before it and a
      space or the line end after (`fail ; use x`). It is what a rewrite of ` -- ` leaves behind.
+     A Makefile's `#:` help marker is notation, so only the note after it is read.
      Two spaces before it is an aligned column and passes. A line with ` ? ` is notation, skipped.
 
 Not scanned: `[scope] exclude` and `golden` paths, lock files, binary and data formats
@@ -90,7 +91,7 @@ def scan_markdown(rel: str, text: str) -> list[str]:
     return hits
 
 
-def scan_code(rel: str, text: str, slash: bool) -> list[str]:
+def scan_code(rel: str, text: str, slash: bool, make: bool = False) -> list[str]:
     hits = []
     for n, line in enumerate(text.splitlines(), 1):
         if n == 1 and line.startswith("#!"):
@@ -99,6 +100,8 @@ def scan_code(rel: str, text: str, slash: bool) -> list[str]:
         if at < 0:
             continue
         body = line[at:].lstrip("/#!").strip()
+        if make and line[at:].startswith("#:"):
+            body = body[1:].strip()  # the `#:` help marker is notation, its note is prose
         if re.match(r"^--\s", body) and ("---" in body or body.endswith("--")):
             continue  # a section banner
         hits += [f"{rel}:{n}: {p}: {line.strip()[:90]}" for p in prose_problems(" " + body)]
@@ -113,7 +116,7 @@ def scan(rel: str, text: str) -> list[str]:
     elif path.suffix in SLASH:
         hits += scan_code(rel, text, True)
     elif path.suffix in HASH or path.name in HASH_NAMES:
-        hits += scan_code(rel, text, False)
+        hits += scan_code(rel, text, False, path.name == "Makefile")
     return hits
 
 

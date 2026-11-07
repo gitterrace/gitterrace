@@ -5,11 +5,17 @@ lint.toml `[lines]`: `max_lines` (600), `max_width` (0 = off, else a cap on COMM
 a formatter never wraps), `globs` (the files counted) and `exclude` (vendored or generated
 paths). A file over the cap is split by responsibility, never trimmed for the count.
 
+`max_code_width` (0 = off) caps CODE lines, which a formatter leaves alone inside strings and
+macro bodies. A file's current excess is its allowance, kept in
+`config/schwarzwald/wide-allowed.json` as {"wide_allowed": {"path": count}}. The count may only
+fall: more wide lines fail, and fewer fail until the allowance is lowered (a ratchet).
+
   file-length.py [--repo DIR]
 """
 
 from __future__ import annotations
 
+import json
 import re
 import sys
 from pathlib import Path
@@ -19,6 +25,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent / "lib"))
 import config  # noqa: E402
 
 RULE = "CONV-FILE-LENGTH"
+ALLOWED = "config/schwarzwald/wide-allowed.json"
 COMMENT = re.compile(r"^\s*(//|#|\*|/\*)")
 
 
@@ -31,9 +38,26 @@ def problems(rel: str, text: str, cap: int, width: int) -> list[str]:
     return out
 
 
+def wide_code(text: str, width: int) -> int:
+    """How many code (non-comment) lines are wider than width."""
+    return sum(1 for x in text.splitlines() if len(x) > width and not COMMENT.match(x))
+
+
+def code_problems(rel: str, text: str, width: int, allowed: int) -> list[str]:
+    n = wide_code(text, width)
+    if n > allowed:
+        return [f"{rel}: {n} code lines wider than {width}, allowed {allowed} (wrap the new one)"]
+    if n < allowed:
+        return [f"{rel}: {n} code lines wider than {width}, allowed {allowed}: lower {ALLOWED}"]
+    return []
+
+
 def self_test() -> bool:
     ok = (problems("a", "x\n" * 5, 4, 0) and not problems("a", "x\n" * 4, 4, 0)
           and problems("a", "// " + "x" * 20 + "\n", 9, 10) and not problems("a", "code " + "x" * 20 + "\n", 9, 10))
+    wide = "code " + "x" * 20 + "\n"
+    ok = bool(ok and code_problems("a", wide, 9, 0) and not code_problems("a", wide, 9, 1)
+              and code_problems("a", wide, 9, 2) and not code_problems("a", "// " + wide, 9, 0))
     if not ok:
         print(f"FAIL [{RULE}] self-test: an over-cap file must fail and an in-cap one pass", file=sys.stderr)
     return bool(ok)
@@ -46,6 +70,10 @@ def main(argv: list[str]) -> int:
         return 2
     s = cfg["lines"]
     bad, seen = [], 0
+    width = s["max_code_width"]
+    allowed = {}
+    if width and (root / ALLOWED).exists():
+        allowed = json.loads((root / ALLOWED).read_text(encoding="utf-8")).get("wide_allowed", {})
     for rel in config.tracked(root, cfg["scope"]["exclude"] + s["exclude"]):
         if not config.matches(rel, s["globs"]):
             continue
@@ -55,6 +83,8 @@ def main(argv: list[str]) -> int:
             continue
         seen += 1
         bad += problems(rel, text, s["max_lines"], s["max_width"])
+        if width:
+            bad += code_problems(rel, text, width, allowed.get(rel, 0))
     if bad:
         print(f"FAIL [{RULE}] {len(bad)} over the cap")
         for b in bad[:60]:

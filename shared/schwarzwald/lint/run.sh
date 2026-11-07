@@ -112,12 +112,31 @@ if [[ -f ruff.toml || -f .ruff.toml || -f pyproject.toml ]] && [[ -n $(git ls-fi
 fi
 [[ -d .github/workflows ]] && run actionlint actionlint "brew install actionlint" actionlint
 
+# Drift: the tool configs keep to the shared bases. drift.py needs tomllib, so it runs under the
+# newest python 3.11 or newer on PATH (not the plain python3, which may be 3.9). None is a FAIL.
+drift_py=""
+for c in python3.15 python3.14 python3.13 python3.12 python3.11 python3; do
+  if command -v "${c}" >/dev/null 2>&1 && "${c}" -c 'import sys; sys.exit(sys.version_info < (3, 11))'; then
+    drift_py=${c}
+    break
+  fi
+done
+if [[ -f ${part}/configs/drift.py ]]; then
+  if [[ -n ${drift_py} ]]; then
+    run drift "${drift_py}" "install python 3.11" "${drift_py}" "${part}/configs/drift.py" --repo .
+  else
+    echo "FAIL drift: no python 3.11 or newer on PATH (install python3.13)"
+    fails=$((fails + 1))
+  fi
+fi
+
 # The shared lints, each proved on its red case by red.py.
 lint="${part}/lint"
 for rule in internal-refs personal-data own-shas actions-pin dash-standins make-targets file-length script-orphans docs-a11y changelog; do
   [[ -f ${lint}/${rule}.py ]] && run "${rule}" "${py}" "install python 3.11" "${py}" "${lint}/${rule}.py" --repo .
 done
 [[ -f ${lint}/red.py ]] && run lint-red "${py}" "install python 3.11" "${py}" "${lint}/red.py" --repo .
+[[ -f ${lint}/run_test.sh ]] && run run-drift-step bash "install bash" bash "${lint}/run_test.sh"
 [[ -f ${part}/hooks/commit-msg_test.sh ]] && run commit-msg-hook bash "install bash" bash "${part}/hooks/commit-msg_test.sh"
 for t in author-guard stale-index markdown-staged; do
   [[ -f ${part}/hooks/${t}_test.sh ]] && run "${t}-hook" bash "install bash" bash "${part}/hooks/${t}_test.sh"

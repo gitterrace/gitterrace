@@ -56,6 +56,9 @@ skip = []
 # (0 = off). exclude lists vendored or generated paths on top of [scope] exclude.
 max_lines = 600
 max_width = 0
+# max_code_width caps code lines (0 = off). A file's excess is its allowance in
+# config/schwarzwald/wide-allowed.json, {"wide_allowed": {"path": count}}, and may only fall.
+max_code_width = 0
 globs = ["*.rs", "*.py", "*.mjs", "*.js", "*.sh", "*.css", "*.html"]
 exclude = []
 
