@@ -1,0 +1,7 @@
+{#- The small labels: `badge` (a setting's state, a diff file's change kind) and `tag` (a ref's or a person's mark, a match count). `cls` adds a modifier class, "" for none. -#}
+{%- macro badge(cls, text) -%}
+<span class="badge{% if !cls.is_empty() %} {{ cls }}{% endif %}">{{ text }}</span>
+{%- endmacro -%}
+{%- macro tag(cls, text) -%}
+<span class="tag{% if !cls.is_empty() %} {{ cls }}{% endif %}">{{ text }}</span>
+{%- endmacro -%}

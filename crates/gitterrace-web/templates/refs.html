@@ -1,4 +1,5 @@
 {% extends "_base.html" %}
+{%- import "_badge.html" as bd -%}
 {% block title %}Refs · {{ c.name }}{% endblock %}
 {% block content %}
 {% if let Some(e) = nothing %}{{ e }}{% else %}
@@ -10,7 +11,7 @@
 <p class="hint">Linked worktrees recorded in this repository's git directory. Paths are shown as written, and gitterrace does not open them.</p>
 <div class="card"><table class="entries">
 <tr class="th"><td>Path</td><td>Name</td><td>Checked out</td><td>Commit</td></tr>
-{% for w in worktrees %}<tr><td class="wrap"><code>{{ w.path }}</code>{% if w.locked %} <span class="tag">locked</span>{% endif %}</td><td><code>{{ w.id }}</code></td><td>{% if w.log.is_empty() %}{{ w.branch }}{% else %}<a href="{{ w.log }}">{{ w.branch }}</a>{% endif %}</td><td>{{ w.commit|safe }}</td></tr>{% endfor %}
+{% for w in worktrees %}<tr><td class="wrap"><code>{{ w.path }}</code>{% if w.locked %} {% call bd::tag("", "locked") %}{% endcall %}{% endif %}</td><td><code>{{ w.id }}</code></td><td>{% if w.log.is_empty() %}{{ w.branch }}{% else %}<a href="{{ w.log }}">{{ w.branch }}</a>{% endif %}</td><td>{{ w.commit|safe }}</td></tr>{% endfor %}
 </table></div>{% endif %}
 {% if !stashes.is_empty() %}<h2 id="stashes">Stashes</h2>
 <div class="card"><table class="entries grow">

@@ -1,4 +1,5 @@
 {% extends "_base.html" %}
+{%- import "_badge.html" as bd -%}
 {% block title %}Search · {{ c.name }}{% endblock %}
 {% block content %}
 <form class="searchbar" method="get" action="{{ c.base }}/search">
@@ -18,7 +19,7 @@
 {% for r in commits %}{{ r }}{% endfor %}
 </ul>
 {% else %}
-{% for f in files %}<section class="card hits" data-path="{{ f.path }}"><header><a href="{{ f.href }}">{{ f.path }}</a><span class="tag">{{ f.matches() }}</span></header>
+{% for f in files %}<section class="card hits" data-path="{{ f.path }}"><header><a href="{{ f.href }}">{{ f.path }}</a>{% call bd::tag("", f.matches()) %}{% endcall %}</header>
 <table class="code">{% for l in f.lines %}{% if l.n == 0 %}<tr class="gap"><td class="n"></td><td class="c">...</td></tr>{% else %}<tr{% if l.hit %} class="hit" data-act="search-hit" data-line="{{ l.n }}"{% endif %}><td class="n"><a href="{{ f.href }}#L{{ l.n }}">{{ l.n }}</a></td><td class="c">{{ l.html|safe }}</td></tr>{% endif %}{% endfor %}</table></section>{% endfor %}
 {% endif %}
 {% if let Some(e) = nothing %}{{ e }}{% endif %}

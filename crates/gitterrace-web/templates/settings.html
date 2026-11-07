@@ -1,3 +1,4 @@
+{%- import "_badge.html" as bd -%}
 <!doctype html>
 <html lang="en">
 <head>
@@ -22,7 +23,7 @@
 {% macro card(c, blank) %}<div class="setcard" data-row="{{ c.id }}"{% if blank %} data-blank hidden{% endif %}>
 <div class="setcardhead"><strong>{{ c.title }}</strong>{% if !blank %}<button type="button" data-remove="{{ c.id }}">Remove</button>{% endif %}</div>
 {% for f in c.fields %}<div class="setrow" data-id="{{ f.id }}" data-kind="{{ f.kind }}" data-row-key>
-<label class="setname" for="f-{{ f.id }}"><code>{{ f.name }}</code>{% if f.required %} <span class="badge">Required</span>{% endif %}</label>
+<label class="setname" for="f-{{ f.id }}"><code>{{ f.name }}</code>{% if f.required %} {% call bd::badge("", "Required") %}{% endcall %}{% endif %}</label>
 <div class="setin">{% match f.kind %}
 {% when "checkbox" %}<input type="checkbox" id="f-{{ f.id }}"{% if f.checked %} checked{% endif %}>
 {% when "list" %}<textarea id="f-{{ f.id }}" rows="2" placeholder="one per line">{{ f.value }}</textarea>
@@ -38,7 +39,7 @@
 <section class="setform" id="setform" data-view="form"{% if form_off.is_some() %} hidden{% endif %}>
 {% for s in sections %}<fieldset class="setsec"><legend>[{{ s.name }}]</legend>
 {% for r in s.rows %}<div class="setrow" data-id="{{ r.id }}" data-kind="{{ r.kind }}" data-src="{{ r.source }}">
-<label class="setname" for="f-{{ r.id }}"><code>{{ r.name }}</code>{% if r.restart %} <span class="badge">Needs a restart</span>{% endif %}{% if r.source != "default" %} <span class="badge set-src">set in {{ r.source }}</span>{% endif %}</label>
+<label class="setname" for="f-{{ r.id }}"><code>{{ r.name }}</code>{% if r.restart %} {% call bd::badge("", "Needs a restart") %}{% endcall %}{% endif %}{% if r.source != "default" %} {% call bd::badge("set-src", "set in " ~ r.source) %}{% endcall %}{% endif %}</label>
 <div class="setin">{% match r.kind %}
 {% when "checkbox" %}<input type="checkbox" id="f-{{ r.id }}"{% if r.checked %} checked{% endif %}>
 {% when "tri" %}<select id="f-{{ r.id }}"><option value=""{% if r.tri == "unset" %} selected{% endif %}>Unset</option><option value="true"{% if r.tri == "true" %} selected{% endif %}>On</option><option value="false"{% if r.tri == "false" %} selected{% endif %}>Off</option></select>
