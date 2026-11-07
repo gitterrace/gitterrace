@@ -105,7 +105,6 @@ fn sidebar_is_built_once_per_tip_and_dirty_flag() {
     assert_eq!(builds(), n, "repeat must hit the memo");
     assert!(first.contains("uncommitted changes"));
     let empty = gitterrace_index::feed::MemorySource::new(&[]);
-    assert_eq!(merges(&app, &head, &*src), 0);
     assert_eq!(
         html(&app, &head, &empty),
         first,

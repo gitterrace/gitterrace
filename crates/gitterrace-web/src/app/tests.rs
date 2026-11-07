@@ -86,10 +86,10 @@ fn overview_totals_are_computed_once_per_tip() {
         .expect("source")
         .expect("ready")
         .unchecked();
-    assert_eq!(app.totals(&head, &*src, opts()).commits, 1);
+    assert_eq!(app.totals(&head, &*src, opts()).counted.commits, 1);
     let empty = gitterrace_index::feed::MemorySource::new(&[]);
     assert_eq!(
-        app.totals(&head, &empty, opts()).commits,
+        app.totals(&head, &empty, opts()).counted.commits,
         1,
         "repeat must hit the memo"
     );
@@ -106,7 +106,7 @@ fn overview_totals_are_computed_once_per_tip() {
         .expect("ready")
         .unchecked();
     assert_eq!(
-        app.totals(&head, &*src, opts()).commits,
+        app.totals(&head, &*src, opts()).counted.commits,
         2,
         "a new tip recomputes"
     );

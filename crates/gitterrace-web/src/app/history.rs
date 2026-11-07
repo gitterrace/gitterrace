@@ -134,13 +134,14 @@ impl App {
         Some(gitterrace_git::IgnoreSet::from_files(found.iter().cloned()))
     }
 
-    /// All-history totals of `commit` with `opts`, computed once per index generation.
+    /// All-history totals of `commit` with `opts`, both populations, computed once per index
+    /// generation.
     pub(crate) fn totals(
         &self,
         commit: &str,
         src: &dyn gitterrace_index::feed::InsightsSource,
         opts: gitterrace_index::Options,
-    ) -> gitterrace_index::PeriodStats {
+    ) -> crate::caches::OverviewTotals {
         let key = format!("{commit}\0{}\0{opts:?}", self.index.generation());
         if let Ok(g) = self.caches.totals.lock()
             && let Some((k, t)) = g.as_ref()
@@ -152,9 +153,11 @@ impl App {
             .respect_ignore
             .then(|| self.ignore_set(commit))
             .flatten();
-        let t = gitterrace_index::Insights::from_source(src, opts, ignore)
-            .period_summary(gitterrace_index::Period::All)
-            .current;
+        let ins = gitterrace_index::Insights::from_source(src, opts, ignore);
+        let t = crate::caches::OverviewTotals {
+            every: ins.every_totals(),
+            counted: ins.period_summary(gitterrace_index::Period::All).current,
+        };
         if src.failure().is_none()
             && let Ok(mut g) = self.caches.totals.lock()
         {

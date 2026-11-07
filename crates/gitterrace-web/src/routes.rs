@@ -143,6 +143,10 @@ fn page<T: Template>(t: &T) -> Result<Html<String>> {
 }
 
 struct Numbers {
+    /// `data-population` of the commit and merge counts: every commit.
+    every: &'static str,
+    /// `data-population` of the authors, files and lines: the counted commits.
+    counted: &'static str,
     commits: String,
     commits_noun: &'static str,
     /// "(2 merges)" or empty: the overview counts every commit, insights leave merges out.
@@ -217,11 +221,15 @@ async fn overview(State(app): Shared, Query(q): Query<DocQuery>) -> Result<Html<
 
 /// The overview's totals line over `src`.
 fn overview_numbers(a: &App, head: &str, src: &crate::insights::Src) -> Numbers {
-    let t = a.totals(head, &**src, a.defaults().into_options());
+    let all = a.totals(head, &**src, a.defaults().into_options());
+    let (e, t) = (all.every, all.counted);
+    let (commits, merges) = (e.commits.value(), e.merges.value());
     Numbers {
-        commits: fmt::thousands(src.len()),
-        commits_noun: fmt::noun(src.len(), "commit", "commits"),
-        merges: match crate::overview_side::merges(a, head, &**src) {
+        every: e.commits.population().as_str(),
+        counted: t.commits_figure().population().as_str(),
+        commits: fmt::thousands(commits),
+        commits_noun: fmt::noun(commits, "commit", "commits"),
+        merges: match merges {
             0 => String::new(),
             n => format!("({})", fmt::count(n, "merge", "merges")),
         },

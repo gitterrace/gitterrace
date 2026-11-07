@@ -14,6 +14,7 @@ mod code;
 mod compare;
 mod counted;
 pub(crate) mod fasthash;
+mod figure;
 mod files;
 mod filter;
 mod format;
@@ -43,6 +44,7 @@ pub use counted::{
     CHUNK, Counted, Item, LabelTally, PersonTallies, PersonTally, Reducer, Series, Sizes, Totals,
     When,
 };
+pub use figure::{EveryTotals, Figure, Population};
 pub use files::{
     AgeBucket, AgeReport, Coupling, DirOwnership, Hotspot, HotspotReport, Owner, OwnershipReport,
     Touch,

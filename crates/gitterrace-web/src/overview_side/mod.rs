@@ -109,18 +109,6 @@ pub(crate) fn html(a: &App, head: &str, src: &dyn InsightsSource) -> String {
     out
 }
 
-/// Merge commits reachable from `head`. A pass over every commit (half a second on
-/// rust-lang/rust), so counted once per (tip, index generation).
-pub(crate) fn merges(a: &App, head: &str, src: &dyn InsightsSource) -> usize {
-    let key = format!("merges\0{}\0{head}\0{}", fmt::base(), a.index.generation());
-    if let Some(n) = a.memo_get(&key).and_then(|h| h.parse().ok()) {
-        return n;
-    }
-    let n = src.commits_in(CommitRange::All).filter(|c| c.merge).count();
-    a.memo_put(key, std::sync::Arc::new(n.to_string()));
-    n
-}
-
 pub(crate) fn build(a: &App, head: &str, src: &dyn InsightsSource, dirty: bool, now: i64) -> Side {
     BUILDS.fetch_add(1, Ordering::Relaxed);
     let branch = a.repo.head_branch();

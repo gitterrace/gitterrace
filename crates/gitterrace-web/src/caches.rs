@@ -16,7 +16,14 @@ pub(crate) type HeadGen = (String, u64);
 /// One commit and its ignore files as `(path, text)`.
 pub(crate) type IgnoreFiles = (String, Arc<Vec<(String, String)>>);
 /// Overview totals for one (commit, index generation, options).
-pub(crate) type TotalsEntry = (String, gitterrace_index::PeriodStats);
+pub(crate) type TotalsEntry = (String, OverviewTotals);
+
+/// The overview's two populations of one history: every commit, and the counted totals.
+#[derive(Debug, Clone)]
+pub(crate) struct OverviewTotals {
+    pub(crate) every: gitterrace_index::EveryTotals,
+    pub(crate) counted: gitterrace_index::PeriodStats,
+}
 
 pub(crate) struct Caches {
     /// The insights source of one (commit, generation), so every page shares its derived
