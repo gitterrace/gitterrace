@@ -3,6 +3,7 @@
 
 mod atomic;
 mod diff;
+mod divergence;
 mod error;
 mod fs_events;
 mod gitdir;

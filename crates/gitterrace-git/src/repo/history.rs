@@ -254,6 +254,8 @@ impl Repo {
             std::collections::HashMap::new();
         ids.iter()
             .map(|id| {
+                self.row_reads
+                    .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                 let oid = self.full_id(&repo, id)?;
                 let commit = repo.find_commit(oid).map_err(git)?;
                 let blob = ident::mailmap_blob(&repo, oid);

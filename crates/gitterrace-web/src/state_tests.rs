@@ -453,3 +453,56 @@ async fn not_found_keeps_the_shell_and_offers_next_steps() {
     let (s, body) = get(&app, "/diff/nope/0").await;
     assert!(s == 404 && !body.contains("class=\"tabnav\""), "{body}");
 }
+
+/// `/refs` on a repository with thousands of refs reads commits and walks divergences for the
+/// rows it shows, never for every ref: the page's cost is bounded by `REFS_SHOWN`, and the
+/// counts say how many exist. `?all=1` still lists every one.
+#[tokio::test]
+async fn refs_reads_only_the_rows_it_shows() {
+    let dir = tempfile::tempdir().expect("tmp");
+    let mut f = Fixture::init(&dir.path().join("many"));
+    for i in 0..20 {
+        f = f
+            .write("a.txt", &format!("{i}\n"))
+            .commit(&format!("feat: c{i}"));
+    }
+    let p = f.path().to_owned();
+    let tips: Vec<String> = (0..20)
+        .map(|i| {
+            git(&p, &["rev-parse", &format!("HEAD~{i}")])
+                .trim()
+                .to_owned()
+        })
+        .collect();
+    let lines: Vec<String> = (0..1000)
+        .map(|i| {
+            let tip = &tips[i % tips.len()];
+            format!("create refs/tags/t{i:04} {tip}\ncreate refs/heads/b{i:04} {tip}\n")
+        })
+        .collect();
+    gitterrace_testkit::git_stdin(&p, &["update-ref", "--stdin"], lines.concat().as_bytes());
+    let app = ready_app(&p);
+    let before = app.repo.row_reads();
+    let (s, body) = get(&app, "/refs").await;
+    assert_eq!(s, 200);
+    let reads = app.repo.row_reads() - before;
+    let shown = crate::routes::REFS_SHOWN as u64;
+    // Per shown row: one commit read, and for a branch one divergence walk.
+    assert!(
+        reads <= 3 * shown,
+        "{reads} reads for {shown} rows shown of 2001 refs"
+    );
+    assert!(body.contains("1,000 tags, 100 shown."), "honest tag count");
+    assert!(
+        body.contains("1,001 branches, 100 shown."),
+        "honest branch count"
+    );
+    assert!(body.contains("Show all 1,000 tags"));
+    let (s, all) = get(&app, "/refs?all=1").await;
+    assert_eq!(s, 200);
+    assert!(
+        all.contains("/tag/t0999") && all.contains("/log/b0999"),
+        "all rows on ?all=1"
+    );
+    assert!(!all.contains("shown."), "no cut on ?all=1");
+}

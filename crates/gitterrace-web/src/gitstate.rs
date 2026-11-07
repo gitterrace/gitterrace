@@ -138,11 +138,28 @@ pub(crate) async fn tag(State(app): Shared, Path(name): Path<String>) -> Result<
 
 /// Branch rows on `/refs`, against HEAD's branch (or HEAD when detached), default first and
 /// then newest commit first: the one commit row, led by the branch, closed by its divergence.
-pub(crate) fn branch_rows(a: &crate::app::App) -> Result<Vec<views::CommitRow>> {
+///
+/// Only the first `limit` rows in that order are built: `refs` comes newest first, so they
+/// are picked before any commit is read or any divergence walked.
+pub(crate) fn branch_rows(
+    a: &crate::app::App,
+    refs: &[gitterrace_git::RefInfo],
+    limit: usize,
+) -> Result<Vec<views::CommitRow>> {
     let default = a.repo.head_branch();
     let now = fmt::now();
     let base = default.clone().unwrap_or_else(|| "HEAD".to_owned());
-    let status = a.repo.branch_status(&base)?;
+    let branches = refs
+        .iter()
+        .filter(|r| r.kind == gitterrace_git::RefKind::Branch);
+    let is_default = |r: &&gitterrace_git::RefInfo| default.as_deref() == Some(r.name.as_str());
+    let picked = branches
+        .clone()
+        .filter(is_default)
+        .chain(branches.filter(|r| !is_default(r)))
+        .take(limit)
+        .cloned();
+    let status = a.repo.branch_status_of(&base, picked)?;
     let ids: Vec<String> = status.iter().map(|s| s.target.clone()).collect();
     let summaries = a.repo.summaries(&ids)?;
     let mut rows: Vec<(bool, i64, views::CommitRow)> = status

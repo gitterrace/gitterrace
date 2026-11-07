@@ -1,14 +1,18 @@
 {% extends "_base.html" %}
 {%- import "_badge.html" as bd -%}
 {%- import "_table.html" as t -%}
+{%- macro cut(c) -%}{% if let Some(c) = c -%}
+<p class="hint">{{ c.said }} <a href="{{ c.href }}">{{ c.label }}</a></p>{% endif %}{%- endmacro -%}
 {% block title %}Refs · {{ c.name }}{% endblock %}
 {% block content %}
 <h1 class="vh">Branches and tags</h1>
 {% if let Some(e) = nothing %}{{ e }}{% else %}
 <h2 id="branches">Branches</h2>
-{% if let Some(e) = no_branches %}{{ e }}{% else %}<ul class="list log refrows">{% for b in branches %}{{ b }}{% endfor %}</ul>{% endif %}
+{% if let Some(e) = no_branches %}{{ e }}{% else %}<ul class="list log refrows">{% for b in branches %}{{ b }}{% endfor %}</ul>
+{%- call cut(branches_cut) %}{% endcall %}{% endif %}
 {% if !tags.is_empty() %}<h2 id="tags">Tags</h2>
-<ul class="list log refrows">{% for t in tags %}{{ t }}{% endfor %}</ul>{% endif %}
+<ul class="list log refrows">{% for t in tags %}{{ t }}{% endfor %}</ul>
+{%- call cut(tags_cut) %}{% endcall %}{% endif %}
 {% if !worktrees.is_empty() %}<h2 id="worktrees">Worktrees</h2>
 <p class="hint">Linked worktrees recorded in this repository's git directory. Paths are shown as written, and gitterrace does not open them.</p>
 <div class="card"><table class="entries">{% call t::caption("Worktrees") %}{% endcall %}
@@ -20,6 +24,7 @@
 {% for s in stashes %}<tr><th scope="row"><a href="{{ s.href }}"><code>{{ s.name }}</code></a></th><td class="grow">{{ s.message }}</td><td class="muted r">{{ s.when }}</td></tr>{% endfor %}
 </table></div>{% endif %}
 {% if !remotes.is_empty() %}<h2 id="remotes">Remotes</h2>
-<ul class="list log refrows">{% for r in remotes %}{{ r }}{% endfor %}</ul>{% endif %}
+<ul class="list log refrows">{% for r in remotes %}{{ r }}{% endfor %}</ul>
+{%- call cut(remotes_cut) %}{% endcall %}{% endif %}
 {% endif %}
 {% endblock %}

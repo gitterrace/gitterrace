@@ -63,6 +63,8 @@ pub struct Repo {
     /// The export run's memo of tree diffs, see [`Repo::use_change_memo`]. Weak: the run owns
     /// it, and a server handle (none set) keeps nothing.
     changes: Mutex<Weak<ChangeMemo>>,
+    /// Commits read for a summary plus divergences walked, see [`Repo::row_reads`].
+    pub(crate) row_reads: AtomicU64,
 }
 
 impl Repo {
@@ -81,7 +83,14 @@ impl Repo {
             id_cache: OnceLock::new(),
             committed_only: AtomicBool::new(false),
             changes: Mutex::new(Weak::new()),
+            row_reads: AtomicU64::new(0),
         })
+    }
+
+    /// Commits read by [`Self::summaries`] plus branches walked by [`Self::branch_status`] since
+    /// this handle opened. A page's cost per row, so a test can bound it by the rows shown.
+    pub fn row_reads(&self) -> u64 {
+        self.row_reads.load(Ordering::Relaxed)
     }
 
     /// From now on every revision this handle resolves is `HEAD`, a full commit id, or a

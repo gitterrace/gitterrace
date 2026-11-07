@@ -278,15 +278,61 @@ struct RefsPage {
     no_branches: Option<Empty>,
     /// Set only when the whole page has nothing to show.
     nothing: Option<Empty>,
+    branches_cut: Option<RefsCut>,
+    tags_cut: Option<RefsCut>,
+    remotes_cut: Option<RefsCut>,
 }
 
-async fn refs(State(app): Shared) -> Result<Html<String>> {
-    let p = blocking(&app, |a| {
+/// Rows each section of `/refs` renders unless asked for all. A row reads its commit (and a
+/// branch walks its divergence), so a repository with thousands of tags took seconds; the
+/// newest rows are the ones a visitor looks for, and `?all=1` lists every one.
+pub(crate) const REFS_SHOWN: usize = 100;
+
+#[derive(Deserialize)]
+struct RefsQuery {
+    all: Option<String>,
+}
+
+/// A section cut at [`REFS_SHOWN`]: how many exist, and the link to all of them.
+struct RefsCut {
+    said: String,
+    href: String,
+    label: String,
+}
+
+async fn refs(State(app): Shared, Query(q): Query<RefsQuery>) -> Result<Html<String>> {
+    let p = blocking(&app, move |a| {
         let all = a.repo.refs()?;
         let now = fmt::now();
-        let tags = views::ref_rows(a, &all, RefKind::Tag, now)?;
-        let branches = crate::gitstate::branch_rows(a)?;
-        let remotes = views::ref_rows(a, &all, RefKind::Remote, now)?;
+        let limit = if q.all.as_deref() == Some("1") {
+            usize::MAX
+        } else {
+            REFS_SHOWN
+        };
+        let total = |k: RefKind| all.iter().filter(|r| r.kind == k).count();
+        let tags = views::ref_rows(a, &all, RefKind::Tag, now, limit)?;
+        let branches = crate::gitstate::branch_rows(a, &all, limit)?;
+        let remotes = views::ref_rows(a, &all, RefKind::Remote, now, limit)?;
+        let cut = |k: RefKind, shown: usize, one: &'static str, many: &'static str| {
+            let n = total(k);
+            (n > shown).then(|| RefsCut {
+                said: format!(
+                    "{}, {} shown.",
+                    fmt::count(n, one, many),
+                    fmt::thousands(shown)
+                ),
+                href: fmt::href("/refs?all=1"),
+                label: format!("Show all {}", fmt::count(n, one, many)),
+            })
+        };
+        let branches_cut = cut(RefKind::Branch, branches.len(), "branch", "branches");
+        let tags_cut = cut(RefKind::Tag, tags.len(), "tag", "tags");
+        let remotes_cut = cut(
+            RefKind::Remote,
+            remotes.len(),
+            "remote branch",
+            "remote branches",
+        );
         let (worktrees, stashes) = if crate::gitstate::local_state(a) {
             (
                 crate::gitstate::worktree_rows(a)?,
@@ -310,6 +356,9 @@ async fn refs(State(app): Shared) -> Result<Html<String>> {
             remotes,
             worktrees,
             stashes,
+            branches_cut,
+            tags_cut,
+            remotes_cut,
         })
     })
     .await?;

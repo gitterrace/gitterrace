@@ -507,14 +507,16 @@ pub(crate) fn entries(rev: &str, path: &str, list: &[TreeEntry]) -> Vec<Entry> {
         .collect()
 }
 
-/// The rows of the refs of `kind`, each led by its name: the one commit row, newest first.
+/// The rows of the newest `limit` refs of `kind`, each led by its name: the one commit row,
+/// newest first. `refs` comes newest first, so only the rows shown read their commit.
 pub(crate) fn ref_rows(
     app: &crate::app::App,
     refs: &[RefInfo],
     kind: gitterrace_git::RefKind,
     now: i64,
+    limit: usize,
 ) -> crate::error::Result<Vec<CommitRow>> {
-    let picked: Vec<&RefInfo> = refs.iter().filter(|r| r.kind == kind).collect();
+    let picked: Vec<&RefInfo> = refs.iter().filter(|r| r.kind == kind).take(limit).collect();
     let ids: Vec<String> = picked.iter().map(|r| r.target.clone()).collect();
     let page = if kind == gitterrace_git::RefKind::Tag {
         "tag"

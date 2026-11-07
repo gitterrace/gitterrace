@@ -139,10 +139,22 @@ impl Repo {
     /// Ahead and behind counts of every local branch against `base`. Results are cached per
     /// (tip, base) pair, so only branches that moved are walked again.
     pub fn branch_status(&self, base: &str) -> Result<Vec<BranchStatus>> {
+        self.branch_status_of(base, self.refs()?)
+    }
+
+    /// [`Self::branch_status`] for just these refs, in their order: a page that shows some
+    /// branches walks only those. Refs other than local branches are skipped.
+    pub fn branch_status_of(
+        &self,
+        base: &str,
+        refs: impl IntoIterator<Item = crate::RefInfo>,
+    ) -> Result<Vec<BranchStatus>> {
         let repo = self.repo();
         let base_id = self.resolve_id(&repo, base)?;
+        // Loaded once per call: a few hundred microseconds on a 345k-commit history.
+        let graph = repo.commit_graph_if_enabled().ok().flatten();
         let mut out = Vec::new();
-        for r in self.refs()? {
+        for r in refs {
             if r.kind != crate::RefKind::Branch {
                 continue;
             }
@@ -155,10 +167,18 @@ impl Repo {
             let (ahead, behind) = if let Some(v) = cached {
                 v
             } else {
-                let v = (
-                    count_only(&repo, tip, base_id)?,
-                    count_only(&repo, base_id, tip)?,
-                );
+                let v = match graph
+                    .as_ref()
+                    .and_then(|g| crate::divergence::graph_divergence(g, tip, base_id))
+                {
+                    Some(v) => v,
+                    None => (
+                        count_only(&repo, tip, base_id)?,
+                        count_only(&repo, base_id, tip)?,
+                    ),
+                };
+                self.row_reads
+                    .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                 if let Ok(mut c) = self.divergence.lock() {
                     c.insert((tip, base_id), v);
                 }
@@ -247,7 +267,11 @@ pub(crate) fn annotation(repo: &gix::Repository, id: gix::ObjectId) -> Option<Ta
 }
 
 /// Commits reachable from `tip` and not from `hidden`.
-fn count_only(repo: &gix::Repository, tip: gix::ObjectId, hidden: gix::ObjectId) -> Result<usize> {
+pub(crate) fn count_only(
+    repo: &gix::Repository,
+    tip: gix::ObjectId,
+    hidden: gix::ObjectId,
+) -> Result<usize> {
     if tip == hidden {
         return Ok(0);
     }
@@ -314,7 +338,7 @@ fn read_inside(common: &Path, parts: &[&str]) -> Option<String> {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use gitterrace_testkit::{Fixture, git};
     use std::fs;
     use std::path::Path;
@@ -322,13 +346,13 @@ mod tests {
     use crate::{InProgress, Repo};
 
     /// Commits `body` as `file` in the repository at `dir`.
-    fn commit(dir: &Path, file: &str, body: &str) {
+    pub(crate) fn commit(dir: &Path, file: &str, body: &str) {
         fs::write(dir.join(file), body).expect("write");
         git(dir, &["add", "-A"]);
         git(dir, &["commit", "-qm", file]);
     }
 
-    fn base() -> (tempfile::TempDir, std::path::PathBuf) {
+    pub(crate) fn base() -> (tempfile::TempDir, std::path::PathBuf) {
         let tmp = tempfile::tempdir().expect("tempdir");
         let d = tmp.path().join("repo");
         let _repo = Fixture::init(&d).write("a", "1\n").commit("a");
