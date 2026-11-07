@@ -12,43 +12,63 @@ BLIND with a reason. The list only shrinks.
 
 from __future__ import annotations
 
+import json
 import os
-import shutil
 import subprocess
 import sys
 import tempfile
 from pathlib import Path
-
-try:
-    import yaml
-except ModuleNotFoundError:
-    # The lint runner calls plain python3, which may lack PyYAML: hand over to the first
-    # interpreter that has it, newest first, so the check runs instead of failing on setup.
-    for c in (
-        "python3.15",
-        "python3.14",
-        "python3.13",
-        "python3.12",
-        "python3.11",
-        "/usr/bin/python3",
-    ):
-        exe = shutil.which(c)
-        if (
-            exe
-            and exe != sys.executable
-            and subprocess.run(
-                [exe, "-c", "import yaml"], capture_output=True, check=False
-            ).returncode
-            == 0
-        ):
-            os.execv(exe, [exe, *sys.argv])
-    sys.exit("ast-grep-macro: no python3 with PyYAML found (install PyYAML)")
+from typing import Any
 
 ROOT = Path(__file__).resolve().parent.parent
 AST = ROOT / "scripts" / "ast-grep"
 
 # Rules known blind inside macro bodies: rule id -> why. Fill only with a reason.
 BLIND: dict[str, str] = {}
+
+
+def scalar(text: str) -> str:
+    """One quoted YAML scalar: single quotes double a quote, double quotes escape like JSON."""
+    if text.startswith("'") and text.endswith("'") and len(text) > 1:
+        return text[1:-1].replace("''", "'")
+    if text.startswith('"') and text.endswith('"') and len(text) > 1:
+        return json.loads(text)
+    return text
+
+
+def read_spec(text: str) -> dict[str, Any]:
+    """The rule test files: `id: x` and the lists `valid:` and `invalid:` of quoted scalars or
+    `|` blocks. No other YAML is read, so a new shape fails loudly instead of being misread."""
+    spec: dict[str, Any] = {"valid": [], "invalid": []}
+    key, block = "", None
+    for line in text.splitlines():
+        if block is not None:
+            if line.startswith("    ") or not line.strip():
+                block.append(line[4:])
+                continue
+            spec[key].append("\n".join(block).rstrip("\n") + "\n")
+            block = None
+        if not line.strip() or line.lstrip().startswith("#"):
+            continue
+        if not line.startswith(" "):
+            name, _, rest = line.partition(":")
+            if name == "id":
+                spec["id"] = scalar(rest.strip())
+            elif name in spec and not rest.strip():
+                key = name
+            else:
+                raise ValueError(f"unsupported line: {line}")
+        elif line.startswith("  - "):
+            item = line[4:].strip()
+            if item == "|":
+                block = []
+            else:
+                spec[key].append(scalar(item))
+        else:
+            raise ValueError(f"unsupported line: {line}")
+    if block is not None:
+        spec[key].append("\n".join(block).rstrip("\n") + "\n")
+    return spec
 
 
 def wrap(code: str) -> str:
@@ -65,12 +85,12 @@ def blind_rules(rules: Path, tests: Path) -> list[str]:
             f"ruleDirs:\n  - {rules}\ntestConfigs:\n  - testDir: tests\n"
         )
         for f in sorted(tests.glob("*-test.yml")):
-            spec = yaml.safe_load(f.read_text())
+            spec = read_spec(f.read_text())
             invalid = [wrap(c) for c in spec.get("invalid", [])]
             if not invalid:
                 continue
             (t / "tests" / f.name).write_text(
-                yaml.safe_dump({"id": spec["id"], "valid": [], "invalid": invalid})
+                json.dumps({"id": spec["id"], "valid": [], "invalid": invalid})
             )
         r = subprocess.run(
             ["ast-grep", "test", "--skip-snapshot-tests"],
@@ -116,8 +136,23 @@ def self_test() -> int:
             "rule:\n  regex: 'a: u8'\n"
         )
         green = blind_rules(t / "rules", t / "tests") == []
-    print("self-test", "ok" if red and green else "FAILED")
-    return 0 if red and green else 1
+        # A python without PyYAML runs the whole check: a module named yaml that refuses to
+        # import stands in for one, and the run must still pass.
+        (t / "nolib").mkdir()
+        (t / "nolib" / "yaml.py").write_text("raise ImportError('no yaml here')\n")
+        env = {**os.environ, "PYTHONPATH": str(t / "nolib")}
+        bare = subprocess.run(
+            [sys.executable, str(Path(__file__).resolve())],
+            env=env,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    ok = red and green and bare.returncode == 0
+    if bare.returncode:
+        print(bare.stdout + bare.stderr)
+    print("self-test", "ok" if ok else "FAILED")
+    return 0 if ok else 1
 
 
 if __name__ == "__main__":
