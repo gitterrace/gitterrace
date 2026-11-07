@@ -56,6 +56,7 @@ header{padding:var(--space-8) 0 var(--space-4);position:relative}
 .gh{right:0;color:var(--muted)}
 .gh:hover,.gh:focus-visible{color:var(--fg)}
 .gh svg{fill:currentColor}
+header h1{margin:0}
 nav a{margin-right:var(--space-3)}
 header img{max-width:calc(100% - 72px);height:auto}
 header img.on-light{display:block}
@@ -172,10 +173,10 @@ pub fn render(root: &Path, ws: &Workspace) -> Result<Vec<Out>> {
     let mut h = head(&pkg.name, &pkg.description, home);
     let _ = write!(
         h,
-        "<header>\n<img class=\"on-light\" src=\"assets/logo-light.svg\" alt=\"{n}\" \
+        "<header>\n<h1><img class=\"on-light\" src=\"assets/logo-light.svg\" alt=\"{n}\" \
          width=\"540\" height=\"120\" loading=\"lazy\">\n\
          <img class=\"on-dark\" src=\"assets/logo-dark.svg\" alt=\"\" width=\"540\" height=\"120\" \
-         loading=\"lazy\">\n<p class=\"tag\">{tag}</p>\n{nav}{THEME_BUTTON}\n<a class=\"gh\" href=\"{r}\" aria-label=\"{n} on GitHub\" title=\"GitHub\"><svg viewBox=\"0 0 16 16\" width=\"24\" height=\"24\" aria-hidden=\"true\"><path d=\"{GH_MARK}\"/></svg></a>\n</header>\n",
+         loading=\"lazy\"></h1>\n<p class=\"tag\">{tag}</p>\n{nav}{THEME_BUTTON}\n<a class=\"gh\" href=\"{r}\" aria-label=\"{n} on GitHub\" title=\"GitHub\"><svg viewBox=\"0 0 16 16\" width=\"24\" height=\"24\" aria-hidden=\"true\"><path d=\"{GH_MARK}\"/></svg></a>\n</header>\n",
         r = esc(repo),
         n = esc(&pkg.name),
         tag = esc(&tagline(root)?),
