@@ -1,7 +1,7 @@
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 
-use crate::config::{Config, ConfigError, Cwd, Kind, Reloader, default_path};
+use crate::config::{Config, ConfigError, Cwd, Kind, Reloader};
 
 fn private_dir() -> tempfile::TempDir {
     let d = tempfile::tempdir().expect("tempdir");
@@ -253,7 +253,9 @@ fn repo_local_config_is_never_loaded() {
     );
     let roots = vec![repo.path().to_path_buf()];
     // The default path is the user's config dir, never relative to a repo or the cwd.
-    let default = default_path(None).expect("home");
+    let default = gitterrace_config::config_dir(None)
+        .expect("home")
+        .join("actions.toml");
     assert!(default.is_absolute());
     assert!(!default.starts_with(repo.path()));
     // Even named explicitly, a file inside a served repo is refused.

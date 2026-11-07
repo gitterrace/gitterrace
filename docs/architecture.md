@@ -12,7 +12,6 @@ flowchart TD
   types["types: shared types, each defined once"]
   web["web: server, pages, guard"]
   gitterrace --> web
-  actions --> config
   actions --> git
   api --> actions
   api --> index

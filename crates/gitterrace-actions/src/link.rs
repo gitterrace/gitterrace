@@ -110,15 +110,6 @@ impl Link {
         })
     }
 
-    /// The `gitterrace://` form.
-    pub fn to_gitterrace(&self) -> String {
-        format!(
-            "{SCHEME}{}{}",
-            self.id,
-            tail(&self.sha, self.path.as_deref(), self.lines)
-        )
-    }
-
     /// The `/go` form rooted at `origin` (empty for the path form).
     pub fn go(&self, origin: &str) -> String {
         permalink(
@@ -250,12 +241,18 @@ mod tests {
         ] {
             assert_eq!(Link::parse(&s), Ok(want.clone()), "{s}");
         }
-        assert_eq!(
-            want.to_gitterrace(),
-            format!("gitterrace://{ID}/{SHA}/src/a%20b.rs#L3-L7")
+        let gt = styled(
+            LinkStyle::Gitterrace,
+            "",
+            Some(ID),
+            "",
+            SHA,
+            want.path.as_deref(),
+            want.lines,
         );
+        assert_eq!(gt, format!("gitterrace://{ID}/{SHA}/src/a%20b.rs#L3-L7"));
         assert_eq!(
-            Link::parse(&want.to_gitterrace()).map(|l| l.go("")),
+            Link::parse(&gt).map(|l| l.go("")),
             Ok(format!("/go/{ID}/{SHA}/src/a%20b.rs#L3-L7"))
         );
         let one = Link::parse(&format!("gitterrace://{ID}/abc1234/x#L5")).expect("short");

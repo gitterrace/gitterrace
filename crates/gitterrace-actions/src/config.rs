@@ -323,14 +323,6 @@ impl Config {
     }
 }
 
-/// `actions.toml` in gitterrace's config folder (`--config <dir>`, else the XDG folder).
-///
-/// The folder rule lives in `gitterrace-config`, so no environment variable a repo could set
-/// moves it. `None` when there is no home to resolve against.
-pub fn default_path(config_flag: Option<&Path>) -> Option<PathBuf> {
-    gitterrace_config::config_dir(config_flag).map(|d| d.join("actions.toml"))
-}
-
 fn home() -> PathBuf {
     let var = if cfg!(windows) { "USERPROFILE" } else { "HOME" };
     std::env::var_os(var).map_or_else(
