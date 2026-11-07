@@ -30,7 +30,10 @@ pub fn render() -> Out {
          turn a feature off, never past what `--public` or the loopback check allows.\n\n\
          Actions live in their own file, `actions.toml`, because they run commands.\n",
     );
-    s.push_str("\n## Names\n\nOne rule for every key and flag, from `gitterrace_config::naming`. A renamed key gets no alias: the old name warns as unknown and the default applies.\n\n");
+    s.push_str(
+        "\n## Names\n\nOne rule for every key and flag, from `gitterrace_config::naming`. A \
+        renamed key gets no alias: the old name warns as unknown and the default applies.\n\n",
+    );
     s.push_str(&gitterrace_config::naming::doc_table());
     let mut section = "";
     for k in gitterrace_config::keys() {
@@ -38,7 +41,8 @@ pub fn render() -> Out {
             section = k.section;
             let _ = write!(
                 s,
-                "\n## `[{section}]`\n\n| Key | Type | Default | Description |\n| --- | --- | --- | --- |\n"
+                "\n## `[{section}]`\n\n| Key | Type | Default | Description |\n| --- | --- | --- | \
+                --- |\n"
             );
         }
         let mut doc = k.doc.split_whitespace().collect::<Vec<_>>().join(" ");

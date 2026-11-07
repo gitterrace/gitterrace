@@ -56,7 +56,8 @@ impl IntoResponse for Error {
 pub(crate) fn page(status: StatusCode, detail: &str) -> Html<String> {
     Html(format!(
         "<!doctype html><meta charset=utf-8><meta name=viewport content=\"width=device-width\">{}\
-         <link rel=stylesheet href=/static/tokens.css><link rel=stylesheet href=/static/app.css><main class=wrap><h1>{}</h1><p class=muted>{}</p>\
+         <link rel=stylesheet href=/static/tokens.css><link rel=stylesheet href=/static/app.css>\
+         <main class=wrap><h1>{}</h1><p class=muted>{}</p>\
          <p><a href=/>Back to overview</a></p></main>",
         crate::fmt::FAVICON,
         status.as_u16(),

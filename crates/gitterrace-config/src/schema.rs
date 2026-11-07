@@ -41,7 +41,8 @@ pub enum Reload {
 
 macro_rules! settings {
     ($( $(#[$attr:meta])* $field:ident : $sec:ident { $(
-        $(#[doc = $doc:literal])* $name:ident : $ty:ty = $default:expr => $reload:ident $(+ $cost:ident)? ,
+        $(#[doc = $doc:literal])* $name:ident : $ty:ty = $default:expr
+        => $reload:ident $(+ $cost:ident)? ,
     )* } )*) => {
         $(
             #[derive(Debug, Clone, PartialEq, Eq)]
@@ -92,7 +93,9 @@ macro_rules! settings {
                 let mut out = Vec::new();
                 $( $( $(
                     let num = |v: String| v.parse::<u64>().unwrap_or(0);
-                    if stringify!($cost) == "cost" && num(Show::show(&self.$field.$name)) > num(Show::show(&d.$field.$name)) {
+                    if stringify!($cost) == "cost"
+                        && num(Show::show(&self.$field.$name)) > num(Show::show(&d.$field.$name))
+                    {
                         out.push(concat!(stringify!($field), ".", stringify!($name)));
                     }
                 )? )* )*
@@ -102,7 +105,9 @@ macro_rules! settings {
             /// Ids of the [`Reload::Restart`] settings whose value differs in `new`.
             pub fn restart_changes(&self, new: &Self) -> Vec<&'static str> {
                 let mut out = Vec::new();
-                $( $( if Reload::$reload == Reload::Restart && self.$field.$name != new.$field.$name {
+                $( $( if Reload::$reload == Reload::Restart
+                    && self.$field.$name != new.$field.$name
+                {
                     out.push(concat!(stringify!($field), ".", stringify!($name)));
                 } )* )*
                 out
@@ -122,7 +127,8 @@ macro_rules! settings {
                     if let Some(v) = t.remove(stringify!($field)) {
                         if let Some(sub) = v.as_table() {
                             $( if let Some(x) = sub.get(stringify!($name)) {
-                                c.$field.$name = <$ty as Show>::from_toml(x).ok_or_else(|| $crate::ConfigError::Expected {
+                                c.$field.$name = <$ty as Show>::from_toml(x).ok_or_else(||
+                                $crate::ConfigError::Expected {
                                     key: format!("{}.{}", stringify!($field), stringify!($name)),
                                     expected: <$ty as Show>::expected(),
                                 })?;
@@ -144,7 +150,10 @@ macro_rules! settings {
                                 })
                         })?;
                         let off = repo_features(name, o.get("features"))?;
-                        c.repo.insert(name.clone(), RepoOverride { exclude: ex, features_off: off });
+                        c.repo.insert(
+                            name.clone(),
+                            RepoOverride { exclude: ex, features_off: off },
+                        );
                     }
                 }
                 Ok(c)
@@ -413,7 +422,8 @@ settings! {
         /// How many folder levels to search below a given folder for repositories. Needs a restart.
         depth: usize = 2 => Restart,
         /// Folder names never searched, besides hidden ones. Needs a restart.
-        skip_dirs: Vec<String> = vec!["node_modules".to_owned(), "target".to_owned(), ".wt".to_owned()] => Restart,
+        skip_dirs: Vec<String> =
+            vec!["node_modules".to_owned(), "target".to_owned(), ".wt".to_owned()] => Restart,
     }
     links: Links {
         /// Form of the permalink Copy permalink, Send to, action payloads and the MCP hand out:
@@ -514,7 +524,8 @@ impl Config {
             return Some((
                 "server.addr",
                 format!(
-                    "{addr} is reachable from other machines. Set server.is_public = true (or pass --public) to serve read-only there"
+                    "{addr} is reachable from other machines. Set server.is_public = true (or pass \
+                    --public) to serve read-only there"
                 ),
             ));
         }

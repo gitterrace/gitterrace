@@ -377,7 +377,8 @@ mod tests {
     #[test]
     fn front_matter_becomes_a_table() {
         let out = render(
-            "---\ntitle: Design contract\ndescription: \"The grammar: twelve rules\"\nname: 'q'\ntags:\n  - a\n  - b\n---\n# Doc\n",
+            "---\ntitle: Design contract\ndescription: \"The grammar: twelve rules\"\nname: \
+            'q'\ntags:\n  - a\n  - b\n---\n# Doc\n",
         );
         assert!(out.contains("<table class=\"fm\">"), "{out}");
         assert!(
@@ -425,7 +426,8 @@ mod tests {
     #[test]
     fn allows_safe_html() {
         let out = render(
-            "<details><summary>More</summary>\n\nbody <kbd>Ctrl</kbd> H<sub>2</sub>O<br>\n\n</details>\n",
+            "<details><summary>More</summary>\n\nbody <kbd>Ctrl</kbd> \
+            H<sub>2</sub>O<br>\n\n</details>\n",
         );
         assert!(out.contains("<details>"));
         assert!(out.contains("<summary>More</summary>"));
@@ -472,7 +474,8 @@ mod tests {
     #[test]
     fn picture_keeps_its_colour_scheme_sources() {
         let out = at(
-            "<picture>\n<source media=\"(prefers-color-scheme: dark)\" srcset=\"b/d.svg\">\n<img alt=\"x\" src=\"b/l.svg\">\n</picture>",
+            "<picture>\n<source media=\"(prefers-color-scheme: dark)\" srcset=\"b/d.svg\">\n<img \
+            alt=\"x\" src=\"b/l.svg\">\n</picture>",
             "docs",
         );
         assert!(out.contains("<picture>"), "{out}");
@@ -484,7 +487,8 @@ mod tests {
         assert!(out.contains("src=\"/raw/abc123/docs/b/l.svg\""), "{out}");
         // Other queries and candidate lists are not passed through.
         let odd = at(
-            "<picture><source media=\"print\" srcset=\"a.svg 1x, b.svg 2x\"><img src=\"l.svg\"></picture>",
+            "<picture><source media=\"print\" srcset=\"a.svg 1x, b.svg 2x\"><img \
+            src=\"l.svg\"></picture>",
             "",
         );
         assert!(!odd.contains("media=") && !odd.contains("srcset="), "{odd}");
@@ -521,7 +525,8 @@ mod tests {
     #[test]
     fn gfm_tables_tasks_strike_footnotes_autolinks() {
         let out = render(
-            "|a|b|\n|:-|-:|\n|1|2|\n\n- [x] done\n- [ ] todo\n\n~~gone~~\n\nnote[^1]\n\n[^1]: the note\n\nhttps://example.com\n",
+            "|a|b|\n|:-|-:|\n|1|2|\n\n- [x] done\n- [ ] todo\n\n~~gone~~\n\nnote[^1]\n\n[^1]: the \
+            note\n\nhttps://example.com\n",
         );
         assert!(out.contains("<table data-line=\"1-3\">"), "{out}");
         assert!(out.contains("text-align: left"));

@@ -80,7 +80,9 @@ pub fn demo_md(ws: &Workspace) -> String {
 fn shots_md() -> String {
     let (name, alt, _) = crate::site::SHOTS[0];
     format!(
-        "<picture>\n<source media=\"(prefers-color-scheme: dark)\" srcset=\"docs/screenshots/{name}-dark.png\">\n<img src=\"docs/screenshots/{name}-light.png\" alt=\"{alt}\">\n</picture>\n"
+        "<picture>\n<source media=\"(prefers-color-scheme: \
+        dark)\" srcset=\"docs/screenshots/{name}-dark.png\">\n<img \
+        src=\"docs/screenshots/{name}-light.png\" alt=\"{alt}\">\n</picture>\n"
     )
 }
 

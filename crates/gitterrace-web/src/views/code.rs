@@ -196,7 +196,8 @@ pub(crate) fn blame_html(r: &Render, path: &str, lines: &[BlameLine], now: i64) 
         if first {
             let _ = write!(
                 out,
-                "<td class=\"who h{heat}\"><div class=\"bl\">{}<a class=\"who\" href=\"{}\">{}</a><span class=\"muted\">{}</span></div></td>",
+                "<td class=\"who h{heat}\"><div class=\"bl\">{}<a \
+                class=\"who\" href=\"{}\">{}</a><span class=\"muted\">{}</span></div></td>",
                 sha_link(&l.commit),
                 esc(&author_href(&l.author)),
                 esc(&l.author),

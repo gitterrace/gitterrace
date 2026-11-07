@@ -109,7 +109,8 @@ async fn git_state_pages_and_banner() {
     let short = gitterrace_git::short_id(&head);
     assert!(
         body.contains(&format!(
-            "id=\"headstate\"><div class=\"wrap\">HEAD is detached at <a class=\"sha\" href=\"/commit/{head}\" data-tip=\"{head}\">{short}</a>"
+            "id=\"headstate\"><div class=\"wrap\">HEAD is detached at <a \
+            class=\"sha\" href=\"/commit/{head}\" data-tip=\"{head}\">{short}</a>"
         )),
         "{body}"
     );

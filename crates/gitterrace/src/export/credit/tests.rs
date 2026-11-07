@@ -2,7 +2,8 @@ use gitterrace_testkit::Fixture;
 
 use super::{Credit, add_footer, public_https};
 
-const MIT: &str = "MIT License\n\nCopyright (c) 2024 A\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\nof this software\n";
+const MIT: &str = "MIT License\n\nCopyright (c) 2024 A\n\nPermission is hereby granted, free of \
+    charge, to any person obtaining a copy\nof this software\n";
 
 fn credit_for(
     dir: &std::path::Path,

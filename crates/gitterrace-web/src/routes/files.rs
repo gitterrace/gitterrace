@@ -247,8 +247,7 @@ pub(super) async fn blame(
         let path = path.trim_matches('/').to_owned();
         let lines = a.repo.blame(&id, &path)?;
         // Blame is empty for binary and oversized files; say which, from the header size.
-        let too_large =
-            lines.is_empty() && a.repo.blob(&id, &path)?.size > a.repo.text_limit();
+        let too_large = lines.is_empty() && a.repo.blob(&id, &path)?.size > a.repo.text_limit();
         let raw = crate::features::href_if(
             Feature::Raw,
             &format!("/raw/{}/{}", fmt::enc_seg(&rev), fmt::enc_path(&path)),
@@ -265,7 +264,8 @@ pub(super) async fn blame(
                 "<p class=\"muted pad\">File too large to blame.</p>".to_owned()
             } else if too_large {
                 format!(
-                    "<p class=\"muted pad\">File too large to blame. <a href=\"{}\">View raw</a>.</p>",
+                    "<p class=\"muted pad\">File too large to blame. <a href=\"{}\">View \
+                    raw</a>.</p>",
                     fmt::esc(&raw)
                 )
             } else {

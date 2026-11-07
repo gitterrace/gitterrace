@@ -25,7 +25,10 @@ const PROGRAM_KEY: &str = "GitterraceProgram";
 /// It replaces osacompile's script icon, and the asset catalogue that would override it goes.
 const ICON: &[u8] = include_bytes!("../assets/gitterrace.icns");
 const DESKTOP_NAME: &str = "gitterrace-open.desktop";
-const LSREGISTER: &str = "/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister";
+const LSREGISTER: &str = concat!(
+    "/System/Library/Frameworks/CoreServices.framework/Frameworks/",
+    "LaunchServices.framework/Support/lsregister"
+);
 
 #[expect(
     clippy::print_stdout,
@@ -57,7 +60,8 @@ fn is_wsl() -> bool {
 /// the background so the app returns at once.
 pub(crate) fn applescript(exe: &Path) -> String {
     format!(
-        "on open location theURL\n\tdo shell script quoted form of \"{}\" & \" open \" & quoted form of theURL & \" >/dev/null 2>&1 &\"\nend open location\n",
+        "on open location theURL\n\tdo shell script quoted form of \"{}\" & \" open \" & quoted \
+        form of theURL & \" >/dev/null 2>&1 &\"\nend open location\n",
         exe.display()
             .to_string()
             .replace('\\', "\\\\")
@@ -128,7 +132,8 @@ fn macos(home: &Path, exe: &Path, uninstall: bool) -> anyhow::Result<()> {
         );
     }
     println!(
-        "wrote {} (runs: {} open <url>)\nregistered gitterrace:// with LaunchServices\nremove with: git terrace install-handler --uninstall",
+        "wrote {} (runs: {} open <url>)\nregistered gitterrace:// with LaunchServices\nremove \
+        with: git terrace install-handler --uninstall",
         app.display(),
         exe.display()
     );
@@ -258,7 +263,8 @@ fn hint_for(app: &Path, exe: &Path) -> Option<String> {
         "a missing"
     };
     Some(format!(
-        "gitterrace:// links run {why} program ({}). Run `git terrace install-handler` to point them here",
+        "gitterrace:// links run {why} program ({}). Run `git terrace install-handler` to point \
+        them here",
         runs.display()
     ))
 }
@@ -321,7 +327,8 @@ fn linux(home: &Path, exe: &Path, uninstall: bool) -> anyhow::Result<()> {
     std::fs::write(&file, desktop_entry(exe))?;
     tool(Command::new("xdg-mime").args(["default", DESKTOP_NAME, "x-scheme-handler/gitterrace"]))?;
     println!(
-        "wrote {}\nran: xdg-mime default {DESKTOP_NAME} x-scheme-handler/gitterrace\nremove with: git terrace install-handler --uninstall",
+        "wrote {}\nran: xdg-mime default {DESKTOP_NAME} x-scheme-handler/gitterrace\nremove with: \
+        git terrace install-handler --uninstall",
         file.display()
     );
     Ok(())
@@ -344,7 +351,9 @@ pub(crate) fn windows_steps(exe: &Path) -> String {
         "Windows: nothing was written. To open gitterrace:// links, run in a terminal:\n\
          \x20 reg add HKCU\\Software\\Classes\\gitterrace /ve /d \"URL:gitterrace link\" /f\n\
          \x20 reg add HKCU\\Software\\Classes\\gitterrace /v \"URL Protocol\" /d \"\" /f\n\
-         \x20 reg add HKCU\\Software\\Classes\\gitterrace\\shell\\open\\command /ve /d \"\\\"{exe}\\\" open \\\"%1\\\"\" /f\n\
+         \x20 reg add HKCU\\Software\\Classes\\gitterrace\\shell\\open\\command \
+         /ve /d \"\\\"{exe}\\\" \
+         open \\\"%1\\\"\" /f\n\
          remove with: reg delete HKCU\\Software\\Classes\\gitterrace /f\n"
     )
 }
@@ -380,7 +389,8 @@ mod tests {
     fn golden_macos_content() {
         assert_eq!(
             applescript(Path::new("/opt/bin/git-terrace")),
-            "on open location theURL\n\tdo shell script quoted form of \"/opt/bin/git-terrace\" & \" open \" & quoted form of theURL & \" >/dev/null 2>&1 &\"\nend open location\n"
+            "on open location theURL\n\tdo shell script quoted form of \"/opt/bin/git-terrace\" & \
+            \" open \" & quoted form of theURL & \" >/dev/null 2>&1 &\"\nend open location\n"
         );
         assert_eq!(
             url_types_json(),
@@ -392,7 +402,9 @@ mod tests {
     fn golden_desktop_entry() {
         assert_eq!(
             desktop_entry(Path::new("/opt/bin/git-terrace")),
-            "[Desktop Entry]\nType=Application\nName=gitterrace link opener\nExec=\"/opt/bin/git-terrace\" open %u\nNoDisplay=true\nTerminal=false\nMimeType=x-scheme-handler/gitterrace;\n"
+            "[Desktop Entry]\nType=Application\nName=gitterrace link \
+            opener\nExec=\"/opt/bin/git-terrace\" open \
+            %u\nNoDisplay=true\nTerminal=false\nMimeType=x-scheme-handler/gitterrace;\n"
         );
     }
 
@@ -511,7 +523,8 @@ mod tests {
         std::fs::write(&here, "").expect("exe");
         let with = |p: &Path| {
             let body = format!(
-                "{}\n\t<key>{MARKER_KEY}</key>\n\t<true/>\n\t<key>{PROGRAM_KEY}</key>\n\t<string>{}</string>",
+                "{}\n\t<key>{MARKER_KEY}</key>\n\t<true/>\n\t<key>{PROGRAM_KEY}</key>\n\
+                 \t<string>{}</string>",
                 id(),
                 p.display()
             );

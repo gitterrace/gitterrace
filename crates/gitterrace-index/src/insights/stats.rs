@@ -175,7 +175,8 @@ impl Counted<'_> {
                 #[expect(
                     clippy::option_if_let_else,
                     clippy::single_match_else,
-                    reason = "the miss arm inserts into path_dir, which get() still borrows in a closure"
+                    reason = "the miss arm inserts into path_dir, which get() still borrows in a \
+                        closure"
                 )]
                 let (slot, new_path) = match path_dir.get(&f.path) {
                     Some(s) => (*s, false),

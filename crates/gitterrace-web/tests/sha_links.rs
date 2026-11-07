@@ -79,7 +79,10 @@ fn bare_ids(html: &str) -> Vec<String> {
 fn scanner_flags_a_plain_id() {
     let old = r#"<p>parent <a href="/commit/abc1234def"><code>abc1234d</code></a></p>"#;
     assert_eq!(bare_ids(old), vec!["abc1234d".to_owned()]);
-    let new = r#"<p>parent <a class="sha" href="/commit/abc1234def" data-tip="abc1234def">abc1234d</a></p>"#;
+    let new = concat!(
+        r#"<p>parent <a class="sha" href="/commit/abc1234def" "#,
+        r#"data-tip="abc1234def">abc1234d</a></p>"#,
+    );
     assert!(bare_ids(new).is_empty());
     let script = "<script>var x = 'abc1234d';</script>";
     assert!(bare_ids(script).is_empty());

@@ -84,7 +84,8 @@ mod tests {
         let w = ago(0, 86_400 * 3);
         assert_eq!(
             w.to_string(),
-            "<time data-tip=\"1970-01-01 00:00 UTC\" datetime=\"1970-01-01T00:00:00Z\" tabindex=\"0\">3 days ago</time>"
+            "<time data-tip=\"1970-01-01 00:00 \
+            UTC\" datetime=\"1970-01-01T00:00:00Z\" tabindex=\"0\">3 days ago</time>"
         );
     }
 

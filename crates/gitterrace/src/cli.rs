@@ -106,7 +106,8 @@ pub(crate) enum Command {
         file_kb: u64,
         /// Most pages to write, folded diff fragments included. Overrides
         /// `limits.export_pages`. Past it the export stops and writes nothing.
-        #[arg(long, value_name = "N", value_parser = clap::value_parser!(u64).range(1..=10_000_000))]
+        #[arg(long, value_name = "N", value_parser = clap::value_parser!(u64).range(1..=10_000_000)
+        )]
         export_pages: Option<u64>,
         /// Credit a repository that is someone else's project (a demo), as `name=url`: its
         /// pages name and link it in the snapshot banner. `name` is the repository's folder

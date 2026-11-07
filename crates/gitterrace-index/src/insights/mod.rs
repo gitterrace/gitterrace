@@ -322,7 +322,9 @@ impl<'a> Insights<'a> {
     }
 
     pub(crate) fn follow(&self) -> &files::Follow {
-        self.d.follow.get_or_init(|| files::Follow::build(self.source()))
+        self.d
+            .follow
+            .get_or_init(|| files::Follow::build(self.source()))
     }
 }
 
@@ -425,7 +427,8 @@ fn decide_with(paths: &[Arc<str>], decide: impl Fn(&str) -> bool + Sync) -> Vec<
     std::thread::scope(|s| {
         #[expect(
             clippy::needless_collect,
-            reason = "all threads must be spawned before the first join, or they would run one after another"
+            reason = "all threads must be spawned before the first join, or they would run one \
+                after another"
         )]
         let parts: Vec<_> = paths
             .chunks(chunk)

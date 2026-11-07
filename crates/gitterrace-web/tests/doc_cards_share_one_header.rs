@@ -59,14 +59,24 @@ fn bad_cards(body: &str) -> Vec<String> {
 #[test]
 fn a_hand_written_header_is_caught() {
     assert_eq!(
-        bad_cards("<div class=\"card readme\"><div class=\"readme-h\">README</div><div class=\"markdown-body\"></div></div>").len(),
+        bad_cards(
+            "<div class=\"card readme\"><div class=\"readme-h\">README</div><div \
+            class=\"markdown-body\"></div></div>"
+        )
+        .len(),
         1
     );
     assert_eq!(
         bad_cards("<div class=\"card\"><div class=\"doc-head\">x</div><pre></pre></div>").len(),
         1
     );
-    assert!(bad_cards("<div class=\"card x\"><div class=\"dochead sticky\" data-dochead></div><div class=\"markdown-body\"></div></div>").is_empty());
+    assert!(
+        bad_cards(
+            "<div class=\"card x\"><div class=\"dochead sticky\" data-dochead></div><div \
+        class=\"markdown-body\"></div></div>"
+        )
+        .is_empty()
+    );
 }
 
 /// The overview, a folder and a Markdown file, with one and with several about documents.

@@ -266,7 +266,9 @@ fn line(counts: &[u32]) -> String {
         .collect();
     let last = counts.len() - 1;
     format!(
-        "<svg class=\"spark s1\" viewBox=\"0 0 {last} {SPARK_H}\" preserveAspectRatio=\"none\" aria-hidden=\"true\"><path class=\"base\" d=\"M0 {b}H{last}\"/><polyline points=\"{}\"/><path class=\"dot\" d=\"M{last} {:.1}h0\"/></svg>",
+        "<svg class=\"spark s1\" viewBox=\"0 0 {last} {SPARK_H}\" preserveAspectRatio=\"none\" \
+         aria-hidden=\"true\"><path class=\"base\" d=\"M0 {b}H{last}\"/><polyline \
+         points=\"{}\"/><path class=\"dot\" d=\"M{last} {:.1}h0\"/></svg>",
         pts.join(" "),
         y(counts.last().copied().unwrap_or(0)),
         b = SPARK_H - 0.5,

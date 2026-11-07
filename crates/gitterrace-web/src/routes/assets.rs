@@ -64,15 +64,17 @@ const FONTS: [(&str, &[u8]); 3] = [
     ),
     (
         "bricolage-grotesque.woff2",
-        include_bytes!(
-            "../../../../shared/schwarzwald/fonts/bricolage-grotesque/bricolage-grotesque-latin-wght-normal.woff2"
-        ),
+        include_bytes!(concat!(
+            "../../../../shared/schwarzwald/fonts/",
+            "bricolage-grotesque/bricolage-grotesque-latin-wght-normal.woff2"
+        )),
     ),
     (
         "jetbrains-mono.woff2",
-        include_bytes!(
-            "../../../../shared/schwarzwald/fonts/jetbrains-mono/jetbrains-mono-latin-wght-normal.woff2"
-        ),
+        include_bytes!(concat!(
+            "../../../../shared/schwarzwald/fonts/",
+            "jetbrains-mono/jetbrains-mono-latin-wght-normal.woff2"
+        )),
     ),
 ];
 

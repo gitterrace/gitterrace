@@ -19,7 +19,8 @@ JSON is `snake_case`. The same endpoints as `OpenAPI` 3.1: [openapi.json](openap
 
 The API of each repository lives at `/r/{name}/api/v1`.
 
-Rust: `gitterrace_api::router(ApiState)` (nest under `/api/v1`), `gitterrace_api::serve_mcp(path, config)`, `gitterrace_api::serve_mcp_repos(scope, repos, config)`.
+Rust: `gitterrace_api::router(ApiState)` (nest under `/api/v1`), \
+`gitterrace_api::serve_mcp(path, config)`, `gitterrace_api::serve_mcp_repos(scope, repos, config)`.
 ";
 
 #[expect(
@@ -79,7 +80,9 @@ pub fn render() -> Out {
     }
 
     s.push_str(
-        "\n## Insights\n\nServed at `GET /insights/{name}`. Every number is counted by one rule, see\n[How numbers are counted](internals/counting.md).\n\n| Name | Summary |\n| --- | --- |\n",
+        "\n## Insights\n\nServed at `GET /insights/{name}`. Every number is counted by one rule, \
+        see\n[How numbers are counted](internals/counting.md).\n\n| Name | Summary |\n| --- | --- \
+        |\n",
     );
     for (name, summary) in insight_list() {
         let _ = writeln!(s, "| `{name}` | {summary} |");

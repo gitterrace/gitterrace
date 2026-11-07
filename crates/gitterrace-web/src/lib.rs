@@ -209,7 +209,8 @@ fn repo_router_tasks(
 /// is kept, so a caller can still tell the cases apart.
 fn bind_error(addr: SocketAddr, e: &io::Error) -> io::Error {
     let hint = if e.kind() == io::ErrorKind::AddrInUse {
-        "; another git terrace or other server is using that port: stop it, or pass --addr with another port (127.0.0.1:0 picks a free one)"
+        "; another git terrace or other server is using that port: stop it, or pass --addr with \
+        another port (127.0.0.1:0 picks a free one)"
     } else {
         ""
     };
@@ -516,7 +517,8 @@ pub async fn serve_on(
     }
     if public {
         tracing::warn!(
-            "public: anyone who can reach this address reads the committed history. Working tree, stashes, live updates and actions are off"
+            "public: anyone who can reach this address reads the committed history. Working tree, \
+            stashes, live updates and actions are off"
         );
     }
     tracing::info!("serving {name} on http://{addr}");
@@ -544,7 +546,8 @@ fn refuse_lan(addr: SocketAddr, cfg: &Config) -> io::Result<()> {
     Err(io::Error::new(
         io::ErrorKind::PermissionDenied,
         format!(
-            "{addr} is reachable from other machines. Pass --public (server.is_public = true) to serve read-only there"
+            "{addr} is reachable from other machines. Pass --public (server.is_public = true) to \
+            serve read-only there"
         ),
     ))
 }

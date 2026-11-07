@@ -114,7 +114,9 @@ macro_rules! string_enum {
 
         impl<'de> $crate::__serde::Deserialize<'de> for $name {
             fn deserialize<D: $crate::__serde::Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
-                let s = <std::borrow::Cow<'de, str> as $crate::__serde::Deserialize>::deserialize(d)?;
+                let s = <std::borrow::Cow<'de, str> as $crate::__serde::Deserialize>::deserialize(
+                    d,
+                )?;
                 s.parse().map_err(<D::Error as $crate::__serde::de::Error>::custom)
             }
         }

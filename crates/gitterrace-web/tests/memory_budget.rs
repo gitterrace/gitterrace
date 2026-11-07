@@ -361,7 +361,8 @@ fn memory_stays_in_budget_at_every_size() {
         for (what, v) in [("idle", idle), ("after sweep", swept)] {
             if v > start + BUDGET_MB * MB {
                 bad.push(format!(
-                    "{n} commits, {what}: {} MB above the just-started {} MB, budget {BUDGET_MB} MB",
+                    "{n} commits, {what}: {} MB above the just-started {} MB, budget {BUDGET_MB} \
+                    MB",
                     v.saturating_sub(start) / MB,
                     start / MB
                 ));
@@ -451,7 +452,8 @@ fn idle_memory_is_flat_in_tree_size() {
     let (small, large) = (idle[0].1, idle[1].1);
     assert!(
         large <= small + GROWTH_MB * MB,
-        "idle grows with the tree: {} MB at {wide} files, {} MB at 1000, more than {GROWTH_MB} MB apart",
+        "idle grows with the tree: {} MB at {wide} files, {} MB at 1000, more than {GROWTH_MB} MB \
+        apart",
         large / MB,
         small / MB
     );

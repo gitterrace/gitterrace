@@ -464,7 +464,8 @@ const fn metric_hint(m: Metric) -> &'static str {
         Metric::Added => "Ordered by lines added. The sparkline is lines added",
         Metric::Deleted => "Ordered by lines deleted. The sparkline is lines deleted",
         Metric::Net => {
-            "Ordered by lines added minus lines deleted. The sparkline is that net, never below zero"
+            "Ordered by lines added minus lines deleted. The sparkline is that net, never below \
+            zero"
         }
     }
 }

@@ -4,7 +4,8 @@
 #![expect(
     clippy::many_single_char_names,
     clippy::too_many_lines,
-    reason = "geometry and colour math reads best with x, y, w, h; one linear sequence, splitting it hides the flow"
+    reason = "geometry and colour math reads best with x, y, w, h; one linear sequence, splitting \
+        it hides the flow"
 )]
 
 use std::collections::HashMap;
@@ -271,7 +272,8 @@ pub(crate) fn section(
     if f.scope().is_none() {
         groups.push(Group {
             title: "Scopes",
-            hint: "The part of the code a commit says it touches, from type(scope). Click one to narrow to it. None means no scope given.",
+            hint: "The part of the code a commit says it touches, from type(scope). Click one to \
+                narrow to it. None means no scope given.",
             lines: false,
             rows: label_rows(&scope_counts, |l| f.link(BASE, Dim::Scope, l)),
         });
@@ -302,7 +304,8 @@ pub(crate) fn section(
         .collect();
     groups.push(Group {
         title: "Directories touched",
-        hint: "Where these commits changed files, by directory, with lines added and removed. Click one to restrict to that path.",
+        hint: "Where these commits changed files, by directory, with lines added and removed. \
+            Click one to restrict to that path.",
         lines: true,
         rows: churn_rows(dirs),
     });
@@ -347,7 +350,8 @@ pub(crate) fn section(
             .collect();
         groups.push(Group {
             title: "Who",
-            hint: "Authors of these commits, by commit count. Click a name to add them as a filter.",
+            hint: "Authors of these commits, by commit count. Click a name to add them as a \
+                filter.",
             lines: true,
             rows: churn_rows(people),
         });

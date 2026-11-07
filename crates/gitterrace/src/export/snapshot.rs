@@ -14,7 +14,8 @@ use crate::export::Project;
 /// and every form (the log's path filter, compare, the search page): each asks the server for
 /// a page the export never wrote. Copy permalink stays: it needs nothing but the page.
 pub(super) const SNAPSHOT_CSS: &str = ".snapshot{background:var(--accent-soft);color:var(--fg);\
- border-bottom:1px solid var(--line-strong);font:var(--text-sm)/1.4 var(--sans);padding:var(--space-2) 0}\
+ border-bottom:1px solid var(--line-strong);\
+ font:var(--text-sm)/1.4 var(--sans);padding:var(--space-2) 0}\
  .snapshot a{color:var(--accent-fg);font-weight:var(--weight-semibold)}\
  body[data-static] .topsearch,body[data-static] .actbtn,body[data-static] .wtchip,\
  body[data-static] .livenote,body[data-static] .actnote,\

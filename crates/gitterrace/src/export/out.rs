@@ -141,7 +141,8 @@ pub(super) fn check_out(repos: &[PathBuf], out: &Path, force: bool) -> anyhow::R
             .any(|p| p.starts_with(&root));
         if inside {
             bail!(
-                "{} holds a repository or the current folder. It cannot be cleared for a fresh export",
+                "{} holds a repository or the current folder. It cannot be cleared for a fresh \
+                export",
                 out.display()
             );
         }

@@ -17,7 +17,8 @@ use tikv_jemalloc_ctl::{Access, AsName};
 #[expect(
     clippy::print_stdout,
     clippy::print_stderr,
-    reason = "the harness reads the answer from stdout; the build note goes to stderr before logging starts"
+    reason = "the harness reads the answer from stdout; the build note goes to stderr before \
+        logging starts"
 )]
 pub(crate) fn start() -> std::io::Result<bool> {
     release_freed_pages()?;
@@ -29,7 +30,8 @@ pub(crate) fn start() -> std::io::Result<bool> {
     if std::env::var_os("TEST_ALLOC_DECAY").is_none() {
         if arenas != 1 {
             eprintln!(
-                "note: built without the repository's allocator setting, idle memory is a few MB higher"
+                "note: built without the repository's allocator setting, idle memory is a few MB \
+                higher"
             );
         }
         return Ok(false);

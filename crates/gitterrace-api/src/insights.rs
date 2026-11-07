@@ -44,17 +44,20 @@ pub struct Insight {
 pub const INSIGHTS: &[Insight] = &[
     Insight {
         name: "summary",
-        summary: "Commits, authors, files and lines in the period, and in the period before it (period).",
+        summary: "Commits, authors, files and lines in the period, and in the period before it \
+            (period).",
         compute: |c, _| val(&c.summary()),
     },
     Insight {
         name: "activity",
-        summary: "Commits and lines per bucket, empty ones included, plus the weekday-by-hour punch card. The period sets the unit (period).",
+        summary: "Commits and lines per bucket, empty ones included, plus the weekday-by-hour \
+            punch card. The period sets the unit (period).",
         compute: |c, _| val(&c.rhythm()),
     },
     Insight {
         name: "contributors",
-        summary: "People with commits, lines, active days and a per-bucket series, bots flagged (period).",
+        summary: "People with commits, lines, active days and a per-bucket series, bots flagged \
+            (period).",
         compute: |c, q| {
             let m = q
                 .metric
@@ -103,7 +106,8 @@ pub const HEAD_INSIGHTS: &[(&str, &str)] = &[
     ),
     (
         "ownership",
-        "Knowledge share and bus factor per directory two levels deep, weighted by size now (period).",
+        "Knowledge share and bus factor per directory two levels deep, weighted by size now \
+        (period).",
     ),
 ];
 

@@ -96,7 +96,8 @@ const fn yes(b: bool) -> &'static str {
 
 fn key_table(title: &str, intro: &str, items: &[Item]) -> String {
     let mut s = format!(
-        "### {title}\n\n{intro}\n\n| Key | Type | Required | Default | Description |\n| --- | --- | --- | --- | --- |\n"
+        "### {title}\n\n{intro}\n\n| Key | Type | Required | Default | Description |\n| --- | --- \
+        | --- | --- | --- |\n"
     );
     for i in items {
         let _ = writeln!(
@@ -180,7 +181,8 @@ pub fn starter_entries() -> Vec<Entry> {
 
 fn starter() -> String {
     let mut s = String::from(
-        "| Entry | Kind | On | What it does | Needs in `vars` | Commit lookup |\n| --- | --- | --- | --- | --- | --- |\n",
+        "| Entry | Kind | On | What it does | Needs in `vars` | Commit lookup |\n| --- | --- | --- \
+        | --- | --- | --- |\n",
     );
     let entries = starter_entries();
     for e in &entries {

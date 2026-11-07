@@ -25,7 +25,8 @@ pub(crate) enum OpenError {
     #[error("{0}")]
     BadLink(#[from] gitterrace_actions::LinkError),
     #[error(
-        "no local clone of {0} known. Run `git terrace` in it once, or list its folder in links.roots"
+        "no local clone of {0} known. Run `git terrace` in it once, or list its folder in \
+        links.roots"
     )]
     Unknown(String),
 }
@@ -260,7 +261,8 @@ fn ensure_server(
                     Ok(_) => "a gitterrace server that added this repository but does not open it"
                         .to_owned(),
                     Err(why) => format!(
-                        "a gitterrace server that does not serve this repository and could not add it ({why})"
+                        "a gitterrace server that does not serve this repository and could not add \
+                        it ({why})"
                     ),
                 }
             } else {
@@ -270,7 +272,9 @@ fn ensure_server(
             let other = l.local_addr()?;
             drop(l);
             eprintln!(
-                "gitterrace: {addr} is held by {what}; it is left running and this repository gets its own server at {other}. Restart the server on {addr} with this repository added to see it there."
+                "gitterrace: {addr} is held by {what}; it is left running and this repository gets \
+                its own server at {other}. Restart the server on {addr} with this repository added \
+                to see it there."
             );
             other
         }
@@ -344,7 +348,8 @@ pub(crate) fn remove_running(
         Listener::Gitterrace => {}
         Listener::Free => anyhow::bail!("no gitterrace server is running on {addr}"),
         Listener::Other => anyhow::bail!(
-            "{addr} is held by a program that is not a gitterrace server of this user, or one started with --public"
+            "{addr} is held by a program that is not a gitterrace server of this user, or one \
+            started with --public"
         ),
     }
     Ok(
@@ -416,7 +421,8 @@ fn secret_request(
     // Building the repository's router opens its index; give it longer than a probe.
     s.set_read_timeout(Some(READY_WAIT))?;
     let req = format!(
-        "{method} /_repos HTTP/1.1\r\nHost: {addr}\r\n{}: {token}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+        "{method} /_repos HTTP/1.1\r\nHost: {addr}\r\n{}: {token}\r\nContent-Type: \
+        application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
         gitterrace_web::ADD_TOKEN_HEADER,
         body.len()
     );

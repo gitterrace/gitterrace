@@ -295,7 +295,8 @@ async fn a_refused_actions_file_is_in_the_first_paint() {
     let file = conf.join("actions.toml");
     std::fs::write(
         &file,
-        "version = 1\n[[action]]\nid = \"x\"\nlabel = \"X\"\nkinds = [\"page\"]\ncommand = [\"true\"]\nenv = [\"\"]\n",
+        "version = 1\n[[action]]\nid = \"x\"\nlabel = \"X\"\nkinds = [\"page\"]\ncommand = \
+        [\"true\"]\nenv = [\"\"]\n",
     )
     .expect("write");
     std::fs::set_permissions(&file, std::fs::Permissions::from_mode(0o600)).expect("chmod");
@@ -424,7 +425,8 @@ async fn action_chords_are_wired_and_listed_in_the_help_sheet() {
     let file = conf.join("actions.toml");
     std::fs::write(
         &file,
-        "version = 1\n[[action]]\nid = \"x\"\nlabel = \"X\"\nkinds = [\"page\"]\ncommand = [\"/bin/echo\"]\nkey = \"x\"\n",
+        "version = 1\n[[action]]\nid = \"x\"\nlabel = \"X\"\nkinds = [\"page\"]\ncommand = \
+        [\"/bin/echo\"]\nkey = \"x\"\n",
     )
     .expect("write");
     std::fs::set_permissions(&file, std::fs::Permissions::from_mode(0o600)).expect("chmod");

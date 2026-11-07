@@ -24,7 +24,8 @@ const fn page(shown: &'static str, does: &'static str, routes: &'static [&'stati
 pub const PAGES: &[Page] = &[
     page(
         "`/`",
-        "README, last commit, file list, key numbers. The server's own `/` forwards to the one repository, or lists several",
+        "README, last commit, file list, key numbers. The server's own `/` forwards to the one \
+        repository, or lists several",
         &["/"],
     ),
     page(
@@ -116,12 +117,15 @@ pub const PAGES: &[Page] = &[
     ),
     page(
         "`/r/{name}/...`, `/api/repos`",
-        "The prefix of every per-repository row above, also when one is served; and the server-wide list the switcher reads",
+        "The prefix of every per-repository row above, also when one is served; and the \
+        server-wide list the switcher reads",
         &["/r/{name}", "/r/{name}/", "/r/{name}/{*rest}", "/api/repos"],
     ),
     page(
         "`POST /_repos`, `DELETE /_repos`, `GET /_repos?nonce=N`",
-        "Adds a repository to the running server for `git terrace open`, or takes one off for `git terrace remove`: loopback, no browser, secret from a 0600 file. The GET proves the secret by hashing it with the nonce",
+        "Adds a repository to the running server for `git terrace open`, or takes one off for `git \
+        terrace remove`: loopback, no browser, secret from a 0600 file. The GET proves the secret \
+        by hashing it with the nonce",
         &["/_repos"],
     ),
     page(

@@ -136,7 +136,8 @@ async fn export_capped(
     // checkout. An ignored folder inside a repo is fine; its root is not.
     if dest.join(".git").exists() {
         bail!(
-            "{} is the root of a git repository. Choose an output folder (usage: export <OUT> [REPO])",
+            "{} is the root of a git repository. Choose an output folder (usage: export <OUT> \
+            [REPO])",
             dest.display()
         );
     }
@@ -443,7 +444,8 @@ fn headers_file() -> String {
          X-Frame-Options: DENY\n  Referrer-Policy: strict-origin-when-cross-origin\n  \
          Strict-Transport-Security: max-age=63072000; includeSubDomains\n  \
          X-Robots-Tag: noindex\n\n\
-         /r/:name/raw/*\n  Content-Security-Policy: sandbox; default-src 'none'; style-src 'unsafe-inline'\n\n\
+         /r/:name/raw/*\n  Content-Security-Policy: sandbox; \
+         default-src 'none'; style-src 'unsafe-inline'\n\n\
          /static/*\n  Cache-Control: public, max-age=3600\n"
     )
 }

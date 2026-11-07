@@ -207,13 +207,15 @@ pub const ENDPOINTS: &[Endpoint] = &[
             p(
                 "period",
                 "string",
-                "`1w`, `1m`, `3m`, `1y` or `all` (default): the window, ending at the newest commit. Sets the bucket unit.",
+                "`1w`, `1m`, `3m`, `1y` or `all` (default): the window, ending at the newest \
+                commit. Sets the bucket unit.",
             ),
             p("label", "string", "`kind` or `scope`."),
             p(
                 "metric",
                 "string",
-                "`contributors` only: `commits` (default), `added`, `deleted` or `net`. Sets the order and the per-bucket series.",
+                "`contributors` only: `commits` (default), `added`, `deleted` or `net`. Sets the \
+                order and the per-bucket series.",
             ),
             p("limit", "integer", "Cap on rows."),
             p(

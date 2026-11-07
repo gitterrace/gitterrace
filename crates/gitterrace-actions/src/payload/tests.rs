@@ -182,7 +182,10 @@ fn bad_locators_are_refused() {
 
 #[test]
 fn request_schema_is_strict() {
-    let ok = r#"{"action":"a","kind":"line","locator":{"repo":"r","rev":"main","path":"x","lines":{"start":1,"end":2}}}"#;
+    let ok = concat!(
+        r#"{"action":"a","kind":"line","locator":{"repo":"r","rev":"main","path":"x","#,
+        r#""lines":{"start":1,"end":2}}}"#,
+    );
     assert!(serde_json::from_str::<RunRequest>(ok).is_ok());
     for bad in [
         r#"{"action":"a","kind":"line","locator":{"repo":"r","rev":"main"},"command":["sh"]}"#,

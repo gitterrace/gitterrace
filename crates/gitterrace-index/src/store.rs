@@ -19,7 +19,8 @@ pub(crate) const LOCK_FILE: &str = "lock";
 /// Why a cache cannot be written by this build.
 pub(crate) fn newer_message(found: &str) -> String {
     format!(
-        "the cache in this repository has format {found}, newer than this build's {FORMAT_VERSION}; \
+        "the cache in this repository has format {found}, newer than this build's \
+         {FORMAT_VERSION}; \
          leaving it untouched. Run the newer gitterrace, or delete .git/gitterrace to rebuild"
     )
 }
@@ -179,7 +180,8 @@ fn has_foreign(dir: &Path) -> io::Result<bool> {
 }
 
 /// Holds the cache's writer lock until dropped. Every writer, in this process or another
-/// (`serve` beside `mcp`), takes it before reading the set it extends, so two writers never build on one manifest.
+/// (`serve` beside `mcp`), takes it before reading the set it extends, so two writers never build
+/// on one manifest.
 pub(crate) struct WriteLock(File);
 
 impl WriteLock {

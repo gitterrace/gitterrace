@@ -354,7 +354,14 @@ fn supervise(mut child: Child, stdin: Option<Vec<u8>>, timeout: Duration, keep: 
                 .map_or_else(String::new, |sig| format!("killed by signal {sig}"))
         })
     };
-    tracing::debug!(target: "gitterrace::actions", ok, ?exit, stdout = %String::from_utf8_lossy(&stdout), stderr = %String::from_utf8_lossy(&stderr), "action finished");
+    tracing::debug!(
+        target: "gitterrace::actions",
+        ok,
+        ?exit,
+        stdout = %String::from_utf8_lossy(&stdout),
+        stderr = %String::from_utf8_lossy(&stderr),
+        "action finished"
+    );
     Outcome {
         ok,
         exit,

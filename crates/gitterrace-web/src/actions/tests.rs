@@ -215,15 +215,18 @@ async fn run_route_security_table() {
     }
     // 12. unknown action, kind not allowed, unknown field, a command field.
     for b in [
-            body("nope", "page", ""),
-            body("echo", "hunk", r#","path":"src/a.rs""#),
-            body("echo", "page", r#","cwd":"/""#),
-            r#"{"action":"echo","kind":"page","command":["sh"],"locator":{"repo":"evil","rev":"main"}}"#
-                .to_owned(),
-            body("echo", "page", "").replace("evil", "other"),
-        ] {
-            assert_eq!(send(&on, Req::ok(&tok, b.clone())).await.0, 400, "{b}");
-        }
+        body("nope", "page", ""),
+        body("echo", "hunk", r#","path":"src/a.rs""#),
+        body("echo", "page", r#","cwd":"/""#),
+        concat!(
+            r#"{"action":"echo","kind":"page","command":["sh"],"#,
+            r#""locator":{"repo":"evil","rev":"main"}}"#,
+        )
+        .to_owned(),
+        body("echo", "page", "").replace("evil", "other"),
+    ] {
+        assert_eq!(send(&on, Req::ok(&tok, b.clone())).await.0, 400, "{b}");
+    }
     // 13. path traversal.
     let (s, _) = send(
         &on,

@@ -170,7 +170,8 @@ pub fn load(dir: Option<&Path>) -> Result<Loaded, ConfigError> {
 /// description above it, grouped by section. It changes nothing until a line is uncommented.
 pub fn template() -> String {
     let mut out = String::from(
-        "# gitterrace config.toml. Every line is commented out at its default: uncomment to change.\n",
+        "# gitterrace config.toml. Every line is commented out at its default: uncomment to \
+        change.\n",
     );
     let mut section = "";
     for k in schema::keys() {
@@ -285,7 +286,8 @@ mod tests {
     #[test]
     fn restart_keys_match_their_docs_and_are_held_back() {
         let mut changed = parse(
-            "[server]\naddr = \"127.0.0.1:9\"\nis_public = true\nhosts = [\"h.example\"]\nlive_streams = 3\n\
+            "[server]\naddr = \"127.0.0.1:9\"\nis_public = true\nhosts = [\"h.example\"]\n\
+             live_streams = 3\n\
              public_timeout_secs = 7\n\
              [index]\nthreads = 3\n[multi]\ndepth = 4\nskip_dirs = [\"x\"]\n\
              [limits]\nunindexed_commits = 7\naction_output_kb = 7\nregistry_entries = 7\n",

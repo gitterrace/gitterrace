@@ -32,19 +32,23 @@ pub use store::FORMAT_VERSION;
 pub const CACHE_FILES: [(&str, &str); 4] = [
     (
         store::VERSION_FILE,
-        "The cache format. A mismatch deletes the cache and rebuilds it. The format is never migrated.",
+        "The cache format. A mismatch deletes the cache and rebuilds it. The format is never \
+        migrated.",
     ),
     (
         store::LOCK_FILE,
-        "Empty. Held locked by whichever process is extending the segment set, so two processes on one repository take turns instead of building on one manifest.",
+        "Empty. Held locked by whichever process is extending the segment set, so two processes on \
+        one repository take turns instead of building on one manifest.",
     ),
     (
         TIP_FILE,
-        "The commit id the segment files were last built for. Opening insights for that commit skips walking its history to check the files hold exactly it.",
+        "The commit id the segment files were last built for. Opening insights for that commit \
+        skips walking its history to check the files hold exactly it.",
     ),
     (
         insights::CACHE_FILE,
-        "Line counts per blob id for the language chart. A blob never changes, so the counts never go stale.",
+        "Line counts per blob id for the language chart. A blob never changes, so the counts never \
+        go stale.",
     ),
 ];
 

@@ -131,7 +131,9 @@ mod tests {
     /// Every block names its own lines of the file, front matter counted.
     #[test]
     fn blocks_carry_their_source_lines() {
-        let src = "---\ntitle: x\n---\n# Head `code`\n\nA wrapped [link](a.md)\nparagraph with ``a ` b``.\n\n- one\n- two\n\n> quoted\n> twice\n\n```rs\nfn f() {}\n```\n\n| a |\n|---|\n| 1 |\n";
+        let src = "---\ntitle: x\n---\n# Head `code`\n\nA wrapped [link](a.md)\nparagraph with ``a \
+            ` b``.\n\n- one\n- two\n\n> quoted\n> twice\n\n```rs\nfn f() {}\n```\n\n| a \
+            |\n|---|\n| 1 |\n";
         let out = render(src);
         for want in [
             "<h1 id=\"head-code\" data-line=\"4-4\">",

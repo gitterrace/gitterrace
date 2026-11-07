@@ -248,7 +248,10 @@ proptest! {
     #![proptest_config(cases())]
 
     #[test]
-    fn accel_answers_equal_the_stream(gens in prop::collection::vec(gen_commit(), 0..40), q in query()) {
+    fn accel_answers_equal_the_stream(
+        gens in prop::collection::vec(gen_commit(), 0..40),
+        q in query()
+    ) {
         let recs = history(&gens);
         let s = scope(&q);
         let ins = Insights::new(&recs, s.options().clone(), None);
@@ -260,7 +263,10 @@ proptest! {
     }
 
     #[test]
-    fn every_breakdown_sums_to_the_totals(gens in prop::collection::vec(gen_commit(), 0..40), q in query()) {
+    fn every_breakdown_sums_to_the_totals(
+        gens in prop::collection::vec(gen_commit(), 0..40),
+        q in query()
+    ) {
         let recs = history(&gens);
         let s = scope(&q);
         let ins = Insights::new(&recs, s.options().clone(), None);
@@ -279,7 +285,11 @@ proptest! {
         for l in [Label::Kind, Label::Scope] {
             let (counts, buckets) = c.per_label(l);
             prop_assert_eq!(n, counts.iter().map(|x| x.commits).sum::<usize>());
-            prop_assert_eq!(n, buckets.iter().flat_map(|b| &b.counts).map(|x| x.commits).sum::<usize>());
+            prop_assert_eq!(n, buckets
+                    .iter()
+                    .flat_map(|b| &b.counts)
+                    .map(|x| x.commits)
+                    .sum::<usize>());
         }
         let series = c.series();
         prop_assert_eq!(n, series.iter().map(|p| p.commits as usize).sum::<usize>());
@@ -298,7 +308,10 @@ proptest! {
     }
 
     #[test]
-    fn the_span_only_prunes(gens in prop::collection::vec(gen_commit(), 0..40), q in query()) {
+    fn the_span_only_prunes(
+        gens in prop::collection::vec(gen_commit(), 0..40),
+        q in query()
+    ) {
         let recs = history(&gens);
         let s = scope(&q);
         let ins = Insights::new(&recs, s.options().clone(), None);
@@ -329,7 +342,10 @@ proptest! {
 
     /// The /stats KPI, per-day chart and punch card against the reducers.
     #[test]
-    fn activity_pages_equal_the_reducers(gens in prop::collection::vec(gen_commit(), 0..40), q in no_chips()) {
+    fn activity_pages_equal_the_reducers(
+        gens in prop::collection::vec(gen_commit(), 0..40),
+        q in no_chips()
+    ) {
         let recs = history(&gens);
         let s = scope(&q);
         let ins = Insights::new(&recs, s.options().clone(), None);
@@ -345,7 +361,10 @@ proptest! {
 
     /// Contributors (bots by option), commit types and sizes against the reducers.
     #[test]
-    fn people_labels_sizes_equal_the_reducers(gens in prop::collection::vec(gen_commit(), 0..40), q in no_chips()) {
+    fn people_labels_sizes_equal_the_reducers(
+        gens in prop::collection::vec(gen_commit(), 0..40),
+        q in no_chips()
+    ) {
         let recs = history(&gens);
         let s = scope(&q);
         let ins = Insights::new(&recs, s.options().clone(), None);
@@ -357,7 +376,11 @@ proptest! {
             .into_iter()
             .map(|x| (x.name, x.commits))
             .collect();
-        let want: Vec<(String, usize)> = c.per_person().into_iter().map(|x| (x.name, x.commits)).collect();
+        let want: Vec<(String, usize)> = c
+            .per_person()
+            .into_iter()
+            .map(|x| (x.name, x.commits))
+            .collect();
         prop_assert_eq!(page, want, "contributors");
         for l in [Label::Kind, Label::Scope] {
             let (counts, buckets) = c.per_label(l);
@@ -378,7 +401,10 @@ proptest! {
 
     /// Frequency, rework, types, churn and sizes against the reducers over one `Counted`.
     #[test]
-    fn frequency_labels_churn_sizes_equal_the_reducers(gens in prop::collection::vec(gen_commit(), 0..40), q in no_chips()) {
+    fn frequency_labels_churn_sizes_equal_the_reducers(
+        gens in prop::collection::vec(gen_commit(), 0..40),
+        q in no_chips()
+    ) {
         let recs = history(&gens);
         let s = scope(&q);
         let ins = Insights::new(&recs, s.options().clone(), None);
@@ -408,7 +434,10 @@ proptest! {
     /// The activity and contributor views over one Counted, chips included, equal its reducers:
     /// one-pass activity == totals + series + when, and every person's row and sparkline add up.
     #[test]
-    fn period_views_over_counted_equal_the_reducers(gens in prop::collection::vec(gen_commit(), 0..40), q in query()) {
+    fn period_views_over_counted_equal_the_reducers(
+        gens in prop::collection::vec(gen_commit(), 0..40),
+        q in query()
+    ) {
         let recs = history(&gens);
         let s = scope(&q);
         let ins = Insights::new(&recs, s.options().clone(), None);
@@ -455,7 +484,10 @@ proptest! {
     /// Hotspots count each counted commit's rows under the head files once, by the same
     /// membership as the reducers, and the period entry point equals the `Counted` one.
     #[test]
-    fn file_reports_follow_counted(gens in prop::collection::vec(gen_commit(), 0..40), q in query()) {
+    fn file_reports_follow_counted(
+        gens in prop::collection::vec(gen_commit(), 0..40),
+        q in query()
+    ) {
         let recs = history(&gens);
         let s = scope(&q);
         let ins = Insights::new(&recs, s.options().clone(), None);

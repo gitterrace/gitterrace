@@ -55,7 +55,10 @@ fn a_pure_rename_is_one_line_not_a_diff() {
     );
     let s = section(&html, 0);
     assert!(
-        s.contains("<p class=\"muted pad moved\">Renamed from <code>old/a.rs</code>, no content change.</p>"),
+        s.contains(
+            "<p class=\"muted pad moved\">Renamed from <code>old/a.rs</code>, no content \
+            change.</p>"
+        ),
         "{s}"
     );
     assert!(

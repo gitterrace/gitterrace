@@ -36,7 +36,8 @@ const fn item(
 
 /// Every kind an action can be offered on, with what the selection is.
 /// What an action is, in one plain sentence, for the website and docs.
-pub const ACTION_SUMMARY: &str = "Run a program of yours on a selection, with no shell between: a task CLI, an editor, a script.";
+pub const ACTION_SUMMARY: &str = "Run a program of yours on a selection, with no shell between: a \
+    task CLI, an editor, a script.";
 
 pub const KINDS: [(Kind, &str); 8] = [
     (Kind::Line, "A line or a range of lines in a file."),
@@ -76,7 +77,8 @@ pub const PAYLOAD_FIELDS: [Item; 16] = [
         "object",
         true,
         "",
-        "`name`, `root` (absolute path) and `id` (stable repository id, absent for a repository without commits).",
+        "`name`, `root` (absolute path) and `id` (stable repository id, absent for a repository \
+        without commits).",
     ),
     item(
         "rev",
@@ -132,7 +134,8 @@ pub const PAYLOAD_FIELDS: [Item; 16] = [
         "string",
         true,
         "",
-        "`gitterrace://<repo-id>/<sha>/<path>#L<a>-L<b>`, or the `/go` URL with `links.style = \"go\"`. Survives clones and renames.",
+        "`gitterrace://<repo-id>/<sha>/<path>#L<a>-L<b>`, or the `/go` URL with `links.style = \
+        \"go\"`. Survives clones and renames.",
     ),
     item(
         "title",
@@ -276,7 +279,8 @@ pub const SEND_KEYS: [Item; 6] = [
         "boolean",
         false,
         "`true`",
-        "`false` checks the block but does not offer it. The starter file ships the ones that need your settings this way.",
+        "`false` checks the block but does not offer it. The starter file ships the ones that need \
+        your settings this way.",
     ),
     item(
         "vars",
@@ -320,14 +324,17 @@ pub const SCRIPT_KEYS: [Item; 6] = [
         "array or string",
         true,
         "",
-        "The argv, run with no shell. `argv[0]` is literal, resolved once at load. Other elements may hold placeholders (below), each filled in as exactly one argument. One string when `shell = true`, which takes no placeholders.",
+        "The argv, run with no shell. `argv[0]` is literal, resolved once at load. Other elements \
+        may hold placeholders (below), each filled in as exactly one argument. One string when \
+        `shell = true`, which takes no placeholders.",
     ),
     item(
         "stdin",
         "string",
         false,
         "`json`",
-        "What the program reads: `json` (the payload), `markdown` (the `markdown` field alone) or `none`.",
+        "What the program reads: `json` (the payload), `markdown` (the `markdown` field alone) or \
+        `none`.",
     ),
     item(
         "cwd",
@@ -348,7 +355,8 @@ pub const SCRIPT_KEYS: [Item; 6] = [
         "boolean",
         false,
         "`false`",
-        "Run `command` as `sh -c \"<string>\"`. A placeholder in it is a load error. Read the environment instead.",
+        "Run `command` as `sh -c \"<string>\"`. A placeholder in it is a load error. Read the \
+        environment instead.",
     ),
 ];
 
@@ -373,7 +381,8 @@ pub const ACTION_KEYS: [Item; 14] = [
         "boolean",
         false,
         "`true`",
-        "`false` checks the block but does not offer it, and its program may be missing. The starter file ships the examples this way.",
+        "`false` checks the block but does not offer it, and its program may be missing. The \
+        starter file ships the examples this way.",
     ),
     item(
         "kinds",
@@ -430,7 +439,9 @@ pub const ACTION_KEYS: [Item; 14] = [
         "string",
         false,
         "",
-        "One letter or digit: a shortcut inside the menu, and on the page press `a` then the key (`a n`). Not a menu key (`p`, `m`, `s`) or a page key (`g`, `t`, `y`, `b`, `j`, `k`), and unique among actions. Either is a load error.",
+        "One letter or digit: a shortcut inside the menu, and on the page press `a` then the key \
+        (`a n`). Not a menu key (`p`, `m`, `s`) or a page key (`g`, `t`, `y`, `b`, `j`, `k`), and \
+        unique among actions. Either is a load error.",
     ),
     item(
         "env",
@@ -444,7 +455,9 @@ pub const ACTION_KEYS: [Item; 14] = [
         "table of strings",
         false,
         "`{}`",
-        "`[action.vars]`: fixed settings, lowercase names `[a-z0-9_]{1,32}`, at most 32, each value at most 4 KiB. They reach the script as `GITTERRACE_VAR_<NAME>`, as `payload.vars` and as `{var.<name>}` in `command`.",
+        "`[action.vars]`: fixed settings, lowercase names `[a-z0-9_]{1,32}`, at most 32, each \
+        value at most 4 KiB. They reach the script as `GITTERRACE_VAR_<NAME>`, as `payload.vars` \
+        and as `{var.<name>}` in `command`.",
     ),
 ];
 

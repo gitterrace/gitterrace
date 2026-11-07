@@ -44,10 +44,14 @@ pub fn on_port(host: &str) -> String {
 fn global_config() -> &'static Path {
     static CONFIG: OnceLock<std::path::PathBuf> = OnceLock::new();
     CONFIG.get_or_init(|| {
-        let path = std::env::temp_dir().join(format!("gitterrace-testkit-{}.gitconfig", std::process::id()));
+        let path = std::env::temp_dir().join(format!(
+            "gitterrace-testkit-{}.gitconfig",
+            std::process::id()
+        ));
         std::fs::write(
             &path,
-            "[user]\n\tname = T\n\temail = t@e.x\n[commit]\n\tgpgsign = false\n[tag]\n\tgpgsign = false\n[init]\n\tdefaultBranch = main\n",
+            "[user]\n\tname = T\n\temail = t@e.x\n[commit]\n\tgpgsign = false\n[tag]\n\tgpgsign = \
+            false\n[init]\n\tdefaultBranch = main\n",
         )
         .expect("write git config");
         path

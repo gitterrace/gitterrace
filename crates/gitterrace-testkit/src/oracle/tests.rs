@@ -106,7 +106,8 @@ fn only_header_and_overview_sidebar_are_chrome() {
     use crate::oracle::without_chrome;
     let page = |head: &str, side: &str, main: &str| {
         format!(
-            "<html><header class=\"top\">{head}</header><main>{main}</main><aside>{side}</aside></html>"
+            "<html><header \
+            class=\"top\">{head}</header><main>{main}</main><aside>{side}</aside></html>"
         )
     };
     let (a, b) = (page("menu", "s1", "42"), page("menu2", "s2", "42"));

@@ -158,7 +158,8 @@ fn fixture(dir: &Path) -> std::path::PathBuf {
     Fixture::init(&dir.join("repo"))
         .write(
             "README.md",
-            "---\ntitle: front\n---\n# Hi\n\n[a](src/a.rs) ![i](img.png)\n\n```mermaid\ngraph TD; A-->B\n```\n\n## One\n\n## Two\n\n## Three\n",
+            "---\ntitle: front\n---\n# Hi\n\n[a](src/a.rs) ![i](img.png)\n\n```mermaid\ngraph TD; \
+            A-->B\n```\n\n## One\n\n## Two\n\n## Three\n",
         )
         .write("src/a.rs", "fn main() {}\n")
         .write("img.png", "\u{89}PNG\r\n")

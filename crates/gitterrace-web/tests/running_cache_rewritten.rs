@@ -239,9 +239,14 @@ fn a_truncated_or_garbage_segment_under_a_running_server_is_rebuilt() {
             assert!(errors.is_empty(), "5xx:\n{}", errors.join("\n"));
             assert!(
                 healed,
-                "the damaged cache (garbage: {garbage}) was never rebuilt; had {} segments; now {:?}",
+                "the damaged cache (garbage: {garbage}) was never rebuilt; had {} segments; now \
+                {:?}",
                 before,
-                std::fs::read_dir(&cache).unwrap().flatten().map(|e| (e.file_name(), e.metadata().unwrap().len())).collect::<Vec<_>>()
+                std::fs::read_dir(&cache)
+                    .unwrap()
+                    .flatten()
+                    .map(|e| (e.file_name(), e.metadata().unwrap().len()))
+                    .collect::<Vec<_>>()
             );
         });
     }

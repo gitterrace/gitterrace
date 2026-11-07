@@ -50,7 +50,9 @@ fn parses_a_good_file() {
 fn a_duplicate_or_built_in_key_is_refused_naming_both() {
     let two = |k1: &str, k2: &str| {
         format!(
-            "version = 1\n[[action]]\nid = \"one\"\nlabel = \"One\"\nkinds = [\"page\"]\ncommand = [\"/bin/echo\"]\nkey = \"{k1}\"\n[[action]]\nid = \"two\"\nlabel = \"Two\"\nkinds = [\"page\"]\ncommand = [\"/bin/echo\"]\nkey = \"{k2}\"\n"
+            "version = 1\n[[action]]\nid = \"one\"\nlabel = \"One\"\nkinds = [\"page\"]\ncommand = \
+            [\"/bin/echo\"]\nkey = \"{k1}\"\n[[action]]\nid = \"two\"\nlabel = \"Two\"\nkinds = \
+            [\"page\"]\ncommand = [\"/bin/echo\"]\nkey = \"{k2}\"\n"
         )
     };
     let dup = Config::parse(&two("x", "x"), Path::new("/")).expect_err("duplicate");
@@ -88,7 +90,8 @@ fn refuses_bad_actions() {
         "unknown kind"
     );
     let dup = format!(
-        "{GOOD}\n[[action]]\nid = \"echo\"\nlabel = \"x\"\nkinds = [\"page\"]\ncommand = [\"/bin/echo\"]\n"
+        "{GOOD}\n[[action]]\nid = \"echo\"\nlabel = \"x\"\nkinds = [\"page\"]\ncommand = \
+        [\"/bin/echo\"]\n"
     );
     assert!(matches!(
         Config::parse(&dup, Path::new("/")),
@@ -117,7 +120,8 @@ fn err(text: &str) -> String {
         .to_string()
 }
 
-const HEAD: &str = "version = 1\n[[action]]\nid = \"a\"\nlabel = \"A\"\nkinds = [\"line\"]\ncommand = [\"/bin/echo\"]\n";
+const HEAD: &str = "version = 1\n[[action]]\nid = \"a\"\nlabel = \"A\"\nkinds = \
+    [\"line\"]\ncommand = [\"/bin/echo\"]\n";
 
 #[test]
 fn vars_are_validated_naming_the_key() {
@@ -202,7 +206,8 @@ cwd = "home"
         err("version = 1\n[[script]]\nid = \"s\"\nscript = \"s\"\ncommand = [\"/bin/echo\"]\n");
     assert!(nested.contains("script"), "{nested}");
     let bad_cmd = err(
-        "version = 1\n[[script]]\nid = \"s\"\ncommand = [\"/nonexistent\"]\n[[action]]\nid = \"a\"\nlabel = \"A\"\nkinds = [\"line\"]\nscript = \"s\"\n",
+        "version = 1\n[[script]]\nid = \"s\"\ncommand = [\"/nonexistent\"]\n[[action]]\nid = \
+        \"a\"\nlabel = \"A\"\nkinds = [\"line\"]\nscript = \"s\"\n",
     );
     assert!(bad_cmd.contains("action a"), "{bad_cmd}");
 }
@@ -319,10 +324,13 @@ fn reload_swaps_valid_and_keeps_old_on_invalid() {
 fn placeholders_load_and_every_refusal_names_its_key() {
     let cmd = |c: &str| HEAD.replace("command = [\"/bin/echo\"]", c);
     let ok = Config::parse(
-            &cmd("command = [\"/bin/echo\", \"--notes\", \"{markdown}\", \"--\", \"{title}\", \"{{x}}\"]\nstdin = \"markdown\""),
-            Path::new("/"),
-        )
-        .expect("parse");
+        &cmd(
+            "command = [\"/bin/echo\", \"--notes\", \"{markdown}\", \"--\", \"{title}\", \
+                \"{{x}}\"]\nstdin = \"markdown\"",
+        ),
+        Path::new("/"),
+    )
+    .expect("parse");
     let a = ok.get("a").expect("a");
     assert_eq!(
         a.argv[1..],
@@ -332,7 +340,8 @@ fn placeholders_load_and_every_refusal_names_its_key() {
     // A literal prefix or a trusted first value needs no `--`.
     let prefixed = cmd("command = [\"/bin/echo\", \"x={title}\", \"{root}/{path}\"]");
     let url = cmd(
-        "command = [\"/bin/echo\", \"tendir://new-task?title={title:url}&notes={markdown:url}\", \"{var.v:url}\", \"{sha:url}\"]\nvars = { v = \"x\" }",
+        "command = [\"/bin/echo\", \"tendir://new-task?title={title:url}&notes={markdown:url}\", \
+        \"{var.v:url}\", \"{sha:url}\"]\nvars = { v = \"x\" }",
     );
     if let Err(e) = Config::parse(&url, Path::new("/")) {
         panic!("{e}");
