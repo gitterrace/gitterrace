@@ -12,7 +12,7 @@ html:has(section.file>header){scroll-padding-top:calc(40px + var(--space-2))}
 .doccard [id^="L"],.doccard .markdown-body :is(h1,h2,h3,h4,h5,h6){scroll-margin-top:calc(44px + var(--space-4))}
 [id^="L"]{scroll-margin-top:var(--space-2)}
 @media (min-width:601px){
-  main:has(>.card.scroll [id^="L"])>.head,main:has(>.head+ul.list.log)>.head{position:sticky;top:0;z-index:3;background:var(--bg);margin-bottom:0;padding-block:var(--space-3)}
+  main:has(>.card.scroll [id^="L"])>.head,main:has(>.head+ul.list.log)>.head{position:sticky;top:0;z-index:3;background:var(--bg)}
   main:has(>.card.scroll [id^="L"]) [id^="L"]{scroll-margin-top:calc(32px + 2 * var(--space-3) + var(--space-2))}
 }
 @media (min-width:1101px){

@@ -77,7 +77,8 @@ header.top>.wrap{container:topbar/inline-size}
 
 /* primitives */
 .muted{color:var(--muted)}.r{text-align:right}.pad{padding:var(--space-4)}
-.head{display:flex;justify-content:space-between;align-items:center;gap:var(--space-4);margin-bottom:var(--space-4);flex-wrap:wrap;min-height:32px}
+.head{display:flex;justify-content:space-between;align-items:flex-start;gap:var(--space-4);margin-bottom:0;padding-block:var(--space-3);flex-wrap:wrap;min-height:calc(35px + 2 * var(--space-3))}
+.head>h1{min-height:35px}.head>.muted{line-height:35px}.head>.filter{align-self:center}
 .head h1 .muted{font-weight:var(--weight-regular);font-size:var(--text-md);font-family:var(--mono)}
 .card{border:var(--border);border-radius:var(--radius);overflow:hidden;overflow-x:auto;background:var(--bg)}
 .scroll{overflow-x:auto}
