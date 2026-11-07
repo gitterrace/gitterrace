@@ -1,0 +1,21 @@
+id: no-ignored-tests
+language: rust
+severity: error
+message: 'An `#[ignore]` test: nothing in the gate runs it, so it rots unseen.'
+note: >-
+  Make it a real test, or move a hand-run measurement to bench/. The one exception is a known
+  red test, `#[ignore = "red until ..."]`, which names the defect it waits for and has a row.
+files: [crates/**/*.rs, xtask/**/*.rs]
+rule:
+  any:
+    - kind: attribute_item
+      regex: '^#\[\s*(ignore\b|cfg_attr\(.*\bignore\b)'
+      not: {regex: '^#\[\s*ignore\s*=\s*"red until '}
+    # Macro bodies are bare tokens, invisible to the pattern above.
+    - kind: token_tree
+      inside: {stopBy: end, any: [{kind: macro_invocation}, {kind: macro_definition}]}
+      regex: '#\s*\[\s*(ignore\s*[\]=]|cfg_attr\([^\]]*\bignore\b)'
+      not:
+        any:
+          - regex: '#\s*\[\s*ignore\s*=\s*"red until '
+          - has: {kind: token_tree, stopBy: end, regex: '#\s*\[\s*ignore'}

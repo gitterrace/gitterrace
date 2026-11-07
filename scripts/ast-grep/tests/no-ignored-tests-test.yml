@@ -1,0 +1,20 @@
+id: no-ignored-tests
+valid:
+  - '#[test] fn sums_match() {}'
+  - |
+    #[test]
+    #[ignore = "red until the aggregate is keyed by the canonical life"]
+    fn renamed_author_counts() {}
+invalid:
+  - |
+    #[test]
+    #[ignore]
+    fn walk_speed() {}
+  - |
+    #[test]
+    #[ignore = "measurement, run by hand"]
+    fn walk_speed() {}
+  - |
+    #[test]
+    #[cfg_attr(not(feature = "slow"), ignore)]
+    fn walk_speed() {}
