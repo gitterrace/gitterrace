@@ -64,7 +64,8 @@ fn png(w: u32, h: u32) -> Vec<u8> {
 #[test]
 fn readme_shots_are_the_linked_pngs() {
     let r = "<img src=\"docs/screenshots/b-light.png\" alt=\"x\">\n\
-                 srcset=\"docs/screenshots/a-dark.png\" docs/screenshots/b-light.png docs/screenshots/x.svg";
+                 srcset=\"docs/screenshots/a-dark.png\" docs/screenshots/b-light.png \
+                 docs/screenshots/x.svg";
     assert_eq!(readme_shots(r), ["a-dark.png", "b-light.png"]);
 }
 
@@ -76,10 +77,11 @@ fn a_missing_unreferenced_or_wrongly_sized_screenshot_fails() {
     std::fs::create_dir_all(&shots).expect("mkdir");
     std::fs::create_dir_all(&site).expect("mkdir");
     std::fs::write(
-            dir.join("README.md"),
-            "<source srcset=\"docs/screenshots/overview-dark.png\">\n<img src=\"docs/screenshots/overview-light.png\">\n",
-        )
-        .expect("readme");
+        dir.join("README.md"),
+        "<source srcset=\"docs/screenshots/overview-dark.png\">\n<img \
+            src=\"docs/screenshots/overview-light.png\">\n",
+    )
+    .expect("readme");
     let err = check_shots(&dir)
         .expect_err("empty folder fails")
         .to_string();

@@ -63,35 +63,45 @@ header img{max-width:calc(100% - 72px);height:auto}
 header img.on-light{display:block}
 .tag{font-family:var(--serif);font-size:var(--text-lg);color:var(--muted);margin:var(--space-4) 0 0}
 pre,code{font-family:var(--mono);font-size:var(--text-sm)}
-pre{background:var(--soft);border:var(--border);border-radius:var(--radius);padding:var(--space-3) var(--space-4);overflow-x:auto}
+pre{background:var(--soft);border:var(--border);border-radius:var(--radius);\
+padding:var(--space-3) var(--space-4);overflow-x:auto}
 :not(pre)>code{background:var(--soft);padding:1px var(--space-1);border-radius:var(--radius)}
-.cmds{display:grid;grid-template-columns:max-content 1fr;gap:var(--space-1) var(--space-4);margin:0}.cmds dt code{background:none;padding:0;white-space:nowrap}.cmds dd{margin:0;color:var(--muted)}
+.cmds{display:grid;grid-template-columns:max-content 1fr;gap:var(--space-1) var(--space-4);\
+margin:0}.cmds dt code{background:none;padding:0;white-space:nowrap}.cmds dd{margin:0;\
+color:var(--muted)}
 @media (max-width:640px){.cmds{grid-template-columns:1fr}.cmds dd{margin-bottom:var(--space-2)}}
 ul.features{list-style:none;padding:0;margin:0}
 ul.features li{padding:var(--space-2) 0;border-top:var(--border)}
 ul.features b{font-weight:var(--weight-semibold)}
-.shots{display:grid;grid-template-columns:1fr 1fr;gap:var(--space-6) var(--space-4);margin:var(--space-8) 0}
+.shots{display:grid;grid-template-columns:1fr 1fr;gap:var(--space-6) var(--space-4);\
+margin:var(--space-8) 0}
 @media (max-width:640px){.shots{grid-template-columns:1fr}}
 figure{margin:0}
 figure img,.lightbox img{width:100%;height:auto;border:var(--border);border-radius:var(--radius)}
 figure img.on-light,.lightbox img.on-light{display:block}
 .lightbox{display:none}
-.lightbox:target{display:flex;position:fixed;inset:0;z-index:10;align-items:center;justify-content:center;padding:var(--space-8);background:color-mix(in srgb,var(--bg) 97%,transparent);cursor:zoom-out}
+.lightbox:target{display:flex;position:fixed;inset:0;z-index:10;align-items:center;\
+justify-content:center;padding:var(--space-8);background:color-mix(in srgb,var(--bg) 97%,\
+transparent);cursor:zoom-out}
 .lightbox:target .shot{max-width:min(1280px,100%)}
 .demo{margin-top:var(--space-6)}
-figcaption{font-size:var(--text-xs);color:var(--muted);margin-top:var(--space-2);line-height:1.4}figcaption b{color:var(--fg);font-weight:var(--weight-semibold)}
+figcaption{font-size:var(--text-xs);color:var(--muted);margin-top:var(--space-2);line-height:1.4}\
+figcaption b{color:var(--fg);font-weight:var(--weight-semibold)}
 footer{display:flex;flex-wrap:wrap;gap:var(--space-4);font-size:var(--text-sm)}
 .gh,.theme{position:absolute;top:var(--space-8);line-height:0}
-.theme{right:40px;width:24px;height:24px;padding:0;display:grid;place-items:center;background:none;border:0;color:var(--muted);cursor:pointer}
+.theme{right:40px;width:24px;height:24px;padding:0;display:grid;place-items:center;\
+background:none;border:0;color:var(--muted);cursor:pointer}
 .theme:hover,.theme:focus-visible{color:var(--fg)}
-.theme svg{width:24px;height:24px;overflow:visible;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;display:none}
+.theme svg{width:24px;height:24px;overflow:visible;fill:none;stroke:currentColor;stroke-width:2;\
+stroke-linecap:round;stroke-linejoin:round;display:none}
 .theme svg *{vector-effect:non-scaling-stroke}
 .theme .fill{fill:currentColor;stroke:none}
 .theme .i-auto{display:block}
 :root[data-theme=light] .theme .i-auto,:root[data-theme=dark] .theme .i-auto{display:none}
 :root[data-theme=light] .theme .i-light,:root[data-theme=dark] .theme .i-dark{display:block}
 .on-dark{display:none}
-@media (prefers-color-scheme:dark){:root:not([data-theme=light]) img.on-light{display:none}:root:not([data-theme=light]) img.on-dark{display:block}}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]) img.on-light{display:none}\
+:root:not([data-theme=light]) img.on-dark{display:block}}
 :root[data-theme=dark] img.on-light{display:none}
 :root[data-theme=dark] img.on-dark{display:block}
 .tab-radio{position:absolute;opacity:0;pointer-events:none}
@@ -104,11 +114,18 @@ footer{display:flex;flex-wrap:wrap;gap:var(--space-4);font-size:var(--text-sm)}
 .tab-panel{display:none}
 #install-curl:checked~#panel-curl,#install-brew:checked~#panel-brew{display:block}
 #install-cargo:checked~#panel-cargo{display:block}
-footer{margin-top:var(--space-16);padding-top:var(--space-4);border-top:var(--border);color:var(--faint)}
+footer{margin-top:var(--space-16);padding-top:var(--space-4);border-top:var(--border);\
+color:var(--faint)}
 ";
 
 /// The source host's mark (16x16 path), the link to the source in the top right corner.
-const GH_MARK: &str = "M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z";
+const GH_MARK: &str = "M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 \
+0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01\
+-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64\
+-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 \
+1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 \
+3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 \
+8c0-4.42-3.58-8-8-8z";
 
 /// The home page `<head>`: title, description, link previews and icons.
 fn head(name: &str, desc: &str, home: &str) -> String {
@@ -129,7 +146,8 @@ fn head(name: &str, desc: &str, home: &str) -> String {
          <meta name=\"twitter:card\" content=\"summary_large_image\">\n\
          <link rel=\"icon\" type=\"image/svg+xml\" href=\"assets/mark.svg\">\n\
          <link rel=\"apple-touch-icon\" href=\"assets/apple-touch-icon.png\">\n\
-         <link rel=\"stylesheet\" href=\"assets/site.css\">\n<script>{THEME_INIT_JS}</script>\n</head>\n{BODY_OPEN}",
+         <link rel=\"stylesheet\" href=\"assets/site.css\">\n<script>{THEME_INIT_JS}</script>\
+         \n</head>\n{BODY_OPEN}",
         name = esc(name),
         desc = esc(desc),
         home = esc(home),
@@ -177,7 +195,10 @@ pub fn render(root: &Path, ws: &Workspace) -> Result<Vec<Out>> {
         "<header>\n<h1><img class=\"on-light\" src=\"assets/logo-light.svg\" alt=\"{n}\" \
          width=\"540\" height=\"120\" loading=\"lazy\">\n\
          <img class=\"on-dark\" src=\"assets/logo-dark.svg\" alt=\"\" width=\"540\" height=\"120\" \
-         loading=\"lazy\"></h1>\n<p class=\"tag\">{tag}</p>\n{nav}{THEME_BUTTON}\n<a class=\"gh\" href=\"{r}\" aria-label=\"{n} on GitHub\" title=\"GitHub\"><svg viewBox=\"0 0 16 16\" width=\"24\" height=\"24\" aria-hidden=\"true\"><path d=\"{GH_MARK}\"/></svg></a>\n</header>\n",
+         loading=\"lazy\"></h1>\n<p class=\"tag\">{tag}</p>\n{nav}{THEME_BUTTON}\n<a \
+         class=\"gh\" href=\"{r}\" aria-label=\"{n} on GitHub\" title=\"GitHub\"><svg \
+         viewBox=\"0 0 16 16\" width=\"24\" height=\"24\" aria-hidden=\"true\"><path \
+         d=\"{GH_MARK}\"/></svg></a>\n</header>\n",
         r = esc(repo),
         n = esc(&pkg.name),
         tag = esc(&tagline(root)?),
@@ -198,7 +219,8 @@ pub fn render(root: &Path, ws: &Workspace) -> Result<Vec<Out>> {
     );
     let _ = write!(
         h,
-        "<section id=\"features\">\n<h2>What it does</h2>\n<ul class=\"features\">\n{}</ul>\n{}{demo}<h3>Commands</h3>\n{}</section>\n",
+        "<section id=\"features\">\n<h2>What it does</h2>\n<ul class=\"features\">\n{}</ul>\n{}\
+        {demo}<h3>Commands</h3>\n{}</section>\n",
         features(),
         gallery(),
         commands(),
@@ -230,7 +252,8 @@ pub fn render(root: &Path, ws: &Workspace) -> Result<Vec<Out>> {
         h,
         "<footer>\n<a href=\"{repo}\">Repository</a>\n<a href=\"docs/\">Docs</a>\n\
          <a href=\"{repo}/blob/main/LICENSE\">{lic}</a>\n<a href=\"{log}\">v{ver}</a>\n</footer>\n\
-         </main>\n<script>{THEME_TOGGLE_JS}</script>\n<script>{LIGHTBOX_JS}</script>\n</body>\n</html>\n",
+         </main>\n<script>{THEME_TOGGLE_JS}</script>\n<script>{LIGHTBOX_JS}</script>\n</body>\
+         \n</html>\n",
         repo = esc(repo),
         lic = esc(&pkg.license),
         ver = esc(&pkg.version),
@@ -256,22 +279,35 @@ pub(crate) const BODY_OPEN: &str = "<body>\n<a class=\"skip\" href=\"#main\">Ski
 
 /// The one script on the page: Escape closes an open screenshot by going back to `#features`,
 /// the same place a click on the overlay leads. Everything else works without it.
-const LIGHTBOX_JS: &str = "addEventListener('keydown',function(e){if(e.key==='Escape'&&location.hash.indexOf('#shot-')===0)location.hash='features'})";
+const LIGHTBOX_JS: &str = "addEventListener('keydown',\
+function(e){if(e.key==='Escape'&&location.hash.indexOf('#shot-')===0)location.hash='features'})";
 
 /// In the head, before first paint: a theme the visitor picked earlier (the app's own key, so
 /// both remember one choice), else none and the system decides. No flash of the wrong scheme.
-const THEME_INIT_JS: &str = "(function(){try{var t=localStorage.getItem('gitterrace-theme');if(t==='light'||t==='dark')document.documentElement.dataset.theme=t}catch(e){}})()";
+const THEME_INIT_JS: &str = "(function(){try{var t=localStorage.getItem('gitterrace-theme');\
+if(t==='light'||t==='dark')document.documentElement.dataset.theme=t}catch(e){}})()";
 
 /// The theme button cycles system, light and dark, as the app's does, and stores the choice.
-const THEME_TOGGLE_JS: &str = "(function(){var r=document.documentElement,b=document.getElementById('theme'),o=['system','light','dark'];if(!b)return;function c(){return r.dataset.theme||'system'}function l(){b.setAttribute('aria-label','Theme: '+c());b.title='Theme: '+c()}l();b.addEventListener('click',function(){var n=o[(o.indexOf(c())+1)%3];if(n==='system')delete r.dataset.theme;else r.dataset.theme=n;try{if(n==='system')localStorage.removeItem('gitterrace-theme');else localStorage.setItem('gitterrace-theme',n)}catch(e){}l()})})()";
+const THEME_TOGGLE_JS: &str = "(function(){var r=document.documentElement,\
+b=document.getElementById('theme'),o=['system','light','dark'];if(!b)return;function c(){return \
+r.dataset.theme||'system'}function l(){b.setAttribute('aria-label','Theme: '+c());\
+b.title='Theme: '+c()}l();b.addEventListener('click',function(){var n=o[(o.indexOf(c())+1)%3];\
+if(n==='system')delete r.dataset.theme;else r.dataset.theme=n;\
+try{if(n==='system')localStorage.removeItem('gitterrace-theme');else \
+localStorage.setItem('gitterrace-theme',n)}catch(e){}l()})})()";
 
 /// The theme button, the app's icons: half disc for system, sun, moon. Each viewBox is cropped
 /// to its own ink plus half the stroke, so at 24 px every icon fills the box as the source-link
 /// mark beside it does.
-const THEME_BUTTON: &str = "<button class=\"theme\" type=\"button\" id=\"theme\" aria-label=\"Theme: system\" title=\"Theme: system\">\
-<svg class=\"i-auto\" viewBox=\"3.2 3.2 17.6 17.6\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"12\" r=\"8\"/><path d=\"M12 4a8 8 0 0 0 0 16z\" class=\"fill\"/></svg>\
-<svg class=\"i-light\" viewBox=\"1.2 1.2 21.6 21.6\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"12\" r=\"4\"/><path d=\"M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8\"/></svg>\
-<svg class=\"i-dark\" viewBox=\"3.85 3.2 16.95 16.95\" aria-hidden=\"true\"><path d=\"M20 14.5A8 8 0 0 1 9.5 4 8 8 0 1 0 20 14.5z\"/></svg></button>";
+const THEME_BUTTON: &str = "<button class=\"theme\" type=\"button\" id=\"theme\" \
+aria-label=\"Theme: system\" title=\"Theme: system\">\
+<svg class=\"i-auto\" viewBox=\"3.2 3.2 17.6 17.6\" aria-hidden=\"true\"><circle cx=\"12\" \
+cy=\"12\" r=\"8\"/><path d=\"M12 4a8 8 0 0 0 0 16z\" class=\"fill\"/></svg>\
+<svg class=\"i-light\" viewBox=\"1.2 1.2 21.6 21.6\" aria-hidden=\"true\"><circle cx=\"12\" \
+cy=\"12\" r=\"4\"/><path d=\"M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 \
+17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8\"/></svg>\
+<svg class=\"i-dark\" viewBox=\"3.85 3.2 16.95 16.95\" aria-hidden=\"true\"><path d=\"M20 14.5A8 \
+8 0 0 1 9.5 4 8 8 0 1 0 20 14.5z\"/></svg></button>";
 
 /// Every inline script on the page, so the CSP lists exactly these by hash.
 const SCRIPTS: [&str; 3] = [THEME_INIT_JS, THEME_TOGGLE_JS, LIGHTBOX_JS];
@@ -302,15 +338,18 @@ fn host_files(home: &str, repo: &str, name: &str, pages: &[String]) -> Vec<Out> 
         let _ = writeln!(s, "<url><loc>{home}/{p}</loc></url>");
         s
     });
-    let headers = format!("\
+    let headers = format!(
+        "\
 # Generated by `cargo xtask generate` (xtask/src/site.rs). Do not edit.
 /*
-  Content-Security-Policy: default-src 'none'; img-src 'self'; style-src 'self'; font-src 'self'; script-src {script}; base-uri 'none'; form-action 'none'; frame-ancestors 'none'
+  Content-Security-Policy: default-src 'none'; img-src 'self'; style-src 'self'; font-src \
+  'self'; script-src {script}; base-uri 'none'; form-action 'none'; frame-ancestors 'none'
   X-Content-Type-Options: nosniff
   X-Frame-Options: DENY
   Referrer-Policy: strict-origin-when-cross-origin
   Strict-Transport-Security: max-age=63072000; includeSubDomains; preload
-  Permissions-Policy: accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()
+  Permissions-Policy: accelerometer=(), camera=(), geolocation=(), gyroscope=(), \
+  magnetometer=(), microphone=(), payment=(), usb=()
   Cross-Origin-Opener-Policy: same-origin
 
 /assets/fonts/*
@@ -352,7 +391,8 @@ fn host_files(home: &str, repo: &str, name: &str, pages: &[String]) -> Vec<Out> 
             "site/.well-known/security.txt",
             format!(
                 "Contact: {repo}/security/advisories/new\nPolicy: {repo}/blob/main/SECURITY.md\n\
-                 Canonical: {home}/.well-known/security.txt\nExpires: {SECURITY_TXT_EXPIRES}\nPreferred-Languages: en\n"
+                 Canonical: {home}/.well-known/security.txt\nExpires: {SECURITY_TXT_EXPIRES}\
+                 \nPreferred-Languages: en\n"
             ),
         ),
     ]
@@ -362,7 +402,8 @@ fn host_files(home: &str, repo: &str, name: &str, pages: &[String]) -> Vec<Out> 
 /// Workers static assets accept an external target in `_redirects`; 302 because "latest" moves.
 fn redirects(repo: &str, name: &str) -> String {
     format!(
-        "# Generated by `cargo xtask generate` (xtask/src/site.rs). Do not edit.\n/install.sh {} 302\n",
+        "# Generated by `cargo xtask generate` (xtask/src/site.rs). Do not edit.\n/install.sh {} \
+        302\n",
         readme_agents_md::installer_url(repo, name)
     )
 }
@@ -394,7 +435,8 @@ fn css(tokens: &str) -> Result<String> {
     let roles = &tokens[end + tail..];
     let body = format!("{generated}{roles}").replace("/static/fonts/", "fonts/");
     Ok(format!(
-        "/* Generated by `cargo xtask generate` from the app's tokens.css. Do not edit. */\n{body}\n{PAGE_CSS}"
+        "/* Generated by `cargo xtask generate` from the app's tokens.css. Do not edit. \
+        */\n{body}\n{PAGE_CSS}"
     ))
 }
 

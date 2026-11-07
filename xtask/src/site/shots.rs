@@ -26,7 +26,8 @@ pub(super) fn check_shots(root: &Path) -> Result<()> {
     }
     if let Some(f) = have.iter().find(|f| !pngs.contains(f)) {
         anyhow::bail!(
-            "{SHOT_DIR}/{f} is not referenced by README.md: delete it (make site-shots keeps only the README's PNG files)"
+            "{SHOT_DIR}/{f} is not referenced by README.md: delete it (make site-shots keeps \
+            only the README's PNG files)"
         );
     }
     for f in &pngs {
