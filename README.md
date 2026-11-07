@@ -68,6 +68,21 @@ that reads every repository served before, the ones a running server shows.
 `list_repos` names them, and every tool takes that name as `repo`. Without
 `--served` it reads only the paths given.
 
+## Upgrade and troubleshooting
+
+Upgrade by running the same install command again. The insights cache in
+`.git/gitterrace/` is disposable: a new format is rebuilt on first open, and
+deleting the folder is always safe.
+
+- **Port in use:** stop the other server, or pass `--addr 127.0.0.1:0` for a
+  free port.
+- **A setting has no effect:** `git terrace config` prints every value and the
+  file it came from.
+- **"A newer gitterrace owns this cache":** run the newer binary, or delete
+  `.git/gitterrace/` to rebuild for this one.
+- **Insights show indexing:** the cache is being built or was unreadable and is
+  being rebuilt. Code and history pages work meanwhile.
+
 ## Commands
 
 <!-- BEGIN GENERATED: commands -->
