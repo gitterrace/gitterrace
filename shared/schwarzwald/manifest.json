@@ -1,7 +1,7 @@
 {
   "schwarzwald": null,
   "dirty": false,
-  "date": "2026-11-07T06:37:53Z",
+  "date": "2026-11-07T11:06:17Z",
   "parts": [
     "configs",
     "fonts",
@@ -14,7 +14,7 @@
     "tools"
   ],
   "files": {
-    "README.md": "80e33ce5280b4e741dcd7368c36a08565fa57aea605893656cf20f3e13579e63",
+    "README.md": "b6da923233e631c73563ee8132b90369e0632df80c5f832a2924ed336a1f9959",
     "check.py": "e9ddbebd285775f979745ffea57d3dfbfe47c041120ec3c6854e84c18a1f0cfe",
     "configs/cliff-base.toml": "af6d61d5605368953ec077c37cd66b6670cd54ae8dbfb7681a2e33c2cf71d4cf",
     "configs/clippy-base.toml": "e2d4a22a5fbdab27da1188a8a664eefc40134d12f1d56cbe4af0a45936c2b77a",
@@ -66,7 +66,7 @@
     "guards/tests/adapters.sh": "5d03e95fd100d562967443e317b782ac0b12c8bc26cd439296753fe1bcccac28",
     "guards/tests/cases-bypass.sh": "972d4807ff4e29c82c8c4614bd05f9200d97b1ad82cfab8b5e19f8271d452b34",
     "guards/tests/cases-fallback.sh": "4682f9da95ec64d2241745ec20129e63f0e99105f9488390b420dad0eb296838",
-    "guards/tests/cases-rules.sh": "f911f050a60602ac9793f362fff10e3e327350049ceb791ef318191852871373",
+    "guards/tests/cases-rules.sh": "24ffcc6f933c33fccf1391d159e865a83ddf1b0e661c8089b31841a87e2d51e8",
     "guards/tests/cases-state.sh": "b234c65d6ecfff8d2f537cd9f53f9db4cb8edaeba1f655e290cfe629e5d83411",
     "guards/tests/lib.sh": "a2f58a2df7f3a72aebb1f7216863b2da3320053c8faa7a68b68265729440fadb",
     "guards/tests/prelude.sh": "0faabe9978e7a077bcfecc9e2856eb0e0f23b79f506dc4cc1a21feedc55c0cc1",

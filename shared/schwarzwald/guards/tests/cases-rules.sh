@@ -197,10 +197,17 @@ t ALLOW git_stash "$REPO" bash '{"command":"python3 .runs/sc-stash.py"}' "a pyth
     done
     printf 'pkill -f "x.app/Contents/MacOS/x"\n'
 } >"$REPO/.runs/sc-big.sh"
-_sc_t0=$SECONDS
+_sc_now() { perl -MTime::HiRes=time -e 'printf "%d\n", time * 1000'; }
+_sc_t0=$(_sc_now)
+t ADVISE broad_process_kill "$REPO" bash '{"command":"bash .runs/sc-kill.sh"}' "a small script with a broad pkill, the timing baseline"
+_sc_small=$(($(_sc_now) - _sc_t0))
+_sc_t0=$(_sc_now)
 t ADVISE broad_process_kill "$REPO" bash '{"command":"bash .runs/sc-big.sh"}' "a script near the size cap with a broad pkill on its last line"
-_sc_dt=$((SECONDS - _sc_t0))
-_assert yes "$([ "$_sc_dt" -le 3 ] && echo yes || echo no)" "the script near the size cap is judged in time (${_sc_dt}s for two calls)"
+_sc_big=$(($(_sc_now) - _sc_t0))
+# A ratio, not a wall-clock budget: load slows both calls alike. Linear reading keeps the big
+# script within a few times the small one. The quadratic join ran it 20 times slower and more.
+_assert yes "$([ "$_sc_big" -le $((_sc_small * 8 + 500)) ] && echo yes || echo no)" \
+    "the script near the size cap costs at most 8 times a small one (${_sc_big} ms vs ${_sc_small} ms)"
 t ADVISE script_content "$REPO" write "$(_sc_in hh-cycle.sh "$_sc_kill")" "writing a .sh with a broad pkill"
 t BLOCK script_content "$REPO" write "$(_sc_in w.sh "$_sc_stash")" "writing a .sh that runs git stash"
 t BLOCK script_content "$REPO" write "$(_sc_in w.zsh $'git reset --hard HEAD\n')" "writing a .zsh that runs git reset --hard"
