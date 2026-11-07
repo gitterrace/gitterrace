@@ -56,6 +56,7 @@ header{padding:var(--space-8) 0 var(--space-4);position:relative}
 .gh{right:0;color:var(--muted)}
 .gh:hover,.gh:focus-visible{color:var(--fg)}
 .gh svg{fill:currentColor}
+nav a{margin-right:var(--space-3)}
 header img{max-width:calc(100% - 72px);height:auto}
 header img.on-light{display:block}
 .tag{font-family:var(--serif);font-size:var(--text-lg);color:var(--muted);margin:var(--space-4) 0 0}
@@ -171,12 +172,14 @@ pub fn render(root: &Path, ws: &Workspace) -> Result<Vec<Out>> {
     let mut h = head(&pkg.name, &pkg.description, home);
     let _ = write!(
         h,
-        "<header>\n<img class=\"on-light\" src=\"assets/logo-light.svg\" alt=\"{n}\" width=\"540\" height=\"120\" loading=\"lazy\">\n\
-         <img class=\"on-dark\" src=\"assets/logo-dark.svg\" alt=\"\" width=\"540\" height=\"120\" loading=\"lazy\">\n\
-         <p class=\"tag\">{tag}</p>\n{THEME_BUTTON}\n<a class=\"gh\" href=\"{r}\" aria-label=\"{n} on GitHub\" title=\"GitHub\"><svg viewBox=\"0 0 16 16\" width=\"24\" height=\"24\" aria-hidden=\"true\"><path d=\"{GH_MARK}\"/></svg></a>\n</header>\n",
+        "<header>\n<img class=\"on-light\" src=\"assets/logo-light.svg\" alt=\"{n}\" \
+         width=\"540\" height=\"120\" loading=\"lazy\">\n\
+         <img class=\"on-dark\" src=\"assets/logo-dark.svg\" alt=\"\" width=\"540\" height=\"120\" \
+         loading=\"lazy\">\n<p class=\"tag\">{tag}</p>\n{nav}{THEME_BUTTON}\n<a class=\"gh\" href=\"{r}\" aria-label=\"{n} on GitHub\" title=\"GitHub\"><svg viewBox=\"0 0 16 16\" width=\"24\" height=\"24\" aria-hidden=\"true\"><path d=\"{GH_MARK}\"/></svg></a>\n</header>\n",
         r = esc(repo),
         n = esc(&pkg.name),
         tag = esc(&tagline(root)?),
+        nav = nav(),
     );
     let demo = if ws.demo.is_empty() {
         String::new()
@@ -236,6 +239,12 @@ pub fn render(root: &Path, ws: &Workspace) -> Result<Vec<Out>> {
     outs.extend(pages);
     outs.extend(host_files(home, repo, &pkg.name, &paths));
     Ok(outs)
+}
+
+/// The site's own pages, the same on every page, as the one navigation landmark.
+pub(crate) fn nav() -> &'static str {
+    "<nav aria-label=\"Site\"><a href=\"/\">Home</a> <a href=\"/docs/\">Docs</a> \
+     <a href=\"/changelog/\">Changelog</a></nav>\n"
 }
 
 /// Every page opens its body the same way: a skip link as the first Tab stop, then the main
