@@ -45,7 +45,7 @@ pub(crate) struct Served {
     /// The background tasks the router started, stopped when the repository is taken off.
     tasks: Mutex<Vec<tokio::task::AbortHandle>>,
     /// Newest commit and the sparkline's counts at the HEAD they were read for, so the index page
-    /// opens a repository once per HEAD move instead of once per hit.
+    /// opens a repository once per HEAD move or new local day instead of once per hit.
     recent: Mutex<Option<(String, Arc<Recent>)>>,
 }
 
@@ -57,6 +57,8 @@ struct Recent {
     series: spark::Series,
     /// Commits since the local midnight of the newest commit's zone.
     today: u32,
+    /// The end of the local day `today` counts, past which the read is stale.
+    day_end: i64,
 }
 
 /// The repository table. A URL name resolves only through this map, never by joining it
@@ -347,6 +349,7 @@ impl Served {
         if let Ok(g) = self.recent.lock()
             && let Some((at, r)) = g.as_ref()
             && *at == head
+            && now < r.day_end
         {
             return Arc::clone(r);
         }
@@ -360,10 +363,12 @@ impl Served {
             .and_then(|l| l.into_iter().next());
         // Days end at local midnight of the newest commit's zone, as on the sidebar.
         let offset = last.as_ref().map_or(0, |c| c.author.offset);
-        let day_start = spark::End::local(now, offset).day_end - DAY;
-        let today = u32::try_from(times.iter().filter(|t| **t >= day_start).count()).unwrap_or(0);
+        let day_end = spark::End::local(now, offset).day_end;
+        let today =
+            u32::try_from(times.iter().filter(|t| **t >= day_end - DAY).count()).unwrap_or(0);
         let r = Arc::new(Recent {
             today,
+            day_end,
             series: spark::series(times, first, spark::End::local(now, offset), SPARK_CAP),
             last,
         });

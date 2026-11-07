@@ -255,3 +255,23 @@ async fn assert_indexed(router: &Router, name: &str) {
         "{name}: {repo}"
     );
 }
+
+/// The today count is keyed on the local day too: the same HEAD read a minute after midnight
+/// counts no commits today, where the read a minute before counted one.
+#[test]
+fn the_today_count_resets_at_midnight() {
+    let dir = tempfile::tempdir().expect("tmp");
+    let _f = gitterrace_testkit::Fixture::init(dir.path())
+        .at("2024-03-09T12:00:00+00:00")
+        .commit("noon");
+    let table = super::Table::new(
+        vec![dir.path().to_path_buf()],
+        crate::app::Env::new(gitterrace_config::Config::default()),
+        None,
+    )
+    .expect("table");
+    let s = table.snapshot()[0].clone();
+    let midnight = 1_710_028_800;
+    assert_eq!(s.recent(midnight - 60).today, 1, "before midnight");
+    assert_eq!(s.recent(midnight + 60).today, 0, "after midnight");
+}
