@@ -1,6 +1,7 @@
 //! `docs/README.md`, the documentation index, and the checks that keep every document honest:
 //! each one listed in the index, every relative link and anchor resolving, and every config key
-//! and command-line flag a document names existing in the schema or the clap definition.
+//! and command-line flag a document names existing in the schema or the clap definition, and
+//! every repository path in a code span existing.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Write as _;
@@ -182,6 +183,7 @@ pub fn check(root: &Path) -> Result<Vec<String>> {
     for (path, text) in &texts {
         bad.extend(check_links(root, path, text, &texts));
         bad.extend(keys.check(path, text));
+        bad.extend(check_paths(root, path, text));
     }
     bad.extend(keys.reverse(&texts));
     Ok(bad)
@@ -291,6 +293,24 @@ fn check_links(
             bad.push(format!(
                 "{path}: link to {dest}: no heading #{anchor} in {target}"
             ));
+        }
+    }
+    bad
+}
+
+/// Folders whose paths a document may name in a code span. A span that starts with one and
+/// holds no placeholder must name a file or folder that exists, so a moved script or crate
+/// cannot leave a dead pointer behind.
+const PATH_ROOTS: [&str; 5] = ["crates/", "scripts/", "xtask/", "bench/", "docs/"];
+
+fn check_paths(root: &Path, path: &str, text: &str) -> Vec<String> {
+    let mut bad = Vec::new();
+    for ev in Parser::new_ext(text, Options::all()) {
+        let Event::Code(code) = ev else { continue };
+        let span = code.trim_end_matches('/');
+        let plain = !span.contains(|c: char| c.is_whitespace() || "*<>{}[]".contains(c));
+        if plain && PATH_ROOTS.iter().any(|r| span.starts_with(r)) && !root.join(span).exists() {
+            bad.push(format!("{path}: `{span}` does not exist"));
         }
     }
     bad
@@ -476,7 +496,8 @@ mod tests {
             "# Why\n\n[a](gone.md) [b](api.md#part-two) [c](api.md#part-3) [d](#why)\n\n\
              Set `server.public = true`, `server.addr`, `index.html`, `--public`, `--bogus`.\n\n\
              ```toml\n[server]\nis_public = true\nlive = 3\n```\n\n\
-             ```sh\ngit terrace export --commits 3 --pages 9\n```\n",
+             ```sh\ngit terrace export --commits 3 --pages 9\n```\n\n\
+             See `scripts/gone.sh` and `scripts/` and `docs/why.md`.\n",
         )
         .expect("why");
         let bad: Vec<String> = check(root)
@@ -493,6 +514,7 @@ mod tests {
             "`--bogus` is not a flag",
             "`server.live` in a toml example",
             "`--pages` is not a flag",
+            "`scripts/gone.sh` does not exist",
         ] {
             assert!(bad.contains(needle), "missing {needle:?} in:\n{bad}");
         }
@@ -503,6 +525,7 @@ mod tests {
             "index.html",
             "--public",
             "--commits",
+            "`docs/why.md` does not",
         ] {
             assert!(!bad.contains(fine), "{fine} flagged:\n{bad}");
         }
