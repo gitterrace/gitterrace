@@ -16,7 +16,7 @@ use crate::out::Out;
     dead_code,
     reason = "xtask only reads the definition, never the parsed values"
 )]
-mod cli;
+pub mod cli;
 
 const README: &str = "README.md";
 
