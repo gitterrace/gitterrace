@@ -1,6 +1,5 @@
 use std::net::{SocketAddr, TcpListener};
 use std::path::Path;
-use std::time::{Duration, Instant};
 
 use gitterrace_git::Repo;
 use gitterrace_testkit::{Fixture, git};
@@ -113,19 +112,14 @@ fn serve_listener(repos: Vec<std::path::PathBuf>, l: TcpListener, state: Option<
         })
         .expect("serve");
     });
-    let t = Instant::now();
     // Without a state folder the server has no secret to prove, so only its port answers.
     let up = |l: Listener| match held {
         Some(_) => l == Listener::Gitterrace,
         None => l != Listener::Free,
     };
-    while !up(identify(addr, held.as_deref())) {
-        assert!(
-            t.elapsed() < Duration::from_secs(10),
-            "server never came up"
-        );
-        std::thread::sleep(Duration::from_millis(50));
-    }
+    gitterrace_testkit::wait::until_blocking("the server came up", || {
+        up(identify(addr, held.as_deref()))
+    });
 }
 
 fn free_addr() -> SocketAddr {

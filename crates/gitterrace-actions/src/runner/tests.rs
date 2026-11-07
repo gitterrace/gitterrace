@@ -279,13 +279,15 @@ fn timeout_kills_the_whole_group() {
         .trim()
         .parse()
         .expect("int");
-    std::thread::sleep(Duration::from_millis(100));
-    let alive = std::process::Command::new("kill")
-        .args(["-0", &pid.to_string()])
-        .status()
-        .expect("kill")
-        .success();
-    assert!(!alive, "grandchild {pid} survived");
+    // The kernel reaps the signalled group soon after, on a loaded runner later.
+    let alive = || {
+        std::process::Command::new("kill")
+            .args(["-0", &pid.to_string()])
+            .status()
+            .expect("kill")
+            .success()
+    };
+    gitterrace_testkit::wait::until_blocking(&format!("grandchild {pid} reaped"), || !alive());
 }
 
 #[test]
@@ -344,7 +346,10 @@ fn concurrency_and_rate_limits() {
             )
         }));
     }
-    std::thread::sleep(Duration::from_millis(300));
+    // All four hold a slot before the fifth asks.
+    gitterrace_testkit::wait::until_blocking("four runs hold a slot", || {
+        runner.state.lock().is_ok_and(|s| s.running.len() == 4)
+    });
     let p = payload(&repo, Kind::Commit);
     assert!(
         matches!(

@@ -350,7 +350,7 @@ fn an_idle_release_empties_every_cache() {
 #[test]
 fn warm_up_reads_do_not_delay_the_release() {
     let (_dir, app, head) = one_commit_app();
-    std::thread::sleep(Duration::from_millis(30));
+    gitterrace_testkit::wait::pause_blocking(Duration::from_millis(30));
     {
         let _warm = app.warming();
         let src = app

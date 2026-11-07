@@ -219,7 +219,7 @@ mod tests {
     fn parallel_reads_keep_the_row_order() {
         let items: Vec<u64> = (0..37).collect();
         let got = super::in_order(&items, |n| {
-            std::thread::sleep(std::time::Duration::from_millis(40 - n));
+            gitterrace_testkit::wait::pause_blocking(std::time::Duration::from_millis(40 - n));
             n * 10
         });
         assert_eq!(got, items.iter().map(|n| n * 10).collect::<Vec<_>>());

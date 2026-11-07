@@ -310,11 +310,7 @@ async fn run_route_security_table() {
             .expect("kill")
             .success()
     };
-    let end = std::time::Instant::now() + std::time::Duration::from_secs(10);
-    while alive() && std::time::Instant::now() < end {
-        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
-    }
-    assert!(!alive(), "grandchild survived");
+    gitterrace_testkit::wait::until("the grandchild is reaped", || async { !alive() }).await;
 
     // 17. the 5th concurrent run is refused.
     let mut runs = Vec::new();
@@ -326,12 +322,8 @@ async fn run_route_security_table() {
     }
     // Each nap marks itself started and runs until released, so all four hold a slot now.
     let up = |id: &str| cfg.path().join(format!("{id}.up")).exists();
-    let end = std::time::Instant::now() + std::time::Duration::from_secs(20);
-    while !["nap1", "nap2", "nap3", "nap4"].iter().all(|id| up(id))
-        && std::time::Instant::now() < end
-    {
-        tokio::time::sleep(std::time::Duration::from_millis(20)).await;
-    }
+    let all_up = || async { ["nap1", "nap2", "nap3", "nap4"].iter().all(|id| up(id)) };
+    gitterrace_testkit::wait::within(gitterrace_testkit::wait::DEADLINE, all_up).await;
     assert!(
         ["nap1", "nap2", "nap3", "nap4"].iter().all(|id| up(id)),
         "four runs started"

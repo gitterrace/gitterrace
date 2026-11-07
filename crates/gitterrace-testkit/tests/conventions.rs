@@ -216,3 +216,83 @@ fn one_markup_escape_definition() {
         found.join("\n")
     );
 }
+
+/// The lines of a Rust file that are test code: all of a test file, else everything after a
+/// `mod tests` line.
+fn test_lines(rel: &str, text: &str) -> Vec<(usize, String)> {
+    let file_is_test = rel.contains("/tests/") || rel.ends_with("tests.rs");
+    let mut inside = file_is_test;
+    let mut out = Vec::new();
+    for (n, line) in text.lines().enumerate() {
+        if !inside && line.trim_start().starts_with("mod tests") {
+            inside = true;
+        }
+        if inside {
+            out.push((n + 1, line.to_owned()));
+        }
+    }
+    out
+}
+
+/// A raw sleep in test code, said either way.
+fn raw_sleep(line: &str) -> bool {
+    let code = line.split("//").next().unwrap_or_default();
+    [concat!("time::", "sleep("), concat!("thread::", "sleep(")]
+        .iter()
+        .any(|s| code.contains(s))
+}
+
+/// Guard class: a test that sleeps and then asserts bets on machine speed, and a loaded
+/// runner loses it. Test code waits through `gitterrace_testkit::wait`: `until` or `within`
+/// for a condition, `pause` for a quiet window it asserts nothing happens in. Catches a sleep
+/// in a test file and in an inline `mod tests` alike.
+#[test]
+fn test_code_waits_through_the_shared_helper() {
+    let mut files = Vec::new();
+    sources(&root().join("crates"), &["rs"], &mut files);
+    let mut found = Vec::new();
+    for f in files {
+        let rel = f
+            .strip_prefix(root())
+            .unwrap_or(&f)
+            .to_string_lossy()
+            .replace('\\', "/");
+        if rel.ends_with("gitterrace-testkit/src/wait.rs") {
+            continue;
+        }
+        let Ok(text) = fs::read_to_string(&f) else {
+            continue;
+        };
+        for (n, line) in test_lines(&rel, &text) {
+            if raw_sleep(&line) {
+                found.push(format!("{rel}:{n}: {}", line.trim()));
+            }
+        }
+    }
+    assert!(
+        found.is_empty(),
+        "wait through gitterrace_testkit::wait (until, within or pause):\n{}",
+        found.join("\n")
+    );
+}
+
+/// The guard's own red cases: a sleep in a test file, after an inline `mod tests`, and the
+/// blocking spelling are all caught, product code and comments are not.
+#[test]
+fn the_sleep_guard_sees_both_kinds_of_test_code() {
+    let sleep = concat!("    tokio::time::", "sleep(d).await;");
+    let blocking = concat!("    std::thread::", "sleep(d);");
+    let caught = |rel: &str, text: &str| {
+        test_lines(rel, text)
+            .iter()
+            .filter(|(_, l)| raw_sleep(l))
+            .count()
+    };
+    assert_eq!(caught("crates/a/tests/x.rs", sleep), 1, "a test file");
+    assert_eq!(
+        caught("crates/a/src/x.rs", &format!("mod tests {{\n{blocking}")),
+        1
+    );
+    assert_eq!(caught("crates/a/src/x.rs", sleep), 0, "product code");
+    assert_eq!(caught("crates/a/tests/x.rs", "    // a sleep( in prose"), 0);
+}

@@ -68,7 +68,7 @@ async fn watched(
             break;
         }
         last = now;
-        tokio::time::sleep(Duration::from_secs(1)).await;
+        wait::pause(Duration::from_secs(1)).await;
     }
     (a, p, rx, wt, task)
 }
@@ -94,7 +94,7 @@ async fn an_edit_shows_within_the_default_interval() {
     // One write per edit, no retry: the OS usually reports it within a second, and when it does
     // not, the safety rescan shows it within `rescan_secs`.
     for i in 0..3 {
-        tokio::time::sleep(Duration::from_millis(500)).await;
+        wait::pause(Duration::from_millis(500)).await;
         while rx.try_recv().is_ok() {}
         std::fs::write(p.join("small.txt"), format!("edited {i}\n")).expect("write");
         let t0 = Instant::now();
@@ -113,7 +113,7 @@ async fn an_idle_tree_is_not_scanned_and_a_touched_one_is() {
     let (a, p, mut rx, _wt, _t) = watched(dir.path(), RESCAN, true).await;
     let before = scans(&a);
     let window = Duration::from_secs(12);
-    tokio::time::sleep(window).await;
+    wait::pause(window).await;
     // Polling would scan once per interval (1 s), twelve times here, and a scan that wakes the
     // watcher would keep looping. The safety rescan adds one scan per `rescan_secs`, and a few
     // late duplicates of the settle markers' events may add more, so the idle count stays well
@@ -126,7 +126,7 @@ async fn an_idle_tree_is_not_scanned_and_a_touched_one_is() {
     );
     // The positive control: every touch shows as a worktree change within the documented bound.
     for i in 0..3 {
-        tokio::time::sleep(Duration::from_millis(500)).await;
+        wait::pause(Duration::from_millis(500)).await;
         while rx.try_recv().is_ok() {}
         std::fs::write(p.join("small.txt"), format!("touch {i}\n")).expect("write");
         assert!(
@@ -138,14 +138,7 @@ async fn an_idle_tree_is_not_scanned_and_a_touched_one_is() {
 
 /// Waits until a scan finished after the count read `before`.
 async fn scanned_after(a: &App, before: u64, within: Duration) -> bool {
-    let end = Instant::now() + within;
-    while Instant::now() < end {
-        if scans(a) > before {
-            return true;
-        }
-        tokio::time::sleep(Duration::from_millis(20)).await;
-    }
-    false
+    wait::within(within, || async { scans(a) > before }).await
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -180,7 +173,7 @@ async fn a_burst_of_five_thousand_files_is_a_few_scans() {
     // Settled once two seconds pass without a scan; `busy` is how long scans kept coming.
     let (mut last, mut moved) = (scans(&a), Instant::now());
     while moved.elapsed() < Duration::from_secs(2) && t0.elapsed() < Duration::from_secs(120) {
-        tokio::time::sleep(Duration::from_millis(50)).await;
+        wait::pause(Duration::from_millis(50)).await;
         if scans(&a) != last {
             (last, moved) = (scans(&a), Instant::now());
         }
@@ -223,10 +216,7 @@ async fn refresher(p: &std::path::Path, rescan_secs: u64, os_events: bool) -> Ar
     a.os_events
         .store(os_events, std::sync::atomic::Ordering::Release);
     tokio::spawn(crate::app::keep_index_fresh(Arc::clone(&a)));
-    let end = Instant::now() + Duration::from_secs(20);
-    while a.version() == 0 && Instant::now() < end {
-        tokio::time::sleep(Duration::from_millis(20)).await;
-    }
+    wait::until("the first fingerprint", || async { a.version() != 0 }).await;
     a
 }
 
@@ -246,7 +236,7 @@ async fn a_ref_update_shows_from_file_events_without_a_timer() {
         assert!(Instant::now() < deadline, "no event in {n} tries");
         n += 1;
         git(&p, &["branch", &format!("b{n}")]);
-        tokio::time::sleep(Duration::from_secs(2)).await;
+        wait::pause(Duration::from_secs(2)).await;
     }
 }
 
@@ -268,9 +258,10 @@ async fn a_dropped_event_still_shows_within_the_rescan() {
     );
     let t0 = Instant::now();
     let bound = Duration::from_secs(rescan + 5);
-    while a.version() == start && t0.elapsed() < bound {
-        tokio::time::sleep(Duration::from_millis(20)).await;
-    }
+    wait::within(bound.saturating_sub(t0.elapsed()), || async {
+        a.version() != start
+    })
+    .await;
     assert_ne!(a.version(), start, "not shown within {bound:?}");
     // The next commit waits for the next rescan: nothing polls in between.
     let seen = a.version();
@@ -278,7 +269,7 @@ async fn a_dropped_event_still_shows_within_the_rescan() {
         &p,
         &["commit", "-q", "--allow-empty", "-m", "chore: unseen 2"],
     );
-    tokio::time::sleep(Duration::from_millis(1500)).await;
+    wait::pause(Duration::from_millis(1500)).await;
     assert_eq!(
         a.version(),
         seen,
@@ -299,7 +290,7 @@ async fn an_open_tab_hears_a_commit_and_an_edit_within_the_rescan() {
         a.os_events.store(os, std::sync::atomic::Ordering::Release);
         let task = tokio::spawn(crate::app::keep_index_fresh(Arc::clone(&a)));
         // The tab opens on an idle refresher, as a browser does: it must wake for the tab.
-        tokio::time::sleep(Duration::from_millis(1500)).await;
+        wait::pause(Duration::from_millis(1500)).await;
         // As a browser does: render the page, open its stream, and the user saves at once,
         // before the tab's first scan. The page shows the tree before the edit, so the edit is
         // a change the tab must hear, however late that scan runs.
@@ -344,7 +335,8 @@ async fn an_edit_between_two_renders_reaches_the_older_tab() {
     let p = repo(dir.path(), "r");
     let a = app(&p, with(|c| c.watch.rescan_secs = 5));
     let task = tokio::spawn(crate::app::keep_index_fresh(Arc::clone(&a)));
-    tokio::time::sleep(Duration::from_millis(1500)).await;
+    // The refresher took its first fingerprint, so the edit below is a change to it.
+    wait::until("the first fingerprint", || async { a.version() != 0 }).await;
     let (code, _) = crate::tests::get(&a, "/worktree").await;
     assert_eq!(code, 200, "tab A renders");
     std::fs::write(p.join("small.txt"), "edited\n").expect("write");

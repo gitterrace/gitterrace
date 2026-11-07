@@ -156,13 +156,7 @@ fn two_steps_then_merge_equal_one_step_byte_for_byte() {
         two.update(&source, tip, &|_| {}).expect("step");
     }
     // The merge runs on a background thread: wait until the set is one segment again.
-    for _ in 0..600 {
-        if segments(&two_dir) == 1 {
-            break;
-        }
-        std::thread::sleep(std::time::Duration::from_millis(50));
-    }
-    assert_eq!(segments(&two_dir), 1, "the merge never ran");
+    gitterrace_testkit::wait::until_blocking("the merge ran", || segments(&two_dir) == 1);
     let got = live_files(&two_dir);
     assert_eq!(got.len(), want.len(), "live file count");
     for (i, (g, w)) in got.iter().zip(&want).enumerate() {

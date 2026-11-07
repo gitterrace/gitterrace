@@ -187,14 +187,8 @@ async fn overview_counts_agree_with_their_noun() {
         .path()
         .to_owned();
     let r = router(&p, Config::default());
-    let mut body = String::new();
-    for _ in 0..100 {
-        body = get(&r, "/").await.1;
-        if body.contains("class=\"facts\"") {
-            break;
-        }
-        tokio::time::sleep(Duration::from_millis(100)).await;
-    }
+    let body =
+        gitterrace_testkit::wait::page_until(&r, "/", |b| b.contains("class=\"facts\"")).await;
     assert!(body.contains("class=\"facts\""), "{body}");
     for (want, wrong) in [
         ("</b> commit<", "</b> commits<"),
@@ -240,14 +234,10 @@ async fn insights_defaults_reach_the_pages() {
     });
     let r = router(&p, cfg);
     // The options row shows the state in force; wait for the index to be ready first.
-    let mut body = String::new();
-    for _ in 0..100 {
-        body = get(&r, "/stats/hotspots").await.1;
-        if body.contains("Generated files") {
-            break;
-        }
-        tokio::time::sleep(Duration::from_millis(100)).await;
-    }
+    let body = gitterrace_testkit::wait::page_until(&r, "/stats/hotspots", |b| {
+        b.contains("Generated files")
+    })
+    .await;
     assert!(body.contains("Bots"), "{body}");
     let on = |label: &str, state: &str| {
         let at = body.find(label).expect(label);
@@ -293,30 +283,19 @@ async fn index_build_on_start_waits_for_demand_when_off() {
     let cfg = with(|c| c.index.build_on_start = false);
     let a = app(&p, cfg);
     tokio::spawn(crate::app::keep_index_fresh(Arc::clone(&a)));
-    tokio::time::sleep(Duration::from_millis(700)).await;
+    // A quiet window: nothing may start the build without a demand.
+    gitterrace_testkit::wait::pause(Duration::from_millis(700)).await;
     assert!(!a.ready(), "nothing builds until a page needs the index");
     let head = a.repo.resolve("HEAD").expect("head");
     assert!(
         a.source(&head).expect("source").is_none(),
         "asking is the demand"
     );
-    for _ in 0..100 {
-        if a.ready() {
-            break;
-        }
-        tokio::time::sleep(Duration::from_millis(100)).await;
-    }
-    assert!(a.ready(), "the demand starts the build");
+    gitterrace_testkit::wait::until("the demand starts the build", || async { a.ready() }).await;
 
     let on = app(&p, Config::default());
     tokio::spawn(crate::app::keep_index_fresh(Arc::clone(&on)));
-    for _ in 0..100 {
-        if on.ready() {
-            break;
-        }
-        tokio::time::sleep(Duration::from_millis(100)).await;
-    }
-    assert!(on.ready(), "the default builds at once");
+    gitterrace_testkit::wait::until("the default builds at once", || async { on.ready() }).await;
 }
 
 #[tokio::test]
@@ -337,7 +316,7 @@ async fn resources_blocking_jobs_bounds_concurrent_work() {
                         crate::app::blocking(&a, move |_| {
                             let n = running.fetch_add(1, Ordering::SeqCst) + 1;
                             max.fetch_max(n, Ordering::SeqCst);
-                            std::thread::sleep(Duration::from_millis(80));
+                            gitterrace_testkit::wait::pause_blocking(Duration::from_millis(80));
                             running.fetch_sub(1, Ordering::SeqCst);
                             Ok(())
                         })

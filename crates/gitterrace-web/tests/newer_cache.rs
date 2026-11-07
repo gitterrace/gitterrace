@@ -60,7 +60,7 @@ fn a_newer_cache_serves_every_page_without_a_500_and_stays_untouched() {
         let router = gitterrace_web::app_router(&repo).expect("router");
         let prefix = base(&router).await;
         // Give the indexer loop time to try (and refuse) the cache before the sweep.
-        tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+        gitterrace_testkit::wait::pause(std::time::Duration::from_millis(500)).await;
 
         let mut todo: Vec<String> = gitterrace_web::WARM_PAGES
             .iter()

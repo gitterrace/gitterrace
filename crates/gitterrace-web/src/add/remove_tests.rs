@@ -144,23 +144,22 @@ async fn a_removed_repository_stops_indexing() {
     let (r, secret) = server(vec![a, b.clone()], cfg);
     let cache = b.join(".git/gitterrace");
     // Let its first index build land.
-    let end = std::time::Instant::now() + Duration::from_secs(20);
-    while snapshot(&cache).is_empty() && std::time::Instant::now() < end {
-        tokio::time::sleep(Duration::from_millis(50)).await;
-    }
-    tokio::time::sleep(Duration::from_millis(500)).await;
-    assert!(!snapshot(&cache).is_empty(), "indexed while served");
+    let w = gitterrace_testkit::wait::DEADLINE;
+    let landed = gitterrace_testkit::wait::within(w, || async { !snapshot(&cache).is_empty() });
+    assert!(landed.await, "indexed while served");
+    gitterrace_testkit::wait::pause(Duration::from_millis(500)).await;
     assert_eq!(
         send(&r, req("DELETE", Some(&secret)), named("b")).await.0,
         200
     );
-    tokio::time::sleep(Duration::from_millis(300)).await;
+    gitterrace_testkit::wait::pause(Duration::from_millis(300)).await;
     let before = snapshot(&cache);
     for i in 0..3 {
         std::fs::write(b.join(format!("src/n{i}.rs")), "fn n() {}\n").expect("write");
         gitterrace_testkit::git(&b, &["add", "-A"]);
         gitterrace_testkit::git(&b, &["commit", "-q", "-m", &format!("after removal {i}")]);
     }
-    tokio::time::sleep(Duration::from_secs(2)).await;
+    // A quiet window: nothing may write to the folder once the repository is off.
+    gitterrace_testkit::wait::pause(Duration::from_secs(2)).await;
     assert_eq!(snapshot(&cache), before, "no writes after removal");
 }

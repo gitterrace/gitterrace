@@ -1,5 +1,7 @@
 use std::sync::atomic::{AtomicUsize, Ordering};
 
+use gitterrace_testkit::wait::pause_blocking;
+
 use super::*;
 
 fn cfg(root: &Path, rescan: Duration, os_events: bool) -> NudgeConfig {
@@ -31,7 +33,7 @@ fn wait_for(n: &AtomicUsize, at_least: usize, within: Duration) -> bool {
         if n.load(Ordering::SeqCst) >= at_least {
             return true;
         }
-        std::thread::sleep(Duration::from_millis(20));
+        pause_blocking(Duration::from_millis(20));
     }
     false
 }
@@ -205,12 +207,12 @@ fn a_burst_of_writes_is_one_or_a_few_nudges() {
         let event = notify::Event::new(write).add_path(root.join(format!("f{i}")));
         tx.send(Msg::Event(Ok(event))).expect("send");
         if i % 500 == 0 {
-            std::thread::sleep(Duration::from_millis(20));
+            pause_blocking(Duration::from_millis(20));
         }
     }
     let streamed = t0.elapsed();
     // Let the debounce settle, then stop.
-    std::thread::sleep(debounce + max_delay);
+    pause_blocking(debounce + max_delay);
     tx.send(Msg::Stop).expect("stop");
     worker.join().expect("join");
     let got = nudges.load(Ordering::SeqCst);
@@ -246,10 +248,10 @@ fn a_storm_of_drop_notices_nudges_at_most_once_per_max_delay() {
     while Instant::now() < storm_end {
         tx.send(Msg::Event(Ok(rescan()))).expect("send");
         sent += 1;
-        std::thread::sleep(Duration::from_millis(5));
+        pause_blocking(Duration::from_millis(5));
     }
     // A notice after the first is still answered, once its `max_delay` is up.
-    std::thread::sleep(max_delay * 2);
+    pause_blocking(max_delay * 2);
     tx.send(Msg::Stop).expect("stop");
     t.join().expect("join");
     let at = stamps

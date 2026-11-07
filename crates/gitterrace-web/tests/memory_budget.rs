@@ -94,7 +94,7 @@ impl Server {
         let end = Instant::now() + Duration::from_secs(30);
         while TcpStream::connect(addr).is_err() {
             assert!(Instant::now() < end, "server did not start");
-            std::thread::sleep(Duration::from_millis(50));
+            gitterrace_testkit::wait::pause_blocking(Duration::from_millis(50));
         }
         s
     }
@@ -141,7 +141,7 @@ impl Server {
                 return;
             }
             assert!(Instant::now() < end, "index never became ready");
-            std::thread::sleep(Duration::from_millis(500));
+            gitterrace_testkit::wait::pause_blocking(Duration::from_millis(500));
         }
     }
 
@@ -160,7 +160,7 @@ impl Server {
                 Instant::now() < end,
                 "no idle release within {RELEASE_WAIT_SECS} s: the server keeps its caches"
             );
-            std::thread::sleep(Duration::from_millis(500));
+            gitterrace_testkit::wait::pause_blocking(Duration::from_millis(500));
         }
     }
 

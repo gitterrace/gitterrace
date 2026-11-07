@@ -259,7 +259,8 @@ async fn an_addition_that_will_not_open_is_refused_and_forgotten() {
     let (_, list) = get(&server, "/api/repos").await;
     assert!(!list.contains("/r/b/"), "{list}");
     assert_eq!(get(&server, "/r/b/").await.0, 404, "not served");
-    tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+    // A refused add writes nothing later either.
+    gitterrace_testkit::wait::pause(std::time::Duration::from_millis(200)).await;
     let recorded = std::fs::read_to_string(state.join("repos.json")).unwrap_or_default();
     assert!(!recorded.contains(b.to_str().expect("utf8")), "{recorded}");
 }
@@ -378,14 +379,9 @@ async fn links_handed_out_survive_a_join_and_a_restart() {
 /// Waits until the repository at `prefix` has built its cache, so an insights page reads the
 /// same before and after rather than "indexing" once.
 async fn ready(r: &axum::Router, prefix: &str) {
-    for _ in 0..600 {
-        let (_, js) = get(r, &format!("{prefix}/api/progress")).await;
-        if js.contains("\"ready\":true") {
-            return;
-        }
-        tokio::time::sleep(std::time::Duration::from_millis(20)).await;
-    }
-    panic!("{prefix} never became ready");
+    let uri = format!("{prefix}/api/progress");
+    let ready = || async { get(r, &uri).await.1.contains("\"ready\":true") };
+    gitterrace_testkit::wait::until(&format!("{prefix} is ready"), ready).await;
 }
 
 /// The `<main>` of a page: what it shows, without the header around it.

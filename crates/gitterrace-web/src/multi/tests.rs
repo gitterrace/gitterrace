@@ -295,10 +295,10 @@ fn the_dirty_chip_follows_the_tree_within_the_bound() {
     let bound = crate::app::DIRTY_TTL + std::time::Duration::from_millis(50);
     assert!(!s.dirty(), "clean");
     let f = f.write("a", "2");
-    std::thread::sleep(bound);
+    gitterrace_testkit::wait::pause_blocking(bound);
     assert!(s.dirty(), "an edit shows within the bound");
     let _f = f.git(&["checkout", "-q", "--", "a"]);
-    std::thread::sleep(bound);
+    gitterrace_testkit::wait::pause_blocking(bound);
     assert!(!s.dirty(), "a revert shows within the bound");
 }
 

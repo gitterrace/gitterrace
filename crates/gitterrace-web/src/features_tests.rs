@@ -171,14 +171,11 @@ fn fixture(dir: &Path) -> std::path::PathBuf {
 }
 
 async fn ready(r: &Router, prefix: &str) {
-    for _ in 0..600 {
-        let (_, js) = get(r, &format!("{prefix}/api/progress")).await;
-        if js.contains("\"ready\":true") {
-            return;
-        }
-        tokio::time::sleep(std::time::Duration::from_millis(20)).await;
-    }
-    panic!("never ready");
+    let uri = format!("{prefix}/api/progress");
+    gitterrace_testkit::wait::until("the index is ready", || async {
+        get(r, &uri).await.1.contains("\"ready\":true")
+    })
+    .await;
 }
 
 /// The core pages every crawl renders: each could link any feature.

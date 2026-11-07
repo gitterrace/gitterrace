@@ -40,7 +40,11 @@ fn one_slow_item_does_not_serialize_the_rest() -> crate::Result<()> {
     let items: Vec<u64> = (0..100).collect();
     let t0 = Instant::now();
     let out = collect(&items, 4, 100, |i| {
-        std::thread::sleep(Duration::from_millis(if *i == 0 { 500 } else { 20 }));
+        gitterrace_testkit::wait::pause_blocking(Duration::from_millis(if *i == 0 {
+            500
+        } else {
+            20
+        }));
         Ok(i * 2)
     })?;
     let took = t0.elapsed();
@@ -60,7 +64,7 @@ fn workers_stay_inside_the_window() -> crate::Result<()> {
     collect(&items, 8, 16, |i| {
         started.fetch_add(1, Ordering::SeqCst);
         if *i == 0 {
-            std::thread::sleep(Duration::from_millis(200));
+            gitterrace_testkit::wait::pause_blocking(Duration::from_millis(200));
             peak.store(started.load(Ordering::SeqCst), Ordering::SeqCst);
         }
         Ok(())
@@ -93,7 +97,7 @@ fn held_results_stay_inside_the_byte_budget() -> crate::Result<()> {
         |(), i| {
             started.fetch_add(1, Ordering::SeqCst);
             if *i == 0 {
-                std::thread::sleep(Duration::from_millis(200));
+                gitterrace_testkit::wait::pause_blocking(Duration::from_millis(200));
                 peak.store(started.load(Ordering::SeqCst), Ordering::SeqCst);
             }
             Ok(())

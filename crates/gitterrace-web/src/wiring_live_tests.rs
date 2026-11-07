@@ -99,7 +99,8 @@ async fn a_stream_that_missed_a_change_hears_it_on_connect() {
     let dir = tempfile::tempdir().expect("tmp");
     let p = repo(dir.path(), "r");
     let r = router(&p, Config::default());
-    tokio::time::sleep(Duration::from_millis(600)).await;
+    // A tab that rendered long before: its `v=1` is behind whatever the server holds now.
+    gitterrace_testkit::wait::pause(Duration::from_millis(600)).await;
     let mut body = open_events(&r, "/events?v=1").await.into_body();
     let got = read_until(&mut body, "event: change", Duration::from_secs(2)).await;
     assert!(
@@ -151,7 +152,7 @@ async fn watch_off_runs_no_timer() {
     let a = app(&p, with(|c| c.watch.enabled = false));
     tokio::spawn(crate::app::keep_index_fresh(Arc::clone(&a)));
     let mut rx = a.changes.subscribe();
-    tokio::time::sleep(Duration::from_millis(300)).await;
+    gitterrace_testkit::wait::pause(Duration::from_millis(300)).await;
     git(&p, &["commit", "-q", "--allow-empty", "-m", "chore: empty"]);
     let got = tokio::time::timeout(Duration::from_millis(1500), rx.recv()).await;
     assert!(got.is_err(), "no change is announced with the watcher off");
@@ -170,7 +171,7 @@ async fn working_tree_is_scanned_only_for_a_subscriber() {
     );
     tokio::spawn(crate::app::keep_index_fresh(Arc::clone(&a)));
     let mut rx = a.changes.subscribe();
-    tokio::time::sleep(Duration::from_millis(400)).await;
+    gitterrace_testkit::wait::pause(Duration::from_millis(400)).await;
     let kinds = |c: Arc<crate::live::Change>| c.kinds.clone();
     std::fs::write(p.join("small.txt"), "edited without a subscriber\n").expect("write");
     // The cheap dirty check may announce the flip, but never a full worktree scan.
@@ -206,14 +207,7 @@ fn scans(a: &crate::app::App) -> u64 {
 
 /// Waits until a scan finished after the count read `before`.
 async fn scanned_after(a: &crate::app::App, before: u64, within: Duration) -> bool {
-    let end = std::time::Instant::now() + within;
-    while std::time::Instant::now() < end {
-        if scans(a) > before {
-            return true;
-        }
-        tokio::time::sleep(Duration::from_millis(20)).await;
-    }
-    false
+    gitterrace_testkit::wait::within(within, || async { scans(a) > before }).await
 }
 
 /// Returns once a second passes without a scan.
@@ -222,7 +216,7 @@ async fn settle(a: &crate::app::App) {
     let mut last = u64::MAX;
     while scans(a) != last && std::time::Instant::now() < end {
         last = scans(a);
-        tokio::time::sleep(Duration::from_secs(1)).await;
+        gitterrace_testkit::wait::pause(Duration::from_secs(1)).await;
     }
 }
 
@@ -256,12 +250,8 @@ async fn dirty_chip_follows_on_pages_without_the_worktree() {
     // A listener, but no page that shows the working tree.
     let mut rx = a.changes.subscribe();
     // The first check is the baseline; an edit before it would be the baseline itself.
-    let end = std::time::Instant::now() + Duration::from_secs(20);
-    while a.wt_scans.load(std::sync::atomic::Ordering::Relaxed) == 0
-        && std::time::Instant::now() < end
-    {
-        tokio::time::sleep(Duration::from_millis(50)).await;
-    }
+    let first = || async { a.wt_scans.load(std::sync::atomic::Ordering::Relaxed) > 0 };
+    gitterrace_testkit::wait::until("the baseline check", first).await;
     while rx.try_recv().is_ok() {}
     let mut next = async |want: bool| {
         loop {

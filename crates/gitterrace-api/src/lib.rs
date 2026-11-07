@@ -463,14 +463,8 @@ mod tests {
                 .and_then(|v| v.to_str().ok()),
             Some(crate::RETRY_AFTER_SECS)
         );
-        let t0 = std::time::Instant::now();
-        while get(&s, "/repo").await.0 != StatusCode::OK {
-            assert!(
-                t0.elapsed() < std::time::Duration::from_secs(10),
-                "the API never rebuilt its unreadable cache"
-            );
-            tokio::time::sleep(std::time::Duration::from_millis(50)).await;
-        }
+        let rebuilt = || async { get(&s, "/repo").await.0 == StatusCode::OK };
+        gitterrace_testkit::wait::until("the API rebuilt its unreadable cache", rebuilt).await;
     }
 
     /// With a server's rebuild installed, an unreadable cache goes to it, not to a second

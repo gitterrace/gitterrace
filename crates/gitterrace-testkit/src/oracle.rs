@@ -11,7 +11,6 @@ use std::collections::BTreeMap;
 use std::fmt::Write as _;
 use std::io::Write as _;
 use std::path::Path;
-use std::time::Duration;
 
 use axum::Router;
 
@@ -175,14 +174,7 @@ pub async fn ready(router: &Router) {
 /// than HEAD loads its own record set on the first visit.
 pub async fn ready_at(router: &Router, rev: &str) {
     let probe = format!("/stats?rev={}", crate::matrix::enc(rev));
-    for _ in 0..600 {
-        let (_, body) = page(router, &probe).await;
-        if !body.contains("data-progress") {
-            return;
-        }
-        tokio::time::sleep(Duration::from_millis(50)).await;
-    }
-    panic!("index never became ready");
+    crate::wait::page_until(router, &probe, crate::wait::indexed).await;
 }
 
 /// The page and API paths every cell asks for. `pages` are the insights pages (the web

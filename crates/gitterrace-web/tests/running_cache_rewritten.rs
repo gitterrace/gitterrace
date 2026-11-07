@@ -26,7 +26,7 @@ async fn until_api_answers(
             s => errors.push(format!("{u} -> {s}, Retry-After {retry:?}")),
         }
         round += 1;
-        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+        wait::pause(std::time::Duration::from_millis(100)).await;
     }
     (None, errors)
 }
@@ -109,7 +109,7 @@ fn a_running_server_survives_its_cache_being_rewritten_underneath() {
         for _ in 0..40 {
             let (s, _) = get(&router, &format!("{prefix}/stats")).await;
             assert!(s < 500, "/stats -> {s} before the rewrite");
-            tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+            wait::pause(std::time::Duration::from_millis(50)).await;
         }
         // Another build rewrites the cache while the server runs.
         let newer = gitterrace_index::FORMAT_VERSION
@@ -139,7 +139,7 @@ fn a_running_server_survives_its_cache_being_rewritten_underneath() {
                     "round {round}: {u} -> {status}, Retry-After {retry:?}"
                 ));
             }
-            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+            wait::pause(std::time::Duration::from_millis(100)).await;
         }
         assert!(
             errors.is_empty(),
@@ -286,9 +286,9 @@ fn a_cache_a_newer_build_owns_is_never_written_by_a_running_server() {
             if cache.join("tip").exists() {
                 break;
             }
-            tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+            wait::pause(std::time::Duration::from_millis(50)).await;
         }
-        tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+        wait::pause(std::time::Duration::from_millis(500)).await;
         // A newer build owns the cache and made it read-only.
         let newer = gitterrace_index::FORMAT_VERSION
             .parse::<u64>()
@@ -308,7 +308,7 @@ fn a_cache_a_newer_build_owns_is_never_written_by_a_running_server() {
                     errors.push(format!("round {round}: {u} -> {s}"));
                 }
             }
-            tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+            wait::pause(std::time::Duration::from_millis(50)).await;
         }
         let after = snapshot(&cache);
         assert!(errors.is_empty(), "5xx:\n{}", errors.join("\n"));
