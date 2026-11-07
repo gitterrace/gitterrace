@@ -1,0 +1,6 @@
+# The ast-grep layout every product shares. sgconfig.yml cannot extend another file, so each product
+# carries these lines and drift.py checks each one. Rules and tests stay per product.
+ruleDirs:
+  - scripts/ast-grep/rules
+testConfigs:
+  - testDir: scripts/ast-grep/tests

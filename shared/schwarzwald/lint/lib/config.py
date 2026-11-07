@@ -67,7 +67,27 @@ DEFAULTS: dict[str, dict] = {
     "a11y": {"docs": ["README.md", "docs/**.md"], "h1_required": True, "known": []},
     "refs": {"patterns": [], "not_id": []},
     "personal": {"exempt": [], "placeholder_homes": []},
-    "history": {"keep": [], "sha_fields": [], "bundles": "", "rewrites": [], "skip": []},
+    "history": {"keep": [], "sha_fields": [], "bundles": "", "replace": [], "skip": []},
+    "lines": {
+        "max_lines": 600,
+        "max_width": 0,
+        "globs": ["*.rs", "*.py", "*.mjs", "*.js", "*.sh", "*.css", "*.html"],
+        "exclude": [],
+    },
+    "scripts": {
+        "dirs": ["scripts"],
+        "readers": ["Makefile", "*.md", "*.yml", "*.yaml", "*.toml", "scripts/*"],
+        "exempt": [],
+    },
+    "changelog": {"git_cliff": "", "file": "CHANGELOG.md", "tag_prefix": "v"},
+    "run": {
+        "steps": [],
+        "shell_exclude": [],
+        "shellcheck_exclude": ["SC2250", "SC2292", "SC2310", "SC2312"],
+        "shfmt_indent": 2,
+        "markdownlint": "",
+        "markdown_exclude": [],
+    },
     "disk": {"floor_gib": 50},
     "denylist": {"max_age_hours": 168, "mode": "warn", "refresh": "", "history_ids": ""},
     "commit": {

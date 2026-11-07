@@ -20,9 +20,9 @@ referenced thing says instead.
    first.
 4. No personal names, agent names, hostnames or local paths. Write `$HOME` or
    `~`.
-5. No commit of the repository's own history by sha. A rewrite makes it dead.
-   Say what the commit did. Upstream shas (a pinned corpus, a vendored release)
-   are fine.
+5. No commit of the repository's own history by sha. A reader may not have
+   that commit. Say what the commit did. Upstream shas (a pinned corpus, a
+   vendored release) are fine.
 6. Test names describe behavior (`owner_ties_follow_names`), never a label.
 7. A commit message describes the product change and its tests in plain words. A
    golden change is described by what changed ("12 ownership cells: only the
@@ -97,3 +97,9 @@ is never edited in the product. Change its source, regenerate, and commit the
 new copy. The product's gate fails on drift. Docs that list registries (rules,
 targets, parts) are generated from the registry or checked against it, never
 kept by hand.
+
+## AGENTS.md headings
+
+Every product's `AGENTS.md` uses these headings, in order: Layout, Rules, Code
+conventions, Workflow, Builds and gates, Every bug gets a guard, Provenance
+stays out. A product adds its own sections after them.

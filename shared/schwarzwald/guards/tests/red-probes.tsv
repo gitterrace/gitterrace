@@ -79,3 +79,8 @@ read_size_bounded	rules/64-read-size.sh	[ -z "${GUARD_READ_BOUND:-}" ] || return
 read_size_cat	rules/64-read-size.sh	[ "$verb" = cat ] || return 0	cat of a 2000-line file	return 0	cases-rules
 read_size_pipe	rules/64-read-size.sh	guard_match "$head" '[|;&<>$`(]' && return 0	a piped cat	:	cases-rules
 read_size_lane_accept	rules/64-read-size.sh	guard_match "$head" 'lane-accept' && return 0	a command naming lane-accept output	:	cases-rules
+script_bodies_run	engine.sh	GUARD_CMD="${GUARD_CMD:-}"$'\n'"$bodies"	bash <script> whose body has a broad pkill	:	cases-rules
+script_bodies_exec	engine.sh	[ -x "$path" ] && [ "${body:0:2}" = '#!' ] || continue	an executable ./script whose body	continue	cases-rules
+script_content_rule	rules/82-script-content.sh	guard_is_script_path "${GUARD_FILE:-}" || return 0	writing a .sh with a broad pkill	return 0	cases-rules
+script_content_patch	engine.sh	[ -z "${GUARD_PATCH:-}" ] || guard_patch_script_lines	apply_patch adding git stash to a .sh	:	cases-rules
+script_content_class	rules/82-script-content.sh	if [ "$GUARD_VERDICT" != block ] &&{NL}        !	writing a .zsh that runs git reset --hard	if false &&{NL}        !	cases-rules

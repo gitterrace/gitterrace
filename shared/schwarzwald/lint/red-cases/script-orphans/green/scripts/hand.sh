@@ -1,0 +1,2 @@
+# manual-only
+echo hi

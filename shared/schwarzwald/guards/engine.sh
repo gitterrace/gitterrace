@@ -154,11 +154,85 @@ guard_parse() {
              GUARD_READ_BOUND=\(if (.input | type) == "object" and (.input | has("offset") or has("limit") or has("start_line")) then "1" else "" end)
              GUARD_MODEL=\(.input.model // "")
              GUARD_PROMPT=\(.input.prompt // .input.initial_message // "")
-             GUARD_BACKGROUND=\(.input.run_in_background // false | tostring)"
+             GUARD_BACKGROUND=\(.input.run_in_background // false | tostring)
+             GUARD_CONTENT=\(.input.content // .input.new_string // ([.input.edits[]?.new_string // empty] | join("\n")))
+             GUARD_PATCH=\(.input.patch_text // .input.patch // .input.input // "" | if type == "string" then . else "" end)"
     ' 2>/dev/null) || return 1
     [ -n "$assigns" ] || return 1
     eval "$assigns" || return 1
+    [ -z "${GUARD_PATCH:-}" ] || guard_patch_script_lines
     return 0
+}
+
+# A script is a file the shell or make runs: what is written to one is code, so the bash rules
+# judge it. Prose (.md, .txt) is never judged.
+guard_is_script_path() {
+    case "${1##*/}" in
+        *.sh | *.bash | *.zsh | *.py | *.mk | Makefile | GNUmakefile | makefile) return 0 ;;
+    esac
+    return 1
+}
+
+# apply_patch has no file_path or content: GUARD_CONTENT becomes the ADDED lines of every script
+# file the patch touches (Codex `*** Add/Update File:` and unified `+++ b/`).
+guard_patch_script_lines() {
+    local line in_script="" out=""
+    while IFS= read -r line || [ -n "$line" ]; do
+        case "$line" in
+            '*** Add File: '* | '*** Update File: '*)
+                guard_is_script_path "${line#*: }" && in_script=1 || in_script=""
+                ;;
+            '+++ '*)
+                line="${line#+++ }"
+                guard_is_script_path "${line#b/}" && in_script=1 || in_script=""
+                ;;
+            '*** '*) in_script="" ;;
+            +*) [ -z "$in_script" ] || out="$out${line#+}"$'\n' ;;
+        esac
+    done <<<"$GUARD_PATCH"
+    GUARD_CONTENT="$out"
+    [ -n "$out" ] && GUARD_FILE="${GUARD_FILE:-patch.sh}"
+    return 0
+}
+
+# The bodies of the scripts a command runs (`bash x.sh`, `sh`, `zsh`, `python3`, `source`, `.`,
+# or an executable `./x`), comment lines dropped. A rule judging the command line alone never
+# sees a `git stash` or a broad `pkill` the agent wrote into a file and then ran. Bounded: a
+# readable regular file of at most GUARD_SCRIPT_MAX bytes, at most 8 scripts, one level deep.
+GUARD_SCRIPT_MAX=262144
+guard_script_bodies() {
+    local rest="$1" out="" path body line size n=0
+    local run="$GUARD_ANCHOR"'(bash|sh|zsh|python3?[.0-9]*|source|\.)[[:space:]]+(-[^[:space:]]+[[:space:]]+)*([^[:space:];&|<>()]+)'
+    local direct="$GUARD_ANCHOR"'(\.{0,2}/[^[:space:];&|<>()]+)'
+    while [ "$n" -lt 8 ]; do
+        local exe=""
+        if [[ $rest =~ $run ]]; then
+            path="${BASH_REMATCH[${#BASH_REMATCH[@]} - 1]}"
+        elif [[ $rest =~ $direct ]]; then
+            path="${BASH_REMATCH[${#BASH_REMATCH[@]} - 1]}"
+            exe=1
+        else
+            break
+        fi
+        rest="${rest#*"${BASH_REMATCH[0]}"}"
+        n=$((n + 1))
+        path="${path//\"/}"
+        path="${path//\'/}"
+        case "$path" in /*) ;; *) path="${GUARD_CWD:-.}/$path" ;; esac
+        [ -f "$path" ] && [ -r "$path" ] || continue
+        size=$(wc -c <"$path" 2>/dev/null) || continue
+        [ "${size// /}" -le "$GUARD_SCRIPT_MAX" ] 2>/dev/null || continue
+        body=$(<"$path") || continue
+        # `./x` or `/bin/ls` runs only an executable, and only a `#!` text file has a body to read.
+        if [ -n "$exe" ]; then
+            [ -x "$path" ] && [ "${body:0:2}" = '#!' ] || continue
+        fi
+        while IFS= read -r line || [ -n "$line" ]; do
+            case "${line#"${line%%[![:space:]]*}"}" in '#'* | '') continue ;; esac
+            out="$out$line"$'\n'
+        done <<<"$body"
+    done
+    printf '%s' "$out"
 }
 
 # `guard_register <id> [event]`. Event scoping is enforced here, so a post_tool
@@ -173,7 +247,7 @@ GUARD_MIN_RULES=10
 # Must EQUAL the shared file count in rules/: the selftest's degradation case deletes
 # exactly one file, so a lower floor cannot see it go. A product's own rule files are
 # counted apart, against GUARD_PRODUCT_RULE_FILES, so a missing one of THOSE is seen too.
-GUARD_SHARED_RULE_FILES=15
+GUARD_SHARED_RULE_FILES=16
 
 # Shared rules first, then each product rule dir (space-separated, relative to the product root:
 # the install's own product, never GUARD_REPO, which a caller may point at another checkout).
@@ -229,6 +303,17 @@ guard_main() {
     GUARD_HEAD_CACHE=""
     _gf_strip_heredocs "${GUARD_CMD:-}"
     GUARD_HEAD_CACHE="${GUARD_FALLBACK_VALUE%$'\n'}"
+    # A script the command runs is judged as if its body were typed: appended to the command
+    # every bash rule and the destructive class read.
+    if [ "${GUARD_TOOL:-}" = bash ]; then
+        local bodies
+        bodies=$(guard_script_bodies "$GUARD_HEAD_CACHE")
+        if [ -n "$bodies" ]; then
+            GUARD_CMD="${GUARD_CMD:-}"$'\n'"$bodies"
+            _gf_strip_heredocs "$GUARD_CMD"
+            GUARD_HEAD_CACHE="${GUARD_FALLBACK_VALUE%$'\n'}"
+        fi
+    fi
 
     [ -n "${GUARD_TOOL:-}" ] || {
         printf 'verdict: allow\n'

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """bulk-read on a stub endpoint, no network: each refusal holds and a request carries its input.
 
-    bulk-read-selftest.py   exit 0 when every case holds, else one line per broken case
+    bulk-read_test.py   exit 0 when every case holds, else one line per broken case
 """
 
 from __future__ import annotations
@@ -16,7 +16,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 
 sys.dont_write_bytecode = True
-TOOL = Path(os.environ.get("BULK_READ_TOOL") or Path(__file__).resolve().parent / "bulk-read")
+TOOL = Path(os.environ.get("BULK_READ_TOOL") or Path(__file__).resolve().parent / "bulk-read.py")
 SEEN: list[dict] = []
 
 

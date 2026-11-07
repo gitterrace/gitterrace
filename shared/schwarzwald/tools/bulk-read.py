@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Ask a cheap model a question about many files and print terse bullets.
 
-    bulk-read "<question>" <file|glob|->...
+    bulk-read.py "<question>" <file|glob|->...
 
 Reads logs, build output, long diffs and unfamiliar files without filling the caller's context.
 The answer is a summary: verify before editing, and never route review verdicts, concurrency,

@@ -157,6 +157,44 @@ t ALLOW broad_process_kill "$REPO" bash '{"command":"pkill -f \"^$BIN serve --tr
 t ALLOW broad_process_kill "$REPO" bash '{"command":"pkill -F /tmp/daemon.pid"}' "kill by pidfile is not a pattern"
 t ALLOW broad_process_kill "$REPO" bash '{"command":"kill 96334"}' "kill by explicit pid"
 t ALLOW broad_process_kill "$REPO" bash '{"command":"pgrep -af example-app"}' "pgrep only looks"
+
+echo
+echo "script content -- a destructive command hidden in a script the agent writes, then runs"
+# The incident: a lane wrote .runs/hh-cycle.sh with a broad pkill on line 5, then ran
+# `bash .runs/hh-cycle.sh`. The bash rules saw only the command line. Each script below is a
+# fixture file the run cases name, and its body is the content the write cases send.
+_sc_write() { printf '%s\n' "$2" >"$REPO/.runs/$1"; }
+_sc_kill=$'#!/usr/bin/env bash\nset -u\ncd "$(dirname "$0")"\necho cycle\npkill -f "x.app/Contents/MacOS/x"\n'
+_sc_stash=$'#!/usr/bin/env bash\necho saving\ngit stash push -m wip\n'
+_sc_rm=$'#!/usr/bin/env bash\nrm -rf ~/Documents/zz\n'
+_sc_discard=$'#!/usr/bin/env bash\ngit checkout -- README.md\n'
+_sc_scoped=$'#!/usr/bin/env bash\napp &\npid=$!\nsleep 1\nkill "$pid"\n'
+_sc_write sc-kill.sh "$_sc_kill"
+_sc_write sc-stash.sh "$_sc_stash"
+_sc_write sc-rm.sh "$_sc_rm"
+_sc_write sc-discard.sh "$_sc_discard"
+_sc_write sc-scoped.sh "$_sc_scoped"
+_sc_write sc-stash.py $'import os\nos.system("echo hi")\n'
+chmod +x "$REPO/.runs/sc-kill.sh"
+_sc_in() { jq -cn --arg f "$REPO/.runs/$1" --arg c "$2" '{file_path:$f,content:$c}'; }
+t ADVISE broad_process_kill "$REPO" bash '{"command":"bash .runs/sc-kill.sh"}' "bash <script> whose body has a broad pkill"
+t ADVISE broad_process_kill "$REPO" bash '{"command":"./.runs/sc-kill.sh --fast"}' "an executable ./script whose body has a broad pkill"
+t ADVISE broad_process_kill "$REPO" bash '{"command":"source .runs/sc-kill.sh"}' "source <script> whose body has a broad pkill"
+t BLOCK git_stash "$REPO" bash '{"command":"bash .runs/sc-stash.sh"}' "bash <script> whose body runs git stash"
+t BLOCK containment "$REPO" bash '{"command":"sh .runs/sc-rm.sh"}' "sh <script> whose body runs rm -rf out of the org"
+t BLOCK git_checkout_discards "$REPO" bash '{"command":"zsh .runs/sc-discard.sh"}' "zsh <script> whose body discards a file"
+t BLOCK destructive_class "$REPO" bash '{"command":"bash .runs/sc-stash.sh"}' "the destructive class sees a script body"
+t ALLOW broad_process_kill "$REPO" bash '{"command":"bash .runs/sc-scoped.sh"}' "a script that kills its own pid"
+t ALLOW git_stash "$REPO" bash '{"command":"python3 .runs/sc-stash.py"}' "a python script with no destructive command"
+t ADVISE script_content "$REPO" write "$(_sc_in hh-cycle.sh "$_sc_kill")" "writing a .sh with a broad pkill"
+t BLOCK script_content "$REPO" write "$(_sc_in w.sh "$_sc_stash")" "writing a .sh that runs git stash"
+t BLOCK script_content "$REPO" write "$(_sc_in w.zsh $'git reset --hard HEAD\n')" "writing a .zsh that runs git reset --hard"
+t BLOCK script_content "$REPO" write "$(_sc_in w.bash "$_sc_rm")" "writing a .bash that runs rm -rf out of the org"
+t BLOCK script_content "$REPO" edit "$(jq -cn --arg f "$REPO/Makefile" '{file_path:$f,old_string:"all:",new_string:"all:\n\tgit checkout -- README.md"}')" "an edit adding a discard to a Makefile"
+t BLOCK script_content "$REPO" apply_patch "$(jq -cn '{patch_text:"*** Begin Patch\n*** Add File: tools/x.sh\n+#!/bin/sh\n+git stash\n*** End Patch"}')" "apply_patch adding git stash to a .sh"
+t ALLOW script_content "$REPO" write "$(_sc_in ok.sh "$_sc_scoped")" "writing a script that kills its own pid"
+t ALLOW script_content "$REPO" write "$(jq -cn --arg f "$REPO/docs/kill.md" '{file_path:$f,content:"Never run pkill -f on an app, and never git stash."}')" "prose naming pkill in a .md"
+t ALLOW script_content "$REPO" apply_patch "$(jq -cn '{patch_text:"*** Begin Patch\n*** Add File: docs/x.md\n+git stash and pkill -f x\n*** End Patch"}')" "apply_patch adding prose to a .md"
 # Unbounded work. The search cases are the walk that ran two hours; the wait cases are the
 # `yes` burners that pinned every core because `wait` came before `kill`.
 t BLOCK unbounded_search "$REPO" bash '{"command":"grep -rn cache_files '"$REPO"' -l"}' "recursive grep over the repo"

@@ -22,6 +22,8 @@ min_files = 1
 docs = ["README.md", "docs/**.md"]
 # A page with headings but no h1 fails. False allows pages without one.
 h1_required = true
+# Accepted problems as "path: problem" (the hit without its line number). A stale entry fails.
+known = []
 
 [refs]
 # Extra patterns the product refuses, and English words its id patterns must skip.
@@ -35,19 +37,34 @@ exempt = []
 placeholder_homes = []
 
 [history]
-# Shas own-shas and the history tools must keep: upstream corpus pins that collide with own ones.
+# Shas own-shas and id-scan must keep: upstream corpus pins that collide with own ones.
 keep = []
-# Regexes for value fields that hold a sha (a history rewrite writes HEAD there), group 1 the
+# Regexes for value fields that hold a sha (a tool may write HEAD there), group 1 the
 # field, group 2 the sha.
 sha_fields = []
-# A file OUTSIDE the repository (e.g. under ~/Backups) listing one pre-rewrite bundle per line.
-# Never a committed path: the bundles hold the old history the rewrite removed.
+# A file OUTSIDE the repository (e.g. under ~/Backups) listing one extra commit source (a git bundle) per line.
+# Never a committed path.
 bundles = ""
-# The history rewrite: [pattern, replacement] pairs applied in order to every text file and
-# message (`{ids}` is the real ids of .personal-denylist), and regexes of paths it never touches.
-rewrites = []
+# [pattern, replacement] pairs applied in order to every text file and message by
+# product tools (`{ids}` is the real ids of .personal-denylist), and regexes of paths they skip.
+replace = []
 skip = []
 # tools/id-scan.py reads the same skip list.
+
+[lines]
+# file-length: files matching globs may not exceed max_lines. max_width caps comment lines
+# (0 = off). exclude lists vendored or generated paths on top of [scope] exclude.
+max_lines = 600
+max_width = 0
+globs = ["*.rs", "*.py", "*.mjs", "*.js", "*.sh", "*.css", "*.html"]
+exclude = []
+
+[scripts]
+# script-orphans: the .sh and .py files under dirs must be named by a file matching readers.
+# exempt lists entry points the VCS or a tool calls by name. `manual-only` in a header exempts one.
+dirs = ["scripts"]
+readers = ["Makefile", "*.md", "*.yml", "*.yaml", "*.toml", "scripts/*"]
+exempt = []
 
 [disk]
 # tools/disk-floor.py and disk-floor.sh: a build, gate or red run refuses to start below this
@@ -69,3 +86,25 @@ mode = "warn"
 refresh = ""
 # A file outside the repository of ids from old history, merged in on every refresh.
 history_ids = ""
+
+[changelog]
+# tools/changelog-gen.sh and lint/changelog.py: CHANGELOG.md is what git-cliff renders
+# from the tagged history. git_cliff pins the version the output was checked with ("" turns
+# the check off: a product with no changelog). file and tag_prefix name the file and the tags.
+git_cliff = ""
+file = "CHANGELOG.md"
+tag_prefix = "v"
+
+[run]
+# run.sh: the external linters, one PASS or FAIL line each. steps are extra checks, each
+# "name|tool|install hint|command" run from the repository root. shell_exclude are git
+# pathspecs kept out of shellcheck and shfmt. shellcheck_exclude are the codes dropped from
+# `shellcheck -o all`. shfmt_indent is the `shfmt -i` width. markdownlint pins the
+# markdownlint-cli2 version ("" skips it), markdown_exclude are pathspecs the staged-markdown
+# hook leaves out (keep them equal to the product's markdownlint ignores).
+steps = []
+shell_exclude = []
+shellcheck_exclude = ["SC2250", "SC2292", "SC2310", "SC2312"]
+shfmt_indent = 2
+markdownlint = ""
+markdown_exclude = []

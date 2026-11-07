@@ -1,0 +1,5 @@
+jobs:
+  b:
+    steps:
+      - uses: actions/checkout@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa # v4
+      - uses: ./local

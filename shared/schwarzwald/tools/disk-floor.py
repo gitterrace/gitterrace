@@ -27,8 +27,9 @@ if sys.version_info < (3, 11):  # tomllib reads lint.toml
     os.execvp(newer[0], [newer[0], *sys.argv])
 
 import subprocess  # noqa: E402
-import tomllib  # noqa: E402
 from pathlib import Path  # noqa: E402
+
+import tomllib  # noqa: E402
 
 DEFAULT_GIB = 50
 GIB = 1 << 30

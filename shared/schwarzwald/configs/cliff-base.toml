@@ -1,0 +1,53 @@
+# The part of a git-cliff config every product shares. git-cliff reads one file and cannot extend
+# another, so each product's cliff.toml carries the keys below and drift.py compares them key by key.
+# Exempt: `header` (product name, CONTRIBUTING anchor), `body` (a product may add a commit link, but
+# keeps the group heading line), `skip_tags` and any parser after the shared ones.
+
+[changelog]
+header = """
+# Changelog
+
+All notable changes are listed here. The format follows
+[Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
+
+"""
+body = """
+{% if version %}\
+## [{{ version | trim_start_matches(pat="v") }}] - {{ timestamp | date(format="%Y-%m-%d") }}
+{% else %}\
+## [Unreleased]
+{% endif %}\
+{% for group, commits in commits | group_by(attribute="group") %}
+### {{ group | striptags | trim | upper_first }}
+
+{% for commit in commits %}\
+- {% if commit.scope %}{{ commit.scope }}: {{ commit.message }}{% else %}{{ commit.message | upper_first }}{% endif %}
+{% endfor %}\
+{% endfor %}
+"""
+trim = true
+footer = ""
+
+[git]
+conventional_commits = true
+# A non-conventional subject (for example "wip: ...") never reaches the changelog.
+filter_unconventional = true
+split_commits = false
+protect_breaking_commits = false
+filter_commits = false
+topo_order = false
+# Oldest first, so a release section reads in the order the work landed.
+sort_commits = "oldest"
+tag_pattern = "v[0-9].*"
+commit_preprocessors = [
+  { pattern = '\.$', replace = "" },
+]
+# The order is the order of the groups in the output (Keep a Changelog order). The `<!-- n -->`
+# prefix sorts the groups and `striptags` in the body removes it. A product appends its own
+# parsers after these four and must keep them first and in this order.
+commit_parsers = [
+  { message = "^feat", group = "<!-- 0 -->Added" },
+  { message = "^refactor", group = "<!-- 1 -->Changed" },
+  { message = "^fix", group = "<!-- 2 -->Fixed" },
+  { message = "^perf", group = "<!-- 3 -->Performance" },
+]

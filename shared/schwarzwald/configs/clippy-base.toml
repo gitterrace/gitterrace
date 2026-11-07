@@ -2,7 +2,8 @@
 # so each product's clippy.toml carries every entry below and drift.py fails when one is dropped
 # or changed. A product adds its own entries beside these.
 
-# Tests may unwrap and dbg!.
+# Tests may unwrap, expect and dbg!.
+allow-expect-in-tests = true
 allow-unwrap-in-tests = true
 allow-dbg-in-tests = true
 

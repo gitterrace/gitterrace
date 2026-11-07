@@ -171,7 +171,7 @@ _assert BLOCK "$([ "$pr_rc" -eq 1 ] && grep -q 'the product rule spoke' <<<"$pr_
 rm -rf "$other"
 rm -f "$prod/rules/90-probe.sh"
 pr_out=$(env "${UNSET_ENV[@]}" -u GUARD_CONFIG bash "$prod_g/adapters/cli.sh" --cwd "$prod" --command 'git status' 2>&1)
-_assert INCOMPLETE "$(grep -q 'INCOMPLETE -- 15 shared and 0 product' <<<"$pr_out" && echo INCOMPLETE || echo silent)" \
+_assert INCOMPLETE "$(grep -q "INCOMPLETE -- $(sed -n 's/^GUARD_SHARED_RULE_FILES=//p' "$ENGINE") shared and 0 product" <<<"$pr_out" && echo INCOMPLETE || echo silent)" \
     "a missing PRODUCT rule file says INCOMPLETE" product_rules
 rm -rf "$prod"
 

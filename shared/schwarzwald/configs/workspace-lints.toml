@@ -1,0 +1,39 @@
+# The [workspace.lints] table every product shares. Cargo cannot extend a table, so each product
+# pastes it into the root Cargo.toml and drift.py compares it entry by entry. A product may set a
+# lint stricter than here (allow < warn < deny < forbid, same priority) and adds its own beside it.
+# A lint is fixed or silenced with `#[expect(.., reason = "..")]`, never with a bare allow.
+[workspace.lints.rust]
+# One group at deny: `cargo build`, the editor and the gate then agree. -1 lets a named lint win.
+warnings = { level = "deny", priority = -1 }
+# deny, not forbid: a crate with FFI opts in per file with `#![expect(unsafe_code, reason = "..")]`.
+unsafe_code = "deny"
+
+[workspace.lints.clippy]
+pedantic = { level = "deny", priority = -1 }
+nursery = { level = "deny", priority = -1 }
+# Do not fit: crate-private items are deliberate, and lock scopes are reviewed by hand.
+redundant_pub_crate = "allow"
+future_not_send = "allow"
+significant_drop_tightening = "allow"
+# The banned types are in clippy.toml.
+await_holding_invalid_type = "deny"
+unwrap_used = "deny"
+dbg_macro = "deny"
+# Output goes through the product's output layer, logs through tracing.
+print_stdout = "deny"
+print_stderr = "deny"
+undocumented_unsafe_blocks = "deny"
+allow_attributes = "deny"
+allow_attributes_without_reason = "deny"
+todo = "deny"
+unimplemented = "deny"
+ignore_without_reason = "deny"
+# Pedantic lints that cost more than they find.
+must_use_candidate = "allow"
+missing_errors_doc = "allow"
+missing_panics_doc = "allow"
+module_name_repetitions = "allow"
+cast_possible_truncation = "allow"
+cast_possible_wrap = "allow"
+cast_precision_loss = "allow"
+cast_sign_loss = "allow"

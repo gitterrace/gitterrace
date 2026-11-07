@@ -3,23 +3,20 @@
     exit 0 if this copy of schwarzwald equals its manifest.json, file contents and exec bits, 1 naming
     the first file that differs. <copy> defaults to the directory this file is in. No network, no
     schwarzwald checkout: a product's gate runs the copy's own check.py."""
-import fnmatch, hashlib, json, os, re, sys
+import hashlib
+import json
+import os
+import re
+import sys
 from pathlib import Path
 
 SKIP = {'manifest.json', 'Cargo.lock'}
-# Files that never leave schwarzwald are listed in never-sync.txt, which stays in schwarzwald: sync.py and
-# build.py --check enforce it. A copy refuses any file outside its manifest, and a file that carries the
-# marker line in its first MARKER_LINES lines whatever its manifest says, since the marker needs no list.
-NEVER_SYNC = 'never-sync.txt'
+# A file that never leaves schwarzwald lives in its internal/ folder, which build.py never reads. The
+# marker line in a file's first MARKER_LINES lines is the backstop: build.py --check fails on a marked
+# file under source/, and a copy refuses one whatever its manifest says.
 MARKER_LINES = 5
 MARKER = re.compile(r'^\W*schwarzwald' r': never-sync\W*$', re.M)
-
-
-def never_sync_list(path):
-    """The entries of a never-sync list: one path or glob per line, relative to dist/, # comments."""
-    if not path.is_file():
-        return []
-    return [line for line in (raw.split('#', 1)[0].strip() for raw in path.read_text().splitlines()) if line]
+SCRIPT_SUFFIXES = ('.py', '.sh', '.cjs', '.mjs')
 
 
 def has_marker(path):
@@ -32,21 +29,28 @@ def has_marker(path):
     return bool(MARKER.search(head))
 
 
-def never_sync_hits(d, rels, entries):
-    """The paths among rels, relative to d, that a never-sync entry or marker keeps out."""
-    return sorted(rel for rel in rels if any(fnmatch.fnmatchcase(rel, e) for e in entries) or has_marker(d / rel))
+def marked_files(d, rels):
+    """The paths among rels, relative to d, that carry the never-sync marker."""
+    return sorted(rel for rel in rels if has_marker(d / rel))
 
 
-def name_leaks(d, rels, entries):
-    """(path, name) for each file among rels whose text names a never-sync entry by its file stem."""
-    names = {n for n in (re.split(r'[*?[]', Path(e).stem)[0] for e in entries) if len(n) >= 4}
+def internal_names(internal):
+    """The file stems of the scripts under internal/: a copy that names one points at a file it lacks."""
+    if not internal.is_dir():
+        return []
+    stems = {p.name.split('.')[0] for p in internal.rglob('*') if p.is_file() and p.suffix in SCRIPT_SUFFIXES}
+    return sorted(s for s in stems if len(s) >= 4)
+
+
+def name_leaks(d, rels, names):
+    """(path, name) for each file among rels whose path or text names one of names."""
     out = []
     for rel in rels:
         try:
             text = (d / rel).read_text(errors='replace')
         except OSError:
             continue
-        out += [(rel, n) for n in sorted(names) if n in text or n in rel]
+        out += [(rel, n) for n in names if n in text or n in rel]
     return out
 
 
@@ -68,7 +72,7 @@ def check(d):
         print(f'no manifest: {mf}')
         return 1
     m, have = json.loads(mf.read_text()), files_of(d)
-    for rel in never_sync_hits(d, have, []):
+    for rel in marked_files(d, have):
         print(f'never-sync file in the copy: {rel}; it never leaves schwarzwald')
         return 1
     for rel in sorted(set(m['files']) | set(have)):

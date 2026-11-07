@@ -2,6 +2,14 @@
 # each product's deny.toml carries every entry below and drift.py fails when one is dropped or
 # changed. A product adds its own: advisory ignores, extra licenses, ban skips, and its choice of
 # `multiple-versions`.
+[advisories]
+# A crate yanked after we locked it was withdrawn or compromised.
+yanked = "deny"
+# An ignore whose advisory no longer matches is dead weight and fails. Every ignore names the crate,
+# the path that pulls it in, why it stays and a drop date or the release that lets it go. The
+# `unmaintained` scope is a product choice: one product sets "workspace", another keeps the default.
+unused-ignored-advisory = "deny"
+
 [licenses]
 allow = [
     "MIT",

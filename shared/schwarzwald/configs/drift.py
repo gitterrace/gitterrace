@@ -4,34 +4,65 @@
     - vale: styles/Schwarzwald is the shared style, and no other style under styles/ defines a rule
       with the file name of a shared rule.
     - ruff: ruff.toml extends the shared base and sets none of its keys.
-    - typos, clippy, deny: the tool cannot extend, so the root file must carry every base key and
-      value, and every base list item.
+    - typos, clippy, deny, rust-toolchain, cliff: the tool cannot extend, so the root file must carry
+      every base key and value, and every base list item. cliff-base.toml names its exempt keys.
+    - Cargo.toml: every [workspace.lints] entry of workspace-lints.toml is there at the same level or
+      a stricter one (allow, warn, deny, forbid).
+    - sgconfig.yml: carries every line of sgconfig-base.yml.
 Python 3.11 or newer, standard library only. Reads the shared files next to it."""
-import argparse, sys, tomllib
+import argparse
+import sys
 from pathlib import Path
+
+import tomllib
 
 HERE = Path(__file__).resolve().parent
 EXTEND = 'shared/schwarzwald/configs/ruff-base.toml'
-CARRIED = {'_typos.toml': 'typos-base.toml', 'clippy.toml': 'clippy-base.toml', 'deny.toml': 'deny-base.toml'}
+CARRIED = {'_typos.toml': 'typos-base.toml', 'clippy.toml': 'clippy-base.toml', 'deny.toml': 'deny-base.toml',
+           'rust-toolchain.toml': 'rust-toolchain-base.toml', 'cliff.toml': 'cliff-base.toml'}
+# Keys a product words itself: the changelog header and body carry its name and links.
+EXEMPT = {'cliff.toml': {'changelog.header', 'changelog.body'}}
+LEVELS = ['allow', 'warn', 'deny', 'forbid']
 
 
 def load(path):
     return tomllib.loads(path.read_text())
 
 
-def dropped(base, prod, path=''):
+def dropped(base, prod, path='', exempt=()):
     """One line per base key the product drops or changes, and per base list item it drops."""
     out = []
     for k, v in base.items():
         here = f'{path}{k}'
+        if here in exempt:
+            continue
         if k not in prod:
             out.append(f'{here}: dropped')
         elif isinstance(v, dict):
-            out += dropped(v, prod[k], here + '.') if isinstance(prod[k], dict) else [f'{here}: not a table']
+            out += dropped(v, prod[k], here + '.', exempt) if isinstance(prod[k], dict) else [f'{here}: not a table']
         elif isinstance(v, list):
             out += [f'{here}: drops {item!r}' for item in v if item not in prod[k]]
         elif prod[k] != v:
             out.append(f'{here}: overrides {v!r} with {prod[k]!r}')
+    return out
+
+
+def level(v):
+    return v['level'] if isinstance(v, dict) else v
+
+
+def weaker_lints(base, prod):
+    """One line per shared lint the product drops or sets below the shared level."""
+    out = []
+    for table, lints in base.get('workspace', {}).get('lints', {}).items():
+        have = prod.get('workspace', {}).get('lints', {}).get(table, {})
+        for name, v in lints.items():
+            if name not in have:
+                out.append(f'workspace.lints.{table}.{name}: dropped')
+            elif LEVELS.index(level(have[name])) < LEVELS.index(level(v)):
+                out.append(f'workspace.lints.{table}.{name}: {level(have[name])!r} is weaker than {level(v)!r}')
+            elif isinstance(v, dict) and have[name].get('priority') != v.get('priority'):
+                out.append(f'workspace.lints.{table}.{name}: priority differs from {v.get("priority")!r}')
     return out
 
 
@@ -70,7 +101,13 @@ def problems(repo):
         out += [f'ruff.toml: {p}' for p in overridden(load(HERE / 'ruff-base.toml'), prod)]
     for name, base in CARRIED.items():
         if (repo / name).is_file():
-            out += [f'{name}: {p}' for p in dropped(load(HERE / base), load(repo / name))]
+            out += [f'{name}: {p}' for p in dropped(load(HERE / base), load(repo / name), exempt=EXEMPT.get(name, ()))]
+    if (repo / 'Cargo.toml').is_file():
+        out += [f'Cargo.toml: {p}' for p in weaker_lints(load(HERE / 'workspace-lints.toml'), load(repo / 'Cargo.toml'))]
+    if (repo / 'sgconfig.yml').is_file():
+        have = {ln.strip() for ln in (repo / 'sgconfig.yml').read_text().splitlines()}
+        out += [f'sgconfig.yml: drops {ln!r}' for ln in (HERE / 'sgconfig-base.yml').read_text().splitlines()
+                if ln.strip() and not ln.lstrip().startswith('#') and ln.strip() not in have]
     return out
 
 

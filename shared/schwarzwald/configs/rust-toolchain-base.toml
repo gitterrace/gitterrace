@@ -1,0 +1,7 @@
+# The part of a rust-toolchain.toml every product shares. rustup reads one file and cannot extend
+# another, so each product carries these keys and drift.py compares them. A product adds `targets`.
+[toolchain]
+# Exact, never `stable`: a new clippy release adds lints, and a floating toolchain turns each into
+# a failure on a tree nobody touched. Bump it deliberately, in its own commit.
+channel = "1.98.0"
+components = ["clippy", "rustfmt"]

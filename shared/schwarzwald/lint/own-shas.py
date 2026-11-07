@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
 """CONV-NO-OWN-SHAS: nothing in the tree or a commit message names a commit of this repository.
 
-A sha of the repository's own history goes stale with every history rewrite and points a
-reader at a commit they may not have. Say what the commit did instead. Any 7 to 40 hex run that
-is a prefix of an own commit fails. Own commits are `git rev-list --all`, plus every commit of
-the pre-rewrite bundles named in lint.toml `[history] bundles`: a file outside the repository
-(`~` expands) listing one bundle path per line, `#` for comments. A rewritten history's old
-shas are just as dead. Upstream shas (a pinned corpus) are in neither, so they pass, and the
+A sha of the repository's own history points a reader at a commit they may not have. Say what
+the commit did instead. Any 7 to 40 hex run that is a prefix of an own commit fails. Own commits
+are `git rev-list --all`, plus every commit of the extra bundles named in lint.toml
+`[history] bundles`: a file outside the repository (`~` expands) listing one bundle path per
+line, `#` for comments. Upstream shas (a pinned corpus) are in neither, so they pass, and the
 ones that happen to collide go in `[history] keep`.
 Golden digests (only their `#` notes are read), `[scope] exclude` and lock files are not scanned.
 
@@ -111,9 +110,9 @@ def self_test() -> bool:
         if scan_tree(root, Own(root, history), scope)[1]:
             print(f"FAIL [{RULE}] self-test: a clean tree must pass", file=sys.stderr)
             return False
-        gone = commit(old, "before the rewrite")
+        gone = commit(old, "older commit")
         git(old, "bundle", "create", "-q", str(Path(d) / "old.bundle"), "--all")
-        (Path(d) / "bundles").write_text(f"# pre-rewrite\n{Path(d) / 'old.bundle'}\n")
+        (Path(d) / "bundles").write_text(f"# extra\n{Path(d) / 'old.bundle'}\n")
         history["bundles"] = str(Path(d) / "bundles")
         (root / "a.txt").write_text(f"measured at {head[:10]}, and 0123abcd99, once {gone[:8]}\n")
         (root / "g/golden").mkdir(parents=True)

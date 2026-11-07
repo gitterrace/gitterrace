@@ -5,7 +5,7 @@
                  step (exit 3), a dirty main (exit 1), and skips a change already on main
   id-scan        finds the id and the own sha in an old history
   ratchet-check  its own self-test: growth, a raised count and a dropped ratchet go red
-  disk guard     disk-selftest.py: the floor refuses, an ENOSPC worktree fails the run, the sweep
+  disk guard     disk_test.py: the floor refuses, an ENOSPC worktree fails the run, the sweep
                  lists only stale, closed build output
 
     selftest.py      exit 0 when every case holds, else one line per broken case
@@ -89,7 +89,7 @@ def history_repo(d: Path) -> tuple[Path, str, str, str]:
     (repo / "config/schwarzwald").mkdir(parents=True)
     (repo / "config/schwarzwald/lint.toml").write_text(
         "[history]\n"
-        "rewrites = [[',? ?see (?:{ids})( for details)?', ''], ['\\\\b(?:{ids})\\\\b', 'the rule']]\n"
+        "replace = [[',? ?see (?:{ids})( for details)?', ''], ['\\\\b(?:{ids})\\\\b', 'the rule']]\n"
         "sha_fields = ['(\"sha\": \")([0-9a-f]{7,40})(\")']\n")
     return repo, base, old, tip
 
@@ -156,10 +156,10 @@ def main() -> int:
     r = run(sys.executable, str(HERE / "ratchet-check.py"), "--self-test")
     if r.returncode != 0:
         bad.append(f"ratchet-check self-test failed: {(r.stdout + r.stderr).strip()[-300:]}")
-    r = run(sys.executable, str(HERE / "disk-selftest.py"))
+    r = run(sys.executable, str(HERE / "disk_test.py"))
     if r.returncode != 0:
         bad.append(f"disk guard self-test failed: {(r.stdout + r.stderr).strip()[-600:]}")
-    r = run(sys.executable, str(HERE / "bulk-read-selftest.py"))
+    r = run(sys.executable, str(HERE / "bulk-read_test.py"))
     if r.returncode != 0:
         bad.append(f"bulk-read self-test failed: {(r.stdout + r.stderr).strip()[-600:]}")
     old = Path("/usr/bin/python3")

@@ -10,7 +10,7 @@
                  or one a process sits in; a scratch run with unlanded commits is kept, --apply
                  removes only what it listed and prints the bytes
 
-    disk-selftest.py   exit 0 when every case holds, else one line per broken case
+    disk_test.py   exit 0 when every case holds, else one line per broken case
 """
 
 from __future__ import annotations

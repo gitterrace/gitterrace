@@ -22,12 +22,12 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 CASES = HERE / "red-cases"
+# Every lint in this folder is a rule: its file stem names its case dir, its RULE line its id.
+# Discovered, not listed, so a new lint without a red case fails here instead of going unchecked.
+RUNNERS = {"red", "run"}
 SCRIPTS = {
-    "internal-refs": "CONV-NO-INTERNAL-REFS",
-    "personal-data": "CONV-PERSONAL-DATA",
-    "own-shas": "CONV-NO-OWN-SHAS",
-    "commit-subject": "CONV-COMMIT-SUBJECT",
-    "docs-a11y": "CONV-DOCS-A11Y",
+    p.stem: (re.search(r'^RULE = "([^"]+)"', p.read_text(encoding="utf-8"), re.M) or [None, p.stem])[1]
+    for p in sorted(HERE.glob("*.py")) if p.stem not in RUNNERS
 }
 
 
