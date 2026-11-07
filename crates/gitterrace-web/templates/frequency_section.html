@@ -2,7 +2,7 @@
 <section class="fold" id="frequency">
 <h2 class="fold-h">Code frequency</h2>
 {% call kp::kpis(kpis) %}{% endcall %}
-<div class="chart-head"><div><h2>Additions and deletions per {{ unit }}</h2><p class="hint">Lines added above the axis, removed below, one column per {{ unit }}. Moves, lock files and whitespace-only changes are left out. {{ crate::rule::link(crate::rule::MERGES)|safe }}</p></div></div>
+<div class="chart-head"><div><h2>Additions and deletions per {{ unit }}</h2><p class="hint">Lines added above the axis, removed below, one column per {{ unit }}. Moves, lock files and whitespace-only changes are left out. Merges add no lines, with the Merges option on or off.</p></div></div>
 <div class="card pad">{{ weekly }}</div>
 <div class="chart-head"><div><h2>Growing or reworking?</h2><p class="hint">Share of changed lines that replaced existing code, over a rolling window of {{ window }}, read at the end of each {{ unit }}. Low means new code, high means rewriting.</p></div></div>
 <div class="card pad">{{ rework }}<p class="foot">{{ verdict }}</p></div>

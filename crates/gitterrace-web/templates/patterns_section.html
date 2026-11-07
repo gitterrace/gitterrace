@@ -7,11 +7,11 @@
 <tr class="th"><th scope="col">File</th><th scope="col">Changes with</th><th scope="col" class="r">Together</th><th scope="col" class="r">Degree</th></tr>
 {% for p in pairs %}<tr><th scope="row"><a href="{{ p.a_href }}">{% call paths::path(&p.a) %}{% endcall %}</a></th><td><a href="{{ p.b_href }}">{% call paths::path(&p.b) %}{% endcall %}</a></td><td class="r">{{ p.together }}</td><td class="r"><b>{{ p.degree }}</b></td></tr>{% endfor %}
 </table></div>
-<div class="chart-head" id="code-age"><div><h2>Code age</h2><p class="hint">Lines now by the year their file last changed. {{ crate::rule::link(crate::rule::CODE_AGE)|safe }}</p></div></div>
+<div class="chart-head" id="code-age"><div><h2>Code age</h2><p class="hint">Lines now by the year their file last changed.</p></div></div>
 <div class="card pad">{{ age }}</div>
 <div class="chart-head" id="sizes"><div><h2>Commit sizes</h2><p class="hint">Commits by lines added plus removed.</p></div></div>
 <div class="card pad">{{ sizes }}</div>
-<div class="chart-head" id="releases"><div><h2>Releases</h2>{% if !cadence.is_empty() %}<p class="hint">{{ cadence }} {{ crate::rule::link(crate::rule::CODE_AGE)|safe }}</p>{% endif %}</div></div>
+<div class="chart-head" id="releases"><div><h2>Releases</h2>{% if !cadence.is_empty() %}<p class="hint">{{ cadence }}</p>{% endif %}</div></div>
 {% if let Some(e) = no_releases %}{{ e }}{% else %}<div class="card"><table class="entries">{% call t::caption("Releases") %}{% endcall %}
 <tr class="th"><th scope="col">Tag</th><th scope="col" class="r">Date</th><th scope="col" class="r">Commits since previous</th><th scope="col" class="r">Days since previous</th></tr>
 {% for r in releases %}<tr><th scope="row"><a href="{{ r.href }}">{{ r.name }}</a></th><td class="r muted">{{ r.when }}</td><td class="r">{{ r.commits }}</td><td class="r">{{ r.days }}</td></tr>{% endfor %}

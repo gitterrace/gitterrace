@@ -14,7 +14,7 @@
 {% if empty %}{{ fb.nothing }}{% else %}
 <div class="chart-head" id="hotspot-map"><div><h2>Change frequency against size</h2><p class="hint">Each dot is a file: how often it changed against how many lines it has now. Dot size is the number of authors. Big files that change a lot are the risky ones. Click a dot for its history.</p></div></div>
 <div class="card pad">{{ scatter }}</div>
-<div class="chart-head" id="hotspot-files"><div><h2>Hotspots</h2><p class="hint">Score is changes times the square root of lines. Click a file for its history. {{ crate::rule::link(crate::rule::RENAMES)|safe }}</p></div></div>
+<div class="chart-head" id="hotspot-files"><div><h2>Hotspots</h2><p class="hint">Score is changes times the square root of lines. Click a file for its history. A renamed file counts once under each of its names.</p></div></div>
 <div class="card"><table class="entries">{% call t::caption("Hotspots") %}{% endcall %}
 <tr class="th"><th scope="col">File</th><th scope="col">Language</th><th scope="col" class="r">Lines</th><th scope="col" class="r">Changes</th><th scope="col" class="r">Authors</th><th scope="col" class="r">Last</th><th scope="col" class="r">Score</th></tr>
 {% for r in rows %}<tr data-act="insight" data-path="{{ r.path }}"><th scope="row" class="fill"><div class="bar w{{ r.pct }}"></div><a href="{{ r.href }}">{% call paths::path(&r.shown) %}{% endcall %}</a></th><td class="muted">{{ r.language }}</td><td class="r">{{ r.lines }}</td><td class="r">{{ r.changes }}</td><td class="r">{{ r.authors }}</td><td class="r muted">{{ r.last }}</td><td class="r"><b>{{ r.score }}</b></td></tr>{% endfor %}
