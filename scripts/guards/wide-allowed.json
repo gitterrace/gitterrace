@@ -41,7 +41,7 @@
     "xtask/src/docs_md.rs": 2,
     "xtask/src/openapi_json.rs": 2,
     "xtask/src/readme_agents_md.rs": 1,
-    "xtask/src/site.rs": 29,
+    "xtask/src/site.rs": 28,
     "xtask/src/site/shots.rs": 1,
     "xtask/src/site/tests.rs": 2
   }

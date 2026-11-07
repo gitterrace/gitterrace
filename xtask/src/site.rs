@@ -215,14 +215,17 @@ pub fn render(root: &Path, ws: &Workspace) -> Result<Vec<Out>> {
         "<section>\n<h2>{MADE}</h2>\n{}</section>\n",
         md(section(&sections, MADE)?)
     );
+    let changelog_text =
+        std::fs::read_to_string(root.join("CHANGELOG.md")).context("read CHANGELOG.md")?;
     let _ = write!(
         h,
-        "<footer>\n<a href=\"{repo}\">Repository</a>\n<a href=\"{repo}/tree/main/docs\">Docs</a>\n\
-         <a href=\"{repo}/blob/main/LICENSE\">{lic}</a>\n<a href=\"{repo}/releases/tag/v{ver}\">v{ver}</a>\n</footer>\n\
+        "<footer>\n<a href=\"{repo}\">Repository</a>\n<a href=\"docs/\">Docs</a>\n\
+         <a href=\"{repo}/blob/main/LICENSE\">{lic}</a>\n<a href=\"{log}\">v{ver}</a>\n</footer>\n\
          </main>\n<script>{THEME_TOGGLE_JS}</script>\n<script>{LIGHTBOX_JS}</script>\n</body>\n</html>\n",
         repo = esc(repo),
         lic = esc(&pkg.license),
         ver = esc(&pkg.version),
+        log = changelog::version_href(&changelog_text, &pkg.version),
     );
     outs.push(Out::file("site/index.html", h));
     let (pages, paths) = docs::pages(root, home, repo, &pkg.name)?;

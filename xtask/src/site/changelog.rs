@@ -22,6 +22,17 @@ fn release_id(heading: &str) -> String {
     }
 }
 
+/// The footer's link for version `ver`: its release heading when the changelog has one, else
+/// the page, so the link and the id come from the same rule and never point at nothing.
+pub fn version_href(text: &str, ver: &str) -> String {
+    let heading = format!("## [{ver}]");
+    if text.lines().any(|l| l.starts_with(&heading)) {
+        format!("{PATH}#{}", release_id(&format!("[{ver}]")))
+    } else {
+        PATH.to_owned()
+    }
+}
+
 /// The changelog's HTML, with its heading ids.
 fn render(text: &str, links: &Links) -> String {
     let mut release = String::new();
@@ -63,5 +74,12 @@ mod tests {
         assert!(html.contains("<h2 id=\"unreleased\">"), "{html}");
         assert!(html.contains("<h3 id=\"v0.3.0-added\">"), "{html}");
         assert!(html.contains("<h3 id=\"unreleased-added\">"), "{html}");
+    }
+
+    #[test]
+    fn the_version_link_names_a_release_only_when_it_exists() {
+        let text = "## [0.3.0] - 2026-01-02\n";
+        assert_eq!(version_href(text, "0.3.0"), "changelog/#v0.3.0");
+        assert_eq!(version_href(text, "0.4.0"), "changelog/");
     }
 }
