@@ -68,7 +68,7 @@ def scan_comments(text: str, name: str, marker: str) -> list[str]:
 
 def files() -> list[Path]:
     r = subprocess.run(
-        ["git", "ls-files", "-co", "--exclude-standard"],
+        ["git", "ls-files", "-c"],
         cwd=ROOT,
         capture_output=True,
         text=True,

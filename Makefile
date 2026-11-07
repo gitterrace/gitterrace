@@ -67,6 +67,7 @@ docs-check:
 	python3 scripts/bench-report.py --check
 	bash scripts/land-check.sh --self-test
 	python3 scripts/commits-check.py --self-test
+	python3 scripts/tracked-check.py --self-test
 	bash scripts/golden-check.sh --self-test
 	bash scripts/linux-run.sh --self-test
 	bash scripts/macos-run.sh --self-test
@@ -78,7 +79,7 @@ names:
 
 # lines: Source files stay under 600 lines, comments carry no process labels
 lines:
-	python3 shared/schwarzwald/lint/file-length.py --repo .
+	python3 scripts/lines-run.py --repo .
 	python3 scripts/width-check.py --self-test && python3 scripts/width-check.py
 	python3 scripts/status-words-check.py
 	python3 scripts/stubs-check.py --self-test && python3 scripts/stubs-check.py

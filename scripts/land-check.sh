@@ -68,11 +68,13 @@ hooks_wired() {
 SUBJECT='^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\([a-z0-9_-]+\))?!?: .+'
 
 # Prints "all" or the touched crates plus everything that depends on them, one per line.
+# The paths come one per line on stdin, never as arguments: a long list overflows argv.
 select_crates() {
-  python3 - "$@" <<'PY'
+  python3 -c "$(
+    cat <<'PY'
 import json, subprocess, sys
 
-paths = sys.argv[1:]
+paths = [p for p in sys.stdin.read().split("\n") if p]
 meta = json.loads(subprocess.check_output(["cargo", "metadata", "--format-version", "1", "--no-deps"]))
 root = meta["workspace_root"] + "/"
 pkgs = {p["name"]: p for p in meta["packages"]}
@@ -100,13 +102,13 @@ while True:
     out |= more
 print("\n".join(sorted(out)))
 PY
+  )"
 }
 
 changed_paths() {
   {
     git diff --name-only "$1"...HEAD
     git diff --name-only HEAD
-    git ls-files --others --exclude-standard
   } | sort -u
 }
 
@@ -159,24 +161,24 @@ self_test() {
   dep_path=$(land_cfg selftest.dependency_path)
   dependent=$(land_cfg selftest.dependent)
   leaf_path=$(land_cfg selftest.leaf_path)
-  got=$(select_crates "$dep_path" | tr '\n' ' ')
+  got=$(printf '%s\n' "$dep_path" | select_crates | tr '\n' ' ')
   [[ $got == *"$dep"* && $got == *"$dependent"* ]] ||
     {
       echo "self-test: a git edit must reach its dependents: $got" >&2
       exit 1
     }
-  got=$(select_crates "$leaf_path" | tr '\n' ' ')
+  got=$(printf '%s\n' "$leaf_path" | select_crates | tr '\n' ' ')
   [[ $got != *"$dep"* ]] ||
     {
       echo "self-test: a cards edit must not select git: $got" >&2
       exit 1
     }
-  got=$(select_crates Makefile)
+  got=$(printf '%s\n' Makefile | select_crates)
   [[ $got == all ]] || {
     echo "self-test: an unmapped path must widen: $got" >&2
     exit 1
   }
-  got=$(select_crates scripts/land-check.sh docs/api.md | tr '\n' ' ')
+  got=$(printf '%s\n' scripts/land-check.sh docs/api.md | select_crates | tr '\n' ' ')
   [[ -z ${got// /} ]] || {
     echo "self-test: scripts and docs select no crate: $got" >&2
     exit 1
@@ -301,7 +303,7 @@ fi
   exit 0
 }
 
-crates=$(select_crates "${paths[@]}")
+crates=$(printf '%s\n' "${paths[@]}" | select_crates)
 if [[ $crates == all ]]; then
   echo "land-check: a path is not mapped to a crate, widening to the workspace" >&2
   scope=(--workspace)
