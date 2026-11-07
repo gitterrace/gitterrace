@@ -10,7 +10,11 @@ const DEFAULT_PAGES: usize = 20_000;
 #[test]
 fn headers_file_carries_the_page_policy() {
     let h = super::headers_file();
-    assert!(h.contains(gitterrace_web::PAGE_CSP));
+    assert!(h.contains("font-src 'self' data:"), "{h}");
+    assert!(
+        !gitterrace_web::PAGE_CSP.contains("font-src"),
+        "the served app takes no data: fonts"
+    );
     assert!(!h.contains("script-src 'self' 'unsafe-inline'"));
 }
 

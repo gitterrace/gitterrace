@@ -182,6 +182,19 @@ pub(crate) async fn guard(State(gate): State<Arc<Gate>>, req: Request, next: Nex
 mod tests {
     use super::{CSP, Gate, host_allowed};
 
+    /// Only an exported copy carries its fonts as `data:` URLs. The served app loads them
+    /// from itself, so its policy never allows a `data:` font.
+    #[test]
+    fn served_policy_takes_no_data_fonts() {
+        let fonts = CSP
+            .split(';')
+            .map(str::trim)
+            .find(|d| d.starts_with("font-src"))
+            .unwrap_or("default-src 'self'");
+        assert!(!fonts.contains("data:"), "{CSP}");
+        assert!(CSP.contains("default-src 'self';"), "{CSP}");
+    }
+
     fn gate(bound: Option<&str>, hosts: &[&str]) -> Gate {
         Gate {
             bound: bound.map(|b| b.parse().expect("ip")),

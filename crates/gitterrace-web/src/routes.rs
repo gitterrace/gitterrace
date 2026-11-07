@@ -29,6 +29,7 @@ mod files;
 mod raw;
 
 pub(crate) use assets::assets;
+pub use assets::font_bytes;
 pub(crate) use commits::DayGroup;
 #[cfg(test)]
 use commits::indexed_author_ids;

@@ -91,6 +91,7 @@ pub use registry::{
     Entry as RegistryEntry, add_token, candidates as registry_candidates, state_dir,
 };
 pub use reload::{Load, Watched};
+pub use routes::font_bytes;
 pub use views::stats_tab_labels;
 
 use crate::app::{App, Env};

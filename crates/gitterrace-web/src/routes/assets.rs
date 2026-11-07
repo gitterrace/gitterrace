@@ -80,8 +80,13 @@ const FONTS: [(&str, &[u8]); 3] = [
     ),
 ];
 
+/// The bytes of the embedded font served as `/static/fonts/<name>`, if there is one.
+pub fn font_bytes(name: &str) -> Option<&'static [u8]> {
+    FONTS.iter().find(|(n, _)| *n == name).map(|(_, b)| *b)
+}
+
 async fn font(Path(name): Path<String>) -> Response {
-    let Some((_, body)) = FONTS.iter().find(|(n, _)| *n == name) else {
+    let Some(body) = font_bytes(&name) else {
         return axum::http::StatusCode::NOT_FOUND.into_response();
     };
     (
@@ -92,7 +97,7 @@ async fn font(Path(name): Path<String>) -> Response {
                 HeaderValue::from_static("public, max-age=31536000, immutable"),
             ),
         ],
-        *body,
+        body,
     )
         .into_response()
 }

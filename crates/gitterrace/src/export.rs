@@ -9,6 +9,7 @@
 //! never published.
 
 mod credit;
+mod fonts;
 mod out;
 mod relative;
 mod seeds;
@@ -243,7 +244,8 @@ async fn crawl(
             if content_type.starts_with("text/html") || content_type.starts_with("text/css") {
                 let mut fragments = Vec::new();
                 for link in links(&String::from_utf8_lossy(&body)) {
-                    let ok = link.starts_with("/static/")
+                    // Fonts travel inside the stylesheet (see `fonts.rs`), not as files.
+                    let ok = (link.starts_with("/static/") && !link.starts_with("/static/fonts/"))
                         || site_for(&link).is_some_and(|s| s.allows(&link));
                     if ok && seen.insert(link.clone()) {
                         if is_fragment(&link) {
@@ -272,7 +274,13 @@ async fn crawl(
 fn write_for_disk(out: &Path, path: &str, content_type: &str, body: &[u8]) -> anyhow::Result<bool> {
     let is_html = content_type.starts_with("text/html");
     if is_html || content_type.starts_with("text/css") {
-        let text = relativize(&String::from_utf8_lossy(body), path, is_html);
+        let raw = String::from_utf8_lossy(body);
+        let raw = if is_html {
+            fonts::drop_font_preloads(&raw)
+        } else {
+            fonts::inline_fonts(&raw)
+        };
+        let text = relativize(&raw, path, is_html);
         return write_page(out, path, content_type, text.as_bytes());
     }
     write_page(out, path, content_type, body)
@@ -436,9 +444,18 @@ async fn wait_for_index(router: &Router, prefix: &str) -> anyhow::Result<()> {
 }
 
 /// Host headers for a static copy: the app's own page policy, since the pages are its HTML,
-/// so the two cannot drift. Raw files are sandboxed.
+/// so the two cannot drift, plus fonts from `data:` URLs, which is how the copy carries them
+/// (see `fonts.rs`). Raw files are sandboxed.
+fn export_csp() -> String {
+    gitterrace_web::PAGE_CSP.replacen(
+        "default-src 'self';",
+        "default-src 'self'; font-src 'self' data:;",
+        1,
+    )
+}
+
 fn headers_file() -> String {
-    let page = gitterrace_web::PAGE_CSP;
+    let page = export_csp();
     format!(
         "/*\n  Content-Security-Policy: {page}\n  X-Content-Type-Options: nosniff\n  \
          X-Frame-Options: DENY\n  Referrer-Policy: strict-origin-when-cross-origin\n  \
