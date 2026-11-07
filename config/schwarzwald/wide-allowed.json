@@ -82,7 +82,7 @@
     "scripts/browser-layout-lib.mjs": 9,
     "scripts/browser-lib.mjs": 11,
     "scripts/browser-outline-lib.mjs": 5,
-    "scripts/browser-pages-lib.mjs": 37,
+    "scripts/browser-pages-lib.mjs": 36,
     "scripts/browser-rows-lib.mjs": 2,
     "scripts/browser-send-lib.mjs": 2,
     "scripts/browser-site-lib.mjs": 38,

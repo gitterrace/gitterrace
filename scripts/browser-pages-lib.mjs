@@ -11,11 +11,19 @@ export function checks(env) {
 // Runs in the page. Returns what is cut, broken, sparse or scrolling.
 function measure() {
   const out = { cut: [], broken: [], sparse: [], subj: [], name: '', full: true, hscroll: false };
-  // `.vh` is text for screen readers only, clipped to 1px on purpose.
+  // Visually hidden text (the .vh pattern: a 1 px box clipped to nothing) is for screen
+  // readers by design, so it is hidden, not cut.
+  const hidden = (e) => {
+    const s = getComputedStyle(e), q = e.getBoundingClientRect();
+    const clipped = s.clip === 'rect(0px, 0px, 0px, 0px)' || s.clipPath === 'inset(50%)';
+    return q.width <= 1 && q.height <= 1 && clipped;
+  };
   const overflowing = (e) => {
+    if (hidden(e)) return false;
     const s = getComputedStyle(e);
     const clips = (s.overflowX !== 'visible' && s.overflowX !== 'auto' && s.overflowX !== 'scroll') || s.textOverflow === 'ellipsis';
-    return clips && e.scrollWidth > e.clientWidth + 1 && e.clientWidth > 0 && !e.classList.contains('subj') && !e.classList.contains('vh');
+    return clips && e.scrollWidth > e.clientWidth + 1 && e.clientWidth > 0
+      && !e.classList.contains('subj');
   };
   out.cut = [...document.querySelectorAll('body *')].filter(overflowing).map((e) => `${e.tagName}.${e.className}`);
   // The repo switcher button is `hidden` while one repository is served, so take the one shown.
@@ -92,6 +100,26 @@ async function truncation() {
     bad ? r.fail(line) : r.ok(`truncation ${width} ${path}`);
     await p.close();
   }
+  // Red case: the visually hidden skip must not swallow real truncation. A subject cut with an
+  // ellipsis at 360, and the same text clipped by overflow hidden, are still reported.
+  const p = await openPage(b, srv.base + '/log', { width: 360, wait: 'networkidle' });
+  await p.evaluate(() => {
+    const cases = [['redcase-ellipsis', 'text-overflow:ellipsis'], ['redcase-hidden', '']];
+    for (const [cls, css] of cases) {
+      const e = document.createElement('div');
+      e.className = cls;
+      e.textContent = 'a commit subject far too long to fit in the narrow column of a phone';
+      e.setAttribute('style', `width:120px;white-space:nowrap;overflow:hidden;${css}`);
+      document.querySelector('main').prepend(e);
+    }
+  });
+  const red = await p.evaluate(measure);
+  for (const cls of ['redcase-ellipsis', 'redcase-hidden']) {
+    const where = `truncation red case: ${cls}`;
+    if (red.cut.some((c) => c.endsWith(`.${cls}`))) r.ok(`${where} is reported as cut`);
+    else r.fail(`${where} was not reported, the hidden-text skip is too wide`);
+  }
+  await p.close();
   await b.close();
 }
 
