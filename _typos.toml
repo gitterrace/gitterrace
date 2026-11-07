@@ -1,6 +1,6 @@
 [files]
 # vendor and the theme snapshot are copies we do not edit; fonts and build output are not text.
-extend-exclude = ["**/vendor/**", "shared/schwarzwald/**", "site/assets/**"]
+extend-exclude = ["shared/schwarzwald/**", "target/**", "**/vendor/**", "site/assets/**"]
 
 [default]
 extend-ignore-re = [
@@ -9,7 +9,7 @@ extend-ignore-re = [
   '\{titel[:}]',
   # token.rs: RFC 4648 test vector "fo"
   'b"fo"',
-  # lines-check.py, internal-refs.py: their label patterns spell the word they refuse
+  # internal-refs.py: their label patterns spell the word they refuse
   '\\b\[Ll\]ane \[A-Z\]\\b',
   '\[Ll\]ane\[ #\]',
   # names-check.py: SHA-256 prefixes are hex, not words
@@ -17,6 +17,8 @@ extend-ignore-re = [
 ]
 
 [default.extend-words]
+# A valid spelling, not a typo of another word.
+unparseable = "unparseable"
 # gix names this field of its worktree status item
 rela = "rela"
 

@@ -1,9 +1,0 @@
-extends: existence
-message: "praise or history word: say what it does, and what is, never what was"
-level: error
-ignorecase: true
-scope: text
-# A match inside a backtick span (an identifier or a quoted message) is not counted.
-nonword: true
-raw:
-  - '(?m)^(?:[^`\n]*`[^`\n]*`)*[^`\n]*?\b(?:seamless(?:ly)?|powerful|simply|blazing(?:ly)?|effortless(?:ly)?|cutting-edge|world-class|no longer|used to|previously|legacy)\b'

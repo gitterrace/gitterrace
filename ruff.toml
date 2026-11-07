@@ -1,9 +1,9 @@
-# Scripts run on the system python3 (3.9 on macOS), so pyupgrade targets 3.9.
-target-version = "py39"
+extend = "shared/schwarzwald/configs/ruff-base.toml"
+# The synced kit carries its own checks.
+extend-exclude = ["shared"]
 
 [lint]
-# Classic errors and import order, plus the families that find bugs: bugbear (B), pyupgrade (UP),
-# simplify (SIM) and ruff's own (RUF). RUF005 only prefers [*a, b] over a + [b], churn without
-# a bug behind it.
-select = ["E4", "E7", "E9", "F", "I", "B", "UP", "SIM", "RUF"]
+# On top of the base: E7, pyupgrade (UP), simplify (SIM) and ruff's own (RUF). RUF005 only
+# prefers [*a, b] over a + [b], churn without a bug behind it.
+extend-select = ["E7", "UP", "SIM", "RUF"]
 ignore = ["RUF005"]

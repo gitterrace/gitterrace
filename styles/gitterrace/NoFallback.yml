@@ -1,9 +1,0 @@
-extends: existence
-message: "'fallback': state the rule instead"
-level: error
-ignorecase: true
-scope: text
-nonword: true
-# A match inside a backtick span (an identifier) is not counted: the prefix must hold only whole spans.
-raw:
-  - '(?m)^(?:[^`\n]*`[^`\n]*`)*[^`\n]*?\b(?:fall(?:s|ing)? ?back|fallbacks?)\b'
