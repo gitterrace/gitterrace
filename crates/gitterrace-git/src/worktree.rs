@@ -363,11 +363,28 @@ fn read_worktree(work: &Path, rel: &str, big: u64) -> Read {
     if meta.len() > big {
         return Read::Big;
     }
-    match std::fs::read(&full) {
+    match read_nofollow(&full) {
         Ok(d) => Read::data(d),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Read::Missing,
         Err(_) => Read::Skip,
     }
+}
+
+/// Reads a file whose final component must not be a symlink. The check above and the read
+/// are two steps, so a link swapped in between is refused by the open itself on unix.
+fn read_nofollow(path: &Path) -> std::io::Result<Vec<u8>> {
+    use std::io::Read as _;
+
+    let mut opts = std::fs::OpenOptions::new();
+    opts.read(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        opts.custom_flags(libc::O_NOFOLLOW);
+    }
+    let mut buf = Vec::new();
+    opts.open(path)?.read_to_end(&mut buf)?;
+    Ok(buf)
 }
 
 fn file_diff(path: String, kind: ChangeKind, old: &[u8], new: &[u8], big: bool) -> FileDiff {
@@ -527,5 +544,18 @@ mod tests {
             .flat_map(|h| &h.lines)
             .any(|l| l.text.contains("secret"));
         assert!(!leaked, "{d:?}");
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn a_symlink_as_the_final_component_is_refused_not_followed() {
+        let outside = tempfile::tempdir().expect("tempdir");
+        let secret = outside.path().join("secret.txt");
+        std::fs::write(&secret, "secret\n").expect("write");
+        let dir = tempfile::tempdir().expect("tempdir");
+        let work = dir.path().canonicalize().expect("canon");
+        std::os::unix::fs::symlink(&secret, work.join("link.png")).expect("link");
+        let err = super::read_nofollow(&work.join("link.png")).expect_err("a link is refused");
+        assert_eq!(err.raw_os_error(), Some(libc::ELOOP));
     }
 }
