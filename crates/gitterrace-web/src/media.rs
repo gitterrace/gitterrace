@@ -1,8 +1,6 @@
 //! Images, audio, video and PDFs: what the blob view and commit diffs show for them, and the
 //! content types `/raw` serves. Pure functions over a path and bytes, so they are testable.
 
-use std::fmt::Write as _;
-
 use crate::fmt::{enc_path, enc_seg, esc, href, size};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -194,6 +192,14 @@ fn element_at(k: Kind, url: &str, path: &str) -> String {
     }
 }
 
+fn source_details(src: &str) -> String {
+    format!(
+        "<details class=\"media-src\"><summary>Code</summary>\
+            <pre class=\"body\">{}</pre></details>",
+        esc(src)
+    )
+}
+
 /// The blob view body for a media file: the preview on a checkerboard, a facts line and links.
 pub(crate) fn blob_html(
     k: Kind,
@@ -212,16 +218,14 @@ pub(crate) fn blob_html(
             size(len)
         );
         if let Some(src) = svg_src {
-            let _ = write!(
-                out,
-                r#"<details class="media-src"><summary>Code</summary><pre class="body">{}</pre></details>"#,
-                esc(src)
-            );
+            out.push_str(&source_details(src));
         }
         return out;
     }
     let mut out = format!(
-        r#"<div class="media"><div class="media-stage{}">{}</div><p class="media-facts muted">{dims}{} · <a href="{url}">Raw</a> · <a href="{url}" download>Download</a></p></div>"#,
+        "<div class=\"media\"><div class=\"media-stage{}\">{}</div>\
+            <p class=\"media-facts muted\">{dims}{} · <a href=\"{url}\">Raw</a> · \
+            <a href=\"{url}\" download>Download</a></p></div>",
         if matches!(k, Kind::Image | Kind::Svg) {
             " checker"
         } else {
@@ -231,11 +235,7 @@ pub(crate) fn blob_html(
         size(len),
     );
     if let Some(src) = svg_src {
-        let _ = write!(
-            out,
-            r#"<details class="media-src"><summary>Code</summary><pre class="body">{}</pre></details>"#,
-            esc(src)
-        );
+        out.push_str(&source_details(src));
     }
     out
 }
@@ -294,7 +294,9 @@ pub(crate) fn diff_html(old: Option<Side<'_>>, new: Option<Side<'_>>) -> String 
     let side = |label: &str, at: Option<Side<'_>>| {
         at.map_or_else(String::new, |at| {
             format!(
-                r#"<figure class="media-side"><figcaption class="muted">{label}</figcaption><div class="media-stage checker">{}</div></figure>"#,
+                "<figure class=\"media-side\">\
+                    <figcaption class=\"muted\">{label}</figcaption>\
+                    <div class=\"media-stage checker\">{}</div></figure>",
                 img(at)
             )
         })

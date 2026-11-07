@@ -136,7 +136,8 @@ fn fold_button(src: DiffSource<'_>, i: usize, f: &FileDiff, label: &str, lazy: b
     // A link, so it is reachable by keyboard, works without script and is a page an export
     // crawl finds; nav.js swaps the body in place instead of navigating.
     format!(
-        "<p class=\"muted pad fold\"><a class=\"linkbtn\" href=\"{u}\" data-load-diff=\"{u}\"{l} aria-controls=\"f{i}\">{label}</a></p>",
+        "<p class=\"muted pad fold\"><a class=\"linkbtn\" href=\"{u}\" \
+            data-load-diff=\"{u}\"{l} aria-controls=\"f{i}\">{label}</a></p>",
         u = esc(&url),
         l = if lazy { " data-lazy" } else { "" }
     )
@@ -175,7 +176,8 @@ pub(crate) fn diff_html_with(r: &Render, src: DiffSource<'_>, files: &[FileDiff]
     for (i, f) in files.iter().enumerate() {
         let _ = write!(
             out,
-            "<section class=\"file\" id=\"f{i}\" data-path=\"{p}\" data-h=\"{h}\"><header><span class=\"badge {k}\">{k}</span> ",
+            "<section class=\"file\" id=\"f{i}\" data-path=\"{p}\" data-h=\"{h}\">\
+                <header><span class=\"badge {k}\">{k}</span> ",
             k = f.kind.as_str(),
             p = esc(&f.path),
             h = content_tag(f)

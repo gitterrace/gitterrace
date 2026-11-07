@@ -2,8 +2,5 @@
   "allowlists": [
     "wide_allowed"
   ],
-  "wide_allowed": {
-    "crates/gitterrace-web/src/media.rs": 4,
-    "crates/gitterrace-web/src/views/diff.rs": 2
-  }
+  "wide_allowed": {}
 }

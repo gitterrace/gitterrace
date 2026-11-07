@@ -224,7 +224,13 @@ def label_hits(
 
 
 def run(root: Path, names: list[str]) -> list[str]:
-    return too_long(root, names) + too_wide(root, names) + label_hits(root, names)
+    stale = [
+        f"wide-allowed.json: entry {n}: the list stays empty, wrap the line"
+        for n in WIDE_ALLOWED
+    ]
+    return (
+        stale + too_long(root, names) + too_wide(root, names) + label_hits(root, names)
+    )
 
 
 def self_test() -> None:
