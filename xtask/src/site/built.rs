@@ -508,3 +508,50 @@ fn a_footer_version_without_its_changelog_heading_is_reported() {
     let bad = version_link_problems(landing, changelog, "1.0.0");
     assert!(bad[0].contains("no link to v1.0.0"), "{bad:?}");
 }
+
+/// Whether the landing page has the safety section, with the default address the code uses and
+/// the link to SECURITY.md in the repository.
+fn safety_problems(landing: &str, addr: &str) -> Vec<String> {
+    let mut bad = Vec::new();
+    let Some((_, rest)) = landing.split_once("<h2>What it does with your code</h2>") else {
+        return vec!["the landing page has no \"What it does with your code\" section".to_owned()];
+    };
+    let section = rest.split("<h2>").next().unwrap_or("");
+    if !section.contains(&format!("<code>{addr}</code>")) {
+        bad.push(format!("the safety section does not name {addr}"));
+    }
+    if !section.contains("/blob/main/SECURITY.md") {
+        bad.push("the safety section does not link SECURITY.md in the repository".to_owned());
+    }
+    bad
+}
+
+/// The class this guards: the landing page losing the promise section, or stating an address
+/// other than the one the code serves on. The prose stays in docs/why.md next to SECURITY.md,
+/// whose long list of promises does not reduce to a short generated block, and
+/// `why_prose_that_names_a_wrong_address_or_cache_path_fails` ties its facts to the code.
+#[test]
+fn the_built_landing_page_has_the_safety_section_with_the_real_address() {
+    let (pages, _) = generated();
+    let landing = &pages
+        .iter()
+        .find(|p| p.0 == "index.html")
+        .expect("landing")
+        .1;
+    let bad = safety_problems(landing, gitterrace_config::DEFAULT_ADDR);
+    assert!(bad.is_empty(), "{}", bad.join("\n"));
+}
+
+#[test]
+fn a_landing_page_without_the_section_or_with_another_address_is_reported() {
+    let (pages, _) = generated();
+    let landing = &pages
+        .iter()
+        .find(|p| p.0 == "index.html")
+        .expect("landing")
+        .1;
+    let gone = landing.replace("What it does with your code", "Safety");
+    assert!(safety_problems(&gone, "127.0.0.1:4242")[0].contains("has no"));
+    let bad = safety_problems(landing, "127.0.0.1:9");
+    assert!(bad[0].contains("does not name 127.0.0.1:9"), "{bad:?}");
+}
