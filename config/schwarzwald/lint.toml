@@ -20,3 +20,7 @@ allow_prefix = "GITTERRACE_"
 [a11y]
 docs = ["README.md", "CONTRIBUTING.md", "SECURITY.md", "docs/**.md"]
 known = []
+
+[refs]
+# The imprint's legal name for a consumer dispute body (VSBG), kept verbatim.
+not_id = ['consumer arbitration board']

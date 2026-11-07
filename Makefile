@@ -168,6 +168,7 @@ site: docs-check
 
 ## deploy: Ship site/ to gitterrace.dev (wrangler deploy, the Worker is in wrangler.toml)
 deploy: site shipped site-render
+	cargo run -q -p xtask -- deploy-check
 	npx wrangler@4 deploy
 
 #: app-icon: Render the macOS icon install-handler gives gitterrace-open.app, from docs/brand/mark-dark.svg (macOS, needs browsers)

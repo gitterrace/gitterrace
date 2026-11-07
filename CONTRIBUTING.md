@@ -104,6 +104,7 @@ gitterrace.dev is generated into `site/` and shipped from a maintainer's machine
    (git-cliff 2.14.2, `cliff.toml`), commit it. Never edit a released section by hand.
 4. Tag and push. The release workflow builds the binaries, the installer and the formula.
 5. `make deploy` (it refuses until the tag, repository and tap answer), then `make domains`.
+   Mail: gitterrace.dev needs MX and the catch-all before the legal pages go live.
 6. Refresh the demo from [gitterrace/demo](https://github.com/gitterrace/demo): `make deploy`
    there.
 

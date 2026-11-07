@@ -36,6 +36,13 @@ New here? [Install it and run it](../README.md#quickstart) in any git repository
 | [api](api.md) | The JSON API and the MCP tools |
 | [benchmarks](benchmarks.md) | What is measured, the budgets and the newest results |
 
+## Legal
+
+| Document | Covers |
+| --- | --- |
+| [imprint](legal/imprint.md) | Who runs the site, as the law requires |
+| [privacy](legal/privacy.md) | What the site does with visitors' data |
+
 ## The project
 
 | Document | Covers |

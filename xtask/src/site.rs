@@ -13,6 +13,7 @@ use anyhow::{Context as _, Result};
 mod changelog;
 mod docs;
 mod landing;
+pub mod legal;
 mod shots;
 
 pub use landing::SHOTS;
@@ -38,6 +39,12 @@ const BRAND: [&str; 5] = ["logo-light", "logo-dark", "mark-light", "mark-dark", 
 const TOKENS: &str = "crates/gitterrace-web/static/tokens.css";
 /// RFC 9116 makes `Expires` mandatory in security.txt. Bump it with each release, at most a year
 /// out; a passed date tells reporters the contact may be dead.
+/// The two mailboxes of the site: the legal pages name `SUPPORT_EMAIL` for contact and rights
+/// requests, and `SECURITY_EMAIL` for vulnerability reports, which is also `security.txt`'s
+/// first Contact. The legal sources are Markdown, so a test holds their addresses to these.
+#[cfg(test)]
+pub(crate) const SUPPORT_EMAIL: &str = "support@gitterrace.dev";
+pub(crate) const SECURITY_EMAIL: &str = "security@gitterrace.dev";
 const SECURITY_TXT_EXPIRES: &str = "2027-10-31T23:00:00Z";
 
 const PAGE_CSS: &str = "\
@@ -246,6 +253,28 @@ pub fn render(root: &Path, ws: &Workspace) -> Result<Vec<Out>> {
         "<section>\n<h2>{MADE}</h2>\n{}</section>\n",
         md(section(&sections, MADE)?)
     );
+    landing_footer(root, &mut h, repo, pkg)?;
+    outs.push(Out::file("site/index.html", h));
+    let (pages, paths) = docs::pages(root, home, repo, &pkg.name)?;
+    outs.extend(pages);
+    outs.extend(host_files(home, repo, &pkg.name, &paths));
+    Ok(outs)
+}
+
+/// The site's own pages, the same on every page, as the one navigation landmark.
+pub(crate) const fn nav() -> &'static str {
+    "<nav aria-label=\"Site\"><a href=\"/\">Home</a> <a href=\"/docs/\">Docs</a> \
+     <a href=\"/changelog/\">Changelog</a></nav>\n"
+}
+
+/// The landing page's footer and closing tags: the shared footer plus the licence and the
+/// version, which links to its changelog entry.
+fn landing_footer(
+    root: &Path,
+    h: &mut String,
+    repo: &str,
+    pkg: &crate::facts::Package,
+) -> Result<()> {
     let changelog_text =
         std::fs::read_to_string(root.join("CHANGELOG.md")).context("read CHANGELOG.md")?;
     let _ = write!(
@@ -264,17 +293,7 @@ pub fn render(root: &Path, ws: &Workspace) -> Result<Vec<Out>> {
             ),
         ),
     );
-    outs.push(Out::file("site/index.html", h));
-    let (pages, paths) = docs::pages(root, home, repo, &pkg.name)?;
-    outs.extend(pages);
-    outs.extend(host_files(home, repo, &pkg.name, &paths));
-    Ok(outs)
-}
-
-/// The site's own pages, the same on every page, as the one navigation landmark.
-pub(crate) fn nav() -> &'static str {
-    "<nav aria-label=\"Site\"><a href=\"/\">Home</a> <a href=\"/docs/\">Docs</a> \
-     <a href=\"/changelog/\">Changelog</a></nav>\n"
+    Ok(())
 }
 
 /// The footer of every page: the links all pages share, then `extra` (HTML, may be empty) for
@@ -286,9 +305,13 @@ pub(crate) fn footer(repo: &str, extra: &str) -> String {
     } else {
         format!("{extra}\n")
     };
+    let mut legal = String::new();
+    for (rel, label) in crate::docs_index::LEGAL {
+        let _ = writeln!(legal, "<a href=\"/{}\">{label}</a>", docs::legal_path(rel));
+    }
     format!(
         "<footer>\n<a href=\"{repo}\">Repository</a>\n<a href=\"/docs/\">Docs</a>\n\
-         <a href=\"/changelog/\">Changelog</a>\n{extra}</footer>\n"
+         <a href=\"/changelog/\">Changelog</a>\n{extra}{legal}</footer>\n"
     )
 }
 
@@ -411,9 +434,12 @@ fn host_files(home: &str, repo: &str, name: &str, pages: &[String]) -> Vec<Out> 
         Out::file(
             "site/.well-known/security.txt",
             format!(
-                "Contact: {repo}/security/advisories/new\nPolicy: {repo}/blob/main/SECURITY.md\n\
-                 Canonical: {home}/.well-known/security.txt\nExpires: {SECURITY_TXT_EXPIRES}\
-                 \nPreferred-Languages: en\n"
+                "Contact: mailto:{SECURITY_EMAIL}\n\
+                 Contact: {repo}/security/advisories/new\n\
+                 Policy: {repo}/blob/main/SECURITY.md\n\
+                 Canonical: {home}/.well-known/security.txt\n\
+                 Expires: {SECURITY_TXT_EXPIRES}\n\
+                 Preferred-Languages: en\n"
             ),
         ),
     ]

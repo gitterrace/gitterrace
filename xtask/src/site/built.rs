@@ -326,12 +326,12 @@ fn chrome_problems(pages: &[(String, String)]) -> Vec<String> {
             continue;
         };
         let repo = attrs(foot, "href").first().copied().unwrap_or("");
-        let shared = footer(repo, "");
-        let shared = shared
-            .strip_prefix("<footer>")
-            .and_then(|s| s.strip_suffix("</footer>\n"))
-            .unwrap_or("");
-        if !foot.starts_with(shared) {
+        // The builder's output around a marker is the shared head and tail of every footer.
+        let marked = footer(repo, "@@");
+        let (head, tail) = marked.split_once("@@\n").unwrap_or(("", ""));
+        let head = head.strip_prefix("<footer>").unwrap_or("");
+        let tail = tail.strip_suffix("</footer>\n").unwrap_or("");
+        if !(foot.starts_with(head) && foot.ends_with(tail)) {
             bad.push(format!("{path}: the footer is not the shared one"));
         }
         if path != "404.html" && !html.contains(nav()) {
@@ -361,4 +361,42 @@ fn a_page_with_an_altered_footer_or_nav_is_reported() {
     let bad = chrome_problems(&pages).join("\n");
     assert!(bad.contains("not the shared one"), "{bad}");
     assert!(bad.contains("shared nav is missing"), "{bad}");
+}
+
+/// Built mode: pages whose footer does not link both legal pages at their site paths.
+fn legal_link_problems(pages: &[(String, String)]) -> Vec<String> {
+    let mut bad = Vec::new();
+    for (path, html) in pages {
+        let foot = footer_of(html).unwrap_or("");
+        for want in ["/legal/imprint/", "/legal/privacy/"] {
+            if !attrs(foot, "href").contains(&want) {
+                bad.push(format!("{path}: the footer does not link {want}"));
+            }
+        }
+    }
+    bad
+}
+
+/// The class this guards: a page, on any template, without the imprint and privacy links, and
+/// a link to a legal page the build does not write.
+#[test]
+fn every_built_page_links_the_imprint_and_privacy_pages() {
+    let (pages, files) = generated();
+    assert!(pages.iter().any(|p| p.0 == "404.html"));
+    for f in ["legal/imprint/index.html", "legal/privacy/index.html"] {
+        assert!(files.iter().any(|x| x == f), "{f} is not built");
+    }
+    let bad = legal_link_problems(&pages);
+    assert!(bad.is_empty(), "{}", bad.join("\n"));
+}
+
+#[test]
+fn a_page_without_a_legal_link_is_reported() {
+    let (mut pages, _) = generated();
+    pages[3].1 = pages[3]
+        .1
+        .replacen("href=\"/legal/privacy/\"", "href=\"/\"", 1);
+    let bad = legal_link_problems(&pages);
+    assert_eq!(bad.len(), 1, "{bad:?}");
+    assert!(bad[0].contains("/legal/privacy/"), "{bad:?}");
 }

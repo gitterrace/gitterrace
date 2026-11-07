@@ -39,6 +39,8 @@ enum Cmd {
     Generate,
     /// Fail when a generated file is stale, writing nothing
     Check,
+    /// Fail while a legal page still has a {{PLACEHOLDER}}; run before a deploy
+    DeployCheck,
 }
 
 /// Every generator. A new one is checked by being listed here.
@@ -93,6 +95,19 @@ fn main() -> Result<()> {
                 std::process::exit(1);
             }
             println!("documents: links, anchors, keys, flags and the index check out");
+            site::legal::check(&root)?;
+            println!("legal pages: the sources exist");
+        }
+        Cmd::DeployCheck => {
+            let bad = site::legal::deploy_check(&root)?;
+            if !bad.is_empty() {
+                println!(
+                    "the legal pages still have placeholders, fill them in before a deploy:\n  {}",
+                    bad.join("\n  ")
+                );
+                std::process::exit(1);
+            }
+            println!("deploy-check: the legal pages have no placeholders");
         }
     }
     Ok(())

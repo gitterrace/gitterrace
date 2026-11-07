@@ -11,7 +11,7 @@ use std::path::Path;
 use anyhow::{Context as _, Result};
 use pulldown_cmark::{CowStr, Event, HeadingLevel, Options, Parser, Tag, TagEnd, html};
 
-use crate::docs_index::{normalize, on_site};
+use crate::docs_index::{LEGAL, normalize, on_site};
 use crate::out::Out;
 use crate::site::changelog;
 use crate::site::{BODY_OPEN, THEME_INIT_JS, esc, footer, nav};
@@ -38,6 +38,9 @@ impl<'a> Links<'a> {
             .map(|(path, ..)| (path.to_owned(), page_path(stem(path))))
             .collect();
         pages.insert(CHANGELOG.to_owned(), "changelog/".to_owned());
+        for (rel, _) in LEGAL {
+            pages.insert(rel.to_owned(), legal_path(rel));
+        }
         Self { pages, repo }
     }
 
@@ -117,6 +120,11 @@ pub fn check_unique_ids(path: &str, html: &str) -> Result<()> {
         }
     }
     Ok(())
+}
+
+/// The site path of a legal page: `legal/<stem>/`, the same on every site.
+pub fn legal_path(rel: &str) -> String {
+    format!("legal/{}/", stem(rel))
 }
 
 /// The site path of a page, from its file stem.
@@ -300,6 +308,20 @@ pub fn pages(root: &Path, home: &str, repo: &str, name: &str) -> Result<(Vec<Out
         outs.push(Out::file(format!("site/{path}index.html"), page));
         paths.push(path);
         titles.push((rel.to_owned(), title));
+    }
+    for (rel, _) in LEGAL {
+        let text = read(rel)?;
+        let title = text
+            .lines()
+            .find_map(|l| l.strip_prefix("# "))
+            .with_context(|| format!("{rel} has no title"))?
+            .to_owned();
+        let path = legal_path(rel);
+        let inner = body(&text, rel, &links, &mut |_, h| slug(h));
+        let page = shell(&site, &title, &path, &inner, &source_link(&site, rel));
+        check_unique_ids(&path, &page)?;
+        outs.push(Out::file(format!("site/{path}index.html"), page));
+        paths.push(path);
     }
     let inner = index(&titles);
     outs.push(Out::file(

@@ -25,15 +25,17 @@ enum Kind {
     Guide,
     Explain,
     Reference,
+    Legal,
     Project,
 }
 
 impl Kind {
-    const ALL: [Self; 5] = [
+    const ALL: [Self; 6] = [
         Self::Start,
         Self::Guide,
         Self::Explain,
         Self::Reference,
+        Self::Legal,
         Self::Project,
     ];
 
@@ -43,6 +45,7 @@ impl Kind {
             Self::Guide => "Get one thing done",
             Self::Explain => "Understand how and why",
             Self::Reference => "Look something up",
+            Self::Legal => "Legal",
             Self::Project => "The project",
         }
     }
@@ -108,6 +111,16 @@ const DOCS: &[(&str, Kind, &str)] = &[
         "What is measured, the budgets and the newest results",
     ),
     (
+        "docs/legal/imprint.md",
+        Kind::Legal,
+        "Who runs the site, as the law requires",
+    ),
+    (
+        "docs/legal/privacy.md",
+        Kind::Legal,
+        "What the site does with visitors' data",
+    ),
+    (
         "CONTRIBUTING.md",
         Kind::Project,
         "Setup, the checks, commits, releasing",
@@ -135,7 +148,7 @@ const DOCS: &[(&str, Kind, &str)] = &[
 pub fn on_site() -> Vec<(&'static str, &'static str, &'static str)> {
     Kind::ALL
         .iter()
-        .filter(|k| **k != Kind::Project)
+        .filter(|k| !matches!(**k, Kind::Project | Kind::Legal))
         .flat_map(|k| {
             DOCS.iter()
                 .filter(move |d| d.1 == *k && d.0 != "README.md")
@@ -143,6 +156,13 @@ pub fn on_site() -> Vec<(&'static str, &'static str, &'static str)> {
         })
         .collect()
 }
+
+/// The legal documents, as repo path and the label the footer shows. They are pages of their
+/// own under `/legal/`, not part of the docs index.
+pub const LEGAL: [(&str, &str); 2] = [
+    ("docs/legal/imprint.md", "Imprint"),
+    ("docs/legal/privacy.md", "Privacy"),
+];
 
 pub fn render() -> Out {
     let mut s = String::new();
