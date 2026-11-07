@@ -2,11 +2,12 @@
 """Counts `super::` outside tests and holds it to the ratchet (stdlib only).
 
 AGENTS.md names items by a `crate::` path. The ast-grep rule no-super-outside-tests sees only
-`use` declarations, so this counts every `super::` path in non-test Rust, in expressions and
-inside macro bodies too (it reads text, not a tree). The count lives in
-scripts/guards/super-paths.json, a ratchet that config/schwarzwald/ratchet.toml names, so a
-new guard needs no change to the shared check; ratchet-check.py fails when it rises, and this
-check fails when the tree holds more than the file allows or fewer (lower the count then).
+`use` declarations and macro bodies with a `use`, so this counts every other `super::` path
+in non-test Rust, in expressions and inside macro bodies too (it reads text, not a tree). The
+count lives in scripts/guards/super-paths.json, a ratchet that config/schwarzwald/ratchet.toml
+names, so a new guard needs no change to the shared check; ratchet-check.py fails when it
+rises, and this check fails when the tree holds more than the file allows or fewer (lower the
+count then).
 
   python3 scripts/super-check.py              compare the tree with the recorded count
   python3 scripts/super-check.py --self-test  prove a planted new use goes red
@@ -24,6 +25,9 @@ ROOT = Path(__file__).resolve().parent.parent
 REGISTRY = "scripts/guards/super-paths.json"
 KEY = "super_paths"
 SUPER = re.compile(r"\bsuper::")
+# A `use super::` line, in a macro body too, is already an error of the ast-grep rule
+# no-super-outside-tests, so it is reported there and not counted a second time here.
+USE_SUPER = re.compile(r"\buse\s+super::")
 TEST_MOD = re.compile(r"^\s*(pub(\([a-z ]+\))?\s+)?mod\s+\w*tests\b[^;{]*\{")
 TEST_FILE = re.compile(r"(^|/)(tests\.rs|[^/]*_tests\.rs)$|/tests/")
 
@@ -53,7 +57,9 @@ def count(root: Path) -> int:
             if "/target/" in f"/{rel}" or TEST_FILE.search(rel):
                 continue
             total += sum(
-                len(SUPER.findall(line)) for line in strip_tests(f.read_text())
+                len(SUPER.findall(line))
+                for line in strip_tests(f.read_text())
+                if not USE_SUPER.search(line)
             )
     return total
 
@@ -91,9 +97,12 @@ def self_test() -> int:
         (t / REGISTRY).write_text(json.dumps({KEY: {"outside_tests": 1}}))
         ok = check(t) == []
         src.write_text(src.read_text() + "m! {\n    use super::x;\n}\n")
+        once = check(t) == []
+        src.write_text(src.read_text() + "m! {\n    super::h();\n}\n")
         red = len(check(t)) == 1
-    print("self-test", "ok" if ok and red else "FAILED")
-    return 0 if ok and red else 1
+    good = ok and once and red
+    print("self-test", "ok" if good else "FAILED")
+    return 0 if good else 1
 
 
 def main() -> int:
