@@ -1,8 +1,8 @@
 # Running it online
 
 gitterrace is built to run on your own machine, bound to `127.0.0.1`. That stays the
-recommendation. When you do want others to read a repository, publish a static export, or use
-public mode. Nothing else binds to another address.
+recommendation. When you want others to read a repository, publish a static export or use public
+mode. Nothing else binds to another address.
 
 ## A static export
 
@@ -20,7 +20,7 @@ upload the folder. Several repositories go into one site (`export site repo1 rep
 `--project name=url` credits a repository that is someone else's work in every page's banner.
 
 Every page ends with one credit line: `Source: name, MIT license, https://github.com/owner/name`.
-The license is recognised from the root `LICENSE` or `COPYING` file (a text that is not a common
+The license is recognized from the root `LICENSE` or `COPYING` file (a text that is not a common
 license links to the file instead). The link is the `origin` remote, or the `--project` URL, with
 any credentials removed, and only for public https and ssh hosts. Either part is left out when
 unknown.

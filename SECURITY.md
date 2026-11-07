@@ -36,9 +36,8 @@ In scope:
   `GET` and `HEAD` only, no live updates, actions, Send to or adding repositories, and no
   host paths. A Host that is not a loopback name, the bound address or listed in
   `server.hosts` gets `403`, which stops DNS rebinding. Error bodies, including `5xx`, never
-  carry host paths. Any
-  read beyond that list, any other method, or a Host outside `server.hosts` being answered
-  is in scope.
+  carry host paths. Any read beyond that list, any other method, or a Host outside
+  `server.hosts` being answered is in scope.
 - **Adding and removing a repository.** `POST /_repos` lets `git terrace open` add a
   repository to a running server, and `DELETE /_repos` lets `git terrace remove` take one off.
   They answer only loopback binds, refuse any request with a browser
@@ -56,7 +55,7 @@ In scope:
   under `raw/`. A leak through an export, such as a working tree file, a host path or a
   write outside the output folder, is in scope.
 - **Rendering repository content.** Markdown, code, diffs and SVG from the repository are
-  sanitised before display. Script running from repository content is in scope.
+  sanitized before display. Script running from repository content is in scope.
 - **Actions.** Actions run programs you configure in `actions.toml` in your own config
   folder, never one from a repository. A run needs a per-process token, and values from
   the repository fill whole arguments with no shell. A way to run an unconfigured program,
