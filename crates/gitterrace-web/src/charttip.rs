@@ -108,7 +108,7 @@ mod tests {
 
     #[test]
     fn the_attribute_is_escaped() {
-        let bars = crate::charts::bars(&[("a \"b\" <c>".to_owned(), 1)], COMMITS).to_string();
+        let bars = crate::charts::bars("t", &[("a \"b\" <c>".to_owned(), 1)], COMMITS).to_string();
         assert!(
             bars.contains(" data-tip=\"a &quot;b&quot; &lt;c&gt;: 1 commit (100%) of 1\""),
             "{bars}"

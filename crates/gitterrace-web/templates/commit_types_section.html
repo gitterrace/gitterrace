@@ -9,12 +9,9 @@
 {% for r in kinds %}<tr><th scope="row" class="fill"><div class="bar w{{ r.pct }}"></div><a href="{{ r.href }}">{{ r.label }}</a></th><td class="r">{{ r.commits }}</td></tr>{% endfor %}
 </table></div>
 {% endif %}
-{% if !matrix.cols.is_empty() && !matrix.rows.is_empty() %}
+{% if let Some(mf) = matrix_fig %}
 <div class="chart-head"><div><h2>Type by scope</h2><p class="hint">Commits per type and scope. Darker cells have more commits. Click a cell to filter by both.</p></div></div>
-<div class="card matrix"><table>{% call t::caption("Commits by type and scope") %}{% endcall %}
-<tr><td></td>{% for col in matrix.cols %}<th scope="col"><a href="{{ col.href }}">{{ col.label }}</a></th>{% endfor %}</tr>
-{% for row in matrix.rows %}<tr><th scope="row"><a href="{{ row.href }}">{{ row.label }}</a></th>{% for cell in row.cells %}<td class="m{{ cell.level }}">{% if cell.n > 0 %}<a href="{{ cell.href }}" data-tip="{{ row.label }} / {{ cell.scope }}: {{ cell.n }}">{{ cell.n }}</a>{% endif %}</td>{% endfor %}</tr>{% endfor %}
-</table></div>
+<div class="card pad">{{ mf }}</div>
 {% endif %}
 <div class="chart-head"><div><h2>{{ over_title }}</h2><p class="hint">{{ over_hint }}</p></div></div>
 <div class="card pad">{{ over_time }}</div>

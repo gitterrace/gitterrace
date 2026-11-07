@@ -1,6 +1,7 @@
 {%- import "_kpis.html" as kp -%}
 {#- The languages page under its tabs. Raw values: sha links are finished HTML from fmt::sha_link, and the plot data is JSON for a script element, `<` written as \u003c, where entities would not decode. -#}
 {%- import "_table.html" as t -%}
+{%- import "_chart.svg" as ch -%}
 {%- if let Some(e) = empty %}{{ e }}{% endif -%}
 {%- if let Some(s) = shown -%}
 {%- let lead = s.lead.clone() %}{% include "_lead.html" -%}
@@ -9,7 +10,10 @@ class="chart-head"><div><h2>Lines of code by language</h2><p
 class="hint">Exact line count at every commit on the first-parent history, {{ s.total }} today. Drag across the chart to select a range.</p></div><div
 class="legend">
 {%- for (class, name) in s.legend %}<span><i class="{{ class }}"></i>{{ name }}</span>{% endfor -%}
-</div></div><div class="plot">{{ s.area }}<div class="loc-tip" hidden></div></div><script type="application/json" id="loc-data">{{ s.json|safe }}</script></section>
+</div></div><figure class="chart-fig"><div class="plot">{{ s.area }}<div class="loc-tip"
+hidden></div></div>
+{%- call ch::text(s.area.fig) %}{% endcall -%}</figure><script type="application/json"
+id="loc-data">{{ s.json|safe }}</script></section>
 {%- let r = &s.range -%}
 <section class="card pad range" id="range">
 {%- if let Some(e) = r.empty -%}
@@ -32,9 +36,16 @@ class="foot">Showing the newest {{ n }}. Narrow the range to see the rest.</p>{%
 {%- endif -%}
 </section>
 {%- let n = &s.now -%}
-<section class="card pad"><div class="chart-head"><div><h2>Languages now</h2><p class="hint">Share of all lines at the newest commit, trend over the whole history, and change over the last 10 commits.</p></div></div><div class="sharebar" role="img" aria-label="Share of lines by language">
+<section class="card pad"><div class="chart-head"><div><h2>Languages now</h2><p
+class="hint">Share of all lines at the newest commit, trend over the whole history, and change over the last 10 commits.</p></div></div>
+<figure class="chart-fig"><div class="sharebar" role="img" aria-label="{{ n.fig.name }}"
+aria-describedby="{{ n.fig.id }}-sum">
 {%- for p in n.bar %}<b class="{{ p.class }} w{{ p.w }}" data-tip="{{ p.tip }}"></b>{% endfor -%}
-</div><div class="scroll"><table class="entries">{% call t::caption("Languages now") %}{% endcall %}<tr class="th"><th scope="col">Language</th><th scope="col" class="r">Lines</th><th scope="col" class="r">Share</th><th scope="col">Trend</th><th scope="col" class="r">{{ n.window }}</th></tr>
+</div>
+{%- call ch::text(n.fig) %}{% endcall -%}</figure><div class="scroll"><table
+class="entries">{% call t::caption("Languages now") %}{% endcall %}<tr class="th"><th
+scope="col">Language</th><th scope="col" class="r">Lines</th><th scope="col" class="r">Share</th><th
+scope="col">Trend</th><th scope="col" class="r">{{ n.window }}</th></tr>
 {%- for l in n.rows %}<tr><th scope="row"><i class="dot {{ l.class }}"></i>{{ l.name }}</th><td class="r">{{ l.lines }}</td><td class="r">{{ l.share }}</td><td><svg class="spark {{ l.spark_class }}" viewBox="0 0 90 20" width="90" height="20" aria-hidden="true"><polyline points="{{ l.points }}"/></svg></td><td class="r"><b class="{% if l.up %}add{% else %}del{% endif %}">{{ l.change }}</b></td></tr>{% endfor -%}
 </table></div></section>
 {%- endif -%}

@@ -10,3 +10,4 @@
 {%- for (class, name) in legend %}<span><i class="{{ class }}"></i>{{ name }}</span>{% endfor -%}
 {%- if other %}<span><i class="c8"></i>other</span>{% endif -%}
 </div>
+{%- call ch::text(f.fig) %}{% endcall -%}</figure>

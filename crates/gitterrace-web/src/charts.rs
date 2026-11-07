@@ -6,11 +6,14 @@ use std::fmt::Write as _;
 use crate::charttip::{self, COMMITS, Unit};
 use crate::fmt;
 
+mod text;
 pub(crate) mod view;
 
+pub(crate) use text::fig;
+
 use view::{
-    BarCol, Bars, DivCol, Diverging, Frame, HeatCell, HeatRow, Heatmap, LinePoint, P, PercentLine,
-    Scatter, ScatterDot, Seg, Spark, StackCol, Stacked, Tick, XLabel,
+    BarCol, Bars, DivCol, Diverging, Fig, Frame, HeatCell, HeatRow, Heatmap, LinePoint, P,
+    PercentLine, Scatter, ScatterDot, Seg, Spark, StackCol, Stacked, Tick, XLabel,
 };
 
 const W: f64 = 960.0;
@@ -139,9 +142,9 @@ fn x_labels(keys: &[&str]) -> Vec<XLabel> {
         .collect()
 }
 
-fn frame(label: &str, linked: bool, ticks: Vec<Tick>, keys: &[&str], bw: f64) -> Frame {
+fn frame(fig: Fig, linked: bool, ticks: Vec<Tick>, keys: &[&str], bw: f64) -> Frame {
     Frame {
-        label: label.to_owned(),
+        fig,
         linked,
         sl: P(slot(keys.len())),
         bw: P(bw),
@@ -151,19 +154,19 @@ fn frame(label: &str, linked: bool, ticks: Vec<Tick>, keys: &[&str], bw: f64) ->
     }
 }
 
-/// Vertical bars, one per `(label, value)` counted in `unit`, scaled to the full container
-/// width. A bar's tip gives its share of all bars.
-pub(crate) fn bars(points: &[(String, u64)], unit: Unit) -> Bars {
-    bars_with(points, None, unit)
+/// Vertical bars named `name`, one per `(label, value)` counted in `unit`, scaled to the full
+/// container width. A bar's tip gives its share of all bars.
+pub(crate) fn bars(name: &str, points: &[(String, u64)], unit: Unit) -> Bars {
+    bars_with(name, points, None, unit)
 }
 
 /// [`bars`] with every bar a link to `links[i]`, for keyboard and pointer alike. A chart of
 /// links is one tab stop and the arrow keys walk its marks (app.js).
-pub(crate) fn linked_bars(points: &[(String, u64)], links: &[String]) -> Bars {
-    bars_with(points, Some(links), COMMITS)
+pub(crate) fn linked_bars(name: &str, points: &[(String, u64)], links: &[String]) -> Bars {
+    bars_with(name, points, Some(links), COMMITS)
 }
 
-fn bars_with(points: &[(String, u64)], links: Option<&[String]>, unit: Unit) -> Bars {
+fn bars_with(name: &str, points: &[(String, u64)], links: Option<&[String]>, unit: Unit) -> Bars {
     let max = points.iter().map(|p| p.1).max().unwrap_or(0);
     let all: u64 = points.iter().map(|p| p.1).sum();
     let (grid, top) = axis(max);
@@ -194,14 +197,20 @@ fn bars_with(points: &[(String, u64)], links: Option<&[String]>, unit: Unit) -> 
         .collect();
     let keys: Vec<&str> = points.iter().map(|p| p.0.as_str()).collect();
     Bars {
-        f: frame("Activity", links.is_some(), grid, &keys, bw),
+        f: frame(
+            text::bars(name, points, unit),
+            links.is_some(),
+            grid,
+            &keys,
+            bw,
+        ),
         cols,
     }
 }
 
 /// Stacked columns per bucket by the `SERIES` biggest labels (rest folded into `other`),
 /// with a legend. Series order is overall frequency, biggest at the bottom.
-pub(crate) fn stacked(buckets: &[gitterrace_index::LabelBucket]) -> Stacked {
+pub(crate) fn stacked(name: &str, buckets: &[gitterrace_index::LabelBucket]) -> Stacked {
     let mut totals: std::collections::BTreeMap<&str, usize> = std::collections::BTreeMap::new();
     for b in buckets {
         for c in &b.counts {
@@ -269,8 +278,18 @@ pub(crate) fn stacked(buckets: &[gitterrace_index::LabelBucket]) -> Stacked {
         })
         .collect();
     let keys: Vec<&str> = buckets.iter().map(|b| b.label.as_str()).collect();
+    let mut series = names.clone();
+    if has_other {
+        series.push("other");
+    }
     Stacked {
-        f: frame("Commit types over time", false, grid, &keys, bw),
+        f: frame(
+            text::stacked(name, &keys, &series, &cols),
+            false,
+            grid,
+            &keys,
+            bw,
+        ),
         cols: marks,
         legend: names
             .iter()
@@ -324,7 +343,7 @@ pub(crate) fn diverging(points: &[(String, u64, u64)], title: &str) -> Diverging
         .collect();
     let keys: Vec<&str> = points.iter().map(|p| p.0.as_str()).collect();
     Diverging {
-        f: frame(title, false, grid, &keys, bw),
+        f: frame(text::diverging(title, points), false, grid, &keys, bw),
         mid: P(mid),
         cols,
     }
@@ -370,7 +389,13 @@ pub(crate) fn percent_line(points: &[(String, Option<f64>)]) -> PercentLine {
     }
     let keys: Vec<&str> = points.iter().map(|p| p.0.as_str()).collect();
     PercentLine {
-        f: frame("Rework share over time", false, grid, &keys, 0.0),
+        f: frame(
+            text::percent_line("Rework share over time", points),
+            false,
+            grid,
+            &keys,
+            0.0,
+        ),
         points: readings,
         d,
     }
@@ -400,6 +425,8 @@ pub(crate) struct Dot {
     pub(crate) size: u64,
     pub(crate) href: String,
     pub(crate) title: String,
+    /// What the dot is, for its row in the data table.
+    pub(crate) name: String,
 }
 
 /// Dots on a linear plane: x along the bottom, y up the side, each dot a link.
@@ -435,8 +462,18 @@ pub(crate) fn scatter(dots: &[Dot], x_title: &str) -> Scatter {
             r: P(5.0f64.mul_add((d.size as f64 / smax as f64).sqrt(), 3.0)),
         })
         .collect();
+    let named: Vec<(&str, u64, u64, u64)> = dots
+        .iter()
+        .map(|d| (d.name.as_str(), d.x, d.y, d.size))
+        .collect();
     Scatter {
-        f: frame("Change frequency against size", true, grid, &[], 0.0),
+        f: frame(
+            text::scatter("Change frequency against size", x_title, &named),
+            true,
+            grid,
+            &[],
+            0.0,
+        ),
         xticks,
         dots: marks,
         x_title: x_title.to_owned(),
@@ -478,6 +515,7 @@ pub(crate) fn heatmap(cells: &[[u32; 24]; 7], max: u32) -> Heatmap {
         })
         .collect();
     Heatmap {
+        fig: text::heatmap("Commits by weekday and hour", cells),
         w: LEFT + 24 * CELL,
         h: TOP + 7 * CELL,
         side: CELL - 4,

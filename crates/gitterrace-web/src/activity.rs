@@ -149,7 +149,7 @@ fn range_card(from: &str, to: &str, by_weekday: &[u32; 7]) -> RangeCard {
             "commit",
             "commits",
         ),
-        weekdays: charts::bars(&days, crate::charttip::COMMITS),
+        weekdays: charts::bars("Commits by weekday", &days, crate::charttip::COMMITS),
     }
 }
 
@@ -292,7 +292,11 @@ pub(crate) async fn page(
             empty: s.current.commits == 0,
             compared: prev.is_some(),
             unit: rhythm.unit.noun(),
-            series: charts::linked_bars(&series, &links),
+            series: charts::linked_bars(
+                &format!("Commits per {}", rhythm.unit.noun()),
+                &series,
+                &links,
+            ),
             range,
             heatmap: charts::heatmap(&rhythm.punch_card, rhythm.punch_max),
             // `insights.pages` still names each section: one left out is not shown.

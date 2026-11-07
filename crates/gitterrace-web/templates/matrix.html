@@ -1,0 +1,12 @@
+{#- The type by scope grid as a chart figure; `fig` is the `Fig` that names and describes it. -#}
+{%- import "_chart.svg" as ch -%}
+<figure class="chart-fig"><div class="matrix matrix-chart" role="group" aria-label="{{ fig.name }}"
+aria-describedby="{{ fig.id }}-sum"><table><caption class="vh">{{ fig.name }}</caption>
+<thead><tr><td></td>{% for col in m.cols %}<th scope="col"><a
+href="{{ col.href }}">{{ col.label }}</a></th>{% endfor %}</tr></thead>
+<tbody>{% for row in m.rows %}<tr><th scope="row"><a
+href="{{ row.href }}">{{ row.label }}</a></th>{% for cell in row.cells %}<td
+class="m{{ cell.level }}">{% if cell.n > 0 %}<a href="{{ cell.href }}"
+data-tip="{{ cell.tip }}">{{ cell.n }}</a>{% endif %}</td>{% endfor %}</tr>{% endfor %}</tbody>
+</table></div>
+{%- call ch::text(fig) %}{% endcall -%}</figure>

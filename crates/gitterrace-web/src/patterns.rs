@@ -112,8 +112,8 @@ pub(crate) fn section(a: &crate::app::App, r: &Src, q: &InsightsQuery) -> String
         }
         PatternsSection {
             pairs,
-            age: charts::bars(&age, crate::charttip::LINES),
-            sizes: charts::bars(&sizes, crate::charttip::COMMITS),
+            age: charts::bars("Code age", &age, crate::charttip::LINES),
+            sizes: charts::bars("Commit sizes", &sizes, crate::charttip::COMMITS),
             no_releases: releases.is_empty().then(|| {
                 Empty::new("No release tags.").step("See all branches and tags", href("/refs"))
             }),

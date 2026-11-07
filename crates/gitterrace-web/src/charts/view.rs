@@ -57,11 +57,37 @@ pub(crate) struct XLabel {
     pub(crate) text: String,
 }
 
-/// The parts every full-width chart shares: its name, whether its marks are links, the column
+/// One row of a chart's data table: what the row is, then its values as the chart shows them.
+#[derive(Debug)]
+pub(crate) struct Row {
+    pub(crate) label: String,
+    pub(crate) cells: Vec<String>,
+}
+
+/// The values of a chart as a table: column heads (the first names the row labels), one row
+/// per mark or column, and where the chart's tips name a total, that total.
+#[derive(Debug)]
+pub(crate) struct Table {
+    pub(crate) head: Vec<String>,
+    pub(crate) rows: Vec<Row>,
+    pub(crate) total: Option<Row>,
+}
+
+/// The text form of a chart: its name, a one-sentence summary it is described by, and its
+/// values as a table behind a "Show as table" disclosure. `id` ties the three together.
+#[derive(Debug)]
+pub(crate) struct Fig {
+    pub(crate) id: String,
+    pub(crate) name: String,
+    pub(crate) summary: String,
+    pub(crate) table: Table,
+}
+
+/// The parts every full-width chart shares: its text form, whether its marks are links, the column
 /// geometry, the gridlines and the labels under the columns.
 #[derive(Debug)]
 pub(crate) struct Frame {
-    pub(crate) label: String,
+    pub(crate) fig: Fig,
     pub(crate) linked: bool,
     pub(crate) sl: P,
     pub(crate) bw: P,
@@ -73,7 +99,8 @@ pub(crate) struct Frame {
 /// One column of [`Bars`].
 #[derive(Debug)]
 pub(crate) struct BarCol {
-    /// Link and its accessible name, for a chart whose bars narrow the page.
+    /// Link and its accessible name, for a chart whose bars narrow the page. The link carries
+    /// the tip, so keyboard focus shows it.
     pub(crate) link: Option<(String, String)>,
     pub(crate) tip: String,
     pub(crate) hx: P,
@@ -195,6 +222,7 @@ pub(crate) struct HeatRow {
 #[derive(Debug, Template)]
 #[template(path = "chart_heat.svg")]
 pub(crate) struct Heatmap {
+    pub(crate) fig: Fig,
     pub(crate) w: usize,
     pub(crate) h: usize,
     pub(crate) side: usize,

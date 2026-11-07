@@ -5,3 +5,4 @@
 {%- endfor -%}
 {%- call ch::labels(f) %}{% endcall -%}
 </svg>
+{%- call ch::text(f.fig) %}{% endcall -%}</figure>

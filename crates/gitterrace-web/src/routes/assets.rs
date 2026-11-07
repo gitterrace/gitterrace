@@ -12,10 +12,11 @@ use axum::{
 pub(crate) fn assets<S: Clone + Send + Sync + 'static>() -> Router<S> {
     const JS: &str = "text/javascript; charset=utf-8";
     const CSS: &str = "text/css; charset=utf-8";
-    let table: [(&str, &str, &'static str); 19] = [
+    let table: [(&str, &str, &'static str); 20] = [
         ("loc.js", JS, include_str!("../../static/loc.js")),
         ("tokens.css", CSS, include_str!("../../static/tokens.css")),
         ("app.css", CSS, include_str!("../../static/app.css")),
+        ("charts.css", CSS, include_str!("../../static/charts.css")),
         (
             "insights.css",
             CSS,

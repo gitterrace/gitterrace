@@ -40,7 +40,8 @@ struct Cell {
     n: usize,
     level: u8,
     href: String,
-    scope: String,
+    /// The cell's tip, from the one tip builder.
+    tip: String,
 }
 
 struct MatrixRow {
@@ -59,12 +60,78 @@ struct Matrix {
     rows: Vec<MatrixRow>,
 }
 
+/// The type by scope grid as a chart figure: a table of links whose cells are shaded by count,
+/// named, summarised, and its counts with row and column totals in the data table, so it reads
+/// like every other chart.
+#[derive(Template)]
+#[template(path = "matrix.html")]
+struct MatrixFigure {
+    m: Matrix,
+    fig: charts::view::Fig,
+}
+
+impl askama::filters::HtmlSafe for MatrixFigure {}
+
+fn matrix_figure(m: Matrix) -> Option<MatrixFigure> {
+    if m.cols.is_empty() || m.rows.is_empty() {
+        return None;
+    }
+    let width = m.cols.len();
+    let col_sums: Vec<u64> = (0..width)
+        .map(|c| m.rows.iter().map(|r| r.cells[c].n as u64).sum())
+        .collect();
+    let all: u64 = col_sums.iter().sum();
+    let row = |label: &str, vals: &[u64]| {
+        let mut cells: Vec<String> = vals.iter().map(|v| fmt::thousands(*v)).collect();
+        cells.push(fmt::thousands(vals.iter().sum::<u64>()));
+        charts::view::Row {
+            label: label.to_owned(),
+            cells,
+        }
+    };
+    let mut head = vec!["Type".to_owned()];
+    head.extend(m.cols.iter().map(|c| c.label.clone()));
+    head.push("Commits".to_owned());
+    let table = charts::view::Table {
+        head,
+        rows: m
+            .rows
+            .iter()
+            .map(|r| {
+                let vals: Vec<u64> = r.cells.iter().map(|c| c.n as u64).collect();
+                row(&r.label, &vals)
+            })
+            .collect(),
+        total: Some(row("Total", &col_sums)),
+    };
+    let mut top: Option<(&str, &str, usize)> = None;
+    for r in &m.rows {
+        for (c, cell) in m.cols.iter().zip(&r.cells) {
+            if cell.n > top.map_or(0, |t| t.2) {
+                top = Some((&r.label, &c.label, cell.n));
+            }
+        }
+    }
+    let summary = top.map_or_else(
+        || "No commits with a type and a scope.".to_owned(),
+        |(k, sc, n)| {
+            format!(
+                "{} by type and scope, the most {k} in {sc} with {}.",
+                fmt::count(all, "commit", "commits"),
+                fmt::thousands(n)
+            )
+        },
+    );
+    let fig = charts::fig("Type by scope", summary, table);
+    Some(MatrixFigure { m, fig })
+}
+
 #[derive(Template)]
 #[template(path = "commit_types_section.html")]
 struct TypesSection {
     kpis: Vec<Kpi>,
     kinds: Vec<Row>,
-    matrix: Matrix,
+    matrix_fig: Option<MatrixFigure>,
     over_title: String,
     over_hint: String,
     over_time: crate::charts::view::Stacked,
@@ -135,6 +202,11 @@ fn matrix(
         .iter()
         .map(|((k, sc), n)| ((k.as_str(), sc.as_str()), *n))
         .collect();
+    let all: usize = scopes
+        .iter()
+        .flat_map(|s| kinds.iter().map(move |k| (k, s)))
+        .map(|(k, s)| grid.get(&(k.as_str(), s.as_str())).copied().unwrap_or(0))
+        .sum();
     let max = scopes
         .iter()
         .flat_map(|s| kinds.iter().map(move |k| (k, s)))
@@ -167,7 +239,12 @@ fn matrix(
                                     .with(Dim::Scope, Some(s))
                                     .query(&[])
                             )),
-                            scope: s.clone(),
+                            tip: crate::charttip::part(
+                                &format!("{k} / {s}"),
+                                n as u64,
+                                all as u64,
+                                crate::charttip::COMMITS,
+                            ),
                         }
                     })
                     .collect(),
@@ -404,13 +481,14 @@ pub(crate) fn section(
         })
         .collect();
 
+    let over_time = charts::stacked(&over_title, &over);
     TypesSection {
         kpis,
         kinds,
-        matrix: mx,
+        matrix_fig: matrix_figure(mx),
         over_title,
         over_hint,
-        over_time: charts::stacked(&over),
+        over_time,
         groups,
         commits_total: n,
         commits,

@@ -1,9 +1,9 @@
 {%- import "_chart.svg" as ch -%}
 {%- call ch::open(f) %}{% endcall -%}
 {%- for c in cols -%}
-{%- if let Some((href, name)) = c.link %}<a tabindex="-1" href="{{ href }}" aria-label="{{ name }}">{% endif -%}
-<g class="col" data-tip="{{ c.tip }}"><rect class="hit" x="{{ c.hx }}" y="10" width="{{ f.sl }}" height="{{ f.plot }}"/><rect class="bar" x="{{ c.x }}" y="{{ c.y }}" width="{{ f.bw }}" height="{{ c.h }}" rx="2"/></g>
+{%- if let Some((href, name)) = c.link %}<a tabindex="-1" href="{{ href }}" aria-label="{{ name }}" data-tip="{{ c.tip }}"><g class="col">{% else %}<g class="col" data-tip="{{ c.tip }}">{% endif -%}<rect class="hit" x="{{ c.hx }}" y="10" width="{{ f.sl }}" height="{{ f.plot }}"/><rect class="bar" x="{{ c.x }}" y="{{ c.y }}" width="{{ f.bw }}" height="{{ c.h }}" rx="2"/></g>
 {%- if c.link.is_some() %}</a>{% endif -%}
 {%- endfor -%}
 {%- call ch::labels(f) %}{% endcall -%}
 </svg>
+{%- call ch::text(f.fig) %}{% endcall -%}</figure>

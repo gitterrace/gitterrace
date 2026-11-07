@@ -2,6 +2,7 @@
 {%- call ch::open(f) %}{% endcall -%}
 {%- for (x, v) in xticks %}<text class="ax" x="{{ x }}" y="212.0" text-anchor="middle">{{ v }}</text>{% endfor -%}
 {%- for d in dots -%}
-<a tabindex="-1" href="{{ d.href }}" aria-label="{{ d.title }}"><circle class="dot-pt" cx="{{ d.cx }}" cy="{{ d.cy }}" r="{{ d.r }}" data-tip="{{ d.title }}"/></a>
+<a tabindex="-1" href="{{ d.href }}" aria-label="{{ d.title }}" data-tip="{{ d.title }}"><circle class="dot-pt" cx="{{ d.cx }}" cy="{{ d.cy }}" r="{{ d.r }}"/></a>
 {%- endfor -%}
 <text class="ax" x="960" y="12.0" text-anchor="end">{{ x_title }}</text></svg>
+{%- call ch::text(f.fig) %}{% endcall -%}</figure>

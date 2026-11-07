@@ -73,6 +73,24 @@
     show(j);
   });
   svg.addEventListener("pointerleave", function () { if (!drag) hide(); });
+  // The keyboard reads the same tip: the arrow keys step through the sampled commits, Home and
+  // End jump to the ends, Escape and leaving the chart drop the tip. The tip is announced
+  // politely while the keyboard drives it, never on hover.
+  var at = -1;
+  svg.addEventListener("keydown", function (ev) {
+    var last = d.x.length - 1;
+    var step = { ArrowRight: 1, ArrowUp: 1, ArrowLeft: -1, ArrowDown: -1 }[ev.key];
+    if (ev.key === "Escape") { hide(); return; }
+    if (!step && ev.key !== "Home" && ev.key !== "End") return;
+    if (ev.key === "Home") at = 0;
+    else if (ev.key === "End") at = last;
+    else at = at < 0 ? (step > 0 ? 0 : last) : Math.max(0, Math.min(last, at + step));
+    tip.setAttribute("aria-live", "polite");
+    show(at);
+    ev.preventDefault();
+  });
+  svg.addEventListener("blur", function () { tip.removeAttribute("aria-live"); hide(); });
+  svg.addEventListener("pointerenter", function () { tip.removeAttribute("aria-live"); });
   svg.addEventListener("pointerdown", function (ev) {
     if (ev.button !== 0) return;
     var j = nearest(fx(ev));

@@ -5,7 +5,7 @@
 use askama::Template;
 use askama::filters::HtmlSafe;
 
-use crate::charts::view::{P, Tick};
+use crate::charts::view::{Fig, P, Tick};
 use crate::empty::Empty;
 use crate::seg::Seg;
 
@@ -28,6 +28,7 @@ pub(super) struct DateLabel {
 #[derive(Debug, Template)]
 #[template(path = "chart_loc.svg")]
 pub(super) struct Area {
+    pub(super) fig: Fig,
     pub(super) right: P,
     pub(super) ticks: Vec<Tick>,
     pub(super) bands: Vec<Band>,
@@ -108,6 +109,7 @@ pub(super) struct NowRow {
 
 #[derive(Debug)]
 pub(super) struct Now {
+    pub(super) fig: Fig,
     pub(super) bar: Vec<SharePart>,
     pub(super) window: String,
     pub(super) rows: Vec<NowRow>,

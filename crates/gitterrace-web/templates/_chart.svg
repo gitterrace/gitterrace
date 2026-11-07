@@ -1,9 +1,19 @@
 {#- The parts of a full-width chart (960 by 220, plot from x 58 and y 10). `f` is a `Frame`. -#}
 {%- macro open(f) -%}
-{%- if f.linked -%}<svg class="chart" viewBox="0 0 960 220" role="group" tabindex="0" data-marks aria-label="{{ f.label }}, arrow keys move between marks" preserveAspectRatio="xMidYMid meet">
-{%- else -%}<svg class="chart" viewBox="0 0 960 220" role="img" aria-label="{{ f.label }}" preserveAspectRatio="xMidYMid meet">{%- endif -%}
+<figure class="chart-fig">
+{%- if f.linked -%}<svg class="chart" viewBox="0 0 960 220" role="group" tabindex="0" data-marks aria-label="{{ f.fig.name }}, arrow keys move between marks" aria-describedby="{{ f.fig.id }}-sum" preserveAspectRatio="xMidYMid meet">
+{%- else -%}<svg class="chart" viewBox="0 0 960 220" role="img" aria-label="{{ f.fig.name }}" aria-describedby="{{ f.fig.id }}-sum" preserveAspectRatio="xMidYMid meet">{%- endif -%}
 {%- for t in f.ticks -%}<line class="grid" x1="58" x2="960" y1="{{ t.y }}" y2="{{ t.y }}"/><text class="ax" x="50.0" y="{{ t.ty }}" text-anchor="end">{{ t.label }}</text>{%- endfor -%}
 {%- endmacro -%}
 {%- macro labels(f) -%}
 {%- for l in f.labels -%}<text class="ax" x="{{ l.x }}" y="212.0" text-anchor="{{ l.anchor }}">{{ l.text }}</text>{%- endfor -%}
+{%- endmacro -%}
+{#- The summary the chart is described by and its values behind a disclosure; `g` is a `Fig`. -#}
+{%- macro text(g) -%}
+<figcaption class="vh" id="{{ g.id }}-sum">{{ g.summary }}</figcaption>
+<details class="chart-data"><summary>Show as table</summary><div class="scroll"><table class="entries" id="{{ g.id }}-data"><caption class="vh">{{ g.name }}</caption>
+<thead><tr>{% for h in g.table.head %}<th scope="col"{% if !loop.first %} class="r"{% endif %}>{{ h }}</th>{% endfor %}</tr></thead>
+<tbody>{% for r in g.table.rows %}<tr><th scope="row">{{ r.label }}</th>{% for c in r.cells %}<td class="r">{{ c }}</td>{% endfor %}</tr>{% endfor %}</tbody>
+{% if let Some(t) = g.table.total %}<tfoot><tr><th scope="row">{{ t.label }}</th>{% for c in t.cells %}<td class="r">{{ c }}</td>{% endfor %}</tr></tfoot>{% endif %}
+</table></div></details>
 {%- endmacro -%}

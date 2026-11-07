@@ -9,8 +9,8 @@
 
 use std::fmt::Write as _;
 
-use crate::charts::ticks;
-use crate::charts::view::{P, Tick};
+use crate::charts::view::{Fig, P, Row, Table, Tick};
+use crate::charts::{self, ticks};
 use crate::charttip;
 use crate::empty::Empty;
 use crate::fmt;
@@ -63,8 +63,10 @@ pub(super) fn sample(n: usize, keep: &[usize]) -> Vec<usize> {
     v
 }
 
+const AREA_NAME: &str = "Lines of code by language over history";
+
 /// The area chart and the JSON `loc.js` reads.
-fn area_chart(ch: &Chain, view: View, subj: &Subjects) -> (Area, String) {
+fn area_chart(ch: &Chain, view: View, subj: &Subjects, lead: &str) -> (Area, String) {
     let n = ch.len();
     let keep: Vec<usize> = view.range.map_or(vec![], |(a, b)| vec![a, b]);
     let pts = sample(n, &keep);
@@ -182,7 +184,48 @@ fn area_chart(ch: &Chain, view: View, subj: &Subjects) -> (Area, String) {
         let jb = pts.iter().position(|p| *p == b).unwrap_or(pts.len() - 1);
         (P(xs[ja]), P((xs[jb] - xs[ja]).max(2.0)))
     });
+    // One row per band, read where the bands' tips read: the first and the newest shown point.
+    let last = pts.len() - 1;
+    let row = |label: &str, first: i64, now: i64, total: i64| Row {
+        label: label.to_owned(),
+        cells: vec![
+            fmt::thousands(first.max(0)),
+            fmt::thousands(now.max(0)),
+            charttip::share(now.max(0) as u64, total.max(0) as u64),
+        ],
+    };
+    let table = Table {
+        head: vec![
+            "Language".to_owned(),
+            fmt::day(ch.time(pts[0])),
+            fmt::day(ch.time(pts[last])),
+            "Share".to_owned(),
+        ],
+        rows: (0..k)
+            .rev()
+            .map(|lang| {
+                row(
+                    &ch.langs()[lang],
+                    rows[0][lang],
+                    rows[last][lang],
+                    totals[last],
+                )
+            })
+            .collect(),
+        total: Some(row("Total", totals[0], totals[last], totals[last])),
+    };
+    let summary = if n == 1 {
+        format!("1 commit on {}. {lead}", fmt::day(ch.time(0)))
+    } else {
+        format!(
+            "{} from {} to {}. {lead}",
+            fmt::count(n, "commit", "commits"),
+            fmt::day(ch.time(0)),
+            fmt::day(ch.time(n - 1))
+        )
+    };
     let area = Area {
+        fig: charts::fig(AREA_NAME, summary.trim_end().to_owned(), table),
         right: P(W - RIGHT),
         ticks: grid,
         bands,
@@ -315,6 +358,37 @@ fn languages_now(ch: &Chain) -> Now {
             })
         })
         .collect();
+    let shown = |v: i64| u64::try_from(v.max(0)).unwrap_or(0);
+    let row = |label: &str, v: i64| Row {
+        label: label.to_owned(),
+        cells: vec![
+            fmt::thousands(shown(v)),
+            charttip::share(shown(v), shown(total)),
+        ],
+    };
+    let table = Table {
+        head: ["Language", "Lines", "Share"].map(str::to_owned).to_vec(),
+        rows: (0..k)
+            .filter(|i| last[*i] > 0)
+            .map(|i| row(&ch.langs()[i], last[i]))
+            .collect(),
+        total: Some(row("Total", total)),
+    };
+    let summary = (0..k)
+        .filter(|i| last[*i] > 0)
+        .max_by_key(|i| last[*i])
+        .map_or_else(
+            || "No lines.".to_owned(),
+            |i| {
+                format!(
+                    "{} at the newest commit, the most in {} with {}.",
+                    fmt::count(shown(total), "line", "lines"),
+                    ch.langs()[i],
+                    charttip::share(shown(last[i]), shown(total))
+                )
+            },
+        );
+    let fig: Fig = charts::fig("Share of lines by language", summary, table);
     let window = if n <= 10 {
         format!("All {}", fmt::count(n, "commit", "commits"))
     } else {
@@ -354,7 +428,12 @@ fn languages_now(ch: &Chain) -> Now {
             }
         })
         .collect();
-    Now { bar, window, rows }
+    Now {
+        fig,
+        bar,
+        window,
+        rows,
+    }
 }
 
 fn seg(label: &str, items: &[(&str, bool, String)]) -> Seg {
@@ -407,7 +486,7 @@ pub(super) fn body(ch: &Chain, view: View, subj: &Subjects) -> Body {
         })
         .unwrap_or_default();
     let k = ch.langs().len();
-    let (area, json) = area_chart(ch, view, subj);
+    let (area, json) = area_chart(ch, view, subj, &lead);
     Body {
         empty: None,
         shown: Some(Shown {

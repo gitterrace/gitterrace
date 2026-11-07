@@ -75,6 +75,7 @@ pub(crate) async fn page(
                 y: u64::from(h.lines),
                 size: h.authors as u64,
                 href: views::file_link(&h.path),
+                name: h.path.clone(),
                 title: format!(
                     "{}, {}, {}",
                     crate::charttip::part(

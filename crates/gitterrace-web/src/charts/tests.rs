@@ -6,7 +6,12 @@ use crate::charttip::COMMITS;
 
 #[test]
 fn bars_escape_labels_and_scale() {
-    let svg = bars(&[("<a>\"&".to_owned(), 5), ("b".to_owned(), 0)], COMMITS).to_string();
+    let svg = bars(
+        "t",
+        &[("<a>\"&".to_owned(), 5), ("b".to_owned(), 0)],
+        COMMITS,
+    )
+    .to_string();
     assert!(svg.contains("&lt;a&gt;&quot;&amp;"), "{svg}");
     assert!(svg.contains("&lt;a&gt;"));
     assert!(!svg.contains("<a>"));
@@ -43,7 +48,7 @@ fn hover_bands_paint_under_the_data() {
     let path = line.find(r#"class="line""#).expect("line");
     assert!(last_hit < path, "hover band drawn over the line");
     for svg in [
-        bars(&[("a".to_owned(), 3), ("b".to_owned(), 1)], COMMITS).to_string(),
+        bars("t", &[("a".to_owned(), 3), ("b".to_owned(), 1)], COMMITS).to_string(),
         diverging(&[("a".to_owned(), 3, 1)], "t").to_string(),
     ] {
         for col in svg.split(r#"<g class="col">"#).skip(1) {
@@ -152,7 +157,7 @@ fn labels_step_by_calendar() {
         .map(|i| format!("Q{} {}", i % 4 + 1, 2016 + i / 4))
         .collect();
     let pts: Vec<(String, u64)> = keys.iter().map(|k| (k.clone(), 1)).collect();
-    let svg = bars(&pts, COMMITS).to_string();
+    let svg = bars("t", &pts, COMMITS).to_string();
     let shown: Vec<&str> = svg
         .split(r#"text-anchor="middle">"#)
         .skip(1)
@@ -169,7 +174,7 @@ fn a_repeated_day_is_labelled_once() {
     let pts: Vec<(String, u64)> = (0..12)
         .map(|i| (format!("2026-11-{:02}", 1 + i / 4), 1))
         .collect();
-    let svg = bars(&pts, COMMITS).to_string();
+    let svg = bars("t", &pts, COMMITS).to_string();
     let shown: Vec<&str> = svg
         .split(r#"class="ax""#)
         .skip(1)
@@ -192,7 +197,7 @@ fn labels_after_dropping_repeats_are_evenly_spaced() {
         let pts: Vec<(String, u64)> = (0..days * run)
             .map(|i| (format!("2026-11-{:02}", 1 + i / run), 1))
             .collect();
-        let svg = bars(&pts, COMMITS).to_string();
+        let svg = bars("t", &pts, COMMITS).to_string();
         let xs: Vec<f64> = svg
             .split(r#"<text class="ax" x=""#)
             .skip(1)
@@ -225,13 +230,18 @@ fn a_chart_of_links_is_one_tab_stop() {
             size: 1,
             href: format!("/h/{i}"),
             title: format!("f{i}"),
+            name: format!("f{i}"),
         })
         .collect();
     for svg in [
-        linked_bars(&pts, &links).to_string(),
+        linked_bars("t", &pts, &links).to_string(),
         scatter(&dots, "changes").to_string(),
     ] {
-        let open = svg.split('>').next().expect("svg tag");
+        let open = svg
+            .split("<svg")
+            .nth(1)
+            .and_then(|t| t.split('>').next())
+            .expect("svg tag");
         assert!(
             open.contains("tabindex=\"0\"") && open.contains("data-marks"),
             "{open}"
@@ -241,7 +251,7 @@ fn a_chart_of_links_is_one_tab_stop() {
         assert_eq!(svg.matches("<a tabindex=\"-1\" ").count(), anchors, "{svg}");
     }
     assert!(
-        !bars(&pts, COMMITS).to_string().contains("tabindex"),
+        !bars("t", &pts, COMMITS).to_string().contains("tabindex"),
         "a chart without links takes no stop"
     );
 }
@@ -252,7 +262,7 @@ fn a_short_per_commit_axis_still_names_its_first_and_last_day() {
         let pts: Vec<(String, u64)> = (0..n)
             .map(|i| (format!("2026-11-{:02}", 1 + i / 3), 1))
             .collect();
-        let svg = bars(&pts, COMMITS).to_string();
+        let svg = bars("t", &pts, COMMITS).to_string();
         let shown: Vec<&str> = svg
             .split(r#"class="ax""#)
             .skip(1)

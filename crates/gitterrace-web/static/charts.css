@@ -1,0 +1,57 @@
+/* charts: marks are colored by class so the theme switches without re-render */
+svg.chart{width:100%;height:auto;display:block;overflow:visible}
+svg.chart .grid{stroke:var(--line);stroke-width:1}
+svg.chart text{fill:var(--faint);font:var(--text-xs) var(--sans);font-variant-numeric:tabular-nums}
+svg.chart .bar{fill:var(--accent)}
+svg.chart .hit{fill:transparent}
+svg.chart .col:hover .hit{fill:var(--soft)}
+svg.chart .col:hover .bar{fill:var(--accent-fg)}
+svg.chart a{cursor:pointer;outline:none}
+svg.chart a:focus-visible .hit{fill:var(--soft);stroke:var(--accent);stroke-width:2}
+svg.chart a:focus-visible .bar{fill:var(--accent-fg)}
+/* Focus on a mark is a ring, never a fill change alone: the bar and the dot gain a stroke. */
+svg.chart a:focus-visible .bar,svg.chart a:focus-visible .dot-pt{stroke:var(--fg);stroke-width:2}
+svg.loc:focus-visible{outline-offset:4px}
+/* Neighbouring series are split by a surface-coloured edge, so two close hues still read as two
+   parts; the legend and the data table name each one. */
+svg.chart .col rect[class^=c],svg.loc path[class^=c]{stroke:var(--surface);stroke-width:1}
+@media (forced-colors:active){
+svg.chart a:focus-visible .hit,svg.chart a:focus-visible .bar,
+svg.chart a:focus-visible .dot-pt{stroke:Highlight}
+svg.chart .col rect[class^=c],svg.loc path[class^=c]{stroke:CanvasText}}
+/* Text for assistive tech only: present to screen readers, takes no room on screen. */
+.vh{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);
+  white-space:nowrap;border:0}
+.chart-fig{margin:0}
+.chart-data{margin-top:var(--space-3)}
+.chart-data summary{cursor:pointer;color:var(--muted);font-size:var(--text-sm);width:max-content;
+  padding:2px 0}
+.chart-data .scroll{margin-top:var(--space-2);max-height:24rem;overflow:auto}
+.chart-data th{text-align:left;font-weight:var(--weight-regular);padding:4px var(--space-3);
+  border-top:var(--border);white-space:nowrap}
+.chart-data thead th{color:var(--muted);font-size:var(--text-sm);font-weight:var(--weight-semibold);
+  background:var(--soft);border-top:0}
+.chart-data th.r{text-align:right}
+.chart-data td{padding:4px var(--space-3);line-height:1.4;font-variant-numeric:tabular-nums}
+.chart-data tfoot th,.chart-data tfoot td{font-weight:var(--weight-semibold)}
+svg.heat .h0{fill:var(--seq-0)}svg.heat .h1{fill:var(--seq-1)}svg.heat .h2{fill:var(--seq-2)}
+svg.heat .h3{fill:var(--seq-3)}svg.heat .h4{fill:var(--seq-4)}
+svg.heat rect:hover{stroke:var(--fg);stroke-width:1.5}
+.c1{fill:var(--cat-1);background:var(--cat-1)}.c2{fill:var(--cat-2);background:var(--cat-2)}
+.c3{fill:var(--cat-3);background:var(--cat-3)}.c4{fill:var(--cat-4);background:var(--cat-4)}
+.c5{fill:var(--cat-5);background:var(--cat-5)}.c6{fill:var(--cat-6);background:var(--cat-6)}
+.c7{fill:var(--cat-7);background:var(--cat-7)}.c8{fill:var(--cat-8);background:var(--cat-8)}
+.legend{display:flex;flex-wrap:wrap;gap:6px var(--space-4);margin-top:var(--space-3);
+  font-size:var(--text-xs);color:var(--muted)}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:var(--radius)}
+.heat-legend{display:flex;justify-content:flex-end;align-items:center;gap:3px;
+  margin-top:var(--space-2);font-size:var(--text-xs);color:var(--faint)}
+.heat-legend i{width:10px;height:10px;border-radius:var(--radius)}
+.heat-legend i:nth-of-type(1){background:var(--seq-0)}
+.heat-legend i:nth-of-type(2){background:var(--seq-1)}
+.heat-legend i:nth-of-type(3){background:var(--seq-2)}
+.heat-legend i:nth-of-type(4){background:var(--seq-3)}
+.heat-legend i:nth-of-type(5){background:var(--seq-4)}
+.legend i,.heat-legend i{border-radius:0}
+svg.chart text{font-family:var(--mono)}

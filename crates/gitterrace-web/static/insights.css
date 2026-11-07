@@ -17,3 +17,5 @@
 table.own b.warn,.kpis b.warn{color:var(--warn);font-weight:var(--weight-semibold)}
 table.own :is(td,th){white-space:nowrap}table.own :is(td,th):first-child{width:30%}
 @media (max-width:600px){table.own .n{display:none}table.own :is(td,th):first-child{width:auto}}
+.matrix-chart td a:focus-visible{outline:2px solid var(--fg);outline-offset:-2px}
+.matrix-chart .m3 a:focus-visible,.matrix-chart .m4 a:focus-visible{outline-color:var(--on-accent)}

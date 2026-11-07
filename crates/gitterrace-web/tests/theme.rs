@@ -11,6 +11,7 @@ fn stylesheets_hold_no_raw_colors() {
         ("send.css", include_str!("../static/send.css")),
         ("docnav.css", include_str!("../static/docnav.css")),
         ("insights.css", include_str!("../static/insights.css")),
+        ("charts.css", include_str!("../static/charts.css")),
     ];
     for (name, css) in sheets {
         for (i, line) in css.lines().enumerate() {
@@ -39,6 +40,7 @@ fn clipped_text_keeps_room_for_descenders() {
         ("send.css", include_str!("../static/send.css")),
         ("docnav.css", include_str!("../static/docnav.css")),
         ("insights.css", include_str!("../static/insights.css")),
+        ("charts.css", include_str!("../static/charts.css")),
     ] {
         for rule in css.split('}') {
             let tight = rule.contains("/1 ") || rule.contains("line-height:1;");
@@ -85,6 +87,7 @@ fn only_commit_messages_truncate() {
         ("send.css", include_str!("../static/send.css")),
         ("docnav.css", include_str!("../static/docnav.css")),
         ("insights.css", include_str!("../static/insights.css")),
+        ("charts.css", include_str!("../static/charts.css")),
     ] {
         for rule in css.split('}') {
             let squeezed: String = rule.split_whitespace().collect();
@@ -114,6 +117,7 @@ fn text_field_rules_skip_toggles() {
         ("send.css", include_str!("../static/send.css")),
         ("docnav.css", include_str!("../static/docnav.css")),
         ("insights.css", include_str!("../static/insights.css")),
+        ("charts.css", include_str!("../static/charts.css")),
     ];
     for (name, css) in sheets {
         for rule in css.split('}') {
