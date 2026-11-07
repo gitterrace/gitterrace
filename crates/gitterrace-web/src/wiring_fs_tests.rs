@@ -11,7 +11,7 @@ use std::time::{Duration, Instant};
 use crate::app::App;
 use crate::live::WorktreeWatch;
 use crate::wiring_tests::{app, repo, with};
-use gitterrace_testkit::git;
+use gitterrace_testkit::{git, wait};
 
 /// These tests count scans and time file events, so they run one at a time: a parallel test
 /// writing thousands of files would slow the OS event stream they measure.
@@ -204,18 +204,16 @@ async fn a_removed_repository_leaves_nothing_running() {
     let (a, p, rx, wt, task) = watched(dir.path(), 30, true).await;
     task.abort();
     drop((rx, wt));
-    let end = Instant::now() + Duration::from_secs(3);
-    while Arc::strong_count(&a) > 1 && Instant::now() < end {
-        tokio::time::sleep(Duration::from_millis(50)).await;
-    }
-    assert_eq!(
-        Arc::strong_count(&a),
-        1,
-        "the refresher and its watcher let go"
-    );
+    // A watcher start walk still running holds the app until it ends, so the wait is on the
+    // release itself; a refresher or watcher that never lets go is the deadline.
+    wait::until("the refresher and its watcher let go", || {
+        let n = Arc::strong_count(&a);
+        async move { n == 1 }
+    })
+    .await;
     let before = scans(&a);
     std::fs::write(p.join("small.txt"), "after removal\n").expect("write");
-    tokio::time::sleep(Duration::from_secs(1)).await;
+    wait::pause(Duration::from_secs(1)).await;
     assert_eq!(scans(&a), before, "no scan after removal");
 }
 
