@@ -9,7 +9,7 @@ markdown sanitizer strips inline <svg> and <style>, and the doc links them throu
 
   scripts/bench-report.py                  normalize, render charts, prune, rewrite the doc
   scripts/bench-report.py --check          fail when anything above is stale, writes nothing
-  scripts/bench-report.py --print          print the results block (what `cargo xtask` splices)
+  scripts/bench-report.py --print          print the short results block that `cargo xtask` splices
   scripts/bench-report.py --corpus         print the corpus list, one source link per repo
   scripts/bench-report.py --normalize F    rewrite one result file in the published format
 

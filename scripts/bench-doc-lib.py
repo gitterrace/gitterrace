@@ -235,18 +235,9 @@ def idle_footprint(r: Json) -> str:
     return "not measured" if fp is None else f"{fp:.0f} MB"
 
 
-def block(cur: Json, old: Json | None) -> str:
-    m = cur["machine"]
-    L = [
-        f"Run {cur['when'][:10]} on {machine_line(m)}. "
-        f"{m['git']}, {version(m)}. "
-        f"{cur['runs']} warm runs per page, {cur['idle_secs']} s idle windows. "
-        + load_note(cur),
-        "",
-    ]
-    gone = withheld_lines(cur)
-    if gone:
-        L += [*gone, ""]
+def block(cur: Json, old: Json | None, d: str) -> str:
+    """The full run: per repo summary, the table, charts (d: their folder), comparison, pages."""
+    L = [f"{cur['runs']} warm runs per page, {cur['idle_secs']} s idle windows.", ""]
     for n, r in cur["repos"].items():
         L += summary(n, r, cur["when"])
     L += [
@@ -274,7 +265,7 @@ def block(cur: Json, old: Json | None) -> str:
     names = charts(cur, old)
     for key in METRICS:
         if f"{key}.svg" in names:
-            L += picture(cur, key)
+            L += picture(cur, key, d)
     if old:
         L += comparison(cur, old)
     for n, r in cur["repos"].items():
@@ -459,16 +450,20 @@ def results_readme(kept: list[Json]) -> str:
                 f"| {n} | {SHORT[k]} | {HELD} | - | withheld |"
                 + (" - |" if old else "")
             )
-    L.append("")
-    for key in METRICS:
-        if any(key in r["budget"] for r in cur["repos"].values()):
-            L += picture(cur, key, run_name(cur))
+    L += ["", block(cur, old, run_name(cur))]
     return wrap("\n".join(L).rstrip("\n") + "\n")
 
 
 def render() -> str:
-    kept = [shown(r) for r in published()]
-    return wrap(block(kept[-1], kept[-2] if len(kept) > 1 else None))
+    """The short results block of docs/benchmarks.md: the newest run's header and where it is.
+    The run in full lives once, in bench/results/README.md."""
+    cur = shown(published()[-1])
+    L = [header(cur), "", *withheld_lines(cur)]
+    L += [
+        "",
+        "Every number, chart and page: [bench/results](../bench/results/README.md).",
+    ]
+    return wrap("\n".join(L).strip("\n") + "\n")
 
 
 def spliced(text: str, body: str) -> str:
