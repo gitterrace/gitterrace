@@ -37,4 +37,3 @@
 --border:1px solid var(--line);
 --page-max:1200px;--page-pad:var(--space-6);--header-h:56px;
 }
-@media (prefers-reduced-motion:reduce){:root{--dur-fast:0ms;--dur-slow:0ms}}

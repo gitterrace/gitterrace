@@ -547,7 +547,25 @@ button.reponame .tri{width:16px;height:16px;fill:var(--muted)}
 .tip.on{opacity:1;visibility:visible;transition:opacity var(--dur-fast) var(--ease)}
 [data-tip]:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 @keyframes ov-in{from{opacity:0}to{opacity:1}}
-@media (prefers-reduced-motion:reduce){.tip,.tip.on{transition:none}.ov-back{animation:none}}
+/* Reduced motion: the one gate. Nothing in the app moves or fades under this setting. */
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:0s!important;
+  animation-delay:0s!important;transition-duration:0s!important;transition-delay:0s!important;
+  scroll-behavior:auto!important}}
+/* Forced colors: the user's palette replaces ours. Boundaries, focus and the selected state use
+   system colors and do not lean on shadows or fills, which the browser removes. */
+@media (forced-colors:active){:focus-visible{outline:2px solid Highlight}
+.ov-input:focus,.send-title:focus,.send-ctx:focus{outline:2px solid Highlight;outline-offset:-2px;
+  box-shadow:none}
+button,.segs .on,.skip,.tip,.loc-tip,.toast{border:1px solid CanvasText}
+.segs .on,.ov-list li.on{outline:2px solid Highlight;outline-offset:-2px;
+  font-weight:var(--weight-semibold)}
+.tabnav a.on,.tabs>a.on,.outline.rail a.on{border-color:Highlight;text-decoration:underline}
+.tabnav a.on,.tabs>a.on{border-bottom-width:3px}
+svg.chart text{fill:CanvasText}svg.chart .grid{stroke:GrayText}
+svg.chart .bar,svg.chart .up,svg.chart .dn,svg.chart .dot-pt{fill:CanvasText;stroke:CanvasText}
+svg.chart .line{stroke:CanvasText}svg.chart .dot{fill:CanvasText;stroke:Canvas}
+svg.chart a:focus-visible .hit{fill:none;stroke:Highlight;stroke-width:3}
+svg.chart a:focus-visible .bar{fill:Highlight}}
 
 /* bar widths and avatar hues as classes: inline style attributes are refused by the page policy */
 .w0{--w:0%}.w1{--w:1%}.w2{--w:2%}.w3{--w:3%}.w4{--w:4%}.w5{--w:5%}.w6{--w:6%}.w7{--w:7%}.w8{--w:8%}.w9{--w:9%}.w10{--w:10%}.w11{--w:11%}.w12{--w:12%}.w13{--w:13%}.w14{--w:14%}.w15{--w:15%}.w16{--w:16%}.w17{--w:17%}.w18{--w:18%}.w19{--w:19%}.w20{--w:20%}.w21{--w:21%}.w22{--w:22%}.w23{--w:23%}.w24{--w:24%}.w25{--w:25%}.w26{--w:26%}.w27{--w:27%}.w28{--w:28%}.w29{--w:29%}.w30{--w:30%}.w31{--w:31%}.w32{--w:32%}.w33{--w:33%}.w34{--w:34%}.w35{--w:35%}.w36{--w:36%}.w37{--w:37%}.w38{--w:38%}.w39{--w:39%}.w40{--w:40%}.w41{--w:41%}.w42{--w:42%}.w43{--w:43%}.w44{--w:44%}.w45{--w:45%}.w46{--w:46%}.w47{--w:47%}.w48{--w:48%}.w49{--w:49%}.w50{--w:50%}.w51{--w:51%}.w52{--w:52%}.w53{--w:53%}.w54{--w:54%}.w55{--w:55%}.w56{--w:56%}.w57{--w:57%}.w58{--w:58%}.w59{--w:59%}.w60{--w:60%}.w61{--w:61%}.w62{--w:62%}.w63{--w:63%}.w64{--w:64%}.w65{--w:65%}.w66{--w:66%}.w67{--w:67%}.w68{--w:68%}.w69{--w:69%}.w70{--w:70%}.w71{--w:71%}.w72{--w:72%}.w73{--w:73%}.w74{--w:74%}.w75{--w:75%}.w76{--w:76%}.w77{--w:77%}.w78{--w:78%}.w79{--w:79%}.w80{--w:80%}.w81{--w:81%}.w82{--w:82%}.w83{--w:83%}.w84{--w:84%}.w85{--w:85%}.w86{--w:86%}.w87{--w:87%}.w88{--w:88%}.w89{--w:89%}.w90{--w:90%}.w91{--w:91%}.w92{--w:92%}.w93{--w:93%}.w94{--w:94%}.w95{--w:95%}.w96{--w:96%}.w97{--w:97%}.w98{--w:98%}.w99{--w:99%}.w100{--w:100%}

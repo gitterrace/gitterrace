@@ -1,0 +1,10 @@
+{
+  "name": "gitterrace-checks",
+  "private": true,
+  "description": "Dev tools for the browser checks (scripts/browser-check.mjs). Not shipped.",
+  "type": "module",
+  "devDependencies": {
+    "axe-core": "^4.10.0",
+    "playwright-core": "^1.50.0"
+  }
+}

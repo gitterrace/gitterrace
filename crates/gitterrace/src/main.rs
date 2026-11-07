@@ -38,8 +38,11 @@ async fn main() -> anyhow::Result<()> {
         .cloned()
         .unwrap_or_else(|| PathBuf::from("."));
     // stdout carries the MCP protocol, so logs always go to stderr.
+    // Color only for a person at a terminal: NO_COLOR (any non-empty value) and a piped stderr
+    // get plain lines. Progress is always printed as lines, never as a redrawn spinner.
     tracing_subscriber::fmt()
         .with_writer(std::io::stderr)
+        .with_ansi(use_color())
         .init();
     let dir = gitterrace_config::config_dir(cli.config.as_deref());
     let flags = Flags {
@@ -236,6 +239,12 @@ async fn export_cmd(
     let n = export::export(&repos, &out, scope, pages).await?;
     println!("wrote {n} files to {}", out.display());
     Ok(())
+}
+
+/// Whether log lines may carry color codes: stderr is a terminal and `NO_COLOR` is unset or empty.
+fn use_color() -> bool {
+    use std::io::IsTerminal as _;
+    std::env::var_os("NO_COLOR").is_none_or(|v| v.is_empty()) && std::io::stderr().is_terminal()
 }
 
 #[cfg(test)]

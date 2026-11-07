@@ -104,6 +104,12 @@
 //   help-keys    in the ? sheet keys and descriptions each start at one x, the key column is at
 //                least 64 px, and a chord joins its keys with a word, closer than the column gap
 //   side-order   with a branch left unmerged, the overview sidebar reads Now, Loose ends, Recent
+//   axe-all      axe-core (WCAG 2 A and AA to 2.2) over every golden page, both browsers, 360 and
+//                1440 px, light and dark; only the violations in KNOWN_VIOLATIONS pass, and
+//                that list can only shrink. AXE_REPORT=1 prints counts and fails nothing
+//   forced-colors  Chromium with forced colors on: every Tab stop has an outline, the open tab
+//                differs from its siblings by more than color
+//   reduced-motion with reduce on, every transition and animation duration is 0s and none runs
 //   small-layout the tree '..' row only at narrow widths, the insights link in the Languages
 //                heading, and 'Branches' in the nav at 390 px.
 //   lone-rows    on every page the goldens cover, at 1440 and 390 px, no control row above the
@@ -150,7 +156,7 @@ const bin = resolve(arg('--bin', join(root, 'target/debug/git-terrace')));
 const fromDisk = process.argv.includes('--from-disk');
 const tabCounts = arg('--tabs', '8,12').split(',').map(Number);
 const browsers = arg('--browsers', 'webkit,chromium').split(',');
-const ALL = ['truncation', 'live-tabs', 'mermaid', 'chip', 'doctabs', 'chords', 'header', 'marked', 'menu-same', 'gutter', 'overlays', 'tips', 'date-tips', 'repo-switch', 'outline', 'mark-seam', 'about-place', 'site-theme', 'side-width', 'calm-header', 'tabs-one-line', 'tab-levels', 'huge-diff', 'sticky-heads', 'md-anchor', 'live-scroll', 'live-read', 'sticky-line', 'seg-one-row', 'period-steady', 'export-from-disk', 'inline-controls', 'section-gaps', 'path-cells', 'mark-flat', 'tab-stops', 'help-keys', 'side-order', 'settings', 'lone-rows', 'page-heads', 'compare-head', 'commit-head', 'search-head', 'small-layout', 'send-dialog', 'keyboard-walk', 'reflow', 'text-spacing', 'targets', 'keys-off', 'outline-filter', 'avatar-fit', 'graph-view', 'layout-shift', 'symbols'];
+const ALL = ['truncation', 'live-tabs', 'mermaid', 'chip', 'doctabs', 'chords', 'header', 'marked', 'menu-same', 'gutter', 'overlays', 'tips', 'date-tips', 'repo-switch', 'outline', 'mark-seam', 'about-place', 'site-theme', 'side-width', 'calm-header', 'tabs-one-line', 'tab-levels', 'huge-diff', 'sticky-heads', 'md-anchor', 'live-scroll', 'live-read', 'sticky-line', 'seg-one-row', 'period-steady', 'export-from-disk', 'inline-controls', 'section-gaps', 'path-cells', 'mark-flat', 'tab-stops', 'help-keys', 'side-order', 'settings', 'lone-rows', 'page-heads', 'compare-head', 'commit-head', 'search-head', 'small-layout', 'send-dialog', 'keyboard-walk', 'reflow', 'text-spacing', 'targets', 'keys-off', 'axe-all', 'forced-colors', 'reduced-motion', 'outline-filter', 'avatar-fit', 'graph-view', 'layout-shift', 'symbols'];
 const wanted = arg('--checks', ALL.join(',')).split(',');
 for (const c of wanted) if (!ALL.includes(c)) { console.error(`unknown check ${c}; known: ${ALL.join(', ')}`); process.exit(2); }
 
@@ -166,9 +172,9 @@ const srv = await serve(bin, dir, cfg);
 const r = reporter();
 console.log('serving', srv.base, 'with', bin);
 
-async function context(name) {
+async function context(name, opts = {}) {
   const b = await launch(pw, name);
-  const ctx = await b.newContext();
+  const ctx = await b.newContext(opts);
   // Every script and stylesheet in the folder, read at run time, so a new or forgotten file is
   // never served stale from the binary while the check claims to test the working tree.
   if (fromDisk) for (const f of readdirSync(join(root, 'crates/gitterrace-web/static')).filter((n) => n.endsWith('.js') || n.endsWith('.css'))) {
@@ -194,7 +200,9 @@ const { stickyLine } = stickyChecks(env);
 const { checks: headsChecks } = await import('./browser-heads-lib.mjs');
 const { pageHeads, compareHeads, commitHeads, searchHeads } = headsChecks(env);
 const { checks: a11yChecks } = await import('./browser-access-lib.mjs');
-const { markFlat, tabStops, helpKeys, sideOrder } = a11yChecks(env);
+const {
+  markFlat, tabStops, helpKeys, sideOrder, axeAll, forcedColors, reducedMotion,
+} = a11yChecks(env);
 const { checks: rowChecks } = await import('./browser-rows-lib.mjs');
 const { loneRows, smallLayout, avatarFit } = rowChecks(env);
 const { checks: sendChecks } = await import('./browser-send-lib.mjs');
@@ -530,7 +538,7 @@ async function settings() {
   }
 }
 
-const checks = {'sticky-heads': stickyHeads, 'tabs-one-line': tabsOneLine, 'tab-levels': tabLevels, 'calm-header': calmHeader, 'side-width': sideWidth, truncation, 'live-tabs': liveTabs, mermaid, chip, doctabs, chords, header, marked, 'menu-same': menuSame, gutter, overlays, tips, 'date-tips': dateTips, 'repo-switch': repoSwitch, outline, 'mark-seam': markSeam, 'about-place': aboutPlace, 'site-theme': siteTheme, 'huge-diff': hugeDiff, 'md-anchor': mdAnchor, 'live-scroll': liveScroll, 'live-read': liveRead, 'sticky-line': stickyLine, 'seg-one-row': segOneRow, 'period-steady': periodSteady, 'export-from-disk': exportFromDisk, 'inline-controls': inlineControls, 'section-gaps': sectionGaps, 'path-cells': pathCells, 'mark-flat': markFlat, 'tab-stops': tabStops, 'help-keys': helpKeys, 'side-order': sideOrder, settings, 'lone-rows': loneRows, 'page-heads': pageHeads, 'compare-head': compareHeads, 'commit-head': commitHeads, 'search-head': searchHeads, 'small-layout': smallLayout, 'send-dialog': sendDialog, 'keyboard-walk': keyboardWalk, reflow, 'text-spacing': textSpacing, targets, 'keys-off': keysOff, 'outline-filter': outlineFilter, 'graph-view': graphView, 'avatar-fit': avatarFit, 'layout-shift': layoutShift, symbols};
+const checks = {'sticky-heads': stickyHeads, 'tabs-one-line': tabsOneLine, 'tab-levels': tabLevels, 'calm-header': calmHeader, 'side-width': sideWidth, truncation, 'live-tabs': liveTabs, mermaid, chip, doctabs, chords, header, marked, 'menu-same': menuSame, gutter, overlays, tips, 'date-tips': dateTips, 'repo-switch': repoSwitch, outline, 'mark-seam': markSeam, 'about-place': aboutPlace, 'site-theme': siteTheme, 'huge-diff': hugeDiff, 'md-anchor': mdAnchor, 'live-scroll': liveScroll, 'live-read': liveRead, 'sticky-line': stickyLine, 'seg-one-row': segOneRow, 'period-steady': periodSteady, 'export-from-disk': exportFromDisk, 'inline-controls': inlineControls, 'section-gaps': sectionGaps, 'path-cells': pathCells, 'mark-flat': markFlat, 'tab-stops': tabStops, 'help-keys': helpKeys, 'side-order': sideOrder, settings, 'lone-rows': loneRows, 'page-heads': pageHeads, 'compare-head': compareHeads, 'commit-head': commitHeads, 'search-head': searchHeads, 'small-layout': smallLayout, 'send-dialog': sendDialog, 'keyboard-walk': keyboardWalk, reflow, 'text-spacing': textSpacing, targets, 'keys-off': keysOff, 'axe-all': axeAll, 'forced-colors': forcedColors, 'reduced-motion': reducedMotion, 'outline-filter': outlineFilter, 'graph-view': graphView, 'avatar-fit': avatarFit, 'layout-shift': layoutShift, symbols};
 try {
   for (const c of wanted) { console.log(`-- ${c}`); await checks[c](); }
 } finally {
