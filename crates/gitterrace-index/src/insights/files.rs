@@ -189,10 +189,6 @@ pub struct AgeReport {
 }
 
 impl Insights<'_> {
-    pub(crate) fn build_follow(&self) -> Follow {
-        Follow::build(self.source())
-    }
-
     /// Follow hits of `path` (the name at the newest commit), newest commit first, rows
     /// ascending: the order the old full replay produced.
     fn hits_of(&self, path: &str) -> Vec<(Rank, u32, PathId)> {

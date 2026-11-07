@@ -321,7 +321,7 @@ impl<'a> Insights<'a> {
     }
 
     pub(crate) fn follow(&self) -> &files::Follow {
-        self.d.follow.get_or_init(|| self.build_follow())
+        self.d.follow.get_or_init(|| files::Follow::build(self.source()))
     }
 }
 
