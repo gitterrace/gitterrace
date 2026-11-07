@@ -243,7 +243,7 @@ settings! {
         /// that is not loopback. Needs a restart.
         is_public: bool = false => Restart,
         /// Host names a reverse proxy forwards with, exact and without port, for example
-        /// `["git.example.com"]`. Needs `public`. Needs a restart.
+        /// `["git.example.com"]`. Needs `is_public`. Needs a restart.
         hosts: Vec<String> = Vec::new() => Restart,
         /// Longest a request to a public server may take, in seconds. Past it the answer is 503
         /// and the work it started finishes in the background, filling the cache for a retry.
