@@ -198,8 +198,10 @@ guard_patch_script_lines() {
 # The bodies of the scripts a command runs (`bash x.sh`, `sh`, `zsh`, `python3`, `source`, `.`,
 # or an executable `./x`), comment lines dropped. A rule judging the command line alone never
 # sees a `git stash` or a broad `pkill` the agent wrote into a file and then ran. Bounded: a
-# readable regular file of at most GUARD_SCRIPT_MAX bytes, at most 8 scripts, one level deep.
-GUARD_SCRIPT_MAX=262144
+# readable regular file of at most GUARD_SCRIPT_MAX bytes, at most 8 scripts, one level deep. The
+# cap keeps a call inside the hook's 4 s deadline under load: every rule's regexes scan the body,
+# and at 256 KiB one call took about 3 s. A script an agent writes is a few KiB.
+GUARD_SCRIPT_MAX=65536
 guard_script_bodies() {
     local rest="$1" out="" path body line size n=0
     local run="$GUARD_ANCHOR"'(bash|sh|zsh|python3?[.0-9]*|source|\.)[[:space:]]+(-[^[:space:]]+[[:space:]]+)*([^[:space:];&|<>()]+)'
@@ -227,10 +229,14 @@ guard_script_bodies() {
         if [ -n "$exe" ]; then
             [ -x "$path" ] && [ "${body:0:2}" = '#!' ] || continue
         fi
+        # Collect into an array and join once: appending to one string per line is quadratic,
+        # and a script near the cap then outruns the guard's deadline. Bash 3.2 has no mapfile.
+        local -a kept=()
         while IFS= read -r line || [ -n "$line" ]; do
             case "${line#"${line%%[![:space:]]*}"}" in '#'* | '') continue ;; esac
-            out="$out$line"$'\n'
+            kept[${#kept[@]}]="$line"
         done <<<"$body"
+        [ "${#kept[@]}" -gt 0 ] && out+=$(printf '%s\n' "${kept[@]}")$'\n'
     done
     printf '%s' "$out"
 }
@@ -304,14 +310,17 @@ guard_main() {
     _gf_strip_heredocs "${GUARD_CMD:-}"
     GUARD_HEAD_CACHE="${GUARD_FALLBACK_VALUE%$'\n'}"
     # A script the command runs is judged as if its body were typed: appended to the command
-    # every bash rule and the destructive class read.
+    # every bash rule and the destructive class read. The body joins the head as is, since the
+    # heredoc stripper and a `${x%pattern}` trim are both quadratic in bash 3.2: on a body near
+    # GUARD_SCRIPT_MAX either one outruns the hook deadline. `$(...)` has already dropped the
+    # trailing newlines. A heredoc inside a script is then read as commands, which can only
+    # add a verdict, never hide one.
     if [ "${GUARD_TOOL:-}" = bash ]; then
         local bodies
         bodies=$(guard_script_bodies "$GUARD_HEAD_CACHE")
         if [ -n "$bodies" ]; then
             GUARD_CMD="${GUARD_CMD:-}"$'\n'"$bodies"
-            _gf_strip_heredocs "$GUARD_CMD"
-            GUARD_HEAD_CACHE="${GUARD_FALLBACK_VALUE%$'\n'}"
+            GUARD_HEAD_CACHE="$GUARD_HEAD_CACHE"$'\n'"$bodies"
         fi
     fi
 

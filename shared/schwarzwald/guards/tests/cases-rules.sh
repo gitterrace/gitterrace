@@ -186,6 +186,21 @@ t BLOCK git_checkout_discards "$REPO" bash '{"command":"zsh .runs/sc-discard.sh"
 t BLOCK destructive_class "$REPO" bash '{"command":"bash .runs/sc-stash.sh"}' "the destructive class sees a script body"
 t ALLOW broad_process_kill "$REPO" bash '{"command":"bash .runs/sc-scoped.sh"}' "a script that kills its own pid"
 t ALLOW git_stash "$REPO" bash '{"command":"python3 .runs/sc-stash.py"}' "a python script with no destructive command"
+# A script near GUARD_SCRIPT_MAX with the pkill on its last line: the body is read whole and in
+# time. Joining it line by line once cost 36 s at 256 KiB, past the hook's 4 s deadline.
+{
+    printf '#!/usr/bin/env bash\n'
+    i=0
+    while [ "$i" -lt 4000 ]; do
+        printf 'echo line %s\n' "$i"
+        i=$((i + 1))
+    done
+    printf 'pkill -f "x.app/Contents/MacOS/x"\n'
+} >"$REPO/.runs/sc-big.sh"
+_sc_t0=$SECONDS
+t ADVISE broad_process_kill "$REPO" bash '{"command":"bash .runs/sc-big.sh"}' "a script near the size cap with a broad pkill on its last line"
+_sc_dt=$((SECONDS - _sc_t0))
+_assert yes "$([ "$_sc_dt" -le 3 ] && echo yes || echo no)" "the script near the size cap is judged in time (${_sc_dt}s for two calls)"
 t ADVISE script_content "$REPO" write "$(_sc_in hh-cycle.sh "$_sc_kill")" "writing a .sh with a broad pkill"
 t BLOCK script_content "$REPO" write "$(_sc_in w.sh "$_sc_stash")" "writing a .sh that runs git stash"
 t BLOCK script_content "$REPO" write "$(_sc_in w.zsh $'git reset --hard HEAD\n')" "writing a .zsh that runs git reset --hard"

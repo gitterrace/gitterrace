@@ -143,7 +143,9 @@ for t in author-guard stale-index markdown-staged; do
 done
 [[ -f ${part}/guards/tests/suite.sh ]] && run guards bash "install bash" bash "${part}/guards/tests/suite.sh"
 
-# Product steps: "name|tool|install hint|command".
+# Product steps: "name|tool|install hint|command". A step's command sees PY, the python 3.11 or
+# newer this runner picked, so `$PY scripts/x.py` never falls back to an older plain python3.
+export PY=${py}
 for s in ${steps[@]+"${steps[@]}"}; do
   [[ -n ${s} ]] || continue
   IFS='|' read -r name tool hint cmd <<<"${s}"

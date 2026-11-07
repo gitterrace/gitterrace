@@ -100,7 +100,8 @@ tag_prefix = "v"
 
 [run]
 # run.sh: the external linters, one PASS or FAIL line each. steps are extra checks, each
-# "name|tool|install hint|command" run from the repository root. shell_exclude are git
+# "name|tool|install hint|command" run from the repository root, with $PY set to the python 3.11
+# or newer the runner picked. shell_exclude are git
 # pathspecs kept out of shellcheck and shfmt. shellcheck_exclude are the codes dropped from
 # `shellcheck -o all`. shfmt_indent is the `shfmt -i` width. markdownlint pins the
 # markdownlint-cli2 version ("" skips it), markdown_exclude are pathspecs the staged-markdown
