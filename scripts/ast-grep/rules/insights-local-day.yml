@@ -13,7 +13,7 @@ files:
   - crates/gitterrace-web/src/hotspots.rs
   - crates/gitterrace-web/src/ownership.rs
   - crates/gitterrace-web/src/patterns.rs
-  - crates/gitterrace-web/src/overview_side.rs
+  - crates/gitterrace-web/src/overview_side/mod.rs
   - crates/gitterrace-web/src/spark.rs
 ignores:
   - crates/gitterrace-index/src/insights/scope.rs

@@ -9,6 +9,7 @@ fn stylesheets_hold_no_raw_colors() {
         ("markdown.css", include_str!("../static/markdown.css")),
         ("media.css", include_str!("../static/media.css")),
         ("send.css", include_str!("../static/send.css")),
+        ("docnav.css", include_str!("../static/docnav.css")),
         ("insights.css", include_str!("../static/insights.css")),
     ];
     for (name, css) in sheets {
@@ -36,6 +37,7 @@ fn clipped_text_keeps_room_for_descenders() {
         ("markdown.css", include_str!("../static/markdown.css")),
         ("media.css", include_str!("../static/media.css")),
         ("send.css", include_str!("../static/send.css")),
+        ("docnav.css", include_str!("../static/docnav.css")),
         ("insights.css", include_str!("../static/insights.css")),
     ] {
         for rule in css.split('}') {
@@ -81,6 +83,7 @@ fn only_commit_messages_truncate() {
         ("markdown.css", include_str!("../static/markdown.css")),
         ("media.css", include_str!("../static/media.css")),
         ("send.css", include_str!("../static/send.css")),
+        ("docnav.css", include_str!("../static/docnav.css")),
         ("insights.css", include_str!("../static/insights.css")),
     ] {
         for rule in css.split('}') {
@@ -109,6 +112,7 @@ fn text_field_rules_skip_toggles() {
         ("markdown.css", include_str!("../static/markdown.css")),
         ("media.css", include_str!("../static/media.css")),
         ("send.css", include_str!("../static/send.css")),
+        ("docnav.css", include_str!("../static/docnav.css")),
         ("insights.css", include_str!("../static/insights.css")),
     ];
     for (name, css) in sheets {

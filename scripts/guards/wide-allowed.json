@@ -30,7 +30,7 @@
     "crates/gitterrace-web/src/markdown.rs": 5,
     "crates/gitterrace-web/src/markdown/lines.rs": 1,
     "crates/gitterrace-web/src/media.rs": 4,
-    "crates/gitterrace-web/src/overview_side.rs": 1,
+    "crates/gitterrace-web/src/overview_side/mod.rs": 1,
     "crates/gitterrace-web/src/routes/assets.rs": 2,
     "crates/gitterrace-web/src/routes/files.rs": 1,
     "crates/gitterrace-web/src/sitemap.rs": 3,
