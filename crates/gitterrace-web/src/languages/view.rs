@@ -63,12 +63,15 @@ pub(super) struct RangeCommit {
     pub(super) day: String,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub(super) struct RangeCard {
-    pub(super) title: &'static str,
+    pub(super) title: String,
+    /// A sentence on how the period maps to the commits, empty when none applies.
+    pub(super) note: &'static str,
+    /// Set when the period holds no commit.
+    pub(super) empty: Option<Empty>,
     pub(super) from: String,
     pub(super) to: String,
-    pub(super) presets: Seg,
     pub(super) count: String,
     pub(super) count_noun: &'static str,
     pub(super) added: String,
@@ -114,6 +117,7 @@ pub(super) struct Now {
 #[derive(Debug)]
 pub(super) struct Shown {
     pub(super) lead: String,
+    pub(super) period: Seg,
     pub(super) axis: Seg,
     pub(super) scale: Seg,
     pub(super) total: String,

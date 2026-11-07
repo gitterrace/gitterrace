@@ -12,7 +12,7 @@ use std::sync::Arc;
 use gitterrace_index::PathFilter;
 use gitterrace_index::feed::{FileRow, InsightsSource, PathId, Rank};
 
-use crate::languages::{COMMIT_LIST, TOP, View, shown};
+use crate::languages::{COMMIT_LIST, Held, TOP, View, shown};
 
 /// Commits per row batch: bounded, and large enough that a batch read stays sequential.
 const CHUNK: usize = 4096;
@@ -228,6 +228,21 @@ impl Skeleton {
 
     pub(crate) const fn len(&self) -> usize {
         self.n
+    }
+
+    /// The oldest chain position whose local day is `first_day` or later, if any. One walk
+    /// over commit rows, no file rows.
+    pub(crate) fn first_from_day(&self, src: &dyn InsightsSource, first_day: i64) -> Option<usize> {
+        let newest = src
+            .len()
+            .checked_sub(1)
+            .map(|i| Rank(u32::try_from(i).unwrap_or(u32::MAX)));
+        let days = walk(src, newest).map(|r| {
+            src.commit(r).map_or(i64::MIN, |c| {
+                gitterrace_index::feed::local_day_of(c.time, c.offset)
+            })
+        });
+        first_from(days, self.n, first_day)
     }
 
     /// Bytes held, for the bound the tests keep flat in history length.
@@ -475,6 +490,23 @@ fn point(src: &dyn InsightsSource, r: Rank, lines: Vec<i64>, added: u64, removed
     }
 }
 
+/// The lowest position whose day is `first_day` or later, from the local days of a chain of
+/// `n` commits listed newest first. A later commit with an older date does not end the
+/// stretch: the result is the first position in the period, whatever follows it.
+pub(super) fn first_from(
+    days: impl Iterator<Item = i64>,
+    n: usize,
+    first_day: i64,
+) -> Option<usize> {
+    let mut found = None;
+    for (k, d) in days.enumerate() {
+        if d >= first_day {
+            found = Some(n - 1 - k);
+        }
+    }
+    found
+}
+
 /// Every position the page reads for a range: the shown commits, the chain ends, the
 /// commit before the range and before the last ten, and the trend samples.
 fn wanted(n: usize, range: Option<(usize, usize)>) -> BTreeSet<usize> {
@@ -482,6 +514,10 @@ fn wanted(n: usize, range: Option<(usize, usize)>) -> BTreeSet<usize> {
         time: false,
         share: false,
         range,
+        picked: range.is_some(),
+        period: gitterrace_index::Period::All,
+        dflt: gitterrace_index::Period::All,
+        held: Held::Commits,
     };
     let mut w: BTreeSet<usize> = shown(n, view).into_iter().collect();
     if n == 0 {

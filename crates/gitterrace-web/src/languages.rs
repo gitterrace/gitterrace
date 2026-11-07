@@ -13,12 +13,13 @@ use std::sync::Arc;
 use askama::Template;
 use axum::extract::{Query, State};
 use axum::response::Html;
+use gitterrace_index::{Period, Scope, ScopeParams};
 use serde::Deserialize;
 
 use crate::{
     error::Result,
     fmt,
-    insights::cached_keyed,
+    insights::{cached_keyed, counted, insights},
     languages::render::{body, sample},
     routes::Shared,
     views::{self, Chrome, Tabs},
@@ -63,9 +64,18 @@ impl Subjects {
 #[derive(Debug, Default, Deserialize)]
 pub(crate) struct LocQuery {
     x: Option<String>,
+    period: Option<String>,
     scale: Option<String>,
     from: Option<usize>,
     to: Option<usize>,
+}
+
+/// Whether the view holds commits to show.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Held {
+    Commits,
+    /// The period holds no commit.
+    Nothing,
 }
 
 /// View state carried by every link on the page.
@@ -73,11 +83,19 @@ pub(crate) struct LocQuery {
 struct View {
     time: bool,
     share: bool,
+    /// The positions the card covers: a dragged range, else the period's stretch.
     range: Option<(usize, usize)>,
+    /// The range comes from `from`/`to` (a drag) and replaces the period.
+    picked: bool,
+    period: Period,
+    /// The period the page starts in, left out of links.
+    dflt: Period,
+    /// The period holds no commit.
+    held: Held,
 }
 
 impl View {
-    fn parse(q: &LocQuery, n: usize) -> Self {
+    fn parse(q: &LocQuery, n: usize, dflt: Period) -> Self {
         let range = match (q.from, q.to) {
             (None, None) => None,
             (f, t) => {
@@ -91,7 +109,30 @@ impl View {
             time: q.x.as_deref() == Some("time"),
             share: q.scale.as_deref() == Some("share"),
             range,
+            picked: range.is_some(),
+            period: q
+                .period
+                .as_deref()
+                .and_then(|p| p.parse().ok())
+                .unwrap_or(dflt),
+            dflt,
+            held: Held::Commits,
         }
+    }
+
+    /// Whether the period still has to be turned into a stretch of the chain.
+    const fn wants_stretch(self) -> bool {
+        !self.picked && self.period.days().is_some()
+    }
+
+    /// Sets the period's stretch: from `first`, the oldest position dated in the period, to
+    /// the newest commit of a chain of `n`.
+    const fn with_stretch(mut self, first: Option<usize>, n: usize) -> Self {
+        match first {
+            Some(a) => self.range = Some((a, n - 1)),
+            None => self.held = Held::Nothing,
+        }
+        self
     }
 
     fn href(self, f: impl FnOnce(&mut Self)) -> String {
@@ -104,9 +145,13 @@ impl View {
         if v.share {
             q.push("scale=share".to_owned());
         }
-        if let Some((a, b)) = v.range {
-            q.push(format!("from={a}"));
-            q.push(format!("to={b}"));
+        if v.picked {
+            if let Some((a, b)) = v.range {
+                q.push(format!("from={a}"));
+                q.push(format!("to={b}"));
+            }
+        } else if v.period != v.dflt {
+            q.push(format!("period={}", v.period.as_str()));
         }
         if q.is_empty() {
             fmt::href("/stats/languages")
@@ -133,7 +178,21 @@ pub(crate) async fn page(State(app): Shared, Query(q): Query<LocQuery>) -> Resul
         let head = a.repo.resolve(&crate::fmt::selected()).unwrap_or_default();
         let filter = path_filter(&a2, &head);
         let sk = a2.chain(&head, &**r, &filter);
-        let view = View::parse(&q, sk.len());
+        let dflt = a2.defaults().period.unwrap_or(Period::All);
+        let mut view = View::parse(&q, sk.len(), dflt);
+        if view.wants_stretch() && sk.len() > 0 {
+            let scope = Scope::from_params(
+                &ScopeParams::default(),
+                a.defaults().into_options(),
+                view.period,
+            )
+            .unwrap_or_else(|_| unreachable!("the default params are valid"));
+            let ins = insights(a, r, scope.options().clone());
+            let anchor = counted(&ins, &scope, r).context().anchor_day();
+            let days = view.period.days().unwrap_or(1);
+            let first = sk.first_from_day(&**r, anchor + 1 - days);
+            view = view.with_stretch(first, sk.len());
+        }
         let ch = sk.view(&**r, &filter, view);
         let at = shown(ch.len(), view);
         let ids: Vec<String> = at.iter().map(|i| ch.id(*i).to_owned()).collect();
@@ -165,8 +224,9 @@ pub(crate) fn path_filter(app: &crate::app::App, head: &str) -> gitterrace_index
 /// The memo key part of a query: every field the page reads, in a fixed order.
 fn memo_query(q: &LocQuery) -> String {
     format!(
-        "x={}&scale={}&from={:?}&to={:?}",
+        "x={}&period={}&scale={}&from={:?}&to={:?}",
         q.x.as_deref().unwrap_or_default(),
+        q.period.as_deref().unwrap_or_default(),
         q.scale.as_deref().unwrap_or_default(),
         q.from,
         q.to

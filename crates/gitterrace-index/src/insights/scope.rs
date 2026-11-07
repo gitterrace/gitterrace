@@ -25,6 +25,10 @@
 //!   so its order and headings agree, while its counts still use the author's day.
 //! - A period is the last 7, 30, 90 or 365 local days ending on the newest commit's local day.
 //!   A selection never moves that end. `from` and `to` are inclusive local days.
+//!   The Languages card is the one exception: it compares lines before and after a
+//!   contiguous stretch of the first-parent history, so its period runs from the first chain
+//!   position whose local day is in the period to the newest commit. A later commit with an
+//!   older author date is included, and a period with no commit shows an empty card.
 //! - `all` is every commit: one dated after the server's clock still counts, at most a day
 //!   ahead of the clock that indexed it, so the same history gives the same totals.
 //! - Code age and release cadence cover the whole history whatever the period. A file's age is

@@ -437,7 +437,7 @@ svg.loc .xh{display:none;stroke:var(--fg);stroke-width:1;stroke-dasharray:3 3;po
    number stays in the text colour. */
 .kpis b{display:block;font:var(--weight-semibold) var(--text-xl)/1.2 var(--mono);font-variant-numeric:tabular-nums;letter-spacing:-.02em;color:var(--fg)}
 .kpis span{color:var(--muted);font-size:var(--text-sm)}
-.card.pad+.card.pad,.filters+.card.pad{margin-top:var(--space-4)}
+.card.pad+.card.pad,.filters+.card.pad,.fbar+.card.pad{margin-top:var(--space-4)}
 .sharebar{display:flex;height:12px;border-radius:6px;overflow:hidden;margin:var(--space-2) 0 var(--space-4);background:var(--soft)}
 .sharebar b{display:block;height:100%}
 .dcol{width:30%;min-width:100px}

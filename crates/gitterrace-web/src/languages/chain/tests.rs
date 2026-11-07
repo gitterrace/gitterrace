@@ -4,7 +4,7 @@ use gitterrace_index::feed::{InsightsSource, MemorySource};
 use gitterrace_index::{CommitRecord, FileStat, Options, PathFilter};
 
 use super::{Fold, Skeleton, Tally, walk, wanted};
-use crate::languages::View;
+use crate::languages::{Held, View};
 
 /// A linear history of `n` commits over a handful of languages, with deletions, a lock file
 /// the filter skips and more languages than the page shows, so `Other` is folded.
@@ -119,6 +119,10 @@ fn views_match_the_full_chain() {
             time: false,
             share: false,
             range,
+            picked: range.is_some(),
+            period: gitterrace_index::Period::All,
+            dflt: gitterrace_index::Period::All,
+            held: Held::Commits,
         };
         let ch = sk.view(&src, &f, view);
         for i in wanted(n, range) {

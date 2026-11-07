@@ -1,11 +1,10 @@
 //! The chart, range card and language table as typed data for `languages_body.html`.
 
 #![expect(
-    clippy::many_single_char_names,
     clippy::too_many_lines,
     clippy::needless_range_loop,
-    reason = "geometry and colour math reads best with x, y, w, h; one linear sequence, splitting \
-        it hides the flow; the index is used for several parallel arrays"
+    reason = "one linear sequence, splitting it hides the flow; the index is used for several \
+        parallel arrays"
 )]
 
 use std::fmt::Write as _;
@@ -20,9 +19,11 @@ use crate::languages::view::{
     Area, Band, Body, DateLabel, Now, NowRow, RangeCard, RangeCommit, RangeRow, SharePart, Shown,
 };
 use crate::languages::{
-    BOTTOM, COMMIT_LIST, H, LEFT, RIGHT, SAMPLES, Subjects, TOP, TOP_PAD, View, W,
+    BOTTOM, COMMIT_LIST, H, Held, LEFT, RIGHT, SAMPLES, Subjects, TOP, TOP_PAD, View, W,
 };
 use crate::seg::{Choice, Seg};
+use gitterrace_index::Period;
+use gitterrace_types::StringEnum;
 
 fn signed(n: i64) -> String {
     if n >= 0 {
@@ -203,7 +204,10 @@ fn area_chart(ch: &Chain, view: View, subj: &Subjects) -> (Area, String) {
         names: ch.langs(),
         s: pts.iter().map(|i| subj.of(*i)).collect(),
         share: view.share,
-        view: view.href(|v| v.range = None),
+        view: view.href(|v| {
+            v.range = None;
+            v.picked = false;
+        }),
         x: xs.iter().map(|x| (x * 10.0).round() / 10.0).collect(),
     };
     // Strings and numbers only: serialization cannot fail.
@@ -215,6 +219,13 @@ fn area_chart(ch: &Chain, view: View, subj: &Subjects) -> (Area, String) {
 
 fn range_card(ch: &Chain, view: View, subj: &Subjects) -> RangeCard {
     let n = ch.len();
+    if view.held == Held::Nothing {
+        return RangeCard {
+            title: format!("Last {}", view.period.label().to_lowercase()),
+            empty: Some(Empty::new("No commits in this period.")),
+            ..RangeCard::default()
+        };
+    }
     let (from, to) = view.range.unwrap_or((0, n - 1));
     let base = ch.before(from);
     let end = &ch.lines(to);
@@ -231,26 +242,6 @@ fn range_card(ch: &Chain, view: View, subj: &Subjects) -> RangeCard {
         .max(1);
     let end_total: i64 = end.iter().sum::<i64>().max(1);
 
-    let preset = |label: &str, size: Option<usize>| {
-        let href = view.href(|v| {
-            v.range = size.map(|s| (n.saturating_sub(s), n - 1));
-        });
-        let on = match (size, view.range) {
-            (None, None) => true,
-            (Some(s), Some((a, b))) => b == n - 1 && a == n.saturating_sub(s),
-            _ => false,
-        };
-        Choice::new(label, href, on)
-    };
-    let presets = Seg::links(
-        "Range",
-        vec![
-            preset("Last 10", Some(10)),
-            preset("Last 25", Some(25)),
-            preset("Whole history", None),
-        ],
-    )
-    .no_caption();
     let rows = (0..k)
         .map(|i| {
             let d = deltas[i];
@@ -268,14 +259,21 @@ fn range_card(ch: &Chain, view: View, subj: &Subjects) -> RangeCard {
         .collect();
     let shown = count.min(COMMIT_LIST);
     RangeCard {
-        title: if view.range.is_some() {
-            "Selected range"
+        title: if view.picked {
+            "Selected range".to_owned()
+        } else if view.period.days().is_some() {
+            format!("Last {}", view.period.label().to_lowercase())
         } else {
-            "Whole history"
+            "Whole history".to_owned()
         },
+        note: if view.picked || view.period.days().is_none() {
+            ""
+        } else {
+            "From the first commit dated in the period to the newest."
+        },
+        empty: None,
         from: fmt::day(ch.time(from)),
         to: fmt::day(ch.time(to)),
-        presets,
         count: fmt::thousands(count),
         count_noun: fmt::noun(count, "commit", "commits"),
         added: fmt::thousands(added),
@@ -367,6 +365,7 @@ fn seg(label: &str, items: &[(&str, bool, String)]) -> Seg {
             .map(|(text, on, href)| Choice::new(*text, href.clone(), *on))
             .collect(),
     )
+    .no_caption()
 }
 
 pub(super) fn body(ch: &Chain, view: View, subj: &Subjects) -> Body {
@@ -376,6 +375,21 @@ pub(super) fn body(ch: &Chain, view: View, subj: &Subjects) -> Body {
             shown: None,
         };
     }
+    let period = Seg::links(
+        "Period",
+        <Period as StringEnum>::ALL
+            .iter()
+            .map(|p| {
+                let href = view.href(|v| {
+                    v.period = *p;
+                    v.picked = false;
+                    v.range = None;
+                });
+                Choice::new(p.label(), href, !view.picked && *p == view.period)
+            })
+            .collect(),
+    )
+    .no_caption();
     let last = ch.lines(ch.len() - 1);
     let total: i64 = last.iter().sum();
     let positive: i64 = last.iter().map(|v| (*v).max(0)).sum::<i64>().max(1);
@@ -398,6 +412,7 @@ pub(super) fn body(ch: &Chain, view: View, subj: &Subjects) -> Body {
         empty: None,
         shown: Some(Shown {
             lead,
+            period,
             axis: seg(
                 "X axis",
                 &[
