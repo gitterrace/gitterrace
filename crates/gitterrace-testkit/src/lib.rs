@@ -10,6 +10,7 @@ pub mod matrix;
 pub mod oracle;
 mod renames;
 pub mod synthetic;
+pub mod wait;
 mod web;
 
 use std::io::Write;
