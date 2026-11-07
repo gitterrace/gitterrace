@@ -43,6 +43,10 @@ const FILE_DIFF_BYTES: usize = 40_000;
 const TOTAL_DIFF_BYTES: usize = 250_000;
 /// Lines per `content-visibility` chunk (the stylesheet sizes a chunk as this many rows).
 pub(super) const CHUNK_LINES: usize = 100;
+/// The words a screen reader says before a changed line, since the line's colour says it to
+/// everyone else. Real text, hidden from sight and left out of a copied selection.
+const SIGN_ADDED: &str = "<span class=\"vh sign\">Added, </span>";
+const SIGN_REMOVED: &str = "<span class=\"vh sign\">Removed, </span>";
 
 /// The hunks of one file as line blocks. Also the body of the fragment a folded file loads.
 fn diff_body_html(r: &Render, f: &FileDiff) -> String {
@@ -79,10 +83,10 @@ fn diff_body_html(r: &Render, f: &FileDiff) -> String {
             if in_chunk == 0 {
                 out.push_str("<div class=\"ch\">");
             }
-            let cls = match l.kind {
-                LineKind::Added => "add",
-                LineKind::Removed => "del",
-                LineKind::Context => "ctx",
+            let (cls, sign) = match l.kind {
+                LineKind::Added => ("add", SIGN_ADDED),
+                LineKind::Removed => ("del", SIGN_REMOVED),
+                LineKind::Context => ("ctx", ""),
             };
             let hl = if l.kind == LineKind::Removed {
                 old_hl.as_mut()
@@ -92,7 +96,7 @@ fn diff_body_html(r: &Render, f: &FileDiff) -> String {
             let body = hl.map_or_else(|| esc_text(&l.text), |h| h.line(&l.text));
             let _ = write!(
                 out,
-                "<div class=\"{cls}\" data-o=\"{}\" data-n=\"{}\">{body}</div>",
+                "<div class=\"{cls}\" data-o=\"{}\" data-n=\"{}\">{sign}{body}</div>",
                 num(l.old_no),
                 num(l.new_no)
             );

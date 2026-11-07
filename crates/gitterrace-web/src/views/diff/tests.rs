@@ -142,3 +142,46 @@ fn the_working_tree_folds_too_and_loads_by_path() {
         "{html}"
     );
 }
+
+/// Each added and removed line says so in words before its text, plain and highlighted, and a
+/// context line says nothing. `gitterrace_testkit::a11y` checks the same on every page.
+#[test]
+fn every_changed_line_says_added_or_removed() {
+    let line = |kind, old_no, new_no| HunkLine {
+        kind,
+        old_no,
+        new_no,
+        text: "let x = 1;".into(),
+    };
+    let f = FileDiff {
+        additions: 1,
+        deletions: 1,
+        hunks: vec![Hunk {
+            header: "@@".into(),
+            lines: vec![
+                line(LineKind::Context, Some(1), Some(1)),
+                line(LineKind::Removed, Some(2), None),
+                line(LineKind::Added, None, Some(2)),
+            ],
+        }],
+        ..file("a.rs", 0)
+    };
+    for plain in [false, true] {
+        let mut r = crate::views::Render::fold(400);
+        if plain {
+            r.highlight_bytes = 0;
+        }
+        let html = diff_html(&r, "abc", None, std::slice::from_ref(&f));
+        let problems = gitterrace_testkit::a11y::problems(&format!("<h1>x</h1>{html}"));
+        assert!(problems.is_empty(), "{problems:?} in {html}");
+        assert!(
+            html.contains("\"><span class=\"vh sign\">Removed, </span>"),
+            "{html}"
+        );
+        assert!(
+            html.contains("\"><span class=\"vh sign\">Added, </span>"),
+            "{html}"
+        );
+        assert_eq!(html.matches("vh sign").count(), 2, "{html}");
+    }
+}

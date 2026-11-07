@@ -9,6 +9,29 @@ pub fn problems(body: &str) -> Vec<String> {
     let mut out = Vec::new();
     out.extend(top_heading(body));
     out.extend(tables(body));
+    out.extend(diff_lines(body));
+    out
+}
+
+/// Every changed line of a diff says in words whether it was added or removed: its colour and
+/// its line numbers say it only to a sighted reader. Commit, compare, worktree and folded
+/// diffs all come from one writer, so a line written another way is caught here.
+fn diff_lines(body: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    for (cls, word) in [("add", "Added, "), ("del", "Removed, ")] {
+        let open = format!("<div class=\"{cls}\"");
+        let bare = body
+            .match_indices(&open)
+            .filter(|(i, _)| {
+                let line = &body[*i..];
+                let start = line.find('>').map_or(line.len(), |e| e + 1);
+                !line[start..].starts_with(&format!("<span class=\"vh sign\">{word}</span>"))
+            })
+            .count();
+        if bare > 0 {
+            out.push(format!("{bare} diff lines ({cls}) do not say {word:?}"));
+        }
+    }
     out
 }
 
@@ -83,6 +106,29 @@ mod tests {
         let two = "<h1>Page</h1><div class=\"markdown-body\"><h1>Doc</h1></div>";
         assert!(problems(two)[0].contains("2 h1"));
         assert!(problems("<h1 class=\"vh\">Page</h1><hr><header></header>").is_empty());
+    }
+
+    #[test]
+    fn a_changed_diff_line_must_say_what_changed() {
+        let page = |line: &str| format!("<h1>x</h1><div class=\"diff\">{line}</div>");
+        let bare = page("<div class=\"add\" data-o=\"\" data-n=\"1\">a</div>");
+        assert!(
+            problems(&bare)[0].contains("Added"),
+            "{:?}",
+            problems(&bare)
+        );
+        let bare = page("<div class=\"del\" data-o=\"1\" data-n=\"\">a</div>");
+        assert!(
+            problems(&bare)[0].contains("Removed"),
+            "{:?}",
+            problems(&bare)
+        );
+        let said = page(
+            "<div class=\"add\" data-o=\"\" data-n=\"1\">\
+             <span class=\"vh sign\">Added, </span>a</div>\
+             <div class=\"ctx\" data-o=\"1\" data-n=\"2\">b</div>",
+        );
+        assert!(problems(&said).is_empty(), "{:?}", problems(&said));
     }
 
     #[test]

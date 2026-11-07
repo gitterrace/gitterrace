@@ -18,8 +18,9 @@ import { serve, sh } from './browser-lib.mjs';
 const RENAMES = 1960;
 const EDITS = 40;
 // Headers of 2,000 files cost about 9 elements each; the rest is the chrome and the files the
-// page opens in full. Every file and line in the DOM is several times this.
-const DOM_BOUND = 30000;
+// page opens in full, each changed line with its hidden "Added, "/"Removed, " span for screen
+// readers (about 1,800 here). Every file and line in the DOM is several times this.
+const DOM_BOUND = 33000;
 
 function makeHugeRepo() {
   const dir = mkdtempSync(join(tmpdir(), 'gt-hugediff-'));
