@@ -19,11 +19,6 @@
 /// the 99th percentile is 33, 32 and 11. The first-parent chain in column 0 is never stubbed.
 pub const FAR_ROWS: u32 = 200;
 
-/// Columns drawn before the rest share one bundle column. Not configurable, and the same at
-/// every width: the server cannot see the viewport, and 6 columns are 92 px, which fits a
-/// 360 px screen.
-pub const COLUMNS_SHOWN: u16 = 6;
-
 /// One parent of a row. `far` marks an edge the caller wants drawn as a stub: its parent lies
 /// more than [`FAR_ROWS`] below, or outside the commits laid out at all (a shallow boundary).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

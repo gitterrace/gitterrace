@@ -46,19 +46,6 @@ pub struct IdentId(pub u32);
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
 pub struct LabelId(pub u32);
 
-/// A segment's position in the manifest's live list.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
-pub struct SegId(pub u32);
-
-/// Orders commits across segments. Rank alone decides, time and oid make the key total and
-/// self-describing for tests.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct CanonicalKey {
-    pub rank: Rank,
-    pub time: i64,
-    pub oid: Oid,
-}
-
 /// Every failure of the store. `Unreadable` is mapped to a rebuild by the caller, never to an
 /// HTTP error.
 #[derive(Debug, thiserror::Error)]
@@ -116,21 +103,6 @@ pub fn fingerprint<'a>(oids: impl IntoIterator<Item = &'a Oid>) -> u64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn key_orders_by_rank_first() {
-        let a = CanonicalKey {
-            rank: Rank(1),
-            time: 99,
-            oid: [9; 20],
-        };
-        let b = CanonicalKey {
-            rank: Rank(2),
-            time: 0,
-            oid: [0; 20],
-        };
-        assert!(a < b);
-    }
 
     #[test]
     fn fingerprint_depends_on_order() {
