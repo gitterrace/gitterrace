@@ -10,7 +10,18 @@ pub fn problems(body: &str) -> Vec<String> {
     out.extend(top_heading(body));
     out.extend(tables(body));
     out.extend(diff_lines(body));
+    out.extend(blame_runs(body));
     out
+}
+
+/// Every run of a blame page says its age in words: the heat bar beside it says it only in
+/// colour. A run is the gutter cell that opens a commit's lines (`<div class="bl">`).
+fn blame_runs(body: &str) -> Option<String> {
+    let runs = body.matches("<div class=\"bl\">").count();
+    let said = body
+        .matches("<div class=\"bl\"><span class=\"vh\">Changed ")
+        .count();
+    (runs != said).then(|| format!("{} of {runs} blame runs do not say their age", runs - said))
 }
 
 /// Every changed line of a diff says in words whether it was added or removed: its colour and
@@ -106,6 +117,16 @@ mod tests {
         let two = "<h1>Page</h1><div class=\"markdown-body\"><h1>Doc</h1></div>";
         assert!(problems(two)[0].contains("2 h1"));
         assert!(problems("<h1 class=\"vh\">Page</h1><hr><header></header>").is_empty());
+    }
+
+    #[test]
+    fn a_blame_run_must_say_its_age() {
+        let run = |words: &str| {
+            format!("<h1>x</h1><td class=\"who h2\"><div class=\"bl\">{words}a</div></td>")
+        };
+        assert!(problems(&run(""))[0].contains("1 of 1 blame runs"));
+        let said = run("<span class=\"vh\">Changed 1 to 3 years ago. </span>");
+        assert!(problems(&said).is_empty(), "{:?}", problems(&said));
     }
 
     #[test]

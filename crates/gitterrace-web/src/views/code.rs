@@ -161,7 +161,7 @@ fn code_html_uncached(r: &Render, path: &str, text: &str, lit_lines: usize) -> (
     (out, cut)
 }
 
-/// How recent a line is, 0 (this month) to 4 (older than three years): the class of its heat bar.
+/// How recent a line is, 0 (this month) to 4 (older than six years): the class of its heat bar.
 const fn heat_bucket(time: i64, now: i64) -> u8 {
     const DAY: i64 = 86_400;
     match (now - time) / DAY {
@@ -172,6 +172,16 @@ const fn heat_bucket(time: i64, now: i64) -> u8 {
         _ => 4,
     }
 }
+
+/// What each heat bar's colour says, in words, for a screen reader: the bar is the only cue,
+/// and the time beside it may be a date. Indexed by [`heat_bucket`].
+const HEAT_WORDS: [&str; 5] = [
+    "Changed in the last month",
+    "Changed in the last year",
+    "Changed 1 to 3 years ago",
+    "Changed 3 to 6 years ago",
+    "Changed over 6 years ago",
+];
 
 pub(crate) fn blame_html(r: &Render, path: &str, lines: &[BlameLine], now: i64) -> String {
     let total: usize = lines.iter().map(|l| l.text.len()).sum();
@@ -204,8 +214,9 @@ pub(crate) fn blame_html(r: &Render, path: &str, lines: &[BlameLine], now: i64) 
         if first {
             let _ = write!(
                 out,
-                "<td class=\"who h{heat}\"><div class=\"bl\">{}<a \
-                class=\"who\" href=\"{}\">{}</a><span class=\"muted\">{}</span></div></td>",
+                "<td class=\"who h{heat}\"><div class=\"bl\"><span class=\"vh\">{}. </span>{}\
+                 <a class=\"who\" href=\"{}\">{}</a><span class=\"muted\">{}</span></div></td>",
+                HEAT_WORDS[usize::from(heat)],
                 sha_link(&l.commit),
                 esc(&author_href(&l.author)),
                 esc(&l.author),
@@ -239,5 +250,41 @@ mod tests {
             .map(|d| heat_bucket(ago(d), now))
             .collect();
         assert_eq!(got, [0, 1, 2, 3, 4]);
+    }
+
+    /// Each run of a blame says the age its heat bar shows, in words, once per run.
+    #[test]
+    fn each_blame_run_says_the_age_of_its_bar() {
+        let now = 10 * 365 * 86_400;
+        let line = |n: u32, commit: &str, days: i64| gitterrace_git::BlameLine {
+            line_no: n,
+            commit: commit.repeat(40),
+            author: "A".into(),
+            time: now - days * 86_400,
+            text: "x".into(),
+        };
+        let lines = [
+            line(1, "a", 3),
+            line(2, "a", 3),
+            line(3, "b", 800),
+            line(4, "c", 4000),
+        ];
+        let html = super::blame_html(&crate::views::Render::fold(400), "a.txt", &lines, now);
+        let said: Vec<&str> = html
+            .split("<div class=\"bl\"><span class=\"vh\">")
+            .skip(1)
+            .map(|s| s.split(". </span>").next().unwrap_or_default())
+            .collect();
+        assert_eq!(
+            said,
+            [
+                "Changed in the last month",
+                "Changed 1 to 3 years ago",
+                "Changed over 6 years ago"
+            ],
+            "{html}"
+        );
+        let problems = gitterrace_testkit::a11y::problems(&format!("<h1>x</h1>{html}"));
+        assert!(problems.is_empty(), "{problems:?}");
     }
 }
