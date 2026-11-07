@@ -54,16 +54,11 @@ pub fn rework_verdict(share: f64) -> &'static str {
 impl Insights<'_> {
     pub fn frequency(&self, period: Period) -> (BucketUnit, Vec<Frequency>) {
         self.in_period(period, |c| c.frequency())
-            .unwrap_or((BucketUnit::Day, Vec::new()))
     }
 
     /// Rolling rework read at the end of every bucket of `period`, see [`Counted::rework`].
     pub fn rework(&self, period: Period) -> Rework {
-        self.in_period(period, |c| c.rework()).unwrap_or(Rework {
-            window: 10,
-            unit: BucketUnit::Day,
-            points: Vec::new(),
-        })
+        self.in_period(period, |c| c.rework())
     }
 }
 

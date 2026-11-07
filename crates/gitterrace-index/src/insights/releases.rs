@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use gitterrace_git::{RefInfo, RefKind};
 
-use crate::feed::{CommitRange, FixedClock};
+use crate::feed::CommitRange;
 use crate::insights::{CountContext, Counted, Insights};
 
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
@@ -27,7 +27,7 @@ pub struct Cadence {
     pub days_since_last: Option<i64>,
 }
 
-/// `(name, commit id)` of every tag, as [`Insights::cadence`] takes them.
+/// `(name, commit id)` of every tag, as [`Insights::cadence_in`] takes them.
 pub fn release_tags(refs: &[RefInfo]) -> Vec<(String, String)> {
     refs.iter()
         .filter(|r| r.kind == RefKind::Tag)
@@ -36,15 +36,9 @@ pub fn release_tags(refs: &[RefInfo]) -> Vec<(String, String)> {
 }
 
 impl Insights<'_> {
-    /// Release rhythm from tags over the whole history under this history's options. Tags
-    /// whose commit is not in the records are dropped.
-    pub fn cadence(&self, tags: &[(String, String)]) -> Cadence {
-        let cx = CountContext::new(self.source(), &FixedClock(self.now));
-        self.cadence_with(tags, &cx, |c| self.counted_row(c))
-    }
-
-    /// [`Insights::cadence`] counting the commits between releases as `c` counts them. The
-    /// patterns page passes an all-time `c`: releases are a whole-history view.
+    /// Release rhythm from tags, counting the commits between releases as `c` counts them.
+    /// Tags whose commit is not in the records are dropped. The patterns page passes an
+    /// all-time `c`: releases are a whole-history view.
     pub fn cadence_in(&self, tags: &[(String, String)], c: &Counted<'_>) -> Cadence {
         let kept: std::collections::HashSet<u32> = c.stream().map(|r| r.rank.0).collect();
         self.cadence_with(tags, c.context(), |r| kept.contains(&r.rank.0))
@@ -125,7 +119,7 @@ mod tests {
             ("v1".to_owned(), "b".to_owned()),
             ("ghost".to_owned(), "zz".to_owned()),
         ];
-        let c = ins.cadence(&tags);
+        let c = ins.in_period(crate::Period::All, |c| ins.cadence_in(&tags, c));
         assert_eq!(c.releases.len(), 2);
         assert_eq!(c.releases[0].name, "v1");
         assert_eq!(c.releases[0].commits_since, 2);
@@ -162,7 +156,7 @@ mod tests {
                 .collect::<Vec<_>>()
         };
         assert_eq!(
-            since(&ins.cadence(&tags)),
+            since(&ins.in_period(Period::All, |c| ins.cadence_in(&tags, c))),
             [1, 2],
             "b and c, never the merge or the bot"
         );

@@ -6,8 +6,10 @@
 use std::time::{Duration, Instant};
 
 use gitterrace_git::Repo;
+use gitterrace_index::feed::FixedClock;
 use gitterrace_index::{
-    Index, Insights, Label, LineCache, MAX_BUCKETS, Options, Period, TimeAxis, head_files,
+    CountContext, Index, Insights, Label, LineCache, MAX_BUCKETS, Options, Period, Scope,
+    ScopeParams, TimeAxis, head_files,
 };
 use gitterrace_testkit::{Adversarial, git_at};
 
@@ -59,7 +61,12 @@ fn every_insight(repo: &Repo, ins: &Insights<'_>) {
     }
     timed("age", || ins.code_age(&files));
     timed("history", || ins.file_history("a.txt"));
-    timed("cadence", || ins.cadence(&[]));
+    timed("cadence", || {
+        let s = Scope::from_params(&ScopeParams::default(), Options::default(), Period::All)
+            .expect("scope");
+        let cx = CountContext::new(ins.source(), &FixedClock(i64::MAX));
+        ins.cadence_in(&[], &ins.counted(&s, cx))
+    });
 }
 
 #[test]

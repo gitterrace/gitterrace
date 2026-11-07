@@ -136,6 +136,12 @@ impl<'a> Counted<'a> {
         self.scope.admits_days(self.ins, &self.days, c)
     }
 
+    /// [`Counted::contains`] without the path selection, for callers that pick the files
+    /// themselves: the per-file reports keep only the rows of the head files they show.
+    pub(crate) fn contains_columns(&self, c: &CommitRow) -> bool {
+        self.scope.admits_in(self.ins, &self.days, c)
+    }
+
     /// The counted commits, oldest rank first.
     pub fn stream(&self) -> impl Iterator<Item = CommitRow> + '_ {
         self.items(false).map(|i| i.commit)

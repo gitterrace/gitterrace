@@ -341,14 +341,10 @@ fn ownership_from_the_aggregate_equals_the_touches() {
         };
         let ins = Insights::new(&recs, opts, None);
         let shown: Vec<&HeadFile> = hf.iter().collect();
-        let fast = ins.owner_lines(&shown, &(i64::MIN..=i64::MAX), |_| true, true);
+        let fast = ins.in_period(Period::All, |c| ins.owner_lines(&shown, c, true));
         let names: Vec<&str> = shown.iter().map(|f| &*f.path).collect();
         let slow: Vec<std::collections::BTreeMap<usize, u64>> = ins
-            .touches_in(
-                &names,
-                &(i64::MIN..=i64::MAX),
-                &|_: &crate::feed::CommitRow| true,
-            )
+            .in_period(Period::All, |c| ins.touches_in(&names, c))
             .into_iter()
             .map(|t| {
                 let mut m = std::collections::BTreeMap::new();
@@ -376,14 +372,10 @@ fn a_reused_name_takes_the_touches_not_the_aggregate() {
     let hf = head(&[("a.rs", 3), ("b.rs", 10)]);
     let ins = Insights::new(&recs, Options::default(), None);
     let shown: Vec<&HeadFile> = hf.iter().collect();
-    let fast = ins.owner_lines(&shown, &(i64::MIN..=i64::MAX), |_| true, true);
+    let fast = ins.in_period(Period::All, |c| ins.owner_lines(&shown, c, true));
     let names: Vec<&str> = shown.iter().map(|f| &*f.path).collect();
     let slow: Vec<std::collections::BTreeMap<usize, u64>> = ins
-        .touches_in(
-            &names,
-            &(i64::MIN..=i64::MAX),
-            &|_: &crate::feed::CommitRow| true,
-        )
+        .in_period(Period::All, |c| ins.touches_in(&names, c))
         .into_iter()
         .map(|t| {
             let mut m = std::collections::BTreeMap::new();

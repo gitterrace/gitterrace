@@ -1,13 +1,10 @@
 mod reports;
 
 use std::collections::HashSet;
-use std::ops::RangeInclusive;
 
-use crate::feed::{
-    CommitRange, CommitRow, InsightsSource, PathId, Posting, Rank, RenameEdge, local_day_of,
-};
+use crate::feed::{CommitRange, CommitRow, InsightsSource, PathId, Posting, Rank, RenameEdge};
 use crate::insights::fasthash::FastMap;
-use crate::insights::{Insights, Period};
+use crate::insights::{Counted, Insights};
 
 /// Most files in one commit that still say something about coupling; bigger commits are
 /// sweeps (formatting, renames, vendoring).
@@ -345,28 +342,14 @@ impl Insights<'_> {
             .unwrap_or_default()
     }
 
-    /// Touches of each head path by counted commits whose local day lies in `days` and that
-    /// `chips` keeps, newest first. The local day is the one rule [`crate::Scope::admits`]
-    /// uses: a commit at the edge of a period counts on the day its author saw.
+    /// Touches of each head path by the commits `c` counts, newest first. The path selection
+    /// is the caller's: it picks the head files, and a touch is a row of one of them.
     pub(super) fn touches_in(
         &self,
         paths: &[&str],
-        days: &RangeInclusive<i64>,
-        chips: &impl Fn(&CommitRow) -> bool,
+        c: &Counted<'_>,
     ) -> Vec<Vec<(TouchRaw, CommitRow)>> {
-        self.touches_many(paths, |c| {
-            days.contains(&local_day_of(c.time, c.offset)) && self.counted_row(c) && chips(c)
-        })
-    }
-
-    /// The local days `period` covers, ending on this history's newest local day: the days
-    /// [`crate::CountContext::days`] gives the same period over the same history.
-    pub(super) fn period_days(&self, period: Period) -> RangeInclusive<i64> {
-        if period.days().is_none() {
-            return i64::MIN..=i64::MAX;
-        }
-        self.in_period(period, |c| c.days().clone())
-            .unwrap_or(RangeInclusive::new(1, 0))
+        self.touches_many(paths, |r| c.contains_columns(r))
     }
 
     /// (rank, row) of every follow touch of `path`, newest first: the old follow table's

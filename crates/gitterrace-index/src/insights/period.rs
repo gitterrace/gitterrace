@@ -1,7 +1,6 @@
-use crate::feed::SystemClock;
 use crate::insights::{
-    BucketUnit, CountContext, Counted, Insights, OptionParams, Scope, ScopeParams, Series, Totals,
-    When, format_date,
+    BucketUnit, Counted, Insights, OptionParams, Scope, ScopeParams, Series, Totals, When,
+    format_date,
 };
 
 mod people;
@@ -125,7 +124,7 @@ pub struct ContributorReport {
 /// A scope of `period` (or, with `days`, of those local days whatever the period) over the
 /// same options and selection as `base`. The "before" column of a day range and the old entry
 /// points build their scope here.
-fn scope_with(base: &Scope, period: Period, days: Option<(i64, i64)>) -> Scope {
+pub(crate) fn scope_with(base: &Scope, period: Period, days: Option<(i64, i64)>) -> Scope {
     let p = ScopeParams {
         period: Some(
             if days.is_some() { Period::All } else { period }
@@ -140,28 +139,16 @@ fn scope_with(base: &Scope, period: Period, days: Option<(i64, i64)>) -> Scope {
     Scope::from_params(&p, base.options().clone(), period).unwrap_or_else(|_| base.clone())
 }
 
+#[expect(
+    clippy::redundant_closure_for_method_calls,
+    reason = "a method path binds one Counted lifetime, in_scope needs a closure over any"
+)]
 impl Insights<'_> {
-    /// A scope of `period` (and `days`) over this history and its options, no selection.
-    fn plain_scope(&self, period: Period, days: Option<(i64, i64)>) -> Scope {
-        let base = Scope::from_params(&ScopeParams::default(), self.opts.clone(), Period::All)
-            .unwrap_or_else(|_| unreachable!("an empty query is always a valid scope"));
-        scope_with(&base, period, days)
-    }
-
-    /// The context over this history read from the system clock.
-    fn own_context(&self) -> CountContext {
-        CountContext::new(self.source(), &SystemClock)
-    }
-
     /// Whether any counted commit falls in the period. Stops at the first one. The
     /// period tests check it against the summed counts.
     #[cfg(test)]
     pub(crate) fn has_commits(&self, period: Period) -> bool {
-        let s = self.plain_scope(period, None);
-        self.counted(&s, self.own_context())
-            .stream()
-            .next()
-            .is_some()
+        self.in_period(period, |c| c.stream().next().is_some())
     }
 
     pub fn period_summary(&self, period: Period) -> PeriodSummary {
@@ -171,8 +158,7 @@ impl Insights<'_> {
     /// [`Insights::period_summary`] limited to the local days `days` (inclusive) when given:
     /// those days against the same number of days right before them.
     pub fn period_summary_in(&self, period: Period, days: Option<(i64, i64)>) -> PeriodSummary {
-        let s = self.plain_scope(period, days);
-        self.counted(&s, self.own_context()).summary_as(period)
+        self.in_scope(&self.period_scope(period, days), |c| c.summary_as(period))
     }
 
     pub fn rhythm(&self, period: Period) -> Rhythm {
@@ -183,8 +169,7 @@ impl Insights<'_> {
     /// epoch): the series, weekday, hour and punch card counts all cover only that range,
     /// and the series buckets span just the range.
     pub fn rhythm_in(&self, period: Period, days: Option<(i64, i64)>) -> Rhythm {
-        let s = self.plain_scope(period, days);
-        self.counted(&s, self.own_context()).rhythm()
+        self.in_scope(&self.period_scope(period, days), |c| c.rhythm())
     }
 
     pub fn contributors(&self, period: Period) -> ContributorReport {
@@ -194,8 +179,7 @@ impl Insights<'_> {
     /// Contributors ordered by `metric`. The series carries that metric per bucket (net is
     /// floored at zero), the other fields are the same.
     pub fn contributors_by(&self, period: Period, metric: Metric) -> ContributorReport {
-        let s = self.plain_scope(period, None);
-        self.counted(&s, self.own_context()).contributors(metric)
+        self.in_period(period, |c| c.contributors(metric))
     }
 }
 

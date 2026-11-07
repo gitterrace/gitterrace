@@ -62,46 +62,51 @@ impl Label {
     reason = "a method path binds one Counted lifetime, in_period needs a closure over any"
 )]
 impl Insights<'_> {
-    /// `f` over the commits `period` counts in this whole history, under these options, with
-    /// the context anchored on this history: what the period-keyed page functions count.
-    /// `None` only if the scope were refused, which empty parameters never are.
-    pub(crate) fn in_period<T>(
-        &self,
-        period: Period,
-        f: impl FnOnce(&Counted<'_>) -> T,
-    ) -> Option<T> {
-        let s = Scope::from_params(&ScopeParams::default(), self.opts.clone(), period).ok()?;
+    /// `f` over the commits `period` counts in this whole history, under these options: what
+    /// every period-keyed function counts. The context reads the clock this history was
+    /// opened with, so two period-keyed answers of one `Insights` share one "now".
+    pub(crate) fn in_period<T>(&self, period: Period, f: impl FnOnce(&Counted<'_>) -> T) -> T {
+        self.in_scope(&self.period_scope(period, None), f)
+    }
+
+    /// `f` over the commits `s` counts, with the context of [`Insights::in_period`].
+    pub(crate) fn in_scope<T>(&self, s: &Scope, f: impl FnOnce(&Counted<'_>) -> T) -> T {
         let cx = CountContext::new(self.source(), &FixedClock(self.now));
-        Some(f(&self.counted(&s, cx)))
+        f(&self.counted(s, cx))
+    }
+
+    /// A scope of `period` (and the local `days`, both inclusive) over this history and its
+    /// options, with no selection.
+    pub(crate) fn period_scope(&self, period: Period, days: Option<(i64, i64)>) -> Scope {
+        let base = Scope::from_params(&ScopeParams::default(), self.opts.clone(), Period::All)
+            .unwrap_or_else(|_| unreachable!("an empty query is always a valid scope"));
+        crate::insights::period::scope_with(&base, period, days)
     }
 
     /// Columns of the counted commits of the period, oldest first.
     pub fn counted_rows(&self, period: Period) -> impl Iterator<Item = CommitRow> {
         self.in_period(period, |c| c.stream().collect::<Vec<_>>())
-            .unwrap_or_default()
             .into_iter()
     }
 
     /// Every counted file with its churn, most commits first, then path.
     pub fn file_churn(&self, period: Period) -> Vec<FileChurn> {
-        self.in_period(period, |c| c.per_file()).unwrap_or_default()
+        self.in_period(period, |c| c.per_file())
     }
 
     /// Churn per containing directory, most commits first, then path.
     pub fn dir_churn(&self, period: Period) -> Vec<DirChurn> {
-        self.in_period(period, |c| c.per_dir()).unwrap_or_default()
+        self.in_period(period, |c| c.per_dir())
     }
 
     /// Commits per type or scope, most first.
     pub fn label_breakdown(&self, label: Label, period: Period) -> Vec<LabelCount> {
         self.in_period(period, |c| c.per_label(label).0)
-            .unwrap_or_default()
     }
 
     /// Type or scope counts per bucket of the period, empty buckets included.
     pub fn label_over_time(&self, label: Label, period: Period) -> Vec<LabelBucket> {
         self.in_period(period, |c| c.per_label(label).1)
-            .unwrap_or_default()
     }
 }
 

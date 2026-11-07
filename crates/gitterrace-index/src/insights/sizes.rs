@@ -21,7 +21,7 @@ impl Insights<'_> {
 
     /// Commits of `period` by size (added plus removed lines over counted files).
     pub fn commit_sizes_in(&self, period: Period) -> Vec<SizeBucket> {
-        self.in_period(period, |c| c.sizes()).unwrap_or_default()
+        self.in_period(period, |c| c.sizes())
     }
 }
 
