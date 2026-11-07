@@ -81,11 +81,6 @@ const DOCS: &[(&str, Kind, &str)] = &[
         "What is protected, at which door, and the test that holds each door shut",
     ),
     (
-        "docs/design/streaming-insights.md",
-        Kind::Explain,
-        "The insights store on disk and how pages read it in some MB",
-    ),
-    (
         "docs/configuration.md",
         Kind::Reference,
         "Every `config.toml` key, its default and the naming rule",

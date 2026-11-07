@@ -8,7 +8,7 @@ name = "gitterrace"
 prose = ["README.md", "AGENTS.md", "docs/**.md", "bench/**.md"]
 code = ["*.rs", "*.py", "*.mjs", "*.js", "*.sh", "*.yml", "*.yaml", "*.toml"]
 make = ["Makefile"]
-design = ["docs/design/**.md"]
+design = ["crates/gitterrace-index/src/seg/store.md"]
 golden = ["*/golden/*"]
 # Vendored code and the synced copy are not ours to reword.
 exclude = ["shared/*", "target/*", "*/static/vendor/*", ".wt/*"]

@@ -94,8 +94,8 @@ repository.
   lints in `shared/schwarzwald/lint`, with gitterrace's values in
   `config/schwarzwald/lint.toml` and the refused words in
   `shared/schwarzwald/rules/deny.toml`. Each runs on its red and green case in
-  `make lint`. `docs/design/` holds product design only: no work breakdown,
-  owner or estimate section.
+  `make lint`. Design docs (the `design` scope there) hold product design
+  only: no work breakdown, owner or estimate section.
 - `test-names-describe-behavior` (ast-grep): a test is named by its behavior,
   not a label.
 - `scripts/hooks/commit-msg`: execs the shared hook, the subject form plus the

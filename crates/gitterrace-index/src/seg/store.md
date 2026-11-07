@@ -1,9 +1,9 @@
 # The insights store
 
 How the insights cache is laid out on disk and read, so the server stays at some
-MB however long the history.
-[Architecture](../architecture.md#how-the-index-is-stored) has the short
-version.
+MB however long the history. It sits beside the code it describes (`seg/`).
+[Architecture](../../../../docs/architecture.md#how-the-index-is-stored) has
+the short version.
 
 ## Problem
 
@@ -65,7 +65,8 @@ One directory `.git/gitterrace/`, files listed in `CACHE_FILES`. Every file
 except `MANIFEST`, `VERSION` and `lock` is immutable: written under a temp name,
 fsynced, never opened for writing again.
 
-- `VERSION`: `FORMAT_VERSION`, `5` (segment containers carry version `6`). Read
+- `VERSION`: `FORMAT_VERSION` in `store.rs`, equal to the container version
+  `VERSION` in `seg/format.rs`, so the numbers below say "the version". Read
   first so a newer build's cache is recognized without parsing anything else.
 - `MANIFEST`: the only entry point. It names every live file with its length and
   CRC32, the generation, the canonical-order fingerprint (section 4), and a
@@ -142,7 +143,7 @@ Container file:
 
 | Part   | Bytes                      | Fields                                                                              |
 | ------ | -------------------------- | ----------------------------------------------------------------------------------- |
-| Header | 16                         | magic `GTS1`, version u32 (`6`), kind u32 (1 segment, 2 strings, 3 order), zero u32 |
+| Header | 16                         | magic `GTS1`, version u32, kind u32 (1 segment, 2 strings, 3 order), zero u32 |
 | Blocks | each at most 1 MiB         | payload only, back to back from offset 16                                           |
 | TOC    | 24 per entry, at most 4096 | section u16, zero u16, items u32, offset u64, len u32, crc u32 (of the payload)     |
 | Footer | 64, the last bytes         | see below                                                                           |
@@ -173,7 +174,7 @@ order, 33 rank (per segment, u32 per local ordinal: its position in the order
 file, read by pread at index, never held as a map), 34 rows, 35 row index, 36
 oid index. A new section is a new id, a changed encoding is a `VERSION` bump.
 
-Section 1 (commit columns, container version 6): one fixed 80 B item per local
+Section 1 (commit columns): one fixed 80 B item per local
 ordinal, in ordinal order, so a pass over commits reads it alone and never the
 file rows of 34. Item: author id u32, time i64 and offset i32 exactly as in 34
 (raw, clamped only at read), flags u8 (bit 0 merge, other bits zero), zero u8,
@@ -355,7 +356,7 @@ Targets, as numbers:
 - **Latency**: every page under the 300 ms warm goal. Aggregate pages read a few
   MB. The pages that stream rows (coupling, filtered views, chips) cost more:
   the targets, and the file pages that miss theirs, are in
-  [benchmarks](../benchmarks.md#budgets).
+  [benchmarks](../../../../docs/benchmarks.md#budgets).
 
 ## 4. Build path
 

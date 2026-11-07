@@ -1,5 +1,7 @@
 //! The segment store: immutable container files named by one manifest.
+//!
 //! Shared ids live here so the feed trait and the aggregates agree on them.
+//! The format, memory model and build path: `store.md` beside this file.
 
 pub(crate) mod agg;
 pub(crate) mod bounds;

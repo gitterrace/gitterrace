@@ -276,7 +276,7 @@ mod tests {
 
     #[test]
     fn cache_budget_default_matches_the_memory_design() {
-        let design = include_str!("../../../docs/design/streaming-insights.md");
+        let design = include_str!("../../gitterrace-index/src/seg/store.md");
         assert!(design.contains("(default 32 MB"), "design moved its budget");
         assert_eq!(Config::default().resources.cache_mb, 32);
     }

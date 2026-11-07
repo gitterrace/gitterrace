@@ -25,7 +25,6 @@ repository, then read [why](why.md) it exists. Contributors start at
 | --- | --- |
 | [architecture](architecture.md) | Crates, the decisions behind them, the cache, routes, highlighted languages |
 | [security](security.md) | What is protected, at which door, and the test that holds each door shut |
-| [streaming-insights](design/streaming-insights.md) | The insights store on disk and how pages read it in some MB |
 
 ## Look something up
 
