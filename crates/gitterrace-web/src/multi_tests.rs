@@ -234,3 +234,28 @@ async fn the_repositories_home_says_what_changed_today() {
         "beta has uncommitted work, alpha is clean"
     );
 }
+
+/// `/?q=` narrows the list on the server, so the filter works without a script and a link
+/// carries it: the other repository stays out of the page's rows, the count says so, and a
+/// filter nothing matches says that quietly.
+#[tokio::test]
+async fn the_repositories_home_filters_by_name_on_the_server() {
+    let dir = tempfile::tempdir().expect("tmp");
+    let a = fixture("alpha", dir.path());
+    let b = fixture("beta", dir.path());
+    let router = crate::multi_router(vec![a, b]).expect("router");
+    let shown = |body: &str, name: &str| body.contains(&format!("data-name=\"{name}\">"));
+    let (_, all) = fetch(&router, "/", "localhost").await;
+    assert!(shown(&all, "alpha") && shown(&all, "beta"), "{all}");
+    assert!(all.contains(">2 of 2<"), "{all}");
+    let (s, one) = fetch(&router, "/?q=%20ALP", "localhost").await;
+    assert_eq!(s, 200);
+    assert!(shown(&one, "alpha") && !shown(&one, "beta"), "{one}");
+    assert!(
+        one.contains(">1 of 2<") && one.contains("value=\" ALP\""),
+        "{one}"
+    );
+    let (_, zero) = fetch(&router, "/?q=zzz", "localhost").await;
+    assert!(zero.contains(">0 of 2<"), "{zero}");
+    assert!(!zero.contains("repos-none\" hidden"), "{zero}");
+}

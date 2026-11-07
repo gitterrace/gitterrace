@@ -21,11 +21,22 @@
 <main class="wrap" id="main" tabindex="-1">
 <div class="card repolist">
 {{ head }}
+<form class="repofilter" method="get" action="/"
+ role="search" data-repofilter>
+<label class="vh" for="repoq">Filter repositories by name</label>
+<input id="repoq" type="search" name="q" value="{{ q }}"
+ placeholder="Filter repositories" autocomplete="off" spellcheck="false">
+<button type="submit" class="repofilter-go">Filter</button>
+<span class="muted repocount" id="repocount" role="status"
+ aria-live="polite">{{ count }}</span></form>
 <ul class="repos">
-{% for r in rows %}<li class="reporow"><div class="rtop"><a class="rname" href="{{ r.href }}">{{ r.name }}</a>{% if let Some(d) = r.dirty %}<a class="wtchip" href="{{ r.href }}worktree" data-repo="{{ r.name }}" data-tip="Uncommitted changes in the working tree"{% if !d %} hidden{% endif %}><span class="dot"></span><span class="label">Uncommitted</span></a>{% endif %}<span class="rmeta"><span class="muted">{{ r.when }}</span><span class="sparkcell" data-tip="{{ r.tip }}"><svg class="spark s1" viewBox="0 0 90 20" width="90" height="20" aria-hidden="true"><polyline points="{{ r.spark }}"/></svg><span class="muted">{{ r.total }}</span></span></span></div>
+{% for r in rows %}<li class="reporow" data-name="{{ r.name }}"
+{%- if r.hidden %} hidden{% endif %}><div class="rtop"><a class="rname" href="{{ r.href }}">{{ r.name }}</a>{% if let Some(d) = r.dirty %}<a class="wtchip" href="{{ r.href }}worktree" data-repo="{{ r.name }}" data-tip="Uncommitted changes in the working tree"{% if !d %} hidden{% endif %}><span class="dot"></span><span class="label">Uncommitted</span></a>{% endif %}<span class="rmeta"><span class="muted">{{ r.when }}</span><span class="sparkcell" data-tip="{{ r.tip }}"><svg class="spark s1" viewBox="0 0 90 20" width="90" height="20" aria-hidden="true"><polyline points="{{ r.spark }}"/></svg><span class="muted">{{ r.total }}</span></span></span></div>
 <a class="today" href="{{ r.commit_href }}" data-tip="{{ r.today }}">{{ r.today }}</a></li>
-{% endfor %}</ul></div>
+{% endfor %}</ul>
+<p class="muted repos-none"{% if !none %} hidden{% endif %}>No repository matches</p></div>
 </main>
+<script src="/static/outline.js" defer></script>
 <script src="/static/home.js" defer></script>
 </body>
 </html>

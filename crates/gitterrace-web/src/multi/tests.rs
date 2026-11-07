@@ -353,7 +353,10 @@ fn the_home_page_over_many_repositories_finds_every_dirty_tree() {
     let rt = tokio::runtime::Runtime::new().expect("rt");
     for _ in 0..2 {
         let r = rt
-            .block_on(super::home::index(axum::extract::State(table.clone())))
+            .block_on(super::home::index(
+                axum::extract::State(table.clone()),
+                axum::extract::Query(super::home::HomeQuery::default()),
+            ))
             .expect("page");
         assert_eq!(r.status(), 200);
     }

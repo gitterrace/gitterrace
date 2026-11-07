@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 use askama::Template;
 use axum::{
-    extract::State,
+    extract::{Query, State},
     http::StatusCode,
     response::{Html, IntoResponse, Response},
 };
@@ -24,10 +24,30 @@ struct IndexPage {
     rows: Vec<IndexRow>,
     /// The card's header: "Repositories" and "2 repositories, 14 commits today".
     head: crate::dochead::DocHead,
+    /// The filter box's text, as typed.
+    q: String,
+    /// "12 of 101": the rows that match and all of them.
+    count: String,
+    /// Whether no row matches, so the page says so.
+    none: bool,
+}
+
+/// `/?q=`: the filter a no-script reader submits and a shared link carries.
+#[derive(serde::Deserialize, Default)]
+pub(super) struct HomeQuery {
+    q: Option<String>,
+}
+
+/// Whether `name` matches the filter text, ignoring case and surrounding blanks.
+fn matches(name: &str, q: &str) -> bool {
+    let q = q.trim().to_lowercase();
+    q.is_empty() || name.to_lowercase().contains(&q)
 }
 
 struct IndexRow {
     name: String,
+    /// Left out of the list by the filter: a hidden row keeps the script's narrowing whole.
+    hidden: bool,
     href: String,
     when: crate::when::When,
     commit_href: String,
@@ -105,11 +125,15 @@ fn in_order<I: Sync, T: Send>(items: &[I], f: impl Fn(&I) -> T + Sync) -> Vec<T>
 
 /// `/`: the one repository while there is one (a 302, so the answer changes once another
 /// joins), else the index of all.
-pub(super) async fn index(State(table): State<Arc<Table>>) -> crate::error::Result<Response> {
+pub(super) async fn index(
+    State(table): State<Arc<Table>>,
+    Query(query): Query<HomeQuery>,
+) -> crate::error::Result<Response> {
     if let [one] = table.snapshot().as_slice() {
         let to = format!("/r/{}/", one.name);
         return Ok((StatusCode::FOUND, [(axum::http::header::LOCATION, to)]).into_response());
     }
+    let q = query.q.unwrap_or_default();
     let html = tokio::task::spawn_blocking(move || {
         let now = fmt::now();
         let show_tree = shows_tree(&table);
@@ -128,6 +152,7 @@ pub(super) async fn index(State(table): State<Arc<Table>>) -> crate::error::Resu
                 let total: u32 = counts.iter().sum();
                 IndexRow {
                     name: s.name.clone(),
+                    hidden: !matches(&s.name, &q),
                     when: c.map_or_else(crate::when::When::none, |c| fmt::ago(c.author.time, now)),
                     commit_href: c.map_or_else(
                         || href.clone(),
@@ -160,7 +185,11 @@ pub(super) async fn index(State(table): State<Arc<Table>>) -> crate::error::Resu
                 "commits"
             )
         );
+        let shown = rows.iter().filter(|r| !r.hidden).count();
         IndexPage {
+            count: format!("{shown} of {}", rows.len()),
+            none: shown == 0,
+            q,
             rows,
             head: crate::dochead::DocHead {
                 title: "Repositories".to_owned(),
