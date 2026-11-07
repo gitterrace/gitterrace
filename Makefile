@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: setup harness-links counting-parity app-icon build install fmt clippy lint test doc theme actions docs-gen docs-check names lines check site-render site-shots help bench bench-report bench-guard memory-check browser-check site deploy shipped domains send-vectors preview gc gc-guard changelog
+.PHONY: setup harness-links counting-parity app-icon build install fmt clippy lint test doc theme actions docs-gen docs-check names lines check site-render site-shots help bench bench-report bench-guard memory-check browser-check site deploy shipped domains send-vectors preview gc gc-guard changelog keep
 
 ## setup: Keep desktop search indexers out of build, bench and agent dirs (run once per machine)
 setup:
@@ -84,6 +84,11 @@ lines:
 	python3 scripts/status-words-check.py
 	python3 scripts/stubs-check.py --self-test && python3 scripts/stubs-check.py
 	python3 scripts/types-check.py --self-test && python3 scripts/types-check.py
+	python3 scripts/keep-report.py --self-test
+
+#: keep: Every item with its prod and test callers, as TSV in target/keep-inventory.tsv
+keep:
+	python3 scripts/keep-report.py . --config config/keep-inventory.json --out target/keep-inventory.tsv
 
 ## gc: Prune cargo units and site-shots/app-icon output unused for DAYS (default 7). DRY=1 only reports, BENCH=1 also removes the cached benchmark clones
 gc:
