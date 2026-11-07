@@ -4,8 +4,11 @@
 
 use gitterrace_git::civil_from_days as civil;
 
+#[cfg(test)]
 use crate::feed::{CommitRange, CommitRow, InsightsSource, local_day_of};
-use crate::insights::{Period, days_from_civil, format_date, reference_day, weekday};
+#[cfg(test)]
+use crate::insights::reference_day;
+use crate::insights::{Period, days_from_civil, format_date, weekday};
 
 /// Not configurable, these four: they define chart resolution, so a setting would move every
 /// golden and make the same history read differently between machines.
@@ -160,8 +163,10 @@ impl TimeAxis {
     }
 
     /// The axis for the commits on screen. A fixed period ends on the local day of the newest
-    /// commit of `all` (the unscoped history); `All` spans `shown`.
-    pub fn covering_source(
+    /// commit of `all` (the unscoped history); `All` spans `shown`. The parity oracle for the
+    /// scope axis, so it lives with the tests.
+    #[cfg(test)]
+    pub(crate) fn covering_source(
         period: Option<Period>,
         all: &dyn InsightsSource,
         shown: &dyn InsightsSource,
@@ -183,7 +188,8 @@ impl TimeAxis {
     }
 
     /// Bucket of a commit, see [`TimeAxis::slot_day`].
-    pub fn slot_row(&self, c: &CommitRow) -> Option<usize> {
+    #[cfg(test)]
+    pub(crate) fn slot_row(&self, c: &CommitRow) -> Option<usize> {
         self.slot_day(local_day_of(c.time, c.offset))
     }
 

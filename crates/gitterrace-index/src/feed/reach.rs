@@ -120,7 +120,8 @@ impl<S: InsightsSource> Reach<S> {
     }
 
     /// Commits the view read from git.
-    pub const fn fresh_len(&self) -> usize {
+    #[cfg(test)]
+    pub(crate) const fn fresh_len(&self) -> usize {
         self.fresh.rows.len()
     }
 

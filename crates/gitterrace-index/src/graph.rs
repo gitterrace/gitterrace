@@ -202,7 +202,8 @@ impl Open {
 }
 
 /// Lays out `rows` below `open`, leaving `open` as the state after the last row.
-pub fn place_all(open: &mut Open, rows: &[Row]) -> Vec<Placed> {
+#[cfg(test)]
+fn place_all(open: &mut Open, rows: &[Row]) -> Vec<Placed> {
     rows.iter().map(|r| open.place(r)).collect()
 }
 

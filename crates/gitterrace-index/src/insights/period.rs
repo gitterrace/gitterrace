@@ -153,9 +153,10 @@ impl Insights<'_> {
         CountContext::new(self.source(), &SystemClock)
     }
 
-    /// Whether any counted commit falls in the period. Stops at the first one: a page that
-    /// only needs "is this empty" must not sum every file row of the period.
-    pub fn has_commits(&self, period: Period) -> bool {
+    /// Whether any counted commit falls in the period. Stops at the first one. The
+    /// period tests check it against the summed counts.
+    #[cfg(test)]
+    pub(crate) fn has_commits(&self, period: Period) -> bool {
         let s = self.plain_scope(period, None);
         self.counted(&s, self.own_context())
             .stream()

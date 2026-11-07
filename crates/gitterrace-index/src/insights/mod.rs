@@ -216,7 +216,8 @@ impl<'a> Insights<'a> {
 
     /// True when both share one set of derived tables (a test hook for
     /// [`Insights::shared_source`]).
-    pub fn shares_tables_with(&self, other: &Insights<'_>) -> bool {
+    #[cfg(test)]
+    pub(crate) fn shares_tables_with(&self, other: &Insights<'_>) -> bool {
         Arc::ptr_eq(&self.d, &other.d)
     }
 
@@ -446,6 +447,7 @@ pub(crate) fn rank_of(i: usize) -> Rank {
 /// Local day of the commit that sets [`feed::reference_time`]: fixed-period axes end on it.
 /// The newest commit not after "now" (the last of equals), else the oldest (the first of
 /// equals), as `max_by_key` and `min_by_key` picked over the records.
+#[cfg(test)]
 pub(crate) fn reference_day(src: &dyn InsightsSource) -> Option<i64> {
     scope::reference_day_at(src, feed::reference_time(src))
 }
