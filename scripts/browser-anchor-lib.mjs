@@ -8,7 +8,7 @@ import { launch } from './browser-lib.mjs';
 export function checks(env) {
   const { dir, srv, r, browsers, context, cfg } = env;
   // Heading ids are plain, as a user writes them, so the link resolves with JS on and off. A
-  // heading named like a chrome id ("main") is prefixed and reached through nav.js. The commit goes
+  // heading named like a chrome id ("main") is prefixed and reached through app.js. The commit goes
   // on a side ref through a private index, so HEAD and the work tree the other checks use stay
   // put.
   async function mdAnchor() {

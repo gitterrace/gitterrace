@@ -79,6 +79,18 @@
   function typing(t) {
     return t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT" || t.isContentEditable);
   }
+  // Single-key shortcuts can be turned off (WCAG 2.1.4). The choice lives in localStorage like
+  // the theme; "?" stays so the sheet, and the switch in it, is always reachable.
+  var KEYS_STORE = "gitterrace-keys";
+  function keysOff() {
+    try { return localStorage.getItem(KEYS_STORE) === "off"; } catch (e) { return false; }
+  }
+  function setKeysOff(off) {
+    try {
+      if (off) localStorage.setItem(KEYS_STORE, "off"); else localStorage.removeItem(KEYS_STORE);
+    } catch (e) {}
+  }
+  window.gtKeysOff = keysOff;
   function toast(msg) { window.gtToast(msg); }
   function copy(text, done, btn) { return window.gtCopy(text, done, btn); }
 
@@ -333,7 +345,13 @@
   }
   function openHelp() {
     var box = overlay("help", "Keyboard shortcuts"), dl = el("dl", "keys");
-    box.append(el("h2", "", "Keyboard shortcuts"), dl);
+    var sw = el("label", "keys-switch"), cb = el("input");
+    cb.type = "checkbox";
+    cb.id = "keys-off";
+    cb.checked = keysOff();
+    cb.addEventListener("change", function () { setKeysOff(cb.checked); });
+    sw.append(cb, el("span", "", "Turn off single-key shortcuts (? still opens this sheet)"));
+    box.append(el("h2", "", "Keyboard shortcuts"), sw, dl);
     // A chord is one unit: keys close together, joined by a muted "then" ("j / k" reads "or").
     SHORTCUTS.filter(function (x) { return !(isOff("insights") && x[0] === "g i") && !(isOff("search") && (x[0] === "g s" || x[0] === "/")); }).concat(actionChords()).forEach(function (s) {
       var alt = s[0].indexOf(" / ") > 0, dt = dl.appendChild(el("dt"));
@@ -384,6 +402,7 @@
     // action menu is its own overlay.
     if (typing(e.target) || ov.name || e.defaultPrevented) return;
     var k = e.key;
+    if (keysOff() && k !== "?") return;
     if (ov.takeChord()) {
       // The second key belongs to the chord even with no target, so "g a" never arms "a".
       e.preventDefault();
@@ -564,31 +583,6 @@
       table.classList.add("has-last");
     }).catch(function () {});
   }
-
-  // ---- #heading links into rendered Markdown --------------------------------
-  // Document ids are plain, so #reference resolves by itself. Only an id that would clobber
-  // the page (main, q, location, ...) carries the "user-content-" prefix: a typed #main jumps
-  // there instead of to the page's own <main>. An old #user-content-x link lands on the plain x.
-  function jumpUserAnchor() {
-    var h = location.hash;
-    if (h.length < 2 || /^#L\d+(-L?\d+)?$/.test(h)) return;
-    var id;
-    try { id = decodeURIComponent(h.slice(1)); } catch (e) { return; }
-    var t = document.getElementById("user-content-" + id);
-    if (!t && id.indexOf("user-content-") === 0 && !document.getElementById(id)) t = document.getElementById(id.slice(13));
-    if (!t) return;
-    t.scrollIntoView();
-    if (!t.hasAttribute("tabindex")) t.tabIndex = -1;
-    t.focus({ preventScroll: true });
-  }
-  window.addEventListener("hashchange", jumpUserAnchor);
-  // Again after load, once the browser's own (late, on a busy machine) scroll to <main> settles.
-  window.addEventListener("load", function () {
-    var end = Date.now() + 1000, again = function () { if (Date.now() < end) jumpUserAnchor(); };
-    requestAnimationFrame(function () { requestAnimationFrame(jumpUserAnchor); });
-    addEventListener("scrollend", again, { once: true }); setTimeout(again, 250);
-  });
-  jumpUserAnchor();
 
   // ---- screenshot hooks: ?open=finder|help|refs -------------------------------
   var want = /[?&]open=(finder|help|refs)/.exec(location.search);

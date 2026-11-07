@@ -485,6 +485,7 @@
 
   document.addEventListener("keydown", function (e) {
     if (e.key !== "." || e.metaKey || e.ctrlKey || e.altKey || ov.name) return;
+    if (window.gtKeysOff && window.gtKeysOff()) return;
     var t = e.target;
     if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return;
     var anchor = (!markBtn.hidden && markBtn) || document.getElementById("actsel") || document.querySelector(".actbtn.top");
@@ -501,6 +502,7 @@
   function disarm() { armed = false; clearTimeout(armTimer); }
   document.addEventListener("keydown", function (e) {
     if (e.metaKey || e.ctrlKey || e.altKey || ov.name) return;
+    if (window.gtKeysOff && window.gtKeysOff()) return;
     var t = e.target;
     if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT" || t.isContentEditable)) return;
     if (armed) {

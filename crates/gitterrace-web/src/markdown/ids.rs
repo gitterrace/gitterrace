@@ -5,12 +5,12 @@
 //! shadow a browser global through named access, is moved under the prefix instead. The same
 //! function maps same-page hrefs, so a link and its target always agree.
 
-/// The prefix a colliding id is moved under. `static/nav.js` maps a plain hash to it.
+/// The prefix a colliding id is moved under. `static/app.js` maps a plain hash to it.
 pub(crate) const USER_ID: &str = "user-content-";
 
 /// Every literal id the page chrome uses: templates, static scripts and Rust views. The
 /// `chrome_ids_match_the_sources` test fails when this list and the sources disagree.
-pub(crate) const CHROME_IDS: [&str; 50] = [
+pub(crate) const CHROME_IDS: [&str; 51] = [
     "about",
     "activity-counts",
     "activity-hours",
@@ -29,6 +29,7 @@ pub(crate) const CHROME_IDS: [&str; 50] = [
     "headstate",
     "hotspot-files",
     "hotspot-map",
+    "keys-off",
     "livenote",
     "loc",
     "loc-data",
@@ -160,7 +161,7 @@ mod tests {
             for c in re.captures_iter(t) {
                 let id = &c[1];
                 // `L` is getElementById("L" + n), covered by `generated`; the prefix is the
-                // nav.js lookup of a moved id.
+                // app.js lookup of a moved id.
                 if id != "L" && id != USER_ID && !generated(id) {
                     found.insert(id.to_owned());
                 }
