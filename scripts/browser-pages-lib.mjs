@@ -1,4 +1,5 @@
-// Checks of the page layout: truncation, live tabs, mermaid, chip, doctabs, chords, header. Imported by scripts/browser-check.mjs, not run on its own.
+// Checks of the page layout: truncation, live tabs, mermaid, chip, doctabs, chords, header.
+// Imported by scripts/browser-check.mjs, not run on its own.
 import { writeFileSync, rmSync, mkdirSync, existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { root, WATCH_BOUND_MS, launch, openPage, sh } from './browser-lib.mjs';

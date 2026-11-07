@@ -1,5 +1,5 @@
-// "On this page" outline: scroll highlight, filter and keyboard (menu and rail). The lists are plain links
-// without this. Loaded on every page: with no [data-outline] it does nothing.
+// "On this page" outline: scroll highlight, filter and keyboard (menu and rail). The lists are
+// plain links without this. Loaded on every page: with no [data-outline] it does nothing.
 (function () {
   var navs = Array.prototype.slice.call(document.querySelectorAll("[data-outline]"));
   if (!navs.length) return;

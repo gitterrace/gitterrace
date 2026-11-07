@@ -228,7 +228,7 @@ self_test() {
       exit 1
     }
   # Today's script, before it called the targets: it copied three commands and lost two.
-  printf '%s\n' 'step python3 scripts/lines-check.py' 'step python3 scripts/status-words-check.py' \
+  printf '%s\n' 'step python3 scripts/width-check.py' 'step python3 scripts/status-words-check.py' \
     'step python3 scripts/names-check.py' >"$d/copied.sh"
   if gate_commands_covered "$d/copied.sh"; then
     echo "self-test: a script that copies only three commands passed" >&2
@@ -337,7 +337,7 @@ step make lines names
 step "$py" shared/schwarzwald/tools/ratchet-check.py --self-test
 step "$py" shared/schwarzwald/tools/ratchet-check.py --base "$base"
 step cargo test -p "$(land_cfg conventions.crate)" --test "$(land_cfg conventions.test)"
-step sh scripts/lint-run.sh
+step bash shared/schwarzwald/lint/run.sh
 step make docs-check
 check_subjects "$base"
 # Subject and body of every commit landed: the shared lints the commit-msg hook runs.

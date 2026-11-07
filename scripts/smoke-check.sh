@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Runtime smoke test of a built git-terrace binary. One script, many callers: the Windows CI job,
-# the release check job and the wine-run, linux-run and macos-run scripts. Usage: smoke-check.sh <binary> [port].
+# the release check job and the wine-run, linux-run and macos-run scripts.
+# Usage: smoke-check.sh <binary> [port].
 # GT_WINE=1 runs the binary under Wine (the binary is a .exe, paths go through winepath).
 # shellcheck disable=SC2015  # `A && ok || bad` is meant: bad runs when the check fails
 set -euo pipefail
@@ -37,7 +38,9 @@ exe() {
 alive() {
   case "$(uname -s)" in
   MINGW* | MSYS* | CYGWIN*) tasklist 2>/dev/null | grep -qi "^$1" ;;
-  *) if [ "${GT_WINE:-}" = 1 ]; then wine tasklist 2>/dev/null | grep -qi "$1"; else pgrep -x "$1" >/dev/null; fi ;;
+  *)
+    if [ "${GT_WINE:-}" = 1 ]; then wine tasklist 2>/dev/null | grep -qi "$1"; else pgrep -x "$1" >/dev/null; fi
+    ;;
   esac
 }
 

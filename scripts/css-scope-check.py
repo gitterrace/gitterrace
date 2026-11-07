@@ -2,7 +2,7 @@
 """Fail when a markdown.css selector is not scoped to .markdown-body, .code or .diff.
 
 Rendered documents share the page with the app, so an unscoped class there (.seg once)
-restyles app widgets. Run by scripts/lint-run.sh as the css-scope hook.
+restyles app widgets. Run by the lint runner as the css-scope hook.
 
   python3 scripts/css-scope-check.py
 """

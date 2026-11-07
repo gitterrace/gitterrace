@@ -25,7 +25,8 @@ ROOT = Path(__file__).resolve().parent.parent
 PY = sys.executable
 # (gate, command, the suffixes or path prefixes that select it; empty selects on any change)
 GATES: list[tuple[str, list[str], tuple[str, ...]]] = [
-    ("lines", [PY, "scripts/lines-check.py"], ()),
+    ("lines", [PY, "shared/schwarzwald/lint/file-length.py", "--repo", "."], ()),
+    ("width", [PY, "scripts/width-check.py"], ()),
     ("names", [PY, "scripts/names-check.py"], ()),
     ("status-words", [PY, "scripts/status-words-check.py"], ()),
     ("stubs", [PY, "scripts/stubs-check.py"], (".rs",)),
@@ -37,8 +38,16 @@ GATES: list[tuple[str, list[str], tuple[str, ...]]] = [
         [PY, "scripts/theme-gen.py", "--check"],
         (".css", "scripts/theme-", "shared/"),
     ),
-    ("make-targets", [PY, "scripts/make-targets-check.py"], (".md", "Makefile")),
-    ("actions-pin", [PY, "scripts/actions-pin-check.py"], (".github/",)),
+    (
+        "make-targets",
+        [PY, "shared/schwarzwald/lint/make-targets.py", "--repo", "."],
+        (".md", "Makefile"),
+    ),
+    (
+        "actions-pin",
+        [PY, "shared/schwarzwald/lint/actions-pin.py", "--repo", "."],
+        (".github/",),
+    ),
 ]
 
 

@@ -1,4 +1,5 @@
-// The md-anchor check: a cross-file Markdown link with #heading lands on the heading. Imported by scripts/browser-check.mjs, not run on its own.
+// The md-anchor check: a cross-file Markdown link with #heading lands on the heading.
+// Imported by scripts/browser-check.mjs, not run on its own.
 import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
 import { launch } from './browser-lib.mjs';
@@ -7,8 +8,9 @@ import { launch } from './browser-lib.mjs';
 export function checks(env) {
   const { dir, srv, r, browsers, context, cfg } = env;
   // Heading ids are plain, as a user writes them, so the link resolves with JS on and off. A
-  // heading named like a chrome id ("main") is prefixed and reached through nav.js. The commit goes on a side ref through a private index, so HEAD and the work tree
-  // the other checks use stay put.
+  // heading named like a chrome id ("main") is prefixed and reached through nav.js. The commit goes
+  // on a side ref through a private index, so HEAD and the work tree the other checks use stay
+  // put.
   async function mdAnchor() {
     const gitEnv = { ...process.env, GIT_INDEX_FILE: join(cfg, 'anchor-index') };
     const git = (input, ...a) => execFileSync('git', a, { cwd: dir, env: gitEnv, input, encoding: 'utf8' }).trim();

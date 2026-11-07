@@ -14,7 +14,8 @@
 //   mermaid      the README diagram renders and has no Copy node
 //   chip         the Working tree chip dot has no animation, in light and dark
 //   doctabs      the README/LICENSE/SECURITY tab row is one line at 360, 900 and 1440 px and the
-//                active tab has aria-current; shots into --shots (default target/shots)/doctabs-*.png
+//                active tab has aria-current; shots into --shots (default
+//                target/shots)/doctabs-*.png
 //   header       from 1440 down to 320 px the top bar's tools (search, actions, theme) share one
 //                row and the page never scrolls sideways; where search is folded, its button opens
 //                the field with focus and Escape folds it again; no tool repeats a menu action
@@ -41,16 +42,18 @@
 //                code, blob, blame, diff file, table) is pinned with a 1 px line under it, never
 //                over it, as wide as its content box, the outline button inside the bar, the
 //                Code view full width
-//   date-tips    hovering or focusing a relative date, in the tree listing and on the overview, shows
-//                its full date in the tip
-//   outline      "On this page": a rail at 1400 px, a menu at 900 px, a click scrolls and sets the hash,
-//                the active item follows the scroll, filter and Escape work, the Code tab hides it
+//   date-tips    hovering or focusing a relative date, in the tree listing and on the
+//                overview, shows its full date in the tip
+//   outline      "On this page": a rail at 1400 px, a menu at 900 px, a click scrolls and sets
+//                the hash, the active item follows the scroll, filter and Escape work, the
+//                Code tab hides it
 //   settings     the gear opens the settings page; a form edit shows in Plain as the server's
 //                text, an invalid plain edit marks its line in the gutter and keeps Save off, and
 //                Save writes the file and reloads with the new value, and an action card edit
 //                saves actions.toml in place, in each browser
-//   repo-switch  a server on one repository hides the switcher (a fresh load paints it in place); when a second `git terrace`
-//                joins, the open page shows it without a reload, it lists both, and picking
+//   repo-switch  a server on one repository hides the switcher (a fresh load paints it in
+//                place); when a second `git terrace` joins, the open page shows it without a
+//                reload, it lists both, and picking
 //                each lands on its /r/NAME/ page; `git terrace remove` hides it again and
 //                the removed repository's page answers 404
 //   about-place  on the overview, About sits beside the files when there are two columns and
@@ -68,8 +71,9 @@
 //   calm-header  at rest the branch switcher and the Working tree chip have no visible border
 //                and are not bold, and toggling the chip does not move the search field, at
 //                1440, 900 and 360 px, light and dark
-//   live-scroll  on the working tree page with 90 changed files, open at #f3 and scrolled to a file far
-//                down, a live refresh keeps that file within 4 px of where it was, keeps the loaded
+//   live-scroll  on the working tree page with 90 changed files, open at #f3 and scrolled to
+//                a file far down, a live refresh keeps that file within 4 px of where it was,
+//                keeps the loaded
 //                bodies and keeps #f3 open
 //   tab-levels   at 1440 and 900 px a page's tabs never share the header nav's font and case,
 //                every insights page is a tab of the row (no More) and the open one is marked
@@ -102,8 +106,8 @@
 //   lone-rows    on every page the goldens cover, at 1440 and 390 px, no control row above the
 //                first content block holds a single control using under 40% of its width;
 //                pages red today are listed as known with the change that fixes them
-//   outline-filter  the "On this page" filter shows, narrows the list and Escape returns focus, on a
-//                Markdown page and an insights page
+//   outline-filter  the "On this page" filter shows, narrows the list and Escape returns
+//                focus, on a Markdown page and an insights page
 //   send-dialog  the Send to window has a "Send to" head, Title and Notes labels, a Cancel that
 //                closes it and the shortcut in words; at 390 px it is a bottom sheet with its
 //                footer in view

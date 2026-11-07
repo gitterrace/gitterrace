@@ -77,7 +77,7 @@ jobs:
       # sure would be cool if github gave us proper conditionals...
       # so here's a doubly-nested ternary-via-truthiness to try to provide the best possible
       # functionality based on whether this is a pull_request, and whether it's from a fork.
-      # (PRs run on the *source* but secrets are usually on the *target* -- that's *good*
+      # (PRs run on the *source* but secrets are usually on the *target*, which is *good*
       # but also really annoying to build CI around when it needs secrets to work right.)
       - id: plan
         run: |

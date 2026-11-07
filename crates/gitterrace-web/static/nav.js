@@ -440,7 +440,7 @@
   var plain = document.querySelector(".src[data-hl]");
   if (plain) {
     var chunks = plain.querySelectorAll(".ch");
-    var hlUrl = location.pathname.replace(/\/blob\//, "/hl/");
+    var hlUrl = location.pathname.replace("/blob/", "/hl/");
     fetch(hlUrl).then(function (r) { return r.ok ? r.text() : null; }).then(function (html) {
       if (html === null || chunks.length < 3) return;
       var sel = plain.querySelectorAll(".sel");

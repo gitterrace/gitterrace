@@ -145,7 +145,12 @@ export function checks(env) {
     // The first fetch of every fragment fails: a lazy file must load on a later scroll.
     const f = await ctx.newPage({ viewport: { width: 1200, height: 900 } });
     const failed = new Set();
-    await f.route(/\/(worktree\/)?diff\//, (rt) => { const u = rt.request().url(); if (failed.has(u)) return rt.continue(); failed.add(u); return rt.fulfill({ status: 503, body: 'busy' }); });
+    await f.route(new RegExp('/(worktree/)?diff/'), (rt) => {
+      const u = rt.request().url();
+      if (failed.has(u)) return rt.continue();
+      failed.add(u);
+      return rt.fulfill({ status: 503, body: 'busy' });
+    });
     await f.goto(url, { waitUntil: 'load', timeout: 180000 });
     const target = await f.evaluate(() => { const a = document.querySelector('[data-load-diff][data-lazy]'); return a ? a.closest('section').id : null; });
     if (!target) r.fail(`${where}: no lazy file for the retry check`);

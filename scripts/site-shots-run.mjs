@@ -63,7 +63,8 @@ const SHOTS = [
   { name: 'insights', path: '/r/jq/stats/hotspots' },
   // A commit page: message, changed files and a highlighted diff that fits one screen.
   { name: 'commit', path: '/r/ripgrep/commit/068a63e' },
-  // configure.ac from the top: 13 blocks and 8 authors in the first 28 lines (scanned over jq and ripgrep).
+  // configure.ac from the top: 13 blocks and 8 authors in the first 28 lines (scanned over jq and
+  // ripgrep).
   { name: 'blame', path: '/r/jq/blame/release/configure.ac' },
   // Bus factor, solo and stale lines, and the owners of each directory.
   { name: 'ownership', path: '/r/jq/stats/ownership' },

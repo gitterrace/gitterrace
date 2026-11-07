@@ -12,12 +12,37 @@ BLIND with a reason. The list only shrinks.
 
 from __future__ import annotations
 
+import os
+import shutil
 import subprocess
 import sys
 import tempfile
 from pathlib import Path
 
-import yaml
+try:
+    import yaml
+except ModuleNotFoundError:
+    # The lint runner calls plain python3, which may lack PyYAML: hand over to the first
+    # interpreter that has it, newest first, so the check runs instead of failing on setup.
+    for c in (
+        "python3.15",
+        "python3.14",
+        "python3.13",
+        "python3.12",
+        "python3.11",
+        "/usr/bin/python3",
+    ):
+        exe = shutil.which(c)
+        if (
+            exe
+            and exe != sys.executable
+            and subprocess.run(
+                [exe, "-c", "import yaml"], capture_output=True, check=False
+            ).returncode
+            == 0
+        ):
+            os.execv(exe, [exe, *sys.argv])
+    sys.exit("ast-grep-macro: no python3 with PyYAML found (install PyYAML)")
 
 ROOT = Path(__file__).resolve().parent.parent
 AST = ROOT / "scripts" / "ast-grep"

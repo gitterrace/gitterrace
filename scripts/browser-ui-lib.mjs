@@ -1,4 +1,5 @@
-// Checks of the interactive UI: marked text, the menu across views, gutter, overlays, tips, repo switcher. Imported by scripts/browser-check.mjs, not run on its own.
+// Checks of the interactive UI: marked text, the menu across views, gutter, overlays, tips, repo
+// switcher. Imported by scripts/browser-check.mjs, not run on its own.
 import { readFileSync, writeFileSync, rmSync, mkdtempSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';

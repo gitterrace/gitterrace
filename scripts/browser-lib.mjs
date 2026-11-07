@@ -33,7 +33,7 @@ export async function loadPlaywright() {
   throw new Error('playwright-core not found: set PLAYWRIGHT_CORE to its index.mjs');
 }
 
-/** A chromium Playwright can start: $PLAYWRIGHT_CHROMIUM, else the newest in its cache, else its default. */
+/** A chromium Playwright can start: $PLAYWRIGHT_CHROMIUM, else the newest cached, else default. */
 function chromiumPath() {
   if (process.env.PLAYWRIGHT_CHROMIUM) return process.env.PLAYWRIGHT_CHROMIUM;
   const cache = join(homedir(), 'Library/Caches/ms-playwright');
@@ -90,7 +90,10 @@ export function makeRepo() {
  * Serves `dir` with `bin` on a free port. Returns { origin, base, stop }, where `base` is the
  * repository's own root, wherever it is mounted.
  */
-/** Serves `dir` with `bin`. `cfg` is the config folder; it must sit outside `dir`, since actions.toml inside a served repository is refused. */
+/**
+ * Serves `dir` with `bin`. `cfg` is the config folder; it must sit outside `dir`, since
+ * actions.toml inside a served repository is refused.
+ */
 export async function serve(bin, dir, cfg = mkdtempSync(join(tmpdir(), 'gt-cfg-'))) {
   const port = await freePort();
   const child = spawn(bin, ['serve', '--addr', `127.0.0.1:${port}`, '--config', cfg, dir], { stdio: 'ignore' });

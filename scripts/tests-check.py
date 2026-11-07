@@ -5,7 +5,7 @@ The ast-grep rules (no-bare-file-write, no-super-outside-tests) skip files named
 or `*_tests.rs`, because a test module kept in its own file has no inline `mod tests` for
 them to see. That skip is only sound if every such file really is test code, so each must be
 declared by its parent under `#[cfg(test)]` or a `cfg_attr`/`cfg` that names `test`. A
-production file named `tests.rs` fails here. Run by scripts/lint-run.sh as the tests hook.
+production file named `tests.rs` fails here. Run by the lint runner as the tests hook.
 
   python3 scripts/tests-check.py [root]
 """

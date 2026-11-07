@@ -5,7 +5,8 @@ body{margin:0;background:var(--bg);color:var(--fg);font:var(--text-base)/var(--l
 a{color:var(--accent-fg);text-decoration:none;text-underline-offset:3px}a:hover{text-decoration:underline}
 /* --focus is opaque (3:1 on every surface, theme-gen.py --check); --ring is a tint for fills. */
 :focus-visible{outline:2px solid var(--focus);outline-offset:2px;border-radius:var(--radius)}
-/* Skip link: the first stop on every page, shown while focused; main takes focus quietly. */.skip{position:absolute;left:var(--space-4);top:var(--space-2);z-index:70;padding:var(--space-2) var(--space-3);background:var(--surface);color:var(--fg);border:var(--border);border-radius:var(--radius);box-shadow:var(--shadow-2);transform:translateY(-200%)}.skip:focus{transform:none}main:focus{outline:none}svg.chart[data-marks]:focus-visible{outline-offset:4px}
+/* Skip link: the first stop on every page, shown while focused; main takes focus quietly. */
+.skip{position:absolute;left:var(--space-4);top:var(--space-2);z-index:70;padding:var(--space-2) var(--space-3);background:var(--surface);color:var(--fg);border:var(--border);border-radius:var(--radius);box-shadow:var(--shadow-2);transform:translateY(-200%)}.skip:focus{transform:none}main:focus{outline:none}svg.chart[data-marks]:focus-visible{outline-offset:4px}
 ::selection{background:var(--ring)}
 code,pre,.code,.diff{font-family:var(--mono);font-size:var(--text-sm)}
 code{color:var(--muted)}
@@ -289,7 +290,7 @@ button.branch{height:auto;cursor:pointer}
 /* Joined to the branch as one phrase ("main · Working tree"): information, not a second button. */
 .wtchip{display:inline-flex;align-items:center;gap:5px;font:var(--weight-regular) var(--text-xs)/1 var(--sans);color:var(--muted);background:transparent;border:1px solid transparent;border-radius:var(--radius);padding:5px 6px;margin-left:-4px;white-space:nowrap;transition:color var(--dur-fast)}
 .wtchip:hover{color:var(--fg);text-decoration:underline;text-underline-offset:3px}
-/* Uncommitted work is a normal state: quiet label, only the dot carries the warn colour. No motion. */
+/* Uncommitted work is a normal state: quiet label, only the dot carries the warn colour. */
 .wtchip .dot{width:6px;height:6px;border-radius:50%;background:var(--warn)}
 .topsearch{position:relative;display:flex;align-items:center}
 .topsearch input[type=search]{min-width:220px;width:320px;padding-right:32px;height:30px}

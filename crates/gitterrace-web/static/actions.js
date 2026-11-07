@@ -29,7 +29,8 @@
   var SHORT = 20;
 
   // The server renders the note into the page, so it is there at first paint. Later edits of
-  // actions.toml are fetched when the tab is shown or focused, and touches the page only when the text changes.
+  // actions.toml are fetched when the tab is shown or focused, and touch the page only when the
+  // text changes.
   var noteEl = document.getElementById("actnote");
   function showNote(text) {
     if (!noteEl) return;

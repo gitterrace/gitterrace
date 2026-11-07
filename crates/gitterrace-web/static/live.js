@@ -1,5 +1,6 @@
 // Live updates. One EventSource per tab on GET /events. The server says which parts of the
-// repository moved (head, refs, stash, worktrees, index, worktree); the page decides what that means:
+// repository moved (head, refs, stash, worktrees, index, worktree); the page decides what that
+// means:
 //   data-live="refresh"  re-fetch this page and swap <main> in place
 //   data-live="notice"   show a quiet "Updated, refresh" note, never reload on its own
 // The top bar chip and the HEAD banner always follow. Pages pinned to a commit or tag carry no

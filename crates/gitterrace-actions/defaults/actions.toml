@@ -50,7 +50,8 @@ url     = "https://gitlab.com/{var.project}/-/issues/new?issue%5Btitle%5D={title
 lookup  = "https://gitlab.com/{var.project}/-/search?search={sha}&scope=commits"
 vars    = { project = "group/name" }
 
-# A new issue on a self-hosted instance of that host. `base` is the instance URL, `project` is `group/name`.
+# A new issue on a self-hosted instance of that host. `base` is the instance URL, `project` is
+# `group/name`.
 [[send]]
 id      = "gitlab-issue-self-hosted"
 label   = "New issue"
@@ -79,7 +80,8 @@ vars    = { base = "https://codeberg.org", repo = "owner/name" }
 
 # ---- Actions: programs of yours, run with no shell. See the scripts in docs/actions.
 
-# Copies the selection as markdown on any system. Needs `clipboard.sh` from docs/actions in your config folder.
+# Copies the selection as markdown on any system. Needs `clipboard.sh` from docs/actions in your
+# config folder.
 [[action]]
 id      = "copy"
 label   = "Copy to clipboard"

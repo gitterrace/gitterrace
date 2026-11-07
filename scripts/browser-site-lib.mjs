@@ -1,4 +1,5 @@
-// Checks of marks and the generated site: mark seam, about placement, site theme. Imported by scripts/browser-check.mjs, not run on its own.
+// Checks of marks and the generated site: mark seam, about placement, site theme.
+// Imported by scripts/browser-check.mjs, not run on its own.
 import { readFileSync, readdirSync, existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -195,9 +196,12 @@ async function exportFromDisk() {
     const p = await b.newPage();
     const where = `export-from-disk ${name}`;
     const errors = [];
-    p.on('console', (m) => { if (m.type() === 'error') errors.push(`${p.url().replace(/^.*\/site\//, '')}: ${m.text()}`); });
-    p.on('pageerror', (e) => errors.push(`${p.url().replace(/^.*\/site\//, '')}: ${String(e)}`));
-    p.on('requestfailed', (q) => errors.push(`${p.url().replace(/^.*\/site\//, '')}: no ${q.url().replace(/^.*\/site\//, '')}`));
+    const rel = (u) => u.replace(new RegExp('^.*/site/'), '');
+    p.on('console', (m) => {
+      if (m.type() === 'error') errors.push(`${rel(p.url())}${': '}${m.text()}`);
+    });
+    p.on('pageerror', (e) => errors.push(`${rel(p.url())}${': '}${String(e)}`));
+    p.on('requestfailed', (q) => errors.push(`${rel(p.url())}${': no '}${rel(q.url())}`));
     try {
       await p.goto(pathToFileURL(join(out, 'index.html')).href, { waitUntil: 'load' });
       const bad = [];
