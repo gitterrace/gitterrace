@@ -1,7 +1,7 @@
 # Who runs this
 
-One person, not a company. Here is the name, the address, and where to write: the information § 5
-DDG and § 18 Abs. 2 MStV require, on one page.
+One person, not a company. Here is the name, the address, and where to write:
+the information § 5 DDG and § 18 Abs. 2 MStV require, on one page.
 
 ## Operator
 
@@ -14,8 +14,8 @@ Timo Runge<br /> Schmiedegasse 14<br /> 14469 Potsdam<br /> Germany
 Email: **support@gitterrace.dev**
 
 Bugs, feature requests, and questions about how gitterrace works belong on the
-[issue tracker](https://github.com/gitterrace/gitterrace/issues), answered in public,
-where the next person with the same problem will find it.
+[issue tracker](https://github.com/gitterrace/gitterrace/issues), answered in
+public, where the next person with the same problem will find it.
 
 The address above is for what does not belong in public: privacy requests, legal
 notices, anything about your own account. It is read every working day. If you
@@ -31,8 +31,8 @@ Timo Runge, address as above.
 
 ## VAT
 
-gitterrace is not currently operated as a registered business, so there is no VAT
-identification number under § 27a UStG.
+gitterrace is not currently operated as a registered business, so there is no
+VAT identification number under § 27a UStG.
 
 ## Consumer dispute resolution
 
@@ -42,7 +42,8 @@ proceedings before a consumer arbitration board (§ 36 VSBG).
 ## Security reports
 
 Please do not report vulnerabilities through the address above. Send them to
-**security@gitterrace.dev**. See [security.txt](https://gitterrace.dev/.well-known/security.txt) for our
+**security@gitterrace.dev**. See
+[security.txt](https://gitterrace.dev/.well-known/security.txt) for our
 disclosure policy.
 
 ## Privacy

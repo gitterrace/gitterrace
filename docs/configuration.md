@@ -2,31 +2,35 @@
 
 # Configuration
 
-One optional file, `config.toml`, in `$XDG_CONFIG_HOME/gitterrace` or `~/.config/gitterrace`
-(`--config DIR` picks another folder). It is never read from a served repository. A flag beats the
-file, the file beats the default. Unknown keys warn, invalid values stop startup naming the key.
+One optional file, `config.toml`, in `$XDG_CONFIG_HOME/gitterrace` or
+`~/.config/gitterrace` (`--config DIR` picks another folder). It is never read
+from a served repository. A flag beats the file, the file beats the default.
+Unknown keys warn, invalid values stop startup naming the key.
 `git terrace config` prints what is in force and where each value came from.
 
-A running server reloads `config.toml` within a second of an edit. An invalid edit is logged with
-the key and the old settings stay. Open pages show "Updated, refresh". Settings marked "Needs a
-restart" log a warning and keep their running value.
+A running server reloads `config.toml` within a second of an edit. An invalid
+edit is logged with the key and the old settings stay. Open pages show "Updated,
+refresh". Settings marked "Needs a restart" log a warning and keep their running
+value.
 
-Per-repository overrides go under `[repo.NAME]` (the repository's folder name) and take `exclude`, a
-list of path globs added to `insights.exclude`. `[repo.NAME.features]` turns a feature off for that
-repository only, with the keys of `[features]` set to `false`. It never turns one on, and the
-server-wide ones (`repo_admin_enabled`, `settings_enabled`, `picker_enabled`, `credit_enabled`,
-`api_enabled`) are refused there.
+Per-repository overrides go under `[repo.NAME]` (the repository's folder name)
+and take `exclude`, a list of path globs added to `insights.exclude`.
+`[repo.NAME.features]` turns a feature off for that repository only, with the
+keys of `[features]` set to `false`. It never turns one on, and the server-wide
+ones (`repo_admin_enabled`, `settings_enabled`, `picker_enabled`,
+`credit_enabled`, `api_enabled`) are refused there.
 
-A feature that shows this machine or changes it (working tree, live updates, actions, adding
-repositories, the settings page) stays off on a public server whatever `[features]` says: the file
-can turn a feature off, never past what `--public` or the loopback check allows.
+A feature that shows this machine or changes it (working tree, live updates,
+actions, adding repositories, the settings page) stays off on a public server
+whatever `[features]` says: the file can turn a feature off, never past what
+`--public` or the loopback check allows.
 
 Actions live in their own file, `actions.toml`, because they run commands.
 
 ## Names
 
-One rule for every key and flag, from `gitterrace_config::naming`. A renamed key gets no alias: the
-old name warns as unknown and the default applies.
+One rule for every key and flag, from `gitterrace_config::naming`. A renamed key
+gets no alias: the old name warns as unknown and the default applies.
 
 | Holds | Form | Example |
 | --- | --- | --- |

@@ -3,8 +3,10 @@
 # Command line
 
 <!-- BEGIN GENERATED: cli -->
-Everything the `git terrace` command line accepts, read from the same definition the binary
-parses with. `git terrace --help` and `git terrace <command> --help` print the same text.
+Everything the `git terrace` command line accepts, read from the same definition
+the binary
+parses with. `git terrace --help` and `git terrace <command> --help` print the
+same text.
 The global flags work on every command.
 
 ## `git terrace`
@@ -46,9 +48,9 @@ git terrace config [OPTIONS] [PATHS]...
 
 Run a read-only MCP server over stdio for agents.
 
-Reads the repositories the paths name (folders are searched as for `serve`). With `--served` it also
-reads every repository served before, such as those of a running server. Tools then take a `repo`
-name from `list_repos`.
+Reads the repositories the paths name (folders are searched as for `serve`).
+With `--served` it also reads every repository served before, such as those of a
+running server. Tools then take a `repo` name from `list_repos`.
 
 ```text
 git terrace mcp [OPTIONS] [PATHS]...
@@ -60,10 +62,11 @@ git terrace mcp [OPTIONS] [PATHS]...
 
 ## `git terrace open`
 
-Open a `gitterrace://` or `/go` permalink in the browser, starting a server if needed.
+Open a `gitterrace://` or `/go` permalink in the browser, starting a server if
+needed.
 
-The clone is found among repositories served before and under `links.roots`. An unknown repository
-exits 2, with no clone and no network.
+The clone is found among repositories served before and under `links.roots`. An
+unknown repository exits 2, with no clone and no network.
 
 ```text
 git terrace open [OPTIONS] <LINK> [PATHS]...
@@ -78,8 +81,9 @@ git terrace open [OPTIONS] <LINK> [PATHS]...
 
 Take a repository off the running server; its pages then answer 404.
 
-The opposite of joining: the server on `server.addr` is found and proven the same way. The on-disk
-index stays, so serving it again is fast. The last repository stays served.
+The opposite of joining: the server on `server.addr` is found and proven the
+same way. The on-disk index stays, so serving it again is fast. The last
+repository stays served.
 
 ```text
 git terrace remove [OPTIONS] [TARGET] [PATHS]...
@@ -91,10 +95,11 @@ git terrace remove [OPTIONS] [TARGET] [PATHS]...
 
 ## `git terrace install-handler`
 
-Register (or with `--uninstall` remove) this program as the `gitterrace://` link handler.
+Register (or with `--uninstall` remove) this program as the `gitterrace://` link
+handler.
 
-Opt-in. macOS writes `~/Applications/gitterrace-open.app`, Linux a `.desktop` file, and WSL and
-Windows only print the steps. It prints exactly what it wrote.
+Opt-in. macOS writes `~/Applications/gitterrace-open.app`, Linux a `.desktop`
+file, and WSL and Windows only print the steps. It prints exactly what it wrote.
 
 ```text
 git terrace install-handler [OPTIONS] [PATHS]...
@@ -106,11 +111,13 @@ git terrace install-handler [OPTIONS] [PATHS]...
 
 ## `git terrace init`
 
-Write a documented `config.toml` and the pre-filled `actions.toml` to the config folder.
+Write a documented `config.toml` and the pre-filled `actions.toml` to the config
+folder.
 
-`config.toml` is a template with every setting commented out at its default. `actions.toml` has the
-Send to targets and example actions. Those that need your own settings start switched off. An
-existing file is kept as it is. To start over, move the file away and run this again.
+`config.toml` is a template with every setting commented out at its default.
+`actions.toml` has the Send to targets and example actions. Those that need your
+own settings start switched off. An existing file is kept as it is. To start
+over, move the file away and run this again.
 
 ```text
 git terrace init [OPTIONS] [PATHS]...

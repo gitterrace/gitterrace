@@ -1,16 +1,16 @@
 # Send to and actions
 
-Select something, press `.` or click `⋯`. The menu always has **Copy permalink** and **Copy
-as markdown**. The rest comes from `actions.toml` in your config folder (never in a
-repository), in two kinds: **Send to** for handing a selection to another app, **actions**
-for running a program of yours.
+Select something, press `.` or click `⋯`. The menu always has **Copy permalink**
+and **Copy as markdown**. The rest comes from `actions.toml` in your config
+folder (never in a repository), in two kinds: **Send to** for handing a
+selection to another app, **actions** for running a program of yours.
 
 ## Send to
 
-A `[[send]]` target is a URL template. The menu opens a small window with the title and notes
-filled in. You edit them and press Send, and the browser opens the destination's own add
-screen, where you confirm. gitterrace starts no process and makes no request, so it stays
-read-only and holds no token.
+A `[[send]]` target is a URL template. The menu opens a small window with the
+title and notes filled in. You edit them and press Send, and the browser opens
+the destination's own add screen, where you confirm. gitterrace starts no
+process and makes no request, so it stays read-only and holds no token.
 
 ```toml
 version = 1
@@ -28,18 +28,19 @@ url   = "obsidian://new?vault={var.vault}&file=Inbox%2F{title}&content={notes}"
 vars  = { vault = "Notes" }
 ```
 
-Page values are always percent-encoded and can never reach the scheme or the host: the text
-before the first placeholder must hold the scheme and end the host. `https`, `mailto` and app
-schemes are allowed, `http` only for loopback. With no `[[send]]` entry, the window offers
-Copy as markdown.
+Page values are always percent-encoded and can never reach the scheme or the
+host: the text before the first placeholder must hold the scheme and end the
+host. `https`, `mailto` and app schemes are allowed, `http` only for loopback.
+With no `[[send]]` entry, the window offers Copy as markdown.
 
 ### What a note carries
 
-Text marked with the mouse snaps to whole words. Marked code sends its lines. Marked prose in
-rendered Markdown (a README, a `.md` preview) sends the source lines it was rendered from,
-byte for byte, and the permalink names them as `#La-Lb`. A mark inside a table quotes the whole
-table. A mark shorter than about 20 characters brings one line on each side as context. The
-title is the first line you type above the context, else the file name and the first words of
+Text marked with the mouse snaps to whole words. Marked code sends its lines.
+Marked prose in rendered Markdown (a README, a `.md` preview) sends the source
+lines it was rendered from, byte for byte, and the permalink names them as
+`#La-Lb`. A mark inside a table quotes the whole table. A mark shorter than
+about 20 characters brings one line on each side as context. The title is the
+first line you type above the context, else the file name and the first words of
 the mark.
 
 The last line of every note, and of Copy as markdown, is for machines:
@@ -48,16 +49,18 @@ The last line of every note, and of Copy as markdown, is for machines:
 source: <repo>@<sha>:<path>#L<a>-L<b>
 ```
 
-`<sha>` is the full commit id. A commit has no `:<path>` part, a whole file no `#L` part, and a
-single line is still `#L<a>-L<a>`. In the path `%` is written `%25` and `#` is written `%23`, so
-the only `#` on the line starts the range. The sha is the first `@` followed by hex and then `:`
-or the line end, so a repository name holding `@` still parses.
+`<sha>` is the full commit id. A commit has no `:<path>` part, a whole file no
+`#L` part, and a single line is still `#L<a>-L<a>`. In the path `%` is written
+`%25` and `#` is written `%23`, so the only `#` on the line starts the range.
+The sha is the first `@` followed by hex and then `:` or the line end, so a
+repository name holding `@` still parses.
 
 ### The starter file
 
-`git terrace init` writes the file below to `actions.toml` in your config folder, unless
-one exists. It is an ordinary `actions.toml`. An entry with `enabled = false` is checked but
-not offered: switch on the ones you use and fill in their `vars`.
+`git terrace init` writes the file below to `actions.toml` in your config
+folder, unless one exists. It is an ordinary `actions.toml`. An entry with
+`enabled = false` is checked but not offered: switch on the ones you use and
+fill in their `vars`.
 
 <!-- BEGIN GENERATED: starter -->
 | Entry | Kind | On | What it does | Needs in `vars` | Commit lookup |
@@ -224,8 +227,8 @@ vars    = { vault = "Notes", folder = "Inbox" }
 | `{repo}` | The repository name. |
 | `{var.<name>}` | A value from `[send.vars]`, inserted verbatim, so it may hold the base URL. |
 
-Refused schemes: `javascript:`, `data:`, `file:`, `vbscript:`, `blob:`, `about:`, `chrome:`,
-`view-source:`.
+Refused schemes: `javascript:`, `data:`, `file:`, `vbscript:`, `blob:`,
+`about:`, `chrome:`, `view-source:`.
 
 ### `[[send]]`
 
@@ -244,9 +247,10 @@ One Send to target: a `url` template.
 
 ## Actions
 
-An action runs a program of yours directly, with no shell: placeholders such as `{title}`
-fill whole arguments, and stdin carries the payload as JSON or the markdown alone. Use one
-when the job is a write with no add screen, a script, or a webhook.
+An action runs a program of yours directly, with no shell: placeholders such as
+`{title}` fill whole arguments, and stdin carries the payload as JSON or the
+markdown alone. Use one when the job is a write with no add screen, a script, or
+a webhook.
 
 ```toml
 [[action]]
@@ -258,9 +262,9 @@ stdin   = "json"
 vars    = { url = "https://example.test/hook" }
 ```
 
-Obsidian's `obsidian://new` takes `vault`, `file` (a path in the vault, `/` encoded as `%2F`),
-`content` and `append`, and opens the note it wrote. With `append`, repeated sends add to one
-inbox note instead of a new note each time:
+Obsidian's `obsidian://new` takes `vault`, `file` (a path in the vault, `/`
+encoded as `%2F`), `content` and `append`, and opens the note it wrote. With
+`append`, repeated sends add to one inbox note instead of a new note each time:
 
 ```toml
 [[action]]
@@ -280,17 +284,18 @@ vars    = { vault = "Notes", folder = "Inbox" }
 
 ### Windows
 
-gitterrace builds and is smoke-tested on native Windows (CI) and under Wine, including a
-timeout that kills its child. Registry, ACL and process group behavior are not exercised
-by Wine. Natively, a timeout ends the script with `taskkill /T` (then `/F`)
-instead of a process group signal, `actions.toml` is read from `%APPDATA%\gitterrace` without
-an owner or mode check (Windows has no mode bits, and ACLs are not read), and `command[0]`
-must be an `.exe`, `.cmd`, `.bat` or `.com`. The sample `.sh` scripts need a POSIX shell, so
-call a Windows tool directly, for example `command = ["clip.exe"]` with `stdin = "markdown"`.
+gitterrace builds and is smoke-tested on native Windows (CI) and under Wine,
+including a timeout that kills its child. Registry, ACL and process group
+behavior are not exercised by Wine. Natively, a timeout ends the script with
+`taskkill /T` (then `/F`) instead of a process group signal, `actions.toml` is
+read from `%APPDATA%\gitterrace` without an owner or mode check (Windows has no
+mode bits, and ACLs are not read), and `command[0]` must be an `.exe`, `.cmd`,
+`.bat` or `.com`. The sample `.sh` scripts need a POSIX shell, so call a Windows
+tool directly, for example `command = ["clip.exe"]` with `stdin = "markdown"`.
 
-When the same action must work on every system, a script picks the tool. The copy action
-with [`clipboard.sh`](actions/clipboard.sh) runs unchanged on macOS, Linux (Wayland or X11)
-and WSL:
+When the same action must work on every system, a script picks the tool. The
+copy action with [`clipboard.sh`](actions/clipboard.sh) runs unchanged on macOS,
+Linux (Wayland or X11) and WSL:
 
 ```toml
 [[action]]
@@ -301,8 +306,8 @@ command = ["~/.config/gitterrace/clipboard.sh"]
 stdin   = "markdown"
 ```
 
-A job with several steps stays a script too. Declare it once as a `[[script]]` and point
-actions at it, each with its own settings:
+A job with several steps stays a script too. Declare it once as a `[[script]]`
+and point actions at it, each with its own settings:
 
 ```toml
 [[script]]
@@ -326,10 +331,10 @@ stdin   = "none"
 
 ## Placeholders
 
-Each element of `command` after the program is filled in on its own and stays exactly one
-argument, whatever the value holds: a title of `$(rm -rf ~)` or `--help` reaches the program
-as that literal text. `{{` and `}}` are literal braces. The program, `command[0]`, is never a
-placeholder.
+Each element of `command` after the program is filled in on its own and stays
+exactly one argument, whatever the value holds: a title of `$(rm -rf ~)` or
+`--help` reaches the program as that literal text. `{{` and `}}` are literal
+braces. The program, `command[0]`, is never a placeholder.
 
 <!-- BEGIN GENERATED: placeholders -->
 | Placeholder | From the repository | Value |
@@ -355,15 +360,19 @@ placeholder.
 
 Rules, checked when the file loads so a mistake never waits for a click:
 
-- An unknown placeholder, or `{var.NAME}` with no such var, is an error naming the element.
+- An unknown placeholder, or `{var.NAME}` with no such var, is an error naming
+  the element.
 - An unknown modifier (`{title:bogus}`) is an error naming the element.
-- `shell = true` takes no placeholders. Read the `GITTERRACE_*` environment instead.
-- A value from the repository may start with `-` and be read as an option. It may open an
-  element only after a literal `--`, right after a literal option it is the argument of
-  (`"--notes", "{markdown}"`), or behind a literal prefix (`"--notes={markdown}"`). In the
-  option case, a value that does start with `-` refuses the run.
-- A value with a NUL byte, a value over 64 KiB, or arguments over 256 KiB together refuse
-  the run with a toast saying so. Nothing is cut short. Send large text on stdin instead.
+- `shell = true` takes no placeholders. Read the `GITTERRACE_*` environment
+  instead.
+- A value from the repository may start with `-` and be read as an option. It
+  may open an element only after a literal `--`, right after a literal option it
+  is the argument of (`"--notes", "{markdown}"`), or behind a literal prefix
+  (`"--notes={markdown}"`). In the option case, a value that does start with `-`
+  refuses the run.
+- A value with a NUL byte, a value over 64 KiB, or arguments over 256 KiB
+  together refuse the run with a toast saying so. Nothing is cut short. Send
+  large text on stdin instead.
 
 <!-- BEGIN GENERATED: action-keys -->
 ### `[[script]]`
@@ -405,9 +414,10 @@ One menu entry. It runs either its own `command` or a `script`.
 Kinds:
 
 <!-- BEGIN GENERATED: kinds -->
-`line` (a line or a range of lines in a file), `file` (a whole file), `commit` (a commit), `hunk`
-(one hunk of a diff), `blame` (one line of a blame view), `search-hit` (a code or commit search
-hit), `insight` (a row of an insights page, such as a hotspot), `page` (the page being shown).
+`line` (a line or a range of lines in a file), `file` (a whole file), `commit`
+(a commit), `hunk` (one hunk of a diff), `blame` (one line of a blame view),
+`search-hit` (a code or commit search hit), `insight` (a row of an insights
+page, such as a hotspot), `page` (the page being shown).
 
 <!-- END GENERATED: kinds -->
 
@@ -440,27 +450,32 @@ Absent fields are never `null`. A removed or retyped field bumps the version.
 Environment (same values, plus `GITTERRACE_VAR_<NAME>`):
 
 <!-- BEGIN GENERATED: env -->
-`GITTERRACE_PAYLOAD_VERSION`, `GITTERRACE_ACTION`, `GITTERRACE_KIND`, `GITTERRACE_REPO`,
-`GITTERRACE_ROOT`, `GITTERRACE_SHA`, `GITTERRACE_TITLE`, `GITTERRACE_URL`, `GITTERRACE_PATH`,
-`GITTERRACE_LINE_START`, `GITTERRACE_LINE_END`.
+`GITTERRACE_PAYLOAD_VERSION`, `GITTERRACE_ACTION`, `GITTERRACE_KIND`,
+`GITTERRACE_REPO`, `GITTERRACE_ROOT`, `GITTERRACE_SHA`, `GITTERRACE_TITLE`,
+`GITTERRACE_URL`, `GITTERRACE_PATH`, `GITTERRACE_LINE_START`,
+`GITTERRACE_LINE_END`.
 
 <!-- END GENERATED: env -->
 
 ## Security
 
-- The file must be yours, private, outside every served repository. Off beyond loopback, with
-  `--no-actions`, and never offered to MCP.
-- No shell between gitterrace and the program: a placeholder is one argument, never parsed.
-  Scrubbed environment, timeout, at most 4 runs at once, 30 a minute.
-- A `timeout` is at most 120 s. That ceiling is fixed and no setting raises it. Each stream of
-  output keeps its first `limits.action_output_kb` (default 64 KiB) and drops the rest.
-- Every field is untrusted repository text. In a script, quote it and never `eval` it.
+- The file must be yours, private, outside every served repository. Off beyond
+  loopback, with `--no-actions`, and never offered to MCP.
+- No shell between gitterrace and the program: a placeholder is one argument,
+  never parsed. Scrubbed environment, timeout, at most 4 runs at once, 30 a
+  minute.
+- A `timeout` is at most 120 s. That ceiling is fixed and no setting raises it.
+  Each stream of output keeps its first `limits.action_output_kb` (default 64
+  KiB) and drops the rest.
+- Every field is untrusted repository text. In a script, quote it and never
+  `eval` it.
 
 ## Scripts
 
-The samples left are the jobs a single command cannot do: `clipboard.sh` picks the clipboard
-tool of the OS, `editor.sh` picks your editor and its line syntax, `obsidian.sh` appends to today's
-daily note, a write with no Obsidian screen of its own.
+The samples left are the jobs a single command cannot do: `clipboard.sh` picks
+the clipboard tool of the OS, `editor.sh` picks your editor and its line syntax,
+`obsidian.sh` appends to today's daily note, a write with no Obsidian screen of
+its own.
 
 <!-- BEGIN GENERATED: scripts -->
 | Script | Does | Needs |

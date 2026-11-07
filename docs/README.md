@@ -1,7 +1,8 @@
 # gitterrace documentation
 
-New here? [Install it and run it](../README.md#quickstart) in any git repository, then read
-[why](why.md) it exists. Contributors start at [contributing](../CONTRIBUTING.md).
+New here? [Install it and run it](../README.md#quickstart) in any git
+repository, then read [why](why.md) it exists. Contributors start at
+[contributing](../CONTRIBUTING.md).
 
 <!-- BEGIN GENERATED: doc-index -->
 ## Start here

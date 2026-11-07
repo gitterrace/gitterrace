@@ -2,17 +2,23 @@
 
 # API
 
-Read-only. Everything is pinned to a revision (`rev`, default `HEAD`). Errors are
-`{"error": {"code", "message"}}`, codes listed below. Every response carries an `ETag`
-built from HEAD, every ref's target, the cache format, how far the cache is filled and the
-configured counting defaults, so moving any branch or tag, the cache catching up or a changed
+Read-only. Everything is pinned to a revision (`rev`, default `HEAD`). Errors
+are
+`{"error": {"code", "message"}}`, codes listed below. Every response carries an
+`ETag`
+built from HEAD, every ref's target, the cache format, how far the cache is
+filled and the
+configured counting defaults, so moving any branch or tag, the cache catching up
+or a changed
 `insights` setting invalidates it. `If-None-Match` gets 304.
-JSON is `snake_case`. The same endpoints as `OpenAPI` 3.1: [openapi.json](openapi.json).
+JSON is `snake_case`. The same endpoints as `OpenAPI` 3.1:
+[openapi.json](openapi.json).
 
 The API of each repository lives at `/r/{name}/api/v1`.
 
 Rust: `gitterrace_api::router(ApiState)` (nest under `/api/v1`),
-`gitterrace_api::serve_mcp(path, config)`, `gitterrace_api::serve_mcp_repos(scope, repos, config)`.
+`gitterrace_api::serve_mcp(path, config)`,
+`gitterrace_api::serve_mcp_repos(scope, repos, config)`.
 
 | Status | `code` | Meaning |
 |---|---|---|
@@ -28,9 +34,9 @@ Rust: `gitterrace_api::router(ApiState)` (nest under `/api/v1`),
 
 A 5xx `message` is always the same fixed text. The details go to the server log.
 
-Answers are capped so one file cannot flood a client: `log` at 500 per page, `blob` at 5000 lines
-and 256 KiB, `blame` at 5000 lines, each with `truncated` when cut. The `[api]` section of
-`config.toml` sets each cap.
+Answers are capped so one file cannot flood a client: `log` at 500 per page,
+`blob` at 5000 lines and 256 KiB, `blame` at 5000 lines, each with `truncated`
+when cut. The `[api]` section of `config.toml` sets each cap.
 
 ## HTTP (`/api/v1`)
 
@@ -135,10 +141,11 @@ Served at `GET /insights/{name}`. Every number is counted by one rule, see
 
 ## MCP (stdio)
 
-`git terrace mcp --served` reads every repository served before (those a running server shows) plus
-the current one. `git terrace mcp [paths]` reads only the repositories the paths name,
-`git terrace mcp` the current one. With several in scope, call `list_repos` and pass its `name` as
-`repo`. Stdio only: no port, read-only, and a name resolves only within the scope fixed at start.
+`git terrace mcp --served` reads every repository served before (those a running
+server shows) plus the current one. `git terrace mcp [paths]` reads only the
+repositories the paths name, `git terrace mcp` the current one. With several in
+scope, call `list_repos` and pass its `name` as `repo`. Stdio only: no port,
+read-only, and a name resolves only within the scope fixed at start.
 
 | Tool | Read-only | Description | Parameters |
 | --- | --- | --- | --- |

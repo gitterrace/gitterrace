@@ -1,13 +1,13 @@
 # What we know about you
 
-Almost nothing, and we would like to keep it that way. This site sets no cookies and runs no
-analytics, and everything below is checkable rather than promised.
+Almost nothing, and we would like to keep it that way. This site sets no cookies
+and runs no analytics, and everything below is checkable rather than promised.
 
 Effective: 6 November 2026
 
 This policy explains which personal data is processed when you visit this
-website (gitterrace.dev), why, on what legal basis, who receives it, and what rights
-you have.
+website (gitterrace.dev), why, on what legal basis, who receives it, and what
+rights you have.
 
 ## 1. Controller and contact
 
@@ -40,8 +40,8 @@ URL, the referring page, your user agent, and a timestamp.
 
 ### 2.2 Browser storage and cookies
 
-This site sets **no cookies**, first- or third-party. It stores one
-preference in your browser, and only when you trigger it:
+This site sets **no cookies**, first- or third-party. It stores one preference
+in your browser, and only when you trigger it:
 
 | Key                | Storage      | What it is                      |
 | ------------------ | ------------ | ------------------------------- |
@@ -50,8 +50,7 @@ preference in your browser, and only when you trigger it:
 It is not an identifier, it is not readable by anyone but your own browser, and
 it is not transmitted anywhere. No consent banner is needed: § 25 (2) No. 2
 TDDDG exempts storage that is strictly necessary to provide a service you
-explicitly requested. You can clear it in your browser's site-data
-settings.
+explicitly requested. You can clear it in your browser's site-data settings.
 
 ### 2.3 Fonts and other assets
 
@@ -60,18 +59,18 @@ Nothing is loaded from Google Fonts, a CDN, or any other third-party origin.
 
 ### 2.4 Email to us
 
-If you write to `support@gitterrace.dev` or `security@gitterrace.dev`, we process your address and your message in order to answer
-you. Legal basis: Art. 6(1)(b) GDPR where your message concerns a contract or
-its initiation, otherwise Art. 6(1)(f) GDPR, our legitimate interest in
-answering people who write to us. We keep correspondence as long as needed to
-handle the matter, plus any statutory retention period, and delete it
-afterwards. You can ask us to delete it sooner at any
-time.
+If you write to `support@gitterrace.dev` or `security@gitterrace.dev`, we
+process your address and your message in order to answer you. Legal basis: Art.
+6(1)(b) GDPR where your message concerns a contract or its initiation, otherwise
+Art. 6(1)(f) GDPR, our legitimate interest in answering people who write to us.
+We keep correspondence as long as needed to handle the matter, plus any
+statutory retention period, and delete it afterwards. You can ask us to delete
+it sooner at any time.
 
 ## 3. The app
 
-The gitterrace app runs on your machine and sends nothing anywhere: no telemetry and no
-update check.
+The gitterrace app runs on your machine and sends nothing anywhere: no telemetry
+and no update check.
 
 ## 4. Your rights
 
@@ -81,15 +80,13 @@ Under the GDPR you have the right to:
 - **Rectification** (Art. 16): have inaccurate data corrected
 - **Erasure** (Art. 17): have your data deleted
 - **Restriction** (Art. 18): have processing limited while a dispute is resolved
-- **Data portability** (Art. 20): receive your data in a machine-readable
-  format
+- **Data portability** (Art. 20): receive your data in a machine-readable format
 - **Object** (Art. 21): object to processing based on legitimate interest, on
   grounds relating to your particular situation
 
 Exercising any of these is free and needs no form: write to
-**support@gitterrace.dev**. We answer within one month. Please
-do not open a public issue for these requests, because they involve your own
-data.
+**support@gitterrace.dev**. We answer within one month. Please do not open a
+public issue for these requests, because they involve your own data.
 
 ## 5. Right to lodge a complaint
 
