@@ -258,3 +258,24 @@ fn no_day_heading_appears_twice_in_a_log() {
     let mut seen = std::collections::HashSet::new();
     assert!(labels.iter().all(|l| seen.insert(l.clone())), "{labels:?}");
 }
+
+#[test]
+fn initials_follow_the_naming_rules() {
+    for (name, want) in [
+        ("Timo Runge", "TR"),
+        ("Ana María López", "AL"),
+        ("dependabot", "D"),
+        ("dependabot[bot]", "D"),
+        ("renovate [bot]", "R"),
+        ("x@y.z", "X"),
+        ("Tim @home", "T"),
+        ("éric dupont", "ÉD"),
+        ("e\u{301}va li", "E\u{301}L"),
+        ("山田太郎", "山"),
+        ("  ", "?"),
+        ("", "?"),
+        ("[bot]", "?"),
+    ] {
+        assert_eq!(crate::views::initials(name), want, "{name:?}");
+    }
+}

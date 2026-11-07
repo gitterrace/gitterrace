@@ -98,7 +98,32 @@ export function checks(env) {
       await b.close();
     }
   }
-  return { loneRows, smallLayout };
+  // Avatar letters: two letters stay inside their disc, in every theme.
+  async function avatarFit() {
+    for (const name of browsers) {
+      const { b, ctx } = await context(name);
+      const p = await ctx.newPage();
+      const all = await pages(p);
+      for (const theme of ['light', 'dark']) {
+        await p.addInitScript((t) => localStorage.setItem('gitterrace-theme', t), theme);
+        for (const [key, path] of Object.entries(all)) {
+          await p.goto(srv.base + path, { waitUntil: 'load' });
+          await p.evaluate(() => document.fonts.ready);
+          const bad = await p.evaluate(() => [...document.querySelectorAll('.av')].filter((e) => {
+            const rg = document.createRange();
+            rg.selectNodeContents(e);
+            const t = rg.getBoundingClientRect(), q = e.getBoundingClientRect();
+            return e.scrollWidth > e.clientWidth || t.width > q.width - 2 || t.left < q.left || t.right > q.right;
+          }).map((e) => e.textContent));
+          const where = `avatar-fit ${name} ${theme} ${key}`;
+          if (bad.length) r.fail(`${where}: letters overflow the disc: ${bad.join(', ')}`);
+          else r.ok(`${where}: avatar letters fit`);
+        }
+      }
+      await b.close();
+    }
+  }
+  return { loneRows, smallLayout, avatarFit };
 }
 
 // Runs in the page. Walks main from the top down to the first content block. A row is the

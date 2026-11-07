@@ -10,7 +10,7 @@ use askama::filters::HtmlSafe;
 use gitterrace_git::CommitSummary;
 
 use crate::fmt::{ago_at, href, sha_link};
-use crate::views::{author_href, hue, initial};
+use crate::views::{author_href, hue, initials};
 
 /// The ref that leads a row on the refs and tag pages: its name as a link and its badges.
 #[derive(Debug, Clone, Default)]
@@ -54,7 +54,7 @@ impl CommitRow {
     pub(crate) fn of(c: &CommitSummary, now: i64) -> Self {
         Self {
             sha: sha_link(&c.id),
-            initial: initial(&c.author.name),
+            initial: initials(&c.author.name),
             hue: hue(&c.author.name),
             href: href(&format!("/commit/{}", c.id)),
             subject: c.subject.clone(),

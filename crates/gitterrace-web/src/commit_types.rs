@@ -393,7 +393,7 @@ pub(crate) fn section(
         .iter()
         .map(|(id, author, email, time, offset)| CommitRow {
             sha: fmt::sha_link(id),
-            initial: views::initial(author),
+            initial: views::initials(author),
             hue: views::hue(author),
             href: href(&format!("/commit/{id}")),
             subject: subjects.get(id).cloned().unwrap_or_default(),

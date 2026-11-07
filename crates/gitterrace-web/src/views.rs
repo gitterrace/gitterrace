@@ -368,11 +368,61 @@ pub(crate) fn stats_tabs(active: &str) -> Tabs {
     Tabs { primary: all }
 }
 
-/// First letter of a name for the avatar disc.
-pub(crate) fn initial(name: &str) -> String {
-    name.chars()
+/// Avatar letters: the first letter of the first and of the last word of the name. One word
+/// gives one letter, bracketed parts ("[bot]") and anything after an "@" are skipped, a CJK
+/// name gives its first character, and nothing usable gives "?".
+pub(crate) fn initials(name: &str) -> String {
+    let mut plain = String::new();
+    let mut depth = 0u32;
+    for ch in name.chars() {
+        match ch {
+            '[' | '(' => depth += 1,
+            ']' | ')' => depth = depth.saturating_sub(1),
+            _ if depth == 0 => plain.push(ch),
+            _ => {}
+        }
+    }
+    let words: Vec<&str> = plain
+        .split_whitespace()
+        .map(|w| w.split('@').next().unwrap_or(""))
+        .filter(|w| w.chars().any(char::is_alphanumeric))
+        .collect();
+    let (Some(first), Some(last)) = (words.first(), words.last()) else {
+        return "?".to_owned();
+    };
+    let head = letter(first);
+    if is_cjk(&head) || words.len() == 1 {
+        return head;
+    }
+    head + &letter(last)
+}
+
+/// The first letter of a word, uppercased, with the combining marks that follow it.
+fn letter(word: &str) -> String {
+    let mut chars = word.chars().skip_while(|c| !c.is_alphanumeric());
+    let mut out: String = chars
         .next()
-        .map_or_else(|| "?".to_owned(), |ch| ch.to_uppercase().collect())
+        .into_iter()
+        .flat_map(char::to_uppercase)
+        .collect();
+    out.extend(chars.take_while(|&c| is_combining(c)));
+    out
+}
+
+fn is_combining(c: char) -> bool {
+    matches!(
+        u32::from(c),
+        0x300..=0x36F | 0x1AB0..=0x1AFF | 0x1DC0..=0x1DFF | 0x20D0..=0x20FF | 0xFE20..=0xFE2F
+    )
+}
+
+fn is_cjk(s: &str) -> bool {
+    s.chars().next().is_some_and(|c| {
+        matches!(
+            u32::from(c),
+            0x2E80..=0x9FFF | 0xAC00..=0xD7AF | 0xF900..=0xFAFF | 0x20000..=0x2FFFF
+        )
+    })
 }
 
 /// Stable avatar hue per name.

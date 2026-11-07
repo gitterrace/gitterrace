@@ -95,7 +95,7 @@ button:hover{border-color:var(--line-strong);background:var(--hover)}button.prim
 .counts{font:var(--weight-semibold) var(--text-xs) var(--mono);font-variant-numeric:tabular-nums}
 .badge{font:var(--weight-semibold) var(--text-xs)/1 var(--sans);padding:3px 8px;border-radius:var(--radius);border:var(--border);color:var(--muted)}
 .badge.added{color:var(--add);border-color:var(--add-hl);background:var(--add-bg)}.badge.deleted{color:var(--del);border-color:var(--del-hl);background:var(--del-bg)}
-.av{display:inline-grid;place-items:center;width:20px;height:20px;border-radius:50%;font:var(--weight-semibold) var(--text-2xs)/1 var(--sans);color:var(--on-accent);background:hsl(var(--hue) 38% 48%);flex:none}
+.av{display:inline-grid;place-items:center;width:20px;height:20px;border-radius:50%;font:var(--weight-semibold) 9px/1.2 var(--sans);letter-spacing:-.02em;overflow:hidden;color:var(--on-accent);background:hsl(var(--hue) 38% 48%);flex:none}
 .sha{font:var(--text-xs) var(--mono);color:var(--muted);border:var(--border);border-radius:var(--radius);padding:3px var(--space-2);background:transparent;white-space:nowrap}
 .sha:hover{text-decoration:none;color:var(--accent-fg);border-color:var(--line-strong)}
 
@@ -164,7 +164,7 @@ thead.quiet th{padding:0;border:0;line-height:0;height:0}
 .day{font:var(--text-2xs) var(--mono);text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin:var(--space-4) 0 var(--space-2);display:flex;align-items:center;gap:var(--space-2)}
 .day::before{content:"";width:12px;border-top:1px solid var(--line-strong)}
 .crow{flex-direction:row!important;align-items:center;gap:var(--space-3)!important;padding-top:var(--space-2)!important;padding-bottom:var(--space-2)!important}
-.crow .av{width:18px;height:18px;font-size:10px;flex:none}
+.crow .av{width:18px;height:18px;flex:none}
 /* One line per commit: subject takes the room, author and time sit after it,
    muted, and give way first when the line is short. */
 .cmain{display:flex;flex-direction:row;flex-wrap:nowrap;align-items:baseline;gap:0 var(--space-3);flex:1;min-width:0}

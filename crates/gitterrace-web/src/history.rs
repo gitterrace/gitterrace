@@ -68,7 +68,7 @@ pub(crate) async fn page(
                 views::CommitRow {
                     href: href(&format!("/commit/{}", t.commit)),
                     sha: fmt::sha_link(&t.commit),
-                    initial: views::initial(&t.author),
+                    initial: views::initials(&t.author),
                     hue: views::hue(&t.author),
                     subject: subjects.get(&t.commit).cloned().unwrap_or_default(),
                     author_href: views::author_href(email),

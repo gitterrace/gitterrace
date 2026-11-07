@@ -424,7 +424,7 @@ pub(crate) async fn contributors(
                     last: fmt::day(p.last_commit),
                     spark: charts::sparkline(&p.series, "s1"),
                     hue: views::hue(&p.name),
-                    initial: views::initial(&p.name),
+                    initial: views::initials(&p.name),
                     bar_add: pct(p.additions),
                     bar_del: pct(p.deletions),
                 }
