@@ -14,6 +14,10 @@ use gitterrace_git::CommitSummary;
 use crate::fmt;
 use crate::multi::Table;
 
+/// Threads reading rows at once: enough to overlap the trees' disk reads, few enough that a
+/// home page of a hundred repositories does not crowd the server's other requests.
+const READERS: usize = 8;
+
 #[derive(Template)]
 #[template(path = "repos.html")]
 struct IndexPage {
@@ -73,6 +77,31 @@ fn today_line(today: u32, last: Option<&CommitSummary>, now: i64) -> String {
     }
 }
 
+/// `f` over `items` on up to [`READERS`] threads, the answers in the order of `items`.
+/// Each thread takes every `READERS`th item, so a slow repository holds up only its stripe.
+fn in_order<I: Sync, T: Send>(items: &[I], f: impl Fn(&I) -> T + Sync) -> Vec<T> {
+    let mut out: Vec<Option<T>> = std::iter::repeat_with(|| None).take(items.len()).collect();
+    std::thread::scope(|sc| {
+        let f = &f;
+        let stripes: Vec<_> = (0..READERS.min(items.len()))
+            .map(|k| {
+                sc.spawn(move || {
+                    let mine = items.iter().enumerate().skip(k).step_by(READERS);
+                    mine.map(|(i, it)| (i, f(it))).collect::<Vec<_>>()
+                })
+            })
+            .collect();
+        for h in stripes {
+            // A panic in one read is the request's panic, as when the rows were read inline.
+            let got = h.join().unwrap_or_else(|p| std::panic::resume_unwind(p));
+            for (i, v) in got {
+                out[i] = Some(v);
+            }
+        }
+    });
+    out.into_iter().flatten().collect()
+}
+
 /// `/`: the one repository while there is one (a 302, so the answer changes once another
 /// joins), else the index of all.
 pub(super) async fn index(State(table): State<Arc<Table>>) -> crate::error::Result<Response> {
@@ -84,12 +113,13 @@ pub(super) async fn index(State(table): State<Arc<Table>>) -> crate::error::Resu
         let now = fmt::now();
         let show_tree =
             !table.env.public() && crate::features::on(gitterrace_config::Feature::Worktree);
-        let rows: Vec<IndexRow> = table
-            .snapshot()
+        let served = table.snapshot();
+        let reads = in_order(&served, |s| (s.recent(now), show_tree.then(|| s.dirty())));
+        let rows: Vec<IndexRow> = served
             .iter()
-            .map(|s| {
+            .zip(reads)
+            .map(|(s, (r, dirty))| {
                 let href = format!("/r/{}/", s.name);
-                let r = s.recent(now);
                 let c = r.last.as_ref();
                 let counts = &r.series.counts;
                 let peak = counts.iter().copied().max().unwrap_or(0);
@@ -105,7 +135,7 @@ pub(super) async fn index(State(table): State<Arc<Table>>) -> crate::error::Resu
                     total,
                     today: today_line(r.today, c, now),
                     commits_today: r.today,
-                    dirty: show_tree.then(|| s.dirty()),
+                    dirty,
                     tip: if counts.is_empty() {
                         "No commits yet.".to_owned()
                     } else {
@@ -140,4 +170,19 @@ pub(super) async fn index(State(table): State<Arc<Table>>) -> crate::error::Resu
     })
     .await??;
     Ok(Html(html).into_response())
+}
+
+#[cfg(test)]
+mod tests {
+    /// Reads finishing out of order (the early items sleep longest) still come back in the
+    /// order of the items, also past one stripe per thread.
+    #[test]
+    fn parallel_reads_keep_the_row_order() {
+        let items: Vec<u64> = (0..37).collect();
+        let got = super::in_order(&items, |n| {
+            std::thread::sleep(std::time::Duration::from_millis(40 - n));
+            n * 10
+        });
+        assert_eq!(got, items.iter().map(|n| n * 10).collect::<Vec<_>>());
+    }
 }

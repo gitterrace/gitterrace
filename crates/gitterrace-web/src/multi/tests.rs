@@ -300,3 +300,40 @@ fn the_dirty_chip_follows_the_tree_within_the_bound() {
     std::thread::sleep(bound);
     assert!(!s.dirty(), "a revert shows within the bound");
 }
+
+/// The home page over many repositories, a fifth of them dirty: every row is read, the dirty
+/// ones are found, and repeated renders serve. The timing run lives in the bench corpus.
+#[test]
+fn the_home_page_over_many_repositories_finds_every_dirty_tree() {
+    let dir = tempfile::tempdir().expect("tmp");
+    let mut paths = Vec::new();
+    for i in 0..10 {
+        let p = dir.path().join(format!("r{i:02}"));
+        let f = gitterrace_testkit::Fixture::init(&p)
+            .write("a.txt", &format!("{i}\n"))
+            .commit("one")
+            .write("log.txt", "1\n")
+            .commit("more");
+        if i % 5 == 0 {
+            let _f = f.write("a.txt", "dirty\n");
+        }
+        paths.push(p);
+    }
+    let table = std::sync::Arc::new(
+        super::Table::new(
+            paths,
+            crate::app::Env::new(gitterrace_config::Config::default()),
+            None,
+        )
+        .expect("table"),
+    );
+    let rows = table.snapshot();
+    assert_eq!(rows.iter().filter(|s| s.dirty()).count(), 2);
+    let rt = tokio::runtime::Runtime::new().expect("rt");
+    for _ in 0..2 {
+        let r = rt
+            .block_on(super::home::index(axum::extract::State(table.clone())))
+            .expect("page");
+        assert_eq!(r.status(), 200);
+    }
+}
