@@ -260,3 +260,25 @@ fn a_planted_bad_link_or_anchor_is_reported() {
     );
     assert!(bad.contains("#nope: no id nope in "), "{bad}");
 }
+
+/// The class this guards: a generated page a keyboard or screen reader user cannot skip into or
+/// find the title of. Every page opens its body with a skip link to `#main` and has one h1.
+#[test]
+fn every_page_has_a_skip_link_first_and_one_h1() {
+    let (pages, _) = generated();
+    let mut bad = Vec::new();
+    for (path, html) in &pages {
+        let body = html.split_once("<body>\n").map_or("", |b| b.1);
+        if !body.starts_with("<a class=\"skip\" href=\"#main\">") {
+            bad.push(format!("{path}: the body does not open with the skip link"));
+        }
+        if !html.contains("<main id=\"main\"") {
+            bad.push(format!("{path}: no main with the id main"));
+        }
+        let h1 = html.matches("<h1").count();
+        if h1 != 1 {
+            bad.push(format!("{path}: {h1} h1"));
+        }
+    }
+    assert!(bad.is_empty(), "{}", bad.join("\n"));
+}
