@@ -47,6 +47,31 @@ where
     }
 }
 
+/// GETs page `uri` of the lone repository until its body passes `ok`, and returns it.
+///
+/// Prefixed as [`crate::page`] does, at most [`DEADLINE`]: the wait for a page to show data
+/// instead of the indexing progress. Panics with the last body.
+pub async fn page_until(router: &axum::Router, uri: &str, ok: impl Fn(&str) -> bool) -> String {
+    let end = Instant::now() + DEADLINE;
+    loop {
+        let (_, body) = crate::page(router, uri).await;
+        if ok(&body) {
+            return body;
+        }
+        assert!(
+            Instant::now() < end,
+            "{uri} never answered as awaited within {DEADLINE:?}: {body}"
+        );
+        pause(STEP).await;
+    }
+}
+
+/// A page body that holds data, not the indexing progress.
+#[must_use]
+pub fn indexed(body: &str) -> bool {
+    !body.contains("data-progress")
+}
+
 /// The blocking twin of [`until`], for tests without a runtime.
 pub fn until_blocking(what: &str, mut cond: impl FnMut() -> bool) {
     let end = Instant::now() + DEADLINE;

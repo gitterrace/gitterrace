@@ -2,8 +2,6 @@
 //! numbers are right, so each page must say which one it shows, and they must add up.
 #![expect(clippy::expect_used, reason = "setup failures should panic")]
 
-use std::time::Duration;
-
 use gitterrace_testkit::{Fixture, page as get};
 
 /// The number inside the first `<b>` after `marker`, separators gone.
@@ -43,13 +41,8 @@ async fn overview_total_is_stats_total_plus_merges_and_both_say_so() {
     assert_eq!((all, merges), (4, 1));
 
     let router = gitterrace_web::app_router(f.path()).expect("router");
-    for _ in 0..200 {
-        let (_, body) = get(&router, "/stats").await;
-        if !body.contains("data-progress") {
-            break;
-        }
-        tokio::time::sleep(Duration::from_millis(50)).await;
-    }
+    gitterrace_testkit::wait::page_until(&router, "/stats", gitterrace_testkit::wait::indexed)
+        .await;
     let (_, overview) = get(&router, "/").await;
     let (_, stats) = get(&router, "/stats").await;
 

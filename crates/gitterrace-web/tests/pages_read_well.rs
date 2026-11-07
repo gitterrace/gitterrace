@@ -5,7 +5,6 @@
 //! what no link reaches: a search with hits, a compare and the working tree.
 
 use std::collections::{BTreeSet, HashSet};
-use std::time::Duration;
 
 use gitterrace_testkit::{Fixture, base, get};
 
@@ -51,13 +50,8 @@ async fn every_linked_page_reads_well() {
     let f = f.write("README.md", "# Hi\n\nchanged\n");
     let router = gitterrace_web::app_router(f.path()).expect("router");
     let at = base(&router).await;
-    for _ in 0..200 {
-        let (_, body) = get(&router, &format!("{at}/stats")).await;
-        if !body.contains("data-progress") {
-            break;
-        }
-        tokio::time::sleep(Duration::from_millis(50)).await;
-    }
+    gitterrace_testkit::wait::page_until(&router, "/stats", gitterrace_testkit::wait::indexed)
+        .await;
     let mut todo: Vec<String> = [
         "/",
         "/search?q=main",

@@ -2,9 +2,7 @@
 //! and the page without a range carries no range markup.
 #![expect(clippy::expect_used, reason = "setup failures should panic")]
 
-use std::time::Duration;
-
-use gitterrace_testkit::{Fixture, page as get};
+use gitterrace_testkit::Fixture;
 
 /// Week of Monday 2024-03-04: two commits on Wednesday, one on Thursday. Others are lone.
 const DATES: [&str; 6] = [
@@ -30,15 +28,7 @@ fn router() -> (tempfile::TempDir, axum::Router) {
 }
 
 async fn body(r: &axum::Router, uri: &str) -> String {
-    let mut b = String::new();
-    for _ in 0..100 {
-        b = get(r, uri).await.1;
-        if b.contains("Commits per") {
-            break;
-        }
-        tokio::time::sleep(Duration::from_millis(100)).await;
-    }
-    b
+    gitterrace_testkit::wait::page_until(r, uri, |b| b.contains("Commits per")).await
 }
 
 /// The `href` of the bar link whose label says `needle`.

@@ -2,9 +2,7 @@
 //! "last week" ends on the repository's newest commit, not on the chip's.
 #![expect(clippy::expect_used, reason = "setup failures should panic")]
 
-use std::time::Duration;
-
-use gitterrace_testkit::{Fixture, page as get};
+use gitterrace_testkit::Fixture;
 
 /// Bob's last commit is ten days before the repository's newest one, Ann's.
 fn router() -> (tempfile::TempDir, axum::Router) {
@@ -24,15 +22,10 @@ fn router() -> (tempfile::TempDir, axum::Router) {
 }
 
 async fn body(r: &axum::Router, uri: &str) -> String {
-    let mut b = String::new();
-    for _ in 0..100 {
-        b = get(r, uri).await.1;
-        if b.contains("Commits per") || b.contains("No commits match") {
-            break;
-        }
-        tokio::time::sleep(Duration::from_millis(100)).await;
-    }
-    b
+    gitterrace_testkit::wait::page_until(r, uri, |b| {
+        b.contains("Commits per") || b.contains("No commits match")
+    })
+    .await
 }
 
 /// The bold "now" cell of the commits row.

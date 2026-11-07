@@ -2,7 +2,6 @@
 //! repository and checks that no 7-to-40 hex token in visible text sits outside one.
 
 use gitterrace_testkit::{git, page as get};
-use std::time::Duration;
 
 /// Hex runs of 7 to 40 digits in visible text (outside tags, scripts, styles and `a.sha`),
 /// bounded by non-word characters and holding both a digit and a letter, so counts and plain
@@ -116,13 +115,10 @@ async fn every_commit_id_is_a_sha_link() {
     let head = git(&p, &["rev-parse", "HEAD"]);
 
     // The index builds in the background: wait until commit search has rows.
-    for _ in 0..100 {
-        let (_, body) = get(&router, "/search?q=first&kind=commits").await;
-        if body.contains("class=\"crow\"") {
-            break;
-        }
-        tokio::time::sleep(Duration::from_millis(100)).await;
-    }
+    gitterrace_testkit::wait::page_until(&router, "/search?q=first&kind=commits", |b| {
+        b.contains("class=\"crow\"")
+    })
+    .await;
 
     let pages = [
         "/".to_owned(),

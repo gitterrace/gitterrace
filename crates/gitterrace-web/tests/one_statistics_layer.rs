@@ -3,8 +3,6 @@
 //! side drifts, and this test catches it whichever side moves.
 #![expect(clippy::expect_used, reason = "setup failures should panic")]
 
-use std::time::Duration;
-
 use gitterrace_testkit::{Fixture, page as get};
 use serde_json::Value;
 
@@ -66,13 +64,8 @@ async fn api_and_pages_give_the_same_numbers_for_the_same_filter() {
         .write("src/b.rs", "x\n")
         .commit("docs: third");
     let router = gitterrace_web::app_router(f.path()).expect("router");
-    for _ in 0..200 {
-        let (_, body) = get(&router, "/stats").await;
-        if !body.contains("data-progress") {
-            break;
-        }
-        tokio::time::sleep(Duration::from_millis(50)).await;
-    }
+    gitterrace_testkit::wait::page_until(&router, "/stats", gitterrace_testkit::wait::indexed)
+        .await;
 
     // Each query narrows differently: none, a type, a path, a period, and options that change
     // which files count. The pages read them the same way the API does.

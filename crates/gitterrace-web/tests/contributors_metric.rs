@@ -2,20 +2,10 @@
 //! and added-lines order differ on purpose: Ann commits most, Bob adds most.
 #![expect(clippy::expect_used, reason = "setup failures should panic")]
 
-use std::time::Duration;
-
 use gitterrace_testkit::{Fixture, page as get};
 
 async fn ready(router: &axum::Router, uri: &str) -> String {
-    let mut body = String::new();
-    for _ in 0..200 {
-        body = get(router, uri).await.1;
-        if !body.contains("data-progress") {
-            break;
-        }
-        tokio::time::sleep(Duration::from_millis(50)).await;
-    }
-    body
+    gitterrace_testkit::wait::page_until(router, uri, gitterrace_testkit::wait::indexed).await
 }
 
 /// Commits `body` as `file` under the author `who`.

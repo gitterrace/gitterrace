@@ -63,14 +63,8 @@ fn corrupt(cache: &Path) {
 
 /// Waits until the server says its index is ready, without reading any insights.
 async fn ready(router: &axum::Router) {
-    for _ in 0..600 {
-        let (_, body) = page(router, "/api/progress").await;
-        if body.contains("\"ready\":true") {
-            return;
-        }
-        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
-    }
-    panic!("index never became ready");
+    gitterrace_testkit::wait::page_until(router, "/api/progress", |b| b.contains("\"ready\":true"))
+        .await;
 }
 
 /// Every target's answer from a fresh server over `repo`, once it is ready. Fresh, so no block

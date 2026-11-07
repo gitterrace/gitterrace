@@ -2,9 +2,7 @@
 //! and the punch card agree with it on and off, and lines and files never change.
 #![expect(clippy::expect_used, reason = "setup failures should panic")]
 
-use std::time::Duration;
-
-use gitterrace_testkit::{Fixture, page as get};
+use gitterrace_testkit::Fixture;
 
 fn router() -> (tempfile::TempDir, axum::Router) {
     let root = tempfile::tempdir().expect("tmp");
@@ -26,15 +24,10 @@ fn router() -> (tempfile::TempDir, axum::Router) {
 }
 
 async fn page(r: &axum::Router, uri: &str) -> String {
-    let mut b = String::new();
-    for _ in 0..200 {
-        b = get(r, uri).await.1;
-        if b.contains("Commits per") && !b.contains("data-progress") {
-            break;
-        }
-        tokio::time::sleep(Duration::from_millis(50)).await;
-    }
-    b
+    gitterrace_testkit::wait::page_until(r, uri, |b| {
+        b.contains("Commits per") && gitterrace_testkit::wait::indexed(b)
+    })
+    .await
 }
 
 /// The first number in the `<b>` of the pulse row `label`, whose label cell is a row header.

@@ -1,9 +1,7 @@
 //! Filter chips show what the visitor filtered on, escaped exactly once: a second pass
 //! would print entities such as `&amp;` as text.
 
-use std::time::Duration;
-
-use gitterrace_testkit::{git, page as get};
+use gitterrace_testkit::git;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn chip_labels_are_escaped_exactly_once() {
@@ -29,14 +27,10 @@ async fn chip_labels_are_escaped_exactly_once() {
 
     let router = gitterrace_web::app_router(&p).expect("router");
     let page = "/stats/contributors?author=t%40x&path=a%26%3Cb%3E";
-    let mut body = String::new();
-    for _ in 0..100 {
-        body = get(&router, page).await.1;
-        if body.contains("class=\"chip\"") && body.contains("Jerry") {
-            break;
-        }
-        tokio::time::sleep(Duration::from_millis(100)).await;
-    }
+    let body = gitterrace_testkit::wait::page_until(&router, page, |b| {
+        b.contains("class=\"chip\"") && b.contains("Jerry")
+    })
+    .await;
     let chips = body
         .split("<div class=\"chips\">")
         .nth(1)
