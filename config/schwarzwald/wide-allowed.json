@@ -85,7 +85,7 @@
     "scripts/browser-pages-lib.mjs": 36,
     "scripts/browser-rows-lib.mjs": 2,
     "scripts/browser-send-lib.mjs": 2,
-    "scripts/browser-site-lib.mjs": 38,
+    "scripts/browser-site-lib.mjs": 36,
     "scripts/browser-sticky-lib.mjs": 17,
     "scripts/browser-ui-lib.mjs": 85,
     "scripts/golden-check.sh": 3,

@@ -15,6 +15,7 @@ mark alone, for each theme:
 
 from __future__ import annotations
 
+import math
 import re
 import sys
 from pathlib import Path
@@ -32,21 +33,20 @@ MARK_GROUP = re.compile(r"<g " + re.escape(MARK_AT) + r">.*?</g>", re.S)
 PATHS = re.compile(r'<path fill="#[0-9a-f]{6}"(?: data-[a-z]+="[^"]*")* d="[^"]*"/>')
 # The wordmark's two halves must stay visibly apart in every theme.
 MIN_SPLIT = 3.0
-# The step-in mark: one clockwise outline on the 32 grid. Stem x8-14, crossbar y8-14, tread
-# y18-24, slab y24-30, every part STROKE thick. Every convex corner is rounded by CONVEX and
-# every concave one by CONCAVE. The line y=SPLIT colours it: ink above, accent below.
-STAIR = (
-    (8, 2), (14, 2), (14, 8), (20, 8), (20, 14), (14, 14), (14, 18), (24, 18), (24, 24),
-    (30, 24), (30, 30), (14, 30), (14, 24), (8, 24), (8, 14), (2, 14), (2, 8), (8, 8),
-)  # fmt: skip
-STROKE, SPLIT, CONVEX, CONCAVE = 6, 24, 1.5, 1.0
+# The step-in mark: a plus-shaped stem and arm on the 32 grid, then a tread under it, and below
+# a separate accent bar. Every arm is ARM thick, the stem's centre is at (CENTRE, CENTRE), the
+# tread ends at TREAD_X and its underside sits at TREAD_Y. The bar starts BAR_GAP under the
+# tread, is ARM tall and runs from the stem's left edge to x=30. Every convex corner is rounded
+# by CONVEX and every concave one by CONCAVE. The ink and the accent are two shapes with clear
+# air between them, so there is no shared edge to seam.
+ARM, CENTRE, TREAD_X, TREAD_Y, BAR_GAP = 4.5, 11, 24.5, 23.5, 1.5
+EDGE_LO, EDGE_HI, BAR_END = 2, 20, 30
+CONVEX, CONCAVE = 1.25, 0.75
 INKS = {"light": ("#21272e", "#5b5e8d"), "dark": ("#e3ecf6", "#9ca1d4")}
 # The in-app header draws the same outline with the page's own colours.
 APP_LOGO = re.compile(r'<svg class="logo" [^>]*>.*?</svg>', re.S)
 
 Point = tuple[float, float]
-# One outline segment: start, end and the arc's (radius, sweep), or None for a line.
-Segment = tuple[Point, Point, "tuple[float, int] | None"]
 
 
 def num(v: float) -> str:
@@ -54,69 +54,40 @@ def num(v: float) -> str:
     return f"{round(v, 3):.3f}".rstrip("0").rstrip(".").replace("-0", "0") or "0"
 
 
-def segments(scale: float, round_: bool) -> list[Segment]:
-    """STAIR as lines and quarter arcs at `scale`, starting after the first corner."""
-    n, out = len(STAIR), []
-    corners: list[tuple[Point, Point, float, int]] = []
-    for i, (x, y) in enumerate(STAIR):
-        (ax, ay), (bx, by) = STAIR[i - 1], STAIR[(i + 1) % n]
-        convex = (x - ax) * (by - y) - (y - ay) * (bx - x) > 0
-        r = (CONVEX if convex else CONCAVE) if round_ else 0.0
-
-        def sgn(v: float) -> int:
-            return (v > 0) - (v < 0)
-
-        s = (x + sgn(ax - x) * r, y + sgn(ay - y) * r)
-        e = (x + sgn(bx - x) * r, y + sgn(by - y) * r)
-        corners.append((s, e, r, 1 if convex else 0))
-    for k in range(1, n + 1):
-        prev, (s, e, r, sweep) = corners[k - 1], corners[k % n]
-        out.append((prev[1], s, None))
+def outline(pts: list[Point], scale: float, round_: bool) -> str:
+    """A clockwise rectilinear polygon as one path, corners rounded unless `round_` is off."""
+    n, d = len(pts), ""
+    for i in range(n):
+        p0, p1, p2 = pts[i - 1], pts[i], pts[(i + 1) % n]
+        d1, d2 = (p1[0] - p0[0], p1[1] - p0[1]), (p2[0] - p1[0], p2[1] - p1[1])
+        l1, l2 = math.hypot(*d1), math.hypot(*d2)
+        u1, u2 = (d1[0] / l1, d1[1] / l1), (d2[0] / l2, d2[1] / l2)
+        convex = u1[0] * u2[1] - u1[1] * u2[0] > 0
+        r = min((CONVEX if convex else CONCAVE) if round_ else 0.0, l1 / 2, l2 / 2)
+        a = (p1[0] - u1[0] * r, p1[1] - u1[1] * r)
+        b = (p1[0] + u2[0] * r, p1[1] + u2[1] * r)
+        d += f"{'M' if i == 0 else 'L'}{num(a[0] * scale)} {num(a[1] * scale)}"
         if r:
-            out.append((s, e, (r, sweep)))
-    return [((a[0] * scale, a[1] * scale), (b[0] * scale, b[1] * scale),
-             (arc[0] * scale, arc[1]) if arc else None) for a, b, arc in out]  # fmt: skip
+            d += (
+                f"A{num(r * scale)} {num(r * scale)} 0 0 {int(convex)} "
+                f"{num(b[0] * scale)} {num(b[1] * scale)}"
+            )
+    return d + "Z"
 
 
 def halves(scale: float = 1.0, round_: bool = True) -> tuple[str, str]:
-    """The ink and accent outlines: STAIR cut at y=SPLIT into two closed paths. Every quarter
-    arc lies between its end points, so a segment's side is its end points' side; a segment
-    on the cut belongs to neither, the closing Z draws it."""
-    cut = SPLIT * scale
-    segs = [s for s in segments(scale, round_) if (s[0][1], s[1][1]) != (cut, cut)]
-    above = [max(a[1], b[1]) <= cut for a, b, _ in segs]
-    paths = []
-    for side in (True, False):
-        # Rotate so the run of this side starts at index 0: the outline crosses the cut twice.
-        start = next(
-            i for i in range(len(segs)) if above[i] == side and above[i - 1] != side
-        )
-        run = [segs[(start + i) % len(segs)] for i in range(len(segs))]
-        run = run[
-            : next(
-                i for i, _ in enumerate(run) if above[(start + i) % len(segs)] != side
-            )
-        ]
-        d = f"M{num(run[0][0][0])} {num(run[0][0][1])}"
-        for _, (x, y), arc in run:
-            if arc:
-                d += f"A{num(arc[0])} {num(arc[0])} 0 0 {arc[1]} {num(x)} {num(y)}"
-            else:
-                d += f"L{num(x)} {num(y)}"
-        paths.append(d + "Z")
-    # The two halves share the cut, and a renderer that antialiases each path on its own (WebKit)
-    # lets the background through there: a hairline at the colour change. The ink half carries
-    # bands below the cut that the accent, drawn after it, covers completely, so the cut is
-    # always ink under accent. A thin one reaches into the inner corners (the accent's fillet at
-    # x=13-14 leaves y<24.29 open), a deep one sits where the slab is solid, at least one pixel
-    # at every size the mark is drawn.
-    bands = [(13.7, 24.4, 0.25), (14.0, 28.0, 3.0)] if round_ else [(14.0, 24.0, 3.0)]
-    band = "".join(
-        f"M{num(left * scale)} {num(cut)}H{num(right * scale)}"
-        f"V{num(cut + depth * scale)}H{num(left * scale)}Z"
-        for left, right, depth in bands
-    )
-    return paths[0] + band, paths[1]
+    """The ink and accent outlines at `scale`."""
+    h, c = ARM / 2, CENTRE
+    s0, s1, c0, c1 = c - h, c + h, c - h, c + h
+    tread_top = TREAD_Y - ARM
+    ink = [
+        (s0, TREAD_Y), (s0, c1), (EDGE_LO, c1), (EDGE_LO, c0), (s0, c0), (s0, EDGE_LO),
+        (s1, EDGE_LO), (s1, c0), (EDGE_HI, c0), (EDGE_HI, c1), (s1, c1), (s1, tread_top),
+        (TREAD_X, tread_top), (TREAD_X, TREAD_Y),
+    ]  # fmt: skip
+    top = TREAD_Y + BAR_GAP
+    bar = [(s0, top), (BAR_END, top), (BAR_END, top + ARM), (s0, top + ARM)]
+    return outline(ink, scale, round_), outline(bar, scale, round_)
 
 
 def mark_group(theme: str) -> str:

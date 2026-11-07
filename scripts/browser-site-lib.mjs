@@ -33,13 +33,21 @@ async function markSeam() {
           const lum = (x, y) => { const i = (y * W + x) * 4; return d[i] + d[i + 1] + d[i + 2]; };
           const out = [];
           sizes.forEach((s, i) => {
-            const left = (10 + i * 140 + 0.3) * dpr, top = 20.4 * dpr, S = s * dpr, ys = top + (24 / 32) * S;
-            let worst = 0;
-            for (let y = Math.floor(ys) - 1; y <= Math.ceil(ys) + 1; y++)
-              for (let x = Math.ceil(left + (16 / 32) * S); x < Math.floor(left + (22 / 32) * S); x++) {
-                const a = lum(x, y - 2 - Math.ceil(dpr)), b2 = lum(x, y + 2 + Math.ceil(dpr)), v = lum(x, y);
-                worst = Math.max(worst, dark ? Math.min(a, b2) - v : v - Math.max(a, b2));
-              }
+            // The ink's tread ends at y=23.5 and the accent bar starts at y=25, so the gap is
+            // open air. Where it spans two device pixels or more, its middle row must stay
+            // within 30% of the background, not blend toward either colour.
+            const left = (10 + i * 140 + 0.3) * dpr, top = 20.4 * dpr, S = s * dpr;
+            const y0 = Math.ceil(top + (23.5 / 32) * S), y1 = Math.floor(top + (25 / 32) * S);
+            if (y1 <= y0) return;
+            const bgv = dark ? 97 : 765;
+            const inkv = dark ? 3 * 0xe8 : 3 * 0x25;
+            let worst = Infinity;
+            for (let y = y0; y < y1; y++) {
+              let row = 0;
+              for (let x = Math.ceil(left + (16 / 32) * S); x < Math.floor(left + (22 / 32) * S); x++)
+                row = Math.max(row, Math.abs(lum(x, y) - bgv) - 0.3 * Math.abs(inkv - bgv));
+              worst = Math.min(worst, row);
+            }
             if (worst > 6) out.push(`${s}px:${worst}`);
           });
           return out;
