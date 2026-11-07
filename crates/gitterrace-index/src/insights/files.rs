@@ -335,7 +335,9 @@ impl Insights<'_> {
         out
     }
 
-    /// Every non-merge touch of `path`, through renames, newest first.
+    /// Every non-merge touch of `path`, through renames, newest first: the cross-check's
+    /// view, bots included.
+    #[cfg(test)]
     fn touches_of(&self, path: &str) -> Vec<(TouchRaw, CommitRow)> {
         self.touches_many(&[path], |_| true)
             .pop()
@@ -362,12 +364,15 @@ impl Insights<'_> {
             .collect()
     }
 
-    /// Full history of a file as it is named at the newest commit, following renames.
-    /// Includes bots and every non-merge commit, newest first.
+    /// Full history of a file as it is named at the newest commit, following renames: every
+    /// commit that counts under the options ([`Insights::counted_row`]: no merges, bots as
+    /// the options say), newest first. The hotspots row of the file counts the same commits.
     pub fn file_history(&self, path: &str) -> Vec<Touch> {
         let src = self.source();
         let mut out: Vec<(Rank, Touch)> = self
-            .touches_of(path)
+            .touches_many(&[path], |c| self.counted_row(c))
+            .pop()
+            .unwrap_or_default()
             .into_iter()
             .map(|(t, c)| {
                 (

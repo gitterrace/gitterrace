@@ -535,3 +535,29 @@ fn code_age_follows_the_membership_rule() {
         "Bob's change counts without a selection"
     );
 }
+
+/// A file's history lists the commits its hotspots row counts: a bot's commits only when the
+/// options count bots. `dependabot[bot]` bumps `Cargo.toml` three times, Ann once.
+#[test]
+fn file_history_counts_bots_by_the_option() {
+    let mut recs = vec![rec("a", "Ann", 0, vec![file("Cargo.toml", 1, 0, 1)])];
+    for d in 1..=3 {
+        recs.push(rec(
+            &format!("d{d}"),
+            "dependabot[bot]",
+            d,
+            vec![file("Cargo.toml", 1, 1, 1)],
+        ));
+    }
+    let hf = head(&[("Cargo.toml", 1)]);
+    for (bots, want) in [(false, 1), (true, 4)] {
+        let opts = Options {
+            include_bots: bots,
+            ..Options::default()
+        };
+        let ins = Insights::new(&recs, opts, None);
+        let changes = ins.hotspots(&hf, Period::All).files[0].changes;
+        assert_eq!(ins.file_history("Cargo.toml").len(), want, "bots {bots}");
+        assert_eq!(changes, want, "bots {bots}");
+    }
+}

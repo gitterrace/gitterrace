@@ -375,3 +375,18 @@ async fn a_count_beside_a_list_is_its_length() {
         assert_eq!(said, rows(&s) as u64, "{q}: {s}");
     }
 }
+
+/// A file's history, its hotspots row and the sidebar's hot files count the same commits:
+/// with bots left out, the two dependabot bumps of `Cargo.toml` count nowhere.
+#[tokio::test]
+async fn file_counts_follow_the_bot_option() {
+    let dir = tempfile::tempdir().expect("tmp");
+    let router = gitterrace_web::app_router(mixed(dir.path())).expect("router");
+    oracle::ready(&router).await;
+    let (_, h) = page(&router, "/history/Cargo.toml").await;
+    assert_eq!(rows(&h), 0, "{h}");
+    let (_, ov) = page(&router, "/").await;
+    assert!(!ov.contains("data-tip=\"Cargo.toml\""), "{ov}");
+    let (_, h) = page(&router, "/history/src/a.rs").await;
+    assert_eq!(rows(&h), 1, "{h}");
+}

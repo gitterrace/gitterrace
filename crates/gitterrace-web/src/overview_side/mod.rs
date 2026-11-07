@@ -4,6 +4,14 @@
 //! overview costs one lookup.
 
 mod lists;
+/// The file name with its parent: the parent keeps the many `lib.rs` and `mod.rs` apart, the
+/// tooltip has the rest.
+fn short_name(p: &str) -> String {
+    let mut parts: Vec<_> = p.rsplitn(3, '/').take(2).collect();
+    parts.reverse();
+    parts.join("/")
+}
+
 #[cfg(test)]
 mod tests;
 
@@ -117,20 +125,21 @@ pub(crate) fn build(a: &App, head: &str, src: &dyn InsightsSource, dirty: bool, 
         .checked_sub(1)
         .and_then(|i| src.commit(Rank(u32::try_from(i).unwrap_or(u32::MAX))));
     let offset = latest.map_or(0, |c| c.offset);
-    // Days start at local midnight of the latest commit's zone: the author's day, not UTC's.
-    // Unlike the insights pages the sidebar reads the wall clock ("today" is the viewer's)
-    // and counts every commit, merges included, as the overview's commit count does.
+    // Days start at local midnight of the latest commit's zone. The spark and today count
+    // every commit by the wall clock, as the overview does. The hot files count what the
+    // hotspots page counts (no merges, bots by the option).
     let today_start = local_day_of(now, offset) * DAY - i64::from(offset);
     let from = (now - SPARK_CAP).min(today_start - 6 * DAY);
     let churn_from = now - CHURN_DAYS * DAY;
     let mut times = Vec::new();
     let (mut today, mut week) = (0, 0);
     let mut recent: Vec<Rank> = Vec::new();
+    let counts = gitterrace_index::Insights::from_source(src, a.defaults().into_options(), None);
     for c in src.commits_in(CommitRange::Time(from..now + DAY)) {
         times.push(c.time);
         today += usize::from(c.time >= today_start);
         week += usize::from(c.time >= today_start - 6 * DAY);
-        if c.time >= churn_from && !c.merge {
+        if c.time >= churn_from && counts.counted_row(&c) {
             recent.push(c.rank);
         }
     }
@@ -149,15 +158,7 @@ pub(crate) fn build(a: &App, head: &str, src: &dyn InsightsSource, dirty: bool, 
         .filter(|(p, _)| !filter.skips(p))
         .take(TOP_CHURN)
         .map(|(p, n)| Hot {
-            // The parent keeps the many `lib.rs` and `mod.rs` apart; the tooltip has the rest.
-            name: p
-                .rsplitn(3, '/')
-                .take(2)
-                .collect::<Vec<_>>()
-                .into_iter()
-                .rev()
-                .collect::<Vec<_>>()
-                .join("/"),
+            name: short_name(&p),
             href: crate::views::file_link(&p),
             changes: fmt::count(n, "change", "changes"),
             path: p.to_string(),

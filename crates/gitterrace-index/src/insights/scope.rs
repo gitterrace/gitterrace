@@ -19,7 +19,9 @@
 //!   and how many count, and the API's `/repo` gives both: `every_commits` for every commit,
 //!   `commits` for the counted ones.
 //! - A bot's commit (name or e-mail marks a bot, such as `dependabot[bot]`) counts only with
-//!   `insights.include_bots` or `bots=1`, on every page and list.
+//!   `insights.include_bots` or `bots=1`, on every page and list. A file's history and the
+//!   sidebar's hot files follow it too, so a file's history lists the commits its hotspots
+//!   row counts.
 //! - Authors are people after `.mailmap`. Ranked people with equal values order by display
 //!   name, then e-mail, never by the order the index first met them.
 //! - A contributor is new in a period when their first counted commit over the whole history
