@@ -248,6 +248,7 @@ fn sanitizer(base: Base) -> ammonia::Builder<'static> {
     b.add_tags(["input", "picture", "source"])
         .add_tag_attributes("input", ["type", "checked", "disabled"])
         .add_tag_attributes("source", ["media", "srcset", "type"])
+        .add_tag_attributes("a", ["aria-label"])
         .add_tag_attributes("th", ["style"])
         .add_tag_attributes("td", ["style"])
         .add_generic_attributes(["class", "id"])

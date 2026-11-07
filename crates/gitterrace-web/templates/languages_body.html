@@ -24,7 +24,8 @@ class="hint">{{ r.from }} to {{ r.to }}. {{ r.note }} Lines are counted along th
 class="add">+{{ r.added }}</b><span>lines added</span></div><div><b
 class="del">&minus;{{ r.removed }}</b><span>lines removed</span></div><div><b
 class="{% if r.net_up %}add{% else %}del{% endif %}">{{ r.net }}</b><span>net</span></div>{% endcall %}<div
-class="scroll"><table class="entries">{% call t::caption("Change by language") %}{% endcall %}<tr
+class="scroll" tabindex="0" role="region" aria-label="Change by language"><table
+class="entries">{% call t::caption("Change by language") %}{% endcall %}<tr
 class="th"><th scope="col">Language</th><th scope="col" class="r">Before</th><th scope="col"
 class="r">After</th><th scope="col" class="r">Change</th><th scope="col" class="dcol"><span
 class="vh">Change bar</span></th></tr>
@@ -42,7 +43,8 @@ class="hint">Share of all lines at the newest commit, trend over the whole histo
 aria-describedby="{{ n.fig.id }}-sum">
 {%- for p in n.bar %}<b class="{{ p.class }} w{{ p.w }}" data-tip="{{ p.tip }}"></b>{% endfor -%}
 </div>
-{%- call ch::text(n.fig) %}{% endcall -%}</figure><div class="scroll"><table
+{%- call ch::text(n.fig) %}{% endcall -%}</figure><div class="scroll" tabindex="0" role="region"
+aria-label="Languages now"><table
 class="entries">{% call t::caption("Languages now") %}{% endcall %}<tr class="th"><th
 scope="col">Language</th><th scope="col" class="r">Lines</th><th scope="col" class="r">Share</th><th
 scope="col">Trend</th><th scope="col" class="r">{{ n.window }}</th></tr>

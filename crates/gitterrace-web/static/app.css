@@ -181,7 +181,10 @@ thead.quiet th{padding:0;border:0;line-height:0;height:0}
 .cmain .muted{flex:0 0 auto;max-width:100%;overflow-wrap:break-word;margin-left:auto}
 .cmain .muted b{color:var(--muted);font-weight:var(--weight-regular)}
 .crow .sha{flex:none}
-.crow>.ref{flex:0 0 11rem;min-width:0;overflow-wrap:anywhere;font:var(--weight-semibold) var(--text-sm) var(--mono)}.crow>.ref .tag{font-weight:var(--weight-regular)}
+.crow>.ref>a{text-decoration:underline}
+.crow>.ref{flex:0 0 11rem;min-width:0;overflow-wrap:anywhere;
+  font:var(--weight-semibold) var(--text-sm) var(--mono)}
+.crow>.ref .tag{font-weight:var(--weight-regular)}
 .crow>.cnums{flex:none;display:flex;gap:var(--space-3);font:var(--text-xs) var(--mono);color:var(--muted);font-variant-numeric:tabular-nums}
 /* Narrow screens: author and time always take their own row under the full-width subject, so
    every row has the same two lines whatever the subject's length. */
