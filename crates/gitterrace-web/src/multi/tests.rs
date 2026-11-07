@@ -233,20 +233,21 @@ async fn listed(router: &Router) -> Vec<String> {
 
 /// `name` reaches ready on its own and its API counts the fixture's two commits.
 async fn assert_indexed(router: &Router, name: &str) {
-    let mut last = String::new();
-    for _ in 0..500 {
-        last = gitterrace_testkit::get(router, &format!("/r/{name}/api/progress"))
-            .await
-            .1;
-        if last.contains("\"ready\":true") {
-            break;
+    let last = std::sync::Mutex::new(String::new());
+    let url = format!("/r/{name}/api/progress");
+    // Indexing on a loaded runner took longer than any fixed budget: await ready itself.
+    let ready = gitterrace_testkit::wait::within(gitterrace_testkit::wait::DEADLINE, || {
+        let (url, last) = (&url, &last);
+        async move {
+            let body = gitterrace_testkit::get(router, url).await.1;
+            let done = body.contains("\"ready\":true");
+            *last.lock().expect("last") = body;
+            done
         }
-        tokio::time::sleep(std::time::Duration::from_millis(20)).await;
-    }
-    assert!(
-        last.contains("\"ready\":true"),
-        "{name} never indexed: {last}"
-    );
+    })
+    .await;
+    let last = last.into_inner().expect("last");
+    assert!(ready, "{name} never indexed: {last}");
     let (s, repo) = gitterrace_testkit::get(router, &format!("/r/{name}/api/v1/repo")).await;
     let v: serde_json::Value = serde_json::from_str(&repo).expect("repo json");
     assert_eq!(
