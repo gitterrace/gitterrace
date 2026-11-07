@@ -14,6 +14,7 @@ mod docs_md;
 mod facts;
 mod openapi_json;
 mod out;
+mod plate;
 mod readme_agents_md;
 mod site;
 
@@ -51,6 +52,7 @@ fn generators(root: &Path) -> Result<Vec<Out>> {
     ];
     outs.extend(readme_agents_md::render(&ws, &scripts));
     outs.extend(docs_md::render(root, &ws, &scripts)?);
+    outs.extend(plate::outs(root, plate::PLATE_COLOR)?);
     outs.extend(site::render(root, &ws)?);
     Ok(outs)
 }
