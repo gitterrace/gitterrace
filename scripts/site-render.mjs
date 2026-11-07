@@ -2,7 +2,8 @@
 // Renders the two raster images the site needs from the brand SVGs, at deploy time, and the
 // site's WebP screenshots (below).
 // They are generated, not committed (.gitignore), because the SVGs are the single source:
-//   site/assets/apple-touch-icon.png  180x180, the mark on the page background (iOS home screen)
+//   site/assets/apple-touch-icon.png  180x180, the plated mark (iOS home screen)
+//   docs/brand/avatar-512.png         512x512, the plated mark (the org avatar, committed)
 //   site/assets/og.png                1200x630, the light README header (link previews)
 // Chromium draws the SVGs, the same renderer as the app icon.
 //
@@ -17,19 +18,21 @@ const brand = (f) => 'data:image/svg+xml,' + encodeURIComponent(readFileSync(joi
 const bg = /--n-1:light-dark\((#[0-9a-f]{6}),/.exec(readFileSync(join(root, 'crates/gitterrace-web/static/tokens.css'), 'utf8'))[1];
 const out = join(root, 'site/assets');
 mkdirSync(out, { recursive: true });
+const plate = brand('mark-plate.svg');
 
 const shots = [
-  { file: 'apple-touch-icon.png', w: 180, h: 180, img: brand('mark-light.svg'), size: 'width:140px;height:140px' },
+  { file: 'apple-touch-icon.png', w: 180, h: 180, img: plate, size: 'width:180px;height:180px', bg: 'transparent' },
+  { file: 'avatar-512.png', dir: join(root, 'docs/brand'), w: 512, h: 512, img: plate, size: 'width:512px;height:512px', bg: 'transparent' },
   { file: 'og.png', w: 1200, h: 630, img: brand('readme-header-light.svg'), size: 'width:1000px' },
 ];
 const pw = await loadPlaywright();
 const b = await launch(pw, 'chromium');
 for (const s of shots) {
   const p = await b.newPage({ viewport: { width: s.w, height: s.h }, colorScheme: 'light' });
-  await p.setContent(`<body style="margin:0;height:100vh;display:grid;place-items:center;background:${bg}"><img src="${s.img}" style="${s.size}"></body>`);
+  await p.setContent(`<body style="margin:0;height:100vh;display:grid;place-items:center;background:${s.bg ?? bg}"><img src="${s.img}" style="${s.size}"></body>`);
   await p.waitForFunction(() => document.images[0].complete);
-  await p.screenshot({ path: join(out, s.file) });
-  console.log(`wrote site/assets/${s.file} (${s.w}x${s.h})`);
+  await p.screenshot({ path: join(s.dir ?? out, s.file), omitBackground: s.bg === 'transparent' });
+  console.log(`wrote ${s.file} (${s.w}x${s.h})`);
 }
 await b.close();
 
