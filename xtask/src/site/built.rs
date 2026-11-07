@@ -2,7 +2,7 @@
 //! the 404 page, `sitemap.xml` and the stylesheet. Each check is a function over data, run on the
 //! real output by one test and on a planted fault by another, so it is seen to go red.
 
-use crate::site::tests::{generated, unresolved};
+use crate::site::tests::{attrs, generated, unresolved};
 use crate::site::*;
 
 /// The text of the built file at `path` (relative to `site/`).
@@ -122,4 +122,113 @@ fn a_planted_dead_sitemap_url_redirect_or_font_is_reported() {
     assert!(bad.contains("url(fonts/missing.woff2)"), "{bad}");
     assert!(!bad.contains("elsewhere"), "{bad}");
     assert_eq!(bad.lines().count(), 3, "{bad}");
+}
+
+/// The sha256 CSP source of an inline script body.
+fn csp_hash(body: &str) -> String {
+    use base64::Engine as _;
+    use sha2::Digest as _;
+    let sum = sha2::Sha256::digest(body.as_bytes());
+    format!(
+        "'sha256-{}'",
+        base64::engine::general_purpose::STANDARD.encode(sum)
+    )
+}
+
+/// Everything the built pages do that the `_headers` CSP would refuse or that weakens it: an
+/// inline script without its hash, `unsafe-inline`, an external origin in the policy, a `<style>`
+/// or `style=` (style-src is 'self'), a `<script src>`, or a `<link>` off this site.
+fn csp_problems(headers: &str, pages: &[(String, String)]) -> Vec<String> {
+    let mut bad = Vec::new();
+    let policy = headers
+        .lines()
+        .find_map(|l| l.trim().strip_prefix("Content-Security-Policy:"))
+        .unwrap_or("");
+    if policy.is_empty() {
+        bad.push("_headers: no Content-Security-Policy".to_owned());
+    }
+    for tok in policy.split([' ', ';']) {
+        if tok.contains("unsafe-") {
+            bad.push(format!("_headers: CSP has {tok}"));
+        }
+        if tok.contains("://") || tok == "*" || tok == "data:" || tok == "blob:" {
+            bad.push(format!("_headers: CSP allows the origin {tok}"));
+        }
+    }
+    for directive in ["style-src", "font-src", "img-src"] {
+        let ok = policy
+            .split(';')
+            .any(|d| d.trim().split(' ').eq([directive, "'self'"]));
+        if !ok {
+            bad.push(format!("_headers: CSP {directive} is not exactly 'self'"));
+        }
+    }
+    for (path, html) in pages {
+        for chunk in html.split("<script").skip(1) {
+            let (tag, rest) = chunk.split_once('>').unwrap_or((chunk, ""));
+            if tag.contains("src=") {
+                bad.push(format!("{path}: a script is loaded, not inline"));
+                continue;
+            }
+            let body = rest.split("</script>").next().unwrap_or("");
+            if !policy.contains(&csp_hash(body)) {
+                bad.push(format!(
+                    "{path}: inline script {} is not in the CSP",
+                    csp_hash(body)
+                ));
+            }
+        }
+        if html.contains("<style") || html.contains(" style=\"") {
+            bad.push(format!("{path}: inline style, refused by style-src 'self'"));
+        }
+        for tag in html.split("<link").skip(1) {
+            let tag = tag.split('>').next().unwrap_or("");
+            // A canonical link names the page, the browser fetches nothing from it.
+            if !tag.contains("rel=\"canonical\"")
+                && attrs(&format!("<link{tag}"), "href")
+                    .iter()
+                    .any(|h| h.contains("://") || h.starts_with("//"))
+            {
+                bad.push(format!("{path}: a link to another origin: {tag}"));
+            }
+        }
+    }
+    bad
+}
+
+/// The class this guards: a page whose scripts or styles the policy would block, or a policy
+/// widened to let them through.
+#[test]
+fn every_inline_script_of_every_built_page_is_hashed_in_the_csp() {
+    let (pages, _) = generated();
+    let bad = csp_problems(&text_of("_headers"), &pages);
+    assert!(bad.is_empty(), "{}", bad.join("\n"));
+}
+
+#[test]
+fn a_planted_inline_script_or_widened_policy_is_reported() {
+    let (mut pages, _) = generated();
+    let headers = text_of("_headers");
+    pages[0].1.push_str(
+        "<script>alert(1)</script><style>a{}</style><script src=\"/x.js\"></script>\
+         <link rel=\"stylesheet\" href=\"https://cdn.example/a.css\">",
+    );
+    let bad = csp_problems(&headers, &pages).join("\n");
+    assert!(
+        bad.contains("inline script") && bad.contains("not in the CSP"),
+        "{bad}"
+    );
+    assert!(bad.contains("inline style"), "{bad}");
+    assert!(bad.contains("is loaded, not inline"), "{bad}");
+    assert!(bad.contains("another origin"), "{bad}");
+    let wide = headers
+        .replace(
+            "script-src ",
+            "script-src 'unsafe-inline' https://cdn.example ",
+        )
+        .replace("style-src 'self'", "style-src 'self' https://f.example");
+    let bad = csp_problems(&wide, &[]).join("\n");
+    assert!(bad.contains("unsafe-inline"), "{bad}");
+    assert!(bad.contains("https://cdn.example"), "{bad}");
+    assert!(bad.contains("style-src is not exactly 'self'"), "{bad}");
 }
