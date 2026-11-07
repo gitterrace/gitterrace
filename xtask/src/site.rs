@@ -45,6 +45,7 @@ const PAGE_CSS: &str = "\
 body{margin:0;background:var(--bg);color:var(--fg);font:var(--text-md)/var(--leading) var(--sans)}
 main{max-width:760px;margin:0 auto;padding:var(--space-8) var(--page-pad) var(--space-16)}
 a{color:var(--accent-ink)}
+:focus-visible{outline:2px solid var(--accent-ink);outline-offset:2px}
 main:focus{outline:none}
 .skip{position:absolute;left:var(--space-2);top:-100px;padding:var(--space-2) var(--space-3)}
 .skip{background:var(--bg);border:var(--border);border-radius:var(--radius);z-index:20}
