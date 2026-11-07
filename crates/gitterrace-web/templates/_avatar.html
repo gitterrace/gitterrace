@@ -1,0 +1,5 @@
+{#- An author's avatar: the initial on a tint picked from the name's hue (0 to 359). The one
+    place that writes an avatar. -#}
+{% macro avatar(hue, initial) -%}
+<span class="av h{{ hue / 10 }}">{{ initial }}</span>
+{%- endmacro %}
