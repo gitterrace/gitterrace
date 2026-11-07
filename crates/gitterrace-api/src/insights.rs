@@ -131,6 +131,19 @@ pub fn scope(params: &Params, defaults: gitterrace_index::Options) -> Result<Sco
     Scope::from_params(&p, defaults, Period::All).map_err(|e| ApiError::BadRequest(e.to_string()))
 }
 
+/// The commits `scope` counts in `ins`, anchored on the whole source `all`: the one place an
+/// API request reads the clock.
+pub fn counted<'a>(
+    ins: &'a gitterrace_index::Insights<'a>,
+    scope: &'a Scope,
+    all: &dyn gitterrace_index::feed::InsightsSource,
+) -> Counted<'a> {
+    ins.counted(
+        scope,
+        gitterrace_index::CountContext::new(all, &gitterrace_index::feed::SystemClock),
+    )
+}
+
 /// Runs the named insight over the commits `c` counts. `head` is called only for the
 /// head-tree insights.
 pub fn compute(

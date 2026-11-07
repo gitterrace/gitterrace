@@ -209,16 +209,12 @@ pub(crate) async fn blame(
     blocking(&s, move |s| s.blame(q.rev.as_deref(), &path)).await
 }
 
-#[derive(Deserialize)]
-pub(crate) struct RevQuery {
-    rev: Option<String>,
-}
-
 pub(crate) async fn contributors(
     State(s): State<ApiState>,
-    Query(q): Query<RevQuery>,
+    Query(q): Query<InsightQuery>,
 ) -> Reply<ContributorsResponse> {
-    blocking(&s, move |s| s.contributors(q.rev.as_deref())).await
+    let InsightQuery { rev, params } = q;
+    blocking(&s, move |s| s.contributors(rev.as_deref(), &params)).await
 }
 
 pub(crate) async fn insight_list() -> Json<InsightList> {

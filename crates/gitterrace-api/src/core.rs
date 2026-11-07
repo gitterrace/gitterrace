@@ -508,9 +508,7 @@ impl ApiState {
         let data = self.read(rev, |all| {
             commits_indexed = all.len();
             let ins = self.insights(&tip, &**all, scope.options().clone());
-            let cx =
-                gitterrace_index::CountContext::new(&**all, &gitterrace_index::feed::SystemClock);
-            let counted = ins.counted(&scope, cx);
+            let counted = insights::counted(&ins, &scope, &**all);
             insights::compute(name, &counted, params, || {
                 let mut cache = gitterrace_index::LineCache::load(self.index.dir());
                 gitterrace_index::head_files(&self.repo, &tip, &mut cache).unwrap_or_default()
@@ -526,13 +524,19 @@ impl ApiState {
     }
 
     /// People with their commits, plus a commit-share bus factor: the fewest people who made
-    /// half the commits. Bots are left out unless the configuration counts them.
-    pub fn contributors(&self, rev: Option<&str>) -> Result<ContributorsResponse, ApiError> {
+    /// half the commits. Counted as `/insights/contributors` counts them under the same
+    /// query: the period, the selection and the options of `params`.
+    pub fn contributors(
+        &self,
+        rev: Option<&str>,
+        params: &insights::Params,
+    ) -> Result<ContributorsResponse, ApiError> {
         let rev = Self::rev(rev)?;
-        let opts = self.settings().defaults;
-        let report = self.read(rev, |records| {
-            self.insights(rev, &**records, opts)
-                .contributors(gitterrace_index::Period::All)
+        let tip = self.repo.resolve(rev)?;
+        let scope = insights::scope(params, self.settings().defaults)?;
+        let report = self.read(rev, |all| {
+            let ins = self.insights(&tip, &**all, scope.options().clone());
+            insights::counted(&ins, &scope, &**all).contributors(gitterrace_index::Metric::Commits)
         })?;
         let people = report.contributors;
         let bus_factor = gitterrace_index::bus_factor(people.iter().map(|c| c.commits as f64));

@@ -106,6 +106,48 @@ const fn req(name: &'static str, ty: &'static str, description: &'static str) ->
 }
 
 const REV: Param = p("rev", "string", "Revision to read, default `HEAD`.");
+// The period, the selection and the options: the web pages' own parameters, shared by every
+// endpoint that counts commits.
+const PERIOD: Param = p(
+    "period",
+    "string",
+    "`1w`, `1m`, `3m`, `1y` or `all` (default): the window, ending at the newest \
+    commit. Sets the bucket unit.",
+);
+const TYPE: Param = p(
+    "type",
+    "string",
+    "Only commits of this conventional type, `other` for none.",
+);
+const SCOPE: Param = p(
+    "scope",
+    "string",
+    "Only commits of this scope, `none` for none.",
+);
+const AUTHOR: Param = p("author", "string", "Only commits by this e-mail or name.");
+const UNDER: Param = p("path", "string", "Only files under this directory.");
+const BOTS: Param = p(
+    "bots",
+    "string",
+    "`1` counts bot accounts, `0` leaves them out.",
+);
+const MERGES: Param = p(
+    "merges",
+    "string",
+    "`1` counts merge commits as commits, never their lines or files.",
+);
+const GENERATED: Param = p(
+    "generated",
+    "string",
+    "`1` counts lock files and minified output.",
+);
+const IGNORE: Param = p(
+    "ignore",
+    "string",
+    "`0` counts paths that `.gitignore` rules out.",
+);
+const WS: Param = p("ws", "string", "`1` counts whitespace-only changes.");
+const EXCLUDE: Param = p("exclude", "string", "Comma separated globs left out.");
 const PATH: Param = p("path", "string", "Repository-relative path.");
 
 /// [`ENDPOINTS`] behind a function call: `index` is itself a route in the registry, and naming the
@@ -187,8 +229,10 @@ pub const ENDPOINTS: &[Endpoint] = &[
     },
     Endpoint {
         path: "/contributors",
-        summary: "Authors and bus factor.",
-        params: &[REV],
+        summary: "Authors and bus factor, counted as `/insights/contributors` counts them.",
+        params: &[
+            REV, PERIOD, TYPE, SCOPE, AUTHOR, UNDER, BOTS, MERGES, GENERATED, IGNORE, WS, EXCLUDE,
+        ],
         schema: of::<ContributorsResponse>,
         route: || get(http::contributors),
     },
@@ -204,12 +248,7 @@ pub const ENDPOINTS: &[Endpoint] = &[
         summary: "One insight.",
         params: &[
             REV,
-            p(
-                "period",
-                "string",
-                "`1w`, `1m`, `3m`, `1y` or `all` (default): the window, ending at the newest \
-                commit. Sets the bucket unit.",
-            ),
+            PERIOD,
             p("label", "string", "`kind` or `scope`."),
             p(
                 "metric",
@@ -218,40 +257,16 @@ pub const ENDPOINTS: &[Endpoint] = &[
                 order and the per-bucket series.",
             ),
             p("limit", "integer", "Cap on rows."),
-            p(
-                "type",
-                "string",
-                "Only commits of this conventional type, `other` for none.",
-            ),
-            p(
-                "scope",
-                "string",
-                "Only commits of this scope, `none` for none.",
-            ),
-            p("author", "string", "Only commits by this e-mail or name."),
-            p("path", "string", "Only files under this directory."),
-            p(
-                "bots",
-                "string",
-                "`1` counts bot accounts, `0` leaves them out.",
-            ),
-            p(
-                "merges",
-                "string",
-                "`1` counts merge commits as commits, never their lines or files.",
-            ),
-            p(
-                "generated",
-                "string",
-                "`1` counts lock files and minified output.",
-            ),
-            p(
-                "ignore",
-                "string",
-                "`0` counts paths that `.gitignore` rules out.",
-            ),
-            p("ws", "string", "`1` counts whitespace-only changes."),
-            p("exclude", "string", "Comma separated globs left out."),
+            TYPE,
+            SCOPE,
+            AUTHOR,
+            UNDER,
+            BOTS,
+            MERGES,
+            GENERATED,
+            IGNORE,
+            WS,
+            EXCLUDE,
         ],
         schema: insight_schema,
         route: || get(http::insight),

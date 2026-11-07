@@ -1162,6 +1162,105 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "`1w`, `1m`, `3m`, `1y` or `all` (default): the window, ending at the newest commit. Sets the bucket unit.",
+            "in": "query",
+            "name": "period",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Only commits of this conventional type, `other` for none.",
+            "in": "query",
+            "name": "type",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Only commits of this scope, `none` for none.",
+            "in": "query",
+            "name": "scope",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Only commits by this e-mail or name.",
+            "in": "query",
+            "name": "author",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Only files under this directory.",
+            "in": "query",
+            "name": "path",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "`1` counts bot accounts, `0` leaves them out.",
+            "in": "query",
+            "name": "bots",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "`1` counts merge commits as commits, never their lines or files.",
+            "in": "query",
+            "name": "merges",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "`1` counts lock files and minified output.",
+            "in": "query",
+            "name": "generated",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "`0` counts paths that `.gitignore` rules out.",
+            "in": "query",
+            "name": "ignore",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "`1` counts whitespace-only changes.",
+            "in": "query",
+            "name": "ws",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Comma separated globs left out.",
+            "in": "query",
+            "name": "exclude",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -1201,7 +1300,7 @@
             "$ref": "#/components/responses/Error"
           }
         },
-        "summary": "Authors and bus factor."
+        "summary": "Authors and bus factor, counted as `/insights/contributors` counts them."
       }
     },
     "/insights": {

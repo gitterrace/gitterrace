@@ -457,7 +457,7 @@ impl McpServer {
         Parameters(a): Parameters<RevArgs>,
     ) -> Result<CallToolResult, ErrorData> {
         self.run("contributors", a.repo.clone(), move |s| {
-            s.contributors(a.rev.as_deref())
+            s.contributors(a.rev.as_deref(), &crate::insights::Params::default())
         })
         .await
     }

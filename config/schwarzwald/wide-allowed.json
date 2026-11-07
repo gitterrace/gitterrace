@@ -110,18 +110,18 @@
     "scripts/theme-tagline-gen.py": 2,
     "site/assets/site.css": 24,
     "site/changelog/index.html": 3,
-    "site/docs/actions/index.html": 65,
-    "site/docs/api/index.html": 35,
-    "site/docs/architecture/index.html": 30,
-    "site/docs/benchmarks/index.html": 17,
-    "site/docs/cli/index.html": 24,
-    "site/docs/configuration/index.html": 71,
+    "site/docs/actions/index.html": 10,
+    "site/docs/api/index.html": 2,
+    "site/docs/architecture/index.html": 4,
+    "site/docs/benchmarks/index.html": 5,
+    "site/docs/cli/index.html": 2,
+    "site/docs/configuration/index.html": 3,
     "site/docs/index.html": 8,
-    "site/docs/online/index.html": 7,
-    "site/docs/security/index.html": 18,
-    "site/docs/why/index.html": 3,
+    "site/docs/online/index.html": 3,
+    "site/docs/security/index.html": 3,
+    "site/docs/why/index.html": 2,
     "site/index.html": 24,
     "site/legal/imprint/index.html": 3,
-    "site/legal/privacy/index.html": 4
+    "site/legal/privacy/index.html": 3
   }
 }

@@ -256,6 +256,32 @@ async fn pages_agree(router: &axum::Router, q: &str, fails: &mut Vec<String>) {
     }
 }
 
+/// `/contributors` and `/insights/contributors` are one figure: under the same query they list
+/// the same people with the same commits.
+async fn contributors_agree(router: &axum::Router, q: &str, fails: &mut Vec<String>) {
+    let plain = json(router, &format!("/api/v1/contributors?{q}")).await;
+    let insight = data(router, &format!("/api/v1/insights/contributors?{q}")).await;
+    let pick = |v: &Value, key: &str| -> Vec<(String, u64)> {
+        v[key]
+            .as_array()
+            .expect("people")
+            .iter()
+            .map(|p| {
+                (
+                    p["name"].as_str().unwrap_or_default().to_owned(),
+                    n(&p["commits"]),
+                )
+            })
+            .collect()
+    };
+    let (a, b) = (pick(&plain, "authors"), pick(&insight, "contributors"));
+    if a != b {
+        fails.push(format!(
+            "{q}: /contributors {a:?}, /insights/contributors {b:?}"
+        ));
+    }
+}
+
 /// Every pairwise cell of every mailmap variant of the matrix repository.
 async fn each_cell(mut f: impl AsyncFnMut(&axum::Router, String)) {
     for mm in [Mailmap::AsIs, Mailmap::Edited, Mailmap::CaseFold] {
@@ -273,6 +299,13 @@ async fn each_cell(mut f: impl AsyncFnMut(&axum::Router, String)) {
 async fn counts_equal_the_sum_of_their_parts() {
     let mut fails = Vec::new();
     each_cell(async |r, q| parts_agree(r, &q, &mut fails).await).await;
+    assert!(fails.is_empty(), "{}", fails.join("\n"));
+}
+
+#[tokio::test]
+async fn both_contributor_endpoints_agree() {
+    let mut fails = Vec::new();
+    each_cell(async |r, q| contributors_agree(r, &q, &mut fails).await).await;
     assert!(fails.is_empty(), "{}", fails.join("\n"));
 }
 

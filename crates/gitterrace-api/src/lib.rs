@@ -415,7 +415,12 @@ mod tests {
                 ..Default::default()
             },
         );
-        let authors = |s: &ApiState| s.contributors(None).expect("contributors").authors.len();
+        let authors = |s: &ApiState| {
+            s.contributors(None, &crate::insights::Params::default())
+                .expect("contributors")
+                .authors
+                .len()
+        };
         assert_eq!(authors(&s), 1, "bots hidden by default");
         // Settings are shared by every clone, so a router built before a reload sees it.
         let router_state = s.clone();

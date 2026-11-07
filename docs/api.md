@@ -50,7 +50,7 @@ when cut. The `[api]` section of `config.toml` sets each cap.
 | `GET /tree` | `rev`, `path` | commit, entries, path, rev |
 | `GET /blob` | `rev`, `path`, `start_line`, `limit` | binary, commit, link, path, permalink, rev, size, text, total_lines, truncated |
 | `GET /blame` | `rev`, `path` | commit, lines, link, path, permalink, rev, truncated |
-| `GET /contributors` | `rev` | authors, bus_factor, rev |
+| `GET /contributors` | `rev`, `period`, `type`, `scope`, `author`, `path`, `bots`, `merges`, `generated`, `ignore`, `ws`, `exclude` | authors, bus_factor, rev |
 | `GET /insights` |  | insights |
 | `GET /insights/{name}` | `rev`, `period`, `label`, `metric`, `limit`, `type`, `scope`, `author`, `path`, `bots`, `merges`, `generated`, `ignore`, `ws`, `exclude` | commits_indexed, data, insight, rev |
 
@@ -95,11 +95,23 @@ when cut. The `[api]` section of `config.toml` sets each cap.
 | `rev` | string | no | Revision to read, default `HEAD`. |
 | `path` | string | yes | File to blame. |
 
-`/contributors`: Authors and bus factor.
+`/contributors`: Authors and bus factor, counted as `/insights/contributors`
+counts them.
 
 | Name | Type | Required | Description |
 | --- | --- | --- | --- |
 | `rev` | string | no | Revision to read, default `HEAD`. |
+| `period` | string | no | `1w`, `1m`, `3m`, `1y` or `all` (default): the window, ending at the newest commit. Sets the bucket unit. |
+| `type` | string | no | Only commits of this conventional type, `other` for none. |
+| `scope` | string | no | Only commits of this scope, `none` for none. |
+| `author` | string | no | Only commits by this e-mail or name. |
+| `path` | string | no | Only files under this directory. |
+| `bots` | string | no | `1` counts bot accounts, `0` leaves them out. |
+| `merges` | string | no | `1` counts merge commits as commits, never their lines or files. |
+| `generated` | string | no | `1` counts lock files and minified output. |
+| `ignore` | string | no | `0` counts paths that `.gitignore` rules out. |
+| `ws` | string | no | `1` counts whitespace-only changes. |
+| `exclude` | string | no | Comma separated globs left out. |
 
 `/insights/{name}`: One insight.
 

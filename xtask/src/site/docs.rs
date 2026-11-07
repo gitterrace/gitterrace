@@ -216,6 +216,54 @@ pub(super) fn body(
     }
     let mut out = String::new();
     html::push_html(&mut out, events.into_iter());
+    wrap_wide(&out)
+}
+
+/// The site's lines at most `WIDTH` wide where a space allows: a line is broken at the last
+/// space before the width, outside a tag and outside `<pre>`, where a newline reads as the space
+/// it replaces. The pages are source files too, held to the repository's line width.
+fn wrap_wide(html: &str) -> String {
+    const WIDTH: usize = 100;
+    let mut out = String::with_capacity(html.len());
+    let mut pre = false;
+    for line in html.split_inclusive('\n') {
+        if line.contains("<pre") {
+            pre = true;
+        }
+        if pre || line.trim_end().chars().count() <= WIDTH {
+            out.push_str(line);
+        } else {
+            out.push_str(&break_line(line, WIDTH));
+        }
+        if line.contains("</pre>") {
+            pre = false;
+        }
+    }
+    out
+}
+
+/// One line broken at spaces outside tags, each piece at most `width` wide where it can be.
+fn break_line(line: &str, width: usize) -> String {
+    let mut out = String::new();
+    let (mut start, mut last, mut tag, mut col) = (0, None, false, 0);
+    for (i, ch) in line.char_indices() {
+        match ch {
+            '<' => tag = true,
+            '>' => tag = false,
+            ' ' if !tag => last = Some(i),
+            _ => {}
+        }
+        col += 1;
+        if col > width
+            && let Some(at) = last.take()
+        {
+            out.push_str(&line[start..at]);
+            out.push('\n');
+            start = at + 1;
+            col = line[start..=i].chars().count();
+        }
+    }
+    out.push_str(&line[start..]);
     out
 }
 
