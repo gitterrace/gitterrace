@@ -1,6 +1,7 @@
 use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
-use gitterrace_index::feed::{InsightsSource, MemorySource};
+use gitterrace_index::feed::{self, InsightsSource, MemorySource, Rank};
 use gitterrace_index::{CommitRecord, FileStat, Options, PathFilter};
 
 use super::{Fold, Skeleton, Tally, walk, wanted};
@@ -180,4 +181,172 @@ fn formats_count_under_other_and_leave_the_legend() {
     // Languages alone fold nothing.
     let f = Fold::new(&names[..1], &last[..1]);
     assert_eq!(f.langs, ["Rust"]);
+}
+
+/// A history with side branches: every fifth commit on the first-parent line merges a side
+/// commit made just before it, so the walk must skip ranks that are not on the chain.
+fn merged_history(n: usize) -> Vec<CommitRecord> {
+    let mut recs = history(n);
+    for i in (5..n).step_by(5) {
+        recs[i].parents = vec![format!("{:040x}", i - 2), format!("{:040x}", i - 1)];
+    }
+    recs
+}
+
+/// A source that counts oid lookups and record reads, forwarding everything.
+struct Reads<'a> {
+    inner: MemorySource<'a>,
+    lookups: AtomicUsize,
+    records: AtomicUsize,
+}
+
+impl Reads<'_> {
+    fn take(&self) -> (usize, usize) {
+        (
+            self.lookups.swap(0, Ordering::Relaxed),
+            self.records.swap(0, Ordering::Relaxed),
+        )
+    }
+}
+
+impl InsightsSource for Reads<'_> {
+    fn len(&self) -> usize {
+        self.inner.len()
+    }
+    fn commit(&self, r: Rank) -> Option<feed::CommitRow> {
+        self.records.fetch_add(1, Ordering::Relaxed);
+        self.inner.commit(r)
+    }
+    fn commits_in(&self, r: feed::CommitRange) -> feed::Stream<'_, feed::CommitRow> {
+        self.inner.commits_in(r)
+    }
+    fn rows_for(&self, c: Vec<Rank>) -> feed::Stream<'_, (Rank, Vec<feed::FileRow>)> {
+        self.inner.rows_for(c)
+    }
+    fn commit_id(&self, r: Rank) -> Option<Arc<str>> {
+        self.records.fetch_add(1, Ordering::Relaxed);
+        self.inner.commit_id(r)
+    }
+    fn parent_ids(&self, r: Rank) -> Vec<Arc<str>> {
+        self.records.fetch_add(1, Ordering::Relaxed);
+        self.inner.parent_ids(r)
+    }
+    fn find_commit(&self, id: &str) -> Result<Option<Rank>, feed::SourceError> {
+        self.lookups.fetch_add(1, Ordering::Relaxed);
+        self.inner.find_commit(id)
+    }
+    fn agg_author_day(&self, d: std::ops::Range<i64>) -> feed::Stream<'_, feed::AuthorDayRow> {
+        self.inner.agg_author_day(d)
+    }
+    fn agg_path_author(&self, p: &str) -> feed::Stream<'_, feed::PathAuthorRow> {
+        self.inner.agg_path_author(p)
+    }
+    fn postings(&self, k: feed::Posting) -> feed::Stream<'_, feed::Hit> {
+        self.inner.postings(k)
+    }
+    fn rename_edges(&self) -> feed::Stream<'_, feed::RenameEdge> {
+        self.inner.rename_edges()
+    }
+    fn path(&self, id: feed::PathId) -> Option<Arc<str>> {
+        self.inner.path(id)
+    }
+    fn find_path(&self, p: &str) -> Result<Option<feed::PathId>, feed::SourceError> {
+        self.inner.find_path(p)
+    }
+    fn paths(&self) -> usize {
+        self.inner.paths()
+    }
+    fn ident(&self, id: feed::IdentId) -> Option<(Arc<str>, Arc<str>)> {
+        self.inner.ident(id)
+    }
+    fn idents(&self) -> usize {
+        self.inner.idents()
+    }
+    fn label(&self, id: feed::LabelId) -> Option<Arc<str>> {
+        self.inner.label(id)
+    }
+    fn find_label(&self, n: &str) -> Result<Option<feed::LabelId>, feed::SourceError> {
+        self.inner.find_label(n)
+    }
+    fn failure(&self) -> Option<feed::SourceError> {
+        self.inner.failure()
+    }
+}
+
+/// The chain by oid lookups, one per step: the walk the page must agree with.
+fn chain_by_lookup(src: &dyn InsightsSource) -> Vec<Rank> {
+    let newest = src
+        .len()
+        .checked_sub(1)
+        .map(|i| Rank(u32::try_from(i).unwrap_or(0)));
+    std::iter::successors(newest, |r| {
+        src.parent_ids(*r).first().and_then(|p| src.commit_of(p))
+    })
+    .collect()
+}
+
+/// Walking the first-parent chain does no oid index lookup, and reads each record a bounded
+/// number of times, whatever the history length. An index lookup per step reads a random
+/// block of the oid index: most of a minute of the cold page on a large history. A walk
+/// that searched from the top for each parent would read the history once per step and
+/// fails the record bound. The chain is the one the lookups give, merges skipped.
+#[test]
+fn the_chain_walk_reads_each_record_a_bounded_number_of_times() {
+    for n in [300, 3000] {
+        let recs = merged_history(n);
+        let src = Reads {
+            inner: MemorySource::new(&recs),
+            lookups: AtomicUsize::new(0),
+            records: AtomicUsize::new(0),
+        };
+        let want = chain_by_lookup(&src.inner);
+        assert!(want.len() < n, "the fixture has side commits");
+        src.take();
+        let newest = Some(Rank(u32::try_from(n - 1).unwrap_or(0)));
+        let got: Vec<Rank> = walk(&src, newest).collect();
+        let (lookups, records) = src.take();
+        assert_eq!(got, want, "the chain at {n} commits");
+        assert_eq!(lookups, 0, "oid lookups walking {n} commits");
+        assert!(
+            records <= 3 * n,
+            "{records} record reads walking {n} commits"
+        );
+        // The whole skeleton too: its walk, its marks and its kept positions.
+        let sk = Skeleton::build(&src, &filter());
+        let (lookups, records) = src.take();
+        assert_eq!(sk.len(), want.len());
+        assert_eq!(lookups, 0, "oid lookups building over {n} commits");
+        assert!(
+            records <= 4 * n,
+            "{records} record reads building over {n} commits"
+        );
+    }
+}
+
+/// With side branches, every view still reads what the full chain gives.
+#[test]
+fn views_match_the_full_chain_across_merges() {
+    let recs = merged_history(1500);
+    let src = MemorySource::new(&recs);
+    let f = filter();
+    let want = reference(&src, &f);
+    let sk = Arc::new(Skeleton::build(&src, &f));
+    let n = sk.len();
+    assert_eq!(n, chain_by_lookup(&src).len());
+    for range in [None, Some((70, 90)), Some((10, n - 200)), Some((0, n - 1))] {
+        let view = View {
+            time: false,
+            share: false,
+            range,
+            picked: range.is_some(),
+            period: gitterrace_index::Period::All,
+            dflt: gitterrace_index::Period::All,
+            held: Held::Commits,
+        };
+        let ch = sk.view(&src, &f, view);
+        for i in wanted(n, range) {
+            assert_eq!(ch.lines(i), want.lines[i], "lines at {i} for {range:?}");
+            assert_eq!(ch.id(i), want.ids[i], "id at {i} for {range:?}");
+        }
+    }
 }

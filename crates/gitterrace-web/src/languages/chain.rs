@@ -133,9 +133,21 @@ impl<'a> Tally<'a> {
 
 /// The first-parent chain from `rank`, newest first.
 fn walk(src: &dyn InsightsSource, rank: Option<Rank>) -> impl Iterator<Item = Rank> + '_ {
-    std::iter::successors(rank, move |r| {
-        src.parent_ids(*r).first().and_then(|p| src.commit_of(p))
-    })
+    std::iter::successors(rank, move |r| first_parent(src, *r))
+}
+
+/// The rank of `r`'s first parent. Canonical order puts every parent below its child, so the
+/// parent is found by reading the ranks below `r`, newest first. Those records sit in the
+/// blocks just read, where an oid index lookup per step reads a random block (most of a
+/// minute on rust). A chain walk reads each rank at most once this way, since the next step
+/// starts below the parent. A parent outside the set is found by the lookup.
+fn first_parent(src: &dyn InsightsSource, r: Rank) -> Option<Rank> {
+    let p = src.parent_ids(r).into_iter().next()?;
+    (0..r.0)
+        .rev()
+        .map(Rank)
+        .find(|k| src.commit_id(*k).as_deref() == Some(&*p))
+        .or_else(|| src.commit_of(&p))
 }
 
 /// Streams the rows of `ranks` (newest first) in bounded ascending batches, yielding newest
