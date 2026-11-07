@@ -48,10 +48,15 @@
   // Restoring window.scrollY would clamp upward and every lazy load would shift the page again.
   // Instead the topmost visible element with a stable key (a file by its path, else an id) is
   // remembered with its offset from the viewport top, and put back at that offset after the swap
-  // and after every body that loads, until the reader scrolls on their own.
+  // and after every body that loads, until nothing has moved for a while. The reader may scroll
+  // on meanwhile: their scroll moves the anchor to wherever they are, so a body that loads above
+  // them later never pushes the page back.
   var hold = null;      // { key, top } being kept in place
   var watch = null;     // MutationObserver re-applying the anchor
+  var sizes = null;     // ResizeObserver re-applying it when only layout moved
   var quiet = null;     // timer that ends the hold once nothing moves for a while
+  var gen = 0;         // which hold is current, so a stale observer never moves the page
+  var ours = null;      // scrollY right after our own scroll, so it is not taken for the reader's
 
   function keyOf(el) {
     return el.dataset && el.dataset.path ? "p:" + el.dataset.path : "i:" + el.id;
@@ -63,8 +68,21 @@
     return null;
   }
 
+  // The file at the middle of the viewport, the one being read, by the offset of its top (also
+  // when that top is far above, inside a long file). The topmost file reaching into view is often
+  // one that started far above: it folds again or loads, and holding it moved the page by whole
+  // files. An enclosing element with an id spans the viewport too, so files come first.
   function anchor(root) {
-    var list = root.querySelectorAll("section[data-path], [id]");
+    var files = root.querySelectorAll("section[data-path]"), mid = window.innerHeight / 2, near = null;
+    for (var j = 0; j < files.length; j++) {
+      var f = files[j].getBoundingClientRect();
+      if (f.bottom <= 0) continue;
+      if (f.top <= mid && f.bottom > mid) return { key: keyOf(files[j]), top: f.top };
+      if (!near) near = { key: keyOf(files[j]), top: f.top };
+      if (f.top > mid) break;
+    }
+    if (near) return near;
+    var list = root.querySelectorAll("[id]");
     for (var i = 0; i < list.length; i++) {
       var el = list[i];
       if (el === root) continue;
@@ -79,25 +97,43 @@
     var el = find(document, hold.key);
     if (!el) return;
     var d = el.getBoundingClientRect().top - hold.top;
-    if (Math.abs(d) >= 1) window.scrollBy(0, d);
+    if (Math.abs(d) >= 1) { window.scrollBy(0, d); ours = window.scrollY; }
+  }
+
+  // A scroll the code did not make is the reader's: hold the place they scrolled to instead.
+  function moved() {
+    if (!hold || window.scrollY === ours) return;
+    ours = null;
+    var main = document.getElementById("main");
+    var a = main && anchor(main);
+    if (a) hold = a;
   }
 
   function release() {
     hold = null;
+    ours = null;
     clearTimeout(quiet);
     if (watch) { watch.disconnect(); watch = null; }
-    ["wheel", "touchstart", "mousedown", "keydown"].forEach(function (t) { window.removeEventListener(t, release, true); });
+    if (sizes) { sizes.disconnect(); sizes = null; }
+    window.removeEventListener("scroll", moved);
   }
 
   function keep(a) {
     release();
     hold = a;
-    ["wheel", "touchstart", "mousedown", "keydown"].forEach(function (t) { window.addEventListener(t, release, true); });
+    var mine = ++gen;
+    window.addEventListener("scroll", moved, { passive: true });
     var main = document.getElementById("main");
     var bump = function () { clearTimeout(quiet); quiet = setTimeout(release, 3000); };
     if (window.MutationObserver && main) {
-      watch = new MutationObserver(function () { place(); bump(); });
+      watch = new MutationObserver(function () { if (mine !== gen) return; place(); bump(); });
       watch.observe(main, { childList: true, subtree: true });
+    }
+    // A diff chunk skipped by content-visibility gets its real height later, with no DOM change,
+    // and the files below it move: re-apply the anchor when any file changes size.
+    if (window.ResizeObserver && main) {
+      sizes = new ResizeObserver(function () { if (mine !== gen) return; place(); });
+      Array.prototype.forEach.call(main.querySelectorAll("section[data-path]"), function (s) { sizes.observe(s); });
     }
     bump();
   }

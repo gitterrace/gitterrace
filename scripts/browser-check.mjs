@@ -75,6 +75,9 @@
 //                a file far down, a live refresh keeps that file within 4 px of where it was,
 //                keeps the loaded
 //                bodies and keeps #f3 open
+//   live-read    the same page while the reader scrolls on (wheel steps, PageDown, Space) and
+//                refreshes keep landing: the file in view never jumps back more than 4 px, the
+//                reader ends where they scrolled to and #f3 stays in the URL and open
 //   tab-levels   at 1440 and 900 px a page's tabs never share the header nav's font and case,
 //                every insights page is a tab of the row (no More) and the open one is marked
 //   page-heads   a Markdown file shows one head row (path, size, Blame, History, Preview/Code,
@@ -141,7 +144,7 @@ const bin = resolve(arg('--bin', join(root, 'target/debug/git-terrace')));
 const fromDisk = process.argv.includes('--from-disk');
 const tabCounts = arg('--tabs', '8,12').split(',').map(Number);
 const browsers = arg('--browsers', 'webkit,chromium').split(',');
-const ALL = ['truncation', 'live-tabs', 'mermaid', 'chip', 'doctabs', 'chords', 'header', 'marked', 'menu-same', 'gutter', 'overlays', 'tips', 'date-tips', 'repo-switch', 'outline', 'mark-seam', 'about-place', 'site-theme', 'side-width', 'calm-header', 'tabs-one-line', 'tab-levels', 'huge-diff', 'sticky-heads', 'md-anchor', 'live-scroll', 'sticky-line', 'seg-one-row', 'period-steady', 'export-from-disk', 'inline-controls', 'section-gaps', 'path-cells', 'mark-flat', 'tab-stops', 'help-keys', 'side-order', 'settings', 'lone-rows', 'page-heads', 'compare-head', 'commit-head', 'search-head', 'small-layout', 'send-dialog', 'outline-filter', 'avatar-fit', 'graph-view', 'layout-shift', 'symbols'];
+const ALL = ['truncation', 'live-tabs', 'mermaid', 'chip', 'doctabs', 'chords', 'header', 'marked', 'menu-same', 'gutter', 'overlays', 'tips', 'date-tips', 'repo-switch', 'outline', 'mark-seam', 'about-place', 'site-theme', 'side-width', 'calm-header', 'tabs-one-line', 'tab-levels', 'huge-diff', 'sticky-heads', 'md-anchor', 'live-scroll', 'live-read', 'sticky-line', 'seg-one-row', 'period-steady', 'export-from-disk', 'inline-controls', 'section-gaps', 'path-cells', 'mark-flat', 'tab-stops', 'help-keys', 'side-order', 'settings', 'lone-rows', 'page-heads', 'compare-head', 'commit-head', 'search-head', 'small-layout', 'send-dialog', 'outline-filter', 'avatar-fit', 'graph-view', 'layout-shift', 'symbols'];
 const wanted = arg('--checks', ALL.join(',')).split(',');
 for (const c of wanted) if (!ALL.includes(c)) { console.error(`unknown check ${c}; known: ${ALL.join(', ')}`); process.exit(2); }
 
@@ -173,6 +176,8 @@ async function context(name) {
 const env = { pw, dir, srv, r, browsers, tabCounts, marker, context, arg, bin, cfg };
 const { checks: anchorChecks } = await import('./browser-anchor-lib.mjs');
 const { mdAnchor } = anchorChecks(env);
+const { checks: scrollChecks } = await import('./browser-scroll-lib.mjs');
+const { liveRead } = scrollChecks(env);
 const { truncation, liveTabs, mermaid, chip, doctabs, chords, header } = pageChecks(env);
 const { marked, menuSame, gutter, overlays, tips, dateTips, repoSwitch, liveScroll, outline } = uiChecks(env);
 const { inlineControls, sectionGaps, pathCells } = layoutChecks(env);
@@ -517,7 +522,7 @@ async function settings() {
   }
 }
 
-const checks = { 'sticky-heads': stickyHeads, 'tabs-one-line': tabsOneLine, 'tab-levels': tabLevels, 'calm-header': calmHeader, 'side-width': sideWidth, truncation, 'live-tabs': liveTabs, mermaid, chip, doctabs, chords, header, marked, 'menu-same': menuSame, gutter, overlays, tips, 'date-tips': dateTips, 'repo-switch': repoSwitch, outline, 'mark-seam': markSeam, 'about-place': aboutPlace, 'site-theme': siteTheme, 'huge-diff': hugeDiff, 'md-anchor': mdAnchor, 'live-scroll': liveScroll, 'sticky-line': stickyLine, 'seg-one-row': segOneRow, 'period-steady': periodSteady, 'export-from-disk': exportFromDisk, 'inline-controls': inlineControls, 'section-gaps': sectionGaps, 'path-cells': pathCells, 'mark-flat': markFlat, 'tab-stops': tabStops, 'help-keys': helpKeys, 'side-order': sideOrder, settings, 'lone-rows': loneRows, 'page-heads': pageHeads, 'compare-head': compareHeads, 'commit-head': commitHeads, 'search-head': searchHeads, 'small-layout': smallLayout, 'send-dialog': sendDialog, 'outline-filter': outlineFilter, 'graph-view': graphView, 'avatar-fit': avatarFit, 'layout-shift': layoutShift, symbols };
+const checks = {'sticky-heads': stickyHeads, 'tabs-one-line': tabsOneLine, 'tab-levels': tabLevels, 'calm-header': calmHeader, 'side-width': sideWidth, truncation, 'live-tabs': liveTabs, mermaid, chip, doctabs, chords, header, marked, 'menu-same': menuSame, gutter, overlays, tips, 'date-tips': dateTips, 'repo-switch': repoSwitch, outline, 'mark-seam': markSeam, 'about-place': aboutPlace, 'site-theme': siteTheme, 'huge-diff': hugeDiff, 'md-anchor': mdAnchor, 'live-scroll': liveScroll, 'live-read': liveRead, 'sticky-line': stickyLine, 'seg-one-row': segOneRow, 'period-steady': periodSteady, 'export-from-disk': exportFromDisk, 'inline-controls': inlineControls, 'section-gaps': sectionGaps, 'path-cells': pathCells, 'mark-flat': markFlat, 'tab-stops': tabStops, 'help-keys': helpKeys, 'side-order': sideOrder, settings, 'lone-rows': loneRows, 'page-heads': pageHeads, 'compare-head': compareHeads, 'commit-head': commitHeads, 'search-head': searchHeads, 'small-layout': smallLayout, 'send-dialog': sendDialog, 'outline-filter': outlineFilter, 'graph-view': graphView, 'avatar-fit': avatarFit, 'layout-shift': layoutShift, symbols};
 try {
   for (const c of wanted) { console.log(`-- ${c}`); await checks[c](); }
 } finally {
