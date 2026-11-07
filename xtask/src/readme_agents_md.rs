@@ -220,13 +220,15 @@ pub fn commands_rows() -> Vec<(String, String)> {
     rows
 }
 
-/// Every long flag of the root command and its subcommands, from the clap definition.
+/// Every documented long flag of the root command and its subcommands, from the clap definition.
+/// Hidden (retired) flags are left out: a document naming one is stale, and none has to list it.
 pub fn cli_flags() -> std::collections::BTreeSet<String> {
     let cmd = cli::Cli::command();
     let mut out = std::collections::BTreeSet::new();
     for c in std::iter::once(&cmd).chain(cmd.get_subcommands()) {
         out.extend(
             c.get_arguments()
+                .filter(|a| !a.is_hide_set())
                 .filter_map(|a| a.get_long().map(str::to_owned)),
         );
     }
