@@ -19,7 +19,7 @@ use crate::live::Change;
 /// Rendered stats pages are reused this long; time-relative windows move slowly.
 const MEMO_TTL: Duration = Duration::from_secs(60);
 /// How long a dirty-worktree answer is reused, so every page need not run a status.
-const DIRTY_TTL: Duration = Duration::from_secs(2);
+pub(crate) const DIRTY_TTL: Duration = Duration::from_secs(2);
 /// The source, its block cache and the tables built over it are dropped after this long without
 /// a page that reads them, so an idle server keeps none of them; a page after the release opens
 /// the set again. The page memo still answers the unfiltered pages in between.

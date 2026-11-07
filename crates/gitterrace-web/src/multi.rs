@@ -47,6 +47,8 @@ pub(crate) struct Served {
     /// Newest commit and the sparkline's counts at the HEAD they were read for, so the index page
     /// opens a repository once per HEAD move or new local day instead of once per hit.
     recent: Mutex<Option<(String, Arc<Recent>)>>,
+    /// The working tree's dirty answer and when it was measured, reused for `DIRTY_TTL`.
+    dirty: Mutex<Option<(std::time::Instant, bool)>>,
 }
 
 /// What the index shows for one repository: its newest commit and its recent commits,
@@ -313,6 +315,7 @@ impl Repos {
             router: OnceCell::new(),
             tasks: Mutex::default(),
             recent: Mutex::new(None),
+            dirty: Mutex::new(None),
         });
         self.by_name.insert(name, Arc::clone(&served));
         self.order.push(Arc::clone(&served));
@@ -376,6 +379,23 @@ impl Served {
             *g = Some((head, Arc::clone(&r)));
         }
         r
+    }
+
+    /// Whether the working tree differs from HEAD, reused for `DIRTY_TTL` like a repository's
+    /// own chip: the home page then scans each tree at most once per bound, however often it
+    /// is reloaded, and a change shows within the bound.
+    fn dirty(&self) -> bool {
+        if let Ok(g) = self.dirty.lock()
+            && let Some((at, v)) = *g
+            && at.elapsed() < crate::app::DIRTY_TTL
+        {
+            return v;
+        }
+        let v = Repo::discover(&self.path).is_ok_and(|r| gitterrace_git::is_dirty(&r));
+        if let Ok(mut g) = self.dirty.lock() {
+            *g = Some((std::time::Instant::now(), v));
+        }
+        v
     }
 }
 

@@ -9,7 +9,7 @@ use axum::{
     http::StatusCode,
     response::{Html, IntoResponse, Response},
 };
-use gitterrace_git::{CommitSummary, Repo};
+use gitterrace_git::CommitSummary;
 
 use crate::fmt;
 use crate::multi::Table;
@@ -105,9 +105,7 @@ pub(super) async fn index(State(table): State<Arc<Table>>) -> crate::error::Resu
                     total,
                     today: today_line(r.today, c, now),
                     commits_today: r.today,
-                    dirty: show_tree.then(|| {
-                        Repo::discover(&s.path).is_ok_and(|r| gitterrace_git::is_dirty(&r))
-                    }),
+                    dirty: show_tree.then(|| s.dirty()),
                     tip: if counts.is_empty() {
                         "No commits yet.".to_owned()
                     } else {

@@ -275,3 +275,28 @@ fn the_today_count_resets_at_midnight() {
     assert_eq!(s.recent(midnight - 60).today, 1, "before midnight");
     assert_eq!(s.recent(midnight + 60).today, 0, "after midnight");
 }
+
+/// A change to the working tree shows on the home page within `DIRTY_TTL`, both ways, and
+/// a reload inside the bound reuses the answer instead of scanning again.
+#[test]
+fn the_dirty_chip_follows_the_tree_within_the_bound() {
+    let dir = tempfile::tempdir().expect("tmp");
+    let f = gitterrace_testkit::Fixture::init(dir.path())
+        .write("a", "1")
+        .commit("one");
+    let table = super::Table::new(
+        vec![dir.path().to_path_buf()],
+        crate::app::Env::new(gitterrace_config::Config::default()),
+        None,
+    )
+    .expect("table");
+    let s = table.snapshot()[0].clone();
+    let bound = crate::app::DIRTY_TTL + std::time::Duration::from_millis(50);
+    assert!(!s.dirty(), "clean");
+    let f = f.write("a", "2");
+    std::thread::sleep(bound);
+    assert!(s.dirty(), "an edit shows within the bound");
+    let _f = f.git(&["checkout", "-q", "--", "a"]);
+    std::thread::sleep(bound);
+    assert!(!s.dirty(), "a revert shows within the bound");
+}
