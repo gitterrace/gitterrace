@@ -250,7 +250,7 @@ fn the_pairwise_golden_agrees_with_the_full_matrix() {
 
 /// The browsing pages, one or more cells each, over the matrix repository at HEAD. Every page
 /// kind the router serves has a cell here or on an insights page, or is exempt below.
-const BROWSE: [&str; 33] = [
+const BROWSE: [&str; 50] = [
     "/log",
     "/log/HEAD",
     "/log/HEAD?path=src",
@@ -284,6 +284,25 @@ const BROWSE: [&str; 33] = [
     "/stats/patterns",
     "/api/refs",
     "/api/files/HEAD",
+    // Filters and paging on the log, and the search switches.
+    "/log/HEAD?author=bob%40y.io",
+    "/log/HEAD?page=2",
+    "/log/HEAD?path=src&author=bob%40y.io",
+    "/search",
+    "/search?q=fn.%2A&regex=1",
+    "/search?q=FN&case=1",
+    "/search?q=fn&glob=src%2F%2A%2A",
+    // Error pages: each page kind on a path, revision or id that does not exist.
+    "/log/nope",
+    "/commit/0000000",
+    "/diff/HEAD/99",
+    "/tree/HEAD/missing",
+    "/blob/HEAD/missing.rs",
+    "/blob/HEAD/src",
+    "/raw/HEAD/missing.rs",
+    "/blame/HEAD/missing.rs",
+    "/compare?base=nope&head=HEAD",
+    "/tag/nope",
 ];
 
 /// Routes with no golden cell, each with the reason. A route listed here that does not exist
