@@ -1,0 +1,25 @@
+id: one-clock-per-request
+language: rust
+severity: error
+message: A CountContext built outside a request's entry point.
+note: >-
+  A request reads the clock once, where it enters: the web pages through insights::counted, the
+  API's insight handler, and the index's period-keyed entry Insights::in_scope. A second context
+  is a second "now", and two numbers on one page can then disagree about the period. Take the
+  caller's Counted or CountContext instead.
+files: [crates/**/*.rs]
+ignores:
+  - crates/gitterrace-index/src/insights/scope.rs
+  - crates/**/tests.rs
+  - crates/**/*_tests.rs
+  - crates/**/tests/**
+rule:
+  kind: call_expression
+  has: {field: function, regex: '(^|::)CountContext::new$'}
+  not:
+    any:
+      - inside: {stopBy: end, kind: mod_item, regex: '^(pub(\(crate\))? )?mod \w*tests'}
+      - inside:
+          stopBy: end
+          kind: function_item
+          has: {field: name, regex: '^(counted|insight|in_scope)$'}

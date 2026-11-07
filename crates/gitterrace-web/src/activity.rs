@@ -4,8 +4,7 @@
 use askama::Template;
 use axum::extract::{Query, RawQuery, State};
 use axum::response::Html;
-use gitterrace_index::feed::SystemClock;
-use gitterrace_index::{CountContext, Period, PeriodStats, Scope, ScopeParams};
+use gitterrace_index::{Period, PeriodStats, Scope, ScopeParams};
 use serde::Deserialize;
 
 use crate::{
@@ -228,7 +227,7 @@ pub(crate) async fn page(
         let sel = rq.parsed();
         let scope = scope_of(&q, &d, period, sel);
         let ins = insights(a, r, scope.options().clone());
-        let counted = ins.counted(&scope, CountContext::new(&**r, &SystemClock));
+        let counted = crate::insights::counted(&ins, &scope, r);
         let (s, rhythm) = counted.activity();
         let prev = s.previous.as_ref();
         let rows = pulse_rows(&s.current, prev, scope.options().include_merges);

@@ -4,7 +4,7 @@ use super::super::HeadFile;
 use crate::insights::fixtures::{file, rec};
 use crate::{FileStat, Insights, Options, Period};
 
-fn head(files: &[(&str, u32)]) -> Vec<HeadFile> {
+pub(super) fn head(files: &[(&str, u32)]) -> Vec<HeadFile> {
     files
         .iter()
         .map(|(p, n)| HeadFile {

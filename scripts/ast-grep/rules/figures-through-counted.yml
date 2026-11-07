@@ -1,0 +1,40 @@
+id: figures-through-counted
+language: rust
+severity: error
+message: A figure page or the API reads raw commit rows instead of a Counted.
+note: >-
+  Every count on an insights page, the overview and the API comes from a reducer over a
+  Counted (insights/counted.rs) or from Insights::every_totals, so its population is the one it
+  says. Reading commits_in or rows_for here counts by a rule of its own: the sidebar hot files
+  did. The sidebar's spark and today/this week count every commit by the
+  wall clock, a documented exception, and are the only functions exempt.
+files:
+  - crates/gitterrace-web/src/activity.rs
+  - crates/gitterrace-web/src/insights.rs
+  - crates/gitterrace-web/src/commit_types.rs
+  - crates/gitterrace-web/src/frequency.rs
+  - crates/gitterrace-web/src/hotspots.rs
+  - crates/gitterrace-web/src/ownership.rs
+  - crates/gitterrace-web/src/patterns.rs
+  - crates/gitterrace-web/src/history.rs
+  - crates/gitterrace-web/src/overview_side/mod.rs
+  - crates/gitterrace-web/src/overview_side/lists.rs
+  - crates/gitterrace-web/src/routes.rs
+  - crates/gitterrace-api/src/**/*.rs
+ignores:
+  - crates/**/tests.rs
+  - crates/**/*_tests.rs
+  - crates/**/tests/**
+rule:
+  kind: call_expression
+  has:
+    field: function
+    kind: field_expression
+    has: {field: field, regex: '^(commits_in|rows_for)$'}
+  not:
+    any:
+      - inside: {stopBy: end, kind: mod_item, regex: '^(pub(\(crate\))? )?mod \w*tests'}
+      - inside:
+          stopBy: end
+          kind: function_item
+          has: {field: name, regex: '^(build|first_time)$'}

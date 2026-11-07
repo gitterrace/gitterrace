@@ -390,3 +390,33 @@ async fn file_counts_follow_the_bot_option() {
     let (_, h) = page(&router, "/history/src/a.rs").await;
     assert_eq!(rows(&h), 1, "{h}");
 }
+
+/// Every number on the overview's facts line names the commits it counts, and a line that
+/// mixes every commit with the counted ones labels both.
+#[tokio::test]
+async fn every_overview_number_names_its_population() {
+    let dir = tempfile::tempdir().expect("tmp");
+    let router = gitterrace_web::app_router(mixed(dir.path())).expect("router");
+    oracle::ready(&router).await;
+    let (_, ov) = page(&router, "/").await;
+    let at = ov.find("<p class=\"facts\">").expect("facts line");
+    let line = &ov[at..at + ov[at..].find("</p>").expect("end")];
+    let spans = line.matches("<span").count();
+    assert!(spans >= 5, "{line}");
+    assert_eq!(
+        line.matches("<span data-population=\"").count()
+            + line
+                .matches("<span class=\"muted\" data-population=\"")
+                .count(),
+        spans,
+        "{line}"
+    );
+    assert!(
+        line.starts_with("<p class=\"facts\"><span data-population=\"every\"><b>6</b>"),
+        "{line}"
+    );
+    assert!(
+        line.contains("data-population=\"counted\"><b>1</b> author"),
+        "{line}"
+    );
+}

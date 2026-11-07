@@ -1,0 +1,8 @@
+id: one-clock-per-request
+valid:
+  - 'fn counted<''a>(ins: &''a Insights<''a>, s: &''a Scope, all: &Src) -> Counted<''a> { ins.counted(s, CountContext::new(&**all, &SystemClock)) }'
+  - 'fn in_scope(&self) { let cx = CountContext::new(self.source(), &FixedClock(self.now)); }'
+  - 'mod tests { fn t() { let cx = CountContext::new(&src, &FixedClock(0)); } }'
+invalid:
+  - 'fn page(a: &App) { let c = ins.counted(&s, CountContext::new(&**r, &SystemClock)); }'
+  - 'fn cadence(&self) { let cx = gitterrace_index::CountContext::new(self.source(), &FixedClock(self.now)); }'
