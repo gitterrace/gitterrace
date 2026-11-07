@@ -1,7 +1,7 @@
-{%- import "_delta.html" as deltas -%}<section class="fold" id="types">
+{%- import "_delta.html" as deltas -%}{%- import "_kpis.html" as kp -%}<section class="fold" id="types">
 <h2 class="fold-h">Commit types</h2>
 {% if commits_total > 0 %}
-<div class="kpis">{% for k in kpis %}<div><b>{{ k.1 }}</b><span>{{ k.0 }}</span></div>{% endfor %}</div>
+{% call kp::kpis(kpis) %}{% endcall %}
 {% if !kinds.is_empty() %}
 <div class="chart-head"><div><h2>Types</h2><p class="hint">Conventional-commit type of each subject line. Click a type to narrow every number on the page to it. Commits that do not follow the convention are grouped as other.</p></div></div>
 <div class="card"><table class="entries">

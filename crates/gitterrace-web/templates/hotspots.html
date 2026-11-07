@@ -1,4 +1,5 @@
 {% extends "_base.html" %}
+{%- import "_kpis.html" as kp -%}
 {%- import "_path.html" as paths -%}
 {% block title %}Hotspots · {{ c.name }}{% endblock %}
 {% block head %}
@@ -8,7 +9,7 @@
 {% include "_filterbar.html" %}
 {% include "_chips.html" %}
 {% include "_lead.html" %}
-{% include "_kpis.html" %}
+{% call kp::kpis(kpis) %}{% endcall %}
 {% if empty %}{{ fb.nothing }}{% else %}
 <div class="chart-head" id="hotspot-map"><div><h2>Change frequency against size</h2><p class="hint">Each dot is a file: how often it changed against how many lines it has now. Dot size is the number of authors. Big files that change a lot are the risky ones. Click a dot for its history.</p></div></div>
 <div class="card pad">{{ scatter }}</div>

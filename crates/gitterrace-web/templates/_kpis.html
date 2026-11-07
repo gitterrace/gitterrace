@@ -1,1 +1,7 @@
-<div class="kpis">{% for k in kpis %}<div><b{% if k.warn() %} class="warn"{% endif %}>{{ k.1 }}</b><span>{{ k.0 }}</span></div>{% endfor %}</div>
+{#- The one row of headline figures. `kpis(list)` shows `Kpi`s, with the caller's extra cells after them. `cells()` holds cells of the caller's own, for figures with their own color. -#}
+{%- macro kpis(list) -%}
+<div class="kpis">{% for k in list %}<div><b{% if k.warn() %} class="warn"{% endif %}>{{ k.1 }}</b><span>{{ k.0 }}</span></div>{% endfor %}{{ caller() }}</div>
+{%- endmacro -%}
+{%- macro cells() -%}
+<div class="kpis">{{ caller() }}</div>
+{%- endmacro -%}

@@ -1,4 +1,5 @@
 {% extends "_base.html" %}
+{%- import "_kpis.html" as kp -%}
 {%- import "_path.html" as paths -%}
 {% block title %}Ownership · {{ c.name }}{% endblock %}
 {% block head %}
@@ -9,7 +10,7 @@
 {% include "_chips.html" %}
 {% include "_lead.html" %}
 {% if let Some(who) = solo %}<p class="hint" data-solo>Every directory has one owner, {{ who }}.</p>{% endif %}
-{% include "_kpis.html" %}
+{% call kp::kpis(kpis) %}{% endcall %}
 <div class="chart-head"><div><h2>Owners by directory</h2><p class="hint">{% if solo.is_none() %}Share of the knowledge per person, from who changed the files and how much. Bus factor is how many people together hold at least half. {% endif %}Click a directory to filter every page to it. {{ crate::rule::link(crate::rule::RENAMES)|safe }}</p></div></div>
 <div class="card"><table class="entries own">
 <tr class="th"><td>Directory</td>{% if solo.is_none() %}<td class="r bus">Bus factor</td>{% endif %}<td class="r n">Lines</td><td class="r n">Files</td>{% if solo.is_none() %}<td>Owners</td>{% endif %}</tr>
