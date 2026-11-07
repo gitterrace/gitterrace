@@ -1,0 +1,82 @@
+#!/usr/bin/env python3
+"""drift.py [--repo DIR]
+    exit 0 when the product's tool configs keep to the shared bases, 1 with one line per problem.
+    - vale: styles/Schwarzwald is the shared style, and no other style under styles/ defines a rule
+      with the file name of a shared rule.
+    - ruff: ruff.toml extends the shared base and sets none of its keys.
+    - typos, clippy, deny: the tool cannot extend, so the root file must carry every base key and
+      value, and every base list item.
+Python 3.11 or newer, standard library only. Reads the shared files next to it."""
+import argparse, sys, tomllib
+from pathlib import Path
+
+HERE = Path(__file__).resolve().parent
+EXTEND = 'shared/schwarzwald/configs/ruff-base.toml'
+CARRIED = {'_typos.toml': 'typos-base.toml', 'clippy.toml': 'clippy-base.toml', 'deny.toml': 'deny-base.toml'}
+
+
+def load(path):
+    return tomllib.loads(path.read_text())
+
+
+def dropped(base, prod, path=''):
+    """One line per base key the product drops or changes, and per base list item it drops."""
+    out = []
+    for k, v in base.items():
+        here = f'{path}{k}'
+        if k not in prod:
+            out.append(f'{here}: dropped')
+        elif isinstance(v, dict):
+            out += dropped(v, prod[k], here + '.') if isinstance(prod[k], dict) else [f'{here}: not a table']
+        elif isinstance(v, list):
+            out += [f'{here}: drops {item!r}' for item in v if item not in prod[k]]
+        elif prod[k] != v:
+            out.append(f'{here}: overrides {v!r} with {prod[k]!r}')
+    return out
+
+
+def overridden(base, prod, path=''):
+    """One line per base key the product sets itself, which the tool would take over the base."""
+    out = []
+    for k, v in base.items():
+        if k in prod:
+            out += overridden(v, prod[k], f'{path}{k}.') if isinstance(v, dict) and isinstance(prod[k], dict) \
+                else [f'{path}{k}: set in the product, replacing the shared value; use extend-select or ignore']
+    return out
+
+
+def vale_problems(repo):
+    rules = {p.name: p.read_bytes() for p in sorted((HERE / 'vale/Schwarzwald').glob('*.yml'))}
+    styles = repo / 'styles'
+    own = styles / 'Schwarzwald'
+    out = []
+    if not own.is_dir():
+        out.append('styles/Schwarzwald: missing; link it to shared/schwarzwald/configs/vale/Schwarzwald')
+    else:
+        out += [f'styles/Schwarzwald/{n}: {"differs from the shared rule" if (own / n).exists() else "missing"}'
+                for n, data in rules.items() if not (own / n).exists() or (own / n).read_bytes() != data]
+        out += [f'styles/Schwarzwald/{p.name}: not a shared rule' for p in sorted(own.glob('*.yml')) if p.name not in rules]
+    for d in sorted(p for p in styles.glob('*') if p.is_dir() and p.name != 'Schwarzwald'):
+        out += [f'styles/{d.name}/{n}: redefines the shared rule Schwarzwald.{n[:-4]}' for n in rules if (d / n).exists()]
+    return out
+
+
+def problems(repo):
+    out = vale_problems(repo) if (repo / 'styles').is_dir() else []
+    if (repo / 'ruff.toml').is_file():
+        prod = load(repo / 'ruff.toml')
+        if prod.get('extend') != EXTEND:
+            out.append(f'ruff.toml: extend is {prod.get("extend")!r}, want {EXTEND!r}')
+        out += [f'ruff.toml: {p}' for p in overridden(load(HERE / 'ruff-base.toml'), prod)]
+    for name, base in CARRIED.items():
+        if (repo / name).is_file():
+            out += [f'{name}: {p}' for p in dropped(load(HERE / base), load(repo / name))]
+    return out
+
+
+if __name__ == '__main__':
+    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument('--repo', type=Path, default=Path.cwd())
+    found = problems(ap.parse_args().repo.resolve())
+    print('\n'.join(found) or 'ok')
+    sys.exit(1 if found else 0)

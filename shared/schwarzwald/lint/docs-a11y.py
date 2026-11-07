@@ -151,7 +151,7 @@ def self_test() -> bool:
         "code span": f"{page}\nThe syntax is `[here](x)`.\n",
         "html alt": f'{page}\n<img src="a.png" alt="Graph of load over a day">\n',
         "no heading at all": "just text\n",
-        "an html h1": '<h1 align="center"><picture><img src="l.svg" alt="The tendir logo"></picture></h1>\n\n## A\n',
+        "an html h1": '<h1 align="center"><picture><img src="l.svg" alt="The product logo"></picture></h1>\n\n## A\n',
         "a frontmatter title is the h1": "---\ntitle: T\ndescription: d\n---\n\ntext\n\n## A\n",
     }
     for why, body in must_hit.items():

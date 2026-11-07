@@ -1,0 +1,13 @@
+extends: substitution
+message: "American English: use '%s' instead of '%s'"
+level: error
+ignorecase: true
+swap:
+  colours?: color
+  coloured: colored
+  centred: centered
+  centres?: center
+  behaviour: behavior
+  honou?red?: honored
+  grey: gray
+  organis(?:e|ation): organize

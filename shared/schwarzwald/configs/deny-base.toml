@@ -1,0 +1,31 @@
+# The part of a cargo-deny config every product shares. cargo-deny cannot include another file, so
+# each product's deny.toml carries every entry below and drift.py fails when one is dropped or
+# changed. A product adds its own: advisory ignores, extra licenses, ban skips, and its choice of
+# `multiple-versions`.
+[licenses]
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Unicode-3.0",
+    "Zlib",
+    "BSL-1.0",
+    "CC0-1.0",
+    "MPL-2.0",
+]
+
+[licenses.private]
+ignore = true
+
+[bans]
+wildcards = "deny"
+# Path dependencies are workspace-internal and never published, so they carry no version.
+allow-wildcard-paths = true
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
