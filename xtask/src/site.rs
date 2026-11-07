@@ -448,4 +448,6 @@ fn esc(s: &str) -> String {
 }
 
 #[cfg(test)]
+mod built;
+#[cfg(test)]
 mod tests;

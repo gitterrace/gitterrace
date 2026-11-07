@@ -152,7 +152,7 @@ fn install_tabs_pair_every_radio_with_a_panel() {
 }
 
 /// Every `attr="value"` of `html`, in order.
-fn attrs<'a>(html: &'a str, attr: &str) -> Vec<&'a str> {
+pub(super) fn attrs<'a>(html: &'a str, attr: &str) -> Vec<&'a str> {
     let pat = format!(" {attr}=\"");
     html.split(&pat)
         .skip(1)
@@ -162,7 +162,7 @@ fn attrs<'a>(html: &'a str, attr: &str) -> Vec<&'a str> {
 
 /// Every relative link, image and `#anchor` of the generated pages that does not resolve to a
 /// generated file or to an id on the page it names. `pages` is (site path, content).
-fn unresolved(pages: &[(String, String)], files: &[String]) -> Vec<String> {
+pub(super) fn unresolved(pages: &[(String, String)], files: &[String]) -> Vec<String> {
     let mut bad = Vec::new();
     for (path, html) in pages {
         let dir = path.rsplit_once('/').map_or("", |d| d.0);
@@ -203,7 +203,7 @@ fn unresolved(pages: &[(String, String)], files: &[String]) -> Vec<String> {
 }
 
 /// The generated site, as (site path, content) of every page and the paths of every file.
-fn generated() -> (Vec<(String, String)>, Vec<String>) {
+pub(super) fn generated() -> (Vec<(String, String)>, Vec<String>) {
     let root = crate::repo_root();
     let ws = crate::facts::load(&root).expect("facts");
     let outs = render(&root, &ws).expect("render");
@@ -213,7 +213,10 @@ fn generated() -> (Vec<(String, String)>, Vec<String>) {
         match out {
             Out::File { path, body } => {
                 let rel = path.strip_prefix("site/").unwrap_or(&path).to_owned();
-                if rel.ends_with(".html") {
+                if std::path::Path::new(&rel)
+                    .extension()
+                    .is_some_and(|e| e == "html")
+                {
                     pages.push((rel.clone(), body));
                 }
                 files.push(rel);
