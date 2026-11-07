@@ -205,10 +205,13 @@ thead.quiet th{padding:0;border:0;line-height:0;height:0}
 .crow:hover .graph .gd circle{stroke:var(--soft)}.crow:hover .graph .gd .m{fill:var(--soft);stroke-width:1.5px}
 .gfold{display:none;position:absolute;right:0;font:var(--text-2xs) var(--mono);color:var(--muted);background:var(--bg);padding-left:2px}.gfold.w{display:block}
 .crow:hover .gfold{background:var(--soft)}
+.graph .xw{display:none}
+.gedge{display:none;position:absolute;right:0;width:5px;height:5px;border-radius:50%}
+.gedge{background:var(--muted)}.gedge.w{display:block}
 .grefs{display:inline-flex;align-self:center;align-items:center;gap:var(--space-1);flex:none;font:var(--text-2xs)/1 var(--mono)}
 .gref{padding:2px 5px;border:var(--border);border-radius:var(--radius);color:var(--muted)}
 .gref.cur{color:var(--accent-ink);border-color:var(--accent);background:var(--accent-soft)}
-@media (max-width:600px){.graph{max-width:36px}.graph .gfold.n{display:block}.graph .gfold.w{display:none}.cmain:has(.grefs)>.subj{flex:1 1 0}.grefs{max-width:50%;overflow:hidden}}
+@media (max-width:600px){.graph{max-width:36px}.graph .xn{display:none}.graph .gedge.n{display:block}.graph .gedge.w{display:none}.graph .gfold.n{display:block}.graph .gfold.w{display:none}.cmain:has(.grefs)>.subj{flex:1 1 0}.grefs{max-width:50%;overflow:hidden}}
 
 /* commit page and diff */
 .meta{color:var(--muted);margin:var(--space-2) 0 var(--space-6)}.head+.meta{margin-top:calc(-1 * var(--space-2));margin-bottom:var(--space-4)}.meta b{color:var(--fg)}

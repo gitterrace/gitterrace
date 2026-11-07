@@ -16,7 +16,9 @@ use gitterrace_index::graph::{FAR_ROWS, Open, Parent, Placed, Row, Seg};
 /// Width of one column in CSS pixels.
 const COL: u32 = 12;
 /// Columns shown before the rest fold into a "+N" marker: a narrow screen, then a wide one.
-/// app.css shows the marker that matches the screen.
+/// app.css shows the marker that matches the screen, and hides the pieces of line and the dots
+/// classed `xn` (past the narrow cap) or `xw` (past the wide one), so a line past the cap is
+/// never drawn cut off at the cell's edge.
 const FOLDS: [(u16, &str); 2] = [(3, "n"), (8, "w")];
 /// Height of the line SVG's coordinate space: a row's top edge is 0, its middle 50.
 const H: u32 = 100;
@@ -75,11 +77,12 @@ fn reach(p: &Placed) -> u16 {
         .unwrap_or(0)
 }
 
-/// One piece of line: its SVG path data, and whether it is the first-parent chain.
+/// One piece of line: its SVG path data and classes.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Line {
     pub(crate) d: String,
-    pub(crate) main: bool,
+    /// `main` on the first-parent chain, plus the fold that hides it (see [`hide`]).
+    pub(crate) cls: &'static str,
 }
 
 /// One row's cell, as `graph_cell.html` draws it.
@@ -93,15 +96,23 @@ pub(crate) struct Cell {
     pub(crate) stub: Option<u32>,
     /// The dot's classes: `m` for a merge (hollow), `main` on the first-parent chain.
     pub(crate) dot: &'static str,
+    /// The fold that hides the dot and its stub, `""` when every screen shows them.
+    pub(crate) off: &'static str,
     pub(crate) cx: u32,
-    /// `(screen class, hidden columns)` for each fold that hides any.
+    /// Screens (`n`, `w`) whose fold hides the dot: there a muted mark at the fold edge
+    /// anchors the row instead.
+    pub(crate) edge: Vec<&'static str>,
+    /// `(screen class, hidden columns)` for each fold whose count differs from the row above.
     pub(crate) folds: Vec<(&'static str, u16)>,
 }
 
 impl HtmlSafe for Cell {}
 
-/// The cell of one row, `width` columns wide. `merge` draws the dot hollow.
-pub(crate) fn cell(p: &Placed, width: u16, merge: bool) -> Cell {
+/// The cell of one row, `width` columns wide. `merge` draws the dot hollow. A "+N" count
+/// shows only where it differs from `above`, the row drawn just over this one, so a run of
+/// rows with the same hidden columns reads as one count.
+pub(crate) fn cell(p: &Placed, above: Option<&Placed>, width: u16, merge: bool) -> Cell {
+    let was = above.map(hidden);
     let halves = p
         .top
         .iter()
@@ -117,12 +128,35 @@ pub(crate) fn cell(p: &Placed, width: u16, merge: bool) -> Cell {
             (false, true) => "main",
             (false, false) => "",
         },
-        cx: x(p.col),
-        folds: FOLDS
+        off: hide(p.col),
+        edge: FOLDS
             .iter()
-            .map(|&(keep, cls)| (cls, (reach(p) + 1).saturating_sub(keep)))
-            .filter(|&(_, n)| n > 0)
+            .filter(|&&(keep, _)| p.col >= keep)
+            .map(|&(_, cls)| cls)
             .collect(),
+        cx: x(p.col),
+        folds: hidden(p)
+            .into_iter()
+            .zip(FOLDS)
+            .enumerate()
+            .filter(|&(i, (n, _))| n > 0 && was.is_none_or(|w| w[i] != n))
+            .map(|(_, (n, (_, cls)))| (cls, n))
+            .collect(),
+    }
+}
+
+/// Columns of `p` each fold hides, in [`FOLDS`] order.
+fn hidden(p: &Placed) -> [u16; 2] {
+    FOLDS.map(|(keep, _)| (reach(p) + 1).saturating_sub(keep))
+}
+
+/// The classes of the folds that hide something drawn in column `col`: the wide cap is past
+/// the narrow one, so what the wide screen hides the narrow one hides too.
+const fn hide(col: u16) -> &'static str {
+    match col {
+        c if c >= FOLDS[1].0 => "xn xw",
+        c if c >= FOLDS[0].0 => "xn",
+        _ => "",
     }
 }
 
@@ -133,6 +167,7 @@ fn x(col: u16) -> u32 {
 /// One half-row piece of line, from `y0` down to `y0 + H / 2`: straight, or a curve between
 /// two columns.
 fn line(seg: Seg, y0: u32) -> Line {
+    let cls = line_class(seg);
     let (a, b, y1) = (x(seg.from), x(seg.to), y0 + H / 2);
     let m = y0 + H / 4;
     let d = if a == b {
@@ -140,9 +175,17 @@ fn line(seg: Seg, y0: u32) -> Line {
     } else {
         format!("M{a} {y0}C{a} {m} {b} {m} {b} {y1}")
     };
-    Line {
-        d,
-        main: seg.color == 0,
+    Line { d, cls }
+}
+
+/// A piece of line's classes: `main` on the first-parent chain, and the folds that hide it.
+const fn line_class(seg: Seg) -> &'static str {
+    let far = if seg.from > seg.to { seg.from } else { seg.to };
+    match (seg.color == 0, far >= FOLDS[1].0, far >= FOLDS[0].0) {
+        (true, true, _) => "main xn xw",
+        (true, false, true) => "main xn",
+        (true, false, false) => "main",
+        (false, ..) => hide(far),
     }
 }
 
@@ -166,7 +209,7 @@ mod tests {
         let hist = h(&[("m", &["a", "b"]), ("b", &["a"]), ("a", &[])]);
         let rows = place(&hist, 0, 3);
         assert_eq!(rows.iter().map(|p| p.col).collect::<Vec<_>>(), [0, 1, 0]);
-        let merge = cell(&rows[0], columns(&rows), true).to_string();
+        let merge = cell(&rows[0], None, columns(&rows), true).to_string();
         assert!(merge.contains('C'), "the merge opens a curve: {merge}");
         assert!(merge.contains("class=\"m main\""), "{merge}");
         assert!(merge.contains("aria-hidden=\"true\""));
@@ -185,7 +228,7 @@ mod tests {
         let rows = place(&hist, 0, 3);
         assert!(rows[1].stubs >= 1, "{rows:?}");
         assert!(
-            cell(&rows[1], columns(&rows), true)
+            cell(&rows[1], Some(&rows[0]), columns(&rows), true)
                 .to_string()
                 .contains("class=\"stub\"")
         );
@@ -201,15 +244,53 @@ mod tests {
         hist.push(("root".to_owned(), vec!["base".to_owned()]));
         hist.push(("base".to_owned(), Vec::new()));
         let rows = place(&hist, 0, hist.len());
-        let c = cell(&rows[0], columns(&rows), true).to_string();
+        let c = cell(&rows[0], None, columns(&rows), true).to_string();
         // Ten parents, ten columns: 7 past the narrow cap, 2 past the wide one.
         assert!(c.contains("class=\"gfold n\">+7<"), "{c}");
         assert!(c.contains("class=\"gfold w\">+2<"), "{c}");
         // Below the point where the lines join, the mainline alone needs no fold.
         assert!(
-            cell(&rows[hist.len() - 1], columns(&rows), false)
+            cell(&rows[hist.len() - 1], None, columns(&rows), false)
                 .folds
                 .is_empty()
         );
+    }
+
+    #[test]
+    fn a_line_past_a_cap_is_not_drawn_and_its_count_shows_once_per_run() {
+        let tips: Vec<String> = (0..15).map(|i| format!("t{i}")).collect();
+        let mut hist: Vec<(String, Vec<String>)> = vec![("m".to_owned(), tips.clone())];
+        for t in &tips {
+            hist.push((t.clone(), vec!["root".to_owned()]));
+        }
+        hist.push(("root".to_owned(), Vec::new()));
+        let rows = place(&hist, 0, hist.len());
+        let w = columns(&rows);
+        for (i, p) in rows.iter().enumerate() {
+            let c = cell(p, i.checked_sub(1).map(|j| &rows[j]), w, false);
+            for l in &c.paths {
+                // x is every even number of "MxyVy" and "MxyCxyxyxy".
+                let nums: Vec<u32> =
+                    l.d.split(|ch: char| !ch.is_ascii_digit())
+                        .filter_map(|n| n.parse().ok())
+                        .collect();
+                let reach_x = nums
+                    .iter()
+                    .step_by(2)
+                    .take(if l.d.contains('C') { 4 } else { 1 });
+                let reach_x = reach_x.copied().max().unwrap_or(0);
+                let cap = |k: u16| u32::from(k) * COL;
+                assert!(reach_x < cap(3) || l.cls.contains("xn"), "row {i}: {l:?}");
+                assert!(reach_x < cap(8) || l.cls.contains("xw"), "row {i}: {l:?}");
+            }
+            assert_eq!(c.edge.is_empty(), p.col < 3, "row {i}: {:?}", c.edge);
+            if i > 1 && hidden(p) == hidden(&rows[i - 1]) {
+                assert!(
+                    c.folds.is_empty(),
+                    "row {i} repeats its count: {:?}",
+                    c.folds
+                );
+            }
+        }
     }
 }
