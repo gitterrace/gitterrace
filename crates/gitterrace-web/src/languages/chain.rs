@@ -138,14 +138,14 @@ fn walk(src: &dyn InsightsSource, rank: Option<Rank>) -> impl Iterator<Item = Ra
     })
 }
 
-/// Streams the chain from `rank` in bounded ascending batches, yielding newest first.
+/// Streams the rows of `ranks` (newest first) in bounded ascending batches, yielding newest
+/// first.
 fn rows_newest_first(
     src: &dyn InsightsSource,
-    rank: Option<Rank>,
-    take: usize,
+    ranks: impl IntoIterator<Item = Rank>,
     mut each: impl FnMut(Rank, &[FileRow]),
 ) {
-    let mut ranks = walk(src, rank).take(take);
+    let mut ranks = ranks.into_iter();
     loop {
         let mut chunk: Vec<Rank> = ranks.by_ref().take(CHUNK).collect();
         if chunk.is_empty() {
@@ -167,7 +167,10 @@ impl Skeleton {
             .len()
             .checked_sub(1)
             .map(|i| Rank(u32::try_from(i).unwrap_or(u32::MAX)));
-        let n = walk(src, newest).count();
+        // One walk: each step decodes a record and looks its parent up in the oid index, so
+        // counting and then streaming the chain walked it twice (1.3M steps on linux).
+        let chain: Vec<Rank> = walk(src, newest).collect();
+        let n = chain.len();
         let gap = n.div_ceil(MARKS).max(MIN_GAP);
         let want = wanted(n, None);
         let mut tally = Tally::new(src, filter);
@@ -175,7 +178,7 @@ impl Skeleton {
         let mut fixed_raw: Vec<(usize, Snapshot)> = Vec::new();
         let mut marks_raw: Vec<Snapshot> = Vec::new();
         let mut pos = n;
-        rows_newest_first(src, newest, n, |r, files| {
+        rows_newest_first(src, chain, |r, files| {
             pos -= 1;
             if want.contains(&pos) {
                 fixed_raw.push((pos, tally.snapshot(r)));
@@ -292,19 +295,23 @@ impl Skeleton {
             let (mut lines, mut added, mut removed) =
                 (mark.lines.clone(), mark.added, mark.removed);
             let mut pos = start + 1;
-            rows_newest_first(src, Some(mark.rank), start - low + 1, |r, files| {
-                pos -= 1;
-                if need.contains(&pos) {
-                    extra.insert(pos, point(src, r, lines.clone(), added, removed));
-                }
-                for f in files {
-                    if let Some(s) = slot_of(f.path) {
-                        lines[s] -= i64::from(f.add) - i64::from(f.del);
-                        added -= u64::from(f.add);
-                        removed -= u64::from(f.del);
+            rows_newest_first(
+                src,
+                walk(src, Some(mark.rank)).take(start - low + 1),
+                |r, files| {
+                    pos -= 1;
+                    if need.contains(&pos) {
+                        extra.insert(pos, point(src, r, lines.clone(), added, removed));
                     }
-                }
-            });
+                    for f in files {
+                        if let Some(s) = slot_of(f.path) {
+                            lines[s] -= i64::from(f.add) - i64::from(f.del);
+                            added -= u64::from(f.add);
+                            removed -= u64::from(f.del);
+                        }
+                    }
+                },
+            );
             need.retain(|p| *p < low);
         }
         let mut ch = Chain {
