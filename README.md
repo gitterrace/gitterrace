@@ -14,6 +14,10 @@ read their diffs. This is a calm place to look again ([why](docs/why.md)).
 Try it without installing: [the live demo](https://demo.gitterrace.dev): jq
 1.8.2 and ripgrep 15.2.0, exported.
 
+The screenshots show the same projects: [jq](https://github.com/jqlang/jq) and
+[ripgrep](https://github.com/BurntSushi/ripgrep), both MIT licensed. Thanks to
+their authors.
+
 <!-- END GENERATED: demo -->
 
 <!-- BEGIN GENERATED: shots -->

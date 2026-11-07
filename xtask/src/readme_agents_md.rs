@@ -71,7 +71,10 @@ pub fn demo_md(ws: &Workspace) -> String {
         [rest @ .., last] => format!(": {} and {last}, exported", rest.join(", ")),
     };
     format!(
-        "Try it without installing: [the live demo]({}){shows}.\n",
+        "Try it without installing: [the live demo]({}){shows}.\n\n\
+         The screenshots show the same projects: [jq](https://github.com/jqlang/jq) and \
+         [ripgrep](https://github.com/BurntSushi/ripgrep), both MIT licensed. Thanks to their \
+         authors.\n",
         ws.demo
     )
 }
