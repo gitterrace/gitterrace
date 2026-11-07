@@ -14,12 +14,17 @@ ignores:
   - crates/**/*_tests.rs
   - crates/**/tests/**
 rule:
-  kind: call_expression
-  has: {field: function, regex: '(^|::)CountContext::new$'}
-  not:
-    any:
-      - inside: {stopBy: end, kind: mod_item, regex: '^(pub(\(crate\))? )?mod \w*tests'}
-      - inside:
+  any:
+    - kind: call_expression
+      has: {field: function, regex: '(^|::)CountContext::new$'}
+      not:
+        inside:
           stopBy: end
           kind: function_item
           has: {field: name, regex: '^(counted|insight|in_scope)$'}
+    # Macro bodies are bare tokens, invisible to the pattern above.
+    - kind: token_tree
+      inside: {stopBy: end, any: [{kind: macro_invocation}, {kind: macro_definition}]}
+      regex: '\bCountContext\s*::\s*new\s*\('
+      not: {has: {kind: token_tree, regex: '\bCountContext\s*::\s*new\s*\('}}
+  not: {inside: {stopBy: end, kind: mod_item, regex: '^(pub(\(crate\))? )?mod \w*tests'}}

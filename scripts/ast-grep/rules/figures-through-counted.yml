@@ -27,15 +27,20 @@ ignores:
   - crates/**/*_tests.rs
   - crates/**/tests/**
 rule:
-  kind: call_expression
-  has:
-    field: function
-    kind: field_expression
-    has: {field: field, regex: '^(commits_in|rows_for)$'}
-  not:
-    any:
-      - inside: {stopBy: end, kind: mod_item, regex: '^(pub(\(crate\))? )?mod \w*tests'}
-      - inside:
+  any:
+    - kind: call_expression
+      has:
+        field: function
+        kind: field_expression
+        has: {field: field, regex: '^(commits_in|rows_for)$'}
+      not:
+        inside:
           stopBy: end
           kind: function_item
           has: {field: name, regex: '^(build|spark_times|hot_files)$'}
+    # Macro bodies are bare tokens, invisible to the pattern above.
+    - kind: token_tree
+      inside: {stopBy: end, any: [{kind: macro_invocation}, {kind: macro_definition}]}
+      regex: '\.(commits_in|rows_for)\s*\('
+      not: {has: {kind: token_tree, regex: '\.(commits_in|rows_for)\s*\('}}
+  not: {inside: {stopBy: end, kind: mod_item, regex: '^(pub(\(crate\))? )?mod \w*tests'}}
