@@ -111,6 +111,8 @@
 //                height, nothing scrolls sideways, and the List | Graph switch keeps the page top
 //   outline-filter  the "On this page" filter shows, narrows the list and Escape returns
 //                focus, on a Markdown page and an insights page
+//   symbols      a source file's symbol outline: at 1440 px a rail beside the code below the
+//                pinned path bar, at 390 px a menu in the path bar; a link lands its line
 //   send-dialog  the Send to window has a "Send to" head, Title and Notes labels, a Cancel that
 //                closes it and the shortcut in words; at 390 px it is a bottom sheet with its
 //                footer in view
@@ -139,7 +141,7 @@ const bin = resolve(arg('--bin', join(root, 'target/debug/git-terrace')));
 const fromDisk = process.argv.includes('--from-disk');
 const tabCounts = arg('--tabs', '8,12').split(',').map(Number);
 const browsers = arg('--browsers', 'webkit,chromium').split(',');
-const ALL = ['truncation', 'live-tabs', 'mermaid', 'chip', 'doctabs', 'chords', 'header', 'marked', 'menu-same', 'gutter', 'overlays', 'tips', 'date-tips', 'repo-switch', 'outline', 'mark-seam', 'about-place', 'site-theme', 'side-width', 'calm-header', 'tabs-one-line', 'tab-levels', 'huge-diff', 'sticky-heads', 'md-anchor', 'live-scroll', 'sticky-line', 'seg-one-row', 'period-steady', 'export-from-disk', 'inline-controls', 'section-gaps', 'path-cells', 'mark-flat', 'tab-stops', 'help-keys', 'side-order', 'settings', 'lone-rows', 'page-heads', 'compare-head', 'commit-head', 'search-head', 'small-layout', 'send-dialog', 'outline-filter', 'avatar-fit', 'graph-view', 'layout-shift'];
+const ALL = ['truncation', 'live-tabs', 'mermaid', 'chip', 'doctabs', 'chords', 'header', 'marked', 'menu-same', 'gutter', 'overlays', 'tips', 'date-tips', 'repo-switch', 'outline', 'mark-seam', 'about-place', 'site-theme', 'side-width', 'calm-header', 'tabs-one-line', 'tab-levels', 'huge-diff', 'sticky-heads', 'md-anchor', 'live-scroll', 'sticky-line', 'seg-one-row', 'period-steady', 'export-from-disk', 'inline-controls', 'section-gaps', 'path-cells', 'mark-flat', 'tab-stops', 'help-keys', 'side-order', 'settings', 'lone-rows', 'page-heads', 'compare-head', 'commit-head', 'search-head', 'small-layout', 'send-dialog', 'outline-filter', 'avatar-fit', 'graph-view', 'layout-shift', 'symbols'];
 const wanted = arg('--checks', ALL.join(',')).split(',');
 for (const c of wanted) if (!ALL.includes(c)) { console.error(`unknown check ${c}; known: ${ALL.join(', ')}`); process.exit(2); }
 
@@ -187,7 +189,7 @@ const { loneRows, smallLayout, avatarFit } = rowChecks(env);
 const { checks: sendChecks } = await import('./browser-send-lib.mjs');
 const { sendDialog } = sendChecks(env);
 const { checks: outlineChecks } = await import('./browser-outline-lib.mjs');
-const { outlineFilter } = outlineChecks(env);
+const { outlineFilter, symbols } = outlineChecks(env);
 const { checks: graphChecks } = await import('./browser-graph-lib.mjs');
 const { graphView } = graphChecks(env);
 const { checks: shiftChecks } = await import('./browser-shift-lib.mjs');
@@ -515,7 +517,7 @@ async function settings() {
   }
 }
 
-const checks = { 'sticky-heads': stickyHeads, 'tabs-one-line': tabsOneLine, 'tab-levels': tabLevels, 'calm-header': calmHeader, 'side-width': sideWidth, truncation, 'live-tabs': liveTabs, mermaid, chip, doctabs, chords, header, marked, 'menu-same': menuSame, gutter, overlays, tips, 'date-tips': dateTips, 'repo-switch': repoSwitch, outline, 'mark-seam': markSeam, 'about-place': aboutPlace, 'site-theme': siteTheme, 'huge-diff': hugeDiff, 'md-anchor': mdAnchor, 'live-scroll': liveScroll, 'sticky-line': stickyLine, 'seg-one-row': segOneRow, 'period-steady': periodSteady, 'export-from-disk': exportFromDisk, 'inline-controls': inlineControls, 'section-gaps': sectionGaps, 'path-cells': pathCells, 'mark-flat': markFlat, 'tab-stops': tabStops, 'help-keys': helpKeys, 'side-order': sideOrder, settings, 'lone-rows': loneRows, 'page-heads': pageHeads, 'compare-head': compareHeads, 'commit-head': commitHeads, 'search-head': searchHeads, 'small-layout': smallLayout, 'send-dialog': sendDialog, 'outline-filter': outlineFilter, 'graph-view': graphView, 'avatar-fit': avatarFit, 'layout-shift': layoutShift };
+const checks = { 'sticky-heads': stickyHeads, 'tabs-one-line': tabsOneLine, 'tab-levels': tabLevels, 'calm-header': calmHeader, 'side-width': sideWidth, truncation, 'live-tabs': liveTabs, mermaid, chip, doctabs, chords, header, marked, 'menu-same': menuSame, gutter, overlays, tips, 'date-tips': dateTips, 'repo-switch': repoSwitch, outline, 'mark-seam': markSeam, 'about-place': aboutPlace, 'site-theme': siteTheme, 'huge-diff': hugeDiff, 'md-anchor': mdAnchor, 'live-scroll': liveScroll, 'sticky-line': stickyLine, 'seg-one-row': segOneRow, 'period-steady': periodSteady, 'export-from-disk': exportFromDisk, 'inline-controls': inlineControls, 'section-gaps': sectionGaps, 'path-cells': pathCells, 'mark-flat': markFlat, 'tab-stops': tabStops, 'help-keys': helpKeys, 'side-order': sideOrder, settings, 'lone-rows': loneRows, 'page-heads': pageHeads, 'compare-head': compareHeads, 'commit-head': commitHeads, 'search-head': searchHeads, 'small-layout': smallLayout, 'send-dialog': sendDialog, 'outline-filter': outlineFilter, 'graph-view': graphView, 'avatar-fit': avatarFit, 'layout-shift': layoutShift, symbols };
 try {
   for (const c of wanted) { console.log(`-- ${c}`); await checks[c](); }
 } finally {
