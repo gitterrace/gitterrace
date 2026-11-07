@@ -308,3 +308,45 @@ fn all_counts_every_admitted_commit_whatever_the_clock() {
         .collect();
     assert_eq!(got, [3, 3], "independent of the clock");
 }
+
+/// A first-time contributor is new to the project, judged on counted commits. Ann worked on
+/// `src/` long ago and on `docs/` only this week: under a `docs/` path she is still not new.
+/// Bob's only earlier commit is a merge, which never counts, so his first counted commit this
+/// week makes him new. Cy committed before the week, so he is not new.
+#[test]
+fn first_time_is_judged_on_counted_commits() {
+    use crate::feed::{FixedClock, MemorySource};
+    use crate::{CountContext, Scope, ScopeParams};
+    let mut recs = vec![
+        rec("a0", "Ann", 0, vec![file("src/a.rs", 1, 0, 1)]),
+        rec("m0", "Bob", 1, vec![file("docs/m.md", 1, 0, 1)]),
+        rec("c0", "Cy", 2, vec![file("docs/c.md", 1, 0, 1)]),
+        rec("a1", "Ann", 30, vec![file("docs/x.md", 1, 0, 1)]),
+        rec("b1", "Bob", 30, vec![file("docs/y.md", 1, 0, 1)]),
+        rec("c1", "Cy", 30, vec![file("docs/z.md", 1, 0, 1)]),
+    ];
+    recs[1].merge = true;
+    let ins = Insights::new(&recs, Options::default(), None);
+    let cx = CountContext::new(&MemorySource::new(&recs), &FixedClock(i64::MAX));
+    let new = |path: Option<&str>| {
+        let mut p = ScopeParams::default();
+        p.select.path = path.map(str::to_owned);
+        let s = Scope::from_params(&p, Options::default(), Period::Week).expect("scope");
+        let mut names: Vec<String> = ins
+            .counted(&s, cx)
+            .contributors(crate::Metric::Commits)
+            .contributors
+            .into_iter()
+            .filter(|c| c.first_time)
+            .map(|c| c.name)
+            .collect();
+        names.sort();
+        names
+    };
+    assert_eq!(new(Some("docs")), ["Bob"], "a path chip makes no one new");
+    assert_eq!(
+        new(None),
+        ["Bob"],
+        "Ann and Cy committed before the week, a merge never counts"
+    );
+}

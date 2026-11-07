@@ -3,9 +3,10 @@
 
 use std::collections::BTreeSet;
 
-use crate::feed::CommitRange;
 use crate::insights::fasthash::FastMap;
-use crate::insights::{Contributor, ContributorReport, Counted, Item, Metric, Reducer};
+use crate::insights::{
+    Contributor, ContributorReport, Counted, Item, Metric, Period, Reducer, Scope, ScopeParams,
+};
 
 struct Acc {
     commits: usize,
@@ -61,9 +62,9 @@ impl Reducer for People {
 
 impl Counted<'_> {
     /// Every person the set counts, ordered by `metric`, then name. The series carries that
-    /// metric per bucket (net floored at zero). `first_time`: the person's first commit ever,
-    /// merges and the whole history of the source included, lies on or after the first
-    /// counted day.
+    /// metric per bucket (net floored at zero). `first_time`: the person's first commit
+    /// counted under the same options, over the whole history and whatever the selection,
+    /// lies on or after the first counted day.
     pub fn contributors(&self, metric: Metric) -> ContributorReport {
         contributors(self, metric)
     }
@@ -82,7 +83,16 @@ fn contributors(set: &Counted<'_>, metric: Metric) -> ContributorReport {
     let fixed = set.scope().period().days().is_some() || set.scope().range().is_some();
     let mut first_day: FastMap<usize, i64> = FastMap::default();
     if fixed {
-        for row in ins.source().commits_in(CommitRange::All) {
+        // New means new to the project: every day, the same options (merges, bots), no
+        // selection. A filter chip never turns a long-time contributor into a newcomer, and a
+        // merge or an uncounted bot never makes anyone a returning contributor.
+        let ever = Scope::from_params(
+            &ScopeParams::default(),
+            set.scope().options().clone(),
+            Period::All,
+        )
+        .unwrap_or_else(|_| unreachable!("an empty query is always a valid scope"));
+        for row in ins.counted(&ever, *set.context()).stream() {
             let who = ins.person_of(row.ident);
             if !people.acc.contains_key(&who) {
                 continue;

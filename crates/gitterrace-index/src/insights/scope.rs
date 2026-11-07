@@ -20,6 +20,10 @@
 //!   `insights.include_bots` or `bots=1`, on every page and list.
 //! - Authors are people after `.mailmap`. Ranked people with equal values order by display
 //!   name, then e-mail, never by the order the index first met them.
+//! - A contributor is new in a period when their first counted commit over the whole history
+//!   lies in that period. The options (merges, bots) apply and the selection does not: a
+//!   filter chip never turns a long-time contributor into a newcomer, and a merge or an
+//!   uncounted bot commit never makes anyone a returning contributor.
 //! - A commit's day is its author's local day, in the author's own offset, for bars, punch
 //!   card, weekday split and totals. The commit log alone groups by the committer's local day,
 //!   so its order and headings agree, while its counts still use the author's day.

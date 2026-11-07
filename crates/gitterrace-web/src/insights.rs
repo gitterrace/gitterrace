@@ -375,7 +375,7 @@ pub(crate) async fn contributors(
         let mut fb = f.bar("/stats/contributors", &**r, period);
         fb.extra = Some(q.metric_switch(&d));
         // The period is applied by Insights so first-time contributors are judged against all
-        // history that the other filters keep.
+        // history that the options keep, whatever the selection.
         let scope = page_scope(&q, &d, period);
         let ins = insights(a, r, scope.options().clone());
         let metric = q.metric();
