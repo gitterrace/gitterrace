@@ -87,8 +87,7 @@ impl Watch {
         if want == self.started {
             return;
         }
-        // Dropping joins the watcher thread, which takes at most one debounce round.
-        self.nudger = None;
+        retire(self.nudger.take());
         self.polling.store(false, Ordering::Release);
         self.started = want;
         let Some((secs, os)) = want else { return };
@@ -146,6 +145,26 @@ impl Watch {
     }
 }
 
+impl Drop for Watch {
+    fn drop(&mut self) {
+        retire(self.nudger.take());
+    }
+}
+
+/// Stops `nudger` on a thread of its own. Dropping it joins the watcher thread, and the OS
+/// stream's teardown took up to forty seconds on a loaded Mac: run on an async worker (where a
+/// refresher is dropped when its repository is removed) that stalled the worker and kept the
+/// whole app alive meanwhile. The nudger holds no app, so nothing waits for this thread.
+fn retire<T: Send + 'static>(nudger: Option<T>) {
+    let Some(n) = nudger else { return };
+    let spawned = std::thread::Builder::new()
+        .name("fs-nudge-stop".into())
+        .spawn(move || drop(n));
+    if let Err(e) = spawned {
+        tracing::warn!("stopping a file watcher on its own thread failed: {e}");
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::sync::{Arc, atomic::Ordering};
@@ -156,6 +175,28 @@ mod tests {
     use crate::wiring_tests::{app, repo, with};
 
     const BOTH: [Scope; 2] = [Scope::Tree, Scope::Git];
+
+    /// Records the thread it is dropped on.
+    struct Spy(std::sync::mpsc::Sender<std::thread::ThreadId>);
+
+    impl Drop for Spy {
+        fn drop(&mut self) {
+            self.0.send(std::thread::current().id()).ok();
+        }
+    }
+
+    /// Guard class: a blocking teardown run on the caller's thread. A watcher's drop joins the
+    /// OS stream's thread, which took tens of seconds on a loaded Mac, and the caller is an
+    /// async worker holding the app. Red when `retire` drops in place.
+    #[test]
+    fn a_retired_watcher_is_dropped_off_the_calling_thread() {
+        let (tx, rx) = std::sync::mpsc::channel();
+        super::retire(Some(Spy(tx)));
+        let on = rx
+            .recv_timeout(gitterrace_testkit::wait::DEADLINE)
+            .expect("the retired value was dropped");
+        assert_ne!(on, std::thread::current().id(), "dropped on the caller");
+    }
 
     /// Guard class: the two watches drifting apart. Each kind runs the same start, restart,
     /// stop and nudge steps; a kind that skipped one (kept polling after a stop, ignored a
