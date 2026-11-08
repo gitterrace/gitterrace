@@ -251,5 +251,87 @@ async function exportFromDisk() {
   }
   rmSync(join(out, '..'), { recursive: true, force: true });
 }
-  return { markSeam, aboutPlace, siteTheme, exportFromDisk };
+// The landing page's install tabs: the selected tab merges into its panel (no line at the seam,
+// the panel's colour), an unselected tab keeps the line so it reads as behind. Pixels at the seam.
+async function installTabs() {
+  const { createServer } = await import('node:http');
+  const siteDir = join(root, 'site');
+  const types = {
+    html: 'text/html', css: 'text/css', svg: 'image/svg+xml', webp: 'image/webp', png: 'image/png',
+  };
+  const server = createServer((q, s) => {
+    const path = decodeURIComponent(String(q.url).split(/[?#]/)[0]);
+    const p = join(siteDir, path.replace(/\/$/, '/index.html'));
+    if (!p.startsWith(siteDir) || !existsSync(p)) { s.writeHead(404); s.end(); return; }
+    s.writeHead(200, { 'content-type': types[p.split('.').pop()] || 'application/octet-stream' });
+    s.end(readFileSync(p));
+  });
+  await new Promise((ok) => server.listen(0, '127.0.0.1', () => ok(undefined)));
+  const url = `http://127.0.0.1:${(/** @type {any} */ (server.address())).port}/`;
+  try {
+    for (const browser of browsers) {
+      const b = await launch(pw, browser);
+      for (const scheme of ['light', 'dark']) for (const width of [390, 1440]) {
+        const where = `install-tabs ${browser} ${scheme} ${width}`;
+        const ctx = await b.newContext({ colorScheme: scheme, viewport: { width, height: 900 } });
+        const p = await ctx.newPage();
+        try {
+          await p.goto(url, { waitUntil: 'load' });
+          const n = await p.evaluate(() => document.querySelectorAll('.tabs .tab-label').length);
+          const bad = [];
+          for (let sel = 0; sel < n; sel++) {
+            await p.evaluate((i) => {
+              const radios = document.querySelectorAll('.tabs .tab-radio');
+              const r = /** @type {HTMLInputElement} */ (radios[i]);
+              r.checked = true;
+              r.dispatchEvent(new Event('change', { bubbles: true }));
+            }, sel);
+            const g = await p.evaluate(() => {
+              const all = document.querySelectorAll('.tabs .tab-panel pre');
+              const pres = /** @type {HTMLElement[]} */ ([...all]);
+              const pre = /** @type {HTMLElement} */ (pres.find((e) => e.offsetParent));
+              const cs = getComputedStyle(pre);
+              const pr = pre.getBoundingClientRect();
+              const labels = [...document.querySelectorAll('.tabs .tab-label')].map((l) => {
+                const r = l.getBoundingClientRect();
+                return { x: r.left + r.width / 2 + window.scrollX };
+              });
+              const bw = parseFloat(cs.borderTopWidth);
+              return { y: pr.top + window.scrollY, bg: cs.backgroundColor, bw, labels };
+            });
+            const shot = (await p.screenshot({ fullPage: true })).toString('base64');
+            const px = await p.evaluate(async ({ shot, g }) => {
+              const img = new Image();
+              img.src = 'data:image/png;base64,' + shot;
+              await img.decode();
+              const c = document.createElement('canvas');
+              c.width = img.width;
+              c.height = img.height;
+              const k = /** @type {CanvasRenderingContext2D} */ (c.getContext('2d'));
+              k.drawImage(img, 0, 0);
+              const f = img.width / document.documentElement.scrollWidth;
+              const y = Math.floor((g.y + g.bw / 2) * f);
+              return g.labels.map((l) => {
+                const d = k.getImageData(Math.floor(l.x * f), y, 1, 1).data;
+                return `rgb(${d[0]}, ${d[1]}, ${d[2]})`;
+              });
+            }, { shot, g });
+            px.forEach((c, i) => {
+              const same = c === g.bg;
+              const line = `tab ${i} (selected) has a line: ${c}, panel ${g.bg}`;
+              if (i === sel && !same) bad.push(line);
+              if (i !== sel && same) bad.push(`tab ${i} lost its line, tab ${sel} selected`);
+            });
+          }
+          if (bad.length) r.fail(`${where}: ${bad.join('; ')}`);
+          else r.ok(`${where}: selected tab merges into its panel, others keep the line`);
+        } catch (e) {
+          r.fail(`${where}: ${String(e.message).split('\n')[0]}`);
+        } finally { await ctx.close(); }
+      }
+      await b.close();
+    }
+  } finally { server.close(); }
+}
+  return { markSeam, aboutPlace, siteTheme, exportFromDisk, installTabs };
 }
