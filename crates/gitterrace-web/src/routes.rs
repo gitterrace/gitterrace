@@ -5,8 +5,7 @@ use std::sync::Arc;
 use askama::Template;
 use axum::{
     Json, Router,
-    extract::{Path, Query, State},
-    http::{HeaderValue, header},
+    extract::{Query, State},
     response::{Html, IntoResponse, Redirect, Response},
     routing::get,
 };
@@ -23,6 +22,7 @@ use crate::{
     views::{Chrome, CommitRow, FileStatRow},
 };
 
+mod api;
 mod assets;
 mod commits;
 mod files;
@@ -65,10 +65,10 @@ pub(crate) fn router(app: Arc<App>) -> Router {
         .route("/worktree", get(worktree))
         .route("/worktree/diff/{*path}", get(views::worktree_fragment))
         .route("/worktree/raw/{*path}", get(raw::worktree_raw))
-        .route("/api/files/{rev}", get(api_files))
-        .route("/api/refs", get(api_refs))
-        .route("/api/last/{rev}", get(api_last_root))
-        .route("/api/last/{rev}/{*path}", get(api_last))
+        .route("/api/files/{rev}", get(api::files))
+        .route("/api/refs", get(api::refs))
+        .route("/api/last/{rev}", get(api::last_root))
+        .route("/api/last/{rev}/{*path}", get(api::last))
         .route("/stats", get(crate::activity::page))
         // The tab reads "Insights": a typed or remembered /insights lands there too.
         .route(
@@ -172,6 +172,7 @@ struct DocQuery {
 #[template(path = "overview.html")]
 struct OverviewPage {
     c: Chrome,
+    head: crate::pagehead::PageHead,
     totals: Option<Numbers>,
     about: Option<crate::about::About>,
     entries: Vec<views::Entry>,
@@ -203,12 +204,19 @@ async fn overview(State(app): Shared, Query(q): Query<DocQuery>) -> Result<Html<
             None => (String::new(), None),
         };
         let (side, totals) = built;
+        let c = views::chrome(a, "files").live(Mode::NOTICE);
+        let counted = totals.as_ref().map(|t| {
+            format!(
+                "{} {} by {} {}",
+                t.commits, t.commits_noun, t.authors, t.authors_noun
+            )
+        });
         Ok(OverviewPage {
+            head: crate::pagehead::overview_head(&c.name, &c.branch, counted.as_deref()),
             c: Chrome {
                 md: about.as_ref().is_some_and(|d| d.markdown),
-                ..views::chrome(a, "files")
-            }
-            .live(Mode::NOTICE),
+                ..c
+            },
             totals,
             about,
             entries: views::entries(&rev, "", &list),
@@ -500,98 +508,6 @@ async fn worktree(State(app): Shared) -> Result<Html<String>> {
     })
     .await?;
     page(&p)
-}
-
-fn json<T: serde::Serialize>(v: &T) -> Response {
-    match serde_json::to_vec(v) {
-        Ok(b) => (
-            [
-                (
-                    header::CONTENT_TYPE,
-                    HeaderValue::from_static("application/json"),
-                ),
-                (header::CACHE_CONTROL, HeaderValue::from_static("no-cache")),
-            ],
-            b,
-        )
-            .into_response(),
-        Err(e) => crate::error::Error::Index(std::io::Error::other(e)).into_response(),
-    }
-}
-
-/// All file paths at a revision, for the client-side finder.
-async fn api_files(State(app): Shared, Path(rev): Path<String>) -> Result<Response> {
-    let paths = blocking(&app, move |a| {
-        let id = a.repo.resolve(&rev)?;
-        a.file_paths(&id)
-    })
-    .await?;
-    Ok(json(&*paths))
-}
-
-#[derive(serde::Serialize)]
-struct RefBody {
-    name: String,
-    kind: &'static str,
-    when: crate::when::When,
-}
-
-/// Branches and tags for the switcher. Remotes are left out to keep the list short.
-async fn api_refs(State(app): Shared) -> Result<Response> {
-    let list = blocking(&app, |a| {
-        let now = fmt::now();
-        Ok(a.repo
-            .refs()?
-            .into_iter()
-            .filter(|r| r.kind != RefKind::Remote)
-            .map(|r| RefBody {
-                kind: if r.kind == RefKind::Tag {
-                    "tag"
-                } else {
-                    "branch"
-                },
-                when: fmt::ago(r.time, now),
-                name: r.name,
-            })
-            .collect::<Vec<_>>())
-    })
-    .await?;
-    Ok(json(&list))
-}
-
-#[derive(serde::Serialize)]
-struct LastBody {
-    name: String,
-    id: String,
-    subject: String,
-    when: crate::when::When,
-}
-
-async fn api_last_root(state: Shared, Path(rev): Path<String>) -> Result<Response> {
-    api_last(state, Path((rev, String::new()))).await
-}
-
-/// Last commit per entry of a directory, filled into the tree after first paint.
-async fn api_last(
-    State(app): Shared,
-    Path((rev, path)): Path<(String, String)>,
-) -> Result<Response> {
-    let list = blocking(&app, move |a| {
-        let id = a.repo.resolve(&rev)?;
-        let now = fmt::now();
-        let found = a.last_commits(&id, path.trim_matches('/'))?;
-        Ok(found
-            .iter()
-            .map(|c| LastBody {
-                name: c.name.clone(),
-                id: c.id.clone(),
-                subject: c.subject.clone(),
-                when: fmt::ago(c.time, now),
-            })
-            .collect::<Vec<_>>())
-    })
-    .await?;
-    Ok(json(&list))
 }
 
 #[cfg(test)]

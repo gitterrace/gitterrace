@@ -8,7 +8,6 @@
     "templates/compare.html",
     "templates/dochead.html",
     "templates/lost.html",
-    "templates/overview.html",
     "templates/search.html",
     "templates/worktree.html"
   ]

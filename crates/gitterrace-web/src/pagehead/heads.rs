@@ -90,3 +90,13 @@ pub(crate) fn file_head(rev: &str, path: &str, on: FileView, tagline: Tagline) -
         ..PageHead::new(path, tagline)
     }
 }
+
+/// The overview's head: the repository's name, its branch and what was counted (`None` while
+/// history is indexing).
+pub(crate) fn overview_head(name: &str, branch: &str, counted: Option<&str>) -> PageHead {
+    let said = format!(
+        "On {branch} \u{b7} {}",
+        counted.unwrap_or("indexing history")
+    );
+    PageHead::new(name, Tagline::of(&said))
+}
