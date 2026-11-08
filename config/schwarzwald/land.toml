@@ -29,6 +29,8 @@ gate = [
   "bash scripts/golden-run.sh",
   "python3 shared/schwarzwald/lint/file-length.py",
   "python3 scripts/names-check.py",
+  # Generated docs, README blocks and site pages match their sources.
+  "cargo xtask check",
   "bash shared/schwarzwald/lint/run.sh",
 ]
 # The landing runs in a fresh clone, which has no core.hooksPath yet: set it there first. The
