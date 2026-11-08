@@ -1,6 +1,7 @@
-//! `site/index.html` and `site/assets/`: the one-page website, written from the repo's own
-//! sources (Cargo.toml facts, clap, the registries, `docs/why.md`, the brand SVGs and the
-//! vendored theme). A fact is never typed here, so `check` fails when the page is stale.
+//! `site/index.html` and `site/assets/`: the website (landing page, docs, changelog and legal
+//! pages), written from the repo's own sources (Cargo.toml facts, clap, the registries,
+//! `docs/why.md`, the brand SVGs and the vendored theme). A fact is never typed here, so `check`
+//! fails when the page is stale.
 
 use std::fmt::Write as _;
 use std::path::Path;

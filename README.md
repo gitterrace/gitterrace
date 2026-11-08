@@ -117,8 +117,8 @@ on it. Off until you write `actions.toml`: [how to set it up](docs/actions.md).
 Every document, by what you need: [the docs index](docs/README.md). Most used:
 [configuration](docs/configuration.md), [JSON API](docs/api.md) and
 [running it online](docs/online.md). gitterrace binds to `127.0.0.1` and never
-changes your files or history. The one-page site is generated into
-[site/](site/index.html).
+changes your files or history. The website (landing page, docs, changelog and
+legal pages) is generated into [site/](site/index.html).
 
 ## Contributing
 
