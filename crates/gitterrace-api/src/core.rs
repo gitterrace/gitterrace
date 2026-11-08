@@ -110,6 +110,7 @@ impl ApiState {
     pub fn reconfigure(&self, cfg: &gitterrace_config::Config) {
         self.index
             .set_block_cache(cfg.cache_bytes(gitterrace_config::Cache::Blocks));
+        self.index.set_message_index(cfg.index.has_messages);
         let defaults = options_from(cfg, &self.repo.name());
         let mut s = self.write_settings();
         s.style = cfg.links.style;

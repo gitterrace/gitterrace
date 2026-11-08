@@ -12,6 +12,7 @@ mod ignore;
 mod nudge;
 mod repo;
 mod repo_id;
+mod text;
 mod time;
 mod treepath;
 mod types;
@@ -45,6 +46,7 @@ pub use ignore::IgnoreSet;
 pub use nudge::{Nudge, NudgeConfig, NudgeError, Nudger, Skip};
 pub use repo::{ChangeMemo, Repo};
 pub use repo_id::resolve_permalink;
+pub use text::{CommitText, Mailmap};
 pub use time::{civil_from_days, days_from_civil};
 pub use types::{
     BlameLine, Blob, ChangeKind, CodeCounts, CommitDetail, CommitSummary, FileDiff, Hunk, HunkLine,

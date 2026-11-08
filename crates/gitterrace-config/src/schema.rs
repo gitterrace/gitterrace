@@ -278,6 +278,11 @@ settings! {
         build_on_start: bool = true => Live,
         /// Threads that parse the index. 0 means one per core, capped at 8. Needs a restart.
         threads: usize = 0 => Restart,
+        /// Keep the commit messages in the index so commit search reads them there instead of
+        /// walking the history. Costs about 12% more cache on disk (31 MB for 345k commits)
+        /// and one extra pass over the history when first turned on (16 s for 345k commits).
+        /// Off, commit search walks git: 3 s on that history when nothing matches, 70 ms on.
+        has_messages: bool = true => Live,
     }
     resources: Resources {
         /// Memory for the serving caches of one repository together, in MB, shared out in

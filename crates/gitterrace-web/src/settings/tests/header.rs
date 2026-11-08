@@ -2,8 +2,8 @@
 
 use std::path::Path;
 
-use crate::settings::tests::{page, repo};
 use crate::app::Env;
+use crate::settings::tests::{page, repo};
 
 /// A server over two repositories, so the repository switcher shows. The repositories open in
 /// the background: this returns once both are served, so no page races the second one.

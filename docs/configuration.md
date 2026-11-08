@@ -73,6 +73,7 @@ Exceptions, each on purpose:
 | --- | --- | --- | --- |
 | `build_on_start` | bool | `true` | Build the commit index as soon as a repository is served: at startup for one repository, at its first visit when several share the server. Off waits for the first page that needs it (Insights). |
 | `threads` | integer | `0` | Threads that parse the index. 0 means one per core, capped at 8. Needs a restart. |
+| `has_messages` | bool | `true` | Keep the commit messages in the index so commit search reads them there instead of walking the history. Costs about 12% more cache on disk (31 MB for 345k commits) and one extra pass over the history when first turned on (16 s for 345k commits). Off, commit search walks git: 3 s on that history when nothing matches, 70 ms on. |
 
 ## `[resources]`
 

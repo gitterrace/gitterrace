@@ -9,7 +9,9 @@ use std::{
 };
 
 use gitterrace_config::{Cache, Config};
-use gitterrace_git::{LastCommit, Repo};
+#[cfg(test)]
+use gitterrace_git::LastCommit;
+use gitterrace_git::Repo;
 use gitterrace_index::{Index, Progress};
 use tokio::sync::{Notify, Semaphore, broadcast, watch};
 
@@ -350,6 +352,7 @@ impl App {
         let live_streams = env.cfg().server.live_streams;
         let streams = Arc::new(Semaphore::new(live_streams));
         let cfg = env.cfg();
+        index.set_message_index(cfg.index.has_messages);
         Self {
             repo,
             index,
@@ -436,6 +439,11 @@ impl App {
             api.reconfigure(cfg);
         }
         self.index.set_block_cache(cfg.cache_bytes(Cache::Blocks));
+        if self.index.message_index() != cfg.index.has_messages {
+            self.index.set_message_index(cfg.index.has_messages);
+            // HEAD did not move: the loop builds or drops the column only when asked to.
+            self.rebuild.store(true, Ordering::Release);
+        }
         let (text_bytes, blame_bytes) = repo_limits(cfg);
         self.repo.set_limits(text_bytes, blame_bytes);
         self.repo.set_worktree_limits(
@@ -512,43 +520,6 @@ impl App {
     /// Digest of the newest fingerprint.
     pub(crate) fn version(&self) -> u64 {
         self.version.load(Ordering::Acquire)
-    }
-
-    /// Last commit per entry of `dir`, cached by the walk start and the directory.
-    ///
-    /// The key is the commit, not the directory's tree id: the same tree can sit in divergent
-    /// histories with different last commits. A walk cut short by its budget is returned but not
-    /// cached, so the next request walks again instead of serving the gaps forever.
-    pub(crate) fn last_commits(&self, commit: &str, dir: &str) -> Result<Arc<Vec<LastCommit>>> {
-        self.last_commits_within(commit, dir, Duration::from_secs(20))
-    }
-
-    fn last_commits_within(
-        &self,
-        commit: &str,
-        dir: &str,
-        budget: Duration,
-    ) -> Result<Arc<Vec<LastCommit>>> {
-        let dir = dir.trim_matches('/');
-        let key = format!("{commit}\0{dir}");
-        if let Ok(g) = self.caches.last_commits.lock()
-            && let Some(v) = g.get(&key)
-        {
-            return Ok(v);
-        }
-        // A ready index names the commits that changed anything under `dir`; the walk visits
-        // only those instead of every commit in history.
-        let among = self.accelerate(commit, |s| touched::touched_names(&**s, dir))?;
-        let (found, complete) =
-            gitterrace_git::last_commits_among(&self.repo, commit, dir, among.as_deref(), budget)?;
-        let v = Arc::new(found);
-        if !complete {
-            return Ok(v);
-        }
-        if let Ok(mut g) = self.caches.last_commits.lock() {
-            g.put(key, Arc::clone(&v));
-        }
-        Ok(v)
     }
 
     fn set_progress(&self, p: Progress) {

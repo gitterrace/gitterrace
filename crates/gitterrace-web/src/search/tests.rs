@@ -2,9 +2,9 @@ use std::sync::Arc;
 
 use axum::extract::{Query, State};
 
+use crate::search::commits::search_commits_counted;
 use crate::search::{
     SearchQuery, build_regex, file_hits, glob_regex, highlight, memo_key, search, search_code,
-    search_commits_counted,
 };
 
 /// Guard: a repeat search at the same tip is served from the memo, not rescanned. The

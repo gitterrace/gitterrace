@@ -184,6 +184,7 @@ pub fn scan_commits(
     for info in walk {
         let commit = info.map_err(git)?.object().map_err(git)?;
         scan.walked += 1;
+        repo.count_commit_read();
         let raw = commit.message_raw().map_err(git)?.to_str_lossy();
         let author = commit.author().map_err(git)?;
         let named = mailmap.resolve_cow(author);
@@ -196,18 +197,39 @@ pub fn scan_commits(
         }
         scan.built += 1;
         let message = raw.into_owned();
-        let summary = CommitSummary {
-            id: commit.id.to_string(),
-            parents: commit.parent_ids().map(|p| p.to_string()).collect(),
-            author: ident::signature(&mailmap, author),
-            committer: ident::signature(&mailmap, commit.committer().map_err(git)?),
-            subject: message.lines().next().unwrap_or_default().trim().to_owned(),
-        };
+        let summary = summary_of(&commit, &mailmap, &message)?;
         if !f(summary, &message) {
             break;
         }
     }
     Ok(scan)
+}
+
+/// The summary commit search lists for `commit`, the one [`scan_commits`] hands out.
+pub(crate) fn search_summary(
+    commit: &gix::Commit<'_>,
+    mailmap: &gix::mailmap::Snapshot,
+) -> Result<CommitSummary> {
+    let message = commit
+        .message_raw()
+        .map_err(git)?
+        .to_str_lossy()
+        .into_owned();
+    summary_of(commit, mailmap, &message)
+}
+
+fn summary_of(
+    commit: &gix::Commit<'_>,
+    mailmap: &gix::mailmap::Snapshot,
+    message: &str,
+) -> Result<CommitSummary> {
+    Ok(CommitSummary {
+        id: commit.id.to_string(),
+        parents: commit.parent_ids().map(|p| p.to_string()).collect(),
+        author: ident::signature(mailmap, commit.author().map_err(git)?),
+        committer: ident::signature(mailmap, commit.committer().map_err(git)?),
+        subject: message.lines().next().unwrap_or_default().trim().to_owned(),
+    })
 }
 
 /// Commit ids reachable from `rev` in the canonical order: parents before children, ties among

@@ -12,7 +12,7 @@ pub(crate) use segments::{
 };
 
 /// Cache format; a different one on disk discards the cache.
-pub const FORMAT_VERSION: &str = "7";
+pub const FORMAT_VERSION: &str = "8";
 pub(crate) const VERSION_FILE: &str = "VERSION";
 pub(crate) const LOCK_FILE: &str = "lock";
 

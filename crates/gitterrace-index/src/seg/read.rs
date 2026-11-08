@@ -209,6 +209,8 @@ pub struct Store {
     pub segments: Vec<Container>,
     pub strings: Vec<Container>,
     pub order: Option<Container>,
+    /// The message column's files in manifest order, empty when it is off.
+    pub messages: Vec<Container>,
 }
 
 impl Store {
@@ -220,6 +222,7 @@ impl Store {
         };
         manifest.verify(dir)?;
         let (mut segments, mut strings, mut order) = (Vec::new(), Vec::new(), None);
+        let mut messages = Vec::new();
         for f in &manifest.live {
             match Kind::from_u32(u32::from(f.kind)) {
                 Some(Kind::Segment) => segments.push(Container::open(dir, &f.name, Kind::Segment)?),
@@ -229,6 +232,9 @@ impl Store {
                 }
                 Some(Kind::Order) => {
                     return Err(SegError::unreadable(&f.name, 0, "second order file"));
+                }
+                Some(Kind::Messages) => {
+                    messages.push(Container::open(dir, &f.name, Kind::Messages)?);
                 }
                 None => {}
             }
@@ -248,6 +254,7 @@ impl Store {
             segments,
             strings,
             order,
+            messages,
         }))
     }
 
@@ -257,6 +264,7 @@ impl Store {
             .iter()
             .chain(&self.strings)
             .chain(&self.order)
+            .chain(&self.messages)
             .try_for_each(Container::check_all)
     }
 

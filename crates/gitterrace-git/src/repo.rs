@@ -21,7 +21,7 @@ use crate::{Error, MAX_TEXT_BYTES, RefInfo, RefKind, Result};
 const OBJECT_CACHE_BYTES: usize = 16 * 1024 * 1024;
 /// Object cache of one index worker thread.
 const BLAME_OBJECT_CACHE_BYTES: usize = 8 * 1024 * 1024;
-const INDEX_WORKER_CACHE_BYTES: usize = 4 * 1024 * 1024;
+pub(crate) const INDEX_WORKER_CACHE_BYTES: usize = 4 * 1024 * 1024;
 /// Delta-base (pack) cache of one index worker thread. gix defaults to up to 96 MB per handle,
 /// close to 1 GB over ten workers; at 24 MB git.git builds as fast with 400 MB less peak.
 const INDEX_WORKER_PACK_CACHE_BYTES: usize = 24 * 1024 * 1024;
@@ -30,7 +30,7 @@ const INDEX_WORKER_PACK_CACHE_BYTES: usize = 24 * 1024 * 1024;
 /// of 4096 commits, samples of the linux build showed workers waiting on it for over half of
 /// their time. So the count is wide, and the held results are bounded by their estimated
 /// bytes instead, which a run of huge merges reaches long before the count.
-const NUMSTAT_WINDOW: crate::diff::Window = crate::diff::Window {
+pub(crate) const NUMSTAT_WINDOW: crate::diff::Window = crate::diff::Window {
     items: 1 << 16,
     bytes: 64 * 1024 * 1024,
 };
@@ -68,6 +68,8 @@ pub struct Repo {
     /// The last peeled ref list and the hash of the raw refs it was built from, see
     /// [`Repo::refs`]. One entry, so it holds at most one list.
     refs_memo: Mutex<Option<(u64, Vec<RefInfo>)>>,
+    /// See [`Repo::commits_read`].
+    pub(crate) commits_read: AtomicU64,
 }
 
 impl Repo {
@@ -88,6 +90,7 @@ impl Repo {
             changes: Mutex::new(Weak::new()),
             row_reads: AtomicU64::new(0),
             refs_memo: Mutex::new(None),
+            commits_read: AtomicU64::new(0),
         })
     }
 
@@ -155,6 +158,11 @@ impl Repo {
         self.worktree_files.store(files, Ordering::Relaxed);
         self.worktree_diff_bytes
             .store(diff_bytes, Ordering::Relaxed);
+    }
+
+    /// The thread count set by [`Repo::with_workers`], 0 for one per core.
+    pub(crate) const fn workers(&self) -> usize {
+        self.workers
     }
 
     pub(crate) fn worktree_files(&self) -> usize {

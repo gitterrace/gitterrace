@@ -115,6 +115,29 @@ indexed tip, rebuilt when a new rename moves old rows, is the planned fix.
 `crates/gitterrace-index/tests/latency.rs` holds today's times on a 100k-commit
 synthetic history as ceilings, so the read path cannot get slower unnoticed.
 
+### Commit search with the message column
+
+`index.has_messages` keeps every commit message in the index, so commit
+search reads the cache instead of walking git. Measured on rust (345,460
+commits) at the corpus sha, release build, M1 Max, 1-minute load 28 at the
+start, median of 5, page cache warm, through the search handler with the
+default cap of 200 rows:
+
+| Query                             | Column on | Column off |
+| --------------------------------- | --------- | ---------- |
+| Literal hit (`Option`)            | 68 ms     | 108 ms     |
+| Literal miss                      | 68 ms     | 3134 ms    |
+| Regex hit (`fix(es\|ed)? #\d{5}`) | 80 ms     | 596 ms     |
+| Regex miss                        | 58 ms     | 3361 ms    |
+
+The cost: the column is 31 MB, the cache grows from 256 MB to 287 MB (12%). The
+first build, the set already indexed and the setting just turned on, takes 16 s.
+An update of 100 commits, set and column together, takes 11 s (the diffs of the
+new commits dominate). A miss reads no commit object, a hit reads only the
+commits it lists. The process peaked at 2.35 GB resident during the full set
+build that preceded these numbers, and held 1.6 GB after the searches,
+mostly the set build's allocator state.
+
 ## Not measured
 
 Browser rendering and JavaScript, network latency (the server is local),

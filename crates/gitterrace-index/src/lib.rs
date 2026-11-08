@@ -7,6 +7,7 @@ mod conventional;
 pub mod feed;
 pub mod graph;
 mod insights;
+pub mod messages;
 pub mod seg;
 mod select;
 mod source;
@@ -136,6 +137,8 @@ pub struct Index {
     block_cache: std::sync::atomic::AtomicUsize,
     /// The format of a cache written by a newer build. Such a cache is never read or written.
     newer: Option<String>,
+    /// Whether updates keep the message column, see [`Index::set_message_index`].
+    messages: std::sync::atomic::AtomicBool,
 }
 
 impl Index {
@@ -152,7 +155,44 @@ impl Index {
             fresh_cap: feed::FRESH_CAP,
             block_cache: std::sync::atomic::AtomicUsize::new(feed::block_cache_default()),
             newer,
+            messages: std::sync::atomic::AtomicBool::new(false),
         })
+    }
+
+    /// Whether updates keep the message column commit search reads (`index.has_messages`).
+    /// On, the next update builds it once and extends it with every later update. Off, the next
+    /// update drops it and commit search walks git.
+    pub fn set_message_index(&self, on: bool) {
+        self.messages
+            .store(on, std::sync::atomic::Ordering::Relaxed);
+    }
+
+    /// The setting [`Index::set_message_index`] put in force.
+    pub fn message_index(&self) -> bool {
+        self.messages.load(std::sync::atomic::Ordering::Relaxed)
+    }
+
+    /// The commits matching `query` reachable from `tip` (a full commit id), newest first, at
+    /// most `most`, read from the message column. `None` when the column is off, not built yet
+    /// or built for another commit: the caller walks git then. An unreadable column is an
+    /// error [`feed::SourceError::of`] finds, which callers turn into a rebuild.
+    pub fn search_messages(
+        &self,
+        tip: &str,
+        query: &messages::MessageQuery<'_>,
+        most: usize,
+    ) -> io::Result<Option<messages::MessageHits>> {
+        if !self.message_index() || self.newer.is_some() {
+            return Ok(None);
+        }
+        let seg = seg_io;
+        let Some(store) = seg::read::Store::open(&self.dir).map_err(seg)? else {
+            return Ok(None);
+        };
+        let Some(col) = messages::MessageColumn::of(store).map_err(seg)? else {
+            return Ok(None);
+        };
+        col.search(tip, query, most).map_err(seg)
     }
 
     /// Sets how many commits a view outside the indexed set reads from git before it asks for a
@@ -231,6 +271,7 @@ impl Index {
         let held = self.held()?;
         let todo = todo(&order, &held);
         if todo.is_empty() {
+            self.sync_messages(source)?;
             if held.len() == order.len()
                 && let Some(t) = tip
             {
@@ -292,6 +333,7 @@ impl Index {
             )?;
             build.finish(previous, Vec::new()).map_err(seg)?;
         }
+        self.sync_messages(source)?;
         // A skipped commit is not in the set, so it stays pending and the next update appends
         // it; until then HEAD's pages read the reach view, and the tip marker is not written.
         if read < total {
@@ -300,6 +342,25 @@ impl Index {
             cache::write_atomic(&self.dir, TIP_FILE, t.as_bytes())?;
         }
         Ok(())
+    }
+
+    /// Builds or extends the message column when it is on, drops it when it is off. Under the
+    /// writer lock the caller holds.
+    fn sync_messages(&self, source: &dyn CommitSource) -> io::Result<()> {
+        if self.message_index() {
+            return messages::extend(&self.dir, source);
+        }
+        let Some(mut m) = seg::manifest::Manifest::load(&self.dir).map_err(seg_io)? else {
+            return Ok(());
+        };
+        let msg = seg::format::Kind::Messages as u8;
+        if !m.live.iter().any(|f| f.kind == msg) {
+            return Ok(());
+        }
+        let (gone, kept): (Vec<_>, Vec<_>) = m.live.into_iter().partition(|f| f.kind == msg);
+        m.live = kept;
+        m.retired.extend(gone.into_iter().map(|f| f.name));
+        m.commit(&self.dir).map_err(seg_io)
     }
 
     /// The commits the segment set holds, empty without a set.
@@ -401,7 +462,7 @@ impl Index {
 
 /// A store error as an `io::Error`. An unreadable file stays a [`feed::SourceError`], so a
 /// caller of [`Index::update`] can tell "rebuild" from any other failure.
-fn seg_io(e: seg::SegError) -> io::Error {
+pub(crate) fn seg_io(e: seg::SegError) -> io::Error {
     match e {
         seg::SegError::Unreadable { .. } => feed::SourceError::io(e),
         e => io::Error::other(e.to_string()),

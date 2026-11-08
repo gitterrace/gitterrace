@@ -20,6 +20,8 @@ pub enum Kind {
     Segment = 1,
     Strings = 2,
     Order = 3,
+    /// The message column of commit search (`messages.rs`).
+    Messages = 4,
 }
 
 impl Kind {
@@ -28,6 +30,7 @@ impl Kind {
             1 => Some(Self::Segment),
             2 => Some(Self::Strings),
             3 => Some(Self::Order),
+            4 => Some(Self::Messages),
             _ => None,
         }
     }
@@ -62,6 +65,8 @@ pub mod section {
     pub const ROW_INDEX: u16 = 35;
     /// (oid, local ordinal u32) sorted by oid.
     pub const OID_INDEX: u16 = 36;
+    /// Message items, zstd blocks, one item per rank (kind 4 only).
+    pub const MESSAGES: u16 = 40;
 }
 
 /// Cumulative string counts a file was written against, checked on open so ids cannot shift.

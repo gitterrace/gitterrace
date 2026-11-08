@@ -52,6 +52,18 @@ pub trait CommitSource {
         Vec::new()
     }
 
+    /// Hands the commit search text of each of `ids` to `emit`, in order, for the message
+    /// column. `Ok(false)` when this source has none (a test double): the column is then not
+    /// built. A commit that cannot be read fails the whole call: a column with a hole would
+    /// give wrong results.
+    fn stream_texts(
+        &self,
+        _ids: &[String],
+        _emit: &mut dyn FnMut(gitterrace_git::CommitText) -> io::Result<()>,
+    ) -> io::Result<bool> {
+        Ok(false)
+    }
+
     /// Maps `(name, email)` pairs as the tip of `rev` says (its `.mailmap`). Records are stored
     /// with the identities as written, so this runs on every read.
     fn map_identities(
@@ -153,6 +165,18 @@ impl CommitSource for Repo {
 
     fn shallow_ids(&self) -> Vec<String> {
         Self::shallow_ids(self)
+    }
+
+    fn stream_texts(
+        &self,
+        ids: &[String],
+        emit: &mut dyn FnMut(gitterrace_git::CommitText) -> io::Result<()>,
+    ) -> io::Result<bool> {
+        self.stream_commit_texts(ids, |t| {
+            emit(t).map_err(|e| gitterrace_git::Error::Git(e.to_string()))
+        })
+        .map_err(io::Error::other)?;
+        Ok(true)
     }
 
     fn map_identities(

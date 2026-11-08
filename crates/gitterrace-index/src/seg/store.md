@@ -65,9 +65,11 @@ One directory `.git/gitterrace/`, files listed in `CACHE_FILES`. Every file
 except `MANIFEST`, `VERSION` and `lock` is immutable: written under a temp name,
 fsynced, never opened for writing again.
 
-- `VERSION`: `FORMAT_VERSION` in `store.rs`, equal to the container version
-  `VERSION` in `seg/format.rs`, so the numbers below say "the version". Read
-  first so a newer build's cache is recognized without parsing anything else.
+- `VERSION`: `FORMAT_VERSION` in `store.rs`, the version of the whole cache. The
+  container version `VERSION` in `seg/format.rs` moves only when the container
+  bytes change, so it can lag behind: format 8 added the message column (kind
+  4) and left containers at 7. Read first so a newer build's cache is
+  recognized without parsing anything else.
 - `MANIFEST`: the only entry point. It names every live file with its length and
   CRC32, the generation, the canonical-order fingerprint (section 4), and a
   `retired` list. Written to `MANIFEST.tmp`, fsynced, renamed, then the
@@ -143,7 +145,7 @@ Container file:
 
 | Part   | Bytes                      | Fields                                                                              |
 | ------ | -------------------------- | ----------------------------------------------------------------------------------- |
-| Header | 16                         | magic `GTS1`, version u32, kind u32 (1 segment, 2 strings, 3 order), zero u32 |
+| Header | 16                         | magic `GTS1`, version u32, kind u32 (1 segment, 2 strings, 3 order, 4 messages), zero u32 |
 | Blocks | each at most 1 MiB         | payload only, back to back from offset 16                                           |
 | TOC    | 24 per entry, at most 4096 | section u16, zero u16, items u32, offset u64, len u32, crc u32 (of the payload)     |
 | Footer | 64, the last bytes         | see below                                                                           |
@@ -202,6 +204,22 @@ error, never truncates.
 Order (kind 3, `ord-<gen>.gts`): the reachable oids in canonical order, 20 B
 each. It gives the topo rank that the canonical key needs across segments.
 Rewritten whole with every manifest.
+
+Messages (kind 4, `msg-<gen>-<n>.gts`, only while `index.has_messages` is
+on): what commit search matches, one item per rank, in section 40. Items:
+flag u8 (0 text kept, 1 too large and read from git), committer time (zigzag
+varint), parent count and parent ranks (varints, a rank past the set is
+`Unreadable`), then for flag 0 author name, email and message as
+length-prefixed bytes (the message is the walk's lossy UTF-8). Items are packed
+to about 64 KiB and each block is one zstd frame of at most 1 MiB inflated. In
+manifest order the files cover ranks 0 to the end without a gap: a build
+writes one, an update one for its new ranks, a merge one in the new order
+(byte for byte a fresh build's). Fewer items than ranks means not built yet
+and search walks git. More, or a block that fails its crc or does not
+inflate, is `Unreadable`. Search decodes the blocks on up to 8 threads, runs
+the regex on `message \n name <email>` (the tip's mailmap applied to each
+distinct author once), replays git's newest-first commit-date walk over the
+stored times and parents, and reads from git only the commits it lists.
 
 Manifest (`MANIFEST`, not a container, read whole, at most 1 MiB):
 

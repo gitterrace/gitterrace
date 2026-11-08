@@ -242,10 +242,12 @@ pub(crate) fn append_segment<'r>(
         .filter(|f| f.kind == kind(Kind::Strings))
         .cloned()
         .collect();
+    // Plain files, then the message column, whose files stay live: the column step after the
+    // append adds the new ranks.
     let plain: Vec<_> = previous
         .live
         .iter()
-        .filter(|f| f.kind == 0)
+        .filter(|f| f.kind == 0 || f.kind == kind(Kind::Messages))
         .cloned()
         .collect();
     let mut retired = previous.retired;
@@ -307,6 +309,18 @@ pub(crate) fn merge_if_needed(
         .count();
     if segments <= MAX_SEGMENTS {
         return Ok(false);
+    }
+    // The column is rewritten in the new order from itself: no git read, and byte for byte what
+    // a fresh build writes. A partial column is left behind, and the next update rebuilds it.
+    let mut extra = extra;
+    let store = crate::seg::read::Store::open(dir)
+        .map_err(crate::seg_io)?
+        .ok_or_else(|| io::Error::other("merge without a set"))?;
+    let name = format!("msg-{}-0.gts", previous.generation + 1);
+    if let Some(col) =
+        crate::messages::remap(dir, &name, store, canonical).map_err(crate::seg_io)?
+    {
+        extra.push(col);
     }
     let mut b = SegmentBuild::new(dir, Some(&previous), shallow).map_err(io::Error::other)?;
     for id in canonical {
