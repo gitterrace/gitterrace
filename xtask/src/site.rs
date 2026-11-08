@@ -132,6 +132,8 @@ stroke-linecap:round;stroke-linejoin:round;display:none}
 .tab-label{border-bottom:0;border-radius:var(--radius) var(--radius) 0 0;color:var(--muted)}
 .tab-label{cursor:pointer;font-family:var(--mono);font-size:var(--text-sm)}
 .tab-radio:checked+.tab-label{color:var(--fg);background:var(--soft)}
+.tab-radio:checked+.tab-label{position:relative;margin-bottom:-1px}
+.tab-radio:checked+.tab-label{border-bottom:1px solid var(--soft)}
 .tab-radio:focus-visible+.tab-label{outline:2px solid var(--accent-ink)}
 .tabs pre{margin-top:0;border-top-left-radius:0}
 .tab-panel{display:none}
