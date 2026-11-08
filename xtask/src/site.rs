@@ -133,6 +133,23 @@ stroke-linecap:round;stroke-linejoin:round;display:none}
 #install-cargo:checked~#panel-cargo{display:block}
 footer{margin-top:var(--space-16);padding-top:var(--space-4);border-top:var(--border);\
 color:var(--faint)}
+.outline{display:none}
+.outline .outline-q,.outline .outline-none{display:none}
+.outline ol{list-style:none;margin:0;padding:0}
+.outline h2{display:flex;align-items:center;gap:var(--space-3);margin:0 0 var(--space-2);
+font:var(--weight-regular) var(--text-2xs)/1.4 var(--mono);text-transform:uppercase;
+letter-spacing:.12em;color:var(--muted)}
+.outline h2::after{content:\"\";flex:1;border-top:var(--border)}
+.outline a{display:block;padding:3px var(--space-3);border-left:2px solid var(--line);
+color:var(--muted);overflow-wrap:anywhere;font-size:var(--text-sm);text-decoration:none}
+.outline a:hover{color:var(--fg)}
+.outline a.on{color:var(--fg);font-weight:var(--weight-semibold);border-left-color:var(--accent)}
+.outline li.d1>a{padding-left:var(--space-6)}
+@media (min-width:1100px){.docgrid{display:grid;grid-template-columns:minmax(0,760px) 220px;
+gap:var(--space-8);justify-content:center;padding:0 var(--page-pad)}
+.docgrid>main{max-width:none;margin:0;padding-inline:0}
+.outline{display:block;position:sticky;top:var(--space-4);align-self:start;
+margin-top:var(--space-8);max-height:calc(100vh - 2*var(--space-4));overflow:auto}}
 ";
 
 /// The home page `<head>`: title, description, link previews and icons.
@@ -198,7 +215,7 @@ pub fn render(root: &Path, ws: &Workspace) -> Result<Vec<Out>> {
     let repo = &pkg.repository;
     let home = pkg.homepage.trim_end_matches('/');
     let mut h = head(&pkg.name, &pkg.description, home);
-    h.push_str(&body_open(&pkg.name, repo, &ws.demo));
+    h.push_str(&body_open(&pkg.name, repo, &ws.demo, false));
     let _ = write!(
         h,
         "<div class=\"hero\">\n<h1><img class=\"on-light\" src=\"assets/logo-light.svg\" \
@@ -308,12 +325,17 @@ pub(crate) fn footer(repo: &str, extra: &str) -> String {
 
 /// Every page opens its body the same way: a skip link as the first Tab stop, the bar, then the
 /// main landmark the link targets. `tabindex="-1"` lets the browser move focus there, not only
-/// scroll.
-pub(crate) fn body_open(name: &str, repo: &str, demo: &str) -> String {
+/// scroll. `grid` opens the two-column grid a docs page with an outline rail sits in.
+pub(crate) fn body_open(name: &str, repo: &str, demo: &str, grid: bool) -> String {
     format!(
-        "<body>\n<a class=\"skip\" href=\"#main\">Skip to content</a>\n{bar}\
+        "<body>\n<a class=\"skip\" href=\"#main\">Skip to content</a>\n{bar}{grid}\
          <main id=\"main\" tabindex=\"-1\">\n",
         bar = bar::bar(name, repo, demo),
+        grid = if grid {
+            "<div class=\"docgrid\">\n"
+        } else {
+            ""
+        },
     )
 }
 
@@ -340,6 +362,17 @@ localStorage.setItem('gitterrace-theme',n)}catch(e){}l()})})()";
 /// Every inline script on the page, so the CSP lists exactly these by hash.
 const SCRIPTS: [&str; 3] = [THEME_INIT_JS, THEME_TOGGLE_JS, LIGHTBOX_JS];
 
+/// The body of the outline's inline script on a docs page with a rail: the app's own script,
+/// from a fresh line so its first line fits the page's line width. Its whole-line comments stay
+/// in the app's file: every docs page carries this copy, so it is held to the page's length.
+pub(crate) fn outline_script() -> String {
+    let code: String = gitterrace_web::OUTLINE_JS
+        .split_inclusive('\n')
+        .filter(|l| !l.trim_start().starts_with("//"))
+        .collect();
+    format!("\n{code}")
+}
+
 /// The CSP source for [`SCRIPTS`]: the sha256 of each, so exactly those run and any other,
 /// inline or loaded, fails loudly in the browser instead of quietly shipping.
 fn script_hashes() -> String {
@@ -347,6 +380,8 @@ fn script_hashes() -> String {
     use sha2::Digest as _;
     SCRIPTS
         .iter()
+        .map(|s| (*s).to_owned())
+        .chain([outline_script()])
         .map(|s| {
             let sum = sha2::Sha256::digest(s.as_bytes());
             format!(
@@ -399,7 +434,7 @@ fn host_files(home: &str, repo: &str, name: &str, demo: &str, pages: &[String]) 
          <h1>Not found</h1>\n<p>There is no page here. <a href=\"/\">Back to {n}</a>.</p>\n\
          {footer}</main>\n<script>{THEME_TOGGLE_JS}</script>\n</body>\n</html>\n",
         n = esc(name),
-        open = body_open(name, repo, demo),
+        open = body_open(name, repo, demo, false),
         footer = footer(repo, ""),
     );
     vec![

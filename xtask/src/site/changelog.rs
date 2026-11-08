@@ -58,6 +58,7 @@ pub(super) fn page(site: &Site, links: &Links, text: &str) -> Out {
             PATH,
             &inner,
             &source_link(site, CHANGELOG),
+            "",
         ),
     )
 }

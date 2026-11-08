@@ -14,7 +14,7 @@ use pulldown_cmark::{CowStr, Event, HeadingLevel, Options, Parser, Tag, TagEnd, 
 use crate::docs_index::{LEGAL, normalize, on_site};
 use crate::out::Out;
 use crate::site::changelog;
-use crate::site::{THEME_INIT_JS, THEME_TOGGLE_JS, body_open, esc, footer};
+use crate::site::{THEME_INIT_JS, THEME_TOGGLE_JS, body_open, esc, footer, outline_script};
 
 pub(super) const CHANGELOG: &str = "CHANGELOG.md";
 
@@ -268,9 +268,25 @@ fn break_line(line: &str, width: usize) -> String {
     out
 }
 
-/// A whole page: the head, the bar, `inner` and a footer with `foot` (HTML, may be empty).
-pub(super) fn shell(site: &Site, title: &str, path: &str, inner: &str, foot: &str) -> String {
+/// A whole page: the head, the bar, `inner`, a footer with `foot` (HTML, may be empty) and the
+/// outline `rail` (HTML, empty for none), the app's own, beside the text on a wide screen.
+pub(super) fn shell(
+    site: &Site,
+    title: &str,
+    path: &str,
+    inner: &str,
+    foot: &str,
+    rail: &str,
+) -> String {
     let footer = footer(site.repo, foot);
+    let (close, script) = if rail.is_empty() {
+        (String::new(), String::new())
+    } else {
+        (
+            format!("{rail}\n</div>\n"),
+            format!("<script>{}</script>\n", outline_script()),
+        )
+    };
     format!(
         "<!doctype html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n\
          <meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">\n\
@@ -280,12 +296,35 @@ pub(super) fn shell(site: &Site, title: &str, path: &str, inner: &str, foot: &st
          <link rel=\"stylesheet\" href=\"/assets/site.css\">\n\
          <script>{THEME_INIT_JS}</script>\n</head>\n{open}\
          {inner}{footer}\
-         </main>\n<script>{THEME_TOGGLE_JS}</script>\n</body>\n</html>\n",
+         </main>\n{close}<script>{THEME_TOGGLE_JS}</script>\n{script}</body>\n</html>\n",
         t = esc(title),
         s = esc(site.name),
         home = esc(site.home),
-        open = body_open(site.name, site.repo, site.demo),
+        open = body_open(site.name, site.repo, site.demo, !rail.is_empty()),
     )
+}
+
+/// The "On this page" rail of a document from its level 2 headings as (id, text): the app's
+/// outline, so the site and the app list headings the same way. Empty below three headings.
+pub(super) fn outline(h2s: &[(String, String)]) -> String {
+    let items: Vec<(&str, &str)> = h2s.iter().map(|(i, t)| (i.as_str(), t.as_str())).collect();
+    // The app writes the rail on one line; the site's pages are held to the line width and
+    // length. Breaking between tags adds no whitespace, so the tags are packed into lines as
+    // full as the width allows.
+    let mut out = String::new();
+    let mut line = 0;
+    for piece in gitterrace_web::outline_rail(&items).split_inclusive(['>']) {
+        let n = piece.chars().count();
+        if line > 0 && line + n > 100 {
+            out.push('\n');
+            line = 0;
+        }
+        out.push_str(piece);
+        line += n;
+    }
+    // The filter field's attributes go on two lines; whitespace between attributes is free.
+    out.trim_end()
+        .replace("\" aria-label=\"Filter", "\"\naria-label=\"Filter")
 }
 
 /// The link to a file in the repository, as a footer entry.
@@ -362,8 +401,23 @@ pub fn pages(
         if paths.contains(&path) {
             anyhow::bail!("{rel}: another document is already the page {path}");
         }
-        let inner = body(&text, rel, &links, &mut |_, h| slug(h));
-        let page = shell(&site, &title, &path, &inner, &source_link(&site, rel));
+        let mut h2s = Vec::new();
+        let inner = body(&text, rel, &links, &mut |level, h| {
+            let id = slug(h);
+            if level == 2 {
+                h2s.push((id.clone(), h.to_owned()));
+            }
+            id
+        });
+        let rail = outline(&h2s);
+        let page = shell(
+            &site,
+            &title,
+            &path,
+            &inner,
+            &source_link(&site, rel),
+            &rail,
+        );
         check_unique_ids(&path, &page)?;
         outs.push(Out::file(format!("site/{path}index.html"), page));
         paths.push(path);
@@ -378,7 +432,7 @@ pub fn pages(
             .to_owned();
         let path = legal_path(rel);
         let inner = body(&text, rel, &links, &mut |_, h| slug(h));
-        let page = shell(&site, &title, &path, &inner, &source_link(&site, rel));
+        let page = shell(&site, &title, &path, &inner, &source_link(&site, rel), "");
         check_unique_ids(&path, &page)?;
         outs.push(Out::file(format!("site/{path}index.html"), page));
         paths.push(path);
@@ -386,7 +440,7 @@ pub fn pages(
     let inner = index(&titles);
     outs.push(Out::file(
         "site/docs/index.html",
-        shell(&site, "Documentation", "docs/", &inner, ""),
+        shell(&site, "Documentation", "docs/", &inner, "", ""),
     ));
     let log = changelog::page(&site, &links, &read(CHANGELOG)?);
     if let Out::File { body, .. } = &log {

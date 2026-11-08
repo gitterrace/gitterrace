@@ -358,3 +358,23 @@ fn a_planted_sibling_line_or_link_is_reported() {
     assert!(bad.contains("b: links the sibling site"), "{bad}");
     assert!(!bad.contains("c:"), "{bad}");
 }
+
+/// The class this guards: a docs page whose rail is missing, or shown on a page too short for one.
+/// A page with three or more level 2 headings has the app's rail, every other page has none.
+#[test]
+fn the_rail_is_on_every_docs_page_with_three_h2_and_only_there() {
+    let (pages, _) = generated();
+    let mut bad = Vec::new();
+    for (path, html) in &pages {
+        let main = html.split("<main").nth(1).unwrap_or("");
+        let main = main.split("</main>").next().unwrap_or("");
+        let h2 = main.matches("<h2").count();
+        let rail = html.contains("<nav class=\"outline rail\"");
+        let want = path.starts_with("docs/") && path != "docs/index.html" && h2 >= 3;
+        if rail != want {
+            bad.push(format!("{path}: {h2} h2, rail {rail}"));
+        }
+    }
+    assert!(bad.is_empty(), "{}", bad.join("\n"));
+    assert!(pages.iter().any(|p| p.1.contains("class=\"outline rail\"")));
+}

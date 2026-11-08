@@ -1,4 +1,4 @@
-// Checks of the generated site's chrome: the bar on every page.
+// Checks of the generated site's chrome: the bar on every page and the docs outline rail.
 // Imported by scripts/browser-check.mjs, not run on its own.
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { join, relative } from 'node:path';
@@ -119,5 +119,93 @@ export function checks(env) {
     } finally { server.close(); }
   }
 
-  return { siteBar };
+  // The outline rail of a docs page: at 1440 px a page with three or more h2 shows it beside
+  // the text, labelled "On this page" in 11 px mono with a hairline after it, each item on a
+  // 2 px rail; scrolling to a heading marks its item (and only it) with the accent. At 390 px
+  // and on a page with fewer than three h2 the rail is not shown.
+  async function siteRail() {
+    const { server, url } = await serve();
+    const all = pages().filter((p) => p.startsWith('/docs/') && p !== '/docs/');
+    try {
+      for (const name of browsers) {
+        const b = await launch(pw, name);
+        for (const width of [390, 1440]) {
+          const ctx = await b.newContext({ viewport: { width, height: 900 } });
+          const p = await ctx.newPage();
+          const bad = [];
+          let railed = 0;
+          for (const path of all) {
+            await p.goto(url + path, { waitUntil: 'load' });
+            const m = await p.evaluate(() => {
+              const main = document.querySelector('main');
+              const rail = document.querySelector('nav.outline.rail');
+              const h2 = main.querySelectorAll('h2').length;
+              if (!rail) return { h2, shown: false };
+              const label = rail.querySelector('h2');
+              const ls = getComputedStyle(label), after = getComputedStyle(label, '::after');
+              const a = rail.querySelector('a');
+              const rb = rail.getBoundingClientRect(), mb = main.getBoundingClientRect();
+              return {
+                h2, shown: rail.getClientRects().length > 0 && rb.width > 0,
+                label: label.textContent, size: ls.fontSize, mono: /mono/i.test(ls.fontFamily),
+                hair: after.borderTopWidth, rail: getComputedStyle(a).borderLeftWidth,
+                beside: rb.left >= mb.right - 1,
+              };
+            });
+            const want = width >= 1100 && m.h2 >= 3;
+            if (m.shown !== want) {
+              bad.push(`${path}: ${m.h2} h2, rail shown ${m.shown}`);
+              continue;
+            }
+            if (!want) continue;
+            railed++;
+            const why = [];
+            if (m.label !== 'On this page') why.push(`label ${m.label}`);
+            if (m.size !== '11px' || !m.mono) why.push(`label ${m.size} mono ${m.mono}`);
+            if (m.hair !== '1px') why.push(`hairline ${m.hair}`);
+            if (m.rail !== '2px') why.push(`rail ${m.rail}`);
+            if (!m.beside) why.push('rail not beside the text');
+            // Scroll a listed heading to the top: the one item marked is the last listed heading
+            // above 30% of the window, the line the app's outline reads by.
+            const ids = await p.$$eval('nav.outline.rail a',
+              (as) => as.map((a) => a.getAttribute('href').slice(1)));
+            for (const id of [ids[1], ids[ids.length - 1]]) {
+              await p.evaluate((i) => { document.getElementById(i).scrollIntoView(); }, id);
+              await p.waitForTimeout(250);
+              const on = await p.evaluate(() => {
+                const a = [...document.querySelectorAll('nav.outline.rail a.on')];
+                // The accent as the page resolves it, from a probe painted with it.
+                const probe = document.body.appendChild(document.createElement('i'));
+                probe.style.color = 'var(--accent)';
+                const accent = getComputedStyle(probe).color;
+                probe.remove();
+                let want = '';
+                for (const l of document.querySelectorAll('nav.outline.rail a')) {
+                  const id = l.getAttribute('href').slice(1);
+                  const top = document.getElementById(id).getBoundingClientRect().top;
+                  if (top <= innerHeight * 0.3) want = id;
+                }
+                return {
+                  want, ids: a.map((x) => x.getAttribute('href').slice(1)),
+                  color: a[0] && getComputedStyle(a[0]).borderLeftColor, accent,
+                };
+              });
+              const ok = on.ids.length === 1 && on.ids[0] === on.want;
+              if (!ok) why.push(`at #${id} marked ${JSON.stringify(on.ids)}`);
+              else if (on.color !== on.accent) why.push(`marked ${on.color}, not ${on.accent}`);
+            }
+            if (why.length) bad.push(`${path}: ${why.join(', ')}`);
+          }
+          const where = `site-rail ${name} ${width}`;
+          if (width >= 1100 && !railed) bad.push('no page shows a rail');
+          if (bad.length) r.fail(`${where}: ${bad.join('; ')}`);
+          else r.ok(`${where}: rail on ${railed} pages with 3+ h2, none elsewhere, follows scroll`);
+          await ctx.close();
+        }
+        await b.close();
+      }
+    } finally { server.close(); }
+  }
+
+  return { siteBar, siteRail };
 }
