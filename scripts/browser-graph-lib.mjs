@@ -113,7 +113,7 @@ export function checks(env) {
           // The switch is a link: the page it loads starts at the top, both ways.
           for (const [to, url] of [['List', /\/log\/HEAD$/], ['Graph', /view=graph/]]) {
             await p.evaluate(() => scrollTo(0, 0));
-            await Promise.all([p.waitForURL(url, { waitUntil: 'load' }), p.click(`.segs a:has-text("${to}")`)]);
+            await Promise.all([p.waitForURL(url, { waitUntil: 'load' }), p.click(`nav.tabs a:has-text("${to}")`)]);
             const y = await p.evaluate(() => scrollY);
             if (y > 0) r.fail(`${where}: switching to ${to} left the page at ${y}px`);
             else r.ok(`${where}: switching to ${to} keeps the page at the top`);

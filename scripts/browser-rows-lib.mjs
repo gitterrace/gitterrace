@@ -145,7 +145,7 @@ export function checks(env) {
 // Runs in the page. Walks main from the top down to the first content block. A row is the
 // first box of at most 72 px that holds a control; its controls count as units (a segmented
 // control, a menu, a link or a field is one). A row with one unit using under 40% of its width
-// is reported.
+// is reported, unless it holds the page's h1: a title row's links are its actions.
 function rowsAboveContent() {
   const CONTENT = '.card, table, pre, .chart-head, .kpis, .markdown-body, .empty, .diff, '
     + 'article, svg, ul.list';
@@ -168,7 +168,8 @@ function rowsAboveContent() {
       const u = units(c);
       if (!u.length) { if (c.querySelector(CONTENT)) walk(c); continue; }
       if (c.getBoundingClientRect().height > 72) { walk(c); continue; }
-      if (u.length !== 1) continue;
+      // A title row carries its page's actions beside the h1: it is the head, not a control row.
+      if (u.length !== 1 || c.querySelector('h1')) continue;
       // A paragraph is prose with a link in it (a hint line), not a row of controls, when it
       // says more than its one control does. A paragraph holding only the control is a row.
       const rest = (c.textContent || '').replace(u[0].textContent || '', '').trim();

@@ -1,0 +1,6 @@
+{#- The log's toolbar in the page head: the path filter (Enter submits it), and Compare pushed
+to the row's end. -#}
+<form class="filter" method="get" action="{{ action }}"><input name="path" value="{{ path }}"
+ placeholder="Filter by path" aria-label="Filter by path" enterkeyhint="search"></form>
+{%- if !compare_href.is_empty() %}<a class="ph-end" href="{{ compare_href }}">Compare</a>
+{%- endif %}

@@ -11,6 +11,7 @@ use axum::{
 use gitterrace_index::feed::{IdentId, InsightsSource, Posting, Rank};
 use serde::Deserialize;
 
+use crate::pagehead::{PageHead, Tab, Tagline};
 use crate::routes::{PAGE, Shared, page};
 use crate::{
     app::{App, blocking},
@@ -38,19 +39,13 @@ pub(crate) struct DayGroup {
 #[template(path = "log.html")]
 struct LogPage {
     c: Chrome,
-    rev: String,
-    rev_enc: String,
-    path: String,
     days: Vec<DayGroup>,
     empty: Option<crate::empty::Empty>,
     newer: Option<String>,
     older: Option<String>,
-    /// Compare from the latest tag to this revision, `""` when the page is off.
-    compare_href: String,
+    head: PageHead,
     /// Removable chip for the active author filter: (name, href without it).
     author_chip: Option<(String, String)>,
-    /// The List | Graph switch; `None` on a filtered log, which has no graph.
-    views: Option<crate::seg::Seg>,
     /// The Graph view's rows, one list without day headers, so the lines run unbroken.
     graph: Vec<CommitRow>,
 }
@@ -205,9 +200,20 @@ pub(super) async fn log(
         } else {
             None
         };
+        let compare_href = crate::compare::compare_href(since.as_deref(), &rev);
+        let head = log_head(&rev, &rev_enc, &path, who, graph, filtered, &list, pg);
+        let head = PageHead {
+            toolbar: LogFilter {
+                action: fmt::href(&format!("/log/{rev_enc}")),
+                path: path.clone(),
+                compare_href,
+            }
+            .render()?,
+            ..head
+        };
         Ok(LogPage {
             c: views::chrome_at(a, "log", &rev).live(Mode::NOTICE),
-            compare_href: crate::compare::compare_href(since.as_deref(), &rev),
+            head,
             newer: (pg > 0).then(|| link(pg - 1)),
             older: more.then(|| link(pg + 1)),
             author_chip,
@@ -219,7 +225,6 @@ pub(super) async fn log(
                     e.step("Show every commit", fmt::href(&format!("/log/{rev_enc}")))
                 }
             }),
-            views: (!filtered).then(|| view_seg(&rev_enc, graph)),
             graph: if graph {
                 graph_rows(a, &id, &list, pg, now)?
             } else {
@@ -230,28 +235,71 @@ pub(super) async fn log(
             } else {
                 views::day_groups(&list, now)
             },
-            rev,
-            rev_enc,
-            path,
         })
     })
     .await?;
     page(&p)
 }
 
-/// The List | Graph switch in the log's head.
-fn view_seg(rev_enc: &str, graph: bool) -> crate::seg::Seg {
-    use crate::seg::{Choice, Seg};
-    let list = fmt::href(&format!("/log/{rev_enc}"));
-    let g = fmt::href(&format!("/log/{rev_enc}?view=graph"));
-    Seg::links(
-        "View",
-        vec![
-            Choice::new("List", list, !graph),
-            Choice::new("Graph", g, graph),
-        ],
-    )
-    .no_caption()
+/// The log's toolbar, from `log_filter.html`: the path filter, and Compare at the row's end.
+#[derive(Template)]
+#[template(path = "log_filter.html")]
+struct LogFilter {
+    action: String,
+    path: String,
+    /// Compare from the latest tag to this revision, `""` when the page is off.
+    compare_href: String,
+}
+
+/// The log's page head: "Commits" with the revision, a tagline saying what the list holds,
+/// and List | Graph as tabs (a filtered log has no graph, so no tabs).
+#[expect(
+    clippy::too_many_arguments,
+    reason = "the head reads what the log handler holds"
+)]
+fn log_head(
+    rev: &str,
+    rev_enc: &str,
+    path: &str,
+    who: Option<&str>,
+    graph: bool,
+    filtered: bool,
+    list: &[gitterrace_git::CommitSummary],
+    pg: usize,
+) -> PageHead {
+    let mut said = String::from("Newest first");
+    if !path.is_empty() {
+        let _ = write!(said, ", touching {path}");
+    }
+    if let Some(w) = who {
+        let name = list.first().map_or(w, |c| c.author.name.as_str());
+        let _ = write!(said, ", by {name}");
+    }
+    if pg > 0 {
+        let _ = write!(said, ", page {}", pg + 1);
+    }
+    let _ = write!(
+        said,
+        " \u{b7} {} on this page",
+        fmt::count(list.len(), "commit", "commits")
+    );
+    let tab = |label: &str, href: String, on: bool| Tab {
+        label: label.to_owned(),
+        href: fmt::href(&href),
+        on,
+    };
+    PageHead {
+        qualifier: rev.to_owned(),
+        tabs: if filtered {
+            Vec::new()
+        } else {
+            vec![
+                tab("List", format!("/log/{rev_enc}"), !graph),
+                tab("Graph", format!("/log/{rev_enc}?view=graph"), graph),
+            ]
+        },
+        ..PageHead::new("Commits", Tagline::of(&said))
+    }
 }
 
 /// The rows of page `pg` with their graph cells and ref chips. The layout replays the rows of

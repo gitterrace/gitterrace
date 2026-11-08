@@ -63,7 +63,7 @@ async fn the_graph_view_draws_a_hidden_cell_per_row_and_marks_refs() {
         "{body}"
     );
     assert!(body.contains("<span class=\"gref\">v1</span>"), "{body}");
-    assert!(body.contains("aria-current=\"true\">Graph</a>"), "{body}");
+    assert!(body.contains("aria-current=\"page\">Graph</a>"), "{body}");
     assert!(
         !body.contains("class=\"day\""),
         "no day header cuts the lines"
@@ -77,7 +77,7 @@ async fn the_list_view_has_no_graph_and_a_filter_hides_the_switch() {
     let (_, list) = page(&router, "/log/HEAD").await;
     assert_eq!(cells(&list), 0);
     assert!(!list.contains("gref"));
-    assert!(list.contains("aria-current=\"true\">List</a>"));
+    assert!(list.contains("aria-current=\"page\">List</a>"));
     let (_, filtered) = page(&router, "/log/HEAD?path=x&view=graph").await;
     assert_eq!(cells(&filtered), 0);
     assert!(!filtered.contains(">Graph</a>"));
