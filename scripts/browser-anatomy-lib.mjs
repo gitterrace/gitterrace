@@ -4,7 +4,7 @@
 // or more and is the page's only one; the tagline says something. Across every page the head
 // starts at the same height, the title has one size and font, and the gaps between the slots
 // are the same, at 1440 and 390 px in light and dark. A new page, or a template that writes its
-// own head, fails here.
+// own head, fails here. tests/conventions.rs fails when a page route is missing from PAGES.
 // A view of figures (every insights tab and a file's history) has exactly one row of big
 // numbers (.kpis) at the page level, and it comes first after the head, before any chart,
 // table or list. A section's own figures (commit types, code frequency) do not count.

@@ -294,3 +294,100 @@ fn the_h1_scan_skips_tests_only() {
     assert!(!writes_h1("fn a() {}\n#[cfg(test)]\nmod t { \"<h1>\" }"));
     assert!(!writes_h1("<h2>x</h2>"));
 }
+
+/// Routes that answer a full page, each with the path the browser check `anatomy` walks for
+/// it (`scripts/browser-anatomy-lib.mjs`, `PAGES`). Every other route answers a fragment, a
+/// file, JSON, a stream or a redirect, and is named in `NOT_PAGES`.
+const PAGE_ROUTES: &[(&str, &str)] = &[
+    ("/", "'/'"),
+    ("/tree/{rev}/{*path}", "'/tree/HEAD/src'"),
+    ("/blob/{rev}/{*path}", "'/blob/HEAD/a.txt'"),
+    ("/blame/{rev}/{*path}", "'/blame/HEAD/a.txt'"),
+    ("/history/{*path}", "'/history/a.txt'"),
+    ("/log/{rev}", "'/log/HEAD'"),
+    ("/commit/{id}", "'/commit/HEAD'"),
+    ("/compare", "'/compare?"),
+    ("/refs", "'/refs'"),
+    ("/worktree", "'/worktree'"),
+    ("/search", "'/search?"),
+    ("/stats", "'/stats'"),
+    ("/stats/contributors", "'/stats/contributors'"),
+    ("/stats/hotspots", "'/stats/hotspots'"),
+    ("/stats/languages", "'/stats/languages'"),
+    ("/stats/ownership", "'/stats/ownership'"),
+    ("/_settings", "'/_settings'"),
+];
+
+/// Routes that render no page of their own: aliases and redirects of a page above, fragments,
+/// raw files, JSON, the event stream and form posts. The tag page and the repositories home
+/// use the head too, but the check's one-repository fixture has neither.
+const NOT_PAGES: &[&str] = &[
+    "/tree/{rev}",
+    "/tree/{rev}/",
+    "/hl/{rev}/{*path}",
+    "/raw/{rev}/{*path}",
+    "/log",
+    "/diff/{rev}/{index}",
+    "/tag/{name}",
+    "/worktrees",
+    "/stashes",
+    "/worktree/diff/{*path}",
+    "/worktree/raw/{*path}",
+    "/stats/types",
+    "/stats/frequency",
+    "/stats/patterns",
+    "/insights",
+    "/events",
+    "/api/files/{rev}",
+    "/api/refs",
+    "/api/last/{rev}",
+    "/api/last/{rev}/{*path}",
+    "/api/progress",
+    "/go/{*rest}",
+    "/_send/targets",
+    "/r/{name}/_send/targets",
+    "/r/{name}",
+    "/r/{name}/",
+    "/r/{name}/{*rest}",
+    "/api/repos",
+    "/_dirty",
+    "/_repos",
+    "/_settings/file",
+    "/_settings/check",
+];
+
+/// Class: every route the sitemap lists is either a page the anatomy check walks or named as
+/// no page. A new page route fails here until it is added to the check, so no page can skip
+/// the one head.
+#[test]
+fn every_page_route_is_walked_by_the_anatomy_check() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let sitemap = fs::read_to_string(root.join("src/sitemap.rs")).expect("sitemap.rs");
+    let check = fs::read_to_string(root.join("../../scripts/browser-anatomy-lib.mjs"))
+        .expect("browser-anatomy-lib.mjs");
+    let start = sitemap.find("pub const PAGES").expect("PAGES");
+    let body = &sitemap[start..];
+    let body = &body[..body.find("\n];").expect("end of PAGES")];
+    let routes: Vec<&str> = body
+        .split('"')
+        .skip(1)
+        .step_by(2)
+        .filter(|s| s.starts_with('/'))
+        .collect();
+    for r in &routes {
+        let page = PAGE_ROUTES.iter().find(|(p, _)| p == r);
+        match page {
+            Some((_, walked)) => assert!(
+                check.contains(walked),
+                "{r} is a page: add {walked} to PAGES in scripts/browser-anatomy-lib.mjs"
+            ),
+            None => assert!(
+                NOT_PAGES.contains(r),
+                "{r} is new: add it to PAGE_ROUTES (and the anatomy check) or NOT_PAGES"
+            ),
+        }
+    }
+    for (p, _) in PAGE_ROUTES {
+        assert!(routes.contains(p), "{p} is no longer routed: drop it here");
+    }
+}
