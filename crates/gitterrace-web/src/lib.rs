@@ -42,6 +42,8 @@ mod multi;
 mod multi_tests;
 mod overview_side;
 mod ownership;
+#[expect(dead_code, reason = "the pages move onto the head one group at a time")]
+mod pagehead;
 mod patterns;
 mod public;
 mod registry;

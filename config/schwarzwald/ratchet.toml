@@ -19,6 +19,12 @@ path = "allowed_definitions"
 file = "scripts/guards/shared-types.json"
 path = "openapi.skip_path_prefixes"
 
+# Templates and modules writing an h1 outside the page head (tests/conventions.rs), toward
+# none: every page opens with pagehead.rs.
+[[ratchet]]
+file = "config/schwarzwald/own-heads.json"
+path = "own_heads"
+
 # `super::` paths outside tests (scripts/super-check.py), toward zero and then a hard rule.
 [[ratchet]]
 file = "scripts/guards/super-paths.json"

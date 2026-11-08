@@ -220,3 +220,77 @@ fn the_plural_scan_sees_what_it_should() {
     assert!(fixed_plural("{{ t.commits_noun }}").is_none());
     assert!(fixed_plural("{{ a }}\n  <td>files</td>").is_none());
 }
+
+/// Templates and modules still writing an h1 of their own, waiting to move onto the page head.
+/// `config/schwarzwald/own-heads.json`, a ratchet: it only shrinks, toward empty.
+fn own_heads() -> Option<Vec<String>> {
+    let path =
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../config/schwarzwald/own-heads.json");
+    let v: serde_json::Value = serde_json::from_str(&fs::read_to_string(path).ok()?).ok()?;
+    Some(
+        v["own_heads"]
+            .as_array()?
+            .iter()
+            .filter_map(|s| s.as_str().map(str::to_owned))
+            .collect(),
+    )
+}
+
+/// Whether `src` writes an h1 tag outside its test module.
+fn writes_h1(src: &str) -> bool {
+    let live = src.split("#[cfg(test)]").next().unwrap_or_default();
+    live.contains("<h1")
+}
+
+/// The page head (`pagehead.rs`, `pagehead.html`) is the only place that writes an h1. A page
+/// that writes its own head starts at its own height with its own type, which is the drift the
+/// one page anatomy exists to end; the browser check `anatomy` measures what this one names.
+#[test]
+fn only_the_page_head_writes_an_h1() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let allowed = own_heads().expect("config/schwarzwald/own-heads.json lists own_heads");
+    let mut found = Vec::new();
+    for (dir, ext) in [("templates", "html"), ("src", "rs")] {
+        let mut stack = vec![root.join(dir)];
+        while let Some(d) = stack.pop() {
+            for entry in fs::read_dir(&d).expect("dir").flatten() {
+                let p = entry.path();
+                if p.is_dir() {
+                    stack.push(p);
+                    continue;
+                }
+                if p.extension().and_then(|e| e.to_str()) != Some(ext) {
+                    continue;
+                }
+                let rel = p.strip_prefix(root).expect("under the crate");
+                let rel = rel.to_string_lossy().replace('\\', "/");
+                let test_file = rel.ends_with("tests.rs") || rel.contains("/tests/");
+                if test_file || rel == "templates/pagehead.html" || rel == "src/pagehead.rs" {
+                    continue;
+                }
+                if writes_h1(&fs::read_to_string(&p).unwrap_or_default()) {
+                    found.push(rel);
+                }
+            }
+        }
+    }
+    found.sort();
+    let new: Vec<&String> = found.iter().filter(|f| !allowed.contains(f)).collect();
+    assert!(
+        new.is_empty(),
+        "{new:?} write an h1: fill a PageHead (pagehead.rs) instead"
+    );
+    let moved: Vec<&String> = allowed.iter().filter(|f| !found.contains(f)).collect();
+    assert!(
+        moved.is_empty(),
+        "{moved:?} no longer write an h1: take them off config/schwarzwald/own-heads.json"
+    );
+}
+
+#[test]
+fn the_h1_scan_skips_tests_only() {
+    assert!(writes_h1("<h1>x</h1>"));
+    assert!(writes_h1("format!(\"<h1 class=x>\")"));
+    assert!(!writes_h1("fn a() {}\n#[cfg(test)]\nmod t { \"<h1>\" }"));
+    assert!(!writes_h1("<h2>x</h2>"));
+}

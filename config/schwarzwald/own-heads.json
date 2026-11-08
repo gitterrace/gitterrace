@@ -1,0 +1,21 @@
+{
+  "allowlists": [
+    "own_heads"
+  ],
+  "own_heads": [
+    "src/error.rs",
+    "templates/_path.html",
+    "templates/_tabs.html",
+    "templates/commit.html",
+    "templates/compare.html",
+    "templates/dochead.html",
+    "templates/history.html",
+    "templates/log.html",
+    "templates/lost.html",
+    "templates/overview.html",
+    "templates/refs.html",
+    "templates/search.html",
+    "templates/tag.html",
+    "templates/worktree.html"
+  ]
+}

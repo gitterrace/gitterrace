@@ -147,6 +147,7 @@ pub(crate) struct Tools {
     pub(crate) many: bool,
 }
 
+#[derive(Debug, Clone)]
 pub(crate) struct Crumb {
     pub(crate) name: String,
     pub(crate) href: String,
