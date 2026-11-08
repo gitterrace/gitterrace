@@ -49,6 +49,22 @@ export function checks(env) {
       }
       await b.close();
     }
+    // Self-test: a paragraph holding only one button is a lone row, a hint with a link is prose.
+    const { b: fb, ctx: fctx } = await context(browsers[0]);
+    const fp = await fctx.newPage();
+    await fp.setViewportSize({ width: 1440, height: 900 });
+    const fixture = (inner) => `<main>${inner}<table><tr><td>x</td></tr></table></main>`;
+    await fp.setContent(fixture('<p><button>Go</button></p>'));
+    const bare = await fp.evaluate(rowsAboveContent);
+    const lone1 = 'lone-rows fixture: a paragraph holding only one button';
+    if (bare.length === 1) r.ok(`${lone1} is reported`);
+    else r.fail(`${lone1} gave ${bare.length} findings`);
+    await fp.setContent(fixture(
+      '<p>Pick two refs to compare, for example <a href="#">main</a> and a tag.</p>'));
+    const hint = await fp.evaluate(rowsAboveContent);
+    if (!hint.length) r.ok('lone-rows fixture: a hint paragraph with a link is prose');
+    else r.fail(`lone-rows fixture: a hint paragraph was reported: ${hint.join('; ')}`);
+    await fb.close();
     for (const [key, row] of Object.entries(KNOWN)) {
       if (!red.has(key)) r.fail(`lone-rows: KNOWN names ${key}, which is not walked`);
       else if (!red.get(key).length) r.fail(`lone-rows ${key}: green now, drop it (${row})`);
@@ -153,8 +169,10 @@ function rowsAboveContent() {
       if (!u.length) { if (c.querySelector(CONTENT)) walk(c); continue; }
       if (c.getBoundingClientRect().height > 72) { walk(c); continue; }
       if (u.length !== 1) continue;
-      // A paragraph is prose with a link in it (a hint line), not a row of controls.
-      if (c.tagName === 'P') continue;
+      // A paragraph is prose with a link in it (a hint line), not a row of controls, when it
+      // says more than its one control does. A paragraph holding only the control is a row.
+      const rest = (c.textContent || '').replace(u[0].textContent || '', '').trim();
+      if (c.tagName === 'P' && rest.split(/\s+/).filter(Boolean).length >= 3) continue;
       const share = u[0].getBoundingClientRect().width / c.getBoundingClientRect().width;
       const box = `${c.tagName.toLowerCase()}.${String(c.className || '').split(' ')[0]}`;
       const pct = Math.round(share * 100);
