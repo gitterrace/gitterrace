@@ -16,6 +16,13 @@ and the names in `multi.skip_dirs` are skipped. `/` then lists every served
 repository with its last commit and recent activity, and each one lives under
 `/r/<name>/`.
 
+The box above that list filters it by repository name. It keeps the names that
+contain what you type, ignoring case, and shows how many of the total match.
+Press `/` anywhere on the page to jump to the box. Enter opens the first match,
+the arrow keys walk the matches and Escape clears the box. The filter is kept
+in the address as `?q=`, so a filtered list can be bookmarked, and it works
+without JavaScript too: the Filter button sends the same query to the server.
+
 Run `git terrace` in another repository while a server runs and it joins that
 server instead of opening a second port. The switcher in the page header lists
 them all. `git terrace remove` takes one off again.
