@@ -107,6 +107,11 @@ fn resize(sem: &Semaphore, cap: &Mutex<usize>, new: usize) {
 }
 
 impl Env {
+    #[cfg(test)]
+    pub(crate) fn free_jobs(&self) -> usize {
+        self.jobs.available_permits()
+    }
+
     pub(crate) fn new(cfg: Config) -> Self {
         let jobs = job_slots(&cfg);
         let public = cfg.server.is_public;
@@ -556,13 +561,17 @@ pub(crate) async fn blocking<T: Send + 'static>(
     let rev = crate::fmt::REQUEST_REV
         .try_with(Clone::clone)
         .unwrap_or_else(|_| "HEAD".to_owned());
-    // Held until the work ends: `resources.blocking_jobs` bounds git work, not waiting.
-    let _slot = Arc::clone(&app.env.jobs).acquire_owned().await.ok();
+    // Moved into the job, so a cancelled request cannot free the slot while git still runs.
+    let slot = Arc::clone(&app.env.jobs)
+        .acquire_owned()
+        .await
+        .map_err(|_| std::io::Error::other("blocking job slots closed"))?;
     let cfg = app.cfg();
     let absolute = cfg.display.dates == gitterrace_types::DateStyle::Absolute;
     // Every page is built here, so every page reads one table of what is switched on.
     let on = crate::features::Effective::of(&cfg, Some(&app.name));
     tokio::task::spawn_blocking(move || {
+        let _slot = slot;
         crate::features::with(on, || {
             crate::fmt::with_dates(absolute, || {
                 crate::fmt::with_base(&app.base, || crate::fmt::with_rev(&rev, || f(&app)))

@@ -335,6 +335,30 @@ async fn resources_blocking_jobs_bounds_concurrent_work() {
     assert!(peak(4).await > 1, "more slots run side by side");
 }
 
+#[tokio::test]
+async fn a_cancelled_request_keeps_its_job_slot_until_the_work_ends() {
+    use std::sync::atomic::{AtomicBool, Ordering};
+    let dir = tempfile::tempdir().expect("tmp");
+    let p = repo(dir.path(), "r");
+    let a = app(&p, with(|c| c.resources.blocking_jobs = 2));
+    let done = Arc::new(AtomicBool::new(false));
+    let d = Arc::clone(&done);
+    let job = crate::app::blocking(&a, move |_| {
+        gitterrace_testkit::wait::pause_blocking(Duration::from_millis(300));
+        d.store(true, Ordering::SeqCst);
+        Ok(())
+    });
+    // Dropped like a timed-out public request: the job itself runs on.
+    let cut = tokio::time::timeout(Duration::from_millis(1), job).await;
+    assert!(cut.is_err(), "the job outlives the timeout");
+    assert!(!done.load(Ordering::SeqCst));
+    assert_eq!(a.env.free_jobs(), 1, "the running job still holds its slot");
+    gitterrace_testkit::wait::until("the job ends", || async { done.load(Ordering::SeqCst) })
+        .await;
+    gitterrace_testkit::wait::until("its slot comes back", || async { a.env.free_jobs() == 2 })
+        .await;
+}
+
 #[test]
 fn resources_cache_mb_sizes_the_code_cache() {
     // A memo of its own: the process-wide cache is shared with every test that renders a
