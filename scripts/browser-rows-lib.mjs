@@ -132,7 +132,7 @@ export function checks(env) {
 // is reported.
 function rowsAboveContent() {
   const CONTENT = '.card, table, pre, .chart-head, .kpis, .markdown-body, .empty, .diff, '
-    + 'article, svg';
+    + 'article, svg, ul.list';
   const UNIT = '[role=group], details, a, button, input, select, summary, [role=tab]';
   const shown = (e) => {
     const q = e.getBoundingClientRect();
