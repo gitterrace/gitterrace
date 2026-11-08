@@ -114,3 +114,60 @@ fn the_watch_sees_repository_entries_but_not_their_contents() {
     }
     assert!(skip(Path::new("/elsewhere"), true));
 }
+
+/// Reads the home stream until it has carried `n` list notices in all, at most the shared
+/// deadline, keeping what it read in `seen`.
+async fn notices(events: &mut axum::body::Body, seen: &mut String, n: usize) {
+    use http_body_util::BodyExt;
+    let got = tokio::time::timeout(wait::DEADLINE, async {
+        while seen.matches("\"repos\"").count() < n {
+            match events.frame().await {
+                Some(Ok(f)) => {
+                    if let Some(d) = f.data_ref() {
+                        seen.push_str(&String::from_utf8_lossy(d));
+                    }
+                }
+                _ => return false,
+            }
+        }
+        true
+    })
+    .await;
+    assert_eq!(got, Ok(true), "{n} list notices on the home stream: {seen}");
+}
+
+/// Guard class: an open home follows the repository list, whatever changes it. The page says
+/// it follows (`data-live`), and its stream hears the sweep add a folder made under the root
+/// and drop it again once deleted. Red when the home has no stream, or the sweep announces
+/// to the repositories' streams alone.
+#[tokio::test(flavor = "multi_thread")]
+async fn an_open_home_hears_the_sweep_add_and_drop_a_repository() {
+    use tower::ServiceExt;
+    let dir = tempfile::tempdir().expect("tmp");
+    let root = dir.path().canonicalize().expect("canon");
+    let router = served(&root);
+    awaits(&router, &["alpha", "beta"], None).await;
+    let (_, home) = get(&router, "/").await;
+    assert!(home.contains("data-live=\"home\""), "{home}");
+    assert!(home.contains("/static/live.js"), "{home}");
+    let res = router
+        .clone()
+        .oneshot(
+            axum::http::Request::get("/events")
+                .header("host", "localhost")
+                .body(axum::body::Body::empty())
+                .expect("req"),
+        )
+        .await
+        .expect("events");
+    assert_eq!(res.status(), 200);
+    let mut events = res.into_body();
+    let mut seen = String::new();
+    repo(&root.join("gamma"));
+    notices(&mut events, &mut seen, 1).await;
+    awaits(&router, &["alpha", "beta", "gamma"], None).await;
+    let gamma = root.join("gamma");
+    wait::until_blocking("removing gamma", || std::fs::remove_dir_all(&gamma).is_ok());
+    notices(&mut events, &mut seen, 2).await;
+    awaits(&router, &["alpha", "beta"], Some("gamma")).await;
+}

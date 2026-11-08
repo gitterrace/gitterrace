@@ -1,16 +1,27 @@
 // The repositories home renders before every working tree is scanned. Rows without a fresh
 // answer start with a hidden chip; one request for /_dirty fills them in.
+// A row live.js adds later starts hidden too, and is filled the same way.
 (function () {
   "use strict";
-  var chips = document.querySelectorAll(".wtchip[data-repo]");
-  if (!chips.length || !window.fetch) return;
-  fetch("/_dirty", { headers: { Accept: "application/json" } })
-    .then(function (r) { return r.ok ? r.json() : null; })
-    .then(function (dirty) {
-      if (!dirty) return;
-      chips.forEach(function (c) { c.hidden = dirty[c.dataset.repo] !== true; });
-    })
-    .catch(function () {});
+  if (!window.fetch) return;
+  function fill(chips) {
+    if (!chips.length) return;
+    fetch("/_dirty", { headers: { Accept: "application/json" } })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (dirty) {
+        if (!dirty) return;
+        chips.forEach(function (c) { c.hidden = dirty[c.dataset.repo] !== true; });
+      })
+      .catch(function () {});
+  }
+  fill(Array.prototype.slice.call(document.querySelectorAll(".wtchip[data-repo]")));
+  document.addEventListener("gt:home-rows", function (e) {
+    var chips = [];
+    (e.detail.added || []).forEach(function (li) {
+      Array.prototype.push.apply(chips, li.querySelectorAll(".wtchip[data-repo]"));
+    });
+    fill(chips);
+  });
 })();
 
 // The filter above the list. Without this script the form submits ?q= and the server narrows

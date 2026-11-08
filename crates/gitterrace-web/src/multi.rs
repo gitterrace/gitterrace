@@ -456,12 +456,21 @@ pub(crate) fn router(table: Arc<Table>) -> Router {
         .route("/", get(home::index))
         .route("/api/repos", get(repos_json))
         .route("/_dirty", get(home::dirty))
+        .route("/events", get(home_events))
         .route("/r/{name}", get(slash))
         .route("/r/{name}/", axum::routing::any(dispatch))
         .route("/r/{name}/{*rest}", axum::routing::any(dispatch))
         .merge(crate::routes::assets())
         .fallback(crate::error::fallback)
         .with_state(table)
+}
+
+/// `/events` beside the home: the repository list's live stream, see `live::home_events`.
+async fn home_events(
+    State(table): State<Arc<Table>>,
+    axum::extract::Query(q): axum::extract::Query<crate::live::EventsQuery>,
+) -> Response {
+    crate::live::home_events(&table.env, &q)
 }
 
 async fn slash(uri: Uri) -> Redirect {

@@ -30,6 +30,8 @@ struct IndexPage {
     count: String,
     /// Whether no row matches, so the page says so.
     none: bool,
+    /// The list version the page was rendered at, when it follows the list live (`live.js`).
+    live: Option<u64>,
 }
 
 /// `/?q=`: the filter a no-script reader submits and a shared link carries.
@@ -137,6 +139,9 @@ pub(super) async fn index(
     let html = tokio::task::spawn_blocking(move || {
         let now = fmt::now();
         let show_tree = shows_tree(&table);
+        // Read before the rows: a change that lands while they are read makes the page behind,
+        // so its stream catches up at once instead of missing it.
+        let live = follows_list(&table).then(|| table.env.home_version());
         let served = table.snapshot();
         let reads = in_order(&served, |s| {
             (s.recent(now), show_tree.then(|| s.known_dirty()))
@@ -197,6 +202,7 @@ pub(super) async fn index(
                 page_head: true,
                 ..crate::dochead::DocHead::default()
             },
+            live,
         }
         .render()
     })
@@ -207,6 +213,15 @@ pub(super) async fn index(
 /// Whether the home page shows working tree chips: never on a public server.
 fn shows_tree(table: &Table) -> bool {
     !table.env.public() && crate::features::on(gitterrace_config::Feature::Worktree)
+}
+
+/// Whether an open home hears the list change: the live feature's stream is local only.
+fn follows_list(table: &Table) -> bool {
+    !table.env.public()
+        && table
+            .env
+            .cfg()
+            .feature_on(gitterrace_config::Feature::Live, None)
 }
 
 /// `/_dirty`, fetched by `home.js` after the rows render, so a cold status scan of every

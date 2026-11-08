@@ -16,7 +16,7 @@ use futures_util::stream;
 use serde::{Deserialize, Serialize};
 use tokio::sync::{OwnedSemaphorePermit, broadcast, watch};
 
-use crate::app::App;
+use crate::app::{App, Env};
 
 /// Seconds between the comment lines that keep an idle stream open through proxies and tell the
 /// browser the server is alive.
@@ -28,7 +28,7 @@ const ALL: [&str; 6] = ["head", "refs", "stash", "worktrees", "index", "worktree
 /// The kind that says the settings changed, see `static/live.js`.
 const CONFIG: &str = "config";
 
-/// The kind that says a repository joined the server, see `static/live.js`.
+/// The kind that says a repository joined or left the server, see `static/live.js`.
 const REPOS: &str = "repos";
 
 /// What moved, and the state the chrome shows, read once for all listeners.
@@ -52,7 +52,7 @@ impl Change {
         }
     }
 
-    /// A repository joined the server: the switcher has one more entry. Carries no chrome.
+    /// A repository joined or left the server: the switcher and the home change. No chrome.
     pub(crate) fn repos(v: u64) -> Self {
         Self {
             kinds: vec![REPOS],
@@ -181,6 +181,16 @@ struct Stream {
     _wt: Option<WorktreeWatch>,
 }
 
+/// A home page's stream: list notices only.
+struct HomeStream {
+    rx: broadcast::Receiver<Arc<Change>>,
+    stop: watch::Receiver<bool>,
+    env: Env,
+    first: Option<Event>,
+    /// Released when the stream drops, which frees the slot.
+    _slot: OwnedSemaphorePermit,
+}
+
 /// `GET /events`: one stream per tab. Refused with 503 past `server.live_streams`.
 pub(crate) async fn events(State(app): State<Arc<App>>, Query(q): Query<EventsQuery>) -> Response {
     let Ok(slot) = Arc::clone(&app.streams).try_acquire_owned() else {
@@ -218,6 +228,65 @@ pub(crate) async fn events(State(app): State<Arc<App>>, Query(q): Query<EventsQu
                     Err(broadcast::error::RecvError::Lagged(_)) => {
                         let v = s.app.version();
                         return Some((Ok(everything(v)), s));
+                    }
+                    Err(broadcast::error::RecvError::Closed) => return None,
+                },
+                gone = s.stop.changed() => {
+                    if gone.is_err() || *s.stop.borrow() {
+                        return None;
+                    }
+                }
+            }
+        }
+    });
+    let mut res = Sse::new(body)
+        .keep_alive(KeepAlive::new().interval(HEARTBEAT).text("hb"))
+        .into_response();
+    res.headers_mut().insert(
+        header::CACHE_CONTROL,
+        header::HeaderValue::from_static("no-store"),
+    );
+    res
+}
+
+/// `GET /events` beside the repositories home: the same `change` stream, carrying only the
+/// `repos` kind, so an open home lists a repository that joined or left. Refused with 503 past
+/// `server.live_streams`.
+pub(crate) fn home_events(env: &Env, q: &EventsQuery) -> Response {
+    let Ok(slot) = Arc::clone(&env.home_streams).try_acquire_owned() else {
+        return (
+            StatusCode::SERVICE_UNAVAILABLE,
+            [(header::RETRY_AFTER, "30")],
+            "too many open pages for live updates\n",
+        )
+            .into_response();
+    };
+    let rx = env.home.subscribe();
+    // A home rendered before the newest list change missed it, which also covers a reconnect.
+    let now = env.home_version();
+    let behind =
+        q.v.as_deref()
+            .and_then(|v| v.parse::<u64>().ok())
+            .is_some_and(|v| v != now);
+    let state = HomeStream {
+        rx,
+        stop: env.stopping(),
+        first: behind.then(|| event(&Change::repos(now))),
+        env: env.clone(),
+        _slot: slot,
+    };
+    let body = stream::unfold(state, |mut s| async move {
+        if let Some(e) = s.first.take() {
+            return Some((Ok::<_, Infallible>(e), s));
+        }
+        loop {
+            tokio::select! {
+                got = s.rx.recv() => match got {
+                    Ok(c) => return Some((Ok(event(&c)), s)),
+                    // Every notice says the same thing: one stands for the ones missed.
+                    Err(broadcast::error::RecvError::Lagged(_)) => {
+                        let v = s.env.home_version();
+                        return Some((Ok(event(&Change::repos(v))), s));
                     }
                     Err(broadcast::error::RecvError::Closed) => return None,
                 },

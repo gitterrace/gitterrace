@@ -3,6 +3,7 @@
 // means:
 //   data-live="refresh"  re-fetch this page and swap <main> in place
 //   data-live="notice"   show a quiet "Updated, refresh" note, never reload on its own
+//   data-live="home"     the repositories home: re-fetch it and add or drop rows in place
 // The top bar chip and the HEAD banner always follow. Pages pinned to a commit or tag carry no
 // data-live attribute and never open a stream.
 (function () {
@@ -191,6 +192,57 @@
     }
   }
 
+  // The home: rows are matched by data-name. A row still listed stays the same node (a filter's
+  // hidden flag and focus survive), a gone one is removed, a new one is put where the server
+  // lists it. Anything that does not fit that shape falls back to the note.
+  async function relist() {
+    if (fetching) { again = true; return; }
+    fetching = true;
+    try {
+      // The bare home, not a filtered ?q= render: the filter is the page's to apply.
+      var res = await fetch("/", { headers: { "X-Live": "1" }, cache: "no-store" });
+      // One repository left: the home forwards to it, there is no list to patch.
+      if (!res.ok || res.redirected) { notice(); return; }
+      var doc = new DOMParser().parseFromString(await res.text(), "text/html");
+      var next = doc.querySelector("ul.repos");
+      var cur = document.querySelector("ul.repos");
+      if (!next || !cur) { notice(); return; }
+      var have = {};
+      Array.prototype.forEach.call(cur.children, function (li) {
+        if (li.dataset.name) have[li.dataset.name] = li;
+      });
+      var want = Array.prototype.slice.call(next.children).filter(function (li) {
+        return li.dataset.name;
+      });
+      if (want.length !== next.children.length) { notice(); return; }
+      var keep = {}, added = [];
+      want.forEach(function (li) { keep[li.dataset.name] = true; });
+      Object.keys(have).forEach(function (n) { if (!keep[n]) have[n].remove(); });
+      var at = cur.firstChild;
+      want.forEach(function (li) {
+        var el = have[li.dataset.name];
+        if (!el) { el = document.importNode(li, true); added.push(el); }
+        if (el !== at) cur.insertBefore(el, at); else at = at.nextSibling;
+      });
+      // A row that joins while a filter is typed follows that filter, as its neighbours do.
+      var q = document.getElementById("repoq");
+      var t = q ? q.value.trim().toLowerCase() : "";
+      if (t) added.forEach(function (li) {
+        li.hidden = li.dataset.name.toLowerCase().indexOf(t) < 0;
+      });
+      var meta = doc.querySelector(".repolist .doc-tools .muted");
+      var mine = document.querySelector(".repolist .doc-tools .muted");
+      if (meta && mine) mine.textContent = meta.textContent;
+      document.dispatchEvent(new CustomEvent("gt:home-rows", { detail: { added: added } }));
+      document.dispatchEvent(new CustomEvent("gt:live-refreshed"));
+    } catch (e) {
+      notice();
+    } finally {
+      fetching = false;
+      if (again) { again = false; relist(); }
+    }
+  }
+
   function handle(ev) {
     var c;
     try { c = JSON.parse(ev.data); } catch (e) { return; }
@@ -198,13 +250,14 @@
     chrome(c);
     // A reload of config.toml can change any page, whatever kinds it follows.
     if ((c.kinds || []).indexOf("config") >= 0) { notice(); return; }
-    // A repository joined the server: the switcher (nav.js) re-reads the list in place.
+    // A repository joined or left: the switcher (nav.js) re-reads the list in place.
     if ((c.kinds || []).indexOf("repos") >= 0) {
       document.dispatchEvent(new CustomEvent("gt:repos-changed"));
       if (!shows(c.kinds)) return;
     }
     if (!shows(c.kinds || [])) return;
     if (how === "refresh") refresh();
+    else if (how === "home") relist();
     else if (how === "notice") notice();
   }
 

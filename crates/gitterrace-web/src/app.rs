@@ -67,6 +67,13 @@ pub(crate) struct Env {
     pub(crate) search: Vec<std::path::PathBuf>,
     /// Whether the settings routes are mounted, so pages offer the settings link only then.
     settings_on: Arc<AtomicBool>,
+    /// Repository-list notices for the open home pages (`GET /events` beside `/`).
+    pub(crate) home: broadcast::Sender<Arc<Change>>,
+    /// Counts the list changes, so a home page that reconnects can tell it missed one.
+    home_v: Arc<AtomicU64>,
+    /// Open home streams, capped by `server.live_streams` as each repository's are.
+    pub(crate) home_streams: Arc<Semaphore>,
+    home_streams_cap: Arc<Mutex<usize>>,
 }
 
 /// The live `actions.toml`, swapped whole on reload.
@@ -101,6 +108,7 @@ impl Env {
     pub(crate) fn new(cfg: Config) -> Self {
         let jobs = job_slots(&cfg);
         let public = cfg.server.is_public;
+        let live_streams = cfg.server.live_streams;
         Self {
             public,
             cfg: Arc::new(RwLock::new(Arc::new(cfg))),
@@ -114,6 +122,10 @@ impl Env {
             settings_dir: None,
             search: Vec::new(),
             settings_on: Arc::default(),
+            home: broadcast::channel(16).0,
+            home_v: Arc::default(),
+            home_streams: Arc::new(Semaphore::new(live_streams)),
+            home_streams_cap: Arc::new(Mutex::new(live_streams)),
         }
     }
 
@@ -172,8 +184,11 @@ impl Env {
     }
 
     /// Tells every open tab that the set of served repositories changed, so the switcher shows
-    /// a repository that joined without a reload.
+    /// a repository that joined without a reload and an open home lists it.
     pub(crate) fn repos_changed(&self) {
+        let v = self.home_v.fetch_add(1, Ordering::AcqRel) + 1;
+        // An error only says no home page is open.
+        self.home.send(Arc::new(Change::repos(v))).ok();
         let apps: Vec<Arc<App>> = self
             .apps
             .lock()
@@ -185,6 +200,16 @@ impl Env {
                 .send(Arc::new(Change::repos(app.version())))
                 .ok();
         }
+    }
+
+    /// Turns true at shutdown: ends the home page streams.
+    pub(crate) fn stopping(&self) -> watch::Receiver<bool> {
+        self.stop.subscribe()
+    }
+
+    /// How many times the repository list changed, rendered into the home page.
+    pub(crate) fn home_version(&self) -> u64 {
+        self.home_v.load(Ordering::Acquire)
     }
 
     /// The settings in force now.
@@ -237,6 +262,8 @@ impl Env {
             Err(e) => *e.into_inner() = Arc::clone(&new),
         }
         resize(&self.jobs, &self.jobs_cap, job_slots(&new));
+        let streams = new.server.live_streams;
+        resize(&self.home_streams, &self.home_streams_cap, streams);
         let apps: Vec<Arc<App>> = self
             .apps
             .lock()
