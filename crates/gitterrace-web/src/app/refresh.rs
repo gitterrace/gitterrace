@@ -123,6 +123,9 @@ pub(crate) async fn keep_index_fresh(app: Arc<App>) {
             }
         } else if look {
             dirty_seen = None;
+            if events.polling() {
+                app.wt_polled.fetch_add(1, Ordering::Release);
+            }
             if worktree_moved(&app, &mut wt_seen).await {
                 kinds.push("worktree");
             }

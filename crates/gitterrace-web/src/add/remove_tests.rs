@@ -152,8 +152,23 @@ async fn a_removed_repository_stops_indexing() {
         send(&r, req("DELETE", Some(&secret)), named("b")).await.0,
         200
     );
-    gitterrace_testkit::wait::pause(Duration::from_millis(300)).await;
-    let before = snapshot(&cache);
+    // Aborting stops the refresher, but a blocking index job it already started (the first
+    // build, the warm-up walk) runs to its end; on a loaded machine that is seconds. Wait for
+    // the folder to hold still, so the check below is about the commits made after removal.
+    let mut before = snapshot(&cache);
+    let end = std::time::Instant::now() + Duration::from_secs(60);
+    loop {
+        gitterrace_testkit::wait::pause(Duration::from_secs(1)).await;
+        let now = snapshot(&cache);
+        if now == before {
+            break;
+        }
+        assert!(
+            std::time::Instant::now() < end,
+            "the cache never holds still"
+        );
+        before = now;
+    }
     for i in 0..3 {
         std::fs::write(b.join(format!("src/n{i}.rs")), "fn n() {}\n").expect("write");
         gitterrace_testkit::git(&b, &["add", "-A"]);

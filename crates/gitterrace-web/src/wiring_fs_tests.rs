@@ -28,6 +28,26 @@ fn scans(a: &App) -> u64 {
     a.wt_scans.load(Ordering::Relaxed)
 }
 
+/// Scans run on the poll timer, while the tree watch starts or after it degraded.
+fn polled(a: &App) -> u64 {
+    a.wt_polled.load(Ordering::Relaxed)
+}
+
+/// Waits until the tree watch is up: three seconds without a poll scan. Registering the OS
+/// watches took many seconds on a loaded Mac, and the refresher polls every second meanwhile,
+/// so a count taken before this measures the documented one-second poll, not the events.
+pub(crate) async fn events_up(a: &App) {
+    let end = Instant::now() + Duration::from_secs(60);
+    let (mut last, mut since) = (polled(a), Instant::now());
+    while since.elapsed() < Duration::from_secs(3) {
+        assert!(Instant::now() < end, "the tree watch never came up");
+        wait::pause(Duration::from_millis(250)).await;
+        if polled(a) != last {
+            (last, since) = (polled(a), Instant::now());
+        }
+    }
+}
+
 /// A served repository with a tab on the worktree page, settled past its first scan.
 async fn watched(
     dir: &std::path::Path,
@@ -60,6 +80,7 @@ async fn watched(
             }
         }
     }
+    events_up(&a).await;
     let end = Instant::now() + Duration::from_secs(10);
     let mut last = u64::MAX;
     while Instant::now() < end {
@@ -111,9 +132,12 @@ async fn an_idle_tree_is_not_scanned_and_a_touched_one_is() {
     let _one = SERIAL.lock().await;
     let dir = tempfile::tempdir().expect("tmp");
     let (a, p, mut rx, _wt, _t) = watched(dir.path(), RESCAN, true).await;
-    let before = scans(&a);
+    let (before, polled_before) = (scans(&a), polled(&a));
     let window = Duration::from_secs(12);
     wait::pause(window).await;
+    // The watch is up (see `watched`), so the timer never runs: a poll scan here is a
+    // watch that degraded on a tree of a few files, a bug of its own.
+    assert_eq!(polled(&a), polled_before, "poll scans with the watch up");
     // Polling would scan once per interval (1 s), twelve times here, and a scan that wakes the
     // watcher would keep looping. The safety rescan adds one scan per `rescan_secs`, and a few
     // late duplicates of the settle markers' events may add more, so the idle count stays well

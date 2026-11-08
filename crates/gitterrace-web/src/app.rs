@@ -329,6 +329,10 @@ pub(crate) struct App {
     /// Working tree scans finished so far, counted once the result is recorded: a test that
     /// sees the count move knows the baseline is in place, and can tell idle from busy.
     pub(crate) wt_scans: AtomicU64,
+    /// The part of `wt_scans` run on the poll timer, while the tree watch was still starting or
+    /// had degraded, so a test can tell scans that events caused from the documented one-second
+    /// poll.
+    pub(crate) wt_polled: AtomicU64,
     /// The working tree signature of the oldest worktree page rendered since the last scan. A
     /// tab's first scan compares against it, so an edit between the render and that scan shows.
     pub(crate) wt_rendered: Mutex<Option<u64>>,
@@ -381,6 +385,7 @@ impl App {
             dirty: Mutex::new(None),
             wt_watchers: std::sync::atomic::AtomicUsize::new(0),
             wt_scans: AtomicU64::new(0),
+            wt_polled: AtomicU64::new(0),
             wt_rendered: Mutex::new(None),
             os_events: AtomicBool::new(true),
             caches: crate::caches::Caches::new(&cfg),

@@ -189,6 +189,9 @@ async fn working_tree_is_scanned_only_for_a_subscriber() {
         scanned_after(&a, before, Duration::from_secs(20)).await,
         "a subscriber gets a baseline scan"
     );
+    // Until the tree watch is up the refresher polls every second; the quiet check below is
+    // about events, so it starts with the watch in place.
+    crate::wiring_fs_tests::events_up(&a).await;
     while rx.try_recv().is_ok() {}
     std::fs::write(p.join("small.txt"), "edited with a subscriber\n").expect("write");
     assert!(worktree_event(&mut rx).await, "an edit is seen");
