@@ -30,6 +30,31 @@ const MAX_LINE_CHARS: usize = 300;
 /// Files scanned in parallel before their results are merged in order and the cap checked:
 /// large enough to keep every worker busy, small enough that a capped query stops early.
 const SCAN_CHUNK: usize = 256;
+/// Longest query or glob a search takes, in bytes. A request controls both, and both are
+/// copied into the memo key, the regex and the page, so a public server caps them before any
+/// of that. Far past any query typed into the box.
+pub(crate) const MAX_QUERY_BYTES: usize = 1024;
+
+/// The message a search over [`MAX_QUERY_BYTES`] shows instead of results.
+fn too_long(what: &str) -> String {
+    format!("The {what} is longer than {MAX_QUERY_BYTES} bytes. Shorten it and search again.")
+}
+
+/// `s` cut to at most `MAX_QUERY_BYTES`, on a character boundary.
+fn clip(s: &str) -> &str {
+    let mut end = s.len().min(MAX_QUERY_BYTES);
+    while !s.is_char_boundary(end) {
+        end -= 1;
+    }
+    &s[..end]
+}
+
+/// Whether the query or glob of `q` is over the cap, so it is neither run nor memoized.
+fn over_cap(q: &SearchQuery) -> bool {
+    [&q.q, &q.glob]
+        .iter()
+        .any(|v| v.as_ref().is_some_and(|v| v.len() > MAX_QUERY_BYTES))
+}
 
 #[derive(Deserialize, Default)]
 pub(crate) struct SearchQuery {
@@ -96,6 +121,9 @@ pub(crate) async fn search(
     State(app): State<Arc<App>>,
     Query(q): Query<SearchQuery>,
 ) -> Result<Html<String>> {
+    if over_cap(&q) {
+        return Ok(Html(blocking(&app, move |a| run(a, q)).await?.render()?));
+    }
     let (key, q) = blocking(&app, move |a| Ok((memo_key(a, &q), q))).await?;
     if let Some(h) = app.memo_get(&key) {
         return Ok(Html((*h).clone()));
@@ -155,15 +183,28 @@ fn kinds_seg(
     .no_caption()
 }
 
+/// The query and file filter cut to [`MAX_QUERY_BYTES`], with the message when either was
+/// longer, the query first.
+fn capped(text: &str, glob: &str) -> (String, String, Option<String>) {
+    let error = if text.len() > MAX_QUERY_BYTES {
+        Some(too_long("query"))
+    } else if glob.len() > MAX_QUERY_BYTES {
+        Some(too_long("file filter"))
+    } else {
+        None
+    };
+    (clip(text).to_owned(), clip(glob).to_owned(), error)
+}
+
 fn run(a: &App, q: SearchQuery) -> Result<SearchPage> {
-    let rev = q
-        .rev
-        .filter(|r| !r.is_empty())
-        .unwrap_or_else(|| "HEAD".to_owned());
-    let text = q.q.unwrap_or_default();
+    let rev = q.rev.filter(|r| !r.is_empty());
+    let rev = rev.unwrap_or_else(|| "HEAD".to_owned());
     let commits_mode = q.kind.as_deref() == Some("commits");
     let (regex, case) = (q.regex.is_some(), q.case.is_some());
-    let glob = q.glob.unwrap_or_default();
+    let (text, glob, cap_error) = capped(
+        q.q.as_deref().unwrap_or_default(),
+        q.glob.as_deref().unwrap_or_default(),
+    );
     let mut page = SearchPage {
         c: views::chrome_at(a, "search", &rev),
         searched: !text.is_empty(),
@@ -185,6 +226,10 @@ fn run(a: &App, q: SearchQuery) -> Result<SearchPage> {
         commits: Vec::new(),
         nothing: None,
     };
+    if let Some(e) = cap_error {
+        page.error = Some(e);
+        return Ok(page);
+    }
     if text.is_empty() {
         return Ok(page);
     }

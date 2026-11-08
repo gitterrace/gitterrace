@@ -165,3 +165,62 @@ fn a_commit_miss_builds_no_more_than_a_hit() {
     let (rows, _, all) = run("step");
     assert_eq!((rows.len(), all.built), (30, 30), "one summary per match");
 }
+
+/// Guard class: a request-sized search input is refused with a message before it is scanned,
+/// memoized or echoed in full. Red when an over-cap query or glob runs, or the page repeats it.
+#[tokio::test]
+async fn an_over_long_query_or_filter_is_refused_with_a_message() {
+    let dir = tempfile::tempdir().expect("tmp");
+    let f = gitterrace_testkit::Fixture::init(dir.path())
+        .write("a.txt", "needle\n")
+        .commit("feat: a");
+    let repo = gitterrace_git::Repo::discover(f.path()).expect("repo");
+    let index = gitterrace_index::Index::open(&repo).expect("index");
+    let env = crate::app::Env::new(gitterrace_config::Config::default());
+    let app = Arc::new(crate::app::App::configured(repo, index, &env));
+    let long = "needle".repeat(crate::search::MAX_QUERY_BYTES);
+    let page = search(
+        State(Arc::clone(&app)),
+        Query(SearchQuery {
+            q: Some(long.clone()),
+            ..SearchQuery::default()
+        }),
+    )
+    .await
+    .expect("page")
+    .0;
+    assert!(page.contains("query is longer than 1024 bytes"), "{page}");
+    assert!(!page.contains("1 match"), "an over-cap query does not run");
+    // A page holds no run of the query longer than the cap: its size grows with the chrome.
+    assert!(
+        !page.contains(&long[..=crate::search::MAX_QUERY_BYTES]),
+        "the query is not echoed in full"
+    );
+    let page = search(
+        State(Arc::clone(&app)),
+        Query(SearchQuery {
+            q: Some("needle".into()),
+            glob: Some("*.txt,".repeat(400)),
+            ..SearchQuery::default()
+        }),
+    )
+    .await
+    .expect("page")
+    .0;
+    assert!(
+        page.contains("file filter is longer than 1024 bytes"),
+        "{page}"
+    );
+    let at_cap = "n".repeat(crate::search::MAX_QUERY_BYTES);
+    let page = search(
+        State(app),
+        Query(SearchQuery {
+            q: Some(at_cap),
+            ..SearchQuery::default()
+        }),
+    )
+    .await
+    .expect("page")
+    .0;
+    assert!(!page.contains("longer than"), "a query at the cap runs");
+}
