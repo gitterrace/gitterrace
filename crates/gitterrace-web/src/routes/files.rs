@@ -40,11 +40,26 @@ pub(super) async fn tree_root(
     tree(state, Path((rev, String::new())), q).await
 }
 
+/// A tree at one commit never changes, so its page (README card included) is rendered once per
+/// (rev, commit, path, doc). The memo key still moves with HEAD, the index and config.
 pub(super) async fn tree(
     State(app): Shared,
     Path((rev, path)): Path<(String, String)>,
     Query(q): Query<DocQuery>,
 ) -> Result<Html<String>> {
+    let (key, rev, path, q) = blocking(&app, move |a| {
+        let id = a.repo.resolve(&rev)?;
+        let query = format!(
+            "{rev}\0{id}\0{}\0{}",
+            path.trim_matches('/'),
+            q.doc.as_deref().unwrap_or_default()
+        );
+        Ok((a.memo_key("tree", Some(&query)), rev, path, q))
+    })
+    .await?;
+    if let Some(h) = app.memo_get(&key) {
+        return Ok(Html((*h).clone()));
+    }
     let p = blocking(&app, move |a| {
         let id = a.repo.resolve(&rev)?;
         let path = path.trim_matches('/').to_owned();
@@ -88,7 +103,9 @@ pub(super) async fn tree(
         })
     })
     .await?;
-    page(&p)
+    let html = p.render()?;
+    app.memo_put(key, Arc::new(html.clone()));
+    Ok(Html(html))
 }
 
 #[derive(Template)]

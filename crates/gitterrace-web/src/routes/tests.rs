@@ -114,3 +114,41 @@ fn author_log_comes_from_the_records_newest_first() {
     assert_eq!(indexed_author_ids(&recs, "Ann", Some("src")), ["a"]);
     assert!(indexed_author_ids(&recs, "nobody", None).is_empty());
 }
+
+/// Guard class: a memoized page keyed on a rev is never served once the rev moves. The memo
+/// entry is swapped for a marker: a repeat returns it, a new commit on the branch must not.
+#[tokio::test]
+async fn tree_page_is_memoized_until_the_branch_moves() {
+    use axum::extract::Query;
+    let dir = tempfile::tempdir().expect("tmp");
+    let f = gitterrace_testkit::Fixture::init(dir.path())
+        .write("a.txt", "one\n")
+        .commit("feat: a");
+    let repo = gitterrace_git::Repo::discover(f.path()).expect("repo");
+    let index = gitterrace_index::Index::open(&repo).expect("index");
+    let env = crate::app::Env::new(gitterrace_config::Config::default());
+    let app = Arc::new(crate::app::App::configured(repo, index, &env));
+    let get = |app: &Arc<crate::app::App>| {
+        super::files::tree(
+            State(Arc::clone(app)),
+            Path(("main".into(), String::new())),
+            Query(crate::routes::DocQuery { doc: None }),
+        )
+    };
+    let first = get(&app).await.expect("page").0;
+    assert!(first.contains("a.txt"), "{first}");
+    let head = app.repo.resolve("main").expect("head");
+    let key = app.memo_key("tree", Some(&format!("main\0{head}\0\0")));
+    app.memo_put(key, Arc::new("memo".into()));
+    assert_eq!(
+        get(&app).await.expect("page").0,
+        "memo",
+        "a repeat is not rebuilt"
+    );
+    let _f = f.write("b.txt", "two\n").commit("feat: b");
+    let moved = get(&app).await.expect("page").0;
+    assert!(
+        moved.contains("b.txt"),
+        "a moved branch renders its new tree: {moved}"
+    );
+}
