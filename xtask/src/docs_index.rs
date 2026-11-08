@@ -247,7 +247,7 @@ fn is_md(path: &str) -> bool {
 }
 
 /// Heading anchors as the page renderer and most Markdown hosts make them.
-fn anchors(text: &str) -> BTreeSet<String> {
+pub fn anchors(text: &str) -> BTreeSet<String> {
     let mut seen: BTreeMap<String, usize> = BTreeMap::new();
     let mut out = BTreeSet::new();
     let mut current: Option<String> = None;

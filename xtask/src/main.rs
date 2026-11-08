@@ -21,7 +21,7 @@ mod site;
 
 use std::path::{Path, PathBuf};
 
-use anyhow::Result;
+use anyhow::{Context as _, Result};
 use clap::{Parser, Subcommand};
 
 use crate::out::{Mode, Out, apply, unowned_blocks};
@@ -77,6 +77,13 @@ fn main() -> Result<()> {
                 println!("generated blocks nobody fills: {}", orphans.join(", "));
                 std::process::exit(1);
             }
+            let ws = facts::load(&root)?;
+            let repo = &ws
+                .packages
+                .get("gitterrace")
+                .context("package gitterrace")?
+                .repository;
+            let site_bad = site::disk::check(&root, &outs, repo)?;
             let stale = apply(&root, outs, Mode::Check)?;
             if !stale.is_empty() {
                 println!(
@@ -86,6 +93,14 @@ fn main() -> Result<()> {
                 std::process::exit(1);
             }
             println!("generated output: up to date");
+            if !site_bad.is_empty() {
+                println!(
+                    "site/ out of step with the docs index, or a link of it lands nowhere:\n  {}",
+                    site_bad.join("\n  ")
+                );
+                std::process::exit(1);
+            }
+            println!("site: every page is a published document, every link and anchor lands");
             let bad = docs_index::check(&root)?;
             if !bad.is_empty() {
                 println!(

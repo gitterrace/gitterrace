@@ -13,6 +13,7 @@ use anyhow::{Context as _, Result};
 
 mod bar;
 mod changelog;
+pub mod disk;
 mod docs;
 mod landing;
 pub mod legal;
