@@ -79,6 +79,14 @@ characters. The scope is the crate name without `gitterrace-`. The body says why
 the change was made. Run `git config core.hooksPath scripts/hooks` once so the
 message rules run on every commit.
 
+A change lands with
+`bash shared/schwarzwald/tools/land.sh <repo> <clone> <sha>`, one commit at a
+time on main's tip. The checkout that takes landings marks itself once with
+`git config --local landing.target "$(git rev-parse --show-toplevel)"`. Its
+pre-commit hook then refuses a plain `git commit` (`MAIN_CHECKOUT_LANDS_ONLY`
+in `config/schwarzwald/guards.env`), so commit in a clone and land from it. A
+clone or a linked worktree is never refused.
+
 ## Before a pull request
 
 The local gate is the one that counts. The hosted workflows run a subset of it.
