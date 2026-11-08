@@ -13,6 +13,14 @@ async fn multi_repo_links_stay_inside_their_repo() {
     let a = fixture("alpha", dir.path());
     let b = fixture("beta", dir.path());
     let router = crate::multi_router(vec![a, b]).expect("router");
+    // The related roots warm in the background: wait for the line before crawling.
+    gitterrace_testkit::wait::until("the Related line on alpha's log", || async {
+        fetch(&router, "/r/alpha/log/HEAD", "localhost")
+            .await
+            .1
+            .contains("class=\"related\"")
+    })
+    .await;
     let (s, idx) = fetch(&router, "/", "localhost").await;
     assert_eq!(s, 200);
     assert!(idx.contains("/r/alpha/") && idx.contains("/r/beta/"));
@@ -21,6 +29,7 @@ async fn multi_repo_links_stay_inside_their_repo() {
         let mut todo = vec![prefix.clone()];
         let mut seen = std::collections::HashSet::new();
         let mut escapes = Vec::new();
+        let mut seen_related = std::collections::BTreeSet::new();
         while let Some(u) = todo.pop() {
             if !seen.insert(u.clone()) || seen.len() > 400 {
                 continue;
@@ -30,9 +39,15 @@ async fn multi_repo_links_stay_inside_their_repo() {
             if !body.contains("<html") {
                 continue;
             }
-            for l in links(&body) {
+            let (related, rest) = related_logs(&body, &["alpha", "beta"]);
+            if u.starts_with("/r/alpha/log") {
+                seen_related.extend(related.iter().cloned());
+            }
+            for l in links(&rest) {
                 // The brand links to the repository index, and stylesheets and scripts
                 // are the server's, shared by every repository: both at the root on purpose.
+                // The Related line links to related repositories on purpose: its anchors to a
+                // served repository's log are taken out of the page by `related_logs`.
                 if l == "/" || l.starts_with("/static/") {
                     continue;
                 }
@@ -44,6 +59,11 @@ async fn multi_repo_links_stay_inside_their_repo() {
             }
         }
         assert!(seen.len() > 10, "crawl too shallow: {}", seen.len());
+        // The exemption stays live: alpha's log shows the Related line, to beta's log only.
+        if name == "alpha" {
+            let want: std::collections::BTreeSet<String> = ["/r/beta/log".to_owned()].into();
+            assert_eq!(seen_related, want, "the Related line on alpha's log");
+        }
         assert!(
             escapes.is_empty(),
             "links escape {prefix}:\n{}",
@@ -63,6 +83,30 @@ async fn multi_repo_links_stay_inside_their_repo() {
         200
     );
     assert_eq!(fetch(&router, "/static/app.css", "localhost").await.0, 200);
+}
+
+/// Takes the Related line's anchors out of `html` when each points at `/r/<name>/log` of a name
+/// in `served`, and returns those hrefs and the rest of the page. Any other anchor in the line
+/// stays in the page, so the crawl still flags it.
+fn related_logs(html: &str, served: &[&str]) -> (Vec<String>, String) {
+    const OPEN: &str = "<span class=\"related\">";
+    let Some(i) = html.find(OPEN) else {
+        return (Vec::new(), html.to_owned());
+    };
+    let end = html[i..]
+        .find("</span>")
+        .map_or(html.len(), |e| i + e + "</span>".len());
+    let mut span = html[i..end].to_owned();
+    let mut hrefs = Vec::new();
+    for name in served {
+        let href = format!("/r/{name}/log");
+        let anchor = format!("<a href=\"{href}\">{name}</a>");
+        if span.contains(&anchor) {
+            span = span.replace(&anchor, "");
+            hrefs.push(href);
+        }
+    }
+    (hrefs, format!("{}{span}{}", &html[..i], &html[end..]))
 }
 
 #[tokio::test]

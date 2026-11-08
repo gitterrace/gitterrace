@@ -456,6 +456,7 @@ svg.spark.s1{stroke:var(--cat-1)}svg.spark.s2{stroke:var(--cat-2)}svg.spark.s3{s
 
 /* insights filter: chips and author links (the rest is in insights.css) */
 .fbar{display:flex;flex-wrap:nowrap;align-items:center;gap:var(--space-3);min-width:0;margin:var(--space-4) 0}
+.fbar .related{color:var(--muted);font-size:var(--text-sm);min-width:0;overflow-wrap:anywhere}
 .fbar>.segctl{flex:0 1 auto}.fbar .outline.menu{display:block;margin-left:0;flex:none;order:2}
 .fbar .optline{margin:0 0 0 auto;order:1}
 /* Narrower, the facts line drops under the row; on a phone the jump menu stays at the row's end

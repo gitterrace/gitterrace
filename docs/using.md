@@ -34,6 +34,12 @@ The log of a branch has a List and a Graph switch in its head. Graph draws the
 branches and merges beside each commit, one row per commit. A log filtered by
 path or author has no graph, since its commits are not one line of history.
 
+When the server serves several clones or forks of one project, the log's
+toolbar says "Related:" and links the log of each other served repository that
+shares a root commit with this one. Only repositories the server already lists
+take part, by their served name. A shallow clone that lacks the root commit is
+not related until it is deepened.
+
 ## The outline of a page
 
 A rendered Markdown file with three or more headings gets an "On this page"

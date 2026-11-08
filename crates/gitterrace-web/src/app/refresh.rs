@@ -14,6 +14,9 @@ impl App {
     /// listening, tells it. Costs nothing but the cache reset while nobody listens.
     async fn changed(self: &Arc<Self>, kinds: Vec<&'static str>, v: u64) {
         self.invalidate(&kinds);
+        if kinds.iter().any(|k| matches!(*k, "head" | "refs")) {
+            self.warm_related();
+        }
         self.version.store(v, Ordering::Release);
         if self.changes.receiver_count() == 0 {
             return;
@@ -31,6 +34,13 @@ impl App {
             // An error only says every listener left meanwhile.
             self.changes.send(Arc::new(c)).ok();
         }
+    }
+
+    /// Warms the root sets behind the log's related links off the request path: this
+    /// repository's, and any peer's not warmed lately. A page only reads what this caches.
+    fn warm_related(self: &Arc<Self>) {
+        let a = Arc::clone(self);
+        tokio::task::spawn_blocking(move || a.env.related.warm(&a.key, &a.repo));
     }
 }
 
@@ -221,6 +231,7 @@ async fn refresh(app: &Arc<App>, rev: &str, warm: Option<&str>) {
     }
     let Some(head) = warm else { return };
     app.mark_ready();
+    app.warm_related();
     let (a, h) = (Arc::clone(app), head.to_owned());
     // The languages walk reads the whole first-parent chain, so it runs here, off the
     // request path. What it keeps is flat in history length.

@@ -361,3 +361,47 @@ fn the_home_page_over_many_repositories_finds_every_dirty_tree() {
         assert_eq!(r.status(), 200);
     }
 }
+
+/// The log of a served repository links the other served clones of its project by table name
+/// and nothing else: a stranger is not listed, no folder path reaches the page, and a lone
+/// repository shows no related line.
+#[tokio::test(flavor = "multi_thread")]
+async fn the_log_links_served_clones_by_name_only() {
+    let dir = tempfile::tempdir().expect("tmp");
+    let (a, b, c) = (
+        dir.path().join("alpha"),
+        dir.path().join("beta"),
+        dir.path().join("gamma"),
+    );
+    for (d, msg) in [(&a, "root"), (&c, "other")] {
+        std::fs::create_dir_all(d).expect("dir");
+        git(d, &["init", "-q", "-b", "main"]);
+        git(d, &["commit", "-q", "--allow-empty", "-m", msg]);
+    }
+    let (from, to) = (a.to_str().expect("utf8"), b.to_str().expect("utf8"));
+    git(dir.path(), &["clone", "-q", from, to]);
+    let router = crate::multi_router(vec![a.clone(), b, c]).expect("router");
+    // The roots warm in the background when a repository joins: a cold page shows no line.
+    let want = "<span class=\"related\">Related: <a href=\"/r/beta/log\">beta</a></span>";
+    let alpha = || async {
+        gitterrace_testkit::get(&router, "/r/alpha/log/HEAD")
+            .await
+            .1
+    };
+    gitterrace_testkit::wait::until("the related line on alpha's log", || async {
+        alpha().await.contains(want)
+    })
+    .await;
+    let log = alpha().await;
+    assert!(log.contains(want), "{log}");
+    assert!(!log.contains("/r/gamma/log"), "a stranger is not related");
+    assert!(
+        !log.contains(&*dir.path().to_string_lossy()),
+        "no path on the page"
+    );
+    let (_, other) = gitterrace_testkit::get(&router, "/r/gamma/log/HEAD").await;
+    assert!(!other.contains("class=\"related\""), "{other}");
+    let lone = crate::app_router(&a).expect("router");
+    let (_, solo) = gitterrace_testkit::get(&lone, "/log/HEAD").await;
+    assert!(!solo.contains("class=\"related\""), "{solo}");
+}

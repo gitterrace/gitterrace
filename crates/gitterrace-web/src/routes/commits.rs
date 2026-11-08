@@ -207,6 +207,7 @@ pub(super) async fn log(
                 action: fmt::href(&format!("/log/{rev_enc}")),
                 path: path.clone(),
                 compare_href,
+                related: related_logs(a),
             }
             .render()?,
             ..head
@@ -249,6 +250,18 @@ struct LogFilter {
     path: String,
     /// Compare from the latest tag to this revision, `""` when the page is off.
     compare_href: String,
+    /// The other served repositories sharing a root commit, as `(log href, name)`. Hrefs
+    /// are built from table names only, never a path.
+    related: Vec<(String, String)>,
+}
+
+/// The log links of the other served repositories sharing a root commit, as `(href, name)`.
+fn related_logs(a: &App) -> Vec<(String, String)> {
+    let names = a.env.related.related(&a.key);
+    names
+        .into_iter()
+        .map(|name| (format!("/r/{}/log", fmt::enc_seg(&name)), name))
+        .collect()
 }
 
 /// The log's page head: "Commits" with the revision, a tagline saying what the list holds,

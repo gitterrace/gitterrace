@@ -46,6 +46,7 @@ mod pagehead;
 mod patterns;
 mod public;
 mod registry;
+mod related;
 mod reload;
 mod routes;
 mod search;

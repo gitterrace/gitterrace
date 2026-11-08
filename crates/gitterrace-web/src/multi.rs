@@ -79,6 +79,8 @@ pub(crate) struct Table {
 struct Repos {
     order: Vec<Arc<Served>>,
     by_name: HashMap<String, Arc<Served>>,
+    /// The same names for the related links, kept in step by `insert` and `drop_name`.
+    peers: crate::related::Peers,
 }
 
 /// Why [`Table::take`] left the table as it was.
@@ -115,8 +117,11 @@ impl Table {
     /// repository are served once.
     pub(crate) fn new(paths: Vec<PathBuf>, env: Env, state: Option<PathBuf>) -> io::Result<Self> {
         let table = Self {
+            repos: RwLock::new(Repos {
+                peers: env.related.clone(),
+                ..Repos::default()
+            }),
             env,
-            repos: RwLock::default(),
             state,
             live: None,
         };
@@ -327,6 +332,7 @@ impl Repos {
             recent: Mutex::new(None),
             dirty: Mutex::new(None),
         });
+        self.peers.add(&name, served.path.clone());
         self.by_name.insert(name, Arc::clone(&served));
         self.order.push(Arc::clone(&served));
         served
@@ -334,6 +340,7 @@ impl Repos {
 
     fn drop_name(&mut self, name: &str) -> Option<Arc<Served>> {
         self.order.retain(|s| s.name != name);
+        self.peers.remove(name);
         self.by_name.remove(name)
     }
 }

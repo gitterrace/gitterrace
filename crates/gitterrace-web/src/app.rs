@@ -75,6 +75,8 @@ pub(crate) struct Env {
     home_v: Arc<AtomicU64>,
     /// Open home streams, capped by `server.live_streams` as each repository's are.
     pub(crate) home_streams: Arc<Semaphore>,
+    /// The served repositories, for the log's related links. Empty for a lone repository.
+    pub(crate) related: crate::related::Peers,
     home_streams_cap: Arc<Mutex<usize>>,
 }
 
@@ -133,6 +135,7 @@ impl Env {
             home_v: Arc::default(),
             home_streams: Arc::new(Semaphore::new(live_streams)),
             home_streams_cap: Arc::new(Mutex::new(live_streams)),
+            related: crate::related::Peers::default(),
         }
     }
 
@@ -202,6 +205,10 @@ impl Env {
             .map(|g| g.iter().filter_map(Weak::upgrade).collect())
             .unwrap_or_default();
         for app in apps {
+            // A log page links the related repositories: a joined or gone one changes it.
+            if let Ok(mut g) = app.memo.lock() {
+                g.clear();
+            }
             // An error only says no tab is open.
             app.changes
                 .send(Arc::new(Change::repos(app.version())))
