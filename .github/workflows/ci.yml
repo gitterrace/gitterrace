@@ -28,7 +28,18 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest]
     steps:
+      # Full history and tags: the history lints refuse a shallow clone.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+          persist-credentials: false
+      # A pull request is judged by the base branch's lint.toml: its [run] steps run code and its
+      # scopes decide what the lints read, so the branch under review may not set them.
+      - if: github.event_name == 'pull_request'
+        env:
+          BASE: ${{ github.base_ref }}
+        run: git show "origin/${BASE}:config/schwarzwald/lint.toml" >config/schwarzwald/lint.toml
       # The toolchain is pinned once, in rust-toolchain.toml: a floating `stable`
       # turns every new clippy lint into a red build nobody caused.
       - id: pin
