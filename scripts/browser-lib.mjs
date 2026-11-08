@@ -1,6 +1,6 @@
 // Shared launcher for the browser checks (scripts/browser-check.mjs). Not run on its own.
-// - finds playwright-core: $PLAYWRIGHT_CORE, then node resolution from the repo, then the
-//   website checkout; no network is used
+// - finds playwright-core: $PLAYWRIGHT_CORE, else the repo's pinned node_modules (make
+//   browser-deps); no network is used, and missing deps or browsers stop it early
 // - builds a temp repository and serves it with a given binary on a free port
 // - opens pages at given widths and colour schemes
 import { spawn, execFileSync } from 'node:child_process';
@@ -18,19 +18,36 @@ export const WATCH_BOUND_MS = (RESCAN_SECS + 5) * 1000;
 
 export const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
-export async function loadPlaywright() {
-  const tries = [
-    process.env.PLAYWRIGHT_CORE,
-    () => createRequire(join(root, 'package.json')).resolve('playwright-core'),
-    join(homedir(), 'github/tendir/website/node_modules/playwright-core/index.mjs'),
-  ];
-  for (const t of tries) {
-    try {
-      const p = typeof t === 'function' ? t() : t;
-      if (p && existsSync(p)) return await import(pathToFileURL(p).href);
-    } catch {}
+/** How to get the browser check dependencies, named in every early failure. */
+const INSTALL = 'run `make browser-deps` (npm ci, then the Playwright browsers)';
+
+function die(msg) {
+  console.error(`browser-check: ${msg}; ${INSTALL}`);
+  process.exit(2);
+}
+
+/**
+ * playwright-core from $PLAYWRIGHT_CORE, else the repo's pinned node_modules. Its ESM entry is
+ * index.mjs: importing the CommonJS index.js leaves the browser types undefined. Exits early,
+ * naming the install step, when it or axe-core or one of the `need` browsers is missing.
+ */
+export async function loadPlaywright(need = ['chromium']) {
+  const p = process.env.PLAYWRIGHT_CORE || join(root, 'node_modules/playwright-core/index.mjs');
+  if (!existsSync(p)) die(`playwright-core not found at ${p}`);
+  const pw = await import(pathToFileURL(p).href);
+  if (!pw.chromium?.launch || !pw.webkit?.launch) die(`${p} has no chromium or webkit launcher`);
+  try {
+    createRequire(join(root, 'package.json')).resolve('axe-core');
+  } catch {
+    die('axe-core not found');
   }
-  throw new Error('playwright-core not found: set PLAYWRIGHT_CORE to its index.mjs');
+  for (const name of need) {
+    const exe = name === 'chromium'
+      ? chromiumPath() ?? pw.chromium.executablePath()
+      : pw[name]?.executablePath();
+    if (!exe || !existsSync(exe)) die(`${name} is not installed (${exe})`);
+  }
+  return pw;
 }
 
 /** A chromium Playwright can start: $PLAYWRIGHT_CHROMIUM, else the newest cached, else default. */

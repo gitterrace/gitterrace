@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: setup harness-links counting-parity app-icon build install fmt clippy lint test doc theme actions docs-gen docs-check names lines check site-render site-shots help bench bench-report bench-guard memory-check speed-check browser-check browser-reap site deploy shipped domains send-vectors preview gc gc-guard changelog keep
+.PHONY: setup harness-links counting-parity app-icon build install fmt clippy lint test doc theme actions docs-gen docs-check names lines check site-render site-shots help bench bench-report bench-guard memory-check speed-check browser-deps browser-check browser-reap site deploy shipped domains send-vectors preview gc gc-guard changelog keep
 
 ## setup: Keep desktop search indexers out of build, bench and agent dirs (run once per machine)
 setup:
@@ -163,6 +163,11 @@ memory-check: build
 ## speed-check: The cold insights pages on the rust bench clone stay under their speed gates (needs an indexed clone, about 10 minutes, so not in check)
 speed-check: build
 	python3 scripts/speed-check.py --bin target/release/git-terrace
+
+## browser-deps: Install the pinned browser check deps (package-lock.json) and their Playwright browsers
+browser-deps:
+	npm ci --no-audit --no-fund
+	PLAYWRIGHT_SKIP_BROWSER_GC=1 node node_modules/playwright-core/cli.js install chromium webkit
 
 ## browser-check: Real-browser checks of the served pages (BIN=path to git-terrace). Needs browsers, so not in check
 browser-check: browser-reap

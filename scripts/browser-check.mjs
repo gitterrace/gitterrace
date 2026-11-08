@@ -167,8 +167,8 @@
 //                folded file with Enter, and prints scroll frame times and long tasks
 //
 // --from-disk serves crates/gitterrace-web/static/*.js from the working tree over the (possibly
-// older) binary's copies, to test edits before a rebuild. Playwright comes from $PLAYWRIGHT_CORE,
-// the repo's node_modules or the website checkout (see browser-lib.mjs).
+// older) binary's copies, to test edits before a rebuild. Playwright comes from $PLAYWRIGHT_CORE
+// or the repo's node_modules, installed by `make browser-deps` (see browser-lib.mjs).
 import { readFileSync, readdirSync, writeFileSync, rmSync, mkdirSync, mkdtempSync, existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -189,7 +189,7 @@ const ALL = ['truncation', 'live-tabs', 'mermaid', 'chip', 'doctabs', 'chords', 
 const wanted = arg('--checks', ALL.join(',')).split(',');
 for (const c of wanted) if (!ALL.includes(c)) { console.error(`unknown check ${c}; known: ${ALL.join(', ')}`); process.exit(2); }
 
-const pw = await loadPlaywright();
+const pw = await loadPlaywright(browsers);
 const dir = makeRepo();
 // The chords check needs one action, key "x", that touches a marker file. It has to exist
 // before the server starts (read at load) and outside the repository (refused inside one).

@@ -94,8 +94,9 @@ The local gate is the one that counts. The hosted workflows run a subset of it.
 - `make check` always
 - `make browser-check BIN=target/debug/git-terrace` if you changed templates,
   CSS or the scripts in `static/`. It drives real browsers (Playwright), so it
-  is not part of `make check`. See `scripts/browser-check.mjs` for the checks
-  and flags
+  is not part of `make check`. Run `make browser-deps` once per clone first:
+  it installs the versions `package-lock.json` pins and their browsers. See
+  `scripts/browser-check.mjs` for the checks and flags
 - `make bench` if you changed how pages, the index or the server do their work
   (see [benchmarks](docs/benchmarks.md))
 - Windows: CI builds and tests `x86_64-pc-windows-msvc` and smoke-tests the
