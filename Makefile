@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: setup harness-links counting-parity app-icon build install fmt clippy lint test doc theme actions docs-gen docs-check names lines check site-render site-shots help bench bench-report bench-guard memory-check browser-check browser-reap site deploy shipped domains send-vectors preview gc gc-guard changelog keep
+.PHONY: setup harness-links counting-parity app-icon build install fmt clippy lint test doc theme actions docs-gen docs-check names lines check site-render site-shots help bench bench-report bench-guard memory-check speed-check browser-check browser-reap site deploy shipped domains send-vectors preview gc gc-guard changelog keep
 
 ## setup: Keep desktop search indexers out of build, bench and agent dirs (run once per machine)
 setup:
@@ -148,6 +148,7 @@ bench-guard:
 	python3 scripts/bench-run.py --synthetic --bin $${CARGO_TARGET_DIR:-target}/debug/git-terrace >/dev/null
 	python3 scripts/bench-report.py --self-test
 	python3 scripts/bench-quiet-lib.py
+	python3 scripts/speed-check.py --self-test
 
 ## counting-parity: The count parity fuzz including the pages-vs-reducers properties still red until every page reads one Counted. Not in check
 counting-parity:
@@ -157,6 +158,10 @@ counting-parity:
 memory-check: build
 	python3 scripts/memory-check.py --bin target/release/git-terrace
 	TEST_MEMORY_WIDE=100000 cargo test --release -p gitterrace-web --test memory_budget idle_memory_is_flat_in_tree_size
+
+## speed-check: The cold insights pages on the rust bench clone stay under their speed gates (needs an indexed clone, about 10 minutes, so not in check)
+speed-check: build
+	python3 scripts/speed-check.py --bin target/release/git-terrace
 
 ## browser-check: Real-browser checks of the served pages (BIN=path to git-terrace). Needs browsers, so not in check
 browser-check: browser-reap
