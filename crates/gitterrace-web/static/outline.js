@@ -17,7 +17,9 @@
     function shown() { return items.filter(function (el) { return !el.hidden; }); }
     function apply() {
       var t = q.value.trim().toLowerCase();
-      items.forEach(function (el) { el.hidden = t !== "" && text(el).toLowerCase().indexOf(t) < 0; });
+      items.forEach(function (el) {
+        el.hidden = t !== "" && text(el).toLowerCase().indexOf(t) < 0;
+      });
       var n = shown().length;
       if (o.none) o.none.hidden = n > 0;
       if (o.count) o.count(n, items.length);
@@ -42,20 +44,26 @@
   var navs = Array.prototype.slice.call(document.querySelectorAll("[data-outline]"));
   if (!navs.length) return;
   var links = [];
-  navs.forEach(function (n) { n.querySelectorAll("a[href^='#']").forEach(function (a) { links.push(a); }); });
+  navs.forEach(function (n) {
+    n.querySelectorAll("a[href^='#']").forEach(function (a) { links.push(a); });
+  });
   var heads = [];
   links.forEach(function (a) {
     var h = document.getElementById(decodeURIComponent(a.getAttribute("href").slice(1)));
     if (h && heads.indexOf(h) < 0) heads.push(h);
   });
-  heads.sort(function (a, b) { return a.getBoundingClientRect().top - b.getBoundingClientRect().top; });
+  heads.sort(function (a, b) {
+    return a.getBoundingClientRect().top - b.getBoundingClientRect().top;
+  });
   function mark(id) {
     links.forEach(function (a) {
       var on = a.getAttribute("href") === "#" + id;
       a.classList.toggle("on", on);
-      if (on) { a.setAttribute("aria-current", "location"); } else { a.removeAttribute("aria-current"); }
+      if (on) { a.setAttribute("aria-current", "location"); }
+      else { a.removeAttribute("aria-current"); }
       if (on && a.closest(".rail")) {
-        var box = a.closest(".rail"), r = a.getBoundingClientRect(), b = box.getBoundingClientRect();
+        var box = a.closest(".rail"), r = a.getBoundingClientRect();
+        var b = box.getBoundingClientRect();
         if (r.top < b.top || r.bottom > b.bottom) box.scrollTop += r.top - b.top - b.height / 2;
       }
     });
@@ -70,7 +78,9 @@
     if (id) mark(id);
   }
   if ("IntersectionObserver" in window && heads.length) {
-    var io = new IntersectionObserver(current, { rootMargin: "0px 0px -70% 0px", threshold: [0, 1] });
+    var io = new IntersectionObserver(current, {
+      rootMargin: "0px 0px -70% 0px", threshold: [0, 1]
+    });
     heads.forEach(function (h) { io.observe(h); });
     window.addEventListener("scroll", current, { passive: true });
     current();
@@ -95,7 +105,11 @@
       if (e.key === "Escape" && menu && d.open) { e.preventDefault(); close(); }
     });
     if (!menu) return;
-    d.addEventListener("click", function (e) { if (e.target.closest && e.target.closest("a")) d.open = false; });
-    document.addEventListener("click", function (e) { if (d.open && !d.contains(e.target)) d.open = false; });
+    d.addEventListener("click", function (e) {
+      if (e.target.closest && e.target.closest("a")) d.open = false;
+    });
+    document.addEventListener("click", function (e) {
+      if (d.open && !d.contains(e.target)) d.open = false;
+    });
   });
 })();

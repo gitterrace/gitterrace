@@ -235,6 +235,16 @@ pub const WARM_PAGES: [&str; 6] = [
     "/stats/ownership",
 ];
 
+/// The app's "On this page" rail for another page to reuse: one `(id, text)` per listed
+/// heading, linked as given, in page order. Empty below three headings.
+pub fn outline_rail(headings: &[(&str, &str)]) -> String {
+    let shown: Vec<_> = headings.iter().map(|(id, t)| (*id, *t, true)).collect();
+    markdown::outline_rail(&sections::jumps(&shown))
+}
+
+/// The script behind the outline: the active heading's item is marked as the page scrolls.
+pub const OUTLINE_JS: &str = include_str!("../static/outline.js");
+
 /// The diagram library: a page's script loads it by name, so no link names it.
 pub const MERMAID_JS: &str = "/static/vendor/mermaid-11.17.2.min.js";
 
