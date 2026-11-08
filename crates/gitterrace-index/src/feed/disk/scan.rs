@@ -385,4 +385,39 @@ mod tests {
         assert_eq!(disk.unreadable(), None);
         Ok(())
     }
+
+    /// Guard class: naming the files of a page reads each string block a bounded number of
+    /// times. Red when names are resolved in hash-map order, which jumps between string blocks
+    /// and re-reads them per path once the path table is larger than the block cache.
+    #[test]
+    fn naming_many_files_reads_each_string_block_a_bounded_number_of_times() -> SegResult<()> {
+        use crate::insights::{Insights, Options, Period};
+        let mut recs = records();
+        for (i, r) in recs.iter_mut().enumerate() {
+            r.files = (0..8)
+                .map(|n| FileStat {
+                    path: format!("{}/{i:05}-{n}.rs", "deep/tree/of/paths".repeat(6)).into(),
+                    additions: 1,
+                    ..FileStat::default()
+                })
+                .collect();
+        }
+        let dir = tempfile::tempdir()?;
+        write_cache(dir.path(), &recs, &[200, 2200])?;
+        let disk = open(dir.path())?.with_cache_bytes(1);
+        let strings: usize = disk.deltas.iter().map(|c| c.toc().len()).sum();
+        let blocks: usize = disk.segs.iter().map(|s| s.c.toc().len()).sum::<usize>() + strings;
+        assert!(
+            strings > 4,
+            "the fixture must span string blocks: {strings}"
+        );
+        let ins = Insights::from_source(&disk, Options::default(), None);
+        let before = crate::seg::read::BLOCK_READS.with(std::cell::Cell::get);
+        let files = ins.file_churn(Period::All);
+        let reads = crate::seg::read::BLOCK_READS.with(std::cell::Cell::get) - before;
+        assert_eq!(files.len(), recs.len() * 8);
+        assert!(reads <= 8 * blocks, "{reads} block reads, {blocks} blocks");
+        assert_eq!(disk.unreadable(), None);
+        Ok(())
+    }
 }

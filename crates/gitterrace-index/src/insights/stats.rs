@@ -145,7 +145,11 @@ impl Counted<'_> {
                 a.time = a.time.max(time);
             }
         }
-        let mut out: Vec<FileChurn> = map
+        // Names in id order: string blocks hold ids in runs, so this reads each block once
+        // where map order jumps between them and, past the block cache, re-reads per path.
+        let mut ids: Vec<(PathId, Acc)> = map.into_iter().collect();
+        ids.sort_unstable_by_key(|(id, _)| *id);
+        let mut out: Vec<FileChurn> = ids
             .into_iter()
             .map(|(id, a)| FileChurn {
                 path: src.path(id).map(|p| p.to_string()).unwrap_or_default(),
