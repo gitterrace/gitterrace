@@ -306,3 +306,55 @@ fn every_page_has_a_skip_link_first_and_one_h1() {
     }
     assert!(bad.is_empty(), "{}", bad.join("\n"));
 }
+
+/// The hosts of the maker's other sites. The site links none of them: each stands on its own.
+const SIBLING_HOSTS: [&str; 2] = ["tendir.app", "timorunge.com"];
+
+/// What on `pages` points at a sibling site: a "same fleet" line, or a link to a sibling host.
+fn sibling_problems(pages: &[(String, String)]) -> Vec<String> {
+    let mut bad = Vec::new();
+    for (path, html) in pages {
+        if html.to_lowercase().contains("same fleet") {
+            bad.push(format!("{path}: names the sibling sites"));
+        }
+        for href in attrs(html, "href") {
+            let host = href.split("://").nth(1).and_then(|r| r.split('/').next());
+            if let Some(host) = host
+                && SIBLING_HOSTS
+                    .iter()
+                    .any(|s| host == *s || host.ends_with(&format!(".{s}")))
+            {
+                bad.push(format!("{path}: links the sibling site {href}"));
+            }
+        }
+    }
+    bad
+}
+
+/// The class this guards: a page that cross-links the maker's other sites, by a footer line or
+/// by any link, on any template.
+#[test]
+fn no_page_links_a_sibling_site() {
+    let (pages, _) = generated();
+    let bad = sibling_problems(&pages);
+    assert!(bad.is_empty(), "{}", bad.join("\n"));
+}
+
+#[test]
+fn a_planted_sibling_line_or_link_is_reported() {
+    let pages = vec![
+        ("a".to_owned(), "<p>Also from the same fleet</p>".to_owned()),
+        (
+            "b".to_owned(),
+            "<a href=\"https://www.tendir.app/x\">t</a>".to_owned(),
+        ),
+        (
+            "c".to_owned(),
+            "<a href=\"https://github.com/o/tendir.app\">ok</a>".to_owned(),
+        ),
+    ];
+    let bad = sibling_problems(&pages).join("\n");
+    assert!(bad.contains("a: names the sibling sites"), "{bad}");
+    assert!(bad.contains("b: links the sibling site"), "{bad}");
+    assert!(!bad.contains("c:"), "{bad}");
+}
