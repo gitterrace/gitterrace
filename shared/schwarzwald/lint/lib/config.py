@@ -94,6 +94,7 @@ DEFAULTS: dict[str, dict] = {
     "commit": {
         "types": ["feat", "fix", "docs", "style", "refactor", "perf", "test", "build", "ci", "chore", "revert"],
         "allow_prefix": "SCHWARZWALD_",
+        "main": "main",
     },
 }
 
@@ -130,21 +131,42 @@ def denylist_problems(root: Path, cfg: dict[str, dict], now: float | None = None
     """A missing or stale `.personal-denylist` as lines to print, and whether the mode refuses.
 
     The list is local and seeded once; the board grows and the guard goes blind without a sound.
-    Settings: lint.toml [denylist] max_age_hours (0 = never stale), mode (warn|refuse), refresh
-    (the product's refresh command, printed), history_ids (a file the refresh merges in)."""
+    Settings: lint.toml [denylist] max_age_hours (0 = never stale), mode (warn|refuse|refresh),
+    refresh (the product's refresh command), history_ids (a file the refresh merges in). In mode
+    "refresh" a missing or stale list is refreshed by running that command from the repository
+    root, and the check refuses only when the command fails or leaves the list missing or stale."""
+    import subprocess
     import time
 
     s = cfg["denylist"]
-    if s["mode"] not in ("warn", "refuse"):
-        sys.exit(f"lint.toml [denylist] mode must be warn or refuse, not {s['mode']!r}")
+    if s["mode"] not in ("warn", "refuse", "refresh"):
+        sys.exit(f"lint.toml [denylist] mode must be warn, refuse or refresh, not {s['mode']!r}")
     path = root / ".personal-denylist"
     how = f" Refresh it: {s['refresh']}" if s["refresh"] else " Set [denylist] refresh in lint.toml to name the refresh command."
-    if not path.exists():
-        return [f".personal-denylist is missing: bare ids are not checked.{how}"], s["mode"] == "refuse"
-    age = ((now if now is not None else time.time()) - path.stat().st_mtime) / 3600
-    if s["max_age_hours"] and age > s["max_age_hours"]:
-        return [f".personal-denylist is {age:.0f}h old (max {s['max_age_hours']}h): new ids are not checked.{how}"], s["mode"] == "refuse"
-    return [], False
+
+    def problem(at: float | None) -> str | None:
+        if not path.exists():
+            return f".personal-denylist is missing: bare ids are not checked.{how}"
+        age = ((at if at is not None else time.time()) - path.stat().st_mtime) / 3600
+        if s["max_age_hours"] and age > s["max_age_hours"]:
+            return f".personal-denylist is {age:.0f}h old (max {s['max_age_hours']}h): new ids are not checked.{how}"
+        return None
+
+    found = problem(now)
+    if found is None:
+        return [], False
+    if s["mode"] != "refresh":
+        return [found], s["mode"] == "refuse"
+    if not s["refresh"]:
+        return [found, "[denylist] mode is refresh but refresh names no command."], True
+    r = subprocess.run(s["refresh"], shell=True, cwd=root, capture_output=True, text=True)
+    if r.returncode != 0:
+        tail = (r.stderr or r.stdout).strip().splitlines()[-3:]
+        return [found, f"The refresh failed (exit {r.returncode}): " + " | ".join(tail)], True
+    after = problem(None)
+    if after is not None:
+        return [after, "The refresh ran but did not renew the list."], True
+    return [".personal-denylist was stale or missing and has been refreshed."], False
 
 
 def denylist(root: Path) -> tuple[list[re.Pattern[str]], set[str]]:

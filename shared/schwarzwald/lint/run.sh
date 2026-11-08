@@ -132,13 +132,13 @@ fi
 
 # The shared lints, each proved on its red case by red.py.
 lint="${part}/lint"
-for rule in internal-refs personal-data own-shas actions-pin dash-standins make-targets file-length script-orphans docs-a11y changelog; do
+for rule in internal-refs personal-data own-shas actions-pin dash-standins make-targets file-length script-orphans docs-a11y changelog commit-dates; do
   [[ -f ${lint}/${rule}.py ]] && run "${rule}" "${py}" "install python 3.11" "${py}" "${lint}/${rule}.py" --repo .
 done
 [[ -f ${lint}/red.py ]] && run lint-red "${py}" "install python 3.11" "${py}" "${lint}/red.py" --repo .
 [[ -f ${lint}/run_test.sh ]] && run run-drift-step bash "install bash" bash "${lint}/run_test.sh"
 [[ -f ${part}/hooks/commit-msg_test.sh ]] && run commit-msg-hook bash "install bash" bash "${part}/hooks/commit-msg_test.sh"
-for t in author-guard stale-index markdown-staged; do
+for t in author-guard stale-index markdown-staged commit-dates; do
   [[ -f ${part}/hooks/${t}_test.sh ]] && run "${t}-hook" bash "install bash" bash "${part}/hooks/${t}_test.sh"
 done
 [[ -f ${part}/guards/tests/suite.sh ]] && run guards bash "install bash" bash "${part}/guards/tests/suite.sh"

@@ -1,0 +1,4 @@
+[denylist]
+max_age_hours = 24
+mode = "refresh"
+refresh = "echo the tracker is unreachable >&2; exit 2"

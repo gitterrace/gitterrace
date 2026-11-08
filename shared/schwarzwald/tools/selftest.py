@@ -54,7 +54,8 @@ def land_cases(d: Path) -> list[str]:
     git(d, "clone", "-q", str(main), str(clone))
     good = commit(clone, "b.txt", "b\n", "feat: b\n\nThe b file.")
     fix = commit(clone, "c.txt", "c\n", "fixup! feat: b")
-    land = ["bash", str(HERE / "land.sh"), str(main), str(clone)]
+    # The fixture has no land.toml, so the landing gate is opted out of explicitly.
+    land = ["bash", str(HERE / "land.sh"), "--no-gate", str(main), str(clone)]
     r = run(*land, good)
     if r.returncode != 0 or git(main, "log", "-1", "--format=%B") != "feat: b\n\nThe b file.":
         bad.append(f"land.sh did not land a clean commit with its message: {r.stderr.strip()}")

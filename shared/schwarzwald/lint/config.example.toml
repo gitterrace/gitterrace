@@ -78,10 +78,14 @@ floor_gib = 50
 types = ["feat", "fix", "docs", "style", "refactor", "perf", "test", "build", "ci", "chore", "revert"]
 # <prefix>ALLOW_FREE_SUBJECT=1 overrides the subject form.
 allow_prefix = "SCHWARZWALD_"
+# The branch hooks/commit-dates.sh (a reference-transaction hook) keeps in landing order.
+main = "main"
 
 [denylist]
 # The local .personal-denylist is seeded once and the tracker grows: past max_age_hours (0 = never)
-# or when missing, internal-refs prints `refresh` and, in mode "refuse", fails. mode: warn | refuse.
+# or when missing, internal-refs prints `refresh` and, in mode "refuse", fails. mode: warn | refuse
+# | refresh. In "refresh" the check runs `refresh` itself from the repository root and fails only
+# when that command fails or leaves the list missing or stale: as strict, without blocking on age.
 max_age_hours = 168
 mode = "warn"
 # The product's command that rewrites the list. It must MERGE (tools/denylist-merge.py: the union

@@ -14,11 +14,16 @@
 # the landed log: sha, author|committer identity, the dates and the subject.
 # Exit: 0 landed or already there, 1 refused, 2 conflict, 3 partial step.
 #
+# Both modes build the result in a temporary clone and run the product's gate there before main
+# moves, by a fast-forward only, so a red gate leaves main untouched.
+#
 # Plan mode: plan lines are `<sha> [fold]` (fold squashes into the previous commit and keeps its
 # message). The clone's HEAD must be the plan's last sha and <base> must be main's tip, else the
 # plan is stale. The commits are rebuilt on <base> in a temporary clone with author date =
 # committer date = landing time, +1 s per commit, one identity from git config. The rebuilt tree
-# must equal the clone's HEAD tree. Then the product's gate runs in the rebuilt clone: the
+# must equal the clone's HEAD tree.
+#
+# The gate, in both modes: the
 # config/schwarzwald/land.toml `[landing]` table, `gate = [cmds]` and `messages = "cmd {base}"`
 # ({base} is the real base sha), each through bash -c. No file or no [landing] table prints
 # "landing gate: none configured" and refuses unless --no-gate is given. The product's full scripts/land-check.sh runs only with --full-gate (as the gate, and as
@@ -67,6 +72,44 @@ c = tomllib.load(open(sys.argv[1], "rb")).get("landing")
 if c is None: sys.exit(0)
 for g in c.get("gate", []): sys.stdout.write(g + "\0")
 sys.stdout.write("--\0" + c.get("messages", "") + "\0")' "$1/config/schwarzwald/land.toml"
+}
+
+# gate_env <cmd...>: run a gate command without the identity and dates this tool sets for its
+# own commits. A gate that makes fixture commits would otherwise get the lander's identity and
+# different shas than on the product's own runs.
+gate_env() {
+  env -u GIT_AUTHOR_NAME -u GIT_AUTHOR_EMAIL -u GIT_AUTHOR_DATE \
+    -u GIT_COMMITTER_NAME -u GIT_COMMITTER_EMAIL -u GIT_COMMITTER_DATE -u LAND_TOOL "$@"
+}
+
+# run_gate <base>: the product's gate, in the current directory (a temporary clone holding the
+# result exactly as main would get it). Exits refusing on a red gate, or on no gate without
+# --no-gate.
+run_gate() {
+  local base=$1 item g out seen=0 msgcmd="" hooks
+  local -a gates=()
+  # A fresh clone has no core.hooksPath. A gate that checks the hooks are wired would refuse every
+  # landing, so the target repository's setting is carried over. It is set here, after the
+  # landing commits, so the hooks judge only what the gate runs.
+  hooks=$(git -C "$repo" config --get core.hooksPath 2>/dev/null || true)
+  [ -z "$hooks" ] || git config core.hooksPath "$hooks"
+  while IFS= read -r -d '' item; do
+    if [ "$seen" = 0 ] && [ "$item" = -- ]; then seen=1; elif [ "$seen" = 0 ]; then gates+=("$item"); else msgcmd=$item; fi
+  done < <(landing_cfg "$PWD")
+  if [ "$seen" = 0 ]; then
+    echo "landing gate: none configured (config/schwarzwald/land.toml [landing] is missing)" >&2
+    [ "$no_gate" = 1 ] || { echo "refused: no landing gate. Add [landing] to config/schwarzwald/land.toml, or pass --no-gate." >&2; exit 1; }
+  fi
+  for g in "${gates[@]+"${gates[@]}"}"; do
+    out=$(gate_env bash -c "$g" 2>&1) || { echo "refused: the product gate failed ($g):" >&2; printf '%s\n' "$out" | tail -5 >&2; exit 1; }
+  done
+  if [ -n "$msgcmd" ]; then
+    out=$(gate_env bash -c "${msgcmd//\{base\}/$base}" 2>&1) || { echo "refused: the message gate failed:" >&2; printf '%s\n' "$out" | tail -5 >&2; exit 1; }
+  fi
+  if [ "$full_gate" = 1 ] && [ -f scripts/land-check.sh ]; then
+    out=$(gate_env bash scripts/land-check.sh 2>&1) || { echo "refused: the full product gate failed:" >&2; printf '%s\n' "$out" | tail -5 >&2; exit 1; }
+    out=$(gate_env bash scripts/land-check.sh --messages "$base" 2>&1) || { echo "refused: the message gate failed:" >&2; printf '%s\n' "$out" | tail -5 >&2; exit 1; }
+  fi
 }
 
 cd "$repo"
@@ -127,24 +170,7 @@ if [ "$plan_mode" = 1 ]; then
     GIT_AUTHOR_DATE=$stamp GIT_COMMITTER_DATE=$stamp git commit -q --amend --no-edit --no-verify --date="$stamp"
   done <"$plan"
   [ "$(git rev-parse 'HEAD^{tree}')" = "$(git -C "$clone" rev-parse "$old^{tree}")" ] || { echo "refused: the rebuilt tree differs from the plan's tree" >&2; exit 1; }
-  gates=() msgcmd="" seen=0
-  while IFS= read -r -d '' item; do
-    if [ "$seen" = 0 ] && [ "$item" = -- ]; then seen=1; elif [ "$seen" = 0 ]; then gates+=("$item"); else msgcmd=$item; fi
-  done < <(landing_cfg "$PWD")
-  if [ "$seen" = 0 ]; then
-    echo "landing gate: none configured (config/schwarzwald/land.toml [landing] is missing)" >&2
-    [ "$no_gate" = 1 ] || { echo "refused: no landing gate. Add [landing] to config/schwarzwald/land.toml, or pass --no-gate." >&2; exit 1; }
-  fi
-  for g in "${gates[@]+"${gates[@]}"}"; do
-    out=$(bash -c "$g" 2>&1) || { echo "refused: the product gate failed ($g):" >&2; printf '%s\n' "$out" | tail -5 >&2; exit 1; }
-  done
-  if [ -n "$msgcmd" ]; then
-    out=$(bash -c "${msgcmd//\{base\}/$base}" 2>&1) || { echo "refused: the message gate failed:" >&2; printf '%s\n' "$out" | tail -5 >&2; exit 1; }
-  fi
-  if [ "$full_gate" = 1 ] && [ -f scripts/land-check.sh ]; then
-    out=$(bash scripts/land-check.sh 2>&1) || { echo "refused: the full product gate failed:" >&2; printf '%s\n' "$out" | tail -5 >&2; exit 1; }
-    out=$(bash scripts/land-check.sh --messages "$base" 2>&1) || { echo "refused: the message gate failed:" >&2; printf '%s\n' "$out" | tail -5 >&2; exit 1; }
-  fi
+  run_gate "$base"
   new=$(git rev-parse HEAD)
   cd "$repo"
   [ -z "$(git status --porcelain)" ] || { echo "main tree is dirty" >&2; exit 1; }
@@ -177,17 +203,30 @@ last=$(git log -1 --format=%ct)
 [ "$now" -gt "$last" ] || now=$((last + 1))
 zone=$(date +%z)
 name=$(git log -1 --format=%an "$full") email=$(git log -1 --format=%ae "$full")
+# The landing is built and gated in a temporary clone of main; main moves only by a fast-forward
+# once the gate is green, so a red gate leaves it untouched.
+tmp=$(mktemp -d); trap 'rm -rf "$tmp"' EXIT
+git clone -q --no-hardlinks "$repo" "$tmp/w"
+if [ -f .personal-denylist ]; then cp .personal-denylist "$tmp/w/"; fi
+cd "$tmp/w"
+git fetch -q "$repo" "$full"
+git checkout -q --detach "$before"
 if ! git cherry-pick --no-commit "$full" >/dev/null 2>&1; then
-  git cherry-pick --abort 2>/dev/null || git reset -q --hard "$before"
-  echo "conflict: rebase $sha onto main $(git rev-parse --short HEAD) first" >&2; exit 2
+  echo "conflict: rebase $sha onto main $(git -C "$repo" rev-parse --short HEAD) first" >&2; exit 2
 fi
 # The message goes through -F, not -C: -C would keep the old author date.
 git log -1 --format=%B "$full" | LAND_TOOL=1 GIT_AUTHOR_NAME=$name GIT_AUTHOR_EMAIL=$email \
   GIT_COMMITTER_NAME=$name GIT_COMMITTER_EMAIL=$email \
   GIT_AUTHOR_DATE="$now $zone" GIT_COMMITTER_DATE="$now $zone" \
   git commit -q --no-verify --cleanup=whitespace -F -
-new=$(git rev-parse --short HEAD)
 [ "$(git rev-parse HEAD^)" = "$before" ] || { echo "unexpected parent" >&2; exit 1; }
+run_gate "$before"
+landed=$(git rev-parse HEAD)
+cd "$repo"
+[ -z "$(git status --porcelain)" ] || { echo "main tree is dirty" >&2; exit 1; }
+git fetch -q "$tmp/w" "$landed"
+git merge -q --ff-only "$landed" >/dev/null 2>&1 || { echo "refused: main moved during the gate, not a fast-forward" >&2; exit 1; }
+new=$(git rev-parse --short HEAD)
 git rev-parse HEAD >>"$ledger"
 if [ "$lands_only" = 1 ]; then git rev-parse HEAD >"$tipfile"; fi
 echo "landed $sha as $new"

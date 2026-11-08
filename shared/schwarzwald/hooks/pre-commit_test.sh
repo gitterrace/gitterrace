@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# The pre-commit hook, opt-in through MAIN_CHECKOUT_LANDS_ONLY=1 in config/schwarzwald/guards.env:
-# the main checkout refuses a commit without LAND_TOOL=1, a linked worktree never does, and with
-# the flag off nothing fires. Runs in a throwaway repository.
+# The pre-commit hook, opt-in through MAIN_CHECKOUT_LANDS_ONLY=1 in config/schwarzwald/guards.env
+# plus the local landing.target marker: only the marked checkout refuses a commit without
+# LAND_TOOL=1. A full clone of the same repository and a linked worktree never do, and with the flag
+# off nothing fires. Runs in a throwaway repository.
 #
 #   bash hooks/pre-commit_test.sh
 #   HOOK=/path/to/always-pass.sh bash hooks/pre-commit_test.sh   # must FAIL
@@ -17,6 +18,7 @@ git -C "$d" init -q -b main
 git -C "$d" -c user.name=t -c user.email=t@example.invalid commit -q --allow-empty -m init
 mkdir -p "$d/config/schwarzwald"
 git -C "$d" worktree add -q "$d/wt" -b side
+git -C "$d" config --local landing.target "$d"
 fail=0
 # expect <label> <ok|refused> <dir> [env...]
 expect() {
@@ -30,6 +32,21 @@ mkdir -p "$d/wt/config/schwarzwald"; cp "$d/config/schwarzwald/guards.env" "$d/w
 expect "flag on, main checkout, no stamp is refused" refused "$d" X=1
 expect "flag on, main checkout, LAND_TOOL=1 passes" ok "$d" LAND_TOOL=1
 expect "flag on, linked worktree passes" ok "$d/wt" X=1
+# The flag is tracked, so every clone carries it: a clone without the local marker commits freely,
+# and the same clone refuses once it is marked.
+git -C "$d" -c user.name=t -c user.email=t@example.invalid commit -q --allow-empty -m flag
+c="$d-clone"
+git clone -q "$d" "$c"
+mkdir -p "$c/config/schwarzwald"
+cp "$d/config/schwarzwald/guards.env" "$c/config/schwarzwald/"
+expect "flag on, a full clone without the marker passes" ok "$c" X=1
+git -C "$c" config --local landing.target "$c"
+expect "flag on, the same clone once marked is refused" refused "$c" X=1
+git -C "$c" config --local landing.target "$d"
+expect "flag on, a marker naming another checkout passes" ok "$c" X=1
+git -C "$d" config --local --unset landing.target
+expect "flag on, the main checkout without the marker passes" ok "$d" X=1
+git -C "$d" config --local landing.target "$d"
 # Every spelling the config shape allows turns the check on; 0 in each turns it off.
 for v in "'1'" '"1"' '1' '"${MAIN_CHECKOUT_LANDS_ONLY:-1}"'; do
   printf 'GUARD_PRODUCT=%s\nMAIN_CHECKOUT_LANDS_ONLY=%s\n' "'t'" "$v" >"$d/config/schwarzwald/guards.env"

@@ -198,12 +198,22 @@ t ALLOW git_stash "$REPO" bash '{"command":"python3 .runs/sc-stash.py"}' "a pyth
     printf 'pkill -f "x.app/Contents/MacOS/x"\n'
 } >"$REPO/.runs/sc-big.sh"
 _sc_now() { perl -MTime::HiRes=time -e 'printf "%d\n", time * 1000'; }
-_sc_t0=$(_sc_now)
-t ADVISE broad_process_kill "$REPO" bash '{"command":"bash .runs/sc-kill.sh"}' "a small script with a broad pkill, the timing baseline"
-_sc_small=$(($(_sc_now) - _sc_t0))
-_sc_t0=$(_sc_now)
-t ADVISE broad_process_kill "$REPO" bash '{"command":"bash .runs/sc-big.sh"}' "a script near the size cap with a broad pkill on its last line"
-_sc_big=$(($(_sc_now) - _sc_t0))
+# The faster of two calls per script: a load spike during one call cannot fail the case.
+_sc_best() {
+    local best="" a d label="$2"
+    for _ in 1 2; do
+        a=$(_sc_now)
+        t ADVISE broad_process_kill "$REPO" bash "{\"command\":\"bash .runs/$1\"}" "$label"
+        d=$(($(_sc_now) - a))
+        [ -z "$best" ] || [ "$d" -lt "$best" ] && best=$d
+        label="$label (again)"
+    done
+    _sc_ms=$best
+}
+_sc_best sc-kill.sh "a small script with a broad pkill, the timing baseline"
+_sc_small=$_sc_ms
+_sc_best sc-big.sh "a script near the size cap with a broad pkill on its last line"
+_sc_big=$_sc_ms
 # A ratio, not a wall-clock budget: load slows both calls alike. Linear reading keeps the big
 # script within a few times the small one. The quadratic join ran it 20 times slower and more.
 _assert yes "$([ "$_sc_big" -le $((_sc_small * 8 + 500)) ] && echo yes || echo no)" \

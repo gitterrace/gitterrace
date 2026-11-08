@@ -31,10 +31,10 @@ SCRIPTS = {
 }
 
 
-def git(root: Path, *args: str) -> str:
+def git(root: Path, *args: str, env_extra: dict[str, str] | None = None) -> str:
     # A hook runs us with GIT_DIR and GIT_INDEX_FILE set: inherited, they point `git init` in a
     # scratch dir at the real repository and re-initialize it as bare.
-    env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+    env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")} | (env_extra or {})
     return subprocess.run(["git", "-C", str(root), *args], capture_output=True, text=True, check=True,
                           env=env).stdout
 
@@ -56,6 +56,15 @@ def run_case(rule: str, case: Path, product: Path | None) -> int:
         if old.exists():
             old.unlink()
             os.utime(root / ".personal-denylist", (1, 1))
+        if (root / "backdated.marker").exists():  # marker: one more commit whose author date is older
+            (root / "backdated.marker").unlink()
+            git(root, "-c", "user.name=t", "-c", "user.email=t@example.invalid", "commit", "-qam",
+                "case: backdated", env_extra={"GIT_AUTHOR_DATE": "2000-01-01T00:00:00Z"})
+        if (root / "inverted.marker").exists():  # marker: one more commit dated before its parent
+            (root / "inverted.marker").unlink()
+            old_date = {"GIT_AUTHOR_DATE": "2000-01-01T00:00:00Z", "GIT_COMMITTER_DATE": "2000-01-01T00:00:00Z"}
+            git(root, "-c", "user.name=t", "-c", "user.email=t@example.invalid", "commit", "-qam",
+                "case: inverted", env_extra=old_date)
         head = git(root, "rev-parse", "HEAD").strip()
         for f in root.rglob("*"):
             if f.is_file() and ".git" not in f.parts and "{HEAD}" in f.read_text(errors="replace"):
@@ -92,13 +101,15 @@ def main(argv: list[str]) -> int:
         if not (CASES / rule / "red").is_dir():
             continue
         reds = {d.name: run_case(rule, d, product) for d in sorted((CASES / rule).glob("red*")) if d.is_dir()}
-        green = run_case(rule, CASES / rule / "green", product)
+        greens = {d.name: run_case(rule, d, product) for d in sorted((CASES / rule).glob("green*")) if d.is_dir()}
         for name, code in reds.items():
             if code != 1:
                 bad.append(f"{rule}: its {name} case exits {code}, must fail with 1")
+        for name, code in greens.items():
+            if code != 0:
+                bad.append(f"{rule}: its {name} case exits {code}, must pass")
         red = 1 if all(c == 1 for c in reds.values()) else sorted(c for c in reds.values() if c != 1)[0]
-        if green != 0:
-            bad.append(f"{rule}: its green case exits {green}, must pass")
+        green = 0 if all(c == 0 for c in greens.values()) else sorted(c for c in greens.values() if c)[0]
         print(f"{'OK ' if red == 1 and green == 0 else 'RED'} {SCRIPTS[rule]}: red exits {red}, green exits {green}")
     for b in bad:
         print(f"FAIL {b}")

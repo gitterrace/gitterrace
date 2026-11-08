@@ -1,17 +1,24 @@
 #!/usr/bin/env bash
-# Opt-in: with MAIN_CHECKOUT_LANDS_ONLY=1 in config/schwarzwald/guards.env, the main (non-worktree)
-# checkout refuses a commit unless the land tool's stamp LAND_TOOL=1 is in the environment.
-# Linked worktrees and products without the flag are never refused.
+# Opt-in, in two parts. The product turns the rule on with MAIN_CHECKOUT_LANDS_ONLY=1 in its tracked
+# config/schwarzwald/guards.env. The one checkout that takes landings marks itself once with
+# `git config --local landing.target "$(git rev-parse --show-toplevel)"`. That lives in its own
+# .git/config, so a clone never inherits it, and it names the path, so a linked worktree sharing
+# that .git/config is not matched either. Only the marked checkout refuses a commit without the
+# land tool's stamp LAND_TOOL=1. A lane, a full clone or a linked worktree, is never refused.
 set -euo pipefail
 top=$(git rev-parse --show-toplevel)
+target=$(git config --local landing.target 2>/dev/null || true)
+[[ -n $target && $(cd "$target" 2>/dev/null && pwd -P) == "$(cd "$top" && pwd -P)" ]] || exit 0
 env_file="$top/config/schwarzwald/guards.env"
 [[ -f $env_file ]] || exit 0
 # Read through the guards' own loader, so every spelling the config shape allows counts.
 # shellcheck source=/dev/null
-. "$(dirname "${BASH_SOURCE[0]}")/../guards/config.sh" || { echo "pre-commit: cannot load guards/config.sh beside it" >&2; exit 1; }
+. "$(dirname "${BASH_SOURCE[0]}")/../guards/config.sh" || {
+  echo "pre-commit: cannot load guards/config.sh beside it" >&2
+  exit 1
+}
 guard_config_value "$env_file" MAIN_CHECKOUT_LANDS_ONLY
 [[ $GUARD_CONFIG_VALUE == 1 ]] || exit 0
-[[ $(git rev-parse --git-dir) == "$(git rev-parse --git-common-dir)" ]] || exit 0
 [[ ${LAND_TOOL:-} == 1 ]] && exit 0
-echo "pre-commit: refused. This checkout takes landings only (MAIN_CHECKOUT_LANDS_ONLY=1): commit in a worktree and land it with land.sh." >&2
+echo "pre-commit: refused. This checkout takes landings only (MAIN_CHECKOUT_LANDS_ONLY=1, landing.target set): commit in a lane and land it with land.sh." >&2
 exit 1

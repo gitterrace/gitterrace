@@ -34,7 +34,7 @@ run() {
   if [[ $rc == "$want" && $err == *"$needle"* ]]; then echo "ok   $label"; else
     echo "FAIL $label (want rc=$want '$needle', got rc=$rc: $err)"; fail=1; fi
 }
-one() { run "$1" "$2" "$3" "$t/main" "$t/clone" "$sha"; }
+one() { run "$1" "$2" "$3" --no-gate "$t/main" "$t/clone" "$sha"; }
 # plan <base> <sha-lines...>: write the plan file
 plan() { local base=$1; shift; printf '%s\n' "$@" >"$t/plan"; planbase=$base; }
 runplan() { run "$1" "$2" "$3" --no-gate --plan "$t/main" "$t/clone" "$planbase" "$t/plan"; }
@@ -170,6 +170,45 @@ setup on
 echo z >"$t/main/z"; git -C "$t/main" add z; LAND_TOOL=1 $G -C "$t/main" commit -q -m "feat(x): moved"
 one "a clone behind main is refused" 1 "rebase onto main"
 setup on
-out=$(bash "$LAND" "$t/main" "$t/clone" "$sha" 2>&1)
+out=$(bash "$LAND" --no-gate "$t/main" "$t/clone" "$sha" 2>&1)
 check "the landed log shows identities, dates and subject" test "$(printf '%s\n' "$out" | tail -1 | grep -c 't <t@example.invalid>|t <t@example.invalid> .*|.* feat(x): second')" = 1
+# 12: single mode runs the same gate on the landed result, and a red gate leaves main untouched.
+# The gate here fails when the result holds a file that only main's tip has: green on the commit's
+# own base, red once landed, the stale-golden shape.
+single_gate() { # single_gate <gate-cmd> <messages-cmd>: main carries land.toml, the clone a change
+  setup off
+  printf '[landing]\ngate = ["%s"]\nmessages = "%s"\n' "$1" "$2" >"$t/main/config/schwarzwald/land.toml"
+  git -C "$t/main" add -A; LAND_TOOL=1 $G -C "$t/main" commit -q -m "chore(x): gate"
+  git -C "$t/clone" pull -q --rebase "$t/main" 2>/dev/null; sha=$(head_of clone)
+}
+single_gate "test ! -f b || { echo stale-golden; exit 1; }" "true"
+before=$(head_of main)
+run "single: a red gate on the landed result is refused" 1 "stale-golden" "$t/main" "$t/clone" "$sha"
+check "single: a red gate leaves main untouched" test "$(head_of main)" = "$before"
+check "single: a red gate leaves the main tree clean" test -z "$(git -C "$t/main" status --porcelain)"
+single_gate "true" "echo msg-broke-{base}; exit 1"
+run "single: a red message gate is refused, with the base" 1 "msg-broke-$(head_of main)" "$t/main" "$t/clone" "$sha"
+single_gate "true" "true"
+run "single: a green gate lands" 0 "" "$t/main" "$t/clone" "$sha"
+check "single: the landed commit is main's tip" test "$(git -C "$t/main" log -1 --format=%s)" = "feat(x): second"
+setup off
+run "single: no land.toml is refused" 1 "landing gate: none configured" "$t/main" "$t/clone" "$sha"
+# 13: a gate runs with the product's own git identity, not the one land.sh sets for its commits:
+# a gate that makes fixture commits would otherwise see other shas.
+leak='test -z ${GIT_AUTHOR_NAME:-}${GIT_AUTHOR_DATE:-}${GIT_COMMITTER_NAME:-}${GIT_COMMITTER_DATE:-}${LAND_TOOL:-} || { echo identity-leaked; exit 1; }'
+single_gate "$leak" "true"
+run "single: a gate does not inherit land.sh's identity and dates" 0 "" "$t/main" "$t/clone" "$sha"
+plan_setup on
+mkdir -p "$t/clone/config/schwarzwald"
+printf '[landing]\ngate = ["%s"]\nmessages = "true"\n' "$leak" >"$t/clone/config/schwarzwald/land.toml"
+git -C "$t/clone" add config; $G -C "$t/clone" commit -q -m "feat(x): gate leak"
+plan "$base" "$s1" "$s2" "$s3" "$(head_of clone)"
+run "plan: a gate does not inherit land.sh's identity and dates" 0 "" --plan "$t/main" "$t/clone" "$planbase" "$t/plan"
+# 14: a gate that checks the hooks are wired sees the target repository's core.hooksPath
+hookgate='test \"$(git config --get core.hooksPath)\" = scripts/hooks || { echo hooks-unwired; exit 1; }'
+single_gate "$hookgate" "true"
+git -C "$t/main" config core.hooksPath scripts/hooks
+run "single: the gate sees the target's core.hooksPath" 0 "" "$t/main" "$t/clone" "$sha"
+single_gate "$hookgate" "true"
+run "single: without core.hooksPath on the target the gate sees none" 1 "hooks-unwired" "$t/main" "$t/clone" "$sha"
 exit "$fail"
