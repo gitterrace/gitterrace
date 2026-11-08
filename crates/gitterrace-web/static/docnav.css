@@ -53,3 +53,11 @@ html:has(section.file>header){scroll-padding-top:calc(40px + var(--space-2))}
 @media (max-width:1100px){.outline-cols{grid-template-columns:minmax(0,1fr)}.outline.rail{display:none}.outline-cols .outline.menu,main>.head>.outline.menu{display:block}}
 @media (min-width:1101px){.outline-cols .outline.menu{display:none}}
 @media print{.outline{display:none!important}}
+/* The kind of a source file's symbol before its name: a quiet mono label in a column as wide
+   as the outline's longest label, so the names line up. The full word is in the hidden text. */
+.outline ol.kinds a{display:flex;gap:var(--space-2);min-width:0}
+.oname{min-width:0;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;
+  line-clamp:2;overflow:hidden;overflow-wrap:anywhere}
+.okind{flex:none;width:var(--kw);color:var(--muted);
+  font:var(--weight-regular) var(--text-xs)/1.7 var(--mono)}
+.kw2{--kw:2ch}.kw3{--kw:3ch}.kw4{--kw:4ch}.kw5{--kw:5ch}.kw6{--kw:6ch}

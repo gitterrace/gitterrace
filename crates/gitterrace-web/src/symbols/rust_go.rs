@@ -1,5 +1,6 @@
 //! Rust and Go declarations from the shared token walk.
 
+use crate::symbols::SymbolKind;
 use crate::symbols::lex::Kind;
 use crate::symbols::walk::Walk;
 
@@ -19,30 +20,37 @@ pub(crate) fn rust(w: &mut Walk<'_>) {
             continue;
         }
         let named = match w.text(t) {
-            "fn" | "struct" | "enum" | "union" | "type" => true,
+            "fn" if w.in_class_body() => Some(SymbolKind::Method),
+            "fn" => Some(SymbolKind::Function),
+            "struct" => Some(SymbolKind::Struct),
+            "enum" => Some(SymbolKind::Enum),
+            "union" => Some(SymbolKind::Union),
+            "type" => Some(SymbolKind::Type),
             "trait" => {
                 w.pending = Some(true);
-                true
+                Some(SymbolKind::Trait)
             }
             "mod" => {
                 w.pending = Some(false);
-                true
+                Some(SymbolKind::Module)
             }
             "macro_rules" if w.punct(i + 1) == Some(b'!') => {
                 if let Some(name) = w.word(i + 2) {
-                    w.emit(name.to_owned(), i + 2);
+                    w.emit(name.to_owned(), i + 2, SymbolKind::Macro);
                 }
-                false
+                None
             }
             "impl" if item_start(w, i) => {
                 rust_impl(w, i);
-                false
+                None
             }
-            _ => false,
+            _ => None,
         };
         // `union` is also an ordinary identifier: a type needs a name right after it.
-        if named && let Some(name) = w.word(i + 1) {
-            w.emit(name.trim_start_matches("r#").to_owned(), i + 1);
+        if let Some(kind) = named
+            && let Some(name) = w.word(i + 1)
+        {
+            w.emit(name.trim_start_matches("r#").to_owned(), i + 1, kind);
         }
     }
 }
@@ -70,7 +78,7 @@ fn pub_paren(w: &Walk<'_>, k: usize) -> bool {
     })
 }
 
-/// `impl<G> Trait for Type where ... {`: listed as `impl Trait for Type`, a container.
+/// `impl<G> Trait for Type where ... {`: listed as `Trait for Type` of kind impl, a container.
 fn rust_impl(w: &mut Walk<'_>, at: usize) {
     let mut k = at + 1;
     if w.punct(k) == Some(b'<') {
@@ -93,7 +101,7 @@ fn rust_impl(w: &mut Walk<'_>, at: usize) {
     }
     let (a, b) = (w.toks[from].start as usize, w.toks[k - 1].end as usize);
     let label: String = w.src[a..b].split_whitespace().collect::<Vec<_>>().join(" ");
-    w.emit(format!("impl {label}"), at);
+    w.emit(label, at, SymbolKind::Impl);
     w.pending = Some(true);
 }
 
@@ -122,7 +130,7 @@ pub(crate) fn go(w: &mut Walk<'_>) {
                         Kind::Punct(b'(' | b'[' | b'{') => depth += 1,
                         Kind::Punct(b')' | b']' | b'}') => depth = depth.saturating_sub(1),
                         Kind::Ident if depth == 0 && w.toks[k - 1].line < tk.line => {
-                            w.emit(w.text(tk).to_owned(), k);
+                            w.emit(w.text(tk).to_owned(), k, SymbolKind::Type);
                         }
                         _ => {}
                     }
@@ -131,7 +139,7 @@ pub(crate) fn go(w: &mut Walk<'_>) {
             }
             "type" => {
                 if let Some(name) = w.word(i + 1) {
-                    w.emit(name.to_owned(), i + 1);
+                    w.emit(name.to_owned(), i + 1, SymbolKind::Type);
                 }
             }
             _ => {}
@@ -141,7 +149,7 @@ pub(crate) fn go(w: &mut Walk<'_>) {
 
 fn go_func(w: &mut Walk<'_>, at: usize) {
     if let Some(name) = w.word(at + 1) {
-        w.emit(name.to_owned(), at + 1);
+        w.emit(name.to_owned(), at + 1, SymbolKind::Function);
         return;
     }
     if w.punct(at + 1) != Some(b'(') {
@@ -159,6 +167,6 @@ fn go_func(w: &mut Walk<'_>, at: usize) {
         }
     }
     if let (Some(recv), Some(name)) = (recv, w.word(end)) {
-        w.emit(format!("{recv}.{name}"), end);
+        w.emit(format!("{recv}.{name}"), end, SymbolKind::Method);
     }
 }

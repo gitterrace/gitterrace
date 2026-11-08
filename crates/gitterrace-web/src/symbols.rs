@@ -22,6 +22,68 @@ pub(crate) struct Symbol {
     pub(crate) name: String,
     pub(crate) line: u32,
     pub(crate) depth: u8,
+    /// What it declares, from the keyword the scanner matched. `None` when no keyword says.
+    pub(crate) kind: Option<SymbolKind>,
+}
+
+/// What a symbol declares: the outline shows it as a short label and speaks the full word.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum SymbolKind {
+    Function,
+    /// A function in a class, trait or impl body, or a Go function with a receiver.
+    Method,
+    Struct,
+    Enum,
+    Union,
+    Trait,
+    Impl,
+    Class,
+    Interface,
+    /// A type alias or a Go type declaration.
+    Type,
+    Module,
+    Namespace,
+    Macro,
+}
+
+impl SymbolKind {
+    /// The short label the outline shows, as the language spells it.
+    pub(crate) const fn label(self) -> &'static str {
+        match self {
+            Self::Function => "fn",
+            Self::Method => "method",
+            Self::Struct => "struct",
+            Self::Enum => "enum",
+            Self::Union => "union",
+            Self::Trait => "trait",
+            Self::Impl => "impl",
+            Self::Class => "class",
+            Self::Interface => "iface",
+            Self::Type => "type",
+            Self::Module => "mod",
+            Self::Namespace => "ns",
+            Self::Macro => "macro",
+        }
+    }
+
+    /// The full word, for assistive tech and the outline filter.
+    pub(crate) const fn spoken(self) -> &'static str {
+        match self {
+            Self::Function => "function",
+            Self::Method => "method",
+            Self::Struct => "struct",
+            Self::Enum => "enum",
+            Self::Union => "union",
+            Self::Trait => "trait",
+            Self::Impl => "implementation",
+            Self::Class => "class",
+            Self::Interface => "interface",
+            Self::Type => "type",
+            Self::Module => "module",
+            Self::Namespace => "namespace",
+            Self::Macro => "macro",
+        }
+    }
 }
 
 /// Which scanner reads a language.
@@ -77,7 +139,7 @@ pub(crate) fn outline(path: &str, text: &str, lines: usize) -> Vec<OutlineItem> 
             id: format!("L{}", s.line),
             text: s.name,
             chrome: true,
-            symbol: true,
+            kind: s.kind,
         })
         .collect()
 }

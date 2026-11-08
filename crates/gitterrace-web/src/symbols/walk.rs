@@ -5,8 +5,8 @@
 //! class or namespace body. A function inside a function body is a detail, not an outline
 //! entry, so it is skipped with the body.
 
-use crate::symbols::Symbol;
 use crate::symbols::lex::{Dialect, Kind, Tok, tokens};
+use crate::symbols::{Symbol, SymbolKind};
 
 /// One open bracket: its byte and whether it is a container body.
 #[derive(Clone, Copy)]
@@ -66,11 +66,16 @@ impl<'a> Walk<'a> {
         u8::from(!self.stack.is_empty())
     }
 
-    /// Lists `name`, declared at token `at`, at the current nesting.
-    pub(crate) fn emit(&mut self, name: String, at: usize) {
+    /// Lists `name`, a `kind` declared at token `at`, at the current nesting.
+    pub(crate) fn emit(&mut self, name: String, at: usize, kind: SymbolKind) {
         let line = self.toks[at].line;
         let depth = self.depth();
-        self.out.push(Symbol { name, line, depth });
+        self.out.push(Symbol {
+            name,
+            line,
+            depth,
+            kind: Some(kind),
+        });
     }
 
     /// The index past a balanced `open ... close` run starting at `k`, which holds `open`.

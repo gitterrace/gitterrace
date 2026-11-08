@@ -4,7 +4,7 @@
 //! docstring or a call's arguments is not one. A function inside a function body is a detail,
 //! as in the brace languages.
 
-use crate::symbols::Symbol;
+use crate::symbols::{Symbol, SymbolKind};
 
 /// Skips string literals and comments: the state carried from one line to the next.
 #[derive(Default)]
@@ -127,6 +127,11 @@ pub(crate) fn symbols(src: &str) -> Vec<Symbol> {
                 name: rest[..len].to_owned(),
                 line: u32::try_from(n + 1).unwrap_or(u32::MAX),
                 depth: u8::from(owner == Some(Block::Class)),
+                kind: Some(match (class, owner) {
+                    (true, _) => SymbolKind::Class,
+                    (false, Some(Block::Class)) => SymbolKind::Method,
+                    (false, _) => SymbolKind::Function,
+                }),
             });
         }
         blocks.push((indent, if class { Block::Class } else { Block::Def }));

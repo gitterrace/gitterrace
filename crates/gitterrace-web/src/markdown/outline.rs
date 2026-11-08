@@ -2,6 +2,8 @@
 
 use askama::Template;
 
+use crate::symbols::SymbolKind;
+
 /// One heading of a document: level 1 to 6, its slug (before `crate::markdown::ids::doc_id`) and
 /// text.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -12,8 +14,8 @@ pub(crate) struct OutlineItem {
     /// A section of the page itself (an insights section), whose id is the page's own and is
     /// linked as is; a document heading's id goes through `doc_id`.
     pub(crate) chrome: bool,
-    /// A symbol of a source file: its list always has the filter, whatever its length.
-    pub(crate) symbol: bool,
+    /// What a source file's symbol declares; `None` for a heading or a page section.
+    pub(crate) kind: Option<SymbolKind>,
 }
 
 impl OutlineItem {
@@ -24,7 +26,7 @@ impl OutlineItem {
             id,
             text: text.to_owned(),
             chrome: false,
-            symbol: false,
+            kind: None,
         }
     }
 }
@@ -56,6 +58,8 @@ struct OutlineLink<'a> {
     depth: u8,
     id: String,
     text: &'a str,
+    /// The short kind label and its spoken word, for a source file's symbol.
+    kind: Option<(&'static str, &'static str)>,
 }
 
 /// The markup, from `outline.html`: the only place that writes an outline.
@@ -68,6 +72,8 @@ struct OutlineMarkup<'a> {
     links: Vec<OutlineLink<'a>>,
     /// Whether the list is long enough for the filter field.
     filter: bool,
+    /// The widest kind label, in characters: the label column's width. 0 without kinds.
+    kind_width: usize,
 }
 
 /// The outline as the rail or the menu, empty below three headings.
@@ -87,14 +93,21 @@ fn outline_html(all: &[OutlineItem], rail: bool, icon_only: bool) -> String {
                 crate::markdown::ids::doc_id(&h.id)
             },
             text: &h.text,
+            kind: h.kind.map(|k| (k.label(), k.spoken())),
         })
-        .collect();
-    let filter = items.len() >= OUTLINE_FILTER_MIN || items.iter().any(|h| h.symbol);
+        .collect::<Vec<_>>();
+    let kind_width = links
+        .iter()
+        .filter_map(|l| l.kind.map(|k| k.0.len()))
+        .max()
+        .unwrap_or(0);
+    let filter = items.len() >= OUTLINE_FILTER_MIN || items.iter().any(|h| h.kind.is_some());
     OutlineMarkup {
         rail,
         icon_only,
         links,
         filter,
+        kind_width,
     }
     .render()
     .unwrap_or_default()

@@ -75,3 +75,39 @@ async fn a_source_file_with_too_few_symbols_has_no_outline() {
     assert!(!body.contains("data-outline"), "two symbols: {body}");
     assert!(!body.contains("outline-cols"), "{body}");
 }
+
+/// A Rust and a Python file's outline names what each symbol is, in the rail and the menu.
+#[tokio::test]
+async fn a_source_page_outline_names_each_symbols_kind() {
+    let dir = tempfile::tempdir().expect("tmp");
+    let p = Fixture::init(&dir.path().join("r"))
+        .write(
+            "src/geo.rs",
+            "pub struct Point;\n\nimpl Point {\n    pub fn new() -> Self { Point }\n}\n",
+        )
+        .write(
+            "tools/r.py",
+            "class Report:\n    def total(self):\n        pass\n\ndef main():\n    pass\n",
+        )
+        .commit("feat: kinds")
+        .path()
+        .to_owned();
+    let app = router(&p, Config::default());
+    let (_, rs) = get(&app, "/blob/HEAD/src/geo.rs").await;
+    for want in [
+        ">struct</span><span class=\"vh\">struct </span><span class=\"oname\">Point<",
+        ">impl</span><span class=\"vh\">implementation </span><span class=\"oname\">Point<",
+        ">method</span><span class=\"vh\">method </span><span class=\"oname\">new<",
+    ] {
+        assert_eq!(rs.matches(want).count(), 2, "rail and menu: {want}\n{rs}");
+    }
+    assert!(rs.contains("title=\"impl Point\""), "{rs}");
+    let (_, py) = get(&app, "/blob/HEAD/tools/r.py").await;
+    for want in [
+        ">class</span><span class=\"vh\">class </span><span class=\"oname\">Report<",
+        ">method</span><span class=\"vh\">method </span><span class=\"oname\">total<",
+        ">fn</span><span class=\"vh\">function </span><span class=\"oname\">main<",
+    ] {
+        assert_eq!(py.matches(want).count(), 2, "rail and menu: {want}\n{py}");
+    }
+}

@@ -1,5 +1,6 @@
 //! TypeScript and JavaScript declarations from the shared token walk.
 
+use crate::symbols::SymbolKind;
 use crate::symbols::lex::Kind;
 use crate::symbols::walk::Walk;
 
@@ -57,7 +58,7 @@ pub(crate) fn script(w: &mut Walk<'_>) {
                     i + 1
                 };
                 if let Some(name) = w.word(k) {
-                    w.emit(name.to_owned(), k);
+                    w.emit(name.to_owned(), k, SymbolKind::Function);
                 }
             }
             "class" => {
@@ -67,7 +68,7 @@ pub(crate) fn script(w: &mut Walk<'_>) {
                         .word(i + 1)
                         .filter(|n| *n != "extends" && *n != "implements")
                 {
-                    w.emit(name.to_owned(), i + 1);
+                    w.emit(name.to_owned(), i + 1, SymbolKind::Class);
                 }
                 // A class expression is listed only as a declarator's value (`var A = class`).
                 if declared || declarator_value(w, i) {
@@ -76,11 +77,26 @@ pub(crate) fn script(w: &mut Walk<'_>) {
                 // The body is the first `{` after the heritage clause, past any generics.
                 skip_to_body(w, i + 1);
             }
-            "interface" | "enum" if w.word(i + 1).is_some() => {
-                w.emit(w.word(i + 1).unwrap_or_default().to_owned(), i + 1);
+            "interface" if w.word(i + 1).is_some() => {
+                w.emit(
+                    w.word(i + 1).unwrap_or_default().to_owned(),
+                    i + 1,
+                    SymbolKind::Interface,
+                );
+            }
+            "enum" if w.word(i + 1).is_some() => {
+                w.emit(
+                    w.word(i + 1).unwrap_or_default().to_owned(),
+                    i + 1,
+                    SymbolKind::Enum,
+                );
             }
             "type" if w.word(i + 1).is_some() && matches!(w.punct(i + 2), Some(b'=' | b'<')) => {
-                w.emit(w.word(i + 1).unwrap_or_default().to_owned(), i + 1);
+                w.emit(
+                    w.word(i + 1).unwrap_or_default().to_owned(),
+                    i + 1,
+                    SymbolKind::Type,
+                );
             }
             "namespace" | "module"
                 if w.tok(i + 1)
@@ -88,12 +104,17 @@ pub(crate) fn script(w: &mut Walk<'_>) {
                     && w.punct(i + 2) == Some(b'{') =>
             {
                 let name = w.text(w.toks[i + 1]).to_owned();
-                w.emit(name, i + 1);
+                let kind = if w.text(t) == "module" {
+                    SymbolKind::Module
+                } else {
+                    SymbolKind::Namespace
+                };
+                w.emit(name, i + 1, kind);
                 w.pending = Some(false);
             }
             "const" | "let" | "var" => declarators(w, i),
             "global" if w.word(i.wrapping_sub(1)) == Some("declare") => {
-                w.emit("global".to_owned(), i);
+                w.emit("global".to_owned(), i, SymbolKind::Namespace);
                 w.pending = Some(false);
             }
             _ => {}
@@ -260,7 +281,7 @@ fn class_member(w: &mut Walk<'_>, k: usize) {
         next += 1;
     }
     if matches!(w.punct(next), Some(b'(' | b'<')) {
-        w.emit(name, k);
+        w.emit(name, k, SymbolKind::Method);
     }
 }
 
@@ -277,8 +298,10 @@ fn declarators(w: &mut Walk<'_>, keyword: usize) {
         let Some(eq) = initializer(w, at + 1) else {
             return;
         };
-        if w.word(eq + 1) == Some("class") || fn_value(w, eq + 1) {
-            w.emit(name.to_owned(), at);
+        if w.word(eq + 1) == Some("class") {
+            w.emit(name.to_owned(), at, SymbolKind::Class);
+        } else if fn_value(w, eq + 1) {
+            w.emit(name.to_owned(), at, SymbolKind::Function);
         }
         // To the next top-level `,`: past the value, which ends at `;` or a new statement.
         let mut depth = 0usize;

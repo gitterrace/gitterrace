@@ -1,7 +1,7 @@
 //! The scanners against hand-checked sources: each case is a class of declaration a real
 //! parser lists (or does not) that a naive keyword scan gets wrong.
 
-use crate::symbols::{outline, symbols};
+use crate::symbols::{SymbolKind, outline, symbols};
 
 /// `(line, name, depth)` of each symbol of `src` read as `path`.
 fn listed(path: &str, src: &str) -> Vec<(u32, String, u8)> {
@@ -41,7 +41,7 @@ fn r#match() {}
             (3, "Shape".into(), 0),
             (4, "Area".into(), 0),
             (5, "area".into(), 1),
-            (7, "impl Area for Wrapper<T>".into(), 0),
+            (7, "Area for Wrapper<T>".into(), 0),
             (8, "area".into(), 1),
             (10, "geo".into(), 0),
             (11, "far".into(), 1),
@@ -229,8 +229,108 @@ fn the_outline_links_each_symbol_to_its_line_and_stops_at_the_shown_lines() {
         got,
         [
             (2, "L1", "A", true),
-            (2, "L2", "impl A", true),
+            (2, "L2", "A", true),
             (3, "L3", "b", true)
         ]
     );
+}
+
+/// `(name, kind)` of each symbol of `src` read as `path`.
+fn kinds(path: &str, src: &str) -> Vec<(String, Option<SymbolKind>)> {
+    symbols(path, src)
+        .into_iter()
+        .map(|s| (s.name, s.kind))
+        .collect()
+}
+
+#[test]
+fn rust_symbols_carry_the_kind_their_keyword_names() {
+    use SymbolKind::*;
+    let src = "struct S;\nenum E {}\nunion U { a: u8 }\ntrait T { fn m(&self); }\n\
+               type A = u8;\nmod m {}\nimpl T for S { fn m(&self) {} }\n\
+               macro_rules! mac { () => {}; }\nfn f() {}\n";
+    assert_eq!(
+        kinds("a.rs", src),
+        [
+            ("S".into(), Some(Struct)),
+            ("E".into(), Some(Enum)),
+            ("U".into(), Some(Union)),
+            ("T".into(), Some(Trait)),
+            ("m".into(), Some(Method)),
+            ("A".into(), Some(Type)),
+            ("m".into(), Some(Module)),
+            ("T for S".into(), Some(Impl)),
+            ("m".into(), Some(Method)),
+            ("mac".into(), Some(Macro)),
+            ("f".into(), Some(Function)),
+        ]
+    );
+}
+
+#[test]
+fn go_symbols_carry_their_kind() {
+    use SymbolKind::*;
+    let src = "package p\ntype A int\ntype (\n\tB int\n)\nfunc F() {}\nfunc (a A) M() {}\n";
+    assert_eq!(
+        kinds("a.go", src),
+        [
+            ("A".into(), Some(Type)),
+            ("B".into(), Some(Type)),
+            ("F".into(), Some(Function)),
+            ("A.M".into(), Some(Method)),
+        ]
+    );
+}
+
+#[test]
+fn python_symbols_carry_their_kind() {
+    use SymbolKind::*;
+    let src = "class C:\n    def m(self):\n        pass\n\nasync def f():\n    pass\n";
+    assert_eq!(
+        kinds("a.py", src),
+        [
+            ("C".into(), Some(Class)),
+            ("m".into(), Some(Method)),
+            ("f".into(), Some(Function)),
+        ]
+    );
+}
+
+#[test]
+fn script_symbols_carry_their_kind() {
+    use SymbolKind::*;
+    let src = "function f() {}\nclass C { m() {} }\ninterface I {}\nenum E {}\n\
+               type T = number;\nnamespace N {}\ndeclare module M {}\n\
+               const g = () => 1;\nconst K = class {};\n";
+    assert_eq!(
+        kinds("a.ts", src),
+        [
+            ("f".into(), Some(Function)),
+            ("C".into(), Some(Class)),
+            ("m".into(), Some(Method)),
+            ("I".into(), Some(Interface)),
+            ("E".into(), Some(Enum)),
+            ("T".into(), Some(Type)),
+            ("N".into(), Some(Namespace)),
+            ("M".into(), Some(Module)),
+            ("g".into(), Some(Function)),
+            ("K".into(), Some(Class)),
+        ]
+    );
+}
+
+#[test]
+fn the_outline_shows_each_kind_as_a_label_and_speaks_the_full_word() {
+    let src = "struct A;\nimpl A {\n    fn b() {}\n}\nfn c() {}\n";
+    let rail = crate::markdown::outline_rail(&outline("a.rs", src, 9));
+    assert!(rail.contains("class=\"kinds kw6\""), "{rail}");
+    assert!(
+        rail.contains(
+            ">fn</span><span class=\"vh\">function </span><span class=\"oname\">c</span>"
+        )
+    );
+    assert!(rail.contains(">impl</span><span class=\"vh\">implementation </span>"));
+    let doc = [("a", "A"), ("b", "B"), ("c", "C")]
+        .map(|(id, t)| crate::markdown::OutlineItem::heading(2, id.into(), t));
+    assert!(!crate::markdown::outline_rail(&doc).contains("okind"));
 }

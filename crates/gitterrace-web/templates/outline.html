@@ -7,5 +7,5 @@
 {%- else %}<summary class="outlinebtn">On this page</summary>{% endif -%}
 <div class="outline-pop">
 {%- endif -%}
-{% if filter %}<input type="search" class="outline-q" placeholder="Filter headings" aria-label="Filter headings" hidden>{% endif %}<ol>{% for l in links %}<li class="d{{ l.depth }}"><a href="#{{ l.id }}" title="{{ l.text }}">{{ l.text }}</a></li>{% endfor %}</ol><p class="muted outline-none" hidden>No matching heading</p>
+{% if filter %}<input type="search" class="outline-q" placeholder="Filter headings" aria-label="Filter headings" hidden>{% endif %}<ol{% if kind_width > 0 %} class="kinds kw{{ kind_width }}"{% endif %}>{% for l in links %}<li class="d{{ l.depth }}">{% if let Some((label, spoken)) = l.kind %}<a href="#{{ l.id }}" title="{{ label }} {{ l.text }}"><span class="okind" aria-hidden="true" data-kind="{{ spoken }}">{{ label }}</span><span class="vh">{{ spoken }} </span><span class="oname">{{ l.text }}</span>{% else %}<a href="#{{ l.id }}" title="{{ l.text }}">{{ l.text }}{% endif %}</a></li>{% endfor %}</ol><p class="muted outline-none" hidden>No matching heading</p>
 {%- if rail %}</nav>{% else %}</div></details>{% endif -%}
