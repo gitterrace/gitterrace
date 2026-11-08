@@ -15,6 +15,75 @@ pub(crate) use segments::{
 pub const FORMAT_VERSION: &str = "8";
 pub(crate) const VERSION_FILE: &str = "VERSION";
 pub(crate) const LOCK_FILE: &str = "lock";
+pub(crate) const OWNER_FILE: &str = "owner";
+
+/// Fails when `dir` exists but this process cannot write it: the lock file opens for append.
+pub(crate) fn writable(dir: &Path) -> io::Result<()> {
+    cache::open_append(dir, LOCK_FILE).map(drop)
+}
+
+/// Whether `e` says the file system refused a write, so another folder may work.
+pub(crate) fn cannot_write(e: &io::Error) -> bool {
+    matches!(
+        e.kind(),
+        io::ErrorKind::PermissionDenied | io::ErrorKind::ReadOnlyFilesystem
+    )
+}
+
+/// The opt-in for a user-cache index on a read-only `.git`: an absolute folder. The Docker image
+/// sets it. Unset, empty or relative, a repository whose `.git` cannot be written gets no cache.
+pub(crate) const FALLBACK_VAR: &str = "GITTERRACE_INDEX_FALLBACK";
+
+/// The cache folder for a repository whose own `.git` cannot be written: `<base>/<hash>`, where
+/// `<base>` is the absolute folder in `$GITTERRACE_INDEX_FALLBACK`. Without that variable there
+/// is no such folder and this returns `None`. The hash is 64-bit FNV-1a over the git dir's real
+/// path, stable across runs and Rust releases. The folder's `owner` file holds that path, so a
+/// collision rebuilds, see [`claim`].
+/// Returns the folder and the real path it is keyed on, for [`claim`].
+pub(crate) fn fallback_dir(git_dir: &Path) -> Option<(std::path::PathBuf, std::path::PathBuf)> {
+    fallback_for(std::env::var_os(FALLBACK_VAR), git_dir)
+}
+
+/// [`fallback_dir`] with the variable's value passed in.
+pub(crate) fn fallback_for(
+    var: Option<std::ffi::OsString>,
+    git_dir: &Path,
+) -> Option<(std::path::PathBuf, std::path::PathBuf)> {
+    let base = std::path::PathBuf::from(var?);
+    if !base.is_absolute() {
+        return None;
+    }
+    // Keyed on the real path: a relative or symlinked spelling of one repository shares a folder.
+    let real = git_dir
+        .canonicalize()
+        .unwrap_or_else(|_| git_dir.to_path_buf());
+    Some((fallback_in(&base, &real), real))
+}
+
+/// Makes the user-cache folder `dir` belong to the git dir at the real path `real`. A cache that
+/// names another repository is a hash collision: it is wiped, never read, and then claimed.
+pub(crate) fn claim(dir: &Path, real: &Path) -> io::Result<()> {
+    let want = real.as_os_str().as_encoded_bytes();
+    let have = cache::read(dir, OWNER_FILE)?;
+    if have.as_deref() == Some(want) {
+        return Ok(());
+    }
+    let _lock = WriteLock::take(dir)?;
+    if cache::read(dir, OWNER_FILE)?.is_some_and(|h| h != want) {
+        wipe(dir)?;
+    }
+    cache::write_atomic(dir, OWNER_FILE, want)
+}
+
+/// [`fallback_dir`] under the cache folder `base`.
+pub(crate) fn fallback_in(base: &Path, git_dir: &Path) -> std::path::PathBuf {
+    let mut h: u64 = 0xcbf2_9ce4_8422_2325;
+    for b in git_dir.as_os_str().as_encoded_bytes() {
+        h ^= u64::from(*b);
+        h = h.wrapping_mul(0x0100_0000_01b3);
+    }
+    base.join(format!("{h:016x}"))
+}
 
 /// Why a cache cannot be written by this build.
 pub(crate) fn newer_message(found: &str) -> String {

@@ -296,3 +296,95 @@ fn the_sweep_removes_only_files_not_live() -> io::Result<()> {
     );
     Ok(())
 }
+
+/// A cache folder this process cannot write is refused, so the index goes to the user cache,
+/// and the user-cache folder for one git dir is one stable folder, a different one for another.
+#[cfg(unix)]
+#[test]
+fn a_read_only_cache_falls_back_to_a_stable_folder() -> io::Result<()> {
+    use std::os::unix::fs::PermissionsExt;
+    let t = tempfile::tempdir()?;
+    let dir = t.path().join("gitterrace");
+    ensure_dir(&dir)?;
+    fs::remove_file(dir.join(LOCK_FILE)).or_else(|e| match e.kind() {
+        io::ErrorKind::NotFound => Ok(()),
+        _ => Err(e),
+    })?;
+    fs::set_permissions(&dir, fs::Permissions::from_mode(0o555))?;
+    let refused = super::writable(&dir);
+    fs::set_permissions(&dir, fs::Permissions::from_mode(0o755))?;
+    // Root writes anywhere: the refusal is then not observable, the folder rule still is.
+    if let Err(e) = refused {
+        assert!(super::cannot_write(&e), "{e}");
+    }
+    let base = t.path().join("cache");
+    let a = super::fallback_in(&base, std::path::Path::new("/repos/a/.git"));
+    assert_eq!(
+        a,
+        super::fallback_in(&base, std::path::Path::new("/repos/a/.git"))
+    );
+    assert_ne!(
+        a,
+        super::fallback_in(&base, std::path::Path::new("/repos/b/.git"))
+    );
+    assert!(a.starts_with(&base));
+    ensure_dir(&a)?;
+    super::writable(&a)
+}
+
+/// A user-cache folder claimed by one repository is wiped before another claims it: a hash
+/// collision rebuilds instead of serving the first repository's index.
+#[test]
+fn a_cache_of_another_repository_is_wiped_on_claim() -> io::Result<()> {
+    let t = tempfile::tempdir()?;
+    let dir = t.path().join("gitterrace");
+    ensure_dir(&dir)?;
+    let a = std::path::Path::new("/repos/a/.git");
+    super::claim(&dir, a)?;
+    fs::write(dir.join("tip"), "abc\n")?;
+    // Claiming again for the same repository keeps what it built.
+    super::claim(&dir, a)?;
+    assert!(dir.join("tip").exists());
+    super::claim(&dir, std::path::Path::new("/repos/b/.git"))?;
+    assert!(
+        !dir.join("tip").exists(),
+        "the other repository's files survived"
+    );
+    assert_eq!(fs::read(dir.join(super::OWNER_FILE))?, b"/repos/b/.git");
+    assert_eq!(
+        fs::read_to_string(dir.join(VERSION_FILE))?.trim(),
+        FORMAT_VERSION
+    );
+    Ok(())
+}
+
+/// The user-cache index is opt-in: without an absolute folder in the variable there is none.
+#[test]
+fn fallback_stays_off_without_the_variable() {
+    let git = std::path::Path::new("/repos/a/.git");
+    assert!(super::fallback_for(None, git).is_none());
+    assert!(super::fallback_for(Some("".into()), git).is_none());
+    assert!(super::fallback_for(Some("cache".into()), git).is_none());
+    let (dir, real) = super::fallback_for(Some("/cache/index".into()), git).expect("set");
+    assert!(dir.starts_with("/cache/index"));
+    assert_eq!(real, git);
+}
+
+/// With the variable unset the open path is a plain `open_dir`: a read-only but current cache
+/// still opens, and no lock file appears.
+#[cfg(unix)]
+#[test]
+fn a_read_only_current_cache_opens_without_the_variable() -> io::Result<()> {
+    use std::os::unix::fs::PermissionsExt;
+    let t = tempfile::tempdir()?;
+    let dir = t.path().join("gitterrace");
+    ensure_dir(&dir)?;
+    fs::remove_file(dir.join(LOCK_FILE))?;
+    fs::set_permissions(&dir, fs::Permissions::from_mode(0o555))?;
+    let opened = crate::Index::open_with(dir.clone(), None);
+    let lock = dir.join(LOCK_FILE).exists();
+    fs::set_permissions(&dir, fs::Permissions::from_mode(0o755))?;
+    assert!(opened.is_ok(), "{:?}", opened.err());
+    assert!(!lock, "open created the lock file");
+    Ok(())
+}

@@ -30,7 +30,7 @@ pub use store::FORMAT_VERSION;
 
 /// Every file the cache keeps in `.git/gitterrace/`, with what it holds. The architecture page is
 /// rendered from this, and a test fails when the folder holds a file not listed here.
-pub const CACHE_FILES: [(&str, &str); 4] = [
+pub const CACHE_FILES: [(&str, &str); 5] = [
     (
         store::VERSION_FILE,
         "The cache format. A mismatch deletes the cache and rebuilds it. The format is never \
@@ -40,6 +40,11 @@ pub const CACHE_FILES: [(&str, &str); 4] = [
         store::LOCK_FILE,
         "Empty. Held locked by whichever process is extending the segment set, so two processes on \
         one repository take turns instead of building on one manifest.",
+    ),
+    (
+        store::OWNER_FILE,
+        "Only in a cache outside the repository: the real path of the git dir it belongs to. \
+        Another path there wipes the cache, so a hash collision rebuilds.",
     ),
     (
         TIP_FILE,
@@ -142,9 +147,29 @@ pub struct Index {
 }
 
 impl Index {
-    /// Opens or creates the cache under `repo.git_dir()/gitterrace`.
+    /// Opens or creates the cache under `repo.git_dir()/gitterrace`, or in the folder
+    /// [`store::fallback_dir`] names when that cannot be written.
     pub fn open(repo: &Repo) -> io::Result<Self> {
-        Self::open_dir(repo.git_dir().join("gitterrace"))
+        let git = repo.git_dir();
+        Self::open_with(git.join("gitterrace"), store::fallback_dir(git))
+    }
+
+    /// [`Index::open`] with the user-cache folder passed in. Without one: [`Index::open_dir`].
+    fn open_with(own: PathBuf, fallback: Option<(PathBuf, PathBuf)>) -> io::Result<Self> {
+        let Some((dir, real)) = fallback else {
+            return Self::open_dir(own);
+        };
+        match Self::open_dir(own.clone()).and_then(|i| store::writable(&own).map(|()| i)) {
+            Ok(i) => Ok(i),
+            Err(e) if store::cannot_write(&e) => {
+                let index = Self::open_dir(dir)?;
+                if index.newer.is_none() {
+                    store::claim(&index.dir, &real)?;
+                }
+                Ok(index)
+            }
+            Err(e) => Err(e),
+        }
     }
 
     /// Opens or creates the cache in `dir`. A format version mismatch discards old records.

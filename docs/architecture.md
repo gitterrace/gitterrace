@@ -118,6 +118,7 @@ the vendored theme.
 | --- | --- |
 | `VERSION` | The cache format. A mismatch deletes the cache and rebuilds it. The format is never migrated. |
 | `lock` | Empty. Held locked by whichever process is extending the segment set, so two processes on one repository take turns instead of building on one manifest. |
+| `owner` | Only in a cache outside the repository: the real path of the git dir it belongs to. Another path there wipes the cache, so a hash collision rebuilds. |
 | `tip` | The commit id the segment files were last built for. Opening insights for that commit skips walking its history to check the files hold exactly it. |
 | `lines.json` | Line counts per blob id for the language chart. A blob never changes, so the counts never go stale. |
 
@@ -126,6 +127,13 @@ The format version is `8`.
 <!-- END GENERATED: cache -->
 
 Disposable: bump the format version instead of migrating.
+
+The cache lives in `.git/gitterrace/` and is used there whenever that folder can
+be written. When it cannot (a read-only mount, a repository of another user),
+it goes to `<dir>/<hash>`, where `<dir>` is the folder in
+`GITTERRACE_INDEX_FALLBACK` and the hash is of the real path of the git dir.
+Without that variable such a repository has no cache. The Docker
+image sets it to `/cache/index`.
 
 ### How the index is stored
 

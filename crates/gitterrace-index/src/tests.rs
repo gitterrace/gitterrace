@@ -289,6 +289,7 @@ fn cache_folder_holds_the_documented_files() -> io::Result<()> {
     lines.map.insert("abc".into(), 3);
     lines.dirty = true;
     lines.save(idx.dir())?;
+    crate::store::claim(idx.dir(), std::path::Path::new("/repos/a/.git"))?;
     let mut have: Vec<String> = std::fs::read_dir(idx.dir())?
         .map(|e| e.map(|e| e.file_name().to_string_lossy().into_owned()))
         .collect::<io::Result<_>>()?;
