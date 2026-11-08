@@ -153,6 +153,8 @@ function rowsAboveContent() {
       if (!u.length) { if (c.querySelector(CONTENT)) walk(c); continue; }
       if (c.getBoundingClientRect().height > 72) { walk(c); continue; }
       if (u.length !== 1) continue;
+      // A paragraph is prose with a link in it (a hint line), not a row of controls.
+      if (c.tagName === 'P') continue;
       const share = u[0].getBoundingClientRect().width / c.getBoundingClientRect().width;
       const box = `${c.tagName.toLowerCase()}.${String(c.className || '').split(' ')[0]}`;
       const pct = Math.round(share * 100);
