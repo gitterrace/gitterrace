@@ -75,6 +75,13 @@ that reads every repository served before, the ones a running server shows.
 `list_repos` names them, and every tool takes that name as `repo`. Without
 `--served` it reads only the paths given.
 
+## Run with Docker
+
+`docker build -t gitterrace .`, then
+`docker run --rm -p 127.0.0.1:8080:8080 -v "$PWD":/repos:ro gitterrace` serves
+the repositories in this folder read-only at `http://localhost:8080`.
+[Run with Docker](docs/online.md#run-with-docker) has the details.
+
 ## Upgrade and troubleshooting
 
 Upgrade by running the same install command again. The insights cache in

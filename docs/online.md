@@ -73,6 +73,31 @@ example `blame_enabled = false` or `search_enabled = false`. A switched-off page
 answers 404 and its links are gone. The ones that show this machine stay off
 whatever the file says.
 
+## Run with Docker
+
+The root `Dockerfile` builds an image that serves one folder, either a
+repository or a folder of repositories two levels deep:
+
+```sh
+docker build -t gitterrace .
+docker run --rm -p 127.0.0.1:8080:8080 -v "$PWD":/repos:ro \
+  -v gitterrace-cache:/cache gitterrace
+```
+
+Open `http://localhost:8080`. A server in a container listens on every
+interface, so the image runs in public mode: committed history only, no working
+tree, actions or settings changes. Keep `127.0.0.1:` in `-p` unless the network
+may read every commit. The `/cache` volume keeps the index, so a restart is
+fast. Mount a config folder on `/config` to change other settings.
+
+There is no prebuilt image and none is published to ghcr.io. Build it locally
+with the command above, which takes about 5 to 10 minutes and works on both
+amd64 and arm64.
+
+A read-only mount cannot hold the index in `.git/gitterrace/`, so the image sets
+`GITTERRACE_INDEX_FALLBACK=/cache/index` and keeps it there. Only the image
+sets it. Without the variable, an index lives in `.git/gitterrace/` or nowhere.
+
 ## Behind a reverse proxy
 
 Run gitterrace on loopback and put a TLS reverse proxy in front of it. The proxy

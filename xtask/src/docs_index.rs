@@ -73,7 +73,7 @@ const DOCS: &[(&str, Kind, &str)] = &[
     (
         "docs/online.md",
         Kind::Guide,
-        "Publish a static export, public mode, a reverse proxy",
+        "Publish a static export, public mode, Docker, a reverse proxy",
     ),
     (
         "docs/architecture.md",
