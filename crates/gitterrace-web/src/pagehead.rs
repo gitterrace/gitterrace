@@ -154,6 +154,8 @@ pub(crate) struct PageHead {
     pub(crate) toolbar: String,
     /// The head stays at the top of the window while long content scrolls (wide screens).
     pub(crate) pin: bool,
+    /// The toolbar's button switches change the page in place (settings' Form and Plain).
+    pub(crate) own: bool,
 }
 
 impl PageHead {

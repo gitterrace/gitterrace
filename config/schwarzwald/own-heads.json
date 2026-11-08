@@ -2,8 +2,5 @@
   "allowlists": [
     "own_heads"
   ],
-  "own_heads": [
-    "src/error.rs",
-    "templates/dochead.html"
-  ]
+  "own_heads": []
 }

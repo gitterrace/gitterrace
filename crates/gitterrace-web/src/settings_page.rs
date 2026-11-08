@@ -52,7 +52,7 @@ struct Page {
     c: crate::views::Chrome,
     token: String,
     file: &'static str,
-    head: crate::dochead::DocHead,
+    head: crate::pagehead::PageHead,
     text: String,
     stamp: String,
     sections: Vec<Section>,
@@ -160,6 +160,56 @@ fn overrides(c: &gitterrace_config::Config) -> Vec<String> {
 }
 
 /// `GET /_settings?f=config|actions`.
+/// The settings page's head: the file tabs, Form, Plain and Save in the toolbar, and the file's
+/// path with whether it exists yet as the tagline.
+fn settings_head(
+    files: Vec<Choice>,
+    form: bool,
+    path: &Path,
+    exists: bool,
+) -> crate::pagehead::PageHead {
+    crate::pagehead::PageHead {
+        own: true,
+        tabs: files
+            .into_iter()
+            .map(|c| crate::pagehead::Tab {
+                label: c.label,
+                href: c.target,
+                on: c.on,
+            })
+            .collect(),
+        toolbar: format!(
+            "{}{}",
+            Seg {
+                name: "Editor".to_owned(),
+                buttons: true,
+                choices: vec![
+                    Choice::new("Form", "form", form),
+                    Choice::new("Plain", "plain", !form),
+                ],
+                ..Seg::default()
+            },
+            concat!(
+                "<span class=\"setnote ph-end\" id=\"setnote\" role=\"status\"></span>",
+                "<button class=\"primary\" type=\"button\" id=\"setsave\" disabled>",
+                "Save</button>"
+            )
+        ),
+        ..crate::pagehead::PageHead::new(
+            "Settings",
+            crate::pagehead::Tagline::of(&format!(
+                "{} \u{b7} {}",
+                shorten(path),
+                if exists {
+                    "edited here, saved in place"
+                } else {
+                    "no file yet, every setting is at its default"
+                }
+            )),
+        )
+    }
+}
+
 pub(crate) async fn page(
     State(settings): State<Arc<Settings>>,
     Query(which): Query<Which>,
@@ -207,29 +257,7 @@ pub(crate) async fn page(
             c: chrome_bare(&env, "Settings", "/_settings"),
             token,
             file: f.as_str(),
-            head: crate::dochead::DocHead {
-                page_head: true,
-                title: shorten(&path),
-                switch: Some((
-                    Seg::links("File", files).no_caption(),
-                    Seg {
-                        name: "Editor".to_owned(),
-                        buttons: true,
-                        choices: vec![
-                            Choice::new("Form", "form", form_off.is_none()),
-                            Choice::new("Plain", "plain", form_off.is_some()),
-                        ],
-                        ..Seg::default()
-                    },
-                )),
-                tools: concat!(
-                    "<span class=\"setnote\" id=\"setnote\" role=\"status\"></span>",
-                    "<button class=\"primary\" type=\"button\" id=\"setsave\" disabled>",
-                    "Save</button>"
-                )
-                .to_owned(),
-                ..crate::dochead::DocHead::default()
-            },
+            head: settings_head(files, form_off.is_none(), &path, stamp.is_some()),
             missing: stamp.is_none().then(|| {
                 Empty::new(format!(
                     "No {file_name} yet: every setting is at its default."

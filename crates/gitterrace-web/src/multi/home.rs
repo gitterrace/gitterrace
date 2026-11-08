@@ -23,7 +23,7 @@ const READERS: usize = 8;
 struct IndexPage {
     rows: Vec<IndexRow>,
     /// The card's header: "Repositories" and "2 repositories, 14 commits today".
-    head: crate::dochead::DocHead,
+    head: crate::pagehead::PageHead,
     /// The filter box's text, as typed.
     q: String,
     /// "12 of 101": the rows that match and all of them.
@@ -196,12 +196,10 @@ pub(super) async fn index(
             none: shown == 0,
             q,
             rows,
-            head: crate::dochead::DocHead {
-                title: "Repositories".to_owned(),
-                meta: sub,
-                page_head: true,
-                ..crate::dochead::DocHead::default()
-            },
+            head: crate::pagehead::PageHead::new(
+                "Repositories",
+                crate::pagehead::Tagline::of(&sub),
+            ),
             live,
         }
         .render()

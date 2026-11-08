@@ -1,7 +1,4 @@
 /* Settings page: one field row per setting and a plain editor with a line gutter. */
-.settings .dochead{flex-wrap:wrap;height:auto;min-height:44px;padding-top:var(--space-1);padding-bottom:var(--space-1)}
-.settings .doc-title{font-family:var(--mono);font-size:var(--text-sm);min-width:0;overflow-wrap:anywhere;text-transform:none;letter-spacing:0}
-.settings .doc-tools{margin-left:auto;display:flex;align-items:center;gap:var(--space-3)}
 .setnote{font-size:var(--text-sm);color:var(--muted)}
 .setform,.setplain{padding:var(--space-4) var(--space-6) var(--space-6)}
 .setsec{border:0;margin:0 0 var(--space-6);padding:0}

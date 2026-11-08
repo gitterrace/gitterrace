@@ -53,9 +53,6 @@ pub(crate) struct DocHead {
     pub(crate) switch: Option<(Seg, Seg)>,
     /// The crate's own escaped markup at the right end, after the actions (a Save button).
     pub(crate) tools: String,
-    /// The card's header is the page's head (a Markdown file's page, the settings page): its
-    /// path or title is the page's one h1. Off for a README card under a file list.
-    pub(crate) page_head: bool,
 }
 
 /// The markup, from `dochead.html`: the only place that writes a document card's header bar.

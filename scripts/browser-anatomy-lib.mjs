@@ -32,6 +32,7 @@ export const PAGES = [
   ['worktree', '/worktree'],
   ['not found', '/blob/HEAD/no-such-file'],
   ['settings', '/_settings', true],
+  ['settings actions', '/_settings?f=actions', true],
 ];
 
 /** The rhythm, from the tokens: title size per width, head top, gaps in px between slots. */

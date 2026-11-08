@@ -222,7 +222,10 @@ async fn the_repositories_home_says_what_changed_today() {
         "{body}"
     );
     assert!(body.contains("Quiet today. Last commit"), "{body}");
-    assert!(body.contains("2 repositories, 2 commits today"), "{body}");
+    assert!(
+        body.contains("<b>2</b> repositories, <b>2</b> commits today"),
+        "{body}"
+    );
     // The chips fill in after the rows: a cold page renders every one hidden.
     assert!(
         !body.contains("working tree\"><"),

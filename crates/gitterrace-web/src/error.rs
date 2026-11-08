@@ -5,8 +5,6 @@ use axum::{
     response::{Html, IntoResponse, Response},
 };
 
-use crate::fmt::esc;
-
 #[derive(Debug, thiserror::Error)]
 pub(crate) enum Error {
     #[error(transparent)]
@@ -58,11 +56,12 @@ pub(crate) fn page(status: StatusCode, detail: &str) -> Html<String> {
         "<!doctype html><meta charset=utf-8><meta name=viewport content=\"width=device-width\">{}\
          <link rel=stylesheet href=/static/tokens.css><link rel=stylesheet href=/static/app.css>\
          <link rel=stylesheet href=/static/pagehead.css>\
-         <main class=wrap><h1>{}</h1><p class=muted>{}</p>\
-         <p><a href=/>Back to overview</a></p></main>",
+         <main class=wrap>{}<p><a href=/>Back to overview</a></p></main>",
         crate::fmt::FAVICON,
-        status.as_u16(),
-        esc(detail)
+        crate::pagehead::PageHead::new(
+            status.as_u16().to_string(),
+            crate::pagehead::Tagline::of(detail)
+        )
     ))
 }
 

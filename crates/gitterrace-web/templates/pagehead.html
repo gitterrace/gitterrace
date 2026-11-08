@@ -1,7 +1,8 @@
 {#- The page head (pagehead.rs): the one template that writes an h1. Slots in a fixed order:
 eyebrow, title row, tagline, tab row or divider, toolbar. `tools` and `toolbar` are the crate's
 own escaped markup (Seg, outline menus, a filter form). -#}
-<header class="ph{% if h.pin %} pin{% endif %}" data-pagehead>
+<header class="ph{% if h.pin %} pin{% endif %}" data-pagehead
+{%- if h.own %} data-seg-own{% endif %}>
 {%- if !h.eyebrow.is_empty() %}<p class="ph-eyebrow">{{ h.eyebrow }}</p>{% endif -%}
 <div class="ph-row">
 {%- if !h.crumbs.is_empty() %}<h1 class="crumbs">

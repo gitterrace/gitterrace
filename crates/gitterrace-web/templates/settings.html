@@ -17,8 +17,8 @@
 <meta name="gitterrace-settings" content="{{ token }}" data-file="{{ file }}" data-stamp="{{ stamp }}">
 <link rel="stylesheet" href="/static/settings.css">{% endblock %}
 {% block content %}
-<div class="card settings" data-seg-own>
 {{ head }}
+<div class="card settings">
 <p class="seterrsum" id="seterrsum" role="alert" tabindex="-1"></p>
 {% if let Some(e) = missing %}{{ e }}{% endif %}
 <section class="setform" id="setform" data-view="form"{% if form_off.is_some() %} hidden{% endif %}>

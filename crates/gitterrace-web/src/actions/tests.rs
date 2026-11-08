@@ -450,7 +450,8 @@ async fn go_redirects_to_the_repo_holding_the_commit() {
     }
     let (s, html) = page(&r, "/go/%3Cimg%20src%3Dx%3E/abc").await;
     assert_eq!(s, 404);
-    assert!(html.contains("&lt;img src=x&gt;") && !html.contains("<img src=x>"));
+    let shown = html.contains("&lt;img src=x&gt;") || html.contains("&#60;img src=x&#62;");
+    assert!(shown && !html.contains("<img src=x>"), "{html}");
     let (_, html) = page(&r, "/").await;
     assert!(
         html.contains(&format!("data-id=\"{id}\"")),
