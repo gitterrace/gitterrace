@@ -95,8 +95,9 @@
 //   anatomy      every page opens with the one page head: slots in one order, one h1 in it,
 //                one tab row of two or more, the same top, title size and gaps (1440 and 390
 //                px, both schemes)
-//   page-heads   a Markdown file shows one head row (path, size, Blame, History, Preview/Code,
-//                sticky), at 1440, 900 and 390 px, light and dark
+//   page-heads   a Markdown file: the page head holds the path and File/Blame/History tabs, the
+//                card one sticky head row with Preview/Code, at 1440, 900 and 390 px, light
+//                and dark
 //   compare-head the compare form sits in the title row, 'Open the head commit' has no row and the
 //                head sha is a link, at 1440 and 900 px (390: form still in the title row)
 //   commit-head  the meta line sits right under the title with no Copy button and the changed-files
@@ -511,23 +512,17 @@ async function stickyHeads() {
       if (!a) bad.push('no #L120 on the source page');
       else if (a.top < a.cover - 0.5 || a.bottom > a.h) bad.push(`#L120 at ${a.top.toFixed(1)} px, under a pinned bar ending at ${a.cover.toFixed(1)} px`);
       if (width > 600 && a && a.cover < 1) bad.push('source path bar not pinned');
-      // The pinned path bar sits balanced: as much room above the path as below it, and the
-      // links on the right centred on the path.
+      // The pinned page head holds the path and the file's tabs, so the reader keeps both.
       if (width > 600) {
-        const bal = await p.evaluate(() => {
-          const h = document.querySelector('main>.head');
-          const last = h && h.querySelector('.crumbs a:last-child'), side = h && h.querySelector('.muted');
-          if (!last || !side) return null;
-          const hr = h.getBoundingClientRect(), c = last.getBoundingClientRect(), s = side.getBoundingClientRect();
-          return { above: c.top - hr.top, below: hr.bottom - c.bottom, dy: (s.top + s.bottom) / 2 - (c.top + c.bottom) / 2 };
+        const held = await p.evaluate(() => {
+          const h = document.querySelector('main>.ph.pin');
+          const path = h && h.querySelector('h1.crumbs a:last-child');
+          return !!(path && h.querySelector('.tabs a[aria-current="page"]'));
         });
-        if (!bal) bad.push('no path or links in the pinned bar');
-        else {
-          if (Math.abs(bal.above - bal.below) > 2) bad.push(`path bar ${bal.above.toFixed(1)} px above the path, ${bal.below.toFixed(1)} px below`);
-          if (Math.abs(bal.dy) > 1.5) bad.push(`links ${bal.dy.toFixed(1)} px off the path's centre`);
-        }
+        if (!held) bad.push('the pinned head lacks the path or the File tab');
       }
-      bad.length ? r.fail(`${where}: ${bad.join(', ')}`) : r.ok(`${where}: file header pinned and handed over, #L120 clear of the bar, path bar balanced`);
+      const held = 'file header pinned and handed over, #L120 clear of the head, path and tabs held';
+      bad.length ? r.fail(`${where}: ${bad.join(', ')}`) : r.ok(`${where}: ${held}`);
       if (arg('--shots')) { mkdirSync(arg('--shots'), { recursive: true }); await p.screenshot({ path: join(arg('--shots'), `sticky-blob-${name}-${scheme}-${width}.png`) }); await p.goto(`${srv.base}/commit/${sha}`); await p.evaluate(() => { const s = document.querySelectorAll('section.file')[1].getBoundingClientRect(); scrollTo(0, scrollY + s.top + s.height / 2); }); await p.screenshot({ path: join(arg('--shots'), `sticky-commit-${name}-${scheme}-${width}.png`) }); }
       await p.close();
     }

@@ -2,7 +2,7 @@
 // Imported by scripts/browser-check.mjs, not run on its own.
 
 /** Visible head rows of the page: the path bar and any document header, as boxes. */
-const HEADS = 'main .head, [data-dochead]';
+const HEADS = 'main .head, main>.ph>.ph-row, main>.ph>.fbar, [data-dochead]';
 
 export function checks({ srv, r, browsers, context }) {
   /** Runs `fn(page)` returning a list of faults at each width and scheme; reports one line each. */
@@ -24,23 +24,30 @@ export function checks({ srv, r, browsers, context }) {
   }
 
   async function pageHeads() {
-    // A Markdown file shows exactly one head row, holding path, size, Blame, History and the
-    // Preview/Code switch, and it is the sticky one.
-    await each('markdown blob', '/blob/HEAD/README.md', (p) => p.evaluate((sel) => {
-      const rows = [...document.querySelectorAll(sel)].filter((e) => e.getClientRects().length);
+    // A Markdown file: the page head holds the path and the File, Blame and History tabs; the
+    // document card's one head row holds the Preview/Code switch and is the sticky one. No
+    // Copy permalink anywhere in either (it is in the page menu).
+    await each('markdown blob', '/blob/HEAD/README.md', (p) => p.evaluate(() => {
       const bad = [];
-      if (rows.length !== 1) bad.push(`${rows.length} head rows, want 1`);
-      const h = rows[0];
-      if (h) {
-        if (!h.querySelector('.crumbs')) bad.push('no path in the row');
-        if (!h.querySelector('[data-show=rendered]') || !h.querySelector('[data-show=source]')) bad.push('no Preview/Code in the row');
-        const text = h.textContent;
-        if (!/History/.test(text)) bad.push('no History link in the row');
-        if (/Copy permalink/.test(text)) bad.push('Copy permalink is still shown');
-        if (getComputedStyle(h).position !== 'sticky') bad.push('the row is not sticky');
+      const ph = document.querySelector('main>.ph');
+      const cards = [...document.querySelectorAll('[data-md-view] [data-dochead]')]
+        .filter((e) => e.getClientRects().length);
+      if (!ph || !ph.querySelector('h1.crumbs')) bad.push('no path in the page head');
+      const tabs = ph ? [...ph.querySelectorAll('.tabs a')].map((a) => a.textContent.trim()) : [];
+      if (!tabs.includes('File') || !tabs.includes('History')) {
+        bad.push(`file tabs ${tabs.join(',') || 'missing'}`);
       }
+      if (cards.length !== 1) bad.push(`${cards.length} card head rows, want 1`);
+      const h = cards[0];
+      if (h) {
+        const both = h.querySelector('[data-show=rendered]') && h.querySelector('[data-show=source]');
+        if (!both) bad.push('no Preview/Code in the card head');
+        if (getComputedStyle(h).position !== 'sticky') bad.push('the card head is not sticky');
+      }
+      const text = (ph?.textContent || '') + (h?.textContent || '');
+      if (/Copy permalink/.test(text)) bad.push('Copy permalink is still shown');
       return bad;
-    }, HEADS));
+    }));
   }
   /** Rows of controls: how many direct rows of `root`'s children hold only `n` controls. */
   const CTL = 'a[href], button, input:not([type=hidden]), select, summary';

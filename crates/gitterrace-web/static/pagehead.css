@@ -18,7 +18,7 @@
 .ph-acts{
   margin-left:auto;display:flex;align-items:center;gap:var(--space-4);
   font-size:var(--text-sm);flex:none}
-.ph-acts .outline.menu{display:block;margin-left:0}
+.ph-acts .outline.menu{margin-left:0}
 .ph-tag{
   font-size:var(--text-sm);line-height:1.5;color:var(--muted);
   margin:var(--space-1) 0 0;max-width:90ch}

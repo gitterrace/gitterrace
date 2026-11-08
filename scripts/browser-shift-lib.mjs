@@ -108,7 +108,8 @@ export function checks(env) {
    */
   function headAlign(ctl) {
     const bad = [];
-    for (const h of document.querySelectorAll('main .head, [data-dochead]')) {
+    const rows = 'main .head, main>.ph>.ph-row, main>.ph>.fbar, [data-dochead]';
+    for (const h of document.querySelectorAll(rows)) {
       if (!h.getClientRects().length) continue;
       const kids = [...h.children].filter((e) => e.getClientRects().length
         && (e.matches(ctl) || e.querySelector(ctl)));

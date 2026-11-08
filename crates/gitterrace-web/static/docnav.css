@@ -4,21 +4,18 @@
    .entries table pin too. Calm like the top bar: page colours, no shadow. Anchors land below. */
 section.file,.card.doccard{overflow:clip}
 section.file>header,.dochead{position:sticky;top:0;z-index:2}
-/* A pinned head's closing line: card heads use their border, the path bar this line. */
-main>.head[data-stuck]::after{content:"";position:absolute;left:0;right:0;bottom:0;height:1px;background:var(--line);pointer-events:none}
+/* A pinned head's closing line: card heads use their border, the page head this line. */
+main>.ph.pin[data-stuck]::after{content:"";position:absolute;left:0;right:0;bottom:0;height:1px;background:var(--line);pointer-events:none}
 /* Focus and anchors inside a document card land below its pinned head. */
 html:has(.dochead){scroll-padding-top:calc(44px + var(--space-2))}
 html:has(section.file>header){scroll-padding-top:calc(40px + var(--space-2))}
 .doccard [id^="L"],.doccard .markdown-body :is(h1,h2,h3,h4,h5,h6){scroll-margin-top:calc(44px + var(--space-4))}
 [id^="L"]{scroll-margin-top:var(--space-2)}
 @media (min-width:601px){
-  main:has(>.card.scroll [id^="L"],>.code-cols>.card.scroll [id^="L"])>.head,
-  main:has(>.head+ul.list.log)>.head{position:sticky;top:0;z-index:3;background:var(--bg)}
-  main:has(>.card.scroll [id^="L"],>.code-cols>.card.scroll [id^="L"]) [id^="L"]{
-    scroll-margin-top:calc(32px + 2 * var(--space-3) + var(--space-2))}
-  /* A source file's symbol rail pins below the pinned path bar. */
-  .code-cols>.outline.rail{top:calc(32px + 2 * var(--space-3) + var(--space-4));
-    max-height:calc(100vh - 32px - 2 * var(--space-3) - 2 * var(--space-4))}
+  main:has(>.ph.pin) [id^="L"]{scroll-margin-top:calc(var(--ph-pin-h,150px) + var(--space-2))}
+  /* A source file's symbol rail pins below the pinned page head. */
+  .code-cols>.outline.rail{top:calc(var(--ph-pin-h,150px) + var(--space-4));
+    max-height:calc(100vh - var(--ph-pin-h,150px) - 2 * var(--space-4))}
 }
 @media (min-width:1101px){
   .card:has(>table.entries tr.th:first-child){overflow:clip}
@@ -50,7 +47,7 @@ html:has(section.file>header){scroll-padding-top:calc(40px + var(--space-2))}
 .markdown-body :is(h1,h2,h3,h4,h5,h6){scroll-margin-top:var(--space-4)}
 /* The Code view has no headings: it takes the rail's column too, the full content width. */
 .outline-cols:has([data-pane=source]:not([hidden])){grid-template-columns:minmax(0,1fr)}.outline-cols:has([data-pane=source]:not([hidden]))>.outline.rail{display:none}
-@media (max-width:1100px){.outline-cols{grid-template-columns:minmax(0,1fr)}.outline.rail{display:none}.outline-cols .outline.menu,main>.head>.outline.menu{display:block}}
+@media (max-width:1100px){.outline-cols{grid-template-columns:minmax(0,1fr)}.outline.rail{display:none}.outline-cols .outline.menu,main>.ph .outline.menu{display:block}}
 @media (min-width:1101px){.outline-cols .outline.menu{display:none}}
 @media print{.outline{display:none!important}}
 /* The kind of a source file's symbol before its name: a quiet mono label in a column as wide

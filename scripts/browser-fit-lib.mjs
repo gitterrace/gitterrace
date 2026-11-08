@@ -58,7 +58,8 @@ function sideways() {
 function headFits() {
   const bad = [];
   const vw = document.documentElement.clientWidth;
-  const boxes = [...document.querySelectorAll('.head')].filter((h) => h.getClientRects().length)
+  const boxes = [...document.querySelectorAll('.head, .ph-row, .ph>.fbar')]
+    .filter((h) => h.getClientRects().length)
     .flatMap((h) => [...h.children]);
   boxes.push(...document.querySelectorAll(
     'input:not([type=hidden],[type=checkbox],[type=radio]), select'));

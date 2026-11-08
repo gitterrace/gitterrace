@@ -1,8 +1,6 @@
 {% extends "_base.html" %}
-{%- import "_path.html" as paths -%}
 {% block title %}Blame {{ title }} · {{ c.name }}{% endblock %}
 {% block content %}
-<div class="head">{% call paths::crumbs(crumbs) %}{% endcall %}
-<a href="{{ blob_href }}">Plain view</a></div>
+{{ head }}
 <div class="card scroll">{{ html|safe }}</div>
 {% endblock %}

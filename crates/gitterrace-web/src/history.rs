@@ -9,7 +9,7 @@ use axum::response::Html;
 use crate::{
     app::App,
     error::Result,
-    fmt::{self, enc_path, href},
+    fmt::{self, href},
     insights::{cached_keyed, insights},
     routes::Shared,
     views::{self, Chrome},
@@ -19,10 +19,9 @@ use crate::{
 #[template(path = "history.html")]
 struct HistoryPage {
     c: Chrome,
+    kpis: Vec<crate::insights::Kpi>,
     path: String,
-    blob_href: String,
-    blame_href: String,
-    total: String,
+    head: crate::pagehead::PageHead,
     rows: Vec<views::CommitRow>,
     empty: Option<crate::empty::Empty>,
 }
@@ -56,6 +55,7 @@ pub(crate) async fn page(
                 Some((id.as_str(), r.ident(c.ident)?.1.to_string()))
             })
             .collect();
+        let kpis = history_kpis(&touches);
         let rows: Vec<views::CommitRow> = touches
             .into_iter()
             .map(|t| {
@@ -80,17 +80,21 @@ pub(crate) async fn page(
             })
             .collect();
         HistoryPage {
+            kpis,
             // Built through the insights helper, but one file's history is a code view.
             c: c.active("files"),
-            blob_href: href(&format!(
-                "/blob/{}/{}",
-                fmt::selected_seg(),
-                enc_path(&path)
-            )),
-            blame_href: crate::features::href_if(
-                gitterrace_config::Feature::Blame,
-                &format!("/blame/{}/{}", fmt::selected_seg(), enc_path(&path)),
-            ),
+            head: crate::pagehead::PageHead {
+                pin: true,
+                ..crate::pagehead::file_head(
+                    &fmt::selected(),
+                    &path,
+                    crate::pagehead::FileView::History,
+                    crate::pagehead::Tagline::of(&format!(
+                        "{}, following renames",
+                        fmt::count(rows.len(), "commit", "commits")
+                    )),
+                )
+            },
             empty: rows.is_empty().then(|| {
                 crate::empty::Empty::new("No history found for this path.").step(
                     "Browse the files",
@@ -98,11 +102,29 @@ pub(crate) async fn page(
                 )
             }),
             path,
-            total: fmt::count(rows.len(), "commit", "commits"),
             rows,
         }
     })
     .await
+}
+
+/// The big numbers of one file's history, from the touches the page lists: commits, authors,
+/// lines changed and the day it was first changed.
+fn history_kpis(touches: &[gitterrace_index::Touch]) -> Vec<crate::insights::Kpi> {
+    use crate::insights::Kpi;
+    let authors: std::collections::HashSet<&str> =
+        touches.iter().map(|t| t.author.as_str()).collect();
+    let lines: u64 = touches.iter().map(|t| u64::from(t.lines)).sum();
+    let first = touches.iter().map(|t| t.time).min();
+    vec![
+        Kpi("Commits", fmt::thousands(touches.len())),
+        Kpi("Authors", fmt::thousands(authors.len())),
+        Kpi("Lines changed", fmt::thousands(lines)),
+        Kpi(
+            "First changed",
+            first.map_or_else(|| "-".to_owned(), fmt::day),
+        ),
+    ]
 }
 
 #[cfg(test)]

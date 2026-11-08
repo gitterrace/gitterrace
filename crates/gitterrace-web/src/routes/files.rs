@@ -1,5 +1,6 @@
 //! The tree, blob and blame pages, and the blame warm-up.
 
+use std::fmt::Write as _;
 use std::sync::Arc;
 
 use askama::Template;
@@ -10,13 +11,14 @@ use axum::{
 use gitterrace_config::Feature;
 use gitterrace_index::feed::{CommitRange, InsightsSource, Rank};
 
-use crate::dochead::{DocAction, DocCrumb, DocHead};
+use crate::dochead::DocHead;
+use crate::pagehead::{Action, FileView, PageHead, Tagline};
 use crate::routes::{DocQuery, Shared, page};
 use crate::{
     app::{App, blocking},
     error::Result,
     fmt, markdown, views,
-    views::{Chrome, Crumb, Entry},
+    views::{Chrome, Entry},
 };
 
 #[derive(Template)]
@@ -24,9 +26,8 @@ use crate::{
 struct TreePage {
     c: Chrome,
     title: String,
-    rev_enc: String,
+    head: PageHead,
     path_enc: String,
-    crumbs: Vec<Crumb>,
     up: Option<String>,
     entries: Vec<Entry>,
     about: Option<crate::about::About>,
@@ -95,10 +96,9 @@ pub(super) async fn tree(
             } else {
                 path.clone()
             },
-            crumbs: views::crumbs(&rev, &path, false),
+            head: tree_head(&rev, &path, &list),
             entries: views::entries(&rev, &path, &list),
             path_enc: fmt::enc_path(&path),
-            rev_enc,
             up,
         })
     })
@@ -108,15 +108,42 @@ pub(super) async fn tree(
     Ok(Html(html))
 }
 
+/// A folder's page head: its path as the title, what it holds as the tagline, and its history
+/// as the action.
+fn tree_head(rev: &str, path: &str, list: &[gitterrace_git::TreeEntry]) -> PageHead {
+    let dirs = list
+        .iter()
+        .filter(|e| e.kind == gitterrace_git::TreeEntryKind::Dir)
+        .count();
+    let files = list.len() - dirs;
+    let said = match (dirs, files) {
+        (0, 0) => "An empty folder".to_owned(),
+        (0, f) => fmt::count(f, "file", "files"),
+        (d, 0) => fmt::count(d, "folder", "folders"),
+        (d, f) => format!(
+            "{} and {}",
+            fmt::count(d, "folder", "folders"),
+            fmt::count(f, "file", "files")
+        ),
+    };
+    let r = fmt::enc_seg(rev);
+    PageHead {
+        crumbs: views::crumbs(rev, path, false),
+        actions: vec![Action {
+            label: "History",
+            href: fmt::href(&format!("/log/{r}?path={}", fmt::enc_path(path))),
+        }],
+        ..PageHead::new(path, Tagline::of(&said))
+    }
+}
+
 #[derive(Template)]
 #[template(path = "blob.html")]
 struct BlobPage {
     c: Chrome,
     title: String,
-    crumbs: Vec<Crumb>,
+    page_head: PageHead,
     size: String,
-    blame_href: String,
-    log_href: String,
     html: Option<String>,
     cut: bool,
     /// The cut notice, naming `limits.blob_lines`.
@@ -127,9 +154,6 @@ struct BlobPage {
     rendered: Option<String>,
     /// "On this page" as the rail: the document's headings, or a source file's symbols.
     outline_rail: String,
-    /// A source file's symbols as the narrow-screen menu in the path bar; empty for a
-    /// document, whose menu is in its card header.
-    symbol_menu: String,
     /// The header of the Markdown card; `None` for any other file.
     head: Option<DocHead>,
 }
@@ -206,30 +230,28 @@ pub(super) async fn blob(
             || markdown::outline_rail(&symbols),
             |d| markdown::outline_rail(&d.outline),
         );
-        let symbol_menu = markdown::outline_menu(&symbols, false);
         let (r, pe) = (fmt::enc_seg(&rev), fmt::enc_path(&path));
-        let crumbs = views::crumbs(&rev, &path, true);
-        let blame_href = crate::features::href_if(Feature::Blame, &format!("/blame/{r}/{pe}"));
-        let log_href = fmt::href(&format!("/log/{r}?path={pe}"));
+        let mut said = fmt::size(b.size);
+        if let Some(t) = text {
+            let _ = write!(
+                said,
+                " \u{b7} {}",
+                fmt::count(t.lines().count(), "line", "lines")
+            );
+        }
+        let page_head = PageHead {
+            // A source file's path stays in view while its lines scroll; a document's own card
+            // head pins instead.
+            pin: doc.is_none() && media.is_none(),
+            tools: if doc.is_none() {
+                markdown::outline_menu(&symbols, false)
+            } else {
+                String::new()
+            },
+            ..crate::pagehead::file_head(&rev, &path, FileView::File, Tagline::of(&said))
+        };
         let head = doc.as_ref().map(|d| DocHead {
-            page_head: true,
             title: path.rsplit('/').next().unwrap_or(&path).to_owned(),
-            crumbs: crumbs
-                .iter()
-                .map(|k| DocCrumb {
-                    name: k.name.clone(),
-                    href: k.href.clone(),
-                })
-                .collect(),
-            meta: fmt::size(b.size),
-            actions: [("Blame", &blame_href), ("History", &log_href)]
-                .into_iter()
-                .filter(|(_, h)| !h.is_empty())
-                .map(|(label, h)| DocAction {
-                    label,
-                    href: h.clone(),
-                })
-                .collect(),
             views: true,
             outline: markdown::outline_menu(&d.outline, true),
             ..DocHead::default()
@@ -242,12 +264,9 @@ pub(super) async fn blob(
             },
             rendered,
             outline_rail,
-            symbol_menu,
             head,
-            crumbs,
+            page_head,
             size: fmt::size(b.size),
-            blame_href,
-            log_href,
             raw_href: crate::features::href_if(Feature::Raw, &format!("/raw/{r}/{pe}")),
             title: path,
             html,
@@ -266,8 +285,7 @@ pub(super) async fn blob(
 struct BlamePage {
     c: Chrome,
     title: String,
-    crumbs: Vec<Crumb>,
-    blob_href: String,
+    head: PageHead,
     html: String,
 }
 
@@ -289,12 +307,15 @@ pub(super) async fn blame(
         );
         Ok(BlamePage {
             c: views::chrome_at(a, "files", &rev),
-            crumbs: views::crumbs(&rev, &path, true),
-            blob_href: fmt::href(&format!(
-                "/blob/{}/{}",
-                fmt::enc_seg(&rev),
-                fmt::enc_path(&path)
-            )),
+            head: PageHead {
+                pin: true,
+                ..crate::pagehead::file_head(
+                    &rev,
+                    &path,
+                    FileView::Blame,
+                    Tagline::of(&blame_said(&lines)),
+                )
+            },
             html: if too_large && raw.is_empty() {
                 "<p class=\"muted pad\">File too large to blame.</p>".to_owned()
             } else if too_large {
@@ -311,6 +332,23 @@ pub(super) async fn blame(
     })
     .await?;
     page(&p)
+}
+
+/// The blame tagline: how many lines, by how many authors, from how many commits.
+fn blame_said(lines: &[gitterrace_git::BlameLine]) -> String {
+    if lines.is_empty() {
+        return "No lines to blame".to_owned();
+    }
+    let authors: std::collections::HashSet<&str> =
+        lines.iter().map(|l| l.author.as_str()).collect();
+    let commits: std::collections::HashSet<&str> =
+        lines.iter().map(|l| l.commit.as_str()).collect();
+    format!(
+        "{} by {} from {}",
+        fmt::count(lines.len(), "line", "lines"),
+        fmt::count(authors.len(), "author", "authors"),
+        fmt::count(commits.len(), "commit", "commits")
+    )
 }
 
 /// Files blamed ahead of the first visitor after each index move.

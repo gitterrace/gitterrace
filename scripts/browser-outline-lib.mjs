@@ -56,7 +56,7 @@ export function checks(env) {
     // The followed line: selected, its box, and the bottom of the path bar when it is pinned.
     // f5 is on line 47.
     const landed = (p, id) => p.evaluate((i) => {
-      const line = document.getElementById(i), bar = document.querySelector('main>.head');
+      const line = document.getElementById(i), bar = document.querySelector('main>.ph');
       const r = line.getBoundingClientRect(), pinned = getComputedStyle(bar).position === 'sticky';
       return {
         hash: location.hash, sel: line.classList.contains('sel'), top: r.top, bottom: r.bottom,
@@ -81,7 +81,7 @@ export function checks(env) {
           await p.goto(srv.base + '/blob/HEAD/symbols.rs', { waitUntil: 'load' });
           const v = {
             rail: await shown(p, '.outline.rail'),
-            menu: await shown(p, 'main>.head>details.outline'),
+            menu: await shown(p, 'main>.ph details.outline'),
             over: await wide(p),
           };
           v.items = await p.evaluate(() => document.querySelectorAll('[data-outline] a').length);
@@ -96,13 +96,13 @@ export function checks(env) {
               () => document.querySelector('.outline.rail a.on')?.getAttribute('href'),
             );
           } else {
-            await p.click('main>.head>details.outline summary');
+            await p.click('main>.ph details.outline summary');
             await p.waitForTimeout(200);
             v.pop = await p.evaluate(() => {
-              const r = document.querySelector('main>.head .outline-pop').getBoundingClientRect();
+              const r = document.querySelector('main>.ph .outline-pop').getBoundingClientRect();
               return r.left >= 0 && r.right <= innerWidth + 1;
             });
-            await p.click('main>.head .outline-pop a[href="#L47"]');
+            await p.click('main>.ph .outline-pop a[href="#L47"]');
             await p.waitForTimeout(400);
             v.go = await landed(p, 'L47');
           }

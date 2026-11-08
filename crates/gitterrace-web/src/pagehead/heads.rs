@@ -51,3 +51,42 @@ pub(crate) fn waiting_head(tab: &str) -> PageHead {
         String::new(),
     )
 }
+
+/// Which view of one file a page shows, for its tab row.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) enum FileView {
+    File,
+    Blame,
+    History,
+}
+
+/// The page head of a file's views: the path as the title, `tagline`, and File, Blame and
+/// History as tabs (each only where its feature is on). `rev` is the revision in the path.
+pub(crate) fn file_head(rev: &str, path: &str, on: FileView, tagline: Tagline) -> PageHead {
+    use gitterrace_config::Feature;
+    let (r, p) = (fmt::enc_seg(rev), fmt::enc_path(path));
+    let mut tabs = vec![Tab {
+        label: "File".to_owned(),
+        href: fmt::href(&format!("/blob/{r}/{p}")),
+        on: on == FileView::File,
+    }];
+    if crate::features::on(Feature::Blame) {
+        tabs.push(Tab {
+            label: "Blame".to_owned(),
+            href: fmt::href(&format!("/blame/{r}/{p}")),
+            on: on == FileView::Blame,
+        });
+    }
+    if crate::features::on(Feature::History) {
+        tabs.push(Tab {
+            label: "History".to_owned(),
+            href: fmt::href(&format!("/history/{p}")),
+            on: on == FileView::History,
+        });
+    }
+    PageHead {
+        crumbs: crate::views::crumbs(rev, path, true),
+        tabs,
+        ..PageHead::new(path, tagline)
+    }
+}

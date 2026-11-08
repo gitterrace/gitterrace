@@ -4,11 +4,9 @@
   ],
   "own_heads": [
     "src/error.rs",
-    "templates/_path.html",
     "templates/commit.html",
     "templates/compare.html",
     "templates/dochead.html",
-    "templates/history.html",
     "templates/lost.html",
     "templates/overview.html",
     "templates/search.html",

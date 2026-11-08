@@ -3,8 +3,3 @@
 {% macro path(parts) -%}
 {%- for s in parts %}{% if !loop.first %}/<wbr>{% endif %}<span class="seg">{{ s }}</span>{% endfor -%}
 {%- endmacro %}
-{#- The page head of a folder, file or blame page: the path as the page's one h1, each part a
-    link. `crumbs` are the parts with their pages. -#}
-{% macro crumbs(crumbs) -%}
-<h1 class="crumbs">{% for k in crumbs %}{% if !loop.first %}<i>/</i>{% endif %}<a href="{{ k.href }}">{{ k.name }}</a>{% endfor %}</h1>
-{%- endmacro %}

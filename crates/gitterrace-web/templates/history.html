@@ -1,7 +1,9 @@
 {% extends "_base.html" %}
 {% block title %}History {{ path }} · {{ c.name }}{% endblock %}
+{%- import "_kpis.html" as kp -%}
 {% block content %}
-<div class="head"><h1>{{ path }}</h1><span class="muted"><a href="{{ blob_href }}">File</a> · {% if !blame_href.is_empty() %}<a href="{{ blame_href }}">Blame</a> · {% endif %}{{ total }}, following renames</span></div>
+{{ head }}
+{% call kp::kpis(kpis) %}{% endcall %}
 {% if let Some(e) = empty %}{{ e }}{% else %}
 <ul class="list log">{% for r in rows %}{{ r }}{% endfor %}</ul>
 {% endif %}
