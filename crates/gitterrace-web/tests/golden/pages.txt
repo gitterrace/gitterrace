@@ -12,10 +12,10 @@ c996a63e27f1df0629988fe18821529f c996a63e27f1df0629988fe18821529f [browse] /blob
 11990fcb582f80862d3ba8241b3b91f4 f45bc848c354257ee595c70214113d24 [browse] /commit/0000000
 031c99848370ad11a83d4e17881a1467 d0ec90661789c33d9461b7b9a1927be7 [browse] /commit/HEAD
 bd39a880de3cc9dc22c74ad7e6ec9598 258849f4c29cd38fce6791d33e631346 [browse] /commit/HEAD~1
-e69d68a0df34dbbb74236dabfa34869d e69d68a0df34dbbb74236dabfa34869d [browse] /compare
-9104b7c6ba7e557f2899980f4c86ef85 9104b7c6ba7e557f2899980f4c86ef85 [browse] /compare?base=HEAD&head=HEAD
-e39323b8383f94dcee229f1410449ca7 f8b01ef6d8bb78b6af4d92125ac44031 [browse] /compare?base=HEAD~3&head=HEAD
-9bce9c5b9edbaa2c3e852c91a6509708 9bce9c5b9edbaa2c3e852c91a6509708 [browse] /compare?base=nope&head=HEAD
+4a83032ee1a873a0bbac423e709e37bf 4a83032ee1a873a0bbac423e709e37bf [browse] /compare
+27612c6ddeca1923eba8b9bf0acae443 27612c6ddeca1923eba8b9bf0acae443 [browse] /compare?base=HEAD&head=HEAD
+2f1369f4046471bee3e024f742786fc9 6c083e2030a4a3c0039828c438b3be23 [browse] /compare?base=HEAD~3&head=HEAD
+d325329a2eb538857bbef7c8a558e93e d325329a2eb538857bbef7c8a558e93e [browse] /compare?base=nope&head=HEAD
 552f6a7e193ae2e4834f5312b8194b1e 552f6a7e193ae2e4834f5312b8194b1e [browse] /diff/HEAD/0
 e1093589d11fad1578a69b56bf1ac87a e323aba035cef4db30c1c77e8db3eb82 [browse] /diff/HEAD/99
 0f58a05873674264430548da20044806 5eb93208b1b128e3ab648304d92fb5ee [browse] /history/src/lib.rs

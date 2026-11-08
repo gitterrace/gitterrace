@@ -5,8 +5,8 @@
 {% block content %}
 <div class="head cmphead"><h1><a href="{{ log_href }}">Commits</a> <span class="muted">/ Compare</span></h1>
 <form class="cmp" action="{{ c.base }}/compare" method="get"><input name="base" value="{{ base }}" placeholder="Base: v1.0 or a commit" aria-label="Base" required><i aria-hidden="true">…</i><input name="head" value="{{ head }}" placeholder="Head" aria-label="Head"><button type="submit" hidden>Compare</button></form></div>
-{% if !tags.is_empty() %}<p class="hint">Since a tag: {% for t in tags %}<a href="{{ t.1 }}">{{ t.0 }}</a>{% if !loop.last %} · {% endif %}{% endfor %}</p>{% endif %}
-{% if !branches.is_empty() %}<p class="hint">Against a branch: {% for t in branches %}<a href="{{ t.1 }}">{{ t.0 }}</a>{% if !loop.last %} · {% endif %}{% endfor %}</p>{% endif %}
+{% if !tags.is_empty() %}<p class="hint">Since a tag:&nbsp;{% for t in tags %}<a href="{{ t.1 }}">{{ t.0 }}</a>{% if !loop.last %} · {% endif %}{% endfor %}</p>{% endif %}
+{% if !branches.is_empty() %}<p class="hint">Against a branch:&nbsp;{% for t in branches %}<a href="{{ t.1 }}">{{ t.0 }}</a>{% if !loop.last %} · {% endif %}{% endfor %}</p>{% endif %}
 {% if let Some(e) = pick %}{{ e }}{% endif %}
 {% if let Some(e) = error %}<p class="muted">{{ e }}</p>{% endif %}
 {% if let Some(r) = result %}
