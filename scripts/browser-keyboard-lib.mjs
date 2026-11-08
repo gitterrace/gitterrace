@@ -71,24 +71,40 @@ export function checks(env) {
       await p.setViewportSize({ width: 1280, height: 800 });
     }, async (p) => {
       const found = [];
-      await p.evaluate(() => {
-        /** @type {HTMLElement} */ (document.activeElement)?.blur();
-        scrollTo(0, 0);
-      });
-      const first = await p.evaluate(() => 0);
-      void first;
-      const seen = new Set();
-      for (let i = 0; i < 400; i++) {
-        await p.keyboard.press('Tab');
-        const m = await p.evaluate(ringProbe);
-        if (!m) break;
-        if (seen.has(m.id) && m.id !== '') { if (m.id === [...seen][0]) break; }
-        seen.add(m.id);
-        if (m.problem) found.push(`${m.what}: ${m.problem}`);
-        if (i === 399) found.push('Tab never leaves the page: a trap or too many stops');
+      // Both schemes: the ring and the surfaces under it change color with it.
+      for (const colorScheme of ['light', 'dark']) {
+        await p.emulateMedia({ colorScheme });
+        found.push(...(await walk(p)).map((f) => `${colorScheme} ${f}`));
       }
+      await p.emulateMedia({ colorScheme: null });
       return found;
     });
+  }
+
+  /** One Tab walk from the top of the page: what is wrong at each stop. */
+  async function walk(p) {
+    const found = [];
+    await p.evaluate(() => {
+      /** @type {HTMLElement} */ (document.activeElement)?.blur();
+      scrollTo(0, 0);
+      // Fades the page load started are held at their start, so every stop sees them whatever
+      // the timing; ringProbe measures both ends of each.
+      for (const an of document.getAnimations()) {
+        an.pause();
+        an.currentTime = 0;
+      }
+    });
+    const seen = new Set();
+    for (let i = 0; i < 400; i++) {
+      await p.keyboard.press('Tab');
+      const m = await p.evaluate(ringProbe);
+      if (!m) break;
+      if (seen.has(m.id) && m.id !== '') { if (m.id === [...seen][0]) break; }
+      seen.add(m.id);
+      if (m.problem) found.push(`${m.what}: ${m.problem}`);
+      if (i === 399) found.push('Tab never leaves the page: a trap or too many stops');
+    }
+    return found;
   }
 
   async function reflow() {
@@ -269,25 +285,21 @@ function ringProbe() {
     && parseFloat(getComputedStyle(inner).strokeWidth) >= 2;
   if (ow < 2 && sh < 2 && !innerChange) problem = `no ring of 2 px (outline ${ow}, shadow ${sh})`;
   if (!problem && ow >= 2) {
-    const lum = (c) => {
-      const v = c.match(/[\d.]+/g).map(Number);
-      const f = (x) => {
-        x /= 255;
-        return x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4;
-      };
-      return 0.2126 * f(v[0]) + 0.7152 * f(v[1]) + 0.0722 * f(v[2]);
-    };
-    let bg = 'rgb(255,255,255)';
-    for (let n = e; n; n = n.parentElement) {
-      const c = getComputedStyle(n).backgroundColor;
-      if (c && !/rgba\(.*, 0\)|transparent/.test(c)) {
-        bg = c;
-        break;
+    // A fill still fading (a transition, such as one a page load starts) is measured at both
+    // ends, the worse counting: the result does not hang on where the fade was at the Tab, and a
+    // fade out of a bad color is still caught.
+    const fades = document.getAnimations().filter((an) => an.playState !== 'finished');
+    const ends = [];
+    if (fades.length) {
+      for (const an of fades) {
+        an.pause();
+        an.currentTime = 0;
       }
+      ends.push(ringContrast(e));
+      for (const an of fades) an.finish();
     }
-    const a = lum(cs.outlineColor),
-      b = lum(bg),
-      ratio = (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+    ends.push(ringContrast(e));
+    const [ratio, bg] = ends.sort((x, y) => x[0] - y[0])[0];
     if (ratio < 3) problem = `ring contrast ${ratio.toFixed(2)}:1 against ${bg}`;
   }
   if (!problem) {
@@ -315,4 +327,49 @@ function ringProbe() {
     }
   }
   return { id, what, problem };
+
+  // The ring's contrast against the lower of the colors it touches, each composited down to the
+  // canvas so it is opaque. An offset above 0 leaves a gap of the parent between ring and element,
+  // so it touches only the backdrop; at 0 it touches the backdrop and the element's fill; below 0
+  // it is drawn on the element's fill.
+  /** @param {Element} e @returns {[number, string]} */
+  function ringContrast(e) {
+    const cs = getComputedStyle(e);
+    const lum = (v) => {
+      const f = (x) => {
+        x /= 255;
+        return x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4;
+      };
+      return 0.2126 * f(v[0]) + 0.7152 * f(v[1]) + 0.0722 * f(v[2]);
+    };
+    const rgba = (c) => {
+      const v = (c.match(/[\d.]+/g) || []).map(Number);
+      return v.length < 3 ? [0, 0, 0, 0] : [v[0], v[1], v[2], v.length > 3 ? v[3] : 1];
+    };
+    const over = (c, u) => [0, 1, 2].map((i) => c[i] * c[3] + u[i] * (1 - c[3]));
+    const probe = document.createElement('div');
+    probe.style.cssText = 'position:absolute;width:0;height:0;background:Canvas';
+    document.body.append(probe);
+    let under = rgba(getComputedStyle(probe).backgroundColor);
+    probe.remove();
+    const offset = parseFloat(cs.outlineOffset) || 0;
+    const start = offset >= 0 ? e.parentElement : e;
+    const layers = [];
+    for (let n = start; n; n = n.parentElement) {
+      const c = rgba(getComputedStyle(n).backgroundColor);
+      if (c[3] > 0) layers.push(c);
+      if (c[3] >= 1) break;
+    }
+    for (const c of layers.reverse()) under = over(c, under);
+    const sides = [under];
+    if (offset === 0) sides.push(over(rgba(cs.backgroundColor), under));
+    const a = lum(rgba(cs.outlineColor));
+    return sides
+      .map((s) => {
+        const b = lum(s);
+        const ratio = (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+        return /** @type {[number, string]} */ ([ratio, `rgb(${s.map(Math.round)})`]);
+      })
+      .sort((x, y) => x[0] - y[0])[0];
+  }
 }
