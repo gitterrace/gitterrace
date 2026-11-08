@@ -67,6 +67,9 @@ loopback address. `--public` servers never take repositories this way.
 is no remove button in the page: a browser has no secret, and a page may be on
 someone's screen.
 
+[Using it](docs/using.md) covers serving a folder of repositories, the log
+graph, outlines, keys and the settings page.
+
 For agents, `git terrace mcp --served` runs a read-only MCP server over stdio
 that reads every repository served before, the ones a running server shows.
 `list_repos` names them, and every tool takes that name as `repo`. Without

@@ -61,6 +61,11 @@ const DOCS: &[(&str, Kind, &str)] = &[
     ),
     ("docs/why.md", Kind::Start, "What gitterrace is for"),
     (
+        "docs/using.md",
+        Kind::Guide,
+        "Repositories, the log graph, outlines, keys, settings",
+    ),
+    (
         "docs/actions.md",
         Kind::Guide,
         "Send a selection to another app, or run your own program on it",

@@ -16,6 +16,7 @@ repository, then read [why](why.md) it exists. Contributors start at
 
 | Document | Covers |
 | --- | --- |
+| [using](using.md) | Repositories, the log graph, outlines, keys, settings |
 | [actions](actions.md) | Send a selection to another app, or run your own program on it |
 | [online](online.md) | Publish a static export, public mode, a reverse proxy |
 
