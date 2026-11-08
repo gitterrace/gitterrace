@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# The shared reference-transaction hook (shared/schwarzwald/hooks): main keeps landing order on
+# every update, a hand-made fast-forward included. Wired by core.hooksPath scripts/hooks.
+exec "$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)/shared/schwarzwald/hooks/commit-dates.sh" "$@"

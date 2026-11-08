@@ -33,5 +33,8 @@ gate = [
   # GIT_CONFIG_COUNT would override that and leave the fixtures unguarded.
   "env -u GIT_CONFIG_COUNT bash shared/schwarzwald/lint/run.sh",
 ]
-# The landing runs in a fresh clone, which has no core.hooksPath yet: set it there first.
-messages = "git config core.hooksPath scripts/hooks && bash scripts/land-check.sh --messages {base}"
+# The landing runs in a fresh clone, which has no core.hooksPath yet: set it there first. The
+# dates of the landed commits are read by the shared commit-dates lint.
+messages = """git config core.hooksPath scripts/hooks \
+  && bash scripts/land-check.sh --messages {base} \
+  && python3 shared/schwarzwald/lint/commit-dates.py --base {base}"""
