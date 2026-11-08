@@ -33,6 +33,7 @@
 .ph>.fbar:has(>.filter){flex-wrap:nowrap}
 .ph>.fbar>.filter{width:auto;flex:0 1 320px;min-width:0}
 .ph-end{margin-left:auto;font-size:var(--text-sm);flex:none}
+main.wrap>.ph+h2{margin-top:0}
 @media (min-width:601px){.ph.pin{position:sticky;top:0;z-index:3;background:var(--bg)}}
 @media (max-width:600px){
   .ph h1{font-size:var(--text-lg)}

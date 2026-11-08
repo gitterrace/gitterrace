@@ -1,8 +1,8 @@
 {% extends "_base.html" %}
-{% block title %}{{ name }} · {{ c.name }}{% endblock %}
+{% block title %}{{ head.title }} · {{ c.name }}{% endblock %}
 {% block content %}
-<div class="head"><h1>{{ name }} <span class="muted">tag</span></h1></div>
-<p class="meta muted">{% if !tagger.is_empty() %}Tagged by <b>{{ tagger }}</b> {% endif %}{{ when }} · <a href="{{ tree_href }}">Browse files</a></p>
+{{ head }}
+<p class="meta muted">{{ when }}</p>
 <ul class="list log">{{ commit }}</ul>
 {% if subject.is_empty() %}<p class="muted">Lightweight tag: no message.</p>{% else %}
 <div class="card pad tagmsg"><b>{{ subject }}</b>{% if !body.is_empty() %}<pre>{{ body }}</pre>{% endif %}</div>

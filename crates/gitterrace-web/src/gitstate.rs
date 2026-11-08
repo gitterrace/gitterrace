@@ -90,11 +90,9 @@ pub(crate) async fn stashes(State(app): Shared) -> Redirect {
 #[template(path = "tag.html")]
 struct TagPage {
     c: Chrome,
-    name: String,
+    head: crate::pagehead::PageHead,
     /// The tagged commit, as every list shows a commit.
     commit: views::CommitRow,
-    tree_href: String,
-    tagger: String,
     when: crate::when::When,
     subject: String,
     body: String,
@@ -110,7 +108,29 @@ pub(crate) async fn tag(State(app): Shared, Path(name): Path<String>) -> Result<
             .ok_or_else(|| gitterrace_git::Error::RevNotFound(name.clone()))?;
         let now = fmt::now();
         let note = r.annotation.as_ref();
+        let tagger = note
+            .and_then(|n| n.tagger.as_ref())
+            .map(|t| t.name.clone())
+            .unwrap_or_default();
+        let when = note
+            .and_then(|n| n.tagger.as_ref())
+            .map_or_else(|| ago(r.time, now), |t| ago(t.time, now));
+        let tree_href = href(&format!("/tree/{}", enc_seg(&r.name)));
+        let said = if tagger.is_empty() {
+            "A lightweight tag".to_owned()
+        } else {
+            format!("Tagged by {tagger}")
+        };
+        let head = crate::pagehead::PageHead {
+            qualifier: "tag".to_owned(),
+            ..crate::pagehead::PageHead::new(
+                r.name.clone(),
+                crate::pagehead::Tagline::of(&said).link(" \u{b7} ", "Browse files", tree_href),
+            )
+        };
         Ok(TagPage {
+            head,
+            when,
             c: views::chrome(a, "refs").pinned(),
             commit: a
                 .repo
@@ -118,17 +138,8 @@ pub(crate) async fn tag(State(app): Shared, Path(name): Path<String>) -> Result<
                 .first()
                 .map(|s| views::CommitRow::of(s, now))
                 .unwrap_or_default(),
-            tree_href: href(&format!("/tree/{}", enc_seg(&r.name))),
-            tagger: note
-                .and_then(|n| n.tagger.as_ref())
-                .map(|t| t.name.clone())
-                .unwrap_or_default(),
-            when: note
-                .and_then(|n| n.tagger.as_ref())
-                .map_or_else(|| ago(r.time, now), |t| ago(t.time, now)),
             subject: note.map(|n| n.subject.clone()).unwrap_or_default(),
             body: note.map(|n| n.body.clone()).unwrap_or_default(),
-            name: r.name,
         }
         .render()?)
     })

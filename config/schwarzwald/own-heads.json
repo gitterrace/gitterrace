@@ -11,9 +11,7 @@
     "templates/history.html",
     "templates/lost.html",
     "templates/overview.html",
-    "templates/refs.html",
     "templates/search.html",
-    "templates/tag.html",
     "templates/worktree.html"
   ]
 }

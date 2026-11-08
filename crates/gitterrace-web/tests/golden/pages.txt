@@ -32,7 +32,7 @@ b7f58d00c12d98058b7075f6b31f0c2e b7f58d00c12d98058b7075f6b31f0c2e [browse] /log/
 6fb0e96f69284344a49603688f88c4c2 b44ea281617645f75e1cd0dce886ff2a [browse] /log/nope
 1bfbb56dc2ef0ec433f3901635ed8766 c8ca8849a5d195f80384015e842cc3a8 [browse] /raw/HEAD/missing.rs
 87a341eef398c071bc0aba64aae6b78f d00ea85271236e53419ce2859a247db7 [browse] /raw/HEAD/src/lib.rs
-6068017cc7c8ecb451aa7decc44387e4 20d2966b3a09619427f3f4deb527ee92 [browse] /refs
+ef13037b148cf27c1dafaf3e14d00fcc 55f63af4247d1ad329d64a0ad5a4d89a [browse] /refs
 0766da27b98ec83cffca9f5756800295 0766da27b98ec83cffca9f5756800295 [browse] /search
 9ff5336721522857ec285f9609bc8be1 9ff5336721522857ec285f9609bc8be1 [browse] /search?q=FN&case=1
 965eab520b4d2ac068264f0fe51997b5 b79d4c8e3b3f569986601a2de286c507 [browse] /search?q=feat&kind=commits
@@ -45,7 +45,7 @@ b3d230f3fa4c7fe2ee263a6af7f5b2b0 3d8063d763148f70df6f7606d756ed1a [browse] /stat
 b3d230f3fa4c7fe2ee263a6af7f5b2b0 3d8063d763148f70df6f7606d756ed1a [browse] /stats/patterns
 b3d230f3fa4c7fe2ee263a6af7f5b2b0 3d8063d763148f70df6f7606d756ed1a [browse] /stats/types
 181a231a5a559f81df4710ebb2e3ed0e f5321ba27b7c6dc46cc998c9eb6e881e [browse] /tag/nope
-d5d4d83d1cfa47ae2eceffeeed5b2989 7770fccf03b2feef4c72ce9c877cd999 [browse] /tag/v1
+c02bffd6bfa07aab55ac92f83a9f55a4 c5cd64f18cd7b37363f75bab4a31de9a [browse] /tag/v1
 6701622e029b1938f5cea4f5cc190711 6701622e029b1938f5cea4f5cc190711 [browse] /tree/HEAD
 6701622e029b1938f5cea4f5cc190711 6701622e029b1938f5cea4f5cc190711 [browse] /tree/HEAD/
 c4474f2e058b0a661ab5cfc1c131f841 c4474f2e058b0a661ab5cfc1c131f841 [browse] /tree/HEAD/docs

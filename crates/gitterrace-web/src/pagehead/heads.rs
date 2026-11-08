@@ -1,5 +1,8 @@
 //! The heads several pages share: insights, a file, the overview, refs and the working tree.
 
+use gitterrace_git::RefKind;
+
+use crate::fmt;
 use crate::pagehead::{PageHead, Tab, Tagline};
 
 /// The tagline of an insights tab: its finding (`crate::lead`), or a plain line when nothing
@@ -27,4 +30,24 @@ pub(crate) fn insights_head(active: &str, tagline: Tagline, toolbar: String) -> 
         toolbar,
         ..PageHead::new("Insights", tagline)
     }
+}
+
+/// The branches and tags page's head: how many of each kind of ref there are, from `total`.
+pub(crate) fn refs_head(total: impl Fn(RefKind) -> usize) -> PageHead {
+    let said = format!(
+        "{} \u{b7} {} \u{b7} {}",
+        fmt::count(total(RefKind::Branch), "branch", "branches"),
+        fmt::count(total(RefKind::Tag), "tag", "tags"),
+        fmt::count(total(RefKind::Remote), "remote branch", "remote branches")
+    );
+    PageHead::new("Branches and tags", Tagline::of(&said))
+}
+
+/// The head of an insights tab while the history index is built.
+pub(crate) fn waiting_head(tab: &str) -> PageHead {
+    insights_head(
+        tab,
+        Tagline::of("Waiting for the history index."),
+        String::new(),
+    )
 }

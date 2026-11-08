@@ -270,6 +270,7 @@ fn overview_numbers(a: &App, head: &str, src: &crate::insights::Src) -> Numbers 
 #[template(path = "refs.html")]
 struct RefsPage {
     c: Chrome,
+    head: crate::pagehead::PageHead,
     branches: Vec<CommitRow>,
     tags: Vec<CommitRow>,
     remotes: Vec<CommitRow>,
@@ -349,6 +350,7 @@ async fn refs(State(app): Shared, Query(q): Query<RefsQuery>) -> Result<Html<Str
         .then(|| Empty::new("No branches, tags or remotes."));
         Ok(RefsPage {
             c: views::chrome(a, "refs").live(Mode::REFS),
+            head: crate::pagehead::refs_head(total),
             no_branches: branches.is_empty().then(|| Empty::new("No branches.")),
             nothing,
             branches,
@@ -402,11 +404,7 @@ pub(crate) async fn with_records<T: Template + Send + 'static>(
         Ok((
             PendingPage {
                 c,
-                page_head: crate::pagehead::insights_head(
-                    tab,
-                    crate::pagehead::Tagline::of("Waiting for the history index."),
-                    String::new(),
-                ),
+                page_head: crate::pagehead::waiting_head(tab),
                 newer: a.index.newer_format().map(|v| {
                     // The cache folder is a path on the host; a public visitor gets no path.
                     let dir = if a.public() {

@@ -62,7 +62,7 @@
     "crates/gitterrace-web/templates/settings.html": 24,
     "crates/gitterrace-web/templates/side.html": 12,
     "crates/gitterrace-web/templates/stats.html": 5,
-    "crates/gitterrace-web/templates/tag.html": 2,
+    "crates/gitterrace-web/templates/tag.html": 1,
     "crates/gitterrace-web/templates/tree.html": 4,
     "crates/gitterrace-web/templates/worktree.html": 3,
     "crates/gitterrace/src/export/tests.rs": 1,
