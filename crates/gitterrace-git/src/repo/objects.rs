@@ -104,6 +104,37 @@ impl Repo {
             .object_id())
     }
 
+    /// [`Repo::blob`] and, when the blob is at most `max_bytes`, its raw bytes (else empty),
+    /// from one content read: a media page wants both.
+    pub fn blob_with_bytes(
+        &self,
+        rev: &str,
+        path: &str,
+        max_bytes: u64,
+    ) -> Result<(Blob, Vec<u8>)> {
+        let repo = self.repo();
+        let tip = self.resolve_id(&repo, rev)?;
+        let path = path.trim_matches('/');
+        let id = Self::blob_id_at(&repo, tip, path)?;
+        let size = repo.find_header(id).map_err(git)?.size();
+        let limit = self.text_limit();
+        let data = if size <= limit.max(max_bytes) {
+            repo.find_object(id).map_err(git)?.detach().data
+        } else {
+            Vec::new()
+        };
+        let text = (size <= limit && !crate::diff::is_binary(&data))
+            .then(|| std::str::from_utf8(&data).ok().map(str::to_owned))
+            .flatten();
+        let bytes = if size <= max_bytes { data } else { Vec::new() };
+        let blob = Blob {
+            path: path.to_string(),
+            size,
+            text,
+        };
+        Ok((blob, bytes))
+    }
+
     /// The file at `path` in `rev`. `text` is `None` for binary blobs and for blobs over
     /// [`MAX_TEXT_BYTES`](crate::MAX_TEXT_BYTES), which are never read.
     pub fn blob(&self, rev: &str, path: &str) -> Result<Blob> {

@@ -507,14 +507,58 @@ fn the_ref_list_follows_every_new_moved_and_deleted_ref() {
     let before = names(&repo);
     assert_eq!(before, names(&repo), "a repeat answers the same list");
     git_at(d, T0, &["tag", "v9"]);
-    assert!(names(&repo).iter().any(|(n, _)| n == "v9"), "a new tag shows");
+    assert!(
+        names(&repo).iter().any(|(n, _)| n == "v9"),
+        "a new tag shows"
+    );
     git_at(d, T0, &["branch", "side", "HEAD~1"]);
-    let side = names(&repo).into_iter().find(|(n, _)| n == "side").expect("side").1;
+    let side = names(&repo)
+        .into_iter()
+        .find(|(n, _)| n == "side")
+        .expect("side")
+        .1;
     git_at(d, T0, &["branch", "-f", "side", "HEAD"]);
-    let moved = names(&repo).into_iter().find(|(n, _)| n == "side").expect("side").1;
+    let moved = names(&repo)
+        .into_iter()
+        .find(|(n, _)| n == "side")
+        .expect("side")
+        .1;
     assert_ne!(side, moved, "a moved branch shows its new commit");
     git_at(d, T0, &["tag", "-d", "v9"]);
-    assert!(!names(&repo).iter().any(|(n, _)| n == "v9"), "a deleted tag goes");
+    assert!(
+        !names(&repo).iter().any(|(n, _)| n == "v9"),
+        "a deleted tag goes"
+    );
     git_at(d, T0, &["pack-refs", "--all"]);
-    assert_eq!(names(&repo).len(), before.len() + 1, "packing changes nothing shown");
+    assert_eq!(
+        names(&repo).len(),
+        before.len() + 1,
+        "packing changes nothing shown"
+    );
+}
+
+/// Guard class: a combined read answers what the separate reads answer, on every side of
+/// both caps. Red when the text or bytes of one read differ from `blob` and `blob_bytes`.
+#[test]
+fn one_read_of_text_and_bytes_matches_the_two_reads() {
+    let tmp = fixture();
+    let d = tmp.path();
+    let repo = Repo::discover(d).expect("open");
+    let at = repo.log("HEAD", None, 0, 10).expect("log")[2].id.clone();
+    for (path, cap) in [
+        ("a.txt", 1 << 20),
+        ("a.txt", 4),
+        ("bin.dat", 1 << 20),
+        ("bin.dat", 0),
+    ] {
+        let (b, bytes) = repo.blob_with_bytes(&at, path, cap).expect("one");
+        let two = repo.blob(&at, path).expect("blob");
+        assert_eq!((b.size, b.text), (two.size, two.text), "{path} {cap}");
+        let want = if b.size <= cap {
+            repo.blob_bytes(&at, path).expect("bytes")
+        } else {
+            Vec::new()
+        };
+        assert_eq!(bytes, want, "{path} {cap}");
+    }
 }

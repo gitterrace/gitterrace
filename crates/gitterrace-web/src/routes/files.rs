@@ -146,15 +146,17 @@ pub(super) async fn blob(
     let p = blocking(&app, move |a| {
         let id = a.repo.resolve(&rev)?;
         let path = path.trim_matches('/').to_owned();
-        let b = a.repo.blob(&id, &path)?;
-        let media = match crate::media::kind(&path) {
+        let kind = crate::media::kind(&path);
+        // One content read serves the text and, for media small enough to want facts about,
+        // the bytes.
+        let (b, bytes) = if kind.is_some() {
+            a.repo
+                .blob_with_bytes(&id, &path, a.cfg().limits.preview_mb << 20)?
+        } else {
+            (a.repo.blob(&id, &path)?, Vec::new())
+        };
+        let media = match kind {
             Some(k) => {
-                // One read, and only for files small enough to want facts about.
-                let bytes = if b.size <= a.cfg().limits.preview_mb << 20 {
-                    a.repo.blob_bytes(&id, &path)?
-                } else {
-                    Vec::new()
-                };
                 let src = (k == crate::media::Kind::Svg)
                     .then(|| std::str::from_utf8(&bytes).ok())
                     .flatten()
