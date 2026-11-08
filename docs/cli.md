@@ -4,10 +4,8 @@
 
 <!-- BEGIN GENERATED: cli -->
 Everything the `git terrace` command line accepts, read from the same definition
-the binary
-parses with. `git terrace --help` and `git terrace <command> --help` print the
-same text.
-The global flags work on every command.
+the binary parses with. `git terrace --help` and `git terrace <command> --help`
+print the same text. The global flags work on every command.
 
 ## `git terrace`
 

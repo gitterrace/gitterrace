@@ -147,17 +147,20 @@ pub const PROSE_WIDTH: usize = 80;
 
 /// Wraps the prose paragraphs of generated markdown at [`PROSE_WIDTH`]. Tables, fences, headings,
 /// HTML comments and list items stay as written: they cannot be reflowed without changing what
-/// they render. A word longer than the limit (a URL, a long code span) keeps its own line.
+/// they render. A paragraph with a line over the width is reflowed as a whole, so a source string
+/// wrapped at another width leaves no one-word line behind. A word longer than the limit (a URL,
+/// a long code span) keeps its own line.
 pub fn wrap_markdown(md: &str) -> String {
     let mut out = String::with_capacity(md.len());
     let mut fence = false;
+    let mut para: Vec<&str> = Vec::new();
     for line in md.split_inclusive('\n') {
         let text = line.trim_end_matches('\n');
         let trimmed = text.trim_start();
         if trimmed.starts_with("```") {
             fence = !fence;
         }
-        let keep = fence
+        let structure = fence
             || trimmed.starts_with("```")
             || trimmed.starts_with('|')
             || trimmed.starts_with('#')
@@ -165,18 +168,40 @@ pub fn wrap_markdown(md: &str) -> String {
             || trimmed.starts_with("- ")
             || trimmed.starts_with("* ")
             || trimmed.starts_with('>')
-            || text.chars().count() <= PROSE_WIDTH;
-        if keep {
-            out.push_str(line);
-            continue;
+            || trimmed.is_empty();
+        let indent = |t: &str| t.len() - t.trim_start().len();
+        if !para.is_empty() && (structure || indent(para[0]) != indent(text)) {
+            flush(&mut out, &mut para);
         }
-        let indent = &text[..text.len() - trimmed.len()];
-        out.push_str(&wrap_line(trimmed, indent));
-        if line.ends_with('\n') {
-            out.push('\n');
+        if structure {
+            out.push_str(line);
+        } else {
+            para.push(text);
         }
     }
+    flush(&mut out, &mut para);
+    // A paragraph at the end of input without a newline gets none.
+    if !md.ends_with('\n') && out.ends_with('\n') {
+        out.pop();
+    }
     out
+}
+
+/// Writes the lines of one prose paragraph: as they are when each fits, else reflowed together.
+fn flush(out: &mut String, para: &mut Vec<&str>) {
+    if para.iter().all(|l| l.chars().count() <= PROSE_WIDTH) {
+        for l in para.iter() {
+            out.push_str(l);
+            out.push('\n');
+        }
+    } else {
+        let first = para[0];
+        let indent = &first[..first.len() - first.trim_start().len()];
+        let joined: Vec<&str> = para.iter().map(|l| l.trim()).collect();
+        out.push_str(&wrap_line(&joined.join(" "), indent));
+        out.push('\n');
+    }
+    para.clear();
 }
 
 /// Breaks one prose line at spaces. A code span never breaks: its spaces become no-break
@@ -272,6 +297,30 @@ mod tests {
         let prose = out.split("\n\n").next().expect("first paragraph");
         assert!(prose.lines().count() > 1);
         assert!(prose.lines().all(|l| l.chars().count() <= PROSE_WIDTH));
+        assert_eq!(wrap_markdown(&out), out, "idempotent");
+    }
+
+    /// The class this guards: a generated paragraph whose source lines were wrapped at another
+    /// width, which wrapping line by line leaves with one-word lines.
+    #[test]
+    fn a_paragraph_reflows_as_a_whole_without_one_word_lines() {
+        let src = format!(
+            "{} are\n`code span` and more words here.\nShort.\n\nNext.\n",
+            "word ".repeat(16).trim_end()
+        );
+        let out = wrap_markdown(&src);
+        let first = out.split("\n\n").next().expect("paragraph");
+        assert!(
+            first.lines().all(|l| l.chars().count() <= PROSE_WIDTH),
+            "{out}"
+        );
+        assert!(
+            first.lines().all(|l| l.split(' ').count() > 1),
+            "one-word line:\n{out}"
+        );
+        assert!(out.ends_with("\n\nNext.\n"), "{out}");
+        let fits = "a short line\nanother short line\n";
+        assert_eq!(wrap_markdown(fits), fits, "fitting lines stay as written");
         assert_eq!(wrap_markdown(&out), out, "idempotent");
     }
 

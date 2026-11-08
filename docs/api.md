@@ -3,16 +3,12 @@
 # API
 
 Read-only. Everything is pinned to a revision (`rev`, default `HEAD`). Errors
-are
-`{"error": {"code", "message"}}`, codes listed below. Every response carries an
-`ETag`
-built from HEAD, every ref's target, the cache format, how far the cache is
-filled and the
-configured counting defaults, so moving any branch or tag, the cache catching up
-or a changed
-`insights` setting invalidates it. `If-None-Match` gets 304.
-JSON is `snake_case`. The same endpoints as `OpenAPI` 3.1:
-[openapi.json](openapi.json).
+are `{"error": {"code", "message"}}`, codes listed below. Every response carries
+an `ETag` built from HEAD, every ref's target, the cache format, how far the
+cache is filled and the configured counting defaults, so moving any branch or
+tag, the cache catching up or a changed `insights` setting invalidates it.
+`If-None-Match` gets 304. JSON is `snake_case`. The same endpoints as `OpenAPI`
+3.1: [openapi.json](openapi.json).
 
 The API of each repository lives at `/r/{name}/api/v1`.
 
