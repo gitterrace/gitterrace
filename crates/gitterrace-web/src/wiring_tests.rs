@@ -353,8 +353,7 @@ async fn a_cancelled_request_keeps_its_job_slot_until_the_work_ends() {
     assert!(cut.is_err(), "the job outlives the timeout");
     assert!(!done.load(Ordering::SeqCst));
     assert_eq!(a.env.free_jobs(), 1, "the running job still holds its slot");
-    gitterrace_testkit::wait::until("the job ends", || async { done.load(Ordering::SeqCst) })
-        .await;
+    gitterrace_testkit::wait::until("the job ends", || async { done.load(Ordering::SeqCst) }).await;
     gitterrace_testkit::wait::until("its slot comes back", || async { a.env.free_jobs() == 2 })
         .await;
 }
