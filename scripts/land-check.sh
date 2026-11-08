@@ -89,7 +89,7 @@ for path in paths:
         touched.add(dirs[top])
     elif path.endswith((".md", ".json")) and not path.startswith(("crates/", "xtask/")):
         continue
-    elif path.startswith(("scripts/", "docs/", "site/", "tests/", ".github/")):
+    elif path.startswith(("scripts/", "docs/", "site/", "tests/bench/", ".github/")):
         continue
     else:
         widen = True
@@ -343,6 +343,7 @@ step "$py" shared/schwarzwald/tools/ratchet-check.py --self-test
 step "$py" shared/schwarzwald/tools/ratchet-check.py --base "$base"
 step cargo test -p "$(land_cfg conventions.crate)" --test "$(land_cfg conventions.test)"
 step bash shared/schwarzwald/lint/run.sh
+step python3 scripts/root-check.py
 step make docs-check
 check_subjects "$base"
 # Subject and body of every commit landed: the shared lints the commit-msg hook runs.

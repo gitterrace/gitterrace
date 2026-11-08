@@ -71,6 +71,8 @@ Install any tool it reports as missing.
   the theme copy, the commit message hook), plus the repository's own: pinned
   actions, CSS scope, the site's content security policy, test configuration
 - tsc and pyright: types for the scripts, actionlint: the workflows
+- `scripts/root-check.py`: the repository root holds only the entries it lists, so new
+  scripts, tests and data go under `scripts/`, `tests/`, `docs/` or `config/`
 
 ## Commits
 
