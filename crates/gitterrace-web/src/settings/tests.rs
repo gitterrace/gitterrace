@@ -10,7 +10,7 @@ use tower::ServiceExt;
 
 use crate::app::Env;
 
-fn repo(root: &Path) -> PathBuf {
+pub(super) fn repo(root: &Path) -> PathBuf {
     let p = root.join("r");
     let built = gitterrace_testkit::Fixture::init(&p)
         .write("a.txt", "a\n")
@@ -258,7 +258,7 @@ async fn a_stale_or_invalid_save_leaves_the_file() {
 }
 
 /// GETs `uri` the way a browser on this server would.
-async fn page(r: &axum::Router, uri: &str) -> (u16, String) {
+pub(super) async fn page(r: &axum::Router, uri: &str) -> (u16, String) {
     let mut req = Req::new("GET", uri, None);
     req.site = None;
     req.origin = None;
@@ -524,3 +524,5 @@ async fn each_field_links_to_its_error_and_the_page_has_an_alert_summary() {
     }
     assert!(html.contains("id=\"seterrsum\" role=\"alert\""));
 }
+
+mod header;

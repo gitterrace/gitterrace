@@ -59,7 +59,7 @@
     "crates/gitterrace-web/templates/repos.html": 3,
     "crates/gitterrace-web/templates/search.html": 6,
     "crates/gitterrace-web/templates/seg_control.html": 1,
-    "crates/gitterrace-web/templates/settings.html": 26,
+    "crates/gitterrace-web/templates/settings.html": 24,
     "crates/gitterrace-web/templates/side.html": 12,
     "crates/gitterrace-web/templates/stats.html": 5,
     "crates/gitterrace-web/templates/tag.html": 2,

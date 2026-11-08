@@ -49,6 +49,7 @@ pub(crate) struct Section {
 #[derive(Template)]
 #[template(path = "settings.html")]
 struct Page {
+    c: crate::views::Chrome,
     token: String,
     file: &'static str,
     head: crate::dochead::DocHead,
@@ -203,6 +204,7 @@ pub(crate) async fn page(
         };
         let form_off = first_error(&check);
         Page {
+            c: chrome_bare(&env, "Settings", "/_settings"),
             token,
             file: f.as_str(),
             head: crate::dochead::DocHead {
@@ -251,5 +253,51 @@ pub(crate) async fn page(
             res
         }
         _ => crate::error::not_found("The settings page could not be built."),
+    }
+}
+
+/// The bar of a page that belongs to the server, not to a repository: `name` stands where the
+/// repository's name does, `nav` is the one tab the page has.
+fn chrome_bare(env: &crate::app::Env, name: &str, href: &str) -> crate::views::Chrome {
+    use gitterrace_config::Feature;
+    let cfg = env.cfg();
+    crate::views::Chrome {
+        base: String::new(),
+        name: name.to_owned(),
+        branch: String::new(),
+        md: false,
+        rev: "HEAD".to_owned(),
+        rev_enc: "HEAD".to_owned(),
+        commit: String::new(),
+        dirty: None,
+        nav: vec![crate::views::Nav {
+            href: href.to_owned(),
+            label: "Settings",
+            key: "settings",
+            on: true,
+        }],
+        banner: None,
+        actions_note: None,
+        home: "/".to_owned(),
+        repo_id: String::new(),
+        link_style: cfg.links.style.as_str(),
+        repo_key: String::new(),
+        theme: match cfg.display.theme {
+            gitterrace_types::ColorScheme::System => String::new(),
+            t => t.as_str().to_owned(),
+        },
+        live: false,
+        live_how: "",
+        live_on: "",
+        version: String::new(),
+        actions: None,
+        tools: crate::views::Tools {
+            search: false,
+            picker: crate::features::on(Feature::Picker),
+            many: env.served() > 1,
+        },
+        off: crate::features::scripted_off(),
+        settings: false,
+        owner: crate::views::Owner::Server,
     }
 }

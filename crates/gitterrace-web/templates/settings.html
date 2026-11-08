@@ -1,26 +1,5 @@
+{% extends "_base.html" %}
 {%- import "_badge.html" as bd -%}
-<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="color-scheme" content="light dark">
-<meta name="gt-base" content="">
-<meta name="gitterrace-settings" content="{{ token }}" data-file="{{ file }}" data-stamp="{{ stamp }}">
-<title>Settings · gitterrace</title>
-<script>(function(){try{var t=localStorage.getItem("gitterrace-theme");if(t==="light"||t==="dark")document.documentElement.dataset.theme=t}catch(e){}})()</script>
-{% include "_favicon.html" %}
-<link rel="stylesheet" href="/static/tokens.css">
-<link rel="stylesheet" href="/static/app.css">
-<link rel="stylesheet" href="/static/settings.css">
-</head>
-<body class="bare">
-<header class="top"><div class="wrap"><div class="topbar">
-<a class="brand" href="/"><svg class="logo" viewBox="2 2 28 28" aria-hidden="true"><path class="i" d="M10 23.5A1.25 1.25 0 0 1 8.75 22.25L8.75 14A0.75 0.75 0 0 0 8 13.25L3.25 13.25A1.25 1.25 0 0 1 2 12L2 10A1.25 1.25 0 0 1 3.25 8.75L8 8.75A0.75 0.75 0 0 0 8.75 8L8.75 3.25A1.25 1.25 0 0 1 10 2L12 2A1.25 1.25 0 0 1 13.25 3.25L13.25 8A0.75 0.75 0 0 0 14 8.75L18.75 8.75A1.25 1.25 0 0 1 20 10L20 12A1.25 1.25 0 0 1 18.75 13.25L14 13.25A0.75 0.75 0 0 0 13.25 14L13.25 18.25A0.75 0.75 0 0 0 14 19L23.25 19A1.25 1.25 0 0 1 24.5 20.25L24.5 22.25A1.25 1.25 0 0 1 23.25 23.5Z"/><path class="a" d="M8.75 26.25A1.25 1.25 0 0 1 10 25L28.75 25A1.25 1.25 0 0 1 30 26.25L30 28.25A1.25 1.25 0 0 1 28.75 29.5L10 29.5A1.25 1.25 0 0 1 8.75 28.25Z"/></svg><span class="wordmark">gitterrace</span></a>
-<span class="sep" aria-hidden="true">/</span>
-<span class="reponame">Settings</span>
-</div><nav class="tabnav">
-<a class="on" href="/_settings" aria-current="page">Settings</a></nav></div></header>
 {% macro card(c, blank) %}<div class="setcard" data-row="{{ c.id }}"{% if blank %} data-blank hidden{% endif %}>
 <div class="setcardhead"><strong>{{ c.title }}</strong>{% if !blank %}<button type="button" data-remove="{{ c.id }}">Remove</button>{% endif %}</div>
 {% for f in c.fields %}<div class="setrow" data-id="{{ f.id }}" data-kind="{{ f.kind }}" data-row-key>
@@ -33,8 +12,12 @@
 {% endmatch %}<p class="setdoc muted" id="d-{{ f.id }}">{{ f.doc }}</p><p class="seterr" id="e-{{ f.id }}" hidden></p></div>
 </div>{% endfor %}
 </div>{% endmacro %}
-<main class="wrap settings" id="main" data-seg-own>
-<div class="card">
+{% block title %}Settings{% endblock %}
+{% block head %}
+<meta name="gitterrace-settings" content="{{ token }}" data-file="{{ file }}" data-stamp="{{ stamp }}">
+<link rel="stylesheet" href="/static/settings.css">{% endblock %}
+{% block content %}
+<div class="card settings" data-seg-own>
 {{ head }}
 <p class="seterrsum" id="seterrsum" role="alert" tabindex="-1"></p>
 {% if let Some(e) = missing %}{{ e }}{% endif %}
@@ -64,9 +47,5 @@
 <ul class="seterrs" id="seterrs"></ul>
 </section>
 </div>
-</main>
-<script src="/static/tip.js" defer></script>
-<script src="/static/app.js" defer></script>
-<script src="/static/settings.js" defer></script>
-</body>
-</html>
+{% endblock %}
+{% block scripts %}<script src="/static/settings.js" defer></script>{% endblock %}

@@ -122,6 +122,18 @@ pub(crate) struct Chrome {
     pub(crate) off: String,
     /// Whether this server serves the settings page: the gear in the bar and the menu entry.
     pub(crate) settings: bool,
+    /// Whose page this is: a server's own page (settings) keeps the brand, the switcher, the
+    /// theme and the menu, and drops what needs a repository (branch, working tree).
+    pub(crate) owner: Owner,
+}
+
+/// Whose page the bar is on.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Owner {
+    /// A repository's page: the bar has its branch and working tree.
+    Repo,
+    /// The server's own page, which belongs to no repository.
+    Server,
 }
 
 /// The top bar's tools a `[features]` switch can take away.
@@ -255,10 +267,16 @@ pub(crate) fn chrome_at(app: &crate::app::App, active: &str, rev: &str) -> Chrom
         },
         off: crate::features::scripted_off(),
         settings: app.settings_on() && crate::features::on(Feature::Settings),
+        owner: Owner::Repo,
     }
 }
 
 impl Chrome {
+    /// A server's own page, not a repository's.
+    pub(crate) fn bare(&self) -> bool {
+        self.owner == Owner::Server
+    }
+
     /// What the ref switcher button shows: the branch for HEAD, the abbreviated id when the page
     /// is pinned to a full commit id, otherwise the ref as written.
     pub(crate) fn switcher_label(&self) -> &str {
