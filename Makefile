@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: setup harness-links counting-parity app-icon build install fmt clippy lint test doc theme actions docs-gen docs-check names lines check site-render site-shots help bench bench-report bench-guard memory-check speed-check browser-deps browser-check browser-reap site deploy shipped domains send-vectors preview gc gc-guard changelog keep
+.PHONY: docker-check setup harness-links counting-parity app-icon build install fmt clippy lint test doc theme actions docs-gen docs-check names lines check site-render site-shots help bench bench-report bench-guard memory-check speed-check browser-deps browser-check browser-reap site deploy shipped domains send-vectors preview gc gc-guard changelog keep
 
 ## setup: Keep desktop search indexers out of build, bench and agent dirs (run once per machine)
 setup:
@@ -73,6 +73,7 @@ docs-check:
 	bash scripts/golden-run.sh --self-test
 	bash scripts/linux-run.sh --self-test
 	bash scripts/macos-run.sh --self-test
+	bash scripts/docker-check.sh --self-test
 	cargo xtask check
 
 # names: File, env and project names follow the conventions
@@ -209,6 +210,10 @@ shipped:
 # domains: Check that gitterrace.dev serves and every other host redirects to it
 domains:
 	python3 scripts/site-check.py domains
+
+## docker-check: Build the Docker image and serve a mounted repository with it (needs docker)
+docker-check:
+	bash scripts/docker-check.sh
 
 ## help: This list
 help:

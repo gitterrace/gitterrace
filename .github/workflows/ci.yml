@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [main]
   workflow_dispatch:
+  # Only the Docker job runs weekly, the others skip the schedule event. The pinned base
+  # images and the toolchain can drift.
+  schedule:
+    - cron: "17 5 * * 1"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -20,6 +24,7 @@ env:
 jobs:
   # The same gate as `make check`: theme, fmt, clippy -D warnings, tests, docs.
   check:
+    if: github.event_name != 'schedule'
     name: Check (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
@@ -67,6 +72,7 @@ jobs:
   # The Windows binary builds, its tests pass and it serves a repository. The runtime smoke test is
   # the same script the release check and scripts/wine-run.sh use.
   windows:
+    if: github.event_name != 'schedule'
     name: Windows
     runs-on: windows-latest
     timeout-minutes: 40
@@ -100,6 +106,7 @@ jobs:
 
   # rust-version in Cargo.toml is a promise; this proves it. Keep the two in step.
   msrv:
+    if: github.event_name != 'schedule'
     name: MSRV check
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -115,9 +122,43 @@ jobs:
       - run: cargo +1.96 check --workspace --exclude xtask --all-features --locked
 
   deny:
+    if: github.event_name != 'schedule'
     name: Cargo deny
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: EmbarkStudios/cargo-deny-action@3c6349835b2b7b196a839186cb8b78e02f7b5f25 # v2.1.1
+
+  # The Docker image builds and serves a mounted repository and a folder of two, read-only. The
+  # build is a cold release build, so it runs only when a Docker-relevant path changed, on a
+  # manual run, and weekly.
+  docker:
+    name: Docker image
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - name: Docker-relevant paths changed?
+        id: paths
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE_PR: ${{ github.event.pull_request.base.sha }}
+          BASE_PUSH: ${{ github.event.before }}
+          PATHS: '^(Dockerfile|\.dockerignore|Cargo\.(toml|lock)|rust-toolchain\.toml|scripts/docker-check\.sh|crates/|xtask/|docs/actions\.md|\.github/workflows/ci\.yml)'
+        run: |
+          run=true
+          base=${BASE_PR:-$BASE_PUSH}
+          if [ "$EVENT" = pull_request ] || [ "$EVENT" = push ]; then
+            run=false
+            if ! git cat-file -e "$base^{commit}" 2>/dev/null; then
+              run=true
+            elif git diff --name-only "$base" HEAD | grep -qE "$PATHS"; then
+              run=true
+            fi
+          fi
+          echo "run=$run" >> "$GITHUB_OUTPUT"
+      - if: steps.paths.outputs.run == 'true'
+        run: bash scripts/docker-check.sh
