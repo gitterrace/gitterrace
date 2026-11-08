@@ -1,0 +1,17 @@
+# The image builds from crates/, xtask/ and the root manifests. Everything else stays out of
+# the build context: build output, local state, the site and the denylist.
+target
+target-*
+.git
+.wt
+.wrangler
+.personal-denylist
+.mcp.json
+node_modules
+**/__pycache__
+.ruff_cache
+site
+bench
+docs/screenshots
+*.actual
+.DS_Store

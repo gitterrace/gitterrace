@@ -44,6 +44,9 @@ ALLOWED = {
     # Git and CI
     ".github",
     ".gitignore",
+    # The image users build with `docker build .`, and its build context filter
+    ".dockerignore",
+    "Dockerfile",
     # Make, and the code and content folders
     "Makefile",
     "config",
