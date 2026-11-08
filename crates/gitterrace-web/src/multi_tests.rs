@@ -11,7 +11,11 @@ use crate::tests::{fetch, fixture, links};
 async fn multi_repo_links_stay_inside_their_repo() {
     let dir = tempfile::tempdir().expect("tmp");
     let a = fixture("alpha", dir.path());
-    let b = fixture("beta", dir.path());
+    // A clone, so the two share a root and alpha's log shows the Related line. Two fixtures made
+    // apart share one only when their commits land in the same second.
+    let b = dir.path().join("beta");
+    let (from, to) = (a.to_str().expect("utf8"), b.to_str().expect("utf8"));
+    gitterrace_testkit::git(dir.path(), &["clone", "-q", from, to]);
     let router = crate::multi_router(vec![a, b]).expect("router");
     // The related roots warm in the background: wait for the line before crawling.
     gitterrace_testkit::wait::until("the Related line on alpha's log", || async {
