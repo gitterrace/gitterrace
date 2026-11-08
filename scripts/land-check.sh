@@ -16,6 +16,9 @@
 #   --paths P...  use these paths instead of asking git
 #   --messages BASE  run only the message step (subjects and the shared lints) over BASE..HEAD
 set -euo pipefail
+# Config passed in through the environment (GIT_CONFIG_COUNT, as a lander sets core.hooksPath)
+# would override what the self-test and hook-test fixture repos configure themselves.
+unset GIT_CONFIG_COUNT
 cd "$(dirname "$0")/.."
 
 # The shared lints read tomllib: the first python3 that is 3.11 or newer.

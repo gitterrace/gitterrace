@@ -69,6 +69,7 @@ docs-check:
 	python3 scripts/commits-check.py --self-test
 	python3 scripts/tracked-check.py --self-test
 	bash scripts/golden-check.sh --self-test
+	bash scripts/golden-run.sh --self-test
 	bash scripts/linux-run.sh --self-test
 	bash scripts/macos-run.sh --self-test
 	cargo xtask check

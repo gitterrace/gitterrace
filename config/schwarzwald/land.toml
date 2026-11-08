@@ -20,3 +20,18 @@ triggers = ["gitterrace-web", "gitterrace-index"]
 [conventions]
 crate = "gitterrace-testkit"
 test = "conventions"
+
+# The landing gate: land.sh runs it on the exact tree it is about to land, before main moves.
+# Every saved-page test runs (found from tests/golden, so a new one needs no edit here), plus
+# the fast tree checks and the external linters; the message step covers the landed commits.
+[landing]
+gate = [
+  "bash scripts/golden-run.sh",
+  "python3 shared/schwarzwald/lint/file-length.py",
+  "python3 scripts/names-check.py",
+  # The hook tests wire hooks in their own fixture repos; a core.hooksPath passed in through
+  # GIT_CONFIG_COUNT would override that and leave the fixtures unguarded.
+  "env -u GIT_CONFIG_COUNT bash shared/schwarzwald/lint/run.sh",
+]
+# The landing runs in a fresh clone, which has no core.hooksPath yet: set it there first.
+messages = "git config core.hooksPath scripts/hooks && bash scripts/land-check.sh --messages {base}"
