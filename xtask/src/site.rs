@@ -520,4 +520,6 @@ fn esc(s: &str) -> String {
 #[cfg(test)]
 mod built;
 #[cfg(test)]
+mod prose;
+#[cfg(test)]
 mod tests;
