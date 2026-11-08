@@ -10,7 +10,12 @@ guard_rule_destructive_class() {
     # Lets the selftest ask whether a DEDICATED rule still refuses on its own.
     [ -z "${GUARD_SELFTEST_NO_DESTRUCTIVE:-}" ] || return 0
     local reason
-    GUARD_FALLBACK_HEALTHY=1 GUARD_FALLBACK_ORG="$GUARD_ORG" _gf_engine_judge && return 0
+    if [ -n "${GUARD_SCRIPT_REFUSE:-}" ]; then
+        guard_block "$GUARD_SCRIPT_REFUSE" \
+            "A script the command runs could hold the destructive class, and this guard cannot read it."
+        return 0
+    fi
+    GUARD_FALLBACK_HEALTHY=1 GUARD_FALLBACK_ORG="$GUARD_ORG" guard_fallback_judge && return 0
     reason="$GUARD_FALLBACK_REASON"
     guard_block \
         "$reason" \

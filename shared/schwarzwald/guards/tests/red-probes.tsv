@@ -17,7 +17,7 @@ shared_index_staging	rules/10-shared-checkout.sh	 +(add|rm|mv)([	git add x write
 commit_plumbing	rules/10-shared-checkout.sh	 +(commit-tree|update-ref	commit-tree skips every hook	 +(zzzcommit|update-ref	cases-rules
 git_stash	rules/10-shared-checkout.sh	git( +-C +[^ ]+)? +stash	bare stash		cases-rules
 index_reads_cwd	rules/10-shared-checkout.sh	    repo=$(guard_cwd_repo){NL}    [ -n "$repo" ] || return 0{NL}    staged=	a clean cwd stays silent while the guards' clone has a staged file	    repo="$GUARD_REPO"{NL}    staged=	cases-rules
-git_checkout_discards	rules/12-discard-guard.sh	(checkout|restore|checkout-index|read-tree)( |$)	checkout discards a path		cases-rules
+git_checkout_discards	rules/12-discard-guard.sh	+(checkout|restore)( |$)	checkout discards a path		cases-rules
 discard_path_cwd	rules/12-discard-guard.sh	[ -e "$_guard_p" ]	bare path resolved against the request cwd	[ -e "$_guard_arg" ]	cases-rules
 worktree_location	rules/30-build-workflow.sh	git( -C [^ ]+)? worktree add	worktree outside .wt/		cases-rules
 pipe_masks_exit_code	rules/30-build-workflow.sh	(make|cargo|swift)[^|;'$'	make [|] tail && ...		cases-rules
@@ -33,9 +33,9 @@ newline_separator	engine.sh	|\n]	stash after a newline	|]	cases-rules
 fail_closed_class	rules/fallback/fail-closed.sh	        stash)	fallback judge: git stash	        zzz_stash)	cases-fallback
 fail_closed_trap	rules/fallback/fail-closed.sh	trap 'guard_fallback_on_exit $?' EXIT	fork-starved jcode-pre refuses git stash	:	cases-fallback
 fail_closed_deadline	adapters/adapter-plumbing.sh	${left:+-t "$left"}	hung engine: answered	-r	cases-fallback
-destructive_class_shared	rules/80-destructive-class.sh	GUARD_FALLBACK_HEALTHY=1 GUARD_FALLBACK_ORG="$GUARD_ORG" _gf_engine_judge && return 0	reset --hard	true && return 0	cases-fallback cases-bypass
-heredoc_split_boundary	rules/fallback/fail-closed.sh	    local np=0 ph=0	here-string, then stash	    rest="${rest%%<<*}"; local np=0 ph=0	cases-fallback
-heredoc_shell_body	rules/fallback/fail-closed.sh	bash | sh | zsh | dash | ksh | eval | source | .) keep=all ;;	the same body fed to a shell is code	zzz) keep=all ;;	cases-rules
+destructive_class_shared	rules/80-destructive-class.sh	GUARD_FALLBACK_HEALTHY=1 GUARD_FALLBACK_ORG="$GUARD_ORG" guard_fallback_judge && return 0	reset --hard	true && return 0	cases-fallback cases-bypass
+heredoc_split_boundary	rules/fallback/fail-closed.sh	            cur="$line"	here-string, then stash	            cur="${line%%<<*}"	cases-fallback
+heredoc_shell_body	rules/fallback/fail-closed.sh	                GUARD_FALLBACK_VALUE=all{NL}	the same body fed to a shell is code	                GUARD_FALLBACK_VALUE=""{NL}	cases-rules
 unparseable_request_refuses	engine.sh	guard_advise "WARNING: $GUARD_PRODUCT guards could not parse the request (not JSON, truncated, or no jq); it is NOT being allowed by the engine."	an unparseable request	printf 'verdict: allow\n'	cases-state cases-fallback
 containment_cd_base	rules/05-containment.sh	base=$(_contain_base "$cmd" "${GUARD_CWD:-$org}")	recursive delete after a cd out of the org	base=$(_contain_norm "${GUARD_CWD:-$org}")	cases-fallback
 containment_dotdot	rules/05-containment.sh	/*) p=$(_contain_norm "$p") ;;	absolute path that climbs out through the org prefix	/*) ;;	cases-fallback
@@ -49,9 +49,9 @@ fallback_find_delete	rules/fallback/fail-closed.sh	            find) _gf_find	de
 fallback_worktree_force	rules/fallback/fail-closed.sh	git worktree remove|--force	worktree remove --force x	zzz worktree remove|--force	cases-bypass
 fallback_git_alias	rules/fallback/fail-closed.sh	alias.* | [Aa][Ll][Ii][Aa][Ss].*)	alias.s=stash s	zzz_alias)	cases-bypass
 fallback_reaches_org	rules/fallback/fail-closed.sh	_gf_reaches_org || return 0	degraded judge: .OUT. git -C	return 0	cases-bypass
-engine_outside_cwd_judged	engine.sh	! GUARD_FALLBACK_HEALTHY=1 GUARD_FALLBACK_ORG="$GUARD_ORG" _gf_engine_judge; then	engine: .OUT. cd	false; then	cases-bypass
+engine_outside_cwd_judged	engine.sh	! GUARD_FALLBACK_HEALTHY=1 GUARD_FALLBACK_ORG="$GUARD_ORG" guard_fallback_judge; then	engine: .OUT. cd	false; then	cases-bypass
 jcode_pre_stdin	adapters/jcode-pre.sh	while IFS= read -r -d '' -n 16384 -t 3 _chunk; do	reads the whole input from stdin	while false; do	cases-bypass
-jcode_pre_empty_cwd	adapters/jcode-pre.sh	"" | "$_org" | "$_org"/*) ;;	unknown [(]empty[)] cwd	"$_org" | "$_org"/*) ;;	cases-bypass
+jcode_pre_empty_cwd	adapters/jcode-pre.sh	"" | "$_org" | "$_org"/* | "$_porg" | "$_porg"/*) ;;	unknown [(]empty[)] cwd	"$_org" | "$_org"/* | "$_porg" | "$_porg"/*) ;;	cases-bypass
 jcode_pre_outside_reach	adapters/jcode-pre.sh	        guard_fallback_judge && exit 0	refuses git -C <org path> stash	        exit 0	cases-bypass
 jcode_pre_jq_check	adapters/jcode-pre.sh	guard_fallback_degraded "jq is not on PATH, so the tool input cannot be parsed."	jcode-pre without jq degrades	:	cases-bypass
 broad_process_kill	rules/13-broad-process-kill.sh	(pkill|killall)( 	a pattern matching the owner's running app	(zzzkill|zzzall)( 	cases-rules
@@ -68,7 +68,7 @@ lane_env	engine.sh	GUARD_LANE="${!GUARD_LANE_ENV:-}"	the product.s lane variable
 lane_roles_file	engine.sh	GUARD_LANE="$role"	role: a session listed ro is refused	:	cases-rules
 lane_git_write	rules/10-shared-checkout.sh	[ "${GUARD_LANE:-}" = "ro" ] || return 0	a read-only lane may not commit	return 0	cases-rules
 worktree_dir	rules/30-build-workflow.sh	local wt="${GUARD_WORKTREE_DIR:-.wt}"	an install.s own worktree dir	local wt=.wt	cases-rules
-product_write_cmds	rules/70-silent-failure.sh	[ -n "${GUARD_WRITE_CMDS_RE:-}" ] && guard_cmd_is "$GUARD_WRITE_CMDS_RE" && mutates='product CLI write'	the product CLI write [|] tail	:	cases-rules
+product_write_cmds	rules/70-silent-failure.sh	[ -n "${GUARD_WRITE_CMDS_RE:-}" ] && guard_cmd_is "$GUARD_WRITE_CMDS_RE" && return 0	the product CLI write [|] tail	:	cases-rules
 build_lock_env	rules/30-build-workflow.sh	[[ ${GUARD_BUILD_LOCK_ENV:-} =~ ^[A-Z][A-Z0-9_]*$ ]] && [ -n "${!GUARD_BUILD_LOCK_ENV:-}" ] && return 0	nested under the build lock	:	cases-rules
 app_name_keystroke	rules/14-live-desktop-input.sh	guard_match "$src" "${GUARD_APP_RE:-x^}|unix id"	a keystroke addressed by pid	guard_match "$src" "zzz_never"	cases-rules
 opus_class_config	rules/49-lane-model-tier.sh	local prompt classes="${GUARD_OPUS_CLASS_RE:-schema|migration|security|irreversible}"	an install.s own class list	local prompt classes="schema|migration|security|irreversible"	cases-rules
@@ -79,8 +79,8 @@ read_size_bounded	rules/64-read-size.sh	[ -z "${GUARD_READ_BOUND:-}" ] || return
 read_size_cat	rules/64-read-size.sh	[ "$verb" = cat ] || return 0	cat of a 2000-line file	return 0	cases-rules
 read_size_pipe	rules/64-read-size.sh	guard_match "$head" '[|;&<>$`(]' && return 0	a piped cat	:	cases-rules
 read_size_lane_accept	rules/64-read-size.sh	guard_match "$head" 'lane-accept' && return 0	a command naming lane-accept output	:	cases-rules
-script_bodies_run	engine.sh	GUARD_HEAD_CACHE="$GUARD_HEAD_CACHE"$'\n'"$bodies"	bash <script> whose body has a broad pkill	:	cases-rules
-script_bodies_exec	engine.sh	[ -x "$path" ] && [ "${body:0:2}" = '#!' ] || continue	an executable ./script whose body	continue	cases-rules
+script_bodies_run	engine.sh	GUARD_HEAD_CACHE="$GUARD_HEAD_CACHE"$'\n'"$GUARD_SCRIPT_BODIES"	bash <script> whose body has a broad pkill	:	cases-rules
+script_bodies_exec	engine.sh	                [ -x "$path" ] || continue	an executable ./script whose body	                continue	cases-rules
 script_content_rule	rules/82-script-content.sh	guard_is_script_path "${GUARD_FILE:-}" || return 0	writing a .sh with a broad pkill	return 0	cases-rules
 script_content_patch	engine.sh	[ -z "${GUARD_PATCH:-}" ] || guard_patch_script_lines	apply_patch adding git stash to a .sh	:	cases-rules
 script_content_class	rules/82-script-content.sh	if [ "$GUARD_VERDICT" != block ] &&{NL}        !	writing a .zsh that runs git reset --hard	if false &&{NL}        !	cases-rules

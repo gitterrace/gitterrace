@@ -1,0 +1,6 @@
+[scope]
+exclude = ["*"]
+min_files = 0
+
+[personal]
+exempt = ["*"]

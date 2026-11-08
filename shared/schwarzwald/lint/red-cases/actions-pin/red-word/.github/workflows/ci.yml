@@ -1,0 +1,4 @@
+jobs:
+  b:
+    steps:
+      - uses: dtolnay/rust-toolchain@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa # master

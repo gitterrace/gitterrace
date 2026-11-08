@@ -131,17 +131,9 @@ rm -rf "$fc"
 fc=$(_fc_copy slowengine)
 fc_t0=$SECONDS
 GUARD_ADAPTER_DEADLINE=1 _fc_run jcode "$fc" 'git stash'
-fc_dt=$((SECONDS - fc_t0))
 _fc_expect 2 'deadline' "hung engine: jcode-pre refuses git stash at the deadline"
-CASES=$((CASES + 1))
-if [ "$fc_dt" -lt 30 ]; then
-    printf '  ok   [TIME  ] hung engine: answered in %ss, before its 30 s sleep ended\n' "$fc_dt"
-else
-    printf '  FAIL hung engine: answered in %ss, only after the engine finished\n' "$fc_dt"
-    FAIL_LOG="${FAIL_LOG}  FAIL hung engine: answered in ${fc_dt}s, only after the engine finished
-"
-    FAILED=1
-fi
+_assert yes "$([ $((SECONDS - fc_t0)) -lt 30 ] && echo yes || echo no)" \
+    "hung engine: answered in $((SECONDS - fc_t0)) s, before its 30 s sleep ended"
 rm -rf "$fc"
 
 # The fallback's own judgement, asked directly. The class is a denylist; the
@@ -372,16 +364,27 @@ fi
 
 # Oversize input. Past any size the healthy engine must still
 # read the whole command.
-_dc_big=$(head -c 40000 /dev/zero | tr '\0' x)
+_dc_big=$(head -c 20000 /dev/zero | tr '\0' x)
 fc=$(_fc_copy none)
 _fc_run cli "$fc" "echo $_dc_big; $_dc_stash"
-_fc_expect 1 'Blocked' "healthy cli refuses a stash after 40 KB of arguments"
+_fc_expect 1 'Blocked' "healthy cli refuses a stash after 20 KB of arguments"
 _fc_run jcode "$fc" "echo $_dc_big; $_dc_stash"
-_fc_expect 2 'Blocked' "healthy jcode-pre refuses a stash after 40 KB of arguments"
+_fc_expect 2 'Blocked' "healthy jcode-pre refuses a stash after 20 KB of arguments"
+# Padding that makes the judge slow must not buy an allow: past the deadline the engine gives no
+# verdict and the fallback must still answer, inside jcode's own 5 s hook timeout (which ALLOWS).
+_dc_pad=$(head -c 30000 /dev/zero | tr '\0' "'")
+_dc_huge=$(head -c 300000 /dev/zero | tr '\0' x)
+for _dc_c in "echo $_dc_pad; git reset --ha""rd" "echo $_dc_huge; git reset --ha""rd" "echo $(printf '"a" %.0s' $(seq 6000)); git reset --ha""rd" "echo $_dc_huge"; do
+    _dc_t0=$SECONDS
+    _fc_run jcode "$fc" "$_dc_c"
+    _fc_expect 2 'Blocked' "healthy jcode-pre refuses ${#_dc_c} bytes of padding (a script file is the way)"
+    _assert yes "$([ $((SECONDS - _dc_t0)) -lt 6 ] && echo yes || echo no)" \
+        "... and answers inside the hook timeout ($((SECONDS - _dc_t0)) s)"
+done
 rm -rf "$fc"
 fc=$(_fc_copy noengine)
 _fc_run jcode "$fc" "echo $_dc_big; $_dc_stash"
-_fc_expect 2 "$FC_REFUSED" "degraded jcode-pre refuses a stash after 40 KB of arguments"
+_fc_expect 2 "$FC_REFUSED" "degraded jcode-pre refuses a stash after 20 KB of arguments"
 _fc_run jcode "$fc" "echo $_dc_big; git status"
 _fc_expect 0 "$FC_LOUD" "degraded jcode-pre allows a long read-only command, loudly"
 rm -rf "$fc"

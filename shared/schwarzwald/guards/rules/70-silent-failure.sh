@@ -3,15 +3,23 @@
 # rejected write piped into `| tail -1` or `| grep` reports success. Not caught:
 # reads, a pipe into `tee`, `set -o pipefail`, GUARD_ALLOW_SILENT=1.
 
+# Shared by both rules: pipefail or GUARD_ALLOW_SILENT=1 opts out, and a product CLI write
+# (GUARD_WRITE_CMDS_RE) counts as a mutation.
+_silent_escaped() { guard_cmd_has 'set -o pipefail|set -eo? *pipefail|GUARD_ALLOW_SILENT=1'; }
+_silent_product_write() {
+    [ -n "${GUARD_WRITE_CMDS_RE:-}" ] && guard_cmd_is "$GUARD_WRITE_CMDS_RE" && return 0
+    return 1
+}
+
 guard_register no_silent_mutation
 guard_rule_no_silent_mutation() {
     [ "$GUARD_TOOL" = bash ] || return 0
     [ -n "$GUARD_CMD" ] || return 0
 
-    guard_cmd_has 'set -o pipefail|set -eo? *pipefail|GUARD_ALLOW_SILENT=1' && return 0
+    _silent_escaped && return 0
 
     local mutates=''
-    [ -n "${GUARD_WRITE_CMDS_RE:-}" ] && guard_cmd_is "$GUARD_WRITE_CMDS_RE" && mutates='product CLI write'
+    _silent_product_write && mutates='product CLI write'
     guard_cmd_is 'git[[:space:]]+(commit|add|push|merge|rebase|tag|reset)' && mutates='git write'
     guard_cmd_is 'cargo[[:space:]]+(install|publish|fix)' && mutates='cargo write'
     guard_cmd_is '(npm|pnpm|yarn)[[:space:]]+(install|publish)' && mutates='package install'
@@ -24,9 +32,7 @@ guard_rule_no_silent_mutation() {
         "      the filter's (0) and a REJECTED command looks identical to one that" \
         "      worked: a rejected 'git commit ... | tail -1' reads as success" \
         "      and nothing was committed." \
-        "      Check the status first, then truncate:" \
-        "          out=\$(cmd 2>&1) || { printf '%s\\n' \"\$out\"; exit 1; }" \
-        "      or put 'set -o pipefail' ahead of the pipeline."
+        "      ${GUARD_PIPE_HINT:-Check the status first, then truncate.}"
 }
 
 # A FAILED command substitution is a valid EMPTY string: `--notes "$(cat f)"`
@@ -38,10 +44,10 @@ guard_rule_no_empty_substitution() {
     [ "$GUARD_TOOL" = bash ] || return 0
     [ -n "$GUARD_CMD" ] || return 0
 
-    guard_cmd_has 'set -o pipefail|set -eo? *pipefail|GUARD_ALLOW_SILENT=1' && return 0
+    _silent_escaped && return 0
 
     local mutates=''
-    [ -n "${GUARD_WRITE_CMDS_RE:-}" ] && guard_cmd_is "$GUARD_WRITE_CMDS_RE" && mutates='product CLI write'
+    _silent_product_write && mutates='product CLI write'
     guard_cmd_is 'git[[:space:]]+(commit|tag)' && mutates='git write'
     [ -n "$mutates" ] || return 0
 

@@ -1,0 +1,6 @@
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      run: |
+        curl -fsSL https://e.org/x.tar.gz | tar -xz

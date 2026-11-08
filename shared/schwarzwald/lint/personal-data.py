@@ -4,8 +4,8 @@
 Three sources of patterns:
   1. `rules/deny.toml` [incident] and [host]: incident stories with a date ("crash 2026-09-07"),
      the owner's own data, and `.local` mDNS hostnames. A test states the invariant.
-  2. The LOCAL, gitignored `.personal-denylist` at the product root: one case-insensitive regex
-     per line (a person or agent name, a hostname), `#` for comments. Bare six-hex lines are
+  2. The private denylist (lint.toml [denylist] path, outside every repository): one
+     case-insensitive regex per line (a person or agent name, a hostname), `#` for comments. Bare six-hex lines are
      ids and belong to CONV-NO-INTERNAL-REFS. Without the file only the generic patterns run.
   3. Every tracked file, binaries included: an absolute home path (`/Users/<name>/`,
      `/home/<name>/`) names the machine that wrote it. Placeholder homes pass, plus the
@@ -63,6 +63,7 @@ class Personal:
         self.skip = cfg["scope"]["exclude"] + cfg["personal"]["exempt"]
 
     def line_hit(self, line: str) -> bool:
+        line = line[: config.MAX_LINE]
         return any(p.search(line) for p in self.lines) or bool(self.home.search(line.encode()))
 
     def scan(self, rel: str, data: bytes) -> list[str]:
@@ -112,7 +113,7 @@ def report(hits: list[str], what: str) -> int:
         for h in hits[:60]:
             print(f"  {h}")
         print("  State the invariant with neutral fixtures. Real names, hosts and ids go in the")
-        print("  local .personal-denylist, never in the repo. Write $HOME or ~ for a home path.")
+        print("  private denylist, never in a repo. Write $HOME or ~ for a home path.")
         return 1
     print(f"PASS [{RULE}] no personal data in {what}")
     return 0
@@ -126,7 +127,7 @@ def main(argv: list[str]) -> int:
     pats, _ = config.denylist(root)
     p = Personal(cfg, pats)
     if args[:1] == ["--messages"]:
-        return report([h for m in config.messages(root, args[1]) for h in p.message_hits(m)],
+        return report(config.widened(root, args[1]) + [h for m in config.messages(root, args[1]) for h in p.message_hits(m)],
                       f"the messages of {args[1]}..HEAD")
     if args[:1] == ["--message"]:
         msg = Path(args[1]).read_text(encoding="utf-8", errors="replace")
@@ -134,13 +135,17 @@ def main(argv: list[str]) -> int:
     names = config.tracked(root, p.skip)
     hits: list[str] = []
     for rel in names:
+        f = root / rel
+        # A tracked symlink can point at a FIFO or a device: reading it would hang the gate.
+        if f.is_symlink() or not f.is_file():
+            continue
         try:
-            hits += p.scan(rel, (root / rel).read_bytes())
+            hits += p.scan(rel, f.read_bytes())
         except OSError:
             continue
     if len(names) < cfg["scope"]["min_files"]:
         print(f"FAIL [{RULE}] scanned only {len(names)} file(s): the census is broken", file=sys.stderr)
-        return 2
+        return 1
     return report(hits, f"the tree ({len(names)} files)")
 
 

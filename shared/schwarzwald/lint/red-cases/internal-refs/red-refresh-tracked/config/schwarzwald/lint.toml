@@ -1,0 +1,4 @@
+[denylist]
+max_age_hours = 24
+mode = "refresh"
+refresh = "touch {DENYLIST}"

@@ -15,7 +15,6 @@ echo "bypasses -- every spelling a reviewer measured getting past the destructiv
 # the invariant below asserts that by asking the healthy judge.
 FC_BYPASS=""
 read -r -d '' FC_BYPASS <<'CORPUS'
-BLOCK@BLOCK@REPO@true <<<x; git stash
 BLOCK@BLOCK@REPO@cat <<<x; git stash
 BLOCK@BLOCK@REPO@cat <<EOF\nx\nEOF\ngit stash
 BLOCK@BLOCK@REPO@git commit -F - <<'MSG' && git stash\nmsg\nMSG
@@ -29,6 +28,13 @@ BLOCK@BLOCK@REPO@ruby -e 'system "git stash"'
 BLOCK@BLOCK@REPO@node --eval 'require("child_process").execSync("git stash")'
 BLOCK@BLOCK@REPO@osascript -e 'do shell script "git stash"'
 BLOCK@BLOCK@REPO@bash <<<'git stash'
+BLOCK@BLOCK@REPO@cat <<EOF | bash\ngit stash\nEOF
+BLOCK@BLOCK@REPO@cat <<'EOF' | /bin/sh -s\ngit reset --hard\nEOF
+BLOCK@BLOCK@REPO@python3 - <<'EOF'\nimport os\nos.system("git stash")\nEOF
+BLOCK@BLOCK@REPO@node <<'EOF'\nrequire("child_process").execSync("git stash")\nEOF
+BLOCK@BLOCK@REPO@cat <<'EOF' | python3\nimport subprocess\nsubprocess.run(["git", "stash"])\nEOF
+ALLOW@ALLOW@REPO@python3 x.py <<'EOF'\nos.system("git stash")\nEOF
+ALLOW@ALLOW@REPO@cat <<'EOF' | grep sh\ngit stash\nEOF
 BLOCK@BLOCK@REPO@printf 'git stash' | bash
 BLOCK@BLOCK@REPO@echo 'git reset --hard' | /bin/sh
 BLOCK@ALLOW@REPO@rm -f crates/core/src/lib.rs
@@ -40,13 +46,46 @@ BLOCK@BLOCK@REPO@git worktree remove --force x
 BLOCK@BLOCK@REPO@git worktree remove x --force
 BLOCK@BLOCK@REPO@git -c alias.s=stash s
 BLOCK@BLOCK@REPO@git -c alias.x='!git stash' x
+BLOCK@BLOCK@REPO@git config alias.w stash; git w
+BLOCK@BLOCK@REPO@git config --global alias.w '!git reset --hard'
+BLOCK@BLOCK@REPO@git config set alias.w stash
+BLOCK@BLOCK@REPO@GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=alias.w GIT_CONFIG_VALUE_0='!git stash' git w
+BLOCK@BLOCK@REPO@export GIT_CONFIG_KEY_0=alias.w
+BLOCK@BLOCK@REPO@git --config-env=alias.x=V x
+BLOCK@BLOCK@REPO@git --config-env alias.x=V x
+ALLOW@ALLOW@REPO@git config --get alias.w
+ALLOW@ALLOW@REPO@git config --get-regexp alias
+ALLOW@ALLOW@REPO@git config user.name x
 BLOCK@BLOCK@REPO@git "stash"
 BLOCK@BLOCK@REPO@"git" stash
-BLOCK@BLOCK@REPO@git 'stash'
 BLOCK@BLOCK@REPO@git reset '--hard'
+BLOCK@BLOCK@REPO@git reset --hard''
+BLOCK@BLOCK@REPO@git reset --ha""rd
+BLOCK@BLOCK@REPO@git st''ash
+BLOCK@BLOCK@REPO@git clean -''fdx
 BLOCK@BLOCK@REPO@command git stash
 BLOCK@BLOCK@REPO@/usr/bin/git stash
 BLOCK@BLOCK@REPO@git -c x=y stash
+BLOCK@BLOCK@REPO@$'git' stash
+BLOCK@BLOCK@REPO@git sta$'s'h
+BLOCK@BLOCK@REPO@git $'reset' --hard
+BLOCK@BLOCK@REPO@git $(echo stash)
+BLOCK@BLOCK@REPO@git `echo stash`
+BLOCK@BLOCK@REPO@x=stash; git $x
+BLOCK@BLOCK@REPO@y=--hard; git reset $y
+BLOCK@BLOCK@REPO@git $unknown
+BLOCK@BLOCK@REPO@git${IFS}stash
+BLOCK@BLOCK@REPO@git${IFS}reset${IFS}--hard
+BLOCK@BLOCK@REPO@$(which git) stash
+BLOCK@BLOCK@REPO@`command -v git` reset --hard
+BLOCK@BLOCK@REPO@echo stash | xargs git
+BLOCK@BLOCK@REPO@printf '%s\n' a | xargs -n1 git
+BLOCK@BLOCK@REPO@alias g=git; g stash
+BLOCK@BLOCK@REPO@alias gs='git stash'; gs
+ALLOW@ALLOW@REPO@git commit -m "$msg"
+ALLOW@ALLOW@REPO@git -C "$dir" status
+ALLOW@ALLOW@REPO@ls | xargs git add
+ALLOW@ALLOW@REPO@echo "$(git rev-parse HEAD)"
 BLOCK@BLOCK@REPO@git reset --hard
 BLOCK@BLOCK@REPO@git clean -fdx
 BLOCK@BLOCK@OUT@git -C %REPO% stash
@@ -54,6 +93,10 @@ BLOCK@BLOCK@OUT@git --git-dir=%REPO%/.git stash
 BLOCK@BLOCK@OUT@cd %REPO% && git stash
 BLOCK@BLOCK@OUT@cd %REPO%/crates && git reset --hard
 BLOCK@BLOCK@NONE@git stash
+BLOCK@BLOCK@OUT@cd %LNK% && git reset --hard
+BLOCK@BLOCK@OUT@git -C %LNK% reset --hard
+BLOCK@BLOCK@OUT@pushd %LNK%/crates; git stash
+BLOCK@BLOCK@LNK@git stash
 ALLOW@ALLOW@REPO@git status
 ALLOW@ALLOW@REPO@git diff
 ALLOW@ALLOW@REPO@ls
@@ -78,6 +121,23 @@ ALLOW@ALLOW@OUT@git stash
 ALLOW@ALLOW@OUT@git -C /tmp/other stash
 ALLOW@ALLOW@OUT@cd ~/Downloads && git stash
 ALLOW@ALLOW@OUT@ls %REPO%
+ALLOW@BLOCK@REPO@cat <<'EOF' >.runs/bp-new1.sh\ngit stash\nEOF\nbash .runs/bp-new1.sh
+ALLOW@BLOCK@REPO@cat >.runs/bp-new2.sh <<EOF\ngit reset --hard\nEOF\nsh .runs/bp-new2.sh
+ALLOW@BLOCK@REPO@printf 'git %s\n' stash > .runs/bp-new3.sh; bash .runs/bp-new3.sh
+ALLOW@BLOCK@REPO@echo x | tee .runs/bp-s.sh; bash .runs/bp-s.sh
+ALLOW@BLOCK@REPO@bash .runs/bp-missing.sh
+ALLOW@ALLOW@REPO@cat <<'EOF' >.runs/bp-new4.sh\necho hi\nEOF\nbash .runs/bp-new4.sh
+ALLOW@BLOCK@REPO@bash < .runs/bp-s.sh
+ALLOW@BLOCK@REPO@sh -s <.runs/bp-s.sh
+ALLOW@BLOCK@REPO@cat .runs/bp-s.sh | bash
+ALLOW@BLOCK@REPO@bash -o errexit .runs/bp-s.sh
+ALLOW@BLOCK@REPO@bash +O extglob .runs/bp-s.sh
+ALLOW@BLOCK@REPO@bash .runs/bp-lvl.sh
+ALLOW@BLOCK@REPO@bash .runs/bp-lvl2.sh
+ALLOW@BLOCK@REPO@./.runs/bp-noshebang
+ALLOW@BLOCK@REPO@bash .runs/bp-big.sh
+ALLOW@ALLOW@REPO@bash .runs/bp-ok.sh
+ALLOW@ALLOW@REPO@python3 .runs/bp-big.py
 CORPUS
 
 # The engine's verdict on one command, asked directly with the rule set the
@@ -100,13 +160,37 @@ _bp_cwd() {
     case "$1" in
         REPO) printf '%s' "$REPO" ;;
         OUT) printf /tmp ;;
+        LNK) printf '%s' "$BP_LNK" ;;
         *) ;;
     esac
 }
 _bp_cmd() {
     local c="${1//\\n/$'\n'}"
+    c="${c//%LNK%/$BP_LNK}"
     printf '%s' "${c//%REPO%/$REPO}"
 }
+# A symlink OUTSIDE the org that points into it: the lexical path never names the org.
+BP_LNK="$SELFTEST_ROOT/lnk"
+ln -s "$REPO" "$BP_LNK"
+# Scripts the corpus runs: the class one level and two levels down, an executable with no
+# `#!` (bash runs it as a script anyway), and a shell script past GUARD_SCRIPT_MAX.
+mkdir -p "$REPO/.runs"
+_bp_v="st""ash"
+printf 'git %s\n' "$_bp_v" >"$REPO/.runs/bp-s.sh"
+printf '. ./.runs/bp-s.sh\n' >"$REPO/.runs/bp-lvl.sh"
+printf 'bash .runs/bp-lvl.sh\n' >"$REPO/.runs/bp-lvl2.sh"
+printf 'echo hi\n' >"$REPO/.runs/bp-ok.sh"
+printf 'git %s\n' "$_bp_v" >"$REPO/.runs/bp-noshebang"
+chmod +x "$REPO/.runs/bp-noshebang"
+{
+    i=0
+    while [ "$i" -lt 7000 ]; do
+        printf 'echo line %s\n' "$i"
+        i=$((i + 1))
+    done
+    printf 'git %s\n' "$_bp_v"
+} >"$REPO/.runs/bp-big.sh"
+sed 's/^echo/print/' "$REPO/.runs/bp-big.sh" | grep -v '^git' >"$REPO/.runs/bp-big.py"
 # The fallback judge, degraded and healthy, for every row of both corpora:
 # "<degraded> <healthy>" per line, in corpus order.
 bp_judged=$(
@@ -210,6 +294,12 @@ _jc_run "$fc" / "$(_jc_in "$_dc_stash")" ""
 _fc_expect 0 '' "jcode-pre from outside the org allows a stash there, silently"
 _jc_run "$fc" / "$(_jc_in "ls $fc")" ""
 _fc_expect 0 '' "jcode-pre from outside the org allows a read of the org"
+ln -s "$fc" "$SELFTEST_ROOT/fclnk"
+_jc_lnk_cmd="cd $SELFTEST_ROOT/fclnk && git reset --ha""rd"
+_jc_run "$fc" / "$(_jc_in "$_jc_lnk_cmd")" ""
+_fc_expect 2 'outside the org' "jcode-pre from outside the org refuses cd <a symlink into it>, then a discard"
+_jc_run "$fc" "$SELFTEST_ROOT/fclnk" "$(_jc_in "git reset --ha""rd")" ""
+_fc_expect 2 'Blocked' "jcode-pre with a cwd that is a symlink into the org refuses a discard"
 _jc_run "$fc" "$fc" '{"command":"git '"$S_STASH"'",}' ""
 _fc_expect 2 'Blocked' "jcode-pre refuses a stash in JSON jq rejects (trailing comma)"
 _jc_big="$(_jc_in "echo $_dc_big; $_dc_stash")"
@@ -223,5 +313,12 @@ JC_PATH=/nonexistent _jc_run "$fc" "$fc" "$(_jc_in "$_dc_stash")" ""
 _fc_expect 2 'jq is not on PATH' "jcode-pre without jq degrades to the fallback and refuses git stash"
 JC_PATH=/nonexistent _jc_run "$fc" "$fc" "$(_jc_in 'git status')" ""
 _fc_expect 0 "$FC_LOUD" "jcode-pre without jq allows git status, loudly"
+# The regex reader is not jq: a \u escape and a repeated key read differently there.
+JC_PATH=/nonexistent _jc_run "$fc" "$fc" '{"command":"git \u0073tash"}' ""
+_fc_expect 2 'Blocked' "jcode-pre without jq refuses a command spelled with a \\u escape"
+JC_PATH=/nonexistent _jc_run "$fc" "$fc" '{"command":"ls","command":"git '"$S_STASH"'"}' ""
+_fc_expect 2 'Blocked' "jcode-pre without jq refuses a payload with the command key twice"
+JC_PATH=/nonexistent _jc_run "$fc" "$fc" '{"command":"git reset --\u0068ard"}' ""
+_fc_expect 2 'Blocked' "jcode-pre without jq refuses a flag spelled with a \\u escape"
 rm -rf "$fc"
 

@@ -3,17 +3,14 @@
 
 Walks each unique blob of REV in REPO once (git rev-list --objects), tokenises six-hex words and
 checks them against a set, so thousands of ids cost no more than a few. Ids are the bare
-six-hex lines of REPO's `.personal-denylist`, or of IDS_FILE when given. Own shas are REPO's
-commits plus the commits of lint.toml `[history] bundles`, minus `[history] keep`. Paths that
-match `[history] skip` are not read, and golden digests (`[scope] golden`) only by their `#`
-note lines. Prints path:line per hit, the count on stderr. Exit 1 when anything hits.
+six-hex lines of the personal denylist (lint.toml [denylist] path), or of IDS_FILE when given. Own shas are REPO's
+commits. Golden digests (`[scope] golden`) are read only by their `#` note lines. Prints path:line per hit, the count on stderr. Exit 1 when anything hits.
 
     id-scan.py REPO REV [IDS_FILE]
 """
 
 from __future__ import annotations
 
-import importlib.util
 import re
 import subprocess
 import sys
@@ -28,34 +25,23 @@ TOKEN = re.compile(r"\b[0-9a-f]{6}\b")
 SHA = re.compile(r"\b[0-9a-f]{7,40}\b")
 
 
-def own_shas(repo: Path, hist: dict) -> set[str]:
-    spec = importlib.util.spec_from_file_location("ownshas", LINT / "own-shas.py")
-    mod = importlib.util.module_from_spec(spec)
-    assert spec.loader
-    spec.loader.exec_module(mod)
-    return set(mod.git(repo, "rev-list", "--all").split()) | set(mod.bundle_commits(hist["bundles"]))
-
-
 def scan(repo: Path, rev: str, ids: set[str]) -> set[str]:
     cfg = config.load(repo)
-    skip = [re.compile(s) for s in cfg["history"]["skip"]]
-    keep = set(cfg["history"]["keep"])
-    own = own_shas(repo, cfg["history"])
-    by7: dict[str, list[str]] = {}
-    for s in own:
-        by7.setdefault(s[:7], []).append(s)
-
-    def is_own(t: str) -> bool:
-        return t not in keep and any(s.startswith(t) for s in by7.get(t[:7], []))
-
     def run(*args: str, inp: str | None = None) -> str:
         return subprocess.run(["git", "-C", str(repo), *args], input=inp, capture_output=True, text=True,
                               check=True).stdout
 
+    by7: dict[str, list[str]] = {}
+    for s in run("rev-list", "--all").split():
+        by7.setdefault(s[:7], []).append(s)
+
+    def is_own(t: str) -> bool:
+        return any(s.startswith(t) for s in by7.get(t[:7], []))
+
     blobs: dict[str, str] = {}
     for line in run("rev-list", "--objects", rev).splitlines():
         parts = line.split(" ", 1)
-        if len(parts) == 2 and not any(s.search(parts[1]) for s in skip):
+        if len(parts) == 2:
             blobs.setdefault(parts[0], parts[1])
     kinds = run("cat-file", "--batch-check=%(objectname) %(objecttype)", inp="\n".join(blobs)).splitlines()
     hits: set[str] = set()

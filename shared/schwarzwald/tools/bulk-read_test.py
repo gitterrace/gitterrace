@@ -41,6 +41,52 @@ def run(cwd: Path, env_extra: dict[str, str], *args: str) -> subprocess.Complete
     return subprocess.run([sys.executable, str(TOOL), *args], cwd=cwd, env=env, capture_output=True, text=True)
 
 
+def run_in(cwd: Path, env_extra: dict[str, str], stdin: bytes, *args: str) -> subprocess.CompletedProcess[bytes]:
+    env = {k: v for k, v in os.environ.items()
+           if k != "ANTHROPIC_API_KEY" and not k.startswith(("JCODE_", "CLAUDE", "BULK_READ_"))}
+    env.update(env_extra)
+    return subprocess.run([sys.executable, str(TOOL), *args], cwd=cwd, env=env, capture_output=True, input=stdin)
+
+
+def bypass_cases(root: Path, jenv: dict[str, str], cli: dict[str, str], jargv: Path, sin: Path) -> list[str]:
+    """The audit's bypasses (ST-4): each must refuse and send nothing, on both CLI backends."""
+    bad: list[str] = []
+    (root / ".env").write_text("TOKEN=sk-live-123\n")
+    (root / "notes.txt").symlink_to(".env")
+    (root / "credentials").write_text("[default]\naws_secret_access_key = x\n")
+    (root / ".npmrc").write_text("//r/:_authToken=x\n")
+    (root / "vault.kdbx").write_bytes(b"kdbx")
+    (root / "utf16.txt").write_bytes("my home is 12 Hidden Lane\n".encode("utf-16"))
+    (root / "split.txt").write_text("my home is 12 Hidden\u200b Lane\n")
+    (root / "wide.txt").write_text("my home is 12 \uff28idden Lane\n")
+    (root / "nul.bin").write_bytes(b"abc\x00def\n")
+    gitd = root / "repo/.git"
+    gitd.mkdir(parents=True)
+    (gitd / "config").write_text("[remote]\nurl = https://x:tok@h/r\n")
+    cases = [("a symlink to .env", ["notes.txt"], b""), ("a case-folded .Env", [".Env"], b""),
+             ("an AWS credentials file", ["credentials"], b""), ("an .npmrc", [".npmrc"], b""),
+             ("a .kdbx vault", ["vault.kdbx"], b""), ("a .git/config", ["repo/.git/config"], b""),
+             ("a UTF-16 denylisted file", ["utf16.txt"], b""), ("a zero-width split word", ["split.txt"], b""),
+             ("a fullwidth denylisted word", ["wide.txt"], b""), ("a file with NUL bytes", ["nul.bin"], b""),
+             ("stdin without BULK_READ_STDIN=1", ["-"], b"hello\n"),
+             ("a denylisted stdin even when allowed", ["-"], b"my home is 12 Hidden Lane\n")]
+    for label, args, data in cases:
+        for env, sent in ((jenv, jargv), (cli, sin)):
+            sent.unlink(missing_ok=True)
+            extra = {"BULK_READ_STDIN": "1"} if "allowed" in label else {}
+            r = run_in(root, env | extra, data, "q", *args)
+            if r.returncode == 0 or sent.exists():
+                bad.append(f"sent {label} ({'jcode' if env is jenv else 'claude'}): exit {r.returncode}")
+    sin.unlink(missing_ok=True)
+    r = run_in(root, cli | {"BULK_READ_STDIN": "1"}, b"plain words\n", "q", "-")
+    if r.returncode != 0 or not sin.exists() or "plain words" not in sin.read_text():
+        bad.append(f"an allowed clean stdin was not sent: exit {r.returncode} {r.stderr[-200:]!r}")
+    r = run_in(root, cli | {"BULK_READ_MAX_BYTES": "10"}, b"", "q", "a.txt")
+    if r.returncode != 4:
+        bad.append(f"an oversize file is not refused by size first: exit {r.returncode}")
+    return bad
+
+
 def main() -> int:
     srv = HTTPServer(("127.0.0.1", 0), Stub)
     threading.Thread(target=srv.serve_forever, daemon=True).start()
@@ -51,7 +97,11 @@ def main() -> int:
         root = Path(d)
         (root / "a.txt").write_text("alpha\nneedle-content-xyz\n")
         (root / "diary.txt").write_text("my home is 12 Hidden Lane\n")
-        (root / ".personal-denylist").write_text("hidden lane\n")
+        keep = root.parent / (root.name + "-private")
+        keep.mkdir()
+        (keep / "denylist").write_text("hidden lane\n")
+        (root / "config/schwarzwald").mkdir(parents=True)
+        (root / "config/schwarzwald/lint.toml").write_text(f'[denylist]\npath = "{keep}/denylist"\n')
         (root / "id.pem").write_text("x\n")
         empty = root / "emptybin"
         empty.mkdir()
@@ -183,6 +233,7 @@ def main() -> int:
             bad.append("request key or default model wrong")
         if not r.stdout.startswith("summary by claude-haiku-4-5-20251001, verify before editing"):
             bad.append(f"output header wrong: {r.stdout[:80]!r}")
+        bad += bypass_cases(root, jenv, cli, jargv, sin)
     for b in bad:
         print(f"FAIL {b}")
     print("ok" if not bad else f"{len(bad)} broken")

@@ -19,8 +19,7 @@ guard_rule_script_content() {
     [ -n "$body" ] || return 0
     GUARD_TOOL=bash
     GUARD_CMD="$body"
-    _gf_strip_heredocs "$GUARD_CMD"
-    GUARD_HEAD_CACHE="${GUARD_FALLBACK_VALUE%$'\n'}"
+    _guard_head_fill
     for r in broad_process_kill git_stash git_checkout_discards containment; do
         "guard_rule_$r" || true
         [ "$GUARD_VERDICT" = block ] && break
@@ -28,7 +27,7 @@ guard_rule_script_content() {
     # The destructive class through its one definition, the fallback's deny list, not the
     # destructive_class rule: that rule stands down when the selftest isolates a dedicated rule.
     if [ "$GUARD_VERDICT" != block ] &&
-        ! GUARD_EVENT=pre_tool GUARD_FALLBACK_HEALTHY=1 GUARD_FALLBACK_ORG="$GUARD_ORG" _gf_engine_judge; then
+        ! GUARD_EVENT=pre_tool GUARD_FALLBACK_HEALTHY=1 GUARD_FALLBACK_ORG="$GUARD_ORG" guard_fallback_judge; then
         guard_block "$GUARD_FALLBACK_REASON" \
             "This is the destructive class, written into a script: running it would do the same."
     fi

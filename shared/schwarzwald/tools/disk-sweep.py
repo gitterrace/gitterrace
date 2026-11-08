@@ -8,13 +8,16 @@ Under each ROOT it finds:
                 and the per-lane subdirs of one (each child of target/ that is itself cargo
                 output), not written for N hours (default 6), whose checkout no running cargo
                 or rustc names in its command line or working directory
-  scratch runs  each child of a --scratch DIR (default $TMPDIR/schwarzwald-scratch) not
+  scratch runs  each child of a --scratch DIR (default: scratch.sh's root, $SCRATCH_ROOT, else
+                $TMPDIR, $XDG_RUNTIME_DIR or ~/.cache, each /schwarzwald-scratch) not
                 written for N hours that no process has open or as its working directory
 
-It never removes a source checkout: only a target dir or a scratch run. A scratch run holding a
-git checkout with commits no other ref or remote has is skipped, or with --bundle DIR first
-bundled into DIR and then removed. The listing is the default; --apply removes. Either way the
-last line is the bytes it would reclaim or did reclaim.
+It never removes a source tree: only a target dir or a scratch run. A scratch run holding a
+repo (nested ones too) with commits no remote has (on any branch, tag, stash or a detached
+HEAD) is skipped, or with --bundle DIR first bundled into DIR and then removed. A run with
+uncommitted changes is always kept. A symlinked target, lane or run is never followed. Each
+dir is checked again right before it is removed. The listing is the default; --apply
+removes. Either way the last line is the bytes it would reclaim or did reclaim.
 
 Bytes. A dir's size is its allocated blocks (st_blocks), labelled "up to": an APFS clone
 (`cp -c`) shares blocks with its source and a local snapshot (Time Machine, a backup agent) pins
@@ -195,44 +198,71 @@ def busy_build(checkout: Path, target: Path, procs: list[tuple[str, str]]) -> bo
 
 
 def targets(root: Path) -> list[tuple[Path, Path, list[Path]]]:
-    """(target dir, its checkout, its per-lane subdirs) for every cargo target dir under root."""
+    """(target dir, its checkout, its per-lane subdirs) for every cargo target dir under root.
+    A symlinked target or lane is never taken: removing through it would delete a dir outside
+    the root. Symlinked dirs are not walked into either."""
     found = []
-    for dirpath, dirnames, _ in os.walk(root):
+    real_root = os.path.realpath(root)
+    for dirpath, dirnames, _ in os.walk(root, followlinks=False):
         p = Path(dirpath)
-        if "target" in dirnames and is_cargo_output(p / "target"):
-            t = p / "target"
-            lanes = [c for c in sorted(t.iterdir()) if c.is_dir() and c.name not in ("debug", "release")
-                     and is_cargo_output(c)]
+        t = p / "target"
+        if "target" in dirnames and not t.is_symlink() and inside(t, real_root) and is_cargo_output(t):
+            lanes = [c for c in sorted(t.iterdir()) if not c.is_symlink() and c.is_dir()
+                     and c.name not in ("debug", "release") and is_cargo_output(c)]
             found.append((t, p, lanes))
             dirnames.remove("target")
         dirnames[:] = [d for d in dirnames if d not in SKIP_WALK]
     return found
 
 
+def inside(p: Path, real_root: str) -> bool:
+    """p, symlinks resolved, lies at or below the resolved root."""
+    r = os.path.realpath(p)
+    return r == real_root or r.startswith(real_root.rstrip("/") + "/")
+
+
 def git_out(d: str, *args: str) -> str | None:
-    r = subprocess.run(["git", "-C", d, *args], capture_output=True, text=True)
+    # --no-optional-locks: a status must not rewrite the index, or the probe itself makes the
+    # run look freshly written.
+    r = subprocess.run(["git", "--no-optional-locks", "-C", d, *args], capture_output=True, text=True)
     return r.stdout.strip() if r.returncode == 0 else None
 
 
-def unlanded(run: Path) -> list[Path]:
-    """Git checkouts inside a scratch run holding commits that removing the run would lose: a
-    clone's commits no remote has (all of them when it has no remote), a worktree's detached
-    HEAD no branch of its repository holds."""
+def repos_in(run: Path) -> list[tuple[Path, bool]]:
+    """Every git work tree in run, nested ones too: (dir, is a linked worktree)."""
     out = []
-    for dirpath, dirnames, filenames in os.walk(run):
+    for dirpath, dirnames, filenames in os.walk(run, followlinks=False):
         if ".git" in dirnames or ".git" in filenames:
-            if git_out(dirpath, "rev-parse", "-q", "--verify", "HEAD"):
-                if ".git" in filenames:  # a worktree: removing it drops only what no branch holds
-                    lost = not git_out(dirpath, "branch", "-a", "--contains", "HEAD", "--format=%(refname)")
-                elif git_out(dirpath, "remote"):
-                    lost = bool(git_out(dirpath, "rev-list", "-1", "HEAD", "--branches", "--not", "--remotes"))
-                else:
-                    lost = True
-                if lost:
-                    out.append(Path(dirpath))
-            dirnames.clear()
-            continue
+            out.append((Path(dirpath), ".git" in filenames))
+        # Keep walking below a work tree: a nested repo (vendored, ignored) holds its own work.
         dirnames[:] = [d for d in dirnames if d not in SKIP_WALK]
+    return out
+
+
+def dirty(run: Path) -> list[Path]:
+    """Work trees in run with uncommitted or untracked changes: a bundle cannot save those, so
+    such a run is always kept."""
+    return [d for d, _ in repos_in(run) if git_out(str(d), "status", "--porcelain") != ""]
+
+
+def unlanded(run: Path) -> list[Path]:
+    """Git work trees inside a scratch run holding commits that removing the run would lose: a
+    clone's commits no remote has (any ref: branches, tags, the stash, a detached HEAD; all of
+    them when it has no remote), a worktree's detached HEAD no branch of its repository holds.
+    Nested repos count too."""
+    out = []
+    for d, worktree in repos_in(run):
+        dirpath = str(d)
+        if not git_out(dirpath, "rev-parse", "-q", "--verify", "HEAD"):
+            continue
+        if worktree:  # a worktree: removing it drops only what no branch holds
+            lost = not git_out(dirpath, "branch", "-a", "--contains", "HEAD", "--format=%(refname)")
+        elif git_out(dirpath, "remote"):
+            lost = git_out(dirpath, "rev-list", "-1", "HEAD", "--all", "--not", "--remotes") != ""
+        else:
+            lost = True
+        if lost:
+            out.append(d)
     return out
 
 
@@ -255,6 +285,15 @@ def human(n: int) -> str:
             return f"{n:.1f} {unit}" if unit != "B" else f"{n} B"
         n /= 1024
     return str(n)
+
+
+def default_scratch() -> Path:
+    """The scratch root tools/scratch.sh uses: $SCRATCH_ROOT, $TMPDIR, $XDG_RUNTIME_DIR, else
+    ~/.cache, each with schwarzwald-scratch. Never a fixed name in shared /tmp."""
+    if os.environ.get("SCRATCH_ROOT"):
+        return Path(os.environ["SCRATCH_ROOT"]).resolve()
+    base = os.environ.get("TMPDIR") or os.environ.get("XDG_RUNTIME_DIR") or str(Path.home() / ".cache")
+    return Path(base).resolve() / "schwarzwald-scratch"
 
 
 def main(argv: list[str]) -> int:
@@ -285,7 +324,7 @@ def main(argv: list[str]) -> int:
     if not roots and not scratch:
         print(__doc__, file=sys.stderr)
         return 2
-    scratch = scratch or [Path(os.environ.get("TMPDIR") or "/tmp").resolve() / "schwarzwald-scratch"]
+    scratch = scratch or [default_scratch()]
     cutoff = time.time() - hours * 3600
     procs = processes()
     opened = open_paths(roots + scratch)
@@ -318,11 +357,13 @@ def main(argv: list[str]) -> int:
         if not s.is_dir():
             continue
         for run in sorted(s.iterdir()):
-            if not run.is_dir():
+            if run.is_symlink() or not run.is_dir():
                 continue
             why = stale(run, None)
             if why:
                 print(f"keep  {why:7} {run}")
+            elif wip := dirty(run):
+                print(f"keep  dirty   {run} (uncommitted changes in {wip[0]})")
             elif (held := unlanded(run)) and not bundle:
                 print(f"keep  unlanded {run} (commits only in {held[0]}, --bundle DIR saves them first)")
             else:
@@ -333,6 +374,13 @@ def main(argv: list[str]) -> int:
     for kind, d in picked:
         n = size(d)
         if apply:
+            # Re-checked just before the delete (ST-9): a lane may have started in the dir, or
+            # changed it, since the listing.
+            if d.is_symlink() or newest_write(d, cutoff) > cutoff or (kind == "scratch" and dirty(d)) \
+                    or (kind == "scratch" and not bundle and unlanded(d)) \
+                    or any(cwd and under(cwd, d) for _, cwd in processes()):
+                print(f"keep  changed {d} (in use or written since the listing)")
+                continue
             if kind == "scratch" and bundle and not save_bundles(d, bundle):
                 failed += 1
                 continue

@@ -19,6 +19,8 @@ if [[ -f ${f} ]]; then
   v=$(read_key main)
   main=${v:-${main}}
 fi
+# Only a shell name: bash evaluates an array subscript in ${!x}, so any other value runs code.
+[[ ${prefix} =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] || prefix=SCHWARZWALD_
 allow="${prefix}ALLOW_OLD_DATES"
 [[ ${!allow:-0} == 1 ]] && exit 0
 zero=0000000000000000000000000000000000000000
@@ -33,10 +35,20 @@ while read -r old new ref; do
   [[ $(git cat-file -t "${new}" 2>/dev/null) == commit ]] || continue
   span=${new}
   [[ -n ${old} ]] && span="${old}..${new}"
-  bad=$(git log --reverse --format='%h %at %ct %P' "${span}" 2>/dev/null |
+  # Fail closed: a git log that fails refuses the update instead of finding nothing.
+  if ! log=$(git log --reverse --format='%h %at %ct %P' "${span}"); then
+    printf 'reference-transaction: refused %s: git log %s failed, the dates cannot be checked.\n' "${ref}" "${span}" >&2
+    status=1
+    continue
+  fi
+  bad=$(printf '%s\n' "${log}" |
     while read -r h at ct parent _; do
+      [[ -n ${h} ]] || continue
       pt=0
-      [[ -n ${parent} ]] && pt=$(git log -1 --format=%ct "${parent}" 2>/dev/null || echo 0)
+      if [[ -n ${parent} ]] && ! pt=$(git log -1 --format=%ct "${parent}"); then
+        echo "${h}(parent-unreadable)"
+        continue
+      fi
       if [[ ${at} != "${ct}" ]] || ((ct < pt)); then echo "${h}"; fi
     done | head -5 | tr '\n' ' ')
   [[ -z ${bad} ]] && continue

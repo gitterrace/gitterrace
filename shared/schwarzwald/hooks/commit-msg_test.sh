@@ -19,6 +19,7 @@ git -C "${d}" init -q
 git -C "${d}" -c user.name=t -c user.email=t@example.invalid commit -q --allow-empty -m "init"
 own=$(git -C "${d}" rev-parse --short=9 HEAD)
 export COMMIT_MSG_REPO="${d}"
+export GIT_EDITOR=:  # what git sets for the hook under -m and -F: no editor ran
 
 fail=0
 # expect <label> <ok|refused> <message>
@@ -45,12 +46,26 @@ home="/Users"
 expect "a home path is refused" refused "$(printf 'fix: x\n\nbuilt in %s/jdoe/src' "${home}")"
 expect "an own sha is refused" refused "$(printf 'fix: x\n\nfollows %s' "${own}")"
 expect "a longer hex run is not a code" ok "chore: bump to deadbeefcafe"
-expect "a stripped comment line is skipped" ok $'fix: x\n# Please enter the message #abcdef'
+# git commit -m and -F keep `#` lines (cleanup whitespace): the hook lints them.
+expect "a comment line kept by -m is linted" refused $'fix: y\n\n# see task 1a2b3c, the coordinator'
+expect "a leading comment line kept by -m is the subject" refused $'# x\nfix: z'
+# The editor's template is stripped by git (cleanup strip), so its lines are not linted.
+GIT_EDITOR="vi" expect "a comment line git strips after the editor is skipped" ok $'fix: x\n# Please enter the commit message for your changes. Lines starting\n# with \'#\' will be ignored, and an empty message aborts the commit.\n# see #abcdef'
+git -C "${d}" config commit.cleanup strip
+expect "commit.cleanup strip skips comment lines" ok $'# note\nfix: x\n# lane 3'
+git -C "${d}" config commit.cleanup verbatim
+expect "commit.cleanup verbatim lints comment lines" refused $'fix: x\n# lane 3'
+git -C "${d}" config --unset commit.cleanup
 expect "a scopeless subject passes" ok "docs: state the commit form"
 expect "a breaking-change marker passes" ok "feat(web)!: new route"
 expect "a free-form subject is refused" refused "Empty states: the copy"
 expect "an unknown type is refused" refused "wip: scrolling"
 expect "a merge subject passes" ok "Merge branch 'x' into main"
-expect "a leading comment line is skipped" ok $'# note\nfix: x'
+expect "a pull request merge passes" ok "Merge pull request #12 from a/b"
+expect "a revert git wrote passes" ok 'Revert "fix: x"'
+expect "a fixup git wrote passes" ok "fixup! fix: x"
+expect "free text after Merge is refused" refused "Merge anything at all"
+expect "free text after fixup! is refused" refused "fixup! wip"
+expect "free text after Revert is refused" refused "Revert the scrolling"
 
 exit "${fail}"

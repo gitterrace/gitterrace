@@ -35,34 +35,15 @@ if [ -n "${GUARDS_SELFTEST_ONLY:-}${GUARDS_SELFTEST_PARTS:-}" ]; then
     exit 1
 fi
 # COVERAGE. Per-rule cases structurally cannot detect a MISSING rule, so the
-# registry is asserted against the cases separately.
-RULES=$(GUARD_REPO="$REPO" bash -c '
-    GUARD_RULES=()
-    guard_register() { GUARD_RULES+=("${1}"); }
-    _guard_cfg() { . "$1/config.sh"; guard_config_load >/dev/null 2>&1; }
-    _guard_cfg "$1"
-    for f in "$1"/rules/*.sh; do . "$f"; done
-    for d in ${GUARD_PRODUCT_RULE_DIRS:-}; do
-        for f in "${GUARD_PRODUCT_ROOT:-$GUARD_REPO}/$d"/*.sh; do [ -e "$f" ] && . "$f"; done
-    done
-    printf "%s\n" "${GUARD_RULES[@]}"
-' _ "${ENGINE%/*}")
-missing=''
+# registry is asserted against the cases separately. Every rule registers on a line of its own
+# (`guard_register <id> [event]`), so the registry is read from the files, not by loading them.
+_rule_files="${ENGINE%/*}/rules/*.sh"
+for _d in $PRODUCT_RULE_DIRS; do _rule_files="$_rule_files $REPO/$_d/*.sh"; done
+# shellcheck disable=SC2086 # the globs expand on purpose
+RULES=$(sed -n 's/^guard_register \([A-Za-z0-9_]*\).*/\1/p' $_rule_files 2>/dev/null)
+real_missing=''
 for r in $RULES; do
     case "$COVERED" in
-        *" $r "*) ;;
-        *) missing="$missing $r" ;;
-    esac
-done
-# Rules that are side effects or environment-dependent, exempt with a reason.
-# An exemption is a debt, not a category.
-# cargo_lock_contention and process_table_pressure read live machine state, so a
-# deterministic case would assert nothing here; they are proven by mutation instead
-# (the same technique red.sh uses on the suite as a whole).
-EXEMPT=" "
-real_missing=''
-for r in $missing; do
-    case "$EXEMPT" in
         *" $r "*) ;;
         *) real_missing="$real_missing $r" ;;
     esac
@@ -79,10 +60,10 @@ if [ "$RULE_COUNT" -lt "${MIN_RULES:-1}" ]; then
     FAILED=1
 elif [ -n "$real_missing" ]; then
     echo "  FAIL rule(s) with no test case:$real_missing"
-    echo "       Add a case, or add the rule to EXEMPT with a reason."
+    echo "       Add a case for each."
     FAILED=1
 else
-    echo "  ok   [COVER ] all $RULE_COUNT registered rules have a case or a documented exemption"
+    echo "  ok   [COVER ] all $RULE_COUNT registered rules have a case"
 fi
 
 # A floor. If the case list is emptied or the loop breaks, "0 cases, 0 failures"

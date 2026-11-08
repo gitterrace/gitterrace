@@ -27,14 +27,24 @@ git config user.name t
 : >config/schwarzwald/lint.toml
 git add bin config
 git commit -qm case
-mkdir -p part/lint part/configs
+mkdir -p part/lint/lib part/configs
+cp "${here}/lib/pick-python.sh" part/lint/lib/
 : >part/configs/drift.py
 awk '/^# The shared lints, each/ { exit } { print }' "${here}/run.sh" >part/lint/run.sh
 PATH="${PWD}/bin:${PATH}" bash part/lint/run.sh --repo "${PWD}" >out.txt 2>&1
+fail=0
 if [[ $(cat "${SANDBOX}/drift-ran" 2>/dev/null) == python3.15 ]] && grep -q '^PASS drift' out.txt; then
   echo "ok   run.sh runs drift.py under the newest python"
-  exit 0
+else
+  echo "FAIL run.sh did not run drift.py under the newest python"
+  fail=1
 fi
-echo "FAIL run.sh did not run drift.py under the newest python"
-cat out.txt
-exit 1
+# A linter whose config is missing says so: a deleted .gitleaks.toml may not drop the secret scan.
+for tool in typos gitleaks; do
+  if grep -q "^FAIL ${tool}: no config" out.txt; then echo "ok   a missing ${tool} config is a FAIL"; else
+    echo "FAIL a missing ${tool} config left no FAIL line"
+    fail=1
+  fi
+done
+[[ ${fail} == 0 ]] || cat out.txt
+exit "${fail}"

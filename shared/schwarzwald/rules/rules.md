@@ -20,9 +20,9 @@ referenced thing says instead.
    first.
 4. No personal names, agent names, hostnames or local paths. Write `$HOME` or
    `~`.
-5. No commit of the repository's own history by sha. A reader may not have
-   that commit. Say what the commit did. Upstream shas (a pinned corpus, a
-   vendored release) are fine.
+5. No commit of the repository's own history by sha. A reader may not have that
+   commit. Say what the commit did. Upstream shas (a pinned corpus, a vendored
+   release) are fine.
 6. Test names describe behavior (`owner_ties_follow_names`), never a label.
 7. A commit message describes the product change and its tests in plain words. A
    golden change is described by what changed ("12 ownership cells: only the
@@ -35,8 +35,9 @@ referenced thing says instead.
 refuse and lines it must pass. The shared lints (`lint/internal-refs.py`,
 `lint/personal-data.py`, `lint/own-shas.py`) read it, and each product's message
 gate runs them on every commit it lands. Real names and real ids never get
-committed: they go in the product's gitignored `.personal-denylist`, one
-case-insensitive regex per line.
+committed: they go in the private denylist, one file outside every repository
+(`~/.config/schwarzwald/personal-denylist`), one case-insensitive regex per
+line.
 
 Tracker threads and direct messages may carry ids and labels. That is where they
 belong.

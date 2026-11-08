@@ -1,0 +1,4 @@
+jobs:
+  b:
+    steps:
+      - {name: x, uses: evil/action@main}

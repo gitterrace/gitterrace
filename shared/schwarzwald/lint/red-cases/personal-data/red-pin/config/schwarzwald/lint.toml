@@ -1,0 +1,2 @@
+[run]
+markdownlint = "npm:other-pkg"

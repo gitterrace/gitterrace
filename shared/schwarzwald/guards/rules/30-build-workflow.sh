@@ -49,9 +49,12 @@ guard_rule_pipe_masks_exit_code() {
     guard_match "$(guard_cmd_head)" '(make|cargo|swift)[^|;'$'\n'']*\|[ \t]*(tail|head)[^&;'$'\n'']*&&' || return 0
     guard_block \
         "piping make/cargo/swift into tail or head makes the following '&&' gate on TAIL's exit code (always 0), masking a real failure." \
-        "Capture instead: redirect to a file, echo the exit code, then grep the full file for error:/FAILED."
+        "$GUARD_PIPE_HINT"
     return 0
 }
+
+# The one remedy for "a pipe into a filter hides the exit code", shared with rules/70.
+GUARD_PIPE_HINT="Check the status first, then truncate: out=\$(cmd 2>&1) || { printf '%s\\n' \"\$out\"; exit 1; }, or put 'set -o pipefail' ahead of the pipeline."
 
 guard_register rtk_proxy_reads
 guard_rule_rtk_proxy_reads() {

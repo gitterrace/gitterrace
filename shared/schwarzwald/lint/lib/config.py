@@ -42,9 +42,11 @@ try:
 except ImportError:  # pragma: no cover - only on a python older than 3.11
     import os
 
-    newer = None if os.environ.get(_REEXEC) == "1" else _newest_python311()
+    # execv keeps the pid: the flag stops a loop in this process, and a child (another pid) that
+    # inherits it still re-execs.
+    newer = None if os.environ.get(_REEXEC) == str(os.getpid()) else _newest_python311()
     if newer:
-        os.environ[_REEXEC] = "1"
+        os.environ[_REEXEC] = str(os.getpid())
         os.execv(newer, [newer, sys.argv[0], *sys.argv[1:]])
     sys.exit(f"the shared lints need python 3.11 or newer for tomllib, this is {sys.version.split()[0]}"
              " and no python3.11+ was found on PATH, in /opt/homebrew/bin or in /usr/local/bin")
@@ -67,7 +69,6 @@ DEFAULTS: dict[str, dict] = {
     "a11y": {"docs": ["README.md", "docs/**.md"], "h1_required": True, "known": []},
     "refs": {"patterns": [], "not_id": []},
     "personal": {"exempt": [], "placeholder_homes": []},
-    "history": {"keep": [], "sha_fields": [], "bundles": "", "replace": [], "skip": []},
     "lines": {
         "max_lines": 600,
         "max_width": 0,
@@ -85,18 +86,27 @@ DEFAULTS: dict[str, dict] = {
         "steps": [],
         "shell_exclude": [],
         "shellcheck_exclude": ["SC2250", "SC2292", "SC2310", "SC2312"],
-        "shfmt_indent": 2,
         "markdownlint": "",
-        "markdown_exclude": [],
     },
     "disk": {"floor_gib": 50},
-    "denylist": {"max_age_hours": 168, "mode": "warn", "refresh": "", "history_ids": ""},
+    "denylist": {"max_age_hours": 168, "mode": "warn", "history_ids": "",
+                 "path": "~/.config/schwarzwald/personal-denylist"},
     "commit": {
         "types": ["feat", "fix", "docs", "style", "refactor", "perf", "test", "build", "ci", "chore", "revert"],
         "allow_prefix": "SCHWARZWALD_",
         "main": "main",
     },
 }
+
+
+def git(root: Path, *args: str, env_extra: dict[str, str] | None = None) -> str:
+    """`git -C root args` with every inherited GIT_* removed: a hook runs the lints with GIT_DIR
+    and GIT_INDEX_FILE set, which would point `git init` in a scratch dir at the real repository."""
+    import os
+
+    env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")} | (env_extra or {})
+    return subprocess.run(["git", "-C", str(root), *args], capture_output=True, text=True, check=True,
+                          env=env).stdout
 
 
 def take_repo(args: list[str]) -> tuple[Path, list[str]]:
@@ -116,7 +126,56 @@ def load(root: Path) -> dict[str, dict]:
     unknown = [f"[{t}] {k}" for t, v in got.items() for k in v if k not in DEFAULTS.get(t, {})]
     if unknown:
         sys.exit(f"{path}: keys no shared lint reads: {', '.join(unknown)}")
-    return {t: {**d, **got.get(t, {})} for t, d in DEFAULTS.items()}
+    cfg = merged(got)
+    pin = cfg["run"]["markdownlint"]
+    if pin and not PIN.fullmatch(str(pin)):
+        # npx --yes installs any npm spec (a URL, npm:other) with no prompt: only a version.
+        sys.exit(f"{path}: [run] markdownlint must be a version like 0.18.1, not {pin!r}")
+    return cfg
+
+
+PIN = re.compile(r"\d+\.\d+\.\d+")
+# The lists that switch a lint off for a path. A branch that adds to one judges itself by rules
+# it wrote, so the message gate compares them with the base.
+WIDENING = [("scope", "exclude"), ("lines", "exclude"), ("personal", "exempt"), ("scripts", "exempt"),
+            ("a11y", "known"), ("run", "shell_exclude"), ("run", "shellcheck_exclude")]
+
+
+def merged(got: dict) -> dict[str, dict]:
+    cfg = {t: {**d, **got.get(t, {})} for t, d in DEFAULTS.items()}
+    # Zero files scanned is a broken census, never a pass.
+    cfg["scope"]["min_files"] = max(1, int(cfg["scope"]["min_files"]))
+    return cfg
+
+
+def widened(root: Path, base: str) -> list[str]:
+    """What lint.toml at HEAD switches off that it did not at BASE: a path added to an exclude
+    or exempt list, a lower min_files. `<allow_prefix>ALLOW_WIDER_LINT=1` lets a reviewed change
+    through."""
+    def at(rev: str) -> dict[str, dict]:
+        r = subprocess.run(["git", "-C", str(root), "show", f"{rev}:{CONFIG}"], capture_output=True, text=True)
+        return merged(tomllib.loads(r.stdout) if r.returncode == 0 else {})
+    old, new = at(base), at("HEAD")
+    import os
+    if os.environ.get(new["commit"]["allow_prefix"] + "ALLOW_WIDER_LINT") == "1":
+        return []
+    out = [f"lint.toml [{t}] {k} adds {x!r}" for t, k in WIDENING for x in new[t][k] if x not in old[t][k]]
+    if new["scope"]["min_files"] < old["scope"]["min_files"]:
+        out.append(f"lint.toml [scope] min_files drops from {old['scope']['min_files']} to {new['scope']['min_files']}")
+    return out
+
+
+# A group holding a quantifier, itself quantified: `(a+)+`. Backtracking on such a pattern
+# doubles per character, so one line hangs the hook. Patterns from lint.toml and the private
+# list are user text: refused at load. Lines are cut to MAX_LINE before a search.
+NESTED = re.compile(r"\((?:[^()\\]|\\.)*[+*}](?:[^()\\]|\\.)*\)[+*{]")
+MAX_LINE = 500
+
+
+def user_pattern(p: str, where: str, flags: int = 0) -> re.Pattern[str]:
+    if NESTED.search(p):
+        sys.exit(f"{where}: {p!r} nests a quantifier in a quantified group, which can hang the lint")
+    return re.compile(p, flags)
 
 
 def deny(product: str) -> dict[str, list[re.Pattern[str]]]:
@@ -127,29 +186,49 @@ def deny(product: str) -> dict[str, list[re.Pattern[str]]]:
     return out
 
 
+def refresh_file(path: Path) -> Path:
+    """The private refresh command: `denylist-refresh.toml` beside the private denylist."""
+    return path.parent / "denylist-refresh.toml"
+
+
+def refresh_argv(path: Path) -> list[str] | None:
+    """`argv = [...]` from the private refresh file, or None. Never from a tracked file: a branch
+    controls its lint.toml, so a command there would run as whoever commits on that branch."""
+    f = refresh_file(path)
+    if not f.is_file() or f.is_symlink():
+        return None
+    argv = tomllib.loads(f.read_text(encoding="utf-8")).get("argv")
+    if not (isinstance(argv, list) and argv and all(isinstance(a, str) and a for a in argv)):
+        sys.exit(f"{f}: argv must be a non-empty list of strings")
+    return argv
+
+
 def denylist_problems(root: Path, cfg: dict[str, dict], now: float | None = None) -> tuple[list[str], bool]:
-    """A missing or stale `.personal-denylist` as lines to print, and whether the mode refuses.
+    """A missing or stale personal denylist as lines to print, and whether the mode refuses.
 
     The list is local and seeded once; the board grows and the guard goes blind without a sound.
     Settings: lint.toml [denylist] max_age_hours (0 = never stale), mode (warn|refuse|refresh),
-    refresh (the product's refresh command), history_ids (a file the refresh merges in). In mode
-    "refresh" a missing or stale list is refreshed by running that command from the repository
-    root, and the check refuses only when the command fails or leaves the list missing or stale."""
-    import subprocess
+    history_ids (a file the refresh merges in), path (the list itself, see denylist_path). The
+    refresh command is private: `argv = [...]` in denylist-refresh.toml beside the list, run
+    without a shell from the repository root. In mode "refresh" a missing or stale list is
+    refreshed that way, and the check refuses only when the command fails or leaves the list
+    missing or stale. The command's output is never printed: it may carry secrets."""
     import time
 
     s = cfg["denylist"]
     if s["mode"] not in ("warn", "refuse", "refresh"):
         sys.exit(f"lint.toml [denylist] mode must be warn, refuse or refresh, not {s['mode']!r}")
-    path = root / ".personal-denylist"
-    how = f" Refresh it: {s['refresh']}" if s["refresh"] else " Set [denylist] refresh in lint.toml to name the refresh command."
+    path = denylist_path(root, cfg)
+    argv = refresh_argv(path)
+    how = (f" Refresh it: {' '.join(argv)}" if argv
+           else f" Put the refresh command in {refresh_file(path)} as argv = [...].")
 
     def problem(at: float | None) -> str | None:
         if not path.exists():
-            return f".personal-denylist is missing: bare ids are not checked.{how}"
+            return f"the personal denylist {path} is missing: bare ids are not checked.{how}"
         age = ((at if at is not None else time.time()) - path.stat().st_mtime) / 3600
         if s["max_age_hours"] and age > s["max_age_hours"]:
-            return f".personal-denylist is {age:.0f}h old (max {s['max_age_hours']}h): new ids are not checked.{how}"
+            return f"the personal denylist {path} is {age:.0f}h old (max {s['max_age_hours']}h): new ids are not checked.{how}"
         return None
 
     found = problem(now)
@@ -157,23 +236,43 @@ def denylist_problems(root: Path, cfg: dict[str, dict], now: float | None = None
         return [], False
     if s["mode"] != "refresh":
         return [found], s["mode"] == "refuse"
-    if not s["refresh"]:
-        return [found, "[denylist] mode is refresh but refresh names no command."], True
-    r = subprocess.run(s["refresh"], shell=True, cwd=root, capture_output=True, text=True)
-    if r.returncode != 0:
-        tail = (r.stderr or r.stdout).strip().splitlines()[-3:]
-        return [found, f"The refresh failed (exit {r.returncode}): " + " | ".join(tail)], True
+    if not argv:
+        return [found, f"[denylist] mode is refresh but {refresh_file(path)} names no command."], True
+    try:
+        r = subprocess.run(argv, cwd=root, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                           stderr=subprocess.DEVNULL)
+        code = r.returncode
+    except OSError as e:
+        code = f"not runnable: {e.strerror}"
+    if code != 0:
+        return [found, f"The refresh failed (exit {code}); run {refresh_file(path)} by hand to see why."], True
     after = problem(None)
     if after is not None:
         return [after, "The refresh ran but did not renew the list."], True
-    return [".personal-denylist was stale or missing and has been refreshed."], False
+    return ["The personal denylist was stale or missing and has been refreshed."], False
+
+
+def denylist_path(root: Path, cfg: dict[str, dict] | None = None) -> Path:
+    """The private denylist: lint.toml [denylist] path, `~` expanded, outside every repository.
+
+    A path inside the product root is refused (exit): private data parked in a work tree is
+    one `git add -f` or one sync away from a commit."""
+    raw = (cfg or load(root))["denylist"]["path"]
+    path = Path(raw).expanduser()
+    if not path.is_absolute():
+        sys.exit(f"lint.toml [denylist] path must be absolute or start with ~, not {raw!r}")
+    here = root.resolve()
+    if path.resolve() == here or here in path.resolve().parents:
+        sys.exit(f"refused: the denylist path {path} lies inside the repository {here}. "
+                 "Set [denylist] path to a location outside every repository.")
+    return path
 
 
 def denylist(root: Path) -> tuple[list[re.Pattern[str]], set[str]]:
-    """The local `.personal-denylist`: regexes, and the bare six-hex lines as a set of ids."""
-    path = root / ".personal-denylist"
+    """The private denylist: regexes, and the bare six-hex lines as a set of ids."""
+    path = denylist_path(root)
     if not path.exists():
-        print("note: .personal-denylist absent, generic patterns only", file=sys.stderr)
+        print("note: the personal denylist is absent, generic patterns only", file=sys.stderr)
         return [], set()
     pats, ids = [], set()
     for line in path.read_text(encoding="utf-8").splitlines():
@@ -183,7 +282,7 @@ def denylist(root: Path) -> tuple[list[re.Pattern[str]], set[str]]:
         if re.fullmatch(r"[0-9a-f]{6}", line):
             ids.add(line)
         else:
-            pats.append(re.compile(line, re.IGNORECASE))
+            pats.append(user_pattern(line, str(path), re.IGNORECASE))
     return pats, ids
 
 
@@ -207,6 +306,17 @@ def messages(root: Path, base: str) -> list[str]:
     return [m for m in out.split("\0") if m.strip()]
 
 
+def shallow(root: Path) -> str | None:
+    """A refusal when the clone is shallow: a history lint there inspects one commit and passes.
+    CI checks out with fetch-depth 0 and fetch-tags (ci/lint-and-test.yml)."""
+    r = subprocess.run(["git", "-C", str(root), "rev-parse", "--is-shallow-repository"],
+                       capture_output=True, text=True)
+    if r.returncode != 0 or r.stdout.strip() != "false":
+        return "the clone is shallow (or not a repository): fetch the full history and tags first"
+    return None
+
+
 def message_lines(msg: str) -> list[str]:
-    """Subject and body; lines git strips (starting with `#`) are skipped."""
-    return [x for x in msg.splitlines() if not x.startswith("#")]
+    """Subject and body, every line: `git commit -m` and `-F` keep `#` lines, so a committed
+    message never skips them. The commit-msg hook strips comments itself when git will."""
+    return msg.splitlines()

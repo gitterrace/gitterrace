@@ -1,29 +1,15 @@
 #!/usr/bin/env bash
-# Discard hygiene: `git checkout -- <path>`, `restore <path>`,
-# `checkout-index`, `read-tree -u` discard work that may not be the caller's.
-# Blocks. Not caught: branch work (`checkout <branch>`, `-b`, `--track`) or a
-# bare `--staged` restore. A discard is an argument NAMING AN EXISTING FILE,
-# or an explicit `--`. The verb list is a denylist, not exhaustive.
+# Discard hygiene: `git checkout -- <path>` and `restore <path>` discard work that may not be
+# the caller's. Blocks. Not caught: branch work (`checkout <branch>`, `-b`, `--track`) or a
+# bare `--staged` restore. A discard is an argument NAMING AN EXISTING FILE, or an explicit
+# `--`: the decision the deny list cannot make. `checkout-index` and `read-tree -u/-m` are
+# the deny list's alone (rules/fallback/fail-closed.sh).
 
 guard_register git_checkout_discards
 guard_rule_git_checkout_discards() {
     [ "$GUARD_TOOL" = bash ] || return 0
     guard_match "$(guard_cmd_head)" \
-        "$GUARD_ANCHOR"'git( +-C +[^ ]+)? +(checkout|restore|checkout-index|read-tree)( |$)' || return 0
-    # read-tree without -u or -m is an index-only load.
-    if guard_cmd_has 'git( -C [^ ]+)? read-tree'; then
-        guard_cmd_has 'git( -C [^ ]+)? read-tree [^|;&]*(-[A-Za-z]*[um]|--reset)' || return 0
-        guard_block \
-            "git read-tree -u/-m overwrites working-tree files -- same destruction as 'git checkout --', and this checkout is SHARED." \
-            "To baseline ONE file: git show HEAD:<path> > /tmp/<session>-baseline, measure, copy back."
-        return 0
-    fi
-    if guard_cmd_has 'git( -C [^ ]+)? checkout-index'; then
-        guard_block \
-            "git checkout-index overwrites working-tree files from the INDEX -- same destruction as 'git checkout --', and this checkout is SHARED." \
-            "To baseline ONE file: git show HEAD:<path> > /tmp/<session>-baseline, measure, copy back."
-        return 0
-    fi
+        "$GUARD_ANCHOR"'git( +-C +[^ ]+)? +(checkout|restore)( |$)' || return 0
     guard_cmd_has 'git( -C [^ ]+)? checkout +-[bB]' && return 0
     guard_cmd_has 'git( -C [^ ]+)? checkout +--track' && return 0
     if guard_cmd_has 'git( -C [^ ]+)? restore +--staged'; then

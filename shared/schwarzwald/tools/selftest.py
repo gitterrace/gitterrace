@@ -85,13 +85,12 @@ def history_repo(d: Path) -> tuple[Path, str, str, str]:
     commit(repo, "r.json", f'{{"sha": "{old[:10]}"}}\n', "docs: results")
     commit(repo, "a.md", "start\nThe rule.\n", "docs: the rule")
     tip = commit(repo, "r.json", '{"sha": "HEAD"}\n', "docs: results at HEAD")
-    (repo / ".git/info/exclude").write_text(".personal-denylist\nconfig/\n")
-    (repo / ".personal-denylist").write_text("4f4f4a\n")
+    (repo / ".git/info/exclude").write_text("config/\n")
+    keep = d / "private"
+    keep.mkdir()
+    (keep / "denylist").write_text("4f4f4a\n")
     (repo / "config/schwarzwald").mkdir(parents=True)
-    (repo / "config/schwarzwald/lint.toml").write_text(
-        "[history]\n"
-        "replace = [[',? ?see (?:{ids})( for details)?', ''], ['\\\\b(?:{ids})\\\\b', 'the rule']]\n"
-        "sha_fields = ['(\"sha\": \")([0-9a-f]{7,40})(\")']\n")
+    (repo / "config/schwarzwald/lint.toml").write_text(f'[denylist]\npath = "{keep}/denylist"\n')
     return repo, base, old, tip
 
 
@@ -148,6 +147,43 @@ def merge_cases() -> list[str]:
         bad.append("denylist-merge took a hex word from a JSON title, or missed its code field")
     if mod.merge(cur, "").split() != cur.split():
         bad.append("denylist-merge with an empty refresh changed the list")
+    bad += private_write_cases("denylist-merge", lambda p: mod.write_private(p, "aaaaaa\n"))
+    return bad
+
+
+def private_write_cases(name: str, write) -> list[str]:
+    """ST-7: the private list's folder ends at 0700 even when it existed wider, and a path inside
+    a git work tree, or a symlink at the path, is refused (SystemExit) and writes nothing."""
+    bad = []
+    with tempfile.TemporaryDirectory() as d:
+        root = Path(d).resolve()
+        wide = root / "wide"
+        wide.mkdir(mode=0o755)
+        wide.chmod(0o755)
+        try:
+            write(wide / "list")
+        except SystemExit as e:
+            bad.append(f"{name} refused a plain private path: {e}")
+        if oct(wide.stat().st_mode & 0o777) != "0o700":
+            bad.append(f"{name} left an existing folder at {oct(wide.stat().st_mode & 0o777)}, not 0700")
+        other = root / "other"
+        (other / ".git").mkdir(parents=True)
+        for label, target in (("inside another repo", other / "sub/denylist"),):
+            try:
+                write(target)
+                bad.append(f"{name} wrote the list {label}")
+            except SystemExit:
+                pass
+            if target.exists():
+                bad.append(f"{name} left a file {label}")
+        (wide / "link").symlink_to(other / "leak")
+        try:
+            write(wide / "link")
+            bad.append(f"{name} wrote through a symlink at the path")
+        except SystemExit:
+            pass
+        if (other / "leak").exists():
+            bad.append(f"{name} wrote the list through a symlink into another repo")
     return bad
 
 
@@ -169,10 +205,18 @@ def main() -> int:
             probe = Path(d) / "probe.py"
             probe.write_text("import sys; sys.path.insert(0, sys.argv[1]); import config; "
                              "print(config.tomllib.__name__)\n")
+            # A parent that re-exec'd once leaves no flag behind to block this child.
             r = run(str(old), str(probe), str(HERE.parent / "lint" / "lib"))
+            parent = Path(d) / "parent.py"
+            parent.write_text("import subprocess, sys; sys.path.insert(0, sys.argv[1]); import config; "
+                              "sys.exit(subprocess.run([sys.argv[2], sys.argv[3], sys.argv[1]]).returncode)\n")
+            inherited = run(str(old), str(parent), str(HERE.parent / "lint" / "lib"), str(old), str(probe))
         if r.returncode != 0 or "tomllib" not in r.stdout:
             bad.append(f"lint config on {old} (no tomllib) did not re-exec under python 3.11+: "
                        f"{(r.stdout + r.stderr).strip()[-200:]}")
+        if inherited.returncode != 0 or "tomllib" not in inherited.stdout:
+            bad.append(f"a {old} child of a re-exec'd lint did not re-exec: "
+                       f"{(inherited.stdout + inherited.stderr).strip()[-200:]}")
     for b in bad:
         print(f"FAIL {b}")
     print("ok" if not bad else f"{len(bad)} broken")

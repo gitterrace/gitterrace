@@ -140,60 +140,83 @@ _assert() {
         FAILED=1
     fi
 }
+# One engine run on the request in $1 with GUARD_REPO $2, attribution on, then KEY=VAL... as env.
+# Sets _RUN_OUT (the verdict line) and _RUN_ERR (stderr, attribution lines included). Every
+# input is stated in the request: the ambient variables are cleared and the machine-sensing
+# rules neutralised (unless _RUN_LIVE=1: a state case reads the machine on purpose), so the
+# verdict cannot depend on who ran the suite.
+_RUN_VF="$SELFTEST_ROOT/verdict"
+_run_engine() {
+    local req="$1" repo="$2"
+    shift 2
+    local -a neutral=("${NEUTRAL_ENV[@]}")
+    [ -z "${_RUN_LIVE:-}" ] || neutral=(GUARD_ATTRIBUTION=1)
+    _RUN_ERR=$(printf '%s' "$req" |
+        env "${UNSET_ENV[@]}" GUARD_REPO="$repo" GUARD_ATTRIBUTION=1 \
+            "${neutral[@]}" "$@" bash "$ENGINE" 2>&1 >"$_RUN_VF")
+    _RUN_OUT=$(<"$_RUN_VF")
+}
+
 # $1=expect BLOCK|ALLOW|ADVISE  $2=rule-id  $3=cwd  $4=tool  $5=input-json  $6=label [KEY=VAL ...]
+# One run, attributed: the verdict line says BLOCK, any advice says ADVISE, and the
+# `guard-block:`/`guard-advise:` lines say WHICH rule spoke. An unattributed verdict would pass
+# while a SIBLING blocks or advises on the same input, so a rule shadowed by a broader one
+# (git_add_scope under shared_index_staging) would pass its own cases with its body deleted.
+# `scope` names the engine's org boundary, not a rule: any rule may block there.
 t() {
     local expect="$1" rule="$2" cwd="$3" tool="$4" input="$5" label="$6"
     shift 6
     _only "$label" || return 0
-    local req out err got vf
-    # The shared destructive-class rule is OFF for every other rule's cases: it
-    # also refuses `git stash`, `sed -i` and a checkout of a path, so with it on a
-    # case for the dedicated rule would pass with that rule removed. Only
-    # destructive_class's own cases run it.
+    local got who="" kind
+    # The shared destructive-class rule is OFF for every other rule's cases: it also refuses
+    # `git stash`, `sed -i` and a checkout of a path, so with it on a case for the dedicated rule
+    # would pass with that rule removed. Only destructive_class's own cases run it.
     local nodc=1
     [ "$rule" != destructive_class ] || nodc=""
-    req=$(printf '{"event":"%s","tool":"%s","cwd":"%s","status":"ok","input":%s}' \
-        "${EVENT:-pre_tool}" "$tool" "$cwd" "$input")
-    vf=$(mktemp "${TMPDIR:-/tmp}/guards-selftest.XXXXXX")
-    # Every input is stated in `$req`: the ambient variables are cleared and the
-    # machine-sensing rules neutralised, so the verdict cannot depend on who ran
-    # the suite. GUARD_REPO is pinned here rather than exported.
-    err=$(printf '%s' "$req" |
-        env "${UNSET_ENV[@]}" \
-            GUARD_REPO="${CASE_REPO:-$REPO}" \
-            "${NEUTRAL_ENV[@]}" ${nodc:+GUARD_SELFTEST_NO_DESTRUCTIVE=1} "$@" bash "$ENGINE" 2>&1 >"$vf")
-    out=$(cat "$vf")
-    rm -f "$vf"
-
-    if [ "$out" = "verdict: block" ]; then
+    _run_engine "$(printf '{"event":"%s","tool":"%s","cwd":"%s","status":"ok","input":%s}' \
+        "${EVENT:-pre_tool}" "$tool" "$cwd" "$input")" "${CASE_REPO:-$REPO}" \
+        ${nodc:+GUARD_SELFTEST_NO_DESTRUCTIVE=1} "$@"
+    local advised
+    advised=$(sed -n 's/^guard-advise: //p' <<<"$_RUN_ERR" | sort -u | tr '\n' ' ')
+    if [ "$_RUN_OUT" = "verdict: block" ]; then
         got=BLOCK
-    elif [ -n "$err" ]; then
+        who=$(sed -n 's/^guard-block: //p' <<<"$_RUN_ERR" | sort -u | tr '\n' ' ')
+    elif [ -n "$advised" ] || [ -n "$(grep -v '^guard-' <<<"$_RUN_ERR")" ]; then
         got=ADVISE
+        who="$advised"
     else
         got=ALLOW
     fi
-
-    # An ADVISE verdict from `t` is UNATTRIBUTED: it classifies on any stderr, so
-    # a SIBLING advising on the same input reads as this rule advising. `ta`
-    # attributes but reads only the advise channel, so it cannot serve a BLOCK
-    # rule.
-    #
-    # So when the verdict is ADVISE and the case expected one, re-ask with
-    # attribution and fail if a DIFFERENT rule spoke.
-    if [ "$got" = ADVISE ] && [ "$expect" = ADVISE ]; then
-        local who
-        who=$(printf '%s' "$req" |
-            env "${UNSET_ENV[@]}" \
-                GUARD_REPO="${CASE_REPO:-$REPO}" GUARD_ATTRIBUTION=1 \
-                "${NEUTRAL_ENV[@]}" ${nodc:+GUARD_SELFTEST_NO_DESTRUCTIVE=1} "$@" \
-                bash "$ENGINE" 2>&1 >/dev/null |
-            sed -n 's/^guard-advise: //p' | sort -u | tr '\n' ' ')
+    kind=""
+    case "$expect/$got" in
+        ADVISE/ADVISE) kind=advice ;;
+        BLOCK/BLOCK) [ "$rule" = scope ] || kind=block ;;
+        ALLOW/ADVISE)
+            # An ALLOW case is a claim about THIS rule, not about global silence: a sibling
+            # advising on the same input is fine, and the message names it.
+            CASES=$((CASES + 1))
+            COVERED="$COVERED$rule "
+            case " $who " in
+                *" $rule "*) ;;
+                *)
+                    printf '  ok   [ALLOW ] %s (a sibling spoke: %s)\n' "$label" "${who% }"
+                    return
+                    ;;
+            esac
+            printf '  FAIL expected ALLOW from %s but %s advised -- %s\n' "$rule" "${who:-<unattributed>}" "$label"
+            FAIL_LOG="${FAIL_LOG}  FAIL expected ALLOW from $rule but ${who:-<unattributed>} advised -- $label
+"
+            FAILED=1
+            return
+            ;;
+    esac
+    if [ -n "$kind" ]; then
         case " $who " in
             *" $rule "*) ;;
             *)
-                printf '  FAIL expected ADVISE from %s but the advice came from: %s -- %s\n' \
-                    "$rule" "${who:-<none>}" "$label"
-                FAIL_LOG="${FAIL_LOG}  FAIL expected ADVISE from $rule but the advice came from: ${who:-<none>} -- $label
+                printf '  FAIL expected %s from %s but the %s came from: %s -- %s\n' \
+                    "$expect" "$rule" "$kind" "${who:-<none>}" "$label"
+                FAIL_LOG="${FAIL_LOG}  FAIL expected $expect from $rule but the $kind came from: ${who:-<none>} -- $label
 "
                 FAILED=1
                 CASES=$((CASES + 1))
@@ -202,66 +225,6 @@ t() {
                 ;;
         esac
     fi
-
-    # The same for BLOCK: an unattributed BLOCK passes while a SIBLING blocks the input, so a
-    # rule shadowed by a broader one (git_add_scope under shared_index_staging) passes its own
-    # cases with its body deleted, and its red-case probe stays green. `scope` names the
-    # engine's org boundary, not a rule: any rule may be the one that blocks there.
-    if [ "$got" = BLOCK ] && [ "$expect" = BLOCK ] && [ "$rule" != scope ]; then
-        local blocker
-        blocker=$(printf '%s' "$req" |
-            env "${UNSET_ENV[@]}" \
-                GUARD_REPO="${CASE_REPO:-$REPO}" GUARD_ATTRIBUTION=1 \
-                "${NEUTRAL_ENV[@]}" ${nodc:+GUARD_SELFTEST_NO_DESTRUCTIVE=1} "$@" \
-                bash "$ENGINE" 2>&1 >/dev/null |
-            sed -n 's/^guard-block: //p' | sort -u | tr '\n' ' ')
-        case " $blocker " in
-            *" $rule "*) ;;
-            *)
-                printf '  FAIL expected BLOCK from %s but the block came from: %s -- %s\n' \
-                    "$rule" "${blocker:-<none>}" "$label"
-                FAIL_LOG="${FAIL_LOG}  FAIL expected BLOCK from $rule but the block came from: ${blocker:-<none>} -- $label
-"
-                FAILED=1
-                CASES=$((CASES + 1))
-                COVERED="$COVERED$rule "
-                return
-                ;;
-        esac
-    fi
-
-    # The mirror of the ADVISE attribution above. A case expecting ALLOW fails on
-    # ANY stderr, so a SIBLING advising on the same input reads as this rule
-    # misbehaving, and the message names the wrong rule. Naming the speaker turns a
-    # misleading failure into a directly actionable one.
-    if [ "$got" = ADVISE ] && [ "$expect" = ALLOW ]; then
-        local speaker
-        speaker=$(printf '%s' "$req" |
-            env "${UNSET_ENV[@]}" \
-                GUARD_REPO="${CASE_REPO:-$REPO}" GUARD_ATTRIBUTION=1 \
-                "${NEUTRAL_ENV[@]}" ${nodc:+GUARD_SELFTEST_NO_DESTRUCTIVE=1} "$@" \
-                bash "$ENGINE" 2>&1 >/dev/null |
-            sed -n 's/^guard-advise: //p' | sort -u | tr '\n' ' ')
-        CASES=$((CASES + 1))
-        COVERED="$COVERED$rule "
-        # An ALLOW case is a claim about THIS rule, not about global silence, and
-        # attribution is what lets the two be told apart. Two rules can both be
-        # right on one input. Failing here would force one of them to be wrong.
-        case " $speaker " in
-            *" $rule "*) ;;
-            *)
-                printf '  ok   [ALLOW ] %s (a sibling spoke: %s)\n' "$label" "${speaker% }"
-                return
-                ;;
-        esac
-        printf '  FAIL expected ALLOW from %s but %s advised -- %s\n' \
-            "$rule" "${speaker:-<unattributed>}" "$label"
-        FAIL_LOG="${FAIL_LOG}  FAIL expected ALLOW from $rule but ${speaker:-<unattributed>} advised -- $label
-"
-        FAILED=1
-        return
-    fi
-
     _assert "$expect" "$got" "$label" "$rule"
 }
 
@@ -277,37 +240,22 @@ t() {
 # nothing would prove NOT firing, and over-reach is what gets a guard routed
 # around. Both directions ask the same question of the same channel.
 ta() {
-    local expect="$1" rule="$2" cmd="$3" label="$4"
+    local expect="$1" rule="$2" cmd="$3" label="$4" got
     _only "$label" || return 0
-    local req err got
-    req=$(printf '{"event":"pre_tool","tool":"bash","cwd":"%s","status":"ok","input":%s}' \
-        "$REPO" "$(jq -cn --arg c "$cmd" '{command:$c}')")
-    err=$(printf '%s' "$req" |
-        env "${UNSET_ENV[@]}" \
-            GUARD_REPO="${CASE_REPO:-$REPO}" GUARD_ATTRIBUTION=1 \
-            "${NEUTRAL_ENV[@]}" \
-            bash "$ENGINE" 2>&1 >/dev/null)
-
-    if grep -q "^guard-advise: $rule\$" <<<"$err"; then
-        got=ADVISE
-    else
-        got=SILENT
-    fi
-
+    _run_engine "$(printf '{"event":"pre_tool","tool":"bash","cwd":"%s","status":"ok","input":%s}' \
+        "$REPO" "$(jq -cn --arg c "$cmd" '{command:$c}')")" "${CASE_REPO:-$REPO}"
+    if grep -q "^guard-advise: $rule\$" <<<"$_RUN_ERR"; then got=ADVISE; else got=SILENT; fi
     _assert "$expect" "$got" "$label" "$rule"
 }
 # A hand-rolled state case, shared because a product's cases use it too and a partial run
 # may load those without cases-state.
 # _hr WANT(FIRE|QUIET) RULE EVENT TOOL CWD INPUT-JSON LABEL [KEY=VAL ...]
 _hr() {
-    local want="$1" rule="$2" event="$3" tool="$4" cwd="$5" input="$6" label="$7" err got
+    local want="$1" rule="$2" event="$3" tool="$4" cwd="$5" input="$6" label="$7" got
     shift 7
-    err=$(printf '{"event":"%s","tool":"%s","cwd":"%s","status":"ok","input":%s}' \
-        "$event" "$tool" "$cwd" "$input" |
-        env "${UNSET_ENV[@]}" \
-            GUARD_REPO="$cwd" GUARD_ATTRIBUTION=1 GUARD_SELFTEST_NO_INDEX=1 \
-            GUARD_SELFTEST_NO_DESTRUCTIVE=1 "$@" \
-            bash "$ENGINE" 2>&1 >/dev/null)
-    if grep -Eq "^guard-(advise|block): $rule\$" <<<"$err"; then got=FIRE; else got=QUIET; fi
+    _RUN_LIVE=1 _run_engine "$(printf '{"event":"%s","tool":"%s","cwd":"%s","status":"ok","input":%s}' \
+        "$event" "$tool" "$cwd" "$input")" "$cwd" \
+        GUARD_SELFTEST_NO_INDEX=1 GUARD_SELFTEST_NO_DESTRUCTIVE=1 "$@"
+    if grep -Eq "^guard-(advise|block): $rule\$" <<<"$_RUN_ERR"; then got=FIRE; else got=QUIET; fi
     _assert "$want" "$got" "$label" "$rule"
 }

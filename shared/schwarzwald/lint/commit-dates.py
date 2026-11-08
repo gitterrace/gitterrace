@@ -14,8 +14,6 @@ which only suits a repository whose history already holds to the rule.
 
 from __future__ import annotations
 
-import os
-import subprocess
 import sys
 from pathlib import Path
 
@@ -26,16 +24,10 @@ import config  # noqa: E402
 RULE = "CONV-COMMIT-DATES"
 
 
-def git(root: Path, *args: str) -> str:
-    env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
-    return subprocess.run(["git", "-C", str(root), *args], capture_output=True, text=True, check=True,
-                          env=env).stdout
-
-
 def problems(root: Path, base: str | None) -> list[str]:
     span = f"{base}..HEAD" if base else "HEAD"
     out = []
-    lines = git(root, "log", "--reverse", "--format=%H %at %ct %P", span).splitlines()
+    lines = config.git(root, "log", "--reverse", "--format=%H %at %ct %P", span).splitlines()
     dates = {}
     for line in lines:
         sha, at, ct, *parents = line.split()
@@ -45,7 +37,7 @@ def problems(root: Path, base: str | None) -> list[str]:
         for p in parents[:1]:
             pt = dates.get(p)
             if pt is None:
-                pt = int(git(root, "log", "-1", "--format=%ct", p).strip())
+                pt = int(config.git(root, "log", "-1", "--format=%ct", p).strip())
             if int(ct) < pt:
                 out.append(f"{sha[:10]}: committed {pt - int(ct)} s before its parent {p[:10]}")
     return out
@@ -56,6 +48,9 @@ def main(argv: list[str]) -> int:
     base = None
     if args[:1] == ["--base"] and len(args) > 1:
         base = args[1]
+    if (why := config.shallow(root)):
+        print(f"FAIL [{RULE}] {why}", file=sys.stderr)
+        return 1
     bad = problems(root, base)
     for b in bad:
         print(f"FAIL [{RULE}] {b}", file=sys.stderr)

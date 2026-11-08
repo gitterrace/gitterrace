@@ -66,6 +66,14 @@ commit env SCHWARZWALD_ALLOW_FOREIGN_AUTHOR=1 GIT_AUTHOR_EMAIL=other@example.org
 expect "an override with another prefix does not count" refused "${rc}"
 git reset -q --hard HEAD
 
+# A prefix that is not a name falls back to the default: bash would run code in a subscript.
+printf '[commit]\nallow_prefix = "a[$(touch %s/pwned)]b"\n' "${SANDBOX}" >config/schwarzwald/lint.toml
+rc=0
+commit git commit -qm hostile-prefix || rc=$?
+[[ -e ${SANDBOX}/pwned ]] && rc=pwned
+expect "a prefix holding a command substitution runs nothing" ok "${rc}"
+printf '[commit]\nallow_prefix = "DEMO_"\n' >config/schwarzwald/lint.toml
+
 git config --unset user.email
 git config --global --unset user.email
 rc=0

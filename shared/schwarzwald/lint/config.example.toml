@@ -14,7 +14,9 @@ design = ["docs/design/**.md"]
 golden = ["*/golden/*"]
 # The synced copy carries its own checks: keep shared/ out.
 exclude = ["shared/*", "target/*"]
-# Fewer files than this in a tree scan means the census is broken.
+# Fewer files than this in a tree scan means the census is broken. Below 1 counts as 1.
+# The message gate (`--messages BASE`) refuses a lint.toml that adds to an exclude or exempt
+# list or lowers min_files against BASE; <allow_prefix>ALLOW_WIDER_LINT=1 lets a reviewed one in.
 min_files = 1
 
 [a11y]
@@ -35,21 +37,6 @@ not_id = []
 # home names fixtures use.
 exempt = []
 placeholder_homes = []
-
-[history]
-# Shas own-shas and id-scan must keep: upstream corpus pins that collide with own ones.
-keep = []
-# Regexes for value fields that hold a sha (a tool may write HEAD there), group 1 the
-# field, group 2 the sha.
-sha_fields = []
-# A file OUTSIDE the repository (e.g. under ~/Backups) listing one extra commit source (a git bundle) per line.
-# Never a committed path.
-bundles = ""
-# [pattern, replacement] pairs applied in order to every text file and message by
-# product tools (`{ids}` is the real ids of .personal-denylist), and regexes of paths they skip.
-replace = []
-skip = []
-# tools/id-scan.py reads the same skip list.
 
 [lines]
 # file-length: files matching globs may not exceed max_lines. max_width caps comment lines
@@ -82,15 +69,19 @@ allow_prefix = "SCHWARZWALD_"
 main = "main"
 
 [denylist]
-# The local .personal-denylist is seeded once and the tracker grows: past max_age_hours (0 = never)
+# The private denylist is seeded once and the tracker grows: past max_age_hours (0 = never)
 # or when missing, internal-refs prints `refresh` and, in mode "refuse", fails. mode: warn | refuse
-# | refresh. In "refresh" the check runs `refresh` itself from the repository root and fails only
-# when that command fails or leaves the list missing or stale: as strict, without blocking on age.
+# | refresh. In "refresh" the check runs the private refresh command itself from the repository
+# root and fails only when that command fails or leaves the list missing or stale: as strict,
+# without blocking on age. The command never comes from this tracked file: it is
+# `argv = ["cmd", "arg", ...]` in denylist-refresh.toml beside the list, run without a shell,
+# its output never printed. It must MERGE (tools/denylist-merge.py: the union of the current
+# list, the tracker's every code, closed and deleted rows too, and history_ids).
 max_age_hours = 168
 mode = "warn"
-# The product's command that rewrites the list. It must MERGE (tools/denylist-merge.py: the union
-# of the current list, the tracker's every code, closed and deleted rows too, and history_ids).
-refresh = ""
+# The list itself: one file for every product, outside every repository (`~` expands, mode 0600,
+# its folder 0700). A path inside the repository is refused, and denylist-parked fails on a copy.
+path = "~/.config/schwarzwald/personal-denylist"
 # A file outside the repository of ids from old history, merged in on every refresh.
 history_ids = ""
 
@@ -107,12 +98,12 @@ tag_prefix = "v"
 # "name|tool|install hint|command" run from the repository root, with $PY set to the python 3.11
 # or newer the runner picked. shell_exclude are git
 # pathspecs kept out of shellcheck and shfmt. shellcheck_exclude are the codes dropped from
-# `shellcheck -o all`. shfmt_indent is the `shfmt -i` width. markdownlint pins the
-# markdownlint-cli2 version ("" skips it), markdown_exclude are pathspecs the staged-markdown
-# hook leaves out (keep them equal to the product's markdownlint ignores).
+# `shellcheck -o all`. shfmt runs with `-i 2`. markdownlint pins the
+# markdownlint-cli2 version, x.y.z only ("" skips it).
+# steps are trusted product code: each runs through bash on every `make lint`, so a change to
+# them is a change to the product's scripts and is reviewed as one. CI runs pull requests with
+# the base branch's lint.toml (ci/lint-and-test.yml), so a branch cannot rewrite its own gate.
 steps = []
 shell_exclude = []
 shellcheck_exclude = ["SC2250", "SC2292", "SC2310", "SC2312"]
-shfmt_indent = 2
 markdownlint = ""
-markdown_exclude = []

@@ -13,6 +13,8 @@ if [[ -f ${f} ]]; then
     on && $1 == "allow_prefix" && $2 == "=" { gsub(/^[^"]*"|"[^"]*$/, ""); print; exit }' "${f}")
   prefix=${v:-${prefix}}
 fi
+# Only a shell name: bash evaluates an array subscript in ${!x}, so any other value runs code.
+[[ ${prefix} =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] || prefix=SCHWARZWALD_
 allow="${prefix}ALLOW_RESTORE"
 depth="${prefix}STALE_DEPTH"
 [[ ${!allow:-0} == 1 ]] && exit 0

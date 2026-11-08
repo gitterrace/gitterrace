@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """CONV-COMMIT-SUBJECT: the subject reads `type(scope): subject`.
 
-Types come from lint.toml `[commit] types`. Merge, Revert, fixup! and squash! subjects pass (the
-landing tool refuses the last two, `rules/deny.toml` [partial_subject]). Lines git strips
-(starting with `#`) are skipped. `<allow_prefix>ALLOW_FREE_SUBJECT=1` in the environment
+Types come from lint.toml `[commit] types`. git's own subjects pass: `Merge branch ...` (and pull
+request, remote-tracking branch, tag), and `Revert "<s>"`, `fixup! <s>`, `squash! <s>` when <s>
+passes (the landing tool refuses the last two, `rules/deny.toml` [partial_subject]). Every line counts:
+the commit-msg hook strips `#` lines itself when git will. `<allow_prefix>ALLOW_FREE_SUBJECT=1` in the environment
 overrides, `[commit] allow_prefix` names the prefix.
 
   commit-subject.py [--repo DIR] --message FILE
@@ -21,18 +22,26 @@ sys.path.insert(0, str(Path(__file__).resolve().parent / "lib"))
 import config  # noqa: E402
 
 RULE = "CONV-COMMIT-SUBJECT"
-FREE = re.compile(r"^(Merge |Revert |fixup! |squash! )")
+# The subjects git and the forges write themselves, in their own words only.
+MERGE = re.compile(r"^Merge (branch|branches|pull request|remote-tracking branch|tag|commit) ")
+REVERT = re.compile(r'^Revert "(.+)"$')
+FIXUP = re.compile(r"^(fixup|squash|amend)! (.+)$")
 
 
 def subject_ok(subject: str, types: list[str]) -> bool:
     form = re.compile(rf"^({'|'.join(map(re.escape, types))})(\([A-Za-z0-9_./,+ -]+\))?!?: \S")
-    return not subject or bool(FREE.match(subject) or form.match(subject))
+    if not subject or MERGE.match(subject) or form.match(subject):
+        return True
+    # A revert or fixup names the subject it acts on, which keeps to the form itself.
+    inner = REVERT.match(subject) or FIXUP.match(subject)
+    return bool(inner) and subject_ok(inner.groups()[-1], types)
 
 
 def self_test() -> bool:
     types = config.DEFAULTS["commit"]["types"]
     good = ["fix(web): one rule", "docs: x", "feat(web)!: new route", "Merge branch 'x'", ""]
-    bad = ["Empty states: the copy", "wip: scrolling", "fix:no space", "fix(web) x"]
+    bad = ["Empty states: the copy", "wip: scrolling", "fix:no space", "fix(web) x", "Merge anything",
+           "fixup! wip", 'Revert "wip"']
     ok = all(subject_ok(s, types) for s in good) and not any(subject_ok(s, types) for s in bad)
     if not ok:
         print(f"FAIL [{RULE}] self-test: subject form", file=sys.stderr)

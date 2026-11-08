@@ -115,13 +115,14 @@ guard_match() {
 # cut at the first `<<`: that would drop `cat <<<x; git stash`. Bodies the shell
 # executes (`bash <<EOF`, `$(...)` in an unquoted body) are kept.
 GUARD_HEAD_CACHE=""
-guard_cmd_head() {
-    if [ -n "${GUARD_HEAD_CACHE:-}" ]; then
-        printf '%s' "$GUARD_HEAD_CACHE"
-        return 0
-    fi
+# Fill GUARD_HEAD_CACHE from GUARD_CMD: the one place the strip and the trailing-newline trim live.
+_guard_head_fill() {
     _gf_strip_heredocs "${GUARD_CMD:-}"
-    printf '%s' "${GUARD_FALLBACK_VALUE%$'\n'}"
+    GUARD_HEAD_CACHE="${GUARD_FALLBACK_VALUE%$'\n'}"
+}
+guard_cmd_head() {
+    [ -n "${GUARD_HEAD_CACHE:-}" ] || _guard_head_fill
+    printf '%s' "$GUARD_HEAD_CACHE"
 }
 
 # The command with quoted runs removed, for a FLAG or fragment subject that
@@ -195,50 +196,185 @@ guard_patch_script_lines() {
     return 0
 }
 
-# The bodies of the scripts a command runs (`bash x.sh`, `sh`, `zsh`, `python3`, `source`, `.`,
-# or an executable `./x`), comment lines dropped. A rule judging the command line alone never
-# sees a `git stash` or a broad `pkill` the agent wrote into a file and then ran. Bounded: a
-# readable regular file of at most GUARD_SCRIPT_MAX bytes, at most 8 scripts, one level deep. The
-# cap keeps a call inside the hook's 4 s deadline under load: every rule's regexes scan the body,
-# and at 256 KiB one call took about 3 s. A script an agent writes is a few KiB.
+# The bodies of the scripts a command runs, comment lines dropped, into GUARD_SCRIPT_BODIES. A
+# rule judging the command line alone never sees a `git stash` or a broad `pkill` the agent wrote
+# into a file and then ran. Followed: `bash|sh|zsh|python3|source|. [opts] x` (the argument of
+# -o/-O/+o/+O is no script; -c, python's -m: no script), `bash < x`, `cat x | bash`, and an
+# executable `./x` (with no `#!` bash still runs it as a script). Bodies are followed in turn, up
+# to 8 scripts. A path is tried against the cwd and every `cd` target in the command.
+# GUARD_SCRIPT_REFUSE says why the class cannot be judged: a script the same command writes (the
+# file on disk is not what runs; a heredoc written to it is judged instead), or a shell script over
+# GUARD_SCRIPT_MAX. The cap keeps a call inside the hook's 4 s deadline under load: every rule's
+# regexes scan the body, and at 256 KiB one call took about 3 s. A script an agent writes is a few
+# KiB.
 GUARD_SCRIPT_MAX=65536
+GUARD_SCRIPT_BODIES=""
+GUARD_SCRIPT_REFUSE=""
 guard_script_bodies() {
-    local rest="$1" out="" path body line size n=0
-    local run="$GUARD_ANCHOR"'(bash|sh|zsh|python3?[.0-9]*|source|\.)[[:space:]]+(-[^[:space:]]+[[:space:]]+)*([^[:space:];&|<>()]+)'
+    local -a queue=("$1") seen=() bases=() words=()
+    local q=0 text rest path kind w i n=0 out="" size body line first base cdre
+    local run="$GUARD_ANCHOR"'(bash|sh|zsh|dash|ksh|python3?[.0-9]*|source|\.)(([[:space:]]+[^[:space:];&|()>]+)*)'
     local direct="$GUARD_ANCHOR"'(\.{0,2}/[^[:space:];&|<>()]+)'
-    while [ "$n" -lt 8 ]; do
-        local exe=""
-        if [[ $rest =~ $run ]]; then
-            path="${BASH_REMATCH[${#BASH_REMATCH[@]} - 1]}"
-        elif [[ $rest =~ $direct ]]; then
-            path="${BASH_REMATCH[${#BASH_REMATCH[@]} - 1]}"
-            exe=1
-        else
-            break
-        fi
+    local piped='(^|[;&|[:space:]])cat[[:space:]]+([^[:space:];&|<>()]+)[[:space:]]*\|[[:space:]]*([^[:space:]]*/)?(bash|zsh|dash|ksh|sh)([[:space:]]|$)'
+    GUARD_SCRIPT_BODIES=""
+    GUARD_SCRIPT_REFUSE=""
+    bases=("${GUARD_CWD:-.}")
+    cdre='(^|[;&|(]|[[:space:]])(cd|pushd)[[:space:]]+([^[:space:];&|<>()]+)'
+    rest="$1"
+    while [[ $rest =~ $cdre ]]; do
+        w="${BASH_REMATCH[3]//[\"\']/}"
+        case "$w" in /*) bases+=("$w") ;; *) bases+=("${GUARD_CWD:-.}/$w") ;; esac
         rest="${rest#*"${BASH_REMATCH[0]}"}"
-        n=$((n + 1))
-        path="${path//\"/}"
-        path="${path//\'/}"
-        case "$path" in /*) ;; *) path="${GUARD_CWD:-.}/$path" ;; esac
-        [ -f "$path" ] && [ -r "$path" ] || continue
-        size=$(wc -c <"$path" 2>/dev/null) || continue
-        [ "${size// /}" -le "$GUARD_SCRIPT_MAX" ] 2>/dev/null || continue
-        body=$(<"$path") || continue
-        # `./x` or `/bin/ls` runs only an executable, and only a `#!` text file has a body to read.
-        if [ -n "$exe" ]; then
-            [ -x "$path" ] && [ "${body:0:2}" = '#!' ] || continue
-        fi
-        # Collect into an array and join once: appending to one string per line is quadratic,
-        # and a script near the cap then outruns the guard's deadline. Bash 3.2 has no mapfile.
-        local -a kept=()
-        while IFS= read -r line || [ -n "$line" ]; do
-            case "${line#"${line%%[![:space:]]*}"}" in '#'* | '') continue ;; esac
-            kept[${#kept[@]}]="$line"
-        done <<<"$body"
-        [ "${#kept[@]}" -gt 0 ] && out+=$(printf '%s\n' "${kept[@]}")$'\n'
     done
-    printf '%s' "$out"
+    while [ "$q" -lt "${#queue[@]}" ] && [ "$n" -lt 8 ]; do
+        text="${queue[$q]}"
+        q=$((q + 1))
+        local -a found=() kinds=()
+        rest="$text"
+        while [[ $rest =~ $run ]]; do
+            rest="${rest#*"${BASH_REMATCH[0]}"}"
+            kind=shell
+            case "${BASH_REMATCH[${#BASH_REMATCH[@]} - 3]}" in python*) kind=py ;; esac
+            # shellcheck disable=SC2206 # the words after the interpreter, split on purpose
+            words=(${BASH_REMATCH[${#BASH_REMATCH[@]} - 2]})
+            i=0
+            path=""
+            while [ "$i" -lt "${#words[@]}" ]; do
+                w="${words[$i]}"
+                case "$w" in
+                    -o | -O | +o | +O) i=$((i + 1)) ;;
+                    -c | -[A-Za-z]*c | -m) break ;;
+                    '<') path="${words[$((i + 1))]:-}" && break ;;
+                    '<'*) path="${w#<}" && break ;;
+                    -* | +*) ;;
+                    *) path="$w" && break ;;
+                esac
+                i=$((i + 1))
+            done
+            [ -z "$path" ] || { found+=("$path") && kinds+=("$kind"); }
+        done
+        rest="$text"
+        while [[ $rest =~ $piped ]]; do
+            rest="${rest#*"${BASH_REMATCH[0]}"}"
+            found+=("${BASH_REMATCH[2]}") && kinds+=(shell)
+        done
+        rest="$text"
+        while [[ $rest =~ $direct ]]; do
+            rest="${rest#*"${BASH_REMATCH[0]}"}"
+            found+=("${BASH_REMATCH[${#BASH_REMATCH[@]} - 1]}") && kinds+=(exe)
+        done
+        i=0
+        while [ "$i" -lt "${#found[@]}" ] && [ "$n" -lt 8 ]; do
+            path="${found[$i]//[\"\']/}"
+            case "$path" in \~/*) path="$HOME/${path#\~/}" ;; esac
+            kind="${kinds[$i]}"
+            i=$((i + 1))
+            case "$path" in *'$'* | '') continue ;; esac
+            case " ${seen[*]:-} " in *" $path "*) continue ;; esac
+            seen+=("$path")
+            n=$((n + 1))
+            # Written by this same command: what is on disk now is not what runs.
+            if _guard_written_body "$path"; then
+                out+="$GUARD_FALLBACK_VALUE"
+                queue+=("$GUARD_FALLBACK_VALUE")
+                continue
+            fi
+            [ -z "$GUARD_SCRIPT_REFUSE" ] || return 0
+            body=""
+            for base in "${bases[@]}"; do
+                case "$path" in /*) body="$path" ;; *) body="$base/$path" ;; esac
+                [ -f "$body" ] && break
+                body=""
+            done
+            [ -n "$body" ] || {
+                # Missing now, so whatever the command puts there first (`cp a x.sh`) runs unseen.
+                [ "$kind" != shell ] || [ "$q" -gt 1 ] ||
+                    GUARD_SCRIPT_REFUSE="the script ${path##*/} does not exist yet, so what runs cannot be judged; create it, then run it in a second call."
+                continue
+            }
+            [ -r "$body" ] || continue
+            path="$body"
+            first=""
+            IFS= read -r first <"$path" 2>/dev/null || :
+            if [ "$kind" = exe ]; then
+                [ -x "$path" ] || continue
+                case "$first" in
+                    '#!'*sh*) kind=shell ;;
+                    '#!'*) ;;
+                    *)
+                        # No `#!`: bash runs a text file as a script; a binary has NUL bytes.
+                        size=$(LC_ALL=C tr -d '\000' <"$path" | wc -c 2>/dev/null)
+                        [ "${size// /}" = "$(wc -c <"$path" | tr -d ' ')" ] || continue
+                        kind=shell
+                        ;;
+                esac
+            fi
+            size=$(wc -c <"$path" 2>/dev/null) || continue
+            if ! [ "${size// /}" -le "$GUARD_SCRIPT_MAX" ] 2>/dev/null; then
+                [ "$kind" = shell ] &&
+                    GUARD_SCRIPT_REFUSE="the script ${path##*/} is over $GUARD_SCRIPT_MAX bytes, too big to judge inside the hook's deadline."
+                continue
+            fi
+            body=$(<"$path") || continue
+            # Collect into an array and join once: appending to one string per line is quadratic,
+            # and a script near the cap then outruns the guard's deadline. Bash 3.2 has no mapfile.
+            local -a kept=()
+            while IFS= read -r line || [ -n "$line" ]; do
+                case "${line#"${line%%[![:space:]]*}"}" in '#'* | '') continue ;; esac
+                kept[${#kept[@]}]="$line"
+            done <<<"$body"
+            if [ "${#kept[@]}" -gt 0 ]; then
+                body=$(printf '%s\n' "${kept[@]}")
+                out+="$body"$'\n'
+                queue+=("$body")
+            fi
+        done
+    done
+    GUARD_SCRIPT_BODIES="$out"
+}
+
+# Does GUARD_CMD write the script $1 (`> x.sh`, `>> x.sh`, `tee x.sh`)? Returns 1 when not. When it
+# does, the heredoc body on the writing line is the script, into GUARD_FALLBACK_VALUE; with no
+# heredoc the content is unknown and GUARD_SCRIPT_REFUSE is set.
+_guard_written_body() {
+    local want="${1##*/}" line t d="" body="" got="" nl=$'\n'
+    local write_re='(>>?|>\||tee([[:space:]]+-[A-Za-z]+)*)[[:space:]]*["'"'"']?([^[:space:];&|<>()"'"'"']+)'
+    local hre='<<-?[[:space:]]*["'"'"'\\]?([A-Za-z0-9_]+)'
+    local rest="${GUARD_CMD:-}" more=1
+    while [ "$more" = 1 ]; do
+        if [[ $rest == *"$nl"* ]]; then
+            line="${rest%%"$nl"*}"
+            rest="${rest#*"$nl"}"
+        else
+            line="$rest"
+            more=0
+        fi
+        if [ -n "$d" ]; then
+            t="${line#"${line%%[!$'\t']*}"}"
+            if [ "$t" = "$d" ]; then
+                d=""
+                [ -z "$got" ] || break
+            elif [ -n "$got" ]; then
+                body+="$line$nl"
+            fi
+            continue
+        fi
+        t="$line"
+        while [[ $t =~ $write_re ]]; do
+            t="${t#*"${BASH_REMATCH[0]}"}"
+            [ "${BASH_REMATCH[3]##*/}" = "$want" ] && got=1
+        done
+        if [[ $line =~ $hre ]]; then
+            d="${BASH_REMATCH[1]}"
+            [ -n "$got" ] || continue
+        elif [ -n "$got" ]; then
+            GUARD_SCRIPT_REFUSE="${1##*/} is written and run in one call, so its content cannot be judged; write it, then run it in a second call."
+            return 1
+        fi
+    done
+    [ -n "$got" ] || return 1
+    GUARD_FALLBACK_VALUE="$body"
+    return 0
 }
 
 # `guard_register <id> [event]`. Event scoping is enforced here, so a post_tool
@@ -307,8 +443,26 @@ guard_main() {
         return 0
     fi
     GUARD_HEAD_CACHE=""
-    _gf_strip_heredocs "${GUARD_CMD:-}"
-    GUARD_HEAD_CACHE="${GUARD_FALLBACK_VALUE%$'\n'}"
+    # Too big to judge inside the hook's deadline: refused before any parsing, since a harness
+    # that kills a slow hook allows the call. The same bound as the fallback's.
+    if [ "${GUARD_TOOL:-}" = bash ] && [ "${GUARD_EVENT:-pre_tool}" = pre_tool ] &&
+        guard_fallback_too_big "${GUARD_CMD:-}"; then
+        GUARD_ACTIVE_RULE=destructive_class
+        guard_block "$GUARD_FALLBACK_REASON"
+        GUARD_ACTIVE_RULE=""
+        printf 'verdict: %s\n' "$GUARD_VERDICT"
+        return 0
+    fi
+    # The cwd as the filesystem sees it: a symlink outside the org can point into it.
+    if [ -n "${GUARD_CWD:-}" ]; then
+        _gf_physical "$GUARD_CWD"
+        GUARD_CWD="$GUARD_FALLBACK_VALUE"
+        _gf_physical "$GUARD_ORG"
+        case "$GUARD_CWD" in
+            "$GUARD_FALLBACK_VALUE" | "$GUARD_FALLBACK_VALUE"/*) GUARD_CWD="$GUARD_ORG${GUARD_CWD#"$GUARD_FALLBACK_VALUE"}" ;;
+        esac
+    fi
+    _guard_head_fill
     # A script the command runs is judged as if its body were typed: appended to the command
     # every bash rule and the destructive class read. The body joins the head as is, since the
     # heredoc stripper and a `${x%pattern}` trim are both quadratic in bash 3.2: on a body near
@@ -316,11 +470,10 @@ guard_main() {
     # trailing newlines. A heredoc inside a script is then read as commands, which can only
     # add a verdict, never hide one.
     if [ "${GUARD_TOOL:-}" = bash ]; then
-        local bodies
-        bodies=$(guard_script_bodies "$GUARD_HEAD_CACHE")
-        if [ -n "$bodies" ]; then
-            GUARD_CMD="${GUARD_CMD:-}"$'\n'"$bodies"
-            GUARD_HEAD_CACHE="$GUARD_HEAD_CACHE"$'\n'"$bodies"
+        guard_script_bodies "$GUARD_HEAD_CACHE"
+        if [ -n "$GUARD_SCRIPT_BODIES" ]; then
+            GUARD_CMD="${GUARD_CMD:-}"$'\n'"$GUARD_SCRIPT_BODIES"
+            GUARD_HEAD_CACHE="$GUARD_HEAD_CACHE"$'\n'"$GUARD_SCRIPT_BODIES"
         fi
     fi
 
@@ -335,7 +488,7 @@ guard_main() {
         "$GUARD_ORG" | "$GUARD_ORG"/*) ;;
         *)
             if [ "$GUARD_TOOL" = bash ] && [ -z "${GUARD_SELFTEST_NO_DESTRUCTIVE:-}" ] &&
-                ! GUARD_FALLBACK_HEALTHY=1 GUARD_FALLBACK_ORG="$GUARD_ORG" _gf_engine_judge; then
+                ! GUARD_FALLBACK_HEALTHY=1 GUARD_FALLBACK_ORG="$GUARD_ORG" guard_fallback_judge; then
                 GUARD_ACTIVE_RULE=destructive_class
                 guard_block "$GUARD_FALLBACK_REASON" \
                     "The cwd (${GUARD_CWD:-unknown}) is outside the org, but the command reaches into it."

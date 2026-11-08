@@ -8,7 +8,7 @@
 # .gitleaks.toml, .markdownlint-cli2.jsonc, ruff.toml), and only run when that config or the
 # files they lint exist. Product values come from config/schwarzwald/lint.toml [run]:
 # steps (extra "name|tool|install hint|command" checks), shell_exclude, shellcheck_exclude,
-# shfmt_indent and markdownlint (the pinned markdownlint-cli2). The part is found from this
+# markdownlint (the pinned markdownlint-cli2). The part is found from this
 # file's own location, so the copy in a product runs the copy beside it.
 set -euo pipefail
 
@@ -28,14 +28,14 @@ while (($#)); do
 done
 cd "${repo:-$(git rev-parse --show-toplevel)}"
 
-# The shared lints need tomllib: the first python3 that is 3.11 or newer.
-py=python3
-for c in python3 python3.15 python3.14 python3.13 python3.12 python3.11; do
-  if command -v "${c}" >/dev/null 2>&1 && "${c}" -c 'import sys; sys.exit(sys.version_info < (3, 11))'; then
-    py=${c}
-    break
-  fi
-done
+# The shared lints and drift.py need tomllib: the newest python 3.11 or newer on PATH.
+# shellcheck source=lib/pick-python.sh
+. "${part}/lint/lib/pick-python.sh"
+pick_py || {
+  echo "FAIL lint: no python 3.11 or newer on PATH (install python3.13)"
+  exit 1
+}
+py=${PY}
 
 # [run] settings as lines "key<TAB>value" (lists joined by the unit separator), through tomllib.
 cfg=$(
@@ -51,7 +51,7 @@ p = Path("config/schwarzwald/lint.toml")
 if p.exists():
     run = tomllib.loads(p.read_text(encoding="utf-8")).get("run", {})
 d = {"steps": [], "shell_exclude": [], "shellcheck_exclude": ["SC2250", "SC2292", "SC2310", "SC2312"],
-     "shfmt_indent": 2, "markdownlint": "", "markdown_exclude": []}
+     "markdownlint": ""}
 d.update(run)
 for k, v in d.items():
     print(k + "\t" + ("\x1f".join(map(str, v)) if isinstance(v, list) else str(v)))
@@ -62,8 +62,13 @@ IFS=$'\x1f' read -r -a steps <<<"$(get steps)"
 IFS=$'\x1f' read -r -a shell_exclude <<<"$(get shell_exclude)"
 sc_exclude=$(get shellcheck_exclude)
 sc_exclude=${sc_exclude//$'\x1f'/,}
-indent=$(get shfmt_indent)
+indent=2
 mdl=$(get markdownlint)
+# npx --yes installs any npm spec (a URL, npm:other) with no prompt: only a version runs.
+if [[ -n ${mdl} && ! ${mdl} =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+  echo "FAIL markdownlint: [run] markdownlint must be a version like 0.18.1, not ${mdl}"
+  exit 1
+fi
 
 fails=0
 # run NAME TOOL INSTALL CMD...: run CMD when TOOL exists, report the verdict.
@@ -98,41 +103,48 @@ vale_run() {
   git ls-files -z -- '*.md' | xargs -0 vale --minAlertLevel=error
 }
 
-[[ -f _typos.toml || -f .typos.toml ]] && run typos typos "brew install typos-cli" typos
-[[ -f .vale.ini ]] && run vale vale "brew install vale" vale_run
-[[ -f .gitleaks.toml ]] && run gitleaks gitleaks "brew install gitleaks" gitleaks detect --no-banner -c .gitleaks.toml
-[[ -n ${mdl} ]] && run markdownlint npx "install node, then npx fetches markdownlint-cli2" npx --yes "markdownlint-cli2@${mdl}"
+# A check that cannot run says so. A missing config is a FAIL where every product needs the
+# check (typos, gitleaks, ruff on python), else a SKIP, which CI=true turns into a FAIL.
+noconf() {
+  echo "FAIL $1: no config ($2), so it would not run"
+  fails=$((fails + 1))
+}
+skip() {
+  if [[ ${CI:-} == true ]]; then
+    echo "FAIL $1: $2 (a skip fails under CI)"
+    fails=$((fails + 1))
+  else echo "SKIP $1: $2"; fi
+}
+has_md=$(git ls-files -- '*.md' | head -1)
+if [[ -f _typos.toml || -f .typos.toml ]]; then run typos typos "brew install typos-cli" typos; else noconf typos _typos.toml; fi
+if [[ -f .vale.ini ]]; then
+  run vale vale "brew install vale" vale_run
+elif [[ -n ${has_md} ]]; then skip vale "markdown is tracked but .vale.ini is missing"; fi
+if [[ -f .gitleaks.toml ]]; then
+  run gitleaks gitleaks "brew install gitleaks" gitleaks detect --no-banner -c .gitleaks.toml
+else noconf gitleaks .gitleaks.toml; fi
+md_files() { git ls-files -z -- '*.md' | xargs -0 -I{} printf './%s\0' {} | xargs -0 "$@"; }
+if [[ -n ${mdl} && -n ${has_md} ]]; then
+  run markdownlint npx "install node, then npx fetches markdownlint-cli2" md_files npx --yes "markdownlint-cli2@${mdl}" --
+elif [[ -n ${has_md} ]]; then skip markdownlint "markdown is tracked but [run] markdownlint pins no version"; fi
 if [[ -n $(git ls-files -- '*.sh' | head -1) ]]; then
   run shellcheck shellcheck "brew install shellcheck" sh_files shellcheck -o all -e "${sc_exclude}"
   run shfmt shfmt "brew install shfmt" sh_files shfmt -d -i "${indent}"
 fi
-if [[ -f ruff.toml || -f .ruff.toml || -f pyproject.toml ]] && [[ -n $(git ls-files -- '*.py' | head -1) ]]; then
-  run ruff-check ruff "brew install ruff" ruff check .
-  run ruff-format ruff "brew install ruff" ruff format --check .
+if [[ -n $(git ls-files -- '*.py' | head -1) ]]; then
+  if [[ -f ruff.toml || -f .ruff.toml || -f pyproject.toml ]]; then
+    run ruff-check ruff "brew install ruff" ruff check .
+    run ruff-format ruff "brew install ruff" ruff format --check .
+  else noconf ruff ruff.toml; fi
 fi
 [[ -d .github/workflows ]] && run actionlint actionlint "brew install actionlint" actionlint
 
-# Drift: the tool configs keep to the shared bases. drift.py needs tomllib, so it runs under the
-# newest python 3.11 or newer on PATH (not the plain python3, which may be 3.9). None is a FAIL.
-drift_py=""
-for c in python3.15 python3.14 python3.13 python3.12 python3.11 python3; do
-  if command -v "${c}" >/dev/null 2>&1 && "${c}" -c 'import sys; sys.exit(sys.version_info < (3, 11))'; then
-    drift_py=${c}
-    break
-  fi
-done
-if [[ -f ${part}/configs/drift.py ]]; then
-  if [[ -n ${drift_py} ]]; then
-    run drift "${drift_py}" "install python 3.11" "${drift_py}" "${part}/configs/drift.py" --repo .
-  else
-    echo "FAIL drift: no python 3.11 or newer on PATH (install python3.13)"
-    fails=$((fails + 1))
-  fi
-fi
+# Drift: the tool configs keep to the shared bases.
+[[ -f ${part}/configs/drift.py ]] && run drift "${py}" "install python 3.11" "${py}" "${part}/configs/drift.py" --repo .
 
 # The shared lints, each proved on its red case by red.py.
 lint="${part}/lint"
-for rule in internal-refs personal-data own-shas actions-pin dash-standins make-targets file-length script-orphans docs-a11y changelog commit-dates; do
+for rule in internal-refs personal-data denylist-parked own-shas actions-pin dash-standins make-targets file-length script-orphans docs-a11y changelog commit-dates; do
   [[ -f ${lint}/${rule}.py ]] && run "${rule}" "${py}" "install python 3.11" "${py}" "${lint}/${rule}.py" --repo .
 done
 [[ -f ${lint}/red.py ]] && run lint-red "${py}" "install python 3.11" "${py}" "${lint}/red.py" --repo .

@@ -1,0 +1,7 @@
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      run: |
+        curl -fsSL -o x.tgz https://e.org/x.tar.gz
+        echo "0000000000000000000000000000000000000000000000000000000000000000  x.tgz" | sha256sum -c -

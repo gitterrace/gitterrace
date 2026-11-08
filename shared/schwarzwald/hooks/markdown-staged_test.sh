@@ -15,6 +15,7 @@ mkdir -p config/schwarzwald vendor
 cat >"${SANDBOX}/bin/npx" <<'S'
 #!/bin/sh
 echo "$*" >>"${STUB_LOG}"
+echo "Linting: ${STUB_FILES:-1} file(s)"
 echo "a.md:1 MD013 line too long"
 exit "${STUB_RC:-1}"
 S
@@ -41,15 +42,23 @@ expect() {
     echo "  ok   $1"
   fi
 }
-printf '[run]\nmarkdownlint = "9.9.9"\nmarkdown_exclude = ["vendor", "red-cases"]\n' >config/schwarzwald/lint.toml
+printf '[run]\nmarkdownlint = "9.9.9"\n' >config/schwarzwald/lint.toml
 printf '# a\n' >a.md && printf '# v\n' >vendor/v.md
 git add a.md vendor/v.md config/schwarzwald/lint.toml && git commit -qm base
 expect "nothing staged passes without running npx" 0 -
 printf '# a2\n' >a.md && git add a.md
-expect "a staged file is linted with the pinned version and refused on findings" 1 "--yes markdownlint-cli2@9.9.9 a.md"
-STUB_RC=0 expect "a clean lint passes" 0 "--yes markdownlint-cli2@9.9.9 a.md"
-git reset -q && printf '# v2\n' >vendor/v.md && git add vendor/v.md
-expect "an excluded path is not linted" 0 -
+expect "a staged file is linted with the pinned version and refused on findings" 1 "--yes markdownlint-cli2@9.9.9 -- ./a.md"
+STUB_RC=0 expect "a clean lint passes" 0 "--yes markdownlint-cli2@9.9.9 -- ./a.md"
+STUB_RC=0 STUB_FILES=0 expect "a tool that lints 0 files for a staged list is refused" 1 "--yes markdownlint-cli2@9.9.9 -- ./a.md"
+printf '# h\n' >'#h.md' && git add '#h.md'
+STUB_RC=0 expect "a name the tool would read as a glob goes after -- as ./" 0 "--yes markdownlint-cli2@9.9.9 -- ./#h.md ./a.md"
+git rm -q --cached '#h.md'
+nonode=$(mktemp -d "${SANDBOX}/nonode.XXXXXX")
+for b in bash git awk mktemp cat grep head; do ln -s "$(command -v "${b}")" "${nonode}/${b}"; done
+PATH="${nonode}" CI=true expect "no npx under CI is refused" 1 -
+PATH="${nonode}" CI="" expect "no npx on a laptop is a skip" 0 -
+printf '[run]\nmarkdownlint = "npm:other-pkg"\n' >config/schwarzwald/lint.toml
+expect "a pin that is not x.y.z is refused without running npx" 1 -
 printf '[run]\nmarkdownlint = ""\n' >config/schwarzwald/lint.toml
 git reset -q && git add a.md
 expect "no pinned version turns the hook off" 0 -

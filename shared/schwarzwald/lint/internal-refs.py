@@ -3,12 +3,12 @@
 
 A reader of the tree cannot open a tracker row. Say what the row says instead. The patterns are
 `rules/deny.toml` ([task_id], [plan], [label], [process], messages add [message]), plus the
-product's `[refs] patterns` from lint.toml. Real ids come from the local `.personal-denylist`
+product's `[refs] patterns` from lint.toml. Real ids come from the private denylist
 (its bare six-hex lines), refused as bare tokens.
 
 A denylisted id is refused anywhere on a code line (a string literal too); labels and process
-words only in comments. A missing or old `.personal-denylist` is reported (lint.toml [denylist]
-max_age_hours, mode warn|refuse, refresh = the command to print).
+words only in comments. A missing or old denylist is reported (lint.toml [denylist]
+max_age_hours, mode warn|refuse|refresh; the command lives in the private denylist-refresh.toml).
 
 Scope, from lint.toml [scope]: markdown read whole (`prose`), comments and ignore reasons in
 code (`code`), `## ` help lines of a Makefile (`make`), only the `#` note lines of golden files
@@ -39,15 +39,16 @@ HEX6 = re.compile(r"\b[0-9a-f]{6}\b")
 class Refs:
     def __init__(self, cfg: dict[str, dict], ids: set[str]) -> None:
         d = config.deny(cfg["product"]["name"])
-        extra = [re.compile(p) for p in cfg["refs"]["patterns"]]
+        extra = [config.user_pattern(p, "lint.toml [refs] patterns") for p in cfg["refs"]["patterns"]]
         self.tree = d["task_id"] + d["plan"] + d["label"] + d["process"] + extra
         self.message = self.tree + d["message"]
         self.breakdown = d["design_breakdown"]
-        self.not_id = d["not_id"] + [re.compile(p) for p in cfg["refs"]["not_id"]]
+        self.not_id = d["not_id"] + [config.user_pattern(p, "lint.toml [refs] not_id") for p in cfg["refs"]["not_id"]]
         self.scope = cfg["scope"]
         self.ids = ids
 
     def hit(self, text: str, pats: list[re.Pattern[str]]) -> bool:
+        text = text[: config.MAX_LINE]
         for n in self.not_id:
             text = n.sub("", text)
         return any(p.search(text) for p in pats) or any(t in self.ids for t in HEX6.findall(text))
@@ -142,8 +143,8 @@ def self_test(cfg: dict[str, dict]) -> bool:
     if r.message_hits("fix(web): hint\n\nThe page reads one rule.\n") or not r.message_hits("fix: x\n\nSee #a1b2c3."):
         print(f"FAIL [{RULE}] self-test: message rules", file=sys.stderr)
         ok = False
-    if r.message_hits("fix: x\n# lane 3 in a stripped line"):
-        print(f"FAIL [{RULE}] self-test: a stripped comment line is skipped", file=sys.stderr)
+    if not r.message_hits("fix: x\n# lane 3 in a kept comment line"):
+        print(f"FAIL [{RULE}] self-test: a committed `#` line is linted", file=sys.stderr)
         ok = False
     return ok
 
@@ -172,7 +173,7 @@ def main(argv: list[str]) -> int:
     _, ids = config.denylist(root)
     r = Refs(cfg, ids)
     if args[:1] == ["--messages"]:
-        return report([h for m in config.messages(root, args[1]) for h in r.message_hits(m)],
+        return report(config.widened(root, args[1]) + [h for m in config.messages(root, args[1]) for h in r.message_hits(m)],
                       f"the messages of {args[1]}..HEAD")
     if args[:1] == ["--message"]:
         msg = Path(args[1]).read_text(encoding="utf-8", errors="replace")
@@ -188,7 +189,7 @@ def main(argv: list[str]) -> int:
         bad += r.scan(f, p.read_text(errors="replace"))
     if not args and seen < cfg["scope"]["min_files"]:
         print(f"FAIL [{RULE}] scanned only {seen} file(s): the census is broken")
-        return 2
+        return 1
     return report(bad, f"the tree ({seen} files)")
 
 

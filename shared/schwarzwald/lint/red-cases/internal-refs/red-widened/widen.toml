@@ -1,0 +1,3 @@
+[scope]
+exclude = ["*"]
+min_files = 0

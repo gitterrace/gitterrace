@@ -20,6 +20,10 @@ import sys
 import tempfile
 from pathlib import Path
 
+sys.dont_write_bytecode = True
+sys.path.insert(0, str(Path(__file__).resolve().parent / "lib"))
+from config import git  # noqa: E402
+
 HERE = Path(__file__).resolve().parent
 CASES = HERE / "red-cases"
 # Every lint in this folder is a rule: its file stem names its case dir, its RULE line its id.
@@ -31,17 +35,12 @@ SCRIPTS = {
 }
 
 
-def git(root: Path, *args: str, env_extra: dict[str, str] | None = None) -> str:
-    # A hook runs us with GIT_DIR and GIT_INDEX_FILE set: inherited, they point `git init` in a
-    # scratch dir at the real repository and re-initialize it as bare.
-    env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")} | (env_extra or {})
-    return subprocess.run(["git", "-C", str(root), *args], capture_output=True, text=True, check=True,
-                          env=env).stdout
-
-
 def run_case(rule: str, case: Path, product: Path | None) -> int:
-    with tempfile.TemporaryDirectory() as d:
-        root = Path(d)
+    with tempfile.TemporaryDirectory() as outer:
+        # The private list sits beside the case repository, never inside it.
+        d = Path(outer) / "repo"
+        d.mkdir()
+        root = d
         git(root, "init", "-q")
         shutil.copytree(case, root, dirs_exist_ok=True)
         if product and (product / "config/schwarzwald/lint.toml").exists() and not (root / "config").exists():
@@ -50,12 +49,48 @@ def run_case(rule: str, case: Path, product: Path | None) -> int:
             text = (product / "config/schwarzwald/lint.toml").read_text(encoding="utf-8")
             text = re.sub(r"(?ms)^known\s*=\s*\[.*?\]\s*$", "", text)
             (root / "config/schwarzwald/lint.toml").write_text(text, encoding="utf-8")
+        # A case's `private-denylist` file stands for the private list: it moves outside the repository
+        # and lint.toml [denylist] path names it, `{DENYLIST}` in the file standing for that path.
+        private = root / "private-denylist"
+        keep = Path(outer) / "private" / "denylist"
+        if private.exists():
+            keep.parent.mkdir()
+            shutil.move(str(private), keep)
+            os.utime(keep)  # fresh: a synced file keeps an old time and would read as stale
+        refresh = root / "private-refresh.toml"  # the private refresh command, beside the list
+        if refresh.exists():
+            keep.parent.mkdir(exist_ok=True)
+            (keep.parent / "denylist-refresh.toml").write_text(
+                refresh.read_text(encoding="utf-8").replace("{DENYLIST}", str(keep)), encoding="utf-8")
+            refresh.unlink()
+        parked = root / "parked.marker"  # marker: the case parks a `.personal-denylist` in the tree
+        if parked.exists():
+            parked.rename(root / ".personal-denylist")
+        cfg_file = root / "config/schwarzwald/lint.toml"
+        cfg_file.parent.mkdir(parents=True, exist_ok=True)
+        text = cfg_file.read_text(encoding="utf-8").replace("{DENYLIST}", str(keep)) if cfg_file.exists() else ""
+        line = f'path = "{keep}"'
+        if "{ROOT}" in text:  # the case names its own path inside the repository
+            text = text.replace("{ROOT}", str(root))
+        elif "[denylist]" in text:
+            text = text.replace("[denylist]", f"[denylist]\n{line}", 1)
+        else:
+            text = f"{text}\n[denylist]\n{line}\n"
+        cfg_file.write_text(text, encoding="utf-8")
+        # The config now names a temp path: kept out of the tree the lint scans.
+        with (root / ".git/info/exclude").open("a", encoding="utf-8") as ex:
+            ex.write("config/schwarzwald/lint.toml\n")
+        fifo = root / "fifo.marker"  # marker: a tracked symlink to a FIFO outside the tree
+        if fifo.exists():
+            fifo.unlink()
+            os.mkfifo(Path(outer) / "fifo")
+            (root / "link.txt").symlink_to(Path(outer) / "fifo")
         git(root, "add", "-A")
         git(root, "-c", "user.name=t", "-c", "user.email=t@example.invalid", "commit", "-qm", "case")
-        old = root / "stale-denylist.marker"  # marker: the case wants a stale .personal-denylist
+        old = root / "stale-denylist.marker"  # marker: the case wants a stale private denylist
         if old.exists():
             old.unlink()
-            os.utime(root / ".personal-denylist", (1, 1))
+            os.utime(keep, (1, 1))
         if (root / "backdated.marker").exists():  # marker: one more commit whose author date is older
             (root / "backdated.marker").unlink()
             git(root, "-c", "user.name=t", "-c", "user.email=t@example.invalid", "commit", "-qam",
@@ -65,19 +100,35 @@ def run_case(rule: str, case: Path, product: Path | None) -> int:
             old_date = {"GIT_AUTHOR_DATE": "2000-01-01T00:00:00Z", "GIT_COMMITTER_DATE": "2000-01-01T00:00:00Z"}
             git(root, "-c", "user.name=t", "-c", "user.email=t@example.invalid", "commit", "-qam",
                 "case: inverted", env_extra=old_date)
+        widen = root / "widen.toml"  # marker: one more commit whose lint.toml switches lints off
+        if widen.exists():
+            git(root, "add", "-f", "config/schwarzwald/lint.toml")
+            git(root, "-c", "user.name=t", "-c", "user.email=t@example.invalid", "commit", "-qm", "case: base")
+            cfg_file.write_text(widen.read_text(encoding="utf-8") + f"\n[denylist]\n{line}\n", encoding="utf-8")
+            widen.unlink()
+            git(root, "-c", "user.name=t", "-c", "user.email=t@example.invalid", "commit", "-qam", "case: widen")
         head = git(root, "rev-parse", "HEAD").strip()
+        if (root / "shallow.marker").exists():  # marker: the clone is shallow (git reads .git/shallow)
+            (root / "shallow.marker").unlink()
+            (root / ".git/shallow").write_text(head + "\n")
         for f in root.rglob("*"):
             if f.is_file() and ".git" not in f.parts and "{HEAD}" in f.read_text(errors="replace"):
                 f.write_text(f.read_text().replace("{HEAD}", head[:10]))
         args = ["--repo", str(root)]
-        if (root / "message").exists():
+        if not widen.exists() and git(root, "log", "-1", "--format=%s") == "case: widen\n":
+            args += ["--messages", "HEAD~1"]
+        elif (root / "message").exists():
             args += ["--message", str(root / "message")]
         else:
             args += [str(p.relative_to(root)) for p in sorted(root.rglob("*"))
                      if p.is_file() and ".git" not in p.parts and "config" not in p.parts]
             if rule != "internal-refs":
                 args = args[:2]  # these scan the whole tree
-        r = subprocess.run([sys.executable, str(HERE / f"{rule}.py"), *args], capture_output=True, text=True)
+        try:  # a hung rule is a failed one, never a stuck runner
+            r = subprocess.run([sys.executable, str(HERE / f"{rule}.py"), *args], capture_output=True,
+                               text=True, timeout=60)
+        except subprocess.TimeoutExpired:
+            return 124
         return r.returncode
 
 

@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Land one checked commit from a clone onto the local main of a repository.
 #
-#   land.sh [--full-gate|--no-gate] <repo> <clone-dir> <sha>        (or LAND_REPO=<repo> land.sh <clone-dir> <sha>)
-#   land.sh [--full-gate|--no-gate] --plan <repo> <clone-dir> <base> <plan-file>
+#   land.sh [--full-gate|--no-gate|--gate-change] <repo> <clone-dir> <sha>        (or LAND_REPO=<repo> land.sh <clone-dir> <sha>)
+#   land.sh [--full-gate|--no-gate|--gate-change] --plan <repo> <clone-dir> <base> <plan-file>
 #
 # Cherry-picks the commit onto main, stamps author and committer date to now (one second after
 # main's tip if the clock is behind), keeps the message and the author identity. The message gets
@@ -26,15 +26,21 @@
 # The gate, in both modes: the
 # config/schwarzwald/land.toml `[landing]` table, `gate = [cmds]` and `messages = "cmd {base}"`
 # ({base} is the real base sha), each through bash -c. No file or no [landing] table prints
-# "landing gate: none configured" and refuses unless --no-gate is given. The product's full scripts/land-check.sh runs only with --full-gate (as the gate, and as
+# "landing gate: none configured" and refuses unless --no-gate is given. --no-gate only allows a
+# missing gate: a configured [landing] gate always runs, so a landing cannot skip it. A red gate
+# prints its FAIL and error lines, then its last 10 lines. The product's full
+# scripts/land-check.sh runs only with --full-gate (as the gate, and as
 # `--messages <base>`). A red result refuses. Then main fast-forwards, refusing a dirty checkout
-# or a non-ff.
+# or a non-ff. The gate (land.toml and land-check.sh) is read from main's tip in <repo>, never
+# from the commits being landed, so a candidate cannot set its own gate. A landing that changes
+# either file is refused unless --gate-change is given, and even then main's gate judges it.
 set -euo pipefail
-plan_mode=0 full_gate=0 no_gate=0
-while [[ ${1:-} == --full-gate || ${1:-} == --no-gate || ${1:-} == --plan ]]; do
-  case $1 in --full-gate) full_gate=1 ;; --no-gate) no_gate=1 ;; --plan) plan_mode=1 ;; esac; shift
+plan_mode=0 full_gate=0 no_gate=0 gate_change=0
+while [[ ${1:-} == --full-gate || ${1:-} == --no-gate || ${1:-} == --plan || ${1:-} == --gate-change ]]; do
+  case $1 in --full-gate) full_gate=1 ;; --no-gate) no_gate=1 ;; --plan) plan_mode=1 ;; --gate-change) gate_change=1 ;; esac; shift
 done
-usage() { sed -n '2,30s/^# \{0,1\}//p' "$0" >&2; exit 1; }
+usage() { sed -n '2,33s/^# \{0,1\}//p' "$0" >&2; exit 1; }
+GATE_FILES=(config/schwarzwald/land.toml scripts/land-check.sh)
 if [[ $plan_mode == 0 ]]; then
   if [[ -n ${LAND_REPO:-} && $# == 2 ]]; then set -- "${LAND_REPO}" "$@"; fi
   [[ $# == 3 ]] || usage
@@ -46,6 +52,21 @@ else
   [[ $plan == /* ]] || plan="$PWD/$plan"
 fi
 [[ $clone == /* ]] || clone="$PWD/$clone"
+# Every rev a caller or a plan names is a hex object id, checked before any git call sees it: a
+# word starting with - would be taken as an option (--upload-pack=, --output=).
+is_oid() { [[ $1 =~ ^[0-9a-fA-F]{7,64}$ ]]; }
+if [[ $plan_mode == 0 ]]; then
+  is_oid "$sha" || { echo "refused: '$sha' is not a commit id (7 to 64 hex digits)" >&2; exit 1; }
+else
+  is_oid "$base_arg" || { echo "refused: base '$base_arg' is not a commit id (7 to 64 hex digits)" >&2; exit 1; }
+  [[ -f $plan ]] || { echo "refused: no plan file $plan" >&2; exit 1; }
+  while read -r s mode extra; do
+    [ -z "$s" ] && continue
+    is_oid "$s" || { echo "refused: plan line '$s' is not a commit id (7 to 64 hex digits)" >&2; exit 1; }
+    [[ -z $mode || $mode == fold ]] || { echo "refused: plan line '$s $mode': unknown mode '$mode', want fold or nothing" >&2; exit 1; }
+    [[ -z $extra ]] || { echo "refused: plan line '$s $mode $extra': unknown mode, too many words" >&2; exit 1; }
+  done <"$plan"
+fi
 deny="$(cd "$(dirname "${BASH_SOURCE[0]}")/../rules" && pwd)/deny.toml"
 # The [partial_subject] patterns are Python regexes: read them with the first python3 >= 3.11.
 py=""
@@ -62,23 +83,33 @@ sys.exit(0 if any(re.search(p, sys.argv[2]) for p in pats) else 1)' "$deny" "$1"
 
 # landed_log <git log args...>: sha, author|committer identity, the dates, the subject
 landed_log() { git log --format='%h %an <%ae>|%cn <%ce> %ad|%cd %s' --date=iso "$@"; }
-# landing_cfg <product-dir>: print the [landing] gate commands, a "--" marker, then the messages
-# command (with {base} left in), NUL separated. Nothing without the file.
+# landing_cfg <land.toml>: print the [landing] gate commands, a "--" marker, then the messages
+# command (with {base} left in), NUL separated. Nothing for an empty or missing file.
 landing_cfg() {
-  [[ -f $1/config/schwarzwald/land.toml ]] || return 0
+  [[ -s $1 ]] || return 0
   "$py" -c '
 import sys, tomllib
 c = tomllib.load(open(sys.argv[1], "rb")).get("landing")
 if c is None: sys.exit(0)
 for g in c.get("gate", []): sys.stdout.write(g + "\0")
-sys.stdout.write("--\0" + c.get("messages", "") + "\0")' "$1/config/schwarzwald/land.toml"
+sys.stdout.write("--\0" + c.get("messages", "") + "\0")' "$1"
 }
 
+# gate_out <text>: a red gate's FAIL and error lines (the failing check), then its last 10 lines.
+gate_out() {
+  printf '%s\n' "$1" | grep -E '(^|[[:space:]])(FAIL|ERROR|error)([:[:space:]]|$)' >&2 || true
+  printf '%s\n' "$1" | tail -10 >&2
+}
 # gate_env <cmd...>: run a gate command without the identity and dates this tool sets for its
 # own commits. A gate that makes fixture commits would otherwise get the lander's identity and
 # different shas than on the product's own runs.
 gate_env() {
-  env -u GIT_AUTHOR_NAME -u GIT_AUTHOR_EMAIL -u GIT_AUTHOR_DATE \
+  # Config from the environment (GIT_CONFIG_COUNT with its KEY_n/VALUE_n, GIT_CONFIG_PARAMETERS)
+  # is dropped too: it would override the fixture's own config, core.hooksPath among others.
+  local -a drop=(-u GIT_CONFIG_COUNT -u GIT_CONFIG_PARAMETERS)
+  local v
+  while IFS= read -r v; do drop+=(-u "$v"); done < <(compgen -e | grep -E '^GIT_CONFIG_(KEY|VALUE)_[0-9]+$' || true)
+  env "${drop[@]}" -u GIT_AUTHOR_NAME -u GIT_AUTHOR_EMAIL -u GIT_AUTHOR_DATE \
     -u GIT_COMMITTER_NAME -u GIT_COMMITTER_EMAIL -u GIT_COMMITTER_DATE -u LAND_TOOL "$@"
 }
 
@@ -86,29 +117,43 @@ gate_env() {
 # result exactly as main would get it). Exits refusing on a red gate, or on no gate without
 # --no-gate.
 run_gate() {
-  local base=$1 item g out seen=0 msgcmd="" hooks
+  local base=$1 item g out seen=0 msgcmd="" hooks gd changed f
   local -a gates=()
+  # The gate is main's, read from the base commit in the target repository, never from the
+  # result tree: a candidate that edits land.toml or land-check.sh would otherwise pick its gate.
+  changed=$(git diff --name-only "$base" HEAD -- "${GATE_FILES[@]}")
+  if [ -n "$changed" ] && [ "$gate_change" = 0 ]; then
+    echo "refused: the landing changes the landing gate ($(echo "$changed" | tr '\n' ' ')). Pass --gate-change to land it, main's gate still judges it." >&2; exit 1
+  fi
+  gd=$(mktemp -d "$tmp/gate.XXXX")
+  for f in "${GATE_FILES[@]}"; do
+    git -C "$repo" cat-file blob "$base:$f" >"$gd/${f##*/}" 2>/dev/null || : >"$gd/${f##*/}"
+  done
   # A fresh clone has no core.hooksPath. A gate that checks the hooks are wired would refuse every
   # landing, so the target repository's setting is carried over. It is set here, after the
   # landing commits, so the hooks judge only what the gate runs.
-  hooks=$(git -C "$repo" config --get core.hooksPath 2>/dev/null || true)
+  hooks=$(gate_env git -C "$repo" config --get core.hooksPath 2>/dev/null || true)
   [ -z "$hooks" ] || git config core.hooksPath "$hooks"
   while IFS= read -r -d '' item; do
     if [ "$seen" = 0 ] && [ "$item" = -- ]; then seen=1; elif [ "$seen" = 0 ]; then gates+=("$item"); else msgcmd=$item; fi
-  done < <(landing_cfg "$PWD")
+  done < <(landing_cfg "$gd/land.toml")
   if [ "$seen" = 0 ]; then
     echo "landing gate: none configured (config/schwarzwald/land.toml [landing] is missing)" >&2
     [ "$no_gate" = 1 ] || { echo "refused: no landing gate. Add [landing] to config/schwarzwald/land.toml, or pass --no-gate." >&2; exit 1; }
   fi
   for g in "${gates[@]+"${gates[@]}"}"; do
-    out=$(gate_env bash -c "$g" 2>&1) || { echo "refused: the product gate failed ($g):" >&2; printf '%s\n' "$out" | tail -5 >&2; exit 1; }
+    out=$(gate_env bash -c "$g" 2>&1) || { echo "refused: the product gate failed ($g):" >&2; gate_out "$out"; exit 1; }
   done
   if [ -n "$msgcmd" ]; then
-    out=$(gate_env bash -c "${msgcmd//\{base\}/$base}" 2>&1) || { echo "refused: the message gate failed:" >&2; printf '%s\n' "$out" | tail -5 >&2; exit 1; }
+    out=$(gate_env bash -c "${msgcmd//\{base\}/$base}" 2>&1) || { echo "refused: the message gate failed:" >&2; gate_out "$out"; exit 1; }
   fi
-  if [ "$full_gate" = 1 ] && [ -f scripts/land-check.sh ]; then
-    out=$(gate_env bash scripts/land-check.sh 2>&1) || { echo "refused: the full product gate failed:" >&2; printf '%s\n' "$out" | tail -5 >&2; exit 1; }
-    out=$(gate_env bash scripts/land-check.sh --messages "$base" 2>&1) || { echo "refused: the message gate failed:" >&2; printf '%s\n' "$out" | tail -5 >&2; exit 1; }
+  # Unchanged, main's land-check.sh is the tree's own, run in place so its sibling paths hold.
+  # Changed (--gate-change), main's copy runs instead.
+  local check=scripts/land-check.sh
+  [ -z "$changed" ] || check=$gd/land-check.sh
+  if [ "$full_gate" = 1 ] && [ -s "$gd/land-check.sh" ]; then
+    out=$(gate_env bash "$check" 2>&1) || { echo "refused: the full product gate failed:" >&2; gate_out "$out"; exit 1; }
+    out=$(gate_env bash "$check" --messages "$base" 2>&1) || { echo "refused: the message gate failed:" >&2; gate_out "$out"; exit 1; }
   fi
 }
 
@@ -139,19 +184,18 @@ fi
 
 if [ "$plan_mode" = 1 ]; then
   old=$(git -C "$clone" rev-parse HEAD)
-  base=$(git rev-parse "$base_arg^{commit}")
+  base=$(git rev-parse --verify --end-of-options "$base_arg^{commit}")
   [ "$base" = "$(git rev-parse HEAD)" ] || { echo "refused: stale plan, base $(git rev-parse --short "$base") is not main's tip $(git rev-parse --short HEAD)" >&2; exit 1; }
   lastsha=$(awk 'NF {s=$1} END {print s}' "$plan")
-  [ -n "$lastsha" ] && [ "$(git -C "$clone" rev-parse "$lastsha^{commit}")" = "$old" ] || { echo "refused: stale plan, it ends at ${lastsha:-nothing}, the clone HEAD is $(git rev-parse --short "$old")" >&2; exit 1; }
+  [ -n "$lastsha" ] && [ "$(git -C "$clone" rev-parse --verify --end-of-options "$lastsha^{commit}")" = "$old" ] || { echo "refused: stale plan, it ends at ${lastsha:-nothing}, the clone HEAD is $(git rev-parse --short "$old")" >&2; exit 1; }
   while read -r s _; do
     [ -z "$s" ] && continue
-    subj=$(git -C "$clone" log -1 --format=%s "$s")
+    subj=$(git -C "$clone" log -1 --format=%s --end-of-options "$s")
     if partial "$subj"; then echo "refused: $s '$subj' is a partial step. Squash it into its change." >&2; exit 3; fi
   done <"$plan"
   tmp=$(mktemp -d); trap 'rm -rf "$tmp"' EXIT
   git clone -q "$clone" "$tmp/w"
   git -C "$tmp/w" fetch -q "$repo" "$base"
-  if [ -f .personal-denylist ]; then cp .personal-denylist "$tmp/w/"; fi
   name=$(git -C "$clone" config user.name) email=$(git -C "$clone" config user.email)
   export GIT_AUTHOR_NAME=$name GIT_AUTHOR_EMAIL=$email GIT_COMMITTER_NAME=$name GIT_COMMITTER_EMAIL=$email LAND_TOOL=1
   cd "$tmp/w"
@@ -162,9 +206,9 @@ if [ "$plan_mode" = 1 ]; then
   while read -r s mode _; do
     [ -z "$s" ] && continue
     if [ "$mode" = fold ]; then
-      git cherry-pick -n "$s" >/dev/null 2>&1 || { echo "conflict: $s does not apply on $(git rev-parse --short "$base")" >&2; exit 2; }
+      git cherry-pick -n --end-of-options "$s" >/dev/null 2>&1 || { echo "conflict: $s does not apply on $(git rev-parse --short "$base")" >&2; exit 2; }
     else
-      git cherry-pick "$s" >/dev/null 2>&1 || { echo "conflict: $s does not apply on $(git rev-parse --short "$base")" >&2; exit 2; }
+      git cherry-pick --end-of-options "$s" >/dev/null 2>&1 || { echo "conflict: $s does not apply on $(git rev-parse --short "$base")" >&2; exit 2; }
       stamp="$t $zone"; t=$((t + 1))
     fi
     GIT_AUTHOR_DATE=$stamp GIT_COMMITTER_DATE=$stamp git commit -q --amend --no-edit --no-verify --date="$stamp"
@@ -183,8 +227,8 @@ if [ "$plan_mode" = 1 ]; then
   exit 0
 fi
 
-git fetch -q "$clone" "$(git -C "$clone" rev-parse "$sha")" 2>/dev/null || git fetch -q "$clone"
-full=$(git rev-parse "$sha^{commit}")
+git fetch -q -- "$clone" "$(git -C "$clone" rev-parse --verify --end-of-options "$sha^{commit}")" 2>/dev/null || git fetch -q -- "$clone"
+full=$(git rev-parse --verify --end-of-options "$sha^{commit}")
 [ "$(git rev-list --count "$full^!")" = 1 ] || { echo "not a single commit" >&2; exit 1; }
 # One change, one commit: a fixup, a re-bless or a style pass belongs inside its change.
 subj=$(git log -1 --format=%s "$full")
@@ -207,7 +251,6 @@ name=$(git log -1 --format=%an "$full") email=$(git log -1 --format=%ae "$full")
 # once the gate is green, so a red gate leaves it untouched.
 tmp=$(mktemp -d); trap 'rm -rf "$tmp"' EXIT
 git clone -q --no-hardlinks "$repo" "$tmp/w"
-if [ -f .personal-denylist ]; then cp .personal-denylist "$tmp/w/"; fi
 cd "$tmp/w"
 git fetch -q "$repo" "$full"
 git checkout -q --detach "$before"

@@ -52,6 +52,23 @@ printf '[commit]\nallow_prefix = "PRODUCT_"\n' >config/schwarzwald/lint.toml
 tip=$(git rev-parse HEAD)
 old2=$(GIT_AUTHOR_DATE="2026-01-01T10:00:00" g commit-tree "$tip^{tree}" -p "$tip" -m lane2)
 lands "the product prefix names the override" yes env PRODUCT_ALLOW_OLD_DATES=1 git update-ref refs/heads/main "$old2"
+printf '[commit]\nallow_prefix = "a[$(touch %s/pwned)]b"\n' "$SANDBOX" >config/schwarzwald/lint.toml
+lands "a prefix holding a command substitution refuses an old date" no git update-ref refs/heads/main "$old2"
+[[ -e $SANDBOX/pwned ]] && { echo "FAIL the prefix ran a command"; fail=1; }
+# A git log that fails (a missing object, a broken repo) refuses: the hook fails closed.
+broken=$SANDBOX/broken-git
+mkdir -p "$broken"
+real_git=$(command -v git)
+printf '#!/bin/sh\n[ "$1" = log ] && exit 128\nexec %q "$@"\n' "$real_git" >"$broken/git"
+chmod +x "$broken/git"
+printf '[commit]\nallow_prefix = "PRODUCT_"\n' >config/schwarzwald/lint.toml
+tip=$(git rev-parse HEAD)
+ok=$(g commit-tree "$tip^{tree}" -p "$tip" -m ok)
+# git puts its exec-path first for a hook, so the stub is run around the hook directly.
+if printf '%s %s refs/heads/main\n' "$tip" "$ok" | PATH="$broken:$PATH" bash "$HOOK" prepared >/dev/null 2>&1; then
+  echo "FAIL a failing git log refuses the update"
+  fail=1
+else echo "ok   a failing git log refuses the update"; fi
 git branch -q other "$tip"
 REF=refs/heads/other lands "another branch is not judged" yes git update-ref refs/heads/other "$old"
 exit "$fail"

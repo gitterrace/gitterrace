@@ -76,6 +76,9 @@ def main(argv: list[str]) -> int:
     if not want:
         print(f"{RULE}: [changelog] git_cliff is empty, no changelog check")
         return 0
+    if (why := config.shallow(root)):
+        print(f"FAIL [{RULE}] {why}", file=sys.stderr)
+        return 1
     path = root / name
     if not path.exists():
         print(f"FAIL [{RULE}] {name} is missing", file=sys.stderr)

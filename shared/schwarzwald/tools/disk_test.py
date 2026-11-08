@@ -137,6 +137,50 @@ def scratch_cases(d: Path) -> list[str]:
         bad.append("scratch.sh --keep did not keep the run dir")
     run("git", "-C", str(repo), "worktree", "prune")
     shutil.rmtree(root, ignore_errors=True)
+    bad += root_cases(d, repo)
+    return bad
+
+
+def root_cases(d: Path, repo: Path) -> list[str]:
+    """ST-8: with no TMPDIR the scratch root is per user ($XDG_RUNTIME_DIR, else ~/.cache), never
+    shared /tmp; a root this user owns ends at 0700; a symlinked root is refused. disk-sweep's
+    default --scratch is the same root."""
+    bad = []
+    home = d / "home"
+    home.mkdir()
+    noenv = {"HOME": str(home), "SCRATCH_PRODUCT": str(repo), "DISK_FLOOR_GIB": "1",
+             "TMPDIR": "", "XDG_RUNTIME_DIR": ""}
+    r = run("bash", "-c", RUNNER, "_", str(HERE), str(repo), env=noenv | {"KEEP": "--keep"})
+    kept = r.stdout.split("RUN ")[-1].strip()
+    want = home / ".cache/schwarzwald-scratch"
+    if r.returncode or not kept.startswith(str(want) + "/"):
+        bad.append(f"scratch.sh without TMPDIR did not use ~/.cache: exit {r.returncode} run {kept!r} {r.stderr.strip()[-200:]}")
+    elif oct(want.stat().st_mode & 0o777) != "0o700":
+        bad.append(f"scratch.sh made its root at {oct(want.stat().st_mode & 0o777)}, not 0700")
+    if kept.startswith("/tmp/") or kept.startswith("/private/tmp/"):
+        bad.append("scratch.sh without TMPDIR put the run in shared /tmp")
+    wide = d / "wide-root"
+    wide.mkdir()
+    wide.chmod(0o777)
+    r = run("bash", "-c", RUNNER, "_", str(HERE), str(repo), env=noenv | {"SCRATCH_ROOT": str(wide)})
+    if r.returncode or oct(wide.stat().st_mode & 0o777) != "0o700":
+        bad.append(f"scratch.sh left a world-writable root at {oct(wide.stat().st_mode & 0o777)}: exit {r.returncode}")
+    link = d / "link-root"
+    link.symlink_to(wide)
+    r = run("bash", "-c", RUNNER, "_", str(HERE), str(repo), env=noenv | {"SCRATCH_ROOT": str(link)})
+    if r.returncode == 0 or "refused" not in r.stderr:
+        bad.append(f"scratch.sh accepted a symlinked root: exit {r.returncode}")
+    # disk-sweep: no --scratch, no TMPDIR: a stale run in ~/.cache/schwarzwald-scratch is listed
+    stale = want / "old.1.zzzz"
+    stale.mkdir(parents=True, exist_ok=True)
+    (stale / "log").write_text("x\n")
+    age(stale, OLD)
+    empty = d / "emptyroot"
+    empty.mkdir()
+    r = run(sys.executable, str(HERE / "disk-sweep.py"), str(empty), env=noenv)
+    if str(stale) not in r.stdout:
+        bad.append(f"disk-sweep without TMPDIR did not default to ~/.cache/schwarzwald-scratch: {r.stdout.strip()[-200:]}")
+    shutil.rmtree(want, ignore_errors=True)
     return bad
 
 
@@ -246,11 +290,104 @@ def apply_cases(r, sweep, d, stale, lane, old_run, fresh, held, main_t, new_run,
     return bad
 
 
+def pushed_clone(origin: Path, at: Path) -> Path:
+    """A clone of origin whose every commit the remote has."""
+    run("git", "clone", "-q", str(origin), str(at))
+    return at
+
+
+def safety_cases(d: Path) -> list[str]:
+    """The audit's proofs (ST-5, ST-6, ST-9), each under this test's own temp root."""
+    bad = []
+    seed = d / "seed"
+    seed.mkdir()
+    run("git", "-C", str(seed), "init", "-q", "-b", "main")
+    (seed / "a.txt").write_text("a\n")
+    run("git", "-C", str(seed), "add", "a.txt")
+    run("git", "-C", str(seed), "commit", "-qm", "feat: a")
+    origin = d / "origin.git"
+    run("git", "clone", "-q", "--bare", str(seed), str(origin))
+    scratch = d / "scratch"
+    runs = {}
+    # runA: a pushed clone with an uncommitted file
+    a = pushed_clone(origin, scratch / "runA" / "c")
+    (a / "wip.txt").write_text("not committed\n")
+    runs["uncommitted work"] = a.parent
+    # runB: a pushed clone holding a nested repo with an unpushed commit
+    b = pushed_clone(origin, scratch / "runB" / "c")
+    inner = b / "vendor/inner"
+    inner.mkdir(parents=True)
+    run("git", "-C", str(inner), "init", "-q", "-b", "main")
+    (inner / "i.txt").write_text("i\n")
+    run("git", "-C", str(inner), "add", "i.txt")
+    run("git", "-C", str(inner), "commit", "-qm", "feat: inner")
+    (b / ".git/info/exclude").write_text("vendor/\n")
+    runs["a nested repo with an unpushed commit"] = b.parent
+    # runD: a commit reachable only from a tag
+    t = pushed_clone(origin, scratch / "runD" / "c")
+    run("git", "-C", str(t), "checkout", "-q", "--detach")
+    (t / "t.txt").write_text("t\n")
+    run("git", "-C", str(t), "add", "t.txt")
+    run("git", "-C", str(t), "commit", "-qm", "feat: tagged")
+    run("git", "-C", str(t), "tag", "only-here")
+    run("git", "-C", str(t), "checkout", "-q", "main")
+    runs["a tag-only commit"] = t.parent
+    # runS: a commit only in the stash
+    s = pushed_clone(origin, scratch / "runS" / "c")
+    (s / "a.txt").write_text("stashed\n")
+    run("git", "-C", str(s), "stash", "-q")
+    runs["a stash-only change"] = s.parent
+    # runC: a clean pushed clone, the one a sweep may remove
+    clean = pushed_clone(origin, scratch / "runC" / "c")
+    for r in (*runs.values(), clean.parent):
+        age(r, OLD)
+    # ST-6: a target that is a symlink to a dir outside the root
+    root, elsewhere = d / "root", d / "elsewhere"
+    plant_target(elsewhere / "prod", time.time())
+    real_lane = plant_target(elsewhere / "prod", OLD, lane="lane1")
+    (root / "prod").mkdir(parents=True)
+    (root / "prod/target").symlink_to(elsewhere / "prod/target")
+    sweep = [sys.executable, str(HERE / "disk-sweep.py"), "--hours", "1", "--scratch", str(scratch), str(root)]
+    r = run(*sweep, "--apply")
+    for why, p in runs.items():
+        if not p.exists():
+            bad.append(f"disk-sweep --apply removed a scratch run with {why}: {r.stdout.strip()[-300:]}")
+    if clean.parent.exists():
+        bad.append(f"disk-sweep --apply kept a clean pushed scratch run: {r.stdout.strip()[-300:]}")
+    if not real_lane.exists():
+        bad.append("disk-sweep --apply deleted through a symlinked target into a dir outside the root")
+    # ST-9: a run that turns fresh between the listing and the delete is kept. size() runs after
+    # the pick and before the remove, so a wrapped size() writes into the run at that moment.
+    late = scratch / "runL"
+    late.mkdir()
+    (late / "log").write_text("x\n")
+    age(late, OLD)
+    code = (
+        "import importlib.util, sys, pathlib\n"
+        f"spec = importlib.util.spec_from_file_location('ds', {str(HERE / 'disk-sweep.py')!r})\n"
+        "m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)\n"
+        "orig = m.size\n"
+        "def size(p):\n"
+        "    if p.name == 'runL': (p / 'new').write_text('started')\n"
+        "    return orig(p)\n"
+        "m.size = size\n"
+        f"sys.exit(m.main(['--hours', '1', '--apply', '--scratch', {str(scratch)!r}]))\n")
+    probe = d / "probe.py"
+    probe.write_text(code)
+    r = run(sys.executable, str(probe))
+    if r.returncode not in (0, 1) or "Traceback" in r.stderr:
+        bad.append(f"the ST-9 probe did not run: {r.stderr.strip()[-300:]}")
+    if not late.exists():
+        bad.append(f"disk-sweep removed a run that turned fresh after the listing: {r.stdout.strip()[-300:]}")
+    return bad
+
+
 def main() -> int:
     bad = []
     with tempfile.TemporaryDirectory() as d:
         base = Path(d).resolve()
-        for name, case in (("floor", floor_cases), ("scratch", scratch_cases), ("sweep", sweep_cases)):
+        for name, case in (("floor", floor_cases), ("scratch", scratch_cases), ("sweep", sweep_cases),
+                           ("safety", safety_cases)):
             (base / name).mkdir()
             bad += case(base / name)
     for b in bad:

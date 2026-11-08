@@ -10,7 +10,10 @@
 #                                            loudly when git fails (a full disk among others)
 #   export CARGO_TARGET_DIR="$(scratch_dir target)"   so the build output goes with the run
 #
-# The root is SCRATCH_ROOT, default $TMPDIR/schwarzwald-scratch. Each run gets
+# The root is SCRATCH_ROOT, default $TMPDIR/schwarzwald-scratch (per user on macOS), else
+# $XDG_RUNTIME_DIR/schwarzwald-scratch, else ~/.cache/schwarzwald-scratch: never a fixed name in
+# shared /tmp. The root must be a real dir (not a symlink) this user owns; it is set to 0700.
+# Each run gets
 # <root>/<name>.<pid>.XXXX, so tools/disk-sweep.py can find what a killed run left behind.
 # --keep (or SCRATCH_KEEP=1) keeps the run dir and prints where it is, for debugging. Worktrees
 # are unregistered from their repository on exit too, so no stale entry is left in it.
@@ -39,16 +42,27 @@ scratch_cleanup() {
     SCRATCH_RUN=""
 }
 
+scratch_root() { # the default root, the same rule tools/disk-sweep.py uses
+    if [ -n "${SCRATCH_ROOT:-}" ]; then printf '%s\n' "$SCRATCH_ROOT"
+    elif [ -n "${TMPDIR:-}" ]; then printf '%s\n' "${TMPDIR%/}/schwarzwald-scratch"
+    elif [ -n "${XDG_RUNTIME_DIR:-}" ]; then printf '%s\n' "${XDG_RUNTIME_DIR%/}/schwarzwald-scratch"
+    else printf '%s\n' "${HOME:?scratch: no TMPDIR, XDG_RUNTIME_DIR or HOME}/.cache/schwarzwald-scratch"
+    fi
+}
+
 scratch_init() {
     local name="${1:?scratch_init needs a run name}" here root
     shift
     [ "${1:-}" = --keep ] && SCRATCH_KEEP=1
     here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-    root="${SCRATCH_ROOT:-${TMPDIR:-/tmp}/schwarzwald-scratch}"
+    root="$(scratch_root)"
     root="${root%/}"
     . "$here/disk-floor.sh"
     disk_floor "${SCRATCH_PRODUCT:-$PWD}" "$root" || return 1
-    mkdir -p "$root" || { echo "scratch: refused, cannot make $root" >&2; return 1; }
+    [ ! -L "$root" ] || { echo "scratch: refused, the root $root is a symlink" >&2; return 1; }
+    (umask 077 && mkdir -p "$root") || { echo "scratch: refused, cannot make $root" >&2; return 1; }
+    [ -O "$root" ] || { echo "scratch: refused, the root $root is not owned by this user" >&2; return 1; }
+    chmod 700 "$root" || { echo "scratch: refused, cannot set $root to 0700" >&2; return 1; }
     SCRATCH_RUN="$(mktemp -d "$root/$name.$$.XXXX")" || { echo "scratch: refused, cannot make a run dir under $root" >&2; return 1; }
     trap scratch_cleanup EXIT
     trap 'scratch_cleanup; exit 130' INT

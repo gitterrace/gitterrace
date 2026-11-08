@@ -33,6 +33,10 @@ expect "refuses a stale index that reverts a change and re-adds a deletion" 1
 DEMO_ALLOW_RESTORE=1 expect "passes the same tree with the restore override" 0
 SCHWARZWALD_ALLOW_RESTORE=1 expect "an override with another prefix does not count" 1
 DEMO_STALE_DEPTH=1 expect "a depth of 1 sees only the last commit, which dropped b" 1
+printf '[commit]\nallow_prefix = "a[$(touch %s/pwned)]b"\n' "${SANDBOX}" >config/schwarzwald/lint.toml
+expect "a prefix holding a command substitution still refuses" 1
+[[ -e ${SANDBOX}/pwned ]] && { echo "  FAIL the prefix ran a command"; fail=1; }
+printf '[commit]\nallow_prefix = "DEMO_"\n' >config/schwarzwald/lint.toml
 git read-tree HEAD && printf 'three\n' >a && git add a
 expect "passes an ordinary change on HEAD" 0
 git read-tree HEAD && git rm -q --cached a

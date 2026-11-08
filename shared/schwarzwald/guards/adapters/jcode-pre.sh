@@ -34,13 +34,23 @@ fi
 [ -n "$_input" ] || _input="${JCODE_HOOK_TOOL_INPUT:-}"
 
 # Outside the org, the deny list still judges a command that could reach back
-# in (names the org, `~`, `HOME` or `..`). An EMPTY cwd takes the full path.
+# in (names the org, `~`, `HOME`, `..`, or changes directory: a symlink outside
+# the org can point into it). An EMPTY cwd takes the full path. A cwd reached
+# through a symlink is compared where it points, via the `cd -P` builtin.
 _cwd="${JCODE_HOOK_CWD:-}"
-case "$_cwd" in
-    "" | "$_org" | "$_org"/*) ;;
+_pcwd="$_cwd"
+if [ -n "$_cwd" ] && CDPATH='' cd -P -- "$_cwd" 2>/dev/null; then
+    _pcwd="$PWD"
+    CDPATH='' cd -- "$_back" 2>/dev/null || :
+fi
+_porg="$_org"
+CDPATH='' cd -P -- "$_org" 2>/dev/null && _porg="$PWD"
+CDPATH='' cd -- "$_back" 2>/dev/null || :
+case "$_pcwd" in
+    "" | "$_org" | "$_org"/* | "$_porg" | "$_porg"/*) ;;
     *)
         case "$_input" in
-            *"$_org"* | *'~'* | *HOME* | *..*) ;;
+            *"$_org"* | *'~'* | *HOME* | *..* | *cd* | *pushd* | *-C* | *--git-dir* | *--work-tree*) ;;
             *) exit 0 ;;
         esac
         # shellcheck source=/dev/null
