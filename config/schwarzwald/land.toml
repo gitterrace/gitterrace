@@ -29,9 +29,7 @@ gate = [
   "bash scripts/golden-run.sh",
   "python3 shared/schwarzwald/lint/file-length.py",
   "python3 scripts/names-check.py",
-  # The hook tests wire hooks in their own fixture repos; a core.hooksPath passed in through
-  # GIT_CONFIG_COUNT would override that and leave the fixtures unguarded.
-  "env -u GIT_CONFIG_COUNT bash shared/schwarzwald/lint/run.sh",
+  "bash shared/schwarzwald/lint/run.sh",
 ]
 # The landing runs in a fresh clone, which has no core.hooksPath yet: set it there first. The
 # dates of the landed commits are read by the shared commit-dates lint.
