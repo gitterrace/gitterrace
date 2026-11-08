@@ -119,6 +119,8 @@ pub(super) struct Now {
 #[derive(Debug)]
 pub(super) struct Shown {
     pub(super) lead: String,
+    /// The big numbers: languages, lines, the largest language and its share.
+    pub(super) kpis: Vec<crate::insights::Kpi>,
     pub(super) period: Seg,
     pub(super) axis: Seg,
     pub(super) scale: Seg,

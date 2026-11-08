@@ -1,0 +1,5 @@
+{#- The insights toolbar (filter.rs `FilterBar::toolbar`), the page head's toolbar slot: the
+period, the page's own choice, the options as one muted line and "On this page". `jump` is the
+crate's own outline menu. -#}
+{{ fb.period }}{% if let Some(x) = fb.extra %}{{ x }}{% endif %}{% include "_options.html" -%}
+{{ fb.jump|safe }}

@@ -4,8 +4,8 @@
 {%- import "_chart.svg" as ch -%}
 {%- if let Some(e) = empty %}{{ e }}{% endif -%}
 {%- if let Some(s) = shown -%}
-{%- let lead = s.lead.clone() %}{% include "_lead.html" -%}
-<div class="fbar">{{ s.period }}{{ s.axis }}{{ s.scale }}</div><section class="card pad"><div
+{% call kp::kpis(&s.kpis) %}{% endcall %}
+<section class="card pad"><div
 class="chart-head"><div><h2>Lines of code by language</h2><p
 class="hint">Exact line count at every commit on the first-parent history, {{ s.total }} today. Drag across the chart to select a range.</p></div><div
 class="legend">

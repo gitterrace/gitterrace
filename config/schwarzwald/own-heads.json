@@ -5,7 +5,6 @@
   "own_heads": [
     "src/error.rs",
     "templates/_path.html",
-    "templates/_tabs.html",
     "templates/commit.html",
     "templates/compare.html",
     "templates/dochead.html",

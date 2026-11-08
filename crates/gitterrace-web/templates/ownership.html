@@ -6,10 +6,8 @@
 {% block head %}
 <link rel="stylesheet" href="/static/insights.css">{% endblock %}
 {% block content %}
-{% include "_tabs.html" %}
-{% include "_filterbar.html" %}
+{{ head }}
 {% include "_chips.html" %}
-{% include "_lead.html" %}
 {% if let Some(who) = solo %}<p class="hint" data-solo>Every directory has one owner, {{ who }}.</p>{% endif %}
 {% call kp::kpis(kpis) %}{% endcall %}
 <div class="chart-head"><div><h2>Owners by directory</h2><p class="hint">{% if solo.is_none() %}Share of the knowledge per person, from who changed the files and how much. Bus factor is how many people together hold at least half. {% endif %}Click a directory to filter every page to it. A renamed file keeps the owners of its earlier names.</p></div></div>

@@ -369,7 +369,7 @@ async fn refs(State(app): Shared, Query(q): Query<RefsQuery>) -> Result<Html<Str
 #[template(path = "pending.html")]
 struct PendingPage {
     c: Chrome,
-    tabs: views::Tabs,
+    page_head: crate::pagehead::PageHead,
     /// Set when a newer build owns the cache: this one leaves it alone instead of indexing.
     newer: Option<String>,
     head: crate::dochead::DocHead,
@@ -402,7 +402,11 @@ pub(crate) async fn with_records<T: Template + Send + 'static>(
         Ok((
             PendingPage {
                 c,
-                tabs: views::stats_tabs(tab),
+                page_head: crate::pagehead::insights_head(
+                    tab,
+                    crate::pagehead::Tagline::of("Waiting for the history index."),
+                    String::new(),
+                ),
                 newer: a.index.newer_format().map(|v| {
                     // The cache folder is a path on the host; a public visitor gets no path.
                     let dir = if a.public() {

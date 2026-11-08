@@ -7,8 +7,11 @@ use gitterrace_index::{Period, Selection};
 use gitterrace_types::StringEnum;
 use serde::Deserialize;
 
+use askama::Template;
+
 use crate::empty::Empty;
 use crate::fmt::{enc_seg, href};
+use crate::insights::OptLink;
 use crate::seg::{Choice, Seg};
 
 /// Value that selects commits without a scope (`none`).
@@ -55,7 +58,7 @@ pub(crate) struct Chip {
     pub(crate) href: String,
 }
 
-/// What `_filterbar.html` renders: removable chips and the page's one toolbar row, which holds
+/// The insights filters: removable chips and the page head's toolbar (`toolbar`), which holds
 /// the period, the page's own choice and its "On this page" menu.
 pub(crate) struct FilterBar {
     pub(crate) chips: Vec<Chip>,
@@ -201,6 +204,24 @@ impl Filter {
             clear: href(base),
             nothing,
         }
+    }
+}
+
+/// The toolbar markup, from `toolbar.html`.
+#[derive(Template)]
+#[template(path = "toolbar.html")]
+struct ToolbarMarkup<'a> {
+    fb: &'a FilterBar,
+    opts: &'a [OptLink],
+}
+
+impl FilterBar {
+    /// The page head's toolbar: the period, the page's own choice, the options line and
+    /// "On this page", as markup.
+    pub(crate) fn toolbar(&self, opts: &[OptLink]) -> String {
+        ToolbarMarkup { fb: self, opts }
+            .render()
+            .unwrap_or_default()
     }
 }
 

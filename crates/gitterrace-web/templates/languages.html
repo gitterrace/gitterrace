@@ -1,7 +1,7 @@
 {% extends "_base.html" %}
 {% block title %}Languages · {{ c.name }}{% endblock %}
 {% block content %}
-{% include "_tabs.html" %}
+{{ head }}
 {{ body }}
 {% endblock %}
 {% block scripts %}<script src="/static/loc.js" defer></script>{% endblock %}

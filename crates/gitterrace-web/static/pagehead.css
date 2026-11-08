@@ -1,6 +1,7 @@
 /* Page head (pagehead.rs), the one head every page opens with: eyebrow, title row, tagline,
    tab row or divider, toolbar. Pages fill the slots and never style them, so the title sits at
-   the same place on every page. The tab row's line, or the divider, closes the head.
+   the same place on every page. The tab row's line, or the divider, closes the head. On a
+   phone the tagline always takes two lines, so a longer finding never moves the controls.
    Loaded after app.css; colors, sizes and gaps come from tokens.css only. */
 .ph{margin:0 0 var(--space-4);min-width:0}
 .ph-eyebrow{
@@ -34,6 +35,6 @@
   .ph h1{font-size:var(--text-lg)}
   .ph-tag{
     display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;
-    overflow:hidden}
+    overflow:hidden;min-height:3em}
   .ph-acts>a{display:none}
 }

@@ -14,6 +14,7 @@ use crate::charts::{self, ticks};
 use crate::charttip;
 use crate::empty::Empty;
 use crate::fmt;
+use crate::insights::Kpi;
 use crate::languages::chain::Chain;
 use crate::languages::view::{
     Area, Band, Body, DateLabel, Now, NowRow, RangeCard, RangeCommit, RangeRow, SharePart, Shown,
@@ -472,25 +473,38 @@ pub(super) fn body(ch: &Chain, view: View, subj: &Subjects) -> Body {
     let last = ch.lines(ch.len() - 1);
     let total: i64 = last.iter().sum();
     let positive: i64 = last.iter().map(|v| (*v).max(0)).sum::<i64>().max(1);
-    let lead = last
+    let top = last
         .iter()
         .enumerate()
         .filter(|(i, _)| ch.langs()[*i] != "Other")
         .max_by_key(|(_, v)| **v)
         .map(|(i, v)| {
-            crate::lead::languages(
-                &ch.langs()[i],
-                &share_label((*v).max(0) as f64 / positive as f64),
-                total,
+            (
+                ch.langs()[i].clone(),
+                share_label((*v).max(0) as f64 / positive as f64),
             )
-        })
+        });
+    let lead = top
+        .as_ref()
+        .map(|(name, share)| crate::lead::languages(name, share, total))
         .unwrap_or_default();
+    let counted = last.iter().filter(|v| **v > 0).count();
+    let kpis = vec![
+        Kpi("Languages", fmt::thousands(counted)),
+        Kpi("Lines", fmt::thousands(total.max(0))),
+        Kpi(
+            "Largest",
+            top.as_ref().map_or_else(|| "-".to_owned(), |t| t.0.clone()),
+        ),
+        Kpi("Its share", top.map_or_else(|| "-".to_owned(), |t| t.1)),
+    ];
     let k = ch.langs().len();
     let (area, json) = area_chart(ch, view, subj, &lead);
     Body {
         empty: None,
         shown: Some(Shown {
             lead,
+            kpis,
             period,
             axis: seg(
                 "X axis",

@@ -9,11 +9,10 @@ use crate::{
     error::Result,
     filter::{Dim, FilterBar},
     fmt::{self},
-    insights::{
-        InsightsQuery, Kpi, OptLink, cached, counted, head_lines, insights, page_scope, period_of,
-    },
+    insights::{InsightsQuery, Kpi, cached, counted, head_lines, insights, page_scope, period_of},
+    pagehead::PageHead,
     routes::Shared,
-    views::{self, Chrome, Tabs},
+    views::Chrome,
 };
 
 const TOP_DIRS: usize = 40;
@@ -32,10 +31,8 @@ struct DirRow {
 #[template(path = "ownership.html")]
 struct OwnershipPage {
     c: Chrome,
-    tabs: Tabs,
+    head: PageHead,
     fb: FilterBar,
-    opts: Vec<OptLink>,
-    lead: String,
     kpis: Vec<Kpi>,
     rows: Vec<DirRow>,
     /// The one person who owns every directory, when that is so: the table then leaves out the
@@ -104,17 +101,20 @@ pub(crate) async fn page(
                 .map(|d| row(d, dir_label(&d.path))),
         );
         let solo = sole_owner(&rows);
+        let fb = f.bar("/stats/ownership", &**r, period_of(&q, &d, Period::All));
         OwnershipPage {
             solo,
             c,
-            tabs: views::stats_tabs("ow"),
-            fb: f.bar("/stats/ownership", &**r, period_of(&q, &d, Period::All)),
-            opts: q.row(&d, "/stats/ownership"),
-            lead: crate::lead::ownership(
-                rep.overall.bus_factor,
-                rep.overall.owners.iter().filter(|o| shown(o)).count(),
-                rep.dirs_with_bus_factor_one,
+            head: crate::pagehead::insights_head(
+                "ow",
+                crate::pagehead::lead_tagline(&crate::lead::ownership(
+                    rep.overall.bus_factor,
+                    rep.overall.owners.iter().filter(|o| shown(o)).count(),
+                    rep.dirs_with_bus_factor_one,
+                )),
+                fb.toolbar(&q.row(&d, "/stats/ownership")),
             ),
+            fb,
             kpis: vec![
                 Kpi("Bus factor", fmt::thousands(rep.overall.bus_factor)),
                 Kpi("Solo lines", fmt::thousands(rep.solo_lines)),

@@ -4,7 +4,7 @@
 use askama::Template;
 use axum::extract::{Query, RawQuery, State};
 use axum::response::Html;
-use gitterrace_index::{Period, PeriodStats, Scope, ScopeParams};
+use gitterrace_index::{BucketUnit, Period, PeriodStats, Rhythm, Scope, ScopeParams};
 use serde::Deserialize;
 
 use crate::{
@@ -12,9 +12,10 @@ use crate::{
     error::Result,
     filter::{Chip, FilterBar},
     fmt::{self},
-    insights::{InsightsQuery, OptLink, cached_keyed, insights, period_of},
+    insights::{InsightsQuery, Kpi, cached_keyed, insights, period_of},
+    pagehead::PageHead,
     routes::Shared,
-    views::{self, Chrome, Tabs},
+    views::Chrome,
 };
 
 fn delta(now: u64, before: Option<u64>) -> (String, &'static str) {
@@ -90,10 +91,9 @@ struct PulseRow {
 #[template(path = "stats.html")]
 struct ActivityPage {
     c: Chrome,
-    tabs: Tabs,
+    kpis: Vec<Kpi>,
+    head: PageHead,
     fb: FilterBar,
-    opts: Vec<OptLink>,
-    lead: String,
     rows: Vec<PulseRow>,
     span: String,
     empty: bool,
@@ -118,6 +118,49 @@ struct RangeCard {
     title: String,
     total: String,
     weekdays: crate::charts::view::Bars,
+}
+
+/// The big numbers of the period: commits, authors, how many of its days or weeks saw a commit,
+/// and the busiest one. From the series the page charts, so no further read.
+fn activity_kpis(now: &PeriodStats, rhythm: &Rhythm) -> Vec<Kpi> {
+    let active = rhythm.series.iter().filter(|p| p.commits > 0).count();
+    let busiest = rhythm
+        .series
+        .iter()
+        .filter(|p| p.commits > 0)
+        .max_by_key(|p| p.commits)
+        .map_or_else(|| "-".to_owned(), |p| p.label.clone());
+    vec![
+        Kpi("Commits", fmt::thousands(now.commits)),
+        Kpi("Authors", fmt::thousands(now.authors)),
+        Kpi(
+            active_label(rhythm.unit),
+            format!("{} of {}", fmt::thousands(active), rhythm.series.len()),
+        ),
+        Kpi(busiest_label(rhythm.unit), busiest),
+    ]
+}
+
+/// "Active days", "Active weeks" and so on, for the KPI caption.
+const fn active_label(unit: BucketUnit) -> &'static str {
+    match unit {
+        BucketUnit::Day => "Active days",
+        BucketUnit::Week => "Active weeks",
+        BucketUnit::Month => "Active months",
+        BucketUnit::Quarter => "Active quarters",
+        BucketUnit::Year => "Active years",
+    }
+}
+
+/// "Busiest day", "Busiest week" and so on.
+const fn busiest_label(unit: BucketUnit) -> &'static str {
+    match unit {
+        BucketUnit::Day => "Busiest day",
+        BucketUnit::Week => "Busiest week",
+        BucketUnit::Month => "Busiest month",
+        BucketUnit::Quarter => "Busiest quarter",
+        BucketUnit::Year => "Busiest year",
+    }
 }
 
 fn span_text(from: Option<i64>, to: i64, days: Option<i64>) -> String {
@@ -278,14 +321,18 @@ pub(crate) async fn page(
             ]),
             false,
         );
+        let kpis = activity_kpis(&s.current, &rhythm);
         ActivityPage {
+            kpis,
             types: types_html,
             frequency: frequency_html,
             c,
-            tabs: views::stats_tabs("a"),
+            head: crate::pagehead::insights_head(
+                "a",
+                crate::pagehead::lead_tagline(&lead),
+                fb.toolbar(&q.row(&d, "/stats")),
+            ),
             fb,
-            opts: q.row(&d, "/stats"),
-            lead,
             rows,
             span,
             empty: s.current.commits == 0,

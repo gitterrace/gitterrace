@@ -11,6 +11,10 @@ use askama::filters::HtmlSafe;
 
 use crate::views::Crumb;
 
+mod heads;
+
+pub(crate) use heads::{insights_head, lead_tagline};
+
 /// A link in the title row, right of the title: the page's main jump (History, Compare).
 #[derive(Debug, Clone)]
 pub(crate) struct Action {

@@ -21,8 +21,9 @@ use crate::{
     fmt,
     insights::{cached_keyed, counted, insights},
     languages::render::{body, sample},
+    pagehead::PageHead,
     routes::Shared,
-    views::{self, Chrome, Tabs},
+    views::Chrome,
 };
 
 const TOP: usize = 7;
@@ -165,7 +166,7 @@ impl View {
 #[template(path = "languages.html")]
 struct LanguagesPage {
     c: Chrome,
-    tabs: Tabs,
+    head: PageHead,
     body: view::Body,
 }
 
@@ -207,10 +208,18 @@ pub(crate) async fn page(State(app): Shared, Query(q): Query<LocQuery>) -> Resul
                 Subjects(HashMap::new())
             }
         };
+        let body = body(&ch, view, &subj);
+        let (lead, toolbar) = body.shown.as_ref().map_or_else(Default::default, |s| {
+            (s.lead.clone(), format!("{}{}{}", s.period, s.axis, s.scale))
+        });
         LanguagesPage {
             c,
-            tabs: views::stats_tabs("l"),
-            body: body(&ch, view, &subj),
+            head: crate::pagehead::insights_head(
+                "l",
+                crate::pagehead::lead_tagline(&lead),
+                toolbar,
+            ),
+            body,
         }
     })
     .await

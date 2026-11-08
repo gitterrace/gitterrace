@@ -5,13 +5,14 @@
 use askama::Template;
 
 use crate::fmt;
-use crate::views::{self, Chrome, Tabs};
+use crate::pagehead::PageHead;
+use crate::views::{self, Chrome};
 
 #[derive(Template)]
 #[template(path = "far.html")]
 struct FarPage {
     c: Chrome,
-    tabs: Tabs,
+    head: PageHead,
     why: String,
     /// The same tab without `?rev=`, so on the indexed branch.
     indexed: Option<String>,
@@ -36,7 +37,13 @@ pub(crate) fn render(c: Chrome, tab: &'static str, read: usize) -> askama::Resul
     });
     FarPage {
         c,
-        tabs: views::stats_tabs(tab),
+        head: crate::pagehead::insights_head(
+            tab,
+            crate::pagehead::Tagline::of(
+                "Not served for this revision: it is too far from the indexed branch.",
+            ),
+            String::new(),
+        ),
         why: why(read),
         indexed,
     }

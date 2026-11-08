@@ -19,8 +19,9 @@ use crate::{
     error::Result,
     filter::{Dim, Filter, FilterBar},
     fmt,
+    pagehead::PageHead,
     routes::{Shared, with_records},
-    views::{self, Chrome, Tabs},
+    views::{self, Chrome},
 };
 
 #[derive(Deserialize, Default)]
@@ -308,6 +309,7 @@ pub(crate) fn period_of(q: &InsightsQuery, d: &Defaults, default: Period) -> Per
     q.filter.period_value().or(d.period).unwrap_or(default)
 }
 
+#[derive(Debug)]
 pub(crate) struct Kpi(pub(crate) &'static str, pub(crate) String);
 
 impl Kpi {
@@ -341,10 +343,8 @@ struct PersonRow {
 struct ContributorsPage {
     unit: &'static str,
     c: Chrome,
-    tabs: Tabs,
+    head: PageHead,
     fb: FilterBar,
-    opts: Vec<OptLink>,
-    lead: String,
     kpis: Vec<Kpi>,
     people: Vec<PersonRow>,
     /// "Show all N contributors" when the list was cut at `PEOPLE_SHOWN`.
@@ -432,10 +432,12 @@ pub(crate) async fn contributors(
         ContributorsPage {
             unit: report.unit.noun(),
             c,
-            tabs: views::stats_tabs("co"),
+            head: crate::pagehead::insights_head(
+                "co",
+                crate::pagehead::lead_tagline(&crate::lead::contributors(total, new_total)),
+                fb.toolbar(&q.row(&d, "/stats/contributors")),
+            ),
             fb,
-            opts: q.row(&d, "/stats/contributors"),
-            lead: crate::lead::contributors(total, new_total),
             kpis: vec![
                 Kpi("Contributors", fmt::thousands(total)),
                 Kpi("New in period", fmt::thousands(new_total)),

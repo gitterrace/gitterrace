@@ -1,17 +1,7 @@
 //! The one sentence each insights page opens with: the finding, computed from the same numbers
 //! the page shows below it, never a canned line. A page with nothing counted gets no sentence.
 
-use askama::Template;
-
 use crate::fmt::{count, noun, thousands};
-
-/// The lead line as markup, for a page that is not one template. `lead_line.html` wraps the
-/// `_lead.html` partial the page templates include, so both write the same markup.
-#[derive(Template)]
-#[template(path = "lead_line.html")]
-pub(crate) struct Lead {
-    pub(crate) lead: String,
-}
 
 /// Activity: how much happened in the period and how it compares with the one before.
 pub(crate) fn activity(commits: u64, authors: u64, before: Option<u64>) -> String {

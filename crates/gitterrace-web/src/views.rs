@@ -362,17 +362,6 @@ pub(crate) struct Tabs {
     pub(crate) primary: Vec<Nav>,
 }
 
-impl Tabs {
-    /// The open tab's label: the page's heading, which only a screen reader shows, since the
-    /// marked tab already says it.
-    pub(crate) fn current(&self) -> &'static str {
-        self.primary
-            .iter()
-            .find(|t| t.on)
-            .map_or("Insights", |t| t.label)
-    }
-}
-
 pub(crate) fn stats_tabs(active: &str) -> Tabs {
     // `insights.pages` orders the tabs.
     let all: Vec<Nav> = crate::features::pages()

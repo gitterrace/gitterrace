@@ -3,11 +3,11 @@
 {% block head %}
 <link rel="stylesheet" href="/static/insights.css">{% endblock %}
 {%- import "_table.html" as t -%}
+{%- import "_kpis.html" as kp -%}
 {% block content %}
-{% include "_tabs.html" %}
-{% include "_filterbar.html" %}
+{{ head }}
 {% include "_chips.html" %}
-{% include "_lead.html" %}
+{% call kp::kpis(kpis) %}{% endcall %}
 {% if empty %}{{ fb.nothing }}{% else %}
 <p class="hint" id="activity-counts">{{ span }}.</p>
 <div class="card"><table class="entries">{% call t::caption("Activity counts") %}{% endcall %}

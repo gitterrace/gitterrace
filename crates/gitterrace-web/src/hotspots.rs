@@ -11,11 +11,10 @@ use crate::{
     error::Result,
     filter::FilterBar,
     fmt::{self},
-    insights::{
-        InsightsQuery, Kpi, OptLink, cached, counted, head_lines, insights, page_scope, period_of,
-    },
+    insights::{InsightsQuery, Kpi, cached, counted, head_lines, insights, page_scope, period_of},
+    pagehead::{self, PageHead},
     routes::Shared,
-    views::{self, Chrome, Tabs},
+    views::{self, Chrome},
 };
 
 const TOP_HOT: usize = 50;
@@ -39,11 +38,9 @@ struct HotRow {
 #[template(path = "hotspots.html")]
 struct HotspotsPage {
     c: Chrome,
-    tabs: Tabs,
+    head: PageHead,
     fb: FilterBar,
-    opts: Vec<OptLink>,
     empty: bool,
-    lead: String,
     kpis: Vec<Kpi>,
     scatter: crate::charts::view::Scatter,
     rows: Vec<HotRow>,
@@ -129,13 +126,13 @@ pub(crate) async fn page(
         );
         let mut fb = f.bar("/stats/hotspots", &**r, period);
         fb.jump = jump;
+        let lead = crate::lead::hotspots(rep.files.len(), rep.concentration);
+        let toolbar = fb.toolbar(&q.row(&d, "/stats/hotspots"));
         HotspotsPage {
             c,
-            tabs: views::stats_tabs("ho"),
+            head: pagehead::insights_head("ho", pagehead::lead_tagline(&lead), toolbar),
             fb,
-            opts: q.row(&d, "/stats/hotspots"),
             empty,
-            lead: crate::lead::hotspots(rep.files.len(), rep.concentration),
             kpis: vec![
                 Kpi("Files changed", fmt::thousands(rep.files.len())),
                 Kpi("Changes", fmt::thousands(rep.total_changes)),
