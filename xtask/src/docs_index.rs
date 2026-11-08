@@ -338,7 +338,7 @@ fn check_links(
 /// Folders whose paths a document may name in a code span. A span that starts with one and
 /// holds no placeholder must name a file or folder that exists, so a moved script or crate
 /// cannot leave a dead pointer behind.
-const PATH_ROOTS: [&str; 5] = ["crates/", "scripts/", "xtask/", "bench/", "docs/"];
+const PATH_ROOTS: [&str; 5] = ["crates/", "scripts/", "xtask/", "tests/", "docs/"];
 
 fn check_paths(root: &Path, path: &str, text: &str) -> Vec<String> {
     let mut bad = Vec::new();

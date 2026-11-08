@@ -5,7 +5,7 @@
 name = "gitterrace"
 
 [scope]
-prose = ["README.md", "AGENTS.md", "docs/**.md", "bench/**.md"]
+prose = ["README.md", "AGENTS.md", "docs/**.md", "tests/bench/**.md"]
 code = ["*.rs", "*.py", "*.mjs", "*.js", "*.sh", "*.yml", "*.yaml", "*.toml"]
 make = ["Makefile"]
 design = ["crates/gitterrace-index/src/seg/store.md"]

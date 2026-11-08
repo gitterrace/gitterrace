@@ -344,12 +344,12 @@ def published() -> list[Json]:
     """The kept runs, oldest first, normalized."""
     files = runs()
     if not files:
-        sys.exit("no results in bench/results, run `make bench` first")
+        sys.exit("no results in tests/bench/results, run `make bench` first")
     return [normalize(load(f)) for f in files[-KEEP:]]
 
 
 def expected() -> dict[Path, str]:
-    """Every file under bench/results the kept runs should produce, with its content."""
+    """Every file under tests/bench/results the kept runs should produce, with its content."""
     out: dict[Path, str] = {}
     raw = published()
     kept = [shown(r) for r in raw]
@@ -384,7 +384,7 @@ def folder_readme(run: Json) -> str:
         "",
         *[x + "\n" for x in withheld_lines(run)],
         f"Numbers: [`../{run_name(run)}.json`](../{run_name(run)}.json). "
-        "Method: [docs/benchmarks.md](../../../docs/benchmarks.md).",
+        "Method: [docs/benchmarks.md](../../../../docs/benchmarks.md).",
         "",
     ]
     for key in METRICS:
@@ -394,7 +394,7 @@ def folder_readme(run: Json) -> str:
 
 
 def results_readme(kept: list[Json]) -> str:
-    """The landing page of bench/results: every kept run, the newest headline, its charts."""
+    """The landing page of tests/bench/results: every kept run, the newest headline, its charts."""
     cur = kept[-1]
     old = kept[-2] if len(kept) > 1 else None
     L = [
@@ -403,7 +403,7 @@ def results_readme(kept: list[Json]) -> str:
         "Each benchmark run (`make bench`, with `LARGE=1` to add the largest repository) writes one "
         "`<date>-<machine>.json` here plus a folder with its charts, and `scripts/bench-report.py` "
         "regenerates this page. The method, corpus and budgets are in "
-        "[docs/benchmarks.md](../../docs/benchmarks.md).",
+        "[docs/benchmarks.md](../../../docs/benchmarks.md).",
         "",
         "| Date | Machine | gitterrace | Repos | Files |",
         "| --- | --- | --- | --- | --- |",
@@ -456,12 +456,12 @@ def results_readme(kept: list[Json]) -> str:
 
 def render() -> str:
     """The short results block of docs/benchmarks.md: the newest run's header and where it is.
-    The run in full lives once, in bench/results/README.md."""
+    The run in full lives once, in tests/bench/results/README.md."""
     cur = shown(published()[-1])
     L = [header(cur), "", *withheld_lines(cur)]
     L += [
         "",
-        "Every number, chart and page: [bench/results](../bench/results/README.md).",
+        "Every number, chart and page: [tests/bench/results](../tests/bench/results/README.md).",
     ]
     return wrap("\n".join(L).strip("\n") + "\n")
 

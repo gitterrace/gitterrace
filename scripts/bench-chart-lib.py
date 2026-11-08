@@ -17,8 +17,8 @@ Json = dict[str, Any]
 ROOT = Path(__file__).resolve().parent.parent
 DOC = ROOT / "docs/benchmarks.md"
 DOCS = ROOT / "docs"
-CORPUS = ROOT / "bench/corpus.toml"
-RESULTS = ROOT / "bench/results"
+CORPUS = ROOT / "tests/bench/corpus.toml"
+RESULTS = ROOT / "tests/bench/results"
 BEGIN, END = "<!-- BEGIN GENERATED: results -->", "<!-- END GENERATED: results -->"
 # Result files are <date>-<machine label>.json. The label comes from the CPU, never the host.
 NAME = re.compile(r"\d{4}-\d{2}-\d{2}-[a-z0-9-]+\.json")
@@ -91,10 +91,12 @@ def corpus() -> list[tuple[str, str, str]]:
     repos = corpus_repos()
     for r in repos:
         if not r.get("url") or not r.get("why"):
-            sys.exit(f"bench/corpus.toml: repo {r.get('name')} needs a url and a why")
+            sys.exit(
+                f"tests/bench/corpus.toml: repo {r.get('name')} needs a url and a why"
+            )
         if r.get("local") and r.get("sha"):
             sys.exit(
-                f"bench/corpus.toml: {r['name']} is local, measured at HEAD: drop its sha"
+                f"tests/bench/corpus.toml: {r['name']} is local, measured at HEAD: drop its sha"
             )
     return [(r["name"], re.sub(r"\.git$", "", r["url"]), r["why"]) for r in repos]
 
@@ -262,7 +264,7 @@ def charts(run: Json, prev: Json | None = None) -> dict[str, str]:
 
 def picture(run: Json, key: str, d: str | None = None) -> list[str]:
     """A light and dark chart. d is the chart folder relative to the page that shows it."""
-    d = f"../bench/results/{run_name(run)}" if d is None else d
+    d = f"../tests/bench/results/{run_name(run)}" if d is None else d
     title = METRICS[key][0]
     return [
         "<picture>",

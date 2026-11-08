@@ -15,7 +15,7 @@ fn repo() -> tempfile::TempDir {
     for f in [
         "crates/app/build.rs",
         "crates/other/lib.rs",
-        "bench/results/run.json",
+        "tests/bench/results/run.json",
     ] {
         let p = root.join(f);
         fs::create_dir_all(p.parent().expect("parent")).expect("mkdir");
@@ -37,8 +37,8 @@ fn a_change_in_another_crate_marks_the_build_dirty() {
 #[test]
 fn a_change_only_in_bench_results_stays_clean() {
     let tmp = repo();
-    fs::write(tmp.path().join("bench/results/run.json"), "b").expect("write");
-    fs::write(tmp.path().join("bench/results/new.json"), "c").expect("write");
+    fs::write(tmp.path().join("tests/bench/results/run.json"), "b").expect("write");
+    fs::write(tmp.path().join("tests/bench/results/new.json"), "c").expect("write");
     assert!(!stamp::is_dirty(&tmp.path().join("crates/app")));
 }
 

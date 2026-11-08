@@ -1,5 +1,5 @@
 //! Stamps `GITTERRACE_VERSION`: `v0.1.0` on a release tag, else `v0.1.0-<sha>` with
-//! `-dirty` for uncommitted changes outside bench/results.
+//! `-dirty` for uncommitted changes outside tests/bench/results.
 //! Outside a git checkout it is just `v0.1.0`.
 
 use std::{

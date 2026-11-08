@@ -2,8 +2,8 @@
 
 gitterrace should feel instant on large repositories. This page says what is
 measured, how, and what the latest run found. The harness is
-`scripts/bench-run.py`, the corpus is `bench/corpus.toml`, and results land in
-`bench/results/<date>-<machine>.json`, where the machine label comes from the
+`scripts/bench-run.py`, the corpus is `tests/bench/corpus.toml`, and results land in
+`tests/bench/results/<date>-<machine>.json`, where the machine label comes from the
 CPU (for example `apple-m1-max`), never the hostname. Older files stay as
 history: the page compares each warm time with the previous run.
 
@@ -39,7 +39,7 @@ after it.
 ## Why these repositories
 
 Each is pinned to a sha in the corpus file, so a re-run measures the same
-history. The list comes from `bench/corpus.toml`, each name links to its public
+history. The list comes from `tests/bench/corpus.toml`, each name links to its public
 source.
 
 <!-- BEGIN GENERATED: corpus -->
@@ -149,7 +149,7 @@ commits, and a spinning disk.
 ```sh
 make bench          # control, git, rust. Needs the network and about 20 GB of disk
 make bench LARGE=1  # adds linux
-make bench-report   # rewrite the block below from the newest bench/results file
+make bench-report   # rewrite the block below from the newest tests/bench/results file
 make gc BENCH=1     # print the path and size, then remove the clones (DRY=1 only prints)
 ```
 
@@ -159,7 +159,7 @@ tiny generated repository to prove it still works.
 ## Results
 
 The newest run, in short. Each kept run is written out once, with its numbers,
-charts and every page, in bench/results.
+charts and every page, in tests/bench/results.
 
 <!-- BEGIN GENERATED: results -->
 Run 2026-11-03 on Apple M1 Max, 10 cores, 64 GB RAM, 4.0 TB SSD disk, macOS
@@ -172,6 +172,7 @@ failed at the page cap and are shown as failed.
 - **rust:** not measured on a quiet machine (other processes used 5 or more
   cores during export, export#3, index), so its numbers are withheld.
 
-Every number, chart and page: [bench/results](../bench/results/README.md).
+Every number, chart and page:
+[tests/bench/results](../tests/bench/results/README.md).
 
 <!-- END GENERATED: results -->

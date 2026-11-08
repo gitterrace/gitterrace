@@ -5,7 +5,7 @@ use std::{path::Path, process::Command};
 /// Pathspec for the dirty check. `:(top)` makes it cover the whole worktree, because
 /// cargo runs build scripts in the crate directory. Result files are output of the
 /// bench, not input to the build, so they never make it dirty.
-pub const DIRTY_SPEC: [&str; 2] = [":(top)", ":(top,exclude)bench/results"];
+pub const DIRTY_SPEC: [&str; 2] = [":(top)", ":(top,exclude)tests/bench/results"];
 
 /// True when `git status` run in `dir` reports a change that counts for the stamp.
 pub fn is_dirty(dir: &Path) -> bool {

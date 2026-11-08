@@ -1,15 +1,16 @@
 #!/usr/bin/env python3
 """Benchmark harness for gitterrace on large public repos (stdlib, git, the release binary).
 
-Run by `make bench`. Reads bench/corpus.toml, clones each repo into $GITTERRACE_BENCH_DIR
+Run by `make bench`. Reads tests/bench/corpus.toml, clones each repo into $GITTERRACE_BENCH_DIR
 (default ~/.cache/gitterrace-bench), starts `git-terrace` on a free port per repo, measures it,
-and writes bench/results/<date>-<machine label>.json (no hostname). Methodology: docs/benchmarks.md.
+and writes tests/bench/results/<date>-<machine label>.json (no hostname).
+Methodology: docs/benchmarks.md.
 
   scripts/bench-run.py [--repos a,b] [--large] [--runs N] [--bin PATH] [--idle-secs S]
   scripts/bench-run.py --synthetic      # tiny generated repo, one run: the cheap guard
   scripts/bench-run.py --fetch-only     # clone and backfill, time nothing
 
-A full run lands in bench/results and `make bench` then runs bench-report. A smoke run (fewer
+A full run lands in tests/bench/results and `make bench` then runs bench-report. A smoke run (fewer
 --runs or a shorter --idle-secs) goes to $GITTERRACE_BENCH_DIR/runs, never into the repo.
 
 Every timed phase waits for a quiet machine first: the 1-minute load average must stay under
@@ -462,7 +463,7 @@ def main():
     a.bin = str(Path(a.bin).resolve())
     if not Path(a.bin).exists():
         sys.exit(f"no binary at {a.bin}, run `make build` (release) first")
-    corpus = parse_toml((ROOT / "bench/corpus.toml").read_text())
+    corpus = parse_toml((ROOT / "tests/bench/corpus.toml").read_text())
     base = Path(
         os.environ.get("GITTERRACE_BENCH_DIR", Path.home() / ".cache/gitterrace-bench")
     )
@@ -522,7 +523,11 @@ def main():
         ]
         result["repos"][repo["name"]] = res
     out_dir = (
-        logdir if a.synthetic else ROOT / "bench/results" if full else base / "runs"
+        logdir
+        if a.synthetic
+        else ROOT / "tests/bench/results"
+        if full
+        else base / "runs"
     )
     out_dir.mkdir(parents=True, exist_ok=True)
     path = out_dir / f"{datetime.date.today()}-{result['machine']['label']}.json"

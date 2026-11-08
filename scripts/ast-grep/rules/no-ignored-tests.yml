@@ -3,7 +3,7 @@ language: rust
 severity: error
 message: 'An `#[ignore]` test: nothing in the gate runs it, so it rots unseen.'
 note: >-
-  Make it a real test, or move a hand-run measurement to bench/. The one exception is a known
+  Make it a real test, or move a hand-run measurement to tests/bench/. The one exception is a known
   red test, `#[ignore = "red until ..."]`, which names the defect it waits for and has a row.
 files: [crates/**/*.rs, xtask/**/*.rs]
 rule:

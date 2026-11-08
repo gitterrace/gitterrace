@@ -6,4 +6,4 @@ shared/
 .github/pull_request_template.md
 target/
 node_modules/
-bench/results/README.md
+tests/bench/results/README.md

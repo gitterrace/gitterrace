@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-"""Publish bench/results: normalize the run files, render their charts, write docs/benchmarks.md.
+"""Publish tests/bench/results: normalize the run files, render their charts, write the doc.
 
-One run is bench/results/<date>-<machine>.json plus its charts in bench/results/<date>-<machine>/
+One run is tests/bench/results/<date>-<machine>.json plus its charts in
+tests/bench/results/<date>-<machine>/
 (<metric>.svg and <metric>-dark.svg). The newest two runs are kept: the newest in full, the one
 before it as the baseline of the comparison table. The machine label comes from the CPU, never
 the hostname. Stdlib only, no PNG, no JS, no fonts. The charts are files, not inline SVG, since a
@@ -108,7 +109,7 @@ def page_problems(
         for d in sorted(set(re.findall(r"\b20\d\d-\d\d-\d\d\b", text)) - dates)
     ]
     errs += [
-        f"names {f}, which is not in bench/results"
+        f"names {f}, which is not in tests/bench/results"
         for f in sorted(set(re.findall(r"[\w-]+\.json", text)) - files)
     ]
     errs += [
@@ -383,7 +384,7 @@ def check(text: str, new: str) -> None:
         errs.append("docs/benchmarks.md#results is stale")
     if errs:
         sys.exit("\n".join(errs) + "\nrun `make bench-report`")
-    print("bench/results and docs/benchmarks.md: up to date")
+    print("tests/bench/results and docs/benchmarks.md: up to date")
 
 
 def write() -> None:
@@ -405,7 +406,7 @@ def write() -> None:
         p.write_text(body)
     DOC.write_text(spliced(DOC.read_text(), render()))
     print(
-        f"updated {DOC.relative_to(ROOT)} and bench/results from {len(published())} run(s)"
+        f"updated {DOC.relative_to(ROOT)} and tests/bench/results from {len(published())} run(s)"
     )
 
 
