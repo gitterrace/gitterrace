@@ -108,9 +108,9 @@ button:hover{border-color:var(--line-strong);background:var(--hover)}button.prim
 .sha:hover{text-decoration:none;color:var(--accent-fg);border-color:var(--line-strong)}
 
 /* breadcrumbs */
-.crumbs{font-family:var(--serif);font-size:22px;font-weight:var(--weight-semibold);letter-spacing:-.015em;display:flex;flex-wrap:wrap;gap:var(--space-1) 6px;align-items:center;min-width:0}
+.crumbs{font-family:var(--serif);font-size:22px;font-weight:var(--weight-semibold);letter-spacing:-.015em;display:block;min-width:0}
 .crumbs a{color:var(--accent-fg)}.crumbs a:last-child{color:var(--fg)}
-.crumbs i{color:var(--faint);font-style:normal;font-weight:var(--weight-regular)}
+.crumbs i{color:var(--faint);font-style:normal;font-weight:var(--weight-regular);margin:0 3px}
 
 /* file table and other row tables */
 /* Text for screen readers only: table captions, header cells of a table with no header row,

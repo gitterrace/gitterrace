@@ -11,7 +11,6 @@
 .ph h1{
   font:var(--weight-semibold) var(--text-xl)/var(--leading-tight) var(--serif);
   letter-spacing:-.015em;margin:0;min-width:0;overflow-wrap:anywhere}
-.ph h1.crumbs{display:flex}
 .ph h1 .ref{
   font:var(--weight-regular) var(--text-sm)/1 var(--mono);
   color:var(--muted);letter-spacing:0;margin-left:var(--space-1)}

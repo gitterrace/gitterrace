@@ -77,6 +77,30 @@ export function checks({ srv, r, browsers, context }) {
       return form && head && head.contains(form) ? [] : ['the form is not in the head toolbar'];
     }), [390]);
   }
+  async function crumbHeads() {
+    // The path flows as one line of text: no crumb starts a new line while the "/" before it ends
+    // the previous one, unless that crumb alone is wider than the heading.
+    const check = (p) => p.evaluate(() => {
+      const bad = [];
+      const h = document.querySelector('main>.ph h1.crumbs');
+      if (!h) return ['no path in the page head'];
+      const hw = h.getBoundingClientRect().width;
+      for (const a of h.querySelectorAll('a')) {
+        const sep = a.previousElementSibling;
+        if (!sep || sep.tagName !== 'I') continue;
+        const ar = a.getClientRects()[0], sr = sep.getClientRects()[0];
+        if (ar && sr && ar.top >= sr.bottom - 1 && a.getBoundingClientRect().width <= hw) {
+          bad.push(`"${a.textContent}" drops below its slash`);
+        }
+      }
+      return bad;
+    });
+    // The deepest fixture path, so the last name has to share a line with the actions.
+    const deep = 'src/a_rather_long_directory_name';
+    await each('crumbs folder', `/tree/HEAD/${deep}`, check, [1440, 390]);
+    const file = `${deep}/a_file_with_a_really_long_name_for_wrapping.rs`;
+    await each('crumbs file', `/blob/HEAD/${file}`, check, [1440, 390]);
+  }
   async function commitHeads() {
     await each('commit', '/commit/HEAD', (p) => p.evaluate(() => {
       const bad = [];
@@ -106,5 +130,5 @@ export function checks({ srv, r, browsers, context }) {
       return bad;
     }));
   }
-  return { pageHeads, compareHeads, commitHeads, searchHeads };
+  return { pageHeads, crumbHeads, compareHeads, commitHeads, searchHeads };
 }
