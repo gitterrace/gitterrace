@@ -73,6 +73,7 @@ pre,code{font-family:var(--mono);font-size:var(--text-sm)}
 pre{background:var(--soft);border:var(--border);border-radius:var(--radius);\
 padding:var(--space-3) var(--space-4);overflow-x:auto}
 :not(pre)>code{background:var(--soft);padding:1px var(--space-1);border-radius:var(--radius)}
+:not(pre)>code{overflow-wrap:anywhere}
 .cmds{display:grid;grid-template-columns:max-content 1fr;gap:var(--space-1) var(--space-4);\
 margin:0}.cmds dt code{background:none;padding:0;white-space:nowrap}.cmds dd{margin:0;\
 color:var(--muted)}
