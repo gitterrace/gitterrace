@@ -89,7 +89,7 @@ impl Links<'_> {
     }
 }
 
-fn stem(path: &str) -> &str {
+pub(super) fn stem(path: &str) -> &str {
     let name = path.rsplit('/').next().unwrap_or(path);
     name.strip_suffix(".md").unwrap_or(name)
 }

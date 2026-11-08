@@ -378,3 +378,90 @@ fn the_rail_is_on_every_docs_page_with_three_h2_and_only_there() {
     assert!(bad.is_empty(), "{}", bad.join("\n"));
     assert!(pages.iter().any(|p| p.1.contains("class=\"outline rail\"")));
 }
+
+fn rust_files(dir: &std::path::Path, out: &mut Vec<std::path::PathBuf>) {
+    for e in std::fs::read_dir(dir).expect("read dir") {
+        let p = e.expect("entry").path();
+        if p.is_dir() {
+            rust_files(&p, out);
+        } else if p.extension().is_some_and(|x| x == "rs") {
+            out.push(p);
+        }
+    }
+}
+
+/// Every markdown parse in xtask takes the app's options, so a new render path cannot drift:
+/// no bare parser, no empty or ad hoc option set.
+#[test]
+fn every_markdown_parse_uses_the_shared_options() {
+    let mut files = Vec::new();
+    rust_files(
+        &std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src"),
+        &mut files,
+    );
+    let ext = ["Parser", "::new_ext("].concat();
+    let bare = ["Parser", "::new("].concat();
+    let ad_hoc = ["pulldown_cmark", "::Options"].concat();
+    let ad_hoc_use = ["Options", "::"].concat();
+    let shared = ["gitterrace_web", "::markdown_options()"].concat();
+    let mut bad = Vec::new();
+    for f in files {
+        if f.file_name().is_some_and(|n| n == "tests.rs") {
+            continue;
+        }
+        let text = std::fs::read_to_string(&f).expect("read");
+        for (n, line) in text.lines().enumerate() {
+            let t = line.trim_start();
+            if t.starts_with("//") {
+                continue;
+            }
+            let wrong = (line.contains(&ext) && !line.contains(&shared))
+                || line.contains(&bare)
+                || line.contains(&ad_hoc)
+                || (line.contains(&ad_hoc_use)
+                    && !line.contains("textwrap")
+                    && !line.contains(&shared));
+            if wrong {
+                bad.push(format!("{}:{}: {t}", f.display(), n + 1));
+            }
+        }
+    }
+    assert!(
+        bad.is_empty(),
+        "markdown parsed without the shared options:\n{}",
+        bad.join("\n")
+    );
+}
+
+/// A docs page whose source has a table renders a table, never the raw delimiter row.
+#[test]
+fn docs_pages_with_a_table_render_a_table() {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+    let delimiter = ["| ", "--- |"].concat();
+    let mut seen = 0;
+    for (path, ..) in crate::docs_index::on_site() {
+        let src = std::fs::read_to_string(root.join(path)).expect("source");
+        let has_table = src.lines().any(|l| {
+            let t = l.trim();
+            t.starts_with('|') && t.contains("---") && t.chars().all(|c| "|-: ".contains(c))
+        });
+        if !has_table {
+            continue;
+        }
+        seen += 1;
+        let page = root
+            .join("site")
+            .join(docs::page_path(docs::stem(path)))
+            .join("index.html");
+        let html = std::fs::read_to_string(&page).expect("built page");
+        assert!(html.contains("<table"), "{path}: no table on the site");
+        assert!(
+            !html.contains(&delimiter),
+            "{path}: raw table row on the site"
+        );
+    }
+    assert!(
+        seen > 0,
+        "no docs page has a table, the guard checks nothing"
+    );
+}
