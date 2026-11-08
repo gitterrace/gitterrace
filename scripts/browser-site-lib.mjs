@@ -102,7 +102,7 @@ async function siteTheme() {
   // What the page shows: data-theme, the visible logo, the visible screenshot images, each by file.
   const state = (p) => p.evaluate(() => {
     const shown = (sel) => [...document.querySelectorAll(sel)].filter((i) => i.offsetParent && getComputedStyle(i).display !== 'none').map((i) => i.getAttribute('src'));
-    return { theme: document.documentElement.dataset.theme || 'system', logo: shown('header img'), shots: shown('.shots a:not(.lightbox) img'), label: document.getElementById('theme')?.getAttribute('aria-label') };
+    return { theme: document.documentElement.dataset.theme || 'system', logo: shown('.hero img'), shots: shown('.shots a:not(.lightbox) img'), label: document.getElementById('theme')?.getAttribute('aria-label') };
   });
   try {
     for (const browser of browsers) {

@@ -1,0 +1,14 @@
+{#- The slim dark bar on top of every site page: brand, Docs, the demo when there is
+one, the source and the theme button. -#}
+<header class="top"><nav class="bar" aria-label="Site">
+<a class="brand" href="/"><img src="/assets/mark-dark.svg" alt="" width="24"
+height="24"><span>{{ name }}</span></a>
+<a href="/docs/">Docs</a>
+{%- if !demo.is_empty() %}
+<a href="{{ demo }}">Demo</a>
+{%- endif %}
+<a class="gh" href="{{ repo }}" aria-label="{{ name }} on GitHub"
+title="GitHub"><svg viewBox="0 0 16 16" width="24" height="24" aria-hidden="true"><path
+d="{{ gh_mark }}"/></svg></a>
+{{ theme_button|safe }}
+</nav></header>

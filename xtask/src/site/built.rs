@@ -317,8 +317,12 @@ fn footer_of(html: &str) -> Option<&str> {
 }
 
 /// Pages whose footer does not open with the shared links as `footer` builds them, or that lack
-/// the shared nav (every page but the 404, which is a dead end with a way back).
+/// the shared bar, 404 included.
 fn chrome_problems(pages: &[(String, String)]) -> Vec<String> {
+    let root = crate::repo_root();
+    let ws = crate::facts::load(&root).expect("facts");
+    let pkg = &ws.packages["gitterrace"];
+    let shared = bar::bar(&pkg.name, &pkg.repository, &ws.demo);
     let mut bad = Vec::new();
     for (path, html) in pages {
         let Some(foot) = footer_of(html) else {
@@ -334,14 +338,14 @@ fn chrome_problems(pages: &[(String, String)]) -> Vec<String> {
         if !(foot.starts_with(head) && foot.ends_with(tail)) {
             bad.push(format!("{path}: the footer is not the shared one"));
         }
-        if path != "404.html" && !html.contains(nav()) {
-            bad.push(format!("{path}: the shared nav is missing or changed"));
+        if !html.contains(&shared) {
+            bad.push(format!("{path}: the shared bar is missing or changed"));
         }
     }
     bad
 }
 
-/// The class this guards: one page whose footer or nav drifted from the single builder.
+/// The class this guards: one page whose footer or bar drifted from the single builder.
 #[test]
 fn every_built_page_has_the_shared_footer_and_nav() {
     let (pages, _) = generated();
@@ -354,13 +358,15 @@ fn every_built_page_has_the_shared_footer_and_nav() {
 fn a_page_with_an_altered_footer_or_nav_is_reported() {
     let (mut pages, _) = generated();
     assert!(chrome_problems(&pages).is_empty());
-    pages[1].1 = pages[1]
-        .1
-        .replacen("\n<a href=\"/docs/\">Docs</a>\n", "\n", 1);
+    pages[1].1 = pages[1].1.replacen(
+        "Docs</a>\n<a href=\"/changelog/\">",
+        "</a>\n<a href=\"/changelog/\">",
+        1,
+    );
     pages[2].1 = pages[2].1.replacen("<nav ", "<nav class=\"x\" ", 1);
     let bad = chrome_problems(&pages).join("\n");
     assert!(bad.contains("not the shared one"), "{bad}");
-    assert!(bad.contains("shared nav is missing"), "{bad}");
+    assert!(bad.contains("shared bar is missing"), "{bad}");
 }
 
 /// Built mode: pages whose footer does not link both legal pages at their site paths.

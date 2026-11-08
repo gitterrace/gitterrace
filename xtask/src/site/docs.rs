@@ -14,7 +14,7 @@ use pulldown_cmark::{CowStr, Event, HeadingLevel, Options, Parser, Tag, TagEnd, 
 use crate::docs_index::{LEGAL, normalize, on_site};
 use crate::out::Out;
 use crate::site::changelog;
-use crate::site::{BODY_OPEN, THEME_INIT_JS, esc, footer, nav};
+use crate::site::{THEME_INIT_JS, THEME_TOGGLE_JS, body_open, esc, footer};
 
 pub(super) const CHANGELOG: &str = "CHANGELOG.md";
 
@@ -23,6 +23,7 @@ pub(super) struct Site<'a> {
     pub home: &'a str,
     pub repo: &'a str,
     pub name: &'a str,
+    pub demo: &'a str,
 }
 
 /// Where each published document is, so a relative link can be rewritten.
@@ -267,7 +268,7 @@ fn break_line(line: &str, width: usize) -> String {
     out
 }
 
-/// A whole page: the head, a way back, `inner` and a footer with `foot` (HTML, may be empty).
+/// A whole page: the head, the bar, `inner` and a footer with `foot` (HTML, may be empty).
 pub(super) fn shell(site: &Site, title: &str, path: &str, inner: &str, foot: &str) -> String {
     let footer = footer(site.repo, foot);
     format!(
@@ -277,13 +278,13 @@ pub(super) fn shell(site: &Site, title: &str, path: &str, inner: &str, foot: &st
          <title>{t} - {s}</title>\n<link rel=\"canonical\" href=\"{home}/{path}\">\n\
          <link rel=\"icon\" type=\"image/svg+xml\" href=\"/assets/mark.svg\">\n\
          <link rel=\"stylesheet\" href=\"/assets/site.css\">\n\
-         <script>{THEME_INIT_JS}</script>\n</head>\n{BODY_OPEN}\
-         {nav}{inner}{footer}\
-         </main>\n</body>\n</html>\n",
+         <script>{THEME_INIT_JS}</script>\n</head>\n{open}\
+         {inner}{footer}\
+         </main>\n<script>{THEME_TOGGLE_JS}</script>\n</body>\n</html>\n",
         t = esc(title),
         s = esc(site.name),
         home = esc(site.home),
-        nav = nav(),
+        open = body_open(site.name, site.repo, site.demo),
     )
 }
 
@@ -330,8 +331,19 @@ fn index(docs: &[(String, String)]) -> String {
 
 /// One page per published document, the docs index and the changelog. Returns the files and
 /// every page path, for the sitemap and the link check.
-pub fn pages(root: &Path, home: &str, repo: &str, name: &str) -> Result<(Vec<Out>, Vec<String>)> {
-    let site = Site { home, repo, name };
+pub fn pages(
+    root: &Path,
+    home: &str,
+    repo: &str,
+    name: &str,
+    demo: &str,
+) -> Result<(Vec<Out>, Vec<String>)> {
+    let site = Site {
+        home,
+        repo,
+        name,
+        demo,
+    };
     let links = Links::new(repo);
     let read = |rel: &str| {
         std::fs::read_to_string(root.join(rel)).with_context(|| format!("reading {rel}"))

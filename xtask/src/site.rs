@@ -10,6 +10,7 @@ use crate::out::Out;
 use crate::readme_agents_md;
 use anyhow::{Context as _, Result};
 
+mod bar;
 mod changelog;
 mod docs;
 mod landing;
@@ -60,14 +61,22 @@ main:focus{outline:none}
 h1,h2{font-family:var(--serif);line-height:var(--leading-tight);font-weight:var(--weight-semibold)}
 h2{font-size:var(--text-xl);margin:var(--space-16) 0 var(--space-3)}
 h3{font-size:var(--text-lg);margin:var(--space-8) 0 var(--space-2)}
-header{padding:var(--space-8) 0 var(--space-4);position:relative}
-.gh{right:0;color:var(--muted)}
+.top{color-scheme:dark;background:var(--header);border-bottom:var(--border)}
+.bar{max-width:1200px;margin:0 auto;height:56px;padding:0 var(--space-6);display:flex;
+align-items:center;gap:var(--space-6)}
+.top a{color:var(--muted);font-size:14.5px;font-weight:500;text-decoration:none}
+.top a:hover{color:var(--fg)}
+.top .brand{display:flex;align-items:center;gap:var(--space-2);margin-right:auto;color:var(--fg);
+font-size:18px;font-weight:var(--weight-semibold);letter-spacing:-.01em}
+.top .brand img{width:24px;height:24px}
+@media (max-width:640px){.bar{gap:var(--space-4);padding:0 var(--page-pad)}}
+.gh{color:var(--muted)}
 .gh:hover,.gh:focus-visible{color:var(--fg)}
 .gh svg{fill:currentColor}
-header h1{margin:0}
-nav a{margin-right:var(--space-3)}
-header img{max-width:calc(100% - 72px);height:auto}
-header img.on-light{display:block}
+.hero{padding:var(--space-4) 0}
+.hero h1{margin:0}
+.hero img{max-width:100%;height:auto}
+.hero img.on-light{display:block}
 .tag{font-family:var(--serif);font-size:var(--text-lg);color:var(--muted);margin:var(--space-4) 0 0}
 pre,code{font-family:var(--mono);font-size:var(--text-sm)}
 pre{background:var(--soft);border:var(--border);border-radius:var(--radius);\
@@ -96,8 +105,8 @@ transparent);cursor:zoom-out}
 figcaption{font-size:var(--text-xs);color:var(--muted);margin-top:var(--space-2);line-height:1.4}\
 figcaption b{color:var(--fg);font-weight:var(--weight-semibold)}
 footer{display:flex;flex-wrap:wrap;gap:var(--space-4);font-size:var(--text-sm)}
-.gh,.theme{position:absolute;top:var(--space-8);line-height:0}
-.theme{right:40px;width:24px;height:24px;padding:0;display:grid;place-items:center;\
+.gh,.theme{line-height:0}
+.theme{width:24px;height:24px;padding:0;display:grid;place-items:center;\
 background:none;border:0;color:var(--muted);cursor:pointer}
 .theme:hover,.theme:focus-visible{color:var(--fg)}
 .theme svg{width:24px;height:24px;overflow:visible;fill:none;stroke:currentColor;stroke-width:2;\
@@ -126,15 +135,6 @@ footer{margin-top:var(--space-16);padding-top:var(--space-4);border-top:var(--bo
 color:var(--faint)}
 ";
 
-/// The source host's mark (16x16 path), the link to the source in the top right corner.
-const GH_MARK: &str = "M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 \
-0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01\
--.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64\
--3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 \
-1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 \
-3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 \
-8c0-4.42-3.58-8-8-8z";
-
 /// The home page `<head>`: title, description, link previews and icons.
 fn head(name: &str, desc: &str, home: &str) -> String {
     format!(
@@ -155,7 +155,7 @@ fn head(name: &str, desc: &str, home: &str) -> String {
          <link rel=\"icon\" type=\"image/svg+xml\" href=\"assets/mark.svg\">\n\
          <link rel=\"apple-touch-icon\" href=\"assets/apple-touch-icon.png\">\n\
          <link rel=\"stylesheet\" href=\"assets/site.css\">\n<script>{THEME_INIT_JS}</script>\
-         \n</head>\n{BODY_OPEN}",
+         \n</head>\n",
         name = esc(name),
         desc = esc(desc),
         home = esc(home),
@@ -198,19 +198,15 @@ pub fn render(root: &Path, ws: &Workspace) -> Result<Vec<Out>> {
     let repo = &pkg.repository;
     let home = pkg.homepage.trim_end_matches('/');
     let mut h = head(&pkg.name, &pkg.description, home);
+    h.push_str(&body_open(&pkg.name, repo, &ws.demo));
     let _ = write!(
         h,
-        "<header>\n<h1><img class=\"on-light\" src=\"assets/logo-light.svg\" alt=\"{n}\" \
-         width=\"540\" height=\"120\" loading=\"lazy\">\n\
+        "<div class=\"hero\">\n<h1><img class=\"on-light\" src=\"assets/logo-light.svg\" \
+         alt=\"{n}\" width=\"540\" height=\"120\" loading=\"lazy\">\n\
          <img class=\"on-dark\" src=\"assets/logo-dark.svg\" alt=\"\" width=\"540\" height=\"120\" \
-         loading=\"lazy\"></h1>\n<p class=\"tag\">{tag}</p>\n{nav}{THEME_BUTTON}\n<a \
-         class=\"gh\" href=\"{r}\" aria-label=\"{n} on GitHub\" title=\"GitHub\"><svg \
-         viewBox=\"0 0 16 16\" width=\"24\" height=\"24\" aria-hidden=\"true\"><path \
-         d=\"{GH_MARK}\"/></svg></a>\n</header>\n",
-        r = esc(repo),
+         loading=\"lazy\"></h1>\n<p class=\"tag\">{tag}</p>\n</div>\n",
         n = esc(&pkg.name),
         tag = esc(&tagline(root)?),
-        nav = nav(),
     );
     let demo = if ws.demo.is_empty() {
         String::new()
@@ -256,16 +252,10 @@ pub fn render(root: &Path, ws: &Workspace) -> Result<Vec<Out>> {
     );
     landing_footer(root, &mut h, repo, pkg)?;
     outs.push(Out::file("site/index.html", h));
-    let (pages, paths) = docs::pages(root, home, repo, &pkg.name)?;
+    let (pages, paths) = docs::pages(root, home, repo, &pkg.name, &ws.demo)?;
     outs.extend(pages);
-    outs.extend(host_files(home, repo, &pkg.name, &paths));
+    outs.extend(host_files(home, repo, &pkg.name, &ws.demo, &paths));
     Ok(outs)
-}
-
-/// The site's own pages, the same on every page, as the one navigation landmark.
-pub(crate) const fn nav() -> &'static str {
-    "<nav aria-label=\"Site\"><a href=\"/\">Home</a> <a href=\"/docs/\">Docs</a> \
-     <a href=\"/changelog/\">Changelog</a></nav>\n"
 }
 
 /// The landing page's footer and closing tags: the shared footer plus the licence and the
@@ -316,42 +306,36 @@ pub(crate) fn footer(repo: &str, extra: &str) -> String {
     )
 }
 
-/// Every page opens its body the same way: a skip link as the first Tab stop, then the main
-/// landmark it targets. `tabindex="-1"` lets the browser move focus there, not only scroll.
-pub(crate) const BODY_OPEN: &str = "<body>\n<a class=\"skip\" href=\"#main\">Skip to content</a>\n\
-                                    <main id=\"main\" tabindex=\"-1\">\n";
+/// Every page opens its body the same way: a skip link as the first Tab stop, the bar, then the
+/// main landmark the link targets. `tabindex="-1"` lets the browser move focus there, not only
+/// scroll.
+pub(crate) fn body_open(name: &str, repo: &str, demo: &str) -> String {
+    format!(
+        "<body>\n<a class=\"skip\" href=\"#main\">Skip to content</a>\n{bar}\
+         <main id=\"main\" tabindex=\"-1\">\n",
+        bar = bar::bar(name, repo, demo),
+    )
+}
 
 /// The one script on the page: Escape closes an open screenshot by going back to `#features`,
 /// the same place a click on the overlay leads. Everything else works without it.
-const LIGHTBOX_JS: &str = "addEventListener('keydown',\
+const LIGHTBOX_JS: &str = "addEventListener('keydown',\n\
 function(e){if(e.key==='Escape'&&location.hash.indexOf('#shot-')===0)location.hash='features'})";
 
 /// In the head, before first paint: a theme the visitor picked earlier (the app's own key, so
 /// both remember one choice), else none and the system decides. No flash of the wrong scheme.
-const THEME_INIT_JS: &str = "(function(){try{var t=localStorage.getItem('gitterrace-theme');\
+const THEME_INIT_JS: &str = "(function(){try{var t=localStorage.getItem('gitterrace-theme');\n\
 if(t==='light'||t==='dark')document.documentElement.dataset.theme=t}catch(e){}})()";
 
 /// The theme button cycles system, light and dark, as the app's does, and stores the choice.
-const THEME_TOGGLE_JS: &str = "(function(){var r=document.documentElement,\
-b=document.getElementById('theme'),o=['system','light','dark'];if(!b)return;function c(){return \
-r.dataset.theme||'system'}function l(){b.setAttribute('aria-label','Theme: '+c());\
-b.title='Theme: '+c()}l();b.addEventListener('click',function(){var n=o[(o.indexOf(c())+1)%3];\
-if(n==='system')delete r.dataset.theme;else r.dataset.theme=n;\
-try{if(n==='system')localStorage.removeItem('gitterrace-theme');else \
+const THEME_TOGGLE_JS: &str = "(function(){var r=document.documentElement,\n\
+b=document.getElementById('theme'),o=['system','light','dark'];if(!b)return;\n\
+function c(){return r.dataset.theme||'system'}\n\
+function l(){b.setAttribute('aria-label','Theme: '+c());\n\
+b.title='Theme: '+c()}l();b.addEventListener('click',function(){var n=o[(o.indexOf(c())+1)%3];\n\
+if(n==='system')delete r.dataset.theme;else r.dataset.theme=n;\n\
+try{if(n==='system')localStorage.removeItem('gitterrace-theme');else \n\
 localStorage.setItem('gitterrace-theme',n)}catch(e){}l()})})()";
-
-/// The theme button, the app's icons: half disc for system, sun, moon. Each viewBox is cropped
-/// to its own ink plus half the stroke, so at 24 px every icon fills the box as the source-link
-/// mark beside it does.
-const THEME_BUTTON: &str = "<button class=\"theme\" type=\"button\" id=\"theme\" \
-aria-label=\"Theme: system\" title=\"Theme: system\">\
-<svg class=\"i-auto\" viewBox=\"3.2 3.2 17.6 17.6\" aria-hidden=\"true\"><circle cx=\"12\" \
-cy=\"12\" r=\"8\"/><path d=\"M12 4a8 8 0 0 0 0 16z\" class=\"fill\"/></svg>\
-<svg class=\"i-light\" viewBox=\"1.2 1.2 21.6 21.6\" aria-hidden=\"true\"><circle cx=\"12\" \
-cy=\"12\" r=\"4\"/><path d=\"M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 \
-17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8\"/></svg>\
-<svg class=\"i-dark\" viewBox=\"3.85 3.2 16.95 16.95\" aria-hidden=\"true\"><path d=\"M20 14.5A8 \
-8 0 0 1 9.5 4 8 8 0 1 0 20 14.5z\"/></svg></button>";
 
 /// Every inline script on the page, so the CSP lists exactly these by hash.
 const SCRIPTS: [&str; 3] = [THEME_INIT_JS, THEME_TOGGLE_JS, LIGHTBOX_JS];
@@ -377,7 +361,7 @@ fn script_hashes() -> String {
 /// The files the static host reads beside the page: response headers, the 404 page, the
 /// crawler files and the security contact. The CSP is tight because the page is static: the
 /// only scripts allowed are [`SCRIPTS`], by their hashes.
-fn host_files(home: &str, repo: &str, name: &str, pages: &[String]) -> Vec<Out> {
+fn host_files(home: &str, repo: &str, name: &str, demo: &str, pages: &[String]) -> Vec<Out> {
     let pages = pages.iter().fold(String::new(), |mut s, p| {
         let _ = writeln!(s, "<url><loc>{home}/{p}</loc></url>");
         s
@@ -410,10 +394,12 @@ fn host_files(home: &str, repo: &str, name: &str, pages: &[String]) -> Vec<Out> 
          <meta name=\"color-scheme\" content=\"light dark\">\n\
          <meta name=\"robots\" content=\"noindex\">\n<title>Not found - {n}</title>\n\
          <link rel=\"icon\" type=\"image/svg+xml\" href=\"/assets/mark.svg\">\n\
-         <link rel=\"stylesheet\" href=\"/assets/site.css\">\n</head>\n{BODY_OPEN}\
+         <link rel=\"stylesheet\" href=\"/assets/site.css\">\n\
+         <script>{THEME_INIT_JS}</script>\n</head>\n{open}\
          <h1>Not found</h1>\n<p>There is no page here. <a href=\"/\">Back to {n}</a>.</p>\n\
-         {footer}</main>\n</body>\n</html>\n",
+         {footer}</main>\n<script>{THEME_TOGGLE_JS}</script>\n</body>\n</html>\n",
         n = esc(name),
+        open = body_open(name, repo, demo),
         footer = footer(repo, ""),
     );
     vec![
