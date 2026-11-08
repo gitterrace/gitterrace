@@ -280,7 +280,9 @@ pub(super) async fn blame(
         let path = path.trim_matches('/').to_owned();
         let lines = a.repo.blame(&id, &path)?;
         // Blame is empty for binary and oversized files; say which, from the header size.
-        let too_large = lines.is_empty() && a.repo.blob(&id, &path)?.size > a.repo.text_limit();
+        // `raw_blob` told to skip reads the header only, not the content.
+        let too_large = lines.is_empty()
+            && a.repo.raw_blob(&id, &path, |_, _| true)?.size > a.repo.text_limit();
         let raw = crate::features::href_if(
             Feature::Raw,
             &format!("/raw/{}/{}", fmt::enc_seg(&rev), fmt::enc_path(&path)),
