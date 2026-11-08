@@ -272,6 +272,10 @@
   var chan = shared ? new BroadcastChannel("gt-live:" + B) : null;
   var leader = false;
   var latest = version; // newest version seen on the stream, leader only
+  // When this page was asked for, and when the leader came to hold `latest`, both by the one
+  // browser clock. Versions are digests, not ordered, so time says which one is newer.
+  var loadedAt = performance.timeOrigin || Date.now();
+  var latestAt = loadedAt;
   var peers = {};       // id -> needs the working tree scan, visible tabs only
   var held = null;      // { abort, release } of the lock request
 
@@ -287,7 +291,7 @@
     source = new EventSource(B + "/events?v=" + encodeURIComponent(latest) + (wt ? "&wt=1" : ""));
     source.wt = wt;
     source.addEventListener("change", function (ev) {
-      try { latest = JSON.parse(ev.data).v || latest; } catch (e) {}
+      try { latest = JSON.parse(ev.data).v || latest; latestAt = Date.now(); } catch (e) {}
       if (chan) chan.postMessage({ t: "ev", data: ev.data });
       handle(ev);
     });
@@ -316,6 +320,7 @@
   function lead(release) {
     leader = true;
     latest = version;
+    latestAt = loadedAt;
     peers = {};
     delay = 1000;
     held.release = release;
@@ -350,6 +355,9 @@
     chan.onmessage = function (m) {
       var d = m.data || {};
       if (d.t === "ev") {
+        // A catch-up is for the tab that said hello, and only if the leader came to its version
+        // after that page was asked for: a page loaded later (a reload) is already as new.
+        if (d.to && (d.to !== id || d.at < loadedAt)) return;
         if (!document.hidden) handle({ data: d.data });
       } else if (d.t === "who") {
         if (!document.hidden) hello();
@@ -358,7 +366,10 @@
         peers[d.id] = d.wt;
         // A tab that was hidden may have missed changes: tell it everything may have moved.
         if (d.v !== latest) {
-          chan.postMessage({ t: "ev", data: JSON.stringify({ kinds: ["head", "refs", "stash", "worktrees", "index", "worktree", "repos"], v: latest }) });
+          var all = ["head", "refs", "stash", "worktrees", "index", "worktree", "repos"];
+          chan.postMessage({
+            t: "ev", to: d.id, at: latestAt, data: JSON.stringify({ kinds: all, v: latest })
+          });
         }
         if (!before && streamWt() && source) open();
       } else if (leader && d.t === "bye") {
