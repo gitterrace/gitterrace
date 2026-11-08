@@ -4,8 +4,8 @@
 release: the page tells people to `brew install` from the tap and `cargo install` from the
   repository. Deploying that before both answer publishes an install line that fails, so the
   deploy refuses until the repository, the tap and the `v<version>` release tag exist.
-csp [DIR]: every inline <script> in DIR/index.html (default site/) has its exact sha256 in
-  the CSP of DIR/_headers and of any meta CSP, and no other script hash is listed. A changed
+csp [DIR]: every inline <script> of every page under DIR (default site/) has its exact sha256
+  in the CSP of DIR/_headers and of any meta CSP, and no hash is listed that no page has. A changed
   script or a stale _headers fails here instead of being blocked silently by the browser.
   `release` runs it too, before a deploy.
 domains: gitterrace.dev serves the page over HTTPS with the generated headers, and every other
@@ -82,14 +82,16 @@ def script_hashes(html: str) -> set[str]:
     return out
 
 
-def csp_problems(where: str, csp: str, html: str) -> list[str]:
-    """What is wrong with `csp` for `html`: a missing policy, an inline script whose exact
-    hash it lacks, a hash for no script, or unsafe-inline."""
+def csp_problems(where: str, csp: str, html: str | list[str]) -> list[str]:
+    """What is wrong with `csp` for `html`, one page or every page the policy covers: a
+    missing policy, an inline script whose exact hash it lacks, a hash for no script on any
+    page, or unsafe-inline."""
     if not csp:
         return [f"{where}: no Content-Security-Policy"]
     m = re.search(r"script-src([^;]*)", csp)
     listed = set(re.findall(r"'sha256-[A-Za-z0-9+/=]+'", m.group(1) if m else ""))
-    want = script_hashes(html)
+    pages = [html] if isinstance(html, str) else html
+    want = set().union(*(script_hashes(p) for p in pages))
     bad = [
         f"{where}: script-src lacks {h}, the inline script changed"
         for h in sorted(want - listed)
@@ -113,13 +115,19 @@ def headers_csp(text: str) -> str:
 
 def csp(directory: str | None = None) -> list[str]:
     d = Path(directory) if directory else ROOT / "site"
-    html = (d / "index.html").read_text()
-    bad = csp_problems(f"{d}/_headers", headers_csp((d / "_headers").read_text()), html)
-    for meta in META_CSP.findall(html):
-        bad += csp_problems(f"{d}/index.html meta CSP", meta, html)
-    n = len(script_hashes(html))
+    # The `/*` policy covers every page, so its hashes answer for the scripts of all of them:
+    # a script only the docs pages carry is still one the policy must list.
+    pages = sorted(d.rglob("*.html"))
+    htmls = [p.read_text() for p in pages]
+    bad = csp_problems(
+        f"{d}/_headers", headers_csp((d / "_headers").read_text()), htmls
+    )
+    for p, html in zip(pages, htmls):
+        for meta in META_CSP.findall(html):
+            bad += csp_problems(f"{p} meta CSP", meta, html)
+    n = len(set().union(*(script_hashes(h) for h in htmls)))
     print(
-        f"  [{'x' if bad else '+'}] {n} inline script(s) in {d}/index.html match the CSP"
+        f"  [{'x' if bad else '+'}] {n} inline script(s) on {len(pages)} pages in {d} match"
     )
     return bad
 
