@@ -30,6 +30,8 @@
 //                heading, whose rendered id is the plain slug (JS on and off)
 //   overlays     t, ? and b each open a named dialog that takes focus, keeps it through 5 Tabs
 //                (and Shift+Tab), closes on Escape and gives focus back to what had it
+//   menu-keys    the action menu says its letter keys work only while it is open; closed, they
+//                do nothing and the ? sheet lists none of them
 //   menu-same    the action menu lists the same entries in the same order in the README preview,
 //                its code, a line selection and the log; an entry the selection does not fit is
 //                disabled with a tip saying why, never dropped
@@ -175,7 +177,7 @@ const bin = resolve(arg('--bin', join(root, 'target/debug/git-terrace')));
 const fromDisk = process.argv.includes('--from-disk');
 const tabCounts = arg('--tabs', '8,12').split(',').map(Number);
 const browsers = arg('--browsers', 'webkit,chromium').split(',');
-const ALL = ['truncation', 'live-tabs', 'mermaid', 'chip', 'doctabs', 'chords', 'header', 'marked', 'menu-same', 'gutter', 'overlays', 'tips', 'date-tips', 'repo-switch', 'outline', 'mark-seam', 'about-place', 'site-theme', 'install-tabs', 'site-bar', 'site-rail', 'side-width', 'calm-header', 'tabs-one-line', 'tab-levels', 'huge-diff', 'sticky-heads', 'md-anchor', 'live-scroll', 'live-read', 'sticky-line', 'seg-one-row', 'period-steady', 'export-from-disk', 'inline-controls', 'section-gaps', 'path-cells', 'mark-flat', 'tab-stops', 'help-keys', 'side-order', 'settings', 'lone-rows', 'page-heads', 'compare-head', 'commit-head', 'search-head', 'small-layout', 'send-dialog', 'keyboard-walk', 'reflow', 'text-spacing', 'targets', 'keys-off', 'axe-all', 'forced-colors', 'reduced-motion', 'outline-filter', 'avatar-fit', 'graph-view', 'layout-shift', 'head-align', 'symbols', 'no-sideways-scroll', 'head-fits', 'repos-filter'];
+const ALL = ['truncation', 'live-tabs', 'mermaid', 'chip', 'doctabs', 'chords', 'header', 'marked', 'menu-same', 'menu-keys', 'gutter', 'overlays', 'tips', 'date-tips', 'repo-switch', 'outline', 'mark-seam', 'about-place', 'site-theme', 'install-tabs', 'site-bar', 'site-rail', 'side-width', 'calm-header', 'tabs-one-line', 'tab-levels', 'huge-diff', 'sticky-heads', 'md-anchor', 'live-scroll', 'live-read', 'sticky-line', 'seg-one-row', 'period-steady', 'export-from-disk', 'inline-controls', 'section-gaps', 'path-cells', 'mark-flat', 'tab-stops', 'help-keys', 'side-order', 'settings', 'lone-rows', 'page-heads', 'compare-head', 'commit-head', 'search-head', 'small-layout', 'send-dialog', 'keyboard-walk', 'reflow', 'text-spacing', 'targets', 'keys-off', 'axe-all', 'forced-colors', 'reduced-motion', 'outline-filter', 'avatar-fit', 'graph-view', 'layout-shift', 'head-align', 'symbols', 'no-sideways-scroll', 'head-fits', 'repos-filter'];
 const wanted = arg('--checks', ALL.join(',')).split(',');
 for (const c of wanted) if (!ALL.includes(c)) { console.error(`unknown check ${c}; known: ${ALL.join(', ')}`); process.exit(2); }
 
@@ -210,7 +212,7 @@ const { mdAnchor } = anchorChecks(env);
 const { checks: scrollChecks } = await import('./browser-scroll-lib.mjs');
 const { liveRead } = scrollChecks(env);
 const { truncation, liveTabs, mermaid, chip, doctabs, chords, header } = pageChecks(env);
-const { marked, menuSame, gutter, overlays, tips, dateTips, repoSwitch, liveScroll, outline } = uiChecks(env);
+const { marked, menuKeys, menuSame, gutter, overlays, tips, dateTips, repoSwitch, liveScroll, outline } = uiChecks(env);
 const { inlineControls, sectionGaps, pathCells } = layoutChecks(env);
 const { markSeam, aboutPlace, siteTheme, exportFromDisk, installTabs } = siteChecks(env);
 const { siteBar, siteRail } = siteBarChecks(env);
@@ -562,7 +564,7 @@ async function settings() {
   }
 }
 
-const checks = {'sticky-heads': stickyHeads, 'tabs-one-line': tabsOneLine, 'tab-levels': tabLevels, 'calm-header': calmHeader, 'side-width': sideWidth, truncation, 'live-tabs': liveTabs, mermaid, chip, doctabs, chords, header, marked, 'menu-same': menuSame, gutter, overlays, tips, 'date-tips': dateTips, 'repo-switch': repoSwitch, outline, 'mark-seam': markSeam, 'about-place': aboutPlace, 'site-theme': siteTheme, 'install-tabs': installTabs, 'site-bar': siteBar, 'site-rail': siteRail, 'huge-diff': hugeDiff, 'md-anchor': mdAnchor, 'live-scroll': liveScroll, 'live-read': liveRead, 'sticky-line': stickyLine, 'seg-one-row': segOneRow, 'period-steady': periodSteady, 'export-from-disk': exportFromDisk, 'inline-controls': inlineControls, 'section-gaps': sectionGaps, 'path-cells': pathCells, 'mark-flat': markFlat, 'tab-stops': tabStops, 'help-keys': helpKeys, 'side-order': sideOrder, settings, 'lone-rows': loneRows, 'page-heads': pageHeads, 'compare-head': compareHeads, 'commit-head': commitHeads, 'search-head': searchHeads, 'small-layout': smallLayout, 'send-dialog': sendDialog, 'keyboard-walk': keyboardWalk, reflow, 'text-spacing': textSpacing, targets, 'keys-off': keysOff, 'axe-all': axeAll, 'forced-colors': forcedColors, 'reduced-motion': reducedMotion, 'outline-filter': outlineFilter, 'graph-view': graphView, 'avatar-fit': avatarFit, 'layout-shift': layoutShift, 'head-align': headAlign, symbols, 'no-sideways-scroll': noSidewaysScroll, 'head-fits': headFits, 'repos-filter': reposFilter};
+const checks = {'sticky-heads': stickyHeads, 'tabs-one-line': tabsOneLine, 'tab-levels': tabLevels, 'calm-header': calmHeader, 'side-width': sideWidth, truncation, 'live-tabs': liveTabs, mermaid, chip, doctabs, chords, header, marked, 'menu-same': menuSame, 'menu-keys': menuKeys, gutter, overlays, tips, 'date-tips': dateTips, 'repo-switch': repoSwitch, outline, 'mark-seam': markSeam, 'about-place': aboutPlace, 'site-theme': siteTheme, 'install-tabs': installTabs, 'site-bar': siteBar, 'site-rail': siteRail, 'huge-diff': hugeDiff, 'md-anchor': mdAnchor, 'live-scroll': liveScroll, 'live-read': liveRead, 'sticky-line': stickyLine, 'seg-one-row': segOneRow, 'period-steady': periodSteady, 'export-from-disk': exportFromDisk, 'inline-controls': inlineControls, 'section-gaps': sectionGaps, 'path-cells': pathCells, 'mark-flat': markFlat, 'tab-stops': tabStops, 'help-keys': helpKeys, 'side-order': sideOrder, settings, 'lone-rows': loneRows, 'page-heads': pageHeads, 'compare-head': compareHeads, 'commit-head': commitHeads, 'search-head': searchHeads, 'small-layout': smallLayout, 'send-dialog': sendDialog, 'keyboard-walk': keyboardWalk, reflow, 'text-spacing': textSpacing, targets, 'keys-off': keysOff, 'axe-all': axeAll, 'forced-colors': forcedColors, 'reduced-motion': reducedMotion, 'outline-filter': outlineFilter, 'graph-view': graphView, 'avatar-fit': avatarFit, 'layout-shift': layoutShift, 'head-align': headAlign, symbols, 'no-sideways-scroll': noSidewaysScroll, 'head-fits': headFits, 'repos-filter': reposFilter};
 try {
   for (const c of wanted) { console.log(`-- ${c}`); await checks[c](); }
 } finally {

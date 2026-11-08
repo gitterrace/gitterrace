@@ -372,6 +372,10 @@
       hint.appendChild(link);
       list.appendChild(hint);
     }
+    // The letters beside the items work only while this menu is open, not as page shortcuts.
+    var note = el("li", "keynote", "Keys work while this menu is open");
+    note.setAttribute("role", "presentation");
+    list.appendChild(note);
     var sel = 0;
     function focus(i) {
       sel = Math.max(0, Math.min(items.length - 1, i));

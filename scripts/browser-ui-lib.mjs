@@ -122,6 +122,45 @@ async function markedIn() {
   }
 }
 
+// ---- menu-keys --------------------------------------------------------------------------------
+// The letters beside the action menu's items work only while the menu is open: the menu says so
+// itself, and pressing one with the menu closed does nothing (no copy, no dialog, no navigation).
+async function menuKeys() {
+  for (const name of browsers) {
+    const { b, ctx } = await context(name);
+    const p = await ctx.newPage();
+    await p.goto(srv.base + '/blob/HEAD/README.md', { waitUntil: 'load' });
+    await p.keyboard.press('.');
+    await p.waitForSelector('.actmenu li');
+    const hint = await p.evaluate(() =>
+      (document.querySelector('.actmenu li.keynote') || {}).textContent || '');
+    await p.keyboard.press('Escape');
+    await p.waitForSelector('.actmenu', { state: 'detached' });
+    const url = p.url();
+    for (const k of ['p', 'm', 's', ',']) await p.keyboard.press(k);
+    await p.waitForTimeout(300);
+    const stray = await p.evaluate(() =>
+      document.querySelectorAll('.actmenu, .send, dialog[open], .toast').length);
+    const help = await (async () => {
+      await p.keyboard.press('?');
+      await p.waitForSelector('.help dl.keys');
+      const t = await p.$eval('.help dl.keys', (d) => d.textContent);
+      await p.keyboard.press('Escape');
+      return t;
+    })();
+    const listed = ['Copy permalink', 'Copy as markdown', 'Send to', 'Settings']
+      .filter((w) => help.includes(w));
+    const where = `menu-keys ${name}`;
+    if (/while this menu is open/.test(hint) && !stray && p.url() === url && !listed.length) {
+      r.ok(`${where}: the menu says its keys are its own; closed, they do nothing, ? lists none`);
+    } else {
+      r.fail(`${where}: hint ${JSON.stringify(hint)}, ${stray} stray overlays, `
+        + `url moved ${p.url() !== url}, sheet lists ${JSON.stringify(listed)}`);
+    }
+    await b.close();
+  }
+}
+
 // ---- menu-same --------------------------------------------------------------------------------
 // The action menu lists the same entries, in the same order, with the same labels in every view:
 // the rendered README, its code, a line selection in it, a blame line, a commit. An action the
@@ -538,5 +577,7 @@ async function liveScroll() {
 // path alone lets the background through there as a hairline (WebKit did). Paint every mark at
 // many sizes and offsets and compare the split rows with the solid rows just above and below.
 
-  return { marked, menuSame, gutter, overlays, tips, dateTips, repoSwitch, liveScroll, outline };
+  return {
+    marked, menuKeys, menuSame, gutter, overlays, tips, dateTips, repoSwitch, liveScroll, outline,
+  };
 }
