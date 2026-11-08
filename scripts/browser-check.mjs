@@ -98,12 +98,12 @@
 //   page-heads   a Markdown file: the page head holds the path and File/Blame/History tabs, the
 //                card one sticky head row with Preview/Code, at 1440, 900 and 390 px, light
 //                and dark
-//   compare-head the compare form sits in the title row, 'Open the head commit' has no row and the
-//                head sha is a link, at 1440 and 900 px (390: form still in the title row)
-//   commit-head  the meta line sits right under the title with no Copy button and the changed-files
-//                header carries the totals, at 1440, 900 and 390 px
-//   search-head  the search bar is no card: query and Code/Commits on row 1, toggles and the
-//                summary on row 2, at 1440, 900 and 390 px
+//   compare-head the compare form sits in the head's toolbar, 'Open the head commit' has no row
+//                and the head sha is a link, at 1440 and 900 px (390: form still in the toolbar)
+//   commit-head  the meta line sits right under the page head with no Copy button and the
+//                changed-files header carries the totals, at 1440, 900 and 390 px
+//   search-head  the search bar is no card: query and Code/Commits on row 1, toggles on row 2,
+//                the summary is the head's tagline, at 1440, 900 and 390 px
 //   seg-one-row  every segmented control on the insights pages and a document shows one row of
 //                choices or its native select, never two rows, at 360 and 1440 px, light and dark
 //   period-steady the period control keeps its x and y with no filter, a period, and a period

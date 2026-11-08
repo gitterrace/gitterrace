@@ -1,0 +1,6 @@
+{#- The compare page's base and head fields, the page head's toolbar. Enter submits. -#}
+<form class="cmp" action="{{ action }}" method="get"><input name="base" value="{{ base }}"
+ placeholder="Base" aria-label="Base" required><i aria-hidden="true">…</i><input name="head"
+ value="{{ head }}" placeholder="Head" aria-label="Head">
+{#- Enter submits through this hidden default button. -#}
+<button type="submit" hidden>Compare</button></form>

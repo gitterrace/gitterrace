@@ -2,8 +2,7 @@
 {%- import "_delta.html" as deltas -%}
 {% block title %}Working tree · {{ c.name }}{% endblock %}
 {% block content %}
-<div class="head"><h1>Working tree <span class="muted">vs HEAD</span></h1></div>
-<p class="hint">Staged, unstaged and untracked changes, read directly from disk. Not committed, so not shareable.</p>
+{{ head }}
 {% if clean %}<p class="muted">The working tree is clean.</p>{% else %}
 <details class="card files" open><summary>{{ files_summary }} <span class="counts">{% call deltas::delta(adds, dels) %}{% endcall %}</span></summary>
 <ul>{% for f in files %}<li><a href="#{{ f.anchor }}">{{ f.label }}</a><span class="counts">{% call deltas::delta(f.additions, f.deletions) %}{% endcall %}</span></li>{% endfor %}</ul></details>

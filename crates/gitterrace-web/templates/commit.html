@@ -1,8 +1,8 @@
 {% extends "_base.html" %}
 {%- import "_delta.html" as deltas -%}
-{% block title %}{{ subject }} · {{ c.name }}{% endblock %}
+{% block title %}{{ head.title }} · {{ c.name }}{% endblock %}
 {% block content %}
-<div class="head"><h1>{{ subject }}</h1></div>
+{{ head }}
 <p class="meta"><a class="who" href="{{ author_href }}"><b>{{ author }}</b></a> <span class="muted">{{ date }}</span> · {{ sha|safe }}
 {% for p in parents %} · parent {{ p|safe }}{% endfor %}
 · <a href="{{ c.base }}/tree/{{ id }}">Browse files</a></p>

@@ -41,4 +41,6 @@ main.wrap>.ph+h2{margin-top:0}
     display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;
     overflow:hidden;min-height:3em}
   .ph-acts>a{display:none}
+  .ph .cmp{flex:1 1 100%}
+  .ph .cmp input{flex:1 1 0;max-width:none}
 }

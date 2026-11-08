@@ -95,6 +95,7 @@ impl FileHits {
 #[template(path = "search.html")]
 struct SearchPage {
     c: Chrome,
+    head: crate::pagehead::PageHead,
     q: String,
     rev: String,
     commits_mode: bool,
@@ -207,6 +208,7 @@ fn run(a: &App, q: SearchQuery) -> Result<SearchPage> {
     );
     let mut page = SearchPage {
         c: views::chrome_at(a, "search", &rev),
+        head: search_head(&rev),
         searched: !text.is_empty(),
         q: text.clone(),
         rev: rev.clone(),
@@ -278,8 +280,16 @@ fn run(a: &App, q: SearchQuery) -> Result<SearchPage> {
         );
         page.nothing = Some(e.step(label, fmt::href(&next)));
     }
+    page.summary = summary(&page, commits_mode, a.repo.text_limit());
+    page.head.tagline =
+        crate::pagehead::Tagline::of(&page.summary).plain(&format!(" in {} ms", page.ms));
+    Ok(page)
+}
+
+/// What a search found, for the head's tagline: the matches, and for code the files read.
+fn summary(page: &SearchPage, commits_mode: bool, text_limit: u64) -> String {
     let plus = if page.capped { "+" } else { "" };
-    page.summary = if commits_mode {
+    if commits_mode {
         format!(
             "{}{plus} {}",
             fmt::thousands(page.matches),
@@ -293,10 +303,15 @@ fn run(a: &App, q: SearchQuery) -> Result<SearchPage> {
             fmt::count(page.files.len(), "file", "files"),
             fmt::count(page.scanned, "file", "files"),
             page.skipped,
-            fmt::size(a.repo.text_limit())
+            fmt::size(text_limit)
         )
-    };
-    Ok(page)
+    }
+}
+
+/// The search page's head, before a query: what it searches.
+fn search_head(rev: &str) -> crate::pagehead::PageHead {
+    let said = format!("Search the code and commit messages at {rev}");
+    crate::pagehead::PageHead::new("Search", crate::pagehead::Tagline::of(&said))
 }
 
 /// The last line of the regex engine's complaint, which is the part a reader needs.

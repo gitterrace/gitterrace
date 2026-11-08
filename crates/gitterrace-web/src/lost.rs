@@ -31,8 +31,7 @@ pub(crate) struct Missing(pub(crate) String);
 #[template(path = "lost.html")]
 struct LostPage {
     c: Chrome,
-    title: String,
-    detail: String,
+    head: crate::pagehead::PageHead,
     steps: Vec<Step>,
 }
 
@@ -61,8 +60,10 @@ pub(crate) async fn in_shell(State(app): State<Arc<App>>, req: Request, next: Ne
         let (title, steps) = explain(&path, &rev);
         Ok(LostPage {
             c: views::chrome(a, ""),
-            title,
-            detail,
+            head: crate::pagehead::PageHead {
+                qualifier: "404".to_owned(),
+                ..crate::pagehead::PageHead::new(title, crate::pagehead::Tagline::of(&detail))
+            },
             steps,
         }
         .render()?)

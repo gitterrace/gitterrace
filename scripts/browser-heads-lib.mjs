@@ -58,8 +58,8 @@ export function checks({ srv, r, browsers, context }) {
     await each('compare', '/compare?base=HEAD~2&head=HEAD', (p) => p.evaluate((ctl) => {
       const bad = [];
       const form = document.querySelector('form.cmp');
-      const head = document.querySelector('main .head');
-      if (!form || !head || !head.contains(form)) bad.push('the form is not in the title row');
+      const head = document.querySelector('main>.ph>.fbar');
+      if (!form || !head || !head.contains(form)) bad.push('the form is not in the head toolbar');
       // No row of one control: every direct child of main that holds controls holds more than one,
       // except the KPI row, whose head sha is a link in a row of figures.
       for (const e of document.querySelectorAll('main > p.hint')) {
@@ -67,19 +67,22 @@ export function checks({ srv, r, browsers, context }) {
       }
       if (!document.querySelector('.kpis a[href*="/commit/"]')) bad.push('no link on the head sha');
       const h = head && head.getBoundingClientRect(), f = form && form.getBoundingClientRect();
-      if (h && f && innerWidth > 600 && f.top - h.top > h.height) bad.push('the form wraps below the title');
+      const wraps = h && f && innerWidth > 600 && f.top - h.top > h.height;
+      if (wraps) bad.push('the form wraps in the toolbar');
       return bad;
     }, CTL), [1440, 900]);
     await each('compare phone', '/compare?base=HEAD~2&head=HEAD', (p) => p.evaluate(() => {
-      const form = document.querySelector('form.cmp'), head = document.querySelector('main .head');
-      return form && head && head.contains(form) ? [] : ['the form is not in the title row'];
+      const form = document.querySelector('form.cmp');
+      const head = document.querySelector('main>.ph>.fbar');
+      return form && head && head.contains(form) ? [] : ['the form is not in the head toolbar'];
     }), [390]);
   }
   async function commitHeads() {
     await each('commit', '/commit/HEAD', (p) => p.evaluate(() => {
       const bad = [];
-      const head = document.querySelector('main .head'), meta = document.querySelector('p.meta');
-      if (!meta || head?.nextElementSibling !== meta) bad.push('the meta line is not right under the title');
+      const head = document.querySelector('main>.ph'), meta = document.querySelector('p.meta');
+      const under = meta && head?.nextElementSibling === meta;
+      if (!under) bad.push('the meta line is not right under the head');
       if (document.querySelector('p.meta button.copy')) bad.push('a Copy button is still on the meta line');
       const sum = document.querySelector('details.files > summary');
       if (!sum || !sum.querySelector('.counts .add') || !sum.querySelector('.counts .del')) bad.push('no totals in the changed-files header');
@@ -97,7 +100,8 @@ export function checks({ srv, r, browsers, context }) {
       const r1 = rows[0];
       if (r1 && (!r1.querySelector('input[name=q]') || !r1.querySelector('.segctl'))) bad.push('row 1 lacks the query or the Code/Commits switch');
       if (form.querySelector('input[type=radio]')) bad.push('radio buttons for the kind');
-      if (!rows[1]?.querySelector('.sum')) bad.push('the summary is not in row 2');
+      const tag = document.querySelector('main>.ph>.ph-tag')?.textContent || '';
+      if (!/match/.test(tag)) bad.push('the summary is not the tagline');
       if (form.nextElementSibling?.classList.contains('sum')) bad.push('a separate summary line');
       return bad;
     }));

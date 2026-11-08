@@ -354,9 +354,9 @@ fn graph_rows(
 #[template(path = "commit.html")]
 struct CommitPage {
     c: Chrome,
+    head: PageHead,
     id: String,
     sha: String,
-    subject: String,
     body: String,
     author: String,
     author_href: String,
@@ -393,8 +393,15 @@ pub(super) async fn commit(State(app): Shared, Path(id): Path<String>) -> Result
                 ..views::chrome(a, "log")
             }
             .pinned(),
+            head: PageHead::new(
+                d.summary.subject.clone(),
+                Tagline::of(&format!(
+                    "{} \u{b7} {}",
+                    fmt::count(d.files.len(), "changed file", "changed files"),
+                    fmt::count(d.summary.parents.len(), "parent", "parents"),
+                )),
+            ),
             sha: fmt::sha_link(&id),
-            subject: d.summary.subject.clone(),
             body: d.body.trim().to_owned(),
             author: d.summary.author.name.clone(),
             author_href: views::author_href(&d.summary.author.email),

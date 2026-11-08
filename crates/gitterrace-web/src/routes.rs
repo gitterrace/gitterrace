@@ -463,6 +463,7 @@ async fn progress(State(app): Shared) -> Json<ProgressBody> {
 #[template(path = "worktree.html")]
 struct WorktreePage {
     c: Chrome,
+    head: crate::pagehead::PageHead,
     files_summary: String,
     files: Vec<FileStatRow>,
     diff: String,
@@ -497,6 +498,7 @@ async fn worktree(State(app): Shared) -> Result<Html<String>> {
             })
             .collect();
         Ok(WorktreePage {
+            head: crate::pagehead::worktree_head(files.len(), adds.into(), dels.into()),
             c: views::chrome(a, "files").live(Mode::WORKTREE),
             clean: files.is_empty(),
             diff: views::diff_html_with(&views::Render::of(a), views::DiffSource::Worktree, &files),

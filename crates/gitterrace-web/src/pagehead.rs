@@ -15,6 +15,7 @@ mod heads;
 
 pub(crate) use heads::{
     FileView, file_head, insights_head, lead_tagline, overview_head, refs_head, waiting_head,
+    worktree_head,
 };
 
 /// A link in the title row, right of the title: the page's main jump (History, Compare).
@@ -97,6 +98,17 @@ impl Tagline {
     #[must_use]
     pub(crate) const fn lead(mut self) -> Self {
         self.lead = true;
+        self
+    }
+
+    /// Appends `text` as words, its digits not set apart (a timing that is not a finding).
+    #[must_use]
+    pub(crate) fn plain(mut self, text: &str) -> Self {
+        self.parts.push(Part {
+            text: text.to_owned(),
+            num: false,
+            href: String::new(),
+        });
         self
     }
 

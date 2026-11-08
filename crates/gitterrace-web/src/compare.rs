@@ -17,6 +17,7 @@ use crate::{
     error::Result,
     fmt::{self, enc_seg, href},
     insights::{Kpi, Src, cached, insights},
+    pagehead::{Action, PageHead, Tagline},
     routes::Shared,
     views::{self, Chrome},
 };
@@ -38,6 +39,8 @@ struct LangRow {
 struct Result2 {
     /// Set when the range is empty: what that means and the way on.
     empty: Option<Empty>,
+    /// The commits and authors counted, for the page head's tagline.
+    said: String,
     kpis: Vec<Kpi>,
     langs: Vec<LangRow>,
     commits: Vec<views::CommitRow>,
@@ -52,17 +55,20 @@ struct Result2 {
 #[template(path = "compare.html")]
 struct ComparePage {
     c: Chrome,
-    /// The commits of the head, the page this one sits under.
-    log_href: String,
-    base: String,
-    head: String,
-    tags: Vec<(String, String)>,
-    /// Other branches, each a link comparing it with the head.
-    branches: Vec<(String, String)>,
+    page_head: PageHead,
     /// Set when there is no base yet, or the range cannot be shown: what to do.
     pick: Option<Empty>,
     error: Option<String>,
     result: Option<Result2>,
+}
+
+/// The base and head fields, the compare page head's toolbar. Enter submits.
+#[derive(Template)]
+#[template(path = "compare_form.html")]
+struct CmpForm {
+    action: String,
+    base: String,
+    head: String,
 }
 
 const COMPARE_LIST: usize = 200;
@@ -120,7 +126,7 @@ pub(crate) async fn page(
         } else {
             base
         };
-        let tags = refs
+        let tags: Vec<(String, String)> = refs
             .iter()
             .filter(|x| x.kind == gitterrace_git::RefKind::Tag)
             .map(|x| (x.name.clone(), compare_href(Some(&x.name), "HEAD")))
@@ -149,13 +155,41 @@ pub(crate) async fn page(
                 _ => error = Some("One of the revisions does not exist.".to_owned()),
             }
         }
+        let said = match &result {
+            Some(r) if r.empty.is_none() => format!("{} from {b2} to {h2}", r.said),
+            _ if b2.is_empty() => "Pick a base to see what changed since".to_owned(),
+            _ => format!("From {b2} to {h2}"),
+        };
+        // The quick picks follow as links: the tags, then the other branches. A no-break space
+        // keeps the first name with the word before it on a narrow screen.
+        let mut tagline = Tagline::of(&said);
+        for (i, (name, to)) in tags.iter().chain(&branches).enumerate() {
+            let sep = match i {
+                0 if !tags.is_empty() => " \u{b7} since\u{a0}",
+                0 => " \u{b7} against\u{a0}",
+                i if i == tags.len() && !tags.is_empty() => ", against\u{a0}",
+                _ => ", ",
+            };
+            tagline = tagline.link(sep, name.clone(), to.clone());
+        }
+        let page_head = PageHead {
+            qualifier: "commits".to_owned(),
+            actions: vec![Action {
+                label: "Commits",
+                href: href(&format!("/log/{}", enc_seg(&h2))),
+            }],
+            toolbar: CmpForm {
+                action: href("/compare"),
+                base: b2,
+                head: h2,
+            }
+            .render()
+            .unwrap_or_default(),
+            ..PageHead::new("Compare", tagline)
+        };
         ComparePage {
-            log_href: href(&format!("/log/{}", enc_seg(&h2))),
             c,
-            base: b2,
-            head: h2,
-            tags,
-            branches,
+            page_head,
             pick: pick.or(state),
             error,
             result,
@@ -236,6 +270,11 @@ fn outcome(
         }
     };
     Ok(Result2 {
+        said: format!(
+            "{} by {}",
+            fmt::count(cmp.commits.len(), "commit", "commits"),
+            fmt::count(cmp.authors, "author", "authors")
+        ),
         empty: cmp.commits.is_empty().then(|| {
             let e = Empty::new(format!("{h2} has no commits that {b2} lacks."));
             if bi == hi {

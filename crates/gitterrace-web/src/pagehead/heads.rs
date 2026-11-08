@@ -100,3 +100,21 @@ pub(crate) fn overview_head(name: &str, branch: &str, counted: Option<&str>) -> 
     );
     PageHead::new(name, Tagline::of(&said))
 }
+
+/// The working tree's head: what differs from HEAD, read from disk.
+pub(crate) fn worktree_head(files: usize, adds: u64, dels: u64) -> PageHead {
+    let said = if files == 0 {
+        "Clean: nothing differs from HEAD".to_owned()
+    } else {
+        format!(
+            "{}, {} lines added and {} removed, read from disk and not committed",
+            fmt::count(files, "changed file", "changed files"),
+            fmt::thousands(adds),
+            fmt::thousands(dels)
+        )
+    };
+    PageHead {
+        qualifier: "vs HEAD".to_owned(),
+        ..PageHead::new("Working tree", Tagline::of(&said))
+    }
+}

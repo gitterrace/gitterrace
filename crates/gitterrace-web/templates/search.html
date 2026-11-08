@@ -3,7 +3,7 @@
 {%- import "_table.html" as t -%}
 {% block title %}Search · {{ c.name }}{% endblock %}
 {% block content %}
-<h1 class="vh">Search</h1>
+{{ head }}
 <form class="searchbar" method="get" action="{{ c.base }}/search">
 <div class="srow"><input name="q" value="{{ q }}" placeholder="Search" aria-label="Search" autofocus autocomplete="off">{{ kinds }}<input type="hidden" name="kind" value="{% if commits_mode %}commits{% else %}code{% endif %}"></div>
 <div class="srow opts">
@@ -11,7 +11,7 @@
 <label><input type="checkbox" name="case" value="1"{% if case %} checked{% endif %}> Match case</label>
 <label>Files <input name="glob" value="{{ glob }}" placeholder="*.rs, src/**" aria-label="Path glob"></label>
 <label>Rev <input name="rev" value="{{ rev }}" aria-label="Revision"></label>
-{% if searched && error.is_none() %}<span class="muted sum">{{ summary }} in {{ ms }} ms{% if capped %}. Showing the first results only, narrow the query to see more.{% endif %}</span>{% endif %}
+{% if searched && error.is_none() && capped %}<span class="muted sum">Showing the first results only, narrow the query to see more.</span>{% endif %}
 <button type="submit" hidden>Search</button>
 </div></form>
 {% if let Some(e) = error %}<p class="err">{{ e }}</p>{% endif %}

@@ -1,6 +1,6 @@
 {% extends "_base.html" %}
 {% block title %}Not found · {{ c.name }}{% endblock %}
 {% block content %}
-<div class="card empty lost"><h1>{{ title }}</h1><p>{{ detail }}</p>
-<ul class="steps">{% for s in steps %}<li><a href="{{ s.href }}">{{ s.label }}</a></li>{% endfor %}</ul></div>
+{{ head }}
+<div class="card empty lost"><ul class="steps">{% for s in steps %}<li><a href="{{ s.href }}">{{ s.label }}</a></li>{% endfor %}</ul></div>
 {% endblock %}
