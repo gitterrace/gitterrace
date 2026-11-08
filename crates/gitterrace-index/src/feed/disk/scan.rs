@@ -345,4 +345,44 @@ mod tests {
         assert_eq!(disk.unreadable(), None);
         Ok(())
     }
+
+    /// Guard class: an insights page over the disk base reads its blocks a bounded number of
+    /// times, not once per commit, with a block cache that holds nothing. Red when a
+    /// per-commit step (the merge check of the line sums, a point lookup) goes back to the
+    /// source by rank.
+    #[test]
+    fn an_insights_page_reads_blocks_per_pass_not_per_commit() -> SegResult<()> {
+        use crate::insights::{Insights, Options, Period};
+        let recs = records();
+        let dir = tempfile::tempdir()?;
+        write_cache(dir.path(), &recs, &[200, 2200])?;
+        let disk = open(dir.path())?.with_cache_bytes(1);
+        let blocks: usize = disk.segs.iter().map(|s| s.c.toc().len()).sum();
+        let ins = Insights::from_source(&disk, Options::default(), None);
+        let reads_of = |f: &dyn Fn() -> usize| {
+            let before = crate::seg::read::BLOCK_READS.with(std::cell::Cell::get);
+            let n = f();
+            (
+                crate::seg::read::BLOCK_READS.with(std::cell::Cell::get) - before,
+                n,
+            )
+        };
+        let pages: [(&str, &dyn Fn() -> usize); 3] = [
+            ("summary", &|| {
+                ins.period_summary(Period::All).current.commits as usize
+            }),
+            ("files", &|| ins.file_churn(Period::All).len()),
+            ("directories", &|| ins.dir_churn(Period::All).len()),
+        ];
+        for (page, f) in pages {
+            let (reads, n) = reads_of(f);
+            assert!(n > 0, "{page}: the fixture has data");
+            assert!(
+                reads <= 8 * blocks,
+                "{page}: {reads} block reads, {blocks} blocks"
+            );
+        }
+        assert_eq!(disk.unreadable(), None);
+        Ok(())
+    }
 }

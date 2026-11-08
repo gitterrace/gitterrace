@@ -147,9 +147,10 @@ impl<'a> Counted<'a> {
         self.items(false).map(|i| i.commit)
     }
 
-    /// The counted commits with the rows the selection keeps, oldest rank first.
-    pub fn rows(&self) -> impl Iterator<Item = (Rank, Vec<FileRow>)> + '_ {
-        self.items(true).map(|i| (i.commit.rank, i.rows))
+    /// The counted commits with the rows the selection keeps, oldest rank first. The commit
+    /// row comes along, so a reader never looks a commit up again by rank.
+    pub fn rows(&self) -> impl Iterator<Item = (CommitRow, Vec<FileRow>)> + '_ {
+        self.items(true).map(|i| (i.commit, i.rows))
     }
 
     /// Ranks of the counted commits, ascending: for two-pass consumers only.
@@ -276,7 +277,7 @@ impl<'a> Counted<'a> {
             person: self.ins.person_of(c.ident),
             day: crate::feed::local_day_of(c.time, c.offset),
             hour: self.cx.local_hour(c.time, c.offset),
-            lines: lines.unwrap_or_else(|| self.ins.commit_sums(c.rank)),
+            lines: lines.unwrap_or_else(|| self.ins.commit_sums(&c)),
             rows,
             commit: c,
         }

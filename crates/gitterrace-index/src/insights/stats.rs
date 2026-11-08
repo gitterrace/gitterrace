@@ -222,11 +222,10 @@ impl Counted<'_> {
         out
     }
 
-    /// The counted commits with their kept rows and author time, streamed.
+    /// The counted commits with their kept rows and author time, streamed. The time comes
+    /// from the row the stream read, never a second lookup by rank per commit.
     fn commit_rows(&self) -> impl Iterator<Item = (Rank, i64, Vec<FileRow>)> + '_ {
-        let src = self.insights().source();
-        self.rows()
-            .filter_map(move |(r, rows)| src.commit(r).map(|c| (r, c.time, rows)))
+        self.rows().map(|(c, rows)| (c.rank, c.time, rows))
     }
 }
 

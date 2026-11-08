@@ -294,11 +294,13 @@ impl<'a> Insights<'a> {
             && (self.opts.include_bots || !self.d.people.list[self.person_of(c.ident)].bot)
     }
 
-    /// Lines changed by commit `rank` over counted files.
-    pub fn commit_sums(&self, rank: Rank) -> Lines {
-        if self.source().commit(rank).is_some_and(|c| c.merge) {
+    /// Lines changed by commit `c` over counted files. Takes the row the caller holds: a
+    /// lookup by rank per commit thrashed the block cache on a large history.
+    pub fn commit_sums(&self, c: &CommitRow) -> Lines {
+        if c.merge {
             return Lines::default();
         }
+        let rank = c.rank;
         self.d
             .commit_lines
             .get_or_init(|| {
