@@ -16,7 +16,7 @@ use crate::CommitSource;
 use crate::feed::fresh::{self, Fresh, FreshRow, Walk, label_count};
 use crate::feed::{
     AuthorDayRow, CommitRange, CommitRow, FileRow, Hit, IdentId, InsightsSource, LabelId,
-    PathAuthorRow, PathId, Posting, Rank, RenameEdge, SourceError, Stream, Sums,
+    PathAuthorRow, PathId, Posting, Rank, RenameEdge, SourceError, Stream, SumOverflow, Sums,
 };
 
 /// Commits per `rows_for` call while folding an aggregate, so one fold holds one chunk.
@@ -40,6 +40,8 @@ pub struct Reach<S> {
     before: Vec<u32>,
     inner: u32,
     fresh: Fresh,
+    /// Set when stored sums added past u64, so the view reports the cache unreadable.
+    over: SumOverflow,
 }
 
 /// Builds the view of `tip` (a commit id) over `base`, reading at most `cap` commits from git.
@@ -103,6 +105,7 @@ impl<S: InsightsSource> Reach<S> {
             before,
             inner: acc,
             fresh: Fresh::default(),
+            over: SumOverflow::new(),
         }
     }
 
@@ -245,7 +248,7 @@ impl<S: InsightsSource> InsightsSource for Reach<S> {
             }
             let e = m.entry((day, c.ident)).or_default();
             e.0 += 1;
-            e.1.merge(&c.sums);
+            self.over.note(e.1.merge(&c.sums));
         }
         Box::new(
             m.into_iter()
@@ -276,7 +279,7 @@ impl<S: InsightsSource> InsightsSource for Reach<S> {
                 if ok {
                     let e = m.entry((f.path, c.ident)).or_default();
                     e.0 += 1;
-                    e.1.add_row(f);
+                    self.over.note(e.1.add_row(f));
                 }
             }
         });
@@ -386,7 +389,7 @@ impl<S: InsightsSource> InsightsSource for Reach<S> {
     }
 
     fn failure(&self) -> Option<SourceError> {
-        self.base.failure()
+        self.base.failure().or_else(|| self.over.failure())
     }
 }
 

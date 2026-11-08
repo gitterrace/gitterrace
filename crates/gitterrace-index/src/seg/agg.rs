@@ -37,13 +37,49 @@ impl Sums {
         self.code_rewritten += u64::from(c.rewritten);
     }
 
-    pub(crate) const fn merge(&mut self, o: &Self) {
-        self.add += o.add;
-        self.del += o.del;
-        self.rewritten += o.rewritten;
-        self.code_add += o.code_add;
-        self.code_del += o.code_del;
-        self.code_rewritten += o.code_rewritten;
+    /// Adds `o`, or `None` when a sum passes u64 (stored counts only get there). `self` is
+    /// unchanged on `None`.
+    #[must_use]
+    pub(crate) const fn merge(&mut self, o: &Self) -> Option<()> {
+        let (Some(add), Some(del), Some(rewritten)) = (
+            self.add.checked_add(o.add),
+            self.del.checked_add(o.del),
+            self.rewritten.checked_add(o.rewritten),
+        ) else {
+            return None;
+        };
+        let (Some(code_add), Some(code_del), Some(code_rewritten)) = (
+            self.code_add.checked_add(o.code_add),
+            self.code_del.checked_add(o.code_del),
+            self.code_rewritten.checked_add(o.code_rewritten),
+        ) else {
+            return None;
+        };
+        *self = Self {
+            add,
+            del,
+            rewritten,
+            code_add,
+            code_del,
+            code_rewritten,
+        };
+        Some(())
+    }
+}
+
+/// What an unreadable error names when stored counts summed past u64. A build never gets
+/// there (a commit adds u32 counts), so only a hostile or broken file does.
+pub(crate) const SUM_OVER: &str = "counts sum past u64";
+
+/// `a += b` on a stored counter, `None` past u64.
+#[must_use]
+pub(crate) const fn add_count(a: &mut u64, b: u64) -> Option<()> {
+    match a.checked_add(b) {
+        Some(v) => {
+            *a = v;
+            Some(())
+        }
+        None => None,
     }
 }
 
@@ -378,7 +414,7 @@ fn pack_path_author(
 pub(crate) fn decode_author_day(
     c: &mut Cursor<'_>,
     items: u32,
-    mut f: impl FnMut(i64, u32, AuthorDay),
+    mut f: impl FnMut(i64, u32, AuthorDay) -> Option<()>,
 ) -> SegResult<()> {
     let mut day = 0i64;
     for _ in 0..items {
@@ -387,7 +423,7 @@ pub(crate) fn decode_author_day(
         let who = u32_of(c, who)?;
         let commits = c.varint()?;
         let merges = c.varint()?;
-        f(
+        let row = f(
             day,
             who,
             AuthorDay {
@@ -396,6 +432,7 @@ pub(crate) fn decode_author_day(
                 lines: get_sums(c)?,
             },
         );
+        row.ok_or_else(|| c.err(SUM_OVER))?;
     }
     if c.is_empty() {
         Ok(())
@@ -408,7 +445,7 @@ pub(crate) fn decode_author_day(
 pub(crate) fn decode_life_month(
     c: &mut Cursor<'_>,
     items: u32,
-    mut f: impl FnMut(u32, i64, LifeMonth),
+    mut f: impl FnMut(u32, i64, LifeMonth) -> Option<()>,
 ) -> SegResult<()> {
     let mut life = 0u32;
     for _ in 0..items {
@@ -419,7 +456,7 @@ pub(crate) fn decode_life_month(
         let month = unzigzag(c.varint()?);
         let touches = c.varint()?;
         let last = unzigzag(c.varint()?);
-        f(
+        let row = f(
             life,
             month,
             LifeMonth {
@@ -428,6 +465,7 @@ pub(crate) fn decode_life_month(
                 last,
             },
         );
+        row.ok_or_else(|| c.err(SUM_OVER))?;
     }
     if c.is_empty() {
         Ok(())
@@ -440,7 +478,7 @@ pub(crate) fn decode_life_month(
 pub(crate) fn decode_path_author(
     c: &mut Cursor<'_>,
     items: u32,
-    mut f: impl FnMut(u32, u32, PathAuthor),
+    mut f: impl FnMut(u32, u32, PathAuthor) -> Option<()>,
 ) -> SegResult<()> {
     let mut path = 0u32;
     for _ in 0..items {
@@ -451,7 +489,7 @@ pub(crate) fn decode_path_author(
         let who = c.varint()?;
         let who = u32_of(c, who)?;
         let touches = c.varint()?;
-        f(
+        let row = f(
             path,
             who,
             PathAuthor {
@@ -459,6 +497,7 @@ pub(crate) fn decode_path_author(
                 lines: get_sums(c)?,
             },
         );
+        row.ok_or_else(|| c.err(SUM_OVER))?;
     }
     if c.is_empty() {
         Ok(())

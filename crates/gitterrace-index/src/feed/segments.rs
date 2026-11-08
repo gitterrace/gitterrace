@@ -212,7 +212,7 @@ impl<B: InsightsSource> SegmentSource<B> {
             agg::decode_author_day(c, n, |day, who, v| {
                 // A merge-only row: the commit counts leave merges out until they are opted in.
                 if !days.contains(&day) || v.commits == 0 {
-                    return;
+                    return Some(());
                 }
                 let e = out.entry((day, who)).or_insert_with(|| AuthorDayRow {
                     day,
@@ -220,8 +220,8 @@ impl<B: InsightsSource> SegmentSource<B> {
                     commits: 0,
                     sums: Sums::default(),
                 });
-                e.commits += v.commits;
-                e.sums.merge(&sums(&v.lines));
+                agg::add_count(&mut e.commits, v.commits)?;
+                e.sums.merge(&sums(&v.lines))
             })
         })?;
         Ok(out.into_values().collect())
@@ -238,7 +238,7 @@ impl<B: InsightsSource> SegmentSource<B> {
                         .is_some_and(|p| prefix.is_empty() || crate::insights::under(&p, prefix))
                 });
                 if !ok {
-                    return;
+                    return Some(());
                 }
                 let e = out.entry((path, who)).or_insert_with(|| PathAuthorRow {
                     path: PathId(path),
@@ -246,8 +246,8 @@ impl<B: InsightsSource> SegmentSource<B> {
                     touches: 0,
                     sums: Sums::default(),
                 });
-                e.touches += v.touches;
-                e.sums.merge(&sums(&v.lines));
+                agg::add_count(&mut e.touches, v.touches)?;
+                e.sums.merge(&sums(&v.lines))
             })
         })?;
         Ok(out.into_values().collect())

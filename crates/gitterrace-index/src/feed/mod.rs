@@ -111,24 +111,49 @@ pub struct Sums {
 }
 
 impl Sums {
-    /// Adds one file row.
-    pub fn add_row(&mut self, f: &FileRow) {
-        self.add += u64::from(f.add);
-        self.del += u64::from(f.del);
-        self.rewritten += u64::from(f.rewritten);
+    /// Adds one file row, or `None` when a sum passes u64 (`self` unchanged then). Rows read
+    /// from a file can repeat without bound across commits, so this is checked as
+    /// [`Sums::merge`] is.
+    #[must_use]
+    pub fn add_row(&mut self, f: &FileRow) -> Option<()> {
         let c = f.code();
-        self.code_add += u64::from(c.0);
-        self.code_del += u64::from(c.1);
-        self.code_rewritten += u64::from(c.2);
+        self.merge(&Self {
+            add: u64::from(f.add),
+            del: u64::from(f.del),
+            rewritten: u64::from(f.rewritten),
+            code_add: u64::from(c.0),
+            code_del: u64::from(c.1),
+            code_rewritten: u64::from(c.2),
+        })
     }
 
-    pub const fn merge(&mut self, o: &Self) {
-        self.add += o.add;
-        self.del += o.del;
-        self.rewritten += o.rewritten;
-        self.code_add += o.code_add;
-        self.code_del += o.code_del;
-        self.code_rewritten += o.code_rewritten;
+    /// Adds `o`, or `None` when a sum passes u64: only stored counts get there, and the caller
+    /// reports the cache unreadable then. `self` is unchanged on `None`.
+    #[must_use]
+    pub const fn merge(&mut self, o: &Self) -> Option<()> {
+        let (Some(add), Some(del), Some(rewritten)) = (
+            self.add.checked_add(o.add),
+            self.del.checked_add(o.del),
+            self.rewritten.checked_add(o.rewritten),
+        ) else {
+            return None;
+        };
+        let (Some(code_add), Some(code_del), Some(code_rewritten)) = (
+            self.code_add.checked_add(o.code_add),
+            self.code_del.checked_add(o.code_del),
+            self.code_rewritten.checked_add(o.code_rewritten),
+        ) else {
+            return None;
+        };
+        *self = Self {
+            add,
+            del,
+            rewritten,
+            code_add,
+            code_del,
+            code_rewritten,
+        };
+        Some(())
     }
 }
 
@@ -311,6 +336,31 @@ pub trait InsightsSource: Send + Sync {
     /// a page or an answer reads a source, and it refuses the result then. No default, so a new
     /// source has to say where its errors go.
     fn failure(&self) -> Option<SourceError>;
+}
+
+/// Set when a source summed stored counts past u64. The sum is then wrong whichever way it is
+/// rounded, so the source reports the cache unreadable ([`InsightsSource::failure`]) instead of
+/// answering with a saturated or wrapped number.
+#[derive(Debug, Default)]
+pub(crate) struct SumOverflow(std::sync::atomic::AtomicBool);
+
+impl SumOverflow {
+    pub(crate) const fn new() -> Self {
+        Self(std::sync::atomic::AtomicBool::new(false))
+    }
+    /// Notes the result of a checked add: `None` sets the flag.
+    pub(crate) fn note(&self, r: Option<()>) {
+        if r.is_none() {
+            self.0.store(true, std::sync::atomic::Ordering::Relaxed);
+        }
+    }
+
+    /// The unreadable-cache error once an add overflowed.
+    pub(crate) fn failure(&self) -> Option<SourceError> {
+        self.0
+            .load(std::sync::atomic::Ordering::Relaxed)
+            .then(|| SourceError(crate::seg::agg::SUM_OVER.to_owned()))
+    }
 }
 
 /// A storage error a source met while answering. The cache it came from is unreadable: the

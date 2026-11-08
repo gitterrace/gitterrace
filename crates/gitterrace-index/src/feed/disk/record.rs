@@ -136,7 +136,8 @@ pub(super) fn parse(c: &mut Cursor<'_>, mut files: Option<&mut Vec<FileRow>>) ->
             binary: ff & 1 != 0,
             deleted: ff & 4 != 0,
         };
-        sums.add_row(&f);
+        sums.add_row(&f)
+            .ok_or_else(|| c.err(crate::seg::agg::SUM_OVER))?;
         if let Some(out) = files.as_deref_mut() {
             out.push(f);
         }

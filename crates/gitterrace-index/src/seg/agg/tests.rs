@@ -116,6 +116,7 @@ fn aggregates_round_trip_through_blocks() {
         let r = match *s {
             section::AUTHOR_DAY => super::decode_author_day(&mut c, *n, |d, w, v| {
                 back.author_day.insert((d, w), v);
+                Some(())
             }),
             section::CANON => {
                 canon.push(b.as_slice());
@@ -123,12 +124,15 @@ fn aggregates_round_trip_through_blocks() {
             }
             section::PATH_AUTHOR => super::decode_path_author(&mut c, *n, |p, w, v| {
                 back.path_author.insert((p, w), v);
+                Some(())
             }),
             section::PATH_TOUCH => super::decode_life_month(&mut c, *n, |l, m, v| {
                 back.life_month.insert((l, m), v);
+                Some(())
             }),
             _ => super::decode_path_author(&mut c, *n, |l, w, v| {
                 back.life_author.insert((l, w), v);
+                Some(())
             }),
         };
         assert!(r.is_ok(), "{r:?}");
@@ -143,7 +147,7 @@ fn aggregates_round_trip_through_blocks() {
     let (s, n, b) = &blocks[0];
     let mut c = Cursor::new(&b[..b.len() - 1], "t", 0);
     assert!(
-        super::decode_author_day(&mut c, *n, |_, _, _| {}).is_err(),
+        super::decode_author_day(&mut c, *n, |_, _, _| Some(())).is_err(),
         "{s}"
     );
 }

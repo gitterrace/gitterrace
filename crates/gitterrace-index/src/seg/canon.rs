@@ -13,7 +13,7 @@
 //! its last name with `HOLDS` set while that name still holds it (the life is live).
 
 use crate::CommitRecord;
-use crate::seg::agg::pack;
+use crate::seg::agg::{add_count, pack};
 use crate::seg::bounds::{Cursor, MAX_BLOCK};
 use crate::seg::format::section;
 use crate::seg::{SegError, SegResult, Sink};
@@ -214,7 +214,7 @@ pub fn dump(store: &crate::seg::read::Store) -> SegResult<(Vec<u32>, Vec<u64>)> 
                 if touches.len() <= l {
                     touches.resize(l + 1, 0);
                 }
-                touches[l] += v.touches;
+                add_count(&mut touches[l], v.touches)
             })?;
         }
     }
@@ -249,33 +249,41 @@ const fn tuple(s: &crate::seg::agg::Sums) -> SumsTuple {
     ]
 }
 
-fn add_tuple(a: &mut SumsTuple, b: &SumsTuple) {
+/// `a += b` per field, `None` past u64 (`a` may be part added then: the caller drops it).
+#[must_use]
+fn add_tuple(a: &mut SumsTuple, b: &SumsTuple) -> Option<()> {
     for (x, y) in a.iter_mut().zip(b) {
-        *x += y;
+        add_count(x, *y)?;
     }
+    Some(())
 }
 
 impl LifeTables {
-    fn month(&mut self, life: u32, month: i64, v: &crate::seg::agg::LifeMonth) {
+    /// The row summed in, `None` when a sum passes u64.
+    fn month(&mut self, life: u32, month: i64, v: &crate::seg::agg::LifeMonth) -> Option<()> {
         let e = self
             .months
             .entry((life, month))
             .or_insert((0, [0; 6], i64::MIN));
-        e.0 += v.touches;
-        add_tuple(&mut e.1, &tuple(&v.lines));
+        add_count(&mut e.0, v.touches)?;
+        add_tuple(&mut e.1, &tuple(&v.lines))?;
         e.2 = e.2.max(v.last);
+        Some(())
     }
 
-    fn author(&mut self, life: u32, who: u32, v: &crate::seg::agg::PathAuthor) {
+    /// The row summed in, `None` when a sum passes u64.
+    fn author(&mut self, life: u32, who: u32, v: &crate::seg::agg::PathAuthor) -> Option<()> {
         let e = self.authors.entry((life, who)).or_insert((0, [0; 6]));
-        e.0 += v.touches;
-        add_tuple(&mut e.1, &tuple(&v.lines));
+        add_count(&mut e.0, v.touches)?;
+        add_tuple(&mut e.1, &tuple(&v.lines))
     }
 
-    fn merge(&mut self, day: i64, who: u32, merges: u64) {
+    /// The merges summed in, `None` when the sum passes u64.
+    fn merge(&mut self, day: i64, who: u32, merges: u64) -> Option<()> {
         if merges > 0 {
-            *self.merges.entry((day, who)).or_default() += merges;
+            add_count(self.merges.entry((day, who)).or_default(), merges)?;
         }
+        Some(())
     }
 }
 
@@ -314,16 +322,19 @@ pub fn life_tables_of(records: &[CommitRecord]) -> LifeTables {
         let olds = olds(&s, r);
         agg.push(r, who, &paths, &olds);
     }
+    // Counts from records: u32 per row, so no sum passes u64 and every add is kept.
     let mut t = LifeTables::default();
+    let mut ok = true;
     for (&(l, m), v) in &agg.life_month {
-        t.month(l, m, v);
+        ok &= t.month(l, m, v).is_some();
     }
     for (&(l, w), v) in &agg.life_author {
-        t.author(l, w, v);
+        ok &= t.author(l, w, v).is_some();
     }
     for (&(d, w), v) in &agg.author_day {
-        t.merge(d, w, v.merges);
+        ok &= t.merge(d, w, v.merges).is_some();
     }
+    debug_assert!(ok, "record counts summed past u64");
     t
 }
 

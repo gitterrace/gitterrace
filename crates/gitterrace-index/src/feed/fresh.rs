@@ -118,7 +118,8 @@ pub(crate) fn walk(
                 binary: s.binary,
                 deleted: s.deleted,
             };
-            sums.add_row(&row);
+            sums.add_row(&row)
+                .ok_or_else(|| io::Error::other(crate::seg::agg::SUM_OVER))?;
             files.push(row);
         }
         let row = CommitRow {

@@ -148,6 +148,8 @@ pub struct DiskSource {
     /// (hash of the path, id), sorted, built on first `find_path`.
     path_hash: OnceLock<Vec<(u32, u32)>>,
     broken: Mutex<Option<String>>,
+    /// Set when stored sums added past u64 across commits ([`InsightsSource::failure`]).
+    pub(super) over: crate::feed::SumOverflow,
 }
 
 impl DiskSource {
@@ -224,6 +226,7 @@ impl DiskSource {
             }),
             path_hash: OnceLock::new(),
             broken: Mutex::new(None),
+            over: crate::feed::SumOverflow::new(),
         };
         let mut raw = Vec::with_capacity(counts[1].min(1 << 20) as usize);
         for id in 0..counts[1] {

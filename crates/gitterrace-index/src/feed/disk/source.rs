@@ -96,7 +96,7 @@ impl InsightsSource for DiskSource {
             }
             let e = m.entry((day, c.ident)).or_default();
             e.0 += 1;
-            e.1.merge(&c.sums);
+            self.over.note(e.1.merge(&c.sums));
         });
         Box::new(
             m.into_iter()
@@ -127,7 +127,7 @@ impl InsightsSource for DiskSource {
                 if ok {
                     let e = m.entry((f.path, c.ident)).or_default();
                     e.0 += 1;
-                    e.1.add_row(f);
+                    self.over.note(e.1.add_row(f));
                 }
             }
         });
@@ -231,6 +231,8 @@ impl InsightsSource for DiskSource {
     }
 
     fn failure(&self) -> Option<SourceError> {
-        self.unreadable().map(SourceError)
+        self.unreadable()
+            .map(SourceError)
+            .or_else(|| self.over.failure())
     }
 }

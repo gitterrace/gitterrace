@@ -109,7 +109,9 @@ impl MemoryTables {
                     binary: f.binary,
                     deleted: f.deleted,
                 };
-                sums.add_row(&row);
+                let added = sums.add_row(&row);
+                // Records, not stored bytes: u32 counts per row cannot sum past u64.
+                debug_assert!(added.is_some(), "record counts summed past u64");
                 t.rows.push(row);
             }
             t.sums.push(sums);
@@ -264,7 +266,8 @@ impl InsightsSource for MemorySource<'_> {
             }
             let e = m.entry((day, self.t().per_commit[i].0)).or_default();
             e.0 += 1;
-            e.1.merge(&self.t().sums[i]);
+            let added = e.1.merge(&self.t().sums[i]);
+            debug_assert!(added.is_some(), "record counts summed past u64");
         }
         Box::new(
             m.into_iter()
@@ -287,7 +290,8 @@ impl InsightsSource for MemorySource<'_> {
                 }
                 let e = m.entry((row.path, self.t().per_commit[i].0)).or_default();
                 e.0 += 1;
-                e.1.add_row(row);
+                let added = e.1.add_row(row);
+                debug_assert!(added.is_some(), "record counts summed past u64");
             }
         }
         Box::new(

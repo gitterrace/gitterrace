@@ -226,3 +226,109 @@ fn path_postings_through_the_block_index_equal_a_full_scan() -> SegResult<()> {
     }
     Ok(())
 }
+
+/// Every stored counter, one at a time: the count (commits or touches), then each of the six
+/// line sums.
+const COUNTERS: usize = 7;
+
+/// Sets counter `k` of a row to `v`.
+fn set_counter(count: &mut u64, lines: &mut crate::seg::agg::Sums, k: usize, v: u64) {
+    match k {
+        0 => *count = v,
+        1 => lines.add = v,
+        2 => lines.del = v,
+        3 => lines.rewritten = v,
+        4 => lines.code_add = v,
+        5 => lines.code_del = v,
+        _ => lines.code_rewritten = v,
+    }
+}
+
+/// Aggregates of `recs` with counter `k` of every row near `u64::MAX`: what a hostile segment
+/// with recomputed crcs decodes to. Two of them sum past u64.
+fn near_max(s: &mut Strings, recs: &[&CommitRecord], k: usize) -> (Aggregates, Postings) {
+    let (mut a, mut p) = (Aggregates::default(), Postings::default());
+    for r in recs {
+        let (who, paths) = s.ids(r);
+        let olds = crate::seg::canon::olds(s, r);
+        a.push(r, who, &paths, &olds);
+        p.push(s, r, who, &paths);
+    }
+    let big = u64::MAX - 1;
+    for v in a.author_day.values_mut() {
+        set_counter(&mut v.commits, &mut v.lines, k, big);
+    }
+    for v in a.path_author.values_mut() {
+        set_counter(&mut v.touches, &mut v.lines, k, big);
+    }
+    for v in a.life_month.values_mut() {
+        set_counter(&mut v.touches, &mut v.lines, k, big);
+    }
+    for v in a.life_author.values_mut() {
+        set_counter(&mut v.touches, &mut v.lines, k, big);
+    }
+    (a, p)
+}
+
+/// Two segments whose stored counters each sit near `u64::MAX`: summing them (the read of an
+/// unmerged set, and the merge) is an unreadable cache, never a panic, a wrapped number or a
+/// saturated one. Every counter field of every aggregate table is tried in turn, so a new
+/// sum written with a plain `+=` fails here.
+#[test]
+fn counters_near_max_in_two_segments_are_unreadable() -> SegResult<()> {
+    let recs = history();
+    let all: Vec<&CommitRecord> = recs.iter().collect();
+    let ranks: Vec<u32> = (0..u32::try_from(recs.len()).unwrap_or(0)).collect();
+    for k in 0..COUNTERS {
+        let dir = tempfile::tempdir()?;
+        let mut s = Strings::default();
+        let mut segs = Vec::new();
+        let mut parts = Vec::new();
+        for n in 0..2 {
+            let (a, p) = near_max(&mut s, &all, k);
+            let name = format!("seg-1-{n}.gts");
+            let mut w =
+                ContainerWriter::new(dir.path(), &name, Kind::Segment, StringBase::default())?;
+            write_tables(&a, &p, &ranks, s.paths.list.len(), &mut |sec, items, b| {
+                w.block(sec, items, b)
+            })?;
+            w.finish()?;
+            segs.push(Container::open(dir.path(), &name, Kind::Segment)?);
+            parts.push((a, p));
+        }
+        let got = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            let src = SegmentSource::new(MemorySource::new(&recs), segs);
+            let days = src.agg_author_day(i64::MIN..i64::MAX).count();
+            let paths = src.agg_path_author("").count();
+            (days, paths, src.failure())
+        }));
+        let (_, _, failure) = got.unwrap_or_else(|_| panic!("counter {k}: the read panicked"));
+        let failure =
+            failure.unwrap_or_else(|| panic!("counter {k}: a summed-past-u64 read was served"));
+        assert!(
+            failure.0.contains(crate::seg::agg::SUM_OVER),
+            "counter {k}: {failure}"
+        );
+        // The merge of the same two parts.
+        let n = crate::seg::merge::Renumber::new(&s, std::iter::empty());
+        let merge_parts: Vec<crate::seg::merge::Part<'_>> = parts
+            .iter()
+            .map(|(a, p)| crate::seg::merge::Part {
+                agg: a,
+                postings: p,
+                rank: &ranks,
+            })
+            .collect();
+        let merged = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            crate::seg::merge::aggregates(&merge_parts, &n).map(|_| ())
+        }))
+        .unwrap_or_else(|_| panic!("counter {k}: the merge panicked"));
+        assert!(
+            merged
+                .as_ref()
+                .is_err_and(crate::seg::SegError::is_unreadable),
+            "counter {k}: the merge gave {merged:?}"
+        );
+    }
+    Ok(())
+}

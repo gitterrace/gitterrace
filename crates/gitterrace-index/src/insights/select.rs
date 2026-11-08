@@ -11,7 +11,8 @@ use std::sync::Arc;
 use crate::CommitRecord;
 use crate::feed::{
     AuthorDayRow, CommitRange, CommitRow, FileRow, Hit, IdentId, InsightsSource, LabelId,
-    PathAuthorRow, PathId, Posting, Rank, RenameEdge, SourceError, Stream, Sums, local_day_of,
+    PathAuthorRow, PathId, Posting, Rank, RenameEdge, SourceError, Stream, SumOverflow, Sums,
+    local_day_of,
 };
 use crate::insights::Options;
 
@@ -116,6 +117,8 @@ pub struct Scoped<'a> {
     /// Per scoped rank: the base rank and, with a path selection, the kept row indices.
     kept: Vec<(Rank, Option<Vec<u32>>)>,
     by_base: BTreeMap<Rank, u32>,
+    /// Set when stored sums added past u64, so the view reports the cache unreadable.
+    over: SumOverflow,
 }
 
 impl<'a> Scoped<'a> {
@@ -168,6 +171,7 @@ impl<'a> Scoped<'a> {
             base: Arc::clone(base),
             kept,
             by_base,
+            over: SumOverflow::new(),
         }
     }
 
@@ -202,7 +206,7 @@ impl<'a> Scoped<'a> {
             c.files = u32::try_from(rows.len()).unwrap_or(u32::MAX);
             c.sums = Sums::default();
             for f in &rows {
-                c.sums.add_row(f);
+                self.over.note(c.sums.add_row(f));
             }
         }
         c
@@ -271,7 +275,7 @@ impl InsightsSource for Scoped<'_> {
             if days.contains(&day) {
                 let e = m.entry((day, c.ident)).or_default();
                 e.0 += 1;
-                e.1.merge(&c.sums);
+                self.over.note(e.1.merge(&c.sums));
             }
         }
         Box::new(
@@ -293,7 +297,7 @@ impl InsightsSource for Scoped<'_> {
                 if prefix.is_empty() || self.base.path(f.path).is_some_and(|n| under(&n, prefix)) {
                     let e = m.entry((f.path, c.ident)).or_default();
                     e.0 += 1;
-                    e.1.add_row(&f);
+                    self.over.note(e.1.add_row(&f));
                 }
             }
         }
@@ -387,7 +391,7 @@ impl InsightsSource for Scoped<'_> {
     }
 
     fn failure(&self) -> Option<SourceError> {
-        self.base.failure()
+        self.base.failure().or_else(|| self.over.failure())
     }
 }
 

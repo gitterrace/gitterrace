@@ -6,8 +6,9 @@
 
 use std::collections::BTreeMap;
 
-use crate::seg::agg::{Aggregates, AuthorDay, Interner, PathAuthor, Strings};
+use crate::seg::agg::{Aggregates, AuthorDay, Interner, PathAuthor, SUM_OVER, Strings, add_count};
 use crate::seg::postings::{Edge, Hit, Postings};
+use crate::seg::{SegError, SegResult};
 
 /// One segment's tables as the merge reads them.
 pub(crate) struct Part<'a> {
@@ -66,22 +67,24 @@ fn give(map: &mut [u32], into: &mut Interner, old: &Interner, id: u32) {
     }
 }
 
-/// Aggregates summed over the parts, keys renumbered and re-sorted.
-pub(crate) fn aggregates(parts: &[Part<'_>], n: &Renumber) -> Aggregates {
+/// Aggregates summed over the parts, keys renumbered and re-sorted. `Unreadable` when a sum
+/// passes u64: the parts were read from files, and only a hostile or broken one gets there.
+pub(crate) fn aggregates(parts: &[Part<'_>], n: &Renumber) -> SegResult<Aggregates> {
+    let over = || SegError::unreadable("segment merge", 0, SUM_OVER);
     let mut out = Aggregates::default();
     for part in parts {
         for (&(day, w), v) in &part.agg.author_day {
             let e: &mut AuthorDay = out.author_day.entry((day, n.who(w))).or_default();
-            e.commits += v.commits;
-            e.lines.merge(&v.lines);
+            add_count(&mut e.commits, v.commits).ok_or_else(over)?;
+            e.lines.merge(&v.lines).ok_or_else(over)?;
         }
         for (&(p, w), v) in &part.agg.path_author {
             let e: &mut PathAuthor = out.path_author.entry((n.path(p), n.who(w))).or_default();
-            e.touches += v.touches;
-            e.lines.merge(&v.lines);
+            add_count(&mut e.touches, v.touches).ok_or_else(over)?;
+            e.lines.merge(&v.lines).ok_or_else(over)?;
         }
     }
-    out
+    Ok(out)
 }
 
 /// A per-id table, each list sorted. Ids past `len` cannot occur (the renumbering is dense).
@@ -211,7 +214,7 @@ mod tests {
                 rank: &[2, 4],
             },
         ];
-        let a = aggregates(&parts, &n);
+        let a = aggregates(&parts, &n).expect("aggregates");
         let p = postings(&parts, &n);
         assert_eq!(n.strings.paths.list, one_s.paths.list);
         assert_eq!(n.strings.identities.list, one_s.identities.list);
