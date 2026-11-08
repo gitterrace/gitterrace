@@ -3,7 +3,7 @@
 
 use std::fmt::Write as _;
 
-use pulldown_cmark::{Options, Parser, html};
+use pulldown_cmark::{Parser, html};
 
 use crate::facts::Workspace;
 use crate::readme_agents_md;
@@ -320,7 +320,10 @@ pub(crate) fn shot_html(name: &str, alt: &str, cap: &str) -> String {
 
 pub(crate) fn md(text: &str) -> String {
     let mut out = String::new();
-    html::push_html(&mut out, Parser::new_ext(text, Options::empty()));
+    html::push_html(
+        &mut out,
+        Parser::new_ext(text, gitterrace_web::markdown_options()),
+    );
     out
 }
 

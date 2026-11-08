@@ -56,6 +56,11 @@ mod settings;
 mod settings_actions;
 mod settings_page;
 pub mod sitemap;
+
+/// The markdown options every render path parses with, so the app and the site cannot drift.
+pub fn markdown_options() -> pulldown_cmark::Options {
+    markdown::options()
+}
 mod spark;
 #[cfg(test)]
 mod state_tests;

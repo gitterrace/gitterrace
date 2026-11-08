@@ -88,6 +88,11 @@ padding:var(--space-3) var(--space-4);overflow-x:auto}
 margin:0}.cmds dt code{background:none;padding:0;white-space:nowrap}.cmds dd{margin:0;\
 color:var(--muted)}
 @media (max-width:640px){.cmds{grid-template-columns:1fr}.cmds dd{margin-bottom:var(--space-2)}}
+main table{display:block;width:max-content;max-width:100%;overflow:auto;border-spacing:0}
+main table{border-collapse:collapse;margin:0 0 var(--space-4)}
+main th,main td{padding:6px 13px;border:1px solid var(--line)}
+main th{font-weight:600;text-align:left}
+main tr:nth-child(2n){background:var(--soft)}
 ul.features{list-style:none;padding:0;margin:0}
 ul.features li{padding:var(--space-2) 0;border-top:var(--border)}
 ul.features b{font-weight:var(--weight-semibold)}

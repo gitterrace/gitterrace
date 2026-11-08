@@ -9,7 +9,7 @@ use std::fmt::Write as _;
 use std::path::Path;
 
 use anyhow::{Context as _, Result};
-use pulldown_cmark::{CowStr, Event, HeadingLevel, Options, Parser, Tag, TagEnd, html};
+use pulldown_cmark::{CowStr, Event, HeadingLevel, Parser, Tag, TagEnd, html};
 
 use crate::docs_index::{LEGAL, normalize, on_site};
 use crate::out::Out;
@@ -138,7 +138,7 @@ pub fn page_path(stem: &str) -> String {
 pub fn anchors(text: &str) -> Vec<String> {
     let mut out = Vec::new();
     let mut cur: Option<String> = None;
-    for ev in Parser::new_ext(text, Options::empty()) {
+    for ev in Parser::new_ext(text, gitterrace_web::markdown_options()) {
         match ev {
             Event::Start(Tag::Heading { .. }) => cur = Some(String::new()),
             Event::End(TagEnd::Heading(_)) => out.extend(cur.take().map(|h| slug(&h))),
@@ -164,7 +164,7 @@ pub(super) fn body(
     let mut events: Vec<Event> = Vec::new();
     let mut pending: Vec<Event> = Vec::new();
     let mut heading: Option<(HeadingLevel, String)> = None;
-    for ev in Parser::new_ext(text, Options::empty()) {
+    for ev in Parser::new_ext(text, gitterrace_web::markdown_options()) {
         let ev = match ev {
             Event::Start(Tag::Link {
                 link_type,
@@ -243,24 +243,42 @@ fn wrap_wide(html: &str) -> String {
     out
 }
 
-/// One line broken at spaces outside tags, each piece at most `width` wide where it can be.
+/// The tags a table is built of: a newline before one is whitespace a table drops, so a table
+/// row with no spaces can still break between its cells.
+const TABLE_TAGS: [&str; 10] = [
+    "<thead", "</thead", "<tbody", "</tbody", "<tr", "</tr", "<th", "</th", "<td", "</td",
+];
+
+/// One line broken at spaces outside tags, or before a table tag, each piece at most `width`
+/// wide where it can be.
 fn break_line(line: &str, width: usize) -> String {
     let mut out = String::new();
+    // `last` is where the line may break and how many bytes the break replaces: a space is
+    // replaced by the newline, a table tag keeps its place after it.
     let (mut start, mut last, mut tag, mut col) = (0, None, false, 0);
     for (i, ch) in line.char_indices() {
         match ch {
-            '<' => tag = true,
+            '<' => {
+                let rest = &line[i..];
+                let at_tag = TABLE_TAGS.iter().any(|t| {
+                    rest.starts_with(t) && matches!(rest.as_bytes().get(t.len()), Some(b'>' | b' '))
+                });
+                if at_tag && i > start {
+                    last = Some((i, 0));
+                }
+                tag = true;
+            }
             '>' => tag = false,
-            ' ' if !tag => last = Some(i),
+            ' ' if !tag => last = Some((i, 1)),
             _ => {}
         }
         col += 1;
         if col > width
-            && let Some(at) = last.take()
+            && let Some((at, skip)) = last.take()
         {
             out.push_str(&line[start..at]);
             out.push('\n');
-            start = at + 1;
+            start = at + skip;
             col = line[start..=i].chars().count();
         }
     }

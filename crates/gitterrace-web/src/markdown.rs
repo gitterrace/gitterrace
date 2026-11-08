@@ -304,12 +304,16 @@ pub(crate) fn render_with(src: &str, base: Base) -> String {
     render_doc(src, base).html
 }
 
-pub(crate) fn render_doc(src: &str, base: Base) -> Doc {
-    let opts = Options::ENABLE_TABLES
+/// The markdown dialect of every render path: the app's pages and the generated site.
+pub(crate) fn options() -> Options {
+    Options::ENABLE_TABLES
         | Options::ENABLE_STRIKETHROUGH
         | Options::ENABLE_TASKLISTS
         | Options::ENABLE_FOOTNOTES
-        | Options::ENABLE_GFM;
+        | Options::ENABLE_GFM
+}
+
+pub(crate) fn render_doc(src: &str, base: Base) -> Doc {
     // The sentinel characters cannot come from the file, so no span is forged through them.
     let src = &*lines::neutralize(src);
     let (head, body) = match split_front_matter(src) {
@@ -320,7 +324,7 @@ pub(crate) fn render_doc(src: &str, base: Base) -> Doc {
     };
     // Spans count lines of the whole file, so the front matter's lines come first.
     let map = LineMap::new(body, src[..src.len() - body.len()].matches('\n').count());
-    let parser = Parser::new_ext(body, opts);
+    let parser = Parser::new_ext(body, options());
     let (events, outline) = transform(body, parser, &map, base.highlight_bytes);
     let mut raw = String::new();
     html::push_html(&mut raw, events.into_iter());

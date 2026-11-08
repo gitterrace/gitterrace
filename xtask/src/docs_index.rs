@@ -8,7 +8,7 @@ use std::fmt::Write as _;
 use std::path::Path;
 
 use anyhow::{Context as _, Result};
-use pulldown_cmark::{CodeBlockKind, Event, Options, Parser, Tag, TagEnd};
+use pulldown_cmark::{CodeBlockKind, Event, Parser, Tag, TagEnd};
 
 use crate::out::{Out, files_in};
 use crate::readme_agents_md::{cli_flags, shown_flags};
@@ -251,7 +251,7 @@ fn anchors(text: &str) -> BTreeSet<String> {
     let mut seen: BTreeMap<String, usize> = BTreeMap::new();
     let mut out = BTreeSet::new();
     let mut current: Option<String> = None;
-    for ev in Parser::new_ext(text, Options::all()) {
+    for ev in Parser::new_ext(text, gitterrace_web::markdown_options()) {
         match ev {
             Event::Start(Tag::Heading { .. }) => current = Some(String::new()),
             Event::Text(t) | Event::Code(t) => {
@@ -293,7 +293,7 @@ fn check_links(
 ) -> Vec<String> {
     let dir = Path::new(path).parent().unwrap_or_else(|| Path::new(""));
     let mut bad = Vec::new();
-    for ev in Parser::new_ext(text, Options::all()) {
+    for ev in Parser::new_ext(text, gitterrace_web::markdown_options()) {
         let Event::Start(Tag::Link { dest_url, .. } | Tag::Image { dest_url, .. }) = ev else {
             continue;
         };
@@ -337,7 +337,7 @@ const PATH_ROOTS: [&str; 5] = ["crates/", "scripts/", "xtask/", "bench/", "docs/
 
 fn check_paths(root: &Path, path: &str, text: &str) -> Vec<String> {
     let mut bad = Vec::new();
-    for ev in Parser::new_ext(text, Options::all()) {
+    for ev in Parser::new_ext(text, gitterrace_web::markdown_options()) {
         let Event::Code(code) = ev else { continue };
         let span = code.trim_end_matches('/');
         let plain = !span.contains(|c: char| c.is_whitespace() || "*<>{}[]".contains(c));
@@ -388,7 +388,7 @@ impl Keys {
     fn check(&self, path: &str, text: &str) -> Vec<String> {
         let mut bad = Vec::new();
         let mut toml = false;
-        for ev in Parser::new_ext(text, Options::all()) {
+        for ev in Parser::new_ext(text, gitterrace_web::markdown_options()) {
             match ev {
                 Event::Code(c) => bad.extend(self.span(path, &c)),
                 Event::Start(Tag::CodeBlock(CodeBlockKind::Fenced(lang))) => {
