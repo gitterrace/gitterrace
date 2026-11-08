@@ -127,7 +127,7 @@ pub(crate) async fn search(
     }
     let (key, q) = blocking(&app, move |a| Ok((memo_key(a, &q), q))).await?;
     if let Some(h) = app.memo_get(&key) {
-        return Ok(Html((*h).clone()));
+        return Ok(Html(h));
     }
     let html = blocking(&app, move |a| run(a, q)).await?.render()?;
     app.memo_put(key, Arc::new(html.clone()));

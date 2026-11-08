@@ -5,10 +5,12 @@ use std::{sync::Arc, time::Instant};
 use crate::app::{App, MEMO_TTL};
 
 impl App {
-    /// A rendered page for `key`, if fresh.
-    pub(crate) fn memo_get(&self, key: &str) -> Option<Arc<String>> {
+    /// A rendered page for `key`, if fresh, carrying the live version of now. The key does not
+    /// move with the version (it moves on every worktree change, which would empty the memo),
+    /// so the page's `data-live-v` is stamped here: a stale one makes the tab hear everything.
+    pub(crate) fn memo_get(&self, key: &str) -> Option<String> {
         let (at, html) = self.memo.lock().ok()?.get(key)?;
-        (at.elapsed() < MEMO_TTL).then_some(html)
+        (at.elapsed() < MEMO_TTL).then(|| stamp(&html, self.version()))
     }
 
     pub(crate) fn memo_put(&self, key: String, html: Arc<String>) {
@@ -73,3 +75,19 @@ impl App {
         )
     }
 }
+
+/// `html` with the value of its first `data-live-v` set to `v`. A page without one is as is.
+fn stamp(html: &str, v: u64) -> String {
+    const KEY: &str = "data-live-v=\"";
+    let Some(start) = html.find(KEY).map(|at| at + KEY.len()) else {
+        return html.to_owned();
+    };
+    let Some(end) = html[start..].find('"').map(|e| start + e) else {
+        return html.to_owned();
+    };
+    format!("{}{v}{}", &html[..start], &html[end..])
+}
+
+#[cfg(test)]
+#[path = "memo_tests.rs"]
+mod tests;

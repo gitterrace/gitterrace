@@ -97,7 +97,7 @@ pub(crate) fn html(a: &App, head: &str, src: &dyn InsightsSource) -> String {
         a.cfg().display.sidebar.join(",")
     );
     if let Some(h) = a.memo_get(&key) {
-        return (*h).clone();
+        return h;
     }
     let out = build(a, head, src, dirty, fmt::now())
         .render()

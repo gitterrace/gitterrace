@@ -59,7 +59,7 @@ pub(super) async fn tree(
     })
     .await?;
     if let Some(h) = app.memo_get(&key) {
-        return Ok(Html((*h).clone()));
+        return Ok(Html(h));
     }
     let p = blocking(&app, move |a| {
         let id = a.repo.resolve(&rev)?;

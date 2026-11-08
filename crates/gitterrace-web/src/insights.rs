@@ -295,7 +295,7 @@ pub(crate) async fn cached_keyed<T: askama::Template + Send + 'static>(
 ) -> Result<Html<String>> {
     let key = blocking(app, move |a| Ok(a.memo_key(tab, Some(&query)))).await?;
     if let Some(h) = app.memo_get(&key) {
-        return Ok(Html((*h).clone()));
+        return Ok(Html(h));
     }
     let (html, served) = with_records(app, tab, build).await?;
     if served {

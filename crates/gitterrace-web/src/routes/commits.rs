@@ -381,7 +381,7 @@ pub(super) async fn commit(State(app): Shared, Path(id): Path<String>) -> Result
     })
     .await?;
     if let Some(h) = app.memo_get(&key) {
-        return Ok(Html((*h).clone()));
+        return Ok(Html(h));
     }
     let p = blocking(&app, move |a| {
         let d = a.repo.commit(&id)?;
