@@ -5,7 +5,7 @@ use std::ops::Range;
 use std::sync::Arc;
 
 use crate::feed::disk::record::{hash32, hex};
-use crate::feed::disk::{DiskSource, SCAN_FROM, scan};
+use crate::feed::disk::{DiskSource, scan};
 use crate::feed::{
     AuthorDayRow, CommitRange, CommitRow, FileRow, Hit, IdentId, InsightsSource, LabelId,
     PathAuthorRow, PathId, Posting, Rank, RenameEdge, SourceError, Stream, Sums,
@@ -37,27 +37,20 @@ impl InsightsSource for DiskSource {
     }
 
     fn rows_for(&self, commits: Vec<Rank>) -> Stream<'_, (Rank, Vec<FileRow>)> {
-        // Many ascending ranks that cover much of their span: one sequential pass beats a cache
-        // probe per commit. A sparse list (a few commits spread over history) would read the
-        // whole span, so it keeps the lookups.
-        let dense = |c: &[Rank]| {
-            let span = u64::from(c[c.len() - 1].0 - c[0].0) + 1;
-            (c.len() as u64).saturating_mul(4) >= span
-        };
-        if commits.len() > SCAN_FROM && commits.is_sorted() && dense(&commits) {
-            let (from, to) = (commits[0].0, commits[commits.len() - 1].0 + 1);
-            let mut s = scan::Scan::new(self, from, to, true);
-            let mut want = commits.into_iter().peekable();
+        // Ascending ranks: one forward scan that seeks to each, so every block is read once
+        // per call, whatever the spread. A lookup per commit goes through the shared block
+        // cache, and a pass over a large history evicts the blocks it needs next: on a history
+        // whose index blocks do not fit the cache, each commit re-read and re-checked several.
+        if commits.len() > 1 && commits.windows(2).all(|w| w[0] < w[1]) {
+            let to = commits[commits.len() - 1].0.saturating_add(1);
+            let mut s = scan::Scan::new(self, commits[0].0, to, true);
+            let mut want = commits.into_iter();
             return Box::new(std::iter::from_fn(move || {
+                let next = want.next()?;
+                s.seek(next.0);
                 let mut files = Vec::new();
-                loop {
-                    let next = *want.peek()?;
-                    let c = s.next_row(&mut files)?;
-                    if c.rank == next {
-                        want.next();
-                        return Some((c.rank, std::mem::take(&mut files)));
-                    }
-                }
+                let c = s.next_row(&mut files)?;
+                Some((c.rank, files))
             }));
         }
         Box::new(commits.into_iter().filter_map(move |r| {

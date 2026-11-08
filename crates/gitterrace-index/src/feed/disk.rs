@@ -35,8 +35,6 @@ pub use writer::RowWriter;
 /// Not configurable: an on-disk format bound against a corrupt or hostile cache.
 const MAX_RECORD: usize = 64 << 20;
 const OID_ENTRY: usize = 24;
-/// From this many ranks on, `rows_for` scans instead of looking each rank up.
-const SCAN_FROM: usize = 256;
 
 /// Maps raw (name, email) pairs to the shown revision's (its `.mailmap`), one call for all.
 pub type IdentMap<'a> =

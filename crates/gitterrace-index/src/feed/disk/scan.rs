@@ -171,6 +171,25 @@ impl<'s> Scan<'s> {
         Ok(it)
     }
 
+    /// Moves forward to `rank`, keeping the blocks already read: a later rank in the same
+    /// block reads nothing. A rank behind the current one, or past the end, ends the scan.
+    pub(super) fn seek(&mut self, rank: u32) {
+        if rank < self.rank || rank >= self.to {
+            self.done = true;
+            return;
+        }
+        let Some((seg, ord)) = self.src.seg_of(Rank(rank)) else {
+            self.done = true;
+            return;
+        };
+        if seg != self.seg {
+            self.row_block = usize::MAX;
+            self.idx_block = usize::MAX;
+            self.col_block = usize::MAX;
+        }
+        (self.rank, self.seg, self.ord) = (rank, seg, ord);
+    }
+
     /// The next commit and, when asked for, its file rows.
     pub(super) fn next_row(&mut self, files: &mut Vec<FileRow>) -> Option<CommitRow> {
         if self.done || self.rank >= self.to {
@@ -288,6 +307,42 @@ mod tests {
         assert_eq!(disk.commits_in(CommitRange::All).count(), recs.len());
         let all: Vec<Rank> = (0..disk.len).map(Rank).collect();
         assert_eq!(disk.rows_for(all).count(), recs.len());
+        Ok(())
+    }
+
+    /// Guard class: a pass over ascending ranks (a filtered page's commits, any spread) reads
+    /// each block from disk at most once, whatever the block cache holds. Red on the lookup
+    /// path, where a cache smaller than the blocks the pass touches re-reads them per commit.
+    #[test]
+    fn rows_for_ascending_ranks_reads_each_block_at_most_once() -> SegResult<()> {
+        let recs = records();
+        let dir = tempfile::tempdir()?;
+        write_cache(dir.path(), &recs, &[200, 2200])?;
+        let disk = open(dir.path())?.with_cache_bytes(1);
+        let blocks: usize = disk.segs.iter().map(|s| s.c.toc().len()).sum();
+        for step in [1, 3, 7, 40] {
+            let ranks: Vec<Rank> = (0..disk.len).step_by(step).map(Rank).collect();
+            let want: Vec<_> = ranks
+                .iter()
+                .map(|r| {
+                    disk.rows_for(vec![*r])
+                        .flat_map(|(_, f)| f)
+                        .collect::<Vec<_>>()
+                })
+                .collect();
+            let before = crate::seg::read::BLOCK_READS.with(std::cell::Cell::get);
+            let got: Vec<_> = disk.rows_for(ranks.clone()).collect();
+            let reads = crate::seg::read::BLOCK_READS.with(std::cell::Cell::get) - before;
+            assert!(
+                reads <= blocks,
+                "step {step}: {reads} block reads, {blocks} blocks"
+            );
+            let got_ranks: Vec<Rank> = got.iter().map(|(r, _)| *r).collect();
+            assert_eq!(got_ranks, ranks, "step {step}: every rank, in order");
+            let got_rows: Vec<_> = got.into_iter().map(|(_, f)| f).collect();
+            assert_eq!(got_rows, want, "step {step}: the rows a lookup reads");
+        }
+        assert_eq!(disk.unreadable(), None);
         Ok(())
     }
 }

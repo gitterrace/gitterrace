@@ -15,6 +15,12 @@ use crate::seg::io::read_exact_at;
 use crate::seg::manifest::{FileEntry, Manifest, check_name};
 use crate::seg::{Rank, SegError, SegResult};
 
+#[cfg(test)]
+thread_local! {
+    /// Blocks read from disk on this thread, for the guards that bound re-reads.
+    pub(crate) static BLOCK_READS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+
 /// An open container. Holds its own `File` (Windows `seek_read` moves the cursor).
 #[derive(Debug)]
 pub struct Container {
@@ -81,6 +87,8 @@ impl Container {
     /// Reads one block into `buf` (reused across calls) and checks its crc.
     pub fn read_block<'b>(&self, e: &TocEntry, buf: &'b mut Vec<u8>) -> SegResult<&'b [u8]> {
         // The toc check bounded len by MAX_BLOCK and the range by the file.
+        #[cfg(test)]
+        BLOCK_READS.with(|n| n.set(n.get() + 1));
         buf.clear();
         buf.resize(e.len as usize, 0);
         read_exact_at(&self.file, buf, e.offset)
