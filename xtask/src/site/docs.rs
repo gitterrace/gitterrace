@@ -94,18 +94,20 @@ pub(super) fn stem(path: &str) -> &str {
     name.strip_suffix(".md").unwrap_or(name)
 }
 
-/// The slug of a heading: lowercase words joined by `-`, so "Code age and releases" is
-/// `code-age-and-releases`.
+/// The slug of a heading, by the rule the app and the repository host use: lowercase, keep
+/// letters, digits, `-` and `_`, spaces to `-`. So "Code age and releases" is
+/// `code-age-and-releases` and "HTTP (/api/v1)" is `http-apiv1`, wherever the page is read.
 pub fn slug(heading: &str) -> String {
-    let mut out = String::new();
-    for c in heading.chars() {
-        if c.is_alphanumeric() {
-            out.extend(c.to_lowercase());
-        } else if !out.is_empty() && !out.ends_with('-') {
-            out.push('-');
-        }
-    }
-    out.trim_end_matches('-').to_owned()
+    heading
+        .trim()
+        .chars()
+        .filter_map(|c| match c {
+            ' ' => Some('-'),
+            c if c == '-' || c == '_' || c.is_alphanumeric() => Some(c),
+            _ => None,
+        })
+        .flat_map(char::to_lowercase)
+        .collect()
 }
 
 /// Fails when two elements of one page share an id, so a link cannot mean two places.

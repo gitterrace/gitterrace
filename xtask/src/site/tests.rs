@@ -465,3 +465,30 @@ fn docs_pages_with_a_table_render_a_table() {
         "no docs page has a table, the guard checks nothing"
     );
 }
+
+/// Guard class: every heading id of every published page is the id the app gives that heading,
+/// so a `#fragment` written against the app or the repository host lands on the site too. Red
+/// for any heading where the two slug rules part, such as punctuation inside a word.
+#[test]
+fn every_published_heading_id_matches_the_app() {
+    let root = crate::repo_root();
+    let mut bad = Vec::new();
+    for (rel, ..) in crate::docs_index::on_site() {
+        let text = std::fs::read_to_string(root.join(rel)).expect("doc");
+        let app = crate::docs_index::anchors(&text);
+        for id in docs::anchors(&text) {
+            if !app.contains(&id) {
+                bad.push(format!("{rel}: #{id} is not an id the app renders"));
+            }
+        }
+    }
+    assert!(bad.is_empty(), "{}", bad.join("\n"));
+}
+
+/// The rule itself, on the shapes that once parted: punctuation inside a word is dropped, not
+/// a word break.
+#[test]
+fn the_site_slug_keeps_the_app_rule() {
+    assert_eq!(docs::slug("HTTP (/api/v1)"), "http-apiv1");
+    assert_eq!(docs::slug("Code age and releases"), "code-age-and-releases");
+}
