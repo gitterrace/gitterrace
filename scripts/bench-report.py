@@ -67,6 +67,31 @@ actual = bd.actual
 stray = bd.stray
 
 
+def gate_test() -> None:
+    """Every labelled metric names its fields, and each of them alone can fail the gate."""
+    br = importlib.import_module("bench-run")
+    for key in bc.SOURCES:
+        if key not in bc.METRICS:
+            sys.exit(f"bench-report self-test failed: {key} has sources but no label")
+    pages = {"warm_total_ms": {"median": 1}, "cold": {"total_ms": 1}}
+    for key, fields in bc.SOURCES.items():
+        for hot in fields:
+            res: Json = {
+                "class": "c",
+                "pages": {"p": pages},
+                "index": {"secs": 1, "peak_rss_mb": 1},
+                "idle": {"cpu_pct": 0.1, "cpu_pct_events_client": 0.1},
+                "memory": {"rss_after_pages_mb": 1},
+            }
+            top, leaf = hot.split(".")
+            res[top][leaf] = 100
+            got = br.judge(res, {"c": {key: 50}}).get(key, {}).get("status")
+            if got != "over":
+                sys.exit(
+                    f"bench-report self-test failed: {hot} over budget reads {got}"
+                )
+
+
 def self_test() -> None:
     """A stray binary file gives the clean message, not a decode crash."""
     import tempfile
@@ -87,6 +112,7 @@ def self_test() -> None:
     wrap_test()
     footprint_test()
     export_test()
+    gate_test()
     print("bench-report self-test: ok")
 
 

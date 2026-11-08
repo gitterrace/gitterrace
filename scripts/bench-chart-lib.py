@@ -34,17 +34,23 @@ METRICS = {
     "page_warm_ms": ("Warm page, slowest median", "ms", "{:.0f}"),
     "page_cold_ms": ("Cold page, slowest", "ms", "{:.0f}"),
     "index_secs": ("Index build", "s", "{:.1f}"),
-    "idle_cpu_pct": ("Idle CPU with /events client", "%", "{:.2f}"),
-    "rss_mb": ("Peak memory (RSS)", "MB", "{:.0f}"),
+    "idle_cpu_pct": ("Idle CPU, worse of plain and /events client", "%", "{:.2f}"),
+    "rss_mb": ("Peak memory (RSS, index peak or after pages)", "MB", "{:.0f}"),
     "footprint_idle_mb": ("Idle footprint above a fresh server", "MB", "{:.0f}"),
     "export_secs": ("Export", "s", "{:.1f}"),
+}
+# metric key -> result fields it reads, dotted. The gate takes the max of the listed fields,
+# and the bench-report self-test fails when one of them can go over budget unnoticed.
+SOURCES = {
+    "idle_cpu_pct": ("idle.cpu_pct", "idle.cpu_pct_events_client"),
+    "rss_mb": ("index.peak_rss_mb", "memory.rss_after_pages_mb"),
 }
 SHORT = {
     "page_warm_ms": "warm page",
     "page_cold_ms": "cold page",
     "index_secs": "index build",
     "idle_cpu_pct": "idle CPU",
-    "rss_mb": "peak memory",
+    "rss_mb": "peak memory (index peak or after pages)",
     "footprint_idle_mb": "idle footprint above a fresh server",
     "export_secs": "export",
 }

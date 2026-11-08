@@ -39,6 +39,7 @@ from typing import Any
 
 bl = importlib.import_module("bench-lib")
 bq = importlib.import_module("bench-quiet-lib")
+bc = importlib.import_module("bench-chart-lib")
 
 Json = dict[str, Any]
 LoadSampler = bq.LoadSampler
@@ -281,6 +282,14 @@ def export(
     return res
 
 
+def field(res: Json, path: str) -> float:
+    """A dotted result field, e.g. index.peak_rss_mb."""
+    cur: Any = res
+    for part in path.split("."):
+        cur = cur[part]
+    return float(cur)
+
+
 def judge(res: Json, budgets: Json) -> Json:
     """Budget status per metric class: pass or over."""
     b, out = budgets.get(res["class"], {}), {}
@@ -318,10 +327,10 @@ def judge(res: Json, budgets: Json) -> Json:
     )
     put(
         "idle_cpu_pct",
-        max(res["idle"]["cpu_pct"], res["idle"]["cpu_pct_events_client"]),
+        max(field(res, f) for f in bc.SOURCES["idle_cpu_pct"]),
         b.get("idle_cpu_pct"),
     )
-    put("rss_mb", res["memory"]["rss_after_pages_mb"], b.get("rss_mb"))
+    put("rss_mb", max(field(res, f) for f in bc.SOURCES["rss_mb"]), b.get("rss_mb"))
     # The serving-memory goal: idle, after a release, at most the cache budget plus margin
     # above a just-started server (docs/benchmarks.md, memory_budget.rs).
     fp, start = (
