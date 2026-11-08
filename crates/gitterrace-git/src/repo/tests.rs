@@ -486,3 +486,35 @@ fn a_mode_only_change_carries_both_modes() {
     assert_eq!(c.files[0].modes, Some((0o100_644, 0o100_755)));
     assert!(c.files[0].hunks.is_empty());
 }
+
+/// Guard class: any memo of ref data must miss when a ref is added, moved or deleted. Red when
+/// the ref list served after such a change is the one built before it.
+#[test]
+fn the_ref_list_follows_every_new_moved_and_deleted_ref() {
+    let tmp = fixture();
+    let d = tmp.path();
+    let repo = Repo::discover(d).expect("open");
+    let names = |r: &Repo| -> Vec<(String, String)> {
+        let mut v: Vec<_> = r
+            .refs()
+            .expect("refs")
+            .into_iter()
+            .map(|x| (x.name, x.target))
+            .collect();
+        v.sort();
+        v
+    };
+    let before = names(&repo);
+    assert_eq!(before, names(&repo), "a repeat answers the same list");
+    git_at(d, T0, &["tag", "v9"]);
+    assert!(names(&repo).iter().any(|(n, _)| n == "v9"), "a new tag shows");
+    git_at(d, T0, &["branch", "side", "HEAD~1"]);
+    let side = names(&repo).into_iter().find(|(n, _)| n == "side").expect("side").1;
+    git_at(d, T0, &["branch", "-f", "side", "HEAD"]);
+    let moved = names(&repo).into_iter().find(|(n, _)| n == "side").expect("side").1;
+    assert_ne!(side, moved, "a moved branch shows its new commit");
+    git_at(d, T0, &["tag", "-d", "v9"]);
+    assert!(!names(&repo).iter().any(|(n, _)| n == "v9"), "a deleted tag goes");
+    git_at(d, T0, &["pack-refs", "--all"]);
+    assert_eq!(names(&repo).len(), before.len() + 1, "packing changes nothing shown");
+}

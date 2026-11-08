@@ -65,6 +65,9 @@ pub struct Repo {
     changes: Mutex<Weak<ChangeMemo>>,
     /// Commits read for a summary plus divergences walked, see [`Repo::row_reads`].
     pub(crate) row_reads: AtomicU64,
+    /// The last peeled ref list and the hash of the raw refs it was built from, see
+    /// [`Repo::refs`]. One entry, so it holds at most one list.
+    refs_memo: Mutex<Option<(u64, Vec<RefInfo>)>>,
 }
 
 impl Repo {
@@ -84,6 +87,7 @@ impl Repo {
             committed_only: AtomicBool::new(false),
             changes: Mutex::new(Weak::new()),
             row_reads: AtomicU64::new(0),
+            refs_memo: Mutex::new(None),
         })
     }
 
@@ -206,13 +210,41 @@ impl Repo {
         Ok(self.resolve_id(&self.repo(), rev)?.to_string())
     }
 
-    /// Branches, tags and remote branches, newest first.
+    /// Branches, tags and remote branches, newest first. Listing the refs is cheap, peeling each
+    /// one to its commit is not, so the peeled list is kept for one key: every ref name with
+    /// its raw target. A new, moved or deleted ref changes the key and the list is rebuilt.
     pub fn refs(&self) -> Result<Vec<RefInfo>> {
+        use std::hash::{Hash, Hasher};
         let repo = self.repo();
         let platform = repo.references().map_err(git)?;
-        let mut out = Vec::new();
+        let mut raw = Vec::new();
+        let mut h = std::collections::hash_map::DefaultHasher::new();
         for reference in platform.all().map_err(git)? {
-            let mut reference = reference.map_err(git)?;
+            let reference = reference.map_err(git)?;
+            reference.name().as_bstr().hash(&mut h);
+            match reference.target() {
+                gix::refs::TargetRef::Object(id) => id.as_bytes().hash(&mut h),
+                gix::refs::TargetRef::Symbolic(n) => n.as_bstr().hash(&mut h),
+            }
+            raw.push(reference);
+        }
+        let key = h.finish();
+        if let Ok(g) = self.refs_memo.lock()
+            && let Some((k, list)) = g.as_ref()
+            && *k == key
+        {
+            return Ok(list.clone());
+        }
+        let out = Self::peel_refs(&repo, raw);
+        if let Ok(mut g) = self.refs_memo.lock() {
+            *g = Some((key, out.clone()));
+        }
+        Ok(out)
+    }
+
+    fn peel_refs(repo: &gix::Repository, raw: Vec<gix::Reference<'_>>) -> Vec<RefInfo> {
+        let mut out = Vec::new();
+        for mut reference in raw {
             let name = reference.name().as_bstr().to_str_lossy().into_owned();
             let (kind, short) = if let Some(s) = name.strip_prefix("refs/heads/") {
                 (RefKind::Branch, s)
@@ -229,7 +261,7 @@ impl Repo {
             let annotation = (kind == RefKind::Tag)
                 .then(|| reference.target().try_id().map(ToOwned::to_owned))
                 .flatten()
-                .and_then(|id| crate::gitdir::annotation(&repo, id));
+                .and_then(|id| crate::gitdir::annotation(repo, id));
             let Ok(commit) = reference.peel_to_commit() else {
                 continue;
             };
@@ -243,7 +275,7 @@ impl Repo {
             });
         }
         out.sort_by_key(|r| Reverse(r.time));
-        Ok(out)
+        out
     }
 
     /// Name of the branch HEAD points at, or `None` when detached.
