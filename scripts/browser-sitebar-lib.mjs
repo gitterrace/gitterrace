@@ -207,5 +207,100 @@ export function checks(env) {
     } finally { server.close(); }
   }
 
-  return { siteBar, siteRail };
+  // Every table on every page, at 390 and 1440 px: no text in a cell wraps inside a token (a
+  // letter or digit on both sides of the line break, so `rescan_secs` or 1440 split over two
+  // lines), and no cell with text is crushed narrower than two em of its font. A wide
+  // table scrolls inside itself, so neither has a reason to happen.
+  async function siteTables() {
+    const { server, url } = await serve();
+    const all = pages();
+    try {
+      for (const name of browsers) {
+        const b = await launch(pw, name);
+        for (const width of [390, 1440]) {
+          const ctx = await b.newContext({ viewport: { width, height: 900 } });
+          const p = await ctx.newPage();
+          let tables = 0;
+          const bad = [];
+          for (const path of all) {
+            await p.goto(url + path, { waitUntil: 'load' });
+            await p.evaluate(() => document.fonts.ready);
+            const m = await p.evaluate(tableProbe);
+            tables += m.tables;
+            for (const f of m.found) bad.push(`${path} ${f}`);
+          }
+          const where = `site-tables ${name} ${width}`;
+          if (bad.length) r.fail(`${where}: ${bad.slice(0, 6).join('; ')}`);
+          else r.ok(`${where}: ${tables} tables on ${all.length} pages, none broken or crushed`);
+          await ctx.close();
+        }
+        await b.close();
+      }
+    } finally {
+      server.close();
+    }
+    // Self-test: a cell of "a, b, c" on one line passes, and the same words squeezed to one
+    // word per line are crushed.
+    const fb = await launch(pw, browsers[0]);
+    const fp = await (await fb.newContext({ viewport: { width: 800, height: 600 } })).newPage();
+    const cell = (w) => `<main><table style="display:table"><tr><td style="width:${w};` +
+      'padding:0;font:16px monospace">alpha, beta, gamma</td></tr></table></main>';
+    for (const [w, crushed] of [['40ch', false], ['6ch', true]]) {
+      await fp.setContent(cell(w));
+      const m = await fp.evaluate(tableProbe);
+      const got = m.found.some((f) => f.includes('crushed'));
+      const what = `site-tables fixture: a cell of "alpha, beta, gamma" at ${w}`;
+      if (got === crushed) r.ok(`${what} is ${crushed ? 'crushed' : 'not crushed'}`);
+      else r.fail(`${what} gave ${m.found.join('; ') || 'no findings'}`);
+    }
+    await fb.close();
+  }
+
+  return { siteBar, siteRail, siteTables };
+}
+
+// Runs in the page: the tables in main and what is wrong in their cells. Each character's line
+// is read from its box. A token is broken where two word characters (letters, digits, `_`)
+// with nothing between them sit on different lines. A cell is crushed where its text of three
+// words or more wraps to one word per line. A line is a change of a character's top, so
+// punctuation only separates words and never starts a line.
+function tableProbe() {
+  const found = [];
+  const word = /[\p{L}\p{N}_]/u;
+  for (const cell of document.querySelectorAll('main th, main td')) {
+    const text = cell.textContent.trim().replace(/\s+/g, ' ');
+    if (!text) continue;
+    const label = `"${text.slice(0, 32)}"`;
+    const walker = document.createTreeWalker(cell, NodeFilter.SHOW_TEXT);
+    const range = document.createRange();
+    const lines = [];
+    let prev = null;
+    let lastTop = null;
+    let broken = '';
+    for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+      const s = n.textContent;
+      for (let i = 0; i < s.length; i++) {
+        if (!word.test(s[i])) {
+          if (prev) prev.gap = true;
+          continue;
+        }
+        range.setStart(n, i);
+        range.setEnd(n, i + 1);
+        const rect = [...range.getClientRects()].find((q) => q.width > 0);
+        if (!rect) continue;
+        const next = lastTop !== null && rect.top > lastTop + rect.height / 2;
+        if (next && !prev.gap && !broken) broken = `${prev.ch}${s[i]}`;
+        if (next || !lines.length) lines.push(0);
+        if (next || !prev || prev.gap) lines[lines.length - 1]++;
+        lastTop = rect.top;
+        prev = { ch: s[i], gap: false };
+      }
+    }
+    if (broken) found.push(`${label} broken inside a token at "${broken}"`);
+    const words = text.split(' ').length;
+    if (words >= 3 && lines.length >= 3 && lines.every((w) => w <= 1)) {
+      found.push(`${label} crushed to one word a line`);
+    }
+  }
+  return { tables: document.querySelectorAll('main table').length, found };
 }

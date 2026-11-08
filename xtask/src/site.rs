@@ -92,6 +92,8 @@ color:var(--muted)}
 main table{display:block;width:max-content;max-width:100%;overflow:auto;border-spacing:0}
 main table{border-collapse:collapse;margin:0 0 var(--space-4)}
 main th,main td{padding:6px 13px;border:1px solid var(--line)}
+main td code,main th code{white-space:nowrap;overflow-wrap:normal}
+main td:not(:has(> code:only-child))::before{content:'';display:block;width:16ch}
 main th{font-weight:600;text-align:left}
 main tr:nth-child(2n){background:var(--soft)}
 ul.features{list-style:none;padding:0;margin:0}
