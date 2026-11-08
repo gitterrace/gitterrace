@@ -94,12 +94,13 @@
   });
   navs.forEach(function (d) {
     var q = d.querySelector(".outline-q"), none = d.querySelector(".outline-none");
-    if (!q) return;
     var menu = d.tagName === "DETAILS";
-    var items = Array.prototype.slice.call(d.querySelectorAll("li"));
-    q.hidden = false;
-    window.gtFilter(q, { items: items, root: d, clear: !menu, none: none });
-    if (menu) d.addEventListener("toggle", function () { if (d.open) q.focus(); });
+    if (q) {
+      var items = Array.prototype.slice.call(d.querySelectorAll("li"));
+      q.hidden = false;
+      window.gtFilter(q, { items: items, root: d, clear: !menu, none: none });
+      if (menu) d.addEventListener("toggle", function () { if (d.open) q.focus(); });
+    }
     function close() { d.open = false; d.querySelector("summary").focus(); }
     d.addEventListener("keydown", function (e) {
       if (e.key === "Escape" && menu && d.open) { e.preventDefault(); close(); }

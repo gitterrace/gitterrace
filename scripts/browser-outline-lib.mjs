@@ -12,7 +12,7 @@ export function checks(env) {
   // The filter shows, narrows the list on typing, and Escape closes the menu and returns focus to
   // its button, on a Markdown page and on an insights page alike.
   async function outlineFilter() {
-    writeFileSync(join(dir, 'filter-outline.md'), '# Doc\n\n## Alpha\n\ntext\n\n## Beta\n\ntext\n\n## Gamma\n\ntext\n');
+    writeFileSync(join(dir, 'filter-outline.md'), '# Doc\n\n' + Array.from({ length: 12 }, (_, i) => `## Head ${i}\n\ntext\n`).join('\n'));
     sh(dir, 'git', 'add', '-A');
     sh(dir, 'git', 'commit', '-q', '-m', 'docs: filter outline fixture');
     await new Promise((ok) => setTimeout(ok, 600));
@@ -20,7 +20,7 @@ export function checks(env) {
       const { b, ctx } = await context(name);
       const p = await ctx.newPage();
       await p.setViewportSize({ width: 900, height: 800 });
-      for (const path of ['/blob/HEAD/filter-outline.md', '/stats/hotspots']) {
+      for (const path of ['/blob/HEAD/filter-outline.md']) {
         const where = `outline-filter ${name} ${path}`;
         try {
           await p.goto(srv.base + path, { waitUntil: 'load' });

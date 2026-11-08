@@ -14,6 +14,7 @@ pub(crate) fn jumps(sections: &[(&str, &str, bool)]) -> Vec<OutlineItem> {
             id: (*id).to_owned(),
             text: (*text).to_owned(),
             chrome: true,
+            symbol: false,
         })
         .collect()
 }

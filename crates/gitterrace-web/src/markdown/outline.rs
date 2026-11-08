@@ -12,6 +12,8 @@ pub(crate) struct OutlineItem {
     /// A section of the page itself (an insights section), whose id is the page's own and is
     /// linked as is; a document heading's id goes through `doc_id`.
     pub(crate) chrome: bool,
+    /// A symbol of a source file: its list always has the filter, whatever its length.
+    pub(crate) symbol: bool,
 }
 
 impl OutlineItem {
@@ -22,12 +24,17 @@ impl OutlineItem {
             id,
             text: text.to_owned(),
             chrome: false,
+            symbol: false,
         }
     }
 }
 
 /// Fewest listed headings that make an outline worth showing.
 const OUTLINE_MIN: usize = 3;
+
+/// Fewest listed headings that get a filter box: a shorter list is scanned faster than filtered.
+/// A source file's symbols always get one.
+const OUTLINE_FILTER_MIN: usize = 12;
 
 /// The headings an outline lists: h2 and h3, plus h1 only when the document has several.
 /// Empty when fewer than three remain.
@@ -59,6 +66,8 @@ struct OutlineMarkup<'a> {
     rail: bool,
     icon_only: bool,
     links: Vec<OutlineLink<'a>>,
+    /// Whether the list is long enough for the filter field.
+    filter: bool,
 }
 
 /// The outline as the rail or the menu, empty below three headings.
@@ -80,10 +89,12 @@ fn outline_html(all: &[OutlineItem], rail: bool, icon_only: bool) -> String {
             text: &h.text,
         })
         .collect();
+    let filter = items.len() >= OUTLINE_FILTER_MIN || items.iter().any(|h| h.symbol);
     OutlineMarkup {
         rail,
         icon_only,
         links,
+        filter,
     }
     .render()
     .unwrap_or_default()
@@ -99,4 +110,24 @@ pub(crate) fn outline_rail(all: &[OutlineItem]) -> String {
 /// `aria-label` and `data-tip`.
 pub(crate) fn outline_menu(all: &[OutlineItem], icon_only: bool) -> String {
     outline_html(all, false, icon_only)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The filter field is rendered from 12 headings on, rail and menu alike.
+    #[test]
+    fn headings_filter_shows_only_on_long_outlines() {
+        let items = |n: usize| -> Vec<OutlineItem> {
+            (0..n)
+                .map(|i| OutlineItem::heading(2, format!("h{i}"), &format!("Head {i}")))
+                .collect()
+        };
+        for rail in [true, false] {
+            let out = |n: usize| outline_html(&items(n), rail, false);
+            assert!(!out(11).contains("outline-q"), "11: no filter");
+            assert!(out(12).contains("outline-q"), "12: a filter");
+        }
+    }
 }

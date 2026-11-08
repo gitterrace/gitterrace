@@ -77,6 +77,7 @@ pub(crate) fn outline(path: &str, text: &str, lines: usize) -> Vec<OutlineItem> 
             id: format!("L{}", s.line),
             text: s.name,
             chrome: true,
+            symbol: true,
         })
         .collect()
 }

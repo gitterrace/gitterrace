@@ -337,7 +337,7 @@ async function dateTips() {
 // "On this page": a sticky rail at 1400px, a menu at 900px, a click scrolls and sets the hash,
 // the active item follows the scroll, the Code tab hides both, light and dark.
 async function outline() {
-  const doc = ['# Doc', ...[1, 2, 3, 4, 5].flatMap((i) => [`\n## Section ${i}\n`, ...Array.from({ length: 14 }, (_, j) => `Paragraph ${i}.${j} of filler text for scrolling.\n`), `### Part ${i}\n`, 'More text.\n'])].join('\n');
+  const doc = ['# Doc', ...[1, 2, 3, 4, 5, 6].flatMap((i) => [`\n## Section ${i}\n`, ...Array.from({ length: 14 }, (_, j) => `Paragraph ${i}.${j} of filler text for scrolling.\n`), `### Part ${i}\n`, 'More text.\n'])].join('\n');
   writeFileSync(join(dir, 'outline.md'), doc);
   sh(dir, 'git', 'add', '-A');
   sh(dir, 'git', 'commit', '-q', '-m', 'docs: outline fixture');
@@ -382,7 +382,7 @@ async function outline() {
       const bad = [];
       // Overview: the button lives in the README header bar, on its right, icon only.
       const readme = readFileSync(join(dir, 'README.md'));
-      writeFileSync(join(dir, 'README.md'), '# Fixture\n\n## One\n\ntext\n\n## Two\n\ntext\n\n### Part 2\n\ntext\n');
+      writeFileSync(join(dir, 'README.md'), '# Fixture\n\n' + Array.from({ length: 11 }, (_, i) => `## Topic ${i}\n\ntext\n`).join('\n') + '\n### Part 2\n\ntext\n');
       sh(dir, 'git', 'add', '-A');
       sh(dir, 'git', 'commit', '-q', '-m', 'docs: outline README');
       await new Promise((ok) => setTimeout(ok, 600));

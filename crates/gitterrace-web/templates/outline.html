@@ -7,5 +7,5 @@
 {%- else %}<summary class="outlinebtn">On this page</summary>{% endif -%}
 <div class="outline-pop">
 {%- endif -%}
-<input type="search" class="outline-q" placeholder="Filter headings" aria-label="Filter headings" hidden><ol>{% for l in links %}<li class="d{{ l.depth }}"><a href="#{{ l.id }}" title="{{ l.text }}">{{ l.text }}</a></li>{% endfor %}</ol><p class="muted outline-none" hidden>No matching heading</p>
+{% if filter %}<input type="search" class="outline-q" placeholder="Filter headings" aria-label="Filter headings" hidden>{% endif %}<ol>{% for l in links %}<li class="d{{ l.depth }}"><a href="#{{ l.id }}" title="{{ l.text }}">{{ l.text }}</a></li>{% endfor %}</ol><p class="muted outline-none" hidden>No matching heading</p>
 {%- if rail %}</nav>{% else %}</div></details>{% endif -%}
