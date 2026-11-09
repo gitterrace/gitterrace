@@ -234,8 +234,8 @@ After 30 s without a request the server drops every cache but the rendered
 pages, and the allocator hands freed pages back to the OS at once. Builds from
 this repository run jemalloc with one arena (`.cargo/config.toml`), so an idle
 server returns to about the footprint it started with. The
-[store design](../crates/gitterrace-index/src/seg/store.md) has the
-full format.
+full format is in the store design,
+[store.md on GitHub](../crates/gitterrace-index/src/seg/store.md).
 
 ### The InsightsSource seam
 

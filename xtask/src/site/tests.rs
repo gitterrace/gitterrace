@@ -251,9 +251,7 @@ pub(super) fn generated() -> (Vec<(String, String)>, Vec<String>) {
             Out::Block { .. } => {}
         }
     }
-    // The screenshots are made by `make site-shots` and checked on disk. The touch icon is
-    // ignored by git and rendered by `make site`, so it is known by name.
-    files.push("assets/apple-touch-icon.png".to_owned());
+    // The screenshots are made by `make site-shots` and checked on disk.
     for dir in ["assets/screenshots"] {
         let entries = std::fs::read_dir(root.join("site").join(dir)).expect("site dir");
         for e in entries.flatten() {

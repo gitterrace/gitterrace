@@ -393,6 +393,41 @@ def folder_readme(run: Json) -> str:
     return wrap("\n".join(L).rstrip("\n") + "\n")
 
 
+def results_table(cur: Json, old: Json | None) -> list[str]:
+    """The newest run's headline numbers against their budgets, one row per repo and metric,
+    with the change against the previous run when there is one."""
+    L = [
+        "| Repo | Metric | Value | Budget | Status |"
+        + (" Change against previous |" if old else ""),
+        "| --- | --- | --- | --- | --- |" + (" --- |" if old else ""),
+    ]
+    for n, r in cur["repos"].items():
+        prev = (old or {}).get("repos", {}).get(n, {}).get("budget", {})
+        for k in HEADLINE:
+            b = r["budget"].get(k)
+            if not b:
+                if k == "export_secs" and r.get("export", {}).get("ok") is False:
+                    L.append(
+                        f"| {n} | {SHORT[k]} | {FAILED_EXPORT} | - | failed |"
+                        + (" - |" if old else "")
+                    )
+                continue
+            p = prev.get(k)
+            ch = change(k, p["value"], b["value"]) if p else "new in this run"
+            L.append(
+                f"| {n} | {SHORT[k]} | {fmt(k, b['value'])}{spread(k, b)} | "
+                f"{b['limit']} {METRICS[k][1]} | {b['status']} |"
+                + (f" {ch} |" if old else "")
+            )
+    for n in cur.get("held", {}):
+        for k in HEADLINE:
+            L.append(
+                f"| {n} | {SHORT[k]} | {HELD} | - | withheld |"
+                + (" - |" if old else "")
+            )
+    return L
+
+
 def results_readme(kept: list[Json]) -> str:
     """The landing page of tests/bench/results: every kept run, the newest headline, its charts."""
     cur = kept[-1]
@@ -422,46 +457,28 @@ def results_readme(kept: list[Json]) -> str:
         header(cur),
         "",
         *[x + "\n" for x in withheld_lines(cur)],
-        "| Repo | Metric | Value | Budget | Status |"
-        + (" Change against previous |" if old else ""),
-        "| --- | --- | --- | --- | --- |" + (" --- |" if old else ""),
+        *results_table(cur, old),
     ]
-    for n, r in cur["repos"].items():
-        prev = (old or {}).get("repos", {}).get(n, {}).get("budget", {})
-        for k in HEADLINE:
-            b = r["budget"].get(k)
-            if not b:
-                if k == "export_secs" and r.get("export", {}).get("ok") is False:
-                    L.append(
-                        f"| {n} | {SHORT[k]} | {FAILED_EXPORT} | - | failed |"
-                        + (" - |" if old else "")
-                    )
-                continue
-            p = prev.get(k)
-            ch = change(k, p["value"], b["value"]) if p else "new in this run"
-            L.append(
-                f"| {n} | {SHORT[k]} | {fmt(k, b['value'])}{spread(k, b)} | "
-                f"{b['limit']} {METRICS[k][1]} | {b['status']} |"
-                + (f" {ch} |" if old else "")
-            )
-    for n in cur.get("held", {}):
-        for k in HEADLINE:
-            L.append(
-                f"| {n} | {SHORT[k]} | {HELD} | - | withheld |"
-                + (" - |" if old else "")
-            )
     L += ["", block(cur, old, run_name(cur))]
     return wrap("\n".join(L).rstrip("\n") + "\n")
 
 
 def render() -> str:
-    """The short results block of docs/benchmarks.md: the newest run's header and where it is.
-    The run in full lives once, in tests/bench/results/README.md."""
-    cur = shown(published()[-1])
-    L = [header(cur), "", *withheld_lines(cur)]
+    """The results block of docs/benchmarks.md: the newest run's header and its table against
+    the budgets. The charts and every page live once, in tests/bench/results/README.md."""
+    runs = published()
+    cur = shown(runs[-1])
+    old = shown(runs[-2]) if len(runs) > 1 else None
+    L = [
+        header(cur),
+        "",
+        *[x + "\n" for x in withheld_lines(cur)],
+        *results_table(cur, old),
+    ]
     L += [
         "",
-        "Every number, chart and page: [tests/bench/results](../tests/bench/results/README.md).",
+        "Every number, chart and page of each run, as files:",
+        "[tests/bench/results](../tests/bench/results/README.md).",
     ]
     return wrap("\n".join(L).strip("\n") + "\n")
 

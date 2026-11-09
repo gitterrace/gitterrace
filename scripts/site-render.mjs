@@ -1,9 +1,10 @@
 #!/usr/bin/env node
-// Renders the two raster images the site needs from the brand SVGs, at deploy time, and the
-// site's WebP screenshots (below).
-// They are generated, not committed (.gitignore), because the SVGs are the single source:
-//   site/assets/apple-touch-icon.png  180x180, the plated mark (iOS home screen)
+// Renders the raster images the site needs from the brand SVGs, and the site's WebP
+// screenshots (below). The link preview is rendered at deploy and ignored; the two plated
+// marks are committed, since the site and the org page link them:
 //   docs/brand/avatar-512.png         512x512, the plated mark (the org avatar, committed)
+//   docs/brand/apple-touch-icon.png   180x180, the plated mark (iOS home screen, committed;
+//                                     the site copies it to assets/icons/)
 //   site/assets/og.png                1200x630, the light README header (link previews)
 // Chromium draws the SVGs, the same renderer as the app icon.
 //
@@ -21,7 +22,7 @@ mkdirSync(out, { recursive: true });
 const plate = brand('mark-plate.svg');
 
 const shots = [
-  { file: 'apple-touch-icon.png', w: 180, h: 180, img: plate, size: 'width:180px;height:180px', bg: 'transparent' },
+  { file: 'apple-touch-icon.png', dir: join(root, 'docs/brand'), w: 180, h: 180, img: plate, size: 'width:180px;height:180px', bg: 'transparent' },
   { file: 'avatar-512.png', dir: join(root, 'docs/brand'), w: 512, h: 512, img: plate, size: 'width:512px;height:512px', bg: 'transparent' },
   { file: 'og.png', w: 1200, h: 630, img: brand('readme-header-light.svg'), size: 'width:1000px' },
 ];

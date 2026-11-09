@@ -158,8 +158,8 @@ tiny generated repository to prove it still works.
 
 ## Results
 
-The newest run, in short. Each kept run is written out once, with its numbers,
-charts and every page, in tests/bench/results.
+The newest run against its budgets. The charts and every page of each kept run
+are in tests/bench/results.
 
 <!-- BEGIN GENERATED: results -->
 Run 2026-11-03 on Apple M1 Max, 10 cores, 64 GB RAM, 4.0 TB SSD disk, macOS
@@ -172,7 +172,30 @@ failed at the page cap and are shown as failed.
 - **rust:** not measured on a quiet machine (other processes used 5 or more
   cores during export, export#3, index), so its numbers are withheld.
 
-Every number, chart and page:
+| Repo | Metric | Value | Budget | Status |
+| --- | --- | --- | --- | --- |
+| control | index build | 0.2 s (0.2 to 0.3) | 30 s | pass |
+| control | warm page | 11 ms | 300 ms | pass |
+| control | cold page | 23 ms (22 to 24) | 1500 ms | pass |
+| control | peak memory (index peak or after pages) | 40 MB | 500 MB | pass |
+| control | export | 12.3 s (12.0 to 12.3) | 60 s | pass |
+| git | index build | 10.8 s (10.5 to 11.3) | 300 s | pass |
+| git | warm page | 27 ms | 300 ms | pass |
+| git | cold page | 2355 ms (2321 to 2381) | 3000 ms | pass |
+| git | peak memory (index peak or after pages) | 383 MB | 1500 MB | pass |
+| git | export | 44.4 s (42.8 to 45.9) | 300 s | pass |
+| linux | index build | 1596.4 s (1596.4 to 1596.4) | 600 s | over |
+| linux | warm page | 43 ms | 500 ms | pass |
+| linux | cold page | 27674 ms (27674 to 27674) | 20000 ms | over |
+| linux | peak memory (index peak or after pages) | 6449 MB | 8000 MB | pass |
+| linux | export | failed (page cap reached) | - | failed |
+| rust | index build | withheld (load) | - | withheld |
+| rust | warm page | withheld (load) | - | withheld |
+| rust | cold page | withheld (load) | - | withheld |
+| rust | peak memory (index peak or after pages) | withheld (load) | - | withheld |
+| rust | export | withheld (load) | - | withheld |
+
+Every number, chart and page of each run, as files:
 [tests/bench/results](../tests/bench/results/README.md).
 
 <!-- END GENERATED: results -->

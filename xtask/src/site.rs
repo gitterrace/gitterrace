@@ -70,6 +70,11 @@ pub fn render(root: &Path, ws: &Workspace) -> Result<Vec<Out>> {
             read(&format!("shared/schwarzwald/fonts/{dir}/OFL.txt"))?,
         ));
     }
+    // Committed in docs/brand, so the built site links a file that exists. Under icons/, since
+    // site/assets/*.png is the ignored, deploy-rendered link preview.
+    let icon = "docs/brand/apple-touch-icon.png";
+    let bytes = std::fs::read(root.join(icon)).with_context(|| format!("reading {icon}"))?;
+    outs.push(Out::bytes("site/assets/icons/apple-touch-icon.png", bytes));
     for name in BRAND {
         outs.push(Out::file(
             format!("site/assets/{name}.svg"),
