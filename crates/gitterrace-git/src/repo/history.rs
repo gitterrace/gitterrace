@@ -27,32 +27,68 @@ impl Repo {
         let repo = self.repo();
         let tip = self.resolve_id(&repo, rev)?;
         let path = path.map(|p| p.trim_matches('/')).filter(|p| !p.is_empty());
+        let Some(path) = path else {
+            return Self::log_from(&repo, &[tip], skip, limit);
+        };
+        let mailmap = ident::mailmap(&repo, tip);
+        // The walk pops in output order, so it can stop once the page is full.
+        let ids = simplified(&repo, tip, path, None, Some(skip.saturating_add(limit)))?;
+        ids.into_iter()
+            .skip(skip)
+            .take(limit)
+            .map(|id| summary(&repo.find_commit(id).map_err(git)?, &mailmap))
+            .collect()
+    }
+
+    /// Commits reachable from any of `revs`, newest first, each once: `git log --all` over
+    /// just these tips. The `.mailmap` is read at the first tip.
+    pub fn log_all(
+        &self,
+        revs: &[String],
+        skip: usize,
+        limit: usize,
+    ) -> Result<Vec<CommitSummary>> {
+        let repo = self.repo();
+        let tips = self.tips(&repo, revs)?;
+        Self::log_from(&repo, &tips, skip, limit)
+    }
+
+    /// [`Self::parents`] over every tip in `revs`, in [`Self::log_all`]'s order.
+    pub fn parents_all(&self, revs: &[String], limit: usize) -> Result<Vec<(String, Vec<String>)>> {
+        let repo = self.repo();
+        let tips = self.tips(&repo, revs)?;
+        parents_from(&repo, &tips, limit)
+    }
+
+    fn tips(&self, repo: &gix::Repository, revs: &[String]) -> Result<Vec<gix::ObjectId>> {
+        let mut tips = Vec::with_capacity(revs.len());
+        for r in revs {
+            let id = self.full_id(repo, r)?;
+            if !tips.contains(&id) {
+                tips.push(id);
+            }
+        }
+        if tips.is_empty() {
+            return Err(Error::RevNotFound(String::new()));
+        }
+        Ok(tips)
+    }
+
+    fn log_from(
+        repo: &gix::Repository,
+        tips: &[gix::ObjectId],
+        skip: usize,
+        limit: usize,
+    ) -> Result<Vec<CommitSummary>> {
+        let mailmap = ident::mailmap(repo, tips[0]);
         let walk = repo
-            .rev_walk([tip])
+            .rev_walk(tips.iter().copied())
             .sorting(Sorting::ByCommitTime(CommitTimeOrder::NewestFirst))
             .all()
             .map_err(git)?;
-        let mailmap = ident::mailmap(&repo, tip);
         let mut out = Vec::new();
-        let mut seen = 0;
-        if let Some(path) = path {
-            // The walk pops in output order, so it can stop once the page is full.
-            let ids = simplified(&repo, tip, path, None, Some(skip.saturating_add(limit)))?;
-            for id in ids.into_iter().skip(skip).take(limit) {
-                out.push(summary(&repo.find_commit(id).map_err(git)?, &mailmap)?);
-            }
-            return Ok(out);
-        }
-        for info in walk {
-            if out.len() >= limit {
-                break;
-            }
-            let info = info.map_err(git)?;
-            let commit = info.object().map_err(git)?;
-            if seen < skip {
-                seen += 1;
-                continue;
-            }
+        for info in walk.skip(skip).take(limit) {
+            let commit = info.map_err(git)?.object().map_err(git)?;
             out.push(summary(&commit, &mailmap)?);
         }
         Ok(out)
@@ -64,18 +100,7 @@ impl Repo {
     pub fn parents(&self, rev: &str, limit: usize) -> Result<Vec<(String, Vec<String>)>> {
         let repo = self.repo();
         let tip = self.resolve_id(&repo, rev)?;
-        let walk = repo
-            .rev_walk([tip])
-            .sorting(Sorting::ByCommitTime(CommitTimeOrder::NewestFirst))
-            .all()
-            .map_err(git)?;
-        let mut out = Vec::new();
-        for info in walk.take(limit) {
-            let info = info.map_err(git)?;
-            let parents = info.parent_ids.iter().map(ToString::to_string).collect();
-            out.push((info.id.to_string(), parents));
-        }
-        Ok(out)
+        parents_from(&repo, &[tip], limit)
     }
 
     /// The ids [`Self::log`] with `path` lists, in its order, from `history`: every commit
@@ -492,4 +517,24 @@ fn path_id(commit: &gix::Commit<'_>, path: &str) -> Result<Option<gix::ObjectId>
     let tree = commit.tree().map_err(git)?;
     let entry = crate::treepath::lookup(&tree, path)?;
     Ok(entry.map(|e| e.object_id()))
+}
+
+/// The `(id, parents)` of the first `limit` commits reachable from `tips`, newest first.
+fn parents_from(
+    repo: &gix::Repository,
+    tips: &[gix::ObjectId],
+    limit: usize,
+) -> Result<Vec<(String, Vec<String>)>> {
+    let walk = repo
+        .rev_walk(tips.iter().copied())
+        .sorting(Sorting::ByCommitTime(CommitTimeOrder::NewestFirst))
+        .all()
+        .map_err(git)?;
+    let mut out = Vec::new();
+    for info in walk.take(limit) {
+        let info = info.map_err(git)?;
+        let parents = info.parent_ids.iter().map(ToString::to_string).collect();
+        out.push((info.id.to_string(), parents));
+    }
+    Ok(out)
 }
