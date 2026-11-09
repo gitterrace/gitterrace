@@ -13,10 +13,10 @@ use crate::seg::{Oid, SegError, SegResult};
 /// a fresh build writes.
 pub(crate) fn remap(
     dir: &Path,
-    name: &str,
+    generation: u64,
     store: Store,
     canonical: &[String],
-) -> SegResult<Option<FileEntry>> {
+) -> SegResult<Option<Vec<FileEntry>>> {
     let old_order = crate::store::load_order(&store)?;
     let Some(col) = MessageColumn::of(store)? else {
         return Ok(None);
@@ -39,7 +39,7 @@ pub(crate) fn remap(
         .enumerate()
         .map(|(i, o)| (*o, u32::try_from(i).unwrap_or(u32::MAX)))
         .collect();
-    let mut w = Writer::new(dir, name)?;
+    let mut w = Writer::new(dir, generation, 0)?;
     for oid in &new_oids {
         let Some(&r) = old.get(oid) else {
             return Ok(None);
@@ -84,28 +84,20 @@ pub(crate) fn extend(dir: &Path, source: &dyn crate::CommitSource) -> std::io::R
         .iter()
         .map(hex)
         .collect();
-    let name = format!("msg-{}-{n}.gts", manifest.generation);
-    let mut w = Writer::new(dir, &name).map_err(seg)?;
+    let mut w = Writer::new(dir, manifest.generation, n).map_err(seg)?;
     let mut next = from;
-    let mut failed = None;
+    // A failed push ends the stream: no later text can land in a column with a hole.
     let supported = source.stream_texts(&ids, &mut |t| {
         // The texts come in the order asked, so each one is the next rank.
         if crate::store::oid_of(&t.id) != order.get(next).copied() {
             return Err(std::io::Error::other("commit text out of order"));
         }
         next += 1;
-        if let Err(e) = w.push(&Item::of(t, &rank)) {
-            failed = Some(e);
-        }
-        Ok(())
+        w.push(&Item::of(t, &rank)).map_err(seg)
     })?;
-    if let Some(e) = failed {
-        return Err(seg(e));
-    }
     if !supported || next != order.len() {
         return Ok(());
     }
-    let entry = w.finish().map_err(seg)?;
-    manifest.live.push(entry);
+    manifest.live.extend(w.finish().map_err(seg)?);
     manifest.commit(dir).map_err(seg)
 }

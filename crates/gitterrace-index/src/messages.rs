@@ -13,14 +13,11 @@
 //! giant generated message) is stored without its text and checked from git when searched.
 
 use std::collections::{BinaryHeap, HashMap};
-use std::path::Path;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use crate::seg::bounds::{Cursor, put_varint, unzigzag, zigzag};
-use crate::seg::format::{Kind, StringBase, TocEntry, section};
-use crate::seg::manifest::FileEntry;
+use crate::seg::format::{TocEntry, section};
 use crate::seg::read::{Container, Store};
-use crate::seg::write::ContainerWriter;
 use crate::seg::{Oid, SegError, SegResult};
 
 /// Raw bytes packed before a block is compressed. Not configurable, any of these: on-disk
@@ -121,49 +118,6 @@ impl Item {
             parents,
             text,
         })
-    }
-}
-
-/// Writes one message file. Drop without `finish` leaves only a `.tmp`, which the sweep
-/// removes.
-pub struct Writer {
-    w: ContainerWriter,
-    raw: Vec<u8>,
-    items: u32,
-}
-
-impl Writer {
-    pub fn new(dir: &Path, name: &str) -> SegResult<Self> {
-        Ok(Self {
-            w: ContainerWriter::new(dir, name, Kind::Messages, StringBase::default())?,
-            raw: Vec::with_capacity(BLOCK_RAW * 2),
-            items: 0,
-        })
-    }
-
-    pub fn push(&mut self, item: &Item) -> SegResult<()> {
-        item.encode(&mut self.raw);
-        self.items += 1;
-        if self.raw.len() >= BLOCK_RAW {
-            self.flush()?;
-        }
-        Ok(())
-    }
-
-    fn flush(&mut self) -> SegResult<()> {
-        if self.items == 0 {
-            return Ok(());
-        }
-        let z = codec::pack(&self.raw)?;
-        self.w.block(section::MESSAGES, self.items, &z)?;
-        self.raw.clear();
-        self.items = 0;
-        Ok(())
-    }
-
-    pub fn finish(mut self) -> SegResult<FileEntry> {
-        self.flush()?;
-        self.w.finish()
     }
 }
 
@@ -564,8 +518,10 @@ pub(crate) fn hex(oid: &Oid) -> String {
 
 mod build;
 mod codec;
+mod writer;
 
 pub(crate) use build::{extend, remap};
+pub use writer::Writer;
 
 #[cfg(test)]
 mod tests;

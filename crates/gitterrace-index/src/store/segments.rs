@@ -324,11 +324,9 @@ pub(crate) fn merge_if_needed(
     let store = crate::seg::read::Store::open(dir)
         .map_err(crate::seg_io)?
         .ok_or_else(|| io::Error::other("merge without a set"))?;
-    let name = format!("msg-{}-0.gts", previous.generation + 1);
-    if let Some(col) =
-        crate::messages::remap(dir, &name, store, canonical).map_err(crate::seg_io)?
-    {
-        extra.push(col);
+    let next = previous.generation + 1;
+    if let Some(col) = crate::messages::remap(dir, next, store, canonical).map_err(crate::seg_io)? {
+        extra.extend(col);
     }
     let mut b = SegmentBuild::new(dir, Some(&previous), shallow).map_err(io::Error::other)?;
     for id in canonical {

@@ -473,6 +473,7 @@ All notable changes are listed here. The format follows
 - site: links land on the site's pages, and the touch icon exists
 - web: let the app header follow the chosen theme
 - site: let the site bar follow the chosen theme
+- index: the message column goes on in a new file when the toc is full
 
 ### Performance
 
