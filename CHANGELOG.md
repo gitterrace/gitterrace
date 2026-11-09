@@ -527,5 +527,15 @@ All notable changes are listed here. The format follows
 ### Changed
 
 - actions: the contract's numbers are written once
+- index: move record decode, shared sets, fixtures and the scan read into
+  modules
+
+### Performance
+
+- index: per-file pages read a tip touches file instead of every row
+- index: share the per-file tables per set and build them before ready
+- index: release cadence reads no commit column without tags
+- index: per-file sections visit the tip touches in place
+- index: coupling counts pairs per file in a dense row
 
 <!-- END GENERATED: unreleased -->

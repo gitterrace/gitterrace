@@ -159,38 +159,32 @@ The newest run against its budgets. The charts and every page of each kept run
 are in tests/bench/results.
 
 <!-- BEGIN GENERATED: results -->
-Run 2026-11-03 on Apple M1 Max, 10 cores, 64 GB RAM, 4.0 TB SSD disk, macOS
+Run 2026-11-09 on Apple M1 Max, 10 cores, 64 GB RAM, 4.0 TB SSD disk, macOS
 26.6.2 (arm64). gitterrace v0.1.0, git version 2.54.0 (Apple Git-157). Every
-timed phase started with the 1-minute load average under 5. The -dirty label
-comes from the version stamp, which counted a bench file as an uncommitted
-change. The binary was built from the clean commit. The rust and linux exports
-failed at the page cap and are shown as failed.
+timed phase started with the 1-minute load average under 5.
 
-- **rust:** not measured on a quiet machine (other processes used 5 or more
-  cores during export, export#3, index), so its numbers are withheld.
-
-| Repo | Metric | Value | Budget | Status |
-| --- | --- | --- | --- | --- |
-| control | index build | 0.2 s (0.2 to 0.3) | 30 s | pass |
-| control | warm page | 11 ms | 300 ms | pass |
-| control | cold page | 23 ms (22 to 24) | 1500 ms | pass |
-| control | peak physical footprint (index peak or after pages) | 40 MB | 500 MB | pass |
-| control | export | 12.3 s (12.0 to 12.3) | 60 s | pass |
-| git | index build | 10.8 s (10.5 to 11.3) | 300 s | pass |
-| git | warm page | 27 ms | 300 ms | pass |
-| git | cold page | 2355 ms (2321 to 2381) | 3000 ms | pass |
-| git | peak physical footprint (index peak or after pages) | 383 MB | 1500 MB | pass |
-| git | export | 44.4 s (42.8 to 45.9) | 300 s | pass |
-| linux | index build | 1596.4 s (1596.4 to 1596.4) | 600 s | over |
-| linux | warm page | 43 ms | 500 ms | pass |
-| linux | cold page | 27674 ms (27674 to 27674) | 20000 ms | over |
-| linux | peak physical footprint (index peak or after pages) | 6449 MB | 8000 MB | pass |
-| linux | export | failed | - | failed |
-| rust | index build | withheld (load) | - | withheld |
-| rust | warm page | withheld (load) | - | withheld |
-| rust | cold page | withheld (load) | - | withheld |
-| rust | peak physical footprint (index peak or after pages) | withheld (load) | - | withheld |
-| rust | export | withheld (load) | - | withheld |
+| Repo | Metric | Value | Budget | Status | Change against previous |
+| --- | --- | --- | --- | --- | --- |
+| control | index build | 0.5 s (0.3 to 0.6) | 30 s | pass | 116% slower |
+| control | warm page | 3 ms | 300 ms | pass | 75% faster |
+| control | cold page | 16 ms (15 to 16) | 1500 ms | pass | 33% faster |
+| control | peak physical footprint (index peak or after pages) | 26 MB | 500 MB | pass | 34% less memory |
+| control | export | 23.3 s (22.7 to 23.8) | 60 s | pass | 90% slower |
+| git | index build | 10.6 s (10.4 to 10.8) | 300 s | pass | 1% faster |
+| git | warm page | 36 ms | 300 ms | pass | 30% slower |
+| git | cold page | 2336 ms (2327 to 2336) | 3000 ms | pass | 1% faster |
+| git | peak physical footprint (index peak or after pages) | 407 MB | 1500 MB | pass | 6% more memory |
+| git | export | 51.2 s (50.6 to 52.3) | 300 s | pass | 15% slower |
+| rust | index build | 67.4 s (67.2 to 68.4) | 2400 s | pass | new in this run |
+| rust | warm page | 48 ms | 300 ms | pass | new in this run |
+| rust | cold page | 1641 ms (1638 to 1641) | 10000 ms | pass | new in this run |
+| rust | peak physical footprint (index peak or after pages) | 909 MB | 6000 MB | pass | new in this run |
+| rust | export | stopped at the page cap | - | capped | - |
+| linux | index build | 300.7 s (300.7 to 300.7) | 600 s | pass | 81% faster |
+| linux | warm page | 44 ms | 500 ms | pass | 2% slower |
+| linux | cold page | 8620 ms (8620 to 8620) | 20000 ms | pass | 69% faster |
+| linux | peak physical footprint (index peak or after pages) | 2004 MB | 8000 MB | pass | 69% less memory |
+| linux | export | stopped at the page cap | - | capped | - |
 
 Every number, chart and page of each run, as files:
 [tests/bench/results](../tests/bench/results/README.md).
