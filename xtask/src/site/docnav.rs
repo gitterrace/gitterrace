@@ -6,14 +6,24 @@ use askama::Template;
 
 use crate::site::frame::pack;
 
+/// One docs page in the list. `current` is the attribute that marks the page shown, fixed
+/// markup or empty.
+#[derive(Clone)]
+struct Item<'a> {
+    href: &'a str,
+    title: &'a str,
+    current: &'static str,
+}
+
 #[derive(Template)]
 #[template(path = "docnav.html")]
 struct Nav<'a> {
     part: &'a str,
-    docs: Vec<(&'a str, &'a str, bool)>,
+    docs: Vec<Item<'a>>,
     heads: &'a [(String, String)],
-    prev: Option<(&'a str, &'a str)>,
-    next: Option<(&'a str, &'a str)>,
+    /// (site path, title), empty for none.
+    prev: (&'a str, &'a str),
+    next: (&'a str, &'a str),
 }
 
 /// The navigation of the docs page at `here` among `order`, every docs page as (site path,
@@ -29,9 +39,17 @@ pub(super) struct DocNav {
 }
 
 pub(super) fn nav(order: &[(String, String)], here: &str, heads: &[(String, String)]) -> DocNav {
-    let docs: Vec<(&str, &str, bool)> = order
+    let docs: Vec<Item> = order
         .iter()
-        .map(|(p, t)| (p.as_str(), t.as_str(), p == here))
+        .map(|(p, t)| Item {
+            href: p,
+            title: t,
+            current: if p == here {
+                " aria-current=\"page\""
+            } else {
+                ""
+            },
+        })
         .collect();
     let at = order.iter().position(|(p, _)| p == here);
     let pair = |i: usize| order.get(i).map(|(p, t)| (p.as_str(), t.as_str()));
@@ -42,8 +60,8 @@ pub(super) fn nav(order: &[(String, String)], here: &str, heads: &[(String, Stri
             part,
             docs: docs.clone(),
             heads,
-            prev,
-            next,
+            prev: prev.unwrap_or(("", "")),
+            next: next.unwrap_or(("", "")),
         }
         .render()
         .unwrap_or_default();

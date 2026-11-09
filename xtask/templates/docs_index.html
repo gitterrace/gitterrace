@@ -3,12 +3,12 @@ title and the one line of what it covers. -#}
 <h1>Documentation</h1>
 <p class="lead">{{ lead }}</p>
 <div class="groups">
-{%- for (heading, docs) in groups %}
-<section aria-labelledby="{{ heading.0 }}">
-<h2 id="{{ heading.0 }}">{{ heading.1 }}</h2>
+{%- for g in groups %}
+<section aria-labelledby="{{ g.0.0 }}">
+<h2 id="{{ g.0.0 }}">{{ g.0.1 }}</h2>
 <ul>
-{%- for (href, title, what) in docs %}
-<li><a href="/{{ href }}">{{ title }}</a><span>{{ what }}</span></li>
+{%- for d in g.1 %}
+<li><a href="/{{ d.0 }}">{{ d.1 }}</a><span>{{ d.2 }}</span></li>
 {%- endfor %}
 </ul>
 </section>

@@ -79,7 +79,8 @@ struct Footer<'a> {
     license: &'a str,
     version: &'a str,
     version_href: &'a str,
-    edit: Option<(&'a str, bool)>,
+    edit: &'a str,
+    generated: bool,
 }
 
 /// The footer of every page: the shared links, then a docs page's source.
@@ -94,7 +95,8 @@ pub(crate) fn footer(site: &Site, edit: Option<(&str, bool)>) -> String {
         license: site.license,
         version: site.version,
         version_href: site.version_href,
-        edit,
+        edit: edit.map_or("", |e| e.0),
+        generated: edit.is_some_and(|e| e.1),
     }
     .render()
     .unwrap_or_default();

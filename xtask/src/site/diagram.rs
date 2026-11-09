@@ -23,6 +23,18 @@ const PAD: u32 = 8;
 const CHAR_W: u32 = 8;
 const MARGIN: u32 = 20;
 
+/// A placed box, its positions worked out here so the template only prints them.
+struct Placed<'a> {
+    x: u32,
+    y: u32,
+    w: u32,
+    mid: u32,
+    line1: u32,
+    line2: u32,
+    name: &'a str,
+    role: &'a str,
+}
+
 #[derive(Template)]
 #[template(path = "diagram.html")]
 struct Svg<'a> {
@@ -32,7 +44,7 @@ struct Svg<'a> {
     height: u32,
     box_h: u32,
     edges: Vec<(u32, u32, u32, u32, u32)>,
-    nodes: Vec<(u32, u32, u32, &'a str, &'a str)>,
+    nodes: Vec<Placed<'a>>,
 }
 
 /// Edges as (from, to) node indices.
@@ -135,7 +147,16 @@ pub(super) fn svg(src: &str, id: &str, title: &str) -> Result<String> {
     let nodes = nodes
         .iter()
         .zip(&place)
-        .map(|(n, &(x, y, w))| (x, y, w, n.name.as_str(), n.role.as_str()))
+        .map(|(n, &(x, y, w))| Placed {
+            x,
+            y,
+            w,
+            mid: x + w / 2,
+            line1: y + 17,
+            line2: y + 33,
+            name: &n.name,
+            role: &n.role,
+        })
         .collect();
     let html = Svg {
         id,

@@ -3,25 +3,25 @@ folded menus above it on a narrow one, or the previous and next links under it. 
 docs page in index order; the current one carries aria-current. -#}
 {%- if part == "list" -%}
 <nav class="docnav" aria-label="Docs"><h2>Docs</h2><ol>
-{%- for (href, title, here) in docs %}<li><a href="/{{ href }}"
-{%- if *here %} aria-current="page"{% endif %}>{{ title }}</a></li>{% endfor -%}
+{%- for d in docs %}<li><a href="/{{ d.href }}"{{ d.current|safe }}>{{ d.title }}</a></li>
+{%- endfor -%}
 </ol></nav>
 {%- elif part == "menus" -%}
 <div class="menus"><details class="menu"><summary>Docs</summary><div class="pop"><ol>
-{%- for (href, title, here) in docs %}<li><a href="/{{ href }}"
-{%- if *here %} aria-current="page"{% endif %}>{{ title }}</a></li>{% endfor -%}
+{%- for d in docs %}<li><a href="/{{ d.href }}"{{ d.current|safe }}>{{ d.title }}</a></li>
+{%- endfor -%}
 </ol></div></details>
 {%- if !heads.is_empty() -%}
 <details class="menu" data-outline><summary>On this page</summary><div class="pop"><ol>
-{%- for (id, text) in heads %}<li><a href="#{{ id }}">{{ text }}</a></li>{% endfor -%}
+{%- for h in heads %}<li><a href="#{{ h.0 }}">{{ h.1 }}</a></li>{% endfor -%}
 </ol></div></details>
 {%- endif -%}
 </div>
 {%- else -%}
 <nav class="pager" aria-label="Previous and next">
-{%- if let Some((href, title)) = prev %}<a class="prev" href="/{{ href }}" rel="prev">
-<span>Previous</span>{{ title }}</a>{% endif -%}
-{%- if let Some((href, title)) = next %}<a class="next" href="/{{ href }}" rel="next">
-<span>Next</span>{{ title }}</a>{% endif -%}
+{%- if !prev.0.is_empty() %}<a class="prev" href="/{{ prev.0 }}" rel="prev">
+<span>Previous</span>{{ prev.1 }}</a>{% endif -%}
+{%- if !next.0.is_empty() %}<a class="next" href="/{{ next.0 }}" rel="next">
+<span>Next</span>{{ next.1 }}</a>{% endif -%}
 </nav>
 {%- endif %}

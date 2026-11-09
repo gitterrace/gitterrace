@@ -17,13 +17,13 @@ loading="lazy"></h1>
 <section>
 <h2 id="install">Install</h2>
 <div class="tabs">
-{%- for (way, _) in install %}
-<input type="radio" name="install" id="install-{{ way }}" class="tab-radio"
+{%- for i in install %}
+<input type="radio" name="install" id="install-{{ i.0 }}" class="tab-radio"
 {%- if loop.first %} checked{% endif %}>
-<label for="install-{{ way }}" class="tab-label">{{ way }}</label>
+<label for="install-{{ i.0 }}" class="tab-label">{{ i.0 }}</label>
 {%- endfor %}
-{%- for (way, line) in install %}
-<div class="tab-panel" id="panel-{{ way }}"><pre><code>{{ line }}</code></pre></div>
+{%- for i in install %}
+<div class="tab-panel" id="panel-{{ i.0 }}"><pre><code>{{ i.1 }}</code></pre></div>
 {%- endfor %}
 </div>
 <p>Installs <code>{{ bin }}</code>; git runs it as <code>git terrace</code>.
@@ -38,24 +38,24 @@ upgrading and troubleshooting. <a href="/docs/cli/">All commands</a>.</p>
 <section id="features">
 <h2>What it does</h2>
 <div class="shots">
-{%- for (file, alt, cap, what) in shots %}
-<figure><a href="#shot-{{ file }}"><span class="shot">
-<img class="on-light" src="/assets/screenshots/{{ file }}-light.thumb.webp" alt="{{ alt }}"
+{%- for s in shots %}
+<figure><a href="#shot-{{ s.0 }}"><span class="shot">
+<img class="on-light" src="/assets/screenshots/{{ s.0 }}-light.thumb.webp" alt="{{ s.1 }}"
 width="1280" height="800" loading="lazy" decoding="async">
-<img class="on-dark" src="/assets/screenshots/{{ file }}-dark.thumb.webp" alt=""
+<img class="on-dark" src="/assets/screenshots/{{ s.0 }}-dark.thumb.webp" alt=""
 width="1280" height="800" loading="lazy" decoding="async"></span></a>
-<a class="lightbox" id="shot-{{ file }}" href="#features" aria-label="Close {{ cap }}"
+<a class="lightbox" id="shot-{{ s.0 }}" href="#features" aria-label="Close {{ s.2 }}"
 tabindex="-1"><span class="shot">
-<img class="on-light" src="/assets/screenshots/{{ file }}-light.webp" alt=""
+<img class="on-light" src="/assets/screenshots/{{ s.0 }}-light.webp" alt=""
 width="1280" height="800" loading="lazy" decoding="async">
-<img class="on-dark" src="/assets/screenshots/{{ file }}-dark.webp" alt=""
+<img class="on-dark" src="/assets/screenshots/{{ s.0 }}-dark.webp" alt=""
 width="1280" height="800" loading="lazy" decoding="async"></span></a>
-<figcaption><b>{{ cap }}.</b> {{ what }}</figcaption></figure>
+<figcaption><b>{{ s.2 }}.</b> {{ s.3 }}</figcaption></figure>
 {%- endfor %}
 </div>
 <ul class="lines" data-from="docs">
-{%- for (title, href, text) in lines %}
-<li><b><a href="/{{ href }}">{{ title }}</a>.</b> {{ text }}</li>
+{%- for l in lines %}
+<li><b><a href="/{{ l.1 }}">{{ l.0 }}</a>.</b> {{ l.2 }}</li>
 {%- endfor %}
 </ul>
 </section>
