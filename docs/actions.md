@@ -130,7 +130,12 @@ a webhook.
 id      = "webhook"
 label   = "Post to webhook"
 kinds   = ["line", "commit"]
-command = ["curl", "-fsS", "-m", "8", "-H", "Content-Type: application/json", "--data-binary", "@-", "{var.url}"]
+command = [
+  "curl", "-fsS", "-m", "8",
+  "-H", "Content-Type: application/json",
+  "--data-binary", "@-",
+  "{var.url}",
+]
 stdin   = "json"
 vars    = { url = "https://example.test/hook" }
 ```
@@ -144,14 +149,20 @@ encoded as `%2F`), `content` and `append`, and opens the note it wrote. With
 id      = "obsidian-new"
 label   = "New Obsidian note"
 kinds   = ["line", "commit"]
-command = ["open", "obsidian://new?vault={var.vault:url}&file={var.folder:url}%2F{title:url}&content={markdown:url}"]
+command = [
+  "open",
+  "obsidian://new?vault={var.vault:url}&file={var.folder:url}%2F{title:url}&content={markdown:url}",
+]
 vars    = { vault = "Notes", folder = "Inbox" }
 
 [[action]]
 id      = "obsidian-inbox"
 label   = "Obsidian inbox"
 kinds   = ["line", "commit"]
-command = ["open", "obsidian://new?vault={var.vault:url}&file={var.folder:url}%2Fgitterrace&append=true&content={markdown:url}"]
+command = [
+  "open",
+  "obsidian://new?vault={var.vault:url}&file={var.folder:url}%2Fgitterrace&append=true&content={markdown:url}",
+]
 vars    = { vault = "Notes", folder = "Inbox" }
 ```
 
