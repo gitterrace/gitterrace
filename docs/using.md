@@ -34,6 +34,15 @@ The log of a branch has a List and a Graph switch in its head. Graph draws the
 branches and merges beside each commit, one row per commit. A log filtered by
 path or author has no graph, since its commits are not one line of history.
 
+Graph draws every lane at once, as `git log --graph --all` does: the browsed
+ref, each local branch and the HEAD of each linked worktree, newest first by
+commit date, each tip labelled with its ref. A detached worktree is labelled
+"worktree" and its id. This ref narrows the graph to the history of the ref in
+the address, as before. Lanes past the column cap fold as "+N", and paging
+works the same in both. Worktree HEADs are working state of this machine, so a
+public server leaves them out, as it does the worktree pages. Branches of
+separate clones are not drawn: gitterrace never fetches into a browsed repo.
+
 When the server serves several clones or forks of one project, the log's
 toolbar says "Related:" and links the log of each other served repository that
 shares a root commit with this one. Only repositories the server already lists
