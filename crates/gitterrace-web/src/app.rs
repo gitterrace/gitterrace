@@ -335,6 +335,8 @@ pub(crate) struct App {
     /// Ranges read from git for a compare, so a test can tell a memo hit from a read.
     pub(crate) git_ranges: AtomicU64,
     memo: Mutex<crate::bounded::Bounded<(Instant, Arc<String>)>>,
+    /// One lock per memo key being rendered, see [`App::render_lock`].
+    pub(crate) rendering: Mutex<std::collections::HashMap<String, Arc<tokio::sync::Mutex<()>>>>,
     dirty: Mutex<Option<(Instant, bool)>>,
     /// Open streams on a page that shows the working tree. Zero means no scan runs.
     pub(crate) wt_watchers: std::sync::atomic::AtomicUsize,
@@ -394,6 +396,7 @@ impl App {
             releases: AtomicU64::new(0),
             git_ranges: AtomicU64::new(0),
             memo: Mutex::new(crate::bounded::Bounded::new(cfg.cache_bytes(Cache::Pages))),
+            rendering: Mutex::new(std::collections::HashMap::new()),
             dirty: Mutex::new(None),
             wt_watchers: std::sync::atomic::AtomicUsize::new(0),
             wt_scans: AtomicU64::new(0),

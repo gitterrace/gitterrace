@@ -297,6 +297,12 @@ pub(crate) async fn cached_keyed<T: askama::Template + Send + 'static>(
     if let Some(h) = app.memo_get(&key) {
         return Ok(Html(h));
     }
+    // One render per cold key: a request that waited here finds the page the first one put.
+    let claim = app.render_lock(&key);
+    let _held = claim.hold().await;
+    if let Some(h) = app.memo_get(&key) {
+        return Ok(Html(h));
+    }
     let (html, served) = with_records(app, tab, build).await?;
     if served {
         app.memo_put(key, Arc::new(html.0.clone()));
@@ -532,5 +538,53 @@ mod tests {
             .await
             .expect("page");
         assert_eq!(second.0, "data");
+    }
+
+    /// Guard class: concurrent requests for one cold memo key render the page once, the
+    /// rest wait and join it. Red when each request renders on its own (the warm-up and the
+    /// first visitor both built hotspots right after the index was ready, doubling its cost).
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    async fn concurrent_requests_for_one_cold_page_render_it_once() {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        let dir = tempfile::tempdir().expect("tmp");
+        let p = gitterrace_testkit::Fixture::init(dir.path())
+            .write("a.txt", "a\n")
+            .commit("feat: a")
+            .path()
+            .to_owned();
+        let repo = gitterrace_git::Repo::discover(&p).expect("repo");
+        let index = gitterrace_index::Index::open(&repo).expect("index");
+        let app = Arc::new(App::new(repo, index));
+        app.index
+            .update(&app.repo, "HEAD", &|_| {})
+            .expect("update");
+        app.mark_ready();
+        let builds = Arc::new(AtomicUsize::new(0));
+        let n = 8;
+        let start = Arc::new(tokio::sync::Barrier::new(n));
+        let mut tasks = Vec::new();
+        for _ in 0..n {
+            let (app, builds, start) = (Arc::clone(&app), Arc::clone(&builds), Arc::clone(&start));
+            tasks.push(tokio::spawn(async move {
+                start.wait().await;
+                super::cached(&app, "one", None, move |_, _, _| {
+                    builds.fetch_add(1, Ordering::SeqCst);
+                    // Long enough that every request arrives while the first renders.
+                    gitterrace_testkit::wait::pause_blocking(std::time::Duration::from_millis(200));
+                    Data
+                })
+                .await
+                .expect("page")
+                .0
+            }));
+        }
+        for t in tasks {
+            assert_eq!(t.await.expect("task"), "data");
+        }
+        assert_eq!(builds.load(Ordering::SeqCst), 1, "renders of one cold page");
+        assert!(
+            app.rendering.lock().expect("lock").is_empty(),
+            "no render lock left behind"
+        );
     }
 }

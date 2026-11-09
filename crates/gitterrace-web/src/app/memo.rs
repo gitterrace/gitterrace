@@ -13,6 +13,22 @@ impl App {
         (at.elapsed() < MEMO_TTL).then(|| stamp(&html, self.version()))
     }
 
+    /// The lock held while `key` is rendered. A second request for the same cold key waits on
+    /// it and then finds the first one's page in the memo, so two concurrent renders of one
+    /// page (the warm-up and the first visitor, right after the index is ready) become one.
+    /// The entry goes when the last holder drops it.
+    pub(crate) fn render_lock(&self, key: &str) -> RenderLock<'_> {
+        let lock = self.rendering.lock().map_or_else(
+            |_| Arc::new(tokio::sync::Mutex::new(())),
+            |mut g| Arc::clone(g.entry(key.to_owned()).or_default()),
+        );
+        RenderLock {
+            app: self,
+            key: key.to_owned(),
+            lock: Some(lock),
+        }
+    }
+
     pub(crate) fn memo_put(&self, key: String, html: Arc<String>) {
         if let Ok(mut g) = self.memo.lock() {
             g.put(key, (Instant::now(), html));
@@ -91,3 +107,29 @@ fn stamp(html: &str, v: u64) -> String {
 #[cfg(test)]
 #[path = "memo_tests.rs"]
 mod tests;
+
+/// A claim on rendering one memo key, from [`App::render_lock`].
+pub(crate) struct RenderLock<'a> {
+    app: &'a App,
+    key: String,
+    lock: Option<Arc<tokio::sync::Mutex<()>>>,
+}
+
+impl RenderLock<'_> {
+    /// Waits until no other request renders this key.
+    pub(crate) async fn hold(&self) -> Option<tokio::sync::MutexGuard<'_, ()>> {
+        Some(self.lock.as_ref()?.lock().await)
+    }
+}
+
+impl Drop for RenderLock<'_> {
+    fn drop(&mut self) {
+        let lock = self.lock.take();
+        if let Ok(mut g) = self.app.rendering.lock() {
+            // Ours plus the table's: nobody else waits, so the entry goes.
+            if lock.as_ref().is_some_and(|l| Arc::strong_count(l) <= 2) {
+                g.remove(&self.key);
+            }
+        }
+    }
+}
