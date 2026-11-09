@@ -26,7 +26,7 @@ use crate::config::trust::check_file;
 /// own `timeout` in actions.toml.
 const DEFAULT_TIMEOUT: Duration = Duration::from_secs(10);
 /// Not configurable: the ceiling is part of the actions.toml contract (docs/actions.md).
-const MAX_TIMEOUT: Duration = Duration::from_secs(120);
+pub const MAX_TIMEOUT: Duration = Duration::from_secs(120);
 /// A config larger than this is not hand-written; refuse instead of parsing it.
 /// Not configurable: a size bound read before parsing, against a file that is not a config.
 const MAX_CONFIG_BYTES: u64 = 256 * 1024;

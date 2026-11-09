@@ -30,6 +30,7 @@ pub fn render(root: &Path, ws: &Workspace, scripts: &[Script]) -> Result<Vec<Out
         Out::block(ACTIONS, "starter", starter()),
         Out::block(ACTIONS, "send", send()),
         Out::block(ACTIONS, "scripts", script_table(scripts)),
+        Out::block(ACTIONS, "limits", limits()),
         Out::block(ARCH, "crates", crate_diagram(ws)?),
         Out::block(ARCH, "routes", routes()),
         Out::block(ARCH, "languages", languages()),
@@ -237,6 +238,33 @@ fn send() -> String {
         &SEND_KEYS,
     ));
     s
+}
+
+/// The fixed run limits of the Security list, from the runner and loader constants.
+fn limits() -> String {
+    use gitterrace_actions::config::MAX_TIMEOUT;
+    use gitterrace_actions::runner::{MAX_RUNNING, PER_MINUTE};
+    let output = gitterrace_config::keys()
+        .iter()
+        .find(|k| k.id == "limits.action_output_kb")
+        .map_or_else(String::new, |k| k.default.clone());
+    let items = [
+        format!(
+            "No shell between gitterrace and the program: a placeholder is one argument, never \
+             parsed. Scrubbed environment, timeout, at most {MAX_RUNNING} runs at once, \
+             {PER_MINUTE} a minute."
+        ),
+        format!(
+            "A `timeout` is at most {} s. That ceiling is fixed and no setting raises it. Each \
+             stream of output keeps its first `limits.action_output_kb` (default {output} KiB) \
+             and drops the rest.",
+            MAX_TIMEOUT.as_secs()
+        ),
+    ];
+    items.iter().fold(String::new(), |mut s, i| {
+        let _ = writeln!(s, "{}", crate::out::wrap_item(i));
+        s
+    })
 }
 
 /// What an `[[action]]` is, for the docs and the website.

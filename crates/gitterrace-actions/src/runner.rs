@@ -47,10 +47,10 @@ const KEEP_ENV: &[&str] = &[
 ];
 /// One expanded placeholder value. Larger values belong on stdin, not in argv.
 /// Not configurable: argv bounds keep a spawn under the OS `ARG_MAX`.
-const MAX_VALUE_BYTES: usize = 64 * 1024;
+pub const MAX_VALUE_BYTES: usize = 64 * 1024;
 /// The whole expanded argv, well under every OS's `ARG_MAX` with the environment beside it.
 /// Not configurable: an OS bound (`ARG_MAX`), not a preference.
-const MAX_ARGV_BYTES: usize = 256 * 1024;
+pub const MAX_ARGV_BYTES: usize = 256 * 1024;
 
 #[derive(Debug, Clone, Copy)]
 pub struct Limits {
@@ -61,13 +61,18 @@ pub struct Limits {
     pub output_bytes: usize,
 }
 
+/// Runs at once, process-wide (one per action id). Not configurable: docs/actions.md states it.
+pub const MAX_RUNNING: usize = 4;
+/// Starts a minute, process-wide. Not configurable: docs/actions.md states it.
+pub const PER_MINUTE: usize = 30;
+
 impl Default for Limits {
-    /// 4 running process-wide (one per action id), 30 starts a minute and 64 KiB of output kept
-    /// per stream.
+    /// [`MAX_RUNNING`] running, [`PER_MINUTE`] starts a minute and 64 KiB of output kept per
+    /// stream.
     fn default() -> Self {
         Self {
-            max_running: 4,
-            per_minute: 30,
+            max_running: MAX_RUNNING,
+            per_minute: PER_MINUTE,
             output_bytes: 64 * 1024,
         }
     }
@@ -266,8 +271,9 @@ pub fn expand(template: &[String], payload: &Payload) -> Result<Vec<String>, Run
                     }
                     if v.len() > MAX_VALUE_BYTES {
                         return Err(RunError::Refused(format!(
-                            "{{{name}}} is {} KiB, over the 64 KiB argument cap. Use stdin",
-                            v.len() / 1024
+                            "{{{name}}} is {} KiB, over the {} KiB argument cap. Use stdin",
+                            v.len() / 1024,
+                            MAX_VALUE_BYTES / 1024
                         )));
                     }
                     arg.push_str(&v);
@@ -286,9 +292,10 @@ pub fn expand(template: &[String], payload: &Payload) -> Result<Vec<String>, Run
         after_dashdash |= el == "--";
         total += arg.len() + 1;
         if total > MAX_ARGV_BYTES {
-            return Err(RunError::Refused(
-                "the arguments are over 256 KiB together. Use stdin".into(),
-            ));
+            return Err(RunError::Refused(format!(
+                "the arguments are over {} KiB together. Use stdin",
+                MAX_ARGV_BYTES / 1024
+            )));
         }
         out.push(arg);
     }
