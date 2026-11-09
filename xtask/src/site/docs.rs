@@ -15,9 +15,9 @@ use askama::Template;
 
 use crate::docs_index::{LEGAL, normalize, on_site};
 use crate::out::Out;
-use crate::site::changelog;
 use crate::site::frame::{Body, Site, page};
 use crate::site::outline_script;
+use crate::site::{changelog, docnav};
 
 pub(super) const CHANGELOG: &str = "CHANGELOG.md";
 
@@ -354,14 +354,25 @@ pub(super) fn pages(root: &Path, site: &Site) -> Result<(Vec<Out>, Vec<String>)>
     };
     let mut outs = Vec::new();
     let mut paths = vec!["docs/".to_owned()];
-    let mut titles = Vec::new();
+    let mut docs = Vec::new();
     for (rel, _, what) in on_site() {
         let text = read(rel)?;
         let title = title_of(rel, &text)?;
         let path = page_path(stem(rel));
-        if paths.contains(&path) {
+        if docs
+            .iter()
+            .any(|d: &(&str, String, String, &str, String)| d.1 == path)
+        {
             anyhow::bail!("{rel}: another document is already the page {path}");
         }
+        docs.push((rel, path, title, what, text));
+    }
+    let order: Vec<(String, String)> = docs
+        .iter()
+        .map(|(_, p, t, ..)| (p.clone(), t.clone()))
+        .collect();
+    let mut titles = Vec::new();
+    for (rel, path, title, what, text) in docs {
         let mut h2s = Vec::new();
         let inner = body(&text, rel, &links, &mut |level, h| {
             let id = slug(h);
@@ -371,11 +382,12 @@ pub(super) fn pages(root: &Path, site: &Site) -> Result<(Vec<Out>, Vec<String>)>
             id
         });
         let rail = outline(&h2s);
-        let scripts = if rail.is_empty() {
-            Vec::new()
+        let (heads, scripts) = if rail.is_empty() {
+            (Vec::new(), Vec::new())
         } else {
-            vec![outline_script()]
+            (h2s, vec![outline_script()])
         };
+        let nav = docnav::nav(&order, &path, &heads);
         let html = page(
             site,
             &Body {
@@ -383,6 +395,9 @@ pub(super) fn pages(root: &Path, site: &Site) -> Result<(Vec<Out>, Vec<String>)>
                 desc: &sentence(what),
                 path: &path,
                 inner: &inner,
+                docnav: &nav.list,
+                menus: &nav.menus,
+                pager: &nav.pager,
                 rail: &rail,
                 edit: rel,
                 scripts,

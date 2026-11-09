@@ -136,9 +136,39 @@ pub(crate) fn page(site: &Site, body: &Body) -> String {
     crate::site::fit::fit(&out)
 }
 
+/// `html` with its tags packed into lines at most 100 wide. A line breaks only between a `>`
+/// and an opening `<`, where no whitespace is added and none is lost, so a closing tag stays on
+/// the line of what it closes. Lists the site builds in one go (the docs list, the menus) stay
+/// short and within the line width the pages are held to. One run without such a break point
+/// that is wider than 100 is left whole.
+pub(crate) fn pack(html: &str) -> String {
+    let mut out = String::new();
+    let mut line = 0;
+    let mut rest = html;
+    while !rest.is_empty() {
+        // The next run ends before the first `<` that opens a tag right after a `>`.
+        let end = rest
+            .match_indices("><")
+            .map(|(i, _)| i + 1)
+            .find(|&i| !rest[i..].starts_with("</"))
+            .unwrap_or(rest.len());
+        let (run, tail) = rest.split_at(end);
+        let n = run.chars().count();
+        if line > 0 && line + n > 100 {
+            out.push('\n');
+            line = 0;
+        }
+        out.push_str(run);
+        line += n;
+        rest = tail;
+    }
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fmt::Write as _;
 
     fn site() -> Site<'static> {
         Site {
@@ -175,5 +205,23 @@ mod tests {
         assert!(!p.contains("a<b") && p.contains(" - r</title>"), "{p}");
         assert!(!p.contains("d\"e"), "{p}");
         assert!(p.contains("<h1>x</h1>"), "{p}");
+    }
+
+    #[test]
+    fn packing_breaks_only_between_tags_and_keeps_the_width() {
+        let list = (0..30).fold(String::new(), |mut s, i| {
+            let _ = write!(s, "<li><a href=\"/{i}/\">Item {i}</a></li>");
+            s
+        });
+        let packed = pack(&list);
+        assert_eq!(packed.replace('\n', ""), list);
+        assert!(packed.lines().all(|l| l.chars().count() <= 100), "{packed}");
+        assert!(
+            packed
+                .lines()
+                .skip(1)
+                .all(|l| l.starts_with('<') && !l.starts_with("</")),
+            "{packed}"
+        );
     }
 }

@@ -1,0 +1,27 @@
+{#- The docs navigation: `part` picks the list beside the text on a wide screen, the two
+folded menus above it on a narrow one, or the previous and next links under it. Every
+docs page in index order; the current one carries aria-current. -#}
+{%- if part == "list" -%}
+<nav class="docnav" aria-label="Docs"><h2>Docs</h2><ol>
+{%- for (href, title, here) in docs %}<li><a href="/{{ href }}"
+{%- if *here %} aria-current="page"{% endif %}>{{ title }}</a></li>{% endfor -%}
+</ol></nav>
+{%- elif part == "menus" -%}
+<div class="menus"><details class="menu"><summary>Docs</summary><div class="pop"><ol>
+{%- for (href, title, here) in docs %}<li><a href="/{{ href }}"
+{%- if *here %} aria-current="page"{% endif %}>{{ title }}</a></li>{% endfor -%}
+</ol></div></details>
+{%- if !heads.is_empty() -%}
+<details class="menu" data-outline><summary>On this page</summary><div class="pop"><ol>
+{%- for (id, text) in heads %}<li><a href="#{{ id }}">{{ text }}</a></li>{% endfor -%}
+</ol></div></details>
+{%- endif -%}
+</div>
+{%- else -%}
+<nav class="pager" aria-label="Previous and next">
+{%- if let Some((href, title)) = prev %}<a class="prev" href="/{{ href }}" rel="prev">
+<span>Previous</span>{{ title }}</a>{% endif -%}
+{%- if let Some((href, title)) = next %}<a class="next" href="/{{ href }}" rel="next">
+<span>Next</span>{{ title }}</a>{% endif -%}
+</nav>
+{%- endif %}
