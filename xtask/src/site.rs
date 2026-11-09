@@ -234,7 +234,7 @@ pub fn render(root: &Path, ws: &Workspace) -> Result<Vec<Out>> {
          <img class=\"on-dark\" src=\"assets/logo-dark.svg\" alt=\"\" width=\"540\" height=\"120\" \
          loading=\"lazy\"></h1>\n<p class=\"tag\">{tag}</p>\n</div>\n",
         n = esc(&pkg.name),
-        tag = esc(&tagline(root)?),
+        tag = esc(&pitch(root, &pkg.description)?),
     );
     let demo = if ws.demo.is_empty() {
         String::new()
@@ -488,16 +488,23 @@ fn redirects(repo: &str, name: &str) -> String {
     )
 }
 
-/// `TAGLINE` from `scripts/theme-tagline-gen.py`, so the page, the README header and the logo
-/// agree.
-fn tagline(root: &Path) -> Result<String> {
+/// The one pitch sentence: the package description, which the README, the landing page and the
+/// meta description show. The README header draws it as outlined text, so generation fails when
+/// `TAGLINE` in `scripts/theme-tagline-gen.py` says something else.
+fn pitch(root: &Path, desc: &str) -> Result<String> {
     let src = std::fs::read_to_string(root.join("scripts/theme-tagline-gen.py"))
         .context("reading scripts/theme-tagline-gen.py")?;
-    src.lines()
+    let tag = src
+        .lines()
         .find_map(|l| l.strip_prefix("TAGLINE = \""))
         .and_then(|l| l.strip_suffix('"'))
-        .map(str::to_owned)
-        .context("TAGLINE in scripts/theme-tagline-gen.py")
+        .context("TAGLINE in scripts/theme-tagline-gen.py")?;
+    anyhow::ensure!(
+        tag == desc,
+        "TAGLINE in scripts/theme-tagline-gen.py is not the package description {desc:?}: \
+         set it and run the script to redraw the README header"
+    );
+    Ok(desc.to_owned())
 }
 
 /// The generated block of the app's tokens, with the font paths pointed at `assets/fonts/`.

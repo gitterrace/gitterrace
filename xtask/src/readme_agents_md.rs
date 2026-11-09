@@ -39,6 +39,11 @@ pub fn render(ws: &Workspace, scripts: &[Script]) -> Vec<Out> {
     );
 
     vec![
+        Out::block(
+            README,
+            "pitch",
+            bin.map_or_else(String::new, |p| p.description.clone()),
+        ),
         Out::block(README, "msrv", msrv),
         Out::block(README, "install", install),
         Out::block(README, "commands", commands()),

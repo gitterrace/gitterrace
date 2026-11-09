@@ -5,10 +5,15 @@
 </picture>
 </h1>
 
-Browse any git repository in your browser, offline, read-only: code, commits,
-blame, branches, worktrees, stashes, live updates and insights. No database,
-accounts or network. Agents write more of the code each month, and few people
-read their diffs. This is a calm place to look again ([why](docs/why.md)).
+<!-- BEGIN GENERATED: pitch -->
+A local, read-only git browser: code, history and insights, offline.
+
+<!-- END GENERATED: pitch -->
+
+Code, commits, blame, branches, worktrees, stashes, live updates and insights,
+with no database, accounts or network. Agents write more of the code each month,
+and few people read their diffs. This is a calm place to look again
+([why](https://gitterrace.dev/docs/why/)).
 
 <!-- BEGIN GENERATED: demo -->
 Try it without installing: [the live demo](https://demo.gitterrace.dev): jq
