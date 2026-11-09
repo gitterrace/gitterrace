@@ -35,7 +35,7 @@ METRICS = {
     "page_cold_ms": ("Cold page, slowest", "ms", "{:.0f}"),
     "index_secs": ("Index build", "s", "{:.1f}"),
     "idle_cpu_pct": ("Idle CPU, worse of plain and /events client", "%", "{:.2f}"),
-    "rss_mb": ("Peak memory (RSS, index peak or after pages)", "MB", "{:.0f}"),
+    "rss_mb": ("Peak physical footprint (index peak or after pages)", "MB", "{:.0f}"),
     "footprint_idle_mb": ("Idle footprint above a fresh server", "MB", "{:.0f}"),
     "export_secs": ("Export", "s", "{:.1f}"),
 }
@@ -43,14 +43,16 @@ METRICS = {
 # and the bench-report self-test fails when one of them can go over budget unnoticed.
 SOURCES = {
     "idle_cpu_pct": ("idle.cpu_pct", "idle.cpu_pct_events_client"),
-    "rss_mb": ("index.peak_rss_mb", "memory.rss_after_pages_mb"),
+    # Physical footprint, not RSS: clean mapped pack files are left out, the system can take
+    # them back. RSS is still recorded beside it (index.peak_rss_mb).
+    "rss_mb": ("index.peak_footprint_mb", "memory.footprint_after_pages_mb"),
 }
 SHORT = {
     "page_warm_ms": "warm page",
     "page_cold_ms": "cold page",
     "index_secs": "index build",
     "idle_cpu_pct": "idle CPU",
-    "rss_mb": "peak memory (index peak or after pages)",
+    "rss_mb": "peak physical footprint (index peak or after pages)",
     "footprint_idle_mb": "idle footprint above a fresh server",
     "export_secs": "export",
 }

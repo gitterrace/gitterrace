@@ -146,7 +146,9 @@ def footprint_mb(pid: int) -> float | None:
             for line in rollup.read_text().splitlines()
             if line.startswith("Private_Dirty:")
         )
-        return kb / 1024
+        # Private_Dirty holds the dirty anonymous pages too; RssAnon adds the clean ones
+        # (zero pages touched only by reads). The larger never counts a page twice.
+        return max(kb, rss_anon_kb(pid)) / 1024
     if not shutil.which("footprint"):
         return None
     out = subprocess.run(["footprint", str(pid)], capture_output=True, text=True).stdout
@@ -154,6 +156,13 @@ def footprint_mb(pid: int) -> float | None:
     if not m:
         return None
     return float(m.group(1)) * {"KB": 1 / 1024, "MB": 1.0, "GB": 1024.0}[m.group(2)]
+
+
+def rss_anon_kb(pid: int) -> int:
+    for line in Path(f"/proc/{pid}/status").read_text().splitlines():
+        if line.startswith("RssAnon:"):
+            return int(line.split()[1])
+    return 0
 
 
 def releases(port: int, prefix: str) -> int:
@@ -275,8 +284,11 @@ class Server:
         Progress lives under the repo prefix, which /api/repos names once the server listens."""
         peak, listening = 0.0, None
         prefix: str | None = None
-        # Peak RSS per index step, charged to the step the last answer named.
+        # Peak RSS and physical footprint per index step, charged to the step the last
+        # answer named. Footprint leaves out clean mapped pack files, the gated number.
         self.phase_rss: dict[str, float] = {}
+        self.phase_fp: dict[str, float] = {}
+        self.peak_footprint = 0.0
         self.phases: list[dict[str, Any]] = []
         step = "start"
         while time.perf_counter() - self.t0 < timeout:
@@ -285,6 +297,9 @@ class Server:
             now = rss_mb(self.pid)
             peak = max(peak, now)
             self.phase_rss[step] = max(self.phase_rss.get(step, 0.0), now)
+            fp = footprint_mb(self.pid) or 0.0
+            self.peak_footprint = max(self.peak_footprint, fp)
+            self.phase_fp[step] = max(self.phase_fp.get(step, 0.0), fp)
             try:
                 if prefix is None:
                     prefix = site_prefix(self.port)
@@ -404,13 +419,18 @@ def pages(probe: Json, search: str) -> dict[str, str]:
 INDEX_GATES = ("index_secs", "rss_mb")
 
 
-def phase_table(phases: list[dict[str, Any]], rss: dict[str, float]) -> list[Json]:
-    """The server's step times, each with the peak RSS sampled while it ran."""
+def phase_table(
+    phases: list[dict[str, Any]], rss: dict[str, float], fp: dict[str, float]
+) -> list[Json]:
+    """The server's step times, each with the peak RSS and peak footprint sampled while it
+    ran."""
     out = []
     for p in phases:
         row = {"name": p["name"], "secs": round(float(p["secs"]), 3)}
         if p["name"] in rss:
             row["rss_mb"] = round(rss[p["name"]], 1)
+        if p["name"] in fp:
+            row["footprint_mb"] = round(fp[p["name"]], 1)
         out.append(row)
     return out
 

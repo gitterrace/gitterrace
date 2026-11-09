@@ -213,6 +213,7 @@ All notable changes are listed here. The format follows
 - site: diagrams drawn at build time, and tables and code that fit a phone
 - index: store the first-parent chain with its line counts in cache format 9
 - index: time each index step and fail the bench on an index over budget
+- bench: gate index memory on physical footprint, not RSS
 
 ### Changed
 

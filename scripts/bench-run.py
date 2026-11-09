@@ -146,11 +146,17 @@ def bench_phases(
     try:
         secs, listen, peak = srv.wait_ready()
         res["index"] = {"secs": secs, "listen_secs": listen, "peak_rss_mb": peak}
-        res["index"]["phases"] = bl.phase_table(srv.phases, srv.phase_rss)
-        print(f"  index {secs:.1f} s, peak RSS {peak:.0f} MB", flush=True)
+        res["index"]["peak_footprint_mb"] = srv.peak_footprint
+        res["index"]["phases"] = bl.phase_table(srv.phases, srv.phase_rss, srv.phase_fp)
+        print(
+            f"  index {secs:.1f} s, peak footprint {srv.peak_footprint:.0f} MB, "
+            f"peak RSS {peak:.0f} MB",
+            flush=True,
+        )
         for p in res["index"]["phases"]:
             print(
-                f"    {p['name']:<12} {p['secs']:8.1f} s  {p.get('rss_mb', 0):6.0f} MB",
+                f"    {p['name']:<12} {p['secs']:8.1f} s  footprint "
+                f"{p.get('footprint_mb', 0):6.0f} MB  RSS {p.get('rss_mb', 0):6.0f} MB",
                 flush=True,
             )
         rss_warm = rss_mb(srv.pid)
@@ -161,6 +167,7 @@ def bench_phases(
         res["memory"] = {
             "rss_after_index_mb": rss_warm,
             "rss_after_pages_mb": rss_mb(srv.pid),
+            "footprint_after_pages_mb": bl.footprint_mb(srv.pid) or 0.0,
         }
         res["index"]["cache_mb"] = dir_mb(cache)
         quiet("idle", loads, wait, sampler)
@@ -341,7 +348,7 @@ def judge(res: Json, budgets: Json) -> Json:
     )
     put("rss_mb", max(field(res, f) for f in bc.SOURCES["rss_mb"]), b.get("rss_mb"))
     if "rss_mb" in out:
-        out["rss_mb"]["phase"] = bl.slowest(phases, "rss_mb")
+        out["rss_mb"]["phase"] = bl.slowest(phases, "footprint_mb")
     # The serving-memory goal: idle, after a release, at most the cache budget plus margin
     # above a just-started server (docs/benchmarks.md, memory_budget.rs).
     fp, start = (

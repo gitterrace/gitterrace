@@ -79,9 +79,9 @@ def gate_test() -> None:
             res: Json = {
                 "class": "c",
                 "pages": {"p": pages},
-                "index": {"secs": 1, "peak_rss_mb": 1},
+                "index": {"secs": 1, "peak_rss_mb": 1, "peak_footprint_mb": 1},
                 "idle": {"cpu_pct": 0.1, "cpu_pct_events_client": 0.1},
-                "memory": {"rss_after_pages_mb": 1},
+                "memory": {"rss_after_pages_mb": 1, "footprint_after_pages_mb": 1},
             }
             top, leaf = hot.split(".")
             res[top][leaf] = 100
@@ -90,6 +90,58 @@ def gate_test() -> None:
                 sys.exit(
                     f"bench-report self-test failed: {hot} over budget reads {got}"
                 )
+
+
+# What the memory gate reads, see bench-chart-lib SOURCES.
+MEASURE = bl.footprint_mb
+CHILD = """
+import mmap, sys, time
+path, heap = sys.argv[1], int(sys.argv[2])
+with open(path, "rb") as f:
+    m = mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ)
+    s = sum(m[i] for i in range(0, len(m), 4096))
+    buf = bytearray(heap)
+    for i in range(0, heap, 4096):
+        buf[i] = 1
+    print("ready", s, flush=True)
+    time.sleep(60)
+"""
+
+
+def memory_measure_test() -> None:
+    """The memory gate's measure: a process holding a large mapped file and a small heap is
+    under the limit, one with a large heap is over. Plain RSS would fail the first."""
+    import subprocess
+    import tempfile
+
+    limit, big = 160.0, 320 * 2**20
+    with tempfile.TemporaryDirectory() as d:
+        path = Path(d) / "pack"
+        with path.open("wb") as f:
+            for _ in range(big // 2**20):
+                f.write(os.urandom(2**20))
+        got = []
+        for heap in (8 * 2**20, big):
+            p = subprocess.Popen(
+                [sys.executable, "-c", CHILD, str(path), str(heap)],
+                stdout=subprocess.PIPE,
+                text=True,
+            )
+            try:
+                if p.stdout is None or not p.stdout.readline().startswith("ready"):
+                    sys.exit(
+                        "bench-report self-test failed: memory child did not start"
+                    )
+                got.append(MEASURE(p.pid) or 0.0)
+            finally:
+                p.kill()
+                p.wait()
+    small, large = got
+    if not (small <= limit < large):
+        sys.exit(
+            f"bench-report self-test failed: mapped file and small heap {small:.0f} MB, "
+            f"large heap {large:.0f} MB, limit {limit:.0f} MB"
+        )
 
 
 def self_test() -> None:
@@ -113,6 +165,7 @@ def self_test() -> None:
     footprint_test()
     export_test()
     gate_test()
+    memory_measure_test()
     print("bench-report self-test: ok")
 
 
