@@ -135,7 +135,8 @@
 //                pages red today are listed as known with the change that fixes them
 //   graph-view   the log's Graph view on a wide merge history, at 390 and 1440 px: lines meet
 //                across every row edge, the "+N" fold shows at 390, a ref chip keeps the row
-//                height, nothing scrolls sideways, and the List | Graph switch keeps the page top
+//                height, nothing scrolls sideways, and the List | Graph switch keeps the page top;
+//                tip labels are never clipped and overlap no label, graph line or subject
 //   outline-filter  the "On this page" filter shows, narrows the list and Escape returns
 //                focus, on a Markdown page and an insights page
 //   repos-filter the Repositories home filter: typing narrows rows and count, Enter opens the

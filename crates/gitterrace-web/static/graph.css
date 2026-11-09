@@ -19,14 +19,26 @@ stroke-width:1.5px}
 .gfold{display:none;position:absolute;right:0;font:var(--text-2xs) var(--mono);color:var(--muted);
 background:var(--bg);padding-left:2px}.gfold.w{display:block}
 .crow:hover .gfold{background:var(--soft)}
-.graph .xw{display:none}
+.graph .xw,.graph .on{display:none}
 .gedge{display:none;position:absolute;right:0;width:5px;height:5px;border-radius:50%}
 .gedge{background:var(--muted)}.gedge.w{display:block}
 .grefs{display:inline-flex;align-self:center;align-items:center;gap:var(--space-1);flex:none;
 font:var(--text-2xs)/1 var(--mono)}
 .gref{padding:2px 5px;border:var(--border);border-radius:var(--radius);color:var(--muted)}
 .gref.cur{color:var(--accent-ink);border-color:var(--accent);background:var(--accent-soft)}
-@media (max-width:600px){.graph{max-width:36px}.graph .xn{display:none}
+.graph .k0{color:var(--accent)}.graph .k1,.glabels.k1{color:var(--add)}
+.graph .k2,.glabels.k2{color:var(--warn)}.graph .k3,.glabels.k3{color:var(--del)}
+.graph .k4,.glabels.k4{color:var(--seq-2)}.graph .k5,.glabels.k5{color:var(--info)}
+.glabels.k0{color:var(--accent)}
+.graph .gl path:not(.main){stroke:currentColor}.graph .gd circle:not(.m){fill:currentColor}
+.graph .gd .m:not(.main){stroke:currentColor}.graph .gd .gtip{fill:none;stroke:currentColor;
+stroke-width:1px;stroke-dasharray:2 2}
+.glabels{display:inline-flex;flex-direction:column;align-items:flex-end;justify-content:center;
+gap:2px;flex:0 1 auto;min-width:0;max-width:12rem;margin-right:-2px;
+font:var(--text-2xs)/1.25 var(--mono)}.glabels .gref{color:inherit;border-color:currentColor;
+max-width:100%;overflow-wrap:anywhere;text-align:right}
+@media (max-width:600px){.glabels{max-width:6.5rem}.graphed .cmain{min-width:0;flex-basis:0}
+.graph{max-width:36px}.graph .xn,.graph .ow{display:none}.graph .on{display:inline}
 .graph .gedge.n{display:block}.graph .gedge.w{display:none}.graph .gfold.n{display:block}
 .graph .gfold.w{display:none}.cmain:has(.grefs)>.subj{flex:1 1 0}.grefs{max-width:50%;
 overflow:hidden}}

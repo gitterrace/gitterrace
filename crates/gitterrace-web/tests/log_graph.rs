@@ -55,7 +55,7 @@ async fn the_graph_view_draws_a_hidden_cell_per_row_and_marks_refs() {
     let (_, body) = page(&router, "/log/HEAD?view=graph").await;
     assert_eq!(cells(&body), 5, "{body}");
     assert!(
-        body.contains("class=\"m main\""),
+        body.contains("class=\"m main "),
         "the merge is a hollow mainline dot"
     );
     assert!(
@@ -152,6 +152,36 @@ async fn the_graph_draws_every_branch_and_worktree_lane_with_its_label() {
         all.contains("<span class=\"gref\">worktree wt</span>"),
         "{all}"
     );
+    // Every tip row leads with its labels in its column's color, joined to the dot by a
+    // dashed line. Colour follows the column: `wt` sits on main's tip, so the two share
+    // column 0, and tips in different columns get different colors.
+    let mut lanes = std::collections::HashMap::new();
+    let mut tips = 0;
+    for row in all.split("<li class=\"crow\">").skip(1) {
+        let Some(l) = row.split("<span class=\"glabels ").nth(1) else {
+            assert!(!row.contains("gref"), "a label outside the graph: {row}");
+            continue;
+        };
+        let k = l.split('"').next().expect("class");
+        // A tip line and dot may carry the fold classes (xn, on) before the column color.
+        let wears = |el: &str| {
+            row.split(&format!("<{el} class=\"")).skip(1).any(|r| {
+                r.split('"')
+                    .next()
+                    .is_some_and(|c| c.split(' ').any(|w| w == k))
+            })
+        };
+        assert!(row.contains("class=\"gtip") && wears("path"), "{row}");
+        assert!(wears("circle"), "the dot wears {k}: {row}");
+        let cx = row.split("\" cx=\"").nth(1).expect("dot");
+        let cx = cx.split('"').next().expect("cx").to_owned();
+        let k = k.to_owned();
+        assert_eq!(lanes.entry(cx).or_insert_with(|| k.clone()), &k, "{row}");
+        tips += 1;
+    }
+    assert_eq!(tips, 5, "{all}");
+    let ks: std::collections::HashSet<_> = lanes.values().collect();
+    assert_eq!((lanes.len(), ks.len()), (4, 4), "{lanes:?}");
     let (_, one) = page(&router, "/log/HEAD?view=graph&lanes=one").await;
     assert_eq!(cells(&one), 2, "{one}");
     assert!(

@@ -1,7 +1,7 @@
 // The log's Graph view: its lines meet across row edges, a wide history folds into "+N" at a
-// narrow width, a ref chip keeps its row's height, and the List | Graph switch keeps the page
-// at the top. Serves its own fixture with a wide merge history. Imported by
-// scripts/browser-check.mjs, not run on its own.
+// narrow width, a ref chip keeps its row's height, tip labels show in full and overlap
+// nothing, and the List | Graph switch keeps the page at the top. Serves its own fixture with
+// a wide merge history. Imported by scripts/browser-check.mjs, not run on its own.
 import { mkdtempSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -12,6 +12,9 @@ const OPEN = 5;
 
 /** Branches in the fan-in fixture: far more than a wide screen shows. */
 const FAN = 15;
+
+/** Branch names on the tip: one must wrap at `/`, `-` and `_` instead of being clipped. */
+const LONG = ['feature/graph-labels_wrap-inside-their-column-at-every-width', 'fix/x'];
 
 /** A history where `open` branches fork from main and merge back one by one, newest on top. */
 function wideRepo(open = OPEN) {
@@ -34,6 +37,8 @@ function wideRepo(open = OPEN) {
     at('merge', '-q', '--no-ff', '-m', `Merge branch 'topic-${i}'`, `topic-${i}`);
   }
   at('tag', 'v1');
+  // Several labels on the top tip, one far longer than a label column.
+  for (const n of LONG) at('branch', n);
   return dir;
 }
 
@@ -53,6 +58,32 @@ function measure() {
   const fold = [...document.querySelectorAll('.gfold')].some((f) => getComputedStyle(f).display !== 'none' && box(f).width > 0);
   const over = document.documentElement.scrollWidth > innerWidth + 1;
   return { rows: rows.length, gaps, tall, fold, over };
+}
+
+/**
+ * In the page: tip labels that are clipped (scrollWidth past clientWidth) or that overlap
+ * another label, the row's graph cell or its subject.
+ */
+function labels() {
+  const bad = [];
+  const box = (el) => el.getBoundingClientRect();
+  const hit = (a, b) => a.left < b.right - 0.5 && b.left < a.right - 0.5
+    && a.top < b.bottom - 0.5 && b.top < a.bottom - 0.5;
+  const refs = [...document.querySelectorAll('.graphed .crow .gref')];
+  refs.forEach((g, i) => {
+    const name = g.textContent;
+    if (g.scrollWidth > g.clientWidth + 0.5) bad.push(`${name} clipped`);
+    const a = box(g);
+    for (const o of refs.slice(i + 1)) {
+      if (hit(a, box(o))) bad.push(`${name} on ${o.textContent}`);
+    }
+    const li = g.closest('.crow');
+    for (const sel of ['.graph', '.subj']) {
+      const o = li.querySelector(sel);
+      if (o && hit(a, box(o))) bad.push(`${name} on ${sel}`);
+    }
+  });
+  return { n: refs.length, bad };
 }
 
 /**
@@ -106,6 +137,11 @@ export function checks(env) {
           if (m.tall) r.fail(`${where}: ${m.tall} labelled row(s) taller than an unlabelled one`);
           else r.ok(`${where}: a ref chip keeps the row height`);
           if (m.over) r.fail(`${where}: page scrolls sideways`);
+          const t = await p.evaluate(labels);
+          const why = t.bad.slice(0, 3).join('; ');
+          if (!t.n) r.fail(`${where}: no tip labels`);
+          else if (t.bad.length) r.fail(`${where}: tip labels clipped or overlapping: ${why}`);
+          else r.ok(`${where}: ${t.n} tip labels show in full and overlap nothing`);
           if (width === 390) {
             if (m.fold) r.ok(`${where}: ${OPEN} open branches fold into a "+N" count`);
             else r.fail(`${where}: no "+N" fold on a history wider than 3 columns`);

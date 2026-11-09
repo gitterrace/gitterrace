@@ -434,16 +434,13 @@ fn graph_rows(
         .map(|(i, (c, p))| {
             let mut row = views::commit_row(c, now);
             let above = i.checked_sub(1).and_then(|j| placed.get(j));
-            row.graph = Some(crate::graph_view::cell(
-                p,
-                above,
-                width,
-                c.parents.len() > 1,
-            ));
+            let mut g = crate::graph_view::cell(p, above, width, c.parents.len() > 1);
             if let Some(mut r) = refs.remove(&c.id) {
                 r.sort_by_key(|(_, h)| !*h);
                 row.refs = r;
+                g.tip = true;
             }
+            row.graph = Some(g);
             row
         })
         .collect())

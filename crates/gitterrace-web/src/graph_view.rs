@@ -83,6 +83,24 @@ pub(crate) struct Line {
     pub(crate) d: String,
     /// `main` on the first-parent chain, plus the fold that hides it (see [`hide`]).
     pub(crate) cls: &'static str,
+    /// The column's color class, from the cycle of theme colors.
+    pub(crate) k: &'static str,
+}
+
+/// Column colors, cycling: column 0's line is `k0` (the accent), every other line takes the
+/// next class in turn. graph.css maps each to an existing theme token.
+const LANES: [&str; 6] = ["k0", "k1", "k2", "k3", "k4", "k5"];
+
+/// The color class of column `color`.
+pub(crate) fn lane(color: u32) -> &'static str {
+    let i = match color {
+        0 => 0,
+        c => 1 + (c - 1) % 5,
+    };
+    LANES
+        .get(usize::try_from(i).unwrap_or(0))
+        .copied()
+        .unwrap_or("k0")
 }
 
 /// One row's cell, as `graph_cell.html` draws it.
@@ -99,6 +117,13 @@ pub(crate) struct Cell {
     /// The fold that hides the dot and its stub, `""` when every screen shows them.
     pub(crate) off: &'static str,
     pub(crate) cx: u32,
+    /// The dot's column color class, also worn by the tip's labels.
+    pub(crate) lane: &'static str,
+    /// A branch tip with labels: a dashed line runs from the cell's left edge to the dot.
+    pub(crate) tip: bool,
+    /// `(x, classes)` ends of the tip's dashed line: the dot, hidden where a fold hides it,
+    /// and for each such fold a line to that fold's edge shown only on its screen.
+    pub(crate) reach: Vec<(u32, &'static str)>,
     /// Screens (`n`, `w`) whose fold hides the dot: there a muted mark at the fold edge
     /// anchors the row instead.
     pub(crate) edge: Vec<&'static str>,
@@ -135,6 +160,9 @@ pub(crate) fn cell(p: &Placed, above: Option<&Placed>, width: u16, merge: bool) 
             .map(|&(_, cls)| cls)
             .collect(),
         cx: x(p.col),
+        lane: lane(p.color),
+        tip: false,
+        reach: tip_ends(p.col),
         folds: hidden(p)
             .into_iter()
             .zip(FOLDS)
@@ -143,6 +171,18 @@ pub(crate) fn cell(p: &Placed, above: Option<&Placed>, width: u16, merge: bool) 
             .map(|(_, (n, (_, cls)))| (cls, n))
             .collect(),
     }
+}
+
+/// Where the tip's dashed line ends on each screen, see [`Cell::reach`]. The wide screen
+/// hides `xw`, so its edge line is `ow`, shown only there; the narrow one's is `on`.
+fn tip_ends(col: u16) -> Vec<(u32, &'static str)> {
+    let mut out = vec![(x(col), hide(col))];
+    for (keep, cls) in FOLDS {
+        if col >= keep {
+            out.push((u32::from(keep) * COL, if cls == "n" { "on" } else { "ow" }));
+        }
+    }
+    out
 }
 
 /// Columns of `p` each fold hides, in [`FOLDS`] order.
@@ -175,7 +215,11 @@ fn line(seg: Seg, y0: u32) -> Line {
     } else {
         format!("M{a} {y0}C{a} {m} {b} {m} {b} {y1}")
     };
-    Line { d, cls }
+    Line {
+        d,
+        cls,
+        k: lane(seg.color),
+    }
 }
 
 /// A piece of line's classes: `main` on the first-parent chain, and the folds that hide it.
@@ -211,7 +255,7 @@ mod tests {
         assert_eq!(rows.iter().map(|p| p.col).collect::<Vec<_>>(), [0, 1, 0]);
         let merge = cell(&rows[0], None, columns(&rows), true).to_string();
         assert!(merge.contains('C'), "the merge opens a curve: {merge}");
-        assert!(merge.contains("class=\"m main\""), "{merge}");
+        assert!(merge.contains("class=\"m main k0\""), "{merge}");
         assert!(merge.contains("aria-hidden=\"true\""));
     }
 
@@ -282,6 +326,14 @@ mod tests {
                 let cap = |k: u16| u32::from(k) * COL;
                 assert!(reach_x < cap(3) || l.cls.contains("xn"), "row {i}: {l:?}");
                 assert!(reach_x < cap(8) || l.cls.contains("xw"), "row {i}: {l:?}");
+            }
+            // Every stroke of the cell, the tip's dashed line too, ends inside each fold.
+            for (end, cls) in &c.reach {
+                let cap = |k: u16| u32::from(k) * COL;
+                let on_narrow = !cls.contains("xn") && *cls != "ow";
+                let on_wide = !cls.contains("xw") && *cls != "on";
+                assert!(!on_narrow || *end <= cap(3), "row {i}: tip to {end} {cls}");
+                assert!(!on_wide || *end <= cap(8), "row {i}: tip to {end} {cls}");
             }
             assert_eq!(c.edge.is_empty(), p.col < 3, "row {i}: {:?}", c.edge);
             if i > 1 && hidden(p) == hidden(&rows[i - 1]) {
