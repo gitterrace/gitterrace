@@ -351,7 +351,7 @@ t ALLOW containment "$REPO" bash '{"command":"git commit -F - <<'"'"'MSG'"'"'\nt
 # engine cannot read: the engine gives NO verdict and the adapter's fallback
 # judges the raw command, instead of the engine saying allow.
 _dc_nojq=$(printf '{"event":"pre_tool","tool":"bash","cwd":"%s","input":{"command":"x"}}' "$REPO" |
-    env PATH=/nonexistent /bin/bash "$ENGINE" 2>/dev/null)
+    env "${UNSET_ENV[@]}" PATH=/nonexistent /bin/bash "$ENGINE" 2>/dev/null)
 CASES=$((CASES + 1))
 if [ -z "$_dc_nojq" ]; then
     printf '  ok   [NOVERD] a missing jq gives NO verdict, never allow\n'

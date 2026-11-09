@@ -63,10 +63,15 @@ UNSET_ENV=(-u FULL_SUITE_OK -u LOCK_OK -u GUARD_LANE -u GUARD_SCRATCH_DIR)
 for _k in $GUARD_CONFIG_KEYS; do
     UNSET_ENV+=(-u "$_k")
 done
-# The product's own lane variable (GUARD_LANE_ENV), read into GUARD_LANE by the engine.
-_lane_env=$(GUARD_CONFIG="$REPO/schwarzwald/config/guards.env" bash -c \
-    '. "$1/config.sh"; unset GUARD_LANE_ENV; guard_config_load >/dev/null 2>&1; printf %s "${GUARD_LANE_ENV:-}"' _ "$GUARDS_HOME")
-[ -z "$_lane_env" ] || UNSET_ENV+=(-u "$_lane_env")
+# A key ending in _ENV names a variable of the product's own (the lane, the build lock): the
+# engine reads that variable, so the caller's value of it would leak into every case. Each is
+# cleared too, whatever the product named it.
+for _k in $GUARD_CONFIG_KEYS; do
+    case "$_k" in *_ENV) ;; *) continue ;; esac
+    _named=$(GUARD_CONFIG="$REPO/schwarzwald/config/guards.env" bash -c \
+        '. "$1/config.sh"; unset "$2"; guard_config_load >/dev/null 2>&1; printf %s "${!2:-}"' _ "$GUARDS_HOME" "$_k")
+    case "$_named" in "" | *[!A-Za-z0-9_]* | [0-9]*) ;; *) UNSET_ENV+=(-u "$_named") ;; esac
+done
 # The product's own rules and cases, copied into the fixture at the same relative paths.
 PRODUCT_CASES=""
 PRODUCT_RULE_DIRS=""

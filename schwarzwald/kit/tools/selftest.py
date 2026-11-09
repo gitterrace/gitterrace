@@ -7,6 +7,8 @@
   ratchet-check  its own self-test: growth, a raised count and a dropped ratchet go red
   disk guard     disk_test.py: the floor refuses, an ENOSPC worktree fails the run, the sweep
                  lists only stale, closed build output
+  golden         golden.py finds a new golden test, golden_test.py: a real answer change fails
+                 the re-bless proof, a compare with no report fails
 
     selftest.py      exit 0 when every case holds, else one line per broken case
 """
@@ -199,6 +201,10 @@ def main() -> int:
     r = run(sys.executable, str(HERE / "bulk-read_test.py"))
     if r.returncode != 0:
         bad.append(f"bulk-read self-test failed: {(r.stdout + r.stderr).strip()[-600:]}")
+    for args in (("golden.py", "--self-test"), ("golden_test.py",)):
+        r = run(sys.executable, str(HERE / args[0]), *args[1:])
+        if r.returncode != 0:
+            bad.append(f"{args[0]} failed: {(r.stdout + r.stderr).strip()[-600:]}")
     old = Path("/usr/bin/python3")
     if old.exists() and run(str(old), "-c", "import tomllib").returncode != 0:
         with tempfile.TemporaryDirectory() as d:

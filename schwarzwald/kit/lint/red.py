@@ -88,6 +88,15 @@ def run_case(rule: str, case: Path, product: Path | None) -> int:
         git(root, "add", "-A")
         git(root, "-c", "user.name=t", "-c", "user.email=t@example.invalid", "commit", "-qm", "case")
         old = root / "stale-denylist.marker"  # marker: the case wants a stale private denylist
+        stray = root / "stray.marker"  # marker: after the commit it lies untracked at the root
+        if stray.exists():
+            git(root, "rm", "-q", "--cached", "stray.marker")
+            stray.rename(root / "stray-note.md")
+        deep = root / "deep-stray.marker"  # marker: after the commit, an untracked new skill folder
+        if deep.exists():
+            git(root, "rm", "-q", "--cached", "deep-stray.marker")
+            (root / ".agents/skills/new-skill").mkdir(parents=True)
+            deep.rename(root / ".agents/skills/new-skill/SKILL.md")
         if old.exists():
             old.unlink()
             os.utime(keep, (1, 1))

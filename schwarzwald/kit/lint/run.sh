@@ -144,7 +144,7 @@ fi
 
 # The shared lints, each proved on its red case by red.py.
 lint="${part}/lint"
-for rule in internal-refs personal-data denylist-parked own-shas actions-pin dash-standins make-targets file-length script-orphans docs-a11y changelog commit-dates; do
+for rule in internal-refs personal-data denylist-parked own-shas actions-pin dash-standins make-targets file-length script-orphans root-entries docs-a11y changelog commit-dates; do
   [[ -f ${lint}/${rule}.py ]] && run "${rule}" "${py}" "install python 3.11" "${py}" "${lint}/${rule}.py" --repo .
 done
 [[ -f ${lint}/red.py ]] && run lint-red "${py}" "install python 3.11" "${py}" "${lint}/red.py" --repo .

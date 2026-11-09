@@ -274,10 +274,10 @@ fi
 _jc_run() {
     if [ "$3" = - ]; then
         FC_OUT=$(JCODE_HOOK_CWD="$2" JCODE_HOOK_TOOL_NAME=bash JCODE_HOOK_TOOL_INPUT="$4" \
-            env -u GUARD_SCRATCH_DIR ${JC_PATH:+PATH="$JC_PATH"} /bin/bash "$1/adapters/jcode-pre.sh" </dev/null 2>&1)
+            env "${UNSET_ENV[@]}" ${JC_PATH:+PATH="$JC_PATH"} /bin/bash "$1/adapters/jcode-pre.sh" </dev/null 2>&1)
     else
         FC_OUT=$(printf '%s' "$3" | JCODE_HOOK_CWD="$2" JCODE_HOOK_TOOL_NAME=bash JCODE_HOOK_TOOL_INPUT="$4" \
-            env -u GUARD_SCRATCH_DIR ${JC_PATH:+PATH="$JC_PATH"} /bin/bash "$1/adapters/jcode-pre.sh" 2>&1)
+            env "${UNSET_ENV[@]}" ${JC_PATH:+PATH="$JC_PATH"} /bin/bash "$1/adapters/jcode-pre.sh" 2>&1)
     fi
     FC_RC=$?
 }

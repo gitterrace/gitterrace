@@ -290,7 +290,7 @@ printf 'staged\nmodified after staging\n' >"$decoy_repo/decoy.txt"
 _cwd_not_repo() { # $1 command  $2 text that must NOT appear  $3 label
     local got
     got=$(printf '{"event":"pre_tool","tool":"bash","cwd":"%s","status":"ok","input":{"command":"%s"}}' "$clean_repo" "$1" |
-        env GUARD_REPO="$decoy_repo" bash "$ENGINE" 2>&1 >/dev/null)
+        env "${UNSET_ENV[@]}" GUARD_REPO="$decoy_repo" bash "$ENGINE" 2>&1 >/dev/null)
     CASES=$((CASES + 1))
     case "$got" in
         *"$2"*)
@@ -323,7 +323,7 @@ git -C "$index_probe" init -q 2>/dev/null
 git -C "$index_probe" add staged.txt 2>/dev/null
 if [ -n "$(git -C "$index_probe" diff --cached --name-only 2>/dev/null)" ]; then
     got_index=$(printf '{"event":"pre_tool","tool":"bash","cwd":"%s","status":"ok","input":{"command":"git commit -F -"}}' "$index_probe" |
-        env GUARD_REPO="$decoy_repo" bash "$ENGINE" 2>&1 >/dev/null)
+        env "${UNSET_ENV[@]}" GUARD_REPO="$decoy_repo" bash "$ENGINE" 2>&1 >/dev/null)
     case "$got_index" in
         *"takes the whole INDEX"*)
             echo "  ok   [ADVISE] git_commit_index_scope -- bare commit with a non-empty index"
@@ -336,7 +336,7 @@ if [ -n "$(git -C "$index_probe" diff --cached --name-only 2>/dev/null)" ]; then
     # The negative control, and the half that makes the case worth anything: the
     # SAME dirty index must stay silent once the commit carries a pathspec.
     got_ok=$(printf '{"event":"pre_tool","tool":"bash","cwd":"%s","status":"ok","input":{"command":"git commit -- staged.txt -F -"}}' "$index_probe" |
-        env GUARD_REPO="$decoy_repo" bash "$ENGINE" 2>&1 >/dev/null)
+        env "${UNSET_ENV[@]}" GUARD_REPO="$decoy_repo" bash "$ENGINE" 2>&1 >/dev/null)
     case "$got_ok" in
         *"takes the whole INDEX"*)
             echo "  FAIL expected ALLOW got ADVISE -- a pathspec on the commit answers the question"
@@ -373,7 +373,7 @@ printf 'staged\nmodified after staging\n' >"$hunk_probe/shared.txt"
 printf 'staged\nmodified after staging\n' >"$hunk_probe/second.txt"
 if [ -n "$(git -C "$hunk_probe" diff --name-only 2>/dev/null)" ]; then
     got_hunk=$(printf '{"event":"pre_tool","tool":"bash","cwd":"%s","status":"ok","input":{"command":"git commit shared.txt -m x"}}' "$hunk_probe" |
-        env GUARD_REPO="$decoy_repo" bash "$ENGINE" 2>&1 >/dev/null)
+        env "${UNSET_ENV[@]}" GUARD_REPO="$decoy_repo" bash "$ENGINE" 2>&1 >/dev/null)
     case "$got_hunk" in
         *"BOTH staged and further modified"*)
             echo "  ok   [ADVISE] git_commit_pathspec_discards_hunk -- pathspec on a staged+modified file"
@@ -384,7 +384,7 @@ if [ -n "$(git -C "$hunk_probe" diff --name-only 2>/dev/null)" ]; then
             ;;
     esac
     got_quiet=$(printf '{"event":"pre_tool","tool":"bash","cwd":"%s","status":"ok","input":{"command":"git commit other.txt -m x"}}' "$hunk_probe" |
-        env GUARD_REPO="$decoy_repo" bash "$ENGINE" 2>&1 >/dev/null)
+        env "${UNSET_ENV[@]}" GUARD_REPO="$decoy_repo" bash "$ENGINE" 2>&1 >/dev/null)
     case "$got_quiet" in
         *"BOTH staged and further modified"*)
             echo "  FAIL expected ALLOW got ADVISE -- a path that is only staged is not this bug"
@@ -399,7 +399,7 @@ if [ -n "$(git -C "$hunk_probe" diff --name-only 2>/dev/null)" ]; then
     # stderr: git_commit_index_scope prints the full staged list on the same
     # channel, so a bare `grep shared.txt` is satisfied by the SIBLING rule.
     got_multi=$(printf '{"event":"pre_tool","tool":"bash","cwd":"%s","status":"ok","input":{"command":"git commit shared.txt second.txt -m x"}}' "$hunk_probe" |
-        env GUARD_REPO="$decoy_repo" bash "$ENGINE" 2>&1 >/dev/null |
+        env "${UNSET_ENV[@]}" GUARD_REPO="$decoy_repo" bash "$ENGINE" 2>&1 >/dev/null |
         sed -n '/BOTH staged and further modified/,/To keep the staged selection/p')
     if grep -q 'shared\.txt' <<<"$got_multi" &&
         grep -q 'second\.txt' <<<"$got_multi"; then

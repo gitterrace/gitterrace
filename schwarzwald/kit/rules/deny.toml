@@ -88,8 +88,11 @@ patterns = ['''\b[a-z0-9][\w-]*\.local\b(?!/)''']
 hit = ["// served by mac-mini.local"]
 pass = ["~/.local/state/app"]
 
-# Commit subjects that are a partial step: they belong inside the change they finish.
+# Commit subjects that are a partial step: they belong inside the change they finish. A format
+# pass after your own commit is a partial step: fold it in. A formatting change that stands
+# alone (a formatter version bump reflowing files, a new rule applied repo-wide) is a real
+# commit and takes `style(scope): what changed`.
 [partial_subject]
-patterns = ['''(?i)(^(fixup!|squash!|amend!|style:|style\(|chore\(fmt\)|fix clippy)|\bwip\b|re-?bless|satisfy clippy|make it (build|compile))''']
-hit = ["fixup! feat: x", "wip: scrolling", "style: rustfmt", "chore(fmt): run", "rebless goldens", "satisfy clippy", "make it build"]
-pass = ["feat(web): one rule", "fix: wipe the cache", "docs: the style guide"]
+patterns = ['''(?i)(^(fixup!|squash!|amend!|chore\(fmt\)|fix clippy|(style|chore)(\([^)]*\))?: (run )?(rustfmt|cargo fmt|fmt|format|lint)\s*$)|\bwip\b|re-?bless|satisfy clippy|make it (build|compile))''']
+hit = ["fixup! feat: x", "wip: scrolling", "style: rustfmt", "style(web): fmt", "chore(fmt): run", "rebless goldens", "satisfy clippy", "make it build"]
+pass = ["feat(web): one rule", "fix: wipe the cache", "docs: the style guide", "style(rust): rustfmt 1.9 reflows match arms"]

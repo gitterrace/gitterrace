@@ -1,0 +1,3 @@
+[root]
+# README.md: the front door. docs, schwarzwald: content and kit.
+allow = ["README.md", ".agents", "docs", "schwarzwald"]

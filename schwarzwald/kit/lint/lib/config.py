@@ -89,6 +89,7 @@ DEFAULTS: dict[str, dict] = {
         "markdownlint": "",
     },
     "disk": {"floor_gib": 50},
+    "root": {"allow": [], "scratch_free": [".agents"]},
     "denylist": {"max_age_hours": 168, "mode": "warn", "history_ids": "",
                  "path": "~/.config/schwarzwald/personal-denylist"},
     "commit": {

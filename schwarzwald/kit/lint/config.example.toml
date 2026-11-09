@@ -61,6 +61,13 @@ exempt = []
 # many GiB free. DISK_FLOOR_GIB in the environment wins (0 turns the check off for one run).
 floor_gib = 50
 
+[root]
+# root-entries: every tracked top-level entry must be on allow (a file or folder name, each
+# with the reason it sits at the root as a comment). Empty turns that half off. Nothing
+# untracked and unignored may sit at the root or anywhere inside a scratch_free folder.
+allow = []
+scratch_free = [".agents"]
+
 [commit]
 types = ["feat", "fix", "docs", "style", "refactor", "perf", "test", "build", "ci", "chore", "revert"]
 # <prefix>ALLOW_FREE_SUBJECT=1 overrides the subject form.
