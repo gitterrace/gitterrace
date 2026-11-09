@@ -210,6 +210,33 @@ the prefix.
 
 <!-- END GENERATED: routes -->
 
+## Security guards
+
+Each door in [security.md](security.md) and what holds it in the code:
+
+| Door | Holds it | Test |
+| --- | --- | --- |
+| Every request | `guard.rs`: Host allowlist, `Sec-Fetch-Site`, nosniff, CORP, CSP | `guard.rs` tests, `security_class_tests` |
+| Page routes (`PUBLIC`) | `restrict_to_committed` when public, time bound | `public.rs` tests |
+| Local routes (`LOCAL`) | `only_public` 404s anything not in `PUBLIC` | `every_local_route_is_dark_on_a_public_server` |
+| Path tails | Tree lookup, the worktree reader canonicalizes the parent | `no_path_route_reads_outside_the_tree` |
+| `/raw` | `sandbox` CSP for SVG and text, PDF attachment, size cap | `wiring_tests`, `security_class_tests` |
+| `POST /_actions/run` | `same_origin_write`, JSON only, `config/trust.rs` | `run_route_security_table` |
+| `/_settings/*` | `same_origin_write`, enum file choice, stamp | `settings/tests.rs` |
+| `/_repos` | Add token from a 0600 file, browser headers refused | `add/tests.rs` |
+| Every non-GET method | Tokenless writes never succeed | `no_write_succeeds_without_the_token` |
+| MCP server | Read-only tools, the switches of `/api/v1` | `mcp_tools_follow_the_switches_of_the_web_api` |
+| `open` and `gitterrace://` | Strict link parse, known clones only | `open` tests |
+| Static export | `_headers` carries the CSP, no local routes crawled | `export/tests.rs` |
+| Hostile content | Askama escaping, CSP, actions never from the repository | `hostile_repo_content_is_escaped_where_the_menu_lives` |
+
+The tests in `security_class_tests.rs` read every route pattern from the built
+routers, the server's and one repository's, so a route registered in any file is
+walked. Each must be public or in `LOCAL`, and in the sitemap. Every route is
+then checked for public darkness under every method, headers on every method it
+takes with each token a page holds, path escapes in its tail and in `?path=`,
+`?file=` and `?doc=`, and tokenless writes, without a new test.
+
 ## Syntax highlighting
 
 Code, diffs, blame and fenced blocks in markdown are highlighted with the
