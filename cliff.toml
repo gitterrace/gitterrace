@@ -43,12 +43,6 @@ tag_pattern = "v[0-9].*"
 
 commit_preprocessors = [
   { pattern = '\.$', replace = "" },
-  # Subjects already on main that predate the subject spelling check; CHANGELOG spells
-  # American English. Whole words only, an exact list.
-  { pattern = '\bcolours\b', replace = "colors" },
-  { pattern = '\bcolour\b', replace = "color" },
-  { pattern = '\bcentre\b', replace = "center" },
-  { pattern = '\bfall back to\b', replace = "return to" },
 ]
 
 # The order here is the order of the groups in the output (Keep a Changelog order).
