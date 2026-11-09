@@ -470,6 +470,7 @@ All notable changes are listed here. The format follows
 - web: keep the blocking job slot until the work ends
 - web: the first log page answers while related roots are walked
 - site: links land on the site's pages, and the touch icon exists
+- web: let the app header follow the chosen theme
 
 ### Performance
 
