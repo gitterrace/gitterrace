@@ -28,6 +28,8 @@ pub(super) struct LogQuery {
     page: Option<usize>,
     author: Option<String>,
     view: Option<String>,
+    /// `one` narrows the Graph view to this ref; the default draws every branch line.
+    lanes: Option<String>,
 }
 
 pub(crate) struct DayGroup {
@@ -100,6 +102,53 @@ pub(super) fn indexed_author_ids(
         .collect()
 }
 
+/// The link to page `n` of this log, keeping its path, author, view and lines.
+fn page_link(
+    rev_enc: &str,
+    n: usize,
+    path: &str,
+    who: Option<&str>,
+    (graph, all): (bool, bool),
+) -> String {
+    let mut q = format!("/log/{rev_enc}?page={n}");
+    if !path.is_empty() {
+        let _ = write!(q, "&path={}", fmt::enc_path(path));
+    }
+    if let Some(w) = who {
+        let _ = write!(q, "&author={}", fmt::enc_seg(w));
+    }
+    if graph {
+        q.push_str("&view=graph");
+    }
+    if graph && !all {
+        q.push_str("&lanes=one");
+    }
+    fmt::href(&q)
+}
+
+/// The log toolbar's Compare link, from the newest tag to `rev`; `""` when Compare is off.
+fn compare_from_latest_tag(a: &App, rev: &str) -> Result<String> {
+    let since = if crate::features::on(gitterrace_config::Feature::Compare) {
+        crate::compare::latest_tag(&a.repo.refs()?)
+    } else {
+        None
+    };
+    Ok(crate::compare::compare_href(since.as_deref(), rev))
+}
+
+/// Page `pg` of the commits reachable from any branch tip, and whether an older page exists.
+fn all_lanes_page(
+    a: &App,
+    tips: &[String],
+    pg: usize,
+) -> Result<(Vec<gitterrace_git::CommitSummary>, bool)> {
+    // One extra row tells us whether an older page exists.
+    let mut list = a.repo.log_all(tips, pg.saturating_mul(PAGE), PAGE + 1)?;
+    let more = list.len() > PAGE;
+    list.truncate(PAGE);
+    Ok((list, more))
+}
+
 /// One page of commits by `who`. With a ready index the records answer it. Without one the
 /// log is walked in chunks (the walk cannot filter by author), up to `AUTHOR_WALK` commits.
 fn author_page(
@@ -146,12 +195,21 @@ pub(super) async fn log(
     let author = q.author;
     let filtered = !path.is_empty() || author.as_deref().is_some_and(|s| !s.is_empty());
     let graph = q.view.as_deref() == Some("graph") && !filtered;
+    let all = graph && q.lanes.as_deref() != Some("one");
     let p = blocking(&app, move |a| {
         let id = a.repo.resolve(&rev)?;
         let filter = (!path.is_empty()).then_some(path.as_str());
         // One extra row tells us whether an older page exists.
         let who = author.as_deref().filter(|s| !s.is_empty());
-        let (mut list, more) = if let Some(w) = who {
+        // The graph's lines: every branch tip, or only this ref's.
+        let tips = if all {
+            lane_tips(a, &id)?
+        } else {
+            vec![id.clone()]
+        };
+        let (mut list, more) = if all {
+            all_lanes_page(a, &tips, pg)?
+        } else if let Some(w) = who {
             author_page(a, &id, filter, w, pg)?
         } else if let Some(p) = filter
             && let Some(log) = a.path_log(&id, p)?
@@ -181,27 +239,19 @@ pub(super) async fn log(
         list.shrink_to_fit();
         let now = fmt::now();
         let rev_enc = fmt::enc_seg(&rev);
-        let link = |n: usize| {
-            let mut q = format!("/log/{rev_enc}?page={n}");
-            if !path.is_empty() {
-                let _ = write!(q, "&path={}", fmt::enc_path(&path));
-            }
-            if let Some(w) = who {
-                let _ = write!(q, "&author={}", fmt::enc_seg(w));
-            }
-            if graph {
-                q.push_str("&view=graph");
-            }
-            fmt::href(&q)
-        };
+        let link = |n: usize| page_link(&rev_enc, n, &path, who, (graph, all));
         // Every ref is peeled to find the newest tag, so skip it when the link is not shown.
-        let since = if crate::features::on(gitterrace_config::Feature::Compare) {
-            crate::compare::latest_tag(&a.repo.refs()?)
-        } else {
-            None
-        };
-        let compare_href = crate::compare::compare_href(since.as_deref(), &rev);
-        let head = log_head(&rev, &rev_enc, &path, who, graph, filtered, &list, pg);
+        let compare_href = compare_from_latest_tag(a, &rev)?;
+        let head = log_head(
+            &rev,
+            &rev_enc,
+            &path,
+            who,
+            (graph, all),
+            filtered,
+            &list,
+            pg,
+        );
         let head = PageHead {
             toolbar: LogFilter {
                 action: fmt::href(&format!("/log/{rev_enc}")),
@@ -227,7 +277,7 @@ pub(super) async fn log(
                 }
             }),
             graph: if graph {
-                graph_rows(a, &id, &list, pg, now)?
+                graph_rows(a, &tips, &list, pg, now)?
             } else {
                 Vec::new()
             },
@@ -265,7 +315,8 @@ fn related_logs(a: &App) -> Vec<(String, String)> {
 }
 
 /// The log's page head: "Commits" with the revision, a tagline saying what the list holds,
-/// and List | Graph as tabs (a filtered log has no graph, so no tabs).
+/// and List | Graph | This ref as tabs (a filtered log has no graph, so no tabs). Graph draws
+/// every branch line, as `git log --graph --all` does; This ref narrows it to the ref in the path.
 #[expect(
     clippy::too_many_arguments,
     reason = "the head reads what the log handler holds"
@@ -275,7 +326,7 @@ fn log_head(
     rev_enc: &str,
     path: &str,
     who: Option<&str>,
-    graph: bool,
+    (graph, all): (bool, bool),
     filtered: bool,
     list: &[gitterrace_git::CommitSummary],
     pg: usize,
@@ -308,18 +359,43 @@ fn log_head(
         } else {
             vec![
                 tab("List", format!("/log/{rev_enc}"), !graph),
-                tab("Graph", format!("/log/{rev_enc}?view=graph"), graph),
+                tab("Graph", format!("/log/{rev_enc}?view=graph"), graph && all),
+                tab(
+                    "This ref",
+                    format!("/log/{rev_enc}?view=graph&lanes=one"),
+                    graph && !all,
+                ),
             ]
         },
         ..PageHead::new("Commits", Tagline::of(&said))
     }
 }
 
+/// The tips the full graph walks: `id` (the browsed ref) first, then every local branch, then
+/// each linked worktree's HEAD. A worktree HEAD is this machine's working state, so it joins
+/// only where worktree pages are served (never on a public server).
+fn lane_tips(a: &App, id: &str) -> Result<Vec<String>> {
+    let mut tips = vec![id.to_owned()];
+    for r in a.repo.refs()? {
+        if r.kind == gitterrace_git::RefKind::Branch && !tips.contains(&r.target) {
+            tips.push(r.target);
+        }
+    }
+    if crate::gitstate::local_state(a) {
+        for w in a.repo.linked_worktrees()? {
+            if let Some(c) = w.commit.filter(|c| !tips.contains(c)) {
+                tips.push(c);
+            }
+        }
+    }
+    Ok(tips)
+}
+
 /// The rows of page `pg` with their graph cells and ref chips. The layout replays the rows of
 /// the pages above and reads `FAR_ROWS` past this one, commit headers only.
 fn graph_rows(
     a: &App,
-    id: &str,
+    tips: &[String],
     list: &[gitterrace_git::CommitSummary],
     pg: usize,
     now: i64,
@@ -328,7 +404,7 @@ fn graph_rows(
     let from = pg.saturating_mul(PAGE);
     let to = from + list.len();
     let reach = to + FAR_ROWS as usize + 1;
-    let history = a.repo.parents(id, reach)?;
+    let history = a.repo.parents_all(tips, reach)?;
     let placed = crate::graph_view::place(&history, from, to);
     let width = crate::graph_view::columns(&placed);
     let mut refs: std::collections::HashMap<String, Vec<(String, bool)>> =
@@ -340,6 +416,16 @@ fn graph_rows(
         }
         let is_head = r.kind == gitterrace_git::RefKind::Branch && head.as_deref() == Some(&r.name);
         refs.entry(r.target).or_default().push((r.name, is_head));
+    }
+    // A detached worktree has no branch to name its tip: label it by its worktree id.
+    if tips.len() > 1 && crate::gitstate::local_state(a) {
+        for w in a.repo.linked_worktrees()? {
+            if let (None, Some(c)) = (w.branch, w.commit) {
+                refs.entry(c)
+                    .or_default()
+                    .push((format!("worktree {}", w.id), false));
+            }
+        }
     }
     Ok(list
         .iter()
