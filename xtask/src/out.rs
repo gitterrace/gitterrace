@@ -204,6 +204,29 @@ fn flush(out: &mut String, para: &mut Vec<&str>) {
     para.clear();
 }
 
+/// One Markdown list item `- text`, wrapped at the prose width with its continuation lines
+/// indented under the text.
+pub fn wrap_item(text: &str) -> String {
+    let guarded: String = {
+        let mut g = String::with_capacity(text.len());
+        let mut in_code = false;
+        for ch in text.chars() {
+            if ch == '`' {
+                in_code = !in_code;
+            }
+            g.push(if in_code && ch == ' ' { '\u{a0}' } else { ch });
+        }
+        g
+    };
+    let opts = textwrap::Options::new(PROSE_WIDTH)
+        .initial_indent("- ")
+        .subsequent_indent("  ")
+        .break_words(false)
+        .word_splitter(textwrap::WordSplitter::NoHyphenation)
+        .word_separator(textwrap::WordSeparator::AsciiSpace);
+    textwrap::fill(&guarded, &opts).replace('\u{a0}', " ")
+}
+
 /// Breaks one prose line at spaces. A code span never breaks: its spaces become no-break
 /// spaces while wrapping, which `textwrap` keeps inside a word, and turn back after.
 fn wrap_line(text: &str, indent: &str) -> String {

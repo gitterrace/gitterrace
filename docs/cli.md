@@ -17,14 +17,18 @@ git terrace [OPTIONS] [PATHS]... [COMMAND]
 
 ## Global flags
 
-| Argument | Type | Default | Values | Help |
-| --- | --- | --- | --- | --- |
-| `paths` | `PATHS` (one or more) | `.` |  | Repositories to serve (any path inside one), or folders to search two levels deep. Other commands use the first |
-| `--addr` | `ADDR` |  |  | Address to listen on. Local only by default. Overrides `server.addr` |
-| `--no-watch` | flag | `false` |  | Do not watch for changes: no live updates, and a restart or reload picks up new commits. Overrides `watch.enabled` |
-| `--config` | `CONFIG` |  |  | Folder holding `config.toml` (and `actions.toml`). Defaults to the XDG config folder |
-| `--no-actions` | flag | `false` |  | Never run user actions, even when `actions.toml` declares some |
-| `--public` | flag | `false` |  | Serve read-only to other machines: committed history only. Required with any `--addr` that is not loopback. Overrides `server.is_public` |
+- `<PATHS>...`: Repositories to serve (any path inside one), or folders to
+  search two levels deep. Other commands use the first. Default `.`.
+- `--addr <ADDR>`: Address to listen on. Local only by default. Overrides
+  `server.addr`.
+- `--no-watch`: Do not watch for changes: no live updates, and a restart or
+  reload picks up new commits. Overrides `watch.enabled`.
+- `--config <CONFIG>`: Folder holding `config.toml` (and `actions.toml`).
+  Defaults to the XDG config folder.
+- `--no-actions`: Never run user actions, even when `actions.toml` declares
+  some.
+- `--public`: Serve read-only to other machines: committed history only.
+  Required with any `--addr` that is not loopback. Overrides `server.is_public`.
 
 ## `git terrace serve`
 
@@ -54,9 +58,8 @@ running server. Tools then take a `repo` name from `list_repos`.
 git terrace mcp [OPTIONS] [PATHS]...
 ```
 
-| Argument | Type | Default | Values | Help |
-| --- | --- | --- | --- | --- |
-| `--served` | flag | `false` |  | Also read the repositories served before (the registry a running server keeps) |
+- `--served`: Also read the repositories served before (the registry a running
+  server keeps).
 
 ## `git terrace open`
 
@@ -70,10 +73,9 @@ unknown repository exits 2, with no clone and no network.
 git terrace open [OPTIONS] <LINK> [PATHS]...
 ```
 
-| Argument | Type | Default | Values | Help |
-| --- | --- | --- | --- | --- |
-| `link` | `LINK` |  |  | `gitterrace://<id>/<sha>[/<path>][#L<a>-L<b>]`, an `http(s)://.../go/...` URL or a bare `/go/...` path |
-| `--print` | flag | `false` |  | Print the URL instead of opening a browser |
+- `<LINK>`: `gitterrace://<id>/<sha>[/<path>][#L<a>-L<b>]`, an
+  `http(s)://.../go/...` URL or a bare `/go/...` path.
+- `--print`: Print the URL instead of opening a browser.
 
 ## `git terrace remove`
 
@@ -87,9 +89,8 @@ repository stays served.
 git terrace remove [OPTIONS] [TARGET] [PATHS]...
 ```
 
-| Argument | Type | Default | Values | Help |
-| --- | --- | --- | --- | --- |
-| `target` | `TARGET` |  |  | A path inside the repository, or its URL name. Default: the current repository |
+- `<TARGET>`: A path inside the repository, or its URL name. Default: the
+  current repository.
 
 ## `git terrace install-handler`
 
@@ -103,9 +104,7 @@ file, and WSL and Windows only print the steps. It prints exactly what it wrote.
 git terrace install-handler [OPTIONS] [PATHS]...
 ```
 
-| Argument | Type | Default | Values | Help |
-| --- | --- | --- | --- | --- |
-| `--uninstall` | flag | `false` |  | Remove what a previous install wrote |
+- `--uninstall`: Remove what a previous install wrote.
 
 ## `git terrace init`
 
@@ -129,13 +128,19 @@ Write a static copy of the site to a folder, for sharing or hosting
 git terrace export [OPTIONS] [OUT] [PATHS]...
 ```
 
-| Argument | Type | Default | Values | Help |
-| --- | --- | --- | --- | --- |
-| `out` | `OUT` |  |  | Folder to write into (created if missing). Default: `./gitterrace-export`. Give it first, before any repositories: `export site repo1 repo2`. A folder an earlier export made is emptied first. Any other non-empty folder is refused without `--force` |
-| `--force` | flag | `false` |  | Write into a non-empty folder that no earlier export made, over what is there |
-| `--commits` | `COMMITS` | `500` |  | Newest commits to include as pages |
-| `--file-kb` | `FILE_KB` | `512` |  | Largest file to include as a page, in KiB. Larger files are left out of the export |
-| `--export-pages` | `N` |  |  | Most pages to write, folded diff fragments included. Overrides `limits.export_pages`. Past it the export stops and writes nothing |
-| `--project` | `NAME=URL` |  |  | Credit a repository that is someone else's project (a demo), as `name=url`: its pages name and link it in the snapshot banner. `name` is the repository's folder name. Repeat it for several repositories |
+- `<OUT>`: Folder to write into (created if missing). Default:
+  `./gitterrace-export`. Give it first, before any repositories:
+  `export site repo1 repo2`. A folder an earlier export made is emptied first.
+  Any other non-empty folder is refused without `--force`.
+- `--force`: Write into a non-empty folder that no earlier export made, over
+  what is there.
+- `--commits <COMMITS>`: Newest commits to include as pages. Default `500`.
+- `--file-kb <FILE_KB>`: Largest file to include as a page, in KiB. Larger files
+  are left out of the export. Default `512`.
+- `--export-pages <N>`: Most pages to write, folded diff fragments included.
+  Overrides `limits.export_pages`. Past it the export stops and writes nothing.
+- `--project <NAME=URL>`: Credit a repository that is someone else's project (a
+  demo), as `name=url`: its pages name and link it in the snapshot banner.
+  `name` is the repository's folder name. Repeat it for several repositories.
 
 <!-- END GENERATED: cli -->
