@@ -11,6 +11,7 @@ use anyhow::{Context as _, Result};
 use crate::docs_index::{normalize, on_site};
 use crate::out::Out;
 use crate::site::docs::page_path;
+use crate::site::guards;
 
 /// Files in `site/` that no generator writes but that belong there: the screenshots come from
 /// `make site-shots` (checked by `check_shots`), the PNG files from `make site-render`.
@@ -252,6 +253,15 @@ pub fn check(root: &Path, outs: &[Out], repo: &str) -> Result<Vec<String>> {
             .map(|b| String::from_utf8_lossy(&b).into_owned())
     };
     bad.extend(dead_links(&tree, repo, &read));
+    let mut published: BTreeSet<String> = on_site().iter().map(|d| d.0.to_owned()).collect();
+    published.extend(crate::docs_index::LEGAL.iter().map(|l| l.0.to_owned()));
+    published.insert(crate::site::docs::CHANGELOG.to_owned());
+    let facts = guards::Facts {
+        repo,
+        published,
+        docs,
+    };
+    bad.extend(guards::problems(&tree.pages, &facts));
     Ok(bad)
 }
 

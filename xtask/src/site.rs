@@ -20,6 +20,7 @@ mod docnav;
 mod docs;
 mod fit;
 mod frame;
+mod guards;
 mod landing;
 pub mod legal;
 mod shots;

@@ -107,12 +107,15 @@ fn main() -> Result<()> {
             println!("generated output: up to date");
             if !site_bad.is_empty() {
                 println!(
-                    "site/ out of step with the docs index, or a link of it lands nowhere:\n  {}",
+                    "site/ out of step with the docs, or a page fails a site guard:\n  {}",
                     site_bad.join("\n  ")
                 );
                 std::process::exit(1);
             }
-            println!("site: every page is a published document, every link and anchor lands");
+            println!(
+                "site: every page is a published document in the docs order, with its title and \
+                 description; every link and anchor lands, and no prose is on two pages"
+            );
             let bad = docs_index::check(&root)?;
             if !bad.is_empty() {
                 println!(

@@ -122,7 +122,9 @@ export function checks(env) {
   // The outline rail of a docs page: at 1440 px a page with three or more h2 shows it beside
   // the text, labelled "On this page" in 11 px mono with a hairline after it, each item on a
   // 2 px rail; scrolling to a heading marks its item (and only it) with the accent. At 390 px
-  // and on a page with fewer than three h2 the rail is not shown.
+  // and on a page with fewer than three h2 the rail is not shown; at 390 px the Docs menu
+  // opens and lists every docs page, and on a page with a rail the "On this page" menu opens,
+  // lists the rail's headings and closes after a pick, which lands on that heading.
   async function siteRail() {
     const { server, url } = await serve();
     const all = pages().filter((p) => p.startsWith('/docs/') && p !== '/docs/');
@@ -152,6 +154,10 @@ export function checks(env) {
                 beside: rb.left >= mb.right - 1,
               };
             });
+            if (width < 1100) {
+              const why = await narrowMenus(p, all.length);
+              if (why.length) bad.push(`${path}: ${why.join(', ')}`);
+            }
             const want = width >= 1100 && m.h2 >= 3;
             if (m.shown !== want) {
               bad.push(`${path}: ${m.h2} h2, rail shown ${m.shown}`);
@@ -303,4 +309,38 @@ function tableProbe() {
     }
   }
   return { tables: document.querySelectorAll('main table').length, found };
+}
+
+/** The folded menus of a docs page at a narrow width: what is wrong, empty when all works.
+ * @param {any} p the page @param {number} docs how many docs pages there are */
+async function narrowMenus(p, docs) {
+  const why = [];
+  const menus = await p.$$('.menus > details');
+  if (!menus.length) return ['no Docs menu'];
+  await menus[0].evaluate((d) => d.querySelector('summary').click());
+  const listed = await menus[0].evaluate((d) => d.open
+    && d.querySelector('.pop').getBoundingClientRect().right <= innerWidth + 0.5
+    ? d.querySelectorAll('a').length : -1);
+  if (listed !== docs) why.push(`Docs menu lists ${listed} of ${docs}`);
+  await menus[0].evaluate((d) => { d.open = false; });
+  const rail = await p.$$eval('nav.outline.rail a', (as) => as.map((a) => a.getAttribute('href')));
+  if (!rail.length) return why;
+  const outline = menus[1];
+  if (!outline) return [...why, 'no On this page menu'];
+  await outline.evaluate((d) => d.querySelector('summary').click());
+  const items = await outline.evaluate((d) => [...d.querySelectorAll('a')]
+    .map((a) => a.getAttribute('href')));
+  if (JSON.stringify(items) !== JSON.stringify(rail)) why.push('On this page menu is not the rail');
+  const pick = items[items.length - 1];
+  await outline.evaluate((d, h) => d.querySelector(`a[href="${h}"]`).click(), pick);
+  await p.waitForTimeout(250);
+  const after = await outline.evaluate((d, h) => ({
+    open: d.open,
+    top: document.getElementById(h.slice(1)).getBoundingClientRect().top,
+    // At the page end a heading cannot reach the top, and that is fine.
+    end: Math.ceil(scrollY + innerHeight) >= document.documentElement.scrollHeight,
+  }), pick);
+  if (after.open) why.push('On this page menu stays open after a pick');
+  if (after.top > 200 && !after.end) why.push(`picked heading at ${Math.round(after.top)} px`);
+  return why;
 }

@@ -31,7 +31,7 @@ loading="lazy"></h1>
 </section>
 <section>
 <h2 id="quickstart">Quickstart</h2>
-<pre><code>{{ quickstart }}</code></pre>
+<div data-from="docs/getting-started/"><pre><code>{{ quickstart }}</code></pre></div>
 <p class="more"><a href="/docs/getting-started/">Getting started</a> covers Windows,
 upgrading and troubleshooting. <a href="/docs/cli/">All commands</a>.</p>
 </section>
@@ -53,7 +53,7 @@ width="1280" height="800" loading="lazy" decoding="async"></span></a>
 <figcaption><b>{{ cap }}.</b> {{ what }}</figcaption></figure>
 {%- endfor %}
 </div>
-<ul class="lines">
+<ul class="lines" data-from="docs">
 {%- for (title, href, text) in lines %}
 <li><b><a href="/{{ href }}">{{ title }}</a>.</b> {{ text }}</li>
 {%- endfor %}
@@ -61,6 +61,7 @@ width="1280" height="800" loading="lazy" decoding="async"></span></a>
 </section>
 <section>
 <h2 id="your-code">What it does with your code</h2>
-{{ promises|safe }}<p class="more"><a href="/docs/why/">Why we built it</a>, and how it
+<div data-from="docs/why/">{{ promises|safe }}</div>
+<p class="more"><a href="/docs/why/">Why we built it</a>, and how it
 compares with the tools you know.</p>
 </section>
