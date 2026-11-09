@@ -519,4 +519,15 @@ All notable changes are listed here. The format follows
 - git: the index pairs only identical renames on a large merge
 - git: the repo id and the roots walk on an alternate's commit-graph
 <!-- BEGIN GENERATED: unreleased -->
+## [Unreleased]
+
+### Added
+
+- index: the first release starts the cache format at 1
+
+### Performance
+
+- web: the languages warm-up names chain paths in id order
+- web: concurrent requests for one cold page render it once
+
 <!-- END GENERATED: unreleased -->

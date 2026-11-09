@@ -48,7 +48,7 @@ async fn a_newer_cache_is_explained_not_clobbered() {
     let built = ready_app(&p);
     let cache = built.index.dir().to_owned();
     drop(built);
-    std::fs::write(cache.join("VERSION"), "99\n").expect("stamp");
+    std::fs::write(cache.join("VERSION"), "v99\n").expect("stamp");
     let snapshot = |d: &std::path::Path| {
         let mut v: Vec<_> = std::fs::read_dir(d)
             .expect("ls")

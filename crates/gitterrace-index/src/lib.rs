@@ -38,8 +38,8 @@ pub use store::FORMAT_VERSION;
 pub const CACHE_FILES: [(&str, &str); 5] = [
     (
         store::VERSION_FILE,
-        "The cache format. A mismatch deletes the cache and rebuilds it. The format is never \
-        migrated.",
+        "The cache format, `v` and the number. A mismatch deletes the cache and rebuilds it. The \
+        format is never migrated.",
     ),
     (
         store::LOCK_FILE,

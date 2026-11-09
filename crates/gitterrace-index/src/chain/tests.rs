@@ -245,9 +245,10 @@ fn a_chain_written_for_another_set_is_not_served() {
     assert_eq!(stored(&dir), Some(walked(&dir)));
 }
 
-/// A cache of format 8 (no chain file kind) is deleted whole on open and rebuilt with one.
+/// A pre-release cache (a bare `VERSION`, no chain file kind) is deleted whole on open and
+/// rebuilt with one.
 #[test]
-fn a_format_8_cache_is_rebuilt_with_a_chain() {
+fn a_pre_release_cache_is_rebuilt_with_a_chain() {
     let h = history();
     let (_t, dir) = build(&h);
     std::fs::write(dir.join("VERSION"), "8\n").expect("old version");

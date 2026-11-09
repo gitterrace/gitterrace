@@ -8,8 +8,12 @@ use crate::seg::{SegError, SegResult};
 
 pub(crate) const MAGIC: [u8; 4] = *b"GTS1";
 pub(crate) const FOOTER_MAGIC: [u8; 4] = *b"GTSF";
-/// The on-disk format, shared with `VERSION`.
-pub(crate) const VERSION: u32 = 7;
+/// The container byte version, in the header and the footer. Separate from the cache format
+/// (`store::FORMAT_VERSION`). Only an exact match reads: any other number is unreadable, so the
+/// cache is deleted and rebuilt, never misparsed. Builds before the first release wrote 5 to 7
+/// here; their caches carry a bare `VERSION` and are wiped before any container is opened, and
+/// a later bump skips 5 to 7 so no stray old file can ever match.
+pub(crate) const VERSION: u32 = 1;
 pub(crate) const HEADER_LEN: u64 = 16;
 pub(crate) const FOOTER_LEN: u64 = 64;
 pub(crate) const TOC_ENTRY_LEN: u64 = 24;
@@ -47,13 +51,12 @@ pub mod section {
     pub const RENAMES: u16 = 4;
     pub const AUTHOR_POSTINGS: u16 = 5;
     pub const AUTHOR_DAY: u16 = 6;
-    /// Path id to life and life to last name, fixed 4 B items (`seg::canon`). Reserved and
-    /// empty before format 7, when id 7 was named `MONTH_PATH`: the version bump allowed
-    /// reusing it.
+    /// Path id to life and life to last name, fixed 4 B items (`seg::canon`). Id 7 once
+    /// named a section no released build wrote.
     pub const CANON: u16 = 7;
     pub const PATH_AUTHOR: u16 = 8;
-    /// Life x local month: touches, line sums, last touch. Reserved and empty before format 7,
-    /// when id 9 was named `MONTH_LANGUAGE`.
+    /// Life x local month: touches, line sums, last touch. Id 9 once named a
+    /// section no released build wrote.
     pub const PATH_TOUCH: u16 = 9;
     /// Life x identity, the rows of section 8 keyed by life.
     pub const CANON_PATH_AUTHOR: u16 = 10;
@@ -281,6 +284,26 @@ mod tests {
             f
         );
         Ok(())
+    }
+
+    /// A container a pre-release build wrote (versions 5 to 7) is unreadable in its header and
+    /// in its footer, even behind a valid crc, so it is rebuilt and never misparsed.
+    #[test]
+    fn a_pre_release_container_is_unreadable() {
+        let f = footer();
+        for old in 5u32..=7 {
+            let mut h = header(Kind::Segment);
+            h[4..8].copy_from_slice(&old.to_le_bytes());
+            let r = check_header(&h, Kind::Segment, "t");
+            assert!(r.is_err_and(|e| e.is_unreadable()), "header {old}");
+            let mut b = f.encode();
+            b[4..8].copy_from_slice(&old.to_le_bytes());
+            let crc = crc32fast::hash(&b[..60]);
+            b[60..].copy_from_slice(&crc.to_le_bytes());
+            let r = Footer::decode(&b, f.file_len, Kind::Segment, "t");
+            assert!(r.is_err_and(|e| e.is_unreadable()), "footer {old}");
+        }
+        assert!(check_header(&header(Kind::Segment), Kind::Segment, "t").is_ok());
     }
 
     #[test]

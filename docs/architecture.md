@@ -116,13 +116,13 @@ the vendored theme.
 <!-- BEGIN GENERATED: cache -->
 | File | Holds |
 | --- | --- |
-| `VERSION` | The cache format. A mismatch deletes the cache and rebuilds it. The format is never migrated. |
+| `VERSION` | The cache format, `v` and the number. A mismatch deletes the cache and rebuilds it. The format is never migrated. |
 | `lock` | Empty. Held locked by whichever process is extending the segment set, so two processes on one repository take turns instead of building on one manifest. |
 | `owner` | Only in a cache outside the repository: the real path of the git dir it belongs to. Another path there wipes the cache, so a hash collision rebuilds. |
 | `tip` | The commit id the segment files were last built for. Opening insights for that commit skips walking its history to check the files hold exactly it. |
 | `lines.json` | Line counts per blob id for the language chart. A blob never changes, so the counts never go stale. |
 
-The format version is `9`.
+The format version is `1`, stored as `v1`.
 
 <!-- END GENERATED: cache -->
 
@@ -178,9 +178,10 @@ that rule that could drift from it, and would have to move with every change to
 the mark gap.
 
 Format numbers: the cache format (`VERSION`, `FORMAT_VERSION` in `store.rs`) is
-9 since the chain was added, after 8 for the message column. The container byte
+stored with a `v` prefix. Builds before the first release wrote a bare number,
+so such a cache is reset, never refused as a newer build's. The container byte
 version inside each file (`seg/format.rs`) is a separate number. It moves only
-when the container bytes change, and is still 7.
+when the container bytes change.
 
 ## Routes
 

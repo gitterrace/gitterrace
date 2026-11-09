@@ -65,12 +65,12 @@ One directory `.git/gitterrace/`, files listed in `CACHE_FILES`. Every file
 except `MANIFEST`, `VERSION` and `lock` is immutable: written under a temp name,
 fsynced, never opened for writing again.
 
-- `VERSION`: `FORMAT_VERSION` in `store.rs`, the version of the whole cache. The
+- `VERSION`: `v` and `FORMAT_VERSION` in `store.rs`, the version of the whole
+  cache. A bare number is a cache from before the first release, reset like any
+  older one; only a `v` number greater than ours is a newer build's. The
   container version `VERSION` in `seg/format.rs` moves only when the container
-  bytes change, so it can lag behind: format 8 added the message column (kind
-  4) and format 9 the stored chain (kind 5), and both left containers at 7.
-  Read first so a newer build's cache is recognized without parsing anything
-  else.
+  bytes change, so the two numbers differ. Read first so a newer build's cache
+  is recognized without parsing anything else.
 - `MANIFEST`: the only entry point. It names every live file with its length and
   CRC32, the generation, the canonical-order fingerprint (section 4), and a
   `retired` list. Written to `MANIFEST.tmp`, fsynced, renamed, then the
@@ -222,7 +222,7 @@ the regex on `message \n name <email>` (the tip's mailmap applied to each
 distinct author once), replays git's newest-first commit-date walk over the
 stored times and parents, and reads from git only the commits it lists.
 
-Chain (kind 5, `chain-<gen>.gts`, cache format 9): the first-parent chain of
+Chain (kind 5, `chain-<gen>.gts`): the first-parent chain of
 the newest rank, newest first, in section 48. A step is rank u32, oid (20 B),
 raw author time i64, offset i32, then a varint row count and per file row the
 path id, added and removed lines as varints: the numbers the languages tally

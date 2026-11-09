@@ -53,7 +53,7 @@ fn a_newer_cache_serves_every_page_without_a_500_and_stays_untouched() {
             .parse::<u64>()
             .expect("numeric")
             + 1;
-        std::fs::write(cache.join("VERSION"), format!("{newer}\n")).expect("w");
+        std::fs::write(cache.join("VERSION"), format!("v{newer}\n")).expect("w");
         std::fs::write(cache.join("future.gts"), b"a newer build's file").expect("w");
         let before = folder(&cache);
 

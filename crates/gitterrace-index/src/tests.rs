@@ -377,7 +377,7 @@ fn a_newer_cache_is_left_byte_identical() -> io::Result<()> {
         Ok(v)
     };
     // A newer build takes over while `idx` is open.
-    std::fs::write(path.join("VERSION"), "99\n")?;
+    std::fs::write(path.join("VERSION"), "v99\n")?;
     src.ids.borrow_mut().push(oid("c"));
     let before = snapshot(&path)?;
     let err = idx.update(&src, "HEAD", &|_| {}).expect_err("must refuse");
@@ -418,7 +418,7 @@ fn version_mismatch_rebuilds() -> io::Result<()> {
     assert_eq!(src.built.get(), 2);
     assert_eq!(
         std::fs::read_to_string(path.join("VERSION"))?.trim(),
-        crate::store::FORMAT_VERSION
+        crate::store::version_stamp()
     );
     Ok(())
 }

@@ -257,8 +257,8 @@ fn the_index_rebuilds_an_unreadable_cache_to_a_fresh_build() {
     drop(store);
 
     let cases: [Case<'_>; 7] = [
-        ("older VERSION", &|d| {
-            fs::write(d.join("VERSION"), "5\n").expect("w");
+        ("pre-release VERSION", &|d| {
+            fs::write(d.join("VERSION"), "9\n").expect("w");
         }),
         ("VERSION 0 beside the old record files", &|d| {
             fs::write(d.join("VERSION"), "0\n").expect("w");
@@ -331,7 +331,7 @@ fn a_newer_cache_is_left_alone_and_no_page_answers_500() {
         .parse::<u64>()
         .expect("numeric")
         + 1;
-    fs::write(dir.join("VERSION"), format!("{newer}\n")).expect("w");
+    fs::write(dir.join("VERSION"), format!("v{newer}\n")).expect("w");
     // A file this build does not know, as a newer format might add.
     fs::write(dir.join("future.gts"), b"from a newer build").expect("w");
     // Even a corrupt set: a newer build's bytes are not ours to judge.

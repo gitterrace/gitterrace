@@ -5,7 +5,7 @@ use std::io;
 
 use crate::seg::format::section;
 
-use super::{FORMAT_VERSION, LOCK_FILE, VERSION_FILE, ensure_dir};
+use super::{LOCK_FILE, VERSION_FILE, ensure_dir, version_stamp};
 
 fn names(dir: &std::path::Path) -> io::Result<Vec<String>> {
     let mut out: Vec<String> = fs::read_dir(dir)?
@@ -15,14 +15,14 @@ fn names(dir: &std::path::Path) -> io::Result<Vec<String>> {
     Ok(out)
 }
 
-/// An older format deletes everything it held, not only the files this build knows.
+/// A pre-release format deletes everything it held, not only the files this build knows.
 #[test]
 fn an_unreadable_cache_is_deleted_whole() -> io::Result<()> {
     let tmp = tempfile::tempdir()?;
     let dir = tmp.path().join("gitterrace");
     fs::create_dir(&dir)?;
     fs::write(dir.join(VERSION_FILE), "5\n")?;
-    // The record files of format 5 and before go with everything else.
+    // The record files of a pre-release build go with everything else.
     fs::write(dir.join("commits.jsonl"), "{}\n")?;
     fs::write(dir.join("paths.jsonl"), "\"a\"\n")?;
     fs::write(dir.join("seg-1-0.gts"), "old segment")?;
@@ -30,7 +30,7 @@ fn an_unreadable_cache_is_deleted_whole() -> io::Result<()> {
     assert_eq!(names(&dir)?, [VERSION_FILE, LOCK_FILE]);
     assert_eq!(
         fs::read_to_string(dir.join(VERSION_FILE))?.trim(),
-        FORMAT_VERSION
+        version_stamp()
     );
     Ok(())
 }
@@ -41,10 +41,44 @@ fn a_newer_cache_stays_untouched() -> io::Result<()> {
     let tmp = tempfile::tempdir()?;
     let dir = tmp.path().join("gitterrace");
     fs::create_dir(&dir)?;
-    fs::write(dir.join(VERSION_FILE), "999\n")?;
+    fs::write(dir.join(VERSION_FILE), "v2\n")?;
     fs::write(dir.join("seg-9-0.gts"), "future")?;
-    assert_eq!(ensure_dir(&dir)?.as_deref(), Some("999"));
+    assert_eq!(ensure_dir(&dir)?.as_deref(), Some("2"));
     assert_eq!(names(&dir)?, ["VERSION", "seg-9-0.gts"]);
+    assert_eq!(fs::read(dir.join(VERSION_FILE))?, b"v2\n");
+    assert_eq!(fs::read(dir.join("seg-9-0.gts"))?, b"future");
+    Ok(())
+}
+
+/// Every bare number a pre-release build wrote, even one greater than ours, is ours to reset:
+/// deleted and rebuilt, never refused as a newer build's.
+#[test]
+fn a_pre_release_cache_is_rebuilt_not_refused() -> io::Result<()> {
+    for old in 1..=9 {
+        let tmp = tempfile::tempdir()?;
+        let dir = tmp.path().join("gitterrace");
+        fs::create_dir(&dir)?;
+        fs::write(dir.join(VERSION_FILE), format!("{old}\n"))?;
+        fs::write(dir.join("seg-1-0.gts"), "pre-release")?;
+        assert_eq!(ensure_dir(&dir)?, None, "VERSION {old}");
+        assert_eq!(names(&dir)?, [VERSION_FILE, LOCK_FILE], "VERSION {old}");
+        assert_eq!(
+            fs::read_to_string(dir.join(VERSION_FILE))?.trim(),
+            version_stamp()
+        );
+    }
+    Ok(())
+}
+
+/// The current stamp opens as is: nothing is wiped.
+#[test]
+fn the_current_version_opens_normally() -> io::Result<()> {
+    let tmp = tempfile::tempdir()?;
+    let dir = tmp.path().join("gitterrace");
+    assert_eq!(ensure_dir(&dir)?, None);
+    assert_eq!(fs::read_to_string(dir.join(VERSION_FILE))?, "v1\n");
+    assert_eq!(ensure_dir(&dir)?, None);
+    assert_eq!(fs::read_to_string(dir.join(VERSION_FILE))?, "v1\n");
     Ok(())
 }
 
@@ -287,7 +321,7 @@ fn the_sweep_removes_only_files_not_live() -> io::Result<()> {
     let tmp = tempfile::tempdir()?;
     let dir = tmp.path().join("gitterrace");
     fs::create_dir(&dir)?;
-    fs::write(dir.join(VERSION_FILE), format!("{FORMAT_VERSION}\n"))?;
+    fs::write(dir.join(VERSION_FILE), format!("{}\n", version_stamp()))?;
     fs::write(dir.join(LOCK_FILE), "")?;
     fs::write(dir.join("retired-seg.gts"), "x")?;
     fs::write(dir.join(".lines.json.1.2.tmp"), "x")?;
@@ -355,7 +389,7 @@ fn a_cache_of_another_repository_is_wiped_on_claim() -> io::Result<()> {
     assert_eq!(fs::read(dir.join(super::OWNER_FILE))?, b"/repos/b/.git");
     assert_eq!(
         fs::read_to_string(dir.join(VERSION_FILE))?.trim(),
-        FORMAT_VERSION
+        version_stamp()
     );
     Ok(())
 }

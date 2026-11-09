@@ -116,7 +116,7 @@ fn a_running_server_survives_its_cache_being_rewritten_underneath() {
             .parse::<u64>()
             .expect("numeric")
             + 1;
-        std::fs::write(cache.join("VERSION"), format!("{newer}\n")).expect("w");
+        std::fs::write(cache.join("VERSION"), format!("v{newer}\n")).expect("w");
         corrupt(&cache);
         let before: Vec<_> = segments(&cache)
             .iter()
@@ -294,7 +294,7 @@ fn a_cache_a_newer_build_owns_is_never_written_by_a_running_server() {
             .parse::<u64>()
             .expect("numeric")
             + 1;
-        std::fs::write(cache.join("VERSION"), format!("{newer}\n")).expect("w");
+        std::fs::write(cache.join("VERSION"), format!("v{newer}\n")).expect("w");
         let before = snapshot(&cache);
         // HEAD moves, so the running server wants to index: it must not write.
         let fx = Fixture::init(&repo);
@@ -370,15 +370,18 @@ fn a_version_6_cache_is_rebuilt_to_7_without_a_500() {
         }
         assert!(errors.is_empty(), "{}", errors.join("\n"));
         let version = std::fs::read_to_string(cache.join("VERSION")).expect("version");
-        assert_eq!(version.trim(), gitterrace_index::FORMAT_VERSION);
+        assert_eq!(
+            version.trim(),
+            format!("v{}", gitterrace_index::FORMAT_VERSION)
+        );
         let rebuilt = segments(&cache);
         assert!(!rebuilt.is_empty(), "no segment after the rebuild");
         for p in rebuilt {
             let b = std::fs::read(&p).expect("read");
             assert_eq!(
                 &b[..8],
-                b"GTS1\x07\0\0\0",
-                "{} is segment version 7",
+                b"GTS1\x01\0\0\0",
+                "{} is segment version 1",
                 p.display()
             );
         }

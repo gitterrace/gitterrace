@@ -290,7 +290,8 @@ fn cache() -> String {
     }
     let _ = write!(
         s,
-        "\nThe format version is `{}`.\n",
+        "\nThe format version is `{}`, stored as `v{}`.\n",
+        gitterrace_index::FORMAT_VERSION,
         gitterrace_index::FORMAT_VERSION
     );
     s

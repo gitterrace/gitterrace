@@ -15,9 +15,17 @@ pub(crate) use segments::{
 
 /// Cache format; a different one on disk discards the cache.
 ///
-/// Format 9 added the stored chain. The container byte version (`seg::format::VERSION`) is
-/// separate and lags: it moves only when the container bytes change.
-pub const FORMAT_VERSION: &str = "9";
+/// The container byte version (`seg::format::VERSION`) is separate: it moves only when the
+/// container bytes change.
+pub const FORMAT_VERSION: &str = "1";
+
+/// What `VERSION` holds: `v` and then `FORMAT_VERSION`, like `v1`. Builds before the first
+/// release wrote a bare number (2 to 9) and never a `v`, so a bare number is a pre-release
+/// cache, ours to reset, and only a `v` number greater than ours is a newer build's. Never drop
+/// the prefix: a bare number must never mean a newer build again.
+pub(crate) fn version_stamp() -> String {
+    format!("v{FORMAT_VERSION}")
+}
 pub(crate) const VERSION_FILE: &str = "VERSION";
 pub(crate) const LOCK_FILE: &str = "lock";
 pub(crate) const OWNER_FILE: &str = "owner";
@@ -99,17 +107,21 @@ pub(crate) fn newer_message(found: &str) -> String {
     )
 }
 
-/// The stored format when it is newer than ours. Older, missing and unreadable versions are
-/// ours to reset; a newer one belongs to a newer build and must never be overwritten.
+/// The stored format number when it is newer than ours. Older, missing, unreadable and
+/// pre-release versions (a bare number, see `version_stamp`) are ours to reset; a newer one
+/// belongs to a newer build and must never be overwritten.
 pub(crate) fn newer_version(dir: &Path) -> io::Result<Option<String>> {
     let found = cache::read(dir, VERSION_FILE)?
         .map(|b| String::from_utf8_lossy(&b).trim().to_owned())
         .unwrap_or_default();
-    let newer = match (found.parse::<u64>(), FORMAT_VERSION.parse::<u64>()) {
+    let Some(number) = found.strip_prefix('v') else {
+        return Ok(None);
+    };
+    let newer = match (number.parse::<u64>(), FORMAT_VERSION.parse::<u64>()) {
         (Ok(f), Ok(ours)) => f > ours,
         _ => false,
     };
-    Ok(newer.then_some(found))
+    Ok(newer.then(|| number.to_owned()))
 }
 
 /// Fails when the cache now belongs to a newer build. Called right before every write, so a
@@ -150,7 +162,11 @@ pub(crate) fn ensure_dir(dir: &Path) -> io::Result<Option<String>> {
 /// goes. The caller holds the lock and has checked the cache is not a newer build's.
 pub(crate) fn wipe(dir: &Path) -> io::Result<()> {
     sweep(dir, &[LOCK_FILE.to_owned()])?;
-    cache::write_atomic(dir, VERSION_FILE, format!("{FORMAT_VERSION}\n").as_bytes())
+    cache::write_atomic(
+        dir,
+        VERSION_FILE,
+        format!("{}\n", version_stamp()).as_bytes(),
+    )
 }
 
 /// Removes every entry of `dir` not named in `live`, the retired-file sweep. Links and
@@ -190,7 +206,7 @@ fn version_stale(dir: &Path) -> io::Result<bool> {
     let current = current
         .as_deref()
         .map(|b| String::from_utf8_lossy(b).trim().to_owned());
-    Ok(current.as_deref() != Some(FORMAT_VERSION))
+    Ok(current.as_deref() != Some(version_stamp().as_str()))
 }
 
 /// Whether `ensure_dir` has files to delete or sweep: a stale format, an unreadable set, or a
