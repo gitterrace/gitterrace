@@ -41,7 +41,7 @@ Graph draws every branch line at once, as `git log --graph --all` does: the
 browsed ref, each local branch and the HEAD of each linked worktree, newest
 first by commit date, each line in its own color from the theme. Each tip's
 labels sit at the left of the graph, joined to the tip's dot by a dashed line in
-its column's color. A detached worktree is labelled "worktree" and its id. This
+its column's color. A detached worktree is labeled "worktree" and its id. This
 ref narrows the graph to the history of the ref in the address, as before. Lines
 past the column cap fold as "+N", and paging works the same in both. Worktree
 HEADs are working state of this machine, so a public server leaves them out, as
