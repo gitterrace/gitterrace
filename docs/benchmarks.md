@@ -70,10 +70,11 @@ back under pressure, and RSS is still recorded beside it.
 
 Serving memory is a product goal: once the index is ready, a server that is
 browsed or idle holds some MB, not GB, and that amount does not grow with the
-history. The goal is at most the 32 MB cache budget plus 16 MB of margin above a
-just-started server, on every repository size, also after a sweep of every
-insights page. Page cache for the index files is not counted. A peak during the
-index build is fine. A test guards it on synthetic repositories of growing
+history. The goal is at most the `resources.cache_mb` cache budget (default 32
+MB) plus 16 MB of margin above a just-started server, on every repository size,
+also after a sweep of every insights page. Page cache for the index files is
+not counted. A peak during the index build is fine. A test guards it on
+synthetic repositories of growing
 size, and `make memory-check` measures it on a real clone. Every bench run
 checks it too, as the `footprint_idle_mb` budget: idle footprint minus that of a
 just-started server, at most 48 MB on every class.
@@ -117,7 +118,7 @@ ceilings, so these pages cannot get slower unnoticed.
 search reads the cache instead of walking git. Measured on rust (345,460
 commits) at the corpus sha, release build, M1 Max, 1-minute load 28 at the
 start, median of 5, page cache warm, through the search handler with the
-default cap of 200 rows:
+`limits.search_commits` cap (default 200 rows):
 
 | Query                             | Column on | Column off |
 | --------------------------------- | --------- | ---------- |
