@@ -338,3 +338,54 @@ fn negative_and_net_zero_paths_stay_hidden_as_the_walk_hides_them() {
     );
     assert!(src.failure().is_none());
 }
+
+/// The stored chain keeps no cut points: blocks split where the bytes fill, and the page
+/// lays its marks over positions as it reads. A chain spanning several blocks, with mark
+/// gaps across every block edge, and chains of fewer than one gap and of an exact multiple
+/// of it, give the walk's skeleton.
+#[test]
+fn marks_across_block_edges_give_the_walks_skeleton() {
+    let id = |i: usize| format!("{i:040x}");
+    // Wide commits so the chain fills more than one 1 MiB block.
+    let wide = |i: usize, n: usize| CommitRecord {
+        id: id(i),
+        author: "a".into(),
+        email: "a@x.io".into(),
+        time: 1_600_000_000 + i64::try_from(i).unwrap_or(0) * 3600,
+        parents: if i == 0 { vec![] } else { vec![id(i - 1)] },
+        files: (0..n)
+            .map(|k| file(&format!("d{}/f{k}.{}", i % 3, ["rs", "py"][k % 2]), 3, 1))
+            .collect(),
+        ..CommitRecord::default()
+    };
+    for (n, width) in [(300, 2500), (40, 2), (128, 2)] {
+        let (tmp, src) = set((0..n).map(|i| wide(i, width)).collect());
+        let store = gitterrace_index::seg::read::Store::open(&tmp.path().join("c"))
+            .expect("open")
+            .expect("a set");
+        let blocks = store
+            .chain
+            .as_ref()
+            .expect("chain")
+            .blocks(gitterrace_index::seg::format::section::CHAIN)
+            .len();
+        assert!(
+            width < 100 || blocks > 1,
+            "{blocks} blocks over {n} wide steps"
+        );
+        let f = filter();
+        let stored = Arc::new(Skeleton::build(&*src, &f));
+        let walked = Arc::new(Skeleton::build(&Walk(Arc::clone(&src)), &f));
+        assert_eq!(stored.len(), n);
+        for range in [None, Some((0, n - 1)), Some((n / 3, n / 2)), Some((63, 65))] {
+            let range = range.filter(|r| r.1 < n);
+            let a = stored.view(&*src, &f, view(range));
+            let b = walked.view(&*src, &f, view(range));
+            for i in wanted(n, range) {
+                assert_eq!(a.lines(i), b.lines(i), "lines at {i} of {n}, {range:?}");
+            }
+            assert_eq!((a.added, a.removed), (b.added, b.removed), "{n}, {range:?}");
+        }
+        assert!(src.failure().is_none());
+    }
+}

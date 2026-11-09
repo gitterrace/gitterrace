@@ -169,6 +169,14 @@ fingerprint and commit count. A chain written for another set (a reset, a
 rewritten history) is not read, and the page walks the records as before. A
 deepened shallow clone wipes the whole cache, chain included.
 
+The chain file keeps no cut points. Its blocks split wherever the bytes fill
+one, so a block edge says nothing about the page's marks. The page lays its
+marks over chain positions as it reads the steps, one pass from the newest,
+with the same gap as a walk, so the stored and the walked skeleton put marks at
+the same positions by construction. A stored cut list would be a second copy of
+that rule that could drift from it, and would have to move with every change to
+the mark gap.
+
 Format numbers: the cache format (`VERSION`, `FORMAT_VERSION` in `store.rs`) is
 9 since the chain was added, after 8 for the message column. The container byte
 version inside each file (`seg/format.rs`) is a separate number. It moves only
