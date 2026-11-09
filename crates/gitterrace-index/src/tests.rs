@@ -466,3 +466,26 @@ fn planted_links_never_write_outside() -> io::Result<()> {
     }
     Ok(())
 }
+
+/// Every step of a fresh build is timed and named, so a bench can say which one is slow.
+#[test]
+fn a_fresh_build_times_every_step_by_name() -> io::Result<()> {
+    let dir = tempfile::tempdir()?;
+    let idx = Index::open_dir(dir.path().join("gitterrace"))?;
+    idx.update(&Fake::new(&["a", "b"]), "HEAD", &|_| {})?;
+    let (steps, running) = idx.phases();
+    let names: Vec<_> = steps.iter().map(|p| p.name).collect();
+    let want = [
+        "rev_list",
+        "held",
+        "stream",
+        "stream.fold",
+        "finish",
+        "messages",
+        "chain",
+    ];
+    assert_eq!(names, want);
+    assert_eq!(running, None);
+    assert!(steps.iter().all(|p| p.secs >= 0.0));
+    Ok(())
+}

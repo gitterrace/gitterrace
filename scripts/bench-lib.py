@@ -275,10 +275,16 @@ class Server:
         Progress lives under the repo prefix, which /api/repos names once the server listens."""
         peak, listening = 0.0, None
         prefix: str | None = None
+        # Peak RSS per index step, charged to the step the last answer named.
+        self.phase_rss: dict[str, float] = {}
+        self.phases: list[dict[str, Any]] = []
+        step = "start"
         while time.perf_counter() - self.t0 < timeout:
             if self.proc.poll() is not None:
                 raise RuntimeError(f"server exited early, see {self.log.name}")
-            peak = max(peak, rss_mb(self.pid))
+            now = rss_mb(self.pid)
+            peak = max(peak, now)
+            self.phase_rss[step] = max(self.phase_rss.get(step, 0.0), now)
             try:
                 if prefix is None:
                     prefix = site_prefix(self.port)
@@ -292,6 +298,8 @@ class Server:
                     )
                 body = json.loads(r.read())
                 c.close()
+                step = body.get("phase") or step
+                self.phases = body.get("phases", [])
                 if body.get("ready"):
                     return time.perf_counter() - self.t0, listening, peak
             except (OSError, ValueError):
@@ -390,3 +398,36 @@ def pages(probe: Json, search: str) -> dict[str, str]:
     for s in STATS:
         p["stats" + (s or "-overview")] = "/stats" + s
     return p
+
+
+# Budgets a run fails on without BENCH_STRICT: the index build, which blocks a release.
+INDEX_GATES = ("index_secs", "rss_mb")
+
+
+def phase_table(phases: list[dict[str, Any]], rss: dict[str, float]) -> list[Json]:
+    """The server's step times, each with the peak RSS sampled while it ran."""
+    out = []
+    for p in phases:
+        row = {"name": p["name"], "secs": round(float(p["secs"]), 3)}
+        if p["name"] in rss:
+            row["rss_mb"] = round(rss[p["name"]], 1)
+        out.append(row)
+    return out
+
+
+def slowest(phases: list[Json], key: str) -> str:
+    """The step with the most `key`, "unknown" without a step table. A sub-step (dotted
+    name) is part of its parent, so it only names the cause when it is the larger part."""
+    rows = [p for p in phases if key in p]
+    if not rows:
+        return "unknown"
+    return max(rows, key=lambda p: p[key])["name"]
+
+
+def index_over(name: str, budget: Json) -> list[str]:
+    """Index time or index memory over budget: always fails the run, naming the step."""
+    return [
+        f"{name}: {k} {v['value']:.1f} > {v['limit']} (slowest phase: {v.get('phase')})"
+        for k, v in budget.items()
+        if k in INDEX_GATES and v["status"] == "over"
+    ]

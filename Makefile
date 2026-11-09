@@ -150,6 +150,10 @@ bench-guard:
 	python3 scripts/indexing-run.py --self-test
 	cargo build -q -p gitterrace
 	python3 scripts/bench-run.py --synthetic --bin $${CARGO_TARGET_DIR:-target}/debug/git-terrace >/dev/null
+	@# Red: an index over budget fails the run and names its slowest phase.
+	out=$$(TEST_BENCH_INDEX_SECS=0 python3 scripts/bench-run.py --synthetic \
+		--bin $${CARGO_TARGET_DIR:-target}/debug/git-terrace) && exit 1; \
+		echo "$$out" | grep -E 'INDEX OVER BUDGET .*slowest phase: [a-z_]+' >/dev/null
 	python3 scripts/bench-report.py --self-test
 	python3 scripts/bench-quiet-lib.py
 	python3 scripts/speed-check.py --self-test

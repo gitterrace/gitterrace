@@ -146,7 +146,13 @@ def bench_phases(
     try:
         secs, listen, peak = srv.wait_ready()
         res["index"] = {"secs": secs, "listen_secs": listen, "peak_rss_mb": peak}
+        res["index"]["phases"] = bl.phase_table(srv.phases, srv.phase_rss)
         print(f"  index {secs:.1f} s, peak RSS {peak:.0f} MB", flush=True)
+        for p in res["index"]["phases"]:
+            print(
+                f"    {p['name']:<12} {p['secs']:8.1f} s  {p.get('rss_mb', 0):6.0f} MB",
+                flush=True,
+            )
         rss_warm = rss_mb(srv.pid)
         quiet("pages", loads, wait, sampler)
         res["pages"] = measure_pages(
@@ -325,12 +331,17 @@ def judge(res: Json, budgets: Json) -> Json:
         b.get("index_secs"),
         res["index"].get("samples"),
     )
+    phases = res["index"].get("phases", [])
+    if "index_secs" in out:
+        out["index_secs"]["phase"] = bl.slowest(phases, "secs")
     put(
         "idle_cpu_pct",
         max(field(res, f) for f in bc.SOURCES["idle_cpu_pct"]),
         b.get("idle_cpu_pct"),
     )
     put("rss_mb", max(field(res, f) for f in bc.SOURCES["rss_mb"]), b.get("rss_mb"))
+    if "rss_mb" in out:
+        out["rss_mb"]["phase"] = bl.slowest(phases, "rss_mb")
     # The serving-memory goal: idle, after a release, at most the cache budget plus margin
     # above a just-started server (docs/benchmarks.md, memory_budget.rs).
     fp, start = (
@@ -508,7 +519,7 @@ def main():
         "machine": machine(a.bin),
         "repos": {},
     }
-    over = []
+    over, fails = [], []
     # Only a full run is published and repeats the cold phases. A smoke run (fewer runs, shorter
     # idle) samples once and stays in the cache.
     full = not a.synthetic and a.runs == FULL_RUNS and a.idle_secs == FULL_IDLE_SECS
@@ -524,7 +535,8 @@ def main():
             not a.synthetic,
             int(repo.get("cold_samples", COLD_SAMPLES)) if full else 1,
         )
-        res["budget"] = judge(res, corpus.get("budgets", {}))
+        res["budget"] = judge(res, budgets(corpus))
+        fails += bl.index_over(repo["name"], res["budget"])
         over += [
             f"{repo['name']}: {k} {v['value']:.1f} > {v['limit']}"
             for k, v in res["budget"].items()
@@ -552,7 +564,21 @@ def main():
         shutil.rmtree(logdir, ignore_errors=True)
     for line in over:
         print("OVER BUDGET", line)
+    for line in fails:
+        print("INDEX OVER BUDGET", line)
+    if fails:
+        return 1
     return 1 if over and os.environ.get("BENCH_STRICT") == "1" else 0
+
+
+def budgets(corpus: Json) -> Json:
+    """The corpus budgets. TEST_BENCH_INDEX_SECS sets every class's index_secs, so the guard
+    sees a run fail red on the tiny synthetic repo."""
+    b = corpus.get("budgets", {})
+    forced = os.environ.get("TEST_BENCH_INDEX_SECS")
+    if forced is None:
+        return b
+    return {k: {**v, "index_secs": float(forced)} for k, v in b.items()}
 
 
 if __name__ == "__main__":

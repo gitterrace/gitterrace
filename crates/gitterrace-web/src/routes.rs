@@ -447,11 +447,18 @@ struct ProgressBody {
     ready: bool,
     /// Idle releases so far, see `App::release_idle`.
     releases: u64,
+    /// Wall time per step of the last index update, the running one so far.
+    phases: Vec<gitterrace_index::PhaseTime>,
+    /// The step running now, so a sampler can charge memory to it.
+    phase: Option<&'static str>,
 }
 
 async fn progress(State(app): Shared) -> Json<ProgressBody> {
     let p = app.progress();
+    let (phases, phase) = app.index.phases();
     Json(ProgressBody {
+        phases,
+        phase,
         done: p.done,
         total: p.total,
         ready: app.ready(),
