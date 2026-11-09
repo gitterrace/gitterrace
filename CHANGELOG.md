@@ -474,6 +474,7 @@ All notable changes are listed here. The format follows
 - web: let the app header follow the chosen theme
 - site: let the site bar follow the chosen theme
 - index: the message column goes on in a new file when the toc is full
+- bench: time only the insights tabs, not pages that now redirect
 
 ### Performance
 

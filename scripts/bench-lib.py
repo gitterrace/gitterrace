@@ -21,14 +21,12 @@ from urllib.parse import quote
 Json = dict[str, Any]
 
 ROOT = Path(__file__).resolve().parent.parent
+# The insights tabs. Pages that moved into a section of a tab answer a redirect, never timed.
 STATS = [
     "",
-    "/types",
     "/languages",
-    "/frequency",
     "/hotspots",
     "/ownership",
-    "/patterns",
     "/contributors",
 ]
 TEXT_BAD = {
