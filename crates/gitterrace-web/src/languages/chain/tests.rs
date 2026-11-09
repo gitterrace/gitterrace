@@ -199,9 +199,20 @@ struct Reads<S> {
     pub(super) inner: S,
     lookups: AtomicUsize,
     records: AtomicUsize,
+    /// Path ids named through `path`, in call order.
+    pub(super) paths: std::sync::Mutex<Vec<u32>>,
 }
 
 impl<S> Reads<S> {
+    pub(super) fn new(inner: S) -> Self {
+        Self {
+            inner,
+            lookups: AtomicUsize::new(0),
+            records: AtomicUsize::new(0),
+            paths: std::sync::Mutex::new(Vec::new()),
+        }
+    }
+
     fn take(&self) -> (usize, usize) {
         (
             self.lookups.swap(0, Ordering::Relaxed),
@@ -249,6 +260,9 @@ impl<S: InsightsSource + ?Sized> InsightsSource for Reads<&S> {
         self.inner.rename_edges()
     }
     fn path(&self, id: feed::PathId) -> Option<Arc<str>> {
+        if let Ok(mut p) = self.paths.lock() {
+            p.push(id.0);
+        }
         self.inner.path(id)
     }
     fn find_path(&self, p: &str) -> Result<Option<feed::PathId>, feed::SourceError> {
@@ -301,11 +315,8 @@ fn chain_by_lookup(src: &dyn InsightsSource) -> Vec<Rank> {
 fn the_chain_walk_reads_each_record_a_bounded_number_of_times() {
     for n in [300, 3000] {
         let recs = merged_history(n);
-        let src = Reads {
-            inner: &MemorySource::new(&recs),
-            lookups: AtomicUsize::new(0),
-            records: AtomicUsize::new(0),
-        };
+        let mem = MemorySource::new(&recs);
+        let src = Reads::new(&mem);
         let want = chain_by_lookup(src.inner);
         assert!(want.len() < n, "the fixture has side commits");
         src.take();

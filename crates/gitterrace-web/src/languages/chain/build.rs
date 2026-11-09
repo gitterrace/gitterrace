@@ -63,6 +63,21 @@ impl<'a> Tally<'a> {
         }
     }
 
+    /// Decides the language of every path in `ids` in ascending id order. The string blocks
+    /// hold ids in runs, so this reads each block once; deciding them lazily in chain order
+    /// jumps between blocks and, once the path table outgrows the shared block cache, re-reads
+    /// a block per path and evicts what the pages read next.
+    pub(super) fn decide(&mut self, mut ids: Vec<PathId>) {
+        ids.sort_unstable();
+        ids.dedup();
+        for id in ids {
+            if !self.lang_of.contains_key(&id) {
+                let s = self.slot_of(id);
+                self.lang_of.insert(id, s);
+            }
+        }
+    }
+
     fn slot_of(&mut self, id: PathId) -> Option<usize> {
         let path = self.src.path(id).unwrap_or_default();
         if self.filter.skips(&path) {
@@ -147,6 +162,11 @@ impl Skeleton {
     pub(crate) fn build(src: &dyn InsightsSource, filter: &PathFilter) -> Self {
         if let Some(n) = src.chain_len() {
             let mut p = Pass::new(n, src, filter);
+            // One cheap sequential read of the chain for its path ids, so their names are
+            // read in id order before the pass, see `Tally::decide`.
+            let mut ids = Vec::new();
+            src.chain(&mut |s| ids.extend(s.files.iter().map(|f| f.path)));
+            p.tally.decide(ids);
             let had = src.chain(&mut |s| {
                 // A chain longer than its meta says is damage, which the source reports.
                 if p.pos > 0 {

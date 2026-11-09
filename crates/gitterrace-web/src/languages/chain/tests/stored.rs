@@ -4,7 +4,6 @@
 use std::cell::RefCell;
 use std::io;
 use std::sync::Arc;
-use std::sync::atomic::AtomicUsize;
 
 use gitterrace_index::feed::{self, InsightsSource};
 use gitterrace_index::{CommitRecord, CommitSource, FileStat, Index, Options, PathFilter};
@@ -184,11 +183,7 @@ fn the_stored_chain_gives_the_walks_skeleton() {
 fn the_build_reads_no_commit_record() {
     for n in [200, 2000] {
         let (_t, src) = set(history(n));
-        let src = Reads {
-            inner: &*src,
-            lookups: AtomicUsize::new(0),
-            records: AtomicUsize::new(0),
-        };
+        let src = Reads::new(&*src);
         let sk = Skeleton::build(&src, &filter());
         let (lookups, records) = src.take();
         assert_eq!(sk.len(), n);
@@ -388,4 +383,44 @@ fn marks_across_block_edges_give_the_walks_skeleton() {
         }
         assert!(src.failure().is_none());
     }
+}
+
+/// Guard class: the stored-chain build names each path once, in ascending id order, so it
+/// reads every string block once. Red when names are read in chain order (newest first),
+/// which jumps between string blocks: on a path table larger than the shared block cache
+/// that re-read a block per path and evicted the blocks the first insights page needed,
+/// 40 s for ownership on rust right after ready.
+#[test]
+fn the_stored_build_names_each_path_once_in_id_order() {
+    let id = |i: usize| format!("{i:040x}");
+    // A new path in every commit and an old one touched again, so chain order is not id order.
+    let recs: Vec<CommitRecord> = (0..400)
+        .map(|i| CommitRecord {
+            id: id(i),
+            author: "a".into(),
+            email: "a@x.io".into(),
+            time: 1_600_000_000 + i64::try_from(i).unwrap_or(0) * 3600,
+            parents: if i == 0 { vec![] } else { vec![id(i - 1)] },
+            files: vec![
+                file(
+                    &format!("d{}/f{i}.{}", i % 7, ["rs", "py", "c"][i % 3]),
+                    3,
+                    1,
+                ),
+                file(&format!("d0/f{}.rs", i / 2), 1, 0),
+            ],
+            ..CommitRecord::default()
+        })
+        .collect();
+    let (_t, src) = set(recs);
+    let src = Reads::new(&*src);
+    let sk = Skeleton::build(&src, &filter());
+    assert_eq!(sk.len(), 400);
+    let named = src.paths.lock().expect("paths").clone();
+    assert!(named.len() >= 400, "every path named: {}", named.len());
+    assert!(
+        named.windows(2).all(|w| w[0] < w[1]),
+        "paths named out of id order or twice: {:?}",
+        &named[..named.len().min(12)]
+    );
 }
