@@ -3,7 +3,9 @@ with your code. Every sentence comes from docs/ or from the code; the long story
 the Why page. The install tabs are radio inputs and CSS, so they need no script, and with
 CSS off every command still shows. A screenshot opens as a :target overlay, also without
 script; its full-size image is a decorative copy, so the description is read once. Light
-and dark are two lazy images, one hidden by the theme, so only the shown one loads. -#}
+and dark are two lazy images, one hidden by the theme, so only the shown one loads. The
+overview under the pitch is above the fold, so it loads at once: one picture whose dark
+source follows the system, and the theme button points that source's media at its choice. -#}
 <div class="hero">
 <h1><img class="on-light" src="/assets/logo-light.svg" alt="{{ name }}" width="540" height="120"
 loading="lazy">
@@ -13,6 +15,10 @@ loading="lazy"></h1>
 {%- if !demo.is_empty() %}
 <p class="demo"><a href="{{ demo }}">Try the live demo</a>, no install needed.</p>
 {%- endif %}
+<picture class="overview"><source media="(prefers-color-scheme: dark)"
+srcset="/assets/screenshots/{{ hero.0 }}-dark.webp">
+<img src="/assets/screenshots/{{ hero.0 }}-light.webp" alt="{{ hero.1 }}" width="1280"
+height="800" loading="eager" decoding="async"></picture>
 </div>
 <section>
 <h2 id="install">Install</h2>

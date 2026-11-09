@@ -102,7 +102,11 @@ async function siteTheme() {
   // What the page shows: data-theme, the visible logo, the visible screenshot images, each by file.
   const state = (p) => p.evaluate(() => {
     const shown = (sel) => [...document.querySelectorAll(sel)].filter((i) => i.offsetParent && getComputedStyle(i).display !== 'none').map((i) => i.getAttribute('src'));
-    return { theme: document.documentElement.dataset.theme || 'system', logo: shown('.hero img'), shots: shown('.shots a:not(.lightbox) img'), label: document.getElementById('theme')?.getAttribute('aria-label') };
+    const pic = document.querySelector('.hero picture');
+    const media = [...(pic?.querySelectorAll('source') || [])]
+      .map((s) => `${s.media} ${s.srcset}`);
+    const img = pic?.querySelector('img')?.currentSrc || '';
+    return { theme: document.documentElement.dataset.theme || 'system', logo: shown('.hero h1 img'), pic: img, media, shots: shown('.shots a:not(.lightbox) img'), label: document.getElementById('theme')?.getAttribute('aria-label') };
   });
   try {
     for (const browser of browsers) {
@@ -117,9 +121,13 @@ async function siteTheme() {
         p.on('pageerror', (e) => errors.push(String(e)));
         const want = (t, s, what) => {
           const other = t === 'light' ? 'dark' : 'light';
-          const bad = [...s.logo, ...s.shots].filter((x) => !x.includes(`-${t}`));
-          if (s.logo.length !== 1 || !s.shots.length || bad.length) r.fail(`site-theme ${where} ${what}: shows ${JSON.stringify(s)} for ${t}`);
-          else r.ok(`site-theme ${where} ${what}: logo and ${s.shots.length} shots are ${t}`);
+          const bad = [...s.logo, ...s.shots, s.pic].filter((x) => !x.includes(`-${t}`));
+          // The landing picture: a source per scheme, the dark one under the system query.
+          const dark = s.media
+            .some((m) => m.includes('-dark') && /prefers-color-scheme: ?dark|^all|not all/.test(m));
+          if (s.logo.length !== 1 || !s.shots.length || bad.length || !dark) r.fail(`site-theme ${where} ${what}: shows ${JSON.stringify(s)} for ${t}`);
+          else r.ok(`site-theme ${where} ${what}: logo, picture and ${s.shots.length} shots`
+            + ` are ${t}`);
           return other;
         };
         await p.goto(url, { waitUntil: 'load' });
@@ -134,6 +142,11 @@ async function siteTheme() {
         // The cycle: system, light, dark, system.
         for (const t of ['light', 'dark', 'system']) {
           await p.click('#theme');
+          // A swapped source sets currentSrc only once it has loaded.
+          const done = () => document.querySelector('.hero picture')?.querySelector('img')
+            ?.complete !== false;
+          await p.waitForFunction(done, null, { timeout: 5000 }).catch(() => {});
+          await p.waitForTimeout(300);
           s = await state(p);
           if (s.theme !== t || s.label !== `Theme: ${t}`) r.fail(`site-theme ${where}: click gave ${s.theme} (${s.label}), wanted ${t}`);
           else want(t === 'system' ? scheme : t, s, `after click to ${t}`);

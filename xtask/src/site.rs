@@ -133,11 +133,15 @@ const THEME_INIT_JS: &str = "(function(){try{var t=localStorage.getItem('gitterr
 if(t==='light'||t==='dark')document.documentElement.dataset.theme=t}catch(e){}})()";
 
 /// The theme button cycles system, light and dark, as the app's does, and stores the choice.
+/// A `<picture>` picks its source by media query alone, so each dark source's query follows
+/// the choice: the system's, or always, or never.
 const THEME_TOGGLE_JS: &str = "(function(){var r=document.documentElement,\n\
 b=document.getElementById('theme'),o=['system','light','dark'];if(!b)return;\n\
 function c(){return r.dataset.theme||'system'}\n\
-function l(){b.setAttribute('aria-label','Theme: '+c());\n\
-b.title='Theme: '+c()}l();b.addEventListener('click',function(){var n=o[(o.indexOf(c())+1)%3];\n\
+function l(){b.setAttribute('aria-label','Theme: '+c());b.title='Theme: '+c();\n\
+var q={system:'(prefers-color-scheme: dark)',light:'not all',dark:'all'}[c()];\n\
+document.querySelectorAll('picture source').forEach(function(s){s.media=q})}l();\n\
+b.addEventListener('click',function(){var n=o[(o.indexOf(c())+1)%3];\n\
 if(n==='system')delete r.dataset.theme;else r.dataset.theme=n;\n\
 try{if(n==='system')localStorage.removeItem('gitterrace-theme');else \n\
 localStorage.setItem('gitterrace-theme',n)}catch(e){}l()})})()";

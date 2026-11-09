@@ -54,6 +54,9 @@ pub const SHOTS: [(&str, &str, &str); 6] = [
     ),
 ];
 
+/// The alt text of the overview under the pitch, the first shot without its caption word.
+const HERO_ALT: &str = "The repository page: README, last commit, file list and key numbers.";
+
 /// What the screenshots cannot show, one line each: (title, docs page, docs section whose
 /// first paragraph is the line). The text is the doc's own, so the landing page says nothing
 /// the docs do not.
@@ -77,6 +80,7 @@ struct Landing<'a> {
     requires: Vec<String>,
     quickstart: &'a str,
     shots: Vec<(&'a str, &'a str, &'a str, &'a str)>,
+    hero: (&'a str, &'a str),
     lines: Vec<(&'a str, String, String)>,
     promises: &'a str,
 }
@@ -125,6 +129,7 @@ pub(crate) fn body(
         requires: requirements(ws),
         quickstart: readme_agents_md::QUICKSTART,
         shots,
+        hero: (SHOTS[0].0, HERO_ALT),
         lines: rows,
         promises: &md(promises, links),
     }

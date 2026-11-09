@@ -214,6 +214,7 @@ All notable changes are listed here. The format follows
 - index: store the first-parent chain with its line counts in cache format 9
 - index: time each index step and fail the bench on an index over budget
 - bench: gate index memory on physical footprint, not RSS
+- site: the landing shows the overview under the tagline
 
 ### Changed
 
