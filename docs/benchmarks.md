@@ -193,7 +193,7 @@ failed at the page cap and are shown as failed.
 | linux | warm page | 43 ms | 500 ms | pass |
 | linux | cold page | 27674 ms (27674 to 27674) | 20000 ms | over |
 | linux | peak physical footprint (index peak or after pages) | 6449 MB | 8000 MB | pass |
-| linux | export | failed (page cap reached) | - | failed |
+| linux | export | failed | - | failed |
 | rust | index build | withheld (load) | - | withheld |
 | rust | warm page | withheld (load) | - | withheld |
 | rust | cold page | withheld (load) | - | withheld |

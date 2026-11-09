@@ -105,8 +105,17 @@ def summary(name: str, r: Json, when: str) -> list[str]:
     return L
 
 
-FAILED_EXPORT = "failed (page cap reached)"
+CAPPED_EXPORT = "stopped at the page cap"
+FAILED_EXPORT = "failed"
 HELD = "withheld (load)"
+
+
+def export_failure(e: Json) -> str:
+    """Why an export did not finish. The cap is a documented limit, any other error a failure.
+    A run that kept no reason says only that it failed, never which."""
+    return (
+        CAPPED_EXPORT if "stopped at the cap" in e.get("error", "") else FAILED_EXPORT
+    )
 
 
 def export_cell(r: Json) -> str:
@@ -115,7 +124,7 @@ def export_cell(r: Json) -> str:
     if not e:
         return "not run"
     if e.get("ok") is False:
-        return FAILED_EXPORT
+        return export_failure(e)
     return f"{e['secs']:.1f} s, {e['out_mb']:.0f} MB"
 
 
@@ -407,8 +416,10 @@ def results_table(cur: Json, old: Json | None) -> list[str]:
             b = r["budget"].get(k)
             if not b:
                 if k == "export_secs" and r.get("export", {}).get("ok") is False:
+                    why = export_failure(r["export"])
+                    status = "capped" if why == CAPPED_EXPORT else "failed"
                     L.append(
-                        f"| {n} | {SHORT[k]} | {FAILED_EXPORT} | - | failed |"
+                        f"| {n} | {SHORT[k]} | {why} | - | {status} |"
                         + (" - |" if old else "")
                     )
                 continue

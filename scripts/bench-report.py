@@ -291,11 +291,18 @@ def export_test() -> None:
     """A failed export is shown as failed, never as a time."""
     bad = {"ok": False, "secs": 4029.4, "out_mb": 511.0}
     good = {"ok": True, "secs": 12.3, "out_mb": 92.0}
+    capped = {
+        **bad,
+        "error": "Error: export stopped at the cap of 20000 pages on a page",
+    }
+    broken = {**bad, "error": "Error: permission denied"}
     got = bd.export_cell({"export": bad})
     if (
         "4029" in got
-        or "failed" not in got
+        or got != bd.FAILED_EXPORT
         or "12.3 s" not in bd.export_cell({"export": good})
+        or bd.export_cell({"export": capped}) != bd.CAPPED_EXPORT
+        or bd.export_cell({"export": broken}) != bd.FAILED_EXPORT
     ):
         sys.exit(f"bench-report self-test failed: export cell {got}")
 

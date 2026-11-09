@@ -291,6 +291,9 @@ def export(
     )
     secs = time.perf_counter() - t
     res = {"secs": secs, "out_mb": dir_mb(out), "ok": r.returncode == 0}
+    if r.returncode != 0:
+        # The last stderr line says why: the page cap by design, or a real failure.
+        res["error"] = (r.stderr.strip().splitlines() or ["no output"])[-1][:300]
     shutil.rmtree(out, ignore_errors=True)
     return res
 
