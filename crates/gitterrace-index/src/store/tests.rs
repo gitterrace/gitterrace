@@ -83,7 +83,8 @@ fn a_built_segment_set_is_kept_and_a_corrupt_one_wiped() -> io::Result<()> {
     }
     let m = b.finish(None, Vec::new()).map_err(io::Error::other)?;
     let live: Vec<&str> = m.live.iter().map(|f| f.name.as_str()).collect();
-    assert_eq!(live, ["seg-1-0.gts", "str-1-0.gts", "ord-1.gts"]);
+    let want = ["seg-1-0.gts", "str-1-0.gts", "ord-1.gts", "chain-1.gts"];
+    assert_eq!(live, want);
     assert_eq!(m.commits, 3);
     assert_eq!(ensure_dir(&dir)?, None);
     assert_eq!(
@@ -91,6 +92,7 @@ fn a_built_segment_set_is_kept_and_a_corrupt_one_wiped() -> io::Result<()> {
         [
             "MANIFEST",
             VERSION_FILE,
+            "chain-1.gts",
             LOCK_FILE,
             "ord-1.gts",
             "seg-1-0.gts",
@@ -226,7 +228,7 @@ fn twenty_updates_with_background_merges_equal_one_step() -> io::Result<()> {
                 .map(|f| fs::read(dir.join(&f.name)))
                 .collect::<io::Result<_>>()?;
             assert_eq!(got, want, "after update {u}");
-            assert_eq!(m.live.len(), 3, "one segment, one delta, one order file");
+            assert_eq!(m.live.len(), 4, "segment, delta, order file and chain");
         }
         // The set itself must stay readable whole between merges.
         crate::seg::read::Store::open(&dir).map_err(io::Error::other)?;
@@ -386,5 +388,90 @@ fn a_read_only_current_cache_opens_without_the_variable() -> io::Result<()> {
     fs::set_permissions(&dir, fs::Permissions::from_mode(0o755))?;
     assert!(opened.is_ok(), "{:?}", opened.err());
     assert!(!lock, "open created the lock file");
+    Ok(())
+}
+
+/// Every file a manifest names is on disk, and the set opens whole with a current chain.
+fn assert_whole(dir: &std::path::Path) -> io::Result<crate::seg::manifest::Manifest> {
+    let store = crate::seg::read::Store::open(dir)
+        .map_err(io::Error::other)?
+        .ok_or_else(|| io::Error::other("no set"))?;
+    for f in &store.manifest.live {
+        assert!(dir.join(&f.name).is_file(), "{} is named but gone", f.name);
+    }
+    let chain = store
+        .chain
+        .as_ref()
+        .ok_or_else(|| io::Error::other("no chain"))?;
+    let current = crate::chain::current(chain, &store.manifest).map_err(io::Error::other)?;
+    assert!(current.is_some(), "the chain is for another set");
+    Ok(store.manifest)
+}
+
+/// Nine appends then a merge: after every step, and after the merge, every named file exists
+/// and the chain is current, so no step's sweep takes a file a later manifest still names. A
+/// merge that fails halfway publishes nothing: the nine-segment set stays live and whole.
+#[test]
+fn appends_and_a_failed_then_good_merge_keep_every_named_file() -> io::Result<()> {
+    let recs: Vec<_> = (0..10).map(|i| rec(i, &format!("p{}", i % 3))).collect();
+    let tmp = tempfile::tempdir()?;
+    let dir = tmp.path().join("gitterrace");
+    assert_eq!(ensure_dir(&dir)?, None);
+    build(&dir, &recs[..1])?;
+    assert_whole(&dir)?;
+    for r in &recs[1..] {
+        let prev = crate::seg::manifest::Manifest::load(&dir)
+            .map_err(io::Error::other)?
+            .ok_or_else(|| io::Error::other("no manifest"))?;
+        super::append_segment(&dir, prev, &[], [r]).map_err(io::Error::other)?;
+        assert_whole(&dir)?;
+    }
+    let ids: Vec<String> = recs.iter().map(|r| r.id.clone()).collect();
+    let before = assert_whole(&dir)?;
+    let mut n = 0;
+    let mut broken = |id: &str| {
+        n += 1;
+        if n > 5 {
+            return Err(io::Error::other("record gone"));
+        }
+        recs.iter()
+            .find(|r| r.id == id)
+            .cloned()
+            .ok_or_else(|| io::Error::other("missing"))
+    };
+    assert!(super::merge_if_needed(&dir, &ids, &[], Vec::new(), &mut broken).is_err());
+    assert_eq!(
+        assert_whole(&dir)?,
+        before,
+        "a failed merge publishes nothing"
+    );
+    ensure_dir(&dir)?;
+    assert_eq!(
+        assert_whole(&dir)?,
+        before,
+        "nor does the sweep after it take a file"
+    );
+    let mut fetch = |id: &str| {
+        recs.iter()
+            .find(|r| r.id == id)
+            .cloned()
+            .ok_or_else(|| io::Error::other("missing"))
+    };
+    assert!(super::merge_if_needed(
+        &dir,
+        &ids,
+        &[],
+        Vec::new(),
+        &mut fetch
+    )?);
+    let merged = assert_whole(&dir)?;
+    let one = tempfile::tempdir()?;
+    let want = build(one.path(), &recs)?;
+    let got: Vec<Vec<u8>> = merged
+        .live
+        .iter()
+        .map(|f| fs::read(dir.join(&f.name)))
+        .collect::<io::Result<_>>()?;
+    assert_eq!(got, want, "the merged set is the one-step build");
     Ok(())
 }

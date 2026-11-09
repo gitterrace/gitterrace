@@ -105,6 +105,17 @@ fn live_files(dir: &Path) -> Vec<(u8, Vec<u8>)> {
         .collect()
 }
 
+/// The kinds the manifest names, in order, after checking each named file exists.
+fn kinds(dir: &Path) -> Vec<u8> {
+    let m = Manifest::load(dir)
+        .expect("manifest")
+        .expect("a segment set");
+    for f in &m.live {
+        assert!(dir.join(&f.name).is_file(), "{} is named but gone", f.name);
+    }
+    m.live.iter().map(|f| f.kind).collect()
+}
+
 fn segments(dir: &Path) -> usize {
     Manifest::load(dir).ok().flatten().map_or(0, |m| {
         m.live
@@ -154,9 +165,20 @@ fn two_steps_then_merge_equal_one_step_byte_for_byte() {
     let two = Index::open_dir(two_dir.clone()).expect("index");
     for tip in &tips[5..] {
         two.update(&source, tip, &|_| {}).expect("step");
+        // Each step names a chain, and every file it names is on disk, not swept. The last
+        // step starts the merge, which may swap the set under the check, so it is left out.
+        if tip != &head {
+            let has = kinds(&two_dir).contains(&(Kind::Chain as u8));
+            assert!(has, "chain after a step");
+        }
     }
     // The merge runs on a background thread: wait until the set is one segment again.
     gitterrace_testkit::wait::until_blocking("the merge ran", || segments(&two_dir) == 1);
+    assert_eq!(
+        kinds(&two_dir),
+        kinds(&one_dir),
+        "live kinds after the merge"
+    );
     let got = live_files(&two_dir);
     assert_eq!(got.len(), want.len(), "live file count");
     for (i, (g, w)) in got.iter().zip(&want).enumerate() {

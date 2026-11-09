@@ -53,7 +53,7 @@ pub use filter::{PathFilter, is_generated};
 pub use format::{count, thousands};
 pub(crate) use headfiles::CACHE_FILE;
 pub use headfiles::{HeadFile, LineCache, head_files};
-pub use lang::language;
+pub use lang::{language, language_key};
 pub use people::{People, Person};
 pub use period::{
     Contributor, ContributorReport, Metric, Period, PeriodStats, PeriodSummary, Rhythm, SeriesPoint,

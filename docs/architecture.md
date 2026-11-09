@@ -122,7 +122,7 @@ the vendored theme.
 | `tip` | The commit id the segment files were last built for. Opening insights for that commit skips walking its history to check the files hold exactly it. |
 | `lines.json` | Line counts per blob id for the language chart. A blob never changes, so the counts never go stale. |
 
-The format version is `8`.
+The format version is `9`.
 
 <!-- END GENERATED: cache -->
 
@@ -146,6 +146,33 @@ How the files are laid out, how search reads them, the memory budget and the
 seam pages read through are in
 [the index internals](../crates/gitterrace-index/src/seg/internals.md), next to
 the [store design](../crates/gitterrace-index/src/seg/store.md).
+
+### How the languages page reads the index
+
+The languages page charts lines per language along the first-parent history.
+Walking that chain one commit record at a time, then reading each one's file
+rows, took minutes cold on a large history. So every update also stores the
+chain of the indexed tip in `chain-<gen>.gts`: per step its rank, oid, time
+and offset, and each file row's path id with its added and removed lines. The
+page reads that file once, front to back, and reads no commit record.
+
+Rows are keyed by path, not by language. The language and the path filter
+(excludes, the generated list, the tip's `.gitignore`) are applied when the
+page is built, so changing any of them needs no rebuild. The language is decided
+once per extension or well-known file name, not once per path.
+
+The chain is rewritten from the stored rows after every update and every
+segment merge, with no git read, and named in the same manifest as the set it
+is written for: a build, an append or a merge that cannot write it publishes
+nothing, and the set before it stays live. Its meta holds the manifest's order
+fingerprint and commit count. A chain written for another set (a reset, a
+rewritten history) is not read, and the page walks the records as before. A
+deepened shallow clone wipes the whole cache, chain included.
+
+Format numbers: the cache format (`VERSION`, `FORMAT_VERSION` in `store.rs`) is
+9 since the chain was added, after 8 for the message column. The container byte
+version inside each file (`seg/format.rs`) is a separate number. It moves only
+when the container bytes change, and is still 7.
 
 ## Routes
 

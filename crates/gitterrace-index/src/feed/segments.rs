@@ -416,6 +416,14 @@ impl<B: InsightsSource> InsightsSource for SegmentSource<B> {
             .map(SourceError)
             .or_else(|| self.base.failure())
     }
+
+    fn chain(&self, each: &mut dyn FnMut(&crate::feed::ChainStep)) -> bool {
+        self.base.chain(each)
+    }
+
+    fn chain_len(&self) -> Option<usize> {
+        self.base.chain_len()
+    }
 }
 
 #[cfg(test)]

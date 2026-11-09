@@ -12,6 +12,7 @@
 //! answers as absent. The index maps a remembered error to a rebuild, so
 //! a corrupt block never serves wrong data.
 
+mod chain;
 mod columns;
 mod record;
 mod scan;
@@ -20,7 +21,7 @@ mod writer;
 
 use std::sync::{Arc, Mutex, OnceLock};
 
-use crate::feed::disk::record::{hash32, hex, open_seg, parse, report};
+use crate::feed::disk::record::{hex, open_seg, parse, report};
 use crate::feed::{CommitRow, FileRow, IdentId, LabelId, Rank, Sums};
 use crate::seg::bounds::Cursor;
 use crate::seg::format::section;
@@ -150,6 +151,8 @@ pub struct DiskSource {
     broken: Mutex<Option<String>>,
     /// Set when stored sums added past u64 across commits ([`InsightsSource::failure`]).
     pub(super) over: crate::feed::SumOverflow,
+    /// The stored chain and its length when it was written for this set, see `crate::chain`.
+    chain: Option<(Container, u32)>,
 }
 
 impl DiskSource {
@@ -170,8 +173,13 @@ impl DiskSource {
             manifest,
             segments,
             strings,
+            chain,
             ..
         } = store;
+        let chain = match chain {
+            Some(c) => crate::chain::current(&c, &manifest)?.map(|n| (c, n)),
+            None => None,
+        };
         let mut segs = Vec::with_capacity(segments.len());
         let mut next = 0u32;
         let mut buf = Vec::new();
@@ -227,6 +235,7 @@ impl DiskSource {
             path_hash: OnceLock::new(),
             broken: Mutex::new(None),
             over: crate::feed::SumOverflow::new(),
+            chain,
         };
         let mut raw = Vec::with_capacity(counts[1].min(1 << 20) as usize);
         for id in 0..counts[1] {
@@ -568,15 +577,6 @@ impl DiskSource {
             }
         }
         Ok(None)
-    }
-
-    fn path_index(&self) -> SegResult<Vec<(u32, u32)>> {
-        let mut v = Vec::with_capacity(self.counts[0].min(1 << 22) as usize);
-        for id in 0..self.counts[0] {
-            v.push((hash32(&self.string(0, id)?), id));
-        }
-        v.sort_unstable();
-        Ok(v)
     }
 
     /// Every file row with its rank, for the aggregates this source answers on its own (the

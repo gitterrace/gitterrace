@@ -211,6 +211,8 @@ pub struct Store {
     pub order: Option<Container>,
     /// The message column's files in manifest order, empty when it is off.
     pub messages: Vec<Container>,
+    /// The stored first-parent chain, absent until the update after a build writes it.
+    pub chain: Option<Container>,
 }
 
 impl Store {
@@ -220,9 +222,15 @@ impl Store {
         let Some(manifest) = Manifest::load(dir)? else {
             return Ok(None);
         };
+        Self::of(dir, manifest).map(Some)
+    }
+
+    /// Opens the set `manifest` names, which need not be the published one: a merge reads its
+    /// staged set this way to write the chain before the manifest naming both goes live.
+    pub(crate) fn of(dir: &Path, manifest: Manifest) -> SegResult<Self> {
         manifest.verify(dir)?;
         let (mut segments, mut strings, mut order) = (Vec::new(), Vec::new(), None);
-        let mut messages = Vec::new();
+        let (mut messages, mut chain) = (Vec::new(), None);
         for f in &manifest.live {
             match Kind::from_u32(u32::from(f.kind)) {
                 Some(Kind::Segment) => segments.push(Container::open(dir, &f.name, Kind::Segment)?),
@@ -235,6 +243,12 @@ impl Store {
                 }
                 Some(Kind::Messages) => {
                     messages.push(Container::open(dir, &f.name, Kind::Messages)?);
+                }
+                Some(Kind::Chain) if chain.is_none() => {
+                    chain = Some(Container::open(dir, &f.name, Kind::Chain)?);
+                }
+                Some(Kind::Chain) => {
+                    return Err(SegError::unreadable(&f.name, 0, "second chain file"));
                 }
                 None => {}
             }
@@ -249,13 +263,14 @@ impl Store {
                 "order count differs from manifest",
             ));
         }
-        Ok(Some(Self {
+        Ok(Self {
             manifest,
             segments,
             strings,
             order,
             messages,
-        }))
+            chain,
+        })
     }
 
     /// Reads every block of every live container (forces every crc and bound check).
@@ -265,6 +280,7 @@ impl Store {
             .chain(&self.strings)
             .chain(&self.order)
             .chain(&self.messages)
+            .chain(&self.chain)
             .try_for_each(Container::check_all)
     }
 

@@ -46,6 +46,23 @@ const BY_NAME: &[(&str, &str)] = &[
     ("Procfile", "Config"),
 ];
 
+/// The part of `path` its language depends on.
+///
+/// `(true, extension)` when it has a usable extension and is no well-known name, else
+/// `(false, file name)`. Paths with one key have
+/// one language, so a caller over many paths asks [`language`] once per key, for the first
+/// path it meets with that key. The flag keeps the dotfile `.rs` apart from the extension.
+pub fn language_key(path: &str) -> (bool, &str) {
+    let name = path.rsplit('/').next().unwrap_or(path);
+    if BY_NAME.iter().any(|(n, _)| *n == name) {
+        return (false, name);
+    }
+    match name.rfind('.') {
+        Some(i) if i > 0 && i + 1 < name.len() => (true, &name[i + 1..]),
+        _ => (false, name),
+    }
+}
+
 /// Language of `path`: well-known file names first, then the extension. Unknown extensions
 /// are their own language (`.xyz`), dotfiles are `Config`, the rest `(no extension)`.
 pub fn language(path: &str) -> String {
@@ -75,7 +92,7 @@ pub fn language(path: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::language;
+    use super::{language, language_key};
 
     #[test]
     fn maps_extensions_and_known_names() {
@@ -87,5 +104,44 @@ mod tests {
         assert_eq!(language("a/b.xyz"), ".xyz");
         assert_eq!(language("types.d.ts"), "TypeScript");
         assert_eq!(language("a.tar.gz"), ".gz");
+    }
+
+    /// Paths with one key have one language, whatever comes before the key.
+    #[test]
+    fn paths_with_one_key_have_one_language() {
+        let paths = [
+            "src/a/main.RS",
+            "x/main.rs",
+            "lib.rs",
+            "a/Makefile",
+            "Makefile",
+            "b/Makefile.am",
+            ".gitignore",
+            "x/.gitignore",
+            "x/.prettierrc",
+            "README",
+            "docs/README",
+            "a/b.xyz",
+            "c.xyz",
+            "types.d.ts",
+            "x.ts",
+            "a.tar.gz",
+            "b.gz",
+            "dir.x/README",
+            "a.",
+            "b.",
+            "x/é.rs",
+            "..rs",
+            ".rs",
+            "rs",
+        ];
+        for p in paths {
+            for q in paths {
+                if language_key(p) == language_key(q) {
+                    assert_eq!(language(p), language(q), "{p} and {q}");
+                }
+            }
+        }
+        assert_eq!(language_key("x/y/main.rs"), language_key("lib.rs"));
     }
 }

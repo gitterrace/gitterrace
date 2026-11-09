@@ -68,8 +68,9 @@ fsynced, never opened for writing again.
 - `VERSION`: `FORMAT_VERSION` in `store.rs`, the version of the whole cache. The
   container version `VERSION` in `seg/format.rs` moves only when the container
   bytes change, so it can lag behind: format 8 added the message column (kind
-  4) and left containers at 7. Read first so a newer build's cache is
-  recognized without parsing anything else.
+  4) and format 9 the stored chain (kind 5), and both left containers at 7.
+  Read first so a newer build's cache is recognized without parsing anything
+  else.
 - `MANIFEST`: the only entry point. It names every live file with its length and
   CRC32, the generation, the canonical-order fingerprint (section 4), and a
   `retired` list. Written to `MANIFEST.tmp`, fsynced, renamed, then the
@@ -145,7 +146,7 @@ Container file:
 
 | Part   | Bytes                      | Fields                                                                              |
 | ------ | -------------------------- | ----------------------------------------------------------------------------------- |
-| Header | 16                         | magic `GTS1`, version u32, kind u32 (1 segment, 2 strings, 3 order, 4 messages), zero u32 |
+| Header | 16                         | magic `GTS1`, version u32, kind u32 (1 segment, 2 strings, 3 order, 4 messages, 5 chain), zero u32 |
 | Blocks | each at most 1 MiB         | payload only, back to back from offset 16                                           |
 | TOC    | 24 per entry, at most 4096 | section u16, zero u16, items u32, offset u64, len u32, crc u32 (of the payload)     |
 | Footer | 64, the last bytes         | see below                                                                           |
@@ -220,6 +221,21 @@ inflate, is `Unreadable`. Search decodes the blocks on up to 8 threads, runs
 the regex on `message \n name <email>` (the tip's mailmap applied to each
 distinct author once), replays git's newest-first commit-date walk over the
 stored times and parents, and reads from git only the commits it lists.
+
+Chain (kind 5, `chain-<gen>.gts`, cache format 9): the first-parent chain of
+the newest rank, newest first, in section 48. A step is rank u32, oid (20 B),
+raw author time i64, offset i32, then a varint row count and per file row the
+path id, added and removed lines as varints: the numbers the languages tally
+reads, keyed by path so the language and the path filter stay decided at read
+time. Section 49 is one 16 B meta item, written last: the manifest's order
+fingerprint u64, its commit count u32 and the step count u32. A chain whose
+fingerprint or count is not the manifest's is stale and not read. Every build,
+append and merge writes it again from the stored rows (no git read, one record
+decode per chain step) before its manifest goes live, and names it in that
+manifest, so no published set lacks its chain. On read the first rank must be
+the newest, each next rank lower, every path id below the string count and
+every count a u32, else `Unreadable`.
+On rust it is about 2% of the store.
 
 Manifest (`MANIFEST`, not a container, read whole, at most 1 MiB):
 

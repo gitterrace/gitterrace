@@ -6,13 +6,18 @@ use std::path::Path;
 
 use crate::cache;
 
+#[cfg(test)]
+pub(crate) use segments::merge_if_needed;
 pub(crate) use segments::{
-    MAX_SEGMENTS, SegmentBuild, append_segment, check_shallow, load_order, merge_if_needed, oid_of,
+    MAX_SEGMENTS, SegmentBuild, append_segment, check_shallow, load_order, merge_stored, oid_of,
     shallow_stale,
 };
 
 /// Cache format; a different one on disk discards the cache.
-pub const FORMAT_VERSION: &str = "8";
+///
+/// Format 9 added the stored chain. The container byte version (`seg::format::VERSION`) is
+/// separate and lags: it moves only when the container bytes change.
+pub const FORMAT_VERSION: &str = "9";
 pub(crate) const VERSION_FILE: &str = "VERSION";
 pub(crate) const LOCK_FILE: &str = "lock";
 pub(crate) const OWNER_FILE: &str = "owner";

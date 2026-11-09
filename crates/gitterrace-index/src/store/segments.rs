@@ -131,9 +131,17 @@ impl SegmentBuild {
             live,
             retired,
         };
-        m.commit(&self.dir)?;
+        publish(&self.dir, &mut m)?;
         Ok(m)
     }
+}
+
+/// Writes the chain of the set `m` names into it, then makes `m` the live manifest. Every
+/// writer of a new set goes through here, so no published set lacks the chain a one-step build
+/// holds, and a failed chain write publishes nothing: the old manifest stays live and whole.
+fn publish(dir: &Path, m: &mut crate::seg::manifest::Manifest) -> crate::seg::SegResult<()> {
+    crate::chain::stage(dir, m)?;
+    m.commit(dir)
 }
 
 /// Segments in a set before [`merge_if_needed`] folds them into one, so open files stay bounded.
@@ -255,7 +263,7 @@ pub(crate) fn append_segment<'r>(
         previous
             .live
             .iter()
-            .filter(|f| f.kind == kind(Kind::Order))
+            .filter(|f| f.kind == kind(Kind::Order) || f.kind == kind(Kind::Chain))
             .map(|f| f.name.clone()),
     );
     segs.push(seg);
@@ -272,7 +280,7 @@ pub(crate) fn append_segment<'r>(
         live,
         retired,
     };
-    m.commit(dir)?;
+    publish(dir, &mut m)?;
     Ok(m)
 }
 
@@ -328,6 +336,31 @@ pub(crate) fn merge_if_needed(
     }
     b.finish(Some(previous), extra).map_err(io::Error::other)?;
     Ok(true)
+}
+
+/// [`merge_if_needed`] with the records read from the set itself, raw as stored. The rows are
+/// opened at the first record, so under the merge's writer lock: opened before it, the set
+/// could be an older one that a foreground writer retires and sweeps meanwhile.
+pub(crate) fn merge_stored(
+    dir: &Path,
+    canonical: &[String],
+    shallow: &[String],
+) -> io::Result<bool> {
+    let mut rows: Option<crate::feed::DiskSource> = None;
+    merge_if_needed(dir, canonical, shallow, Vec::new(), &mut |id| {
+        let oid = oid_of(id).ok_or_else(|| io::Error::other(format!("merge: {id} not an oid")))?;
+        if rows.is_none() {
+            let store = crate::seg::read::Store::open(dir)
+                .map_err(crate::seg_io)?
+                .ok_or_else(|| io::Error::other("merge without a set"))?;
+            let open = crate::feed::DiskSource::open(store, &mut |p| Ok(p.to_vec()));
+            rows = Some(open.map_err(crate::seg_io)?);
+        }
+        let rows = rows.as_ref().ok_or_else(|| io::Error::other("no rows"))?;
+        rows.record_by_oid(&oid)
+            .map_err(crate::seg_io)?
+            .ok_or_else(|| io::Error::other(format!("merge: {id} not stored")))
+    })
 }
 
 /// Every live string delta read whole into interners, for an append that continues the ids.

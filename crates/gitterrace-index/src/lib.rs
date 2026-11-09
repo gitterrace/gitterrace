@@ -3,6 +3,7 @@
 //! by [`Insights`].
 
 mod cache;
+mod chain;
 mod conventional;
 pub mod feed;
 pub mod graph;
@@ -297,6 +298,7 @@ impl Index {
         let todo = todo(&order, &held);
         if todo.is_empty() {
             self.sync_messages(source)?;
+            chain::sync(&self.dir)?;
             if held.len() == order.len()
                 && let Some(t) = tip
             {
@@ -359,6 +361,7 @@ impl Index {
             build.finish(previous, Vec::new()).map_err(seg)?;
         }
         self.sync_messages(source)?;
+        chain::sync(&self.dir)?;
         // A skipped commit is not in the set, so it stays pending and the next update appends
         // it; until then HEAD's pages read the reach view, and the tip marker is not written.
         if read < total {
@@ -410,20 +413,7 @@ impl Index {
     fn merge_in_background(&self, order: &[String], shallow: &[String]) {
         let dir = self.dir.clone();
         let (order, shallow) = (order.to_vec(), shallow.to_vec());
-        let run = move || -> io::Result<bool> {
-            let seg = seg_io;
-            let Some(store) = seg::read::Store::open(&dir).map_err(seg)? else {
-                return Ok(false);
-            };
-            let rows = feed::DiskSource::open(store, &mut |p| Ok(p.to_vec())).map_err(seg)?;
-            store::merge_if_needed(&dir, &order, &shallow, Vec::new(), &mut |id| {
-                let oid = store::oid_of(id)
-                    .ok_or_else(|| io::Error::other(format!("merge: {id} not an oid")))?;
-                rows.record_by_oid(&oid)
-                    .map_err(seg)?
-                    .ok_or_else(|| io::Error::other(format!("merge: {id} not stored")))
-            })
-        };
+        let run = move || store::merge_stored(&dir, &order, &shallow);
         let spawned = std::thread::Builder::new()
             .name("gitterrace-merge".into())
             .spawn(move || {

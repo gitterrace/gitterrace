@@ -22,6 +22,8 @@ pub enum Kind {
     Order = 3,
     /// The message column of commit search (`messages.rs`).
     Messages = 4,
+    /// The first-parent chain of the tip and its line totals (`chain.rs`).
+    Chain = 5,
 }
 
 impl Kind {
@@ -31,6 +33,7 @@ impl Kind {
             2 => Some(Self::Strings),
             3 => Some(Self::Order),
             4 => Some(Self::Messages),
+            5 => Some(Self::Chain),
             _ => None,
         }
     }
@@ -67,6 +70,11 @@ pub mod section {
     pub const OID_INDEX: u16 = 36;
     /// Message items, zstd blocks, one item per rank (kind 4 only).
     pub const MESSAGES: u16 = 40;
+    /// One item per first-parent chain position, newest first (kind 5): rank u32, oid, raw
+    /// time i64, offset i32, row count varint, then path id, add and del varints per row.
+    pub const CHAIN: u16 = 48;
+    /// Chain file meta, written last: order fingerprint u64, commit count u32, length u32.
+    pub const CHAIN_META: u16 = 49;
 }
 
 /// Cumulative string counts a file was written against, checked on open so ids cannot shift.

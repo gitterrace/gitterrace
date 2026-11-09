@@ -235,4 +235,12 @@ impl InsightsSource for DiskSource {
             .map(SourceError)
             .or_else(|| self.over.failure())
     }
+
+    fn chain(&self, each: &mut dyn FnMut(&crate::feed::ChainStep)) -> bool {
+        self.stored_chain(each)
+    }
+
+    fn chain_len(&self) -> Option<usize> {
+        self.stored_chain_len()
+    }
 }
