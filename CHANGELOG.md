@@ -115,7 +115,7 @@ All notable changes are listed here. The format follows
 - web: compare sits under Commits and starts from the latest tag
 - dev: keep build, bench and agent dirs out of desktop search indexing
 - web: every chart hover gives the value, its share and the total
-- index: write file lives, life aggregates and merge counts in cache format 7
+- index: write file lives, life aggregates and merge counts
 - config: save a settings file safely, with each error at its line
 - config: every setting names the form input its type takes
 - web: routes that read, check and save the settings files
@@ -152,7 +152,7 @@ All notable changes are listed here. The format follows
 - api: the MCP server reads several repositories by name
 - web: git terrace mcp --served reads the repositories served before
 - Drop the year card
-- site: slim dark bar, docs outline rail and fleet footer
+- site: slim bar, docs outline rail and fleet footer
 - insights: count merge commits as a visible option
 - xtask: generate the plated mark from mark-dark.svg
 - brand: favicon shows the plate in light mode, the bare mark in dark
@@ -188,7 +188,7 @@ All notable changes are listed here. The format follows
 - brand: a lighter mark that sits with the line icons
 - web: a filter at the top of the repositories home narrows the list by name
 - web: the outline rail and its script are public, for the site to reuse
-- site: a slim dark bar on every page, from one template
+- site: a slim bar on every page, from one template
 - site: docs pages with three sections or more show the app's outline rail
 - index: keep commit messages in the index for commit search
 - web: the code outline names what each symbol is
@@ -208,11 +208,12 @@ All notable changes are listed here. The format follows
 - site: a short landing page: pitch, install, quickstart, screenshots, promises
 - xtask: the changelog lists what is unreleased, from the commits
 - site: diagrams drawn at build time, and tables and code that fit a phone
-- index: store the first-parent chain with its line counts in cache format 9
+- index: store the first-parent chain with its line counts
 - index: time each index step and fail the bench on an index over budget
 - bench: gate index memory on physical footprint, not RSS
 - site: the landing shows the overview under the tagline
 - actions: the starter file offers no tendir target
+- index: the first release starts the cache format at 1
 
 ### Changed
 
@@ -518,16 +519,7 @@ All notable changes are listed here. The format follows
 - web: the languages page reads the stored chain and no commit record
 - git: the index pairs only identical renames on a large merge
 - git: the repo id and the roots walk on an alternate's commit-graph
-<!-- BEGIN GENERATED: unreleased -->
-## [Unreleased]
-
-### Added
-
-- index: the first release starts the cache format at 1
-
-### Performance
-
 - web: the languages warm-up names chain paths in id order
 - web: concurrent requests for one cold page render it once
-
+<!-- BEGIN GENERATED: unreleased -->
 <!-- END GENERATED: unreleased -->
