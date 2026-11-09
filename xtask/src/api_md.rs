@@ -63,7 +63,6 @@ pub fn render() -> Out {
     s.push_str("\n### Parameters\n");
     for e in ENDPOINTS.iter().filter(|e| !e.params.is_empty()) {
         let _ = write!(s, "\n`{}`: {}\n\n", e.path, e.summary);
-        s.push_str("| Name | Type | Required | Description |\n| --- | --- | --- | --- |\n");
         for Param {
             name,
             ty,
@@ -71,8 +70,9 @@ pub fn render() -> Out {
             description,
         } in e.params
         {
-            let req = if *required { "yes" } else { "no" };
-            let _ = writeln!(s, "| `{name}` | {ty} | {req} | {description} |");
+            let req = if *required { ", required" } else { "" };
+            let item = format!("`{name}` ({ty}{req}): {description}");
+            let _ = writeln!(s, "{}", crate::out::wrap_item(&item));
         }
     }
 
@@ -91,8 +91,8 @@ pub fn render() -> Out {
          `git terrace mcp [paths]` reads only the repositories the paths name, \
          `git terrace mcp` the current one. With several in scope, \
          call `list_repos` and pass its `name` as `repo`. Stdio only: no port, read-only, and a \
-         name resolves only within the scope fixed at start.\n\n\
-         | Tool | Read-only | Description | Parameters |\n| --- | --- | --- | --- |\n",
+         name resolves only within the scope fixed at start. Every tool is read-only unless \
+         it says otherwise.\n\n",
     );
     for t in McpServer::tool_docs() {
         let params = t
@@ -104,9 +104,15 @@ pub fn render() -> Out {
             })
             .collect::<Vec<_>>()
             .join(", ");
-        let ro = if t.read_only { "yes" } else { "no" };
+        let ro = if t.read_only { "" } else { " Not read-only." };
         let desc = t.description.replace('\n', " ");
-        let _ = writeln!(s, "| `{}` | {ro} | {desc} | {params} |", t.name);
+        let args = if params.is_empty() {
+            String::new()
+        } else {
+            format!(" Parameters: {params}.")
+        };
+        let item = format!("`{}`: {desc}{ro}{args}", t.name);
+        let _ = writeln!(s, "{}", crate::out::wrap_item(&item));
     }
     s.push_str("\nA trailing `?` marks an optional parameter.\n");
     Out::file(PATH, s)
