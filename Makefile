@@ -91,7 +91,7 @@ lines:
 
 # keep: Every item with its prod and test callers, as TSV in target/keep-inventory.tsv
 keep:
-	python3 scripts/keep-report.py . --config config/keep-inventory.json --out target/keep-inventory.tsv
+	python3 scripts/keep-report.py . --config schwarzwald/config/keep-inventory.json --out target/keep-inventory.tsv
 
 ## gc: Prune cargo units and site-shots/app-icon output unused for DAYS (default 7). DRY=1 only reports, BENCH=1 also removes the cached benchmark clones
 gc:

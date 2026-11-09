@@ -2,8 +2,8 @@
 """Root guard (stdlib only), run by `make lint` and land-check.
 
 Every tracked top-level entry must be on ALLOWED. A new file or folder at the root fails
-here: put it under scripts/, tests/, docs/ or config/, or add it below with the tool that
-needs it there. Entries are listed once, grouped by why they stay at the root.
+here: put it under scripts/, tests/, docs/ or schwarzwald/config/, or add it below with the
+tool that needs it there. Entries are listed once, grouped by why they stay at the root.
 """
 
 import subprocess
@@ -48,7 +48,6 @@ ALLOWED = {
     "Dockerfile",
     # Make, and the code and content folders
     "Makefile",
-    "config",
     "crates",
     "docs",
     "schwarzwald",
