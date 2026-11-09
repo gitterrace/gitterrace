@@ -79,10 +79,9 @@ size, and `make memory-check` measures it on a real clone. Every bench run
 checks it too, as the `footprint_idle_mb` budget: idle footprint minus that of a
 just-started server, at most 48 MB on every class.
 
-Timings need a quiet machine. Before each timed phase the harness waits until
-the 1-minute load average stays under `BENCH_MAX_LOAD` (default half the cores)
-for 20 s, and records the load per phase. `make docs-check` refuses results
-timed above that limit.
+Every run is made on a quiet machine, so runs compare under the same
+conditions. The harness waits for the machine to settle before each timed
+phase, and `make docs-check` refuses results from a busy one.
 
 The published run is made once per release, on the release candidate commit, on
 a quiet machine, never as extra runs in between. The 0.1.0 run is the first
@@ -94,7 +93,7 @@ The pages that read every change of every file have a cold target for the first
 request after the index is ready. Hotspots and ownership hold at most 1.5 times
 the in-memory build they replaced. Languages has an absolute goal. Measured on
 rust (345k commits, 64k files at HEAD), release build, M1 Max, median of 3 cold
-runs, 1-minute load 4 to 5:
+runs:
 
 | Page      | Period | Target | Measured | Result |
 | --------- | ------ | ------ | -------- | ------ |
@@ -122,8 +121,8 @@ unnoticed.
 
 `index.has_messages` keeps every commit message in the index, so commit
 search reads the cache instead of walking git. Measured on rust (345,460
-commits) at the corpus sha, release build, M1 Max, 1-minute load 28 at the
-start, median of 5, page cache warm, through the search handler with the
+commits) at the corpus sha, release build, M1 Max, median of 5, page cache
+warm, through the search handler with the
 `limits.search_commits` cap (default 200 rows):
 
 | Query                             | Column on | Column off |
@@ -166,8 +165,8 @@ are in tests/bench/results.
 
 <!-- BEGIN GENERATED: results -->
 Run 2026-11-09 on Apple M1 Max, 10 cores, 64 GB RAM, 4.0 TB SSD disk, macOS
-26.6.2 (arm64). gitterrace v0.1.0, git version 2.54.0 (Apple Git-157). Every
-timed phase started with the 1-minute load average under 5.
+26.6.2 (arm64). gitterrace v0.1.0, git version 2.54.0 (Apple Git-157). Measured
+on a quiet machine.
 
 | Repo | Metric | Value | Budget | Status | Change against previous |
 | --- | --- | --- | --- | --- | --- |

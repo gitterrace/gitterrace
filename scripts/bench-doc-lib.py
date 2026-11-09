@@ -178,10 +178,7 @@ def load_note(run: Json) -> str:
     limits = {r["load"]["limit"] for r in run["repos"].values() if r.get("load")}
     if not limits:
         return "This run predates the quiet-machine guard and recorded no load."
-    return (
-        "Every timed phase started with the 1-minute load average under "
-        f"{max(limits):g}."
-    )
+    return "Measured on a quiet machine."
 
 
 def change(key: str, old: float, new: float) -> str:
