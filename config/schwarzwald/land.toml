@@ -25,16 +25,20 @@ test = "conventions"
 # Every saved-page test runs (found from tests/golden, so a new one needs no edit here), plus
 # the fast tree checks and the external linters; the message step covers the landed commits.
 [landing]
+# While the shared files move, $K is wherever they are, so the gate runs in either layout.
 gate = [
   "bash scripts/golden-run.sh",
-  "python3 shared/schwarzwald/lint/file-length.py",
+  """K=$(ls -d schwarzwald/kit shared/schwarzwald 2>/dev/null | head -1); \
+  python3 $K/lint/file-length.py""",
   "python3 scripts/names-check.py",
   # Generated docs, README blocks and site pages match their sources.
   "cargo xtask check",
-  "bash shared/schwarzwald/lint/run.sh",
+  """K=$(ls -d schwarzwald/kit shared/schwarzwald 2>/dev/null | head -1); \
+  bash $K/lint/run.sh""",
 ]
 # The landing runs in a fresh clone, which has no core.hooksPath yet: set it there first. The
 # dates of the landed commits are read by the shared commit-dates lint.
 messages = """git config core.hooksPath scripts/hooks \
   && bash scripts/land-check.sh --messages {base} \
-  && python3 shared/schwarzwald/lint/commit-dates.py --base {base}"""
+  && K=$(ls -d schwarzwald/kit shared/schwarzwald 2>/dev/null | head -1) \
+  && python3 $K/lint/commit-dates.py --base {base}"""
