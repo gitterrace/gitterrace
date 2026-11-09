@@ -286,3 +286,55 @@ impl InsightsSource for Walk {
         self.0.failure()
     }
 }
+
+/// A path whose net lines go negative over the chain (removed in a shallow history whose
+/// adding commit is not there) and a path added then deleted (net 0) stay out of the
+/// legend from the stored chain exactly as from the walk, and every line still sums.
+#[test]
+fn negative_and_net_zero_paths_stay_hidden_as_the_walk_hides_them() {
+    let id = |i: usize| format!("{i:040x}");
+    let commit = |i: usize, files: Vec<FileStat>| CommitRecord {
+        id: id(i),
+        author: "a".into(),
+        email: "a@x.io".into(),
+        time: 1_600_000_000 + i64::try_from(i).unwrap_or(0) * 3600,
+        parents: if i == 0 { vec![] } else { vec![id(i - 1)] },
+        files,
+        ..CommitRecord::default()
+    };
+    let gone = FileStat {
+        deleted: true,
+        ..file("gone.kt", 0, 5)
+    };
+    let mut recs = vec![
+        commit(0, vec![file("a.rs", 10, 0), file("gone.kt", 5, 0)]),
+        commit(1, vec![gone, file("old.go", 0, 7), file("b.py", 20, 0)]),
+    ];
+    // Past one mark gap, so the negative net crosses a mark too.
+    recs.extend((2..150).map(|i| commit(i, vec![file("a.rs", 1, 1)])));
+    let (_t, src) = set(recs);
+    assert!(src.chain_len().is_some(), "the index stored the chain");
+    let f = filter();
+    let stored = Arc::new(Skeleton::build(&*src, &f));
+    let walked = Arc::new(Skeleton::build(&Walk(Arc::clone(&src)), &f));
+    assert_eq!(stored.langs, walked.langs);
+    for hidden in ["Go", "Kotlin"] {
+        assert!(!stored.langs.iter().any(|l| l == hidden), "{hidden} shows");
+    }
+    let n = stored.len();
+    for range in [None, Some((0, 1)), Some((1, n - 1))] {
+        let a = stored.view(&*src, &f, view(range));
+        let b = walked.view(&*src, &f, view(range));
+        for i in wanted(n, range) {
+            assert_eq!(a.lines(i), b.lines(i), "lines at {i} for {range:?}");
+        }
+        assert_eq!((a.added, a.removed), (b.added, b.removed), "{range:?}");
+    }
+    let last = stored.view(&*src, &f, view(None)).lines(n - 1);
+    assert_eq!(
+        last.iter().sum::<i64>(),
+        10 + 20 - 7,
+        "no line is lost or wrapped"
+    );
+    assert!(src.failure().is_none());
+}
