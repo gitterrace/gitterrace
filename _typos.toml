@@ -1,6 +1,6 @@
 [files]
 # vendor and the theme snapshot are copies we do not edit; fonts and build output are not text.
-extend-exclude = ["shared/schwarzwald/**", "target/**", "**/vendor/**", "site/assets/**"]
+extend-exclude = ["schwarzwald/kit/**", "target/**", "**/vendor/**", "site/assets/**"]
 
 [default]
 extend-ignore-re = [

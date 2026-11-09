@@ -57,7 +57,7 @@ keeps a few MB more while idle.
 Install any tool it reports as missing.
 
 - typos (`_typos.toml`): misspellings in code and prose
-- vale (`.vale.ini`, `styles/gitterrace`): American spelling, no praise or
+- vale (`.vale.ini`, `schwarzwald/styles/gitterrace`): American spelling, no praise or
   history words, rules stated outright
 - gitleaks (`.gitleaks.toml`): committed secrets
 - markdownlint-cli2 (`.markdownlint-cli2.jsonc`): Markdown structure
@@ -82,11 +82,11 @@ the change was made. Run `git config core.hooksPath scripts/hooks` once so the
 message rules run on every commit.
 
 A change lands with
-`bash shared/schwarzwald/tools/land.sh <repo> <clone> <sha>`, one commit at a
+`bash schwarzwald/kit/tools/land.sh <repo> <clone> <sha>`, one commit at a
 time on main's tip. The checkout that takes landings marks itself once with
 `git config --local landing.target "$(git rev-parse --show-toplevel)"`. Its
 pre-commit hook then refuses a plain `git commit` (`MAIN_CHECKOUT_LANDS_ONLY`
-in `config/schwarzwald/guards.env`), so commit in a clone and land from it. A
+in `schwarzwald/config/guards.env`), so commit in a clone and land from it. A
 clone or a linked worktree is never refused.
 
 ## Before a pull request

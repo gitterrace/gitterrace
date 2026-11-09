@@ -35,13 +35,13 @@ done
   exit 1
 }
 
-# One value of config/schwarzwald/land.toml: `land_cfg oracle.crate`. A list prints one item
+# One value of schwarzwald/config/land.toml: `land_cfg oracle.crate`. A list prints one item
 # per line.
 land_cfg() {
   "$py" - "$1" <<'PY'
 import sys, tomllib
 section, key = sys.argv[1].split(".")
-with open("config/schwarzwald/land.toml", "rb") as f:
+with open("schwarzwald/config/land.toml", "rb") as f:
     v = tomllib.load(f)[section][key]
 print("\n".join(v) if isinstance(v, list) else v)
 PY
@@ -157,14 +157,14 @@ gate_commands_covered() {
   ((missing == 0))
 }
 
-LINTS="$PWD/shared/schwarzwald/lint"
+LINTS="$PWD/schwarzwald/kit/lint"
 
 # The message step: the shared lints over subject and body of every commit in $1..HEAD. Each
 # lint runs, so one log names every refusal; any refusal fails the step.
 message_lints() {
   local rc=0 rule
   for rule in internal-refs personal-data own-shas; do
-    echo "== $py shared/schwarzwald/lint/$rule.py --messages $1"
+    echo "== $py schwarzwald/kit/lint/$rule.py --messages $1"
     "$py" "$LINTS/$rule.py" --messages "$1" || rc=1
   done
   return "$rc"
@@ -360,10 +360,10 @@ if ((${#scope[@]})); then
   fi
 fi
 step make lines names
-step "$py" shared/schwarzwald/tools/ratchet-check.py --self-test
-step "$py" shared/schwarzwald/tools/ratchet-check.py --base "$base"
+step "$py" schwarzwald/kit/tools/ratchet-check.py --self-test
+step "$py" schwarzwald/kit/tools/ratchet-check.py --base "$base"
 step cargo test -p "$(land_cfg conventions.crate)" --test "$(land_cfg conventions.test)"
-step bash shared/schwarzwald/lint/run.sh
+step bash schwarzwald/kit/lint/run.sh
 step python3 scripts/root-check.py
 step make docs-check
 check_subjects "$base"

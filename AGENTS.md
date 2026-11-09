@@ -3,7 +3,7 @@
 Local, read-only git browser with insights.
 [Architecture](docs/architecture.md).
 
-Shared rules: `shared/schwarzwald/rules/rules.md`. They apply here in full.
+Shared rules: `schwarzwald/kit/rules/rules.md`. They apply here in full.
 
 ## Layout
 
@@ -36,7 +36,7 @@ HTTP. Nothing outside `gitterrace-git` imports `gix`.
   in `insights.rs`). Add unfiltered pages to `WARM_PAGES` in `lib.rs`.
 - No inline scripts beyond the hashed theme snippet: the CSP refuses them. JS
   lives in `static/`.
-- Never edit `shared/schwarzwald` or the generated block in `tokens.css`.
+- Never edit `schwarzwald/kit` or the generated block in `tokens.css`.
   `make theme` fails on drift. No raw color outside `tokens.css`.
 - Logic lives in Rust. Templates render values, they do not compute them.
 - Docs: `api.md`, `configuration.md` and every `GENERATED` block come from code
@@ -91,9 +91,9 @@ it lands. Real names, hosts and ids for the checks go in the gitignored
 repository.
 
 - `CONV-NO-INTERNAL-REFS`, `CONV-PERSONAL-DATA`, `CONV-NO-OWN-SHAS`: the shared
-  lints in `shared/schwarzwald/lint`, with gitterrace's values in
-  `config/schwarzwald/lint.toml` and the refused words in
-  `shared/schwarzwald/rules/deny.toml`. Each runs on its red and green case in
+  lints in `schwarzwald/kit/lint`, with gitterrace's values in
+  `schwarzwald/config/lint.toml` and the refused words in
+  `schwarzwald/kit/rules/deny.toml`. Each runs on its red and green case in
   `make lint`. Design docs (the `design` scope there) hold product design
   only: no work breakdown, owner or estimate section.
 - `test-names-describe-behavior` (ast-grep): a test is named by its behavior,
@@ -102,9 +102,9 @@ repository.
   message rules above, before a commit exists. `make lint` runs the shared hook
   test through the shim.
 - Tool-use guards: `scripts/guards/adapters/*.sh` exec the shared guards
-  (`shared/schwarzwald/guards`), with gitterrace's values in
-  `config/schwarzwald/guards.env`. `make lint` runs their selftest and adapters,
+  (`schwarzwald/kit/guards`), with gitterrace's values in
+  `schwarzwald/config/guards.env`. `make lint` runs their selftest and adapters,
   the red probes run with
-  `GUARDS_SELFTEST_PRODUCT=$PWD bash shared/schwarzwald/guards/tests/red.sh`.
-- Allowlists and counts only fall: `config/schwarzwald/ratchet.toml`, checked by
-  `shared/schwarzwald/tools/ratchet-check.py` in land-check.
+  `GUARDS_SELFTEST_PRODUCT=$PWD bash schwarzwald/kit/guards/tests/red.sh`.
+- Allowlists and counts only fall: `schwarzwald/config/ratchet.toml`, checked by
+  `schwarzwald/kit/tools/ratchet-check.py` in land-check.

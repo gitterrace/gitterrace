@@ -8,10 +8,10 @@
 # Rendered from docs/brand at deploy (scripts/site-render.mjs); the SVGs are the source.
 /site/assets/*.png
 
-# Vale: `vale sync` downloads proselint into styles/. Only styles/gitterrace is ours.
-/styles/*
-!/styles/gitterrace/
-!/styles/Schwarzwald
+# Vale: `vale sync` downloads proselint into schwarzwald/styles/. Only schwarzwald/styles/gitterrace is ours.
+/schwarzwald/styles/*
+!/schwarzwald/styles/gitterrace/
+!/schwarzwald/styles/Schwarzwald
 .DS_Store
 
 # Failure dumps from the equivalence oracle (debug output, never committed)
@@ -22,5 +22,5 @@ __pycache__/
 .ruff_cache/
 node_modules/
 
-# Local denylist of names, hosts and ids (the shared lints in shared/schwarzwald/lint)
+# Local denylist of names, hosts and ids (the shared lints in schwarzwald/kit/lint)
 /.personal-denylist

@@ -34,7 +34,6 @@ ALLOWED = {
     "cliff.toml",
     "ruff.toml",
     "sgconfig.yml",
-    "styles",
     # Editor and type checker configs, plus the web toolchain manifests
     "jsconfig.json",
     "pyrightconfig.json",
@@ -52,8 +51,8 @@ ALLOWED = {
     "config",
     "crates",
     "docs",
+    "schwarzwald",
     "scripts",
-    "shared",
     "site",
     "tests",
     "xtask",

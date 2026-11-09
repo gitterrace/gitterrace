@@ -36,12 +36,12 @@ OUTSIDE_HASHES = frozenset(
 # .mcp.json is local agent tooling config, not product content. The guard shims and guards.env
 # bind the shared guards to the agent harness, so they name its adapters and scratch dir.
 SKIP = (
-    "shared/schwarzwald/",
+    "schwarzwald/kit/",
     "Cargo.lock",
     ".mcp.json",
     "scripts/names-check.py",
     "scripts/guards/adapters/",
-    "config/schwarzwald/guards.env",
+    "schwarzwald/config/guards.env",
 )
 WORD = re.compile(r"[A-Za-z_]{4,}")
 

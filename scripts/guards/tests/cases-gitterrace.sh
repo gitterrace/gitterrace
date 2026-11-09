@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # gitterrace's cases, sourced by the shared selftest after its own when it runs on gitterrace
 # (GUARD_PRODUCT_CASES). gitterrace has no rules of its own: these prove the shared rules with
-# gitterrace's values in config/schwarzwald/guards.env, read from the fixture's copy of it.
+# gitterrace's values in schwarzwald/config/guards.env, read from the fixture's copy of it.
 
 # REPO, EVENT, UNSET_ENV and t come from the shared selftest that sources this file.
 # shellcheck disable=SC2154,SC2034
@@ -13,7 +13,7 @@ t BLOCK protected_files "$REPO" edit '{"file_path":"'"$REPO"'/crates/gitterrace-
 t BLOCK protected_files "$REPO" write '{"file_path":"'"$REPO"'/crates/gitterrace-web/tests/golden/revisions.txt"}' "a golden file, written only via TEST_BLESS"
 t BLOCK protected_files "$REPO" write '{"file_path":"'"$REPO"'/docs/api.md"}' "the generated api doc"
 t BLOCK protected_files "$REPO" write '{"file_path":"'"$REPO"'/docs/configuration.md"}' "the generated configuration doc"
-t BLOCK protected_files "$REPO" edit '{"file_path":"'"$REPO"'/shared/schwarzwald/tokens/theme-tokens.json"}' "the synced theme copy"
+t BLOCK protected_files "$REPO" edit '{"file_path":"'"$REPO"'/schwarzwald/kit/tokens/theme-tokens.json"}' "the synced theme copy"
 t ALLOW protected_files "$REPO" edit '{"file_path":"'"$REPO"'/crates/gitterrace-web/static/app.js"}' "a static file that is not vendored"
 t ALLOW protected_files "$REPO" edit '{"file_path":"'"$REPO"'/docs/architecture.md"}' "a hand-written doc"
 EVENT=post_tool

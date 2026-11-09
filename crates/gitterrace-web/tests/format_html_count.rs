@@ -54,7 +54,7 @@ fn walk(dir: &Path, n: &mut usize) {
 
 /// The `web_format_html` count of the ratchet registry.
 fn registered(root: &Path) -> usize {
-    let reg = std::fs::read_to_string(root.join("config/schwarzwald/ratchet.toml")).expect("reg");
+    let reg = std::fs::read_to_string(root.join("schwarzwald/config/ratchet.toml")).expect("reg");
     reg.lines()
         .find_map(|l| l.strip_prefix("web_format_html = "))
         .and_then(|v| v.trim().parse().ok())

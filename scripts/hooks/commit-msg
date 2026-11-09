@@ -1,4 +1,4 @@
 #!/usr/bin/env bash
-# The shared commit-msg hook (shared/schwarzwald/hooks), kept here so core.hooksPath stays one
+# The shared commit-msg hook (schwarzwald/kit/hooks), kept here so core.hooksPath stays one
 # dir:   git config core.hooksPath scripts/hooks
-exec "$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)/shared/schwarzwald/hooks/commit-msg" "$@"
+exec "$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)/schwarzwald/kit/hooks/commit-msg" "$@"

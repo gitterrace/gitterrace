@@ -1,0 +1,9 @@
+# The part of a typos config every product shares. typos reads one file and cannot extend another,
+# so each product's _typos.toml carries every entry below and drift.py fails when one is dropped
+# or changed. A product adds its own entries beside these.
+[files]
+extend-exclude = ["schwarzwald/kit/**", "target/**", "**/vendor/**"]
+
+[default.extend-words]
+# A valid spelling, not a typo of another word.
+unparseable = "unparseable"

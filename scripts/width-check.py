@@ -18,7 +18,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 COMMENT_EXTS = (".rs", ".py", ".mjs", ".js", ".sh")
-EXCLUDE = ("static/vendor/", "shared/schwarzwald/")
+EXCLUDE = ("static/vendor/", "schwarzwald/kit/")
 DOC_REF = re.compile(r"§|\b[Ss]ection \d+\.\d+|\bdesign (doc|section)")
 # `//` and `#` start a comment after whitespace or at line start. `://` and `#[` are not.
 COMMENT = re.compile(r"(?:^|\s)(?://+!?|#)(?=\s|$)(.*)$|^\s*\*(?!/)\s?(.*)$")

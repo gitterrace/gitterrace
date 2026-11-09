@@ -16,7 +16,7 @@
 #   scripts/golden-check.sh --self-test   (a planted change in one cell must report REAL 1)
 set -euo pipefail
 cd "$(dirname "$0")/.."
-# The oracle crate and test target come from config/schwarzwald/land.toml (tomllib, python 3.11+).
+# The oracle crate and test target come from schwarzwald/config/land.toml (tomllib, python 3.11+).
 py=""
 for c in python3 python3.15 python3.14 python3.13 python3.12 python3.11; do
   if command -v "$c" >/dev/null && "$c" -c 'import sys; sys.exit(sys.version_info < (3, 11))'; then
@@ -29,7 +29,7 @@ done
   exit 1
 }
 oracle_cfg() {
-  "$py" -c 'import sys, tomllib; print(tomllib.load(open("config/schwarzwald/land.toml", "rb"))["oracle"][sys.argv[1]])' "$1"
+  "$py" -c 'import sys, tomllib; print(tomllib.load(open("schwarzwald/config/land.toml", "rb"))["oracle"][sys.argv[1]])' "$1"
 }
 oracle_crate=$(oracle_cfg crate)
 oracle_test=$(oracle_cfg test)

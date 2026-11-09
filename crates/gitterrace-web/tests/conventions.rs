@@ -222,10 +222,10 @@ fn the_plural_scan_sees_what_it_should() {
 }
 
 /// Templates and modules still writing an h1 of their own, waiting to move onto the page head.
-/// `config/schwarzwald/own-heads.json`, a ratchet: it only shrinks, toward empty.
+/// `schwarzwald/config/own-heads.json`, a ratchet: it only shrinks, toward empty.
 fn own_heads() -> Option<Vec<String>> {
     let path =
-        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../config/schwarzwald/own-heads.json");
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../schwarzwald/config/own-heads.json");
     let v: serde_json::Value = serde_json::from_str(&fs::read_to_string(path).ok()?).ok()?;
     Some(
         v["own_heads"]
@@ -248,7 +248,7 @@ fn writes_h1(src: &str) -> bool {
 #[test]
 fn only_the_page_head_writes_an_h1() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let allowed = own_heads().expect("config/schwarzwald/own-heads.json lists own_heads");
+    let allowed = own_heads().expect("schwarzwald/config/own-heads.json lists own_heads");
     let mut found = Vec::new();
     for (dir, ext) in [("templates", "html"), ("src", "rs")] {
         let mut stack = vec![root.join(dir)];
@@ -283,7 +283,7 @@ fn only_the_page_head_writes_an_h1() {
     let moved: Vec<&String> = allowed.iter().filter(|f| !found.contains(f)).collect();
     assert!(
         moved.is_empty(),
-        "{moved:?} no longer write an h1: take them off config/schwarzwald/own-heads.json"
+        "{moved:?} no longer write an h1: take them off schwarzwald/config/own-heads.json"
     );
 }
 

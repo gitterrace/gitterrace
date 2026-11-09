@@ -33,7 +33,7 @@ the vendored theme.
 ## Decisions
 
 - **The theme is a snapshot, not a design.** Colors, type, space and motion come
-  only from `shared/schwarzwald/`, replaced as a whole, never edited.
+  only from `schwarzwald/kit/`, replaced as a whole, never edited.
   `scripts/theme-gen.py` writes the block in `tokens.css`. `make theme` fails on
   drift. Components use the role aliases, never a raw color, and charts are
   server-rendered SVG colored by class.

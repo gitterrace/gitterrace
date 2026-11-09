@@ -1,4 +1,4 @@
 #!/usr/bin/env bash
-# The shared pre-commit hook (shared/schwarzwald/hooks), kept here so core.hooksPath stays one
+# The shared pre-commit hook (schwarzwald/kit/hooks), kept here so core.hooksPath stays one
 # dir:   git config core.hooksPath scripts/hooks
-exec "$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)/shared/schwarzwald/hooks/pre-commit" "$@"
+exec "$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)/schwarzwald/kit/hooks/pre-commit" "$@"

@@ -28,14 +28,14 @@ clippy:
 
 ## lint: External linters (typos, vale, gitleaks, markdownlint, shellcheck, shfmt, ruff, pyright, tsc, actionlint, ast-grep, machete)
 lint: harness-links
-	bash shared/schwarzwald/lint/run.sh
+	bash schwarzwald/kit/lint/run.sh
 	python3 scripts/root-check.py
 
 # harness-links: The shared skills and agents are linked and harness.env names every key
 harness-links:
 	@set -e; h="$${HARNESS_KIT:-$(CURDIR)/../harness-kit}/source/harness/tools"; \
 	if [ ! -d "$$h" ]; then echo "harness missing: set HARNESS_KIT to the shared kit checkout" >&2; exit 1; fi; \
-	python3 "$$h/harness-env-check.py" config/schwarzwald/harness.env; \
+	python3 "$$h/harness-env-check.py" schwarzwald/config/harness.env; \
 	python3 "$$h/harness-link.py" --check || { echo "links missing: run python3 $$h/harness-link.py" >&2; exit 1; }
 
 ## test: All tests
@@ -50,7 +50,7 @@ doc:
 
 # theme: Snapshot matches its manifest, generated files match the snapshot
 theme:
-	python3 shared/schwarzwald/check.py
+	python3 schwarzwald/kit/check.py
 	python3 scripts/theme-gen.py --check
 	python3 scripts/theme-logo-gen.py --check
 	python3 scripts/theme-tagline-gen.py --check
@@ -111,7 +111,7 @@ gc-guard:
 ## changelog: Prepend the section for the release about to be tagged to CHANGELOG.md, from the commits since the last tag, in place of the generated Unreleased section (VERSION=x.y.z, needs git-cliff 2.14.2)
 changelog:
 	python3 -c 'import re,pathlib;p=pathlib.Path("CHANGELOG.md");p.write_text(re.sub(r"(<!-- BEGIN GENERATED: unreleased -->\n).*?(<!-- END GENERATED: unreleased -->)",r"\1\2",p.read_text(),flags=re.S))'
-	bash shared/schwarzwald/tools/changelog-gen.sh $(or $(VERSION),$(error VERSION=x.y.z is required))
+	bash schwarzwald/kit/tools/changelog-gen.sh $(or $(VERSION),$(error VERSION=x.y.z is required))
 
 ## check: Every gate (fmt, clippy, lint, test, doc, theme, actions, send-vectors, names, docs-check, gc-guard, bench-guard)
 check: gc-guard theme actions send-vectors names lines bench-guard docs-check fmt clippy lint test doc

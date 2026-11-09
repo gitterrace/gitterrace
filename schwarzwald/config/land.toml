@@ -1,0 +1,40 @@
+# The crate names scripts/land-check.sh and scripts/golden-check.sh run against. Data only,
+# read with tomllib. The scripts hold the steps, this file holds which crates they name.
+
+# The land-check self-test fixtures: an edit in `dependency_path` must select `dependency`
+# and `dependent`, and an edit in `leaf_path` must not select `dependency`.
+[selftest]
+dependency = "gitterrace-git"
+dependency_path = "crates/gitterrace-git/src/repo.rs"
+dependent = "gitterrace-web"
+leaf_path = "crates/gitterrace-web/src/lib.rs"
+
+# The output oracle: the test target in `crate` that renders every page against its golden.
+# It runs again as its own step when the selection holds a `trigger` crate or the workspace.
+[oracle]
+crate = "gitterrace-web"
+test = "equivalence_pages"
+triggers = ["gitterrace-web", "gitterrace-index"]
+
+# The conventions test over the whole tree.
+[conventions]
+crate = "gitterrace-testkit"
+test = "conventions"
+
+# The landing gate: land.sh runs it on the exact tree it is about to land, before main moves.
+# Every saved-page test runs (found from tests/golden, so a new one needs no edit here), plus
+# the fast tree checks and the external linters; the message step covers the landed commits.
+[landing]
+gate = [
+  "bash scripts/golden-run.sh",
+  "python3 schwarzwald/kit/lint/file-length.py",
+  "python3 scripts/names-check.py",
+  # Generated docs, README blocks and site pages match their sources.
+  "cargo xtask check",
+  "bash schwarzwald/kit/lint/run.sh",
+]
+# The landing runs in a fresh clone, which has no core.hooksPath yet: set it there first. The
+# dates of the landed commits are read by the shared commit-dates lint.
+messages = """git config core.hooksPath scripts/hooks \
+  && bash scripts/land-check.sh --messages {base} \
+  && python3 schwarzwald/kit/lint/commit-dates.py --base {base}"""

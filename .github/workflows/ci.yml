@@ -44,7 +44,7 @@ jobs:
       - if: github.event_name == 'pull_request'
         env:
           BASE: ${{ github.base_ref }}
-        run: git show "origin/${BASE}:config/schwarzwald/lint.toml" >config/schwarzwald/lint.toml
+        run: git show "origin/${BASE}:schwarzwald/config/lint.toml" >schwarzwald/config/lint.toml
       # The toolchain is pinned once, in rust-toolchain.toml: a floating `stable`
       # turns every new clippy lint into a red build nobody caused.
       - id: pin

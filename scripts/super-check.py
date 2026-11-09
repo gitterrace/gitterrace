@@ -4,7 +4,7 @@
 AGENTS.md names items by a `crate::` path. The ast-grep rule no-super-outside-tests sees only
 `use` declarations and macro bodies with a `use`, so this counts every other `super::` path
 in non-test Rust, in expressions and inside macro bodies too (it reads text, not a tree). The
-count lives in scripts/guards/super-paths.json, a ratchet that config/schwarzwald/ratchet.toml
+count lives in scripts/guards/super-paths.json, a ratchet that schwarzwald/config/ratchet.toml
 names, so a new guard needs no change to the shared check; ratchet-check.py fails when it
 rises, and this check fails when the tree holds more than the file allows or fewer (lower the
 count then).
