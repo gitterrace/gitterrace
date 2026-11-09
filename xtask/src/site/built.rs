@@ -334,7 +334,7 @@ fn chrome_problems(pages: &[(String, String)]) -> Vec<String> {
         version: &pkg.version,
         version_href: &version_href,
     };
-    let shared_footer = frame::footer(&site, "");
+    let shared_footer = frame::footer(&site, None);
     let mut bad = Vec::new();
     for (path, html) in pages {
         let Some(foot) = footer_of(html) else {

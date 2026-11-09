@@ -60,7 +60,6 @@ pub(super) fn page(site: &Site, links: &Links, text: &str) -> Out {
                 desc: "What changed in each release of gitterrace, written from the commits.",
                 path: PATH,
                 inner: &inner,
-                edit: CHANGELOG,
                 ..Body::default()
             },
         ),

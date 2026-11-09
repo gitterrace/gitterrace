@@ -1,5 +1,6 @@
 {#- The footer of every page: the same links in the same order on every page, so it
-never shifts. `edit` is the page's source file, empty for a page without one. -#}
+never shifts. A docs page adds its source last: "Edit on GitHub" for prose, "View source
+on GitHub" for a page generated from code, where an edit would be overwritten. -#}
 <footer>
 <a href="{{ repo }}">Repository</a>
 <a href="/docs/">Docs</a>
@@ -9,7 +10,11 @@ never shifts. `edit` is the page's source file, empty for a page without one. -#
 {%- endfor %}
 <a href="{{ repo }}/blob/main/LICENSE">{{ license }}</a>
 <a href="/{{ version_href }}">v{{ version }}</a>
-{%- if !edit.is_empty() %}
-<a class="edit" href="{{ repo }}/blob/main/{{ edit }}">Source of this page</a>
+{%- if let Some((file, generated)) = edit %}
+{%- if *generated %}
+<a class="edit" href="{{ repo }}/blob/main/{{ file }}">View source on GitHub</a>
+{%- else %}
+<a class="edit" href="{{ repo }}/edit/main/{{ file }}">Edit on GitHub</a>
+{%- endif %}
 {%- endif %}
 </footer>

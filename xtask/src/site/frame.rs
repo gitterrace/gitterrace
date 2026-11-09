@@ -30,8 +30,8 @@ pub(crate) struct Body<'a> {
     pub pager: &'a str,
     /// The "On this page" rail, empty for none.
     pub rail: &'a str,
-    /// The repository file the page is made from, for the footer's source link.
-    pub edit: &'a str,
+    /// A docs page's source file and whether it is generated, for the footer's edit link.
+    pub edit: Option<(&'a str, bool)>,
     /// Extra inline scripts after the theme button's; each is hashed into the CSP.
     pub scripts: Vec<String>,
     /// Keep the page out of search results (the 404).
@@ -79,11 +79,11 @@ struct Footer<'a> {
     license: &'a str,
     version: &'a str,
     version_href: &'a str,
-    edit: &'a str,
+    edit: Option<(&'a str, bool)>,
 }
 
-/// The footer of every page: the shared links, then the page's source when it has one.
-pub(crate) fn footer(site: &Site, edit: &str) -> String {
+/// The footer of every page: the shared links, then a docs page's source.
+pub(crate) fn footer(site: &Site, edit: Option<(&str, bool)>) -> String {
     let legal = crate::docs_index::LEGAL
         .iter()
         .map(|(rel, label)| (crate::site::docs::legal_path(rel), *label))
@@ -183,12 +183,17 @@ mod tests {
     }
 
     #[test]
-    fn every_page_gets_the_same_footer_and_only_a_sourced_page_names_its_source() {
-        let a = footer(&site(), "");
-        let b = footer(&site(), "docs/why.md");
+    fn every_page_gets_the_same_footer_and_a_docs_page_adds_its_edit_link() {
+        let a = footer(&site(), None);
+        let b = footer(&site(), Some(("docs/why.md", false)));
+        let c = footer(&site(), Some(("docs/cli.md", true)));
         assert!(b.starts_with(a.trim_end_matches("</footer>\n")), "{a}\n{b}");
         assert!(!a.contains("class=\"edit\""), "{a}");
-        assert!(b.contains("/blob/main/docs/why.md"), "{b}");
+        assert!(b.contains("/edit/main/docs/why.md\">Edit on GitHub"), "{b}");
+        assert!(
+            c.contains("/blob/main/docs/cli.md\">View source on GitHub"),
+            "{c}"
+        );
     }
 
     #[test]
