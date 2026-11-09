@@ -29,7 +29,7 @@ mod shared;
 mod sizes;
 mod stats;
 
-use std::sync::{Arc, OnceLock};
+use std::sync::{Arc, Mutex, OnceLock};
 
 pub(crate) use gitterrace_git::days_from_civil;
 use gitterrace_git::{IgnoreSet, civil_from_days as civil};
@@ -143,6 +143,18 @@ struct Derived {
     /// every statistic that sums a commit (sizes, rhythm, code frequency, contributors).
     commit_lines: OnceLock<Vec<Lines>>,
     follow: OnceLock<files::Follow>,
+    /// The period anchors of this history for the `now` they were read at, read once per
+    /// `now` instead of once per section (a scan of every commit column).
+    context: Mutex<Option<(i64, CountContext)>>,
+    /// Newest author time of the history, so [`feed::reference_time`] needs no scan while the
+    /// clock is past it (the usual case; a future-dated commit scans as before).
+    newest: OnceLock<i64>,
+    /// The stored tip touches grouped by tip name, `None` without a tip file: what every
+    /// per-file section slices (see [`files::TipIndex`]). Released with these tables on idle.
+    tip: OnceLock<Option<files::TipIndex>>,
+    /// Path ids of names looked up by the per-file pages (the head tree, 64k on rust), so a
+    /// page and its sections pay each lookup once per set, not once per call.
+    ids: Mutex<std::collections::HashMap<Arc<str>, Option<PathId>>>,
 }
 
 impl<'a> Insights<'a> {
@@ -182,7 +194,19 @@ impl<'a> Insights<'a> {
     }
 
     fn with(src: Src<'a>, opts: Options, d: Arc<Derived>) -> Self {
-        let now = feed::reference_time(src.get());
+        let newest = *d.newest.get_or_init(|| {
+            src.get()
+                .commits_in(CommitRange::All)
+                .map(|c| c.time)
+                .max()
+                .unwrap_or(0)
+        });
+        // The scan's answer when no commit is past the clock: the newest time.
+        let now = if newest <= feed::Clock::now(&feed::SystemClock) && newest >= 0 {
+            newest
+        } else {
+            feed::reference_time(src.get())
+        };
         Self { src, opts, now, d }
     }
 
@@ -224,9 +248,33 @@ impl<'a> Insights<'a> {
     /// the per-id table, decided once for all paths in parallel; a path it never saw (an
     /// untracked or brand-new name) is decided on its own.
     pub(crate) fn skips_head(&self, path: &str) -> bool {
-        self.source()
-            .path_id(path)
+        self.head_id(path)
             .map_or_else(|| self.d.filter.skips(path), |id| self.skips_id(id))
+    }
+
+    /// [`InsightsSource::path_id`] remembered per set: head names are asked for by every
+    /// per-file section. A storage error is recorded by the source and not remembered.
+    pub(crate) fn head_id(&self, path: &str) -> Option<PathId> {
+        if let Ok(g) = self.d.ids.lock()
+            && let Some(id) = g.get(path)
+        {
+            return *id;
+        }
+        let id = self.source().find_path(path);
+        let Ok(id) = id else {
+            return None;
+        };
+        if let Ok(mut g) = self.d.ids.lock() {
+            g.insert(path.into(), id);
+        }
+        id
+    }
+
+    /// Remembers the ids of `paths` in one pass (the warm-up gives it the head tree).
+    pub fn warm_paths<'p>(&self, paths: impl IntoIterator<Item = &'p str>) {
+        for p in paths {
+            let _ = self.head_id(p);
+        }
     }
 
     /// True when path statistics leave path `id` out.
@@ -288,28 +336,48 @@ impl<'a> Insights<'a> {
             return Lines::default();
         }
         let rank = c.rank;
-        self.d
-            .commit_lines
-            .get_or_init(|| {
-                let src = self.source();
-                let all: Vec<Rank> = (0..src.len()).map(rank_of).collect();
-                src.rows_for(all)
-                    .map(|(_, rows)| {
-                        rows.iter().filter_map(|r| self.row_lines(r)).fold(
-                            Lines::default(),
-                            |mut out, l| {
-                                out.add += l.add;
-                                out.del += l.del;
-                                out.rewritten += l.rewritten;
-                                out
-                            },
-                        )
-                    })
-                    .collect()
-            })
+        self.commit_lines()
             .get(rank.0 as usize)
             .copied()
             .unwrap_or_default()
+    }
+
+    /// The tip index, built on first use (the server's ready warm-up asks for it).
+    pub(crate) fn tip_index(&self) -> Option<&files::TipIndex> {
+        self.d
+            .tip
+            .get_or_init(|| files::TipIndex::build(self.source()))
+            .as_ref()
+    }
+
+    /// Builds the tables the per-file pages share, so the first visitor after the warm-up
+    /// does not pay them: the path filter's decisions, the anchors and the tip index.
+    pub fn warm_files(&self) {
+        let _ = self.skips_id(PathId(0));
+        let _ = self.context();
+        let _ = self.tip_index();
+        let _ = self.commit_lines();
+    }
+
+    /// [`Insights::commit_sums`] per rank, read from every file row once per set.
+    fn commit_lines(&self) -> &[Lines] {
+        self.d.commit_lines.get_or_init(|| {
+            let src = self.source();
+            let all: Vec<Rank> = (0..src.len()).map(rank_of).collect();
+            src.rows_for(all)
+                .map(|(_, rows)| {
+                    rows.iter().filter_map(|r| self.row_lines(r)).fold(
+                        Lines::default(),
+                        |mut out, l| {
+                            out.add += l.add;
+                            out.del += l.del;
+                            out.rewritten += l.rewritten;
+                            out
+                        },
+                    )
+                })
+                .collect()
+        })
     }
 
     pub(crate) fn follow(&self) -> &files::Follow {
@@ -370,6 +438,10 @@ impl Derived {
             skip: OnceLock::new(),
             commit_lines: OnceLock::new(),
             follow: OnceLock::new(),
+            context: Mutex::default(),
+            newest: OnceLock::new(),
+            tip: OnceLock::new(),
+            ids: Mutex::default(),
         }
     }
 }

@@ -232,6 +232,39 @@ pub struct CountContext {
     last_day: i64,
 }
 
+/// The period anchors of a shared set, memoized there: the one place besides a request's
+/// entry that builds a [`CountContext`], since every page of the set reads the same `now`.
+impl Insights<'_> {
+    /// [`CountContext::new`] over this history at this instance's clock, built once per set.
+    /// Every `Insights` over one shared set reads the same `now` (`with` derives it from the
+    /// same source), so the context is the same for all of them.
+    pub fn context(&self) -> CountContext {
+        if let Ok(g) = self.d.context.lock()
+            && let Some((now, cx)) = *g
+            && now == self.now
+        {
+            return cx;
+        }
+        let cx = CountContext::new(self.source(), &feed::FixedClock(self.now));
+        if let Ok(mut g) = self.d.context.lock() {
+            *g = Some((self.now, cx));
+        }
+        cx
+    }
+
+    /// The context `CountContext::new(src, clock)` gives, from the memo when `src` is this
+    /// history and `clock` reads the instant this instance was opened at.
+    pub fn context_for(&self, src: &dyn InsightsSource, clock: &dyn Clock) -> CountContext {
+        let same = std::ptr::addr_eq(std::ptr::from_ref(src), std::ptr::from_ref(self.source()));
+        // With the clock past the newest commit, the reference time is that commit's: no scan.
+        let newest = self.d.newest.get().copied();
+        if same && newest == Some(self.now) && clock.now() >= self.now && self.now >= 0 {
+            return self.context();
+        }
+        CountContext::new(src, clock)
+    }
+}
+
 impl CountContext {
     /// Reads `clock` once. An empty history anchors on day 0 and has no days.
     pub fn new(unscoped: &dyn InsightsSource, clock: &dyn Clock) -> Self {

@@ -29,12 +29,23 @@ pub(super) fn tables(
     at: (usize, usize),
     ignore: impl FnOnce() -> Option<IgnoreSet>,
 ) -> Arc<Derived> {
-    let hit = SHARED.lock().ok().and_then(|g| {
-        g.iter()
-            .find(|e| e.key == key && e.opts == *opts && e.at == at)
-            .map(|e| Arc::clone(&e.d))
-    });
-    hit.unwrap_or_else(|| {
+    let find = || {
+        SHARED.lock().ok().and_then(|g| {
+            g.iter()
+                .find(|e| e.key == key && e.opts == *opts && e.at == at)
+                .map(|e| Arc::clone(&e.d))
+        })
+    };
+    if let Some(d) = find() {
+        return d;
+    }
+    // One build per set: a page arriving while the warm-up builds waits for its tables
+    // instead of building a second copy beside it.
+    let _one = BUILDING.lock();
+    if let Some(d) = find() {
+        return d;
+    }
+    {
         let d = Arc::new(Derived::build(src, opts, ignore()));
         if let Ok(mut g) = SHARED.lock() {
             g.retain(|e| !(e.key == key && e.opts == *opts));
@@ -49,5 +60,8 @@ pub(super) fn tables(
             });
         }
         d
-    })
+    }
 }
+
+/// Held while a shared table set is built, see [`tables`].
+static BUILDING: Mutex<()> = Mutex::new(());

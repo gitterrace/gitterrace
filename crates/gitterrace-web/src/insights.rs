@@ -8,7 +8,7 @@ use axum::response::Html;
 use gitterrace_index::feed::InsightsSource;
 use gitterrace_index::feed::SystemClock;
 use gitterrace_index::{
-    CountContext, Counted, Insights, Metric, OptionParams, Options, Period, Scope, ScopeParams,
+    Counted, Insights, Metric, OptionParams, Options, Period, Scope, ScopeParams,
 };
 use serde::Deserialize;
 
@@ -245,11 +245,35 @@ pub(crate) fn insights<'a>(a: &App, src: &'a Src, o: Options) -> Insights<'a> {
         .flatten()
         .is_some_and(|tip| tip.holds(src));
     if full {
-        let key = format!("{}\u{0}{head}\u{0}{}", a.base, a.index.generation());
-        Insights::shared_source(&**src, o, &key, || ignore(a))
+        shared_at(a, src, &head, o)
     } else {
         Insights::from_source(&**src, o, ignore(a))
     }
+}
+
+/// The shared tables of the full set of `head`, see [`insights`].
+fn shared_at<'a>(a: &App, src: &'a Src, head: &str, o: Options) -> Insights<'a> {
+    let respect = o.respect_ignore;
+    let key = format!("{}\u{0}{head}\u{0}{}", a.base, a.index.generation());
+    Insights::shared_source(&**src, o, &key, || {
+        respect.then(|| a.ignore_set(head)).flatten()
+    })
+}
+
+/// Builds the tables every per-file page slices (path filter decisions, period anchors, the
+/// tip index, the head tree's path ids) for the default options at `head`. The refresh runs
+/// it before it marks the index ready, so the first page after ready finds them and never
+/// races their build. They go with the shared tables when the server idles.
+pub(crate) fn warm_shared(a: &App, head: &str) {
+    let Ok(Some(src)) = a.source_before_ready(head) else {
+        return;
+    };
+    let files = a.head_lines(head);
+    drop(src.run(|s| {
+        let ins = shared_at(a, s, head, a.defaults().into_options());
+        ins.warm_files();
+        ins.warm_paths(files.iter().map(|f| &*f.path));
+    }));
 }
 
 /// The page's [`Scope`]: its period, the URL's selection and options, through the constructor
@@ -267,7 +291,7 @@ pub(crate) fn page_scope(q: &InsightsQuery, d: &Defaults, period: Period) -> Sco
 
 /// The commits `scope` counts in `ins`, anchored on the whole source `all`.
 pub(crate) fn counted<'a>(ins: &'a Insights<'a>, scope: &'a Scope, all: &Src) -> Counted<'a> {
-    ins.counted(scope, CountContext::new(&**all, &SystemClock))
+    ins.counted(scope, ins.context_for(&**all, &SystemClock))
 }
 
 /// Text files of HEAD with line counts, the cache persisted under `.git/gitterrace`.

@@ -18,6 +18,95 @@ const PER_PATH_MAX: usize = 64;
 pub(super) const SOLO_SHARE: f64 = 0.8;
 pub(super) const STALE_SECS: i64 = 365 * crate::insights::DAY;
 
+/// One stored tip touch: commit rank, row in it, tip name, raw and whitespace-blind churn.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct Tipped {
+    pub rank: u32,
+    pub row: u32,
+    pub path: u32,
+    pub raw: u32,
+    pub code: u32,
+}
+
+/// The stored tip touches (`crate::tip`) grouped by tip name, newest commit first and rows
+/// ascending within one, plus the commit columns: what every per-file section slices, built
+/// once per set and dropped with the shared tables. About 20 B per touch (28 MB on rust).
+pub(crate) struct TipIndex {
+    /// Per tip path id, the start of its touches in `touches`; one past the end last.
+    start: Vec<u32>,
+    touches: Vec<Tipped>,
+    pub cols: Vec<CommitRow>,
+}
+
+impl TipIndex {
+    /// `None` when the source has no tip file for this set.
+    pub(crate) fn build(src: &dyn InsightsSource) -> Option<Self> {
+        if !src.has_tip() {
+            return None;
+        }
+        let cols: Vec<CommitRow> = src.commits_in(CommitRange::All).collect();
+        let mut count = vec![0u32; src.paths() + 1];
+        let mut flat: Vec<Tipped> = Vec::new();
+        let had = src.tip_touches(&mut |rank, rows| {
+            for (i, t) in rows.iter().enumerate() {
+                if let Some(n) = count.get_mut(t.path.0 as usize) {
+                    *n += 1;
+                }
+                flat.push(Tipped {
+                    rank: rank.0,
+                    row: u32::try_from(i).unwrap_or(u32::MAX),
+                    path: t.path.0,
+                    raw: t.raw,
+                    code: t.code,
+                });
+            }
+        });
+        if !had {
+            return None;
+        }
+        // Counting sort by path, ranks descending inside one: walk the flat list (ascending
+        // rank, rows ascending) backwards per commit.
+        let mut start = Vec::with_capacity(count.len() + 1);
+        let mut at = 0u32;
+        for n in &count {
+            start.push(at);
+            at += n;
+        }
+        start.push(at);
+        let mut fill = start.clone();
+        let mut touches = vec![
+            Tipped {
+                rank: 0,
+                row: 0,
+                path: 0,
+                raw: 0,
+                code: 0
+            };
+            flat.len()
+        ];
+        for group in flat.chunk_by(|a, b| a.rank == b.rank).rev() {
+            for t in group {
+                if let Some(f) = fill.get_mut(t.path as usize) {
+                    touches[*f as usize] = *t;
+                    *f += 1;
+                }
+            }
+        }
+        Some(Self {
+            start,
+            touches,
+            cols,
+        })
+    }
+
+    /// Touches of tip name `id`, newest commit first.
+    pub(crate) fn of(&self, id: PathId) -> Option<&[Tipped]> {
+        let i = id.0 as usize;
+        let (a, b) = (*self.start.get(i)?, *self.start.get(i + 1)?);
+        self.touches.get(a as usize..b as usize)
+    }
+}
+
 /// One change to a file, followed to its canonical (head) name.
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct TouchRaw {
@@ -224,8 +313,8 @@ impl Insights<'_> {
         keep: impl Fn(&CommitRow) -> bool,
     ) -> Vec<Vec<(TouchRaw, CommitRow)>> {
         if paths.len() > PER_PATH_MAX {
-            if self.source().has_tip() {
-                return self.touches_tip(paths, keep);
+            if let Some(tip) = self.tip_index() {
+                return self.touches_tip(tip, paths, keep);
             }
             return self.touches_scan(paths, keep);
         }
@@ -279,61 +368,43 @@ impl Insights<'_> {
             .collect()
     }
 
-    /// [`Insights::touches_scan`] from the stored tip touches (`crate::tip`): each row already
-    /// carries the name its file has at the indexed tip, so this reads one small item per commit
-    /// and follows no rename. The same touches in the same order; `TouchRaw::path` is the tip
+    /// [`Insights::touches_scan`] from the shared [`TipIndex`]: each touch already carries
+    /// the name its file has at the indexed tip, so this slices each head path's list and
+    /// follows no rename. The same touches in the same order; `TouchRaw::path` is the tip
     /// name, which no caller of the many-path read shows.
     fn touches_tip(
         &self,
+        tip: &TipIndex,
         paths: &[&str],
         keep: impl Fn(&CommitRow) -> bool,
     ) -> Vec<Vec<(TouchRaw, CommitRow)>> {
-        let src = self.source();
-        let mut first: FastMap<PathId, usize> = FastMap::default();
-        let mut copies: Vec<(usize, usize)> = Vec::new();
-        for (i, p) in paths.iter().enumerate() {
-            let Some(head) = src.path_id(p) else {
-                continue;
-            };
-            match first.get(&head) {
-                Some(&at) => copies.push((i, at)),
-                None => {
-                    first.insert(head, i);
-                }
-            }
-        }
-        let cols: Vec<CommitRow> = src.commits_in(CommitRange::All).collect();
         let raw = self.opts.count_whitespace;
-        let mut out: Vec<Vec<(TouchRaw, CommitRow)>> = vec![Vec::new(); paths.len()];
-        src.tip_touches(&mut |rank, rows| {
-            if rows.is_empty() {
-                return;
-            }
-            let Some(c) = cols.get(rank.0 as usize).filter(|c| !c.merge && keep(c)) else {
-                return;
-            };
-            for (i, t) in rows.iter().enumerate() {
-                let Some(&at) = first.get(&t.path) else {
-                    continue;
+        // A commit is kept or not for every path: decide it once.
+        let mut kept: Vec<Option<bool>> = vec![None; tip.cols.len()];
+        paths
+            .iter()
+            .map(|p| {
+                let Some(list) = self.head_id(p).and_then(|id| tip.of(id)) else {
+                    return Vec::new();
                 };
-                let touch = TouchRaw {
-                    commit: rank,
-                    row: u32::try_from(i).unwrap_or(u32::MAX),
-                    path: t.path,
-                    lines: if raw { t.raw } else { t.code },
-                };
-                out[at].push((touch, *c));
-            }
-        });
-        // Newest commit first, rows ascending: a stable sort keeps the row order of a commit.
-        for list in &mut out {
-            list.sort_by_key(|t| std::cmp::Reverse(t.0.commit));
-        }
-        for (i, at) in copies {
-            let copy = out[at].clone();
-            out[i] = copy;
-        }
-        out
+                list.iter()
+                    .filter_map(|t| {
+                        let c = tip.cols.get(t.rank as usize)?;
+                        let k = kept.get_mut(t.rank as usize)?;
+                        if !*k.get_or_insert_with(|| keep(c)) {
+                            return None;
+                        }
+                        let touch = TouchRaw {
+                            commit: Rank(t.rank),
+                            row: t.row,
+                            path: PathId(t.path),
+                            lines: if raw { t.raw } else { t.code },
+                        };
+                        Some((touch, *c))
+                    })
+                    .collect()
+            })
+            .collect()
     }
 
     /// Every non-merge touch of `path`, through renames, newest first: the cross-check's

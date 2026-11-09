@@ -2,9 +2,9 @@
 //! here they count non-merge commits by people who count under the options, over the files the
 //! path filter keeps, inside the period's window.
 
-use crate::feed::{CommitRow, FileRow, FixedClock, PathId, Rank};
+use crate::feed::{CommitRow, FileRow, PathId, Rank};
 use crate::insights::fasthash::FastMap;
-use crate::insights::{CountContext, Counted, Insights, Period, Scope, ScopeParams, Selection};
+use crate::insights::{Counted, Insights, Period, Scope, ScopeParams, Selection};
 
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
 pub struct FileChurn {
@@ -71,8 +71,7 @@ impl Insights<'_> {
 
     /// `f` over the commits `s` counts, with the context of [`Insights::in_period`].
     pub(crate) fn in_scope<T>(&self, s: &Scope, f: impl FnOnce(&Counted<'_>) -> T) -> T {
-        let cx = CountContext::new(self.source(), &FixedClock(self.now));
-        f(&self.counted(s, cx))
+        f(&self.counted(s, self.context()))
     }
 
     /// A scope of `period` (and the local `days`, both inclusive) over this history and its

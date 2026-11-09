@@ -41,6 +41,31 @@ impl App {
             self.demand();
             return Ok(None);
         }
+        self.open_set(key, head)
+    }
+
+    /// Opens and keeps the set of `head` without the ready check: the refresh builds the
+    /// tables the per-file pages share over it just before it marks the index ready.
+    pub(crate) fn source_before_ready(
+        &self,
+        head: &str,
+    ) -> Result<Option<crate::insights::CheckedSrc>> {
+        self.check_unreadable()?;
+        let key = (head.to_owned(), self.index.generation());
+        if let Ok(g) = self.caches.source.lock()
+            && let Some((k, s)) = g.as_ref()
+            && *k == key
+        {
+            return Ok(Some(s.share()));
+        }
+        self.open_set(key, head)
+    }
+
+    fn open_set(
+        &self,
+        key: (String, u64),
+        head: &str,
+    ) -> Result<Option<crate::insights::CheckedSrc>> {
         // HEAD (the rev the set was last built for) reads the segment files and holds no
         // history. Another commit reads the set plus what it lacks, read from git.
         if self.index.newer_format().is_none() {

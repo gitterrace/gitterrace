@@ -236,6 +236,14 @@ async fn refresh(app: &Arc<App>, rev: &str, warm: Option<&str>) {
         Err(e) => return tracing::warn!("index task failed: {e}"),
     }
     let Some(head) = warm else { return };
+    // The tables the per-file pages share, built before ready: the first page after ready
+    // reads them instead of racing their build (which doubled hotspots on rust).
+    let (a, h) = (Arc::clone(app), head.to_owned());
+    let _ = tokio::task::spawn_blocking(move || {
+        let _warm = a.warming();
+        crate::insights::warm_shared(&a, &h);
+    })
+    .await;
     app.mark_ready();
     app.warm_related();
     let (a, h) = (Arc::clone(app), head.to_owned());
