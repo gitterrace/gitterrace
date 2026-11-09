@@ -518,4 +518,10 @@ All notable changes are listed here. The format follows
 - git: the index pairs only identical renames on a large merge
 - git: the repo id and the roots walk on an alternate's commit-graph
 <!-- BEGIN GENERATED: unreleased -->
+## [Unreleased]
+
+### Fixed
+
+- bench: an export that stops at its page cap says so
+
 <!-- END GENERATED: unreleased -->

@@ -113,10 +113,13 @@ fn unreleased_only(text: &str, released: &HashSet<String>) -> String {
         if line.starts_with("### ") && !has_item(i) {
             continue;
         }
+        if line.is_empty() && out.ends_with("\n\n") {
+            continue;
+        }
         out.push_str(line);
         out.push('\n');
     }
-    out.replace("\n\n\n", "\n\n")
+    out
 }
 
 /// git-cliff's section with its heading kept and each list item wrapped with a hanging
@@ -175,6 +178,9 @@ mod tests {
         let cliff = "## [Unreleased]\n\n### Added\n\n- a long item\n- new\n\n### Fixed\n\n- b\n";
         let left = unreleased_only(cliff, &released);
         assert_eq!(left, "## [Unreleased]\n\n### Added\n\n- new\n\n");
+        let cliff = "## [Unreleased]\n\n### Added\n\n- a long item\n\n### Fixed\n\n- c\n";
+        let left = unreleased_only(cliff, &released);
+        assert_eq!(left, "## [Unreleased]\n\n### Fixed\n\n- c\n");
     }
 
     #[test]
