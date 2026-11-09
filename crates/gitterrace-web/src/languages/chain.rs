@@ -6,6 +6,8 @@
 //! positions it reads by walking from the nearest newer mark, at most one mark gap plus the
 //! commit list.
 
+mod build;
+
 use std::collections::{BTreeSet, HashMap};
 use std::sync::Arc;
 
@@ -34,9 +36,6 @@ pub(crate) struct Point {
     removed: u64,
 }
 
-/// Tally state at one commit: its rank, net lines per slot and the added and removed sums.
-type Snapshot = (Rank, Vec<i64>, u64, u64);
-
 /// The state after one commit, from which older positions are walked.
 struct Mark {
     rank: Rank,
@@ -63,72 +62,6 @@ pub(crate) struct Chain {
     /// Lines added and removed over the view's range (the whole chain without one).
     pub(super) added: u64,
     pub(super) removed: u64,
-}
-
-/// Net lines per language slot over the commits applied so far.
-struct Tally<'a> {
-    src: &'a dyn InsightsSource,
-    filter: &'a PathFilter,
-    names: Vec<String>,
-    slot: HashMap<String, usize>,
-    /// Language slot per path id, `None` when the path filter leaves it out.
-    lang_of: HashMap<PathId, Option<usize>>,
-    net: Vec<i64>,
-    added: u64,
-    removed: u64,
-}
-
-impl<'a> Tally<'a> {
-    fn new(src: &'a dyn InsightsSource, filter: &'a PathFilter) -> Self {
-        Self {
-            src,
-            filter,
-            names: Vec::new(),
-            slot: HashMap::new(),
-            lang_of: HashMap::new(),
-            net: Vec::new(),
-            added: 0,
-            removed: 0,
-        }
-    }
-
-    fn apply(&mut self, files: &[FileRow]) {
-        for f in files {
-            let s = if let Some(s) = self.lang_of.get(&f.path) {
-                *s
-            } else {
-                let s = self.slot_of(f.path);
-                self.lang_of.insert(f.path, s);
-                s
-            };
-            let Some(s) = s else {
-                continue;
-            };
-            self.net[s] += i64::from(f.add) - i64::from(f.del);
-            self.added += u64::from(f.add);
-            self.removed += u64::from(f.del);
-        }
-    }
-
-    fn slot_of(&mut self, id: PathId) -> Option<usize> {
-        let path = self.src.path(id).unwrap_or_default();
-        if self.filter.skips(&path) {
-            return None;
-        }
-        let l = gitterrace_index::language(&path);
-        if let Some(s) = self.slot.get(&l) {
-            return Some(*s);
-        }
-        self.names.push(l.clone());
-        self.net.push(0);
-        self.slot.insert(l, self.names.len() - 1);
-        Some(self.names.len() - 1)
-    }
-
-    /// The tally's current state, saved to be subtracted from the final totals.
-    fn snapshot(&self, rank: Rank) -> Snapshot {
-        (rank, self.net.clone(), self.added, self.removed)
-    }
 }
 
 /// The first-parent chain from `rank`, newest first.
@@ -172,82 +105,18 @@ fn rows_newest_first(
 }
 
 impl Skeleton {
-    /// Counts the chain, then streams its rows once, keeping the unranged view's positions
-    /// and one mark per gap.
-    pub(crate) fn build(src: &dyn InsightsSource, filter: &PathFilter) -> Self {
-        let newest = src
-            .len()
-            .checked_sub(1)
-            .map(|i| Rank(u32::try_from(i).unwrap_or(u32::MAX)));
-        // One walk: each step decodes a record and looks its parent up in the oid index, so
-        // counting and then streaming the chain walked it twice (1.3M steps on linux).
-        let chain: Vec<Rank> = walk(src, newest).collect();
-        let n = chain.len();
-        let gap = n.div_ceil(MARKS).max(MIN_GAP);
-        let want = wanted(n, None);
-        let mut tally = Tally::new(src, filter);
-        // Tally state over the commits newer than each kept position.
-        let mut fixed_raw: Vec<(usize, Snapshot)> = Vec::new();
-        let mut marks_raw: Vec<Snapshot> = Vec::new();
-        let mut pos = n;
-        rows_newest_first(src, chain, |r, files| {
-            pos -= 1;
-            if want.contains(&pos) {
-                fixed_raw.push((pos, tally.snapshot(r)));
-            }
-            if pos % gap == gap - 1 || pos == n - 1 {
-                marks_raw.push(tally.snapshot(r));
-            }
-            tally.apply(files);
-        });
-        let fold = Fold::new(&tally.names, &tally.net);
-        let total = (&tally.net, tally.added, tally.removed);
-        let after = |(_, newer, a, d): &Snapshot| {
-            let row: Vec<i64> = total
-                .0
-                .iter()
-                .enumerate()
-                .map(|(s, v)| v - newer.get(s).copied().unwrap_or(0))
-                .collect();
-            (fold.apply(&row), total.1 - a, total.2 - d)
-        };
-        // Marks were met newest first; the mark of gap `g` is wanted at index `g`.
-        marks_raw.reverse();
-        let marks = marks_raw
-            .iter()
-            .map(|m| {
-                let (lines, added, removed) = after(m);
-                Mark {
-                    rank: m.0,
-                    lines,
-                    added,
-                    removed,
-                }
-            })
-            .collect();
-        let fixed = fixed_raw
-            .iter()
-            .map(|(p, m)| {
-                let (lines, added, removed) = after(m);
-                (*p, point(src, m.0, lines, added, removed))
-            })
-            .collect();
-        Self {
-            n,
-            langs: fold.langs,
-            gap,
-            marks,
-            fixed,
-        }
-    }
-
     pub(crate) const fn len(&self) -> usize {
         self.n
     }
 
-    /// The oldest chain position whose local day is `first_day` or later, if any. One walk
-    /// over commit rows, no file rows.
+    /// The oldest chain position whose local day is `first_day` or later, if any. One read
+    /// of the stored chain, else one walk over commit rows; no file rows either way.
     pub(crate) fn first_from_day(&self, src: &dyn InsightsSource, first_day: i64) -> Option<usize> {
+        let mut days = Vec::with_capacity(self.n);
+        let day = gitterrace_index::feed::local_day_of;
+        if src.chain(&mut |s| days.push(day(s.time, s.offset))) && days.len() == self.n {
+            return first_from(days.into_iter(), self.n, first_day);
+        }
         let newest = src
             .len()
             .checked_sub(1)

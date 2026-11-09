@@ -4,7 +4,8 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use gitterrace_index::feed::{self, InsightsSource, MemorySource, Rank};
 use gitterrace_index::{CommitRecord, FileStat, Options, PathFilter};
 
-use super::{Fold, Skeleton, Tally, walk, wanted};
+use super::build::Tally;
+use super::{Fold, Skeleton, walk, wanted};
 use crate::languages::{Held, View};
 
 /// A linear history of `n` commits over a handful of languages, with deletions, a lock file
@@ -194,13 +195,13 @@ fn merged_history(n: usize) -> Vec<CommitRecord> {
 }
 
 /// A source that counts oid lookups and record reads, forwarding everything.
-struct Reads<'a> {
-    inner: MemorySource<'a>,
+struct Reads<S> {
+    pub(super) inner: S,
     lookups: AtomicUsize,
     records: AtomicUsize,
 }
 
-impl Reads<'_> {
+impl<S> Reads<S> {
     fn take(&self) -> (usize, usize) {
         (
             self.lookups.swap(0, Ordering::Relaxed),
@@ -209,7 +210,7 @@ impl Reads<'_> {
     }
 }
 
-impl InsightsSource for Reads<'_> {
+impl<S: InsightsSource + ?Sized> InsightsSource for Reads<&S> {
     fn len(&self) -> usize {
         self.inner.len()
     }
@@ -271,6 +272,12 @@ impl InsightsSource for Reads<'_> {
     fn failure(&self) -> Option<feed::SourceError> {
         self.inner.failure()
     }
+    fn chain(&self, each: &mut dyn FnMut(&feed::ChainStep)) -> bool {
+        self.inner.chain(each)
+    }
+    fn chain_len(&self) -> Option<usize> {
+        self.inner.chain_len()
+    }
 }
 
 /// The chain by oid lookups, one per step: the walk the page must agree with.
@@ -295,11 +302,11 @@ fn the_chain_walk_reads_each_record_a_bounded_number_of_times() {
     for n in [300, 3000] {
         let recs = merged_history(n);
         let src = Reads {
-            inner: MemorySource::new(&recs),
+            inner: &MemorySource::new(&recs),
             lookups: AtomicUsize::new(0),
             records: AtomicUsize::new(0),
         };
-        let want = chain_by_lookup(&src.inner);
+        let want = chain_by_lookup(src.inner);
         assert!(want.len() < n, "the fixture has side commits");
         src.take();
         let newest = Some(Rank(u32::try_from(n - 1).unwrap_or(0)));
@@ -350,3 +357,5 @@ fn views_match_the_full_chain_across_merges() {
         }
     }
 }
+
+mod stored;

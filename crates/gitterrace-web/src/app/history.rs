@@ -321,14 +321,14 @@ mod tests {
         }
     }
 
-    /// Zeroes every block byte of each segment in `cache`. Same length, so the set still
-    /// opens; a read of any block fails its check.
+    /// Zeroes every block byte of each segment and chain file in `cache`. Same length, so the
+    /// set still opens; a read of any block fails its check.
     fn zero_blocks(cache: &std::path::Path) {
         for e in std::fs::read_dir(cache).expect("ls").flatten() {
             let seg = e.path();
             let name = e.file_name().to_string_lossy().into_owned();
             let is_seg = seg.extension().is_some_and(|x| x == "gts");
-            if !(name.starts_with("seg-") && is_seg) {
+            if !((name.starts_with("seg-") || name.starts_with("chain-")) && is_seg) {
                 continue;
             }
             let mut bytes = std::fs::read(&seg).expect("read");
