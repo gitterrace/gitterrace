@@ -108,8 +108,9 @@ gc-guard:
 	@python3 scripts/target-run.py --auto
 	@python3 scripts/target-run.py --self-test
 
-## changelog: Prepend the section for the release about to be tagged to CHANGELOG.md, from the commits since the last tag (VERSION=x.y.z, needs git-cliff 2.14.2)
+## changelog: Prepend the section for the release about to be tagged to CHANGELOG.md, from the commits since the last tag, in place of the generated Unreleased section (VERSION=x.y.z, needs git-cliff 2.14.2)
 changelog:
+	python3 -c 'import re,pathlib;p=pathlib.Path("CHANGELOG.md");p.write_text(re.sub(r"(<!-- BEGIN GENERATED: unreleased -->\n).*?(<!-- END GENERATED: unreleased -->)",r"\1\2",p.read_text(),flags=re.S))'
 	bash shared/schwarzwald/tools/changelog-gen.sh $(or $(VERSION),$(error VERSION=x.y.z is required))
 
 ## check: Every gate (fmt, clippy, lint, test, doc, theme, actions, send-vectors, names, docs-check, gc-guard, bench-guard)

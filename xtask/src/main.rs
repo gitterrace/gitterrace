@@ -8,6 +8,7 @@
 
 mod action_scripts;
 mod api_md;
+mod changelog_md;
 mod cli_md;
 mod config_md;
 mod docs_index;
@@ -43,8 +44,9 @@ enum Cmd {
     DeployCheck,
 }
 
-/// Every generator. A new one is checked by being listed here.
-fn generators(root: &Path) -> Result<Vec<Out>> {
+/// Every generator. A new one is checked by being listed here. `refresh` is false for
+/// `check`, where a block made from the commits keeps its text (see `changelog_md`).
+fn generators(root: &Path, refresh: bool) -> Result<Vec<Out>> {
     let ws = facts::load(root)?;
     let scripts = action_scripts::load(root)?;
     let mut outs = vec![
@@ -57,6 +59,7 @@ fn generators(root: &Path) -> Result<Vec<Out>> {
     outs.extend(readme_agents_md::render(&ws, &scripts));
     outs.extend(docs_md::render(root, &ws, &scripts)?);
     outs.extend(plate::outs(root, plate::PLATE_COLOR)?);
+    outs.extend(changelog_md::render(root, refresh)?);
     outs.extend(site::render(root, &ws)?);
     Ok(outs)
 }
@@ -65,13 +68,22 @@ fn main() -> Result<()> {
     let root = repo_root();
     match Cli::parse().cmd {
         Cmd::Generate => {
-            for path in apply(&root, generators(&root)?, Mode::Write)? {
-                println!("  wrote {path}");
+            // The site reads the documents from disk, so a block written in this pass shows
+            // on its page in the next. Two passes settle it; a third change is a bug.
+            for pass in 0..3 {
+                let wrote = apply(&root, generators(&root, true)?, Mode::Write)?;
+                for path in &wrote {
+                    println!("  wrote {path}");
+                }
+                if wrote.is_empty() {
+                    break;
+                }
+                anyhow::ensure!(pass < 2, "generate does not settle: {}", wrote.join(", "));
             }
             println!("generate: done");
         }
         Cmd::Check => {
-            let outs = generators(&root)?;
+            let outs = generators(&root, false)?;
             let orphans = unowned_blocks(&root, &outs)?;
             if !orphans.is_empty() {
                 println!("generated blocks nobody fills: {}", orphans.join(", "));
