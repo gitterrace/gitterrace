@@ -52,7 +52,7 @@ SHORT = {
     "page_cold_ms": "cold page",
     "index_secs": "index build",
     "idle_cpu_pct": "idle CPU",
-    "rss_mb": "peak physical footprint (index peak or after pages)",
+    "rss_mb": "peak memory",
     "footprint_idle_mb": "idle footprint above a fresh server",
     "export_secs": "export",
 }
