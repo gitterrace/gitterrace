@@ -56,7 +56,7 @@ Building with cargo needs Rust 1.96 or newer.
 <!-- BEGIN GENERATED: quickstart -->
 ```bash
 cd path/to/any/git/repo
-git terrace          # serves on 127.0.0.1 and opens your browser
+git terrace          # serves on http://127.0.0.1:4242, open it in your browser
 cd ../another/repo
 git terrace          # joins the server already running, no second port
 ```

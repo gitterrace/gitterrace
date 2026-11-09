@@ -523,5 +523,6 @@ All notable changes are listed here. The format follows
 ### Fixed
 
 - bench: an export that stops at its page cap says so
+- xtask: a dropped changelog heading leaves one blank line
 
 <!-- END GENERATED: unreleased -->

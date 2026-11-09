@@ -24,7 +24,7 @@ const START: &str = "docs/getting-started.md";
 
 /// The first run, the same in the README, on the getting started page and on the landing page.
 pub const QUICKSTART: &str = "cd path/to/any/git/repo
-git terrace          # serves on 127.0.0.1 and opens your browser
+git terrace          # serves on http://127.0.0.1:4242, open it in your browser
 cd ../another/repo
 git terrace          # joins the server already running, no second port
 ";
