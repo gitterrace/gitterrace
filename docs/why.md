@@ -46,19 +46,17 @@ same repository.
 ## What it does with your code
 
 - It serves on `127.0.0.1:4242` by default, so only your machine can reach it.
-  Serving beyond loopback needs `--public`, which is read-only, as
-  [running it online](online.md) describes.
-- It sends nothing anywhere: no telemetry and no update check. Its pages load
-  nothing from outside, and their content security policy allows only the server
-  itself.
+  Serving beyond loopback needs `--public`, which is read-only
+  ([running it online](online.md)).
+- It sends nothing anywhere: no telemetry, no update check, and its pages load
+  nothing from outside.
 - It reads the repository and never changes its files or history.
-- It writes a disposable cache under `.git/gitterrace/`, plus one line in
-  `.git/info/exclude` when you export into the worktree. Outside the repository
-  it writes only your config and a state folder: the repositories you served and
-  the token that guards adding one.
+- It writes only a disposable cache under `.git/gitterrace/` (plus one line in
+  `.git/info/exclude` when you export into the worktree), your config and a
+  state folder.
 
-[SECURITY.md](../SECURITY.md) lists each promise and what counts as a
-vulnerability.
+The [security model](security.md) shows which check holds each promise, and
+[SECURITY.md](../SECURITY.md) says how to report a vulnerability.
 
 ## What it is not
 

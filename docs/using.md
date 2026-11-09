@@ -4,6 +4,9 @@ What the pages offer once `git terrace` runs, and how to reach each part.
 
 ## Serving many repositories
 
+One server shows many repositories: one address, a switcher between them, and
+links that stay valid as others join.
+
 Give several paths, or a folder that holds repositories:
 
 ```sh

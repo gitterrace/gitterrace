@@ -525,18 +525,18 @@ fn a_footer_version_without_its_changelog_heading_is_reported() {
 }
 
 /// Whether the landing page has the safety section, with the default address the code uses and
-/// the link to SECURITY.md in the repository.
+/// a link to the security model page.
 fn safety_problems(landing: &str, addr: &str) -> Vec<String> {
     let mut bad = Vec::new();
-    let Some((_, rest)) = landing.split_once("<h2>What it does with your code</h2>") else {
+    let Some((_, rest)) = landing.split_once(">What it does with your code</h2>") else {
         return vec!["the landing page has no \"What it does with your code\" section".to_owned()];
     };
     let section = rest.split("<h2>").next().unwrap_or("");
     if !section.contains(&format!("<code>{addr}</code>")) {
         bad.push(format!("the safety section does not name {addr}"));
     }
-    if !section.contains("/blob/main/SECURITY.md") {
-        bad.push("the safety section does not link SECURITY.md in the repository".to_owned());
+    if !section.contains("href=\"/docs/security/\"") {
+        bad.push("the safety section does not link the security model page".to_owned());
     }
     bad
 }

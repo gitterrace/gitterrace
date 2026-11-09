@@ -1,0 +1,66 @@
+{#- The landing page body: the pitch, how to start, what it looks like and what it does
+with your code. Every sentence comes from docs/ or from the code; the long story lives on
+the Why page. The install tabs are radio inputs and CSS, so they need no script, and with
+CSS off every command still shows. A screenshot opens as a :target overlay, also without
+script; its full-size image is a decorative copy, so the description is read once. Light
+and dark are two lazy images, one hidden by the theme, so only the shown one loads. -#}
+<div class="hero">
+<h1><img class="on-light" src="/assets/logo-light.svg" alt="{{ name }}" width="540" height="120"
+loading="lazy">
+<img class="on-dark" src="/assets/logo-dark.svg" alt="" width="540" height="120"
+loading="lazy"></h1>
+<p class="lead">{{ pitch }}</p>
+{%- if !demo.is_empty() %}
+<p class="demo"><a href="{{ demo }}">Try the live demo</a>, no install needed.</p>
+{%- endif %}
+</div>
+<section>
+<h2 id="install">Install</h2>
+<div class="tabs">
+{%- for (way, _) in install %}
+<input type="radio" name="install" id="install-{{ way }}" class="tab-radio"
+{%- if loop.first %} checked{% endif %}>
+<label for="install-{{ way }}" class="tab-label">{{ way }}</label>
+{%- endfor %}
+{%- for (way, line) in install %}
+<div class="tab-panel" id="panel-{{ way }}"><pre><code>{{ line }}</code></pre></div>
+{%- endfor %}
+</div>
+<p>Installs <code>{{ bin }}</code>; git runs it as <code>git terrace</code>.
+{%- for r in requires %} {{ r }}.{% endfor %}</p>
+</section>
+<section>
+<h2 id="quickstart">Quickstart</h2>
+<pre><code>{{ quickstart }}</code></pre>
+<p class="more"><a href="/docs/getting-started/">Getting started</a> covers Windows,
+upgrading and troubleshooting. <a href="/docs/cli/">All commands</a>.</p>
+</section>
+<section id="features">
+<h2>What it does</h2>
+<div class="shots">
+{%- for (file, alt, cap, what) in shots %}
+<figure><a href="#shot-{{ file }}"><span class="shot">
+<img class="on-light" src="/assets/screenshots/{{ file }}-light.thumb.webp" alt="{{ alt }}"
+width="1280" height="800" loading="lazy" decoding="async">
+<img class="on-dark" src="/assets/screenshots/{{ file }}-dark.thumb.webp" alt=""
+width="1280" height="800" loading="lazy" decoding="async"></span></a>
+<a class="lightbox" id="shot-{{ file }}" href="#features" aria-label="Close {{ cap }}"
+tabindex="-1"><span class="shot">
+<img class="on-light" src="/assets/screenshots/{{ file }}-light.webp" alt=""
+width="1280" height="800" loading="lazy" decoding="async">
+<img class="on-dark" src="/assets/screenshots/{{ file }}-dark.webp" alt=""
+width="1280" height="800" loading="lazy" decoding="async"></span></a>
+<figcaption><b>{{ cap }}.</b> {{ what }}</figcaption></figure>
+{%- endfor %}
+</div>
+<ul class="lines">
+{%- for (title, href, text) in lines %}
+<li><b><a href="/{{ href }}">{{ title }}</a>.</b> {{ text }}</li>
+{%- endfor %}
+</ul>
+</section>
+<section>
+<h2 id="your-code">What it does with your code</h2>
+{{ promises|safe }}<p class="more"><a href="/docs/why/">Why we built it</a>, and how it
+compares with the tools you know.</p>
+</section>
