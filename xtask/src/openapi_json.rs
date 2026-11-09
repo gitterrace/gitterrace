@@ -37,7 +37,7 @@ pub fn render(ws: &Workspace) -> Out {
                 default `HEAD`). Each repository's API lives at `/r/{name}/api/v1`."
         },
         "servers": [{
-            "url": "http://127.0.0.1:4242/r/{name}/api/v1",
+            "url": format!("http://{}/r/{{name}}/api/v1", gitterrace_config::DEFAULT_ADDR),
             "description": "the default address",
             "variables": { "name": { "default": "repo", "description": "the repository's URL \
             name" } }

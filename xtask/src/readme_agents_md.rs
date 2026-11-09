@@ -23,11 +23,16 @@ const README: &str = "README.md";
 const START: &str = "docs/getting-started.md";
 
 /// The first run, the same in the README, on the getting started page and on the landing page.
-pub const QUICKSTART: &str = "cd path/to/any/git/repo
-git terrace          # serves on http://127.0.0.1:4242, open it in your browser
-cd ../another/repo
-git terrace          # joins the server already running, no second port
-";
+/// The address is the config default, so the docs cannot name another.
+pub fn quickstart() -> String {
+    let addr = gitterrace_config::DEFAULT_ADDR;
+    format!(
+        "cd path/to/any/git/repo\n\
+         git terrace          # serves on http://{addr}, open it in your browser\n\
+         cd ../another/repo\n\
+         git terrace          # joins the server already running, no second port\n"
+    )
+}
 
 pub fn render(ws: &Workspace, scripts: &[Script]) -> Vec<Out> {
     let bin = ws.packages.get("gitterrace");
@@ -100,9 +105,9 @@ pub fn demo_md(ws: &Workspace) -> String {
     )
 }
 
-/// [`QUICKSTART`] as a fenced block.
+/// [`quickstart`] as a fenced block.
 fn quickstart_md() -> String {
-    format!("```bash\n{QUICKSTART}```\n")
+    format!("```bash\n{}```\n", quickstart())
 }
 
 /// One screenshot, light and dark, from the same list the site uses.
