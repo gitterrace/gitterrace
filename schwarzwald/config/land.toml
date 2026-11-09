@@ -26,6 +26,8 @@ test = "conventions"
 # the fast tree checks and the external linters; the message step covers the landed commits.
 [landing]
 gate = [
+  # Unformatted Rust never lands. The cheapest check runs first.
+  "cargo fmt --all --check",
   "bash scripts/golden-run.sh",
   "python3 schwarzwald/kit/lint/file-length.py",
   "python3 scripts/names-check.py",
