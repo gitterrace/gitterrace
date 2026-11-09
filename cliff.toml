@@ -23,7 +23,15 @@ body = """
 ### {{ group | striptags | trim | upper_first }}
 
 {% for commit in commits %}\
-- {% if commit.scope %}{{ commit.scope }}: {{ commit.message }}{% else %}{{ commit.message | upper_first }}{% endif %}
+{% if commit.scope %}{% set_global m = commit.scope ~ ": " ~ commit.message %}\
+{% else %}{% set_global m = commit.message | upper_first %}{% endif %}\
+{% set_global col = 2 %}- \
+{% for w in m | split(pat=" ") %}\
+{% set n = w | length %}{% if not loop.first and col + 1 + n > 80 %}
+{{ "  " }}{% set_global col = 2 %}\
+{% elif not loop.first %} {% set_global col = col + 1 %}{% endif %}\
+{{ w }}{% set_global col = col + n %}\
+{% endfor %}
 {% endfor %}\
 {% endfor %}
 """
