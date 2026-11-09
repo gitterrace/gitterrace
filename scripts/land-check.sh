@@ -20,6 +20,7 @@ set -euo pipefail
 # would override what the self-test and hook-test fixture repos configure themselves.
 unset GIT_CONFIG_COUNT
 cd "$(dirname "$0")/.."
+VALE_INI=$PWD/.vale.ini
 
 # The shared lints read tomllib: the first python3 that is 3.11 or newer.
 py=""
@@ -115,15 +116,26 @@ changed_paths() {
   } | sort -u
 }
 
-# Fails on any commit in BASE..HEAD whose subject is not type(scope): subject.
+# Fails on any commit in BASE..HEAD whose subject is not type(scope): subject, or whose subject
+# breaks the spelling and word rules CHANGELOG.md is held to: git-cliff copies subjects there,
+# so a British spelling or a banned word in one fails vale on the generated file.
 check_subjects() {
-  local bad=0 line
+  local bad=0 line d
   while IFS= read -r line; do
     if [[ ! $line =~ $SUBJECT ]]; then
       echo "subject does not read type(scope): subject: $line" >&2
       bad=1
     fi
   done < <(git log --format=%s "$1"..HEAD)
+  d=$(mktemp -d)
+  git log --format='- %s' "$1"..HEAD >"$d/CHANGELOG.md"
+  if [[ -s $d/CHANGELOG.md ]] &&
+    ! (cd "$d" && vale --config="$VALE_INI" --output=line \
+      --filter='.Name in ["Schwarzwald.American","Schwarzwald.NoFallback"]' CHANGELOG.md) >&2; then
+    echo "a subject breaks the CHANGELOG spelling rules (vale, above)" >&2
+    bad=1
+  fi
+  rm -r "$d"
   return "$bad"
 }
 
@@ -213,6 +225,15 @@ self_test() {
     echo "self-test: a subject without a type passed" >&2
     exit 1
   fi
+  git -C "$d" reset -q --hard HEAD~1
+  git -C "$d" -c user.name=t -c user.email=t@example.invalid commit -q --allow-empty \
+    -m "feat(web): graph columns take cycling theme colours"
+  if (cd "$d" && check_subjects HEAD~1) 2>/dev/null; then
+    echo "self-test: a subject with a British spelling passed" >&2
+    exit 1
+  fi
+  git -C "$d" reset -q --hard HEAD~1
+  git -C "$d" -c user.name=t -c user.email=t@example.invalid commit -q --allow-empty -m "wip stuff"
   # The message step, from this checkout over the scratch history: a body the shared deny list
   # refuses fails it, and the commit before it passes.
   git -C "$d" -c user.name=t -c user.email=t@example.invalid commit -q --allow-empty \
