@@ -364,7 +364,7 @@ step "$py" schwarzwald/kit/tools/ratchet-check.py --self-test
 step "$py" schwarzwald/kit/tools/ratchet-check.py --base "$base"
 step cargo test -p "$(land_cfg conventions.crate)" --test "$(land_cfg conventions.test)"
 step bash schwarzwald/kit/lint/run.sh
-step python3 scripts/root-check.py
+step python3 schwarzwald/kit/lint/root-entries.py
 step make docs-check
 check_subjects "$base"
 # Subject and body of every commit landed: the shared lints the commit-msg hook runs.

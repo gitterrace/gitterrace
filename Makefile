@@ -29,7 +29,6 @@ clippy:
 ## lint: External linters (typos, vale, gitleaks, markdownlint, shellcheck, shfmt, ruff, pyright, tsc, actionlint, ast-grep, machete)
 lint: harness-links
 	bash schwarzwald/kit/lint/run.sh
-	python3 scripts/root-check.py
 
 # harness-links: The shared skills and agents are linked and harness.env names every key
 harness-links:
