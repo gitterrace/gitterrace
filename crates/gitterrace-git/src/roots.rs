@@ -90,6 +90,7 @@ impl Roots {
             let walk = r
                 .rev_walk(fresh)
                 .with_hidden(self.tips.iter().copied())
+                .with_commit_graph(crate::graph::commit_graph(&r))
                 .all()
                 .map_err(git)?;
             for info in walk {

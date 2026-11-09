@@ -30,7 +30,12 @@ impl Repo {
             return Ok(None);
         };
         let mut best: Option<(i64, gix::ObjectId)> = None;
-        for info in repo.rev_walk([head.detach()]).all().map_err(git)? {
+        let walk = repo
+            .rev_walk([head.detach()])
+            .with_commit_graph(crate::graph::commit_graph(&repo))
+            .all()
+            .map_err(git)?;
+        for info in walk {
             let info = info.map_err(git)?;
             if !info.parent_ids.is_empty() {
                 continue;

@@ -7,6 +7,7 @@ mod divergence;
 mod error;
 mod fs_events;
 mod gitdir;
+mod graph;
 mod ident;
 mod ignore;
 mod nudge;
