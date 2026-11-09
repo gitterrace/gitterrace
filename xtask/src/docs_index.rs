@@ -212,6 +212,7 @@ pub fn check(root: &Path) -> Result<Vec<String>> {
     for (path, text) in &texts {
         bad.extend(check_links(root, path, text, &texts));
         bad.extend(keys.check(path, text));
+        bad.extend(keys.defaults(path, text));
         bad.extend(check_paths(root, path, text));
     }
     bad.extend(keys.reverse(&texts));
