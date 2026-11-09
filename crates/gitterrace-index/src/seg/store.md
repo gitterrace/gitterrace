@@ -2,7 +2,7 @@
 
 How the insights cache is laid out on disk and read, so the server stays at some
 MB however long the history. It sits beside the code it describes (`seg/`).
-[Architecture](../../../../docs/architecture.md#how-the-index-is-stored) has
+[The index internals](internals.md#how-the-index-is-stored) have
 the short version.
 
 ## Problem

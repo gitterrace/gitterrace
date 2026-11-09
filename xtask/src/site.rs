@@ -118,9 +118,8 @@ pub fn render(root: &Path, ws: &Workspace) -> Result<Vec<Out>> {
     Ok(outs)
 }
 
-/// The 404 page's text.
-const NOT_FOUND: &str = "<h1>Not found</h1>\n<p>There is no page here. <a href=\"/\">Back to the \
-home page</a>.</p>\n";
+/// The 404 page's text: where the reader likely meant to go.
+const NOT_FOUND: &str = include_str!("../templates/not_found.html");
 
 /// The one script on the page: Escape closes an open screenshot by going back to `#features`,
 /// the same place a click on the overlay leads. Everything else works without it.
@@ -211,7 +210,7 @@ fn host_files(site: &Site, pages: &[String]) -> Vec<Out> {
         site,
         &Body {
             title: "Not found",
-            desc: "There is no page at this address.",
+            desc: "There is no page at this address: the home page, the docs and the changelog.",
             path: "404.html",
             inner: NOT_FOUND,
             noindex: true,

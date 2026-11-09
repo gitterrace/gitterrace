@@ -439,26 +439,7 @@ pub(super) fn pages(root: &Path, site: &Site) -> Result<(Vec<Out>, Vec<String>)>
         paths.push(path);
         titles.push((rel.to_owned(), title));
     }
-    for (rel, _) in LEGAL {
-        let text = read(rel)?;
-        let title = title_of(rel, &text)?;
-        let path = legal_path(rel);
-        let inner = body(&text, rel, &links, &mut |_, h| slug(h))?;
-        let what = crate::docs_index::covers(rel).unwrap_or_default();
-        let html = page(
-            site,
-            &Body {
-                title: &title,
-                desc: &sentence(what),
-                path: &path,
-                inner: &inner,
-                ..Body::default()
-            },
-        );
-        check_unique_ids(&path, &html)?;
-        outs.push(Out::file(format!("site/{path}index.html"), html));
-        paths.push(path);
-    }
+    legal_pages(site, &links, &read, &mut outs, &mut paths)?;
     let lead = "Every document, by what you need. Each page is also a file in the repository.";
     outs.push(Out::file(
         "site/docs/index.html",
