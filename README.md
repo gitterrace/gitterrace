@@ -35,10 +35,6 @@ their authors.
 
 ## Install
 
-<!-- BEGIN GENERATED: msrv -->
-Rust 1.96 or newer.
-
-<!-- END GENERATED: msrv -->
 <!-- BEGIN GENERATED: install -->
 ```bash
 curl -fsSL https://gitterrace.dev/install.sh | sh
@@ -50,12 +46,14 @@ Installs `git-terrace`; git runs it as `git terrace`.
 
 <!-- END GENERATED: install -->
 
-Windows: releases ship a zip. Config lives in `%APPDATA%\gitterrace` and the
-repo registry in `%LOCALAPPDATA%\gitterrace`. `install-handler` prints the
-`reg add` commands instead of writing the registry.
+<!-- BEGIN GENERATED: msrv -->
+Building with cargo needs Rust 1.96 or newer.
+
+<!-- END GENERATED: msrv -->
 
 ## Quickstart
 
+<!-- BEGIN GENERATED: quickstart -->
 ```bash
 cd path/to/any/git/repo
 git terrace          # serves on 127.0.0.1 and opens your browser
@@ -63,22 +61,11 @@ cd ../another/repo
 git terrace          # joins the server already running, no second port
 ```
 
-Every repository lives under `/r/<name>/`, also the first, so its links stay
-valid as others join. Run `git terrace` in a second repository while one is
-served and it joins that server: the repository appears under `/r/<name>/` and
-in the switcher, and the command exits. This works for the same user on a
-loopback address. `--public` servers never take repositories this way.
-`git terrace remove [path|name]` takes one off again (the last one stays). There
-is no remove button in the page: a browser has no secret, and a page may be on
-someone's screen.
+<!-- END GENERATED: quickstart -->
 
-[Using it](docs/using.md) covers serving a folder of repositories, the log
-graph, outlines, keys and the settings page.
-
-For agents, `git terrace mcp --served` runs a read-only MCP server over stdio
-that reads every repository served before, the ones a running server shows.
-`list_repos` names them, and every tool takes that name as `repo`. Without
-`--served` it reads only the paths given.
+[Getting started](https://gitterrace.dev/docs/getting-started/) covers Windows,
+upgrading and troubleshooting. [Using it](https://gitterrace.dev/docs/using/)
+covers serving many repositories, the log graph, outlines, keys and settings.
 
 ## Run with Docker
 
@@ -86,21 +73,6 @@ that reads every repository served before, the ones a running server shows.
 `docker run --rm -p 127.0.0.1:8080:8080 -v "$PWD":/repos:ro gitterrace` serves
 the repositories in this folder read-only at `http://localhost:8080`.
 [Run with Docker](docs/online.md#run-with-docker) has the details.
-
-## Upgrade and troubleshooting
-
-Upgrade by running the same install command again. The insights cache in
-`.git/gitterrace/` is disposable: a new format is rebuilt on first open, and
-deleting the folder is always safe.
-
-- **Port in use:** stop the other server, or pass `--addr 127.0.0.1:0` for a
-  free port.
-- **A setting has no effect:** `git terrace config` prints every value and the
-  file it came from.
-- **"A newer gitterrace owns this cache":** run the newer binary, or delete
-  `.git/gitterrace/` to rebuild for this one.
-- **Insights show indexing:** the cache is being built or was unreadable and is
-  being rebuilt. Code and history pages work meanwhile.
 
 ## Commands
 
@@ -127,20 +99,20 @@ Run your own program on a selection (`line`, `file`, `commit`, `hunk`, `blame`,
 <!-- END GENERATED: actions -->
 
 Send a selection to a tracker, notes app or mail draft, or run your own program
-on it. Off until you write `actions.toml`: [how to set it up](docs/actions.md).
+on it. Off until you write `actions.toml`:
+[how to set it up](https://gitterrace.dev/docs/actions/).
 
-Every document, by what you need: [the docs index](docs/README.md). Most used:
-[configuration](docs/configuration.md), [JSON API](docs/api.md) and
-[running it online](docs/online.md). gitterrace binds to `127.0.0.1` and never
-changes your files or history. The website (landing page, docs, changelog and
-legal pages) is generated into [site/](site/index.html).
+Every document, by what you need, is on
+[gitterrace.dev/docs](https://gitterrace.dev/docs/), generated from
+[docs/](docs/README.md). gitterrace binds to `127.0.0.1` and never changes your
+files or history ([security model](https://gitterrace.dev/docs/security/)).
 
 ## Contributing
 
 Issues and pull requests are welcome: see [contributing](CONTRIBUTING.md), and
 report vulnerabilities privately as [SECURITY.md](SECURITY.md) describes. A
 human sets the direction and decides
-([how it is made](docs/why.md#how-it-is-made)).
+([how it is made](https://gitterrace.dev/docs/why/#how-it-is-made)).
 
 ## License
 

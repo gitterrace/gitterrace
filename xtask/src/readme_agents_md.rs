@@ -1,6 +1,6 @@
-//! The generated blocks of `README.md` and `AGENTS.md`, and the crate and cache facts
-//! `docs/architecture.md` shows. Everything here is read from the workspace or from the
-//! registries the code itself uses.
+//! The generated blocks of `README.md`, `AGENTS.md` and `docs/getting-started.md`, and the
+//! crate and cache facts `docs/architecture.md` shows. Everything here is read from the
+//! workspace or from the registries the code itself uses.
 
 use std::fmt::Write as _;
 
@@ -19,12 +19,24 @@ use crate::out::Out;
 pub mod cli;
 
 const README: &str = "README.md";
+/// The docs page the README's install and quickstart blocks are shared with.
+const START: &str = "docs/getting-started.md";
+
+/// The first run, the same in the README, on the getting started page and on the landing page.
+pub const QUICKSTART: &str = "cd path/to/any/git/repo
+git terrace          # serves on 127.0.0.1 and opens your browser
+cd ../another/repo
+git terrace          # joins the server already running, no second port
+";
 
 pub fn render(ws: &Workspace, scripts: &[Script]) -> Vec<Out> {
     let bin = ws.packages.get("gitterrace");
     let install = install_md(ws);
     let msrv = bin.map_or_else(String::new, |p| {
-        format!("Rust {} or newer.", p.rust_version)
+        format!(
+            "Building with cargo needs Rust {} or newer.",
+            p.rust_version
+        )
     });
 
     let kinds: Vec<String> = KINDS
@@ -44,8 +56,12 @@ pub fn render(ws: &Workspace, scripts: &[Script]) -> Vec<Out> {
             "pitch",
             bin.map_or_else(String::new, |p| p.description.clone()),
         ),
-        Out::block(README, "msrv", msrv),
-        Out::block(README, "install", install),
+        Out::block(README, "msrv", msrv.clone()),
+        Out::block(README, "install", install.clone()),
+        Out::block(README, "quickstart", quickstart_md()),
+        Out::block(START, "msrv", msrv),
+        Out::block(START, "install", install),
+        Out::block(START, "quickstart", quickstart_md()),
         Out::block(README, "commands", commands()),
         Out::block(README, "actions", actions),
         Out::block(README, "license", license_md(bin)),
@@ -82,6 +98,11 @@ pub fn demo_md(ws: &Workspace) -> String {
          authors.\n",
         ws.demo
     )
+}
+
+/// [`QUICKSTART`] as a fenced block.
+fn quickstart_md() -> String {
+    format!("```bash\n{QUICKSTART}```\n")
 }
 
 /// One screenshot, light and dark, from the same list the site uses.
