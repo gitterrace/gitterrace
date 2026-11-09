@@ -92,7 +92,7 @@ baseline.
 The pages that read every change of every file (hotspots, ownership) have a cold
 target of at most 1.5 times the in-memory build they replaced: on rust, hotspots
 230 ms and ownership 115 ms for the first request after the index is ready. The
-streaming store misses it. Measured on rust (345k commits, 64k files at HEAD),
+current index misses it. Measured on rust (345k commits, 64k files at HEAD),
 release build, M1 Max, first request after ready, 1-minute load 11 to 16:
 
 | Page      | Period | Target | Measured        |
@@ -103,8 +103,8 @@ release build, M1 Max, first request after ready, 1-minute load 11 to 16:
 | Ownership | 1 year | 115 ms | 520 to 640 ms   |
 
 The server renders these pages right after the index is ready, so a visitor who
-arrives after that warm-up (about 10 s on rust) gets them from the page memo in
-a few milliseconds. The cold numbers are what a visitor pays inside that window,
+arrives after that warm-up (about 10 s on rust) gets them from memory in a few
+milliseconds. The cold numbers are what a visitor pays inside that window,
 or for a filter combination that was not rendered before.
 
 The cost is reading every change of every file once per page, with renames
