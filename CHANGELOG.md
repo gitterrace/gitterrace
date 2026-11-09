@@ -530,6 +530,10 @@ All notable changes are listed here. The format follows
 - index: move record decode, shared sets, fixtures and the scan read into
   modules
 
+### Fixed
+
+- scripts: the send vector check loads send.js whatever the package module type
+
 ### Performance
 
 - index: per-file pages read a tip touches file instead of every row
