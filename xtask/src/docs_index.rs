@@ -12,6 +12,7 @@ use pulldown_cmark::{Event, Parser, Tag, TagEnd};
 
 use crate::out::{Out, files_in};
 
+mod docker;
 mod keys;
 use keys::Keys;
 
@@ -209,7 +210,12 @@ pub fn check(root: &Path) -> Result<Vec<String>> {
         texts.insert(d.clone(), text);
     }
     let keys = Keys::load();
+    let (port, docker_bad) = docker::port(root);
+    bad.extend(docker_bad);
     for (path, text) in &texts {
+        if let Some(port) = port {
+            bad.extend(docker::check(path, text, port));
+        }
         bad.extend(check_links(root, path, text, &texts));
         bad.extend(keys.check(path, text));
         bad.extend(keys.defaults(path, text));
