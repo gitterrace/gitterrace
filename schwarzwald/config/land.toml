@@ -28,7 +28,9 @@ test = "conventions"
 gate = [
   # Unformatted Rust never lands. The cheapest check runs first.
   "cargo fmt --all --check",
-  "bash scripts/golden-run.sh",
+  # While the golden check moves to the shared tool, run whichever script the tree has.
+  """if [ -f scripts/golden-run.sh ]; then bash scripts/golden-run.sh; \
+  else bash scripts/python-run.sh schwarzwald/kit/tools/golden.py run; fi""",
   "python3 schwarzwald/kit/lint/file-length.py",
   "python3 scripts/names-check.py",
   # Generated docs, README blocks and site pages match their sources.
