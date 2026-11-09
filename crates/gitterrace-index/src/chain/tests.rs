@@ -287,3 +287,90 @@ fn hostile_chain_steps_are_unreadable() {
     assert!(check(&good, entry.items, 1).is_err_and(|err| err.is_unreadable()));
     assert!(check(&good[..good.len() - 1], entry.items, 64).is_err());
 }
+
+/// One step's bytes for rank `rank` whose file count is the varint `count`, then `tail`.
+fn step_bytes(rank: u32, count: &[u8], tail: &[u8]) -> Vec<u8> {
+    let mut b = rank.to_le_bytes().to_vec();
+    b.extend_from_slice(&[7; 20]);
+    b.extend_from_slice(&0i64.to_le_bytes());
+    b.extend_from_slice(&0i32.to_le_bytes());
+    b.extend_from_slice(count);
+    b.extend_from_slice(tail);
+    b
+}
+
+fn one_step(bytes: &[u8], paths: usize) -> crate::seg::SegResult<()> {
+    let mut cur = crate::seg::bounds::Cursor::new(bytes, "t", 0);
+    let mut below = 1;
+    super::step(&mut cur, 1, &mut below, paths, i64::MAX, &mut |_| {})
+}
+
+/// An oversized varint (11 bytes, or 10 that overflow u64), a truncated one and a count
+/// past u32 are refused as unreadable wherever they sit in a step: the file count, a path
+/// id, an added or a removed count. None is read as data.
+#[test]
+fn oversized_and_truncated_varints_are_refused() {
+    assert!(one_step(&step_bytes(0, &[1], &[0, 3, 1]), 1).is_ok());
+    let long = [0x80; 11];
+    let over = [0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x02];
+    let past_u32 = [0x80, 0x80, 0x80, 0x80, 0x10];
+    for bad in [&long[..], &over[..], &[0x80][..], &[][..]] {
+        assert!(one_step(&step_bytes(0, bad, &[]), 1).is_err_and(|e| e.is_unreadable()));
+        let path = [&[1][..], bad].concat();
+        assert!(one_step(&step_bytes(0, &path, &[]), 1).is_err_and(|e| e.is_unreadable()));
+        for at in [1, 2] {
+            let mut tail = vec![0, 3, 1];
+            tail.truncate(at);
+            tail.extend_from_slice(bad);
+            let b = step_bytes(0, &[1], &tail);
+            assert!(
+                one_step(&b, 1).is_err_and(|e| e.is_unreadable()),
+                "{bad:?} at {at}"
+            );
+        }
+    }
+    for tail in [
+        [&[0][..], &past_u32[..], &[0]].concat(),
+        [&[0, 0][..], &past_u32].concat(),
+    ] {
+        assert!(one_step(&step_bytes(0, &[1], &tail), 1).is_err_and(|e| e.is_unreadable()));
+    }
+}
+
+/// A chain file with an oversized varint behind a valid crc and a valid meta: the source
+/// reports the cache unreadable instead of serving the steps, and a rebuild writes a chain
+/// the walk agrees with again.
+#[test]
+fn a_hostile_chain_file_fails_the_read_and_the_store_rebuilds() {
+    use crate::seg::format::{StringBase, section};
+    use crate::seg::write::ContainerWriter;
+    let h = history();
+    let (_t, dir) = build(&h);
+    let mut m = Manifest::load(&dir).expect("manifest").expect("set");
+    let newest = m.commits - 1;
+    let mut w = ContainerWriter::new(&dir, "chain-999.gts", Kind::Chain, StringBase::default())
+        .expect("writer");
+    w.block(section::CHAIN, 1, &step_bytes(newest, &[0x80; 11], &[]))
+        .expect("step");
+    let mut meta = m.fingerprint.to_le_bytes().to_vec();
+    meta.extend_from_slice(&m.commits.to_le_bytes());
+    meta.extend_from_slice(&1u32.to_le_bytes());
+    w.block(section::CHAIN_META, 1, &meta).expect("meta");
+    let entry = w.finish().expect("finish");
+    let at = m.live.iter().position(|f| f.kind == Kind::Chain as u8);
+    m.live[at.expect("a chain")] = entry;
+    m.commit(&dir).expect("commit");
+    let d = disk(&dir);
+    let mut steps = 0;
+    assert!(d.chain(&mut |_| steps += 1));
+    assert_eq!(steps, 0, "no hostile step is served");
+    assert!(
+        d.failure().is_some(),
+        "the read reports the cache unreadable"
+    );
+    drop(d);
+    let idx = Index::open_dir(dir.clone()).expect("index");
+    idx.rebuild().expect("rebuild");
+    idx.update(&h, "HEAD", &|_| {}).expect("update");
+    assert_eq!(stored(&dir), Some(walked(&dir)));
+}
