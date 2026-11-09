@@ -1,11 +1,13 @@
 //! Segment tables at open, the record decoder and the small id helpers.
 
-use crate::feed::disk::{OID_ENTRY, Rec, Seg, columns};
+use crate::feed::Rank;
+use crate::feed::disk::{DiskSource, OID_ENTRY, Rec, Seg, columns};
 use crate::feed::{FileRow, PathId, Sums};
 use crate::seg::bounds::Cursor;
 use crate::seg::format::{TocEntry, section};
 use crate::seg::read::Container;
 use crate::seg::{Oid, SegError, SegResult};
+use crate::{CodeStat, CommitRecord, FileStat};
 
 pub(super) fn open_seg(c: Container, first_expected: u32, buf: &mut Vec<u8>) -> SegResult<Seg> {
     let total = |sec| {
@@ -185,4 +187,48 @@ pub(super) fn hash32(s: &str) -> u32 {
 )]
 pub(super) fn report(e: &SegError) {
     eprintln!("gitterrace: {e}");
+}
+
+impl DiskSource {
+    /// One record as stored, raw identity and raw time.
+    pub(super) fn record(&self, rank: Rank) -> SegResult<CommitRecord> {
+        let mut files = Vec::new();
+        let rec = self.decode(rank, Some(&mut files))?;
+        let who = self.raw_ident(rec.ident)?;
+        let label = |l: Option<u32>| {
+            l.map(|i| self.string(2, i).map(|s| s.to_string()))
+                .transpose()
+        };
+        let path = |p: u32| self.string(0, p);
+        let mut stats = Vec::new();
+        for f in files {
+            stats.push(FileStat {
+                path: path(f.path.0)?,
+                additions: f.add,
+                deletions: f.del,
+                lines: f.lines,
+                rewritten: f.rewritten,
+                code: f.code.map(|(a, d, r)| CodeStat {
+                    additions: a,
+                    deletions: d,
+                    rewritten: r,
+                }),
+                old: f.old.map(|o| path(o.0)).transpose()?,
+                binary: f.binary,
+                deleted: f.deleted,
+            });
+        }
+        Ok(CommitRecord {
+            id: hex(&rec.oid),
+            author: who.0,
+            email: who.1,
+            time: rec.time,
+            offset: rec.offset,
+            merge: rec.merge,
+            parents: rec.parents.iter().map(hex).collect(),
+            kind: label(rec.kind)?,
+            scope: label(rec.scope)?,
+            files: stats,
+        })
+    }
 }

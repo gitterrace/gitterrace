@@ -21,13 +21,13 @@ mod writer;
 
 use std::sync::{Arc, Mutex, OnceLock};
 
-use crate::feed::disk::record::{hex, open_seg, parse, report};
+use crate::CommitRecord;
+use crate::feed::disk::record::{open_seg, parse, report};
 use crate::feed::{CommitRow, FileRow, IdentId, LabelId, Rank, Sums};
 use crate::seg::bounds::Cursor;
 use crate::seg::format::section;
 use crate::seg::read::{Container, Store};
 use crate::seg::{Oid, SegError, SegResult};
-use crate::{CodeStat, CommitRecord, FileStat};
 
 pub use writer::RowWriter;
 
@@ -271,47 +271,6 @@ impl DiskSource {
     /// Every record in rank order, raw, for a sequential merge.
     pub fn records(&self) -> impl Iterator<Item = SegResult<CommitRecord>> + '_ {
         (0..self.len).map(|r| self.record(Rank(r)))
-    }
-
-    fn record(&self, rank: Rank) -> SegResult<CommitRecord> {
-        let mut files = Vec::new();
-        let rec = self.decode(rank, Some(&mut files))?;
-        let who = self.raw_ident(rec.ident)?;
-        let label = |l: Option<u32>| {
-            l.map(|i| self.string(2, i).map(|s| s.to_string()))
-                .transpose()
-        };
-        let path = |p: u32| self.string(0, p);
-        let mut stats = Vec::new();
-        for f in files {
-            stats.push(FileStat {
-                path: path(f.path.0)?,
-                additions: f.add,
-                deletions: f.del,
-                lines: f.lines,
-                rewritten: f.rewritten,
-                code: f.code.map(|(a, d, r)| CodeStat {
-                    additions: a,
-                    deletions: d,
-                    rewritten: r,
-                }),
-                old: f.old.map(|o| path(o.0)).transpose()?,
-                binary: f.binary,
-                deleted: f.deleted,
-            });
-        }
-        Ok(CommitRecord {
-            id: hex(&rec.oid),
-            author: who.0,
-            email: who.1,
-            time: rec.time,
-            offset: rec.offset,
-            merge: rec.merge,
-            parents: rec.parents.iter().map(hex).collect(),
-            kind: label(rec.kind)?,
-            scope: label(rec.scope)?,
-            files: stats,
-        })
     }
 
     fn fail<T>(&self, e: &SegError) -> Option<T> {

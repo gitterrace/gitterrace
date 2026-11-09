@@ -25,10 +25,11 @@ mod period;
 mod releases;
 mod scope;
 mod select;
+mod shared;
 mod sizes;
 mod stats;
 
-use std::sync::{Arc, Mutex, OnceLock};
+use std::sync::{Arc, OnceLock};
 
 pub(crate) use gitterrace_git::days_from_civil;
 use gitterrace_git::{IgnoreSet, civil_from_days as civil};
@@ -65,12 +66,6 @@ pub use sizes::SizeBucket;
 pub use stats::{DirChurn, FileChurn, Label, LabelBucket, LabelCount};
 
 pub(crate) const DAY: i64 = 86_400;
-
-/// Derived tables kept for this many (key, options) pairs: the unfiltered pages of a few tips.
-const SHARED_SETS: usize = 4;
-
-/// Derived tables of recent unfiltered sources, see [`Insights::shared_source`].
-static SHARED: Mutex<Vec<SharedEntry>> = Mutex::new(Vec::new());
 
 /// Which paths and commits count.
 #[expect(
@@ -150,14 +145,6 @@ struct Derived {
     follow: OnceLock<files::Follow>,
 }
 
-struct SharedEntry {
-    key: String,
-    opts: Options,
-    /// Address and length of what the tables index into: a hit must be the same set.
-    at: (usize, usize),
-    d: Arc<Derived>,
-}
-
 impl<'a> Insights<'a> {
     /// Over records in memory, through the oracle adapter `feed::MemorySource`: the side
     /// equivalence tests compare the segment set against, never served. `ignore` is the ignore
@@ -190,7 +177,7 @@ impl<'a> Insights<'a> {
         ignore: impl FnOnce() -> Option<IgnoreSet>,
     ) -> Self {
         let at = (std::ptr::from_ref(src).cast::<u8>() as usize, src.len());
-        let d = shared_tables(src, &opts, key, at, ignore);
+        let d = shared::tables(src, &opts, key, at, ignore);
         Self::with(Src::Borrowed(src), opts, d)
     }
 
@@ -203,7 +190,7 @@ impl<'a> Insights<'a> {
     /// the records they index into once nobody browses, so an idle process holds neither; the
     /// next page builds them again. Callers holding an `Insights` keep their own `Arc`.
     pub fn release_shared(prefix: &str) {
-        if let Ok(mut g) = SHARED.lock() {
+        if let Ok(mut g) = shared::SHARED.lock() {
             g.retain(|e| !e.key.starts_with(prefix));
         }
     }
@@ -211,7 +198,7 @@ impl<'a> Insights<'a> {
     /// Shared table sets whose key starts with `prefix` (a test hook for
     /// [`Insights::release_shared`]).
     pub fn shared_sets(prefix: &str) -> usize {
-        SHARED.lock().map_or(0, |g| {
+        shared::SHARED.lock().map_or(0, |g| {
             g.iter().filter(|e| e.key.starts_with(prefix)).count()
         })
     }
@@ -387,36 +374,6 @@ impl Derived {
     }
 }
 
-fn shared_tables(
-    src: &dyn InsightsSource,
-    opts: &Options,
-    key: &str,
-    at: (usize, usize),
-    ignore: impl FnOnce() -> Option<IgnoreSet>,
-) -> Arc<Derived> {
-    let hit = SHARED.lock().ok().and_then(|g| {
-        g.iter()
-            .find(|e| e.key == key && e.opts == *opts && e.at == at)
-            .map(|e| Arc::clone(&e.d))
-    });
-    hit.unwrap_or_else(|| {
-        let d = Arc::new(Derived::build(src, opts, ignore()));
-        if let Ok(mut g) = SHARED.lock() {
-            g.retain(|e| !(e.key == key && e.opts == *opts));
-            if g.len() >= SHARED_SETS {
-                g.remove(0);
-            }
-            g.push(SharedEntry {
-                key: key.to_owned(),
-                opts: opts.clone(),
-                at,
-                d: Arc::clone(&d),
-            });
-        }
-        d
-    })
-}
-
 /// Decides every path once, spread over the cores.
 fn decide_all(paths: &[Arc<str>], filter: &PathFilter) -> Vec<bool> {
     decide_with(paths, |p| filter.decide(p))
@@ -510,53 +467,6 @@ pub fn bus_factor(shares: impl IntoIterator<Item = f64>) -> usize {
 }
 
 #[cfg(test)]
-pub(crate) mod fixtures {
-    use crate::{CommitRecord, FileStat};
-
-    // 2024-01-01 is a Monday.
-    pub const MON: i64 = 1_704_067_200;
-    pub const DAYS: i64 = 86_400;
-
-    pub fn file(path: &str, add: u32, del: u32, lines: u32) -> FileStat {
-        FileStat {
-            path: path.into(),
-            additions: add,
-            deletions: del,
-            lines,
-            ..FileStat::default()
-        }
-    }
-
-    /// Four commits in a line: a, b, c, d.
-    pub fn chain() -> Vec<CommitRecord> {
-        let mut v = vec![
-            rec("a", "Ann", 0, vec![file("x.rs", 1, 0, 1)]),
-            rec("b", "Ann", 10, vec![file("x.rs", 30, 0, 31)]),
-            rec(
-                "c",
-                "Bob",
-                30,
-                vec![file("y.py", 300, 100, 200), file("x.rs", 0, 3, 28)],
-            ),
-            rec("d", "Bob", 40, vec![file("y.py", 3000, 0, 3200)]),
-        ];
-        for i in 1..v.len() {
-            v[i].parents = vec![v[i - 1].id.clone()];
-        }
-        v
-    }
-
-    pub fn rec(id: &str, who: &str, day: i64, files: Vec<FileStat>) -> CommitRecord {
-        CommitRecord {
-            id: id.into(),
-            author: who.into(),
-            email: format!("{}@x.io", who.to_lowercase()),
-            time: MON + day * DAYS + 3600 * 12,
-            files,
-            ..CommitRecord::default()
-        }
-    }
-}
-
+pub(crate) mod fixtures;
 #[cfg(test)]
 mod tests;
