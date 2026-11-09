@@ -333,27 +333,66 @@ impl Insights<'_> {
             changes[i] += 1;
             true
         });
-        touches.sort_unstable();
-        // Pairs are keyed by the two file numbers, a < b because each group is sorted.
-        let mut pairs: FastMap<u64, usize> = FastMap::default();
-        for group in touches.chunk_by(|x, y| x.0 == y.0) {
-            if group.len() < 2 || group.len() > COUPLING_MAX_FILES {
+        // By commit, files ascending in one: the visit is per file in order, so a stable
+        // counting sort on the rank gives what sorting the pairs did, in linear time. Only the
+        // files that can be in a kept pair (`min_together` changes) are placed, and only for
+        // commits that count for coupling (2 to 30 files, counted before that filter).
+        let ranks = touches.iter().map(|t| t.0 as usize + 1).max().unwrap_or(0);
+        let mut size = vec![0u32; ranks];
+        for t in &touches {
+            size[t.0 as usize] += 1;
+        }
+        let counts = |r: u32| (2..=COUPLING_MAX_FILES as u32).contains(&size[r as usize]);
+        let live = |t: &(u32, u32)| counts(t.0) && changes[t.1 as usize] >= min_together;
+        let mut begin = vec![0u32; ranks + 1];
+        for t in touches.iter().filter(|t| live(t)) {
+            begin[t.0 as usize + 1] += 1;
+        }
+        for i in 1..begin.len() {
+            begin[i] += begin[i - 1];
+        }
+        let mut fill = begin.clone();
+        let mut by_commit = vec![0u32; begin[ranks] as usize];
+        for t in touches.iter().filter(|t| live(t)) {
+            let slot = &mut fill[t.0 as usize];
+            by_commit[*slot as usize] = t.1;
+            *slot += 1;
+        }
+        // Per file `a`, the files after it in each of its commits, counted in a dense row:
+        // the pairs a map keyed by (a, b) counted, one file's row at a time. A file twice in
+        // one commit pairs as the nested loop over the commit's list paired it.
+        let mut pairs: Vec<(u32, u32, usize)> = Vec::new();
+        let mut row = vec![0usize; head.len()];
+        let mut hit: Vec<u32> = Vec::new();
+        for list in touches.chunk_by(|x, y| x.1 == y.1) {
+            let a = list[0].1;
+            if changes[a as usize] < min_together {
                 continue;
             }
-            for (x, a) in group.iter().enumerate() {
-                for b in &group[x + 1..] {
-                    *pairs
-                        .entry((u64::from(a.1) << 32) | u64::from(b.1))
-                        .or_default() += 1;
+            for same in list.chunk_by(|x, y| x.0 == y.0) {
+                let r = same[0].0;
+                if !counts(r) {
+                    continue;
                 }
+                let group = &by_commit[begin[r as usize] as usize..begin[r as usize + 1] as usize];
+                let first = group.partition_point(|&f| f < a);
+                for j in 0..same.len() {
+                    for &b in group.get(first + j + 1..).unwrap_or_default() {
+                        if row[b as usize] == 0 {
+                            hit.push(b);
+                        }
+                        row[b as usize] += 1;
+                    }
+                }
+            }
+            for b in std::mem::take(&mut hit) {
+                let n = std::mem::take(&mut row[b as usize]);
+                pairs.push((a, b, n));
             }
         }
         // Cheap tuples first, strings only for the pairs that are shown.
-        let mut kept: Vec<(u32, u32, usize)> = pairs
-            .into_iter()
-            .filter(|(_, n)| *n >= min_together)
-            .map(|(key, together)| ((key >> 32) as u32, (key & 0xffff_ffff) as u32, together))
-            .collect();
+        let mut kept: Vec<(u32, u32, usize)> =
+            pairs.into_iter().filter(|p| p.2 >= min_together).collect();
         let degree = |&(a, b, together): &(u32, u32, usize)| {
             together as f64 / changes[a as usize].min(changes[b as usize]) as f64
         };

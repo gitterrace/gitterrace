@@ -250,6 +250,9 @@ fn pages(ins: &Insights<'_>, files: &[HeadFile]) -> String {
         out.push(format!("{p:?}\n{:?}", ins.hotspots(files, p)));
         out.push(format!("{:?}", ins.ownership(files, p, 1)));
         out.push(format!("{:?}", ins.coupling(files, p, 1, 50)));
+        // The page's own threshold: files under it are left out of the pair count.
+        out.push(format!("{:?}", ins.coupling(files, p, 3, 50)));
+        out.push(format!("{:?}", ins.coupling(files, p, 2, 1)));
     }
     out.push(format!("{:?}", ins.code_age(files)));
     let tags = [("v1".to_owned(), id(3)), ("v2".to_owned(), id(9))];
@@ -510,3 +513,6 @@ fn per_file_pages_read_no_file_rows_with_a_tip_file() {
     drop(ins.hotspots(&files, Period::All));
     assert!(mem.take() > 0, "the row read reads rows");
 }
+
+#[path = "tests/coupling.rs"]
+mod coupling;
