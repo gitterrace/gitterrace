@@ -3,7 +3,8 @@
 //! repeat in every release, so they take the release's id as a prefix to stay unique.
 
 use crate::out::Out;
-use crate::site::docs::{CHANGELOG, Links, Site, body, shell, slug, source_link};
+use crate::site::docs::{CHANGELOG, Links, body, slug};
+use crate::site::frame::{Body, Site, page as frame_page};
 
 /// The site path of the page.
 pub const PATH: &str = "changelog/";
@@ -52,13 +53,16 @@ pub(super) fn page(site: &Site, links: &Links, text: &str) -> Out {
     let inner = render(text, links);
     Out::file(
         format!("site/{PATH}index.html"),
-        shell(
+        frame_page(
             site,
-            "Changelog",
-            PATH,
-            &inner,
-            &source_link(site, CHANGELOG),
-            "",
+            &Body {
+                title: "Changelog",
+                desc: "What changed in each release of gitterrace, written from the commits.",
+                path: PATH,
+                inner: &inner,
+                edit: CHANGELOG,
+                ..Body::default()
+            },
         ),
     )
 }

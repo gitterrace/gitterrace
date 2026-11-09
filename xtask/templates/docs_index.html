@@ -1,0 +1,16 @@
+{#- The docs index: one section per group, a mono label, then each document as its
+title and the one line of what it covers. -#}
+<h1>Documentation</h1>
+<p class="lead">{{ lead }}</p>
+<div class="groups">
+{%- for (heading, docs) in groups %}
+<section aria-labelledby="{{ heading.0 }}">
+<h2 id="{{ heading.0 }}">{{ heading.1 }}</h2>
+<ul>
+{%- for (href, title, what) in docs %}
+<li><a href="/{{ href }}">{{ title }}</a><span>{{ what }}</span></li>
+{%- endfor %}
+</ul>
+</section>
+{%- endfor %}
+</div>

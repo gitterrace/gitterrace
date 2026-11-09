@@ -11,20 +11,15 @@ use std::path::Path;
 use anyhow::{Context as _, Result};
 use pulldown_cmark::{CowStr, Event, HeadingLevel, Parser, Tag, TagEnd, html};
 
+use askama::Template;
+
 use crate::docs_index::{LEGAL, normalize, on_site};
 use crate::out::Out;
 use crate::site::changelog;
-use crate::site::{THEME_INIT_JS, THEME_TOGGLE_JS, body_open, esc, footer, outline_script};
+use crate::site::frame::{Body, Site, page};
+use crate::site::outline_script;
 
 pub(super) const CHANGELOG: &str = "CHANGELOG.md";
-
-/// Where pages live and what they are called, for the shell and the links.
-pub(super) struct Site<'a> {
-    pub home: &'a str,
-    pub repo: &'a str,
-    pub name: &'a str,
-    pub demo: &'a str,
-}
 
 /// Where each published document is, so a relative link can be rewritten.
 pub(super) struct Links<'a> {
@@ -288,42 +283,6 @@ fn break_line(line: &str, width: usize) -> String {
     out
 }
 
-/// A whole page: the head, the bar, `inner`, a footer with `foot` (HTML, may be empty) and the
-/// outline `rail` (HTML, empty for none), the app's own, beside the text on a wide screen.
-pub(super) fn shell(
-    site: &Site,
-    title: &str,
-    path: &str,
-    inner: &str,
-    foot: &str,
-    rail: &str,
-) -> String {
-    let footer = footer(site.repo, foot);
-    let (close, script) = if rail.is_empty() {
-        (String::new(), String::new())
-    } else {
-        (
-            format!("{rail}\n</div>\n"),
-            format!("<script>{}</script>\n", outline_script()),
-        )
-    };
-    format!(
-        "<!doctype html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n\
-         <meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">\n\
-         <meta name=\"color-scheme\" content=\"light dark\">\n\
-         <title>{t} - {s}</title>\n<link rel=\"canonical\" href=\"{home}/{path}\">\n\
-         <link rel=\"icon\" type=\"image/svg+xml\" href=\"/assets/mark.svg\">\n\
-         <link rel=\"stylesheet\" href=\"/assets/site.css\">\n\
-         <script>{THEME_INIT_JS}</script>\n</head>\n{open}\
-         {inner}{footer}\
-         </main>\n{close}<script>{THEME_TOGGLE_JS}</script>\n{script}</body>\n</html>\n",
-        t = esc(title),
-        s = esc(site.name),
-        home = esc(site.home),
-        open = body_open(site.name, site.repo, site.demo, !rail.is_empty()),
-    )
-}
-
 /// The "On this page" rail of a document from its level 2 headings as (id, text): the app's
 /// outline, so the site and the app list headings the same way. Empty below three headings.
 pub(super) fn outline(h2s: &[(String, String)]) -> String {
@@ -347,76 +306,58 @@ pub(super) fn outline(h2s: &[(String, String)]) -> String {
         .replace("\" aria-label=\"Filter", "\"\naria-label=\"Filter")
 }
 
-/// The link to a file in the repository, as a footer entry.
-pub(super) fn source_link(site: &Site, rel: &str) -> String {
-    format!(
-        "<a href=\"{}/blob/main/{rel}\">Source of this page</a>",
-        esc(site.repo)
-    )
+/// The docs index page, `templates/docs_index.html`.
+#[derive(Template)]
+#[template(path = "docs_index.html")]
+struct Index<'a> {
+    lead: &'a str,
+    groups: Vec<Group<'a>>,
 }
 
-/// The docs index: every published document under the heading of its kind.
-fn index(docs: &[(String, String)]) -> String {
-    let mut out = String::from("<h1>Documentation</h1>\n");
-    let mut group = "";
-    for (path, title, heading, what) in on_site()
-        .into_iter()
-        .map(|(p, h, w)| (p, docs.iter().find(|d| d.0 == p), h, w))
-        .filter_map(|(p, d, h, w)| d.map(|d| (p, d.1.as_str(), h, w)))
-    {
-        if group != heading {
-            if !group.is_empty() {
-                out.push_str("</ul>\n");
-            }
-            let _ = writeln!(
-                out,
-                "<h2 id=\"{}\">{}</h2>\n<ul>",
-                slug(heading),
-                esc(heading)
-            );
-            group = heading;
+/// One docs index group: (anchor slug, label) and its (link, title, what it covers) entries.
+type Group<'a> = ((String, &'a str), Vec<(String, &'a str, String)>);
+
+/// The docs index: every published document under the label of its group, as its title and
+/// the line of what it covers.
+fn index(docs: &[(String, String)], lead: &str) -> String {
+    let mut groups: Vec<Group> = Vec::new();
+    for (path, heading, what) in on_site() {
+        let Some((_, title)) = docs.iter().find(|d| d.0 == path) else {
+            continue;
+        };
+        if groups.last().is_none_or(|g| g.0.1 != heading) {
+            groups.push(((slug(heading), heading), Vec::new()));
         }
-        let _ = writeln!(
-            out,
-            "<li><a href=\"/{}\">{}</a>: {}</li>",
-            page_path(stem(path)),
-            esc(title),
-            esc(&what.replace('`', "")),
-        );
+        if let Some(g) = groups.last_mut() {
+            g.1.push((page_path(stem(path)), title, what.replace('`', "")));
+        }
     }
-    out.push_str("</ul>\n");
+    let mut out = Index { lead, groups }.render().unwrap_or_default();
+    out.push('\n');
     out
 }
 
-/// One page per published document, the docs index and the changelog. Returns the files and
-/// every page path, for the sitemap and the link check.
-pub fn pages(
-    root: &Path,
-    home: &str,
-    repo: &str,
-    name: &str,
-    demo: &str,
-) -> Result<(Vec<Out>, Vec<String>)> {
-    let site = Site {
-        home,
-        repo,
-        name,
-        demo,
-    };
-    let links = Links::new(repo);
+/// A document's title, its first `# ` line.
+fn title_of(rel: &str, text: &str) -> Result<String> {
+    text.lines()
+        .find_map(|l| l.strip_prefix("# "))
+        .map(str::to_owned)
+        .with_context(|| format!("{rel} has no title"))
+}
+
+/// One page per published document, the docs index, the legal pages and the changelog.
+/// Returns the files and every page path, for the sitemap and the link check.
+pub(super) fn pages(root: &Path, site: &Site) -> Result<(Vec<Out>, Vec<String>)> {
+    let links = Links::new(site.repo);
     let read = |rel: &str| {
         std::fs::read_to_string(root.join(rel)).with_context(|| format!("reading {rel}"))
     };
     let mut outs = Vec::new();
     let mut paths = vec!["docs/".to_owned()];
     let mut titles = Vec::new();
-    for (rel, ..) in on_site() {
+    for (rel, _, what) in on_site() {
         let text = read(rel)?;
-        let title = text
-            .lines()
-            .find_map(|l| l.strip_prefix("# "))
-            .with_context(|| format!("{rel} has no title"))?
-            .to_owned();
+        let title = title_of(rel, &text)?;
         let path = page_path(stem(rel));
         if paths.contains(&path) {
             anyhow::bail!("{rel}: another document is already the page {path}");
@@ -430,39 +371,65 @@ pub fn pages(
             id
         });
         let rail = outline(&h2s);
-        let page = shell(
-            &site,
-            &title,
-            &path,
-            &inner,
-            &source_link(&site, rel),
-            &rail,
+        let scripts = if rail.is_empty() {
+            Vec::new()
+        } else {
+            vec![outline_script()]
+        };
+        let html = page(
+            site,
+            &Body {
+                title: &title,
+                desc: &sentence(what),
+                path: &path,
+                inner: &inner,
+                rail: &rail,
+                edit: rel,
+                scripts,
+                ..Body::default()
+            },
         );
-        check_unique_ids(&path, &page)?;
-        outs.push(Out::file(format!("site/{path}index.html"), page));
+        check_unique_ids(&path, &html)?;
+        outs.push(Out::file(format!("site/{path}index.html"), html));
         paths.push(path);
         titles.push((rel.to_owned(), title));
     }
     for (rel, _) in LEGAL {
         let text = read(rel)?;
-        let title = text
-            .lines()
-            .find_map(|l| l.strip_prefix("# "))
-            .with_context(|| format!("{rel} has no title"))?
-            .to_owned();
+        let title = title_of(rel, &text)?;
         let path = legal_path(rel);
         let inner = body(&text, rel, &links, &mut |_, h| slug(h));
-        let page = shell(&site, &title, &path, &inner, &source_link(&site, rel), "");
-        check_unique_ids(&path, &page)?;
-        outs.push(Out::file(format!("site/{path}index.html"), page));
+        let what = crate::docs_index::covers(rel).unwrap_or_default();
+        let html = page(
+            site,
+            &Body {
+                title: &title,
+                desc: &sentence(what),
+                path: &path,
+                inner: &inner,
+                edit: rel,
+                ..Body::default()
+            },
+        );
+        check_unique_ids(&path, &html)?;
+        outs.push(Out::file(format!("site/{path}index.html"), html));
         paths.push(path);
     }
-    let inner = index(&titles);
+    let lead = "Every document, by what you need. Each page is also a file in the repository.";
     outs.push(Out::file(
         "site/docs/index.html",
-        shell(&site, "Documentation", "docs/", &inner, "", ""),
+        page(
+            site,
+            &Body {
+                title: "Documentation",
+                desc: "How to install, use, run and look up gitterrace, by what you need.",
+                path: "docs/",
+                inner: &index(&titles, lead),
+                ..Body::default()
+            },
+        ),
     ));
-    let log = changelog::page(&site, &links, &read(CHANGELOG)?);
+    let log = changelog::page(site, &links, &read(CHANGELOG)?);
     if let Out::File { body, .. } = &log {
         check_unique_ids(changelog::PATH, body)?;
     }
@@ -470,4 +437,46 @@ pub fn pages(
     paths.push(changelog::PATH.to_owned());
     paths.sort();
     Ok((outs, paths))
+}
+
+/// The legal pages. A legal page's <title> and kicker are the word the footer links it by; its
+/// h1 may be friendlier.
+fn legal_pages(
+    site: &Site,
+    links: &Links,
+    read: &dyn Fn(&str) -> Result<String>,
+    outs: &mut Vec<Out>,
+    paths: &mut Vec<String>,
+) -> Result<()> {
+    for (rel, label) in LEGAL {
+        let text = read(rel)?;
+        let path = legal_path(rel);
+        let inner = body(&text, rel, links, &mut |_, h| slug(h));
+        let what = crate::docs_index::covers(rel).unwrap_or_default();
+        let html = page(
+            site,
+            &Body {
+                title: label,
+                desc: &sentence(what),
+                path: &path,
+                kicker: label,
+                inner: &inner,
+                ..Body::default()
+            },
+        );
+        check_unique_ids(&path, &html)?;
+        outs.push(Out::file(format!("site/{path}index.html"), html));
+        paths.push(path);
+    }
+    Ok(())
+}
+
+/// The index line of what a document covers, as a sentence for its meta description.
+pub(super) fn sentence(what: &str) -> String {
+    let what = what.replace('`', "");
+    if what.ends_with('.') {
+        what
+    } else {
+        format!("{what}.")
+    }
 }

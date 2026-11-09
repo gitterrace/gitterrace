@@ -1,0 +1,182 @@
+/* The site's own rules, after the app's tokens. One frame for every page: the docs list,
+   the text column and the "On this page" rail share one grid, so the text never moves
+   between pages. Below 1100 px the grid is one column and both lists fold into menus. */
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);
+font:var(--text-md)/var(--leading) var(--sans)}
+a{color:var(--accent-ink);text-underline-offset:2px}
+:focus-visible{outline:2px solid var(--accent-ink);outline-offset:2px}
+main:focus{outline:none}
+.skip{position:absolute;left:var(--space-2);top:-100px;padding:var(--space-2) var(--space-3);
+background:var(--bg);border:var(--border);border-radius:var(--radius);z-index:20}
+.skip:focus{top:var(--space-2)}
+
+/* Type: one scale. Titles are serif at every level, labels are mono caps. */
+h1,h2,h3{font-family:var(--serif);font-weight:var(--weight-semibold);
+line-height:var(--leading-tight);letter-spacing:-.01em;overflow-wrap:break-word}
+h1{font-size:clamp(2rem,3.2vw,2.5rem);margin:0 0 var(--space-4);text-wrap:balance}
+h2{font-size:var(--text-xl);margin:var(--space-16) 0 var(--space-3)}
+h3{font-size:var(--text-lg);margin:var(--space-8) 0 var(--space-2)}
+p,ul,ol,pre,table{margin:0 0 var(--space-4)}
+.lead{font-size:var(--text-lg);color:var(--muted);margin:0 0 var(--space-8)}
+.label,.kicker,.outline h2,.docnav h2,.groups h2{display:flex;align-items:center;
+gap:var(--space-3);margin:0 0 var(--space-2);
+font:var(--weight-regular) var(--text-2xs)/1.4 var(--mono);text-transform:uppercase;
+letter-spacing:.12em;color:var(--muted)}
+.outline h2::after,.docnav h2::after,.groups h2::after{content:"";flex:1;
+border-top:var(--border)}
+.kicker{margin-bottom:var(--space-3)}
+
+/* The bar: dark in both schemes, as the app's header. */
+.top{color-scheme:dark;background:var(--header);border-bottom:var(--border)}
+.bar{max-width:var(--page-max);margin:0 auto;height:56px;padding:0 var(--page-pad);
+display:flex;align-items:center;gap:var(--space-6)}
+.top a{color:var(--muted);font-size:14.5px;font-weight:500;text-decoration:none}
+.top a:hover{color:var(--fg)}
+.top .brand{display:flex;align-items:center;gap:var(--space-2);margin-right:auto;
+color:var(--fg);font-size:18px;font-weight:var(--weight-semibold);letter-spacing:-.01em}
+.top .brand img{width:24px;height:24px}
+.gh,.theme{line-height:0}
+.gh{color:var(--muted)}
+.gh:hover,.gh:focus-visible{color:var(--fg)}
+.gh svg{fill:currentColor}
+.theme{width:24px;height:24px;padding:0;display:grid;place-items:center;background:none;
+border:0;color:var(--muted);cursor:pointer}
+.theme:hover,.theme:focus-visible{color:var(--fg)}
+.theme svg{width:24px;height:24px;overflow:visible;fill:none;stroke:currentColor;
+stroke-width:2;stroke-linecap:round;stroke-linejoin:round;display:none}
+.theme svg *{vector-effect:non-scaling-stroke}
+.theme .fill{fill:currentColor;stroke:none}
+.theme .i-auto{display:block}
+:root[data-theme=light] .theme .i-auto,:root[data-theme=dark] .theme .i-auto{display:none}
+:root[data-theme=light] .theme .i-light,:root[data-theme=dark] .theme .i-dark{display:block}
+
+/* The frame. */
+.frame{max-width:var(--page-max);margin:0 auto;padding:0 var(--page-pad);display:grid;
+grid-template-columns:168px minmax(0,1fr) 208px;gap:0 var(--space-8);align-items:start}
+.frame>main{grid-column:2;min-width:0;padding:var(--space-8) 0 0}
+.frame>.docnav{grid-column:1;grid-row:1}
+.frame>.outline.rail{grid-column:3;grid-row:1}
+.frame>footer{grid-column:2}
+.docnav,.outline.rail{position:sticky;top:var(--space-4);margin-top:var(--space-8);
+max-height:calc(100vh - 2*var(--space-4));overflow:auto}
+.docnav ol,.outline ol{list-style:none;margin:0;padding:0}
+.docnav a,.outline.rail a{display:block;padding:3px var(--space-3);
+border-left:2px solid var(--line);color:var(--muted);font-size:var(--text-sm);
+text-decoration:none;overflow-wrap:anywhere}
+.docnav a:hover,.outline a:hover{color:var(--fg)}
+.docnav a[aria-current],.outline.rail a.on{color:var(--fg);font-weight:var(--weight-semibold);
+border-left-color:var(--accent)}
+.outline .outline-q,.outline .outline-none{display:none}
+.outline li.d1>a{padding-left:var(--space-6)}
+.menus{display:none}
+@media (max-width:1099px){
+.frame{display:block;max-width:calc(760px + 2*var(--page-pad))}
+.frame>.docnav,.frame>.outline.rail{display:none}
+.menus{display:flex;flex-wrap:wrap;gap:var(--space-2);padding-top:var(--space-6)}
+.frame>main{padding-top:var(--space-6)}}
+@media (max-width:640px){.bar{gap:var(--space-4);padding:0 var(--page-pad)}}
+
+/* The folded lists on a narrow screen: native details, so they open without script. */
+.menu{position:relative}
+.menu>summary{display:inline-flex;align-items:center;height:32px;padding:0 var(--space-3);
+border:var(--border);border-radius:var(--radius);background:var(--soft);color:var(--fg);
+font-size:var(--text-sm);font-weight:var(--weight-semibold);cursor:pointer;list-style:none}
+.menu>summary::-webkit-details-marker{display:none}
+.menu>summary::after{content:"";width:6px;height:6px;margin-left:var(--space-2);
+border:solid currentColor;border-width:0 1.5px 1.5px 0;transform:translateY(-2px) rotate(45deg)}
+.menu[open]>summary{background:var(--hover);border-color:var(--line-strong)}
+.menu .pop,.outline-pop{position:absolute;left:0;top:calc(100% + var(--space-1));z-index:20;
+width:min(320px,calc(100vw - 2*var(--page-pad)));max-height:60vh;overflow:auto;
+padding:var(--space-2);background:var(--raised);border:var(--border);
+border-radius:var(--radius);box-shadow:var(--shadow-2);font-size:var(--text-sm)}
+.menu .pop a,.outline-pop a{display:block;padding:6px var(--space-3);border-radius:var(--radius);
+color:var(--fg);text-decoration:none;overflow-wrap:anywhere}
+.menu .pop a:hover,.menu .pop a[aria-current],.outline-pop a:hover,.outline-pop a.on{
+background:var(--hover)}
+.menu .pop h2{margin:var(--space-2) var(--space-3) var(--space-1)}
+.outline.menu .outlinebtn::before{content:none}
+
+/* Text. */
+pre,code{font-family:var(--mono);font-size:var(--text-sm)}
+pre{background:var(--soft);border:var(--border);border-radius:var(--radius);
+padding:var(--space-3) var(--space-4);overflow-x:auto;max-width:100%}
+:not(pre)>code{background:var(--soft);padding:1px var(--space-1);border-radius:var(--radius);
+overflow-wrap:anywhere}
+main table{display:block;width:max-content;max-width:100%;overflow-x:auto;
+border-collapse:collapse;font-size:var(--text-sm)}
+main th,main td{padding:6px var(--space-3);border:1px solid var(--line);vertical-align:top}
+main th{font-weight:var(--weight-semibold);text-align:left}
+main tr:nth-child(2n){background:var(--soft)}
+main td code,main th code{overflow-wrap:normal;white-space:nowrap}
+main td:not(:has(> code:only-child))::before{content:'';display:block;width:16ch}
+main img,main svg{max-width:100%;height:auto}
+.diagram{margin:0 0 var(--space-4);overflow-x:auto}
+.diagram svg{display:block;font:var(--text-xs) var(--mono)}
+.diagram rect{fill:var(--soft);stroke:var(--line-strong)}
+.diagram text{fill:var(--fg)}
+.diagram path{fill:none;stroke:var(--muted);stroke-width:1.2}
+.diagram .tip{fill:var(--muted);stroke:none}
+
+/* The docs index: a group label, then each document as its title and one muted line. */
+.groups section+section{margin-top:var(--space-8)}
+.groups ul{list-style:none;margin:0;padding:0}
+.groups li{padding:var(--space-2) 0;border-bottom:var(--border)}
+.groups li a{font-weight:var(--weight-semibold);text-decoration:none}
+.groups li a:hover{text-decoration:underline}
+.groups li span{display:block;color:var(--muted);font-size:var(--text-sm)}
+
+/* Previous and next at the end of a docs page. */
+.pager{display:flex;justify-content:space-between;gap:var(--space-4);
+margin-top:var(--space-16);padding-top:var(--space-4);border-top:var(--border)}
+.pager a{display:flex;flex-direction:column;text-decoration:none;font-weight:var(--weight-semibold)}
+.pager a span{font:var(--weight-regular) var(--text-2xs)/1.4 var(--mono);
+text-transform:uppercase;letter-spacing:.12em;color:var(--muted)}
+.pager .next{margin-left:auto;text-align:right}
+
+/* The landing page. */
+.hero h1{margin:0}
+.hero img{max-width:100%;height:auto}
+.hero .lead{margin:var(--space-4) 0 0;color:var(--fg)}
+.demo{margin:var(--space-6) 0 0}
+.promises{padding-left:var(--space-6)}
+.more{color:var(--muted)}
+ul.lines{list-style:none;padding:0}
+ul.lines li{padding:var(--space-2) 0;border-top:var(--border)}
+.shots{display:grid;grid-template-columns:1fr 1fr;gap:var(--space-6) var(--space-4);
+margin:var(--space-6) 0}
+@media (max-width:640px){.shots{grid-template-columns:1fr}}
+figure{margin:0}
+figure img,.lightbox img{width:100%;height:auto;border:var(--border);border-radius:var(--radius)}
+figcaption{font-size:var(--text-xs);color:var(--muted);margin-top:var(--space-2);line-height:1.4}
+figcaption b{color:var(--fg);font-weight:var(--weight-semibold)}
+.lightbox{display:none}
+.lightbox:target{display:flex;position:fixed;inset:0;z-index:10;align-items:center;
+justify-content:center;padding:var(--space-8);
+background:color-mix(in srgb,var(--bg) 97%,transparent);cursor:zoom-out}
+.lightbox:target .shot{max-width:min(1280px,100%)}
+.on-dark{display:none}
+img.on-light,figure img.on-light,.lightbox img.on-light{display:block}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]) img.on-light{display:none}
+:root:not([data-theme=light]) img.on-dark{display:block}}
+:root[data-theme=dark] img.on-light{display:none}
+:root[data-theme=dark] img.on-dark{display:block}
+.tab-radio{position:absolute;opacity:0;pointer-events:none}
+.tab-label{display:inline-block;padding:var(--space-1) var(--space-3);border:var(--border);
+border-bottom:0;border-radius:var(--radius) var(--radius) 0 0;color:var(--muted);cursor:pointer;
+font-family:var(--mono);font-size:var(--text-sm)}
+.tab-radio:checked+.tab-label{color:var(--fg);background:var(--soft);position:relative;
+margin-bottom:-1px;border-bottom:1px solid var(--soft)}
+.tab-radio:focus-visible+.tab-label{outline:2px solid var(--accent-ink)}
+.tabs pre{margin-top:0;border-top-left-radius:0}
+.tab-panel{display:none}
+#install-curl:checked~#panel-curl,#install-brew:checked~#panel-brew{display:block}
+#install-cargo:checked~#panel-cargo{display:block}
+
+/* The footer: one row of quiet links under the text column. */
+footer{display:flex;flex-wrap:wrap;gap:var(--space-2) var(--space-4);
+margin:var(--space-16) 0 0;padding:var(--space-4) 0 var(--space-16);border-top:var(--border);
+font-size:var(--text-sm);color:var(--faint)}
+footer a{color:var(--muted)}
+footer a:hover{color:var(--fg)}
+@media print{.top,.docnav,.outline,.menus,.pager{display:none!important}}

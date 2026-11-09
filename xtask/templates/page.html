@@ -1,0 +1,41 @@
+{#- Every page of the site: head, bar, the one grid (docs list, text, "On this page"),
+footer. Each |safe value is markup built by the site's own templates or the markdown
+renderer; every plain value is escaped here. -#}
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light dark">
+{%- if noindex %}
+<meta name="robots" content="noindex">
+{%- endif %}
+<title>{{ title }}</title>
+<meta name="description" content="{{ desc }}">
+<link rel="canonical" href="{{ home }}/{{ path }}">
+<meta property="og:title" content="{{ title }}">
+<meta property="og:description" content="{{ desc }}">
+<meta property="og:url" content="{{ home }}/{{ path }}">
+<meta property="og:type" content="website">
+<meta property="og:image" content="{{ home }}/assets/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="{{ name }}">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/svg+xml" href="/assets/mark.svg">
+<link rel="apple-touch-icon" href="/assets/apple-touch-icon.png">
+<link rel="stylesheet" href="/assets/site.css">
+<script>{{ theme_init|safe }}</script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+{{ bar|safe }}<div class="frame">
+{{ docnav|safe }}<main id="main" tabindex="-1">
+{{ menus|safe }}{% if !kicker.is_empty() %}<p class="kicker">{{ kicker }}</p>
+{% endif %}{{ inner|safe }}{{ pager|safe }}</main>
+{{ rail|safe }}{{ footer|safe }}</div>
+{%- for s in scripts %}
+<script>{{ s|safe }}</script>
+{%- endfor %}
+</body>
+</html>

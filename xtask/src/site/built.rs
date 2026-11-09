@@ -323,19 +323,28 @@ fn chrome_problems(pages: &[(String, String)]) -> Vec<String> {
     let ws = crate::facts::load(&root).expect("facts");
     let pkg = &ws.packages["gitterrace"];
     let shared = bar::bar(&pkg.name, &pkg.repository, &ws.demo);
+    let log = std::fs::read_to_string(root.join("CHANGELOG.md")).expect("changelog");
+    let version_href = changelog::version_href(&log, &pkg.version);
+    let site = frame::Site {
+        home: "",
+        repo: &pkg.repository,
+        name: &pkg.name,
+        demo: &ws.demo,
+        license: &pkg.license,
+        version: &pkg.version,
+        version_href: &version_href,
+    };
+    let shared_footer = frame::footer(&site, "");
     let mut bad = Vec::new();
     for (path, html) in pages {
         let Some(foot) = footer_of(html) else {
             bad.push(format!("{path}: not exactly one footer"));
             continue;
         };
-        let repo = attrs(foot, "href").first().copied().unwrap_or("");
-        // The builder's output around a marker is the shared head and tail of every footer.
-        let marked = footer(repo, "@@");
-        let (head, tail) = marked.split_once("@@\n").unwrap_or(("", ""));
-        let head = head.strip_prefix("<footer>").unwrap_or("");
-        let tail = tail.strip_suffix("</footer>\n").unwrap_or("");
-        if !(foot.starts_with(head) && foot.ends_with(tail)) {
+        // Every footer opens with the shared links the builder writes for a page with no source.
+        let head = shared_footer.trim_end_matches("</footer>\n");
+        let head = head.strip_prefix("<footer>").unwrap_or(head);
+        if !foot.starts_with(head) {
             bad.push(format!("{path}: the footer is not the shared one"));
         }
         if !html.contains(&shared) {

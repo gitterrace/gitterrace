@@ -466,6 +466,23 @@ fn docs_pages_with_a_table_render_a_table() {
     );
 }
 
+/// The class this guards: a generated page with a line over the width that a break could have
+/// fixed, from any part of any page (a tag, a meta description, prose, a table, the footer).
+/// Only a line holding an unbreakable token (a single URL) or inside `<pre>` may stay wider.
+#[test]
+fn no_generated_line_is_wider_than_the_width_where_it_could_break() {
+    let (pages, _) = generated();
+    let mut bad = Vec::new();
+    for (path, html) in &pages {
+        for line in super::fit::breakable_wide_lines(html) {
+            bad.push(format!("{path}: {line}"));
+        }
+    }
+    assert!(bad.is_empty(), "{}", bad.join("\n"));
+    let planted = format!("<p>{}</p>\n", "a wide line of prose ".repeat(8));
+    assert!(!super::fit::breakable_wide_lines(&planted).is_empty());
+}
+
 /// Guard class: every heading id of every published page is the id the app gives that heading,
 /// so a `#fragment` written against the app or the repository host lands on the site too. Red
 /// for any heading where the two slug rules part, such as punctuation inside a word.

@@ -175,6 +175,11 @@ pub fn render() -> Out {
     Out::block(INDEX, "doc-index", s)
 }
 
+/// What the document at `path` covers, its index line; None for a path the index lacks.
+pub fn covers(path: &str) -> Option<&'static str> {
+    DOCS.iter().find(|d| d.0 == path).map(|d| d.2)
+}
+
 fn title(path: &str) -> &str {
     let name = path.rsplit('/').next().unwrap_or(path);
     name.strip_suffix(".md").unwrap_or(name)

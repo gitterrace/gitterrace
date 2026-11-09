@@ -1,0 +1,15 @@
+{#- The footer of every page: the same links in the same order on every page, so it
+never shifts. `edit` is the page's source file, empty for a page without one. -#}
+<footer>
+<a href="{{ repo }}">Repository</a>
+<a href="/docs/">Docs</a>
+<a href="/changelog/">Changelog</a>
+{%- for (href, label) in legal %}
+<a href="/{{ href }}">{{ label }}</a>
+{%- endfor %}
+<a href="{{ repo }}/blob/main/LICENSE">{{ license }}</a>
+<a href="/{{ version_href }}">v{{ version }}</a>
+{%- if !edit.is_empty() %}
+<a class="edit" href="{{ repo }}/blob/main/{{ edit }}">Source of this page</a>
+{%- endif %}
+</footer>

@@ -105,17 +105,12 @@
     "scripts/tests-check.py": 1,
     "scripts/theme-gen.py": 1,
     "scripts/theme-tagline-gen.py": 2,
-    "site/assets/site.css": 24,
+    "site/assets/site.css": 15,
     "site/changelog/index.html": 1,
     "site/docs/actions/index.html": 8,
-    "site/docs/architecture/index.html": 2,
-    "site/docs/benchmarks/index.html": 3,
-    "site/docs/configuration/index.html": 1,
-    "site/docs/index.html": 6,
+    "site/docs/architecture/index.html": 1,
+    "site/docs/benchmarks/index.html": 2,
     "site/docs/online/index.html": 1,
-    "site/docs/security/index.html": 1,
-    "site/index.html": 19,
-    "site/legal/imprint/index.html": 1,
-    "site/legal/privacy/index.html": 1
+    "site/index.html": 2
   }
 }

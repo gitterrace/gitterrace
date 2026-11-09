@@ -9,12 +9,15 @@ use std::path::Path;
 use crate::facts::Workspace;
 use crate::out::Out;
 use crate::readme_agents_md;
+use crate::site::frame::{Body, Site, page};
 use anyhow::{Context as _, Result};
 
 mod bar;
 mod changelog;
 pub mod disk;
 mod docs;
+mod fit;
+mod frame;
 mod landing;
 pub mod legal;
 mod shots;
@@ -50,145 +53,8 @@ pub(crate) const SUPPORT_EMAIL: &str = "support@gitterrace.dev";
 pub(crate) const SECURITY_EMAIL: &str = "security@gitterrace.dev";
 const SECURITY_TXT_EXPIRES: &str = "2027-10-31T23:00:00Z";
 
-const PAGE_CSS: &str = "\
-*{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--fg);font:var(--text-md)/var(--leading) var(--sans)}
-main{max-width:760px;margin:0 auto;padding:var(--space-8) var(--page-pad) var(--space-16)}
-a{color:var(--accent-ink)}
-:focus-visible{outline:2px solid var(--accent-ink);outline-offset:2px}
-main:focus{outline:none}
-.skip{position:absolute;left:var(--space-2);top:-100px;padding:var(--space-2) var(--space-3)}
-.skip{background:var(--bg);border:var(--border);border-radius:var(--radius);z-index:20}
-.skip:focus{top:var(--space-2)}
-h1,h2{font-family:var(--serif);line-height:var(--leading-tight);font-weight:var(--weight-semibold)}
-h2{font-size:var(--text-xl);margin:var(--space-16) 0 var(--space-3)}
-h3{font-size:var(--text-lg);margin:var(--space-8) 0 var(--space-2)}
-.top{color-scheme:dark;background:var(--header);border-bottom:var(--border)}
-.bar{max-width:1200px;margin:0 auto;height:56px;padding:0 var(--space-6);display:flex;
-align-items:center;gap:var(--space-6)}
-.top a{color:var(--muted);font-size:14.5px;font-weight:500;text-decoration:none}
-.top a:hover{color:var(--fg)}
-.top .brand{display:flex;align-items:center;gap:var(--space-2);margin-right:auto;color:var(--fg);
-font-size:18px;font-weight:var(--weight-semibold);letter-spacing:-.01em}
-.top .brand img{width:24px;height:24px}
-@media (max-width:640px){.bar{gap:var(--space-4);padding:0 var(--page-pad)}}
-.gh{color:var(--muted)}
-.gh:hover,.gh:focus-visible{color:var(--fg)}
-.gh svg{fill:currentColor}
-.hero{padding:var(--space-4) 0}
-.hero h1{margin:0}
-.hero img{max-width:100%;height:auto}
-.hero img.on-light{display:block}
-.tag{font-family:var(--serif);font-size:var(--text-lg);color:var(--muted);margin:var(--space-4) 0 0}
-pre,code{font-family:var(--mono);font-size:var(--text-sm)}
-pre{background:var(--soft);border:var(--border);border-radius:var(--radius);\
-padding:var(--space-3) var(--space-4);overflow-x:auto}
-:not(pre)>code{background:var(--soft);padding:1px var(--space-1);border-radius:var(--radius)}
-:not(pre)>code{overflow-wrap:anywhere}
-.cmds{display:grid;grid-template-columns:max-content 1fr;gap:var(--space-1) var(--space-4);\
-margin:0}.cmds dt code{background:none;padding:0;white-space:nowrap}.cmds dd{margin:0;\
-color:var(--muted)}
-@media (max-width:640px){.cmds{grid-template-columns:1fr}.cmds dd{margin-bottom:var(--space-2)}}
-main table{display:block;width:max-content;max-width:100%;overflow:auto;border-spacing:0}
-main table{border-collapse:collapse;margin:0 0 var(--space-4)}
-main th,main td{padding:6px 13px;border:1px solid var(--line)}
-main td code,main th code{white-space:nowrap;overflow-wrap:normal}
-main td:not(:has(> code:only-child))::before{content:'';display:block;width:16ch}
-main th{font-weight:600;text-align:left}
-main tr:nth-child(2n){background:var(--soft)}
-ul.features{list-style:none;padding:0;margin:0}
-ul.features li{padding:var(--space-2) 0;border-top:var(--border)}
-ul.features b{font-weight:var(--weight-semibold)}
-.shots{display:grid;grid-template-columns:1fr 1fr;gap:var(--space-6) var(--space-4);\
-margin:var(--space-8) 0}
-@media (max-width:640px){.shots{grid-template-columns:1fr}}
-figure{margin:0}
-figure img,.lightbox img{width:100%;height:auto;border:var(--border);border-radius:var(--radius)}
-figure img.on-light,.lightbox img.on-light{display:block}
-.lightbox{display:none}
-.lightbox:target{display:flex;position:fixed;inset:0;z-index:10;align-items:center;\
-justify-content:center;padding:var(--space-8);background:color-mix(in srgb,var(--bg) 97%,\
-transparent);cursor:zoom-out}
-.lightbox:target .shot{max-width:min(1280px,100%)}
-.demo{margin-top:var(--space-6)}
-figcaption{font-size:var(--text-xs);color:var(--muted);margin-top:var(--space-2);line-height:1.4}\
-figcaption b{color:var(--fg);font-weight:var(--weight-semibold)}
-footer{display:flex;flex-wrap:wrap;gap:var(--space-4);font-size:var(--text-sm)}
-.gh,.theme{line-height:0}
-.theme{width:24px;height:24px;padding:0;display:grid;place-items:center;\
-background:none;border:0;color:var(--muted);cursor:pointer}
-.theme:hover,.theme:focus-visible{color:var(--fg)}
-.theme svg{width:24px;height:24px;overflow:visible;fill:none;stroke:currentColor;stroke-width:2;\
-stroke-linecap:round;stroke-linejoin:round;display:none}
-.theme svg *{vector-effect:non-scaling-stroke}
-.theme .fill{fill:currentColor;stroke:none}
-.theme .i-auto{display:block}
-:root[data-theme=light] .theme .i-auto,:root[data-theme=dark] .theme .i-auto{display:none}
-:root[data-theme=light] .theme .i-light,:root[data-theme=dark] .theme .i-dark{display:block}
-.on-dark{display:none}
-@media (prefers-color-scheme:dark){:root:not([data-theme=light]) img.on-light{display:none}\
-:root:not([data-theme=light]) img.on-dark{display:block}}
-:root[data-theme=dark] img.on-light{display:none}
-:root[data-theme=dark] img.on-dark{display:block}
-.tab-radio{position:absolute;opacity:0;pointer-events:none}
-.tab-label{display:inline-block;padding:var(--space-1) var(--space-3);border:var(--border)}
-.tab-label{border-bottom:0;border-radius:var(--radius) var(--radius) 0 0;color:var(--muted)}
-.tab-label{cursor:pointer;font-family:var(--mono);font-size:var(--text-sm)}
-.tab-radio:checked+.tab-label{color:var(--fg);background:var(--soft)}
-.tab-radio:checked+.tab-label{position:relative;margin-bottom:-1px}
-.tab-radio:checked+.tab-label{border-bottom:1px solid var(--soft)}
-.tab-radio:focus-visible+.tab-label{outline:2px solid var(--accent-ink)}
-.tabs pre{margin-top:0;border-top-left-radius:0}
-.tab-panel{display:none}
-#install-curl:checked~#panel-curl,#install-brew:checked~#panel-brew{display:block}
-#install-cargo:checked~#panel-cargo{display:block}
-footer{margin-top:var(--space-16);padding-top:var(--space-4);border-top:var(--border);\
-color:var(--faint)}
-.outline{display:none}
-.outline .outline-q,.outline .outline-none{display:none}
-.outline ol{list-style:none;margin:0;padding:0}
-.outline h2{display:flex;align-items:center;gap:var(--space-3);margin:0 0 var(--space-2);
-font:var(--weight-regular) var(--text-2xs)/1.4 var(--mono);text-transform:uppercase;
-letter-spacing:.12em;color:var(--muted)}
-.outline h2::after{content:\"\";flex:1;border-top:var(--border)}
-.outline a{display:block;padding:3px var(--space-3);border-left:2px solid var(--line);
-color:var(--muted);overflow-wrap:anywhere;font-size:var(--text-sm);text-decoration:none}
-.outline a:hover{color:var(--fg)}
-.outline a.on{color:var(--fg);font-weight:var(--weight-semibold);border-left-color:var(--accent)}
-.outline li.d1>a{padding-left:var(--space-6)}
-@media (min-width:1100px){.docgrid{display:grid;grid-template-columns:minmax(0,760px) 220px;
-gap:var(--space-8);justify-content:center;padding:0 var(--page-pad)}
-.docgrid>main{max-width:none;margin:0;padding-inline:0}
-.outline{display:block;position:sticky;top:var(--space-4);align-self:start;
-margin-top:var(--space-8);max-height:calc(100vh - 2*var(--space-4));overflow:auto}}
-";
-
-/// The home page `<head>`: title, description, link previews and icons.
-fn head(name: &str, desc: &str, home: &str) -> String {
-    format!(
-        "<!doctype html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n\
-         <meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">\n\
-         <meta name=\"color-scheme\" content=\"light dark\">\n\
-         <title>{name}</title>\n<meta name=\"description\" content=\"{desc}\">\n\
-         <link rel=\"canonical\" href=\"{home}/\">\n\
-         <meta property=\"og:title\" content=\"{name}\">\n\
-         <meta property=\"og:description\" content=\"{desc}\">\n\
-         <meta property=\"og:url\" content=\"{home}/\">\n\
-         <meta property=\"og:type\" content=\"website\">\n\
-         <meta property=\"og:image\" content=\"{home}/assets/og.png\">\n\
-         <meta property=\"og:image:width\" content=\"1200\">\n\
-         <meta property=\"og:image:height\" content=\"630\">\n\
-         <meta property=\"og:image:alt\" content=\"{name}\">\n\
-         <meta name=\"twitter:card\" content=\"summary_large_image\">\n\
-         <link rel=\"icon\" type=\"image/svg+xml\" href=\"assets/mark.svg\">\n\
-         <link rel=\"apple-touch-icon\" href=\"assets/apple-touch-icon.png\">\n\
-         <link rel=\"stylesheet\" href=\"assets/site.css\">\n<script>{THEME_INIT_JS}</script>\
-         \n</head>\n",
-        name = esc(name),
-        desc = esc(desc),
-        home = esc(home),
-    )
-}
+/// The site's own rules, after the app's tokens in `site.css`.
+const PAGE_CSS: &str = include_str!("../templates/site.css");
 
 pub fn render(root: &Path, ws: &Workspace) -> Result<Vec<Out>> {
     let read = |rel: &str| -> Result<String> {
@@ -225,16 +91,27 @@ pub fn render(root: &Path, ws: &Workspace) -> Result<Vec<Out>> {
 
     let repo = &pkg.repository;
     let home = pkg.homepage.trim_end_matches('/');
-    let mut h = head(&pkg.name, &pkg.description, home);
-    h.push_str(&body_open(&pkg.name, repo, &ws.demo, false));
+    let log = read(docs::CHANGELOG)?;
+    let version_href = changelog::version_href(&log, &pkg.version);
+    let site = Site {
+        home,
+        repo,
+        name: &pkg.name,
+        demo: &ws.demo,
+        license: &pkg.license,
+        version: &pkg.version,
+        version_href: &version_href,
+    };
+    let pitch = pitch(root, &pkg.description)?;
+    let mut h = String::new();
     let _ = write!(
         h,
         "<div class=\"hero\">\n<h1><img class=\"on-light\" src=\"assets/logo-light.svg\" \
          alt=\"{n}\" width=\"540\" height=\"120\" loading=\"lazy\">\n\
          <img class=\"on-dark\" src=\"assets/logo-dark.svg\" alt=\"\" width=\"540\" height=\"120\" \
-         loading=\"lazy\"></h1>\n<p class=\"tag\">{tag}</p>\n</div>\n",
+         loading=\"lazy\"></h1>\n<p class=\"lead\">{tag}</p>\n</div>\n",
         n = esc(&pkg.name),
-        tag = esc(&pitch(root, &pkg.description)?),
+        tag = esc(&pitch),
     );
     let demo = if ws.demo.is_empty() {
         String::new()
@@ -278,77 +155,27 @@ pub fn render(root: &Path, ws: &Workspace) -> Result<Vec<Out>> {
         "<section>\n<h2>{MADE}</h2>\n{}</section>\n",
         md(section(&sections, MADE)?)
     );
-    landing_footer(root, &mut h, repo, pkg)?;
-    outs.push(Out::file("site/index.html", h));
-    let (pages, paths) = docs::pages(root, home, repo, &pkg.name, &ws.demo)?;
+    outs.push(Out::file(
+        "site/index.html",
+        page(
+            &site,
+            &Body {
+                desc: &pitch,
+                inner: &h,
+                scripts: vec![LIGHTBOX_JS.to_owned()],
+                ..Body::default()
+            },
+        ),
+    ));
+    let (pages, paths) = docs::pages(root, &site)?;
     outs.extend(pages);
-    outs.extend(host_files(home, repo, &pkg.name, &ws.demo, &paths));
+    outs.extend(host_files(&site, &paths));
     Ok(outs)
 }
 
-/// The landing page's footer and closing tags: the shared footer plus the licence and the
-/// version, which links to its changelog entry.
-fn landing_footer(
-    root: &Path,
-    h: &mut String,
-    repo: &str,
-    pkg: &crate::facts::Package,
-) -> Result<()> {
-    let changelog_text =
-        std::fs::read_to_string(root.join("CHANGELOG.md")).context("read CHANGELOG.md")?;
-    let _ = write!(
-        h,
-        "{footer}\
-         </main>\n<script>{THEME_TOGGLE_JS}</script>\n<script>{LIGHTBOX_JS}</script>\n</body>\
-         \n</html>\n",
-        footer = footer(
-            repo,
-            &format!(
-                "<a href=\"{r}/blob/main/LICENSE\">{lic}</a>\n<a href=\"/{log}\">v{ver}</a>",
-                r = esc(repo),
-                lic = esc(&pkg.license),
-                ver = esc(&pkg.version),
-                log = changelog::version_href(&changelog_text, &pkg.version),
-            ),
-        ),
-    );
-    Ok(())
-}
-
-/// The footer of every page: the links all pages share, then `extra` (HTML, may be empty) for
-/// what only this page has. One builder, so a page cannot drift from the others.
-pub(crate) fn footer(repo: &str, extra: &str) -> String {
-    let repo = esc(repo);
-    let extra = if extra.is_empty() {
-        String::new()
-    } else {
-        format!("{extra}\n")
-    };
-    let mut legal = String::new();
-    for (rel, label) in crate::docs_index::LEGAL {
-        let _ = writeln!(legal, "<a href=\"/{}\">{label}</a>", docs::legal_path(rel));
-    }
-    format!(
-        "<footer>\n<a href=\"{repo}\">Repository</a>\n<a href=\"/docs/\">Docs</a>\n\
-         <a href=\"/changelog/\">Changelog</a>\n{extra}{legal}</footer>\n"
-    )
-}
-
-/// Every page opens its body the same way: a skip link as the first Tab stop, the bar, then the
-/// main landmark the link targets. `tabindex="-1"` lets the browser move focus there, not only
-/// scroll. `grid` opens the two-column grid a docs page with an outline rail sits in.
-pub(crate) fn body_open(name: &str, repo: &str, demo: &str, grid: bool) -> String {
-    format!(
-        "<body>\n<a class=\"skip\" href=\"#main\">Skip to content</a>\n{bar}{grid}\
-         <main id=\"main\" tabindex=\"-1\">\n",
-        bar = bar::bar(name, repo, demo),
-        grid = if grid {
-            "<div class=\"docgrid\">\n"
-        } else {
-            ""
-        },
-    )
-}
+/// The 404 page's text.
+const NOT_FOUND: &str = "<h1>Not found</h1>\n<p>There is no page here. <a href=\"/\">Back to the \
+home page</a>.</p>\n";
 
 /// The one script on the page: Escape closes an open screenshot by going back to `#features`,
 /// the same place a click on the overlay leads. Everything else works without it.
@@ -407,7 +234,8 @@ fn script_hashes() -> String {
 /// The files the static host reads beside the page: response headers, the 404 page, the
 /// crawler files and the security contact. The CSP is tight because the page is static: the
 /// only scripts allowed are [`SCRIPTS`], by their hashes.
-fn host_files(home: &str, repo: &str, name: &str, demo: &str, pages: &[String]) -> Vec<Out> {
+fn host_files(site: &Site, pages: &[String]) -> Vec<Out> {
+    let (home, repo, name) = (site.home, site.repo, site.name);
     let pages = pages.iter().fold(String::new(), |mut s, p| {
         let _ = writeln!(s, "<url><loc>{home}/{p}</loc></url>");
         s
@@ -434,19 +262,16 @@ fn host_files(home: &str, repo: &str, name: &str, demo: &str, pages: &[String]) 
 ",
         script = script_hashes()
     );
-    let not_found = format!(
-        "<!doctype html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n\
-         <meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">\n\
-         <meta name=\"color-scheme\" content=\"light dark\">\n\
-         <meta name=\"robots\" content=\"noindex\">\n<title>Not found - {n}</title>\n\
-         <link rel=\"icon\" type=\"image/svg+xml\" href=\"/assets/mark.svg\">\n\
-         <link rel=\"stylesheet\" href=\"/assets/site.css\">\n\
-         <script>{THEME_INIT_JS}</script>\n</head>\n{open}\
-         <h1>Not found</h1>\n<p>There is no page here. <a href=\"/\">Back to {n}</a>.</p>\n\
-         {footer}</main>\n<script>{THEME_TOGGLE_JS}</script>\n</body>\n</html>\n",
-        n = esc(name),
-        open = body_open(name, repo, demo, false),
-        footer = footer(repo, ""),
+    let not_found = page(
+        site,
+        &Body {
+            title: "Not found",
+            desc: "There is no page at this address.",
+            path: "404.html",
+            inner: NOT_FOUND,
+            noindex: true,
+            ..Body::default()
+        },
     );
     vec![
         Out::file("site/_headers", &headers),
