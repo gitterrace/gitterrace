@@ -133,8 +133,6 @@ pub struct Entry {
     pub enabled: bool,
     pub about: String,
     pub vars: Vec<String>,
-    /// The block has a `lookup` template.
-    pub lookup: bool,
 }
 
 /// The blocks of `defaults/actions.toml`: a chunk is the comment lines right above a
@@ -173,37 +171,53 @@ pub fn starter_entries() -> Vec<Entry> {
                 enabled: value(&text, "enabled").is_none_or(|e| e == "true"),
                 about: about.join(" "),
                 vars,
-                lookup: value(&text, "lookup").is_some(),
             })
         })
         .collect()
 }
 
+/// The widest a generated markdown table row may be, so the page stays readable and short.
+pub const TABLE_ROW_MAX: usize = 100;
+
+/// The first sentence of `about`, cut at a word to fit `budget` columns.
+fn summary(about: &str, budget: usize) -> String {
+    let first = about
+        .split_once(". ")
+        .map_or(about, |(f, _)| f)
+        .trim_end_matches('.');
+    if first.chars().count() <= budget {
+        return first.to_owned();
+    }
+    let mut out = String::new();
+    for w in first.split(' ') {
+        if out.chars().count() + w.chars().count() + 4 > budget {
+            break;
+        }
+        if !out.is_empty() {
+            out.push(' ');
+        }
+        out.push_str(w);
+    }
+    out.push_str("...");
+    out
+}
+
 fn starter() -> String {
     let mut s = String::from(
-        "| Entry | Kind | On | What it does | Needs in `vars` | Commit lookup |\n| --- | --- | --- \
-        | --- | --- | --- |\n",
+        "| Entry | Kind | On | What it does | `vars` |\n| --- | --- | --- | --- | --- |\n",
     );
     let entries = starter_entries();
     for e in &entries {
-        let _ = writeln!(
-            s,
-            "| `{}` | {} | {} | {} | {} | {} |",
-            e.id,
-            if e.table == "send" {
-                "Send to"
-            } else {
-                "action"
-            },
-            yes(e.enabled),
-            e.about,
-            e.vars.join(", "),
-            yes(e.lookup)
-        );
+        let kind = if e.table == "send" { "send" } else { "action" };
+        let head = format!("| `{}` | {kind} | {} | ", e.id, yes(e.enabled));
+        let tail = format!(" | {} |", e.vars.join(", "));
+        let budget = TABLE_ROW_MAX.saturating_sub(head.len() + tail.len());
+        let _ = writeln!(s, "{head}{}{tail}", summary(&e.about, budget));
     }
     // Linked, not copied: `git terrace init` writes the real file, a copy doubled the page.
     s.push_str(
-        "\nThe whole file, as `git terrace init` writes it: \
+        "\nA cell ending in `...` is cut short. The whole text of every entry is in the file \
+         `git terrace init` writes: \
          [defaults/actions.toml](../crates/gitterrace-actions/defaults/actions.toml).\n",
     );
     s
@@ -280,4 +294,69 @@ fn cache() -> String {
         gitterrace_index::FORMAT_VERSION
     );
     s
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{TABLE_ROW_MAX, render};
+
+    /// Blocks whose rows are still wider than `TABLE_ROW_MAX`, with their widest row today. A
+    /// ratchet that only falls: a block may not get wider, and when it gets narrower the cap must
+    /// be lowered to match (or the entry dropped once it fits). Any block not listed must fit.
+    const STILL_WIDE: &[(&str, usize)] = &[
+        ("send", 283),
+        ("placeholders", 266),
+        ("action-keys", 263),
+        ("payload", 154),
+        ("scripts", 336),
+        ("cache", 165),
+        ("routes", 357),
+    ];
+    use crate::facts;
+    use crate::out::Out;
+
+    /// No generated markdown table row is wider than `TABLE_ROW_MAX`, in any block. A long cell
+    /// grows the page past its line cap once the rows wrap.
+    #[test]
+    fn generated_table_rows_stay_narrow() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+        let ws = facts::load(&root).expect("workspace facts");
+        let scripts = crate::action_scripts::load(&root).expect("action scripts");
+        let mut bad = Vec::new();
+        for out in render(&root, &ws, &scripts).expect("render") {
+            let Out::Block { path, id, body } = out else {
+                continue;
+            };
+            let widest = body
+                .lines()
+                .filter(|l| l.starts_with('|'))
+                .map(|l| l.chars().count())
+                .max()
+                .unwrap_or(0);
+            let cap = STILL_WIDE
+                .iter()
+                .find(|(name, _)| *name == id)
+                .map_or(TABLE_ROW_MAX, |(_, cap)| *cap);
+            if widest > cap {
+                let row = body
+                    .lines()
+                    .find(|l| l.chars().count() == widest)
+                    .unwrap_or("");
+                bad.push(format!(
+                    "{path} [{id}]: widest row is {widest} columns, cap {cap}: {}",
+                    row.chars().take(40).collect::<String>()
+                ));
+            } else if cap > TABLE_ROW_MAX && widest < cap {
+                bad.push(format!(
+                    "{path} [{id}]: widest row shrank to {widest}, lower its STILL_WIDE cap from \
+                     {cap} (drop the entry if it fits {TABLE_ROW_MAX})"
+                ));
+            }
+        }
+        assert!(
+            bad.is_empty(),
+            "generated table rows too wide:\n{}",
+            bad.join("\n")
+        );
+    }
 }

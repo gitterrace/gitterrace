@@ -477,6 +477,8 @@ All notable changes are listed here. The format follows
 - site: let the site bar follow the chosen theme
 - index: the message column goes on in a new file when the toc is full
 - bench: time only the insights tabs, not pages that now redirect
+- xtask: the starter table is one short line per entry, and a guard keeps
+  generated rows narrow
 
 ### Performance
 

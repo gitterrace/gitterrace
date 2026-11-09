@@ -63,23 +63,24 @@ folder, unless one exists. It is an ordinary `actions.toml`. An entry with
 fill in their `vars`.
 
 <!-- BEGIN GENERATED: starter -->
-| Entry | Kind | On | What it does | Needs in `vars` | Commit lookup |
-| --- | --- | --- | --- | --- | --- |
-| `tendir` | Send to | yes | Opens tendir's new-task sheet, filled in. Needs the tendir app. |  | no |
-| `mail` | Send to | yes | A mail draft in your mail app. |  | no |
-| `github-issue` | Send to | no | A new issue on github.com. `repo` is `owner/name`. | `repo` | yes |
-| `github-discussion` | Send to | no | A new discussion on github.com. `repo` is `owner/name`, `category` the category slug. | `repo`, `category` | no |
-| `gitlab-issue` | Send to | no | A new issue on gitlab.com. `project` is `group/name`, or `group/subgroup/name`. | `project` | yes |
-| `gitlab-issue-self-hosted` | Send to | no | A new issue on a self-hosted instance of that host. `base` is the instance URL, `project` is `group/name`. | `base`, `project` | yes |
-| `gitlab-merge-request` | Send to | no | A new merge request on gitlab.com from a fixed branch. `branch` is the source branch. The Send window has no branch field, so change `branch` in this file before you send. | `project`, `branch` | no |
-| `forgejo-issue` | Send to | no | A new issue on a self-hosted forge. `base` is the instance URL, `repo` is `owner/name`. | `base`, `repo` | yes |
-| `copy` | action | no | Copies the selection as markdown on any system. Needs `clipboard.sh` from docs/actions in your config folder. |  | no |
-| `edit` | action | no | Opens the file at the selected line in your editor. Needs `editor.sh` from docs/actions. |  | no |
-| `tendir-add` | action | no | Adds a task with the tendir command line tool. |  | no |
-| `webhook` | action | no | Posts the payload as JSON to a webhook of yours. Set `url` in `vars`. | `url` | no |
-| `obsidian-new` | action | no | Writes a new note in an Obsidian vault. `vault` and `folder` pick where it lands. | `vault`, `folder` | no |
+| Entry | Kind | On | What it does | `vars` |
+| --- | --- | --- | --- | --- |
+| `tendir` | send | yes | Opens tendir's new-task sheet, filled in |  |
+| `mail` | send | yes | A mail draft in your mail app |  |
+| `github-issue` | send | no | A new issue on github.com | `repo` |
+| `github-discussion` | send | no | A new discussion on github.com | `repo`, `category` |
+| `gitlab-issue` | send | no | A new issue on gitlab.com | `project` |
+| `gitlab-issue-self-hosted` | send | no | A new issue on a self-hosted... | `base`, `project` |
+| `gitlab-merge-request` | send | no | A new merge request on gitlab.com... | `project`, `branch` |
+| `forgejo-issue` | send | no | A new issue on a self-hosted forge | `base`, `repo` |
+| `copy` | action | no | Copies the selection as markdown on any system |  |
+| `edit` | action | no | Opens the file at the selected line in your editor |  |
+| `tendir-add` | action | no | Adds a task with the tendir command line tool |  |
+| `webhook` | action | no | Posts the payload as JSON to a webhook of yours | `url` |
+| `obsidian-new` | action | no | Writes a new note in an Obsidian vault | `vault`, `folder` |
 
-The whole file, as `git terrace init` writes it:
+A cell ending in `...` is cut short. The whole text of every entry is in the
+file `git terrace init` writes:
 [defaults/actions.toml](../crates/gitterrace-actions/defaults/actions.toml).
 
 <!-- END GENERATED: starter -->
