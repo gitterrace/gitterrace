@@ -39,8 +39,9 @@ pub(crate) struct Peer {
 pub(crate) struct Peers(Arc<RwLock<Vec<Arc<Peer>>>>);
 
 impl Peers {
-    /// Adds the repository the table now serves as `name` and warms its roots in the
-    /// background. Outside a runtime (some tests) nothing is warmed until [`Peers::warm`].
+    /// Adds the repository the table now serves as `name`. Nothing is walked here: a
+    /// refresher warms it through [`Peers::warm`] once its own repository id is known, so the
+    /// root walks never hold up the id that permalinks carry.
     pub(crate) fn add(&self, name: &str, path: PathBuf) {
         let peer = Arc::new(Peer {
             name: name.to_owned(),
@@ -52,10 +53,7 @@ impl Peers {
         });
         if let Ok(mut g) = self.0.write() {
             g.retain(|p| p.name != name);
-            g.push(Arc::clone(&peer));
-        }
-        if let Ok(rt) = tokio::runtime::Handle::try_current() {
-            rt.spawn_blocking(move || peer.warm(None));
+            g.push(peer);
         }
     }
 
@@ -72,13 +70,13 @@ impl Peers {
 
     /// Warms `own` from its open `repo`, and every other peer not warmed within [`REWARM`].
     /// Blocking git work: the index refresher calls it off the request path.
-    pub(crate) fn warm(&self, own: &str, repo: &Repo) {
+    /// Every peer walks through its own handle opened from its path, never the page's `repo`:
+    /// a walk then shares no handle, cache or lock with a page being built.
+    pub(crate) fn warm(&self, own: &str) {
         let now = Instant::now();
         for p in self.snapshot() {
-            if p.name == own {
-                p.warm(Some(repo));
-            } else if p.warmed().is_none_or(|at| now.duration_since(at) >= REWARM) {
-                p.warm(None);
+            if p.name == own || p.warmed().is_none_or(|at| now.duration_since(at) >= REWARM) {
+                p.warm();
             }
         }
     }
@@ -121,22 +119,26 @@ impl Peer {
             .unwrap_or_default()
     }
 
+    /// When the set was last stored. Never waits either: a set being stored counts as fresh.
     fn warmed(&self) -> Option<Instant> {
-        self.roots.lock().ok().and_then(|g| g.0)
+        self.roots
+            .try_lock()
+            .map_or_else(|_| Some(Instant::now()), |g| g.0)
     }
 
-    /// Updates the set from `repo`, an open handle on this peer, else one opened from its
-    /// path. A repository that will not open shares nothing.
-    fn warm(&self, repo: Option<&Repo>) {
+    /// Updates the set from a handle opened from its path for this walk alone. A repository
+    /// that will not open shares nothing.
+    fn warm(&self) {
         if self.busy.swap(true, Ordering::AcqRel) {
             return;
         }
         let mut roots = self.roots.lock().map(|g| g.1.clone()).unwrap_or_default();
-        let mut opened = None;
-        let repo = repo.or_else(|| Repo::discover(&self.path).ok().map(|r| &*opened.insert(r)));
+        let repo = Repo::discover(&self.path).ok();
         #[cfg(test)]
         self.walks.fetch_add(1, Ordering::Relaxed);
-        match repo.map(|r| roots.update(r)) {
+        #[cfg(test)]
+        hold::wait(&self.path);
+        match repo.as_ref().map(|r| roots.update(r)) {
             Some(Ok(_)) => {}
             Some(Err(e)) => {
                 tracing::debug!("roots of {}: {e}", self.name);
@@ -151,13 +153,41 @@ impl Peer {
     }
 }
 
+/// A test hold on root walks: a walk of a held path waits before reading git, so a test can
+/// prove a page never waits for one. Keyed by path, so parallel tests are not held.
+#[cfg(test)]
+pub(crate) mod hold {
+    use std::path::{Path, PathBuf};
+    use std::sync::{Condvar, Mutex};
+
+    static HELD: Mutex<Vec<PathBuf>> = Mutex::new(Vec::new());
+    static FREED: Condvar = Condvar::new();
+
+    pub(crate) fn set(path: &Path, on: bool) {
+        if let Ok(mut g) = HELD.lock() {
+            g.retain(|p| p != path);
+            if on {
+                g.push(path.to_owned());
+            }
+        }
+        FREED.notify_all();
+    }
+
+    pub(crate) fn wait(path: &Path) {
+        let Ok(mut g) = HELD.lock() else { return };
+        while g.iter().any(|p| p == path) {
+            let Ok(next) = FREED.wait(g) else { return };
+            g = next;
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use gitterrace_testkit::git;
     use std::path::Path;
 
     use super::Peers;
-    use gitterrace_git::Repo;
 
     fn repo(d: &Path, msg: &str) {
         std::fs::create_dir_all(d).expect("dir");
@@ -194,7 +224,7 @@ mod tests {
         let before = peers.walks();
         assert!(peers.related("a").is_empty(), "cold: no line yet");
         assert_eq!(peers.walks(), before, "a read never walks");
-        peers.warm("a", &Repo::discover(&a).expect("open"));
+        peers.warm("a");
         assert!(peers.walks() >= before + 3, "the warm-up walks");
         let walked = peers.walks();
         assert_eq!(peers.related("a"), ["b"]);

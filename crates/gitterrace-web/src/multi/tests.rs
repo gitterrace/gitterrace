@@ -405,3 +405,47 @@ async fn the_log_links_served_clones_by_name_only() {
     let (_, solo) = gitterrace_testkit::get(&lone, "/log/HEAD").await;
     assert!(!solo.contains("class=\"related\""), "{solo}");
 }
+
+/// Guard class: a page that waits on background git work it only reads the result of. With
+/// every root walk held, alpha's first log still answers and shows no Related line; once the
+/// walks are freed the line appears. A page that took a lock, a job slot or a handle the walk
+/// holds, or read the repo id through the walk's `OnceLock`, would time out here.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn the_first_log_does_not_wait_for_a_held_root_walk() {
+    let dir = tempfile::tempdir().expect("tmp");
+    let (a, b) = (dir.path().join("alpha"), dir.path().join("beta"));
+    std::fs::create_dir_all(&a).expect("dir");
+    git(&a, &["init", "-q", "-b", "main"]);
+    git(&a, &["commit", "-q", "--allow-empty", "-m", "root"]);
+    let (from, to) = (a.to_str().expect("utf8"), b.to_str().expect("utf8"));
+    git(dir.path(), &["clone", "-q", from, to]);
+    for p in [&a, &b] {
+        crate::related::hold::set(p, true);
+    }
+    let router = crate::multi_router(vec![a.clone(), b.clone()]).expect("router");
+    gitterrace_testkit::wait::until("alpha is ready", || async {
+        gitterrace_testkit::get(&router, "/r/alpha/api/progress")
+            .await
+            .1
+            .contains("\"ready\":true")
+    })
+    .await;
+    let first = tokio::time::timeout(
+        std::time::Duration::from_secs(10),
+        gitterrace_testkit::get(&router, "/r/alpha/log/HEAD"),
+    )
+    .await;
+    for p in [&a, &b] {
+        crate::related::hold::set(p, false);
+    }
+    let (status, log) = first.expect("the first log waited for the held root walk");
+    assert_eq!(status, 200);
+    assert!(!log.contains("class=\"related\""), "held: no line yet");
+    gitterrace_testkit::wait::until("the Related line once the walk is freed", || async {
+        gitterrace_testkit::get(&router, "/r/alpha/log/HEAD")
+            .await
+            .1
+            .contains("class=\"related\"")
+    })
+    .await;
+}

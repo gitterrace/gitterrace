@@ -452,6 +452,11 @@ async fn go_redirects_to_the_repo_holding_the_commit() {
     assert_eq!(s, 404);
     let shown = html.contains("&lt;img src=x&gt;") || html.contains("&#60;img src=x&#62;");
     assert!(shown && !html.contains("<img src=x>"), "{html}");
+    // The id is known once the repository is ready: a page served after that carries it.
+    gitterrace_testkit::wait::until("the index is ready", || async {
+        page(&r, "/api/progress").await.1.contains("\"ready\":true")
+    })
+    .await;
     let (_, html) = page(&r, "/").await;
     assert!(
         html.contains(&format!("data-id=\"{id}\"")),

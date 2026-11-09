@@ -253,7 +253,10 @@ pub(crate) fn chrome_at(app: &crate::app::App, active: &str, rev: &str) -> Chrom
         live_on: "",
         version: app.version().to_string(),
         home: crate::fmt::with_rev(rev, || href("/")),
-        repo_id: app.repo.id().unwrap_or_default(),
+        // Read without waiting: the refresher computes it before ready, and a page that came
+        // first (or while root walks of related repositories load the disk) must not block on
+        // that walk. The permalink scripts skip an empty id.
+        repo_id: app.repo.id_if_known().unwrap_or_default(),
         link_style: app.cfg().links.style.as_str(),
         repo_key: app.key.clone(),
         actions: app

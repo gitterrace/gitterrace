@@ -64,6 +64,8 @@ fn source_pages_with_their_symbol_outline_match_the_oracle() {
             .at("2024-03-01T10:00:00Z")
             .commit("feat: one file per outlined language");
         let router = gitterrace_web::app_router(f.path()).expect("router");
+        // A page carries the repo id only once it is known: answer after ready, as a user would.
+        oracle::ready(&router).await;
         let mut got = BTreeMap::new();
         for (p, _) in FILES {
             let uri = format!("/blob/HEAD/{p}");

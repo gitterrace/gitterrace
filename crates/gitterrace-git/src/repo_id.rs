@@ -18,6 +18,12 @@ impl Repo {
             .clone()
     }
 
+    /// [`Repo::id`] when it is already known, else `None` at once: never walks and never
+    /// waits for a walk another thread is running. For a page, which must not stall behind it.
+    pub fn id_if_known(&self) -> Option<String> {
+        self.id_cache.get().cloned().flatten()
+    }
+
     fn root_id(&self) -> Result<Option<String>> {
         let repo = self.repo();
         let Ok(head) = repo.head_id() else {

@@ -38,9 +38,15 @@ impl App {
 
     /// Warms the root sets behind the log's related links off the request path: this
     /// repository's, and any peer's not warmed lately. A page only reads what this caches.
+    /// The walk takes no job slot and not the page's handle: it opens its own, so a page never
+    /// queues behind it. The repository id comes first: permalinks need it, so the root walks
+    /// queue behind it and never the other way round.
     fn warm_related(self: &Arc<Self>) {
-        let a = Arc::clone(self);
-        tokio::task::spawn_blocking(move || a.env.related.warm(&a.key, &a.repo));
+        let app = Arc::clone(self);
+        tokio::task::spawn_blocking(move || {
+            app.repo.id();
+            app.env.related.warm(&app.key);
+        });
     }
 }
 
