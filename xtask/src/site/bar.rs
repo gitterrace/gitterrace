@@ -1,6 +1,6 @@
-//! The slim dark bar on top of every site page, from `templates/bar.html`: brand, Docs, the demo
-//! when there is one, the source link and the theme button. It stays dark in light mode
-//! (`color-scheme:dark` on `.top`), as the app's header does.
+//! The slim bar on top of every site page, from `templates/bar.html`: brand, Docs, the demo
+//! when there is one, the source link and the theme button. It follows the page's color scheme,
+//! light in light mode and dark in dark mode, as the app's header does.
 
 use askama::Template;
 

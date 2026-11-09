@@ -43,12 +43,13 @@ function pages() {
 
 /** @param {any} env what browser-check.mjs set up (pw, r, browsers, ...) */
 export function checks(env) {
-  const { pw, r, browsers } = env;
+  const { pw, r, browsers, srv } = env;
 
   // The bar on every page, 404 included, at 390 and 1440 px, in light and dark: one header.top
-  // first in the body after the skip link, 56 px tall plus its hairline, its background dark
-  // (luminance under 0.1) in both schemes, its text light, Docs, the source link and the theme
-  // button inside it and in the viewport, no sideways scroll. A script error fails.
+  // first in the body after the skip link, 56 px tall plus its hairline, its background and text
+  // following the scheme (dark bar and light text in dark, light bar and dark text in light),
+  // Docs, the source link and the theme button inside it and in the viewport,
+  // no sideways scroll. A script error fails.
   async function siteBar() {
     const { server, url } = await serve();
     const all = pages();
@@ -100,8 +101,13 @@ export function checks(env) {
               else {
                 if (!m.afterSkip) why.push('not right after the skip link');
                 if (Math.abs(m.height - 57) > 1) why.push(`${m.height} px tall`);
-                if (m.bg > 0.1) why.push(`background luminance ${m.bg.toFixed(2)}, not dark`);
-                if (m.fg < 0.5) why.push(`text luminance ${m.fg.toFixed(2)}, not light`);
+                const dark = scheme === 'dark';
+                if (dark ? m.bg > 0.1 : m.bg < 0.5) {
+                  why.push(`background luminance ${m.bg.toFixed(2)}, not ${scheme}`);
+                }
+                if (dark ? m.fg < 0.5 : m.fg > 0.3) {
+                  why.push(`text luminance ${m.fg.toFixed(2)}, not ${dark ? 'light' : 'dark'}`);
+                }
                 if (!m.docs || !m.gh || !m.theme) why.push(`links in view: ${JSON.stringify(m)}`);
                 if (m.scroll > 0) why.push(`page scrolls sideways by ${m.scroll} px`);
               }
@@ -110,7 +116,8 @@ export function checks(env) {
             const where = `site-bar ${name} ${scheme} ${width}`;
             if (errors.length) bad.push(`errors: ${errors.join(' | ')}`);
             if (bad.length) r.fail(`${where}: ${bad.join('; ')}`);
-            else r.ok(`${where}: one dark bar on all ${all.length} pages, links in view`);
+            else r.ok(`${where}: one scheme-following bar on all ${all.length} pages`
+              + ', links in view');
             await ctx.close();
           }
         }
@@ -262,7 +269,65 @@ export function checks(env) {
     await fb.close();
   }
 
-  return { siteBar, siteRail, siteTables };
+  // The real theme button, on the app and on the site: from the light theme to the dark one the
+  // header's computed background changes along with the body's, the header dark in dark and
+  // light in light, its text and brand the other way round.
+  async function headerTheme() {
+    const { server, url } = await serve();
+    const lum = (c) => {
+      const [r, g, b] = (c.match(/[\d.]+/g) || []).map(Number);
+      const f = (v) => (v /= 255) <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+      return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b);
+    };
+    const read = () => {
+      const top = document.querySelector('header.top');
+      const brand = top.querySelector('.brand');
+      return {
+        head: getComputedStyle(top).backgroundColor,
+        body: getComputedStyle(document.body).backgroundColor,
+        text: getComputedStyle(brand).color,
+        theme: document.documentElement.dataset.theme || 'system',
+      };
+    };
+    try {
+      for (const name of browsers) {
+        const b = await launch(pw, name);
+        for (const [what, base] of [['site', url + '/'], ['app', srv.base + '/']]) {
+          const viewport = { width: 1200, height: 800 };
+          const ctx = await b.newContext({ colorScheme: 'dark', viewport });
+          const p = await ctx.newPage();
+          await p.goto(base, { waitUntil: 'load' });
+          // Click the real toggle until the page is on light, then once more for dark.
+          const seen = {};
+          for (let i = 0; i < 3 && !seen.dark; i++) {
+            const m = await p.evaluate(read);
+            if (m.theme === 'light' || m.theme === 'dark') seen[m.theme] = m;
+            if (!seen.dark) await p.click('#theme');
+          }
+          const l = seen.light, d = seen.dark;
+          const why = [];
+          if (!l || !d) why.push('the toggle did not reach both themes');
+          else {
+            if (l.head === d.head) why.push(`header stays ${d.head}`);
+            if (l.body === d.body) why.push('body does not change');
+            if (lum(l.head) < 0.5 || lum(l.text) > 0.3) {
+              why.push(`light header ${l.head}, text ${l.text}`);
+            }
+            if (lum(d.head) > 0.1 || lum(d.text) < 0.5) {
+              why.push(`dark header ${d.head}, text ${d.text}`);
+            }
+          }
+          const where = `header-theme ${name} ${what}`;
+          if (why.length) r.fail(`${where}: ${why.join('; ')}`);
+          else r.ok(`${where}: header follows the theme toggle with the body`);
+          await ctx.close();
+        }
+        await b.close();
+      }
+    } finally { server.close(); }
+  }
+
+  return { siteBar, siteRail, siteTables, headerTheme };
 }
 
 // Runs in the page: the tables in main and what is wrong in their cells. Each character's line

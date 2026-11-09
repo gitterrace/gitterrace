@@ -27,8 +27,8 @@ letter-spacing:.12em;color:var(--muted)}
 border-top:var(--border)}
 .kicker{margin-bottom:var(--space-3)}
 
-/* The bar: dark in both schemes, as the app's header. */
-.top{color-scheme:dark;background:var(--header);border-bottom:var(--border)}
+/* The bar: follows the chosen scheme, as the app's header. */
+.top{background:var(--header);border-bottom:var(--border)}
 .bar{max-width:var(--page-max);margin:0 auto;height:56px;padding:0 var(--page-pad);
 display:flex;align-items:center;gap:var(--space-6)}
 .top a{color:var(--muted);font-size:14.5px;font-weight:500;text-decoration:none}
