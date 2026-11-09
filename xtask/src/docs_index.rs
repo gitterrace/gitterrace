@@ -22,28 +22,31 @@ const INDEX: &str = "docs/README.md";
 enum Kind {
     Start,
     Guide,
-    Explain,
     Reference,
+    Explain,
+    Contribute,
     Legal,
     Project,
 }
 
 impl Kind {
-    const ALL: [Self; 6] = [
+    const ALL: [Self; 7] = [
         Self::Start,
         Self::Guide,
-        Self::Explain,
         Self::Reference,
+        Self::Explain,
+        Self::Contribute,
         Self::Legal,
         Self::Project,
     ];
 
     const fn heading(self) -> &'static str {
         match self {
-            Self::Start => "Start here",
-            Self::Guide => "Get one thing done",
-            Self::Explain => "Understand how and why",
-            Self::Reference => "Look something up",
+            Self::Start => "Start",
+            Self::Guide => "Use",
+            Self::Reference => "Look up",
+            Self::Explain => "Background",
+            Self::Contribute => "Contribute",
             Self::Legal => "Legal",
             Self::Project => "The project",
         }
@@ -58,7 +61,6 @@ const DOCS: &[(&str, Kind, &str)] = &[
         Kind::Start,
         "Install, the first run, Windows, upgrading and troubleshooting",
     ),
-    ("docs/why.md", Kind::Start, "What gitterrace is for"),
     (
         "README.md",
         Kind::Start,
@@ -80,16 +82,6 @@ const DOCS: &[(&str, Kind, &str)] = &[
         "Publish a static export, public mode, Docker, a reverse proxy",
     ),
     (
-        "docs/architecture.md",
-        Kind::Explain,
-        "Crates, the decisions behind them, the cache, routes, highlighted languages",
-    ),
-    (
-        "docs/security.md",
-        Kind::Explain,
-        "What is protected, at which door, and the test that holds each door shut",
-    ),
-    (
         "docs/configuration.md",
         Kind::Reference,
         "Every `config.toml` key, its default and the naming rule",
@@ -104,10 +96,21 @@ const DOCS: &[(&str, Kind, &str)] = &[
         Kind::Reference,
         "The JSON API and the MCP tools",
     ),
+    ("docs/why.md", Kind::Explain, "What gitterrace is for"),
+    (
+        "docs/security.md",
+        Kind::Explain,
+        "What is protected, from whom, and what holds each door shut",
+    ),
     (
         "docs/benchmarks.md",
-        Kind::Reference,
+        Kind::Explain,
         "What is measured, the budgets and the newest results",
+    ),
+    (
+        "docs/architecture.md",
+        Kind::Contribute,
+        "Crates, decisions, the cache, routes, security guards and their tests",
     ),
     (
         "docs/legal/imprint.md",

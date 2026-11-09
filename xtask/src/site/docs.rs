@@ -384,24 +384,24 @@ pub(super) fn pages(root: &Path, site: &Site) -> Result<(Vec<Out>, Vec<String>)>
     let mut outs = Vec::new();
     let mut paths = vec!["docs/".to_owned()];
     let mut docs = Vec::new();
-    for (rel, _, what) in on_site() {
+    for (rel, group, what) in on_site() {
         let text = read(rel)?;
         let title = title_of(rel, &text)?;
         let path = page_path(stem(rel));
         if docs
             .iter()
-            .any(|d: &(&str, String, String, &str, String)| d.1 == path)
+            .any(|d: &(&str, String, String, &str, String, &str)| d.1 == path)
         {
             anyhow::bail!("{rel}: another document is already the page {path}");
         }
-        docs.push((rel, path, title, what, text));
+        docs.push((rel, path, title, what, text, group));
     }
-    let order: Vec<(String, String)> = docs
+    let order: Vec<(String, String, String)> = docs
         .iter()
-        .map(|(_, p, t, ..)| (p.clone(), t.clone()))
+        .map(|(_, p, t, .., g)| (p.clone(), t.clone(), (*g).to_owned()))
         .collect();
     let mut titles = Vec::new();
-    for (rel, path, title, what, text) in docs {
+    for (rel, path, title, what, text, _) in docs {
         let mut h2s = Vec::new();
         let inner = body(&text, rel, &links, &mut |level, h| {
             let id = slug(h);

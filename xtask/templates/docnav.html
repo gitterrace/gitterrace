@@ -2,13 +2,19 @@
 folded menus above it on a narrow one, or the previous and next links under it. Every
 docs page in index order; the current one carries aria-current. -#}
 {%- if part == "list" -%}
-<nav class="docnav" aria-label="Docs"><h2>Docs</h2><ol>
-{%- for d in docs %}<li><a href="/{{ d.href }}"{{ d.current|safe }}>{{ d.title }}</a></li>
+<nav class="docnav" aria-label="Docs"><h2>Docs</h2>
+{%- for d in docs %}
+{%- if !d.group.is_empty() %}{% if !loop.first %}</ol>{% endif -%}
+<h3>{{ d.group }}</h3><ol>{% endif -%}
+<li><a href="/{{ d.href }}"{{ d.current|safe }}>{{ d.title }}</a></li>
 {%- endfor -%}
 </ol></nav>
 {%- elif part == "menus" -%}
-<div class="menus"><details class="menu"><summary>Docs</summary><div class="pop"><ol>
-{%- for d in docs %}<li><a href="/{{ d.href }}"{{ d.current|safe }}>{{ d.title }}</a></li>
+<div class="menus"><details class="menu"><summary>Docs</summary><div class="pop">
+{%- for d in docs %}
+{%- if !d.group.is_empty() %}{% if !loop.first %}</ol>{% endif -%}
+<h3>{{ d.group }}</h3><ol>{% endif -%}
+<li><a href="/{{ d.href }}"{{ d.current|safe }}>{{ d.title }}</a></li>
 {%- endfor -%}
 </ol></div></details>
 {%- if !heads.is_empty() -%}

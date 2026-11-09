@@ -13,6 +13,8 @@ struct Item<'a> {
     href: &'a str,
     title: &'a str,
     current: &'static str,
+    /// The group heading shown above this page, set only on the first page of its group.
+    group: &'a str,
 }
 
 #[derive(Template)]
@@ -27,8 +29,8 @@ struct Nav<'a> {
 }
 
 /// The navigation of the docs page at `here` among `order`, every docs page as (site path,
-/// title) in index order. `heads` are the page's level 2 headings as (id, text) for the narrow
-/// "On this page" menu, empty when the page has no outline.
+/// title, group heading) in index order. `heads` are the page's level 2 headings as (id, text)
+/// for the narrow "On this page" menu, empty when the page has no outline.
 pub(super) struct DocNav {
     /// The list beside the text on a wide screen.
     pub list: String,
@@ -38,10 +40,16 @@ pub(super) struct DocNav {
     pub pager: String,
 }
 
-pub(super) fn nav(order: &[(String, String)], here: &str, heads: &[(String, String)]) -> DocNav {
+pub(super) fn nav(
+    order: &[(String, String, String)],
+    here: &str,
+    heads: &[(String, String)],
+) -> DocNav {
     let docs: Vec<Item> = order
         .iter()
-        .map(|(p, t)| Item {
+        .enumerate()
+        .map(|(i, (p, t, g))| Item {
+            group: if i == 0 || order[i - 1].2 != *g { g } else { "" },
             href: p,
             title: t,
             current: if p == here {
@@ -51,8 +59,8 @@ pub(super) fn nav(order: &[(String, String)], here: &str, heads: &[(String, Stri
             },
         })
         .collect();
-    let at = order.iter().position(|(p, _)| p == here);
-    let pair = |i: usize| order.get(i).map(|(p, t)| (p.as_str(), t.as_str()));
+    let at = order.iter().position(|(p, ..)| p == here);
+    let pair = |i: usize| order.get(i).map(|(p, t, _)| (p.as_str(), t.as_str()));
     let prev = at.and_then(|i| i.checked_sub(1)).and_then(pair);
     let next = at.and_then(|i| pair(i + 1));
     let render = |part: &str| {
@@ -80,10 +88,10 @@ pub(super) fn nav(order: &[(String, String)], here: &str, heads: &[(String, Stri
 mod tests {
     use super::*;
 
-    fn order() -> Vec<(String, String)> {
+    fn order() -> Vec<(String, String, String)> {
         ["a", "b", "c"]
             .iter()
-            .map(|n| (format!("docs/{n}/"), n.to_uppercase()))
+            .map(|n| (format!("docs/{n}/"), n.to_uppercase(), "G".to_owned()))
             .collect()
     }
 

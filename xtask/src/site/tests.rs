@@ -532,3 +532,57 @@ fn the_site_slug_keeps_the_app_rule() {
     assert_eq!(docs::slug("HTTP (/api/v1)"), "http-apiv1");
     assert_eq!(docs::slug("Code age and releases"), "code-age-and-releases");
 }
+
+/// Guard class: the docs nav, its group headings and the pager drift from the docs index, in
+/// order, label or membership. Every built docs page's nav must list the index's groups under
+/// their headings in index order, and its previous and next links must be its index neighbors.
+#[test]
+fn docs_nav_headings_order_and_pager_follow_the_index() {
+    let (pages, _) = generated();
+    let mut want: Vec<String> = Vec::new();
+    let mut order: Vec<String> = Vec::new();
+    let mut last = "";
+    for (rel, heading, _) in crate::docs_index::on_site() {
+        if heading != last {
+            want.push(format!("# {heading}"));
+            last = heading;
+        }
+        let p = docs::page_path(docs::stem(rel));
+        want.push(p.clone());
+        order.push(p);
+    }
+    for (i, p) in order.iter().enumerate() {
+        let html = &pages
+            .iter()
+            .find(|(f, _)| *f == format!("{p}index.html"))
+            .unwrap_or_else(|| panic!("{p}: not built"))
+            .1;
+        let nav = html
+            .split_once("<nav class=\"docnav\"")
+            .and_then(|(_, r)| r.split_once("</nav>"))
+            .map(|(n, _)| n)
+            .expect("docnav");
+        let mut got = Vec::new();
+        for part in nav.split('<').skip(1) {
+            if let Some(h) = part.strip_prefix("h3>") {
+                got.push(format!("# {h}"));
+            } else if let Some(a) = part.strip_prefix("a href=\"/") {
+                got.push(a.split('"').next().unwrap_or("").to_owned());
+            }
+        }
+        assert_eq!(got, want, "{p}: nav differs from the index");
+        let under = html
+            .split_once("<nav class=\"pager\"")
+            .map(|(_, r)| r)
+            .expect("pager");
+        let prev = i.checked_sub(1).map(|j| &order[j]);
+        let next = order.get(i + 1);
+        for (rel, link) in [("prev", prev), ("next", next)] {
+            let has = |q: &str| under.contains(&format!("href=\"/{q}\" rel=\"{rel}\""));
+            match link {
+                Some(q) => assert!(has(q), "{p}: {rel} is not {q}"),
+                None => assert!(!under.contains(&format!("rel=\"{rel}\"")), "{p}: {rel}"),
+            }
+        }
+    }
+}

@@ -5,15 +5,14 @@ then read [why](why.md) it exists. Contributors start at
 [contributing](../CONTRIBUTING.md).
 
 <!-- BEGIN GENERATED: doc-index -->
-## Start here
+## Start
 
 | Document | Covers |
 | --- | --- |
 | [getting-started](getting-started.md) | Install, the first run, Windows, upgrading and troubleshooting |
-| [why](why.md) | What gitterrace is for |
 | [README](../README.md) | The repository's front page: install, quickstart and every command |
 
-## Get one thing done
+## Use
 
 | Document | Covers |
 | --- | --- |
@@ -21,21 +20,27 @@ then read [why](why.md) it exists. Contributors start at
 | [actions](actions.md) | Send a selection to another app, or run your own program on it |
 | [online](online.md) | Publish a static export, public mode, Docker, a reverse proxy |
 
-## Understand how and why
-
-| Document | Covers |
-| --- | --- |
-| [architecture](architecture.md) | Crates, the decisions behind them, the cache, routes, highlighted languages |
-| [security](security.md) | What is protected, at which door, and the test that holds each door shut |
-
-## Look something up
+## Look up
 
 | Document | Covers |
 | --- | --- |
 | [configuration](configuration.md) | Every `config.toml` key, its default and the naming rule |
 | [cli](cli.md) | Every command and flag of `git terrace` |
 | [api](api.md) | The JSON API and the MCP tools |
+
+## Background
+
+| Document | Covers |
+| --- | --- |
+| [why](why.md) | What gitterrace is for |
+| [security](security.md) | What is protected, from whom, and what holds each door shut |
 | [benchmarks](benchmarks.md) | What is measured, the budgets and the newest results |
+
+## Contribute
+
+| Document | Covers |
+| --- | --- |
+| [architecture](architecture.md) | Crates, decisions, the cache, routes, security guards and their tests |
 
 ## Legal
 
