@@ -28,6 +28,8 @@ pub enum Kind {
     Messages = 4,
     /// The first-parent chain of the tip and its line totals (`chain.rs`).
     Chain = 5,
+    /// Slim file rows of the non-merge commits, the per-file pages' read (`tip.rs`).
+    Tip = 6,
 }
 
 impl Kind {
@@ -38,6 +40,7 @@ impl Kind {
             3 => Some(Self::Order),
             4 => Some(Self::Messages),
             5 => Some(Self::Chain),
+            6 => Some(Self::Tip),
             _ => None,
         }
     }
@@ -78,6 +81,11 @@ pub mod section {
     pub const CHAIN: u16 = 48;
     /// Chain file meta, written last: order fingerprint u64, commit count u32, length u32.
     pub const CHAIN_META: u16 = 49;
+    /// One item per rank, ascending: the commit's file rows keyed by the file's name at the
+    /// indexed tip, none for a merge (kind 6, `tip.rs`).
+    pub const TIP_TOUCHES: u16 = 50;
+    /// Tip file meta, written last: order fingerprint u64, commit count u32 (kind 6).
+    pub const TIP_META: u16 = 51;
 }
 
 /// Cumulative string counts a file was written against, checked on open so ids cannot shift.

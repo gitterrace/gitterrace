@@ -16,6 +16,7 @@ pub mod seg;
 mod select;
 mod source;
 mod store;
+mod tip;
 
 use std::collections::HashSet;
 use std::io;
@@ -312,6 +313,7 @@ impl Index {
             self.sync_messages(source)?;
             ph.start("chain");
             chain::sync(&self.dir)?;
+            tip::sync(&self.dir)?;
             ph.end();
             if held.len() == order.len()
                 && let Some(t) = tip
@@ -387,6 +389,8 @@ impl Index {
         self.sync_messages(source)?;
         ph.start("chain");
         chain::sync(&self.dir)?;
+        ph.start("tip");
+        tip::sync(&self.dir)?;
         ph.end();
         // A skipped commit is not in the set, so it stays pending and the next update appends
         // it; until then HEAD's pages read the reach view, and the tip marker is not written.

@@ -29,6 +29,24 @@ impl DiskSource {
         true
     }
 
+    /// Streams the stored tip touches, `false` when there are none for this set. A store error
+    /// is remembered for `failure` and ends the stream.
+    pub(crate) fn stored_tip(&self, each: &mut dyn FnMut(Rank, &[crate::feed::TipTouch])) -> bool {
+        let Some(c) = &self.tip else {
+            return false;
+        };
+        let r = crate::tip::read(c, self.len, self.counts[0] as usize, &mut |r, t| {
+            each(r, t);
+            Ok(())
+        });
+        self.ok(r);
+        true
+    }
+
+    pub(crate) const fn stored_has_tip(&self) -> bool {
+        self.tip.is_some()
+    }
+
     /// The stored chain's length, checked at open against its steps.
     pub(crate) fn stored_chain_len(&self) -> Option<usize> {
         self.chain.as_ref().map(|(_, n)| *n as usize)

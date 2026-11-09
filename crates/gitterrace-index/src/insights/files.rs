@@ -44,7 +44,12 @@ pub(crate) struct Follow {
 impl Follow {
     /// Replays `edges` newest commit first, rows ascending, merges left out.
     pub(crate) fn build(src: &dyn InsightsSource) -> Self {
-        let mut edges: Vec<RenameEdge> = src.rename_edges().collect();
+        let edges: Vec<RenameEdge> = src.rename_edges().collect();
+        Self::of_edges(edges, |r| src.commit(r).is_some_and(|c| c.merge))
+    }
+
+    /// [`Follow::build`] over `edges`, `merge` telling the merge commits apart.
+    pub(crate) fn of_edges(mut edges: Vec<RenameEdge>, merge_at: impl Fn(Rank) -> bool) -> Self {
         edges.sort_by(|x, y| y.rank.cmp(&x.rank).then_with(|| x.row.cmp(&y.row)));
         let mut alias: FastMap<PathId, PathId> = FastMap::default();
         let mut out = Self::default();
@@ -53,7 +58,7 @@ impl Follow {
             let is_merge = match merge {
                 Some((r, m)) if r == e.rank => m,
                 _ => {
-                    let m = src.commit(e.rank).is_some_and(|c| c.merge);
+                    let m = merge_at(e.rank);
                     merge = Some((e.rank, m));
                     m
                 }
@@ -76,7 +81,7 @@ impl Follow {
     }
 
     /// Canonical id of `path` as seen by row `row` of commit `rank`.
-    fn canonical(&self, path: PathId, rank: Rank, row: u32) -> PathId {
+    pub(crate) fn canonical(&self, path: PathId, rank: Rank, row: u32) -> PathId {
         // The log is in replay order: rank descending, rows ascending within a rank. The
         // aliases a row sees are a prefix of it, so its last entry is found by bisection
         // (hits of a busy path times a long rename log made the linear walk quadratic).
@@ -219,6 +224,9 @@ impl Insights<'_> {
         keep: impl Fn(&CommitRow) -> bool,
     ) -> Vec<Vec<(TouchRaw, CommitRow)>> {
         if paths.len() > PER_PATH_MAX {
+            if self.source().has_tip() {
+                return self.touches_tip(paths, keep);
+            }
             return self.touches_scan(paths, keep);
         }
         let src = self.source();
@@ -269,6 +277,63 @@ impl Insights<'_> {
                     .collect()
             })
             .collect()
+    }
+
+    /// [`Insights::touches_scan`] from the stored tip touches (`crate::tip`): each row already
+    /// carries the name its file has at the indexed tip, so this reads one small item per commit
+    /// and follows no rename. The same touches in the same order; `TouchRaw::path` is the tip
+    /// name, which no caller of the many-path read shows.
+    fn touches_tip(
+        &self,
+        paths: &[&str],
+        keep: impl Fn(&CommitRow) -> bool,
+    ) -> Vec<Vec<(TouchRaw, CommitRow)>> {
+        let src = self.source();
+        let mut first: FastMap<PathId, usize> = FastMap::default();
+        let mut copies: Vec<(usize, usize)> = Vec::new();
+        for (i, p) in paths.iter().enumerate() {
+            let Some(head) = src.path_id(p) else {
+                continue;
+            };
+            match first.get(&head) {
+                Some(&at) => copies.push((i, at)),
+                None => {
+                    first.insert(head, i);
+                }
+            }
+        }
+        let cols: Vec<CommitRow> = src.commits_in(CommitRange::All).collect();
+        let raw = self.opts.count_whitespace;
+        let mut out: Vec<Vec<(TouchRaw, CommitRow)>> = vec![Vec::new(); paths.len()];
+        src.tip_touches(&mut |rank, rows| {
+            if rows.is_empty() {
+                return;
+            }
+            let Some(c) = cols.get(rank.0 as usize).filter(|c| !c.merge && keep(c)) else {
+                return;
+            };
+            for (i, t) in rows.iter().enumerate() {
+                let Some(&at) = first.get(&t.path) else {
+                    continue;
+                };
+                let touch = TouchRaw {
+                    commit: rank,
+                    row: u32::try_from(i).unwrap_or(u32::MAX),
+                    path: t.path,
+                    lines: if raw { t.raw } else { t.code },
+                };
+                out[at].push((touch, *c));
+            }
+        });
+        // Newest commit first, rows ascending: a stable sort keeps the row order of a commit.
+        for list in &mut out {
+            list.sort_by_key(|t| std::cmp::Reverse(t.0.commit));
+        }
+        for (i, at) in copies {
+            let copy = out[at].clone();
+            out[i] = copy;
+        }
+        out
     }
 
     /// Every non-merge touch of `path`, through renames, newest first: the cross-check's

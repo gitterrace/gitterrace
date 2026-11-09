@@ -98,6 +98,8 @@ impl Insights<'_> {
             let id = src.path_id(&f.path)?;
             (!follow.log.contains_key(&id) && !follow.names.contains_key(&id)).then_some(id)
         };
+        // The stored tip touches answer every file in one pass, cheaper than the aggregate.
+        let whole = whole && !src.has_tip();
         let ids: Vec<Option<PathId>> = files
             .iter()
             .map(|f| if whole { plain(f) } else { None })

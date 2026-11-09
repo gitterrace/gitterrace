@@ -34,6 +34,7 @@ use std::ops::Range;
 use std::sync::Arc;
 
 pub use crate::seg::{IdentId, LabelId, Oid, PathId, Rank};
+pub use crate::tip::TipTouch;
 #[doc(hidden)]
 pub use disk::testing as disk_testing;
 pub use disk::{DiskSource, IdentMap, RowWriter, block_cache_default};
@@ -349,6 +350,19 @@ pub trait InsightsSource: Send + Sync {
     /// when there is no stored chain for this set.
     fn chain_len(&self) -> Option<usize> {
         None
+    }
+
+    /// Hands every commit's file rows keyed by the file's name at the indexed tip to `each`,
+    /// ascending rank, merges with none, when the index stored them for exactly this set (see
+    /// `crate::tip`). `false` when it did not: the caller reads the rows then. A view whose
+    /// ranks are not the stored set's keeps the default.
+    fn tip_touches(&self, _each: &mut dyn FnMut(Rank, &[TipTouch])) -> bool {
+        false
+    }
+
+    /// Whether [`InsightsSource::tip_touches`] would stream, without reading it.
+    fn has_tip(&self) -> bool {
+        false
     }
 }
 

@@ -424,6 +424,14 @@ impl<B: InsightsSource> InsightsSource for SegmentSource<B> {
     fn chain_len(&self) -> Option<usize> {
         self.base.chain_len()
     }
+
+    fn tip_touches(&self, each: &mut dyn FnMut(Rank, &[crate::feed::TipTouch])) -> bool {
+        self.base.tip_touches(each)
+    }
+
+    fn has_tip(&self) -> bool {
+        self.base.has_tip()
+    }
 }
 
 #[cfg(test)]

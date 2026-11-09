@@ -153,6 +153,8 @@ pub struct DiskSource {
     pub(super) over: crate::feed::SumOverflow,
     /// The stored chain and its length when it was written for this set, see `crate::chain`.
     chain: Option<(Container, u32)>,
+    /// The stored tip touches when written for this set, see `crate::tip`.
+    tip: Option<Container>,
 }
 
 impl DiskSource {
@@ -174,8 +176,13 @@ impl DiskSource {
             segments,
             strings,
             chain,
+            tip,
             ..
         } = store;
+        let tip = match tip {
+            Some(c) => crate::tip::current(&c, &manifest)?.map(|_| c),
+            None => None,
+        };
         let chain = match chain {
             Some(c) => crate::chain::current(&c, &manifest)?.map(|n| (c, n)),
             None => None,
@@ -236,6 +243,7 @@ impl DiskSource {
             broken: Mutex::new(None),
             over: crate::feed::SumOverflow::new(),
             chain,
+            tip,
         };
         let mut raw = Vec::with_capacity(counts[1].min(1 << 20) as usize);
         for id in 0..counts[1] {

@@ -117,7 +117,13 @@ fn a_built_segment_set_is_kept_and_a_corrupt_one_wiped() -> io::Result<()> {
     }
     let m = b.finish(None, Vec::new()).map_err(io::Error::other)?;
     let live: Vec<&str> = m.live.iter().map(|f| f.name.as_str()).collect();
-    let want = ["seg-1-0.gts", "str-1-0.gts", "ord-1.gts", "chain-1.gts"];
+    let want = [
+        "seg-1-0.gts",
+        "str-1-0.gts",
+        "ord-1.gts",
+        "chain-1.gts",
+        "tip-1.gts",
+    ];
     assert_eq!(live, want);
     assert_eq!(m.commits, 3);
     assert_eq!(ensure_dir(&dir)?, None);
@@ -130,7 +136,8 @@ fn a_built_segment_set_is_kept_and_a_corrupt_one_wiped() -> io::Result<()> {
             LOCK_FILE,
             "ord-1.gts",
             "seg-1-0.gts",
-            "str-1-0.gts"
+            "str-1-0.gts",
+            "tip-1.gts"
         ]
     );
     let seg = dir.join("seg-1-0.gts");
@@ -262,7 +269,11 @@ fn twenty_updates_with_background_merges_equal_one_step() -> io::Result<()> {
                 .map(|f| fs::read(dir.join(&f.name)))
                 .collect::<io::Result<_>>()?;
             assert_eq!(got, want, "after update {u}");
-            assert_eq!(m.live.len(), 4, "segment, delta, order file and chain");
+            assert_eq!(
+                m.live.len(),
+                5,
+                "segment, delta, order file, chain and tip file"
+            );
         }
         // The set itself must stay readable whole between merges.
         crate::seg::read::Store::open(&dir).map_err(io::Error::other)?;

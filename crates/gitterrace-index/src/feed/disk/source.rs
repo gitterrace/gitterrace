@@ -243,4 +243,12 @@ impl InsightsSource for DiskSource {
     fn chain_len(&self) -> Option<usize> {
         self.stored_chain_len()
     }
+
+    fn tip_touches(&self, each: &mut dyn FnMut(Rank, &[crate::feed::TipTouch])) -> bool {
+        self.stored_tip(each)
+    }
+
+    fn has_tip(&self) -> bool {
+        self.stored_has_tip()
+    }
 }

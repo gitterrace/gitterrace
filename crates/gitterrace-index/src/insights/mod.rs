@@ -15,7 +15,7 @@ mod compare;
 mod counted;
 pub(crate) mod fasthash;
 mod figure;
-mod files;
+pub(crate) mod files;
 mod filter;
 mod format;
 mod headfiles;

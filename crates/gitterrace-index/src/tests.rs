@@ -483,6 +483,7 @@ fn a_fresh_build_times_every_step_by_name() -> io::Result<()> {
         "finish",
         "messages",
         "chain",
+        "tip",
     ];
     assert_eq!(names, want);
     assert_eq!(running, None);

@@ -213,6 +213,8 @@ pub struct Store {
     pub messages: Vec<Container>,
     /// The stored first-parent chain, absent until the update after a build writes it.
     pub chain: Option<Container>,
+    /// The tip touch table (`crate::tip`), absent until the update after a build writes it.
+    pub tip: Option<Container>,
 }
 
 impl Store {
@@ -230,7 +232,7 @@ impl Store {
     pub(crate) fn of(dir: &Path, manifest: Manifest) -> SegResult<Self> {
         manifest.verify(dir)?;
         let (mut segments, mut strings, mut order) = (Vec::new(), Vec::new(), None);
-        let (mut messages, mut chain) = (Vec::new(), None);
+        let (mut messages, mut chain, mut tip) = (Vec::new(), None, None);
         for f in &manifest.live {
             match Kind::from_u32(u32::from(f.kind)) {
                 Some(Kind::Segment) => segments.push(Container::open(dir, &f.name, Kind::Segment)?),
@@ -249,6 +251,12 @@ impl Store {
                 }
                 Some(Kind::Chain) => {
                     return Err(SegError::unreadable(&f.name, 0, "second chain file"));
+                }
+                Some(Kind::Tip) if tip.is_none() => {
+                    tip = Some(Container::open(dir, &f.name, Kind::Tip)?);
+                }
+                Some(Kind::Tip) => {
+                    return Err(SegError::unreadable(&f.name, 0, "second tip file"));
                 }
                 None => {}
             }
@@ -270,6 +278,7 @@ impl Store {
             order,
             messages,
             chain,
+            tip,
         })
     }
 
@@ -281,6 +290,7 @@ impl Store {
             .chain(&self.order)
             .chain(&self.messages)
             .chain(&self.chain)
+            .chain(&self.tip)
             .try_for_each(Container::check_all)
     }
 
