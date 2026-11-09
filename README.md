@@ -72,7 +72,7 @@ covers serving many repositories, the log graph, outlines, keys and settings.
 `docker build -t gitterrace .`, then
 `docker run --rm -p 127.0.0.1:8080:8080 -v "$PWD":/repos:ro gitterrace` serves
 the repositories in this folder read-only at `http://localhost:8080`.
-[Run with Docker](docs/online.md#run-with-docker) has the details.
+[Run with Docker](https://gitterrace.dev/docs/online/#run-with-docker) has the details.
 
 ## Commands
 
@@ -103,8 +103,7 @@ on it. Off until you write `actions.toml`:
 [how to set it up](https://gitterrace.dev/docs/actions/).
 
 Every document, by what you need, is on
-[gitterrace.dev/docs](https://gitterrace.dev/docs/), generated from
-[docs/](docs/README.md). gitterrace binds to `127.0.0.1` and never changes your
+[gitterrace.dev/docs](https://gitterrace.dev/docs/). gitterrace binds to `127.0.0.1` and never changes your
 files or history ([security model](https://gitterrace.dev/docs/security/)).
 
 ## Contributing
