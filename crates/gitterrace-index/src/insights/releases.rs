@@ -40,8 +40,20 @@ impl Insights<'_> {
     /// Tags whose commit is not in the records are dropped. The patterns page passes an
     /// all-time `c`: releases are a whole-history view.
     pub fn cadence_in(&self, tags: &[(String, String)], c: &Counted<'_>) -> Cadence {
-        let kept: std::collections::HashSet<u32> = c.stream().map(|r| r.rank.0).collect();
-        self.cadence_with(tags, c.context(), |r| kept.contains(&r.rank.0))
+        // No tags, no releases: the count between them is never read.
+        if tags.is_empty() {
+            return self.cadence_with(tags, c.context(), |_| false);
+        }
+        // One flag per rank: a hash set of 345k ranks cost more than the count itself.
+        let mut kept = vec![false; self.source().len()];
+        for r in c.stream() {
+            if let Some(k) = kept.get_mut(r.rank.0 as usize) {
+                *k = true;
+            }
+        }
+        self.cadence_with(tags, c.context(), |r| {
+            kept.get(r.rank.0 as usize).copied().unwrap_or(false)
+        })
     }
 
     fn cadence_with(
@@ -64,7 +76,12 @@ impl Insights<'_> {
         // Counted commits up to and including each rank: the gap between two releases is the
         // difference, so it never counts a merge or a commit the selection leaves out.
         let mut upto: Vec<usize> = Vec::new();
-        for c in src.commits_in(CommitRange::All) {
+        let scan = if found.is_empty() {
+            None
+        } else {
+            Some(src.commits_in(CommitRange::All))
+        };
+        for c in scan.into_iter().flatten() {
             let i = c.rank.0 as usize;
             if upto.len() <= i {
                 upto.resize(i + 1, 0);

@@ -252,6 +252,9 @@ fn pages(ins: &Insights<'_>, files: &[HeadFile]) -> String {
         out.push(format!("{:?}", ins.coupling(files, p, 1, 50)));
     }
     out.push(format!("{:?}", ins.code_age(files)));
+    let tags = [("v1".to_owned(), id(3)), ("v2".to_owned(), id(9))];
+    let cadence = ins.in_period(Period::All, |c| ins.cadence_in(&tags, c));
+    out.push(format!("{cadence:?}"));
     out.join("\n")
 }
 
@@ -371,13 +374,16 @@ fn hostile_tip_items_are_unreadable() {
     assert!(check(&[2, 0, 1, 0], 1).is_err_and(|e| e.is_unreadable()));
 }
 
-/// A source that counts the file rows `rows_for` hands out, forwarding the rest.
-struct Rows<S> {
+/// A source that counts the file rows `rows_for` hands out and the commit scans, forwarding
+/// the rest.
+struct Counting<S> {
     inner: S,
     rows: std::sync::atomic::AtomicUsize,
+    /// Commit column scans (`commits_in` calls).
+    scans: std::sync::atomic::AtomicUsize,
 }
 
-impl<S: InsightsSource> Rows<S> {
+impl<S: InsightsSource> Counting<S> {
     fn take(&self) -> usize {
         self.rows.swap(0, std::sync::atomic::Ordering::Relaxed)
     }
@@ -389,11 +395,10 @@ macro_rules! forward {
     };
 }
 
-impl<S: InsightsSource> InsightsSource for Rows<S> {
+impl<S: InsightsSource> InsightsSource for Counting<S> {
     forward! {
         len() -> usize;
         commit(r: crate::feed::Rank) -> Option<crate::feed::CommitRow>;
-        commits_in(r: crate::feed::CommitRange) -> crate::feed::Stream<'_, crate::feed::CommitRow>;
         commit_id(r: crate::feed::Rank) -> Option<std::sync::Arc<str>>;
         parent_ids(r: crate::feed::Rank) -> Vec<std::sync::Arc<str>>;
         find_commit(id: &str) -> Result<Option<crate::feed::Rank>, crate::feed::SourceError>;
@@ -410,6 +415,15 @@ impl<S: InsightsSource> InsightsSource for Rows<S> {
         find_label(n: &str) -> Result<Option<crate::feed::LabelId>, crate::feed::SourceError>;
         failure() -> Option<crate::feed::SourceError>;
         has_tip() -> bool;
+    }
+
+    fn commits_in(
+        &self,
+        r: crate::feed::CommitRange,
+    ) -> crate::feed::Stream<'_, crate::feed::CommitRow> {
+        self.scans
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        self.inner.commits_in(r)
     }
 
     fn rows_for(
@@ -440,9 +454,10 @@ fn per_file_pages_read_no_file_rows_with_a_tip_file() {
     let tmp = tempfile::tempdir().expect("tmp");
     let dir = tmp.path().join("gitterrace");
     index(&dir, &h);
-    let src = Rows {
+    let src = Counting {
         inner: disk(&dir),
         rows: std::sync::atomic::AtomicUsize::new(0),
+        scans: std::sync::atomic::AtomicUsize::new(0),
     };
     let ins = Insights::from_source(&src, Options::default(), None);
     let files = many();
@@ -459,6 +474,13 @@ fn per_file_pages_read_no_file_rows_with_a_tip_file() {
     }
     drop(ins.code_age(&files));
     assert_eq!(src.take(), 0, "code age");
+    // Guard class: a whole-history scan a section pays without needing it. Release cadence
+    // with no tag reads no commit column.
+    src.scans.store(0, std::sync::atomic::Ordering::Relaxed);
+    let none = ins.in_period(Period::All, |c| ins.cadence_in(&[], c));
+    assert!(none.releases.is_empty());
+    let scans = src.scans.load(std::sync::atomic::Ordering::Relaxed);
+    assert_eq!(scans, 0, "cadence without tags scanned the commits");
     // The same pages without the tip file read the rows: the guard can see a row read.
     let mem_recs: Vec<CommitRecord> = h
         .order
@@ -466,9 +488,10 @@ fn per_file_pages_read_no_file_rows_with_a_tip_file() {
         .iter()
         .map(|i| h.recs.borrow()[i].clone())
         .collect();
-    let mem = Rows {
+    let mem = Counting {
         inner: MemorySource::new(&mem_recs),
         rows: std::sync::atomic::AtomicUsize::new(0),
+        scans: std::sync::atomic::AtomicUsize::new(0),
     };
     let ins = Insights::from_source(&mem, Options::default(), None);
     drop(ins.hotspots(&files, Period::All));
