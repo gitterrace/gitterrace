@@ -1,0 +1,12 @@
+# The golden tests, read by schwarzwald/kit/tools/golden.py. Data only.
+# Any test file under crates/*/tests that names golden/ is a golden test, so a new one is found
+# without an edit here.
+[golden]
+tests = "crates/*/tests/*.rs"
+marker = "golden/"
+match = 'crates/(?P<crate>[^/]+)/tests/(?P<test>[^/]+)\.rs'
+run = ["cargo", "test", "-q"]
+each = ["-p", "{crate}", "--test", "{test}"]
+# The re-bless proof: dump every answer at two commits, then classify old against new.
+dump = ["bash", "scripts/golden-proof-run.sh", "dump"]
+compare = ["bash", "scripts/golden-proof-run.sh", "classify", "{old}", "{new}", "{report}"]

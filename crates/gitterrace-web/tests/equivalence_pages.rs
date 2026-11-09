@@ -578,7 +578,7 @@ fn a_real_history_samples_match_the_oracle() {
 /// The re-bless proof: two `TEST_ORACLE_DUMP` folders of the same cells, one per commit, compared
 /// per cell and classified unchanged, chrome-only, tie-only or real, each real cell with its
 /// first differing line. Writes `$TEST_CHANGE_REPORT` and fails on any real or one-sided cell.
-/// `scripts/golden-check.sh change OLD NEW` makes the dumps and runs it:
+/// `golden.py change OLD NEW` (the shared tool) makes the dumps and runs it:
 /// `TEST_CHANGE_OLD=<dump> TEST_CHANGE_NEW=<dump> TEST_CHANGE_REPORT=<file>`.
 #[test]
 fn a_rebless_proof_classifies_old_against_new() {

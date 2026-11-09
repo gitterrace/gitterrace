@@ -68,8 +68,8 @@ docs-check:
 	bash scripts/land-check.sh --self-test
 	python3 scripts/commits-check.py --self-test
 	python3 scripts/tracked-check.py --self-test
-	bash scripts/golden-check.sh --self-test
-	bash scripts/golden-run.sh --self-test
+	bash scripts/python-run.sh schwarzwald/kit/tools/golden.py --self-test
+	bash scripts/golden-proof-run.sh --self-test
 	bash scripts/linux-run.sh --self-test
 	bash scripts/macos-run.sh --self-test
 	bash scripts/docker-check.sh --self-test

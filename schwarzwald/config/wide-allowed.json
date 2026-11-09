@@ -86,7 +86,6 @@
     "scripts/browser-site-lib.mjs": 36,
     "scripts/browser-sticky-lib.mjs": 17,
     "scripts/browser-ui-lib.mjs": 85,
-    "scripts/golden-check.sh": 3,
     "scripts/guards/tests/cases-gitterrace.sh": 13,
     "scripts/icon-render.mjs": 5,
     "scripts/indexing-run.py": 2,

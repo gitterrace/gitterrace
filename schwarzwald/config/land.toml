@@ -1,4 +1,4 @@
-# The crate names scripts/land-check.sh and scripts/golden-check.sh run against. Data only,
+# The crate names scripts/land-check.sh and scripts/golden-proof-run.sh run against. Data only,
 # read with tomllib. The scripts hold the steps, this file holds which crates they name.
 
 # The land-check self-test fixtures: an edit in `dependency_path` must select `dependency`
@@ -28,9 +28,7 @@ test = "conventions"
 gate = [
   # Unformatted Rust never lands. The cheapest check runs first.
   "cargo fmt --all --check",
-  # While the golden check moves to the shared tool, run whichever script the tree has.
-  """if [ -f scripts/golden-run.sh ]; then bash scripts/golden-run.sh; \
-  else bash scripts/python-run.sh schwarzwald/kit/tools/golden.py run; fi""",
+  "bash scripts/python-run.sh schwarzwald/kit/tools/golden.py run",
   "python3 schwarzwald/kit/lint/file-length.py",
   "python3 scripts/names-check.py",
   # Generated docs, README blocks and site pages match their sources.
