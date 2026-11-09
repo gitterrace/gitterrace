@@ -141,8 +141,8 @@ vars    = { url = "https://example.test/hook" }
 ```
 
 Obsidian's `obsidian://new` takes `vault`, `file` (a path in the vault, `/`
-encoded as `%2F`), `content` and `append`, and opens the note it wrote. With
-`append`, repeated sends add to one inbox note instead of a new note each time:
+encoded as `%2F`), `content` and `append`, and opens the note it wrote. This
+action opens a URL with `open`, each value encoded with `:url`:
 
 ```toml
 [[action]]
@@ -154,17 +154,10 @@ command = [
   "obsidian://new?vault={var.vault:url}&file={var.folder:url}%2F{title:url}&content={markdown:url}",
 ]
 vars    = { vault = "Notes", folder = "Inbox" }
-
-[[action]]
-id      = "obsidian-inbox"
-label   = "Obsidian inbox"
-kinds   = ["line", "commit"]
-command = [
-  "open",
-  "obsidian://new?vault={var.vault:url}&file={var.folder:url}%2Fgitterrace&append=true&content={markdown:url}",
-]
-vars    = { vault = "Notes", folder = "Inbox" }
 ```
+
+Add `&append=true` and a fixed `file` to send every note to one inbox note
+instead of a new note each time.
 
 ### Windows
 
@@ -178,17 +171,9 @@ mode bits, and ACLs are not read), and `command[0]` must be an `.exe`, `.cmd`,
 tool directly, for example `command = ["clip.exe"]` with `stdin = "markdown"`.
 
 When the same action must work on every system, a script picks the tool. The
-copy action with [`clipboard.sh`](actions/clipboard.sh) runs unchanged on macOS,
-Linux (Wayland or X11) and WSL:
-
-```toml
-[[action]]
-id      = "copy"
-label   = "Copy to clipboard"
-kinds   = ["line", "file", "commit"]
-command = ["~/.config/gitterrace/clipboard.sh"]
-stdin   = "markdown"
-```
+copy entry in the starter file uses [`clipboard.sh`](actions/clipboard.sh),
+which runs unchanged on macOS, Linux (Wayland or X11) and WSL, with
+`stdin = "markdown"`.
 
 A job with several steps stays a script too. Declare it once as a `[[script]]`
 and point actions at it, each with its own settings:
@@ -204,14 +189,10 @@ label  = "Obsidian daily note"
 kinds  = ["line", "commit"]
 script = "obsidian"
 vars   = { folder = "Daily" }
-
-[[action]]
-id      = "edit"
-label   = "Open in editor"
-kinds   = ["line"]
-command = ["~/.config/gitterrace/editor.sh", "{line_start}", "{root}/{path}"]
-stdin   = "none"
 ```
+
+The `edit` entry in the starter file is a script too: it passes `{line_start}`
+and `{root}/{path}` to `editor.sh`.
 
 ## Placeholders
 
