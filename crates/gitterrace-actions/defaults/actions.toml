@@ -14,9 +14,10 @@ version = 1
 
 # Opens tendir's new-task sheet, filled in. Needs the tendir app.
 [[send]]
-id    = "tendir"
-label = "Send to tendir"
-url   = "tendir://new-task?title={title}&notes={notes}"
+id      = "tendir"
+label   = "Send to tendir"
+enabled = false
+url     = "tendir://new-task?title={title}&notes={notes}"
 
 # A mail draft in your mail app.
 [[send]]

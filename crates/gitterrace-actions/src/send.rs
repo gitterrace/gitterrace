@@ -398,7 +398,7 @@ mod tests {
     fn starter_file_loads_and_hides_the_unset() {
         let c = Config::parse(Config::STARTER, Path::new("/")).expect("starter loads");
         let ids: Vec<&str> = c.sends.iter().map(|t| t.id.as_str()).collect();
-        assert_eq!(ids, ["tendir", "mail"]);
+        assert_eq!(ids, ["mail"]);
         assert!(c.actions.is_empty(), "nothing offered until you enable it");
         assert!(starter_sends().sends.len() > 6);
     }

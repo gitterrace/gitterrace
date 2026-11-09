@@ -65,7 +65,7 @@ fill in their `vars`.
 <!-- BEGIN GENERATED: starter -->
 | Entry | Kind | On | What it does | `vars` |
 | --- | --- | --- | --- | --- |
-| `tendir` | send | yes | Opens tendir's new-task sheet, filled in |  |
+| `tendir` | send | no | Opens tendir's new-task sheet, filled in |  |
 | `mail` | send | yes | A mail draft in your mail app |  |
 | `github-issue` | send | no | A new issue on github.com | `repo` |
 | `github-discussion` | send | no | A new discussion on github.com | `repo`, `category` |
