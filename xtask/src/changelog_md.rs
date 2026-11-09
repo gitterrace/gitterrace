@@ -7,6 +7,7 @@
 //! included, so `check` keeps the text in the file instead of asking for a regenerate on every
 //! commit; the changelog lint leaves Unreleased out for the same reason.
 
+use std::collections::HashSet;
 use std::path::Path;
 use std::process::Command;
 
@@ -35,6 +36,7 @@ pub fn render(root: &Path, refresh: bool) -> Result<Vec<Out>> {
     if !refresh {
         return current();
     }
+    let file = std::fs::read_to_string(root.join(FILE)).context("reading CHANGELOG.md")?;
     let Ok(out) = Command::new("git-cliff")
         .args(["--unreleased", "--strip", "all"])
         .current_dir(root)
@@ -48,7 +50,73 @@ pub fn render(root: &Path, refresh: bool) -> Result<Vec<Out>> {
         String::from_utf8_lossy(&out.stderr)
     );
     let text = String::from_utf8(out.stdout).context("git-cliff output")?;
+    let text = unreleased_only(&text, &released_items(&file));
     Ok(vec![Out::block(FILE, "unreleased", section(&text))])
+}
+
+/// Every list item of the released sections, outside the Unreleased block, with its wrapped
+/// lines joined. Between `make changelog` and its tag, git-cliff still counts the written
+/// release as unreleased.
+fn released_items(text: &str) -> HashSet<String> {
+    let outside = match text.split_once(BEGIN) {
+        Some((before, rest)) => [before, rest.split_once(END).map_or("", |(_, a)| a)],
+        None => [text, ""],
+    };
+    items(&outside.join("\n")).into_iter().collect()
+}
+
+/// The list items of `text`, each with its indented continuation lines joined by a space.
+fn items(text: &str) -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
+    let mut open = false;
+    for line in text.lines() {
+        if let Some(item) = line.strip_prefix("- ") {
+            out.push(item.to_owned());
+            open = true;
+        } else if let (true, Some(more), Some(last)) =
+            (open, line.strip_prefix("  "), out.last_mut())
+        {
+            last.push(' ');
+            last.push_str(more.trim());
+        } else {
+            open = false;
+        }
+    }
+    out
+}
+
+/// git-cliff's section without the items a release already lists, and without a heading
+/// left with no item. Nothing left means nothing is unreleased.
+fn unreleased_only(text: &str, released: &HashSet<String>) -> String {
+    let mut lines: Vec<String> = Vec::new();
+    for line in text.lines() {
+        match lines.last_mut() {
+            Some(last) if line.starts_with("  ") && last.starts_with("- ") => {
+                last.push(' ');
+                last.push_str(line.trim());
+            }
+            _ => lines.push(line.to_owned()),
+        }
+    }
+    lines.retain(|l| l.strip_prefix("- ").is_none_or(|i| !released.contains(i)));
+    let has_item = |from: usize| {
+        lines[from + 1..]
+            .iter()
+            .take_while(|l| !l.starts_with("### ") && !l.starts_with("## "))
+            .any(|l| l.starts_with("- "))
+    };
+    if !lines.iter().any(|l| l.starts_with("- ")) {
+        return String::new();
+    }
+    let mut out = String::new();
+    for (i, line) in lines.iter().enumerate() {
+        if line.starts_with("### ") && !has_item(i) {
+            continue;
+        }
+        out.push_str(line);
+        out.push('\n');
+    }
+    out.replace("\n\n\n", "\n\n")
 }
 
 /// git-cliff's section with its heading kept and each list item wrapped with a hanging
@@ -92,6 +160,21 @@ mod tests {
             "{s}"
         );
         assert!(s.ends_with("- short\n"), "{s}");
+    }
+
+    #[test]
+    fn a_written_release_leaves_only_new_items_unreleased() {
+        let file = format!(
+            "# C\n\n## [0.1.0] - d\n\n### Added\n\n- a long\n  item\n\n### Fixed\n\n- b\n\n\
+             {BEGIN}- x\n{END}\n"
+        );
+        let released = released_items(&file);
+        assert!(!released.contains("x"), "the old block is not a release");
+        let cliff = "## [Unreleased]\n\n### Added\n\n- a long\n  item\n\n### Fixed\n\n- b\n";
+        assert_eq!(unreleased_only(cliff, &released), "");
+        let cliff = "## [Unreleased]\n\n### Added\n\n- a long item\n- new\n\n### Fixed\n\n- b\n";
+        let left = unreleased_only(cliff, &released);
+        assert_eq!(left, "## [Unreleased]\n\n### Added\n\n- new\n\n");
     }
 
     #[test]
