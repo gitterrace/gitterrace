@@ -94,7 +94,7 @@
     "scripts/linux-run.sh": 3,
     "scripts/macos-run.sh": 3,
     "scripts/names-check.py": 2,
-    "scripts/send-vectors-check.mjs": 5,
+    "scripts/send-vectors-check.mjs": 4,
     "scripts/site-check.py": 2,
     "scripts/site-render.mjs": 9,
     "scripts/site-shots-run.mjs": 14,

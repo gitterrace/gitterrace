@@ -4,11 +4,15 @@
 //
 //   node scripts/send-vectors-check.mjs
 import { readFileSync } from 'node:fs';
-import { createRequire } from 'node:module';
 import { join } from 'node:path';
+import { runInNewContext } from 'node:vm';
 import { root } from './browser-lib.mjs';
 
-const { fill, sourceLine, titleOf } = createRequire(import.meta.url)(join(root, 'crates/gitterrace-web/static/send.js'));
+// send.js is a classic browser script that exports through `module` when no document exists.
+// A sandbox gives it that `module`, whatever module type the package declares.
+const sandbox = { module: { exports: {} }, TextEncoder };
+runInNewContext(readFileSync(join(root, 'crates/gitterrace-web/static/send.js'), 'utf8'), sandbox);
+const { fill, sourceLine, titleOf } = sandbox.module.exports;
 const data = (f) => JSON.parse(readFileSync(join(root, 'crates/gitterrace-actions/testdata', f), 'utf8'));
 let bad = 0;
 const fail = (msg) => { bad++; console.error(`FAIL ${msg}`); };
