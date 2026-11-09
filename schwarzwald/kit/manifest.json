@@ -1,7 +1,7 @@
 {
   "schwarzwald": null,
   "dirty": false,
-  "date": "2026-11-09T04:40:37Z",
+  "date": "2026-11-09T12:20:45Z",
   "parts": [
     "configs",
     "fonts",
@@ -14,7 +14,7 @@
     "tools"
   ],
   "files": {
-    "README.md": "2e9101bc103b139498bea960a77b63d684bdab82c6fd193a431c936f5d53004a",
+    "README.md": "03231f4f74f0bd8f45f9ff2ed18aab64f2b4b0cdccabb81c60bad8e80cd5c2d3",
     "check.py": "7e6cb0ce8e4284252a0a153c0c91835f9606b4700bb8dc8ddad0fcbc688576b5",
     "configs/cliff-base.toml": "af6d61d5605368953ec077c37cd66b6670cd54ae8dbfb7681a2e33c2cf71d4cf",
     "configs/clippy-base.toml": "e2d4a22a5fbdab27da1188a8a664eefc40134d12f1d56cbe4af0a45936c2b77a",
@@ -265,8 +265,8 @@
     "tools/golden.py": "660c09eb8d88ccc80e6c6c76e0747ba352377475e9e8a25e1abf4575089dd712",
     "tools/golden_test.py": "81b91e673ddc81a4d276cec02148e49845fa32263930f72fa2a597031f34cd9e",
     "tools/id-scan.py": "e179372fd0b61b48fc075c892f6456e0e604ccfda857e7f9d26742ce11a6d27d",
-    "tools/land.sh": "a911d4d46a2b1c9789a55ea4e78f79cd65c4b9622b4356fb303dcbda5a6713b7",
-    "tools/land_test.sh": "b81094afbae0a63862278bbe9e6a32292e7282a491d28cfdb28e98424853b6a6",
+    "tools/land.sh": "31f15c5d78a0896381c681888ee2f26d26977516c9bfa39fd4748d55d966c409",
+    "tools/land_test.sh": "bd22757d4abffb33e2a66bc944a3670be589e428d6ecd42d22be259193af4309",
     "tools/ratchet-check.py": "870be1966e7b0680c58828e0a97633357993b536c4cf7d1fe923627d2a92882c",
     "tools/scratch.sh": "eafaaf22d09b440f0a25fae4c8e1fc5c7e8b01dc4c8e81e5dbcdd890b6757142",
     "tools/selftest.py": "010c69a52d1caeb88209acacd7387bf797c8fa06e820f56766334181229fcd6b",

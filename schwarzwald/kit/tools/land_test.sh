@@ -165,16 +165,78 @@ for mode in single plan; do
   if [[ $mode == single ]]; then
     sha=$(head_of clone)
     run "single: a candidate that rewrites the gate is refused" 1 "gate" "$t/main" "$t/clone" "$sha"
-    run "single: --gate-change still runs main's gate" 1 "test -f OK" --gate-change "$t/main" "$t/clone" "$sha"
+    check "single: without --gate-change the candidate's own gate never ran" test ! -e "$pwn"
+    run "single: --gate-change still runs main's commands the result can run" 1 "test -f OK" --gate-change "$t/main" "$t/clone" "$sha"
   else
     base=$(head_of main)
     # shellcheck disable=SC2046
     plan "$base" $(git -C "$t/clone" rev-list --reverse "$base..HEAD")
     runplan "plan: a candidate that rewrites the gate is refused" 1 "gate"
-    run "plan: --gate-change still runs main's gate" 1 "test -f OK" --gate-change --plan "$t/main" "$t/clone" "$planbase" "$t/plan"
+    check "plan: without --gate-change the candidate's own gate never ran" test ! -e "$pwn"
+    run "plan: --gate-change still runs main's commands the result can run" 1 "test -f OK" --gate-change --plan "$t/main" "$t/clone" "$planbase" "$t/plan"
   fi
-  check "$mode: the candidate's own gate never ran" test ! -e "$pwn"
 done
+# 9f (a91609): a gate change that MOVES the gate's own script lands with --gate-change. main runs
+# `bash old/check.sh`; the candidate moves it to new/check.sh and points its land.toml there.
+MAIN_TOML=$(printf '[landing]\ngate = ["bash old/check.sh"]\nmessages = "true"\n'); setup off; MAIN_TOML=
+mkdir -p "$t/main/old"; printf 'exit 0\n' >"$t/main/old/check.sh"
+git -C "$t/main" add -A; LAND_TOOL=1 $G -C "$t/main" commit -q -m "chore(x): gate script"
+git -C "$t/clone" pull -q --rebase "$t/main" 2>/dev/null
+git -C "$t/clone" mv old new
+printf '[landing]\ngate = ["bash new/check.sh"]\nmessages = "true"\n' >"$t/clone/schwarzwald/config/land.toml"
+git -C "$t/clone" add -A; $G -C "$t/clone" commit -q -m "refactor(x): move the gate script"
+sha=$(head_of clone)
+run "a91609: a landing that moves the gate's script is refused without --gate-change" 1 "--gate-change" "$t/main" "$t/clone" "$sha"
+err=$(bash "$LAND" --gate-change "$t/main" "$t/clone" "$sha" 2>&1 >/dev/null) || true
+check "a91609: --gate-change lands a move of the gate's own script" test "$(git -C "$t/main" log -1 --format=%s)" = "refactor(x): move the gate script"
+check "a91609: the gate diff is printed before the candidate's gate runs" grep -q '^+gate = \["bash new/check.sh"\]' <<<"$err"
+check "a91609: main's moved command is named as skipped" grep -q "skipped, old/check.sh is not in the result" <<<"$err"
+# 9g: an empty candidate gate never judges a gate change
+MAIN_TOML=$(printf '[landing]\ngate = ["true"]\nmessages = "true"\n'); setup off; MAIN_TOML=
+printf '[landing]\ngate = []\nmessages = "true"\n' >"$t/clone/schwarzwald/config/land.toml"
+git -C "$t/clone" add -A; $G -C "$t/clone" commit -q --amend --no-edit
+sha=$(head_of clone)
+run "a91609: an empty candidate gate is refused" 1 "candidate's gate is empty" --gate-change "$t/main" "$t/clone" "$sha"
+# 9h (f94ecb): a tree a gate sent back is refused, under its own commit and under a new one
+MAIN_TOML=$(printf '[landing]\ngate = ["true"]\nmessages = "true"\n'); setup off; MAIN_TOML=
+sha=$(head_of clone)
+sent=$(git -C "$t/clone" rev-parse "$sha^{tree}")
+git -C "$t/main" fetch -q "$t/clone" "$sha"
+check "f94ecb: --sent-back records a refusal" bash "$LAND" --sent-back "$t/main" "$sha" "golden drift"
+run "f94ecb: a sent-back tree is refused" 1 "sent this tree back: sent back $sha: golden drift" "$t/main" "$t/clone" "$sha"
+git -C "$t/clone" commit -q --amend -m "feat(x): second, again"
+check "f94ecb: the re-offer is another commit with the same tree" test "$(git -C "$t/clone" rev-parse 'HEAD^{tree}')" = "$sent"
+run "f94ecb: the same tree under a new commit is refused" 1 "sent this tree back" "$t/main" "$t/clone" "$(head_of clone)"
+run "f94ecb: --sent-back refuses an option-shaped sha" 1 "not a commit id" --sent-back "$t/main" "--output=x" "why"
+# 9i (f94ecb): one gate per clone. A live holder refuses a second landing, a dead one is taken over.
+MAIN_TOML=$(printf '[landing]\ngate = ["true"]\nmessages = "true"\n'); setup off; MAIN_TOML=
+sha=$(head_of clone)
+sleep 30 & live=$!
+printf '%s other-session\n' "$live" >"$t/main/.git/GATE-OWNER"
+run "f94ecb: a second gate on a held clone is refused" 1 "another gate holds this repository (other-session" "$t/main" "$t/clone" "$sha"
+kill "$live" 2>/dev/null; wait "$live" 2>/dev/null || true
+run "f94ecb: a lock left by a dead pid is taken over and the landing passes" 0 "" "$t/main" "$t/clone" "$sha"
+check "f94ecb: the lock is released after the landing" test ! -e "$t/main/.git/GATE-OWNER"
+# 9j: a sanctioned reword of main moves land-tip with --rewritten, only for equal trees
+setup on
+head_of main >"$t/main/.git/land-tip"
+oldtip=$(head_of main)
+# A commit with other content, on a side branch: the "rewrite" that changed a tree.
+git -C "$t/main" checkout -q -b side
+echo c >"$t/main/c"; git -C "$t/main" add c
+LAND_TOOL=1 $G -C "$t/main" commit -q -m "feat(x): third"; changed=$(head_of main)
+git -C "$t/main" checkout -q main
+LAND_TOOL=1 $G -C "$t/main" commit -q --amend -m "feat(x): first, reworded"
+newtip=$(head_of main)
+one "a reworded main is refused before --rewritten" 1 "landed"
+run "--rewritten refuses trees that differ" 1 "not a message-only rewrite" --rewritten "$t/main" "$oldtip" "$changed"
+run "--rewritten refuses an option-shaped sha" 1 "not a commit id" --rewritten "$t/main" "--upload-pack=x" "$newtip"
+run "--rewritten refuses an old tip that is not land-tip" 1 "not the old tip" --rewritten "$t/main" "$newtip" "$newtip"
+run "--rewritten moves land-tip for a message-only rewrite" 0 "" --rewritten "$t/main" "$oldtip" "$newtip"
+check "--rewritten: land-tip names the new tip" test "$(cat "$t/main/.git/land-tip")" = "$newtip"
+git -C "$t/clone" fetch -q "$t/main" main
+git -C "$t/clone" rebase -q --onto FETCH_HEAD "$oldtip" 2>/dev/null; sha=$(head_of clone)
+one "after --rewritten the next landing passes" 0 ""
 # 9c: no land.toml, or no [landing] in it: loud line and refused, --no-gate passes
 plan_setup on
 plan "$base" "$s1" "$s2" "$s3 fold"
