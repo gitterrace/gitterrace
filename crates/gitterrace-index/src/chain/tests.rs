@@ -374,3 +374,63 @@ fn a_hostile_chain_file_fails_the_read_and_the_store_rebuilds() {
     idx.update(&h, "HEAD", &|_| {}).expect("update");
     assert_eq!(stored(&dir), Some(walked(&dir)));
 }
+
+/// A small deterministic generator, so the fuzz below needs no dependency and replays.
+struct Lcg(u64);
+
+impl Lcg {
+    fn next(&mut self) -> u64 {
+        self.0 = self
+            .0
+            .wrapping_mul(6_364_136_223_846_793_005)
+            .wrapping_add(1_442_695_040_888_963_407);
+        self.0 >> 33
+    }
+}
+
+/// Random bytes and mutations of a real chain block (flips, cuts, splices and runs of
+/// 0x80 or 0xff) fed to the step decoder: every one gives Ok or Err, none panics, and an
+/// Ok never hands out a path id past the strings.
+#[test]
+fn decoding_random_and_mutated_chain_bytes_never_panics() {
+    let hist = history();
+    let (_t, dir) = build(&hist);
+    let store = Store::open(&dir).expect("open").expect("set");
+    let chain = store.chain.as_ref().expect("chain");
+    let entry = chain.blocks(crate::seg::format::section::CHAIN)[0];
+    let mut buf = Vec::new();
+    let good = chain.read_block(&entry, &mut buf).expect("block").to_vec();
+    let mut rng = Lcg(0x5eed_c4a1);
+    let rand = |rng: &mut Lcg, n: u64| usize::try_from(rng.next() % n.max(1)).unwrap_or(0);
+    for round in 0..600 {
+        let mut b = if round % 3 == 0 {
+            let n = rand(&mut rng, 200);
+            (0..n).map(|_| rng.next().to_le_bytes()[0]).collect()
+        } else {
+            good.clone()
+        };
+        for _ in 0..=rand(&mut rng, 4) {
+            let at = rand(&mut rng, b.len() as u64);
+            let (op, run) = (rand(&mut rng, 4), rand(&mut rng, 16));
+            match op {
+                0 if !b.is_empty() => b[at] ^= 1 << (run % 8),
+                1 => b.truncate(at),
+                2 => drop(b.splice(at..at, std::iter::repeat_n(0x80, run))),
+                _ => drop(b.splice(at..at, std::iter::repeat_n(0xff, run))),
+            }
+        }
+        let paths = rand(&mut rng, 8);
+        let commits = u32::try_from(rand(&mut rng, 10)).unwrap_or(0);
+        let mut cur = crate::seg::bounds::Cursor::new(&b, "t", 0);
+        let mut below = commits;
+        for _ in 0..entry.items {
+            let r = super::step(&mut cur, commits, &mut below, paths, i64::MAX, &mut |s| {
+                let ok = s.files.iter().all(|f| (f.path.0 as usize) < paths);
+                assert!(ok, "path id past the strings");
+            });
+            if r.is_err() {
+                break;
+            }
+        }
+    }
+}
