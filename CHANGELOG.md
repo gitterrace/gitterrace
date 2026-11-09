@@ -285,6 +285,7 @@ All notable changes are listed here. The format follows
 - web: the outline filter's narrowing and arrow keys move into one shared helper
 - web: the graph rules get their own stylesheet
 - site: templates print plain fields, the code works them out
+- site: the docs page module imports in the house order
 
 ### Fixed
 
