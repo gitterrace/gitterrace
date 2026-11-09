@@ -1,11 +1,9 @@
 # Benchmarks
 
 gitterrace should feel instant on large repositories. This page says what is
-measured, how, and what the latest run found. The harness is
-`scripts/bench-run.py`, the corpus is `tests/bench/corpus.toml`, and results land in
-`tests/bench/results/<date>-<machine>.json`, where the machine label comes from the
-CPU (for example `apple-m1-max`), never the hostname. Older files stay as
-history: the page compares each warm time with the previous run.
+measured, how, and what the latest run found. Each run is kept, named by date
+and CPU, never the hostname, and each warm time is compared with the previous
+run.
 
 ## What is measured
 
@@ -75,11 +73,10 @@ browsed or idle holds some MB, not GB, and that amount does not grow with the
 history. The goal is at most the 32 MB cache budget plus 16 MB of margin above a
 just-started server, on every repository size, also after a sweep of every
 insights page. Page cache for the index files is not counted. A peak during the
-index build is fine. `crates/gitterrace-web/tests/memory_budget.rs` guards it on
-synthetic repositories of growing size, and `make memory-check` measures it on a
-real clone. Every bench run checks it too, as the `footprint_idle_mb` budget:
-idle footprint minus that of a just-started server, at most 48 MB on every
-class.
+index build is fine. A test guards it on synthetic repositories of growing
+size, and `make memory-check` measures it on a real clone. Every bench run
+checks it too, as the `footprint_idle_mb` budget: idle footprint minus that of a
+just-started server, at most 48 MB on every class.
 
 Timings need a quiet machine. Before each timed phase the harness waits until
 the 1-minute load average stays under `BENCH_MAX_LOAD` (default half the cores)
@@ -110,15 +107,9 @@ arrives after that warm-up (about 10 s on rust) gets them from the page memo in
 a few milliseconds. The cold numbers are what a visitor pays inside that window,
 or for a filter combination that was not rendered before.
 
-The cost is reading every file row once per page with renames followed. A
-per-path aggregate cannot replace that read today: it is keyed by the name a
-file had in each commit, and a name that was renamed or reused belongs to two
-files at different times. On rust more than half the files at HEAD have such a
-name. Ownership over all history reads the aggregate for the files that were
-never renamed and the rows for the rest. An aggregate keyed by the name at the
-indexed tip, rebuilt when a new rename moves old rows, is the planned fix.
-`crates/gitterrace-index/tests/latency.rs` holds today's times on a 100k-commit
-synthetic history as ceilings, so the read path cannot get slower unnoticed.
+The cost is reading every change of every file once per page, with renames
+followed. A faster summary per file is planned. A test holds today's times as
+ceilings, so these pages cannot get slower unnoticed.
 
 ### Commit search with the message column
 

@@ -188,6 +188,24 @@ so such a cache is reset, never refused as a newer build's. The container byte
 version inside each file (`seg/format.rs`) is a separate number. It moves only
 when the container bytes change.
 
+### Why hotspots and ownership read every row
+
+These pages read every file row once per page with renames followed. A per-path
+aggregate cannot replace that read today: it is keyed by the name a file had in
+each commit, and a name that was renamed or reused belongs to two files at
+different times. On rust more than half the files at HEAD have such a name.
+Ownership over all history reads the aggregate for the files that were never
+renamed and the rows for the rest. An aggregate keyed by the name at the indexed
+tip, rebuilt when a new rename moves old rows, is the planned fix.
+`crates/gitterrace-index/tests/latency.rs` holds today's times on a 100k-commit
+synthetic history as ceilings, and `crates/gitterrace-web/tests/memory_budget.rs`
+guards serving memory on synthetic repositories of growing size.
+
+The bench harness is `scripts/bench-run.py`, the corpus is
+`tests/bench/corpus.toml`, and results land in
+`tests/bench/results/<date>-<machine>.json`, the machine label from the CPU
+(for example `apple-m1-max`).
+
 ## Routes
 
 Every row from `/` to `/api/v1` is per repository and lives under `/r/{name}`,
