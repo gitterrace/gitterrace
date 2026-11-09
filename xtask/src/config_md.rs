@@ -39,11 +39,7 @@ pub fn render() -> Out {
     for k in gitterrace_config::keys() {
         if k.section != section {
             section = k.section;
-            let _ = write!(
-                s,
-                "\n## `[{section}]`\n\n| Key | Type | Default | Description |\n| --- | --- | --- | \
-                --- |\n"
-            );
+            let _ = write!(s, "\n## `[{section}]`\n\n");
         }
         let mut doc = k.doc.split_whitespace().collect::<Vec<_>>().join(" ");
         if k.section == "resources" && k.name == "cache_mb" {
@@ -54,7 +50,9 @@ pub fn render() -> Out {
                 1,
             );
         }
-        let _ = writeln!(s, "| `{}` | {} | `{}` | {} |", k.name, k.ty, k.default, doc);
+        // One list item per key: a table squeezed the description, the one column a reader wants.
+        let item = format!("`{}` ({}, default `{}`): {doc}", k.name, k.ty, k.default);
+        let _ = writeln!(s, "{}", crate::out::wrap_item(&item));
     }
     Out::file(PATH, s)
 }
@@ -79,7 +77,7 @@ mod tests {
                 .and_then(|s| s.strip_suffix("]`"))
             {
                 section = s;
-            } else if let Some(name) = line.strip_prefix("| `").and_then(|l| l.split('`').next())
+            } else if let Some(name) = line.strip_prefix("- `").and_then(|l| l.split('`').next())
                 && !section.is_empty()
             {
                 rows.push(format!("{section}.{name}"));

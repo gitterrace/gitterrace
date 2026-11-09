@@ -52,118 +52,194 @@ Exceptions, each on purpose:
 
 ## `[server]`
 
-| Key | Type | Default | Description |
-| --- | --- | --- | --- |
-| `addr` | string | `"127.0.0.1:4242"` | Address to listen on. Keep it local: pages show source code and there is no login. Needs a restart. |
-| `live_streams` | integer | `32` | Maximum open live-update streams per repository (one per browser tab). |
-| `is_public` | bool | `false` | Serve read-only to anyone who can reach the address: committed history only, no working tree, stashes, live updates, actions or additions. Required for any address that is not loopback. Needs a restart. |
-| `hosts` | list of strings | `[]` | Host names a reverse proxy forwards with, exact and without port, for example `["git.example.com"]`. Needs `is_public`. Needs a restart. |
-| `public_timeout_secs` | integer | `30` | Longest a request to a public server may take, in seconds. Past it the answer is 503 and the work it started finishes in the background, filling the cache for a retry. Needs a restart. |
+- `addr` (string, default `"127.0.0.1:4242"`): Address to listen on. Keep it
+  local: pages show source code and there is no login. Needs a restart.
+- `live_streams` (integer, default `32`): Maximum open live-update streams per
+  repository (one per browser tab).
+- `is_public` (bool, default `false`): Serve read-only to anyone who can reach
+  the address: committed history only, no working tree, stashes, live updates,
+  actions or additions. Required for any address that is not loopback. Needs a
+  restart.
+- `hosts` (list of strings, default `[]`): Host names a reverse proxy forwards
+  with, exact and without port, for example `["git.example.com"]`. Needs
+  `is_public`. Needs a restart.
+- `public_timeout_secs` (integer, default `30`): Longest a request to a public
+  server may take, in seconds. Past it the answer is 503 and the work it started
+  finishes in the background, filling the cache for a retry. Needs a restart.
 
 ## `[watch]`
 
-| Key | Type | Default | Description |
-| --- | --- | --- | --- |
-| `enabled` | bool | `true` | Notice new commits and refs while running. Off means a restart or a reload is needed. |
-| `rescan_secs` | integer | `30` | The safety rescan, in seconds. The OS reports file changes, so a new commit, a ref or a staged file usually shows within about a second, and the working tree is scanned only while a tab shows it. On a heavily loaded Mac the OS can drop a file change without a word, and then it shows within this many seconds, so lower it for a tighter bound (each rescan checks HEAD, refs and index with a few `stat` calls, plus a full status while a tab shows the working tree). With no tab open nothing runs more often. Minimum 5. |
+- `enabled` (bool, default `true`): Notice new commits and refs while running.
+  Off means a restart or a reload is needed.
+- `rescan_secs` (integer, default `30`): The safety rescan, in seconds. The OS
+  reports file changes, so a new commit, a ref or a staged file usually shows
+  within about a second, and the working tree is scanned only while a tab shows
+  it. On a heavily loaded Mac the OS can drop a file change without a word, and
+  then it shows within this many seconds, so lower it for a tighter bound (each
+  rescan checks HEAD, refs and index with a few `stat` calls, plus a full status
+  while a tab shows the working tree). With no tab open nothing runs more often.
+  Minimum 5.
 
 ## `[index]`
 
-| Key | Type | Default | Description |
-| --- | --- | --- | --- |
-| `build_on_start` | bool | `true` | Build the commit index as soon as a repository is served: at startup for one repository, at its first visit when several share the server. Off waits for the first page that needs it (Insights). |
-| `threads` | integer | `0` | Threads that parse the index. 0 means one per core, capped at 8. Needs a restart. |
-| `has_messages` | bool | `true` | Keep the commit messages in the index so commit search reads them there instead of walking the history. Costs about 12% more cache on disk (31 MB for 345k commits) and one extra pass over the history when first turned on (16 s for 345k commits). Off, commit search walks git: 3 s on that history when nothing matches, 70 ms on. |
+- `build_on_start` (bool, default `true`): Build the commit index as soon as a
+  repository is served: at startup for one repository, at its first visit when
+  several share the server. Off waits for the first page that needs it
+  (Insights).
+- `threads` (integer, default `0`): Threads that parse the index. 0 means one
+  per core, capped at 8. Needs a restart.
+- `has_messages` (bool, default `true`): Keep the commit messages in the index
+  so commit search reads them there instead of walking the history. Costs about
+  12% more cache on disk (31 MB for 345k commits) and one extra pass over the
+  history when first turned on (16 s for 345k commits). Off, commit search walks
+  git: 3 s on that history when nothing matches, 70 ms on.
 
 ## `[resources]`
 
-| Key | Type | Default | Description |
-| --- | --- | --- | --- |
-| `cache_mb` | integer | `32` | Memory for the serving caches of one repository together, in MB, shared out in sixteenths between the caches. Parts of 16: blame 3, highlighted code 3, rendered pages 2, file lists 1, last commits 1, path logs 1, compares 1, index blocks 4. An entry over an eighth of its cache is not kept. An idle server keeps only the rendered pages. |
-| `blocking_jobs` | integer | `0` | Most page-building git jobs running at once across all repositories. 0 means one per core. |
+- `cache_mb` (integer, default `32`): Memory for the serving caches of one
+  repository together, in MB, shared out in sixteenths between the caches. Parts
+  of 16: blame 3, highlighted code 3, rendered pages 2, file lists 1, last
+  commits 1, path logs 1, compares 1, index blocks 4. An entry over an eighth of
+  its cache is not kept. An idle server keeps only the rendered pages.
+- `blocking_jobs` (integer, default `0`): Most page-building git jobs running at
+  once across all repositories. 0 means one per core.
 
 ## `[limits]`
 
-| Key | Type | Default | Description |
-| --- | --- | --- | --- |
-| `text_kb` | integer | `2048` | Largest file shown as text, in KiB. Larger files are offered as raw downloads. |
-| `raw_mb` | integer | `256` | Largest file served raw, in MB. A larger one is refused. |
-| `search_matches` | integer | `500` | Most matches a code search returns. Past it the search stops and says it was cut off. |
-| `search_file_lines` | integer | `100` | Matching lines one file keeps in a code search. Past it the file says more matched. |
-| `search_commits` | integer | `200` | Most commits a commit search lists. Past it the search stops and says it was cut off. |
-| `diff_fold_lines` | integer | `400` | Lines of one file's diff shown before it folds. A folded file loads on demand. |
-| `blob_lines` | integer | `20000` | Lines a file page shows. Past it the page cuts the file and says so. `api.blob_lines` is the API's own cut. |
-| `highlight_kb` | integer | `256` | Largest text highlighted, in KiB: a file, its blame, one file's diff or a Markdown code block. Larger text shows plain. |
-| `log_pages` | integer | `1000` | History pages a log reaches: a later page number shows the last of them. |
-| `preview_mb` | integer | `16` | Largest image whose pixel size a file page reads, in MB. A larger one shows no pixel size. |
-| `worktree_files` | integer | `2000` | Changed files the Uncommitted view lists. Past it the rest are left out. |
-| `worktree_diff_kb` | integer | `1024` | Largest working-tree file the Uncommitted view diffs, in KiB. A larger one is listed without hunks. |
-| `unindexed_commits` | integer | `2000` | Commits a view of a revision outside the indexed history reads from git per request. Past it the view asks for a reindex instead. Needs a restart. |
-| `action_output_kb` | integer | `64` | Output kept from each stream (stdout, stderr) of an action, in KiB. The rest is read and dropped. Needs a restart. |
-| `registry_entries` | integer | `500` | Repositories remembered in `repos.json`, newest first. Past it the least recently served are forgotten with their names. Needs a restart. |
-| `export_pages` | integer | `20000` | Most pages `git terrace export` writes, folded diff fragments included. Past it the export stops and writes nothing. `export --export-pages` overrides it. Between 1 and 10000000. |
+- `text_kb` (integer, default `2048`): Largest file shown as text, in KiB.
+  Larger files are offered as raw downloads.
+- `raw_mb` (integer, default `256`): Largest file served raw, in MB. A larger
+  one is refused.
+- `search_matches` (integer, default `500`): Most matches a code search returns.
+  Past it the search stops and says it was cut off.
+- `search_file_lines` (integer, default `100`): Matching lines one file keeps in
+  a code search. Past it the file says more matched.
+- `search_commits` (integer, default `200`): Most commits a commit search lists.
+  Past it the search stops and says it was cut off.
+- `diff_fold_lines` (integer, default `400`): Lines of one file's diff shown
+  before it folds. A folded file loads on demand.
+- `blob_lines` (integer, default `20000`): Lines a file page shows. Past it the
+  page cuts the file and says so. `api.blob_lines` is the API's own cut.
+- `highlight_kb` (integer, default `256`): Largest text highlighted, in KiB: a
+  file, its blame, one file's diff or a Markdown code block. Larger text shows
+  plain.
+- `log_pages` (integer, default `1000`): History pages a log reaches: a later
+  page number shows the last of them.
+- `preview_mb` (integer, default `16`): Largest image whose pixel size a file
+  page reads, in MB. A larger one shows no pixel size.
+- `worktree_files` (integer, default `2000`): Changed files the Uncommitted view
+  lists. Past it the rest are left out.
+- `worktree_diff_kb` (integer, default `1024`): Largest working-tree file the
+  Uncommitted view diffs, in KiB. A larger one is listed without hunks.
+- `unindexed_commits` (integer, default `2000`): Commits a view of a revision
+  outside the indexed history reads from git per request. Past it the view asks
+  for a reindex instead. Needs a restart.
+- `action_output_kb` (integer, default `64`): Output kept from each stream
+  (stdout, stderr) of an action, in KiB. The rest is read and dropped. Needs a
+  restart.
+- `registry_entries` (integer, default `500`): Repositories remembered in
+  `repos.json`, newest first. Past it the least recently served are forgotten
+  with their names. Needs a restart.
+- `export_pages` (integer, default `20000`): Most pages `git terrace export`
+  writes, folded diff fragments included. Past it the export stops and writes
+  nothing. `export --export-pages` overrides it. Between 1 and 10000000.
 
 ## `[api]`
 
-| Key | Type | Default | Description |
-| --- | --- | --- | --- |
-| `log_page_commits` | integer | `500` | Most commits one `log` answer lists, whatever `per_page` asks. |
-| `log_skip_commits` | integer | `50000` | Commits a `log` answer may skip to reach its page. A deeper page is refused. |
-| `blob_lines` | integer | `5000` | Most lines one `blob` answer carries, whatever `limit` asks. The rest is cut and `truncated` says so. `limits.blob_lines` is the file page's own cut. |
-| `blob_kb` | integer | `256` | Most bytes one `blob` answer carries, in KiB: one minified line can be megabytes. The rest is cut and `truncated` says so. |
-| `blame_lines` | integer | `5000` | Most lines one `blame` answer carries. The rest is cut and `truncated` says so. |
-| `diff_lines` | integer | `20000` | Most diff lines one commit answer carries, whatever `max_lines` asks. The rest is cut and `truncated` says so. |
+- `log_page_commits` (integer, default `500`): Most commits one `log` answer
+  lists, whatever `per_page` asks.
+- `log_skip_commits` (integer, default `50000`): Commits a `log` answer may skip
+  to reach its page. A deeper page is refused.
+- `blob_lines` (integer, default `5000`): Most lines one `blob` answer carries,
+  whatever `limit` asks. The rest is cut and `truncated` says so.
+  `limits.blob_lines` is the file page's own cut.
+- `blob_kb` (integer, default `256`): Most bytes one `blob` answer carries, in
+  KiB: one minified line can be megabytes. The rest is cut and `truncated` says
+  so.
+- `blame_lines` (integer, default `5000`): Most lines one `blame` answer
+  carries. The rest is cut and `truncated` says so.
+- `diff_lines` (integer, default `20000`): Most diff lines one commit answer
+  carries, whatever `max_lines` asks. The rest is cut and `truncated` says so.
 
 ## `[insights]`
 
-| Key | Type | Default | Description |
-| --- | --- | --- | --- |
-| `exclude` | list of strings | `[]` | Paths (globs) left out of every insight. |
-| `include_bots` | bool | `false` | Count commits by bots. |
-| `include_generated` | bool | `false` | Count lock files and minified output. |
-| `period` | string | `"all"` | Period the insights pages use when the URL names none: 1w, 1m, 3m, 1y or all. The API and MCP default to all. Their `period` parameter picks one. |
-| `pages` | list of strings | `["activity", "contributors", "hotspots", "languages", "ownership", "types", "frequency", "patterns"]` | Insights pages, in the order the tabs show them: `activity`, `contributors`, `hotspots`, `languages` and `ownership`, plus the sections `types` and `frequency` (on Activity) and `patterns` (on Hotspots). Leave one out to stop serving it. `features.insights_enabled` switches them all. |
+- `exclude` (list of strings, default `[]`): Paths (globs) left out of every
+  insight.
+- `include_bots` (bool, default `false`): Count commits by bots.
+- `include_generated` (bool, default `false`): Count lock files and minified
+  output.
+- `period` (string, default `"all"`): Period the insights pages use when the URL
+  names none: 1w, 1m, 3m, 1y or all. The API and MCP default to all. Their
+  `period` parameter picks one.
+- `pages` (list of strings, default
+  `["activity", "contributors", "hotspots", "languages", "ownership", "types", "frequency", "patterns"]`):
+  Insights pages, in the order the tabs show them: `activity`, `contributors`,
+  `hotspots`, `languages` and `ownership`, plus the sections `types` and
+  `frequency` (on Activity) and `patterns` (on Hotspots). Leave one out to stop
+  serving it. `features.insights_enabled` switches them all.
 
 ## `[display]`
 
-| Key | Type | Default | Description |
-| --- | --- | --- | --- |
-| `theme` | string | `"system"` | Color theme before the visitor picks one: system, light or dark. |
-| `dates` | string | `"relative"` | How dates read: relative or absolute. |
-| `sidebar` | list of strings | `["now", "loose_ends", "recent", "churn", "languages"]` | Overview sidebar sections, in the order shown: `now`, `loose_ends`, `recent`, `churn` and `languages`. Leave one out to hide it. An empty list hides the sidebar. |
+- `theme` (string, default `"system"`): Color theme before the visitor picks
+  one: system, light or dark.
+- `dates` (string, default `"relative"`): How dates read: relative or absolute.
+- `sidebar` (list of strings, default
+  `["now", "loose_ends", "recent", "churn", "languages"]`): Overview sidebar
+  sections, in the order shown: `now`, `loose_ends`, `recent`, `churn` and
+  `languages`. Leave one out to hide it. An empty list hides the sidebar.
 
 ## `[features]`
 
-| Key | Type | Default | Description |
-| --- | --- | --- | --- |
-| `blame_enabled` | bool | `true` | Serve who last changed each line of a file (`/blame`) and its API endpoint. |
-| `search_enabled` | bool | `true` | Serve code and commit search (`/search`) and the search box. |
-| `raw_enabled` | bool | `true` | Serve the bytes of a file (`/raw`): downloads and images in rendered Markdown. |
-| `history_enabled` | bool | `true` | Serve the history of one file (`/history`). |
-| `compare_enabled` | bool | `true` | Serve the comparison of two revisions (`/compare`). |
-| `worktree_enabled` | bool | `true` | Serve the working tree, linked worktrees and stashes. Never on a public server. |
-| `insights_enabled` | bool | `true` | Serve the insights pages (`/stats`) and their API. `insights.pages` picks which. |
-| `live_enabled` | bool | `true` | Push changes to open pages (`/events`). Never on a public server. |
-| `actions_enabled` | bool | `true` | Run the actions of `actions.toml` and offer Send to. Never on a public server. |
-| `repo_admin_enabled` | bool | `true` | Let `git terrace open` and `remove` add and take off repositories of a running server. Never on a public server. Server-wide. |
-| `settings_enabled` | bool | `true` | Serve the settings page, which edits `config.toml` and `actions.toml` from the browser. Never on a public server. Server-wide. |
-| `picker_enabled` | bool | `true` | Show the repository switcher and the list of served repositories. Server-wide. |
-| `front_matter_enabled` | bool | `true` | Show the front matter of a Markdown file as a table. |
-| `mermaid_enabled` | bool | `true` | Draw mermaid diagrams in Markdown; off shows their source. |
-| `markdown_preview_enabled` | bool | `true` | Render Markdown files and the README card; off shows them as their source. |
-| `credit_enabled` | bool | `true` | Write the credit line (source, license, origin) at the foot of exported pages. Server-wide. |
-| `api_enabled` | bool | `unset` | Serve the JSON API (`/api/v1`). Unset means on locally and off on a public server. Server-wide. |
+- `blame_enabled` (bool, default `true`): Serve who last changed each line of a
+  file (`/blame`) and its API endpoint.
+- `search_enabled` (bool, default `true`): Serve code and commit search
+  (`/search`) and the search box.
+- `raw_enabled` (bool, default `true`): Serve the bytes of a file (`/raw`):
+  downloads and images in rendered Markdown.
+- `history_enabled` (bool, default `true`): Serve the history of one file
+  (`/history`).
+- `compare_enabled` (bool, default `true`): Serve the comparison of two
+  revisions (`/compare`).
+- `worktree_enabled` (bool, default `true`): Serve the working tree, linked
+  worktrees and stashes. Never on a public server.
+- `insights_enabled` (bool, default `true`): Serve the insights pages (`/stats`)
+  and their API. `insights.pages` picks which.
+- `live_enabled` (bool, default `true`): Push changes to open pages (`/events`).
+  Never on a public server.
+- `actions_enabled` (bool, default `true`): Run the actions of `actions.toml`
+  and offer Send to. Never on a public server.
+- `repo_admin_enabled` (bool, default `true`): Let `git terrace open` and
+  `remove` add and take off repositories of a running server. Never on a public
+  server. Server-wide.
+- `settings_enabled` (bool, default `true`): Serve the settings page, which
+  edits `config.toml` and `actions.toml` from the browser. Never on a public
+  server. Server-wide.
+- `picker_enabled` (bool, default `true`): Show the repository switcher and the
+  list of served repositories. Server-wide.
+- `front_matter_enabled` (bool, default `true`): Show the front matter of a
+  Markdown file as a table.
+- `mermaid_enabled` (bool, default `true`): Draw mermaid diagrams in Markdown;
+  off shows their source.
+- `markdown_preview_enabled` (bool, default `true`): Render Markdown files and
+  the README card; off shows them as their source.
+- `credit_enabled` (bool, default `true`): Write the credit line (source,
+  license, origin) at the foot of exported pages. Server-wide.
+- `api_enabled` (bool, default `unset`): Serve the JSON API (`/api/v1`). Unset
+  means on locally and off on a public server. Server-wide.
 
 ## `[multi]`
 
-| Key | Type | Default | Description |
-| --- | --- | --- | --- |
-| `depth` | integer | `2` | How many folder levels to search below a given folder for repositories. Needs a restart. |
-| `skip_dirs` | list of strings | `["node_modules", "target", ".wt"]` | Folder names never searched, besides hidden ones. Needs a restart. |
+- `depth` (integer, default `2`): How many folder levels to search below a given
+  folder for repositories. Needs a restart.
+- `skip_dirs` (list of strings, default `["node_modules", "target", ".wt"]`):
+  Folder names never searched, besides hidden ones. Needs a restart.
 
 ## `[links]`
 
-| Key | Type | Default | Description |
-| --- | --- | --- | --- |
-| `style` | string | `"gitterrace"` | Form of the permalink Copy permalink, Send to, action payloads and the MCP hand out: gitterrace (`gitterrace://<id>/<sha>/<path>`, opened by `git terrace open` without a running server) or go (`http://<addr>/go/...`, needs this server running). |
-| `roots` | list of strings | `[]` | Folders `git terrace open` searches, `multi.depth` levels deep, for a clone a link names, besides every repository served before. |
+- `style` (string, default `"gitterrace"`): Form of the permalink Copy
+  permalink, Send to, action payloads and the MCP hand out: gitterrace
+  (`gitterrace://<id>/<sha>/<path>`, opened by `git terrace open` without a
+  running server) or go (`http://<addr>/go/...`, needs this server running).
+- `roots` (list of strings, default `[]`): Folders `git terrace open` searches,
+  `multi.depth` levels deep, for a clone a link names, besides every repository
+  served before.

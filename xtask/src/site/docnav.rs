@@ -49,7 +49,11 @@ pub(super) fn nav(
         .iter()
         .enumerate()
         .map(|(i, (p, t, g))| Item {
-            group: if i == 0 || order[i - 1].2 != *g { g } else { "" },
+            group: if i == 0 || order[i - 1].2 != *g {
+                g
+            } else {
+                ""
+            },
             href: p,
             title: t,
             current: if p == here {

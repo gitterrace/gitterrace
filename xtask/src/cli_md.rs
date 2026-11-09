@@ -83,7 +83,11 @@ fn table(s: &mut String, args: &[&Arg]) {
             .filter(|v| a.get_action().takes_values() || v != "false")
             .collect();
         if !default.is_empty() {
-            let _ = write!(line, " Default {}.", join(default.iter().map(|d| d.as_str().into())));
+            let _ = write!(
+                line,
+                " Default {}.",
+                join(default.iter().map(|d| d.as_str().into()))
+            );
         }
         let values = join(
             a.get_possible_values()

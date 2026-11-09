@@ -89,14 +89,14 @@ impl Keys {
             .collect()
     }
 
-    /// The other direction: every key has its row in the configuration page and every flag
+    /// The other direction: every key has its entry in the configuration page and every flag
     /// its place in the README's command list, so neither reference leaves one out.
     pub(super) fn reverse(&self, texts: &BTreeMap<String, String>) -> Vec<String> {
         let mut bad = Vec::new();
         if let Some(config) = texts.get(CONFIG) {
             for id in &self.ids {
                 let (section, name) = id.split_once('.').unwrap_or((id, ""));
-                let row = format!("| `{name}` |");
+                let row = format!("\n- `{name}` (");
                 let head = format!("## `[{section}]`");
                 let found = config
                     .split("\n## ")
