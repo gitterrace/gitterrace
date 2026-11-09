@@ -10,6 +10,7 @@ fn stylesheets_hold_no_raw_colors() {
         ("media.css", include_str!("../static/media.css")),
         ("send.css", include_str!("../static/send.css")),
         ("docnav.css", include_str!("../static/docnav.css")),
+        ("graph.css", include_str!("../static/graph.css")),
         ("insights.css", include_str!("../static/insights.css")),
         ("charts.css", include_str!("../static/charts.css")),
     ];
@@ -39,6 +40,7 @@ fn clipped_text_keeps_room_for_descenders() {
         ("media.css", include_str!("../static/media.css")),
         ("send.css", include_str!("../static/send.css")),
         ("docnav.css", include_str!("../static/docnav.css")),
+        ("graph.css", include_str!("../static/graph.css")),
         ("insights.css", include_str!("../static/insights.css")),
         ("charts.css", include_str!("../static/charts.css")),
     ] {
@@ -86,6 +88,7 @@ fn only_commit_messages_truncate() {
         ("media.css", include_str!("../static/media.css")),
         ("send.css", include_str!("../static/send.css")),
         ("docnav.css", include_str!("../static/docnav.css")),
+        ("graph.css", include_str!("../static/graph.css")),
         ("insights.css", include_str!("../static/insights.css")),
         ("charts.css", include_str!("../static/charts.css")),
     ] {
@@ -116,6 +119,7 @@ fn text_field_rules_skip_toggles() {
         ("media.css", include_str!("../static/media.css")),
         ("send.css", include_str!("../static/send.css")),
         ("docnav.css", include_str!("../static/docnav.css")),
+        ("graph.css", include_str!("../static/graph.css")),
         ("insights.css", include_str!("../static/insights.css")),
         ("charts.css", include_str!("../static/charts.css")),
     ];

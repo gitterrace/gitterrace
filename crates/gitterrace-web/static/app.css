@@ -194,27 +194,6 @@ thead.quiet th{padding:0;border:0;line-height:0;height:0}
    move under the text when the row has no room for them, so no part of a row is drawn over
    another. The Graph view keeps one line per row, its cell must meet the rows around it. */
 @media (max-width:600px){.list:not(.graphed)>.crow{flex-wrap:wrap}.crow>.ref{flex-basis:6rem}.cmain{flex-wrap:wrap;flex:1 1 9rem;min-width:min(9rem,100%)}.cmain>.subj{flex:1 0 100%}.cmain .muted{margin-left:0;overflow-wrap:anywhere}}
-/* Graph view: the cell spans the row edge to edge so lines meet the rows above and below.
-   Side lines are --line-strong (3:1 or more on the row and its hover in every theme), the
-   first-parent chain is the accent at 2px. A cell shows 8 columns, a narrow screen 3, and
-   the rest fold into a count. */
-.graphed .crow{padding-left:var(--space-3)!important}
-.graph{position:relative;flex:none;align-self:stretch;display:flex;align-items:center;max-width:96px;margin:calc(-1 * var(--space-2)) 0;overflow:hidden}
-.graph .gl{position:absolute;inset:0 auto 0 0;height:100%;fill:none;stroke:var(--line-strong);stroke-width:1.5px}
-.graph .gl path{vector-effect:non-scaling-stroke}.graph .gl .main{stroke:var(--accent);stroke-width:2px}
-.graph .gl .stub{stroke-dasharray:2 2}
-.graph .gd{position:relative;display:block;flex:none}.graph .gd circle{fill:var(--line-strong);stroke:var(--bg);stroke-width:2px}
-.graph .gd .main{fill:var(--accent)}.graph .gd .m{fill:var(--bg);stroke:var(--line-strong);stroke-width:1.5px}.graph .gd .m.main{stroke:var(--accent)}
-.crow:hover .graph .gd circle{stroke:var(--soft)}.crow:hover .graph .gd .m{fill:var(--soft);stroke-width:1.5px}
-.gfold{display:none;position:absolute;right:0;font:var(--text-2xs) var(--mono);color:var(--muted);background:var(--bg);padding-left:2px}.gfold.w{display:block}
-.crow:hover .gfold{background:var(--soft)}
-.graph .xw{display:none}
-.gedge{display:none;position:absolute;right:0;width:5px;height:5px;border-radius:50%}
-.gedge{background:var(--muted)}.gedge.w{display:block}
-.grefs{display:inline-flex;align-self:center;align-items:center;gap:var(--space-1);flex:none;font:var(--text-2xs)/1 var(--mono)}
-.gref{padding:2px 5px;border:var(--border);border-radius:var(--radius);color:var(--muted)}
-.gref.cur{color:var(--accent-ink);border-color:var(--accent);background:var(--accent-soft)}
-@media (max-width:600px){.graph{max-width:36px}.graph .xn{display:none}.graph .gedge.n{display:block}.graph .gedge.w{display:none}.graph .gfold.n{display:block}.graph .gfold.w{display:none}.cmain:has(.grefs)>.subj{flex:1 1 0}.grefs{max-width:50%;overflow:hidden}}
 
 /* commit page and diff */
 .meta{color:var(--muted);margin:var(--space-2) 0 var(--space-6)}.head+.meta{margin-top:calc(-1 * var(--space-2));margin-bottom:var(--space-4)}.meta b{color:var(--fg)}
