@@ -312,6 +312,8 @@ impl Insights<'_> {
         paths: &[&str],
         keep: impl Fn(&CommitRow) -> bool,
     ) -> Vec<Vec<(TouchRaw, CommitRow)>> {
+        #[cfg(test)]
+        LISTED.with(|n| n.set(n.get() + paths.len()));
         if paths.len() > PER_PATH_MAX {
             if let Some(tip) = self.tip_index() {
                 return self.touches_tip(tip, paths, keep);
@@ -407,6 +409,66 @@ impl Insights<'_> {
             .collect()
     }
 
+    /// Calls `each(i, lines, person, commit)` for every touch of `paths[i]` by the commits `c`
+    /// counts, newest first per path, the touches [`Insights::touches_in`] lists, `person`
+    /// being [`Insights::person_of`] its author. Read straight from the shared tip index when
+    /// there is one, so no list per path is built; `each` returns false to skip the rest of
+    /// that path. A caller that needs no commit field never reads the commit columns.
+    pub(super) fn visit_touches_in(
+        &self,
+        paths: &[&str],
+        c: &Counted<'_>,
+        mut each: impl FnMut(usize, u32, usize, &CommitRow) -> bool,
+    ) {
+        let tip = (paths.len() > PER_PATH_MAX)
+            .then(|| self.tip_index())
+            .flatten();
+        let Some(tip) = tip else {
+            for (i, list) in self.touches_in(paths, c).into_iter().enumerate() {
+                for (t, row) in list {
+                    if !each(i, t.lines, self.person_of(row.ident), &row) {
+                        break;
+                    }
+                }
+            }
+            return;
+        };
+        let raw = self.opts.count_whitespace;
+        // Per rank, its author's person when `c` counts it, else none: 4 bytes a commit, so
+        // the touch loop reads this, not a commit row, for each touch.
+        let skip = u32::MAX;
+        let who: Vec<u32> = tip
+            .cols
+            .iter()
+            .map(|row| {
+                if c.contains_columns(row) {
+                    u32::try_from(self.person_of(row.ident)).unwrap_or(skip)
+                } else {
+                    skip
+                }
+            })
+            .collect();
+        for (i, p) in paths.iter().enumerate() {
+            let Some(list) = self.head_id(p).and_then(|id| tip.of(id)) else {
+                continue;
+            };
+            for t in list {
+                let Some(&person) = who.get(t.rank as usize) else {
+                    continue;
+                };
+                if person == skip {
+                    continue;
+                }
+                let Some(row) = tip.cols.get(t.rank as usize) else {
+                    continue;
+                };
+                if !each(i, if raw { t.raw } else { t.code }, person as usize, row) {
+                    break;
+                }
+            }
+        }
+    }
+
     /// Every non-merge touch of `path`, through renames, newest first: the cross-check's
     /// view, bots included.
     #[cfg(test)]
@@ -466,6 +528,13 @@ impl Insights<'_> {
         out.sort_by_key(|(r, t)| (std::cmp::Reverse(t.time), std::cmp::Reverse(*r)));
         out.into_iter().map(|(_, t)| t).collect()
     }
+}
+
+#[cfg(test)]
+thread_local! {
+    /// Paths whose touches were built as lists, for the counted-work guard: the per-file
+    /// pages over the tip index visit the touches in place and build none.
+    pub(crate) static LISTED: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
 }
 
 #[cfg(test)]

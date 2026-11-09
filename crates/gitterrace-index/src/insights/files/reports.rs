@@ -1,6 +1,6 @@
 //! Hotspots, ownership, coupling and code age over the followed file history.
 
-use std::collections::{BTreeMap, HashSet};
+use std::collections::BTreeMap;
 
 use gitterrace_git::civil_from_days;
 
@@ -31,17 +31,24 @@ impl Insights<'_> {
             .filter(|f| f.lines != 0 && !self.skips_head(&f.path))
             .collect();
         let names: Vec<&str> = shown.iter().map(|f| &*f.path).collect();
-        for (f, touches) in shown.into_iter().zip(self.touches_in(&names, counted)) {
-            let mut count = 0;
-            let mut churn = 0u64;
-            let mut last = i64::MIN;
-            let mut who = HashSet::new();
-            for (t, c) in touches {
-                count += 1;
-                churn += u64::from(t.lines);
-                last = last.max(c.time);
-                who.insert(self.person_of(c.ident));
+        // (changes, churn, last change, authors) per shown file, filled in one visit. A file's
+        // touches come together, so a person stamp per file counts its authors without a set.
+        let mut acc: Vec<(usize, u64, i64, usize)> = vec![(0, 0, i64::MIN, 0); shown.len()];
+        let mut seen: Vec<usize> = vec![usize::MAX; self.d.people.list.len()];
+        self.visit_touches_in(&names, counted, |i, lines, person, c| {
+            let a = &mut acc[i];
+            a.0 += 1;
+            a.1 += u64::from(lines);
+            a.2 = a.2.max(c.time);
+            if let Some(s) = seen.get_mut(person)
+                && *s != i
+            {
+                *s = i;
+                a.3 += 1;
             }
+            true
+        });
+        for (f, (count, churn, last, who)) in shown.into_iter().zip(acc) {
             if count == 0 {
                 continue;
             }
@@ -51,7 +58,7 @@ impl Insights<'_> {
                 lines: f.lines,
                 changes: count,
                 lines_changed: churn,
-                authors: who.len(),
+                authors: who,
                 last_change: last,
                 score: count as f64 * f64::from(f.lines).sqrt(),
             });
@@ -91,10 +98,10 @@ impl Insights<'_> {
         whole: bool,
     ) -> Vec<BTreeMap<usize, u64>> {
         let src = self.source();
-        let follow = self.follow();
         // The aggregate holds every commit: usable only when the counted set drops none,
         // which `whole` says.
         let plain = |f: &HeadFile| -> Option<PathId> {
+            let follow = self.follow();
             let id = src.path_id(&f.path)?;
             (!follow.log.contains_key(&id) && !follow.names.contains_key(&id)).then_some(id)
         };
@@ -133,11 +140,36 @@ impl Insights<'_> {
         }
         let rest: Vec<usize> = (0..files.len()).filter(|&i| ids[i].is_none()).collect();
         let names: Vec<&str> = rest.iter().map(|&i| &*files[i].path).collect();
-        for (&i, touches) in rest.iter().zip(self.touches_in(&names, counted)) {
-            for (t, c) in touches {
-                *out[i].entry(self.person_of(c.ident)).or_default() += u64::from(t.lines);
+        // A file's touches come together: sum them per person in a dense scratch row and move
+        // the row into the file's map when the next file starts, one insert per author.
+        let mut sums: Vec<u64> = vec![0; self.d.people.list.len()];
+        // Per person, the file it last joined `held` for.
+        let mut mark: Vec<usize> = vec![usize::MAX; sums.len()];
+        let mut held: Vec<usize> = Vec::new();
+        let mut cur: Option<usize> = None;
+        let mut flush = |cur: Option<usize>, sums: &mut [u64], held: &mut Vec<usize>| {
+            let Some(k) = cur else { return };
+            let map = &mut out[rest[k]];
+            for p in held.drain(..) {
+                *map.entry(p).or_default() += std::mem::take(&mut sums[p]);
             }
-        }
+        };
+        self.visit_touches_in(&names, counted, |k, lines, p, _| {
+            if cur != Some(k) {
+                flush(cur, &mut sums, &mut held);
+                cur = Some(k);
+            }
+            if let (Some(s), Some(m)) = (sums.get_mut(p), mark.get_mut(p)) {
+                // A zero-line touch still makes its author hold the file, as the map entry did.
+                if *m != k {
+                    *m = k;
+                    held.push(p);
+                }
+                *s += u64::from(lines);
+            }
+            true
+        });
+        flush(cur, &mut sums, &mut held);
         // A person whose rows sum to zero lines still held the file in the touches; drop
         // nobody, the touches kept zero entries too.
         out
@@ -296,13 +328,11 @@ impl Insights<'_> {
         // and a sequential pass. State is sized by the touches of head files in the window.
         let mut touches: Vec<(u32, u32)> = Vec::new();
         let mut changes = vec![0_usize; head.len()];
-        for (i, list) in self.touches_in(&head, counted).into_iter().enumerate() {
-            let id = u32::try_from(i).unwrap_or(u32::MAX);
-            for (t, _) in list {
-                touches.push((t.commit.0, id));
-                changes[i] += 1;
-            }
-        }
+        self.visit_touches_in(&head, counted, |i, _, _, c| {
+            touches.push((c.rank.0, u32::try_from(i).unwrap_or(u32::MAX)));
+            changes[i] += 1;
+            true
+        });
         touches.sort_unstable();
         // Pairs are keyed by the two file numbers, a < b because each group is sorted.
         let mut pairs: FastMap<u64, usize> = FastMap::default();
@@ -376,9 +406,14 @@ impl Insights<'_> {
             .filter(|f| f.lines != 0 && !self.skips_head(&f.path))
             .collect();
         let names: Vec<&str> = shown.iter().map(|f| &*f.path).collect();
-        let all = self.touches_in(&names, counted);
-        for (f, touches) in shown.into_iter().zip(all) {
-            let Some((_, c)) = touches.into_iter().max_by_key(|t| t.0.commit) else {
+        // Touches come newest commit first: the first one is the file's last change.
+        let mut newest: Vec<Option<crate::feed::CommitRow>> = vec![None; shown.len()];
+        self.visit_touches_in(&names, counted, |i, _, _, c| {
+            newest[i] = Some(*c);
+            false
+        });
+        for (f, c) in shown.into_iter().zip(newest) {
+            let Some(c) = c else {
                 continue;
             };
             let day = local_day_of(c.time, c.offset);

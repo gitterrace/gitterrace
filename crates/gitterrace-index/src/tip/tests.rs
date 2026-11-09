@@ -474,6 +474,17 @@ fn per_file_pages_read_no_file_rows_with_a_tip_file() {
     }
     drop(ins.code_age(&files));
     assert_eq!(src.take(), 0, "code age");
+    // Guard class: per-page work that grows with the touches but builds a structure per
+    // path (lists of touches, a set per file). The pages visit the tip index in place.
+    crate::insights::files::LISTED.with(|n| n.set(0));
+    for p in [Period::All, Period::Year] {
+        drop(ins.hotspots(&files, p));
+        drop(ins.ownership(&files, p, 1));
+        drop(ins.coupling(&files, p, 3, 50));
+    }
+    drop(ins.code_age(&files));
+    let listed = crate::insights::files::LISTED.with(std::cell::Cell::get);
+    assert_eq!(listed, 0, "per-file pages built touch lists");
     // Guard class: a whole-history scan a section pays without needing it. Release cadence
     // with no tag reads no commit column.
     src.scans.store(0, std::sync::atomic::Ordering::Relaxed);
