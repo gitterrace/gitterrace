@@ -6,6 +6,7 @@
 //! change to a field, key or kind cannot ship without its documentation.
 
 use crate::config::Kind;
+use crate::numbers;
 
 /// One documented field or key.
 pub struct Item {
@@ -113,7 +114,13 @@ pub const PAYLOAD_FIELDS: [Item; 16] = [
         "string",
         false,
         "",
-        "The selected text, read from git. Capped at 64 KiB or 400 lines.",
+        concat!(
+            "The selected text, read from git. Capped at ",
+            numbers::text_kib!(),
+            " KiB or ",
+            numbers::text_lines!(),
+            " lines."
+        ),
     ),
     item(
         "text_truncated",
@@ -287,8 +294,12 @@ pub const SEND_KEYS: [Item; 6] = [
         "table of strings",
         false,
         "`{}`",
-        "`[send.vars]`: settings, inserted verbatim as `{var.<name>}`, one line each, at most \
-         4 KiB.",
+        concat!(
+            "`[send.vars]`: settings, inserted verbatim as `{var.<name>}`, one line each, at \
+             most ",
+            numbers::var_kib!(),
+            " KiB."
+        ),
     ),
 ];
 
@@ -348,7 +359,11 @@ pub const SCRIPT_KEYS: [Item; 6] = [
         "string",
         false,
         "`10s`",
-        "Like `10s` or `500ms`, at most `120s`.",
+        concat!(
+            "Like `10s` or `500ms`, at most `",
+            numbers::timeout_secs!(),
+            "s`."
+        ),
     ),
     item(
         "shell",
@@ -455,9 +470,16 @@ pub const ACTION_KEYS: [Item; 14] = [
         "table of strings",
         false,
         "`{}`",
-        "`[action.vars]`: fixed settings, lowercase names `[a-z0-9_]{1,32}`, at most 32, each \
-        value at most 4 KiB. They reach the script as `GITTERRACE_VAR_<NAME>`, as `payload.vars` \
-        and as `{var.<name>}` in `command`.",
+        concat!(
+            "`[action.vars]`: fixed settings, lowercase names `[a-z0-9_]{1,",
+            numbers::max_vars!(),
+            "}`, at most ",
+            numbers::max_vars!(),
+            ", each value at most ",
+            numbers::var_kib!(),
+            " KiB. They reach the script as `GITTERRACE_VAR_<NAME>`, as `payload.vars` \
+             and as `{var.<name>}` in `command`."
+        ),
     ),
 ];
 

@@ -129,7 +129,7 @@ impl RawSend {
 /// Why a `[[send]]` block is refused. The text is the reason, without the id.
 #[derive(Debug, thiserror::Error)]
 pub(crate) enum SendError {
-    #[error("vars.{0}: one line, at most 4 KiB")]
+    #[error("vars.{0}: one line, at most {kib} KiB", kib = crate::config::MAX_VAR_BYTES / 1024)]
     VarValue(String),
     #[error("label must be 1 to 80 characters")]
     Label,
@@ -162,7 +162,7 @@ pub(crate) enum SendError {
 /// Validates one `[[send]]` block. The error is the reason, without the id.
 pub(crate) fn compile(raw: RawSend) -> Result<Target, SendError> {
     for (name, value) in &raw.vars {
-        if value.len() > 4096 || value.contains(['\0', '\n', '\r']) {
+        if value.len() > crate::config::MAX_VAR_BYTES || value.contains(['\0', '\n', '\r']) {
             return Err(SendError::VarValue(name.clone()));
         }
     }

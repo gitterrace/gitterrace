@@ -522,4 +522,10 @@ All notable changes are listed here. The format follows
 - web: the languages warm-up names chain paths in id order
 - web: concurrent requests for one cold page render it once
 <!-- BEGIN GENERATED: unreleased -->
+## [Unreleased]
+
+### Changed
+
+- actions: the contract's numbers are written once
+
 <!-- END GENERATED: unreleased -->

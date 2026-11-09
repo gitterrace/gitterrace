@@ -26,15 +26,21 @@ use crate::config::trust::check_file;
 /// own `timeout` in actions.toml.
 const DEFAULT_TIMEOUT: Duration = Duration::from_secs(10);
 /// Not configurable: the ceiling is part of the actions.toml contract (docs/actions.md).
-pub const MAX_TIMEOUT: Duration = Duration::from_secs(120);
+pub const MAX_TIMEOUT: Duration = Duration::from_secs(crate::numbers::timeout_secs!());
+/// The refusal of a `timeout` that does not parse or is over [`MAX_TIMEOUT`].
+const BAD_TIMEOUT: &str = concat!(
+    "timeout must be like 10s or 500ms, at most ",
+    crate::numbers::timeout_secs!(),
+    "s"
+);
 /// A config larger than this is not hand-written; refuse instead of parsing it.
 /// Not configurable: a size bound read before parsing, against a file that is not a config.
 const MAX_CONFIG_BYTES: u64 = 256 * 1024;
 /// Limits on `[action.vars]`: names `[a-z0-9_]{1,32}`, values are plain strings.
 /// Not configurable: part of the payload v1 contract, and they bound the argv a var fills.
-const MAX_VARS: usize = 32;
-const MAX_VAR_NAME: usize = 32;
-const MAX_VAR_BYTES: usize = 4 * 1024;
+pub const MAX_VARS: usize = crate::numbers::max_vars!();
+pub const MAX_VAR_NAME: usize = crate::numbers::max_vars!();
+pub const MAX_VAR_BYTES: usize = crate::numbers::var_kib!() * 1024;
 /// Placeholders a `command` element may hold, besides `{var.NAME}`.
 pub(crate) const FIELDS: [&str; 11] = [
     "title",
@@ -441,7 +447,7 @@ fn validate(
         None => DEFAULT_TIMEOUT,
         Some(t) => parse_duration(t)
             .filter(|d| !d.is_zero() && *d <= MAX_TIMEOUT)
-            .ok_or_else(|| invalid(&id, "timeout must be like 10s or 500ms, at most 120s"))?,
+            .ok_or_else(|| invalid(&id, BAD_TIMEOUT))?,
     };
     let key = parse_key(a.key.as_deref()).map_err(|why| invalid(&id, why))?;
     for name in &a.env {
@@ -532,7 +538,10 @@ fn validate_vars(
             ));
         }
         if value.len() > MAX_VAR_BYTES {
-            return Err(invalid(id, format!("vars.{name}: value over 4 KiB")));
+            return Err(invalid(
+                id,
+                format!("vars.{name}: value over {} KiB", MAX_VAR_BYTES / 1024),
+            ));
         }
         if value.contains('\0') {
             return Err(invalid(id, format!("vars.{name}: value contains NUL")));
