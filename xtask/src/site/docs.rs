@@ -9,7 +9,7 @@ use std::fmt::Write as _;
 use std::path::Path;
 
 use anyhow::{Context as _, Result};
-use pulldown_cmark::{CowStr, Event, HeadingLevel, Parser, Tag, TagEnd, html};
+use pulldown_cmark::{CodeBlockKind, CowStr, Event, HeadingLevel, Parser, Tag, TagEnd, html};
 
 use askama::Template;
 
@@ -17,7 +17,7 @@ use crate::docs_index::{LEGAL, normalize, on_site};
 use crate::out::Out;
 use crate::site::frame::{Body, Site, page};
 use crate::site::outline_script;
-use crate::site::{changelog, docnav};
+use crate::site::{changelog, diagram, docnav};
 
 pub(super) const CHANGELOG: &str = "CHANGELOG.md";
 /// The first line of a document written whole by `cargo xtask generate`.
@@ -159,7 +159,7 @@ pub(super) fn body(
     from: &str,
     links: &Links,
     id: &mut dyn FnMut(usize, &str) -> String,
-) -> String {
+) -> Result<String> {
     let mut events: Vec<Event> = Vec::new();
     let mut pending: Vec<Event> = Vec::new();
     let mut heading: Option<(HeadingLevel, String)> = None;
@@ -215,8 +215,36 @@ pub(super) fn body(
         }
     }
     let mut out = String::new();
-    html::push_html(&mut out, events.into_iter());
-    wrap_wide(&out)
+    html::push_html(&mut out, diagrams(events, from)?.into_iter());
+    Ok(wrap_wide(&out))
+}
+
+/// `events` with each fenced `mermaid` block drawn as an inline SVG, numbered in page order so
+/// two diagrams on one page keep their ids apart. A block the site cannot draw is an error.
+fn diagrams<'a>(events: Vec<Event<'a>>, from: &str) -> Result<Vec<Event<'a>>> {
+    let mut out = Vec::with_capacity(events.len());
+    let mut src: Option<String> = None;
+    let mut n = 0;
+    for ev in events {
+        match (&mut src, ev) {
+            (None, Event::Start(Tag::CodeBlock(CodeBlockKind::Fenced(lang))))
+                if lang.as_ref() == "mermaid" =>
+            {
+                src = Some(String::new());
+            }
+            (Some(text), Event::Text(t)) => text.push_str(&t),
+            (Some(text), Event::End(TagEnd::CodeBlock)) => {
+                n += 1;
+                let svg = diagram::svg(text, &format!("diagram-{n}"), "How the crates depend")
+                    .with_context(|| format!("{from}: diagram {n}"))?;
+                out.push(Event::Html(CowStr::from(svg)));
+                src = None;
+            }
+            (Some(_), _) => {}
+            (None, ev) => out.push(ev),
+        }
+    }
+    Ok(out)
 }
 
 /// The site's lines at most `WIDTH` wide where a space allows: a line is broken at the last
@@ -382,7 +410,7 @@ pub(super) fn pages(root: &Path, site: &Site) -> Result<(Vec<Out>, Vec<String>)>
                 h2s.push((id.clone(), h.to_owned()));
             }
             id
-        });
+        })?;
         let rail = outline(&h2s);
         let (heads, scripts) = if rail.is_empty() {
             (Vec::new(), Vec::new())
@@ -415,7 +443,7 @@ pub(super) fn pages(root: &Path, site: &Site) -> Result<(Vec<Out>, Vec<String>)>
         let text = read(rel)?;
         let title = title_of(rel, &text)?;
         let path = legal_path(rel);
-        let inner = body(&text, rel, &links, &mut |_, h| slug(h));
+        let inner = body(&text, rel, &links, &mut |_, h| slug(h))?;
         let what = crate::docs_index::covers(rel).unwrap_or_default();
         let html = page(
             site,
@@ -445,7 +473,7 @@ pub(super) fn pages(root: &Path, site: &Site) -> Result<(Vec<Out>, Vec<String>)>
             },
         ),
     ));
-    let log = changelog::page(site, &links, &read(CHANGELOG)?);
+    let log = changelog::page(site, &links, &read(CHANGELOG)?)?;
     if let Out::File { body, .. } = &log {
         check_unique_ids(changelog::PATH, body)?;
     }
@@ -467,7 +495,7 @@ fn legal_pages(
     for (rel, label) in LEGAL {
         let text = read(rel)?;
         let path = legal_path(rel);
-        let inner = body(&text, rel, links, &mut |_, h| slug(h));
+        let inner = body(&text, rel, links, &mut |_, h| slug(h))?;
         let what = crate::docs_index::covers(rel).unwrap_or_default();
         let html = page(
             site,

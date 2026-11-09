@@ -14,6 +14,7 @@ use anyhow::{Context as _, Result};
 
 mod bar;
 mod changelog;
+mod diagram;
 pub mod disk;
 mod docnav;
 mod docs;

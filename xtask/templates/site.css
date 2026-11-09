@@ -100,7 +100,7 @@ background:var(--hover)}
 /* Text. */
 pre,code{font-family:var(--mono);font-size:var(--text-sm)}
 pre{background:var(--soft);border:var(--border);border-radius:var(--radius);
-padding:var(--space-3) var(--space-4);overflow-x:auto;max-width:100%}
+padding:var(--space-3) var(--space-4);overflow-x:auto;max-width:100%;white-space:pre}
 :not(pre)>code{background:var(--soft);padding:1px var(--space-1);border-radius:var(--radius);
 overflow-wrap:anywhere}
 main table{display:block;width:max-content;max-width:100%;overflow-x:auto;
@@ -111,6 +111,19 @@ main tr:nth-child(2n){background:var(--soft)}
 main td code,main th code{overflow-wrap:normal;white-space:nowrap}
 main td:not(:has(> code:only-child))::before{content:'';display:block;width:16ch}
 main img,main svg{max-width:100%;height:auto}
+/* On a narrow screen a table reads as a list: each row a block, its first cell (the flag,
+   key or route) on a line of its own and the rest under it, the header row left out. */
+@media (max-width:640px){
+main table{display:block;width:auto;border:0}
+main thead{display:none}
+main tbody,main tr,main td{display:block}
+main tr{padding:var(--space-2) 0;border-top:var(--border)}
+main tr:nth-child(2n){background:none}
+main td{border:0;padding:0 0 2px;overflow-x:auto}
+main td:first-child{font-weight:var(--weight-semibold)}
+main td:not(:first-child){color:var(--muted);font-size:var(--text-xs)}
+main td:empty{display:none}
+main td::before{display:none}}
 .diagram{margin:0 0 var(--space-4);overflow-x:auto}
 .diagram svg{display:block;font:var(--text-xs) var(--mono)}
 .diagram rect{fill:var(--soft);stroke:var(--line-strong)}

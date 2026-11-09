@@ -161,7 +161,8 @@ fn internals_pages_give_every_heading_its_slug_as_id() {
     let links = docs::Links::new("https://r");
     let html = docs::body(text, "docs/internals/x.md", &links, &mut |_, h| {
         docs::slug(h)
-    });
+    })
+    .expect("body");
     assert!(html.contains("<h2 id=\"code-age-and-releases\">Code age and releases</h2>"));
     assert_eq!(docs::page_path("architecture"), "docs/architecture/");
 }

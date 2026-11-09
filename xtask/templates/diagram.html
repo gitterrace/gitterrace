@@ -1,0 +1,19 @@
+{#- A layered "uses" diagram as inline SVG: one row per layer, a box per node, an
+arrow per edge from the bottom of the user to the top of the used. The colours are the
+site's tokens, set in the stylesheet, so light and dark both follow. -#}
+<figure class="diagram"><svg viewBox="0 0 {{ width }} {{ height }}"
+width="{{ width }}" height="{{ height }}" role="img" aria-labelledby="{{ id }}-t">
+<title id="{{ id }}-t">{{ title }}</title>
+<defs><marker id="{{ id }}-a" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7"
+markerHeight="7" orient="auto"><path class="tip" d="M0 0L8 4L0 8z"/></marker></defs>
+{%- for (x1, y1, x2, y2, mid) in edges %}
+<path d="M{{ x1 }} {{ y1 }}C{{ x1 }} {{ mid }} {{ x2 }} {{ mid }} {{ x2 }} {{ y2 }}"
+marker-end="url(#{{ id }}-a)"/>
+{%- endfor %}
+{%- for (x, y, w, name, role) in nodes %}
+<rect x="{{ x }}" y="{{ y }}" width="{{ w }}" height="{{ box_h }}" rx="3"/>
+<text x="{{ x + w / 2 }}" y="{{ y + 17 }}" text-anchor="middle"
+font-weight="600">{{ name }}</text>
+<text x="{{ x + w / 2 }}" y="{{ y + 33 }}" text-anchor="middle">{{ role }}</text>
+{%- endfor %}
+</svg></figure>

@@ -210,6 +210,7 @@ All notable changes are listed here. The format follows
 - site: an edit link on docs pages only
 - site: a short landing page: pitch, install, quickstart, screenshots, promises
 - xtask: the changelog lists what is unreleased, from the commits
+- site: diagrams drawn at build time, and tables and code that fit a phone
 
 ### Changed
 

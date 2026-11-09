@@ -36,7 +36,7 @@ pub fn version_href(text: &str, ver: &str) -> String {
 }
 
 /// The changelog's HTML, with its heading ids.
-fn render(text: &str, links: &Links) -> String {
+fn render(text: &str, links: &Links) -> anyhow::Result<String> {
     let mut release = String::new();
     body(text, CHANGELOG, links, &mut |level, h| match level {
         2 => {
@@ -49,9 +49,9 @@ fn render(text: &str, links: &Links) -> String {
 }
 
 /// The changelog page.
-pub(super) fn page(site: &Site, links: &Links, text: &str) -> Out {
-    let inner = render(text, links);
-    Out::file(
+pub(super) fn page(site: &Site, links: &Links, text: &str) -> anyhow::Result<Out> {
+    let inner = render(text, links)?;
+    Ok(Out::file(
         format!("site/{PATH}index.html"),
         frame_page(
             site,
@@ -63,7 +63,7 @@ pub(super) fn page(site: &Site, links: &Links, text: &str) -> Out {
                 ..Body::default()
             },
         ),
-    )
+    ))
 }
 
 #[cfg(test)]
@@ -74,7 +74,7 @@ mod tests {
     fn every_release_heading_is_its_version_as_anchor() {
         let text = "# Changelog\n\n## [Unreleased]\n\n### Added\n\n- a\n\n\
                     ## [0.3.0] - 2026-01-02\n\n### Added\n\n- b\n";
-        let html = render(text, &Links::new("https://r"));
+        let html = render(text, &Links::new("https://r")).expect("render");
         assert!(html.contains("<h2 id=\"v0.3.0\">"), "{html}");
         assert!(html.contains("<h2 id=\"unreleased\">"), "{html}");
         assert!(html.contains("<h3 id=\"v0.3.0-added\">"), "{html}");
