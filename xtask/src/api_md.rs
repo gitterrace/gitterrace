@@ -18,9 +18,6 @@ configured counting defaults, so moving any branch or tag, the cache catching up
 JSON is `snake_case`. The same endpoints as `OpenAPI` 3.1: [openapi.json](openapi.json).
 
 The API of each repository lives at `/r/{name}/api/v1`.
-
-Rust: `gitterrace_api::router(ApiState)` (nest under `/api/v1`), \
-`gitterrace_api::serve_mcp(path, config)`, `gitterrace_api::serve_mcp_repos(scope, repos, config)`.
 ";
 
 #[expect(

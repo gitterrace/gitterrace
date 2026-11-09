@@ -29,8 +29,8 @@ Actions live in their own file, `actions.toml`, because they run commands.
 
 ## Names
 
-One rule for every key and flag, from `gitterrace_config::naming`. A renamed key
-gets no alias: the old name warns as unknown and the default applies.
+One rule for every key and flag. A renamed key gets no alias: the old name warns
+as unknown and the default applies.
 
 | Holds | Form | Example |
 | --- | --- | --- |

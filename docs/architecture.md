@@ -30,6 +30,11 @@ too, though only `actions` points at it. `config` reads `config.toml` and knows
 nothing else. `testkit` is not drawn, since only tests use it. `schwarzwald` is
 the vendored theme.
 
+The API crate's entry points: `gitterrace_api::router(ApiState)` (nest under
+`/api/v1`), `gitterrace_api::serve_mcp(path, config)` and
+`gitterrace_api::serve_mcp_repos(scope, repos, config)`. The naming rule for
+config keys lives in `gitterrace_config::naming`.
+
 ## Decisions
 
 - **The theme is a snapshot, not a design.** Colors, type, space and motion come

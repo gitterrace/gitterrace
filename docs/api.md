@@ -12,10 +12,6 @@ tag, the cache catching up or a changed `insights` setting invalidates it.
 
 The API of each repository lives at `/r/{name}/api/v1`.
 
-Rust: `gitterrace_api::router(ApiState)` (nest under `/api/v1`),
-`gitterrace_api::serve_mcp(path, config)`,
-`gitterrace_api::serve_mcp_repos(scope, repos, config)`.
-
 | Status | `code` | Meaning |
 |---|---|---|
 | 400 | `bad_request` | a parameter is missing or invalid |
