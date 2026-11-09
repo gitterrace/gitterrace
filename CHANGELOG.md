@@ -4,8 +4,7 @@ All notable changes are listed here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
-<!-- BEGIN GENERATED: unreleased -->
-## [Unreleased]
+## [0.1.0] - 2026-11-09
 
 ### Added
 
@@ -480,6 +479,7 @@ All notable changes are listed here. The format follows
 - bench: time only the insights tabs, not pages that now redirect
 - xtask: the starter table is one short line per entry, and a guard keeps
   generated rows narrow
+- xtask: Unreleased leaves out what a written release already lists
 
 ### Performance
 
@@ -516,5 +516,6 @@ All notable changes are listed here. The format follows
 - index: name the files of the churn table in path id order
 - web: the languages page reads the stored chain and no commit record
 - git: the index pairs only identical renames on a large merge
-
+- git: the repo id and the roots walk on an alternate's commit-graph
+<!-- BEGIN GENERATED: unreleased -->
 <!-- END GENERATED: unreleased -->
