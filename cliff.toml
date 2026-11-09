@@ -55,6 +55,10 @@ commit_preprocessors = [
 
 # The order here is the order of the groups in the output (Keep a Changelog order).
 commit_parsers = [
+  # Superseded before the release, so the notes name only what shipped: the app
+  # header was kept dark in light mode, then made to follow the theme.
+  { message = "^feat\\(web\\): keep the app header dark in light mode$", skip = true },
+  { message = "^feat\\(web\\): the app header stays dark in light mode$", skip = true },
   { message = "^feat", group = "<!-- 0 -->Added" },
   { message = "^refactor", group = "<!-- 1 -->Changed" },
   { message = "^fix", group = "<!-- 2 -->Fixed" },

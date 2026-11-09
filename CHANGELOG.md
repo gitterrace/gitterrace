@@ -153,7 +153,6 @@ All notable changes are listed here. The format follows
 - web: git terrace mcp --served reads the repositories served before
 - Drop the year card
 - site: slim dark bar, docs outline rail and fleet footer
-- web: keep the app header dark in light mode
 - insights: count merge commits as a visible option
 - xtask: generate the plated mark from mark-dark.svg
 - brand: favicon shows the plate in light mode, the bare mark in dark
@@ -188,7 +187,6 @@ All notable changes are listed here. The format follows
 - a11y: forced colors, one reduced-motion gate, plain CLI output, axe checks
 - brand: a lighter mark that sits with the line icons
 - web: a filter at the top of the repositories home narrows the list by name
-- web: the app header stays dark in light mode
 - web: the outline rail and its script are public, for the site to reuse
 - site: a slim dark bar on every page, from one template
 - site: docs pages with three sections or more show the app's outline rail
@@ -214,6 +212,7 @@ All notable changes are listed here. The format follows
 - index: time each index step and fail the bench on an index over budget
 - bench: gate index memory on physical footprint, not RSS
 - site: the landing shows the overview under the tagline
+- actions: the starter file offers no tendir target
 
 ### Changed
 
@@ -480,6 +479,8 @@ All notable changes are listed here. The format follows
 - xtask: the starter table is one short line per entry, and a guard keeps
   generated rows narrow
 - xtask: Unreleased leaves out what a written release already lists
+- bench: an export that stops at its page cap says so
+- xtask: a dropped changelog heading leaves one blank line
 
 ### Performance
 
@@ -518,11 +519,4 @@ All notable changes are listed here. The format follows
 - git: the index pairs only identical renames on a large merge
 - git: the repo id and the roots walk on an alternate's commit-graph
 <!-- BEGIN GENERATED: unreleased -->
-## [Unreleased]
-
-### Fixed
-
-- bench: an export that stops at its page cap says so
-- xtask: a dropped changelog heading leaves one blank line
-
 <!-- END GENERATED: unreleased -->
