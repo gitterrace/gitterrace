@@ -22,6 +22,22 @@ thread_local! {
 const BINARY_PROBE: usize = 8000;
 /// Blob buffers a worker's diff cache keeps between commits; see `changes_with`.
 const KEEP_BLOB_BUFFERS: usize = 64;
+/// Rename limit of a merge commit's diff against its first parent, as git's
+/// `diff.renameLimit`: with more than this many added times deleted files, only renames with
+/// identical content are paired, and an edited rename stays a delete plus an add. A merge of a
+/// long-lived branch can bring thousands of both, and pairing them by similarity was 97% of the
+/// tree-diff time on linux. Other commits keep gix's default (1000). Not configurable: it
+/// decides which rows the cache stores.
+pub(crate) const MERGE_RENAME_LIMIT: usize = 30;
+
+/// How a tree diff pairs renames.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Renames {
+    /// gix's defaults on every commit: what pages show.
+    Full,
+    /// The index's: [`MERGE_RENAME_LIMIT`] on merge commits, the defaults elsewhere.
+    Index,
+}
 
 struct Counted {
     additions: u32,
@@ -120,7 +136,15 @@ pub(crate) fn changes(
     text_limit: u64,
 ) -> Result<Vec<FileDiff>> {
     let mut cache = resource_cache(repo)?;
-    changes_with(repo, commit, with_hunks, text_limit, &mut cache, None)
+    changes_with(
+        repo,
+        commit,
+        with_hunks,
+        text_limit,
+        &mut cache,
+        None,
+        Renames::Full,
+    )
 }
 
 /// The blob cache a tree diff needs. Building it reads attributes and, in a bare clone,
@@ -178,8 +202,9 @@ pub(crate) fn changes_with(
     text_limit: u64,
     cache: &mut gix::diff::blob::Platform,
     memo: Option<&CountMemo>,
+    renames: Renames,
 ) -> Result<Vec<FileDiff>> {
-    let raw = raw_changes(repo, commit, cache)?;
+    let raw = raw_changes(repo, commit, cache, renames)?;
     let mut out = Vec::with_capacity(raw.len());
     for change in raw {
         let memo = memo.filter(|_| !with_hunks);
@@ -197,6 +222,7 @@ pub(crate) fn raw_changes(
     repo: &gix::Repository,
     commit: &gix::Commit<'_>,
     cache: &mut gix::diff::blob::Platform,
+    renames: Renames,
 ) -> Result<Vec<ChangeDetached>> {
     #[cfg(test)]
     TREE_DIFFS.with(|n| n.set(n.get() + 1));
@@ -204,7 +230,11 @@ pub(crate) fn raw_changes(
     let old_tree = first_parent_tree(repo, commit)?;
     let empty = repo.empty_tree();
     let old = old_tree.as_ref().unwrap_or(&empty);
-    let opts = gix::diff::Options::default().with_rewrites(Some(gix::diff::Rewrites::default()));
+    let mut rewrites = gix::diff::Rewrites::default();
+    if renames == Renames::Index && commit.parent_ids().nth(1).is_some() {
+        rewrites.limit = MERGE_RENAME_LIMIT;
+    }
+    let opts = gix::diff::Options::default().with_rewrites(Some(rewrites));
     let mut raw = Vec::new();
     let diffed = gix::diff::tree_with_rewrites(
         gix::objs::TreeRefIter::from_bytes(&old.data, old.id.kind()),

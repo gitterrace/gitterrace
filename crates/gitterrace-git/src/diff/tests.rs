@@ -203,6 +203,7 @@ fn the_count_memo_never_changes_a_result() -> crate::Result<()> {
                 crate::MAX_TEXT_BYTES,
                 &mut cache,
                 Some(&memo),
+                super::Renames::Full,
             )?;
             assert_eq!(format!("{memoized:?}"), format!("{plain:?}"), "commit {id}");
         }
@@ -254,8 +255,24 @@ fn the_owned_index_cache_diffs_as_the_shared_one() -> crate::Result<()> {
             .find_commit(repo.full_id(&gix, &id)?)
             .map_err(crate::error::git)?;
         for hunks in [false, true] {
-            let a = super::changes_with(&gix, &commit, hunks, 1 << 20, &mut owned, None)?;
-            let b = super::changes_with(&gix, &commit, hunks, 1 << 20, &mut shared, None)?;
+            let a = super::changes_with(
+                &gix,
+                &commit,
+                hunks,
+                1 << 20,
+                &mut owned,
+                None,
+                super::Renames::Full,
+            )?;
+            let b = super::changes_with(
+                &gix,
+                &commit,
+                hunks,
+                1 << 20,
+                &mut shared,
+                None,
+                super::Renames::Full,
+            )?;
             assert_eq!(format!("{a:?}"), format!("{b:?}"), "commit {id}");
         }
     }

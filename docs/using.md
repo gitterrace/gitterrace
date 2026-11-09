@@ -64,6 +64,13 @@ field to filter the headings.
 A source file in Rust, Go, Python, JavaScript or TypeScript gets the same list
 of its symbols: functions, types, classes and methods, each linked to its line.
 
+## Languages
+
+The languages page counts lines per language along the first-parent history. On
+a large merge (more than 30 by 30 added and deleted files left to pair, the same
+cut as git's `diff.renameLimit`), a renamed file that was also edited counts as a
+delete plus an add in the added and removed lines. The net lines stay the same.
+
 ## Keys
 
 Press `?` on any page for the full list. The common ones:

@@ -374,4 +374,6 @@ fn committed_rev(repo: &gix::Repository, rev: &str) -> Option<gix::ObjectId> {
 #[cfg(test)]
 mod tests;
 #[cfg(test)]
+mod tests_renames;
+#[cfg(test)]
 mod tests_treediff;

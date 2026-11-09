@@ -263,7 +263,7 @@ impl Repo {
     ) -> Result<std::sync::Arc<Vec<gix::object::tree::diff::ChangeDetached>>> {
         let diff = || {
             let mut cache = crate::diff::resource_cache(repo)?;
-            crate::diff::raw_changes(repo, commit, &mut cache)
+            crate::diff::raw_changes(repo, commit, &mut cache, crate::diff::Renames::Full)
         };
         self.change_memo().map_or_else(
             || diff().map(std::sync::Arc::new),
@@ -402,6 +402,8 @@ impl Repo {
                     MAX_TEXT_BYTES,
                     cache,
                     Some(&memo),
+                    // The index's limit: see MERGE_RENAME_LIMIT.
+                    crate::diff::Renames::Index,
                 ) else {
                     return Ok(None);
                 };

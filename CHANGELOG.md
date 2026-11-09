@@ -512,5 +512,6 @@ All notable changes are listed here. The format follows
 - index: an insights pass uses the commit it read, never a lookup by rank
 - index: name the files of the churn table in path id order
 - web: the languages page reads the stored chain and no commit record
+- git: the index pairs only identical renames on a large merge
 
 <!-- END GENERATED: unreleased -->
