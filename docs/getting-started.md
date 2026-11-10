@@ -47,9 +47,23 @@ first.
 
 ## Upgrade
 
-Run the same install command again. The insights cache in `.git/gitterrace/` is
-disposable: a new format is rebuilt on first open, and deleting the folder is
-always safe.
+Upgrade the same way you installed:
+
+<!-- BEGIN GENERATED: upgrade -->
+```bash
+curl -fsSL https://gitterrace.dev/install.sh | sh
+brew update && brew upgrade gitterrace
+cargo install --locked --force --git https://github.com/gitterrace/gitterrace gitterrace
+```
+
+<!-- END GENERATED: upgrade -->
+
+A server that is already running keeps serving the old version, since
+`git terrace` joins it rather than replacing it. Stop it (Ctrl-C in its
+terminal) and run `git terrace` again. When a release changes the cache
+format, gitterrace builds a fresh cache in `.git/gitterrace/` the first time it
+opens each repository, in place of the old one. There is nothing to migrate or
+clean up.
 
 ## Troubleshooting
 

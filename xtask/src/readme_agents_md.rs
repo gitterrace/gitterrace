@@ -67,6 +67,7 @@ pub fn render(ws: &Workspace, scripts: &[Script]) -> Vec<Out> {
         Out::block(START, "msrv", msrv),
         Out::block(START, "install", install),
         Out::block(START, "quickstart", quickstart_md()),
+        Out::block(START, "upgrade", upgrade_md(ws)),
         Out::block(README, "commands", commands()),
         Out::block(README, "actions", actions),
         Out::block(README, "license", license_md(bin)),
@@ -180,6 +181,35 @@ pub fn install_lines(ws: &Workspace) -> Vec<(&'static str, String)> {
         format!("cargo install --locked --git {} {}", p.repository, p.name),
     ));
     lines
+}
+
+/// How each install way takes a new release, in the order of [`install_lines`]: the one-line
+/// installer and cargo are run again (cargo with `--force`, since it skips an installed crate),
+/// Homebrew upgrades the formula.
+pub fn upgrade_lines(ws: &Workspace) -> Vec<(&'static str, String)> {
+    let name = ws
+        .packages
+        .get("gitterrace")
+        .map_or("gitterrace", |p| p.name.as_str());
+    install_lines(ws)
+        .into_iter()
+        .map(|(way, line)| match way {
+            "brew" => (way, format!("brew update && brew upgrade {name}")),
+            "cargo" => (way, line.replacen("--locked", "--locked --force", 1)),
+            _ => (way, line),
+        })
+        .collect()
+}
+
+/// The upgrade block of the getting started page: one command per install way, in the order
+/// of the install block, so each reader finds the line next to the one they installed with.
+pub fn upgrade_md(ws: &Workspace) -> String {
+    let mut s = String::from("```bash\n");
+    for (_, line) in upgrade_lines(ws) {
+        let _ = writeln!(s, "{line}");
+    }
+    s.push_str("```\n");
+    s
 }
 
 /// One line per subcommand and flag, from the clap definition.
@@ -415,6 +445,24 @@ mod tests {
         assert!(!d.contains(": \"]"), "a box without a role:\n{d}");
         assert!(!d.contains("testkit"), "a test-only crate is drawn:\n{d}");
         assert!(d.contains("config[\"config: config.toml\"]"), "{d}");
+    }
+
+    /// Guard class: every install way has its upgrade line, and none merely repeats an install
+    /// that would do nothing on a machine that already has gitterrace.
+    #[test]
+    fn every_install_way_has_an_upgrade_that_upgrades() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+        let ws = crate::facts::load(&root).expect("workspace");
+        let ways =
+            |v: Vec<(&'static str, String)>| v.into_iter().map(|(w, _)| w).collect::<Vec<_>>();
+        assert_eq!(ways(install_lines(&ws)), ways(upgrade_lines(&ws)));
+        for (way, line) in upgrade_lines(&ws) {
+            match way {
+                "brew" => assert!(line.contains("brew upgrade"), "{line}"),
+                "cargo" => assert!(line.contains("--force"), "{line}"),
+                _ => {}
+            }
+        }
     }
 
     #[test]
