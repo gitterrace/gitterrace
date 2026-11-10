@@ -4,7 +4,7 @@ All notable changes are listed here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
-## [0.1.0] - 2026-11-09
+## [0.1.0] - 2026-11-10
 
 ### Added
 
@@ -273,13 +273,7 @@ All notable changes are listed here. The format follows
 - index: cut two unused items and a one-line follow builder
 - index: build the unit-test-only helpers in test builds only
 - actions: drop Link::to_gitterrace and default_path
-- actions: wrap long strings and tracing fields to 100 columns
-- api: wrap long summaries to 100 columns
-- config: wrap long config strings to 100 columns
-- Wrap long strings and proptest signatures to 100 columns
-- web: wrap long html and doc strings to 100 columns
-- cli: wrap long strings and install steps to 100 columns
-- xtask: wrap long doc strings to 100 columns
+- Wrap long strings to 100 columns
 - web: keep markdown and overview files under 600 lines after wrapping
 - xtask: the landing page sections move to site/landing.rs
 - web: wrap the last wide strings and keep the width allow-list empty
@@ -289,6 +283,9 @@ All notable changes are listed here. The format follows
 - web: the graph rules get their own stylesheet
 - site: templates print plain fields, the code works them out
 - site: the docs page module imports in the house order
+- actions: the contract's numbers are written once
+- index: move record decode, shared sets, fixtures and the scan read into
+  modules
 
 ### Fixed
 
@@ -482,6 +479,9 @@ All notable changes are listed here. The format follows
 - xtask: Unreleased leaves out what a written release already lists
 - bench: an export that stops at its page cap says so
 - xtask: a dropped changelog heading leaves one blank line
+- scripts: the send vector check loads send.js whatever the package module type
+- web: a far revision keeps its reindex notice after an idle release
+- web: no insights source is served before the index is ready
 
 ### Performance
 
@@ -521,25 +521,11 @@ All notable changes are listed here. The format follows
 - git: the repo id and the roots walk on an alternate's commit-graph
 - web: the languages warm-up names chain paths in id order
 - web: concurrent requests for one cold page render it once
-<!-- BEGIN GENERATED: unreleased -->
-## [Unreleased]
-
-### Changed
-
-- actions: the contract's numbers are written once
-- index: move record decode, shared sets, fixtures and the scan read into
-  modules
-
-### Fixed
-
-- scripts: the send vector check loads send.js whatever the package module type
-
-### Performance
-
 - index: per-file pages read a tip touches file instead of every row
 - index: share the per-file tables per set and build them before ready
 - index: release cadence reads no commit column without tags
 - index: per-file sections visit the tip touches in place
 - index: coupling counts pairs per file in a dense row
 
+<!-- BEGIN GENERATED: unreleased -->
 <!-- END GENERATED: unreleased -->
