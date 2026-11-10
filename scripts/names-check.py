@@ -19,6 +19,7 @@ import hashlib
 import re
 import subprocess
 import sys
+from collections.abc import Callable
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -206,26 +207,65 @@ PATH_REF = re.compile(
 PATH_REF_SKIP = ("site/", "target/", "docs/brand/")
 
 
-def check_path_refs() -> list[str]:
-    """R7: a renamed file leaves no stale path in the scripts, generators or Makefile."""
-    bad = []
-    sources = [
-        *sorted((ROOT / "scripts").glob("*.*")),
+def path_ref_sources() -> list[Path]:
+    """The files whose paths must resolve: every script (nested dirs too), the generators, the
+    Makefile, and the configs and workflows that call scripts by path."""
+    tracked = subprocess.run(
+        ["git", "ls-files", "-z", "scripts", "schwarzwald/config", ".github"],
+        cwd=ROOT,
+        capture_output=True,
+        check=True,
+    ).stdout.decode()
+    keep = (".py", ".sh", ".mjs", ".toml", ".env", ".yml", ".yaml")
+    out = [ROOT / r for r in tracked.split("\0") if r.endswith(keep)]
+    # The generators at the top of xtask/src; its submodules hold test fixtures of made-up paths.
+    out += [
         *sorted((ROOT / "xtask/src").glob("*.rs")),
         ROOT / "Makefile",
+        ROOT / "package.json",
     ]
-    for f in sources:
-        # Test fixtures name made-up paths on purpose.
-        body = f.read_text().split("#[cfg(test)]")[0]
-        for n, line in enumerate(body.splitlines(), 1):
-            for path in PATH_REF.findall(line):
-                if "*" in path or "{" in path or path.startswith(PATH_REF_SKIP):
-                    continue
-                if not (ROOT / path).exists():
-                    bad.append(
-                        f"{f.relative_to(ROOT)}:{n}: names {path}, which does not exist (R7)"
-                    )
-    return bad
+    return [f for f in out if f.is_file() and "/tests/" not in f.as_posix()]
+
+
+def stale_paths(text: str, exists: Callable[[str], bool]) -> list[tuple[int, str]]:
+    """(line, path) for each path under PATH_REF in `text` that `exists` says is gone. Test
+    fixtures (after #[cfg(test)]) and a toml [retired] table name gone paths on purpose."""
+    body = re.split(r"^\[retired\]$", text.split("#[cfg(test)]")[0], flags=re.M)[0]
+    out = []
+    for n, line in enumerate(body.splitlines(), 1):
+        for path in PATH_REF.findall(line):
+            if "*" in path or "{" in path or path.startswith(PATH_REF_SKIP):
+                continue
+            if not exists(path):
+                out.append((n, path))
+    return out
+
+
+def check_path_refs() -> list[str]:
+    """R7: a renamed or moved file leaves no stale path in the scripts, generators, Makefile,
+    configs or workflows."""
+    return [
+        f"{f.relative_to(ROOT)}:{n}: names {path}, which does not exist (R7)"
+        for f in path_ref_sources()
+        for n, path in stale_paths(f.read_text(), lambda p: (ROOT / p).exists())
+    ]
+
+
+def self_test() -> int:
+    """R7 red and green: a moved script leaves its old path in a gate config."""
+    have = {"scripts/lint/names-check.py"}
+    cases = [
+        ('gate = ["python3 scripts/names-check.py"]\n', True),
+        ('gate = ["python3 scripts/lint/names-check.py"]\n', False),
+        ('ok = 1\n[retired]\nentries = ["scripts/names-check.py"]\n', False),
+        ("run: bash scripts/gone-check.sh\n", True),
+    ]
+    for text, red in cases:
+        if bool(stale_paths(text, have.__contains__)) != red:
+            print(f"names self-test: {'missed' if red else 'flagged'} {text!r}")
+            return 1
+    print("names self-test: ok")
+    return 0
 
 
 # A Rust version written into a build file: `+1.98`, `toolchain: "1.98"`, `channel = "1.98.0"`.
@@ -257,6 +297,8 @@ def check_toolchain() -> list[str]:
 
 
 def main() -> int:
+    if "--self-test" in sys.argv:
+        return self_test()
     bad = [
         *check_modules(),
         *check_templates(),

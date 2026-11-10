@@ -86,6 +86,7 @@ send-vectors:
 
 # names: File, env and project names follow the conventions
 names:
+	python3 scripts/names-check.py --self-test
 	python3 scripts/names-check.py
 
 # lines: Source files stay under 600 lines, comments carry no process labels
