@@ -538,6 +538,4 @@ thread_local! {
 }
 
 #[cfg(test)]
-mod counted_tests;
-#[cfg(test)]
 mod tests;

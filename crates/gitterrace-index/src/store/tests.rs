@@ -274,6 +274,22 @@ fn twenty_updates_with_background_merges_equal_one_step() -> io::Result<()> {
                 5,
                 "segment, delta, order file, chain and tip file"
             );
+            // The merge rewrites the commit rows too, one row per commit, not only the
+            // tables, and the files of the merged steps are gone.
+            let store = crate::seg::read::Store::open(&dir)
+                .map_err(io::Error::other)?
+                .ok_or_else(|| io::Error::other("no set"))?;
+            let seg = &store.segments[0];
+            assert!(!seg.blocks(section::ROWS).is_empty(), "no row section");
+            for sec in [section::ROW_INDEX, section::OID_INDEX] {
+                let n: u32 = seg.blocks(sec).iter().map(|e| e.items).sum();
+                assert_eq!(n as usize, all.len(), "section {sec} after update {u}");
+            }
+            let live: Vec<&str> = m.live.iter().map(|f| f.name.as_str()).collect();
+            for n in names(&dir)? {
+                let old = n.starts_with("seg-") && !live.contains(&n.as_str());
+                assert!(!old, "{n} outlived the merge");
+            }
         }
         // The set itself must stay readable whole between merges.
         crate::seg::read::Store::open(&dir).map_err(io::Error::other)?;
@@ -287,41 +303,6 @@ fn twenty_updates_with_background_merges_equal_one_step() -> io::Result<()> {
         );
     }
     assert_eq!(merges, 2);
-    Ok(())
-}
-
-/// Two-step (HEAD~k, then HEAD) followed by the merge equals a one-step build byte for
-/// byte: the merge renumbers by rebuilding from the records in canonical order, so ids and
-/// ordinals cannot depend on the build history. Retired files of the steps are gone.
-#[test]
-fn two_steps_then_merge_equal_one_step() -> io::Result<()> {
-    let recs: Vec<_> = ["a", "b", "c", "a", "d", "b", "e"]
-        .iter()
-        .enumerate()
-        .map(|(i, p)| rec(i, p))
-        .collect();
-    let one = tempfile::tempdir()?;
-    let want = build(one.path(), &recs)?;
-    let two = tempfile::tempdir()?;
-    build(two.path(), &recs[..3])?;
-    build(two.path(), &recs[3..])?;
-    let got = build(two.path(), &recs)?;
-    assert_eq!(got, want);
-    // The merge rewrites the commit rows too, one row per commit, not only the tables.
-    let store = crate::seg::read::Store::open(two.path())
-        .map_err(io::Error::other)?
-        .ok_or_else(|| io::Error::other("no set"))?;
-    let seg = &store.segments[0];
-    assert!(!seg.blocks(section::ROWS).is_empty(), "no row section");
-    for sec in [section::ROW_INDEX, section::OID_INDEX] {
-        let n: u32 = seg.blocks(sec).iter().map(|e| e.items).sum();
-        assert_eq!(n as usize, recs.len(), "section {sec}");
-    }
-    assert!(
-        !names(two.path())?
-            .iter()
-            .any(|n| n.starts_with("seg-1") || n.starts_with("seg-2"))
-    );
     Ok(())
 }
 

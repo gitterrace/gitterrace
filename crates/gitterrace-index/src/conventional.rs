@@ -36,19 +36,16 @@ mod tests {
         Some(s.to_owned())
     }
 
+    /// A plain type, a scope with a breaking bang, and a type lowercased.
     #[test]
-    fn plain_type() {
-        assert_eq!(p("fix: crash"), (some("fix"), None));
-    }
-
-    #[test]
-    fn type_with_scope_and_bang() {
-        assert_eq!(p("feat(web)!: new api"), (some("feat"), some("web")));
-    }
-
-    #[test]
-    fn type_is_lowercased() {
-        assert_eq!(p("Feat(git): x"), (some("feat"), some("git")));
+    fn parses_type_and_scope() {
+        for (s, want) in [
+            ("fix: crash", (some("fix"), None)),
+            ("feat(web)!: new api", (some("feat"), some("web"))),
+            ("Feat(git): x", (some("feat"), some("git"))),
+        ] {
+            assert_eq!(p(s), want, "{s}");
+        }
     }
 
     #[test]

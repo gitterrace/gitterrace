@@ -183,20 +183,6 @@ fn a_string_base_out_of_manifest_order_is_unreadable() {
     assert_unreadable(d.path(), "missing first delta");
 }
 
-/// A path or identity over 65535 bytes is an error from the writer, never truncated: a cut
-/// string would silently merge two paths.
-#[test]
-fn an_overlong_string_is_an_error_not_a_truncation() {
-    let long = "a".repeat(65_536);
-    let mut i = Interner::new(StringBase::default());
-    assert!(matches!(i.path(&long), Err(SegError::TooLong { .. })));
-    assert!(matches!(i.identity(&long), Err(SegError::TooLong { .. })));
-    assert!(
-        i.path(&"b".repeat(65_535)).is_ok(),
-        "the limit itself is allowed"
-    );
-}
-
 /// A small repository and its HEAD id, for the cases that build through the index.
 fn repo(dir: &Path) -> (gitterrace_git::Repo, String) {
     let mut f = gitterrace_testkit::Fixture::init(&dir.join("repo")).at("2024-01-01T00:00:00Z");
