@@ -1,8 +1,7 @@
 # Benchmarks
 
-gitterrace should feel instant on large repositories. This page says what is
-measured, how, and what the latest run found. Each run is kept, named by date
-and CPU, and each warm time is compared with the previous run.
+gitterrace should feel instant on large repositories. Each run is kept, named
+by date and CPU, and each warm time is compared with the previous run.
 
 ## What is measured
 
@@ -17,27 +16,20 @@ after it.
 2. **Pages.** Time to first byte and full response for `/`, `/tree/HEAD`, a deep
    tree path, `/blob` of the largest file under the text limit, `/blame` of that
    file, `/log/HEAD`, `/commit` and `/diff` fragment of the newest commit,
-   `/search` for a common identifier, `/refs`, and every `/stats` page. The
-   probes are discovered from the pinned tree. Every page must answer 200 or the
-   run fails, and the server runs with an empty config directory so the
-   developer's own settings never apply.
+   `/search` for a common identifier, `/refs`, and every `/stats` page. Every
+   page must answer 200, with an empty config directory.
 3. **Idle.** CPU percent over a 60 s window with no client, and again with one
    `/events` client open, which is the cost of the live watcher.
-4. **Memory.** RSS after the index is ready and after every page was visited,
-   then the dirty footprint (`footprint` on macOS, `Private_Dirty` from
-   `smaps_rollup` on Linux) once `/api/progress` reports an idle release, and
-   that of a just-started server. RSS includes the mapped pack and index files
-   and the working set not yet released, the footprint is the dirty memory the
-   server still holds after the idle release.
-5. **Export.** `git terrace export` time and output size, on every repository.
-   The output goes to `export-<repo>` under the clone directory and is removed
-   afterwards.
+4. **Memory.** RSS after the index is ready and after every page, then the
+   dirty footprint (`footprint` on macOS, `Private_Dirty` on Linux) after the
+   idle release, and that of a just-started server.
+5. **Export.** `git terrace export` time and output size, on every repository,
+   written to `export-<repo>` under the clone directory and removed after.
 
 ## Why these repositories
 
-Each is pinned to a sha in the corpus file, so a re-run measures the same
-history. The list comes from `tests/bench/corpus.toml`, and each name links to
-its public source.
+Each is pinned to a sha in `tests/bench/corpus.toml`, so a re-run measures the
+same history.
 
 <!-- BEGIN GENERATED: corpus -->
 - [**control**](https://github.com/gitterrace/gitterrace): this repository, the floor.
@@ -47,44 +39,30 @@ its public source.
 
 <!-- END GENERATED: corpus -->
 
-Clones are bare, blobless fetches of the pinned sha followed by `git backfill`,
-kept in `$GITTERRACE_BENCH_DIR` (default `~/.cache/gitterrace-bench`), never in
-the repository. The harness refuses to clone when free disk is under the corpus
-`need_gb`.
+Clones are blobless fetches of the pinned sha, kept in `$GITTERRACE_BENCH_DIR`
+(default `~/.cache/gitterrace-bench`). The harness refuses to clone when free
+disk is under the corpus `need_gb`.
 
 ## Budgets
 
-Each size class has a target per metric (warm page, cold page, index time, idle
-CPU, RSS, export) in the corpus file. They come from the first measured run plus
-headroom, except the warm page target of 300 ms, the idle target of 1% CPU and
-the huge index target of 600 s (a cold linux index in about 10 minutes), which
-are product goals. The large and huge export budgets come from the first run
-that exported those repos. A run marks each metric pass or over. An index time
-or memory over budget fails the run, since it blocks a release. Any other
-metric over budget fails it only with `BENCH_STRICT=1`.
+Each size class has a target per metric in the corpus file: the first measured
+run plus headroom, except three product goals: a warm page in 300 ms, idle at
+1% CPU and the huge index in 600 s. An index time or memory over budget fails
+the run. Any other metric over budget fails it only with `BENCH_STRICT=1`.
 
 The memory budget (`rss_mb`) gates physical footprint, not RSS: macOS
-`phys_footprint`, and on Linux the larger of `RssAnon` and private dirty pages.
-Clean mapped pack files count in RSS but not here, since the system takes them
-back under pressure, and RSS is still recorded beside it.
+`phys_footprint`, on Linux the larger of `RssAnon` and private dirty pages.
+RSS is recorded beside it.
 
-Serving memory is a product goal: once the index is ready, a server that is
-browsed or idle holds some MB, not GB, and that amount does not grow with the
-history. The goal is at most the `resources.cache_mb` cache budget (default 32
-MB) plus 16 MB of margin above a just-started server, on every repository size,
-also after a sweep of every insights page. Page cache for the index files is
-not counted. A peak during the index build is fine. A test guards it on
-synthetic repositories of growing size, and `make memory-check` measures it on
-a real clone. Every bench run checks it too, as the `footprint_idle_mb`
-budget: idle footprint minus that of a just-started server, at most 48 MB on
-every class.
+Serving memory does not grow with the history: once the index is ready, idle
+footprint stays at most 48 MB above a just-started server (`footprint_idle_mb`,
+the 32 MB `resources.cache_mb` plus 16 MB), on every size and after every
+insights page. A peak during the index build is fine. `make memory-check`
+measures it on a real clone.
 
-Every run is made on a quiet machine, so runs compare under the same
-conditions. The harness waits for the machine to settle before each timed
-phase, and `make docs-check` refuses results from a busy one.
-
-The published run is made once per release, on the release candidate commit, on
-a quiet machine, never as extra runs in between. The 0.1.0 run is the first
+Runs are made on a quiet machine: the harness waits for it to settle, and
+`make docs-check` refuses results from a busy one. The published run is made
+once per release, on the release candidate commit. The 0.1.0 run is the first
 baseline.
 
 ### Insights pages on a large history
@@ -103,27 +81,16 @@ runs:
 | Ownership | 1 year | 115 ms | 35 ms    | met    |
 | Languages | -      | 66 ms  | 589 ms   | missed |
 
-Hotspots and ownership read a per-file summary that the index writes for the
-tip, so a page visits each change once instead of every row of the history.
-Languages reads the line counts along the first-parent chain, also written at
-index time, in one pass. That pass is still over its goal, and the cause is
-not yet known.
-
-The server renders these pages right after the index is ready, so a visitor who
-arrives after that warm-up gets them from memory in a few milliseconds. The
-cold numbers are what a visitor pays inside that window, or for a filter
-combination that was not rendered before. `make speed-check` measures them on
-the rust clone and fails on a page over its target. A test also holds the file
-pages under fixed ceilings on a synthetic history, so they cannot get slower
-unnoticed.
+Languages is over its goal, and the cause is not yet known. The server renders
+these pages right after the index is ready, so most visitors get them from
+memory in a few milliseconds. `make speed-check` measures them on the rust
+clone and fails on a page over its target.
 
 ### Commit search with the message column
 
-`index.has_messages` keeps every commit message in the index, so commit
-search reads the cache instead of walking git. Measured on rust (345,460
-commits) at the corpus sha, release build, M1 Max, median of 5, page cache
-warm, through the search handler with the
-`limits.search_commits` cap (default 200 rows):
+`index.has_messages` keeps every commit message in the index. Measured on rust
+(345,460 commits), release build, M1 Max, median of 5, page cache warm, with
+the default `limits.search_commits` of 200:
 
 | Query                             | Column on | Column off |
 | --------------------------------- | --------- | ---------- |
@@ -132,13 +99,8 @@ warm, through the search handler with the
 | Regex hit (`fix(es\|ed)? #\d{5}`) | 80 ms     | 596 ms     |
 | Regex miss                        | 58 ms     | 3361 ms    |
 
-The cost: the column is 31 MB, the cache grows from 256 MB to 287 MB (12%). The
-first build, the set already indexed and the setting just turned on, takes 16 s.
-An update of 100 commits, set and column together, takes 11 s (the diffs of the
-new commits dominate). A miss reads no commit object, a hit reads only the
-commits it lists. The process peaked at 2.35 GB resident during the full set
-build that preceded these numbers, and held 1.6 GB after the searches,
-mostly the set build's allocator state.
+The cost: the cache grows from 256 MB to 287 MB (12%). Turning it on takes one
+16 s pass. An update of 100 commits takes 11 s.
 
 ## Reproduce
 
@@ -149,17 +111,11 @@ make bench-report   # rewrite the results block from the newest run
 make gc BENCH=1     # remove the clones (DRY=1 only prints path and size)
 ```
 
-`make check` runs only `bench-guard`, which drives the harness once against a
-tiny generated repository to prove it still works.
+`make check` runs only `bench-guard`, a smoke run on a tiny repository.
 
-## Which build
-
-Each run names the gitterrace commit it measured as `gitterrace
-v0.1.0-<7-hex>`, from the binary's `--version`. The commit is kept in
-`machine.commit` of the results JSON and in the version string, and the
-results block below shows it. A run whose commit is not recorded renders as
-the plain version. A `-dirty` build is never published: `bench-report --check`
-refuses it, and the JSON carries the `dirty` flag, not the mark in the version.
+Each run names the commit it measured, from `--version`. A `-dirty` build is
+never published: `bench-report --check` refuses it. The JSON keeps the commit
+in `machine.commit` and a `dirty` flag.
 
 ## Results
 
