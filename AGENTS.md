@@ -33,7 +33,8 @@ HTTP. Nothing outside `gitterrace-git` imports `gix`.
   meta), so a repo works at `/` and at `/r/{name}/`. A crawler test fails on a
   link that escapes its repo.
 - Every new insights page uses the shared `Filter` and the page memo (`cached`
-  in `insights.rs`). Add unfiltered pages to `WARM_PAGES` in `lib.rs`.
+  in `gitterrace-web/src/insights.rs`). Add unfiltered pages to `WARM_PAGES`
+  in `gitterrace-web/src/lib.rs`.
 - No inline scripts beyond the hashed theme snippet: the CSP refuses them. JS
   lives in `static/`.
 - Never edit `schwarzwald/kit` or the generated block in `tokens.css`.
@@ -61,12 +62,13 @@ HTTP. Nothing outside `gitterrace-git` imports `gix`.
 
 ## Workflow
 
-- Gate: `make check` runs every gate in the order CI does (`make help` lists
-  them: theme, actions, names, lines, docs-check, fmt, clippy `-D warnings`,
-  lint, test, doc and the guards). `make lint` runs typos, vale, gitleaks,
-  markdownlint, shellcheck, shfmt, ruff, pyright, tsc, actionlint, ast-grep,
-  cargo-machete and the provenance checks below. Without the shared harness
-  kit checkout (`HARNESS_KIT`) its link check is skipped with a note.
+- Gate: `make check` runs every gate in the order CI does: gc-guard, theme,
+  actions, send-vectors, names, lines, bench-guard, docs-check, fmt, clippy
+  `-D warnings`, lint, test, doc. `make help` lists only the targets a person
+  runs, the steps are in the `check:` line of the Makefile. `make lint` runs
+  the linters in [CONTRIBUTING](CONTRIBUTING.md#lint) and the provenance
+  checks below. Without the shared harness kit checkout (`HARNESS_KIT`) its
+  link check is skipped with a note.
   `cargo test -p <crate>` while working on one crate.
   `make preview` restarts the preview on the default address.
 - Commits: `type(scope): subject`, scope is the crate without `gitterrace-`.
@@ -77,14 +79,15 @@ HTTP. Nothing outside `gitterrace-git` imports `gix`.
   Commits). The gate for a squashed commit here is
   `scripts/land-check.sh --base <main>`.
 - Accepting commits written without a build:
-  `python3 scripts/lint/commits-check.py --range <base>..<tip>` prints the files and
-  diffstat and runs the cargo-free gates those file types need, with the message
-  step when the tip is checked out. `scripts/land-check.sh` still builds and
-  tests afterwards.
+  `python3 scripts/lint/commits-check.py --range <base>..<tip>` prints the
+  files and diffstat and runs the cargo-free gates those file types need,
+  with the message step when the tip is checked out. `scripts/land-check.sh`
+  still builds and tests afterwards.
 - Names: files in `scripts/` sit in an area folder (`lint`, `verify`, `bench`,
-  `dev`, `lib`, `release`) and are `<area>-<verb>.<ext>`, make targets are
-  `<area>[-<verb>]`, harness-only env vars use a `TEST_` prefix. `make names`
-  enforces it.
+  `dev`, `lib`, `release`) and are `<area>-<verb>.<ext>`. `land-check.sh` is
+  the one entry point at the top, and `hooks`, `guards` and `ast-grep` hold
+  data other tools name. Make targets are `<area>[-<verb>]`, harness-only env
+  vars use a `TEST_` prefix. `make names` enforces it.
 
 ## Provenance stays out
 
