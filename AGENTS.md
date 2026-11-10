@@ -61,10 +61,13 @@ HTTP. Nothing outside `gitterrace-git` imports `gix`.
 
 ## Workflow
 
-- Gate: `make check` (theme, actions, docs-check, fmt, clippy `-D warnings`,
-  lint, test, doc). `make lint` runs typos, vale, gitleaks, markdownlint,
-  shellcheck, shfmt, ruff, actionlint, ast-grep, cargo-machete and the
-  provenance checks below. `cargo test -p <crate>` while working on one crate.
+- Gate: `make check` runs every gate in the order CI does (`make help` lists
+  them: theme, actions, names, lines, docs-check, fmt, clippy `-D warnings`,
+  lint, test, doc and the guards). `make lint` runs typos, vale, gitleaks,
+  markdownlint, shellcheck, shfmt, ruff, pyright, tsc, actionlint, ast-grep,
+  cargo-machete and the provenance checks below. Without the shared harness
+  kit checkout (`HARNESS_KIT`) its link check is skipped with a note.
+  `cargo test -p <crate>` while working on one crate.
   `make preview` restarts the preview on the default address.
 - Commits: `type(scope): subject`, scope is the crate without `gitterrace-`.
   Commit by pathspec, never `git add -A`. The message says what changed and how
@@ -78,7 +81,8 @@ HTTP. Nothing outside `gitterrace-git` imports `gix`.
   diffstat and runs the cargo-free gates those file types need, with the message
   step when the tip is checked out. `scripts/land-check.sh` still builds and
   tests afterwards.
-- Names: files in `scripts/` are `<area>-<verb>.<ext>`, make targets are
+- Names: files in `scripts/` sit in an area folder (`lint`, `verify`, `bench`,
+  `dev`, `lib`) and are `<area>-<verb>.<ext>`, make targets are
   `<area>[-<verb>]`, harness-only env vars use a `TEST_` prefix. `make names`
   enforces it.
 
