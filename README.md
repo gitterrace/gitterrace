@@ -10,10 +10,8 @@ A local, read-only git browser: code, history and insights, offline.
 
 <!-- END GENERATED: pitch -->
 
-Code, commits, blame, branches, worktrees, stashes, live updates and insights,
-with no database, accounts or network. Agents write more of the code each month,
-and few people read their diffs. This is a calm place to look again
-([why](https://gitterrace.dev/docs/why/)).
+Code, commits, blame, branches, worktrees, stashes and insights, with no
+database, accounts or network ([why](https://gitterrace.dev/docs/why/)).
 
 <!-- BEGIN GENERATED: demo -->
 Try it without installing: [the live demo](https://demo.gitterrace.dev): jq
@@ -63,17 +61,10 @@ git terrace          # joins the server already running, no second port
 
 <!-- END GENERATED: quickstart -->
 
-[Getting started](https://gitterrace.dev/docs/getting-started/) covers Windows,
-upgrading and troubleshooting. [Using it](https://gitterrace.dev/docs/using/)
-covers serving many repositories, the log graph, outlines, keys and settings.
-
-## Run with Docker
-
-`docker build -t gitterrace .`, then
-`docker run --rm -p 127.0.0.1:8080:8080 -v "$PWD":/repos:ro gitterrace` serves
-the repositories in this folder read-only at `http://localhost:8080`.
-[Run with Docker](https://gitterrace.dev/docs/online/#run-with-docker) has the
-details.
+Next: [getting started](https://gitterrace.dev/docs/getting-started/) and
+[using it](https://gitterrace.dev/docs/using/). Docker serves read-only at
+`http://localhost:8080`
+([run with Docker](https://gitterrace.dev/docs/online/#run-with-docker)).
 
 ## Commands
 
@@ -99,21 +90,17 @@ Run your own program on a selection (`line`, `file`, `commit`, `hunk`, `blame`,
 
 <!-- END GENERATED: actions -->
 
-Actions can also send a selection to a tracker, notes app or mail draft. They
-are off until you write `actions.toml`:
-[how to set it up](https://gitterrace.dev/docs/actions/).
+Or send it to a tracker, notes app or mail draft. Both are off until you write
+`actions.toml` ([set up](https://gitterrace.dev/docs/actions/)).
 
-Every document, by what you need, is on
-[gitterrace.dev/docs](https://gitterrace.dev/docs/). gitterrace binds to
-`127.0.0.1` and never changes your files or history
-([security model](https://gitterrace.dev/docs/security/)).
+gitterrace binds to `127.0.0.1` and never changes your files or history
+([security model](https://gitterrace.dev/docs/security/)). All docs:
+[gitterrace.dev/docs](https://gitterrace.dev/docs/).
 
 ## Contributing
 
-Issues and pull requests are welcome: see [contributing](CONTRIBUTING.md), and
-report vulnerabilities privately as [SECURITY.md](SECURITY.md) describes. A
-human sets the direction and decides
-([how it is made](https://gitterrace.dev/docs/why/#how-it-is-made)).
+Issues and pull requests are welcome: see [contributing](CONTRIBUTING.md).
+Report vulnerabilities privately ([SECURITY.md](SECURITY.md)).
 
 ## License
 
