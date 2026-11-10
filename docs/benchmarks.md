@@ -36,8 +36,8 @@ after it.
 ## Why these repositories
 
 Each is pinned to a sha in the corpus file, so a re-run measures the same
-history. The list comes from `tests/bench/corpus.toml`, each name links to its public
-source.
+history. The list comes from `tests/bench/corpus.toml`, and each name links to
+its public source.
 
 <!-- BEGIN GENERATED: corpus -->
 - [**control**](https://github.com/gitterrace/gitterrace): this repository, the floor.
@@ -59,8 +59,9 @@ CPU, RSS, export) in the corpus file. They come from the first measured run plus
 headroom, except the warm page target of 300 ms, the idle target of 1% CPU and
 the huge index target of 600 s (a cold linux index in about 10 minutes), which
 are product goals. The large and huge export budgets come from the first run
-that exported those repos. A run marks each metric pass or over. Over budget
-does not fail the run unless `BENCH_STRICT=1`.
+that exported those repos. A run marks each metric pass or over. An index time
+or memory over budget fails the run, since it blocks a release. Any other
+metric over budget fails it only with `BENCH_STRICT=1`.
 
 The memory budget (`rss_mb`) gates physical footprint, not RSS: macOS
 `phys_footprint`, and on Linux the larger of `RssAnon` and private dirty pages.
@@ -73,10 +74,10 @@ history. The goal is at most the `resources.cache_mb` cache budget (default 32
 MB) plus 16 MB of margin above a just-started server, on every repository size,
 also after a sweep of every insights page. Page cache for the index files is
 not counted. A peak during the index build is fine. A test guards it on
-synthetic repositories of growing
-size, and `make memory-check` measures it on a real clone. Every bench run
-checks it too, as the `footprint_idle_mb` budget: idle footprint minus that of a
-just-started server, at most 48 MB on every class.
+synthetic repositories of growing size, and `make memory-check` measures it on
+a real clone. Every bench run checks it too, as the `footprint_idle_mb`
+budget: idle footprint minus that of a just-started server, at most 48 MB on
+every class.
 
 Every run is made on a quiet machine, so runs compare under the same
 conditions. The harness waits for the machine to settle before each timed
@@ -142,10 +143,10 @@ mostly the set build's allocator state.
 ## Reproduce
 
 ```sh
-make bench          # control, git, rust. Needs the network and about 20 GB of disk
+make bench          # control, git, rust: network and about 20 GB of disk
 make bench LARGE=1  # adds linux
-make bench-report   # rewrite the block below from the newest tests/bench/results file
-make gc BENCH=1     # print the path and size, then remove the clones (DRY=1 only prints)
+make bench-report   # rewrite the results block from the newest run
+make gc BENCH=1     # remove the clones (DRY=1 only prints path and size)
 ```
 
 `make check` runs only `bench-guard`, which drives the harness once against a
