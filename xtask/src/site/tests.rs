@@ -1,4 +1,4 @@
-use super::shots::{SHOT_DIR, SITE_SHOT_DIR};
+use super::shots::SHOT_DIR;
 use super::*;
 
 /// The built landing page, from the real sources.
@@ -97,9 +97,8 @@ fn readme_shots_are_the_linked_pngs() {
 fn a_missing_unreferenced_or_wrongly_sized_screenshot_fails() {
     let dir = std::env::temp_dir().join(format!("gt-shots-{}", std::process::id()));
     let shots = dir.join(SHOT_DIR);
-    let site = dir.join(SITE_SHOT_DIR);
+    let site = shots.clone();
     std::fs::create_dir_all(&shots).expect("mkdir");
-    std::fs::create_dir_all(&site).expect("mkdir");
     std::fs::write(
         dir.join("README.md"),
         "<source srcset=\"docs/screenshots/overview-dark.png\">\n<img \
@@ -227,6 +226,13 @@ pub(super) fn unresolved(pages: &[(String, String)], files: &[String]) -> Vec<St
     bad
 }
 
+/// `path` relative to the built site.
+fn site_rel(path: &str) -> &str {
+    path.strip_prefix(SITE_DIR)
+        .and_then(|p| p.strip_prefix('/'))
+        .unwrap_or(path)
+}
+
 /// The generated site, as (site path, content) of every page and the paths of every file.
 pub(super) fn generated() -> (Vec<(String, String)>, Vec<String>) {
     let root = crate::repo_root();
@@ -237,7 +243,7 @@ pub(super) fn generated() -> (Vec<(String, String)>, Vec<String>) {
     for out in outs {
         match out {
             Out::File { path, body } => {
-                let rel = path.strip_prefix("site/").unwrap_or(&path).to_owned();
+                let rel = site_rel(&path).to_owned();
                 if std::path::Path::new(&rel)
                     .extension()
                     .is_some_and(|e| e == "html")
@@ -247,16 +253,9 @@ pub(super) fn generated() -> (Vec<(String, String)>, Vec<String>) {
                 files.push(rel);
             }
             Out::Bytes { path, .. } => {
-                files.push(path.strip_prefix("site/").unwrap_or(&path).to_owned());
+                files.push(site_rel(&path).to_owned());
             }
             Out::Block { .. } => {}
-        }
-    }
-    // The screenshots are made by `make site-shots` and checked on disk.
-    for dir in ["assets/screenshots"] {
-        let entries = std::fs::read_dir(root.join("site").join(dir)).expect("site dir");
-        for e in entries.flatten() {
-            files.push(format!("{dir}/{}", e.file_name().to_string_lossy()));
         }
     }
     (pages, files)
@@ -461,6 +460,7 @@ fn every_markdown_parse_uses_the_shared_options() {
 fn docs_pages_with_a_table_render_a_table() {
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
     let delimiter = ["| ", "--- |"].concat();
+    let (pages, _) = generated();
     let mut seen = 0;
     for (path, ..) in crate::docs_index::on_site() {
         let src = std::fs::read_to_string(root.join(path)).expect("source");
@@ -472,11 +472,8 @@ fn docs_pages_with_a_table_render_a_table() {
             continue;
         }
         seen += 1;
-        let page = root
-            .join("site")
-            .join(docs::page_path(docs::stem(path)))
-            .join("index.html");
-        let html = std::fs::read_to_string(&page).expect("built page");
+        let page = format!("{}index.html", docs::page_path(docs::stem(path)));
+        let html = &pages.iter().find(|p| p.0 == page).expect("built page").1;
         assert!(html.contains("<table"), "{path}: no table on the site");
         assert!(
             !html.contains(&delimiter),

@@ -132,11 +132,11 @@ for (const [tool, args] of optimizers) {
 for (const f of files) console.log(`${f.slice(root.length + 1)} ${(statSync(f).size / 1024).toFixed(0)} KiB`);
 
 // The README's PNG files, by the same rule as readme_shots in xtask/src/site.rs: every
-// docs/screenshots/*.png path README.md names. Only those are tracked.
+// docs/screenshots/*.png path README.md names. Only those are tracked, beside the site's WebPs.
 const docs = join(root, 'docs/screenshots');
 const readme = new Set([...readFileSync(join(root, 'README.md'), 'utf8').matchAll(/docs\/screenshots\/([\w.-]+?\.png)/g)].map((m) => m[1]));
 mkdirSync(docs, { recursive: true });
-for (const f of readdirSync(docs)) if (!readme.has(f)) rmSync(join(docs, f));
+for (const f of readdirSync(docs)) if (f.endsWith('.png') && !readme.has(f)) rmSync(join(docs, f));
 for (const f of readme) {
   try {
     copyFileSync(join(out, f), join(docs, f));

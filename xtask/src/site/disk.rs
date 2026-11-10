@@ -1,4 +1,4 @@
-//! Checks over `site/` as it is on disk, the tree a deploy ships. The generator's own checks see
+//! Checks over the built site as it is on disk, the tree a deploy ships. The generator's checks see
 //! what it writes. These see what is there: a page left behind by a removed document, a link or
 //! `#fragment` that names nothing on the built site, and a link into the repository at a file or
 //! heading that does not exist there.
@@ -11,15 +11,13 @@ use anyhow::{Context as _, Result};
 use crate::docs_index::{normalize, on_site};
 use crate::out::Out;
 use crate::site::docs::page_path;
-use crate::site::guards;
+use crate::site::{SITE_DIR, guards};
 
-/// Files in `site/` that no generator writes but that belong there: the screenshots come from
-/// `make site-shots` (checked by `check_shots`), the PNG files from `make site-render`.
+/// Files in the built site that no generator writes but that belong there: the link preview
+/// PNG files, which `make site-render` adds before a deploy.
 fn made_elsewhere(path: &str) -> bool {
-    path.starts_with("assets/screenshots/")
-        || path
-            .strip_prefix("assets/")
-            .is_some_and(|f| !f.contains('/') && has_ext(f, "png"))
+    path.strip_prefix("assets/")
+        .is_some_and(|f| !f.contains('/') && has_ext(f, "png"))
 }
 
 /// Whether `path` ends in `.ext`, in any case.
@@ -29,20 +27,20 @@ fn has_ext(path: &str, ext: &str) -> bool {
         .is_some_and(|e| e.eq_ignore_ascii_case(ext))
 }
 
-/// The built site: every file by its path under `site/`, with the text of each HTML page.
+/// The built site: every file by its path under the site dir, with the text of each HTML page.
 pub(super) struct Tree {
     files: BTreeSet<String>,
     pages: BTreeMap<String, String>,
 }
 
 impl Tree {
-    /// `site/` as it is on disk under `root`.
-    pub(super) fn load(root: &Path) -> Result<Self> {
+    /// The built site in `site`, as it is on disk.
+    pub(super) fn load(site: &Path) -> Result<Self> {
         let mut tree = Self {
             files: BTreeSet::new(),
             pages: BTreeMap::new(),
         };
-        let mut dirs = vec![root.join("site")];
+        let mut dirs = vec![site.to_path_buf()];
         while let Some(dir) = dirs.pop() {
             for e in std::fs::read_dir(&dir).with_context(|| dir.display().to_string())? {
                 let e = e?;
@@ -52,8 +50,8 @@ impl Tree {
                 }
                 let rel = e
                     .path()
-                    .strip_prefix(root.join("site"))
-                    .context("under site/")?
+                    .strip_prefix(site)
+                    .context("under the site dir")?
                     .to_string_lossy()
                     .replace('\\', "/");
                 if has_ext(&rel, "html") {
@@ -79,7 +77,7 @@ impl Tree {
     }
 }
 
-/// Every file in `site/` that no generator writes and no other make target owns, and every
+/// Every file in the built site that no generator writes and no other make target owns, and every
 /// docs page that is not a document the docs index publishes. `written` is the generators'
 /// output, `docs` the site paths the index publishes (`docs/<stem>/`).
 pub(super) fn leftovers(tree: &Tree, written: &BTreeSet<String>, docs: &[String]) -> Vec<String> {
@@ -87,7 +85,7 @@ pub(super) fn leftovers(tree: &Tree, written: &BTreeSet<String>, docs: &[String]
     for f in &tree.files {
         if !written.contains(f) && !made_elsewhere(f) {
             bad.push(format!(
-                "site/{f}: no generator writes it, delete it (a removed document leaves its page)"
+                "{SITE_DIR}/{f}: no generator writes it (a removed document leaves its page)"
             ));
         }
     }
@@ -103,12 +101,12 @@ pub(super) fn leftovers(tree: &Tree, written: &BTreeSet<String>, docs: &[String]
         .collect();
     for d in on_disk.difference(&listed) {
         bad.push(format!(
-            "site/docs/{d}/: a page for a document the docs index does not publish"
+            "{SITE_DIR}/docs/{d}/: a page for a document the docs index does not publish"
         ));
     }
     for d in listed.difference(&on_disk) {
         bad.push(format!(
-            "site/docs/{d}/: the docs index publishes it but the page is missing (make docs-gen)"
+            "{SITE_DIR}/docs/{d}/: the docs index publishes it but the page is missing"
         ));
     }
     bad
@@ -220,20 +218,23 @@ pub(super) fn dead_links(
     bad
 }
 
-/// Every problem of `site/` under `root` against what the generators write. Empty when the
-/// built site is in step with the docs index and every link of it lands.
-pub fn check(root: &Path, outs: &[Out], repo: &str) -> Result<Vec<String>> {
-    let tree = Tree::load(root)?;
-    // Fail closed: a site/ with no page has no link that could be reported dead.
+/// Every problem of the site built in `site` against what the generators write, with repository
+/// links resolved under `root`. Empty when the built site is in step with the docs index and
+/// every link of it lands.
+pub fn check(root: &Path, site: &Path, outs: &[Out], repo: &str) -> Result<Vec<String>> {
+    let tree = Tree::load(site)?;
+    // Fail closed: a site with no page has no link that could be reported dead.
     if tree.pages.is_empty() {
-        return Ok(vec![
-            "site/ has no HTML page: nothing was checked".to_owned(),
-        ]);
+        return Ok(vec![format!(
+            "{SITE_DIR} has no HTML page: nothing was checked"
+        )]);
     }
     let written: BTreeSet<String> = outs
         .iter()
         .filter_map(|o| match o {
-            Out::File { path, .. } | Out::Bytes { path, .. } => path.strip_prefix("site/"),
+            Out::File { path, .. } | Out::Bytes { path, .. } => {
+                path.strip_prefix(SITE_DIR)?.strip_prefix('/')
+            }
             Out::Block { .. } => None,
         })
         .map(str::to_owned)
@@ -341,22 +342,21 @@ mod tests {
         let tree = Tree::from(&[
             ("docs/why/index.html", ""),
             ("docs/removed/index.html", ""),
-            ("assets/screenshots/a.webp", ""),
             ("assets/og.png", ""),
         ]);
         let mut written = BTreeSet::from(["docs/why/index.html".to_owned()]);
         let docs = ["docs/why/".to_owned(), "docs/cli/".to_owned()];
         let bad = leftovers(&tree, &written, &docs).join("\n");
         assert!(
-            bad.contains("site/docs/removed/index.html: no generator writes it"),
+            bad.contains("target/site/docs/removed/index.html: no generator writes it"),
             "{bad}"
         );
         assert!(
-            bad.contains("site/docs/removed/: a page for a document"),
+            bad.contains("target/site/docs/removed/: a page for a document"),
             "{bad}"
         );
         assert!(
-            bad.contains("site/docs/cli/: the docs index publishes it"),
+            bad.contains("target/site/docs/cli/: the docs index publishes it"),
             "{bad}"
         );
         assert_eq!(bad.lines().count(), 3, "{bad}");
@@ -365,14 +365,17 @@ mod tests {
         assert!(leftovers(&tree, &written, &docs).is_empty());
     }
 
-    /// The real tree: what `make docs-check` runs, held here too so `cargo test` sees it.
+    /// A fresh build: what `make docs-check` runs, held here too so `cargo test` sees it.
     #[test]
-    fn the_committed_site_has_no_dead_link_or_leftover_page() {
+    fn the_built_site_has_no_dead_link_or_leftover_page() {
         let root = crate::repo_root();
         let ws = crate::facts::load(&root).expect("facts");
         let outs = crate::site::render(&root, &ws).expect("render");
         let repo = &ws.packages["gitterrace"].repository;
-        let bad = check(&root, &outs, repo).expect("check");
+        let dir = tempfile::tempdir().expect("tempdir");
+        let site = crate::site::build(dir.path(), outs).expect("build");
+        let outs = crate::site::render(&root, &ws).expect("render");
+        let bad = check(&root, &site, &outs, repo).expect("check");
         assert!(bad.is_empty(), "{}", bad.join("\n"));
     }
 }

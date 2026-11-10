@@ -16,7 +16,7 @@ use crate::docs_index::{LEGAL, normalize, on_site};
 use crate::out::Out;
 use crate::site::frame::{Body, Site, page};
 use crate::site::outline_script;
-use crate::site::{changelog, diagram, docnav};
+use crate::site::{at, changelog, diagram, docnav};
 
 pub(super) const CHANGELOG: &str = "CHANGELOG.md";
 /// The first line of a document written whole by `cargo xtask generate`.
@@ -434,14 +434,14 @@ pub(super) fn pages(root: &Path, site: &Site) -> Result<(Vec<Out>, Vec<String>)>
             },
         );
         check_unique_ids(&path, &html)?;
-        outs.push(Out::file(format!("site/{path}index.html"), html));
+        outs.push(Out::file(at(&format!("{path}index.html")), html));
         paths.push(path);
         titles.push((rel.to_owned(), title));
     }
     legal_pages(site, &links, &read, &mut outs, &mut paths)?;
     let lead = "Every document, by what you need. Each page is also a file in the repository.";
     outs.push(Out::file(
-        "site/docs/index.html",
+        at("docs/index.html"),
         page(
             site,
             &Body {
@@ -489,7 +489,7 @@ fn legal_pages(
             },
         );
         check_unique_ids(&path, &html)?;
-        outs.push(Out::file(format!("site/{path}index.html"), html));
+        outs.push(Out::file(at(&format!("{path}index.html")), html));
         paths.push(path);
     }
     Ok(())

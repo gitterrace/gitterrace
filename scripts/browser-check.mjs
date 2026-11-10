@@ -65,12 +65,12 @@
 //   mark-seam    every two-colour mark (docs/brand/mark-*.svg, the in-app header logo) at 16 to
 //                133 px, 1x and 2x, on light and dark: no pixel on the colour change is closer
 //                to the background than both colours are, in every browser
-//   site-theme   the generated site/ (served with its _headers CSP): first load follows the
+//   site-theme   the built site, target/site (served with its _headers CSP): first load follows the
 //                system scheme with the theme already set in the head, the button cycles system,
 //                light, dark, the choice survives a reload, the shown logo and screenshots are
 //                the theme's and the other scheme's are never fetched, no CSP violation, and each
 //                theme icon is the source-link mark's size
-//   site-bar     every page of the generated site/, 404 included, at 390 and 1440 px in light
+//   site-bar     every page of the built site, 404 included, at 390 and 1440 px in light
 //                and dark: one bar right after the skip link, dark with light text in both
 //                schemes, Docs, the source link and the theme button in view, no sideways
 //                scroll

@@ -3,6 +3,7 @@
 //! repeat in every release, so they take the release's id as a prefix to stay unique.
 
 use crate::out::Out;
+use crate::site::at;
 use crate::site::docs::{CHANGELOG, Links, body, slug};
 use crate::site::frame::{Body, Site, page as frame_page};
 
@@ -52,7 +53,7 @@ fn render(text: &str, links: &Links) -> anyhow::Result<String> {
 pub(super) fn page(site: &Site, links: &Links, text: &str) -> anyhow::Result<Out> {
     let inner = render(text, links)?;
     Ok(Out::file(
-        format!("site/{PATH}index.html"),
+        at(&format!("{PATH}index.html")),
         frame_page(
             site,
             &Body {

@@ -1,5 +1,7 @@
 //! The generator behind `make docs-gen` and `make docs-check`: runs every `*_md` module and the
-//! site writer, then writes the result or compares it with the tree.
+//! site writer, then writes the tracked result or compares it with the tree. The website is
+//! never tracked: both commands build it fresh into `target/site/`, and `check` runs the site
+//! guards on that build.
 
 #![expect(
     clippy::print_stdout,
@@ -36,9 +38,9 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Cmd {
-    /// Regenerate every generated file
+    /// Regenerate every generated file and build the site into target/site
     Generate,
-    /// Fail when a generated file is stale, writing nothing
+    /// Fail when a generated file is stale, then build the site and run its guards
     Check,
     /// Fail while a legal page still has a {{PLACEHOLDER}}; run before a deploy
     DeployCheck,
@@ -71,7 +73,7 @@ fn main() -> Result<()> {
             // The site reads the documents from disk, so a block written in this pass shows
             // on its page in the next. Two passes settle it; a third change is a bug.
             for pass in 0..3 {
-                let wrote = apply(&root, generators(&root, true)?, Mode::Write)?;
+                let wrote = apply(&root, tracked(generators(&root, true)?), Mode::Write)?;
                 for path in &wrote {
                     println!("  wrote {path}");
                 }
@@ -80,7 +82,8 @@ fn main() -> Result<()> {
                 }
                 anyhow::ensure!(pass < 2, "generate does not settle: {}", wrote.join(", "));
             }
-            println!("generate: done");
+            site::build(&root, generators(&root, true)?)?;
+            println!("generate: done, the site is in {}", site::SITE_DIR);
         }
         Cmd::Check => {
             let outs = generators(&root, false)?;
@@ -95,7 +98,7 @@ fn main() -> Result<()> {
                 .get("gitterrace")
                 .context("package gitterrace")?
                 .repository;
-            let site_bad = site::disk::check(&root, &outs, repo)?;
+            let (site_outs, outs): (Vec<Out>, Vec<Out>) = outs.into_iter().partition(site::is_site);
             let stale = apply(&root, outs, Mode::Check)?;
             if !stale.is_empty() {
                 println!(
@@ -105,9 +108,12 @@ fn main() -> Result<()> {
                 std::process::exit(1);
             }
             println!("generated output: up to date");
+            // A fresh build, so the guards never see a site older than its sources.
+            let dir = site::build(&root, generators(&root, false)?)?;
+            let site_bad = site::disk::check(&root, &dir, &site_outs, repo)?;
             if !site_bad.is_empty() {
                 println!(
-                    "site/ out of step with the docs, or a page fails a site guard:\n  {}",
+                    "the built site is out of step with the docs, or fails a site guard:\n  {}",
                     site_bad.join("\n  ")
                 );
                 std::process::exit(1);
@@ -141,6 +147,11 @@ fn main() -> Result<()> {
         }
     }
     Ok(())
+}
+
+/// The outputs that are tracked files, without the site build.
+fn tracked(outs: Vec<Out>) -> Vec<Out> {
+    outs.into_iter().filter(|o| !site::is_site(o)).collect()
 }
 
 fn repo_root() -> PathBuf {

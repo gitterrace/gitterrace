@@ -5,7 +5,7 @@
 //   docs/brand/avatar-512.png         512x512, the plated mark (the org avatar, committed)
 //   docs/brand/apple-touch-icon.png   180x180, the plated mark (iOS home screen, committed;
 //                                     the site copies it to assets/icons/)
-//   site/assets/og.png                1200x630, the light README header (link previews)
+//   target/site/assets/og.png         1200x630, the light README header (link previews)
 // Chromium draws the SVGs, the same renderer as the app icon.
 //
 //   node scripts/site-render.mjs
@@ -17,7 +17,8 @@ import { root, loadPlaywright, launch } from './browser-lib.mjs';
 const brand = (f) => 'data:image/svg+xml,' + encodeURIComponent(readFileSync(join(root, 'docs/brand', f), 'utf8'));
 // The light page background, from the shared tokens, so the PNG files match the site.
 const bg = /--n-1:light-dark\((#[0-9a-f]{6}),/.exec(readFileSync(join(root, 'crates/gitterrace-web/static/tokens.css'), 'utf8'))[1];
-const out = join(root, 'site/assets');
+// Into the built site, so `make docs-gen` (which empties it) runs first.
+const out = join(root, 'target/site/assets');
 mkdirSync(out, { recursive: true });
 const plate = brand('mark-plate.svg');
 
@@ -39,11 +40,11 @@ await b.close();
 
 // The site's screenshots, from the raw PNG files `make site-shots` leaves in target/site-shots/
 // (ignored, 2560x1600): a full-size `{name}.webp` for the lightbox and a 1280x800
-// `{name}.thumb.webp` for the tile, both into site/assets/screenshots/ and committed. Without
-// raw PNG files (a fresh clone, a deploy) the committed WebPs stay as they are. `make docs-gen`
-// checks that the folder holds exactly these files at exactly these sizes.
+// `{name}.thumb.webp` for the tile, both into docs/screenshots/ and committed, the one source the
+// site copies. Without raw PNG files (a fresh clone, a deploy) the committed WebPs stay as they
+// are. `make docs-gen` checks that the folder holds exactly these files at exactly these sizes.
 const rawDir = join(root, 'target/site-shots');
-const siteShots = join(out, 'screenshots');
+const siteShots = join(root, 'docs/screenshots');
 const raw = existsSync(rawDir) ? readdirSync(rawDir).filter((f) => f.endsWith('.png')) : [];
 if (!raw.length) {
   console.log('site-render: no raw shots in target/site-shots, keeping the committed WebPs');
@@ -53,7 +54,7 @@ if (!raw.length) {
     process.exit(1);
   }
   mkdirSync(siteShots, { recursive: true });
-  for (const f of readdirSync(siteShots)) rmSync(join(siteShots, f));
+  for (const f of readdirSync(siteShots)) if (f.endsWith('.webp')) rmSync(join(siteShots, f));
   for (const f of raw) {
     const src = join(rawDir, f);
     /** @type {[string[], string][]} */
@@ -63,10 +64,10 @@ if (!raw.length) {
       if (r.status !== 0) { console.error(`site-render: cwebp failed on ${f}`); process.exit(1); }
     }
   }
-  console.log('wrote site/assets/screenshots/*.webp (2560x1600) and *.thumb.webp (1280x800)');
+  console.log('wrote docs/screenshots/*.webp (2560x1600) and *.thumb.webp (1280x800)');
 }
 
 // Every .png the generated pages link must now exist, or the deploy ships a dead image.
-const html = ['index.html', '404.html'].map((f) => readFileSync(join(root, 'site', f), 'utf8')).join('');
+const html = ['index.html', '404.html'].map((f) => readFileSync(join(root, 'target/site', f), 'utf8')).join('');
 const missing = [...html.matchAll(/assets\/([\w-]+\.png)/g)].map((m) => m[1]).filter((f) => !shots.some((s) => s.file === f));
 if (missing.length) { console.error(`site-render: linked but not rendered: ${missing.join(', ')}`); process.exit(1); }

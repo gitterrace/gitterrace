@@ -154,7 +154,7 @@ export function checks(env) {
     fixtures();
     await new Promise((ok) => setTimeout(ok, 600));
     const pages = Object.fromEntries(Object.entries(repoPages).map(([k, v]) => [k, srv.base + v]));
-    const site = resolve(new URL('..', import.meta.url).pathname, 'site');
+    const site = resolve(new URL('..', import.meta.url).pathname, 'target/site');
     const s = existsSync(join(site, 'docs')) ? await serveDir(site) : null;
     if (s) for (const d of readdirSync(join(site, 'docs'))) {
       if (existsSync(join(site, 'docs', d, 'index.html'))) {

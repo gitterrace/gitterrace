@@ -1,7 +1,7 @@
-//! `site/index.html` and `site/assets/`: the website (landing page, docs, changelog and legal
-//! pages), written from the repo's own sources (Cargo.toml facts, clap, the registries,
-//! `docs/why.md`, the brand SVGs and the vendored theme). A fact is never typed here, so `check`
-//! fails when the page is stale.
+//! `target/site/`: the website (landing page, docs, changelog and legal pages), built from the
+//! repo's own sources (Cargo.toml facts, clap, the registries, `docs/why.md`, the brand SVGs, the
+//! screenshots and the vendored theme). A fact is never typed here, and the site is never
+//! tracked, so what `check` guards is always a fresh build.
 
 use std::fmt::Write as _;
 use std::path::Path;
@@ -38,6 +38,13 @@ const FONTS: [(&str, &str); 3] = [
     ),
     ("jetbrains-mono", "jetbrains-mono-latin-wght-normal.woff2"),
 ];
+/// Where `generate` writes the website, relative to the repo root.
+pub const SITE_DIR: &str = "target/site";
+
+/// The path of `rel` in the built site.
+pub fn at(rel: &str) -> String {
+    format!("{SITE_DIR}/{rel}")
+}
 const BRAND: [&str; 5] = ["logo-light", "logo-dark", "mark-light", "mark-dark", "mark"];
 const TOKENS: &str = "crates/gitterrace-web/static/tokens.css";
 /// RFC 9116 makes `Expires` mandatory in security.txt. Bump it with each release, at most a year
@@ -53,6 +60,31 @@ const SECURITY_TXT_EXPIRES: &str = "2027-11-09T23:00:00Z";
 /// The site's own rules, after the app's tokens in `site.css`.
 const PAGE_CSS: &str = include_str!("../templates/site.css");
 
+/// Whether `out` is a file of the built site rather than a tracked file.
+pub fn is_site(out: &Out) -> bool {
+    match out {
+        Out::File { path, .. } | Out::Bytes { path, .. } => path
+            .strip_prefix(SITE_DIR)
+            .is_some_and(|p| p.starts_with('/')),
+        Out::Block { .. } => false,
+    }
+}
+
+/// Writes the site files of `outs` under `dest`, into an emptied `dest/SITE_DIR`, so no file of
+/// an earlier build survives. Returns that dir.
+pub fn build(dest: &Path, outs: Vec<Out>) -> Result<std::path::PathBuf> {
+    let site = dest.join(SITE_DIR);
+    match std::fs::remove_dir_all(&site) {
+        Err(e) if e.kind() != std::io::ErrorKind::NotFound => {
+            return Err(e).with_context(|| format!("emptying {}", site.display()));
+        }
+        _ => {}
+    }
+    let outs: Vec<Out> = outs.into_iter().filter(is_site).collect();
+    crate::out::apply(dest, outs, crate::out::Mode::Write)?;
+    Ok(site)
+}
+
 pub fn render(root: &Path, ws: &Workspace) -> Result<Vec<Out>> {
     let read = |rel: &str| -> Result<String> {
         std::fs::read_to_string(root.join(rel)).with_context(|| format!("reading {rel}"))
@@ -62,13 +94,13 @@ pub fn render(root: &Path, ws: &Workspace) -> Result<Vec<Out>> {
         .get("gitterrace")
         .context("package gitterrace")?;
     let mut outs = Vec::new();
-    outs.push(Out::file("site/assets/site.css", css(&read(TOKENS)?)?));
+    outs.push(Out::file(at("assets/site.css"), css(&read(TOKENS)?)?));
     for (dir, file) in FONTS {
         let path = format!("schwarzwald/kit/fonts/{dir}/{file}");
         let bytes = std::fs::read(root.join(&path)).with_context(|| format!("reading {path}"))?;
-        outs.push(Out::bytes(format!("site/assets/fonts/{dir}.woff2"), bytes));
+        outs.push(Out::bytes(at(&format!("assets/fonts/{dir}.woff2")), bytes));
         outs.push(Out::file(
-            format!("site/assets/fonts/{dir}-OFL.txt"),
+            at(&format!("assets/fonts/{dir}-OFL.txt")),
             read(&format!("schwarzwald/kit/fonts/{dir}/OFL.txt"))?,
         ));
     }
@@ -76,15 +108,16 @@ pub fn render(root: &Path, ws: &Workspace) -> Result<Vec<Out>> {
     // site/assets/*.png is the ignored, deploy-rendered link preview.
     let icon = "docs/brand/apple-touch-icon.png";
     let bytes = std::fs::read(root.join(icon)).with_context(|| format!("reading {icon}"))?;
-    outs.push(Out::bytes("site/assets/icons/apple-touch-icon.png", bytes));
+    outs.push(Out::bytes(at("assets/icons/apple-touch-icon.png"), bytes));
     for name in BRAND {
         outs.push(Out::file(
-            format!("site/assets/{name}.svg"),
+            at(&format!("assets/{name}.svg")),
             read(&format!("docs/brand/{name}.svg"))?,
         ));
     }
 
     check_shots(root)?;
+    outs.extend(shots::site_shots(root)?);
 
     let repo = &pkg.repository;
     let home = pkg.homepage.trim_end_matches('/');
@@ -102,7 +135,7 @@ pub fn render(root: &Path, ws: &Workspace) -> Result<Vec<Out>> {
     let pitch = pitch(root, &pkg.description)?;
     let h = landing::body(ws, &pitch, &docs::Links::new(repo), &read)?;
     outs.push(Out::file(
-        "site/index.html",
+        at("index.html"),
         page(
             &site,
             &Body {
@@ -223,15 +256,15 @@ fn host_files(site: &Site, pages: &[String]) -> Vec<Out> {
         },
     );
     vec![
-        Out::file("site/_headers", &headers),
-        Out::file("site/_redirects", redirects(repo, name)),
-        Out::file("site/404.html", not_found),
+        Out::file(at("_headers"), &headers),
+        Out::file(at("_redirects"), redirects(repo, name)),
+        Out::file(at("404.html"), not_found),
         Out::file(
-            "site/robots.txt",
+            at("robots.txt"),
             format!("User-agent: *\nAllow: /\nSitemap: {home}/sitemap.xml\n"),
         ),
         Out::file(
-            "site/sitemap.xml",
+            at("sitemap.xml"),
             format!(
                 "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n\
                  <urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">\n\
@@ -239,7 +272,7 @@ fn host_files(site: &Site, pages: &[String]) -> Vec<Out> {
             ),
         ),
         Out::file(
-            "site/.well-known/security.txt",
+            at(".well-known/security.txt"),
             format!(
                 "Contact: mailto:{SECURITY_EMAIL}\n\
                  Contact: {repo}/security/advisories/new\n\

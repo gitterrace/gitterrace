@@ -27,7 +27,7 @@
   // vendored and generated-elsewhere trees are left out.
   "globs": ["**/*.md"],
   "ignores": [
-    "target/**", "crates/*/tests/golden/**", "node_modules/**", "schwarzwald/kit/**", "site/**",
+    "target/**", "crates/*/tests/golden/**", "node_modules/**", "schwarzwald/kit/**",
     // vale downloads its packages here (gitignored)
     "schwarzwald/styles/proselint/**"
   ]

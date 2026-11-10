@@ -88,7 +88,7 @@ async function aboutPlace() {
 
 async function siteTheme() {
   const { createServer } = await import('node:http');
-  const siteDir = join(root, 'site');
+  const siteDir = join(root, 'target/site');
   const csp = /Content-Security-Policy:\s*(.+)/.exec(readFileSync(join(siteDir, '_headers'), 'utf8'))[1].trim();
   const types = { html: 'text/html', css: 'text/css', svg: 'image/svg+xml', webp: 'image/webp', png: 'image/png' };
   const server = createServer((q, s) => {
@@ -268,7 +268,7 @@ async function exportFromDisk() {
 // the panel's colour), an unselected tab keeps the line so it reads as behind. Pixels at the seam.
 async function installTabs() {
   const { createServer } = await import('node:http');
-  const siteDir = join(root, 'site');
+  const siteDir = join(root, 'target/site');
   const types = {
     html: 'text/html', css: 'text/css', svg: 'image/svg+xml', webp: 'image/webp', png: 'image/png',
   };

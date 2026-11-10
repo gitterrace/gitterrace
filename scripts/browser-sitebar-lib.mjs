@@ -5,11 +5,11 @@ import { join, relative } from 'node:path';
 import { createServer } from 'node:http';
 import { root, launch } from './browser-lib.mjs';
 
-const siteDir = join(root, 'site');
+const siteDir = join(root, 'target/site');
 const types = { html: 'text/html', css: 'text/css', svg: 'image/svg+xml', webp: 'image/webp',
   png: 'image/png', woff2: 'font/woff2' };
 
-/** Serves site/ with its _headers CSP, as the host does. @returns {Promise<any>} */
+/** Serves target/site with its _headers CSP, as the host does. @returns {Promise<any>} */
 async function serve() {
   const head = readFileSync(join(siteDir, '_headers'), 'utf8');
   const csp = /Content-Security-Policy:\s*(.+)/.exec(head)[1].trim();

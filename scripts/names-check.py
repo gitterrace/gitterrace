@@ -202,7 +202,7 @@ PATH_REF = re.compile(
     r"(?<![\w./-])((?:crates|scripts|docs|xtask|demo|theme|site|styles)/[\w./-]*\w\.\w+)"
 )
 # Paths a generator writes or a doc names as an example are not references.
-PATH_REF_SKIP = ("site/", "docs/brand/")
+PATH_REF_SKIP = ("site/", "target/", "docs/brand/")
 
 
 def check_path_refs() -> list[str]:

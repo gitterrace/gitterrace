@@ -1,26 +1,31 @@
 //! Screenshot checks: the README's PNG files and the site's WebP files exist, are linked and are
-//! the right size.
+//! the right size. Both live in `docs/screenshots/`, the one source; the site gets a copy.
 
 use std::path::Path;
 
 use anyhow::{Context as _, Result};
 
-use crate::site::SHOTS;
+use crate::out::Out;
+use crate::site::{SHOTS, at};
 
 pub(super) const SHOT_DIR: &str = "docs/screenshots";
-pub(super) const SITE_SHOT_DIR: &str = "site/assets/screenshots";
 /// Pixel size of the lightbox WebP and of the tile thumbnail.
 const FULL: (u32, u32) = (2560, 1600);
 const THUMB: (u32, u32) = (1280, 800);
 
 /// Checks the screenshots without copying them. `docs/screenshots/` holds exactly the PNG files
-/// README.md links, each 2560x1600; `site/assets/screenshots/` holds exactly a full-size WebP at
-/// 2560x1600 and a 1280x800 thumbnail for every entry in `SHOTS`. All of them come from
+/// README.md links, each 2560x1600, and a full-size WebP at 2560x1600 and a 1280x800 thumbnail
+/// for every entry in `SHOTS`. All of them come from
 /// `make site-shots`; a missing, extra or wrongly sized file fails generation and names it.
 pub(super) fn check_shots(root: &Path) -> Result<()> {
     let readme = std::fs::read_to_string(root.join("README.md")).context("reading README.md")?;
     let pngs = readme_shots(&readme);
-    let have = list(root, SHOT_DIR, "make site-shots")?;
+    let all = list(root, SHOT_DIR, "make site-shots")?;
+    let (webps, have): (Vec<String>, Vec<String>) = all.into_iter().partition(|f| {
+        Path::new(f)
+            .extension()
+            .is_some_and(|e| e.eq_ignore_ascii_case("webp"))
+    });
     if let Some(f) = pngs.iter().find(|f| !have.contains(f)) {
         anyhow::bail!("{SHOT_DIR}/{f} is linked by README.md but does not exist (make site-shots)");
     }
@@ -46,15 +51,15 @@ pub(super) fn check_shots(root: &Path) -> Result<()> {
             want.push((format!("{n}-{c}.thumb.webp"), THUMB));
         }
     }
-    let have = list(root, SITE_SHOT_DIR, "make site-shots")?;
+    let have = webps;
     if let Some((f, _)) = want.iter().find(|(f, _)| !have.contains(f)) {
-        anyhow::bail!("{SITE_SHOT_DIR}/{f} is missing (make site-shots)");
+        anyhow::bail!("{SHOT_DIR}/{f} is missing (make site-shots)");
     }
     if let Some(f) = have.iter().find(|f| !want.iter().any(|(w, _)| w == *f)) {
-        anyhow::bail!("{SITE_SHOT_DIR}/{f} is not referenced: delete it and run `make site-shots`");
+        anyhow::bail!("{SHOT_DIR}/{f} is not referenced: delete it and run `make site-shots`");
     }
     for (f, size) in &want {
-        let path = format!("{SITE_SHOT_DIR}/{f}");
+        let path = format!("{SHOT_DIR}/{f}");
         let got =
             webp_size(&std::fs::read(root.join(&path)).with_context(|| format!("reading {path}"))?)
                 .with_context(|| format!("{path} is not a WebP (make site-shots)"))?;
@@ -68,6 +73,23 @@ pub(super) fn check_shots(root: &Path) -> Result<()> {
         );
     }
     Ok(())
+}
+
+/// The site's copy of every WebP in `SHOTS`, under `assets/screenshots/`. Run after
+/// `check_shots`, so each one is there at its size.
+pub(super) fn site_shots(root: &Path) -> Result<Vec<Out>> {
+    let mut outs = Vec::new();
+    for (n, ..) in SHOTS {
+        for c in ["light", "dark"] {
+            for f in [format!("{n}-{c}.webp"), format!("{n}-{c}.thumb.webp")] {
+                let path = format!("{SHOT_DIR}/{f}");
+                let body =
+                    std::fs::read(root.join(&path)).with_context(|| format!("reading {path}"))?;
+                outs.push(Out::bytes(at(&format!("assets/screenshots/{f}")), body));
+            }
+        }
+    }
+    Ok(outs)
 }
 
 /// The `docs/screenshots/*.png` file names README.md links, sorted and deduplicated. The same

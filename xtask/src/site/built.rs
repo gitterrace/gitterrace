@@ -11,7 +11,7 @@ fn text_of(path: &str) -> String {
     let ws = crate::facts::load(&root).expect("facts");
     for out in render(&root, &ws).expect("render") {
         if let Out::File { path: p, body } = out
-            && p.strip_prefix("site/") == Some(path)
+            && p.strip_prefix(&format!("{SITE_DIR}/")) == Some(path)
         {
             return body;
         }

@@ -58,7 +58,7 @@ theme:
 actions:
 	sh scripts/actions-check.sh
 
-## docs-gen: Regenerate every generated file (docs, README blocks, site)
+## docs-gen: Regenerate every generated file (docs, README blocks) and build the site
 docs-gen:
 	cargo xtask generate
 
@@ -187,8 +187,9 @@ browser-reap:
 site: docs-check
 	python3 scripts/site-check.py release
 
-## deploy: Ship site/ to gitterrace.dev (wrangler deploy, the Worker is in wrangler.toml)
-deploy: site shipped site-render
+## deploy: Build the site from a clean HEAD into target/site and ship it with wrangler deploy
+deploy: shipped site site-render
+	@test -s target/site/404.html || { echo "target/site/404.html missing: not_found_handling has nothing to serve"; exit 1; }
 	cargo run -q -p xtask -- deploy-check
 	npx wrangler@4 deploy
 
@@ -196,20 +197,22 @@ deploy: site shipped site-render
 app-icon:
 	node scripts/icon-render.mjs
 
-# site-render: Render the touch icon and link-preview image from docs/brand (ignored), and the site's WebPs from target/site-shots when present (needs cwebp then)
+# site-render: Render the touch icon from docs/brand, the link preview into target/site, and the WebPs from target/site-shots when present (needs cwebp then)
 site-render:
 	node scripts/site-render.mjs
 
-## site-shots: Retake every screenshot: build, serve jq and ripgrep pinned in ~/.cache/gitterrace-shots with scripts/site-shots/config, shoot to target/site-shots and docs/screenshots, the site WebPs, then generate. Needs browsers, so not in check
+# site-shots builds, serves jq and ripgrep pinned in ~/.cache/gitterrace-shots with
+# scripts/site-shots/config, shoots to target/site-shots and docs/screenshots, renders the WebPs,
+# then generates. Needs browsers, so not in check.
+## site-shots: Retake every screenshot (needs browsers, so not in check)
 site-shots: build
 	node scripts/site-shots-run.mjs
 	node scripts/site-render.mjs
 	cargo xtask generate
 
-# shipped: site/ and wrangler.toml are committed, so a deploy ships a known commit
+# shipped: The tree is clean, so the site deploy builds is the one HEAD builds
 shipped:
-	@git diff --quiet HEAD -- site wrangler.toml || { echo "site/ or wrangler.toml has uncommitted changes"; exit 1; }
-	@test -s site/404.html || { echo "site/404.html missing: not_found_handling has nothing to serve"; exit 1; }
+	@test -z "$$(git status --porcelain)" || { echo "uncommitted changes: commit them, a deploy builds HEAD only"; git status --short; exit 1; }
 
 # domains: Check that gitterrace.dev serves and every other host redirects to it
 domains:

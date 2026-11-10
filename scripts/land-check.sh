@@ -90,7 +90,7 @@ for path in paths:
         touched.add(dirs[top])
     elif path.endswith((".md", ".json")) and not path.startswith(("crates/", "xtask/")):
         continue
-    elif path.startswith(("scripts/", "docs/", "site/", "tests/bench/", ".github/")):
+    elif path.startswith(("scripts/", "docs/", "tests/bench/", ".github/")):
         continue
     else:
         widen = True

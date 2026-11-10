@@ -5,8 +5,6 @@
 /.mcp.json
 # wrangler's local state (dev sessions, deploy cache); never part of the repository.
 /.wrangler/
-# Rendered from docs/brand at deploy (scripts/site-render.mjs); the SVGs are the source.
-/site/assets/*.png
 
 # Vale: `vale sync` downloads proselint into schwarzwald/styles/. Only schwarzwald/styles/gitterrace is ours.
 /schwarzwald/styles/*
