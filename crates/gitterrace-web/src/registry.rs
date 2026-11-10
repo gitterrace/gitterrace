@@ -8,7 +8,7 @@ use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 
-use gitterrace_git::Repo;
+use gitterrace_git::{Repo, refused};
 use serde::{Deserialize, Serialize};
 
 const FILE: &str = "repos.json";
@@ -261,13 +261,6 @@ fn private_dir(dir: &Path) -> io::Result<()> {
 /// refused rather than replaced, so the user sees it.
 fn write_atomic(dir: &Path, file: &str, bytes: &[u8]) -> io::Result<()> {
     gitterrace_git::write_atomic(dir, file, bytes, 0o600)
-}
-
-fn refused(path: &Path) -> io::Error {
-    io::Error::other(format!(
-        "refusing {}: not a regular file or folder",
-        path.display()
-    ))
 }
 
 #[cfg(test)]

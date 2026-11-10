@@ -106,7 +106,8 @@ fn no_follow(o: &mut OpenOptions) -> &mut OpenOptions {
     o
 }
 
-fn refused(path: &Path) -> io::Error {
+/// The error for a path that is not a regular file or folder, which no write follows.
+pub fn refused(path: &Path) -> io::Error {
     io::Error::other(format!(
         "refusing to write {}: not a regular file or folder",
         path.display()

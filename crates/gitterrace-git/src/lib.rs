@@ -24,7 +24,7 @@ mod walk;
 mod watch;
 mod worktree;
 
-pub use atomic::{open_append_no_follow, read_no_follow, write_atomic};
+pub use atomic::{open_append_no_follow, read_no_follow, refused, write_atomic};
 pub use error::{Error, Result};
 pub use fnv::{fnv1a32, fnv1a64};
 

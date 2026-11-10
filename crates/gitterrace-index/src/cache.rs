@@ -8,6 +8,8 @@ use std::fs::{self, File};
 use std::io;
 use std::path::{Path, PathBuf};
 
+use gitterrace_git::refused;
+
 /// Makes `dir` a real directory, replacing a symlink or other non-directory entry.
 #[expect(
     clippy::print_stderr,
@@ -94,11 +96,4 @@ pub(crate) fn remove(dir: &Path, name: &str) -> io::Result<()> {
         Err(e) if e.kind() != io::ErrorKind::NotFound => Err(e),
         _ => Ok(()),
     }
-}
-
-fn refused(path: &Path) -> io::Error {
-    io::Error::other(format!(
-        "refusing cache path {}: not a regular entry",
-        path.display()
-    ))
 }
