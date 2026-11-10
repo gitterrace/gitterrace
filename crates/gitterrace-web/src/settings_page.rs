@@ -71,17 +71,6 @@ pub(crate) struct Which {
     f: Option<SettingsFile>,
 }
 
-/// `path` with the home folder written as `~`, so a page never shows the user's name.
-fn shorten(path: &Path) -> String {
-    let home = gitterrace_config::home_var().map(std::path::PathBuf::from);
-    home.as_deref()
-        .and_then(|h| path.strip_prefix(h).ok())
-        .map_or_else(
-            || path.display().to_string(),
-            |rest| format!("~/{}", rest.display()),
-        )
-}
-
 fn row(f: Field) -> Row {
     let value = f.plain();
     let (kind, min, max, options) = match &f.input {
@@ -199,7 +188,7 @@ fn settings_head(
             "Settings",
             crate::pagehead::Tagline::of(&format!(
                 "{} \u{b7} {}",
-                shorten(path),
+                gitterrace_config::tilde(path),
                 if exists {
                     "edited here, saved in place"
                 } else {

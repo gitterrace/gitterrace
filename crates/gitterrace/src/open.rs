@@ -550,13 +550,10 @@ fn loopback(a: SocketAddr) -> SocketAddr {
 
 /// `~/x` against `$HOME`; anything else as written.
 fn expand(p: &str) -> PathBuf {
-    let rest = p
-        .strip_prefix("~/")
-        .or_else(|| p.strip_prefix("~\\").filter(|_| cfg!(windows)));
-    match (rest, gitterrace_config::home_var()) {
-        (Some(rest), Some(h)) => PathBuf::from(h).join(rest),
-        _ => PathBuf::from(p),
-    }
+    gitterrace_config::home_dir().map_or_else(
+        || PathBuf::from(p),
+        |home| gitterrace_config::expand_tilde(p, &home),
+    )
 }
 
 /// The platform's URL opener. The URL is built here from validated parts and starts with

@@ -4,7 +4,7 @@
 //! path, so no argument reaches a folder outside the table.
 
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
@@ -194,16 +194,6 @@ impl Repos {
     }
 }
 
-/// `path` with the home folder as `~`, so the answer does not carry the user name.
-fn shown(path: &Path) -> String {
-    let home = std::env::var_os("HOME").map(PathBuf::from);
-    home.and_then(|h| path.strip_prefix(h).ok().map(Path::to_path_buf))
-        .map_or_else(
-            || path.display().to_string(),
-            |rel| format!("~/{}", rel.display()),
-        )
-}
-
 /// A repository whose api switch is off is named, so an agent knows why it cannot read it, and
 /// nothing else: no path, HEAD or subject.
 fn row(r: &McpRepo, cfg: &Config) -> RepoRow {
@@ -220,7 +210,7 @@ fn row(r: &McpRepo, cfg: &Config) -> RepoRow {
     }
     let mut out = RepoRow {
         name: r.name.clone(),
-        path: shown(&r.path),
+        path: gitterrace_config::tilde(&r.path),
         available: false,
         error: r.unavailable.clone(),
         head: None,

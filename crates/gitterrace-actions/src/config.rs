@@ -329,7 +329,8 @@ impl Config {
     }
 }
 
-fn home() -> PathBuf {
+/// The home folder, or the filesystem root when its variable is unset.
+pub(crate) fn home() -> PathBuf {
     let var = if cfg!(windows) { "USERPROFILE" } else { "HOME" };
     std::env::var_os(var).map_or_else(
         || PathBuf::from(std::path::MAIN_SEPARATOR_STR),

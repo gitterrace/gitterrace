@@ -105,6 +105,31 @@ pub fn home_var() -> Option<std::ffi::OsString> {
     std::env::var_os(if cfg!(windows) { "USERPROFILE" } else { "HOME" })
 }
 
+/// The home folder, `None` when its variable is unset.
+pub fn home_dir() -> Option<PathBuf> {
+    home_var().map(PathBuf::from)
+}
+
+/// `path` with the home folder written as `~`, so output never shows the user's name.
+pub fn tilde(path: &Path) -> String {
+    home_dir()
+        .and_then(|h| path.strip_prefix(h).ok().map(Path::to_path_buf))
+        .map_or_else(
+            || path.display().to_string(),
+            |rest| format!("~/{}", rest.display()),
+        )
+}
+
+/// `~`, `~/x` (and `~\x` on Windows) against `home`; anything else as written.
+pub fn expand_tilde(p: &str, home: &Path) -> PathBuf {
+    match p.strip_prefix("~/") {
+        Some(rest) => home.join(rest),
+        None if cfg!(windows) && p.starts_with("~\\") => home.join(&p[2..]),
+        None if p == "~" => home.to_path_buf(),
+        None => PathBuf::from(p),
+    }
+}
+
 /// A loaded config plus where each key came from and what was ignored.
 #[derive(Debug)]
 pub struct Loaded {
@@ -240,6 +265,16 @@ mod enum_keys_tests;
 
 #[cfg(test)]
 mod tests {
+    use std::path::Path;
+    #[test]
+    fn tilde_and_expand_tilde_round_trip_under_a_home() {
+        let home = Path::new("/h/me");
+        assert_eq!(super::expand_tilde("~/x/y", home), Path::new("/h/me/x/y"));
+        assert_eq!(super::expand_tilde("~", home), home);
+        assert_eq!(super::expand_tilde("/a/b", home), Path::new("/a/b"));
+        assert_eq!(super::expand_tilde("~x", home), Path::new("~x"));
+    }
+
     use super::{Config, ConfigError, Reload, Source, keys, load, parse, template};
 
     /// The user-visible text of each config error, the wording the CLI and settings show.

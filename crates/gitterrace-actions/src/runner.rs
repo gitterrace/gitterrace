@@ -165,8 +165,7 @@ impl Runner {
             .env_clear()
             .current_dir(match &action.cwd {
                 Cwd::Repo => repo_root.to_path_buf(),
-                Cwd::Home => std::env::var_os(if cfg!(windows) { "USERPROFILE" } else { "HOME" })
-                    .map_or_else(|| std::path::MAIN_SEPARATOR_STR.into(), Into::into),
+                Cwd::Home => crate::config::home(),
                 Cwd::Path(p) => p.clone(),
             })
             .stdin(if stdin.is_some() {
