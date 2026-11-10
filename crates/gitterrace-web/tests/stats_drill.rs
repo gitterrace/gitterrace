@@ -50,7 +50,7 @@ async fn a_bar_link_narrows_to_its_bucket() {
         href.contains("from=2024-03-04") && href.contains("to=2024-03-10"),
         "{href}"
     );
-    assert!(href.contains("period=1y"), "filters carry over: {href}");
+    assert!(href.contains("q=after%3A1y"), "filters carry over: {href}");
     let href = href.replacen("/r/repo", "", 1);
     let narrowed = body(&r, &href).await;
     assert!(narrowed.contains("Wednesday: 2"), "{narrowed}");
@@ -75,7 +75,7 @@ async fn the_chip_removes_the_range() {
     let remove = chips
         .split("href=\"")
         .filter_map(|s| s.split('"').next())
-        .find(|h| !h.contains("from=") && h.contains("period=1y"))
+        .find(|h| !h.contains("from=") && h.contains("q=after%3A1y"))
         .expect("a chip link without the range");
     assert!(!remove.contains("to="), "{remove}");
     let remove = remove.replacen("/r/repo", "", 1);
