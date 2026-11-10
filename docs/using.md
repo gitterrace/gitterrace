@@ -21,7 +21,7 @@ repository with its last commit and recent activity, and each one lives under
 
 The box above that list filters it by repository name. It keeps the names that
 contain what you type, ignoring case, and shows how many of the total match.
-Press `/` anywhere on the page to jump to the box. Enter opens the first match,
+On this page `/` jumps to the box. Enter opens the first match,
 the arrow keys walk the matches and Escape clears the box. The filter is kept
 in the address as `?q=`, so a filtered list can be bookmarked, and it works
 without JavaScript too: the Filter button sends the same query to the server.
@@ -33,8 +33,8 @@ them all. `git terrace remove` takes one off again.
 
 ## The commit log and its graph
 
-The log of a branch has a List and a Graph switch in its head. Graph draws the
-branches and merges beside each commit, one row per commit. A log filtered by
+The log of a branch has three tabs in its head: List, Graph and This ref. Graph
+draws the branches and merges beside each commit, one row per commit. A log filtered by
 path or author has no graph, since its commits are not one line of history.
 
 Graph draws every branch line at once, as `git log --graph --all` does: the
@@ -42,11 +42,11 @@ browsed ref, each local branch and the HEAD of each linked worktree, newest
 first by commit date, each line in its own color from the theme. Each tip's
 labels sit at the left of the graph, joined to the tip's dot by a dashed line in
 its column's color. A detached worktree is labeled "worktree" and its id. This
-ref narrows the graph to the history of the ref in the address, as before. Lines
+ref narrows the graph to the history of the ref in the address. Lines
 past the column cap fold as "+N", and paging works the same in both. Worktree
 HEADs are working state of this machine, so a public server leaves them out, as
 it does the worktree pages. Branches of separate clones are not drawn:
-gitterrace never fetches into a browsed repo.
+gitterrace never fetches into a browsed repository.
 
 When the server serves several clones or forks of one project, the log's
 toolbar says "Related:" and links the log of each other served repository that
@@ -66,10 +66,9 @@ of its symbols: functions, types, classes and methods, each linked to its line.
 
 ## Languages
 
-The languages page counts lines per language along the first-parent history. On
-a large merge (more than 30 by 30 added and deleted files left to pair, the same
-cut as git's `diff.renameLimit`), a renamed file that was also edited counts as a
-delete plus an add in the added and removed lines. The net lines stay the same.
+The languages page counts lines per language along the first-parent history.
+On a very large merge, a renamed and edited file may count as a delete plus an
+add, as with git's `diff.renameLimit`. The net lines stay the same.
 
 ## Keys
 
