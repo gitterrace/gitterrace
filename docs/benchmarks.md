@@ -158,6 +158,15 @@ make gc BENCH=1     # print the path and size, then remove the clones (DRY=1 onl
 `make check` runs only `bench-guard`, which drives the harness once against a
 tiny generated repository to prove it still works.
 
+## Which build
+
+Each run names the gitterrace commit it measured as `gitterrace
+v0.1.0-<7-hex>`, from the binary's `--version`. The commit is kept in
+`machine.commit` of the results JSON and in the version string, and the
+results block below shows it. A run whose commit is not recorded renders as
+the plain version. A `-dirty` build is never published: `bench-report --check`
+refuses it, and the JSON carries the `dirty` flag, not the mark in the version.
+
 ## Results
 
 The newest run against its budgets. The charts and every page of each kept run
@@ -165,8 +174,8 @@ are in tests/bench/results.
 
 <!-- BEGIN GENERATED: results -->
 Run 2026-11-09 on Apple M1 Max, 10 cores, 64 GB RAM, 4.0 TB SSD disk, macOS
-26.6.2 (arm64). gitterrace v0.1.0, git version 2.54.0 (Apple Git-157). Measured
-on a quiet machine.
+26.6.2 (arm64). gitterrace 0.1.0, git version 2.54.0 (Apple Git-157).
+Measured on a quiet machine.
 
 | Repo | Metric | Value | Budget | Status | Change against previous |
 | --- | --- | --- | --- | --- | --- |

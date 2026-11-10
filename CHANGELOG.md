@@ -528,4 +528,10 @@ All notable changes are listed here. The format follows
 - index: coupling counts pairs per file in a dense row
 
 <!-- BEGIN GENERATED: unreleased -->
+## [Unreleased]
+
+### Added
+
+- Bench runs record the commit they measured
+
 <!-- END GENERATED: unreleased -->
