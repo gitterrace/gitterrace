@@ -151,6 +151,9 @@ pub struct DiskSource {
     broken: Mutex<Option<String>>,
     /// Set when stored sums added past u64 across commits ([`InsightsSource::failure`]).
     pub(super) over: crate::feed::SumOverflow,
+    /// See [`InsightsSource::instance`].
+    #[cfg(any(test, feature = "oracle"))]
+    pub(super) instance: u64,
     /// The stored chain and its length when it was written for this set, see `crate::chain`.
     chain: Option<(Container, u32)>,
     /// The stored tip touches when written for this set, see `crate::tip`.
@@ -242,6 +245,8 @@ impl DiskSource {
             path_hash: OnceLock::new(),
             broken: Mutex::new(None),
             over: crate::feed::SumOverflow::new(),
+            #[cfg(any(test, feature = "oracle"))]
+            instance: crate::feed::next_instance(),
             chain,
             tip,
         };

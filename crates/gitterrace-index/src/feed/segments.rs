@@ -125,15 +125,27 @@ pub struct SegmentSource<B> {
     /// Per segment, the first path id of each path postings block, read on first lookup: a
     /// path's hits then cost the blocks that hold it, not the whole section.
     path_index: std::sync::OnceLock<Vec<Vec<u32>>>,
+    /// See [`InsightsSource::instance`].
+    #[cfg(any(test, feature = "oracle"))]
+    instance: u64,
 }
 
 impl<B: InsightsSource> SegmentSource<B> {
-    pub const fn new(base: B, segments: Vec<Container>) -> Self {
+    #[cfg_attr(
+        not(any(test, feature = "oracle")),
+        expect(
+            clippy::missing_const_for_fn,
+            reason = "const only without the instance id, which reads an atomic"
+        )
+    )]
+    pub fn new(base: B, segments: Vec<Container>) -> Self {
         Self {
             base,
             segments,
             broken: std::sync::Mutex::new(None),
             path_index: std::sync::OnceLock::new(),
+            #[cfg(any(test, feature = "oracle"))]
+            instance: crate::feed::next_instance(),
         }
     }
 
@@ -409,6 +421,11 @@ impl<B: InsightsSource> InsightsSource for SegmentSource<B> {
 
     fn find_label(&self, name: &str) -> Result<Option<LabelId>, SourceError> {
         self.base.find_label(name)
+    }
+
+    #[cfg(any(test, feature = "oracle"))]
+    fn instance(&self) -> u64 {
+        self.instance
     }
 
     fn failure(&self) -> Option<SourceError> {

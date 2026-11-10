@@ -42,6 +42,9 @@ pub struct Reach<S> {
     fresh: Fresh,
     /// Set when stored sums added past u64, so the view reports the cache unreadable.
     over: SumOverflow,
+    /// See [`InsightsSource::instance`].
+    #[cfg(any(test, feature = "oracle"))]
+    instance: u64,
 }
 
 /// Builds the view of `tip` (a commit id) over `base`, reading at most `cap` commits from git.
@@ -106,6 +109,8 @@ impl<S: InsightsSource> Reach<S> {
             inner: acc,
             fresh: Fresh::default(),
             over: SumOverflow::new(),
+            #[cfg(any(test, feature = "oracle"))]
+            instance: crate::feed::next_instance(),
         }
     }
 
@@ -380,6 +385,11 @@ impl<S: InsightsSource> InsightsSource for Reach<S> {
             return Ok(None);
         };
         Ok(u32::try_from(label_count(&self.base) + i).ok().map(LabelId))
+    }
+
+    #[cfg(any(test, feature = "oracle"))]
+    fn instance(&self) -> u64 {
+        self.instance
     }
 
     fn failure(&self) -> Option<SourceError> {

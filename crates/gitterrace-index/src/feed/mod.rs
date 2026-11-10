@@ -257,6 +257,13 @@ pub struct RenameEdge {
     pub new: PathId,
 }
 
+/// The next [`InsightsSource::instance`] id, from 1: unique for the life of the process.
+#[cfg(any(test, feature = "oracle"))]
+pub(crate) fn next_instance() -> u64 {
+    static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
+    NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+}
+
 /// Read access to one indexed history. See the module docs for the contract.
 pub trait InsightsSource: Send + Sync {
     /// Commits indexed (`commits_indexed` on the pages).
@@ -337,6 +344,13 @@ pub trait InsightsSource: Send + Sync {
     /// a page or an answer reads a source, and it refuses the result then. No default, so a new
     /// source has to say where its errors go.
     fn failure(&self) -> Option<SourceError>;
+
+    /// An id unique to this source for the life of the process, 0 when it has none: the
+    /// tests that count work per source key by it, since an address is reused once freed.
+    #[cfg(any(test, feature = "oracle"))]
+    fn instance(&self) -> u64 {
+        0
+    }
 
     /// Streams the first-parent chain from the newest rank, newest first, with each step's
     /// file rows (path, add and del only), when the index stored it for exactly this set.

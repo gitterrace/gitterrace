@@ -231,6 +231,11 @@ impl InsightsSource for DiskSource {
             .map(LabelId))
     }
 
+    #[cfg(any(test, feature = "oracle"))]
+    fn instance(&self) -> u64 {
+        self.instance
+    }
+
     fn failure(&self) -> Option<SourceError> {
         self.unreadable()
             .map(SourceError)
