@@ -13,7 +13,9 @@
 //! its last name with `HOLDS` set while that name still holds it (the life is live).
 
 use crate::CommitRecord;
-use crate::seg::agg::{add_count, pack};
+#[cfg(any(test, feature = "oracle"))]
+use crate::seg::agg::add_count;
+use crate::seg::agg::pack;
 use crate::seg::bounds::{Cursor, MAX_BLOCK};
 use crate::seg::format::section;
 use crate::seg::{SegError, SegResult, Sink};
@@ -160,9 +162,10 @@ impl Lives {
     }
 }
 
-/// Section 7 and the section 10 touches per life re-derived from records in order-file order,
-/// in one replay: the oracle an append is checked against (the shape of [`dump`]).
-#[doc(hidden)]
+/// Section 7 and the section 10 touches per life re-derived from records in order-file order.
+///
+/// One replay: the oracle an append is checked against (the shape of [`dump`]).
+#[cfg(any(test, feature = "oracle"))]
 pub fn canon_of(records: &[CommitRecord]) -> (Vec<u32>, Vec<u64>) {
     let mut s = crate::seg::agg::Strings::default();
     let mut agg = crate::seg::agg::Aggregates::default();
@@ -194,7 +197,7 @@ pub(crate) fn olds(s: &crate::seg::agg::Strings, r: &CommitRecord) -> Vec<Option
 
 /// What a store's lives hold, for guards: the newest section 7 and, per life, the touches
 /// of section 10 summed over every segment. Reads the store whole, a test hook. Not an API.
-#[doc(hidden)]
+#[cfg(any(test, feature = "oracle"))]
 pub fn dump(store: &crate::seg::read::Store) -> SegResult<(Vec<u32>, Vec<u64>)> {
     let mut canon = Vec::new();
     let mut buf = Vec::new();
@@ -224,10 +227,11 @@ pub fn dump(store: &crate::seg::read::Store) -> SegResult<(Vec<u32>, Vec<u64>)> 
 /// Line sums as a tuple: raw add, del, rewritten, then the whitespace-blind three.
 pub type SumsTuple = [u64; 6];
 
-/// The rows of sections 9 and 10 and the merges of section 6, summed over a set's segments
-/// (months: touches and sums added, last touch the newest). The shape both [`life_tables`] and
+/// The rows of sections 9 and 10 and the merges of section 6, summed over a set's segments.
+///
+/// Months: touches and sums added, last touch the newest. The shape both [`life_tables`] and
 /// [`life_tables_of`] give, so the equivalence test compares a set with its records.
-#[doc(hidden)]
+#[cfg(any(test, feature = "oracle"))]
 #[derive(Debug, Default, PartialEq, Eq)]
 pub struct LifeTables {
     /// (life, local month) to (touches, sums, last touch).
@@ -238,6 +242,7 @@ pub struct LifeTables {
     pub merges: std::collections::BTreeMap<(i64, u32), u64>,
 }
 
+#[cfg(any(test, feature = "oracle"))]
 const fn tuple(s: &crate::seg::agg::Sums) -> SumsTuple {
     [
         s.add,
@@ -250,6 +255,7 @@ const fn tuple(s: &crate::seg::agg::Sums) -> SumsTuple {
 }
 
 /// `a += b` per field, `None` past u64 (`a` may be part added then: the caller drops it).
+#[cfg(any(test, feature = "oracle"))]
 #[must_use]
 fn add_tuple(a: &mut SumsTuple, b: &SumsTuple) -> Option<()> {
     for (x, y) in a.iter_mut().zip(b) {
@@ -258,6 +264,7 @@ fn add_tuple(a: &mut SumsTuple, b: &SumsTuple) -> Option<()> {
     Some(())
 }
 
+#[cfg(any(test, feature = "oracle"))]
 impl LifeTables {
     /// The row summed in, `None` when a sum passes u64.
     fn month(&mut self, life: u32, month: i64, v: &crate::seg::agg::LifeMonth) -> Option<()> {
@@ -288,7 +295,7 @@ impl LifeTables {
 }
 
 /// [`LifeTables`] as a store holds them. Reads the store whole, a test hook. Not an API.
-#[doc(hidden)]
+#[cfg(any(test, feature = "oracle"))]
 pub fn life_tables(store: &crate::seg::read::Store) -> SegResult<LifeTables> {
     let mut t = LifeTables::default();
     let mut buf = Vec::new();
@@ -313,7 +320,7 @@ pub fn life_tables(store: &crate::seg::read::Store) -> SegResult<LifeTables> {
 }
 
 /// [`LifeTables`] re-derived from records in order-file order, in one replay: the oracle.
-#[doc(hidden)]
+#[cfg(any(test, feature = "oracle"))]
 pub fn life_tables_of(records: &[CommitRecord]) -> LifeTables {
     let mut s = crate::seg::agg::Strings::default();
     let mut agg = crate::seg::agg::Aggregates::default();

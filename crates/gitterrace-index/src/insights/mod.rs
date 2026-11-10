@@ -221,6 +221,7 @@ impl<'a> Insights<'a> {
 
     /// Shared table sets whose key starts with `prefix` (a test hook for
     /// [`Insights::release_shared`]).
+    #[cfg(any(test, feature = "oracle"))]
     pub fn shared_sets(prefix: &str) -> usize {
         shared::SHARED.lock().map_or(0, |g| {
             g.iter().filter(|e| e.key.starts_with(prefix)).count()

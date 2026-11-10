@@ -442,6 +442,7 @@ pub(crate) fn decode_author_day(
 }
 
 /// Rows of one life x month block (section 9), ascending by (life, month).
+#[cfg(any(test, feature = "oracle"))]
 pub(crate) fn decode_life_month(
     c: &mut Cursor<'_>,
     items: u32,

@@ -557,9 +557,10 @@ impl DiskSource {
     }
 }
 
-/// Writes a segment cache from records the way the build does, for this crate's guards and
-/// the memory guard in `tests/disk_memory.rs`. Not an API.
-#[doc(hidden)]
+/// Writes a segment cache from records the way the build does.
+///
+/// For this crate's guards and the memory guard in `tests/disk_memory.rs`. Not an API.
+#[cfg(any(test, feature = "oracle"))]
 pub mod testing;
 
 #[cfg(test)]

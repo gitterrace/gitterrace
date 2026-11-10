@@ -35,7 +35,7 @@ use std::sync::Arc;
 
 pub use crate::seg::{IdentId, LabelId, Oid, PathId, Rank};
 pub use crate::tip::TipTouch;
-#[doc(hidden)]
+#[cfg(any(test, feature = "oracle"))]
 pub use disk::testing as disk_testing;
 pub use disk::{DiskSource, IdentMap, RowWriter, block_cache_default};
 pub use fresh::FRESH_CAP;
