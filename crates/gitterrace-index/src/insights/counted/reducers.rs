@@ -16,19 +16,30 @@ pub struct Totals {
     s: PeriodStats,
     people: FastSet<usize>,
     files: FastSet<PathId>,
+    /// The distinct files when a table already holds them: the set reads no rows then.
+    known_files: Option<usize>,
 }
 
 impl Totals {
+    /// Totals over `c`. The whole unselected history takes its file count from the shared
+    /// table, so it streams commit columns only.
+    pub fn of(c: &Counted<'_>) -> Self {
+        Self {
+            known_files: c.is_whole().then(|| c.ins.all_files()),
+            ..Self::default()
+        }
+    }
+
     pub fn finish(mut self) -> PeriodStats {
         self.s.authors = self.people.len();
-        self.s.files = self.files.len();
+        self.s.files = self.known_files.unwrap_or(self.files.len());
         self.s
     }
 }
 
 impl Reducer for Totals {
     fn needs_rows(&self) -> bool {
-        true
+        self.known_files.is_none()
     }
 
     fn add(&mut self, c: &Counted<'_>, item: &Item) {

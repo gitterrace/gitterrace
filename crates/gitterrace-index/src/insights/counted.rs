@@ -199,7 +199,16 @@ impl<'a> Counted<'a> {
     }
 
     pub fn totals(&self) -> PeriodStats {
-        self.one(Totals::default()).finish()
+        self.one(Totals::of(self)).finish()
+    }
+
+    /// True for every day of the history with no selection: the set the shared tables
+    /// already summarize.
+    pub(crate) fn is_whole(&self) -> bool {
+        !self.shifted
+            && self.scope.selection().is_empty()
+            && *self.days.start() == i64::MIN
+            && *self.days.end() == i64::MAX
     }
 
     pub fn series(&self) -> Vec<SeriesPoint> {
@@ -233,7 +242,7 @@ impl<'a> Counted<'a> {
         let src = self.ins.source();
         let path = self.scope.selection().path().is_some();
         let need = with_rows || path;
-        self.ins.count_walk();
+        self.ins.count_walk(need);
         let mut base = src
             .commits_in(CommitRange::Time(self.span.clone()))
             .filter(move |c| self.scope.admits_in(self.ins, &self.days, c));

@@ -46,7 +46,7 @@ impl Counted<'_> {
     /// the first-time check of a fixed period read their own, earlier days).
     pub fn activity_fold(&self) -> ActivityFold {
         let axis = self.axis();
-        let mut totals = Totals::default();
+        let mut totals = Totals::of(self);
         let mut series = Series::new(axis);
         let mut when = When::default();
         let mut rows = Rows(Vec::new());

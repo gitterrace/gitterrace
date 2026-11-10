@@ -195,3 +195,47 @@ async fn pages_after_the_warm_up_build_no_tables() {
     }
     assert_eq!(builds() - before, 0, "table sets built after the warm-up");
 }
+
+/// Guard class: a count a shared table holds is read, not walked again. After the
+/// before-ready pass a cold overview reads no file rows: red at 1 when its all-time totals
+/// streamed every row for the distinct files. Second catch: any whole-history reducer
+/// that asks for rows a table already summarizes.
+#[tokio::test]
+async fn a_cold_overview_reads_no_file_rows() {
+    let dir = tempfile::tempdir().expect("tmp");
+    let p = gitterrace_testkit::Fixture::init(dir.path())
+        .write("a.txt", "a\n")
+        .commit("feat: a")
+        .write("b.txt", "b\n")
+        .commit("feat: b")
+        .path()
+        .to_owned();
+    let repo = gitterrace_git::Repo::discover(&p).expect("repo");
+    let index = gitterrace_index::Index::open(&repo).expect("index");
+    let app = Arc::new(App::new(repo, index));
+    app.index
+        .update(&app.repo, "HEAD", &|_| {})
+        .expect("update");
+    let head = app.repo.resolve("HEAD").expect("head");
+    super::warm_shared(&app, &head);
+    app.mark_ready();
+    let rows = || {
+        let src = app.source(&head).expect("source").expect("ready");
+        src.run(|s| {
+            crate::fmt::with_rev("HEAD", || {
+                let all: super::Src = Arc::clone(s) as super::Src;
+                super::insights(&app, &all, app.defaults().into_options()).row_walks()
+            })
+        })
+        .expect("run")
+    };
+    let before = rows();
+    let router = crate::routes::router(Arc::clone(&app));
+    let (status, body) = gitterrace_testkit::get(&router, "/").await;
+    assert_eq!(status, 200, "{body}");
+    assert!(
+        body.contains("<b>2</b> files touched"),
+        "the file count is still shown"
+    );
+    assert_eq!(rows() - before, 0, "row walks of a cold overview");
+}

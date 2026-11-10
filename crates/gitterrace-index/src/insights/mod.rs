@@ -21,6 +21,7 @@ mod fold;
 mod format;
 mod headfiles;
 mod lang;
+mod lines;
 mod people;
 mod period;
 mod releases;
@@ -146,7 +147,7 @@ struct Derived {
     skip: OnceLock<Vec<bool>>,
     /// Lines changed by each commit over counted files, computed on first use and shared by
     /// every statistic that sums a commit (sizes, rhythm, code frequency, contributors).
-    commit_lines: OnceLock<Vec<Lines>>,
+    commit_lines: OnceLock<lines::CommitLines>,
     follow: OnceLock<files::Follow>,
     /// The period anchors of this history for the `now` they were read at, read once per
     /// `now` instead of once per section (a scan of every commit column).
@@ -163,6 +164,9 @@ struct Derived {
     /// Walks of a counted set over these tables, for the tests that count work per page.
     #[cfg(any(test, feature = "oracle"))]
     walks: std::sync::atomic::AtomicUsize,
+    /// The walks of those that read file rows.
+    #[cfg(any(test, feature = "oracle"))]
+    row_walks: std::sync::atomic::AtomicUsize,
 }
 
 impl<'a> Insights<'a> {
@@ -255,15 +259,26 @@ impl<'a> Insights<'a> {
         self.d.walks.load(std::sync::atomic::Ordering::Relaxed)
     }
 
+    /// The [`Insights::walks`] that read file rows.
     #[cfg(any(test, feature = "oracle"))]
-    fn count_walk(&self) {
+    pub fn row_walks(&self) -> usize {
+        self.d.row_walks.load(std::sync::atomic::Ordering::Relaxed)
+    }
+
+    #[cfg(any(test, feature = "oracle"))]
+    fn count_walk(&self, rows: bool) {
         self.d
             .walks
             .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        if rows {
+            self.d
+                .row_walks
+                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        }
     }
 
     #[cfg(not(any(test, feature = "oracle")))]
-    const fn count_walk(&self) {}
+    const fn count_walk(&self, _rows: bool) {}
 
     /// True when path statistics leave `path` out.
     pub fn skips(&self, path: &str) -> bool {
@@ -385,27 +400,6 @@ impl<'a> Insights<'a> {
         let _ = self.commit_lines();
     }
 
-    /// [`Insights::commit_sums`] per rank, read from every file row once per set.
-    fn commit_lines(&self) -> &[Lines] {
-        self.d.commit_lines.get_or_init(|| {
-            let src = self.source();
-            let all: Vec<Rank> = (0..src.len()).map(rank_of).collect();
-            src.rows_for(all)
-                .map(|(_, rows)| {
-                    rows.iter().filter_map(|r| self.row_lines(r)).fold(
-                        Lines::default(),
-                        |mut out, l| {
-                            out.add += l.add;
-                            out.del += l.del;
-                            out.rewritten += l.rewritten;
-                            out
-                        },
-                    )
-                })
-                .collect()
-        })
-    }
-
     pub(crate) fn follow(&self) -> &files::Follow {
         self.d
             .follow
@@ -494,6 +488,8 @@ impl Derived {
             ids: Mutex::default(),
             #[cfg(any(test, feature = "oracle"))]
             walks: std::sync::atomic::AtomicUsize::new(0),
+            #[cfg(any(test, feature = "oracle"))]
+            row_walks: std::sync::atomic::AtomicUsize::new(0),
         }
     }
 }

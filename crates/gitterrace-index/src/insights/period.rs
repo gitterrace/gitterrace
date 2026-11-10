@@ -210,7 +210,7 @@ impl Counted<'_> {
     /// [`Counted::summary`] and [`Counted::rhythm`] in one pass (the "before" column is a
     /// second one, over the earlier days).
     pub fn activity(&self) -> (PeriodSummary, Rhythm) {
-        let mut totals = Totals::default();
+        let mut totals = Totals::of(self);
         let mut series = Series::new(self.axis());
         let mut when = When::default();
         self.reduce(&mut [&mut totals, &mut series, &mut when]);
