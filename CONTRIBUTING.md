@@ -117,11 +117,15 @@ The local gate is the one that counts. The hosted workflows run a subset of it.
 
 ## Releasing (maintainers)
 
-gitterrace.dev is generated into `site/` and shipped from a maintainer's machine
-with `make deploy`. There is no deploy workflow and no Cloudflare token in the
-repository.
+gitterrace.dev is shipped from a maintainer's machine with `make deploy`. There
+is no deploy workflow and no Cloudflare token in the repository. The site is
+build output and never tracked: `make docs-gen` builds it into `target/site`
+from the docs, the brand files in `docs/brand` and the screenshots in
+`docs/screenshots`, and `make check` runs the site guards on a fresh build.
+`make deploy` refuses a dirty tree, builds from HEAD, checks that build and
+ships it.
 
-1. Bump `SECURITY_TXT_EXPIRES` in `xtask/src/site.rs`, `make docs-gen`, commit.
+1. Bump `SECURITY_TXT_EXPIRES` in `xtask/src/site.rs`, commit.
 2. On the release candidate commit, in a clean clone on a quiet machine,
    `make bench LARGE=1` and commit the results. This is the only published run
    per release, never one in between.
