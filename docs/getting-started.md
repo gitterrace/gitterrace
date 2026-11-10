@@ -32,7 +32,7 @@ git terrace          # joins the server already running, no second port
 
 <!-- END GENERATED: quickstart -->
 
-Every repository lives under `/r/<name>/`, also the first, so its links stay
+Every repository lives under `/r/<name>/`, the first one too, so its links stay
 valid as others join. `git terrace remove [path|name]` takes one off again.
 [Using it](using.md) covers serving a folder of repositories, the log graph,
 outlines, keys and the settings page. [Command line](cli.md) lists every command
