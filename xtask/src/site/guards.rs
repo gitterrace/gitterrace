@@ -15,6 +15,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
+use crate::site::attrs;
+
 /// The fewest words a page's main text needs, outside its navigation.
 const MIN_WORDS: usize = 60;
 /// The shortest prose that counts as repeated: shorter lines (a label, a link) may repeat.
@@ -74,15 +76,6 @@ fn text(html: &str) -> String {
         }
     }
     out.split_whitespace().collect::<Vec<_>>().join(" ")
-}
-
-/// Every `attr="value"` of `html`, in order.
-fn attrs<'a>(html: &'a str, attr: &str) -> Vec<&'a str> {
-    let pat = format!(" {attr}=\"");
-    html.split(&pat)
-        .skip(1)
-        .filter_map(|r| r.split_once('"').map(|v| v.0))
-        .collect()
 }
 
 /// The page's main, without the parts that navigate (menus, previous and next) and without

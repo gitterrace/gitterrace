@@ -42,6 +42,15 @@ const FONTS: [(&str, &str); 3] = [
 pub const SITE_DIR: &str = "target/site";
 
 /// The path of `rel` in the built site.
+/// Every `attr="value"` of `html`, in order.
+fn attrs<'a>(html: &'a str, attr: &str) -> Vec<&'a str> {
+    let pat = format!(" {attr}=\"");
+    html.split(&pat)
+        .skip(1)
+        .filter_map(|r| r.split_once('"').map(|v| v.0))
+        .collect()
+}
+
 pub fn at(rel: &str) -> String {
     format!("{SITE_DIR}/{rel}")
 }

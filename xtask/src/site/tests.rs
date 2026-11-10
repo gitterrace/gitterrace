@@ -175,15 +175,6 @@ fn install_tabs_pair_every_radio_with_a_panel() {
     }
 }
 
-/// Every `attr="value"` of `html`, in order.
-pub(super) fn attrs<'a>(html: &'a str, attr: &str) -> Vec<&'a str> {
-    let pat = format!(" {attr}=\"");
-    html.split(&pat)
-        .skip(1)
-        .filter_map(|r| r.split_once('"').map(|v| v.0))
-        .collect()
-}
-
 /// Every relative link, image and `#anchor` of the generated pages that does not resolve to a
 /// generated file or to an id on the page it names. `pages` is (site path, content).
 pub(super) fn unresolved(pages: &[(String, String)], files: &[String]) -> Vec<String> {

@@ -2,7 +2,8 @@
 //! the 404 page, `sitemap.xml` and the stylesheet. Each check is a function over data, run on the
 //! real output by one test and on a planted fault by another, so it is seen to go red.
 
-use crate::site::tests::{attrs, generated, unresolved};
+use crate::site::attrs;
+use crate::site::tests::{generated, unresolved};
 use crate::site::*;
 
 /// The text of the built file at `path` (relative to `site/`).

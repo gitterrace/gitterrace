@@ -11,7 +11,7 @@ use anyhow::{Context as _, Result};
 use crate::docs_index::{normalize, on_site};
 use crate::out::Out;
 use crate::site::docs::page_path;
-use crate::site::{SITE_DIR, guards};
+use crate::site::{SITE_DIR, attrs, guards};
 
 /// Files in the built site that no generator writes but that belong there: the link preview
 /// PNG files, which `make site-render` adds before a deploy.
@@ -110,15 +110,6 @@ pub(super) fn leftovers(tree: &Tree, written: &BTreeSet<String>, docs: &[String]
         ));
     }
     bad
-}
-
-/// Every `attr="value"` of `html`, in order.
-fn attrs<'a>(html: &'a str, attr: &str) -> Vec<&'a str> {
-    let pat = format!(" {attr}=\"");
-    html.split(&pat)
-        .skip(1)
-        .filter_map(|r| r.split_once('"').map(|v| v.0))
-        .collect()
 }
 
 /// Every place a page links or loads: `href`, `src` and each URL of a `srcset`.
