@@ -84,3 +84,48 @@ async fn concurrent_requests_for_one_cold_page_render_it_once() {
         "no render lock left behind"
     );
 }
+
+/// Walks of HEAD's counted sets so far, over the tables every unfiltered page of HEAD shares.
+fn walks(app: &App) -> usize {
+    let head = app.repo.resolve("HEAD").expect("head");
+    let src = app.source(&head).expect("source").expect("ready");
+    src.run(|s| {
+        crate::fmt::with_rev("HEAD", || {
+            let all: super::Src = Arc::clone(s) as super::Src;
+            super::insights(app, &all, app.defaults().into_options()).walks()
+        })
+    })
+    .expect("run")
+}
+
+/// Guard class: work per page, counted. A cold activity page walks its counted set once,
+/// whatever sections it holds: red at 9 walks when commit types and code frequency each
+/// streamed the set per reader. Second catch: a new section with a walk of its own.
+#[tokio::test]
+async fn a_cold_activity_page_walks_its_counted_set_once() {
+    let dir = tempfile::tempdir().expect("tmp");
+    let p = gitterrace_testkit::Fixture::init(dir.path())
+        .write("a/x.rs", "a\n")
+        .commit("feat(a): one")
+        .write("b/y.rs", "b\n")
+        .commit("fix(b): two")
+        .path()
+        .to_owned();
+    let repo = gitterrace_git::Repo::discover(&p).expect("repo");
+    let index = gitterrace_index::Index::open(&repo).expect("index");
+    let app = Arc::new(App::new(repo, index));
+    app.index
+        .update(&app.repo, "HEAD", &|_| {})
+        .expect("update");
+    app.mark_ready();
+    let router = crate::routes::router(Arc::clone(&app));
+    let before = walks(&app);
+    let (status, body) = gitterrace_testkit::get(&router, "/stats").await;
+    assert_eq!(status, 200, "{body}");
+    assert!(body.contains("id=\"types\""), "the types section rendered");
+    assert_eq!(
+        walks(&app) - before,
+        1,
+        "walks of the counted set for one cold /stats"
+    );
+}

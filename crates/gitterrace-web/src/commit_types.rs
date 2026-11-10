@@ -12,13 +12,13 @@ use std::collections::HashMap;
 
 use askama::Template;
 use gitterrace_index::feed::{CommitRow as SrcRow, InsightsSource, LabelId};
-use gitterrace_index::{Label, LabelCount, Period, Selection};
+use gitterrace_index::{ActivityFold, Counted, LabelCount, Selection};
 
 use crate::{
     charts,
     filter::{Dim, Filter, NO_SCOPE},
     fmt::{self, href},
-    insights::{InsightsQuery, Kpi, Src, counted, insights, page_scope, period_of},
+    insights::{InsightsQuery, Kpi},
     views::{self, CommitRow, Row},
 };
 
@@ -278,23 +278,17 @@ fn page_link(f: &Filter, n: usize) -> String {
 /// The section's markup for the commits `q` selects, at commit-list page `page`.
 pub(crate) fn section(
     a: &crate::app::App,
-    all: &Src,
     q: &InsightsQuery,
     page: Option<&str>,
+    set: &Counted<'_>,
+    fold: &ActivityFold,
 ) -> String {
     let f = &q.filter;
-    let d = a.defaults();
-    let period = period_of(q, &d, Period::All);
-    let scope = page_scope(q, &d, period);
-    let ins = insights(a, all, scope.options().clone());
-    let set = counted(&ins, &scope, all);
-    let src = ins.source();
-    let recs: Vec<SrcRow> = set.stream().collect();
-    let sum = set.totals();
+    let src = set.insights().source();
+    let recs: Vec<SrcRow> = fold.rows.clone();
+    let sum = &fold.summary.current;
     let n = sum.commits;
-    let people = set
-        .contributors(gitterrace_index::Metric::Commits)
-        .contributors;
+    let people = &fold.people.contributors;
     let size = if n == 0 {
         0
     } else {
@@ -311,8 +305,7 @@ pub(crate) fn section(
         Kpi("Average commit", fmt::count(size, "line", "lines")),
     ];
 
-    let kind_counts = set.per_label(Label::Kind).0;
-    let scope_counts = set.per_label(Label::Scope).0;
+    let (kind_counts, scope_counts) = (&fold.kinds.0, &fold.scopes.0);
     let (kinds, mx) = if f.kind().is_some() {
         (
             Vec::new(),
@@ -323,15 +316,17 @@ pub(crate) fn section(
         )
     } else {
         (
-            label_rows(&kind_counts, |l| f.link(BASE, Dim::Kind, l)),
-            matrix(src, &recs, &kind_counts, &scope_counts, f),
+            label_rows(kind_counts, |l| f.link(BASE, Dim::Kind, l)),
+            matrix(src, &recs, kind_counts, scope_counts, f),
         )
     };
 
     let by_scope = f.kind().is_some();
-    let over = set
-        .per_label(if by_scope { Label::Scope } else { Label::Kind })
-        .1;
+    let over = if by_scope {
+        &fold.scopes.1
+    } else {
+        &fold.kinds.1
+    };
     let unit = set.axis().unit().noun();
     let (over_title, over_hint) = if by_scope {
         (
@@ -352,12 +347,12 @@ pub(crate) fn section(
             hint: "The part of the code a commit says it touches, from type(scope). Click one to \
                 narrow to it. None means no scope given.",
             lines: false,
-            rows: label_rows(&scope_counts, |l| f.link(BASE, Dim::Scope, l)),
+            rows: label_rows(scope_counts, |l| f.link(BASE, Dim::Scope, l)),
         });
     }
-    let dirs = set
-        .per_dir()
-        .into_iter()
+    let dirs = fold
+        .dirs
+        .iter()
         // Only the first LIST rows render: links for the rest cost most of a cold build.
         .take(LIST)
         .map(|d| {
@@ -370,7 +365,7 @@ pub(crate) fn section(
                 if d.path == "." {
                     "(repository root)".to_owned()
                 } else {
-                    d.path
+                    d.path.clone()
                 },
                 h,
                 d.commits,
@@ -386,9 +381,9 @@ pub(crate) fn section(
         lines: true,
         rows: churn_rows(dirs),
     });
-    let files = set
-        .per_file()
-        .into_iter()
+    let files = fold
+        .files
+        .iter()
         .take(LIST)
         .map(|x| {
             (
@@ -481,7 +476,7 @@ pub(crate) fn section(
         })
         .collect();
 
-    let over_time = charts::stacked(&over_title, &over);
+    let over_time = charts::stacked(&over_title, over);
     TypesSection {
         kpis,
         kinds,

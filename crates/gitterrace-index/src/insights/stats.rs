@@ -2,9 +2,9 @@
 //! here they count non-merge commits by people who count under the options, over the files the
 //! path filter keeps, inside the period's window.
 
-use crate::feed::{CommitRow, FileRow, PathId, Rank};
+use crate::feed::{CommitRow, InsightsSource, PathId, Rank};
 use crate::insights::fasthash::FastMap;
-use crate::insights::{Counted, Insights, Period, Scope, ScopeParams, Selection};
+use crate::insights::{Counted, Insights, Item, Period, Reducer, Scope, ScopeParams, Selection};
 
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
 pub struct FileChurn {
@@ -112,41 +112,40 @@ impl Insights<'_> {
 impl Counted<'_> {
     /// Every counted file with its churn, most commits first, then path.
     pub fn per_file(&self) -> Vec<FileChurn> {
-        struct Acc {
-            /// Last commit counted, so a commit counts once per file in O(1).
-            stamp: Rank,
-            time: i64,
-            commits: usize,
-            additions: u64,
-            deletions: u64,
-        }
-        let ins = self.insights();
-        let src = ins.source();
-        let mut map: FastMap<PathId, Acc> = FastMap::default();
-        for (rank, time, rows) in self.commit_rows() {
-            for f in &rows {
-                let Some(l) = ins.row_lines(f) else {
-                    continue;
-                };
-                let a = map.entry(f.path).or_insert(Acc {
-                    stamp: Rank(u32::MAX),
-                    time,
-                    commits: 0,
-                    additions: 0,
-                    deletions: 0,
-                });
-                if a.stamp != rank {
-                    a.stamp = rank;
-                    a.commits += 1;
-                }
-                a.additions += u64::from(l.add);
-                a.deletions += u64::from(l.del);
-                a.time = a.time.max(time);
-            }
-        }
+        let mut r = FileTally::default();
+        self.reduce(&mut [&mut r]);
+        r.finish(self)
+    }
+
+    /// Churn per containing directory, most commits first, then path.
+    pub fn per_dir(&self) -> Vec<DirChurn> {
+        let mut r = DirTally::default();
+        self.reduce(&mut [&mut r]);
+        r.finish()
+    }
+}
+
+struct FileAcc {
+    /// Last commit counted, so a commit counts once per file in O(1).
+    stamp: Rank,
+    time: i64,
+    commits: usize,
+    additions: u64,
+    deletions: u64,
+}
+
+/// Churn per counted file, see [`Counted::per_file`].
+#[derive(Default)]
+pub struct FileTally {
+    map: FastMap<PathId, FileAcc>,
+}
+
+impl FileTally {
+    pub fn finish(self, c: &Counted<'_>) -> Vec<FileChurn> {
+        let src = c.insights().source();
         // Names in id order: string blocks hold ids in runs, so this reads each block once
         // where map order jumps between them and, past the block cache, re-reads per path.
-        let mut ids: Vec<(PathId, Acc)> = map.into_iter().collect();
+        let mut ids: Vec<(PathId, FileAcc)> = self.map.into_iter().collect();
         ids.sort_unstable_by_key(|(id, _)| *id);
         let mut out: Vec<FileChurn> = ids
             .into_iter()
@@ -161,74 +160,109 @@ impl Counted<'_> {
         out.sort_by(|a, b| b.commits.cmp(&a.commits).then_with(|| a.path.cmp(&b.path)));
         out
     }
+}
 
-    /// Churn per containing directory, most commits first, then path.
-    pub fn per_dir(&self) -> Vec<DirChurn> {
-        struct Acc {
-            stamp: Rank,
-            churn: DirChurn,
-        }
-        let ins = self.insights();
-        let src = ins.source();
-        let mut dirs: Vec<Acc> = Vec::new();
-        let mut dir_slot: FastMap<String, usize> = FastMap::default();
-        // Directory slot per path id, resolved once. A path belongs to one directory, so the
-        // first sight of a path is a new file of its directory.
-        let mut path_dir: FastMap<PathId, usize> = FastMap::default();
-        for (rank, _, rows) in self.commit_rows() {
-            for f in &rows {
-                let Some(l) = ins.row_lines(f) else {
-                    continue;
-                };
-                #[expect(
-                    clippy::option_if_let_else,
-                    clippy::single_match_else,
-                    reason = "the miss arm inserts into path_dir, which get() still borrows in a \
-                        closure"
-                )]
-                let (slot, new_path) = match path_dir.get(&f.path) {
-                    Some(s) => (*s, false),
-                    None => {
-                        let path = src.path(f.path).unwrap_or_default();
-                        let dir = path.rsplit_once('/').map_or(".", |(d, _)| d);
-                        let s = *dir_slot.entry(dir.to_owned()).or_insert_with(|| {
-                            dirs.push(Acc {
-                                stamp: Rank(u32::MAX),
-                                churn: DirChurn {
-                                    path: dir.to_owned(),
-                                    commits: 0,
-                                    files: 0,
-                                    additions: 0,
-                                    deletions: 0,
-                                },
-                            });
-                            dirs.len() - 1
-                        });
-                        path_dir.insert(f.path, s);
-                        (s, true)
-                    }
-                };
-                let a = &mut dirs[slot];
-                if a.stamp != rank {
-                    a.stamp = rank;
-                    a.churn.commits += 1;
-                }
-                if new_path {
-                    a.churn.files += 1;
-                }
-                a.churn.additions += u64::from(l.add);
-                a.churn.deletions += u64::from(l.del);
+impl Reducer for FileTally {
+    fn needs_rows(&self) -> bool {
+        true
+    }
+
+    fn add(&mut self, c: &Counted<'_>, item: &Item) {
+        let ins = c.insights();
+        let (rank, time) = (item.commit.rank, item.commit.time);
+        for f in &item.rows {
+            let Some(l) = ins.row_lines(f) else {
+                continue;
+            };
+            let a = self.map.entry(f.path).or_insert(FileAcc {
+                stamp: Rank(u32::MAX),
+                time,
+                commits: 0,
+                additions: 0,
+                deletions: 0,
+            });
+            if a.stamp != rank {
+                a.stamp = rank;
+                a.commits += 1;
             }
+            a.additions += u64::from(l.add);
+            a.deletions += u64::from(l.del);
+            a.time = a.time.max(time);
         }
-        let mut out: Vec<DirChurn> = dirs.into_iter().map(|a| a.churn).collect();
+    }
+}
+
+struct DirAcc {
+    stamp: Rank,
+    churn: DirChurn,
+}
+
+/// Churn per containing directory, see [`Counted::per_dir`].
+#[derive(Default)]
+pub struct DirTally {
+    dirs: Vec<DirAcc>,
+    dir_slot: FastMap<String, usize>,
+    /// Directory slot per path id, resolved once. A path belongs to one directory, so the
+    /// first sight of a path is a new file of its directory.
+    path_dir: FastMap<PathId, usize>,
+}
+
+impl DirTally {
+    pub fn finish(self) -> Vec<DirChurn> {
+        let mut out: Vec<DirChurn> = self.dirs.into_iter().map(|a| a.churn).collect();
         out.sort_by(|a, b| b.commits.cmp(&a.commits).then_with(|| a.path.cmp(&b.path)));
         out
     }
 
-    /// The counted commits with their kept rows and author time, streamed. The time comes
-    /// from the row the stream read, never a second lookup by rank per commit.
-    fn commit_rows(&self) -> impl Iterator<Item = (Rank, i64, Vec<FileRow>)> + '_ {
-        self.rows().map(|(c, rows)| (c.rank, c.time, rows))
+    fn slot(&mut self, src: &dyn InsightsSource, id: PathId) -> (usize, bool) {
+        if let Some(s) = self.path_dir.get(&id) {
+            return (*s, false);
+        }
+        let path = src.path(id).unwrap_or_default();
+        let dir = path.rsplit_once('/').map_or(".", |(d, _)| d);
+        let dirs = &mut self.dirs;
+        let s = *self.dir_slot.entry(dir.to_owned()).or_insert_with(|| {
+            dirs.push(DirAcc {
+                stamp: Rank(u32::MAX),
+                churn: DirChurn {
+                    path: dir.to_owned(),
+                    commits: 0,
+                    files: 0,
+                    additions: 0,
+                    deletions: 0,
+                },
+            });
+            dirs.len() - 1
+        });
+        self.path_dir.insert(id, s);
+        (s, true)
+    }
+}
+
+impl Reducer for DirTally {
+    fn needs_rows(&self) -> bool {
+        true
+    }
+
+    fn add(&mut self, c: &Counted<'_>, item: &Item) {
+        let ins = c.insights();
+        let rank = item.commit.rank;
+        for f in &item.rows {
+            let Some(l) = ins.row_lines(f) else {
+                continue;
+            };
+            let (slot, new_path) = self.slot(ins.source(), f.path);
+            let a = &mut self.dirs[slot];
+            if a.stamp != rank {
+                a.stamp = rank;
+                a.churn.commits += 1;
+            }
+            if new_path {
+                a.churn.files += 1;
+            }
+            a.churn.additions += u64::from(l.add);
+            a.churn.deletions += u64::from(l.del);
+        }
     }
 }
 

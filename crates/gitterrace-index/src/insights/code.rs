@@ -1,4 +1,4 @@
-use crate::insights::{BucketUnit, Counted, Insights, Item, Lines, Period, Reducer};
+use crate::insights::{BucketUnit, Counted, Insights, Item, Lines, Period, Reducer, TimeAxis};
 
 /// Additions and deletions of one bucket, moves and (by default) whitespace excluded.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
@@ -80,8 +80,35 @@ impl Counted<'_> {
     /// [`Counted::frequency`] and the lines of every counted commit, in one pass. The totals
     /// never come from the buckets: a commit outside the axis still counts in them.
     pub fn frequency_totals(&self) -> (BucketUnit, Vec<Frequency>, LineTotals) {
-        let axis = self.axis();
-        let mut out: Vec<Frequency> = axis
+        let mut r = FrequencyTally::new(self.axis());
+        self.reduce(&mut [&mut r]);
+        let (unit, out, t, _) = r.finish(self);
+        (unit, out, t)
+    }
+
+    /// Rolling rework read at the end of every bucket. The window is an eighth of the counted
+    /// commits, between 10 and 100: a week of a dozen commits must not average over a hundred
+    /// older ones, and a big history needs the 100 to smooth out.
+    pub fn rework(&self) -> Rework {
+        let mut r = FrequencyTally::new(self.axis());
+        self.reduce(&mut [&mut r]);
+        r.finish(self).3
+    }
+}
+
+/// Code frequency, its line totals and the rolling rework, from one pass: see
+/// [`Counted::frequency_totals`] and [`Counted::rework`].
+pub struct FrequencyTally {
+    out: Vec<Frequency>,
+    sum: LineTotals,
+    /// Bucket and lines of every counted commit, in stream order, 16 B each: rework reads
+    /// them twice.
+    slots: Vec<(Option<usize>, Lines)>,
+}
+
+impl FrequencyTally {
+    pub fn new(axis: &TimeAxis) -> Self {
+        let out = axis
             .names()
             .map(|(key, label)| Frequency {
                 key,
@@ -91,23 +118,18 @@ impl Counted<'_> {
                 rewritten: 0,
             })
             .collect();
-        let mut r = Bucketed(&mut out);
-        let mut t = Summed(LineTotals::default());
-        self.reduce(&mut [&mut r, &mut t]);
-        (axis.unit(), out, t.0)
+        Self {
+            out,
+            sum: LineTotals::default(),
+            slots: Vec::new(),
+        }
     }
 
-    /// Rolling rework read at the end of every bucket. The window is an eighth of the counted
-    /// commits, between 10 and 100: a week of a dozen commits must not average over a hundred
-    /// older ones, and a big history needs the 100 to smooth out.
-    pub fn rework(&self) -> Rework {
-        let axis = self.axis();
-        // Two passes over the counted list: its slot and lines per commit, 16 B each.
-        let counted: Vec<(Option<usize>, Lines)> = {
-            let mut c = Slots(Vec::new());
-            self.reduce(&mut [&mut c]);
-            c.0
-        };
+    /// The buckets, their totals (a commit outside the axis still counts in them) and the
+    /// rework series over `c`'s axis.
+    pub fn finish(self, c: &Counted<'_>) -> (BucketUnit, Vec<Frequency>, LineTotals, Rework) {
+        let axis = c.axis();
+        let counted = self.slots;
         let window = (counted.len() / 8).clamp(10, 100);
         // Prefix sums make every window O(1).
         let mut pre = vec![(0u64, 0u64, 0u64); counted.len() + 1];
@@ -148,44 +170,28 @@ impl Counted<'_> {
                 }
             })
             .collect();
-        Rework {
+        let rework = Rework {
             window,
             unit: axis.unit(),
             points,
-        }
+        };
+        (axis.unit(), self.out, self.sum, rework)
     }
 }
 
-/// Lines into the bucket of each commit's local day.
-struct Bucketed<'o>(&'o mut [Frequency]);
-
-impl Reducer for Bucketed<'_> {
+impl Reducer for FrequencyTally {
     fn add(&mut self, c: &Counted<'_>, item: &Item) {
-        if let Some(w) = c.axis().slot_day(item.day).and_then(|s| self.0.get_mut(s)) {
-            w.additions += u64::from(item.lines.add);
-            w.deletions += u64::from(item.lines.del);
-            w.rewritten += u64::from(item.lines.rewritten);
+        let slot = c.axis().slot_day(item.day);
+        let l = item.lines;
+        if let Some(w) = slot.and_then(|s| self.out.get_mut(s)) {
+            w.additions += u64::from(l.add);
+            w.deletions += u64::from(l.del);
+            w.rewritten += u64::from(l.rewritten);
         }
-    }
-}
-
-/// Lines of every counted commit.
-struct Summed(LineTotals);
-
-impl Reducer for Summed {
-    fn add(&mut self, _: &Counted<'_>, item: &Item) {
-        self.0.additions += u64::from(item.lines.add);
-        self.0.deletions += u64::from(item.lines.del);
-        self.0.rewritten += u64::from(item.lines.rewritten);
-    }
-}
-
-/// Bucket and lines of every counted commit, in stream order.
-struct Slots(Vec<(Option<usize>, Lines)>);
-
-impl Reducer for Slots {
-    fn add(&mut self, c: &Counted<'_>, item: &Item) {
-        self.0.push((c.axis().slot_day(item.day), item.lines));
+        self.sum.additions += u64::from(l.add);
+        self.sum.deletions += u64::from(l.del);
+        self.sum.rewritten += u64::from(l.rewritten);
+        self.slots.push((slot, l));
     }
 }
 

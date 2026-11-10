@@ -12,7 +12,7 @@ use crate::{
     error::Result,
     filter::{Chip, FilterBar},
     fmt::{self},
-    insights::{InsightsQuery, Kpi, cached_keyed, insights, period_of},
+    insights::{InsightsQuery, Kpi, cached_keyed, insights, page_scope, period_of},
     pagehead::PageHead,
     routes::Shared,
     views::Chrome,
@@ -271,7 +271,16 @@ pub(crate) async fn page(
         let scope = scope_of(&q, &d, period, sel);
         let ins = insights(a, r, scope.options().clone());
         let counted = crate::insights::counted(&ins, &scope, r);
-        let (s, rhythm) = counted.activity();
+        // One walk feeds the page and both sections. The sections count the page's period
+        // without the range, so a selected range gives them a fold of their own.
+        let fold = counted.activity_fold();
+        let plain = page_scope(&q, &d, period);
+        let plain_set = crate::insights::counted(&ins, &plain, r);
+        let plain_fold = sel.map(|_| plain_set.activity_fold());
+        let (sec_set, sec_fold) = plain_fold
+            .as_ref()
+            .map_or((&counted, &fold), |f| (&plain_set, f));
+        let (s, rhythm) = (&fold.summary, &fold.rhythm);
         let prev = s.previous.as_ref();
         let rows = pulse_rows(&s.current, prev, scope.options().include_merges);
         let lead = crate::lead::activity(
@@ -302,12 +311,12 @@ pub(crate) async fn page(
             range_card(from, to, &rhythm.by_weekday)
         });
         let types_html = if crate::features::pages().contains(&"types") {
-            crate::commit_types::section(a, r, &q, lp.page.as_deref())
+            crate::commit_types::section(a, &q, lp.page.as_deref(), sec_set, sec_fold)
         } else {
             String::new()
         };
         let frequency_html = if crate::features::pages().contains(&"frequency") {
-            crate::frequency::section(a, r, &q)
+            crate::frequency::section(sec_fold)
         } else {
             String::new()
         };
@@ -321,7 +330,7 @@ pub(crate) async fn page(
             ]),
             false,
         );
-        let kpis = activity_kpis(&s.current, &rhythm);
+        let kpis = activity_kpis(&s.current, rhythm);
         ActivityPage {
             kpis,
             types: types_html,

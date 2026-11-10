@@ -5,6 +5,8 @@ use crate::insights::{
 
 mod people;
 
+pub use people::ContributorTally;
+
 pub use gitterrace_types::Period;
 
 /// What the contributors list is ordered and charted by.
@@ -212,8 +214,18 @@ impl Counted<'_> {
         let mut series = Series::new(self.axis());
         let mut when = When::default();
         self.reduce(&mut [&mut totals, &mut series, &mut when]);
+        self.activity_of(totals, series, &when)
+    }
+
+    /// [`Counted::activity`] from reducers another pass fed.
+    pub(crate) fn activity_of(
+        &self,
+        totals: Totals,
+        series: Series,
+        when: &When,
+    ) -> (PeriodSummary, Rhythm) {
         let s = self.summary_of(self.scope().period(), totals.finish());
-        (s, self.rhythm_of(series, &when))
+        (s, self.rhythm_of(series, when))
     }
 
     fn summary_as(&self, period: Period) -> PeriodSummary {

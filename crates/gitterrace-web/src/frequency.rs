@@ -2,12 +2,9 @@
 //! rolling rework.
 
 use askama::Template;
-use gitterrace_index::{Period, rework_share, rework_verdict};
+use gitterrace_index::{ActivityFold, rework_share, rework_verdict};
 
-use crate::{
-    charts, fmt,
-    insights::{InsightsQuery, Kpi, Src, counted, insights, page_scope, period_of},
-};
+use crate::{charts, fmt, insights::Kpi};
 
 #[derive(Template)]
 #[template(path = "frequency_section.html")]
@@ -21,20 +18,16 @@ struct FrequencySection {
 }
 
 /// The section's markup for the commits `q` selects.
-pub(crate) fn section(a: &crate::app::App, r: &Src, q: &InsightsQuery) -> String {
+pub(crate) fn section(fold: &ActivityFold) -> String {
     {
-        let d = a.defaults();
-        let period = period_of(q, &d, Period::All);
-        let scope = page_scope(q, &d, period);
-        let ins = insights(a, r, scope.options().clone());
-        let set = counted(&ins, &scope, r);
-        let (unit, weeks, sum) = set.frequency_totals();
+        let (unit, weeks, sum) = &fold.frequency;
+        let (unit, sum) = (*unit, *sum);
         let (add, del, rew) = (sum.additions, sum.deletions, sum.rewritten);
         let points: Vec<_> = weeks
             .iter()
             .map(|w| (w.label.clone(), w.additions, w.deletions))
             .collect();
-        let rw = set.rework();
+        let rw = &fold.rework;
         let verdict = rw.points.iter().rev().find_map(|p| p.share).map_or_else(
             || "No changes in this selection.".to_owned(),
             |s| {

@@ -6,6 +6,7 @@ use std::collections::BTreeSet;
 use crate::insights::fasthash::FastMap;
 use crate::insights::{
     Contributor, ContributorReport, Counted, Item, Metric, Period, Reducer, Scope, ScopeParams,
+    TimeAxis,
 };
 
 struct Acc {
@@ -20,13 +21,14 @@ struct Acc {
     dels: Vec<u32>,
 }
 
-struct People {
+/// Contributors over the stream, see [`Counted::contributors`].
+pub struct ContributorTally {
     metric: Metric,
     len: usize,
     acc: FastMap<usize, Acc>,
 }
 
-impl Reducer for People {
+impl Reducer for ContributorTally {
     fn add(&mut self, c: &Counted<'_>, item: &Item) {
         let len = self.len;
         let t = item.commit.time;
@@ -66,19 +68,29 @@ impl Counted<'_> {
     /// counted under the same options, over the whole history and whatever the selection,
     /// lies on or after the first counted day.
     pub fn contributors(&self, metric: Metric) -> ContributorReport {
-        contributors(self, metric)
+        let mut people = ContributorTally::new(metric, self.axis());
+        self.reduce(&mut [&mut people]);
+        people.finish(self)
     }
 }
 
-fn contributors(set: &Counted<'_>, metric: Metric) -> ContributorReport {
-    let ins = set.insights();
-    let axis = set.axis();
-    let mut people = People {
-        metric,
-        len: axis.len(),
-        acc: FastMap::default(),
-    };
-    set.reduce(&mut [&mut people]);
+impl ContributorTally {
+    pub fn new(metric: Metric, axis: &TimeAxis) -> Self {
+        Self {
+            metric,
+            len: axis.len(),
+            acc: FastMap::default(),
+        }
+    }
+
+    /// The report of what the stream fed in, over the set `set` it came from.
+    pub fn finish(self, set: &Counted<'_>) -> ContributorReport {
+        report(self, set)
+    }
+}
+
+fn report(people: ContributorTally, set: &Counted<'_>) -> ContributorReport {
+    let (ins, axis, metric) = (set.insights(), set.axis(), people.metric);
     let start = *set.days().start();
     let fixed = set.scope().period().days().is_some() || set.scope().range().is_some();
     let mut first_day: FastMap<usize, i64> = FastMap::default();

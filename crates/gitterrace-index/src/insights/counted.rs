@@ -233,6 +233,7 @@ impl<'a> Counted<'a> {
         let src = self.ins.source();
         let path = self.scope.selection().path().is_some();
         let need = with_rows || path;
+        self.ins.count_walk();
         let mut base = src
             .commits_in(CommitRange::Time(self.span.clone()))
             .filter(move |c| self.scope.admits_in(self.ins, &self.days, c));

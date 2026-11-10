@@ -17,6 +17,7 @@ pub(crate) mod fasthash;
 mod figure;
 pub(crate) mod files;
 mod filter;
+mod fold;
 mod format;
 mod headfiles;
 mod lang;
@@ -39,7 +40,9 @@ use crate::feed::{self, CommitRange, CommitRow, FileRow, IdentId, InsightsSource
 
 pub use accel::{Accel, NoAccel, ReducerKind, ReducerOut};
 pub use axis::{BucketUnit, MAX_BUCKETS, TimeAxis};
-pub use code::{Frequency, LineTotals, Rework, ReworkPoint, rework_share, rework_verdict};
+pub use code::{
+    Frequency, FrequencyTally, LineTotals, Rework, ReworkPoint, rework_share, rework_verdict,
+};
 pub use compare::{Comparison, LangDelta, RawCommit};
 pub use counted::{
     CHUNK, Counted, Item, LabelTally, PersonTallies, PersonTally, Reducer, Series, Sizes, Totals,
@@ -51,19 +54,21 @@ pub use files::{
     Touch,
 };
 pub use filter::{PathFilter, is_generated};
+pub use fold::ActivityFold;
 pub use format::{count, thousands};
 pub(crate) use headfiles::CACHE_FILE;
 pub use headfiles::{HeadFile, LineCache, head_files};
 pub use lang::{language, language_key};
 pub use people::{People, Person};
 pub use period::{
-    Contributor, ContributorReport, Metric, Period, PeriodStats, PeriodSummary, Rhythm, SeriesPoint,
+    Contributor, ContributorReport, ContributorTally, Metric, Period, PeriodStats, PeriodSummary,
+    Rhythm, SeriesPoint,
 };
 pub use releases::{Cadence, Release, release_tags};
 pub use scope::{CountContext, Scope, ScopeError, ScopeParams};
 pub use select::{OptionParams, Scoped, Selection, under};
 pub use sizes::SizeBucket;
-pub use stats::{DirChurn, FileChurn, Label, LabelBucket, LabelCount};
+pub use stats::{DirChurn, DirTally, FileChurn, FileTally, Label, LabelBucket, LabelCount};
 
 pub(crate) const DAY: i64 = 86_400;
 
@@ -155,6 +160,9 @@ struct Derived {
     /// Path ids of names looked up by the per-file pages (the head tree, 64k on rust), so a
     /// page and its sections pay each lookup once per set, not once per call.
     ids: Mutex<std::collections::HashMap<Arc<str>, Option<PathId>>>,
+    /// Walks of a counted set over these tables, for the tests that count work per page.
+    #[cfg(any(test, feature = "oracle"))]
+    walks: std::sync::atomic::AtomicUsize,
 }
 
 impl<'a> Insights<'a> {
@@ -239,6 +247,23 @@ impl<'a> Insights<'a> {
     pub fn source(&self) -> &dyn InsightsSource {
         self.src.get()
     }
+
+    /// Counted-set walks over these tables so far, shared with every `Insights` of them: what
+    /// a page costs, counted where a timing would be noise.
+    #[cfg(any(test, feature = "oracle"))]
+    pub fn walks(&self) -> usize {
+        self.d.walks.load(std::sync::atomic::Ordering::Relaxed)
+    }
+
+    #[cfg(any(test, feature = "oracle"))]
+    fn count_walk(&self) {
+        self.d
+            .walks
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    }
+
+    #[cfg(not(any(test, feature = "oracle")))]
+    const fn count_walk(&self) {}
 
     /// True when path statistics leave `path` out.
     pub fn skips(&self, path: &str) -> bool {
@@ -443,6 +468,8 @@ impl Derived {
             newest: OnceLock::new(),
             tip: OnceLock::new(),
             ids: Mutex::default(),
+            #[cfg(any(test, feature = "oracle"))]
+            walks: std::sync::atomic::AtomicUsize::new(0),
         }
     }
 }
