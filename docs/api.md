@@ -7,7 +7,7 @@ are `{"error": {"code", "message"}}`, codes listed below. Every response carries
 an `ETag` built from HEAD, every ref's target, the cache format, how far the
 cache is filled and the configured counting defaults, so moving any branch or
 tag, the cache catching up or a changed `insights` setting invalidates it.
-`If-None-Match` gets 304. JSON is `snake_case`. The same endpoints as `OpenAPI`
+`If-None-Match` gets 304. JSON is `snake_case`. The same endpoints as OpenAPI
 3.1: [openapi.json](openapi.json).
 
 The API of each repository lives at `/r/{name}/api/v1`.
@@ -17,18 +17,19 @@ The API of each repository lives at `/r/{name}/api/v1`.
 | 400 | `bad_request` | a parameter is missing or invalid |
 | 404 | `rev_not_found` | the revision does not exist |
 | 404 | `path_not_found` | the path does not exist at the revision |
+| 409 | `needs_reindex` | the revision is too far from the indexed branch to answer without a reindex |
 | 500 | `git` | reading the repository failed |
 | 500 | `index` | reading the insights cache failed |
 | 500 | `internal` | the server failed |
-| 503 | `index_unreadable` | the insights cache failed a read and is being rebuilt; retry shortly |
-| 503 | `index_newer` | a newer gitterrace owns the insights cache; run it, or delete the cache to rebuild |
-| 409 | `needs_reindex` | the revision is too far from the indexed branch to answer without a reindex |
+| 503 | `index_unreadable` | the insights cache failed a read and is being rebuilt, retry shortly |
+| 503 | `index_newer` | a newer gitterrace owns the insights cache: run that one, or delete the cache to rebuild |
 
 A 5xx `message` is always the same fixed text. The details go to the server log.
 
 Answers are capped so one file cannot flood a client: `log` at 500 per page,
-`blob` at 5000 lines and 256 KiB, `blame` at 5000 lines, each with `truncated`
-when cut. The `[api]` section of `config.toml` sets each cap.
+`blob` at 5000 lines and 256 KiB, `blame` at 5000 lines, `commits` at 20000 diff
+lines, each with `truncated` when cut. The `[api]` section of `config.toml` sets
+each cap.
 
 ## HTTP (`/api/v1`)
 
@@ -52,25 +53,26 @@ when cut. The `[api]` section of `config.toml` sets each cap.
 
 - `rev` (string): Revision to read, default `HEAD`.
 - `path` (string): Only commits touching this path.
-- `page` (integer): 1-based page, default 1.
-- `per_page` (integer): Page size, default 50, capped.
+- `page` (integer): 1-based page, default `1`.
+- `per_page` (integer): Page size, default `50`, at most `api.log_page_commits`.
 
 `/commits/{id}`: One commit with its diff.
 
-- `diff` (boolean): Include hunks, default true.
-- `max_lines` (integer): Cap on diff lines.
+- `diff` (boolean): Include hunks, default `true`.
+- `max_lines` (integer): Most diff lines, at most `api.diff_lines`.
 
 `/tree`: One directory level.
 
 - `rev` (string): Revision to read, default `HEAD`.
-- `path` (string): Repository-relative path.
+- `path` (string): Directory to list, relative to the repository root, default
+  the root.
 
 `/blob`: File text at a revision.
 
 - `rev` (string): Revision to read, default `HEAD`.
 - `path` (string, required): File to read.
-- `start_line` (integer): First line of the window.
-- `limit` (integer): Lines in the window, capped.
+- `start_line` (integer): First line of the window, 1-based, default `1`.
+- `limit` (integer): Lines in the window, at most `api.blob_lines`.
 
 `/blame`: Per-line authorship.
 
@@ -85,7 +87,7 @@ counts them.
   ending at the newest commit. Sets the bucket unit.
 - `type` (string): Only commits of this conventional type, `other` for none.
 - `scope` (string): Only commits of this scope, `none` for none.
-- `author` (string): Only commits by this e-mail or name.
+- `author` (string): Only commits by this email or name.
 - `path` (string): Only files under this directory.
 - `bots` (string): `1` counts bot accounts, `0` leaves them out.
 - `merges` (string): `1` counts merge commits as commits, never their lines or
@@ -93,20 +95,20 @@ counts them.
 - `generated` (string): `1` counts lock files and minified output.
 - `ignore` (string): `0` counts paths that `.gitignore` rules out.
 - `ws` (string): `1` counts whitespace-only changes.
-- `exclude` (string): Comma separated globs left out.
+- `exclude` (string): Comma-separated globs left out.
 
 `/insights/{name}`: One insight.
 
 - `rev` (string): Revision to read, default `HEAD`.
 - `period` (string): `1w`, `1m`, `3m`, `1y` or `all` (default): the window,
   ending at the newest commit. Sets the bucket unit.
-- `label` (string): `kind` or `scope`.
+- `label` (string): `kind` (default) or `scope`.
 - `metric` (string): `contributors` only: `commits` (default), `added`,
   `deleted` or `net`. Sets the order and the per-bucket series.
-- `limit` (integer): Cap on rows.
+- `limit` (integer): Most rows.
 - `type` (string): Only commits of this conventional type, `other` for none.
 - `scope` (string): Only commits of this scope, `none` for none.
-- `author` (string): Only commits by this e-mail or name.
+- `author` (string): Only commits by this email or name.
 - `path` (string): Only files under this directory.
 - `bots` (string): `1` counts bot accounts, `0` leaves them out.
 - `merges` (string): `1` counts merge commits as commits, never their lines or
@@ -114,25 +116,26 @@ counts them.
 - `generated` (string): `1` counts lock files and minified output.
 - `ignore` (string): `0` counts paths that `.gitignore` rules out.
 - `ws` (string): `1` counts whitespace-only changes.
-- `exclude` (string): Comma separated globs left out.
+- `exclude` (string): Comma-separated globs left out.
 
 ## Insights
 
 Served at `GET /insights/{name}`. Each page's hints say what its numbers leave
-out.
+out. Every insight takes `rev`, `period` and the counting parameters. The
+summary names any other it takes.
 
 | Name | Summary |
 | --- | --- |
-| `summary` | Commits, authors, files and lines in the period, and in the period before it (period). |
-| `activity` | Commits and lines per bucket, empty ones included, plus the weekday-by-hour punch card. The period sets the unit (period). |
-| `contributors` | People with commits, lines, active days and a per-bucket series, bots flagged (period). |
-| `file_churn` | Per-file commits and lines changed (period, limit). |
-| `dir_churn` | Per-directory commits and lines changed (period, limit). |
-| `label_breakdown` | Conventional-commit type or scope counts (label, period). |
-| `label_over_time` | Type or scope counts per bucket, empty ones included (label, period). |
-| `frequency` | Lines added, removed and rewritten per bucket (period). |
-| `hotspots` | Files of the head tree by changes times the square root of their size (period, limit). |
-| `ownership` | Knowledge share and bus factor per directory two levels deep, weighted by size now (period). |
+| `summary` | Commits, authors, files and lines in the period, and in the period before it. |
+| `activity` | Commits and lines per bucket, empty ones included, plus the weekday-by-hour punch card. The period sets the unit. |
+| `contributors` | People with commits, lines, active days and a per-bucket series, bots flagged. Takes `metric` and `limit`. |
+| `file_churn` | Per-file commits and lines changed. Takes `limit`. |
+| `dir_churn` | Per-directory commits and lines changed. Takes `limit`. |
+| `label_breakdown` | Conventional-commit type or scope counts. Takes `label`. |
+| `label_over_time` | Type or scope counts per bucket, empty ones included. Takes `label`. |
+| `frequency` | Lines added, removed and rewritten per bucket. |
+| `hotspots` | Files of the head tree by changes times the square root of their size. Takes `limit`. |
+| `ownership` | Knowledge share and bus factor per directory two levels deep, weighted by size now. |
 
 ## MCP (stdio)
 
@@ -161,8 +164,8 @@ is read-only unless it says otherwise.
 - `hotspots`: Files of the head tree that change most for their size (changes,
   lines, authors, last change, score = changes times the square root of lines),
   the web Hotspots page's numbers. Use to find risky or central code and where
-  to look first. Optional `period` and `path`. Parameters: `limit?` (integer),
-  `path?` (string), `period?` (string), `repo?` (string), `rev?` (string).
+  to look first. Parameters: `limit?` (integer), `path?` (string), `period?`
+  (string), `repo?` (string), `rev?` (string).
 - `list_repos`: The repositories this server may read and which scope it was
   started with: name (pass it as `repo` to every other tool), path, HEAD, branch
   and newest commit. One that cannot be read shows `available: false` and why.

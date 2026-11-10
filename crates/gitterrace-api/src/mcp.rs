@@ -427,7 +427,7 @@ impl McpServer {
 
     /// Files of the head tree that change most for their size (changes, lines, authors, last
     /// change, score = changes times the square root of lines), the web Hotspots page's numbers.
-    /// Use to find risky or central code and where to look first. Optional `period` and `path`.
+    /// Use to find risky or central code and where to look first.
     #[tool(name = "hotspots", annotations(read_only_hint = true))]
     async fn hotspots(
         &self,

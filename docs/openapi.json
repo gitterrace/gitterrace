@@ -401,12 +401,12 @@
                   "bad_request",
                   "rev_not_found",
                   "path_not_found",
+                  "needs_reindex",
                   "git",
                   "index",
                   "internal",
                   "index_unreadable",
-                  "index_newer",
-                  "needs_reindex"
+                  "index_newer"
                 ],
                 "type": "string"
               },
@@ -1020,7 +1020,7 @@
             }
           },
           {
-            "description": "First line of the window.",
+            "description": "First line of the window, 1-based, default `1`.",
             "in": "query",
             "name": "start_line",
             "required": false,
@@ -1029,7 +1029,7 @@
             }
           },
           {
-            "description": "Lines in the window, capped.",
+            "description": "Lines in the window, at most `api.blob_lines`.",
             "in": "query",
             "name": "limit",
             "required": false,
@@ -1092,7 +1092,7 @@
             }
           },
           {
-            "description": "Include hunks, default true.",
+            "description": "Include hunks, default `true`.",
             "in": "query",
             "name": "diff",
             "required": false,
@@ -1101,7 +1101,7 @@
             }
           },
           {
-            "description": "Cap on diff lines.",
+            "description": "Most diff lines, at most `api.diff_lines`.",
             "in": "query",
             "name": "max_lines",
             "required": false,
@@ -1191,7 +1191,7 @@
             }
           },
           {
-            "description": "Only commits by this e-mail or name.",
+            "description": "Only commits by this email or name.",
             "in": "query",
             "name": "author",
             "required": false,
@@ -1254,7 +1254,7 @@
             }
           },
           {
-            "description": "Comma separated globs left out.",
+            "description": "Comma-separated globs left out.",
             "in": "query",
             "name": "exclude",
             "required": false,
@@ -1379,7 +1379,7 @@
             }
           },
           {
-            "description": "`kind` or `scope`.",
+            "description": "`kind` (default) or `scope`.",
             "in": "query",
             "name": "label",
             "required": false,
@@ -1397,7 +1397,7 @@
             }
           },
           {
-            "description": "Cap on rows.",
+            "description": "Most rows.",
             "in": "query",
             "name": "limit",
             "required": false,
@@ -1424,7 +1424,7 @@
             }
           },
           {
-            "description": "Only commits by this e-mail or name.",
+            "description": "Only commits by this email or name.",
             "in": "query",
             "name": "author",
             "required": false,
@@ -1487,7 +1487,7 @@
             }
           },
           {
-            "description": "Comma separated globs left out.",
+            "description": "Comma-separated globs left out.",
             "in": "query",
             "name": "exclude",
             "required": false,
@@ -1571,7 +1571,7 @@
             }
           },
           {
-            "description": "1-based page, default 1.",
+            "description": "1-based page, default `1`.",
             "in": "query",
             "name": "page",
             "required": false,
@@ -1580,7 +1580,7 @@
             }
           },
           {
-            "description": "Page size, default 50, capped.",
+            "description": "Page size, default `50`, at most `api.log_page_commits`.",
             "in": "query",
             "name": "per_page",
             "required": false,
@@ -1731,7 +1731,7 @@
             }
           },
           {
-            "description": "Repository-relative path.",
+            "description": "Directory to list, relative to the repository root, default the root.",
             "in": "query",
             "name": "path",
             "required": false,

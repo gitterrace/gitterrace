@@ -124,7 +124,7 @@ const SCOPE: Param = p(
     "string",
     "Only commits of this scope, `none` for none.",
 );
-const AUTHOR: Param = p("author", "string", "Only commits by this e-mail or name.");
+const AUTHOR: Param = p("author", "string", "Only commits by this email or name.");
 const UNDER: Param = p("path", "string", "Only files under this directory.");
 const BOTS: Param = p(
     "bots",
@@ -147,8 +147,12 @@ const IGNORE: Param = p(
     "`0` counts paths that `.gitignore` rules out.",
 );
 const WS: Param = p("ws", "string", "`1` counts whitespace-only changes.");
-const EXCLUDE: Param = p("exclude", "string", "Comma separated globs left out.");
-const PATH: Param = p("path", "string", "Repository-relative path.");
+const EXCLUDE: Param = p("exclude", "string", "Comma-separated globs left out.");
+const PATH: Param = p(
+    "path",
+    "string",
+    "Directory to list, relative to the repository root, default the root.",
+);
 
 /// [`ENDPOINTS`] behind a function call: `index` is itself a route in the registry, and naming the
 /// const inside its own body would be a type cycle.
@@ -185,8 +189,12 @@ pub const ENDPOINTS: &[Endpoint] = &[
         params: &[
             REV,
             p("path", "string", "Only commits touching this path."),
-            p("page", "integer", "1-based page, default 1."),
-            p("per_page", "integer", "Page size, default 50, capped."),
+            p("page", "integer", "1-based page, default `1`."),
+            p(
+                "per_page",
+                "integer",
+                "Page size, default `50`, at most `api.log_page_commits`.",
+            ),
         ],
         schema: of::<LogResponse>,
         route: || get(http::log),
@@ -195,8 +203,12 @@ pub const ENDPOINTS: &[Endpoint] = &[
         path: "/commits/{id}",
         summary: "One commit with its diff.",
         params: &[
-            p("diff", "boolean", "Include hunks, default true."),
-            p("max_lines", "integer", "Cap on diff lines."),
+            p("diff", "boolean", "Include hunks, default `true`."),
+            p(
+                "max_lines",
+                "integer",
+                "Most diff lines, at most `api.diff_lines`.",
+            ),
         ],
         schema: of::<CommitResponse>,
         route: || get(http::commit),
@@ -214,8 +226,16 @@ pub const ENDPOINTS: &[Endpoint] = &[
         params: &[
             REV,
             req("path", "string", "File to read."),
-            p("start_line", "integer", "First line of the window."),
-            p("limit", "integer", "Lines in the window, capped."),
+            p(
+                "start_line",
+                "integer",
+                "First line of the window, 1-based, default `1`.",
+            ),
+            p(
+                "limit",
+                "integer",
+                "Lines in the window, at most `api.blob_lines`.",
+            ),
         ],
         schema: of::<BlobResponse>,
         route: || get(http::blob),
@@ -249,14 +269,14 @@ pub const ENDPOINTS: &[Endpoint] = &[
         params: &[
             REV,
             PERIOD,
-            p("label", "string", "`kind` or `scope`."),
+            p("label", "string", "`kind` (default) or `scope`."),
             p(
                 "metric",
                 "string",
                 "`contributors` only: `commits` (default), `added`, `deleted` or `net`. Sets the \
                 order and the per-bucket series.",
             ),
-            p("limit", "integer", "Cap on rows."),
+            p("limit", "integer", "Most rows."),
             TYPE,
             SCOPE,
             AUTHOR,

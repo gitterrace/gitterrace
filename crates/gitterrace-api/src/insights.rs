@@ -44,20 +44,19 @@ pub struct Insight {
 pub const INSIGHTS: &[Insight] = &[
     Insight {
         name: "summary",
-        summary: "Commits, authors, files and lines in the period, and in the period before it \
-            (period).",
+        summary: "Commits, authors, files and lines in the period, and in the period before it.",
         compute: |c, _| val(&c.summary()),
     },
     Insight {
         name: "activity",
         summary: "Commits and lines per bucket, empty ones included, plus the weekday-by-hour \
-            punch card. The period sets the unit (period).",
+            punch card. The period sets the unit.",
         compute: |c, _| val(&c.rhythm()),
     },
     Insight {
         name: "contributors",
-        summary: "People with commits, lines, active days and a per-bucket series, bots flagged \
-            (period).",
+        summary: "People with commits, lines, active days and a per-bucket series, bots flagged. \
+            Takes `metric` and `limit`.",
         compute: |c, q| {
             let m = q
                 .metric
@@ -70,27 +69,27 @@ pub const INSIGHTS: &[Insight] = &[
     },
     Insight {
         name: "file_churn",
-        summary: "Per-file commits and lines changed (period, limit).",
+        summary: "Per-file commits and lines changed. Takes `limit`.",
         compute: |c, q| val(&limited(c.per_file(), q)),
     },
     Insight {
         name: "dir_churn",
-        summary: "Per-directory commits and lines changed (period, limit).",
+        summary: "Per-directory commits and lines changed. Takes `limit`.",
         compute: |c, q| val(&limited(c.per_dir(), q)),
     },
     Insight {
         name: "label_breakdown",
-        summary: "Conventional-commit type or scope counts (label, period).",
+        summary: "Conventional-commit type or scope counts. Takes `label`.",
         compute: |c, q| val(&c.per_label(label(q)?).0),
     },
     Insight {
         name: "label_over_time",
-        summary: "Type or scope counts per bucket, empty ones included (label, period).",
+        summary: "Type or scope counts per bucket, empty ones included. Takes `label`.",
         compute: |c, q| val(&c.per_label(label(q)?).1),
     },
     Insight {
         name: "frequency",
-        summary: "Lines added, removed and rewritten per bucket (period).",
+        summary: "Lines added, removed and rewritten per bucket.",
         compute: |c, _| val(&c.frequency().1),
     },
 ];
@@ -102,12 +101,11 @@ pub const OWNERSHIP_DEPTH: usize = 2;
 pub const HEAD_INSIGHTS: &[(&str, &str)] = &[
     (
         "hotspots",
-        "Files of the head tree by changes times the square root of their size (period, limit).",
+        "Files of the head tree by changes times the square root of their size. Takes `limit`.",
     ),
     (
         "ownership",
-        "Knowledge share and bus factor per directory two levels deep, weighted by size now \
-        (period).",
+        "Knowledge share and bus factor per directory two levels deep, weighted by size now.",
     ),
 ];
 

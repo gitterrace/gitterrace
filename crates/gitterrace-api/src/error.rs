@@ -40,23 +40,23 @@ pub const ERROR_CODES: &[(&str, u16, &str)] = &[
         404,
         "the path does not exist at the revision",
     ),
+    (
+        "needs_reindex",
+        409,
+        "the revision is too far from the indexed branch to answer without a reindex",
+    ),
     ("git", 500, "reading the repository failed"),
     ("index", 500, "reading the insights cache failed"),
     ("internal", 500, "the server failed"),
     (
         "index_unreadable",
         503,
-        "the insights cache failed a read and is being rebuilt; retry shortly",
+        "the insights cache failed a read and is being rebuilt, retry shortly",
     ),
     (
         "index_newer",
         503,
-        "a newer gitterrace owns the insights cache; run it, or delete the cache to rebuild",
-    ),
-    (
-        "needs_reindex",
-        409,
-        "the revision is too far from the indexed branch to answer without a reindex",
+        "a newer gitterrace owns the insights cache: run that one, or delete the cache to rebuild",
     ),
 ];
 

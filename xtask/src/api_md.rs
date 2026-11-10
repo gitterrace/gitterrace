@@ -15,7 +15,7 @@ Read-only. Everything is pinned to a revision (`rev`, default `HEAD`). Errors ar
 built from HEAD, every ref's target, the cache format, how far the cache is filled and the
 configured counting defaults, so moving any branch or tag, the cache catching up or a changed
 `insights` setting invalidates it. `If-None-Match` gets 304.
-JSON is `snake_case`. The same endpoints as `OpenAPI` 3.1: [openapi.json](openapi.json).
+JSON is `snake_case`. The same endpoints as OpenAPI 3.1: [openapi.json](openapi.json).
 
 The API of each repository lives at `/r/{name}/api/v1`.
 ";
@@ -39,9 +39,9 @@ pub fn render() -> Out {
     let _ = writeln!(
         s,
         "\nAnswers are capped so one file cannot flood a client: `log` at {} per page, \
-         `blob` at {} lines and {} KiB, `blame` at {} lines, each \
-         with `truncated` when cut. The `[api]` section of `config.toml` sets each cap.",
-        a.log_page_commits, a.blob_lines, a.blob_kb, a.blame_lines
+         `blob` at {} lines and {} KiB, `blame` at {} lines, `commits` at {} diff lines, \
+         each with `truncated` when cut. The `[api]` section of `config.toml` sets each cap.",
+        a.log_page_commits, a.blob_lines, a.blob_kb, a.blame_lines, a.diff_lines
     );
 
     s.push_str("\n## HTTP (`/api/v1`)\n\n| Endpoint | Query | Returns |\n| --- | --- | --- |\n");
@@ -78,8 +78,9 @@ pub fn render() -> Out {
 
     s.push_str(
         "\n## Insights\n\nServed at `GET /insights/{name}`. Each page's hints say what its \
-        numbers leave out.\n\n| Name | Summary |\n| --- | --- \
-        |\n",
+        numbers leave out. Every insight takes `rev`, `period` and the \
+        counting parameters. The summary names any other it takes.\n\n\
+        | Name | Summary |\n| --- | --- |\n",
     );
     for (name, summary) in insight_list() {
         let _ = writeln!(s, "| `{name}` | {summary} |");
