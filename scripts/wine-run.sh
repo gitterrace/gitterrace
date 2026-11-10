@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Build git-terrace for Windows and run scripts/smoke-check.sh against it under Wine in Docker.
+# Build git-terrace for Windows and run scripts/verify/smoke-check.sh against it under Wine in
+# Docker.
 # Needs docker and cargo-xwin. Usage: scripts/wine-run.sh [--no-build].
 # The target follows the host: aarch64-pc-windows-msvc on arm64 (arm64 Wine, native speed),
 # x86_64-pc-windows-msvc elsewhere. Wine is never installed on the host.
@@ -22,6 +23,6 @@ docker=$root/deploy/test
 docker build -q -t gitterrace-wine -f "$docker/wine.Dockerfile" "$docker" >/dev/null
 docker run --rm \
   -v "$exe:/work/git-terrace.exe:ro" \
-  -v "$root/scripts/smoke-check.sh:/work/smoke-check.sh:ro" \
+  -v "$root/scripts/verify/smoke-check.sh:/work/smoke-check.sh:ro" \
   -e GT_WINE=1 gitterrace-wine \
   bash -c 'wineboot -i >/dev/null 2>&1; bash /work/smoke-check.sh /work/git-terrace.exe 4261'

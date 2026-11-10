@@ -9,7 +9,7 @@
 #
 # Run the proof itself with `python3 schwarzwald/kit/tools/golden.py change OLD NEW`.
 set -euo pipefail
-cd "$(dirname "$0")/.."
+cd "$(dirname "$0")/../.."
 oracle_cfg() {
   bash scripts/lib/python-run.sh -c 'import sys, tomllib
 cfg = tomllib.load(open("schwarzwald/config/land.toml", "rb"))

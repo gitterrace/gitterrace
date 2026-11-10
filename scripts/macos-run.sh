@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Install git-terrace on this Mac and run scripts/smoke-check.sh against it in a clean environment:
+# Install git-terrace on this Mac and run scripts/verify/smoke-check.sh against it in a clean
+# environment:
 # HOME is an empty temp dir and PATH is /usr/bin:/bin plus the install dir, so a dependency that
 # only exists on the dev machine fails here. Usage: scripts/macos-run.sh [--full | --self-test].
 # Default: release install plus the smoke test. --full: make check under the same clean HOME, with
@@ -84,4 +85,4 @@ if [ "$mode" = full ]; then
   (cd "$root" && clean_env "$work/home" "$tool:$work/install/bin:/usr/bin:/bin" \
     CARGO_HOME="$cargo_home" RUSTUP_HOME="$rustup_home" make check)
 fi
-clean_env "$work/home" "$work/install/bin:/usr/bin:/bin" bash "$root/scripts/smoke-check.sh" "$bin" 4261
+clean_env "$work/home" "$work/install/bin:/usr/bin:/bin" bash "$root/scripts/verify/smoke-check.sh" "$bin" 4261

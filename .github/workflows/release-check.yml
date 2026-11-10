@@ -60,4 +60,4 @@ jobs:
       - run: cargo build --locked --profile dist -p gitterrace
       - name: Smoke test
         shell: bash
-        run: bash scripts/smoke-check.sh "target/dist/git-terrace${{ runner.os == 'Windows' && '.exe' || '' }}"
+        run: bash scripts/verify/smoke-check.sh "target/dist/git-terrace${{ runner.os == 'Windows' && '.exe' || '' }}"

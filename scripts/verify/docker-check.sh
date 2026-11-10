@@ -4,14 +4,14 @@
 # read-only, and fetch the home page and a repository page. A second start on the same cache
 # volume reuses the index. Needs docker.
 #
-#   scripts/docker-check.sh              hadolint, build, serve checks
-#   scripts/docker-check.sh --self-test  the Dockerfile's fixed rules, no docker
+#   scripts/verify/docker-check.sh              hadolint, build, serve checks
+#   scripts/verify/docker-check.sh --self-test  the Dockerfile's fixed rules, no docker
 #
 # The self-test runs in `make docs-check`. The full run is the docker job of lint-and-test.yml.
 # DOCKER_JOBS sets the compile jobs of the build (default 2, the same as the Dockerfile, so a
 # busy machine stays usable).
 set -euo pipefail
-root=$(cd "$(dirname "$0")/.." && pwd)
+root=$(cd "$(dirname "$0")/../.." && pwd)
 image=gitterrace-check
 port=${DOCKER_CHECK_PORT:-18080}
 hadolint=hadolint/hadolint:v2.14.0@sha256:
@@ -54,7 +54,7 @@ if [ "${1:-}" = --self-test ]; then
   self_test
   exit 0
 fi
-[ "$#" -eq 0 ] || fail "usage: scripts/docker-check.sh [--self-test]"
+[ "$#" -eq 0 ] || fail "usage: scripts/verify/docker-check.sh [--self-test]"
 self_test
 command -v docker >/dev/null || fail "needs docker"
 

@@ -8,5 +8,5 @@ match = 'crates/(?P<crate>[^/]+)/tests/(?P<test>[^/]+)\.rs'
 run = ["cargo", "test", "-q"]
 each = ["-p", "{crate}", "--test", "{test}"]
 # The re-bless proof: dump every answer at two commits, then classify old against new.
-dump = ["bash", "scripts/golden-proof-run.sh", "dump"]
-compare = ["bash", "scripts/golden-proof-run.sh", "classify", "{old}", "{new}", "{report}"]
+dump = ["bash", "scripts/verify/golden-proof-run.sh", "dump"]
+compare = ["bash", "scripts/verify/golden-proof-run.sh", "classify", "{old}", "{new}", "{report}"]

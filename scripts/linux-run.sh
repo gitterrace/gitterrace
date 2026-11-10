@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Build git-terrace for Linux in Docker and run scripts/smoke-check.sh against it, or the whole
-# `make check` gate. Needs docker. Usage: scripts/linux-run.sh [--full | --self-test].
+# Build git-terrace for Linux in Docker and run scripts/verify/smoke-check.sh against it, or the
+# whole `make check` gate. Needs docker. Usage: scripts/linux-run.sh [--full | --self-test].
 # Default: release build plus the smoke test. --full: make check, the ubuntu CI job's gate, then
 # the release memory_budget test. --self-test: argument parsing and the toolchain pin, no docker.
 # The image is native arch (arm64 on Apple silicon). The source is mounted read-only and copied
@@ -79,5 +79,5 @@ prep='tar -C /src --exclude=./target -cf - . | tar -C /work -xf - && '
 if [ "$mode" = full ]; then
   "${run[@]}" bash -c "$prep"'make check && cargo test --locked --release -p gitterrace-web --test memory_budget'
 else
-  "${run[@]}" bash -c "$prep"'cargo build --locked --release -p gitterrace && bash scripts/smoke-check.sh target/release/git-terrace 4261'
+  "${run[@]}" bash -c "$prep"'cargo build --locked --release -p gitterrace && bash scripts/verify/smoke-check.sh target/release/git-terrace 4261'
 fi

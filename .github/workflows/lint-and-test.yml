@@ -103,7 +103,7 @@ jobs:
           EVENT: ${{ github.event_name }}
           BASE_PR: ${{ github.event.pull_request.base.sha }}
           BASE_PUSH: ${{ github.event.before }}
-          PATHS: '^(Dockerfile|\.dockerignore|Cargo\.(toml|lock)|rust-toolchain\.toml|scripts/docker-check\.sh|crates/|xtask/|docs/actions\.md|\.github/workflows/(ci|lint-and-test)\.yml)'
+          PATHS: '^(Dockerfile|\.dockerignore|Cargo\.(toml|lock)|rust-toolchain\.toml|scripts/verify/docker-check\.sh|crates/|xtask/|docs/actions\.md|\.github/workflows/(ci|lint-and-test)\.yml)'
         run: |
           run=true
           base=${BASE_PR:-$BASE_PUSH}
@@ -117,7 +117,7 @@ jobs:
           fi
           echo "run=$run" >> "$GITHUB_OUTPUT"
       - if: steps.paths.outputs.run == 'true'
-        run: bash scripts/docker-check.sh
+        run: bash scripts/verify/docker-check.sh
 
   # Full tier from here on.
   check-macos:
@@ -183,4 +183,4 @@ jobs:
         run: cargo test --locked -p gitterrace-index --test unreadable --test hostile --test deterministic
       - name: Smoke test
         shell: bash
-        run: bash scripts/smoke-check.sh target/debug/git-terrace.exe
+        run: bash scripts/verify/smoke-check.sh target/debug/git-terrace.exe

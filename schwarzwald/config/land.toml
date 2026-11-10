@@ -1,5 +1,6 @@
-# The crate names scripts/land-check.sh and scripts/golden-proof-run.sh run against. Data only,
-# read with tomllib. The scripts hold the steps, this file holds which crates they name.
+# The crate names scripts/land-check.sh and scripts/verify/golden-proof-run.sh run against.
+# Data only, read with tomllib. The scripts hold the steps, this file holds which crates they
+# name.
 
 # The land-check self-test fixtures: an edit in `dependency_path` must select `dependency`
 # and `dependent`, and an edit in `leaf_path` must not select `dependency`.

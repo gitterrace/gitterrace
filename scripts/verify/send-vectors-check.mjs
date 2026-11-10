@@ -2,11 +2,11 @@
 // Runs every shared send vector through the JS encoder in send.js, every source-line vector
 // through its sourceLine(), and the title rule through titleOf().
 //
-//   node scripts/send-vectors-check.mjs
+//   node scripts/verify/send-vectors-check.mjs
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { runInNewContext } from 'node:vm';
-import { root } from './lib/browser-lib.mjs';
+import { root } from '../lib/browser-lib.mjs';
 
 // send.js is a classic browser script that exports through `module` when no document exists.
 // A sandbox gives it that `module`, whatever module type the package declares.

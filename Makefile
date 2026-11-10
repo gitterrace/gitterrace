@@ -82,7 +82,7 @@ actions:
 
 # send-vectors: Check send.js against the shared send vectors
 send-vectors:
-	node scripts/send-vectors-check.mjs
+	node scripts/verify/send-vectors-check.mjs
 
 # names: File, env and project names follow the conventions
 names:
@@ -105,10 +105,10 @@ docs-check:
 	python3 scripts/lint/commits-check.py --self-test
 	python3 scripts/lint/tracked-check.py --self-test
 	bash scripts/lib/python-run.sh schwarzwald/kit/tools/golden.py --self-test
-	bash scripts/golden-proof-run.sh --self-test
+	bash scripts/verify/golden-proof-run.sh --self-test
 	bash scripts/linux-run.sh --self-test
 	bash scripts/macos-run.sh --self-test
-	bash scripts/docker-check.sh --self-test
+	bash scripts/verify/docker-check.sh --self-test
 	cargo xtask check
 
 # gc-guard: Daily silent gc, then the gc self-test on a fixture tree
@@ -159,7 +159,7 @@ browser-reap:
 
 ## docker-check: Build the Docker image and serve a mounted repository with it (needs docker)
 docker-check:
-	bash scripts/docker-check.sh
+	bash scripts/verify/docker-check.sh
 
 ##@ Bench
 .PHONY: bench bench-report
