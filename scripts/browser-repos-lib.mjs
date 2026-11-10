@@ -1,6 +1,6 @@
 // The filter on the repositories home. Imported by scripts/browser-check.mjs, not run alone.
 import { basename } from 'node:path';
-import { sh, makeRepo, serve } from './browser-lib.mjs';
+import { sh, makeRepo, serve } from './lib/browser-lib.mjs';
 
 /** @param {any} env what browser-check.mjs set up (srv, r, browsers, context, dir, ...) */
 export function checks(env) {

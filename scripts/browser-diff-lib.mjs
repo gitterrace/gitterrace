@@ -13,7 +13,7 @@
 import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { serve, sh } from './browser-lib.mjs';
+import { serve, sh } from './lib/browser-lib.mjs';
 
 const RENAMES = 1960;
 const EDITS = 40;

@@ -14,7 +14,7 @@ import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdir
 import { execFileSync, spawn } from 'node:child_process';
 import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { root, loadPlaywright, launch, freePort } from './browser-lib.mjs';
+import { root, loadPlaywright, launch, freePort } from './lib/browser-lib.mjs';
 
 // The demo's releases: jq 1.8.2 and ripgrep 15.2.0. The shot paths below fit these commits
 // (ripgrep 068a63e is in 15.2.0, and the blame and send files below exist there).

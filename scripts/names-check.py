@@ -163,15 +163,28 @@ def check_templates() -> list[str]:
     return bad
 
 
+def script_files() -> list[Path]:
+    """Every script under scripts/, its group dirs too. Hooks, guard adapters, ast-grep rules
+    and the screenshot config are data or entry points other tools name, not scripts."""
+    data = ("guards", "hooks", "ast-grep", "site-shots")
+    return sorted(
+        f
+        for f in (ROOT / "scripts").rglob("*")
+        if f.is_file()
+        and f.relative_to(ROOT / "scripts").parts[0] not in data
+        and "__pycache__" not in f.parts
+    )
+
+
 def check_headers() -> list[str]:
     """R5: scripts are `<area>-<verb>` and every script and static file opens with a comment."""
     bad = []
-    for f in sorted((ROOT / "scripts").iterdir()):
-        if f.is_file() and not SCRIPT.match(f.name):
+    for f in script_files():
+        if not SCRIPT.match(f.name):
             bad.append(
-                f"scripts/{f.name}: not <area>-<verb> with a verb of check|gen|run|export|report|render|lib (R5)"
+                f"{f.relative_to(ROOT)}: not <area>-<verb> with a verb of check|gen|run|export|report|render|lib (R5)"
             )
-    files = [f for f in (ROOT / "scripts").iterdir() if f.is_file()]
+    files = script_files()
     files += sorted((ROOT / "crates/gitterrace-web/static").glob("*.js"))
     files += sorted((ROOT / "xtask/src").glob("*.rs"))
     for f in files:

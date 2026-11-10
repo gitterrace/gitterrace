@@ -4,7 +4,7 @@
 // Imported by scripts/browser-check.mjs, not run on its own.
 import { createServer } from 'node:http';
 import { readFileSync, existsSync, statSync, readdirSync, writeFileSync } from 'node:fs';
-import { sh } from './browser-lib.mjs';
+import { sh } from './lib/browser-lib.mjs';
 import { join, extname, resolve } from 'node:path';
 
 const WIDTHS = [1440, 900, 360];

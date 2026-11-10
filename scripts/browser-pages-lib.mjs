@@ -2,7 +2,7 @@
 // Imported by scripts/browser-check.mjs, not run on its own.
 import { writeFileSync, rmSync, mkdirSync, existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { root, WATCH_BOUND_MS, launch, openPage, sh } from './browser-lib.mjs';
+import { root, WATCH_BOUND_MS, launch, openPage, sh } from './lib/browser-lib.mjs';
 
 /** @param {any} env what browser-check.mjs set up (pw, dir, srv, r, bin, cfg, arg, ...) */
 export function checks(env) {

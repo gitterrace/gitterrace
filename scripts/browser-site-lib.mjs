@@ -4,7 +4,7 @@ import { readFileSync, readdirSync, existsSync, mkdtempSync, rmSync } from 'node
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { pathToFileURL } from 'node:url';
-import { root, launch, sh } from './browser-lib.mjs';
+import { root, launch, sh } from './lib/browser-lib.mjs';
 
 /** @param {any} env what browser-check.mjs set up (pw, dir, srv, r, bin, cfg, arg, ...) */
 export function checks(env) {

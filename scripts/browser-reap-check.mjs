@@ -1,17 +1,17 @@
 #!/usr/bin/env node
 // Guard: a browser check killed mid-run, or one that throws, leaves no test server running. A
 // `finally` around the checks never runs on a signal, so the server is stopped by the exit hook
-// in browser-lib.mjs. This starts a child that serves and then hangs, ends it each way and
+// in lib/browser-lib.mjs. This starts a child that serves and then hangs, ends it each way and
 // counts the servers left on its port.
 //
 //   node scripts/browser-reap-check.mjs [--bin target/debug/git-terrace]
 import { spawn, execFileSync } from 'node:child_process';
 import { join } from 'node:path';
-import { root } from './browser-lib.mjs';
+import { root } from './lib/browser-lib.mjs';
 
 const at = process.argv.indexOf('--bin');
 const bin = at > 0 ? process.argv[at + 1] : join(root, 'target/debug/git-terrace');
-const lib = join(root, 'scripts/browser-lib.mjs');
+const lib = join(root, 'scripts/lib/browser-lib.mjs');
 
 /** A child that serves a fresh repository, prints its origin, then hangs or throws. */
 const child = (end) => `

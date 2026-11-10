@@ -162,7 +162,7 @@ export function checks({ dir, srv, r, browsers, context }) {
   // On the overview the sidebar reads Now, Loose ends, Recent: what is left open comes before
   // the activity numbers.
   async function sideOrder() {
-    const { sh } = await import('./browser-lib.mjs');
+    const { sh } = await import('./lib/browser-lib.mjs');
     sh(dir, 'git', 'checkout', '-q', '-b', 'side-order');
     sh(dir, 'git', 'commit', '-q', '--allow-empty', '-m', 'Work left on a branch');
     sh(dir, 'git', 'checkout', '-q', 'main');
@@ -185,7 +185,7 @@ export function checks({ dir, srv, r, browsers, context }) {
   // The shipped theme is the one the stylesheet carries; its light and dark are both walked.
   async function axeAll() {
     const { createRequire } = await import('node:module');
-    const { root } = await import('./browser-lib.mjs');
+    const { root } = await import('./lib/browser-lib.mjs');
     const axePath = createRequire(`${root}/package.json`).resolve('axe-core');
     const report = process.env.AXE_REPORT === '1';
     const seen = new Set();

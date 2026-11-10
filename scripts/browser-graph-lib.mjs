@@ -5,7 +5,7 @@
 import { mkdtempSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { sh, serve } from './browser-lib.mjs';
+import { sh, serve } from './lib/browser-lib.mjs';
 
 /** Branches open at once in the fixture: more than a narrow screen shows. */
 const OPEN = 5;

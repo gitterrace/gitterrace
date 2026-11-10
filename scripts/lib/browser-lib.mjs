@@ -16,7 +16,7 @@ export const RESCAN_SECS = 5;
 /** How long a working tree change may take to show: the documented rescan bound plus a margin. */
 export const WATCH_BOUND_MS = (RESCAN_SECS + 5) * 1000;
 
-export const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+export const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 
 /** How to get the browser check dependencies, named in every early failure. */
 const INSTALL = 'run `make browser-deps` (npm ci, then the Playwright browsers)';

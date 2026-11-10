@@ -3,7 +3,7 @@
 // scripts/browser-check.mjs, not run on its own.
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { sh } from './browser-lib.mjs';
+import { sh } from './lib/browser-lib.mjs';
 
 /** @param {any} env what browser-check.mjs set up (dir, srv, r, browsers, context, ...) */
 export function checks(env) {

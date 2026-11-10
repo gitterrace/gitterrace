@@ -104,7 +104,7 @@ docs-check:
 	bash scripts/land-check.sh --self-test
 	python3 scripts/commits-check.py --self-test
 	python3 scripts/tracked-check.py --self-test
-	bash scripts/python-run.sh schwarzwald/kit/tools/golden.py --self-test
+	bash scripts/lib/python-run.sh schwarzwald/kit/tools/golden.py --self-test
 	bash scripts/golden-proof-run.sh --self-test
 	bash scripts/linux-run.sh --self-test
 	bash scripts/macos-run.sh --self-test

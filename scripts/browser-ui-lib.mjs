@@ -3,7 +3,7 @@
 import { readFileSync, writeFileSync, rmSync, mkdtempSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { WATCH_BOUND_MS, makeRepo, serve, sh } from './browser-lib.mjs';
+import { WATCH_BOUND_MS, makeRepo, serve, sh } from './lib/browser-lib.mjs';
 
 /** @param {any} env what browser-check.mjs set up (pw, dir, srv, r, bin, cfg, arg, ...) */
 export function checks(env) {

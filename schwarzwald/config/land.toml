@@ -30,7 +30,7 @@ test = "conventions"
 gate = [
   # Unformatted Rust never lands. The cheapest check runs first.
   "make fmt",
-  "bash scripts/python-run.sh schwarzwald/kit/tools/golden.py run",
+  "bash scripts/lib/python-run.sh schwarzwald/kit/tools/golden.py run",
   "make lines names theme actions send-vectors",
   # Generated docs, README blocks and site pages match their sources, and the generators'
   # own unit tests pass (xtask check runs the binary, not its tests).

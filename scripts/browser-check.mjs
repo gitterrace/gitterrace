@@ -171,7 +171,7 @@
 //
 // --from-disk serves crates/gitterrace-web/static/*.js from the working tree over the (possibly
 // older) binary's copies, to test edits before a rebuild. Playwright comes from $PLAYWRIGHT_CORE
-// or the repo's node_modules, installed by `make browser-deps` (see browser-lib.mjs).
+// or the repo's node_modules, installed by `make browser-deps` (see lib/browser-lib.mjs).
 import { readFileSync, readdirSync, writeFileSync, rmSync, mkdirSync, mkdtempSync, existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -181,7 +181,7 @@ import { checks as layoutChecks } from './browser-layout-lib.mjs';
 import { checks as siteChecks } from './browser-site-lib.mjs';
 import { checks as siteBarChecks } from './browser-sitebar-lib.mjs';
 import { checks as diffChecks } from './browser-diff-lib.mjs';
-import { root, RESCAN_SECS, loadPlaywright, launch, makeRepo, serve, openPage, reporter, sh } from './browser-lib.mjs';
+import { root, RESCAN_SECS, loadPlaywright, launch, makeRepo, serve, openPage, reporter, sh } from './lib/browser-lib.mjs';
 
 const arg = (k, d) => { const i = process.argv.indexOf(k); return i < 0 ? d : process.argv[i + 1]; };
 const bin = resolve(arg('--bin', join(root, 'target/debug/git-terrace')));

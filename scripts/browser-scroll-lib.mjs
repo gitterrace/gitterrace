@@ -3,7 +3,7 @@
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { serve, sh } from './browser-lib.mjs';
+import { serve, sh } from './lib/browser-lib.mjs';
 
 /** @param {any} env what browser-check.mjs set up (r, browsers, context, bin, cfg, ...) */
 export function checks(env) {

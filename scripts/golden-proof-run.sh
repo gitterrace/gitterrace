@@ -11,7 +11,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 oracle_cfg() {
-  bash scripts/python-run.sh -c 'import sys, tomllib
+  bash scripts/lib/python-run.sh -c 'import sys, tomllib
 cfg = tomllib.load(open("schwarzwald/config/land.toml", "rb"))
 print(cfg["oracle"][sys.argv[1]])' "$1"
 }

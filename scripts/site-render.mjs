@@ -12,7 +12,7 @@
 import { existsSync, readFileSync, mkdirSync, readdirSync, rmSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { join } from 'node:path';
-import { root, loadPlaywright, launch } from './browser-lib.mjs';
+import { root, loadPlaywright, launch } from './lib/browser-lib.mjs';
 
 const brand = (f) => 'data:image/svg+xml,' + encodeURIComponent(readFileSync(join(root, 'docs/brand', f), 'utf8'));
 // The light page background, from the shared tokens, so the PNG files match the site.

@@ -2,7 +2,7 @@
 // Imported by scripts/browser-check.mjs, not run on its own.
 import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
-import { launch } from './browser-lib.mjs';
+import { launch } from './lib/browser-lib.mjs';
 
 /** @param {any} env what browser-check.mjs set up (dir, srv, r, browsers, context, cfg, ...) */
 export function checks(env) {

@@ -3,7 +3,7 @@
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { createServer } from 'node:http';
-import { root, launch } from './browser-lib.mjs';
+import { root, launch } from './lib/browser-lib.mjs';
 
 const siteDir = join(root, 'target/site');
 const types = { html: 'text/html', css: 'text/css', svg: 'image/svg+xml', webp: 'image/webp',

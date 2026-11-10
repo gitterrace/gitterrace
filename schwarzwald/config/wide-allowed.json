@@ -78,7 +78,7 @@
     "scripts/browser-graph-lib.mjs": 6,
     "scripts/browser-heads-lib.mjs": 6,
     "scripts/browser-layout-lib.mjs": 9,
-    "scripts/browser-lib.mjs": 11,
+    "scripts/lib/browser-lib.mjs": 11,
     "scripts/browser-outline-lib.mjs": 5,
     "scripts/browser-pages-lib.mjs": 36,
     "scripts/browser-rows-lib.mjs": 2,

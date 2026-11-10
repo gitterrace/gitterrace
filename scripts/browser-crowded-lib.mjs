@@ -6,7 +6,7 @@
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { sh } from './browser-lib.mjs';
+import { sh } from './lib/browser-lib.mjs';
 
 /** A branch name long enough to crowd its row. */
 export const LONG = 'a-rather-long-branch-name-that-crowds-the-row';

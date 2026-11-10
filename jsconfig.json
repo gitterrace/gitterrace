@@ -11,5 +11,5 @@
     "typeRoots": ["target/js-types/node_modules/@types"],
     "types": ["node"]
   },
-  "include": ["scripts/*.mjs"]
+  "include": ["scripts/**/*.mjs"]
 }
