@@ -4,7 +4,7 @@
 
 use std::collections::BTreeMap;
 
-use gitterrace_git::{Repo, civil_from_days, percent_encode_path};
+use gitterrace_git::{Repo, percent_encode_path};
 use gitterrace_types::LinkStyle;
 use serde::{Deserialize, Serialize};
 
@@ -172,7 +172,7 @@ impl Payload {
         let commit = Some(CommitInfo {
             subject: cap(&s.subject, MAX_SUBJECT_BYTES).0,
             author: cap(&s.author.name, MAX_SUBJECT_BYTES).0,
-            date: rfc3339(s.author.time),
+            date: gitterrace_git::iso_utc(s.author.time).unwrap_or_default(),
         });
         let short = gitterrace_git::short_id(&sha);
         let id = repo.id();
@@ -411,19 +411,6 @@ fn markdown(
     }
     // The machine line comes last, so a reader finds it on the final line.
     format!("{md}{source}\n")
-}
-
-/// Seconds since the epoch as `YYYY-MM-DDTHH:MM:SSZ`.
-fn rfc3339(secs: i64) -> String {
-    let days = secs.div_euclid(86_400);
-    let rem = secs.rem_euclid(86_400);
-    let (y, m, d) = civil_from_days(days);
-    format!(
-        "{y:04}-{m:02}-{d:02}T{:02}:{:02}:{:02}Z",
-        rem / 3600,
-        rem % 3600 / 60,
-        rem % 60
-    )
 }
 
 #[cfg(test)]

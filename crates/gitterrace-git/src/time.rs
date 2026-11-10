@@ -25,8 +25,50 @@ pub fn days_from_civil(y: i64, m: i64, d: i64) -> i64 {
     era * 146_097 + doe - 719_468
 }
 
+/// First and last second of years 1 to 9999, the range a date can be written in.
+pub const FIRST_SECOND: i64 = -62_135_596_800;
+/// See [`FIRST_SECOND`].
+pub const LAST_SECOND: i64 = 253_402_300_799;
+
+/// `YYYY-MM-DD` of a day number since the epoch.
+pub fn ymd(days: i64) -> String {
+    let (y, m, d) = civil_from_days(days);
+    format!("{y:04}-{m:02}-{d:02}")
+}
+
+/// `YYYY-MM-DDTHH:MM:SSZ` of epoch seconds, `None` outside years 1 to 9999 so a hostile time
+/// never prints a wrapped or invented date.
+pub fn iso_utc(secs: i64) -> Option<String> {
+    if !(FIRST_SECOND..=LAST_SECOND).contains(&secs) {
+        return None;
+    }
+    let rem = secs.rem_euclid(86_400);
+    Some(format!(
+        "{}T{:02}:{:02}:{:02}Z",
+        ymd(secs.div_euclid(86_400)),
+        rem / 3600,
+        rem % 3600 / 60,
+        rem % 60
+    ))
+}
+
 #[cfg(test)]
 mod tests {
+    use crate::{iso_utc, ymd};
+
+    #[test]
+    fn iso_utc_and_ymd_write_known_points_and_refuse_out_of_range() {
+        assert_eq!(iso_utc(0).as_deref(), Some("1970-01-01T00:00:00Z"));
+        assert_eq!(
+            iso_utc(951_782_400).as_deref(),
+            Some("2000-02-29T00:00:00Z")
+        );
+        assert_eq!(iso_utc(-1).as_deref(), Some("1969-12-31T23:59:59Z"));
+        assert_eq!(iso_utc(i64::MAX), None);
+        assert_eq!(iso_utc(i64::MIN), None);
+        assert_eq!(ymd(19_782), "2024-02-29");
+    }
+
     use crate::{civil_from_days, days_from_civil};
 
     #[test]

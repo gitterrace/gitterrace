@@ -32,8 +32,8 @@ mod stats;
 
 use std::sync::{Arc, Mutex, OnceLock};
 
+use gitterrace_git::IgnoreSet;
 pub(crate) use gitterrace_git::days_from_civil;
-use gitterrace_git::{IgnoreSet, civil_from_days as civil};
 
 use crate::CommitRecord;
 use crate::feed::{self, CommitRange, CommitRow, FileRow, IdentId, InsightsSource, PathId, Rank};
@@ -567,10 +567,7 @@ pub fn weekday(days: i64) -> usize {
     usize::try_from((days + 3).rem_euclid(7)).unwrap_or(0)
 }
 
-pub(crate) fn format_date(days: i64) -> String {
-    let (y, m, d) = civil(days);
-    format!("{y:04}-{m:02}-{d:02}")
-}
+pub(crate) use gitterrace_git::ymd as format_date;
 
 /// Bus factor: the fewest contributors whose shares, largest first, hold at least half.
 ///

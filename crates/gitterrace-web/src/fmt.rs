@@ -1,6 +1,6 @@
 //! Small formatting helpers shared by view models.
 
-use gitterrace_git::{civil_from_days as civil, percent_decode};
+use gitterrace_git::{FIRST_SECOND, LAST_SECOND, civil_from_days as civil, percent_decode};
 
 use crate::when::When;
 
@@ -15,10 +15,6 @@ pub(crate) const FAVICON: &str = include_str!("../templates/_favicon.html");
 /// How a commit time renders when it is outside years 1 to 9999 (a corrupt or hostile
 /// timestamp, such as `i64::MIN`): never a wrapped or invented date.
 pub(crate) const UNKNOWN_DATE: &str = "unknown date";
-
-/// First and last second of years 1 to 9999, the range a date can be written in.
-const FIRST_SECOND: i64 = -62_135_596_800;
-const LAST_SECOND: i64 = 253_402_300_799;
 
 /// `time` shifted into its offset, or `None` when the sum overflows or leaves years 1 to
 /// 9999. Every date helper goes through this, so none does unchecked time arithmetic.
@@ -43,11 +39,10 @@ pub(crate) fn date(time: i64, offset: i32) -> String {
 
 /// `YYYY-MM-DD` in UTC.
 pub(crate) fn day(time: i64) -> String {
-    let d = date(time, 0);
-    d.get(..10)
-        .filter(|_| d != UNKNOWN_DATE)
-        .unwrap_or(&d)
-        .to_owned()
+    local(time, 0).map_or_else(
+        || UNKNOWN_DATE.to_owned(),
+        |t| gitterrace_git::ymd(t.div_euclid(86_400)),
+    )
 }
 
 thread_local! {
@@ -120,17 +115,7 @@ fn relative(time: i64, now: i64) -> String {
 
 /// `YYYY-MM-DDTHH:MM:SSZ`, the instant a time element's datetime carries.
 pub(crate) fn iso(time: i64) -> String {
-    let Some(t) = local(time, 0) else {
-        return String::new();
-    };
-    let (y, m, d) = civil(t.div_euclid(86_400));
-    let secs = t.rem_euclid(86_400);
-    format!(
-        "{y:04}-{m:02}-{d:02}T{:02}:{:02}:{:02}Z",
-        secs / 3600,
-        secs % 3600 / 60,
-        secs % 60
-    )
+    gitterrace_git::iso_utc(time).unwrap_or_default()
 }
 
 pub(crate) fn now() -> i64 {

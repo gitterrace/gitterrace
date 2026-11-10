@@ -6,7 +6,7 @@ use gitterrace_git::Repo;
 use gitterrace_types::LinkStyle;
 
 use crate::config::Kind;
-use crate::payload::{Lines, Locator, Payload, PayloadError, RunRequest, rfc3339};
+use crate::payload::{Lines, Locator, Payload, PayloadError, RunRequest};
 
 /// One commit whose subject and file content carry shell and HTML payloads.
 pub(crate) fn hostile_repo() -> (tempfile::TempDir, String) {
@@ -195,11 +195,4 @@ fn request_schema_is_strict() {
     ] {
         assert!(serde_json::from_str::<RunRequest>(bad).is_err(), "{bad}");
     }
-}
-
-#[test]
-fn rfc3339_known_points() {
-    assert_eq!(rfc3339(0), "1970-01-01T00:00:00Z");
-    assert_eq!(rfc3339(951_782_400), "2000-02-29T00:00:00Z");
-    assert_eq!(rfc3339(-1), "1969-12-31T23:59:59Z");
 }
