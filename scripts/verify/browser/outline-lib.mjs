@@ -127,5 +127,64 @@ export function checks(env) {
       await b.close();
     }
   }
-  return { outlineFilter, symbols };
+  // A long source file opened at #L<n> in the middle lights the symbol that holds n, and still
+  // does after scrolling up and down. The page swaps its code chunks once the highlighted copy
+  // arrives, so a head element held from load goes stale (rect all zeros) and the last symbol
+  // lit up. Each symbol is 60 lines (59 of code, a blank), taller than the reading line is deep, so
+  // the holder is the same wherever the line lands. The file is over 32 KB, which is what makes
+  // the page highlight its tail after first paint.
+  async function outlineCurrent() {
+    const fn = (i) => `pub fn g${i}() -> u32 {\n${"    1 +\n".repeat(56)}    0\n}\n`;
+    writeFileSync(join(dir, 'current.rs'), Array.from({ length: 90 }, (_, i) => fn(i)).join("\n"));
+    sh(dir, 'git', 'add', '-A');
+    sh(dir, 'git', 'commit', '-q', '-m', 'feat: current symbol fixture');
+    await new Promise((ok) => setTimeout(ok, 600));
+    // The symbol whose lines hold n: fn k starts on line 60k+1.
+    const holding = (n) => `#L${60 * Math.floor((n - 1) / 60) + 1}`;
+    const lit = (p) => p.evaluate(
+      () => [...document.querySelectorAll('.outline.rail a.on')].map((a) => a.getAttribute('href')),
+    );
+    for (const name of browsers) {
+      const { b, ctx } = await context(name);
+      const p = await ctx.newPage();
+      for (const [width, height] of [[1440, 800], [1440, 1200]]) {
+        const where = `outline-current ${name} ${width}x${height}`;
+        try {
+          await p.setViewportSize({ width, height });
+          const n = 1830;
+          await p.goto(`${srv.base}/blob/HEAD/current.rs#L${n}`, { waitUntil: 'load' });
+          // Past the first-screen swap of the code chunks.
+          await p.waitForFunction(() => !document.querySelector('.src[data-hl]') ||
+            document.querySelectorAll('.src .ch').length > 0);
+          await p.waitForTimeout(1200);
+          const seen = { landed: await lit(p) };
+          await p.mouse.wheel(0, -2400);
+          await p.waitForTimeout(500);
+          seen.up = await lit(p);
+          seen.upLine = await p.evaluate(() => {
+            const line = (innerHeight) * 0.55;
+            const ids = [...document.querySelectorAll('.outline.rail a')]
+              .filter((a) => a instanceof HTMLAnchorElement)
+              .map((a) => a.hash.slice(1));
+            let id = '';
+            for (const i of ids) {
+              if (document.getElementById(i).getBoundingClientRect().top <= line) id = i;
+            }
+            return '#' + id;
+          });
+          await p.mouse.wheel(0, 4800);
+          await p.waitForTimeout(500);
+          seen.down = await lit(p);
+          const want = holding(n);
+          const ok = seen.landed.length === 1 && seen.landed[0] === want &&
+            seen.up.length === 1 && seen.up[0] === seen.upLine &&
+            seen.down.length === 1 && seen.down[0] !== want;
+          if (ok) r.ok(`${where}: #L${n} lights ${want}, and it follows the scroll`);
+          else r.fail(`${where}: want ${want}, got ${JSON.stringify(seen)}`);
+        } catch (e) { r.fail(`${where}: ${e.message.split('\n')[0]}`); }
+      }
+      await b.close();
+    }
+  }
+  return { outlineFilter, symbols, outlineCurrent };
 }

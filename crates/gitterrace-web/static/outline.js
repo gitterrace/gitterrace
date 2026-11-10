@@ -79,7 +79,13 @@
     var top = pinned ? pin.getBoundingClientRect().height : 0;
     var line = top + (window.innerHeight - top) * (mid ? 0.55 : 0.3);
     var id = heads.length ? heads[0].id : "";
-    heads.forEach(function (h) { if (h.getBoundingClientRect().top <= line) id = h.id; });
+    // Looked up by id each time: a live refresh swaps <main> and the first-screen highlight swaps
+    // the code chunks, so an element held from load is detached, and its rect is all zeros,
+    // which would put every head above the line and light the last one.
+    heads.forEach(function (k) {
+      var h = document.getElementById(k.id);
+      if (h && h.getBoundingClientRect().top <= line) id = h.id;
+    });
     if (id) mark(id);
   }
   if ("IntersectionObserver" in window && heads.length) {
