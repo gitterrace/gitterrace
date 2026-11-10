@@ -49,21 +49,14 @@ pub(crate) struct RangeQuery {
     to: Option<String>,
 }
 
-/// `YYYY-MM-DD` as days since the epoch.
-fn parse_day(s: &str) -> Option<i64> {
-    let mut it = s.splitn(3, '-');
-    let y: i64 = it.next()?.parse().ok()?;
-    let m: i64 = it.next()?.parse().ok()?;
-    let d: i64 = it.next()?.parse().ok()?;
-    ((1..=12).contains(&m) && (1..=31).contains(&d) && s.len() == 10)
-        .then(|| gitterrace_git::days_from_civil(y, m, d))
-}
-
 impl RangeQuery {
     /// The range as `(from, to)` dates and days, or `None` when absent or malformed.
     fn parsed(&self) -> Option<(&str, &str, i64, i64)> {
         let (f, t) = (self.from.as_deref()?, self.to.as_deref()?);
-        let (a, b) = (parse_day(f)?, parse_day(t)?);
+        let (a, b) = (
+            gitterrace_index::parse_day(f)?,
+            gitterrace_index::parse_day(t)?,
+        );
         (a <= b).then_some((f, t, a, b))
     }
 }
@@ -358,4 +351,25 @@ pub(crate) async fn page(
         }
     })
     .await
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn range(from: &str, to: &str) -> RangeQuery {
+        RangeQuery {
+            from: Some(from.to_owned()),
+            to: Some(to.to_owned()),
+        }
+    }
+
+    #[test]
+    fn an_impossible_date_gives_no_range_instead_of_shifting_it() {
+        assert!(range("2026-02-30", "2026-03-31").parsed().is_none());
+        assert!(range("2026-03-01", "2026-04-31").parsed().is_none());
+        assert!(range("2026-3-1", "2026-03-31").parsed().is_none());
+        let (_, _, a, b) = range("2026-03-01", "2026-03-31").parsed().expect("valid");
+        assert_eq!(b - a, 30);
+    }
 }

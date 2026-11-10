@@ -377,7 +377,7 @@ fn set(v: Option<&str>) -> Option<&str> {
 }
 
 /// `YYYY-MM-DD` as a day number, `None` for anything else (including 2026-02-30).
-fn parse_day(s: &str) -> Option<i64> {
+pub fn parse_day(s: &str) -> Option<i64> {
     let mut it = s.splitn(3, '-');
     let (y, m, d) = (it.next()?, it.next()?, it.next()?);
     if y.len() != 4 || m.len() != 2 || d.len() != 2 {

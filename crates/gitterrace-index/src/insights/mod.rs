@@ -65,7 +65,7 @@ pub use period::{
     Rhythm, SeriesPoint,
 };
 pub use releases::{Cadence, Release, release_tags};
-pub use scope::{CountContext, Scope, ScopeError, ScopeParams};
+pub use scope::{CountContext, Scope, ScopeError, ScopeParams, parse_day};
 pub use select::{OptionParams, Scoped, Selection, under};
 pub use sizes::SizeBucket;
 pub use stats::{DirChurn, DirTally, FileChurn, FileTally, Label, LabelBucket, LabelCount};
