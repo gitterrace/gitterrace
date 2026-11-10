@@ -159,6 +159,8 @@ pub(crate) struct Highlighter {
     state: ParseState,
     stack: ScopeStack,
     cache: HashMap<Scope, Option<&'static str>>,
+    /// Records the declarations the grammar names, when the caller wants an outline.
+    symbols: Option<crate::symbols::scopes::Collector>,
 }
 
 impl Highlighter {
@@ -167,7 +169,28 @@ impl Highlighter {
             state: ParseState::new(syntax),
             stack: ScopeStack::new(),
             cache: HashMap::new(),
+            symbols: None,
         }
+    }
+
+    /// Also records the symbols the grammar names, read in the same pass as the colours.
+    pub(crate) fn with_symbols(mut self) -> Self {
+        self.symbols = Some(crate::symbols::scopes::Collector::default());
+        self
+    }
+
+    /// The scope pushes seen and the scope names the symbol collector built, for the guard.
+    #[cfg(test)]
+    pub(crate) fn symbol_work(&self) -> (u64, u64) {
+        self.symbols.as_ref().map_or((0, 0), |c| (c.pushes, c.work))
+    }
+
+    /// The symbols recorded so far, in source order; empty without [`Self::with_symbols`].
+    pub(crate) fn take_symbols(&mut self) -> Vec<crate::symbols::Symbol> {
+        self.symbols
+            .as_mut()
+            .map(|c| std::mem::take(&mut c.out))
+            .unwrap_or_default()
     }
 
     fn class(&mut self) -> Option<&'static str> {
@@ -182,6 +205,9 @@ impl Highlighter {
     /// The HTML of one line (no trailing newline in or out), spans closed at the end of it.
     /// On a parser error the line comes back escaped and plain.
     pub(crate) fn line(&mut self, text: &str) -> String {
+        if let Some(c) = self.symbols.as_mut() {
+            c.next_line();
+        }
         let mut buf = String::with_capacity(text.len() + 1);
         buf.push_str(text);
         buf.push('\n');
@@ -202,9 +228,18 @@ impl Highlighter {
                 }
                 prev = to;
             }
+            if let Some(c) = self.symbols.as_mut() {
+                c.before(&self.stack, i, &op);
+            }
             if self.stack.apply(&op).is_err() {
                 return crate::fmt::esc_text(text);
             }
+            if let Some(c) = self.symbols.as_mut() {
+                c.after(&self.stack, i, body);
+            }
+        }
+        if let Some(c) = self.symbols.as_mut() {
+            c.close(body.len(), body);
         }
         if body.len() > prev {
             let class = self.class();

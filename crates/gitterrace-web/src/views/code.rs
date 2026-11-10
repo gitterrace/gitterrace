@@ -20,16 +20,26 @@ const EAGER_BYTES: usize = 32 * 1024;
 #[derive(Default)]
 pub(crate) struct CodeMemo {
     size: usize,
-    map: std::collections::HashMap<u64, (String, bool)>,
+    map: std::collections::HashMap<u64, Code>,
+}
+
+/// A highlighted file: its line blocks, whether it was cut at the line cap, and the symbols
+/// its grammar named while highlighting (empty for a language with its own scanner, which
+/// the outline reads instead).
+#[derive(Clone, Default)]
+pub(crate) struct Code {
+    pub(crate) html: String,
+    pub(crate) cut: bool,
+    pub(crate) symbols: Vec<crate::symbols::Symbol>,
 }
 
 impl CodeMemo {
-    fn get(&self, key: u64) -> Option<(String, bool)> {
+    fn get(&self, key: u64) -> Option<Code> {
         self.map.get(&key).cloned()
     }
 
-    fn put(&mut self, cap: usize, key: u64, v: &(String, bool)) {
-        let len = v.0.len();
+    fn put(&mut self, cap: usize, key: u64, v: &Code) {
+        let len = v.html.len();
         if len > cap / 8 {
             return;
         }
@@ -59,7 +69,7 @@ pub(crate) fn code_memo_put(memo: &mut CodeMemo, cap: usize, path: &str, text: &
     let r = Render::test(cap);
     let built = code_html_uncached(&r, path, text, usize::MAX);
     memo.put(cap, code_key(&r, path, text), &built);
-    built.0.len()
+    built.html.len()
 }
 
 #[cfg(test)]
@@ -81,7 +91,7 @@ pub(crate) fn code_is_cached(r: &Render, path: &str, text: &str) -> bool {
     code_cached(code_key(r, path, text)).is_some()
 }
 
-fn code_cached(key: u64) -> Option<(String, bool)> {
+fn code_cached(key: u64) -> Option<Code> {
     let g = CODE_CACHE.lock().ok()?;
     g.as_ref()?.get(key)
 }
@@ -89,7 +99,14 @@ fn code_cached(key: u64) -> Option<(String, bool)> {
 /// Returns the line blocks and whether it was cut at the line cap.
 /// One div per line: the number is a CSS counter, so it neither selects nor copies.
 /// Highlighting costs ~0.7 ms/KB, so a blob is rendered once per content.
+#[cfg(test)]
 pub(crate) fn code_html(r: &Render, path: &str, text: &str) -> (String, bool) {
+    let c = code(r, path, text);
+    (c.html, c.cut)
+}
+
+/// [`code_html`] with the symbols named in the same pass.
+pub(crate) fn code(r: &Render, path: &str, text: &str) -> Code {
     let key = code_key(r, path, text);
     if let Some(hit) = code_cached(key) {
         return hit;
@@ -104,17 +121,26 @@ pub(crate) fn code_html(r: &Render, path: &str, text: &str) -> (String, bool) {
 
 /// Like `code_html`, but a big uncached file highlights only its first chunks and marks the
 /// block `data-hl` so the page fetches the rest from `code_tail_html` after first paint.
-pub(crate) fn code_html_first(r: &Render, path: &str, text: &str) -> (String, bool) {
+/// The symbols are those of the highlighted part: the lines a big file shows plain at first
+/// name none until its tail is highlighted and kept.
+pub(crate) fn code_first(r: &Render, path: &str, text: &str) -> Code {
     if text.len() <= EAGER_BYTES || code_cached(code_key(r, path, text)).is_some() {
-        return code_html(r, path, text);
+        return code(r, path, text);
     }
     code_html_uncached(r, path, text, EAGER_CHUNKS * CHUNK_LINES)
 }
 
-/// The chunks `code_html_first` left plain, highlighted. Empty when the file has no chunk
+/// [`code_first`] without the symbols.
+#[cfg(test)]
+pub(crate) fn code_html_first(r: &Render, path: &str, text: &str) -> (String, bool) {
+    let c = code_first(r, path, text);
+    (c.html, c.cut)
+}
+
+/// The chunks `code_first` left plain, highlighted. Empty when the file has no chunk
 /// past the eager ones, which is also the answer for a direct request on a small file.
 pub(crate) fn code_tail_html(r: &Render, path: &str, text: &str) -> String {
-    let (full, _) = code_html(r, path, text);
+    let full = code(r, path, text).html;
     let marker = "<div class=\"ch\"";
     let end = full.len() - "</div>".len();
     let from = full
@@ -124,10 +150,19 @@ pub(crate) fn code_tail_html(r: &Render, path: &str, text: &str) -> String {
     full[from..end].to_owned()
 }
 
-fn code_html_uncached(r: &Render, path: &str, text: &str, lit_lines: usize) -> (String, bool) {
+fn code_html_uncached(r: &Render, path: &str, text: &str, lit_lines: usize) -> Code {
+    let first = text.lines().next().unwrap_or("");
     let mut hl = (text.len() <= r.highlight_bytes)
-        .then(|| crate::highlight::for_file(path, text.lines().next().unwrap_or("")))
-        .flatten();
+        .then(|| crate::highlight::for_file(path, first))
+        .flatten()
+        .map(|h| {
+            if crate::symbols::scoped(path, first) {
+                h.with_symbols()
+            } else {
+                h
+            }
+        });
+    let mut symbols = Vec::new();
     let lazy = hl.is_some() && lit_lines != usize::MAX;
     let mut out = String::with_capacity(text.len() + text.len() / 8 + 64);
     // The number column is sized by the widest line number shown, floored at three digits.
@@ -152,7 +187,7 @@ fn code_html_uncached(r: &Render, path: &str, text: &str, lit_lines: usize) -> (
             break;
         }
         if i == lit_lines {
-            hl = None;
+            symbols = hl.take().map(|mut h| h.take_symbols()).unwrap_or_default();
         }
         if i % CHUNK_LINES == 0 {
             if open {
@@ -172,7 +207,14 @@ fn code_html_uncached(r: &Render, path: &str, text: &str, lit_lines: usize) -> (
         out.push_str("</div>");
     }
     out.push_str("</div>");
-    (out, cut)
+    if let Some(mut h) = hl {
+        symbols = h.take_symbols();
+    }
+    Code {
+        html: out,
+        cut,
+        symbols,
+    }
 }
 
 /// How recent a line is, 0 (this month) to 4 (older than six years): the class of its heat bar.

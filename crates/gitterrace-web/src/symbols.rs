@@ -2,13 +2,15 @@
 //! its line, for the "On this page" list of the file page.
 //!
 //! The language comes from the highlighter's detector, so the outline and the colours agree.
-//! Each language has a small scanner rather than a grammar: a full syntect parse costs 100 to
-//! 400 ms on a 5000-line file, a scan under 2 ms. Strings and comments are skipped first, so a
-//! keyword inside one is never read as a declaration.
+//! Rust, Go, Python and TS/JS have a small scanner: exact about nesting and members, and
+//! under 2 ms on a 5000-line file. Every other language takes the declarations its grammar
+//! names (`scopes`), recorded by the highlight pass the page already makes, so no language
+//! pays a second parse.
 
 mod lex;
 mod python;
 mod rust_go;
+pub(crate) mod scopes;
 mod script;
 mod walk;
 
@@ -108,8 +110,25 @@ fn scanner(language: &str) -> Option<Scanner> {
     }
 }
 
-/// The symbols of `text`, a file at `path`, in source order. Empty for a language without a
-/// scanner.
+/// Whether a file's language has a scanner, so its highlight pass need not record symbols.
+pub(crate) fn scanned(path: &str, first_line: &str) -> bool {
+    crate::highlight::language(path, first_line).is_some_and(|l| scanner(l).is_some())
+}
+
+/// Whether the highlight pass of a file records the symbols its grammar names: a language
+/// without a scanner, and not prose or data whose grammar reuses `entity.name` for headers.
+pub(crate) fn scoped(path: &str, first_line: &str) -> bool {
+    crate::highlight::language(path, first_line).is_some_and(|l| {
+        scanner(l).is_none()
+            && !matches!(
+                l,
+                "Email" | "Command Help" | "Manpage" | "MediaWiki" | "Textile" | "BibTeX"
+            )
+    })
+}
+
+/// The symbols of `text`, a file at `path`, in source order, by its scanner. Empty for a
+/// language without one.
 pub(crate) fn symbols(path: &str, text: &str) -> Vec<Symbol> {
     let first = text.lines().next().unwrap_or("");
     let Some(language) = crate::highlight::language(path, first) else {
@@ -125,14 +144,26 @@ pub(crate) fn symbols(path: &str, text: &str) -> Vec<Symbol> {
 /// The outline entries of a file: each symbol on a line the page shows (the first `lines`),
 /// linked to that line's anchor. Top-level symbols are level 2, members level 3, the two
 /// levels the outline lists. Only the shown lines are read, so a cut file costs no more than
-/// the page.
-pub(crate) fn outline(path: &str, text: &str, lines: usize) -> Vec<OutlineItem> {
+/// the page. `named` are the symbols the highlight pass recorded, used when the language has
+/// no scanner.
+pub(crate) fn outline(
+    path: &str,
+    text: &str,
+    lines: usize,
+    named: Vec<Symbol>,
+) -> Vec<OutlineItem> {
     let shown = text
         .match_indices('\n')
         .nth(lines.saturating_sub(1))
         .map_or(text, |(i, _)| &text[..i]);
     let shown = if lines == 0 { "" } else { shown };
-    symbols(path, shown)
+    let first = shown.lines().next().unwrap_or("");
+    let found = if scanned(path, first) {
+        symbols(path, shown)
+    } else {
+        named
+    };
+    found
         .into_iter()
         .map(|s| OutlineItem {
             level: 2 + s.depth.min(1),

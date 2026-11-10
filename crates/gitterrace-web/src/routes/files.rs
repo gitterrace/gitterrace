@@ -208,10 +208,9 @@ pub(super) async fn blob(
         };
         let too_large = b.size > a.repo.text_limit();
         let text = b.text.as_deref().filter(|_| !too_large);
-        let (html, cut) = text.map_or((None, false), |t| {
-            let (h, cut) = views::code_html_first(&views::Render::of(a), &path, t);
-            (Some(h), cut)
-        });
+        let code = text.map(|t| views::code_first(&views::Render::of(a), &path, t));
+        let cut = code.as_ref().is_some_and(|c| c.cut);
+        let (html, named) = code.map_or((None, Vec::new()), |c| (Some(c.html), c.symbols));
         let preview = crate::features::on(Feature::MarkdownPreview);
         let doc = text.filter(|_| preview && is_markdown(&path)).map(|t| {
             let dir = path.rsplit_once('/').map_or("", |(d, _)| d);
@@ -222,7 +221,7 @@ pub(super) async fn blob(
         });
         let symbols = match (&doc, text, media.is_some()) {
             (None, Some(t), false) => {
-                crate::symbols::outline(&path, t, views::Render::of(a).blob_lines)
+                crate::symbols::outline(&path, t, views::Render::of(a).blob_lines, named)
             }
             _ => Vec::new(),
         };
