@@ -139,12 +139,6 @@ commits it lists. The process peaked at 2.35 GB resident during the full set
 build that preceded these numbers, and held 1.6 GB after the searches,
 mostly the set build's allocator state.
 
-## Not measured
-
-Browser rendering and JavaScript, network latency (the server is local),
-concurrent clients, the worktree view, incremental index updates after new
-commits, and a spinning disk.
-
 ## Reproduce
 
 ```sh
