@@ -134,16 +134,7 @@ pub(crate) fn iso(time: i64) -> String {
 }
 
 pub(crate) fn now() -> i64 {
-    // The equivalence oracle freezes the clock so "3 days ago" does not move between runs.
-    if let Some(t) = std::env::var("GITTERRACE_TEST_NOW")
-        .ok()
-        .and_then(|v| v.parse().ok())
-    {
-        return t;
-    }
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map_or(0, |d| i64::try_from(d.as_secs()).unwrap_or(0))
+    gitterrace_index::wall_clock()
 }
 
 pub(crate) fn size(bytes: u64) -> String {

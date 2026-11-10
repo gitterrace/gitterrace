@@ -7,7 +7,6 @@
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use gitterrace_git::Repo;
 use serde::{Deserialize, Serialize};
@@ -188,16 +187,7 @@ fn short_hash(path: &Path) -> String {
 }
 
 fn now() -> u64 {
-    // The equivalence oracle freezes the clock so registry stamps do not move between runs.
-    if let Some(t) = std::env::var("GITTERRACE_TEST_NOW")
-        .ok()
-        .and_then(|v| v.parse().ok())
-    {
-        return t;
-    }
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map_or(0, |d| d.as_secs())
+    u64::try_from(gitterrace_index::wall_clock()).unwrap_or(0)
 }
 
 /// The `keep` most recently served entries, newest first.

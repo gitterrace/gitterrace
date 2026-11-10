@@ -544,8 +544,9 @@ fn skipped(n: usize, dir: &std::path::Path) {
     );
 }
 
-/// Seconds since the epoch on this machine's clock.
-fn wall_clock() -> i64 {
+/// Seconds since the epoch on this machine's clock, frozen by `GITTERRACE_TEST_NOW`. The one
+/// reader of the clock: the web pages and the registry stamp through it.
+pub fn wall_clock() -> i64 {
     // The equivalence oracle freezes the clock so period windows do not move between runs.
     if let Some(t) = std::env::var("GITTERRACE_TEST_NOW")
         .ok()
