@@ -226,7 +226,7 @@ fn a_rev_view_equals_a_fresh_load_of_that_rev() {
         };
         let got = got.unchecked();
         assert_eq!(view(&*got), view(&mem), "tip {tip}");
-        assert_eq!(got.fresh_len(), reads, "tip {tip}");
+        assert_eq!(got.fresh.rows.len(), reads, "tip {tip}");
         assert_eq!(git.reads.load(std::sync::atomic::Ordering::Relaxed), reads);
     }
 }

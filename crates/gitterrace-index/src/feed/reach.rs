@@ -122,12 +122,6 @@ impl<S: InsightsSource> Reach<S> {
         &self.base
     }
 
-    /// Commits the view read from git.
-    #[cfg(test)]
-    pub(crate) const fn fresh_len(&self) -> usize {
-        self.fresh.rows.len()
-    }
-
     fn dense(&self, base: Rank) -> Option<Rank> {
         if !bit(&self.bits, base.0) {
             return None;

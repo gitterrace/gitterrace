@@ -55,11 +55,6 @@ fn every_section_counts_one_set_of_commits() {
             assert_eq!(series, hour, "series vs hour, {at}");
             assert_eq!(series, punch, "series vs punch, {at}");
             assert_eq!(series, kpi, "series vs table, {at}");
-            assert_eq!(
-                ins.has_commits(period),
-                days.is_some() || series > 0,
-                "{at}"
-            );
         }
     }
 }

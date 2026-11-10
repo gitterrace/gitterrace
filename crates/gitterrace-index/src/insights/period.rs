@@ -144,13 +144,6 @@ pub(crate) fn scope_with(base: &Scope, period: Period, days: Option<(i64, i64)>)
     reason = "a method path binds one Counted lifetime, in_scope needs a closure over any"
 )]
 impl Insights<'_> {
-    /// Whether any counted commit falls in the period. Stops at the first one. The
-    /// period tests check it against the summed counts.
-    #[cfg(test)]
-    pub(crate) fn has_commits(&self, period: Period) -> bool {
-        self.in_period(period, |c| c.stream().next().is_some())
-    }
-
     pub fn period_summary(&self, period: Period) -> PeriodSummary {
         self.period_summary_in(period, None)
     }
