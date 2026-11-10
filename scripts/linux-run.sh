@@ -8,7 +8,7 @@
 # target/ live in named volumes, so repeat runs are incremental.
 set -euo pipefail
 root=$(cd "$(dirname "$0")/.." && pwd)
-dockerfile=$root/scripts/docker/linux.Dockerfile
+dockerfile=$root/deploy/test/linux.Dockerfile
 
 # Prints the mode for the arguments, or fails on an unknown one.
 parse_args() {
@@ -47,7 +47,7 @@ self_test() {
   want=$(toolchain_pin "$root/rust-toolchain.toml")
   got=$(toolchain_pin "$dockerfile")
   if [ -z "$want" ] || [ "$want" != "$got" ]; then
-    fail "scripts/docker/linux.Dockerfile pins '$got', rust-toolchain.toml pins '$want'"
+    fail "deploy/test/linux.Dockerfile pins '$got', rust-toolchain.toml pins '$want'"
   fi
   echo "linux-run self-test: ok (toolchain $want)"
 }
@@ -67,7 +67,7 @@ docker info >/dev/null 2>&1 || {
   exit 1
 }
 
-docker build -q -t gitterrace-linux -f "$dockerfile" "$root/scripts/docker" >/dev/null
+docker build -q -t gitterrace-linux -f "$dockerfile" "$root/deploy/test" >/dev/null
 run=(docker run --rm
   -v "$root:/src:ro"
   -v gitterrace-linux-cargo:/usr/local/cargo/registry

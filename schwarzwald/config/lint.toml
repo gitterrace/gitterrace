@@ -35,7 +35,8 @@ not_id = ['consumer arbitration board']
 
 [root]
 # Every tracked top-level entry must be listed, grouped by why it stays at the root. A new file
-# goes under scripts/, tests/, docs/ or schwarzwald/config/, or is added here with its reason.
+# goes under scripts/, tests/, docs/, deploy/ or schwarzwald/config/, or is added here with its
+# reason.
 allow = [
   # Project documents
   "AGENTS.md",
@@ -76,6 +77,8 @@ allow = [
   # Make, and the code and content folders
   "Makefile",
   "crates",
+  # The images the dev scripts and CI build besides the user Dockerfile
+  "deploy",
   "docs",
   "schwarzwald",
   "scripts",

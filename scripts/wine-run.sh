@@ -18,7 +18,7 @@ exe="$tdir/$target/release/git-terrace.exe"
   echo "missing $exe" >&2
   exit 1
 }
-docker=$root/scripts/docker
+docker=$root/deploy/test
 docker build -q -t gitterrace-wine -f "$docker/wine.Dockerfile" "$docker" >/dev/null
 docker run --rm \
   -v "$exe:/work/git-terrace.exe:ro" \

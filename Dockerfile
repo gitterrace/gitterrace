@@ -7,7 +7,7 @@
 # working tree, no actions, no settings writes. docs/online.md#run-with-docker has
 # the details.
 # Base images are pinned by digest and rustup-init by sha256, like
-# scripts/docker/linux.Dockerfile.
+# deploy/test/linux.Dockerfile.
 
 FROM debian:trixie-slim@sha256:f6b08b09a05725f9431502d3b5714f5c4576e82c1a84fa1debe0c24a7e0c3ec4 AS build
 # Keep in step with rust-toolchain.toml (scripts/docker-check.sh checks it).
