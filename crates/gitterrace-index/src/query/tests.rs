@@ -44,6 +44,7 @@ fn refusals_say_what_is_supported() {
         "type:fix,",
         "after:soon",
         "after:all",
+        "before:2026-02-30",
         "\"open",
         "!",
         "path:/",
@@ -95,7 +96,7 @@ fn when() -> impl Strategy<Value = When> {
             Period::Year
         ])
         .prop_map(When::Period),
-        (1970..2100i32, 1..=12u8, 1..=28u8).prop_map(|(y, m, d)| When::Day { y, m, d }),
+        (0..50_000i64).prop_map(When::Day),
     ]
 }
 

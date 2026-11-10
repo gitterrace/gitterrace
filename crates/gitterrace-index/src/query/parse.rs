@@ -277,11 +277,5 @@ fn bound(v: &str, all_ok: bool) -> Option<Bound> {
             p => Some(Bound::At(When::Period(p))),
         };
     }
-    let mut it = v.splitn(3, '-');
-    let (y, m, d) = (it.next()?, it.next()?, it.next()?);
-    if y.len() != 4 || m.len() != 2 || d.len() != 2 {
-        return None;
-    }
-    let (y, m, d): (i32, u8, u8) = (y.parse().ok()?, m.parse().ok()?, d.parse().ok()?);
-    ((1..=12).contains(&m) && (1..=31).contains(&d)).then_some(Bound::At(When::Day { y, m, d }))
+    crate::parse_day(v).map(|d| Bound::At(When::Day(d)))
 }

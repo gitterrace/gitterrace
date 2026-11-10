@@ -45,7 +45,8 @@ pub enum Leaf {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum When {
     Period(Period),
-    Day { y: i32, m: u8, d: u8 },
+    /// A day number, as [`crate::parse_day`] reads `YYYY-MM-DD`.
+    Day(i64),
 }
 
 /// Text the parser refuses, with the byte range it points at.
@@ -129,12 +130,10 @@ impl Leaf {
 impl When {
     /// The bound in epoch seconds with `now` the newest commit's time.
     #[must_use]
-    pub fn instant(self, now: i64) -> i64 {
+    pub const fn instant(self, now: i64) -> i64 {
         match self {
             Self::Period(p) => p.window(now).0,
-            Self::Day { y, m, d } => {
-                crate::days_from_civil(i64::from(y), i64::from(m), i64::from(d)) * 86_400
-            }
+            Self::Day(d) => d.saturating_mul(86_400),
         }
     }
 }
@@ -143,7 +142,7 @@ impl std::fmt::Display for When {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Period(p) => f.write_str(p.as_str()),
-            Self::Day { y, m, d } => write!(f, "{y:04}-{m:02}-{d:02}"),
+            Self::Day(d) => f.write_str(&crate::format_date(*d)),
         }
     }
 }
