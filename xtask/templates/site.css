@@ -122,7 +122,7 @@ main img,main svg{max-width:100%;height:auto}
 main table{display:block;width:auto;border:0}
 main thead{display:none}
 main tbody,main tr,main td{display:block}
-main tr{padding:var(--space-2) 0;border-top:var(--border)}
+main tr+tr{margin-top:var(--space-4)}
 main tr:nth-child(2n){background:none}
 main td{border:0;padding:0 0 2px;overflow-x:auto}
 main td:first-child{font-weight:var(--weight-semibold)}
@@ -155,7 +155,7 @@ font-size:var(--text-sm);line-height:1.45}
 
 /* Previous and next at the end of a docs page. */
 .pager{display:flex;justify-content:space-between;gap:var(--space-4);
-margin-top:var(--space-16);padding-top:var(--space-4);border-top:var(--border)}
+margin-top:var(--space-16)}
 .pager a{display:flex;flex-direction:column;text-decoration:none;font-weight:var(--weight-semibold)}
 .pager a span{font:var(--weight-regular) var(--text-2xs)/1.4 var(--mono);
 text-transform:uppercase;letter-spacing:.12em;color:var(--muted)}
@@ -171,7 +171,7 @@ border:var(--border);border-radius:var(--radius)}
 .promises{padding-left:var(--space-6)}
 .more{color:var(--muted)}
 ul.lines{list-style:none;padding:0}
-ul.lines li{padding:var(--space-2) 0;border-top:var(--border)}
+ul.lines li+li{margin-top:var(--space-3)}
 .shots{display:grid;grid-template-columns:1fr 1fr;gap:var(--space-6) var(--space-4);
 margin:var(--space-6) 0}
 @media (max-width:640px){.shots{grid-template-columns:1fr}}
