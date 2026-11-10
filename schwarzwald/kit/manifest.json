@@ -1,7 +1,7 @@
 {
   "schwarzwald": null,
   "dirty": false,
-  "date": "2026-11-10T04:02:05Z",
+  "date": "2026-11-10T14:28:17Z",
   "parts": [
     "configs",
     "fonts",
@@ -13,8 +13,14 @@
     "tokens",
     "tools"
   ],
+  "exclude": [
+    "tools/bulk-read*",
+    "tools/denylist-merge.py",
+    "tools/id-scan.py",
+    "tools/selftest.py"
+  ],
   "files": {
-    "README.md": "aed68b58dc025113cdf6efa5e3ac20e24860af5d501782324c5834b9ac2ff95e",
+    "README.md": "55253526056cb4472c4902f59e719e9cb615133dc31976d340ed11c7c5737475",
     "check.py": "7e6cb0ce8e4284252a0a153c0c91835f9606b4700bb8dc8ddad0fcbc688576b5",
     "configs/cliff-base.toml": "af6d61d5605368953ec077c37cd66b6670cd54ae8dbfb7681a2e33c2cf71d4cf",
     "configs/clippy-base.toml": "e2d4a22a5fbdab27da1188a8a664eefc40134d12f1d56cbe4af0a45936c2b77a",
@@ -264,22 +270,17 @@
     "rust/src/lib.rs": "7430676cd08d77cd0cb6f05cff78779fea693973c96edf68b5c2bdc0973dc188",
     "tokens/design-tokens.json": "39b39ed41d5c6980af8f221260dc0a5e199aebb1f5f5bc4bf29628450ea1bd02",
     "tokens/theme-tokens.json": "0826a8c8440be38917921555c621f6e997e837e78d6e9f3e977ba8873ea4abdd",
-    "tools/bulk-read.py": "b4ee94963113fe55835a661eebce6ffd7d1114c6e2e902b6bd6f1871ea11bab2",
-    "tools/bulk-read_test.py": "40d729093fc5c0381ff1423bc369b892d3d6826dd6c277326b3dc41700504f4b",
     "tools/changelog-gen.sh": "462757c9fe38bb9065a9853e1b40b79b29a7dd19c6fa0e197ce2b525972a11f2",
-    "tools/denylist-merge.py": "817e54b3306ec13c7a781825fdf244adfe7337d93b6fb83eaa36fb7753474037",
     "tools/disk-floor.py": "a122b96e20665f6a67201744ac5317e1a66c84829500c53885afbb88ba994d23",
     "tools/disk-floor.sh": "45d43d7482f1cc059658f041c67bad0ee310ffd492efb6626847fa5f914b7054",
     "tools/disk-sweep.py": "1fbc731e86111aa13257afddcacaf94305948814293a7dffceb22f4613840444",
     "tools/disk_test.py": "ae80253c87a63d25b5cf8c4458d999e0dbc2eac34d8515c7f56d7357225dd385",
     "tools/golden.py": "660c09eb8d88ccc80e6c6c76e0747ba352377475e9e8a25e1abf4575089dd712",
     "tools/golden_test.py": "81b91e673ddc81a4d276cec02148e49845fa32263930f72fa2a597031f34cd9e",
-    "tools/id-scan.py": "e179372fd0b61b48fc075c892f6456e0e604ccfda857e7f9d26742ce11a6d27d",
     "tools/land.sh": "31f15c5d78a0896381c681888ee2f26d26977516c9bfa39fd4748d55d966c409",
     "tools/land_test.sh": "bd22757d4abffb33e2a66bc944a3670be589e428d6ecd42d22be259193af4309",
     "tools/ratchet-check.py": "cb8526f43aaba95ca85cec9063229dc20dda2e26976311466020bcafd383e9ad",
     "tools/scratch.sh": "eafaaf22d09b440f0a25fae4c8e1fc5c7e8b01dc4c8e81e5dbcdd890b6757142",
-    "tools/selftest.py": "010c69a52d1caeb88209acacd7387bf797c8fa06e820f56766334181229fcd6b",
     "tools/test-sandbox.sh": "e58e5ce84dccfd9add2bc62467cb38e37346580e45c850a2c9b6118ae64f402e"
   },
   "exec": [
@@ -326,8 +327,6 @@
     "lint/personal-data.py",
     "lint/root-entries.py",
     "lint/run.sh",
-    "tools/bulk-read.py",
-    "tools/bulk-read_test.py",
     "tools/changelog-gen.sh",
     "tools/disk-floor.py",
     "tools/disk-floor.sh",
@@ -335,11 +334,9 @@
     "tools/disk_test.py",
     "tools/golden.py",
     "tools/golden_test.py",
-    "tools/id-scan.py",
     "tools/land.sh",
     "tools/ratchet-check.py",
     "tools/scratch.sh",
-    "tools/selftest.py",
     "tools/test-sandbox.sh"
   ]
 }
