@@ -60,8 +60,6 @@ pub use walk::{
     BlobId, BlobReader, CommitScan, FileRef, LastCommit, canonical_order, files, files_named,
     last_commits, last_commits_among, scan_commits, tree_id,
 };
-#[cfg(test)]
-pub use watch::Cost;
 pub use watch::{Parts, Watcher};
 pub use worktree::{
     WORKTREE_DIFF_BYTES, WORKTREE_FILES, is_dirty, worktree_bytes, worktree_diff,

@@ -31,8 +31,6 @@ mod raw;
 pub(crate) use assets::assets;
 pub use assets::font_bytes;
 pub(crate) use commits::DayGroup;
-#[cfg(test)]
-use commits::indexed_author_ids;
 use commits::{commit, log};
 pub(crate) use files::prewarm_blame;
 use files::{blame, blob, highlight_tail, tree, tree_root};

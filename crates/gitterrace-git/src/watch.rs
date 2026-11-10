@@ -99,9 +99,9 @@ struct Listed {
 /// System calls one tick made. Tests assert on it; the watcher itself never reads it.
 #[cfg(test)]
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
-pub struct Cost {
-    pub stats: u64,
-    pub dir_listings: u64,
+pub(crate) struct Cost {
+    pub(crate) stats: u64,
+    pub(crate) dir_listings: u64,
 }
 
 /// One hash per kind of change, so a page can react to what it shows. Equal parts mean that
@@ -177,7 +177,7 @@ impl Watcher {
 
     /// System calls made by the last [`Watcher::fingerprint`].
     #[cfg(test)]
-    pub const fn last_cost(&self) -> Cost {
+    pub(crate) const fn last_cost(&self) -> Cost {
         self.cost
     }
 

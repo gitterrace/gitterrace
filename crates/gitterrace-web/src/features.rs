@@ -70,41 +70,6 @@ pub(crate) const FEATURE_ROUTES: &[(Feature, &[&str])] = &[
     (Feature::Mermaid, &[crate::MERMAID_JS]),
 ];
 
-/// Every route no switch turns off: the pages a code browser is made of and their plumbing.
-/// `/api/v1` ones still need `api_enabled`. Only the coverage test reads it: a route the gate
-/// finds in neither table is always on, so the test makes a new route pick its table.
-#[cfg(test)]
-pub(crate) const CORE_ROUTES: &[&str] = &[
-    "/",
-    "/log",
-    "/log/{rev}",
-    "/commit/{id}",
-    "/diff/{rev}/{index}",
-    "/tree/{rev}",
-    "/tree/{rev}/",
-    "/tree/{rev}/{*path}",
-    "/blob/{rev}/{*path}",
-    "/hl/{rev}/{*path}",
-    "/refs",
-    "/tag/{name}",
-    "/api/files/{rev}",
-    "/api/refs",
-    "/api/last/{rev}",
-    "/api/last/{rev}/{*path}",
-    "/api/progress",
-    "/r/{name}",
-    "/r/{name}/",
-    "/r/{name}/{*rest}",
-    "/go/{*rest}",
-    "/api/v1/",
-    "/api/v1/repo",
-    "/api/v1/refs",
-    "/api/v1/log",
-    "/api/v1/commits/{id}",
-    "/api/v1/tree",
-    "/api/v1/blob",
-];
-
 /// The route of each `insights.pages` entry; a page off in the list answers 404 there.
 pub(crate) const INSIGHT_ROUTES: &[(&str, &str)] = &[
     ("activity", "/stats"),

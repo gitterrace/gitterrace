@@ -10,7 +10,41 @@ use gitterrace_testkit::{Fixture, base, get};
 use http_body_util::BodyExt;
 use tower::ServiceExt;
 
-use crate::features::{CORE_ROUTES, FEATURE_ROUTES, INSIGHT_ROUTES, route_on, warm};
+use crate::features::{FEATURE_ROUTES, INSIGHT_ROUTES, route_on, warm};
+
+/// Every route no switch turns off: the pages a code browser is made of and their plumbing.
+/// `/api/v1` ones still need `api_enabled`. The coverage test below reads it: a route the gate
+/// finds in neither table is always on, so the test makes a new route pick its table.
+const CORE_ROUTES: &[&str] = &[
+    "/",
+    "/log",
+    "/log/{rev}",
+    "/commit/{id}",
+    "/diff/{rev}/{index}",
+    "/tree/{rev}",
+    "/tree/{rev}/",
+    "/tree/{rev}/{*path}",
+    "/blob/{rev}/{*path}",
+    "/hl/{rev}/{*path}",
+    "/refs",
+    "/tag/{name}",
+    "/api/files/{rev}",
+    "/api/refs",
+    "/api/last/{rev}",
+    "/api/last/{rev}/{*path}",
+    "/api/progress",
+    "/r/{name}",
+    "/r/{name}/",
+    "/r/{name}/{*rest}",
+    "/go/{*rest}",
+    "/api/v1/",
+    "/api/v1/repo",
+    "/api/v1/refs",
+    "/api/v1/log",
+    "/api/v1/commits/{id}",
+    "/api/v1/tree",
+    "/api/v1/blob",
+];
 
 /// Every route the server answers: the classified page routes, the API registry and the one
 /// switchable asset.

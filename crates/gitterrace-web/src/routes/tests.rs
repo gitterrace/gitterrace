@@ -5,7 +5,8 @@ use std::sync::Arc;
 use axum::extract::{Path, State};
 use gitterrace_index::{CommitRecord, FileStat};
 
-use crate::routes::{commit, indexed_author_ids};
+use crate::routes::commit;
+use crate::routes::commits::indexed_author_ids;
 
 /// Guard: after the index is ready, the costliest files are blamed off the request path, so
 /// the first visitor reads the cache. Ranking is size times churn, and it stops at N.
