@@ -245,7 +245,7 @@ settings! {
         /// Address to listen on. Keep it local: pages show source code and there is no login. Needs
         /// a restart.
         addr: String = DEFAULT_ADDR.to_owned() => Restart,
-        /// Maximum open live-update streams per repository (one per browser tab).
+        /// Most live-update streams open at once per repository (one per browser tab).
         live_streams: usize = 32 => Live,
         /// Serve read-only to anyone who can reach the address: committed history only, no
         /// working tree, stashes, live updates, actions or additions. Required for any address
@@ -260,7 +260,8 @@ settings! {
         public_timeout_secs: u64 = 30 => Restart + cost,
     }
     watch: Watch {
-        /// Notice new commits and refs while running. Off means a restart or a reload is needed.
+        /// Notice new commits and refs while running. Off, they show only after a restart or a
+        /// reload.
         enabled: bool = true => Live,
         /// The safety rescan, in seconds. The OS reports file changes, so a new commit, a ref or
         /// a staged file usually shows within about a second, and the working tree is scanned
@@ -268,7 +269,7 @@ settings! {
         /// without a word, and then it shows within this many seconds, so lower it for a tighter
         /// bound (each rescan checks HEAD, refs and index with a few `stat` calls, plus a full
         /// status while a tab shows the working tree). With no tab open nothing runs more often.
-        /// Minimum 5.
+        /// At least 5.
         rescan_secs: u64 = 30 => Live,
     }
     index: Index {
@@ -276,16 +277,17 @@ settings! {
         /// repository, at its first visit when several share the server. Off waits for the first
         /// page that needs it (Insights).
         build_on_start: bool = true => Live,
-        /// Threads that parse the index. 0 means one per core, capped at 8. Needs a restart.
+        /// Threads that parse the index. 0 means one per core. Needs a restart.
         threads: usize = 0 => Restart,
         /// Keep the commit messages in the index so commit search reads them there instead of
         /// walking the history. Costs about 12% more cache on disk (31 MB for 345k commits)
         /// and one extra pass over the history when first turned on (16 s for 345k commits).
-        /// Off, commit search walks git: 3 s on that history when nothing matches, 70 ms on.
+        /// Off, commit search walks git instead: 3 s on that history when nothing matches,
+        /// against 70 ms with this on.
         has_messages: bool = true => Live,
     }
     resources: Resources {
-        /// Memory for the serving caches of one repository together, in MB, shared out in
+        /// Memory for the serving caches of one repository together, in MiB, shared out in
         /// sixteenths between the caches. An entry over an eighth of its cache is not kept. An idle
         /// server keeps only the rendered pages.
         cache_mb: usize = 32 => Live,
@@ -296,50 +298,50 @@ settings! {
     limits: Limits {
         /// Largest file shown as text, in KiB. Larger files are offered as raw downloads.
         text_kb: u64 = 2048 => Live + cost,
-        /// Largest file served raw, in MB. A larger one is refused.
+        /// Largest file served raw, in MiB. A larger one is refused.
         raw_mb: u64 = 256 => Live + cost,
         /// Most matches a code search returns. Past it the search stops and says it was cut off.
         search_matches: usize = 500 => Live + cost,
-        /// Matching lines one file keeps in a code search. Past it the file says more matched.
+        /// Most matching lines one file keeps in a code search. Past it the file says more matched.
         search_file_lines: usize = 100 => Live + cost,
         /// Most commits a commit search lists. Past it the search stops and says it was cut off.
         search_commits: usize = 200 => Live + cost,
-        /// Lines of one file's diff shown before it folds. A folded file loads on demand.
+        /// Most lines of one file's diff shown before it folds. A folded file loads on demand.
         diff_fold_lines: usize = 400 => Live + cost,
-        /// Lines a file page shows. Past it the page cuts the file and says so. `api.blob_lines`
-        /// is the API's own cut.
+        /// Most lines a file page shows. Past it the page cuts the file and says so.
+        /// `api.blob_lines` is the API's own cut.
         blob_lines: usize = 20_000 => Live + cost,
         /// Largest text highlighted, in KiB: a file, its blame, one file's diff or a Markdown
         /// code block. Larger text shows plain.
         highlight_kb: usize = 256 => Live + cost,
-        /// History pages a log reaches: a later page number shows the last of them.
+        /// Most history pages a log reaches. A later page number shows the last of them.
         log_pages: usize = 1000 => Live + cost,
-        /// Largest image whose pixel size a file page reads, in MB. A larger one shows no
+        /// Largest image whose pixel size a file page reads, in MiB. A larger one shows no
         /// pixel size.
         preview_mb: u64 = 16 => Live + cost,
-        /// Changed files the Uncommitted view lists. Past it the rest are left out.
+        /// Most changed files the Uncommitted view lists. Past it the rest are left out.
         worktree_files: usize = 2000 => Live,
         /// Largest working-tree file the Uncommitted view diffs, in KiB. A larger one is listed
         /// without hunks.
         worktree_diff_kb: usize = 1024 => Live,
-        /// Commits a view of a revision outside the indexed history reads from git per request.
+        /// Most commits a view of a revision outside the indexed history reads from git per
+        /// request.
         /// Past it the view asks for a reindex instead. Needs a restart.
         unindexed_commits: usize = 2000 => Restart + cost,
         /// Output kept from each stream (stdout, stderr) of an action, in KiB. The rest is read
         /// and dropped. Needs a restart.
         action_output_kb: usize = 64 => Restart,
-        /// Repositories remembered in `repos.json`, newest first. Past it the least recently
+        /// Most repositories remembered in `repos.json`, newest first. Past it the least recently
         /// served are forgotten with their names. Needs a restart.
         registry_entries: usize = 500 => Restart,
         /// Most pages `git terrace export` writes, folded diff fragments included. Past it the
-        /// export stops and writes nothing. `export --export-pages` overrides it. Between 1 and
-        /// 10000000.
+        /// export stops and writes nothing. `export --export-pages` overrides it.
         export_pages: usize = 20_000 => Live,
     }
     api: Api {
         /// Most commits one `log` answer lists, whatever `per_page` asks.
         log_page_commits: usize = 500 => Live + cost,
-        /// Commits a `log` answer may skip to reach its page. A deeper page is refused.
+        /// Most commits a `log` answer may skip to reach its page. A deeper page is refused.
         log_skip_commits: usize = 50_000 => Live + cost,
         /// Most lines one `blob` answer carries, whatever `limit` asks. The rest is cut and
         /// `truncated` says so. `limits.blob_lines` is the file page's own cut.
@@ -349,7 +351,7 @@ settings! {
         blob_kb: usize = 256 => Live + cost,
         /// Most lines one `blame` answer carries. The rest is cut and `truncated` says so.
         blame_lines: usize = 5000 => Live + cost,
-        /// Most diff lines one commit answer carries, whatever `max_lines` asks. The rest is
+        /// Most diff lines one `commits` answer carries, whatever `max_lines` asks. The rest is
         /// cut and `truncated` says so.
         diff_lines: usize = 20_000 => Live + cost,
     }
@@ -360,8 +362,8 @@ settings! {
         include_bots: bool = false => Live,
         /// Count lock files and minified output.
         include_generated: bool = false => Live,
-        /// Period the insights pages use when the URL names none: 1w, 1m, 3m, 1y or all. The
-        /// API and MCP default to all. Their `period` parameter picks one.
+        /// Period the insights pages use when the URL names none: `1w`, `1m`, `3m`, `1y` or
+        /// `all`. The API and MCP default to `all`. Their `period` parameter picks one.
         period: Period = Period::All => Live,
         /// Insights pages, in the order the tabs show them: `activity`, `contributors`,
         /// `hotspots`, `languages` and `ownership`, plus the sections `types` and `frequency`
@@ -370,9 +372,9 @@ settings! {
         pages: Vec<String> = INSIGHT_PAGES.iter().map(|&s| s.to_owned()).collect() => Live,
     }
     display: Display {
-        /// Color theme before the visitor picks one: system, light or dark.
+        /// Color theme before the visitor picks one: `system`, `light` or `dark`.
         theme: ColorScheme = ColorScheme::System => Live,
-        /// How dates read: relative or absolute.
+        /// How dates read: `relative` or `absolute`.
         dates: DateStyle = DateStyle::Relative => Live,
         /// Overview sidebar sections, in the order shown: `now`, `loose_ends`, `recent`,
         /// `churn` and `languages`. Leave one out to hide it. An empty list hides the
@@ -412,9 +414,9 @@ settings! {
         picker_enabled: bool = true => Live,
         /// Show the front matter of a Markdown file as a table.
         front_matter_enabled: bool = true => Live,
-        /// Draw mermaid diagrams in Markdown; off shows their source.
+        /// Draw Mermaid diagrams in Markdown. Off shows their source.
         mermaid_enabled: bool = true => Live,
-        /// Render Markdown files and the README card; off shows them as their source.
+        /// Render Markdown files and the README card. Off shows them as their source.
         markdown_preview_enabled: bool = true => Live,
         /// Write the credit line (source, license, origin) at the foot of exported pages.
         /// Server-wide.
@@ -424,16 +426,17 @@ settings! {
         api_enabled: Option<bool> = None => Live,
     }
     multi: Multi {
-        /// How many folder levels to search below a given folder for repositories. Needs a restart.
+        /// Folder levels searched for repositories below a folder given on the command line.
+        /// Needs a restart.
         depth: usize = 2 => Restart,
         /// Folder names never searched, besides hidden ones. Needs a restart.
         skip_dirs: Vec<String> =
             vec!["node_modules".to_owned(), "target".to_owned(), ".wt".to_owned()] => Restart,
     }
     links: Links {
-        /// Form of the permalink Copy permalink, Send to, action payloads and the MCP hand out:
-        /// gitterrace (`gitterrace://<id>/<sha>/<path>`, opened by `git terrace open` without a
-        /// running server) or go (`http://<addr>/go/...`, needs this server running).
+        /// Permalink form that Copy permalink, Send to, action payloads and the MCP hand out:
+        /// `gitterrace` (`gitterrace://<id>/<sha>/<path>`, opened by `git terrace open` without
+        /// a running server) or `go` (`http://<addr>/go/...`, needs this server running).
         style: LinkStyle = LinkStyle::Gitterrace => Live,
         /// Folders `git terrace open` searches, `multi.depth` levels deep, for a clone a link
         /// names, besides every repository served before.
