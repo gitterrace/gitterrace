@@ -84,7 +84,7 @@ git terrace serve            Serve the repository in the browser (the default)
 git terrace config           Print the effective configuration and where each value comes from
 git terrace mcp              Run a read-only MCP server over stdio for agents [--served]
 git terrace open <link>      Open a `gitterrace://` or `/go` permalink in the browser, starting a server if needed [--print]
-git terrace remove [target]  Take a repository off the running server; its pages then answer 404
+git terrace remove [target]  Take a repository off the running server. Its pages then answer 404
 git terrace install-handler  Register (or with `--uninstall` remove) this program as the `gitterrace://` link handler [--uninstall]
 git terrace init             Write a documented `config.toml` and the pre-filled `actions.toml` to the config folder
 git terrace export [out]     Write a static copy of the site to a folder, for sharing or hosting [--force --commits --file-kb --export-pages --project]

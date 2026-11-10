@@ -9,7 +9,7 @@ print the same text. The global flags work on every command.
 
 ## `git terrace`
 
-Browse a git repository in your browser, offline
+Browse a git repository in your browser, offline.
 
 ```text
 git terrace [OPTIONS] [PATHS]... [COMMAND]
@@ -18,13 +18,13 @@ git terrace [OPTIONS] [PATHS]... [COMMAND]
 ## Global flags
 
 - `<PATHS>...`: Repositories to serve (any path inside one), or folders to
-  search two levels deep. Other commands use the first. Default `.`.
+  search two levels deep. Other commands use the first. Default: `.`.
 - `--addr <ADDR>`: Address to listen on. Local only by default. Overrides
   `server.addr`.
 - `--no-watch`: Do not watch for changes: no live updates, and a restart or
   reload picks up new commits. Overrides `watch.enabled`.
-- `--config <CONFIG>`: Folder holding `config.toml` (and `actions.toml`).
-  Defaults to the XDG config folder.
+- `--config <DIR>`: Folder holding `config.toml` (and `actions.toml`). Default:
+  the XDG config folder.
 - `--no-actions`: Never run user actions, even when `actions.toml` declares
   some.
 - `--public`: Serve read-only to other machines: committed history only.
@@ -32,7 +32,7 @@ git terrace [OPTIONS] [PATHS]... [COMMAND]
 
 ## `git terrace serve`
 
-Serve the repository in the browser (the default)
+Serve the repository in the browser (the default).
 
 ```text
 git terrace serve [OPTIONS] [PATHS]...
@@ -40,7 +40,7 @@ git terrace serve [OPTIONS] [PATHS]...
 
 ## `git terrace config`
 
-Print the effective configuration and where each value comes from
+Print the effective configuration and where each value comes from.
 
 ```text
 git terrace config [OPTIONS] [PATHS]...
@@ -79,11 +79,11 @@ git terrace open [OPTIONS] <LINK> [PATHS]...
 
 ## `git terrace remove`
 
-Take a repository off the running server; its pages then answer 404.
+Take a repository off the running server. Its pages then answer 404.
 
-The opposite of joining: the server on `server.addr` is found and proven the
-same way. The on-disk index stays, so serving it again is fast. The last
-repository stays served.
+The opposite of serving a repository while a server already runs: the server on
+`server.addr` is found and checked the same way. The on-disk index stays, so
+serving it again is fast. The last repository stays served.
 
 ```text
 git terrace remove [OPTIONS] [TARGET] [PATHS]...
@@ -122,7 +122,7 @@ git terrace init [OPTIONS] [PATHS]...
 
 ## `git terrace export`
 
-Write a static copy of the site to a folder, for sharing or hosting
+Write a static copy of the site to a folder, for sharing or hosting.
 
 ```text
 git terrace export [OPTIONS] [OUT] [PATHS]...
@@ -134,9 +134,9 @@ git terrace export [OPTIONS] [OUT] [PATHS]...
   Any other non-empty folder is refused without `--force`.
 - `--force`: Write into a non-empty folder that no earlier export made, over
   what is there.
-- `--commits <COMMITS>`: Newest commits to include as pages. Default `500`.
-- `--file-kb <FILE_KB>`: Largest file to include as a page, in KiB. Larger files
-  are left out of the export. Default `512`.
+- `--commits <N>`: Newest commits to include as pages. Default: `500`.
+- `--file-kb <KIB>`: Largest file to include as a page, in KiB. Larger files are
+  left out of the export. Default: `512`.
 - `--export-pages <N>`: Most pages to write, folded diff fragments included.
   Overrides `limits.export_pages`. Past it the export stops and writes nothing.
 - `--project <NAME=URL>`: Credit a repository that is someone else's project (a

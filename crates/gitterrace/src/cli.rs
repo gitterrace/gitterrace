@@ -22,8 +22,8 @@ pub(crate) struct Cli {
     /// Overrides `watch.enabled`.
     #[arg(long, global = true)]
     pub(crate) no_watch: bool,
-    /// Folder holding `config.toml` (and `actions.toml`). Defaults to the XDG config folder.
-    #[arg(long, global = true)]
+    /// Folder holding `config.toml` (and `actions.toml`). Default: the XDG config folder.
+    #[arg(long, global = true, value_name = "DIR")]
     pub(crate) config: Option<PathBuf>,
     /// Never run user actions, even when `actions.toml` declares some.
     #[arg(long, global = true)]
@@ -64,10 +64,11 @@ pub(crate) enum Command {
         #[arg(long)]
         print: bool,
     },
-    /// Take a repository off the running server; its pages then answer 404.
+    /// Take a repository off the running server. Its pages then answer 404.
     ///
-    /// The opposite of joining: the server on `server.addr` is found and proven the same way.
-    /// The on-disk index stays, so serving it again is fast. The last repository stays served.
+    /// The opposite of serving a repository while a server already runs: the server on
+    /// `server.addr` is found and checked the same way. The on-disk index stays, so serving it
+    /// again is fast. The last repository stays served.
     Remove {
         /// A path inside the repository, or its URL name. Default: the current repository.
         target: Option<String>,
@@ -99,10 +100,10 @@ pub(crate) enum Command {
         #[arg(long)]
         force: bool,
         /// Newest commits to include as pages.
-        #[arg(long, default_value_t = 500)]
+        #[arg(long, value_name = "N", default_value_t = 500)]
         commits: usize,
         /// Largest file to include as a page, in KiB. Larger files are left out of the export.
-        #[arg(long, default_value_t = 512)]
+        #[arg(long, value_name = "KIB", default_value_t = 512)]
         file_kb: u64,
         /// Most pages to write, folded diff fragments included. Overrides
         /// `limits.export_pages`. Past it the export stops and writes nothing.

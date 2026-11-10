@@ -39,7 +39,16 @@ fn visible(c: &Command) -> impl Iterator<Item = &Arg> {
 
 fn command_body(s: &mut String, c: &Command, is_root: bool) {
     if let Some(about) = c.get_long_about().or_else(|| c.get_about()) {
-        let _ = writeln!(s, "{about}\n");
+        // clap drops the period of a one-line about. Every summary ends in one on the page.
+        let about = about.to_string();
+        let (first, rest) = about.split_once('\n').unwrap_or((&about, ""));
+        let dot = if first.ends_with('.') { "" } else { "." };
+        let rest = if rest.is_empty() {
+            String::new()
+        } else {
+            format!("\n{rest}")
+        };
+        let _ = writeln!(s, "{first}{dot}{rest}\n");
     }
     let usage = c.clone().render_usage().to_string();
     let _ = writeln!(
@@ -85,7 +94,7 @@ fn table(s: &mut String, args: &[&Arg]) {
         if !default.is_empty() {
             let _ = write!(
                 line,
-                " Default {}.",
+                " Default: {}.",
                 join(default.iter().map(|d| d.as_str().into()))
             );
         }
