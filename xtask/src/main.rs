@@ -17,6 +17,7 @@ mod config_md;
 mod docs_index;
 mod docs_md;
 mod facts;
+mod main_guard;
 mod openapi_json;
 mod out;
 mod plate;
@@ -73,6 +74,10 @@ fn main() -> Result<()> {
     let root = repo_root();
     match Cli::parse().cmd {
         Cmd::Generate => {
+            main_guard::refuse_main(
+                &root,
+                std::env::var(main_guard::ALLOW).is_ok_and(|v| v == "1"),
+            )?;
             // The site reads the documents from disk, so a block written in this pass shows
             // on its page in the next. Two passes settle it; a third change is a bug.
             for pass in 0..3 {
