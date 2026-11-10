@@ -45,6 +45,8 @@ enum Cmd {
     Check,
     /// Fail while a legal page still has a {{PLACEHOLDER}}; run before a deploy
     DeployCheck,
+    /// Build only the site into target/site, from the files as they are, writing no tracked file
+    Site,
 }
 
 /// Every generator. A new one is checked by being listed here. `refresh` is false for
@@ -134,6 +136,11 @@ fn main() -> Result<()> {
             println!("documents: links, anchors, keys, flags and the index check out");
             site::legal::check(&root)?;
             println!("legal pages: the sources exist");
+        }
+        Cmd::Site => {
+            // `refresh` false: the changelog's Unreleased block is read, not rewritten.
+            let dir = site::build(&root, generators(&root, false)?)?;
+            println!("site: built into {}", dir.display());
         }
         Cmd::DeployCheck => {
             let bad = site::legal::deploy_check(&root)?;

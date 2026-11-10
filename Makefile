@@ -202,10 +202,12 @@ deploy: shipped site site-render
 	npx wrangler@4 deploy
 
 # site-preview serves target/site through the same assets runtime as the deploy, so the
-# headers, the redirects and the 404 page behave as on gitterrace.dev. Needs node. The touch
-# icon and the link preview come from site-render, which needs the browsers.
+# headers, the redirects and the 404 page behave as on gitterrace.dev. It builds the site from
+# the files as they are and writes no tracked file, so it is safe in any checkout. Needs node.
+# The touch icon and the link preview come from site-render, which needs the browsers.
 ## site-preview: Build the website and serve it on http://127.0.0.1:4343 (SITE_PORT)
-site-preview: docs-gen
+site-preview:
+	cargo xtask site
 	npx --yes wrangler@4 dev --ip 127.0.0.1 --port $(or $(SITE_PORT),4343)
 
 # app-icon: Render the macOS icon install-handler gives gitterrace-open.app, from docs/brand/mark-dark.svg (macOS, needs browsers)
