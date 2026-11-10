@@ -26,9 +26,9 @@ flowchart TD
 
 Each box is a crate the binary ships, and an arrow means "uses". An arrow
 already implied by a longer path is left out, so `web` and `api` use `config`
-too, though only `actions` points at it. `config` reads `config.toml` and knows
+too, though only `index` points at it. `config` reads `config.toml` and knows
 nothing else. `testkit` is not drawn, since only tests use it. `schwarzwald` is
-the vendored theme.
+the vendored shared kit: the theme, the lints, the hooks and the guards.
 
 The API crate's entry points: `gitterrace_api::router(ApiState)` (nest under
 `/api/v1`), `gitterrace_api::serve_mcp(path, config)` and
@@ -188,18 +188,21 @@ so such a cache is reset, never refused as a newer build's. The container byte
 version inside each file (`seg/format.rs`) is a separate number. It moves only
 when the container bytes change.
 
-### Why hotspots and ownership read every row
+### How hotspots and ownership read the index
 
-These pages read every file row once per page with renames followed. A per-path
-aggregate cannot replace that read today: it is keyed by the name a file had in
-each commit, and a name that was renamed or reused belongs to two files at
-different times. On rust more than half the files at HEAD have such a name.
-Ownership over all history reads the aggregate for the files that were never
-renamed and the rows for the rest. An aggregate keyed by the name at the indexed
-tip, rebuilt when a new rename moves old rows, is the planned fix.
-`crates/gitterrace-index/tests/latency.rs` holds today's times on a 100k-commit
-synthetic history as ceilings, and `crates/gitterrace-web/tests/memory_budget.rs`
-guards serving memory on synthetic repositories of growing size.
+A per-path aggregate cannot serve these pages: it is keyed by the name a file
+had in each commit, and a name that was renamed or reused belongs to two files
+at different times. On rust more than half the files at HEAD have such a name.
+So every update also writes `tip-<gen>.gts` (`tip.rs`): each commit's file
+rows keyed by the file's name at the indexed tip, with its churn. Hotspots,
+ownership, coupling and code age read one item per commit from it instead of
+every file row with renames followed. It is named in the manifest like the
+chain, and a set without it reads the rows as before.
+
+`crates/gitterrace-index/tests/latency.rs` holds today's times on a
+100k-commit synthetic history as ceilings, and
+`crates/gitterrace-web/tests/memory_budget.rs` guards serving memory on
+synthetic repositories of growing size.
 
 The bench harness is `scripts/bench/bench-run.py`, the corpus is
 `tests/bench/corpus.toml`, and results land in
