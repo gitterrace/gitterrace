@@ -324,8 +324,10 @@ Environment (same values, plus `GITTERRACE_VAR_<NAME>`):
 
 ## Security
 
-- The file must be yours, private, outside every served repository. Off beyond
-  loopback, with `--no-actions`, and never offered to MCP.
+- The file must be a regular file outside every served repository. On Unix it
+  and its folder must also be owned by you and not writable by group or others.
+  Windows checks neither. Actions are off on a public server, on a non-loopback
+  bind and with `--no-actions`, and never offered to MCP.
 - Every field is untrusted repository text. In a script, quote it and never
   `eval` it.
 
