@@ -9,7 +9,8 @@ use crate::query::{Leaf, QueryError, Term, When};
 const SUPPORTED: &str = "terms side by side (all must match), `!` before a term, and \
                          commas inside one value (any of them)";
 
-/// Longest filter text read: a URL parameter, bounded so a parse stays cheap.
+/// Longest filter text read: a URL parameter, bounded so a parse stays cheap. Not configurable:
+/// no real filter comes near it, and the API and pages must refuse the same text.
 const MAX_LEN: usize = 2_048;
 
 /// Reads `text` into terms, in the order written.

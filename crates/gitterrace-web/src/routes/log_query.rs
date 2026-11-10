@@ -15,7 +15,8 @@ use crate::routes::PAGE;
 
 /// Commits per read of the walk.
 const CHUNK: usize = 500;
-/// Commits the walk reads before it gives up with what it has.
+/// Commits the walk reads before it gives up with what it has. Not configurable: it only bounds
+/// a log served before the index is built, which then answers every filter without a walk.
 pub(crate) const WALK_CAP: usize = 2_000;
 
 /// One page of a filtered log.
