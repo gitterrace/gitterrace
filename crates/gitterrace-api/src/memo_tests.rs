@@ -34,3 +34,18 @@ fn insights_after_the_first_walk_no_tree() {
     let again = s.insight("hotspots", None, &params).expect("again");
     assert_eq!(again.data, first.data);
 }
+
+#[test]
+fn release_records_empties_the_head_memo() {
+    let dir = tempfile::tempdir().expect("tmp");
+    let s = state(dir.path());
+    let params = Params {
+        period: Some("all".to_owned()),
+        ..Params::default()
+    };
+    // Hotspots read both the ignore files and the head line counts.
+    s.insight("hotspots", None, &params).expect("hotspots");
+    assert!(s.head_memo_held(), "a request fills the head memo");
+    s.release_records();
+    assert!(!s.head_memo_held(), "the release keeps a per-commit value");
+}
