@@ -1,7 +1,7 @@
 {
   "name": "gitterrace-checks",
   "private": true,
-  "description": "Dev tools for the browser checks (scripts/browser-check.mjs). Not shipped.",
+  "description": "Dev tools for the browser checks (scripts/verify/browser/browser-check.mjs). Not shipped.",
   "type": "module",
   "devDependencies": {
     "axe-core": "4.14.0",

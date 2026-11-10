@@ -36,7 +36,7 @@ const TOTAL_DIFF_BUDGET: usize = 2_000;
 /// Files with hunks rendered in full before the rest fold. Each file costs a section, a
 /// header and at least one chunk whatever its size, so many small files cost as much as one
 /// large one. With the line budget this keeps a page near 3,000 line rows and under 30k
-/// elements for 2,000 files (scripts/browser-diff-lib.mjs measures it).
+/// elements for 2,000 files (scripts/verify/browser/diff-lib.mjs measures it).
 const TOTAL_DIFF_FILES: usize = 50;
 /// The same budgets in rendered bytes, since a few huge lines cost more than many short ones.
 const FILE_DIFF_BYTES: usize = 40_000;

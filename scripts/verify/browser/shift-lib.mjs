@@ -2,7 +2,7 @@
 // its nav, the content's left edge, the top of the first block or the title inside a head row.
 // Every page kind is measured in the same boxes and compared with the first page walked. The
 // walk reads the nav and the insights tab row, so a new tab is covered without touching the
-// list; a new kind of page goes into `fixed`. Imported by scripts/browser-check.mjs.
+// list; a new kind of page goes into `fixed`. Imported by scripts/verify/browser/browser-check.mjs.
 
 /** How far (px) a box may differ between two page kinds. */
 const TOL = 0.5;

@@ -1,9 +1,9 @@
 // Checks of the interactive UI: marked text, the menu across views, gutter, overlays, tips, repo
-// switcher. Imported by scripts/browser-check.mjs, not run on its own.
+// switcher. Imported by scripts/verify/browser/browser-check.mjs, not run on its own.
 import { readFileSync, writeFileSync, rmSync, mkdtempSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { WATCH_BOUND_MS, makeRepo, serve, sh } from './lib/browser-lib.mjs';
+import { WATCH_BOUND_MS, makeRepo, serve, sh } from '../../lib/browser-lib.mjs';
 
 /** @param {any} env what browser-check.mjs set up (pw, dir, srv, r, bin, cfg, arg, ...) */
 export function checks(env) {

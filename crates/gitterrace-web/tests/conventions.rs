@@ -296,7 +296,7 @@ fn the_h1_scan_skips_tests_only() {
 }
 
 /// Routes that answer a full page, each with the path the browser check `anatomy` walks for
-/// it (`scripts/browser-anatomy-lib.mjs`, `PAGES`). Every other route answers a fragment, a
+/// it (`scripts/verify/browser/anatomy-lib.mjs`, `PAGES`). Every other route answers a fragment, a
 /// file, JSON, a stream or a redirect, and is named in `NOT_PAGES`.
 const PAGE_ROUTES: &[(&str, &str)] = &[
     ("/", "'/'"),
@@ -363,8 +363,8 @@ const NOT_PAGES: &[&str] = &[
 fn every_page_route_is_walked_by_the_anatomy_check() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let sitemap = fs::read_to_string(root.join("src/sitemap.rs")).expect("sitemap.rs");
-    let check = fs::read_to_string(root.join("../../scripts/browser-anatomy-lib.mjs"))
-        .expect("browser-anatomy-lib.mjs");
+    let check = fs::read_to_string(root.join("../../scripts/verify/browser/anatomy-lib.mjs"))
+        .expect("scripts/verify/browser/anatomy-lib.mjs");
     let start = sitemap.find("pub const PAGES").expect("PAGES");
     let body = &sitemap[start..];
     let body = &body[..body.find("\n];").expect("end of PAGES")];
@@ -379,7 +379,7 @@ fn every_page_route_is_walked_by_the_anatomy_check() {
         match page {
             Some((_, walked)) => assert!(
                 check.contains(walked),
-                "{r} is a page: add {walked} to PAGES in scripts/browser-anatomy-lib.mjs"
+                "{r} is a page: add {walked} to PAGES in scripts/verify/browser/anatomy-lib.mjs"
             ),
             None => assert!(
                 NOT_PAGES.contains(r),

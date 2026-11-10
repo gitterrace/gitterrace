@@ -1,11 +1,11 @@
 // The log's Graph view: its lines meet across row edges, a wide history folds into "+N" at a
 // narrow width, a ref chip keeps its row's height, tip labels show in full and overlap
 // nothing, and the List | Graph switch keeps the page at the top. Serves its own fixture with
-// a wide merge history. Imported by scripts/browser-check.mjs, not run on its own.
+// a wide merge history. Imported by scripts/verify/browser/browser-check.mjs, not run on its own.
 import { mkdtempSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { sh, serve } from './lib/browser-lib.mjs';
+import { sh, serve } from '../../lib/browser-lib.mjs';
 
 /** Branches open at once in the fixture: more than a narrow screen shows. */
 const OPEN = 5;

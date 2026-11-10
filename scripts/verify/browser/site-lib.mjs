@@ -1,10 +1,10 @@
 // Checks of marks and the generated site: mark seam, about placement, site theme.
-// Imported by scripts/browser-check.mjs, not run on its own.
+// Imported by scripts/verify/browser/browser-check.mjs, not run on its own.
 import { readFileSync, readdirSync, existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { pathToFileURL } from 'node:url';
-import { root, launch, sh } from './lib/browser-lib.mjs';
+import { root, launch, sh } from '../../lib/browser-lib.mjs';
 
 /** @param {any} env what browser-check.mjs set up (pw, dir, srv, r, bin, cfg, arg, ...) */
 export function checks(env) {

@@ -1,5 +1,5 @@
 // Page heads: each page's controls sit in the title row or one bar, never in rows of their own.
-// Imported by scripts/browser-check.mjs, not run on its own.
+// Imported by scripts/verify/browser/browser-check.mjs, not run on its own.
 
 /** Visible head rows of the page: the path bar and any document header, as boxes. */
 const HEADS = 'main .head, main>.ph>.ph-row, main>.ph>.fbar, [data-dochead]';

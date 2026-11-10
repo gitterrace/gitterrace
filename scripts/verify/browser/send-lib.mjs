@@ -1,5 +1,5 @@
 // The Send to window and image diffs, as a reader meets them. Imported by
-// scripts/browser-check.mjs, not run on its own.
+// scripts/verify/browser/browser-check.mjs, not run on its own.
 
 /** @param {any} env what browser-check.mjs set up (srv, r, browsers, context, ...) */
 export function checks(env) {

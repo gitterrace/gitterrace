@@ -1,9 +1,9 @@
 // The "On this page" filter on every page that has the menu. Imported by
-// scripts/browser-check.mjs, not run on its own.
+// scripts/verify/browser/browser-check.mjs, not run on its own.
 import { writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { sh } from './lib/browser-lib.mjs';
+import { sh } from '../../lib/browser-lib.mjs';
 
 /** @param {any} env what browser-check.mjs set up (srv, r, browsers, context, dir, ...) */
 export function checks(env) {

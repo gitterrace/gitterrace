@@ -3,8 +3,8 @@
 // on a free port and runs the checks below in real browsers. Not in `make check`: it needs
 // browsers. Run it with `make browser-check BIN=target/debug/git-terrace`.
 //
-//   node scripts/browser-check.mjs [--bin PATH] [--checks a,b] [--browsers webkit,chromium]
-//        [--tabs 8,12] [--from-disk]
+//   node scripts/verify/browser/browser-check.mjs [--bin PATH] [--checks a,b]
+//        [--browsers webkit,chromium] [--tabs 8,12] [--from-disk]
 //
 // Checks (all by default):
 //   truncation   nothing cut or broken mid-word, one-line .subj with a tip when cut, no sparse
@@ -175,13 +175,13 @@
 import { readFileSync, readdirSync, writeFileSync, rmSync, mkdirSync, mkdtempSync, existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
-import { checks as pageChecks } from './browser-pages-lib.mjs';
-import { checks as uiChecks } from './browser-ui-lib.mjs';
-import { checks as layoutChecks } from './browser-layout-lib.mjs';
-import { checks as siteChecks } from './browser-site-lib.mjs';
-import { checks as siteBarChecks } from './browser-sitebar-lib.mjs';
-import { checks as diffChecks } from './browser-diff-lib.mjs';
-import { root, RESCAN_SECS, loadPlaywright, launch, makeRepo, serve, openPage, reporter, sh } from './lib/browser-lib.mjs';
+import { checks as pageChecks } from './pages-lib.mjs';
+import { checks as uiChecks } from './ui-lib.mjs';
+import { checks as layoutChecks } from './layout-lib.mjs';
+import { checks as siteChecks } from './site-lib.mjs';
+import { checks as siteBarChecks } from './sitebar-lib.mjs';
+import { checks as diffChecks } from './diff-lib.mjs';
+import { root, RESCAN_SECS, loadPlaywright, launch, makeRepo, serve, openPage, reporter, sh } from '../../lib/browser-lib.mjs';
 
 const arg = (k, d) => { const i = process.argv.indexOf(k); return i < 0 ? d : process.argv[i + 1]; };
 const bin = resolve(arg('--bin', join(root, 'target/debug/git-terrace')));
@@ -218,9 +218,9 @@ async function context(name, opts = {}) {
 
 
 const env = { pw, dir, srv, r, browsers, tabCounts, marker, context, arg, bin, cfg };
-const { checks: anchorChecks } = await import('./browser-anchor-lib.mjs');
+const { checks: anchorChecks } = await import('./anchor-lib.mjs');
 const { mdAnchor } = anchorChecks(env);
-const { checks: scrollChecks } = await import('./browser-scroll-lib.mjs');
+const { checks: scrollChecks } = await import('./scroll-lib.mjs');
 const { liveRead } = scrollChecks(env);
 const { truncation, liveTabs, mermaid, chip, doctabs, chords, header } = pageChecks(env);
 const { marked, menuKeys, menuSame, gutter, overlays, tips, dateTips, repoSwitch, liveScroll, outline } = uiChecks(env);
@@ -228,35 +228,35 @@ const { inlineControls, sectionGaps, pathCells } = layoutChecks(env);
 const { markSeam, aboutPlace, siteTheme, exportFromDisk, installTabs } = siteChecks(env);
 const { siteBar, siteRail, siteTables, headerTheme } = siteBarChecks(env);
 const { hugeDiff } = diffChecks(env);
-const { checks: stickyChecks } = await import('./browser-sticky-lib.mjs');
+const { checks: stickyChecks } = await import('./sticky-lib.mjs');
 const { stickyLine } = stickyChecks(env);
-const { checks: headsChecks } = await import('./browser-heads-lib.mjs');
+const { checks: headsChecks } = await import('./heads-lib.mjs');
 const { pageHeads, crumbHeads, compareHeads, commitHeads, searchHeads } = headsChecks(env);
-const { checks: a11yChecks } = await import('./browser-access-lib.mjs');
+const { checks: a11yChecks } = await import('./access-lib.mjs');
 const {
   markFlat, tabStops, helpKeys, sideOrder, axeAll, forcedColors, reducedMotion,
 } = a11yChecks(env);
-const { checks: rowChecks } = await import('./browser-rows-lib.mjs');
+const { checks: rowChecks } = await import('./rows-lib.mjs');
 const { loneRows, smallLayout, avatarFit } = rowChecks(env);
-const { checks: sendChecks } = await import('./browser-send-lib.mjs');
+const { checks: sendChecks } = await import('./send-lib.mjs');
 const { sendDialog } = sendChecks(env);
-const { checks: outlineChecks } = await import('./browser-outline-lib.mjs');
+const { checks: outlineChecks } = await import('./outline-lib.mjs');
 const { outlineFilter, symbols } = outlineChecks(env);
-const { checks: graphChecks } = await import('./browser-graph-lib.mjs');
+const { checks: graphChecks } = await import('./graph-lib.mjs');
 const { graphView } = graphChecks(env);
-const { checks: shiftChecks } = await import('./browser-shift-lib.mjs');
+const { checks: shiftChecks } = await import('./shift-lib.mjs');
 const { layoutShift, headAlign } = shiftChecks(env);
-const { checks: homeLiveChecks } = await import('./browser-homelive-lib.mjs');
+const { checks: homeLiveChecks } = await import('./homelive-lib.mjs');
 const { homeLive } = homeLiveChecks(env);
-const { checks: reposChecks } = await import('./browser-repos-lib.mjs');
+const { checks: reposChecks } = await import('./repos-lib.mjs');
 const { reposFilter } = reposChecks(env);
-const { checks: anatomyChecks } = await import('./browser-anatomy-lib.mjs');
+const { checks: anatomyChecks } = await import('./anatomy-lib.mjs');
 const { anatomy } = anatomyChecks(env);
-const { checks: kbChecks } = await import('./browser-keyboard-lib.mjs');
+const { checks: kbChecks } = await import('./keyboard-lib.mjs');
 const { keyboardWalk, reflow, textSpacing, targets, keysOff } = kbChecks(env);
-const { checks: fitChecks } = await import('./browser-fit-lib.mjs');
+const { checks: fitChecks } = await import('./fit-lib.mjs');
 const { noSidewaysScroll, headFits } = fitChecks(env);
-const { checks: overlapChecks } = await import('./browser-overlap-lib.mjs');
+const { checks: overlapChecks } = await import('./overlap-lib.mjs');
 const { rowOverlap } = overlapChecks(env);
 async function sideWidth() {
   for (const name of browsers) {

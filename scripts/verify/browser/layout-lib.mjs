@@ -1,9 +1,9 @@
 // Layout checks of the insights and commit pages: inline controls share one size, section heads
 // keep room above them, and file paths break only between folders. Imported by
-// scripts/browser-check.mjs, not run on its own.
+// scripts/verify/browser/browser-check.mjs, not run on its own.
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { sh } from './lib/browser-lib.mjs';
+import { sh } from '../../lib/browser-lib.mjs';
 
 /** @param {any} env what browser-check.mjs set up (dir, srv, r, browsers, context, ...) */
 export function checks(env) {

@@ -4,10 +4,10 @@
 // in lib/browser-lib.mjs. This starts a child that serves and then hangs, ends it each way and
 // counts the servers left on its port.
 //
-//   node scripts/browser-reap-check.mjs [--bin target/debug/git-terrace]
+//   node scripts/verify/browser/reap-check.mjs [--bin target/debug/git-terrace]
 import { spawn, execFileSync } from 'node:child_process';
 import { join } from 'node:path';
-import { root } from './lib/browser-lib.mjs';
+import { root } from '../../lib/browser-lib.mjs';
 
 const at = process.argv.indexOf('--bin');
 const bin = at > 0 ? process.argv[at + 1] : join(root, 'target/debug/git-terrace');

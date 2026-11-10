@@ -151,11 +151,11 @@ browser-deps:
 
 ## browser-check: Real-browser checks of the served pages (BIN=path to git-terrace)
 browser-check: browser-reap
-	node scripts/browser-check.mjs $(if $(BIN),--bin $(BIN))
+	node scripts/verify/browser/browser-check.mjs $(if $(BIN),--bin $(BIN))
 
 ## browser-reap: A killed or throwing browser check leaves no test server behind
 browser-reap:
-	node scripts/browser-reap-check.mjs $(if $(BIN),--bin $(BIN))
+	node scripts/verify/browser/reap-check.mjs $(if $(BIN),--bin $(BIN))
 
 ## docker-check: Build the Docker image and serve a mounted repository with it (needs docker)
 docker-check:

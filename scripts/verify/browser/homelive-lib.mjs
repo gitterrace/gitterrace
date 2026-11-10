@@ -1,9 +1,9 @@
-// The repositories home following the folder it serves. Imported by scripts/browser-check.mjs,
+// The repositories home following the folder it serves. Imported by browser-check.mjs,
 // not run alone.
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { sh, serve, WATCH_BOUND_MS } from './lib/browser-lib.mjs';
+import { sh, serve, WATCH_BOUND_MS } from '../../lib/browser-lib.mjs';
 
 /** A one-commit repository in `dir`. */
 function small(dir) {

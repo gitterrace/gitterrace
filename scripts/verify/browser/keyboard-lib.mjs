@@ -1,7 +1,7 @@
 // Keyboard and reflow checks over every page the goldens cover: a Tab walk with a visible ring
 // on every stop, 320 px reflow, WCAG 1.4.12 text spacing, 24 px targets, and the shortcut off
 // switch. Each list of known pages can only shrink: a page green everywhere fails until it is
-// dropped. Imported by scripts/browser-check.mjs, not run on its own.
+// dropped. Imported by scripts/verify/browser/browser-check.mjs, not run on its own.
 
 // Pages red today, each with the change that fixes it, in words.
 const KNOWN_WALK = {};

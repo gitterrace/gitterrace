@@ -1,9 +1,9 @@
 // The live-read check: the reader scrolls on while live refreshes land. Imported by
-// scripts/browser-check.mjs, not run on its own.
+// scripts/verify/browser/browser-check.mjs, not run on its own.
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { serve, sh } from './lib/browser-lib.mjs';
+import { serve, sh } from '../../lib/browser-lib.mjs';
 
 /** @param {any} env what browser-check.mjs set up (r, browsers, context, bin, cfg, ...) */
 export function checks(env) {

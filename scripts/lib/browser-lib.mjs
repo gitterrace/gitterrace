@@ -1,4 +1,5 @@
-// Shared launcher for the browser checks (scripts/browser-check.mjs). Not run on its own.
+// Shared launcher for the browser checks (scripts/verify/browser/browser-check.mjs). Not run
+// on its own.
 // - finds playwright-core: $PLAYWRIGHT_CORE, else the repo's pinned node_modules (make
 //   browser-deps); no network is used, and missing deps or browsers stop it early
 // - builds a temp repository and serves it with a given binary on a free port

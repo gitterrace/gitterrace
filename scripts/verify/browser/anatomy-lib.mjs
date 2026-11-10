@@ -8,7 +8,7 @@
 // A view of figures (every insights tab and a file's history) has exactly one row of big
 // numbers (.kpis) at the page level, and it comes first after the head, before any chart,
 // table or list. A section's own figures (commit types, code frequency) do not count.
-// Imported by scripts/browser-check.mjs, not run on its own.
+// Imported by scripts/verify/browser/browser-check.mjs, not run on its own.
 
 /** Every kind of page under the top bar, by path under the repository (or the server). */
 export const PAGES = [

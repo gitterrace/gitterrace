@@ -1,7 +1,7 @@
 // Pinned heads, one check per view: scrolled past its top, each document or code card keeps its
 // head at the top of the window, closed by a line under it as wide as the card's content box,
 // the outline button sits inside the bar, and the Markdown Code view spans the content width.
-// Imported by scripts/browser-check.mjs, not run on its own.
+// Imported by scripts/verify/browser/browser-check.mjs, not run on its own.
 
 /** The views: a page, the head and the box it closes, and whether to switch to Code first. */
 const VIEWS = [

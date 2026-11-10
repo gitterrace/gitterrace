@@ -2,10 +2,10 @@
 // compare, refs, tag, insights), no two painted parts of a row (ref name, badges, avatar,
 // subject, author and time, commit id, ahead and behind) share a pixel, and none runs past
 // the row's edge, at 1440, 900, 600 and 360 px. Served on the crowded repository of
-// browser-crowded-lib.mjs. Imported by scripts/browser-check.mjs, not run on its own.
+// crowded-lib.mjs. Imported by browser-check.mjs, not run on its own.
 
-import { serve } from './lib/browser-lib.mjs';
-import { LONG, LONG_TAG, crowdedRepo } from './browser-crowded-lib.mjs';
+import { serve } from '../../lib/browser-lib.mjs';
+import { LONG, LONG_TAG, crowdedRepo } from './crowded-lib.mjs';
 
 /** Pairs of overlapping parts, per row, read in the page. A part is what the row paints: each
  * run of text (by line, from a Range, so a box squeezed to 0 px still shows the text it spills)

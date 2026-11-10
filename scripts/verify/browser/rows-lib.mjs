@@ -1,6 +1,6 @@
 // Control rows above a page's content: a row that holds one control and leaves most of its
 // width empty reads as a stray and pushes the content down. Imported by
-// scripts/browser-check.mjs, not run on its own.
+// scripts/verify/browser/browser-check.mjs, not run on its own.
 
 // Pages red today, each with the change that fixes it, in words. A page listed here that is
 // green at every width and in every browser fails the check, so the list can only shrink.

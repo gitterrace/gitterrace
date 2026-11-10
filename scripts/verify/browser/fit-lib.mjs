@@ -1,10 +1,10 @@
 // Fit: a region that scrolls down never scrolls sideways, and a page head shows every control
 // whole. Walks every page kind of layout-shift, a Markdown file with an outline, a source file
 // with symbols and the built site's docs pages, at 1440, 900 and 360 px.
-// Imported by scripts/browser-check.mjs, not run on its own.
+// Imported by scripts/verify/browser/browser-check.mjs, not run on its own.
 import { createServer } from 'node:http';
 import { readFileSync, existsSync, statSync, readdirSync, writeFileSync } from 'node:fs';
-import { sh } from './lib/browser-lib.mjs';
+import { sh } from '../../lib/browser-lib.mjs';
 import { join, extname, resolve } from 'node:path';
 
 const WIDTHS = [1440, 900, 360];

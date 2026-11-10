@@ -1,4 +1,4 @@
-// The huge-diff check. Imported by scripts/browser-check.mjs, not run on its own.
+// The huge-diff check. Imported by scripts/verify/browser/browser-check.mjs, not run on its own.
 //
 // A repository whose last commit changes 2,000 files: 1,960 pure renames (a folder moved) and
 // 40 files rewritten with 300 lines each (12k lines). Checked on the commit page and, after a
@@ -13,7 +13,7 @@
 import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { serve, sh } from './lib/browser-lib.mjs';
+import { serve, sh } from '../../lib/browser-lib.mjs';
 
 const RENAMES = 1960;
 const EDITS = 40;
