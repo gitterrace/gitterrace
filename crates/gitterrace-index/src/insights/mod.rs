@@ -278,6 +278,10 @@ impl<'a> Insights<'a> {
     }
 
     #[cfg(not(any(test, feature = "oracle")))]
+    #[expect(
+        clippy::unused_self,
+        reason = "the counted build reads self; a release build has nothing to count"
+    )]
     const fn count_walk(&self, _rows: bool) {}
 
     /// True when path statistics leave `path` out.
