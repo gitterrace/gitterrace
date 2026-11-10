@@ -163,12 +163,7 @@ pub(super) fn oid_of(id: &str) -> SegResult<Oid> {
 }
 
 pub(super) fn hash32(s: &str) -> u32 {
-    let mut h: u32 = 0x811c_9dc5;
-    for &b in s.as_bytes() {
-        h ^= u32::from(b);
-        h = h.wrapping_mul(0x0100_0193);
-    }
-    h
+    gitterrace_git::fnv1a32(s.bytes())
 }
 
 #[expect(

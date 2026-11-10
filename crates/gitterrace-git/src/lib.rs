@@ -5,6 +5,7 @@ mod atomic;
 mod diff;
 mod divergence;
 mod error;
+mod fnv;
 mod fs_events;
 mod gitdir;
 mod graph;
@@ -25,6 +26,7 @@ mod worktree;
 
 pub use atomic::{open_append_no_follow, read_no_follow, write_atomic};
 pub use error::{Error, Result};
+pub use fnv::{fnv1a32, fnv1a64};
 
 /// How many hex digits of a commit id any surface shows. One constant, so a short id looks the
 /// same in the web pages, the action payloads and the CLI.

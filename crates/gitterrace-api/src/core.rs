@@ -174,16 +174,13 @@ impl ApiState {
             .collect();
         refs.sort();
         // FNV-1a: stable across Rust releases, unlike `DefaultHasher`.
-        let mut h: u64 = 0xcbf2_9ce4_8422_2325;
-        for (name, target) in &refs {
-            for b in name.bytes().chain([0]).chain(target.bytes()).chain([0]) {
-                h = (h ^ u64::from(b)).wrapping_mul(0x0100_0000_01b3);
-            }
-        }
         let defaults = serde_json::to_string(&self.settings().defaults).unwrap_or_default();
-        for b in defaults.bytes().chain([0]) {
-            h = (h ^ u64::from(b)).wrapping_mul(0x0100_0000_01b3);
-        }
+        let h = gitterrace_git::fnv1a64(
+            refs.iter()
+                .flat_map(|(name, target)| name.bytes().chain([0]).chain(target.bytes()).chain([0]))
+                .chain(defaults.bytes())
+                .chain([0]),
+        );
         let version = gitterrace_index::FORMAT_VERSION;
         let generation = self.index.generation();
         Some(format!("\"{head}-{h:016x}-{version}-{generation}\""))

@@ -90,11 +90,7 @@ pub(crate) fn claim(dir: &Path, real: &Path) -> io::Result<()> {
 
 /// [`fallback_dir`] under the cache folder `base`.
 pub(crate) fn fallback_in(base: &Path, git_dir: &Path) -> std::path::PathBuf {
-    let mut h: u64 = 0xcbf2_9ce4_8422_2325;
-    for b in git_dir.as_os_str().as_encoded_bytes() {
-        h ^= u64::from(*b);
-        h = h.wrapping_mul(0x0100_0000_01b3);
-    }
+    let h = gitterrace_git::fnv1a64(git_dir.as_os_str().as_encoded_bytes().iter().copied());
     base.join(format!("{h:016x}"))
 }
 

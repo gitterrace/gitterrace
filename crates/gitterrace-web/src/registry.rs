@@ -178,11 +178,7 @@ pub(crate) fn pick(stem: &str, root: &Path, used: &dyn Fn(&str) -> bool) -> Stri
 /// Six hex digits of FNV-1a over the path bytes: stable across runs and Rust releases, unlike
 /// the std hasher.
 fn short_hash(path: &Path) -> String {
-    let mut h: u64 = 0xcbf2_9ce4_8422_2325;
-    for b in path.as_os_str().as_encoded_bytes() {
-        h ^= u64::from(*b);
-        h = h.wrapping_mul(0x0100_0000_01b3);
-    }
+    let h = gitterrace_git::fnv1a64(path.as_os_str().as_encoded_bytes().iter().copied());
     format!("{:06x}", h & 0xff_ffff)
 }
 

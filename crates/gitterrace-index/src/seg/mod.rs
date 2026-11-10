@@ -103,14 +103,7 @@ pub(crate) type Sink<'s> = dyn FnMut(u16, u32, &[u8]) -> SegResult<()> + 's;
 
 /// FNV-1a 64 over the ordered oid bytes: the manifest's order fingerprint.
 pub fn fingerprint<'a>(oids: impl IntoIterator<Item = &'a Oid>) -> u64 {
-    let mut h: u64 = 0xcbf2_9ce4_8422_2325;
-    for oid in oids {
-        for &b in oid {
-            h ^= u64::from(b);
-            h = h.wrapping_mul(0x0100_0000_01b3);
-        }
-    }
-    h
+    gitterrace_git::fnv1a64(oids.into_iter().flatten().copied())
 }
 
 #[cfg(test)]
