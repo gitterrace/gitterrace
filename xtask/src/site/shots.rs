@@ -93,7 +93,7 @@ pub(super) fn site_shots(root: &Path) -> Result<Vec<Out>> {
 }
 
 /// The `docs/screenshots/*.png` file names README.md links, sorted and deduplicated. The same
-/// rule as `scripts/site-shots-run.mjs`, which copies exactly these.
+/// rule as `scripts/release/site/site-shots-run.mjs`, which copies exactly these.
 pub(super) fn readme_shots(readme: &str) -> Vec<String> {
     let key = "docs/screenshots/";
     let mut v: Vec<String> = readme

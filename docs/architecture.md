@@ -39,9 +39,9 @@ config keys lives in `gitterrace_config::naming`.
 
 - **The theme is a snapshot, not a design.** Colors, type, space and motion come
   only from `schwarzwald/kit/`, replaced as a whole, never edited.
-  `scripts/theme-gen.py` writes the block in `tokens.css`. `make theme` fails on
-  drift. Components use the role aliases, never a raw color, and charts are
-  server-rendered SVG colored by class.
+  `scripts/release/site/theme-gen.py` writes the block in `tokens.css`.
+  `make theme` fails on drift. Components use the role aliases, never a raw
+  color, and charts are server-rendered SVG colored by class.
 - **Read-only, pinned.** Every read takes a resolved commit id, so a commit
   landing mid-request cannot tear a page. Only the uncommitted view reads the
   worktree.

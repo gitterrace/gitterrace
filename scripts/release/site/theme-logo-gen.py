@@ -8,7 +8,7 @@ mark alone, for each theme:
     logo-{light,dark}.svg   mark and wordmark, cropped
     mark-{light,dark}.svg   the mark alone, square
 
-    python3 scripts/theme-logo-gen.py [--check | --list-outputs]
+    python3 scripts/release/site/theme-logo-gen.py [--check | --list-outputs]
 
 `make theme` runs the check, so the logos cannot drift from the headers.
 """
@@ -20,7 +20,7 @@ import re
 import sys
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parents[3]
 BRAND = ROOT / "docs/brand"
 TEMPLATES = ROOT / "crates/gitterrace-web/templates"
 # The header's wordmark ends near x=545 and its tagline starts below y=128; the mark's group
@@ -192,7 +192,9 @@ def main() -> int:
     if LISTING:
         return 0
     for s in stale:
-        print(f"{s}: does not match the README header; run scripts/theme-logo-gen.py")
+        print(
+            f"{s}: does not match the README header; run scripts/release/site/theme-logo-gen.py"
+        )
     # Every template that writes its own <head> takes the icon from that include, so a new
     # page shell cannot ship without a favicon.
     bare = [

@@ -131,7 +131,7 @@ steps = [
   "super-ratchet-test|python3|install python3|python3 scripts/lint/super-check.py --self-test",
   "tests-cfg|python3|install python3|python3 scripts/lint/tests-check.py",
   "css-scope|python3|install python3|python3 scripts/lint/css-scope-check.py",
-  "site-csp|python3|install python3|python3 scripts/site-check.py csp",
+  "site-csp|python3|install python3|python3 scripts/release/site/site-check.py csp",
   "gate|python3|install python 3.11|$PY scripts/lint/gate-check.py",
   "gate-test|python3|install python 3.11|$PY scripts/lint/gate-check.py --self-test",
   "ci-tiers|python3|install python3|python3 scripts/lint/ci-check.py",

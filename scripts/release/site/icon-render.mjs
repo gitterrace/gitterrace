@@ -10,11 +10,11 @@
 // is committed because the binary embeds it; rerun this (`make app-icon`) when
 // docs/brand/mark-dark.svg changes.
 //
-//   node scripts/icon-render.mjs
+//   node scripts/release/site/icon-render.mjs
 import { readFileSync, writeFileSync, mkdirSync, rmSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { join } from 'node:path';
-import { root, loadPlaywright, launch } from './lib/browser-lib.mjs';
+import { root, loadPlaywright, launch } from '../../lib/browser-lib.mjs';
 
 const mark = 'data:image/svg+xml,' + encodeURIComponent(readFileSync(join(root, 'docs/brand/mark-dark.svg'), 'utf8'));
 // The dark page background: the dark side of --n-1 in tokens.css.

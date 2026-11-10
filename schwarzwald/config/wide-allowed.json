@@ -87,7 +87,7 @@
     "scripts/verify/browser/sticky-lib.mjs": 17,
     "scripts/verify/browser/ui-lib.mjs": 85,
     "scripts/guards/tests/cases-gitterrace.sh": 13,
-    "scripts/icon-render.mjs": 5,
+    "scripts/release/site/icon-render.mjs": 5,
     "scripts/bench/indexing-run.py": 2,
     "scripts/dev/keep-report.py": 2,
     "scripts/land-check.sh": 2,
@@ -95,14 +95,14 @@
     "scripts/dev/macos-run.sh": 3,
     "scripts/lint/names-check.py": 2,
     "scripts/verify/send-vectors-check.mjs": 4,
-    "scripts/site-check.py": 2,
-    "scripts/site-render.mjs": 9,
-    "scripts/site-shots-run.mjs": 14,
+    "scripts/release/site/site-check.py": 2,
+    "scripts/release/site/site-render.mjs": 9,
+    "scripts/release/site/site-shots-run.mjs": 14,
     "scripts/verify/smoke-check.sh": 11,
     "scripts/lint/status-words-check.py": 1,
     "scripts/lint/stubs-check.py": 1,
     "scripts/lint/tests-check.py": 1,
-    "scripts/theme-gen.py": 1,
-    "scripts/theme-tagline-gen.py": 2
+    "scripts/release/site/theme-gen.py": 1,
+    "scripts/release/site/theme-tagline-gen.py": 2
   }
 }

@@ -297,19 +297,19 @@ fn redirects(repo: &str, name: &str) -> String {
 
 /// The one pitch sentence: the package description, which the README, the landing page and the
 /// meta description show. The README header draws it as outlined text, so generation fails when
-/// `TAGLINE` in `scripts/theme-tagline-gen.py` says something else.
+/// `TAGLINE` in `scripts/release/site/theme-tagline-gen.py` says something else.
 fn pitch(root: &Path, desc: &str) -> Result<String> {
-    let src = std::fs::read_to_string(root.join("scripts/theme-tagline-gen.py"))
-        .context("reading scripts/theme-tagline-gen.py")?;
+    let src = std::fs::read_to_string(root.join("scripts/release/site/theme-tagline-gen.py"))
+        .context("reading scripts/release/site/theme-tagline-gen.py")?;
     let tag = src
         .lines()
         .find_map(|l| l.strip_prefix("TAGLINE = \""))
         .and_then(|l| l.strip_suffix('"'))
-        .context("TAGLINE in scripts/theme-tagline-gen.py")?;
+        .context("TAGLINE in scripts/release/site/theme-tagline-gen.py")?;
     anyhow::ensure!(
         tag == desc,
-        "TAGLINE in scripts/theme-tagline-gen.py is not the package description {desc:?}: \
-         set it and run the script to redraw the README header"
+        "TAGLINE in scripts/release/site/theme-tagline-gen.py is not the package description \
+         {desc:?}: set it and run the script to redraw the README header"
     );
     Ok(desc.to_owned())
 }

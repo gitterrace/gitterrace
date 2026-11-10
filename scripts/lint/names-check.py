@@ -171,7 +171,7 @@ def script_files() -> list[Path]:
         f
         for f in (ROOT / "scripts").rglob("*")
         if f.is_file()
-        and f.relative_to(ROOT / "scripts").parts[0] not in data
+        and not set(f.relative_to(ROOT / "scripts").parts[:-1]) & set(data)
         and "__pycache__" not in f.parts
     )
 

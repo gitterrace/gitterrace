@@ -1,4 +1,4 @@
-# The actions file `make site-shots` serves with (git-terrace --config scripts/site-shots/config).
+# The actions file `make site-shots` serves with (git-terrace --config scripts/release/site/site-shots/config).
 # The site shows kinds of Send to targets, not one app, so no tendir here. The repo and project
 # names are placeholders: the shot opens the Send window and never sends.
 

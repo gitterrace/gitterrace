@@ -82,7 +82,7 @@ HTTP. Nothing outside `gitterrace-git` imports `gix`.
   step when the tip is checked out. `scripts/land-check.sh` still builds and
   tests afterwards.
 - Names: files in `scripts/` sit in an area folder (`lint`, `verify`, `bench`,
-  `dev`, `lib`) and are `<area>-<verb>.<ext>`, make targets are
+  `dev`, `lib`, `release`) and are `<area>-<verb>.<ext>`, make targets are
   `<area>[-<verb>]`, harness-only env vars use a `TEST_` prefix. `make names`
   enforces it.
 

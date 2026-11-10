@@ -48,14 +48,14 @@ fn tree_matches_generator_and_a_changed_color_is_stale() {
     assert_eq!(red.len(), 3, "every plated file must notice: {red:?}");
 }
 
-/// Every path the script `scripts/theme-logo-gen.py` writes, as it lists them.
+/// Every path the script `scripts/release/site/theme-logo-gen.py` writes, as it lists them.
 fn script_outputs() -> Vec<String> {
     let root = crate::repo_root();
     let run = std::process::Command::new("python3")
-        .args(["scripts/theme-logo-gen.py", "--list-outputs"])
+        .args(["scripts/release/site/theme-logo-gen.py", "--list-outputs"])
         .current_dir(root)
         .output()
-        .expect("run scripts/theme-logo-gen.py");
+        .expect("run scripts/release/site/theme-logo-gen.py");
     assert!(run.status.success(), "--list-outputs failed");
     String::from_utf8(run.stdout)
         .expect("utf8")

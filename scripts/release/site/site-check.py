@@ -15,9 +15,9 @@ domains: gitterrace.dev serves the page over HTTPS with the generated headers, a
 Creates nothing: attaching custom domains and the redirect rule are Cloudflare dashboard
 steps, and scripting them needs a Zone:Edit token, too large a credential for this.
 
-  python3 scripts/site-check.py release
-  python3 scripts/site-check.py csp [DIR]
-  python3 scripts/site-check.py domains
+  python3 scripts/release/site/site-check.py release
+  python3 scripts/release/site/site-check.py csp [DIR]
+  python3 scripts/release/site/site-check.py domains
 """
 
 from __future__ import annotations
@@ -31,7 +31,7 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parents[3]
 CANONICAL = "gitterrace.dev"
 REDIRECTS = ("www.gitterrace.dev", "gitterrace.com", "www.gitterrace.com")
 TIMEOUT = 15

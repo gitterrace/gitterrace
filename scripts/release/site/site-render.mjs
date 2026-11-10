@@ -8,11 +8,11 @@
 //   target/site/assets/og.png         1200x630, the light README header (link previews)
 // Chromium draws the SVGs, the same renderer as the app icon.
 //
-//   node scripts/site-render.mjs
+//   node scripts/release/site/site-render.mjs
 import { existsSync, readFileSync, mkdirSync, readdirSync, rmSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { join } from 'node:path';
-import { root, loadPlaywright, launch } from './lib/browser-lib.mjs';
+import { root, loadPlaywright, launch } from '../../lib/browser-lib.mjs';
 
 const brand = (f) => 'data:image/svg+xml,' + encodeURIComponent(readFileSync(join(root, 'docs/brand', f), 'utf8'));
 // The light page background, from the shared tokens, so the PNG files match the site.

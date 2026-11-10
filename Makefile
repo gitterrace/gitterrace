@@ -72,9 +72,9 @@ doc:
 # theme: Snapshot matches its manifest, generated files match the snapshot
 theme:
 	python3 schwarzwald/kit/check.py
-	python3 scripts/theme-gen.py --check
-	python3 scripts/theme-logo-gen.py --check
-	python3 scripts/theme-tagline-gen.py --check
+	python3 scripts/release/site/theme-gen.py --check
+	python3 scripts/release/site/theme-logo-gen.py --check
+	python3 scripts/release/site/theme-tagline-gen.py --check
 
 # actions: Example actions work per OS profile (stubbed PATH)
 actions:
@@ -174,8 +174,6 @@ bench-report:
 	python3 scripts/bench/bench-report.py
 
 ##@ Site and release
-# The site, deploy, shipped, site-render and site-shots targets below are kept as they were:
-# the site build is moving out of the repository and rewrites them.
 .PHONY: docs-gen domains changelog site deploy app-icon site-render site-shots shipped
 
 ## docs-gen: Regenerate every generated file (docs, README blocks) and build the site
@@ -184,18 +182,18 @@ docs-gen:
 
 ## domains: gitterrace.dev serves and every other host redirects to it
 domains:
-	python3 scripts/site-check.py domains
+	python3 scripts/release/site/site-check.py domains
 
 # Writes the section from the commits since the last tag, in place of the generated Unreleased
 # section. Needs git-cliff 2.14.2.
 ## changelog: Prepend the release's section to CHANGELOG.md (VERSION=x.y.z)
 changelog:
-	python3 scripts/changelog-run.py
+	python3 scripts/release/changelog-run.py
 	bash schwarzwald/kit/tools/changelog-gen.sh $(or $(VERSION),$(error VERSION=x.y.z is required))
 
 # site: Refuse to publish install lines before the repository, tap and release tag answer
 site: docs-check
-	python3 scripts/site-check.py release
+	python3 scripts/release/site/site-check.py release
 
 ## deploy: Build the site from a clean HEAD into target/site and ship it with wrangler deploy
 deploy: shipped site site-render
@@ -205,19 +203,19 @@ deploy: shipped site site-render
 
 # app-icon: Render the macOS icon install-handler gives gitterrace-open.app, from docs/brand/mark-dark.svg (macOS, needs browsers)
 app-icon:
-	node scripts/icon-render.mjs
+	node scripts/release/site/icon-render.mjs
 
 # site-render: Render the touch icon from docs/brand, the link preview into target/site, and the WebPs from target/site-shots when present (needs cwebp then)
 site-render:
-	node scripts/site-render.mjs
+	node scripts/release/site/site-render.mjs
 
 # site-shots builds, serves jq and ripgrep pinned in ~/.cache/gitterrace-shots with
-# scripts/site-shots/config, shoots to target/site-shots and docs/screenshots, renders the WebPs,
-# then generates. Needs browsers, so not in check.
+# scripts/release/site/site-shots/config, shoots to target/site-shots and docs/screenshots,
+# renders the WebPs, then generates. Needs browsers, so not in check.
 ## site-shots: Retake every screenshot (needs browsers, so not in check)
 site-shots: build
-	node scripts/site-shots-run.mjs
-	node scripts/site-render.mjs
+	node scripts/release/site/site-shots-run.mjs
+	node scripts/release/site/site-render.mjs
 	cargo xtask generate
 
 # shipped: The tree is clean, so the site deploy builds is the one HEAD builds

@@ -6,9 +6,10 @@ rendered again. This draws TAGLINE with the vendored Bricolage Grotesque at the 
 size and position and swaps it into both files, keeping each file's colour. The path carries
 data-text (the words it spells) and data-sha (sha256 of its path data).
 
-    scripts/theme-tagline-gen.py --check    stdlib only: data-text equals TAGLINE, data-sha
-                                            matches the path
-    uv run --with fonttools --with brotli python scripts/theme-tagline-gen.py    rewrite
+    scripts/release/site/theme-tagline-gen.py --check
+        stdlib only: data-text equals TAGLINE, data-sha matches the path
+    uv run --with fonttools --with brotli python \
+        scripts/release/site/theme-tagline-gen.py    rewrite
 
 `make theme` runs the check, so the outlined words cannot drift from TAGLINE, and the
 names check reads TAGLINE as prose.
@@ -23,7 +24,7 @@ import sys
 from pathlib import Path
 
 TAGLINE = "A local, read-only git browser: code, history and insights, offline."
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parents[3]
 FONT = (
     ROOT
     / "schwarzwald/kit/fonts/bricolage-grotesque/bricolage-grotesque-latin-wght-normal.woff2"

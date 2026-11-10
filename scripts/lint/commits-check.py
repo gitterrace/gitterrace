@@ -36,8 +36,8 @@ GATES: list[tuple[str, list[str], tuple[str, ...]]] = [
     ("css-scope", [PY, "scripts/lint/css-scope-check.py"], (".css",)),
     (
         "theme",
-        [PY, "scripts/theme-gen.py", "--check"],
-        (".css", "scripts/theme-", "schwarzwald/kit/"),
+        [PY, "scripts/release/site/theme-gen.py", "--check"],
+        (".css", "scripts/release/site/theme-", "schwarzwald/kit/"),
     ),
     (
         "make-targets",
