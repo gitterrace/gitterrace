@@ -68,7 +68,8 @@ allow = [
   "package.json",
   "package-lock.json",
   "wrangler.toml",
-  # Git and CI
+  # Git and CI, and the attributes that mark generated and vendored files for diff and stats
+  ".gitattributes",
   ".github",
   ".gitignore",
   # The image users build with `docker build .`, and its build context filter
