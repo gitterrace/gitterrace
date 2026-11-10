@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Constants, number formatting, run normalizing and chart rendering for
-scripts/bench-report.py. Imported, not run.
+scripts/bench/bench-report.py. Imported, not run.
 """
 
 from __future__ import annotations
@@ -14,7 +14,7 @@ from typing import Any
 
 Json = dict[str, Any]
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parents[2]
 DOC = ROOT / "docs/benchmarks.md"
 DOCS = ROOT / "docs"
 CORPUS = ROOT / "tests/bench/corpus.toml"

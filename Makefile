@@ -16,11 +16,11 @@ BENCH_REPOS := --repos control,git,rust
 
 ## setup: Keep search indexers out of build, bench and agent dirs (once per machine)
 setup:
-	python3 scripts/indexing-run.py --apply
+	python3 scripts/bench/indexing-run.py --apply
 
 ## build: Release binary
 build:
-	@python3 scripts/indexing-run.py --apply-dir "$(TARGET)"
+	@python3 scripts/bench/indexing-run.py --apply-dir "$(TARGET)"
 	cargo build --release -p gitterrace
 
 ## install: Install git-terrace into ~/.cargo/bin, so git runs it as git terrace
@@ -100,7 +100,7 @@ lines:
 
 # docs-check: Generated files are up to date, and the dev scripts pass their self-tests
 docs-check:
-	python3 scripts/bench-report.py --check
+	python3 scripts/bench/bench-report.py --check
 	bash scripts/land-check.sh --self-test
 	python3 scripts/lint/commits-check.py --self-test
 	python3 scripts/lint/tracked-check.py --self-test
@@ -118,13 +118,13 @@ gc-guard:
 
 # bench-guard: The bench harness still works, on a tiny generated repo
 bench-guard:
-	python3 scripts/indexing-run.py --self-test
+	python3 scripts/bench/indexing-run.py --self-test
 	cargo build -q -p gitterrace
-	python3 scripts/bench-run.py --synthetic --bin $(TARGET)/debug/git-terrace >/dev/null
-	bash scripts/bench-budget-check.sh $(TARGET)/debug/git-terrace
-	python3 scripts/bench-report.py --self-test
-	python3 scripts/bench-quiet-lib.py
-	python3 scripts/speed-check.py --self-test
+	python3 scripts/bench/bench-run.py --synthetic --bin $(TARGET)/debug/git-terrace >/dev/null
+	bash scripts/bench/bench-budget-check.sh $(TARGET)/debug/git-terrace
+	python3 scripts/bench/bench-report.py --self-test
+	python3 scripts/bench/bench-quiet-lib.py
+	python3 scripts/bench/speed-check.py --self-test
 
 ##@ Slow checks, not in check
 .PHONY: counting-parity memory-check speed-check browser-deps browser-check browser-reap \
@@ -137,12 +137,12 @@ counting-parity:
 
 ## memory-check: An idle server's memory stays flat as history and tree grow (about 5 minutes)
 memory-check: build
-	python3 scripts/memory-check.py --bin $(RELEASE_BIN)
+	python3 scripts/bench/memory-check.py --bin $(RELEASE_BIN)
 	TEST_MEMORY_WIDE=100000 cargo test --release -p gitterrace-web --test memory_budget idle_memory_is_flat_in_tree_size
 
 ## speed-check: Cold insights pages on the rust bench clone stay in budget (about 10 minutes)
 speed-check: build
-	python3 scripts/speed-check.py --bin $(RELEASE_BIN)
+	python3 scripts/bench/speed-check.py --bin $(RELEASE_BIN)
 
 ## browser-deps: Install the pinned browser check deps and their Playwright browsers
 browser-deps:
@@ -166,12 +166,12 @@ docker-check:
 
 ## bench: Benchmark the pinned corpus (needs the network). LARGE=1 adds linux (about 30 GB)
 bench: build
-	$(if $(LARGE),BENCH_LARGE=1 )python3 scripts/bench-run.py --bin $(RELEASE_BIN) $(if $(LARGE),--large,$(BENCH_REPOS))
-	python3 scripts/bench-report.py
+	$(if $(LARGE),BENCH_LARGE=1 )python3 scripts/bench/bench-run.py --bin $(RELEASE_BIN) $(if $(LARGE),--large,$(BENCH_REPOS))
+	python3 scripts/bench/bench-report.py
 
 ## bench-report: Write the newest results into docs/benchmarks.md
 bench-report:
-	python3 scripts/bench-report.py
+	python3 scripts/bench/bench-report.py
 
 ##@ Site and release
 # The site, deploy, shipped, site-render and site-shots targets below are kept as they were:

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Helpers for the benchmark harness (scripts/bench-run.py): subprocess and OS probes, the
+"""Helpers for the benchmark harness (scripts/bench/bench-run.py): subprocess and OS probes, the
 server under test, corpus clones and the page plan. Imported, not run."""
 
 from __future__ import annotations
@@ -20,7 +20,7 @@ from urllib.parse import quote
 
 Json = dict[str, Any]
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parents[2]
 # The insights tabs. Pages that moved into a section of a tab answer a redirect, never timed.
 STATS = [
     "",

@@ -201,7 +201,7 @@ tip, rebuilt when a new rename moves old rows, is the planned fix.
 synthetic history as ceilings, and `crates/gitterrace-web/tests/memory_budget.rs`
 guards serving memory on synthetic repositories of growing size.
 
-The bench harness is `scripts/bench-run.py`, the corpus is
+The bench harness is `scripts/bench/bench-run.py`, the corpus is
 `tests/bench/corpus.toml`, and results land in
 `tests/bench/results/<date>-<machine>.json`, the machine label from the CPU
 (for example `apple-m1-max`).

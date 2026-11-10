@@ -40,14 +40,14 @@ pub fn render(root: &Path, ws: &Workspace, scripts: &[Script]) -> Result<Vec<Out
     ])
 }
 
-/// A benchmark block from `scripts/bench-report.py`: `--corpus` lists the repos with their source
-/// links from `tests/bench/corpus.toml`, `--print` renders the newest result file.
+/// A benchmark block from `scripts/bench/bench-report.py`: `--corpus` lists the repos with their
+/// source links from `tests/bench/corpus.toml`, `--print` renders the newest result file.
 fn bench_report(root: &Path, flag: &str) -> Result<String> {
     let out = std::process::Command::new("python3")
-        .args(["scripts/bench-report.py", flag])
+        .args(["scripts/bench/bench-report.py", flag])
         .current_dir(root)
         .output()
-        .context("running scripts/bench-report.py")?;
+        .context("running scripts/bench/bench-report.py")?;
     anyhow::ensure!(
         out.status.success(),
         "bench-report.py: {}",

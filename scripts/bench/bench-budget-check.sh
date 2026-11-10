@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # The bench harness's red case, run by `make bench-guard`: an index over its budget fails the
 # synthetic run, and the failure names its slowest phase.
-#   scripts/bench-budget-check.sh <git-terrace binary>
+#   scripts/bench/bench-budget-check.sh <git-terrace binary>
 set -euo pipefail
-cd "$(dirname "$0")/.."
+cd "$(dirname "$0")/../.."
 bin=${1:?usage: bench-budget-check.sh <git-terrace binary>}
-if out=$(TEST_BENCH_INDEX_SECS=0 python3 scripts/bench-run.py --synthetic --bin "$bin"); then
+if out=$(TEST_BENCH_INDEX_SECS=0 python3 scripts/bench/bench-run.py --synthetic --bin "$bin"); then
   echo "bench-budget-check: an index over budget passed the run" >&2
   exit 1
 fi

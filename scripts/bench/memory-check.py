@@ -9,7 +9,7 @@ Fails when the idle footprint (RSS elsewhere) is over the bound at any size, or 
 than the slack from the smallest repository to the largest: memory that scales with history
 while nobody browses is the bug this catches, whatever cache holds it.
 
-  scripts/memory-check.py [--bin PATH] [--sizes 2000,8000,32000] [--bound-mb 100]
+  scripts/bench/memory-check.py [--bin PATH] [--sizes 2000,8000,32000] [--bound-mb 100]
 """
 
 from __future__ import annotations
@@ -22,7 +22,7 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parents[2]
 # RECORDS_IDLE is 30 s and the sweeper checks every quarter of it: a release later than this
 # is a server that does not release.
 RELEASE_WAIT_SECS = 120
@@ -31,10 +31,10 @@ SLACK_MB = 25
 
 def bench():
     spec = importlib.util.spec_from_file_location(
-        "bench_lib", ROOT / "scripts/bench-lib.py"
+        "bench_lib", ROOT / "scripts/bench/bench-lib.py"
     )
     if spec is None or spec.loader is None:
-        sys.exit("cannot load scripts/bench-lib.py")
+        sys.exit("cannot load scripts/bench/bench-lib.py")
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     return mod

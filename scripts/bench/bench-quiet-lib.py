@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Quiet-machine gate for the benchmark harness (scripts/bench-run.py): load sampling and the
+"""Quiet-machine gate for the benchmark harness (scripts/bench/bench-run.py): load sampling and the
 wait for a calm machine before each timed phase. Imported, not run."""
 
 from __future__ import annotations

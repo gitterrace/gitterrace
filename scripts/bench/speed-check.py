@@ -6,8 +6,8 @@ page memo is empty and the visitor pays for the tables the page needs. Each samp
 own server; the gate is on the median. The 1-minute load is printed next to every timing, and
 a run above --max-load waits for a quieter machine first, as the bench does.
 
-  scripts/speed-check.py --bin PATH [--repo DIR] [--runs 3] [--max-load N] [--only a,b]
-  scripts/speed-check.py --self-test     # the verdict logic, no server
+  scripts/bench/speed-check.py --bin PATH [--repo DIR] [--runs 3] [--max-load N] [--only a,b]
+  scripts/bench/speed-check.py --self-test     # the verdict logic, no server
 
 The repository defaults to the bench clone ($GITTERRACE_BENCH_DIR/rust.git). It must be
 indexed already: the check times pages, not the index build.

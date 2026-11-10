@@ -8,11 +8,12 @@ before it as the baseline of the comparison table. The machine label comes from 
 the hostname. Stdlib only, no PNG, no JS, no fonts. The charts are files, not inline SVG, since a
 markdown sanitizer strips inline <svg> and <style>, and the doc links them through <picture>.
 
-  scripts/bench-report.py                  normalize, render charts, prune, rewrite the doc
-  scripts/bench-report.py --check          fail when anything above is stale, writes nothing
-  scripts/bench-report.py --print          print the short results block that `cargo xtask` splices
-  scripts/bench-report.py --corpus         print the corpus list, one source link per repo
-  scripts/bench-report.py --normalize F    rewrite one result file in the published format
+  scripts/bench/bench-report.py                  normalize, render charts, prune, rewrite the doc
+  scripts/bench/bench-report.py --check          fail when anything above is stale, writes nothing
+  scripts/bench/bench-report.py --print          print the short results block that
+                                                 `cargo xtask` splices
+  scripts/bench/bench-report.py --corpus         print the corpus list, one source link per repo
+  scripts/bench/bench-report.py --normalize F    rewrite one result file in the published format
 
 --check also guards publication: no result file, chart or doc may carry this machine's hostname
 or a "host" field, every result file is sorted and rounded, every corpus repo has a url and a

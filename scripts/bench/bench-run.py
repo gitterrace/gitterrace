@@ -6,9 +6,9 @@ Run by `make bench`. Reads tests/bench/corpus.toml, clones each repo into $GITTE
 and writes tests/bench/results/<date>-<machine label>.json (no hostname).
 Methodology: docs/benchmarks.md.
 
-  scripts/bench-run.py [--repos a,b] [--large] [--runs N] [--bin PATH] [--idle-secs S]
-  scripts/bench-run.py --synthetic      # tiny generated repo, one run: the cheap guard
-  scripts/bench-run.py --fetch-only     # clone and backfill, time nothing
+  scripts/bench/bench-run.py [--repos a,b] [--large] [--runs N] [--bin PATH] [--idle-secs S]
+  scripts/bench/bench-run.py --synthetic      # tiny generated repo, one run: the cheap guard
+  scripts/bench/bench-run.py --fetch-only     # clone and backfill, time nothing
 
 A full run lands in tests/bench/results and `make bench` then runs bench-report. A smoke run (fewer
 --runs or a shorter --idle-secs) goes to $GITTERRACE_BENCH_DIR/runs, never into the repo.

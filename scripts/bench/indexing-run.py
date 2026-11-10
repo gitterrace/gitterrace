@@ -4,11 +4,12 @@
 Indexers rescanning cargo target dirs and bench corpora cost CPU and distort benches. This is the
 ONE place that knows the directory list and how each OS excludes one. Other scripts call it.
 
-  python3 scripts/indexing-run.py --check            exit 1 and list dirs lacking the exclusion
-  python3 scripts/indexing-run.py --apply            exclude every expected dir (idempotent)
-  python3 scripts/indexing-run.py --apply-dir PATH   create PATH if needed and exclude it
-  python3 scripts/indexing-run.py --list             print the expected dirs
-  python3 scripts/indexing-run.py --self-test        guard on a temp tree
+  python3 scripts/bench/indexing-run.py --check            exit 1 and list dirs lacking the
+                                                           exclusion
+  python3 scripts/bench/indexing-run.py --apply            exclude every expected dir (idempotent)
+  python3 scripts/bench/indexing-run.py --apply-dir PATH   create PATH if needed and exclude it
+  python3 scripts/bench/indexing-run.py --list             print the expected dirs
+  python3 scripts/bench/indexing-run.py --self-test        guard on a temp tree
 
 Expected dirs: the repo's parent (the org root), target/, the bench cache (GITTERRACE_BENCH_DIR,
 default ~/.cache/gitterrace-bench), ~/.cargo, ~/.rustup, and the
@@ -33,7 +34,7 @@ import sys
 import tempfile
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parents[2]
 SYSTEM = platform.system()
 MARKER = {"Darwin": ".metadata_never_index", "Linux": ".trackerignore"}.get(SYSTEM)
 NOT_CONTENT_INDEXED = 0x2000
@@ -189,7 +190,7 @@ def self_test() -> int:
             "GITTERRACE_INDEX_STOP": t,
         }
         r = subprocess.run(
-            [sys.executable, str(ROOT / "scripts/bench-run.py"), "--preflight"],
+            [sys.executable, str(ROOT / "scripts/bench/bench-run.py"), "--preflight"],
             env=env,
             capture_output=True,
             text=True,
@@ -203,7 +204,7 @@ def self_test() -> int:
         exclude(bench)
         exclude(Path(t) / "tgt")
         r = subprocess.run(
-            [sys.executable, str(ROOT / "scripts/bench-run.py"), "--preflight"],
+            [sys.executable, str(ROOT / "scripts/bench/bench-run.py"), "--preflight"],
             env=env,
             capture_output=True,
             text=True,

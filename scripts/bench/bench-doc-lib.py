@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """The docs/benchmarks.md block and the results folder READMEs for
-scripts/bench-report.py. Imported, not run.
+scripts/bench/bench-report.py. Imported, not run.
 """
 
 from __future__ import annotations
@@ -470,8 +470,9 @@ def results_readme(kept: list[Json]) -> str:
         "# Benchmark results",
         "",
         "Each benchmark run (`make bench`, with `LARGE=1` to add the largest repository) writes one "
-        "`<date>-<machine>.json` here plus a folder with its charts, and `scripts/bench-report.py` "
-        "regenerates this page. The method, corpus and budgets are in "
+        "`<date>-<machine>.json` here plus a folder with its charts, and "
+        "`scripts/bench/bench-report.py` regenerates this page. The method, corpus and "
+        "budgets are in "
         "[docs/benchmarks.md](../../../docs/benchmarks.md).",
         "",
         "| Date | Machine | gitterrace | Repos | Files |",
