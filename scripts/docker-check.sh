@@ -7,7 +7,7 @@
 #   scripts/docker-check.sh              hadolint, build, serve checks
 #   scripts/docker-check.sh --self-test  the Dockerfile's fixed rules, no docker
 #
-# The self-test runs in `make docs-check`. The full run is the docker job of ci.yml.
+# The self-test runs in `make docs-check`. The full run is the docker job of lint-and-test.yml.
 # DOCKER_JOBS sets the compile jobs of the build (default 2, the same as the Dockerfile, so a
 # busy machine stays usable).
 set -euo pipefail

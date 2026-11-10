@@ -92,7 +92,11 @@ clone or a linked worktree is never refused.
 
 ## Before a pull request
 
-The local gate is the one that counts. The hosted workflows run a subset of it.
+The local gate is the one that counts. The hosted workflows run a subset of it:
+a pull request and a push to main run the Linux `make check`, cargo deny, the
+MSRV check and, when a Docker path changed, the image. macOS and Windows run
+on a manual CI run (full by default), weekly, and in the release check of
+every tag.
 
 - `make check` always
 - `make browser-check BIN=target/debug/git-terrace` if you changed templates,

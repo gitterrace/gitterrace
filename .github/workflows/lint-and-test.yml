@@ -1,0 +1,186 @@
+name: Lint and test
+
+# The jobs behind ci.yml, in two tiers. The fast tier runs on every pull request and push: the
+# Linux gate, cargo deny, the MSRV check, and the Docker image when a Docker path changed. The
+# full tier (input `full`) adds macOS and Windows; it runs on a manual run and weekly. A tag
+# never ships on the fast tier alone: release-check.yml runs macOS and Windows again before
+# dist publishes. scripts/ci-check.py holds both rules.
+
+on:
+  workflow_call:
+    inputs:
+      full:
+        description: Also run the macOS and Windows jobs
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  # The same gate as `make check`: theme, fmt, clippy -D warnings, tests (the release memory
+  # budget among them), docs, lint.
+  check-linux:
+    name: Check (ubuntu-latest)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      # Full history and tags: the history lints refuse a shallow clone.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+          persist-credentials: false
+      # A pull request is judged by the base branch's lint.toml: its [run] steps run code and its
+      # scopes decide what the lints read, so the branch under review may not set them.
+      - if: github.event_name == 'pull_request'
+        env:
+          BASE: ${{ github.base_ref }}
+        run: git show "origin/${BASE}:schwarzwald/config/lint.toml" >schwarzwald/config/lint.toml
+      # The toolchain is pinned once, in rust-toolchain.toml: a floating `stable`
+      # turns every new clippy lint into a red build nobody caused.
+      - id: pin
+        run: echo "channel=$(sed -n 's/^channel *= *"\(.*\)"/\1/p' rust-toolchain.toml)" >> "$GITHUB_OUTPUT"
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # v1
+        id: toolchain
+        with:
+          toolchain: ${{ steps.pin.outputs.channel }}
+          components: clippy, rustfmt
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ steps.toolchain.outputs.cachekey }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-${{ steps.toolchain.outputs.cachekey }}-
+      - uses: ./.github/actions/lint-tools
+      - run: make check
+
+  deny:
+    name: Cargo deny
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: EmbarkStudios/cargo-deny-action@3c6349835b2b7b196a839186cb8b78e02f7b5f25 # v2.1.1
+
+  # rust-version in Cargo.toml is a promise; this proves it. Keep the two in step. Fast tier:
+  # release-check.yml does not run it, so a tag would otherwise ship on a stale MSRV run.
+  msrv:
+    name: MSRV check
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # v1
+        with:
+          toolchain: "1.96"
+      # +1.96 beats rust-toolchain.toml, which pins a newer compiler; the -V line proves it.
+      - run: cargo +1.96 -V | grep -q 'cargo 1\.96\.'
+      # The promise covers what users build. xtask is a dev tool on the pinned toolchain, and
+      # its lint expectations differ between compiler versions.
+      - run: cargo +1.96 check --workspace --exclude xtask --all-features --locked
+
+  # The Docker image builds and serves a mounted repository and a folder of two, read-only. The
+  # build is a cold release build, so it runs only when a Docker-relevant path changed, on a
+  # manual run, and weekly (the pinned base images and the toolchain can drift).
+  docker:
+    name: Docker image
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - name: Docker-relevant paths changed?
+        id: paths
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE_PR: ${{ github.event.pull_request.base.sha }}
+          BASE_PUSH: ${{ github.event.before }}
+          PATHS: '^(Dockerfile|\.dockerignore|Cargo\.(toml|lock)|rust-toolchain\.toml|scripts/docker-check\.sh|crates/|xtask/|docs/actions\.md|\.github/workflows/(ci|lint-and-test)\.yml)'
+        run: |
+          run=true
+          base=${BASE_PR:-$BASE_PUSH}
+          if [ "$EVENT" = pull_request ] || [ "$EVENT" = push ]; then
+            run=false
+            if ! git cat-file -e "$base^{commit}" 2>/dev/null; then
+              run=true
+            elif git diff --name-only "$base" HEAD | grep -qE "$PATHS"; then
+              run=true
+            fi
+          fi
+          echo "run=$run" >> "$GITHUB_OUTPUT"
+      - if: steps.paths.outputs.run == 'true'
+        run: bash scripts/docker-check.sh
+
+  # Full tier from here on.
+  check-macos:
+    if: inputs.full
+    name: Check (macos-latest)
+    runs-on: macos-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+          persist-credentials: false
+      - id: pin
+        run: echo "channel=$(sed -n 's/^channel *= *"\(.*\)"/\1/p' rust-toolchain.toml)" >> "$GITHUB_OUTPUT"
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # v1
+        id: toolchain
+        with:
+          toolchain: ${{ steps.pin.outputs.channel }}
+          components: clippy, rustfmt
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ steps.toolchain.outputs.cachekey }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-${{ steps.toolchain.outputs.cachekey }}-
+      - uses: ./.github/actions/lint-tools
+      - run: make check
+
+  # The Windows binary builds, its tests pass and it serves a repository. The runtime smoke test is
+  # the same script the release check and scripts/wine-run.sh use.
+  windows:
+    if: inputs.full
+    name: Windows
+    runs-on: windows-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - id: pin
+        shell: bash
+        run: echo "channel=$(sed -n 's/^channel *= *"\(.*\)"/\1/p' rust-toolchain.toml)" >> "$GITHUB_OUTPUT"
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # v1
+        id: toolchain
+        with:
+          toolchain: ${{ steps.pin.outputs.channel }}
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ steps.toolchain.outputs.cachekey }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-${{ steps.toolchain.outputs.cachekey }}-
+      - run: cargo build --locked -p gitterrace
+      - run: cargo test --locked --workspace
+      # The segment store on Windows: the seek_read shim, rename over an open file, retired
+      # files that cannot be deleted while a reader holds them. Named, so a red one is visible.
+      - name: Segment store guards
+        run: cargo test --locked -p gitterrace-index --test unreadable --test hostile --test deterministic
+      - name: Smoke test
+        shell: bash
+        run: bash scripts/smoke-check.sh target/debug/git-terrace.exe

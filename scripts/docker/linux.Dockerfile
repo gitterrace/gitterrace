@@ -1,5 +1,6 @@
-# Linux image for scripts/linux-run.sh: the ubuntu job of ci.yml, runnable locally. Same base as
-# the runner, the toolchain pinned like rust-toolchain.toml, and the tools `make check` needs.
+# Linux image for scripts/linux-run.sh: the Linux job of lint-and-test.yml, runnable locally.
+# Same base as the runner, the toolchain pinned like rust-toolchain.toml, and the tools
+# `make check` needs.
 # Built for the native arch (arm64 on Apple silicon), never emulated.
 FROM ubuntu:24.04@sha256:fe81560990fae86dc4743202b2cb4d3df98d0bcf949173cecef15ce1127ef852
 ARG RUST_TOOLCHAIN=1.98.0
