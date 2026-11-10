@@ -6,7 +6,7 @@ thousands of files (their names alone overflow the argument limit), an untracked
 directory with a long file and an untracked wide file. `make lines names`, the file-list
 scripts and the land-check crate selection must all still pass.
 
-  python3 scripts/tracked-check.py --self-test
+  python3 scripts/lint/tracked-check.py --self-test
 """
 
 from __future__ import annotations
@@ -18,7 +18,7 @@ import sys
 import tempfile
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parents[2]
 GIT = ["git", "-c", "user.name=t", "-c", "user.email=t@example.invalid"]
 MODULES = 25000
 

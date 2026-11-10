@@ -5,7 +5,7 @@ The kit lists tracked and untracked files, so an untracked build directory or a 
 folder in a clone is counted against the caps. Here the list is `git ls-files` alone, which
 is what a landed commit holds. The lint itself is unchanged.
 
-  python3 scripts/lines-run.py [--repo DIR]
+  python3 scripts/lint/lines-check.py [--repo DIR]
 """
 
 from __future__ import annotations
@@ -17,7 +17,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parents[2]
 LINT = ROOT / "schwarzwald" / "kit" / "lint"
 
 

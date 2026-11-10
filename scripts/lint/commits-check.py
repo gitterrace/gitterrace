@@ -8,9 +8,10 @@ also fails a `test` commit that removes product lines (code above `#[cfg(test)]`
 and runs the commit-message step of land-check over the range. It does not replace
 `scripts/land-check.sh`, which builds and tests; this is the gate before it.
 
-  python3 scripts/commits-check.py --range A..B   the commits to accept
-  python3 scripts/commits-check.py                the working tree against HEAD
-  python3 scripts/commits-check.py --self-test    prove a failing gate and a product removal go red
+  python3 scripts/lint/commits-check.py --range A..B   the commits to accept
+  python3 scripts/lint/commits-check.py                the working tree against HEAD
+  python3 scripts/lint/commits-check.py --self-test    prove a failing gate and a product
+                                                       removal go red
 """
 
 from __future__ import annotations
@@ -21,18 +22,18 @@ import sys
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path, PurePosixPath
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parents[2]
 PY = sys.executable
 # (gate, command, the suffixes or path prefixes that select it; empty selects on any change)
 GATES: list[tuple[str, list[str], tuple[str, ...]]] = [
-    ("lines", [PY, "scripts/lines-run.py", "--repo", "."], ()),
-    ("width", [PY, "scripts/width-check.py"], ()),
-    ("names", [PY, "scripts/names-check.py"], ()),
-    ("status-words", [PY, "scripts/status-words-check.py"], ()),
-    ("stubs", [PY, "scripts/stubs-check.py"], (".rs",)),
-    ("tests-modules", [PY, "scripts/tests-check.py"], (".rs",)),
-    ("types", [PY, "scripts/types-check.py"], (".rs", "scripts/guards/")),
-    ("css-scope", [PY, "scripts/css-scope-check.py"], (".css",)),
+    ("lines", [PY, "scripts/lint/lines-check.py", "--repo", "."], ()),
+    ("width", [PY, "scripts/lint/width-check.py"], ()),
+    ("names", [PY, "scripts/lint/names-check.py"], ()),
+    ("status-words", [PY, "scripts/lint/status-words-check.py"], ()),
+    ("stubs", [PY, "scripts/lint/stubs-check.py"], (".rs",)),
+    ("tests-modules", [PY, "scripts/lint/tests-check.py"], (".rs",)),
+    ("types", [PY, "scripts/lint/types-check.py"], (".rs", "scripts/guards/")),
+    ("css-scope", [PY, "scripts/lint/css-scope-check.py"], (".css",)),
     (
         "theme",
         [PY, "scripts/theme-gen.py", "--check"],

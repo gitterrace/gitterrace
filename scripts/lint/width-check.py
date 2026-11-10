@@ -4,8 +4,9 @@
 The shared file-length lint caps file length, comment width and code width. This adds what it
 does not: no comment points at a design doc section.
 
-  python3 scripts/width-check.py              check the tree (tracked and untracked, not ignored)
-  python3 scripts/width-check.py --self-test  prove the rule goes red and green on fixtures
+  python3 scripts/lint/width-check.py              check the tree (tracked and untracked,
+                                                   not ignored)
+  python3 scripts/lint/width-check.py --self-test  prove the rule goes red and green on fixtures
 """
 
 from __future__ import annotations
@@ -16,7 +17,7 @@ import sys
 import tempfile
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parents[2]
 COMMENT_EXTS = (".rs", ".py", ".mjs", ".js", ".sh")
 EXCLUDE = ("static/vendor/", "schwarzwald/kit/")
 DOC_REF = re.compile(r"§|\b[Ss]ection \d+\.\d+|\bdesign (doc|section)")

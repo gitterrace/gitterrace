@@ -4,7 +4,7 @@
 Rendered documents share the page with the app, so an unscoped class there (.seg once)
 restyles app widgets. Run by the lint runner as the css-scope hook.
 
-  python3 scripts/css-scope-check.py
+  python3 scripts/lint/css-scope-check.py
 """
 
 from __future__ import annotations
@@ -14,9 +14,7 @@ import sys
 from collections.abc import Iterator
 from pathlib import Path
 
-CSS = (
-    Path(__file__).resolve().parent.parent / "crates/gitterrace-web/static/markdown.css"
-)
+CSS = Path(__file__).resolve().parents[2] / "crates/gitterrace-web/static/markdown.css"
 SCOPED = re.compile(
     r"^(\.markdown-body|\.code|\.diff|:is\(\.markdown-body,\.code,\.diff\))(?![\w-])"
 )

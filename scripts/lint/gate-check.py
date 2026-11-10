@@ -9,8 +9,8 @@ So a step added to `make check` cannot reach main unseen by the gate: it is red 
 gated or skipped on purpose. Also red: a skip entry for a step `make check` no longer has, an
 empty reason, and a step both gated and skipped.
 
-  python3 scripts/gate-check.py [--repo DIR]
-  python3 scripts/gate-check.py --self-test   red and green on fixture trees
+  python3 scripts/lint/gate-check.py [--repo DIR]
+  python3 scripts/lint/gate-check.py --self-test   red and green on fixture trees
 """
 
 from __future__ import annotations
@@ -22,7 +22,7 @@ from pathlib import Path
 
 import tomllib
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parents[2]
 MAKE_CMD = re.compile(r"(?:^|[;&|]\s*)make\s+((?:[a-z][a-z0-9-]*\s*)+)")
 
 

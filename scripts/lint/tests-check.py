@@ -7,7 +7,7 @@ them to see. That skip is only sound if every such file really is test code, so 
 declared by its parent under `#[cfg(test)]` or a `cfg_attr`/`cfg` that names `test`. A
 production file named `tests.rs` fails here. Run by the lint runner as the tests hook.
 
-  python3 scripts/tests-check.py [root]
+  python3 scripts/lint/tests-check.py [root]
 """
 
 from __future__ import annotations
@@ -16,7 +16,7 @@ import re
 import sys
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parents[2]
 GLOBS = (
     "crates/**/tests.rs",
     "crates/**/*_tests.rs",

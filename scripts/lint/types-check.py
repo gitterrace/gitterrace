@@ -7,8 +7,8 @@ scripts/guards/shared-types.json, so another project reuses the script with its 
 2. The OpenAPI document types every 200 response: each is an object whose properties are all
    non-empty schemas. Off while the config says so, with the reason.
 
-  python3 scripts/types-check.py [--config FILE] [--root DIR]
-  python3 scripts/types-check.py --self-test    prove each rule goes red on a planted offender
+  python3 scripts/lint/types-check.py [--config FILE] [--root DIR]
+  python3 scripts/lint/types-check.py --self-test    prove each rule goes red on a planted offender
 """
 
 from __future__ import annotations
@@ -21,7 +21,7 @@ from pathlib import Path
 from typing import Any
 
 HERE = Path(__file__).resolve().parent
-DEFAULT_CONFIG = HERE / "guards" / "shared-types.json"
+DEFAULT_CONFIG = HERE.parent / "guards" / "shared-types.json"
 DEF = re.compile(r"^\s*(?:pub(?:\([a-z]+\))?\s+)?(?:struct|enum|union)\s+(\w+)", re.M)
 MACRO_DEF = r"{m}!\s*\{{(?:[^{{}}]|\{{[^{{}}]*\}})*?\bpub\s+enum\s+(\w+)"
 

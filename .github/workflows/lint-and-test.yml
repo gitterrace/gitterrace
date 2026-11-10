@@ -4,7 +4,7 @@ name: Lint and test
 # Linux gate, cargo deny, the MSRV check, and the Docker image when a Docker path changed. The
 # full tier (input `full`) adds macOS and Windows; it runs on a manual run and weekly. A tag
 # never ships on the fast tier alone: release-check.yml runs macOS and Windows again before
-# dist publishes. scripts/ci-check.py holds both rules.
+# dist publishes. scripts/lint/ci-check.py holds both rules.
 
 on:
   workflow_call:

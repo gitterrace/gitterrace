@@ -5,8 +5,8 @@ Example: "on main clean" should read "on main, clean". Checks Rust string litera
 and JS UI text. Not a full parser, it looks for a status word right after a name or a
 placeholder.
 
-  python3 scripts/status-words-check.py              check the tree
-  python3 scripts/status-words-check.py --self-test  prove it goes red on a planted case
+  python3 scripts/lint/status-words-check.py              check the tree
+  python3 scripts/lint/status-words-check.py --self-test  prove it goes red on a planted case
 """
 
 from __future__ import annotations
@@ -16,7 +16,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parents[2]
 COMMENT_EXTS = {".rs": "//", ".mjs": "//", ".py": "#", ".sh": "#"}
 HISTORY = re.compile(r"\b(?:no longer|used to|previously|was changed)\b", re.I)
 # Existing comments with history wording, `path:line` entries. Only shrinks.
@@ -79,7 +79,7 @@ def files() -> list[Path]:
         for f in r.stdout.split("\n")
         if f.endswith(EXTS + tuple(COMMENT_EXTS))
         and not any(x in f for x in EXCLUDE)
-        and f != "scripts/status-words-check.py"
+        and f != "scripts/lint/status-words-check.py"
     ]
 
 

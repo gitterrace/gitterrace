@@ -9,8 +9,8 @@ names, so a new guard needs no change to the shared check; ratchet-check.py fail
 rises, and this check fails when the tree holds more than the file allows or fewer (lower the
 count then).
 
-  python3 scripts/super-check.py              compare the tree with the recorded count
-  python3 scripts/super-check.py --self-test  prove a planted new use goes red
+  python3 scripts/lint/super-check.py              compare the tree with the recorded count
+  python3 scripts/lint/super-check.py --self-test  prove a planted new use goes red
 """
 
 from __future__ import annotations
@@ -21,7 +21,7 @@ import sys
 import tempfile
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parents[2]
 REGISTRY = "scripts/guards/super-paths.json"
 KEY = "super_paths"
 SUPER = re.compile(r"\bsuper::")

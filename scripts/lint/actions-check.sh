@@ -9,7 +9,7 @@ set -u
 # pipefail is POSIX since 2024 but older dash lacks it, so it is set only where supported.
 # shellcheck disable=SC3040
 (set -o pipefail) 2>/dev/null && set -o pipefail
-root=$(cd "$(dirname "$0")/.." && pwd)
+root=$(cd "$(dirname "$0")/../.." && pwd)
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 fails=0

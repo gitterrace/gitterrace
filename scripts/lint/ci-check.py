@@ -11,8 +11,8 @@
 
 Read with a small indentation reader (2-space job keys under `jobs:`), no YAML library.
 
-  python3 scripts/ci-check.py [--repo DIR]
-  python3 scripts/ci-check.py --self-test
+  python3 scripts/lint/ci-check.py [--repo DIR]
+  python3 scripts/lint/ci-check.py --self-test
 """
 
 from __future__ import annotations
@@ -22,7 +22,7 @@ import sys
 import tempfile
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parents[2]
 WF = ".github/workflows"
 # Full-tier job -> (release-check job, the OS its matrix must hold).
 COVERS = {
@@ -78,7 +78,7 @@ def problems(repo: Path) -> list[str]:
         if j not in COVERS:
             bad.append(
                 f"lint-and-test.yml: full-tier job {j} has no release-check cover in "
-                f"scripts/ci-check.py COVERS, so a tag could ship without it"
+                f"scripts/lint/ci-check.py COVERS, so a tag could ship without it"
             )
             continue
         rj, os_ = COVERS[j]
@@ -89,7 +89,7 @@ def problems(repo: Path) -> list[str]:
     for j in COVERS:
         if j not in tiers:
             bad.append(
-                f"scripts/ci-check.py COVERS names {j}, not a lint-and-test.yml job"
+                f"scripts/lint/ci-check.py COVERS names {j}, not a lint-and-test.yml job"
             )
     return bad
 

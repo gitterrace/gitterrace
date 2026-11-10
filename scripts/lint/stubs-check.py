@@ -6,8 +6,9 @@ A test marked `#[ignore]` whose body is nothing but `panic!`, `todo!` or `unimpl
 Such a stub must be written for real or deleted. Comments inside the body do not count as
 content.
 
-  python3 scripts/stubs-check.py [root]      scan crates/ and xtask/
-  python3 scripts/stubs-check.py --self-test prove it goes red on planted stubs, green on real tests
+  python3 scripts/lint/stubs-check.py [root]      scan crates/ and xtask/
+  python3 scripts/lint/stubs-check.py --self-test prove it goes red on planted stubs, green
+                                                  on real tests
 """
 
 from __future__ import annotations
@@ -16,7 +17,7 @@ import re
 import sys
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parents[2]
 DIRS = ("crates", "xtask")
 
 # Attributes, then a test fn header. The body is matched by brace counting below.

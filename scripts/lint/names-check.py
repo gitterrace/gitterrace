@@ -22,7 +22,7 @@ import sys
 from collections.abc import Callable
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parents[2]
 # Policy list of outside project names: this repo stands on its own and must not lean on
 # another repo's internals. Not a ban on any deleted name. Stored as SHA-256 prefixes, so
 # the guard does not itself spell the names it keeps out.
@@ -40,7 +40,7 @@ SKIP = (
     "schwarzwald/kit/",
     "Cargo.lock",
     ".mcp.json",
-    "scripts/names-check.py",
+    "scripts/lint/names-check.py",
     "scripts/guards/adapters/",
     "schwarzwald/config/guards.env",
 )
@@ -266,11 +266,11 @@ def check_path_refs() -> list[str]:
 
 def self_test() -> int:
     """R7 red and green: a moved script leaves its old path in a gate config."""
-    have = {"scripts/lint/names-check.py"}
+    have = {"scripts/new/x-check.py"}
     cases = [
-        ('gate = ["python3 scripts/names-check.py"]\n', True),
-        ('gate = ["python3 scripts/lint/names-check.py"]\n', False),
-        ('ok = 1\n[retired]\nentries = ["scripts/names-check.py"]\n', False),
+        ('gate = ["python3 scripts/x-check.py"]\n', True),
+        ('gate = ["python3 scripts/new/x-check.py"]\n', False),
+        ('ok = 1\n[retired]\nentries = ["scripts/x-check.py"]\n', False),
         ("run: bash scripts/gone-check.sh\n", True),
     ]
     for text, red in cases:

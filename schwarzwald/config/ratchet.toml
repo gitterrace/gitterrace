@@ -25,7 +25,7 @@ path = "openapi.skip_path_prefixes"
 file = "schwarzwald/config/own-heads.json"
 path = "own_heads"
 
-# `super::` paths outside tests (scripts/super-check.py), toward zero and then a hard rule.
+# `super::` paths outside tests (scripts/lint/super-check.py), toward zero and then a hard rule.
 [[ratchet]]
 file = "scripts/guards/super-paths.json"
 path = "super_paths"

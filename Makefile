@@ -78,7 +78,7 @@ theme:
 
 # actions: Example actions work per OS profile (stubbed PATH)
 actions:
-	sh scripts/actions-check.sh
+	sh scripts/lint/actions-check.sh
 
 # send-vectors: Check send.js against the shared send vectors
 send-vectors:
@@ -86,24 +86,24 @@ send-vectors:
 
 # names: File, env and project names follow the conventions
 names:
-	python3 scripts/names-check.py --self-test
-	python3 scripts/names-check.py
+	python3 scripts/lint/names-check.py --self-test
+	python3 scripts/lint/names-check.py
 
 # lines: Source files stay under 600 lines, comments carry no process labels
 lines:
-	python3 scripts/lines-run.py --repo .
-	python3 scripts/width-check.py --self-test && python3 scripts/width-check.py
-	python3 scripts/status-words-check.py
-	python3 scripts/stubs-check.py --self-test && python3 scripts/stubs-check.py
-	python3 scripts/types-check.py --self-test && python3 scripts/types-check.py
+	python3 scripts/lint/lines-check.py --repo .
+	python3 scripts/lint/width-check.py --self-test && python3 scripts/lint/width-check.py
+	python3 scripts/lint/status-words-check.py
+	python3 scripts/lint/stubs-check.py --self-test && python3 scripts/lint/stubs-check.py
+	python3 scripts/lint/types-check.py --self-test && python3 scripts/lint/types-check.py
 	python3 scripts/keep-report.py --self-test
 
 # docs-check: Generated files are up to date, and the dev scripts pass their self-tests
 docs-check:
 	python3 scripts/bench-report.py --check
 	bash scripts/land-check.sh --self-test
-	python3 scripts/commits-check.py --self-test
-	python3 scripts/tracked-check.py --self-test
+	python3 scripts/lint/commits-check.py --self-test
+	python3 scripts/lint/tracked-check.py --self-test
 	bash scripts/lib/python-run.sh schwarzwald/kit/tools/golden.py --self-test
 	bash scripts/golden-proof-run.sh --self-test
 	bash scripts/linux-run.sh --self-test

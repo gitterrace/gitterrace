@@ -6,8 +6,8 @@ A rule that matches only at item level goes blind once the same code sits in a m
 is wrapped and run through `ast-grep test`; a rule that misses is reported unless it is on
 BLIND with a reason. The list only shrinks.
 
-  python3 scripts/ast-grep-macro-check.py              check the rules
-  python3 scripts/ast-grep-macro-check.py --self-test  prove it goes red on an item-only rule
+  python3 scripts/lint/ast-grep-macro-check.py              check the rules
+  python3 scripts/lint/ast-grep-macro-check.py --self-test  prove it goes red on an item-only rule
 """
 
 from __future__ import annotations
@@ -20,7 +20,7 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parents[2]
 AST = ROOT / "scripts" / "ast-grep"
 
 # Rules known blind inside macro bodies: rule id -> why. Fill only with a reason.

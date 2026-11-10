@@ -9,7 +9,7 @@ ignores:
   - crates/*/tests/**
   - crates/gitterrace-web/src/wiring_tests.rs
   # Test modules kept in their own file (`#[cfg(test)] mod tests;`): the inline-module check
-  # below cannot see them. scripts/tests-check.py proves each is compiled for tests only.
+  # below cannot see them. scripts/lint/tests-check.py proves each is compiled for tests only.
   - crates/**/tests.rs
   - crates/**/*_tests.rs
   # Writes to a path the user named or to a per-user folder, not into a repository. Listed so

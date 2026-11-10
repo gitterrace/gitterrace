@@ -74,7 +74,7 @@ HTTP. Nothing outside `gitterrace-git` imports `gix`.
   Commits). The gate for a squashed commit here is
   `scripts/land-check.sh --base <main>`.
 - Accepting commits written without a build:
-  `python3 scripts/commits-check.py --range <base>..<tip>` prints the files and
+  `python3 scripts/lint/commits-check.py --range <base>..<tip>` prints the files and
   diffstat and runs the cargo-free gates those file types need, with the message
   step when the tip is checked out. `scripts/land-check.sh` still builds and
   tests afterwards.

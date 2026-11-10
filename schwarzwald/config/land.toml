@@ -25,7 +25,7 @@ test = "conventions"
 # Every saved-page test runs (found from tests/golden, so a new one needs no edit here), plus
 # the fast tree checks and the external linters; the message step covers the landed commits.
 # Every `make check` step is either run here as `make <step>` or named in [landing.skip] with
-# the reason, which scripts/gate-check.py (a `make lint` step) holds to.
+# the reason, which scripts/lint/gate-check.py (a `make lint` step) holds to.
 [landing]
 gate = [
   # Unformatted Rust never lands. The cheapest check runs first.
