@@ -324,7 +324,7 @@ Environment (same values, plus `GITTERRACE_VAR_<NAME>`):
 <!-- BEGIN GENERATED: scripts -->
 | Script | Does | Needs |
 | --- | --- | --- |
-| [`clipboard.sh`](actions/clipboard.sh) | Copy the selection as markdown, on any OS. | (first present wins): macOS:         pbcopy (built in) Linux Wayland: wl-copy (wl-clipboard) Linux X11:     xclip or xsel WSL:           clip.exe (built in) Windows:       a POSIX sh is needed. On native Windows use command = ["clip.exe"] instead |
+| [`clipboard.sh`](actions/clipboard.sh) | Copy the selection as markdown, on any OS. | (first present wins): macOS: pbcopy (built in); Linux Wayland: wl-copy (wl-clipboard); Linux X11: xclip or xsel; WSL: clip.exe (built in); Windows: a POSIX sh is needed. On native Windows use command = ["clip.exe"] instead |
 | [`editor.sh`](actions/editor.sh) | Open a file at a line in the editor, on any OS. | (all OSes): an editor. Picks $VISUAL, then $EDITOR, then the first of code, zed, zeditor found, then vi. Line jump is known for code, vim/nvim/vi, nano, emacs, subl, zed/zeditor and hx. Any other editor opens the file without a line. |
 | [`obsidian.sh`](actions/obsidian.sh) | Append the selection to today's Obsidian daily note. | (all OSes): jq (brew install jq, apt install jq). date and mkdir are POSIX. |
 

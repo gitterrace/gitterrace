@@ -337,7 +337,7 @@ mod tests {
         ("placeholders", 266),
         ("action-keys", 263),
         ("payload", 154),
-        ("scripts", 336),
+        ("scripts", 322),
         ("cache", 165),
         ("routes", 357),
     ];

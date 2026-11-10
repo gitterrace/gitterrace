@@ -43,7 +43,21 @@ pub fn load(root: &Path) -> Result<Vec<Script>> {
             if let Some(first) = paragraph.first_mut() {
                 *first = first.trim_start_matches("Needs").trim_start();
             }
-            paragraph.join(" ")
+            // A header lists its needs one per line, aligned with spaces for a terminal. In a
+            // table cell the lines join with "; " and the alignment collapses.
+            let mut lines = paragraph
+                .iter()
+                .map(|l| l.split_whitespace().collect::<Vec<_>>().join(" "))
+                .filter(|l| !l.is_empty());
+            let head = lines.next().unwrap_or_default();
+            let rest: Vec<String> = lines.collect();
+            if rest.is_empty() {
+                head
+            } else if head.ends_with(':') {
+                format!("{head} {}", rest.join("; "))
+            } else {
+                format!("{head} {}", rest.join(" "))
+            }
         });
         out.push(Script {
             file,
