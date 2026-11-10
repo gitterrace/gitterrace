@@ -1,84 +1,67 @@
 # Running it online
 
-gitterrace is built to run on your own machine, bound to `127.0.0.1`. That stays
-the recommendation. When you want others to read a repository, publish a static
-export or use public mode. Nothing else binds to another address.
+gitterrace is built to run on your own machine, bound to `127.0.0.1`. To let
+others read a repository, publish a static export or use public mode. Nothing
+else binds to another address.
 
 ## A static export
 
-The safest way to put a repository online is no server at all.
-`git terrace export` writes the site as plain files: files, commits, diffs,
-blame, history and insights for the newest commits, and nothing else. Any static
-host or CDN can serve the folder. There is no process to attack, no working tree
-to leak and no action to run. The export writes a `_headers` file with the
-content security policy and other headers. Hosts that read it, such as Netlify
-and Cloudflare Pages, apply it. Elsewhere, set the same headers on the host.
+The safest option is no server at all. `git terrace export` writes files,
+commits, diffs, blame, history and insights for the newest commits as plain
+files for any static host. There is no process to attack, no working tree to
+leak and no action to run.
 
 ```sh
 git terrace export site ~/src/project --commits 300
 ```
 
-It is a single command, so it scripts well: run it from CI or a cron job on each
-release and upload the folder. Several repositories go into one site
-(`export site repo1 repo2`), and `--project name=url` credits a repository that
-is someone else's work in every page's banner.
+Several repositories go into one site (`export site repo1 repo2`), and
+`--project name=url` credits someone else's repository in every page's banner.
+The export writes a `_headers` file with the content security policy. Netlify
+and Cloudflare Pages apply it. Elsewhere, set the same headers on the host.
 
-Every page ends with one credit line:
-`Source: name, MIT license, https://github.com/owner/name`. The license is
-recognized from the root `LICENSE`, `LICENCE` or `COPYING` file (a text that
-is not a common license links to the file instead). The link is the `origin`
-remote, or the `--project` URL, with any credentials removed, and only for
-public https and ssh hosts. Either part is left out when unknown.
+Every page ends with a credit line such as
+`Source: name, MIT license, https://github.com/owner/name`. The license comes
+from the root `LICENSE`, `LICENCE` or `COPYING` (an uncommon text links to the
+file). The link is the `origin` remote or `--project` URL without credentials,
+only for public https and ssh hosts. An unknown part is left out. The
+[live demo](https://demo.gitterrace.dev) is built this way.
 
-The [live demo](https://demo.gitterrace.dev) is built this way. Its build script
-clones each repository at a release tag, exports them all into one folder with
-`--commits 300` and deploys the folder with its `_headers` file. Bumping a tag
-and rerunning the script publishes the new release.
-
-An export is a snapshot. It shows what was committed when it ran and is updated
-only by running it again. It has no search, live updates or actions, since those
-need a server. When you need those, or any revision on demand, use public mode.
+An export is a snapshot with no search, live updates or actions. For those, or
+any revision on demand, use public mode.
 
 ## Public mode
 
-`--public` (or `server.is_public = true` in `config.toml`) turns the server into
-a read-only viewer of committed history. Any `--addr` that is not loopback
-refuses to start without it.
+`--public` (or `server.is_public = true`) makes the server a read-only viewer of
+committed history. Any `--addr` that is not loopback refuses to start without
+it.
 
-What a public server shows:
+A public server shows files, commits, diffs, blame, history, compare, search and
+insights at `HEAD`, any branch, tag or remote-tracking branch, or a full commit
+id, plus `/go/...` permalinks. The JSON API under `/api/v1` is off unless
+`features.api_enabled = true`.
 
-- Files, commits, diffs, blame, history, compare, search and insights at `HEAD`,
-  any branch, tag or remote-tracking branch, or a full commit id.
-- The JSON API under `/api/v1` with the same revisions, only when
-  `features.api_enabled = true` says so. It is off on a public server by
-  default.
-- `/go/...` permalinks.
-
-What it never shows or does:
+It never shows or does:
 
 - The working tree, uncommitted changes, stashes, linked worktrees, reflogs or
   any other ref.
-- Abbreviated commit ids: only full ids resolve, so the object store cannot be
-  enumerated.
-- Paths of folders on the host, an in-progress rebase or merge.
-- Live updates (no `/events`), actions, Send to targets, and adding
-  repositories.
+- Abbreviated commit ids, so the object store cannot be enumerated.
+- Host folder paths, an in-progress rebase or merge.
+- Live updates, actions, Send to, or adding repositories.
 - Any method but `GET` and `HEAD`.
 
-Every request that takes longer than `server.public_timeout_secs` (default 30)
-answers `503`. Pages that are slow on a large history (blame, insights) finish
-in the background and answer from the cache next time.
+A request over `server.public_timeout_secs` (default 30) answers `503`. Slow
+pages finish in the background and answer from the cache next time.
 
-Any feature in `[features]` can be switched off for a public server as well, for
-example `blame_enabled = false` or `search_enabled = false`. A switched-off page
-answers 404 and its links are gone. The ones that show this machine or change
-the server (`worktree_enabled`, `live_enabled`, `actions_enabled`,
-`repo_admin_enabled`, `settings_enabled`) stay off whatever the file says.
+`[features]` can switch off more pages, such as `blame_enabled = false`: the
+page answers 404 and its links are gone. The
+ones that show this machine or change the server stay off whatever the file
+says.
 
 ## Run with Docker
 
-The root `Dockerfile` builds an image that serves one folder, either a
-repository or a folder of repositories two levels deep:
+The root `Dockerfile` serves one repository, or a folder of repositories two
+levels deep:
 
 ```sh
 docker build -t gitterrace .
@@ -86,24 +69,16 @@ docker run --rm -p 127.0.0.1:8080:8080 -v "$PWD":/repos:ro \
   -v gitterrace-cache:/cache gitterrace
 ```
 
-Open `http://localhost:8080`. A server in a container listens on every
-interface, so the image runs in public mode: committed history only, no working
-tree, actions or settings changes. Keep `127.0.0.1:` in `-p` unless the network
-may read every commit. The `/cache` volume keeps the index, so a restart is
-fast. Mount a config folder on `/config` to change other settings.
-
-There is no prebuilt image and none is published to ghcr.io. Build it locally
-with the command above, which takes about 5 to 10 minutes and works on both
-amd64 and arm64.
-
-A read-only mount cannot hold the index in `.git/gitterrace/`, so the image sets
-`GITTERRACE_INDEX_FALLBACK=/cache/index` and keeps it there. Only the image
-sets it. Without the variable, an index lives in `.git/gitterrace/` or nowhere.
+Open `http://localhost:8080`. The image runs in public mode. Keep `127.0.0.1:`
+in `-p` unless the network may read every commit. The `/cache` volume keeps the
+index across restarts. Mount a config folder on `/config` for other settings.
+No prebuilt image is published. The build takes 5 to 10 minutes, on amd64 or
+arm64.
 
 ## Behind a reverse proxy
 
-Run gitterrace on loopback and put a TLS reverse proxy in front of it. The proxy
-owns TLS, HSTS, connection limits, slow-client timeouts and, for a private
+Put a TLS reverse proxy in front of gitterrace on loopback. The proxy owns
+TLS, HSTS, connection limits, slow-client timeouts and, for a private
 repository, the login.
 
 ```toml
@@ -113,16 +88,15 @@ is_public = true
 hosts = ["git.example.com"]
 ```
 
-`hosts` lists the exact names the proxy forwards in the `Host` header, without
-scheme or port. Wildcards are refused. Any other name answers `403`, which stops
-DNS rebinding. Forward the original `Host`, since gitterrace reads no
-`X-Forwarded-*` header.
+`hosts` lists the exact names the proxy forwards in `Host`, without scheme or
+port. Wildcards are refused. Any other name answers `403`, which stops DNS
+rebinding. Forward the original `Host`: gitterrace reads no `X-Forwarded-*`.
 
 ## What not to do
 
-- Do not serve a clone with work you have not published: everything committed on
-  any branch or tag is readable, and history includes deleted files.
-- Do not expose it without TLS or without the proxy's login when the repository
-  is private. gitterrace has no accounts.
+- Do not serve a clone with unpublished work: every branch and tag is readable,
+  and history includes deleted files.
+- Do not expose a private repository without TLS and the proxy's login.
+  gitterrace has no accounts.
 - Do not bind `0.0.0.0` on a shared network for convenience: public mode makes
   it safe to read, not private.
