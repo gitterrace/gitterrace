@@ -85,6 +85,23 @@ def own_shas(root: str | Path) -> set[str]:
 
 
 OWN_HEX = re.compile(r"\b[0-9a-f]{7,40}\b")
+STAMP = re.compile(r"(v\d+\.\d+\.\d+)(?:-([0-9a-f]{7}))?")
+
+
+def version_stamp(text: str) -> str:
+    """`gitterrace v0.1.0-1161f1d` from `--version` output: the version and the build's 7-hex
+    commit, never the -dirty mark (that is its own flag). Plain `gitterrace v0.1.0` when the
+    binary names no commit."""
+    m = STAMP.search(text)
+    if not m:
+        return text.strip()
+    return "gitterrace " + m.group(1) + (f"-{m.group(2)}" if m.group(2) else "")
+
+
+def commit_of(text: str) -> str | None:
+    """The build's 7-hex commit from `--version` output, None when it names none."""
+    m = STAMP.search(text)
+    return m.group(2) if m else None
 
 
 def scrub_own(v: Any, own: set[str]) -> Any:

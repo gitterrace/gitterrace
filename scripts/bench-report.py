@@ -161,6 +161,7 @@ def self_test() -> None:
     loud_test()
     own_load_test()
     page_test()
+    commit_test()
     wrap_test()
     footprint_test()
     export_test()
@@ -195,6 +196,35 @@ def page_problems(
         f"tracker id {m} in the text" for m in sorted(set(TRACKER_ID.findall(text)))
     ]
     return errs
+
+
+def commit_test() -> None:
+    """A run record without its build commit fails, and the doc names the commit it records."""
+    machine = {"gitterrace": "gitterrace v0.1.0-1161f1d", "commit": "1161f1d"}
+    run = {"when": "2026-11-20T10:00:00", "machine": machine}
+    if bd.commit_errors(run) or bd.version(machine) != "gitterrace v0.1.0-1161f1d":
+        sys.exit("bench-report self-test failed: a run with its commit was refused")
+    for label, m in [
+        ("no commit", {"gitterrace": "gitterrace v0.1.0"}),
+        (
+            "a short commit",
+            {"gitterrace": "gitterrace v0.1.0-1161f", "commit": "1161f"},
+        ),
+        ("a null commit", {"gitterrace": "gitterrace v0.1.0", "commit": None}),
+    ]:
+        if not bd.commit_errors({**run, "machine": m}):
+            sys.exit(f"bench-report self-test failed: {label} passed the commit guard")
+    dirty = {"gitterrace": "gitterrace v0.1.0-dirty", "commit": "1161f1d"}
+    if bd.version(dirty).count("1161f1d") != 1:
+        sys.exit("bench-report self-test failed: the doc version dropped the commit")
+    if bd.version({"gitterrace": "gitterrace v0.1.0"}) != "gitterrace v0.1.0":
+        sys.exit(
+            "bench-report self-test failed: a run with no commit must render plain"
+        )
+    if bd.commit_errors(
+        {**run, "when": "2026-11-03T10:00:00", "machine": {"gitterrace": "x"}}
+    ):
+        sys.exit("bench-report self-test failed: a run before COMMIT_FROM was refused")
 
 
 def page_test() -> None:
@@ -361,7 +391,7 @@ def pins() -> list[str]:
 
 def newest_ok(run: Json) -> list[str]:
     """The newest run must come from a clean build, timed under its load limit."""
-    errs: list[str] = []
+    errs: list[str] = bd.commit_errors(run)
     m = run["machine"]
     if (m.get("dirty") or "dirty" in m.get("gitterrace", "")) and not run.get("note"):
         errs.append(f"{run_name(run)}: measured a -dirty build")
@@ -428,13 +458,14 @@ def no_hostname(paths: list[Path]) -> list[str]:
 
 
 def own_ids() -> list[str]:
-    """No result names a commit of gitterrace's own history: the control repo is measured at
-    HEAD and the run date names it. Upstream corpus shas stay."""
+    """No result names a commit of gitterrace's own history except the build commit in the
+    machine record: the control repo is measured at HEAD and the run date names it. Upstream
+    corpus shas stay."""
     own = bl.own_shas(ROOT)
     errs: list[str] = []
     for p in runs():
-        text = p.read_text()
-        if bl.scrub_own(text, own) != text:
+        rest = {k: v for k, v in json.loads(p.read_text()).items() if k != "machine"}
+        if bl.scrub_own(rest, own) != rest:
             errs.append(f"{p.name}: names a commit of this repository")
     return errs
 

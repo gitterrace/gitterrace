@@ -389,6 +389,7 @@ def disk_name():
 
 
 def machine(binary: str) -> Json:
+    stamp = run([binary, "--version"]).strip()
     ram = 0
     with contextlib.suppress(ValueError, OSError):
         ram = os.sysconf("SC_PAGE_SIZE") * os.sysconf("SC_PHYS_PAGES") / 2**30
@@ -415,11 +416,11 @@ def machine(binary: str) -> Json:
         "cpus": os.cpu_count(),
         "ram_gb": round(ram, 1),
         "git": run(["git", "--version"]).strip(),
-        # The version only: the build's own commit is never recorded (dirty is its own flag).
-        "gitterrace": re.sub(
-            r"(v\d+\.\d+\.\d+)\S*", r"\1", run([binary, "--version"]).strip()
-        ),
-        "dirty": "dirty" in run([binary, "--version"]),
+        # The version and the build's own 7-hex commit, kept apart: the commit names what was
+        # measured. Dirty is its own flag, never part of the version string.
+        "gitterrace": bl.version_stamp(stamp),
+        "commit": bl.commit_of(stamp),
+        "dirty": "dirty" in stamp,
     }
 
 
@@ -567,7 +568,8 @@ def main():
     if path.exists():
         prev = json.loads(path.read_text())
         result["repos"] = {**prev.get("repos", {}), **result["repos"]}
-    result = bl.scrub_own(result, bl.own_shas(ROOT))
+    # Own shas become HEAD everywhere but the machine record, which names the build's commit.
+    result = {**bl.scrub_own(result, bl.own_shas(ROOT)), "machine": result["machine"]}
     path.write_text(json.dumps(result, indent=1, sort_keys=True) + "\n")
     print(f"wrote {path}")
     if a.synthetic:

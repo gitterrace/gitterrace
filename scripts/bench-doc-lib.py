@@ -58,9 +58,35 @@ def samples_note(r: Json) -> str:
 OWN = "control"
 
 
+HEX7 = re.compile(r"[0-9a-f]{7}")
+# A run whose commit is not known yet: it renders as the plain version until the field is filled.
+PENDING = "pending"
+# Runs from this date on must record the commit they measured (or PENDING).
+COMMIT_FROM = "2026-11-09"
+
+
 def version(m: Json) -> str:
-    """`gitterrace v0.1.0`, without the build's own commit or dirty mark."""
-    return re.sub(r"(v\d+\.\d+\.\d+)\S*", r"\1", m["gitterrace"])
+    """`gitterrace v0.1.0-1161f1d`: the version and the build's recorded commit, never the dirty
+    mark. A run with no recorded commit renders as the plain `gitterrace v0.1.0`."""
+    base = re.sub(r"(v\d+\.\d+\.\d+)\S*", r"\1", m["gitterrace"])
+    c = m.get("commit")
+    return f"{base}-{c}" if isinstance(c, str) and HEX7.fullmatch(c) else base
+
+
+def commit_errors(run: Json) -> list[str]:
+    """A run from COMMIT_FROM on records the commit it measured as 7 hex (or PENDING), and the
+    version it renders names that commit."""
+    if run["when"][:10] < COMMIT_FROM:
+        return []
+    m, name = run["machine"], run["when"][:10]
+    c = m.get("commit")
+    if c == PENDING:
+        return []
+    if not isinstance(c, str) or not HEX7.fullmatch(c):
+        return [f"{name}: machine.commit is {c!r}, not the 7-hex commit of the build"]
+    if not version(m).endswith(f"-{c}"):
+        return [f"{name}: the rendered version does not name commit {c}"]
+    return []
 
 
 def at(name: str, sha: str, when: str) -> str:
