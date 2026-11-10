@@ -206,7 +206,7 @@ impl<'a> Counted<'a> {
     /// already summarize.
     pub(crate) fn is_whole(&self) -> bool {
         !self.shifted
-            && self.scope.selection().is_empty()
+            && self.scope.matcher().is_empty()
             && *self.days.start() == i64::MIN
             && *self.days.end() == i64::MAX
     }
