@@ -4,9 +4,10 @@
 release: the page tells people to `brew install` from the tap and `cargo install` from the
   repository. Deploying that before both answer publishes an install line that fails, so the
   deploy refuses until the repository, the tap and the `v<version>` release tag exist.
-csp [DIR]: every inline <script> of every page under DIR (default target/site/) has its exact sha256
-  in the CSP of DIR/_headers and of any meta CSP, and no hash is listed that no page has. A changed
-  script or a stale _headers fails here instead of being blocked silently by the browser.
+csp [DIR]: every inline <script> of every page under DIR has its exact sha256 in the CSP of
+  DIR/_headers and of any meta CSP, and no hash is listed that no page has. A changed script or
+  a stale _headers fails here instead of being blocked silently by the browser. Without DIR it
+  builds the site into target/site first (`cargo xtask site`, no tracked file is written).
   `release` runs it too, before a deploy.
 domains: gitterrace.dev serves the page over HTTPS with the generated headers, and every other
   host (www, gitterrace.com, www.gitterrace.com) redirects to it permanently. A www host that
@@ -26,6 +27,7 @@ import base64
 import email.message
 import hashlib
 import re
+import subprocess
 import sys
 import urllib.error
 import urllib.request
@@ -114,7 +116,15 @@ def headers_csp(text: str) -> str:
 
 
 def csp(directory: str | None = None) -> list[str]:
-    d = Path(directory) if directory else ROOT / "target" / "site"
+    if directory:
+        d = Path(directory)
+    else:
+        # The site is build output, so a fresh clone has none: build it from the tree as it is.
+        # `xtask site` writes only target/site, never a tracked file. A failed build fails here.
+        subprocess.run(
+            ["cargo", "xtask", "site"], cwd=ROOT, check=True, stdout=subprocess.DEVNULL
+        )
+        d = ROOT / "target" / "site"
     # The `/*` policy covers every page, so its hashes answer for the scripts of all of them:
     # a script only the docs pages carry is still one the policy must list.
     pages = sorted(d.rglob("*.html"))
