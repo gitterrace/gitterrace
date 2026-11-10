@@ -10,7 +10,7 @@ use crate::insights::files::{
     AgeBucket, AgeReport, COUPLING_MAX_FILES, Coupling, DirOwnership, Hotspot, HotspotReport,
     Owner, OwnershipReport, SOLO_SHARE, STALE_SECS,
 };
-use crate::insights::{Counted, HeadFile, Insights, Period, under};
+use crate::insights::{Counted, HeadFile, Insights, Period};
 
 impl Insights<'_> {
     /// Hotspots among `files` (the head tree) for the period: [`Insights::hotspots_in`] over
@@ -189,7 +189,7 @@ impl Insights<'_> {
         depth: usize,
     ) -> OwnershipReport {
         let s = c.scope();
-        let whole = s.period() == Period::All && s.range().is_none() && s.selection().is_empty();
+        let whole = s.period() == Period::All && s.range().is_none() && s.matcher().is_empty();
         let per_file = |shown: &[&HeadFile]| self.owner_lines(shown, c, whole);
         self.ownership_with(&under_path(files, c), depth, per_file)
     }
@@ -482,12 +482,8 @@ impl Insights<'_> {
 
 /// The head files a path selection keeps: a file outside it has no counted change.
 fn under_path(files: &[HeadFile], c: &Counted<'_>) -> Vec<HeadFile> {
-    let path = c.scope().selection().path();
-    files
-        .iter()
-        .filter(|f| path.is_none_or(|p| under(&f.path, p)))
-        .cloned()
-        .collect()
+    let m = c.scope().matcher();
+    files.iter().filter(|f| m.row(&f.path)).cloned().collect()
 }
 
 #[derive(Default)]

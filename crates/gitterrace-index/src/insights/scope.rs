@@ -49,7 +49,8 @@
 use std::ops::{Range, RangeInclusive};
 
 use crate::feed::{self, Clock, CommitRange, CommitRow, FileRow, InsightsSource};
-use crate::insights::{DAY, Insights, OptionParams, Options, Period, Selection, TimeAxis, under};
+use crate::insights::{DAY, Insights, OptionParams, Options, Period, Selection, TimeAxis};
+use crate::query::Matcher;
 
 /// A scope as a query string carries it: every value a plain, possibly empty or junk, string.
 /// The web pages and the API both fill this and call [`Scope::from_params`].
@@ -76,6 +77,10 @@ pub enum ScopeError {
     Date(&'static str, String),
     #[error("from {0} is after to {1}")]
     Order(String, String),
+    #[error("{0}")]
+    Query(#[from] crate::query::QueryError),
+    #[error("statistics cannot select by message text: use the log for {0:?}")]
+    Words(String),
 }
 
 /// One request's counting question. Built only by [`Scope::from_params`], so every surface
@@ -85,7 +90,9 @@ pub struct Scope {
     period: Period,
     /// Local days, both inclusive.
     range: Option<(i64, i64)>,
+    /// The selection as canonical filter text, for the scopes derived from this one.
     sel: Selection,
+    m: Matcher,
     opts: Options,
 }
 
@@ -117,17 +124,16 @@ impl Scope {
             }
             (f, t) => Some((f.unwrap_or(i64::MIN), t.unwrap_or(i64::MAX))),
         };
-        let norm = |v: Option<&String>| set(v.map(String::as_str)).map(str::to_owned);
-        let sel = Selection {
-            kind: norm(p.select.kind.as_ref()),
-            scope: norm(p.select.scope.as_ref()),
-            author: norm(p.select.author.as_ref()),
-            path: p.select.path().map(str::to_owned),
-        };
+        let q = p.select.query()?;
+        let m = Matcher::new(&q);
+        if let Some((_, w)) = m.words().first() {
+            return Err(ScopeError::Words(w.clone()));
+        }
         Ok(Self {
             period,
             range,
-            sel,
+            sel: Selection::of(&q),
+            m,
             opts: p.options.apply(defaults),
         })
     }
@@ -143,6 +149,11 @@ impl Scope {
 
     pub const fn selection(&self) -> &Selection {
         &self.sel
+    }
+
+    /// The selection compiled: what every count tests commits and rows with.
+    pub const fn matcher(&self) -> &Matcher {
+        &self.m
     }
 
     pub const fn options(&self) -> &Options {
@@ -164,7 +175,7 @@ impl Scope {
         c: &CommitRow,
     ) -> bool {
         self.admits_in(ins, days, c)
-            && self.sel.path().is_none_or(|_| {
+            && (!self.m.has_path() || {
                 // A merge has no files of its own, so a path selection never keeps one.
                 !c.merge && {
                     let src = ins.source();
@@ -185,25 +196,12 @@ impl Scope {
     ) -> bool {
         ins.counted_row(c)
             && days.contains(&feed::local_day_of(c.time, c.offset))
-            && self.selects(ins.source(), c)
+            && self.selects(ins.source(), c, ins.now)
     }
 
-    /// The type, scope and author selection over a commit's columns.
-    pub(crate) fn selects(&self, src: &dyn InsightsSource, c: &CommitRow) -> bool {
-        let label_is = |id: Option<crate::feed::LabelId>, want: &str, none: &str| {
-            id.and_then(|l| src.label(l)).as_deref().unwrap_or(none) == want
-        };
-        self.sel
-            .kind()
-            .is_none_or(|k| label_is(c.kind, k, Selection::OTHER))
-            && self
-                .sel
-                .scope()
-                .is_none_or(|s| label_is(c.scope, s, Selection::NO_SCOPE))
-            && self.sel.author().is_none_or(|a| {
-                src.ident(c.ident)
-                    .is_some_and(|(name, email)| email.eq_ignore_ascii_case(a) || &*name == a)
-            })
+    /// The selection's column terms over a commit, its bounds counted back from `now`.
+    pub(crate) fn selects(&self, src: &dyn InsightsSource, c: &CommitRow, now: i64) -> bool {
+        self.m.commit_row(src, c, now)
     }
 
     /// The rows of one commit a path selection keeps: all of them without one.
@@ -212,11 +210,10 @@ impl Scope {
         src: &'r dyn InsightsSource,
         rows: &'r [FileRow],
     ) -> impl Iterator<Item = &'r FileRow> + 'r {
-        let path = self.sel.path().map(str::to_owned);
-        rows.iter().filter(move |f| {
-            path.as_deref()
-                .is_none_or(|p| src.path(f.path).is_some_and(|n| under(&n, p)))
-        })
+        let m = self.m.clone();
+        let all = !m.has_path();
+        rows.iter()
+            .filter(move |f| all || src.path(f.path).is_some_and(|n| m.row(&n)))
     }
 }
 
@@ -420,6 +417,7 @@ mod tests {
                 "to" => p.to = v,
                 "author" => p.select.author = v,
                 "path" => p.select.path = v,
+                "q" => p.select.q = v,
                 "bots" => p.options.bots = v,
                 _ => {}
             }
@@ -435,8 +433,12 @@ mod tests {
     fn from_params_normalises_and_validates() {
         let s = scope(&[("author", "  "), ("path", "/src/")]).expect("ok");
         assert_eq!(s.period(), Period::Month);
-        assert_eq!(s.selection().author, None);
-        assert_eq!(s.selection().path.as_deref(), Some("src"));
+        assert_eq!(s.selection().q.as_deref(), Some("path:src"));
+        assert!(matches!(
+            scope(&[("q", "a | b")]),
+            Err(ScopeError::Query(_))
+        ));
+        assert!(matches!(scope(&[("q", "fix")]), Err(ScopeError::Words(_))));
         assert!(matches!(
             scope(&[("period", "2w")]),
             Err(ScopeError::Period(_))

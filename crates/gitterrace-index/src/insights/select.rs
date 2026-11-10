@@ -3,35 +3,39 @@
 //! ignore rules, whitespace, extra excludes). The web pages, the HTTP API and the MCP server all
 //! parse these two structs, so the same URL parameters select the same commits everywhere.
 
-use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::ops::Range;
 use std::sync::Arc;
 
-use crate::CommitRecord;
 use crate::feed::{
     AuthorDayRow, CommitRange, CommitRow, FileRow, Hit, IdentId, InsightsSource, LabelId,
     PathAuthorRow, PathId, Posting, Rank, RenameEdge, SourceError, Stream, SumOverflow, Sums,
     local_day_of,
 };
 use crate::insights::Options;
+use crate::query::{Leaf, Matcher, Query, QueryError, Term};
 
-/// Which commits count. Empty strings count as unset.
+/// Which commits count, as the URL says it.
+///
+/// The filter text `q` and the older one-key forms of its terms. Empty strings count as unset.
+/// [`Selection::query`] reads them into one [`Query`], the only form anything is selected by.
 #[derive(Debug, Clone, Default, PartialEq, Eq, serde::Deserialize)]
 pub struct Selection {
-    /// Conventional-commit type; [`Selection::OTHER`] selects commits without one.
+    /// Filter text, `author:ann path:src !merge`: see [`crate::query::KEYWORDS`].
+    pub q: Option<String>,
+    /// `type:<v>`. [`Selection::OTHER`] selects commits without one.
     #[serde(rename = "type")]
     pub kind: Option<String>,
-    /// Conventional-commit scope; [`Selection::NO_SCOPE`] selects commits without one.
+    /// `scope:<v>`. [`Selection::NO_SCOPE`] selects commits without one.
     pub scope: Option<String>,
-    /// E-mail (any case) or exact author name.
+    /// `author:<v>`: e-mail (any case) or exact author name.
     pub author: Option<String>,
-    /// Path prefix: a kept commit lists only its files under the prefix.
+    /// `path:<v>`: a kept commit lists only its files under the prefix.
     pub path: Option<String>,
 }
 
 fn set(v: Option<&String>) -> Option<&str> {
-    v.map(String::as_str).filter(|s| !s.is_empty())
+    v.map(|s| s.trim()).filter(|s| !s.is_empty())
 }
 
 impl Selection {
@@ -40,76 +44,51 @@ impl Selection {
     /// Scope value of commits without a scope.
     pub const NO_SCOPE: &str = "none";
 
-    pub fn kind(&self) -> Option<&str> {
-        set(self.kind.as_ref())
+    /// The selection of the filter text `q` alone.
+    #[must_use]
+    pub fn of(q: &Query) -> Self {
+        Self {
+            q: (!q.is_empty()).then(|| q.to_string()),
+            ..Self::default()
+        }
     }
 
-    pub fn scope(&self) -> Option<&str> {
-        set(self.scope.as_ref())
-    }
-
-    pub fn author(&self) -> Option<&str> {
-        set(self.author.as_ref())
-    }
-
-    /// Path prefix without surrounding slashes, `None` for the whole tree.
-    pub fn path(&self) -> Option<&str> {
-        set(self.path.as_ref())
+    /// The one query: the one-key forms first (as the older links wrote them), then `q`.
+    ///
+    /// # Errors
+    /// [`QueryError`] when `q` does not parse.
+    pub fn query(&self) -> Result<Query, QueryError> {
+        let one = |v: Option<&String>, leaf: fn(Vec<String>) -> Leaf| {
+            set(v).map(|v| Term {
+                neg: false,
+                leaf: leaf(vec![v.to_owned()]),
+            })
+        };
+        let path = set(self.path.as_ref())
             .map(|p| p.trim_matches('/'))
             .filter(|p| !p.is_empty())
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.kind().is_none()
-            && self.scope().is_none()
-            && self.author().is_none()
-            && self.path().is_none()
-    }
-
-    fn matches(&self, r: &CommitRecord) -> bool {
-        self.kind()
-            .is_none_or(|k| r.kind.as_deref().unwrap_or(Self::OTHER) == k)
-            && self
-                .scope()
-                .is_none_or(|s| r.scope.as_deref().unwrap_or(Self::NO_SCOPE) == s)
-            && self
-                .author()
-                .is_none_or(|a| r.email.eq_ignore_ascii_case(a) || r.author == a)
-    }
-
-    /// The records the selection keeps. With a path each kept commit lists only the files under
-    /// it, so line counts and churn are the path's own. Without a selection the input is borrowed.
-    pub fn apply<'a>(&self, records: &'a [CommitRecord]) -> Cow<'a, [CommitRecord]> {
-        if self.is_empty() {
-            return Cow::Borrowed(records);
-        }
-        let path = self.path();
-        let out = records
-            .iter()
-            .filter(|r| self.matches(r))
-            .filter_map(|r| {
-                path.map_or_else(
-                    || Some(r.clone()),
-                    |p| {
-                        let files: Vec<_> = r
-                            .files
-                            .iter()
-                            .filter(|f| under(&f.path, p))
-                            .cloned()
-                            .collect();
-                        (!files.is_empty()).then(|| CommitRecord { files, ..r.clone() })
-                    },
-                )
-            })
-            .collect();
-        Cow::Owned(out)
+            .map(|p| Term {
+                neg: false,
+                leaf: Leaf::Path(vec![p.to_owned()]),
+            });
+        let mut terms: Vec<Term> = [
+            one(self.kind.as_ref(), Leaf::Kind),
+            one(self.scope.as_ref(), Leaf::Scope),
+            one(self.author.as_ref(), Leaf::Author),
+            path,
+        ]
+        .into_iter()
+        .flatten()
+        .collect();
+        terms.extend_from_slice(Query::parse(set(self.q.as_ref()).unwrap_or_default())?.terms());
+        Ok(Query::new(terms))
     }
 }
 
-/// A [`Selection`] and an optional author-time window applied to a source.
+/// A [`Matcher`] and an optional author-time window applied to a source.
 ///
 /// It keeps the commits
-/// [`Selection::apply`] plus a `[from, to)` time filter keep, renumbered to dense ranks, a path
+/// [`Matcher::apply`] plus a `[from, to)` time filter keep, renumbered to dense ranks, a path
 /// selection trimming each commit to its rows under the prefix. State is one entry per kept
 /// commit. Ids (paths, identities, labels) are the base's.
 pub struct Scoped<'a> {
@@ -124,43 +103,30 @@ pub struct Scoped<'a> {
 impl<'a> Scoped<'a> {
     pub fn new(
         base: &Arc<dyn InsightsSource + 'a>,
-        sel: &Selection,
+        m: &Matcher,
         window: Option<&Range<i64>>,
     ) -> Self {
-        let label_is = |id: Option<LabelId>, want: &str, none: &str| {
-            id.and_then(|l| base.label(l)).as_deref().unwrap_or(none) == want
-        };
+        let now = crate::feed::reference_time(&**base);
         let mut cand: Vec<Rank> = Vec::new();
         for c in base.commits_in(CommitRange::All) {
-            let keep = sel
-                .kind()
-                .is_none_or(|k| label_is(c.kind, k, Selection::OTHER))
-                && sel
-                    .scope()
-                    .is_none_or(|s| label_is(c.scope, s, Selection::NO_SCOPE))
-                && sel.author().is_none_or(|a| {
-                    base.ident(c.ident)
-                        .is_some_and(|(name, email)| email.eq_ignore_ascii_case(a) || &*name == a)
-                })
-                && window.is_none_or(|w| w.contains(&c.time));
-            if keep {
+            if window.is_none_or(|w| w.contains(&c.time)) && m.commit_row(&**base, &c, now) {
                 cand.push(c.rank);
             }
         }
-        let kept: Vec<(Rank, Option<Vec<u32>>)> = match sel.path() {
-            None => cand.into_iter().map(|r| (r, None)).collect(),
-            Some(p) => base
-                .rows_for(cand)
+        let kept: Vec<(Rank, Option<Vec<u32>>)> = if m.has_path() {
+            base.rows_for(cand)
                 .filter_map(|(r, rows)| {
                     let rows: Vec<u32> = rows
                         .iter()
                         .enumerate()
-                        .filter(|(_, f)| base.path(f.path).is_some_and(|n| under(&n, p)))
+                        .filter(|(_, f)| base.path(f.path).is_some_and(|n| m.row(&n)))
                         .map(|(i, _)| u32::try_from(i).unwrap_or(u32::MAX))
                         .collect();
                     (!rows.is_empty()).then_some((r, Some(rows)))
                 })
-                .collect(),
+                .collect()
+        } else {
+            cand.into_iter().map(|r| (r, None)).collect()
         };
         let by_base = kept
             .iter()
@@ -460,6 +426,7 @@ mod tests {
     use super::{OptionParams, Scoped, Selection, under};
     use crate::feed::{CommitRange, InsightsSource, MemorySource, Rank};
     use crate::insights::fixtures::{file, rec};
+    use crate::query::Matcher;
     use crate::{CommitRecord, Options};
 
     fn sample() -> Vec<CommitRecord> {
@@ -482,37 +449,84 @@ mod tests {
         v
     }
 
-    fn ids(s: &Selection) -> Vec<String> {
-        s.apply(&sample()).iter().map(|r| r.id.clone()).collect()
+    fn sel(q: &str) -> Selection {
+        Selection {
+            q: Some(q.to_owned()),
+            ..Selection::default()
+        }
     }
 
-    fn sel(kind: Option<&str>, scope: Option<&str>, author: Option<&str>) -> Selection {
-        Selection {
-            kind: kind.map(Into::into),
-            scope: scope.map(Into::into),
-            author: author.map(Into::into),
-            path: None,
-        }
+    fn matcher(s: &Selection) -> Matcher {
+        Matcher::new(&s.query().expect("query"))
+    }
+
+    fn ids(s: &Selection) -> Vec<String> {
+        matcher(s)
+            .apply(&sample(), i64::MAX)
+            .iter()
+            .map(|r| r.id.clone())
+            .collect()
     }
 
     #[test]
     fn selections_stack() {
         assert_eq!(ids(&Selection::default()), ["a", "b", "c", "d"]);
-        assert_eq!(ids(&sel(Some("fix"), None, None)), ["a", "d"]);
-        assert_eq!(ids(&sel(Some("fix"), Some("web"), None)), ["a"]);
-        assert_eq!(ids(&sel(Some("other"), None, None)), ["c"]);
-        assert_eq!(ids(&sel(None, Some("none"), None)), ["b", "c"]);
-        assert_eq!(ids(&sel(Some("fix"), None, Some("ANN@x.io"))), ["a", "d"]);
-        assert_eq!(ids(&sel(Some(""), None, None)), ["a", "b", "c", "d"]);
+        assert_eq!(ids(&sel("type:fix")), ["a", "d"]);
+        assert_eq!(ids(&sel("type:fix scope:web")), ["a"]);
+        assert_eq!(ids(&sel("type:other")), ["c"]);
+        assert_eq!(ids(&sel("scope:none")), ["b", "c"]);
+        assert_eq!(ids(&sel("type:fix author:ANN@x.io")), ["a", "d"]);
+        assert_eq!(ids(&sel("  ")), ["a", "b", "c", "d"]);
+        assert_eq!(ids(&sel("type:fix,feat")), ["a", "b", "d"]);
+        assert_eq!(ids(&sel("!type:fix,feat")), ["c"]);
+        assert_eq!(ids(&sel("!author:bob")), ["a", "c", "d"]);
+        assert_eq!(ids(&sel("path:crates/git,crates/webby")), ["b", "d"]);
+        assert_eq!(ids(&sel("!path:other")), ["a", "b", "c", "d"]);
+    }
+
+    /// Every one-key form of an older link selects what its `q` form selects.
+    #[test]
+    fn one_key_forms_fold_into_the_query() {
+        let one = |k: &str, v: &str| {
+            let v = Some(v.to_owned());
+            let mut s = Selection::default();
+            match k {
+                "type" => s.kind = v,
+                "scope" => s.scope = v,
+                "author" => s.author = v,
+                _ => s.path = v,
+            }
+            s
+        };
+        for (k, v, q) in [
+            ("type", "fix", "type:fix"),
+            ("scope", "none", "scope:none"),
+            ("author", "Ann Lee", "author:\"Ann Lee\""),
+            ("path", "/crates/web/", "path:crates/web"),
+            ("path", "/", ""),
+        ] {
+            let s = one(k, v);
+            assert_eq!(
+                s.query().map(|q| q.to_string()).as_deref(),
+                Ok(q),
+                "{k}={v}"
+            );
+            assert_eq!(ids(&s), ids(&sel(q)), "{k}={v}");
+        }
+        let both = Selection {
+            author: Some("ann".into()),
+            ..sel("type:fix")
+        };
+        assert_eq!(
+            both.query().map(|q| q.to_string()).as_deref(),
+            Ok("author:ann type:fix")
+        );
+        assert!(sel("a | b").query().is_err());
     }
 
     #[test]
     fn path_keeps_only_files_under_the_prefix() {
-        let s = Selection {
-            path: Some("/crates/web/".into()),
-            ..Selection::default()
-        };
-        let out = s.apply(&sample()).into_owned();
+        let out = matcher(&sel("path:/crates/web/")).apply(&sample(), i64::MAX);
         assert_eq!(
             out.iter().map(|r| r.id.as_str()).collect::<Vec<_>>(),
             ["a", "c"]
@@ -542,7 +556,7 @@ mod tests {
         assert_eq!(OptionParams::default().apply(defaults.clone()), defaults);
     }
 
-    /// The scoped view must keep exactly the commits and rows `Selection::apply` plus the
+    /// The scoped view must keep exactly the commits and rows `Matcher::apply` plus the
     /// window keep, in order, with sums over the kept rows. Every selection of
     /// `selections_stack` plus path and window cells.
     #[test]
@@ -551,27 +565,27 @@ mod tests {
         let base: Arc<dyn InsightsSource> = Arc::new(MemorySource::shared(Arc::new(recs.clone())));
         let cells = [
             Selection::default(),
-            sel(Some("fix"), None, None),
-            sel(Some("fix"), Some("web"), None),
-            sel(Some("other"), None, None),
-            sel(None, Some("none"), None),
-            sel(Some("fix"), None, Some("ANN@x.io")),
-            sel(None, None, Some("bob")),
-            Selection {
-                path: Some("/crates/web/".into()),
-                ..Selection::default()
-            },
+            sel("type:fix"),
+            sel("type:fix scope:web"),
+            sel("type:other"),
+            sel("scope:none"),
+            sel("type:fix author:ANN@x.io"),
+            sel("author:bob"),
+            sel("path:/crates/web/"),
+            sel("!path:crates/web,other"),
+            sel("!author:bob type:fix,other"),
         ];
         let t = |d: i64| crate::insights::fixtures::MON + d * crate::insights::fixtures::DAYS;
         for s in &cells {
             for w in [None, Some(t(40)..t(100)), Some(t(0)..t(1))] {
-                let want: Vec<_> = s
-                    .apply(&recs)
+                let now = crate::feed::reference_time(&*base);
+                let want: Vec<_> = matcher(s)
+                    .apply(&recs, now)
                     .iter()
                     .filter(|r| w.as_ref().is_none_or(|w| w.contains(&r.time)))
                     .cloned()
                     .collect();
-                let v = Scoped::new(&base, s, w.as_ref());
+                let v = Scoped::new(&base, &matcher(s), w.as_ref());
                 assert_eq!(v.len(), want.len(), "{s:?} {w:?}");
                 let rows: Vec<_> = v.commits_in(CommitRange::All).collect();
                 for (i, (c, r)) in rows.iter().zip(&want).enumerate() {

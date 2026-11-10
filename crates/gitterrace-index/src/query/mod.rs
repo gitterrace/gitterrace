@@ -5,11 +5,13 @@
 //! completion. Terms keep the order written: canonical text is the user's terms, respaced and
 //! requoted, so a chip or a link never reorders what was typed.
 
+mod matcher;
 mod parse;
 mod spec;
 
 use gitterrace_types::Period;
 
+pub use matcher::{Commit, Matcher, by};
 pub use spec::{KEYWORDS, KeywordSpec};
 
 /// A parsed filter: every term must match, in the order written.

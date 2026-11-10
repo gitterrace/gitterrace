@@ -240,7 +240,7 @@ impl<'a> Counted<'a> {
     /// when asked for or when a path selection must see them.
     fn items(&self, with_rows: bool) -> impl Iterator<Item = Item> + '_ {
         let src = self.ins.source();
-        let path = self.scope.selection().path().is_some();
+        let path = self.scope.matcher().has_path();
         let need = with_rows || path;
         self.ins.count_walk(need);
         let mut base = src

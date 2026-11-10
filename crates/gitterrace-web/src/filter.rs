@@ -150,6 +150,7 @@ impl Filter {
             scope: own(Dim::Scope),
             author: own(Dim::Author),
             path: own(Dim::Path),
+            q: None,
         }
     }
 
@@ -278,6 +279,7 @@ mod tests {
             scope: Some("web".into()),
             author: Some("ann".into()),
             path: Some("crates/web".into()),
+            q: None,
         };
         assert_eq!(s, want);
         assert_eq!(

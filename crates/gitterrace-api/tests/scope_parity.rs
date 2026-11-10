@@ -67,7 +67,7 @@ fn every_reader_gives_an_equal_scope() {
 fn empties_mean_unset() {
     let a = direct("period=&author=&path=%2F&type=").expect("ok");
     assert_eq!(a, direct("").expect("ok"));
-    assert!(a.selection().is_empty());
+    assert!(a.matcher().is_empty());
 }
 
 #[test]
