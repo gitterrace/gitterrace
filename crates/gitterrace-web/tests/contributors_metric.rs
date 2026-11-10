@@ -45,7 +45,7 @@ async fn metric_added_sorts_by_added_lines() {
     let net = ready(&r, "/stats/contributors?metric=net&period=3m&bots=1").await;
     assert_eq!(first_person(&net), "Bob", "works with other filters");
     assert!(
-        net.contains("period=3m") && net.contains("metric=added"),
+        net.contains("q=after%3A3m") && net.contains("metric=added"),
         "{net}"
     );
 }

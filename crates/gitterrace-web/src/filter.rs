@@ -216,8 +216,18 @@ impl Filter {
         term.or_else(|| self.all.then_some(Period::All))
     }
 
-    /// This filter with the `d` term set to `value` (or removed with `None`).
+    /// This filter with the `d` term set to `value` (or removed with `None` or an empty or
+    /// root value, as the whole-repository row links it).
     pub(crate) fn with(&self, d: Dim, value: Option<&str>) -> Self {
+        let value = value
+            .map(|v| {
+                if d == Dim::Path {
+                    v.trim_matches('/')
+                } else {
+                    v.trim()
+                }
+            })
+            .filter(|v| !v.is_empty());
         self.swap(
             |l| d.is(l),
             value.map(|v| Term {
@@ -517,6 +527,15 @@ mod tests {
             assert_eq!(ids(&a), ids(&b), "{old}");
         }
         assert_eq!(parse("period=3m").period_value(), Some(Period::Quarter));
+        // The whole-repository row links an empty path: that removes the term, as before.
+        assert_eq!(
+            parse("path=src&type=fix").link("/s", Dim::Path, ""),
+            "/s?q=type%3Afix"
+        );
+        assert_eq!(
+            parse("author=a").link("/s", Dim::Path, "/"),
+            "/s?q=author%3Aa"
+        );
         // `all` overrides a configured default period, so it survives into every link.
         assert_eq!(parse("period=all").period_value(), Some(Period::All));
         assert_eq!(

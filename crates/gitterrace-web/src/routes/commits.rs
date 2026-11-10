@@ -108,7 +108,7 @@ pub(super) async fn log(
         let rev_enc = fmt::enc_seg(&rev);
         let base = format!("/log/{rev_enc}");
         let link = |n: usize| page_link(&rev_enc, n, &f, (graph, all));
-        let head = log_head(&rev, &rev_enc, (graph, all), filtered, &list, pg);
+        let head = log_head(&rev, &rev_enc, (graph, all), &f, &list, pg);
         let head = PageHead {
             toolbar: LogFilter {
                 action: fmt::href(&base),
@@ -261,15 +261,29 @@ fn log_head(
     rev: &str,
     rev_enc: &str,
     (graph, all): (bool, bool),
-    filtered: bool,
+    f: &Filter,
     list: &[gitterrace_git::CommitSummary],
     pg: usize,
 ) -> PageHead {
-    let mut said = String::from(if filtered {
-        "Newest first, filtered"
-    } else {
-        "Newest first"
-    });
+    let filtered = !f.query_terms().is_empty();
+    let mut said = String::from("Newest first");
+    // A lone path and author say what they keep; any other filter reads from its chips.
+    let (path, who) = (f.path(), f.author());
+    let plain =
+        f.query_terms().terms().len() == usize::from(path.is_some()) + usize::from(who.is_some());
+    if filtered && !plain {
+        said.push_str(", filtered");
+    }
+    if plain && let Some(p) = path {
+        let _ = write!(said, ", touching {p}");
+    }
+    if plain && let Some(w) = who {
+        let name = list
+            .iter()
+            .find(|c| by(w, &c.author.name, &c.author.email))
+            .map_or(w, |c| c.author.name.as_str());
+        let _ = write!(said, ", by {name}");
+    }
     if pg > 0 {
         let _ = write!(said, ", page {}", pg + 1);
     }
