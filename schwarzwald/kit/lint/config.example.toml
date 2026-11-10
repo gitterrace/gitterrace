@@ -32,6 +32,14 @@ known = []
 patterns = []
 not_id = []
 
+[own_shas]
+# own-shas: files that may name the one build commit a record file stores. `allow` is paths
+# (a `#NAME` suffix limits it to that generated block), `record` a glob of JSON files, `key` the
+# field holding the commit. Empty `allow` (the default) allows nothing.
+allow = []
+record = ""
+key = "commit"
+
 [personal]
 # Paths never scanned for personal data (a licence text, a legal page), and extra placeholder
 # home names fixtures use.

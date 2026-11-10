@@ -68,6 +68,9 @@ DEFAULTS: dict[str, dict] = {
     },
     "a11y": {"docs": ["README.md", "docs/**.md"], "h1_required": True, "known": []},
     "refs": {"patterns": [], "not_id": []},
+    # own-shas: a file of `allow` may name a build commit that a `record` file stores under `key`
+    # (a path ending in `#NAME` reads only the generated block NAME). Nothing else is allowed.
+    "own_shas": {"allow": [], "record": "", "key": "commit"},
     "personal": {"exempt": [], "placeholder_homes": []},
     "lines": {
         "max_lines": 600,

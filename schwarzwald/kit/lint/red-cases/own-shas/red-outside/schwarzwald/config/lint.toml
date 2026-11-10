@@ -1,0 +1,4 @@
+[own_shas]
+allow = ["tests/bench/results/**", "docs/benchmarks.md#results"]
+record = "tests/bench/results/*.json"
+key = "commit"

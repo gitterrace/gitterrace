@@ -21,6 +21,14 @@ allow_prefix = "GITTERRACE_"
 docs = ["README.md", "CONTRIBUTING.md", "SECURITY.md", "docs/**.md"]
 known = []
 
+[own_shas]
+# The one place a tracked file may name a commit of this repository: the build commit a bench
+# run recorded in its results JSON, in those results and in the generated results block of
+# docs/benchmarks.md. Any other own sha still fails.
+allow = ["tests/bench/results/**", "docs/benchmarks.md#results"]
+record = "tests/bench/results/*.json"
+key = "commit"
+
 [refs]
 # The imprint's legal name for a consumer dispute body (VSBG), kept verbatim.
 not_id = ['consumer arbitration board']
