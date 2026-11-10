@@ -62,19 +62,13 @@ HTTP. Nothing outside `gitterrace-git` imports `gix`.
 
 ## Workflow
 
-- Gate: `make check` runs every gate in the order CI does: gc-guard, theme,
-  actions, send-vectors, names, lines, bench-guard, docs-check, fmt, clippy
-  `-D warnings`, lint, test, doc. `make help` lists only the targets a person
-  runs, the steps are in the `check:` line of the Makefile. `make lint` runs
-  the linters in [CONTRIBUTING](CONTRIBUTING.md#lint) and the provenance
-  checks below. Without the shared harness kit checkout (`HARNESS_KIT`) its
-  link check is skipped with a note.
+- Gate: `make check` runs every gate in CI's order (the `check:` line of the
+  Makefile). `make lint` runs the linters in
+  [CONTRIBUTING](CONTRIBUTING.md#lint) and the provenance checks below.
+  Without `HARNESS_KIT` its link check is skipped with a note.
   `cargo test -p <crate>` while working on one crate.
-  `make preview` restarts the preview on the default address.
-- Commits: `type(scope): subject`, scope is the crate without `gitterrace-`.
-  Commit by pathspec, never `git add -A`. The message says what changed and how
-  it is tested, in plain words. `git config core.hooksPath scripts/hooks` runs
-  the message rules on every commit.
+- Commits: as in [CONTRIBUTING](CONTRIBUTING.md#commits). Commit by pathspec,
+  never `git add -A`.
 - One change, one commit, squashed in its own clone or worktree (shared rules,
   Commits). The gate for a squashed commit here is
   `scripts/land-check.sh --base <main>`.
