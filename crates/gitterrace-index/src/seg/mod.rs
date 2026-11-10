@@ -28,6 +28,17 @@ use std::fmt;
 /// A commit id, raw bytes.
 pub type Oid = [u8; 20];
 
+/// The 40 lowercase hex digits of `oid`.
+pub fn hex(oid: &Oid) -> String {
+    const DIGITS: &[u8; 16] = b"0123456789abcdef";
+    let mut s = String::with_capacity(40);
+    for b in oid {
+        s.push(char::from(DIGITS[usize::from(b >> 4)]));
+        s.push(char::from(DIGITS[usize::from(b & 15)]));
+    }
+    s
+}
+
 /// A commit's position inside one segment. Never compared across segments.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
 pub struct Ordinal(pub u32);
@@ -111,5 +122,13 @@ mod tests {
         let (x, y) = ([1; 20], [2; 20]);
         assert_ne!(fingerprint([&x, &y]), fingerprint([&y, &x]));
         assert_eq!(fingerprint([]), 0xcbf2_9ce4_8422_2325);
+    }
+
+    #[test]
+    fn hex_writes_forty_lowercase_digits() {
+        let mut oid = [0xab; 20];
+        oid[0] = 0x01;
+        oid[19] = 0xff;
+        assert_eq!(hex(&oid), format!("01{}ff", "ab".repeat(18)));
     }
 }

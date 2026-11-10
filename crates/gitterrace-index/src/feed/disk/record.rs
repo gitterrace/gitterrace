@@ -6,7 +6,7 @@ use crate::feed::{FileRow, PathId, Sums};
 use crate::seg::bounds::Cursor;
 use crate::seg::format::{TocEntry, section};
 use crate::seg::read::Container;
-use crate::seg::{Oid, SegError, SegResult};
+use crate::seg::{Oid, SegError, SegResult, hex};
 use crate::{CodeStat, CommitRecord, FileStat};
 
 pub(super) fn open_seg(c: Container, first_expected: u32, buf: &mut Vec<u8>) -> SegResult<Seg> {
@@ -160,16 +160,6 @@ pub(super) fn parse(c: &mut Cursor<'_>, mut files: Option<&mut Vec<FileRow>>) ->
 
 pub(super) fn oid_of(id: &str) -> SegResult<Oid> {
     crate::store::oid_of(id).ok_or_else(|| SegError::BadName(format!("commit id {id:?}")))
-}
-
-pub(super) fn hex(oid: &Oid) -> String {
-    const H: &[u8; 16] = b"0123456789abcdef";
-    let mut s = String::with_capacity(40);
-    for b in oid {
-        s.push(char::from(H[usize::from(b >> 4)]));
-        s.push(char::from(H[usize::from(b & 15)]));
-    }
-    s
 }
 
 pub(super) fn hash32(s: &str) -> u32 {

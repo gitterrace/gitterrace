@@ -18,7 +18,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use crate::seg::bounds::{Cursor, put_varint, unzigzag, zigzag};
 use crate::seg::format::{TocEntry, section};
 use crate::seg::read::{Container, Store};
-use crate::seg::{Oid, SegError, SegResult};
+use crate::seg::{Oid, SegError, SegResult, hex};
 
 /// Raw bytes packed before a block is compressed. Not configurable, any of these: on-disk
 /// format bounds that the writer and every reader must agree on.
@@ -504,16 +504,6 @@ fn walk(scan: &Scan, tip: u32) -> impl Iterator<Item = u32> + '_ {
         }
         Some(q.rank)
     })
-}
-
-pub(crate) fn hex(oid: &Oid) -> String {
-    const DIGITS: &[u8; 16] = b"0123456789abcdef";
-    let mut s = String::with_capacity(40);
-    for b in oid {
-        s.push(char::from(DIGITS[usize::from(b >> 4)]));
-        s.push(char::from(DIGITS[usize::from(b & 15)]));
-    }
-    s
 }
 
 mod build;

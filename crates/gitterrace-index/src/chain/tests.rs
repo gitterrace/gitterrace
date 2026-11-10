@@ -125,7 +125,7 @@ fn stored(dir: &Path) -> Option<Steps> {
             .iter()
             .map(|f| (path(f.path), f.add, f.del))
             .collect();
-        out.push((crate::messages::hex(&s.oid), s.time, files));
+        out.push((crate::seg::hex(&s.oid), s.time, files));
     });
     assert!(d.failure().is_none(), "the chain read fails");
     had.then_some(out)

@@ -4,12 +4,13 @@ use std::collections::BTreeMap;
 use std::ops::Range;
 use std::sync::Arc;
 
-use crate::feed::disk::record::{hash32, hex};
+use crate::feed::disk::record::hash32;
 use crate::feed::disk::{DiskSource, scan};
 use crate::feed::{
     AuthorDayRow, CommitRange, CommitRow, FileRow, Hit, IdentId, InsightsSource, LabelId,
     PathAuthorRow, PathId, Posting, Rank, RenameEdge, SourceError, Stream, Sums,
 };
+use crate::seg::hex;
 
 impl InsightsSource for DiskSource {
     fn len(&self) -> usize {
