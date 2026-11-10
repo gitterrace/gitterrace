@@ -30,7 +30,9 @@
 .ph-sep{border:0;border-top:var(--border);margin:var(--space-4) 0 0}
 .ph>.fbar{margin:var(--space-3) 0 0}
 .ph>.fbar:has(>.filter){flex-wrap:nowrap}
-.ph>.fbar>.filter{width:auto;flex:0 1 420px;min-width:0;flex-wrap:wrap}
+/* The log filter is the row: it takes the width the related links leave. */
+.ph>.fbar>.filter{width:auto;flex:1 1 320px;min-width:0;flex-wrap:wrap}
+.ph>.fbar>.filter>input{flex:1 1 240px}
 .filter-error{flex-basis:100%;font-size:var(--text-sm);color:var(--warn)}
 .ph-end{margin-left:auto;font-size:var(--text-sm);flex:none}
 main.wrap>.ph+h2{margin-top:0}
