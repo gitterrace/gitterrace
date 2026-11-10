@@ -3,12 +3,14 @@
 
 use std::path::Path;
 
+use gitterrace_testkit::scan;
+
 /// Spellings of the avatar's class in a template, a Rust string or a script.
 const OWNED: &[&str] = &["class=\"av ", "class=\\\"av ", "class=\"av\"", "'av h"];
 
 /// The avatar markup `code` writes by hand. Rust test modules may name the class in asserts.
 fn loose_avatars(code: &str) -> usize {
-    let code = code.split("#[cfg(test)]").next().unwrap_or_default();
+    let code = scan::product(code);
     OWNED.iter().map(|m| code.matches(m).count()).sum()
 }
 
@@ -29,25 +31,10 @@ fn a_hand_written_avatar_is_caught() {
     );
 }
 
-/// Each file under `dir` with one of `exts`, recursively.
-fn files(dir: &Path, exts: &[&str], out: &mut Vec<std::path::PathBuf>) {
-    for e in std::fs::read_dir(dir).into_iter().flatten().flatten() {
-        let p = e.path();
-        if p.is_dir() {
-            files(&p, exts, out);
-        } else if p.extension().is_some_and(|x| exts.iter().any(|w| x == *w)) {
-            out.push(p);
-        }
-    }
-}
-
 #[test]
 fn only_the_avatar_macro_writes_an_avatar() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let mut all = Vec::new();
-    for d in ["templates", "src", "static"] {
-        files(&root.join(d), &["html", "rs", "js"], &mut all);
-    }
+    let all = scan::files_in(root, &["templates", "src", "static"], &["html", "rs", "js"]);
     let bad: Vec<String> = all
         .iter()
         .filter(|p| !p.ends_with("_avatar.html"))

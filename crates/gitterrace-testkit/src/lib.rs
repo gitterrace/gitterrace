@@ -9,6 +9,7 @@ mod fixture;
 pub mod matrix;
 pub mod oracle;
 mod renames;
+pub mod scan;
 pub mod synthetic;
 pub mod wait;
 mod web;

@@ -3,7 +3,7 @@
 
 use std::path::Path;
 
-use gitterrace_testkit::{Fixture, page};
+use gitterrace_testkit::{Fixture, page, scan};
 
 /// Markup only `dochead.rs` writes. A template or script holding one is a hand-written header.
 const OWNED: &[&str] = &[
@@ -119,36 +119,28 @@ async fn document_cards_open_with_the_shared_header() {
 fn only_dochead_writes_card_headers() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let mut bad = Vec::new();
-    let mut stack = vec![root.join("src"), root.join("templates")];
-    while let Some(d) = stack.pop() {
-        for e in std::fs::read_dir(&d).expect("dir").flatten() {
-            let p = e.path();
-            if p.is_dir() {
-                stack.push(p);
-                continue;
-            }
-            // The owner, the outline and the segmented control it embeds, and test files that
-            // read the markup back.
-            let name = p.file_name().map(|n| n.to_string_lossy().into_owned());
-            if name.as_deref().is_some_and(|n| {
-                n == "dochead.rs"
-                    || n == "dochead.html"
-                    || n == "outline.rs"
-                    || n == "outline.html"
-                    || n == "seg.rs"
-                    || n == "seg_control.html"
-                    || n.ends_with("tests.rs")
-            }) {
-                continue;
-            }
-            let Ok(text) = std::fs::read_to_string(&p) else {
-                continue;
-            };
-            // Tests may read the markup back; only the code before them counts.
-            let code = text.split("#[cfg(test)]").next().unwrap_or_default();
-            if OWNED.iter().any(|m| code.contains(m)) {
-                bad.push(p.display().to_string());
-            }
+    for p in scan::files_in(root, &["src", "templates"], &[]) {
+        // The owner, the outline and the segmented control it embeds, and test files that
+        // read the markup back.
+        let name = p.file_name().map(|n| n.to_string_lossy().into_owned());
+        if name.as_deref().is_some_and(|n| {
+            n == "dochead.rs"
+                || n == "dochead.html"
+                || n == "outline.rs"
+                || n == "outline.html"
+                || n == "seg.rs"
+                || n == "seg_control.html"
+                || n.ends_with("tests.rs")
+        }) {
+            continue;
+        }
+        let Ok(text) = std::fs::read_to_string(&p) else {
+            continue;
+        };
+        // Tests may read the markup back; only the code before them counts.
+        let code = scan::product(&text);
+        if OWNED.iter().any(|m| code.contains(m)) {
+            bad.push(p.display().to_string());
         }
     }
     assert!(bad.is_empty(), "hand-written card header in {bad:?}");

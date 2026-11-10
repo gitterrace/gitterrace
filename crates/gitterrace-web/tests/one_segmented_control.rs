@@ -4,7 +4,7 @@
 
 use std::path::Path;
 
-use gitterrace_testkit::{Fixture, page};
+use gitterrace_testkit::{Fixture, page, scan};
 
 /// Markup only `seg.rs` writes: the container, its parts, the old hand-written class and the
 /// pressed state of an in-place switch.
@@ -79,41 +79,28 @@ fn a_hand_written_switch_is_caught() {
 fn only_the_shared_control_writes_a_switch() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let mut bad = Vec::new();
-    let mut stack = vec![
-        root.join("src"),
-        root.join("templates"),
-        root.join("static"),
-    ];
-    while let Some(d) = stack.pop() {
-        for e in std::fs::read_dir(&d).expect("dir").flatten() {
-            let p = e.path();
-            if p.is_dir() {
-                stack.push(p);
-                continue;
-            }
-            let name = p.file_name().map(|n| n.to_string_lossy().into_owned());
-            // The owner, the stylesheet that styles it, the script that wires the narrow
-            // select and the document views, the path macro whose `seg` spans are path
-            // parts rather than a switch, and test files that read the markup back.
-            if name.as_deref().is_some_and(|n| {
-                n == "seg.rs"
-                    || n == "_path.html"
-                    || n == "seg_control.html"
-                    || n == "app.css"
-                    || n == "app.js"
-                    || n == "markdown.js"
-                    || n.ends_with("tests.rs")
-            }) {
-                continue;
-            }
-            let Ok(text) = std::fs::read_to_string(&p) else {
-                continue;
-            };
-            let code = text.split("#[cfg(test)]").next().unwrap_or_default();
-            let found = owned_in(code);
-            if !found.is_empty() {
-                bad.push(format!("{}: {found:?}", p.display()));
-            }
+    for p in scan::files_in(root, &["src", "templates", "static"], &[]) {
+        let name = p.file_name().map(|n| n.to_string_lossy().into_owned());
+        // The owner, the stylesheet that styles it, the script that wires the narrow
+        // select and the document views, the path macro whose `seg` spans are path
+        // parts rather than a switch, and test files that read the markup back.
+        if name.as_deref().is_some_and(|n| {
+            n == "seg.rs"
+                || n == "_path.html"
+                || n == "seg_control.html"
+                || n == "app.css"
+                || n == "app.js"
+                || n == "markdown.js"
+                || n.ends_with("tests.rs")
+        }) {
+            continue;
+        }
+        let Ok(text) = std::fs::read_to_string(&p) else {
+            continue;
+        };
+        let found = owned_in(scan::product(&text));
+        if !found.is_empty() {
+            bad.push(format!("{}: {found:?}", p.display()));
         }
     }
     assert!(bad.is_empty(), "hand-written switch in {bad:?}");

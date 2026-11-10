@@ -6,26 +6,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-fn sources(dir: &Path, exts: &[&str], out: &mut Vec<PathBuf>) {
-    let Ok(entries) = fs::read_dir(dir) else {
-        return;
-    };
-    for e in entries.flatten() {
-        let p = e.path();
-        let name = e.file_name();
-        if p.is_dir() {
-            if name != "target" && name != "node_modules" && name != ".git" {
-                sources(&p, exts, out);
-            }
-        } else if p
-            .extension()
-            .and_then(|x| x.to_str())
-            .is_some_and(|x| exts.contains(&x))
-        {
-            out.push(p);
-        }
-    }
-}
+use gitterrace_testkit::scan;
 
 fn root() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../..")
@@ -33,10 +14,7 @@ fn root() -> PathBuf {
 
 /// Offending `file:line` entries for `needle` in files under `dirs`, skipping `allowed` paths.
 fn hits(dirs: &[&str], exts: &[&str], allowed: &[&str], bad: impl Fn(&str) -> bool) -> Vec<String> {
-    let mut files = Vec::new();
-    for d in dirs {
-        sources(&root().join(d), exts, &mut files);
-    }
+    let files = scan::files_in(&root(), dirs, exts);
     assert!(!files.is_empty(), "no sources found");
     let mut out = Vec::new();
     for f in files {
@@ -145,8 +123,7 @@ fn every_limit_constant_is_classified() {
             || n == "MAX"
             || n == "CAP"
     };
-    let mut files = Vec::new();
-    sources(&root().join("crates"), &["rs"], &mut files);
+    let files = scan::files_in(&root(), &["crates"], &["rs"]);
     let mut bad = Vec::new();
     for f in files {
         let rel = f
@@ -248,8 +225,7 @@ fn raw_sleep(line: &str) -> bool {
 /// in a test file and in an inline `mod tests` alike.
 #[test]
 fn test_code_waits_through_the_shared_helper() {
-    let mut files = Vec::new();
-    sources(&root().join("crates"), &["rs"], &mut files);
+    let files = scan::files_in(&root(), &["crates"], &["rs"]);
     let mut found = Vec::new();
     for f in files {
         let rel = f

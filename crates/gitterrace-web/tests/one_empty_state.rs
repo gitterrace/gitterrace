@@ -4,7 +4,7 @@
 
 use std::path::Path;
 
-use gitterrace_testkit::{Fixture, page};
+use gitterrace_testkit::{Fixture, page, scan};
 
 /// Hand-written empty states in `code`: an element whose class names `empty`, or a muted line
 /// or cell that opens with "No" or reads "None".
@@ -58,32 +58,23 @@ fn a_hand_written_empty_state_is_caught() {
 fn only_the_shared_empty_state_writes_one() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let mut bad = Vec::new();
-    let mut stack = vec![root.join("src"), root.join("templates")];
-    while let Some(d) = stack.pop() {
-        for e in std::fs::read_dir(&d).expect("dir").flatten() {
-            let p = e.path();
-            if p.is_dir() {
-                stack.push(p);
-                continue;
-            }
-            let name = p.file_name().map(|n| n.to_string_lossy().into_owned());
-            // The owner and its markup; the not-found page, which is a whole page with its own
-            // heading and several ways on; test files that read the markup back.
-            if name.as_deref().is_some_and(|n| {
-                n == "empty.rs"
-                    || n == "empty_state.html"
-                    || n == "lost.html"
-                    || n.ends_with("tests.rs")
-            }) {
-                continue;
-            }
-            let Ok(text) = std::fs::read_to_string(&p) else {
-                continue;
-            };
-            let code = text.split("#[cfg(test)]").next().unwrap_or_default();
-            for b in loose_empties(code) {
-                bad.push(format!("{}: {b}", p.display()));
-            }
+    for p in scan::files_in(root, &["src", "templates"], &[]) {
+        let name = p.file_name().map(|n| n.to_string_lossy().into_owned());
+        // The owner and its markup; the not-found page, which is a whole page with its own
+        // heading and several ways on; test files that read the markup back.
+        if name.as_deref().is_some_and(|n| {
+            n == "empty.rs"
+                || n == "empty_state.html"
+                || n == "lost.html"
+                || n.ends_with("tests.rs")
+        }) {
+            continue;
+        }
+        let Ok(text) = std::fs::read_to_string(&p) else {
+            continue;
+        };
+        for b in loose_empties(scan::product(&text)) {
+            bad.push(format!("{}: {b}", p.display()));
         }
     }
     assert!(
