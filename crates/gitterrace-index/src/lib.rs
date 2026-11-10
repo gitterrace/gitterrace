@@ -12,6 +12,7 @@ pub mod messages;
 #[cfg(any(test, feature = "oracle"))]
 mod oracle;
 mod phases;
+pub mod query;
 pub mod seg;
 mod select;
 mod source;
