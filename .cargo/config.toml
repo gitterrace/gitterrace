@@ -4,7 +4,12 @@ xtask = "run -q -p xtask --"
 # One jemalloc arena instead of four per core. Each arena keeps partly used slabs and pages of
 # its own after a page frees its data, so an idle server sat 5 to 8 MB above a just-started one
 # with no data held. Measured on a 100k-commit history: warm pages and 8 concurrent clients as
-# fast, the index build as fast. A build setting, read when jemalloc is compiled: builds from
-# this repository (make install, the release builds) get it, `cargo install --git` does not.
+# fast, the index build as fast.
+# No thread caches either. Each thread keeps freed small objects for reuse, and they pin the
+# slabs they sit in, so a release returned the data but not the pages. Idle after a blame and a
+# tree page: 13 MB at 1k files and 18 MB at 50k with them, 8 and 10 MB without. The live heap
+# stayed at 2.3 MB without them and 4.6 to 4.9 MB with them.
+# Both are build settings, read when jemalloc is compiled: builds from this repository (make
+# install, the release builds) get them, `cargo install --git` does not.
 [env]
-JEMALLOC_SYS_WITH_MALLOC_CONF = "narenas:1"
+JEMALLOC_SYS_WITH_MALLOC_CONF = "narenas:1,tcache:false"
