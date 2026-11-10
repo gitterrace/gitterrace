@@ -1,4 +1,5 @@
-//! Generated blocks of `docs/actions.md`, `docs/architecture.md` and `docs/benchmarks.md`.
+//! Generated blocks of `docs/actions.md`, `docs/architecture.md`, `docs/benchmarks.md` and
+//! `docs/using.md`.
 
 use std::fmt::Write as _;
 use std::path::Path;
@@ -19,6 +20,7 @@ use crate::readme_agents_md::crate_diagram;
 const ACTIONS: &str = "docs/actions.md";
 const ARCH: &str = "docs/architecture.md";
 const BENCH: &str = "docs/benchmarks.md";
+const USING: &str = "docs/using.md";
 
 pub fn render(root: &Path, ws: &Workspace, scripts: &[Script]) -> Result<Vec<Out>> {
     Ok(vec![
@@ -37,6 +39,7 @@ pub fn render(root: &Path, ws: &Workspace, scripts: &[Script]) -> Result<Vec<Out
         Out::block(ARCH, "cache", cache()),
         Out::block(BENCH, "corpus", bench_report(root, "--corpus")?),
         Out::block(BENCH, "results", bench_report(root, "--print")?),
+        Out::block(USING, "log-filter", log_filter()),
     ])
 }
 
@@ -293,6 +296,21 @@ fn script_table(scripts: &[Script]) -> String {
             f = sc.file
         );
     }
+    s
+}
+
+/// The commit filter's keywords, from the table the parser and the field's completions read.
+fn log_filter() -> String {
+    let mut s = String::from("| Syntax | Matches |\n| --- | --- |\n");
+    for k in gitterrace_index::query::KEYWORDS {
+        let _ = writeln!(
+            s,
+            "| `{}` | {} |",
+            k.syntax.replace('|', "\\|"),
+            k.description
+        );
+    }
+    s.push_str("\nA period is `1w`, `1m`, `3m` or `1y`, counted back from the newest commit.\n");
     s
 }
 
