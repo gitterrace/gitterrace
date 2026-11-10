@@ -155,15 +155,21 @@ async fn five_insights_tabs_and_compare_sits_under_commits() {
     ] {
         assert!(tabs.contains(&format!(">{kept}</a>")), "{kept} tab missing");
     }
-    // Compare sits under Commits: no insights tab, a link on the log, Commits marked there.
+    // Compare sits under Commits: no insights tab and none in the log's toolbar (its one
+    // field is the filter), reached from the branch and tag lists, Commits marked there.
     assert!(
         !tabs.contains("Compare"),
         "Compare is still an insights tab"
     );
     let (_, log) = page(&router, "/log/HEAD").await;
     assert!(
-        log.contains(&format!("href=\"{root}/compare?")),
-        "the log does not link to Compare"
+        !log.contains(">Compare</a>"),
+        "Compare is back in the log toolbar"
+    );
+    let (_, refs) = page(&router, "/refs").await;
+    assert!(
+        refs.contains(&format!("href=\"{root}/compare?")),
+        "the branch and tag lists do not link to Compare"
     );
     let (_, cmp) = page(&router, "/compare").await;
     let nav = cmp

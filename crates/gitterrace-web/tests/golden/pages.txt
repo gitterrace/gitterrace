@@ -1,4 +1,4 @@
-# log-filter: links say ?q=; with links read back to the old keys every body is unchanged except the log's path chip and the root History link
+# log-filter: links say ?q=; read back to the old keys every body is unchanged but the log path chip, the root History link and Compare moving from the log toolbar to the refs head
 3d6331935b06992963d36c2eaffb6666 3d6331935b06992963d36c2eaffb6666 [browse] /api/files/HEAD
 5926060c7e0029dde61fa7387dbc2baf 5926060c7e0029dde61fa7387dbc2baf [browse] /api/refs
 bebf476f24e053138c70726f732dec41 4ef57968e0b11422ff4c4fd25a6ae0cd [browse] /blame/HEAD/missing.rs
@@ -33,7 +33,7 @@ cf37ebe231acbd6be73c3e2d324eef36 cf37ebe231acbd6be73c3e2d324eef36 [browse] /log/
 6b95ed0a8f52a814ea4f9dd8ad26e33f 67697c1f1d9d52c2b6446265daeafd11 [browse] /log/nope
 bebf476f24e053138c70726f732dec41 4ef57968e0b11422ff4c4fd25a6ae0cd [browse] /raw/HEAD/missing.rs
 87a341eef398c071bc0aba64aae6b78f d00ea85271236e53419ce2859a247db7 [browse] /raw/HEAD/src/lib.rs
-f9eb7bb6f4def21ab5c1a7d2caf7b6a7 102e0035c49386631061f1c88f367319 [browse] /refs
+269237b9d5d61505e3418e10aeaa2fa7 1c65edc9d210eab99ae21bfc71cbc419 [browse] /refs
 90344d91d431008234a33328bf56793e 90344d91d431008234a33328bf56793e [browse] /search
 23e11d398ac25cf0b693b3169499a2f2 23e11d398ac25cf0b693b3169499a2f2 [browse] /search?q=FN&case=1
 7f8e83af8d67e888f0671e994fefcd42 f7e499ed32569e811035e7777c48d178 [browse] /search?q=feat&kind=commits

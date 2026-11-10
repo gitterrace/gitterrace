@@ -3,7 +3,7 @@
 use gitterrace_git::RefKind;
 
 use crate::fmt;
-use crate::pagehead::{PageHead, Tab, Tagline};
+use crate::pagehead::{Action, PageHead, Tab, Tagline};
 
 /// The tagline of an insights tab: its finding (`crate::lead`), or a plain line when nothing
 /// was counted.
@@ -32,15 +32,26 @@ pub(crate) fn insights_head(active: &str, tagline: Tagline, toolbar: String) -> 
     }
 }
 
-/// The branches and tags page's head: how many of each kind of ref there are, from `total`.
-pub(crate) fn refs_head(total: impl Fn(RefKind) -> usize) -> PageHead {
+/// The branches and tags page's head: how many of each kind of ref there are, from `total`,
+/// and Compare from the newest tag (`compare`, `""` when the page is off).
+pub(crate) fn refs_head(total: impl Fn(RefKind) -> usize, compare: String) -> PageHead {
     let said = format!(
         "{} \u{b7} {} \u{b7} {}",
         fmt::count(total(RefKind::Branch), "branch", "branches"),
         fmt::count(total(RefKind::Tag), "tag", "tags"),
         fmt::count(total(RefKind::Remote), "remote branch", "remote branches")
     );
-    PageHead::new("Branches and tags", Tagline::of(&said))
+    PageHead {
+        actions: if compare.is_empty() {
+            Vec::new()
+        } else {
+            vec![Action {
+                label: "Compare",
+                href: compare,
+            }]
+        },
+        ..PageHead::new("Branches and tags", Tagline::of(&said))
+    }
 }
 
 /// The head of an insights tab while the history index is built.

@@ -359,7 +359,10 @@ async fn refs(State(app): Shared, Query(q): Query<RefsQuery>) -> Result<Html<Str
         .then(|| Empty::new("No branches, tags or remotes."));
         Ok(RefsPage {
             c: views::chrome(a, "refs").live(Mode::REFS),
-            head: crate::pagehead::refs_head(total),
+            head: crate::pagehead::refs_head(
+                total,
+                crate::compare::compare_href(crate::compare::latest_tag(&all).as_deref(), "HEAD"),
+            ),
             no_branches: branches.is_empty().then(|| Empty::new("No branches.")),
             nothing,
             branches,
