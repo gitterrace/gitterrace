@@ -236,8 +236,9 @@ async fn refresh(app: &Arc<App>, rev: &str, warm: Option<&str>) {
         Err(e) => return tracing::warn!("index task failed: {e}"),
     }
     let Some(head) = warm else { return };
-    // The tables the per-file pages share, built before ready: the first page after ready
-    // reads them instead of racing their build (which doubled hotspots on rust).
+    // The tables the per-file pages share and the languages chain, built before ready: the
+    // first page after ready reads them instead of racing their build (which doubled
+    // hotspots on rust, and walked the chain twice for languages).
     let (a, h) = (Arc::clone(app), head.to_owned());
     let _ = tokio::task::spawn_blocking(move || {
         let _warm = a.warming();
@@ -246,16 +247,6 @@ async fn refresh(app: &Arc<App>, rev: &str, warm: Option<&str>) {
     .await;
     app.mark_ready();
     app.warm_related();
-    let (a, h) = (Arc::clone(app), head.to_owned());
-    // The languages walk reads the whole first-parent chain, so it runs here, off the
-    // request path. What it keeps is flat in history length.
-    tokio::task::spawn_blocking(move || {
-        let _warm = a.warming();
-        if let Ok(Some(r)) = a.source(&h) {
-            // A walk that met a storage error is dropped: the next page rebuilds the cache.
-            drop(r.run(|r| a.chain(&h, &**r, &crate::languages::path_filter(&a, &h))));
-        }
-    });
     app.refreshed.notify_one();
 }
 

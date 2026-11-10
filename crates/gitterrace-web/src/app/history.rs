@@ -73,6 +73,8 @@ impl App {
         {
             return Arc::clone(s);
         }
+        self.chain_walks
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         let s = Arc::new(crate::languages::Skeleton::build(src, filter));
         // Built over a read that failed: the caller refuses it, and a rebuild keeps the
         // generation, so a kept copy would be served over the clean cache.

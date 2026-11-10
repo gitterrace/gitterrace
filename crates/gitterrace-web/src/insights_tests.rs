@@ -239,3 +239,34 @@ async fn a_cold_overview_reads_no_file_rows() {
     );
     assert_eq!(rows() - before, 0, "row walks of a cold overview");
 }
+
+/// Guard class: the before-ready pass does what the first page would. A cold languages page
+/// after it walks no first-parent chain: red at 1 when the walk was spawned after ready and
+/// the first visitor raced it. Second catch: any languages table left to the request path.
+#[tokio::test]
+async fn a_cold_languages_page_after_the_warm_up_walks_no_chain() {
+    use std::sync::atomic::Ordering;
+    let dir = tempfile::tempdir().expect("tmp");
+    let p = gitterrace_testkit::Fixture::init(dir.path())
+        .write("a.rs", "fn a() {}\n")
+        .commit("feat: a")
+        .write("b.py", "b = 1\n")
+        .commit("feat: b")
+        .path()
+        .to_owned();
+    let repo = gitterrace_git::Repo::discover(&p).expect("repo");
+    let index = gitterrace_index::Index::open(&repo).expect("index");
+    let app = Arc::new(App::new(repo, index));
+    app.index
+        .update(&app.repo, "HEAD", &|_| {})
+        .expect("update");
+    let head = app.repo.resolve("HEAD").expect("head");
+    super::warm_shared(&app, &head);
+    app.mark_ready();
+    let router = crate::routes::router(Arc::clone(&app));
+    let before = app.chain_walks.load(Ordering::Relaxed);
+    let (status, body) = gitterrace_testkit::get(&router, "/stats/languages").await;
+    assert_eq!(status, 200, "{body}");
+    let walks = app.chain_walks.load(Ordering::Relaxed) - before;
+    assert_eq!(walks, 0, "chain walks of a cold languages page");
+}

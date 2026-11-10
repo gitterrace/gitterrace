@@ -283,6 +283,9 @@ pub(crate) fn warm_shared(a: &App, head: &str) {
         let ins = shared_at(a, s, head, a.defaults().into_options());
         ins.warm_files();
         ins.warm_paths(files.iter().map(|f| &*f.path));
+        // The languages chain reads the whole first-parent chain once per head. What it
+        // keeps is flat in history length. A walk that met a storage error is not kept.
+        drop(a.chain(head, &**s, &crate::languages::path_filter(a, head)));
     }));
 }
 
