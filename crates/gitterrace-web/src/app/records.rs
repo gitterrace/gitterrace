@@ -29,6 +29,13 @@ impl App {
 
     fn open_source(&self, head: &str) -> Result<Option<crate::insights::CheckedSrc>> {
         self.check_unreadable()?;
+        // Ready first: the warm-up keeps HEAD's source before the index is marked ready, and a
+        // page served from it then would say ready while every other revision still gets the
+        // indexing page.
+        if !self.ready() {
+            self.demand();
+            return Ok(None);
+        }
         let key = (head.to_owned(), self.index.generation());
         if let Ok(g) = self.caches.source.lock()
             && let Some((k, s)) = g.as_ref()
@@ -36,10 +43,6 @@ impl App {
         {
             self.touch();
             return Ok(Some(s.share()));
-        }
-        if !self.ready() {
-            self.demand();
-            return Ok(None);
         }
         self.open_set(key, head)
     }
