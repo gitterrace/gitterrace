@@ -61,8 +61,8 @@ Install any tool it reports as missing.
   history words, rules stated outright
 - gitleaks (`.gitleaks.toml`): committed secrets
 - markdownlint-cli2 (`.markdownlint-cli2.jsonc`): Markdown structure
-- shellcheck and shfmt: `scripts/*.sh`
-- ruff (`ruff.toml`): `scripts/*.py`
+- shellcheck and shfmt: the shell scripts under `scripts/`
+- ruff (`ruff.toml`): the Python scripts under `scripts/`
 - cargo-machete: unused dependencies
 - ast-grep (`sgconfig.yml`, `scripts/ast-grep/`): structural rules from
   AGENTS.md (gix only in gitterrace-git, no git subprocess, no `use super::`
@@ -73,7 +73,7 @@ Install any tool it reports as missing.
 - tsc and pyright: types for the scripts, actionlint: the workflows
 - the shared root check (`[root] allow` in `schwarzwald/config/lint.toml`): the repository root
   holds only the entries it lists, so new scripts, tests and data go under `scripts/`, `tests/`,
-  `docs/` or `schwarzwald/config/`
+  `docs/`, `deploy/` or `schwarzwald/config/`
 
 ## Commits
 
@@ -123,11 +123,8 @@ every tag.
 
 gitterrace.dev is shipped from a maintainer's machine with `make deploy`. There
 is no deploy workflow and no Cloudflare token in the repository. The site is
-build output and never tracked: `make docs-gen` builds it into `target/site`
-from the docs, the brand files in `docs/brand` and the screenshots in
-`docs/screenshots`, and `make check` runs the site guards on a fresh build.
-`make deploy` refuses a dirty tree, builds from HEAD, checks that build and
-ships it.
+build output, never tracked: `make deploy` refuses a dirty tree, builds it from
+HEAD into `target/site`, checks that build and ships it.
 
 1. Bump `SECURITY_TXT_EXPIRES` in `xtask/src/site.rs`, commit.
 2. On the release candidate commit, in a clean clone on a quiet machine,
