@@ -23,7 +23,7 @@ use axum::{
     response::{IntoResponse, Redirect, Response},
     routing::get,
 };
-use gitterrace_git::{CommitSummary, Repo};
+use gitterrace_git::{CommitSummary, DAY, Repo};
 use tokio::sync::OnceCell;
 use tower::ServiceExt;
 
@@ -34,7 +34,6 @@ use crate::{fmt, spark};
 /// The index sparkline's longest window, half a year.
 /// Not configurable: a chart definition (the span a sparkline shows), not a resource limit.
 const SPARK_CAP: i64 = 26 * spark::WEEK;
-const DAY: i64 = 86_400;
 
 /// One served repository: its URL name and where it lives.
 pub(crate) struct Served {

@@ -6,14 +6,14 @@
 
 use std::collections::BTreeMap;
 
+use gitterrace_git::DAY;
+
 use crate::CommitRecord;
 use crate::insights::fasthash::FastMap;
 use crate::seg::bounds::{Cursor, MAX_BLOCK, put_varint, unzigzag, zigzag};
 use crate::seg::canon::Lives;
 use crate::seg::format::section;
 use crate::seg::{SegError, SegResult, Sink};
-
-const DAY: i64 = 86_400;
 
 /// Line sums, raw and with whitespace-only changes ignored.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]

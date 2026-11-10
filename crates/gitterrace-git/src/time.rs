@@ -25,6 +25,9 @@ pub fn days_from_civil(y: i64, m: i64, d: i64) -> i64 {
     era * 146_097 + doe - 719_468
 }
 
+/// Seconds in a day.
+pub const DAY: i64 = 86_400;
+
 /// First and last second of years 1 to 9999, the range a date can be written in.
 pub const FIRST_SECOND: i64 = -62_135_596_800;
 /// See [`FIRST_SECOND`].
@@ -42,10 +45,10 @@ pub fn iso_utc(secs: i64) -> Option<String> {
     if !(FIRST_SECOND..=LAST_SECOND).contains(&secs) {
         return None;
     }
-    let rem = secs.rem_euclid(86_400);
+    let rem = secs.rem_euclid(DAY);
     Some(format!(
         "{}T{:02}:{:02}:{:02}Z",
-        ymd(secs.div_euclid(86_400)),
+        ymd(secs.div_euclid(DAY)),
         rem / 3600,
         rem % 3600 / 60,
         rem % 60

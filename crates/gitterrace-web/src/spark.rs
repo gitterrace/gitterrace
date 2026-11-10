@@ -12,12 +12,12 @@
 //! existed never draws a flat run. A time before the window is dropped, never piled into the
 //! first bucket.
 
+use gitterrace_git::DAY;
 use gitterrace_index::feed::local_day_of;
 
 use crate::fmt;
 
 const HOUR: i64 = 3_600;
-const DAY: i64 = 86_400;
 pub(crate) const WEEK: i64 = 7 * DAY;
 /// Fewest buckets a window of `MIN` hours or more gets, so the line still has a shape.
 const MIN: i64 = 6;

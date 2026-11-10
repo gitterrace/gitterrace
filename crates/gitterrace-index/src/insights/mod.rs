@@ -70,7 +70,7 @@ pub use select::{OptionParams, Scoped, Selection, under};
 pub use sizes::SizeBucket;
 pub use stats::{DirChurn, DirTally, FileChurn, FileTally, Label, LabelBucket, LabelCount};
 
-pub(crate) const DAY: i64 = 86_400;
+pub(crate) use gitterrace_git::DAY;
 
 /// Which paths and commits count.
 #[expect(

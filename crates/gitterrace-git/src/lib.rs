@@ -52,7 +52,7 @@ pub use repo::{ChangeMemo, Repo};
 pub use repo_id::resolve_permalink;
 pub use roots::Roots;
 pub use text::{CommitText, Mailmap};
-pub use time::{FIRST_SECOND, LAST_SECOND, civil_from_days, days_from_civil, iso_utc, ymd};
+pub use time::{DAY, FIRST_SECOND, LAST_SECOND, civil_from_days, days_from_civil, iso_utc, ymd};
 pub use types::{
     BlameLine, Blob, ChangeKind, CodeCounts, CommitDetail, CommitSummary, FileDiff, Hunk, HunkLine,
     LineKind, RawBlob, RefInfo, RefKind, Signature, TreeEntry, TreeEntryKind,

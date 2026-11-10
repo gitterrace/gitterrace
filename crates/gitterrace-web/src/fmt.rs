@@ -1,6 +1,6 @@
 //! Small formatting helpers shared by view models.
 
-use gitterrace_git::{FIRST_SECOND, LAST_SECOND, civil_from_days as civil, percent_decode};
+use gitterrace_git::{DAY, FIRST_SECOND, LAST_SECOND, civil_from_days as civil, percent_decode};
 
 use crate::when::When;
 
@@ -28,8 +28,8 @@ pub(crate) fn date(time: i64, offset: i32) -> String {
     let Some(local) = local(time, offset) else {
         return UNKNOWN_DATE.to_owned();
     };
-    let (y, m, d) = civil(local.div_euclid(86_400));
-    let secs = local.rem_euclid(86_400);
+    let (y, m, d) = civil(local.div_euclid(DAY));
+    let secs = local.rem_euclid(DAY);
     format!(
         "{y:04}-{m:02}-{d:02} {:02}:{:02}",
         secs / 3600,
@@ -41,7 +41,7 @@ pub(crate) fn date(time: i64, offset: i32) -> String {
 pub(crate) fn day(time: i64) -> String {
     local(time, 0).map_or_else(
         || UNKNOWN_DATE.to_owned(),
-        |t| gitterrace_git::ymd(t.div_euclid(86_400)),
+        |t| gitterrace_git::ymd(t.div_euclid(DAY)),
     )
 }
 
@@ -105,10 +105,10 @@ fn relative(time: i64, now: i64) -> String {
     }
     let (n, unit) = match secs {
         s if s < 3600 => (s / 60, "minute"),
-        s if s < 86_400 => (s / 3600, "hour"),
-        s if s < 86_400 * 30 => (s / 86_400, "day"),
-        s if s < 86_400 * 365 => (s / (86_400 * 30), "month"),
-        s => (s / (86_400 * 365), "year"),
+        s if s < DAY => (s / 3600, "hour"),
+        s if s < DAY * 30 => (s / DAY, "day"),
+        s if s < DAY * 365 => (s / (DAY * 30), "month"),
+        s => (s / (DAY * 365), "year"),
     };
     format!("{n} {unit}{} ago", if n == 1 { "" } else { "s" })
 }
@@ -254,12 +254,12 @@ pub(crate) fn day_label(time: i64, offset: i32, now: i64) -> String {
     let Some(t) = local(time, offset) else {
         return UNKNOWN_DATE.to_owned();
     };
-    let d = t.div_euclid(86_400);
+    let d = t.div_euclid(DAY);
     // `now` comes from the clock (or a test), clamped into range so the subtraction is exact.
     let today = now
         .saturating_add(i64::from(offset))
         .clamp(FIRST_SECOND, LAST_SECOND)
-        .div_euclid(86_400);
+        .div_euclid(DAY);
     match today - d {
         0 => "Today".to_owned(),
         1 => "Yesterday".to_owned(),
