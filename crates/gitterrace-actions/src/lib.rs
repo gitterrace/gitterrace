@@ -23,4 +23,4 @@ pub use payload::{Lines, Locator, Payload, PayloadError, RunRequest, permalink};
 pub use runner::{Limits, Outcome, RunError, Runner};
 pub use send::{Part, fill};
 pub use source::{SOURCE_PREFIX, Source, parse_source, source_line};
-pub use token::{Token, proof as token_proof};
+pub use token::{Base64, Token, base64, proof as token_proof};

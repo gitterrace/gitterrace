@@ -16,7 +16,7 @@ impl Token {
     pub fn generate() -> Result<Self, getrandom::Error> {
         let mut raw = [0u8; TOKEN_BYTES];
         getrandom::fill(&mut raw)?;
-        Ok(Self(base64url(&raw)))
+        Ok(Self(base64(&raw, Base64::UrlSafe)))
     }
 
     pub fn as_str(&self) -> &str {
@@ -61,16 +61,39 @@ impl fmt::Debug for Token {
     }
 }
 
-fn base64url(bytes: &[u8]) -> String {
-    const ALPHABET: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+/// The two base64 forms the product writes: a token travels in a URL, a font in a data URI.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Base64 {
+    /// RFC 4648 section 4 alphabet with `=` padding.
+    Standard,
+    /// RFC 4648 section 5 alphabet (`-` and `_`) without padding.
+    UrlSafe,
+}
+
+/// `bytes` as base64 in the given form.
+pub fn base64(bytes: &[u8], form: Base64) -> String {
+    let tail: &[u8; 2] = match form {
+        Base64::Standard => b"+/",
+        Base64::UrlSafe => b"-_",
+    };
+    let digit = |n: u32| match n as u8 & 63 {
+        v @ 0..=25 => char::from(b'A' + v),
+        v @ 26..=51 => char::from(b'a' + v - 26),
+        v @ 52..=61 => char::from(b'0' + v - 52),
+        v => char::from(tail[usize::from(v - 62)]),
+    };
     let mut out = String::with_capacity(bytes.len().div_ceil(3) * 4);
     for chunk in bytes.chunks(3) {
         let n = chunk
             .iter()
             .enumerate()
             .fold(0u32, |acc, (i, &b)| acc | (u32::from(b) << (16 - 8 * i)));
-        for i in 0..=chunk.len() {
-            out.push(char::from(ALPHABET[(n >> (18 - 6 * i)) as usize & 63]));
+        for i in 0..4 {
+            if i <= chunk.len() {
+                out.push(digit(n >> (18 - 6 * i)));
+            } else if form == Base64::Standard {
+                out.push('=');
+            }
         }
     }
     out
@@ -79,7 +102,7 @@ fn base64url(bytes: &[u8]) -> String {
 #[cfg(test)]
 mod tests {
     use crate::Token;
-    use crate::token::{base64url, proof};
+    use crate::token::{Base64, base64, proof};
 
     #[test]
     fn proof_is_sha256_of_secret_and_nonce() {
@@ -93,11 +116,20 @@ mod tests {
     }
 
     #[test]
-    fn base64url_matches_known_vectors() {
-        assert_eq!(base64url(b"f"), "Zg");
-        assert_eq!(base64url(b"fo"), "Zm8");
-        assert_eq!(base64url(b"foo"), "Zm9v");
-        assert_eq!(base64url(&[0xfb, 0xff]), "-_8");
+    fn base64_matches_the_rfc_vectors_in_both_forms() {
+        let cases: [(&[u8], &str, &str); 5] = [
+            (b"", "", ""),
+            (b"f", "Zg==", "Zg"),
+            (b"fo", "Zm8=", "Zm8"),
+            (b"foo", "Zm9v", "Zm9v"),
+            (b"foob", "Zm9vYg==", "Zm9vYg"),
+        ];
+        for (raw, std, url) in cases {
+            assert_eq!(base64(raw, Base64::Standard), std);
+            assert_eq!(base64(raw, Base64::UrlSafe), url);
+        }
+        assert_eq!(base64(&[0xfb, 0xff], Base64::UrlSafe), "-_8");
+        assert_eq!(base64(&[0xfb, 0xff], Base64::Standard), "+/8=");
     }
 
     #[test]
