@@ -22,9 +22,11 @@ and Python 3. `uv` is only needed to regenerate the README header tagline.
 ```sh
 git clone https://github.com/gitterrace/gitterrace && cd gitterrace
 make build
-make install  # puts git-terrace in ~/.cargo/bin, so `git terrace` works anywhere
-git terrace   # serves this checkout on 127.0.0.1 (make preview rebuilds and restarts it)
+make install  # git-terrace into ~/.cargo/bin, so `git terrace` works
+git terrace   # serves this checkout on 127.0.0.1
 ```
+
+`make preview` rebuilds and restarts the served checkout.
 
 Run `make setup` once per machine. It keeps Spotlight, Windows Search and
 tracker or baloo out of your checkout, `target/` and the bench cache, because
@@ -57,8 +59,8 @@ keeps a few MB more while idle.
 Install any tool it reports as missing.
 
 - typos (`_typos.toml`): misspellings in code and prose
-- vale (`.vale.ini`, `schwarzwald/styles/gitterrace`): American spelling, no praise or
-  history words, rules stated outright
+- vale (`.vale.ini`, `schwarzwald/styles/`): American spelling, no praise
+  or history words, rules stated outright
 - gitleaks (`.gitleaks.toml`): committed secrets
 - markdownlint-cli2 (`.markdownlint-cli2.jsonc`): Markdown structure
 - shellcheck and shfmt: the shell scripts under `scripts/`
@@ -70,17 +72,20 @@ Install any tool it reports as missing.
 - the shared house checks (personal data, own commit ids, internal references,
   the theme copy, the commit message hook), plus the repository's own: pinned
   actions, CSS scope, the site's content security policy, test configuration
-- tsc and pyright: types for the scripts, actionlint: the workflows
-- the shared root check (`[root] allow` in `schwarzwald/config/lint.toml`): the repository root
-  holds only the entries it lists, so new scripts, tests and data go under `scripts/`, `tests/`,
-  `docs/`, `deploy/` or `schwarzwald/config/`
+- tsc and pyright: types for the scripts
+- actionlint: the workflows
+- the shared root check (`[root] allow` in `schwarzwald/config/lint.toml`):
+  the repository root holds only the entries it lists, so new scripts, tests
+  and data go under `scripts/`, `tests/`, `docs/`, `deploy/` or
+  `schwarzwald/config/`
 
 ## Commits
 
 Conventional Commits, `type(scope): subject`, with the subject under 72
-characters. The scope is the crate name without `gitterrace-`. The body says why
-the change was made. Run `git config core.hooksPath scripts/hooks` once so the
-message rules run on every commit.
+characters. The scope is the crate name without `gitterrace-`. The body says
+what changed, why, and how it is tested. Run
+`git config core.hooksPath scripts/hooks` once so the message rules run on
+every commit.
 
 A change lands with
 `bash schwarzwald/kit/tools/land.sh <repo> <clone> <sha>`, one commit at a
@@ -110,14 +115,14 @@ every tag.
   binary on a Windows runner. To run it locally on macOS or Linux, use
   `scripts/dev/wine-run.sh`
 - Linux: to check it locally in Docker, `scripts/dev/linux-run.sh` builds and
-  smoke-tests the binary (a few minutes), and `scripts/dev/linux-run.sh --full` runs
-  `make check` as the ubuntu CI job does
-- macOS: `scripts/dev/macos-run.sh` installs the binary and smoke-tests it with an
-  empty HOME and a minimal PATH, so a dependency that only exists on your
-  machine fails. `scripts/dev/macos-run.sh --full` runs `make check` under the same
-  clean HOME
-- The three scripts exit 2 on a bad argument, and each has a self-test, part of
-  `make check`, for its argument parsing
+  smoke-tests the binary (a few minutes), and
+  `scripts/dev/linux-run.sh --full` runs `make check` as the ubuntu CI job does
+- macOS: `scripts/dev/macos-run.sh` installs the binary and smoke-tests it
+  with an empty HOME and a minimal PATH, so a dependency that only exists on
+  your machine fails. `scripts/dev/macos-run.sh --full` runs `make check`
+  under the same clean HOME
+- `linux-run.sh` and `macos-run.sh` exit 2 on a bad argument, and `make check`
+  runs the self-test of each
 
 ## Releasing (maintainers)
 
