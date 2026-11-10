@@ -6,7 +6,6 @@ use axum::extract::{Path, State};
 use gitterrace_index::{CommitRecord, FileStat};
 
 use crate::routes::commit;
-use crate::routes::commits::indexed_author_ids;
 
 /// Guard: after the index is ready, the costliest files are blamed off the request path, so
 /// the first visitor reads the cache. Ranking is size times churn, and it stops at N.
@@ -111,9 +110,24 @@ fn author_log_comes_from_the_records_newest_first() {
         rec("c", "Ann", "ANN@x.y", "docs/c.md"),
     ];
     let recs = gitterrace_index::feed::MemorySource::new(&list);
-    assert_eq!(indexed_author_ids(&recs, "ann@x.y", None), ["c", "a"]);
-    assert_eq!(indexed_author_ids(&recs, "Ann", Some("src")), ["a"]);
-    assert!(indexed_author_ids(&recs, "nobody", None).is_empty());
+    let ids = |q: &str| {
+        let m = gitterrace_index::query::Matcher::new(
+            &gitterrace_index::query::Query::parse(q).expect("query"),
+        );
+        let (ranks, _) = crate::routes::log_query::indexed(&recs, &m);
+        ranks
+            .iter()
+            .rev()
+            .filter_map(|r| {
+                gitterrace_index::feed::InsightsSource::commit_id(&recs, *r).map(|s| s.to_string())
+            })
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(ids("author:ann@x.y"), ["c", "a"]);
+    assert_eq!(ids("author:Ann path:src"), ["a"]);
+    assert!(ids("author:nobody").is_empty());
+    assert_eq!(ids("author:Ann,bob@x.y !path:docs"), ["b", "a"]);
+    assert_eq!(ids("!author:Ann"), ["b"]);
 }
 
 /// Guard class: a memoized page keyed on a rev is never served once the rev moves. The memo

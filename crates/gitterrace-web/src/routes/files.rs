@@ -131,7 +131,11 @@ fn tree_head(rev: &str, path: &str, list: &[gitterrace_git::TreeEntry]) -> PageH
         crumbs: views::crumbs(rev, path, false),
         actions: vec![Action {
             label: "History",
-            href: fmt::href(&format!("/log/{r}?path={}", fmt::enc_path(path))),
+            href: crate::filter::Filter::default().link(
+                &format!("/log/{r}"),
+                crate::filter::Dim::Path,
+                path,
+            ),
         }],
         ..PageHead::new(path, Tagline::of(&said))
     }

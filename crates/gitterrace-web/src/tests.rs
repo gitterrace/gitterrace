@@ -94,15 +94,32 @@ async fn serves_every_page() {
     assert!(body.contains("<h2 class=\"markdown-h1\" id=\"hello"));
     let (s, body) = get(&app, "/log/HEAD").await;
     assert_eq!((s, body.contains("fix: second")), (200, true));
-    // A lone input submits on Enter, so the log filter carries no button beside it.
-    let (_, form) = get(&app, "/log/HEAD").await;
-    let form = form
+    // One field, a GET form that submits on Enter: no button beside it, no Compare link.
+    let (_, page) = get(&app, "/log/HEAD").await;
+    let form = page
         .split("<form class=\"filter\"")
         .nth(1)
         .and_then(|f| f.split("</form>").next());
-    assert!(form.is_some_and(|f| f.contains("name=\"path\"") && !f.contains("<button")));
-    let (s, body) = get(&app, "/log/HEAD?path=src/a.rs&page=0").await;
-    assert_eq!((s, body.contains("first")), (200, true));
+    assert!(form.is_some_and(|f| f.contains("name=\"q\"") && !f.contains("<button")));
+    assert!(
+        !page.contains(">Compare</a>"),
+        "Compare left the log toolbar"
+    );
+    for uri in [
+        "/log/HEAD?path=src/a.rs&page=0",
+        "/log/HEAD?q=path%3Asrc%2Fa.rs&page=0",
+    ] {
+        let (s, body) = get(&app, uri).await;
+        assert_eq!((s, body.contains("first")), (200, true), "{uri}");
+        assert!(body.contains("<i>path</i> src/a.rs"), "{uri}: a chip");
+    }
+    // A refused filter keeps the text, says what is supported and never fails the page.
+    let (s, body) = get(&app, "/log/HEAD?q=a+%7C+b").await;
+    assert_eq!(s, 200);
+    assert!(
+        body.contains("value=\"a | b\"") && body.contains("Supported:"),
+        "{body}"
+    );
     let (s, body) = get(&app, "/tree/HEAD/src").await;
     assert_eq!((s, body.contains("a.rs")), (200, true));
     let (s, body) = get(&app, "/blob/HEAD/src/a.rs").await;
@@ -133,7 +150,10 @@ async fn serves_every_page() {
     assert_eq!(get(&app, "/static/app.css").await.0, 200);
 
     let (s, body) = get(&app, "/log/HEAD?author=nobody%40example.com").await;
-    assert_eq!((s, body.contains("author: ")), (200, true));
+    assert_eq!(
+        (s, body.contains("<i>author</i> nobody@example.com")),
+        (200, true)
+    );
     let (_, body) = get(&app, "/log/HEAD?author=t%40e.x").await;
     assert!(body.contains("fix: second") && body.contains("first"));
 
@@ -212,11 +232,13 @@ async fn serves_every_page() {
     assert!(body.contains("class=\"chip\"") && body.contains("fix: second"));
     assert!(!body.contains("feat: first"));
     let (_, body) = get(&app, "/stats").await;
-    assert!(body.contains("/stats?type=feat"));
+    assert!(body.contains("/stats?q=type%3Afeat"));
     let (_, body) = get(&app, "/stats/contributors").await;
-    assert!(body.contains("/stats/contributors?author=") && body.contains("/log/HEAD?author="));
+    assert!(
+        body.contains("/stats/contributors?q=author%3A") && body.contains("/log/HEAD?q=author%3A")
+    );
     let (_, body) = get(&app, "/blame/HEAD/src/a.rs").await;
-    assert!(body.contains("class=\"who\" href=\"/log/HEAD?author="));
+    assert!(body.contains("class=\"who\" href=\"/log/HEAD?q=author%3A"));
     // The gutter names a run once and carries its age as a heat class on every line of it.
     assert!(body.contains("class=\"who h"));
     // Both lines of src/a.rs come from "fix: second": one run, two heat cells, one name.
@@ -227,7 +249,7 @@ async fn serves_every_page() {
     // Every page that names an author links to their log, branch rows included.
     let (_, body) = get(&app, "/refs").await;
     assert!(
-        body.contains("class=\"who\" href=\"/log/HEAD?author="),
+        body.contains("class=\"who\" href=\"/log/HEAD?q=author%3A"),
         "refs"
     );
 }

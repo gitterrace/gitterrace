@@ -105,6 +105,22 @@ impl Repo {
             .collect()
     }
 
+    /// The full message of each of `ids`, in order: what the log's message terms test.
+    pub fn messages(&self, ids: &[String]) -> Result<Vec<String>> {
+        let repo = self.repo();
+        ids.iter()
+            .map(|id| {
+                let commit = repo.find_commit(self.full_id(&repo, id)?).map_err(git)?;
+                self.count_commit_read();
+                Ok(commit
+                    .message_raw()
+                    .map_err(git)?
+                    .to_str_lossy()
+                    .into_owned())
+            })
+            .collect()
+    }
+
     /// Commits read by commit search through this handle so far: the walk and the summaries
     /// of index matches. Lets a test prove an index miss reads no commit.
     pub fn commits_read(&self) -> u64 {

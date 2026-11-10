@@ -1,6 +1,6 @@
 /// Splits `type(scope)!: description` into type and scope. Subjects that do not follow the
 /// convention yield `(None, None)`.
-pub(crate) fn parse_subject(subject: &str) -> (Option<String>, Option<String>) {
+pub fn parse_subject(subject: &str) -> (Option<String>, Option<String>) {
     let Some((head, _)) = subject.split_once(": ") else {
         return (None, None);
     };

@@ -2,7 +2,7 @@
 {% block title %}Commits · {{ c.name }}{% endblock %}
 {% block content %}
 {{ head }}
-{% if let Some(ch) = author_chip %}<p class="chips"><span class="chip">author: {{ ch.0 }} <a href="{{ ch.1 }}" aria-label="Remove author filter">×</a></span></p>{% endif %}
+{% include "_chips.html" %}
 {% if let Some(e) = empty %}{{ e }}{% endif %}
 {% if !graph.is_empty() %}<ul class="list log graphed">
 {% for r in graph %}{{ r }}{% endfor %}

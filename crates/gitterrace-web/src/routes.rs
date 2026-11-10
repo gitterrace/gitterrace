@@ -26,6 +26,9 @@ mod api;
 mod assets;
 mod commits;
 mod files;
+mod log_query;
+#[cfg(test)]
+mod log_query_tests;
 mod raw;
 
 pub(crate) use assets::assets;

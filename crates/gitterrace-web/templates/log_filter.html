@@ -1,10 +1,13 @@
-{#- The log's toolbar in the page head: the path filter (Enter submits it), the related served
-repositories, and Compare pushed to the row's end. -#}
-<form class="filter" method="get" action="{{ action }}"><input name="path" value="{{ path }}"
- placeholder="Filter by path" aria-label="Filter by path" enterkeyhint="search"></form>
+{#- The log's toolbar in the page head: the one filter field (a GET form: Enter submits it,
+no script needed) with the keyword examples as completions, and the related served
+repositories. -#}
+<form class="filter" method="get" action="{{ action }}" role="search"><input name="q" value="{{ text }}"
+ placeholder="author:ann path:src fix" aria-label="Filter commits" list="log-q" enterkeyhint="search"
+ {%- if !error.is_empty() %} aria-invalid="true" aria-describedby="log-q-error"{% endif %}>
+<datalist id="log-q">{% for k in keywords %}<option value="{{ k }}">{% endfor %}</datalist>
+{%- if !error.is_empty() %}<small class="filter-error" id="log-q-error" role="alert">{{ error }}</small>{% endif -%}
+</form>
 {%- if !related.is_empty() %}<span class="related">Related:
 {%- for (href, name) in related -%}
 {%- if !loop.first %},{% endif %} <a href="{{ href }}">{{ name }}</a>
 {%- endfor %}</span>{% endif -%}
-{%- if !compare_href.is_empty() %}<a class="ph-end" href="{{ compare_href }}">Compare</a>
-{%- endif %}

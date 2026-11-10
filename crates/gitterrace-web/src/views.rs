@@ -449,11 +449,16 @@ pub(crate) fn hue(name: &str) -> u32 {
 
 /// Link to the commit list of one author.
 pub(crate) fn author_href(email: &str) -> String {
-    href(&format!(
-        "/log/{}?author={}",
-        crate::fmt::selected_seg(),
-        enc_seg(email)
-    ))
+    log_href(
+        &crate::filter::Filter::default(),
+        crate::filter::Dim::Author,
+        email,
+    )
+}
+
+/// The log of the selected revision with `d` set to `value`: every link into a filtered log.
+pub(crate) fn log_href(f: &crate::filter::Filter, d: crate::filter::Dim, value: &str) -> String {
+    f.link(&format!("/log/{}", crate::fmt::selected_seg()), d, value)
 }
 
 pub(crate) fn commit_row(c: &CommitSummary, now: i64) -> CommitRow {

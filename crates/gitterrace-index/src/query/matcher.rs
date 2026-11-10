@@ -63,6 +63,26 @@ impl Matcher {
         !self.paths.is_empty()
     }
 
+    /// The items of the first author term when it is positive: where an indexed answer
+    /// starts, from the author postings.
+    #[must_use]
+    pub fn authors(&self) -> Option<&[String]> {
+        self.authors
+            .iter()
+            .find(|(n, _)| !n)
+            .map(|(_, v)| v.as_slice())
+    }
+
+    /// The one path prefix when the path terms are exactly one positive term of one item:
+    /// what a git walk can filter by itself.
+    #[must_use]
+    pub fn single_path(&self) -> Option<&str> {
+        match self.paths.as_slice() {
+            [(false, v)] if v.len() == 1 => v.first().map(String::as_str),
+            _ => None,
+        }
+    }
+
     /// The message words and phrases (lowercase), each with whether it is negated.
     #[must_use]
     pub fn words(&self) -> &[(bool, String)] {

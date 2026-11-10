@@ -1,4 +1,4 @@
-//! The log and commit pages, with the author filter.
+//! The log and commit pages, with the commit filter.
 
 use std::fmt::Write as _;
 use std::sync::Arc;
@@ -8,10 +8,12 @@ use axum::{
     extract::{Path, Query, State},
     response::Html,
 };
-use gitterrace_index::feed::{IdentId, InsightsSource, Posting, Rank};
+use gitterrace_index::query::{Matcher, by};
 use serde::Deserialize;
 
+use crate::filter::{Chip, ChipRow, Filter};
 use crate::pagehead::{PageHead, Tab, Tagline};
+use crate::routes::log_query;
 use crate::routes::{PAGE, Shared, page};
 use crate::{
     app::{App, blocking},
@@ -24,9 +26,7 @@ use crate::{
 
 #[derive(Deserialize)]
 pub(super) struct LogQuery {
-    path: Option<String>,
     page: Option<usize>,
-    author: Option<String>,
     view: Option<String>,
     /// `one` narrows the Graph view to this ref; the default draws every branch line.
     lanes: Option<String>,
@@ -46,94 +46,23 @@ struct LogPage {
     newer: Option<String>,
     older: Option<String>,
     head: PageHead,
-    /// Removable chip for the active author filter: (name, href without it).
-    author_chip: Option<(String, String)>,
+    /// One removable chip per filter term, and "Clear all" to the unfiltered log.
+    fb: ChipRow,
     /// The Graph view's rows, one list without day headers, so the lines run unbroken.
     graph: Vec<CommitRow>,
 }
 
-/// Commits per read of the unindexed author walk.
-const CHUNK: usize = 500;
-/// Commits the unindexed author walk reads before it gives up with what it has.
-const AUTHOR_WALK: usize = 2_000;
-
-/// Whether `who` (email or name) wrote the commit.
-fn by(who: &str, author: &str, email: &str) -> bool {
-    email.eq_ignore_ascii_case(who) || author == who
-}
-
-/// Ids of the commits by `who` touching `path`, newest first, from the author postings of the
-/// index, so no history is walked.
-pub(super) fn indexed_author_ids(
-    src: &dyn InsightsSource,
-    who: &str,
-    path: Option<&str>,
-) -> Vec<String> {
-    let mut ranks: Vec<Rank> = (0..src.idents())
-        .filter_map(|i| {
-            let id = IdentId(u32::try_from(i).ok()?);
-            let (name, email) = src.ident(id)?;
-            by(who, &name, &email).then_some(id)
-        })
-        .flat_map(|id| {
-            src.postings(Posting::Author(id))
-                .map(|h| h.rank)
-                .collect::<Vec<_>>()
-        })
-        .collect();
-    ranks.sort_unstable();
-    ranks.dedup();
-    if let Some(p) = path {
-        ranks = src
-            .rows_for(ranks)
-            .filter(|(_, rows)| {
-                rows.iter().any(|f| {
-                    src.path(f.path)
-                        .is_some_and(|n| crate::filter::under(&n, p))
-                })
-            })
-            .map(|(r, _)| r)
-            .collect();
-    }
-    ranks
-        .into_iter()
-        .rev()
-        .filter_map(|r| src.commit_id(r).map(|s| s.to_string()))
-        .collect()
-}
-
-/// The link to page `n` of this log, keeping its path, author, view and lines.
-fn page_link(
-    rev_enc: &str,
-    n: usize,
-    path: &str,
-    who: Option<&str>,
-    (graph, all): (bool, bool),
-) -> String {
-    let mut q = format!("/log/{rev_enc}?page={n}");
-    if !path.is_empty() {
-        let _ = write!(q, "&path={}", fmt::enc_path(path));
-    }
-    if let Some(w) = who {
-        let _ = write!(q, "&author={}", fmt::enc_seg(w));
-    }
+/// The link to page `n` of this log, keeping its filter, view and lines.
+fn page_link(rev_enc: &str, n: usize, f: &Filter, (graph, all): (bool, bool)) -> String {
+    let n = n.to_string();
+    let mut extra = vec![("page", n.as_str())];
     if graph {
-        q.push_str("&view=graph");
+        extra.push(("view", "graph"));
     }
     if graph && !all {
-        q.push_str("&lanes=one");
+        extra.push(("lanes", "one"));
     }
-    fmt::href(&q)
-}
-
-/// The log toolbar's Compare link, from the newest tag to `rev`; `""` when Compare is off.
-fn compare_from_latest_tag(a: &App, rev: &str) -> Result<String> {
-    let since = if crate::features::on(gitterrace_config::Feature::Compare) {
-        crate::compare::latest_tag(&a.repo.refs()?)
-    } else {
-        None
-    };
-    Ok(crate::compare::compare_href(since.as_deref(), rev))
+    fmt::href(&format!("/log/{rev_enc}{}", f.query(&extra)))
 }
 
 /// Page `pg` of the commits reachable from any branch tip, and whether an older page exists.
@@ -149,114 +78,46 @@ fn all_lanes_page(
     Ok((list, more))
 }
 
-/// One page of commits by `who`. With a ready index the records answer it. Without one the
-/// log is walked in chunks (the walk cannot filter by author), up to `AUTHOR_WALK` commits.
-fn author_page(
-    a: &App,
-    id: &str,
-    path: Option<&str>,
-    who: &str,
-    pg: usize,
-) -> Result<(Vec<gitterrace_git::CommitSummary>, bool)> {
-    let from = pg * PAGE;
-    if let Some(ids) = a.accelerate(id, |s| indexed_author_ids(&**s, who, path))? {
-        let more = ids.len() > from + PAGE;
-        let slice: Vec<String> = ids.into_iter().skip(from).take(PAGE).collect();
-        return Ok((a.repo.summaries(&slice)?, more));
-    }
-    let want = from + PAGE + 1;
-    let mut hits = Vec::new();
-    for skip in (0..AUTHOR_WALK).step_by(CHUNK) {
-        let chunk = a.repo.log(id, path, skip, CHUNK)?;
-        let n = chunk.len();
-        hits.extend(
-            chunk
-                .into_iter()
-                .filter(|c| by(who, &c.author.name, &c.author.email)),
-        );
-        if hits.len() >= want || n < CHUNK {
-            break;
-        }
-    }
-    let mut page: Vec<_> = hits.into_iter().skip(from).collect();
-    let more = page.len() > PAGE;
-    page.truncate(PAGE);
-    Ok((page, more))
-}
-
 pub(super) async fn log(
     State(app): Shared,
     Path(rev): Path<String>,
     Query(q): Query<LogQuery>,
+    Query(f): Query<Filter>,
 ) -> Result<Html<String>> {
-    let path = q.path.unwrap_or_default().trim_matches('/').to_owned();
     // Pages past `limits.log_pages` are clamped: the walk behind a page costs its offset.
     let pg = q.page.unwrap_or(0).min(app.cfg().limits.log_pages);
-    let author = q.author;
-    let filtered = !path.is_empty() || author.as_deref().is_some_and(|s| !s.is_empty());
+    let filtered = !f.query_terms().is_empty();
     let graph = q.view.as_deref() == Some("graph") && !filtered;
     let all = graph && q.lanes.as_deref() != Some("one");
     let p = blocking(&app, move |a| {
         let id = a.repo.resolve(&rev)?;
-        let filter = (!path.is_empty()).then_some(path.as_str());
-        // One extra row tells us whether an older page exists.
-        let who = author.as_deref().filter(|s| !s.is_empty());
         // The graph's lines: every branch tip, or only this ref's.
         let tips = if all {
             lane_tips(a, &id)?
         } else {
             vec![id.clone()]
         };
-        let (mut list, more) = if all {
-            all_lanes_page(a, &tips, pg)?
-        } else if let Some(w) = who {
-            author_page(a, &id, filter, w, pg)?
-        } else if let Some(p) = filter
-            && let Some(log) = a.path_log(&id, p)?
-            // One past the page decides `more`; a cut list must reach it to be trusted.
-            && (log.complete || log.ids.len() > pg.saturating_mul(PAGE) + PAGE)
-        {
-            let ids = &log.ids;
-            let from = pg.saturating_mul(PAGE).min(ids.len());
-            let to = (from + PAGE).min(ids.len());
-            (a.repo.summaries_at(&id, &ids[from..to])?, ids.len() > to)
+        let (mut list, more, capped) = if all {
+            let (l, more) = all_lanes_page(a, &tips, pg)?;
+            (l, more, false)
         } else {
-            let mut list = a.repo.log(&id, filter, pg.saturating_mul(PAGE), PAGE + 1)?;
-            let more = list.len() > PAGE;
-            list.truncate(PAGE);
-            (list, more)
+            filtered_page(a, &id, &f, pg)?
         };
-        let author_chip = who.map(|w| {
-            let name = list
-                .first()
-                .map_or_else(|| w.to_owned(), |c| c.author.name.clone());
-            let mut back = fmt::href(&format!("/log/{}", fmt::enc_seg(&rev)));
-            if !path.is_empty() {
-                let _ = write!(back, "?path={}", fmt::enc_path(&path));
-            }
-            (name, back)
-        });
         list.shrink_to_fit();
         let now = fmt::now();
         let rev_enc = fmt::enc_seg(&rev);
-        let link = |n: usize| page_link(&rev_enc, n, &path, who, (graph, all));
-        // Every ref is peeled to find the newest tag, so skip it when the link is not shown.
-        let compare_href = compare_from_latest_tag(a, &rev)?;
-        let head = log_head(
-            &rev,
-            &rev_enc,
-            &path,
-            who,
-            (graph, all),
-            filtered,
-            &list,
-            pg,
-        );
+        let base = format!("/log/{rev_enc}");
+        let link = |n: usize| page_link(&rev_enc, n, &f, (graph, all));
+        let head = log_head(&rev, &rev_enc, (graph, all), filtered, &list, pg);
         let head = PageHead {
             toolbar: LogFilter {
-                action: fmt::href(&format!("/log/{rev_enc}")),
-                path: path.clone(),
-                compare_href,
+                action: fmt::href(&base),
+                text: f.text(),
+                error: f.error().map(ToString::to_string).unwrap_or_default(),
+                keywords: gitterrace_index::query::KEYWORDS
+                    .iter()
+                    .filter_map(|k| k.example)
+                    .collect(),
                 related: related_logs(a),
             }
             .render()?,
@@ -267,13 +128,22 @@ pub(super) async fn log(
             head,
             newer: (pg > 0).then(|| link(pg - 1)),
             older: more.then(|| link(pg + 1)),
-            author_chip,
+            fb: ChipRow {
+                chips: chips(&f, &base, &list),
+                clear: fmt::href(&base),
+            },
             empty: list.is_empty().then(|| {
-                let e = crate::empty::Empty::new("No commits.");
-                if path.is_empty() && who.is_none() {
-                    e
+                let e = crate::empty::Empty::new(if capped {
+                    "No match in the newest 2,000 commits."
+                } else if filtered {
+                    "No commits match this filter."
                 } else {
-                    e.step("Show every commit", fmt::href(&format!("/log/{rev_enc}")))
+                    "No commits."
+                });
+                if filtered {
+                    e.step("Show every commit", fmt::href(&base))
+                } else {
+                    e
                 }
             }),
             graph: if graph {
@@ -292,14 +162,84 @@ pub(super) async fn log(
     page(&p)
 }
 
-/// The log's toolbar, from `log_filter.html`: the path filter, and Compare at the row's end.
+/// Page `pg` of `id`'s log under `f`, whether an older page exists, and whether the walk
+/// stopped at its cap. A lone path term reads the file's history as `git log -- path` lists
+/// it; any other filter goes through [`log_query::page`].
+fn filtered_page(
+    a: &App,
+    id: &str,
+    f: &Filter,
+    pg: usize,
+) -> Result<(Vec<gitterrace_git::CommitSummary>, bool, bool)> {
+    let terms = f.query_terms();
+    if terms.is_empty() {
+        let mut list = a.repo.log(id, None, pg.saturating_mul(PAGE), PAGE + 1)?;
+        let more = list.len() > PAGE;
+        list.truncate(PAGE);
+        return Ok((list, more, false));
+    }
+    if terms.terms().len() == 1
+        && let Some(p) = f.path()
+    {
+        if let Some(log) = a.path_log(id, p)?
+            // One past the page decides `more`; a cut list must reach it to be trusted.
+            && (log.complete || log.ids.len() > pg.saturating_mul(PAGE) + PAGE)
+        {
+            let ids = &log.ids;
+            let from = pg.saturating_mul(PAGE).min(ids.len());
+            let to = (from + PAGE).min(ids.len());
+            return Ok((
+                a.repo.summaries_at(id, &ids[from..to])?,
+                ids.len() > to,
+                false,
+            ));
+        }
+        let mut list = a.repo.log(id, Some(p), pg.saturating_mul(PAGE), PAGE + 1)?;
+        let more = list.len() > PAGE;
+        list.truncate(PAGE);
+        return Ok((list, more, false));
+    }
+    let lp = log_query::page(a, id, &Matcher::new(terms), pg)?;
+    tracing::debug!(filter = %terms, rows = lp.work.rows, walked = lp.work.walked, "log filter");
+    Ok((lp.list, lp.more, lp.capped))
+}
+
+/// The filter's chips, an author's shown by the name the listed commits carry.
+fn chips(f: &Filter, base: &str, list: &[gitterrace_git::CommitSummary]) -> Vec<Chip> {
+    let name = |w: &str| {
+        list.iter()
+            .find(|c| by(w, &c.author.name, &c.author.email))
+            .map(|c| c.author.name.clone())
+    };
+    f.chips(base, None)
+        .into_iter()
+        .map(|mut ch| {
+            if ch.dim == "author" {
+                let (not, who) = ch
+                    .label
+                    .strip_prefix("not ")
+                    .map_or(("", ch.label.as_str()), |w| ("not ", w));
+                if let Some(n) = name(who) {
+                    ch.label = format!("{not}{n}");
+                }
+            }
+            ch
+        })
+        .collect()
+}
+
+/// The log's toolbar, from `log_filter.html`: the one filter field (a GET form, so it works
+/// without script) and the related repositories.
 #[derive(Template)]
 #[template(path = "log_filter.html")]
 struct LogFilter {
     action: String,
-    path: String,
-    /// Compare from the latest tag to this revision, `""` when the page is off.
-    compare_href: String,
+    /// The filter as the field shows it: canonical, or the refused text as typed.
+    text: String,
+    /// Why the text was refused, `""` when it parsed.
+    error: String,
+    /// Example expressions the field offers as completions, from the keyword table.
+    keywords: Vec<&'static str>,
     /// The other served repositories sharing a root commit, as `(log href, name)`. Hrefs
     /// are built from table names only, never a path.
     related: Vec<(String, String)>,
@@ -317,28 +257,19 @@ fn related_logs(a: &App) -> Vec<(String, String)> {
 /// The log's page head: "Commits" with the revision, a tagline saying what the list holds,
 /// and List | Graph | This ref as tabs (a filtered log has no graph, so no tabs). Graph draws
 /// every branch line, as `git log --graph --all` does; This ref narrows it to the ref in the path.
-#[expect(
-    clippy::too_many_arguments,
-    reason = "the head reads what the log handler holds"
-)]
 fn log_head(
     rev: &str,
     rev_enc: &str,
-    path: &str,
-    who: Option<&str>,
     (graph, all): (bool, bool),
     filtered: bool,
     list: &[gitterrace_git::CommitSummary],
     pg: usize,
 ) -> PageHead {
-    let mut said = String::from("Newest first");
-    if !path.is_empty() {
-        let _ = write!(said, ", touching {path}");
-    }
-    if let Some(w) = who {
-        let name = list.first().map_or(w, |c| c.author.name.as_str());
-        let _ = write!(said, ", by {name}");
-    }
+    let mut said = String::from(if filtered {
+        "Newest first, filtered"
+    } else {
+        "Newest first"
+    });
     if pg > 0 {
         let _ = write!(said, ", page {}", pg + 1);
     }
