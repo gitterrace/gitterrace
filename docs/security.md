@@ -28,22 +28,24 @@ vulnerability, see [SECURITY.md](../SECURITY.md).
 
 | Door | Exposure | Holds it |
 | --- | --- | --- |
-| Every request | all | Host allowlist, cross-site requests refused, strict content security policy |
+| Every request | all | Host allowlist, strict content security policy, cross-site requests refused on a local server |
 | Pages | local and public | Committed objects only when public, every read pinned to a commit |
 | Local-only pages | local only | Answered 404 on a public server |
 | File paths in a URL | both | Looked up by name in the tree, the working tree reader never follows a symlink out |
 | `/raw` | both | SVG and text sandboxed, PDF as a download, size cap |
-| Running an action | loopback only | Same-origin token, JSON only, `actions.toml` must be yours and not writable by others |
+| Running an action | loopback only | Same-origin token, JSON only, `actions.toml` outside every served repository, and on Unix owned by you and not writable by others |
 | Settings | loopback only, not in an export | Same-origin token, only `config.toml` or `actions.toml`, never a path from the request |
 | Adding a repository | loopback only | Token from a private file, any browser request refused |
 | Every write | all | Never succeeds without its token |
 | MCP server | the process that started it | Read-only tools, the same feature switches as `/api/v1` |
 | `open` and `gitterrace://` | the OS | Strict link parse, only known clones, no network for an unknown id |
-| Static export | wherever it is hosted | The content security policy ships with it, no local pages |
+| Static export | wherever it is hosted | No local pages, the content security policy in a `_headers` file the host must apply |
 | Repository content | rendered pages | Escaped, inline script refused, actions never load from the repository |
 
-Every route is checked against these doors by tests that walk all of them, so a
-new route is covered without a new test.
+Tests walk every route of the built server and check that it is classified
+public or local, that a local one is dark on a public server, that it sends
+`nosniff` and the policy, that no path reads outside the tree and that no write
+succeeds without its token. A new route is covered without a new test.
 
 ## Accepted risks
 
