@@ -110,7 +110,8 @@ padding:var(--space-3) var(--space-4);overflow-x:auto;max-width:100%;white-space
 overflow-wrap:anywhere}
 main table{display:block;width:max-content;max-width:100%;overflow-x:auto;
 border-collapse:collapse;font-size:var(--text-sm)}
-main th,main td{padding:6px var(--space-3);border:1px solid var(--line);vertical-align:top}
+main th,main td{padding:6px var(--space-3);vertical-align:top}
+main th{border-bottom:1px solid var(--line-strong)}
 main th{font-weight:var(--weight-semibold);text-align:left}
 main tr:nth-child(2n){background:var(--soft)}
 main td code,main th code{overflow-wrap:normal;white-space:nowrap}
