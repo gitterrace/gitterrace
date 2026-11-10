@@ -1,7 +1,7 @@
 {
   "schwarzwald": null,
   "dirty": false,
-  "date": "2026-11-09T12:20:45Z",
+  "date": "2026-11-10T04:02:05Z",
   "parts": [
     "configs",
     "fonts",
@@ -14,7 +14,7 @@
     "tools"
   ],
   "files": {
-    "README.md": "03231f4f74f0bd8f45f9ff2ed18aab64f2b4b0cdccabb81c60bad8e80cd5c2d3",
+    "README.md": "aed68b58dc025113cdf6efa5e3ac20e24860af5d501782324c5834b9ac2ff95e",
     "check.py": "7e6cb0ce8e4284252a0a153c0c91835f9606b4700bb8dc8ddad0fcbc688576b5",
     "configs/cliff-base.toml": "af6d61d5605368953ec077c37cd66b6670cd54ae8dbfb7681a2e33c2cf71d4cf",
     "configs/clippy-base.toml": "e2d4a22a5fbdab27da1188a8a664eefc40134d12f1d56cbe4af0a45936c2b77a",
@@ -98,7 +98,7 @@
     "lint/lib/config.py": "6d1a1fe71f760f8874a782cf175a9669b0cdced51b8eea6030affb02bab11d90",
     "lint/lib/pick-python.sh": "b05fc08775ee55f72f908545fd5454e16cde28a6c3c7b0e8bb3402ae5f6b556e",
     "lint/make-targets.py": "4ae3b20f93adb80f2841220bbb3a640c0879821cfe45678e962951fb361a17fe",
-    "lint/own-shas.py": "7af76d4daf360179752bd2cf875782f487b201cfaa5cea1bc41c3d727b7fdf07",
+    "lint/own-shas.py": "021c134ef72319650ab0c2399ede03270f53fef3745a2f4bbab0e5319cadd78e",
     "lint/personal-data.py": "bc1eb2cb40742ab231e12e0246c897f4befbeb43b6cbf61cae4af8b0b03de83f",
     "lint/red-cases/actions-pin/green-run/.github/actions/t/action.yml": "af0bb05a1c24e30a689924287806d957edf1c020c286907aa8053a3ebd407be4",
     "lint/red-cases/actions-pin/green/.github/workflows/ci.yml": "37d6934c10e0c293c7d2b7972c88ff998b964850f534efc817e840a41c5b2dca",
@@ -203,9 +203,9 @@
     "lint/red-cases/make-targets/red/Makefile": "e18b382911c8e331c8052f0126f94c2771d08aa6feeb86ca8402009a1e1d401c",
     "lint/red-cases/make-targets/red/README.md": "4e5416841aaf93c0376ac1d46a7a5459a6a747707d1ba2510dd9de5cc39bfec2",
     "lint/red-cases/make-targets/red/schwarzwald/config/lint.toml": "59123de50440075c274e718eed36a59b17333154ddddcefc67f97f4a8a2857fb",
-    "lint/red-cases/own-shas/green-record/docs/benchmarks.md": "7eec274e4a0d200c831b28b2a792dbe627523007647f5ad681ce5c04a47efe06",
+    "lint/red-cases/own-shas/green-record/docs/benchmarks.md": "f51d7c9296955bcccf6ce20a4ec3dcb89391853ab2560b38b758717d79943749",
     "lint/red-cases/own-shas/green-record/schwarzwald/config/lint.toml": "ceef3a5a8af155f97c5a34278b5cb97cee397084920fd1d6e49beea20b011185",
-    "lint/red-cases/own-shas/green-record/tests/bench/results/README.md": "fcf237d84a4f8ab3ffb1ba929f47f0e22f5c96c6f7814f9e03d5c7938e335b64",
+    "lint/red-cases/own-shas/green-record/tests/bench/results/README.md": "26382cb96c796898a1c561244ed54adde0fb3c7a886fa5e1dbc56a680b132c45",
     "lint/red-cases/own-shas/green-record/tests/bench/results/r.json": "5f8d6f23a04d19963a84f1ab6f776e5ebeabb49ac86281d6c2d3d7c9741ac207",
     "lint/red-cases/own-shas/green/a.md": "4705f185474cfe34bb57c380b300ed6f56cc987d75a92959bb2cc5eefe43caba",
     "lint/red-cases/own-shas/red-golden/g/golden/e.txt": "78d5d3a7d80676d97032c6c2e451179fa1a2e5dd175bd1ef68d790a82cc6df5c",
@@ -277,7 +277,7 @@
     "tools/id-scan.py": "e179372fd0b61b48fc075c892f6456e0e604ccfda857e7f9d26742ce11a6d27d",
     "tools/land.sh": "31f15c5d78a0896381c681888ee2f26d26977516c9bfa39fd4748d55d966c409",
     "tools/land_test.sh": "bd22757d4abffb33e2a66bc944a3670be589e428d6ecd42d22be259193af4309",
-    "tools/ratchet-check.py": "870be1966e7b0680c58828e0a97633357993b536c4cf7d1fe923627d2a92882c",
+    "tools/ratchet-check.py": "cb8526f43aaba95ca85cec9063229dc20dda2e26976311466020bcafd383e9ad",
     "tools/scratch.sh": "eafaaf22d09b440f0a25fae4c8e1fc5c7e8b01dc4c8e81e5dbcdd890b6757142",
     "tools/selftest.py": "010c69a52d1caeb88209acacd7387bf797c8fa06e820f56766334181229fcd6b",
     "tools/test-sandbox.sh": "e58e5ce84dccfd9add2bc62467cb38e37346580e45c850a2c9b6118ae64f402e"

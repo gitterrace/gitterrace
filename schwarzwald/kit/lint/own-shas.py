@@ -7,7 +7,9 @@ are `git rev-list --all`. Upstream shas (a pinned corpus) are not in it, so they
 Golden digests (only their `#` notes are read), `[scope] exclude` and lock files are not scanned.
 `[own_shas] allow` lists files that may name one recorded build commit: the sha a `record` file
 (a glob of JSON files) holds under `key` and no other. A path ending in `#NAME` allows it only
-inside that file's generated block (`BEGIN GENERATED: NAME` to `END GENERATED: NAME`).
+inside that file's generated block (`BEGIN GENERATED: NAME` to `END GENERATED: NAME`). An
+allowed sha goes stale if the product's history is ever rewritten: the recorded commit then
+names nothing, so re-run the benchmark and record the new commit.
 
   own-shas.py [--repo DIR]                  the tree
   own-shas.py [--repo DIR] --messages BASE  subject and body of every commit in BASE..HEAD

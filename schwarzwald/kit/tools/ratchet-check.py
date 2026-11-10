@@ -87,6 +87,32 @@ def load(text: str | None, path: str) -> dict[str, int]:
     return entries(dig(json.loads(text), path)) if text else {}
 
 
+def renames(root: Path, base: str) -> dict[str, str]:
+    """Old path to new path for every rename between base and the working tree (R, any score)."""
+    env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+    r = subprocess.run(["git", "-C", str(root), "diff", "-M", "--name-status", "-z", base],
+                       capture_output=True, text=True, env=env)
+    parts = r.stdout.split("\0") if r.returncode == 0 else []
+    out, i = {}, 0
+    while i < len(parts) and parts[i]:
+        if parts[i][0] in "RC":
+            if parts[i][0] == "R":
+                out[parts[i + 1]] = parts[i + 2]
+            i += 3
+        else:
+            i += 2
+    return out
+
+
+def follow(before: dict[str, int], moved: dict[str, str]) -> dict[str, int]:
+    """Carry the base's keys to their new paths. A target the base already holds takes the larger count."""
+    out = {k: n for k, n in before.items() if k not in moved}
+    for k, n in before.items():
+        if k in moved:
+            out[moved[k]] = max(n, out.get(moved[k], 0)) if moved[k] in before else n
+    return out
+
+
 def check(root: Path, base: str) -> list[str]:
     reg = parse_registry((root / REGISTRY).read_text())
     old_text = at_base(root, base, REGISTRY)
@@ -94,14 +120,56 @@ def check(root: Path, base: str) -> list[str]:
     bad = grown(entries(old["counts"]), entries(reg["counts"]), f"{REGISTRY} [counts]", new_ok=True)
     bad += dropped(old, reg)
     known = {key(r) for r in old["ratchet"]}
+    moved = renames(root, base)
     for r in reg["ratchet"]:
         if key(r) not in known:
             continue
         before_text = at_base(root, base, r["file"])
         if before_text is None:
             continue
-        bad += grown(load(before_text, r["path"]), load((root / r["file"]).read_text(), r["path"]), key(r))
+        bad += grown(follow(load(before_text, r["path"]), moved), load((root / r["file"]).read_text(), r["path"]), key(r))
     return bad
+
+
+def rename_cases(root: Path, git: list[str], env: dict[str, str]) -> None:
+    """Renamed keys carry their count: equal passes, raised fails, a new key fails."""
+    def run(*args: str) -> None:
+        subprocess.run([*git, *args], check=True, env=env)
+
+    (root / REGISTRY).write_text('[[ratchet]]\nfile = "w.json"\npath = "a"\n')
+    (root / "old").mkdir()
+    for n in ("one", "two", "gone", "f"):
+        (root / f"old/{n}.sh").write_text("".join(f"{n} line {i}\n" for i in range(40)))
+    (root / "w.json").write_text(json.dumps({"a": {"old/one.sh": 3, "old/two.sh": 2, "old/gone.sh": 1, "old/f.sh": 1}}))
+    run("add", "-A")
+    run("commit", "-q", "-m", "w")
+    base = "HEAD"
+
+    def move(src: str, dst: str, edit: bool = False) -> None:
+        (root / dst).parent.mkdir(exist_ok=True)
+        (root / src).rename(root / dst)
+        if edit:
+            (root / dst).write_text("".join(f"{src[4:-3]} line {i}\n" for i in range(38)) + "edit\n")
+
+    def put(a: dict[str, int]) -> None:
+        (root / "w.json").write_text(json.dumps({"a": a}))
+        run("add", "-A")
+
+    move("old/one.sh", "new/one.sh")
+    move("old/two.sh", "new/two.sh")
+    (root / "old/gone.sh").unlink()
+    move("old/f.sh", "new/f.sh", edit=True)
+    put({"new/one.sh": 3, "new/two.sh": 2, "new/f.sh": 1})
+    assert check(root, base) == [], "equal counts after renames, an edited rename and a delete are green"
+    put({"new/one.sh": 4, "new/two.sh": 2, "new/f.sh": 1})
+    assert check(root, base), "a rename with a raised count is red"
+    put({"new/one.sh": 3, "new/two.sh": 2, "new/f.sh": 2})
+    assert check(root, base), "a renamed and edited path with a raised count is red"
+    put({"new/one.sh": 3, "new/two.sh": 2, "new/f.sh": 1, "other.sh": 1})
+    assert check(root, base), "a new unrelated key beside renames is red"
+    # a rename onto a key the base already holds keeps the target's own count
+    assert follow({"a": 5, "b": 1}, {"a": "b"}) == {"b": 5}, "a rename onto an existing key takes the larger count"
+    assert follow({"a": 5}, {"a": "b"}) == {"b": 5}, "a free target takes the count"
 
 
 def self_test() -> None:
@@ -144,6 +212,7 @@ def self_test() -> None:
         assert check(root, "HEAD"), "a deleted [[ratchet]] entry is red, its list cannot grow unseen"
         (root / REGISTRY).write_text('[retired]\nentries = ["g.json a"]\n\n[counts]\nsupers = 5\n')
         assert check(root, "HEAD") == [], "a ratchet named in [retired] is a reviewed removal"
+        rename_cases(root, git, env)
     print("ratchet-check self-test: ok")
 
 
