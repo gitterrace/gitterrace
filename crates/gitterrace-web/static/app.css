@@ -218,7 +218,7 @@ div.diff .add,div.diff .del{color:inherit}
 /* The gutter: inside each cell a grid of sha, author and age. The column takes its widest
    cell, so the three line up down the page. The grid sits in a div, since a grid td leaves
    the table layout. Names are never cut (theme test), a long one widens the column. */
-.blame td.who{width:240px;min-width:240px;max-width:240px;font:var(--text-xs) var(--sans);padding-right:var(--space-4);border-right:var(--border);color:var(--muted)}
+.blame td.who{width:1%;white-space:nowrap;font:var(--text-xs) var(--sans);padding-right:var(--space-4);border-right:var(--border);color:var(--muted)}
 /* Age is a 3px bar down the left edge of the whole run, hotter for newer lines. */
 .blame td.who{box-shadow:inset 3px 0 0 var(--heat,transparent)}
 .blame td.h0{--heat:var(--accent)}
