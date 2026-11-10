@@ -37,6 +37,9 @@ gate = [
   # own unit tests pass (xtask check runs the binary, not its tests).
   "cargo xtask check",
   "cargo test -q -p xtask",
+  # The crates with features, built without them: the shipped build's lints (one crate pair,
+  # seconds once warm), which the feature-unified workspace clippy of CI never sees.
+  "make clippy-features",
   "make lint",
 ]
 # The landing runs in a fresh clone, which has no core.hooksPath yet: set it there first. The

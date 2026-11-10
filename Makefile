@@ -32,12 +32,12 @@ preview:
 	@bash scripts/dev/preview-run.sh
 
 ##@ Check gates
-.PHONY: check fmt clippy lint harness-links test doc theme actions send-vectors names lines \
-	docs-check gc-guard bench-guard
+.PHONY: check fmt clippy clippy-features lint harness-links test doc theme actions send-vectors \
+	names lines docs-check gc-guard bench-guard
 
 ## check: Every gate, in the order CI runs them
-check: gc-guard theme actions send-vectors names lines bench-guard docs-check fmt clippy lint \
-	test doc
+check: gc-guard theme actions send-vectors names lines bench-guard docs-check fmt clippy \
+	clippy-features lint test doc
 
 # fmt: Check formatting
 fmt:
@@ -46,6 +46,12 @@ fmt:
 # clippy: Clippy, warnings are errors
 clippy:
 	cargo clippy --workspace --all-targets -- -D warnings
+
+# clippy-features: Clippy on each crate that has features, built without them. The workspace run
+# above unifies features (dev-dependencies turn them on), so a lint that only fires in the shipped
+# build, such as an item used only under a feature, would never run.
+clippy-features:
+	cargo clippy -p gitterrace-index -p gitterrace-types --lib --no-default-features -- -D warnings
 
 ## lint: External linters (typos, vale, shellcheck, ruff, pyright, ast-grep, ...)
 lint: harness-links
