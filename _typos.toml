@@ -9,9 +9,6 @@ extend-ignore-re = [
   '\{titel[:}]',
   # token.rs: RFC 4648 test vector "fo"
   'b"fo"',
-  # internal-refs.py: their label patterns spell the word they refuse
-  '\\b\[Ll\]ane \[A-Z\]\\b',
-  '\[Ll\]ane\[ #\]',
   # names-check.py: SHA-256 prefixes are hex, not words
   '"[0-9a-f]{16}"',
 ]
