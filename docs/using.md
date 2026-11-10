@@ -34,8 +34,9 @@ them all. `git terrace remove` takes one off again.
 ## The commit log and its graph
 
 The log of a branch has three tabs in its head: List, Graph and This ref. Graph
-draws the branches and merges beside each commit, one row per commit. A log filtered by
-path or author has no graph, since its commits are not one line of history.
+draws the branches and merges beside each commit, one row per commit. A log
+filtered by path or author has no graph, since its commits are not one line of
+history.
 
 Graph draws every branch line at once, as `git log --graph --all` does: the
 browsed ref, each local branch and the HEAD of each linked worktree, newest
