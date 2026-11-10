@@ -89,13 +89,6 @@ impl ApiState {
         }
     }
 
-    /// Counting options from the configuration, used when a request leaves one unset.
-    #[must_use]
-    pub fn with_defaults(self, defaults: Options) -> Self {
-        self.write_settings().defaults = defaults;
-        self
-    }
-
     /// Link style and counting defaults from the configuration: `links.style`, `insights.*`
     /// and this repository's `[repo.NAME] exclude`. The web's `/api/v1` and the MCP server both
     /// build their state through here, so the two answer with the same numbers.
@@ -129,13 +122,6 @@ impl ApiState {
             .read()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .clone()
-    }
-
-    /// The `link` field in `style` from now on.
-    #[must_use]
-    pub fn with_link_style(self, style: LinkStyle) -> Self {
-        self.write_settings().style = style;
-        self
     }
 
     /// Answers only for committed history, see [`Repo::restrict_to_committed`].

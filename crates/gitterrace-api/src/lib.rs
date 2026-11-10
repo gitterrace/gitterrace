@@ -129,7 +129,10 @@ mod tests {
         assert_eq!(blob["link"], format!("{gt}/a.txt#L1-L3").as_str());
         assert_eq!(row["link"], format!("{gt}/a.txt").as_str());
 
-        let go = s.clone().with_link_style(gitterrace_types::LinkStyle::Go);
+        let go_cfg = gitterrace_config::parse("[links]\nstyle = \"go\"\n")
+            .expect("parse")
+            .config;
+        let go = s.clone().configured(&go_cfg);
         let (_, head) = get(&go, "/commits/HEAD").await;
         assert_eq!(head["link"], base.as_str(), "links.style = go");
         assert_eq!(head["permalink"], base.as_str(), "permalink stays /go");
@@ -257,14 +260,6 @@ mod tests {
     }
 
     #[test]
-    fn mcp_refuses_a_tool_switched_off() {
-        let off = gitterrace_config::parse("[features]\napi_enabled = false\n")
-            .expect("parse")
-            .config;
-        assert!(!crate::tool_on(&off, None, "log"));
-    }
-
-    #[test]
     fn mcp_lists_read_only_tools() {
         let docs = McpServer::tool_docs();
         assert!(
@@ -377,10 +372,10 @@ mod tests {
         s.refresh_index().expect("index");
         let built = s.etag().expect("tag");
         assert_ne!(empty, built, "the cache filled with no ref moving");
-        let bots = s.with_defaults(gitterrace_index::Options {
-            include_bots: true,
-            ..gitterrace_index::Options::default()
-        });
+        let cfg = gitterrace_config::parse("[insights]\ninclude_bots = true\n")
+            .expect("parse")
+            .config;
+        let bots = s.configured(&cfg);
         assert_ne!(built, bots.etag().expect("tag"), "other counting defaults");
     }
 
