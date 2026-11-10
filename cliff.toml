@@ -2,7 +2,7 @@
 # https://git-cliff.org/docs/configuration
 #
 # CHANGELOG.md is generated at release time by `make changelog VERSION=x.y.z`. Do not edit a
-# released section by hand: `make docs-check` compares the file with this output.
+# released section by hand: the changelog lint compares the file with this output.
 
 [changelog]
 header = """
