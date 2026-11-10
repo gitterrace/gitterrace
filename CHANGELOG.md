@@ -214,6 +214,7 @@ All notable changes are listed here. The format follows
 - site: the landing shows the overview under the tagline
 - actions: the starter file offers no tendir target
 - index: the first release starts the cache format at 1
+- Bench runs record the commit they measured
 
 ### Changed
 
@@ -482,6 +483,8 @@ All notable changes are listed here. The format follows
 - scripts: the send vector check loads send.js whatever the package module type
 - web: a far revision keeps its reindex notice after an idle release
 - web: no insights source is served before the index is ready
+- lint: allow the schwarzwald manifest at its current path
+- web: the outline rail lights the symbol at the reading line, not the last one
 
 ### Performance
 
@@ -528,10 +531,4 @@ All notable changes are listed here. The format follows
 - index: coupling counts pairs per file in a dense row
 
 <!-- BEGIN GENERATED: unreleased -->
-## [Unreleased]
-
-### Added
-
-- Bench runs record the commit they measured
-
 <!-- END GENERATED: unreleased -->
