@@ -47,6 +47,8 @@ pub struct ApiState {
     pub(crate) index: Arc<Index>,
     /// Insights source of the last request, keyed by (resolved tip, index generation).
     cache: Arc<Mutex<Option<RecordsCache>>>,
+    /// What the head tree costs to read, kept for the last commit asked about.
+    head: Arc<Mutex<HeadMemo>>,
     /// `links.style` and the counting options a request leaves unset. Shared with every clone,
     /// so a config reload ([`ApiState::reconfigure`]) reaches routers already built.
     settings: Arc<RwLock<Settings>>,
@@ -75,6 +77,17 @@ struct Settings {
     caps: gitterrace_config::Api,
 }
 
+/// Per commit id: the ignore files (finding them walks the tree) and the line count of every
+/// head file (a walk plus a cache read). Blobs are immutable, so a key never goes stale.
+/// `(path, text)` of each ignore file of one commit.
+type IgnoreFiles = Arc<Vec<(String, String)>>;
+
+#[derive(Default)]
+struct HeadMemo {
+    ignores: Option<(String, IgnoreFiles)>,
+    lines: Option<(String, Arc<Vec<gitterrace_index::HeadFile>>)>,
+}
+
 type RecordsCache = ((String, u64), Checked<dyn InsightsSource>);
 
 impl ApiState {
@@ -83,6 +96,7 @@ impl ApiState {
             repo,
             index,
             cache: Arc::default(),
+            head: Arc::default(),
             settings: Arc::default(),
             on_unreadable: Arc::default(),
             rebuilding: Arc::default(),
@@ -473,11 +487,43 @@ impl ApiState {
     /// Statistics over `src` under `opts`, with the ignore rules of `rev` when asked: what
     /// the web pages build for the same options.
     fn insights<'a>(&self, rev: &str, src: &'a dyn InsightsSource, opts: Options) -> Insights<'a> {
-        let ignore = opts
-            .respect_ignore
-            .then(|| gitterrace_git::IgnoreSet::at(&self.repo, rev).ok())
-            .flatten();
+        let ignore = opts.respect_ignore.then(|| self.ignore_set(rev)).flatten();
         Insights::from_source(src, opts, ignore)
+    }
+
+    /// The ignore rules committed at `rev`. The files are found once per commit.
+    fn ignore_set(&self, rev: &str) -> Option<gitterrace_git::IgnoreSet> {
+        let id = self.repo.resolve(rev).ok()?;
+        let mut memo = self
+            .head
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        if let Some((k, files)) = &memo.ignores
+            && *k == id
+        {
+            return Some(gitterrace_git::IgnoreSet::from_files(files.iter().cloned()));
+        }
+        let files = Arc::new(gitterrace_git::IgnoreSet::files_at(&self.repo, &id).ok()?);
+        memo.ignores = Some((id, Arc::clone(&files)));
+        Some(gitterrace_git::IgnoreSet::from_files(files.iter().cloned()))
+    }
+
+    /// Line count of every file in the tree of `tip`, built once per commit.
+    fn head_lines(&self, tip: &str) -> Arc<Vec<gitterrace_index::HeadFile>> {
+        let mut memo = self
+            .head
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        if let Some((k, files)) = &memo.lines
+            && k == tip
+        {
+            return Arc::clone(files);
+        }
+        let mut cache = gitterrace_index::LineCache::load(self.index.dir());
+        let files = gitterrace_index::head_files(&self.repo, tip, &mut cache).unwrap_or_default();
+        let files = Arc::new(files);
+        memo.lines = Some((tip.to_owned(), Arc::clone(&files)));
+        files
     }
 
     /// One named statistic over the cached records reachable from `rev`, after the selection
@@ -496,10 +542,7 @@ impl ApiState {
             commits_indexed = all.len();
             let ins = self.insights(&tip, &**all, scope.options().clone());
             let counted = insights::counted(&ins, &scope, &**all);
-            insights::compute(name, &counted, params, || {
-                let mut cache = gitterrace_index::LineCache::load(self.index.dir());
-                gitterrace_index::head_files(&self.repo, &tip, &mut cache).unwrap_or_default()
-            })
+            insights::compute(name, &counted, params, || self.head_lines(&tip))
         })??;
         let data = insights::with_links(name, data, |p| self.links(&tip, Some(p), None));
         Ok(insights::InsightResponse {

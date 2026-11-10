@@ -70,6 +70,8 @@ pub struct Repo {
     refs_memo: Mutex<Option<(u64, Vec<RefInfo>)>>,
     /// See [`Repo::commits_read`].
     pub(crate) commits_read: AtomicU64,
+    /// See [`Repo::tree_walks`].
+    pub(crate) tree_walks: AtomicU64,
 }
 
 impl Repo {
@@ -91,7 +93,14 @@ impl Repo {
             row_reads: AtomicU64::new(0),
             refs_memo: Mutex::new(None),
             commits_read: AtomicU64::new(0),
+            tree_walks: AtomicU64::new(0),
         })
+    }
+
+    /// Whole-tree listings ([`crate::files`]) made through this handle. A request's cost, so a
+    /// test can prove a cached answer walks none.
+    pub fn tree_walks(&self) -> u64 {
+        self.tree_walks.load(Ordering::Relaxed)
     }
 
     /// Commits read by [`Self::summaries`] plus branches walked by [`Self::branch_status`] since

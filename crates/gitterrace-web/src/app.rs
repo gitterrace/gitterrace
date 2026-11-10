@@ -26,9 +26,6 @@ pub(crate) const DIRTY_TTL: Duration = Duration::from_secs(2);
 /// a page that reads them, so an idle server keeps none of them; a page after the release opens
 /// the set again. The page memo still answers the unfiltered pages in between.
 pub(crate) const RECORDS_IDLE: Duration = Duration::from_secs(30);
-/// Largest ignore file read: these are configuration, never megabytes.
-/// Not configurable: a read bound on a file from the repository, which may be hostile.
-const MAX_IGNORE_BYTES: usize = 1 << 20;
 
 mod events;
 mod history;

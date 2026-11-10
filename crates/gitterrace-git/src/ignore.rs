@@ -22,6 +22,13 @@ pub struct IgnoreSet {
 impl IgnoreSet {
     /// Reads every `.gitignore` and `.ignore` blob in the tree of `rev`, never the worktree.
     pub fn at(repo: &Repo, rev: &str) -> Result<Self> {
+        Ok(Self::from_files(Self::files_at(repo, rev)?))
+    }
+
+    /// `(path, text)` of every ignore file in the tree of `rev`, shallow files first. The walk
+    /// costs as much as the rest of an insights page, so a server keeps the result per commit
+    /// and builds sets with [`IgnoreSet::from_files`].
+    pub fn files_at(repo: &Repo, rev: &str) -> Result<Vec<(String, String)>> {
         let reader = BlobReader::open(repo)?;
         let mut found: Vec<(String, String)> = files(repo, rev)?
             .into_iter()
@@ -37,7 +44,7 @@ impl IgnoreSet {
             .collect();
         // Shallow first: the search tries the last added list first, so deeper rules win.
         found.sort_by_key(|(path, _)| path.matches('/').count());
-        Ok(Self::from_files(found))
+        Ok(found)
     }
 
     /// Builds the set from `(path of the ignore file, its text)` pairs, shallow files first.

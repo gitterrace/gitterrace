@@ -27,6 +27,8 @@ pub use mcp::{McpRepo, McpServer, ToolDoc, serve_mcp, serve_mcp_repos, tool_on};
 #[cfg(test)]
 mod limit_tests;
 #[cfg(test)]
+mod memo_tests;
+#[cfg(test)]
 mod tests {
     use std::sync::Arc;
 

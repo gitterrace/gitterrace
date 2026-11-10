@@ -148,7 +148,7 @@ pub fn compute(
     name: &str,
     c: &Counted<'_>,
     params: &Params,
-    head: impl FnOnce() -> Vec<gitterrace_index::HeadFile>,
+    head: impl FnOnce() -> std::sync::Arc<Vec<gitterrace_index::HeadFile>>,
 ) -> Result<Value, ApiError> {
     let ins = c.insights();
     match name {

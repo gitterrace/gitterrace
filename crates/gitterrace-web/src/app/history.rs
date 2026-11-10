@@ -2,7 +2,7 @@
 
 use std::sync::Arc;
 
-use crate::app::{App, MAX_IGNORE_BYTES};
+use crate::app::App;
 use crate::error::Result;
 
 impl App {
@@ -115,18 +115,7 @@ impl App {
         {
             return Some(gitterrace_git::IgnoreSet::from_files(found.iter().cloned()));
         }
-        let paths =
-            gitterrace_git::files_named(&self.repo, commit, &[".gitignore", ".ignore"]).ok()?;
-        let mut found: Vec<(String, String)> = paths
-            .iter()
-            .filter_map(|p| {
-                let bytes = self.repo.blob_bytes(commit, p).ok()?;
-                (bytes.len() <= MAX_IGNORE_BYTES)
-                    .then(|| (p.clone(), String::from_utf8_lossy(&bytes).into_owned()))
-            })
-            .collect();
-        // Shallow first: the search tries the last added list first, so deeper rules win.
-        found.sort_by_key(|(path, _)| path.matches('/').count());
+        let found = gitterrace_git::IgnoreSet::files_at(&self.repo, commit).ok()?;
         let found = Arc::new(found);
         if let Ok(mut g) = self.caches.ignores.lock() {
             *g = Some((commit.to_owned(), Arc::clone(&found)));
