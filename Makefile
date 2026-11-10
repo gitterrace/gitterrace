@@ -29,7 +29,7 @@ install:
 
 ## preview: Rebuild and restart the preview (PREVIEW_ADDR, PREVIEW_REPOS="a b")
 preview:
-	@bash scripts/preview-run.sh
+	@bash scripts/dev/preview-run.sh
 
 ##@ Check gates
 .PHONY: check fmt clippy lint harness-links test doc theme actions send-vectors names lines \
@@ -96,7 +96,7 @@ lines:
 	python3 scripts/lint/status-words-check.py
 	python3 scripts/lint/stubs-check.py --self-test && python3 scripts/lint/stubs-check.py
 	python3 scripts/lint/types-check.py --self-test && python3 scripts/lint/types-check.py
-	python3 scripts/keep-report.py --self-test
+	python3 scripts/dev/keep-report.py --self-test
 
 # docs-check: Generated files are up to date, and the dev scripts pass their self-tests
 docs-check:
@@ -106,15 +106,15 @@ docs-check:
 	python3 scripts/lint/tracked-check.py --self-test
 	bash scripts/lib/python-run.sh schwarzwald/kit/tools/golden.py --self-test
 	bash scripts/verify/golden-proof-run.sh --self-test
-	bash scripts/linux-run.sh --self-test
-	bash scripts/macos-run.sh --self-test
+	bash scripts/dev/linux-run.sh --self-test
+	bash scripts/dev/macos-run.sh --self-test
 	bash scripts/verify/docker-check.sh --self-test
 	cargo xtask check
 
 # gc-guard: Daily silent gc, then the gc self-test on a fixture tree
 gc-guard:
-	@python3 scripts/target-run.py --auto
-	@python3 scripts/target-run.py --self-test
+	@python3 scripts/dev/target-run.py --auto
+	@python3 scripts/dev/target-run.py --self-test
 
 # bench-guard: The bench harness still works, on a tiny generated repo
 bench-guard:
@@ -230,11 +230,11 @@ shipped:
 # DRY=1 only reports. BENCH=1 also removes the cached benchmark clones.
 ## gc: Prune cargo units and scratch output unused for DAYS (default 7, DRY=1, BENCH=1)
 gc:
-	python3 scripts/target-run.py --days $(or $(DAYS),7) $(if $(filter 1,$(DRY)),--dry-run) $(if $(filter 1,$(BENCH)),--bench)
+	python3 scripts/dev/target-run.py --days $(or $(DAYS),7) $(if $(filter 1,$(DRY)),--dry-run) $(if $(filter 1,$(BENCH)),--bench)
 
 ## keep: Every item with its prod and test callers, as TSV in target/keep-inventory.tsv
 keep:
-	python3 scripts/keep-report.py . --config schwarzwald/config/keep-inventory.json --out target/keep-inventory.tsv
+	python3 scripts/dev/keep-report.py . --config schwarzwald/config/keep-inventory.json --out target/keep-inventory.tsv
 
 ## help: This list
 help:

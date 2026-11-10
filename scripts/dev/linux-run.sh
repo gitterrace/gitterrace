@@ -1,19 +1,19 @@
 #!/usr/bin/env bash
 # Build git-terrace for Linux in Docker and run scripts/verify/smoke-check.sh against it, or the
-# whole `make check` gate. Needs docker. Usage: scripts/linux-run.sh [--full | --self-test].
+# whole `make check` gate. Needs docker. Usage: scripts/dev/linux-run.sh [--full | --self-test].
 # Default: release build plus the smoke test. --full: make check, the ubuntu CI job's gate, then
 # the release memory_budget test. --self-test: argument parsing and the toolchain pin, no docker.
 # The image is native arch (arm64 on Apple silicon). The source is mounted read-only and copied
 # into the container, since some linters write beside the files they read. Cargo's registry and
 # target/ live in named volumes, so repeat runs are incremental.
 set -euo pipefail
-root=$(cd "$(dirname "$0")/.." && pwd)
+root=$(cd "$(dirname "$0")/../.." && pwd)
 dockerfile=$root/deploy/test/linux.Dockerfile
 
 # Prints the mode for the arguments, or fails on an unknown one.
 parse_args() {
   if [ "$#" -gt 1 ]; then
-    echo "usage: scripts/linux-run.sh [--full | --self-test]" >&2
+    echo "usage: scripts/dev/linux-run.sh [--full | --self-test]" >&2
     return 2
   fi
   case "${1:-}" in
@@ -21,7 +21,7 @@ parse_args() {
   --full) echo full ;;
   --self-test) echo self-test ;;
   *)
-    echo "usage: scripts/linux-run.sh [--full | --self-test]" >&2
+    echo "usage: scripts/dev/linux-run.sh [--full | --self-test]" >&2
     return 2
     ;;
   esac

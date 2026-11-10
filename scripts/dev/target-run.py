@@ -43,7 +43,7 @@ import time
 from collections.abc import Callable
 from pathlib import Path
 
-REPO = Path(__file__).resolve().parents[1]
+REPO = Path(__file__).resolve().parents[2]
 HASH = re.compile(r"^(?:.*-)?([0-9a-f]{16})$")
 DAY = 86400
 SCRATCH = ("site-shots", "app-icon")

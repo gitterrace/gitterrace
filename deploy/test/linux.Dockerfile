@@ -1,4 +1,4 @@
-# Linux image for scripts/linux-run.sh: the Linux job of lint-and-test.yml, runnable locally.
+# Linux image for scripts/dev/linux-run.sh: the Linux job of lint-and-test.yml, runnable locally.
 # Same base as the runner, the toolchain pinned like rust-toolchain.toml, and the tools
 # `make check` needs.
 # Built for the native arch (arm64 on Apple silicon), never emulated.

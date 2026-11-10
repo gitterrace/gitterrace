@@ -108,13 +108,13 @@ every tag.
   (see [benchmarks](docs/benchmarks.md))
 - Windows: CI builds and tests `x86_64-pc-windows-msvc` and smoke-tests the
   binary on a Windows runner. To run it locally on macOS or Linux, use
-  `scripts/wine-run.sh`
-- Linux: to check it locally in Docker, `scripts/linux-run.sh` builds and
-  smoke-tests the binary (a few minutes), and `scripts/linux-run.sh --full` runs
+  `scripts/dev/wine-run.sh`
+- Linux: to check it locally in Docker, `scripts/dev/linux-run.sh` builds and
+  smoke-tests the binary (a few minutes), and `scripts/dev/linux-run.sh --full` runs
   `make check` as the ubuntu CI job does
-- macOS: `scripts/macos-run.sh` installs the binary and smoke-tests it with an
+- macOS: `scripts/dev/macos-run.sh` installs the binary and smoke-tests it with an
   empty HOME and a minimal PATH, so a dependency that only exists on your
-  machine fails. `scripts/macos-run.sh --full` runs `make check` under the same
+  machine fails. `scripts/dev/macos-run.sh --full` runs `make check` under the same
   clean HOME
 - The three scripts exit 2 on a bad argument, and each has a self-test, part of
   `make check`, for its argument parsing

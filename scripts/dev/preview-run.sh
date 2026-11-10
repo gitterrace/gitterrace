@@ -3,7 +3,7 @@
 # PREVIEW_ADDR, else DEFAULT_ADDR from the config schema. PREVIEW_REPOS="a b" picks the repos,
 # default this checkout. The log goes to /tmp/gt-<port>.log.
 set -euo pipefail
-cd "$(dirname "$0")/.."
+cd "$(dirname "$0")/../.."
 schema=crates/gitterrace-config/src/schema.rs
 addr=${PREVIEW_ADDR:-$(sed -n 's/.*DEFAULT_ADDR: &str = "\(.*\)";/\1/p' "$schema")}
 log=/tmp/gt-${addr##*:}.log

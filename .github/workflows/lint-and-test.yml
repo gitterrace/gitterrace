@@ -151,7 +151,7 @@ jobs:
       - run: make check
 
   # The Windows binary builds, its tests pass and it serves a repository. The runtime smoke test is
-  # the same script the release check and scripts/wine-run.sh use.
+  # the same script the release check and scripts/dev/wine-run.sh use.
   windows:
     if: inputs.full
     name: Windows

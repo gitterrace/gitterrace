@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # Build git-terrace for Windows and run scripts/verify/smoke-check.sh against it under Wine in
 # Docker.
-# Needs docker and cargo-xwin. Usage: scripts/wine-run.sh [--no-build].
+# Needs docker and cargo-xwin. Usage: scripts/dev/wine-run.sh [--no-build].
 # The target follows the host: aarch64-pc-windows-msvc on arm64 (arm64 Wine, native speed),
 # x86_64-pc-windows-msvc elsewhere. Wine is never installed on the host.
 set -euo pipefail
-root=$(cd "$(dirname "$0")/.." && pwd)
+root=$(cd "$(dirname "$0")/../.." && pwd)
 case "$(uname -m)" in
 arm64 | aarch64) target=aarch64-pc-windows-msvc ;;
 *) target=x86_64-pc-windows-msvc ;;

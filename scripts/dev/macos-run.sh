@@ -2,17 +2,17 @@
 # Install git-terrace on this Mac and run scripts/verify/smoke-check.sh against it in a clean
 # environment:
 # HOME is an empty temp dir and PATH is /usr/bin:/bin plus the install dir, so a dependency that
-# only exists on the dev machine fails here. Usage: scripts/macos-run.sh [--full | --self-test].
+# only exists on the dev machine fails here. Usage: scripts/dev/macos-run.sh [--full | --self-test].
 # Default: release install plus the smoke test. --full: make check under the same clean HOME, with
 # the cargo and rustup homes and the toolchain on PATH, since the build cannot work without them.
 # --self-test: argument parsing and the clean environment, no build.
 set -euo pipefail
-root=$(cd "$(dirname "$0")/.." && pwd)
+root=$(cd "$(dirname "$0")/../.." && pwd)
 
 # Prints the mode for the arguments, or fails on an unknown one.
 parse_args() {
   if [ "$#" -gt 1 ]; then
-    echo "usage: scripts/macos-run.sh [--full | --self-test]" >&2
+    echo "usage: scripts/dev/macos-run.sh [--full | --self-test]" >&2
     return 2
   fi
   case "${1:-}" in
@@ -20,7 +20,7 @@ parse_args() {
   --full) echo full ;;
   --self-test) echo self-test ;;
   *)
-    echo "usage: scripts/macos-run.sh [--full | --self-test]" >&2
+    echo "usage: scripts/dev/macos-run.sh [--full | --self-test]" >&2
     return 2
     ;;
   esac
@@ -61,7 +61,7 @@ if [ "$mode" = self-test ]; then
 fi
 
 [ "$(uname -s)" = Darwin ] || {
-  echo "macos-run: this runs on macOS only, use scripts/linux-run.sh on Linux." >&2
+  echo "macos-run: this runs on macOS only, use scripts/dev/linux-run.sh on Linux." >&2
   exit 1
 }
 

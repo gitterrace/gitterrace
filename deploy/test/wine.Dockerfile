@@ -1,4 +1,4 @@
-# Wine image for scripts/wine-run.sh: runs the Windows build of git-terrace and its smoke test.
+# Wine image for scripts/dev/wine-run.sh: runs the Windows build of git-terrace and its smoke test.
 # arm64 Wine runs the aarch64-pc-windows-msvc build natively on Apple silicon. (x86_64 Wine under
 # Rosetta aborts in Wine's AVX state handling, so it is not used.) On an x86_64 host build this
 # for linux/amd64 and run the x86_64-pc-windows-msvc exe instead.
