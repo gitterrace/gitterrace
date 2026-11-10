@@ -1,7 +1,5 @@
 # Getting started
 
-Install gitterrace, open a repository in the browser, and keep it up to date.
-
 ## Install
 
 <!-- BEGIN GENERATED: install -->
@@ -32,18 +30,13 @@ git terrace          # joins the server already running, no second port
 
 <!-- END GENERATED: quickstart -->
 
-Every repository lives under `/r/<name>/`, the first one too, so its links stay
-valid as others join. `git terrace remove [path|name]` takes one off again.
-[Using it](using.md) covers serving a folder of repositories, the log graph,
-outlines, keys and the settings page. [Command line](cli.md) lists every command
-and flag.
+Next: [using it](using.md) and the [command line](cli.md).
 
 ## Windows
 
-Releases ship a zip. Config lives in `%APPDATA%\gitterrace` and the repository
-registry in `%LOCALAPPDATA%\gitterrace`. `git terrace install-handler` prints
-the `reg add` commands instead of writing the registry, so you can read them
-first.
+Releases ship a zip. Config lives in `%APPDATA%\gitterrace`, the repository
+list in `%LOCALAPPDATA%\gitterrace`. `git terrace install-handler` only prints
+the `reg add` commands.
 
 ## Upgrade
 
@@ -58,12 +51,8 @@ cargo install --locked --force --git https://github.com/gitterrace/gitterrace gi
 
 <!-- END GENERATED: upgrade -->
 
-A server that is already running keeps serving the old version, since
-`git terrace` joins it rather than replacing it. Stop it (Ctrl-C in its
-terminal) and run `git terrace` again. When a release changes the cache
-format, gitterrace builds a fresh cache in `.git/gitterrace/` the first time it
-opens each repository, in place of the old one. There is nothing to migrate or
-clean up.
+A running server keeps the old version: stop it (Ctrl-C) and run `git terrace`
+again. A new cache format rebuilds the cache by itself.
 
 ## Troubleshooting
 
