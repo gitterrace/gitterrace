@@ -38,7 +38,7 @@ export function checks(env) {
             await Promise.all([p.waitForNavigation(), p.press('#logq', 'Enter')]);
             const refused = await p.evaluate(() => {
               const e = document.querySelector('.filter-error');
-              const q = document.querySelector('#logq');
+              const q = /** @type {HTMLInputElement | null} */ (document.querySelector('#logq'));
               return {
                 shown: !!e && e.getClientRects().length > 0,
                 says: e?.textContent.includes('Supported:'),
