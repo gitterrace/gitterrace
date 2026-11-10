@@ -85,17 +85,7 @@ counts them.
 - `rev` (string): Revision to read, default `HEAD`.
 - `period` (string): `1w`, `1m`, `3m`, `1y` or `all` (default): the window,
   ending at the newest commit. Sets the bucket unit.
-- `type` (string): Only commits of this conventional type, `other` for none.
-- `scope` (string): Only commits of this scope, `none` for none.
-- `author` (string): Only commits by this email or name.
-- `path` (string): Only files under this directory.
-- `bots` (string): `1` counts bot accounts, `0` leaves them out.
-- `merges` (string): `1` counts merge commits as commits, never their lines or
-  files.
-- `generated` (string): `1` counts lock files and minified output.
-- `ignore` (string): `0` counts paths that `.gitignore` rules out.
-- `ws` (string): `1` counts whitespace-only changes.
-- `exclude` (string): Comma-separated globs left out.
+- The counting parameters below.
 
 `/insights/{name}`: One insight.
 
@@ -106,6 +96,10 @@ counts them.
 - `metric` (string): `contributors` only: `commits` (default), `added`,
   `deleted` or `net`. Sets the order and the per-bucket series.
 - `limit` (integer): Most rows.
+- The counting parameters below.
+
+`Counting parameters`: shared by every endpoint that counts.
+
 - `type` (string): Only commits of this conventional type, `other` for none.
 - `scope` (string): Only commits of this scope, `none` for none.
 - `author` (string): Only commits by this email or name.

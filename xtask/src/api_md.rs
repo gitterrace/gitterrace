@@ -63,21 +63,7 @@ pub fn render() -> Out {
             e.returns(&mut generator)
         );
     }
-    s.push_str("\n### Parameters\n");
-    for e in ENDPOINTS.iter().filter(|e| !e.params.is_empty()) {
-        let _ = write!(s, "\n`{}`: {}\n\n", e.path, e.summary);
-        for Param {
-            name,
-            ty,
-            required,
-            description,
-        } in e.params
-        {
-            let req = if *required { ", required" } else { "" };
-            let item = format!("`{name}` ({ty}{req}): {description}");
-            let _ = writeln!(s, "{}", crate::out::wrap_item(&item));
-        }
-    }
+    s.push_str(&parameters());
 
     s.push_str(
         "\n## Insights\n\nServed at `GET /insights/{name}`. Each page's hints say what its \
@@ -131,6 +117,73 @@ pub fn render() -> Out {
     Out::file(PATH, s)
 }
 
+/// The parameters of each endpoint. A run that two or more endpoints share word for word (the
+/// counting filters) is listed once, so each endpoint names only what it adds.
+fn parameters() -> String {
+    let mut s = String::from("\n### Parameters\n");
+    let shared = shared_tail();
+    for e in ENDPOINTS.iter().filter(|e| !e.params.is_empty()) {
+        let _ = write!(s, "\n`{}`: {}\n\n", e.path, e.summary);
+        let own = if ends_with(e.params, shared) {
+            &e.params[..e.params.len() - shared.len()]
+        } else {
+            e.params
+        };
+        for p in own {
+            let req = if p.required { ", required" } else { "" };
+            let item = format!("`{}` ({}{req}): {}", p.name, p.ty, p.description);
+            let _ = writeln!(s, "{}", crate::out::wrap_item(&item));
+        }
+        if own.len() < e.params.len() {
+            s.push_str("- The counting parameters below.\n");
+        }
+    }
+    if !shared.is_empty() {
+        s.push_str("\n`Counting parameters`: shared by every endpoint that counts.\n\n");
+        for p in shared {
+            let item = format!("`{}` ({}): {}", p.name, p.ty, p.description);
+            let _ = writeln!(s, "{}", crate::out::wrap_item(&item));
+        }
+    }
+    s
+}
+
+/// Two parameters read the same on the page: name, type and text, both optional.
+fn same(a: &Param, b: &Param) -> bool {
+    a.name == b.name && a.ty == b.ty && a.description == b.description && !a.required
+}
+
+/// Whether `params` ends with `tail`, compared as the page shows them. Never for an empty tail.
+fn ends_with(params: &[Param], tail: &[Param]) -> bool {
+    !tail.is_empty()
+        && params.len() >= tail.len()
+        && params[params.len() - tail.len()..]
+            .iter()
+            .zip(tail)
+            .all(|(a, b)| same(a, b))
+}
+
+/// The longest run of parameters at the end of two or more endpoints, identical in name, type
+/// and text: the counting filters. Empty when no two endpoints share a tail of at least three.
+fn shared_tail() -> &'static [Param] {
+    let mut best: &'static [Param] = &[];
+    for (i, a) in ENDPOINTS.iter().enumerate() {
+        for b in &ENDPOINTS[i + 1..] {
+            let n = a
+                .params
+                .iter()
+                .rev()
+                .zip(b.params.iter().rev())
+                .take_while(|(x, y)| same(x, y))
+                .count();
+            if n >= 3 && n > best.len() {
+                best = &a.params[a.params.len() - n..];
+            }
+        }
+    }
+    best
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -151,5 +204,35 @@ mod tests {
             panic!("api.md is a file")
         };
         assert_eq!(body.matches("untrusted").count(), 1, "{body}");
+    }
+
+    /// Guard: listing shared parameters once never drops one. Every parameter of every
+    /// endpoint is still described on the page, and the shared list says each only once.
+    #[test]
+    fn every_endpoint_parameter_is_described_once_shared_or_own() {
+        let Out::File { body, .. } = render() else {
+            panic!("api.md is a file")
+        };
+        let params = body
+            .split("### Parameters")
+            .nth(1)
+            .expect("a parameters section");
+        let params = params.split("\n## ").next().unwrap_or(params);
+        for e in ENDPOINTS {
+            for p in e.params {
+                let item = format!("- `{}` ({}", p.name, p.ty);
+                assert!(
+                    params.contains(&item),
+                    "{} `{}` is not described",
+                    e.path,
+                    p.name
+                );
+            }
+        }
+        for p in shared_tail() {
+            let item = format!("- `{}` ({}): {}", p.name, p.ty, p.description);
+            let flat = params.replace("\n  ", " ");
+            assert_eq!(flat.matches(&item).count(), 1, "`{}` repeats", p.name);
+        }
     }
 }
