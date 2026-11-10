@@ -124,7 +124,9 @@ every tag.
 gitterrace.dev is shipped from a maintainer's machine with `make deploy`. There
 is no deploy workflow and no Cloudflare token in the repository. The site is
 build output, never tracked: `make deploy` refuses a dirty tree, builds it from
-HEAD into `target/site`, checks that build and ships it.
+HEAD into `target/site`, checks that build and ships it. `make site-preview`
+builds the same site and serves it on http://127.0.0.1:4343, with the headers,
+redirects and 404 page of the deploy.
 
 1. Bump `SECURITY_TXT_EXPIRES` in `xtask/src/site.rs`, commit.
 2. On the release candidate commit, in a clean clone on a quiet machine,

@@ -174,7 +174,7 @@ bench-report:
 	python3 scripts/bench/bench-report.py
 
 ##@ Site and release
-.PHONY: docs-gen domains changelog site deploy app-icon site-render site-shots shipped
+.PHONY: docs-gen domains changelog site deploy site-preview app-icon site-render site-shots shipped
 
 ## docs-gen: Regenerate every generated file (docs, README blocks) and build the site
 docs-gen:
@@ -200,6 +200,13 @@ deploy: shipped site site-render
 	@test -s target/site/404.html || { echo "target/site/404.html missing: not_found_handling has nothing to serve"; exit 1; }
 	cargo run -q -p xtask -- deploy-check
 	npx wrangler@4 deploy
+
+# site-preview serves target/site through the same assets runtime as the deploy, so the
+# headers, the redirects and the 404 page behave as on gitterrace.dev. Needs node. The touch
+# icon and the link preview come from site-render, which needs the browsers.
+## site-preview: Build the website and serve it on http://127.0.0.1:4343 (SITE_PORT)
+site-preview: docs-gen
+	npx --yes wrangler@4 dev --ip 127.0.0.1 --port $(or $(SITE_PORT),4343)
 
 # app-icon: Render the macOS icon install-handler gives gitterrace-open.app, from docs/brand/mark-dark.svg (macOS, needs browsers)
 app-icon:
