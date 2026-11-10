@@ -112,14 +112,25 @@ _probe() {
         printf 'ERROR\t%s\tnames a missing file: %s\n' "$id" "$file" >"$WORK/$n.res"
         return
     fi
-    local text
-    text=$(<"$target")
-    if [[ "$text" != *"$needle"* ]]; then
+    # The replacement runs outside bash: macOS's bash 3.2 never finishes `${text//needle/rep}`
+    # once the file passes about 35 KB (fail-closed.sh is 41 KB), and spins at 100% CPU. awk
+    # reads the literals from the environment, so no character in them is special.
+    local rc=0
+    if ! NEEDLE="$needle" awk 'BEGIN { RS = "\001" } index($0, ENVIRON["NEEDLE"]) { f = 1 } END { exit !f }' "$target"; then
         printf 'ERROR\t%s\tthe literal is not in %s: the probe is STALE\n' "$id" "$file" >"$WORK/$n.res"
         return
     fi
-    printf '%s\n' "${text//"$needle"/$replacement}" >"$target"
-    local rc=0
+    NEEDLE="$needle" REPLACEMENT="$replacement" awk '
+        BEGIN { RS = "\001"; n = ENVIRON["NEEDLE"]; r = ENVIRON["REPLACEMENT"] }
+        {
+            out = ""; s = $0
+            while ((i = index(s, n)) > 0) { out = out substr(s, 1, i - 1) r; s = substr(s, i + length(n)) }
+            printf "%s", out s
+        }' "$target" >"$target.new" || {
+        printf 'ERROR\t%s\tcould not rewrite %s\n' "$id" "$file" >"$WORK/$n.res"
+        return
+    }
+    cat "$target.new" >"$target" && rm -f "$target.new"
     # Only the case files the probe names, and among their table cases only the one it must turn
     # red: the hand-rolled cases in those files always run.
     # The product goes through env: an assignment that comes out of an expansion is a word, so

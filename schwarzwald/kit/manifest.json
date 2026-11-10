@@ -1,7 +1,7 @@
 {
   "schwarzwald": null,
   "dirty": false,
-  "date": "2026-11-10T14:28:17Z",
+  "date": "2026-11-10T18:32:45Z",
   "parts": [
     "configs",
     "fonts",
@@ -20,7 +20,7 @@
     "tools/selftest.py"
   ],
   "files": {
-    "README.md": "55253526056cb4472c4902f59e719e9cb615133dc31976d340ed11c7c5737475",
+    "README.md": "2a272002af6b2b4f2279380d0db301911c3ab1cc0628f8ba970a7538684b71a2",
     "check.py": "7e6cb0ce8e4284252a0a153c0c91835f9606b4700bb8dc8ddad0fcbc688576b5",
     "configs/cliff-base.toml": "af6d61d5605368953ec077c37cd66b6670cd54ae8dbfb7681a2e33c2cf71d4cf",
     "configs/clippy-base.toml": "e2d4a22a5fbdab27da1188a8a664eefc40134d12f1d56cbe4af0a45936c2b77a",
@@ -75,7 +75,7 @@
     "guards/tests/lib.sh": "0f40fc13f133e029768a9b3592540c8d7aa306e866d7260bb6f1abad6496e1a4",
     "guards/tests/prelude.sh": "0faabe9978e7a077bcfecc9e2856eb0e0f23b79f506dc4cc1a21feedc55c0cc1",
     "guards/tests/red-probes.tsv": "a468cf6a774fae4fa1031db41703af4818a55c4d0485af0540a82d716df9afd8",
-    "guards/tests/red.sh": "dfe2515525649e136b2fb4f8c2a5c316411553ad658b8de31b7a74cc0544399f",
+    "guards/tests/red.sh": "ab543ea7f78f927b97b40f543861047a2d29a45d54c09859ee910b69ec4fd21a",
     "guards/tests/selftest.sh": "20ff05d0e4e12b06f22210916fde7737abec2788f3fafdb45cca5ebd14e1627b",
     "guards/tests/suite.sh": "8a83e8ae35737bcf2d4eea47cf5218ff8e6b533b9595f2d818890c772fb7d643",
     "guards/tests/wiring.sh": "fb18622eab4d6d12bd1f589c83918c149a35f830b966b55b61db7163128e15e7",
