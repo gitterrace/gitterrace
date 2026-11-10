@@ -10,10 +10,12 @@ The safest way to put a repository online is no server at all.
 `git terrace export` writes the site as plain files: files, commits, diffs,
 blame, history and insights for the newest commits, and nothing else. Any static
 host or CDN can serve the folder. There is no process to attack, no working tree
-to leak and no action to run.
+to leak and no action to run. The export writes a `_headers` file with the
+content security policy and other headers. Hosts that read it, such as Netlify
+and Cloudflare Pages, apply it. Elsewhere, set the same headers on the host.
 
 ```sh
-git terrace export site ~/src/project --commits 300 --no-actions --no-watch
+git terrace export site ~/src/project --commits 300
 ```
 
 It is a single command, so it scripts well: run it from CI or a cron job on each
@@ -23,16 +25,15 @@ is someone else's work in every page's banner.
 
 Every page ends with one credit line:
 `Source: name, MIT license, https://github.com/owner/name`. The license is
-recognized from the root `LICENSE` or `COPYING` file (a text that is not a
-common license links to the file instead). The link is the `origin` remote, or
-the `--project` URL, with any credentials removed, and only for public https and
-ssh hosts. Either part is left out when unknown.
+recognized from the root `LICENSE`, `LICENCE` or `COPYING` file (a text that
+is not a common license links to the file instead). The link is the `origin`
+remote, or the `--project` URL, with any credentials removed, and only for
+public https and ssh hosts. Either part is left out when unknown.
 
 The [live demo](https://demo.gitterrace.dev) is built this way. Its build script
 clones each repository at a release tag, exports them all into one folder with
-`--commits 300 --no-actions`, adds a header file that limits scripts and styles
-to the same origin, and deploys the folder. Bumping a tag and rerunning the
-script publishes the new release.
+`--commits 300` and deploys the folder with its `_headers` file. Bumping a tag
+and rerunning the script publishes the new release.
 
 An export is a snapshot. It shows what was committed when it ran and is updated
 only by running it again. It has no search, live updates or actions, since those
@@ -70,8 +71,9 @@ in the background and answer from the cache next time.
 
 Any feature in `[features]` can be switched off for a public server as well, for
 example `blame_enabled = false` or `search_enabled = false`. A switched-off page
-answers 404 and its links are gone. The ones that show this machine stay off
-whatever the file says.
+answers 404 and its links are gone. The ones that show this machine or change
+the server (`worktree_enabled`, `live_enabled`, `actions_enabled`,
+`repo_admin_enabled`, `settings_enabled`) stay off whatever the file says.
 
 ## Run with Docker
 
