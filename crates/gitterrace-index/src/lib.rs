@@ -156,7 +156,7 @@ pub struct Index {
 
 impl Index {
     /// Opens or creates the cache under `repo.git_dir()/gitterrace`, or in the folder
-    /// [`store::fallback_dir`] names when that cannot be written.
+    /// `store::fallback_dir` names when that cannot be written.
     pub fn open(repo: &Repo) -> io::Result<Self> {
         let git = repo.git_dir();
         Self::open_with(git.join("gitterrace"), store::fallback_dir(git))

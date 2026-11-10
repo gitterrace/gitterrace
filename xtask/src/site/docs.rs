@@ -463,7 +463,7 @@ pub(super) fn pages(root: &Path, site: &Site) -> Result<(Vec<Out>, Vec<String>)>
     Ok((outs, paths))
 }
 
-/// The legal pages. A legal page's <title> and kicker are the word the footer links it by; its
+/// The legal pages. A legal page's `<title>` and kicker are the word the footer links it by; its
 /// h1 may be friendlier.
 fn legal_pages(
     site: &Site,

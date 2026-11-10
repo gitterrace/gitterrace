@@ -13,7 +13,7 @@ use crate::seg::write::ContainerWriter;
 /// Writes the message files of one step.
 ///
 /// The first file is `msg-<gen>-<n>.gts`, then `-<n+1>` and on once a file holds
-/// [`MAX_TOC`] blocks, the most a container's toc takes. Readers take the files in manifest
+/// `MAX_TOC` blocks, the most a container's toc takes. Readers take the files in manifest
 /// order, so a column of any length is several files. Drop without `finish` leaves only
 /// `.tmp` files, which the sweep removes.
 pub struct Writer {

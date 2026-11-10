@@ -1,10 +1,10 @@
 //! The one codec of a string-encoded enum.
 //!
-//! A variant meets its text only in the table given to [`string_enum!`]: `as_str`, `Display`,
-//! `FromStr`, the list of accepted values and (when asked) serde all read that table, so a
-//! surface can never spell a value its own way.
+//! A variant meets its text only in the table given to [`string_enum!`](crate::string_enum):
+//! `as_str`, `Display`, `FromStr`, the list of accepted values and (when asked) serde all read
+//! that table, so a surface can never spell a value its own way.
 
-/// An enum whose values are fixed strings, declared with [`string_enum!`].
+/// An enum whose values are fixed strings, declared with [`string_enum!`](crate::string_enum).
 pub trait StringEnum: Copy + Sized + 'static {
     /// Every variant, in declaration order.
     const ALL: &'static [Self];
