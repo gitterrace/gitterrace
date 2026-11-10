@@ -24,19 +24,31 @@ test = "conventions"
 # The landing gate: land.sh runs it on the exact tree it is about to land, before main moves.
 # Every saved-page test runs (found from tests/golden, so a new one needs no edit here), plus
 # the fast tree checks and the external linters; the message step covers the landed commits.
+# Every `make check` step is either run here as `make <step>` or named in [landing.skip] with
+# the reason, which scripts/gate-check.py (a `make lint` step) holds to.
 [landing]
 gate = [
   # Unformatted Rust never lands. The cheapest check runs first.
-  "cargo fmt --all --check",
+  "make fmt",
   "bash scripts/python-run.sh schwarzwald/kit/tools/golden.py run",
-  "python3 schwarzwald/kit/lint/file-length.py",
-  "python3 scripts/names-check.py",
-  # Generated docs, README blocks and site pages match their sources.
+  "make lines names theme actions send-vectors",
+  # Generated docs, README blocks and site pages match their sources, and the generators'
+  # own unit tests pass (xtask check runs the binary, not its tests).
   "cargo xtask check",
-  "bash schwarzwald/kit/lint/run.sh",
+  "cargo test -q -p xtask",
+  "make lint",
 ]
 # The landing runs in a fresh clone, which has no core.hooksPath yet: set it there first. The
 # dates of the landed commits are read by the shared commit-dates lint.
 messages = """git config core.hooksPath scripts/hooks \
   && bash scripts/land-check.sh --messages {base} \
   && python3 schwarzwald/kit/lint/commit-dates.py --base {base}"""
+
+# The `make check` steps the gate leaves to `make check` itself (CI, and land-check --full).
+[landing.skip]
+gc-guard = "prunes the local target dir; its self-test is a fixture of the pruner, not the tree"
+bench-guard = "builds a debug binary and runs the bench harness, minutes per landing"
+docs-check = "the gate runs its cargo xtask check; the rest are self-tests of the dev scripts"
+clippy = "a full workspace clippy takes minutes; CI runs it on every push and pull request"
+test = "the gate runs the golden and xtask tests; the full workspace run is CI's"
+doc = "a full rustdoc build takes minutes; CI runs it on every push and pull request"
