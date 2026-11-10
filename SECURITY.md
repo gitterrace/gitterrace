@@ -28,7 +28,8 @@ In scope:
 
 - **The local server and its guard.** It binds to `127.0.0.1` by default and
   refuses requests whose Host is not loopback (or listed in `server.hosts`). It
-  refuses cross-site requests, and pages carry a strict content security policy.
+  refuses cross-site requests, and its pages carry a strict content security
+  policy.
   Scripts are locked to the app's own origin plus the hashes of its inline theme
   snippets. Styles allow inline rules only because mermaid writes diagram styles
   at runtime. The app's own markup carries no style attribute. A page from
@@ -63,7 +64,8 @@ In scope:
   repository are sanitized before display. Script running from repository
   content is in scope.
 - **Actions.** Actions run programs you configure in `actions.toml` in your own
-  config folder, never one from a repository. A run needs a per-process token,
+  config folder, never one from a repository. They run only on a loopback
+  server that is not public. A run needs a per-process token,
   and values from the repository fill whole arguments with no shell. A way to
   run an unconfigured program, to inject an option or shell syntax through
   repository text, or to trigger an action from another page is in scope.
