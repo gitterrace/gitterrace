@@ -2,9 +2,20 @@ use std::path::Path;
 
 use axum::Router;
 
-use super::{url_stem, valid_name};
+use super::{Table, url_stem, valid_name};
 use axum::response::IntoResponse;
 use gitterrace_testkit::git;
+
+impl Table {
+    /// The URL name the repository at `root` is served under.
+    pub(crate) fn name_of(&self, root: &Path) -> Option<String> {
+        let g = self.read();
+        g.order
+            .iter()
+            .find(|s| s.root == root)
+            .map(|s| s.name.clone())
+    }
+}
 
 #[test]
 fn names() {

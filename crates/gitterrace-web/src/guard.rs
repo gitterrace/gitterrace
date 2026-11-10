@@ -51,13 +51,6 @@ impl Gate {
     }
 }
 
-#[cfg(test)]
-impl Gate {
-    pub(crate) const fn timeout_for_test(&self) -> Duration {
-        self.timeout
-    }
-}
-
 /// The name part of a Host header, lowercase: `[v6]` unbracketed, a numeric port dropped.
 fn host_name(host: &str) -> Option<String> {
     let name = match host.strip_prefix('[') {
@@ -181,6 +174,12 @@ pub(crate) async fn guard(State(gate): State<Arc<Gate>>, req: Request, next: Nex
 #[cfg(test)]
 mod tests {
     use super::{CSP, Gate, host_allowed};
+
+    impl Gate {
+        pub(crate) const fn timeout_for_test(&self) -> std::time::Duration {
+            self.timeout
+        }
+    }
 
     /// Only an exported copy carries its fonts as `data:` URLs. The served app loads them
     /// from itself, so its policy never allows a `data:` font.

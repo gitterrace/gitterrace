@@ -109,11 +109,6 @@ fn resize(sem: &Semaphore, cap: &Mutex<usize>, new: usize) {
 }
 
 impl Env {
-    #[cfg(test)]
-    pub(crate) fn free_jobs(&self) -> usize {
-        self.jobs.available_permits()
-    }
-
     pub(crate) fn new(cfg: Config) -> Self {
         let jobs = job_slots(&cfg);
         let public = cfg.server.is_public;
@@ -231,15 +226,6 @@ impl Env {
         self.cfg
             .read()
             .map_or_else(|e| Arc::clone(&e.into_inner()), |g| Arc::clone(&g))
-    }
-
-    /// Every live app built on this environment.
-    #[cfg(test)]
-    pub(crate) fn apps_for_test(&self) -> Vec<Arc<App>> {
-        self.apps
-            .lock()
-            .map(|g| g.iter().filter_map(Weak::upgrade).collect())
-            .unwrap_or_default()
     }
 
     /// How many repositories are served: more than one shows the switcher from the first paint.
@@ -591,5 +577,7 @@ pub(crate) async fn blocking<T: Send + 'static>(
     .await?
 }
 
+#[cfg(test)]
+mod env_tests;
 #[cfg(test)]
 mod tests;

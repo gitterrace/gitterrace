@@ -253,16 +253,6 @@ impl Table {
         (status, crate::error::page(status, &detail)).into_response()
     }
 
-    /// The URL name the repository at `root` is served under.
-    #[cfg(test)]
-    pub(crate) fn name_of(&self, root: &Path) -> Option<String> {
-        let g = self.read();
-        g.order
-            .iter()
-            .find(|s| s.root == root)
-            .map(|s| s.name.clone())
-    }
-
     pub(crate) fn get(&self, name: &str) -> Option<Arc<Served>> {
         self.read().by_name.get(name).cloned()
     }
