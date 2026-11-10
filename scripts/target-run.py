@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Prune stale cargo artefacts and old scratch output under target/ (stdlib only).
 
-Run by `make gc` (DAYS=n, DRY=1), and with --auto at the start of `make check`.
+Run by `make gc` (DAYS=n, DRY=1, BENCH=1), and with --auto at the start of `make check`.
 
 Why: cargo never garbage-collects target/<profile>/deps, so every toolchain or
 dependency bump leaves the old units behind and target/ grows without bound.
@@ -22,7 +22,8 @@ output of `make site-shots` and `make app-icon`: their top-level entries go
 once nothing in them changed within --days. .git/gitterrace/ caches belong to
 users' repos and are never touched. The bench clones are only reported.
 
-    target-run.py [--days N] [--dry-run]   prune now, print what went
+    target-run.py [--days N] [--dry-run] [--bench]   prune now, print what went; --bench
+                                           also removes the benchmark clones
     target-run.py --auto                   at most once a day, silent, never fails
     target-run.py --self-test
 """
@@ -206,13 +207,28 @@ def cargo_quiet() -> bool:
     return True
 
 
-def bench_report() -> str | None:
-    d = Path(
+def bench_dir() -> Path:
+    return Path(
         os.environ.get("GITTERRACE_BENCH_DIR", Path.home() / ".cache/gitterrace-bench")
     )
+
+
+def bench_report() -> str | None:
+    d = bench_dir()
     if not d.is_dir():
         return None
     return f"bench clones: {d} holds {human(size(d))}, kept (remove with `make gc BENCH=1`)"
+
+
+def bench_remove(d: Path, dry_run: bool) -> str:
+    """--bench: the cached benchmark clones go too (DRY=1 only reports them)."""
+    if not d.is_dir():
+        return f"no benchmark clones at {d}"
+    held = human(size(d))
+    if dry_run:
+        return f"would remove {d} ({held})"
+    shutil.rmtree(d)
+    return f"removed {d} ({held})"
 
 
 def run(
@@ -357,6 +373,15 @@ def self_test() -> int:
         if saved_ci is not None:
             os.environ["CI"] = saved_ci
 
+        clones = root / "bench"
+        (clones / "git").mkdir(parents=True)
+        if "would remove" not in bench_remove(clones, True) or not clones.is_dir():
+            fail.append("--bench --dry-run removed the clones or did not report")
+        if "removed" not in bench_remove(clones, False) or clones.exists():
+            fail.append("--bench kept the clones")
+        if "no benchmark clones" not in bench_remove(clones, False):
+            fail.append("--bench without clones did not say so")
+
     for f in fail:
         print("FAIL:", f)
     if not fail:
@@ -369,6 +394,7 @@ def main() -> int:
     ap.add_argument("--days", type=float, default=7)
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--auto", action="store_true")
+    ap.add_argument("--bench", action="store_true")
     ap.add_argument("--self-test", action="store_true")
     a = ap.parse_args()
     if a.self_test:
@@ -380,6 +406,9 @@ def main() -> int:
             auto(target, a.days, target / ".gc-stamp")
         return 0
     print(run(target, a.days, a.dry_run))
+    if a.bench:
+        print(bench_remove(bench_dir(), a.dry_run))
+        return 0
     line = bench_report()
     if line:
         print(line)

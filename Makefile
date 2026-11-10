@@ -1,22 +1,43 @@
-.DEFAULT_GOAL := help
-.PHONY: docker-check setup harness-links counting-parity app-icon build install fmt clippy lint test doc theme actions docs-gen docs-check names lines check site-render site-shots help bench bench-report bench-guard memory-check speed-check browser-deps browser-check browser-reap site deploy shipped domains send-vectors preview gc gc-guard changelog keep
+# gitterrace. `make` lists the targets a person runs; the steps `make check` composes are
+# commented with `#` and left out of the list. One .PHONY line per section.
 
-## setup: Keep desktop search indexers out of build, bench and agent dirs (run once per machine)
+.DEFAULT_GOAL := help
+
+# The compiler rust-toolchain.toml pins. `cargo install` warns when that file picks it
+# implicitly, so install names it.
+TOOLCHAIN := $(shell sed -n 's/^channel *= *"\(.*\)"/\1/p' rust-toolchain.toml)
+# Where cargo puts its output: CARGO_TARGET_DIR when the shell sets it, else target.
+TARGET := $${CARGO_TARGET_DIR:-target}
+RELEASE_BIN := target/release/git-terrace
+BENCH_REPOS := --repos control,git,rust
+
+##@ Build and run
+.PHONY: setup build install preview
+
+## setup: Keep search indexers out of build, bench and agent dirs (once per machine)
 setup:
 	python3 scripts/indexing-run.py --apply
 
 ## build: Release binary
 build:
-	@python3 scripts/indexing-run.py --apply-dir "$${CARGO_TARGET_DIR:-target}"
+	@python3 scripts/indexing-run.py --apply-dir "$(TARGET)"
 	cargo build --release -p gitterrace
 
 ## install: Install git-terrace into ~/.cargo/bin, so git runs it as git terrace
 install:
 	cargo +$(TOOLCHAIN) install --locked --path crates/gitterrace
 
-# The compiler rust-toolchain.toml pins. `cargo install` warns when that file picks it implicitly,
-# so install names it.
-TOOLCHAIN := $(shell sed -n 's/^channel *= *"\(.*\)"/\1/p' rust-toolchain.toml)
+## preview: Rebuild and restart the preview (PREVIEW_ADDR, PREVIEW_REPOS="a b")
+preview:
+	@bash scripts/preview-run.sh
+
+##@ Check gates
+.PHONY: check fmt clippy lint harness-links test doc theme actions send-vectors names lines \
+	docs-check gc-guard bench-guard
+
+## check: Every gate, in the order CI runs them
+check: gc-guard theme actions send-vectors names lines bench-guard docs-check fmt clippy lint \
+	test doc
 
 # fmt: Check formatting
 fmt:
@@ -26,11 +47,12 @@ fmt:
 clippy:
 	cargo clippy --workspace --all-targets -- -D warnings
 
-## lint: External linters (typos, vale, gitleaks, markdownlint, shellcheck, shfmt, ruff, pyright, tsc, actionlint, ast-grep, machete)
+## lint: External linters (typos, vale, shellcheck, ruff, pyright, ast-grep, ...)
 lint: harness-links
 	bash schwarzwald/kit/lint/run.sh
 
-# harness-links: The shared skills and agents are linked and harness.env names every key
+# harness-links: The shared skills and agents are linked and harness.env names every key.
+# Skipped, with a line saying so, on a clone without the shared kit checkout.
 harness-links:
 	@set -e; h="$${HARNESS_KIT:-$(CURDIR)/../harness-kit}/source/harness/tools"; \
 	if [ ! -d "$$h" ]; then echo "harness-links: skipped, no shared kit checkout (set HARNESS_KIT)"; exit 0; fi; \
@@ -58,22 +80,9 @@ theme:
 actions:
 	sh scripts/actions-check.sh
 
-## docs-gen: Regenerate every generated file (docs, README blocks) and build the site
-docs-gen:
-	cargo xtask generate
-
-# docs-check: Generated files are up to date
-docs-check:
-	python3 scripts/bench-report.py --check
-	bash scripts/land-check.sh --self-test
-	python3 scripts/commits-check.py --self-test
-	python3 scripts/tracked-check.py --self-test
-	bash scripts/python-run.sh schwarzwald/kit/tools/golden.py --self-test
-	bash scripts/golden-proof-run.sh --self-test
-	bash scripts/linux-run.sh --self-test
-	bash scripts/macos-run.sh --self-test
-	bash scripts/docker-check.sh --self-test
-	cargo xtask check
+# send-vectors: Check send.js against the shared send vectors
+send-vectors:
+	node scripts/send-vectors-check.mjs
 
 # names: File, env and project names follow the conventions
 names:
@@ -88,100 +97,100 @@ lines:
 	python3 scripts/types-check.py --self-test && python3 scripts/types-check.py
 	python3 scripts/keep-report.py --self-test
 
-# keep: Every item with its prod and test callers, as TSV in target/keep-inventory.tsv
-keep:
-	python3 scripts/keep-report.py . --config schwarzwald/config/keep-inventory.json --out target/keep-inventory.tsv
+# docs-check: Generated files are up to date, and the dev scripts pass their self-tests
+docs-check:
+	python3 scripts/bench-report.py --check
+	bash scripts/land-check.sh --self-test
+	python3 scripts/commits-check.py --self-test
+	python3 scripts/tracked-check.py --self-test
+	bash scripts/python-run.sh schwarzwald/kit/tools/golden.py --self-test
+	bash scripts/golden-proof-run.sh --self-test
+	bash scripts/linux-run.sh --self-test
+	bash scripts/macos-run.sh --self-test
+	bash scripts/docker-check.sh --self-test
+	cargo xtask check
 
-## gc: Prune cargo units and site-shots/app-icon output unused for DAYS (default 7). DRY=1 only reports, BENCH=1 also removes the cached benchmark clones
-gc:
-	python3 scripts/target-run.py --days $(or $(DAYS),7) $(if $(filter 1,$(DRY)),--dry-run)
-	@if [ "$(BENCH)" = 1 ]; then \
-		d="$${GITTERRACE_BENCH_DIR:-$$HOME/.cache/gitterrace-bench}"; \
-		if [ ! -d "$$d" ]; then echo "no benchmark clones at $$d"; \
-		elif [ "$(DRY)" = 1 ]; then echo "would remove $$d ($$(du -sh "$$d" | cut -f1))"; \
-		else echo "removing $$d ($$(du -sh "$$d" | cut -f1))"; rm -rf "$$d"; fi; \
-	fi
-
-# gc-guard: Daily silent gc, then the gc self-test on a fixture tree (part of check)
+# gc-guard: Daily silent gc, then the gc self-test on a fixture tree
 gc-guard:
 	@python3 scripts/target-run.py --auto
 	@python3 scripts/target-run.py --self-test
 
-## changelog: Prepend the section for the release about to be tagged to CHANGELOG.md, from the commits since the last tag, in place of the generated Unreleased section (VERSION=x.y.z, needs git-cliff 2.14.2)
-changelog:
-	python3 -c 'import re,pathlib;p=pathlib.Path("CHANGELOG.md");p.write_text(re.sub(r"(<!-- BEGIN GENERATED: unreleased -->\n).*?(<!-- END GENERATED: unreleased -->)",r"\1\2",p.read_text(),flags=re.S))'
-	bash schwarzwald/kit/tools/changelog-gen.sh $(or $(VERSION),$(error VERSION=x.y.z is required))
-
-## check: Every gate (fmt, clippy, lint, test, doc, theme, actions, send-vectors, names, docs-check, gc-guard, bench-guard)
-check: gc-guard theme actions send-vectors names lines bench-guard docs-check fmt clippy lint test doc
-
-# send-vectors: Check send.js against the shared send vectors
-send-vectors:
-	node scripts/send-vectors-check.mjs
-
-## preview: Rebuild and restart the preview on DEFAULT_ADDR (PREVIEW_ADDR overrides). PREVIEW_REPOS="a b" picks repos, default this checkout
-preview:
-	@set -eu; \
-	addr="$${PREVIEW_ADDR:-$$(sed -n 's/.*DEFAULT_ADDR: &str = "\(.*\)";/\1/p' crates/gitterrace-config/src/schema.rs)}"; \
-	log="/tmp/gt-$${addr##*:}.log"; \
-	cargo build -q --release -p gitterrace; \
-	pkill -f "target/release/git-terrace .*$$addr" 2>/dev/null || true; \
-	sleep 0.3; \
-	nohup ./target/release/git-terrace $${PREVIEW_REPOS:-$$PWD} --addr "$$addr" >"$$log" 2>&1 & \
-	for _ in $$(seq 1 50); do \
-		curl -s -o /dev/null -m 1 "$$addr"/ && { echo "preview up: http://$$addr ($$(git rev-parse --short HEAD))"; exit 0; }; \
-		sleep 0.2; \
-	done; \
-	echo "preview did not come up, see $$log" >&2; exit 1
-
-## bench: Benchmark gitterrace on the pinned corpus (small, medium, rust). Needs the network. LARGE=1 adds the linux kernel (about 30 GB)
-BENCH_REPOS = --repos control,git,rust
-bench: build
-	$(if $(LARGE),BENCH_LARGE=1 )python3 scripts/bench-run.py --bin target/release/git-terrace $(if $(LARGE),--large,$(BENCH_REPOS))
-	python3 scripts/bench-report.py
-
-# bench-report: Write the newest results into docs/benchmarks.md
-bench-report:
-	python3 scripts/bench-report.py
-
-# bench-guard: The harness still works, on a tiny generated repo (part of check)
+# bench-guard: The bench harness still works, on a tiny generated repo
 bench-guard:
 	python3 scripts/indexing-run.py --self-test
 	cargo build -q -p gitterrace
-	python3 scripts/bench-run.py --synthetic --bin $${CARGO_TARGET_DIR:-target}/debug/git-terrace >/dev/null
-	@# Red: an index over budget fails the run and names its slowest phase.
-	out=$$(TEST_BENCH_INDEX_SECS=0 python3 scripts/bench-run.py --synthetic \
-		--bin $${CARGO_TARGET_DIR:-target}/debug/git-terrace) && exit 1; \
-		echo "$$out" | grep -E 'INDEX OVER BUDGET .*slowest phase: [a-z_]+' >/dev/null
+	python3 scripts/bench-run.py --synthetic --bin $(TARGET)/debug/git-terrace >/dev/null
+	bash scripts/bench-budget-check.sh $(TARGET)/debug/git-terrace
 	python3 scripts/bench-report.py --self-test
 	python3 scripts/bench-quiet-lib.py
 	python3 scripts/speed-check.py --self-test
 
-## counting-parity: The count parity fuzz including the pages-vs-reducers properties still red until every page reads one Counted. Not in check
+##@ Slow checks, not in check
+.PHONY: counting-parity memory-check speed-check browser-deps browser-check browser-reap \
+	docker-check
+
+# Red until every page reads one Counted.
+## counting-parity: Count parity fuzz, pages against reducers
 counting-parity:
 	cargo test -p gitterrace-index --test it count_parity -- --include-ignored
 
-## memory-check: An idle server's memory stays flat as the history and the tree grow (about 5 minutes, so not in check)
+## memory-check: An idle server's memory stays flat as history and tree grow (about 5 minutes)
 memory-check: build
-	python3 scripts/memory-check.py --bin target/release/git-terrace
+	python3 scripts/memory-check.py --bin $(RELEASE_BIN)
 	TEST_MEMORY_WIDE=100000 cargo test --release -p gitterrace-web --test memory_budget idle_memory_is_flat_in_tree_size
 
-## speed-check: The cold insights pages on the rust bench clone stay under their speed gates (needs an indexed clone, about 10 minutes, so not in check)
+## speed-check: Cold insights pages on the rust bench clone stay in budget (about 10 minutes)
 speed-check: build
-	python3 scripts/speed-check.py --bin target/release/git-terrace
+	python3 scripts/speed-check.py --bin $(RELEASE_BIN)
 
-## browser-deps: Install the pinned browser check deps (package-lock.json) and their Playwright browsers
+## browser-deps: Install the pinned browser check deps and their Playwright browsers
 browser-deps:
 	npm ci --no-audit --no-fund
 	PLAYWRIGHT_SKIP_BROWSER_GC=1 node node_modules/playwright-core/cli.js install chromium webkit
 
-## browser-check: Real-browser checks of the served pages (BIN=path to git-terrace). Needs browsers, so not in check
+## browser-check: Real-browser checks of the served pages (BIN=path to git-terrace)
 browser-check: browser-reap
 	node scripts/browser-check.mjs $(if $(BIN),--bin $(BIN))
 
-## browser-reap: A browser check killed mid-run or one that throws leaves no test server (BIN=path to git-terrace)
+## browser-reap: A killed or throwing browser check leaves no test server behind
 browser-reap:
 	node scripts/browser-reap-check.mjs $(if $(BIN),--bin $(BIN))
+
+## docker-check: Build the Docker image and serve a mounted repository with it (needs docker)
+docker-check:
+	bash scripts/docker-check.sh
+
+##@ Bench
+.PHONY: bench bench-report
+
+## bench: Benchmark the pinned corpus (needs the network). LARGE=1 adds linux (about 30 GB)
+bench: build
+	$(if $(LARGE),BENCH_LARGE=1 )python3 scripts/bench-run.py --bin $(RELEASE_BIN) $(if $(LARGE),--large,$(BENCH_REPOS))
+	python3 scripts/bench-report.py
+
+## bench-report: Write the newest results into docs/benchmarks.md
+bench-report:
+	python3 scripts/bench-report.py
+
+##@ Site and release
+# The site, deploy, shipped, site-render and site-shots targets below are kept as they were:
+# the site build is moving out of the repository and rewrites them.
+.PHONY: docs-gen domains changelog site deploy app-icon site-render site-shots shipped
+
+## docs-gen: Regenerate every generated file (docs, README blocks) and build the site
+docs-gen:
+	cargo xtask generate
+
+## domains: gitterrace.dev serves and every other host redirects to it
+domains:
+	python3 scripts/site-check.py domains
+
+# Writes the section from the commits since the last tag, in place of the generated Unreleased
+# section. Needs git-cliff 2.14.2.
+## changelog: Prepend the release's section to CHANGELOG.md (VERSION=x.y.z)
+changelog:
+	python3 scripts/changelog-run.py
+	bash schwarzwald/kit/tools/changelog-gen.sh $(or $(VERSION),$(error VERSION=x.y.z is required))
 
 # site: Refuse to publish install lines before the repository, tap and release tag answer
 site: docs-check
@@ -214,14 +223,20 @@ site-shots: build
 shipped:
 	@test -z "$$(git status --porcelain)" || { echo "uncommitted changes: commit them, a deploy builds HEAD only"; git status --short; exit 1; }
 
-# domains: Check that gitterrace.dev serves and every other host redirects to it
-domains:
-	python3 scripts/site-check.py domains
+##@ Maintenance
+.PHONY: gc keep help
 
-## docker-check: Build the Docker image and serve a mounted repository with it (needs docker)
-docker-check:
-	bash scripts/docker-check.sh
+# DRY=1 only reports. BENCH=1 also removes the cached benchmark clones.
+## gc: Prune cargo units and scratch output unused for DAYS (default 7, DRY=1, BENCH=1)
+gc:
+	python3 scripts/target-run.py --days $(or $(DAYS),7) $(if $(filter 1,$(DRY)),--dry-run) $(if $(filter 1,$(BENCH)),--bench)
+
+## keep: Every item with its prod and test callers, as TSV in target/keep-inventory.tsv
+keep:
+	python3 scripts/keep-report.py . --config schwarzwald/config/keep-inventory.json --out target/keep-inventory.tsv
 
 ## help: This list
 help:
-	@sed -n 's/^## \([^:]*\): \(.*\)/\1\t\2/p' $(MAKEFILE_LIST) | awk -F '\t' '{printf "%-14s %s\n", $$1, $$2}'
+	@awk '/^##@ /{printf "\n%s\n", substr($$0, 5)} \
+		/^## [a-z-]+: /{sub(/^## /, ""); i = index($$0, ": "); \
+		printf "  %-16s %s\n", substr($$0, 1, i - 1), substr($$0, i + 2)}' $(MAKEFILE_LIST)

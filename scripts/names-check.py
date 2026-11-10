@@ -86,8 +86,9 @@ MAKE_TARGET = re.compile(r"^[a-z]+(-[a-z]+)?$")
 
 
 def make_targets() -> list[str]:
-    """Names declared in .PHONY, the Makefile's list of real targets."""
-    text = (ROOT / "Makefile").read_text()
+    """Names declared in .PHONY, the Makefile's list of real targets (one line per section,
+    backslash continuations joined)."""
+    text = (ROOT / "Makefile").read_text().replace("\\\n", " ")
     out: list[str] = []
     for m in re.finditer(r"^\.PHONY:(.*)$", text, re.M):
         out += m.group(1).split()
