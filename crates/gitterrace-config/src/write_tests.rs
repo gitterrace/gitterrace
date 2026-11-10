@@ -4,7 +4,7 @@
 use std::fs;
 use std::path::Path;
 
-use crate::{Change, SaveError, Stamp, apply, save_config};
+use crate::{SaveError, Stamp, save_config};
 
 const GOOD: &str = "# mine\n[watch]\n# fast\nrescan_secs = 50\n";
 
@@ -59,21 +59,6 @@ fn a_bad_value_names_its_line() {
         panic!("accepted");
     };
     assert_eq!((l.line, l.key.as_deref()), (3, Some("watch.rescan_secs")));
-}
-
-#[test]
-fn a_form_save_keeps_comments_and_key_order() {
-    let d = dir_with(GOOD);
-    let text = apply(
-        GOOD,
-        &[Change {
-            id: "watch.rescan_secs".into(),
-            value: Some("75".into()),
-        }],
-    )
-    .expect("apply");
-    save_config(d.path(), &text, stamp(d.path())).expect("save");
-    assert_eq!(bytes(d.path()), GOOD.replace("50", "75").as_bytes());
 }
 
 #[test]

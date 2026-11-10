@@ -242,8 +242,7 @@ mod enum_keys_tests;
 mod tests {
     use super::{Config, ConfigError, Reload, Source, keys, load, parse, template};
 
-    /// The serving cache budget is the one the memory guard assumes (32 MB plus margin): a
-    /// larger default breaks the guard on every machine, not just a small one.
+    /// The user-visible text of each config error, the wording the CLI and settings show.
     #[test]
     fn config_errors_keep_their_text() {
         assert_eq!(
@@ -274,6 +273,8 @@ mod tests {
         assert!(e.to_string().starts_with("repo.x.features."), "{e}");
     }
 
+    /// The serving cache budget is the one the memory guard assumes (32 MB plus margin): a
+    /// larger default breaks the guard on every machine, not just a small one.
     #[test]
     fn cache_budget_default_matches_the_memory_design() {
         let design = include_str!("../../gitterrace-index/src/seg/store.md");

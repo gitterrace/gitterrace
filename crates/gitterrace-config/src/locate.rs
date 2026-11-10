@@ -90,10 +90,13 @@ mod tests {
         (l.line, l.col, l.key)
     }
 
+    /// The parse and the plain syntax check both name the broken line.
     #[test]
     fn a_syntax_error_names_its_line() {
         let (line, _, key) = place("[watch]\nenabled = true\nrescan_secs = = 5\n");
         assert_eq!((line, key), (3, None));
+        assert_eq!(syntax("a = 1\n\nb = \n").expect_err("bad").line, 3);
+        syntax("version = 1\n[[action]]\nid = \"x\"\n").expect("toml");
     }
 
     #[test]
@@ -104,12 +107,6 @@ mod tests {
         assert_eq!(place(text), (3, 3, Some("watch.rescan_secs".into())));
         let text = "[repo.x.features]\nlive = true\n";
         assert_eq!(place(text).0, 2);
-    }
-
-    #[test]
-    fn syntax_names_the_line() {
-        assert_eq!(syntax("a = 1\n\nb = \n").expect_err("bad").line, 3);
-        syntax("version = 1\n[[action]]\nid = \"x\"\n").expect("toml");
     }
 
     #[test]
