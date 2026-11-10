@@ -24,11 +24,9 @@ flowchart TD
 
 <!-- END GENERATED: crates -->
 
-Each box is a crate the binary ships, and an arrow means "uses". An arrow
-already implied by a longer path is left out, so `web` and `api` use `config`
-too, though only `index` points at it. `config` reads `config.toml` and knows
-nothing else. `testkit` is not drawn, since only tests use it. `schwarzwald` is
-the vendored shared kit: the theme, the lints, the hooks and the guards.
+Each box is a crate the binary ships, and an arrow means "uses" (implied arrows
+left out). `testkit` is test-only. `schwarzwald` is the vendored shared kit:
+theme, lints, hooks and guards.
 
 The API crate's entry points: `gitterrace_api::router(ApiState)` (nest under
 `/api/v1`), `gitterrace_api::serve_mcp(path, config)` and
@@ -49,72 +47,43 @@ config keys lives in `gitterrace_config::naming`.
 - **One guard** (`gitterrace-web/src/guard.rs`): loopback Host, no cross-site
   requests, hashed inline script CSP.
 - **Live.** A watcher pushes changes over `/events`, and config files reload on
-  change. A repository that joins the server is announced the same way, so open
-  pages show it in the switcher without a reload. Changes come from the OS's
-  file events: a few watches on the git folder (HEAD, refs, `packed-refs`, the
-  index) at all times, and the working tree while a tab shows it. Each event
-  triggers a cheap check of what moved, and a burst is one check. A new commit
-  or an edit usually shows within about a second. On a heavily loaded Mac the OS
-  can drop a file change silently, and then it shows within `watch.rescan_secs`
-  (30 by default), the setting to lower for a tighter bound. With no tab open
-  nothing wakes more often than that. Where file events are unavailable (the
-  watch limit, some network volumes) the server checks once a second instead.
+  change, and a joining repository appears in open switchers. OS file events
+  watch the git folder always and the working tree while a tab shows it. A
+  burst of events is one cheap check. Dropped events (a loaded Mac) are caught
+  by the `watch.rescan_secs` rescan (30 by default). Without
+  file events the server checks once a second.
 - **Features switch off at the route.** Each `[features]` switch owns its routes
-  (`gitterrace-web/src/features.rs`), and one gate answers a route of an off
-  feature with the 404 of an unknown page. Pages ask the same table, so an off
-  feature leaves no link or menu entry behind. Off always wins: the file narrows
-  what public mode and the loopback checks allow, never widens it.
-- **Markdown renders as the hosts do.** Heading anchors are the plain slugs most
-  Markdown hosts make (`#getting-started`), so links written for elsewhere land.
-  Only an id the page itself uses gets a prefix. Front matter shows as a table
-  (`features.front_matter_enabled`), and a long document gets an "On this page"
-  outline from its headings.
-- **Dates read relative, the full date is a hover away** (`display.dates`).
-- **Send to opens a URL in your browser.** The server never calls the
-  destination, so there is nothing to authenticate and nothing written
-  ([how Send to works](actions.md)).
+  (`gitterrace-web/src/features.rs`). One gate answers an off route with 404,
+  and pages ask the same table, so no link is left behind. Off always wins.
+- **Markdown renders as the hosts do.** Heading anchors are the plain slugs
+  (`#getting-started`). Only an id the page itself uses gets a prefix.
 - **Every repo under `/r/{name}/`**, also when it is the only one, resolved only
   through the repository table. `/` forwards to a lone repository and lists
   several. A link never moves when another repository joins.
   `/go/{repo-id}/{sha}` is the permalink and outlives names.
-- **A name is assigned once.** It is the folder name made URL-safe and
-  lowercase. A folder whose name another folder already holds gets `-` and six
-  hex digits of its path. The first to arrive keeps the plain name. The name is
-  kept in `repos.json` in the state folder, so a restart in any order serves
-  each repository where it was. Without a state folder the same rule runs
-  against the table alone.
-- **A running server grows, it is never replaced.** Every server keeps a
-  repository table and serves added ones under `/r/{name}/` beside the rest.
-  `git terrace open` adds a repository the server lacks through `POST /_repos`
-  instead of starting a second server, and so does a second `git terrace` on an
-  address a gitterrace server already holds: it hands over its repositories and
-  exits 0. Before it sends a path it asks `GET /_repos?nonce=N`, and the server
-  must answer the SHA-256 of its secret and that nonce. A listener that cannot,
-  or a missing secret, counts as foreign: `open` starts its own server and
-  `serve` binds as usual. A second `serve` opens every root before it adds any.
-  Once adding starts, a refused add is an error. It never falls through to a
-  bind on the held address. `--public` never joins. That route makes the server
-  read a path it was not started with, so a browser can never reach it: it
-  exists only on a loopback bind, it refuses any `Origin` or `Sec-Fetch-Site`,
-  and it needs a per-process secret the server writes 0600 into the state
-  folder. The path must be canonical and a repository's top folder.
-  `git terrace remove` sends `DELETE /_repos` through the same gate: its URLs
-  answer 404, its refresher and warm-up stop, open switchers drop it, and its
-  on-disk index and name stay for a fast re-add. The last repository stays, so
-  `/` always has one (it forwards there when one is left). No page offers
-  remove, since a page has no secret and may be seen by others. An added
-  repository gets what a startup one does: its own refresher and warm-up,
-  permalinks, actions and the switcher. A repository holding `actions.toml` is
-  refused, as at start.
+- **A name is assigned once:** the folder name, URL-safe and lowercase. A
+  clash gets `-` and six hex digits of its path, and the first keeps the plain
+  name. Names persist in `repos.json`, so a restart serves each where it was.
+  Without a state folder the rule runs against the table alone.
+- **A running server grows, it is never replaced.** `git terrace open` and a
+  second `git terrace` add repositories through `POST /_repos`, and
+  `git terrace remove` takes one off with `DELETE /_repos`. The gate (loopback
+  only, browser headers refused, a 0600 token, a nonce check of the listener) is
+  in [SECURITY.md](../SECURITY.md). A foreign listener gets no path: `open`
+  starts its own server and `serve` binds as usual. A second `serve` opens every
+  root before it adds any, then exits 0. Once adding starts, a refused add is an
+  error, never a bind on the held address. `--public` never joins. Removal keeps
+  the index and name, stops its refresher and drops it from open switchers. The
+  last repository stays. No page offers remove, since a page has no token. An
+  added repository gets what a startup one does, and one holding
+  `actions.toml` is refused.
 - **`gitterrace://` permalinks name what, not where.**
-  `gitterrace://<repo-id>/<sha>/<path>` is the `/go` tuple without a host, so it
-  works with no server running and on another machine. `git terrace open` finds
-  the clone among repositories served before (recorded in
-  `$XDG_STATE_HOME/gitterrace/repos.json`, else `~/.local/state/gitterrace`, on
-  macOS too) and under `links.roots`, rechecks its id, then starts or reuses a
-  server. A link is input from outside: one strict parser in
-  `gitterrace-actions/src/link.rs`, the registry never stores anything from a
-  link, and an unknown id never clones or fetches.
+  `gitterrace://<repo-id>/<sha>/<path>` is the `/go` tuple without a host.
+  `git terrace open` finds the clone among repositories served before
+  (`$XDG_STATE_HOME/gitterrace/repos.json`, else `~/.local/state/gitterrace`)
+  and under `links.roots`, and rechecks its id. A link is input from outside:
+  one strict parser in `gitterrace-actions/src/link.rs`, nothing from a link is
+  stored, and an unknown id never clones or fetches.
 
 ## Cache
 
@@ -133,12 +102,9 @@ The format version is `1`, stored as `v1`.
 
 Disposable: bump the format version instead of migrating.
 
-The cache lives in `.git/gitterrace/` and is used there whenever that folder can
-be written. When it cannot (a read-only mount, a repository of another user),
-it goes to `<dir>/<hash>`, where `<dir>` is the folder in
-`GITTERRACE_INDEX_FALLBACK` and the hash is of the real path of the git dir.
-Without that variable such a repository has no cache. The Docker
-image sets it to `/cache/index`.
+The cache lives in `.git/gitterrace/` when that folder is writable, else in
+`$GITTERRACE_INDEX_FALLBACK/<hash of the git dir>` (the Docker image sets
+`/cache/index`), else nowhere.
 
 The index is a set of immutable files named by one manifest, swapped by rename,
 so a crash leaves the previous complete set. Pages read bounded, checksummed
@@ -155,49 +121,31 @@ the [store design](../crates/gitterrace-index/src/seg/store.md).
 ### How the languages page reads the index
 
 The languages page charts lines per language along the first-parent history.
-Walking that chain one commit record at a time, then reading each one's file
-rows, took minutes cold on a large history. So every update also stores the
-chain of the indexed tip in `chain-<gen>.gts`: per step its rank, oid, time
-and offset, and each file row's path id with its added and removed lines. The
-page reads that file once, front to back, and reads no commit record.
+Every update stores the chain of the indexed tip in `chain-<gen>.gts` (per step
+its rank, oid, time, offset and each file row's path id and line counts), and
+the page reads it once, front to back.
 
-Rows are keyed by path, not by language. The language and the path filter
-(excludes, the generated list, the tip's `.gitignore`) are applied when the
-page is built, so changing any of them needs no rebuild. The language is decided
-once per extension or well-known file name, not once per path.
+Rows are keyed by path, and the language and path filters apply when the page
+is built, so changing them needs no rebuild.
 
-The chain is rewritten from the stored rows after every update and every
-segment merge, with no git read, and named in the same manifest as the set it
-is written for: a build, an append or a merge that cannot write it publishes
-nothing, and the set before it stays live. Its meta holds the manifest's order
-fingerprint and commit count. A chain written for another set (a reset, a
-rewritten history) is not read, and the page walks the records as before. A
-deepened shallow clone wipes the whole cache, chain included.
-
-The chain file keeps no cut points. Its blocks split wherever the bytes fill
-one, so a block edge says nothing about the page's marks. The page lays its
-marks over chain positions as it reads the steps, one pass from the newest,
-with the same gap as a walk, so the stored and the walked skeleton put marks at
-the same positions by construction. A stored cut list would be a second copy of
-that rule that could drift from it, and would have to move with every change to
-the mark gap.
+The chain is rewritten after every update and segment merge, with no git read,
+and named in the same manifest as its set: if it cannot be written, nothing is
+published. A chain for another set (a reset, a rewritten history) is not read,
+and the page walks the records. The chain stores no cut points: the page lays
+its marks while reading, with the walk's gap, so both paths agree by
+construction.
 
 Format numbers: the cache format (`VERSION`, `FORMAT_VERSION` in `store.rs`) is
-stored with a `v` prefix. Builds before the first release wrote a bare number,
-so such a cache is reset, never refused as a newer build's. The container byte
-version inside each file (`seg/format.rs`) is a separate number. It moves only
-when the container bytes change.
+stored with a `v` prefix, and a bare number from before the first release is
+reset, not refused. The container byte version (`seg/format.rs`) is separate.
 
 ### How hotspots and ownership read the index
 
-A per-path aggregate cannot serve these pages: it is keyed by the name a file
-had in each commit, and a name that was renamed or reused belongs to two files
-at different times. On rust more than half the files at HEAD have such a name.
-So every update also writes `tip-<gen>.gts` (`tip.rs`): each commit's file
-rows keyed by the file's name at the indexed tip, with its churn. Hotspots,
-ownership, coupling and code age read one item per commit from it instead of
-every file row with renames followed. It is named in the manifest like the
-chain, and a set without it reads the rows as before.
+A per-path aggregate cannot serve these pages, since a renamed or reused name
+belongs to two files (over half of rust's files at HEAD). Every update writes
+`tip-<gen>.gts` (`tip.rs`): each commit's file rows keyed by the name at the
+indexed tip, with churn. Hotspots, ownership, coupling and code age read it,
+and a set without it reads the rows as before.
 
 `crates/gitterrace-index/tests/latency.rs` holds today's times on a
 100k-commit synthetic history as ceilings, and
@@ -256,12 +204,10 @@ Each door in [security.md](security.md) and what holds it in the code:
 | Static export | `_headers` carries the CSP, no local routes crawled | `export/tests.rs` |
 | Hostile content | Askama escaping, CSP, actions never from the repository | `hostile_repo_content_is_escaped_where_the_menu_lives` |
 
-The tests in `security_class_tests.rs` read every route pattern from the built
-routers, the server's and one repository's, so a route registered in any file is
-walked. Each must be public or in `LOCAL`, and in the sitemap. Every route is
-then checked for public darkness under every method, headers on every method it
-takes with each token a page holds, path escapes in its tail and in `?path=`,
-`?file=` and `?doc=`, and tokenless writes, without a new test.
+`security_class_tests.rs` reads every route from the built routers, so a route
+registered anywhere is walked: public or `LOCAL`, in the sitemap, dark when
+public, headers on every method, path escapes in the tail and in `?path=`,
+`?file=` and `?doc=`, and tokenless writes.
 
 ## Syntax highlighting
 
