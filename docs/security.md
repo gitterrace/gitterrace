@@ -17,8 +17,7 @@ vulnerability, see [SECURITY.md](../SECURITY.md).
 
 - A web page in any browser tab on this machine: it can fire requests at
   loopback and try DNS rebinding.
-- Another local process: it runs as the user already, so it gains nothing it
-  lacks.
+- Another local process: it already runs as the user and gains nothing.
 - A peer on the network, when the server binds beyond loopback or runs with
   `--public`.
 - A hostile repository: file names, commit text, markdown, SVG, `.mailmap`, huge
@@ -42,10 +41,10 @@ vulnerability, see [SECURITY.md](../SECURITY.md).
 | Static export | wherever it is hosted | No local pages, the content security policy in a `_headers` file the host must apply |
 | Repository content | rendered pages | Escaped, inline script refused, actions never load from the repository |
 
-Tests walk every route of the built server and check that it is classified
-public or local, that a local one is dark on a public server, that it sends
-`nosniff` and the policy, that no path reads outside the tree and that no write
-succeeds without its token. A new route is covered without a new test.
+Tests walk every route of the built server, so a new route is covered without a
+new test. Each must be classified public or local, dark on a public server when
+local, send `nosniff` and the policy, read nothing outside the tree, and refuse
+a write without its token.
 
 ## Accepted risks
 
