@@ -40,7 +40,8 @@ rustix = { version = "1", default-features = false, features = ["std", "process"
 [dev-dependencies]
 gitterrace-index = { workspace = true, features = ["oracle"] }
 tikv-jemallocator = "0.7"
-tikv-jemalloc-ctl = "0.7"
+# `stats`: the memory budget reads live heap (`stats.allocated`), which load cannot move.
+tikv-jemalloc-ctl = { version = "0.7", features = ["stats"] }
 gitterrace-testkit.workspace = true
 tempfile.workspace = true
 http-body-util = "0.1"

@@ -21,6 +21,8 @@ const REQUEST_PEAK_MB: u64 = 8;
 const FOOTPRINT_IDLE_MB: u64 = 48;
 /// Run to run spread of the released idle above start plus memo (measured 0 to 3 MB).
 const SLACK_MB: u64 = 4;
+/// Live heap a release may keep beyond the memo: the allocator's own and the runtime's.
+const HEAP_SLACK_MB: u64 = 1;
 
 /// What [`insights_request_peak`] and [`insights_release_returns_to_start`] read off one run.
 struct PeakRun {
@@ -28,6 +30,12 @@ struct PeakRun {
     start: u64,
     /// After the idle release that follows the measured requests.
     released: u64,
+    /// Live heap of the just-started server, read by its own allocator.
+    heap_start: u64,
+    /// Live heap after the release that follows indexing, before any page was read.
+    heap_idle: u64,
+    /// Live heap after the release that follows the measured requests.
+    heap_released: u64,
     /// Budget breaches of the warm idle and of each request.
     bad: Vec<String>,
 }
@@ -63,12 +71,13 @@ fn insights_request_peak() {
     assert!(run.bad.is_empty(), "{}", run.bad.join("\n"));
 }
 
-/// After the idle release the server holds what a just-started one does, plus the page memo it
-/// keeps by design and 4 MB of slack: five runs on a 100k history released 11, 11, 12, 12 and 13 MB
-/// over a 6 MB start and a 4 MB memo, the high ones under heavy machine load. The block cache and
-/// the derived tables go with the source, and the allocator runs one arena, so no per-core arena
-/// keeps freed slabs (red with one arena per core: 17 MB released against a 12 MB cap on a 100k
-/// history).
+/// After the idle release the server's live heap is what a just-started one holds plus the page
+/// memo it keeps by design: 7 MB against a 9 MB start on a 100k history, and 32 MB when the
+/// release keeps the shared tables. The footprint is only reported: it moved 16 to 18 MB run to
+/// run on the same commit with the same heap, freed pages the kernel had not taken back. The
+/// block cache and the derived tables go with the source, and the allocator runs one arena, so
+/// no per-core arena keeps freed slabs (red with one arena per core: 17 MB released against a
+/// 12 MB cap on a 100k history).
 #[test]
 fn insights_release_returns_to_start() {
     if serve_if_child() {
@@ -78,13 +87,42 @@ fn insights_release_returns_to_start() {
         return;
     };
     let cap = run.start + memo_budget() + SLACK_MB * MB;
-    assert!(
-        run.released <= cap,
-        "released idle {} MB, just-started {} MB plus memo {} MB plus {SLACK_MB} MB",
-        run.released / MB,
-        run.start / MB,
-        memo_budget() / MB
-    );
+    let mut bad = Vec::new();
+    // What load cannot move: live heap as each server's allocator counts it. After a
+    // release only the page memo may stay over a just-started server's heap, and the first
+    // release, before any page, may keep less still. A cache that survives the release fails
+    // both; one that only the requests fill fails the second.
+    for (what, v, allowed) in [
+        (
+            "the release after indexing",
+            run.heap_idle,
+            HEAP_SLACK_MB * MB,
+        ),
+        (
+            "the release after the requests",
+            run.heap_released,
+            memo_budget() + HEAP_SLACK_MB * MB,
+        ),
+    ] {
+        if v > run.heap_start + allowed {
+            bad.push(format!(
+                "live heap after {what} {} KB, just-started {} KB plus {} KB",
+                v / 1024,
+                run.heap_start / 1024,
+                allowed / 1024
+            ));
+        }
+    }
+    // The resident reading against a fresh server, as the user sees it: unchanged, and kept.
+    if run.released > cap {
+        bad.push(format!(
+            "released idle {} MB, just-started {} MB plus memo {} MB plus {SLACK_MB} MB",
+            run.released / MB,
+            run.start / MB,
+            memo_budget() / MB
+        ));
+    }
+    assert!(bad.is_empty(), "{}", bad.join("\n"));
 }
 
 fn peak_run(test: &str) -> Option<PeakRun> {
@@ -113,12 +151,14 @@ fn peak_run(test: &str) -> Option<PeakRun> {
         let t = Server::start(tiny.path(), test);
         let b = t.base();
         t.wait_ready(&b);
-        t.dirty()
+        (t.dirty(), t.heap())
     };
+    let (start, heap_start) = start;
     let s = Server::start(&repo, test);
     let base = s.base();
     s.wait_ready(&base);
     s.wait_released(&base, 0);
+    let heap_idle = s.heap();
     let path = if std::env::var_os("TEST_LINUX").is_some() {
         "kernel"
     } else {
@@ -180,10 +220,22 @@ fn peak_run(test: &str) -> Option<PeakRun> {
     let before = s.releases(&base);
     s.wait_released(&base, before);
     let released = s.dirty();
+    let heap_released = s.heap();
+    writeln!(
+        std::io::stderr(),
+        "live heap: just-started {} KB, idle {} KB, released {} KB",
+        heap_start / 1024,
+        heap_idle / 1024,
+        heap_released / 1024
+    )
+    .expect("stderr");
     writeln!(std::io::stderr(), "released idle {} MB", released / MB).expect("stderr");
     Some(PeakRun {
         start,
         released,
+        heap_start,
+        heap_idle,
+        heap_released,
         bad,
     })
 }

@@ -27,6 +27,8 @@ const BUDGET_MB: u64 = 32 + 16;
 /// Most that idle memory may grow from 2k commits to the largest size measured.
 const GROWTH_MB: u64 = 4;
 const SERVE_VAR: &str = "TEST_MEMORY_SERVE";
+/// File the child writes its live heap bytes to, see `report_heap`.
+const HEAP_VAR: &str = "TEST_MEMORY_HEAP";
 /// Longest wait for an idle release after the server is ready.
 const RELEASE_WAIT_SECS: u64 = 120;
 
@@ -54,12 +56,37 @@ fn apply_and_assert_allocator() {
     }
 }
 
+/// Inside the child: writes the bytes jemalloc counts as allocated to `out` every 100 ms.
+/// Live heap is what a leak grows and what a release must return; unlike the footprint it
+/// does not move with freed pages the kernel has not taken back yet, so machine load does
+/// not shift it.
+fn report_heap(out: PathBuf) {
+    use tikv_jemalloc_ctl::{epoch, stats};
+    std::thread::spawn(move || {
+        let (e, allocated) = (
+            epoch::mib().expect("epoch"),
+            stats::allocated::mib().expect("allocated"),
+        );
+        let tmp = out.with_extension("tmp");
+        for seq in 0_u64.. {
+            e.advance().expect("advance");
+            let n = allocated.read().expect("read allocated");
+            std::fs::write(&tmp, format!("{seq} {n}")).expect("write heap");
+            std::fs::rename(&tmp, &out).expect("publish heap");
+            gitterrace_testkit::wait::pause_blocking(Duration::from_millis(100));
+        }
+    });
+}
+
 /// Inside the child: serve the repository named by `TEST_MEMORY_SERVE=<addr> <path>`.
 fn serve_if_child() -> bool {
     let Ok(v) = std::env::var(SERVE_VAR) else {
         return false;
     };
     apply_and_assert_allocator();
+    if let Ok(out) = std::env::var(HEAP_VAR) {
+        report_heap(PathBuf::from(out));
+    }
     let (addr, path) = v.split_once(' ').expect("addr and path");
     let addr: SocketAddr = addr.parse().expect("addr");
     let rt = tokio::runtime::Runtime::new().expect("runtime");
@@ -78,6 +105,8 @@ fn serve_if_child() -> bool {
 struct Server {
     child: Child,
     addr: SocketAddr,
+    /// Where the child reports its live heap; the directory goes with the server.
+    heap: tempfile::TempDir,
 }
 
 impl Server {
@@ -85,12 +114,14 @@ impl Server {
         let addr = std::net::TcpListener::bind("127.0.0.1:0")
             .and_then(|l| l.local_addr())
             .expect("free port");
+        let heap = tempfile::tempdir().expect("tmp");
         let child = Command::new(std::env::current_exe().expect("exe"))
             .args([test, "--exact", "--nocapture", "--include-ignored"])
             .env(SERVE_VAR, format!("{addr} {}", repo.display()))
+            .env(HEAP_VAR, heap.path().join("heap"))
             .spawn()
             .expect("spawn server");
-        let s = Self { child, addr };
+        let s = Self { child, addr, heap };
         let end = Instant::now() + Duration::from_secs(30);
         while TcpStream::connect(addr).is_err() {
             assert!(Instant::now() < end, "server did not start");
@@ -177,6 +208,32 @@ impl Server {
     /// Dirty memory of the server in bytes.
     fn dirty(&self) -> u64 {
         dirty_of(self.child.id())
+    }
+
+    /// Live heap of the server in bytes, as its allocator counts it: the newest of the
+    /// reports written after this call, so a reading never predates the caller's last step.
+    fn heap(&self) -> u64 {
+        let file = self.heap.path().join("heap");
+        let read = || -> Option<(u64, u64)> {
+            let text = std::fs::read_to_string(&file).ok()?;
+            let (seq, n) = text.trim().split_once(' ')?;
+            Some((seq.parse().ok()?, n.parse().ok()?))
+        };
+        // Two reports on: the first may have been read before the caller's last step.
+        let asked = read().map_or(0, |(seq, _)| seq + 2);
+        let end = Instant::now() + Duration::from_secs(30);
+        loop {
+            if let Some((seq, n)) = read()
+                && seq >= asked
+            {
+                return n;
+            }
+            assert!(
+                Instant::now() < end,
+                "the server stopped reporting its heap"
+            );
+            gitterrace_testkit::wait::pause_blocking(Duration::from_millis(50));
+        }
     }
 }
 
