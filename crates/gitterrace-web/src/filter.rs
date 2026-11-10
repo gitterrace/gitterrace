@@ -238,91 +238,13 @@ fn author_name(src: &dyn InsightsSource, email: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
-
     use gitterrace_index::feed::MemorySource;
-    use gitterrace_index::{CommitRecord, FileStat};
 
-    use super::{Dim, Filter, Period, under};
-    use crate::insights::Src;
+    use super::{Dim, Filter, Period};
 
     fn parse(q: &str) -> Filter {
         let uri: axum::http::Uri = format!("/?{q}").parse().expect("uri");
         axum::extract::Query::try_from_uri(&uri).expect("parse").0
-    }
-
-    fn rec(
-        id: &str,
-        who: &str,
-        day: i64,
-        kind: Option<&str>,
-        scope: Option<&str>,
-        path: &str,
-    ) -> CommitRecord {
-        CommitRecord {
-            id: id.to_owned(),
-            author: who.to_owned(),
-            time: day * 86_400,
-            kind: kind.map(str::to_owned),
-            scope: scope.map(str::to_owned),
-            files: vec![
-                FileStat {
-                    path: path.into(),
-                    additions: 3,
-                    ..FileStat::default()
-                },
-                FileStat {
-                    path: "other/x.rs".into(),
-                    additions: 1,
-                    ..FileStat::default()
-                },
-            ],
-            ..CommitRecord::default()
-        }
-    }
-
-    /// The commits a filter's selection keeps, as a scoped source.
-    fn kept(f: &Filter, all: &Src) -> Src {
-        Arc::new(gitterrace_index::Scoped::new(all, &f.selection(), None))
-    }
-
-    fn sample() -> Src {
-        Arc::new(MemorySource::shared(Arc::new(sample_records())))
-    }
-
-    /// What a filtered source holds: each commit id with its kept rows' paths.
-    fn recs_of(s: &Src) -> Vec<CommitRecord> {
-        use gitterrace_index::feed::CommitRange;
-        let ranks: Vec<_> = s.commits_in(CommitRange::All).map(|c| c.rank).collect();
-        s.rows_for(ranks)
-            .map(|(rank, rows)| CommitRecord {
-                id: s.commit_id(rank).as_deref().unwrap_or_default().to_owned(),
-                files: rows
-                    .iter()
-                    .map(|r| gitterrace_index::FileStat {
-                        path: s.path(r.path).unwrap_or_default(),
-                        ..Default::default()
-                    })
-                    .collect(),
-                ..Default::default()
-            })
-            .collect()
-    }
-
-    fn sample_records() -> Vec<CommitRecord> {
-        vec![
-            rec("a", "ann", 1, Some("fix"), Some("web"), "crates/web/a.rs"),
-            rec("b", "bob", 50, Some("feat"), None, "crates/git/b.rs"),
-            rec("c", "ann", 99, None, None, "crates/web/c.rs"),
-            rec(
-                "d",
-                "ann",
-                100,
-                Some("fix"),
-                Some("git"),
-                "crates/webby/d.rs",
-            ),
-        ]
     }
 
     #[test]
@@ -346,35 +268,21 @@ mod tests {
         );
     }
 
+    /// The query parses to the index selection, which owns stacking and the path rule (the
+    /// select tests): every dimension lands in its field, an empty one stays unset.
     #[test]
-    fn filters_stack() {
-        let recs = sample();
-        let ids = |f: &Filter| {
-            recs_of(&kept(f, &recs))
-                .iter()
-                .map(|r| r.id.clone())
-                .collect::<Vec<_>>()
+    fn the_query_becomes_the_selection() {
+        let s = parse("type=fix&scope=web&author=ann&path=crates%2Fweb").selection();
+        let want = gitterrace_index::Selection {
+            kind: Some("fix".into()),
+            scope: Some("web".into()),
+            author: Some("ann".into()),
+            path: Some("crates/web".into()),
         };
-        assert_eq!(ids(&Filter::default()), ["a", "b", "c", "d"]);
-        assert_eq!(ids(&parse("type=fix")), ["a", "d"]);
-        assert_eq!(ids(&parse("type=fix&scope=web")), ["a"]);
-        assert_eq!(ids(&parse("type=other")), ["c"]);
-        assert_eq!(ids(&parse("scope=none")), ["b", "c"]);
-        assert_eq!(ids(&parse("author=ann&type=fix")), ["a", "d"]);
-        assert_eq!(ids(&parse("type=nothing")), Vec::<String>::new());
-    }
-
-    #[test]
-    fn path_filter_keeps_only_files_under_prefix() {
-        let recs = sample();
-        let out = recs_of(&kept(&parse("path=crates/web"), &recs));
+        assert_eq!(s, want);
         assert_eq!(
-            out.iter().map(|r| r.id.as_str()).collect::<Vec<_>>(),
-            ["a", "c"]
-        );
-        assert!(out.iter().all(|r| r.files.len() == 1));
-        assert!(
-            under("crates/web/a.rs", "crates/web") && !under("crates/webby/d.rs", "crates/web")
+            parse("type=&path=").selection(),
+            gitterrace_index::Selection::default()
         );
     }
 

@@ -302,17 +302,16 @@ async fn counts_equal_the_sum_of_their_parts() {
     assert!(fails.is_empty(), "{}", fails.join("\n"));
 }
 
-#[tokio::test]
-async fn both_contributor_endpoints_agree() {
-    let mut fails = Vec::new();
-    each_cell(async |r, q| contributors_agree(r, &q, &mut fails).await).await;
-    assert!(fails.is_empty(), "{}", fails.join("\n"));
-}
-
+/// Every page shows the API's numbers, and both contributor endpoints agree, over one build
+/// of each fixture.
 #[tokio::test]
 async fn every_page_shows_the_api_numbers() {
     let mut fails = Vec::new();
-    each_cell(async |r, q| pages_agree(r, &q, &mut fails).await).await;
+    each_cell(async |r, q| {
+        pages_agree(r, &q, &mut fails).await;
+        contributors_agree(r, &q, &mut fails).await;
+    })
+    .await;
     assert!(fails.is_empty(), "{}", fails.join("\n"));
 }
 
