@@ -39,9 +39,8 @@ program, and the decision stays with you.
 ## Insights
 
 How a project moves is part of the same reading: its rhythm, what churns, where
-the hot spots are, who touches what. We find that interesting, at least while
-doing this kind of work, so it lives beside the history and is built from the
-same repository.
+the hot spots are, who touches what. So insights live beside the history, built
+from the same repository.
 
 ## What it does with your code
 
