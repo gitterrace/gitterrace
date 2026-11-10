@@ -2,8 +2,7 @@
 
 gitterrace should feel instant on large repositories. This page says what is
 measured, how, and what the latest run found. Each run is kept, named by date
-and CPU, never the hostname, and each warm time is compared with the previous
-run.
+and CPU, and each warm time is compared with the previous run.
 
 ## What is measured
 
