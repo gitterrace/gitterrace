@@ -10,6 +10,7 @@
 
 mod action_scripts;
 mod api_md;
+mod build_dirs;
 mod changelog_md;
 mod cli_md;
 mod config_md;

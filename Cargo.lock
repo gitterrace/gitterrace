@@ -3809,6 +3809,7 @@ dependencies = [
  "gitterrace-api",
  "gitterrace-config",
  "gitterrace-index",
+ "gitterrace-testkit",
  "gitterrace-web",
  "pulldown-cmark",
  "schemars",
