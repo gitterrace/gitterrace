@@ -72,7 +72,6 @@ text-decoration:none;overflow-wrap:anywhere}
 .docnav a:hover,.outline a:hover{color:var(--fg)}
 .docnav a[aria-current],.outline.rail a.on{color:var(--fg);font-weight:var(--weight-semibold);
 border-left-color:var(--accent)}
-.outline .outline-q,.outline .outline-none{display:none}
 .outline li.d1>a{padding-left:var(--space-6)}
 .menus{display:none}
 @media (max-width:1099px){

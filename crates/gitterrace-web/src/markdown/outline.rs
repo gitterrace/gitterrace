@@ -34,10 +34,6 @@ impl OutlineItem {
 /// Fewest listed headings that make an outline worth showing.
 const OUTLINE_MIN: usize = 3;
 
-/// Fewest listed headings that get a filter box: a shorter list is scanned faster than filtered.
-/// A source file's symbols always get one.
-const OUTLINE_FILTER_MIN: usize = 12;
-
 /// The headings an outline lists: h2 and h3, plus h1 only when the document has several.
 /// Empty when fewer than three remain.
 pub(crate) fn outline_items(all: &[OutlineItem]) -> Vec<&OutlineItem> {
@@ -70,8 +66,6 @@ struct OutlineMarkup<'a> {
     rail: bool,
     icon_only: bool,
     links: Vec<OutlineLink<'a>>,
-    /// Whether the list is long enough for the filter field.
-    filter: bool,
     /// The widest kind label, in characters: the label column's width. 0 without kinds.
     kind_width: usize,
 }
@@ -101,12 +95,10 @@ fn outline_html(all: &[OutlineItem], rail: bool, icon_only: bool) -> String {
         .filter_map(|l| l.kind.map(|k| k.0.len()))
         .max()
         .unwrap_or(0);
-    let filter = items.len() >= OUTLINE_FILTER_MIN || items.iter().any(|h| h.kind.is_some());
     OutlineMarkup {
         rail,
         icon_only,
         links,
-        filter,
         kind_width,
     }
     .render()
@@ -129,18 +121,24 @@ pub(crate) fn outline_menu(all: &[OutlineItem], icon_only: bool) -> String {
 mod tests {
     use super::*;
 
-    /// The filter field is rendered from 12 headings on, rail and menu alike.
+    /// No outline renders a search field, however long: headings or a source file's symbols.
     #[test]
-    fn headings_filter_shows_only_on_long_outlines() {
-        let items = |n: usize| -> Vec<OutlineItem> {
-            (0..n)
-                .map(|i| OutlineItem::heading(2, format!("h{i}"), &format!("Head {i}")))
-                .collect()
-        };
-        for rail in [true, false] {
-            let out = |n: usize| outline_html(&items(n), rail, false);
-            assert!(!out(11).contains("outline-q"), "11: no filter");
-            assert!(out(12).contains("outline-q"), "12: a filter");
+    fn outline_has_no_input() {
+        let heads: Vec<OutlineItem> = (0..30)
+            .map(|i| OutlineItem::heading(2, format!("h{i}"), &format!("Head {i}")))
+            .collect();
+        let syms: Vec<OutlineItem> = (0..30)
+            .map(|i| OutlineItem {
+                kind: Some(SymbolKind::Function),
+                ..OutlineItem::heading(2, format!("f{i}"), &format!("f{i}"))
+            })
+            .collect();
+        for items in [&heads, &syms] {
+            for rail in [true, false] {
+                let html = outline_html(items, rail, false);
+                assert!(html.contains("<ol"), "the list renders");
+                assert!(!html.contains("<input"), "no search field: {html}");
+            }
         }
     }
 }

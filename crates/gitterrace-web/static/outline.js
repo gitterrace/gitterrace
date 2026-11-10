@@ -1,8 +1,8 @@
-// "On this page" outline: scroll highlight, filter and keyboard (menu and rail). The lists are
+// "On this page" outline: scroll highlight and keyboard (menu and rail). The lists are
 // plain links without this. Loaded on every page: with no [data-outline] it does nothing.
 // gtFilter, the filter behind every "narrow this list" box: typing hides the items that do not
 // contain the text, an empty result shows a note, and the arrow keys walk the links that are
-// left. Used by the outline and the repositories home, so the two cannot drift.
+// left. Used by the repositories home.
 // gtFilter(input, { items, text, link, none, root, clear, count }) returns { shown, apply }.
 //   items  the elements to hide or show   text  item -> the string searched (default textContent)
 //   link   item -> its focusable link     none  the note shown when nothing matches
@@ -104,14 +104,7 @@
     });
   });
   navs.forEach(function (d) {
-    var q = d.querySelector(".outline-q"), none = d.querySelector(".outline-none");
     var menu = d.tagName === "DETAILS";
-    if (q) {
-      var items = Array.prototype.slice.call(d.querySelectorAll("li"));
-      q.hidden = false;
-      window.gtFilter(q, { items: items, root: d, clear: !menu, none: none });
-      if (menu) d.addEventListener("toggle", function () { if (d.open) q.focus(); });
-    }
     function close() { d.open = false; d.querySelector("summary").focus(); }
     d.addEventListener("keydown", function (e) {
       if (e.key === "Escape" && menu && d.open) { e.preventDefault(); close(); }

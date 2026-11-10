@@ -137,8 +137,8 @@
 //                across every row edge, the "+N" fold shows at 390, a ref chip keeps the row
 //                height, nothing scrolls sideways, and the List | Graph switch keeps the page top;
 //                tip labels are never clipped and overlap no label, graph line or subject
-//   outline-filter  the "On this page" filter shows, narrows the list and Escape returns
-//                focus, on a Markdown page and an insights page
+//   outline-menu  the "On this page" menu opens with its list and Escape returns focus to
+//                its button
 //   repos-filter the Repositories home filter: typing narrows rows and count, Enter opens the
 //                first match, Escape clears, nothing shifts, at 390 and 1440 px
 //   symbols      a source file's symbol outline: at 1440 px a rail beside the code below the
@@ -190,7 +190,7 @@ const bin = resolve(arg('--bin', join(root, 'target/debug/git-terrace')));
 const fromDisk = process.argv.includes('--from-disk');
 const tabCounts = arg('--tabs', '8,12').split(',').map(Number);
 const browsers = arg('--browsers', 'webkit,chromium').split(',');
-const ALL = ['truncation', 'live-tabs', 'mermaid', 'chip', 'doctabs', 'chords', 'header', 'marked', 'menu-same', 'menu-keys', 'gutter', 'overlays', 'tips', 'date-tips', 'repo-switch', 'outline', 'mark-seam', 'about-place', 'site-theme', 'install-tabs', 'site-bar', 'site-rail', 'site-tables', 'side-width', 'calm-header', 'header-theme', 'tabs-one-line', 'tab-levels', 'huge-diff', 'sticky-heads', 'md-anchor', 'live-scroll', 'live-read', 'sticky-line', 'seg-one-row', 'period-steady', 'export-from-disk', 'inline-controls', 'section-gaps', 'path-cells', 'mark-flat', 'tab-stops', 'help-keys', 'side-order', 'settings', 'lone-rows', 'page-heads', 'crumb-flow', 'compare-head', 'commit-head', 'search-head', 'small-layout', 'send-dialog', 'keyboard-walk', 'reflow', 'text-spacing', 'targets', 'keys-off', 'axe-all', 'forced-colors', 'reduced-motion', 'outline-filter', 'avatar-fit', 'graph-view', 'layout-shift', 'head-align', 'symbols', 'outline-current', 'no-sideways-scroll', 'head-fits', 'repos-filter', 'home-live', 'row-overlap', 'anatomy'];
+const ALL = ['truncation', 'live-tabs', 'mermaid', 'chip', 'doctabs', 'chords', 'header', 'marked', 'menu-same', 'menu-keys', 'gutter', 'overlays', 'tips', 'date-tips', 'repo-switch', 'outline', 'mark-seam', 'about-place', 'site-theme', 'install-tabs', 'site-bar', 'site-rail', 'site-tables', 'side-width', 'calm-header', 'header-theme', 'tabs-one-line', 'tab-levels', 'huge-diff', 'sticky-heads', 'md-anchor', 'live-scroll', 'live-read', 'sticky-line', 'seg-one-row', 'period-steady', 'export-from-disk', 'inline-controls', 'section-gaps', 'path-cells', 'mark-flat', 'tab-stops', 'help-keys', 'side-order', 'settings', 'lone-rows', 'page-heads', 'crumb-flow', 'compare-head', 'commit-head', 'search-head', 'small-layout', 'send-dialog', 'keyboard-walk', 'reflow', 'text-spacing', 'targets', 'keys-off', 'axe-all', 'forced-colors', 'reduced-motion', 'outline-menu', 'avatar-fit', 'graph-view', 'layout-shift', 'head-align', 'symbols', 'outline-current', 'no-sideways-scroll', 'head-fits', 'repos-filter', 'home-live', 'row-overlap', 'anatomy'];
 const wanted = arg('--checks', ALL.join(',')).split(',');
 for (const c of wanted) if (!ALL.includes(c)) { console.error(`unknown check ${c}; known: ${ALL.join(', ')}`); process.exit(2); }
 
@@ -243,7 +243,7 @@ const { loneRows, smallLayout, avatarFit } = rowChecks(env);
 const { checks: sendChecks } = await import('./send-lib.mjs');
 const { sendDialog } = sendChecks(env);
 const { checks: outlineChecks } = await import('./outline-lib.mjs');
-const { outlineFilter, symbols, outlineCurrent } = outlineChecks(env);
+const { outlineMenu, symbols, outlineCurrent } = outlineChecks(env);
 const { checks: graphChecks } = await import('./graph-lib.mjs');
 const { graphView } = graphChecks(env);
 const { checks: shiftChecks } = await import('./shift-lib.mjs');
@@ -577,7 +577,7 @@ async function settings() {
   }
 }
 
-const checks = {'sticky-heads': stickyHeads, 'tabs-one-line': tabsOneLine, 'tab-levels': tabLevels, 'calm-header': calmHeader, 'side-width': sideWidth, truncation, 'live-tabs': liveTabs, mermaid, chip, doctabs, chords, header, marked, 'menu-same': menuSame, 'menu-keys': menuKeys, gutter, overlays, tips, 'date-tips': dateTips, 'repo-switch': repoSwitch, outline, 'mark-seam': markSeam, 'about-place': aboutPlace, 'site-theme': siteTheme, 'install-tabs': installTabs, 'site-bar': siteBar, 'site-rail': siteRail, 'site-tables': siteTables, 'header-theme': headerTheme, 'huge-diff': hugeDiff, 'md-anchor': mdAnchor, 'live-scroll': liveScroll, 'live-read': liveRead, 'sticky-line': stickyLine, 'seg-one-row': segOneRow, 'period-steady': periodSteady, 'export-from-disk': exportFromDisk, 'inline-controls': inlineControls, 'section-gaps': sectionGaps, 'path-cells': pathCells, 'mark-flat': markFlat, 'tab-stops': tabStops, 'help-keys': helpKeys, 'side-order': sideOrder, settings, 'lone-rows': loneRows, 'page-heads': pageHeads, 'crumb-flow': crumbHeads, 'compare-head': compareHeads, 'commit-head': commitHeads, 'search-head': searchHeads, 'small-layout': smallLayout, 'send-dialog': sendDialog, 'keyboard-walk': keyboardWalk, reflow, 'text-spacing': textSpacing, targets, 'keys-off': keysOff, 'axe-all': axeAll, 'forced-colors': forcedColors, 'reduced-motion': reducedMotion, 'outline-filter': outlineFilter, 'graph-view': graphView, 'avatar-fit': avatarFit, 'layout-shift': layoutShift, 'head-align': headAlign, symbols, 'outline-current': outlineCurrent, 'no-sideways-scroll': noSidewaysScroll, 'head-fits': headFits, 'repos-filter': reposFilter, 'home-live': homeLive, 'row-overlap': rowOverlap, anatomy};
+const checks = {'sticky-heads': stickyHeads, 'tabs-one-line': tabsOneLine, 'tab-levels': tabLevels, 'calm-header': calmHeader, 'side-width': sideWidth, truncation, 'live-tabs': liveTabs, mermaid, chip, doctabs, chords, header, marked, 'menu-same': menuSame, 'menu-keys': menuKeys, gutter, overlays, tips, 'date-tips': dateTips, 'repo-switch': repoSwitch, outline, 'mark-seam': markSeam, 'about-place': aboutPlace, 'site-theme': siteTheme, 'install-tabs': installTabs, 'site-bar': siteBar, 'site-rail': siteRail, 'site-tables': siteTables, 'header-theme': headerTheme, 'huge-diff': hugeDiff, 'md-anchor': mdAnchor, 'live-scroll': liveScroll, 'live-read': liveRead, 'sticky-line': stickyLine, 'seg-one-row': segOneRow, 'period-steady': periodSteady, 'export-from-disk': exportFromDisk, 'inline-controls': inlineControls, 'section-gaps': sectionGaps, 'path-cells': pathCells, 'mark-flat': markFlat, 'tab-stops': tabStops, 'help-keys': helpKeys, 'side-order': sideOrder, settings, 'lone-rows': loneRows, 'page-heads': pageHeads, 'crumb-flow': crumbHeads, 'compare-head': compareHeads, 'commit-head': commitHeads, 'search-head': searchHeads, 'small-layout': smallLayout, 'send-dialog': sendDialog, 'keyboard-walk': keyboardWalk, reflow, 'text-spacing': textSpacing, targets, 'keys-off': keysOff, 'axe-all': axeAll, 'forced-colors': forcedColors, 'reduced-motion': reducedMotion, 'outline-menu': outlineMenu, 'graph-view': graphView, 'avatar-fit': avatarFit, 'layout-shift': layoutShift, 'head-align': headAlign, symbols, 'outline-current': outlineCurrent, 'no-sideways-scroll': noSidewaysScroll, 'head-fits': headFits, 'repos-filter': reposFilter, 'home-live': homeLive, 'row-overlap': rowOverlap, anatomy};
 try {
   for (const c of wanted) { console.log(`-- ${c}`); await checks[c](); }
 } finally {

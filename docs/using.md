@@ -38,7 +38,7 @@ root commit is not related.
 
 A rendered Markdown file with three or more headings gets an "On this page"
 list (a rail on a wide screen, a menu on a narrow one) of its h2 and h3
-headings, and h1 when there are several, with a filter field. A source file
+headings, and h1 when there are several. A source file
 lists its functions, types, classes and methods, each linked to its line, in
 any language whose highlighting names its declarations (Java, C, C++, C#,
 Kotlin, Ruby, PHP, Scala, Elixir, Lua, shell and about 80 more). In a large

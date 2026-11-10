@@ -1,4 +1,4 @@
-{#- The "On this page" outline (markdown/outline.rs) as the rail or the menu, escaped with the crate's `& < > "` set. The filter field, list and empty note are shared, so the two cannot drift. -#}
+{#- The "On this page" outline (markdown/outline.rs) as the rail or the menu, escaped with the crate's `& < > "` set. The list is shared, so the two cannot drift. -#}
 {%- if rail -%}
 <nav class="outline rail" aria-label="On this page" data-outline><h2>On this page</h2>
 {%- else -%}
@@ -7,5 +7,5 @@
 {%- else %}<summary class="outlinebtn">On this page</summary>{% endif -%}
 <div class="outline-pop">
 {%- endif -%}
-{% if filter %}<input type="search" class="outline-q" placeholder="Filter headings" aria-label="Filter headings" hidden>{% endif %}<ol{% if kind_width > 0 %} class="kinds kw{{ kind_width }}"{% endif %}>{% for l in links %}<li class="d{{ l.depth }}">{% if let Some((label, spoken)) = l.kind %}<a href="#{{ l.id }}" title="{{ label }} {{ l.text }}"><span class="okind" aria-hidden="true" data-kind="{{ spoken }}">{{ label }}</span><span class="vh">{{ spoken }} </span><span class="oname">{{ l.text }}</span>{% else %}<a href="#{{ l.id }}" title="{{ l.text }}">{{ l.text }}{% endif %}</a></li>{% endfor %}</ol><p class="muted outline-none" hidden>No matching heading</p>
+<ol{% if kind_width > 0 %} class="kinds kw{{ kind_width }}"{% endif %}>{% for l in links %}<li class="d{{ l.depth }}">{% if let Some((label, spoken)) = l.kind %}<a href="#{{ l.id }}" title="{{ label }} {{ l.text }}"><span class="okind" aria-hidden="true" data-kind="{{ spoken }}">{{ label }}</span><span class="vh">{{ spoken }} </span><span class="oname">{{ l.text }}</span>{% else %}<a href="#{{ l.id }}" title="{{ l.text }}">{{ l.text }}{% endif %}</a></li>{% endfor %}</ol>
 {%- if rail %}</nav>{% else %}</div></details>{% endif -%}
