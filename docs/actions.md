@@ -7,10 +7,9 @@ selection to another app, **actions** for running a program of yours.
 
 ## Send to
 
-A `[[send]]` target is a URL template. The menu opens a small window with the
-title and notes filled in. You edit them and press Send, and the browser opens
-the destination's own add screen, where you confirm. gitterrace starts no
-process and makes no request, so it stays read-only and holds no token.
+A `[[send]]` target is a URL template. A small window opens with the title and
+notes filled in. Press Send and the browser opens the destination's own add
+screen, where you confirm. gitterrace starts no process and makes no request.
 
 ```toml
 version = 1
@@ -35,13 +34,10 @@ With no `[[send]]` entry, the window offers Copy as markdown.
 
 ### What a note carries
 
-Text marked with the mouse snaps to whole words. Marked code sends its lines.
-Marked prose in rendered Markdown (a README, a `.md` preview) sends the source
-lines it was rendered from, byte for byte, and the permalink names them as
-`#La-Lb`. A mark inside a table quotes the whole table. A mark shorter than
-about 20 characters brings one line on each side as context. The title is the
-first line you type above the context, else the file name and the first words of
-the mark.
+A mark snaps to whole words and sends its source lines, also from rendered
+Markdown. A mark in a table quotes the whole table. A mark under about 20
+characters brings one line on each side. The title is the first line you type,
+else the file name and the first words of the mark.
 
 The last line of every note, and of Copy as markdown, is for machines:
 
@@ -57,10 +53,8 @@ repository name holding `@` still parses.
 
 ### The starter file
 
-`git terrace init` writes the file below to `actions.toml` in your config
-folder, unless one exists. It is an ordinary `actions.toml`. An entry with
-`enabled = false` is checked but not offered: switch on the ones you use and
-fill in their `vars`.
+`git terrace init` writes these entries to `actions.toml`, unless one exists.
+Switch on the ones you use (`enabled = true`) and fill in their `vars`.
 
 <!-- BEGIN GENERATED: starter -->
 | Entry | Kind | On | What it does | `vars` |
@@ -120,10 +114,9 @@ One Send to target: a `url` template.
 
 ## Actions
 
-An action runs a program of yours directly, with no shell: placeholders such as
-`{title}` fill whole arguments, and stdin carries the payload as JSON or the
-markdown alone. Use one when the job is a write with no add screen, a script, or
-a webhook.
+An action runs a program of yours with no shell. Placeholders such as `{title}`
+fill whole arguments, and stdin carries the payload as JSON or the markdown
+alone. Use one for a write with no add screen, a script or a webhook.
 
 ```toml
 [[action]]
@@ -140,9 +133,7 @@ stdin   = "json"
 vars    = { url = "https://example.test/hook" }
 ```
 
-Obsidian's `obsidian://new` takes `vault`, `file` (a path in the vault, `/`
-encoded as `%2F`), `content` and `append`, and opens the note it wrote. This
-action opens a URL with `open`, each value encoded with `:url`:
+`:url` encodes a value for a URL:
 
 ```toml
 [[action]]
@@ -156,27 +147,20 @@ command = [
 vars    = { vault = "Notes", folder = "Inbox" }
 ```
 
-Add `&append=true` and a fixed `file` to send every note to one inbox note
-instead of a new note each time.
+Add `&append=true` and a fixed `file` to append every note to one note.
 
 ### Windows
 
-gitterrace builds and is smoke-tested on native Windows (CI) and under Wine,
-including a timeout that kills its child. Registry, ACL and process group
-behavior are not exercised by Wine. Natively, a timeout ends the script with
-`taskkill /T` (then `/F`) instead of a process group signal, `actions.toml` is
-read from `%APPDATA%\gitterrace` without an owner or mode check (Windows has no
-mode bits, and ACLs are not read), and `command[0]` must be an `.exe`, `.cmd`,
-`.bat` or `.com`. The sample `.sh` scripts need a POSIX shell, so call a Windows
-tool directly, for example `command = ["clip.exe"]` with `stdin = "markdown"`.
+`actions.toml` is read from `%APPDATA%\gitterrace` with no owner or mode check.
+`command[0]` must be an `.exe`, `.cmd`, `.bat` or `.com`, and a timeout ends the
+process tree with `taskkill /T` (then `/F`). The sample `.sh` scripts need a
+POSIX shell, so call a Windows tool directly, such as `command = ["clip.exe"]`
+with `stdin = "markdown"`.
 
-When the same action must work on every system, a script picks the tool. The
-copy entry in the starter file uses [`clipboard.sh`](actions/clipboard.sh),
-which runs unchanged on macOS, Linux (Wayland or X11) and WSL, with
-`stdin = "markdown"`.
+### Scripts shared by actions
 
-A job with several steps stays a script too. Declare it once as a `[[script]]`
-and point actions at it, each with its own settings:
+Declare a command once as a `[[script]]` and point actions at it, each with its
+own settings. The starter `copy` and `edit` entries use the scripts below.
 
 ```toml
 [[script]]
@@ -191,15 +175,11 @@ script = "obsidian"
 vars   = { folder = "Daily" }
 ```
 
-The `edit` entry in the starter file is a script too: it passes `{line_start}`
-and `{root}/{path}` to `editor.sh`.
-
 ## Placeholders
 
-Each element of `command` after the program is filled in on its own and stays
-exactly one argument, whatever the value holds: a title of `$(rm -rf ~)` or
-`--help` reaches the program as that literal text. `{{` and `}}` are literal
-braces. The program, `command[0]`, is never a placeholder.
+Each element of `command` stays exactly one argument: a title of `$(rm -rf ~)`
+or `--help` arrives as that literal text. `{{` and `}}` are literal braces.
+`command[0]` is never a placeholder.
 
 <!-- BEGIN GENERATED: placeholders -->
 | Placeholder | From the repository | Value |
@@ -223,11 +203,9 @@ braces. The program, `command[0]`, is never a placeholder.
 
 <!-- END GENERATED: placeholders -->
 
-Rules, checked when the file loads so a mistake never waits for a click:
+Checked when the file loads:
 
-- An unknown placeholder, or `{var.NAME}` with no such var, is an error naming
-  the element.
-- An unknown modifier (`{title:bogus}`) is an error naming the element.
+- An unknown placeholder, var or modifier is an error naming the element.
 - `shell = true` takes no placeholders. Read the `GITTERRACE_*` environment
   instead.
 - A value from the repository may start with `-` and be read as an option. It
@@ -236,8 +214,8 @@ Rules, checked when the file loads so a mistake never waits for a click:
   (`"--notes={markdown}"`). In the option case, a value that does start with `-`
   refuses the run.
 - A value with a NUL byte, a value over 64 KiB, or arguments over 256 KiB
-  together refuse the run with a toast saying so. Nothing is cut short. Send
-  large text on stdin instead.
+  together refuse the run with a toast. Nothing is cut short. Send large text
+  on stdin.
 
 <!-- BEGIN GENERATED: action-keys -->
 ### `[[script]]`
@@ -342,11 +320,6 @@ Environment (same values, plus `GITTERRACE_VAR_<NAME>`):
 <!-- END GENERATED: limits -->
 
 ## Scripts
-
-The samples left are the jobs a single command cannot do: `clipboard.sh` picks
-the clipboard tool of the OS, `editor.sh` picks your editor and its line syntax,
-`obsidian.sh` appends to today's daily note, a write with no Obsidian screen of
-its own.
 
 <!-- BEGIN GENERATED: scripts -->
 | Script | Does | Needs |
