@@ -127,7 +127,9 @@ pub(crate) fn build(a: &App, head: &str, src: &dyn InsightsSource, dirty: bool, 
     let mut times = Vec::new();
     let (mut today, mut week) = (0, 0);
     let mut recent: Vec<Rank> = Vec::new();
-    let counts = gitterrace_index::Insights::from_source(src, a.defaults().into_options(), None);
+    // Who counts is read from HEAD's shared tables: a fresh set rebuilt the people of the
+    // whole history on every cold overview.
+    let counts = crate::insights::shared_on(a, src, head, a.defaults().into_options());
     for c in window {
         times.push(c.time);
         today += usize::from(c.time >= today_start);

@@ -423,8 +423,32 @@ impl Src<'_> {
     }
 }
 
+/// Table sets built per source address, for the tests that count work per page.
+#[cfg(any(test, feature = "oracle"))]
+static BUILDS: Mutex<Vec<(usize, usize)>> = Mutex::new(Vec::new());
+
+/// [`Derived`] sets built so far over the source at `src`: every fresh [`Insights`] of a
+/// source that the shared tables already hold builds one more.
+#[cfg(any(test, feature = "oracle"))]
+pub fn table_builds(src: &dyn InsightsSource) -> usize {
+    let at = std::ptr::from_ref(src).cast::<u8>() as usize;
+    BUILDS
+        .lock()
+        .ok()
+        .and_then(|g| g.iter().find(|(a, _)| *a == at).map(|(_, n)| *n))
+        .unwrap_or(0)
+}
+
 impl Derived {
     fn build(src: &dyn InsightsSource, opts: &Options, ignore: Option<IgnoreSet>) -> Self {
+        #[cfg(any(test, feature = "oracle"))]
+        if let Ok(mut g) = BUILDS.lock() {
+            let at = std::ptr::from_ref(src).cast::<u8>() as usize;
+            match g.iter_mut().find(|(a, _)| *a == at) {
+                Some(e) => e.1 += 1,
+                None => g.push((at, 1)),
+            }
+        }
         // One pass: commits and newest time per raw identity, folded into people below.
         let mut per_ident = vec![0usize; src.idents()];
         let mut newest = vec![i64::MIN; src.idents()];

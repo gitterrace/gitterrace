@@ -135,7 +135,8 @@ impl App {
     }
 
     /// All-history totals of `commit` with `opts`, both populations, computed once per index
-    /// generation.
+    /// generation over the tables every unfiltered page of `commit` shares: a fresh set of
+    /// them cost the cold overview half a second on rust.
     pub(crate) fn totals(
         &self,
         commit: &str,
@@ -149,11 +150,7 @@ impl App {
         {
             return t.clone();
         }
-        let ignore = opts
-            .respect_ignore
-            .then(|| self.ignore_set(commit))
-            .flatten();
-        let ins = gitterrace_index::Insights::from_source(src, opts, ignore);
+        let ins = crate::insights::shared_on(self, src, commit, opts);
         let t = crate::caches::OverviewTotals {
             every: ins.every_totals(),
             counted: ins.period_summary(gitterrace_index::Period::All).current,

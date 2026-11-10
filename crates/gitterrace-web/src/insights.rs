@@ -253,9 +253,19 @@ pub(crate) fn insights<'a>(a: &App, src: &'a Src, o: Options) -> Insights<'a> {
 
 /// The shared tables of the full set of `head`, see [`insights`].
 fn shared_at<'a>(a: &App, src: &'a Src, head: &str, o: Options) -> Insights<'a> {
+    shared_on(a, &**src, head, o)
+}
+
+/// [`shared_at`] over any source of `head`'s full set: the overview's totals read it too.
+pub(crate) fn shared_on<'a>(
+    a: &App,
+    src: &'a dyn gitterrace_index::feed::InsightsSource,
+    head: &str,
+    o: Options,
+) -> Insights<'a> {
     let respect = o.respect_ignore;
     let key = format!("{}\u{0}{head}\u{0}{}", a.base, a.index.generation());
-    Insights::shared_source(&**src, o, &key, || {
+    Insights::shared_source(src, o, &key, || {
         respect.then(|| a.ignore_set(head)).flatten()
     })
 }

@@ -129,3 +129,69 @@ async fn a_cold_activity_page_walks_its_counted_set_once() {
         "walks of the counted set for one cold /stats"
     );
 }
+
+/// Guard class: one table set per tip. The cold overview after an insights page builds no
+/// derived tables of its own: red at 1 when its totals opened a fresh `Insights` over HEAD.
+/// Second catch: any page that counts HEAD's full set beside the shared tables.
+#[tokio::test]
+async fn the_overview_reuses_the_shared_tables_of_head() {
+    let dir = tempfile::tempdir().expect("tmp");
+    let p = gitterrace_testkit::Fixture::init(dir.path())
+        .write("a.txt", "a\n")
+        .commit("feat: a")
+        .path()
+        .to_owned();
+    let repo = gitterrace_git::Repo::discover(&p).expect("repo");
+    let index = gitterrace_index::Index::open(&repo).expect("index");
+    let app = Arc::new(App::new(repo, index));
+    app.index
+        .update(&app.repo, "HEAD", &|_| {})
+        .expect("update");
+    app.mark_ready();
+    let router = crate::routes::router(Arc::clone(&app));
+    let (status, _) = gitterrace_testkit::get(&router, "/stats").await;
+    assert_eq!(status, 200);
+    let builds = || {
+        let head = app.repo.resolve("HEAD").expect("head");
+        let src = app.source(&head).expect("source").expect("ready");
+        src.run(|s| gitterrace_index::table_builds(&**s))
+            .expect("run")
+    };
+    let before = builds();
+    let (status, body) = gitterrace_testkit::get(&router, "/").await;
+    assert_eq!(status, 200, "{body}");
+    assert_eq!(builds() - before, 0, "table sets built for the overview");
+}
+
+/// Guard class: what the warm-up builds is what the pages read. After the before-ready
+/// pass, a cold activity page and overview build no table set of their own.
+#[tokio::test]
+async fn pages_after_the_warm_up_build_no_tables() {
+    let dir = tempfile::tempdir().expect("tmp");
+    let p = gitterrace_testkit::Fixture::init(dir.path())
+        .write("a.txt", "a\n")
+        .commit("feat: a")
+        .path()
+        .to_owned();
+    let repo = gitterrace_git::Repo::discover(&p).expect("repo");
+    let index = gitterrace_index::Index::open(&repo).expect("index");
+    let app = Arc::new(App::new(repo, index));
+    app.index
+        .update(&app.repo, "HEAD", &|_| {})
+        .expect("update");
+    let head = app.repo.resolve("HEAD").expect("head");
+    super::warm_shared(&app, &head);
+    app.mark_ready();
+    let builds = || {
+        let src = app.source(&head).expect("source").expect("ready");
+        src.run(|s| gitterrace_index::table_builds(&**s))
+            .expect("run")
+    };
+    let before = builds();
+    let router = crate::routes::router(Arc::clone(&app));
+    for page in ["/stats", "/"] {
+        let (status, _) = gitterrace_testkit::get(&router, page).await;
+        assert_eq!(status, 200, "{page}");
+    }
+    assert_eq!(builds() - before, 0, "table sets built after the warm-up");
+}
