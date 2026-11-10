@@ -257,7 +257,15 @@ fn sweep(s: &Server, base: &str, side: usize) {
                 let (status, body) = s.get(&path);
                 assert_eq!(status, 200, "{path}");
                 if far && !rev.is_empty() && p.starts_with("/stats") {
-                    assert!(body.contains("need a reindex"), "{path}: no reindex notice");
+                    let what = if body.contains("data-progress") {
+                        "the indexing page"
+                    } else {
+                        "another page"
+                    };
+                    assert!(
+                        body.contains("need a reindex"),
+                        "{path}: no reindex notice, {what}"
+                    );
                 }
             }
             for n in &names {

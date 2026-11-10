@@ -161,11 +161,30 @@ impl App {
     }
 
     /// Commits read before `head` was found too far from the segment set, when its insights
-    /// are not served for that reason (the last [`App::source`] call for it said so).
+    /// are not served for that reason. The answer kept by the last [`App::source`] call can
+    /// be gone by the time a page asks: a far page is no use, so the idle release may clear
+    /// it in between, and a background segment merge moves the generation. Then the index is
+    /// asked again, which reads at most the fresh-commit cap and loads no records.
     pub(crate) fn far(&self, head: &str) -> Option<usize> {
         let key = (head.to_owned(), self.index.generation());
-        let f = self.caches.far.lock().ok()?;
-        f.as_ref().filter(|(k, _)| *k == key).map(|(_, n)| *n)
+        if let Ok(f) = self.caches.far.lock()
+            && let Some((k, n)) = f.as_ref()
+            && *k == key
+        {
+            return Some(*n);
+        }
+        if !self.ready() || self.index.newer_format().is_some() {
+            return None;
+        }
+        match self.index.source_for(&self.repo, head, head) {
+            Ok(Some(gitterrace_index::Selected::NeedsReindex { read })) => {
+                if let Ok(mut f) = self.caches.far.lock() {
+                    *f = Some((key, read));
+                }
+                Some(read)
+            }
+            _ => None,
+        }
     }
 
     #[cfg(test)]
@@ -230,3 +249,7 @@ impl Drop for Warming {
         self.0.warming.fetch_sub(1, Ordering::Relaxed);
     }
 }
+
+#[cfg(test)]
+#[path = "far_tests.rs"]
+mod tests;
