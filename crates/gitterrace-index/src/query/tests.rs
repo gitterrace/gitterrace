@@ -124,7 +124,9 @@ proptest! {
     }
 
     #[test]
-    fn parse_never_panics_and_canonical_text_is_a_fixed_point(s in "[a-z:!\"\\\\ ,()|/0-9-]{0,24}") {
+    fn parse_never_panics_and_canonical_text_is_a_fixed_point(
+        s in "[a-z:!\"\\\\ ,()|/0-9-]{0,24}"
+    ) {
         if let Ok(once) = Query::parse(&s) {
             let text = once.to_string();
             prop_assert_eq!(Query::parse(&text).map(|q| q.to_string()), Ok(text));

@@ -47,7 +47,6 @@
     "crates/gitterrace-web/templates/graph_cell.html": 1,
     "crates/gitterrace-web/templates/hotspots.html": 4,
     "crates/gitterrace-web/templates/languages_body.html": 8,
-    "crates/gitterrace-web/templates/log.html": 1,
     "crates/gitterrace-web/templates/lost.html": 1,
     "crates/gitterrace-web/templates/outline.html": 3,
     "crates/gitterrace-web/templates/overview.html": 6,

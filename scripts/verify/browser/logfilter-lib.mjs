@@ -19,14 +19,16 @@ export function checks(env) {
             await p.goto(srv.base + '/log/HEAD', { waitUntil: 'load' });
             const head = await p.evaluate(() => ({
               fields: document.querySelectorAll('.ph form.filter input[name=q]').length,
-              compare: [...document.querySelectorAll('.ph a')].some((a) => a.textContent.trim() === 'Compare'),
+              compare: [...document.querySelectorAll('.ph a')]
+                .some((a) => a.textContent.trim() === 'Compare'),
               path: !!document.querySelector('input[name=path]'),
               named: document.querySelector('#logq')?.getAttribute('aria-label'),
             }));
             await p.fill('#logq', 'path:src !merge');
             await Promise.all([p.waitForURL(/[?&]q=/), p.press('#logq', 'Enter')]);
             const url = new URL(p.url());
-            const chips = () => p.$$eval('.chips .chip', (cs) => cs.map((c) => c.textContent.replace('×', '').trim()));
+            const chips = () => p.$$eval('.chips .chip',
+              (cs) => cs.map((c) => c.textContent.replace('×', '').trim()));
             const two = await chips();
             const value = await p.inputValue('#logq');
             await Promise.all([p.waitForNavigation(), p.click('.chips .chip:first-child a')]);
@@ -52,8 +54,9 @@ export function checks(env) {
               && one.length === 1 && left === '!merge'
               && refused.shown && refused.says && refused.kept === 'a | b' && refused.tied
               && refused.sideways <= 0;
-            if (ok) r.ok(`${where}: one field, Enter sends q, chips remove one term, refusal shown`);
-            else r.fail(`${where}: ${JSON.stringify({ head, url: url.search, two, value, one, left, refused })}`);
+            const got = { head, url: url.search, two, value, one, left, refused };
+            if (ok) r.ok(`${where}: one field, Enter sends q, a chip removes one term, refused`);
+            else r.fail(`${where}: ${JSON.stringify(got)}`);
           } catch (e) { r.fail(`${where}: ${e.message.split('\n')[0]}`); }
         }
         await b.close();
