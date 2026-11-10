@@ -71,6 +71,9 @@ pub fn files(repo: &Repo, rev: &str) -> Result<Vec<FileRef>> {
         })
         .collect();
     out.sort_by(|a, b| a.path.cmp(&b.path));
+    // The collect reuses the walk's buffer, sized for every entry with directories; callers
+    // keep this list (the tree caches), so it holds the files alone.
+    out.shrink_to_fit();
     Ok(out)
 }
 

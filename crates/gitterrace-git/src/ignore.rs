@@ -44,6 +44,9 @@ impl IgnoreSet {
             .collect();
         // Shallow first: the search tries the last added list first, so deeper rules win.
         found.sort_by_key(|(path, _)| path.matches('/').count());
+        // The collect above reuses the buffer of the tree's file list, sized for every file;
+        // a server keeps this list per commit, so it keeps only its own entries.
+        found.shrink_to_fit();
         Ok(found)
     }
 
@@ -96,6 +99,39 @@ impl IgnoreSet {
 #[cfg(test)]
 mod tests {
     use super::IgnoreSet;
+
+    /// The list a server keeps per commit holds its own entries, not the buffer of the tree
+    /// walk it was filtered from: a collect from a large Vec reuses that buffer.
+    #[test]
+    fn ignore_files_hold_only_their_own_capacity() {
+        let tmp = tempfile::tempdir().expect("tmp");
+        let dir = tmp.path();
+        gitterrace_testkit::git(dir, &["init", "-q", "-b", "main"]);
+        let files = (0..10_000).map(|i| {
+            format!(
+                "M 100644 inline d{}/f{i}.txt\ndata 2\n{}\n\n",
+                i % 100,
+                i % 10
+            )
+        });
+        let ignores = [".gitignore", "d1/.gitignore", "d2/.ignore"]
+            .map(|p| format!("M 100644 inline {p}\ndata 4\n*.o\n\n"));
+        let script: String = std::iter::once(
+            "commit refs/heads/main\ncommitter t <t@t> 1700000000 +0000\ndata 1\nx\n".to_owned(),
+        )
+        .chain(files)
+        .chain(ignores)
+        .collect();
+        gitterrace_testkit::git_stdin(dir, &["fast-import", "--quiet"], script.as_bytes());
+        let repo = crate::Repo::discover(dir).expect("open");
+        let found = IgnoreSet::files_at(&repo, "main").expect("files");
+        assert_eq!(found.len(), 3);
+        assert!(
+            found.capacity() <= 2 * found.len(),
+            "3 ignore files keep capacity for {}",
+            found.capacity()
+        );
+    }
 
     fn set(files: &[(&str, &str)]) -> IgnoreSet {
         IgnoreSet::from_files(
