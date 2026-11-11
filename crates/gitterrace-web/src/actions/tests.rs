@@ -320,10 +320,20 @@ async fn run_route_security_table() {
             send(&r, Req::ok(&t, body(id, "page", ""))).await.0
         }));
     }
-    // Each nap marks itself started and runs until released, so all four hold a slot now.
+    // Each nap marks itself started and runs until released, so all four hold a slot now. A
+    // nap that answers before the release did not run (refused, or its spawn failed under load):
+    // the wait ends there and names its answer instead of running out the deadline.
     let up = |id: &str| cfg.path().join(format!("{id}.up")).exists();
-    let all_up = || async { ["nap1", "nap2", "nap3", "nap4"].iter().all(|id| up(id)) };
-    gitterrace_testkit::wait::within(gitterrace_testkit::wait::DEADLINE, all_up).await;
+    let settled = || async {
+        ["nap1", "nap2", "nap3", "nap4"].iter().all(|id| up(id))
+            || runs.iter().any(tokio::task::JoinHandle::is_finished)
+    };
+    gitterrace_testkit::wait::within(gitterrace_testkit::wait::DEADLINE, settled).await;
+    if let Some(i) = runs.iter().position(tokio::task::JoinHandle::is_finished) {
+        let s = runs.swap_remove(i).await.expect("join");
+        std::fs::write(cfg.path().join("release"), "").expect("release");
+        panic!("nap run {} answered {s} before the release", i + 1);
+    }
     assert!(
         ["nap1", "nap2", "nap3", "nap4"].iter().all(|id| up(id)),
         "four runs started"

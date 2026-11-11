@@ -556,3 +556,31 @@ fn stdin_modes() {
     record(t.path(), &[], Stdin::None, &p).expect("none");
     assert!(read().is_empty());
 }
+
+/// A timed-out run gives its slot back when `run` returns, not when the kernel reaps its group:
+/// with one slot, the next run starts right away even while the killed grandchild may linger.
+#[test]
+fn a_timed_out_run_frees_its_slot_on_return() {
+    let (_t, repo) = fixture();
+    let runner = Runner::new(Limits {
+        max_running: 1,
+        ..Limits::default()
+    });
+    let p = payload(&repo, Kind::Commit);
+    let slow = shell(
+        "slow",
+        "sh -c 'sleep 30' & sleep 30",
+        Duration::from_millis(200),
+    );
+    let r = runner.run(&slow, &p, &repo.root()).expect("run");
+    assert!(r.timed_out);
+    let next = runner.run(
+        &shell("next", "cat >/dev/null", Duration::from_secs(5)),
+        &p,
+        &repo.root(),
+    );
+    assert!(
+        next.is_ok_and(|o| o.ok),
+        "the slot was still held after the time-out"
+    );
+}
