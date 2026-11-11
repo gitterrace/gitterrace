@@ -338,6 +338,12 @@ def export_test() -> None:
         or bd.export_cell({"export": {**capped, "commits": 100}}) != bd.CAPPED_EXPORT
         or bd.export_cell({"export": capped}) != bd.CAPPED_EXPORT
         or bd.export_cell({"export": broken}) != bd.FAILED_EXPORT
+        or "1 run"
+        not in bd.export_cell(
+            {"cold_samples": 5, "export": {**good, "samples": [12.3]}}
+        )
+        or "1 run"
+        in bd.export_cell({"cold_samples": 5, "export": {**good, "samples": [1, 2]}})
     ):
         sys.exit(f"bench-report self-test failed: export cell {got}")
 

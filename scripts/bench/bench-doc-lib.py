@@ -153,10 +153,12 @@ def export_cell(r: Json) -> str:
         return "not run"
     if e.get("ok") is False:
         return export_failure(e)
-    # A bounded export (corpus export_commits) says so: it is never a full export.
+    # A bounded export (corpus export_commits) says so: it is never a full export. One timed
+    # run (corpus export_samples) says so too, beside a median of several elsewhere.
     n = e.get("commits", DEFAULT_EXPORT_COMMITS)
     bound = f" ({n} commits)" if n != DEFAULT_EXPORT_COMMITS else ""
-    return f"{e['secs']:.1f} s{bound}, {e['out_mb']:.0f} MB"
+    once = ", 1 run" if r.get("cold_samples") and len(e.get("samples", [])) == 1 else ""
+    return f"{e['secs']:.1f} s{bound}{once}, {e['out_mb']:.0f} MB"
 
 
 def machine_line(m: Json) -> str:

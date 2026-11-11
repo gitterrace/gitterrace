@@ -221,7 +221,7 @@ def bench_phases(
         res["pages"][label]["cold"]["total_ms"] = statistics.median(xs)
     exports = [
         export(repo, repo_dir, binary, logdir, base, loads, wait, i, sampler)
-        for i in range(1, samples + 1)
+        for i in range(1, min(samples, int(repo.get("export_samples", samples))) + 1)
     ]
     secs = [e["secs"] for e in exports]
     res["export"] = {
