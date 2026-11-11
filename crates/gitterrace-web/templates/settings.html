@@ -7,6 +7,9 @@
 <div class="setin">{% match f.kind %}
 {% when "checkbox" %}<input type="checkbox" id="f-{{ f.id }}" aria-describedby="d-{{ f.id }} e-{{ f.id }}"{% if f.checked %} checked{% endif %}>
 {% when "list" %}<textarea id="f-{{ f.id }}" aria-describedby="d-{{ f.id }} e-{{ f.id }}" rows="2" placeholder="one per line">{{ f.value }}</textarea>
+{% when "kv" %}<textarea id="f-{{ f.id }}" class="kvtext" rows="3"
+ aria-describedby="d-{{ f.id }} e-{{ f.id }}"
+ placeholder="name = value, one per line">{{ f.value }}</textarea>
 {% when "text" %}<input type="text" id="f-{{ f.id }}" aria-describedby="d-{{ f.id }} e-{{ f.id }}" value="{{ f.value }}">
 {% else %}<code class="setro">{% if f.value.is_empty() %}edited in Plain{% else %}{{ f.value }}{% endif %}</code>
 {% endmatch %}<p class="setdoc muted" id="d-{{ f.id }}">{{ f.doc }}</p><p class="seterr" id="e-{{ f.id }}" hidden></p></div>

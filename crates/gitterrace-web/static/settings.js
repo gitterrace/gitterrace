@@ -60,6 +60,61 @@
     return el.value;
   }
 
+  // A "kv" field is a textarea of `name = value` lines that works without script. Here it
+  // becomes name and value rows with an Add and a Remove button each; the textarea stays the
+  // one source, so check and save read it as before.
+  function kvRows(area) {
+    var box = document.createElement("div");
+    box.className = "kvrows";
+    var id = area.id;
+    function sync() {
+      var lines = [];
+      box.querySelectorAll(".kvrow").forEach(function (r) {
+        var n = r.querySelector(".kvname").value.trim();
+        if (n !== "") lines.push(n + " = " + r.querySelector(".kvval").value);
+      });
+      area.value = lines.join("\n");
+      area.dispatchEvent(new Event("input", { bubbles: true }));
+    }
+    function add(name, value) {
+      var r = document.createElement("div");
+      r.className = "kvrow";
+      var n = document.createElement("input");
+      n.type = "text"; n.className = "kvname"; n.value = name;
+      n.setAttribute("aria-label", "Variable name");
+      var v = document.createElement("input");
+      v.type = "text"; v.className = "kvval"; v.value = value;
+      v.setAttribute("aria-label", "Variable value");
+      var x = document.createElement("button");
+      x.type = "button"; x.className = "kvdel"; x.textContent = "Remove";
+      x.setAttribute("aria-label", "Remove variable");
+      r.append(n, v, x);
+      box.appendChild(r);
+      return n;
+    }
+    area.value.split("\n").forEach(function (l) {
+      var i = l.indexOf("=");
+      if (i > 0) add(l.slice(0, i).trim(), l.slice(i + 1).trim());
+    });
+    var plus = document.createElement("button");
+    plus.type = "button"; plus.className = "kvadd"; plus.textContent = "Add variable";
+    plus.id = id + "-add";
+    box.addEventListener("input", function (e) { e.stopPropagation(); sync(); });
+    box.addEventListener("click", function (e) {
+      var d = e.target.closest(".kvdel");
+      if (!d) return;
+      var row = d.closest(".kvrow");
+      var next = row.nextElementSibling || row.previousElementSibling;
+      row.remove();
+      sync();
+      (next ? next.querySelector(".kvname") : plus).focus();
+    });
+    plus.addEventListener("click", function () { add("", "").focus(); });
+    area.hidden = true;
+    area.after(box, plus);
+  }
+  document.querySelectorAll(".setrow[data-kind='kv'] textarea.kvtext").forEach(kvRows);
+
   function changes() {
     var out = [];
     if (!form) return out;

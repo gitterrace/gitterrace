@@ -234,11 +234,11 @@ fn resulting_text(path: &std::path::Path, e: &Edit) -> Result<String, Located> {
     for c in &e.changes {
         let value = match (&c.input, e.f) {
             (Some(input), SettingsFile::Actions) => Some(
-                crate::settings_actions::literal(&c.id, input).ok_or_else(|| Located {
+                crate::settings_actions::literal(&c.id, input).map_err(|msg| Located {
                     line: 0,
                     col: 0,
                     key: Some(c.id.clone()),
-                    msg: format!("{}: not a value this key takes", c.id),
+                    msg,
                 })?,
             ),
             _ => c.value.clone(),

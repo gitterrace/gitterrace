@@ -504,6 +504,54 @@ async fn an_actions_form_edit_keeps_comments_and_is_checked() {
 }
 
 #[tokio::test]
+async fn a_vars_edit_saves_and_the_loader_reads_it() {
+    const FILE: &str = "version = 1\n# mine\n[[action]]\nid = \"e\"\nlabel = \"Edit\"\n\
+                        kinds = [\"file\"]\ncommand = [\"/usr/bin/true\"]\n\n\
+                        [action.vars]\nold = \"1\"\n";
+    let (root, dir) = (
+        tempfile::tempdir().expect("t"),
+        tempfile::tempdir().expect("t"),
+    );
+    let app = with_actions(root.path(), dir.path(), FILE);
+    let token = token_of(&app);
+    let file = dir.path().join("actions.toml");
+    let (_, html) = page(&app, "/_settings?f=actions").await;
+    assert!(
+        html.contains("data-kind=\"kv\""),
+        "vars render as a kv field"
+    );
+    assert!(
+        html.contains("old = 1"),
+        "the sub-table reads back into the field"
+    );
+    let put = |input: &str| {
+        let stamp = gitterrace_config::Stamp::tag(gitterrace_config::Stamp::of(&file).expect("s"));
+        let mut req = Req::new("PUT", "/_settings/file", Some(&token));
+        req.body = serde_json::json!({
+            "f": "actions",
+            "changes": [{ "id": "action.0.vars", "input": input }],
+            "stamp": stamp
+        })
+        .to_string();
+        req
+    };
+    let (status, reply) = send(&app, put("old = 1\nnew = say \"hi\" \\ ok")).await;
+    assert_eq!(status, 200, "{reply}");
+    let saved = std::fs::read_to_string(&file).expect("r");
+    assert!(saved.contains("# mine"), "{saved}");
+    let cfg = gitterrace_actions::Config::load(&file, &[]).expect("loads");
+    let vars = &cfg.get("e").expect("e").vars;
+    assert_eq!(
+        vars.get("new").map(String::as_str),
+        Some("say \"hi\" \\ ok")
+    );
+    assert_eq!(vars.get("old").map(String::as_str), Some("1"));
+    let (status, reply) = send(&app, put("Bad-Name = x")).await;
+    assert_eq!(status, 422, "{reply}");
+    assert_eq!(std::fs::read_to_string(&file).expect("r"), saved);
+}
+
+#[tokio::test]
 async fn each_field_links_to_its_error_and_the_page_has_an_alert_summary() {
     let (root, dir) = (
         tempfile::tempdir().expect("t"),

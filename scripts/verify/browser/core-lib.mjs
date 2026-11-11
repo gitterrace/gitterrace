@@ -4,6 +4,7 @@
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { sh } from '../../lib/browser-lib.mjs';
+import { varsStep } from './settings-vars-lib.mjs';
 
 let dir, srv, r, browsers, context, arg, cfg;
 
@@ -505,6 +506,7 @@ async function settings() {
       if (after === before.replace('label = "Mark"', 'label = "Mark it"')) {
         r.ok(`settings ${name}: an action card edit saves in place`);
       } else r.fail(`settings ${name}: actions.toml became ${JSON.stringify(after)}`);
+      await varsStep(p, srv, cfg, name, r);
       writeFileSync(join(cfg, 'actions.toml'), before, { mode: 0o600 });
     } catch (e) {
       r.fail(`settings ${name}: ${e.message.split('\n')[0]}`);

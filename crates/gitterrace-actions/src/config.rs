@@ -515,17 +515,24 @@ fn validate_vars(
     id: &str,
     vars: BTreeMap<String, String>,
 ) -> Result<BTreeMap<String, String>, ConfigError> {
+    check_vars(&vars).map_err(|why| invalid(id, why))?;
+    Ok(vars)
+}
+
+/// The rules `[action.vars]` is loaded under, so the settings form refuses what the loader
+/// would: the reason, or `Ok` when `vars` loads.
+pub fn check_vars(vars: &BTreeMap<String, String>) -> Result<(), String> {
     if vars.len() > MAX_VARS {
-        return Err(invalid(id, format!("at most {MAX_VARS} vars")));
+        return Err(format!("at most {MAX_VARS} vars"));
     }
-    for (name, value) in &vars {
+    for (name, value) in vars {
         let lower = name.to_ascii_lowercase();
         let fixable = lower.len() <= MAX_VAR_NAME
             && lower
                 .bytes()
                 .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'_');
         if *name != lower && fixable {
-            return Err(invalid(id, format!("vars.{name}: use lowercase: {lower}")));
+            return Err(format!("vars.{name}: use lowercase: {lower}"));
         }
         if name.is_empty()
             || name.len() > MAX_VAR_NAME
@@ -533,22 +540,19 @@ fn validate_vars(
                 .bytes()
                 .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'_')
         {
-            return Err(invalid(
-                id,
-                format!("vars.{name}: name must match [a-z0-9_]{{1,32}}"),
-            ));
+            return Err(format!("vars.{name}: name must match [a-z0-9_]{{1,32}}"));
         }
         if value.len() > MAX_VAR_BYTES {
-            return Err(invalid(
-                id,
-                format!("vars.{name}: value over {} KiB", MAX_VAR_BYTES / 1024),
+            return Err(format!(
+                "vars.{name}: value over {} KiB",
+                MAX_VAR_BYTES / 1024
             ));
         }
         if value.contains('\0') {
-            return Err(invalid(id, format!("vars.{name}: value contains NUL")));
+            return Err(format!("vars.{name}: value contains NUL"));
         }
     }
-    Ok(vars)
+    Ok(())
 }
 
 fn parse_duration(t: &str) -> Option<Duration> {

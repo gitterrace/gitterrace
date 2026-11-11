@@ -52,7 +52,8 @@
 //   settings     the gear opens the settings page; a form edit shows in Plain as the server's
 //                text, an invalid plain edit marks its line in the gutter and keeps Save off, and
 //                Save writes the file and reloads with the new value, and an action card edit
-//                saves actions.toml in place, in each browser
+//                saves actions.toml in place, and a variable added as a name and value row
+//                saves, in each browser
 //   repo-switch  a server on one repository hides the switcher (a fresh load paints it in
 //                place); when a second `git terrace` joins, the open page shows it without a
 //                reload, it lists both, and picking

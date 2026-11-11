@@ -33,7 +33,8 @@ pub(crate) struct CardField {
     pub(crate) name: &'static str,
     pub(crate) doc: &'static str,
     pub(crate) required: bool,
-    /// `checkbox`, `list`, `text`, or `plain` for a key the form leaves to Plain.
+    /// `checkbox`, `list`, `kv` (one `name = value` per line), `text`, or `plain` for a key the
+    /// form leaves to Plain.
     pub(crate) kind: &'static str,
     pub(crate) value: String,
     pub(crate) checked: bool,
@@ -82,6 +83,7 @@ fn card(list: &str, i: usize, keys: &[Item], set: &[(&'static str, String)]) -> 
                 ty if !gitterrace_config::row_editable(ty) => "plain",
                 "boolean" => "checkbox",
                 "array of strings" => "list",
+                "table of strings" => "kv",
                 _ => "text",
             };
             CardField {
@@ -103,13 +105,26 @@ fn card(list: &str, i: usize, keys: &[Item], set: &[(&'static str, String)]) -> 
 }
 
 /// The TOML literal a form input means for `list.N.name`, by the key's type in the schema.
-/// `None` for a key the schema does not list or the form does not edit.
-pub(crate) fn literal(id: &str, input: &str) -> Option<String> {
+/// `Err` names why: a key the schema does not list or the form does not edit, or a table the
+/// loader would refuse (`vars` go through the loader's own check).
+pub(crate) fn literal(id: &str, input: &str) -> Result<String, String> {
+    let not_taken = || format!("{id}: not a value this key takes");
     let mut parts = id.split('.');
-    let (list, _, name) = (parts.next()?, parts.next()?, parts.next()?);
-    let keys = LISTS.iter().find(|(l, _)| *l == list)?.1;
-    let k = keys.iter().find(|k| k.name == name)?;
-    gitterrace_config::row_literal(k.ty, input)
+    let (Some(list), Some(_), Some(name)) = (parts.next(), parts.next(), parts.next()) else {
+        return Err(not_taken());
+    };
+    let key = LISTS
+        .iter()
+        .find(|(l, _)| *l == list)
+        .and_then(|(_, keys)| keys.iter().find(|k| k.name == name));
+    let Some(k) = key else {
+        return Err(not_taken());
+    };
+    if k.ty == "table of strings" {
+        return gitterrace_config::table_literal(input, gitterrace_actions::config::check_vars)
+            .map_err(|why| format!("{id}: {why}"));
+    }
+    gitterrace_config::row_literal(k.ty, input).ok_or_else(not_taken)
 }
 
 #[cfg(test)]
@@ -157,21 +172,78 @@ mod tests {
 
     #[test]
     fn inputs_become_literals_by_the_schema_type() {
-        assert_eq!(literal("send.0.label", "M\"x").as_deref(), Some("'M\"x'"));
+        assert_eq!(literal("send.0.label", "M\"x").as_deref(), Ok("'M\"x'"));
         assert_eq!(
             literal("action.1.kinds", "file\n\nline").as_deref(),
-            Some("[\"file\", \"line\"]")
+            Ok("[\"file\", \"line\"]")
         );
         for id in ["action.0.command", "send.0.nope", "repo.0.id"] {
-            assert_eq!(literal(id, "x"), None, "{id}");
+            assert!(literal(id, "x").is_err(), "{id}");
         }
+    }
+
+    #[test]
+    fn vars_input_uses_the_loader_rules_and_the_kv_kind() {
+        let l = lists(FILE).expect("toml");
+        let vars = l[1]
+            .blank
+            .fields
+            .iter()
+            .find(|f| f.name == "vars")
+            .expect("vars");
+        assert_eq!(vars.kind, "kv");
+        assert_eq!(
+            literal("action.0.vars", "a = 1\nb_2 = x").as_deref(),
+            Ok("{ a = \"1\", b_2 = \"x\" }")
+        );
+        let bad = literal("action.0.vars", "Bad-Name = x").expect_err("name");
+        assert!(
+            bad.contains("action.0.vars") && bad.contains("vars."),
+            "{bad}"
+        );
+        let many = (0..33).fold(String::new(), |acc, i| acc + &format!("v{i} = x\n"));
+        assert!(
+            literal("action.0.vars", &many)
+                .expect_err("many")
+                .contains("at most 32")
+        );
+    }
+
+    #[test]
+    fn vars_roundtrip_keeps_comments_and_other_keys() {
+        let text = "version = 1\n# mine\n[[action]]\nid = \"e\" # id\nlabel = \"E\"\n\
+                    command = [\"x\"]\n\n[action.vars]\nold = \"1\"\n";
+        let l = lists(text).expect("toml");
+        let v = l[1].rows[0]
+            .fields
+            .iter()
+            .find(|f| f.name == "vars")
+            .expect("vars");
+        assert_eq!(v.value, "old = 1");
+        let c = gitterrace_config::Change {
+            id: "action.0.vars".into(),
+            value: literal("action.0.vars", "old = 1\nnew = q\"\\z").ok(),
+        };
+        let out = gitterrace_config::apply(text, &[c]).expect("apply");
+        assert!(
+            out.contains("# mine") && out.contains("id = \"e\" # id"),
+            "{out}"
+        );
+        assert!(out.contains("command = [\"x\"]"), "{out}");
+        let back = lists(&out).expect("toml");
+        let v = back[1].rows[0]
+            .fields
+            .iter()
+            .find(|f| f.name == "vars")
+            .expect("vars");
+        assert_eq!(v.value, "new = q\"\\z\nold = 1");
     }
 
     #[test]
     fn roundtrip_keeps_comments() {
         let c = gitterrace_config::Change {
             id: "send.0.label".into(),
-            value: literal("send.0.label", "Mail draft"),
+            value: literal("send.0.label", "Mail draft").ok(),
         };
         let out = gitterrace_config::apply(FILE, &[c]).expect("apply");
         assert_eq!(out, FILE.replace("\"Mail\"", "\"Mail draft\""));
