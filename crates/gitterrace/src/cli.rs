@@ -93,10 +93,12 @@ pub(crate) enum Command {
     Export {
         /// Folder to write into (created if missing). Default: `./gitterrace-export`. Give it
         /// first, before any repositories: `export site repo1 repo2`. A folder an earlier
-        /// export made is emptied first. Any other non-empty folder is refused without
-        /// `--force`.
+        /// export made is replaced whole. Any other non-empty folder is refused without
+        /// `--force`, and so are a symlink and a folder holding a repository being exported.
         out: Option<PathBuf>,
-        /// Write into a non-empty folder that no earlier export made, over what is there.
+        /// Write into a non-empty folder that no earlier export made. Its files are kept, a
+        /// file in the site's way is replaced, a folder in its way fails the export. Later
+        /// exports replace only what an export put there.
         #[arg(long)]
         force: bool,
         /// Newest commits to include as pages.

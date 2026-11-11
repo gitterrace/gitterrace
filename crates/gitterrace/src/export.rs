@@ -17,6 +17,7 @@ mod relative;
 mod seeds;
 mod seen;
 mod snapshot;
+mod swap;
 mod write;
 
 use std::{
@@ -30,7 +31,7 @@ use gitterrace_git::percent_decode;
 
 use crate::export::caps::{Caps, is_fragment};
 use crate::export::credit::{Credit, add_footer};
-use crate::export::out::{Staging, check_out};
+use crate::export::out::{Target, check_out};
 pub(crate) use crate::export::progress::{Mode, Progress};
 use crate::export::relative::relativize;
 use crate::export::seeds::{queue_seeds, seeds};
@@ -38,6 +39,7 @@ use crate::export::seen::Seen;
 #[cfg(test)]
 use crate::export::snapshot::mark_snapshot_as;
 use crate::export::snapshot::{SNAPSHOT_CSS, mark_snapshot, snapshot_label};
+use crate::export::swap::{Staging, recover};
 use crate::export::write::{fetch, write_page};
 #[cfg(test)]
 use crate::export::write::{fetch_within, target};
@@ -152,11 +154,15 @@ pub(crate) async fn export_with(
             dest.display()
         );
     }
-    let existing = check_out(repos, dest, scope.force)?;
-    let staging = Staging::new(dest)?;
+    // One lifecycle: see where the output really is, undo what a crashed run left, decide
+    // what the export owns there, build beside it, then put the site in place.
+    let target = Target::resolve(dest)?;
+    recover(&target)?;
+    let owned = check_out(repos, &target, scope.force)?;
+    let staging = Staging::new(&target)?;
     let written = crawl(repos, staging.path(), scope, export_pages, progress).await?;
     progress.done(written);
-    staging.finish(repos, dest, existing)?;
+    staging.publish(repos, owned, scope.force)?;
     exclude_from_worktree(dest);
     Ok(written)
 }

@@ -130,10 +130,12 @@ git terrace export [OPTIONS] [OUT] [PATHS]...
 
 - `<OUT>`: Folder to write into (created if missing). Default:
   `./gitterrace-export`. Give it first, before any repositories:
-  `export site repo1 repo2`. A folder an earlier export made is emptied first.
-  Any other non-empty folder is refused without `--force`.
-- `--force`: Write into a non-empty folder that no earlier export made, over
-  what is there.
+  `export site repo1 repo2`. A folder an earlier export made is replaced whole.
+  Any other non-empty folder is refused without `--force`, and so are a symlink
+  and a folder holding a repository being exported.
+- `--force`: Write into a non-empty folder that no earlier export made. Its
+  files are kept, a file in the site's way is replaced, a folder in its way
+  fails the export. Later exports replace only what an export put there.
 - `--commits <N>`: Newest commits to include as pages. Default: `500`.
 - `--file-kb <KIB>`: Largest file to include as a page, in KiB. Larger files are
   left out of the export. Default: `512`.
