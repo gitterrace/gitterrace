@@ -18,7 +18,7 @@ use crate::seg::format::section;
 use crate::seg::postings::{self, Postings};
 use crate::seg::read::Container;
 use crate::seg::spill::Spill;
-use crate::seg::{Ordinal, SegResult, Sink};
+use crate::seg::{SegResult, Sink};
 
 /// Writes the tables of one segment in section order: postings (3, 4, 5), aggregates (6 to 10)
 /// and the rank of each local ordinal (33).
@@ -214,10 +214,6 @@ impl<B: InsightsSource> SegmentSource<B> {
         Ok(())
     }
 
-    fn rank(seg: &Container, ordinal: u32) -> SegResult<Rank> {
-        seg.rank(Ordinal(ordinal))
-    }
-
     fn author_day(&self, days: &Range<i64>) -> SegResult<Vec<AuthorDayRow>> {
         let mut out: BTreeMap<(i64, u32), AuthorDayRow> = BTreeMap::new();
         self.each_block(section::AUTHOR_DAY, |_, c, n| {
@@ -303,11 +299,8 @@ impl<B: InsightsSource> SegmentSource<B> {
                             local.extend_from_slice(ords);
                         }
                     })?;
-                    for &o in &local {
-                        out.push(Hit {
-                            rank: Self::rank(seg, o)?,
-                            row: 0,
-                        });
+                    for rank in seg.ranks(&local)? {
+                        out.push(Hit { rank, row: 0 });
                     }
                     Ok(())
                 })?;
@@ -324,9 +317,10 @@ impl<B: InsightsSource> SegmentSource<B> {
         self.each_block(section::RENAMES, |seg, c, n| {
             local.clear();
             postings::decode_renames(c, n, |e| local.push(e))?;
-            for e in &local {
+            let ords: Vec<u32> = local.iter().map(|e| e.ordinal).collect();
+            for (e, rank) in local.iter().zip(seg.ranks(&ords)?) {
                 out.push(RenameEdge {
-                    rank: Self::rank(seg, e.ordinal)?,
+                    rank,
                     row: e.row,
                     old: PathId(e.old),
                     new: PathId(e.new),

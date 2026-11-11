@@ -1,7 +1,7 @@
 //! Segment tables at open, the record decoder and the small id helpers.
 
 use crate::feed::Rank;
-use crate::feed::disk::{DiskSource, OID_ENTRY, Rec, Seg, columns};
+use crate::feed::disk::{DiskSource, Rec, Seg, columns};
 use crate::feed::{FileRow, PathId, Sums};
 use crate::seg::bounds::Cursor;
 use crate::seg::format::{TocEntry, section};
@@ -56,19 +56,16 @@ pub(super) fn open_seg(c: Container, first_expected: u32, buf: &mut Vec<u8>) -> 
         at += e.items;
     }
     let mut oid_first = Vec::new();
-    let mut at = 0u32;
     for e in c.blocks(section::OID_INDEX) {
         if !fixed(e, 24) || e.items == 0 {
             return Err(bad("oid index block length"));
         }
-        // Routing only: the block's crc is checked when it is searched, and its first oid
-        // must equal this one then.
-        let mut o = [0u8; OID_ENTRY];
-        c.record_at(section::OID_INDEX, at, OID_ENTRY, &mut o)?;
+        // Routing only, read without the crc so open stays one small pread per block: a
+        // lookup compares it with the checked block it routes to and with the next block's
+        // checked first oid before it answers "absent" (`DiskSource::rank_of`).
         let mut oid = [0u8; 20];
-        oid.copy_from_slice(&o[..20]);
+        c.head_unchecked(e, &mut oid)?;
         oid_first.push(oid);
-        at += e.items;
     }
     if !oid_first.is_sorted() {
         return Err(bad("oid index not sorted"));

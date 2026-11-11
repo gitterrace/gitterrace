@@ -108,11 +108,9 @@ impl Container {
         Ok(())
     }
 
-    /// Reads one fixed-width record by index across a section's blocks, by pread, without
-    /// loading the section (a rank lookup never holds the table in memory). Each block must hold
-    /// `items * width` bytes. The block crc is not checked here: the record is a pure index
-    /// and the file passed its footer check, so a flipped byte gives a wrong rank, which the
-    /// next full read (`check_all`, merge) catches.
+    /// Reads one fixed-width record by index across a section's blocks. The whole block is
+    /// read and its crc checked first, so a flipped byte is `Unreadable`, never a wrong value.
+    /// A block is at most `MAX_BLOCK`, so this costs one bounded pread.
     pub fn record_at(
         &self,
         section: u16,
@@ -130,12 +128,17 @@ impl Container {
                 ));
             }
             if index < first.saturating_add(e.items) {
-                let at = e.offset + u64::from(index - first) * width as u64;
+                let at = (index - first) as usize * width;
                 let out = out
                     .get_mut(..width)
-                    .ok_or_else(|| SegError::unreadable(&self.name, at, "width"))?;
-                return read_exact_at(&self.file, out, at)
-                    .map_err(|_| SegError::unreadable(&self.name, at, "record read"));
+                    .ok_or_else(|| SegError::unreadable(&self.name, e.offset, "width"))?;
+                let mut buf = Vec::new();
+                let block = self.read_block(e, &mut buf)?;
+                let rec = block
+                    .get(at..at + width)
+                    .ok_or_else(|| SegError::unreadable(&self.name, e.offset, "record read"))?;
+                out.copy_from_slice(rec);
+                return Ok(());
             }
             first = first.saturating_add(e.items);
         }
@@ -146,7 +149,18 @@ impl Container {
         ))
     }
 
-    /// The canonical rank of a segment-local ordinal (section `RANK`).
+    /// The first `out.len()` bytes of block `e`, by pread, crc not checked. For routing
+    /// tables built at open only: every use compares the value with the block once that
+    /// block is read checked (`DiskSource::rank_of`).
+    pub(crate) fn head_unchecked(&self, e: &TocEntry, out: &mut [u8]) -> SegResult<()> {
+        if out.len() as u64 > u64::from(e.len) {
+            return Err(SegError::unreadable(&self.name, e.offset, "block head"));
+        }
+        read_exact_at(&self.file, out, e.offset)
+            .map_err(|_| SegError::unreadable(&self.name, e.offset, "block head read"))
+    }
+
+    /// The canonical rank of a segment-local ordinal (section `RANK`), crc checked.
     pub fn rank(&self, ordinal: crate::seg::Ordinal) -> SegResult<Rank> {
         let mut b = [0; 4];
         self.record_at(crate::seg::format::section::RANK, ordinal.0, 4, &mut b)?;

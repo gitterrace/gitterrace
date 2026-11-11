@@ -7,8 +7,8 @@ use super::DiskSource;
 use crate::feed::{
     CommitRange, IdentId, IdentPairs, InsightsSource, LabelId, MemorySource, PathId, Posting, Rank,
 };
-use crate::seg::SegResult;
 use crate::seg::read::Store;
+use crate::seg::{SegResult, hex};
 use crate::{CodeStat, CommitRecord, FileStat};
 
 static ONE_AT_A_TIME: std::sync::Mutex<()> = std::sync::Mutex::new(());
@@ -462,4 +462,46 @@ fn reseal(b: &mut [u8], toc_index: usize, at: usize, len: usize) {
     b[foot + 28..foot + 32].copy_from_slice(&toc_crc.to_le_bytes());
     let fcrc = crc32fast::hash(&b[foot..foot + 60]);
     b[foot + 60..].copy_from_slice(&fcrc.to_le_bytes());
+}
+
+/// Past one `OID_INDEX` block (43690 entries), every commit is found in whichever block it
+/// routes to, and an oid between two blocks' boundaries or past the last is absent, not an
+/// error: the boundary checks pass on a sound set.
+#[test]
+fn lookups_across_oid_blocks_find_every_commit() -> SegResult<()> {
+    let _one = ONE_AT_A_TIME.lock();
+    let recs: Vec<CommitRecord> = (0..45_000usize)
+        .map(|i| CommitRecord {
+            id: oid(i),
+            author: "A".into(),
+            email: "a@x.io".into(),
+            time: 1_700_000_000 + i as i64,
+            ..CommitRecord::default()
+        })
+        .collect();
+    let dir = tempfile::tempdir()?;
+    write_cache(dir.path(), &recs, &[])?;
+    let disk = open(dir.path(), &IdentPairs::new())?;
+    assert_eq!(disk.segs[0].oid_first.len(), 2, "two oid blocks");
+    for (i, r) in recs
+        .iter()
+        .enumerate()
+        .step_by(97)
+        .chain(recs.iter().enumerate().skip(44_990))
+    {
+        assert!(
+            disk.find_commit(&r.id).ok().flatten().is_some(),
+            "commit {i}"
+        );
+    }
+    let mut ids: Vec<&str> = recs.iter().map(|r| r.id.as_str()).collect();
+    ids.sort_unstable();
+    let boundary = hex(&disk.segs[0].oid_first[1]);
+    assert!(disk.find_commit(&boundary).is_ok_and(|r| r.is_some()));
+    for absent in [format!("{:040x}", 0), "f".repeat(40), oid(99_999_999)] {
+        assert!(ids.binary_search(&absent.as_str()).is_err());
+        assert_eq!(disk.find_commit(&absent), Ok(None), "{absent}");
+    }
+    assert_eq!(disk.unreadable(), None);
+    Ok(())
 }

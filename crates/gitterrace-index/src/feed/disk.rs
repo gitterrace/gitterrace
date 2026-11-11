@@ -515,23 +515,24 @@ impl DiskSource {
         }
     }
 
+    /// The rank of `oid`. Routing uses the open-time block boundaries, which were read without
+    /// a crc, so neither answer trusts them alone: the block routed to must start with its
+    /// boundary, and "absent" also needs the block after it to start with its own. A corrupt
+    /// boundary is then `Unreadable`, never a commit reported missing.
     fn rank_of(&self, oid: &Oid) -> SegResult<Option<Rank>> {
         for (s, seg) in self.segs.iter().enumerate() {
-            let bi = seg.oid_first.partition_point(|f| f <= oid);
-            let Some(bi) = bi.checked_sub(1) else {
-                continue;
-            };
             let start = seg
                 .c
                 .toc()
                 .partition_point(|e| e.section < section::OID_INDEX);
-            let b = self.block(Key::Seg(s, start + bi))?;
-            let n = b.bytes.len() / OID_ENTRY;
+            let bi = seg.oid_first.partition_point(|f| f <= oid);
+            let Some(bi) = bi.checked_sub(1) else {
+                self.oid_block(s, start, 0)?;
+                continue;
+            };
+            let b = self.oid_block(s, start, bi)?;
             let at = |i: usize| &b.bytes[i * OID_ENTRY..i * OID_ENTRY + 20];
-            if n == 0 || at(0) != seg.oid_first[bi] {
-                return Err(SegError::unreadable(seg.c.name(), 0, "oid index routing"));
-            }
-            let (mut lo, mut hi) = (0, n);
+            let (mut lo, mut hi) = (0, b.bytes.len() / OID_ENTRY);
             while lo < hi {
                 let mid = usize::midpoint(lo, hi);
                 match at(mid).cmp(oid.as_slice()) {
@@ -547,8 +548,23 @@ impl DiskSource {
                     }
                 }
             }
+            if bi + 1 < seg.oid_first.len() {
+                self.oid_block(s, start, bi + 1)?;
+            }
         }
         Ok(None)
+    }
+
+    /// `OID_INDEX` block `bi` of segment `s`, crc checked, and its first oid equal to the
+    /// routing boundary open recorded for it.
+    fn oid_block(&self, s: usize, start: usize, bi: usize) -> SegResult<Arc<Block>> {
+        let seg = &self.segs[s];
+        let b = self.block(Key::Seg(s, start + bi))?;
+        let first = b.bytes.get(..20);
+        if b.bytes.len() < OID_ENTRY || first != seg.oid_first.get(bi).map(<[u8; 20]>::as_slice) {
+            return Err(SegError::unreadable(seg.c.name(), 0, "oid index routing"));
+        }
+        Ok(b)
     }
 
     /// Every file row with its rank, for the aggregates this source answers on its own (the

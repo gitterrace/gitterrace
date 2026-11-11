@@ -6,12 +6,14 @@
 #![expect(clippy::expect_used, reason = "test setup")]
 
 use std::fs;
+use std::io::{Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
 
 use gitterrace_git::Repo;
-use gitterrace_index::feed::InsightsSource;
+use gitterrace_index::feed::{IdentId, InsightsSource, Posting};
+use gitterrace_index::seg::format::section;
 use gitterrace_index::seg::read::Store;
 use gitterrace_index::{CommitSource, Index};
 use gitterrace_testkit::Fixture;
@@ -45,6 +47,27 @@ fn built() -> Built {
     }
 }
 
+/// The segment file and the offset of the first block of `sec` in it.
+fn first_block(cache: &Path, sec: u16) -> (PathBuf, u64) {
+    let store = Store::open(cache).expect("store").expect("a set");
+    let seg = &store.segments[0];
+    (cache.join(seg.name()), seg.blocks(sec)[0].offset)
+}
+
+/// Flips one byte in place, the same inode, so an already open handle sees it too.
+fn flip(path: &Path, at: u64) {
+    let mut f = fs::OpenOptions::new()
+        .read(true)
+        .write(true)
+        .open(path)
+        .expect("open");
+    let mut b = [0u8];
+    f.seek(SeekFrom::Start(at)).expect("seek");
+    std::io::Read::read_exact(&mut f, &mut b).expect("read");
+    f.seek(SeekFrom::Start(at)).expect("seek");
+    f.write_all(&[b[0] ^ 0xff]).expect("write");
+}
+
 fn find_head(b: &Built) -> Result<Option<u32>, String> {
     let set = b
         .index
@@ -54,6 +77,39 @@ fn find_head(b: &Built) -> Result<Option<u32>, String> {
     set.run(|s| s.find_commit(&b.head).map(|r| r.map(|r| r.0)))
         .map_err(|e| e.to_string())?
         .map_err(|e| e.to_string())
+}
+
+#[test]
+fn a_corrupt_oid_boundary_is_an_error_never_a_missing_head() {
+    let b = built();
+    assert!(matches!(find_head(&b), Ok(Some(_))), "valid lookup");
+    let (seg, at) = first_block(&b.cache, section::OID_INDEX);
+    // The first byte of the first oid: the routing boundary of block 0.
+    flip(&seg, at);
+    let got = find_head(&b);
+    assert!(got.is_err(), "a corrupt boundary gave {got:?}");
+    // The caller's answer to an unreadable set: rebuild, then the lookup is whole again.
+    b.index.rebuild().expect("rebuild");
+    b.index.update(&b.repo, "HEAD", &|_| {}).expect("update");
+    assert!(matches!(find_head(&b), Ok(Some(_))), "after rebuild");
+}
+
+#[test]
+fn a_rank_changed_after_open_is_an_error_never_served() {
+    let b = built();
+    let set = b
+        .index
+        .disk_source(&b.repo, &b.head)
+        .expect("open")
+        .expect("set");
+    let (seg, at) = first_block(&b.cache, section::RANK);
+    flip(&seg, at);
+    let got = set.run(|s| {
+        s.postings(Posting::Author(IdentId(0)))
+            .map(|h| h.rank.0)
+            .collect::<Vec<_>>()
+    });
+    assert!(got.is_err(), "a changed rank was served: {got:?}");
 }
 
 /// A child run: opens the cache and the set. The outcome may be an error; only returning
