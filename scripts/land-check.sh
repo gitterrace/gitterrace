@@ -350,6 +350,9 @@ step cargo fmt --all -- --check
 if ((${#scope[@]})); then
   step cargo clippy "${scope[@]}" --all-targets -- -D warnings
   step cargo test "${scope[@]}"
+  # Rustdoc as `make doc` runs it: a link to an item that only exists under cfg(test) passes
+  # clippy and the tests and fails here alone.
+  step env RUSTDOCFLAGS="-D warnings" cargo doc --no-deps "${scope[@]}"
   # The output oracle: named on its own so a log shows it ran whenever the pages could move.
   run_oracle=0
   [[ " ${scope[*]} " == *" --workspace "* ]] && run_oracle=1
