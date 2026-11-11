@@ -1,4 +1,4 @@
-# insight answers echo the canonical filter as query; with that field removed every answer equals the one before
+# the log page gains the filter's ? help: a details after the field, with every keyword and a link to the docs
 3d6331935b06992963d36c2eaffb6666 3d6331935b06992963d36c2eaffb6666 [browse] /api/files/HEAD
 5926060c7e0029dde61fa7387dbc2baf 5926060c7e0029dde61fa7387dbc2baf [browse] /api/refs
 bebf476f24e053138c70726f732dec41 4ef57968e0b11422ff4c4fd25a6ae0cd [browse] /blame/HEAD/missing.rs
@@ -23,13 +23,13 @@ e3520eb35c6c5aa88b264948f595c91b e3520eb35c6c5aa88b264948f595c91b [browse] /comp
 6c62272e07bb014262b821756295c58d 6c62272e07bb014262b821756295c58d [browse] /hl/HEAD/src/lib.rs
 b3d230dde44c7fe2ee263a6af7e825ff 3d8063d75a148f70df6f7606d756e207 [browse] /insights
 b3d230dde44c7fe2ee263a6af7e825ff 3d8063d75a148f70df6f7606d756e207 [browse] /log
-b07ecc4c133f2af13811dc0e10089fc6 1a253d4007632c51670275a3e74b123e [browse] /log/HEAD
-a61f2d770cb03650a13d27062038fb78 a61f2d770cb03650a13d27062038fb78 [browse] /log/HEAD?author=bob%40y.io
-0d3496a0e5ddc5af7f805eebe6b88d1e 0d3496a0e5ddc5af7f805eebe6b88d1e [browse] /log/HEAD?page=2
-ccd32be1d636e8fb6f106d64f805527c ccd32be1d636e8fb6f106d64f805527c [browse] /log/HEAD?path=src
-549b7bdf42702a7aaf16725e58f78349 549b7bdf42702a7aaf16725e58f78349 [browse] /log/HEAD?path=src&author=bob%40y.io
-1aaffe4e3cd406281f4fa36d444bd425 1c0ad1376c92249a55c5f84553935dbd [browse] /log/HEAD?view=graph
-8b4792862f26de0c409c5d5e5abb6693 8b4792862f26de0c409c5d5e5abb6693 [browse] /log/HEAD?view=graph&page=2
+cf73a9f79882dd7478858ab7372bb6d6 b5bc89b4b3606a057b24da2ed3eb426e [browse] /log/HEAD
+c73836b5295ba5e501321eb2b332cf50 c73836b5295ba5e501321eb2b332cf50 [browse] /log/HEAD?author=bob%40y.io
+c697a78c0cc82c77b12ed53b0e97e996 c697a78c0cc82c77b12ed53b0e97e996 [browse] /log/HEAD?page=2
+ebd314535d996c52bb8e10bf73d5df2c ebd314535d996c52bb8e10bf73d5df2c [browse] /log/HEAD?path=src
+23d48e96d1afecc8cc69b6f93ceef941 23d48e96d1afecc8cc69b6f93ceef941 [browse] /log/HEAD?path=src&author=bob%40y.io
+bbe28c01240b8f2f6362a506379233d5 dddd54fd920bfe7682555b021f132c2d [browse] /log/HEAD?view=graph
+37f76e16ccc6a302ca368c7dae22ae6b 37f76e16ccc6a302ca368c7dae22ae6b [browse] /log/HEAD?view=graph&page=2
 6b95ed0a8f52a814ea4f9dd8ad26e33f 67697c1f1d9d52c2b6446265daeafd11 [browse] /log/nope
 bebf476f24e053138c70726f732dec41 4ef57968e0b11422ff4c4fd25a6ae0cd [browse] /raw/HEAD/missing.rs
 87a341eef398c071bc0aba64aae6b78f d00ea85271236e53419ce2859a247db7 [browse] /raw/HEAD/src/lib.rs

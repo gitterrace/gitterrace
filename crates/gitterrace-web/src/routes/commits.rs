@@ -118,6 +118,8 @@ pub(super) async fn log(
                     .iter()
                     .filter_map(|k| k.example)
                     .collect(),
+                help: filter_help(),
+                docs: FILTER_DOCS,
                 related: related_logs(a),
             }
             .render()?,
@@ -240,9 +242,24 @@ struct LogFilter {
     error: String,
     /// Example expressions the field offers as completions, from the keyword table.
     keywords: Vec<&'static str>,
+    /// The help popover's lines as `(syntax, what it matches)`, from the keyword table.
+    help: Vec<(&'static str, &'static str)>,
+    docs: &'static str,
     /// The other served repositories sharing a root commit, as `(log href, name)`. Hrefs
     /// are built from table names only, never a path.
     related: Vec<(String, String)>,
+}
+
+/// Where the "More" link in the filter help goes: the docs page the site serves.
+const FILTER_DOCS: &str = "https://gitterrace.dev/docs/using/#log-filter";
+
+/// The filter help lines, one per keyword of the table, so a new keyword shows up here with no
+/// second list to edit.
+fn filter_help() -> Vec<(&'static str, &'static str)> {
+    gitterrace_index::query::KEYWORDS
+        .iter()
+        .map(|k| (k.syntax, k.description))
+        .collect()
 }
 
 /// The log links of the other served repositories sharing a root commit, as `(href, name)`.
@@ -509,4 +526,43 @@ fn media_facts(
             (f.path.clone(), (old, new))
         })
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use askama::Template;
+
+    use super::{FILTER_DOCS, LogFilter, filter_help};
+
+    fn escaped(s: &str) -> String {
+        s.replace('&', "&#38;")
+            .replace('<', "&#60;")
+            .replace('>', "&#62;")
+            .replace('"', "&#34;")
+    }
+
+    #[test]
+    fn filter_help_lists_every_keyword() {
+        let html = LogFilter {
+            action: "/log/HEAD".into(),
+            text: String::new(),
+            error: String::new(),
+            keywords: Vec::new(),
+            help: filter_help(),
+            docs: FILTER_DOCS,
+            related: Vec::new(),
+        }
+        .render()
+        .expect("render");
+        for k in gitterrace_index::query::KEYWORDS {
+            let line = format!("<code>{}</code>", escaped(k.syntax));
+            assert!(
+                html.contains(&line),
+                "no help line for {}: {html}",
+                k.keyword
+            );
+        }
+        assert!(html.contains("aria-label=\"Filter help\""));
+        assert!(html.contains(FILTER_DOCS));
+    }
 }

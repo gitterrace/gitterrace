@@ -46,3 +46,19 @@ main.wrap>.ph+h2{margin-top:0}
   .ph .cmp{flex:1 1 100%}
   .ph .cmp input{flex:1 1 0;max-width:none}
 }
+/* The filter's "?" help: a native details at the field's right end, the outline menu's look. */
+.filter-help{position:relative;flex:none}
+.helpbtn{display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box;
+  width:32px;height:100%;min-height:32px;border:var(--border);border-radius:var(--radius);
+  background:var(--soft);color:var(--fg);font-size:var(--text-sm);
+  font-weight:var(--weight-semibold);cursor:pointer;list-style:none}
+.helpbtn::-webkit-details-marker{display:none}
+.helpbtn:hover,.filter-help[open]>.helpbtn{background:var(--hover);border-color:var(--line-strong)}
+.helpbtn:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.outline-pop.filter-pop{width:min(460px,92vw);max-height:none;padding:var(--space-3)}
+.filter-pop dl{margin:0;display:grid;grid-template-columns:minmax(0,auto) minmax(0,1fr);
+  gap:var(--space-1) var(--space-3)}
+.filter-pop dt,.filter-pop dd{margin:0;overflow-wrap:anywhere}
+.filter-pop dd{color:var(--muted)}
+.filter-pop a{display:inline-block;margin-top:var(--space-2);padding:2px 0;
+  font-weight:var(--weight-semibold)}

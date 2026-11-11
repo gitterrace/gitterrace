@@ -5,6 +5,15 @@ repositories. -#}
 <input id="logq" name="q" value="{{ text }}" placeholder="author:ann path:src fix"
  aria-label="Filter commits" list="logq-list" enterkeyhint="search"
  {%- if !error.is_empty() %} aria-invalid="true" aria-describedby="logq-error"{% endif %}>
+<details class="filter-help" data-filter-help>
+<summary class="helpbtn" aria-label="Filter help">?</summary>
+<div class="outline-pop filter-pop" id="logq-help">
+<dl>{% for (syntax, what) in help -%}
+<dt><code>{{ syntax }}</code></dt><dd>{{ what }}</dd>
+{%- endfor %}</dl>
+<a href="{{ docs }}">More</a>
+</div>
+</details>
 <datalist id="logq-list">{% for k in keywords %}<option value="{{ k }}">{% endfor %}</datalist>
 {%- if !error.is_empty() %}
 <small class="filter-error" id="logq-error" role="alert">{{ error }}</small>

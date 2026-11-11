@@ -63,5 +63,68 @@ export function checks(env) {
       }
     }
   }
-  return { logFilter };
+  // The "?" at the field's right end opens a short help that lists every keyword, with and
+  // without script, at both widths. Escape closes it and gives focus back; a click outside
+  // closes it (script only: without script a details only toggles).
+  async function logFilterHelp() {
+    const names = ['type', 'scope', 'author', 'path', 'after', 'before', 'period', 'merge'];
+    for (const name of browsers) {
+      for (const js of [true, false]) {
+        const { b, ctx } = await context(name, { javaScriptEnabled: js });
+        const p = await ctx.newPage();
+        for (const width of [1440, 390]) {
+          const where = `log-filter-help ${name} ${js ? 'js' : 'no-js'} ${width}`;
+          try {
+            await p.setViewportSize({ width, height: 800 });
+            await p.goto(srv.base + '/log/HEAD', { waitUntil: 'load' });
+            const btn = p.locator('.filter-help > .helpbtn');
+            const has = await btn.count() === 1;
+            if (!has) { r.fail(`${where}: no ? button`); continue; }
+            const label = await btn.getAttribute('aria-label');
+            const box = await p.evaluate(() => {
+              const f = document.querySelector('.filter').getBoundingClientRect();
+              const q = document.querySelector('#logq').getBoundingClientRect();
+              const s = document.querySelector('.filter-help').getBoundingClientRect();
+              return { sameRow: Math.abs(s.top - q.top) < 20, right: s.left >= q.right - 1,
+                inside: s.right <= f.right + 1 };
+            });
+            await btn.click();
+            const shown = await p.evaluate(() => {
+              const h = document.querySelector('.filter-pop');
+              const t = h.textContent;
+              const rc = h.getBoundingClientRect();
+              return { vis: h.getClientRects().length > 0, text: t,
+                more: !!h.querySelector('a[href*="log-filter"]'),
+                fits: rc.left >= 0 && rc.right <= innerWidth,
+                sideways: document.documentElement.scrollWidth - innerWidth };
+            });
+            const lists = names.every((n) => shown.text.includes(n + (n === 'merge' ? '' : ':')));
+            let closed = true;
+            if (js) {
+              await p.keyboard.press('Escape');
+              const esc = await p.evaluate(() => {
+                const d = /** @type {HTMLDetailsElement} */ (
+                  document.querySelector('.filter-help'));
+                return { open: d.open, focus: document.activeElement?.closest('summary') !== null };
+              });
+              await btn.click();
+              await p.mouse.click(5, 700);
+              const out = await p.evaluate(() =>
+                /** @type {HTMLDetailsElement} */ (document.querySelector('.filter-help')).open);
+              closed = !esc.open && esc.focus && !out;
+            }
+            const ok = label === 'Filter help' && box.sameRow && box.right && box.inside
+              && shown.vis && lists && shown.more && shown.fits && shown.sideways <= 0 && closed;
+            if (ok) r.ok(`${where}: ? opens the help with every keyword`);
+            else {
+              const got = { label, box, shown: { ...shown, text: '' }, lists, closed };
+              r.fail(`${where}: ${JSON.stringify(got)}`);
+            }
+          } catch (e) { r.fail(`${where}: ${e.message.split('\n')[0]}`); }
+        }
+        await b.close();
+      }
+    }
+  }
+  return { logFilter, logFilterHelp };
 }

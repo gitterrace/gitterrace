@@ -1,4 +1,4 @@
-# insight answers echo the canonical filter as query; with that field removed every answer equals the one before
+# the log page gains the filter's ? help: a details after the field, with every keyword and a link to the docs
 8f83ae1501197de40396b988205a2205 74fd7ddb40ad979b5af37bd0ec37cced [HEAD~3] /?period=1m&bots=0&author=bob%40y.io&rev=HEAD~3
 8f83ae1501197de40396b988205a2205 74fd7ddb40ad979b5af37bd0ec37cced [HEAD~3] /?period=1m&bots=0&path=src&rev=HEAD~3
 8f83ae1501197de40396b988205a2205 74fd7ddb40ad979b5af37bd0ec37cced [HEAD~3] /?period=1m&bots=0&rev=HEAD~3

@@ -118,3 +118,19 @@
     });
   });
 })();
+
+// The filter's "?" help is a native details, so it opens without script. Escape and a click
+// outside close it, and Escape gives focus back to its button.
+(function () {
+  document.addEventListener("keydown", function (e) {
+    var d = e.target.closest && e.target.closest("details[data-filter-help][open]");
+    if (e.key !== "Escape" || !d) return;
+    d.open = false;
+    d.querySelector("summary").focus();
+  });
+  document.addEventListener("click", function (e) {
+    document.querySelectorAll("details[data-filter-help][open]").forEach(function (d) {
+      if (!d.contains(e.target)) d.open = false;
+    });
+  });
+})();
