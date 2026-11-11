@@ -9,15 +9,15 @@ fn range_is_clamped_and_ordered() {
         to: Some(7),
         ..LocQuery::default()
     };
-    assert_eq!(View::parse(&q, 100, Period::All).range, Some((7, 7)));
+    assert_eq!(View::parse(&q, None, 100, Period::All).range, Some((7, 7)));
     let q = LocQuery {
         from: Some(3),
         to: Some(999),
         ..LocQuery::default()
     };
-    assert_eq!(View::parse(&q, 100, Period::All).range, Some((3, 99)));
+    assert_eq!(View::parse(&q, None, 100, Period::All).range, Some((3, 99)));
     assert_eq!(
-        View::parse(&LocQuery::default(), 100, Period::All).range,
+        View::parse(&LocQuery::default(), None, 100, Period::All).range,
         None
     );
 }
@@ -107,7 +107,7 @@ fn period_links_replace_a_dragged_range_and_the_default_stays_out() {
             v.picked = false;
             v.range = None;
         }),
-        "/stats/languages?period=1m"
+        "/stats/languages?q=after%3A1m"
     );
     assert_eq!(
         v.href(|v| {

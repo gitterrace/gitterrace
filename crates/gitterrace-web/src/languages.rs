@@ -18,6 +18,7 @@ use serde::Deserialize;
 
 use crate::{
     error::Result,
+    filter::Filter,
     fmt,
     insights::{cached_keyed, counted, insights},
     languages::render::{body, sample},
@@ -65,7 +66,6 @@ impl Subjects {
 #[derive(Debug, Default, Deserialize)]
 pub(crate) struct LocQuery {
     x: Option<String>,
-    period: Option<String>,
     scale: Option<String>,
     from: Option<usize>,
     to: Option<usize>,
@@ -96,7 +96,8 @@ struct View {
 }
 
 impl View {
-    fn parse(q: &LocQuery, n: usize, dflt: Period) -> Self {
+    /// The view of `q`, with `period` the shared filter's (`?q=after:1w` or `?period=1w`).
+    fn parse(q: &LocQuery, period: Option<Period>, n: usize, dflt: Period) -> Self {
         let range = match (q.from, q.to) {
             (None, None) => None,
             (f, t) => {
@@ -111,11 +112,7 @@ impl View {
             share: q.scale.as_deref() == Some("share"),
             range,
             picked: range.is_some(),
-            period: q
-                .period
-                .as_deref()
-                .and_then(|p| p.parse().ok())
-                .unwrap_or(dflt),
+            period: period.unwrap_or(dflt),
             dflt,
             held: Held::Commits,
         }
@@ -139,26 +136,25 @@ impl View {
     fn href(self, f: impl FnOnce(&mut Self)) -> String {
         let mut v = self;
         f(&mut v);
-        let mut q: Vec<String> = Vec::new();
+        let mut extra: Vec<(&str, String)> = Vec::new();
         if v.time {
-            q.push("x=time".to_owned());
+            extra.push(("x", "time".to_owned()));
         }
         if v.share {
-            q.push("scale=share".to_owned());
+            extra.push(("scale", "share".to_owned()));
         }
+        // The period is said the way every insights page says it, through the shared filter.
+        let mut filter = Filter::default();
         if v.picked {
             if let Some((a, b)) = v.range {
-                q.push(format!("from={a}"));
-                q.push(format!("to={b}"));
+                extra.push(("from", a.to_string()));
+                extra.push(("to", b.to_string()));
             }
         } else if v.period != v.dflt {
-            q.push(format!("period={}", v.period.as_str()));
+            filter = filter.with_period(v.period);
         }
-        if q.is_empty() {
-            fmt::href("/stats/languages")
-        } else {
-            fmt::href(&format!("/stats/languages?{}", q.join("&")))
-        }
+        let extra: Vec<(&str, &str)> = extra.iter().map(|(k, v)| (*k, v.as_str())).collect();
+        fmt::href(&format!("/stats/languages{}", filter.query(&extra)))
     }
 }
 
@@ -170,17 +166,22 @@ struct LanguagesPage {
     body: view::Body,
 }
 
-pub(crate) async fn page(State(app): Shared, Query(q): Query<LocQuery>) -> Result<Html<String>> {
+pub(crate) async fn page(
+    State(app): Shared,
+    Query(q): Query<LocQuery>,
+    Query(f): Query<Filter>,
+) -> Result<Html<String>> {
     let a2 = Arc::clone(&app);
-    // The page reads its own parameters, none of the shared filter ones, so it keys the memo
+    // The page reads its own parameters and the shared filter's period, so it keys the memo
     // by them: the chart and the commit subjects cost tens of ms on every visit otherwise.
-    let key = memo_query(&q);
+    let period = f.period_value();
+    let key = memo_query(&q, period);
     cached_keyed(&app, "l", key, move |a, r, c| {
         let head = a.repo.resolve(&crate::fmt::selected()).unwrap_or_default();
         let filter = path_filter(&a2, &head);
         let sk = a2.chain(&head, &**r, &filter);
         let dflt = a2.defaults().period.unwrap_or(Period::All);
-        let mut view = View::parse(&q, sk.len(), dflt);
+        let mut view = View::parse(&q, period, sk.len(), dflt);
         if view.wants_stretch() && sk.len() > 0 {
             let scope = Scope::from_params(
                 &ScopeParams::default(),
@@ -231,11 +232,11 @@ pub(crate) fn path_filter(app: &crate::app::App, head: &str) -> gitterrace_index
 }
 
 /// The memo key part of a query: every field the page reads, in a fixed order.
-fn memo_query(q: &LocQuery) -> String {
+fn memo_query(q: &LocQuery, period: Option<Period>) -> String {
     format!(
         "x={}&period={}&scale={}&from={:?}&to={:?}",
         q.x.as_deref().unwrap_or_default(),
-        q.period.as_deref().unwrap_or_default(),
+        period.map(Period::as_str).unwrap_or_default(),
         q.scale.as_deref().unwrap_or_default(),
         q.from,
         q.to
