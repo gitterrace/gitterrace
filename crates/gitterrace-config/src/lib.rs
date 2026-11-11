@@ -398,6 +398,20 @@ mod tests {
         assert!(e.to_string().contains("watch.enabled"), "{e}");
     }
 
+    /// `display.has_line_hover` parses, defaults on and applies without a restart.
+    #[test]
+    fn display_line_hover_defaults_on_and_is_live() {
+        assert!(parse("").expect("empty").config.display.has_line_hover);
+        let off = parse("[display]\nhas_line_hover = false\n").expect("parses");
+        assert!(!off.config.display.has_line_hover);
+        let all = keys();
+        let k = all
+            .iter()
+            .find(|k| k.id == "display.has_line_hover")
+            .expect("key exists");
+        assert_eq!(k.reload, Reload::Live);
+    }
+
     /// A sidebar section name is checked, never silently dropped, and the error lists the
     /// valid ones. An empty list is valid: it hides the sidebar.
     #[test]

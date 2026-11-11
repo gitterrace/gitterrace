@@ -298,6 +298,15 @@ pub(crate) fn sha_link_at(base: &str, full: &str) -> String {
 
 pub(crate) use gitterrace_types::{esc, esc_text};
 
+/// Link to the history page of one file, or to its plain view when file history is off.
+pub(crate) fn file_link(path: &str) -> String {
+    if crate::features::on(gitterrace_config::Feature::History) {
+        href(&format!("/history/{}", enc_path(path)))
+    } else {
+        href(&format!("/blob/{}/{}", selected_seg(), enc_path(path)))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::fmt::{

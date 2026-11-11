@@ -186,6 +186,8 @@ Exceptions, each on purpose:
   one: `system`, `light` or `dark`.
 - `dates` (string, default `"relative"`): How dates read: `relative` or
   `absolute`.
+- `has_line_hover` (bool, default `true`): Tint the whole line under the pointer
+  in a file, its blame and a diff.
 - `sidebar` (list of strings, default
   `["now", "loose_ends", "recent", "churn", "languages"]`): Overview sidebar
   sections, in the order shown: `now`, `loose_ends`, `recent`, `churn` and

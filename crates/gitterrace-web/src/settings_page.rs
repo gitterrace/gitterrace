@@ -303,6 +303,7 @@ fn chrome_bare(env: &crate::app::Env, name: &str, href: &str) -> crate::views::C
             gitterrace_types::ColorScheme::System => String::new(),
             t => t.as_str().to_owned(),
         },
+        has_line_hover: cfg.display.has_line_hover,
         live: false,
         live_how: "",
         live_on: "",

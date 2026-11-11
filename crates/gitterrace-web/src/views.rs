@@ -76,6 +76,10 @@ pub(crate) struct Nav {
     pub(crate) on: bool,
 }
 
+#[expect(
+    clippy::struct_excessive_bools,
+    reason = "independent page switches, each read by the shared chrome template"
+)]
 pub(crate) struct Chrome {
     /// Prefix for absolute links; empty for a single repository.
     pub(crate) base: String,
@@ -106,6 +110,8 @@ pub(crate) struct Chrome {
     pub(crate) repo_key: String,
     /// Color theme before the visitor picks one (`display.theme`), empty for the system's.
     pub(crate) theme: String,
+    /// Tint the line under the pointer (`display.has_line_hover`).
+    pub(crate) has_line_hover: bool,
     /// Open a live-update stream: off on pages pinned to a commit or tag.
     pub(crate) live: bool,
     /// What the page does with a change: `refresh`, `notice` or nothing but the chrome.
@@ -247,6 +253,7 @@ pub(crate) fn chrome_at(app: &crate::app::App, active: &str, rev: &str) -> Chrom
             ColorScheme::System => String::new(),
             t => t.as_str().to_owned(),
         },
+        has_line_hover: app.cfg().display.has_line_hover,
         live: !app.public()
             && crate::features::on(Feature::Live)
             && app.cfg().watch.enabled
@@ -580,19 +587,6 @@ pub(crate) fn file_stats(d: &CommitDetail) -> Vec<FileStatRow> {
             deletions: crate::fmt::thousands(f.deletions),
         })
         .collect()
-}
-
-/// Link to the history page of one file, or to its plain view when file history is off.
-pub(crate) fn file_link(path: &str) -> String {
-    if crate::features::on(gitterrace_config::Feature::History) {
-        crate::fmt::href(&format!("/history/{}", crate::fmt::enc_path(path)))
-    } else {
-        crate::fmt::href(&format!(
-            "/blob/{}/{}",
-            crate::fmt::selected_seg(),
-            crate::fmt::enc_path(path)
-        ))
-    }
 }
 
 #[cfg(test)]

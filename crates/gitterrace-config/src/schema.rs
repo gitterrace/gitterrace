@@ -377,6 +377,8 @@ settings! {
         theme: ColorScheme = ColorScheme::System => Live,
         /// How dates read: `relative` or `absolute`.
         dates: DateStyle = DateStyle::Relative => Live,
+        /// Tint the whole line under the pointer in a file, its blame and a diff.
+        has_line_hover: bool = true => Live,
         /// Overview sidebar sections, in the order shown: `now`, `loose_ends`, `recent`,
         /// `churn` and `languages`. Leave one out to hide it. An empty list hides the
         /// sidebar.

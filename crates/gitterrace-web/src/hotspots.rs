@@ -14,7 +14,7 @@ use crate::{
     insights::{InsightsQuery, Kpi, cached, counted, head_lines, insights, page_scope, period_of},
     pagehead::{self, PageHead},
     routes::Shared,
-    views::{self, Chrome},
+    views::Chrome,
 };
 
 const TOP_HOT: usize = 50;
@@ -71,7 +71,7 @@ pub(crate) async fn page(
                 x: h.changes as u64,
                 y: u64::from(h.lines),
                 size: h.authors as u64,
-                href: views::file_link(&h.path),
+                href: crate::fmt::file_link(&h.path),
                 name: h.path.clone(),
                 title: format!(
                     "{}, {}, {}",
@@ -93,7 +93,7 @@ pub(crate) async fn page(
             .map(|h| HotRow {
                 path: h.path.clone(),
                 shown: fmt::path_parts(&h.path),
-                href: views::file_link(&h.path),
+                href: crate::fmt::file_link(&h.path),
                 language: h.language.clone(),
                 lines: fmt::thousands(h.lines),
                 changes: fmt::thousands(h.changes),

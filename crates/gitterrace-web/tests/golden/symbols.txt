@@ -1,7 +1,7 @@
-# buttons take the shared vocabulary: each page links buttons.css and its buttons carry the variant classes; no text, link or number moves
-911e5922c38075ea49152373180d65ca 3c87977d336c58305a52ab27e2503f9c [symbols] /blob/HEAD/cmd/serve.go
-da665892f5dfdacb1a94f3227b2abdcc ea91a71ca323ac2a186bee623873d818 [symbols] /blob/HEAD/src/shapes.rs
-d57ece923b54d5a9295a8f31d5ecf9bc d57ece923b54d5a9295a8f31d5ecf9bc [symbols] /blob/HEAD/src/two.rs
-4c65ea2fb99cf6b1fb4f86ef9c13ae18 97bcb2aea5e9fcb38ade47b9054a5168 [symbols] /blob/HEAD/tools/report.py
-0493cd20baab1946c6b16b1f50ff28af d59558f3e3b5983a0344dd0f37931c2b [symbols] /blob/HEAD/web/store.ts
-df248b49821da18a98d28fb694db44e8 e519d9082782be884566e5c316dc6274 [symbols] /blob/HEAD/web/view.js
+# every page body carries data-line-hover (display.has_line_hover, on by default); no other byte moves
+a9636995f62bf9c600b0d0a3acb712ec 9db8d44473d409089796867f8df5a4e6 [symbols] /blob/HEAD/cmd/serve.go
+f2af7c04b374066324ecbd0f6f768f8e ba24b22e6f73c1376deb56b64200f752 [symbols] /blob/HEAD/src/shapes.rs
+75606ddb73206bc4e71bc2df1a69fb32 75606ddb73206bc4e71bc2df1a69fb32 [symbols] /blob/HEAD/src/two.rs
+0f86492b29a37c44000c9d06821a5d76 f728e178c1dd593b78e8174f317294a6 [symbols] /blob/HEAD/tools/report.py
+f14ebab22e784d9c2b2623810a959d41 3df28c99973f202bbbcda858402f75e5 [symbols] /blob/HEAD/web/store.ts
+359a32341df1bfc70e509444a4cd0576 9eba89c0f265005ef4efd61067320002 [symbols] /blob/HEAD/web/view.js

@@ -206,7 +206,6 @@ table.code{border-collapse:collapse;width:100%}
 .n{width:1%;min-width:48px;text-align:right;color:var(--faint);user-select:none}
 .n a{color:inherit}.n a:hover{color:var(--accent-fg)}
 div.diff .add,div.diff .del{color:inherit}
-.code tr:hover td{background:var(--soft)}
 .code tr:target td,.src .l:target{background:var(--accent-soft);box-shadow:inset 2px 0 0 var(--accent)}
 /* The gutter: inside each cell a grid of sha, author and age. The column takes its widest
    cell, so the three line up down the page. The grid sits in a div, since a grid td leaves
@@ -451,7 +450,13 @@ a.who{color:inherit}a.who:hover b{color:var(--accent-fg);text-decoration:underli
 .src .ch,.diff .ch{content-visibility:auto;contain-intrinsic-block-size:auto calc(var(--leading-code)*100);width:max-content;min-width:100%}
 .src .l{white-space:pre;min-height:var(--leading-code);padding:0 var(--space-3) 0 0;min-width:max-content;position:relative;padding-left:calc(var(--nd,3)*1ch + var(--space-3)*3)}
 .src .l::before{content:attr(data-n);position:absolute;left:0;box-sizing:border-box;padding-left:var(--space-3);width:calc(var(--nd,3)*1ch + var(--space-3)*2);text-align:right;color:var(--faint);user-select:none;cursor:pointer}
-.src .l:hover::before{background:var(--soft)}
+/* One line hover for blame, file and diff (display.has_line_hover). A translucent overlay in
+   background-image, so a diff keeps its add/del tint and a syntax span never covers it. A
+   selected line keeps its own paint. */
+body[data-line-hover] :is(.code tr:hover td,.src .l:not(.sel):hover,
+  div.diff :is(.add,.del,.ctx):hover){
+  background-image:linear-gradient(color-mix(in srgb,var(--fg) 6%,transparent),
+    color-mix(in srgb,var(--fg) 6%,transparent))}
 .src .l.sel{background:var(--accent-soft)!important}
 .src .l.sel::before{box-shadow:inset 2px 0 0 var(--accent)}
 div.diff .add,div.diff .del,div.diff .ctx,div.diff .hh{white-space:pre;min-height:var(--leading-code);min-width:max-content;position:relative;padding:0 var(--space-3) 0 calc(12ch + var(--space-3)*3)}

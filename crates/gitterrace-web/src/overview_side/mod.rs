@@ -210,7 +210,7 @@ fn hot_files(a: &App, head: &str, src: &dyn InsightsSource, recent: Vec<Rank>) -
         .take(TOP_CHURN)
         .map(|(p, n)| Hot {
             name: short_name(&p),
-            href: crate::views::file_link(&p),
+            href: crate::fmt::file_link(&p),
             changes: fmt::count(n, "change", "changes"),
             path: p.to_string(),
         })

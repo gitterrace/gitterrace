@@ -9,7 +9,6 @@ use crate::{
     empty::Empty,
     fmt::{self, enc_seg, href},
     insights::{InsightsQuery, Src, counted, head_lines, insights, page_scope, period_of},
-    views::{self},
 };
 
 const TOP_PAIRS: usize = 30;
@@ -56,8 +55,8 @@ pub(crate) fn section(a: &crate::app::App, r: &Src, q: &InsightsQuery) -> String
             .coupling_in(&files, &set, 3, TOP_PAIRS)
             .into_iter()
             .map(|p| PairRow {
-                a_href: views::file_link(&p.a),
-                b_href: views::file_link(&p.b),
+                a_href: crate::fmt::file_link(&p.a),
+                b_href: crate::fmt::file_link(&p.b),
                 a: fmt::path_parts(&p.a),
                 b: fmt::path_parts(&p.b),
                 together: fmt::thousands(p.together),
