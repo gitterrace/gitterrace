@@ -19,8 +19,12 @@ const REQUEST_PEAK_MB: u64 = 8;
 /// `resources.cache_mb`, `Cache::Blocks`) and the shared derived tables (skip, commit lines, follow
 /// maps).
 const FOOTPRINT_IDLE_MB: u64 = 48;
-/// Run to run spread of the released idle above start plus memo (measured 0 to 3 MB).
-const SLACK_MB: u64 = 4;
+/// Run to run spread of the released idle above start plus memo. Measured in KB on a 100k
+/// history with thread caches off: 8.0 to 8.8 MB above start, of which the memo is 3.7 MB and the
+/// rest is the allocator's own bookkeeping after the request peak (about 1.4 MB of metadata, 0.8 MB
+/// of partly used slabs) and 1.6 MB the system allocator keeps for the regex engine. None of it is
+/// data the server holds: the live-heap check below stays at the memo plus 1 MB and catches that.
+const SLACK_MB: u64 = 5;
 /// Live heap a release may keep beyond the memo: the allocator's own and the runtime's.
 const HEAP_SLACK_MB: u64 = 1;
 
@@ -72,12 +76,12 @@ fn insights_request_peak() {
 }
 
 /// After the idle release the server's live heap is what a just-started one holds plus the page
-/// memo it keeps by design: 7 MB against a 9 MB start on a 100k history, and 32 MB when the
-/// release keeps the shared tables. The footprint is only reported: it moved 16 to 18 MB run to
-/// run on the same commit with the same heap, freed pages the kernel had not taken back. The
-/// block cache and the derived tables go with the source, and the allocator runs one arena, so
-/// no per-core arena keeps freed slabs (red with one arena per core: 17 MB released against a
-/// 12 MB cap on a 100k history).
+/// memo it keeps by design: 4.3 MB against a 0.6 MB start on a 100k history, and 32 MB when the
+/// release keeps the shared tables. The footprint moves about 1 MB run to run on the same commit
+/// with the same heap, which SLACK_MB covers. The block cache and the derived tables go with the
+/// source, and the allocator runs one arena with no thread caches, so no arena or cache keeps
+/// freed slabs (red with one arena per core: 17 MB released against a 12 MB cap; red with thread
+/// caches: a 50k-file tree held 5 MB more than a 1k one).
 #[test]
 fn insights_release_returns_to_start() {
     if serve_if_child() {
