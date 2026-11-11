@@ -314,8 +314,10 @@ kbd{font:var(--weight-semibold) var(--text-2xs)/1 var(--mono);color:var(--muted)
 .keys-switch{display:flex;align-items:center;gap:var(--space-2);margin:0 0 var(--space-3);
   font-size:var(--text-xs)}
 .keys{display:grid;grid-template-columns:minmax(var(--space-16),max-content) 1fr;
-  gap:var(--space-2) var(--space-5);margin:0;overflow:auto}
-.keys dt{display:flex;align-items:baseline;gap:var(--space-1);white-space:nowrap;font-size:var(--text-xs)}.keys dd{margin:0;color:var(--muted)}
+  align-items:center;gap:var(--space-2) var(--space-5);margin:0;overflow:auto}
+/* A key chip is a box, so the row centers both sides on one line instead of matching baselines
+   across two text sizes, which left the chips above their description. */
+.keys dt{display:flex;align-items:center;gap:var(--space-1);white-space:nowrap;font-size:var(--text-xs);line-height:1}.keys dd{margin:0;color:var(--muted);line-height:var(--leading-tight)}
 .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--fg);color:var(--bg);padding:8px 14px;border-radius:var(--radius);font-size:var(--text-sm);z-index:60;transition:opacity var(--dur-slow);animation:toast-in var(--dur-fast) ease-out}
 .toast.out{opacity:0}
 @keyframes toast-in{from{opacity:0;transform:translate(-50%,6px)}}
