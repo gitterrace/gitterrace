@@ -96,9 +96,9 @@
     var foot = el("div", "send-foot");
     var pick = el("select", "send-pick");
     pick.setAttribute("aria-label", "Target");
-    var go = el("button", "send-go", "Send");
+    var go = el("button", "send-go primary sm", "Send");
     go.type = "submit";
-    var cancel = el("button", "send-cancel", "Cancel");
+    var cancel = el("button", "send-cancel sm", "Cancel");
     cancel.type = "button";
     cancel.addEventListener("click", function () { close(); });
     var hint = el("span", "send-hint", (/Mac|iP/.test(navigator.platform) ? "Cmd" : "Ctrl") + "+Enter to send");

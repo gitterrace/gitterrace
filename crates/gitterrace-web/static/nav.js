@@ -465,7 +465,7 @@
 
   // ---- copy buttons ---------------------------------------------------------
   Array.prototype.forEach.call(document.querySelectorAll("[data-copyable]"), function (card) {
-    var b = el("button", "copy float", "Copy");
+    var b = el("button", "copy float sm", "Copy");
     b.type = "button";
     b.setAttribute("data-tip", "Copy file contents");
     b.addEventListener("click", function () {
@@ -477,7 +477,7 @@
   });
   // Not on diagrams: mermaid reads the block's text, so a button inside it becomes a node.
   Array.prototype.forEach.call(document.querySelectorAll(".markdown-body pre:not(.mermaid)"), function (pre) {
-    var b = el("button", "copy float", "Copy");
+    var b = el("button", "copy float sm", "Copy");
     b.type = "button";
     // The button sits inside the pre, so its own label would ride along in textContent.
     b.addEventListener("click", function () {

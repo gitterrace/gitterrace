@@ -30,6 +30,10 @@
 :root{
 --bg:var(--n-1);--surface:var(--n-0);--soft:var(--n-2);--hover:var(--n-3);--line:var(--n-4);--line-strong:var(--n-5);--accent-ink:var(--accent);
 --focus:var(--accent);
+/* A pressed or hovered accent fill steps toward the text color: darker in light, lighter in
+   dark, so on-accent text gains contrast in both. */
+--accent-hover:color-mix(in oklab,var(--accent),var(--fg) 14%);
+--accent-press:color-mix(in oklab,var(--accent),var(--fg) 26%);
 --faint:var(--n-6);--muted:var(--n-7);--fg:var(--n-9);
 --serif:var(--font-title);--sans:var(--font-body);--mono:var(--font-mono);
 --leading-tight:1.25;--leading:1.6;--leading-code:20px;

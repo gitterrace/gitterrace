@@ -1,0 +1,49 @@
+/* ---- buttons: the one vocabulary ------------------------------------------------------------
+   Loaded before app.css, so a component rule there may size or place a button. Every <button>,
+   and an <a class="btn"> or <summary class="btn"> that acts as one, picks a look here. A
+   component sets size and placement only, never its own background or border
+   (scripts/lint/css-button-check.py refuses one outside this file).
+     (none)    secondary: soft fill and a line. Most actions (Cancel, Add, Copy, Filter).
+     .primary  the one main action of a form or window (Save, Send): the accent fill.
+     .ghost    quiet: no fill or line at rest, for toolbars and switchers.
+     .danger   destructive (Remove): the secondary look in the delete color.
+     .icon     square, glyph only. Toolbar glyphs are .ghost.icon.
+     .sm       28px tall instead of 32, for rows and dense bars.
+   Every variant gets every state from here: hover, :active (pressed), the shared focus ring
+   (app.css), :disabled, and aria-expanded or aria-pressed true, which read as held. */
+button,.btn{display:inline-flex;align-items:center;justify-content:center;gap:var(--space-2);
+  box-sizing:border-box;height:32px;padding:0 var(--space-4);font:inherit;
+  font-weight:var(--weight-semibold);line-height:1;white-space:nowrap;color:var(--fg);
+  background:var(--soft);border:var(--border);border-radius:var(--radius);cursor:pointer;
+  text-decoration:none;transition:background var(--dur-fast),border-color var(--dur-fast),
+  color var(--dur-fast)}
+:is(button,.btn):hover:not(:disabled),:is(button,.btn)[aria-expanded=true],
+:is(button,.btn)[aria-pressed=true],details[open]>summary.btn{background:var(--hover);
+  border-color:var(--line-strong);color:var(--fg);text-decoration:none}
+:is(button,.btn):active:not(:disabled){background:var(--line);border-color:var(--line-strong)}
+:is(button,.btn):disabled{opacity:.5;cursor:default}
+.primary{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.primary:hover:not(:disabled),.primary[aria-expanded=true]{background:var(--accent-hover);
+  border-color:var(--accent-hover);color:var(--on-accent)}
+.primary:active:not(:disabled){background:var(--accent-press);border-color:var(--accent-press);
+  color:var(--on-accent)}
+.ghost{background:transparent;border-color:transparent;color:var(--muted)}
+.ghost:hover:not(:disabled),.ghost[aria-expanded=true]{border-color:var(--line)}
+.danger{color:var(--del)}
+.danger:hover:not(:disabled){color:var(--del);background:var(--del-bg);border-color:var(--del)}
+.danger:active:not(:disabled){color:var(--del);background:var(--del-hl);border-color:var(--del)}
+.sm{height:28px;padding:0 var(--space-3);font-size:var(--text-sm)}
+.icon{width:32px;padding:0}.icon.sm{width:28px}
+/* A copy button says it worked in the accent for a moment (app.js flashes .copied). */
+.copied{color:var(--accent-ink);border-color:var(--accent-ink)}
+/* The segmented control: ghost choices in one frame, the chosen one held in the accent. */
+.segs a,.segs button{display:inline-flex;align-items:center;height:auto;min-height:32px;
+  box-sizing:border-box;padding:var(--space-2) var(--space-3);border:1px solid transparent;
+  border-radius:var(--radius);color:var(--muted);background:none;font:inherit;line-height:1;
+  cursor:pointer}
+.segs a:hover,.segs button:hover:not(:disabled){color:var(--fg);text-decoration:none;
+  background:var(--hover);border-color:transparent}
+.segs .on,.segs .on:hover:not(:disabled){background:var(--accent-soft);color:var(--accent-ink);
+  border-color:var(--accent);font-weight:var(--weight-semibold)}
+.dochead .segs a,.dochead .segs button{min-height:28px;padding:var(--space-1) var(--space-3)}
+/* ---- end of buttons ---- */

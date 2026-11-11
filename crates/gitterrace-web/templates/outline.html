@@ -3,8 +3,8 @@
 <nav class="outline rail" aria-label="On this page" data-outline><h2>On this page</h2>
 {%- else -%}
 <details class="outline menu" data-outline>
-{%- if icon_only %}<summary class="outlinebtn icon" aria-label="On this page" data-tip="On this page"></summary>
-{%- else %}<summary class="outlinebtn">On this page</summary>{% endif -%}
+{%- if icon_only %}<summary class="outlinebtn btn icon sm" aria-label="On this page" data-tip="On this page"></summary>
+{%- else %}<summary class="outlinebtn btn">On this page</summary>{% endif -%}
 <div class="outline-pop">
 {%- endif -%}
 <ol{% if kind_width > 0 %} class="kinds kw{{ kind_width }}"{% endif %}>{% for l in links %}<li class="d{{ l.depth }}">{% if let Some((label, spoken)) = l.kind %}<a href="#{{ l.id }}" title="{{ label }} {{ l.text }}"><span class="okind" aria-hidden="true" data-kind="{{ spoken }}">{{ label }}</span><span class="vh">{{ spoken }} </span><span class="oname">{{ l.text }}</span>{% else %}<a href="#{{ l.id }}" title="{{ l.text }}">{{ l.text }}{% endif %}</a></li>{% endfor %}</ol>

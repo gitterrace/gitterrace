@@ -1,7 +1,7 @@
 {% extends "_base.html" %}
 {%- import "_badge.html" as bd -%}
 {% macro card(c, blank) %}<div class="setcard" data-row="{{ c.id }}"{% if blank %} data-blank hidden{% endif %}>
-<div class="setcardhead"><strong>{{ c.title }}</strong>{% if !blank %}<button type="button" data-remove="{{ c.id }}">Remove</button>{% endif %}</div>
+<div class="setcardhead"><strong>{{ c.title }}</strong>{% if !blank %}<button class="danger sm" type="button" data-remove="{{ c.id }}">Remove</button>{% endif %}</div>
 {% for f in c.fields %}<div class="setrow" data-id="{{ f.id }}" data-kind="{{ f.kind }}" data-row-key>
 <label class="setname" for="f-{{ f.id }}"><code>{{ f.name }}</code>{% if f.required %} {% call bd::badge("", "Required") %}{% endcall %}{% endif %}</label>
 <div class="setin">{% match f.kind %}

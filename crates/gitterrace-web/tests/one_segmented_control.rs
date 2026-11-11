@@ -89,6 +89,7 @@ fn only_the_shared_control_writes_a_switch() {
                 || n == "_path.html"
                 || n == "seg_control.html"
                 || n == "app.css"
+                || n == "buttons.css"
                 || n == "app.js"
                 || n == "markdown.js"
                 || n.ends_with("tests.rs")

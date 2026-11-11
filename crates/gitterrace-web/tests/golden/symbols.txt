@@ -1,7 +1,7 @@
-# every page loads pickers.js after nav.js; no other byte moves
-60b50b4a20257859a09ed02fd9931bb8 2bfba3be3f596d612d8a663a60869b62 [symbols] /blob/HEAD/cmd/serve.go
-f18c04a708e332016809d9ef6467140a 05c18b0bbdb29abe5f547abf31141d8e [symbols] /blob/HEAD/src/shapes.rs
-3251d4d34b7817a0ff2d8a6efba34f36 3251d4d34b7817a0ff2d8a6efba34f36 [symbols] /blob/HEAD/src/two.rs
-b6c0855bffbdcab66b678d02903e7920 3494f699aa950aa060b2a7cefb84d2f0 [symbols] /blob/HEAD/tools/report.py
-7f2db4fd38da8a237f72266d7c1e84d3 2b8a80eac33174cfc8a71fa0eacb95af [symbols] /blob/HEAD/web/store.ts
-e07a76e2c87a3f3efc1712458d3f9358 007105ccb65d6fc990f739c1502bae24 [symbols] /blob/HEAD/web/view.js
+# buttons take the shared vocabulary: each page links buttons.css and its buttons carry the variant classes; no text, link or number moves
+911e5922c38075ea49152373180d65ca 3c87977d336c58305a52ab27e2503f9c [symbols] /blob/HEAD/cmd/serve.go
+da665892f5dfdacb1a94f3227b2abdcc ea91a71ca323ac2a186bee623873d818 [symbols] /blob/HEAD/src/shapes.rs
+d57ece923b54d5a9295a8f31d5ecf9bc d57ece923b54d5a9295a8f31d5ecf9bc [symbols] /blob/HEAD/src/two.rs
+4c65ea2fb99cf6b1fb4f86ef9c13ae18 97bcb2aea5e9fcb38ade47b9054a5168 [symbols] /blob/HEAD/tools/report.py
+0493cd20baab1946c6b16b1f50ff28af d59558f3e3b5983a0344dd0f37931c2b [symbols] /blob/HEAD/web/store.ts
+df248b49821da18a98d28fb694db44e8 e519d9082782be884566e5c316dc6274 [symbols] /blob/HEAD/web/view.js

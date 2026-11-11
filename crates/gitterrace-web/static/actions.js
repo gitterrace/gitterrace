@@ -403,7 +403,7 @@
   // ---- triggers -------------------------------------------------------------
   // The glyph is drawn by CSS, so a trigger inside a code line adds nothing to copied text.
   function button(title) {
-    var b = el("button", "actbtn", null);
+    var b = el("button", "actbtn icon sm", null);
     b.type = "button";
     b.setAttribute("data-tip", title);
     b.setAttribute("aria-haspopup", "menu");
@@ -414,7 +414,8 @@
   var theme = document.getElementById("theme");
   if (theme) {
     var top = button("Actions for this page (.)");
-    top.classList.add("top");
+    top.classList.remove("sm");
+    top.classList.add("top", "ghost");
     top.addEventListener("click", function () { openMenu(current(), top); });
     // Copy permalink lives in this menu and on y: no separate icon competing for the bar.
     theme.parentNode.insertBefore(top, theme);

@@ -69,7 +69,7 @@
     box.classList.add("anchored");
     var head = el("div", "ov-title");
     head.appendChild(el("h2", "", "Switch repository"));
-    var x = el("button", "tool", null);
+    var x = el("button", "ghost icon", null);
     x.type = "button";
     x.setAttribute("aria-label", "Close");
     x.appendChild(icon("M4 4l8 8M12 4l-8 8"));
