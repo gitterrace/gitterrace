@@ -285,6 +285,8 @@ struct HotspotArgs {
     period: Option<String>,
     /// Only files under this directory.
     path: Option<String>,
+    #[schemars(schema_with = "query_schema")]
+    query: Option<String>,
     /// Files to return. Defaults to 20.
     limit: Option<usize>,
 }
@@ -297,6 +299,22 @@ struct ActivityArgs {
     /// `1w`, `1m`, `3m`, `1y` or `all` (default). The period sets the bucket unit: days up to
     /// a month, weeks up to a year, then months, quarters or years.
     period: Option<String>,
+    #[schemars(schema_with = "query_schema")]
+    query: Option<String>,
+}
+
+/// The `query` argument: the commit filter of the web page, its grammar read from the keyword
+/// registry so the model is told what the parser accepts and the two cannot drift.
+fn query_schema(_: &mut schemars::SchemaGenerator) -> schemars::Schema {
+    schemars::json_schema!({
+        "type": ["string", "null"],
+        "description": format!(
+            "Commit filter, every term must match, e.g. `author:ann after:3m !merge`. Same \
+             text as the web filter. Together with `period` and `path`, which read as \
+             `after:` and `path:` terms. {}",
+            gitterrace_index::query::grammar_line()
+        ),
+    })
 }
 
 /// Every tool answers with data read from the repository, which anyone who can push to it
@@ -438,6 +456,7 @@ impl McpServer {
             limit: a.limit,
             select: gitterrace_index::Selection {
                 path: a.path,
+                q: a.query,
                 ..Default::default()
             },
             ..Params::default()
@@ -472,6 +491,10 @@ impl McpServer {
     ) -> Result<CallToolResult, ErrorData> {
         let p = Params {
             period: a.period,
+            select: gitterrace_index::Selection {
+                q: a.query,
+                ..Default::default()
+            },
             ..Params::default()
         };
         self.run("activity", a.repo.clone(), move |s| {

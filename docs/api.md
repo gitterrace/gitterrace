@@ -166,7 +166,7 @@ so to the model.
 - `activity`: Commits and lines changed per bucket (day, week, month, quarter or
   year, chosen by `period`) and a weekday-by-hour punch card. Use for "how
   active is this project" and trend questions. Parameters: `period?` (string),
-  `repo?` (string), `rev?` (string).
+  `query` (string), `repo?` (string), `rev?` (string).
 - `blame`: Per-line authorship of a file: the commit, author and time that last
   changed each line. Use to find who to ask about, or which commit introduced, a
   line. Follow up with `show_commit` on the commit id. Parameters: `path`
@@ -180,7 +180,7 @@ so to the model.
   lines, authors, last change, score = changes times the square root of lines),
   the web Hotspots page's numbers. Use to find risky or central code and where
   to look first. Parameters: `limit?` (integer), `path?` (string), `period?`
-  (string), `repo?` (string), `rev?` (string).
+  (string), `query` (string), `repo?` (string), `rev?` (string).
 - `list_repos`: The repositories this server may read and which scope it was
   started with: name (pass it as `repo` to every other tool), path, HEAD, branch
   and newest commit. One that cannot be read shows `available: false` and why.

@@ -189,3 +189,44 @@ fn concurrent_first_calls_on_a_cold_repo_open_it_once() {
     });
     assert_eq!(s.repos.opens(), 1);
 }
+
+/// The `query` argument and the older keys say one thing: the same JSON either way, for both
+/// tools that take it. A key that folded differently from its keyword would split them.
+#[tokio::test]
+async fn query_and_the_older_keys_give_equal_json() {
+    use rmcp::handler::server::wrapper::Parameters;
+    let (_d, s) = server("");
+    let hot = |period: Option<&str>, query: Option<&str>| {
+        Parameters(super::HotspotArgs {
+            repo: None,
+            rev: None,
+            period: period.map(str::to_owned),
+            path: None,
+            query: query.map(str::to_owned),
+            limit: None,
+        })
+    };
+    let act = |period: Option<&str>, query: Option<&str>| {
+        Parameters(super::ActivityArgs {
+            repo: None,
+            rev: None,
+            period: period.map(str::to_owned),
+            query: query.map(str::to_owned),
+        })
+    };
+    let (a, b) = (
+        s.hotspots(hot(Some("1m"), None)).await.expect("a"),
+        s.hotspots(hot(None, Some("after:1m"))).await.expect("b"),
+    );
+    assert_ne!(a.is_error, Some(true), "{}", text(&a));
+    assert_eq!(text(&a), text(&b));
+    let (a, b) = (
+        s.activity(act(Some("1m"), None)).await.expect("a"),
+        s.activity(act(None, Some("after:1m"))).await.expect("b"),
+    );
+    assert_ne!(a.is_error, Some(true), "{}", text(&a));
+    assert_eq!(text(&a), text(&b));
+    // A bad query is a readable error naming the span, not a panic.
+    let bad = s.activity(act(None, Some("nope:x"))).await.expect("bad");
+    assert_eq!(bad.is_error, Some(true), "{}", text(&bad));
+}

@@ -122,3 +122,14 @@ pub fn aliases() -> Vec<(&'static str, &'static str)> {
         .filter_map(|k| k.param.map(|p| (p, k.keyword)))
         .collect()
 }
+
+/// The grammar on one line, `syntax: description` per keyword, for a tool argument the model
+/// reads in a schema.
+#[must_use]
+pub fn grammar_line() -> String {
+    KEYWORDS
+        .iter()
+        .map(|k| format!("`{}` {}", k.syntax, k.description))
+        .collect::<Vec<_>>()
+        .join(" ")
+}

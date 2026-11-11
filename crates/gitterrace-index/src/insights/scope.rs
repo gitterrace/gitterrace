@@ -50,7 +50,7 @@ use std::ops::{Range, RangeInclusive};
 
 use crate::feed::{self, Clock, CommitRange, CommitRow, FileRow, InsightsSource};
 use crate::insights::{DAY, Insights, OptionParams, Options, Period, Selection, TimeAxis};
-use crate::query::Matcher;
+use crate::query::{Leaf, Matcher, When};
 
 /// A scope as a query string carries it: every value a plain, possibly empty or junk, string.
 /// The web pages and the API both fill this and call [`Scope::from_params`].
@@ -125,6 +125,18 @@ impl Scope {
             (f, t) => Some((f.unwrap_or(i64::MIN), t.unwrap_or(i64::MAX))),
         };
         let q = p.select.query()?;
+        // A period in the text (`after:1m`, or `period:1m`) is the scope's period, which the
+        // pages and the buckets follow: the same as the `period` parameter, which says it only
+        // when the parameter does not. Date bounds stay terms of the matcher.
+        let lifted = q.terms().iter().find_map(|t| match t.leaf {
+            Leaf::After(When::Period(w)) if !t.neg => Some(w),
+            _ => None,
+        });
+        let period = match (set(p.period.as_deref()), lifted) {
+            (None, Some(w)) => w,
+            _ => period,
+        };
+        let q = q.replace(|l| matches!(l, Leaf::After(When::Period(_))), None);
         let m = Matcher::new(&q);
         if let Some((_, w)) = m.words().first() {
             return Err(ScopeError::Words(w.clone()));
@@ -427,6 +439,20 @@ mod tests {
 
     fn scope(q: &[(&str, &str)]) -> Result<Scope, ScopeError> {
         Scope::from_params(&params(q), Options::default(), Period::Month)
+    }
+
+    #[test]
+    fn a_period_in_the_text_is_the_period_parameter() {
+        for (a, b) in [
+            (&[("period", "1m")][..], &[("q", "after:1m")][..]),
+            (&[("period", "1w")], &[("q", "period:1w")]),
+        ] {
+            let (a, b) = (scope(a).expect("a"), scope(b).expect("b"));
+            assert_eq!(a, b, "{a:?}");
+        }
+        // The parameter wins over the text, as the web's filter has it.
+        let both = scope(&[("period", "1y"), ("q", "after:1m")]).expect("both");
+        assert_eq!(both.period(), Period::Year);
     }
 
     #[test]
