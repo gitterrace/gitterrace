@@ -10,7 +10,7 @@ const types = { html: 'text/html', css: 'text/css', svg: 'image/svg+xml', webp: 
   png: 'image/png', woff2: 'font/woff2' };
 
 /** Serves target/site with its _headers CSP, as the host does. @returns {Promise<any>} */
-async function serve() {
+export async function serve() {
   const head = readFileSync(join(siteDir, '_headers'), 'utf8');
   const csp = /Content-Security-Policy:\s*(.+)/.exec(head)[1].trim();
   const server = createServer((q, s) => {
@@ -26,7 +26,7 @@ async function serve() {
 }
 
 /** Every page of the site as its URL path. */
-function pages() {
+export function pages() {
   const out = [];
   const walk = (d) => {
     for (const e of readdirSync(d, { withFileTypes: true })) {
