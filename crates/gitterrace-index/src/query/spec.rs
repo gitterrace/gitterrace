@@ -102,3 +102,23 @@ pub(crate) const UNSUPPORTED: &[(&str, &str)] = &[(
     "committer",
     "`committer:` is not supported: the index keeps authors only. Use `author:`",
 )];
+
+/// The grammar as one line per keyword, ``- `syntax`: description``, for the docs and the MCP
+/// tool descriptions, so the model reads the registry and nothing is written twice.
+#[must_use]
+pub fn grammar() -> String {
+    KEYWORDS
+        .iter()
+        .map(|k| format!("- `{}`: {}", k.syntax, k.description))
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+/// The older one-key URL parameters and the keyword each one reads as, `(param, keyword)`.
+#[must_use]
+pub fn aliases() -> Vec<(&'static str, &'static str)> {
+    KEYWORDS
+        .iter()
+        .filter_map(|k| k.param.map(|p| (p, k.keyword)))
+        .collect()
+}

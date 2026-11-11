@@ -112,6 +112,27 @@ counts them.
 - `ws` (string): `1` counts whitespace-only changes.
 - `exclude` (string): Comma-separated globs left out.
 
+## Filter
+
+`q` is the commit filter, the same text the web filter field takes. Every term
+must match; they read in the order written. A bad `q` is a 400 with the span.
+
+- `type:<type>[,<type>]`: Conventional type; `other` is none.
+- `scope:<scope>[,<scope>]`: Conventional scope; `none` is none.
+- `author:<who>[,<who>]`: E-mail in any case, or the exact name.
+- `path:<prefix>[,<prefix>]`: Touches a file under the prefix.
+- `after:<period|YYYY-MM-DD>`: Within the period, or from the date.
+- `before:<period|YYYY-MM-DD>`: Before the period, or the date.
+- `period:<1w|1m|3m|1y|all>`: Old form of `after:`; `all` is none.
+- `merge`: Merge commits.
+- `<word> or "<words>"`: The message has it, any case.
+- `!<term>`: The term does not match.
+- `<term> <term>`: All terms match; `a,b` is either.
+
+The one-key parameters stay and read as terms of `q`, and must match as well:
+`type` as `type:`, `scope` as `scope:`, `author` as `author:`, `path` as
+`path:`, `period` as `period:`.
+
 ## Insights
 
 Served at `GET /insights/{name}`. Each page's hints say what its numbers leave

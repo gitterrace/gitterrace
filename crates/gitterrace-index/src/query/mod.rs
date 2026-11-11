@@ -12,7 +12,7 @@ mod spec;
 use gitterrace_types::Period;
 
 pub use matcher::{Commit, Matcher, by};
-pub use spec::{KEYWORDS, KeywordSpec};
+pub use spec::{KEYWORDS, KeywordSpec, aliases, grammar};
 
 /// A parsed filter: every term must match, in the order written.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]

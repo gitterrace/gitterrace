@@ -65,6 +65,8 @@ pub fn render() -> Out {
     }
     s.push_str(&parameters());
 
+    s.push_str(&filter_section());
+
     s.push_str(
         "\n## Insights\n\nServed at `GET /insights/{name}`. Each page's hints say what its \
         numbers leave out. Every insight takes `rev`, `period` and the \
@@ -115,6 +117,24 @@ pub fn render() -> Out {
     }
     s.push_str("\nA trailing `?` marks an optional parameter.\n");
     Out::file(PATH, s)
+}
+
+/// The commit filter every insight reads as `q`, from the keyword registry. The one-key
+/// parameters are listed as aliases of its terms, from the same registry the fold reads.
+fn filter_section() -> String {
+    let mut s = String::from(
+        "\n## Filter\n\n`q` is the commit filter, the same text the web filter field takes. \
+         Every term must match; they read in the order written. A bad `q` is a 400 with \
+         the span.\n\n",
+    );
+    s.push_str(&gitterrace_index::query::grammar());
+    s.push_str("\n\nThe one-key parameters stay and read as terms of `q`, and must match as well:");
+    for (i, (param, keyword)) in gitterrace_index::query::aliases().into_iter().enumerate() {
+        let sep = if i == 0 { " " } else { ", " };
+        let _ = write!(s, "{sep}`{param}` as `{keyword}:`");
+    }
+    s.push_str(".\n");
+    s
 }
 
 /// The parameters of each endpoint. A run that two or more endpoints share word for word (the
