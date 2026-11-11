@@ -10,6 +10,8 @@
 3. COVERS names no job lint-and-test.yml lacks.
 4. Every release-check.yml job that runs `make check` checks out with `fetch-depth: 0`: the
    history lints refuse a shallow clone.
+5. The git-cliff version in lint.toml is the one the lint-tools action downloads, digest-checked,
+   for both runner kinds.
 
 Read with a small indentation reader (2-space job keys under `jobs:`), no YAML library.
 
@@ -101,6 +103,35 @@ def problems(repo: Path) -> list[str]:
                 f"release-check.yml: job {j} runs make check on a shallow checkout; "
                 f"add fetch-depth: 0 to its checkout"
             )
+    bad += cliff_problems(repo)
+    return bad
+
+
+def cliff_problems(repo: Path) -> list[str]:
+    cfg = repo / "schwarzwald/config/lint.toml"
+    tools = repo / ".github/actions/lint-tools/action.yml"
+    if not cfg.exists() or not tools.exists():
+        return []
+    m = re.search(r'^git_cliff\s*=\s*"([^"]*)"', cfg.read_text(), re.M)
+    if not m or not m.group(1):
+        return []
+    want, text = m.group(1), tools.read_text()
+    found = re.findall(r"git-cliff/releases/download/v([0-9.]+)/", text)
+    bad = []
+    if want not in found:
+        bad.append(
+            f"lint-tools action installs no git-cliff {want}, the pin in lint.toml"
+        )
+    if set(found) - {want}:
+        bad.append(
+            f"lint-tools action: git-cliff {sorted(set(found) - {want})} is not {want}"
+        )
+    if len(found) < 2:
+        bad.append(
+            "lint-tools action: git-cliff needs a pinned download on macOS and Linux"
+        )
+    if not re.search(r"git-cliff[^\n]*\n[^\n]*\n?[^\n]*(sha256sum|shasum)", text):
+        bad.append("lint-tools action: git-cliff download is not digest-checked")
     return bad
 
 
@@ -111,6 +142,13 @@ WIN = "  windows:\n    if: inputs.full\n    runs-on: windows-latest\n"
 REL = (
     "  check:\n    strategy:\n      matrix:\n"
     "        os: [ubuntu-22.04, macos-latest, windows-latest]\n"
+)
+TOOLS = (
+    "runs:\n  steps:\n    - run: |\n"
+    "        curl -o a https://github.com/orhun/git-cliff/releases/download/v{v}/a.tgz\n"
+    "        sha256sum -c x\n"
+    "        curl -o b https://github.com/orhun/git-cliff/releases/download/v{v}/b.tgz\n"
+    "        shasum -a 256 -c x\n"
 )
 GATE = (
     "  gate:\n    steps:\n      - uses: actions/checkout@x\n        with:\n"
@@ -155,6 +193,18 @@ def self_test() -> int:
             REL + GATE.format(depth="          fetch-depth: 0\n"),
             False,
         ),
+    ]
+    cases += [
+        # The git-cliff pin drifts from lint.toml, or only one runner kind installs it.
+        (CALL, FAST + MAC + WIN, REL, True, TOOLS.format(v="2.10.0")),
+        (
+            CALL,
+            FAST + MAC + WIN,
+            REL,
+            True,
+            TOOLS.format(v="2.14.2").split("        curl -o b")[0],
+        ),
+        (CALL, FAST + MAC + WIN, REL, False, TOOLS.format(v="2.14.2")),
     ]
     for i, (ci, tiers, rel, red, *tools) in enumerate(cases):
         with tempfile.TemporaryDirectory() as t:
