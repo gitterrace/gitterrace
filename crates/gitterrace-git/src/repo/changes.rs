@@ -76,3 +76,27 @@ impl ChangeMemo {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{ChangeMemo, KEEP_COMMITS};
+
+    /// Guard class: an export-run cache whose size follows the history instead of a fixed
+    /// count. Asking for many more commits than it keeps leaves it at its bound, holding the
+    /// newest; red when eviction is dropped or the bound is skipped on a miss.
+    #[test]
+    fn the_memo_stays_bounded_over_many_commits() {
+        let memo = ChangeMemo::new();
+        let id = |n: usize| {
+            let mut b = [0u8; 20];
+            b[..8].copy_from_slice(&(n as u64).to_be_bytes());
+            gix::ObjectId::from(b)
+        };
+        for n in 0..KEEP_COMMITS * 50 {
+            memo.get(id(n), || Ok(Vec::new())).expect("changes");
+        }
+        let slots = memo.slots.lock().expect("lock");
+        assert_eq!(slots.len(), KEEP_COMMITS);
+        assert_eq!(slots.back().map(|s| s.0), Some(id(KEEP_COMMITS * 50 - 1)));
+    }
+}

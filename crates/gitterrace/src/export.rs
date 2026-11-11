@@ -15,6 +15,7 @@ mod out;
 mod progress;
 mod relative;
 mod seeds;
+mod seen;
 mod snapshot;
 mod write;
 
@@ -33,6 +34,7 @@ use crate::export::out::{Staging, check_out};
 pub(crate) use crate::export::progress::{Mode, Progress};
 use crate::export::relative::relativize;
 use crate::export::seeds::{queue_seeds, seeds};
+use crate::export::seen::Seen;
 #[cfg(test)]
 use crate::export::snapshot::mark_snapshot_as;
 use crate::export::snapshot::{SNAPSHOT_CSS, mark_snapshot, snapshot_label};
@@ -215,7 +217,7 @@ async fn crawl(
         })
     };
 
-    let mut seen: BTreeSet<String> = queue.iter().cloned().collect();
+    let mut seen = Seen::from_iter(&queue);
     let mut written = 0usize;
     let mut count = Caps::new(export_pages, scope);
     progress.phase("writing pages");
@@ -259,7 +261,7 @@ async fn crawl(
                     // Fonts travel inside the stylesheet (see `fonts.rs`), not as files.
                     let ok = (link.starts_with("/static/") && !link.starts_with("/static/fonts/"))
                         || site_for(&link).is_some_and(|s| s.allows(&link));
-                    if ok && seen.insert(link.clone()) {
+                    if ok && seen.insert(&link) {
                         if is_fragment(&link) {
                             fragments.push(link);
                         } else {
