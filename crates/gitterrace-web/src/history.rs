@@ -188,6 +188,9 @@ mod tests {
         let (_, page) = gitterrace_testkit::get(&router, "/history/small.txt").await;
         let links = page.matches("/commit/").count();
         let anchored = page.matches("#p/small.txt\"").count();
-        assert!(links >= 2 && anchored >= 2, "{links} links, {anchored} anchored");
+        assert!(
+            links >= 2 && anchored >= 2,
+            "{links} links, {anchored} anchored"
+        );
     }
 }

@@ -299,7 +299,11 @@ pub(crate) fn sha_file_link(full: &str, path: &str) -> String {
         return link;
     }
     let plain = format!("/commit/{}\"", esc(full));
-    let with = format!("/commit/{}#{}\"", esc(full), esc(&file_anchor(&enc_path(path))));
+    let with = format!(
+        "/commit/{}#{}\"",
+        esc(full),
+        esc(&file_anchor(&enc_path(path)))
+    );
     link.replacen(&plain, &with, 1)
 }
 

@@ -122,6 +122,9 @@ pub(crate) fn sections(loaded: &gitterrace_config::Loaded) -> Vec<Section> {
     out
 }
 
+/// What the actions tab shows for a file not written yet: the one line the loader requires.
+const ACTIONS_START: &str = "version = 1\n";
+
 fn first_error(r: &crate::settings::CheckReply) -> Option<String> {
     r.errors.first().map(|e| {
         if e.line > 0 {
@@ -215,6 +218,12 @@ pub(crate) async fn page(
         let text = match std::fs::symlink_metadata(&path) {
             Ok(m) if m.file_type().is_file() => std::fs::read_to_string(&path).unwrap_or_default(),
             _ => String::new(),
+        };
+        // An actions.toml not written yet is the empty form, not a broken file: it starts from
+        // the one line the loader requires, so a save from either view writes a file that loads.
+        let text = match f {
+            SettingsFile::Actions if text.trim().is_empty() => ACTIONS_START.to_owned(),
+            _ => text,
         };
         let check = crate::settings::validate(f, &text, &text, &env);
         let (sections, overrides) = match (f, gitterrace_config::parse(&text)) {
