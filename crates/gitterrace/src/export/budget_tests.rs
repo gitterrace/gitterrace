@@ -7,7 +7,7 @@ use std::time::{Duration, Instant};
 
 use gitterrace_testkit::Fixture;
 
-use crate::export::{Scope, export_capped, fetch, fetch_within};
+use crate::export::{Scope, export, fetch, fetch_within};
 
 /// Files a commit page shows in full before the rest fold (`TOTAL_DIFF_FILES` in the web
 /// crate). Every file in these fixtures is small, so only this budget folds them.
@@ -104,7 +104,7 @@ async fn a_wide_export_writes_the_expected_pages_within_one_budget() {
         }
     }
     let out = dir.path().join("out");
-    let n = export_capped(&repos, &out, &scope(in_scope), usize::MAX)
+    let n = export(&repos, &out, &scope(in_scope), None)
         .await
         .expect("export");
     assert_eq!(fragments(&out), want, "fragment pages");
@@ -118,12 +118,12 @@ async fn a_wide_export_writes_the_expected_pages_within_one_budget() {
     );
 
     let fits = dir.path().join("fits");
-    export_capped(&repos, &fits, &scope(in_scope), pages)
+    export(&repos, &fits, &scope(in_scope), Some(pages))
         .await
         .expect("the exact budget fits");
     assert_eq!(fragments(&fits), want);
     let over = dir.path().join("over");
-    let err = export_capped(&repos, &over, &scope(in_scope), pages - 1)
+    let err = export(&repos, &over, &scope(in_scope), Some(pages - 1))
         .await
         .expect_err("one page short must fail, fragments included");
     assert!(err.to_string().contains("cap of"), "{err}");
@@ -211,7 +211,7 @@ async fn a_capped_export_leaves_the_existing_folder_untouched() {
     let parent = dir.path().join("sites");
     std::fs::create_dir(&parent).expect("mkdir");
     let earlier = parent.join("earlier");
-    export_capped(&repos, &earlier, &scope(2), usize::MAX)
+    export(&repos, &earlier, &scope(2), None)
         .await
         .expect("first export");
     let foreign = parent.join("foreign");
@@ -222,7 +222,7 @@ async fn a_capped_export_leaves_the_existing_folder_untouched() {
     for (out, force) in [(&earlier, false), (&foreign, true)] {
         let before = tree(out);
         let capped = Scope { force, ..scope(2) };
-        let err = export_capped(&repos, out, &capped, 3)
+        let err = export(&repos, out, &capped, Some(3))
             .await
             .expect_err("capped");
         let msg = err.to_string();
@@ -243,10 +243,10 @@ async fn a_capped_export_leaves_the_existing_folder_untouched() {
 #[tokio::test]
 async fn the_flag_beats_the_config_and_the_cap_error_names_both() {
     let mut c = gitterrace_config::Config::default();
-    assert_eq!(crate::export::budget(None, &c), 20_000);
-    c.limits.export_pages = 7;
-    assert_eq!(crate::export::budget(None, &c), 7);
-    assert_eq!(crate::export::budget(Some(3), &c), 3);
+    assert_eq!(crate::export::budget(None, &c), None, "no cap by default");
+    c.limits.export_pages = Some(7);
+    assert_eq!(crate::export::budget(None, &c), Some(7));
+    assert_eq!(crate::export::budget(Some(3), &c), Some(3));
 
     let dir = tempfile::tempdir().expect("tempdir");
     let fx = wide(&dir.path().join("r"), 2, 2);
@@ -291,4 +291,25 @@ async fn a_page_over_the_body_limit_fails_naming_the_knobs() {
         msg.contains("limits.blob_lines") && msg.contains("limits.highlight_kb"),
         "{msg}"
     );
+}
+
+/// A page count far past any fixed default cap a config could ship.
+const MANY_PAGES: usize = 100_000;
+
+/// Guard class: a default that bounds the export by a page count rather than by its scope.
+/// The crawl takes every page from this budget; under the default config it hands out
+/// pages without a count limit, and an explicit cap still refuses. A full export of that many
+/// pages runs for minutes, so the budget the crawl uses is driven directly.
+#[test]
+fn the_default_budget_has_no_page_limit() {
+    let config = gitterrace_config::Config::default();
+    let mut caps = crate::export::Caps::new(crate::export::budget(None, &config), &scope(1));
+    for i in 0..=MANY_PAGES {
+        caps.take(&format!("/blob/HEAD/{i}.txt"))
+            .unwrap_or_else(|e| panic!("page {i}: {e}"));
+    }
+    let mut capped = crate::export::Caps::new(crate::export::budget(Some(2), &config), &scope(1));
+    capped.take("/").expect("first");
+    capped.take("/log").expect("second");
+    assert!(capped.take("/refs").is_err(), "a set cap still refuses");
 }

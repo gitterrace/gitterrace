@@ -8,6 +8,7 @@
 //! and 404 in the exported copy, the same as a link to a page that was
 //! never published.
 
+mod caps;
 mod credit;
 mod fonts;
 mod out;
@@ -25,6 +26,7 @@ use anyhow::{Context, bail};
 use axum::{Router, http::StatusCode};
 use gitterrace_git::percent_decode;
 
+use crate::export::caps::{Caps, is_fragment};
 use crate::export::credit::{Credit, add_footer};
 use crate::export::out::{Staging, check_out};
 use crate::export::relative::relativize;
@@ -106,32 +108,34 @@ fn exclude_from_worktree(out: &Path) {
 /// repository under `/r/<name>/`, named by the server's own table.
 /// The site is built in a folder beside `out` and moved into place only when complete: a failed
 /// or capped export leaves `out` as it was.
-/// `export_pages` is the ceiling on pages written, folded diff fragments (`/diff/{id}/{n}`)
-/// included: one budget, so a wide commit costs pages like any other and the export's size is
-/// bounded by its scope, not by how many files its commits touch. It comes from
-/// `export --export-pages`, else `limits.export_pages`.
+/// `export_pages`, when set, is the ceiling on pages written, folded diff fragments
+/// (`/diff/{id}/{n}`) included: one budget, so a wide commit costs pages like any other. Unset,
+/// every page in scope is written. It comes from `export --export-pages`, else
+/// `limits.export_pages`. Pages stream to disk as they render, so memory holds the queue of
+/// paths, not the pages.
 pub(crate) async fn export(
     repos: &[PathBuf],
     out: &Path,
     scope: &Scope,
-    export_pages: usize,
+    export_pages: Option<usize>,
 ) -> anyhow::Result<usize> {
     export_capped(repos, out, scope, export_pages).await
 }
 
-/// The export page budget: `--export-pages` wins over `limits.export_pages`.
-pub(crate) fn budget(flag: Option<u64>, config: &gitterrace_config::Config) -> usize {
+/// The export page budget: `--export-pages` wins over `limits.export_pages`, and neither set
+/// means no cap.
+pub(crate) fn budget(flag: Option<u64>, config: &gitterrace_config::Config) -> Option<usize> {
     flag.map_or(config.limits.export_pages, |n| {
-        usize::try_from(n).unwrap_or(usize::MAX)
+        Some(usize::try_from(n).unwrap_or(usize::MAX))
     })
 }
 
-/// [`export`] under a given page budget, so a test can reach the cap with a small fixture.
+/// [`export`] under a given page budget.
 async fn export_capped(
     repos: &[PathBuf],
     dest: &Path,
     scope: &Scope,
-    export_pages: usize,
+    export_pages: Option<usize>,
 ) -> anyhow::Result<usize> {
     // Swapped arguments (`export <repo> <out>`) would scatter pages over a
     // checkout. An ignored folder inside a repo is fine; its root is not.
@@ -150,12 +154,12 @@ async fn export_capped(
     Ok(written)
 }
 
-/// Writes every page in scope under `out`, failing at `export_pages`.
+/// Writes every page in scope under `out`, failing at `export_pages` when set.
 async fn crawl(
     repos: &[PathBuf],
     out: &Path,
     scope: &Scope,
-    export_pages: usize,
+    export_pages: Option<usize>,
 ) -> anyhow::Result<usize> {
     // Owned by this run alone: dropped with the router when the crawl ends, so nothing the
     // export diffed outlives it.
@@ -284,54 +288,6 @@ fn write_for_disk(out: &Path, path: &str, content_type: &str, body: &[u8]) -> an
         return write_page(out, path, content_type, text.as_bytes());
     }
     write_page(out, path, content_type, body)
-}
-
-/// Pages written so far against the one budget, diff fragments included.
-struct Caps {
-    pages: usize,
-    max: usize,
-    commits: usize,
-    file_kb: u64,
-}
-
-impl Caps {
-    const fn new(max: usize, scope: &Scope) -> Self {
-        Self {
-            pages: 0,
-            max,
-            commits: scope.commits,
-            file_kb: scope.max_file / 1024,
-        }
-    }
-
-    fn take(&mut self, path: &str) -> anyhow::Result<()> {
-        if self.pages >= self.max {
-            let kind = if is_fragment(path) {
-                "a diff fragment"
-            } else {
-                "a page"
-            };
-            bail!(
-                "export stopped at the cap of {} pages (diff fragments count) on {kind}, {path}; \
-                 nothing was written. Lower --commits (now {}) or --file-kb (now {}), or \
-                 raise --export-pages or limits.export_pages in config.toml",
-                self.max,
-                self.commits,
-                self.file_kb
-            );
-        }
-        self.pages += 1;
-        Ok(())
-    }
-}
-
-/// Whether `path` is a folded diff fragment, under any repository prefix.
-fn is_fragment(path: &str) -> bool {
-    let local = path
-        .strip_prefix("/r/")
-        .and_then(|r| r.split_once('/'))
-        .map_or(path, |(_, rest)| rest);
-    local.trim_start_matches('/').starts_with("diff/")
 }
 
 /// The credit line for one repository, using its project URL as origin when one was given.

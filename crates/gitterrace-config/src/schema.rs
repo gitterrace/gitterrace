@@ -334,9 +334,10 @@ settings! {
         /// Most repositories remembered in `repos.json`, newest first. Past it the least recently
         /// served are forgotten with their names. Needs a restart.
         registry_entries: usize = 500 => Restart,
-        /// Most pages `git terrace export` writes, folded diff fragments included. Past it the
-        /// export stops and writes nothing. `export --export-pages` overrides it.
-        export_pages: usize = 20_000 => Live,
+        /// Most pages `git terrace export` writes, folded diff fragments included. Unset, the
+        /// export writes every page in scope. Past a set cap the export stops and writes
+        /// nothing. `export --export-pages` overrides it.
+        export_pages: Option<usize> = None => Live,
     }
     api: Api {
         /// Most commits one `log` answer lists, whatever `per_page` asks.
@@ -478,10 +479,12 @@ impl Config {
             return bad("limits", "text_kb and raw_mb must be at least 1");
         }
         for (k, lo, hi) in BOUNDS {
-            let v = keys()
-                .iter()
-                .find(|x| x.id == *k)
-                .and_then(|x| self.show(x).parse::<u64>().ok());
+            let shown = keys().iter().find(|x| x.id == *k).map(|x| self.show(x));
+            // An optional cap left unset has no value to bound.
+            if shown.as_deref() == Some("unset") {
+                continue;
+            }
+            let v = shown.and_then(|s| s.parse::<u64>().ok());
             if v.is_none_or(|v| v < *lo || v > *hi) {
                 return bad(k, &format!("must be between {lo} and {hi}"));
             }

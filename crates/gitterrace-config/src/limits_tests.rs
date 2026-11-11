@@ -44,6 +44,10 @@ fn every_limit_refuses_zero_and_absurd_values() {
 fn every_limit_is_bounded_and_its_default_fits() {
     let d = Config::default();
     for (id, lo, hi) in BOUNDS {
+        let k = keys().into_iter().find(|k| k.id == *id).expect("known key");
+        if d.show(&k) == "unset" {
+            continue;
+        }
         let v = value(&d, id);
         assert!(
             (*lo..=*hi).contains(&v),

@@ -107,26 +107,8 @@ async fn main() -> anyhow::Result<()> {
         }
         Command::Init => init(cli.config.as_deref())?,
         Command::InstallHandler { uninstall } => handler::run(uninstall)?,
-        Command::Export {
-            out,
-            force,
-            commits,
-            file_kb,
-            export_pages,
-            project,
-        } => {
-            let scope = export::Scope {
-                commits,
-                max_file: file_kb * 1024,
-                force,
-                projects: project
-                    .iter()
-                    .map(|p| export::Project::parse(p))
-                    .collect::<anyhow::Result<_>>()?,
-                config: loaded.config.clone(),
-            };
-            let pages = export::budget(export_pages, &loaded.config);
-            export_cmd(&cli.paths, &path, out, &scope, pages, &loaded.config).await?;
+        cmd @ Command::Export { .. } => {
+            export_cmd(&cli.paths, &path, cmd, &loaded.config).await?;
         }
     }
     Ok(())
@@ -225,11 +207,31 @@ impl Flags {
 async fn export_cmd(
     paths: &[PathBuf],
     path: &Path,
-    out: Option<PathBuf>,
-    scope: &export::Scope,
-    pages: usize,
+    cmd: Command,
     config: &gitterrace_config::Config,
 ) -> anyhow::Result<()> {
+    let Command::Export {
+        out,
+        force,
+        commits,
+        file_kb,
+        export_pages,
+        project,
+    } = cmd
+    else {
+        anyhow::bail!("export_cmd runs the export command only");
+    };
+    let scope = &export::Scope {
+        commits,
+        max_file: file_kb * 1024,
+        force,
+        projects: project
+            .iter()
+            .map(|p| export::Project::parse(p))
+            .collect::<anyhow::Result<_>>()?,
+        config: config.clone(),
+    };
+    let pages = export::budget(export_pages, config);
     let out = out.unwrap_or_else(|| PathBuf::from(export::DEFAULT_OUT));
     let m = &config.multi;
     let repos = gitterrace_web::discover_repos(paths, m.depth, &m.skip_dirs);

@@ -4,8 +4,8 @@ use std::path::Path;
 use crate::export::write_page;
 use crate::export::{links, mark_snapshot, mark_snapshot_as, target};
 
-/// The budget an export gets with no flag and no config: `limits.export_pages`'s default.
-const DEFAULT_PAGES: usize = 20_000;
+/// The budget an export gets with no flag and no config: no cap.
+const DEFAULT_PAGES: Option<usize> = None;
 
 #[test]
 fn headers_file_carries_the_page_policy() {
@@ -465,8 +465,14 @@ fn diff_fragments_follow_the_commit_scope() {
     ] {
         assert!(!allowed.contains(bad), "{bad}");
     }
-    assert!(super::is_fragment("/r/name/diff/abc/0") && super::is_fragment("/diff/abc/0"));
-    assert!(!super::is_fragment("/r/name/commit/abc") && !super::is_fragment("/r/diff/commit/abc"));
+    assert!(
+        crate::export::is_fragment("/r/name/diff/abc/0")
+            && crate::export::is_fragment("/diff/abc/0")
+    );
+    assert!(
+        !crate::export::is_fragment("/r/name/commit/abc")
+            && !crate::export::is_fragment("/r/diff/commit/abc")
+    );
 }
 
 /// An export serves what the server would: with insights and the credit line switched off it

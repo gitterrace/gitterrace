@@ -80,6 +80,22 @@ macro_rules! int {
 int!(u64);
 int!(usize);
 
+/// A cap that is off unless set: unset means no limit.
+impl Show for Option<usize> {
+    const TYPE: &'static str = "integer";
+    fn control() -> Control {
+        Control::Number
+    }
+    fn show(&self) -> String {
+        self.map_or_else(|| "unset".to_owned(), |n| n.to_string())
+    }
+    fn from_toml(v: &toml::Value) -> Option<Self> {
+        v.as_integer()
+            .and_then(|i| usize::try_from(i).ok())
+            .map(Some)
+    }
+}
+
 impl Show for String {
     const TYPE: &'static str = "string";
     fn control() -> Control {

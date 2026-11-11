@@ -138,7 +138,8 @@ git terrace export [OPTIONS] [OUT] [PATHS]...
 - `--file-kb <KIB>`: Largest file to include as a page, in KiB. Larger files are
   left out of the export. Default: `512`.
 - `--export-pages <N>`: Most pages to write, folded diff fragments included.
-  Overrides `limits.export_pages`. Past it the export stops and writes nothing.
+  Overrides `limits.export_pages`. Unset, every page in scope is written. Past a
+  set cap the export stops and writes nothing.
 - `--project <NAME=URL>`: Credit a repository that is someone else's project (a
   demo), as `name=url`: its pages name and link it in the snapshot banner.
   `name` is the repository's folder name. Repeat it for several repositories.

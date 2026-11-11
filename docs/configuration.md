@@ -141,9 +141,10 @@ Exceptions, each on purpose:
 - `registry_entries` (integer, default `500`): Most repositories remembered in
   `repos.json`, newest first. Past it the least recently served are forgotten
   with their names. Needs a restart.
-- `export_pages` (integer, default `20000`): Most pages `git terrace export`
-  writes, folded diff fragments included. Past it the export stops and writes
-  nothing. `export --export-pages` overrides it.
+- `export_pages` (integer, default `unset`): Most pages `git terrace export`
+  writes, folded diff fragments included. Unset, the export writes every page in
+  scope. Past a set cap the export stops and writes nothing.
+  `export --export-pages` overrides it.
 
 ## `[api]`
 

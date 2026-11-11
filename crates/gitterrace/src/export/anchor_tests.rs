@@ -1,6 +1,6 @@
 //! Exported Markdown keeps plain heading anchors, so a page opened with JS off still jumps.
 
-const DEFAULT_PAGES: usize = 20_000;
+const DEFAULT_PAGES: Option<usize> = None;
 
 /// Guard class: a static page whose in-page links only resolve through script. Every
 /// `href="#x"` in every exported page must name an `id="x"` on the same page, and the README
