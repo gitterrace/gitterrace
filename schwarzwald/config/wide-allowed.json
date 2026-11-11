@@ -72,7 +72,7 @@
     "scripts/bench/bench-run.py": 2,
     "scripts/verify/browser/access-lib.mjs": 2,
     "scripts/verify/browser/anchor-lib.mjs": 16,
-    "scripts/verify/browser/browser-check.mjs": 53,
+    "scripts/verify/browser/browser-check.mjs": 10,
     "scripts/verify/browser/diff-lib.mjs": 25,
     "scripts/verify/browser/graph-lib.mjs": 6,
     "scripts/verify/browser/heads-lib.mjs": 6,
