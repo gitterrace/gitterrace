@@ -12,6 +12,7 @@ mod caps;
 mod credit;
 mod fonts;
 mod out;
+mod progress;
 mod relative;
 mod seeds;
 mod snapshot;
@@ -29,6 +30,7 @@ use gitterrace_git::percent_decode;
 use crate::export::caps::{Caps, is_fragment};
 use crate::export::credit::{Credit, add_footer};
 use crate::export::out::{Staging, check_out};
+pub(crate) use crate::export::progress::{Mode, Progress};
 use crate::export::relative::relativize;
 use crate::export::seeds::{queue_seeds, seeds};
 #[cfg(test)]
@@ -112,14 +114,15 @@ fn exclude_from_worktree(out: &Path) {
 /// (`/diff/{id}/{n}`) included: one budget, so a wide commit costs pages like any other. Unset,
 /// every page in scope is written. It comes from `export --export-pages`, else
 /// `limits.export_pages`. Pages stream to disk as they render, so memory holds the queue of
-/// paths, not the pages.
+/// paths, not the pages. Silent: the command line uses [`export_with`].
+#[cfg(test)]
 pub(crate) async fn export(
     repos: &[PathBuf],
     out: &Path,
     scope: &Scope,
     export_pages: Option<usize>,
 ) -> anyhow::Result<usize> {
-    export_capped(repos, out, scope, export_pages).await
+    export_with(repos, out, scope, export_pages, &mut Progress::quiet()).await
 }
 
 /// The export page budget: `--export-pages` wins over `limits.export_pages`, and neither set
@@ -130,12 +133,13 @@ pub(crate) fn budget(flag: Option<u64>, config: &gitterrace_config::Config) -> O
     })
 }
 
-/// [`export`] under a given page budget.
-async fn export_capped(
+/// [`export`], telling `progress` what it does.
+pub(crate) async fn export_with(
     repos: &[PathBuf],
     dest: &Path,
     scope: &Scope,
     export_pages: Option<usize>,
+    progress: &mut Progress,
 ) -> anyhow::Result<usize> {
     // Swapped arguments (`export <repo> <out>`) would scatter pages over a
     // checkout. An ignored folder inside a repo is fine; its root is not.
@@ -148,7 +152,8 @@ async fn export_capped(
     }
     let existing = check_out(repos, dest, scope.force)?;
     let staging = Staging::new(dest)?;
-    let written = crawl(repos, staging.path(), scope, export_pages).await?;
+    let written = crawl(repos, staging.path(), scope, export_pages, progress).await?;
+    progress.done(written);
     staging.finish(repos, dest, existing)?;
     exclude_from_worktree(dest);
     Ok(written)
@@ -160,6 +165,7 @@ async fn crawl(
     out: &Path,
     scope: &Scope,
     export_pages: Option<usize>,
+    progress: &mut Progress,
 ) -> anyhow::Result<usize> {
     // Owned by this run alone: dropped with the router when the crawl ends, so nothing the
     // export diffed outlives it.
@@ -171,7 +177,7 @@ async fn crawl(
     let mut queue: VecDeque<String> = root_page(out, &sites)?.into_iter().collect();
     let mut site_of = Vec::with_capacity(sites.len());
     for (repo_path, site) in repos.iter().zip(&sites) {
-        wait_for_index(&router, site).await?;
+        wait_for_index(&router, site, progress).await?;
         let repo = gitterrace_git::Repo::discover(repo_path).context("opening the repository")?;
         let head = repo.resolve("HEAD").context("resolving HEAD")?;
         queue_seeds(&mut queue, site, &scope.config);
@@ -212,6 +218,7 @@ async fn crawl(
     let mut seen: BTreeSet<String> = queue.iter().cloned().collect();
     let mut written = 0usize;
     let mut count = Caps::new(export_pages, scope);
+    progress.phase("writing pages");
     // Pages render on blocking threads, so one at a time leaves the cores idle.
     // Fetch a batch concurrently, then write and follow links in queue order so
     // the output and the page cap stay deterministic.
@@ -245,6 +252,7 @@ async fn crawl(
                 body
             };
             written += usize::from(write_for_disk(out, &path, &content_type, &body)?);
+            progress.pages(count.pages, count.pages + queue.len());
             if content_type.starts_with("text/html") || content_type.starts_with("text/css") {
                 let mut fragments = Vec::new();
                 for link in links(&String::from_utf8_lossy(&body)) {
@@ -378,13 +386,16 @@ async fn sites(router: &Router, repos: &[PathBuf]) -> anyhow::Result<Vec<String>
     Ok(prefixes)
 }
 
-#[expect(
-    clippy::print_stderr,
-    reason = "user-facing CLI output: this is the command's result or diagnostic, not a log line"
-)]
 /// Polls the progress endpoint so insights pages are exported built, not "indexing".
-async fn wait_for_index(router: &Router, prefix: &str) -> anyhow::Result<()> {
-    eprintln!("building the cache for {prefix} (first run reads every commit once)...");
+async fn wait_for_index(
+    router: &Router,
+    prefix: &str,
+    progress: &mut Progress,
+) -> anyhow::Result<()> {
+    let name = if prefix.is_empty() { "/" } else { prefix };
+    progress.phase(&format!(
+        "building the cache for {name} (first run reads every commit once)"
+    ));
     for _ in 0..3_600 {
         let (_, _, body) = fetch(router, &format!("{prefix}/api/progress")).await?;
         let ready = serde_json::from_slice::<serde_json::Value>(&body)

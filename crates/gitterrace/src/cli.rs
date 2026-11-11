@@ -111,6 +111,10 @@ pub(crate) enum Command {
         #[arg(long, value_name = "N", value_parser = clap::value_parser!(u64).range(1..=10_000_000)
         )]
         export_pages: Option<u64>,
+        /// Print no progress. Progress goes to stderr: one updating line on a terminal, a
+        /// line every few seconds otherwise.
+        #[arg(long, short)]
+        quiet: bool,
         /// Credit a repository that is someone else's project (a demo), as `name=url`: its
         /// pages name and link it in the snapshot banner. `name` is the repository's folder
         /// name. Repeat it for several repositories.

@@ -39,7 +39,7 @@ async fn main() -> anyhow::Result<()> {
         .unwrap_or_else(|| PathBuf::from("."));
     // stdout carries the MCP protocol, so logs always go to stderr.
     // Color only for a person at a terminal: NO_COLOR (any non-empty value) and a piped stderr
-    // get plain lines. Progress is always printed as lines, never as a redrawn spinner.
+    // get plain lines. Export progress redraws one line only on a terminal, with no escape codes.
     tracing_subscriber::fmt()
         .with_writer(std::io::stderr)
         .with_ansi(use_color())
@@ -216,6 +216,7 @@ async fn export_cmd(
         commits,
         file_kb,
         export_pages,
+        quiet,
         project,
     } = cmd
     else {
@@ -232,13 +233,15 @@ async fn export_cmd(
         config: config.clone(),
     };
     let pages = export::budget(export_pages, config);
+    let mut progress =
+        export::Progress::new(export::Mode::detect(quiet), Box::new(std::io::stderr()));
     let out = out.unwrap_or_else(|| PathBuf::from(export::DEFAULT_OUT));
     let m = &config.multi;
     let repos = gitterrace_web::discover_repos(paths, m.depth, &m.skip_dirs);
     if repos.is_empty() {
         anyhow::bail!("no git repository found in {}", path.display());
     }
-    let n = export::export(&repos, &out, scope, pages).await?;
+    let n = export::export_with(&repos, &out, scope, pages, &mut progress).await?;
     println!("wrote {n} files to {}", out.display());
     Ok(())
 }

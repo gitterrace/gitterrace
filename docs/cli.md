@@ -140,6 +140,8 @@ git terrace export [OPTIONS] [OUT] [PATHS]...
 - `--export-pages <N>`: Most pages to write, folded diff fragments included.
   Overrides `limits.export_pages`. Unset, every page in scope is written. Past a
   set cap the export stops and writes nothing.
+- `-q`, `--quiet`: Print no progress. Progress goes to stderr: one updating line
+  on a terminal, a line every few seconds otherwise.
 - `--project <NAME=URL>`: Credit a repository that is someone else's project (a
   demo), as `name=url`: its pages name and link it in the snapshot banner.
   `name` is the repository's folder name. Repeat it for several repositories.
