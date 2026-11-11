@@ -95,6 +95,8 @@ pub(crate) enum Command {
         /// first, before any repositories: `export site repo1 repo2`. A folder an earlier
         /// export made is replaced whole. Any other non-empty folder is refused without
         /// `--force`, and so are a symlink and a folder holding a repository being exported.
+        /// A folder an older version exported records no ownership and is refused: remove it
+        /// and export again.
         out: Option<PathBuf>,
         /// Write into a non-empty folder that no earlier export made. Its files are kept, a
         /// file in the site's way is replaced, a folder in its way fails the export. Later

@@ -119,8 +119,7 @@ pub(super) fn check_out(
             // is unknown and none of it is cleared.
             bail!(
                 "{} has a {MARKER} file that does not say what the export owns there, as an \
-                 older version wrote it. Remove the folder if it holds only an export, or \
-                 choose another",
+                 older version wrote it. Remove the folder and export again, or choose another",
                 out.display()
             );
         }
