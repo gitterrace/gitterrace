@@ -245,8 +245,7 @@ impl ApiState {
         }
     }
 
-    /// Drops the shared source and the per-commit head memo; the next call builds them again.
-    /// The server calls this when nobody browses, so an idle process keeps neither.
+    /// Drops the shared source, the head memo and the full-id set, so an idle server keeps none.
     pub fn release_records(&self) {
         if let Ok(mut g) = self.cache.lock() {
             g.take();
@@ -254,6 +253,7 @@ impl ApiState {
         if let Ok(mut g) = self.head.lock() {
             *g = HeadMemo::default();
         }
+        self.repo.clear_visible();
     }
 
     /// Whether the head memo holds anything (a test hook for [`ApiState::release_records`]).

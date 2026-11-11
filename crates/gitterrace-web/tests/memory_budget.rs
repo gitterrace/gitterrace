@@ -29,6 +29,8 @@ const GROWTH_MB: u64 = 4;
 const SERVE_VAR: &str = "TEST_MEMORY_SERVE";
 /// File the child writes its live heap bytes to, see `report_heap`.
 const HEAP_VAR: &str = "TEST_MEMORY_HEAP";
+/// Set in the child: serve as a public server (`server.is_public`).
+const PUBLIC_VAR: &str = "TEST_MEMORY_PUBLIC";
 /// Longest wait for an idle release after the server is ready.
 const RELEASE_WAIT_SECS: u64 = 120;
 
@@ -89,12 +91,14 @@ fn serve_if_child() -> bool {
     }
     let (addr, path) = v.split_once(' ').expect("addr and path");
     let addr: SocketAddr = addr.parse().expect("addr");
+    let mut cfg = gitterrace_config::Config::default();
+    cfg.server.is_public = std::env::var_os(PUBLIC_VAR).is_some();
     let rt = tokio::runtime::Runtime::new().expect("runtime");
     rt.block_on(gitterrace_web::serve_in(
         vec![PathBuf::from(path)],
         addr,
         None,
-        gitterrace_config::Config::default(),
+        cfg,
         None,
         None,
     ))
@@ -111,16 +115,23 @@ struct Server {
 
 impl Server {
     fn start(repo: &Path, test: &str) -> Self {
+        Self::start_with(repo, test, false)
+    }
+
+    /// [`Server::start`], as a public server when `public` is set.
+    fn start_with(repo: &Path, test: &str, public: bool) -> Self {
         let addr = std::net::TcpListener::bind("127.0.0.1:0")
             .and_then(|l| l.local_addr())
             .expect("free port");
         let heap = tempfile::tempdir().expect("tmp");
-        let child = Command::new(std::env::current_exe().expect("exe"))
-            .args([test, "--exact", "--nocapture", "--include-ignored"])
+        let mut cmd = Command::new(std::env::current_exe().expect("exe"));
+        cmd.args([test, "--exact", "--nocapture", "--include-ignored"])
             .env(SERVE_VAR, format!("{addr} {}", repo.display()))
-            .env(HEAP_VAR, heap.path().join("heap"))
-            .spawn()
-            .expect("spawn server");
+            .env(HEAP_VAR, heap.path().join("heap"));
+        if public {
+            cmd.env(PUBLIC_VAR, "1");
+        }
+        let child = cmd.spawn().expect("spawn server");
         let s = Self { child, addr, heap };
         let end = Instant::now() + Duration::from_secs(30);
         while TcpStream::connect(addr).is_err() {
@@ -526,5 +537,7 @@ fn idle_memory_is_flat_in_tree_size() {
 
 #[path = "memory_budget/insights.rs"]
 mod insights;
+#[path = "memory_budget/public.rs"]
+mod public;
 #[path = "memory_budget/renames.rs"]
 mod renames;

@@ -198,3 +198,36 @@ fn the_visible_set_is_walked_once_per_ref_state() {
         );
     }
 }
+
+/// The set costs one id per commit and nothing for a hash table: at most `BYTES_PER_COMMIT`
+/// heap bytes for each commit it holds, so a 1.3M-commit history stays near 26 MB.
+#[test]
+fn the_visible_set_costs_one_id_per_commit() {
+    const BYTES_PER_COMMIT: usize = 20;
+    let (tmp, ids) = repo();
+    let repo = Repo::discover(tmp.path()).expect("repo").committed_only();
+    assert!(repo.resolve(&ids.old).is_ok());
+    let v = repo.visible.lock().expect("lock");
+    assert!(v.len() > 0, "an old id builds the set");
+    assert!(
+        v.heap_bytes() <= v.len() * BYTES_PER_COMMIT,
+        "{} bytes for {} commits",
+        v.heap_bytes(),
+        v.len()
+    );
+}
+
+/// Clearing drops every commit and says it held some; the next full id walks again and the
+/// answers stay the same, a hidden commit refused as before.
+#[test]
+fn a_cleared_visible_set_rebuilds_on_the_next_full_id() {
+    let (tmp, ids) = repo();
+    let repo = Repo::discover(tmp.path()).expect("repo").committed_only();
+    assert!(!repo.clear_visible(), "an unbuilt set holds nothing");
+    assert!(repo.resolve(&ids.old).is_ok());
+    assert!(repo.clear_visible(), "a built set reports what it held");
+    assert_eq!(repo.visible.lock().expect("lock").len(), 0);
+    assert!(repo.resolve(&ids.dangling).is_err(), "cleared set widened");
+    assert!(repo.resolve(&ids.old).is_ok());
+    assert!(repo.visible.lock().expect("lock").len() > 0, "not rebuilt");
+}

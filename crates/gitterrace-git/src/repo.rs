@@ -141,6 +141,12 @@ impl Repo {
         self.changes.lock().ok()?.upgrade()
     }
 
+    /// Drops the commits a committed-only handle walked to check full ids, returning whether
+    /// it held any. A server calls this when nobody browses; the next full id walks again.
+    pub fn clear_visible(&self) -> bool {
+        self.visible.lock().is_ok_and(|mut v| v.clear())
+    }
+
     /// [`Repo::restrict_to_committed`] as a builder.
     #[must_use]
     pub fn committed_only(self) -> Self {

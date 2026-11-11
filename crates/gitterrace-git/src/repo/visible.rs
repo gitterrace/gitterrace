@@ -5,6 +5,8 @@
 //! The reachable set is walked once and kept for one key, the raw targets of the public roots.
 //! A moved, new or deleted root changes the key. When the roots only grew, the walk covers the
 //! new history alone, otherwise the set is rebuilt: a deleted ref may have hidden commits.
+//! An idle server drops the set ([`crate::Repo::clear_visible`]) and the next raw id walks
+//! again.
 
 use std::collections::HashSet;
 use std::hash::{Hash, Hasher};
@@ -20,7 +22,9 @@ const PUBLIC_PREFIXES: [&str; 3] = ["refs/heads/", "refs/tags/", "refs/remotes/"
 pub(crate) struct Visible {
     key: Option<u64>,
     roots: HashSet<gix::ObjectId>,
-    reachable: HashSet<gix::ObjectId>,
+    /// Sorted and deduplicated: 20 bytes a commit, 26 MB on a 1.3M-commit history, where a
+    /// hash set costs three to four times that.
+    reachable: Vec<gix::ObjectId>,
     built: bool,
 }
 
@@ -38,7 +42,7 @@ impl Visible {
                 walk_into(repo, fresh, old, &mut self.reachable)?;
                 self.built = true;
             } else {
-                self.reachable.clear();
+                self.reachable = Vec::new();
                 self.built = false;
             }
             self.roots = roots;
@@ -53,13 +57,27 @@ impl Visible {
             walk_into(repo, roots, Vec::new(), &mut self.reachable)?;
             self.built = true;
         }
-        Ok(self.reachable.contains(&id))
+        Ok(self.reachable.binary_search(&id).is_ok())
+    }
+
+    /// Drops the set and its key, returning whether it held commits. The next raw id walks
+    /// again, so a server that nobody browses keeps no per-commit state here.
+    pub(crate) fn clear(&mut self) -> bool {
+        let held = !self.reachable.is_empty();
+        *self = Self::default();
+        held
     }
 
     /// Commits held, so a test can see the set is built once.
     #[cfg(test)]
-    pub(crate) fn len(&self) -> usize {
+    pub(crate) const fn len(&self) -> usize {
         self.reachable.len()
+    }
+
+    /// Heap bytes the set holds.
+    #[cfg(test)]
+    pub(crate) const fn heap_bytes(&self) -> usize {
+        self.reachable.capacity() * size_of::<gix::ObjectId>()
     }
 }
 
@@ -114,12 +132,13 @@ fn public_roots(repo: &gix::Repository) -> HashSet<gix::ObjectId> {
     out
 }
 
-/// Adds every commit reachable from `tips` but not from `hidden` to `into`.
+/// Adds every commit reachable from `tips` but not from `hidden` to the sorted `into`, which
+/// stays sorted, deduplicated and trimmed to its length.
 fn walk_into(
     repo: &gix::Repository,
     tips: Vec<gix::ObjectId>,
     hidden: Vec<gix::ObjectId>,
-    into: &mut HashSet<gix::ObjectId>,
+    into: &mut Vec<gix::ObjectId>,
 ) -> Result<()> {
     if tips.is_empty() {
         return Ok(());
@@ -131,7 +150,10 @@ fn walk_into(
         .all()
         .map_err(git)?;
     for info in walk {
-        into.insert(info.map_err(git)?.id);
+        into.push(info.map_err(git)?.id);
     }
+    into.sort_unstable();
+    into.dedup();
+    into.shrink_to_fit();
     Ok(())
 }
