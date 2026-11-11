@@ -1,6 +1,7 @@
-// The docs menus on a narrow screen. Imported by scripts/verify/browser/browser-check.mjs.
+// The docs menus on a narrow screen, and the bar that must not move. Imported by browser-check.mjs.
 import { serve, pages } from './sitebar-lib.mjs';
 import { launch } from '../../lib/browser-lib.mjs';
+import { checks as steadyChecks } from './barsteady-lib.mjs';
 
 /** @param {any} env what browser-check.mjs set up (pw, r, browsers, ...) */
 export function checks(env) {
@@ -72,5 +73,5 @@ export function checks(env) {
     } finally { server.close(); }
   }
 
-  return { docMenus };
+  return { docMenus, ...steadyChecks(env) };
 }
