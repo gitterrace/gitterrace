@@ -573,5 +573,7 @@ async fn each_field_links_to_its_error_and_the_page_has_an_alert_summary() {
     assert!(html.contains("id=\"seterrsum\" role=\"alert\""));
 }
 
+// Its fixtures write unix file modes the actions loader demands.
+#[cfg(unix)]
 mod actions_live;
 mod header;

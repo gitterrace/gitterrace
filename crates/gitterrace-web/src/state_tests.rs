@@ -270,6 +270,7 @@ async fn crawl_read_only(router: &axum::Router, actions: bool) {
     );
 }
 
+#[cfg(unix)]
 fn public_cfg() -> gitterrace_config::Config {
     let mut c = gitterrace_config::Config::default();
     c.server.is_public = true;

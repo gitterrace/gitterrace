@@ -224,12 +224,12 @@ pub(crate) fn remove_add_token(dir: &Path, port: u16) {
 /// symlink, a non-file, or (on unix) a file another user owns or can read is refused.
 pub fn add_token(dir: &Path, port: u16) -> io::Result<String> {
     let name = token_file(port);
-    let path = dir.join(&name);
     let bytes = gitterrace_git::read_no_follow(dir, &name)?
         .ok_or_else(|| io::Error::from(io::ErrorKind::NotFound))?;
     #[cfg(unix)]
     {
         use std::os::unix::fs::MetadataExt;
+        let path = dir.join(&name);
         let m = fs::symlink_metadata(&path)?;
         let me = rustix::process::getuid().as_raw();
         if m.uid() != me || m.mode() & 0o077 != 0 {

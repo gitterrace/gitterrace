@@ -35,9 +35,10 @@ struct Built {
     dirs: (tempfile::TempDir, tempfile::TempDir),
 }
 
-/// A repository named `r` with a committed symlink `link`, an untracked symlink `out`, both
-/// aiming at a secret file outside it, and a committed folder `d` swapped for a link to the
-/// secret's folder.
+/// A repository named `r` with a committed file and folder, and a secret file outside it. On
+/// unix the repository also holds a committed symlink `link`, an untracked symlink `out`, both
+/// aiming at the secret, and the committed folder `d` swapped for a link to the secret's
+/// folder. Windows needs a privilege to make links, so there the path classes run without them.
 fn hostile(root: &Path) -> (PathBuf, PathBuf) {
     std::fs::create_dir_all(root).expect("root");
     let secret = root.join("secret.txt");
@@ -46,14 +47,53 @@ fn hostile(root: &Path) -> (PathBuf, PathBuf) {
     let f = gitterrace_testkit::Fixture::init(&p)
         .write("a.txt", "a\n")
         .write("d/secret.txt", "inside\n");
-    std::os::unix::fs::symlink(&secret, p.join("link")).expect("link");
+    links::commit_link(&secret, &p);
     let repo = f.commit("feat: one").path().to_path_buf();
-    std::os::unix::fs::symlink(&secret, repo.join("out")).expect("out");
-    // The committed folder `d` becomes a link to the folder holding the secret, so its
-    // tracked file now resolves outside the tree.
-    std::fs::remove_dir_all(repo.join("d")).expect("rm d");
-    std::os::unix::fs::symlink(root, repo.join("d")).expect("d");
+    links::swap_in_links(root, &secret, &repo);
     (repo, secret)
+}
+
+#[cfg(unix)]
+mod links {
+    use std::path::Path;
+
+    pub(super) fn commit_link(secret: &Path, repo: &Path) {
+        std::os::unix::fs::symlink(secret, repo.join("link")).expect("link");
+    }
+
+    pub(super) fn swap_in_links(root: &Path, secret: &Path, repo: &Path) {
+        std::os::unix::fs::symlink(secret, repo.join("out")).expect("out");
+        // The committed folder `d` becomes a link to the folder holding the secret, so its
+        // tracked file now resolves outside the tree.
+        std::fs::remove_dir_all(repo.join("d")).expect("rm d");
+        std::os::unix::fs::symlink(root, repo.join("d")).expect("d");
+    }
+}
+
+#[cfg(not(unix))]
+mod links {
+    use std::path::Path;
+
+    pub(super) fn commit_link(_secret: &Path, _repo: &Path) {}
+
+    pub(super) fn swap_in_links(_root: &Path, _secret: &Path, _repo: &Path) {}
+}
+
+/// A folder holding an `actions.toml` with one action, so the action routes are mounted. Unix
+/// uses the shared fixture, whose loader demands private modes. Elsewhere a plain file does.
+#[cfg(unix)]
+fn actions_dir() -> tempfile::TempDir {
+    crate::actions::actions_tests::config_dir(crate::actions::actions_tests::ECHO)
+}
+
+#[cfg(not(unix))]
+fn actions_dir() -> tempfile::TempDir {
+    let d = tempfile::tempdir().expect("tmp");
+    let body = "version = 1\n[[action]]\nid = \"echo\"\nlabel = \"Echo\"\n\
+        kinds = [\"line\", \"commit\", \"page\", \"file\"]\nshell = true\n\
+        command = \"echo hi\"\ntimeout = \"5s\"\n";
+    std::fs::write(d.path().join("actions.toml"), body).expect("write");
+    d
 }
 
 fn env(public: bool, settings: Option<&Path>) -> Env {
@@ -70,7 +110,7 @@ fn env(public: bool, settings: Option<&Path>) -> Env {
 /// feature on, so every route that can be mounted is.
 fn server(root: &Path, public: bool) -> Built {
     let (repo, secret) = hostile(root);
-    let actions = crate::actions::actions_tests::config_dir(crate::actions::actions_tests::ECHO);
+    let actions = actions_dir();
     let settings = tempfile::tempdir().expect("tmp");
     std::fs::write(settings.path().join("config.toml"), "").expect("w");
     let env = env(public, Some(settings.path()));
