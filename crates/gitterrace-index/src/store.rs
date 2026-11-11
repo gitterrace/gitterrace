@@ -77,12 +77,12 @@ pub(crate) fn fallback_for(
 /// names another repository is a hash collision: it is wiped, never read, and then claimed.
 pub(crate) fn claim(dir: &Path, real: &Path) -> io::Result<()> {
     let want = real.as_os_str().as_encoded_bytes();
-    let have = cache::read(dir, OWNER_FILE)?;
+    let have = cache::read_stamp(dir, OWNER_FILE)?;
     if have.as_deref() == Some(want) {
         return Ok(());
     }
     let _lock = WriteLock::take(dir)?;
-    if cache::read(dir, OWNER_FILE)?.is_some_and(|h| h != want) {
+    if cache::read_stamp(dir, OWNER_FILE)?.is_some_and(|h| h != want) {
         wipe(dir)?;
     }
     cache::write_atomic(dir, OWNER_FILE, want)
@@ -107,9 +107,7 @@ pub(crate) fn newer_message(found: &str) -> String {
 /// pre-release versions (a bare number, see `version_stamp`) are ours to reset; a newer one
 /// belongs to a newer build and must never be overwritten.
 pub(crate) fn newer_version(dir: &Path) -> io::Result<Option<String>> {
-    let found = cache::read(dir, VERSION_FILE)?
-        .map(|b| String::from_utf8_lossy(&b).trim().to_owned())
-        .unwrap_or_default();
+    let found = stored_version(dir)?.unwrap_or_default();
     let Some(number) = found.strip_prefix('v') else {
         return Ok(None);
     };
@@ -198,11 +196,17 @@ pub(crate) fn sweep(dir: &Path, live: &[String]) -> io::Result<()> {
 
 /// Whether the stored format differs from ours.
 fn version_stale(dir: &Path) -> io::Result<bool> {
-    let current = cache::read(dir, VERSION_FILE)?;
-    let current = current
-        .as_deref()
-        .map(|b| String::from_utf8_lossy(b).trim().to_owned());
-    Ok(current.as_deref() != Some(version_stamp().as_str()))
+    Ok(stored_version(dir)?.as_deref() != Some(version_stamp().as_str()))
+}
+
+/// `VERSION`, trimmed. One longer than a stamp is no version of ours or a newer build's, so it
+/// reads as empty: stale, and reset like any unreadable cache.
+fn stored_version(dir: &Path) -> io::Result<Option<String>> {
+    match cache::read_stamp(dir, VERSION_FILE) {
+        Ok(b) => Ok(b.map(|b| String::from_utf8_lossy(&b).trim().to_owned())),
+        Err(e) if e.kind() == io::ErrorKind::InvalidData => Ok(Some(String::new())),
+        Err(e) => Err(e),
+    }
 }
 
 /// Whether `ensure_dir` has files to delete or sweep: a stale format, an unreadable set, or a

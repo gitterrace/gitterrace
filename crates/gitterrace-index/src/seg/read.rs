@@ -11,7 +11,7 @@ use crate::seg::format::{
     FOOTER_LEN, Footer, HEADER_LEN, Kind, StringBase, TOC_ENTRY_LEN, TocEntry, check_header,
     decode_toc,
 };
-use crate::seg::io::read_exact_at;
+use crate::seg::io::{open_named, read_exact_at};
 use crate::seg::manifest::{FileEntry, Manifest, check_name};
 use crate::seg::{Rank, SegError, SegResult};
 
@@ -34,7 +34,7 @@ impl Container {
     pub fn open(dir: &Path, name: &str, kind: Kind) -> SegResult<Self> {
         check_name(name)?;
         let unreadable = |off, what| SegError::unreadable(name, off, what);
-        let file = File::open(dir.join(name)).map_err(|_| unreadable(0, "cannot open"))?;
+        let file = open_named(dir, name).map_err(|_| unreadable(0, "cannot open"))?;
         let len = file.metadata()?.len();
         if len < HEADER_LEN + FOOTER_LEN {
             return Err(unreadable(0, "shorter than header and footer"));

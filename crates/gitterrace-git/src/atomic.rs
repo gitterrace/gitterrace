@@ -14,20 +14,83 @@ use std::sync::atomic::{AtomicU64, Ordering};
 /// # Errors
 /// When `dir` is not a real folder, `name` is not a regular file, or the read fails.
 pub fn read_no_follow(dir: &Path, name: &str) -> io::Result<Option<Vec<u8>>> {
+    read_no_follow_bounded(dir, name, u64::MAX)
+}
+
+/// As [`read_no_follow`], refusing a file longer than `max` bytes with `InvalidData`, so a
+/// planted huge file cannot be read into memory. The limit holds even when the file grows
+/// after the open.
+///
+/// # Errors
+/// As [`read_no_follow`], and `InvalidData` past `max`.
+pub fn read_no_follow_bounded(dir: &Path, name: &str, max: u64) -> io::Result<Option<Vec<u8>>> {
+    let Some(f) = open_read_no_follow(dir, name)? else {
+        return Ok(None);
+    };
+    if f.metadata()?.len() > max {
+        return Err(too_long(dir, name));
+    }
+    let mut out = Vec::new();
+    f.take(max.saturating_add(1)).read_to_end(&mut out)?;
+    if out.len() as u64 > max {
+        return Err(too_long(dir, name));
+    }
+    Ok(Some(out))
+}
+
+/// Opens `dir/name` for reading, never following a link or blocking on a FIFO.
+///
+/// The open is non-blocking and no-follow, and the opened handle must be a regular
+/// file. Checking the handle, not the path, closes the race with an entry swapped after a
+/// path check. A missing file opens as `None`.
+///
+/// # Errors
+/// When `dir` is not a real folder, the entry is a link or not a regular file, or the open
+/// fails.
+pub fn open_read_no_follow(dir: &Path, name: &str) -> io::Result<Option<fs::File>> {
     // A folder not made yet holds no file: the same answer as a missing file.
     if matches!(fs::symlink_metadata(dir), Err(e) if e.kind() == io::ErrorKind::NotFound) {
         return Ok(None);
     }
     let path = regular_entry(dir, name)?;
-    match no_follow(OpenOptions::new().read(true)).open(&path) {
-        Ok(mut f) => {
-            let mut out = Vec::new();
-            f.read_to_end(&mut out)?;
-            Ok(Some(out))
-        }
-        Err(e) if e.kind() == io::ErrorKind::NotFound => Ok(None),
-        Err(e) => Err(e),
+    let mut o = OpenOptions::new();
+    o.read(true);
+    let f = match read_flags(&mut o).open(&path) {
+        Ok(f) => f,
+        Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(None),
+        Err(e) => return Err(e),
+    };
+    if !f.metadata()?.is_file() {
+        return Err(refused(&path));
     }
+    Ok(Some(f))
+}
+
+fn too_long(dir: &Path, name: &str) -> io::Error {
+    io::Error::new(
+        io::ErrorKind::InvalidData,
+        format!("{} is longer than expected", dir.join(name).display()),
+    )
+}
+
+/// No-follow and non-blocking on unix (a FIFO opens at once and is then refused as not a
+/// regular file). On Windows the reparse point itself is opened, so a link is seen as one.
+#[cfg(unix)]
+fn read_flags(o: &mut OpenOptions) -> &mut OpenOptions {
+    use std::os::unix::fs::OpenOptionsExt;
+    o.custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK)
+}
+
+#[cfg(windows)]
+fn read_flags(o: &mut OpenOptions) -> &mut OpenOptions {
+    use std::os::windows::fs::OpenOptionsExt;
+    // FILE_FLAG_OPEN_REPARSE_POINT
+    o.custom_flags(0x0020_0000)
+}
+
+#[cfg(not(any(unix, windows)))]
+fn read_flags(o: &mut OpenOptions) -> &mut OpenOptions {
+    o
 }
 
 /// Replaces `dir/name` with `bytes`: a uniquely named temp file (created new, `O_NOFOLLOW`,
@@ -118,7 +181,7 @@ pub fn refused(path: &Path) -> io::Error {
 mod tests {
     use std::os::unix::fs::symlink;
 
-    use super::{read_no_follow, write_atomic};
+    use super::{open_read_no_follow, read_no_follow, read_no_follow_bounded, write_atomic};
 
     #[test]
     fn writes_replace_and_read_back() {
@@ -147,5 +210,23 @@ mod tests {
         assert!(write_atomic(&linked, "g", b"x", 0o644).is_err());
         assert!(!dir.join("g").exists());
         assert_eq!(std::fs::read_to_string(&victim).expect("read"), "keep");
+    }
+
+    #[test]
+    fn a_fifo_is_refused_at_once_and_a_long_file_past_its_bound() {
+        let t = tempfile::tempdir().expect("tmp");
+        // The crate forbids unsafe, so the FIFO comes from the system tool.
+        let made = std::process::Command::new("mkfifo")
+            .arg(t.path().join("p"))
+            .status()
+            .expect("mkfifo");
+        assert!(made.success(), "mkfifo");
+        assert!(open_read_no_follow(t.path(), "p").is_err());
+        write_atomic(t.path(), "f", b"12345", 0o644).expect("write");
+        assert!(read_no_follow_bounded(t.path(), "f", 4).is_err());
+        assert_eq!(
+            read_no_follow_bounded(t.path(), "f", 5).expect("read"),
+            Some(b"12345".to_vec())
+        );
     }
 }

@@ -30,7 +30,7 @@ impl Index {
             return Ok(None);
         };
         // The set was built for this exact commit: no history walk needed to prove it holds it.
-        let built = cache::read(&self.dir, TIP_FILE)
+        let built = cache::read_stamp(&self.dir, TIP_FILE)
             .ok()
             .flatten()
             .is_some_and(|t| t.trim_ascii() == rev.as_bytes() && store::oid_of(rev).is_some());

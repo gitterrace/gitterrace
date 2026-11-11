@@ -29,6 +29,13 @@ pub(crate) fn read_exact_at(file: &File, buf: &mut [u8], offset: u64) -> io::Res
     }
 }
 
+/// Opens the cache file `dir/name` for reading: a missing file, a link or a special file is
+/// an error, never followed or blocked on (see `cache::open_read`). Every container and
+/// manifest-named file opens here.
+pub(crate) fn open_named(dir: &Path, name: &str) -> io::Result<File> {
+    crate::cache::open_read(dir, name)?.ok_or_else(|| io::ErrorKind::NotFound.into())
+}
+
 /// Makes a rename in `dir` durable. Windows has no directory handle to sync, NTFS journals it.
 pub(crate) fn sync_dir(dir: &Path) -> io::Result<()> {
     #[cfg(unix)]

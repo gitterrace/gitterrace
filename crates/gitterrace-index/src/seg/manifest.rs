@@ -4,13 +4,13 @@
 //! with its length and footer crc, the generation, the order fingerprint and the retired list.
 //! Replaced by write, fsync, rename, directory sync, so a crash leaves the old one whole.
 
-use std::fs::{self, File};
+use std::fs;
 use std::io::{self, Read};
 use std::path::Path;
 
 use crate::seg::bounds::{Cursor, MAX_MANIFEST, MAX_TOC};
 use crate::seg::format::{FOOTER_LEN, VERSION};
-use crate::seg::io::{create_no_follow, read_exact_at, sync_dir};
+use crate::seg::io::{create_no_follow, open_named, read_exact_at, sync_dir};
 use crate::seg::write::crashed;
 use crate::seg::{SegError, SegResult};
 
@@ -175,16 +175,21 @@ impl Manifest {
 
     /// Reads `MANIFEST`. `Ok(None)` when there is none (a fresh cache).
     pub fn load(dir: &Path) -> SegResult<Option<Self>> {
-        let file = match File::open(dir.join(MANIFEST)) {
-            Ok(f) => f,
-            Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(None),
-            Err(e) => return Err(e.into()),
+        // A link or special file at the name is unreadable (rebuilt), never followed or
+        // blocked on: the open is no-follow and non-blocking, then checked for a regular file.
+        let file = match crate::cache::open_read(dir, MANIFEST) {
+            Ok(Some(f)) => f,
+            Ok(None) => return Ok(None),
+            Err(_) => return Err(SegError::unreadable(MANIFEST, 0, "not a regular file")),
         };
         if file.metadata()?.len() > MAX_MANIFEST {
             return Err(SegError::unreadable(MANIFEST, 0, "manifest over 1 MiB"));
         }
         let mut bytes = Vec::new();
         file.take(MAX_MANIFEST + 1).read_to_end(&mut bytes)?;
+        if bytes.len() as u64 > MAX_MANIFEST {
+            return Err(SegError::unreadable(MANIFEST, 0, "manifest over 1 MiB"));
+        }
         Self::decode(&bytes).map(Some)
     }
 
@@ -192,7 +197,7 @@ impl Manifest {
     pub fn verify(&self, dir: &Path) -> SegResult<()> {
         for f in &self.live {
             let bad = |what| SegError::unreadable(&f.name, 0, what);
-            let file = File::open(dir.join(&f.name)).map_err(|_| bad("named file missing"))?;
+            let file = open_named(dir, &f.name).map_err(|_| bad("named file missing"))?;
             if file.metadata()?.len() != f.len {
                 return Err(bad("length differs from manifest"));
             }

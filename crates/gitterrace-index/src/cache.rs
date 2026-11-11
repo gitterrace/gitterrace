@@ -72,10 +72,34 @@ pub(crate) fn cache_file(dir: &Path, name: &str) -> io::Result<PathBuf> {
     Ok(path)
 }
 
-/// Reads a cache file; a missing file reads as `None`.
+/// Longest stamp file (`VERSION`, the owner path, the built tip): a few bytes when sound.
+/// Not configurable: a size bound on a file the repository may have planted.
+pub(crate) const MAX_STAMP: u64 = 16 << 10;
+/// Longest whole-read cache file (`lines.json`): far above any real head tree's line counts.
+/// Not configurable: a size bound on a file the repository may have planted.
+const MAX_READ: u64 = 64 << 20;
+
+/// Reads a cache file of at most 64 MiB; a missing file reads as `None`.
 pub(crate) fn read(dir: &Path, name: &str) -> io::Result<Option<Vec<u8>>> {
+    read_bounded(dir, name, MAX_READ)
+}
+
+/// Reads a stamp file of at most `MAX_STAMP` bytes; a missing file reads as `None`.
+pub(crate) fn read_stamp(dir: &Path, name: &str) -> io::Result<Option<Vec<u8>>> {
+    read_bounded(dir, name, MAX_STAMP)
+}
+
+/// Reads a cache file without following a link, blocking on a FIFO or reading past `max`.
+fn read_bounded(dir: &Path, name: &str, max: u64) -> io::Result<Option<Vec<u8>>> {
     cache_file(dir, name)?;
-    gitterrace_git::read_no_follow(dir, name)
+    gitterrace_git::read_no_follow_bounded(dir, name, max)
+}
+
+/// Opens a cache file for positional reads: no link followed, no FIFO blocked on, and the
+/// opened handle a regular file. A missing file opens as `None`.
+pub(crate) fn open_read(dir: &Path, name: &str) -> io::Result<Option<File>> {
+    cache_file(dir, name)?;
+    gitterrace_git::open_read_no_follow(dir, name)
 }
 
 /// Opens a cache file for appending, creating it.
