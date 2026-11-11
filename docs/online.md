@@ -46,6 +46,8 @@ It never shows or does:
 - The working tree, uncommitted changes, stashes, linked worktrees, reflogs or
   any other ref.
 - Abbreviated commit ids, so the object store cannot be enumerated.
+- A full commit id that no public branch, tag, remote branch or HEAD reaches,
+  so a stash or dangling commit stays private.
 - Host folder paths, an in-progress rebase or merge.
 - Live updates, actions, Send to, or adding repositories.
 - Any method but `GET` and `HEAD`.
