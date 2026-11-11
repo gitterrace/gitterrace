@@ -1,9 +1,9 @@
-# every page body carries data-line-hover (display.has_line_hover, on by default); no other byte moves
+# history and blame link a commit at #p/<path>, and each diff file header carries that id; no other byte moves
 3d6331935b06992963d36c2eaffb6666 3d6331935b06992963d36c2eaffb6666 [browse] /api/files/HEAD
 5926060c7e0029dde61fa7387dbc2baf 5926060c7e0029dde61fa7387dbc2baf [browse] /api/refs
 45c4275d82173232a185abf4ac360913 d9bcc297a7248eccd0b33ece109ab5df [browse] /blame/HEAD/missing.rs
-0c3f128e0109d038543bcded07fc0ecb 0c3f128e0109d038543bcded07fc0ecb [browse] /blame/HEAD/src/lib.rs
-79a65ab745a40e57082d515961fc3851 79a65ab745a40e57082d515961fc3851 [browse] /blame/HEAD~1/src/lib.rs
+eded8c27c3213e519017ada76e52b1d6 eded8c27c3213e519017ada76e52b1d6 [browse] /blame/HEAD/src/lib.rs
+b9958f5826d5413fd8be9d5cfbfe70a0 b9958f5826d5413fd8be9d5cfbfe70a0 [browse] /blame/HEAD~1/src/lib.rs
 a36542dca7185845ba4a63383fcdf46b a36542dca7185845ba4a63383fcdf46b [browse] /blob/HEAD/docs/x.md
 45c4275d82173232a185abf4ac360913 d9bcc297a7248eccd0b33ece109ab5df [browse] /blob/HEAD/missing.rs
 fc9b73315c153b64e6e4e4cdc23d8d4e a18d75cbdc5281a6b20c858611dd94b8 [browse] /blob/HEAD/src
@@ -11,15 +11,15 @@ dcd77e2d404b1c8c79cf8a193aa2c55d dcd77e2d404b1c8c79cf8a193aa2c55d [browse] /blob
 f813ee5c66bc6a8ff2e136663caa4149 f813ee5c66bc6a8ff2e136663caa4149 [browse] /blob/HEAD/vendor/x.c
 0a22b1bd5abb3b71f0f777ad9c9828bc 0a22b1bd5abb3b71f0f777ad9c9828bc [browse] /blob/HEAD~1/src/lib.rs
 6be51317b0f4467724e0ea7dae3cfc74 8904612472a5738a31fa215c68cd71dc [browse] /commit/0000000
-fe2aeddbc3407d935f301570ac66a2ed dede55c4271f0299cdcc2f272ccac8ed [browse] /commit/HEAD
-2928badeb7362d372fbe1f0ce401e718 14275f0ed293f1b3fa2e12e6d487a4d2 [browse] /commit/HEAD~1
+72b1e1caccbdb90bc5e6192c9ddc9edd b4ee6a85503f43d408960ee3269790dd [browse] /commit/HEAD
+5f1eb91463913e2a12b9d5942fd51436 b778a6e0168b43f92cbbe95f38a25cdc [browse] /commit/HEAD~1
 7a4b320b224526514c993ffae00210ba 7a4b320b224526514c993ffae00210ba [browse] /compare
 d0cb51d22819672a660667fc3cf04ad6 d0cb51d22819672a660667fc3cf04ad6 [browse] /compare?base=HEAD&head=HEAD
 5caf32cdda93010ae2a6d57ee2edb27c 4a699aadb2225d1da57f5b45c7382a18 [browse] /compare?base=HEAD~3&head=HEAD
 3de6bf1d5b224f64d690e7e0c98d8605 3de6bf1d5b224f64d690e7e0c98d8605 [browse] /compare?base=nope&head=HEAD
 552f6a7e193ae2e4834f5312b8194b1e 552f6a7e193ae2e4834f5312b8194b1e [browse] /diff/HEAD/0
 39fe5dec283cb19c64bb2abc94a3486e bf216c8d6b9cd9d0c54e5cb75cf3cf6c [browse] /diff/HEAD/99
-c374df550eb7d9a81b532b9c85202fab 2ffe22a2ba1ec09d7efaff6ca21f0ee5 [browse] /history/src/lib.rs
+4558f8da85b20295a47a663206f41ec4 f4aa9206882c4ca4bf3cea3ccc6bf660 [browse] /history/src/lib.rs
 6c62272e07bb014262b821756295c58d 6c62272e07bb014262b821756295c58d [browse] /hl/HEAD/src/lib.rs
 b3d230dde44c7fe2ee263a6af7e825ff 3d8063d75a148f70df6f7606d756e207 [browse] /insights
 b3d230dde44c7fe2ee263a6af7e825ff 3d8063d75a148f70df6f7606d756e207 [browse] /log

@@ -282,6 +282,27 @@ pub(crate) fn sha_link(full: &str) -> String {
     sha_link_at(&base(), full)
 }
 
+/// The anchor id of one file's section on a commit page, stable across file order.
+pub(crate) fn file_anchor(path: &str) -> String {
+    format!("p/{path}")
+}
+
+/// A commit's page opened on one file's section: the one helper for "this commit, for this file".
+pub(crate) fn commit_file_href(id: &str, path: &str) -> String {
+    href(&format!("/commit/{id}#{}", file_anchor(&enc_path(path))))
+}
+
+/// [`sha_link`] that lands on `path`'s section of the commit.
+pub(crate) fn sha_file_link(full: &str, path: &str) -> String {
+    let link = sha_link(full);
+    if full.is_empty() {
+        return link;
+    }
+    let plain = format!("/commit/{}\"", esc(full));
+    let with = format!("/commit/{}#{}\"", esc(full), esc(&file_anchor(&enc_path(path))));
+    link.replacen(&plain, &with, 1)
+}
+
 /// [`sha_link`] for code that runs outside a request (the watcher), with the URL prefix given.
 pub(crate) fn sha_link_at(base: &str, full: &str) -> String {
     if full.is_empty() {

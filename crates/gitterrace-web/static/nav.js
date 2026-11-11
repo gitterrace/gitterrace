@@ -454,9 +454,14 @@
   }
   // `jump` brings the file into view once it loads; a live refresh opens it where it is.
   function openHashed(jump) {
-    var m = /^#(f\d+)$/.exec(location.hash), s = m && document.getElementById(m[1]);
+    var m = /^#(f\d+|p\/.+)$/.exec(location.hash), id = m && m[1], s;
+    // #p/<path> names a file by path, so it survives a different file order.
+    try { if (id && id[0] === "p") id = decodeURIComponent(id); } catch (x) { id = null; }
+    s = id && document.getElementById(id);
+    s = s && s.closest("section");
     var b = s && s.querySelector("[data-load-diff]");
     if (b) loadDiff(b, jump !== false);
+    else if (s && jump !== false) s.scrollIntoView();
   }
   watchLazy();
   openHashed();

@@ -66,7 +66,7 @@ pub(crate) async fn page(
                     note.push_str(&t.path);
                 }
                 views::CommitRow {
-                    href: href(&format!("/commit/{}", t.commit)),
+                    href: fmt::commit_file_href(&t.commit, &t.path),
                     sha: fmt::sha_link(&t.commit),
                     initial: views::initials(&t.author),
                     hue: views::hue(&t.author),
@@ -172,5 +172,22 @@ mod tests {
             let (status, _) = gitterrace_testkit::get(&router, uri).await;
             assert_eq!(status, 200, "{uri}");
         }
+    }
+
+    /// Each commit link of a file's history opens the commit on that file's section.
+    #[tokio::test]
+    async fn commit_links_carry_the_file_fragment() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let p = crate::wiring_tests::repo(dir.path(), "r");
+        let app = crate::wiring_tests::app(&p, gitterrace_config::Config::default());
+        app.index
+            .update(&app.repo, "HEAD", &|_| {})
+            .expect("update");
+        app.mark_ready();
+        let router = routes::router(app);
+        let (_, page) = gitterrace_testkit::get(&router, "/history/small.txt").await;
+        let links = page.matches("/commit/").count();
+        let anchored = page.matches("#p/small.txt\"").count();
+        assert!(links >= 2 && anchored >= 2, "{links} links, {anchored} anchored");
     }
 }

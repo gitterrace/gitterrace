@@ -4,7 +4,7 @@ use std::fmt::Write as _;
 
 use gitterrace_git::BlameLine;
 
-use crate::fmt::{ago, esc, esc_text, sha_link};
+use crate::fmt::{ago, esc, esc_text};
 use crate::views::diff::CHUNK_LINES;
 use crate::views::{Render, author_href};
 
@@ -273,7 +273,7 @@ pub(crate) fn blame_html(r: &Render, path: &str, lines: &[BlameLine], now: i64) 
                 "<td class=\"who h{heat}\"><div class=\"bl\"><span class=\"vh\">{}. </span>{}\
                  <a class=\"who\" href=\"{}\">{}</a><span class=\"muted\">{}</span></div></td>",
                 HEAT_WORDS[usize::from(heat)],
-                sha_link(&l.commit),
+                crate::fmt::sha_file_link(&l.commit, path),
                 esc(&author_href(&l.author)),
                 esc(&l.author),
                 ago(l.time, now)

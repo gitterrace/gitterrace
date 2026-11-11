@@ -177,9 +177,10 @@ pub(crate) fn diff_html_with(r: &Render, src: DiffSource<'_>, files: &[FileDiff]
         let _ = write!(
             out,
             "<section class=\"file\" id=\"f{i}\" data-path=\"{p}\" data-h=\"{h}\">\
-                <header><span class=\"badge {k}\">{k}</span> ",
+                <header id=\"{a}\"><span class=\"badge {k}\">{k}</span> ",
             k = f.kind.as_str(),
             p = esc(&f.path),
+            a = esc(&crate::fmt::file_anchor(&f.path)),
             h = content_tag(f)
         );
         match src {

@@ -1,4 +1,4 @@
-# every page body carries data-line-hover (display.has_line_hover, on by default); no other byte moves
+# history and blame link a commit at #p/<path>, and each diff file header carries that id; no other byte moves
 a9636995f62bf9c600b0d0a3acb712ec 9db8d44473d409089796867f8df5a4e6 [symbols] /blob/HEAD/cmd/serve.go
 f2af7c04b374066324ecbd0f6f768f8e ba24b22e6f73c1376deb56b64200f752 [symbols] /blob/HEAD/src/shapes.rs
 75606ddb73206bc4e71bc2df1a69fb32 75606ddb73206bc4e71bc2df1a69fb32 [symbols] /blob/HEAD/src/two.rs
