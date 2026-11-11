@@ -4,7 +4,8 @@ import { launch } from '../../lib/browser-lib.mjs';
 
 const WIDTHS = [390, 600, 768, 1024, 1280];
 const SLACK = 0.5;
-const ITEMS = ['logo', 'Docs', 'Demo', 'GitHub', 'theme'];
+const fix = (v) => Math.round(v * 10) / 10;
+const ITEMS = ['logo', 'Docs', 'Demo', 'GitHub', 'theme', 'logo text', 'Docs text', 'Demo text'];
 
 /** The box of each bar item in the page now, by name, in page coordinates. */
 function boxes() {
@@ -12,6 +13,7 @@ function boxes() {
   const seen = (e) => e.getClientRects().length > 0 && getComputedStyle(e).visibility !== 'hidden';
   const text = (t) => [...bar.querySelectorAll('a, summary')]
     .find((e) => seen(e) && e.textContent.trim() === t);
+  const textOf = (e) => (e.matches('.brand') ? e.querySelector('span') : e);
   const found = { logo: bar.querySelector('.brand'), Docs: text('Docs'), Demo: text('Demo'),
     GitHub: bar.querySelector('.gh'), theme: bar.querySelector('#theme') };
   const out = {};
@@ -19,6 +21,10 @@ function boxes() {
     if (!e) continue;
     const b = e.getBoundingClientRect();
     out[k] = [b.x + scrollX, b.y + scrollY, b.width, b.height];
+    const range = document.createRange();
+    range.selectNodeContents(k === 'Docs' || k === 'Demo' || k === 'logo' ? textOf(e) : e);
+    const t = range.getBoundingClientRect();
+    out[k + ' text'] = [t.x + scrollX, t.y + scrollY, t.width, t.height];
   }
   return out;
 }
@@ -53,7 +59,7 @@ export function checks(env) {
                 const c = got[k];
                 if (!a !== !c) bad.push(`${page} ${state}: ${k} ${c ? 'appears' : 'is gone'}`);
                 else if (a && a.some((v, i) => Math.abs(v - c[i]) > SLACK)) {
-                  bad.push(`${page} ${state}: ${k} ${a.map(Math.round)} -> ${c.map(Math.round)}`);
+                  bad.push(`${page} ${state}: ${k} ${a.map(fix)} -> ${c.map(fix)}`);
                 }
               }
             };
