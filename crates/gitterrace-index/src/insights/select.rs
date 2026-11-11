@@ -13,7 +13,7 @@ use crate::feed::{
     local_day_of,
 };
 use crate::insights::Options;
-use crate::query::{Leaf, Matcher, Query, QueryError, Term};
+use crate::query::{Matcher, Query, QueryError, Term, fold};
 
 /// Which commits count, as the URL says it.
 ///
@@ -58,28 +58,15 @@ impl Selection {
     /// # Errors
     /// [`QueryError`] when `q` does not parse.
     pub fn query(&self) -> Result<Query, QueryError> {
-        let one = |v: Option<&String>, leaf: fn(Vec<String>) -> Leaf| {
-            set(v).map(|v| Term {
-                neg: false,
-                leaf: leaf(vec![v.to_owned()]),
-            })
-        };
-        let path = set(self.path.as_ref())
-            .map(|p| p.trim_matches('/'))
-            .filter(|p| !p.is_empty())
-            .map(|p| Term {
-                neg: false,
-                leaf: Leaf::Path(vec![p.to_owned()]),
-            });
-        let mut terms: Vec<Term> = [
-            one(self.kind.as_ref(), Leaf::Kind),
-            one(self.scope.as_ref(), Leaf::Scope),
-            one(self.author.as_ref(), Leaf::Author),
-            path,
-        ]
-        .into_iter()
-        .flatten()
-        .collect();
+        let mut terms: Vec<Term> = Vec::new();
+        for (key, value) in [
+            ("type", &self.kind),
+            ("scope", &self.scope),
+            ("author", &self.author),
+            ("path", &self.path),
+        ] {
+            terms.extend(fold(key, value.as_deref().unwrap_or_default())?);
+        }
         terms.extend_from_slice(Query::parse(set(self.q.as_ref()).unwrap_or_default())?.terms());
         Ok(Query::new(terms))
     }

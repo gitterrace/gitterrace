@@ -3,7 +3,7 @@
 //! page respects every active chip.
 
 use gitterrace_index::feed::{CommitRange, InsightsSource};
-use gitterrace_index::query::{Leaf, Query, QueryError, Term, When};
+use gitterrace_index::query::{Leaf, Query, QueryError, Term, When, fold};
 use gitterrace_index::{Period, Selection};
 use gitterrace_types::StringEnum;
 use serde::Deserialize;
@@ -82,13 +82,13 @@ pub(crate) enum Dim {
 }
 
 impl Dim {
-    fn leaf(self, v: &str) -> Leaf {
-        let v = vec![v.to_owned()];
+    /// The URL key of the term, as [`fold`] reads it.
+    const fn key(self) -> &'static str {
         match self {
-            Self::Kind => Leaf::Kind(v),
-            Self::Scope => Leaf::Scope(v),
-            Self::Author => Leaf::Author(v),
-            Self::Path => Leaf::Path(v),
+            Self::Kind => "type",
+            Self::Scope => "scope",
+            Self::Author => "author",
+            Self::Path => "path",
         }
     }
 
@@ -230,10 +230,7 @@ impl Filter {
             .filter(|v| !v.is_empty());
         self.swap(
             |l| d.is(l),
-            value.map(|v| Term {
-                neg: false,
-                leaf: d.leaf(v),
-            }),
+            value.and_then(|v| fold(d.key(), v).ok().flatten()),
         )
     }
 

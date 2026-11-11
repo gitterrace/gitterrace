@@ -1,6 +1,6 @@
 use proptest::prelude::*;
 
-use super::{KEYWORDS, Leaf, Query, Term, When};
+use super::{KEYWORDS, Leaf, Query, Term, When, fold};
 use gitterrace_types::Period;
 
 fn q(s: &str) -> Query {
@@ -132,5 +132,41 @@ proptest! {
             let text = once.to_string();
             prop_assert_eq!(Query::parse(&text).map(|q| q.to_string()), Ok(text));
         }
+    }
+}
+
+#[test]
+fn every_alias_folds_to_its_keyword() {
+    for (key, value, want) in [
+        ("type", "fix", "type:fix"),
+        ("scope", "web", "scope:web"),
+        ("author", "Ann Lee", "author:\"Ann Lee\""),
+        ("path", "/src/", "path:src"),
+        ("period", "1m", "period:1m"),
+    ] {
+        let term = fold(key, value).expect(key).expect(key);
+        let want = if key == "period" { "after:1m" } else { want };
+        assert_eq!(term.to_string(), want, "{key}");
+    }
+    assert_eq!(fold("period", "all"), Ok(None));
+    assert_eq!(fold("type", "  "), Ok(None));
+    assert!(fold("period", "soon").is_err());
+}
+
+#[test]
+fn every_keyword_alias_is_in_the_fold() {
+    for k in KEYWORDS {
+        if let Some(p) = k.param {
+            let sample = if k.keyword == "period" { "1m" } else { "x" };
+            assert!(
+                matches!(fold(p, sample), Ok(Some(_))),
+                "{} has no fold",
+                k.keyword
+            );
+        }
+    }
+    // The reverse: a key the fold reads is a KEYWORDS param.
+    for key in ["type", "scope", "author", "path", "period"] {
+        assert!(KEYWORDS.iter().any(|k| k.param == Some(key)), "{key}");
     }
 }

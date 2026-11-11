@@ -110,6 +110,38 @@ impl Query {
     }
 }
 
+/// The term an older one-key URL parameter (`type`, `scope`, `author`, `path`, `period`, the
+/// `param` of [`KEYWORDS`]) says: the one place web, API and MCP read those keys.
+///
+/// `Ok(None)` when the key is no alias, the value is blank, or it bounds nothing
+/// (`period=all`). A list value is one item: commas belong to `q`.
+///
+/// # Errors
+/// [`QueryError`] when a `period` value is none of the periods.
+pub fn fold(key: &str, value: &str) -> Result<Option<Term>, QueryError> {
+    let value = value.trim();
+    let Some(spec) = KEYWORDS.iter().find(|k| k.param == Some(key)) else {
+        return Ok(None);
+    };
+    let value = if spec.keyword == "path" {
+        value.trim_matches('/')
+    } else {
+        value
+    };
+    if value.is_empty() {
+        return Ok(None);
+    }
+    let one = || vec![value.to_owned()];
+    let leaf = match spec.keyword {
+        "type" => Leaf::Kind(one()),
+        "scope" => Leaf::Scope(one()),
+        "author" => Leaf::Author(one()),
+        "path" => Leaf::Path(one()),
+        _ => return Ok(parse::terms(&format!("{}:{}", spec.keyword, parse::quote(value)))?.pop()),
+    };
+    Ok(Some(Term { neg: false, leaf }))
+}
+
 impl Leaf {
     /// The keyword this leaf is written with, `""` for message text.
     #[must_use]
