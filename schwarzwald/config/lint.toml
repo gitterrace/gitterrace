@@ -6,7 +6,7 @@ name = "gitterrace"
 
 [scope]
 prose = ["README.md", "AGENTS.md", "docs/**.md", "tests/bench/**.md"]
-code = ["*.rs", "*.py", "*.mjs", "*.js", "*.sh", "*.yml", "*.yaml", "*.toml"]
+code = ["*.rs", "*.py", "*.mjs", "*.js", "*.sh", "*.yml", "*.yaml", "*.toml", "scripts/hooks/*"]
 make = ["Makefile"]
 design = ["crates/gitterrace-index/src/seg/store.md"]
 golden = ["*/golden/*"]

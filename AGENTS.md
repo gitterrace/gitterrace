@@ -69,8 +69,9 @@ HTTP. Nothing outside `gitterrace-git` imports `gix`.
   `cargo test -p <crate>` while working on one crate.
 - Commits: as in [CONTRIBUTING](CONTRIBUTING.md#commits). Commit by pathspec,
   never `git add -A`.
-- One change, one commit, squashed in its own clone or worktree (shared rules,
-  Commits). The gate for a squashed commit here is
+- One change, one commit, squashed in its own clone, made with
+  `bash schwarzwald/kit/tools/clone.sh <label>` (shared rules, Commits). The
+  gate for a squashed commit here is
   `scripts/land-check.sh --base <main>`.
 - Accepting commits written without a build:
   `python3 scripts/lint/commits-check.py --range <base>..<tip>` prints the
@@ -82,6 +83,10 @@ HTTP. Nothing outside `gitterrace-git` imports `gix`.
   the one entry point at the top, and `hooks`, `guards` and `ast-grep` hold
   data other tools name. Make targets are `<area>[-<verb>]`, harness-only env
   vars use a `TEST_` prefix. `make names` enforces it.
+- Parallel work follows the shared rules
+  ([Parallel work](schwarzwald/kit/rules/rules.md#parallel-work)); this
+  repository adds only its gate, `scripts/land-check.sh`, which one runner
+  runs for all of it.
 
 ## Provenance stays out
 
