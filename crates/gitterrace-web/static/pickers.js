@@ -29,12 +29,7 @@
   function openRefs() {
     var btn = document.getElementById("refbtn");
     var box = overlay("refs", "Switch branch or tag", btn);
-    if (btn) {
-      var r = btn.getBoundingClientRect();
-      box.classList.add("anchored");
-      box.style.left = Math.max(8, r.left) + "px";
-      box.style.top = r.bottom + 6 + "px";
-    }
+    box.classList.add("anchored");
     var p = listPicker(box, "Filter branches and tags", function (q) {
       return (refs || []).filter(function (x) {
         return !q || x.name.toLowerCase().indexOf(q) >= 0;
@@ -44,6 +39,7 @@
       li.appendChild(el("span", "tag " + it.kind, it.kind));
       li.appendChild(whenEl(it.when, "dir"));
     }, function (it) { swapRev(it.name); }, "Enter to switch");
+    n.ov.place(box, btn);
     if (refs) p.refresh();
     else if (!STATIC) fetch(B + "/api/refs").then(function (r) { return r.json(); })
       .then(function (l) { refs = l; p.refresh(); });
@@ -70,10 +66,7 @@
   function openRepos() {
     var btn = document.getElementById("repobtn");
     var box = overlay("refs repopanel", "Switch repository", btn);
-    var r = btn.getBoundingClientRect();
     box.classList.add("anchored");
-    box.style.left = Math.max(8, Math.min(r.left, window.innerWidth - box.offsetWidth - 8)) + "px";
-    box.style.top = r.bottom + 6 + "px";
     var head = el("div", "ov-title");
     head.appendChild(el("h2", "", "Switch repository"));
     var x = el("button", "tool", null);
@@ -98,6 +91,7 @@
       txt.appendChild(whenEl(it.when, "dir"));
       li.appendChild(txt);
     }, function (it) { location.href = it.href; }, "Enter to open", "No repositories match");
+    n.ov.place(box, btn);
     if (repos) p.refresh();
     else fetch("/api/repos").then(function (r) { return r.json(); })
       .then(function (l) { repos = l; p.refresh(); });

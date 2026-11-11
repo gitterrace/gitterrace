@@ -44,8 +44,51 @@
       document.body.appendChild(back);
       box.focus();
     },
+    // Puts a position:fixed box beside `anchor`, using the box's measured size. An anchor that is
+    // scrolled out of view is ignored: the box goes top-center, under a pinned header or at 12vh
+    // like the centered overlays. It flips above the anchor when it would overflow below, and is
+    // clamped inside the viewport. It re-places on resize and on scroll (rather than closing on
+    // scroll) so a box stays glued to a visible trigger and long lists keep their place; a
+    // ResizeObserver covers content that arrives late.
+    place: function (box, anchor) {
+      var M = 8;
+      function go() {
+        if (!box.isConnected) return;
+        var vw = document.documentElement.clientWidth, vh = window.innerHeight;
+        var w = box.offsetWidth, h = box.offsetHeight;
+        var r = anchor && anchor.isConnected ? anchor.getBoundingClientRect() : null;
+        var seen = r && r.width + r.height > 0 && r.bottom > 0 && r.top < vh;
+        seen = seen && r.right > 0 && r.left < vw;
+        var left, top;
+        if (seen) {
+          left = r.left;
+          top = r.bottom + 6;
+          if (top + h > vh - M && r.top - 6 - h >= M) top = r.top - 6 - h;
+        } else {
+          var hd = document.querySelector("header.top");
+          var pinned = hd && /^(sticky|fixed)$/.test(getComputedStyle(hd).position);
+          left = (vw - w) / 2;
+          top = pinned ? hd.getBoundingClientRect().bottom + 8 : vh * 0.12;
+        }
+        box.style.left = Math.max(M, Math.min(left, vw - w - M)) + "px";
+        box.style.top = Math.max(M, Math.min(top, vh - h - M)) + "px";
+      }
+      go();
+      window.addEventListener("resize", go);
+      window.addEventListener("scroll", go, { passive: true });
+      var ro = window.ResizeObserver ? new ResizeObserver(go) : null;
+      if (ro) ro.observe(box);
+      ov.unplace = function () {
+        window.removeEventListener("resize", go);
+        window.removeEventListener("scroll", go);
+        if (ro) ro.disconnect();
+        ov.unplace = null;
+      };
+    },
+    unplace: null,
     close: function () {
       if (!ov.back) return;
+      if (ov.unplace) ov.unplace();
       var from = ov.from, done = ov.onClose;
       ov.back.remove();
       ov.name = ov.back = ov.from = ov.onClose = null;
@@ -128,7 +171,7 @@
   function closeOverlay() { ov.close(); }
   // What pickers.js builds on; the function declarations below are hoisted.
   window.gtNav = {
-    B: B, STATIC: STATIC, el: el, whenEl: whenEl, inRepo: local, isOff: isOff,
+    B: B, STATIC: STATIC, ov: ov, el: el, whenEl: whenEl, inRepo: local, isOff: isOff,
     overlay: overlay, listPicker: listPicker, closeOverlay: closeOverlay
   };
 

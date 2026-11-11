@@ -396,9 +396,7 @@
     });
     menu = { back: back };
     ov.open("actmenu", back, box, { menu: true, label: "Actions", from: anchor, onClose: function () { if (menu && menu.back === back) menu = null; } });
-    var r = anchor.getBoundingClientRect();
-    box.style.left = Math.max(8, Math.min(r.left, window.innerWidth - 300)) + "px";
-    box.style.top = Math.min(r.bottom + 6, window.innerHeight - 200) + "px";
+    ov.place(box, anchor);
     focus(0);
   }
 
