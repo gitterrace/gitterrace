@@ -10,9 +10,9 @@ use serde::Deserialize;
 use crate::{
     charts,
     error::Result,
-    filter::{Chip, FilterBar},
+    filter::FilterBar,
     fmt::{self},
-    insights::{InsightsQuery, Kpi, cached_keyed, insights, page_scope, period_of},
+    insights::{InsightsQuery, Kpi, cached_keyed, insights, period_of},
     pagehead::PageHead,
     routes::Shared,
     views::Chrome,
@@ -40,26 +40,6 @@ fn delta(now: u64, before: Option<u64>) -> (String, &'static str) {
 const COMMITS: &str = "Commits without merges";
 /// The same total with the merges option on.
 const COMMITS_WITH_MERGES: &str = "Commits";
-
-/// The date range a bucket link narrows the page to: `?from=YYYY-MM-DD&to=YYYY-MM-DD`, both
-/// ends inclusive.
-#[derive(Debug, Default, Deserialize)]
-pub(crate) struct RangeQuery {
-    from: Option<String>,
-    to: Option<String>,
-}
-
-impl RangeQuery {
-    /// The range as `(from, to)` dates and days, or `None` when absent or malformed.
-    fn parsed(&self) -> Option<(&str, &str, i64, i64)> {
-        let (f, t) = (self.from.as_deref()?, self.to.as_deref()?);
-        let (a, b) = (
-            gitterrace_index::parse_day(f)?,
-            gitterrace_index::parse_day(t)?,
-        );
-        (a <= b).then_some((f, t, a, b))
-    }
-}
 
 const WEEKDAYS: [&str; 7] = [
     "Monday",
@@ -194,13 +174,13 @@ fn scope_of(
     q: &InsightsQuery,
     d: &crate::insights::Defaults,
     period: Period,
-    sel: Option<(&str, &str, i64, i64)>,
+    sel: Option<(i64, i64)>,
 ) -> Scope {
     let params = ScopeParams {
         period: Some(sel.map_or(period, |_| Period::All).as_str().to_owned()),
-        from: sel.map(|(f, _, _, _)| f.to_owned()),
-        to: sel.map(|(_, t, _, _)| t.to_owned()),
-        select: q.filter.selection(),
+        from: sel.map(|(f, _)| gitterrace_git::ymd(f)),
+        to: sel.map(|(_, t)| gitterrace_git::ymd(t)),
+        select: q.filter.unranged().selection(),
         options: q.opts.clone(),
     };
     Scope::from_params(&params, d.clone().into_options(), period)
@@ -248,26 +228,23 @@ pub(crate) async fn page(
     State(app): Shared,
     RawQuery(raw): RawQuery,
     Query(q): Query<InsightsQuery>,
-    Query(rq): Query<RangeQuery>,
     Query(lp): Query<ListPage>,
 ) -> Result<Html<String>> {
-    // The memo key keeps only the shared parameters: the range is part of this page's key.
-    let mut key = crate::app::App::canonical_query(raw.as_deref());
-    if let Some((f, t, _, _)) = rq.parsed() {
-        key = format!("{key}&from={f}&to={t}");
-    }
+    // The memo key keeps the shared parameters, and the range keys `from` and `to` are among
+    // them: an older link's range moves the key as `q` does.
+    let key = crate::app::App::canonical_query(raw.as_deref());
     cached_keyed(&app, "a", key, move |a, r, c| {
         let f = &q.filter;
         let d = a.defaults();
         let period = period_of(&q, &d, Period::All);
-        let sel = rq.parsed();
+        let sel = f.range();
         let scope = scope_of(&q, &d, period, sel);
         let ins = insights(a, r, scope.options().clone());
         let counted = crate::insights::counted(&ins, &scope, r);
         // One walk feeds the page and both sections. The sections count the page's period
         // without the range, so a selected range gives them a fold of their own.
         let fold = counted.activity_fold();
-        let plain = page_scope(&q, &d, period);
+        let plain = scope_of(&q, &d, period, None);
         let plain_set = crate::insights::counted(&ins, &plain, r);
         let plain_fold = sel.map(|_| plain_set.activity_fold());
         let (sec_set, sec_fold) = plain_fold
@@ -281,7 +258,7 @@ pub(crate) async fn page(
             s.current.authors as u64,
             prev.map(|p| p.commits as u64),
         );
-        let span_days = sel.map_or_else(|| period.days(), |(_, _, a, b)| Some(b - a + 1));
+        let span_days = sel.map_or_else(|| period.days(), |(a, b)| Some(b - a + 1));
         let span = span_text(s.from, s.to, span_days);
         let series: Vec<_> = rhythm
             .series
@@ -295,13 +272,9 @@ pub(crate) async fn page(
             .map(|(p, end)| q.range_link(&d, "/stats", &p.key, end))
             .collect();
         let mut fb = f.bar("/stats", &**r, period);
-        let range = sel.map(|(from, to, _, _)| {
-            fb.chips.push(Chip {
-                dim: "range",
-                label: format!("{from} to {to}"),
-                href: q.unranged_link(&d, "/stats"),
-            });
-            range_card(from, to, &rhythm.by_weekday)
+        let range = sel.map(|(from, to)| {
+            let (from, to) = (gitterrace_git::ymd(from), gitterrace_git::ymd(to));
+            range_card(&from, &to, &rhythm.by_weekday)
         });
         let types_html = if crate::features::pages().contains(&"types") {
             crate::commit_types::section(a, &q, lp.page.as_deref(), sec_set, sec_fold)
@@ -351,25 +324,4 @@ pub(crate) async fn page(
         }
     })
     .await
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn range(from: &str, to: &str) -> RangeQuery {
-        RangeQuery {
-            from: Some(from.to_owned()),
-            to: Some(to.to_owned()),
-        }
-    }
-
-    #[test]
-    fn an_impossible_date_gives_no_range_instead_of_shifting_it() {
-        assert!(range("2026-02-30", "2026-03-31").parsed().is_none());
-        assert!(range("2026-03-01", "2026-04-31").parsed().is_none());
-        assert!(range("2026-3-1", "2026-03-31").parsed().is_none());
-        let (_, _, a, b) = range("2026-03-01", "2026-03-31").parsed().expect("valid");
-        assert_eq!(b - a, 30);
-    }
 }

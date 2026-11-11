@@ -37,6 +37,10 @@ struct Raw {
     #[serde(flatten)]
     select: Selection,
     period: Option<String>,
+    /// The date range of a bucket link, both ends inclusive days: read as `after:` and
+    /// `before:` the day after.
+    from: Option<String>,
+    to: Option<String>,
 }
 
 impl<'de> Deserialize<'de> for Filter {
@@ -127,9 +131,15 @@ impl Filter {
                 .q
                 .as_deref()
                 .is_some_and(|t| t.split_whitespace().any(|w| w == "period:all"));
+        let range = Self::range_terms(raw);
+        let with_range = |q: Query| {
+            let mut terms = q.terms().to_vec();
+            terms.extend(range.clone());
+            Query::new(terms)
+        };
         match with_period.query() {
             Ok(query) => Self {
-                query,
+                query: with_range(query),
                 refused: None,
                 all,
             },
@@ -140,7 +150,7 @@ impl Filter {
                     ..raw.select.clone()
                 };
                 Self {
-                    query: rest.query().unwrap_or_default(),
+                    query: with_range(rest.query().unwrap_or_default()),
                     refused: Some((raw.select.q.clone().unwrap_or_default(), e)),
                     all,
                 }
@@ -156,8 +166,86 @@ impl Filter {
                 q: Some(text.to_owned()),
                 ..Selection::default()
             },
-            period: None,
+            ..Raw::default()
         })
+    }
+
+    /// The terms of `from` and `to`: both or neither, so a malformed or backwards range reads
+    /// as none, as it always has.
+    fn range_terms(raw: &Raw) -> Vec<Term> {
+        let (Some(f), Some(t)) = (raw.from.as_deref(), raw.to.as_deref()) else {
+            return Vec::new();
+        };
+        let ordered = gitterrace_index::parse_day(f)
+            .zip(gitterrace_index::parse_day(t))
+            .is_some_and(|(a, b)| a <= b);
+        if !ordered {
+            return Vec::new();
+        }
+        [fold("from", f), fold("to", t)]
+            .into_iter()
+            .filter_map(|r| r.ok().flatten())
+            .collect()
+    }
+
+    /// The date range both of whose bounds the filter holds, as local days, both inclusive:
+    /// the pair a bucket link sets. `None` for any other use of `after:` and `before:`.
+    pub(crate) fn range(&self) -> Option<(i64, i64)> {
+        let (from, to) = self.range_at()?;
+        match (&self.query.terms()[from].leaf, &self.query.terms()[to].leaf) {
+            (Leaf::After(When::Day(a)), Leaf::Before(When::Day(b))) if *a < *b => Some((*a, b - 1)),
+            _ => None,
+        }
+    }
+
+    /// Where the first positive day `after:` and day `before:` terms sit.
+    fn range_at(&self) -> Option<(usize, usize)> {
+        let at =
+            |f: fn(&Leaf) -> bool| self.query.terms().iter().position(|t| !t.neg && f(&t.leaf));
+        Some((
+            at(|l| matches!(l, Leaf::After(When::Day(_))))?,
+            at(|l| matches!(l, Leaf::Before(When::Day(_))))?,
+        ))
+    }
+
+    /// This filter with the range replaced by the days `from` to `to`, both inclusive. It
+    /// replaces the period: the bar a link comes from says the days, not the window.
+    pub(crate) fn with_range(&self, from: i64, to: i64) -> Self {
+        let mut query = self.unranged().query;
+        for leaf in [
+            Leaf::After(When::Day(from)),
+            // `before:` is exclusive: the day after `to`, computed as a day.
+            Leaf::Before(When::Day(to.saturating_add(1))),
+        ] {
+            let mut terms = query.terms().to_vec();
+            terms.push(Term { neg: false, leaf });
+            query = Query::new(terms);
+        }
+        Self {
+            query: query.replace(|l| matches!(l, Leaf::After(When::Period(_))), None),
+            refused: None,
+            all: false,
+        }
+    }
+
+    /// This filter without its range, the rest kept.
+    pub(crate) fn unranged(&self) -> Self {
+        let Some((a, b)) = self.range_at().filter(|_| self.range().is_some()) else {
+            return self.clone();
+        };
+        Self {
+            query: Query::new(
+                self.query
+                    .terms()
+                    .iter()
+                    .enumerate()
+                    .filter(|(i, _)| *i != a && *i != b)
+                    .map(|(_, t)| t.clone())
+                    .collect(),
+            ),
+            refused: None,
+            all: self.all,
+        }
     }
 
     pub(crate) const fn query_terms(&self) -> &Query {
@@ -238,7 +326,7 @@ impl Filter {
     pub(crate) fn with_period(&self, p: Period) -> Self {
         Self {
             all: p == Period::All,
-            ..self.swap(
+            ..self.unranged().swap(
                 |l| matches!(l, Leaf::After(When::Period(_))),
                 (p != Period::All).then_some(Term {
                     neg: false,

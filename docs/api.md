@@ -131,7 +131,7 @@ must match; they read in the order written. A bad `q` is a 400 with the span.
 
 The one-key parameters stay and read as terms of `q`, and must match as well:
 `type` as `type:`, `scope` as `scope:`, `author` as `author:`, `path` as
-`path:`, `period` as `period:`.
+`path:`, `from` as `after:`, `to` as `before:`, `period` as `period:`.
 
 ## Insights
 

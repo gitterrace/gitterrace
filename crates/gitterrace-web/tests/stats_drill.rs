@@ -47,10 +47,14 @@ async fn a_bar_link_narrows_to_its_bucket() {
     let page = body(&r, "/stats?period=1y").await;
     let href = bar_href(&page, "4 Mar: 3 commits");
     assert!(
-        href.contains("from=2024-03-04") && href.contains("to=2024-03-10"),
-        "{href}"
+        href.contains("q=after%3A2024-03-04+before%3A2024-03-11")
+            || href.contains("q=after%3A2024-03-04%20before%3A2024-03-11"),
+        "the range is two terms of q, the end day exclusive: {href}"
     );
-    assert!(href.contains("q=after%3A1y"), "filters carry over: {href}");
+    assert!(
+        !href.contains("from=") && !href.contains("to="),
+        "links write q only: {href}"
+    );
     let href = href.replacen("/r/repo", "", 1);
     let narrowed = body(&r, &href).await;
     assert!(narrowed.contains("Wednesday: 2"), "{narrowed}");
@@ -63,32 +67,32 @@ async fn a_bar_link_narrows_to_its_bucket() {
 async fn the_chip_removes_the_range() {
     let (_root, r) = router();
     let page = body(&r, "/stats?period=1y&from=2024-03-04&to=2024-03-10").await;
+    // The old keys and the new text read the same page.
+    let by_q = body(&r, "/stats?q=after%3A2024-03-04%20before%3A2024-03-11").await;
+    assert_eq!(kpi_commits(&by_q), kpi_commits(&page));
     let chips = page
         .split("<div class=\"chips\">")
         .nth(1)
         .and_then(|s| s.split("</div>").next())
         .expect("chips");
-    assert!(
-        chips.contains("<i>range</i> 2024-03-04 to 2024-03-10"),
-        "{chips}"
-    );
+    assert!(chips.contains("<i>after</i> 2024-03-04"), "{chips}");
+    assert!(chips.contains("<i>before</i> 2024-03-11"), "{chips}");
+    // Each bound removes itself: dropping one leaves no range, so no range card.
     let remove = chips
         .split("href=\"")
-        .filter_map(|s| s.split('"').next())
-        .find(|h| !h.contains("from=") && h.contains("q=after%3A1y"))
-        .expect("a chip link without the range");
-    assert!(!remove.contains("to="), "{remove}");
-    let remove = remove.replacen("/r/repo", "", 1);
-    let remove = remove.as_str();
-    let back = body(&r, remove).await;
-    assert!(!back.contains("<h2>Commits by weekday</h2>") && !back.contains("<i>range</i>"));
+        .skip(1)
+        .find_map(|s| s.split('"').next())
+        .expect("a chip link");
+    let remove = remove.replacen("/r/repo", "", 1).replace("&amp;", "&");
+    let back = body(&r, &remove).await;
+    assert!(!back.contains("<h2>Commits by weekday</h2>"));
 }
 
 #[tokio::test(flavor = "multi_thread")]
 async fn without_a_range_there_is_no_range_markup() {
     let (_root, r) = router();
     let page = body(&r, "/stats?period=1y").await;
-    assert!(!page.contains("<h2>Commits by weekday</h2>") && !page.contains("<i>range</i>"));
+    assert!(!page.contains("<h2>Commits by weekday</h2>"));
     let bad = body(&r, "/stats?period=1y&from=nonsense&to=2024-03-10").await;
     assert_eq!(bad, page, "a malformed range is ignored");
 }

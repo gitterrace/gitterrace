@@ -48,14 +48,14 @@ pub const KEYWORDS: &[KeywordSpec] = &[
     },
     KeywordSpec {
         keyword: "after",
-        param: None,
+        param: Some("from"),
         syntax: "after:<period|YYYY-MM-DD>",
         description: "Within the period, or from the date.",
         example: Some("after:3m"),
     },
     KeywordSpec {
         keyword: "before",
-        param: None,
+        param: Some("to"),
         syntax: "before:<period|YYYY-MM-DD>",
         description: "Before the period, or the date.",
         example: Some("before:2026-01-31"),

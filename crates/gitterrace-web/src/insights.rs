@@ -130,17 +130,16 @@ impl InsightsQuery {
         fmt::href(&format!("{base}{}", self.filter.query(&pairs)))
     }
 
-    /// Link to `base` with the current filters and options and the date range `from` to `to`.
-    pub(crate) fn unranged_link(&self, d: &Defaults, base: &str) -> String {
-        self.link(d, base, "from", None)
-    }
-
+    /// Link to `base` with the current filters and options and the days `from` to `to`
+    /// (`YYYY-MM-DD`, both inclusive) as the range, written as `?q=` like any filter.
     pub(crate) fn range_link(&self, d: &Defaults, base: &str, from: &str, to: &str) -> String {
-        let mut extra = self.pairs(d);
-        extra.push(("from", from.to_owned()));
-        extra.push(("to", to.to_owned()));
-        let pairs: Vec<(&str, &str)> = extra.iter().map(|(k, v)| (*k, v.as_str())).collect();
-        fmt::href(&format!("{base}{}", self.filter.query(&pairs)))
+        let filter = match gitterrace_index::parse_day(from).zip(gitterrace_index::parse_day(to)) {
+            Some((a, b)) => self.filter.with_range(a, b),
+            None => self.filter.clone(),
+        };
+        let pairs = self.pairs(d);
+        let pairs: Vec<(&str, &str)> = pairs.iter().map(|(k, v)| (*k, v.as_str())).collect();
+        fmt::href(&format!("{base}{}", filter.query(&pairs)))
     }
 
     /// The quiet options row under the filter bar.

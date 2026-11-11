@@ -143,6 +143,9 @@ fn every_alias_folds_to_its_keyword() {
         ("author", "Ann Lee", "author:\"Ann Lee\""),
         ("path", "/src/", "path:src"),
         ("period", "1m", "period:1m"),
+        ("from", "2024-03-04", "after:2024-03-04"),
+        ("to", "2024-03-04", "before:2024-03-05"),
+        ("to", "2024-02-29", "before:2024-03-01"),
     ] {
         let term = fold(key, value).expect(key).expect(key);
         let want = if key == "period" { "after:1m" } else { want };
@@ -157,7 +160,11 @@ fn every_alias_folds_to_its_keyword() {
 fn every_keyword_alias_is_in_the_fold() {
     for k in KEYWORDS {
         if let Some(p) = k.param {
-            let sample = if k.keyword == "period" { "1m" } else { "x" };
+            let sample = match k.keyword {
+                "period" => "1m",
+                "after" | "before" => "2024-03-04",
+                _ => "x",
+            };
             assert!(
                 matches!(fold(p, sample), Ok(Some(_))),
                 "{} has no fold",
@@ -166,7 +173,35 @@ fn every_keyword_alias_is_in_the_fold() {
         }
     }
     // The reverse: a key the fold reads is a KEYWORDS param.
-    for key in ["type", "scope", "author", "path", "period"] {
+    for key in ["type", "scope", "author", "path", "period", "from", "to"] {
         assert!(KEYWORDS.iter().any(|k| k.param == Some(key)), "{key}");
     }
+}
+
+#[test]
+fn from_and_to_the_same_day_select_exactly_that_day() {
+    use super::Matcher;
+    let day = crate::parse_day("2024-03-04").expect("day");
+    let (from, to) = (fold("from", "2024-03-04"), fold("to", "2024-03-04"));
+    let terms = vec![
+        from.expect("ok").expect("term"),
+        to.expect("ok").expect("term"),
+    ];
+    let m = Matcher::new(&Query::new(terms));
+    let at = |time: i64| {
+        let c = super::Commit {
+            kind: None,
+            scope: None,
+            name: "a",
+            email: "a@x.io",
+            time,
+            merge: false,
+        };
+        m.commit(&c, 0)
+    };
+    let start = day * 86_400;
+    assert!(!at(start - 1), "the second before the day");
+    assert!(at(start), "the first second");
+    assert!(at(start + 86_399), "the last second");
+    assert!(!at(start + 86_400), "the first second of the next day");
 }
