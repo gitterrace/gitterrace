@@ -332,6 +332,10 @@ def export_test() -> None:
         "4029" in got
         or got != bd.FAILED_EXPORT
         or "12.3 s" not in bd.export_cell({"export": good})
+        or "(100 commits)" not in bd.export_cell({"export": {**good, "commits": 100}})
+        or "commits" in bd.export_cell({"export": {**good, "commits": 500}})
+        or "commits" in bd.export_cell({"export": good})
+        or bd.export_cell({"export": {**capped, "commits": 100}}) != bd.CAPPED_EXPORT
         or bd.export_cell({"export": capped}) != bd.CAPPED_EXPORT
         or bd.export_cell({"export": broken}) != bd.FAILED_EXPORT
     ):

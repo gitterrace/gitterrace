@@ -59,6 +59,7 @@ FULL_RUNS = bq.FULL_RUNS
 HARNESS = 2
 FULL_IDLE_SECS = bq.FULL_IDLE_SECS
 COLD_SAMPLES = bq.COLD_SAMPLES
+DEFAULT_COMMITS = 500  # `export --commits` default (cli.rs)
 max_load = bq.max_load
 quiet = bq.quiet
 measure_pages = bq.measure_pages
@@ -132,7 +133,6 @@ def bench_phases(
     sampler: Any,
 ) -> Json:
     """The timed phases of bench_repo, each started through quiet() so the sampler follows."""
-    name = repo["name"]
     quiet("index", loads, wait, sampler)
     srv = Server(binary, repo_dir, logdir)
     # A local repo is measured at its HEAD, so report that, not the corpus pin.
@@ -220,7 +220,7 @@ def bench_phases(
         res["pages"][label]["cold"]["samples"] = xs
         res["pages"][label]["cold"]["total_ms"] = statistics.median(xs)
     exports = [
-        export(name, repo_dir, binary, logdir, base, loads, wait, i, sampler)
+        export(repo, repo_dir, binary, logdir, base, loads, wait, i, sampler)
         for i in range(1, samples + 1)
     ]
     secs = [e["secs"] for e in exports]
@@ -268,7 +268,7 @@ def start_footprint(binary: str, logdir: Path) -> float | None:
 
 
 def export(
-    name: str,
+    repo: Json,
     repo_dir: Path,
     binary: str,
     logdir: Path,
@@ -278,19 +278,19 @@ def export(
     i: int,
     sampler: Any | None = None,
 ) -> Json:
-    """One timed export. The output can be gigabytes, so it goes under the bench dir."""
-    out = Path(base) / f"export-{name}"
+    """One timed export, under the bench dir (it can be gigabytes). export_commits bounds it."""
+    commits = repo.get("export_commits", DEFAULT_COMMITS)
+    out = Path(base) / f"export-{repo['name']}"
     shutil.rmtree(out, ignore_errors=True)
     quiet("export" if i == 1 else f"export#{i}", loads, wait, sampler)
     t = time.perf_counter()
+    cmd = [binary, "--config", str(isolated_config(logdir)), "export", str(out)]
     r = subprocess.run(
-        [binary, "--config", str(isolated_config(logdir)), "export", str(out)],
-        cwd=repo_dir,
-        capture_output=True,
-        text=True,
+        [*cmd, "--commits", str(commits)], cwd=repo_dir, capture_output=True, text=True
     )
     secs = time.perf_counter() - t
     res = {"secs": secs, "out_mb": dir_mb(out), "ok": r.returncode == 0}
+    res["commits"] = commits
     if r.returncode != 0:
         # The last stderr line says why: the page cap by design, or a real failure.
         res["error"] = (r.stderr.strip().splitlines() or ["no output"])[-1][:300]
@@ -441,6 +441,7 @@ def synthetic(base: str | Path) -> tuple[Json, Path]:
         "sha": sha,
         "local": str(d),
         "search": "item",
+        "export_commits": 10,
     }, d
 
 
@@ -554,6 +555,7 @@ def main():
             if v["status"] == "over"
         ]
         result["repos"][repo["name"]] = res
+        assert not a.synthetic or res["export"]["commits"] == 10, "bound not recorded"
     out_dir = (
         logdir
         if a.synthetic

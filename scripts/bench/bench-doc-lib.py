@@ -131,6 +131,8 @@ def summary(name: str, r: Json, when: str) -> list[str]:
     return L
 
 
+# `export --commits` default: an export at it is not called bounded.
+DEFAULT_EXPORT_COMMITS = 500
 CAPPED_EXPORT = "stopped at the page cap"
 FAILED_EXPORT = "failed"
 HELD = "withheld (load)"
@@ -151,7 +153,10 @@ def export_cell(r: Json) -> str:
         return "not run"
     if e.get("ok") is False:
         return export_failure(e)
-    return f"{e['secs']:.1f} s, {e['out_mb']:.0f} MB"
+    # A bounded export (corpus export_commits) says so: it is never a full export.
+    n = e.get("commits", DEFAULT_EXPORT_COMMITS)
+    bound = f" ({n} commits)" if n != DEFAULT_EXPORT_COMMITS else ""
+    return f"{e['secs']:.1f} s{bound}, {e['out_mb']:.0f} MB"
 
 
 def machine_line(m: Json) -> str:

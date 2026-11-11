@@ -4,6 +4,9 @@
 # A missing probe is discovered from the tree (largest file under the text limit, deepest
 # folder, HEAD). A blob or blame probe above that limit is the refusal page, so keep it under.
 # why is the reason the repo is in the corpus. docs/benchmarks.md links it to url.
+# export_commits bounds `export --commits` (default 500) for a repo whose export would stop at the
+# page cap: the report then shows the bound next to the time, never a full export. Unset means
+# the default.
 # need_gb is the free disk the clone and its blobs need. The harness refuses below it.
 
 [[repo]]
@@ -31,6 +34,7 @@ url = "https://github.com/rust-lang/rust.git"
 sha = "f90a2d27c2a1e18f10f4fd84c0dcd02710c37de8"
 class = "large"
 need_gb = 15
+export_commits = 100
 search = "Option"
 
 [[repo]]
@@ -40,6 +44,7 @@ url = "https://github.com/torvalds/linux.git"
 sha = "cbbddb6b08cc9900a87cccaa9b22bbe06aa4f50a"
 class = "huge"
 need_gb = 30
+export_commits = 100
 opt_in = true
 # One cold sample: a cold linux index takes too long to repeat. The doc marks it.
 cold_samples = 1
