@@ -69,8 +69,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: EmbarkStudios/cargo-deny-action@3c6349835b2b7b196a839186cb8b78e02f7b5f25 # v2.1.1
 
-  # rust-version in Cargo.toml is a promise; this proves it. Keep the two in step. Fast tier:
-  # release-check.yml does not run it, so a tag would otherwise ship on a stale MSRV run.
+  # rust-version in Cargo.toml is a promise; this proves it. Keep the two in step. Fast tier;
+  # release-check.yml runs it again on the release commit.
   msrv:
     name: MSRV check
     runs-on: ubuntu-latest
