@@ -34,6 +34,7 @@ GATES: list[tuple[str, list[str], tuple[str, ...]]] = [
     ("tests-modules", [PY, "scripts/lint/tests-check.py"], (".rs",)),
     ("types", [PY, "scripts/lint/types-check.py"], (".rs", "scripts/guards/")),
     ("css-scope", [PY, "scripts/lint/css-scope-check.py"], (".css",)),
+    ("css-button", [PY, "scripts/lint/css-button-check.py"], (".css", ".html", ".js")),
     (
         "theme",
         [PY, "scripts/release/site/theme-gen.py", "--check"],
