@@ -323,7 +323,7 @@ fn chrome_problems(pages: &[(String, String)]) -> Vec<String> {
     let root = crate::repo_root();
     let ws = crate::facts::load(&root).expect("facts");
     let pkg = &ws.packages["gitterrace"];
-    let shared = bar::bar(&pkg.name, &pkg.repository, &ws.demo);
+    let shared = bar::bar(&pkg.name, &pkg.repository, &ws.demo, "");
     let log = std::fs::read_to_string(root.join("CHANGELOG.md")).expect("changelog");
     let version_href = changelog::version_href(&log, &pkg.version);
     let site = frame::Site {
@@ -348,6 +348,15 @@ fn chrome_problems(pages: &[(String, String)]) -> Vec<String> {
         if !foot.starts_with(head) {
             bad.push(format!("{path}: the footer is not the shared one"));
         }
+        // A docs page's bar carries its Docs menu, which is the docs list and so differs by
+        // page; the rest of the bar is the shared one.
+        let html = html.find("<details class=\"menu docsmenu\"").map_or_else(
+            || html.clone(),
+            |at| {
+                let end = html[at..].find("</details>\n").map_or(at, |e| at + e + 11);
+                format!("{}{}", &html[..at], &html[end..])
+            },
+        );
         if !html.contains(&shared) {
             bad.push(format!("{path}: the shared bar is missing or changed"));
         }

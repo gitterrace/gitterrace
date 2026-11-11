@@ -1,10 +1,11 @@
 {#- The slim bar on top of every site page: brand, Docs, the demo when there is
-one, the source and the theme button. -#}
+one, the source and the theme button. On a docs page the Docs menu sits before the Docs
+link and takes its place on a narrow screen. -#}
 <header class="top"><nav class="bar" aria-label="Site">
 <a class="brand" href="/"><img class="on-light" src="/assets/mark-light.svg" alt="" width="24"
 height="24"><img class="on-dark" src="/assets/mark-dark.svg" alt="" width="24"
 height="24"><span>{{ name }}</span></a>
-<a href="/docs/">Docs</a>
+{{ docs_menu|safe }}<a href="/docs/">Docs</a>
 {%- if !demo.is_empty() %}
 <a href="{{ demo }}">Demo</a>
 {%- endif %}

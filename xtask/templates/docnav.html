@@ -1,28 +1,26 @@
-{#- The docs navigation: `part` picks the list beside the text on a wide screen, the two
-folded menus above it on a narrow one, or the previous and next links under it. Every
-docs page in index order; the current one carries aria-current. -#}
+{#- The docs navigation: `part` picks the list beside the text on a wide screen, the bar's
+Docs menu that folds the same list on a narrow one, the "On this page" menu above the text
+on a narrow one, or the previous and next links under it. Every docs page in index order;
+the current one carries aria-current. -#}
+{%- if part == "list" || part == "menu" -%}
 {%- if part == "list" -%}
 <nav class="docnav" aria-label="Docs"><h2>Docs</h2>
-{%- for d in docs %}
-{%- if !d.group.is_empty() %}{% if !loop.first %}</ol>{% endif -%}
-<h3>{{ d.group }}</h3><ol>{% endif -%}
-<li><a href="/{{ d.href }}"{{ d.current|safe }}>{{ d.title }}</a></li>
-{%- endfor -%}
-</ol></nav>
-{%- elif part == "menus" -%}
-<div class="menus"><details class="menu"><summary>Docs</summary><div class="pop">
-{%- for d in docs %}
-{%- if !d.group.is_empty() %}{% if !loop.first %}</ol>{% endif -%}
-<h3>{{ d.group }}</h3><ol>{% endif -%}
-<li><a href="/{{ d.href }}"{{ d.current|safe }}>{{ d.title }}</a></li>
-{%- endfor -%}
-</ol></div></details>
-{%- if !heads.is_empty() -%}
-<details class="menu" data-outline><summary>On this page</summary><div class="pop"><ol>
-{%- for h in heads %}<li><a href="#{{ h.0 }}">{{ h.1 }}</a></li>{% endfor -%}
-</ol></div></details>
+{%- else -%}
+<details class="menu docsmenu"><summary>Docs</summary><nav class="pop" aria-label="Docs">
 {%- endif -%}
-</div>
+{%- for d in docs %}
+{%- if !d.group.is_empty() %}{% if !loop.first %}</ol>{% endif -%}
+<h3>{{ d.group }}</h3><ol>{% endif -%}
+<li><a href="/{{ d.href }}"{{ d.current|safe }}>{{ d.title }}</a></li>
+{%- endfor -%}
+</ol></nav>{% if part == "menu" %}</details>{% endif %}
+{%- elif part == "outline" -%}
+{%- if !heads.is_empty() -%}
+<div class="menus"><details class="menu" data-outline><summary>On this page</summary>
+<div class="pop"><ol>
+{%- for h in heads %}<li><a href="#{{ h.0 }}">{{ h.1 }}</a></li>{% endfor -%}
+</ol></div></details></div>
+{%- endif -%}
 {%- else -%}
 <nav class="pager" aria-label="Previous and next">
 {%- if !prev.0.is_empty() %}<a class="prev" href="/{{ prev.0 }}" rel="prev">

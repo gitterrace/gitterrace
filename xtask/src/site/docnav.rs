@@ -1,6 +1,7 @@
 //! The docs navigation from `templates/docnav.html`: the list of every docs page beside the
-//! text, the same list and the page's outline folded into menus on a narrow screen, and the
-//! previous and next links at the end of a page. One order, the docs index's, for all three.
+//! text, the same list folded into the bar's Docs menu on a narrow screen, the page's outline
+//! folded into an "On this page" menu above the text, and the previous and next links at the
+//! end of a page. One order, the docs index's, for all of them.
 
 use askama::Template;
 
@@ -34,7 +35,9 @@ struct Nav<'a> {
 pub(super) struct DocNav {
     /// The list beside the text on a wide screen.
     pub list: String,
-    /// The two menus above the text on a narrow screen.
+    /// The bar's Docs menu, the list on a narrow screen, in place of the bar's Docs link.
+    pub menu: String,
+    /// The "On this page" menu above the text on a narrow screen, empty without an outline.
     pub menus: String,
     /// Previous and next under the text.
     pub pager: String,
@@ -77,13 +80,17 @@ pub(super) fn nav(
         }
         .render()
         .unwrap_or_default();
+        if html.is_empty() {
+            return html;
+        }
         let mut out = pack(&html);
         out.push('\n');
         out
     };
     DocNav {
         list: render("list"),
-        menus: render("menus"),
+        menu: render("menu"),
+        menus: render("outline"),
         pager: render("pager"),
     }
 }
@@ -117,7 +124,12 @@ mod tests {
             "{}",
             n.pager
         );
-        assert!(!n.menus.contains("On this page"), "{}", n.menus);
+        assert!(n.menus.is_empty(), "{}", n.menus);
+        assert!(
+            n.menu
+                .starts_with("<details class=\"menu docsmenu\"><summary>Docs</summary>")
+        );
+        assert_eq!(n.menu.matches("<li>").count(), 3, "{}", n.menu);
     }
 
     #[test]

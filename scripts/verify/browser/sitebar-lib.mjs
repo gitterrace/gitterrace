@@ -48,8 +48,8 @@ export function checks(env) {
   // The bar on every page, 404 included, at 390 and 1440 px, in light and dark: one header.top
   // first in the body after the skip link, 56 px tall plus its hairline, its background and text
   // following the scheme (dark bar and light text in dark, light bar and dark text in light),
-  // Docs, the source link and the theme button inside it and in the viewport,
-  // no sideways scroll. A script error fails.
+  // Docs (the link, or its menu on a narrow docs page), the source link and the theme button
+  // inside it and in the viewport, no sideways scroll. A script error fails.
   async function siteBar() {
     const { server, url } = await serve();
     const all = pages();
@@ -92,7 +92,8 @@ export function checks(env) {
                   height: Math.round(box.height),
                   bg: lum(getComputedStyle(top).backgroundColor),
                   fg: lum(getComputedStyle(top.querySelector('.brand')).color),
-                  docs: inside('a[href="/docs/"]'), gh: inside('.gh'), theme: inside('#theme'),
+                  docs: inside('a[href="/docs/"]') || inside('.docsmenu>summary'),
+                  gh: inside('.gh'), theme: inside('#theme'),
                   scroll: document.documentElement.scrollWidth - innerWidth,
                 };
               });
@@ -380,8 +381,8 @@ function tableProbe() {
  * @param {any} p the page @param {number} docs how many docs pages there are */
 async function narrowMenus(p, docs) {
   const why = [];
-  const menus = await p.$$('.menus > details');
-  if (!menus.length) return ['no Docs menu'];
+  const menus = [await p.$('header.top details.docsmenu'), await p.$('.menus > details')];
+  if (!menus[0]) return ['no Docs menu'];
   await menus[0].evaluate((d) => d.querySelector('summary').click());
   const listed = await menus[0].evaluate((d) => d.open
     && d.querySelector('.pop').getBoundingClientRect().right <= innerWidth + 0.5

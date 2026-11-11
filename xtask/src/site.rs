@@ -188,8 +188,17 @@ if(n==='system')delete r.dataset.theme;else r.dataset.theme=n;\n\
 try{if(n==='system')localStorage.removeItem('gitterrace-theme');else \n\
 localStorage.setItem('gitterrace-theme',n)}catch(e){}l()})})()";
 
+/// The bar's Docs menu on a docs page: Escape closes it and puts focus back on its button, a
+/// click outside or on a link closes it. It opens and closes without it, as native details.
+/// "On this page" gets the same from the outline script.
+pub(crate) const MENU_JS: &str = "document.querySelectorAll('details.docsmenu')\n\
+.forEach(function(d){var s=d.querySelector('summary');d.addEventListener('keydown',function(e){\n\
+if(e.key==='Escape'&&d.open){e.preventDefault();d.open=false;s.focus()}});\n\
+d.addEventListener('click',function(e){if(e.target.closest('a'))d.open=false});\n\
+document.addEventListener('click',function(e){if(d.open&&!d.contains(e.target))d.open=false})})";
+
 /// Every inline script on the page, so the CSP lists exactly these by hash.
-const SCRIPTS: [&str; 3] = [THEME_INIT_JS, THEME_TOGGLE_JS, LIGHTBOX_JS];
+const SCRIPTS: [&str; 4] = [THEME_INIT_JS, THEME_TOGGLE_JS, LIGHTBOX_JS, MENU_JS];
 
 /// The body of the outline's inline script on a docs page with a rail: the app's own script,
 /// from a fresh line so its first line fits the page's line width. Its whole-line comments stay

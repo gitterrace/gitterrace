@@ -425,6 +425,7 @@ pub(super) fn pages(root: &Path, site: &Site) -> Result<(Vec<Out>, Vec<String>)>
                 path: &path,
                 inner: &inner,
                 docnav: &nav.list,
+                docs_menu: &nav.menu,
                 menus: &nav.menus,
                 pager: &nav.pager,
                 rail: &rail,

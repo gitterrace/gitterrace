@@ -6,7 +6,7 @@
 
 use askama::Template;
 
-use crate::site::{THEME_INIT_JS, THEME_TOGGLE_JS, bar};
+use crate::site::{MENU_JS, THEME_INIT_JS, THEME_TOGGLE_JS, bar};
 
 /// What a page shows, the parts only it has. Every HTML value is markup the site built.
 #[derive(Default)]
@@ -24,7 +24,9 @@ pub(crate) struct Body<'a> {
     pub inner: &'a str,
     /// The docs list on the left, empty off the docs.
     pub docnav: &'a str,
-    /// The folded docs list and outline for a narrow screen, empty for none.
+    /// The bar's Docs menu, the docs list folded for a narrow screen, empty off the docs.
+    pub docs_menu: &'a str,
+    /// The "On this page" menu above the text on a narrow screen, empty for none.
     pub menus: &'a str,
     /// Previous and next at the end of a docs page, empty for none.
     pub pager: &'a str,
@@ -112,6 +114,9 @@ pub(crate) fn page(site: &Site, body: &Body) -> String {
         format!("{} - {}", body.title, site.name)
     };
     let mut scripts = vec![THEME_TOGGLE_JS.to_owned()];
+    if !body.docs_menu.is_empty() {
+        scripts.push(MENU_JS.to_owned());
+    }
     scripts.extend(body.scripts.iter().cloned());
     let mut out = Page {
         title: &title,
@@ -121,7 +126,7 @@ pub(crate) fn page(site: &Site, body: &Body) -> String {
         name: site.name,
         noindex: body.noindex,
         theme_init: THEME_INIT_JS,
-        bar: &bar::bar(site.name, site.repo, site.demo),
+        bar: &bar::bar(site.name, site.repo, site.demo, body.docs_menu),
         docnav: body.docnav,
         menus: body.menus,
         kicker: body.kicker,

@@ -34,17 +34,20 @@ struct Bar<'a> {
     demo: &'a str,
     gh_mark: &'a str,
     theme_button: &'a str,
+    docs_menu: &'a str,
 }
 
 /// The bar for the site `name` with its source at `repo`. `demo` is the live demo's URL, empty
-/// when there is none, and then the bar has no Demo link.
-pub(crate) fn bar(name: &str, repo: &str, demo: &str) -> String {
+/// when there is none, and then the bar has no Demo link. `docs_menu` is a docs page's folded
+/// docs list, which stands in for the Docs link on a narrow screen, empty off the docs.
+pub(crate) fn bar(name: &str, repo: &str, demo: &str, docs_menu: &str) -> String {
     let mut out = Bar {
         name,
         repo,
         demo,
         gh_mark: GH_MARK,
         theme_button: THEME_BUTTON,
+        docs_menu,
     }
     .render()
     .unwrap_or_default();
@@ -58,9 +61,9 @@ mod tests {
 
     #[test]
     fn the_demo_link_is_there_only_with_a_demo() {
-        let none = bar("r", "https://github.com/o/r", "");
+        let none = bar("r", "https://github.com/o/r", "", "");
         assert!(!none.contains(">Demo<"), "{none}");
-        let one = bar("r", "https://github.com/o/r", "https://demo.example");
+        let one = bar("r", "https://github.com/o/r", "https://demo.example", "");
         assert!(
             one.contains("<a href=\"https://demo.example\">Demo</a>"),
             "{one}"
@@ -75,7 +78,7 @@ mod tests {
 
     #[test]
     fn the_name_and_urls_are_escaped() {
-        let b = bar("a<b", "https://x/\"y", "");
+        let b = bar("a<b", "https://x/\"y", "", "");
         assert!(!b.contains("a<b") && !b.contains("x/\"y"), "{b}");
     }
 }
