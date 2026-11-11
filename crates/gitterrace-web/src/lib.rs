@@ -402,6 +402,7 @@ fn build_server(
                 router = router.merge(settings::router(Arc::new(settings::Settings {
                     dir,
                     actions: actions_file.map(Path::to_path_buf),
+                    actions_on: live.is_some(),
                     token,
                     env: env.clone(),
                 })));

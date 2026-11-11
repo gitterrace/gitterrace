@@ -28,6 +28,9 @@ pub(crate) struct Settings {
     pub(crate) dir: PathBuf,
     /// The `actions.toml` the server was started with, `None` with actions off.
     pub(crate) actions: Option<PathBuf>,
+    /// Whether the run route is mounted. Without it a first action needs a restart: the route
+    /// and its token are decided once at startup, see `actions::start`.
+    pub(crate) actions_on: bool,
     pub(crate) token: Token,
     pub(crate) env: Env,
 }
@@ -42,6 +45,18 @@ impl Settings {
         match f {
             SettingsFile::Config => Some(self.dir.join("config.toml")),
             SettingsFile::Actions => self.actions.clone(),
+        }
+    }
+
+    /// Adds `actions` to the restart list when `text` declares an action this server, started
+    /// without one, cannot turn on live.
+    fn note_restart(&self, f: SettingsFile, text: &str, reply: &mut CheckReply) {
+        if f != SettingsFile::Actions || self.actions_on {
+            return;
+        }
+        let home = gitterrace_config::home_var().map_or_else(PathBuf::new, PathBuf::from);
+        if gitterrace_actions::Config::parse(text, &home).is_ok_and(|c| !c.actions.is_empty()) {
+            reply.restart.push("actions");
         }
     }
 }
@@ -312,6 +327,7 @@ async fn check(State(s): State<Arc<Settings>>, req: Request) -> Response {
         Ok(text) => {
             let before = std::fs::read_to_string(&path).unwrap_or_default();
             let mut reply = validate(e.f, &text, &before, &env);
+            s.note_restart(e.f, &text, &mut reply);
             reply.text = Some(text);
             reply
         }
@@ -347,7 +363,8 @@ async fn write(State(s): State<Arc<Settings>>, req: Request) -> Response {
     let r = tokio::task::spawn_blocking(move || {
         let text = resulting_text(&path, &e).map_err(SaveError::Invalid)?;
         let before = std::fs::read_to_string(&path).unwrap_or_default();
-        let reply = validate(e.f, &text, &before, &env);
+        let mut reply = validate(e.f, &text, &before, &env);
+        s.note_restart(e.f, &text, &mut reply);
         let saved = gitterrace_config::save(&path, &text, expect, |t| match e.f {
             SettingsFile::Config => gitterrace_config::parse(t)
                 .map(drop)

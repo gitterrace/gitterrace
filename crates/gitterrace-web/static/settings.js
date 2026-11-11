@@ -286,7 +286,10 @@
       if (!save.disabled) save.click();
     }
   });
-  if (/[?&]restart=1/.test(location.search)) note.textContent = "Saved. Some changes need a restart.";
+  // The first action on a server started without any: the run route is decided at startup.
+  if (file === "actions" && /[?&]restart=1/.test(location.search)) {
+    note.textContent = "Saved. Restart gitterrace to show your actions in the menu.";
+  } else if (/[?&]restart=1/.test(location.search)) note.textContent = "Saved. Some changes need a restart.";
   else if (/[?&]saved/.test(location.search)) note.textContent = "Saved.";
   lines();
 })();
