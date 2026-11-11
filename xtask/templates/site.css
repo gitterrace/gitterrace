@@ -36,7 +36,7 @@ display:flex;align-items:center;gap:var(--space-6)}
 .top a:hover{color:var(--fg)}
 /* The bar's Docs link has the box of the Docs menu button (44 px tall, chevron room), so
    no item of the bar moves from a page with the menu to one with the link. */
-.top a[href$="/docs/"]{display:inline-flex;align-items:center;min-height:44px;
+.top a[href$="/docs/"]{display:inline-flex;align-items:center;min-height:44px;line-height:1;
 margin:0 calc(-1*var(--space-2));padding:0 var(--space-2)}
 .top a[href$="/docs/"]::after{content:"";width:5px;height:5px;margin-left:var(--space-2);
 border:solid transparent;border-width:0 1.5px 1.5px 0}
@@ -100,8 +100,7 @@ font:var(--weight-regular) var(--text-2xs)/1 var(--mono);text-transform:uppercas
 letter-spacing:.12em}
 .menu>summary::-webkit-details-marker{display:none}
 .menu>summary::after{content:"";width:5px;height:5px;margin-left:var(--space-2);
-border:solid currentColor;border-width:0 1.5px 1.5px 0;transform:translateY(-2px) rotate(45deg);
-transition:transform .15s}
+border:solid currentColor;border-width:0 1.5px 1.5px 0;transform:translateY(-2px) rotate(45deg)}
 .menu[open]>summary::after{transform:translateY(1px) rotate(-135deg)}
 .menu>summary:hover,.menu[open]>summary{color:var(--fg)}
 .top .docsmenu{position:static}
