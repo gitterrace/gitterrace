@@ -1,4 +1,4 @@
-# history and blame link a commit at #p/<path>, and each diff file header carries that id; no other byte moves
+# the log filter help links the docs heading Filtering commits; no other byte moves
 3d6331935b06992963d36c2eaffb6666 3d6331935b06992963d36c2eaffb6666 [browse] /api/files/HEAD
 5926060c7e0029dde61fa7387dbc2baf 5926060c7e0029dde61fa7387dbc2baf [browse] /api/refs
 45c4275d82173232a185abf4ac360913 d9bcc297a7248eccd0b33ece109ab5df [browse] /blame/HEAD/missing.rs
@@ -23,13 +23,13 @@ d0cb51d22819672a660667fc3cf04ad6 d0cb51d22819672a660667fc3cf04ad6 [browse] /comp
 6c62272e07bb014262b821756295c58d 6c62272e07bb014262b821756295c58d [browse] /hl/HEAD/src/lib.rs
 b3d230dde44c7fe2ee263a6af7e825ff 3d8063d75a148f70df6f7606d756e207 [browse] /insights
 b3d230dde44c7fe2ee263a6af7e825ff 3d8063d75a148f70df6f7606d756e207 [browse] /log
-870da2c02d21382fd6e445ad561f76b4 66b7316e5e70e02e3962e28106688514 [browse] /log/HEAD
-7f8a0bfef31cad515d8c04ceedbcc23e 7f8a0bfef31cad515d8c04ceedbcc23e [browse] /log/HEAD?author=bob%40y.io
-c7cc3c898ab99dc5f962c86595e9d890 c7cc3c898ab99dc5f962c86595e9d890 [browse] /log/HEAD?page=2
-6be131364ef611cde2134358fe8a6b12 6be131364ef611cde2134358fe8a6b12 [browse] /log/HEAD?path=src
-28dbf8a2e258031c41dd03f88c27549d 28dbf8a2e258031c41dd03f88c27549d [browse] /log/HEAD?path=src&author=bob%40y.io
-92c088d5a03e60e53c776230a8e48599 71e9a0e41c64257e210ba8bacf977af1 [browse] /log/HEAD?view=graph
-50bfbcb4cc118ce2bb8580669730de8b 50bfbcb4cc118ce2bb8580669730de8b [browse] /log/HEAD?view=graph&page=2
+041f2afbea8b4f3940e9650db990109a 0b71587cf518d74c94304fb6350f3a8a [browse] /log/HEAD
+2eca744437c93a2dcc9c41cd338129c8 2eca744437c93a2dcc9c41cd338129c8 [browse] /log/HEAD?author=bob%40y.io
+df3fb891d755e1b6a4521ecf81d3d448 df3fb891d755e1b6a4521ecf81d3d448 [browse] /log/HEAD?page=2
+0b1de11479836ae7c114d756624ff452 0b1de11479836ae7c114d756624ff452 [browse] /log/HEAD?path=src
+f8ab928c14b24e2f0a095698dfa911e5 f8ab928c14b24e2f0a095698dfa911e5 [browse] /log/HEAD?path=src&author=bob%40y.io
+48e5940e916e4c03d52f5681a17a2c1f 22e1e4db313c636841b6af18db0d8817 [browse] /log/HEAD?view=graph
+2eb784b62307e1d2b25bffab504a2d63 2eb784b62307e1d2b25bffab504a2d63 [browse] /log/HEAD?view=graph&page=2
 b395bfb48151f30cd5bdac0b8a06cb7d 8ecdf1148656105fe0be84b5d60f1b23 [browse] /log/nope
 45c4275d82173232a185abf4ac360913 d9bcc297a7248eccd0b33ece109ab5df [browse] /raw/HEAD/missing.rs
 87a341eef398c071bc0aba64aae6b78f d00ea85271236e53419ce2859a247db7 [browse] /raw/HEAD/src/lib.rs
