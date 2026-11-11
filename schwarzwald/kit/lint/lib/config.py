@@ -59,7 +59,7 @@ DEFAULTS: dict[str, dict] = {
     "product": {"name": "product"},
     "scope": {
         "prose": ["README.md", "AGENTS.md", "docs/**.md", "bench/**.md"],
-        "code": ["*.rs", "*.py", "*.mjs", "*.js", "*.sh", "*.yml", "*.yaml", "*.toml"],
+        "code": ["*.rs", "*.py", "*.mjs", "*.js", "*.sh", "*.yml", "*.yaml", "*.toml", "scripts/hooks/*"],
         "make": ["Makefile"],
         "design": ["docs/design/**.md"],
         "golden": ["*/golden/*"],

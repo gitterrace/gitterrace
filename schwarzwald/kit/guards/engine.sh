@@ -389,7 +389,7 @@ GUARD_MIN_RULES=10
 # Must EQUAL the shared file count in rules/: the selftest's degradation case deletes
 # exactly one file, so a lower floor cannot see it go. A product's own rule files are
 # counted apart, against GUARD_PRODUCT_RULE_FILES, so a missing one of THOSE is seen too.
-GUARD_SHARED_RULE_FILES=16
+GUARD_SHARED_RULE_FILES=17
 
 # Shared rules first, then each product rule dir (space-separated, relative to the product root:
 # the install's own product, never GUARD_REPO, which a caller may point at another checkout).

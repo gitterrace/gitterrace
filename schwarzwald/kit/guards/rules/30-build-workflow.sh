@@ -28,19 +28,6 @@ guard_rule_unquoted_include_glob() {
     return 0
 }
 
-guard_register worktree_location
-guard_rule_worktree_location() {
-    [ "$GUARD_TOOL" = bash ] || return 0
-    guard_cmd_has 'git( -C [^ ]+)? worktree add' || return 0
-    local wt="${GUARD_WORKTREE_DIR:-.wt}"
-    case "$GUARD_CMD" in *"$wt/"*) return 0 ;; esac
-    guard_block \
-        "worktrees live in ONE place -- <checkout>/$wt/<name> (git-ignored, skipped by the linters)." \
-        "Use: git worktree add -b <branch> $wt/<name> main" \
-        "Run 'git worktree list' first; never touch another session's."
-    return 0
-}
-
 guard_register pipe_masks_exit_code
 guard_rule_pipe_masks_exit_code() {
     [ "$GUARD_TOOL" = bash ] || return 0

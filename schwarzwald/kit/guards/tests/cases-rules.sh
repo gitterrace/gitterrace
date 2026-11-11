@@ -67,6 +67,13 @@ t BLOCK containment "$REPO" bash '{"command":"rm -rf /etc/zz"}' "GUARD_SCRATCH_R
 t BLOCK containment "$REPO" bash '{"command":"rm -f '"$HOME"'/.jcode/config.toml"}' "a root with .. opens nothing" GUARD_SCRATCH_ROOTS="$HOME/.jcode/scratch/.."
 # A heredoc fed to python is the interpreter's input, not shell: its file writes and the
 # words inside are not commands. Only a body fed to a SHELL is re-read as code.
+# Removing is a move to the Trash: the Trash is an mv DESTINATION, and nothing more.
+t ALLOW containment "$REPO" bash '{"command":"mv '"$REPO"'/.wt/done '"$HOME"'/.Trash/done-0152"}' "mv a clone into the Trash"
+t ALLOW containment "$REPO" bash '{"command":"mv .wt/done ~/.Trash/done"}' "mv into the Trash, tilde form"
+t BLOCK containment "$REPO" bash '{"command":"rm -rf '"$HOME"'/.Trash/done"}' "rm in the Trash is still outside the org"
+t BLOCK containment "$REPO" bash '{"command":"mv '"$HOME"'/.Trash/done '"$HOME"'/Documents/x"}' "the Trash is no mv source"
+t BLOCK containment "$REPO" bash '{"command":"mv '"$HOME"'/Documents/x '"$HOME"'/.Trash/x"}' "trashing a file outside the org"
+t BLOCK containment "$REPO" bash '{"command":"cp .wt/done '"$HOME"'/.Trash/x"}' "cp into the Trash is a write outside the org"
 t ALLOW containment "$REPO" bash '{"command":"python3 - <<'"'"'PY'"'"'\nimport pathlib\npathlib.Path(\"notes.md\").write_text(\"rm -rf ~/x and git stash\")\nPY"}' "a python heredoc that writes a file"
 t ALLOW destructive_class "$REPO" bash '{"command":"python3 - <<'"'"'PY'"'"'\nopen(\"n.md\",\"w\").write(\"never git stash or sed -i\")\nPY"}' "a python heredoc naming the class as data"
 t BLOCK destructive_class "$REPO" bash '{"command":"bash <<'"'"'SH'"'"'\ngit stash\nSH"}' "the same body fed to a shell is code"
@@ -487,10 +494,41 @@ t BLOCK unquoted_include_glob "$REPO" bash '{"command":"grep -r --include=*.rs f
 t ALLOW unquoted_include_glob "$REPO" bash '{"command":"grep -r --include='"'"'*.rs'"'"' foo crates"}' "quoted include glob"
 
 t BLOCK worktree_location "$REPO" bash '{"command":"git worktree add -b x /tmp/x"}' "worktree outside .wt/"
-t ALLOW worktree_location "$REPO" bash '{"command":"git worktree add -b x .wt/x main"}' "worktree in .wt/"
+t BLOCK worktree_location "$REPO" bash '{"command":"git worktree add -b x .wt/x main"}' "a worktree even in .wt/: work goes in a clone"
+t BLOCK worktree_location "$REPO" bash '{"command":"git -C /x worktree add --detach y"}' "worktree add behind git -C"
 t ALLOW worktree_location "$REPO" bash '{"command":"git worktree list"}' "listing worktrees"
-t ALLOW worktree_location "$REPO" bash '{"command":"git worktree add -b x lanes/x main"}' "an install's own worktree dir" GUARD_WORKTREE_DIR=lanes
-t BLOCK worktree_location "$REPO" bash '{"command":"git worktree add -b x .wt/x main"}' "the default dir is not an install's dir" GUARD_WORKTREE_DIR=lanes
+t ALLOW worktree_location "$REPO" bash '{"command":"git -C \"$repo\" worktree add -q --detach \"$wt\" \"$rev\""}' "a script's temporary worktree at a variable path"
+t ALLOW worktree_location "$REPO" bash '{"command":"echo use clone.sh, not git worktree add"}' "the command named as prose"
+
+t BLOCK clone_location "$REPO" bash '{"command":"git clone --no-local '"$REPO"' '"$HOME"'/.jcode/scratch/x"}' "a clone of an org repo outside its .wt/"
+t BLOCK clone_location "$REPO" bash '{"command":"git clone '"$REPO"' '"$ORG"'/product-copy"}' "a clone as a sibling of the repo"
+t BLOCK clone_location "$ORG" bash '{"command":"git clone product"}' "a clone with no destination lands in the cwd"
+t BLOCK clone_location "$REPO" bash '{"command":"git clone . .wt/../x"}' "a destination that climbs out of .wt/"
+t BLOCK clone_location "$REPO" bash '{"command":"git clone -q --no-local '"$REPO"'/.wt/a '"$REPO"'/.wt/../b"}' "a clone of a clone outside .wt/"
+t ALLOW clone_location "$REPO" bash '{"command":"git clone --no-local '"$REPO"' '"$REPO"'/.wt/x"}' "a clone at <repo>/.wt/<label>"
+t ALLOW clone_location "$REPO" bash '{"command":"git clone -q --no-local . .wt/x"}' "a relative clone into .wt/"
+t ALLOW clone_location "$ORG" bash '{"command":"cd product && git clone -b main . .wt/y"}' "after a cd, with a branch flag"
+t ALLOW clone_location "$REPO" bash '{"command":"git clone --depth 1 https://example.invalid/tap.git /tmp/tap"}' "a URL source is no lane clone"
+t ALLOW clone_location "$REPO" bash '{"command":"git clone -q \"$clone\" \"$tmp/w\""}' "a script's temporary clone at a variable path"
+t ALLOW clone_location "$REPO" bash '{"command":"git clone -q '"$ORG"'/../elsewhere /tmp/e"}' "a source outside the org"
+t ALLOW clone_location "$REPO" bash '{"command":"git clone . y/x"}' "an install's own clone dir" GUARD_WORKTREE_DIR=y
+
+# hookless_commit reads the checkout's hooks dir: one repo whose hooks are wired, one fresh
+# clone with none, and one with no scripts/hooks at all (a repo that keeps no hooks).
+_hk="$REPO/.runs/hooks-fixture"
+mkdir -p "$_hk/wired/scripts/hooks" "$_hk/bare/scripts/hooks" "$_hk/plain"
+for _d in wired bare plain; do git init -q "$_hk/$_d"; done
+for _h in commit-msg pre-commit; do
+    printf '#!/bin/sh\n' >"$_hk/wired/scripts/hooks/$_h"
+    printf '#!/bin/sh\n' >"$_hk/bare/scripts/hooks/$_h"
+    chmod +x "$_hk/wired/scripts/hooks/$_h" "$_hk/bare/scripts/hooks/$_h"
+done
+(cd "$_hk/wired" && git config core.hooksPath scripts/hooks)
+t BLOCK hookless_commit "$_hk/bare" bash '{"command":"git commit x -m \"feat: x\""}' "a commit in a clone whose hooks are not installed"
+t BLOCK hookless_commit "$REPO" bash '{"command":"git -C '"$_hk"'/bare commit -m x"}' "the same commit through git -C"
+t ALLOW hookless_commit "$_hk/wired" bash '{"command":"git commit x -m \"feat: x\""}' "a commit where core.hooksPath runs the hooks"
+t ALLOW hookless_commit "$_hk/plain" bash '{"command":"git commit -m x"}' "a repo that keeps no hooks"
+t ALLOW hookless_commit "$_hk/bare" bash '{"command":"git log -1 && git status"}' "reading in a hookless clone is fine"
 t ALLOW shared_index_staging "$REPO/lanes/k" bash '{"command":"git add x"}' "an install's own worktree has its own index" GUARD_WORKTREE_DIR=lanes
 
 # bare_cargo_bypasses_make is ADVISORY, so both directions are ALLOW; what is

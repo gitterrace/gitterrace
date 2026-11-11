@@ -44,7 +44,9 @@ belong.
 
 ## Commits
 
-- Work in your own clone or worktree, never in a checkout someone else uses.
+- Work in your own clone at `<repo>/.wt/<label>`, made with
+  `schwarzwald/kit/tools/clone.sh <label>`, never a worktree and never a
+  checkout someone else uses. The guards block the other ways.
 - One change, one commit. The tests, guard, docs, golden update and formatting
   fixes of a change go into that change's commit.
 - No `fixup!`, `squash!`, `wip`, style-only, "satisfy clippy", "re-bless" or
@@ -60,6 +62,34 @@ belong.
   product's gate on the squashed commit. It must exit 0.
 - Landing restamps author and committer date to the landing time and keeps the
   message and identity.
+
+## Parallel work
+
+- Feature work builds and runs short checks only: a compile check, its own
+  targeted tests, the lint for the files it touched, at most one browser or UI
+  case. Never the full test suite, the landing gate, the full browser run or
+  repeat loops. It ends by handing over the clone path, the tip and one line on
+  what it checked.
+- One runner takes the full gates and the merges, one at a time: it rebases each
+  stack onto main, gates it and lands what is green. It may gate small
+  file-disjoint stacks together, and it decides whether a red is the stack, a
+  known flake or main.
+- At most six pieces of feature work at once, plus the runner. Above load 60 the
+  cap is four. Above 100 nothing new starts until running work finishes.
+- Clones: `<repo>/.wt/<label>`, one per piece of work, made by `clone.sh` (a
+  `git clone --no-local` with the hooks installed). `.wt/` is in the repo's
+  `.gitignore`. Bench and measurement runs live there too. Nothing as a sibling
+  of the repo, nothing in the main checkout.
+- Builds: each clone builds into its own `target/`, and `CARGO_TARGET_DIR` stays
+  unset. A product whose AGENTS.md names one shared target builds every clone
+  into it, and only its runner builds: a new test binary path pays the macOS
+  first-run scan, and one target per clone costs the disk.
+- Scratch (logs, probes, notes) goes in the session's scratch directory, never
+  `/tmp` and never in a clone's tracked tree.
+- Before anything destructive: `git bundle create --all` into
+  `~/Backups/<project>-backups/<what>-<yyyymmdd-hhmm>/`.
+- Removing: move to `~/.Trash`, never `rm -rf`. A clone goes once every commit
+  in it is on main (checked by subject after a rewrite), with a bundle first.
 
 ## The shared tree always compiles
 

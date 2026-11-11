@@ -7,6 +7,7 @@ git_add_scope	rules/10-shared-checkout.sh	add( +-[A-Za-z]+)* +(\.|\./|-A|--all)	
 containment	rules/05-containment.sh	(rm|rmdir|mv|cp|dd|truncate|shred|chown|chmod|ln)	rm outside the org		cases-rules
 containment_scratch_open	rules/05-containment.sh	_contain_scratch "$p" && continue	inside the org or scratch: rm -rf ~/.jcode/scratch/zz	:	cases-rules
 containment_scratch_home	rules/05-containment.sh	case "$h/" in "$r"/*) continue ;; esac	a scratch dir of .HOME opens nothing	:	cases-rules
+containment_trash	rules/05-containment.sh	if [ "$is_mv" -eq 1 ] && [ "$p" = "$trash_dest" ]; then	rm in the Trash is still outside the org	if true; then	cases-rules
 workspace_test	rules/30-build-workflow.sh	cargo (nextest run|test)[^&|;]*--workspace	bare workspace nextest		cases-rules
 rtk_proxy_reads	rules/30-build-workflow.sh	git( -C [^ ]+)? (show [^ |]*:|cat-file -p)	git show ref:path		cases-rules
 cwd_has_marker	rules/40-cwd.sh	guard_cmd_is 'make[[:space:]]' && need=Makefile	make where there is no Makefile		cases-rules
@@ -19,7 +20,9 @@ git_stash	rules/10-shared-checkout.sh	git( +-C +[^ ]+)? +stash	bare stash		cases
 index_reads_cwd	rules/10-shared-checkout.sh	    repo=$(guard_cwd_repo){NL}    [ -n "$repo" ] || return 0{NL}    staged=	a clean cwd stays silent while the guards' clone has a staged file	    repo="$GUARD_REPO"{NL}    staged=	cases-rules
 git_checkout_discards	rules/12-discard-guard.sh	+(checkout|restore)( |$)	checkout discards a path		cases-rules
 discard_path_cwd	rules/12-discard-guard.sh	[ -e "$_guard_p" ]	bare path resolved against the request cwd	[ -e "$_guard_arg" ]	cases-rules
-worktree_location	rules/30-build-workflow.sh	git( -C [^ ]+)? worktree add	worktree outside .wt/		cases-rules
+worktree_location	rules/15-lane-checkouts.sh	worktree +add([^;&|	worktree outside .wt/		cases-rules
+clone_location	rules/15-lane-checkouts.sh	case "$dest" in "$main/$wt"/?*) return 0 ;; esac	a clone of an org repo outside its .wt/	case "$dest" in *) return 0 ;; esac	cases-rules
+hookless_commit	rules/15-lane-checkouts.sh	[ -x "$hooks/$h" ] || missing	a commit in a clone whose hooks are not installed	: || missing	cases-rules
 pipe_masks_exit_code	rules/30-build-workflow.sh	(make|cargo|swift)[^|;'$'	make [|] tail && ...		cases-rules
 bare_cargo_bypasses_make	rules/30-build-workflow.sh	cargo[[:space:]]+(build|check|clippy|test|nextest|doc|bench|run)	workspace-wide cargo outside make		cases-rules
 long_run_detached	rules/30-build-workflow.sh	make[[:space:]]+(${GUARD_LONG_TARGETS_RE:-check|test|lint})	a long gate in the foreground	make[[:space:]]+(zzz)	cases-rules
@@ -69,7 +72,7 @@ product_rule_floor	engine.sh	[ "$m" -ge "${GUARD_PRODUCT_RULE_FILES:-0}" ]	a mis
 lane_env	engine.sh	GUARD_LANE="${!GUARD_LANE_ENV:-}"	the product.s lane variable says ro	:	cases-rules
 lane_roles_file	engine.sh	GUARD_LANE="$role"	role: a session listed ro is refused	:	cases-rules
 lane_git_write	rules/10-shared-checkout.sh	[ "${GUARD_LANE:-}" = "ro" ] || return 0	a read-only lane may not commit	return 0	cases-rules
-worktree_dir	rules/30-build-workflow.sh	local wt="${GUARD_WORKTREE_DIR:-.wt}"	an install.s own worktree dir	local wt=.wt	cases-rules
+worktree_dir	rules/15-lane-checkouts.sh	_lane_wt() { printf '%s' "${GUARD_WORKTREE_DIR:-.wt}"; }	an install.s own clone dir	_lane_wt() { printf '%s' .wt; }	cases-rules
 product_write_cmds	rules/70-silent-failure.sh	[ -n "${GUARD_WRITE_CMDS_RE:-}" ] && guard_cmd_is "$GUARD_WRITE_CMDS_RE" && mutates='product CLI write'	the product CLI write [|] tail	:	cases-rules
 build_lock_env	rules/30-build-workflow.sh	[[ ${GUARD_BUILD_LOCK_ENV:-} =~ ^[A-Z][A-Z0-9_]*$ ]] && [ -n "${!GUARD_BUILD_LOCK_ENV:-}" ] && return 0	nested under the build lock	:	cases-rules
 app_name_keystroke	rules/14-live-desktop-input.sh	guard_match "$src" "${GUARD_APP_RE:-x^}|unix id"	a keystroke addressed by pid	guard_match "$src" "zzz_never"	cases-rules

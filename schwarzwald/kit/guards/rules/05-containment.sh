@@ -111,9 +111,10 @@ _contain_check() {
 
     # cp/ln write only the destination: judging the source blocked taking a
     # backup. mv is NOT dest-only: it destroys its source (`mv /etc/hosts /tmp/x`).
-    local dest_only=0
+    local dest_only=0 is_mv=0
     case "$seg" in
         cp\ * | ln\ * | /bin/cp\ * | /usr/bin/cp\ * | /bin/ln\ * | /usr/bin/ln\ *) dest_only=1 ;;
+        mv\ * | /bin/mv\ *) is_mv=1 ;;
     esac
 
     # Expanded like the loop below: a raw `last` never matched a quoted dest.
@@ -125,9 +126,10 @@ _contain_check() {
 
     # A relative path is skipped only when it cannot leave the org: no `..` and
     # no `cd`.
-    local base moved=0
+    local base moved=0 trash_dest=""
     base=$(_contain_base "$cmd" "${GUARD_CWD:-$org}")
     [ "$base" = "$(_contain_norm "${GUARD_CWD:-$org}")" ] || moved=1
+    case "$last" in /*) trash_dest=$(_contain_norm "$last") ;; esac
 
     for p in $seg; do
         p=$(_contain_expand "$p")
@@ -145,6 +147,11 @@ _contain_check() {
                 p=$(_contain_norm "$base/$p")
                 ;;
         esac
+        # Removing is a move to the Trash (rules.md, Parallel work): the Trash is a fine
+        # DESTINATION of an mv, and nothing else (not a source, not an rm target).
+        if [ "$is_mv" -eq 1 ] && [ "$p" = "$trash_dest" ]; then
+            case "$p" in "${HOME%/}/.Trash"/?*) continue ;; esac
+        fi
         case "$p" in
             "$org" | "$org"/*) continue ;;
             "$tmp" | "$tmp"/*) continue ;;
