@@ -397,7 +397,12 @@ pub(crate) fn blame_warm_list(
 /// on one blocking thread and outside the request job slots, so it never makes a visitor wait.
 /// Stops when HEAD moves or when the cache is three quarters full, leaving room for what
 /// visitors open. A large translation catalog's blame is several MB.
+/// An export run (the env with a change memo) skips it: it writes no blame page, and gix holds
+/// every past version of a blamed file while it runs, about 1 GB for one rust file.
 pub(crate) async fn prewarm_blame(app: Arc<App>) {
+    if app.env.changes.is_some() {
+        return;
+    }
     let work = tokio::task::spawn_blocking(move || {
         let Ok(head) = app.repo.resolve("HEAD") else {
             return;

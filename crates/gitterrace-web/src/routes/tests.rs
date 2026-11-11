@@ -48,6 +48,32 @@ async fn blame_prewarm_fills_the_cache_for_the_costliest_files() {
     assert!(!app.repo.blame_is_cached(&head, "once.txt"));
 }
 
+/// Guard class: background work an export pays for but never writes out. An export writes no
+/// blame page, and one blame of a large, often edited file holds every past version of it (a
+/// gigabyte on rust), so an export run (the one env with a change memo) warms no blame. Red
+/// when the warm-up ignores what kind of run it serves.
+#[tokio::test]
+async fn an_export_run_warms_no_blame() {
+    let dir = tempfile::tempdir().expect("tmp");
+    let f = gitterrace_testkit::Fixture::init(dir.path())
+        .write("big.txt", "a\nb\n")
+        .commit("feat: a")
+        .write("big.txt", "a\nB\n")
+        .commit("fix: b");
+    let repo = gitterrace_git::Repo::discover(f.path()).expect("repo");
+    let index = gitterrace_index::Index::open(&repo).expect("index");
+    let mut env = crate::app::Env::new(gitterrace_config::Config::default());
+    env.changes = Some(Arc::new(gitterrace_git::ChangeMemo::new()));
+    let app = Arc::new(crate::app::App::configured(repo, index, &env));
+    app.index
+        .update(&app.repo, "HEAD", &|_| {})
+        .expect("update");
+    app.mark_ready();
+    let head = app.repo.resolve("HEAD").expect("head");
+    super::prewarm_blame(Arc::clone(&app)).await;
+    assert!(!app.repo.blame_is_cached(&head, "big.txt"));
+}
+
 /// Guard: the commit page (diff and diffstat) is rendered once per commit. The memo entry
 /// is swapped for a marker; a handler that diffs again would not return it.
 #[tokio::test]
