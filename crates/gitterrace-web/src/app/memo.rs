@@ -45,7 +45,8 @@ impl App {
     /// The query reduced to what the stats pages read, sorted: unknown parameters and the
     /// order of known ones must not make a new memo entry.
     pub(crate) fn canonical_query(raw: Option<&str>) -> String {
-        const KNOWN: [&str; 15] = [
+        const KNOWN: [&str; 16] = [
+            "q",
             "type",
             "scope",
             "author",

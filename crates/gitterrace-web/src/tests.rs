@@ -1,5 +1,7 @@
 //! Tests for the server: every page, the routers, the Host guard and the public mode.
 
+mod links;
+
 use gitterrace_testkit::{Fixture, git};
 use std::sync::Arc;
 
