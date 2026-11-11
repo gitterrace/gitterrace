@@ -39,6 +39,8 @@ function wideRepo(open = OPEN) {
   at('tag', 'v1');
   // Several labels on the top tip, one far longer than a label column.
   for (const n of LONG) at('branch', n);
+  // A branch on a commit off the first parent: its row is labelled, the rows around it are not.
+  at('branch', 'side-topic', 'topic-1');
   return dir;
 }
 
@@ -58,6 +60,18 @@ function measure() {
   const fold = [...document.querySelectorAll('.gfold')].some((f) => getComputedStyle(f).display !== 'none' && box(f).width > 0);
   const over = document.documentElement.scrollWidth > innerWidth + 1;
   return { rows: rows.length, gaps, tall, fold, over };
+}
+
+/** In the page: left edges of every row's graph cell, a labelled row's must match the rest. */
+function cellLefts() {
+  const rows = [...document.querySelectorAll('.graphed .crow')];
+  const left = (li) => li.querySelector('.graph').getBoundingClientRect().left;
+  const labelled = rows.filter((li) => li.querySelector('.glabels')).length;
+  const xs = rows.map(left);
+  const off = xs.map((x, i) => (Math.abs(x - xs[0]) > 0.5 ? `row ${i} at ${x} not ${xs[0]}` : ''))
+    .filter(Boolean);
+  const side = rows.some((li) => li.querySelector('.glabels')?.textContent.includes('side-topic'));
+  return { labelled, rows: rows.length, off, side };
 }
 
 /**
@@ -136,6 +150,11 @@ export function checks(env) {
           else r.ok(`${where}: lines meet across all ${m.rows} row edges`);
           if (m.tall) r.fail(`${where}: ${m.tall} labelled row(s) taller than an unlabelled one`);
           else r.ok(`${where}: a ref chip keeps the row height`);
+          const c = await p.evaluate(cellLefts);
+          const moved = c.off.slice(0, 3).join("; ");
+          if (!c.side || c.labelled === c.rows) r.fail(`${where}: no labelled row among plain`);
+          else if (c.off.length) r.fail(`${where}: labels move the cell: ${moved}`);
+          else r.ok(`${where}: the graph cell starts at the same x on all ${c.rows} rows`);
           if (m.over) r.fail(`${where}: page scrolls sideways`);
           const t = await p.evaluate(labels);
           const why = t.bad.slice(0, 3).join('; ');

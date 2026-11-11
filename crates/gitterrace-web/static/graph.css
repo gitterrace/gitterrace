@@ -2,7 +2,12 @@
    Side lines are --line-strong (3:1 or more on the row and its hover in every theme), the
    first-parent chain is the accent at 2px. A cell shows 8 columns, a narrow screen 3, and
    the rest fold into a count. */
-.graphed .crow{padding-left:var(--space-3)!important}
+/* Every graphed row reserves the same label gutter (--gw) left of the cell, so the cell starts
+   at the same x on every row. A row's .glabels sits in that gutter: it is in flow, so a row with
+   several labels still grows, but its negative margins cancel its own width and the flex gap, so
+   it never moves the cell. */
+.graphed{--gw:12rem}
+.graphed .crow{padding-left:calc(var(--space-3) * 2 + var(--gw))!important}
 .graph{position:relative;flex:none;align-self:stretch;display:flex;align-items:center;
 max-width:96px;margin:calc(-1 * var(--space-2)) 0;overflow:hidden}
 .graph .gl{position:absolute;inset:0 auto 0 0;height:100%;fill:none;stroke:var(--line-strong);
@@ -34,10 +39,11 @@ font:var(--text-2xs)/1 var(--mono)}
 .graph .gd .m:not(.main){stroke:currentColor}.graph .gd .gtip{fill:none;stroke:currentColor;
 stroke-width:1px;stroke-dasharray:2 2}
 .glabels{display:inline-flex;flex-direction:column;align-items:flex-end;justify-content:center;
-gap:2px;flex:0 1 auto;min-width:0;max-width:12rem;margin-right:-2px;
+gap:2px;flex:none;width:var(--gw);box-sizing:border-box;
+margin:0 0 0 calc(-1 * (var(--gw) + var(--space-3)));
 font:var(--text-2xs)/1.25 var(--mono)}.glabels .gref{color:inherit;border-color:currentColor;
 max-width:100%;overflow-wrap:anywhere;text-align:right}
-@media (max-width:600px){.glabels{max-width:6.5rem}.graphed .cmain{min-width:0;flex-basis:0}
+@media (max-width:600px){.graphed{--gw:6.5rem}.graphed .cmain{min-width:0;flex-basis:0}
 .graph{max-width:36px}.graph .xn,.graph .ow{display:none}.graph .on{display:inline}
 .graph .gedge.n{display:block}.graph .gedge.w{display:none}.graph .gfold.n{display:block}
 .graph .gfold.w{display:none}.cmain:has(.grefs)>.subj{flex:1 1 0}.grefs{max-width:50%;
