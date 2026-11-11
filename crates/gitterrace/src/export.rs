@@ -107,16 +107,7 @@ fn exclude_from_worktree(out: &Path) {
     }
 }
 
-/// Writes the scoped site to `out` and returns how many files were written. One repository
-/// exports at `/`; several export like the server serves them: an index at `/` and each
-/// repository under `/r/<name>/`, named by the server's own table.
-/// The site is built in a folder beside `out` and moved into place only when complete: a failed
-/// or capped export leaves `out` as it was.
-/// `export_pages`, when set, is the ceiling on pages written, folded diff fragments
-/// (`/diff/{id}/{n}`) included: one budget, so a wide commit costs pages like any other. Unset,
-/// every page in scope is written. It comes from `export --export-pages`, else
-/// `limits.export_pages`. Pages stream to disk as they render, so memory holds the queue of
-/// paths, not the pages. Silent: the command line uses [`export_with`].
+/// [`export_with`] without progress output, for tests.
 #[cfg(test)]
 pub(crate) async fn export(
     repos: &[PathBuf],
@@ -135,7 +126,16 @@ pub(crate) fn budget(flag: Option<u64>, config: &gitterrace_config::Config) -> O
     })
 }
 
-/// [`export`], telling `progress` what it does.
+/// Writes the scoped site to `out` and returns how many files were written. One repository
+/// exports at `/`; several export like the server serves them: an index at `/` and each
+/// repository under `/r/<name>/`, named by the server's own table.
+/// The site is built in a folder beside `out` and moved into place only when complete: a failed
+/// or capped export leaves `out` as it was.
+/// `export_pages`, when set, is the ceiling on pages written, folded diff fragments
+/// (`/diff/{id}/{n}`) included: one budget, so a wide commit costs pages like any other. Unset,
+/// every page in scope is written. It comes from `export --export-pages`, else
+/// `limits.export_pages`. Pages stream to disk as they render, so memory holds the queue of
+/// paths, not the pages. `progress` is told what it does.
 pub(crate) async fn export_with(
     repos: &[PathBuf],
     dest: &Path,
