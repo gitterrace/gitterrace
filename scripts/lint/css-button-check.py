@@ -9,6 +9,11 @@ variants. A selector whose last part is a button or carries one of those classes
 and placement, never `background*` or `border`, `border-color`, `border-style`, `border-width`
 or a side of them. Rules under forced colors are exempt: that palette is the user's.
 
+Pickers (<select>) share one arrow from the same section, inset from the right edge. A rule
+whose last part is a select, or a class the markup puts on one, may set background-color and
+padding-left, never the `background` or `padding` shorthand, `padding-right`,
+`background-image` or `appearance`: each drops the arrow or pushes it against the border.
+
   python3 scripts/lint/css-button-check.py              check the tree
   python3 scripts/lint/css-button-check.py --self-test  prove a planted rule goes red
 """
@@ -36,11 +41,19 @@ MARKUP = [
     re.compile(r"el\(\s*\"button\"\s*,\s*\"([^\"]*)\""),
     re.compile(r"class=\\?\"([^\"\\]*\bbtn\b[^\"\\]*)"),
 ]
+# Where markup names a picker's classes.
+SELECT_MARKUP = [
+    re.compile(r"<select\s[^<>]*?class=\\?\"([^\"\\]*)"),
+    re.compile(r"el\(\s*\"select\"\s*,\s*\"([^\"]*)\""),
+]
+PICKER_OWNED = re.compile(
+    r"^(background|background-image|appearance|-webkit-appearance|padding|padding-right)$"
+)
 
 
-def button_classes() -> set[str]:
-    """Every class the markup puts on a button, and the variants."""
-    found = set(VARIANTS)
+def markup_classes(patterns: list[re.Pattern[str]]) -> set[str]:
+    """Every class the web markup puts on an element the patterns match."""
+    found: set[str] = set()
     files = [
         *WEB.glob("templates/*.html"),
         *WEB.glob("src/**/*.rs"),
@@ -50,12 +63,28 @@ def button_classes() -> set[str]:
         if "tests" in f.name or "/tests/" in str(f):
             continue
         text = f.read_text(errors="replace")
-        for rx in MARKUP:
+        for rx in patterns:
             for m in rx.finditer(text):
                 found.update(
                     c for c in m.group(1).split() if re.fullmatch(r"[\w-]+", c)
                 )
     return found
+
+
+def button_classes() -> set[str]:
+    """Every class the markup puts on a button, and the variants."""
+    return VARIANTS | markup_classes(MARKUP)
+
+
+def targets_select(sel: str, picks: set[str]) -> bool:
+    """Whether the last part of `sel` is a picker itself."""
+    last = re.split(r"[\s>+~]+", re.sub(r"\([^()]*\)", "", sel.strip()))[-1]
+    if "::" in last:
+        return False
+    tag = re.match(r"^[a-z]+", last)
+    if tag:
+        return tag.group(0) == "select"
+    return any(c in picks for c in re.findall(r"\.([\w-]+)", last))
 
 
 def rules(css: str) -> Iterator[tuple[str, str, bool]]:
@@ -126,28 +155,32 @@ def paints_button(sel: str, classes: set[str]) -> bool:
     return any(c in classes for c in re.findall(r"\.([\w-]+)", last))
 
 
-def problems(css: str, name: str, classes: set[str]) -> list[str]:
+def problems(
+    css: str, name: str, classes: set[str], picks: frozenset[str] = frozenset()
+) -> list[str]:
     bad = []
     for head, body, exempt in rules(css):
         if exempt:
             continue
         props = [d.split(":", 1)[0].strip() for d in split_top(body, ";") if ":" in d]
         painted = [p for p in props if PAINT.match(p)]
-        if not painted:
-            continue
+        owned = [p for p in props if PICKER_OWNED.match(p)]
         for sel in split_top(head, ","):
-            if paints_button(sel, classes):
+            if painted and paints_button(sel, classes):
                 bad.append(
                     f"{name}: {sel.strip()} sets {', '.join(painted)} on a button"
                 )
+            if owned and targets_select(sel, set(picks)):
+                bad.append(f"{name}: {sel.strip()} sets {', '.join(owned)} on a picker")
     return bad
 
 
 def check() -> list[str]:
     classes = button_classes()
+    picks = frozenset(markup_classes(SELECT_MARKUP))
     bad = []
     for f in sorted((WEB / "static").glob("*.css")):
-        bad += problems(f.read_text(), f.name, classes)
+        bad += problems(f.read_text(), f.name, classes, picks)
     return bad
 
 
@@ -167,8 +200,19 @@ def self_test() -> int:
         "@media (forced-colors:active){button{border:1px solid CanvasText}}",
         "@media (max-width:600px){.send-go{flex:1}}",
     ]
-    fails = [c for c in red if not problems(c, "red", classes)]
-    fails += [c for c in green if problems(c, "green", classes)]
+    picks = frozenset({"send-pick"})
+    red += [
+        ".send-pick{padding:0 8px}",
+        ".setin select{background:var(--surface)}",
+        ".x select{padding-right:0}",
+    ]
+    green += [
+        ".send-pick{padding-left:12px;background-color:var(--bg)}",
+        ".setin select{max-width:420px}",
+        ".send-pick option{padding:0}",
+    ]
+    fails = [c for c in red if not problems(c, "red", classes, picks)]
+    fails += [c for c in green if problems(c, "green", classes, picks)]
     for c in fails:
         print(f"css-button self-test: wrong verdict for {c}")
     return 1 if fails else 0

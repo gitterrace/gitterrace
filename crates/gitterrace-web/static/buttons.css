@@ -46,4 +46,13 @@ button,.btn{display:inline-flex;align-items:center;justify-content:center;gap:va
 .segs .on,.segs .on:hover:not(:disabled){background:var(--accent-soft);color:var(--accent-ink);
   border-color:var(--accent);font-weight:var(--weight-semibold)}
 .dochead .segs a,.dochead .segs button{min-height:28px;padding:var(--space-1) var(--space-3)}
+/* Every picker (<select>) draws one arrow, inset from the right edge like its text from the
+   left, so no arrow sits against the border. A component may size a picker and set its
+   background-color, never the background shorthand, which would drop the arrow. */
+select{appearance:none;-webkit-appearance:none;padding-right:calc(var(--space-3)*2 + 10px);
+  background-image:var(--chev);background-repeat:no-repeat;
+  background-position:right var(--space-3) center;background-size:10px 6px;
+  --chev:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'%3E\
+%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23888' stroke-width='1.5' stroke-linecap='round' \
+stroke-linejoin='round'/%3E%3C/svg%3E")}
 /* ---- end of buttons ---- */
