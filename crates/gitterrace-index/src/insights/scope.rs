@@ -159,6 +159,18 @@ impl Scope {
         self.range
     }
 
+    /// The commit filter this scope counts, as canonical text: its period (as `after:`, none
+    /// for `all`) and then its selection, whichever way the request said them.
+    pub fn query_text(&self) -> String {
+        let period = (self.period != Period::All).then(|| format!("after:{}", self.period));
+        let sel = self.sel.q.clone();
+        [period, sel]
+            .into_iter()
+            .flatten()
+            .collect::<Vec<_>>()
+            .join(" ")
+    }
+
     pub const fn selection(&self) -> &Selection {
         &self.sel
     }

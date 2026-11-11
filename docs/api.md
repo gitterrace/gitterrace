@@ -43,9 +43,9 @@ each cap.
 | `GET /tree` | `rev`, `path` | commit, entries, path, rev |
 | `GET /blob` | `rev`, `path`, `start_line`, `limit` | binary, commit, link, path, permalink, rev, size, text, total_lines, truncated |
 | `GET /blame` | `rev`, `path` | commit, lines, link, path, permalink, rev, truncated |
-| `GET /contributors` | `rev`, `period`, `type`, `scope`, `author`, `path`, `bots`, `merges`, `generated`, `ignore`, `ws`, `exclude` | authors, bus_factor, rev |
+| `GET /contributors` | `rev`, `q`, `period`, `type`, `scope`, `author`, `path`, `bots`, `merges`, `generated`, `ignore`, `ws`, `exclude` | authors, bus_factor, rev |
 | `GET /insights` |  | insights |
-| `GET /insights/{name}` | `rev`, `period`, `label`, `metric`, `limit`, `type`, `scope`, `author`, `path`, `bots`, `merges`, `generated`, `ignore`, `ws`, `exclude` | commits_indexed, data, insight, rev |
+| `GET /insights/{name}` | `rev`, `q`, `period`, `label`, `metric`, `limit`, `type`, `scope`, `author`, `path`, `bots`, `merges`, `generated`, `ignore`, `ws`, `exclude` | commits_indexed, data, insight, query, rev |
 
 ### Parameters
 
@@ -83,6 +83,9 @@ each cap.
 counts them.
 
 - `rev` (string): Revision to read, default `HEAD`.
+- `q` (string): The commit filter, the web filter field's text, see Filter. The
+  primary way to select commits: the parameters below are older forms read as
+  its terms.
 - `period` (string): `1w`, `1m`, `3m`, `1y` or `all` (default): the window,
   ending at the newest commit. Sets the bucket unit.
 - The counting parameters below.
@@ -90,6 +93,9 @@ counts them.
 `/insights/{name}`: One insight.
 
 - `rev` (string): Revision to read, default `HEAD`.
+- `q` (string): The commit filter, the web filter field's text, see Filter. The
+  primary way to select commits: the parameters below are older forms read as
+  its terms.
 - `period` (string): `1w`, `1m`, `3m`, `1y` or `all` (default): the window,
   ending at the newest commit. Sets the bucket unit.
 - `label` (string): `kind` (default) or `scope`.

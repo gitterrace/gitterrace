@@ -12,9 +12,10 @@ use crate::error::ApiError;
 
 /// Query parameters any insight may read.
 ///
-/// Unused ones are ignored. The selection and option
-/// parameters are the web pages' own (`type`, `scope`, `author`, `path`, `bots`, `generated`,
-/// `ignore`, `ws`, `exclude`), so a page URL's query gives the same numbers here.
+/// Unused ones are ignored. `q` is the commit filter, the web pages' own text. The selection
+/// and option parameters are the web pages' too (`type`, `scope`, `author`, `path`, `bots`,
+/// `generated`, `ignore`, `ws`, `exclude`), read as terms of `q`, so a page URL's query gives
+/// the same numbers here.
 #[derive(Debug, Clone, Default, Deserialize)]
 pub struct Params {
     /// `1w`, `1m`, `3m`, `1y` or `all`.
@@ -172,6 +173,9 @@ pub fn compute(
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct InsightResponse {
     pub commits_indexed: usize,
+    /// The filter the numbers were counted under, as canonical text: `q` and the one-key
+    /// parameters read into one, so a client sees how its request was understood.
+    pub query: String,
     pub data: Value,
     pub insight: String,
     pub rev: String,

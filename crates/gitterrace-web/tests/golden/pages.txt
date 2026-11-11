@@ -1,4 +1,4 @@
-# stats day links say ?q=after:D before:D+1; on the old binary each old from=D&to=D link and the new link give equal counts
+# insight answers echo the canonical filter as query; with that field removed every answer equals the one before
 3d6331935b06992963d36c2eaffb6666 3d6331935b06992963d36c2eaffb6666 [browse] /api/files/HEAD
 5926060c7e0029dde61fa7387dbc2baf 5926060c7e0029dde61fa7387dbc2baf [browse] /api/refs
 bebf476f24e053138c70726f732dec41 4ef57968e0b11422ff4c4fd25a6ae0cd [browse] /blame/HEAD/missing.rs

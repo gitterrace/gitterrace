@@ -557,6 +557,7 @@ impl ApiState {
         let data = insights::with_links(name, data, |p| self.links(&tip, Some(p), None));
         Ok(insights::InsightResponse {
             commits_indexed,
+            query: scope.query_text(),
             data,
             insight: name.to_owned(),
             rev: rev.to_owned(),

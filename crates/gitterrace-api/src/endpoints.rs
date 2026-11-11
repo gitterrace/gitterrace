@@ -82,6 +82,7 @@ fn insight_schema(_: &mut SchemaGenerator) -> Schema {
             "commits_indexed": { "type": "integer" },
             "data": {},
             "insight": { "type": "string" },
+            "query": { "type": "string" },
             "rev": { "type": "string" }
         }
     })
@@ -108,6 +109,12 @@ const fn req(name: &'static str, ty: &'static str, description: &'static str) ->
 const REV: Param = p("rev", "string", "Revision to read, default `HEAD`.");
 // The period, the selection and the options: the web pages' own parameters, shared by every
 // endpoint that counts commits.
+const Q: Param = p(
+    "q",
+    "string",
+    "The commit filter, the web filter field's text, see Filter. The primary way to select \
+    commits: the parameters below are older forms read as its terms.",
+);
 const PERIOD: Param = p(
     "period",
     "string",
@@ -251,7 +258,8 @@ pub const ENDPOINTS: &[Endpoint] = &[
         path: "/contributors",
         summary: "Authors and bus factor, counted as `/insights/contributors` counts them.",
         params: &[
-            REV, PERIOD, TYPE, SCOPE, AUTHOR, UNDER, BOTS, MERGES, GENERATED, IGNORE, WS, EXCLUDE,
+            REV, Q, PERIOD, TYPE, SCOPE, AUTHOR, UNDER, BOTS, MERGES, GENERATED, IGNORE, WS,
+            EXCLUDE,
         ],
         schema: of::<ContributorsResponse>,
         route: || get(http::contributors),
@@ -268,6 +276,7 @@ pub const ENDPOINTS: &[Endpoint] = &[
         summary: "One insight.",
         params: &[
             REV,
+            Q,
             PERIOD,
             p("label", "string", "`kind` (default) or `scope`."),
             p(

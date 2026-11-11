@@ -1164,6 +1164,15 @@
             }
           },
           {
+            "description": "The commit filter, the web filter field's text, see Filter. The primary way to select commits: the parameters below are older forms read as its terms.",
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
             "description": "`1w`, `1m`, `3m`, `1y` or `all` (default): the window, ending at the newest commit. Sets the bucket unit.",
             "in": "query",
             "name": "period",
@@ -1370,6 +1379,15 @@
             }
           },
           {
+            "description": "The commit filter, the web filter field's text, see Filter. The primary way to select commits: the parameters below are older forms read as its terms.",
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
             "description": "`1w`, `1m`, `3m`, `1y` or `all` (default): the window, ending at the newest commit. Sets the bucket unit.",
             "in": "query",
             "name": "period",
@@ -1509,6 +1527,9 @@
                     "insight": {
                       "type": "string"
                     },
+                    "query": {
+                      "type": "string"
+                    },
                     "rev": {
                       "type": "string"
                     }
@@ -1517,7 +1538,7 @@
                 }
               }
             },
-            "description": "commits_indexed, data, insight, rev",
+            "description": "commits_indexed, data, insight, query, rev",
             "headers": {
               "ETag": {
                 "schema": {

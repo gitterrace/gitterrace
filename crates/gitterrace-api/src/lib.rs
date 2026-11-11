@@ -98,6 +98,31 @@ mod tests {
         assert_eq!(v["bus_factor"], 1);
     }
 
+    /// `q` and the older keys say one thing: every insight answers the same JSON, the `query`
+    /// echo included, however the filter was written.
+    #[tokio::test]
+    async fn q_and_the_older_keys_give_equal_insights() {
+        let (_d, s) = fixture();
+        let names = crate::insights::list().map(|(n, _)| n);
+        for name in names {
+            for (old, new) in [
+                ("period=1m", "q=after:1m"),
+                ("type=fix", "q=type:fix"),
+                ("path=src&author=a@b.c", "q=author:a@b.c%20path:src"),
+                ("period=1w&type=feat", "q=type:feat%20period:1w"),
+            ] {
+                let (st, a) = get(&s, &format!("/insights/{name}?{old}")).await;
+                assert_eq!(st, StatusCode::OK, "{name} {old}: {a}");
+                let (_, b) = get(&s, &format!("/insights/{name}?{new}")).await;
+                assert_eq!(a, b, "{name}: {old} vs {new}");
+            }
+        }
+        let (_, v) = get(&s, "/insights/summary?period=1m&type=fix").await;
+        assert_eq!(v["query"], "after:1m type:fix");
+        let (st, v) = get(&s, "/insights/summary?q=nope:x").await;
+        assert_eq!(st, StatusCode::BAD_REQUEST, "{v}");
+    }
+
     #[tokio::test]
     async fn results_carry_go_permalinks() {
         let (_d, s) = fixture();
