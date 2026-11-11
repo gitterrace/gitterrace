@@ -8,6 +8,8 @@
    publishes, and that job's matrix must hold that OS. Every other job is the fast tier, which
    runs on every pull request and push.
 3. COVERS names no job lint-and-test.yml lacks.
+4. Every release-check.yml job that runs `make check` checks out with `fetch-depth: 0`: the
+   history lints refuse a shallow clone.
 
 Read with a small indentation reader (2-space job keys under `jobs:`), no YAML library.
 
@@ -91,6 +93,14 @@ def problems(repo: Path) -> list[str]:
             bad.append(
                 f"scripts/lint/ci-check.py COVERS names {j}, not a lint-and-test.yml job"
             )
+    for j, body in release.items():
+        if "make check" in body and not re.search(
+            r"^\s+fetch-depth: 0\s*$", body, re.M
+        ):
+            bad.append(
+                f"release-check.yml: job {j} runs make check on a shallow checkout; "
+                f"add fetch-depth: 0 to its checkout"
+            )
     return bad
 
 
@@ -102,9 +112,20 @@ REL = (
     "  check:\n    strategy:\n      matrix:\n"
     "        os: [ubuntu-22.04, macos-latest, windows-latest]\n"
 )
+GATE = (
+    "  gate:\n    steps:\n      - uses: actions/checkout@x\n        with:\n"
+    "{depth}      - run: make check\n"
+)
 
 
-def fixture(d: Path, ci: str, tiers: str, rel: str) -> Path:
+def fixture(d: Path, ci: str, tiers: str, rel: str, tools: str = "") -> Path:
+    if tools:
+        (d / "schwarzwald/config").mkdir(parents=True)
+        (d / "schwarzwald/config/lint.toml").write_text(
+            '[changelog]\ngit_cliff = "2.14.2"\n'
+        )
+        (d / ".github/actions/lint-tools").mkdir(parents=True)
+        (d / ".github/actions/lint-tools/action.yml").write_text(tools)
     (d / WF).mkdir(parents=True)
     for name, body in (
         ("ci.yml", ci),
@@ -126,10 +147,18 @@ def self_test() -> int:
         (CALL, FAST + MAC + WIN, REL.replace(", windows-latest", ""), True),
         # A cover for a job that is gone.
         (CALL, FAST + MAC, REL, True),
+        # A gate job running make check on a shallow checkout.
+        (CALL, FAST + MAC + WIN, REL + GATE.format(depth=""), True),
+        (
+            CALL,
+            FAST + MAC + WIN,
+            REL + GATE.format(depth="          fetch-depth: 0\n"),
+            False,
+        ),
     ]
-    for i, (ci, tiers, rel, red) in enumerate(cases):
+    for i, (ci, tiers, rel, red, *tools) in enumerate(cases):
         with tempfile.TemporaryDirectory() as t:
-            got = problems(fixture(Path(t), ci, tiers, rel))
+            got = problems(fixture(Path(t), ci, tiers, rel, *tools))
         if bool(got) != red:
             print(
                 f"ci-check self-test: case {i} {'passed' if red else 'failed'}: {got}"
