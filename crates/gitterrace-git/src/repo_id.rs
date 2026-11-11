@@ -50,10 +50,14 @@ impl Repo {
     }
 
     /// Whether `sha` names a commit here and, when given, `path` is a file or directory in it.
-    /// Read from objects only, so `..` or an absolute path never matches.
+    /// Read from objects only, so `..` or an absolute path never matches. Goes through the
+    /// resolver, so a committed-only handle never confirms a commit it would not show.
     pub fn has(&self, sha: &str, path: Option<&str>) -> bool {
         let repo = self.repo();
-        let Ok(id) = gix::ObjectId::from_hex(sha.as_bytes()) else {
+        if gix::ObjectId::from_hex(sha.as_bytes()).is_err() {
+            return false;
+        }
+        let Ok(id) = self.resolve_id(&repo, sha) else {
             return false;
         };
         let Ok(commit) = repo.find_commit(id) else {

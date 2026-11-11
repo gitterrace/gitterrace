@@ -2,6 +2,7 @@ mod blame;
 mod changes;
 mod history;
 mod objects;
+mod visible;
 
 use std::cmp::Reverse;
 use std::collections::HashMap;
@@ -14,6 +15,7 @@ use gix::bstr::ByteSlice;
 use crate::error::git;
 use crate::repo::blame::{BLAME_CACHE_BYTES, BlameCache};
 pub use crate::repo::changes::ChangeMemo;
+use crate::repo::visible::Visible;
 use crate::{Error, MAX_TEXT_BYTES, RefInfo, RefKind, Result};
 
 /// Decoded-object cache; trees and commits are re-read constantly by walks and diffs. One per
@@ -60,6 +62,8 @@ pub struct Repo {
     pub(crate) id_cache: OnceLock<Option<String>>,
     /// See [`Repo::committed_only`].
     committed_only: AtomicBool,
+    /// The commits a committed-only handle may name by full id, see `visible.rs`.
+    visible: Mutex<Visible>,
     /// The export run's memo of tree diffs, see [`Repo::use_change_memo`]. Weak: the run owns
     /// it, and a server handle (none set) keeps nothing.
     changes: Mutex<Weak<ChangeMemo>>,
@@ -89,6 +93,7 @@ impl Repo {
             divergence: Mutex::new(HashMap::new()),
             id_cache: OnceLock::new(),
             committed_only: AtomicBool::new(false),
+            visible: Mutex::new(Visible::default()),
             changes: Mutex::new(Weak::new()),
             row_reads: AtomicU64::new(0),
             refs_memo: Mutex::new(None),
@@ -111,7 +116,8 @@ impl Repo {
 
     /// From now on every revision this handle resolves is `HEAD`, a full commit id, or a
     /// branch, tag or remote-tracking ref, optionally followed by `~N` / `^N`. Stashes, other
-    /// refs, reflogs and abbreviated ids (which enumerate the object store) stop resolving.
+    /// refs, reflogs and abbreviated ids (which enumerate the object store) stop resolving,
+    /// and a full id answers only for a commit reachable from one of those refs or HEAD.
     /// What a public server shows, enforced where every URL rev passes. One way: nothing
     /// turns it off again, so a shared handle cannot be widened.
     pub fn restrict_to_committed(&self) {
@@ -318,7 +324,8 @@ impl Repo {
         if REJECTED_REV.iter().any(|p| rev.contains(p)) {
             return Err(not_found());
         }
-        let id = if self.committed_only.load(Ordering::Relaxed) {
+        let committed = self.committed_only.load(Ordering::Relaxed);
+        let id = if committed {
             committed_rev(repo, rev).ok_or_else(not_found)?
         } else {
             repo.rev_parse_single(rev)
@@ -327,6 +334,14 @@ impl Repo {
         };
         let id = repo.find_object(id).map_err(|_| not_found())?;
         let commit = id.peel_to_commit().map_err(|_| not_found())?;
+        // A ref base and its ancestors are public by construction; a raw id may name a stash
+        // or a dangling commit, so its final commit must be reachable from a public root.
+        if committed && rev.find(['~', '^']).unwrap_or(rev.len()) == 40 {
+            let mut visible = self.visible.lock().map_err(|_| not_found())?;
+            if !visible.contains(repo, commit.id).unwrap_or(false) {
+                return Err(not_found());
+            }
+        }
         Ok(commit.id)
     }
 }
@@ -386,3 +401,5 @@ mod tests;
 mod tests_renames;
 #[cfg(test)]
 mod tests_treediff;
+#[cfg(test)]
+mod tests_visible;

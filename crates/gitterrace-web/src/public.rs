@@ -95,6 +95,8 @@ pub(crate) async fn only_public(req: Request, next: Next) -> Response {
 }
 
 #[cfg(test)]
+mod revs_tests;
+#[cfg(test)]
 mod tests {
     use super::{LOCAL, public_route};
 

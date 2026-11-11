@@ -143,7 +143,7 @@ fn committed_only_refuses_local_state() {
         repo.resolve("HEAD~1").expect("restricted"),
         open.resolve("HEAD~1").expect("open")
     );
-    // A full id is accepted whatever it names: 160 bits nobody public was shown.
+    // A full id that no public ref reaches is refused too, see `tests_visible.rs`.
     for bad in [
         "stash",
         "refs/stash",
