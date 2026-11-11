@@ -1,6 +1,7 @@
-f5cd9192985beadb4fb1615b688419dc 56ef649af137cfde3d8572e39ab4704a [symbols] /blob/HEAD/cmd/serve.go
-23952728c63f89ecf8a5f8a2c4b814e2 3f8b50b1690be3a297a38bc74892027e [symbols] /blob/HEAD/src/shapes.rs
-8f1adc0e35f704fa4d8b0e5a72db2316 8f1adc0e35f704fa4d8b0e5a72db2316 [symbols] /blob/HEAD/src/two.rs
-62d6aa95c8e94aa82a83ab2e5aea3274 036867b41973d606f8181741e7f0b244 [symbols] /blob/HEAD/tools/report.py
-1f54c6b08c652960a64aac8f55f113fd e8f26381730e248a28716181792e4471 [symbols] /blob/HEAD/web/store.ts
-fcd764231cec4e248a7f6a569693f93c b4a26ae947ca6eaa096b1be522cf4b50 [symbols] /blob/HEAD/web/view.js
+# every page loads pickers.js after nav.js; no other byte moves
+60b50b4a20257859a09ed02fd9931bb8 2bfba3be3f596d612d8a663a60869b62 [symbols] /blob/HEAD/cmd/serve.go
+f18c04a708e332016809d9ef6467140a 05c18b0bbdb29abe5f547abf31141d8e [symbols] /blob/HEAD/src/shapes.rs
+3251d4d34b7817a0ff2d8a6efba34f36 3251d4d34b7817a0ff2d8a6efba34f36 [symbols] /blob/HEAD/src/two.rs
+b6c0855bffbdcab66b678d02903e7920 3494f699aa950aa060b2a7cefb84d2f0 [symbols] /blob/HEAD/tools/report.py
+7f2db4fd38da8a237f72266d7c1e84d3 2b8a80eac33174cfc8a71fa0eacb95af [symbols] /blob/HEAD/web/store.ts
+e07a76e2c87a3f3efc1712458d3f9358 007105ccb65d6fc990f739c1502bae24 [symbols] /blob/HEAD/web/view.js

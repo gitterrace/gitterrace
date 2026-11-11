@@ -1,4 +1,4 @@
-// Keyboard shortcuts, file finder, ref switcher, line selection and copy buttons.
+// Keyboard shortcuts, file finder, line selection and copy buttons.
 // Vanilla JS, no dependencies. Everything degrades to plain links without it.
 (function () {
   "use strict";
@@ -126,6 +126,11 @@
     return box;
   }
   function closeOverlay() { ov.close(); }
+  // What pickers.js builds on; the function declarations below are hoisted.
+  window.gtNav = {
+    B: B, STATIC: STATIC, el: el, whenEl: whenEl, inRepo: local, isOff: isOff,
+    overlay: overlay, listPicker: listPicker, closeOverlay: closeOverlay
+  };
 
   // Subsequence match with a score favoring file-name hits, word starts and short paths.
   function score(q, path) {
@@ -229,107 +234,6 @@
     loadFiles().then(function () { status.remove(); p.refresh(); }, function () { status.textContent = "Could not load the file list"; });
   }
 
-  // ---- ref switcher -------------------------------------------------------
-  var refs = null;
-  function swapRev(name) {
-    var path = local(location.pathname);
-    var parts = path.split("/");
-    if (["tree", "blob", "blame", "log", "raw"].indexOf(parts[1]) >= 0 && parts.length > 2) {
-      parts[2] = encodeURIComponent(name);
-      location.href = B + parts.join("/") + location.search;
-    } else if (path === "/" || path === "/refs" || path === "/stats" || path.indexOf("/stats/") === 0 || path.indexOf("/history/") === 0) {
-      // Pages computed from the selected ref keep their place and their filters.
-      var q = new URLSearchParams(location.search);
-      if (name === "HEAD") q.delete("rev"); else q.set("rev", name);
-      var s = q.toString();
-      location.href = B + path + (s ? "?" + s : "");
-    } else {
-      location.href = B + "/tree/" + encodeURIComponent(name);
-    }
-  }
-  function openRefs() {
-    var btn = document.getElementById("refbtn");
-    var box = overlay("refs", "Switch branch or tag", btn);
-    if (btn) {
-      var r = btn.getBoundingClientRect();
-      box.classList.add("anchored");
-      box.style.left = Math.max(8, r.left) + "px";
-      box.style.top = r.bottom + 6 + "px";
-    }
-    var p = listPicker(box, "Filter branches and tags", function (q) {
-      return (refs || []).filter(function (x) { return !q || x.name.toLowerCase().indexOf(q) >= 0; }).slice(0, 100);
-    }, function (li, it) {
-      li.appendChild(el("span", "name", it.name));
-      li.appendChild(el("span", "tag " + it.kind, it.kind));
-      li.appendChild(whenEl(it.when, "dir"));
-    }, function (it) { swapRev(it.name); }, "Enter to switch");
-    if (refs) p.refresh();
-    else if (!STATIC) fetch(B + "/api/refs").then(function (r) { return r.json(); }).then(function (l) { refs = l; p.refresh(); });
-  }
-
-  // ---- repository switcher (shown while the server holds several repos) --
-  // Repositories join and leave a running server, so the list is read on every page and again
-  // on each live notice: the switcher shows, drops an entry or hides without a reload.
-  var repos = null;
-  // A select panel: title row with a close button, a filter that holds
-  // focus, a check before the current repository and an empty slot before the others.
-  var TICK = "M13.8 4.2a.75.75 0 0 1 0 1.06l-6.5 6.5a.75.75 0 0 1-1.06 0l-3-3a.75.75 0 1 1 1.06-1.06L6.77 10.2l5.97-5.97a.75.75 0 0 1 1.06 0z";
-  function icon(d) {
-    var NS = "http://www.w3.org/2000/svg";
-    var s = document.createElementNS(NS, "svg");
-    s.setAttribute("viewBox", "0 0 16 16");
-    s.setAttribute("aria-hidden", "true");
-    var p = document.createElementNS(NS, "path");
-    p.setAttribute("d", d);
-    s.appendChild(p);
-    return s;
-  }
-  function openRepos() {
-    var btn = document.getElementById("repobtn");
-    var box = overlay("refs repopanel", "Switch repository", btn);
-    var r = btn.getBoundingClientRect();
-    box.classList.add("anchored");
-    box.style.left = Math.max(8, Math.min(r.left, window.innerWidth - box.offsetWidth - 8)) + "px";
-    box.style.top = r.bottom + 6 + "px";
-    var head = el("div", "ov-title");
-    head.appendChild(el("h2", "", "Switch repository"));
-    var x = el("button", "tool", null);
-    x.type = "button";
-    x.setAttribute("aria-label", "Close");
-    x.appendChild(icon("M4 4l8 8M12 4l-8 8"));
-    x.addEventListener("click", closeOverlay);
-    head.appendChild(x);
-    box.appendChild(head);
-    var here = B.replace(/\/$/, "") + "/";
-    var p = listPicker(box, "Filter repositories", function (q) {
-      return (repos || []).filter(function (x) { return !q || x.name.toLowerCase().indexOf(q) >= 0; });
-    }, function (li, it) {
-      var on = it.href === here;
-      var slot = el("span", "tick");
-      if (on) { slot.appendChild(icon(TICK)); li.setAttribute("aria-current", "true"); }
-      li.appendChild(slot);
-      var txt = el("span", "two");
-      txt.appendChild(el("span", "name", it.name));
-      txt.appendChild(whenEl(it.when, "dir"));
-      li.appendChild(txt);
-    }, function (it) { location.href = it.href; }, "Enter to open", "No repositories match");
-    if (repos) p.refresh();
-    else fetch("/api/repos").then(function (r) { return r.json(); }).then(function (l) { repos = l; p.refresh(); });
-  }
-  var repoBtn = document.getElementById("repobtn");
-  function loadRepos() {
-    fetch("/api/repos", { cache: "no-store" }).then(function (r) { return r.json(); }).then(function (l) {
-      repos = l;
-      var box = document.getElementById("reposwitch");
-      if (box) box.hidden = l.length < 2;
-    }).catch(function () {});
-  }
-  if (repoBtn && !isOff("picker") && !STATIC) { // an export lists no repositories
-    repoBtn.addEventListener("click", openRepos);
-    loadRepos();
-    // live.js: a repository joined or left, so the switcher follows without a reload.
-    document.addEventListener("gt:repos-changed", loadRepos);
-  }
 
   // ---- shortcut sheet -----------------------------------------------------
   var SHORTCUTS = [
@@ -413,14 +317,12 @@
     else if (k === "t") { openFinder(); e.preventDefault(); }
     else if (k === "/") { if (openSearch()) e.preventDefault(); }
     else if (k === "y") { permalink(); }
-    else if (k === "b") { openRefs(); e.preventDefault(); }
+    else if (k === "b") { if (window.gtPickers) window.gtPickers.openRefs(); e.preventDefault(); }
     else if (k === "?") { openHelp(); e.preventDefault(); }
     else if (k === "j") move(1);
     else if (k === "k") move(-1);
     else if (k === "Enter" && cursor >= 0) openCurrent();
   });
-  var rb = document.getElementById("refbtn");
-  if (rb) rb.addEventListener("click", openRefs);
 
   // ---- line selection on blob and blame pages -------------------------------
   var code = document.querySelector(".card .src");
@@ -584,11 +486,10 @@
     }).catch(function () {});
   }
 
-  // ---- screenshot hooks: ?open=finder|help|refs -------------------------------
-  var want = /[?&]open=(finder|help|refs)/.exec(location.search);
+  // ---- screenshot hooks: ?open=finder|help -------------------------------
+  var want = /[?&]open=(finder|help)/.exec(location.search);
   if (want) {
     if (want[1] === "finder") { openFinder(); var qm = /[?&]fq=([^&]*)/.exec(location.search); if (qm) setTimeout(function () { var i = document.querySelector(".ov-input"); if (i) { i.value = decodeURIComponent(qm[1]); i.dispatchEvent(new Event("input")); } }, 300); }
-    else if (want[1] === "help") openHelp();
-    else openRefs();
+    else openHelp();
   }
 })();
