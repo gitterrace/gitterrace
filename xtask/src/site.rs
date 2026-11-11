@@ -357,4 +357,6 @@ mod built;
 #[cfg(test)]
 mod prose;
 #[cfg(test)]
+mod repo_links;
+#[cfg(test)]
 mod tests;
