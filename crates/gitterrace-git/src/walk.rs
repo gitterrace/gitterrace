@@ -15,6 +15,12 @@ use crate::{CommitSummary, Repo, Result};
 
 const OBJECT_CACHE_BYTES: usize = 64 * 1024 * 1024;
 
+/// The most tree entries, folders included, one walk of [`files`] records. A crafted tree with
+/// millions of entries would otherwise hold them all before the filter; past this the list is
+/// cut short, so the page shows a partial tree rather than exhaust memory. Not configurable: no
+/// real repository comes near it.
+const MAX_TREE_ENTRIES: usize = 500_000;
+
 /// Opaque handle to a blob in the object database.
 #[derive(Clone, Copy, Debug)]
 pub struct BlobId(gix::ObjectId);
@@ -52,16 +58,30 @@ fn oid(id: &str) -> Result<gix::ObjectId> {
     gix::ObjectId::from_hex(id.as_bytes()).map_err(git)
 }
 
-/// All regular files (not links or submodules) in the tree of `rev`, in tree order.
+/// All regular files (not links or submodules) in the tree of `rev`, in tree order. Past
+/// 500,000 tree entries the walk stops and the files found so far are the answer.
 pub fn files(repo: &Repo, rev: &str) -> Result<Vec<FileRef>> {
+    files_capped(repo, rev, MAX_TREE_ENTRIES)
+}
+
+fn files_capped(repo: &Repo, rev: &str, cap: usize) -> Result<Vec<FileRef>> {
     repo.tree_walks
         .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     let id = oid(&repo.resolve(rev)?)?;
     let r = open(repo)?;
     let tree = r.find_commit(id).map_err(git)?.tree().map_err(git)?;
-    let mut rec = gix::traverse::tree::Recorder::default();
-    tree.traverse().breadthfirst(&mut rec).map_err(git)?;
+    let mut rec = Capped {
+        rec: gix::traverse::tree::Recorder::default(),
+        cap,
+    };
+    // The cap stops the walk with a cancel: that ends it cleanly, anything else is an error.
+    if let Err(e) = tree.traverse().breadthfirst(&mut rec)
+        && rec.rec.records.len() < cap
+    {
+        return Err(git(e));
+    }
     let mut out: Vec<FileRef> = rec
+        .rec
         .records
         .into_iter()
         .filter(|e| e.mode.is_blob())
@@ -75,6 +95,57 @@ pub fn files(repo: &Repo, rev: &str) -> Result<Vec<FileRef>> {
     // keep this list (the tree caches), so it holds the files alone.
     out.shrink_to_fit();
     Ok(out)
+}
+
+/// A [`gix::traverse::tree::Recorder`] that stops the walk at `cap` records.
+struct Capped {
+    rec: gix::traverse::tree::Recorder,
+    cap: usize,
+}
+
+impl Capped {
+    const fn room(
+        &self,
+        act: gix::traverse::tree::visit::Action,
+    ) -> gix::traverse::tree::visit::Action {
+        if self.rec.records.len() >= self.cap {
+            std::ops::ControlFlow::Break(())
+        } else {
+            act
+        }
+    }
+}
+
+impl gix::traverse::tree::Visit for Capped {
+    fn pop_back_tracked_path_and_set_current(&mut self) {
+        self.rec.pop_back_tracked_path_and_set_current();
+    }
+    fn pop_front_tracked_path_and_set_current(&mut self) {
+        self.rec.pop_front_tracked_path_and_set_current();
+    }
+    fn push_back_tracked_path_component(&mut self, c: &gix::bstr::BStr) {
+        self.rec.push_back_tracked_path_component(c);
+    }
+    fn push_path_component(&mut self, c: &gix::bstr::BStr) {
+        self.rec.push_path_component(c);
+    }
+    fn pop_path_component(&mut self) {
+        self.rec.pop_path_component();
+    }
+    fn visit_tree(
+        &mut self,
+        e: &gix::objs::tree::EntryRef<'_>,
+    ) -> gix::traverse::tree::visit::Action {
+        let act = self.rec.visit_tree(e);
+        self.room(act)
+    }
+    fn visit_nontree(
+        &mut self,
+        e: &gix::objs::tree::EntryRef<'_>,
+    ) -> gix::traverse::tree::visit::Action {
+        let act = self.rec.visit_nontree(e);
+        self.room(act)
+    }
 }
 
 /// Reads blobs on one thread. Make one per worker.
@@ -446,6 +517,22 @@ pub fn last_commits_among(
 #[cfg(test)]
 mod tests {
     use super::topo_sort;
+
+    /// A tree past the cap ends the walk with the files found so far, not an error.
+    #[test]
+    fn files_caps_entry_count_at_limit() {
+        let dir = tempfile::tempdir().expect("tmp");
+        let f = gitterrace_testkit::Fixture::init(dir.path())
+            .write("a", "1\n")
+            .write("b", "2\n")
+            .write("d/c", "3\n")
+            .commit("feat: files");
+        let repo = crate::Repo::discover(f.path()).expect("repo");
+        let all = super::files_capped(&repo, "HEAD", usize::MAX).expect("all");
+        assert_eq!(all.len(), 3);
+        let cut = super::files_capped(&repo, "HEAD", 2).expect("capped");
+        assert!(!cut.is_empty() && cut.len() < 3, "{cut:?}");
+    }
 
     fn id(n: u8) -> gix::ObjectId {
         gix::ObjectId::from_bytes_or_panic(&[n; 20])
