@@ -94,7 +94,7 @@
       requestAnimationFrame(grow);
     }
     var foot = el("div", "send-foot");
-    var pick = el("select", "send-pick");
+    var pick = el("select", "send-pick sm");
     pick.setAttribute("aria-label", "Target");
     var go = el("button", "send-go primary sm", "Send");
     go.type = "submit";
