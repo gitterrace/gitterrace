@@ -10,6 +10,10 @@ csp [DIR]: every inline <script> of every page under DIR has its exact sha256 in
   a stale _headers fails here instead of being blocked silently by the browser. Without DIR it
   builds the site into target/site first (`cargo xtask site`, no tracked file is written).
   `release` runs it too, before a deploy.
+links [DIR]: every link of a docs page takes the one shared link color (the `a` rule of
+  DIR/assets/site.css), and only the chrome (bar, lists, pager, footer) may set its own. The
+  footer of a docs page is a landmark with a labelled nav and holds the Edit link last, pushed
+  to the right on a wide screen and stacked on a narrow one. Without DIR it reads target/site.
 domains: gitterrace.dev serves the page over HTTPS with the generated headers, and every other
   host (www, gitterrace.com, www.gitterrace.com) redirects to it permanently. A www host that
   resolves to nothing looks like DNS propagation and goes unnoticed for weeks; this measures it.
@@ -19,6 +23,7 @@ steps, and scripting them needs a Zone:Edit token, too large a credential for th
 
   python3 scripts/release/site/site-check.py release
   python3 scripts/release/site/site-check.py csp [DIR]
+  python3 scripts/release/site/site-check.py links [DIR]
   python3 scripts/release/site/site-check.py domains
   python3 scripts/release/site/site-check.py --self-test
 """
@@ -147,6 +152,69 @@ def csp(directory: str | None = None) -> list[str]:
     return bad
 
 
+# Selectors that style a link of the page chrome, not of the text: only these may set their own
+# link color. A content link such as `.groups li a` must take the shared `a` rule instead.
+CHROME = (".top", ".docnav", ".outline", ".menu", ".pager", "footer", ".skip", ".brand")
+RULE = re.compile(r"([^{}]+)\{([^{}]*)\}")
+
+
+def css_problems(css: str) -> list[str]:
+    css = re.sub(r"/\*.*?\*/", "", css, flags=re.S)
+    rules = [(re.sub(r"\s+", " ", a).strip(), b) for a, b in RULE.findall(css)]
+    bad = []
+    if not any(
+        sel == "a" and "color:var(--accent-ink)" in body for sel, body in rules
+    ):
+        bad.append("site.css has no shared `a{color:var(--accent-ink)}` link rule")
+    for sel, body in rules:
+        if not re.search(r"(^|;)color:", body.strip()):
+            continue
+        for one in (x.strip() for x in sel.split(",")):
+            is_link = re.search(r"(^| |>)a(\[[^]]*\])?(:[a-z-]+)?$", one)
+            if is_link and one != "a" and not one.startswith(CHROME):
+                bad.append(f"site.css: `{one}` sets its own link color")
+    pushed = any(
+        sel.startswith("footer") and ".edit" in sel and "margin-left:auto" in body
+        for sel, body in rules
+    )
+    if not pushed:
+        bad.append("site.css does not push the footer's Edit link to the right")
+    return bad
+
+
+def footer_problems(where: str, html: str) -> list[str]:
+    m = re.search(r"<footer>(.*?)</footer>", html, flags=re.S)
+    if not m:
+        return [f"{where}: no footer"]
+    foot = m.group(1)
+    bad = []
+    if not re.search(r"<nav aria-label=\"[^\"]+\"", foot):
+        bad.append(f"{where}: the footer has no nav with an aria-label")
+    links = re.findall(r'<a [^>]*href="([^"]*)"', foot)
+    if len(links) != len(set(links)):
+        bad.append(f"{where}: the footer links a page twice")
+    if 'class="edit"' in foot and not re.search(
+        r'</nav>\s*<a class="edit"[^>]*>[^<]*</a>\s*$', foot
+    ):
+        bad.append(f"{where}: the Edit link is not the last item, after the nav")
+    return bad
+
+
+def links(directory: str | None = None) -> list[str]:
+    d = Path(directory) if directory else ROOT / "target" / "site"
+    bad = css_problems((d / "assets" / "site.css").read_text())
+    pages = sorted((d / "docs").rglob("index.html"))
+    edits = 0
+    for p in pages:
+        html = p.read_text()
+        edits += 'class="edit"' in html
+        bad += footer_problems(str(p.relative_to(d)), html)
+    if not edits:
+        bad.append(f"{d}: no docs page carries an Edit link")
+    print(f"  [{'x' if bad else '+'}] links and footer of {len(pages)} docs pages in {d}")
+    return bad
+
+
 def facts() -> tuple[str, str, str]:
     # tomllib is 3.11+, and `csp` runs on older ones, so only `release` imports it.
     import tomllib  # pyright: ignore[reportMissingImports]
@@ -243,6 +311,25 @@ def domains() -> list[str]:
     return bad
 
 
+def links_self_test() -> bool:
+    """A content link with its own color, a footer without the nav and one whose Edit link
+    is not after the nav are red; the shared rules and a good footer are green."""
+    base = "a{color:var(--accent-ink)}footer .edit{margin-left:auto}"
+    nav = '<nav aria-label="F"><a href="/a">A</a></nav>'
+    edit = '<a class="edit" href="/e">Edit</a>'
+    ok = (
+        not css_problems(base + ".pager a{color:var(--fg)}")
+        and css_problems(base + ".groups li a{color:var(--fg)}")
+        and css_problems("a{color:red}")
+        and not footer_problems("p", f"<footer>{nav}\n{edit}\n</footer>")
+        and footer_problems("p", f"<footer>{edit}{nav}</footer>")
+        and footer_problems("p", f"<footer><a href='/a'>A</a>{edit}</footer>")
+    )
+    if not ok:
+        print("self-test: the links check misjudged a planted fault")
+    return bool(ok)
+
+
 def self_test() -> int:
     """An installer without a digest line, or one that does not answer, is red; one with it
     is green. `fetch` is replaced, so nothing goes to the network."""
@@ -265,6 +352,7 @@ def self_test() -> int:
                 good = False
     finally:
         fetch = real
+    good = links_self_test() and good
     print("self-test", "ok" if good else "FAILED")
     return 0 if good else 1
 
@@ -273,7 +361,7 @@ def main() -> int:
     if "--self-test" in sys.argv:
         return self_test()
     cmd = sys.argv[1] if len(sys.argv) > 1 else ""
-    run = {"release": release, "domains": domains, "csp": csp}.get(cmd)
+    run = {"release": release, "domains": domains, "csp": csp, "links": links}.get(cmd)
     if not run:
         print(__doc__)
         return 2

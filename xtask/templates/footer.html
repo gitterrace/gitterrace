@@ -1,7 +1,10 @@
 {#- The footer of every page: the same links in the same order on every page, so it
-never shifts. A docs page adds its source last: "Edit on GitHub" for prose, "View source
-on GitHub" for a page generated from code, where an edit would be overwritten. -#}
+never shifts. Three groups in one labelled nav: the project, the legal pages, then the
+license and version. A docs page adds its source after the nav, on the right: "Edit on
+GitHub" for prose, "View source on GitHub" for a page generated from code, where an edit
+would be overwritten. -#}
 <footer>
+<nav aria-label="Footer">
 <a href="{{ repo }}">Repository</a>
 <a href="/docs/">Docs</a>
 <a href="/changelog/">Changelog</a>
@@ -10,6 +13,7 @@ on GitHub" for a page generated from code, where an edit would be overwritten. -
 {%- endfor %}
 <a href="{{ repo }}/blob/main/LICENSE">{{ license }}</a>
 <a href="/{{ version_href }}">v{{ version }}</a>
+</nav>
 {%- if !edit.is_empty() %}
 {%- if generated %}
 <a class="edit" href="{{ repo }}/blob/main/{{ edit }}">View source on GitHub</a>
