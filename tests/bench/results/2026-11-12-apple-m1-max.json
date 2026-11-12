@@ -1,0 +1,2299 @@
+{
+ "harness": 2,
+ "idle_secs": 60,
+ "machine": {
+  "arch": "arm64",
+  "commit": "548f044",
+  "cpu": "Apple M1 Max",
+  "cpus": 10,
+  "dirty": false,
+  "disk": "4.0 TB SSD",
+  "git": "git version 2.54.0 (Apple Git-157)",
+  "gitterrace": "gitterrace v0.1.0-548f044",
+  "label": "apple-m1-max",
+  "os": "macOS 26.6.2",
+  "ram_gb": 64.0
+ },
+ "repos": {
+ "control": {
+  "budget": {
+   "export_secs": {
+    "limit": 60,
+    "max": 34.72,
+    "min": 33.5,
+    "status": "pass",
+    "value": 34.42
+   },
+   "footprint_idle_mb": {
+    "limit": 48,
+    "status": "pass",
+    "value": 7.23
+   },
+   "idle_cpu_pct": {
+    "limit": 1,
+    "status": "pass",
+    "value": 0.08
+   },
+   "index_secs": {
+    "limit": 30,
+    "max": 0.83,
+    "min": 0.64,
+    "phase": "stream",
+    "status": "pass",
+    "value": 0.82
+   },
+   "page_cold_ms": {
+    "limit": 1500,
+    "max": 25.43,
+    "min": 24.7,
+    "status": "pass",
+    "value": 25.16
+   },
+   "page_warm_ms": {
+    "limit": 300,
+    "status": "pass",
+    "value": 1.94
+   },
+   "rss_mb": {
+    "limit": 500,
+    "phase": "stream",
+    "status": "pass",
+    "value": 117.0
+   }
+  },
+  "class": "small",
+  "cold_samples": 3,
+  "config": "empty config.toml, no actions.toml",
+  "export": {
+   "commits": 500,
+   "ok": true,
+   "out_mb": 109.8,
+   "samples": [
+    34.72,
+    34.42,
+    33.5
+   ],
+   "secs": 34.42
+  },
+  "idle": {
+   "cpu_pct": 0.03,
+   "cpu_pct_events_client": 0.08,
+   "secs": 60
+  },
+  "index": {
+   "cache_mb": 0.88,
+   "listen_secs": 0.06,
+   "peak_footprint_mb": 117.0,
+   "peak_rss_mb": 134.05,
+   "phases": [
+    {
+     "name": "rev_list",
+     "secs": 0.0
+    },
+    {
+     "name": "held",
+     "secs": 0.0
+    },
+    {
+     "footprint_mb": 117.0,
+     "name": "stream",
+     "rss_mb": 134.0,
+     "secs": 0.4
+    },
+    {
+     "name": "stream.fold",
+     "secs": 0.03
+    },
+    {
+     "name": "finish",
+     "secs": 0.07
+    },
+    {
+     "name": "messages",
+     "secs": 0.02
+    },
+    {
+     "name": "chain",
+     "secs": 0.0
+    },
+    {
+     "name": "tip",
+     "secs": 0.0
+    }
+   ],
+   "samples": [
+    0.64,
+    0.82,
+    0.83
+   ],
+   "secs": 0.82
+  },
+  "load": {
+   "limit": 5.0,
+   "phases": {
+    "export": 1.97,
+    "export#2": 4.56,
+    "export#3": 4.8,
+    "idle": 4.2,
+    "index": 3.85,
+    "index#2": 3.23,
+    "index#3": 2.75,
+    "pages": 3.67,
+    "pages#2": 3.12,
+    "pages#3": 2.17
+   },
+   "sampled": {
+    "export": {
+     "max": 1.41,
+     "mean": 0.79,
+     "n": 8
+    },
+    "export#2": {
+     "max": 1.08,
+     "mean": 0.82,
+     "n": 8
+    },
+    "export#3": {
+     "max": 2.09,
+     "mean": 1.03,
+     "n": 8
+    },
+    "idle": {
+     "max": 3.21,
+     "mean": 1.23,
+     "n": 26
+    },
+    "index": {
+     "max": 1.71,
+     "mean": 1.71,
+     "n": 1
+    },
+    "index#2": {
+     "max": 1.6,
+     "mean": 1.6,
+     "n": 1
+    },
+    "index#3": {
+     "max": 1.22,
+     "mean": 1.22,
+     "n": 1
+    },
+    "pages": {
+     "max": 0.71,
+     "mean": 0.71,
+     "n": 1
+    },
+    "pages#2": {
+     "max": 1.04,
+     "mean": 1.04,
+     "n": 1
+    },
+    "pages#3": {
+     "max": 1.03,
+     "mean": 1.03,
+     "n": 1
+    }
+   }
+  },
+  "memory": {
+   "footprint_after_pages_mb": 17.0,
+   "footprint_idle_mb": 12.0,
+   "footprint_releases": 1,
+   "footprint_start_mb": 4.77,
+   "rss_after_index_mb": 37.31,
+   "rss_after_pages_mb": 43.12,
+   "rss_idle_mb": 39.11
+  },
+  "pages": {
+   "blame-long-history": {
+    "bytes": 8086,
+    "cold": {
+     "samples": [
+      1.86,
+      1.85,
+      2.13
+     ],
+     "total_ms": 1.86,
+     "ttfb_ms": 1.86
+    },
+    "path": "/r/bench-010/blame/HEAD/docs/screenshots/send-light.webp",
+    "status": 200,
+    "warm_total_ms": {
+     "max": 0.59,
+     "median": 0.57,
+     "min": 0.5,
+     "n": 5
+    },
+    "warm_ttfb_ms": {
+     "max": 0.59,
+     "median": 0.57,
+     "min": 0.5,
+     "n": 5
+    }
+   },
+   "blob-largest": {
+    "bytes": 8221,
+    "cold": {
+     "samples": [
+      1.02,
+      1.04,
+      1.2
+     ],
+     "total_ms": 1.04,
+     "ttfb_ms": 1.02
+    },
+    "path": "/r/bench-010/blob/HEAD/docs/screenshots/send-light.webp",
+    "status": 200,
+    "warm_total_ms": {
+     "max": 0.99,
+     "median": 0.96,
+     "min": 0.92,
+     "n": 5
+    },
+    "warm_ttfb_ms": {
+     "max": 0.99,
+     "median": 0.96,
+     "min": 0.92,
+     "n": 5
+    }
+   },
+   "commit-largest": {
+    "bytes": 11893,
+    "cold": {
+     "samples": [
+      4.88,
+      4.96,
+      4.92
+     ],
+     "total_ms": 4.92,
+     "ttfb_ms": 4.87
+    },
+    "path": "/r/bench-010/commit/HEAD",
+    "status": 200,
+    "warm_total_ms": {
+     "max": 0.61,
+     "median": 0.59,
+     "min": 0.54,
+     "n": 5
+    },
+    "warm_ttfb_ms": {
+     "max": 0.61,
+     "median": 0.59,
+     "min": 0.54,
+     "n": 5
+    }
+   },
+   "diff-fragment": {
+    "bytes": 3142,
+    "cold": {
+     "samples": [
+      1.54,
+      1.7,
+      1.64
+     ],
+     "total_ms": 1.64,
+     "ttfb_ms": 1.54
+    },
+    "path": "/r/bench-010/diff/HEAD/0",
+    "status": 200,
+    "warm_total_ms": {
+     "max": 1.57,
+     "median": 1.52,
+     "min": 1.48,
+     "n": 5
+    },
+    "warm_ttfb_ms": {
+     "max": 1.56,
+     "median": 1.52,
+     "min": 1.48,
+     "n": 5
+    }
+   },
+   "log": {
+    "bytes": 39948,
+    "cold": {
+     "samples": [
+      1.5,
+      1.49,
+      1.52
+     ],
+     "total_ms": 1.5,
+     "ttfb_ms": 1.49
+    },
+    "path": "/r/bench-010/log/HEAD",
+    "status": 200,
+    "warm_total_ms": {
+     "max": 1.45,
+     "median": 1.36,
+     "min": 1.32,
+     "n": 5
+    },
+    "warm_ttfb_ms": {
+     "max": 1.45,
+     "median": 1.36,
+     "min": 1.32,
+     "n": 5
+    }
+   },
+   "overview": {
+    "bytes": 27280,
+    "cold": {
+     "samples": [
+      14.46,
+      14.08,
+      14.88
+     ],
+     "total_ms": 14.46,
+     "ttfb_ms": 14.44
+    },
+    "path": "/r/bench-010/",
+    "status": 200,
+    "warm_total_ms": {
+     "max": 2.44,
+     "median": 1.94,
+     "min": 1.92,
+     "n": 5
+    },
+    "warm_ttfb_ms": {
+     "max": 2.44,
+     "median": 1.94,
+     "min": 1.92,
+     "n": 5
+    }
+   },
+   "refs": {
+    "bytes": 9935,
+    "cold": {
+     "samples": [
+      1.28,
+      1.12,
+      1.08
+     ],
+     "total_ms": 1.12,
+     "ttfb_ms": 1.27
+    },
+    "path": "/r/bench-010/refs",
+    "status": 200,
+    "warm_total_ms": {
+     "max": 1.58,
+     "median": 1.16,
+     "min": 0.96,
+     "n": 5
+    },
+    "warm_ttfb_ms": {
+     "max": 1.57,
+     "median": 1.16,
+     "min": 0.95,
+     "n": 5
+    }
+   },
+   "search": {
+    "bytes": 332468,
+    "cold": {
+     "samples": [
+      25.16,
+      24.7,
+      25.43
+     ],
+     "total_ms": 25.16,
+     "ttfb_ms": 25.02
+    },
+    "path": "/r/bench-010/search?q=fn",
+    "status": 200,
+    "warm_total_ms": {
+     "max": 0.95,
+     "median": 0.72,
+     "min": 0.68,
+     "n": 5
+    },
+    "warm_ttfb_ms": {
+     "max": 0.87,
+     "median": 0.61,
+     "min": 0.56,
+     "n": 5
+    }
+   },
+   "stats-overview": {
+    "bytes": 108469,
+    "cold": {
+     "samples": [
+      0.56,
+      0.52,
+      0.58
+     ],
+     "total_ms": 0.56,
+     "ttfb_ms": 0.56
+    },
+    "path": "/r/bench-010/stats",
+    "status": 200,
+    "warm_total_ms": {
+     "max": 0.89,
+     "median": 0.64,
+     "min": 0.5,
+     "n": 5
+    },
+    "warm_ttfb_ms": {
+     "max": 0.88,
+     "median": 0.63,
+     "min": 0.5,
+     "n": 5
+    }
+   },
+   "stats/contributors": {
+    "bytes": 11515,
+    "cold": {
+     "samples": [
+      0.46,
+      0.47,
+      0.46
+     ],
+     "total_ms": 0.46,
+     "ttfb_ms": 0.45
+    },
+    "path": "/r/bench-010/stats/contributors",
+    "status": 200,
+    "warm_total_ms": {
+     "max": 0.45,
+     "median": 0.44,
+     "min": 0.43,
+     "n": 5
+    },
+    "warm_ttfb_ms": {
+     "max": 0.45,
+     "median": 0.44,
+     "min": 0.43,
+     "n": 5
+    }
+   },
+   "stats/hotspots": {
+    "bytes": 246568,
+    "cold": {
+     "samples": [
+      0.54,
+      0.61,
+      0.62
+     ],
+     "total_ms": 0.61,
+     "ttfb_ms": 0.51
+    },
+    "path": "/r/bench-010/stats/hotspots",
+    "status": 200,
+    "warm_total_ms": {
+     "max": 0.52,
+     "median": 0.5,
+     "min": 0.5,
+     "n": 5
+    },
+    "warm_ttfb_ms": {
+     "max": 0.48,
+     "median": 0.48,
+     "min": 0.47,
+     "n": 5
+    }
+   },
+   "stats/languages": {
+    "bytes": 395988,
+    "cold": {
+     "samples": [
+      0.62,
+      0.69,
+      0.72
+     ],
+     "total_ms": 0.69,
+     "ttfb_ms": 0.52
+    },
+    "path": "/r/bench-010/stats/languages",
+    "status": 200,
+    "warm_total_ms": {
+     "max": 0.62,
+     "median": 0.61,
+     "min": 0.58,
+     "n": 5
+    },
+    "warm_ttfb_ms": {
+     "max": 0.54,
+     "median": 0.5,
+     "min": 0.48,
+     "n": 5
+    }
+   },
+   "stats/ownership": {
+    "bytes": 17890,
+    "cold": {
+     "samples": [
+      0.43,
+      0.49,
+      0.48
+     ],
+     "total_ms": 0.48,
+     "ttfb_ms": 0.43
+    },
+    "path": "/r/bench-010/stats/ownership",
+    "status": 200,
+    "warm_total_ms": {
+     "max": 0.44,
+     "median": 0.43,
+     "min": 0.42,
+     "n": 5
+    },
+    "warm_ttfb_ms": {
+     "max": 0.44,
+     "median": 0.43,
+     "min": 0.42,
+     "n": 5
+    }
+   },
+   "tree-deep": {
+    "bytes": 9216,
+    "cold": {
+     "samples": [
+      1.06,
+      1.23,
+      1.56
+     ],
+     "total_ms": 1.23,
+     "ttfb_ms": 1.06
+    },
+    "path": "/r/bench-010/tree/HEAD/schwarzwald/kit/lint/red-cases/actions-pin/green-run/.github/actions/t",
+    "status": 200,
+    "warm_total_ms": {
+     "max": 0.54,
+     "median": 0.51,
+     "min": 0.51,
+     "n": 5
+    },
+    "warm_ttfb_ms": {
+     "max": 0.54,
+     "median": 0.51,
+     "min": 0.51,
+     "n": 5
+    }
+   },
+   "tree-root": {
+    "bytes": 24000,
+    "cold": {
+     "samples": [
+      1.87,
+      2.3,
+      2.28
+     ],
+     "total_ms": 2.28,
+     "ttfb_ms": 1.86
+    },
+    "path": "/r/bench-010/tree/HEAD",
+    "status": 200,
+    "warm_total_ms": {
+     "max": 0.6,
+     "median": 0.51,
+     "min": 0.51,
+     "n": 5
+    },
+    "warm_ttfb_ms": {
+     "max": 0.6,
+     "median": 0.51,
+     "min": 0.51,
+     "n": 5
+    }
+   }
+  },
+  "probe": {
+   "blame": "docs/screenshots/send-light.webp",
+   "blob": "docs/screenshots/send-light.webp",
+   "commit": "HEAD",
+   "deep_tree": "schwarzwald/kit/lint/red-cases/actions-pin/green-run/.github/actions/t"
+  },
+  "sha": "HEAD"
+ },
+ "git": {
+  "budget": {
+   "export_secs": {
+    "limit": 300,
+    "max": 56.82,
+    "min": 53.08,
+    "status": "pass",
+    "value": 55.14
+   },
+   "footprint_idle_mb": {
+    "limit": 48,
+    "status": "pass",
+    "value": 8.38
+   },
+   "idle_cpu_pct": {
+    "limit": 1,
+    "status": "pass",
+    "value": 0.03
+   },
+   "index_secs": {
+    "limit": 300,
+    "max": 23.21,
+    "min": 22.11,
+    "phase": "stream",
+    "status": "pass",
+    "value": 22.57
+   },
+   "page_cold_ms": {
+    "limit": 3000,
+    "max": 2448.12,
+    "min": 2408.63,
+    "status": "pass",
+    "value": 2427.24
+   },
+   "page_warm_ms": {
+    "limit": 300,
+    "status": "pass",
+    "value": 87.3
+   },
+   "rss_mb": {
+    "limit": 1500,
+    "phase": "stream",
+    "status": "pass",
+    "value": 366.0
+   }
+  },
+  "class": "medium",
+  "cold_samples": 3,
+  "config": "empty config.toml, no actions.toml",
+  "export": {
+   "commits": 500,
+   "ok": true,
+   "out_mb": 218.46,
+   "samples": [
+    55.14,
+    53.08,
+    56.82
+   ],
+   "secs": 55.14
+  },
+  "idle": {
+   "cpu_pct": 0.03,
+   "cpu_pct_events_client": 0.02,
+   "secs": 60
+  },
+  "index": {
+   "cache_mb": 44.74,
+   "listen_secs": 0.06,
+   "peak_footprint_mb": 366.0,
+   "peak_rss_mb": 646.58,
+   "phases": [
+    {
+     "footprint_mb": 112.0,
+     "name": "rev_list",
+     "rss_mb": 140.7,
+     "secs": 0.05
+    },
+    {
+     "name": "held",
+     "secs": 0.03
+    },
+    {
+     "footprint_mb": 366.0,
+     "name": "stream",
+     "rss_mb": 646.6,
+     "secs": 22.25
+    },
+    {
+     "name": "stream.fold",
+     "secs": 1.33
+    },
+    {
+     "footprint_mb": 123.0,
+     "name": "finish",
+     "rss_mb": 449.7,
+     "secs": 0.17
+    },
+    {
+     "footprint_mb": 31.0,
+     "name": "messages",
+     "rss_mb": 348.6,
+     "secs": 0.33
+    },
+    {
+     "name": "chain",
+     "secs": 0.0
+    },
+    {
+     "name": "tip",
+     "secs": 0.0
+    }
+   ],
+   "samples": [
+    23.21,
+    22.11,
+    22.57
+   ],
+   "secs": 22.57
+  },
+  "load": {
+   "limit": 5.0,
+   "phases": {
+    "export": 3.45,
+    "export#2": 3.86,
+    "export#3": 4.15,
+    "idle": 2.97,
+    "index": 4.3,
+    "index#2": 2.74,
+    "index#3": 2.83,
+    "pages": 3.72,
+    "pages#2": 3.79,
+    "pages#3": 4.37
+   },
+   "sampled": {
+    "export": {
+     "max": 4.38,
+     "mean": 1.85,
+     "n": 12
+    },
+    "export#2": {
+     "max": 0.9,
+     "mean": 0.63,
+     "n": 12
+    },
+    "export#3": {
+     "max": 1.01,
+     "mean": 0.66,
+     "n": 13
+    },
+    "idle": {
+     "max": 4.3,
+     "mean": 1.3,
+     "n": 25
+    },
+    "index": {
+     "max": 0.83,
+     "mean": 0.57,
+     "n": 5
+    },
+    "index#2": {
+     "max": 1.32,
+     "mean": 0.92,
+     "n": 6
+    },
+    "index#3": {
+     "max": 1.13,
+     "mean": 0.76,
+     "n": 6
+    },
+    "pages": {
+     "max": 0.78,
+     "mean": 0.74,
+     "n": 2
+    },
+    "pages#2": {
+     "max": 1.14,
+     "mean": 1.14,
+     "n": 1
+    },
+    "pages#3": {
+     "max": 1.12,
+     "mean": 1.12,
+     "n": 1
+    }
+   }
+  },
+  "memory": {
+   "footprint_after_pages_mb": 34.0,
+   "footprint_idle_mb": 13.0,
+   "footprint_releases": 2,
+   "footprint_start_mb": 4.62,
+   "rss_after_index_mb": 349.19,
+   "rss_after_pages_mb": 358.2,
+   "rss_idle_mb": 337.52
+  },
+  "pages": {
+   "blame-long-history": {
+    "bytes": 9610974,
+    "cold": {
+     "samples": [
+      2408.63,
+      2448.12,
+      2427.24
+     ],
+     "total_ms": 2427.24,
+     "ttfb_ms": 2405.01
+    },
+    "path": "/r/git/blame/HEAD/po/bg.po",
+    "status": 200,
+    "warm_total_ms": {
+     "max": 88.95,
+     "median": 87.3,
+     "min": 86.08,
+     "n": 5
+    },
+    "warm_ttfb_ms": {
+     "max": 85.02,
+     "median": 83.7,
+     "min": 83.3,
+     "n": 5
+    }
+   },
+   "blob-largest": {
+    "bytes": 1750823,
+    "cold": {
+     "samples": [
+      12.65,
+      13.26,
+      12.61
+     ],
+     "total_ms": 12.65,
+     "ttfb_ms": 11.81
+    },
+    "path": "/r/git/blob/HEAD/po/bg.po",
+    "status": 200,
+    "warm_total_ms": {
+     "max": 12.97,
+     "median": 12.43,
+     "min": 12.15,
+     "n": 5
+    },
+    "warm_ttfb_ms": {
+     "max": 12.29,
+     "median": 11.78,
+     "min": 11.54,
+     "n": 5
+    }
+   },
+   "commit-largest": {
+    "bytes": 12728,
+    "cold": {
+     "samples": [
+      4.72,
+      4.87,
+      4.82
+     ],
+     "total_ms": 4.82,
+     "ttfb_ms": 4.7
+    },
+    "path": "/r/git/commit/50fe5cc63f9cd6e89b87a2c9ccf96a444f4cfdb7",
+    "status": 200,
+    "warm_total_ms": {
+     "max": 0.54,
+     "median": 0.5,
+     "min": 0.48,
+     "n": 5
+    },
+    "warm_ttfb_ms": {
+     "max": 0.54,
+     "median": 0.5,
+     "min": 0.48,
+     "n": 5
+    }
+   },
+   "diff-fragment": {
+    "bytes": 4217,
+    "cold": {
+     "samples": [
+      2.69,
+      3.4,
+      2.8
+     ],
+     "total_ms": 2.8,
+     "ttfb_ms": 2.69
+    },
+    "path": "/r/git/diff/50fe5cc63f9cd6e89b87a2c9ccf96a444f4cfdb7/0",
+    "status": 200,
+    "warm_total_ms": {
+     "max": 2.59,
+     "median": 2.55,
+     "min": 2.5,
+     "n": 5
+    },
+    "warm_ttfb_ms": {
+     "max": 2.59,
+     "median": 2.55,
+     "min": 2.5,
+     "n": 5
+    }
+   },
+   "log": {
+    "bytes": 38737,
+    "cold": {
+     "samples": [
+      1.75,
+      1.92,
+      1.85
+     ],
+     "total_ms": 1.85,
+     "ttfb_ms": 1.75
+    },
+    "path": "/r/git/log/HEAD",
+    "status": 200,
+    "warm_total_ms": {
+     "max": 1.68,
+     "median": 1.64,
+     "min": 1.61,
+     "n": 5
+    },
+    "warm_ttfb_ms": {
+     "max": 1.67,
+     "median": 1.64,
+     "min": 1.61,
+     "n": 5
+    }
+   },
+   "overview": {
+    "bytes": 138748,
+    "cold": {
+     "samples": [
+      136.06,
+      97.45,
+      124.75
+     ],
+     "total_ms": 124.75,
+     "ttfb_ms": 136.02
+    },
+    "path": "/r/git/",
+    "status": 200,
+    "warm_total_ms": {
+     "max": 4.81,
+     "median": 4.35,
+     "min": 3.94,
+     "n": 5
+    },
+    "warm_ttfb_ms": {
+     "max": 4.79,
+     "median": 4.33,
+     "min": 3.93,
+     "n": 5
+    }
+   },
+   "refs": {
+    "bytes": 8037,
+    "cold": {
+     "samples": [
+      1.22,
+      1.09,
+      0.99
+     ],
+     "total_ms": 1.09,
+     "ttfb_ms": 1.2
+    },
+    "path": "/r/git/refs",
+    "status": 200,
+    "warm_total_ms": {
+     "max": 1.5,
+     "median": 1.07,
+     "min": 0.95,
+     "n": 5
+    },
+    "warm_ttfb_ms": {
+     "max": 1.49,
+     "median": 1.07,
+     "min": 0.94,
+     "n": 5
+    }
+   },
+   "search": {
+    "bytes": 237675,
+    "cold": {
+     "samples": [
+      47.25,
+      49.52,
+      48.65
+     ],
+     "total_ms": 48.65,
+     "ttfb_ms": 47.2
+    },
+    "path": "/r/git/search?q=strbuf",
+    "status": 200,
+    "warm_total_ms": {
+     "max": 0.79,
+     "median": 0.55,
+     "min": 0.52,
+     "n": 5
+    },
+    "warm_ttfb_ms": {
+     "max": 0.76,
+     "median": 0.52,
+     "min": 0.47,
+     "n": 5
+    }
+   },
+   "stats-overview": {
+    "bytes": 124001,
+    "cold": {
+     "samples": [
+      73.61,
+      0.83,
+      73.55
+     ],
+     "total_ms": 73.55,
+     "ttfb_ms": 73.58
+    },
+    "path": "/r/git/stats",
+    "status": 200,
+    "warm_total_ms": {
+     "max": 0.74,
+     "median": 0.54,
+     "min": 0.46,
+     "n": 5
+    },
+    "warm_ttfb_ms": {
+     "max": 0.72,
+     "median": 0.52,
+     "min": 0.45,
+     "n": 5
+    }
+   },
+   "stats/contributors": {
+    "bytes": 85790,
+    "cold": {
+     "samples": [
+      14.49,
+      0.45,
+      14.37
+     ],
+     "total_ms": 14.37,
+     "ttfb_ms": 14.47
+    },
+    "path": "/r/git/stats/contributors",
+    "status": 200,
+    "warm_total_ms": {
+     "max": 0.74,
+     "median": 0.51,
+     "min": 0.51,
+     "n": 5
+    },
+    "warm_ttfb_ms": {
+     "max": 0.73,
+     "median": 0.51,
+     "min": 0.51,
+     "n": 5
+    }
+   },
+   "stats/hotspots": {
+    "bytes": 212838,
+    "cold": {
+     "samples": [
+      37.8,
+      0.59,
+      38.42
+     ],
+     "total_ms": 37.8,
+     "ttfb_ms": 37.77
+    },
+    "path": "/r/git/stats/hotspots",
+    "status": 200,
+    "warm_total_ms": {
+     "max": 0.8,
+     "median": 0.61,
+     "min": 0.57,
+     "n": 5
+    },
+    "warm_ttfb_ms": {
+     "max": 0.72,
+     "median": 0.5,
+     "min": 0.47,
+     "n": 5
+    }
+   },
+   "stats/languages": {
+    "bytes": 372101,
+    "cold": {
+     "samples": [
+      118.62,
+      0.66,
+      119.94
+     ],
+     "total_ms": 118.62,
+     "ttfb_ms": 118.55
+    },
+    "path": "/r/git/stats/languages",
+    "status": 200,
+    "warm_total_ms": {
+     "max": 0.82,
+     "median": 0.67,
+     "min": 0.6,
+     "n": 5
+    },
+    "warm_ttfb_ms": {
+     "max": 0.75,
+     "median": 0.55,
+     "min": 0.53,
+     "n": 5
+    }
+   },
+   "stats/ownership": {
+    "bytes": 26058,
+    "cold": {
+     "samples": [
+      9.1,
+      0.45,
+      9.42
+     ],
+     "total_ms": 9.1,
+     "ttfb_ms": 9.09
+    },
+    "path": "/r/git/stats/ownership",
+    "status": 200,
+    "warm_total_ms": {
+     "max": 0.62,
+     "median": 0.43,
+     "min": 0.43,
+     "n": 5
+    },
+    "warm_ttfb_ms": {
+     "max": 0.61,
+     "median": 0.43,
+     "min": 0.42,
+     "n": 5
+    }
+   },
+   "tree-deep": {
+    "bytes": 8598,
+    "cold": {
+     "samples": [
+      1.4,
+      1.5,
+      1.45
+     ],
+     "total_ms": 1.45,
+     "ttfb_ms": 1.4
+    },
+    "path": "/r/git/tree/HEAD/t/unit-tests/clar/test/suites/resources/test",
+    "status": 200,
+    "warm_total_ms": {
+     "max": 0.59,
+     "median": 0.45,
+     "min": 0.43,
+     "n": 5
+    },
+    "warm_ttfb_ms": {
+     "max": 0.59,
+     "median": 0.44,
+     "min": 0.42,
+     "n": 5
+    }
+   },
+   "tree-root": {
+    "bytes": 135261,
+    "cold": {
+     "samples": [
+      3.7,
+      4.08,
+      4.13
+     ],
+     "total_ms": 4.08,
+     "ttfb_ms": 3.68
+    },
+    "path": "/r/git/tree/HEAD",
+    "status": 200,
+    "warm_total_ms": {
+     "max": 0.59,
+     "median": 0.52,
+     "min": 0.49,
+     "n": 5
+    },
+    "warm_ttfb_ms": {
+     "max": 0.58,
+     "median": 0.51,
+     "min": 0.48,
+     "n": 5
+    }
+   }
+  },
+  "probe": {
+   "blame": "po/bg.po",
+   "blob": "po/bg.po",
+   "commit": "50fe5cc63f9cd6e89b87a2c9ccf96a444f4cfdb7",
+   "deep_tree": "t/unit-tests/clar/test/suites/resources/test"
+  },
+  "sha": "50fe5cc63f9cd6e89b87a2c9ccf96a444f4cfdb7"
+ },
+ "rust": {
+  "budget": {
+   "footprint_idle_mb": {
+    "limit": 48,
+    "status": "pass",
+    "value": 16.31
+   },
+   "idle_cpu_pct": {
+    "limit": 1,
+    "status": "pass",
+    "value": 0.05
+   },
+   "index_secs": {
+    "limit": 2400,
+    "max": 98.02,
+    "min": 96.88,
+    "phase": "stream",
+    "status": "pass",
+    "value": 97.06
+   },
+   "page_cold_ms": {
+    "limit": 10000,
+    "max": 1737.37,
+    "min": 1720.3,
+    "status": "pass",
+    "value": 1735.93
+   },
+   "page_warm_ms": {
+    "limit": 300,
+    "status": "pass",
+    "value": 122.03
+   },
+   "rss_mb": {
+    "limit": 6000,
+    "phase": "stream",
+    "status": "pass",
+    "value": 914.0
+   }
+  },
+  "class": "large",
+  "cold_samples": 3,
+  "config": "empty config.toml, no actions.toml",
+  "export": {
+   "commits": 500,
+   "ok": true,
+   "out_mb": 1699.32,
+   "samples": [
+    928.6
+   ],
+   "secs": 928.6
+  },
+  "idle": {
+   "cpu_pct": 0.05,
+   "cpu_pct_events_client": 0.02,
+   "secs": 60
+  },
+  "index": {
+   "cache_mb": 295.34,
+   "listen_secs": 0.21,
+   "peak_footprint_mb": 914.0,
+   "peak_rss_mb": 1950.58,
+   "phases": [
+    {
+     "footprint_mb": 60.0,
+     "name": "rev_list",
+     "rss_mb": 64.0,
+     "secs": 0.3
+    },
+    {
+     "name": "held",
+     "secs": 0.11
+    },
+    {
+     "footprint_mb": 914.0,
+     "name": "stream",
+     "rss_mb": 1950.6,
+     "secs": 92.87
+    },
+    {
+     "name": "stream.fold",
+     "secs": 6.22
+    },
+    {
+     "footprint_mb": 153.0,
+     "name": "finish",
+     "rss_mb": 1226.7,
+     "secs": 1.07
+    },
+    {
+     "footprint_mb": 214.0,
+     "name": "messages",
+     "rss_mb": 1290.2,
+     "secs": 1.04
+    },
+    {
+     "name": "chain",
+     "secs": 0.0
+    },
+    {
+     "name": "tip",
+     "secs": 0.0
+    }
+   ],
+   "samples": [
+    98.02,
+    97.06,
+    96.88
+   ],
+   "secs": 97.06
+  },
+  "load": {
+   "limit": 5.0,
+   "phases": {
+    "export": 3.18,
+    "idle": 3.24,
+    "index": 3.69,
+    "index#2": 2.17,
+    "index#3": 3.6,
+    "pages": 4.2,
+    "pages#2": 3.97,
+    "pages#3": 4.64
+   },
+   "sampled": {
+    "export": {
+     "max": 4.93,
+     "mean": 0.89,
+     "n": 188
+    },
+    "idle": {
+     "max": 1.87,
+     "mean": 0.83,
+     "n": 25
+    },
+    "index": {
+     "max": 2.3,
+     "mean": 0.74,
+     "n": 20
+    },
+    "index#2": {
+     "max": 1.22,
+     "mean": 0.72,
+     "n": 20
+    },
+    "index#3": {
+     "max": 2.22,
+     "mean": 1.79,
+     "n": 20
+    },
+    "pages": {
+     "max": 0.91,
+     "mean": 0.74,
+     "n": 2
+    },
+    "pages#2": {
+     "max": 0.78,
+     "mean": 0.65,
+     "n": 2
+    },
+    "pages#3": {
+     "max": 0.78,
+     "mean": 0.61,
+     "n": 2
+    }
+   }
+  },
+  "memory": {
+   "footprint_after_pages_mb": 116.0,
+   "footprint_idle_mb": 21.0,
+   "footprint_releases": 3,
+   "footprint_start_mb": 4.69,
+   "rss_after_index_mb": 1131.58,
+   "rss_after_pages_mb": 1197.86,
+   "rss_idle_mb": 1102.48
+  },
+  "pages": {
+   "blame-long-history": {
+    "bytes": 13219674,
+    "cold": {
+     "samples": [
+      1720.3,
+      1737.37,
+      1735.93
+     ],
+     "total_ms": 1735.93,
+     "ttfb_ms": 1714.97
+    },
+    "path": "/r/rust/blame/HEAD/library/stdarch/crates/core_arch/src/aarch64/neon/generated.rs",
+    "status": 200,
+    "warm_total_ms": {
+     "max": 123.1,
+     "median": 122.03,
+     "min": 121.46,
+     "n": 5
+    },
+    "warm_ttfb_ms": {
+     "max": 118.4,
+     "median": 117.03,
+     "min": 116.46,
+     "n": 5
+    }
+   },
+   "blob-largest": {
+    "bytes": 2384350,
+    "cold": {
+     "samples": [
+      15.88,
+      16.31,
+      16.64
+     ],
+     "total_ms": 16.31,
+     "ttfb_ms": 14.96
+    },
+    "path": "/r/rust/blob/HEAD/library/stdarch/crates/core_arch/src/aarch64/neon/generated.rs",
+    "status": 200,
+    "warm_total_ms": {
+     "max": 16.05,
+     "median": 15.85,
+     "min": 15.45,
+     "n": 5
+    },
+    "warm_ttfb_ms": {
+     "max": 15.09,
+     "median": 15.02,
+     "min": 14.56,
+     "n": 5
+    }
+   },
+   "commit-largest": {
+    "bytes": 79770,
+    "cold": {
+     "samples": [
+      45.87,
+      48.66,
+      44.91
+     ],
+     "total_ms": 45.87,
+     "ttfb_ms": 45.85
+    },
+    "path": "/r/rust/commit/f90a2d27c2a1e18f10f4fd84c0dcd02710c37de8",
+    "status": 200,
+    "warm_total_ms": {
+     "max": 1.5,
+     "median": 1.11,
+     "min": 1.07,
+     "n": 5
+    },
+    "warm_ttfb_ms": {
+     "max": 1.49,
+     "median": 1.11,
+     "min": 1.07,
+     "n": 5
+    }
+   },
+   "diff-fragment": {
+    "bytes": 14431,
+    "cold": {
+     "samples": [
+      29.02,
+      30.66,
+      29.36
+     ],
+     "total_ms": 29.36,
+     "ttfb_ms": 29.01
+    },
+    "path": "/r/rust/diff/f90a2d27c2a1e18f10f4fd84c0dcd02710c37de8/0",
+    "status": 200,
+    "warm_total_ms": {
+     "max": 31.87,
+     "median": 29.43,
+     "min": 28.83,
+     "n": 5
+    },
+    "warm_ttfb_ms": {
+     "max": 31.86,
+     "median": 29.42,
+     "min": 28.82,
+     "n": 5
+    }
+   },
+   "log": {
+    "bytes": 38511,
+    "cold": {
+     "samples": [
+      2.58,
+      3.3,
+      2.76
+     ],
+     "total_ms": 2.76,
+     "ttfb_ms": 2.57
+    },
+    "path": "/r/rust/log/HEAD",
+    "status": 200,
+    "warm_total_ms": {
+     "max": 2.62,
+     "median": 2.44,
+     "min": 2.36,
+     "n": 5
+    },
+    "warm_ttfb_ms": {
+     "max": 2.61,
+     "median": 2.43,
+     "min": 2.35,
+     "n": 5
+    }
+   },
+   "overview": {
+    "bytes": 26240,
+    "cold": {
+     "samples": [
+      876.73,
+      880.84,
+      896.82
+     ],
+     "total_ms": 880.84,
+     "ttfb_ms": 876.71
+    },
+    "path": "/r/rust/",
+    "status": 200,
+    "warm_total_ms": {
+     "max": 4.27,
+     "median": 4.07,
+     "min": 3.69,
+     "n": 5
+    },
+    "warm_ttfb_ms": {
+     "max": 4.27,
+     "median": 4.05,
+     "min": 3.69,
+     "n": 5
+    }
+   },
+   "refs": {
+    "bytes": 8080,
+    "cold": {
+     "samples": [
+      1.99,
+      1.85,
+      1.3
+     ],
+     "total_ms": 1.85,
+     "ttfb_ms": 1.98
+    },
+    "path": "/r/rust/refs",
+    "status": 200,
+    "warm_total_ms": {
+     "max": 1.45,
+     "median": 1.32,
+     "min": 1.19,
+     "n": 5
+    },
+    "warm_ttfb_ms": {
+     "max": 1.45,
+     "median": 1.32,
+     "min": 1.19,
+     "n": 5
+    }
+   },
+   "search": {
+    "bytes": 293577,
+    "cold": {
+     "samples": [
+      68.21,
+      64.5,
+      64.55
+     ],
+     "total_ms": 64.55,
+     "ttfb_ms": 68.12
+    },
+    "path": "/r/rust/search?q=Option",
+    "status": 200,
+    "warm_total_ms": {
+     "max": 0.93,
+     "median": 0.64,
+     "min": 0.63,
+     "n": 5
+    },
+    "warm_ttfb_ms": {
+     "max": 0.84,
+     "median": 0.54,
+     "min": 0.52,
+     "n": 5
+    }
+   },
+   "stats-overview": {
+    "bytes": 115941,
+    "cold": {
+     "samples": [
+      497.91,
+      497.97,
+      496.72
+     ],
+     "total_ms": 497.91,
+     "ttfb_ms": 497.88
+    },
+    "path": "/r/rust/stats",
+    "status": 200,
+    "warm_total_ms": {
+     "max": 0.76,
+     "median": 0.67,
+     "min": 0.54,
+     "n": 5
+    },
+    "warm_ttfb_ms": {
+     "max": 0.76,
+     "median": 0.66,
+     "min": 0.54,
+     "n": 5
+    }
+   },
+   "stats/contributors": {
+    "bytes": 81511,
+    "cold": {
+     "samples": [
+      56.49,
+      55.15,
+      54.53
+     ],
+     "total_ms": 55.15,
+     "ttfb_ms": 56.48
+    },
+    "path": "/r/rust/stats/contributors",
+    "status": 200,
+    "warm_total_ms": {
+     "max": 0.83,
+     "median": 0.49,
+     "min": 0.47,
+     "n": 5
+    },
+    "warm_ttfb_ms": {
+     "max": 0.82,
+     "median": 0.48,
+     "min": 0.46,
+     "n": 5
+    }
+   },
+   "stats/hotspots": {
+    "bytes": 267712,
+    "cold": {
+     "samples": [
+      336.89,
+      337.09,
+      334.86
+     ],
+     "total_ms": 336.89,
+     "ttfb_ms": 336.81
+    },
+    "path": "/r/rust/stats/hotspots",
+    "status": 200,
+    "warm_total_ms": {
+     "max": 1.93,
+     "median": 0.64,
+     "min": 0.64,
+     "n": 5
+    },
+    "warm_ttfb_ms": {
+     "max": 1.8,
+     "median": 0.52,
+     "min": 0.51,
+     "n": 5
+    }
+   },
+   "stats/languages": {
+    "bytes": 391947,
+    "cold": {
+     "samples": [
+      547.72,
+      528.34,
+      527.49
+     ],
+     "total_ms": 528.34,
+     "ttfb_ms": 547.64
+    },
+    "path": "/r/rust/stats/languages",
+    "status": 200,
+    "warm_total_ms": {
+     "max": 0.89,
+     "median": 0.79,
+     "min": 0.54,
+     "n": 5
+    },
+    "warm_ttfb_ms": {
+     "max": 0.8,
+     "median": 0.62,
+     "min": 0.44,
+     "n": 5
+    }
+   },
+   "stats/ownership": {
+    "bytes": 26092,
+    "cold": {
+     "samples": [
+      82.34,
+      86.71,
+      81.98
+     ],
+     "total_ms": 82.34,
+     "ttfb_ms": 82.32
+    },
+    "path": "/r/rust/stats/ownership",
+    "status": 200,
+    "warm_total_ms": {
+     "max": 0.67,
+     "median": 0.5,
+     "min": 0.43,
+     "n": 5
+    },
+    "warm_ttfb_ms": {
+     "max": 0.67,
+     "median": 0.5,
+     "min": 0.42,
+     "n": 5
+    }
+   },
+   "tree-deep": {
+    "bytes": 9538,
+    "cold": {
+     "samples": [
+      1.68,
+      1.99,
+      1.97
+     ],
+     "total_ms": 1.97,
+     "ttfb_ms": 1.68
+    },
+    "path": "/r/rust/tree/HEAD/src/tools/rustfmt/tests/cargo-fmt/source/workspaces/path-dep-above/ws/a/d/f/src",
+    "status": 200,
+    "warm_total_ms": {
+     "max": 0.5,
+     "median": 0.47,
+     "min": 0.44,
+     "n": 5
+    },
+    "warm_ttfb_ms": {
+     "max": 0.5,
+     "median": 0.46,
+     "min": 0.43,
+     "n": 5
+    }
+   },
+   "tree-root": {
+    "bytes": 22615,
+    "cold": {
+     "samples": [
+      2.48,
+      2.93,
+      2.91
+     ],
+     "total_ms": 2.91,
+     "ttfb_ms": 2.48
+    },
+    "path": "/r/rust/tree/HEAD",
+    "status": 200,
+    "warm_total_ms": {
+     "max": 0.53,
+     "median": 0.47,
+     "min": 0.46,
+     "n": 5
+    },
+    "warm_ttfb_ms": {
+     "max": 0.53,
+     "median": 0.47,
+     "min": 0.46,
+     "n": 5
+    }
+   }
+  },
+  "probe": {
+   "blame": "library/stdarch/crates/core_arch/src/aarch64/neon/generated.rs",
+   "blob": "library/stdarch/crates/core_arch/src/aarch64/neon/generated.rs",
+   "commit": "f90a2d27c2a1e18f10f4fd84c0dcd02710c37de8",
+   "deep_tree": "src/tools/rustfmt/tests/cargo-fmt/source/workspaces/path-dep-above/ws/a/d/f/src"
+  },
+  "sha": "f90a2d27c2a1e18f10f4fd84c0dcd02710c37de8"
+ },
+ "linux": {
+  "budget": {
+   "footprint_idle_mb": {
+    "limit": 48,
+    "status": "pass",
+    "value": 21.33
+   },
+   "idle_cpu_pct": {
+    "limit": 1,
+    "status": "pass",
+    "value": 0.05
+   },
+   "index_secs": {
+    "limit": 600,
+    "max": 476.97,
+    "min": 476.97,
+    "phase": "stream",
+    "status": "pass",
+    "value": 476.97
+   },
+   "page_cold_ms": {
+    "limit": 20000,
+    "max": 3886.92,
+    "min": 3886.92,
+    "status": "pass",
+    "value": 3886.92
+   },
+   "page_warm_ms": {
+    "limit": 500,
+    "status": "pass",
+    "value": 44.85
+   },
+   "rss_mb": {
+    "limit": 8000,
+    "phase": "stream",
+    "status": "pass",
+    "value": 1937.0
+   }
+  },
+  "class": "huge",
+  "cold_samples": 1,
+  "config": "empty config.toml, no actions.toml",
+  "export": {
+   "commits": 500,
+   "ok": true,
+   "out_mb": 6153.74,
+   "samples": [
+    1277.38
+   ],
+   "secs": 1277.38
+  },
+  "idle": {
+   "cpu_pct": 0.05,
+   "cpu_pct_events_client": 0.02,
+   "secs": 60
+  },
+  "index": {
+   "cache_mb": 1468.77,
+   "listen_secs": 0.67,
+   "peak_footprint_mb": 1937.0,
+   "peak_rss_mb": 8176.14,
+   "phases": [
+    {
+     "footprint_mb": 271.0,
+     "name": "rev_list",
+     "rss_mb": 457.0,
+     "secs": 1.71
+    },
+    {
+     "footprint_mb": 403.0,
+     "name": "held",
+     "rss_mb": 672.4,
+     "secs": 0.51
+    },
+    {
+     "footprint_mb": 1937.0,
+     "name": "stream",
+     "rss_mb": 8176.1,
+     "secs": 455.74
+    },
+    {
+     "name": "stream.fold",
+     "secs": 20.05
+    },
+    {
+     "footprint_mb": 805.0,
+     "name": "finish",
+     "rss_mb": 7249.7,
+     "secs": 3.43
+    },
+    {
+     "footprint_mb": 606.0,
+     "name": "messages",
+     "rss_mb": 6906.0,
+     "secs": 6.68
+    },
+    {
+     "name": "chain",
+     "secs": 0.0
+    },
+    {
+     "name": "tip",
+     "secs": 0.0
+    }
+   ],
+   "samples": [
+    476.97
+   ],
+   "secs": 476.97
+  },
+  "load": {
+   "limit": 5.0,
+   "phases": {
+    "export": 2.63,
+    "idle": 3.78,
+    "index": 4.22,
+    "pages": 4.43
+   },
+   "sampled": {
+    "export": {
+     "max": 4.28,
+     "mean": 0.79,
+     "n": 259
+    },
+    "idle": {
+     "max": 1.76,
+     "mean": 0.92,
+     "n": 25
+    },
+    "index": {
+     "max": 4.26,
+     "mean": 0.63,
+     "n": 95
+    },
+    "pages": {
+     "max": 0.99,
+     "mean": 0.86,
+     "n": 4
+    }
+   }
+  },
+  "memory": {
+   "footprint_after_pages_mb": 292.0,
+   "footprint_idle_mb": 26.0,
+   "footprint_releases": 6,
+   "footprint_start_mb": 4.67,
+   "rss_after_index_mb": 6453.41,
+   "rss_after_pages_mb": 6596.39,
+   "rss_idle_mb": 6329.69
+  },
+  "pages": {
+   "blame-long-history": {
+    "bytes": 4465455,
+    "cold": {
+     "samples": [
+      452.47
+     ],
+     "total_ms": 452.47,
+     "ttfb_ms": 450.25
+    },
+    "path": "/r/linux/blame/HEAD/drivers/gpu/drm/amd/include/asic_reg/nbio/nbio_6_1_default.h",
+    "status": 200,
+    "warm_total_ms": {
+     "max": 18.54,
+     "median": 17.93,
+     "min": 17.12,
+     "n": 5
+    },
+    "warm_ttfb_ms": {
+     "max": 16.51,
+     "median": 16.09,
+     "min": 15.5,
+     "n": 5
+    }
+   },
+   "blob-largest": {
+    "bytes": 2775226,
+    "cold": {
+     "samples": [
+      11.37
+     ],
+     "total_ms": 11.37,
+     "ttfb_ms": 10.51
+    },
+    "path": "/r/linux/blob/HEAD/drivers/gpu/drm/amd/include/asic_reg/nbio/nbio_6_1_default.h",
+    "status": 200,
+    "warm_total_ms": {
+     "max": 12.77,
+     "median": 12.39,
+     "min": 11.7,
+     "n": 5
+    },
+    "warm_ttfb_ms": {
+     "max": 11.68,
+     "median": 11.49,
+     "min": 10.46,
+     "n": 5
+    }
+   },
+   "commit-largest": {
+    "bytes": 146262,
+    "cold": {
+     "samples": [
+      68.29
+     ],
+     "total_ms": 68.29,
+     "ttfb_ms": 68.25
+    },
+    "path": "/r/linux/commit/cbbddb6b08cc9900a87cccaa9b22bbe06aa4f50a",
+    "status": 200,
+    "warm_total_ms": {
+     "max": 3.03,
+     "median": 2.48,
+     "min": 2.16,
+     "n": 5
+    },
+    "warm_ttfb_ms": {
+     "max": 3.0,
+     "median": 2.46,
+     "min": 2.14,
+     "n": 5
+    }
+   },
+   "diff-fragment": {
+    "bytes": 1669,
+    "cold": {
+     "samples": [
+      45.01
+     ],
+     "total_ms": 45.01,
+     "ttfb_ms": 45.0
+    },
+    "path": "/r/linux/diff/cbbddb6b08cc9900a87cccaa9b22bbe06aa4f50a/0",
+    "status": 200,
+    "warm_total_ms": {
+     "max": 45.32,
+     "median": 44.85,
+     "min": 44.81,
+     "n": 5
+    },
+    "warm_ttfb_ms": {
+     "max": 45.31,
+     "median": 44.84,
+     "min": 44.8,
+     "n": 5
+    }
+   },
+   "log": {
+    "bytes": 40781,
+    "cold": {
+     "samples": [
+      4.55
+     ],
+     "total_ms": 4.55,
+     "ttfb_ms": 4.54
+    },
+    "path": "/r/linux/log/HEAD",
+    "status": 200,
+    "warm_total_ms": {
+     "max": 5.38,
+     "median": 4.68,
+     "min": 4.49,
+     "n": 5
+    },
+    "warm_ttfb_ms": {
+     "max": 5.37,
+     "median": 4.67,
+     "min": 4.49,
+     "n": 5
+    }
+   },
+   "overview": {
+    "bytes": 26241,
+    "cold": {
+     "samples": [
+      3886.92
+     ],
+     "total_ms": 3886.92,
+     "ttfb_ms": 3886.9
+    },
+    "path": "/r/linux/",
+    "status": 200,
+    "warm_total_ms": {
+     "max": 7.47,
+     "median": 7.36,
+     "min": 6.39,
+     "n": 5
+    },
+    "warm_ttfb_ms": {
+     "max": 7.46,
+     "median": 7.35,
+     "min": 6.39,
+     "n": 5
+    }
+   },
+   "refs": {
+    "bytes": 8176,
+    "cold": {
+     "samples": [
+      2.69
+     ],
+     "total_ms": 2.69,
+     "ttfb_ms": 2.69
+    },
+    "path": "/r/linux/refs",
+    "status": 200,
+    "warm_total_ms": {
+     "max": 1.59,
+     "median": 1.51,
+     "min": 1.46,
+     "n": 5
+    },
+    "warm_ttfb_ms": {
+     "max": 1.59,
+     "median": 1.51,
+     "min": 1.45,
+     "n": 5
+    }
+   },
+   "search": {
+    "bytes": 349223,
+    "cold": {
+     "samples": [
+      239.44
+     ],
+     "total_ms": 239.44,
+     "ttfb_ms": 239.37
+    },
+    "path": "/r/linux/search?q=kmalloc",
+    "status": 200,
+    "warm_total_ms": {
+     "max": 0.92,
+     "median": 0.64,
+     "min": 0.6,
+     "n": 5
+    },
+    "warm_ttfb_ms": {
+     "max": 0.8,
+     "median": 0.54,
+     "min": 0.5,
+     "n": 5
+    }
+   },
+   "stats-overview": {
+    "bytes": 170627,
+    "cold": {
+     "samples": [
+      2776.41
+     ],
+     "total_ms": 2776.41,
+     "ttfb_ms": 2776.36
+    },
+    "path": "/r/linux/stats",
+    "status": 200,
+    "warm_total_ms": {
+     "max": 2.87,
+     "median": 0.66,
+     "min": 0.62,
+     "n": 5
+    },
+    "warm_ttfb_ms": {
+     "max": 2.82,
+     "median": 0.65,
+     "min": 0.6,
+     "n": 5
+    }
+   },
+   "stats/contributors": {
+    "bytes": 122515,
+    "cold": {
+     "samples": [
+      697.23
+     ],
+     "total_ms": 697.23,
+     "ttfb_ms": 697.21
+    },
+    "path": "/r/linux/stats/contributors",
+    "status": 200,
+    "warm_total_ms": {
+     "max": 0.86,
+     "median": 0.63,
+     "min": 0.56,
+     "n": 5
+    },
+    "warm_ttfb_ms": {
+     "max": 0.86,
+     "median": 0.62,
+     "min": 0.56,
+     "n": 5
+    }
+   },
+   "stats/hotspots": {
+    "bytes": 244574,
+    "cold": {
+     "samples": [
+      1942.52
+     ],
+     "total_ms": 1942.52,
+     "ttfb_ms": 1942.44
+    },
+    "path": "/r/linux/stats/hotspots",
+    "status": 200,
+    "warm_total_ms": {
+     "max": 3.1,
+     "median": 0.6,
+     "min": 0.52,
+     "n": 5
+    },
+    "warm_ttfb_ms": {
+     "max": 3.07,
+     "median": 0.54,
+     "min": 0.45,
+     "n": 5
+    }
+   },
+   "stats/languages": {
+    "bytes": 418277,
+    "cold": {
+     "samples": [
+      1583.72
+     ],
+     "total_ms": 1583.72,
+     "ttfb_ms": 1583.58
+    },
+    "path": "/r/linux/stats/languages",
+    "status": 200,
+    "warm_total_ms": {
+     "max": 1.06,
+     "median": 0.79,
+     "min": 0.76,
+     "n": 5
+    },
+    "warm_ttfb_ms": {
+     "max": 0.9,
+     "median": 0.62,
+     "min": 0.57,
+     "n": 5
+    }
+   },
+   "stats/ownership": {
+    "bytes": 25923,
+    "cold": {
+     "samples": [
+      616.26
+     ],
+     "total_ms": 616.26,
+     "ttfb_ms": 616.24
+    },
+    "path": "/r/linux/stats/ownership",
+    "status": 200,
+    "warm_total_ms": {
+     "max": 0.76,
+     "median": 0.52,
+     "min": 0.46,
+     "n": 5
+    },
+    "warm_ttfb_ms": {
+     "max": 0.75,
+     "median": 0.52,
+     "min": 0.45,
+     "n": 5
+    }
+   },
+   "tree-deep": {
+    "bytes": 19328,
+    "cold": {
+     "samples": [
+      3.4
+     ],
+     "total_ms": 3.4,
+     "ttfb_ms": 3.39
+    },
+    "path": "/r/linux/tree/HEAD/drivers/gpu/drm/amd/display/dc/dml2_0/dml21/src/dml2_core",
+    "status": 200,
+    "warm_total_ms": {
+     "max": 0.87,
+     "median": 0.71,
+     "min": 0.63,
+     "n": 5
+    },
+    "warm_ttfb_ms": {
+     "max": 0.86,
+     "median": 0.7,
+     "min": 0.63,
+     "n": 5
+    }
+   },
+   "tree-root": {
+    "bytes": 22648,
+    "cold": {
+     "samples": [
+      4.2
+     ],
+     "total_ms": 4.2,
+     "ttfb_ms": 4.19
+    },
+    "path": "/r/linux/tree/HEAD",
+    "status": 200,
+    "warm_total_ms": {
+     "max": 0.59,
+     "median": 0.55,
+     "min": 0.53,
+     "n": 5
+    },
+    "warm_ttfb_ms": {
+     "max": 0.58,
+     "median": 0.55,
+     "min": 0.53,
+     "n": 5
+    }
+   }
+  },
+  "probe": {
+   "blame": "drivers/gpu/drm/amd/include/asic_reg/nbio/nbio_6_1_default.h",
+   "blob": "drivers/gpu/drm/amd/include/asic_reg/nbio/nbio_6_1_default.h",
+   "commit": "cbbddb6b08cc9900a87cccaa9b22bbe06aa4f50a",
+   "deep_tree": "drivers/gpu/drm/amd/display/dc/dml2_0/dml21/src/dml2_core"
+  },
+  "sha": "cbbddb6b08cc9900a87cccaa9b22bbe06aa4f50a"
+ }
+ },
+ "runs": 5,
+ "when": "2026-11-12"
+}
