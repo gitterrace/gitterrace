@@ -3,7 +3,7 @@ use gitterrace_testkit::git;
 use rmcp::model::RawContent;
 
 use super::McpServer;
-use crate::ApiState;
+use crate::{ApiError, ApiState};
 
 fn server(config: &str) -> (tempfile::TempDir, McpServer) {
     let dir = tempfile::tempdir().expect("tempdir");
@@ -229,4 +229,12 @@ async fn query_and_the_older_keys_give_equal_json() {
     // A bad query is a readable error naming the span, not a panic.
     let bad = s.activity(act(None, Some("nope:x"))).await.expect("bad");
     assert_eq!(bad.is_error, Some(true), "{}", text(&bad));
+}
+
+#[test]
+fn mcp_tool_error_emits_server_error_message_for_5xx() {
+    let inner = ApiError::Task("/home/me/.git/gitterrace/x: denied".to_owned());
+    assert_eq!(super::tool_error_text(&inner), crate::SERVER_ERROR_MESSAGE);
+    let client = ApiError::BadRequest("bad rev".to_owned());
+    assert_eq!(super::tool_error_text(&client), client.to_string());
 }

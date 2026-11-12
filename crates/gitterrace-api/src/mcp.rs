@@ -12,7 +12,7 @@ use schemars::JsonSchema;
 use serde::Deserialize;
 
 use crate::core::ApiState;
-use crate::error::ApiError;
+use crate::error::{ApiError, SERVER_ERROR_MESSAGE};
 use crate::insights::Params;
 use crate::mcp::bounded::{LineBound, MAX_LINE_BYTES};
 pub use crate::mcp::repos::McpRepo;
@@ -202,8 +202,19 @@ impl McpServer {
                     .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
                 CallToolResult::success(vec![Content::text(text)])
             }
-            Err(e) => CallToolResult::error(vec![Content::text(e.to_string())]),
+            Err(e) => CallToolResult::error(vec![Content::text(tool_error_text(&e))]),
         })
+    }
+}
+
+/// What an agent reads for a failed tool: the error, except for a server error, whose text
+/// can name files on the host and so goes to the log alone, as for the HTTP answer.
+fn tool_error_text(e: &ApiError) -> String {
+    if e.status().is_server_error() {
+        tracing::error!(code = e.code(), "mcp: {e}");
+        SERVER_ERROR_MESSAGE.to_owned()
+    } else {
+        e.to_string()
     }
 }
 
