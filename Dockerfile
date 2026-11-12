@@ -54,6 +54,7 @@ COPY --from=build /out/git-terrace /usr/local/bin/git-terrace
 COPY --from=build --chown=65532:65532 /out/cache /cache
 COPY --from=build --chown=65532:65532 /out/config /config
 COPY --from=build /out/repos /repos
+COPY --from=build /src/THIRD-PARTY-NOTICES /usr/share/doc/git-terrace/THIRD-PARTY-NOTICES
 # Repositories under /repos are owned by the host user, not this one, so git's ownership check
 # would refuse them. The folder is mounted read-only and served read-only, so trust it.
 COPY --from=build --chmod=0644 /out/gitconfig /etc/gitconfig

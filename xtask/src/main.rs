@@ -18,6 +18,7 @@ mod docs_index;
 mod docs_md;
 mod facts;
 mod main_guard;
+mod notices_md;
 mod openapi_json;
 mod out;
 mod plate;
@@ -61,6 +62,7 @@ fn generators(root: &Path, refresh: bool) -> Result<Vec<Out>> {
         config_md::render(),
         docs_index::render(),
         openapi_json::render(&ws),
+        notices_md::render(root)?,
     ];
     outs.extend(readme_agents_md::render(&ws, &scripts));
     outs.extend(docs_md::render(root, &ws, &scripts)?);

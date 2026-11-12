@@ -45,6 +45,7 @@ allow = [
   "LICENSE",
   "README.md",
   "SECURITY.md",
+  "THIRD-PARTY-NOTICES",
   # Cargo and toolchain, found by walking up from the workspace root
   ".cargo",
   "Cargo.lock",

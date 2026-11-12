@@ -115,4 +115,6 @@ windows-archive = ".zip"
 allow-dirty = ["ci"]
 local-artifacts-jobs = ["./release-check"]
 checksum = "sha256"
+# The licence texts of the embedded fonts and script travel in every archive.
+extra-files = ["THIRD-PARTY-NOTICES"]
 pr-run-mode = "plan"
