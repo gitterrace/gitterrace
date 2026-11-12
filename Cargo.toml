@@ -91,8 +91,10 @@ strip = true
 [profile.dist]
 inherits = "release"
 
-# The live demo, built and deployed from github.com/gitterrace/demo. Read by xtask for the
-# README and site link; keep `repos` in step with that repository's repos.txt.
+# The live demo: `make demo` builds it into target/demo and `make demo-deploy` ships it with
+# deploy/demo/wrangler.toml. Read by xtask for the README and site link. `repos` names the tags
+# pinned in scripts/lib/corpus-lib.mjs, which the screenshots share; an xtask test holds them in
+# step.
 [workspace.metadata.demo]
 url = "https://demo.gitterrace.dev"
 repos = ["jq jq-1.8.2", "ripgrep 15.2.0"]

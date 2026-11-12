@@ -109,8 +109,8 @@ on http://127.0.0.1:4343.
    formula.
 5. `make deploy` (it refuses until the tag, repository and tap answer), then
    `make domains`.
-6. Refresh the demo from [gitterrace/demo](https://github.com/gitterrace/demo):
-   `make deploy` there.
+6. Refresh the live demo: `make demo demo-deploy` exports the pinned jq and
+   ripgrep and ships them to demo.gitterrace.dev.
 
 ## Security
 
