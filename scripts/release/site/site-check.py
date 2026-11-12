@@ -162,9 +162,7 @@ def css_problems(css: str) -> list[str]:
     css = re.sub(r"/\*.*?\*/", "", css, flags=re.S)
     rules = [(re.sub(r"\s+", " ", a).strip(), b) for a, b in RULE.findall(css)]
     bad = []
-    if not any(
-        sel == "a" and "color:var(--accent-ink)" in body for sel, body in rules
-    ):
+    if not any(sel == "a" and "color:var(--accent-ink)" in body for sel, body in rules):
         bad.append("site.css has no shared `a{color:var(--accent-ink)}` link rule")
     for sel, body in rules:
         if not re.search(r"(^|;)color:", body.strip()):
@@ -211,7 +209,9 @@ def links(directory: str | None = None) -> list[str]:
         bad += footer_problems(str(p.relative_to(d)), html)
     if not edits:
         bad.append(f"{d}: no docs page carries an Edit link")
-    print(f"  [{'x' if bad else '+'}] links and footer of {len(pages)} docs pages in {d}")
+    print(
+        f"  [{'x' if bad else '+'}] links and footer of {len(pages)} docs pages in {d}"
+    )
     return bad
 
 

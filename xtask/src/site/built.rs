@@ -580,28 +580,3 @@ fn a_landing_page_without_the_section_or_with_another_address_is_reported() {
     let bad = safety_problems(landing, "127.0.0.1:9");
     assert!(bad[0].contains("does not name 127.0.0.1:9"), "{bad:?}");
 }
-
-/// The class this guards: a docs page whose footer lost its labelled nav, repeats a link, or
-/// does not end with the source link after the nav (the right side), and a stylesheet where a
-/// content link sets its own color instead of the shared one. The same rules as
-/// `site-check.py links`, which runs on the built site.
-#[test]
-fn the_docs_footer_is_a_labelled_nav_with_the_edit_link_last() {
-    let (pages, _) = generated();
-    let mut seen = 0;
-    for (path, html) in pages.iter().filter(|(p, _)| p.starts_with("docs/")) {
-        let foot = footer_of(html).unwrap_or("");
-        assert!(foot.contains("<nav aria-label=\"Footer\">"), "{path}: {foot}");
-        let hrefs = attrs(foot, "href");
-        let mut once = hrefs.clone();
-        once.sort_unstable();
-        once.dedup();
-        assert_eq!(hrefs.len(), once.len(), "{path}: a link twice");
-        if foot.contains("class=\"edit\"") {
-            seen += 1;
-            let after = foot.rsplit_once("</nav>").map_or("", |x| x.1);
-            assert!(after.trim_start().starts_with("<a class=\"edit\""), "{path}");
-        }
-    }
-    assert!(seen > 0, "no docs page has an Edit link");
-}

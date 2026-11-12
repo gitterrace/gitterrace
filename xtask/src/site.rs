@@ -355,6 +355,8 @@ fn css(tokens: &str) -> Result<String> {
 #[cfg(test)]
 mod built;
 #[cfg(test)]
+mod footer;
+#[cfg(test)]
 mod prose;
 #[cfg(test)]
 mod repo_links;
