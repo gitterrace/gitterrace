@@ -134,9 +134,11 @@ pub fn installer_url(repo: &str, name: &str) -> String {
     format!("{repo}/releases/latest/download/{name}-installer.sh")
 }
 
-/// The one-line install, served by the site's `/install.sh` redirect.
+/// The one-line install, served by the site's `/install.sh` redirect. HTTPS and TLS 1.2 or
+/// newer only, through every redirect, so the script piped to `sh` cannot come over plain HTTP.
 pub fn curl_install(home: &str) -> String {
-    format!("curl -fsSL {}/install.sh | sh", home.trim_end_matches('/'))
+    let home = home.trim_end_matches('/');
+    format!("curl --proto '=https' --tlsv1.2 -fsSL {home}/install.sh | sh")
 }
 
 /// The install block: the README and the site both show exactly this.
@@ -473,7 +475,7 @@ mod tests {
         );
         assert_eq!(
             curl_install("https://example.dev/"),
-            "curl -fsSL https://example.dev/install.sh | sh"
+            "curl --proto '=https' --tlsv1.2 -fsSL https://example.dev/install.sh | sh"
         );
     }
 }

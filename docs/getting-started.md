@@ -4,7 +4,7 @@
 
 <!-- BEGIN GENERATED: install -->
 ```bash
-curl -fsSL https://gitterrace.dev/install.sh | sh
+curl --proto '=https' --tlsv1.2 -fsSL https://gitterrace.dev/install.sh | sh
 brew install gitterrace/tap/gitterrace
 cargo install --locked --git https://github.com/gitterrace/gitterrace gitterrace
 ```
@@ -44,7 +44,7 @@ Upgrade the same way you installed:
 
 <!-- BEGIN GENERATED: upgrade -->
 ```bash
-curl -fsSL https://gitterrace.dev/install.sh | sh
+curl --proto '=https' --tlsv1.2 -fsSL https://gitterrace.dev/install.sh | sh
 brew update && brew upgrade gitterrace
 cargo install --locked --force --git https://github.com/gitterrace/gitterrace gitterrace
 ```
