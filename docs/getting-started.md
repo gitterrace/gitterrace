@@ -18,6 +18,23 @@ Building with cargo needs Rust 1.96 or newer.
 
 <!-- END GENERATED: msrv -->
 
+### Verifying downloads
+
+The shell installer checks each archive against its `.sha256` file only when
+`sha256sum` is on the path, and stock macOS does not ship it. On macOS,
+install with Homebrew, which checks the digest in the formula.
+
+The Windows PowerShell installer does not check a digest. Download the zip and
+its `.sha256` file from the release page and compare them before unpacking:
+
+```powershell
+(Get-FileHash .\gitterrace-x86_64-pc-windows-msvc.zip).Hash
+Get-Content .\gitterrace-x86_64-pc-windows-msvc.zip.sha256
+```
+
+Every release archive also carries a build provenance attestation:
+`gh attestation verify <archive> --repo gitterrace/gitterrace`.
+
 ## Quickstart
 
 <!-- BEGIN GENERATED: quickstart -->
