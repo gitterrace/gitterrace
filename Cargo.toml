@@ -21,6 +21,9 @@ gitterrace-types = { path = "crates/gitterrace-types", version = "0.1.0" }
 schwarzwald = { path = "schwarzwald/kit/rust" }
 gix = { version = "0.90", default-features = false, features = ["max-performance", "sha1", "blob-diff", "blame", "revision", "index", "mailmap", "status"] }
 axum = "0.8"
+# The accept loop: an HTTP/1.1 header-read deadline axum::serve does not expose.
+hyper = { version = "1", features = ["server", "http1"] }
+hyper-util = { version = "0.1", features = ["tokio", "server-graceful", "service"] }
 askama = "0.16"
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "signal", "time", "sync"] }
 serde = { version = "1", features = ["derive"] }

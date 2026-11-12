@@ -64,6 +64,9 @@ COPY --from=build --chmod=0644 /out/gitconfig /etc/gitconfig
 ENV XDG_CONFIG_HOME=/config XDG_CACHE_HOME=/cache XDG_STATE_HOME=/cache/state \
     GITTERRACE_INDEX_FALLBACK=/cache/index NO_COLOR=1
 USER 65532:65532
+# Distroless has no shell or curl, so the probe is the binary itself, in exec form.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD ["/usr/local/bin/git-terrace", "--version"]
 EXPOSE 8080
 VOLUME ["/cache"]
 ENTRYPOINT ["/usr/local/bin/git-terrace", "--public", "--addr", "0.0.0.0:8080"]

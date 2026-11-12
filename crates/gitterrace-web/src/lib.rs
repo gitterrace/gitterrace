@@ -32,6 +32,7 @@ mod languages;
 mod lead;
 #[cfg(test)]
 mod limits_wiring_tests;
+mod listen;
 mod live;
 mod lost;
 mod markdown;
@@ -552,15 +553,13 @@ pub async fn serve_on(
         );
     }
     tracing::info!("serving {name} on http://{addr}");
-    let served = axum::serve(listener, router)
-        .with_graceful_shutdown(async move {
-            if tokio::signal::ctrl_c().await.is_err() {
-                std::future::pending::<()>().await;
-            }
-            // Open tabs hold their streams; closing them lets the server stop.
-            env.shut_down();
-        })
-        .await;
+    let stop = listen::stop_signal()?;
+    let stop = async move {
+        stop.await;
+        // Open tabs hold their streams; closing them lets the server stop.
+        env.shut_down();
+    };
+    let served = listen::run(listener, router, listen::HEADER_READ_TIMEOUT, stop).await;
     if let (true, Some(dir)) = (published, &state) {
         registry::remove_add_token(dir, addr.port());
     }

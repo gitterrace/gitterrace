@@ -1071,6 +1071,8 @@ dependencies = [
  "gitterrace-testkit",
  "gitterrace-types",
  "http-body-util",
+ "hyper",
+ "hyper-util",
  "pulldown-cmark",
  "regex",
  "rustix",
