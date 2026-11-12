@@ -226,7 +226,7 @@ div.diff .add,div.diff .del{color:inherit}
 /* The chip is the shared .sha, untouched in every state. The row makes room for it: 4px of
    padding above and below, so the chip never meets the run rule. The first row has no top
    rule (the card border frames it), and hover only recolours, so the box never changes. */
-.blame td{padding-top:var(--space-1);padding-bottom:var(--space-1)}
+.blame td{padding-top:var(--space-1);padding-bottom:var(--space-1);vertical-align:middle}
 .blame tr:first-child td{border-top:0}
 .blame td.who .sha{display:inline-block;line-height:1.3}
 /* Quiet sha: a mono link per run, its chip border shows on hover only. The box is the same
