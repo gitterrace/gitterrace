@@ -46,6 +46,14 @@ In scope:
   working tree file or host path, or a write outside the folder, is in scope.
 - **Rendering repository content.** Markdown, code, diffs and SVG are sanitized.
   Script running from repository content is in scope.
+- **The `.git` folder.** A served repository's `.git/config`, `.gitattributes`
+  and `objects/info/alternates` are trusted: gitterrace reads and follows them
+  as git does. A repository cloned as a shared or referenced clone of an
+  untrusted source, or one whose `.git` folder was tampered with, is untrusted
+  input. The worktree view runs the filter drivers `.gitattributes` assigns,
+  and public mode turns that view off. A commit-graph is read only from the
+  repository's own objects. Reading data from a repository outside the served
+  tree through alternates, past what git itself would show, is in scope.
 - **Actions.** Actions run programs from `actions.toml` in your config folder,
   never from a repository, only on a loopback server that is not public, with a
   per-process token. Repository values fill whole arguments with no shell.

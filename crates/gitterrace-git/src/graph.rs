@@ -1,25 +1,14 @@
 //! The commit-graph a full-history walk reads parents from, so it decodes no commit object.
 
-/// The repository's commit-graph, or else the first one an alternate object store holds.
+/// The repository's own commit-graph, or `None` when it has none or the configuration turns it
+/// off.
 ///
-/// gix looks only in the repository's own `objects/info`, so a repository that borrows its
-/// objects from another (`git clone --shared`, an alternates file) walks without a graph and
-/// decodes every commit. A graph indexes commits by id, so one written in the alternate serves
-/// the commits it holds; the walk reads the rest from objects. `None` when the configuration
-/// turns the graph off, and for a shallow repository: the alternate's graph records the parents
-/// the shallow boundary cuts off, so it would change what the walk reaches.
+/// gix looks only in the repository's own `objects/info`. A graph held by an alternate object
+/// store is never read: an alternates entry may name any path on the machine, and its graph
+/// would feed parents and roots from outside the served tree. A shared clone still walks, it
+/// decodes each commit from the borrowed objects instead.
 pub(crate) fn commit_graph(repo: &gix::Repository) -> Option<gix::commitgraph::Graph> {
-    if let Ok(Some(graph)) = repo.commit_graph_if_enabled() {
-        return Some(graph);
-    }
-    let disabled = repo.config_snapshot().boolean("core.commitGraph") == Some(false);
-    if disabled || repo.is_shallow().unwrap_or(true) {
-        return None;
-    }
-    let alternates = repo.objects.store_ref().alternate_db_paths().ok()?;
-    alternates.iter().find_map(|objects| {
-        gix::commitgraph::Graph::at(&objects.join("info"), repo.object_hash(), None).ok()
-    })
+    repo.commit_graph_if_enabled().ok().flatten()
 }
 
 #[cfg(test)]
@@ -70,14 +59,11 @@ mod tests {
         assert_eq!(id(d), want, "with a graph");
     }
 
-    /// Counted walk: the clone borrows every object from an alternate that holds a graph,
-    /// and the middle commits' objects are deleted. The id and the roots must come from the
-    /// graph alone, decoding only the parentless commit; a walk that decodes one commit
-    /// object per history commit fails on the first missing one.
-    #[test]
-    fn id_and_roots_read_no_history_commit_object() {
-        let tmp = tempfile::tempdir().expect("tmp");
-        let a = tmp.path().join("a");
+    /// A `main` of root, three middle commits and tip in `a`, a graph written there, and `b`
+    /// cloned from it with `--shared`, so `b` borrows every object through an absolute
+    /// alternates entry. Returns the root id and the middle ids.
+    fn shared(tmp: &Path) -> (String, Vec<String>) {
+        let a = tmp.join("a");
         std::fs::create_dir(&a).expect("dir");
         git_at(&a, T, &["init", "-q", "-b", "main"]);
         git_at(&a, T, &["config", "user.name", "T"]);
@@ -86,18 +72,58 @@ mod tests {
         let middle: Vec<String> = (0..3).map(|i| commit(&a, T, &format!("c{i}"))).collect();
         commit(&a, T, "tip");
         git_at(&a, T, &["commit-graph", "write", "--reachable"]);
+        let (from, to) = (
+            a.to_string_lossy(),
+            tmp.join("b").to_string_lossy().into_owned(),
+        );
+        git_at(tmp, T, &["clone", "-q", "--shared", &from, &to]);
+        (root, middle)
+    }
+
+    /// A shared clone reads its id and roots through the borrowed objects.
+    #[test]
+    fn shared_clone_walks_history_via_alternates() {
+        let tmp = tempfile::tempdir().expect("tmp");
+        let (root, _) = shared(tmp.path());
         let b = tmp.path().join("b");
-        let (from, to) = (a.to_string_lossy(), b.to_string_lossy());
-        git_at(tmp.path(), T, &["clone", "-q", "--shared", &from, &to]);
-        for sha in &middle {
-            let loose = a.join(".git/objects").join(&sha[..2]).join(&sha[2..]);
-            std::fs::remove_file(&loose).expect("loose commit object");
-        }
         assert_eq!(id(&b), Some(root[..12].to_owned()));
         let mut roots = Roots::default();
         roots
             .update(&Repo::discover(&b).expect("open"))
             .expect("roots");
         assert_eq!(roots.ids().iter().collect::<Vec<_>>(), [&root]);
+    }
+
+    /// Guard class: nothing a foreign object store's commit-graph says reaches a walk of the
+    /// served repository. The middle commit objects are deleted from `a`, so only `a`'s graph
+    /// still links the tip to the root. Red when any walk (the id, the roots, the public
+    /// reachable set) reads that graph: the root would come out found and public.
+    #[test]
+    fn an_alternate_commit_graph_outside_the_repo_is_never_read() {
+        let tmp = tempfile::tempdir().expect("tmp");
+        let (root, middle) = shared(tmp.path());
+        let (a, b) = (tmp.path().join("a"), tmp.path().join("b"));
+        let foreign = commit(&a, T, "only in a");
+        git_at(&a, T, &["commit-graph", "write", "--reachable"]);
+        for sha in &middle {
+            let loose = a.join(".git/objects").join(&sha[..2]).join(&sha[2..]);
+            std::fs::remove_file(&loose).expect("loose commit object");
+        }
+        assert_eq!(id(&b), None, "the id came from the foreign graph");
+        let mut roots = Roots::default();
+        let open = Repo::discover(&b).expect("open");
+        assert!(
+            roots.update(&open).is_err(),
+            "the roots came from the foreign graph"
+        );
+        let public = Repo::discover(&b).expect("open").committed_only();
+        assert!(
+            public.resolve(&foreign).is_err(),
+            "a commit only in a is public in b"
+        );
+        assert!(
+            public.resolve(&root).is_err(),
+            "the foreign graph fed the public reachable set"
+        );
     }
 }
