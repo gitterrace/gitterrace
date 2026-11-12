@@ -66,6 +66,14 @@ render = bd.render
 spliced = bd.spliced
 actual = bd.actual
 stray = bd.stray
+_own: set[str] = set()
+
+
+def own_commits() -> set[str]:
+    """Every commit of this repository, read once."""
+    if not _own:
+        _own.update(bl.own_shas(ROOT))
+    return _own
 
 
 def gate_test() -> None:
@@ -401,9 +409,18 @@ def pins() -> list[str]:
 
 
 def newest_ok(run: Json) -> list[str]:
-    """The newest run must come from a clean build, timed under its load limit."""
+    """The newest run must come from a clean build, timed under its load limit, of a commit
+    still in history: landing restamps a commit, so a run recorded on the lane's copy names
+    nothing once it lands."""
     errs: list[str] = bd.commit_errors(run)
     m = run["machine"]
+    c = m.get("commit")
+    if (
+        isinstance(c, str)
+        and c != bd.PENDING
+        and not any(s.startswith(c) for s in own_commits())
+    ):
+        errs.append(f"{run_name(run)}: machine.commit {c} is not in this history")
     if (m.get("dirty") or "dirty" in m.get("gitterrace", "")) and not run.get("note"):
         errs.append(f"{run_name(run)}: measured a -dirty build")
     for n, r in run["repos"].items():
