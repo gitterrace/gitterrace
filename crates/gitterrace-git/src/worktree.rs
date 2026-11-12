@@ -371,19 +371,19 @@ fn read_worktree(work: &Path, rel: &str, big: u64) -> Read {
 }
 
 /// Reads a file whose final component must not be a symlink. The check above and the read
-/// are two steps, so a link swapped in between is refused by the open itself on unix.
+/// are two steps, so a link swapped in between is refused by the open itself. On Windows the
+/// reparse point opens as itself, and the handle check refuses anything but a regular file.
 fn read_nofollow(path: &Path) -> std::io::Result<Vec<u8>> {
     use std::io::Read as _;
 
     let mut opts = std::fs::OpenOptions::new();
     opts.read(true);
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::OpenOptionsExt;
-        opts.custom_flags(libc::O_NOFOLLOW);
+    let f = crate::atomic::no_follow(&mut opts).open(path)?;
+    if !f.metadata()?.is_file() {
+        return Err(crate::refused(path));
     }
     let mut buf = Vec::new();
-    opts.open(path)?.read_to_end(&mut buf)?;
+    (&f).read_to_end(&mut buf)?;
     Ok(buf)
 }
 
@@ -557,5 +557,22 @@ mod tests {
         std::os::unix::fs::symlink(&secret, work.join("link.png")).expect("link");
         let err = super::read_nofollow(&work.join("link.png")).expect_err("a link is refused");
         assert_eq!(err.raw_os_error(), Some(libc::ELOOP));
+    }
+
+    #[test]
+    #[cfg(windows)]
+    fn read_nofollow_refuses_reparse_point() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let target = dir.path().join("target");
+        std::fs::create_dir(&target).expect("mkdir");
+        let at = dir.path().join("j");
+        let made = std::process::Command::new("cmd")
+            .args(["/c", "mklink", "/J"])
+            .arg(&at)
+            .arg(&target)
+            .status()
+            .expect("mklink");
+        assert!(made.success(), "mklink /J");
+        assert!(super::read_nofollow(&at).is_err());
     }
 }

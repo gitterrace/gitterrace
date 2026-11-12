@@ -2,7 +2,8 @@
 //! directory (a tarball, a zip), so any entry may be a planted symlink: following one would
 //! read or overwrite a file outside the repository. Links and non-regular entries are removed
 //! (removing a link never touches its target) and the cache is rebuilt; writes open with
-//! `O_NOFOLLOW` so a link planted between the check and the open still fails.
+//! `O_NOFOLLOW` (unix) or `FILE_FLAG_OPEN_REPARSE_POINT` (Windows) so a link planted between
+//! the check and the open still fails.
 
 use std::fs::{self, File};
 use std::io;

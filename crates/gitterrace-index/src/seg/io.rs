@@ -61,6 +61,12 @@ pub(crate) fn create_no_follow(dir: &Path, name: &str) -> io::Result<File> {
         use std::os::unix::fs::OpenOptionsExt;
         o.mode(0o644).custom_flags(libc::O_NOFOLLOW);
     }
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::OpenOptionsExt;
+        // FILE_FLAG_OPEN_REPARSE_POINT: a link or junction opens as itself, so writing fails.
+        o.custom_flags(0x0020_0000);
+    }
     o.open(path)
 }
 
@@ -93,6 +99,22 @@ mod tests {
         assert!(read_exact_at(&f, &mut b, 8).is_err());
         assert!(read_exact_at(&f, &mut b, u64::MAX).is_err());
         assert!(!dir.path().join("f.tmp").exists());
+        Ok(())
+    }
+
+    #[test]
+    #[cfg(windows)]
+    fn create_no_follow_refuses_reparse_point() -> io::Result<()> {
+        let dir = tempfile::tempdir()?;
+        let target = dir.path().join("target");
+        fs::create_dir(&target)?;
+        let made = std::process::Command::new("cmd")
+            .args(["/c", "mklink", "/J"])
+            .arg(dir.path().join("seg"))
+            .arg(&target)
+            .status()?;
+        assert!(made.success(), "mklink /J");
+        assert!(create_no_follow(dir.path(), "seg").is_err());
         Ok(())
     }
 }

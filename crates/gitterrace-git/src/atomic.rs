@@ -158,14 +158,24 @@ fn regular_entry(dir: &Path, name: &str) -> io::Result<PathBuf> {
     }
 }
 
+/// Opens the final component itself, never a link's target: `O_NOFOLLOW` on unix, and on
+/// Windows `FILE_FLAG_OPEN_REPARSE_POINT`, so a link or junction opens as itself and a write
+/// through it fails. Every no-follow open in this crate sets its flags here.
 #[cfg(unix)]
-fn no_follow(o: &mut OpenOptions) -> &mut OpenOptions {
+pub(crate) fn no_follow(o: &mut OpenOptions) -> &mut OpenOptions {
     use std::os::unix::fs::OpenOptionsExt;
     o.custom_flags(libc::O_NOFOLLOW)
 }
 
-#[cfg(not(unix))]
-fn no_follow(o: &mut OpenOptions) -> &mut OpenOptions {
+#[cfg(windows)]
+pub(crate) fn no_follow(o: &mut OpenOptions) -> &mut OpenOptions {
+    use std::os::windows::fs::OpenOptionsExt;
+    // FILE_FLAG_OPEN_REPARSE_POINT
+    o.custom_flags(0x0020_0000)
+}
+
+#[cfg(not(any(unix, windows)))]
+pub(crate) fn no_follow(o: &mut OpenOptions) -> &mut OpenOptions {
     o
 }
 
@@ -177,11 +187,9 @@ pub fn refused(path: &Path) -> io::Error {
     ))
 }
 
-#[cfg(all(test, unix))]
+#[cfg(test)]
 mod tests {
-    use std::os::unix::fs::symlink;
-
-    use super::{open_read_no_follow, read_no_follow, read_no_follow_bounded, write_atomic};
+    use super::{read_no_follow, write_atomic};
 
     #[test]
     fn writes_replace_and_read_back() {
@@ -194,6 +202,13 @@ mod tests {
         );
         assert_eq!(read_no_follow(t.path(), "none").expect("read"), None);
     }
+}
+
+#[cfg(all(test, unix))]
+mod unix_tests {
+    use std::os::unix::fs::symlink;
+
+    use super::{open_read_no_follow, read_no_follow, read_no_follow_bounded, write_atomic};
 
     #[test]
     fn a_link_at_the_file_or_the_folder_is_refused_and_its_target_kept() {
@@ -228,5 +243,42 @@ mod tests {
             read_no_follow_bounded(t.path(), "f", 5).expect("read"),
             Some(b"12345".to_vec())
         );
+    }
+}
+
+#[cfg(all(test, windows))]
+mod windows_tests {
+    use std::path::Path;
+
+    use super::{open_append_no_follow, write_atomic};
+
+    /// Plants a directory junction at `at` pointing to `to`: junctions need no privilege.
+    fn junction(at: &Path, to: &Path) {
+        let made = std::process::Command::new("cmd")
+            .args(["/c", "mklink", "/J"])
+            .arg(at)
+            .arg(to)
+            .status()
+            .expect("mklink");
+        assert!(made.success(), "mklink /J");
+    }
+
+    #[test]
+    fn open_append_refuses_reparse_point() {
+        let t = tempfile::tempdir().expect("tmp");
+        let target = t.path().join("target");
+        std::fs::create_dir(&target).expect("mkdir");
+        junction(&t.path().join("f"), &target);
+        assert!(open_append_no_follow(t.path(), "f", 0o644).is_err());
+    }
+
+    #[test]
+    fn write_atomic_refuses_reparse_point() {
+        let t = tempfile::tempdir().expect("tmp");
+        let target = t.path().join("target");
+        std::fs::create_dir(&target).expect("mkdir");
+        junction(&t.path().join("f"), &target);
+        assert!(write_atomic(t.path(), "f", b"x", 0o644).is_err());
+        assert!(std::fs::read_dir(&target).expect("list").next().is_none());
     }
 }
