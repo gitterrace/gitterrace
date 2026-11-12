@@ -164,8 +164,7 @@ main td::before{display:none}}
 .groups ul{list-style:none;margin:0;padding:0}
 .groups li{line-height:var(--leading-tight)}
 .groups li+li{margin-top:var(--space-5)}
-.groups li a{color:var(--fg);font-weight:var(--weight-semibold);text-decoration:none}
-.groups li a:hover{color:var(--accent-ink);text-decoration:underline}
+.groups li a{font-weight:var(--weight-semibold)}
 .groups li span{display:block;margin-top:var(--space-1);color:var(--muted);
 font-size:var(--text-sm);line-height:1.45}
 /* On a wide screen the label takes a narrow column of its own, level with the first title. */
@@ -174,13 +173,20 @@ font-size:var(--text-sm);line-height:1.45}
 .groups h2{margin:0;align-self:start;line-height:calc(var(--text-md)*1.25)}
 .groups section+section{margin-top:calc(var(--space-8) + var(--space-2))}}
 
-/* Previous and next at the end of a docs page. */
+/* Previous and next at the end of a docs page: a bordered block each, not a text link. A
+   small mono label above the page title, the title in the text color, left and right.
+   Stacked on a narrow screen. */
 .pager{display:flex;justify-content:space-between;gap:var(--space-4);
 margin-top:var(--space-16)}
-.pager a{display:flex;flex-direction:column;text-decoration:none;font-weight:var(--weight-semibold)}
+.pager a{display:flex;flex-direction:column;gap:var(--space-1);flex:0 1 48%;
+padding:var(--space-3) var(--space-4);border:var(--border);border-radius:var(--radius);
+color:var(--fg);text-decoration:none;font-weight:var(--weight-semibold)}
+.pager a:hover{border-color:var(--line-strong);background:var(--soft)}
 .pager a span{font:var(--weight-regular) var(--text-2xs)/1.4 var(--mono);
 text-transform:uppercase;letter-spacing:.12em;color:var(--muted)}
 .pager .next{margin-left:auto;text-align:right}
+@media (max-width:640px){.pager{flex-direction:column}.pager a{flex:none}
+.pager .next{margin-left:0}}
 
 /* The landing page. */
 .hero h1{margin:0}
@@ -223,10 +229,17 @@ margin-bottom:-1px;border-bottom:1px solid var(--soft)}
 #install-curl:checked~#panel-curl,#install-brew:checked~#panel-brew{display:block}
 #install-cargo:checked~#panel-cargo{display:block}
 
-/* The footer: one row of quiet links under the text column. */
-footer{display:flex;flex-wrap:wrap;gap:var(--space-2) var(--space-4);
-margin:var(--space-16) 0 0;padding:var(--space-4) 0 var(--space-16);border-top:var(--border);
-font-size:var(--text-sm);color:var(--faint)}
+/* The footer: one labelled nav of quiet links under the text column, a docs page's source
+   link on the right. Small type at the muted ink, which holds AA on the page. Stacked on a
+   narrow screen, the source link last. */
+footer{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;
+gap:var(--space-2) var(--space-6);margin:var(--space-16) 0 0;
+padding:var(--space-4) 0 var(--space-16);border-top:var(--border);
+font-size:var(--text-sm);color:var(--muted)}
+footer nav{display:flex;flex-wrap:wrap;gap:var(--space-2) var(--space-4)}
 footer a{color:var(--muted);text-decoration:none}
 footer a:hover{color:var(--fg);text-decoration:underline}
+footer .edit{margin-left:auto}
+@media (max-width:640px){footer{flex-direction:column;align-items:flex-start}
+footer .edit{margin-left:0}}
 @media print{.top,.docnav,.outline,.menus,.pager{display:none!important}}
