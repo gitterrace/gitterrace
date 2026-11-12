@@ -193,3 +193,39 @@ async fn tree_page_is_memoized_until_the_branch_moves() {
         "a moved branch renders its new tree: {moved}"
     );
 }
+
+/// Guard class, as for the tree: the blame page is rendered once per (rev, commit, path), and a
+/// moved branch is never served the old page.
+#[tokio::test]
+async fn blame_page_is_memoized_until_the_branch_moves() {
+    let dir = tempfile::tempdir().expect("tmp");
+    let f = gitterrace_testkit::Fixture::init(dir.path())
+        .write("a.txt", "one\n")
+        .commit("feat: a");
+    let repo = gitterrace_git::Repo::discover(f.path()).expect("repo");
+    let index = gitterrace_index::Index::open(&repo).expect("index");
+    let env = crate::app::Env::new(gitterrace_config::Config::default());
+    let app = Arc::new(crate::app::App::configured(repo, index, &env));
+    let get = |app: &Arc<crate::app::App>| {
+        super::files::blame(
+            State(Arc::clone(app)),
+            Path(("main".into(), "a.txt".into())),
+        )
+    };
+    let first = get(&app).await.expect("page").0;
+    assert!(first.contains("one"), "{first}");
+    let head = app.repo.resolve("main").expect("head");
+    let key = app.memo_key("blame", Some(&format!("main\0{head}\0a.txt")));
+    app.memo_put(key, Arc::new("memo".into()));
+    assert_eq!(
+        get(&app).await.expect("page").0,
+        "memo",
+        "a repeat is not rebuilt"
+    );
+    let _f = f.write("a.txt", "two\n").commit("feat: b");
+    let moved = get(&app).await.expect("page").0;
+    assert!(
+        moved.contains("two"),
+        "a moved branch blames its new file: {moved}"
+    );
+}

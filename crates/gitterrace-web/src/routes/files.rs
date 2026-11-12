@@ -292,10 +292,21 @@ struct BlamePage {
     html: String,
 }
 
+/// Blame at one commit never changes, and its HTML is a row per line, so the page is rendered
+/// once per (rev, commit, path), as the tree is.
 pub(super) async fn blame(
     State(app): Shared,
     Path((rev, path)): Path<(String, String)>,
 ) -> Result<Html<String>> {
+    let (key, rev, path) = blocking(&app, move |a| {
+        let id = a.repo.resolve(&rev)?;
+        let query = format!("{rev}\0{id}\0{}", path.trim_matches('/'));
+        Ok((a.memo_key("blame", Some(&query)), rev, path))
+    })
+    .await?;
+    if let Some(h) = app.memo_get(&key) {
+        return Ok(Html(h));
+    }
     let p = blocking(&app, move |a| {
         let id = a.repo.resolve(&rev)?;
         let path = path.trim_matches('/').to_owned();
@@ -334,7 +345,9 @@ pub(super) async fn blame(
         })
     })
     .await?;
-    page(&p)
+    let html = p.render()?;
+    app.memo_put(key, Arc::new(html.clone()));
+    Ok(Html(html))
 }
 
 /// The blame tagline: how many lines, by how many authors, from how many commits.
