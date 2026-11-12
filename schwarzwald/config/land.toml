@@ -55,4 +55,5 @@ bench-guard = "builds a debug binary and runs the bench harness, minutes per lan
 docs-check = "the gate runs its cargo xtask check; the rest are self-tests of the dev scripts"
 clippy = "a full workspace clippy takes minutes; CI runs it on every push and pull request"
 test = "the gate runs the golden and xtask tests; the full workspace run is CI's"
+clippy-windows = "land-check runs it scoped to the touched crates; the workspace run is CI's"
 doc = "a full rustdoc build takes minutes; CI runs it on every push and pull request"

@@ -417,7 +417,7 @@ fn exit_signal(s: std::process::ExitStatus) -> Option<i32> {
 }
 
 #[cfg(windows)]
-fn exit_signal(_: std::process::ExitStatus) -> Option<i32> {
+const fn exit_signal(_: std::process::ExitStatus) -> Option<i32> {
     None
 }
 

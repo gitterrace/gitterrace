@@ -49,6 +49,8 @@ jobs:
         with:
           toolchain: ${{ steps.pin.outputs.channel }}
           components: clippy, rustfmt
+          # make check cross-checks Windows (clippy-windows).
+          targets: x86_64-pc-windows-gnu
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
@@ -59,6 +61,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-${{ steps.toolchain.outputs.cachekey }}-
       - uses: ./.github/actions/lint-tools
+      - run: sudo apt-get install -y --no-install-recommends gcc-mingw-w64-x86-64
       - run: make check
 
   deny:

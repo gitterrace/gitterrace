@@ -349,6 +349,11 @@ step() {
 step cargo fmt --all -- --check
 if ((${#scope[@]})); then
   step cargo clippy "${scope[@]}" --all-targets -- -D warnings
+  # The Windows cross check, as `make clippy-windows`: test-only code that is dead there fails.
+  if rustup target list --installed 2>/dev/null | grep -qx x86_64-pc-windows-gnu &&
+    command -v x86_64-w64-mingw32-gcc >/dev/null; then
+    step cargo clippy "${scope[@]}" --all-targets --target x86_64-pc-windows-gnu -- -D warnings
+  fi
   step cargo test "${scope[@]}"
   # Rustdoc as `make doc` runs it: a link to an item that only exists under cfg(test) passes
   # clippy and the tests and fails here alone.

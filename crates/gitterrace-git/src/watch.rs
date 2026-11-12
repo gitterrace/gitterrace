@@ -83,7 +83,7 @@ fn inode(m: &Metadata) -> u64 {
 }
 
 #[cfg(not(unix))]
-fn inode(_: &Metadata) -> u64 {
+const fn inode(_: &Metadata) -> u64 {
     0
 }
 

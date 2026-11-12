@@ -12,7 +12,9 @@ use crate::seg::bounds::{MAX_BLOCK, MAX_TOC};
 use crate::seg::format::{
     FOOTER_LEN, Footer, HEADER_LEN, Kind, StringBase, TocEntry, encode_toc, header,
 };
-use crate::seg::io::{create_no_follow, sync_dir};
+use crate::seg::io::create_no_follow;
+#[cfg(unix)]
+use crate::seg::io::sync_dir;
 use crate::seg::manifest::{FileEntry, Step, check_name};
 use crate::seg::{Oid, SegError, SegResult};
 
@@ -124,6 +126,7 @@ impl ContainerWriter {
         }
         let tmp = self.dir.join(format!("{}.tmp", self.name));
         fs::rename(tmp, self.dir.join(&self.name))?;
+        #[cfg(unix)]
         sync_dir(&self.dir)?;
         if !hook(Step::FileRenamed(self.name.clone())) {
             return Err(crashed());

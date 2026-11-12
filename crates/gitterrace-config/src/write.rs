@@ -130,6 +130,8 @@ pub fn save(
         drop(fs::remove_file(&tmp));
         return Err(e.into());
     }
+    // Windows has no folder handle to sync, and NTFS journals the rename.
+    #[cfg(unix)]
     sync_dir(dir)?;
     let stamp = Stamp::of(target)?.ok_or_else(|| io::Error::other("saved file vanished"))?;
     Ok(Saved { stamp })
@@ -184,11 +186,8 @@ fn temp_file(dir: &Path, name: &str, bytes: &[u8]) -> io::Result<PathBuf> {
     }
 }
 
-/// Makes the rename durable. Windows cannot open a folder for sync, and its rename is.
+/// Makes the rename durable. Unix only: Windows cannot open a folder for sync.
+#[cfg(unix)]
 fn sync_dir(dir: &Path) -> io::Result<()> {
-    #[cfg(unix)]
-    fs::File::open(dir)?.sync_all()?;
-    #[cfg(not(unix))]
-    let _ = dir;
-    Ok(())
+    fs::File::open(dir)?.sync_all()
 }

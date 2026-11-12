@@ -8,7 +8,9 @@
 use std::fs;
 use std::io::{Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
+#[cfg(unix)]
 use std::process::{Command, Stdio};
+#[cfg(unix)]
 use std::time::{Duration, Instant};
 
 use gitterrace_git::Repo;
@@ -20,6 +22,7 @@ use gitterrace_testkit::Fixture;
 
 /// Set in the child: the cache folder it opens.
 const CHILD_DIR: &str = "TEST_INTEGRITY_CHILD_DIR";
+#[cfg(unix)]
 const CHILD_TIMEOUT: Duration = Duration::from_secs(5);
 
 struct Built {
@@ -124,6 +127,7 @@ fn child_opens_the_cache() {
     drop(Store::open(&dir));
 }
 
+#[cfg(unix)]
 /// Runs `child_opens_the_cache` on `dir` in a child process, killed after `CHILD_TIMEOUT`.
 fn open_in_child(dir: &Path, case: &str) {
     let mut child = Command::new(std::env::current_exe().expect("exe"))

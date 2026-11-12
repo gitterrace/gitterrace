@@ -32,12 +32,12 @@ preview:
 	@bash scripts/dev/preview-run.sh
 
 ##@ Check gates
-.PHONY: check fmt clippy clippy-features lint harness-links test doc theme actions send-vectors \
+.PHONY: check fmt clippy clippy-features clippy-windows lint harness-links test doc theme actions send-vectors \
 	names lines docs-check gc-guard bench-guard
 
 ## check: Every gate, in the order CI runs them
 check: gc-guard theme actions send-vectors names lines bench-guard docs-check fmt clippy \
-	clippy-features lint test doc
+	clippy-features clippy-windows lint test doc
 
 # fmt: Check formatting
 fmt:
@@ -52,6 +52,15 @@ clippy:
 # build, such as an item used only under a feature, would never run.
 clippy-features:
 	cargo clippy -p gitterrace-index -p gitterrace-types --lib --no-default-features -- -D warnings
+
+# clippy-windows: Clippy on every target, tests included, cross-checked for Windows. Code used
+# only by unix tests is dead there and fails here, not on the weekly Windows runner. Skipped
+# with a note without the target and the mingw C compiler the C dependencies build with.
+clippy-windows:
+	@if rustup target list --installed 2>/dev/null | grep -qx x86_64-pc-windows-gnu \
+		&& command -v x86_64-w64-mingw32-gcc >/dev/null; then \
+		cargo clippy --workspace --all-targets --target x86_64-pc-windows-gnu -- -D warnings; \
+	else echo "clippy-windows: target or x86_64-w64-mingw32-gcc missing, skipped"; fi
 
 ## lint: External linters (typos, vale, shellcheck, ruff, pyright, ast-grep, ...)
 lint: harness-links

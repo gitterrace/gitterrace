@@ -10,7 +10,9 @@ use std::path::Path;
 
 use crate::seg::bounds::{Cursor, MAX_MANIFEST, MAX_TOC};
 use crate::seg::format::{FOOTER_LEN, VERSION};
-use crate::seg::io::{create_no_follow, open_named, read_exact_at, sync_dir};
+#[cfg(unix)]
+use crate::seg::io::sync_dir;
+use crate::seg::io::{create_no_follow, open_named, read_exact_at};
 use crate::seg::write::crashed;
 use crate::seg::{SegError, SegResult};
 
@@ -250,6 +252,7 @@ impl Manifest {
             return Err(crashed());
         }
         fs::rename(&tmp, dir.join(MANIFEST))?;
+        #[cfg(unix)]
         sync_dir(dir)?;
         if !hook(Step::ManifestRenamed) {
             return Err(crashed());

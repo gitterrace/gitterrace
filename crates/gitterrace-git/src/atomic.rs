@@ -253,14 +253,14 @@ mod windows_tests {
     use super::{open_append_no_follow, write_atomic};
 
     /// Plants a directory junction at `at` pointing to `to`: junctions need no privilege.
-    fn junction(at: &Path, to: &Path) {
+    fn junction(at: &Path, to: &Path) -> std::io::Result<()> {
         let made = std::process::Command::new("cmd")
             .args(["/c", "mklink", "/J"])
             .arg(at)
             .arg(to)
-            .status()
-            .expect("mklink");
+            .status()?;
         assert!(made.success(), "mklink /J");
+        Ok(())
     }
 
     #[test]
@@ -268,7 +268,7 @@ mod windows_tests {
         let t = tempfile::tempdir().expect("tmp");
         let target = t.path().join("target");
         std::fs::create_dir(&target).expect("mkdir");
-        junction(&t.path().join("f"), &target);
+        junction(&t.path().join("f"), &target).expect("junction");
         assert!(open_append_no_follow(t.path(), "f", 0o644).is_err());
     }
 
@@ -277,7 +277,7 @@ mod windows_tests {
         let t = tempfile::tempdir().expect("tmp");
         let target = t.path().join("target");
         std::fs::create_dir(&target).expect("mkdir");
-        junction(&t.path().join("f"), &target);
+        junction(&t.path().join("f"), &target).expect("junction");
         assert!(write_atomic(t.path(), "f", b"x", 0o644).is_err());
         assert!(std::fs::read_dir(&target).expect("list").next().is_none());
     }

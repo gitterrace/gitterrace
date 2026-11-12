@@ -36,17 +36,11 @@ pub(crate) fn open_named(dir: &Path, name: &str) -> io::Result<File> {
     crate::cache::open_read(dir, name)?.ok_or_else(|| io::ErrorKind::NotFound.into())
 }
 
-/// Makes a rename in `dir` durable. Windows has no directory handle to sync, NTFS journals it.
+/// Makes a rename in `dir` durable. Unix only: Windows has no directory handle to sync, and
+/// NTFS journals the rename, so each caller gates the call.
+#[cfg(unix)]
 pub(crate) fn sync_dir(dir: &Path) -> io::Result<()> {
-    #[cfg(unix)]
-    {
-        File::open(dir)?.sync_all()
-    }
-    #[cfg(not(unix))]
-    {
-        let _ = dir;
-        Ok(())
-    }
+    File::open(dir)?.sync_all()
 }
 
 /// Creates or truncates `dir/name` for writing without following a link at that name: the
@@ -79,7 +73,9 @@ pub(crate) fn write_atomic(dir: &Path, name: &str, bytes: &[u8]) -> io::Result<(
         f.sync_all()?;
     }
     fs::rename(dir.join(&tmp), dir.join(name))?;
-    sync_dir(dir)
+    #[cfg(unix)]
+    sync_dir(dir)?;
+    Ok(())
 }
 
 #[cfg(test)]

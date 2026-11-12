@@ -52,7 +52,7 @@ pub(super) fn check_file(path: &Path, repos: &[PathBuf]) -> Result<(), ConfigErr
     clippy::unnecessary_wraps,
     reason = "the signature must match the unix variant"
 )]
-fn owned_private(_: &Path, _: &std::fs::Metadata, _: u32) -> Result<(), ConfigError> {
+const fn owned_private(_: &Path, _: &std::fs::Metadata, _: u32) -> Result<(), ConfigError> {
     Ok(())
 }
 
