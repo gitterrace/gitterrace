@@ -14,8 +14,9 @@
 # title/body based on your changelogs.
 
 name: Release
+# Hand edit, keep across `dist generate`: read by default, write only where `host` releases.
 permissions:
-  "contents": "write"
+  "contents": "read"
 
 # This task will run whenever you push a git tag that looks like a version
 # like "1.0.0", "v0.1.0-prerelease.1", "my-app/0.1.0", "releases/v1.0.0", etc.
@@ -267,6 +268,9 @@ jobs:
       - build-global-artifacts
     # Only run if we're "publishing", and only if plan, local and global didn't fail (skipped is fine)
     if: ${{ always() && needs.plan.result == 'success' && needs.plan.outputs.publishing == 'true' && (needs.build-global-artifacts.result == 'skipped' || needs.build-global-artifacts.result == 'success') && (needs.build-local-artifacts.result == 'skipped' || needs.build-local-artifacts.result == 'success') && (needs.custom-release-check.result == 'skipped' || needs.custom-release-check.result == 'success') }}
+    # Hand edit, keep across `dist generate`: the one job that writes, to create the release.
+    permissions:
+      "contents": "write"
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     runs-on: "ubuntu-22.04"
