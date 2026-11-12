@@ -1,7 +1,7 @@
 {
   "schwarzwald": null,
   "dirty": false,
-  "date": "2026-11-12T05:00:28Z",
+  "date": "2026-11-12T18:49:44Z",
   "parts": [
     "configs",
     "fonts",
@@ -19,7 +19,7 @@
     "tools/selftest.py"
   ],
   "files": {
-    "README.md": "a2c31e4b702d642ce76ced50d9e740d87f3ad73f08cc3aff1c2498095b296ba2",
+    "README.md": "aff103106a14c61da6c96230caecf8489f5bbfc7c568fb37d811ac16f3d4d4bd",
     "check.py": "42413a5f2df406126d7ebf142317beb462716825ab16e5804b0e1f28a05a3d95",
     "configs/cliff-base.toml": "af6d61d5605368953ec077c37cd66b6670cd54ae8dbfb7681a2e33c2cf71d4cf",
     "configs/clippy-base.toml": "e2d4a22a5fbdab27da1188a8a664eefc40134d12f1d56cbe4af0a45936c2b77a",
