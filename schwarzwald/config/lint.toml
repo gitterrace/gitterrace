@@ -152,5 +152,7 @@ steps = [
   "ci-tiers-test|python3|install python3|python3 scripts/lint/ci-check.py --self-test",
   "ci-inject|python3|install python3|python3 scripts/lint/inject-check.py",
   "ci-inject-test|python3|install python3|python3 scripts/lint/inject-check.py --self-test",
+  "deps|python3|install python3|python3 scripts/lint/deps-check.py",
+  "deps-test|python3|install python3|python3 scripts/lint/deps-check.py --self-test",
   "machete|cargo-machete|cargo install cargo-machete|cargo-machete",
 ]

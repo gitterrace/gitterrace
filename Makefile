@@ -12,7 +12,11 @@ RELEASE_BIN := target/release/git-terrace
 BENCH_REPOS := --repos control,git,rust
 
 ##@ Build and run
-.PHONY: setup build install preview
+.PHONY: deps setup build install preview
+
+## deps: Install Rust and every tool the gate runs, at CI's versions (BROWSERS=1 adds browsers)
+deps:
+	bash scripts/dev/deps-run.sh $(if $(BROWSERS),--browsers)
 
 ## setup: Keep search indexers out of build, bench and agent dirs (once per machine)
 setup:

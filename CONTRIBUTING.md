@@ -9,11 +9,14 @@ A pull request is offered under the MIT license ([LICENSE](LICENSE)).
 
 ## Setup
 
-You need a Rust toolchain (the version is pinned in `rust-toolchain.toml`), git
-and Python 3. `uv` is only needed to regenerate the README header tagline.
+You need git. `make deps` installs the rest at the versions CI uses: the Rust
+toolchain `rust-toolchain.toml` pins, Python 3.11 or newer, node and the
+linters `make check` runs. On macOS it uses Homebrew, so install that first.
+`make deps BROWSERS=1` also fetches the browsers the browser checks drive.
 
 ```sh
 git clone https://github.com/gitterrace/gitterrace && cd gitterrace
+make deps
 make build
 make install  # git-terrace into ~/.cargo/bin, so `git terrace` works
 git terrace   # serves this checkout on 127.0.0.1
