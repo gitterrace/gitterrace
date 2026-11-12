@@ -49,7 +49,7 @@ jobs:
         with:
           toolchain: ${{ steps.pin.outputs.channel }}
           components: clippy, rustfmt
-          # make check cross-checks Windows (clippy-windows).
+          # make check cross-checks Windows (clippy-cross); Linux is this runner's host.
           targets: x86_64-pc-windows-gnu
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
@@ -62,7 +62,7 @@ jobs:
             ${{ runner.os }}-cargo-${{ steps.toolchain.outputs.cachekey }}-
       - uses: ./.github/actions/lint-tools
       - run: sudo apt-get install -y --no-install-recommends gcc-mingw-w64-x86-64
-      - run: make check
+      - run: make check CROSS=x86_64-pc-windows-gnu
 
   deny:
     name: Cargo deny
@@ -151,7 +151,8 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-${{ steps.toolchain.outputs.cachekey }}-
       - uses: ./.github/actions/lint-tools
-      - run: make check
+      # The Ubuntu job cross-checks Windows; this runner has neither that target nor Docker.
+      - run: make check CROSS=none
 
   # The Windows binary builds, its tests pass and it serves a repository. The runtime smoke test is
   # the same script the release check and scripts/dev/wine-run.sh use.

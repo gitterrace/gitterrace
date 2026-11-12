@@ -102,6 +102,11 @@ globs = ["*.rs", "*.py", "*.mjs", "*.js", "*.sh", "*.css", "*.html"]
 # Vendored third-party files are not ours to split.
 exclude = ["*/static/vendor/*"]
 
+[cross]
+# make clippy-cross: the targets gitterrace ships besides the macOS host. Code behind a windows
+# or linux cfg compiles only there, so the host's clippy never reads it.
+targets = ["x86_64-pc-windows-gnu", "x86_64-unknown-linux-gnu"]
+
 [changelog]
 # The git-cliff the output was checked with; keep equal to the version in CONTRIBUTING.
 git_cliff = "2.14.2"
