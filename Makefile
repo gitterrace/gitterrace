@@ -32,8 +32,8 @@ preview:
 	@bash scripts/dev/preview-run.sh
 
 ##@ Check gates
-.PHONY: check fmt clippy clippy-features clippy-windows lint harness-links test doc theme actions send-vectors \
-	names lines docs-check gc-guard bench-guard
+.PHONY: check fmt clippy clippy-features clippy-windows lint harness-links test doc theme \
+	actions send-vectors names lines docs-check gc-guard bench-guard
 
 ## check: Every gate, in the order CI runs them
 check: gc-guard theme actions send-vectors names lines bench-guard docs-check fmt clippy \
