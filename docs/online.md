@@ -77,6 +77,13 @@ index across restarts. Mount a config folder on `/config` for other settings.
 No prebuilt image is published. The build takes 5 to 10 minutes, on amd64 or
 arm64.
 
+`docker stop` sends SIGTERM, and the server stops accepting connections, lets
+open responses finish and exits 0, well inside Docker's 10 seconds. The image
+has a healthcheck that runs `git-terrace --version`: it proves the binary
+starts, not that the port answers, because the image has no shell or HTTP
+client. A client that does not finish its request headers in 10 seconds is
+disconnected.
+
 ## Behind a reverse proxy
 
 Put a TLS reverse proxy in front of gitterrace on loopback. The proxy owns
