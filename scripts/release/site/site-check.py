@@ -3,7 +3,8 @@
 
 release: the page tells people to `brew install` from the tap and `cargo install` from the
   repository. Deploying that before both answer publishes an install line that fails, so the
-  deploy refuses until the repository, the tap and the `v<version>` release tag exist.
+  deploy refuses until the repository, the tap and the `v<version>` release tag exist, and
+  until that release's shell installer holds a digest to check each download against.
 csp [DIR]: every inline <script> of every page under DIR has its exact sha256 in the CSP of
   DIR/_headers and of any meta CSP, and no hash is listed that no page has. A changed script or
   a stale _headers fails here instead of being blocked silently by the browser. Without DIR it
@@ -19,6 +20,7 @@ steps, and scripting them needs a Zone:Edit token, too large a credential for th
   python3 scripts/release/site/site-check.py release
   python3 scripts/release/site/site-check.py csp [DIR]
   python3 scripts/release/site/site-check.py domains
+  python3 scripts/release/site/site-check.py --self-test
 """
 
 from __future__ import annotations
@@ -48,6 +50,9 @@ OPENER = urllib.request.build_opener(NoRedirect)
 
 
 Answer = tuple[int, email.message.Message, str]
+# The shell installer dist attaches to each release, and the line in it that holds a digest.
+INSTALLER = "gitterrace-installer.sh"
+CHECKSUM = "_checksum_value="
 
 
 def fetch(url: str, method: str = "GET", body: bool = False) -> Answer:
@@ -172,7 +177,35 @@ def release() -> list[str]:
         )
         if status != 200:
             bad.append(f"{what} does not answer at {url}")
-    return bad
+    return bad + installer(f"{repo}/releases/download/v{version}/{INSTALLER}")
+
+
+def installer(url: str) -> list[str]:
+    """The shell installer `/install.sh` sends people to checks a digest per archive. A dist
+    change that dropped `checksum` would still ship a script, one that verifies nothing."""
+    status, _, text = fetch_following(url)
+    good = status == 200 and CHECKSUM in text
+    print(
+        f"  [{'+' if good else 'x'}] installer checks digests: {url} ({status or 'no answer'})"
+    )
+    if status != 200:
+        return [f"shell installer does not answer at {url}"]
+    if CHECKSUM not in text:
+        return [
+            f"shell installer at {url} has no {CHECKSUM}, so it verifies no download"
+        ]
+    return []
+
+
+def fetch_following(url: str) -> Answer:
+    """`fetch` that follows redirects: release downloads answer from a storage host."""
+    for _ in range(5):
+        status, headers, text = fetch(url, body=True)
+        loc = headers.get("Location", "")
+        if status not in (301, 302, 303, 307, 308) or not loc.startswith("https://"):
+            return status, headers, text
+        url = loc
+    return 0, email.message.Message(), ""
 
 
 def domains() -> list[str]:
@@ -210,7 +243,35 @@ def domains() -> list[str]:
     return bad
 
 
+def self_test() -> int:
+    """An installer without a digest line, or one that does not answer, is red; one with it
+    is green. `fetch` is replaced, so nothing goes to the network."""
+    global fetch
+    real = fetch
+    ok = "x\n_checksum_value=abc\n"
+    cases = [
+        ((200, email.message.Message(), "install without digests\n"), True),
+        ((404, email.message.Message(), ""), True),
+        ((200, email.message.Message(), ok), False),
+    ]
+    good = True
+    try:
+        for answer, red in cases:
+            fetch = lambda *_a, answer=answer, **_k: answer  # noqa: E731
+            if bool(installer("https://example.dev/i.sh")) != red:
+                print(
+                    f"self-test: {answer[0]} {answer[2]!r} should be {'red' if red else 'green'}"
+                )
+                good = False
+    finally:
+        fetch = real
+    print("self-test", "ok" if good else "FAILED")
+    return 0 if good else 1
+
+
 def main() -> int:
+    if "--self-test" in sys.argv:
+        return self_test()
     cmd = sys.argv[1] if len(sys.argv) > 1 else ""
     run = {"release": release, "domains": domains, "csp": csp}.get(cmd)
     if not run:
