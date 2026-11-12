@@ -60,6 +60,8 @@ clippy-windows:
 	@if rustup target list --installed 2>/dev/null | grep -qx x86_64-pc-windows-gnu \
 		&& command -v x86_64-w64-mingw32-gcc >/dev/null; then \
 		cargo clippy --workspace --all-targets --target x86_64-pc-windows-gnu -- -D warnings; \
+	elif [ -n "$$CI" ]; then \
+		echo "clippy-windows: target or x86_64-w64-mingw32-gcc missing in CI" >&2; exit 1; \
 	else echo "clippy-windows: target or x86_64-w64-mingw32-gcc missing, skipped"; fi
 
 ## lint: External linters (typos, vale, shellcheck, ruff, pyright, ast-grep, ...)
