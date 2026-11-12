@@ -296,6 +296,8 @@ async fn every_local_route_is_dark_on_a_public_server() {
 /// Class: every response, under every method a route takes and with the token a page holds,
 /// carries nosniff and the same-origin resource policy, and every HTML response a CSP that
 /// refuses foreign and inline script, so repository content rendered into any page cannot run.
+/// Every HTML response also says how long it may be cached, so no browser guesses one for a
+/// page named by a moving ref.
 #[tokio::test(flavor = "multi_thread")]
 async fn every_response_sends_nosniff_and_html_sends_the_csp() {
     let tmp = tempfile::tempdir().expect("tmp");
@@ -343,7 +345,32 @@ fn assert_safe_headers(m: &str, u: &str, res: &Reply) {
             "{m} {u}: {csp}"
         );
         assert!(!csp.contains("'unsafe-eval'"), "{m} {u}: {csp}");
+        assert!(
+            !get("cache-control").is_empty(),
+            "{m} {u}: no cache-control"
+        );
     }
+}
+
+/// A page at HEAD revalidates every time, a hashed asset keeps its year and raw its validator.
+#[tokio::test(flavor = "multi_thread")]
+async fn moving_pages_revalidate_and_assets_keep_their_lifetime() {
+    let tmp = tempfile::tempdir().expect("tmp");
+    let b = server(tmp.path(), false);
+    let cache = |r: &Reply| {
+        let v = r.headers.get("cache-control").expect("cache-control");
+        v.to_str().expect("ascii").to_owned()
+    };
+    let blob = send(&b.router, "GET", "/r/r/blob/HEAD/a.txt", &[]).await;
+    assert_eq!(
+        (blob.status, cache(&blob).as_str()),
+        (200, "private, no-cache")
+    );
+    let js = send(&b.router, "GET", crate::MERMAID_JS, &[]).await;
+    assert_eq!(cache(&js), "public, max-age=31536000, immutable");
+    let raw = send(&b.router, "GET", "/r/r/raw/HEAD/a.txt", &[]).await;
+    assert_eq!(cache(&raw), "private, max-age=300");
+    assert!(raw.headers.contains_key("etag"));
 }
 
 /// Class: no path a request names reaches outside the tree. Every path tail and every

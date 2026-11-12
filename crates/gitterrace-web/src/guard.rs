@@ -164,6 +164,18 @@ pub(crate) async fn guard(State(gate): State<Arc<Gate>>, req: Request, next: Nex
         header::REFERRER_POLICY,
         HeaderValue::from_static("strict-origin-when-cross-origin"),
     );
+    // A route that knows its lifetime (hashed assets, raw with an ETag, no-store forms) says so.
+    // Everything else is named by something that moves (HEAD, a branch, the worktree), and
+    // even a page pinned to a commit shows refs and the live tree in its chrome, so the
+    // browser revalidates instead of guessing. Local data stays out of shared caches.
+    if !h.contains_key(header::CACHE_CONTROL) {
+        let default = if gate.public {
+            "no-cache"
+        } else {
+            "private, no-cache"
+        };
+        h.insert(header::CACHE_CONTROL, HeaderValue::from_static(default));
+    }
     let html = h
         .get(header::CONTENT_TYPE)
         .is_some_and(|v| v.as_bytes().starts_with(b"text/html"));
