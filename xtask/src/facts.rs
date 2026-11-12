@@ -34,7 +34,7 @@ pub struct Workspace {
     /// windows-archive`; empty when there is none.
     pub windows_archive: String,
     /// The live demo's URL, from `[workspace.metadata.demo]`; empty when there is none. The
-    /// demo itself is built in github.com/gitterrace/demo.
+    /// demo itself is built by `make demo` and shipped by `make demo-deploy`.
     pub demo: String,
     /// The repositories the demo shows, `(name, tag)` from `[workspace.metadata.demo] repos`.
     pub demo_repos: Vec<(String, String)>,
@@ -179,5 +179,63 @@ impl Workspace {
             }
         }
         out
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::path::Path;
+
+    use super::*;
+
+    fn root() -> &'static Path {
+        Path::new(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .expect("xtask sits in the workspace")
+    }
+
+    fn read(rel: &str) -> String {
+        std::fs::read_to_string(root().join(rel)).expect(rel)
+    }
+
+    /// The demo and the screenshots show the same trees: every `[workspace.metadata.demo]` repo
+    /// is pinned at its tag in the shared corpus, and the corpus pins nothing else.
+    #[test]
+    fn demo_repos_match_the_screenshot_pins() {
+        let ws = load(root()).expect("cargo metadata");
+        let pins = read("scripts/lib/corpus-lib.mjs");
+        // `  name: {` opens a pin, its `tag: '...'` line closes it.
+        let mut pinned = Vec::new();
+        let mut name = None;
+        for line in pins.lines() {
+            if let Some(n) = line.strip_prefix("  ").and_then(|l| l.strip_suffix(": {")) {
+                name = Some(n.to_owned());
+            } else if let Some(t) = line.trim().strip_prefix("tag: '") {
+                let tag = t.split('\'').next().unwrap_or_default().to_owned();
+                pinned.push((name.take().expect("a tag inside a pin"), tag));
+            }
+        }
+        assert!(
+            !ws.demo_repos.is_empty(),
+            "no [workspace.metadata.demo] repos"
+        );
+        assert_eq!(
+            ws.demo_repos, pinned,
+            "Cargo.toml demo repos vs scripts/lib/corpus-lib.mjs"
+        );
+    }
+
+    /// The demo's Cloudflare route serves the URL the README and the site link.
+    #[test]
+    fn demo_config_routes_the_metadata_url() {
+        let ws = load(root()).expect("cargo metadata");
+        let host = ws.demo.strip_prefix("https://").expect("demo url is https");
+        let conf = read("deploy/demo/wrangler.toml");
+        let route = format!("routes = [{{ pattern = \"{host}\", custom_domain = true }}]");
+        assert!(
+            conf.contains(&route),
+            "deploy/demo/wrangler.toml lacks {route}"
+        );
+        assert!(conf.contains("directory = \"../../target/demo\""));
     }
 }
