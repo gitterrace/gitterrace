@@ -96,7 +96,7 @@
     "scripts/verify/send-vectors-check.mjs": 4,
     "scripts/release/site/site-check.py": 2,
     "scripts/release/site/site-render.mjs": 9,
-    "scripts/release/site/site-shots-run.mjs": 14,
+    "scripts/release/site/site-shots-run.mjs": 9,
     "scripts/verify/smoke-check.sh": 11,
     "scripts/lint/status-words-check.py": 1,
     "scripts/lint/stubs-check.py": 1,

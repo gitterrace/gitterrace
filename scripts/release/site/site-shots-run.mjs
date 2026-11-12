@@ -1,44 +1,29 @@
 #!/usr/bin/env node
 // Takes the website and README screenshots of jq and ripgrep (public MIT projects, the same as
-// the demo). Self-contained: clones both into ~/.cache/gitterrace-shots (reused when present),
-// pins a `release` branch in each to the commit in PINS, and serves them with the release binary
-// on a free port, with scripts/release/site/site-shots/config as the config folder (no tendir in
-// Send to) and a throwaway state folder, so neither the user's config nor a running preview is
-// touched. Light
-// and dark images per shot, 1280x800 at 2x, into target/site-shots/ (ignored). Then copies the
-// PNG files README.md links into docs/screenshots/ and deletes the rest there. `make site-shots`
-// builds first and follows this with site-render (the WebPs) and `cargo xtask generate`. Not in
-// check: it needs browsers and the network on the first run.
+// the live demo `make demo` builds). Self-contained: checks both out at the pins in
+// scripts/lib/corpus-lib.mjs (cached in ~/.cache/gitterrace-shots), and serves them with the
+// release binary on a free port, with scripts/release/site/site-shots/config as the config
+// folder (no tendir in Send to) and a throwaway state folder, so neither the user's config nor a
+// running preview is touched. Light and dark images per shot, 1280x800 at 2x, into
+// target/site-shots/ (ignored). Then copies the PNG files README.md links into docs/screenshots/
+// and deletes the rest there. `make site-shots` builds first and follows this with site-render
+// (the WebPs) and `cargo xtask generate`. Not in check: it needs browsers and the network on the
+// first run.
 //
 //   node scripts/release/site/site-shots-run.mjs [NAME...]   all shots by default
-import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync } from 'node:fs';
+import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync } from 'node:fs';
 import { execFileSync, spawn } from 'node:child_process';
-import { homedir, tmpdir } from 'node:os';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { root, loadPlaywright, launch, freePort } from '../../lib/browser-lib.mjs';
+import { checkout } from '../../lib/corpus-lib.mjs';
 
-// The demo's releases: jq 1.8.2 and ripgrep 15.2.0. The shot paths below fit these commits
-// (ripgrep 068a63e is in 15.2.0, and the blame and send files below exist there).
-const PINS = {
-  jq: { url: 'https://github.com/jqlang/jq.git', commit: '34f7186b86743a083a589741b6cea95293524108' },
-  ripgrep: { url: 'https://github.com/BurntSushi/ripgrep.git', commit: 'e89fff89ac9af12e8d4ce9d5fd07beb408ca730f' },
-};
-const corpus = join(homedir(), '.cache/gitterrace-shots');
-const git = (cwd, ...a) => execFileSync('git', ['-C', cwd, ...a], { stdio: ['ignore', 'pipe', 'inherit'] }).toString().trim();
-mkdirSync(corpus, { recursive: true });
-for (const [name, { url, commit }] of Object.entries(PINS)) {
-  const dir = join(corpus, name);
-  if (!existsSync(join(dir, '.git'))) execFileSync('git', ['clone', '-q', url, dir], { stdio: 'inherit' });
-  try { git(dir, 'cat-file', '-e', `${commit}^{commit}`); } catch { git(dir, 'fetch', '-q', 'origin', commit); }
-  // HEAD on `release` at the pin, a clean worktree: every shot reads the same tree.
-  git(dir, 'checkout', '-q', '-f', '-B', 'release', commit);
-  git(dir, 'clean', '-qfdx', '-e', '.git');
-}
+const dirs = checkout();
 
 const bin = join(root, 'target/release/git-terrace');
 const port = await freePort();
 const state = mkdtempSync(join(tmpdir(), 'gt-shots-state-'));
-const server = spawn(bin, ['serve', '--addr', `127.0.0.1:${port}`, '--no-watch', '--config', join(root, 'scripts/release/site/site-shots/config'), ...Object.keys(PINS).map((n) => join(corpus, n))], {
+const server = spawn(bin, ['serve', '--addr', `127.0.0.1:${port}`, '--no-watch', '--config', join(root, 'scripts/release/site/site-shots/config'), ...Object.values(dirs)], {
   stdio: ['ignore', 'ignore', 'inherit'],
   env: { ...process.env, XDG_STATE_HOME: state },
 });
