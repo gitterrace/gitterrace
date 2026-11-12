@@ -7,7 +7,6 @@
 //! anything outside the common git directory.
 
 use std::fs;
-use std::io::Read;
 use std::path::{Component, Path, PathBuf};
 
 use gix::bstr::ByteSlice;
@@ -324,17 +323,11 @@ fn read_inside(common: &Path, parts: &[&str]) -> Option<String> {
             return None;
         }
     }
-    let meta = fs::symlink_metadata(&path).ok()?;
-    if !meta.is_file() || meta.len() > MAX_META_BYTES {
-        return None;
-    }
-    let mut text = String::new();
-    fs::File::open(&path)
-        .ok()?
-        .take(MAX_META_BYTES)
-        .read_to_string(&mut text)
-        .ok()?;
-    Some(text)
+    // The open refuses a link and a non-file handle itself, so an entry swapped after the
+    // checks above is never followed; the bound holds even if the file grows meanwhile.
+    let name = path.file_name()?.to_str()?;
+    let bytes = crate::read_no_follow_bounded(path.parent()?, name, MAX_META_BYTES).ok()??;
+    String::from_utf8(bytes).ok()
 }
 
 #[cfg(test)]
@@ -481,6 +474,27 @@ pub(crate) mod tests {
         assert!(!w[0].locked, "a symlinked locked file must read as absent");
         assert!(super::read_inside(&d.join(".git"), &["worktrees", "..", "HEAD"]).is_none());
         assert!(super::read_inside(&d.join(".git"), &["worktrees/etc", "HEAD"]).is_none());
+    }
+
+    /// The read opens without following and without blocking: a FIFO at a metadata name (the
+    /// stand-in for an entry swapped after the checks) reads as absent at once, never hangs.
+    #[test]
+    #[cfg(unix)]
+    fn read_inside_returns_none_for_symlink_target() {
+        let t = tempfile::tempdir().expect("tmp");
+        let wt = t.path().join("worktrees/x");
+        fs::create_dir_all(&wt).expect("mkdir");
+        let made = std::process::Command::new("mkfifo")
+            .arg(wt.join("HEAD"))
+            .status()
+            .expect("mkfifo");
+        assert!(made.success(), "mkfifo");
+        assert!(super::read_inside(t.path(), &["worktrees", "x", "HEAD"]).is_none());
+        fs::write(wt.join("gitdir"), "/w\n").expect("write");
+        assert_eq!(
+            super::read_inside(t.path(), &["worktrees", "x", "gitdir"]).as_deref(),
+            Some("/w\n")
+        );
     }
 
     #[test]
