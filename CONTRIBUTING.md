@@ -108,8 +108,7 @@ on http://127.0.0.1:4343.
 4. Tag and push. The release workflow builds the binaries, the installer and the
    formula.
 5. `make deploy` (it refuses until the tag, repository and tap answer), then
-   `make domains`. Mail: gitterrace.dev needs MX and the catch-all before the
-   legal pages go live.
+   `make domains`.
 6. Refresh the demo from [gitterrace/demo](https://github.com/gitterrace/demo):
    `make deploy` there.
 
