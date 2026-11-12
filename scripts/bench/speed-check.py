@@ -107,6 +107,8 @@ def main() -> int:
         return self_test()
     if not a.bin:
         ap.error("--bin is required")
+    # The server runs with the bench clone as cwd, so a relative --bin would not resolve there.
+    a.bin = str(Path(a.bin).resolve())
     if not (a.repo / "gitterrace" / "MANIFEST").exists():
         sys.exit(f"{a.repo} has no built index: serve it once first")
     names = [n for n in a.only.split(",") if n] or list(GATES)
