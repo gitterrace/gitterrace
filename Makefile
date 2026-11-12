@@ -191,7 +191,8 @@ bench-report:
 	python3 scripts/bench/bench-report.py
 
 ##@ Site and release
-.PHONY: docs-gen domains changelog site deploy site-preview app-icon site-render site-shots shipped
+.PHONY: docs-gen domains changelog site deploy demo demo-deploy site-preview app-icon site-render \
+	site-shots shipped
 
 ## docs-gen: Regenerate every generated file (docs, README blocks) and build the site
 docs-gen:
@@ -217,6 +218,16 @@ deploy: shipped site site-render
 	@test -s target/site/404.html || { echo "target/site/404.html missing: not_found_handling has nothing to serve"; exit 1; }
 	cargo run -q -p xtask -- deploy-check
 	npx wrangler@4 deploy
+
+# demo: the pinned jq and ripgrep (scripts/lib/corpus-lib.mjs, the screenshots' trees) exported in
+# public mode, then the export checks. Needs node and the network on the first run.
+## demo: Build the live demo (jq and ripgrep, exported) into target/demo
+demo: build
+	node scripts/release/demo-export.mjs
+
+## demo-deploy: Ship target/demo, rebuilt from a clean HEAD, to demo.gitterrace.dev
+demo-deploy: shipped demo
+	npx wrangler@4 deploy --config deploy/demo/wrangler.toml
 
 # site-preview serves target/site through the same assets runtime as the deploy, so the
 # headers, the redirects and the 404 page behave as on gitterrace.dev. It builds the site from
