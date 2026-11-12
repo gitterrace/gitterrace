@@ -25,7 +25,9 @@ pub struct Stamp {
 }
 
 impl Stamp {
-    /// The stamp of `path` now. `None` when there is no file.
+    /// The stamp of `path` now. `None` when there is no file. On a filesystem with
+    /// one-second mtimes (HFS+), two saves of the same length within a second stamp alike, so
+    /// the stale-file guard misses the second; APFS and ext4 keep nanoseconds.
     pub fn of(path: &Path) -> io::Result<Option<Self>> {
         match fs::symlink_metadata(path) {
             Ok(m) => {

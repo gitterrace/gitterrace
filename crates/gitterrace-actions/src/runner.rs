@@ -285,7 +285,8 @@ pub fn expand(template: &[String], payload: &Payload) -> Result<Vec<String>, Run
             Some(Piece::Field(n)) if REPO_FIELDS.contains(&field_parts(n).0));
         if !after_dashdash && repo_first && arg.starts_with('-') {
             return Err(RunError::Refused(format!(
-                "command[{i}] would start with '-' and read as an option"
+                "command[{i}] would start with '-' and read as an option. Put '--' before the \
+                placeholder or a literal prefix in front of it in actions.toml"
             )));
         }
         after_dashdash |= el == "--";

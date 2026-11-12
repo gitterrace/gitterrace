@@ -270,6 +270,8 @@ fn ensure_server(
             };
             let l = TcpListener::bind((addr.ip(), 0)).context("finding a free port")?;
             let other = l.local_addr()?;
+            // The listener only found a free port; the child binds it again on its own. Another
+            // process could take it in between, on loopback, and the child then fails to start.
             drop(l);
             eprintln!(
                 "gitterrace: {addr} is held by {what}; it is left running and this repository gets \
