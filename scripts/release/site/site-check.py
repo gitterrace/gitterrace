@@ -83,11 +83,15 @@ META_CSP = re.compile(
 )
 
 
+# A data block (`type="application/json"`) is never run, so the CSP need not list it.
+DATA_BLOCK = re.compile(r"\btype\s*=\s*[\"']?application/(ld\+)?json", re.I)
+
+
 def script_hashes(html: str) -> set[str]:
     """The CSP source of every inline script: 'sha256-<base64>' over its exact text."""
     out = set()
     for attrs, text in INLINE_SCRIPT.findall(html):
-        if re.search(r"\bsrc\s*=", attrs, re.I):
+        if re.search(r"\bsrc\s*=", attrs, re.I) or DATA_BLOCK.search(attrs):
             continue
         digest = hashlib.sha256(text.encode("utf-8")).digest()
         out.add(f"'sha256-{base64.b64encode(digest).decode()}'")
@@ -97,7 +101,7 @@ def script_hashes(html: str) -> set[str]:
 def csp_problems(where: str, csp: str, html: str | list[str]) -> list[str]:
     """What is wrong with `csp` for `html`, one page or every page the policy covers: a
     missing policy, an inline script whose exact hash it lacks, a hash for no script on any
-    page, or unsafe-inline."""
+    page, or unsafe-inline in script-src."""
     if not csp:
         return [f"{where}: no Content-Security-Policy"]
     m = re.search(r"script-src([^;]*)", csp)
@@ -112,8 +116,9 @@ def csp_problems(where: str, csp: str, html: str | list[str]) -> list[str]:
         f"{where}: script-src lists {h}, which no inline script has"
         for h in sorted(listed - want)
     ]
-    if "'unsafe-inline'" in csp:
-        bad.append(f"{where}: unsafe-inline")
+    # Inline styles are harmless next to scripts: only script-src must refuse unsafe-inline.
+    if m and "'unsafe-inline'" in m.group(1):
+        bad.append(f"{where}: script-src unsafe-inline")
     return bad
 
 
@@ -137,7 +142,8 @@ def csp(directory: str | None = None) -> list[str]:
         d = ROOT / "target" / "site"
     # The `/*` policy covers every page, so its hashes answer for the scripts of all of them:
     # a script only the docs pages carry is still one the policy must list.
-    pages = sorted(d.rglob("*.html"))
+    # An export names a folder for a repository file, so ICU-license.html can be a folder.
+    pages = sorted(p for p in d.rglob("*.html") if p.is_file())
     htmls = [p.read_text() for p in pages]
     bad = csp_problems(
         f"{d}/_headers", headers_csp((d / "_headers").read_text()), htmls
@@ -352,6 +358,22 @@ def self_test() -> int:
                 good = False
     finally:
         fetch = real
+    # The CSP rules: a run script needs its hash, a data block does not, and unsafe-inline is
+    # refused in script-src only.
+    run = "<script>go()</script>"
+    data = '<script type="application/json">{"a":1}</script>'
+    h = next(iter(script_hashes(run)))
+    for policy, page, red in [
+        (f"script-src {h}", run + data, False),
+        ("script-src 'self'", run, True),
+        (f"script-src {h}; style-src 'unsafe-inline'", run, False),
+        (f"script-src {h} 'unsafe-inline'", run, True),
+    ]:
+        if bool(csp_problems("t", policy, page)) != red:
+            print(
+                f"self-test: {policy!r} on {page!r} should be {'red' if red else 'green'}"
+            )
+            good = False
     good = links_self_test() and good
     print("self-test", "ok" if good else "FAILED")
     return 0 if good else 1
