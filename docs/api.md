@@ -188,9 +188,9 @@ so to the model.
   to look first. Parameters: `limit?` (integer), `path?` (string), `period?`
   (string), `query` (string), `repo?` (string), `rev?` (string).
 - `list_repos`: The repositories this server may read and which scope it was
-  started with: name (pass it as `repo` to every other tool), path, HEAD, branch
-  and newest commit. One that cannot be read shows `available: false` and why.
-  Call this first when several are in scope.
+  started with: name (pass it as `repo` to every other tool), HEAD, branch and
+  newest commit. One that cannot be read shows `available: false` and why. Call
+  this first when several are in scope.
 - `list_tree`: Directory listing at a revision: name, kind (dir, file, symlink,
   submodule) and size per entry, one level deep. Use to explore the layout
   before `read_file`. Parameters: `path?` (string), `repo?` (string), `rev?`

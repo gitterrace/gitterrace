@@ -93,6 +93,10 @@ async fn list_repos_names_every_repository_in_scope_with_its_last_commit() {
     let repos = v["repos"].as_array().expect("repos");
     assert_eq!(repos.len(), 3);
     assert_eq!(repos[0]["name"], "alpha");
+    assert!(
+        repos[0].get("path").is_none(),
+        "a host path would reach the model"
+    );
     assert_eq!(repos[0]["last_commit"]["subject"], "feat: alpha one");
     assert_eq!(repos[1]["head_branch"], "main");
     assert_eq!(repos[2]["available"], false);

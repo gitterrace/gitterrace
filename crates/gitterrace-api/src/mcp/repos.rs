@@ -45,7 +45,6 @@ pub(crate) struct LastCommit {
 #[derive(Debug, Serialize, JsonSchema)]
 pub(crate) struct RepoRow {
     name: String,
-    path: String,
     available: bool,
     error: Option<String>,
     head: Option<String>,
@@ -200,7 +199,6 @@ fn row(r: &McpRepo, cfg: &Config) -> RepoRow {
     if !cfg.feature_on(Feature::Api, Some(&r.name)) {
         return RepoRow {
             name: r.name.clone(),
-            path: String::new(),
             available: false,
             error: Some("api off".to_owned()),
             head: None,
@@ -210,7 +208,6 @@ fn row(r: &McpRepo, cfg: &Config) -> RepoRow {
     }
     let mut out = RepoRow {
         name: r.name.clone(),
-        path: gitterrace_config::tilde(&r.path),
         available: false,
         error: r.unavailable.clone(),
         head: None,

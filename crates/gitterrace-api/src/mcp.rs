@@ -354,7 +354,7 @@ impl McpServer {
     }
 
     /// The repositories this server may read and which scope it was started with: name (pass
-    /// it as `repo` to every other tool), path, HEAD, branch and newest commit. One that cannot
+    /// it as `repo` to every other tool), HEAD, branch and newest commit. One that cannot
     /// be read shows `available: false` and why. Call this first when several are in scope.
     #[tool(name = "list_repos", annotations(read_only_hint = true))]
     async fn list_repos(&self) -> Result<CallToolResult, ErrorData> {
