@@ -1,6 +1,6 @@
 /* The Send to window. */
 .ov.send{width:min(520px,94vw);max-height:80vh}
-.send-title{border:0;border-bottom:var(--border);border-radius:0;height:40px;padding:0 var(--space-4);font-size:var(--text-md);width:100%;background:transparent;flex:none}
+.send-title{box-sizing:border-box;display:block;width:calc(100% - var(--space-4)*2);height:32px;margin:var(--space-2) var(--space-4) 0;padding:0 var(--space-3);font-size:var(--text-md);background-color:var(--bg);border:var(--border);border-radius:var(--radius);flex:none}
 /* The context box starts a few lines tall and grows with what is in it (field-sizing where the
    browser has it, send.js elsewhere), up to most of the window, then scrolls. */
 .send-ctx{border:0;border-radius:0;resize:none;flex:none;field-sizing:content;min-height:calc(1.5em*4 + var(--space-3)*2);max-height:60vh;overflow-y:auto;padding:var(--space-3) var(--space-4);font-family:var(--font-mono);font-size:var(--text-sm);line-height:1.5;background:transparent;color:var(--fg)}
