@@ -7,6 +7,7 @@
     reason = "the trait fixes the async signature"
 )]
 
+mod bounds;
 mod core;
 mod endpoints;
 mod error;

@@ -16,13 +16,11 @@ use gitterrace_types::api::{
     RepoResponse, RepoTotals, TreeResponse,
 };
 
+use crate::bounds::{checked, checked_path};
 use crate::error::ApiError;
 use crate::{insights, wire};
 
 const DEFAULT_REV: &str = "HEAD";
-/// Rev syntax that searches history (`:/text`, `^{/text}`) or reads reflogs (`@{...}`): a
-/// request could make one call walk every commit. Branch, tag, sha and `~`/`^` stay allowed.
-const REJECTED_REV: [&str; 3] = [":/", "^{/", "@{"];
 
 /// Counting options the configuration sets for the repository named `name`: `insights.*` plus
 /// `[repo.NAME] exclude`.
@@ -428,6 +426,7 @@ impl ApiState {
         start_line: Option<usize>,
         limit: Option<usize>,
     ) -> Result<BlobResponse, ApiError> {
+        checked_path(path)?;
         let rev = Self::rev(rev)?;
         let id = self.repo.resolve(rev)?;
         let blob = self.repo.blob(&id, path)?;
@@ -477,6 +476,7 @@ impl ApiState {
     }
 
     pub fn blame(&self, rev: Option<&str>, path: &str) -> Result<BlameResponse, ApiError> {
+        checked_path(path)?;
         let rev = Self::rev(rev)?;
         let id = self.repo.resolve(rev)?;
         let all = self.repo.blame(&id, path)?;
@@ -587,14 +587,4 @@ impl ApiState {
             rev: rev.to_owned(),
         })
     }
-}
-
-/// `rev` unless it uses syntax in [`REJECTED_REV`].
-fn checked(rev: &str) -> Result<&str, ApiError> {
-    if REJECTED_REV.iter().any(|p| rev.contains(p)) {
-        return Err(ApiError::BadRequest(format!(
-            "unsupported revision syntax in {rev:?}: use a branch, tag, sha or HEAD~n"
-        )));
-    }
-    Ok(rev)
 }
