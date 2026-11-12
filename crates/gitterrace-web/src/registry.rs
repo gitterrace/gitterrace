@@ -240,7 +240,13 @@ pub fn add_token(dir: &Path, port: u16) -> io::Result<String> {
         }
     }
     let head = &bytes[..bytes.len().min(256)];
-    Ok(String::from_utf8_lossy(head).trim().to_owned())
+    let token = String::from_utf8_lossy(head).trim().to_owned();
+    // The token goes verbatim into a hand-built request header: only base64url passes.
+    let base64url = |b: u8| b.is_ascii_alphanumeric() || matches!(b, b'-' | b'_');
+    if token.is_empty() || !token.bytes().all(base64url) {
+        return Err(io::Error::other("token contains unexpected characters"));
+    }
+    Ok(token)
 }
 
 fn private_dir(dir: &Path) -> io::Result<()> {
@@ -410,6 +416,20 @@ mod tests {
             std::os::unix::fs::symlink(&elsewhere, &f).expect("link");
             assert!(add_token(&state, 4321).is_err(), "symlink");
             assert!(write_add_token(&state, 4321, "s").is_err(), "not replaced");
+        }
+    }
+
+    /// The token goes verbatim into a request header, so a line break or a space in the file
+    /// must fail the read, not split the header.
+    #[test]
+    fn add_token_rejects_non_base64url_content() {
+        let t = tempfile::tempdir().expect("tmp");
+        let state = t.path().join("s");
+        write_add_token(&state, 4321, "Ab-_09\n").expect("write");
+        assert_eq!(add_token(&state, 4321).expect("read"), "Ab-_09");
+        for bad in ["ab\r\nX-Evil: 1", "a b", "a=b", "é", ""] {
+            write_add_token(&state, 4321, bad).expect("write");
+            assert!(add_token(&state, 4321).is_err(), "{bad:?}");
         }
     }
 
