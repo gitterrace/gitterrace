@@ -519,12 +519,23 @@ fn code_counts(input: &InternedInput<&[u8]>, diff: &Diff) -> CodeCounts {
     let mut out = CodeCounts::default();
     let line = |t: &gix::diff::blob::Token| input.interner[*t];
     for h in diff.hunks() {
-        let before: Vec<Vec<u8>> = input.before[h.before.start as usize..h.before.end as usize]
+        // The ranges come from gix: one past the tokens is skipped, never a panic on a page.
+        let (Some(before), Some(after)) = (
+            input
+                .before
+                .get(h.before.start as usize..h.before.end as usize),
+            input
+                .after
+                .get(h.after.start as usize..h.after.end as usize),
+        ) else {
+            continue;
+        };
+        let before: Vec<Vec<u8>> = before
             .iter()
             .map(|t| squash(line(t)))
             .filter(|l| !l.is_empty())
             .collect();
-        let after: Vec<Vec<u8>> = input.after[h.after.start as usize..h.after.end as usize]
+        let after: Vec<Vec<u8>> = after
             .iter()
             .map(|t| squash(line(t)))
             .filter(|l| !l.is_empty())

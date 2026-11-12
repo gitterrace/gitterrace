@@ -29,6 +29,8 @@ pub(crate) fn build_hunks(old: &[u8], new: &[u8], diff: &Diff) -> Vec<Hunk> {
                 h.after.start as usize..h.after.end as usize,
             )
         })
+        // The ranges come from gix: one past the lines is dropped, never a panic on a page.
+        .filter(|(b, a)| b.end <= old_lines.len() && a.end <= new_lines.len())
         .collect();
     let mut out = Vec::new();
     let mut i = 0;

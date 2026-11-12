@@ -278,3 +278,25 @@ fn the_owned_index_cache_diffs_as_the_shared_one() -> crate::Result<()> {
     }
     Ok(())
 }
+
+/// A diff computed on longer texts than the ones it is applied to: its ranges run past them.
+fn stale_diff() -> gix::diff::blob::Diff {
+    use gix::diff::blob::{Algorithm, Diff, InternedInput};
+    let (old, new) = (
+        b"a\nb\nc\nd\ne\nf\n".as_slice(),
+        b"a\nb\nc\nd\ne\nF\n".as_slice(),
+    );
+    Diff::compute(Algorithm::Myers, &InternedInput::new(old, new))
+}
+
+#[test]
+fn code_counts_ignores_out_of_range_hunk() {
+    let input = gix::diff::blob::InternedInput::new(b"a\n".as_slice(), b"b\n".as_slice());
+    let counts = crate::diff::code_counts(&input, &stale_diff());
+    assert_eq!(counts, crate::CodeCounts::default());
+}
+
+#[test]
+fn build_hunks_ignores_out_of_range_hunk() {
+    assert!(crate::diff::hunks::build_hunks(b"a\n", b"b\n", &stale_diff()).is_empty());
+}
