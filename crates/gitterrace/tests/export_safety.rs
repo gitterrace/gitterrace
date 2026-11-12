@@ -251,3 +251,81 @@ fn a_site_left_aside_by_a_crash_is_restored_by_the_next_export() {
         .collect();
     assert!(left.is_empty(), "left beside the site: {left:?}");
 }
+
+/// A repository whose tree, written by plumbing so no disk folds it, holds `names` at the top.
+fn names_repo(at: &Path, names: &[(&str, &str)]) -> Fixture {
+    let f = Fixture::init(at);
+    // Otherwise fast-import on macOS, where init sets it, folds the pair into one path.
+    f.git(&["config", "core.ignorecase", "false"]);
+    let mut s = String::from(
+        "commit refs/heads/main\ncommitter T <t@example.com> 1700000000 +0000\ndata 2\nc\n",
+    );
+    for (name, body) in names {
+        s += &[
+            "M 100644 inline ",
+            name,
+            "\ndata ",
+            &body.len().to_string(),
+            "\n",
+            body,
+            "\n",
+        ]
+        .concat();
+    }
+    gitterrace_testkit::git_stdin(f.path(), &["fast-import", "--quiet"], s.as_bytes());
+    f
+}
+
+/// Guard class: two names one disk stores as one file, by case or by Unicode form, and names
+/// Windows reserves or strips. The later of a pair is skipped with a line naming both, the
+/// first keeps its own page, and a reserved name is skipped like any hostile segment. Red
+/// before the check: the second write replaced the first on APFS and NTFS.
+#[test]
+fn names_one_disk_stores_as_one_file_are_skipped_with_a_line() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let home = dir.path();
+    let nfd = "no\u{308}te.txt";
+    let nfc = "n\u{f6}te.txt";
+    let src = names_repo(
+        &home.join("src"),
+        &[
+            ("README.md", "upper body"),
+            ("readme.md", "lower body"),
+            (nfd, "decomposed body"),
+            (nfc, "composed body"),
+            ("NUL.txt", "device body"),
+            ("ok.txt", "plain body"),
+        ],
+    );
+    let out = home.join("site");
+    let o = export(home, &out, &[src.path()], &[]);
+    let err = stderr(&o);
+    assert!(o.status.success(), "{err}");
+    // Names are reported quoted, a combining mark escaped.
+    for [kept, skipped] in [["README.md", "readme.md"], [nfd, nfc]] {
+        let [kept, skipped] = [format!("{kept:?}"), format!("{skipped:?}")];
+        let line = err
+            .lines()
+            .find(|l| l.contains(&skipped))
+            .unwrap_or_default();
+        assert!(
+            line.contains(&kept),
+            "no line names {skipped} and {kept}: {err}"
+        );
+    }
+    assert!(
+        err.contains("NUL.txt"),
+        "the device name was not reported: {err}"
+    );
+    let blob = out.join("r/src/blob/HEAD");
+    let names: Vec<String> = std::fs::read_dir(&blob)
+        .expect("read")
+        .map(|e| e.expect("entry").file_name().to_string_lossy().into_owned())
+        .collect();
+    let readmes = names.iter().filter(|n| n.eq_ignore_ascii_case("readme.md"));
+    assert_eq!(readmes.count(), 1, "{names:?}");
+    assert!(!names.iter().any(|n| n.starts_with("NUL")), "{names:?}");
+    let page = std::fs::read_to_string(blob.join("README.md/index.html")).expect("README page");
+    assert!(page.contains("upper body") && !page.contains("lower body"));
+    assert!(blob.join("ok.txt/index.html").is_file());
+}

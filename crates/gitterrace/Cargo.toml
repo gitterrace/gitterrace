@@ -36,6 +36,9 @@ serde.workspace = true
 serde_json.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
+# Already in the tree through gix: two names that differ only in case or normalization form
+# land in one file on APFS and NTFS, so the export compares them folded.
+unicode-normalization = "0.1"
 
 # The system allocator on macOS keeps freed pages: a server that drops an idle 800 MB record set
 # stayed at that footprint. jemalloc with decay 0, set at start (`src/alloc.rs`), hands them back.

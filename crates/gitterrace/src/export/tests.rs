@@ -89,6 +89,17 @@ fn target_refuses_every_hostile_segment() {
         "/blob/HEAD/c:x",
         "/blob/HEAD/a\0b",
         "/blob/HEAD/a/../../b",
+        "/blob/HEAD/NUL",
+        "/blob/HEAD/nul",
+        "/blob/HEAD/NUL.txt",
+        "/blob/HEAD/COM1",
+        "/blob/HEAD/lpt9",
+        "/blob/HEAD/CON.log",
+        "/tree/HEAD/aux.tar.gz/x",
+        "/blob/HEAD/prn ",
+        "/blob/HEAD/foo.",
+        "/blob/HEAD/foo ",
+        "/tree/HEAD/dir./x",
     ];
     for path in hostile {
         assert_eq!(
@@ -114,6 +125,22 @@ fn target_refuses_every_hostile_segment() {
                 );
             }
         }
+    }
+}
+
+/// Only a whole device name is refused: a name that merely starts with one is a plain name.
+#[test]
+fn target_accepts_names_that_share_a_device_prefix() {
+    let out = Path::new("/o");
+    for name in [
+        "CONMAN", "NULLIFY", "AUX_data", "com10", "lpt0.txt", ".con", "a.b",
+    ] {
+        let path = format!("/blob/HEAD/{name}");
+        assert_eq!(
+            target(out, &path, "text/plain"),
+            Some(out.join("blob/HEAD").join(name)),
+            "{path:?} was refused"
+        );
     }
 }
 

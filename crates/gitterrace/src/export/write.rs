@@ -10,6 +10,7 @@ use axum::{
 };
 use gitterrace_git::percent_encode_path;
 use tower::ServiceExt;
+use unicode_normalization::UnicodeNormalization;
 
 /// Largest page read, in bytes. Not configurable: it bounds one page in memory; a page over it
 /// fails the export naming the settings that make pages larger.
@@ -20,13 +21,15 @@ const SHRINK: &str = "Lower limits.blob_lines, limits.highlight_kb, limits.text_
 
 /// File the page lands in: HTML pages become `<path>/index.html` so their links
 /// resolve when the folder is served by any static server. `None` for a path with a segment
-/// that is not a plain name (`.`, `..`, a separator or drive colon on some platform, NUL):
-/// such a page is skipped rather than written somewhere it was not named.
+/// that is not a plain name (`.`, `..`, a separator or drive colon on some platform, NUL), a
+/// Windows device name such as `NUL` or `com1.txt`, or a name ending in a dot or a space,
+/// which Windows strips: such a page is skipped rather than written somewhere it was not
+/// named. Refused on every platform, since an export is copied and served elsewhere.
 pub(super) fn target(out: &Path, path: &str, content_type: &str) -> Option<PathBuf> {
     let mut p = out.to_path_buf();
     for seg in path.split('/').filter(|s| !s.is_empty()) {
         let hostile = seg == "." || seg == ".." || seg.contains(['\\', ':', '\0']);
-        if hostile {
+        if hostile || seg.ends_with(['.', ' ']) || is_device(seg) {
             return None;
         }
         p.push(seg);
@@ -35,6 +38,22 @@ pub(super) fn target(out: &Path, path: &str, content_type: &str) -> Option<PathB
         p.push("index.html");
     }
     Some(p)
+}
+
+/// Whether Win32 opens a device for `seg` in any folder: the part before the first dot,
+/// trailing spaces dropped, is a reserved name in any case.
+fn is_device(seg: &str) -> bool {
+    let stem = seg.split('.').next().unwrap_or(seg).trim_end_matches(' ');
+    let upper = stem.to_ascii_uppercase();
+    matches!(upper.as_str(), "CON" | "PRN" | "AUX" | "NUL")
+        || matches!(upper.as_bytes(), [b'C', b'O', b'M', b'1'..=b'9'])
+        || matches!(upper.as_bytes(), [b'L', b'P', b'T', b'1'..=b'9'])
+}
+
+/// The name a case-insensitive, normalizing file system (APFS, NTFS) stores `name` under:
+/// two names with one key land in one file.
+pub(super) fn fold(name: &str) -> String {
+    name.nfc().collect::<String>().to_lowercase()
 }
 
 #[expect(

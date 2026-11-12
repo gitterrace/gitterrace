@@ -21,7 +21,7 @@ mod swap;
 mod write;
 
 use std::{
-    collections::{BTreeSet, VecDeque},
+    collections::{BTreeSet, HashMap, VecDeque, hash_map::Entry},
     path::{Path, PathBuf},
 };
 
@@ -40,7 +40,7 @@ use crate::export::seen::Seen;
 use crate::export::snapshot::mark_snapshot_as;
 use crate::export::snapshot::{SNAPSHOT_CSS, mark_snapshot, snapshot_label};
 use crate::export::swap::{Staging, recover};
-use crate::export::write::{fetch, write_page};
+use crate::export::write::{fetch, fold, write_page};
 #[cfg(test)]
 use crate::export::write::{fetch_within, target};
 
@@ -501,6 +501,14 @@ impl Allowed {
     }
 }
 
+/// Adds every file and folder under `dir` to `out`. Of two names in one folder that a
+/// case-insensitive or normalizing file system stores as one, only the first is kept: the
+/// other is skipped with a line, the same as a name `target` refuses, so neither overwrites
+/// the other.
+#[expect(
+    clippy::print_stderr,
+    reason = "user-facing CLI output: this is the command's result or diagnostic, not a log line"
+)]
 fn walk(
     repo: &gitterrace_git::Repo,
     rev: &str,
@@ -508,10 +516,24 @@ fn walk(
     max_file: u64,
     out: &mut BTreeSet<String>,
 ) -> anyhow::Result<()> {
+    let mut names = HashMap::new();
     for e in repo
         .tree(rev, dir)
         .with_context(|| format!("listing {dir}"))?
     {
+        match names.entry(fold(&e.name)) {
+            Entry::Occupied(first) => {
+                eprintln!(
+                    "skipping {:?} in {dir:?}: one file with {:?} where case or form is ignored",
+                    e.name,
+                    first.get()
+                );
+                continue;
+            }
+            Entry::Vacant(v) => {
+                v.insert(e.name.clone());
+            }
+        }
         let path = if dir.is_empty() {
             e.name.clone()
         } else {
