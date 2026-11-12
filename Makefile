@@ -236,10 +236,13 @@ site-render:
 
 # site-shots builds, serves jq and ripgrep pinned in ~/.cache/gitterrace-shots with
 # scripts/release/site/site-shots/config, shoots to target/site-shots and docs/screenshots,
-# renders the WebPs, then generates. Needs browsers, so not in check.
+# builds the site the render checks its links against, renders the WebPs, then generates.
+# Needs browsers (make browser-deps), so not in check.
 ## site-shots: Retake every screenshot (needs browsers, so not in check)
 site-shots: build
+	@test -f node_modules/playwright-core/index.mjs || { echo "site-shots: no browsers, run make browser-deps first" >&2; exit 1; }
 	node scripts/release/site/site-shots-run.mjs
+	cargo xtask site
 	node scripts/release/site/site-render.mjs
 	cargo xtask generate
 
