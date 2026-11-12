@@ -76,9 +76,9 @@ pub(crate) async fn keep_index_fresh(app: Arc<App>) {
         if !on {
             watcher = None;
             seen = None;
-        } else if watcher.is_none() {
-            let mut w = app.repo.watcher();
-            let p = w.parts();
+        } else if watcher.is_none()
+            && let Some((w, p)) = parts_off_worker(app.repo.watcher()).await
+        {
             app.version.store(p.digest(), Ordering::Release);
             seen = Some(p);
             watcher = Some(w);
@@ -116,8 +116,11 @@ pub(crate) async fn keep_index_fresh(app: Arc<App>) {
         }
         // The git digest below is read every round, so the git nudge only needs clearing.
         git_events.take();
-        let Some(w) = watcher.as_mut() else { continue };
-        let now = w.parts();
+        let Some(w) = watcher.take() else { continue };
+        let Some((w, now)) = parts_off_worker(w).await else {
+            continue;
+        };
+        watcher = Some(w);
         let mut kinds = seen
             .filter(|b| *b != now)
             .map(|before| now.changed_since(&before))
@@ -152,6 +155,21 @@ pub(crate) async fn keep_index_fresh(app: Arc<App>) {
         }
         seen = Some(now);
     }
+}
+
+/// The watcher's fingerprint, read on the blocking pool: it is a `stat` per ref folder and a
+/// directory listing, which must not stall the async workers. The watcher travels into the
+/// closure and back. `None` when the blocking task panicked; the watcher is then rebuilt.
+async fn parts_off_worker(
+    mut w: gitterrace_git::Watcher,
+) -> Option<(gitterrace_git::Watcher, gitterrace_git::Parts)> {
+    tokio::task::spawn_blocking(move || {
+        let p = w.parts();
+        (w, p)
+    })
+    .await
+    .map_err(|e| tracing::warn!("watcher fingerprint failed: {e}"))
+    .ok()
 }
 
 /// The loop's own wake: at once for owed work, a poll interval for missing events, else never.
@@ -276,3 +294,4 @@ pub(crate) async fn release_when_idle(app: Weak<App>, idle: Duration) {
         }
     }
 }
+
