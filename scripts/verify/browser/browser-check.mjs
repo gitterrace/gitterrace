@@ -184,7 +184,8 @@
 //   blame-fit    every blame gutter cell (sha, author, age) ends inside its right hairline, with a
 //                long author and a minutes-old age, at 1400 and 900 px, light and dark
 //   inset-balance the one-line blame row and the Send to action row have equal space above
-//                and below their content, within 1 px, light and dark
+//                and below their content, within 1 px, and the label ink of the Send to
+//                buttons, picker and a cap-only probe is centered within 0.5 px, light and dark
 //   huge-diff    a commit of 2,000 changed files (mostly pure renames) loads under a DOM bound,
 //                shows a rename as one line, loads the last files on scroll, opens #fN, opens a
 //                folded file with Enter, and prints scroll frame times and long tasks
