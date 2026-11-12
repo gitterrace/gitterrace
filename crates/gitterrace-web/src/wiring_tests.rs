@@ -282,7 +282,7 @@ async fn index_build_on_start_waits_for_demand_when_off() {
     let p = repo(dir.path(), "r");
     let cfg = with(|c| c.index.build_on_start = false);
     let a = app(&p, cfg);
-    tokio::spawn(crate::app::keep_index_fresh(Arc::clone(&a)));
+    tokio::spawn(crate::app::keep_index_fresh_supervised(Arc::clone(&a)));
     // A quiet window: nothing may start the build without a demand.
     gitterrace_testkit::wait::pause(Duration::from_millis(700)).await;
     assert!(!a.ready(), "nothing builds until a page needs the index");
@@ -294,7 +294,7 @@ async fn index_build_on_start_waits_for_demand_when_off() {
     gitterrace_testkit::wait::until("the demand starts the build", || async { a.ready() }).await;
 
     let on = app(&p, Config::default());
-    tokio::spawn(crate::app::keep_index_fresh(Arc::clone(&on)));
+    tokio::spawn(crate::app::keep_index_fresh_supervised(Arc::clone(&on)));
     gitterrace_testkit::wait::until("the default builds at once", || async { on.ready() }).await;
 }
 

@@ -150,7 +150,7 @@ async fn watch_off_runs_no_timer() {
     let dir = tempfile::tempdir().expect("tmp");
     let p = repo(dir.path(), "r");
     let a = app(&p, with(|c| c.watch.enabled = false));
-    tokio::spawn(crate::app::keep_index_fresh(Arc::clone(&a)));
+    tokio::spawn(crate::app::keep_index_fresh_supervised(Arc::clone(&a)));
     let mut rx = a.changes.subscribe();
     gitterrace_testkit::wait::pause(Duration::from_millis(300)).await;
     git(&p, &["commit", "-q", "--allow-empty", "-m", "chore: empty"]);
@@ -169,7 +169,7 @@ async fn working_tree_is_scanned_only_for_a_subscriber() {
             c.watch.rescan_secs = 5;
         }),
     );
-    tokio::spawn(crate::app::keep_index_fresh(Arc::clone(&a)));
+    tokio::spawn(crate::app::keep_index_fresh_supervised(Arc::clone(&a)));
     let mut rx = a.changes.subscribe();
     gitterrace_testkit::wait::pause(Duration::from_millis(400)).await;
     let kinds = |c: Arc<crate::live::Change>| c.kinds.clone();
@@ -249,7 +249,7 @@ async fn dirty_chip_follows_on_pages_without_the_worktree() {
             c.watch.rescan_secs = 5;
         }),
     );
-    tokio::spawn(crate::app::keep_index_fresh(Arc::clone(&a)));
+    tokio::spawn(crate::app::keep_index_fresh_supervised(Arc::clone(&a)));
     // A listener, but no page that shows the working tree.
     let mut rx = a.changes.subscribe();
     // The first check is the baseline; an edit before it would be the baseline itself.

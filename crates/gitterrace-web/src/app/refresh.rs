@@ -172,6 +172,46 @@ async fn parts_off_worker(
     .ok()
 }
 
+/// Runs [`keep_index_fresh`] and starts it again when it panics, so one bad round does not
+/// leave the repository unwatched for the rest of the process. Spawn this, not the loop.
+pub(crate) async fn keep_index_fresh_supervised(app: Arc<App>) {
+    supervise("index refresher", RESTART_AFTER, || {
+        keep_index_fresh(Arc::clone(&app))
+    })
+    .await;
+}
+
+/// How long a panicked task waits before it runs again, so a loop that panics at once does not
+/// spin a core.
+const RESTART_AFTER: Duration = Duration::from_secs(1);
+
+/// Runs `make()` as its own task until it ends without a panic. A panic is logged and the task
+/// started again after `pause`. Dropping or aborting this future aborts the running task too.
+async fn supervise<F, Fut>(name: &str, pause: Duration, mut make: F)
+where
+    F: FnMut() -> Fut,
+    Fut: std::future::Future<Output = ()> + Send + 'static,
+{
+    /// Aborts the inner task when the supervisor goes, the way it went with a bare spawn.
+    struct AbortOnDrop(tokio::task::AbortHandle);
+    impl Drop for AbortOnDrop {
+        fn drop(&mut self) {
+            self.0.abort();
+        }
+    }
+    loop {
+        let task = tokio::spawn(make());
+        let _guard = AbortOnDrop(task.abort_handle());
+        match task.await {
+            Err(e) if e.is_panic() => {
+                tracing::warn!("{name} panicked, restarting: {e}");
+                tokio::time::sleep(pause).await;
+            }
+            _ => return,
+        }
+    }
+}
+
 /// The loop's own wake: at once for owed work, a poll interval for missing events, else never.
 async fn tick(owed: bool, poll: bool) {
     if owed {
@@ -295,3 +335,56 @@ pub(crate) async fn release_when_idle(app: Weak<App>, idle: Duration) {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::time::Duration;
+
+    use super::supervise;
+
+    #[tokio::test]
+    async fn a_panicking_task_is_restarted_until_it_ends() {
+        let runs = Arc::new(AtomicUsize::new(0));
+        let r = Arc::clone(&runs);
+        supervise("test task", Duration::ZERO, move || {
+            let n = r.fetch_add(1, Ordering::AcqRel);
+            async move {
+                if n < 2 {
+                    std::panic::panic_any("round failed");
+                }
+            }
+        })
+        .await;
+        assert_eq!(runs.load(Ordering::Acquire), 3);
+    }
+
+    #[tokio::test]
+    async fn aborting_the_supervisor_stops_its_task() {
+        let ticks = Arc::new(AtomicUsize::new(0));
+        let t = Arc::clone(&ticks);
+        let sup = tokio::spawn(async move {
+            supervise("test task", Duration::ZERO, move || {
+                let t = Arc::clone(&t);
+                async move {
+                    loop {
+                        t.fetch_add(1, Ordering::AcqRel);
+                        gitterrace_testkit::wait::pause(Duration::from_millis(5)).await;
+                    }
+                }
+            })
+            .await;
+        });
+        gitterrace_testkit::wait::pause(Duration::from_millis(30)).await;
+        sup.abort();
+        drop(sup.await);
+        gitterrace_testkit::wait::pause(Duration::from_millis(10)).await;
+        let at = ticks.load(Ordering::Acquire);
+        gitterrace_testkit::wait::pause(Duration::from_millis(40)).await;
+        assert_eq!(
+            ticks.load(Ordering::Acquire),
+            at,
+            "the task outlived its supervisor"
+        );
+    }
+}

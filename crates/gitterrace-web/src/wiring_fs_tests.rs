@@ -63,7 +63,7 @@ async fn watched(
     let p = repo(dir, "r");
     let a = app(&p, with(|c| c.watch.rescan_secs = rescan_secs));
     a.os_events.store(os_events, Ordering::Release);
-    let task = tokio::spawn(crate::app::keep_index_fresh(Arc::clone(&a))).abort_handle();
+    let task = tokio::spawn(crate::app::keep_index_fresh_supervised(Arc::clone(&a))).abort_handle();
     let mut rx = a.changes.subscribe();
     let wt = WorktreeWatch::new(&a);
     // The fixture's own writes may still be replayed by the OS, late and in one batch. A new
@@ -239,7 +239,7 @@ async fn refresher(p: &std::path::Path, rescan_secs: u64, os_events: bool) -> Ar
     let a = app(p, with(|c| c.watch.rescan_secs = rescan_secs));
     a.os_events
         .store(os_events, std::sync::atomic::Ordering::Release);
-    tokio::spawn(crate::app::keep_index_fresh(Arc::clone(&a)));
+    tokio::spawn(crate::app::keep_index_fresh_supervised(Arc::clone(&a)));
     wait::until("the first fingerprint", || async { a.version() != 0 }).await;
     a
 }
@@ -312,7 +312,7 @@ async fn an_open_tab_hears_a_commit_and_an_edit_within_the_rescan() {
         let p = repo(dir.path(), "r");
         let a = app(&p, with(|c| c.watch.rescan_secs = 5));
         a.os_events.store(os, std::sync::atomic::Ordering::Release);
-        let task = tokio::spawn(crate::app::keep_index_fresh(Arc::clone(&a)));
+        let task = tokio::spawn(crate::app::keep_index_fresh_supervised(Arc::clone(&a)));
         // The tab opens on an idle refresher, as a browser does: it must wake for the tab.
         wait::pause(Duration::from_millis(1500)).await;
         // As a browser does: render the page, open its stream, and the user saves at once,
@@ -358,7 +358,7 @@ async fn an_edit_between_two_renders_reaches_the_older_tab() {
     let dir = tempfile::tempdir().expect("tmp");
     let p = repo(dir.path(), "r");
     let a = app(&p, with(|c| c.watch.rescan_secs = 5));
-    let task = tokio::spawn(crate::app::keep_index_fresh(Arc::clone(&a)));
+    let task = tokio::spawn(crate::app::keep_index_fresh_supervised(Arc::clone(&a)));
     // The refresher took its first fingerprint, so the edit below is a change to it.
     wait::until("the first fingerprint", || async { a.version() != 0 }).await;
     let (code, _) = crate::tests::get(&a, "/worktree").await;

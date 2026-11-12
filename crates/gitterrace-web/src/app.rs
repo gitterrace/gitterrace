@@ -35,7 +35,7 @@ mod refresh;
 mod touched;
 
 pub(crate) use history::PathLog;
-pub(crate) use refresh::{keep_index_fresh, on_refreshed, release_when_idle};
+pub(crate) use refresh::{keep_index_fresh_supervised, on_refreshed, release_when_idle};
 
 /// What every repository of one server shares: the settings in force, the cap on page-building
 /// jobs and the shutdown signal that ends live streams.

@@ -185,7 +185,7 @@ fn repo_router_tasks(
     let app = Arc::new(app);
     env.register(&app);
     let mut tasks = vec![
-        tokio::spawn(app::keep_index_fresh(Arc::clone(&app))).abort_handle(),
+        tokio::spawn(app::keep_index_fresh_supervised(Arc::clone(&app))).abort_handle(),
         tokio::spawn(app::release_when_idle(
             Arc::downgrade(&app),
             app::RECORDS_IDLE,
