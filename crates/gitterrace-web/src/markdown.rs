@@ -9,6 +9,8 @@ mod anchor_tests;
 mod base;
 mod front;
 mod ids;
+#[cfg(test)]
+mod image_tests;
 mod levels;
 mod lines;
 mod outline;
@@ -101,7 +103,9 @@ fn rewrite_url(base: &Base, url: &str, image: bool) -> String {
 fn image_url<'a>(base: &Base, value: &str) -> Option<Cow<'a, str>> {
     let url = rewrite_url(base, value, true);
     // An absolute URL or an anchor comes back unchanged: only a rewritten one needs `/raw`.
-    (url == value || crate::features::on(Feature::Raw)).then_some(Cow::Owned(url))
+    // `//host/x` is not in the repository either, but goes with `/raw`, not with the CSP alone.
+    let kept = url == value && !value.starts_with("//");
+    (kept || crate::features::on(Feature::Raw)).then_some(Cow::Owned(url))
 }
 
 fn code_block(code: &str, lang: &str, span: &str, most: usize) -> String {
@@ -288,6 +292,7 @@ fn sanitizer(base: Base) -> ammonia::Builder<'static> {
                 "text-align: left" | "text-align: right" | "text-align: center"
             )
             .then(|| Cow::Borrowed(value)),
+            // ammonia 4.2 drops a refused URL scheme before this callback: recheck on upgrade.
             _ => Some(Cow::Borrowed(value)),
         });
     b
@@ -343,7 +348,7 @@ mod tests {
         render_with(src, base)
     }
 
-    use crate::markdown::{Base, render_with, resolve_path, rewrite_url, slugify};
+    use crate::markdown::{Base, render_with, resolve_path, slugify};
 
     fn at(src: &str, dir: &str) -> String {
         render_with(src, Base::new("abc123", dir))
@@ -491,25 +496,6 @@ mod tests {
             "",
         );
         assert!(!odd.contains("media=") && !odd.contains("srcset="), "{odd}");
-    }
-
-    #[test]
-    fn relative_images_go_to_raw() {
-        let out = at(
-            "![logo](img/l.svg)\n\n<img src=\"../p.png\" alt=\"p\">",
-            "docs",
-        );
-        assert!(out.contains("src=\"/raw/abc123/docs/img/l.svg\""));
-        assert!(out.contains("src=\"/raw/abc123/p.png\""));
-        let base = Base {
-            rev: "r".into(),
-            dir: String::new(),
-            highlight_bytes: crate::highlight::HIGHLIGHT_BYTES,
-        };
-        assert_eq!(
-            rewrite_url(&base, "https://x/y.png", true),
-            "https://x/y.png"
-        );
     }
 
     #[test]

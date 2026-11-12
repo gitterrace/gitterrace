@@ -41,7 +41,7 @@
     var rows = d.names.map(function (n, k) {
       var v = Math.max(d.l[j][k], 0);
       var cls = k === d.names.length - 1 && d.names[k] === "Other" ? "c8" : "c" + Math.min(k + 1, 8);
-      var pct = v > 0 && v / total < 0.005 ? "<1%" : Math.round((v / total) * 100) + "%";
+      var pct = v > 0 && v / total < 0.005 ? "&lt;1%" : Math.round((v / total) * 100) + "%";
       return '<div><i class="dot ' + cls + '"></i><span>' + esc(n) + "</span><b>" + num(v) +
         ' <span class="muted">' + pct + "</span></b></div>";
     }).reverse().join("");

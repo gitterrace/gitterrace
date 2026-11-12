@@ -22,7 +22,7 @@ use axum::{
 pub const CSP: &str = "default-src 'self'; img-src 'self' data:; media-src 'self'; \
     style-src 'self' 'unsafe-inline'; \
     script-src 'self' 'sha256-fYt56R17Pz3RaWQCK4ngD4kWxzR9lHjYqQRanR4kAxk=' \
-    'sha256-Rbk1A+FIExFQ+koGhLey9hvtVuj90foK6DS83At6mms='; object-src 'self'; \
+    'sha256-Rbk1A+FIExFQ+koGhLey9hvtVuj90foK6DS83At6mms='; object-src 'none'; \
     frame-ancestors 'none'; base-uri 'none'; form-action 'self'";
 
 /// What the guard checks, fixed at startup.
@@ -159,6 +159,11 @@ pub(crate) async fn guard(State(gate): State<Arc<Gate>>, req: Request, next: Nex
         header::X_CONTENT_TYPE_OPTIONS,
         HeaderValue::from_static("nosniff"),
     );
+    // The value an export's `_headers` sets, so both deployments leak the same referrer.
+    h.insert(
+        header::REFERRER_POLICY,
+        HeaderValue::from_static("strict-origin-when-cross-origin"),
+    );
     let html = h
         .get(header::CONTENT_TYPE)
         .is_some_and(|v| v.as_bytes().starts_with(b"text/html"));
@@ -192,6 +197,51 @@ mod tests {
             .unwrap_or("default-src 'self'");
         assert!(!fonts.contains("data:"), "{CSP}");
         assert!(CSP.contains("default-src 'self';"), "{CSP}");
+    }
+
+    /// No page embeds a plugin, so the policy loads none.
+    #[test]
+    fn served_policy_loads_no_plugin_objects() {
+        assert!(CSP.contains("object-src 'none'"), "{CSP}");
+        assert!(!CSP.contains("object-src 'self'"), "{CSP}");
+    }
+
+    #[tokio::test]
+    async fn every_response_carries_the_referrer_policy_and_html_the_csp() {
+        let dir = tempfile::tempdir().expect("tmp");
+        let f = gitterrace_testkit::Fixture::init(dir.path())
+            .write("a.txt", "a\n")
+            .commit("feat: a");
+        let router = crate::app_router(f.path()).expect("router");
+        let base = gitterrace_testkit::base(&router).await;
+        let head = |uri: String| {
+            let router = router.clone();
+            async move {
+                let req = axum::http::Request::get(uri)
+                    .header("host", "localhost")
+                    .body(axum::body::Body::empty())
+                    .expect("req");
+                let res = tower::ServiceExt::oneshot(router, req).await.expect("res");
+                (res.status().as_u16(), res.headers().clone())
+            }
+        };
+        for uri in [
+            "/".to_owned(),
+            format!("{base}/raw/HEAD/a.txt"),
+            "/nope".to_owned(),
+        ] {
+            let (_, h) = head(uri.clone()).await;
+            let referrer = h.get("referrer-policy").map(|v| v.as_bytes().to_vec());
+            assert_eq!(
+                referrer.as_deref(),
+                Some(&b"strict-origin-when-cross-origin"[..]),
+                "{uri}"
+            );
+        }
+        let (status, h) = head(format!("{base}/tree/HEAD")).await;
+        assert_eq!(status, 200);
+        let csp = h.get("content-security-policy").expect("csp on a page");
+        assert_eq!(csp, CSP, "the page policy, object-src 'none' included");
     }
 
     fn gate(bound: Option<&str>, hosts: &[&str]) -> Gate {

@@ -265,6 +265,10 @@ impl Env {
         if new == *old {
             return restart;
         }
+        let api_on = |c: &Config| c.feature_on(gitterrace_config::Feature::Api, None);
+        if self.public && api_on(&new) && !api_on(&old) {
+            tracing::warn!("features.api_enabled turned on: this public server now serves /api/v1");
+        }
         let new = Arc::new(new);
         match self.cfg.write() {
             Ok(mut g) => *g = Arc::clone(&new),

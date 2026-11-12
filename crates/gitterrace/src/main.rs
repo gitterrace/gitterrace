@@ -203,7 +203,11 @@ impl Flags {
 
 /// Exports the repositories `serve` would show for `paths`, so an export of a folder of repos is
 /// the multi-repo site, index and all.
-#[expect(clippy::print_stdout, reason = "the command's result line")]
+#[expect(
+    clippy::print_stdout,
+    clippy::print_stderr,
+    reason = "the command's result line and its hosting note"
+)]
 async fn export_cmd(
     paths: &[PathBuf],
     path: &Path,
@@ -243,6 +247,12 @@ async fn export_cmd(
     }
     let n = export::export_with(&repos, &out, scope, pages, &mut progress).await?;
     println!("wrote {n} files to {}", out.display());
+    if !quiet {
+        eprintln!(
+            "note: _headers carries the CSP; Netlify and Cloudflare Pages apply it, other hosts \
+             need the same headers set by hand (docs/online.md)"
+        );
+    }
     Ok(())
 }
 

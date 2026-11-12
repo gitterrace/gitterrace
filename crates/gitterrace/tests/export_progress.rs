@@ -35,6 +35,10 @@ fn export(quiet: bool) -> (String, String) {
 fn a_piped_export_prints_phases_and_the_count_as_plain_lines() {
     let (out, err) = export(false);
     assert!(out.starts_with("wrote "), "{out}");
+    assert!(
+        err.contains("note: _headers carries the CSP"),
+        "a host needs it: {err}"
+    );
     assert!(!err.contains('\x1b') && !err.contains('\r'), "{err:?}");
     assert!(err.contains("building the cache for /"), "{err}");
     assert!(err.contains("writing pages ("), "{err}");
