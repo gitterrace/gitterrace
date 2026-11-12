@@ -260,7 +260,7 @@ fn an_idle_app_lets_go_of_its_source_and_opens_it_again_on_use() {
     let weak = Arc::downgrade(&src);
     drop(src);
     assert!(app.source_held());
-    let tables = || gitterrace_index::Insights::shared_sets(&format!("\u{0}{head}"));
+    let tables = || app.caches.tables.len();
     assert_eq!(tables(), 1);
     assert!(!app.release_idle(Duration::from_secs(3600)), "in use");
     assert!(weak.upgrade().is_some(), "kept while browsed");

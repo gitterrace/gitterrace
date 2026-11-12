@@ -270,3 +270,58 @@ async fn a_cold_languages_page_after_the_warm_up_walks_no_chain() {
     let walks = app.chain_walks.load(Ordering::Relaxed) - before;
     assert_eq!(walks, 0, "chain walks of a cold languages page");
 }
+
+/// Guard class: a repository owns its shared tables. Another repository going idle, or
+/// filling the set with its own tips, leaves them in place: red at 1 when the set was one
+/// per process and an unrelated app's idle release (every app in a test binary, every repo
+/// on a multi-repo server, has the same empty or colliding base) dropped them mid-page.
+/// Second catch: one repository's pages evicting another's tables from a shared bound.
+#[tokio::test]
+async fn another_repository_going_idle_keeps_these_tables() {
+    let app = |dir: &std::path::Path| {
+        drop(
+            gitterrace_testkit::Fixture::init(dir)
+                .write("a.txt", "a\n")
+                .commit("feat: a"),
+        );
+        let repo = gitterrace_git::Repo::discover(dir).expect("repo");
+        let index = gitterrace_index::Index::open(&repo).expect("index");
+        let app = Arc::new(App::new(repo, index));
+        app.index
+            .update(&app.repo, "HEAD", &|_| {})
+            .expect("update");
+        let head = app.repo.resolve("HEAD").expect("head");
+        super::warm_shared(&app, &head);
+        app.mark_ready();
+        (app, head)
+    };
+    let (d1, d2) = (
+        tempfile::tempdir().expect("tmp"),
+        tempfile::tempdir().expect("tmp"),
+    );
+    let (ours, head) = app(d1.path());
+    let (other, _) = app(d2.path());
+    assert!(
+        other.release_idle(std::time::Duration::ZERO),
+        "the other app held nothing"
+    );
+    assert_eq!(
+        ours.caches.tables.len(),
+        1,
+        "another app's idle release took our tables"
+    );
+    let builds = || {
+        let src = ours.source(&head).expect("source").expect("ready");
+        src.run(|s| gitterrace_index::table_builds(&**s))
+            .expect("run")
+    };
+    let before = builds();
+    let router = crate::routes::router(Arc::clone(&ours));
+    let (status, _) = gitterrace_testkit::get(&router, "/stats").await;
+    assert_eq!(status, 200);
+    assert_eq!(
+        builds() - before,
+        0,
+        "table sets rebuilt after another app idled"
+    );
+}

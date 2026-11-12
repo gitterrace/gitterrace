@@ -68,6 +68,7 @@ pub use period::{
 pub use releases::{Cadence, Release, release_tags};
 pub use scope::{CountContext, Scope, ScopeError, ScopeParams, parse_day};
 pub use select::{OptionParams, Scoped, Selection, under};
+pub use shared::SharedTables;
 pub use sizes::SizeBucket;
 pub use stats::{DirChurn, DirTally, FileChurn, FileTally, Label, LabelBucket, LabelCount};
 
@@ -192,16 +193,17 @@ impl<'a> Insights<'a> {
     }
 
     /// [`Insights::from_source`] whose derived tables are shared by every caller passing the
-    /// same `key`, options and source, bounded to the last few. `key` must name the set and the
-    /// ignore rules, e.g. tip and index generation; `ignore` runs on a miss only.
+    /// same `store`, `key`, options and source, bounded to the last few. `key` must name the
+    /// set and the ignore rules, e.g. tip and index generation; `ignore` runs on a miss only.
     pub fn shared_source(
+        store: &SharedTables,
         src: &'a dyn InsightsSource,
         opts: Options,
         key: &str,
         ignore: impl FnOnce() -> Option<IgnoreSet>,
     ) -> Self {
         let at = (std::ptr::from_ref(src).cast::<u8>() as usize, src.len());
-        let d = shared::tables(src, &opts, key, at, ignore);
+        let d = store.tables(src, &opts, key, at, ignore);
         Self::with(Src::Borrowed(src), opts, d)
     }
 
@@ -220,24 +222,6 @@ impl<'a> Insights<'a> {
             feed::reference_time(src.get())
         };
         Self { src, opts, now, d }
-    }
-
-    /// Drops every shared table set whose key starts with `prefix`. A server releases them with
-    /// the records they index into once nobody browses, so an idle process holds neither; the
-    /// next page builds them again. Callers holding an `Insights` keep their own `Arc`.
-    pub fn release_shared(prefix: &str) {
-        if let Ok(mut g) = shared::SHARED.lock() {
-            g.retain(|e| !e.key.starts_with(prefix));
-        }
-    }
-
-    /// Shared table sets whose key starts with `prefix` (a test hook for
-    /// [`Insights::release_shared`]).
-    #[cfg(any(test, feature = "oracle"))]
-    pub fn shared_sets(prefix: &str) -> usize {
-        shared::SHARED.lock().map_or(0, |g| {
-            g.iter().filter(|e| e.key.starts_with(prefix)).count()
-        })
     }
 
     /// True when both share one set of derived tables (a test hook for

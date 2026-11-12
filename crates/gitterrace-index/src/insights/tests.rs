@@ -12,7 +12,8 @@ fn derived_tables_are_built_once_per_key_and_options() {
         built.set(built.get() + 1);
         None
     };
-    let shared = |s, o, k| Insights::shared_source(s, o, k, ignore);
+    let store = super::SharedTables::new();
+    let shared = |s, o, k| Insights::shared_source(&store, s, o, k, ignore);
     let a = shared(&src, Options::default(), "t1\u{0}gen1");
     let b = shared(&src, Options::default(), "t1\u{0}gen1");
     assert!(a.shares_tables_with(&b), "second page rebuilt the tables");

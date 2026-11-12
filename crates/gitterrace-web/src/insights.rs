@@ -264,7 +264,7 @@ pub(crate) fn shared_on<'a>(
 ) -> Insights<'a> {
     let respect = o.respect_ignore;
     let key = format!("{}\u{0}{head}\u{0}{}", a.base, a.index.generation());
-    Insights::shared_source(src, o, &key, || {
+    Insights::shared_source(&a.caches.tables, src, o, &key, || {
         respect.then(|| a.ignore_set(head)).flatten()
     })
 }

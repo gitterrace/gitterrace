@@ -46,6 +46,9 @@ pub(crate) struct Caches {
     pub(crate) compares: Mutex<Bounded<Arc<gitterrace_index::Comparison>>>,
     pub(crate) chain: Mutex<Option<(HeadGen, Arc<crate::languages::Skeleton>)>>,
     pub(crate) head_lines: Mutex<Option<(String, Arc<Vec<gitterrace_index::HeadFile>>)>>,
+    /// The derived tables of this repository's unfiltered sources. Owned per repository: a
+    /// process-wide set let one repository's pages evict or release another's tables.
+    pub(crate) tables: gitterrace_index::SharedTables,
 }
 
 impl Caches {
@@ -61,6 +64,7 @@ impl Caches {
             compares: Mutex::new(Bounded::new(cfg.cache_bytes(Cache::Compares))),
             chain: Mutex::new(None),
             head_lines: Mutex::new(None),
+            tables: gitterrace_index::SharedTables::new(),
         }
     }
 
@@ -78,6 +82,7 @@ impl Caches {
             compares,
             chain,
             head_lines,
+            tables,
         } = self;
         [
             take(source),
@@ -90,6 +95,7 @@ impl Caches {
             bounded_held(compares),
             take(chain),
             take(head_lines),
+            tables.clear(),
         ]
         .into_iter()
         .fold(false, |any, held| any | held)

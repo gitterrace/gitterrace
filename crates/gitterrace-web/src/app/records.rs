@@ -150,7 +150,6 @@ impl App {
         // Everything built over the source goes with it: a rebuild of the same history gets
         // the same generation, so a table built while a read failed would be served again.
         self.caches.clear_all();
-        gitterrace_index::Insights::release_shared(&format!("{}\u{0}", self.base));
         // The page memo too: a sidebar or count rendered while a read failed would otherwise
         // be served from the rebuilt cache, whose generation is the same.
         self.clear_memo();
@@ -233,7 +232,6 @@ impl App {
             | self.repo.clear_blame_cache()
             | self.repo.clear_visible()
             | crate::views::clear_code_memo();
-        gitterrace_index::Insights::release_shared(&format!("{}\u{0}", self.base));
         // The API opens its own source; a caller there is a client that can wait a second too.
         if let Some(api) = self.api.get() {
             api.release_records();
