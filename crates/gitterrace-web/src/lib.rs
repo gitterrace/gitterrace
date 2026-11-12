@@ -125,13 +125,14 @@ pub fn multi_router(paths: Vec<PathBuf>) -> io::Result<axum::Router> {
     Ok(build_multi(paths, None, None, &Env::new(Config::default()))?.0)
 }
 
-/// [`multi_router`] for one export run: every repository shares commit tree diffs through
-/// `changes`, which the caller owns and drops when the run ends, freeing them all.
+/// [`multi_router`] for one export run, always public (`public.rs`) whatever the config says,
+/// sharing tree diffs through `changes`, which the caller drops when the run ends.
 pub fn export_router(
     paths: Vec<PathBuf>,
     changes: &Arc<gitterrace_git::ChangeMemo>,
-    cfg: Config,
+    mut cfg: Config,
 ) -> io::Result<axum::Router> {
+    cfg.server.is_public = true;
     let mut env = Env::new(cfg);
     env.changes = Some(Arc::clone(changes));
     Ok(build_multi(paths, None, None, &env)?.0)

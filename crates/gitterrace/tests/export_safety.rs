@@ -329,3 +329,82 @@ fn names_one_disk_stores_as_one_file_are_skipped_with_a_line() {
     assert!(page.contains("upper body") && !page.contains("lower body"));
     assert!(blob.join("ok.txt/index.html").is_file());
 }
+
+/// Every file under `dir` read as text, lossily, with its path.
+fn texts(dir: &Path) -> Vec<(PathBuf, String)> {
+    tree(dir)
+        .into_iter()
+        .map(|(p, b)| (p, String::from_utf8_lossy(&b).into_owned()))
+        .collect()
+}
+
+/// Guard class: anything of this machine reaching a published export under the default
+/// config: the working tree, a stash, a commit no public ref reaches, a ref outside heads,
+/// tags and remotes, the declared actions or a host path. An export always follows the
+/// public rule. Red when the export router took the rule from `server.is_public`, which is
+/// off by default, so the crawl wrote the worktree and stash pages and the hidden ref.
+#[test]
+fn a_default_config_export_holds_nothing_a_public_server_refuses() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let home = dir.path();
+    std::fs::create_dir_all(home.join("cfg")).expect("mkdir");
+    std::fs::write(
+        home.join("cfg/actions.toml"),
+        "version = 1\n\n[[send]]\nid = \"leakysend\"\nlabel = \"Leaky send label\"\n\
+         url = \"https://example.test/{title}\"\n\n[[action]]\nid = \"leakyaction\"\n\
+         label = \"Leaky action label\"\nkinds = [\"commit\"]\ncommand = [\"true\"]\n",
+    )
+    .expect("actions.toml");
+    let src = Fixture::standard(&home.join("src"))
+        .write("hidden/side.txt", "unreachable body\n")
+        .commit("chore: unreachable commit");
+    let hidden = src.git(&["rev-parse", "HEAD"]).trim().to_owned();
+    src.git(&["update-ref", "refs/secretref/leak", &hidden]);
+    src.git(&["reset", "-q", "--hard", "HEAD~1"]);
+    src.git(&["reflog", "expire", "--expire=now", "--all"]);
+    let src = src
+        .write("src/a.rs", "stashed body\n")
+        .stash("stashed message")
+        .write("notes/draft.txt", "uncommitted body\n");
+    let out = home.join("site");
+    let o = export(home, &out, &[src.path()], &[]);
+    assert!(o.status.success(), "{}", stderr(&o));
+    let home_path = home.to_string_lossy().into_owned();
+    let banned = [
+        "uncommitted body",
+        "stashed body",
+        "stashed message",
+        "unreachable body",
+        "unreachable commit",
+        hidden.as_str(),
+        &hidden[..12],
+        "secretref",
+        "leakysend",
+        "Leaky send label",
+        "leakyaction",
+        "Leaky action label",
+        home_path.as_str(),
+    ];
+    let mut found = Vec::new();
+    for (path, body) in texts(&out) {
+        for b in banned {
+            if body.contains(b) || path.to_string_lossy().contains(b) {
+                found.push(format!("{} holds {b:?}", path.display()));
+            }
+        }
+        let p = path.to_string_lossy();
+        for local in [
+            "worktree",
+            "stashes",
+            "_settings",
+            "_actions",
+            "_send",
+            "events",
+        ] {
+            if p.split('/').any(|seg| seg == local) {
+                found.push(format!("{p} is a local page"));
+            }
+        }
+    }
+    assert!(found.is_empty(), "{found:#?}");
+}
