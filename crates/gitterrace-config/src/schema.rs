@@ -293,7 +293,7 @@ settings! {
         /// server keeps only the rendered pages.
         cache_mb: usize = 32 => Live,
         /// Most page-building git jobs running at once across all repositories. 0 means one per
-        /// core.
+        /// core. A code search scans with up to this many threads (at most 8) in its one job.
         blocking_jobs: usize = 0 => Live,
     }
     limits: Limits {

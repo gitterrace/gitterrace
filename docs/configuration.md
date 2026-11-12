@@ -103,7 +103,8 @@ Exceptions, each on purpose:
   commits 1, path logs 1, compares 1, index blocks 4. An entry over an eighth of
   its cache is not kept. An idle server keeps only the rendered pages.
 - `blocking_jobs` (integer, default `0`): Most page-building git jobs running at
-  once across all repositories. 0 means one per core.
+  once across all repositories. 0 means one per core. A code search scans with
+  up to this many threads (at most 8) in its one job.
 
 ## `[limits]`
 

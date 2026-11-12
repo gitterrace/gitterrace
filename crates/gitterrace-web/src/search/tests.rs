@@ -224,3 +224,62 @@ async fn an_over_long_query_or_filter_is_refused_with_a_message() {
     .0;
     assert!(!page.contains("longer than"), "a query at the cap runs");
 }
+
+#[test]
+fn an_oversized_glob_is_refused_like_an_oversized_pattern() {
+    // Past the 8 MiB the query regex allows, within the regex crate's own default.
+    let glob = "?".repeat(10_000);
+    assert!(
+        glob_regex(&glob).is_err(),
+        "the glob regex has the query's size limit"
+    );
+    assert!(glob_regex("src/**/*.rs, *.md").expect("small").is_some());
+}
+
+#[test]
+fn scan_threads_stay_within_blocking_jobs() {
+    let cfg = |jobs| {
+        let mut c = gitterrace_config::Config::default();
+        c.resources.blocking_jobs = jobs;
+        c
+    };
+    assert_eq!(crate::search::scan_workers(&cfg(1)), 1);
+    assert!(crate::search::scan_workers(&cfg(2)) <= 2);
+    assert!(
+        crate::search::scan_workers(&cfg(64)) <= 8,
+        "never more than eight"
+    );
+}
+
+/// N identical cold searches at once scan the tree once: the rest wait and read the memo.
+#[tokio::test]
+async fn concurrent_cold_identical_searches_scan_once() {
+    let dir = tempfile::tempdir().expect("tmp");
+    let f = gitterrace_testkit::Fixture::init(dir.path())
+        .write("a.txt", "needle\n")
+        .commit("feat: a");
+    let repo = gitterrace_git::Repo::discover(f.path()).expect("repo");
+    let index = gitterrace_index::Index::open(&repo).expect("index");
+    let git_dir = repo.git_dir().to_owned();
+    let env = crate::app::Env::new(gitterrace_config::Config::default());
+    let app = Arc::new(crate::app::App::configured(repo, index, &env));
+    let tasks: Vec<_> = (0..6)
+        .map(|_| {
+            let q = SearchQuery {
+                q: Some("needle".into()),
+                ..SearchQuery::default()
+            };
+            tokio::spawn(search(State(Arc::clone(&app)), Query(q)))
+        })
+        .collect();
+    let mut pages = Vec::new();
+    for t in tasks {
+        pages.push(t.await.expect("task").expect("page").0);
+    }
+    assert!(pages.iter().all(|p| *p == pages[0]), "one page for all");
+    assert_eq!(
+        crate::search::scans_of(&git_dir),
+        1,
+        "one scan for six requests"
+    );
+}

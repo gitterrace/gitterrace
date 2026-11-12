@@ -85,7 +85,7 @@ pub(crate) struct Env {
 type SharedActions = Arc<RwLock<Arc<gitterrace_actions::Config>>>;
 
 /// Page-building slots for `cfg`: 0 means one per core.
-fn job_slots(cfg: &Config) -> usize {
+pub(crate) fn job_slots(cfg: &Config) -> usize {
     match cfg.resources.blocking_jobs {
         0 => std::thread::available_parallelism().map_or(2, usize::from),
         n => n,

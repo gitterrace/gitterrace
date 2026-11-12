@@ -129,9 +129,32 @@ pub(crate) async fn search(
     if let Some(h) = app.memo_get(&key) {
         return Ok(Html(h));
     }
+    // One scan per key: requests that arrive while it runs wait, then read its memo entry.
+    let claim = app.render_lock(&key);
+    let _held = claim.hold().await;
+    if let Some(h) = app.memo_get(&key) {
+        return Ok(Html(h));
+    }
     let html = blocking(&app, move |a| run(a, q)).await?.render()?;
     app.memo_put(key, Arc::new(html.clone()));
     Ok(Html(html))
+}
+
+/// Threads one code search scans with. The search holds one `blocking_jobs` slot, and its
+/// readers stay within that setting, so `blocking_jobs` bounds the CPU a search takes.
+pub(crate) fn scan_workers(cfg: &gitterrace_config::Config) -> usize {
+    crate::app::job_slots(cfg).clamp(1, 8)
+}
+
+#[cfg(test)]
+static SCANS: Mutex<Vec<std::path::PathBuf>> = Mutex::new(Vec::new());
+
+/// Code scans run for the repository at `git_dir`, for the single-flight test.
+#[cfg(test)]
+pub(crate) fn scans_of(git_dir: &std::path::Path) -> usize {
+    SCANS
+        .lock()
+        .map_or(0, |g| g.iter().filter(|p| *p == git_dir).count())
 }
 
 /// Key for one rendered search: the memo key moves with HEAD, the index and config, and the
@@ -198,6 +221,10 @@ fn capped(text: &str, glob: &str) -> (String, String, Option<String>) {
 }
 
 fn run(a: &App, q: SearchQuery) -> Result<SearchPage> {
+    #[cfg(test)]
+    if let Ok(mut g) = SCANS.lock() {
+        g.push(a.repo.git_dir().to_owned());
+    }
     let rev = q.rev.filter(|r| !r.is_empty());
     let rev = rev.unwrap_or_else(|| "HEAD".to_owned());
     let commits_mode = q.kind.as_deref() == Some("commits");
@@ -382,7 +409,9 @@ fn glob_regex(glob: &str) -> std::result::Result<Option<Regex>, String> {
             format!("(?:^|/){body}$")
         });
     }
-    Regex::new(&alts.join("|"))
+    RegexBuilder::new(&alts.join("|"))
+        .size_limit(8 * 1024 * 1024)
+        .build()
         .map(Some)
         .map_err(|e| e.to_string())
 }
@@ -410,9 +439,7 @@ fn search_code(a: &App, rev: &str, re: &Regex, glob: Option<&Regex>) -> Result<C
         .collect();
     let max_matches = a.cfg().limits.search_matches;
     let per_file = a.cfg().limits.search_file_lines;
-    let workers = std::thread::available_parallelism()
-        .map_or(2, usize::from)
-        .min(8);
+    let workers = scan_workers(&a.cfg());
     let rev_enc = fmt::enc_seg(rev);
     let mut readers: Vec<BlobReader> = (0..workers)
         .filter_map(|_| BlobReader::open(&a.repo).ok())
