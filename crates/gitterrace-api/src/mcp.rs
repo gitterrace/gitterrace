@@ -1,3 +1,4 @@
+mod bounded;
 mod repos;
 
 use std::path::Path;
@@ -13,6 +14,7 @@ use serde::Deserialize;
 use crate::core::ApiState;
 use crate::error::ApiError;
 use crate::insights::Params;
+use crate::mcp::bounded::{LineBound, MAX_LINE_BYTES};
 pub use crate::mcp::repos::McpRepo;
 use crate::mcp::repos::Repos;
 
@@ -504,6 +506,14 @@ impl McpServer {
     }
 }
 
+/// Stdin and stdout, with a line limit on what is read.
+fn stdio() -> (LineBound<tokio::io::Stdin>, tokio::io::Stdout) {
+    (
+        LineBound::new(tokio::io::stdin(), MAX_LINE_BYTES),
+        tokio::io::stdout(),
+    )
+}
+
 /// Serves MCP on stdin/stdout for the repository containing `repo_path` until the client leaves.
 ///
 /// The insights cache is brought up to date first; when that fails the server still answers
@@ -529,7 +539,7 @@ pub async fn serve_mcp(repo_path: &Path, cfg: &gitterrace_config::Config) -> Res
     .map_err(|e| ApiError::Task(e.to_string()))??;
     let running = McpServer::new(state)
         .with_config(&served)
-        .serve(rmcp::transport::stdio())
+        .serve(stdio())
         .await
         .map_err(|e| ApiError::Task(e.to_string()))?;
     running
@@ -550,7 +560,7 @@ pub async fn serve_mcp_repos(
 ) -> Result<(), ApiError> {
     let running = McpServer::over(scope, list)
         .with_config(cfg)
-        .serve(rmcp::transport::stdio())
+        .serve(stdio())
         .await
         .map_err(|e| ApiError::Task(e.to_string()))?;
     running
