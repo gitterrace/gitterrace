@@ -27,6 +27,11 @@ file). The link is the `origin` remote or `--project` URL without credentials,
 only for public https and ssh hosts. An unknown part is left out. The
 [live demo](https://demo.gitterrace.dev) is built this way.
 
+An export always follows the public rule below, whatever `server.is_public`
+says: committed history reachable from branches, tags, remote-tracking branches
+and `HEAD`, and nothing of this machine. No working tree, stash, other ref,
+action, Send to target, settings page or host path reaches it.
+
 An export is a snapshot with no search, live updates or actions. For those, or
 any revision on demand, use public mode.
 
