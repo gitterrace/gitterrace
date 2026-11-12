@@ -93,14 +93,16 @@ pub(super) async fn raw(
 }
 
 /// A body of `bytes` that keeps `permit` until the bytes are handed on, or the client leaves.
+/// Fused: compression polls a body once more after its end, and a bare `unfold` panics then.
 fn held(bytes: Vec<u8>, permit: OwnedSemaphorePermit) -> Body {
+    use futures_util::StreamExt;
     let state = (Some(bytes), permit);
-    Body::from_stream(futures_util::stream::unfold(
-        state,
-        |(bytes, permit)| async move {
+    Body::from_stream(
+        futures_util::stream::unfold(state, |(bytes, permit)| async move {
             bytes.map(|b| (Ok::<_, std::convert::Infallible>(b), (None, permit)))
-        },
-    ))
+        })
+        .fuse(),
+    )
 }
 
 /// Bytes of a file with the content type its name says, the sandbox for anything that could
@@ -176,4 +178,31 @@ pub(crate) async fn worktree_raw(State(app): Shared, Path(path): Path<String>) -
         || crate::error::not_found("This file is not a changed file of the working tree."),
         |b| media_response(&path, b, None),
     ))
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use axum::body::HttpBody;
+    use tokio::sync::Semaphore;
+
+    /// Guard: a body may be polled again after its end (compression does this). It must answer
+    /// end again, not panic.
+    #[tokio::test]
+    async fn a_held_body_polled_past_its_end_stays_ended() {
+        let permit = Arc::new(Semaphore::new(1))
+            .acquire_owned()
+            .await
+            .expect("permit");
+        let mut body = super::held(b"abc".to_vec(), permit);
+        let mut seen = 0;
+        for _ in 0..4 {
+            let frame = std::future::poll_fn(|cx| std::pin::Pin::new(&mut body).poll_frame(cx));
+            if let Some(f) = frame.await {
+                seen += f.expect("frame").into_data().map_or(0, |d| d.len());
+            }
+        }
+        assert_eq!(seen, 3);
+    }
 }

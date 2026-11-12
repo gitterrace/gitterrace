@@ -272,3 +272,67 @@ fn the_sleep_guard_sees_both_kinds_of_test_code() {
     assert_eq!(caught("crates/a/src/x.rs", sleep), 0, "product code");
     assert_eq!(caught("crates/a/tests/x.rs", "    // a sleep( in prose"), 0);
 }
+
+/// Each `Body::from_stream(` call up to its closing parenthesis, as `file:line` and text.
+fn from_stream_calls(text: &str) -> Vec<(usize, String)> {
+    let mut out = Vec::new();
+    for (at, _) in text.match_indices("Body::from_stream(") {
+        let open = at + "Body::from_stream".len();
+        let mut depth = 0;
+        let mut end = text.len();
+        for (i, c) in text[open..].char_indices() {
+            match c {
+                '(' => depth += 1,
+                ')' => {
+                    depth -= 1;
+                    if depth == 0 {
+                        end = open + i + 1;
+                        break;
+                    }
+                }
+                _ => {}
+            }
+        }
+        out.push((text[..at].lines().count(), text[at..end].to_string()));
+    }
+    out
+}
+
+/// A body streamed from a `Stream` is polled again after its end by the compression layer, and
+/// a bare `stream::unfold` or `poll_fn` panics then. Every `Body::from_stream` source is fused.
+#[test]
+fn every_streamed_body_is_fused() {
+    let mut bad = Vec::new();
+    for f in scan::files_in(&root(), &["crates"], &["rs"]) {
+        let Ok(text) = fs::read_to_string(&f) else {
+            continue;
+        };
+        let rel = f
+            .strip_prefix(root())
+            .unwrap_or(&f)
+            .to_string_lossy()
+            .replace('\\', "/");
+        // Shipped code only: this file names the pattern it looks for.
+        if !rel.contains("/src/") {
+            continue;
+        }
+        for (line, call) in from_stream_calls(&text) {
+            if !call.contains(".fuse()") {
+                bad.push(format!("{rel}:{line}"));
+            }
+        }
+    }
+    assert!(
+        bad.is_empty(),
+        "fuse the stream these bodies read:\n{}",
+        bad.join("\n")
+    );
+}
+
+#[test]
+fn the_fuse_guard_reads_a_whole_call() {
+    let fused = "let b = Body::from_stream(\n    stream::unfold(s, f)\n        .fuse(),\n);";
+    let bare = "let b = Body::from_stream(stream::unfold(s, |x| async { f(x) }));\nfoo.fuse();";
+    assert!(from_stream_calls(fused)[0].1.contains(".fuse()"));
+    assert!(!from_stream_calls(bare)[0].1.contains(".fuse()"));
+}
