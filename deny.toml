@@ -18,6 +18,10 @@ ignore = [
     # dropped paste, so drop this ignore with the first release after 0.7.0.
     # Expires 2027-02-05: if that date passes with no such release, decide again.
     "RUSTSEC-2024-0436",
+    # rmcp (Streamable HTTP client body buffering): gitterrace-api enables server,
+    # transport-io and macros only, so the vulnerable client transports are not
+    # compiled in. Revisit when upgrading rmcp or if its feature set changes.
+    "RUSTSEC-2026-0462",
 ]
 
 [licenses]
@@ -29,12 +33,10 @@ allow = [
     "BSD-3-Clause",
     "ISC",
     "Unicode-3.0",
-    "Unicode-DFS-2016",
     "Zlib",
     "BSL-1.0",
     "CC0-1.0",
     "MPL-2.0",
-    "OFL-1.1",
 ]
 
 [licenses.private]
