@@ -37,7 +37,7 @@ OUTSIDE_HASHES = frozenset(
 # .mcp.json is local agent tooling config, not product content. The guard shims and guards.env
 # bind the shared guards to the agent harness, so they name its adapters and scratch dir.
 SKIP = (
-    "schwarzwald/kit/",
+    "vendor/schwarzwald/kit/",
     "Cargo.lock",
     ".mcp.json",
     "scripts/lint/names-check.py",

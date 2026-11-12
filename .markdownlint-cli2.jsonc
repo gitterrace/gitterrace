@@ -21,13 +21,13 @@
     "MD036": false,
     "MD060": false
   },
-  "customRules": ["./schwarzwald/kit/configs/markdownlint/prose-length.cjs"],
+  "customRules": ["./vendor/schwarzwald/kit/configs/markdownlint/prose-length.cjs"],
   "prose-length": { "line_length": 80 },
   // Every markdown file in the tree, so a new page is linted without a list to update. Only
   // vendored and generated-elsewhere trees are left out.
   "globs": ["**/*.md"],
   "ignores": [
-    "target/**", "crates/*/tests/golden/**", "node_modules/**", "schwarzwald/kit/**",
+    "target/**", "crates/*/tests/golden/**", "node_modules/**", "vendor/schwarzwald/kit/**",
     // vale downloads its packages here (gitignored)
     "schwarzwald/styles/proselint/**"
   ]

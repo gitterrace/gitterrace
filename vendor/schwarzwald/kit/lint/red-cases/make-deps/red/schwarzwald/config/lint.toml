@@ -1,0 +1,6 @@
+[deps]
+installer = "deps-run.sh"
+ci = "ci.yml"
+
+[deps.pins]
+RUFF = 'ruff==([\d.]+)'

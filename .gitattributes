@@ -1,4 +1,4 @@
-schwarzwald/kit/tokens/theme-tokens.json linguist-generated
+vendor/schwarzwald/kit/tokens/theme-tokens.json linguist-generated
 crates/gitterrace-web/static/vendor/** linguist-vendored
 docs/openapi.json linguist-generated
 tests/bench/results/*.json linguist-generated

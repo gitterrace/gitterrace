@@ -14,14 +14,14 @@ const PATH: &str = "THIRD-PARTY-NOTICES";
 
 /// Each embedded third-party asset and the file holding its notice, in output order.
 const SOURCES: [(&str, &str); 4] = [
-    ("Fraunces", "schwarzwald/kit/fonts/fraunces/OFL.txt"),
+    ("Fraunces", "vendor/schwarzwald/kit/fonts/fraunces/OFL.txt"),
     (
         "Bricolage Grotesque",
-        "schwarzwald/kit/fonts/bricolage-grotesque/OFL.txt",
+        "vendor/schwarzwald/kit/fonts/bricolage-grotesque/OFL.txt",
     ),
     (
         "JetBrains Mono",
-        "schwarzwald/kit/fonts/jetbrains-mono/OFL.txt",
+        "vendor/schwarzwald/kit/fonts/jetbrains-mono/OFL.txt",
     ),
     (
         "mermaid",
@@ -88,7 +88,7 @@ mod tests {
             );
         }
         // A font folder under the kit that assets.rs embeds needs a notice entry.
-        let fonts = root.join("schwarzwald/kit/fonts");
+        let fonts = root.join("vendor/schwarzwald/kit/fonts");
         for entry in std::fs::read_dir(fonts).expect("fonts dir") {
             let name = entry
                 .expect("entry")

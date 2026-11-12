@@ -71,7 +71,7 @@ what changed, why, and how it is tested. Run
 every commit.
 
 A change lands with
-`bash schwarzwald/kit/tools/land.sh <repo> <clone> <sha>`, one commit at a
+`bash vendor/schwarzwald/kit/tools/land.sh <repo> <clone> <sha>`, one commit at a
 time on main's tip. The landing checkout (marked with
 `git config --local landing.target "$(git rev-parse --show-toplevel)"`) refuses
 a plain `git commit`, so commit in a clone and land from it.

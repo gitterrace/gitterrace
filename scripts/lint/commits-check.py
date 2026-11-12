@@ -38,16 +38,16 @@ GATES: list[tuple[str, list[str], tuple[str, ...]]] = [
     (
         "theme",
         [PY, "scripts/release/site/theme-gen.py", "--check"],
-        (".css", "scripts/release/site/theme-", "schwarzwald/kit/"),
+        (".css", "scripts/release/site/theme-", "vendor/schwarzwald/kit/"),
     ),
     (
         "make-targets",
-        [PY, "schwarzwald/kit/lint/make-targets.py", "--repo", "."],
+        [PY, "vendor/schwarzwald/kit/lint/make-targets.py", "--repo", "."],
         (".md", "Makefile"),
     ),
     (
         "actions-pin",
-        [PY, "schwarzwald/kit/lint/actions-pin.py", "--repo", "."],
+        [PY, "vendor/schwarzwald/kit/lint/actions-pin.py", "--repo", "."],
         (".github/",),
     ),
 ]

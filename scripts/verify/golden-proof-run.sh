@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# The two product steps the shared golden tool (schwarzwald/kit/tools/golden.py) calls for a
+# The two product steps the shared golden tool (vendor/schwarzwald/kit/tools/golden.py) calls for a
 # re-bless proof, kept here because they name this product's oracle test:
 #
 #   golden-proof-run.sh dump              writes every golden answer into $GOLDEN_DUMP
@@ -7,7 +7,7 @@
 #                                     REAL, only-old or only-new cell
 #   golden-proof-run.sh --self-test       a planted change in one cell must report REAL 1
 #
-# Run the proof itself with `python3 schwarzwald/kit/tools/golden.py change OLD NEW`.
+# Run the proof itself with `python3 vendor/schwarzwald/kit/tools/golden.py change OLD NEW`.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 oracle_cfg() {
@@ -32,7 +32,7 @@ classify() {
 
 case ${1:-} in
 dump)
-  : "${GOLDEN_DUMP:?set by schwarzwald/kit/tools/golden.py}"
+  : "${GOLDEN_DUMP:?set by vendor/schwarzwald/kit/tools/golden.py}"
   # Its own target dir: the old build must not replace the binary classify uses.
   CARGO_TARGET_DIR=$PWD/target/golden-check TEST_ORACLE_DUMP=$GOLDEN_DUMP \
     cargo test --release -q -p "$crate" --test "$test" \

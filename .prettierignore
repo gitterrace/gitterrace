@@ -1,6 +1,6 @@
 # Not ours to rewrap: the shared kit, test goldens and lint fixtures, and the
 # template whose first line must stay the markdownlint directive.
-schwarzwald/kit/
+vendor/schwarzwald/kit/
 **/golden/
 **/red-cases/
 .github/pull_request_template.md

@@ -69,20 +69,20 @@ const FONTS: [(&str, &[u8]); 3] = [
     (
         "fraunces.woff2",
         include_bytes!(
-            "../../../../schwarzwald/kit/fonts/fraunces/fraunces-latin-wght-normal.woff2"
+            "../../../../vendor/schwarzwald/kit/fonts/fraunces/fraunces-latin-wght-normal.woff2"
         ),
     ),
     (
         "bricolage-grotesque.woff2",
         include_bytes!(concat!(
-            "../../../../schwarzwald/kit/fonts/",
+            "../../../../vendor/schwarzwald/kit/fonts/",
             "bricolage-grotesque/bricolage-grotesque-latin-wght-normal.woff2"
         )),
     ),
     (
         "jetbrains-mono.woff2",
         include_bytes!(concat!(
-            "../../../../schwarzwald/kit/fonts/",
+            "../../../../vendor/schwarzwald/kit/fonts/",
             "jetbrains-mono/jetbrains-mono-latin-wght-normal.woff2"
         )),
     ),

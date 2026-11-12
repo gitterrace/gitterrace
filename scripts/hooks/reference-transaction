@@ -1,4 +1,4 @@
 #!/usr/bin/env bash
-# The shared reference-transaction hook (schwarzwald/kit/hooks): main keeps landing order on
+# The shared reference-transaction hook (vendor/schwarzwald/kit/hooks): main keeps landing order on
 # every update, a hand-made fast-forward included. Wired by core.hooksPath scripts/hooks.
-exec "$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)/schwarzwald/kit/hooks/commit-dates.sh" "$@"
+exec "$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)/vendor/schwarzwald/kit/hooks/commit-dates.sh" "$@"

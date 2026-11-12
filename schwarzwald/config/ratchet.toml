@@ -1,4 +1,4 @@
-# The one registry of allowlists and counts that may only fall. schwarzwald/kit/tools/
+# The one registry of allowlists and counts that may only fall. vendor/schwarzwald/kit/tools/
 # ratchet-check.py compares each entry with the base revision, and land-check fails when one
 # grows or a ratchet of the base disappears. A new guard declares its
 # allowlist here and needs no change to the check.

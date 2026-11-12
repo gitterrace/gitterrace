@@ -7,7 +7,7 @@
 # implicitly, so install names it.
 TOOLCHAIN := $(shell sed -n 's/^channel *= *"\(.*\)"/\1/p' rust-toolchain.toml)
 # Where cargo puts its output: CARGO_TARGET_DIR when the shell sets it, else target.
-TARGET := $${CARGO_TARGET_DIR:-target}
+CARGO_OUT := $${CARGO_TARGET_DIR:-target}
 RELEASE_BIN := target/release/git-terrace
 BENCH_REPOS := --repos control,git,rust
 
@@ -20,7 +20,7 @@ setup:
 
 ## build: Release binary
 build:
-	@python3 scripts/bench/indexing-run.py --apply-dir "$(TARGET)"
+	@python3 scripts/bench/indexing-run.py --apply-dir "$(CARGO_OUT)"
 	cargo build --release -p gitterrace
 
 ## install: Install git-terrace into ~/.cargo/bin, so git runs it as git terrace
@@ -66,7 +66,7 @@ clippy-windows:
 
 ## lint: External linters (typos, vale, shellcheck, ruff, pyright, ast-grep, ...)
 lint: harness-links
-	bash schwarzwald/kit/lint/run.sh
+	bash vendor/schwarzwald/kit/lint/run.sh
 
 # harness-links: The shared skills and agents are linked and harness.env names every key.
 # Skipped, with a line saying so, on a clone without the shared kit checkout.
@@ -88,7 +88,7 @@ doc:
 
 # theme: Snapshot matches its manifest, generated files match the snapshot
 theme:
-	python3 schwarzwald/kit/check.py
+	python3 vendor/schwarzwald/kit/check.py
 	python3 scripts/release/site/theme-gen.py --check
 	python3 scripts/release/site/theme-logo-gen.py --check
 	python3 scripts/release/site/theme-tagline-gen.py --check
@@ -121,7 +121,7 @@ docs-check:
 	bash scripts/land-check.sh --self-test
 	python3 scripts/lint/commits-check.py --self-test
 	python3 scripts/lint/tracked-check.py --self-test
-	bash scripts/lib/python-run.sh schwarzwald/kit/tools/golden.py --self-test
+	bash scripts/lib/python-run.sh vendor/schwarzwald/kit/tools/golden.py --self-test
 	bash scripts/verify/golden-proof-run.sh --self-test
 	bash scripts/dev/linux-run.sh --self-test
 	bash scripts/dev/macos-run.sh --self-test
@@ -137,8 +137,8 @@ gc-guard:
 bench-guard:
 	python3 scripts/bench/indexing-run.py --self-test
 	cargo build -q -p gitterrace
-	python3 scripts/bench/bench-run.py --synthetic --bin $(TARGET)/debug/git-terrace >/dev/null
-	bash scripts/bench/bench-budget-check.sh $(TARGET)/debug/git-terrace
+	python3 scripts/bench/bench-run.py --synthetic --bin $(CARGO_OUT)/debug/git-terrace >/dev/null
+	bash scripts/bench/bench-budget-check.sh $(CARGO_OUT)/debug/git-terrace
 	python3 scripts/bench/bench-report.py --self-test
 	python3 scripts/bench/bench-quiet-lib.py
 	python3 scripts/bench/speed-check.py --self-test
@@ -206,7 +206,7 @@ domains:
 ## changelog: Prepend the release's section to CHANGELOG.md (VERSION=x.y.z)
 changelog:
 	python3 scripts/release/changelog-run.py
-	bash schwarzwald/kit/tools/changelog-gen.sh $(or $(VERSION),$(error VERSION=x.y.z is required))
+	bash vendor/schwarzwald/kit/tools/changelog-gen.sh $(or $(VERSION),$(error VERSION=x.y.z is required))
 
 # site: Refuse to publish install lines before the repository, tap and release tag answer
 site: docs-check
@@ -249,7 +249,7 @@ shipped:
 	@test -z "$$(git status --porcelain)" || { echo "uncommitted changes: commit them, a deploy builds HEAD only"; git status --short; exit 1; }
 
 ##@ Maintenance
-.PHONY: gc keep help
+.PHONY: gc keep
 
 # DRY=1 only reports. BENCH=1 also removes the cached benchmark clones.
 ## gc: Prune cargo units and scratch output unused for DAYS (default 7, DRY=1, BENCH=1)
@@ -260,8 +260,4 @@ gc:
 keep:
 	python3 scripts/dev/keep-report.py . --config schwarzwald/config/keep-inventory.json --out target/keep-inventory.tsv
 
-## help: This list
-help:
-	@awk '/^##@ /{printf "\n%s\n", substr($$0, 5)} \
-		/^## [a-z-]+: /{sub(/^## /, ""); i = index($$0, ": "); \
-		printf "  %-16s %s\n", substr($$0, 1, i - 1), substr($$0, i + 2)}' $(MAKEFILE_LIST)
+include vendor/schwarzwald/kit/configs/help.mk

@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[2]
-LINT = ROOT / "schwarzwald" / "kit" / "lint"
+LINT = ROOT / "vendor" / "schwarzwald" / "kit" / "lint"
 
 
 def tracked(root: Path, exclude: list[str]) -> list[str]:

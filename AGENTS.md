@@ -3,7 +3,7 @@
 Local, read-only git browser with insights.
 [Architecture](docs/architecture.md).
 
-Shared rules: `schwarzwald/kit/rules/rules.md`. They apply here in full.
+Shared rules: `vendor/schwarzwald/kit/rules/rules.md`. They apply here in full.
 
 ## Layout
 
@@ -37,7 +37,7 @@ HTTP. Nothing outside `gitterrace-git` imports `gix`.
   in `gitterrace-web/src/lib.rs`.
 - No inline scripts beyond the hashed theme snippet: the CSP refuses them. JS
   lives in `static/`.
-- Never edit `schwarzwald/kit` or the generated block in `tokens.css`.
+- Never edit `vendor/schwarzwald/kit` or the generated block in `tokens.css`.
   `make theme` fails on drift. No raw color outside `tokens.css`.
 - Logic lives in Rust. Templates render values, they do not compute them.
 - Docs: `api.md`, `configuration.md` and every `GENERATED` block come from code
@@ -70,7 +70,7 @@ HTTP. Nothing outside `gitterrace-git` imports `gix`.
 - Commits: as in [CONTRIBUTING](CONTRIBUTING.md#commits). Commit by pathspec,
   never `git add -A`.
 - One change, one commit, squashed in its own clone, made with
-  `bash schwarzwald/kit/tools/clone.sh <label>` (shared rules, Commits). The
+  `bash vendor/schwarzwald/kit/tools/clone.sh <label>` (shared rules, Commits). The
   gate for a squashed commit here is
   `scripts/land-check.sh --base <main>`.
 - Accepting commits written without a build:
@@ -84,7 +84,7 @@ HTTP. Nothing outside `gitterrace-git` imports `gix`.
   data other tools name. Make targets are `<area>[-<verb>]`, harness-only env
   vars use a `TEST_` prefix. `make names` enforces it.
 - Parallel work follows the shared rules
-  ([Parallel work](schwarzwald/kit/rules/rules.md#parallel-work)); this
+  ([Parallel work](vendor/schwarzwald/kit/rules/rules.md#parallel-work)); this
   repository adds only its gate, `scripts/land-check.sh`, which one runner
   runs for all of it.
 
@@ -97,9 +97,9 @@ it lands. Real names, hosts and ids for the checks go in the gitignored
 repository.
 
 - `CONV-NO-INTERNAL-REFS`, `CONV-PERSONAL-DATA`, `CONV-NO-OWN-SHAS`: the shared
-  lints in `schwarzwald/kit/lint`, with gitterrace's values in
+  lints in `vendor/schwarzwald/kit/lint`, with gitterrace's values in
   `schwarzwald/config/lint.toml` and the refused words in
-  `schwarzwald/kit/rules/deny.toml`. Each runs on its red and green case in
+  `vendor/schwarzwald/kit/rules/deny.toml`. Each runs on its red and green case in
   `make lint`. Design docs (the `design` scope there) hold product design
   only: no work breakdown, owner or estimate section.
 - `test-names-describe-behavior` (ast-grep): a test is named by its behavior,
@@ -108,9 +108,9 @@ repository.
   message rules above, before a commit exists. `make lint` runs the shared hook
   test through the shim.
 - Tool-use guards: `scripts/guards/adapters/*.sh` exec the shared guards
-  (`schwarzwald/kit/guards`), with gitterrace's values in
+  (`vendor/schwarzwald/kit/guards`), with gitterrace's values in
   `schwarzwald/config/guards.env`. `make lint` runs their selftest and adapters,
   the red probes run with
-  `GUARDS_SELFTEST_PRODUCT=$PWD bash schwarzwald/kit/guards/tests/red.sh`.
+  `GUARDS_SELFTEST_PRODUCT=$PWD bash vendor/schwarzwald/kit/guards/tests/red.sh`.
 - Allowlists and counts only fall: `schwarzwald/config/ratchet.toml`, checked by
-  `schwarzwald/kit/tools/ratchet-check.py` in land-check.
+  `vendor/schwarzwald/kit/tools/ratchet-check.py` in land-check.

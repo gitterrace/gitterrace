@@ -157,14 +157,14 @@ gate_commands_covered() {
   ((missing == 0))
 }
 
-LINTS="$PWD/schwarzwald/kit/lint"
+LINTS="$PWD/vendor/schwarzwald/kit/lint"
 
 # The message step: the shared lints over subject and body of every commit in $1..HEAD. Each
 # lint runs, so one log names every refusal; any refusal fails the step.
 message_lints() {
   local rc=0 rule
   for rule in internal-refs personal-data own-shas; do
-    echo "== $py schwarzwald/kit/lint/$rule.py --messages $1"
+    echo "== $py vendor/schwarzwald/kit/lint/$rule.py --messages $1"
     "$py" "$LINTS/$rule.py" --messages "$1" || rc=1
   done
   return "$rc"
@@ -369,11 +369,11 @@ if ((${#scope[@]})); then
   fi
 fi
 step make lines names
-step "$py" schwarzwald/kit/tools/ratchet-check.py --self-test
-step "$py" schwarzwald/kit/tools/ratchet-check.py --base "$base"
+step "$py" vendor/schwarzwald/kit/tools/ratchet-check.py --self-test
+step "$py" vendor/schwarzwald/kit/tools/ratchet-check.py --base "$base"
 step cargo test -p "$(land_cfg conventions.crate)" --test "$(land_cfg conventions.test)"
-step bash schwarzwald/kit/lint/run.sh
-step python3 schwarzwald/kit/lint/root-entries.py
+step bash vendor/schwarzwald/kit/lint/run.sh
+step python3 vendor/schwarzwald/kit/lint/root-entries.py
 step make docs-check
 check_subjects "$base"
 # Subject and body of every commit landed: the shared lints the commit-msg hook runs.

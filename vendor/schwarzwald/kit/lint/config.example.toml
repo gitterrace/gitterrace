@@ -1,0 +1,148 @@
+# schwarzwald/config/lint.toml in a product: what the shared lints read. Data only. Every key
+# is optional; the value shown is the default. A key no lint reads is an error.
+
+[product]
+# Filled into `{product}` in rules/deny.toml, e.g. "<product> 1a2b3c" as a tracker id.
+name = "product"
+
+[scope]
+# Globs over repository paths. `**` and `*` both cross folders.
+prose = ["README.md", "AGENTS.md", "docs/**.md", "bench/**.md"]
+code = ["*.rs", "*.py", "*.mjs", "*.js", "*.sh", "*.yml", "*.yaml", "*.toml", "scripts/hooks/*"]
+make = ["Makefile"]
+design = ["docs/design/**.md"]
+golden = ["*/golden/*"]
+# The synced copy carries its own checks: keep it out, in either place.
+exclude = ["schwarzwald/kit/*", "vendor/schwarzwald/kit/*", "target/*"]
+# Fewer files than this in a tree scan means the census is broken. Below 1 counts as 1.
+# The message gate (`--messages BASE`) refuses a lint.toml that adds to an exclude or exempt
+# list or lowers min_files against BASE; <allow_prefix>ALLOW_WIDER_LINT=1 lets a reviewed one in.
+min_files = 1
+
+[a11y]
+# docs-a11y: the markdown it reads (heading order, one h1, alt text, link text, fence languages).
+docs = ["README.md", "docs/**.md"]
+# A page with headings but no h1 fails. False allows pages without one.
+h1_required = true
+# Accepted problems as "path: problem" (the hit without its line number). A stale entry fails.
+known = []
+
+[refs]
+# Extra patterns the product refuses, and English words its id patterns must skip.
+patterns = []
+not_id = []
+
+[own_shas]
+# own-shas: files that may name the one build commit a record file stores. `allow` is paths
+# (a `#NAME` suffix limits it to that generated block), `record` a glob of JSON files, `key` the
+# field holding the commit. Empty `allow` (the default) allows nothing.
+allow = []
+record = ""
+key = "commit"
+
+[personal]
+# Paths never scanned for personal data (a licence text, a legal page), and extra placeholder
+# home names fixtures use.
+exempt = []
+placeholder_homes = []
+
+[lines]
+# file-length: files matching globs may not exceed max_lines. max_width caps comment lines
+# (0 = off). exclude lists vendored or generated paths on top of [scope] exclude.
+max_lines = 600
+max_width = 0
+# max_code_width caps code lines (0 = off). A file's excess is its allowance in
+# schwarzwald/config/wide-allowed.json, {"wide_allowed": {"path": count}}, and may only fall.
+max_code_width = 0
+globs = ["*.rs", "*.py", "*.mjs", "*.js", "*.sh", "*.css", "*.html"]
+exclude = []
+
+[scripts]
+# script-orphans: the .sh and .py files under dirs must be named by a file matching readers.
+# exempt lists entry points the VCS or a tool calls by name. `manual-only` in a header exempts one.
+dirs = ["scripts"]
+readers = ["Makefile", "*.md", "*.yml", "*.yaml", "*.toml", "scripts/*"]
+exempt = []
+
+[disk]
+# tools/disk-floor.py and disk-floor.sh: a build, gate or red run refuses to start below this
+# many GiB free. DISK_FLOOR_GIB in the environment wins (0 turns the check off for one run).
+floor_gib = 50
+
+[cross]
+# tools/cross-clippy.sh: the Rust targets the product ships besides the host. Code behind a
+# windows, linux or unix cfg compiles only there, so the host's clippy never reads it. A Windows
+# target runs natively, a Linux target in Docker on git archive HEAD.
+targets = []
+
+[root]
+# root-entries: every tracked top-level entry must be on allow (a file or folder name, each
+# with the reason it sits at the root as a comment). Empty turns that half off. Nothing
+# untracked and unignored may sit at the root or anywhere inside a scratch_free folder.
+allow = []
+scratch_free = [".agents"]
+
+[commit]
+types = ["feat", "fix", "docs", "style", "refactor", "perf", "test", "build", "ci", "chore", "revert"]
+# <prefix>ALLOW_FREE_SUBJECT=1 overrides the subject form.
+allow_prefix = "SCHWARZWALD_"
+# The branch hooks/commit-dates.sh (a reference-transaction hook) keeps in landing order.
+main = "main"
+
+[denylist]
+# The private denylist is seeded once and the tracker grows: past max_age_hours (0 = never)
+# or when missing, internal-refs prints `refresh` and, in mode "refuse", fails. mode: warn | refuse
+# | refresh. In "refresh" the check runs the private refresh command itself from the repository
+# root and fails only when that command fails or leaves the list missing or stale: as strict,
+# without blocking on age. The command never comes from this tracked file: it is
+# `argv = ["cmd", "arg", ...]` in denylist-refresh.toml beside the list, run without a shell,
+# its output never printed. It must MERGE (tools/denylist-merge.py: the union of the current
+# list, the tracker's every code, closed and deleted rows too, and history_ids).
+max_age_hours = 168
+mode = "warn"
+# The list itself: one file for every product, outside every repository (`~` expands, mode 0600,
+# its folder 0700). A path inside the repository is refused, and denylist-parked fails on a copy.
+path = "~/.config/schwarzwald/personal-denylist"
+# A file outside the repository of ids from old history, merged in on every refresh.
+history_ids = ""
+
+[changelog]
+# tools/changelog-gen.sh and lint/changelog.py: CHANGELOG.md is what git-cliff renders
+# from the tagged history. git_cliff pins the version the output was checked with ("" turns
+# the check off: a product with no changelog). file and tag_prefix name the file and the tags.
+git_cliff = ""
+file = "CHANGELOG.md"
+tag_prefix = "v"
+
+[make]
+# make-help: the targets every Makefile in [scope] make must define and document with a `##`
+# line. The shared vocabulary is deps, setup, build, run, check, lint, test, fmt and clean
+# (contract/scripts.md); a product lists the ones it has. Empty checks only the help layout.
+core = []
+
+[deps]
+# make-deps: `make deps` installs every tool `make lint` runs, at the version CI pins.
+# installer is the script `make deps` runs ("" turns the check off). It lists what it installs
+# as DEPS_TOOLS=(...) and pins NAME_VERSION=x.y.z lines. ci is the file that installs the same
+# tools in CI. given are commands there before the installer runs. pins maps NAME to a regex
+# with one group that finds NAME's version in ci, e.g. RUFF = 'ruff==([\d.]+)'.
+installer = ""
+ci = ""
+given = ["git", "bash", "python3"]
+
+[deps.pins]
+
+[run]
+# run.sh: the external linters, one PASS or FAIL line each. steps are extra checks, each
+# "name|tool|install hint|command" run from the repository root, with $PY set to the python 3.11
+# or newer the runner picked. shell_exclude are git
+# pathspecs kept out of shellcheck and shfmt. shellcheck_exclude are the codes dropped from
+# `shellcheck -o all`. shfmt runs with `-i 2`. markdownlint pins the
+# markdownlint-cli2 version, x.y.z only ("" skips it).
+# steps are trusted product code: each runs through bash on every `make lint`, so a change to
+# them is a change to the product's scripts and is reviewed as one. CI runs pull requests with
+# the base branch's lint.toml (ci/lint-and-test.yml), so a branch cannot rewrite its own gate.
+steps = []
+shell_exclude = []
+shellcheck_exclude = ["SC2250", "SC2292", "SC2310", "SC2312"]
+markdownlint = ""

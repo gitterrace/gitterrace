@@ -1,0 +1,5 @@
+[scope]
+make = ["Makefile"]
+
+[make]
+core = ["build"]

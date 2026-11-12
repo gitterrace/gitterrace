@@ -105,12 +105,12 @@ pub fn render(root: &Path, ws: &Workspace) -> Result<Vec<Out>> {
     let mut outs = Vec::new();
     outs.push(Out::file(at("assets/site.css"), css(&read(TOKENS)?)?));
     for (dir, file) in FONTS {
-        let path = format!("schwarzwald/kit/fonts/{dir}/{file}");
+        let path = format!("vendor/schwarzwald/kit/fonts/{dir}/{file}");
         let bytes = std::fs::read(root.join(&path)).with_context(|| format!("reading {path}"))?;
         outs.push(Out::bytes(at(&format!("assets/fonts/{dir}.woff2")), bytes));
         outs.push(Out::file(
             at(&format!("assets/fonts/{dir}-OFL.txt")),
-            read(&format!("schwarzwald/kit/fonts/{dir}/OFL.txt"))?,
+            read(&format!("vendor/schwarzwald/kit/fonts/{dir}/OFL.txt"))?,
         ));
     }
     // Committed in docs/brand, so the built site links a file that exists. Under icons/, since

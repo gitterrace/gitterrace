@@ -17,6 +17,7 @@ mod config_md;
 mod docs_index;
 mod docs_md;
 mod facts;
+mod kit_path;
 mod main_guard;
 mod notices_md;
 mod openapi_json;

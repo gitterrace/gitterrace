@@ -13,7 +13,7 @@ t BLOCK protected_files "$REPO" edit '{"file_path":"'"$REPO"'/crates/gitterrace-
 t BLOCK protected_files "$REPO" write '{"file_path":"'"$REPO"'/crates/gitterrace-web/tests/golden/revisions.txt"}' "a golden file, written only via TEST_BLESS"
 t BLOCK protected_files "$REPO" write '{"file_path":"'"$REPO"'/docs/api.md"}' "the generated api doc"
 t BLOCK protected_files "$REPO" write '{"file_path":"'"$REPO"'/docs/configuration.md"}' "the generated configuration doc"
-t BLOCK protected_files "$REPO" edit '{"file_path":"'"$REPO"'/schwarzwald/kit/tokens/theme-tokens.json"}' "the synced theme copy"
+t BLOCK protected_files "$REPO" edit '{"file_path":"'"$REPO"'/vendor/schwarzwald/kit/tokens/theme-tokens.json"}' "the synced theme copy"
 t ALLOW protected_files "$REPO" edit '{"file_path":"'"$REPO"'/crates/gitterrace-web/static/app.js"}' "a static file that is not vendored"
 t ALLOW protected_files "$REPO" edit '{"file_path":"'"$REPO"'/docs/architecture.md"}' "a hand-written doc"
 EVENT=post_tool

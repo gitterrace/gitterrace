@@ -1,0 +1,10 @@
+# The part of a ruff config every product shares. A product's ruff.toml starts with
+# `extend = "vendor/schwarzwald/kit/configs/ruff-base.toml"` and adds to it with `extend-select` and
+# `ignore`. It does not set `target-version` or `select`: a product value replaces the base value,
+# and drift.py fails on it.
+target-version = "py39"
+
+[lint]
+# Import order (I) and E4 on top of errors (E9, F) and bugbear (B). E7, UP, SIM and RUF are not
+# clean in every product yet, so a product that passes them adds them with `extend-select`.
+select = ["E4", "E9", "F", "I", "B"]

@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+# Commit-msg: the subject reads `type(scope): subject` (CONV-COMMIT-SUBJECT), and subject and body
+# pass CONV-NO-INTERNAL-REFS, CONV-PERSONAL-DATA and CONV-NO-OWN-SHAS. `#` lines are skipped only
+# when git strips them: commit.cleanup strip or scissors, or the default with an editor (git sets
+# GIT_EDITOR=: for a hook when no editor runs, as with -m and -F, which keep `#` lines). Types and the override prefix come from the product's
+# schwarzwald/config/lint.toml. The product's landing gate runs the same lints on every commit
+# it lands, so the hook is a convenience, never the only gate.
+#
+# A product keeps a one-line shim in its hooks dir that execs this file, so core.hooksPath
+# stays one dir:   exec "$(git rev-parse --show-toplevel)/vendor/schwarzwald/kit/hooks/commit-msg" "$@"
+set -euo pipefail
+lint="$(cd "$(dirname "${BASH_SOURCE[0]}")/../lint" && pwd)"
+hooks="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+root="${COMMIT_MSG_REPO:-$(git rev-parse --show-toplevel)}"
+
+# shellcheck source=../lint/lib/pick-python.sh
+. "${lint}/lib/pick-python.sh"
+pick_py || { echo "commit-msg: needs python 3.11 or newer" >&2; exit 1; }
+py=${PY}
+
+msg=$1
+mode=$(git -C "${root}" config commit.cleanup 2>/dev/null || echo default)
+if [[ ${mode} == strip || ${mode} == scissors || (${mode} == default && ${GIT_EDITOR:-} != ":") ]]; then
+  msg=$(mktemp "${TMPDIR:-/tmp}/commit-msg.XXXXXX")
+  trap 'rm -f "${msg}"' EXIT
+  git -C "${root}" stripspace --strip-comments <"$1" >"${msg}"
+fi
+"$py" "${lint}/commit-subject.py" --repo "${root}" --message "${msg}" >&2 || exit 1
+# A commit from a stale private index; a `restore:` line in the message lets it through.
+(cd "${root}" && bash "${hooks}/stale-index.sh" "${msg}") || exit 1
+rc=0
+for rule in internal-refs personal-data own-shas; do
+  out=$("$py" "${lint}/${rule}.py" --repo "${root}" --message "${msg}" 2>&1) || { printf '%s\n' "${out}" >&2; rc=1; }
+done
+exit "${rc}"

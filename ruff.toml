@@ -1,6 +1,6 @@
-extend = "schwarzwald/kit/configs/ruff-base.toml"
+extend = "vendor/schwarzwald/kit/configs/ruff-base.toml"
 # The synced kit carries its own checks.
-extend-exclude = ["schwarzwald/kit"]
+extend-exclude = ["vendor/schwarzwald/kit"]
 
 [lint]
 # On top of the base: E7, pyupgrade (UP), simplify (SIM) and ruff's own (RUF). RUF005 only

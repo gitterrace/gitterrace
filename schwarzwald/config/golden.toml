@@ -1,4 +1,4 @@
-# The golden tests, read by schwarzwald/kit/tools/golden.py. Data only.
+# The golden tests, read by vendor/schwarzwald/kit/tools/golden.py. Data only.
 # Any test file under crates/*/tests that names golden/ is a golden test, so a new one is found
 # without an edit here.
 [golden]

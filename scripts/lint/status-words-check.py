@@ -22,7 +22,7 @@ HISTORY = re.compile(r"\b(?:no longer|used to|previously|was changed)\b", re.I)
 # Existing comments with history wording, `path:line` entries. Only shrinks.
 ALLOW: set[str] = set()
 EXTS = (".rs", ".html", ".js", ".mjs", ".md")
-EXCLUDE = ("static/vendor/", "schwarzwald/kit/", "target/", "CHANGELOG.md")
+EXCLUDE = ("static/vendor/", "vendor/schwarzwald/kit/", "target/", "CHANGELOG.md")
 W = r"(?:clean|dirty|ahead|behind|detached|untracked|modified)"
 PATTERNS = [
     # "on main clean", "branch {name} ahead 2"
