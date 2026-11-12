@@ -77,11 +77,15 @@ pub fn render(ws: &Workspace, scripts: &[Script]) -> Vec<Out> {
     ]
 }
 
-/// The live demo link and what it shows, from `[workspace.metadata.demo]`; nothing when there
-/// is no demo.
+/// The live demo link and what it shows, from `[workspace.metadata.demo]`, then the credit for
+/// the projects the screenshots show. The credit stays without a demo: the screenshots do too.
 pub fn demo_md(ws: &Workspace) -> String {
+    let credit = "The screenshots show the open source projects \
+         [jq](https://github.com/jqlang/jq) and [ripgrep](https://github.com/BurntSushi/ripgrep), \
+         used under their MIT licenses. They are not affiliated with gitterrace. Thanks to their \
+         authors for great tools.\n";
     if ws.demo.is_empty() {
-        return String::new();
+        return credit.to_owned();
     }
     let names: Vec<String> = ws
         .demo_repos
@@ -98,10 +102,7 @@ pub fn demo_md(ws: &Workspace) -> String {
         [rest @ .., last] => format!(": {} and {last}, exported", rest.join(", ")),
     };
     format!(
-        "Try it without installing: [the live demo]({}){shows}.\n\n\
-         The screenshots show the same projects: [jq](https://github.com/jqlang/jq) and \
-         [ripgrep](https://github.com/BurntSushi/ripgrep), both MIT licensed. Thanks to their \
-         authors.\n",
+        "Try it without installing: [the live demo]({}){shows}.\n\n{credit}",
         ws.demo
     )
 }
