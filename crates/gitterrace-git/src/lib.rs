@@ -51,7 +51,7 @@ pub const MAX_TEXT_BYTES: u64 = 2 * 1024 * 1024;
 pub use gitdir::{BranchStatus, HeadState, InProgress, LinkedWorktree, Stash, TagAnnotation};
 pub use ignore::IgnoreSet;
 pub use nudge::{Nudge, NudgeConfig, NudgeError, Nudger, Skip};
-pub use repo::{ChangeMemo, Repo};
+pub use repo::{ChangeMemo, REJECTED_REV, Repo};
 pub use repo_id::resolve_permalink;
 pub use roots::Roots;
 pub use text::{CommitText, Mailmap};

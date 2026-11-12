@@ -42,7 +42,7 @@ pub(crate) const NUMSTAT_WINDOW: crate::diff::Window = crate::diff::Window {
 const NUMSTAT_MEMO_PAIRS: usize = 1 << 18;
 /// Rev syntax that searches history (`:/text`, `^{/text}`) or reads reflogs (`@{...}`).
 /// Every caller passes URL input here, so the refusal lives at the one choke point.
-const REJECTED_REV: [&str; 3] = [":/", "^{/", "@{"];
+pub const REJECTED_REV: [&str; 3] = [":/", "^{/", "@{"];
 /// Most `~N` / `^N` steps one committed-only rev may take, summed over the whole expression,
 /// so a URL cannot make one request read thousands of commits. Past it the rev is not found,
 /// as it is when N runs past the root. Not configurable: no page links a rev this far back.

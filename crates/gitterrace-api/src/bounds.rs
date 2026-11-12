@@ -1,10 +1,9 @@
 //! Length and syntax bounds on the `rev` and `path` a caller names, checked before any git read.
 
+use gitterrace_git::REJECTED_REV;
+
 use crate::error::ApiError;
 
-/// Rev syntax that searches history (`:/text`, `^{/text}`) or reads reflogs (`@{...}`): a
-/// request could make one call walk every commit. Branch, tag, sha and `~`/`^` stay allowed.
-const REJECTED_REV: [&str; 3] = [":/", "^{/", "@{"];
 /// Longest `rev` or `path` accepted, in bytes. Real ones are far shorter. Not configurable:
 /// a longer name is never a real one.
 const MAX_PATH_LEN: usize = 1_024;
@@ -76,11 +75,5 @@ mod tests {
             s.blame(None, &long()),
             Err(ApiError::BadRequest(_))
         ));
-    }
-
-    #[test]
-    fn rejected_rev_constants_are_equal() {
-        // The git crate keeps its own copy as the enforcement point: change both together.
-        assert_eq!(REJECTED_REV, [":/", "^{/", "@{"]);
     }
 }
