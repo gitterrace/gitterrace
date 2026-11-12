@@ -143,6 +143,11 @@ const DOCS: &[(&str, Kind, &str)] = &[
         Kind::Project,
         "Changes per release, written from the commits",
     ),
+    (
+        "docs/screenshots/README.md",
+        Kind::Project,
+        "Every screenshot, in both color schemes, with the tree it shows",
+    ),
 ];
 
 /// The documents the site publishes: every kind but the project's own files, as repo path,

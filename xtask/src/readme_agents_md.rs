@@ -1,6 +1,6 @@
-//! The generated blocks of `README.md`, `AGENTS.md` and `docs/getting-started.md`, and the
-//! crate and cache facts `docs/architecture.md` shows. Everything here is read from the
-//! workspace or from the registries the code itself uses.
+//! The generated blocks of `README.md`, `AGENTS.md` and `docs/getting-started.md`, the whole of
+//! `docs/screenshots/README.md`, and the crate and cache facts `docs/architecture.md` shows.
+//! Everything here is read from the workspace or from the registries the code itself uses.
 
 use std::fmt::Write as _;
 
@@ -73,6 +73,7 @@ pub fn render(ws: &Workspace, scripts: &[Script]) -> Vec<Out> {
         Out::block(README, "license", license_md(bin)),
         Out::block(README, "demo", demo_md(ws)),
         Out::block(README, "shots", shots_md()),
+        Out::file("docs/screenshots/README.md", crate::credit::gallery_md()),
         Out::block("AGENTS.md", "crates", crate_table(ws)),
     ]
 }
@@ -80,10 +81,7 @@ pub fn render(ws: &Workspace, scripts: &[Script]) -> Vec<Out> {
 /// The live demo link and what it shows, from `[workspace.metadata.demo]`, then the credit for
 /// the projects the screenshots show. The credit stays without a demo: the screenshots do too.
 pub fn demo_md(ws: &Workspace) -> String {
-    let credit = "The screenshots show the open source projects \
-         [jq](https://github.com/jqlang/jq) and [ripgrep](https://github.com/BurntSushi/ripgrep), \
-         used under their MIT licenses. They are not affiliated with gitterrace. Thanks to their \
-         authors for great tools.\n";
+    let credit = crate::credit::credit_md();
     if ws.demo.is_empty() {
         return credit.to_owned();
     }

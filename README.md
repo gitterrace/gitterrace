@@ -17,10 +17,11 @@ database, accounts or network ([why](https://gitterrace.dev/docs/why/)).
 Try it without installing: [the live demo](https://demo.gitterrace.dev): jq
 1.8.2 and ripgrep 15.2.0, exported.
 
-The screenshots show the open source projects [jq](https://github.com/jqlang/jq)
-and [ripgrep](https://github.com/BurntSushi/ripgrep), used under their MIT
-licenses. They are not affiliated with gitterrace. Thanks to their authors for
-great tools.
+[The screenshots](docs/screenshots/) show the open source projects
+[jq](https://github.com/jqlang/jq/tree/jq-1.8.2) and
+[ripgrep](https://github.com/BurntSushi/ripgrep/tree/15.2.0), used under their
+MIT licenses. They are not affiliated with gitterrace. Thanks to their authors
+for great tools.
 
 <!-- END GENERATED: demo -->
 

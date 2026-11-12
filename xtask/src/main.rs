@@ -14,6 +14,7 @@ mod build_dirs;
 mod changelog_md;
 mod cli_md;
 mod config_md;
+mod credit;
 mod docs_index;
 mod docs_md;
 mod facts;

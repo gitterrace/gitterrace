@@ -119,7 +119,7 @@ fn list(root: &Path, dir: &str, fix: &str) -> Result<Vec<String>> {
     let mut v: Vec<String> = std::fs::read_dir(root.join(dir))
         .with_context(|| format!("reading {dir} (run `{fix}`)"))?
         .filter_map(|e| e.ok()?.file_name().into_string().ok())
-        .filter(|f| !f.starts_with('.'))
+        .filter(|f| !f.starts_with('.') && f != "README.md")
         .collect();
     v.sort();
     Ok(v)
