@@ -109,8 +109,12 @@ Exceptions, each on purpose:
 
 - `text_kb` (integer, default `2048`): Largest file shown as text, in KiB.
   Larger files are offered as raw downloads.
-- `raw_mb` (integer, default `256`): Largest file served raw, in MiB. A larger
-  one is refused.
+- `raw_mb` (integer, default `10`): Largest file served raw, in MiB. A larger
+  one is refused. The default was 256 before 0.1.0: a repository that serves
+  large binaries raw sets it again.
+- `raw_concurrent_mb` (integer, default `512`): Raw file bytes held in memory at
+  once across all requests, in MiB. Each raw request reserves `raw_mb` until its
+  body is sent, so a request past the budget waits.
 - `search_matches` (integer, default `500`): Most matches a code search returns.
   Past it the search stops and says it was cut off.
 - `search_file_lines` (integer, default `100`): Most matching lines one file

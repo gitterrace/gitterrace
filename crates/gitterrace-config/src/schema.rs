@@ -223,6 +223,7 @@ pub const BOUNDS: &[(&str, u64, u64)] = &[
     ("limits.highlight_kb", 1, 65_536),
     ("limits.log_pages", 1, 1_000_000),
     ("limits.preview_mb", 1, 4096),
+    ("limits.raw_concurrent_mb", 1, 1_048_576),
     ("limits.worktree_files", 1, 100_000),
     ("limits.worktree_diff_kb", 1, 262_144),
     ("limits.unindexed_commits", 1, 200_000),
@@ -298,8 +299,12 @@ settings! {
     limits: Limits {
         /// Largest file shown as text, in KiB. Larger files are offered as raw downloads.
         text_kb: u64 = 2048 => Live + cost,
-        /// Largest file served raw, in MiB. A larger one is refused.
-        raw_mb: u64 = 256 => Live + cost,
+        /// Largest file served raw, in MiB. A larger one is refused. The default was 256 before
+        /// 0.1.0: a repository that serves large binaries raw sets it again.
+        raw_mb: u64 = 10 => Live + cost,
+        /// Raw file bytes held in memory at once across all requests, in MiB. Each raw request
+        /// reserves `raw_mb` until its body is sent, so a request past the budget waits.
+        raw_concurrent_mb: u64 = 512 => Live,
         /// Most matches a code search returns. Past it the search stops and says it was cut off.
         search_matches: usize = 500 => Live + cost,
         /// Most matching lines one file keeps in a code search. Past it the file says more matched.

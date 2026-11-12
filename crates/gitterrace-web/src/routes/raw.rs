@@ -1,10 +1,14 @@
 //! The `/raw` route: blob bytes with an `ETag`, refused above `limits.raw_mb`.
 
+use std::sync::Arc;
+
 use axum::{
+    body::Body,
     extract::{Path, State},
     http::{HeaderValue, StatusCode, header},
     response::{IntoResponse, Response},
 };
+use tokio::sync::OwnedSemaphorePermit;
 
 use crate::routes::Shared;
 use crate::{app::blocking, error::Result};
@@ -38,7 +42,14 @@ pub(super) async fn raw(
     Path((rev, path)): Path<(String, String)>,
 ) -> Result<Response> {
     let name = path.trim_matches('/').to_owned();
-    let limit = app.cfg().limits.raw_mb;
+    let (limit, budget) = (app.cfg().limits.raw_mb, app.cfg().limits.raw_concurrent_mb);
+    // Reserved before the read and held until the body is sent: gix inflates whole objects,
+    // so the budget bounds the bytes in memory, not the bytes on the wire.
+    let permit = Arc::clone(&app.env.raw_budget)
+        // Never more than the whole budget, so a budget below raw_mb serves one at a time.
+        .acquire_many_owned(u32::try_from(limit.min(budget)).unwrap_or(1))
+        .await
+        .map_err(|_| std::io::Error::other("raw budget closed"))?;
     let loaded = blocking(&app, move |a| {
         // One resolve and one tree walk; the header size comes before any content read.
         let blob = a.repo.raw_blob(&rev, &name, |id, size| {
@@ -78,12 +89,23 @@ pub(super) async fn raw(
         }
         Raw::Bytes(bytes, tag) => (bytes, tag),
     };
-    Ok(media_response(&path, bytes, Some(&tag)))
+    Ok(media_response(&path, held(bytes, permit), Some(&tag)))
+}
+
+/// A body of `bytes` that keeps `permit` until the bytes are handed on, or the client leaves.
+fn held(bytes: Vec<u8>, permit: OwnedSemaphorePermit) -> Body {
+    let state = (Some(bytes), permit);
+    Body::from_stream(futures_util::stream::unfold(
+        state,
+        |(bytes, permit)| async move {
+            bytes.map(|b| (Ok::<_, std::convert::Infallible>(b), (None, permit)))
+        },
+    ))
 }
 
 /// Bytes of a file with the content type its name says, the sandbox for anything that could
 /// run (SVG, text) and `nosniff`: one answer for `/raw` and `/worktree/raw`.
-fn media_response(path: &str, bytes: Vec<u8>, tag: Option<&str>) -> Response {
+fn media_response(path: &str, bytes: impl Into<Body>, tag: Option<&str>) -> Response {
     // PDFs never open in the browser's viewer on this origin.
     let disposition = if crate::media::kind(path) == Some(crate::media::Kind::Pdf) {
         "attachment"
@@ -117,7 +139,7 @@ fn media_response(path: &str, bytes: Vec<u8>, tag: Option<&str>) -> Response {
                 HeaderValue::from_static("nosniff"),
             ),
         ],
-        bytes,
+        bytes.into(),
     )
         .into_response();
     let h = res.headers_mut();

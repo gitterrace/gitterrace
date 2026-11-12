@@ -75,6 +75,10 @@ pub(crate) struct Env {
     /// The served repositories, for the log's related links. Empty for a lone repository.
     pub(crate) related: crate::related::Peers,
     home_streams_cap: Arc<Mutex<usize>>,
+    /// MiB of raw file bytes in memory at once, `limits.raw_concurrent_mb`: a `/raw` request
+    /// holds its share until the body is sent.
+    pub(crate) raw_budget: Arc<Semaphore>,
+    raw_budget_cap: Arc<Mutex<usize>>,
 }
 
 /// The live `actions.toml`, swapped whole on reload.
@@ -86,6 +90,11 @@ fn job_slots(cfg: &Config) -> usize {
         0 => std::thread::available_parallelism().map_or(2, usize::from),
         n => n,
     }
+}
+
+/// `limits.raw_concurrent_mb` as MiB permits; the config bounds it below the semaphore's cap.
+fn raw_slots(cfg: &Config) -> usize {
+    usize::try_from(cfg.limits.raw_concurrent_mb).unwrap_or(1)
 }
 
 /// Text cap and blame cache size in bytes for a repository handle.
@@ -110,6 +119,7 @@ impl Env {
         let jobs = job_slots(&cfg);
         let public = cfg.server.is_public;
         let live_streams = cfg.server.live_streams;
+        let raw = raw_slots(&cfg);
         Self {
             public,
             cfg: Arc::new(RwLock::new(Arc::new(cfg))),
@@ -128,6 +138,8 @@ impl Env {
             home_streams: Arc::new(Semaphore::new(live_streams)),
             home_streams_cap: Arc::new(Mutex::new(live_streams)),
             related: crate::related::Peers::default(),
+            raw_budget: Arc::new(Semaphore::new(raw)),
+            raw_budget_cap: Arc::new(Mutex::new(raw)),
         }
     }
 
@@ -261,6 +273,7 @@ impl Env {
         resize(&self.jobs, &self.jobs_cap, job_slots(&new));
         let streams = new.server.live_streams;
         resize(&self.home_streams, &self.home_streams_cap, streams);
+        resize(&self.raw_budget, &self.raw_budget_cap, raw_slots(&new));
         let apps: Vec<Arc<App>> = self
             .apps
             .lock()

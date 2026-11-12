@@ -388,3 +388,60 @@ fn resources_cache_mb_sizes_the_code_cache() {
     put(&mut m, 1 << 24, "roomy_b.rs", &text);
     assert!(has(&m, "roomy_a.rs", &text) && has(&m, "roomy_b.rs", &text));
 }
+
+#[tokio::test]
+async fn raw_budget_blocks_a_third_concurrent_reader_until_a_body_is_sent() {
+    let dir = tempfile::tempdir().expect("tmp");
+    let p = repo(dir.path(), "r");
+    let a = app(
+        &p,
+        with(|c| {
+            c.limits.raw_mb = 1;
+            c.limits.raw_concurrent_mb = 2;
+        }),
+    );
+    let r = crate::routes::router(Arc::clone(&a));
+    let send = |r: Router| async move {
+        let req = Request::get("/raw/HEAD/mid.txt")
+            .body(Body::empty())
+            .expect("req");
+        r.oneshot(req).await.expect("response")
+    };
+    // Unread bodies: each still holds its share of the budget.
+    let first = send(r.clone()).await;
+    let second = send(r.clone()).await;
+    assert_eq!(first.status(), 200);
+    assert_eq!(
+        a.env.raw_budget.available_permits(),
+        0,
+        "two readers fill it"
+    );
+    let third = tokio::spawn(send(r.clone()));
+    gitterrace_testkit::wait::pause(Duration::from_millis(100)).await;
+    assert!(!third.is_finished(), "the third waits before reading");
+    let bytes = first.into_body().collect().await.expect("body").to_bytes();
+    assert_eq!(bytes.len(), 450 * 7, "the body is the whole file");
+    let third = tokio::time::timeout(Duration::from_secs(5), third)
+        .await
+        .expect("served once a body is sent")
+        .expect("task");
+    assert_eq!(third.status(), 200);
+    drop((second, third));
+    assert_eq!(
+        a.env.raw_budget.available_permits(),
+        2,
+        "every share comes back"
+    );
+}
+
+#[test]
+fn raw_mb_defaults_to_ten_and_refuses_one_byte_over() {
+    let mb = Config::default().limits.raw_mb;
+    assert_eq!(mb, 10);
+    assert!(!crate::routes::raw_refused(mb << 20, mb));
+    assert!(crate::routes::raw_refused((mb << 20) + 1, mb));
+    let zero = with(|_| {});
+    let mut bad = zero;
+    bad.limits.raw_concurrent_mb = 0;
+    assert!(bad.validate().is_err(), "a zero budget would serve nothing");
+}
