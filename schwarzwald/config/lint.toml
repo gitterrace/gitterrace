@@ -136,6 +136,7 @@ steps = [
   "css-button|python3|install python3|python3 scripts/lint/css-button-check.py",
   "css-button-test|python3|install python3|python3 scripts/lint/css-button-check.py --self-test",
   "site-csp|python3|install python3|python3 scripts/release/site/site-check.py csp",
+  "site-installer-test|python3|install python3|python3 scripts/release/site/site-check.py --self-test",
   "gate|python3|install python 3.11|$PY scripts/lint/gate-check.py",
   "gate-test|python3|install python 3.11|$PY scripts/lint/gate-check.py --self-test",
   "ci-tiers|python3|install python3|python3 scripts/lint/ci-check.py",
