@@ -43,6 +43,10 @@ const NUMSTAT_MEMO_PAIRS: usize = 1 << 18;
 /// Rev syntax that searches history (`:/text`, `^{/text}`) or reads reflogs (`@{...}`).
 /// Every caller passes URL input here, so the refusal lives at the one choke point.
 const REJECTED_REV: [&str; 3] = [":/", "^{/", "@{"];
+/// Most `~N` / `^N` steps one committed-only rev may take, summed over the whole expression,
+/// so a URL cannot make one request read thousands of commits. Past it the rev is not found,
+/// as it is when N runs past the root. Not configurable: no page links a rev this far back.
+const MAX_REV_STEPS: usize = 1_000;
 
 /// A repository opened read-only.
 pub struct Repo {
@@ -375,6 +379,7 @@ fn committed_rev(repo: &gix::Repository, rev: &str) -> Option<gix::ObjectId> {
             })?;
         reference.peel_to_id().ok()?.detach()
     };
+    let mut budget = MAX_REV_STEPS;
     while let Some(op) = steps.chars().next() {
         steps = &steps[1..];
         let digits = steps.bytes().take_while(u8::is_ascii_digit).count();
@@ -383,6 +388,7 @@ fn committed_rev(repo: &gix::Repository, rev: &str) -> Option<gix::ObjectId> {
         } else {
             steps[..digits].parse().ok()?
         };
+        budget = budget.checked_sub(n)?;
         steps = &steps[digits..];
         let commit = repo.find_object(id).ok()?.peel_to_commit().ok()?;
         id = match op {
@@ -405,6 +411,8 @@ fn committed_rev(repo: &gix::Repository, rev: &str) -> Option<gix::ObjectId> {
 mod tests;
 #[cfg(test)]
 mod tests_renames;
+#[cfg(test)]
+mod tests_steps;
 #[cfg(test)]
 mod tests_treediff;
 #[cfg(test)]
