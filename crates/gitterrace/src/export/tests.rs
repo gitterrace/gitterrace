@@ -18,6 +18,22 @@ fn headers_file_carries_the_page_policy() {
     assert!(!h.contains("script-src 'self' 'unsafe-inline'"));
 }
 
+/// A published export revalidates its pages like the server does, and the page rule stays off
+/// `/*`, where a host would merge it into the static lifetime.
+#[test]
+fn headers_file_revalidates_pages_but_not_static() {
+    let h = super::headers_file();
+    for rule in ["/\n", "/r/*\n"] {
+        let at = h
+            .find(&format!("\n{rule}"))
+            .unwrap_or_else(|| panic!("{rule:?} in {h}"));
+        let block = h[at + 1..].split("\n\n").next().unwrap_or_default();
+        assert!(block.contains("Cache-Control: no-cache"), "{block}");
+    }
+    let top = h.split("\n\n").next().unwrap_or_default();
+    assert!(!top.contains("Cache-Control"), "{top}");
+}
+
 /// Guard class: a static host (Cloudflare, Netlify) takes one `*` per rule and ignores a
 /// rule with two, so a raw file would lose its sandbox. Every rule path has at most one.
 #[test]

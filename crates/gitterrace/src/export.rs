@@ -429,6 +429,8 @@ fn export_csp() -> String {
     )
 }
 
+// Hosts join the values of every matching rule, so the page cache rule names the page trees
+// and never `/*`: there it would merge into the `/static/*` lifetime.
 fn headers_file() -> String {
     let page = export_csp();
     format!(
@@ -436,6 +438,8 @@ fn headers_file() -> String {
          X-Frame-Options: DENY\n  Referrer-Policy: strict-origin-when-cross-origin\n  \
          Strict-Transport-Security: max-age=63072000; includeSubDomains\n  \
          X-Robots-Tag: noindex\n\n\
+         /\n  Cache-Control: no-cache\n\n\
+         /r/*\n  Cache-Control: no-cache\n\n\
          /r/:name/raw/*\n  Content-Security-Policy: sandbox; \
          default-src 'none'; style-src 'unsafe-inline'\n\n\
          /static/*\n  Cache-Control: public, max-age=3600\n"

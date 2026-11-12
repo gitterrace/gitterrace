@@ -17,8 +17,10 @@ git terrace export site ~/src/project --commits 300
 
 Several repositories go into one site (`export site repo1 repo2`), and
 `--project name=url` credits someone else's repository in every page's banner.
-The export writes a `_headers` file with the content security policy. Netlify
-and Cloudflare Pages apply it. Elsewhere, set the same headers on the host.
+The export writes a `_headers` file with the content security policy and
+`Cache-Control: no-cache` on the pages, so a browser revalidates them after a
+new export, as it does against the server. Netlify and Cloudflare Pages apply
+it. Elsewhere, set the same headers on the host.
 
 Every page ends with a credit line such as
 `Source: name, MIT license, https://github.com/owner/name`. The license comes
