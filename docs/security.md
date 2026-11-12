@@ -49,5 +49,11 @@ a write without its token.
 ## Accepted risks
 
 - The working tree reader checks a file and then reads it: a local process could
-  swap in a symlink in between, and it already runs as the user.
+  swap in a symlink in between, and it already runs as the user. The open itself
+  refuses a link (`O_NOFOLLOW` on Unix, the reparse point opened as itself on
+  Windows), so the swap fails rather than reads elsewhere.
+- Windows checks no ACLs. `actions.toml` is accepted without an owner check, and
+  the temp file a settings save writes takes the ACL its folder passes down.
+  Both rely on `%APPDATA%` being private to one user, its default. A shared
+  account or a folder other users can write to is not supported.
 - Styles allow inline rules for mermaid diagrams. A style cannot run code.

@@ -160,7 +160,9 @@ fn backup(dir: &Path, name: &str, old: &[u8]) -> io::Result<()> {
 }
 
 /// A new private file next to the target holding `bytes`, synced. `create_new` refuses any
-/// existing entry, a link included.
+/// existing entry, a link included. On Windows the file takes the ACL its folder passes down:
+/// setting one needs Win32 calls the workspace's `unsafe` ban rules out, and `%APPDATA%` is
+/// private to the user by default (docs/security.md, Accepted risks).
 fn temp_file(dir: &Path, name: &str, bytes: &[u8]) -> io::Result<PathBuf> {
     static SEQ: AtomicU64 = AtomicU64::new(0);
     let tmp = dir.join(format!(

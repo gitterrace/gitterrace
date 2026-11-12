@@ -157,6 +157,12 @@ process tree with `taskkill /T` (then `/F`). The sample `.sh` scripts need a
 POSIX shell, so call a Windows tool directly, such as `command = ["clip.exe"]`
 with `stdin = "markdown"`.
 
+Windows relies on the ACLs of your profile folder: `%APPDATA%` is private to
+your account by default, and gitterrace does not read ACLs itself. A shared
+account, or an `%APPDATA%` other users can write to, is not supported.
+Background processes a script starts are not reaped when the action completes
+normally; only a timeout triggers `taskkill /T` (then `/F`) cleanup.
+
 ### Scripts shared by actions
 
 Declare a command once as a `[[script]]` and point actions at it, each with its
@@ -304,7 +310,8 @@ Environment (same values, plus `GITTERRACE_VAR_<NAME>`):
 
 - The file must be a regular file outside every served repository. On Unix it
   and its folder must also be owned by you and not writable by group or others.
-  Windows checks neither. Actions are off on a public server, on a non-loopback
+  Windows checks neither and relies on the profile folder's ACLs (see
+  [Windows](#windows)). Actions are off on a public server, on a non-loopback
   bind and with `--no-actions`, and never offered to MCP.
 - Every field is untrusted repository text. In a script, quote it and never
   `eval` it.
