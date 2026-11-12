@@ -59,8 +59,10 @@ if (!raw.length) {
     const src = join(rawDir, f);
     /** @type {[string[], string][]} */
     const variants = [[[], '.webp'], [['-resize', '1280', '800'], '.thumb.webp']];
+    // Lossless: the page glow steps 1 to 2 color levels, and lossy encoding turns it into bands.
     for (const [args, ext] of variants) {
-      const r = spawnSync('cwebp', ['-quiet', '-q', '82', ...args, src, '-o', join(siteShots, f.replace(/\.png$/, ext))]);
+      const out = join(siteShots, f.replace(/\.png$/, ext));
+      const r = spawnSync('cwebp', ['-quiet', '-lossless', '-z', '6', ...args, src, '-o', out]);
       if (r.status !== 0) { console.error(`site-render: cwebp failed on ${f}`); process.exit(1); }
     }
   }
