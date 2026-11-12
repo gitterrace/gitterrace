@@ -44,6 +44,32 @@ function wideRepo(open = OPEN) {
   return dir;
 }
 
+/** A history with one lane: a straight line of commits, only `main` labelled. */
+function linearRepo() {
+  const dir = mkdtempSync(join(tmpdir(), 'gt-graph-'));
+  sh(dir, 'git', 'init', '-q', '-b', 'main');
+  const who = ['-c', 'user.name=t', '-c', 'user.email=t@t'];
+  for (let i = 0; i < 4; i++) {
+    sh(dir, 'git', ...who, 'commit', '-q', '--allow-empty', '-m', `step ${i}`);
+  }
+  return dir;
+}
+
+/** Width of one lane in CSS pixels, as graph_view.rs draws it. */
+const LANE = 12;
+
+/**
+ * In the page: the space between the list's left edge and the cell beyond the widest chip,
+ * and the cell's width: the cell fits the columns drawn, the label space fits the chips.
+ */
+function sizing() {
+  const ul = document.querySelector('.graphed').getBoundingClientRect();
+  const cell = document.querySelector('.graph').getBoundingClientRect();
+  const labels = [...document.querySelectorAll('.glabels .gref')];
+  const label = Math.max(0, ...labels.map((l) => l.getBoundingClientRect().width));
+  return { gap: cell.left - ul.left - label, cell: cell.width };
+}
+
 /** In the page: row edges where the cell above and the one below do not touch. */
 function measure() {
   const rows = [...document.querySelectorAll('.graphed .crow')];
@@ -161,6 +187,11 @@ export function checks(env) {
           if (!t.n) r.fail(`${where}: no tip labels`);
           else if (t.bad.length) r.fail(`${where}: tip labels clipped or overlapping: ${why}`);
           else r.ok(`${where}: ${t.n} tip labels show in full and overlap nothing`);
+          if (width === 1440) {
+            const z = await p.evaluate(sizing);
+            if (z.cell < (OPEN + 1) * LANE) r.fail(`${where}: ${OPEN} branches in ${z.cell}px`);
+            else r.ok(`${where}: ${OPEN} branches keep their ${z.cell}px cell`);
+          }
           if (width === 390) {
             if (m.fold) r.ok(`${where}: ${OPEN} open branches fold into a "+N" count`);
             else r.fail(`${where}: no "+N" fold on a history wider than 3 columns`);
@@ -178,6 +209,24 @@ export function checks(env) {
       }
     } finally {
       srv.stop();
+    }
+    const lin = await serve(bin, linearRepo());
+    try {
+      for (const name of browsers) {
+        const { b, ctx } = await context(name);
+        const p = await ctx.newPage();
+        await p.setViewportSize({ width: 1280, height: 900 });
+        await p.goto(lin.base + '/log/HEAD?view=graph', { waitUntil: 'load' });
+        const z = await p.evaluate(sizing);
+        const where = `graph-view ${name} 1280 one lane`;
+        // At most a few columns of slack beside the line.
+        if (z.cell > 2 * LANE) r.fail(`${where}: cell ${z.cell}px wide for one lane`);
+        else if (z.gap > 6 * LANE) r.fail(`${where}: ${z.gap}px of empty gutter beside the lane`);
+        else r.ok(`${where}: one lane gets a ${z.cell}px cell and a ${z.gap}px gutter`);
+        await b.close();
+      }
+    } finally {
+      lin.stop();
     }
     const fan = await serve(bin, wideRepo(FAN));
     try {

@@ -3,10 +3,15 @@
    first-parent chain is the accent at 2px. A cell shows 8 columns, a narrow screen 3, and
    the rest fold into a count. */
 /* Every graphed row reserves the same label gutter (--gw) left of the cell, so the cell starts
-   at the same x on every row. A row's .glabels sits in that gutter: it is in flow, so a row with
+   at the same x on every row. The page sets --lw to the longest label it shows, so a linear
+   history with a short ref wastes no space, and --gw caps it where long names wrap. A row's
+   .glabels sits in that gutter: it is in flow, so a row with
    several labels still grows, but its negative margins cancel its own width and the flex gap, so
    it never moves the cell. */
-.graphed{--gw:12rem}
+.graphed{--gw:min(var(--lw,192px),12rem)}
+.lw0{--lw:0px}.lw1{--lw:16px}.lw2{--lw:32px}.lw3{--lw:48px}.lw4{--lw:64px}.lw5{--lw:80px}
+.lw6{--lw:96px}.lw7{--lw:112px}.lw8{--lw:128px}.lw9{--lw:144px}.lw10{--lw:160px}
+.lw11{--lw:176px}.lw12{--lw:192px}
 .graphed .crow{padding-left:calc(var(--space-3) * 2 + var(--gw))!important}
 .graph{position:relative;flex:none;align-self:stretch;display:flex;align-items:center;
 max-width:96px;margin:calc(-1 * var(--space-2)) 0;overflow:hidden}
@@ -43,7 +48,8 @@ gap:2px;flex:none;width:var(--gw);box-sizing:border-box;
 margin:0 0 0 calc(-1 * (var(--gw) + var(--space-3)));
 font:var(--text-2xs)/1.25 var(--mono)}.glabels .gref{color:inherit;border-color:currentColor;
 max-width:100%;overflow-wrap:anywhere;text-align:right}
-@media (max-width:600px){.graphed{--gw:6.5rem}.graphed .cmain{min-width:0;flex-basis:0}
+@media (max-width:600px){.graphed{--gw:min(var(--lw,104px),6.5rem)}
+.graphed .cmain{min-width:0;flex-basis:0}
 .graph{max-width:36px}.graph .xn,.graph .ow{display:none}.graph .on{display:inline}
 .graph .gedge.n{display:block}.graph .gedge.w{display:none}.graph .gfold.n{display:block}
 .graph .gfold.w{display:none}.cmain:has(.grefs)>.subj{flex:1 1 0}.grefs{max-width:50%;

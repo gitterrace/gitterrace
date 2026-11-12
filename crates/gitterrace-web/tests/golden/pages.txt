@@ -1,4 +1,4 @@
-# the log filter help links the docs heading Filtering commits; no other byte moves
+# the graph view names its label gutter step as a class; no other byte moves
 3d6331935b06992963d36c2eaffb6666 3d6331935b06992963d36c2eaffb6666 [browse] /api/files/HEAD
 5926060c7e0029dde61fa7387dbc2baf 5926060c7e0029dde61fa7387dbc2baf [browse] /api/refs
 45c4275d82173232a185abf4ac360913 d9bcc297a7248eccd0b33ece109ab5df [browse] /blame/HEAD/missing.rs
@@ -28,7 +28,7 @@ b3d230dde44c7fe2ee263a6af7e825ff 3d8063d75a148f70df6f7606d756e207 [browse] /log
 df3fb891d755e1b6a4521ecf81d3d448 df3fb891d755e1b6a4521ecf81d3d448 [browse] /log/HEAD?page=2
 0b1de11479836ae7c114d756624ff452 0b1de11479836ae7c114d756624ff452 [browse] /log/HEAD?path=src
 f8ab928c14b24e2f0a095698dfa911e5 f8ab928c14b24e2f0a095698dfa911e5 [browse] /log/HEAD?path=src&author=bob%40y.io
-48e5940e916e4c03d52f5681a17a2c1f 22e1e4db313c636841b6af18db0d8817 [browse] /log/HEAD?view=graph
+3df818a16b64149e201782725aa02e1d b35ca921e362e6c5ec2d24b8b944a9e5 [browse] /log/HEAD?view=graph
 2eb784b62307e1d2b25bffab504a2d63 2eb784b62307e1d2b25bffab504a2d63 [browse] /log/HEAD?view=graph&page=2
 b395bfb48151f30cd5bdac0b8a06cb7d 8ecdf1148656105fe0be84b5d60f1b23 [browse] /log/nope
 45c4275d82173232a185abf4ac360913 d9bcc297a7248eccd0b33ece109ab5df [browse] /raw/HEAD/missing.rs

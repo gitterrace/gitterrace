@@ -50,6 +50,31 @@ struct LogPage {
     fb: ChipRow,
     /// The Graph view's rows, one list without day headers, so the lines run unbroken.
     graph: Vec<CommitRow>,
+    /// The label gutter step left of the graph for this page's labels: the class `lw{gutter}`.
+    gutter: u32,
+}
+
+/// Pixels of one label character in the 11px mono label font, rounded up.
+const LABEL_CH: u32 = 7;
+/// Pixels a chip adds around its text: padding, border and a little air.
+const LABEL_PAD: u32 = 14;
+/// The gutter grows in steps of this many pixels: graph.css names each step as `lw0` to `lw12`
+/// (12 steps reach its 192px cap), since the page carries no `style` attribute.
+const GUTTER_STEP: u32 = 16;
+
+/// The gutter step the labels of `rows` need, 0 when no row has one, at most 12.
+fn gutter(rows: &[CommitRow]) -> u32 {
+    let chars = rows
+        .iter()
+        .flat_map(|r| r.refs.iter())
+        .map(|(n, _)| n.chars().count())
+        .max()
+        .unwrap_or(0);
+    let px = match u32::try_from(chars) {
+        Ok(0) | Err(_) => 0,
+        Ok(n) => n.saturating_mul(LABEL_CH) + LABEL_PAD,
+    };
+    px.div_ceil(GUTTER_STEP).min(12)
 }
 
 /// The link to page `n` of this log, keeping its filter, view and lines.
@@ -125,7 +150,13 @@ pub(super) async fn log(
             .render()?,
             ..head
         };
+        let graph_rows = if graph {
+            graph_rows(a, &tips, &list, pg, now)?
+        } else {
+            Vec::new()
+        };
         Ok(LogPage {
+            gutter: gutter(&graph_rows),
             c: views::chrome_at(a, "log", &rev).live(Mode::NOTICE),
             head,
             newer: (pg > 0).then(|| link(pg - 1)),
@@ -148,11 +179,7 @@ pub(super) async fn log(
                     e
                 }
             }),
-            graph: if graph {
-                graph_rows(a, &tips, &list, pg, now)?
-            } else {
-                Vec::new()
-            },
+            graph: graph_rows,
             days: if graph {
                 Vec::new()
             } else {
