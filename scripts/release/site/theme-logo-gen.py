@@ -8,6 +8,9 @@ mark alone, for each theme:
     logo-{light,dark}.svg   mark and wordmark, cropped
     mark-{light,dark}.svg   the mark alone, square
 
+It also draws the mark and the outlined wordmark inline into every page header of the app and
+the site, coloured by the page's tokens.
+
     python3 scripts/release/site/theme-logo-gen.py [--check | --list-outputs]
 
 `make theme` runs the check, so the logos cannot drift from the headers.
@@ -23,6 +26,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[3]
 BRAND = ROOT / "docs/brand"
 TEMPLATES = ROOT / "crates/gitterrace-web/templates"
+SITE_TEMPLATES = ROOT / "xtask/templates"
+TOKENS = ROOT / "crates/gitterrace-web/static/tokens.css"
 # The header's wordmark ends near x=545 and its tagline starts below y=128; the mark's group
 # draws the 32 grid scaled by 3.2 from (40, 40), so the 28-unit stair box spans y 46 to 136,
 # the wordmark's height from the top of "t" to the tail of "g".
@@ -44,6 +49,9 @@ CONVEX, CONCAVE = 1.25, 0.75
 INKS = {"light": ("#21272e", "#5b5e8d"), "dark": ("#e3ecf6", "#9ca1d4")}
 # The in-app header draws the same outline with the page's own colours.
 APP_LOGO = re.compile(r'<svg class="logo" [^>]*>.*?</svg>', re.S)
+WORDMARK = re.compile(r'<svg class="wordmark" [^>]*>.*?</svg>', re.S)
+# The tokens that colour the inline wordmark, each the header's fill for its half.
+WORD_TOKENS = ("--wm-git", "--wm-terrace")
 
 Point = tuple[float, float]
 
@@ -102,6 +110,87 @@ def app_logo() -> str:
         '<svg class="logo" viewBox="2 2 28 28" aria-hidden="true">'
         f'<path class="i" d="{top}"/><path class="a" d="{bottom}"/></svg>'
     )
+
+
+def bbox(d: str) -> tuple[float, float, float, float]:
+    """The box of every point a path of absolute M, L, H, V, Q and Z commands names."""
+    xs: list[float] = []
+    ys: list[float] = []
+    for cmd, args in re.findall(r"([MLHVQZ])([^MLHVQZ]*)", d):
+        v = [float(n) for n in re.findall(r"-?\d*\.?\d+(?:e-?\d+)?", args)]
+        if cmd == "H":
+            xs += v
+        elif cmd == "V":
+            ys += v
+        else:
+            xs += v[0::2]
+            ys += v[1::2]
+    if not xs or not ys or re.search(r"[a-z]", d.replace("e-", "")):
+        raise SystemExit(
+            "header layout changed: the wordmark is not absolute M L H V Q Z"
+        )
+    return min(xs), min(ys), max(xs), max(ys)
+
+
+def wordmark(header: str) -> str:
+    """The outlined "git" and "terrace" as one inline SVG cropped to their ink, each half
+    coloured by a class that app.css and site.css fill from the tokens."""
+    paths = PATHS.findall(MARK_GROUP.sub("", header))[:2]
+    # Two decimals are far under a pixel at any header size and halve the inline bytes.
+    ds = [
+        re.sub(r"\d+\.\d{3,}", lambda m: num(round(float(m.group(0)), 2)), d)
+        for d in (find(r' d="([^"]*)"', p).group(1) for p in paths)
+    ]
+    boxes = [bbox(d) for d in ds]
+    x0, y0 = math.floor(min(b[0] for b in boxes)), math.floor(min(b[1] for b in boxes))
+    x1, y1 = math.ceil(max(b[2] for b in boxes)), math.ceil(max(b[3] for b in boxes))
+    return (
+        f'<svg class="wordmark" viewBox="{x0} {y0} {x1 - x0} {y1 - y0}" aria-hidden="true">'
+        f'<path class="w-git" d="{ds[0]}"/><path class="w-terrace" d="{ds[1]}"/></svg>'
+    )
+
+
+def token_drift(header: str, theme: str, tokens: str) -> list[str]:
+    """Each wordmark token against the fill the header gives its half in `theme`. A token is a
+    plain colour, a light-dark pair or a var() of another role, resolved here."""
+
+    def value(name: str) -> str:
+        m = re.search(re.escape(name) + r":\s*([^;]+);", tokens)
+        if not m:
+            return ""
+        v = m.group(1).strip()
+        ref = re.fullmatch(r"var\((--[\w-]+)\)", v)
+        if ref:
+            return value(ref.group(1))
+        pair = re.fullmatch(r"light-dark\((#[0-9a-f]{6}),\s*(#[0-9a-f]{6})\)", v)
+        if pair:
+            return pair.group(1 if theme == "light" else 2)
+        return v
+
+    paths = PATHS.findall(MARK_GROUP.sub("", header))[:2]
+    bad = []
+    for name, p in zip(WORD_TOKENS, paths):
+        fill = find(r'fill="(#[0-9a-f]{6})"', p).group(1)
+        got = value(name)
+        if got != fill:
+            bad.append(
+                f"{TOKENS.relative_to(ROOT)}: {name} is {got or 'missing'} in {theme}, "
+                f"the {theme} README header fills it {fill}"
+            )
+    return bad
+
+
+def wrap(svg: str, width: int = 100) -> str:
+    """`svg` broken at spaces into lines at most `width` wide, for the site's templates, whose
+    built pages are held to that width. A newline in a path's data reads as a space."""
+    lines, line = [], ""
+    for word in svg.split(" "):
+        if line and len(line) + 1 + len(word) > width:
+            lines.append(line)
+            line = word
+        else:
+            line = f"{line} {word}" if line else word
+    return "\n".join([*lines, line])
 
 
 def contrast(a: str, b: str) -> float:
@@ -172,6 +261,9 @@ def sync(path: Path, text: str, check: bool, stale: list[Path]) -> None:
 def main() -> int:
     check = "--check" in sys.argv
     stale: list[Path] = []
+    word = ""
+    tokens = TOKENS.read_text()
+    drift: list[str] = []
     for theme in ("light", "dark"):
         path = BRAND / f"readme-header-{theme}.svg"
         header = path.read_text()
@@ -180,15 +272,21 @@ def main() -> int:
         header = MARK_GROUP.sub(lambda _: mark_group(theme), header, count=1)  # noqa: B023
         sync(path, header, check, stale)
         built = build(header)
+        drift += token_drift(header, theme, tokens)
+        if theme == "light":
+            # The halves have the same shapes in both themes, only the colour changes.
+            word = wordmark(header)
         for name, svg in built.items():
             sync(BRAND / f"{name}-{theme}.svg", svg, check, stale)
     # docs/brand/mark.svg and the _favicon.html include are the plated icon, written by xtask.
     tpl = TEMPLATES / "_favicon.html"
-    # Every page header draws the same mark inline.
-    for page in sorted(TEMPLATES.glob("*.html")):
+    # Every page header, the app's and the site's, draws the same mark and wordmark inline.
+    for page in sorted([*TEMPLATES.glob("*.html"), *SITE_TEMPLATES.glob("*.html")]):
         text = page.read_text()
-        if APP_LOGO.search(text):
-            sync(page, APP_LOGO.sub(lambda _: app_logo(), text), check, stale)
+        if APP_LOGO.search(text) or WORDMARK.search(text):
+            fit = wrap if page.parent == SITE_TEMPLATES else str
+            text = APP_LOGO.sub(lambda _: fit(app_logo()), text)  # noqa: B023
+            sync(page, WORDMARK.sub(lambda _: fit(word), text), check, stale)  # noqa: B023
     if LISTING:
         return 0
     for s in stale:
@@ -205,7 +303,9 @@ def main() -> int:
     ]
     for t in bare:
         print(f'{t}: has a <head> without {{% include "_favicon.html" %}}')
-    return 1 if stale or bare else 0
+    for d in drift:
+        print(d)
+    return 1 if stale or bare or drift else 0
 
 
 if __name__ == "__main__":

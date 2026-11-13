@@ -42,7 +42,10 @@ margin:0 calc(-1*var(--space-2));padding:0 var(--space-2)}
 border:solid transparent;border-width:0 1.5px 1.5px 0}
 .top .brand{display:flex;align-items:center;gap:var(--space-2);margin-right:auto;
 color:var(--fg);font-size:18px;font-weight:var(--weight-semibold);letter-spacing:-.01em}
-.top .brand img{width:24px;height:24px}
+.top .brand .logo{width:24px;height:24px;display:block}
+.top .logo .i{fill:var(--fg)}.top .logo .a{fill:var(--accent)}
+.wordmark{height:15px;width:auto;display:block;overflow:visible}
+.wordmark .w-git{fill:var(--wm-git)}.wordmark .w-terrace{fill:var(--wm-terrace)}
 .gh,.theme{line-height:0}
 .gh{color:var(--muted)}
 .gh:hover,.gh:focus-visible{color:var(--fg)}

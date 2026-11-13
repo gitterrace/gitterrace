@@ -1,7 +1,7 @@
-# history and blame link a commit at #p/<path>, and each diff file header carries that id; no other byte moves
-a9636995f62bf9c600b0d0a3acb712ec 9db8d44473d409089796867f8df5a4e6 [symbols] /blob/HEAD/cmd/serve.go
-f2af7c04b374066324ecbd0f6f768f8e ba24b22e6f73c1376deb56b64200f752 [symbols] /blob/HEAD/src/shapes.rs
-75606ddb73206bc4e71bc2df1a69fb32 75606ddb73206bc4e71bc2df1a69fb32 [symbols] /blob/HEAD/src/two.rs
-0f86492b29a37c44000c9d06821a5d76 f728e178c1dd593b78e8174f317294a6 [symbols] /blob/HEAD/tools/report.py
-f14ebab22e784d9c2b2623810a959d41 3df28c99973f202bbbcda858402f75e5 [symbols] /blob/HEAD/web/store.ts
-359a32341df1bfc70e509444a4cd0576 9eba89c0f265005ef4efd61067320002 [symbols] /blob/HEAD/web/view.js
+# the header draws the outlined wordmark as inline SVG; no other byte moves
+37b06ba5fdd75198090a2c1bedaf92a7 cd5810486e9495ae5662c900b72f3939 [symbols] /blob/HEAD/cmd/serve.go
+64400a4834204bef10b2c3b667378cbf 48c687f5289acd231fce1d6551945b63 [symbols] /blob/HEAD/src/shapes.rs
+8157ddaf38ba7f02735465ed3b51832b 8157ddaf38ba7f02735465ed3b51832b [symbols] /blob/HEAD/src/two.rs
+1135b86ce10cc53fb9caa31364dab8f5 cd8cde6cedaa0c2ba017bc87204f4e45 [symbols] /blob/HEAD/tools/report.py
+3aaf9a02d8a9b45d98215f2cf13ec87e 9af1080bc29608824616702f4df3cda6 [symbols] /blob/HEAD/web/store.ts
+c087d033e04a2d94d4826f5aa49f0315 53fa9a0190ee01799c01967d8c13e7a9 [symbols] /blob/HEAD/web/view.js

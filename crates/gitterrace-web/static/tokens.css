@@ -40,4 +40,6 @@
 --weight-regular:400;--weight-semibold:600;
 --border:1px solid var(--line);
 --page-max:1200px;--page-pad:var(--space-6);--header-h:56px;
+/* The wordmark's halves, the README header's fills; theme-logo-gen.py fails on drift. */
+--muted-brand:#707881;--wm-git:var(--muted-brand);--wm-terrace:var(--fg);
 }
