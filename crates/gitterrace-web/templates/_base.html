@@ -10,22 +10,23 @@
 <title>{% block title %}{{ c.name }}{% endblock %} · gitterrace</title>
 <script>(function(){try{var q=/[?&]theme=(light|dark)/.exec(location.search),t=q?q[1]:localStorage.getItem("gitterrace-theme");if(t==="light"||t==="dark")document.documentElement.dataset.theme=t}catch(e){}})()</script>
 {% include "_favicon.html" %}
-<link rel="preload" href="/static/fonts/fraunces.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="preload" href="/static/fonts/bricolage-grotesque.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="preload" href="/static/fonts/jetbrains-mono.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/static/tokens.css">
-<link rel="stylesheet" href="/static/buttons.css">
-<link rel="stylesheet" href="/static/app.css">
-<link rel="stylesheet" href="/static/pagehead.css">
-<link rel="stylesheet" href="/static/charts.css">{% block head %}{% endblock %}
-<link rel="stylesheet" href="/static/markdown.css">
-<link rel="stylesheet" href="/static/media.css">
-<link rel="stylesheet" href="/static/send.css">
-<link rel="stylesheet" href="/static/docnav.css">
-<link rel="stylesheet" href="/static/graph.css">
+<link rel="preload" href="{{ crate::asset_url("fonts/fraunces.woff2") }}" as="font"
+ type="font/woff2" crossorigin>
+<link rel="preload" href="{{ crate::asset_url("fonts/bricolage-grotesque.woff2") }}" as="font"
+ type="font/woff2" crossorigin>
+<link rel="preload" href="{{ crate::asset_url("fonts/jetbrains-mono.woff2") }}" as="font"
+ type="font/woff2" crossorigin>
+<link rel="stylesheet" href="{{ crate::asset_url("tokens.css") }}">
+<link rel="stylesheet" href="{{ crate::asset_url("buttons.css") }}">
+<link rel="stylesheet" href="{{ crate::asset_url("app.css") }}">
+<link rel="stylesheet" href="{{ crate::asset_url("pagehead.css") }}">
+<link rel="stylesheet" href="{{ crate::asset_url("charts.css") }}">{% block head %}{% endblock %}
+<link rel="stylesheet" href="{{ crate::asset_url("markdown.css") }}">
+<link rel="stylesheet" href="{{ crate::asset_url("media.css") }}">
+<link rel="stylesheet" href="{{ crate::asset_url("docnav.css") }}">
 </head>
 <body{% if c.has_line_hover %} data-line-hover{% endif %} data-rev="{{ c.rev }}" data-commit="{{ c.commit }}"{% if c.live %} data-live="{{ c.live_how }}" data-live-on="{{ c.live_on }}" data-live-v="{{ c.version }}"{% endif %}>
-<a class="skip" href="#main">Skip to content</a>
+<a class="skip" href="#gt-main">Skip to content</a>
 <header class="top"><div class="wrap">
 <div class="topbar{% if c.bare() %} bare{% endif %}">
 <div class="where">
@@ -39,8 +40,10 @@
 </div>
 <span class="livenote" id="livenote" hidden role="status"></span>
 <div class="tools">
-{% if c.tools.search %}<form class="topsearch" action="{{ c.base }}/search" method="get" role="search"><input id="q" name="q" type="search" placeholder="Search code and commits" aria-label="Search code and commits" autocomplete="off"><input type="hidden" name="rev" value="{{ c.rev }}"><kbd data-tip="Press / to search">/</kbd></form>
+{% if c.tools.search %}<form class="topsearch" action="{{ c.base }}/search" method="get" role="search"><input id="q" name="q" type="search" placeholder="Search code and commits" aria-label="Search code and commits" autocomplete="off"><input type="hidden" name="rev" value="{{ c.rev }}"></form>
 <button class="ghost icon searchbtn" type="button" id="searchbtn" aria-label="Search" aria-controls="q" data-tip="Search (/)"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg></button>{% endif %}
+<button class="actbtn top ghost icon" type="button" id="actpage" aria-haspopup="menu"
+ data-tip="Actions for this page (.)" aria-label="Actions for this page (.)"></button>
 <button class="theme ghost icon" type="button" id="theme" aria-label="Color theme"
  data-tip="Color theme">
 <svg class="i-auto" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 0 0 16z" class="fill"/></svg>
@@ -53,18 +56,14 @@
 </div></header>
 <div class="headstate" role="status" id="headstate"{% if c.banner.is_none() %} hidden{% endif %}><div class="wrap">{% if let Some(b) = c.banner %}{{ b|safe }}{% endif %}</div></div>
 <div class="actnote" role="status" id="actnote"{% if c.actions_note.is_none() %} hidden{% endif %}><div class="wrap">{% if let Some(n) = c.actions_note %}{{ n }}{% endif %}</div></div>
-<main class="wrap" id="main" tabindex="-1">
+<main class="wrap" id="gt-main" tabindex="-1">
 {% block content %}{% endblock %}
 </main>
-<script src="/static/tip.js" defer></script>
-<script src="/static/app.js" defer></script>
-<script src="/static/nav.js" defer></script>
-<script src="/static/pickers.js" defer></script>
-<script src="/static/outline.js" defer></script>
-<script src="/static/actions.js" defer></script>
-<script src="/static/send.js" defer></script>
-{% if c.live %}<script src="/static/live.js" defer></script>{% endif %}
-{% if c.md %}<script src="/static/markdown.js" defer></script>{% endif %}
+<script src="{{ crate::asset_url("tip.js") }}" defer></script>
+<script src="{{ crate::asset_url("app.js") }}" defer></script>
+<script src="{{ crate::asset_url("nav.js") }}" defer></script>
+{% if c.live %}<script src="{{ crate::asset_url("live.js") }}" defer></script>{% endif %}
+{% if c.md %}<script src="{{ crate::asset_url("markdown.js") }}" defer></script>{% endif %}
 {% block scripts %}{% endblock %}
 </body>
 </html>

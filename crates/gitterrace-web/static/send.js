@@ -68,13 +68,14 @@
   }
 
   function open(c) {
-    var back = el("div", "ov-back send-back");
+    var dlg = el("dialog", "ov-back send-back");
     var box = el("form", "ov send");
+    dlg.appendChild(box);
     // Named fields under a named head: with targets set up the window is a small form, and a
     // bare input and text box gave no hint which was the title and which the notes.
     var head = el("h2", "send-head", "Send to");
     head.id = "send-head";
-    box.setAttribute("aria-labelledby", "send-head");
+    dlg.setAttribute("aria-labelledby", "send-head");
     var title = el("input", "send-title");
     title.type = "text";
     title.id = "send-title";
@@ -112,9 +113,8 @@
     box.appendChild(ctxLab);
     box.appendChild(ctx);
     box.appendChild(foot);
-    back.appendChild(box);
-    cur = { back: back, targets: [] };
-    window.gtOverlay.open("send", back, box, { label: "Send", onClose: function () { if (cur && cur.back === back) cur = null; } });
+    cur = { box: dlg, targets: [] };
+    window.gtOverlay.open("send", dlg, box, { label: "Send", onClose: function () { if (cur && cur.box === dlg) cur = null; } });
     ctx.focus();
     ctx.setSelectionRange(0, 0);
     // The title follows the note's first line until the user edits the title itself.
@@ -139,7 +139,7 @@
       if (last === COPY) pick.value = COPY;
     }
     fillPick([]);
-    load().then(function (l) { if (cur && cur.back === back && Array.isArray(l)) fillPick(l); });
+    load().then(function (l) { if (cur && cur.box === dlg && Array.isArray(l)) fillPick(l); });
 
     function send() {
       var id = pick.value;
@@ -162,7 +162,6 @@
       else location.href = url;
     }
     box.addEventListener("submit", function (e) { e.preventDefault(); send(); });
-    back.addEventListener("mousedown", function (e) { if (e.target === back) close(); });
     box.addEventListener("keydown", function (e) {
       e.stopPropagation();
       if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); send(); }

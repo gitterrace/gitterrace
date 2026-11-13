@@ -2,7 +2,7 @@
 .media{padding:var(--space-4)}
 .media-stage{display:flex;justify-content:center;align-items:center;padding:var(--space-4);border:var(--border);border-radius:var(--radius);overflow:auto}
 .media-stage.checker{background:conic-gradient(var(--soft) 25%,var(--surface) 0 50%,var(--soft) 0 75%,var(--surface) 0) 0 0/16px 16px}
-.media-img{max-width:100%;max-height:70vh;width:auto;height:auto;display:block}
+.media-img{max-width:100%;max-height:70vh;height:auto;object-fit:contain;display:block}
 .media-file{padding:var(--space-4)}
 .media-av{max-width:100%;display:block}
 .media-facts{margin:var(--space-3) 0 0;font-size:var(--text-sm)}

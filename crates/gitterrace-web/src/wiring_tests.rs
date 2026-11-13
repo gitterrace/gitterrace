@@ -173,8 +173,10 @@ async fn an_empty_sidebar_list_hides_the_sidebar() {
     let (_, body) = get(&router(&p, with(|c| c.display.sidebar.clear())), "/").await;
     assert!(!body.contains("<aside>"), "{body}");
     assert!(body.contains("<div class=\"cols wide\">"), "{body}");
-    let (_, body) = get(&router(&p, Config::default()), "/").await;
-    assert!(body.contains("<aside>") && body.contains("<div class=\"cols\">"));
+    // The sidebar holds insights, so it shows once the index is ready, never as a progress box.
+    let r = router(&p, Config::default());
+    let body = gitterrace_testkit::wait::page_until(&r, "/", |b| b.contains("<aside>")).await;
+    assert!(body.contains("<div class=\"cols\">"), "{body}");
 }
 
 /// A count sits next to the noun that agrees with it: one commit by one author reads singular.

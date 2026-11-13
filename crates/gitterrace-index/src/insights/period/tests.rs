@@ -325,7 +325,7 @@ fn first_time_is_judged_on_counted_commits() {
     let cx = CountContext::new(&MemorySource::new(&recs), &FixedClock(i64::MAX));
     let new = |path: Option<&str>| {
         let mut p = ScopeParams::default();
-        p.select.path = path.map(str::to_owned);
+        p.select.q = path.map(|p| format!("path:{p}"));
         let s = Scope::from_params(&p, Options::default(), Period::Week).expect("scope");
         let mut names: Vec<String> = ins
             .counted(&s, cx)

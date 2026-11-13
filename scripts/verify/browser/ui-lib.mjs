@@ -255,14 +255,14 @@ async function overlays() {
       // A page link holds focus first, so "returns" means back to it, not to <body>.
       const opener = await p.evaluate(() => { const a = /** @type {HTMLElement} */ (document.querySelector('main a[href], a[href]')); a.focus(); a.dataset.opener = '1'; return !!a; });
       await p.keyboard.press(key);
-      await p.waitForSelector('.ov-back [role=dialog]');
-      const inside = () => p.evaluate(() => { const d = document.querySelector('.ov-back [role=dialog]'); return !!d && d.contains(document.activeElement); });
-      const named = await p.evaluate(() => !!document.querySelector('.ov-back [role=dialog]').getAttribute('aria-label'));
+      await p.waitForSelector('.ov');
+      const inside = () => p.evaluate(() => { const d = document.querySelector('.ov'); return !!d && d.contains(document.activeElement); });
+      const named = await p.evaluate(() => !!document.querySelector('.ov').closest('[role=dialog][aria-label], dialog[aria-label]'));
       let kept = await inside();
       for (let i = 0; i < 5; i++) { await p.keyboard.press('Tab'); kept = kept && await inside(); }
       await p.keyboard.press('Shift+Tab'); kept = kept && await inside();
       await p.keyboard.press('Escape');
-      const after = await p.evaluate(() => ({ open: !!document.querySelector('.ov-back'), back: document.activeElement instanceof HTMLElement && document.activeElement.dataset.opener === '1' }));
+      const after = await p.evaluate(() => ({ open: !!document.querySelector('.ov'), back: document.activeElement instanceof HTMLElement && document.activeElement.dataset.opener === '1' }));
       if (opener && named && kept && !after.open && after.back) r.ok(`overlays ${name} ${key}: named, focus kept inside, Escape closes and returns focus`);
       else r.fail(`overlays ${name} ${key}: ${JSON.stringify({ named, kept, ...after })}`);
     }
@@ -285,7 +285,7 @@ async function tips() {
       // The page-actions button holds focus first, as it does after a click on it.
       await p.evaluate(() => { const t = /** @type {HTMLElement} */ (document.querySelector('.actbtn.top')); if (t) t.focus(); });
       for (const k of keys) await p.keyboard.press(k);
-      await p.waitForSelector('.ov-back');
+      await p.waitForSelector('.ov');
       await p.keyboard.press('Escape');
       await p.waitForTimeout(50);
       const on = await tipOn();
@@ -470,10 +470,10 @@ async function repoSwitch() {
         for (const target of joined ? [two, dir] : []) {
           const want = target.split('/').pop().toLowerCase();
           await p.click('#repobtn');
-          await p.waitForSelector('.ov-back li');
-          const names = await p.$$eval('.ov-back li .name', (l) => l.map((e) => e.textContent));
+          await p.waitForSelector('.ov li');
+          const names = await p.$$eval('.ov li .name', (l) => l.map((e) => e.textContent));
           const pick = names.find((n) => n === want);
-          if (pick) await Promise.all([p.waitForURL(`**/r/${pick}/`), p.click(`.ov-back li:has(.name:text-is("${pick}"))`)]);
+          if (pick) await Promise.all([p.waitForURL(`**/r/${pick}/`), p.click(`.ov li:has(.name:text-is("${pick}"))`)]);
           visits.push({ names, pick, at: new URL(p.url()).pathname });
         }
         // `git terrace remove` takes the second one off again: the open page hears it and the
@@ -535,7 +535,7 @@ async function liveScroll() {
         await p.waitForTimeout(500);
         await p.evaluate(() => window.scrollBy(0, -37));
         await p.waitForTimeout(300);
-        const read = () => p.evaluate(() => ({ top: document.getElementById('f70').getBoundingClientRect().top, bodies: document.querySelectorAll('#main .diffwrap').length, f3: !document.querySelector('#f3 [data-load-diff]'), y: scrollY }));
+        const read = () => p.evaluate(() => ({ top: document.getElementById('f70').getBoundingClientRect().top, bodies: document.querySelectorAll('#gt-main .diffwrap').length, f3: !document.querySelector('#f3 [data-load-diff]'), y: scrollY }));
         const before = await read();
         writeFileSync(join(repo, 's01.txt'), body('edited again'));
         await p.waitForFunction(() => /** @type {any} */ (window).__refreshed > 0, null, { timeout: WATCH_BOUND_MS }).catch(() => {});

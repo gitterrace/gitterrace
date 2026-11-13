@@ -275,7 +275,7 @@ pub(crate) fn language(path: &str, first_line: &str) -> Option<&'static str> {
 }
 
 /// Highlighted HTML of a whole block for a fence token; `None` when unknown or over the limit.
-pub(crate) fn block(code: &str, token: &str, most: usize) -> Option<String> {
+pub fn block(code: &str, token: &str, most: usize) -> Option<String> {
     if code.len() > most {
         return None;
     }

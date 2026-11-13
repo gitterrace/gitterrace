@@ -3,10 +3,12 @@
 # Configuration
 
 One optional file, `config.toml`, in `$XDG_CONFIG_HOME/gitterrace` or
-`~/.config/gitterrace` (`--config DIR` picks another folder). It is never read
-from a served repository. A flag beats the file, the file beats the default.
-Unknown keys warn, invalid values stop startup naming the key.
-`git terrace config` prints what is in force and where each value came from.
+`~/.config/gitterrace`, or `%APPDATA%\gitterrace` on Windows (`--config DIR`
+picks another folder). It is never read from a served repository. A flag beats
+the file, the file beats the default. Unknown keys warn, invalid values stop
+startup naming the key. `git terrace config` prints what is in force and where
+each value came from. `git terrace init` writes the file with every setting
+commented out at its default, and keeps one that exists.
 
 A running server reloads `config.toml` within a second of an edit. An invalid
 edit is logged with the key and the old settings stay. Open pages show "Updated,
@@ -111,8 +113,7 @@ Exceptions, each on purpose:
 - `text_kb` (integer, default `2048`): Largest file shown as text, in KiB.
   Larger files are offered as raw downloads.
 - `raw_mb` (integer, default `10`): Largest file served raw, in MiB. A larger
-  one is refused. The default was 256 before 0.1.0: a repository that serves
-  large binaries raw sets it again.
+  one is refused: a repository that serves large binaries raw raises it.
 - `raw_concurrent_mb` (integer, default `512`): Raw file bytes held in memory at
   once across all requests, in MiB. Each raw request reserves `raw_mb` until its
   body is sent, so a request past the budget waits.

@@ -103,7 +103,7 @@ export function checks({ dir, srv, r, browsers, context }) {
           const seen = a.getBoundingClientRect().bottom > 0;
           return { text: a.textContent.trim(), href: a.getAttribute('href'), seen };
         });
-        if (!first || first.href !== '#main') {
+        if (!first || first.href !== '#gt-main') {
           bad.push(`first stop is "${first?.text}", not a skip link`);
         } else {
           if (!first.seen) bad.push('skip link not visible on focus');

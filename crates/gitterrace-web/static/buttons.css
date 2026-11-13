@@ -40,15 +40,18 @@ select.sm{padding-right:calc(var(--space-3)*2 + 10px)}
 /* A copy button says it worked in the accent for a moment (app.js flashes .copied). */
 .copied{color:var(--accent-ink);border-color:var(--accent-ink)}
 /* The segmented control: ghost choices in one frame, the chosen one held in the accent. */
-.segs a,.segs button{display:inline-flex;align-items:center;height:auto;min-height:32px;
+.segs a,.segs button,.segs label{display:inline-flex;align-items:center;height:auto;min-height:32px;
   box-sizing:border-box;padding:var(--space-2) var(--space-3);border:1px solid transparent;
   border-radius:var(--radius);color:var(--muted);background:none;font:inherit;line-height:1;
   cursor:pointer}
-.segs a:hover,.segs button:hover:not(:disabled){color:var(--fg);text-decoration:none;
+.segs a:hover,.segs button:hover:not(:disabled),.segs label:hover{color:var(--fg);
+  text-decoration:none;
   background:var(--hover);border-color:transparent}
-.segs .on,.segs .on:hover:not(:disabled){background:var(--accent-soft);color:var(--accent-ink);
+.segs .on,.segs .on:hover:not(:disabled),.segs label:has(:checked){background:var(--accent-soft);
+  color:var(--accent-ink);
   border-color:var(--accent);font-weight:var(--weight-semibold)}
-.dochead .segs a,.dochead .segs button{min-height:28px;padding:var(--space-1) var(--space-3)}
+.dochead .segs a,.dochead .segs button,.dochead .segs label{min-height:28px;
+  padding:var(--space-1) var(--space-3)}
 /* Every picker (<select>) draws one arrow, inset from the right edge like its text from the
    left, so no arrow sits against the border. A component may size a picker and set its
    background-color, never the background shorthand, which would drop the arrow. */

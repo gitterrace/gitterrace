@@ -29,7 +29,6 @@ fn sample() -> Vec<CommitRecord> {
 fn sel(q: &str) -> Selection {
     Selection {
         q: Some(q.to_owned()),
-        ..Selection::default()
     }
 }
 
@@ -61,41 +60,15 @@ fn selections_stack() {
     assert_eq!(ids(&sel("!path:other")), ["a", "b", "c", "d"]);
 }
 
-/// Every one-key form of an older link selects what its `q` form selects.
+/// `q` is the whole selection: blank text selects everything, bad text is refused.
 #[test]
-fn one_key_forms_fold_into_the_query() {
-    let one = |k: &str, v: &str| {
-        let v = Some(v.to_owned());
-        let mut s = Selection::default();
-        match k {
-            "type" => s.kind = v,
-            "scope" => s.scope = v,
-            "author" => s.author = v,
-            _ => s.path = v,
-        }
-        s
-    };
-    for (k, v, q) in [
-        ("type", "fix", "type:fix"),
-        ("scope", "none", "scope:none"),
-        ("author", "Ann Lee", "author:\"Ann Lee\""),
-        ("path", "/crates/web/", "path:crates/web"),
-        ("path", "/", ""),
-    ] {
-        let s = one(k, v);
-        assert_eq!(
-            s.query().map(|q| q.to_string()).as_deref(),
-            Ok(q),
-            "{k}={v}"
-        );
-        assert_eq!(ids(&s), ids(&sel(q)), "{k}={v}");
-    }
-    let both = Selection {
-        author: Some("ann".into()),
-        ..sel("type:fix")
-    };
+fn the_selection_is_q_alone() {
+    assert_eq!(sel("  ").query(), Ok(crate::query::Query::default()));
     assert_eq!(
-        both.query().map(|q| q.to_string()).as_deref(),
+        sel("author:ann type:fix")
+            .query()
+            .map(|q| q.to_string())
+            .as_deref(),
         Ok("author:ann type:fix")
     );
     assert!(sel("a | b").query().is_err());

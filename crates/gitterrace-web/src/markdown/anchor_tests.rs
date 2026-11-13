@@ -33,8 +33,8 @@ fn heading_pilcrow_and_outline_hrefs_are_plain() {
 
 #[test]
 fn colliding_heading_keeps_a_working_prefixed_target() {
-    let d = doc("# main\n\n# q\n\n# location\n\n[m](#main)\n");
-    for id in ["main", "q", "location"] {
+    let d = doc("# theme\n\n# q\n\n# location\n\n[m](#theme)\n");
+    for id in ["theme", "q", "location"] {
         let pre = format!("user-content-{id}");
         assert!(
             d.html.contains(&format!("id=\"{pre}\"")),
@@ -54,7 +54,7 @@ fn colliding_heading_keeps_a_working_prefixed_target() {
         assert!(rail.contains(&format!("href=\"#{pre}\"")), "{rail}");
     }
     assert!(
-        d.html.contains("<a href=\"#user-content-main\" rel"),
+        d.html.contains("<a href=\"#user-content-theme\" rel"),
         "{}",
         d.html
     );

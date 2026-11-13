@@ -61,5 +61,56 @@ export function checks(env) {
       await b.close();
     }
   }
-  return { popupPlace };
+  // The finder, the sheet and Send to are a modal <dialog>; the pickers and the action menu
+  // are a [popover]. A box in a plain backdrop div fails, whichever overlay it is.
+  async function overlayNative() {
+    /** @type {[string[], string][]} */
+    const want = [[['t'], 'dialog'], [['?'], 'dialog'], [['.', 's'], 'dialog'],
+      [['b'], 'popover'], [['.'], 'popover']];
+    for (const name of browsers) {
+      const { b, ctx } = await context(name);
+      const p = await ctx.newPage();
+      await p.goto(srv.base + '/', { waitUntil: 'load' });
+      const bad = [];
+      for (const [keys, kind] of want) {
+        for (const k of keys) await p.keyboard.press(k);
+        await p.waitForTimeout(150);
+        const got = await p.evaluate(() => {
+          const box = document.activeElement?.closest('.ov');
+          if (!box) return 'none';
+          if (box.closest('dialog:modal')) return 'dialog';
+          if (box.matches(':popover-open')) return 'popover';
+          return box.tagName.toLowerCase();
+        });
+        if (got !== kind) bad.push(`${keys.join('+')}: ${got}, want ${kind}`);
+        await p.keyboard.press('Escape');
+        await p.waitForTimeout(100);
+      }
+      if (!bad.length) r.ok(`overlay-native ${name}: dialogs are modal, menus are popovers`);
+      else r.fail(`overlay-native ${name}: ${bad.join('; ')}`);
+      await b.close();
+    }
+  }
+
+  // With scripts off, Code and Preview still switch the README panes: radios and CSS only.
+  async function panedNoJs() {
+    for (const name of browsers) {
+      const { b } = await context(name);
+      const ctx = await b.newContext({ javaScriptEnabled: false });
+      const p = await ctx.newPage();
+      await p.goto(`${srv.base}/blob/HEAD/README.md`, { waitUntil: 'load' });
+      const shown = () => p.evaluate(() => [...document.querySelectorAll('[data-pane]')]
+        .filter((e) => e.checkVisibility()).map((e) => e.getAttribute('data-pane')).join(','));
+      const first = await shown();
+      await p.click('[data-show=source]');
+      const code = await shown();
+      await p.click('[data-show=rendered]');
+      const back = await shown();
+      if (first === 'rendered' && code === 'source' && back === 'rendered') {
+        r.ok(`paned-nojs ${name}: Code and Preview switch without scripts`);
+      } else r.fail(`paned-nojs ${name}: ${JSON.stringify({ first, code, back })}`);
+      await b.close();
+    }
+  }
+  return { popupPlace, overlayNative, panedNoJs };
 }

@@ -1,7 +1,7 @@
 # Benchmarks
 
-gitterrace should feel instant on large repositories. Each run is kept, named
-by date and CPU, and each warm time is compared with the previous run.
+gitterrace should feel instant on large repositories. Each run is kept, named by
+date and CPU, and each warm time is compared with the previous run.
 
 ## What is measured
 
@@ -20,9 +20,9 @@ after it.
    page must answer 200, with an empty config directory.
 3. **Idle.** CPU percent over a 60 s window with no client, and again with one
    `/events` client open, which is the cost of the live watcher.
-4. **Memory.** RSS after the index is ready and after every page, then the
-   dirty footprint (`footprint` on macOS, `Private_Dirty` on Linux) after the
-   idle release, and that of a just-started server.
+4. **Memory.** RSS after the index is ready and after every page, then the dirty
+   footprint (`footprint` on macOS, `Private_Dirty` on Linux) after the idle
+   release, and that of a just-started server.
 5. **Export.** `git terrace export` time and output size, on every repository,
    written to `export-<repo>` under the clone directory and removed after.
 
@@ -46,13 +46,13 @@ disk is under the corpus `need_gb`.
 ## Budgets
 
 Each size class has a target per metric in the corpus file: the first measured
-run plus headroom, except three product goals: a warm page in 300 ms, idle at
-1% CPU and the huge index in 600 s. An index time or memory over budget fails
-the run. Any other metric over budget fails it only with `BENCH_STRICT=1`.
+run plus headroom, except three product goals: a warm page in 300 ms, idle at 1%
+CPU and the huge index in 600 s. An index time or memory over budget fails the
+run. Any other metric over budget fails it only with `BENCH_STRICT=1`.
 
 The memory budget (`rss_mb`) gates physical footprint, not RSS: macOS
-`phys_footprint`, on Linux the larger of `RssAnon` and private dirty pages.
-RSS is recorded beside it.
+`phys_footprint`, on Linux the larger of `RssAnon` and private dirty pages. RSS
+is recorded beside it.
 
 Serving memory does not grow with the history: once the index is ready, idle
 footprint stays at most 48 MB above a just-started server (`footprint_idle_mb`,
@@ -69,7 +69,7 @@ baseline.
 
 The pages that read every change of every file have a cold target for the first
 request after the index is ready. Hotspots and ownership hold at most 1.5 times
-the in-memory build they replaced. Languages has an absolute goal. Measured on
+the time of building them in memory. Languages has an absolute goal. Measured on
 rust (345k commits, 64k files at HEAD), release build, M1 Max, median of 3 cold
 runs:
 
@@ -83,14 +83,14 @@ runs:
 
 Languages is over its goal, and the cause is not yet known. The server renders
 these pages right after the index is ready, so most visitors get them from
-memory in a few milliseconds. `make speed-check` measures them on the rust
-clone and fails on a page over its target.
+memory in a few milliseconds. `make speed-check` measures them on the rust clone
+and fails on a page over its target.
 
 ### Commit search with the message column
 
 `index.has_messages` keeps every commit message in the index. Measured on rust
-(345,460 commits), release build, M1 Max, median of 5, page cache warm, with
-the default `limits.search_commits` of 200:
+(345,460 commits), release build, M1 Max, median of 5, page cache warm, with the
+default `limits.search_commits` of 200:
 
 | Query                             | Column on | Column off |
 | --------------------------------- | --------- | ---------- |
@@ -114,13 +114,13 @@ make gc BENCH=1     # remove the clones (DRY=1 only prints path and size)
 `make check` runs only `bench-guard`, a smoke run on a tiny repository.
 
 Each run names the commit it measured, from `--version`. A `-dirty` build is
-never published: `bench-report --check` refuses it. The JSON keeps the commit
-in `machine.commit` and a `dirty` flag.
+never published: `bench-report --check` refuses it. The JSON keeps the commit in
+`machine.commit` and a `dirty` flag.
 
 ## Results
 
 The newest run against its budgets. The charts and every page of each kept run
-are in tests/bench/results.
+are in [tests/bench/results](../tests/bench/results/README.md).
 
 <!-- BEGIN GENERATED: results -->
 Run 2026-11-12 on Apple M1 Max, 10 cores, 64 GB RAM, 4.0 TB SSD disk, macOS
@@ -147,8 +147,5 @@ Measured on a quiet machine.
 | linux | warm page | 45 ms | 500 ms | pass |
 | linux | cold page | 3887 ms (3887 to 3887) | 20000 ms | pass |
 | linux | peak memory | 1937 MB | 8000 MB | pass |
-
-Every number, chart and page of each run, as files:
-[tests/bench/results](../tests/bench/results/README.md).
 
 <!-- END GENERATED: results -->

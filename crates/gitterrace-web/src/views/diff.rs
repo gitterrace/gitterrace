@@ -51,6 +51,7 @@ const SIGN_REMOVED: &str = "<span class=\"vh sign\">Removed, </span>";
 /// The hunks of one file as line blocks. Also the body of the fragment a folded file loads.
 fn diff_body_html(r: &Render, f: &FileDiff) -> String {
     let mut out = String::from("<div class=\"diffwrap\"><div class=\"diff\">");
+    let mut chunk = String::new();
     let mut in_chunk = 0usize;
     let total: usize = f
         .hunks
@@ -74,15 +75,9 @@ fn diff_body_html(r: &Render, f: &FileDiff) -> String {
         .then(|| crate::highlight::for_file(old_path, first(LineKind::Removed)))
         .flatten();
     for h in &f.hunks {
-        if in_chunk == 0 {
-            out.push_str("<div class=\"ch\">");
-        }
-        let _ = write!(out, "<div class=\"hh\">{}</div>", esc(&h.header));
+        let _ = write!(chunk, "<div class=\"hh\">{}</div>", esc(&h.header));
         in_chunk += 1;
         for l in &h.lines {
-            if in_chunk == 0 {
-                out.push_str("<div class=\"ch\">");
-            }
             let (cls, sign) = match l.kind {
                 LineKind::Added => ("add", SIGN_ADDED),
                 LineKind::Removed => ("del", SIGN_REMOVED),
@@ -95,23 +90,36 @@ fn diff_body_html(r: &Render, f: &FileDiff) -> String {
             };
             let body = hl.map_or_else(|| esc_text(&l.text), |h| h.line(&l.text));
             let _ = write!(
-                out,
+                chunk,
                 "<div class=\"{cls}\" data-o=\"{}\" data-n=\"{}\">{sign}{body}</div>",
                 num(l.old_no),
                 num(l.new_no)
             );
             in_chunk += 1;
             if in_chunk >= CHUNK_LINES {
-                out.push_str("</div>");
-                in_chunk = 0;
+                push_chunk(&mut out, &mut chunk, &mut in_chunk);
             }
         }
     }
-    if in_chunk != 0 {
-        out.push_str("</div>");
-    }
+    push_chunk(&mut out, &mut chunk, &mut in_chunk);
     out.push_str("</div></div>");
     out
+}
+
+/// Closes a `content-visibility` chunk of `rows` lines into `out`. A short chunk names its row
+/// count (`data-rows`, which the stylesheet reads), so a skipped chunk reserves its real height
+/// and an anchor below it lands where the page settles. A full chunk needs no attribute.
+pub(super) fn push_chunk(out: &mut String, chunk: &mut String, rows: &mut usize) {
+    if *rows == 0 {
+        return;
+    }
+    if *rows == CHUNK_LINES {
+        let _ = write!(out, "<div class=\"ch\">{chunk}</div>");
+    } else {
+        let _ = write!(out, "<div class=\"ch\" data-rows=\"{rows}\">{chunk}</div>");
+    }
+    chunk.clear();
+    *rows = 0;
 }
 
 /// Where a page's diff comes from, which decides its links and where a folded file loads from.
@@ -257,8 +265,15 @@ fn file_body(r: &Render, src: DiffSource<'_>, i: usize, f: &FileDiff, used: &mut
             }
         };
         if let (true, Some((old, new))) = (shown, sides) {
-            let old = old.filter(|_| f.kind != ChangeKind::Added);
-            let new = (f.kind != ChangeKind::Deleted).then_some(new);
+            let (was, now) = match src {
+                DiffSource::Commit { media, .. } => media.get(&f.path).copied().unwrap_or_default(),
+                DiffSource::Worktree => (None, None),
+            };
+            let px = |x: Option<crate::media::Facts>| x.and_then(|x| x.dims);
+            let old = old
+                .filter(|_| f.kind != ChangeKind::Added)
+                .map(|s| (s, px(was)));
+            let new = (f.kind != ChangeKind::Deleted).then_some((new, px(now)));
             return crate::media::diff_html(old, new);
         }
         return "<p class=\"muted pad\">Binary file not shown.</p>".to_owned();

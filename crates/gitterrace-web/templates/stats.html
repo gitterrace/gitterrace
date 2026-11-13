@@ -1,7 +1,7 @@
 {% extends "_base.html" %}
 {% block title %}Activity · {{ c.name }}{% endblock %}
 {% block head %}
-<link rel="stylesheet" href="/static/insights.css">{% endblock %}
+<link rel="stylesheet" href="{{ crate::asset_url("insights.css") }}">{% endblock %}
 {%- import "_table.html" as t -%}
 {%- import "_kpis.html" as kp -%}
 {% block content %}

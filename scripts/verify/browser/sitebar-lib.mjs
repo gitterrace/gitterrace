@@ -45,11 +45,13 @@ export function pages() {
 export function checks(env) {
   const { pw, r, browsers, srv } = env;
 
-  // The bar on every page, 404 included, at 390 and 1440 px, in light and dark: one header.top
+  // The bar on every page, 404 included, at 390, 1100 and 1440 px, in light and dark: one
+  // header.top
   // first in the body after the skip link, 56 px tall plus its hairline, its background and text
   // following the scheme (dark bar and light text in dark, light bar and dark text in light),
   // Docs (the link, or its menu on a narrow docs page), the source link and the theme button
-  // inside it and in the viewport, no sideways scroll. A script error fails.
+  // inside it and in the viewport, no sideways scroll, and main centered on a page without a
+  // rail beside it. A script error fails.
   async function siteBar() {
     const { server, url } = await serve();
     const all = pages();
@@ -57,7 +59,7 @@ export function checks(env) {
       for (const name of browsers) {
         const b = await launch(pw, name);
         for (const scheme of ['light', 'dark']) {
-          for (const width of [390, 1440]) {
+          for (const width of [390, 1100, 1440]) {
             const viewport = { width, height: 900 };
             const ctx = await b.newContext({ colorScheme: scheme, viewport });
             const p = await ctx.newPage();
@@ -92,11 +94,40 @@ export function checks(env) {
                   count: bars.length,
                   afterSkip: top.previousElementSibling?.classList.contains('skip') ?? false,
                   height: Math.round(box.height),
+                  // The hairline under the bar, as the app's header draws it: shown at the top
+                  // of the page, not only once it has scrolled.
+                  hair: (() => {
+                    const s = getComputedStyle(top);
+                    const c = s.borderBottomColor;
+                    const a = (c.match(/[\d.]+/g) || [])[3];
+                    return s.borderBottomStyle !== 'none' && parseFloat(s.borderBottomWidth) >= 1
+                      && c !== 'transparent' && (a === undefined || Number(a) > 0.5);
+                  })(),
                   bg: lum(getComputedStyle(top).backgroundColor),
                   fg: lum(getComputedStyle(top.querySelector('.brand')).color),
                   docs: inside('a[href="/docs/"]') || inside('.docsmenu>summary'),
                   gh: inside('.gh'), theme: inside('#theme'),
                   scroll: document.documentElement.scrollWidth - innerWidth,
+                  // A page with no rail beside main (the landing, a page under 1000 px) holds
+                  // main in the middle: equal room left and right, within a pixel.
+                  offCenter: (() => {
+                    const main = document.querySelector('.frame>main');
+                    const side = [...document.querySelectorAll('.frame>.docnav, .frame>.rail')]
+                      .some((e) => e.getClientRects().length > 0);
+                    if (!main || side) return 0;
+                    const q = main.getBoundingClientRect();
+                    return Math.round(Math.abs(q.left - (innerWidth - q.right)));
+                  })(),
+                  // The space between each pair of shown items after the brand: one value, so
+                  // no item sits closer to its neighbor than another, chevron or not.
+                  gaps: (() => {
+                    const shown = [...top.querySelectorAll('.bar > *:not(.brand)')]
+                      .map((e) => (e.matches('details') ? e.querySelector('summary') : e))
+                      .filter((e) => e && e.getClientRects().length
+                        && getComputedStyle(e).display !== 'none');
+                    const xs = shown.map((e) => e.getBoundingClientRect());
+                    return xs.slice(1).map((x, i) => Math.round(x.left - xs[i].right));
+                  })(),
                 };
               });
               const why = [];
@@ -104,6 +135,7 @@ export function checks(env) {
               else {
                 if (!m.afterSkip) why.push('not right after the skip link');
                 if (Math.abs(m.height - 57) > 1) why.push(`${m.height} px tall`);
+                if (!m.hair) why.push('no hairline under the bar at the top of the page');
                 const dark = scheme === 'dark';
                 if (dark ? m.bg > 0.1 : m.bg < 0.5) {
                   why.push(`background luminance ${m.bg.toFixed(2)}, not ${scheme}`);
@@ -113,6 +145,8 @@ export function checks(env) {
                 }
                 if (!m.docs || !m.gh || !m.theme) why.push(`links in view: ${JSON.stringify(m)}`);
                 if (m.scroll > 0) why.push(`page scrolls sideways by ${m.scroll} px`);
+                if (m.offCenter > 1) why.push(`main is ${m.offCenter} px off center`);
+                if (new Set(m.gaps).size > 1) why.push(`uneven gaps between bar items ${m.gaps}`);
               }
               if (why.length) bad.push(`${path}: ${why.join(', ')}`);
             }
@@ -129,10 +163,12 @@ export function checks(env) {
     } finally { server.close(); }
   }
 
-  // The outline rail of a docs page: at 1440 px a page with three or more h2 shows it beside
+  // The outline rail of a docs page: from 1000 px a page with three or more h2 shows it beside
   // the text, labelled "On this page" in 11 px mono with a hairline after it, each item on a
-  // 2 px rail; scrolling to a heading marks its item (and only it) with the accent. At 390 px
-  // and on a page with fewer than three h2 the rail is not shown; at 390 px the Docs menu
+  // 2 px rail; scrolling to a heading marks its item (and only it) with the accent. The docs
+  // list stands beside the text from 1280 px and folds into the bar's Docs menu below, so
+  // 1100 px has the menu and the rail. At 390 px and on a page with fewer than three h2 the
+  // rail is not shown; below 1280 px the Docs menu
   // opens and lists every docs page, and on a page with a rail the "On this page" menu opens,
   // lists the rail's headings and closes after a pick, which lands on that heading.
   async function siteRail() {
@@ -141,7 +177,7 @@ export function checks(env) {
     try {
       for (const name of browsers) {
         const b = await launch(pw, name);
-        for (const width of [390, 1440]) {
+        for (const width of [390, 1100, 1440]) {
           const ctx = await b.newContext({ viewport: { width, height: 900 } });
           const p = await ctx.newPage();
           const bad = [];
@@ -164,11 +200,13 @@ export function checks(env) {
                 beside: rb.left >= mb.right - 1,
               };
             });
-            if (width < 1100) {
-              const why = await narrowMenus(p, all.length);
+            const list = await p.$eval('.frame>.docnav', (n) => n.getClientRects().length > 0);
+            if (list !== width >= 1280) bad.push(`${path}: docs list shown ${list}`);
+            if (width < 1280) {
+              const why = await narrowMenus(p, all.length, width >= 1000);
               if (why.length) bad.push(`${path}: ${why.join(', ')}`);
             }
-            const want = width >= 1100 && m.h2 >= 3;
+            const want = width >= 1000 && m.h2 >= 3;
             if (m.shown !== want) {
               bad.push(`${path}: ${m.h2} h2, rail shown ${m.shown}`);
               continue;
@@ -213,7 +251,7 @@ export function checks(env) {
             if (why.length) bad.push(`${path}: ${why.join(', ')}`);
           }
           const where = `site-rail ${name} ${width}`;
-          if (width >= 1100 && !railed) bad.push('no page shows a rail');
+          if (width >= 1000 && !railed) bad.push('no page shows a rail');
           if (bad.length) r.fail(`${where}: ${bad.join('; ')}`);
           else r.ok(`${where}: rail on ${railed} pages with 3+ h2, none elsewhere, follows scroll`);
           await ctx.close();
@@ -376,12 +414,39 @@ function tableProbe() {
       found.push(`${label} crushed to one word a line`);
     }
   }
+  // No column is much wider than its widest content: a yes/no or send/action column sits as
+  // tight as its words, and the room goes to the text columns.
+  for (const table of document.querySelectorAll('main table')) {
+    if (getComputedStyle(table).display === 'block' && innerWidth < 700) continue;
+    const head = table.querySelector('tr');
+    if (!head) continue;
+    [...head.children].forEach((th, col) => {
+      const cells = [...table.querySelectorAll('tr')].map((tr) => tr.children[col]).filter(Boolean);
+      const range = document.createRange();
+      let ink = 0;
+      for (const c of cells) {
+        // A cell that wraps fills its column: its column is as wide as it needs.
+        range.selectNodeContents(c);
+        const rects = [...range.getClientRects()].filter((q) => q.width > 0);
+        const tops = new Set(rects.map((q) => Math.round(q.top)));
+        ink = tops.size > 1 ? Infinity : Math.max(ink, range.getBoundingClientRect().width);
+        if (ink === Infinity) break;
+      }
+      const pad = parseFloat(getComputedStyle(th).paddingLeft)
+        + parseFloat(getComputedStyle(th).paddingRight);
+      const extra = th.getBoundingClientRect().width - pad - ink;
+      if (extra > 24) {
+        const name = th.textContent.trim();
+        found.push(`column "${name}" is ${Math.round(extra)} px wider than its content`);
+      }
+    });
+  }
   return { tables: document.querySelectorAll('main table').length, found };
 }
 
 /** The folded menus of a docs page at a narrow width: what is wrong, empty when all works.
  * @param {any} p the page @param {number} docs how many docs pages there are */
-async function narrowMenus(p, docs) {
+async function narrowMenus(p, docs, railed) {
   const why = [];
   const menus = [await p.$('header.top details.docsmenu'), await p.$('.menus > details')];
   if (!menus[0]) return ['no Docs menu'];
@@ -392,6 +457,11 @@ async function narrowMenus(p, docs) {
   if (listed !== docs) why.push(`Docs menu lists ${listed} of ${docs}`);
   await menus[0].evaluate((d) => { d.open = false; });
   const rail = await p.$$eval('nav.outline.rail a', (as) => as.map((a) => a.getAttribute('href')));
+  // Beside the rail the "On this page" menu has no reason to show.
+  if (railed) {
+    const shown = await p.$$eval('.menus', (m) => m.some((x) => x.getClientRects().length > 0));
+    return shown ? [...why, 'On this page menu shows beside the rail'] : why;
+  }
   if (!rail.length) return why;
   const outline = menus[1];
   if (!outline) return [...why, 'no On this page menu'];

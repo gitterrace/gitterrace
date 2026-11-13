@@ -62,7 +62,7 @@ fn a_chip_keeps_the_period_anchor() {
         let all = json(&router, &format!("{api}/summary?period=1m")).await;
         let bob = json(
             &router,
-            &format!("{api}/summary?period=1m&author=bob%40y.io"),
+            &format!("{api}/summary?q=author:bob%40y.io&period=1m"),
         )
         .await;
         assert_eq!(
@@ -71,7 +71,7 @@ fn a_chip_keeps_the_period_anchor() {
             "{bob}"
         );
         let fa = json(&router, &format!("{api}/frequency?period=1m")).await;
-        let fb = json(&router, &format!("{api}/frequency?period=1m&type=fix")).await;
+        let fb = json(&router, &format!("{api}/frequency?q=type:fix&period=1m")).await;
         assert_eq!(keys(&fb), keys(&fa), "frequency buckets with a chip");
     });
 }
@@ -85,7 +85,11 @@ fn new_is_judged_on_the_whole_history() {
         let dir = tempfile::tempdir().expect("tmp");
         let router = gitterrace_web::app_router(repo(dir.path())).expect("router");
         oracle::ready(&router).await;
-        let c = json(&router, "/api/v1/insights/contributors?period=1m&type=fix").await;
+        let c = json(
+            &router,
+            "/api/v1/insights/contributors?q=type:fix&period=1m",
+        )
+        .await;
         let bob = c["contributors"]
             .as_array()
             .expect("people")
@@ -105,7 +109,7 @@ fn a_path_covers_only_its_head_files() {
         let dir = tempfile::tempdir().expect("tmp");
         let router = gitterrace_web::app_router(repo(dir.path())).expect("router");
         oracle::ready(&router).await;
-        let o = json(&router, "/api/v1/insights/ownership?period=all&path=src").await;
+        let o = json(&router, "/api/v1/insights/ownership?q=path:src&period=all").await;
         assert_eq!(o["untracked_lines"], 0, "{o}");
     });
 }
@@ -120,10 +124,10 @@ fn patterns_empty_state_follows_the_period_anchor() {
         let dir = tempfile::tempdir().expect("tmp");
         let router = gitterrace_web::app_router(repo(dir.path())).expect("router");
         oracle::ready(&router).await;
-        let (status, body) = page(&router, "/stats/hotspots?period=1w&author=bob%40y.io").await;
+        let (status, body) = page(&router, "/stats/hotspots?q=author:bob%40y.io&period=1w").await;
         assert_eq!(status, 200, "{body}");
         assert!(body.contains("No commits match these filters."), "{body}");
-        let (_, all) = page(&router, "/stats/hotspots?period=all&author=bob%40y.io").await;
+        let (_, all) = page(&router, "/stats/hotspots?q=author:bob%40y.io&period=all").await;
         assert!(!all.contains("No commits match these filters."), "{all}");
     });
 }

@@ -278,7 +278,7 @@ struct LogFilter {
 }
 
 /// Where the "More" link in the filter help goes: the docs page the site serves.
-const FILTER_DOCS: &str = "https://gitterrace.dev/docs/using/#filtering-commits";
+const FILTER_DOCS: &str = "https://gitterrace.dev/docs/using/#find-commits";
 
 /// The filter help lines, one per keyword of the table, so a new keyword shows up here with no
 /// second list to edit.

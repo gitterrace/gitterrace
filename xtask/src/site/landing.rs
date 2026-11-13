@@ -1,18 +1,21 @@
-//! The landing page from `templates/landing.html`: the pitch, install, the quickstart, the
-//! screenshots with two lines for what they cannot show, and the promises of `docs/why.md`
-//! with a link to the rest of it. The page repeats nothing the Why page says beyond those
-//! promises.
+//! The landing page from `templates/landing.html`: the pitch, the why beside the overview,
+//! install, the quickstart, the screenshots with two lines for what they cannot show, and the
+//! promises. Its prose lives in `docs/landing.md`, each sentence once, and no landing sentence
+//! repeats on the page or in another doc.
 
 use askama::Template;
 use pulldown_cmark::{Parser, html};
 
 use crate::facts::Workspace;
 use crate::readme_agents_md;
-use crate::site::docs::Links;
+use crate::site::docs::{Links, code_block};
 
-/// The section of `docs/why.md` the landing page shows: its promises, which link to the
-/// security model.
+/// The landing page's words, one `##` section per block, each sentence here once.
+pub(crate) const LANDING: &str = "docs/landing.md";
+/// The section of the landing copy with the promises, which link to the security model.
 pub(crate) const SAFETY: &str = "What it does with your code";
+/// The section of the landing copy beside the overview picture.
+const WHY: &str = "Why";
 /// The folder under `.git/` the cache lives in (`Index::open`). The files in it are
 /// `CACHE_FILES`, so the prose may name only those.
 const CACHE_DIR: &str = ".git/gitterrace/";
@@ -65,7 +68,7 @@ const LINES: [(&str, &str, &str); 2] = [
     (
         "Many repositories",
         "docs/using.md",
-        "Serving many repositories",
+        "Browse several repositories",
     ),
 ];
 
@@ -74,7 +77,6 @@ const LINES: [(&str, &str, &str); 2] = [
 struct Landing<'a> {
     name: &'a str,
     pitch: &'a str,
-    demo: &'a str,
     install: Vec<(&'static str, String)>,
     bin: &'a str,
     requires: Vec<String>,
@@ -83,6 +85,7 @@ struct Landing<'a> {
     hero: (&'a str, &'a str),
     lines: Vec<(&'a str, String, String)>,
     promises: &'a str,
+    story: &'a str,
 }
 
 /// The landing page's body, its h1 first. `read` reads a repository file.
@@ -96,16 +99,21 @@ pub(crate) fn body(
         .packages
         .get("gitterrace")
         .ok_or_else(|| anyhow::anyhow!("package gitterrace"))?;
-    let why = read("docs/why.md")?;
-    let promises = section(&why, SAFETY)
-        .ok_or_else(|| anyhow::anyhow!("docs/why.md has no '## {SAFETY}' section"))?;
+    let copy = read(LANDING)?;
+    let promises = section(&copy, SAFETY)
+        .ok_or_else(|| anyhow::anyhow!("{LANDING} has no '## {SAFETY}' section"))?;
     check_facts(promises)?;
+    let story = section(&copy, WHY)
+        .ok_or_else(|| anyhow::anyhow!("{LANDING} has no '## {WHY}' section"))?;
     let mut rows = Vec::new();
     for (title, doc, head) in LINES {
         let text = read(doc)?;
         let para = section(&text, head)
             .and_then(|s| s.split("\n\n").map(str::trim).find(|p| !p.is_empty()))
             .ok_or_else(|| anyhow::anyhow!("{doc} has no '## {head}' paragraph"))?;
+        let para = lead(para).ok_or_else(|| {
+            anyhow::anyhow!("{doc} '## {head}' opens with no sentence that stands alone")
+        })?;
         let path = crate::site::docs::page_path(crate::site::docs::stem(doc));
         rows.push((
             title,
@@ -123,15 +131,18 @@ pub(crate) fn body(
     let html = Landing {
         name: &pkg.name,
         pitch,
-        demo: &ws.demo,
-        install: readme_agents_md::install_lines(ws),
+        install: readme_agents_md::install_lines(ws)
+            .into_iter()
+            .map(|(way, line)| (way, code_block(&format!("{line}\n"), "bash")))
+            .collect(),
         bin: pkg.bins.first().map_or("", String::as_str),
         requires: requirements(ws),
-        quickstart: readme_agents_md::quickstart(),
+        quickstart: code_block(&readme_agents_md::quickstart(), "bash"),
         shots,
         hero: (SHOTS[0].0, HERO_ALT),
         lines: rows,
         promises: &md(promises, links),
+        story: &md(story, links),
     }
     .render()?;
     Ok(format!("{html}\n"))
@@ -168,6 +179,22 @@ pub(crate) fn section<'a>(text: &'a str, title: &str) -> Option<&'a str> {
         .find("\n## ")
         .map_or(text.len(), |i| start + i);
     Some(&text[start..end])
+}
+
+/// The sentences of a paragraph up to the last one that ends in `.`, so a lead-in to a
+/// code block ("...holds repositories:") never ends a landing line. None if there is none.
+fn lead(para: &str) -> Option<&str> {
+    let t = para.trim_end();
+    if t.ends_with('.') {
+        return Some(t);
+    }
+    // Markdown wraps lines, so a sentence end is ". " or ".\n".
+    let end = t.rfind([' ', '\n']).and_then(|_| {
+        t.char_indices()
+            .rfind(|&(i, c)| c == '.' && t[i + 1..].starts_with([' ', '\n']))
+            .map(|(i, _)| i + 1)
+    })?;
+    Some(&t[..end])
 }
 
 /// One markdown paragraph as plain text for an escaped template value: links keep their
@@ -216,12 +243,12 @@ pub(crate) fn check_facts(text: &str) -> anyhow::Result<()> {
     if wrong.is_empty() {
         Ok(())
     } else {
-        anyhow::bail!("docs/why.md: {}", wrong.join("; "))
+        anyhow::bail!("{LANDING}: {}", wrong.join("; "))
     }
 }
 
-/// Markdown from `docs/why.md` as HTML, with its relative links pointed at the site's pages,
-/// as on the Why page itself.
+/// Markdown from the landing copy as HTML, with its relative links pointed at the site's
+/// pages, as from any doc.
 fn md(text: &str, links: &Links) -> String {
     let mut out = String::new();
     let events = Parser::new_ext(text, gitterrace_web::markdown_options()).map(|ev| match ev {
@@ -232,7 +259,7 @@ fn md(text: &str, links: &Links) -> String {
             id,
         }) => pulldown_cmark::Event::Start(pulldown_cmark::Tag::Link {
             link_type,
-            dest_url: links.rewrite("docs/why.md", &dest_url, false).into(),
+            dest_url: links.rewrite(LANDING, &dest_url, false).into(),
             title,
             id,
         }),
@@ -249,11 +276,18 @@ mod tests {
     /// The promises name the default address the code uses, and a wrong address, cache
     /// folder or cache file fails the build.
     #[test]
-    fn why_prose_that_names_a_wrong_address_or_cache_path_fails() {
-        let path = concat!(env!("CARGO_MANIFEST_DIR"), "/../docs/why.md");
-        let why = std::fs::read_to_string(path).expect("why.md");
-        let safety = section(&why, SAFETY).expect("safety section");
-        check_facts(safety).expect("why.md agrees with the code");
+    fn a_landing_line_ends_on_a_full_stop_never_on_a_colon() {
+        assert_eq!(lead("One. Two."), Some("One. Two."));
+        assert_eq!(lead("One server. Give paths:"), Some("One server."));
+        assert_eq!(lead("Give several paths:"), None);
+    }
+
+    #[test]
+    fn landing_prose_that_names_a_wrong_address_or_cache_path_fails() {
+        let path = concat!(env!("CARGO_MANIFEST_DIR"), "/../docs/landing.md");
+        let copy = std::fs::read_to_string(path).expect("landing.md");
+        let safety = section(&copy, SAFETY).expect("safety section");
+        check_facts(safety).expect("landing.md agrees with the code");
         assert!(safety.contains(&format!("`{}`", gitterrace_config::DEFAULT_ADDR)));
         for bad in [
             "`127.0.0.1:8080`",

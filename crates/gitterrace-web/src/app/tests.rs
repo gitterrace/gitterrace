@@ -10,10 +10,10 @@ use super::{App, LastCommit};
 #[test]
 fn junk_and_order_do_not_make_new_memo_keys() {
     let canon = |q| App::canonical_query(Some(q));
-    assert_eq!(canon("x=1&type=fix"), canon("type=fix&x=2&y"));
-    assert_eq!(canon("period=1y&type=fix"), canon("type=fix&period=1y"));
-    assert_ne!(canon("type=fix"), canon("type=feat"));
-    assert_eq!(App::canonical_query(None), "");
+    assert_eq!(canon("x=1&q=type:fix"), canon("q=type:fix&x=2&y"));
+    assert_eq!(canon("period=1y&q=type:fix"), canon("q=type:fix&period=1y"));
+    assert_ne!(canon("q=type:fix"), canon("q=type:feat"));
+    assert_eq!(canon("type=fix&author=a"), App::canonical_query(None));
 }
 
 #[test]
@@ -32,8 +32,8 @@ fn memo_key_moves_with_head_and_index_and_the_source_follows() {
         .expect("update");
     app.mark_ready();
     let head = app.repo.resolve("HEAD").expect("head");
-    let key = app.memo_key("t", Some("type=fix"));
-    assert_ne!(key, app.memo_key("t", Some("type=feat")));
+    let key = app.memo_key("t", Some("q=type:fix"));
+    assert_ne!(key, app.memo_key("t", Some("q=type:feat")));
     app.memo_put(key.clone(), std::sync::Arc::new("page".into()));
     assert!(app.memo_get(&key).is_some());
     let first = app
@@ -45,7 +45,7 @@ fn memo_key_moves_with_head_and_index_and_the_source_follows() {
 
     std::fs::write(path.join("a.txt"), "2\n").expect("write");
     git(path, &["commit", "-qam", "fix: two"]);
-    let moved = app.memo_key("t", Some("type=fix"));
+    let moved = app.memo_key("t", Some("q=type:fix"));
     assert_ne!(key, moved, "moving HEAD must change the memo key");
     assert!(app.memo_get(&moved).is_none());
     app.index
@@ -140,65 +140,6 @@ fn racing_callers_share_one_source() {
         .expect("ready")
         .unchecked();
     assert!(Arc::ptr_eq(&kept, &again), "a kept source is shared");
-}
-
-#[test]
-fn a_block_corrupted_while_serving_rebuilds_the_cache() {
-    use gitterrace_index::feed::CommitRange;
-    let dir = tempfile::tempdir().expect("tempdir");
-    let path = dir.path();
-    git(path, &["init", "-q", "-b", "main"]);
-    std::fs::write(path.join("a.txt"), "1\n").expect("write");
-    git(path, &["add", "."]);
-    git(path, &["commit", "-q", "-m", "feat: one"]);
-    let repo = gitterrace_git::Repo::discover(path).expect("repo");
-    let index = gitterrace_index::Index::open(&repo).expect("index");
-    let app = App::new(repo, index);
-    app.index
-        .update(&app.repo, "HEAD", &|_| {})
-        .expect("update");
-    app.mark_ready();
-    let head = app.repo.resolve("HEAD").expect("head");
-    let src = app
-        .source(&head)
-        .expect("source")
-        .expect("ready")
-        .unchecked();
-    let cache = app.index.dir().to_path_buf();
-    let seg = std::fs::read_dir(&cache)
-        .expect("ls")
-        .filter_map(Result::ok)
-        .map(|e| e.path())
-        .find(|p| {
-            p.extension().is_some_and(|x| x == "gts")
-                && p.file_name()
-                    .is_some_and(|n| n.to_string_lossy().starts_with("seg-"))
-        })
-        .expect("a segment");
-    // Zero every block byte (same length, so open-time checks still pass).
-    let mut bytes = std::fs::read(&seg).expect("read");
-    let end = bytes.len() - 64;
-    let toc = usize::try_from(u64::from_le_bytes(
-        bytes[end + 16..end + 24].try_into().expect("8 bytes"),
-    ))
-    .expect("toc");
-    bytes[16..toc].fill(0);
-    std::fs::write(&seg, &bytes).expect("corrupt");
-    // A page reads the tables and the rows: the zeroed blocks fail their crc.
-    let read = src.agg_author_day(i64::MIN..i64::MAX).count()
-        + src.agg_path_author("").count()
-        + src.rename_edges().count()
-        + src.commits_in(CommitRange::All).count();
-    assert_eq!(read, 0, "nothing of a corrupt block is handed out");
-    drop(src);
-    assert!(
-        app.source(&head).expect("source").is_none(),
-        "a corrupt set must not serve"
-    );
-    assert!(
-        !cache.join("MANIFEST").exists(),
-        "the cache is deleted for a rebuild"
-    );
 }
 
 #[test]

@@ -1,7 +1,6 @@
 #!/bin/sh
 # Append the selection to today's Obsidian daily note. Payload fields come from the browsed
 # repository: treat them as untrusted. They are written as file content, never run.
-# A new note or an inbox append needs no script: use obsidian://new (see docs/actions.md).
 #
 # Settings (the action's [action.vars] table, delivered as GITTERRACE_VAR_*):
 #   VAULT   vault directory, default ~/Notes

@@ -3,7 +3,7 @@
 Almost nothing, and we would like to keep it that way. This site sets no cookies
 and runs no analytics, and everything below is checkable rather than promised.
 
-Effective: 6 November 2026
+Effective: 13 November 2026
 
 This policy explains which personal data is processed when you visit this
 website (gitterrace.dev), why, on what legal basis, who receives it, and what

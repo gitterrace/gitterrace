@@ -431,6 +431,9 @@ fn export_csp() -> String {
 
 // Hosts join the values of every matching rule, so the page cache rule names the page trees
 // and never `/*`: there it would merge into the `/static/*` lifetime.
+// Pages name each asset as `/static/<file>?v=<build>`: a host serves the file and ignores the
+// query, and a new export brings new URLs, so a year under `/static/*` never serves a stale
+// asset to a fresh page.
 fn headers_file() -> String {
     let page = export_csp();
     format!(
@@ -442,7 +445,7 @@ fn headers_file() -> String {
          /r/*\n  Cache-Control: no-cache\n\n\
          /r/:name/raw/*\n  Content-Security-Policy: sandbox; \
          default-src 'none'; style-src 'unsafe-inline'\n\n\
-         /static/*\n  Cache-Control: public, max-age=3600\n"
+         /static/*\n  Cache-Control: public, max-age=31536000, immutable\n"
     )
 }
 

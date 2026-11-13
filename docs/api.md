@@ -43,9 +43,9 @@ each cap.
 | `GET /tree` | `rev`, `path` | commit, entries, path, rev |
 | `GET /blob` | `rev`, `path`, `start_line`, `limit` | binary, commit, link, path, permalink, rev, size, text, total_lines, truncated |
 | `GET /blame` | `rev`, `path` | commit, lines, link, path, permalink, rev, truncated |
-| `GET /contributors` | `rev`, `q`, `period`, `type`, `scope`, `author`, `path`, `bots`, `merges`, `generated`, `ignore`, `ws`, `exclude` | authors, bus_factor, rev |
+| `GET /contributors` | `rev`, `q`, `period`, `bots`, `merges`, `generated`, `ignore`, `ws`, `exclude` | authors, bus_factor, rev |
 | `GET /insights` |  | insights |
-| `GET /insights/{name}` | `rev`, `q`, `period`, `label`, `metric`, `limit`, `type`, `scope`, `author`, `path`, `bots`, `merges`, `generated`, `ignore`, `ws`, `exclude` | commits_indexed, data, insight, query, rev |
+| `GET /insights/{name}` | `rev`, `q`, `period`, `label`, `metric`, `limit`, `bots`, `merges`, `generated`, `ignore`, `ws`, `exclude` | commits_indexed, data, insight, query, rev |
 
 ### Parameters
 
@@ -84,8 +84,7 @@ counts them.
 
 - `rev` (string): Revision to read, default `HEAD`.
 - `q` (string): The commit filter, the web filter field's text, see Filter. The
-  primary way to select commits: the parameters below are older forms read as
-  its terms.
+  one way to select commits.
 - `period` (string): `1w`, `1m`, `3m`, `1y` or `all` (default): the window,
   ending at the newest commit. Sets the bucket unit.
 - The counting parameters below.
@@ -94,8 +93,7 @@ counts them.
 
 - `rev` (string): Revision to read, default `HEAD`.
 - `q` (string): The commit filter, the web filter field's text, see Filter. The
-  primary way to select commits: the parameters below are older forms read as
-  its terms.
+  one way to select commits.
 - `period` (string): `1w`, `1m`, `3m`, `1y` or `all` (default): the window,
   ending at the newest commit. Sets the bucket unit.
 - `label` (string): `kind` (default) or `scope`.
@@ -106,10 +104,6 @@ counts them.
 
 `Counting parameters`: shared by every endpoint that counts.
 
-- `type` (string): Only commits of this conventional type, `other` for none.
-- `scope` (string): Only commits of this scope, `none` for none.
-- `author` (string): Only commits by this email or name.
-- `path` (string): Only files under this directory.
 - `bots` (string): `1` counts bot accounts, `0` leaves them out.
 - `merges` (string): `1` counts merge commits as commits, never their lines or
   files.
@@ -123,21 +117,19 @@ counts them.
 `q` is the commit filter, the same text the web filter field takes. Every term
 must match; they read in the order written. A bad `q` is a 400 with the span.
 
-- `type:<type>[,<type>]`: Conventional type; `other` is none.
-- `scope:<scope>[,<scope>]`: Conventional scope; `none` is none.
+- `type:<type>[,<type>]`: Conventional type, `other` for none.
+- `scope:<scope>[,<scope>]`: Conventional scope, `none` for none.
 - `author:<who>[,<who>]`: E-mail in any case, or the exact name.
 - `path:<prefix>[,<prefix>]`: Touches a file under the prefix.
 - `after:<period|YYYY-MM-DD>`: Within the period, or from the date.
 - `before:<period|YYYY-MM-DD>`: Before the period, or the date.
-- `period:<1w|1m|3m|1y|all>`: Old form of `after:`; `all` is none.
 - `merge`: Merge commits.
 - `<word> or "<words>"`: The message has it, any case.
 - `!<term>`: The term does not match.
-- `<term> <term>`: All terms match; `a,b` is either.
+- `<term> <term>`: All terms match, `a,b` is either.
 
-The one-key parameters stay and read as terms of `q`, and must match as well:
-`type` as `type:`, `scope` as `scope:`, `author` as `author:`, `path` as
-`path:`, `from` as `after:`, `to` as `before:`, `period` as `period:`.
+A query key an endpoint does not list is a 400 naming it: `q` is the one way to
+select commits.
 
 ## Insights
 
@@ -185,8 +177,8 @@ so to the model.
 - `hotspots`: Files of the head tree that change most for their size (changes,
   lines, authors, last change, score = changes times the square root of lines),
   the web Hotspots page's numbers. Use to find risky or central code and where
-  to look first. Parameters: `limit?` (integer), `path?` (string), `period?`
-  (string), `query` (string), `repo?` (string), `rev?` (string).
+  to look first. Parameters: `limit?` (integer), `period?` (string), `query`
+  (string), `repo?` (string), `rev?` (string).
 - `list_repos`: The repositories this server may read and which scope it was
   started with: name (pass it as `repo` to every other tool), HEAD, branch and
   newest commit. One that cannot be read shows `available: false` and why. Call

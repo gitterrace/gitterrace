@@ -323,7 +323,7 @@ mod tests {
             period: Some(period.to_owned()),
             ..ScopeParams::default()
         };
-        p.select.path = path.map(str::to_owned);
+        p.select.q = path.map(|p| format!("path:{p}"));
         Scope::from_params(&p, Options::default(), Period::All).expect("scope")
     }
 

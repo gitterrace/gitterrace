@@ -94,7 +94,8 @@ and Windows run weekly, on demand and for every tag.
 - Other systems locally: `scripts/dev/wine-run.sh` (Windows),
   `scripts/dev/linux-run.sh` (Docker) and `scripts/dev/macos-run.sh` (clean
   HOME and PATH) build and smoke-test the binary, and `linux-run.sh --full` or
-  `macos-run.sh --full` runs `make check` there. Both exit 2 on a bad argument
+  `macos-run.sh --full` runs `make check` there. Those two exit 2 on a bad
+  argument.
 
 ## Releasing (maintainers)
 
@@ -103,7 +104,9 @@ deploy workflow or token in the repository. It refuses a dirty tree and builds
 the site from HEAD into `target/site`. `make site-preview` serves the same site
 on http://127.0.0.1:4343.
 
-1. Bump `SECURITY_TXT_EXPIRES` in `xtask/src/site.rs`, commit.
+1. Bump `SECURITY_TXT_EXPIRES` in `xtask/src/site.rs`, commit. For the first
+   release, set `Effective:` in `docs/legal/privacy.md` to the launch date.
+   After that it moves only when the policy's content does.
 2. On the release candidate commit, in a clean clone on a quiet machine,
    `make bench LARGE=1` and commit the results.
 3. `make changelog VERSION=x.y.z` writes the CHANGELOG.md section from the

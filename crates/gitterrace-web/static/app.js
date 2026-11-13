@@ -43,8 +43,16 @@
     sel.hidden = false;
     sel.addEventListener("change", function () {
       var btn = box.querySelector('button[data-show="' + sel.value + '"]');
-      if (btn) btn.click();
+      var radio = box.querySelector('input[value="' + sel.value + '"]');
+      if (radio) {
+        radio.checked = true;
+        radio.dispatchEvent(new Event("change", { bubbles: true }));
+      }
+      else if (btn) btn.click();
       else location.href = sel.value;
+    });
+    box.addEventListener("change", function (e) {
+      if (e.target.type === "radio") sel.value = e.target.value;
     });
     // A button switch can change from elsewhere (a keyboard shortcut): keep the select in step.
     box.querySelectorAll("button[data-show]").forEach(function (b) {
@@ -197,55 +205,169 @@
     e.preventDefault();
   });
   window.gtToast = toast;
-  // Image diffs: side by side or one over the other. The choice is kept per browser; on a
-  // phone, where the sides stack anyway, the overlay is the default.
+  // Image diffs: CSS shows the checked view. The choice is kept per browser; on a phone,
+  // where the sides stack anyway, the overlay is the default.
   var mediaViews = document.querySelectorAll("[data-media-view]");
   if (mediaViews.length) {
     var KEY = "gitterrace-media-view", saved = null;
     try { saved = localStorage.getItem(KEY); } catch (e) {}
     var first = saved || (matchMedia("(max-width:600px)").matches ? "overlay" : "sides");
     mediaViews.forEach(function (box) {
-      var btns = box.querySelectorAll("[data-show]");
-      function show(v) {
-        box.querySelectorAll("[data-pane]").forEach(function (p) { p.hidden = p.dataset.pane !== v; });
-      }
-      btns.forEach(function (b) {
-        b.addEventListener("click", function () {
-          show(b.dataset.show);
-          try { localStorage.setItem(KEY, b.dataset.show); } catch (e) {}
-        });
-        if (b.dataset.show === first && first !== "sides") b.click();
+      var r = box.querySelector('input[value="' + first + '"]');
+      if (r) r.checked = true;
+      box.addEventListener("change", function (e) {
+        if (e.target.type !== "radio") return;
+        try { localStorage.setItem(KEY, e.target.value); } catch (x) {}
       });
       var cut = box.querySelector("[data-media-cut]");
       if (cut) cut.addEventListener("input", function () { box.style.setProperty("--cut", cut.value + "%"); });
     });
   }
-
-  // ---- #heading links into rendered Markdown --------------------------------
-  // Document ids are plain, so #reference resolves by itself. Only an id that would clobber
-  // the page (main, q, location, ...) carries the "user-content-" prefix: a typed #main jumps
-  // there instead of to the page's own <main>. An old #user-content-x link lands on the plain x.
-  function jumpUserAnchor() {
-    var h = location.hash;
-    if (h.length < 2 || /^#L\d+(-L?\d+)?$/.test(h)) return;
-    var id;
-    try { id = decodeURIComponent(h.slice(1)); } catch (e) { return; }
-    var t = document.getElementById("user-content-" + id);
-    if (!t && id.indexOf("user-content-") === 0 && !document.getElementById(id)) {
-      t = document.getElementById(id.slice(13));
-    }
-    if (!t) return;
-    t.scrollIntoView();
-    if (!t.hasAttribute("tabindex")) t.tabIndex = -1;
-    t.focus({ preventScroll: true });
-  }
-  window.addEventListener("hashchange", jumpUserAnchor);
-  // Again after load, once the browser's own (late, on a busy machine) scroll to <main> settles.
-  window.addEventListener("load", function () {
-    var end = Date.now() + 1000, again = function () { if (Date.now() < end) jumpUserAnchor(); };
-    requestAnimationFrame(function () { requestAnimationFrame(jumpUserAnchor); });
-    addEventListener("scrollend", again, { once: true }); setTimeout(again, 250);
-  });
-  jumpUserAnchor();
 })();
 
+
+// Scripts behind a gesture load on first use. gtLazy(name, done) adds <name>.js once, beside
+// this script, and calls done when it has run. The server renders the triggers.
+(function () {
+  "use strict";
+  var HERE = document.currentScript ? document.currentScript.src : location.href;
+  // This script's own ?v=, so a file it adds is the same build's, cached as long.
+  var V = new URL(HERE).search;
+  var body = document.body;
+  var STATIC = body.dataset.static !== undefined;
+  var CSS = { send: "send.css" };
+  var state = {};
+  window.gtLazy = function (name, done) {
+    var s = state[name];
+    if (!s) {
+      s = state[name] = { ready: false, wait: [] };
+      // Wait for the stylesheet too, or the window opens unstyled.
+      var left = CSS[name] ? 2 : 1;
+      var one = function () {
+        if (--left > 0) return;
+        s.ready = true;
+        s.wait.splice(0).forEach(function (f) { f(); });
+      };
+      if (CSS[name]) {
+        var l = document.createElement("link");
+        l.rel = "stylesheet";
+        l.href = new URL(CSS[name] + V, HERE).href;
+        l.onload = l.onerror = one;
+        document.head.appendChild(l);
+      }
+      var t = document.createElement("script");
+      t.src = new URL(name + ".js" + V, HERE).href;
+      t.onload = one;
+      document.head.appendChild(t);
+    }
+    if (!done) return;
+    if (s.ready) done(); else s.wait.push(done);
+  };
+  function meta(n) { return document.querySelector('meta[name="' + n + '"]'); }
+  var off = meta("gt-off");
+  var OFF = off ? off.content.split(" ") : [];
+  var act = meta("gitterrace-actions");
+  var chords = false;
+  try {
+    chords = !!act && JSON.parse(act.dataset.menu || "[]").some(function (a) { return a.key; });
+  } catch (e) { chords = false; }
+  function typing(t) {
+    return t && (/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName) || t.isContentEditable);
+  }
+  function free(e) {
+    var ov = window.gtOverlay;
+    if (e.metaKey || e.ctrlKey || e.altKey || typing(e.target)) return false;
+    return !(ov && (ov.name || ov.chord)) && !(window.gtKeysOff && window.gtKeysOff());
+  }
+
+  // Outline and filter help: only where the page has one.
+  if (document.querySelector("[data-outline], [data-filter-help]")) window.gtLazy("outline");
+
+  // Pickers: "b", a click on a switcher, a live repository change or ?open=refs.
+  var pickers = false;
+  function withPickers(done) { pickers = true; window.gtLazy("pickers", done); }
+  document.addEventListener("keydown", function (e) {
+    // nav.js handles "b" once the pickers are here.
+    if (pickers || e.key !== "b" || !free(e)) return;
+    e.preventDefault();
+    withPickers(function () { window.gtPickers.openRefs(); });
+  });
+  ["refbtn", "repobtn"].forEach(function (id) {
+    var b = document.getElementById(id);
+    if (!b) return;
+    b.addEventListener("click", function first() {
+      b.removeEventListener("click", first);
+      if (!pickers) withPickers(function () { b.click(); });
+    });
+  });
+  document.addEventListener("gt:repos-changed", function () { if (!pickers) withPickers(); });
+  if (/[?&]open=refs/.test(location.search)) withPickers();
+
+  // Action menu: none in an export, which has no server.
+  if (STATIC) return;
+  // The actions note is rendered by the server and refreshed on show and focus. No timer: WebKit
+  // caps connections per host.
+  var noteEl = document.getElementById("actnote");
+  function pollNote() {
+    if (!noteEl || document.hidden || OFF.indexOf("actions") >= 0) return;
+    fetch("/_actions/status", { cache: "no-store" })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (j) {
+        if (!j) return;
+        var line = noteEl.firstElementChild;
+        if (!j.note) { noteEl.hidden = true; return; }
+        if (line.textContent !== j.note) line.textContent = j.note;
+        noteEl.hidden = false;
+      })
+      .catch(function () {});
+  }
+  pollNote();
+  document.addEventListener("visibilitychange", pollNote);
+  window.addEventListener("focus", pollNote);
+
+  var actions = false;
+  function withActions(done) { actions = true; window.gtLazy("actions", done); }
+  // A chord runs a user action, which needs a real key press: load at once.
+  if (chords) withActions();
+  // ".": keys typed while loading (". s") are held, then replayed in order.
+  var held = null;
+  document.addEventListener("keydown", function (e) {
+    if (held) { e.preventDefault(); e.stopImmediatePropagation(); held.push(e.key); return; }
+    if (actions || e.key !== "." || !free(e)) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    held = [e.key];
+    withActions(function () {
+      var keys = held;
+      held = null;
+      keys.forEach(function (key) {
+        var ev = new KeyboardEvent("keydown", { key: key, bubbles: true, cancelable: true });
+        (document.activeElement || document.body).dispatchEvent(ev);
+      });
+    });
+  }, true);
+  ["actpage", "actcommit"].forEach(function (id) {
+    var b = document.getElementById(id);
+    if (!b) return;
+    b.addEventListener("click", function first() {
+      b.removeEventListener("click", first);
+      if (!actions) withActions(function () { b.click(); });
+    });
+  });
+  // Floating triggers come from the menu's script: load it on the first sign of one.
+  var HOVER = ".diff .hh, table.blame tr[id^=L], tr[data-act]";
+  document.addEventListener("mouseover", function (e) {
+    var h = !actions && e.target.closest && e.target.closest(HOVER);
+    if (!h) return;
+    withActions(function () { h.dispatchEvent(new MouseEvent("mouseover", { bubbles: true })); });
+  });
+  document.addEventListener("selectionchange", function () {
+    var s = window.getSelection();
+    if (!actions && s && !s.isCollapsed) {
+      withActions(function () { document.dispatchEvent(new Event("selectionchange")); });
+    }
+  });
+  function lines() { return /^#L\d/.test(location.hash); }
+  if (lines() || document.querySelector(".src .l.sel, table.code tr.sel")) withActions();
+  window.addEventListener("hashchange", function () { if (!actions && lines()) withActions(); });
+})();

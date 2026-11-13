@@ -30,49 +30,39 @@ letter-spacing:.12em;color:var(--muted)}
 border-top:var(--border)}
 .kicker{margin-bottom:var(--space-3)}
 
-/* The bar: follows the chosen scheme, as the app's header. It stays on top while the page
-   scrolls, a little see-through over a blur; its hairline shows once the page has moved. */
-.top{position:sticky;top:0;z-index:30;
-background:color-mix(in srgb,var(--header) 85%,transparent);
-backdrop-filter:saturate(1.4) blur(10px);-webkit-backdrop-filter:saturate(1.4) blur(10px);
-border-bottom:1px solid var(--line)}
-@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
-.top{background:var(--header)}}
-@supports (animation-timeline:scroll()){
-.top{animation:hairline linear both;animation-timeline:scroll();animation-range:0 24px}
-@keyframes hairline{from{border-bottom-color:transparent}to{border-bottom-color:var(--line)}}}
+/* The bar: follows the chosen scheme, as the app's header, with the same hairline under it
+   on every page. It stays on top while the page scrolls. */
+.top{position:sticky;top:0;z-index:30;background:var(--header);border-bottom:var(--border)}
 .bar{max-width:var(--page-max);margin:0 auto;height:56px;padding:0 var(--page-pad);
-display:flex;align-items:center;gap:var(--space-4)}
-/* Text links read as words: muted sans, the current section in the text color over an
-   accent edge, as the docs list marks its page. */
+display:flex;align-items:center;gap:var(--space-5)}
+/* Links are an icon and a word, muted, as quiet as the app header's controls; the current
+   section is in the text color over an accent edge, as the docs list marks its page. */
 .top a{color:var(--muted);font-size:14.5px;font-weight:500;text-decoration:none}
 .top a:hover{color:var(--fg)}
 .top a[aria-current]{color:var(--fg);text-decoration:underline 2px var(--accent);
 text-underline-offset:6px}
-/* The bar's Docs link has the box of the Docs menu button (44 px tall, chevron room), so
-   no item of the bar moves from a page with the menu to one with the link. */
-.top a[href$="/docs/"]{display:inline-flex;align-items:center;min-height:44px;line-height:1;
-margin:0 calc(-1*var(--space-2));padding:0 var(--space-2)}
-.top a[href$="/docs/"]::after{content:"";width:5px;height:5px;margin-left:var(--space-2);
-border:solid transparent;border-width:0 1.5px 1.5px 0}
+/* Every bar item is as wide as its ink, so the bar's one gap is the space the eye sees
+   between any two items. The Docs menu that stands in for the Docs link on a narrow docs
+   page draws the same icon and word and no chevron, so nothing moves between pages. */
+.top a[href$="/docs/"]{line-height:1}
 .top .brand{display:flex;align-items:center;gap:var(--space-2);margin-right:auto;
 min-height:44px}
 .top .brand .logo{width:24px;height:24px;display:block;flex:none}
 .top .logo .i{fill:var(--fg)}.top .logo .a{fill:var(--accent)}
 .wordmark{height:15px;width:auto;display:block;overflow:visible}
 .wordmark .w-git{fill:var(--wm-git)}.wordmark .w-terrace{fill:var(--wm-terrace)}
-/* Docs and the source link are words, set apart from the icon controls after them. */
-.top .gh{display:inline-flex;align-items:center;gap:6px;min-height:44px;
-margin-left:calc(var(--space-6) - var(--space-4));margin-right:var(--space-4)}
+.top .docs,.top .live,.top .gh,.top .docsmenu>summary{display:inline-flex;align-items:center;
+gap:6px;min-height:44px}
+.top .ico{fill:none;stroke:currentColor;stroke-width:1.75;stroke-linecap:round;
+stroke-linejoin:round;flex:none}
 .gh svg{fill:currentColor;flex:none}
 .gh:hover,.gh:focus-visible{color:var(--fg)}
-/* The theme button is a control, not a logo: an 18 px icon in a bordered 32 px square, its
-   tap target grown to 44 px by an invisible ring. */
-.theme{position:relative;width:32px;height:32px;padding:0;display:grid;place-items:center;
-flex:none;background:none;border:var(--border);border-radius:var(--radius);
+/* The theme button, as in the app's header: the icon alone, its tap target 44 px. */
+.theme{position:relative;width:18px;height:32px;padding:0;display:grid;place-items:center;
+flex:none;background:none;border:0;border-radius:var(--radius);
 color:var(--muted);cursor:pointer;line-height:0}
-.theme::before{content:"";position:absolute;inset:-6px}
-.theme:hover,.theme:focus-visible{color:var(--fg);border-color:var(--line-strong)}
+.theme::before{content:"";position:absolute;inset:-6px -13px}
+.theme:hover,.theme:focus-visible{color:var(--fg)}
 .theme svg{width:18px;height:18px;overflow:visible;fill:none;stroke:currentColor;
 stroke-width:2;stroke-linecap:round;stroke-linejoin:round;display:none}
 .theme svg *{vector-effect:non-scaling-stroke}
@@ -80,17 +70,6 @@ stroke-width:2;stroke-linecap:round;stroke-linejoin:round;display:none}
 .theme .i-auto{display:block}
 :root[data-theme=light] .theme .i-auto,:root[data-theme=dark] .theme .i-auto{display:none}
 :root[data-theme=light] .theme .i-light,:root[data-theme=dark] .theme .i-dark{display:block}
-/* The demo is what the bar asks for: the one filled button, last. */
-.top .cta{position:relative;display:inline-flex;align-items:center;gap:6px;flex:none;
-height:32px;padding:0 var(--space-3);border-radius:var(--radius);background:var(--accent);
-color:var(--on-accent);font:600 14px/1 var(--sans);white-space:nowrap}
-.top .cta::before{content:"";position:absolute;inset:-6px 0}
-.top .cta:hover{color:var(--on-accent);
-background:color-mix(in srgb,var(--accent) 88%,var(--fg))}
-.top .cta:focus-visible{outline:2px solid var(--ring);outline-offset:2px}
-.top .cta svg{fill:none;stroke:currentColor;stroke-width:1.75;stroke-linecap:round;
-stroke-linejoin:round}
-.top .cta .short{display:none}
 /* On the landing page the hero draws the big logo, so the bar shows the mark alone until
    the hero's heading has scrolled away, where a browser can tie that to the scroll. */
 body:has(.hero) .top .wordmark{opacity:0}
@@ -100,14 +79,14 @@ body:has(.hero){timeline-scope:--hero}
 body:has(.hero) .top .wordmark{animation:wordmark-in linear both;animation-timeline:--hero;
 animation-range:exit 40% exit 100%}
 @keyframes wordmark-in{from{opacity:0}to{opacity:1}}}
-@media (max-width:640px){
-.bar{gap:var(--space-3)}
-.top .gh{position:relative;width:24px;justify-content:center;margin:0}
-.top .gh::before{content:"";position:absolute;inset:0 -10px}
-.top .gh span{display:none}
-.top .gh svg{width:20px;height:20px}
-.top .cta .long{display:none}
-.top .cta .short{display:inline}}
+/* The words go when the bar runs out of room, all at once, and each link is its icon:
+   the gap stays the same. */
+.top{container:bar/inline-size}
+@container bar (max-width:560px){
+.top .docs span,.top .live span,.top .gh span,.top .docsmenu>summary span{display:none}
+.top .docs,.top .live,.top .gh{position:relative}
+.top .docs::before,.top .live::before,.top .gh::before{content:"";position:absolute;
+inset:0 -10px}}
 @media (max-width:359px){.top .wordmark{display:none}}
 
 /* The frame. */
@@ -131,13 +110,26 @@ text-decoration:none;overflow-wrap:anywhere}
 .docnav a:hover,.outline a:hover{color:var(--fg)}
 .docnav a[aria-current],.outline.rail a.on{color:var(--fg);font-weight:var(--weight-semibold);
 border-left-color:var(--accent)}
-.outline li.d1>a{padding-left:var(--space-6)}
 .menus,.top .docsmenu{display:none}
-@media (max-width:1099px){
-.frame{display:block;max-width:calc(760px + 2*var(--page-pad))}
-.frame>.docnav,.frame>.outline.rail{display:none}
+/* The landing has no rails: one centered column the page's width, footer included. */
+.frame:has(.hero){display:block}
+/* A page with no rail beside it (the changelog, the legal pages, a short doc) is one centered
+   text column, as on a narrow screen. */
+.frame:not(:has(.hero,>.docnav,>.outline.rail)){display:block;
+max-width:calc(760px + 2*var(--page-pad))}
+/* Two steps, so the text column never drops below about 700 px: the docs list folds into
+   the bar's Docs menu below 1280 px, the "On this page" rail into a menu below 1000 px. */
+@media (max-width:1279px){
+.frame{grid-template-columns:minmax(0,1fr) 208px}
+.frame>main,.frame>footer{grid-column:1}
+.frame>.outline.rail{grid-column:2}
+.frame>.docnav{display:none}
+.frame:not(:has(.hero,>.outline.rail)){display:block;max-width:calc(760px + 2*var(--page-pad))}
 .top .docsmenu{display:block}
-.top .docsmenu+a{display:none}
+.top .docsmenu+a{display:none}}
+@media (max-width:999px){
+.frame{display:block;max-width:calc(760px + 2*var(--page-pad))}
+.frame>.outline.rail{display:none}
 .menus{display:flex;margin:0 0 var(--space-4) calc(-1*var(--space-2))}
 .frame>main{padding-top:var(--space-4)}}
 
@@ -155,22 +147,22 @@ border:solid currentColor;border-width:0 1.5px 1.5px 0;transform:translateY(-2px
 .menu[open]>summary::after{transform:translateY(1px) rotate(-135deg)}
 .menu>summary:hover,.menu[open]>summary{color:var(--fg)}
 .top .docsmenu{position:static}
-.top .docsmenu>summary{margin:0 calc(-1*var(--space-2));font:500 14.5px/1 var(--sans);
+.top .docsmenu>summary{margin:0;padding:0;font:500 14.5px/1 var(--sans);
 text-transform:none;letter-spacing:0}
+.top .docsmenu>summary::after{display:none}
 .bar{position:relative}
 .top .docsmenu .pop{left:auto;right:var(--page-pad);top:calc(100% - var(--space-1))}
 .top .docsmenu .pop a{font-size:var(--text-sm);font-weight:var(--weight-regular)}
-.menu .pop,.outline-pop{position:absolute;left:0;top:calc(100% + var(--space-1));z-index:20;
+.menu .pop{position:absolute;left:0;top:calc(100% + var(--space-1));z-index:20;
 width:min(320px,calc(100vw - 2*var(--page-pad)));max-height:60vh;overflow:auto;
 padding:var(--space-2);background:var(--raised);border:var(--border);
 border-radius:var(--radius);box-shadow:var(--shadow-2);font-size:var(--text-sm)}
-.menu .pop a,.outline-pop a{display:block;padding:6px var(--space-3);border-radius:var(--radius);
+.menu .pop a{display:block;padding:6px var(--space-3);border-radius:var(--radius);
 color:var(--fg);text-decoration:none;overflow-wrap:anywhere}
 .menu .pop a[aria-current]{font-weight:var(--weight-semibold)}
-.menu .pop a:hover,.menu .pop a[aria-current],.outline-pop a:hover,.outline-pop a.on{
+.menu .pop a:hover,.menu .pop a[aria-current]{
 background:var(--hover)}
 .menu .pop h2{margin:var(--space-2) var(--space-3) var(--space-1)}
-.outline.menu .outlinebtn::before{content:none}
 
 /* Text. */
 pre,code{font-family:var(--mono);font-size:var(--text-sm)}
@@ -185,7 +177,8 @@ main th{border-bottom:1px solid var(--line-strong)}
 main th{font-weight:var(--weight-semibold);text-align:left}
 main tr:nth-child(2n){background:var(--soft)}
 main td code,main th code{overflow-wrap:normal;white-space:nowrap}
-main td:not(:has(> code:only-child))::before{content:'';display:block;width:16ch}
+/* Columns size to their content: a yes/no or send/action column sits tight, and a prose
+   column takes the rest and wraps. */
 main img,main svg{max-width:100%;height:auto}
 /* On a narrow screen a table reads as a list: each row a block, its first cell (the flag,
    key or route) on a line of its own and the rest under it, the header row left out. */
@@ -242,9 +235,18 @@ text-transform:uppercase;letter-spacing:.12em;color:var(--muted)}
 .hero h1{margin:0}
 .hero img{max-width:100%;height:auto}
 .hero .lead{margin:var(--space-4) 0 0;color:var(--fg)}
-.hero .overview img{display:block;width:100%;height:auto;margin-top:var(--space-8);
+.hero .overview img{display:block;width:100%;height:auto;
 border:var(--border);border-radius:var(--radius)}
-.demo{margin:var(--space-6) 0 0}
+/* Why beside the overview: the heading spans the row, so the picture starts on the line the
+   text starts on. The row takes the docs rail's room on the left, so the picture has space
+   to read. On a narrow screen the two stack, text first. */
+.why-row{display:grid;gap:0 var(--space-8);margin-top:var(--space-16);align-items:start}
+.why-row h2{margin-top:0}
+.why-row .overview{margin-top:var(--space-4)}
+@media (min-width:1000px){
+.why-row{grid-template-columns:minmax(0,5fr) minmax(0,7fr)}
+.why-row h2{grid-column:1/-1}
+.why-row .overview{margin-top:0}}
 .promises{padding-left:var(--space-6)}
 .more{color:var(--muted)}
 ul.lines{list-style:none;padding:0}
@@ -279,9 +281,8 @@ margin-bottom:-1px;border-bottom:1px solid var(--soft)}
 #install-curl:checked~#panel-curl,#install-brew:checked~#panel-brew{display:block}
 #install-cargo:checked~#panel-cargo{display:block}
 
-/* The footer: one labelled nav of quiet links under the text column, a docs page's source
-   link on the right. Small type at the muted ink, which holds AA on the page. Stacked on a
-   narrow screen, the source link last. */
+/* The footer: the project's links on the left, the legal pages on the right. Small type at
+   the muted ink, which holds AA on the page. Stacked on a narrow screen, legal last. */
 footer{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;
 gap:var(--space-2) var(--space-6);margin:var(--space-16) 0 0;
 padding:var(--space-4) 0 var(--space-16);border-top:var(--border);
@@ -289,7 +290,5 @@ font-size:var(--text-sm);color:var(--muted)}
 footer nav{display:flex;flex-wrap:wrap;gap:var(--space-2) var(--space-4)}
 footer a{color:var(--muted);text-decoration:none}
 footer a:hover{color:var(--fg);text-decoration:underline}
-footer .edit{margin-left:auto}
-@media (max-width:640px){footer{flex-direction:column;align-items:flex-start}
-footer .edit{margin-left:0}}
+@media (max-width:640px){footer{flex-direction:column;align-items:flex-start}}
 @media print{.top,.docnav,.outline,.menus,.pager{display:none!important}}

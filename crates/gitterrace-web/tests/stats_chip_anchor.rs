@@ -38,10 +38,10 @@ fn commits(page: &str) -> Option<String> {
 #[tokio::test(flavor = "multi_thread")]
 async fn a_chip_keeps_the_repository_week() {
     let (_root, r) = router();
-    let page = body(&r, "/stats?period=1w&author=bob%40y.io").await;
+    let page = body(&r, "/stats?q=author:bob%40y.io&period=1w").await;
     // The week is 14 to 20 March: Bob has nothing in it.
     assert!(page.contains("No commits match"), "{page}");
-    let page = body(&r, "/stats?period=1m&author=bob%40y.io").await;
+    let page = body(&r, "/stats?q=author:bob%40y.io&period=1m").await;
     // 30 days ending 20 March start on 20 February: both of Bob's commits.
     assert_eq!(commits(&page).as_deref(), Some("2"), "{page}");
     assert!(page.contains("2024-02-20 to 2024-03-20"), "{page}");

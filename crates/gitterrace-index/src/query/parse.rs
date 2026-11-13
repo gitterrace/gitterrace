@@ -29,7 +29,7 @@ pub(super) fn terms(text: &str) -> Result<Vec<Term>, QueryError> {
         if s.done() {
             return Ok(out);
         }
-        out.extend(s.term()?);
+        out.push(s.term()?);
     }
 }
 
@@ -100,8 +100,8 @@ impl Scan<'_> {
         }
     }
 
-    /// One term; `None` for a term that sets nothing (`period:all`).
-    fn term(&mut self) -> Result<Option<Term>, QueryError> {
+    /// One term.
+    fn term(&mut self) -> Result<Term, QueryError> {
         let start = self.at;
         let neg = self.peek() == Some('!');
         if neg {
@@ -117,10 +117,10 @@ impl Scan<'_> {
             }
             Some('"') => {
                 let text = self.quoted()?;
-                return Ok(Some(Term {
+                return Ok(Term {
                     neg,
                     leaf: Leaf::Text(text),
-                }));
+                });
             }
             None => return Err(self.err(start, "`!` needs a term after it".to_owned())),
             Some(c) if c.is_whitespace() => {
@@ -151,14 +151,14 @@ impl Scan<'_> {
             } else {
                 Leaf::Text(word.to_owned())
             };
-            return Ok(Some(Term { neg, leaf }));
+            return Ok(Term { neg, leaf });
         }
         self.bump();
         self.keyed(start, neg, word)
     }
 
     /// The value of `word:`, the colon just read.
-    fn keyed(&mut self, start: usize, neg: bool, word: &str) -> Result<Option<Term>, QueryError> {
+    fn keyed(&mut self, start: usize, neg: bool, word: &str) -> Result<Term, QueryError> {
         if let Some((_, why)) = UNSUPPORTED.iter().find(|(k, _)| *k == word) {
             return Err(self.err(start, format!("{why}.")));
         }
@@ -177,9 +177,9 @@ impl Scan<'_> {
                 }
                 Leaf::Path(v)
             }
-            "after" | "before" | "period" => {
+            "after" | "before" => {
                 let v = self.value(start)?;
-                let Some(b) = bound(&v, word == "period") else {
+                let Some(w) = bound(&v) else {
                     return Err(self.err(
                         start,
                         format!(
@@ -188,10 +188,10 @@ impl Scan<'_> {
                         ),
                     ));
                 };
-                match (word, b) {
-                    (_, Bound::None) => return Ok(None),
-                    ("before", Bound::At(w)) => Leaf::Before(w),
-                    (_, Bound::At(w)) => Leaf::After(w),
+                if word == "before" {
+                    Leaf::Before(w)
+                } else {
+                    Leaf::After(w)
                 }
             }
             _ => {
@@ -209,7 +209,7 @@ impl Scan<'_> {
                 ));
             }
         };
-        Ok(Some(Term { neg, leaf }))
+        Ok(Term { neg, leaf })
     }
 
     /// A comma list of values, at least one, none empty.
@@ -263,19 +263,11 @@ impl Scan<'_> {
     }
 }
 
-/// A date bound, or `period:all`, which bounds nothing.
-enum Bound {
-    At(When),
-    None,
-}
-
-/// The bound `v` names; `all` only where `all_ok`.
-fn bound(v: &str, all_ok: bool) -> Option<Bound> {
-    if let Some(p) = Period::parse(v) {
-        return match p {
-            Period::All => all_ok.then_some(Bound::None),
-            p => Some(Bound::At(When::Period(p))),
-        };
+/// The bound `v` names: a period other than `all`, or a day.
+fn bound(v: &str) -> Option<When> {
+    match Period::parse(v) {
+        Some(Period::All) => None,
+        Some(p) => Some(When::Period(p)),
+        None => crate::parse_day(v).map(When::Day),
     }
-    crate::parse_day(v).map(|d| Bound::At(When::Day(d)))
 }

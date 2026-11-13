@@ -1,5 +1,5 @@
-//! Screenshot checks: the README's PNG files and the site's WebP files exist, are linked and are
-//! the right size. Both live in `docs/screenshots/`, the one source; the site gets a copy.
+//! Screenshot checks: the WebP files exist and are the right size. They live in
+//! `docs/screenshots/`, the one source: the README links two of them, the site gets a copy.
 
 use std::path::Path;
 
@@ -13,37 +13,11 @@ pub(super) const SHOT_DIR: &str = "docs/screenshots";
 const FULL: (u32, u32) = (2560, 1600);
 const THUMB: (u32, u32) = (1280, 800);
 
-/// Checks the screenshots without copying them. `docs/screenshots/` holds exactly the PNG files
-/// README.md links, each 2560x1600, and a full-size WebP at 2560x1600 and a 1280x800 thumbnail
-/// for every entry in `SHOTS`. All of them come from
+/// Checks the screenshots without copying them. `docs/screenshots/` holds exactly a
+/// full-size WebP at 2560x1600 and a 1280x800 thumbnail for every entry in `SHOTS`, all from
 /// `make site-shots`; a missing, extra or wrongly sized file fails generation and names it.
 pub(super) fn check_shots(root: &Path) -> Result<()> {
-    let readme = std::fs::read_to_string(root.join("README.md")).context("reading README.md")?;
-    let pngs = readme_shots(&readme);
-    let all = list(root, SHOT_DIR, "make site-shots")?;
-    let (webps, have): (Vec<String>, Vec<String>) = all.into_iter().partition(|f| {
-        Path::new(f)
-            .extension()
-            .is_some_and(|e| e.eq_ignore_ascii_case("webp"))
-    });
-    if let Some(f) = pngs.iter().find(|f| !have.contains(f)) {
-        anyhow::bail!("{SHOT_DIR}/{f} is linked by README.md but does not exist (make site-shots)");
-    }
-    if let Some(f) = have.iter().find(|f| !pngs.contains(f)) {
-        anyhow::bail!(
-            "{SHOT_DIR}/{f} is not referenced by README.md: delete it (make site-shots keeps \
-            only the README's PNG files)"
-        );
-    }
-    for f in &pngs {
-        let got = shot_size(root, f)?;
-        anyhow::ensure!(
-            got == (2560, 1600),
-            "{SHOT_DIR}/{f} is {}x{}, the README needs 2560x1600 (make site-shots)",
-            got.0,
-            got.1
-        );
-    }
+    let have = list(root, SHOT_DIR, "make site-shots")?;
     let mut want: Vec<(String, (u32, u32))> = Vec::new();
     for (n, ..) in SHOTS {
         for c in ["light", "dark"] {
@@ -51,7 +25,6 @@ pub(super) fn check_shots(root: &Path) -> Result<()> {
             want.push((format!("{n}-{c}.thumb.webp"), THUMB));
         }
     }
-    let have = webps;
     if let Some((f, _)) = want.iter().find(|(f, _)| !have.contains(f)) {
         anyhow::bail!("{SHOT_DIR}/{f} is missing (make site-shots)");
     }
@@ -92,28 +65,6 @@ pub(super) fn site_shots(root: &Path) -> Result<Vec<Out>> {
     Ok(outs)
 }
 
-/// The `docs/screenshots/*.png` file names README.md links, sorted and deduplicated. The same
-/// rule as `scripts/release/site/site-shots-run.mjs`, which copies exactly these.
-pub(super) fn readme_shots(readme: &str) -> Vec<String> {
-    let key = "docs/screenshots/";
-    let mut v: Vec<String> = readme
-        .match_indices(key)
-        .filter_map(|(i, _)| {
-            let rest = &readme[i + key.len()..];
-            let end = rest
-                .find(|c: char| !(c.is_ascii_alphanumeric() || c == '-' || c == '_' || c == '.'))?;
-            let f = rest[..end].trim_end_matches('.');
-            Path::new(f)
-                .extension()
-                .is_some_and(|e| e.eq_ignore_ascii_case("png"))
-                .then(|| f.to_string())
-        })
-        .collect();
-    v.sort();
-    v.dedup();
-    v
-}
-
 /// The file names in `dir`, sorted. A missing folder names the target that fills it.
 fn list(root: &Path, dir: &str, fix: &str) -> Result<Vec<String>> {
     let mut v: Vec<String> = std::fs::read_dir(root.join(dir))
@@ -142,14 +93,4 @@ fn webp_size(b: &[u8]) -> Option<(u32, u32)> {
         b"VP8X" => Some((le24(24) + 1, le24(27) + 1)),
         _ => None,
     }
-}
-
-/// Width and height in pixels of a PNG, from its header.
-fn shot_size(root: &Path, file: &str) -> Result<(u32, u32)> {
-    let path = format!("{SHOT_DIR}/{file}");
-    let b = std::fs::read(root.join(&path)).with_context(|| format!("reading {path}"))?;
-    anyhow::ensure!(b.len() > 24 && &b[1..4] == b"PNG", "{path} is not a PNG");
-    let w = u32::from_be_bytes([b[16], b[17], b[18], b[19]]);
-    let h = u32::from_be_bytes([b[20], b[21], b[22], b[23]]);
-    Ok((w, h))
 }

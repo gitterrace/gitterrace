@@ -26,8 +26,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 bl = importlib.import_module("bench-lib")
 
-# Page, gate in ms. Languages is the absolute goal; hotspots and ownership hold the 1.5x of
-# the in-memory build they replaced (docs/benchmarks.md, "File pages on a large history").
+# Page, gate in ms. Languages is the absolute goal. Hotspots and ownership hold 1.5x the time
+# of building them in memory (docs/benchmarks.md, "Insights pages on a large history").
 GATES: dict[str, tuple[str, float]] = {
     "languages": ("/stats/languages", 66),
     "hotspots-all": ("/stats/hotspots?period=all", 230),

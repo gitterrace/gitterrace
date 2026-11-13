@@ -123,15 +123,3 @@ command = [
 ]
 stdin   = "json"
 vars    = { url = "https://example.test/hook" }
-
-# Writes a new note in an Obsidian vault. `vault` and `folder` pick where it lands.
-[[action]]
-id      = "obsidian-new"
-label   = "New Obsidian note"
-enabled = false
-kinds   = ["line", "commit"]
-command = [
-  "open",
-  "obsidian://new?vault={var.vault:url}&file={var.folder:url}%2F{title:url}&content={markdown:url}",
-]
-vars    = { vault = "Notes", folder = "Inbox" }

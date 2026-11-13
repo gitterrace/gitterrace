@@ -41,6 +41,8 @@ pub(crate) struct Seg {
     pub(crate) choices: Vec<Choice>,
     /// Buttons that switch panes in place instead of links that load a page.
     pub(crate) buttons: bool,
+    /// Radio group name. Set, the choices are radios and CSS shows the checked pane, no script.
+    pub(crate) panes: String,
 }
 
 impl Seg {
@@ -129,5 +131,22 @@ mod tests {
         // Every control carries the select it becomes when its row does not fit.
         assert!(s.contains("<option value=\"source\">Code</option>"));
         assert!(!s.contains("<a "));
+    }
+
+    #[test]
+    fn panes_are_radios_with_the_default_checked() {
+        let s = Seg {
+            name: "View".to_owned(),
+            panes: "view".to_owned(),
+            choices: vec![
+                Choice::new("Preview", "rendered", true),
+                Choice::new("Code", "source", false),
+            ],
+            ..Seg::default()
+        }
+        .to_string();
+        assert!(s.contains("<input type=\"radio\" name=\"view\" value=\"rendered\" checked>"));
+        assert!(s.contains("value=\"source\">Code</label>"));
+        assert!(!s.contains("<button"));
     }
 }

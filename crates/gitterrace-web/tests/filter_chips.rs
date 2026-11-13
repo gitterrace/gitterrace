@@ -26,7 +26,7 @@ async fn chip_labels_are_escaped_exactly_once() {
     );
 
     let router = gitterrace_web::app_router(&p).expect("router");
-    let page = "/stats/contributors?author=t%40x&path=a%26%3Cb%3E";
+    let page = "/stats/contributors?q=author:t%40x%20path:a%26%3Cb%3E";
     let body = gitterrace_testkit::wait::page_until(&router, page, |b| {
         b.contains("class=\"chip\"") && b.contains("Jerry")
     })

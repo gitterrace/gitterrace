@@ -30,8 +30,8 @@ stroke-width:1.5px}
 background:var(--bg);padding-left:2px}.gfold.w{display:block}
 .crow:hover .gfold{background:var(--soft)}
 .graph .xw,.graph .on{display:none}
-.gedge{display:none;position:absolute;right:0;width:5px;height:5px;border-radius:50%}
-.gedge{background:var(--muted)}.gedge.w{display:block}
+.gedge{display:none;position:absolute;right:0;width:5px;height:5px;border-radius:50%;
+  background:var(--muted)}.gedge.w{display:block}
 .grefs{display:inline-flex;align-self:center;align-items:center;gap:var(--space-1);flex:none;
 font:var(--text-2xs)/1 var(--mono)}
 .gref{padding:2px 5px;border:var(--border);border-radius:var(--radius);color:var(--muted)}

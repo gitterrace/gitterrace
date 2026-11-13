@@ -24,6 +24,47 @@
   });
 })();
 
+// gtFilter, the filter behind every "narrow this list" box: typing hides the items that do not
+// contain the text, an empty result shows a note, and the arrow keys walk the links that are
+// left. Used by the filter below.
+// gtFilter(input, { items, text, link, none, root, clear, count }) returns { shown, apply }.
+//   items  the elements to hide or show   text  item -> the string searched (default textContent)
+//   link   item -> its focusable link     none  the note shown when nothing matches
+//   root   where arrow keys are heard     clear Escape empties the box
+//   count  called with (shown, total) after every change
+(function () {
+  "use strict";
+  window.gtFilter = function (q, o) {
+    var items = o.items;
+    var text = o.text || function (el) { return el.textContent; };
+    var link = o.link || function (el) { return el.firstChild; };
+    function shown() { return items.filter(function (el) { return !el.hidden; }); }
+    function apply() {
+      var t = q.value.trim().toLowerCase();
+      items.forEach(function (el) {
+        el.hidden = t !== "" && text(el).toLowerCase().indexOf(t) < 0;
+      });
+      var n = shown().length;
+      if (o.none) o.none.hidden = n > 0;
+      if (o.count) o.count(n, items.length);
+    }
+    q.addEventListener("input", apply);
+    (o.root || q).addEventListener("keydown", function (e) {
+      if (e.key === "Escape") {
+        if (o.clear && q.value) { e.preventDefault(); q.value = ""; apply(); }
+        return;
+      }
+      if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
+      var list = shown().map(link), i = list.indexOf(document.activeElement);
+      if (!list.length) return;
+      e.preventDefault();
+      var n = e.key === "ArrowDown" ? i + 1 : i - 1;
+      if (n < 0) { q.focus(); } else { list[Math.min(n, list.length - 1)].focus(); }
+    });
+    return { shown: shown, apply: apply };
+  };
+})();
+
 // The filter above the list. Without this script the form submits ?q= and the server narrows
 // the list; with it the same box narrows in place: "/" focuses it, Enter opens the first match,
 // Escape clears it and the arrow keys walk the matches.

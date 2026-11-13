@@ -1,5 +1,7 @@
 {% extends "_base.html" %}
 {% block title %}Commits · {{ c.name }}{% endblock %}
+{% block head %}{% if !graph.is_empty() %}
+<link rel="stylesheet" href="{{ crate::asset_url("graph.css") }}">{% endif %}{% endblock %}
 {% block content %}
 {{ head }}
 {% include "_chips.html" %}

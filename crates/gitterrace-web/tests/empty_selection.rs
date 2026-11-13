@@ -25,7 +25,7 @@ async fn an_empty_selection_reads_as_empty_on_every_insights_page() {
         "/stats/languages",
         "/stats/contributors",
     ] {
-        let url = format!("{page}?author=nobody%40example.com");
+        let url = format!("{page}?q=author:nobody%40example.com");
         let (status, body) = get(&router, &url).await;
         assert_eq!(status, 200, "{url}");
         assert!(

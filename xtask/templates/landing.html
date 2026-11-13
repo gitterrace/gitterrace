@@ -1,6 +1,7 @@
-{#- The landing page body: the pitch, how to start, what it looks like and what it does
-with your code. Every sentence comes from docs/ or from the code; the long story lives on
-the Why page. The install tabs are radio inputs and CSS, so they need no script, and with
+{#- The landing page body: the pitch, why it exists, how to start, what it looks like and
+what it does with your code. Its prose comes from docs/landing.md, each sentence once, and
+the rest from the code. The bar holds the Demo link, so the page does not repeat it. The
+install tabs are radio inputs and CSS, so they need no script, and with
 CSS off every command still shows. A screenshot opens as a :target overlay, also without
 script; its full-size image is a decorative copy, so the description is read once. Light
 and dark are two lazy images, one hidden by the theme, so only the shown one loads. The
@@ -12,13 +13,14 @@ loading="lazy">
 <img class="on-dark" src="/assets/logo-dark.svg" alt="" width="540" height="120"
 loading="lazy"></h1>
 <p class="lead">{{ pitch }}</p>
-{%- if !demo.is_empty() %}
-<p class="demo"><a href="{{ demo }}">Try the live demo</a>, no install needed.</p>
-{%- endif %}
+<section class="why-row">
+<h2 id="why">Why</h2>
+<div class="story">{{ story|safe }}</div>
 <picture class="overview"><source media="(prefers-color-scheme: dark)"
 srcset="/assets/screenshots/{{ hero.0 }}-dark.webp">
 <img src="/assets/screenshots/{{ hero.0 }}-light.webp" alt="{{ hero.1 }}" width="1280"
 height="800" loading="eager" decoding="async"></picture>
+</section>
 </div>
 <section>
 <h2 id="install">Install</h2>
@@ -29,7 +31,7 @@ height="800" loading="eager" decoding="async"></picture>
 <label for="install-{{ i.0 }}" class="tab-label">{{ i.0 }}</label>
 {%- endfor %}
 {%- for i in install %}
-<div class="tab-panel" id="panel-{{ i.0 }}"><pre><code>{{ i.1 }}</code></pre></div>
+<div class="tab-panel" id="panel-{{ i.0 }}">{{ i.1|safe }}</div>
 {%- endfor %}
 </div>
 <p>Installs <code>{{ bin }}</code>; git runs it as <code>git terrace</code>.
@@ -37,7 +39,7 @@ height="800" loading="eager" decoding="async"></picture>
 </section>
 <section>
 <h2 id="quickstart">Quickstart</h2>
-<div data-from="docs/getting-started/"><pre><code>{{ quickstart }}</code></pre></div>
+<div data-from="docs/getting-started/">{{ quickstart|safe }}</div>
 <p class="more"><a href="/docs/getting-started/">Getting started</a> covers Windows,
 upgrading and troubleshooting. <a href="/docs/cli/">All commands</a>.</p>
 </section>
@@ -67,7 +69,7 @@ width="1280" height="800" loading="lazy" decoding="async"></span></a>
 </section>
 <section>
 <h2 id="your-code">What it does with your code</h2>
-<div data-from="docs/why/">{{ promises|safe }}</div>
-<p class="more"><a href="/docs/why/">Why we built it</a>, and how it
-compares with the tools you know.</p>
+<div>{{ promises|safe }}</div>
+<p class="more"><a href="/docs/why/#compared-with">How it compares</a> with the
+tools you know.</p>
 </section>

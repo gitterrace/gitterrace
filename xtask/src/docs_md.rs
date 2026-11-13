@@ -243,7 +243,9 @@ fn send() -> String {
     s
 }
 
-/// The fixed run limits of the Security list, from the runner and loader constants.
+/// The whole Security list of the actions page: the file and field rules, then the fixed run
+/// limits from the runner and loader constants. One generated list, so the page never shows
+/// a hand list and a generated one as two lists.
 fn limits() -> String {
     use gitterrace_actions::config::MAX_TIMEOUT;
     use gitterrace_actions::runner::{MAX_RUNNING, PER_MINUTE};
@@ -252,6 +254,14 @@ fn limits() -> String {
         .find(|k| k.id == "limits.action_output_kb")
         .map_or_else(String::new, |k| k.default.clone());
     let items = [
+        "The file must be a regular file outside every served repository. On Unix it and its \
+         folder must also be owned by you and not writable by group or others. Windows checks \
+         neither and relies on the profile folder's ACLs (see [Windows](#windows)). Actions are \
+         off on a public server, on a non-loopback bind and with `--no-actions`, and never \
+         offered to MCP."
+            .to_owned(),
+        "Every field is untrusted repository text. In a script, quote it and never `eval` it."
+            .to_owned(),
         format!(
             "No shell between gitterrace and the program: a placeholder is one argument, never \
              parsed. Scrubbed environment, timeout, at most {MAX_RUNNING} runs at once, \
@@ -357,7 +367,7 @@ mod tests {
         ("payload", 154),
         ("scripts", 322),
         ("cache", 165),
-        ("routes", 357),
+        ("routes", 270),
     ];
     use crate::facts;
     use crate::out::Out;

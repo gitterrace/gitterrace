@@ -1,7 +1,7 @@
-# the header draws the outlined wordmark as inline SVG; no other byte moves
-37b06ba5fdd75198090a2c1bedaf92a7 cd5810486e9495ae5662c900b72f3939 [symbols] /blob/HEAD/cmd/serve.go
-64400a4834204bef10b2c3b667378cbf 48c687f5289acd231fce1d6551945b63 [symbols] /blob/HEAD/src/shapes.rs
-8157ddaf38ba7f02735465ed3b51832b 8157ddaf38ba7f02735465ed3b51832b [symbols] /blob/HEAD/src/two.rs
-1135b86ce10cc53fb9caa31364dab8f5 cd8cde6cedaa0c2ba017bc87204f4e45 [symbols] /blob/HEAD/tools/report.py
-3aaf9a02d8a9b45d98215f2cf13ec87e 9af1080bc29608824616702f4df3cda6 [symbols] /blob/HEAD/web/store.ts
-c087d033e04a2d94d4826f5aa49f0315 53fa9a0190ee01799c01967d8c13e7a9 [symbols] /blob/HEAD/web/view.js
+# asset URLs read as ?v=_ and the header markup moved; no symbol moves
+d2f014c274745c41996da82991963278 3ba8e7cff0ec6cab3477f2fd8ce347c8 [symbols] /blob/HEAD/cmd/serve.go
+e60142927f807aadfceceb16a6ba8868 f478ce39ed9b7dfecaa6dbdd59b2c058 [symbols] /blob/HEAD/src/shapes.rs
+cc188c9cc64c6cfd57d0122fef99fc4d cc188c9cc64c6cfd57d0122fef99fc4d [symbols] /blob/HEAD/src/two.rs
+d4d91669f83442aa8fe8aae49e73e0ca 728013c0ae2daddc239255ef6e19c39e [symbols] /blob/HEAD/tools/report.py
+e48e8049b55db1d6cb7021772e3b3702 9e2894b0b2e591ca6a275e1f28f5f93a [symbols] /blob/HEAD/web/store.ts
+ebe1931f9fabb69cff54abd3f6414621 0ce4e68d7b4bdaa05d0de943615f1efd [symbols] /blob/HEAD/web/view.js

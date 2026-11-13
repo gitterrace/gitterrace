@@ -8,45 +8,6 @@ use crate::export::{links, mark_snapshot, mark_snapshot_as, target};
 const DEFAULT_PAGES: Option<usize> = None;
 
 #[test]
-fn headers_file_carries_the_page_policy() {
-    let h = super::headers_file();
-    assert!(h.contains("font-src 'self' data:"), "{h}");
-    assert!(
-        !gitterrace_web::PAGE_CSP.contains("font-src"),
-        "the served app takes no data: fonts"
-    );
-    assert!(!h.contains("script-src 'self' 'unsafe-inline'"));
-}
-
-/// A published export revalidates its pages like the server does, and the page rule stays off
-/// `/*`, where a host would merge it into the static lifetime.
-#[test]
-fn headers_file_revalidates_pages_but_not_static() {
-    let h = super::headers_file();
-    for rule in ["/\n", "/r/*\n"] {
-        let at = h
-            .find(&format!("\n{rule}"))
-            .unwrap_or_else(|| panic!("{rule:?} in {h}"));
-        let block = h[at + 1..].split("\n\n").next().unwrap_or_default();
-        assert!(block.contains("Cache-Control: no-cache"), "{block}");
-    }
-    let top = h.split("\n\n").next().unwrap_or_default();
-    assert!(!top.contains("Cache-Control"), "{top}");
-}
-
-/// Guard class: a static host (Cloudflare, Netlify) takes one `*` per rule and ignores a
-/// rule with two, so a raw file would lose its sandbox. Every rule path has at most one.
-#[test]
-fn every_header_rule_has_at_most_one_splat() {
-    let h = super::headers_file();
-    let rules: Vec<&str> = h.lines().filter(|l| l.starts_with('/')).collect();
-    assert!(rules.iter().any(|r| r.contains("/raw/")), "{h}");
-    for r in rules {
-        assert!(r.matches('*').count() <= 1, "{r} has more than one *");
-    }
-}
-
-#[test]
 fn encoded_names_round_trip_to_real_file_names() {
     let html =
         r#"<a href="/blob/HEAD/docs/a%20b%23c.md">x</a><a href="/blob/HEAD/%C3%BCber.md">y</a>"#;

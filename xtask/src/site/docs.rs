@@ -219,24 +219,29 @@ pub(super) fn body(
 }
 
 /// `events` with each fenced `mermaid` block drawn as an inline SVG, numbered in page order so
-/// two diagrams on one page keep their ids apart. A block the site cannot draw is an error.
+/// two diagrams on one page keep their ids apart, and each other fence in a language the app
+/// highlights coloured with its `s-*` classes. A block the site cannot draw is an error.
 fn diagrams<'a>(events: Vec<Event<'a>>, from: &str) -> Result<Vec<Event<'a>>> {
     let mut out = Vec::with_capacity(events.len());
-    let mut src: Option<String> = None;
+    let mut src: Option<(String, String)> = None;
     let mut n = 0;
     for ev in events {
         match (&mut src, ev) {
             (None, Event::Start(Tag::CodeBlock(CodeBlockKind::Fenced(lang))))
-                if lang.as_ref() == "mermaid" =>
+                if !lang.is_empty() && lang.as_ref() != "text" =>
             {
-                src = Some(String::new());
+                src = Some((lang.to_string(), String::new()));
             }
-            (Some(text), Event::Text(t)) => text.push_str(&t),
-            (Some(text), Event::End(TagEnd::CodeBlock)) => {
+            (Some((_, text)), Event::Text(t)) => text.push_str(&t),
+            (Some((lang, text)), Event::End(TagEnd::CodeBlock)) if lang == "mermaid" => {
                 n += 1;
                 let svg = diagram::svg(text, &format!("diagram-{n}"), "How the crates depend")
                     .with_context(|| format!("{from}: diagram {n}"))?;
                 out.push(Event::Html(CowStr::from(svg)));
+                src = None;
+            }
+            (Some((lang, text)), Event::End(TagEnd::CodeBlock)) => {
+                out.push(Event::Html(CowStr::from(code_block(text, lang))));
                 src = None;
             }
             (Some(_), _) => {}
@@ -244,6 +249,32 @@ fn diagrams<'a>(events: Vec<Event<'a>>, from: &str) -> Result<Vec<Event<'a>>> {
         }
     }
     Ok(out)
+}
+
+/// `code` as a `<pre>` block, highlighted when the app knows `lang` and escaped plain otherwise.
+pub(super) fn code_block(code: &str, lang: &str) -> String {
+    const MOST: usize = 64 * 1024;
+    let lang = lang.split_whitespace().next().unwrap_or("");
+    let body = gitterrace_web::highlight_block(code, lang, MOST).unwrap_or_else(|| esc(code));
+    format!(
+        "<pre><code class=\"language-{}\">{body}</code></pre>\n",
+        esc(lang)
+    )
+}
+
+/// `text` escaped for HTML text and attribute values.
+fn esc(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    for c in text.chars() {
+        match c {
+            '&' => out.push_str("&amp;"),
+            '<' => out.push_str("&lt;"),
+            '>' => out.push_str("&gt;"),
+            '"' => out.push_str("&quot;"),
+            c => out.push(c),
+        }
+    }
+    out
 }
 
 /// The site's lines at most `WIDTH` wide where a space allows: a line is broken at the last
@@ -503,5 +534,36 @@ pub(super) fn sentence(what: &str) -> String {
         what
     } else {
         format!("{what}.")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Fences in a language the app highlights come out with its `s-*` spans and a language class;
+    /// `text` and unknown fences stay plain and escaped.
+    #[test]
+    fn known_fences_are_highlighted_and_text_stays_plain() {
+        let links = Links::new("https://r");
+        let text = "```toml\n[x]\nname = \"a\"\n```\n\n\
+                    ```bash\nif true; then echo \"a\"; fi\n```\n\n\
+                    ```text\nname = \"a\" <b>\n```\n";
+        let html = body(text, "docs/x.md", &links, &mut |_, h| slug(h)).expect("body");
+        let blocks: Vec<&str> = html.split("<pre>").skip(1).collect();
+        assert_eq!(blocks.len(), 3, "{html}");
+        assert!(
+            blocks[0].starts_with("<code class=\"language-toml\">"),
+            "{html}"
+        );
+        assert!(blocks[0].contains("class=\"s-"), "{html}");
+        assert!(
+            blocks[1].starts_with("<code class=\"language-bash\">"),
+            "{html}"
+        );
+        assert!(blocks[1].contains("class=\"s-"), "{html}");
+        assert!(!blocks[2].contains("s-"), "{html}");
+        assert!(blocks[2].contains("&lt;b&gt;"), "{html}");
+        assert!(!html.contains("style="), "{html}");
     }
 }

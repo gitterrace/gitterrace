@@ -4,4 +4,4 @@
 {{ head }}
 {{ body }}
 {% endblock %}
-{% block scripts %}<script src="/static/loc.js" defer></script>{% endblock %}
+{% block scripts %}<script src="{{ crate::asset_url("loc.js") }}" defer></script>{% endblock %}

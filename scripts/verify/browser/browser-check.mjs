@@ -38,6 +38,8 @@
 //   gutter       in a 250-line file (three chunks) every line's gutter number equals its line,
 //                read from the CSS counter itself, with the selection trigger shown; and the
 //                Send to window opens small and grows with its text
+//   overlay-native  t, ? and Send to open a modal <dialog>; b and . open a [popover]
+//   paned-nojs   with scripts off, Code and Preview switch the README panes
 //   tips         closing ., .+s, t, ? or b with Escape leaves no tip on the opener they hand
 //                focus back to, while Tab onto a tipped button still shows its tip
 //   sticky-line  scrolled past its top, each view's head (overview README, Markdown preview and
@@ -71,14 +73,15 @@
 //                light, dark, the choice survives a reload, the shown logo and screenshots are
 //                the theme's and the other scheme's are never fetched, no CSP violation, and each
 //                theme icon is the source-link mark's size
-//   site-bar     every page of the built site, 404 included, at 390 and 1440 px in light
-//                and dark: one bar right after the skip link, dark with light text in both
-//                schemes, Docs, the source link and the theme button in view, no sideways
-//                scroll
-//   site-rail    the docs pages: at 1440 px a page with three or more h2 shows the "On this
+//   site-bar     every page of the built site, 404 included, at 390, 1100 and 1440 px in
+//                light and dark: one bar right after the skip link, dark with light text in
+//                both schemes, Docs, the source link and the theme button in view, no sideways
+//                scroll, main centered on a page with no rail beside it
+//   site-rail    the docs pages: from 1000 px a page with three or more h2 shows the "On this
 //                page" rail beside the text (11 px mono label with a hairline, 2 px rail) and
-//                scrolling to a heading marks its item alone in the accent; at 390 px and on
-//                shorter pages no rail
+//                scrolling to a heading marks its item alone in the accent; the docs list
+//                shows from 1280 px, the Docs menu below; at 390 px and on shorter pages no
+//                rail
 //   doc-menus    docs pages at 390 px: one Docs control, menus clear of the h1, keyboard
 //   bar-steady   top bar items keep their boxes across pages, widths, menu, hover, focus, theme
 //   site-tables  every table on every site page, at 390 and 1440 px: no cell text wraps inside a
@@ -209,7 +212,7 @@ const bin = resolve(arg('--bin', join(root, 'target/debug/git-terrace')));
 const fromDisk = process.argv.includes('--from-disk');
 const tabCounts = arg('--tabs', '8,12').split(',').map(Number);
 const browsers = arg('--browsers', 'webkit,chromium').split(',');
-const ALL = ['truncation', 'live-tabs', 'mermaid', 'chip', 'doctabs', 'chords', 'header', 'marked', 'menu-same', 'menu-keys', 'gutter', 'overlays', 'tips', 'date-tips', 'repo-switch', 'outline', 'mark-seam', 'about-place', 'site-theme', 'install-tabs', 'site-bar', 'site-rail', 'site-tables', 'doc-menus', 'bar-steady', 'side-width', 'calm-header', 'header-theme', 'tabs-one-line', 'tab-levels', 'huge-diff', 'sticky-heads', 'md-anchor', 'live-scroll', 'live-read', 'sticky-line', 'seg-one-row', 'period-steady', 'period-click', 'export-from-disk', 'inline-controls', 'section-gaps', 'path-cells', 'mark-flat', 'tab-stops', 'help-keys', 'side-order', 'settings', 'lone-rows', 'page-heads', 'crumb-flow', 'compare-head', 'commit-head', 'search-head', 'small-layout', 'send-dialog', 'keyboard-walk', 'reflow', 'text-spacing', 'targets', 'keys-off', 'axe-all', 'forced-colors', 'reduced-motion', 'outline-menu', 'avatar-fit', 'graph-view', 'layout-shift', 'head-align', 'symbols', 'outline-current', 'no-sideways-scroll', 'head-fits', 'repos-filter', 'log-filter', 'log-filter-help', 'home-live', 'row-overlap', 'blame-fit', 'inset-balance', 'anatomy', 'popup-place', 'buttons', 'line-hover'];
+const ALL = ['truncation', 'live-tabs', 'mermaid', 'chip', 'doctabs', 'chords', 'header', 'marked', 'menu-same', 'menu-keys', 'gutter', 'overlays', 'overlay-native', 'paned-nojs', 'tips', 'date-tips', 'repo-switch', 'outline', 'mark-seam', 'about-place', 'site-theme', 'install-tabs', 'site-bar', 'site-rail', 'site-tables', 'doc-menus', 'bar-steady', 'side-width', 'calm-header', 'header-theme', 'tabs-one-line', 'tab-levels', 'huge-diff', 'sticky-heads', 'md-anchor', 'live-scroll', 'live-read', 'sticky-line', 'seg-one-row', 'period-steady', 'period-click', 'export-from-disk', 'inline-controls', 'section-gaps', 'path-cells', 'mark-flat', 'tab-stops', 'help-keys', 'side-order', 'settings', 'lone-rows', 'page-heads', 'crumb-flow', 'compare-head', 'commit-head', 'search-head', 'small-layout', 'send-dialog', 'keyboard-walk', 'reflow', 'text-spacing', 'targets', 'keys-off', 'axe-all', 'forced-colors', 'reduced-motion', 'outline-menu', 'avatar-fit', 'graph-view', 'layout-shift', 'head-align', 'symbols', 'outline-current', 'no-sideways-scroll', 'head-fits', 'repos-filter', 'log-filter', 'log-filter-help', 'home-live', 'row-overlap', 'blame-fit', 'inset-balance', 'anatomy', 'popup-place', 'buttons', 'line-hover'];
 const wanted = arg('--checks', ALL.join(',')).split(',');
 for (const c of wanted) if (!ALL.includes(c)) { console.error(`unknown check ${c}; known: ${ALL.join(', ')}`); process.exit(2); }
 
@@ -287,14 +290,14 @@ const { noSidewaysScroll, headFits } = fitChecks(env);
 const { checks: overlapChecks } = await import('./overlap-lib.mjs');
 const { rowOverlap } = overlapChecks(env);
 const { checks: popupChecks } = await import('./popup-lib.mjs');
-const { popupPlace } = popupChecks(env);
+const { popupPlace, overlayNative, panedNoJs } = popupChecks(env);
 const { checks: blameChecks } = await import('./blame-lib.mjs');
 const { blameFit } = blameChecks(env);
 const { insetBalance } = (await import('./inset-lib.mjs')).checks(env);
 const { buttons } = (await import('./buttons-lib.mjs')).checks(env);
 const { lineHover } = (await import('./linehover-lib.mjs')).checks(env);
 
-const checks = {'sticky-heads': stickyHeads, 'tabs-one-line': tabsOneLine, 'tab-levels': tabLevels, 'calm-header': calmHeader, 'side-width': sideWidth, truncation, 'live-tabs': liveTabs, mermaid, chip, doctabs, chords, header, marked, 'menu-same': menuSame, 'menu-keys': menuKeys, gutter, overlays, tips, 'date-tips': dateTips, 'repo-switch': repoSwitch, outline, 'mark-seam': markSeam, 'about-place': aboutPlace, 'site-theme': siteTheme, 'install-tabs': installTabs, 'site-bar': siteBar, 'site-rail': siteRail, 'site-tables': siteTables, 'doc-menus': docMenus, 'bar-steady': barSteady, 'header-theme': headerTheme, 'huge-diff': hugeDiff, 'md-anchor': mdAnchor, 'live-scroll': liveScroll, 'live-read': liveRead, 'sticky-line': stickyLine, 'seg-one-row': segOneRow, 'period-steady': periodSteady, 'period-click': periodClick, 'export-from-disk': exportFromDisk, 'inline-controls': inlineControls, 'section-gaps': sectionGaps, 'path-cells': pathCells, 'mark-flat': markFlat, 'tab-stops': tabStops, 'help-keys': helpKeys, 'side-order': sideOrder, settings, 'lone-rows': loneRows, 'page-heads': pageHeads, 'crumb-flow': crumbHeads, 'compare-head': compareHeads, 'commit-head': commitHeads, 'search-head': searchHeads, 'small-layout': smallLayout, 'send-dialog': sendDialog, 'keyboard-walk': keyboardWalk, reflow, 'text-spacing': textSpacing, targets, 'keys-off': keysOff, 'axe-all': axeAll, 'forced-colors': forcedColors, 'reduced-motion': reducedMotion, 'outline-menu': outlineMenu, 'graph-view': graphView, 'avatar-fit': avatarFit, 'layout-shift': layoutShift, 'head-align': headAlign, symbols, 'outline-current': outlineCurrent, 'no-sideways-scroll': noSidewaysScroll, 'head-fits': headFits, 'repos-filter': reposFilter, 'log-filter': logFilter, 'log-filter-help': logFilterHelp, 'home-live': homeLive, 'row-overlap': rowOverlap, 'blame-fit': blameFit, 'inset-balance': insetBalance, 'popup-place': popupPlace, anatomy, buttons, 'line-hover': lineHover};
+const checks = {'sticky-heads': stickyHeads, 'tabs-one-line': tabsOneLine, 'tab-levels': tabLevels, 'calm-header': calmHeader, 'side-width': sideWidth, truncation, 'live-tabs': liveTabs, mermaid, chip, doctabs, chords, header, marked, 'menu-same': menuSame, 'menu-keys': menuKeys, gutter, overlays, 'overlay-native': overlayNative, 'paned-nojs': panedNoJs, tips, 'date-tips': dateTips, 'repo-switch': repoSwitch, outline, 'mark-seam': markSeam, 'about-place': aboutPlace, 'site-theme': siteTheme, 'install-tabs': installTabs, 'site-bar': siteBar, 'site-rail': siteRail, 'site-tables': siteTables, 'doc-menus': docMenus, 'bar-steady': barSteady, 'header-theme': headerTheme, 'huge-diff': hugeDiff, 'md-anchor': mdAnchor, 'live-scroll': liveScroll, 'live-read': liveRead, 'sticky-line': stickyLine, 'seg-one-row': segOneRow, 'period-steady': periodSteady, 'period-click': periodClick, 'export-from-disk': exportFromDisk, 'inline-controls': inlineControls, 'section-gaps': sectionGaps, 'path-cells': pathCells, 'mark-flat': markFlat, 'tab-stops': tabStops, 'help-keys': helpKeys, 'side-order': sideOrder, settings, 'lone-rows': loneRows, 'page-heads': pageHeads, 'crumb-flow': crumbHeads, 'compare-head': compareHeads, 'commit-head': commitHeads, 'search-head': searchHeads, 'small-layout': smallLayout, 'send-dialog': sendDialog, 'keyboard-walk': keyboardWalk, reflow, 'text-spacing': textSpacing, targets, 'keys-off': keysOff, 'axe-all': axeAll, 'forced-colors': forcedColors, 'reduced-motion': reducedMotion, 'outline-menu': outlineMenu, 'graph-view': graphView, 'avatar-fit': avatarFit, 'layout-shift': layoutShift, 'head-align': headAlign, symbols, 'outline-current': outlineCurrent, 'no-sideways-scroll': noSidewaysScroll, 'head-fits': headFits, 'repos-filter': reposFilter, 'log-filter': logFilter, 'log-filter-help': logFilterHelp, 'home-live': homeLive, 'row-overlap': rowOverlap, 'blame-fit': blameFit, 'inset-balance': insetBalance, 'popup-place': popupPlace, anatomy, buttons, 'line-hover': lineHover};
 try {
   for (const c of wanted) { console.log(`-- ${c}`); await checks[c](); }
 } finally {

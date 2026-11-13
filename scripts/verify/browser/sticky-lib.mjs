@@ -85,7 +85,8 @@ export function checks({ pw, dir, srv, r, browsers, context }) {
           const btn = h.querySelector('summary.outlinebtn');
           let inBar = true;
           if (btn) { const s = btn.getBoundingClientRect(); inBar = s.top >= hr.top && s.bottom <= hr.bottom - 1 && s.right <= hr.right; }
-          const code = document.querySelector('[data-pane=source]:not([hidden])');
+          const code = [...document.querySelectorAll('[data-pane=source]')]
+            .find((e) => e.checkVisibility());
           const mainBox = document.querySelector('main').getBoundingClientRect();
           const mainPad = parseFloat(getComputedStyle(document.querySelector('main')).paddingLeft) * 2;
           return { top: hr.top,

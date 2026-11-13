@@ -99,29 +99,43 @@ mod tests {
         assert_eq!(v["bus_factor"], 1);
     }
 
-    /// `q` and the older keys say one thing: every insight answers the same JSON, the `query`
-    /// echo included, however the filter was written.
+    /// `period` and `q` say one thing: every insight answers the same JSON, the `query` echo
+    /// included, however the window was written.
     #[tokio::test]
-    async fn q_and_the_older_keys_give_equal_insights() {
+    async fn the_period_and_q_give_equal_insights() {
         let (_d, s) = fixture();
         let names = crate::insights::list().map(|(n, _)| n);
         for name in names {
-            for (old, new) in [
-                ("period=1m", "q=after:1m"),
-                ("type=fix", "q=type:fix"),
-                ("path=src&author=a@b.c", "q=author:a@b.c%20path:src"),
-                ("period=1w&type=feat", "q=type:feat%20period:1w"),
-            ] {
-                let (st, a) = get(&s, &format!("/insights/{name}?{old}")).await;
-                assert_eq!(st, StatusCode::OK, "{name} {old}: {a}");
-                let (_, b) = get(&s, &format!("/insights/{name}?{new}")).await;
-                assert_eq!(a, b, "{name}: {old} vs {new}");
-            }
+            let (st, a) = get(&s, &format!("/insights/{name}?period=1m")).await;
+            assert_eq!(st, StatusCode::OK, "{name}: {a}");
+            let (_, b) = get(&s, &format!("/insights/{name}?q=after:1m")).await;
+            assert_eq!(a, b, "{name}");
         }
-        let (_, v) = get(&s, "/insights/summary?period=1m&type=fix").await;
+        let (_, v) = get(&s, "/insights/summary?period=1m&q=type:fix").await;
         assert_eq!(v["query"], "after:1m type:fix");
         let (st, v) = get(&s, "/insights/summary?q=nope:x").await;
         assert_eq!(st, StatusCode::BAD_REQUEST, "{v}");
+    }
+
+    /// The one-key forms are no parameters: a request that names one is a 400 naming it, never
+    /// unfiltered numbers. Red while they were read as terms of `q`.
+    #[tokio::test]
+    async fn one_key_params_are_refused() {
+        let (_d, s) = fixture();
+        for uri in [
+            "/insights/summary?type=fix",
+            "/insights/hotspots?q=type:fix&path=src",
+            "/contributors?author=a@b.c",
+            "/insights/activity?scope=web",
+            "/repo?author=a",
+        ] {
+            let (st, v) = get(&s, uri).await;
+            assert_eq!(st, StatusCode::BAD_REQUEST, "{uri}: {v}");
+            assert!(v.to_string().contains("unknown parameter"), "{uri}: {v}");
+        }
+        // Every listed parameter still passes, `path` where the endpoint lists it.
+        let (st, v) = get(&s, "/log?path=src&page=1&per_page=5").await;
+        assert_eq!(st, StatusCode::OK, "{v}");
     }
 
     #[tokio::test]

@@ -57,6 +57,7 @@ then read [why](why.md) it exists. Contributors start at
 | [AGENTS](../AGENTS.md) | Crate layout and code conventions |
 | [SECURITY](../SECURITY.md) | Reporting a vulnerability, and what is in scope |
 | [CHANGELOG](../CHANGELOG.md) | Changes per release, written from the commits |
-| [README](screenshots/README.md) | Every screenshot, in both color schemes, with the tree it shows |
+| [landing](landing.md) | The words on the landing page, each sentence once |
+| [screenshots](screenshots/README.md) | Every screenshot, in both color schemes, with the tree it shows |
 
 <!-- END GENERATED: doc-index -->

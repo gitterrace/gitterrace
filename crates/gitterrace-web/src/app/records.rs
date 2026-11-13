@@ -84,11 +84,17 @@ impl App {
                     }
                     return Ok(None);
                 }
-                None => {}
+                None => {
+                    // Ready, the format ours, and no set: the cache was emptied or moved from
+                    // outside. Left as is, the progress endpoint says ready while every page
+                    // shows the indexing page, and a waiting page reloads forever.
+                    tracing::warn!("cache gone while ready, rebuilding");
+                    self.unreadable_now()?;
+                    return Ok(None);
+                }
             }
         }
-        // Ready but no set holds or reaches it: a newer build owns the cache, or the set is
-        // being rebuilt. The indexing page, never data from anywhere else.
+        // A newer build owns the cache. The indexing page, never data from anywhere else.
         Ok(None)
     }
 

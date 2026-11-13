@@ -147,7 +147,7 @@ pub(crate) enum Owner {
 /// The top bar's tools a `[features]` switch can take away.
 #[derive(Clone, Copy)]
 pub(crate) struct Tools {
-    /// `features.search_enabled`: the search box and its button.
+    /// `features.search_enabled`: the search button and the field it opens.
     pub(crate) search: bool,
     /// `features.picker_enabled`: the repository switcher.
     pub(crate) picker: bool,

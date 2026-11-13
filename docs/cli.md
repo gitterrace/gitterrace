@@ -11,7 +11,7 @@ print the same text. The global flags work on every command.
 
 Browse a git repository in your browser, offline.
 
-```text
+```sh
 git terrace [OPTIONS] [PATHS]... [COMMAND]
 ```
 
@@ -34,7 +34,7 @@ git terrace [OPTIONS] [PATHS]... [COMMAND]
 
 Serve the repository in the browser (the default).
 
-```text
+```sh
 git terrace serve [OPTIONS] [PATHS]...
 ```
 
@@ -42,7 +42,7 @@ git terrace serve [OPTIONS] [PATHS]...
 
 Print the effective configuration and where each value comes from.
 
-```text
+```sh
 git terrace config [OPTIONS] [PATHS]...
 ```
 
@@ -54,7 +54,7 @@ Reads the repositories the paths name (folders are searched as for `serve`).
 With `--served` it also reads every repository served before, such as those of a
 running server. Tools then take a `repo` name from `list_repos`.
 
-```text
+```sh
 git terrace mcp [OPTIONS] [PATHS]...
 ```
 
@@ -69,7 +69,7 @@ needed.
 The clone is found among repositories served before and under `links.roots`. An
 unknown repository exits 2, with no clone and no network.
 
-```text
+```sh
 git terrace open [OPTIONS] <LINK> [PATHS]...
 ```
 
@@ -85,7 +85,7 @@ The opposite of serving a repository while a server already runs: the server on
 `server.addr` is found and checked the same way. The on-disk index stays, so
 serving it again is fast. The last repository stays served.
 
-```text
+```sh
 git terrace remove [OPTIONS] [TARGET] [PATHS]...
 ```
 
@@ -100,7 +100,7 @@ handler.
 Opt-in. macOS writes `~/Applications/gitterrace-open.app`, Linux a `.desktop`
 file, and WSL and Windows only print the steps. It prints exactly what it wrote.
 
-```text
+```sh
 git terrace install-handler [OPTIONS] [PATHS]...
 ```
 
@@ -116,7 +116,7 @@ folder.
 own settings start switched off. An existing file is kept as it is. To start
 over, move the file away and run this again.
 
-```text
+```sh
 git terrace init [OPTIONS] [PATHS]...
 ```
 
@@ -124,7 +124,7 @@ git terrace init [OPTIONS] [PATHS]...
 
 Write a static copy of the site to a folder, for sharing or hosting.
 
-```text
+```sh
 git terrace export [OPTIONS] [OUT] [PATHS]...
 ```
 
@@ -132,8 +132,8 @@ git terrace export [OPTIONS] [OUT] [PATHS]...
   `./gitterrace-export`. Give it first, before any repositories:
   `export site repo1 repo2`. A folder an earlier export made is replaced whole.
   Any other non-empty folder is refused without `--force`, and so are a symlink
-  and a folder holding a repository being exported. A folder an older version
-  exported records no ownership and is refused: remove it and export again.
+  and a folder holding a repository being exported. An export folder that
+  records no ownership is refused: remove it and export again.
 - `--force`: Write into a non-empty folder that no earlier export made. Its
   files are kept, a file in the site's way is replaced, a folder in its way
   fails the export. Later exports replace only what an export put there.

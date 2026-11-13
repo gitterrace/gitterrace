@@ -5,6 +5,7 @@
 
 use askama::Template;
 
+use crate::site::bar::DOCS_ICON;
 use crate::site::frame::pack;
 
 /// One docs page in the list. `current` is the attribute that marks the page shown, fixed
@@ -22,6 +23,8 @@ struct Item<'a> {
 #[template(path = "docnav.html")]
 struct Nav<'a> {
     part: &'a str,
+    /// The Docs icon on the menu's summary, as the bar's Docs link draws it.
+    docs_icon: &'a str,
     docs: Vec<Item<'a>>,
     heads: &'a [(String, String)],
     /// (site path, title), empty for none.
@@ -73,6 +76,7 @@ pub(super) fn nav(
     let render = |part: &str| {
         let html = Nav {
             part,
+            docs_icon: DOCS_ICON,
             docs: docs.clone(),
             heads,
             prev: prev.unwrap_or(("", "")),
@@ -127,7 +131,12 @@ mod tests {
         assert!(n.menus.is_empty(), "{}", n.menus);
         assert!(
             n.menu
-                .starts_with("<details class=\"menu docsmenu\"><summary>Docs</summary>")
+                .starts_with("<details class=\"menu docsmenu\"><summary>")
+        );
+        let summary = n.menu.split("</summary>").next().unwrap_or_default();
+        assert!(
+            summary.contains("<span>Docs</span>") && summary.contains("M12 6.5C10.5"),
+            "the menu draws the Docs link's icon and word: {summary}"
         );
         assert_eq!(n.menu.matches("<li>").count(), 3, "{}", n.menu);
     }

@@ -5,18 +5,6 @@
   var HERE = document.currentScript ? document.currentScript.src : location.href;
   var root = document.documentElement;
   function base() { var m = document.querySelector('meta[name="gt-base"]'); return m ? m.content : ""; }
-  document.querySelectorAll("[data-md-view]").forEach(function (box) {
-    var btns = box.querySelectorAll("[data-show]");
-    btns.forEach(function (b) {
-      b.addEventListener("click", function () {
-        btns.forEach(function (o) { o.classList.toggle("on", o === b); o.setAttribute("aria-pressed", o === b ? "true" : "false"); });
-        box.querySelectorAll("[data-pane]").forEach(function (p) {
-          p.hidden = p.dataset.pane !== b.dataset.show;
-        });
-      });
-    });
-  });
-
   // A README <picture> picks its source by the OS colour scheme. When the page theme is
   // forced, rewrite each source's query so the image follows the page instead.
   var sources = Array.prototype.slice.call(document.querySelectorAll(".markdown-body picture source[media]"));
@@ -45,7 +33,7 @@
   var s = document.createElement("script");
   // Beside this script, not at the root: an export opened from disk has its static folder
   // under the site, written with relative links, so `/static/` would leave the copy.
-  s.src = new URL("vendor/mermaid-11.17.2.min.js", HERE).href;
+  s.src = new URL("vendor/mermaid-11.17.2.min.js" + new URL(HERE).search, HERE).href;
   s.onload = function () {
     var n = 0;
     function draw() {

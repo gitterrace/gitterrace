@@ -36,24 +36,15 @@ header.top{background:var(--header);border-bottom:var(--border)}
 /* The bar is two units: where you are (brand, repository, switchers, chip) and the tools.
    Each wraps as a whole, never one control at a time. */
 .where{display:flex;align-items:center;flex-wrap:wrap;gap:var(--space-2) var(--space-3);min-width:0}
-/* The tools (search, actions, theme) are one unit that never wraps apart. Search gives way
-   first: it narrows, then folds into a button that opens it across the bar. */
+/* The tools (search, actions, theme) are one unit that never wraps apart. Search is a
+   button. Opening it takes the whole bar, so the field is as wide as it can be. */
 .tools{display:flex;align-items:center;gap:var(--space-1);flex:0 1 auto;min-width:0;margin-left:auto}
-/* Wide enough for the whole placeholder beside the / hint at the body font. */
-.tools .topsearch{flex:0 1 auto;width:256px;min-width:140px;transition:width var(--dur-fast)}
-.tools .topsearch:focus-within{width:320px}
-.tools .topsearch input[type=search]{min-width:0;width:100%}
 button.icon:not(.theme)>svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.75;stroke-linecap:round}
-.searchbtn{display:none}
+.topsearch{display:none;align-items:center}
+.topsearch input[type=search]{min-width:0;width:100%;height:30px}
+.topbar.searching>:not(.tools),.topbar.searching .searchbtn{display:none}
+.topbar.searching .tools,.topbar.searching .topsearch{display:flex;flex:1}
 header.top>.wrap{container:topbar/inline-size}
-@container topbar (max-width:900px){
-  .tools .topsearch{display:none}
-  .searchbtn{display:inline-flex}
-  .topbar.searching>:not(.tools){display:none}
-  .topbar.searching .tools{flex:1}
-  .topbar.searching .topsearch{display:flex;flex:1}
-  .topbar.searching .searchbtn{display:none}
-}
 /* Then the bar sheds words, never controls: the wordmark, then the chip's label, then the
    ref name (the button keeps its icon and opens the same menu). Names are never cut. */
 @container topbar (max-width:700px){.wordmark,.sep{display:none}}
@@ -66,8 +57,9 @@ header.top>.wrap{container:topbar/inline-size}
 :root[data-theme=light] .theme .i-light,:root[data-theme=dark] .theme .i-dark{display:block}
 
 /* Two tab levels that never look alike: header nav in mono caps, page tabs in sans. */
-.tabnav,.tabs{display:flex;flex-wrap:wrap;gap:0 var(--space-1)}
-.tabnav,.tabs{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}.tabnav::-webkit-scrollbar,.tabs::-webkit-scrollbar{display:none}.tabnav{margin-bottom:-1px}
+.tabnav,.tabs{display:flex;flex-wrap:nowrap;gap:0 var(--space-1);
+  overflow-x:auto;scrollbar-width:none}
+.tabnav::-webkit-scrollbar,.tabs::-webkit-scrollbar{display:none}.tabnav{margin-bottom:-1px}
 .tabs{border-bottom:var(--border);margin-bottom:var(--space-2)}.tabs::after{content:"";flex:0 0 var(--space-1)}.tabs.over-r{--fr:transparent}.tabs.over-l{--fl:transparent}.tabs.over-l,.tabs.over-r{-webkit-mask-image:linear-gradient(90deg,var(--fl,black),black 32px,black calc(100% - 32px),var(--fr,black));mask-image:linear-gradient(90deg,var(--fl,black),black 32px,black calc(100% - 32px),var(--fr,black))}
 .tabnav a{position:relative;color:var(--muted);padding:var(--space-2) var(--space-3) 10px;font:var(--weight-regular) 12px/1.4 var(--mono);text-transform:uppercase;letter-spacing:.08em;white-space:nowrap;border-bottom:2px solid transparent;transition:color var(--dur-fast)}
 .tabs>a{position:relative;color:var(--muted);padding:var(--space-2) var(--space-3);font:var(--weight-regular) var(--text-sm)/1.4 var(--sans);white-space:nowrap;border-bottom:2px solid transparent;margin-bottom:-1px;transition:color var(--dur-fast)}
@@ -85,13 +77,13 @@ header.top>.wrap{container:topbar/inline-size}
 .scroll{overflow-x:auto}
 .cols{display:grid;grid-template-columns:minmax(0,1fr) 280px;gap:var(--space-8)}
 .cols.wide{grid-template-columns:minmax(0,1fr)}
-@media (max-width:1100px){.cols{grid-template-columns:minmax(0,1fr);gap:var(--space-6)}aside{order:-1}}
+@media (max-width:999px){.cols{grid-template-columns:minmax(0,1fr);gap:var(--space-6)}aside{order:-1}}
 aside h2{margin-top:0}
 input:not([type=checkbox],[type=radio]){font:inherit;padding:5px var(--space-3);border:1px solid var(--line-strong);border-radius:var(--radius);background:var(--surface);color:var(--fg);min-width:240px;height:32px}
 input[type=checkbox],input[type=radio]{width:16px;height:16px;margin:0;flex:none;accent-color:var(--accent);vertical-align:-3px}
 input::placeholder{color:var(--faint)}
 input:focus-visible{outline:2px solid var(--focus);outline-offset:0;border-color:var(--accent)}
-.filter{display:flex;gap:var(--space-2)}.head .cmplink{font-size:var(--text-sm);border:var(--border);border-radius:var(--radius);padding:4px var(--space-3)}
+.filter{display:flex;gap:var(--space-2)}
 .pager{display:flex;justify-content:space-between;margin-top:var(--space-6)}
 .add{color:var(--add)}.del{color:var(--del)}
 .counts{font:var(--weight-semibold) var(--text-xs) var(--mono);font-variant-numeric:tabular-nums}
@@ -195,9 +187,14 @@ thead.quiet th{padding:0;border:0;line-height:0;height:0}
 .files ul{list-style:none;margin:0;padding:0}
 .files li{display:flex;justify-content:space-between;gap:var(--space-4);padding:6px var(--space-4);border-top:var(--border);font-family:var(--mono);font-size:var(--text-sm)}
 .files li:hover{background:var(--soft)}
-section.file,section.file>header{
-  scroll-margin-top:calc(var(--ph-pin-h,var(--header-h)) + var(--space-2))}
+/* A file anchor scrolls the file to the top, its header where it pins. The file's own top
+   border goes just above the window, so the header reads as already stuck. The app bar
+   does not stick, so nothing covers it. */
+section.file{scroll-margin-top:-1px}
 section.file{border:var(--border);border-radius:var(--radius);margin-top:var(--space-4);overflow:hidden;background:var(--bg)}
+/* Files above an #fN target never anchor the scroll, so their growth cannot push it down. */
+section.file:has(~section.file:target){
+  overflow-anchor:none}
 section.file>header{display:flex;gap:var(--space-3);align-items:center;padding:var(--space-2) var(--space-4);background:var(--soft);border-bottom:var(--border);font-family:var(--mono);font-size:var(--text-sm)}
 section.file>header a{color:var(--fg)}section.file>header .counts{margin-left:auto}
 section.file>header .media-counts{white-space:nowrap;font-variant-numeric:tabular-nums}
@@ -212,9 +209,10 @@ div.diff .add,div.diff .del{color:inherit}
 /* The gutter: inside each cell a grid of sha, author and age. The column takes its widest
    cell, so the three line up down the page. The grid sits in a div, since a grid td leaves
    the table layout. Names are never cut (theme test), a long one widens the column. */
-.blame td.who{width:1%;white-space:nowrap;font:var(--text-xs) var(--sans);padding-right:var(--space-4);border-right:var(--border);color:var(--muted)}
+.blame td.who{width:1%;white-space:nowrap;font:var(--text-xs) var(--sans);
+  padding-right:var(--space-4);border-right:var(--border);color:var(--muted);
 /* Age is a 3px bar down the left edge of the whole run, hotter for newer lines. */
-.blame td.who{box-shadow:inset 3px 0 0 var(--heat,transparent)}
+box-shadow:inset 3px 0 0 var(--heat,transparent)}
 .blame td.h0{--heat:var(--accent)}
 .blame td.h1{--heat:color-mix(in srgb,var(--accent) 70%,transparent)}
 .blame td.h2{--heat:color-mix(in srgb,var(--accent) 45%,transparent)}
@@ -284,13 +282,17 @@ button.branch{height:auto}
 .wtchip:hover{color:var(--fg);text-decoration:underline;text-underline-offset:3px}
 /* Uncommitted work is a normal state: quiet label, only the dot carries the warn colour. */
 .wtchip .dot{width:6px;height:6px;border-radius:50%;background:var(--warn)}
-.topsearch{position:relative;display:flex;align-items:center}
-.topsearch input[type=search]{min-width:220px;width:320px;padding-right:32px;height:30px}
-.topsearch kbd{position:absolute;right:8px;pointer-events:none}
 kbd{font:var(--weight-semibold) var(--text-2xs)/1 var(--mono);color:var(--muted);border:var(--border);border-bottom-width:2px;border-radius:var(--radius);padding:2px 5px;background:var(--soft)}
-.ov-back{animation:ov-in var(--dur-fast) var(--ease);position:fixed;inset:0;background:var(--scrim);z-index:50;display:flex;justify-content:center;align-items:flex-start;padding-top:12vh}
-.ov{background:var(--raised);border:var(--border);border-radius:var(--radius);box-shadow:var(--shadow-2);width:min(640px,92vw);max-height:70vh;display:flex;flex-direction:column;overflow:hidden}
-.ov.anchored{position:fixed;width:min(380px,92vw)}
+/* A modal is a <dialog> filling the window, its box centered inside; a menu is the box itself. */
+.ov-back[open]{animation:ov-in var(--dur-fast) var(--ease);position:fixed;inset:0;width:auto;
+  height:auto;max-width:none;max-height:none;margin:0;border:0;padding:12vh 0 0;
+  background:var(--scrim);display:flex;justify-content:center;align-items:flex-start}
+.ov-back::backdrop{background:transparent}
+.ov{background:var(--raised);color:var(--fg);border:var(--border);border-radius:var(--radius);
+  box-shadow:var(--shadow-2);width:min(640px,92vw);max-height:70vh;padding:0;display:flex;
+  flex-direction:column;overflow:hidden}
+.ov[popover]:not(:popover-open){display:none}
+.ov.anchored{position:fixed;inset:auto;margin:0;width:min(380px,92vw)}
 .ov-input{border:0;border-bottom:var(--border);border-radius:0;height:44px;min-width:0;flex:none;padding:0 var(--space-4);font-size:var(--text-md);width:100%;background:transparent}
 .ov-input:focus-visible,.send-title:focus-visible,.send-ctx:focus-visible{
   outline:2px solid var(--focus);outline-offset:-2px}
@@ -369,7 +371,15 @@ main h2:not(.markdown-body *)::after{content:"";flex:1;border-top:var(--border)}
 .segs{display:inline-flex;flex-wrap:nowrap;white-space:nowrap;min-width:0;max-width:100%;overflow:hidden;gap:2px;padding:2px;border:var(--border);border-radius:var(--radius);background:var(--soft)}
 .segsel{font:inherit;min-height:44px;padding-left:var(--space-3);border:var(--border);border-radius:var(--radius);background-color:var(--surface);color:var(--fg)}
 .dochead .segctl{font-size:var(--text-xs)}
-@media (pointer:coarse){.segs a,.segs button{min-height:44px}}
+@media (pointer:coarse){.segs a,.segs button,.segs label{min-height:44px}}
+/* A paned switch: radios, the ring on the label, the checked one's pane shown. */
+.segs label input{position:absolute;opacity:0;width:1px;height:1px;pointer-events:none}
+.segs label:has(:focus-visible){outline:2px solid var(--focus);outline-offset:2px}
+.paned:has(input[value=rendered]:checked) [data-pane=source],
+.paned:has(input[value=source]:checked) [data-pane=rendered],
+.paned:has(input[value=sides]:checked) [data-pane=overlay],
+.paned:has(input[value=overlay]:checked) [data-pane=sides],
+.paned:has(input[value=source]:checked) .outline.menu{display:none}
 [data-seg-select] .segsel,[data-seg-select].narrow .segs{display:none}
 [data-seg-select].narrow .segsel{display:inline-block}
 .md-pane[hidden]{display:none}
@@ -428,7 +438,7 @@ svg.spark.s1{stroke:var(--cat-1)}svg.spark.s2{stroke:var(--cat-2)}svg.spark.s3{s
 .fbar .optline{margin:0 0 0 auto;order:1}
 /* Narrower, the facts line drops under the row; on a phone the jump menu stays at the row's end
    as an icon only, a second choice shows as its select and the period takes what is left. */
-@media (max-width:1100px){.fbar{flex-wrap:wrap;row-gap:var(--space-2)}.fbar .outline.menu{margin-left:auto}.fbar .optline{order:3;flex-basis:100%;margin:0}}
+@media (max-width:999px){.fbar{flex-wrap:wrap;row-gap:var(--space-2)}.fbar .outline.menu{margin-left:auto}.fbar .optline{order:3;flex-basis:100%;margin:0}}
 @media (max-width:600px){.fbar{column-gap:var(--space-2)}.fbar>.segctl:first-child{flex:1 1 0;min-width:0}.fbar>.segctl+.segctl{flex:none}.fbar>.segctl+.segctl .segs{display:none}.fbar>.segctl+.segctl .segsel{display:inline-block}.fbar .outlinebtn{width:32px;padding:0;justify-content:center;font-size:0;gap:0}}
 .chips{display:flex;flex-wrap:wrap;align-items:center;gap:var(--space-2);margin:var(--space-2) 0;min-height:28px}
 .chip{display:inline-flex;align-items:center;gap:6px;background:var(--accent-soft);border:var(--border);border-radius:var(--radius);padding:3px 4px 3px 12px;font-size:var(--text-sm);color:var(--fg)}
@@ -448,8 +458,11 @@ a.who{color:inherit}a.who:hover b{color:var(--accent-fg);text-decoration:underli
 .src,.diff{font-family:var(--mono);font-size:var(--text-sm);line-height:var(--leading-code)}
 /* A content-visibility chunk clips to its own box, so it must be as wide as its longest line
    for the card to scroll sideways. The placeholder size is set for height only: a single
-   contain-intrinsic-size value would also give every skipped chunk that width. */
-.src .ch,.diff .ch{content-visibility:auto;contain-intrinsic-block-size:auto calc(var(--leading-code)*100);width:max-content;min-width:100%}
+   contain-intrinsic-size value would also give every skipped chunk that width. Each chunk
+   is CHUNK_LINES rows unless it names fewer (data-rows, read below), and a row is one line (1lh), so a skipped chunk is as
+   tall as it will be and an anchor below it lands where the page settles. */
+.src .ch,.diff .ch{content-visibility:auto;contain-intrinsic-block-size:auto calc(1lh*var(--rows,100));width:max-content;min-width:100%}
+.ch[data-rows="1"]{--rows:1}.ch[data-rows="2"]{--rows:2}.ch[data-rows="3"]{--rows:3}.ch[data-rows="4"]{--rows:4}.ch[data-rows="5"]{--rows:5}.ch[data-rows="6"]{--rows:6}.ch[data-rows="7"]{--rows:7}.ch[data-rows="8"]{--rows:8}.ch[data-rows="9"]{--rows:9}.ch[data-rows="10"]{--rows:10}.ch[data-rows="11"]{--rows:11}.ch[data-rows="12"]{--rows:12}.ch[data-rows="13"]{--rows:13}.ch[data-rows="14"]{--rows:14}.ch[data-rows="15"]{--rows:15}.ch[data-rows="16"]{--rows:16}.ch[data-rows="17"]{--rows:17}.ch[data-rows="18"]{--rows:18}.ch[data-rows="19"]{--rows:19}.ch[data-rows="20"]{--rows:20}.ch[data-rows="21"]{--rows:21}.ch[data-rows="22"]{--rows:22}.ch[data-rows="23"]{--rows:23}.ch[data-rows="24"]{--rows:24}.ch[data-rows="25"]{--rows:25}.ch[data-rows="26"]{--rows:26}.ch[data-rows="27"]{--rows:27}.ch[data-rows="28"]{--rows:28}.ch[data-rows="29"]{--rows:29}.ch[data-rows="30"]{--rows:30}.ch[data-rows="31"]{--rows:31}.ch[data-rows="32"]{--rows:32}.ch[data-rows="33"]{--rows:33}.ch[data-rows="34"]{--rows:34}.ch[data-rows="35"]{--rows:35}.ch[data-rows="36"]{--rows:36}.ch[data-rows="37"]{--rows:37}.ch[data-rows="38"]{--rows:38}.ch[data-rows="39"]{--rows:39}.ch[data-rows="40"]{--rows:40}.ch[data-rows="41"]{--rows:41}.ch[data-rows="42"]{--rows:42}.ch[data-rows="43"]{--rows:43}.ch[data-rows="44"]{--rows:44}.ch[data-rows="45"]{--rows:45}.ch[data-rows="46"]{--rows:46}.ch[data-rows="47"]{--rows:47}.ch[data-rows="48"]{--rows:48}.ch[data-rows="49"]{--rows:49}.ch[data-rows="50"]{--rows:50}.ch[data-rows="51"]{--rows:51}.ch[data-rows="52"]{--rows:52}.ch[data-rows="53"]{--rows:53}.ch[data-rows="54"]{--rows:54}.ch[data-rows="55"]{--rows:55}.ch[data-rows="56"]{--rows:56}.ch[data-rows="57"]{--rows:57}.ch[data-rows="58"]{--rows:58}.ch[data-rows="59"]{--rows:59}.ch[data-rows="60"]{--rows:60}.ch[data-rows="61"]{--rows:61}.ch[data-rows="62"]{--rows:62}.ch[data-rows="63"]{--rows:63}.ch[data-rows="64"]{--rows:64}.ch[data-rows="65"]{--rows:65}.ch[data-rows="66"]{--rows:66}.ch[data-rows="67"]{--rows:67}.ch[data-rows="68"]{--rows:68}.ch[data-rows="69"]{--rows:69}.ch[data-rows="70"]{--rows:70}.ch[data-rows="71"]{--rows:71}.ch[data-rows="72"]{--rows:72}.ch[data-rows="73"]{--rows:73}.ch[data-rows="74"]{--rows:74}.ch[data-rows="75"]{--rows:75}.ch[data-rows="76"]{--rows:76}.ch[data-rows="77"]{--rows:77}.ch[data-rows="78"]{--rows:78}.ch[data-rows="79"]{--rows:79}.ch[data-rows="80"]{--rows:80}.ch[data-rows="81"]{--rows:81}.ch[data-rows="82"]{--rows:82}.ch[data-rows="83"]{--rows:83}.ch[data-rows="84"]{--rows:84}.ch[data-rows="85"]{--rows:85}.ch[data-rows="86"]{--rows:86}.ch[data-rows="87"]{--rows:87}.ch[data-rows="88"]{--rows:88}.ch[data-rows="89"]{--rows:89}.ch[data-rows="90"]{--rows:90}.ch[data-rows="91"]{--rows:91}.ch[data-rows="92"]{--rows:92}.ch[data-rows="93"]{--rows:93}.ch[data-rows="94"]{--rows:94}.ch[data-rows="95"]{--rows:95}.ch[data-rows="96"]{--rows:96}.ch[data-rows="97"]{--rows:97}.ch[data-rows="98"]{--rows:98}.ch[data-rows="99"]{--rows:99}
 .src .l{white-space:pre;min-height:var(--leading-code);padding:0 var(--space-3) 0 0;min-width:max-content;position:relative;padding-left:calc(var(--nd,3)*1ch + var(--space-3)*3)}
 .src .l::before{content:attr(data-n);position:absolute;left:0;box-sizing:border-box;padding-left:var(--space-3);width:calc(var(--nd,3)*1ch + var(--space-3)*2);text-align:right;color:var(--faint);user-select:none;cursor:pointer}
 /* One line hover for blame, file and diff (display.has_line_hover). A translucent overlay in
@@ -502,7 +515,6 @@ td:has(>.actbtn.float){position:relative}
 :hover>.actbtn.float,.actbtn.float:focus-visible,.actbtn.float.sel{opacity:1}
 .actbtn.mark{position:fixed;z-index:20;box-shadow:var(--shadow-2)}
 .meta .actbtn{margin-left:var(--space-1)}
-.actmenu-back{background:transparent;padding:0}
 .ov.actmenu{width:min(300px,92vw)}
 .actmenu .ov-list li{justify-content:space-between;align-items:center}
 .actmenu .ov-list li kbd{margin-left:auto}
@@ -510,8 +522,8 @@ td:has(>.actbtn.float){position:relative}
 .actmenu .ov-list li.off{opacity:.5;cursor:default}
 .actmenu .ov-list li.busy .name::after{content:" \2026"}
 .actmenu .ov-list li.sep{height:0;padding:0;margin:var(--space-1) 0;border-top:var(--border);cursor:default}
-.actmenu .ov-list li.keynote{cursor:default;font-size:var(--text-xs);color:var(--muted)}
-.actmenu .ov-list li.keynote{border-top:var(--border);margin-top:var(--space-1);
+.actmenu .ov-list li.keynote{cursor:default;font-size:var(--text-xs);
+  color:var(--muted);border-top:var(--border);margin-top:var(--space-1);
   padding-top:var(--space-2)}
 .actmenu .ov-list li.hint{cursor:default;font-size:var(--text-xs)}
 .actmenu .ov-list li.hint a{color:var(--muted)}
@@ -534,7 +546,8 @@ button.reponame .tri{width:16px;height:16px;fill:var(--muted)}
 .repopanel .two{display:flex;flex-direction:column;min-width:0;gap:2px}
 .repopanel .two .dir{margin-left:0}
 .tip,.loc-tip{background:var(--surface);border:var(--border);border-radius:var(--radius);box-shadow:var(--shadow-2);color:var(--fg)}
-.tip{position:fixed;left:0;top:0;z-index:50;box-sizing:border-box;max-width:320px;padding:var(--space-2) var(--space-3);font:var(--text-xs)/1.4 var(--sans);overflow-wrap:break-word;white-space:normal;pointer-events:none;opacity:0;visibility:hidden;transition:opacity var(--dur-fast) var(--ease),visibility 0s linear var(--dur-fast)}
+.tip{position:fixed;inset:0 auto auto 0;margin:0;overflow:visible;
+  z-index:50;box-sizing:border-box;max-width:320px;padding:var(--space-2) var(--space-3);font:var(--text-xs)/1.4 var(--sans);overflow-wrap:break-word;white-space:normal;pointer-events:none;opacity:0;visibility:hidden;transition:opacity var(--dur-fast) var(--ease),visibility 0s linear var(--dur-fast)}
 .tip.on{opacity:1;visibility:visible;transition:opacity var(--dur-fast) var(--ease)}
 [data-tip]:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 @keyframes ov-in{from{opacity:0}to{opacity:1}}
@@ -547,8 +560,9 @@ button.reponame .tri{width:16px;height:16px;fill:var(--muted)}
 @media (forced-colors:active){:focus-visible{outline:2px solid Highlight}
 .ov-input:focus,.send-title:focus,.send-ctx:focus{outline:2px solid Highlight;outline-offset:-2px;
   box-shadow:none}
-button,.btn,.segs .on,.skip,.tip,.loc-tip,.toast{border:1px solid CanvasText}
-.segs .on,.ov-list li.on{outline:2px solid Highlight;outline-offset:-2px;
+button,.btn,.segs .on,.segs label:has(:checked),.skip,.tip,.loc-tip,.toast{
+  border:1px solid CanvasText}
+.segs .on,.segs label:has(:checked),.ov-list li.on{outline:2px solid Highlight;outline-offset:-2px;
   font-weight:var(--weight-semibold)}
 .tabnav a.on,.tabs>a.on,.outline.rail a.on{border-color:Highlight;text-decoration:underline}
 .tabnav a.on,.tabs>a.on{border-bottom-width:3px}

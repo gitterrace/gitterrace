@@ -336,6 +336,9 @@ pub(crate) async fn release_when_idle(app: Weak<App>, idle: Duration) {
 }
 
 #[cfg(test)]
+#[path = "rebuild_tests.rs"]
+mod rebuild_tests;
+#[cfg(test)]
 mod tests {
     use std::sync::Arc;
     use std::sync::atomic::{AtomicUsize, Ordering};

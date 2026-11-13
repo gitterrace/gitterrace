@@ -43,15 +43,21 @@ config keys lives in `gitterrace_config::naming`.
 - **Read-only, pinned.** Every read takes a resolved commit id, so a commit
   landing mid-request cannot tear a page. Only the uncommitted view reads the
   worktree.
-- **Browsing never waits on the cache**, and insights show progress.
+- **Browsing never waits on the cache.** Only insights pages show "Indexing
+  history" while the index builds. The overview shows no progress.
+- **Assets are versioned by build.** Every `/static/` asset is linked as
+  `/static/<name>?v=<build hash>` (`asset_url` in
+  `gitterrace-web/src/routes/assets.rs`). At the current version it is
+  immutable for a year, otherwise `no-cache`. Exports keep `/static/*` a year,
+  and the site versions `/assets/*` by content sha.
 - **One guard** (`gitterrace-web/src/guard.rs`): loopback Host, no cross-site
   requests, hashed inline script CSP.
 - **Live.** A watcher pushes changes over `/events`, and config files reload on
   change, and a joining repository appears in open switchers. OS file events
-  watch the git folder always and the working tree while a tab shows it. A
-  burst of events is one cheap check. Dropped events (a loaded Mac) are caught
-  by the `watch.rescan_secs` rescan (30 by default). Without
-  file events the server checks once a second.
+  watch the git folder always and the working tree while a tab shows it. A burst
+  of events is one cheap check. Dropped events (a loaded Mac) are caught by the
+  `watch.rescan_secs` rescan (30 by default). Without file events the server
+  checks once a second.
 - **Features switch off at the route.** Each `[features]` switch owns its routes
   (`gitterrace-web/src/features.rs`). One gate answers an off route with 404,
   and pages ask the same table, so no link is left behind. Off always wins.
@@ -61,10 +67,10 @@ config keys lives in `gitterrace_config::naming`.
   through the repository table. `/` forwards to a lone repository and lists
   several. A link never moves when another repository joins.
   `/go/{repo-id}/{sha}` is the permalink and outlives names.
-- **A name is assigned once:** the folder name, URL-safe and lowercase. A
-  clash gets `-` and six hex digits of its path, and the first keeps the plain
-  name. Names persist in `repos.json`, so a restart serves each where it was.
-  Without a state folder the rule runs against the table alone.
+- **A name is assigned once:** the folder name, URL-safe and lowercase. A clash
+  gets `-` and six hex digits of its path, and the first keeps the plain name.
+  Names persist in `repos.json`, so a restart serves each where it was. Without
+  a state folder the rule runs against the table alone.
 - **A running server grows, it is never replaced.** `git terrace open` and a
   second `git terrace` add repositories through `POST /_repos`, and
   `git terrace remove` takes one off with `DELETE /_repos`. The gate (loopback
@@ -75,8 +81,8 @@ config keys lives in `gitterrace_config::naming`.
   error, never a bind on the held address. `--public` never joins. Removal keeps
   the index and name, stops its refresher and drops it from open switchers. The
   last repository stays. No page offers remove, since a page has no token. An
-  added repository gets what a startup one does, and one holding
-  `actions.toml` is refused.
+  added repository gets what a startup one does, and one holding `actions.toml`
+  is refused.
 - **`gitterrace://` permalinks name what, not where.**
   `gitterrace://<repo-id>/<sha>/<path>` is the `/go` tuple without a host.
   `git terrace open` finds the clone among repositories served before
@@ -99,8 +105,6 @@ config keys lives in `gitterrace_config::naming`.
 The format version is `1`, stored as `v1`.
 
 <!-- END GENERATED: cache -->
-
-Disposable: bump the format version instead of migrating.
 
 The cache lives in `.git/gitterrace/` when that folder is writable, else in
 `$GITTERRACE_INDEX_FALLBACK/<hash of the git dir>` (the Docker image sets
@@ -125,8 +129,8 @@ Every update stores the chain of the indexed tip in `chain-<gen>.gts` (per step
 its rank, oid, time, offset and each file row's path id and line counts), and
 the page reads it once, front to back.
 
-Rows are keyed by path, and the language and path filters apply when the page
-is built, so changing them needs no rebuild.
+Rows are keyed by path, and the language and path filters apply when the page is
+built, so changing them needs no rebuild.
 
 The chain is rewritten after every update and segment merge, with no git read,
 and named in the same manifest as its set: if it cannot be written, nothing is
@@ -136,26 +140,26 @@ its marks while reading, with the walk's gap, so both paths agree by
 construction.
 
 Format numbers: the cache format (`VERSION`, `FORMAT_VERSION` in `store.rs`) is
-stored with a `v` prefix, and a bare number from before the first release is
-reset, not refused. The container byte version (`seg/format.rs`) is separate.
+stored with a `v` prefix, and a bare number without it is reset, not
+refused. The container byte version (`seg/format.rs`) is separate.
 
 ### How hotspots and ownership read the index
 
 A per-path aggregate cannot serve these pages, since a renamed or reused name
 belongs to two files (over half of rust's files at HEAD). Every update writes
 `tip-<gen>.gts` (`tip.rs`): each commit's file rows keyed by the name at the
-indexed tip, with churn. Hotspots, ownership, coupling and code age read it,
-and a set without it reads the rows as before.
+indexed tip, with churn. Hotspots, ownership, coupling and code age read it, and
+a set without it reads the commit rows directly.
 
-`crates/gitterrace-index/tests/latency.rs` holds today's times on a
-100k-commit synthetic history as ceilings, and
+`crates/gitterrace-index/tests/latency.rs` holds today's times on a 100k-commit
+synthetic history as ceilings, and
 `crates/gitterrace-web/tests/memory_budget.rs` guards serving memory on
 synthetic repositories of growing size.
 
 The bench harness is `scripts/bench/bench-run.py`, the corpus is
 `tests/bench/corpus.toml`, and results land in
-`tests/bench/results/<date>-<machine>.json`, the machine label from the CPU
-(for example `apple-m1-max`).
+`tests/bench/results/<date>-<machine>.json`, the machine label from the CPU (for
+example `apple-m1-max`).
 
 ## Routes
 
@@ -172,7 +176,7 @@ the prefix.
 | `/commit/{id}`, `/diff/{rev}/{index}` | A commit's diff, large files fold and load on demand |
 | `/refs`, `/tag/{name}`, `/worktrees`, `/stashes`, `/worktree`, `/worktree/diff/{path}`, `/worktree/raw/{path}` | Git state: branches, tags, linked worktrees, stashes, uncommitted changes, their folded files and changed images |
 | `/search` | Code and commit search |
-| `/stats`, `/stats/{page}` | Insights on the shared filter and period: activity (with commit types and code frequency), contributors, hotspots (with patterns), languages, ownership. `/stats/types`, `/stats/frequency` and `/stats/patterns` answer with a permanent redirect to their section, query kept, and `/insights` to `/stats`. `?rev=` follows any ref |
+| `/stats`, `/stats/{page}` | Insights on the shared filter and period: activity (with commit types and code frequency), contributors, hotspots (with patterns), languages, ownership. `?rev=` follows any ref |
 | `/events`, `/api/{files,refs,last,progress}` | Live updates and the fragments pages fetch |
 | `/api/v1/...` | JSON API, see [api.md](api.md) |
 | `/go/{repo-id}/{sha}/{path}` | Permalink: finds the served repository by id |
@@ -186,23 +190,23 @@ the prefix.
 
 ## Security guards
 
-Each door in [security.md](security.md) and what holds it in the code:
+Each door in [security](security.md) and what holds it in the code:
 
-| Door | Holds it | Test |
-| --- | --- | --- |
-| Every request | `guard.rs`: Host allowlist, `Sec-Fetch-Site`, nosniff, CORP, CSP | `guard.rs` tests, `security_class_tests` |
-| Page routes (`PUBLIC`) | `restrict_to_committed` when public, time bound | `public.rs` tests |
-| Local routes (`LOCAL`) | `only_public` 404s anything not in `PUBLIC` | `every_local_route_is_dark_on_a_public_server` |
-| Path tails | Tree lookup, the worktree reader canonicalizes the parent | `no_path_route_reads_outside_the_tree` |
-| `/raw` | `sandbox` CSP for SVG and text, PDF attachment, size cap | `wiring_tests`, `security_class_tests` |
-| `POST /_actions/run` | `same_origin_write`, JSON only, `config/trust.rs` | `run_route_security_table` |
-| `/_settings/*` | `same_origin_write`, enum file choice, stamp | `settings/tests.rs` |
-| `/_repos` | Add token from a 0600 file, browser headers refused | `add/tests.rs` |
-| Every non-GET method | Tokenless writes never succeed | `no_write_succeeds_without_the_token` |
-| MCP server | Read-only tools, the switches of `/api/v1` | `mcp_tools_follow_the_switches_of_the_web_api` |
-| `open` and `gitterrace://` | Strict link parse, known clones only | `open` tests |
-| Static export | `_headers` carries the CSP, no local routes crawled | `export/tests.rs` |
-| Hostile content | Askama escaping, CSP, actions never from the repository | `hostile_repo_content_is_escaped_where_the_menu_lives` |
+| Door                       | Holds it                                                         | Test                                                   |
+| -------------------------- | ---------------------------------------------------------------- | ------------------------------------------------------ |
+| Every request              | `guard.rs`: Host allowlist, `Sec-Fetch-Site`, nosniff, CORP, CSP | `guard.rs` tests, `security_class_tests`               |
+| Page routes (`PUBLIC`)     | `restrict_to_committed` when public, time bound                  | `public.rs` tests                                      |
+| Local routes (`LOCAL`)     | `only_public` 404s anything not in `PUBLIC`                      | `every_local_route_is_dark_on_a_public_server`         |
+| Path tails                 | Tree lookup, the worktree reader canonicalizes the parent        | `no_path_route_reads_outside_the_tree`                 |
+| `/raw`                     | `sandbox` CSP for SVG and text, PDF attachment, size cap         | `wiring_tests`, `security_class_tests`                 |
+| `POST /_actions/run`       | `same_origin_write`, JSON only, `config/trust.rs`                | `run_route_security_table`                             |
+| `/_settings/*`             | `same_origin_write`, enum file choice, stamp                     | `settings/tests.rs`                                    |
+| `/_repos`                  | Add token from a 0600 file, browser headers refused              | `add/tests.rs`                                         |
+| Every non-GET method       | Tokenless writes never succeed                                   | `no_write_succeeds_without_the_token`                  |
+| MCP server                 | Read-only tools, the switches of `/api/v1`                       | `mcp_tools_follow_the_switches_of_the_web_api`         |
+| `open` and `gitterrace://` | Strict link parse, known clones only                             | `open` tests                                           |
+| Static export              | `_headers` carries the CSP, no local routes crawled              | `export/tests.rs`                                      |
+| Hostile content            | Askama escaping, CSP, actions never from the repository          | `hostile_repo_content_is_escaped_where_the_menu_lives` |
 
 `security_class_tests.rs` reads every route from the built routers, so a route
 registered anywhere is walked: public or `LOCAL`, in the sitemap, dark when

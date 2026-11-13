@@ -2,10 +2,10 @@
 {% block title %}{{ title }} · {{ c.name }}{% endblock %}
 {% block content %}
 {{ page_head }}
-{% if let Some(m) = rendered %}<div{% if !outline_rail.is_empty() %} class="cols outline-cols"{% endif %}><div class="card doccard" data-md-view>
+{% if let Some(m) = rendered %}<div{% if !outline_rail.is_empty() %} class="cols outline-cols"{% endif %}><div class="card doccard paned" data-md-view>
 {% if let Some(h) = head %}{{ h }}{% endif %}
 <div class="markdown-body md-pane" data-pane="rendered" data-src="{{ title }}">{{ m|safe }}</div>
-<div class="scroll md-pane" data-pane="source" hidden>
+<div class="scroll md-pane" data-pane="source">
 {% if let Some(h) = html %}{{ h|safe }}{% endif %}
 </div></div>{{ outline_rail|safe }}</div>
 {% else if let Some(m) = media %}<div class="card">{{ m|safe }}</div>

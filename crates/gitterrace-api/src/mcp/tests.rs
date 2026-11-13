@@ -205,7 +205,6 @@ async fn query_and_the_older_keys_give_equal_json() {
             repo: None,
             rev: None,
             period: period.map(str::to_owned),
-            path: None,
             query: query.map(str::to_owned),
             limit: None,
         })
@@ -241,4 +240,15 @@ fn mcp_tool_error_emits_server_error_message_for_5xx() {
     assert_eq!(super::tool_error_text(&inner), crate::SERVER_ERROR_MESSAGE);
     let client = ApiError::BadRequest("bad rev".to_owned());
     assert_eq!(super::tool_error_text(&client), client.to_string());
+}
+
+/// A tool argument the schema does not list is refused, never dropped: `path` on `hotspots`
+/// was an older form of `query`'s `path:` and would otherwise answer unfiltered numbers.
+#[test]
+fn unknown_tool_arguments_are_refused() {
+    let hot = serde_json::json!({ "path": "src" });
+    let e = serde_json::from_value::<super::HotspotArgs>(hot).err();
+    assert!(e.is_some_and(|e| e.to_string().contains("unknown field `path`")));
+    let ok = serde_json::json!({ "query": "path:src" });
+    assert!(serde_json::from_value::<super::HotspotArgs>(ok).is_ok());
 }

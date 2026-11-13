@@ -1,40 +1,30 @@
 # Why gitterrace
 
-Agents now write much of the code, and fast. Many changes land without anyone
-reading the diff. The repository still holds the whole story, but nobody looks.
+Before a push, we want to see the repository the way others will: the README
+rendered, the docs linked, the history readable. A code host shows that only
+after the push. Editor and terminal views show the code, but not as a reader
+sees it.
 
-gitterrace is a place to look again, calmly and after the fact: what changed
-today, which files keep churning, which branches and worktrees the agents left
-behind. It reads the repository on your machine, offline, in a browser. When a
-glance is one click away, you take it, and that often catches the change nobody
-meant.
+With agents writing much of the code, and fast, that reading is how we catch
+what nobody meant. Every finding needs a place to go: back to an agent, or as
+a task or ticket. The [tools we knew](why.md#compared-with) could show the
+code, but not send it on.
+
+What it promises about your code, from where it listens to what it writes, is
+in the [security model](security.md).
 
 ## Reading, then sending on
 
-When you spot something, hand it on with its context as a task, note, issue or
-hook. Unlike an editor's integration, targets are generic entries in a small
-file you own, any URL or command works, and the destination's own add screen
-asks you to confirm. gitterrace never calls the destination itself.
+Send to and actions do the handing on, as a task, note, issue or hook. Unlike
+an editor's integration, targets are generic entries in a small file you own,
+any URL or command works, and the destination's own add screen asks you to
+confirm. gitterrace never calls the destination itself.
 
 ## Insights
 
-How a project moves (its rhythm, what churns, who touches what) is part of the
-same reading, so insights live beside the history.
-
-## What it does with your code
-
-- It serves on `127.0.0.1:4242` by default, so only your machine can reach it.
-  Serving beyond loopback needs `--public`, which is read-only
-  ([running it online](online.md)).
-- It sends nothing anywhere: no telemetry, no update check, nothing loaded from
-  outside.
-- It never changes the repository's files or history.
-- It writes only a disposable cache under `.git/gitterrace/` (plus one line in
-  `.git/info/exclude` when you export into the worktree), your config and a
-  state folder.
-
-See the [security model](security.md), and [SECURITY.md](../SECURITY.md) to
-report a vulnerability.
+How a project moves (its rhythm, what churns, who touches what, which branches
+and worktrees were left behind) is part of the same reading, so insights live
+beside the history.
 
 ## Compared with
 
@@ -42,6 +32,9 @@ report a vulnerability.
   unpushed branches and worktrees included.
 - gitk, tig, lazygit and gitui: desktop or terminal, and most also commit.
   gitterrace runs in a browser and only reads.
+- gitweb and cgit: web browsers for git, read-only as well, but dated. They
+  show plain listings: no rendered docs or diagrams, no insights, and no way
+  to send a finding on.
 - A self-hosted code server: a service to run. gitterrace is one binary you
   start and stop.
 - Your editor's git view: tied to that editor. gitterrace works beside any.

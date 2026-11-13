@@ -27,8 +27,6 @@ mod shots;
 
 pub use landing::SHOTS;
 use shots::check_shots;
-#[cfg(test)]
-use shots::readme_shots;
 
 const FONTS: [(&str, &str); 3] = [
     ("fraunces", "fraunces-latin-wght-normal.woff2"),
@@ -56,6 +54,8 @@ pub fn at(rel: &str) -> String {
 }
 const BRAND: [&str; 5] = ["logo-light", "logo-dark", "mark-light", "mark-dark", "mark"];
 const TOKENS: &str = "crates/gitterrace-web/static/tokens.css";
+/// The app's syntax colours, which the site's code blocks share.
+const MARKDOWN_CSS: &str = "crates/gitterrace-web/static/markdown.css";
 /// RFC 9116 makes `Expires` mandatory in security.txt. Bump it with each release, at most a year
 /// out; a passed date tells reporters the contact may be dead.
 /// The two mailboxes of the site: the legal pages name `SUPPORT_EMAIL` for contact and rights
@@ -103,7 +103,10 @@ pub fn render(root: &Path, ws: &Workspace) -> Result<Vec<Out>> {
         .get("gitterrace")
         .context("package gitterrace")?;
     let mut outs = Vec::new();
-    outs.push(Out::file(at("assets/site.css"), css(&read(TOKENS)?)?));
+    outs.push(Out::file(
+        at("assets/site.css"),
+        css(&read(TOKENS)?, &read(MARKDOWN_CSS)?)?,
+    ));
     for (dir, file) in FONTS {
         let path = format!("vendor/schwarzwald/kit/fonts/{dir}/{file}");
         let bytes = std::fs::read(root.join(&path)).with_context(|| format!("reading {path}"))?;
@@ -158,7 +161,76 @@ pub fn render(root: &Path, ws: &Workspace) -> Result<Vec<Out>> {
     let (pages, paths) = docs::pages(root, &site)?;
     outs.extend(pages);
     outs.extend(host_files(&site, &paths));
-    Ok(outs)
+    Ok(version_assets(outs))
+}
+
+/// Every `/assets/<file>` a built page or stylesheet names gets `?v=` and the first hex of
+/// the file's sha256. A new build of a changed file is a new URL, so `_headers` can keep
+/// `/assets/*` a year without a page ever meeting a stale picture, font or stylesheet. The
+/// absolute link-preview URL (`og:image`) is left alone: crawlers fetch it once, by name.
+fn version_assets(outs: Vec<Out>) -> Vec<Out> {
+    use sha2::Digest as _;
+    let mut sums = std::collections::BTreeMap::new();
+    for o in &outs {
+        let (path, bytes) = match o {
+            Out::File { path, body } => (path, body.as_bytes()),
+            Out::Bytes { path, body } => (path, body.as_slice()),
+            Out::Block { .. } => continue,
+        };
+        if let Some(rel) = path.strip_prefix(&format!("{SITE_DIR}/assets/")) {
+            let sum = sha2::Sha256::digest(bytes);
+            let hex = sum.iter().take(6).fold(String::new(), |mut h, b| {
+                let _ = write!(h, "{b:02x}");
+                h
+            });
+            sums.insert(rel.to_owned(), hex);
+        }
+    }
+    outs.into_iter()
+        .map(|o| match o {
+            // A page is fitted again: a version can push a line past the width.
+            Out::File { path, body } if has_ext(&path, "html") => {
+                let body = fit::fit(&versioned(&body, &sums));
+                Out::File { path, body }
+            }
+            Out::File { path, body } if has_ext(&path, "css") => {
+                let body = versioned(&body, &sums);
+                Out::File { path, body }
+            }
+            other => other,
+        })
+        .collect()
+}
+
+fn has_ext(path: &str, ext: &str) -> bool {
+    Path::new(path)
+        .extension()
+        .is_some_and(|e| e.eq_ignore_ascii_case(ext))
+}
+
+/// `body` with each `/assets/<file>` that `sums` knows followed by its `?v=`.
+fn versioned(body: &str, sums: &std::collections::BTreeMap<String, String>) -> String {
+    let mut out = String::with_capacity(body.len() + 256);
+    let mut rest = body;
+    while let Some(at) = rest.find("/assets/") {
+        let start = at + "/assets/".len();
+        out.push_str(&rest[..start]);
+        rest = &rest[start..];
+        let end = rest
+            .find(|c: char| !(c.is_ascii_alphanumeric() || "-_./".contains(c)))
+            .unwrap_or(rest.len());
+        let file = &rest[..end];
+        out.push_str(file);
+        rest = &rest[end..];
+        if let Some(v) = sums.get(file)
+            && !rest.starts_with('?')
+        {
+            out.push_str("?v=");
+            out.push_str(v);
+        }
+    }
+    out.push_str(rest);
+    out
 }
 
 /// The 404 page's text: where the reader likely meant to go.
@@ -256,11 +328,12 @@ fn host_files(site: &Site, pages: &[String]) -> Vec<Out> {
   magnetometer=(), microphone=(), payment=(), usb=()
   Cross-Origin-Opener-Policy: same-origin
 
-/assets/fonts/*
+/assets/*
   Cache-Control: public, max-age=31536000, immutable
 
-/assets/screenshots/*
-  Cache-Control: public, max-age=86400
+/assets/og.png
+  ! Cache-Control
+  Cache-Control: no-cache
 ",
         script = script_hashes()
     );
@@ -334,8 +407,44 @@ fn pitch(root: &Path, desc: &str) -> Result<String> {
     Ok(desc.to_owned())
 }
 
-/// The generated block of the app's tokens, with the font paths pointed at `assets/fonts/`.
-fn css(tokens: &str) -> Result<String> {
+/// The app's syntax colours from `markdown.css` for the site's `pre` blocks: the rules after its
+/// `/* syntax` comment, scoped to `pre`, with each `--md-*` alias resolved to the token it names
+/// so the site needs no markdown variables. Light and dark come with the tokens.
+fn syntax_css(markdown: &str) -> Result<String> {
+    const SCOPE: &str = ":is(.markdown-body,.code,.diff) ";
+    let vars = markdown
+        .lines()
+        .find(|l| l.starts_with(SCOPE.trim_end()) && l.contains("--md-k1:"))
+        .context("markdown.css: no --md-* aliases")?;
+    let aliases: Vec<(&str, &str)> = vars
+        .split(['{', ';'])
+        .filter_map(|d| d.split_once(':'))
+        .filter(|(k, _)| k.starts_with("--md-"))
+        .collect();
+    let at = markdown
+        .find("/* syntax")
+        .context("markdown.css: no syntax block")?;
+    let mut out = String::from("/* syntax: generated from the app's markdown.css */\n");
+    for line in markdown[at..].lines().skip(1) {
+        if !line.contains("[class~=s-") {
+            break;
+        }
+        let mut rule = line.replace(SCOPE, "pre ");
+        for (k, v) in &aliases {
+            rule = rule.replace(&format!("var({k})"), v);
+        }
+        if rule.contains("--md-") {
+            anyhow::bail!("markdown.css: unresolved alias in {rule}");
+        }
+        out.push_str(&rule);
+        out.push('\n');
+    }
+    Ok(out)
+}
+
+/// The generated block of the app's tokens, with the font paths pointed at `assets/fonts/`,
+/// then the site's rules and the app's syntax colours.
+fn css(tokens: &str, markdown: &str) -> Result<String> {
     let begin = tokens
         .find("/* BEGIN generated")
         .context("tokens.css begin marker")?;
@@ -347,10 +456,11 @@ fn css(tokens: &str) -> Result<String> {
         .context("tokens.css roles marker")?;
     let generated = &tokens[begin..end];
     let roles = &tokens[end + tail..];
-    let body = format!("{generated}{roles}").replace("/static/fonts/", "fonts/");
+    let body = format!("{generated}{roles}").replace("/static/fonts/", "/assets/fonts/");
     Ok(format!(
         "/* Generated by `cargo xtask generate` from the app's tokens.css. Do not edit. \
-        */\n{body}\n{PAGE_CSS}"
+        */\n{body}\n{PAGE_CSS}{}",
+        syntax_css(markdown)?
     ))
 }
 
@@ -362,5 +472,7 @@ mod footer;
 mod prose;
 #[cfg(test)]
 mod repo_links;
+#[cfg(test)]
+mod safety;
 #[cfg(test)]
 mod tests;

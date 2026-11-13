@@ -4,7 +4,7 @@
 {%- import "_table.html" as t -%}
 {% block title %}Ownership · {{ c.name }}{% endblock %}
 {% block head %}
-<link rel="stylesheet" href="/static/insights.css">{% endblock %}
+<link rel="stylesheet" href="{{ crate::asset_url("insights.css") }}">{% endblock %}
 {% block content %}
 {{ head }}
 {% include "_chips.html" %}

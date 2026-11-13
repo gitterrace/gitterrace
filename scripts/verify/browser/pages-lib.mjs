@@ -71,8 +71,7 @@ function measure() {
     const t = e.textContent.trim().slice(0, 30);
     if (e.getBoundingClientRect().height > lh * 1.6) out.subj.push(`wraps: ${t}`);
     if (getComputedStyle(e).textOverflow !== 'ellipsis') out.subj.push(`no ellipsis: ${t}`);
-    e.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
-    if (e.scrollWidth > e.clientWidth + 1 && !e.getAttribute('data-tip')) out.subj.push(`cut without tip: ${t}`);
+    if (e.scrollWidth > e.clientWidth + 1 && e.getAttribute('title') !== e.textContent.trim()) out.subj.push(`cut without tip: ${t}`);
   }
   // A commit row never grows a line for its message: above the narrow breakpoint the subject
   // and its author share one line (the subject is cut instead); below it, the author line sits
@@ -261,7 +260,6 @@ async function header() {
   for (const name of browsers) {
     const { b, ctx } = await context(name);
     const p = await ctx.newPage();
-    let folded = 0;
     for (const width of [1440, 1100, 900, 760, 600, 480, 375, 320]) {
       await p.setViewportSize({ width, height: 600 });
       await p.goto(srv.base + '/', { waitUntil: 'load' });
@@ -283,8 +281,9 @@ async function header() {
       else if (m.hscroll) r.fail(`header ${where}: page scrolls sideways`);
       else if (m.dup.length) r.fail(`header ${where}: the bar repeats a menu action: ${m.dup.join(', ')}`);
       else if (m.vague) r.fail(`header ${where}: the search placeholder does not say what it searches`);
-      else r.ok(`header ${where}: tools on one row${m.folded ? ', search folded' : ''}`);
-      if (!m.folded || folded++) continue;
+      else if (!m.folded) r.fail(`header ${where}: search is a field, not the search button`);
+      else r.ok(`header ${where}: tools on one row, search is a button`);
+      if (width !== 1440 && width !== 375) continue;
       await p.click('#searchbtn');
       const open = await p.evaluate(() => document.activeElement && document.activeElement.id === 'q' && getComputedStyle(document.querySelector('.topsearch')).display !== 'none');
       await p.keyboard.press('Escape');

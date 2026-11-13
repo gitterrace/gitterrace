@@ -5,6 +5,8 @@ mod actions;
 mod activity;
 mod add;
 mod app;
+#[cfg(test)]
+mod asset_wiring_tests;
 mod bounded;
 mod caches;
 mod charts;
@@ -91,7 +93,7 @@ use gitterrace_config::Config;
 use gitterrace_git::Repo;
 use gitterrace_index::Index;
 pub use guard::CSP as PAGE_CSP;
-pub use highlight::languages as highlighted_languages;
+pub use highlight::{block as highlight_block, languages as highlighted_languages};
 pub use mcp_scope::mcp_scope;
 pub use media::plain_media;
 pub use multi::{discover_repos, search_roots};
@@ -99,7 +101,7 @@ pub use registry::{
     Entry as RegistryEntry, add_token, candidates as registry_candidates, state_dir,
 };
 pub use reload::{Load, Watched};
-pub use routes::font_bytes;
+pub use routes::{LAZY_ASSETS, MERMAID_JS, asset_url, asset_version, font_bytes};
 pub use views::stats_tab_labels;
 
 use crate::app::{App, Env};
@@ -253,9 +255,6 @@ pub fn outline_rail(headings: &[(&str, &str)]) -> String {
 
 /// The script behind the outline: the active heading's item is marked as the page scrolls.
 pub const OUTLINE_JS: &str = include_str!("../static/outline.js");
-
-/// The diagram library: a page's script loads it by name, so no link names it.
-pub const MERMAID_JS: &str = "/static/vendor/mermaid-11.17.2.min.js";
 
 /// [`WARM_PAGES`] without the pages `cfg` switches off, for `export` to seed its crawl from.
 pub fn warm_pages(cfg: &Config) -> Vec<&'static str> {

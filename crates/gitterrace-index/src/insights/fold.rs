@@ -98,8 +98,7 @@ mod tests {
             ..ScopeParams::default()
         };
         p.select = Selection {
-            path: path.map(str::to_owned),
-            ..Selection::default()
+            q: path.map(|p| format!("path:{p}")),
         };
         Scope::from_params(&p, Options::default(), Period::All).expect("scope")
     }

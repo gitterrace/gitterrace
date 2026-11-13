@@ -15,9 +15,6 @@ pub(crate) struct Cli {
     /// Address to listen on. Local only by default. Overrides `server.addr`.
     #[arg(long, global = true)]
     pub(crate) addr: Option<SocketAddr>,
-    /// Retired: changes come from OS file events. Accepted with a warning so old scripts start.
-    #[arg(long, global = true, value_name = "MS", hide = true)]
-    pub(crate) interval_ms: Option<u64>,
     /// Do not watch for changes: no live updates, and a restart or reload picks up new commits.
     /// Overrides `watch.enabled`.
     #[arg(long, global = true)]
@@ -95,8 +92,7 @@ pub(crate) enum Command {
         /// first, before any repositories: `export site repo1 repo2`. A folder an earlier
         /// export made is replaced whole. Any other non-empty folder is refused without
         /// `--force`, and so are a symlink and a folder holding a repository being exported.
-        /// A folder an older version exported records no ownership and is refused: remove it
-        /// and export again.
+        /// An export folder that records no ownership is refused: remove it and export again.
         out: Option<PathBuf>,
         /// Write into a non-empty folder that no earlier export made. Its files are kept, a
         /// file in the site's way is replaced, a folder in its way fails the export. Later

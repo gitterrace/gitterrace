@@ -3,7 +3,10 @@
 //!
 //! 1. a link to the markdown source of a page the site publishes, instead of the page;
 //! 3. a paragraph or list item of prose that two pages both carry, outside the text a page
-//!    quotes on purpose (marked `data-from`);
+//!    quotes on purpose (marked `data-from`), and a landing sentence said twice there or
+//!    said on another page too;
+//! 3. also a page naming an `/assets/` file without its build's `?v=`, which a browser would
+//!    keep a year past the next build (the absolute link preview excepted);
 //! 4. a page with too little text, or no section, to be worth its link;
 //! 6. a fenced block in a language that is meant to be drawn, shown as source;
 //! 7. a page without a title, a meta description or the shared bar, main and footer;
@@ -46,6 +49,8 @@ pub(super) fn problems(pages: &BTreeMap<String, String>, facts: &Facts) -> Vec<S
     let mut bad = Vec::new();
     bad.extend(markdown_links(pages, facts));
     bad.extend(repeated_prose(pages));
+    bad.extend(landing_repeats(pages));
+    bad.extend(unversioned_assets(pages));
     bad.extend(thin_pages(pages));
     bad.extend(raw_drawings(pages));
     bad.extend(missing_head_or_frame(pages));
@@ -137,30 +142,97 @@ fn markdown_links(pages: &BTreeMap<String, String>, facts: &Facts) -> Vec<String
     bad
 }
 
+/// Guard 3b: a sentence of the landing page that the landing page says twice, or that another
+/// page also says. Paragraphs are compared whole by guard 3, so a repeat inside a longer one
+/// slips through there. Here the landing's own text is split into sentences.
+fn landing_repeats(pages: &BTreeMap<String, String>) -> Vec<String> {
+    let Some(home) = pages.get("index.html") else {
+        return Vec::new();
+    };
+    let others: String = pages
+        .iter()
+        .filter(|(p, _)| p.as_str() != "index.html")
+        .flat_map(|(_, h)| prose(&own_main(h)))
+        .collect::<Vec<_>>()
+        .join(" ");
+    let mut seen = BTreeSet::new();
+    let mut bad = Vec::new();
+    for s in prose(&own_main(home)).iter().flat_map(|p| sentences(p)) {
+        if s.chars().count() < MIN_REPEAT {
+            continue;
+        }
+        if !seen.insert(s.clone()) {
+            bad.push(format!("index.html: says twice: \"{s}\""));
+        } else if others.contains(&s) {
+            bad.push(format!("index.html: another page also says: \"{s}\""));
+        }
+    }
+    bad
+}
+
+/// The paragraphs and list items of a page's main, as plain text.
+fn prose(main: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    for (open, close) in [("<p", "</p>"), ("<li", "</li>")] {
+        for chunk in main.split(open).skip(1) {
+            // `<p` and `<li` also start `<pre`, `<path` and `<link`, which are not prose.
+            if !chunk.starts_with(['>', ' ']) {
+                continue;
+            }
+            let body = chunk.split_once('>').map_or("", |(_, b)| b);
+            out.push(text(body.split(close).next().unwrap_or("")));
+        }
+    }
+    out
+}
+
+/// The sentences of plain text: split after `.`, `?` or `!` followed by a space.
+fn sentences(text: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    let mut start = 0;
+    for (i, c) in text.char_indices() {
+        if matches!(c, '.' | '?' | '!') && text[i + 1..].starts_with(' ') {
+            out.push(text[start..=i].trim().to_owned());
+            start = i + 1;
+        }
+    }
+    out.push(text[start..].trim().to_owned());
+    out.retain(|s| !s.is_empty());
+    out
+}
+
+/// Guard 3c: an `href`, `src` or `srcset` entry under `/assets/` with no `?v=`.
+fn unversioned_assets(pages: &BTreeMap<String, String>) -> Vec<String> {
+    let mut bad = Vec::new();
+    for (path, html) in pages {
+        for attr in ["href", "src", "srcset"] {
+            // A srcset lists `url width` pairs, each checked.
+            for url in attrs(html, attr).into_iter().flat_map(|v| v.split(", ")) {
+                let url = url.split(' ').next().unwrap_or(url);
+                if url.starts_with("/assets/") && !url.contains("?v=") {
+                    bad.push(format!("{path}: {url} has no ?v="));
+                }
+            }
+        }
+    }
+    bad
+}
+
 /// Guard 3: prose of `MIN_REPEAT` characters or more that two pages both carry.
 fn repeated_prose(pages: &BTreeMap<String, String>) -> Vec<String> {
     let mut seen: BTreeMap<String, &str> = BTreeMap::new();
     let mut bad = Vec::new();
     for (path, html) in pages {
-        let main = own_main(html);
         let mut on_page = BTreeSet::new();
-        for (open, close) in [("<p", "</p>"), ("<li", "</li>")] {
-            for chunk in main.split(open).skip(1) {
-                // `<p` and `<li` also start `<pre`, `<path` and `<link`, which are not prose.
-                if !chunk.starts_with(['>', ' ']) {
-                    continue;
-                }
-                let body = chunk.split_once('>').map_or("", |(_, b)| b);
-                let line = text(body.split(close).next().unwrap_or(""));
-                if line.chars().count() >= MIN_REPEAT && on_page.insert(line.clone()) {
-                    match seen.get(&line) {
-                        Some(first) => bad.push(format!(
-                            "{path}: repeats prose of {first}: \"{}\"",
-                            line.chars().take(60).collect::<String>()
-                        )),
-                        None => {
-                            seen.insert(line, path);
-                        }
+        for line in prose(&own_main(html)) {
+            if line.chars().count() >= MIN_REPEAT && on_page.insert(line.clone()) {
+                match seen.get(&line) {
+                    Some(first) => bad.push(format!(
+                        "{path}: repeats prose of {first}: \"{}\"",
+                        line.chars().take(60).collect::<String>()
+                    )),
+                    None => {
+                        seen.insert(line, path);
                     }
                 }
             }

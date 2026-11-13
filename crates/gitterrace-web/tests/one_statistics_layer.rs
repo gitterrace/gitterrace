@@ -71,11 +71,11 @@ async fn api_and_pages_give_the_same_numbers_for_the_same_filter() {
     // which files count. The pages read them the same way the API does.
     for q in [
         "",
-        "type=fix",
-        "path=src",
+        "q=type%3Afix",
+        "q=path%3Asrc",
         "period=1m",
         "generated=1&exclude=docs/*",
-        "author=t%40e.x&period=3m",
+        "q=author%3At%40e.x&period=3m",
     ] {
         let (s, page) = get(&router, &format!("/stats?{q}")).await;
         assert_eq!(s, 200, "/stats?{q}");

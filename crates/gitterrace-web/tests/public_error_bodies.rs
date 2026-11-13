@@ -58,8 +58,14 @@ async fn public_error_bodies_never_name_host_folders() {
         .into_iter()
         .map(str::to_owned)
         .chain(gitterrace_api::ENDPOINTS.iter().map(|e| {
+            // An endpoint refuses a parameter it does not list, before any cache read.
+            let query = if e.params.iter().any(|p| p.name == "path") {
+                "?path=src/a.rs"
+            } else {
+                ""
+            };
             format!(
-                "/r/repo/api/v1{}?path=src/a.rs",
+                "/r/repo/api/v1{}{query}",
                 e.path.replace("{id}", "HEAD").replace("{name}", "summary")
             )
         }))

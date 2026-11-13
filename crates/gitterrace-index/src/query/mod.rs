@@ -12,7 +12,7 @@ mod spec;
 use gitterrace_types::Period;
 
 pub use matcher::{Commit, Matcher, by};
-pub use spec::{KEYWORDS, KeywordSpec, aliases, grammar, grammar_line};
+pub use spec::{KEYWORDS, KeywordSpec, grammar, grammar_line};
 
 /// A parsed filter: every term must match, in the order written.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -110,49 +110,20 @@ impl Query {
     }
 }
 
-/// The term an older one-key URL parameter (`type`, `scope`, `author`, `path`, `period`, the
-/// `param` of [`KEYWORDS`]) says: the one place web, API and MCP read those keys.
+/// The `after:` and `before:` terms of a bucket link's `from` and `to`.
 ///
-/// `from` and `to` are the date range of a bucket link, both ends inclusive days: `from` reads
-/// as `after:` that day, `to` as `before:` the next one, since `before:` is exclusive.
-///
-/// `Ok(None)` when the key is no alias, the value is blank, or it bounds nothing
-/// (`period=all`). A list value is one item: commas belong to `q`.
-///
-/// # Errors
-/// [`QueryError`] when a `period` value is none of the periods or a date is no `YYYY-MM-DD`.
-pub fn fold(key: &str, value: &str) -> Result<Option<Term>, QueryError> {
-    let value = value.trim();
-    let Some(spec) = KEYWORDS.iter().find(|k| k.param == Some(key)) else {
-        return Ok(None);
-    };
-    let value = if spec.keyword == "path" {
-        value.trim_matches('/')
-    } else {
-        value
-    };
-    if value.is_empty() {
-        return Ok(None);
-    }
-    let one = || vec![value.to_owned()];
-    let day = || {
-        crate::parse_day(value).ok_or_else(|| QueryError {
-            start: 0,
-            end: value.len().max(1),
-            message: format!("`{key}` takes a date YYYY-MM-DD, got {value:?}"),
-        })
-    };
-    let leaf = match spec.keyword {
-        "after" => Leaf::After(When::Day(day()?)),
-        // Inclusive in the URL, exclusive in the keyword: the next day, computed as a day.
-        "before" => Leaf::Before(When::Day(day()?.saturating_add(1))),
-        "type" => Leaf::Kind(one()),
-        "scope" => Leaf::Scope(one()),
-        "author" => Leaf::Author(one()),
-        "path" => Leaf::Path(one()),
-        _ => return Ok(parse::terms(&format!("{}:{}", spec.keyword, parse::quote(value)))?.pop()),
-    };
-    Ok(Some(Term { neg: false, leaf }))
+/// Both ends are inclusive days: `before:` is exclusive, so it takes the day after `to`.
+/// `None` when either is no `YYYY-MM-DD` or `from` is after `to`.
+#[must_use]
+pub fn day_range(from: &str, to: &str) -> Option<[Term; 2]> {
+    let (f, t) = (crate::parse_day(from.trim())?, crate::parse_day(to.trim())?);
+    (f <= t).then(|| {
+        [
+            Leaf::After(When::Day(f)),
+            Leaf::Before(When::Day(t.saturating_add(1))),
+        ]
+        .map(|leaf| Term { neg: false, leaf })
+    })
 }
 
 impl Leaf {

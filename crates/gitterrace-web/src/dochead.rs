@@ -69,7 +69,7 @@ impl fmt::Display for DocHead {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let views = (self.switch.is_none() && self.views).then(|| Seg {
             name: "View".to_owned(),
-            buttons: true,
+            panes: "view".to_owned(),
             choices: vec![
                 Choice::new("Preview", "rendered", true),
                 Choice::new("Code", "source", false),

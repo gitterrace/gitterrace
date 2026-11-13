@@ -4,22 +4,18 @@
 {%- import "_table.html" as t -%}
 {% block content %}
 {{ head }}
-<div class="cols{% if no_side %} wide{% endif %}">
+<div class="cols{% if no_side || totals.is_none() %} wide{% endif %}">
 <article>
-{% if let Some(l) = latest %}<div class="card latest">{% call avatars::avatar(l.hue, l.initial) %}{% endcall %}<a class="who" href="{{ l.author_href }}"><b>{{ l.author }}</b></a><a class="subj" href="{{ l.href }}">{{ l.subject }}</a>{{ l.sha|safe }}<span class="muted">{{ l.when }}</span><a class="hist" href="{{ c.base }}/log/{{ c.rev_enc }}">History</a></div>{% endif %}
+{% if let Some(l) = latest %}<div class="card latest">{% call avatars::avatar(l.hue, l.initial) %}{% endcall %}<a class="who" href="{{ l.author_href }}"><b>{{ l.author }}</b></a><a class="subj" href="{{ l.href }}" title="{{ l.subject }}">{{ l.subject }}</a>{{ l.sha|safe }}<span class="muted">{{ l.when }}</span><a class="hist" href="{{ c.base }}/log/{{ c.rev_enc }}">History</a></div>{% endif %}
 <div class="card files-card"><table class="entries" data-last="{{ c.base }}/api/last/{{ c.rev_enc }}/">{% call t::files_head("Files") %}{% endcall %}
 {% for e in entries %}<tr><th scope="row">{% if e.href.is_empty() %}<span class="ico {{ e.kind }}"></span>{{ e.name }}{% else %}<a href="{{ e.href }}"><span class="ico {{ e.kind }}"></span>{{ e.name }}</a>{% endif %}</th><td class="lc muted" data-name="{{ e.name }}"></td><td class="muted r" headers="files-size">{{ e.size }}</td></tr>{% endfor %}
 </table></div>
 {% if let Some(a) = about %}<div class="card readme doccard" id="about">{{ a.head }}<div class="{% if a.markdown %}markdown-body" data-src="{{ a.file }}"{% else %}doc-plain"{% endif %}>{{ a.html|safe }}</div></div>{% endif %}
 </article>
-{% if !no_side %}<aside>
-{% if let Some(t) = totals %}
+{% if let Some(t) = totals %}{% if !no_side %}<aside>
 {{ side|safe }}
 <section class="side"><h3>All time</h3>
 <p class="facts"><span data-population="{{ t.every }}"><b>{{ t.commits }}</b> {{ t.commits_noun }}</span>{% if !t.merges.is_empty() %} <span class="muted" data-population="{{ t.every }}" data-tip="All commits, merges and bots included. Insights and the rest of this line count only the counted ones: no merges, since a merge repeats its branch, and bots as the options say.">{{ t.merges }}</span>{% endif %} <span data-population="{{ t.counted }}"><b>{{ t.authors }}</b> {{ t.authors_noun }}</span> <span data-population="{{ t.counted }}"><b>{{ t.files }}</b> {{ t.files_noun }}</span> <span data-population="{{ t.counted }}">{% call deltas::delta(t.additions, t.deletions) %}{% endcall %} {{ t.lines_noun }}</span></p></section>
-{% else %}
-<section class="side progress" data-progress><h3>Indexing history</h3><div class="bar"><progress max="100" value="0"></progress><b class="pct">0%</b></div><p class="muted">Insights fill in when the index is ready.</p></section>
-{% endif %}
-</aside>{% endif %}
+</aside>{% endif %}{% endif %}
 </div>
 {% endblock %}

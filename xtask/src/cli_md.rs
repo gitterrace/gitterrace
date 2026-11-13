@@ -53,7 +53,7 @@ fn command_body(s: &mut String, c: &Command, is_root: bool) {
     let usage = c.clone().render_usage().to_string();
     let _ = writeln!(
         s,
-        "```text\n{}\n```",
+        "```sh\n{}\n```",
         usage.trim_start_matches("Usage: ").trim()
     );
     let own: Vec<&Arg> = visible(c)

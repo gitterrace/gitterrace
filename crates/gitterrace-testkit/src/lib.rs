@@ -5,6 +5,7 @@
 #![expect(clippy::expect_used, reason = "setup failures should panic")]
 
 pub mod a11y;
+pub mod css;
 mod fixture;
 pub mod matrix;
 pub mod oracle;

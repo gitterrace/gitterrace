@@ -96,6 +96,51 @@ fn guard_1_a_link_to_the_markdown_of_a_published_page_is_red() {
 }
 
 #[test]
+fn guard_3c_an_asset_link_without_its_version_is_red() {
+    let bad = plant(|p| {
+        let a = "<h2>S</h2><img src=\"/assets/x.svg\" alt=\"\">";
+        edit_page(p, "docs/a/index.html", "<h2>S</h2>", a);
+    });
+    assert!(bad.contains("/assets/x.svg has no ?v="), "{bad}");
+    let ok = plant(|p| {
+        let a = "<h2>S</h2><img src=\"/assets/x.svg?v=1\" alt=\"\">";
+        edit_page(p, "docs/a/index.html", "<h2>S</h2>", a);
+    });
+    assert!(!ok.contains("has no ?v="), "{ok}");
+}
+
+#[test]
+fn guard_3b_a_landing_sentence_said_twice_or_elsewhere_is_red() {
+    let line = "This sentence is long enough to count, and the landing page says it.";
+    let twice = plant(|p| {
+        let html = page(&format!(
+            "<h1>Home</h1><h2>S</h2><p>{}.</p><p>{line}</p><p>Other words. {line}</p>",
+            words(70)
+        ));
+        p.insert("index.html".to_owned(), html);
+    });
+    assert!(twice.contains("index.html: says twice"), "{twice}");
+    let elsewhere = plant(|p| {
+        let html = page(&format!(
+            "<h1>Home</h1><h2>S</h2><p>{}. {line}</p>",
+            words(70)
+        ));
+        p.insert("index.html".to_owned(), html);
+        let b = format!("<h2>S</h2><p>Some lead in. {line} And more.</p>");
+        edit_page(p, "docs/b/index.html", "<h2>S</h2>", &b);
+    });
+    assert!(elsewhere.contains("another page also says"), "{elsewhere}");
+    let once = plant(|p| {
+        let html = page(&format!(
+            "<h1>Home</h1><h2>S</h2><p>{}. {line}</p>",
+            words(70)
+        ));
+        p.insert("index.html".to_owned(), html);
+    });
+    assert!(!once.contains("index.html:"), "{once}");
+}
+
+#[test]
 fn guard_3_prose_two_pages_carry_is_red_unless_quoted() {
     let shared = "This sentence is long enough to count as prose that two pages repeat.";
     let bad = plant(|p| {

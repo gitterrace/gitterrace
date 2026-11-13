@@ -3,7 +3,7 @@
 //! page respects every active chip.
 
 use gitterrace_index::feed::{CommitRange, InsightsSource};
-use gitterrace_index::query::{Leaf, Query, QueryError, Term, When, fold};
+use gitterrace_index::query::{Leaf, Query, QueryError, Term, When, day_range};
 use gitterrace_index::{Period, Selection};
 use gitterrace_types::StringEnum;
 use serde::Deserialize;
@@ -19,9 +19,8 @@ use crate::seg::{Choice, Seg};
 pub(crate) const NO_SCOPE: &str = Selection::NO_SCOPE;
 pub(crate) use gitterrace_index::under;
 
-/// The filter of a page: the URL's `q` and the one-key forms older links use (`type`,
-/// `scope`, `author`, `path`, `period`), read into one [`Query`]. Every link it writes says
-/// it as `?q=` alone.
+/// The filter of a page: the URL's `q`, with `period` and a bucket's `from` and `to` read into
+/// the same [`Query`]. Every link it writes says the terms as `?q=`.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub(crate) struct Filter {
     query: Query,
@@ -86,13 +85,14 @@ pub(crate) enum Dim {
 }
 
 impl Dim {
-    /// The URL key of the term, as [`fold`] reads it.
-    const fn key(self) -> &'static str {
+    /// The term selecting the one value `v`.
+    fn leaf(self, v: &str) -> Leaf {
+        let one = vec![v.to_owned()];
         match self {
-            Self::Kind => "type",
-            Self::Scope => "scope",
-            Self::Author => "author",
-            Self::Path => "path",
+            Self::Kind => Leaf::Kind(one),
+            Self::Scope => Leaf::Scope(one),
+            Self::Author => Leaf::Author(one),
+            Self::Path => Leaf::Path(one),
         }
     }
 
@@ -113,48 +113,48 @@ impl Filter {
             .period
             .as_deref()
             .map(str::trim)
-            .filter(|p| !p.is_empty())
-            .map(|p| format!("period:{p}"));
-        let with_period = Selection {
-            q: Some(format!(
-                "{} {}",
-                period.unwrap_or_default(),
-                raw.select.q.as_deref().unwrap_or_default()
-            )),
-            ..raw.select.clone()
-        };
-        // `all` bounds nothing, so the query drops it: remembered here, it still overrides a
-        // configured default period, whether `?period=all` or `period:all` in the text said it.
-        let all = raw.period.as_deref().map(str::trim) == Some(Period::All.as_str())
-            || raw
-                .select
-                .q
-                .as_deref()
-                .is_some_and(|t| t.split_whitespace().any(|w| w == "period:all"));
+            .filter(|p| !p.is_empty());
+        // `all` bounds nothing, so the query has no term for it: remembered here, it still
+        // overrides a configured default period.
+        let all = period == Some(Period::All.as_str());
+        let lead: Vec<Term> = period
+            .and_then(Period::parse)
+            .filter(|p| *p != Period::All)
+            .map(|p| Term {
+                neg: false,
+                leaf: Leaf::After(When::Period(p)),
+            })
+            .into_iter()
+            .collect();
+        if let Some(p) = period.filter(|p| Period::parse(p).is_none()) {
+            let message = format!("`period` takes {}, got {p:?}", Period::expected());
+            return Self {
+                query: Query::new(Self::range_terms(raw)),
+                refused: Some((
+                    raw.select.q.clone().unwrap_or_default(),
+                    QueryError {
+                        start: 0,
+                        end: 1,
+                        message,
+                    },
+                )),
+                all,
+            };
+        }
         let range = Self::range_terms(raw);
-        let with_range = |q: Query| {
-            let mut terms = q.terms().to_vec();
-            terms.extend(range.clone());
-            Query::new(terms)
-        };
-        match with_period.query() {
+        let with = |q: &Query| Query::new([lead.as_slice(), q.terms(), range.as_slice()].concat());
+        match raw.select.query() {
             Ok(query) => Self {
-                query: with_range(query),
+                query: with(&query),
                 refused: None,
                 all,
             },
-            Err(e) => {
-                // The one-key forms and the period still hold; only the text is shown back.
-                let rest = Selection {
-                    q: None,
-                    ..raw.select.clone()
-                };
-                Self {
-                    query: with_range(rest.query().unwrap_or_default()),
-                    refused: Some((raw.select.q.clone().unwrap_or_default(), e)),
-                    all,
-                }
-            }
+            // The period and the range still hold; only the text is shown back.
+            Err(e) => Self {
+                query: with(&Query::default()),
+                refused: Some((raw.select.q.clone().unwrap_or_default(), e)),
+                all,
+            },
         }
     }
 
@@ -164,28 +164,20 @@ impl Filter {
         Self::of_raw(&Raw {
             select: Selection {
                 q: Some(text.to_owned()),
-                ..Selection::default()
             },
             ..Raw::default()
         })
     }
 
     /// The terms of `from` and `to`: both or neither, so a malformed or backwards range reads
-    /// as none, as it always has.
+    /// as none.
     fn range_terms(raw: &Raw) -> Vec<Term> {
-        let (Some(f), Some(t)) = (raw.from.as_deref(), raw.to.as_deref()) else {
-            return Vec::new();
-        };
-        let ordered = gitterrace_index::parse_day(f)
-            .zip(gitterrace_index::parse_day(t))
-            .is_some_and(|(a, b)| a <= b);
-        if !ordered {
-            return Vec::new();
-        }
-        [fold("from", f), fold("to", t)]
-            .into_iter()
-            .filter_map(|r| r.ok().flatten())
-            .collect()
+        raw.from
+            .as_deref()
+            .zip(raw.to.as_deref())
+            .and_then(|(f, t)| day_range(f, t))
+            .map(Vec::from)
+            .unwrap_or_default()
     }
 
     /// The date range both of whose bounds the filter holds, as local days, both inclusive:
@@ -318,7 +310,10 @@ impl Filter {
             .filter(|v| !v.is_empty());
         self.swap(
             |l| d.is(l),
-            value.and_then(|v| fold(d.key(), v).ok().flatten()),
+            value.map(|v| Term {
+                neg: false,
+                leaf: d.leaf(v),
+            }),
         )
     }
 

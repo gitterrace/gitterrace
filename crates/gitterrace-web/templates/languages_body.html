@@ -31,7 +31,7 @@ class="r">After</th><th scope="col" class="r">Change</th><th scope="col" class="
 class="vh">Change bar</span></th></tr>
 {%- for l in r.rows %}<tr><th scope="row"><i class="dot {{ l.class }}"></i>{{ l.name }}</th><td class="r">{{ l.before }}</td><td class="r">{{ l.after }} <span class="muted">{{ l.share }}</span></td><td class="r"><b class="{% if l.up %}add{% else %}del{% endif %}">{{ l.change }}</b></td><td class="dcol"><span class="dbar"><b class="{% if l.up %}up{% else %}dn{% endif %} w{{ l.w }}"></b></span></td></tr>{% endfor -%}
 </table></div><details class="rlist"><summary>{{ r.list_title }} in this range</summary><ul>
-{%- for c in r.commits %}<li>{{ c.sha|safe }} <span class="subj">{{ c.subject }}</span> <span class="muted">{{ c.day }}</span></li>{% endfor -%}
+{%- for c in r.commits %}<li>{{ c.sha|safe }} <span class="subj" title="{{ c.subject }}">{{ c.subject }}</span> <span class="muted">{{ c.day }}</span></li>{% endfor -%}
 </ul>{% if let Some(n) = r.cut %}<p
 class="foot">Showing the newest {{ n }}. Narrow the range to see the rest.</p>{% endif %}</details>
 {%- endif -%}

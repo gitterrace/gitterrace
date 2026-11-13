@@ -23,33 +23,12 @@
   try { mine = act ? JSON.parse(act.dataset.menu || "[]") : []; } catch (e) { mine = []; }
   var rev = body.dataset.rev || "HEAD";
   var commit = body.dataset.commit || "";
+  // Copy as markdown needs send.js's source line.
+  window.gtLazy("send");
   var DOCS = "https://github.com/gitterrace/gitterrace/blob/main/docs/actions.md";
   var MD_LINES = 40;
   // A mark shorter than this many characters carries a line or two of context with it.
   var SHORT = 20;
-
-  // The server renders the note into the page, so it is there at first paint. Later edits of
-  // actions.toml are fetched when the tab is shown or focused, and touch the page only when the
-  // text changes.
-  var noteEl = document.getElementById("actnote");
-  function showNote(text) {
-    if (!noteEl) return;
-    var line = noteEl.firstElementChild;
-    if (!text) { noteEl.hidden = true; return; }
-    if (line.textContent !== text) line.textContent = text;
-    noteEl.hidden = false;
-  }
-  function pollNote() {
-    if (document.hidden || OFF.indexOf("actions") >= 0) return;
-    fetch("/_actions/status", { cache: "no-store" })
-      .then(function (r) { return r.ok ? r.json() : null; })
-      .then(function (j) { if (j) showNote(j.note); })
-      .catch(function () {});
-  }
-  pollNote();
-  // No timer: a poll per tab holds connections that WebKit's 6 per host cap needs for navigation.
-  document.addEventListener("visibilitychange", pollNote);
-  window.addEventListener("focus", pollNote);
 
   function el(tag, cls, text) {
     var e = document.createElement(tag);
@@ -307,11 +286,9 @@
   function openMenu(t, anchor) {
     closeMenu();
     menuOpener = anchor || null;
-    var back = el("div", "ov-back actmenu-back");
     var box = el("div", "ov anchored actmenu");
     var list = el("ul", "ov-list");
     box.appendChild(list);
-    back.appendChild(box);
     var items = [], fns = [];
     function add(label, key, fn, cls) {
       var li = el("li", cls || "", null);
@@ -336,7 +313,7 @@
       head("Share");
       add("Send to\u2026", "s", function () {
         closeMenu();
-        if (window.gtSend) window.gtSend.open({ kind: t.kind, path: t.path || "", lines: t.lines || null, subject: t.subject || "", sha: commit, link: permalink(t), markdown: markdown(t), text: t.text || "", marked: t.marked || t.quote || "" });
+        window.gtLazy("send", function () { window.gtSend.open({ kind: t.kind, path: t.path || "", lines: t.lines || null, subject: t.subject || "", sha: commit, link: permalink(t), markdown: markdown(t), text: t.text || "", marked: t.marked || t.quote || "" }); });
       });
       keys.s = 2;
     }
@@ -382,7 +359,6 @@
       items.forEach(function (x, j) { x.classList.toggle("on", j === sel); });
       items[sel].focus();
     }
-    back.addEventListener("mousedown", function (e) { if (e.target === back) closeMenu(); });
     // The key press itself is handed to the item, so a user action sees a trusted event.
     box.addEventListener("keydown", function (e) {
       e.stopPropagation();
@@ -394,8 +370,8 @@
       else return;
       e.preventDefault();
     });
-    menu = { back: back };
-    ov.open("actmenu", back, box, { menu: true, label: "Actions", from: anchor, onClose: function () { if (menu && menu.back === back) menu = null; } });
+    if (!ov.open("actmenu", box, box, { menu: true, label: "Actions", from: anchor, anchor: anchor, onClose: function () { if (menu === box) menu = null; } })) return;
+    menu = box;
     ov.place(box, anchor);
     focus(0);
   }
@@ -411,22 +387,11 @@
     return b;
   }
   // Page-level trigger in the top bar.
-  var theme = document.getElementById("theme");
-  if (theme) {
-    var top = button("Actions for this page (.)");
-    top.classList.remove("sm");
-    top.classList.add("top", "ghost");
-    top.addEventListener("click", function () { openMenu(current(), top); });
-    // Copy permalink lives in this menu and on y: no separate icon competing for the bar.
-    theme.parentNode.insertBefore(top, theme);
-  }
-  // Commit page: next to the sha.
-  var sha = document.querySelector("p.meta > a.sha");
-  if (sha && local().indexOf("/commit/") === 0) {
-    var cb = button("Actions for this commit");
-    cb.addEventListener("click", function () { openMenu(commitTarget(), cb); });
-    sha.parentNode.insertBefore(cb, sha.nextSibling);
-  }
+  // The page and commit triggers are rendered by the server, so nothing shifts.
+  var top = document.getElementById("actpage");
+  if (top) top.addEventListener("click", function () { openMenu(current(), top); });
+  var cb = document.getElementById("actcommit");
+  if (cb) cb.addEventListener("click", function () { openMenu(commitTarget(), cb); });
   // One floating trigger follows the hovered hunk header, blame line, search hit or
   // hotspot row, so a long page does not carry thousands of buttons.
   var hover = button("Actions");
@@ -490,7 +455,7 @@
     if (e.key !== "." || e.metaKey || e.ctrlKey || e.altKey || ov.name) return;
     if (window.gtKeysOff && window.gtKeysOff()) return;
     var t = e.target;
-    if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return;
+    if (window.gtTyping(t)) return;
     var anchor = (!markBtn.hidden && markBtn) || document.getElementById("actsel") || document.querySelector(".actbtn.top");
     if (!anchor) return;
     openMenu(current(), anchor);
@@ -507,7 +472,7 @@
     if (e.metaKey || e.ctrlKey || e.altKey || ov.name) return;
     if (window.gtKeysOff && window.gtKeysOff()) return;
     var t = e.target;
-    if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT" || t.isContentEditable)) return;
+    if (window.gtTyping(t)) return;
     if (armed) {
       disarm();
       e.preventDefault();

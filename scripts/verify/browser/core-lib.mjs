@@ -77,7 +77,7 @@ async function calmHeader() {
             return { border: bw, weight: Number(s.fontWeight) };
           };
           const chip = document.getElementById('wtchip'),
-            q = /** @type {HTMLElement | null} */ (document.querySelector('.topsearch'));
+            q = /** @type {HTMLElement | null} */ (document.getElementById('searchbtn'));
           const x = () => (q && q.offsetParent ? q.getBoundingClientRect().x : null);
           const out = {
             branch: look(document.getElementById('refbtn')),

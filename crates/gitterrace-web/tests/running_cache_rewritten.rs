@@ -16,16 +16,14 @@ async fn until_api_answers(
 ) -> (Option<std::time::Duration>, Vec<String>) {
     let t0 = std::time::Instant::now();
     let mut errors = Vec::new();
-    let mut round = 0;
     while t0.elapsed() < limit {
-        let u = format!("{prefix}/api/v1/repo?author=probe{round}");
+        let u = format!("{prefix}/api/v1/repo");
         let (status, retry) = api(router, &u).await;
         match status {
             200 => return (Some(t0.elapsed()), errors),
             503 if retry.is_some() => {}
             s => errors.push(format!("{u} -> {s}, Retry-After {retry:?}")),
         }
-        round += 1;
         wait::pause(std::time::Duration::from_millis(100)).await;
     }
     (None, errors)
@@ -89,7 +87,7 @@ fn a_running_server_rebuilds_a_cache_corrupted_underneath_for_the_api_too() {
         );
         // The pages answer from the rebuilt cache too, and never with a 5xx.
         for p in ["/", "/stats", "/log/HEAD"] {
-            let (s, _) = get(&router, &format!("{prefix}{p}?author=after")).await;
+            let (s, _) = get(&router, &format!("{prefix}{p}?q=author:after")).await;
             assert!(s < 500, "{p} -> {s} after the rebuild");
         }
     });
@@ -125,13 +123,13 @@ fn a_running_server_survives_its_cache_being_rewritten_underneath() {
         let mut errors = Vec::new();
         for round in 0..20 {
             for p in ["/", "/stats", "/log/HEAD"] {
-                let u = format!("{prefix}{p}?author=probe{round}");
+                let u = format!("{prefix}{p}?q=author:probe{round}");
                 let (s, _) = get(&router, &u).await;
                 if s >= 500 {
                     errors.push(format!("round {round}: {u} -> {s}"));
                 }
             }
-            let u = format!("{prefix}/api/v1/repo?author=probe{round}");
+            let u = format!("{prefix}/api/v1/repo");
             let (status, retry) = api(&router, &u).await;
             let (_, body) = get(&router, &u).await;
             if status != 503 || retry.is_none() || !body.contains("index_newer") {
@@ -193,7 +191,7 @@ fn a_truncated_or_garbage_segment_under_a_running_server_is_rebuilt() {
             // The start finished: damage met by the startup update is another path, and the
             // stats page then reads the segments, so the server holds them.
             gitterrace_testkit::oracle::ready(&router).await;
-            let (st, _) = get(&router, &format!("{prefix}/stats?author=warm")).await;
+            let (st, _) = get(&router, &format!("{prefix}/stats?q=author:warm")).await;
             assert!(st < 500, "/stats -> {st} while warming");
             let segs = segments(&cache);
             assert!(!segs.is_empty(), "no segment to damage");
@@ -219,7 +217,7 @@ fn a_truncated_or_garbage_segment_under_a_running_server_is_rebuilt() {
                     (&router, &prefix, &cache, &damaged, &errors);
                 async move {
                     for p in ["/stats", "/", "/log/HEAD"] {
-                        let u = format!("{prefix}{p}?author=probe{round}");
+                        let u = format!("{prefix}{p}?q=author:probe{round}");
                         let (s, _) = get(router, &u).await;
                         if s >= 500 {
                             errors.lock().expect("errors").push(format!("{u} -> {s}"));
@@ -264,7 +262,7 @@ fn a_cache_a_newer_build_owns_is_never_written_by_a_running_server() {
         let (repo, router, prefix) = built(tmp.path()).await;
         let cache = repo.join(".git/gitterrace");
         for i in 0..3 {
-            let (s, _) = get(&router, &format!("{prefix}/stats?author=warm{i}")).await;
+            let (s, _) = get(&router, &format!("{prefix}/stats?q=author:warm{i}")).await;
             assert!(s < 500, "/stats -> {s} while warming");
         }
         let snapshot = |dir: &std::path::Path| {
@@ -302,7 +300,13 @@ fn a_cache_a_newer_build_owns_is_never_written_by_a_running_server() {
         let mut errors = Vec::new();
         for round in 0..30 {
             for p in ["/", "/stats", "/log/HEAD", "/api/v1/repo"] {
-                let u = format!("{prefix}{p}?author=ro{round}");
+                // The API refuses a parameter it does not list: probe it bare.
+                let q = if p.starts_with("/api/") {
+                    String::new()
+                } else {
+                    format!("?q=author:ro{round}")
+                };
+                let u = format!("{prefix}{p}{q}");
                 let (s, _) = get(&router, &u).await;
                 if s >= 500 {
                     errors.push(format!("round {round}: {u} -> {s}"));

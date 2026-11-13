@@ -5,14 +5,14 @@
 // release binary on a free port, with scripts/release/site/site-shots/config as the config
 // folder (no tendir in Send to) and a throwaway state folder, so neither the user's config nor a
 // running preview is touched. Light and dark images per shot, 1280x800 at 2x, into
-// target/site-shots/ (ignored). Then copies the PNG files README.md links into docs/screenshots/
-// and deletes the rest there. `make site-shots` builds first and follows this with site-render
-// (the WebPs) and `cargo xtask generate`. Not in check: it needs browsers and the network on the
+// target/site-shots/ (ignored). `make site-shots` builds first and follows this with
+// site-render, which writes the WebPs into docs/screenshots/ (the site and the README both link
+// those), and `cargo xtask generate`. Not in check: it needs browsers and the network on the
 // first run.
 //
 //   node scripts/release/site/site-shots-run.mjs [NAME...]   all shots by default
-import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync } from 'node:fs';
-import { execFileSync, spawn } from 'node:child_process';
+import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import { spawn } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { root, loadPlaywright, launch, freePort } from '../../lib/browser-lib.mjs';
@@ -103,32 +103,3 @@ for (const scheme of ['light', 'dark']) {
 }
 await browser.close();
 stop();
-
-// Smaller files when a PNG optimizer is installed; the shots are the same either way.
-const files = todo.flatMap((s) => ['light', 'dark'].map((c) => join(out, `${s.name}-${c}.png`)));
-/** @type {[string, string[]][]} */
-const optimizers = [['oxipng', ['-q', '-o', '4', '--strip', 'safe']], ['pngquant', ['--force', '--skip-if-larger', '--ext', '.png', '--quality', '70-95']]];
-for (const [tool, args] of optimizers) {
-  try {
-    execFileSync(tool, [...args, ...files], { stdio: 'ignore' });
-    console.log(`optimized with ${tool}`);
-    break;
-  } catch {}
-}
-for (const f of files) console.log(`${f.slice(root.length + 1)} ${(statSync(f).size / 1024).toFixed(0)} KiB`);
-
-// The README's PNG files, by the same rule as readme_shots in xtask/src/site.rs: every
-// docs/screenshots/*.png path README.md names. Only those are tracked, beside the site's WebPs.
-const docs = join(root, 'docs/screenshots');
-const readme = new Set([...readFileSync(join(root, 'README.md'), 'utf8').matchAll(/docs\/screenshots\/([\w.-]+?\.png)/g)].map((m) => m[1]));
-mkdirSync(docs, { recursive: true });
-for (const f of readdirSync(docs)) if (f.endsWith('.png') && !readme.has(f)) rmSync(join(docs, f));
-for (const f of readme) {
-  try {
-    copyFileSync(join(out, f), join(docs, f));
-    console.log(`copied docs/screenshots/${f}`);
-  } catch {
-    console.error(`site-shots: README.md links docs/screenshots/${f}, but no shot made it`);
-    process.exit(1);
-  }
-}

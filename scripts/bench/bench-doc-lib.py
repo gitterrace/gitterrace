@@ -517,11 +517,6 @@ def render() -> str:
         *[x + "\n" for x in withheld_lines(cur)],
         *results_table(cur, old),
     ]
-    L += [
-        "",
-        "Every number, chart and page of each run, as files:",
-        "[tests/bench/results](../tests/bench/results/README.md).",
-    ]
     return wrap("\n".join(L).strip("\n") + "\n")
 
 

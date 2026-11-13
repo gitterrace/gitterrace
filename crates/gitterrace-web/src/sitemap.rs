@@ -76,20 +76,14 @@ pub const PAGES: &[Page] = &[
         concat!(
             "Insights on the shared filter and period: activity (with commit types and code ",
             "frequency), contributors, hotspots (with patterns), languages, ownership. ",
-            "`/stats/types`, `/stats/frequency` and `/stats/patterns` answer with a permanent ",
-            "redirect to their section, query kept, and `/insights` to `/stats`. ",
             "`?rev=` follows any ref",
         ),
         &[
             "/stats",
-            "/stats/types",
             "/stats/languages",
-            "/stats/frequency",
             "/stats/hotspots",
             "/stats/ownership",
-            "/stats/patterns",
             "/stats/contributors",
-            "/insights",
         ],
     ),
     page(

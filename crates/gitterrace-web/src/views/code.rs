@@ -180,7 +180,8 @@ fn code_html_uncached(r: &Render, path: &str, text: &str, lit_lines: usize) -> C
         if lazy { " data-hl" } else { "" }
     );
     let mut cut = false;
-    let mut open = false;
+    let mut chunk = String::new();
+    let mut rows = 0usize;
     for (i, line) in text.lines().enumerate() {
         if i >= r.blob_lines {
             cut = true;
@@ -189,23 +190,18 @@ fn code_html_uncached(r: &Render, path: &str, text: &str, lit_lines: usize) -> C
         if i == lit_lines {
             symbols = hl.take().map(|mut h| h.take_symbols()).unwrap_or_default();
         }
-        if i % CHUNK_LINES == 0 {
-            if open {
-                out.push_str("</div>");
-            }
-            out.push_str("<div class=\"ch\">");
-            open = true;
-        }
         let _ = write!(
-            out,
+            chunk,
             "<div id=\"L{n}\" class=\"l\" data-n=\"{n}\">{}</div>",
             hl.as_mut().map_or_else(|| esc_text(line), |h| h.line(line)),
             n = i + 1
         );
+        rows += 1;
+        if rows == CHUNK_LINES {
+            crate::views::diff::push_chunk(&mut out, &mut chunk, &mut rows);
+        }
     }
-    if open {
-        out.push_str("</div>");
-    }
+    crate::views::diff::push_chunk(&mut out, &mut chunk, &mut rows);
     out.push_str("</div>");
     if let Some(mut h) = hl {
         symbols = h.take_symbols();

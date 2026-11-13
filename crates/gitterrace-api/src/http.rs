@@ -18,11 +18,18 @@ use crate::insights;
 type Reply<T> = Result<Json<T>, ApiError>;
 
 /// The read-only JSON API. Nest it under `/api/v1`. Routes come from [`ENDPOINTS`], so an
-/// endpoint cannot exist without its documentation.
+/// endpoint cannot exist without its documentation, and each refuses a parameter it does not
+/// list.
 pub fn router(state: ApiState) -> Router {
     ENDPOINTS
         .iter()
-        .fold(Router::new(), |r, e| r.route(e.path, (e.route)()))
+        .fold(Router::new(), |r, e| {
+            let params = e.params;
+            let route = (e.route)().layer(middleware::from_fn(move |req, next| {
+                known_params(params, req, next)
+            }));
+            r.route(e.path, route)
+        })
         .layer(middleware::from_fn_with_state(state.clone(), etag))
         .with_state(state)
 }
@@ -38,6 +45,36 @@ where
         .await
         .map_err(|e| ApiError::Task(e.to_string()))?
         .map(Json)
+}
+
+/// Refuses a query key the endpoint does not list with 400: an unread key would answer
+/// unfiltered numbers to a caller who thinks they are filtered.
+async fn known_params(
+    params: &'static [endpoints::Param],
+    req: Request<axum::body::Body>,
+    next: Next,
+) -> Response {
+    let unknown = req.uri().query().and_then(|q| {
+        q.split('&')
+            .map(|kv| kv.split_once('=').map_or(kv, |(k, _)| k))
+            .find(|k| !k.is_empty() && !params.iter().any(|p| p.name == *k))
+            .map(str::to_owned)
+    });
+    match unknown {
+        Some(k) => {
+            let known: Vec<&str> = params.iter().map(|p| p.name).collect();
+            let known = if known.is_empty() {
+                "none".to_owned()
+            } else {
+                known.join(", ")
+            };
+            ApiError::BadRequest(format!(
+                "unknown parameter `{k}`. Known: {known}. Select commits with `q`"
+            ))
+            .into_response()
+        }
+        None => next.run(req).await,
+    }
 }
 
 /// Answers `If-None-Match` with 304 and tags every response with [`ApiState::etag`].

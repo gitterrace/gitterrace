@@ -179,7 +179,7 @@ mod tests {
         );
         let cx = CountContext::new(&MemorySource::new(&recs), &FixedClock(i64::MAX));
         let mut p = ScopeParams::default();
-        p.select.author = Some("ann@x.io".to_owned());
+        p.select.q = Some("author:ann@x.io".to_owned());
         let s = Scope::from_params(&p, Options::default(), Period::All).expect("scope");
         let c = ins.counted(&s, cx);
         assert_eq!(

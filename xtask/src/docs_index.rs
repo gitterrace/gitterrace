@@ -144,6 +144,11 @@ const DOCS: &[(&str, Kind, &str)] = &[
         "Changes per release, written from the commits",
     ),
     (
+        "docs/landing.md",
+        Kind::Project,
+        "The words on the landing page, each sentence once",
+    ),
+    (
         "docs/screenshots/README.md",
         Kind::Project,
         "Every screenshot, in both color schemes, with the tree it shows",
@@ -194,6 +199,11 @@ pub fn covers(path: &str) -> Option<&'static str> {
 }
 
 fn title(path: &str) -> &str {
+    // A folder's README is named by its folder, so two READMEs in the index stay apart.
+    let path = path
+        .strip_suffix("/README.md")
+        .filter(|p| p.contains('/'))
+        .unwrap_or(path);
     let name = path.rsplit('/').next().unwrap_or(path);
     name.strip_suffix(".md").unwrap_or(name)
 }
@@ -225,6 +235,8 @@ pub fn check(root: &Path) -> Result<Vec<String>> {
         bad.extend(keys.check(path, text));
         bad.extend(keys.defaults(path, text));
         bad.extend(check_paths(root, path, text));
+        bad.extend(split_lists(path, text));
+        bad.extend(plain_commands(path, text));
     }
     bad.extend(keys.reverse(&texts));
     Ok(bad)
@@ -392,6 +404,72 @@ pub fn normalize(p: &Path) -> String {
     parts.join("/")
 }
 
+/// A `text` fence whose lines are commands, so the site shows them uncolored. A command block
+/// is `sh` and is highlighted like the app's. A line is a command when it starts with a
+/// program the docs run (git, cargo, brew, curl, make, docker, npm or node) and holds no
+/// description after a column gap: a table of commands and what they do stays `text`.
+fn plain_commands(path: &str, text: &str) -> Vec<String> {
+    const PROGRAMS: [&str; 8] = [
+        "git ", "cargo ", "brew ", "curl ", "make ", "docker ", "npm ", "node ",
+    ];
+    let command = |l: &&str| PROGRAMS.iter().any(|p| l.starts_with(p)) && !l.contains("  ");
+    let mut bad = Vec::new();
+    let mut lines = text.lines().enumerate();
+    while let Some((i, l)) = lines.next() {
+        if l.trim() != "```text" {
+            continue;
+        }
+        let body: Vec<&str> = lines
+            .by_ref()
+            .map(|(_, l)| l)
+            .take_while(|l| !l.starts_with("```"))
+            .collect();
+        if !body.is_empty() && body.iter().all(command) {
+            bad.push(format!(
+                "{path}:{}: a block of commands is marked `text`: mark it `sh`",
+                i + 1
+            ));
+        }
+    }
+    bad
+}
+
+/// A list that a generated block ends or starts right against another list: a hand list and
+/// a generated one render as two lists where one was meant. Their items belong in one place,
+/// the generator. Only a blank line or a marker may sit between them.
+fn split_lists(path: &str, text: &str) -> Vec<String> {
+    // A list line: an item, or the indented continuation of one.
+    let item = |l: &str| {
+        let t = l.trim_start();
+        t.starts_with("- ") || t.starts_with("* ") || (l.starts_with("  ") && !t.is_empty())
+    };
+    let lines: Vec<&str> = text.lines().collect();
+    let mut bad = Vec::new();
+    for (i, l) in lines.iter().enumerate() {
+        if !(l.starts_with("<!-- BEGIN GENERATED") || l.starts_with("<!-- END GENERATED")) {
+            continue;
+        }
+        let near = |step: isize| {
+            let mut j = i as isize + step;
+            while let Some(s) = usize::try_from(j).ok().and_then(|j| lines.get(j)) {
+                if !s.trim().is_empty() {
+                    return Some(*s);
+                }
+                j += step;
+            }
+            None
+        };
+        if near(-1).is_some_and(item) && near(1).is_some_and(item) {
+            bad.push(format!(
+                "{path}:{}: a list on both sides of a generated marker reads as two lists: \
+                 generate the whole list",
+                i + 1
+            ));
+        }
+    }
+    bad
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -482,5 +560,31 @@ mod tests {
         for want in ["a-server-key", "same", "same-1", "21-byte-layout"] {
             assert!(a.contains(want), "{want} in {a:?}");
         }
+    }
+
+    #[test]
+    fn a_command_fence_marked_text_is_refused() {
+        let run = "```text\ngit terrace serve [PATHS]...\n```\n";
+        assert_eq!(plain_commands("d.md", run).len(), 1, "{run}");
+        let sh = "```sh\ngit terrace serve [PATHS]...\n```\n";
+        assert!(plain_commands("d.md", sh).is_empty(), "{sh}");
+        let table = "```text\ngit terrace serve   Serve the repository\n```\n";
+        assert!(plain_commands("d.md", table).is_empty(), "{table}");
+        let line = "```text\nsource: <repo>@<sha>\n```\n";
+        assert!(plain_commands("d.md", line).is_empty(), "{line}");
+    }
+
+    #[test]
+    fn a_hand_list_against_a_generated_list_is_refused() {
+        let two = "## S\n\n- hand\n\n<!-- BEGIN GENERATED: x -->\n- gen\n\
+                   <!-- END GENERATED: x -->\n";
+        assert_eq!(split_lists("d.md", two).len(), 1, "{two}");
+        let wrapped = "- hand item\n  wrapped on\n\n<!-- BEGIN GENERATED: x -->\n- gen\n";
+        assert_eq!(split_lists("d.md", wrapped).len(), 1, "{wrapped}");
+        let after = "<!-- BEGIN GENERATED: x -->\n- gen\n<!-- END GENERATED: x -->\n\n- hand\n";
+        assert_eq!(split_lists("d.md", after).len(), 1, "{after}");
+        let one = "## S\n\nProse.\n\n<!-- BEGIN GENERATED: x -->\n- gen\n\
+                   <!-- END GENERATED: x -->\n";
+        assert!(split_lists("d.md", one).is_empty(), "{one}");
     }
 }

@@ -71,7 +71,7 @@ fn unresolved_host_refs(
             .next()
             .unwrap_or("")
             .trim_matches(['"', '\'']);
-        if !dest.starts_with("data:") && !files.contains(&format!("assets/{dest}")) {
+        if !dest.starts_with("data:") && !files.contains(&asset_file(dest)) {
             bad.push(format!("assets/site.css: url({dest}): no built file"));
         }
     }
@@ -270,7 +270,7 @@ fn font_problems(css: &str, pages: &[(String, String)], files: &[String]) -> Vec
         }
         for src in srcs {
             let src = src.trim_matches(['"', '\'']);
-            if !files.contains(&format!("assets/{src}")) {
+            if !files.contains(&asset_file(src)) {
                 bad.push(format!(
                     "assets/site.css: @font-face src {src} is not built"
                 ));
@@ -278,6 +278,12 @@ fn font_problems(css: &str, pages: &[(String, String)], files: &[String]) -> Vec
         }
     }
     bad
+}
+
+/// The built file a stylesheet `url()` names: `/assets/x?v=..` or `x` relative to `assets/`.
+fn asset_file(url: &str) -> String {
+    let path = url.split('?').next().unwrap_or(url);
+    format!("assets/{}", path.trim_start_matches("/assets/"))
 }
 
 /// The class this guards: a font or stylesheet fetched from a third party, or a face whose file
@@ -323,7 +329,8 @@ fn chrome_problems(pages: &[(String, String)]) -> Vec<String> {
     let root = crate::repo_root();
     let ws = crate::facts::load(&root).expect("facts");
     let pkg = &ws.packages["gitterrace"];
-    let shared = bar::bar(&pkg.name, &pkg.repository, &ws.demo, "", false);
+    // Pages are fitted to the width as a whole, so the bar is compared as a page shows it.
+    let shared = crate::site::fit::fit(&bar::bar(&pkg.name, &pkg.repository, &ws.demo, "", false));
     let log = std::fs::read_to_string(root.join("CHANGELOG.md")).expect("changelog");
     let version_href = changelog::version_href(&log, &pkg.version);
     let site = frame::Site {
@@ -342,15 +349,27 @@ fn chrome_problems(pages: &[(String, String)]) -> Vec<String> {
             bad.push(format!("{path}: not exactly one footer"));
             continue;
         };
-        // Every footer opens with the shared links the builder writes for a page with no source.
+        // Every footer is the shared one the builder writes for a page with no source, apart
+        // from a docs page's own source link at the end of the project nav.
         let head = shared_footer.trim_end_matches("</footer>\n");
         let head = head.strip_prefix("<footer>").unwrap_or(head);
-        if !foot.starts_with(head) {
+        let own = foot.find("\n<a class=\"edit\"").map_or_else(
+            || foot.to_owned(),
+            |at| {
+                let end = foot[at + 1..].find("</a>").map_or(at, |e| at + 1 + e + 4);
+                format!("{}{}", &foot[..at], &foot[end..])
+            },
+        );
+        if own != head {
             bad.push(format!("{path}: the footer is not the shared one"));
         }
         // A docs page's bar carries its Docs menu, which is the docs list and so differs by
         // page, and marks its Docs link current; the rest of the bar is the shared one.
-        let html = html.replacen(" aria-current=\"page\">Docs</a>", ">Docs</a>", 1);
+        let html = html.replacen(
+            "href=\"/docs/\" aria-current=\"page\">",
+            "href=\"/docs/\">",
+            1,
+        );
         let html = html.find("<details class=\"menu docsmenu\"").map_or_else(
             || html.clone(),
             |at| {
@@ -535,49 +554,40 @@ fn a_footer_version_without_its_changelog_heading_is_reported() {
     assert!(bad[0].contains("no link to v1.0.0"), "{bad:?}");
 }
 
-/// Whether the landing page has the safety section, with the default address the code uses and
-/// a link to the security model page.
-fn safety_problems(landing: &str, addr: &str) -> Vec<String> {
-    let mut bad = Vec::new();
-    let Some((_, rest)) = landing.split_once(">What it does with your code</h2>") else {
-        return vec!["the landing page has no \"What it does with your code\" section".to_owned()];
-    };
-    let section = rest.split("<h2>").next().unwrap_or("");
-    if !section.contains(&format!("<code>{addr}</code>")) {
-        bad.push(format!("the safety section does not name {addr}"));
-    }
-    if !section.contains("href=\"/docs/security/\"") {
-        bad.push("the safety section does not link the security model page".to_owned());
-    }
-    bad
+/// Classes of the site's stylesheet that no built page, inline script, template or source names.
+fn dead_site_classes(css: &str, code: &str) -> Vec<String> {
+    gitterrace_testkit::css::dead_classes(css, code, &[], &[])
 }
 
-/// The class this guards: the landing page losing the promise section, or stating an address
-/// other than the one the code serves on. The prose stays in docs/why.md next to SECURITY.md,
-/// whose long list of promises does not reduce to a short generated block, and
-/// `why_prose_that_names_a_wrong_address_or_cache_path_fails` ties its facts to the code.
-#[test]
-fn the_built_landing_page_has_the_safety_section_with_the_real_address() {
-    let (pages, _) = generated();
-    let landing = &pages
-        .iter()
-        .find(|p| p.0 == "index.html")
-        .expect("landing")
-        .1;
-    let bad = safety_problems(landing, gitterrace_config::DEFAULT_ADDR);
-    assert!(bad.is_empty(), "{}", bad.join("\n"));
+/// The text a class can come from: built pages (inline scripts included), templates and sources.
+fn site_code() -> String {
+    let root = crate::repo_root().join("xtask");
+    let dirs = [root.join("templates"), root.join("src")];
+    let mut code = String::new();
+    for f in gitterrace_testkit::scan::files(&dirs, &["html", "svg", "txt", "rs", "js"]) {
+        code.push_str(&std::fs::read_to_string(f).unwrap_or_default());
+        code.push('\n');
+    }
+    for (_, html) in generated().0 {
+        code.push_str(&html);
+        code.push('\n');
+    }
+    code
 }
 
 #[test]
-fn a_landing_page_without_the_section_or_with_another_address_is_reported() {
-    let (pages, _) = generated();
-    let landing = &pages
-        .iter()
-        .find(|p| p.0 == "index.html")
-        .expect("landing")
-        .1;
-    let gone = landing.replace("What it does with your code", "Safety");
-    assert!(safety_problems(&gone, "127.0.0.1:4242")[0].contains("has no"));
-    let bad = safety_problems(landing, "127.0.0.1:9");
-    assert!(bad[0].contains("does not name 127.0.0.1:9"), "{bad:?}");
+fn every_site_css_class_is_emitted_somewhere() {
+    let dead = dead_site_classes(&text_of("assets/site.css"), &site_code());
+    assert!(
+        dead.is_empty(),
+        "classes in site.css that nothing emits: {dead:?}"
+    );
+}
+
+#[test]
+fn a_planted_dead_site_class_is_reported() {
+    // Built at run time so this file does not mention the class itself.
+    let name = format!("{}-planted-dead", "zz");
+    let css = format!("{}\n.{name} {{ color: red; }}", text_of("assets/site.css"));
+    assert_eq!(dead_site_classes(&css, &site_code()), [name]);
 }

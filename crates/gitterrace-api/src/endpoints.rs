@@ -112,8 +112,8 @@ const REV: Param = p("rev", "string", "Revision to read, default `HEAD`.");
 const Q: Param = p(
     "q",
     "string",
-    "The commit filter, the web filter field's text, see Filter. The primary way to select \
-    commits: the parameters below are older forms read as its terms.",
+    "The commit filter, the web filter field's text, see Filter. The one way to select \
+    commits.",
 );
 const PERIOD: Param = p(
     "period",
@@ -121,18 +121,6 @@ const PERIOD: Param = p(
     "`1w`, `1m`, `3m`, `1y` or `all` (default): the window, ending at the newest \
     commit. Sets the bucket unit.",
 );
-const TYPE: Param = p(
-    "type",
-    "string",
-    "Only commits of this conventional type, `other` for none.",
-);
-const SCOPE: Param = p(
-    "scope",
-    "string",
-    "Only commits of this scope, `none` for none.",
-);
-const AUTHOR: Param = p("author", "string", "Only commits by this email or name.");
-const UNDER: Param = p("path", "string", "Only files under this directory.");
 const BOTS: Param = p(
     "bots",
     "string",
@@ -257,10 +245,7 @@ pub const ENDPOINTS: &[Endpoint] = &[
     Endpoint {
         path: "/contributors",
         summary: "Authors and bus factor, counted as `/insights/contributors` counts them.",
-        params: &[
-            REV, Q, PERIOD, TYPE, SCOPE, AUTHOR, UNDER, BOTS, MERGES, GENERATED, IGNORE, WS,
-            EXCLUDE,
-        ],
+        params: &[REV, Q, PERIOD, BOTS, MERGES, GENERATED, IGNORE, WS, EXCLUDE],
         schema: of::<ContributorsResponse>,
         route: || get(http::contributors),
     },
@@ -286,10 +271,6 @@ pub const ENDPOINTS: &[Endpoint] = &[
                 order and the per-bucket series.",
             ),
             p("limit", "integer", "Most rows."),
-            TYPE,
-            SCOPE,
-            AUTHOR,
-            UNDER,
             BOTS,
             MERGES,
             GENERATED,

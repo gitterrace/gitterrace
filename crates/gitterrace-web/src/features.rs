@@ -38,14 +38,10 @@ pub(crate) const FEATURE_ROUTES: &[(Feature, &[&str])] = &[
         Feature::Insights,
         &[
             "/stats",
-            "/stats/types",
             "/stats/languages",
-            "/stats/frequency",
             "/stats/hotspots",
             "/stats/ownership",
-            "/stats/patterns",
             "/stats/contributors",
-            "/insights",
             "/api/v1/contributors",
             "/api/v1/insights",
             "/api/v1/insights/{name}",
@@ -70,7 +66,8 @@ pub(crate) const FEATURE_ROUTES: &[(Feature, &[&str])] = &[
     (Feature::Mermaid, &[crate::MERMAID_JS]),
 ];
 
-/// The route of each `insights.pages` entry; a page off in the list answers 404 there.
+/// The route of each `insights.pages` entry that is a page; a page off in the list answers 404
+/// there. `types`, `frequency` and `patterns` are sections of another page and own no route.
 pub(crate) const INSIGHT_ROUTES: &[(&str, &str)] = &[
     ("activity", "/stats"),
     ("contributors", "/stats/contributors"),
@@ -78,9 +75,6 @@ pub(crate) const INSIGHT_ROUTES: &[(&str, &str)] = &[
     ("hotspots", "/stats/hotspots"),
     ("languages", "/stats/languages"),
     ("ownership", "/stats/ownership"),
-    ("types", "/stats/types"),
-    ("frequency", "/stats/frequency"),
-    ("patterns", "/stats/patterns"),
 ];
 
 /// Where the API is mounted.
@@ -257,7 +251,8 @@ pub(crate) fn page_href(page: &str) -> String {
 
 /// Where Insights starts: the first page served, `None` when none is.
 pub(crate) fn insights_home() -> Option<&'static str> {
-    pages().first().and_then(|p| page_route(p))
+    // A section listed first owns no route: the first entry that is a page is home.
+    pages().iter().find_map(|p| page_route(p))
 }
 
 /// The `gt-off` meta content: the scripted features the file turned off, empty when none.

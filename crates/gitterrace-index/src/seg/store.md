@@ -66,8 +66,8 @@ except `MANIFEST`, `VERSION` and `lock` is immutable: written under a temp name,
 fsynced, never opened for writing again.
 
 - `VERSION`: `v` and `FORMAT_VERSION` in `store.rs`, the version of the whole
-  cache. A bare number is a cache from before the first release, reset like any
-  older one; only a `v` number greater than ours is a newer build's. The
+  cache. A bare number without the `v` is reset like any lower one. Only a `v`
+  number greater than ours is a newer build's. The
   container version `VERSION` in `seg/format.rs` moves only when the container
   bytes change, so the two numbers differ. Read first so a newer build's cache
   is recognized without parsing anything else.
@@ -140,13 +140,14 @@ is `Unreadable`.
 ### 2.1 Byte layout
 
 All integers little endian. CRC is CRC32 (IEEE, `crc32fast`). One container
-serves every kind of immutable file (segment, string delta, order list).
+serves every kind of immutable file (segment, string delta, order list,
+messages, chain, tip rows).
 
 Container file:
 
 | Part   | Bytes                      | Fields                                                                              |
 | ------ | -------------------------- | ----------------------------------------------------------------------------------- |
-| Header | 16                         | magic `GTS1`, version u32, kind u32 (1 segment, 2 strings, 3 order, 4 messages, 5 chain), zero u32 |
+| Header | 16                         | magic `GTS1`, version u32, kind u32 (1 segment, 2 strings, 3 order, 4 messages, 5 chain, 6 tip), zero u32 |
 | Blocks | each at most 1 MiB         | payload only, back to back from offset 16                                           |
 | TOC    | 24 per entry, at most 4096 | section u16, zero u16, items u32, offset u64, len u32, crc u32 (of the payload)     |
 | Footer | 64, the last bytes         | see below                                                                           |
@@ -170,12 +171,14 @@ checked when the block is read, before any field in it is parsed.
 
 Section ids are fixed and never reused. A dropped section keeps its slot, a
 reader skips ids it does not use: 1 commits, 2 file rows, 3 path postings, 4
-rename edges, 5 author postings, 6 author x day, 7 month x path (reserved,
-hotspots are served from postings), 8 path x author, 9 month x language
-(reserved until its source is chosen), 16 paths, 17 identities, 18 labels, 32
+rename edges, 5 author postings, 6 author x day, 7 path id to life and life to
+last name (`seg/canon.rs`), 8 path x author, 9 life x month (touches, line
+sums, last touch), 10 life x identity, 16 paths, 17 identities, 18 labels, 32
 order, 33 rank (per segment, u32 per local ordinal: its position in the order
 file, read by pread at index, never held as a map), 34 rows, 35 row index, 36
-oid index. A new section is a new id, a changed encoding is a `VERSION` bump.
+oid index, 40 messages, 48 and 49 chain, 50 and 51 tip rows. Ids 7 and 9 once
+named sections no released build wrote. A new section is a new id, a changed
+encoding is a `VERSION` bump.
 
 Section 1 (commit columns): one fixed 80 B item per local
 ordinal, in ordinal order, so a pass over commits reads it alone and never the
@@ -249,7 +252,7 @@ Manifest (`MANIFEST`, not a container, read whole, at most 1 MiB):
 
 Names match `[a-z0-9.-]{1,64}` with no `..`, so a manifest cannot name a path
 outside the directory. Live files are listed in canonical order (segments, then
-their string deltas in the same order, then order and `lines.json`). The reader
+their string deltas in the same order, then the other files). The reader
 checks each named file's length and the crc of its 64 B footer against the
 manifest on open. The shallow fingerprint is the FNV-1a 64 of the sorted
 `.git/shallow` oids, 0 when not shallow: a deepened or grafted clone changes
@@ -357,8 +360,8 @@ which sum to the whole budget). The segment block cache is one of them (a
 quarter), not a fixed amount beside it. An ast-grep rule refuses a cache bound
 written as a constant. After the idle release only the page memo remains. What
 still separates a released server from a just-started one is allocator state,
-not data: jemalloc's per-core arenas each keep partly used slabs and a thread
-cache.
+not data. Builds from this repository run jemalloc with one arena and no thread
+caches (`.cargo/config.toml`), and `alloc.rs` returns freed pages at once.
 
 Streamed: everything else. A page reads the aggregate blocks for its time range
 through a 1 MB block buffer, folds into a result sized by the answer (top-k
@@ -456,7 +459,8 @@ page until the rebuild is done. A block that fails its CRC at page time is
 treated the same way: the request returns the indexing page, the index rebuilds.
 A cache format error surfacing as HTTP 500 cannot reach a handler, because store
 errors of kind `Unreadable` are mapped to rebuild in the index crate, not to an
-error.
+error. A cache folder emptied from outside while the index was ready is the
+same case: the server finds no set and rebuilds (`app/records.rs`).
 
 One exception: a cache written by a _newer_ build is left untouched (two
 binaries would otherwise rebuild over each other). The older binary shows the

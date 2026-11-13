@@ -85,7 +85,9 @@ fn every_route_is_a_feature_or_core() {
         assert!(INSIGHT_PAGES.contains(page), "{page}");
         assert!(owned.contains(*route), "{route}");
     }
-    for page in INSIGHT_PAGES {
+    // Sections switch off a part of another page and own no route of their own.
+    let sections = ["types", "frequency", "patterns"];
+    for page in INSIGHT_PAGES.into_iter().filter(|p| !sections.contains(p)) {
         assert!(
             INSIGHT_ROUTES.iter().any(|(p, _)| *p == page),
             "insights page {page} has no route"
@@ -326,8 +328,8 @@ fn check_inline(off: &Off, page: &str, html: &str) {
     }
 }
 
-/// The default config renders the page chrome as before: no `gt-off`, the search box, every
-/// insights tab in the old order.
+/// The default config renders the full page chrome: no `gt-off`, the search, every insights
+/// tab in its order.
 #[tokio::test]
 async fn defaults_add_nothing_to_a_page() {
     let dir = tempfile::tempdir().expect("tmp");

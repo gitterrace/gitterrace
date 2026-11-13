@@ -105,7 +105,7 @@
   function moved() {
     if (!hold || window.scrollY === ours) return;
     ours = null;
-    var main = document.getElementById("main");
+    var main = document.getElementById("gt-main");
     var a = main && anchor(main);
     if (a) hold = a;
   }
@@ -124,7 +124,7 @@
     hold = a;
     var mine = ++gen;
     window.addEventListener("scroll", moved, { passive: true });
-    var main = document.getElementById("main");
+    var main = document.getElementById("gt-main");
     var bump = function () { clearTimeout(quiet); quiet = setTimeout(release, 3000); };
     if (window.MutationObserver && main) {
       watch = new MutationObserver(function () { if (mine !== gen) return; place(); bump(); });
@@ -172,8 +172,8 @@
       var res = await fetch(location.href, { headers: { "X-Live": "1" }, cache: "no-store" });
       if (!res.ok) return;
       var doc = new DOMParser().parseFromString(await res.text(), "text/html");
-      var next = doc.getElementById("main");
-      var cur = document.getElementById("main");
+      var next = doc.getElementById("gt-main");
+      var cur = document.getElementById("gt-main");
       if (!next || !cur) return;
       var a = anchor(cur);
       var y = window.scrollY;

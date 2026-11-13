@@ -125,7 +125,7 @@ impl Scope {
             (f, t) => Some((f.unwrap_or(i64::MIN), t.unwrap_or(i64::MAX))),
         };
         let q = p.select.query()?;
-        // A period in the text (`after:1m`, or `period:1m`) is the scope's period, which the
+        // A period in the text (`after:1m`) is the scope's period, which the
         // pages and the buckets follow: the same as the `period` parameter, which says it only
         // when the parameter does not. Date bounds stay terms of the matcher.
         let lifted = q.terms().iter().find_map(|t| match t.leaf {
@@ -439,8 +439,6 @@ mod tests {
                 "period" => p.period = v,
                 "from" => p.from = v,
                 "to" => p.to = v,
-                "author" => p.select.author = v,
-                "path" => p.select.path = v,
                 "q" => p.select.q = v,
                 "bots" => p.options.bots = v,
                 _ => {}
@@ -457,7 +455,7 @@ mod tests {
     fn a_period_in_the_text_is_the_period_parameter() {
         for (a, b) in [
             (&[("period", "1m")][..], &[("q", "after:1m")][..]),
-            (&[("period", "1w")], &[("q", "period:1w")]),
+            (&[("period", "1w")], &[("q", "after:1w")]),
         ] {
             let (a, b) = (scope(a).expect("a"), scope(b).expect("b"));
             assert_eq!(a, b, "{a:?}");
@@ -469,7 +467,7 @@ mod tests {
 
     #[test]
     fn from_params_normalises_and_validates() {
-        let s = scope(&[("author", "  "), ("path", "/src/")]).expect("ok");
+        let s = scope(&[("q", "  path:/src/ ")]).expect("ok");
         assert_eq!(s.period(), Period::Month);
         assert_eq!(s.selection().q.as_deref(), Some("path:src"));
         assert!(matches!(

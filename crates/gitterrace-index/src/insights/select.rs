@@ -13,25 +13,14 @@ use crate::feed::{
     local_day_of,
 };
 use crate::insights::Options;
-use crate::query::{Matcher, Query, QueryError, Term, fold};
+use crate::query::{Matcher, Query, QueryError};
 
-/// Which commits count, as the URL says it.
-///
-/// The filter text `q` and the older one-key forms of its terms. Empty strings count as unset.
-/// [`Selection::query`] reads them into one [`Query`], the only form anything is selected by.
+/// Which commits count, as the URL says it: the filter text `q` alone.
+/// [`Selection::query`] reads it into a [`Query`], the only form anything is selected by.
 #[derive(Debug, Clone, Default, PartialEq, Eq, serde::Deserialize)]
 pub struct Selection {
     /// Filter text, `author:ann path:src !merge`: see [`crate::query::KEYWORDS`].
     pub q: Option<String>,
-    /// `type:<v>`. [`Selection::OTHER`] selects commits without one.
-    #[serde(rename = "type")]
-    pub kind: Option<String>,
-    /// `scope:<v>`. [`Selection::NO_SCOPE`] selects commits without one.
-    pub scope: Option<String>,
-    /// `author:<v>`: e-mail (any case) or exact author name.
-    pub author: Option<String>,
-    /// `path:<v>`: a kept commit lists only its files under the prefix.
-    pub path: Option<String>,
 }
 
 fn set(v: Option<&String>) -> Option<&str> {
@@ -49,26 +38,15 @@ impl Selection {
     pub fn of(q: &Query) -> Self {
         Self {
             q: (!q.is_empty()).then(|| q.to_string()),
-            ..Self::default()
         }
     }
 
-    /// The one query: the one-key forms first (as the older links wrote them), then `q`.
+    /// The query `q` says. Empty or blank text is the empty query.
     ///
     /// # Errors
     /// [`QueryError`] when `q` does not parse.
     pub fn query(&self) -> Result<Query, QueryError> {
-        let mut terms: Vec<Term> = Vec::new();
-        for (key, value) in [
-            ("type", &self.kind),
-            ("scope", &self.scope),
-            ("author", &self.author),
-            ("path", &self.path),
-        ] {
-            terms.extend(fold(key, value.as_deref().unwrap_or_default())?);
-        }
-        terms.extend_from_slice(Query::parse(set(self.q.as_ref()).unwrap_or_default())?.terms());
-        Ok(Query::new(terms))
+        Query::parse(set(self.q.as_ref()).unwrap_or_default())
     }
 }
 

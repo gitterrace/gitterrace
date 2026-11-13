@@ -1,16 +1,45 @@
 // The md-anchor check: a cross-file Markdown link with #heading lands on the heading.
 // Imported by scripts/verify/browser/browser-check.mjs, not run on its own.
 import { execFileSync } from 'node:child_process';
+import { deflateSync } from 'node:zlib';
 import { join } from 'node:path';
 import { launch } from '../../lib/browser-lib.mjs';
+
+/** A valid w x h grey PNG, as bytes. */
+function png(w, h) {
+  const crcTable = Array.from({ length: 256 }, (_, n) => {
+    let c = n;
+    for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+    return c >>> 0;
+  });
+  const crc = (b) => {
+    let c = 0xffffffff;
+    for (const x of b) c = crcTable[(c ^ x) & 0xff] ^ (c >>> 8);
+    return (c ^ 0xffffffff) >>> 0;
+  };
+  const chunk = (type, data) => {
+    const t = Buffer.concat([Buffer.from(type), data]);
+    const len = Buffer.alloc(4); len.writeUInt32BE(data.length);
+    const c = Buffer.alloc(4); c.writeUInt32BE(crc(t));
+    return Buffer.concat([len, t, c]);
+  };
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(w, 0); ihdr.writeUInt32BE(h, 4); ihdr[8] = 8; ihdr[9] = 0;
+  const raw = Buffer.alloc((w + 1) * h, 0x80);
+  for (let y = 0; y < h; y++) raw[y * (w + 1)] = 0;
+  const sig = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  const end = chunk('IEND', Buffer.alloc(0));
+  return Buffer.concat([sig, chunk('IHDR', ihdr), chunk('IDAT', deflateSync(raw)), end]);
+}
 
 /** @param {any} env what browser-check.mjs set up (dir, srv, r, browsers, context, cfg, ...) */
 export function checks(env) {
   const { dir, srv, r, browsers, context, cfg } = env;
   // Heading ids are plain, as a user writes them, so the link resolves with JS on and off. A
-  // heading named like a chrome id ("main") is prefixed and reached through app.js. The commit goes
-  // on a side ref through a private index, so HEAD and the work tree the other checks use stay
-  // put.
+  // heading named like a chrome id ("theme") is prefixed; every heading also answers to its
+  // prefixed form, so a typed #main or an old #user-content-x link lands without script. The
+  // commit goes on a side ref through a private index, so HEAD and the work tree the other checks
+  // use stay put.
   async function mdAnchor() {
     const gitEnv = { ...process.env, GIT_INDEX_FILE: join(cfg, 'anchor-index') };
     const git = (input, ...a) => execFileSync('git', a, { cwd: dir, env: gitEnv, input, encoding: 'utf8' }).trim();
@@ -18,13 +47,31 @@ export function checks(env) {
     const filler = Array.from({ length: 80 }, (_, i) => `Paragraph ${i + 1} of filler text.\n`).join('\n');
     const files = {
       'anchor/index.md': '# Index\n\n[main](guide.md#main) [syntax](guide.md#syntax-highlighting) [lines](guide.md#L2)\n',
-      'anchor/guide.md': `# Guide\n\n${filler}\n## Syntax highlighting\n\nThe target.\n\n${filler}\n## main\n\nClobber bait.\n\n${filler}`,
+      'anchor/guide.md': [
+        `# Guide\n\n${filler}`, `## Syntax highlighting\n\nThe target.\n\n${filler}`,
+        `## main\n\nClobber bait.\n\n${filler}`, `## theme\n\nChrome id.\n\n${filler}`,
+      ].join('\n'),
+      'anchor/lines.txt': Array.from({ length: 200 }, (_, i) => `line ${i + 1}`).join('\n') + '\n',
     };
     for (const [path, body] of Object.entries(files)) {
       git(undefined, 'update-index', '--add', '--cacheinfo', `100644,${git(body, 'hash-object', '-w', '--stdin')},${path}`);
     }
     const sha = git(undefined, 'commit-tree', git(undefined, 'write-tree'), '-p', 'HEAD', '-m', 'Anchor fixtures');
     git(undefined, 'update-ref', 'refs/heads/anchor-check', sha);
+    const add = (blob, path) =>
+      git(undefined, 'update-index', '--add', '--cacheinfo', `100644,${blob},${path}`);
+    // A commit of tall pictures above one text file: lazy images with no reserved box would
+    // grow above #fN after the jump and push it down the screen.
+    for (let i = 0; i < 12; i++) {
+      const input = png(300, 400 + i);
+      const blob = execFileSync('git', ['hash-object', '-w', '--stdin'], { cwd: dir, input });
+      add(blob.toString().trim(), `anchor/img${String(i).padStart(2, '0')}.png`);
+    }
+    const tail = Array.from({ length: 300 }, (_, i) => `after the pictures ${i}`).join('\n') + '\n';
+    add(git(tail, 'hash-object', '-w', '--stdin'), 'anchor/zz.txt');
+    const tree = git(undefined, 'write-tree');
+    const pics = git(undefined, 'commit-tree', tree, '-p', sha, '-m', 'Pictures');
+    git(undefined, 'update-ref', 'refs/heads/anchor-pics', pics);
     const seen = async (p, id = 'syntax-highlighting') => p.evaluate((id) => {
       const h = document.getElementById(id);
       if (!h) return null;
@@ -57,28 +104,14 @@ export function checks(env) {
       await q.waitForTimeout(400);
       m = await seen(q);
       m && m.scrolled && m.inView ? r.ok(`${where}: hashchange lands on the heading`) : r.fail(`${where}: hashchange: ${m ? `heading at ${Math.round(m.top)} px` : 'no heading'}`);
-      // A heading named "main" must not clobber the page, and a typed #main still lands on it.
+      // A heading named "main" is plain now that the page's own <main> is gt-main.
       const c = await ctx.newPage();
       await c.setViewportSize({ width: 900, height: 600 });
       await c.goto(`${srv.base}/blob/${sha}/anchor/guide.md#main`, { waitUntil: 'load' });
       await c.waitForTimeout(400);
-      const own = await c.evaluate(() => document.getElementById('main') && document.getElementById('main').tagName);
-      m = await seen(c, 'user-content-main');
+      const own = await c.evaluate(() => document.getElementById('gt-main')?.tagName);
+      m = await seen(c, 'main');
       own === 'MAIN' && m && m.scrolled && m.inView ? r.ok(`${where}: #main lands on the heading, page <main> intact`) : r.fail(`${where}: #main: own=${own} ${m ? `heading at ${Math.round(m.top)} px` : 'no heading'}`);
-      // A busy machine: the browser's own scroll to the page's <main> comes well after load.
-      // Played here as a late scroll 150 ms after load; the jump must still win.
-      const late = await ctx.newPage();
-      await late.setViewportSize({ width: 900, height: 600 });
-      await late.addInitScript(() => {
-        addEventListener('load', () => setTimeout(() => {
-          const el = document.querySelector('main');
-          if (el) el.scrollIntoView();
-        }, 150));
-      });
-      await late.goto(`${srv.base}/blob/${sha}/anchor/guide.md#main`, { waitUntil: 'load' });
-      await late.waitForTimeout(1200);
-      m = await seen(late, 'user-content-main');
-      m && m.scrolled && m.inView ? r.ok(`${where}: #main still lands on the heading after a late load scroll`) : r.fail(`${where}: #main after a late load scroll: ${m ? `heading at ${Math.round(m.top)} px` : 'no heading'}`);
       await b.close();
       // JS off, as an export may be opened: the plain fragment resolves by the browser alone.
       const nb = await launch(env.pw, name);
@@ -90,7 +123,50 @@ export function checks(env) {
       const pos = await n.evaluate(() => ({ y: scrollY }));
       const box = await n.locator('[id="syntax-highlighting"]').boundingBox();
       box && pos.y > 0 && box.y >= -2 && box.y < 600 ? r.ok(`${where}: JS off, plain #fragment lands on the heading`) : r.fail(`${where}: JS off: y=${pos.y} box=${box && Math.round(box.y)}`);
-      await nb.close();
+      // Each anchor lands the same with JS on and off: the browser does the jump, no script
+      // re-scrolls. Pictures are held back so they arrive after the jump.
+      for (const js of [true, false]) {
+        const jb = await launch(env.pw, name);
+        const jctx = await jb.newContext({ javaScriptEnabled: js });
+        await jctx.route('**/raw/**', async (q) => {
+          await new Promise((ok) => setTimeout(ok, 400));
+          await q.continue();
+        });
+        const how = `${where} JS ${js ? 'on' : 'off'}`;
+        const land = async (path, id, lo, hi) => {
+          const pg = await jctx.newPage();
+          await pg.setViewportSize({ width: 1100, height: 700 });
+          await pg.goto(`${srv.base}${path}#${id}`, { waitUntil: 'load' });
+          await pg.waitForTimeout(1500);
+          const at = await pg.evaluate((x) => {
+            const e = document.getElementById(x);
+            if (!e) return null;
+            return { top: Math.round(e.getBoundingClientRect().top), y: scrollY, tag: e.tagName };
+          }, id);
+          await pg.close();
+          at && at.y > 0 && at.top >= lo && at.top <= hi
+            ? r.ok(`${how}: #${id} lands at ${at.top} px`)
+            : r.fail(`${how}: #${id} on ${path}: ${at ? `${at.top} px, y ${at.y}` : 'missing'}`);
+          return at;
+        };
+        const files = await (async () => {
+          const pg = await jctx.newPage();
+          await pg.goto(`${srv.base}/commit/${pics}`, { waitUntil: 'load' });
+          const ids = await pg.evaluate(() => [...document.querySelectorAll('section.file')]
+            .map((x) => [x.id, x.getAttribute('data-path')]));
+          await pg.close();
+          return ids;
+        })();
+        const last = files.find(([, p]) => p === 'anchor/zz.txt');
+        if (!last) r.fail(`${how}: no section for anchor/zz.txt`);
+        else await land(`/commit/${pics}`, last[0], -2, 200);
+        await land(`/blob/${sha}/anchor/lines.txt`, 'L120', -2, 350);
+        const typed = await land(`/blob/${sha}/anchor/guide.md`, 'main', -2, 200);
+        if (typed && typed.tag === 'MAIN') r.fail(`${how}: #main resolved to the page's <main>`);
+        await land(`/blob/${sha}/anchor/guide.md`, 'user-content-syntax-highlighting', -2, 200);
+        await land(`/blob/${sha}/anchor/guide.md`, 'user-content-theme', -2, 200);
+        await jb.close();
+      }
     }
   }
   return { mdAnchor };

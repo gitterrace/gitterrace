@@ -27,8 +27,8 @@ for great tools.
 
 <!-- BEGIN GENERATED: shots -->
 <picture>
-<source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/overview-dark.png">
-<img src="docs/screenshots/overview-light.png" alt="Browse: the repository page with README, last commit, file list and key numbers.">
+<source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/overview-dark.webp">
+<img src="docs/screenshots/overview-light.webp" alt="Browse: the repository page with README, last commit, file list and key numbers.">
 </picture>
 
 <!-- END GENERATED: shots -->
@@ -42,7 +42,7 @@ brew install gitterrace/tap/gitterrace
 cargo install --locked --git https://github.com/gitterrace/gitterrace gitterrace
 ```
 
-Installs `git-terrace`; git runs it as `git terrace`.
+Installs `git-terrace`, which git runs as `git terrace`.
 
 <!-- END GENERATED: install -->
 

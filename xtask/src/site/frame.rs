@@ -200,11 +200,15 @@ mod tests {
         let a = footer(&site(), None);
         let b = footer(&site(), Some(("docs/why.md", false)));
         let c = footer(&site(), Some(("docs/cli.md", true)));
-        assert!(b.starts_with(a.trim_end_matches("</footer>\n")), "{a}\n{b}");
+        let legal = |f: &str| {
+            f.split_once("<nav aria-label=\"Legal\"")
+                .map(|x| x.1.to_owned())
+        };
+        assert_eq!(legal(&a), legal(&b), "{a}\n{b}");
         assert!(!a.contains("class=\"edit\""), "{a}");
-        assert!(b.contains("/edit/main/docs/why.md\">Edit on GitHub"), "{b}");
+        assert!(b.contains("/edit/main/docs/why.md\">Edit this page"), "{b}");
         assert!(
-            c.contains("/blob/main/docs/cli.md\">View source on GitHub"),
+            c.contains("/blob/main/docs/cli.md\">View page source"),
             "{c}"
         );
     }

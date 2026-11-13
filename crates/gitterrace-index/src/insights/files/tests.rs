@@ -452,7 +452,7 @@ fn file_reports_in_counted_match_the_period() {
             period: Some("1w".to_owned()),
             ..ScopeParams::default()
         };
-        p.select.path = path.map(str::to_owned);
+        p.select.q = path.map(|p| format!("path:{p}"));
         Scope::from_params(&p, Options::default(), Period::All).expect("scope")
     };
     let s = scope(None);
@@ -521,7 +521,7 @@ fn code_age_follows_the_membership_rule() {
     let ins = Insights::new(&recs, Options::default(), None);
     let cx = CountContext::new(&MemorySource::new(&recs), &FixedClock(i64::MAX));
     let mut p = ScopeParams::default();
-    p.select.author = Some("ann@x.io".to_owned());
+    p.select.q = Some("author:ann@x.io".to_owned());
     let s = Scope::from_params(&p, Options::default(), Period::All).expect("scope");
     let years = |r: crate::AgeReport| r.buckets.iter().map(|b| b.year).collect::<Vec<_>>();
     assert_eq!(

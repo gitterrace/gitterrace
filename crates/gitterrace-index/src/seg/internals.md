@@ -24,8 +24,9 @@ belong to someone else.
 
 One rule covers damage: if the cache cannot be read, it is deleted and rebuilt.
 That means a different format version, a torn manifest, a bad CRC, or a changed
-shallow set. It is never partly served. The page shows indexing until the
-rebuild is done. A cache written by a newer build is left alone and the page
+shallow set. A cache folder emptied from outside while the index was ready is
+rebuilt the same way. It is never partly served. The page shows indexing until
+the rebuild is done. A cache written by a newer build is left alone and the page
 says so.
 
 ## How commit search reads the index
@@ -101,15 +102,16 @@ during an index build is higher and is accepted.
 
 After 30 s without a request the server drops every cache but the rendered
 pages, and the allocator hands freed pages back to the OS at once. Builds from
-this repository run jemalloc with one arena (`.cargo/config.toml`), so an idle
-server returns to about the footprint it started with. The
-full format is in the [store design](store.md).
+this repository run jemalloc with one arena and no thread caches
+(`.cargo/config.toml`), so an idle server returns to about the footprint it
+started with. The full format is in the [store design](store.md).
 
 ## The InsightsSource seam
 
 Pages read history through the `InsightsSource` trait in
 `gitterrace-index/src/feed/`. It gives commit columns for a range, file rows for
 chosen commits, the aggregates, postings and strings, all as streams.
-`feed/segments.rs` serves it from the files. `feed/memory.rs` serves it from
-records in memory and is the oracle that tests compare the segments against. A
-page does not know which one it has.
+`feed/segments.rs` serves it from the files, over the commit rows that
+`feed/disk.rs` reads. `feed/memory.rs` serves it from records in memory. It is
+the oracle that tests compare the segments against and is built only for tests.
+A page does not know which one it has.

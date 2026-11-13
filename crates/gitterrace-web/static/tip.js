@@ -17,21 +17,13 @@
     tip.className = "tip";
     tip.id = "gt-tip";
     tip.setAttribute("role", "tooltip");
+    // In the top layer, so a tip inside an open dialog or menu is drawn above it.
+    if (tip.showPopover) tip.popover = "manual";
     document.body.appendChild(tip);
     return tip;
   }
 
-  // A commit message (.subj) is cut with an ellipsis when it runs out of room; only then does
-  // it carry its full text as a tip.
-  function cut(node) {
-    var s = node && node.closest ? node.closest(".subj") : null;
-    if (!s) return;
-    if (s.scrollWidth > s.clientWidth) s.setAttribute("data-tip", s.textContent.trim());
-    else s.removeAttribute("data-tip");
-  }
-
   function target(node) {
-    cut(node);
     return node && node.closest ? node.closest("[data-tip]") : null;
   }
 
@@ -59,6 +51,8 @@
     t.textContent = text;
     current = el;
     el.setAttribute("aria-describedby", "gt-tip");
+    // Shown again each time, so it stacks above a dialog opened after it.
+    if (t.showPopover) { if (t.matches(":popover-open")) t.hidePopover(); t.showPopover(); }
     place(el);
     t.classList.add("on");
   }

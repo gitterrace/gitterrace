@@ -126,7 +126,10 @@ fn a_cache_that_fails_a_read_is_never_shown_as_data() {
     for t in targets() {
         let at = tempfile::tempdir().expect("tmp");
         let (status, body) = rt.block_on(first_answer(&repo, at.path(), &t));
-        let refused = status == 503 || body.contains("data-progress");
+        // The overview needs no index: over a bad cache it shows its code and leaves the
+        // insights sidebar out, which is a refusal of the data, not data.
+        let no_side = t == "/" && !body.contains("<aside>");
+        let refused = status == 503 || body.contains("data-progress") || no_side;
         if !refused && clean.get(&t).is_none_or(|(_, want)| *want != body) {
             shown.push(format!("{t}: status {status}"));
         }

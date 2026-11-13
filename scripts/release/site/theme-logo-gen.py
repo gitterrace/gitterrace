@@ -303,9 +303,20 @@ def main() -> int:
     ]
     for t in bare:
         print(f'{t}: has a <head> without {{% include "_favicon.html" %}}')
+    # A header brand is the mark and the drawn wordmark, never the name as text, so no page
+    # shows a different logo from the next one.
+    plain = [
+        p.relative_to(ROOT)
+        for p in sorted([*TEMPLATES.glob("*.html"), *SITE_TEMPLATES.glob("*.html")])
+        if 'class="brand"' in p.read_text() and not WORDMARK.search(p.read_text())
+    ]
+    for p in plain:
+        print(
+            f'{p}: its header brand has no <svg class="wordmark">, so it shows a text name'
+        )
     for d in drift:
         print(d)
-    return 1 if stale or bare or drift else 0
+    return 1 if stale or bare or drift or plain else 0
 
 
 if __name__ == "__main__":

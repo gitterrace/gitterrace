@@ -4,7 +4,7 @@ gitterrace is built to run on your own machine, bound to `127.0.0.1`. To let
 others read a repository, publish a static export or use public mode. Nothing
 else binds to another address.
 
-## A static export
+## Publish a static export
 
 The safest option is no server at all. `git terrace export` writes files,
 commits, diffs, blame, history and insights for the newest commits as plain
@@ -18,9 +18,11 @@ git terrace export site ~/src/project --commits 300
 Several repositories go into one site (`export site repo1 repo2`), and
 `--project name=url` credits someone else's repository in every page's banner.
 The export writes a `_headers` file with the content security policy and
-`Cache-Control: no-cache` on the pages, so a browser revalidates them after a
-new export, as it does against the server. Netlify and Cloudflare Pages apply
-it. Elsewhere, set the same headers on the host.
+`Cache-Control: no-cache` on the pages. A browser then revalidates them after a
+new export. Scripts, styles and fonts carry the build's version
+(`app.css?v=...`) and are kept a year. A new export names new versions, so a
+fresh page never runs a stale script. Netlify and Cloudflare Pages apply the
+file. Elsewhere, set the same headers on the host.
 
 Every page ends with a credit line such as
 `Source: name, MIT license, https://github.com/owner/name`. The license comes
@@ -37,7 +39,7 @@ action, Send to target, settings page or host path reaches it.
 An export is a snapshot with no search, live updates or actions. For those, or
 any revision on demand, use public mode.
 
-## Public mode
+## Serve in public mode
 
 `--public` (or `server.is_public = true`) makes the server a read-only viewer of
 committed history. Any `--addr` that is not loopback refuses to start without
@@ -84,14 +86,13 @@ index across restarts. Mount a config folder on `/config` for other settings.
 No prebuilt image is published. The build takes 5 to 10 minutes, on amd64 or
 arm64.
 
-`docker stop` sends SIGTERM, and the server stops accepting connections, lets
-open responses finish and exits 0, well inside Docker's 10 seconds. The image
-has a healthcheck that runs `git-terrace --version`: it proves the binary
-starts, not that the port answers, because the image has no shell or HTTP
-client. A client that does not finish its request headers in 10 seconds is
+On `docker stop` the server lets open responses finish and exits 0, well
+inside Docker's 10 seconds. The healthcheck runs `git-terrace --version`. It
+proves the binary starts, not that the port answers: the image has no shell or
+HTTP client. A client that does not send its request headers in 10 seconds is
 disconnected.
 
-## Behind a reverse proxy
+## Put it behind a reverse proxy
 
 Put a TLS reverse proxy in front of gitterrace on loopback. The proxy owns
 TLS, HSTS, connection limits, slow-client timeouts and, for a private

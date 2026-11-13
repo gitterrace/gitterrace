@@ -14,8 +14,8 @@ const TABLE: &[&str] = &[
     "period=",
     "period=1w",
     "period=all&bots=1",
-    "period=3m&author=ann@x.io&path=/src/&type=fix&scope=web",
-    "path=%2F&author=",
+    "period=3m&q=author:ann@x.io%20path:/src/%20type:fix%20scope:web",
+    "q=%20&period=",
     "bots=yes&ws=1&generated=0&ignore=0&exclude=*.md,%20,docs/**",
     "period=1y&from=2026-01-01&to=2026-03-31",
     "from=2026-01-01",
@@ -63,9 +63,17 @@ fn every_reader_gives_an_equal_scope() {
     }
 }
 
+/// `type`, `scope`, `author` and `path` are no parameters: they select nothing. The API refuses
+/// them before this reader runs; here they read as unset.
+#[test]
+fn one_key_forms_select_nothing() {
+    let a = direct("type=fix&scope=web&author=ann@x.io&path=src").expect("ok");
+    assert!(a.matcher().is_empty());
+}
+
 #[test]
 fn empties_mean_unset() {
-    let a = direct("period=&author=&path=%2F&type=").expect("ok");
+    let a = direct("period=&q=%20").expect("ok");
     assert_eq!(a, direct("").expect("ok"));
     assert!(a.matcher().is_empty());
 }

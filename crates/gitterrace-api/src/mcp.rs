@@ -219,12 +219,14 @@ fn tool_error_text(e: &ApiError) -> String {
 }
 
 #[derive(Deserialize, JsonSchema, Default)]
+#[serde(deny_unknown_fields)]
 struct RepoArgs {
     /// Repository name from `list_repos`. Required when more than one is in scope.
     repo: Option<String>,
 }
 
 #[derive(Deserialize, JsonSchema, Default)]
+#[serde(deny_unknown_fields)]
 struct RevArgs {
     /// Repository name from `list_repos`. Required when more than one is in scope.
     repo: Option<String>,
@@ -233,6 +235,7 @@ struct RevArgs {
 }
 
 #[derive(Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
 struct LogArgs {
     /// Repository name from `list_repos`. Required when more than one is in scope.
     repo: Option<String>,
@@ -247,6 +250,7 @@ struct LogArgs {
 }
 
 #[derive(Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
 struct ShowArgs {
     /// Repository name from `list_repos`. Required when more than one is in scope.
     repo: Option<String>,
@@ -259,6 +263,7 @@ struct ShowArgs {
 }
 
 #[derive(Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
 struct ReadArgs {
     /// Repository name from `list_repos`. Required when more than one is in scope.
     repo: Option<String>,
@@ -272,6 +277,7 @@ struct ReadArgs {
 }
 
 #[derive(Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
 struct TreeArgs {
     /// Repository name from `list_repos`. Required when more than one is in scope.
     repo: Option<String>,
@@ -281,6 +287,7 @@ struct TreeArgs {
 }
 
 #[derive(Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
 struct BlameArgs {
     /// Repository name from `list_repos`. Required when more than one is in scope.
     repo: Option<String>,
@@ -290,14 +297,13 @@ struct BlameArgs {
 }
 
 #[derive(Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
 struct HotspotArgs {
     /// Repository name from `list_repos`. Required when more than one is in scope.
     repo: Option<String>,
     rev: Option<String>,
     /// `1w`, `1m`, `3m`, `1y` or `all` (default): only changes in that window count.
     period: Option<String>,
-    /// Only files under this directory.
-    path: Option<String>,
     #[schemars(schema_with = "query_schema")]
     query: Option<String>,
     /// Files to return. Defaults to 20.
@@ -305,6 +311,7 @@ struct HotspotArgs {
 }
 
 #[derive(Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
 struct ActivityArgs {
     /// Repository name from `list_repos`. Required when more than one is in scope.
     repo: Option<String>,
@@ -467,11 +474,7 @@ impl McpServer {
         let p = Params {
             period: a.period,
             limit: a.limit,
-            select: gitterrace_index::Selection {
-                path: a.path,
-                q: a.query,
-                ..Default::default()
-            },
+            select: gitterrace_index::Selection { q: a.query },
             ..Params::default()
         };
         self.run("hotspots", a.repo.clone(), move |s| {
@@ -504,10 +507,7 @@ impl McpServer {
     ) -> Result<CallToolResult, ErrorData> {
         let p = Params {
             period: a.period,
-            select: gitterrace_index::Selection {
-                q: a.query,
-                ..Default::default()
-            },
+            select: gitterrace_index::Selection { q: a.query },
             ..Params::default()
         };
         self.run("activity", a.repo.clone(), move |s| {

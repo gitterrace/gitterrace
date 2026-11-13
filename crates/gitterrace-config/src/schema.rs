@@ -299,8 +299,8 @@ settings! {
     limits: Limits {
         /// Largest file shown as text, in KiB. Larger files are offered as raw downloads.
         text_kb: u64 = 2048 => Live + cost,
-        /// Largest file served raw, in MiB. A larger one is refused. The default was 256 before
-        /// 0.1.0: a repository that serves large binaries raw sets it again.
+        /// Largest file served raw, in MiB. A larger one is refused: a repository that serves
+        /// large binaries raw raises it.
         raw_mb: u64 = 10 => Live + cost,
         /// Raw file bytes held in memory at once across all requests, in MiB. Each raw request
         /// reserves `raw_mb` until its body is sent, so a request past the budget waits.

@@ -142,6 +142,35 @@ export function checks(env) {
     }
     await h.close();
 
+    // Opening the page at #fN scrolls that file to the top, its header where it pins and its
+    // top border just above the window. Nothing of the file above shows. Off-screen line
+    // blocks are only measured once seen, so their reserved height must be their real one.
+    const g = await ctx.newPage({ viewport: { width: 1200, height: 900 } });
+    await g.goto(url, { waitUntil: 'load', timeout: 180000 });
+    const open = await g.evaluate(() => [...document.querySelectorAll('section.file')]
+      .filter((s) => s.querySelector('.diff') && !s.querySelector('[data-load-diff]'))
+      .map((s) => s.id));
+    const pick = [open[Math.floor(open.length / 2)], open[open.length - 1]].filter(Boolean);
+    for (const id of pick) {
+      await g.goto(`${url}#${id}`, { waitUntil: 'load', timeout: 180000 });
+      await g.waitForTimeout(1500);
+      const at = await g.evaluate((x) => {
+        const s = document.getElementById(x);
+        const hdr = s.querySelector('header').getBoundingClientRect();
+        const under = document.elementFromPoint(innerWidth / 2, hdr.bottom + 20)
+          ?.closest('section.file');
+        // The file above may not show: a sliver of it reads as being in the wrong file.
+        const above = document.elementFromPoint(innerWidth / 2, 4)?.closest('section.file');
+        return { top: Math.round(s.getBoundingClientRect().top), hdr: Math.round(hdr.top),
+          under: under && under.id, above: above && above.id };
+      }, id);
+      at.top === -1 && at.hdr === 0 && at.under === id && (!at.above || at.above === id)
+        ? r.ok(`${where}: opening at #${id} pins its header at the top`)
+        : r.fail(`${where}: opening at #${id} shows ${at.above} on top, file ${at.top},`
+          + ` header ${at.hdr}`);
+    }
+    await g.close();
+
     // The first fetch of every fragment fails: a lazy file must load on a later scroll.
     const f = await ctx.newPage({ viewport: { width: 1200, height: 900 } });
     const failed = new Set();

@@ -9,7 +9,7 @@ brew install gitterrace/tap/gitterrace
 cargo install --locked --git https://github.com/gitterrace/gitterrace gitterrace
 ```
 
-Installs `git-terrace`; git runs it as `git terrace`.
+Installs `git-terrace`, which git runs as `git terrace`.
 
 <!-- END GENERATED: install -->
 
@@ -70,6 +70,18 @@ cargo install --locked --force --git https://github.com/gitterrace/gitterrace gi
 
 A running server keeps the old version: stop it (Ctrl-C) and run `git terrace`
 again. A new cache format rebuilds the cache by itself.
+
+## Uninstall
+
+1. If you ran `git terrace install-handler`, run
+   `git terrace install-handler --uninstall` first.
+2. Remove the binary the way you installed it: `brew uninstall gitterrace`,
+   `cargo uninstall gitterrace`, or delete `git-terrace` from the folder the
+   shell installer reported (`~/.cargo/bin` by default).
+3. Delete what it wrote, if you want it gone too: the config folder
+   (`~/.config/gitterrace`, `%APPDATA%\gitterrace` on Windows), the repository
+   list (`~/.local/state/gitterrace`, `%LOCALAPPDATA%\gitterrace` on Windows)
+   and `.git/gitterrace/` in each repository you served.
 
 ## Troubleshooting
 

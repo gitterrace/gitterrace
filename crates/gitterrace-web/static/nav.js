@@ -14,19 +14,25 @@
   var offMeta = document.querySelector('meta[name="gt-off"]'), OFF = offMeta ? offMeta.content.split(" ") : [];
   function isOff(f) { return OFF.indexOf(f) >= 0; }
   var STATIC = document.body.dataset.static !== undefined; // an export: no server, no /api
-  // The one record of which overlay is open, shared by every script that opens one (this file
-  // loads first); key handlers read it instead of their own copies. `name` labels it, `back` is
-  // its backdrop. open() names the box, moves focus in, keeps Tab inside a dialog (a menu closes
-  // on Tab instead, as WAI-ARIA menus do), closes on Escape and gives focus back to the opener
-  // (`o.from`, else whatever had focus).
+  // The one record of the open overlay, shared by every script (this file loads first).
+  // `top` enters the top layer: a <dialog> around `box` opens modal, a bare box as a popover.
+  // Tab wraps inside a dialog (the browser would leave for its own chrome) and closes a menu,
+  // as WAI-ARIA menus do. Escape closes. Focus goes back to the opener (`o.from`, else what had
+  // focus) unless a light-dismiss click moved it.
   var ov = window.gtOverlay = {
-    name: null, back: null, from: null, onClose: null,
-    open: function (name, back, box, o) {
+    name: null, top: null, from: null, onClose: null, shut: null,
+    open: function (name, top, box, o) {
       ov.close();
       o = o || {};
-      box.setAttribute("role", o.menu ? "menu" : "dialog");
-      if (!o.menu) box.setAttribute("aria-modal", "true");
-      box.setAttribute("aria-label", o.label);
+      // The click that light-dismissed this anchor's popover does not reopen it.
+      var shut = ov.shut;
+      ov.shut = null;
+      if (shut && o.anchor && shut.anchor === o.anchor && Date.now() - shut.t < 400) return false;
+      var modal = top.tagName === "DIALOG";
+      // A <dialog> is its own role; the box inside it is plain.
+      if (o.menu) box.setAttribute("role", "menu");
+      else if (!modal) box.setAttribute("role", "dialog");
+      if (!top.hasAttribute("aria-labelledby")) top.setAttribute("aria-label", o.label);
       if (!box.hasAttribute("tabindex")) box.tabIndex = -1;
       box.addEventListener("keydown", function (e) {
         if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); ov.close(); return; }
@@ -40,9 +46,24 @@
       });
       ov.from = o.from || document.activeElement;
       ov.onClose = o.onClose || null;
-      ov.name = name; ov.back = back;
-      document.body.appendChild(back);
+      ov.name = name; ov.top = top;
+      document.body.appendChild(top);
+      if (modal) {
+        top.addEventListener("cancel", function (e) { e.preventDefault(); ov.close(); });
+        // The dialog fills the window: a press on it, not on its box, is on the backdrop.
+        top.addEventListener("mousedown", function (e) { if (e.target === top) ov.close(); });
+        top.showModal();
+      } else {
+        top.popover = "auto";
+        top.addEventListener("toggle", function (e) {
+          if (e.newState !== "closed" || ov.top !== top) return;
+          ov.shut = { anchor: o.anchor, t: Date.now() };
+          ov.close();
+        });
+        top.showPopover();
+      }
       box.focus();
+      return true;
     },
     // Puts a position:fixed box beside `anchor`, using the box's measured size. An anchor that is
     // scrolled out of view is ignored: the box goes top-center, under a pinned header or at 12vh
@@ -87,13 +108,16 @@
     },
     unplace: null,
     close: function () {
-      if (!ov.back) return;
+      var top = ov.top;
+      if (!top) return;
       if (ov.unplace) ov.unplace();
       var from = ov.from, done = ov.onClose;
-      ov.back.remove();
-      ov.name = ov.back = ov.from = ov.onClose = null;
+      ov.name = ov.top = ov.from = ov.onClose = null;
+      top.remove();
       if (done) done();
-      if (from && from.focus && document.contains(from)) from.focus();
+      var at = document.activeElement;
+      var lost = !at || at === document.body;
+      if (lost && from && from.focus && document.contains(from)) from.focus();
     },
     // The "g" chord: nav.js arms it, and actions.js (capture phase, runs first) leaves the
     // armed second key to nav.js, so both read one timer.
@@ -120,6 +144,8 @@
     return e;
   }
   function typing(t) {
+    // A radio takes no text: page keys still work on a view switch.
+    if (t && t.type === "radio") return false;
     return t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT" || t.isContentEditable);
   }
   // Single-key shortcuts can be turned off (WCAG 2.1.4). The choice lives in localStorage like
@@ -134,12 +160,12 @@
     } catch (e) {}
   }
   window.gtKeysOff = keysOff;
+  window.gtTyping = typing;
   function toast(msg) { window.gtToast(msg); }
   function copy(text, done, btn) { return window.gtCopy(text, done, btn); }
 
-  // Search folds into a button when the top bar is narrow (CSS decides). Opening it takes the
-  // whole bar; Escape, or focus leaving it empty, folds it again. Returns false when there is
-  // no search box, so "/" falls through.
+  // Search is a button. Opening it takes the whole bar. Escape, or focus leaving it empty,
+  // folds it again. Returns false when there is no search box, so "/" falls through.
   var bar = document.querySelector(".topbar");
   var q = document.getElementById("q");
   function openSearch() {
@@ -158,13 +184,13 @@
   }
 
   // ---- overlays -----------------------------------------------------------
-  // `btn` is the toggle whose aria-expanded follows the overlay, if any.
+  // Anchored to a toggle button (`btn`, whose aria-expanded follows it): a popover. Otherwise a
+  // modal dialog.
   function overlay(cls, label, btn) {
-    var back = el("div", "ov-back");
-    var box = el("div", "ov " + cls);
-    back.appendChild(box);
-    back.addEventListener("mousedown", function (e) { if (e.target === back) closeOverlay(); });
-    ov.open(cls, back, box, { label: label, onClose: btn ? function () { btn.setAttribute("aria-expanded", "false"); } : null });
+    var box = el("div", "ov " + cls), top = box;
+    if (!btn) { top = el("dialog", "ov-back"); top.appendChild(box); }
+    var done = btn ? function () { btn.setAttribute("aria-expanded", "false"); } : null;
+    if (!ov.open(cls, top, box, { label: label, anchor: btn, onClose: done })) return null;
     if (btn) btn.setAttribute("aria-expanded", "true");
     return box;
   }
@@ -380,8 +406,6 @@
       var row = document.getElementById("L" + n);
       if (row) row.classList.add("sel");
     }
-    var first = document.getElementById("L" + a);
-    if (first && first.scrollIntoView) first.scrollIntoView({ block: "center" });
   }
   if (code && code.querySelector("[id^=L]")) {
     var anchor = null;
@@ -420,19 +444,16 @@
   // A folded file is a link to its body. Clicking it (or Enter on it) swaps the body in; a file
   // folded only for the page budget (data-lazy) also loads when it scrolls near the viewport,
   // and an #fN anchor opens its file. Find in page sees loaded files only.
-  function loadDiff(b, scroll) {
+  function loadDiff(b) {
     if (b.dataset.busy) return;
     b.dataset.busy = "1";
     if (lazyObs) lazyObs.unobserve(b);
-    var section = b.closest("section");
     fetch(b.dataset.loadDiff).then(function (r) { if (!r.ok) throw r; return r.text(); }).then(function (h) {
       var p = b.parentNode, focused = document.activeElement === b;
       p.insertAdjacentHTML("afterend", h);
       var body = p.nextElementSibling;
       p.remove();
       if (focused && body) { body.tabIndex = -1; body.focus({ preventScroll: true }); }
-      // The body above the target grew or the target moved: put the file's top back in view.
-      if (scroll && section) section.scrollIntoView();
     }, function () {
       delete b.dataset.busy;
       // Watched again, so a lazy file that failed once retries when it next scrolls near.
@@ -452,21 +473,20 @@
     if (!lazyObs) return;
     Array.prototype.forEach.call(document.querySelectorAll("[data-load-diff][data-lazy]"), function (b) { lazyObs.observe(b); });
   }
-  // `jump` brings the file into view once it loads; a live refresh opens it where it is.
-  function openHashed(jump) {
+  // The browser jumps to #fN itself. This only opens a folded target.
+  function openHashed() {
     var m = /^#(f\d+|p\/.+)$/.exec(location.hash), id = m && m[1], s;
     // #p/<path> names a file by path, so it survives a different file order.
     try { if (id && id[0] === "p") id = decodeURIComponent(id); } catch (x) { id = null; }
     s = id && document.getElementById(id);
     s = s && s.closest("section");
     var b = s && s.querySelector("[data-load-diff]");
-    if (b) loadDiff(b, jump !== false);
-    else if (s && jump !== false) s.scrollIntoView();
+    if (b) loadDiff(b);
   }
   watchLazy();
   openHashed();
-  window.addEventListener("hashchange", function () { openHashed(true); });
-  document.addEventListener("gt:live-refreshed", function () { watchLazy(); openHashed(false); });
+  window.addEventListener("hashchange", openHashed);
+  document.addEventListener("gt:live-refreshed", function () { watchLazy(); openHashed(); });
 
   // ---- copy buttons ---------------------------------------------------------
   Array.prototype.forEach.call(document.querySelectorAll("[data-copyable]"), function (card) {
@@ -522,6 +542,7 @@
         var c = by[td.dataset.name];
         if (!c) return;
         var a = el("a", "subj", c.subject);
+        a.title = c.subject;
         a.href = B + "/commit/" + c.id;
         td.appendChild(a);
         // The age gets its own right-aligned column, so the

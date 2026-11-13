@@ -110,13 +110,13 @@ fn quickstart_md() -> String {
     format!("```bash\n{}```\n", quickstart())
 }
 
-/// One screenshot, light and dark, from the same list the site uses.
+/// One screenshot, light and dark: the site's own WebP files, from the same list.
 fn shots_md() -> String {
     let (name, alt, _) = crate::site::SHOTS[0];
     format!(
         "<picture>\n<source media=\"(prefers-color-scheme: \
-        dark)\" srcset=\"docs/screenshots/{name}-dark.png\">\n<img \
-        src=\"docs/screenshots/{name}-light.png\" alt=\"{alt}\">\n</picture>\n"
+        dark)\" srcset=\"docs/screenshots/{name}-dark.webp\">\n<img \
+        src=\"docs/screenshots/{name}-light.webp\" alt=\"{alt}\">\n</picture>\n"
     )
 }
 
@@ -152,7 +152,7 @@ pub fn install_md(ws: &Workspace) -> String {
         let names: Vec<String> = p.bins.iter().map(|b| format!("`{b}`")).collect();
         let _ = writeln!(
             install,
-            "Installs {}; git runs it as `git terrace`.",
+            "Installs {}, which git runs as `git terrace`.",
             names.join(" and ")
         );
     }

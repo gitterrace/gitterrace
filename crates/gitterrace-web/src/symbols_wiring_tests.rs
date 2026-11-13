@@ -51,7 +51,10 @@ async fn a_source_page_outlines_its_symbols_as_rail_and_menu_linked_to_shown_lin
         assert!(body.contains(&format!("id=\"{id}\"")), "{id} has no line");
     }
     assert!(body.contains("title=\"impl Point\""), "{body}");
-    assert!(body.contains("src=\"/static/outline.js\""));
+    assert!(
+        body.contains("data-outline"),
+        "app.js loads outline.js for it"
+    );
 
     // Lines past `limits.blob_lines` are not on the page, so their symbols are not listed.
     let cut = router(&p, with(|c| c.limits.blob_lines = 4));

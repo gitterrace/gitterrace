@@ -163,6 +163,8 @@ pub(super) fn dead_links(
     for (page, html) in &tree.pages {
         for dest in refs(html) {
             let (file, anchor) = dest.split_once('#').unwrap_or((dest, ""));
+            // An asset's `?v=` is its content hash, not another file.
+            let file = file.split('?').next().unwrap_or(file);
             if let Some(rest) = ["blob", "tree", "raw"]
                 .iter()
                 .find_map(|k| file.strip_prefix(&format!("{repo}/{k}/main/")))

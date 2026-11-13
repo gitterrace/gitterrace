@@ -113,7 +113,7 @@ fn an_author_selection_follows_renames_made_by_others() {
         oracle::ready(&router).await;
 
         let all = src_dir(&router, "").await;
-        let bob = src_dir(&router, "author=bob%40y.io").await;
+        let bob = src_dir(&router, "q=author%3Abob%40y.io").await;
         assert_eq!(all["owners"][0]["name"], "Bob", "{all}");
         assert_eq!(bob["lines"], all["lines"], "author=bob: {bob}");
         assert_eq!(bob["owners"][0]["name"], "Bob", "{bob}");

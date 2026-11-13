@@ -1,7 +1,7 @@
-{#- The slim bar on top of every site page: brand, Docs, the source, the theme button and
-the demo when there is one, as the bar's one filled button. On a docs page the Docs menu
-sits before the Docs link and takes its place on a narrow screen, and the Docs link is
-marked current. -#}
+{#- The slim bar on top of every site page: brand, then quiet links, each an icon and a
+word: Docs, the demo when there is one, the source, then the theme button. On a docs page
+the Docs menu sits before the Docs link and takes its place on a narrow screen, and the Docs
+link is marked current. -#}
 <header class="top"><nav class="bar" aria-label="Site">
 <a class="brand" href="/" aria-label="{{ name }} home">
 <svg class="logo" viewBox="2 2 28 28" aria-hidden="true"><path class="i" d="M10 23.5A1.25 1.25 0 0 1
@@ -116,15 +116,12 @@ d="M275.32 70.04 273.48 69.48Q272.52 69.16 272.12 68.74Q271.72 68.32 271.72 67.7
 514.68 67.84Q519.2 65.2 525.48 65.2Q530.84 65.2 534.62 67.14Q538.4 69.08 540.38 72.5Q542.36 75.92
 542.36 80.36Z"/></svg></a>
 {{ docs_menu|safe }}<a class="docs" href="/docs/"
-{%- if current %} aria-current="page"{% endif %}>Docs</a>
+{%- if current %} aria-current="page"{% endif %}>{{ docs_icon|safe }}<span>Docs</span></a>
+{%- if !demo.is_empty() %}
+<a class="live" href="{{ demo }}">{{ demo_icon|safe }}<span>Demo</span></a>
+{%- endif %}
 <a class="gh" href="{{ repo }}" aria-label="{{ name }} on GitHub"
 title="GitHub"><svg viewBox="0 0 16 16" width="18" height="18" aria-hidden="true"><path
 d="{{ gh_mark }}"/></svg><span>GitHub</span></a>
 {{ theme_button|safe }}
-{%- if !demo.is_empty() %}
-<a class="cta" href="{{ demo }}"
-aria-label="Live demo"><span class="long">Live demo</span><span class="short">Demo</span><svg
-viewBox="0 0 12 12" width="12" height="12" aria-hidden="true"><path
-d="M4.5 2.5 8 6l-3.5 3.5"/></svg></a>
-{%- endif %}
 </nav></header>

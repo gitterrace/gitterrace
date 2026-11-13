@@ -21,10 +21,10 @@ url   = "https://github.com/{var.repo}/issues/new?title={title}&body={notes}"
 vars  = { repo = "owner/name" }
 
 [[send]]
-id    = "notes"
-label = "New note"
-url   = "obsidian://new?vault={var.vault}&file=Inbox%2F{title}&content={notes}"
-vars  = { vault = "Notes" }
+id    = "mail"
+label = "Mail draft"
+url   = "mailto:{var.to}?subject={title}&body={notes}"
+vars  = { to = "me@example.com" }
 ```
 
 Page values are always percent-encoded and can never reach the scheme or the
@@ -71,7 +71,6 @@ Switch on the ones you use (`enabled = true`) and fill in their `vars`.
 | `edit` | action | no | Opens the file at the selected line in your editor |  |
 | `tendir-add` | action | no | Adds a task with the tendir command line tool |  |
 | `webhook` | action | no | Posts the payload as JSON to a webhook of yours | `url` |
-| `obsidian-new` | action | no | Writes a new note in an Obsidian vault | `vault`, `folder` |
 
 A cell ending in `...` is cut short. The whole text of every entry is in the
 file `git terrace init` writes:
@@ -133,21 +132,17 @@ stdin   = "json"
 vars    = { url = "https://example.test/hook" }
 ```
 
-`:url` encodes a value for a URL:
+`:url` encodes a value for a URL, so a title with `&` or `#` stays one query
+value. This one searches the web for the selection's title (`open` on macOS,
+`xdg-open` on Linux):
 
 ```toml
 [[action]]
-id      = "obsidian-new"
-label   = "New Obsidian note"
+id      = "search"
+label   = "Search the web"
 kinds   = ["line", "commit"]
-command = [
-  "open",
-  "obsidian://new?vault={var.vault:url}&file={var.folder:url}%2F{title:url}&content={markdown:url}",
-]
-vars    = { vault = "Notes", folder = "Inbox" }
+command = ["open", "https://duckduckgo.com/?q={title:url}"]
 ```
-
-Add `&append=true` and a fixed `file` to append every note to one note.
 
 ### Windows
 
@@ -161,7 +156,7 @@ Windows relies on the ACLs of your profile folder: `%APPDATA%` is private to
 your account by default, and gitterrace does not read ACLs itself. A shared
 account, or an `%APPDATA%` other users can write to, is not supported.
 Background processes a script starts are not reaped when the action completes
-normally; only a timeout triggers `taskkill /T` (then `/F`) cleanup.
+normally. Only a timeout triggers `taskkill /T` (then `/F`) cleanup.
 
 ### Scripts shared by actions
 
@@ -219,9 +214,9 @@ Checked when the file loads:
   is the argument of (`"--notes", "{markdown}"`), or behind a literal prefix
   (`"--notes={markdown}"`). In the option case, a value that does start with `-`
   refuses the run.
-- A value with a NUL byte, a value over 64 KiB, or arguments over 256 KiB
-  together refuse the run with a toast. Nothing is cut short. Send large text
-  on stdin.
+- A value with a zero byte (NUL), a value over 64 KiB, or arguments over 256 KiB
+  together refuse the run with a toast. Nothing is cut short. Send large text on
+  stdin.
 
 <!-- BEGIN GENERATED: action-keys -->
 ### `[[script]]`
@@ -308,6 +303,7 @@ Environment (same values, plus `GITTERRACE_VAR_<NAME>`):
 
 ## Security
 
+<!-- BEGIN GENERATED: limits -->
 - The file must be a regular file outside every served repository. On Unix it
   and its folder must also be owned by you and not writable by group or others.
   Windows checks neither and relies on the profile folder's ACLs (see
@@ -315,8 +311,6 @@ Environment (same values, plus `GITTERRACE_VAR_<NAME>`):
   bind and with `--no-actions`, and never offered to MCP.
 - Every field is untrusted repository text. In a script, quote it and never
   `eval` it.
-
-<!-- BEGIN GENERATED: limits -->
 - No shell between gitterrace and the program: a placeholder is one argument,
   never parsed. Scrubbed environment, timeout, at most 4 runs at once, 30 a
   minute.

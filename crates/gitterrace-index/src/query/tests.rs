@@ -1,6 +1,6 @@
 use proptest::prelude::*;
 
-use super::{KEYWORDS, Leaf, Query, Term, When, fold};
+use super::{KEYWORDS, Leaf, Query, Term, When, day_range};
 use gitterrace_types::Period;
 
 fn q(s: &str) -> Query {
@@ -25,8 +25,7 @@ fn reads_terms_and_writes_them_canonically() {
         got.to_string(),
         "crash !merge author:\"Ann Lee\",bob@x.io type:fix,feat path:src after:3m"
     );
-    assert_eq!(q("period:all"), Query::default());
-    assert_eq!(q("period:quarter").to_string(), "after:3m");
+    assert_eq!(q("after:quarter").to_string(), "after:3m");
     assert_eq!(q("before:2026-01-31").to_string(), "before:2026-01-31");
     assert_eq!(q("\"merge\"").terms()[0].leaf, Leaf::Text("merge".into()));
     assert_eq!(q("  ").to_string(), "");
@@ -135,58 +134,38 @@ proptest! {
     }
 }
 
+/// `period:` was the old spelling of `after:`. It is an unknown keyword now, refused with the
+/// known ones, never read as a window.
 #[test]
-fn every_alias_folds_to_its_keyword() {
-    for (key, value, want) in [
-        ("type", "fix", "type:fix"),
-        ("scope", "web", "scope:web"),
-        ("author", "Ann Lee", "author:\"Ann Lee\""),
-        ("path", "/src/", "path:src"),
-        ("period", "1m", "period:1m"),
-        ("from", "2024-03-04", "after:2024-03-04"),
-        ("to", "2024-03-04", "before:2024-03-05"),
-        ("to", "2024-02-29", "before:2024-03-01"),
-    ] {
-        let term = fold(key, value).expect(key).expect(key);
-        let want = if key == "period" { "after:1m" } else { want };
-        assert_eq!(term.to_string(), want, "{key}");
+fn period_is_no_keyword() {
+    for text in ["period:1m", "period:all"] {
+        let e = Query::parse(text).expect_err(text);
+        assert!(e.message.contains("unknown keyword `period:`"), "{e}");
     }
-    assert_eq!(fold("period", "all"), Ok(None));
-    assert_eq!(fold("type", "  "), Ok(None));
-    assert!(fold("period", "soon").is_err());
+    assert!(Query::parse("after:all").is_err());
 }
 
 #[test]
-fn every_keyword_alias_is_in_the_fold() {
-    for k in KEYWORDS {
-        if let Some(p) = k.param {
-            let sample = match k.keyword {
-                "period" => "1m",
-                "after" | "before" => "2024-03-04",
-                _ => "x",
-            };
-            assert!(
-                matches!(fold(p, sample), Ok(Some(_))),
-                "{} has no fold",
-                k.keyword
-            );
-        }
-    }
-    // The reverse: a key the fold reads is a KEYWORDS param.
-    for key in ["type", "scope", "author", "path", "period", "from", "to"] {
-        assert!(KEYWORDS.iter().any(|k| k.param == Some(key)), "{key}");
-    }
+fn a_day_range_reads_both_ends_inclusive() {
+    let [from, to] = day_range("2024-03-04", "2024-03-04").expect("range");
+    assert_eq!(
+        (from.to_string(), to.to_string()),
+        (
+            "after:2024-03-04".to_owned(),
+            "before:2024-03-05".to_owned()
+        )
+    );
+    let [_, leap] = day_range("2024-02-28", "2024-02-29").expect("range");
+    assert_eq!(leap.to_string(), "before:2024-03-01");
+    assert!(day_range("2024-03-05", "2024-03-04").is_none());
+    assert!(day_range("2024-02-30", "2024-03-04").is_none());
 }
 
 #[test]
 fn from_and_to_the_same_day_select_exactly_that_day() {
     use super::Matcher;
     let day = crate::parse_day("2024-03-04").expect("day");
-    let (from, to) = (fold("from", "2024-03-04"), fold("to", "2024-03-04"));
-    let terms = vec![
-        from.expect("ok").expect("term"),
-        to.expect("ok").expect("term"),
-    ];
+    let terms = Vec::from(day_range("2024-03-04", "2024-03-04").expect("range"));
     let m = Matcher::new(&Query::new(terms));
     let at = |time: i64| {
         let c = super::Commit {

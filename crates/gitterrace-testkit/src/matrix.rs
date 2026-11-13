@@ -73,13 +73,14 @@ impl Cell {
         if self.ws {
             q.push("ws=1".to_owned());
         }
-        match self.chip {
-            Chip::None => {}
-            Chip::Author => q.push(format!("author={}", enc(&v.author))),
-            Chip::Kind => q.push(format!("type={}", enc(&v.kind))),
-            Chip::Scope => q.push(format!("scope={}", enc(&v.scope))),
-            Chip::Path => q.push(format!("path={}", enc(&v.path))),
-        }
+        let term = match self.chip {
+            Chip::None => None,
+            Chip::Author => Some(format!("author:{}", v.author)),
+            Chip::Kind => Some(format!("type:{}", v.kind)),
+            Chip::Scope => Some(format!("scope:{}", v.scope)),
+            Chip::Path => Some(format!("path:{}", v.path)),
+        };
+        q.extend(term.map(|t| format!("q={}", enc(&t))));
         q.join("&")
     }
 }

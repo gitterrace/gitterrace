@@ -95,10 +95,10 @@ async fn empty_pages_offer_a_next_step() {
     gitterrace_testkit::oracle::ready(&router).await;
     let mut fails = Vec::new();
     for p in [
-        "/log/HEAD?path=nope",
+        "/log/HEAD?q=path:nope",
         "/history/nope.rs",
         "/search?q=zzzqqq",
-        "/stats?author=nobody%40example.com",
+        "/stats?q=author:nobody%40example.com",
     ] {
         let (status, body) = page(&router, p).await;
         assert_eq!(status, 200, "{p}");

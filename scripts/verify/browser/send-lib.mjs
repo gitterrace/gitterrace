@@ -20,7 +20,8 @@ export function checks(env) {
         await p.waitForSelector('.send-ctx');
         const v = await p.evaluate(() => {
           const box = document.querySelector('.ov.send');
-          const head = document.getElementById(box.getAttribute('aria-labelledby') || '');
+          const named = box.closest('[aria-labelledby]');
+          const head = document.getElementById(named?.getAttribute('aria-labelledby') || '');
           const lab = (id) => document.querySelector(`label[for="${id}"]`)?.textContent || '';
           const foot = box.querySelector('.send-foot').getBoundingClientRect();
           return {

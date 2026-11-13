@@ -221,9 +221,14 @@ fn scope(q: &Q) -> Scope {
         period: Some(PERIODS[q.period].to_owned()),
         ..ScopeParams::default()
     };
-    p.select.author = q.author.map(|a| AUTHORS[a].1.to_owned());
-    p.select.path = q.path.map(|i| ["src", "docs", "src/a.rs"][i].to_owned());
-    p.select.kind = q.kind.map(|k| KINDS[k].unwrap_or("other").to_owned());
+    let terms = [
+        q.kind
+            .map(|k| format!("type:{}", KINDS[k].unwrap_or("other"))),
+        q.author.map(|a| format!("author:{}", AUTHORS[a].1)),
+        q.path
+            .map(|i| format!("path:{}", ["src", "docs", "src/a.rs"][i])),
+    ];
+    p.select.q = Some(terms.into_iter().flatten().collect::<Vec<_>>().join(" "));
     p.options.bots = flag(q.bots);
     p.options.ws = flag(q.ws);
     p.options.generated = flag(q.generated);

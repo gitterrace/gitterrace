@@ -7,14 +7,15 @@ use std::collections::VecDeque;
 const SEEDS: [&str; 2] = ["/refs", "/log/HEAD"];
 
 /// Every seed: the extra ones, the server's prewarmed pages (every unfiltered insights page
-/// `cfg` serves), and the diagram library when diagrams are on: a script loads it by name, so
-/// the crawl finds no link to it.
+/// `cfg` serves), the assets `app.js` adds on first use, and the diagram library when diagrams
+/// are on: a script loads each by name, so the crawl finds no link to it.
 pub(super) fn seeds(cfg: &gitterrace_config::Config) -> impl Iterator<Item = &'static str> {
     let on = cfg.feature_on(gitterrace_config::Feature::Mermaid, None);
     let warm = gitterrace_web::warm_pages(cfg);
     SEEDS
         .into_iter()
         .chain(warm)
+        .chain(gitterrace_web::LAZY_ASSETS)
         .chain(on.then_some(gitterrace_web::MERMAID_JS))
 }
 

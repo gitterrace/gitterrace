@@ -119,8 +119,7 @@ pub fn render() -> Out {
     Out::file(PATH, s)
 }
 
-/// The commit filter every insight reads as `q`, from the keyword registry. The one-key
-/// parameters are listed as aliases of its terms, from the same registry the fold reads.
+/// The commit filter every insight reads as `q`, from the keyword registry.
 fn filter_section() -> String {
     let mut s = String::from(
         "\n## Filter\n\n`q` is the commit filter, the same text the web filter field takes. \
@@ -128,12 +127,10 @@ fn filter_section() -> String {
          the span.\n\n",
     );
     s.push_str(&gitterrace_index::query::grammar());
-    s.push_str("\n\nThe one-key parameters stay and read as terms of `q`, and must match as well:");
-    for (i, (param, keyword)) in gitterrace_index::query::aliases().into_iter().enumerate() {
-        let sep = if i == 0 { " " } else { ", " };
-        let _ = write!(s, "{sep}`{param}` as `{keyword}:`");
-    }
-    s.push_str(".\n");
+    s.push_str(
+        "\n\nA query key an endpoint does not list is a 400 naming it: `q` is the one way to \
+         select commits.\n",
+    );
     s
 }
 

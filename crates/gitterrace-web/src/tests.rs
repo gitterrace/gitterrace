@@ -94,6 +94,12 @@ async fn serves_every_page() {
     let (s, body) = get(&app, "/").await;
     assert_eq!(s, 200);
     assert!(body.contains("<h2 class=\"markdown-h1\" id=\"hello"));
+    // Code needs no index: while it builds, only insights pages show the progress, so a
+    // page that never waits for it never reloads for it.
+    assert!(
+        !body.contains("data-progress"),
+        "the overview waits for nothing"
+    );
     let (s, body) = get(&app, "/log/HEAD").await;
     assert_eq!((s, body.contains("fix: second")), (200, true));
     // One field, a GET form that submits on Enter: no button beside it, no Compare link.
@@ -108,7 +114,7 @@ async fn serves_every_page() {
         "Compare left the log toolbar"
     );
     for uri in [
-        "/log/HEAD?path=src/a.rs&page=0",
+        "/log/HEAD?q=path:src%2Fa.rs&page=0",
         "/log/HEAD?q=path%3Asrc%2Fa.rs&page=0",
     ] {
         let (s, body) = get(&app, uri).await;
@@ -140,23 +146,18 @@ async fn serves_every_page() {
     );
     assert!(body.contains("Code and commits work now."), "{body}");
     assert!(body.contains("/log/HEAD\">Commits</a>"), "{body}");
-    assert_eq!(
-        get(&app, "/insights").await.0,
-        303,
-        "the tab's name answers too"
-    );
     assert_eq!(get(&app, "/nope/x").await.0, 404);
     assert_eq!(get(&app, "/blob/HEAD/missing").await.0, 404);
     let (_, js) = get(&app, "/api/progress").await;
     assert!(js.contains("\"ready\":false"));
     assert_eq!(get(&app, "/static/app.css").await.0, 200);
 
-    let (s, body) = get(&app, "/log/HEAD?author=nobody%40example.com").await;
+    let (s, body) = get(&app, "/log/HEAD?q=author:nobody%40example.com").await;
     assert_eq!(
         (s, body.contains("<i>author</i> nobody@example.com")),
         (200, true)
     );
-    let (_, body) = get(&app, "/log/HEAD?author=t%40e.x").await;
+    let (_, body) = get(&app, "/log/HEAD?q=author:t%40e.x").await;
     assert!(body.contains("fix: second") && body.contains("first"));
 
     let (s, body) = get(&app, "/search?q=fn+main").await;
@@ -205,24 +206,24 @@ async fn serves_every_page() {
     }
     for u in [
         "/stats",
-        "/stats?type=fix&period=1y",
-        "/stats?author=t%40e.x&path=src",
-        "/stats?type=fix&scope=none&period=3m",
-        "/stats?type=other&path=src&author=x",
+        "/stats?q=type:fix&period=1y",
+        "/stats?q=author:t%40e.x%20path:src",
+        "/stats?q=type:fix%20scope:none&period=3m",
+        "/stats?q=type:other%20path:src%20author:x",
         "/stats/languages",
-        "/stats?type=fix&path=src&period=1y",
+        "/stats?q=type:fix%20path:src&period=1y",
         "/stats/contributors",
-        "/stats?period=1w&type=fix&bots=1&ws=1&generated=1&ignore=0&exclude=*.md",
+        "/stats?q=type:fix&period=1w&bots=1&ws=1&generated=1&ignore=0&exclude=*.md",
         "/stats?bots=1&ws=1&page=1",
         "/stats/hotspots",
-        "/stats/hotspots?period=3m&path=src",
+        "/stats/hotspots?q=path:src&period=3m",
         "/stats/ownership",
         "/compare",
         "/compare?base=HEAD~1&head=HEAD",
         "/compare?base=nope",
         "/history/src/a.rs",
         "/history/missing.rs",
-        "/stats/contributors?bots=1&period=3m&author=t%40e.x",
+        "/stats/contributors?q=author:t%40e.x&bots=1&period=3m",
         "/stats/languages?x=time&scale=share&from=0&to=1",
         "/",
     ] {
@@ -230,7 +231,7 @@ async fn serves_every_page() {
         assert_eq!(s, 200, "{u}");
         assert!(!body.contains("data-progress"), "{u}");
     }
-    let (_, body) = get(&app, "/stats?type=fix").await;
+    let (_, body) = get(&app, "/stats?q=type:fix").await;
     assert!(body.contains("class=\"chip\"") && body.contains("fix: second"));
     assert!(!body.contains("feat: first"));
     let (_, body) = get(&app, "/stats").await;

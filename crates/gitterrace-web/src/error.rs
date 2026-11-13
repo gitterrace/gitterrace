@@ -54,10 +54,13 @@ impl IntoResponse for Error {
 pub(crate) fn page(status: StatusCode, detail: &str) -> Html<String> {
     Html(format!(
         "<!doctype html><meta charset=utf-8><meta name=viewport content=\"width=device-width\">{}\
-         <link rel=stylesheet href=/static/tokens.css><link rel=stylesheet href=/static/app.css>\
-         <link rel=stylesheet href=/static/pagehead.css>\
+         <link rel=stylesheet href={}><link rel=stylesheet href={}>\
+         <link rel=stylesheet href={}>\
          <main class=wrap>{}<p><a href=/>Back to overview</a></p></main>",
         crate::fmt::FAVICON,
+        crate::asset_url("tokens.css"),
+        crate::asset_url("app.css"),
+        crate::asset_url("pagehead.css"),
         crate::pagehead::PageHead::new(
             status.as_u16().to_string(),
             crate::pagehead::Tagline::of(detail)

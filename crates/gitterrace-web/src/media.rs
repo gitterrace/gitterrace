@@ -170,16 +170,15 @@ impl<'a> Side<'a> {
     }
 }
 
-/// One `<img>` (or media element) for `path` at `rev`.
-fn element(k: Kind, rev: &str, path: &str) -> String {
-    element_at(k, &raw_url(rev, path), path)
-}
-
-fn element_at(k: Kind, url: &str, path: &str) -> String {
+/// One `<img>` (or media element) at `url`. A known pixel size reserves the box before load.
+fn element_at(k: Kind, url: &str, path: &str, dims: Option<(u32, u32)>) -> String {
     let name = esc(path.rsplit('/').next().unwrap_or(path));
     match k {
         Kind::Image | Kind::Svg => {
-            format!(r#"<img class="media-img" src="{url}" alt="{name}" loading="lazy">"#)
+            let size = dims.map_or_else(String::new, |(w, h)| {
+                format!(r#" width="{w}" height="{h}""#)
+            });
+            format!(r#"<img class="media-img" src="{url}" alt="{name}"{size} loading="lazy">"#)
         }
         // No embedded viewer: a crafted PDF would run in the app's origin.
         Kind::Pdf => format!(r#"<a class="media-file" href="{url}" download>Download {name}</a>"#),
@@ -210,7 +209,8 @@ pub(crate) fn blob_html(
     svg_src: Option<&str>,
 ) -> String {
     let url = raw_url(rev, path);
-    let dims = dimensions(path, bytes).map_or_else(String::new, |(w, h)| format!("{w} x {h} · "));
+    let px = dimensions(path, bytes);
+    let dims = px.map_or_else(String::new, |(w, h)| format!("{w} x {h} · "));
     // Without `/raw` there is no byte to show or download, only the facts.
     if !crate::features::on(gitterrace_config::Feature::Raw) {
         let mut out = format!(
@@ -231,7 +231,7 @@ pub(crate) fn blob_html(
         } else {
             ""
         },
-        element(k, rev, path),
+        element_at(k, &url, path, px),
         size(len),
     );
     if let Some(src) = svg_src {
@@ -285,13 +285,16 @@ pub(crate) fn diff_counts(old: Option<Facts>, new: Option<Facts>) -> String {
     )
 }
 
+/// One side of an image diff: where it loads from and its pixel size when known.
+pub(crate) type Pic<'a> = (Side<'a>, Option<(u32, u32)>);
+
 /// Before and after of one changed image, side by side; one side for added or deleted files.
-pub(crate) fn diff_html(old: Option<Side<'_>>, new: Option<Side<'_>>) -> String {
-    let img = |at: Side<'_>| {
+pub(crate) fn diff_html(old: Option<Pic<'_>>, new: Option<Pic<'_>>) -> String {
+    let img = |(at, dims): Pic<'_>| {
         let path = at.file();
-        element_at(kind(path).unwrap_or(Kind::Image), &at.url(), path)
+        element_at(kind(path).unwrap_or(Kind::Image), &at.url(), path, dims)
     };
-    let side = |label: &str, at: Option<Side<'_>>| {
+    let side = |label: &str, at: Option<Pic<'_>>| {
         at.map_or_else(String::new, |at| {
             format!(
                 "<figure class=\"media-side\">\
@@ -312,7 +315,7 @@ pub(crate) fn diff_html(old: Option<Side<'_>>, new: Option<Side<'_>>) -> String 
     // between two near-identical pictures is easier to find.
     let view = crate::seg::Seg {
         name: "Image view".to_owned(),
-        buttons: true,
+        panes: format!("view-{}", n.0.file()),
         choices: vec![
             crate::seg::Choice::new("Side by side", "sides", true),
             crate::seg::Choice::new("Overlay", "overlay", false),
@@ -321,10 +324,10 @@ pub(crate) fn diff_html(old: Option<Side<'_>>, new: Option<Side<'_>>) -> String 
     };
     format!(
         concat!(
-            r#"<div class="media-view" data-media-view data-seg-own>"#,
+            r#"<div class="media-view paned" data-media-view>"#,
             r#"<div class="media-bar">{view}</div>"#,
             r#"<div class="media-diff" data-pane="sides">{}{}</div>"#,
-            r#"<div class="media-overlay" data-pane="overlay" hidden>"#,
+            r#"<div class="media-overlay" data-pane="overlay">"#,
             r#"<div class="media-stage checker"><div class="media-stack">"#,
             r#"<div class="media-before">{}</div><div class="media-after">{}</div>"#,
             r#"</div></div><label class="media-cut muted">Before"#,
@@ -382,12 +385,18 @@ mod tests {
 
     #[test]
     fn diff_shows_one_or_two_sides() {
-        let both = diff_html(Some(Side::At("p", "a.png")), Some(Side::At("c", "a.png")));
+        let both = diff_html(
+            Some((Side::At("p", "a.png"), None)),
+            Some((Side::At("c", "a.png"), Some((7, 5)))),
+        );
+        // The known size reserves the picture's box before it loads.
+        assert!(both.contains(r#"width="7" height="5" loading"#), "{both}");
+        assert!(both.contains(r#"alt="a.png" loading"#), "{both}");
         // Side by side and the overlay each hold both pictures.
         assert_eq!(both.matches("<img").count(), 4);
         assert!(both.contains("/raw/p/a.png") && both.contains("/raw/c/a.png"));
         assert_eq!(
-            diff_html(None, Some(Side::At("c", "a.png")))
+            diff_html(None, Some((Side::At("c", "a.png"), None)))
                 .matches("<img")
                 .count(),
             1
@@ -410,12 +419,15 @@ mod tests {
 
     #[test]
     fn a_modified_image_offers_side_by_side_and_overlay() {
-        let both = diff_html(Some(Side::At("p", "a.png")), Some(Side::At("c", "a.png")));
+        let both = diff_html(
+            Some((Side::At("p", "a.png"), None)),
+            Some((Side::At("c", "a.png"), None)),
+        );
         assert!(both.contains("aria-label=\"Image view\""), "{both}");
         assert!(both.contains("data-show=\"overlay\""), "{both}");
-        assert!(both.contains("data-pane=\"overlay\" hidden"), "{both}");
+        assert!(both.contains("value=\"sides\" checked"), "{both}");
         assert!(both.contains("data-media-cut"), "{both}");
-        let added = diff_html(None, Some(Side::At("c", "a.png")));
+        let added = diff_html(None, Some((Side::At("c", "a.png"), None)));
         assert!(
             !added.contains("data-show"),
             "one side has nothing to compare: {added}"

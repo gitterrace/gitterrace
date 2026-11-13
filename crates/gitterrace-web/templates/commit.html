@@ -3,7 +3,7 @@
 {% block title %}{{ head.title }} · {{ c.name }}{% endblock %}
 {% block content %}
 {{ head }}
-<p class="meta"><a class="who" href="{{ author_href }}"><b>{{ author }}</b></a> <span class="muted">{{ date }}</span> · {{ sha|safe }}
+<p class="meta"><a class="who" href="{{ author_href }}"><b>{{ author }}</b></a> <span class="muted">{{ date }}</span> · {{ sha|safe }}<button class="actbtn icon sm" type="button" id="actcommit" data-tip="Actions for this commit" aria-haspopup="menu" aria-label="Actions for this commit"></button>
 {% for p in parents %} · parent {{ p|safe }}{% endfor %}
 · <a href="{{ c.base }}/tree/{{ id }}">Browse files</a></p>
 {% if !body.is_empty() %}<pre class="body">{{ body }}</pre>{% endif %}

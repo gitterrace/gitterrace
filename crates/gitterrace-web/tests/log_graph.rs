@@ -78,7 +78,7 @@ async fn the_list_view_has_no_graph_and_a_filter_hides_the_switch() {
     assert_eq!(cells(&list), 0);
     assert!(!list.contains("gref"));
     assert!(list.contains("aria-current=\"page\">List</a>"));
-    let (_, filtered) = page(&router, "/log/HEAD?path=x&view=graph").await;
+    let (_, filtered) = page(&router, "/log/HEAD?q=path:x&view=graph").await;
     assert_eq!(cells(&filtered), 0);
     assert!(!filtered.contains(">Graph</a>"));
 }

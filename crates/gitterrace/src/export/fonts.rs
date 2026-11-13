@@ -12,7 +12,9 @@ pub(super) fn inline_fonts(css: &str) -> String {
         out.push_str(&rest[..at]);
         let tail = &rest[at + FONT_URL.len()..];
         let end = tail.find(')').unwrap_or(tail.len());
-        match gitterrace_web::font_bytes(&tail[..end]) {
+        // The served stylesheet names `<font>.woff2?v=<version>`; the bytes go by name.
+        let name = tail[..end].split('?').next().unwrap_or_default();
+        match gitterrace_web::font_bytes(name) {
             Some(bytes) => {
                 out.push_str("url(data:font/woff2;base64,");
                 out.push_str(&gitterrace_actions::base64(

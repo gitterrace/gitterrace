@@ -12,8 +12,9 @@ csp [DIR]: every inline <script> of every page under DIR has its exact sha256 in
   `release` runs it too, before a deploy.
 links [DIR]: every link of a docs page takes the one shared link color (the `a` rule of
   DIR/assets/site.css), and only the chrome (bar, lists, pager, footer) may set its own. The
-  footer of a docs page is a landmark with a labelled nav and holds the Edit link last, pushed
-  to the right on a wide screen and stacked on a narrow one. Without DIR it reads target/site.
+  footer of a docs page holds the project nav on the left, its Edit link right after the
+  GitHub link and the version last, and the legal nav on the right, stacked on a narrow
+  screen. Without DIR it reads target/site.
 domains: gitterrace.dev serves the page over HTTPS with the generated headers, and every other
   host (www, gitterrace.com, www.gitterrace.com) redirects to it permanently. A www host that
   resolves to nothing looks like DNS propagation and goes unnoticed for weeks; this measures it.
@@ -177,12 +178,6 @@ def css_problems(css: str) -> list[str]:
             is_link = re.search(r"(^| |>)a(\[[^]]*\])?(:[a-z-]+)?$", one)
             if is_link and one != "a" and not one.startswith(CHROME):
                 bad.append(f"site.css: `{one}` sets its own link color")
-    pushed = any(
-        sel.startswith("footer") and ".edit" in sel and "margin-left:auto" in body
-        for sel, body in rules
-    )
-    if not pushed:
-        bad.append("site.css does not push the footer's Edit link to the right")
     return bad
 
 
@@ -197,10 +192,17 @@ def footer_problems(where: str, html: str) -> list[str]:
     links = re.findall(r'<a [^>]*href="([^"]*)"', foot)
     if len(links) != len(set(links)):
         bad.append(f"{where}: the footer links a page twice")
+    project, _, legal = foot.partition('<nav aria-label="Legal"')
+    if "/legal/" in project or "/legal/" not in legal:
+        bad.append(
+            f"{where}: the legal links are not the footer's last nav, on the right"
+        )
+    if not re.search(r'<a class="version"[^>]*>[^<]*</a>\s*</nav>\s*$', project):
+        bad.append(f"{where}: the version is not the last link of the project nav")
     if 'class="edit"' in foot and not re.search(
-        r'</nav>\s*<a class="edit"[^>]*>[^<]*</a>\s*$', foot
+        r'<a class="repo"[^>]*>[^<]*</a>\s*<a class="edit"', project
     ):
-        bad.append(f"{where}: the Edit link is not the last item, after the nav")
+        bad.append(f"{where}: the Edit link does not follow the GitHub link")
     return bad
 
 
@@ -318,18 +320,29 @@ def domains() -> list[str]:
 
 
 def links_self_test() -> bool:
-    """A content link with its own color, a footer without the nav and one whose Edit link
-    is not after the nav are red; the shared rules and a good footer are green."""
-    base = "a{color:var(--accent-ink)}footer .edit{margin-left:auto}"
-    nav = '<nav aria-label="F"><a href="/a">A</a></nav>'
+    """A content link with its own color, a footer without the legal nav on the right, a
+    legal link on the left and an Edit link not last in the project nav are red; the shared
+    rules and a good footer are green."""
+    base = "a{color:var(--accent-ink)}"
     edit = '<a class="edit" href="/e">Edit</a>'
+    legal = '<nav aria-label="Legal" class="legal"><a href="/legal/i/">I</a></nav>'
+    first = '<a class="repo" href="/a">GitHub</a>'
+    ver = '<a class="version" href="/v">v1</a>'
+    lic = '<a href="/l">MIT license</a>'
+    good = (
+        f'<footer><nav aria-label="Project">{first}\n{edit}\n{lic}\n{ver}\n</nav>\n'
+        f"{legal}</footer>"
+    )
     ok = (
         not css_problems(base + ".pager a{color:var(--fg)}")
         and css_problems(base + ".groups li a{color:var(--fg)}")
         and css_problems("a{color:red}")
-        and not footer_problems("p", f"<footer>{nav}\n{edit}\n</footer>")
-        and footer_problems("p", f"<footer>{edit}{nav}</footer>")
-        and footer_problems("p", f"<footer><a href='/a'>A</a>{edit}</footer>")
+        and not footer_problems("p", good)
+        and footer_problems("p", good.replace(legal, ""))
+        and footer_problems("p", good.replace('href="/a"', 'href="/legal/p/"'))
+        and footer_problems("p", good.replace(f"{first}\n{edit}", f"{edit}\n{first}"))
+        and footer_problems("p", good.replace(f"{lic}\n{ver}", f"{ver}\n{lic}"))
+        and footer_problems("p", good.replace(f"{edit}\n{lic}", f"{lic}\n{edit}"))
     )
     if not ok:
         print("self-test: the links check misjudged a planted fault")

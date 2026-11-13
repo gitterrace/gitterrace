@@ -29,6 +29,7 @@
   function openRefs() {
     var btn = document.getElementById("refbtn");
     var box = overlay("refs", "Switch branch or tag", btn);
+    if (!box) return;
     box.classList.add("anchored");
     var p = listPicker(box, "Filter branches and tags", function (q) {
       return (refs || []).filter(function (x) {
@@ -66,6 +67,7 @@
   function openRepos() {
     var btn = document.getElementById("repobtn");
     var box = overlay("refs repopanel", "Switch repository", btn);
+    if (!box) return;
     box.classList.add("anchored");
     var head = el("div", "ov-title");
     head.appendChild(el("h2", "", "Switch repository"));

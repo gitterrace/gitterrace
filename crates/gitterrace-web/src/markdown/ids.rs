@@ -5,18 +5,21 @@
 //! shadow a browser global through named access, is moved under the prefix instead. The same
 //! function maps same-page hrefs, so a link and its target always agree.
 
-/// The prefix a colliding id is moved under. `static/app.js` maps a plain hash to it.
+/// The prefix a colliding id is moved under. Same-page hrefs are mapped the same way, so a
+/// link lands without script.
 pub(crate) const USER_ID: &str = "user-content-";
 
 /// Every literal id the page chrome uses: templates, static scripts and Rust views. The
 /// `chrome_ids_match_the_sources` test fails when this list and the sources disagree.
-pub(crate) const CHROME_IDS: [&str; 57] = [
+pub(crate) const CHROME_IDS: [&str; 59] = [
     "about",
+    "actcommit",
     "activity-counts",
     "activity-hours",
     "activity-series",
     "actmark",
     "actnote",
+    "actpage",
     "actsel",
     "branches",
     "code-age",
@@ -25,6 +28,7 @@ pub(crate) const CHROME_IDS: [&str; 57] = [
     "files-size",
     "formoff",
     "frequency",
+    "gt-main",
     "gt-tip",
     "headstate",
     "hotspot-files",
@@ -37,7 +41,6 @@ pub(crate) const CHROME_IDS: [&str; 57] = [
     "logq-error",
     "logq-help",
     "logq-list",
-    "main",
     "patterns",
     "q",
     "range",
@@ -121,9 +124,11 @@ fn reserved(id: &str) -> bool {
         || id.starts_with(USER_ID)
 }
 
-/// The id a document's `id` ends up with in the page: plain unless it is reserved.
+/// The id a document's `id` ends up with in the page: plain unless it is reserved. A prefixed
+/// id over a plain one is already the heading alias and stays as it is.
 pub(crate) fn doc_id(id: &str) -> String {
-    if reserved(id) {
+    let alias = id.strip_prefix(USER_ID).is_some_and(|rest| !reserved(rest));
+    if !alias && reserved(id) {
         format!("{USER_ID}{id}")
     } else {
         id.to_owned()
@@ -185,10 +190,18 @@ mod tests {
         for id in CHROME_IDS.iter().chain(NAMED_ACCESS.iter()) {
             assert_eq!(doc_id(id), format!("{USER_ID}{id}"), "{id}");
         }
-        for id in ["Location", "L12", "L3-L9", "L3-9", "f4", "user-content-x"] {
+        for id in ["Location", "L12", "L3-L9", "L3-9", "f4", "user-content-q"] {
             assert!(doc_id(id).starts_with(USER_ID), "{id}");
         }
-        for id in ["reference", "main-loop", "label", "fn1", "f", "Lx", "query"] {
+        for id in [
+            "reference",
+            "main",
+            "label",
+            "fn1",
+            "f",
+            "Lx",
+            "user-content-x",
+        ] {
             assert_eq!(doc_id(id), id, "{id}");
         }
     }

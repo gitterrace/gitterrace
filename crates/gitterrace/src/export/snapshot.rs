@@ -99,3 +99,7 @@ pub(super) fn mark_snapshot_as(
     out.push_str(&page[end..]);
     out.into_bytes()
 }
+
+#[cfg(test)]
+#[path = "headers_tests.rs"]
+mod tests;

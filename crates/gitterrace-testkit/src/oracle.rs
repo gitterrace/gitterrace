@@ -393,6 +393,23 @@ pub fn canonical(body: &str) -> String {
     out.join("\n")
 }
 
+/// `body` with each `?v=<hex>` written as `?v=_`.
+fn unversioned(body: &str) -> String {
+    let mut out = String::with_capacity(body.len());
+    let mut rest = body;
+    while let Some(at) = rest.find("?v=") {
+        out.push_str(&rest[..at + 3]);
+        rest = &rest[at + 3..];
+        let end = rest
+            .find(|c: char| !c.is_ascii_hexdigit())
+            .unwrap_or(rest.len());
+        out.push('_');
+        rest = &rest[end..];
+    }
+    out.push_str(rest);
+    out
+}
+
 /// FNV-1a 128: stable across platforms and releases, unlike `DefaultHasher`.
 #[must_use]
 pub fn digest(body: &str) -> String {
@@ -412,6 +429,13 @@ pub fn digest(body: &str) -> String {
 /// `dump` (a folder under `target/`, the caller's `CARGO_TARGET_TMPDIR`) and panics with the
 /// first keys and that path. A green run removes a stale `dump`.
 pub fn check(golden: &Path, dump: &Path, answers: &BTreeMap<String, String>) {
+    // An asset URL carries the build's `?v=`, which moves with any script or stylesheet edit:
+    // the goldens hold what a page says, so the version is read as one placeholder.
+    let answers: BTreeMap<String, String> = answers
+        .iter()
+        .map(|(k, v)| (k.clone(), unversioned(v)))
+        .collect();
+    let answers = &answers;
     let mut text = String::new();
     for (k, v) in answers {
         writeln!(text, "{} {} {k}", digest(v), digest(&canonical(v))).expect("write string");

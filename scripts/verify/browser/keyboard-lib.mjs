@@ -237,7 +237,7 @@ export function checks(env) {
       await sw.check();
       await p.keyboard.press('Escape');
       await p.keyboard.press('t');
-      const finder = await p.$('.overlay, [role=dialog]');
+      const finder = await p.$('.overlay, dialog[open], [role=dialog]');
       const open = finder ? await finder.isVisible() : false;
       if (open) r.fail(`keys-off ${bname}: t opened the finder with shortcuts off`);
       else r.ok(`keys-off ${bname}: t does nothing with shortcuts off`);
@@ -248,7 +248,7 @@ export function checks(env) {
       await (await p.$('#keys-off'))?.uncheck();
       await p.keyboard.press('Escape');
       await p.keyboard.press('t');
-      const back = await p.$('.overlay, [role=dialog]');
+      const back = await p.$('.overlay, dialog[open], [role=dialog]');
       if (back && await back.isVisible()) r.ok(`keys-off ${bname}: back on after unchecking`);
       else r.fail(`keys-off ${bname}: t does nothing after turning shortcuts back on`);
       await p.keyboard.press('Escape');

@@ -221,10 +221,10 @@ fn the_pairwise_golden_agrees_with_the_full_matrix() {
 
 /// The browsing pages, one or more cells each, over the matrix repository at HEAD. Every page
 /// kind the router serves has a cell here or on an insights page, or is exempt below.
-const BROWSE: [&str; 59] = [
+const BROWSE: [&str; 55] = [
     "/log",
     "/log/HEAD",
-    "/log/HEAD?path=src",
+    "/log/HEAD?q=path:src",
     "/history/src/lib.rs",
     "/compare",
     "/compare?base=HEAD~3&head=HEAD",
@@ -250,17 +250,14 @@ const BROWSE: [&str; 59] = [
     "/search?q=fn",
     "/search?q=feat&kind=commits",
     "/search?q=nothing-matches-this",
-    "/stats/types",
-    "/stats/frequency",
-    "/stats/patterns",
     "/api/refs",
     "/api/files/HEAD",
     // Filters and paging on the log, and the search switches.
-    "/log/HEAD?author=bob%40y.io",
+    "/log/HEAD?q=author:bob%40y.io",
     "/log/HEAD?page=2",
     "/log/HEAD?view=graph",
     "/log/HEAD?view=graph&page=2",
-    "/log/HEAD?path=src&author=bob%40y.io",
+    "/log/HEAD?q=path:src%20author:bob%40y.io",
     "/search",
     "/search?q=fn.%2A&regex=1",
     "/search?q=FN&case=1",
@@ -276,14 +273,13 @@ const BROWSE: [&str; 59] = [
     "/blame/HEAD/missing.rs",
     "/compare?base=nope&head=HEAD",
     "/tag/nope",
-    // An older revision, an empty compare, the worktree file route and the insights alias.
+    // An older revision, an empty compare and the worktree file route.
     "/blob/HEAD~1/src/lib.rs",
     "/blame/HEAD~1/src/lib.rs",
     "/tree/HEAD~1/src",
     "/compare?base=HEAD&head=HEAD",
     "/worktree/raw/src/lib.rs",
     "/worktree/raw/missing.rs",
-    "/insights",
 ];
 
 /// Routes with no golden cell, each with the reason. A route listed here that does not exist

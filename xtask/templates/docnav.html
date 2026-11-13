@@ -6,7 +6,8 @@ the current one carries aria-current. -#}
 {%- if part == "list" -%}
 <nav class="docnav" aria-label="Docs"><h2>Docs</h2>
 {%- else -%}
-<details class="menu docsmenu"><summary>Docs</summary><nav class="pop" aria-label="Docs">
+<details class="menu docsmenu"><summary>{{ docs_icon|safe }}<span>Docs</span></summary>
+<nav class="pop" aria-label="Docs">
 {%- endif -%}
 {%- for d in docs %}
 {%- if !d.group.is_empty() %}{% if !loop.first %}</ol>{% endif -%}

@@ -55,9 +55,6 @@ async fn main() -> anyhow::Result<()> {
     for w in &loaded.warnings {
         tracing::warn!("config: {w}");
     }
-    if cli.interval_ms.is_some() {
-        tracing::warn!("--interval-ms is ignored: changes come from file events");
-    }
     match cli.command.unwrap_or(Command::Serve) {
         Command::Config => print!("{}", loaded.describe()),
         Command::Serve => {

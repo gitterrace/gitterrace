@@ -8,14 +8,14 @@ use crate::wiring_tests::{app, repo};
 fn a_memo_hit_carries_the_version_of_now() {
     let dir = tempfile::tempdir().expect("tmp");
     let a = app(&repo(dir.path(), "r"), gitterrace_config::Config::default());
-    let key = a.memo_key("stats", Some("type=fix"));
+    let key = a.memo_key("stats", Some("q=type:fix"));
     let page = |v: u64| format!("<body data-live=\"notice\" data-live-v=\"{v}\">x</body>");
     a.memo_put(key.clone(), Arc::new(page(a.version())));
     // A change the key does not see (staging into a tree already dirty): only the version moves.
     let next = a.version().wrapping_add(7);
     a.version.store(next, Ordering::Release);
     assert_eq!(
-        a.memo_key("stats", Some("type=fix")),
+        a.memo_key("stats", Some("q=type:fix")),
         key,
         "the key stays put"
     );

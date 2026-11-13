@@ -1,11 +1,12 @@
-//! Every page with an "On this page" outline loads the script that wires its filter, keys and
-//! highlight. The menu is one component, so a page that renders it without the script shows a
-//! filter that never appears.
+//! Every page with an "On this page" outline gets the script that wires its filter, keys and
+//! highlight. app.js loads it on demand for any `[data-outline]`, so a page needs app.js and
+//! the loader must still name that selector. Without both, the filter never appears.
 
 use gitterrace_testkit::matrix::Mailmap;
 use gitterrace_testkit::{oracle, page};
 
-const SCRIPT: &str = "src=\"/static/outline.js\"";
+/// The script's URL up to its build version, which moves with any asset edit.
+const SCRIPT: &str = "src=\"/static/app.js?v=";
 
 /// Pages whose HTML has an outline but not the script.
 fn missing(pages: &[(String, String)]) -> Vec<&str> {
@@ -22,9 +23,19 @@ fn the_check_sees_an_outline_without_its_script() {
     assert_eq!(missing(&bad), ["/x"]);
     let good = vec![(
         "/x".to_owned(),
-        format!("<nav data-outline></nav><script {SCRIPT}>"),
+        format!("<nav data-outline></nav><script {SCRIPT}1\">"),
     )];
     assert!(missing(&good).is_empty());
+}
+
+/// The loader in app.js fetches outline.js for every outline on the page.
+#[test]
+fn app_js_loads_the_outline_script_for_an_outline() {
+    let app = include_str!("../static/app.js");
+    assert!(
+        app.contains("[data-outline]") && app.contains("gtLazy(\"outline\")"),
+        "app.js no longer loads outline.js for [data-outline]"
+    );
 }
 
 #[test]

@@ -1,6 +1,7 @@
-//! The slim bar on top of every site page, from `templates/bar.html`: brand, Docs, the source
-//! link, the theme button and the demo when there is one. It follows the page's color scheme,
-//! light in light mode and dark in dark mode, as the app's header does.
+//! The slim bar on top of every site page, from `templates/bar.html`: brand, then Docs, the demo
+//! when there is one and the source link, each an icon and a word, and the theme button. It
+//! follows the page's color scheme, light in light mode and dark in dark mode, as the app's
+//! header does.
 
 use askama::Template;
 
@@ -12,6 +13,17 @@ const GH_MARK: &str = "M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55
 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87\n\
 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016\n\
 8c0-4.42-3.58-8-8-8z";
+
+/// The Docs icon, an open book in the theme button's line style. The bar's Docs menu draws
+/// it too, so the link and the menu that stands in for it look the same.
+pub(crate) const DOCS_ICON: &str = "<svg class=\"ico\" viewBox=\"0 0 24 24\" width=\"18\" \n\
+height=\"18\" aria-hidden=\"true\"><path d=\"M12 6.5C10.5 5.3 8.3 4.75 4 4.75v13c4.3 0 6.5.55 \n\
+8 1.75 1.5-1.2 3.7-1.75 8-1.75v-13c-4.3 0-6.5.55-8 1.75zM12 6.5v13\"/></svg>";
+
+/// The demo icon, a play triangle in a circle: the demo runs the app.
+const DEMO_ICON: &str = "<svg class=\"ico\" viewBox=\"0 0 24 24\" width=\"18\" height=\"18\" \n\
+aria-hidden=\"true\"><circle cx=\"12\" cy=\"12\" r=\"8.5\"/><path d=\"M10.25 8.9v6.2L15.1 \n\
+12z\"/></svg>";
 
 /// The theme button, the app's icons: half disc for system, sun, moon. Each viewBox is cropped
 /// to its own ink plus half the stroke, so at 18 px every icon fills the box as the source-link
@@ -34,6 +46,8 @@ struct Bar<'a> {
     repo: &'a str,
     demo: &'a str,
     gh_mark: &'a str,
+    docs_icon: &'a str,
+    demo_icon: &'a str,
     theme_button: &'a str,
     docs_menu: &'a str,
     current: bool,
@@ -49,6 +63,8 @@ pub(crate) fn bar(name: &str, repo: &str, demo: &str, docs_menu: &str, current: 
         repo,
         demo,
         gh_mark: GH_MARK,
+        docs_icon: DOCS_ICON,
+        demo_icon: DEMO_ICON,
         theme_button: THEME_BUTTON,
         docs_menu,
         current,
@@ -61,12 +77,12 @@ pub(crate) fn bar(name: &str, repo: &str, demo: &str, docs_menu: &str, current: 
 
 #[cfg(test)]
 mod tests {
-    use super::bar;
+    use super::{DOCS_ICON, bar};
 
     #[test]
     fn the_demo_link_is_there_only_with_a_demo() {
         let none = bar("r", "https://github.com/o/r", "", "", false);
-        assert!(!none.contains("class=\"cta\""), "{none}");
+        assert!(!none.contains("class=\"live\""), "{none}");
         let one = bar(
             "r",
             "https://github.com/o/r",
@@ -75,19 +91,22 @@ mod tests {
             false,
         );
         assert!(
-            one.contains("<a class=\"cta\" href=\"https://demo.example\""),
+            one.contains("<a class=\"live\" href=\"https://demo.example\""),
             "{one}"
         );
-        // The demo is the bar's last item, after the theme button.
+        // The demo is a link among the links, between Docs and the source, not a button.
         assert!(
-            one.find("class=\"cta\"") > one.find("id=\"theme\""),
+            one.find("class=\"docs\"") < one.find("class=\"live\"")
+                && one.find("class=\"live\"") < one.find("class=\"gh\""),
             "{one}"
         );
         for b in [none, one] {
             assert_eq!(b.matches("<header class=\"top\">").count(), 1);
             assert_eq!(b.matches("<nav ").count(), 1);
             assert!(b.contains("id=\"theme\"") && b.contains("class=\"gh\""));
-            assert!(b.contains("<a class=\"docs\" href=\"/docs/\">Docs</a>"));
+            assert!(b.contains(&format!(
+                "<a class=\"docs\" href=\"/docs/\">{DOCS_ICON}<span>Docs</span></a>"
+            )));
         }
     }
 
@@ -97,7 +116,9 @@ mod tests {
         let on = bar("r", "https://github.com/o/r", "", "", true);
         assert!(!off.contains("aria-current"), "{off}");
         assert!(
-            on.contains("href=\"/docs/\" aria-current=\"page\">Docs</a>"),
+            on.contains(&format!(
+                "href=\"/docs/\" aria-current=\"page\">{DOCS_ICON}<span>Docs</span></a>"
+            )),
             "{on}"
         );
     }

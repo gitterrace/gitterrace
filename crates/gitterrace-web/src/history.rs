@@ -165,8 +165,8 @@ mod tests {
             }
         }
         for uri in [
-            "/log/HEAD?path=sub/f",
-            "/log/HEAD?page=1&path=sub/f",
+            "/log/HEAD?q=path:sub%2Ff",
+            "/log/HEAD?q=path:sub%2Ff&page=1",
             "/history/sub/f",
         ] {
             let (status, _) = gitterrace_testkit::get(&router, uri).await;
