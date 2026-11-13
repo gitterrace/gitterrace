@@ -12,6 +12,11 @@ use gitterrace_git::{Repo, refused};
 use serde::{Deserialize, Serialize};
 
 const FILE: &str = "repos.json";
+/// Not configurable: a size bound on a state file. Room for thousands of entries, and a
+/// longer file was not written by gitterrace.
+const MAX_FILE: u64 = 1 << 20;
+/// Not configurable: an add token is a few dozen bytes.
+const MAX_TOKEN: u64 = 4096;
 /// Default of `limits.registry_entries`. Each serve touches one per repository; past this the
 /// least recently served go, so a file a user never looks at cannot grow without bound.
 static ENTRIES: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(500);
@@ -75,7 +80,7 @@ pub fn state_dir() -> Option<PathBuf> {
 /// then reads the candidate's own id before trusting it.
 /// A missing file is empty; a corrupt one is too, since the next serve rewrites it.
 pub fn candidates(dir: &Path) -> io::Result<Vec<Entry>> {
-    Ok(gitterrace_git::read_no_follow(dir, FILE)?
+    Ok(gitterrace_git::read_no_follow_bounded(dir, FILE, MAX_FILE)?
         .map(|b| serde_json::from_slice(&b).unwrap_or_default())
         .unwrap_or_default())
 }
@@ -224,7 +229,7 @@ pub(crate) fn remove_add_token(dir: &Path, port: u16) {
 /// symlink, a non-file, or (on unix) a file another user owns or can read is refused.
 pub fn add_token(dir: &Path, port: u16) -> io::Result<String> {
     let name = token_file(port);
-    let bytes = gitterrace_git::read_no_follow(dir, &name)?
+    let bytes = gitterrace_git::read_no_follow_bounded(dir, &name, MAX_TOKEN)?
         .ok_or_else(|| io::Error::from(io::ErrorKind::NotFound))?;
     #[cfg(unix)]
     {
@@ -275,7 +280,8 @@ mod tests {
     use std::path::Path;
 
     use crate::registry::{
-        Entry, FILE, add_token, candidates, claim, newest, record, write_add_token,
+        Entry, FILE, MAX_FILE, MAX_TOKEN, add_token, candidates, claim, newest, record, token_file,
+        write_add_token,
     };
 
     /// `limits.registry_entries` is how many entries the file keeps: the newest.
@@ -431,6 +437,19 @@ mod tests {
             write_add_token(&state, 4321, bad).expect("write");
             assert!(add_token(&state, 4321).is_err(), "{bad:?}");
         }
+    }
+
+    /// The class: a state file read whole into memory. Every no-follow read names a bound, and
+    /// a file past it (a planted or runaway one) is refused, not read.
+    #[test]
+    fn a_registry_or_token_file_past_its_bound_is_refused() {
+        let t = tempfile::tempdir().expect("tmp");
+        let big = usize::try_from(MAX_FILE + 1).expect("fits");
+        std::fs::write(t.path().join(FILE), vec![b' '; big]).expect("big");
+        assert!(candidates(t.path()).is_err(), "a huge registry is not read");
+        let big = usize::try_from(MAX_TOKEN + 1).expect("fits");
+        std::fs::write(t.path().join(token_file(1)), vec![b'a'; big]).expect("big token");
+        assert!(add_token(t.path(), 1).is_err(), "a huge token is not read");
     }
 
     #[cfg(unix)]

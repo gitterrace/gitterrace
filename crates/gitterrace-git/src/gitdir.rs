@@ -206,7 +206,8 @@ impl Repo {
         if fs::symlink_metadata(&info).is_err() {
             fs::create_dir(&info).map_err(git)?;
         }
-        let current = crate::read_no_follow(&info, "exclude")
+        // A hand-kept ignore list; anything past this was planted, and is not rewritten.
+        let current = crate::read_no_follow_bounded(&info, "exclude", 1 << 20)
             .map_err(git)?
             .unwrap_or_default();
         if current.lines().any(|l| l.trim() == line.as_bytes()) {

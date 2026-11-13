@@ -9,20 +9,15 @@ use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 
-/// Reads `dir/name` without following a link at either. A missing file reads as `None`.
+/// Reads `dir/name` without following a link at either, up to `max` bytes.
+///
+/// A longer file is refused with `InvalidData`, so a planted huge file cannot be read into
+/// memory. The limit holds even when the file grows after the open. A missing file reads as
+/// `None`. There is no unbounded variant: every reader names what its file can hold.
 ///
 /// # Errors
-/// When `dir` is not a real folder, `name` is not a regular file, or the read fails.
-pub fn read_no_follow(dir: &Path, name: &str) -> io::Result<Option<Vec<u8>>> {
-    read_no_follow_bounded(dir, name, u64::MAX)
-}
-
-/// As [`read_no_follow`], refusing a file longer than `max` bytes with `InvalidData`, so a
-/// planted huge file cannot be read into memory. The limit holds even when the file grows
-/// after the open.
-///
-/// # Errors
-/// As [`read_no_follow`], and `InvalidData` past `max`.
+/// When `dir` is not a real folder, `name` is not a regular file, the read fails, or the file
+/// is longer than `max`.
 pub fn read_no_follow_bounded(dir: &Path, name: &str, max: u64) -> io::Result<Option<Vec<u8>>> {
     let Some(f) = open_read_no_follow(dir, name)? else {
         return Ok(None);
@@ -189,7 +184,7 @@ pub fn refused(path: &Path) -> io::Error {
 
 #[cfg(test)]
 mod tests {
-    use super::{read_no_follow, write_atomic};
+    use super::{read_no_follow_bounded, write_atomic};
 
     #[test]
     fn writes_replace_and_read_back() {
@@ -197,10 +192,13 @@ mod tests {
         write_atomic(t.path(), "f", b"one", 0o644).expect("write");
         write_atomic(t.path(), "f", b"two", 0o644).expect("replace");
         assert_eq!(
-            read_no_follow(t.path(), "f").expect("read"),
+            read_no_follow_bounded(t.path(), "f", 1024).expect("read"),
             Some(b"two".to_vec())
         );
-        assert_eq!(read_no_follow(t.path(), "none").expect("read"), None);
+        assert_eq!(
+            read_no_follow_bounded(t.path(), "none", 1024).expect("read"),
+            None
+        );
     }
 }
 
@@ -208,7 +206,7 @@ mod tests {
 mod unix_tests {
     use std::os::unix::fs::symlink;
 
-    use super::{open_read_no_follow, read_no_follow, read_no_follow_bounded, write_atomic};
+    use super::{open_read_no_follow, read_no_follow_bounded, write_atomic};
 
     #[test]
     fn a_link_at_the_file_or_the_folder_is_refused_and_its_target_kept() {
@@ -219,7 +217,7 @@ mod unix_tests {
         std::fs::create_dir(&dir).expect("mkdir");
         symlink(&victim, dir.join("f")).expect("link");
         assert!(write_atomic(&dir, "f", b"x", 0o644).is_err());
-        assert!(read_no_follow(&dir, "f").is_err());
+        assert!(read_no_follow_bounded(&dir, "f", 1024).is_err());
         let linked = t.path().join("linked");
         symlink(&dir, &linked).expect("link dir");
         assert!(write_atomic(&linked, "g", b"x", 0o644).is_err());
