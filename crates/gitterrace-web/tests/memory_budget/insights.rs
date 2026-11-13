@@ -78,7 +78,7 @@ fn insights_request_peak() {
 /// After the idle release the server's live heap is what a just-started one holds plus the page
 /// memo it keeps by design: 4.3 MB against a 0.6 MB start on a 100k history, and 32 MB when the
 /// release keeps the shared tables. The footprint moves about 1 MB run to run on the same commit
-/// with the same heap, which SLACK_MB covers. The block cache and the derived tables go with the
+/// with the same heap, which `SLACK_MB` covers. The block cache and the derived tables go with the
 /// source, and the allocator runs one arena with no thread caches, so no arena or cache keeps
 /// freed slabs (red with one arena per core: 17 MB released against a 12 MB cap; red with thread
 /// caches: a 50k-file tree held 5 MB more than a 1k one).
@@ -129,6 +129,39 @@ fn insights_release_returns_to_start() {
     assert!(bad.is_empty(), "{}", bad.join("\n"));
 }
 
+/// Dirty and heap bytes of a server just started on a one-commit repository: the floor the
+/// budgets are measured from.
+fn just_started(test: &str) -> (u64, u64) {
+    let tiny = tempfile::tempdir().expect("tmp");
+    synthetic::build(
+        tiny.path(),
+        Shape {
+            commits: 1,
+            ..Shape::sized(1)
+        },
+    );
+    let t = Server::start(tiny.path(), test);
+    let b = t.base();
+    t.wait_ready(&b);
+    (t.dirty(), t.heap())
+}
+
+/// The insights pages the run reads: activity, hotspots and the summary API, over all time and
+/// one year, unfiltered and under `path`.
+fn measured_pages(base: &str, path: &str) -> Vec<String> {
+    let mut pages = Vec::new();
+    for period in ["all", "1y"] {
+        for sel in [String::new(), format!("&q=path:{path}")] {
+            pages.push(format!("{base}/stats?period={period}{sel}"));
+            pages.push(format!("{base}/stats/hotspots?period={period}{sel}"));
+            pages.push(format!(
+                "{base}/api/v1/insights/summary?period={period}{sel}"
+            ));
+        }
+    }
+    pages
+}
+
 fn peak_run(test: &str) -> Option<PeakRun> {
     apply_and_assert_allocator();
     if cfg!(not(any(target_os = "macos", target_os = "linux"))) {
@@ -143,21 +176,7 @@ fn peak_run(test: &str) -> Option<PeakRun> {
         },
         PathBuf::from,
     );
-    let start = {
-        let tiny = tempfile::tempdir().expect("tmp");
-        synthetic::build(
-            tiny.path(),
-            Shape {
-                commits: 1,
-                ..Shape::sized(1)
-            },
-        );
-        let t = Server::start(tiny.path(), test);
-        let b = t.base();
-        t.wait_ready(&b);
-        (t.dirty(), t.heap())
-    };
-    let (start, heap_start) = start;
+    let (start, heap_start) = just_started(test);
     let s = Server::start(&repo, test);
     let base = s.base();
     s.wait_ready(&base);
@@ -168,16 +187,7 @@ fn peak_run(test: &str) -> Option<PeakRun> {
     } else {
         "d1"
     };
-    let mut pages = Vec::new();
-    for period in ["all", "1y"] {
-        for sel in [String::new(), format!("&path={path}")] {
-            pages.push(format!("{base}/stats?period={period}{sel}"));
-            pages.push(format!("{base}/stats/hotspots?period={period}{sel}"));
-            pages.push(format!(
-                "{base}/api/v1/insights/summary?period={period}{sel}"
-            ));
-        }
-    }
+    let pages = measured_pages(&base, path);
     let mut bad = Vec::new();
     // The memo drops unknown parameters, so a second read of the same URL is a memo hit.
     // Warm every page as measured plus `bots=0`, the default: the same counts and shared

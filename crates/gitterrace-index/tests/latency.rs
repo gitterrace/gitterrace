@@ -9,8 +9,8 @@
 //! Release builds only (debug is ten times slower and says nothing). Runs in `make check`
 //! through `cargo test --release`.
 #![cfg(not(debug_assertions))]
-#![expect(clippy::expect_used, reason = "setup failures should panic")]
 
+use std::io::Write as _;
 use std::time::{Duration, Instant};
 
 use gitterrace_git::Repo;
@@ -80,5 +80,6 @@ fn file_pages_stay_under_their_ceilings_at_100k_commits() {
             files.len()
         );
     }
-    eprintln!("{}", report.join("\n"));
+    // The report is the point of a passing run: the times against their ceilings.
+    writeln!(std::io::stderr(), "{}", report.join("\n")).expect("stderr");
 }

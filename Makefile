@@ -47,9 +47,12 @@ check: gc-guard theme actions send-vectors names lines bench-guard docs-check fm
 fmt:
 	cargo fmt --all -- --check
 
-# clippy: Clippy, warnings are errors
+# clippy: Clippy, warnings are errors. Tests marked cfg(not(debug_assertions)) compile only in
+# release, so every such test target is linted there too: found by its marker, never by name.
 clippy:
 	cargo clippy --workspace --all-targets -- -D warnings
+	cargo clippy --release $$(grep -l 'cfg(not(debug_assertions))' crates/*/tests/*.rs \
+		| sed -E 's#crates/([^/]+)/tests/(.+)\.rs#-p \1 --test \2#') -- -D warnings
 
 # clippy-features: Clippy on each crate that has features, built without them. The workspace run
 # above unifies features (dev-dependencies turn them on), so a lint that only fires in the shipped

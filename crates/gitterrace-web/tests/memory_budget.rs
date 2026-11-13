@@ -70,7 +70,10 @@ fn report_heap(out: PathBuf) {
             stats::allocated::mib().expect("allocated"),
         );
         let tmp = out.with_extension("tmp");
-        for seq in 0_u64.. {
+        // Runs for the life of the test process.
+        let mut seq = 0_u64;
+        loop {
+            seq += 1;
             e.advance().expect("advance");
             let n = allocated.read().expect("read allocated");
             std::fs::write(&tmp, format!("{seq} {n}")).expect("write heap");
