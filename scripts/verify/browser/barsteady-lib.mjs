@@ -7,24 +7,25 @@ const SLACK = 0.5;
 const fix = (v) => Math.round(v * 10) / 10;
 const ITEMS = ['logo', 'Docs', 'Demo', 'GitHub', 'theme', 'logo text', 'Docs text', 'Demo text'];
 
-/** The box of each bar item in the page now, by name, in page coordinates. */
+/** The box of each bar item now, by name, in viewport coordinates: the bar is sticky. */
 function boxes() {
   const bar = document.querySelector('header.top');
   const seen = (e) => e.getClientRects().length > 0 && getComputedStyle(e).visibility !== 'hidden';
   const text = (t) => [...bar.querySelectorAll('a, summary')]
     .find((e) => seen(e) && e.textContent.trim() === t);
-  const textOf = (e) => (e.matches('.brand') ? e.querySelector('span') : e);
-  const found = { logo: bar.querySelector('.brand'), Docs: text('Docs'), Demo: text('Demo'),
-    GitHub: bar.querySelector('.gh'), theme: bar.querySelector('#theme') };
+  const textOf = (e) => (e.matches('.brand') ? e.querySelector('.wordmark') : e);
+  const found = { logo: bar.querySelector('.brand'), Docs: text('Docs'),
+    Demo: bar.querySelector('.cta'), GitHub: bar.querySelector('.gh'),
+    theme: bar.querySelector('#theme') };
   const out = {};
   for (const [k, e] of Object.entries(found)) {
     if (!e) continue;
     const b = e.getBoundingClientRect();
-    out[k] = [b.x + scrollX, b.y + scrollY, b.width, b.height];
+    out[k] = [b.x, b.y, b.width, b.height];
     const range = document.createRange();
     range.selectNodeContents(k === 'Docs' || k === 'Demo' || k === 'logo' ? textOf(e) : e);
     const t = range.getBoundingClientRect();
-    out[k + ' text'] = [t.x + scrollX, t.y + scrollY, t.width, t.height];
+    out[k + ' text'] = [t.x, t.y, t.width, t.height];
   }
   return out;
 }

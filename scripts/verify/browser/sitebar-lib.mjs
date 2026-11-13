@@ -68,8 +68,10 @@ export function checks(env) {
             for (const path of all) {
               await p.goto(url + path, { waitUntil: 'load' });
               const m = await p.evaluate(() => {
+                // rgb() in 0-255, or color(srgb ...) in 0-1 for a mixed, see-through bar.
                 const lum = (c) => {
-                  const [r, g, b] = (c.match(/[\d.]+/g) || []).map(Number);
+                  const k = c.startsWith('color(') ? 255 : 1;
+                  const [r, g, b] = (c.match(/[\d.]+/g) || []).map((v) => Number(v) * k);
                   const f = (v) => {
                     v /= 255;
                     return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;

@@ -134,12 +134,13 @@ async function siteTheme() {
         await p.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
         await p.waitForTimeout(400);
         let s = await state(p);
-        if (s.theme !== 'system' || s.label !== 'Theme: system') r.fail(`site-theme ${where}: first load is ${s.theme} (${s.label})`);
+        if (s.theme !== 'system' || s.label !== 'Theme: system, click for light') r.fail(`site-theme ${where}: first load is ${s.theme} (${s.label})`);
         const other = want(scheme, s, 'first load');
         const leaked = fetched.filter((u) => u.includes(`-${other}`) && /screenshots|logo/.test(u));
         if (leaked.length) r.fail(`site-theme ${where}: fetched the ${other} scheme's images: ${leaked.join(' ')}`);
         else r.ok(`site-theme ${where}: nothing of the ${other} scheme fetched`);
-        // The cycle: system, light, dark, system.
+        // The cycle: system, light, dark, system. The label names the next pick too.
+        const next = { system: 'light', light: 'dark', dark: 'system' };
         for (const t of ['light', 'dark', 'system']) {
           await p.click('#theme');
           // A swapped source sets currentSrc only once it has loaded.
@@ -148,7 +149,7 @@ async function siteTheme() {
           await p.waitForFunction(done, null, { timeout: 5000 }).catch(() => {});
           await p.waitForTimeout(300);
           s = await state(p);
-          if (s.theme !== t || s.label !== `Theme: ${t}`) r.fail(`site-theme ${where}: click gave ${s.theme} (${s.label}), wanted ${t}`);
+          if (s.theme !== t || s.label !== `Theme: ${t}, click for ${next[t]}`) r.fail(`site-theme ${where}: click gave ${s.theme} (${s.label}), wanted ${t}`);
           else want(t === 'system' ? scheme : t, s, `after click to ${t}`);
         }
         // The choice survives a reload, and is in place before first paint (set in the head).

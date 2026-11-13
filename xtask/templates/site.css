@@ -3,13 +3,15 @@
    between pages. Below 1100 px the grid is one column and both lists fold into menus. */
 *{box-sizing:border-box}
 html{scrollbar-gutter:stable}
+/* An anchor lands below the sticky bar, not under it. */
+[id]{scroll-margin-top:72px}
 body{margin:0;background:var(--bg);color:var(--fg);
 font:var(--text-md)/var(--leading) var(--sans)}
 a{color:var(--accent-ink);text-underline-offset:2px}
 :focus-visible{outline:2px solid var(--accent-ink);outline-offset:2px}
 main:focus{outline:none}
 .skip{position:absolute;left:var(--space-2);top:-100px;padding:var(--space-2) var(--space-3);
-background:var(--bg);border:var(--border);border-radius:var(--radius);z-index:20}
+background:var(--bg);border:var(--border);border-radius:var(--radius);z-index:50}
 .skip:focus{top:var(--space-2)}
 
 /* Type: one scale. Titles are serif at every level, labels are mono caps. */
@@ -28,12 +30,25 @@ letter-spacing:.12em;color:var(--muted)}
 border-top:var(--border)}
 .kicker{margin-bottom:var(--space-3)}
 
-/* The bar: follows the chosen scheme, as the app's header. */
-.top{background:var(--header);border-bottom:var(--border)}
+/* The bar: follows the chosen scheme, as the app's header. It stays on top while the page
+   scrolls, a little see-through over a blur; its hairline shows once the page has moved. */
+.top{position:sticky;top:0;z-index:30;
+background:color-mix(in srgb,var(--header) 85%,transparent);
+backdrop-filter:saturate(1.4) blur(10px);-webkit-backdrop-filter:saturate(1.4) blur(10px);
+border-bottom:1px solid var(--line)}
+@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
+.top{background:var(--header)}}
+@supports (animation-timeline:scroll()){
+.top{animation:hairline linear both;animation-timeline:scroll();animation-range:0 24px}
+@keyframes hairline{from{border-bottom-color:transparent}to{border-bottom-color:var(--line)}}}
 .bar{max-width:var(--page-max);margin:0 auto;height:56px;padding:0 var(--page-pad);
-display:flex;align-items:center;gap:var(--space-6)}
+display:flex;align-items:center;gap:var(--space-4)}
+/* Text links read as words: muted sans, the current section in the text color over an
+   accent edge, as the docs list marks its page. */
 .top a{color:var(--muted);font-size:14.5px;font-weight:500;text-decoration:none}
 .top a:hover{color:var(--fg)}
+.top a[aria-current]{color:var(--fg);text-decoration:underline 2px var(--accent);
+text-underline-offset:6px}
 /* The bar's Docs link has the box of the Docs menu button (44 px tall, chevron room), so
    no item of the bar moves from a page with the menu to one with the link. */
 .top a[href$="/docs/"]{display:inline-flex;align-items:center;min-height:44px;line-height:1;
@@ -41,25 +56,59 @@ margin:0 calc(-1*var(--space-2));padding:0 var(--space-2)}
 .top a[href$="/docs/"]::after{content:"";width:5px;height:5px;margin-left:var(--space-2);
 border:solid transparent;border-width:0 1.5px 1.5px 0}
 .top .brand{display:flex;align-items:center;gap:var(--space-2);margin-right:auto;
-color:var(--fg);font-size:18px;font-weight:var(--weight-semibold);letter-spacing:-.01em}
-.top .brand .logo{width:24px;height:24px;display:block}
+min-height:44px}
+.top .brand .logo{width:24px;height:24px;display:block;flex:none}
 .top .logo .i{fill:var(--fg)}.top .logo .a{fill:var(--accent)}
 .wordmark{height:15px;width:auto;display:block;overflow:visible}
 .wordmark .w-git{fill:var(--wm-git)}.wordmark .w-terrace{fill:var(--wm-terrace)}
-.gh,.theme{line-height:0}
-.gh{color:var(--muted)}
+/* Docs and the source link are words, set apart from the icon controls after them. */
+.top .gh{display:inline-flex;align-items:center;gap:6px;min-height:44px;
+margin-left:calc(var(--space-6) - var(--space-4));margin-right:var(--space-4)}
+.gh svg{fill:currentColor;flex:none}
 .gh:hover,.gh:focus-visible{color:var(--fg)}
-.gh svg{fill:currentColor}
-.theme{width:24px;height:24px;padding:0;display:grid;place-items:center;background:none;
-border:0;color:var(--muted);cursor:pointer}
-.theme:hover,.theme:focus-visible{color:var(--fg)}
-.theme svg{width:24px;height:24px;overflow:visible;fill:none;stroke:currentColor;
+/* The theme button is a control, not a logo: an 18 px icon in a bordered 32 px square, its
+   tap target grown to 44 px by an invisible ring. */
+.theme{position:relative;width:32px;height:32px;padding:0;display:grid;place-items:center;
+flex:none;background:none;border:var(--border);border-radius:var(--radius);
+color:var(--muted);cursor:pointer;line-height:0}
+.theme::before{content:"";position:absolute;inset:-6px}
+.theme:hover,.theme:focus-visible{color:var(--fg);border-color:var(--line-strong)}
+.theme svg{width:18px;height:18px;overflow:visible;fill:none;stroke:currentColor;
 stroke-width:2;stroke-linecap:round;stroke-linejoin:round;display:none}
 .theme svg *{vector-effect:non-scaling-stroke}
 .theme .fill{fill:currentColor;stroke:none}
 .theme .i-auto{display:block}
 :root[data-theme=light] .theme .i-auto,:root[data-theme=dark] .theme .i-auto{display:none}
 :root[data-theme=light] .theme .i-light,:root[data-theme=dark] .theme .i-dark{display:block}
+/* The demo is what the bar asks for: the one filled button, last. */
+.top .cta{position:relative;display:inline-flex;align-items:center;gap:6px;flex:none;
+height:32px;padding:0 var(--space-3);border-radius:var(--radius);background:var(--accent);
+color:var(--on-accent);font:600 14px/1 var(--sans);white-space:nowrap}
+.top .cta::before{content:"";position:absolute;inset:-6px 0}
+.top .cta:hover{color:var(--on-accent);
+background:color-mix(in srgb,var(--accent) 88%,var(--fg))}
+.top .cta:focus-visible{outline:2px solid var(--ring);outline-offset:2px}
+.top .cta svg{fill:none;stroke:currentColor;stroke-width:1.75;stroke-linecap:round;
+stroke-linejoin:round}
+.top .cta .short{display:none}
+/* On the landing page the hero draws the big logo, so the bar shows the mark alone until
+   the hero's heading has scrolled away, where a browser can tie that to the scroll. */
+body:has(.hero) .top .wordmark{opacity:0}
+@supports (animation-timeline:view()){
+body:has(.hero){timeline-scope:--hero}
+.hero h1{view-timeline:--hero block}
+body:has(.hero) .top .wordmark{animation:wordmark-in linear both;animation-timeline:--hero;
+animation-range:exit 40% exit 100%}
+@keyframes wordmark-in{from{opacity:0}to{opacity:1}}}
+@media (max-width:640px){
+.bar{gap:var(--space-3)}
+.top .gh{position:relative;width:24px;justify-content:center;margin:0}
+.top .gh::before{content:"";position:absolute;inset:0 -10px}
+.top .gh span{display:none}
+.top .gh svg{width:20px;height:20px}
+.top .cta .long{display:none}
+.top .cta .short{display:inline}}
+@media (max-width:359px){.top .wordmark{display:none}}
 
 /* The frame. */
 .frame{max-width:var(--page-max);margin:0 auto;padding:0 var(--page-pad);display:grid;
@@ -68,8 +117,8 @@ grid-template-columns:168px minmax(0,1fr) 208px;gap:0 var(--space-8);align-items
 .frame>.docnav{grid-column:1;grid-row:1}
 .frame>.outline.rail{grid-column:3;grid-row:1}
 .frame>footer{grid-column:2}
-.docnav,.outline.rail{position:sticky;top:var(--space-4);margin-top:var(--space-8);
-max-height:calc(100vh - 2*var(--space-4));overflow:auto}
+.docnav,.outline.rail{position:sticky;top:calc(56px + var(--space-4));
+margin-top:var(--space-8);max-height:calc(100vh - 56px - 2*var(--space-4));overflow:auto}
 .docnav ol,.outline ol{list-style:none;margin:0;padding:0}
 .menu .pop ol{list-style:none;margin:0;padding:0}
 .docnav h3,.menu .pop h3{margin:var(--space-3) 0 var(--space-1);padding:0 var(--space-3);
@@ -91,7 +140,6 @@ border-left-color:var(--accent)}
 .top .docsmenu+a{display:none}
 .menus{display:flex;margin:0 0 var(--space-4) calc(-1*var(--space-2))}
 .frame>main{padding-top:var(--space-4)}}
-@media (max-width:640px){.bar{gap:var(--space-4);padding:0 var(--page-pad)}}
 
 /* The folded lists on a narrow screen: native details, so they open without script. Text
    controls, no box: the bar's Docs reads as the bar's other links, "On this page" as the
@@ -109,7 +157,6 @@ border:solid currentColor;border-width:0 1.5px 1.5px 0;transform:translateY(-2px
 .top .docsmenu{position:static}
 .top .docsmenu>summary{margin:0 calc(-1*var(--space-2));font:500 14.5px/1 var(--sans);
 text-transform:none;letter-spacing:0}
-.top{position:relative;z-index:30}
 .bar{position:relative}
 .top .docsmenu .pop{left:auto;right:var(--page-pad);top:calc(100% - var(--space-1))}
 .top .docsmenu .pop a{font-size:var(--text-sm);font-weight:var(--weight-regular)}
@@ -210,7 +257,7 @@ figure img,.lightbox img{width:100%;height:auto;border:var(--border);border-radi
 figcaption{font-size:var(--text-xs);color:var(--muted);margin-top:var(--space-2);line-height:1.4}
 figcaption b{color:var(--fg);font-weight:var(--weight-semibold)}
 .lightbox{display:none}
-.lightbox:target{display:flex;position:fixed;inset:0;z-index:10;align-items:center;
+.lightbox:target{display:flex;position:fixed;inset:0;z-index:40;align-items:center;
 justify-content:center;padding:var(--space-8);
 background:color-mix(in srgb,var(--bg) 97%,transparent);cursor:zoom-out}
 .lightbox:target .shot{max-width:min(1280px,100%)}

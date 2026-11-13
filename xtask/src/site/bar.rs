@@ -1,5 +1,5 @@
-//! The slim bar on top of every site page, from `templates/bar.html`: brand, Docs, the demo
-//! when there is one, the source link and the theme button. It follows the page's color scheme,
+//! The slim bar on top of every site page, from `templates/bar.html`: brand, Docs, the source
+//! link, the theme button and the demo when there is one. It follows the page's color scheme,
 //! light in light mode and dark in dark mode, as the app's header does.
 
 use askama::Template;
@@ -14,10 +14,11 @@ const GH_MARK: &str = "M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55
 8c0-4.42-3.58-8-8-8z";
 
 /// The theme button, the app's icons: half disc for system, sun, moon. Each viewBox is cropped
-/// to its own ink plus half the stroke, so at 24 px every icon fills the box as the source-link
-/// mark beside it does.
+/// to its own ink plus half the stroke, so at 18 px every icon fills the box as the source-link
+/// mark beside it does. Its label names the scheme now and the one a press picks.
 const THEME_BUTTON: &str = "<button class=\"theme\" type=\"button\" id=\"theme\" \n\
-aria-label=\"Theme: system\" title=\"Theme: system\">\n\
+aria-label=\"Theme: system, click for light\"\n\
+title=\"Theme: system, click for light\">\n\
 <svg class=\"i-auto\" viewBox=\"3.2 3.2 17.6 17.6\" aria-hidden=\"true\"><circle cx=\"12\" \n\
 cy=\"12\" r=\"8\"/><path d=\"M12 4a8 8 0 0 0 0 16z\" class=\"fill\"/></svg>\n\
 <svg class=\"i-light\" viewBox=\"1.2 1.2 21.6 21.6\" aria-hidden=\"true\"><circle cx=\"12\" \n\
@@ -35,12 +36,14 @@ struct Bar<'a> {
     gh_mark: &'a str,
     theme_button: &'a str,
     docs_menu: &'a str,
+    current: bool,
 }
 
 /// The bar for the site `name` with its source at `repo`. `demo` is the live demo's URL, empty
 /// when there is none, and then the bar has no Demo link. `docs_menu` is a docs page's folded
 /// docs list, which stands in for the Docs link on a narrow screen, empty off the docs.
-pub(crate) fn bar(name: &str, repo: &str, demo: &str, docs_menu: &str) -> String {
+/// `current` marks the Docs link as the current page's section, on every page under /docs/.
+pub(crate) fn bar(name: &str, repo: &str, demo: &str, docs_menu: &str, current: bool) -> String {
     let mut out = Bar {
         name,
         repo,
@@ -48,6 +51,7 @@ pub(crate) fn bar(name: &str, repo: &str, demo: &str, docs_menu: &str) -> String
         gh_mark: GH_MARK,
         theme_button: THEME_BUTTON,
         docs_menu,
+        current,
     }
     .render()
     .unwrap_or_default();
@@ -61,24 +65,46 @@ mod tests {
 
     #[test]
     fn the_demo_link_is_there_only_with_a_demo() {
-        let none = bar("r", "https://github.com/o/r", "", "");
-        assert!(!none.contains(">Demo<"), "{none}");
-        let one = bar("r", "https://github.com/o/r", "https://demo.example", "");
+        let none = bar("r", "https://github.com/o/r", "", "", false);
+        assert!(!none.contains("class=\"cta\""), "{none}");
+        let one = bar(
+            "r",
+            "https://github.com/o/r",
+            "https://demo.example",
+            "",
+            false,
+        );
         assert!(
-            one.contains("<a href=\"https://demo.example\">Demo</a>"),
+            one.contains("<a class=\"cta\" href=\"https://demo.example\""),
+            "{one}"
+        );
+        // The demo is the bar's last item, after the theme button.
+        assert!(
+            one.find("class=\"cta\"") > one.find("id=\"theme\""),
             "{one}"
         );
         for b in [none, one] {
             assert_eq!(b.matches("<header class=\"top\">").count(), 1);
             assert_eq!(b.matches("<nav ").count(), 1);
             assert!(b.contains("id=\"theme\"") && b.contains("class=\"gh\""));
-            assert!(b.contains("<a href=\"/docs/\">Docs</a>"));
+            assert!(b.contains("<a class=\"docs\" href=\"/docs/\">Docs</a>"));
         }
     }
 
     #[test]
+    fn the_docs_link_is_current_only_under_the_docs() {
+        let off = bar("r", "https://github.com/o/r", "", "", false);
+        let on = bar("r", "https://github.com/o/r", "", "", true);
+        assert!(!off.contains("aria-current"), "{off}");
+        assert!(
+            on.contains("href=\"/docs/\" aria-current=\"page\">Docs</a>"),
+            "{on}"
+        );
+    }
+
+    #[test]
     fn the_name_and_urls_are_escaped() {
-        let b = bar("a<b", "https://x/\"y", "", "");
+        let b = bar("a<b", "https://x/\"y", "", "", false);
         assert!(!b.contains("a<b") && !b.contains("x/\"y"), "{b}");
     }
 }
