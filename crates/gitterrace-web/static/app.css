@@ -345,7 +345,6 @@ mark{/* one quiet background, no ring or padding: letters keep their places */ba
 .searchbar input[type=radio],.searchbar input[type=checkbox]{min-width:0;width:auto;height:auto;flex:none;margin:0}
 
 /* ---- voice: serif display, grotesk body, mono metadata, hairlines ---- */
-body{background-image:radial-gradient(60rem 22rem at 80% -6rem,color-mix(in srgb,var(--accent) 7%,transparent),transparent 70%);background-repeat:no-repeat}
 h2:not(.markdown-body *),.doc-title,.files summary{font:var(--weight-regular) var(--text-2xs)/1.4 var(--mono);text-transform:uppercase;letter-spacing:.12em;color:var(--muted)}
 main h2:not(.markdown-body *){display:flex;align-items:center;gap:var(--space-3)}
 main h2:not(.markdown-body *)::after{content:"";flex:1;border-top:var(--border)}
