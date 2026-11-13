@@ -83,7 +83,7 @@ pub fn render(ws: &Workspace, scripts: &[Script]) -> Vec<Out> {
 pub fn demo_md(ws: &Workspace) -> String {
     let credit = crate::credit::credit_md();
     if ws.demo.is_empty() {
-        return credit.to_owned();
+        return credit;
     }
     let names: Vec<String> = ws
         .demo_repos
