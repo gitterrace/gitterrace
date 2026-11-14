@@ -13,7 +13,12 @@ fn site_prose(root: &std::path::Path) -> Vec<(String, String)> {
                 if p.is_dir() {
                     stack.push(p);
                 } else if p.extension().is_some_and(|x| x == "md" || x == "rs") {
-                    let rel = p.strip_prefix(root).unwrap().to_string_lossy().into_owned();
+                    // `/` on every system, so the suffix checks below match on Windows too.
+                    let rel = p
+                        .strip_prefix(root)
+                        .unwrap()
+                        .to_string_lossy()
+                        .replace('\\', "/");
                     files.push(rel);
                 }
             }

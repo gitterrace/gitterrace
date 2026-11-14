@@ -1,6 +1,9 @@
 //! A path with markup in it renders as text in every path cell. Paths are data the
 //! shared path macro escapes, so a directory like `<b>&c` never becomes a tag in the hotspots,
 //! coupled files or ownership tables.
+//!
+//! Not on Windows: it refuses `<` and `>` in a file name, so no checkout there holds one.
+#![cfg(not(windows))]
 
 use gitterrace_testkit::{Fixture, oracle, page};
 

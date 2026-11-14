@@ -268,7 +268,14 @@ fn multi_depth_and_skip_dirs_change_discovery() {
         let skip: Vec<String> = skip.iter().map(|s| (*s).to_owned()).collect();
         let mut names: Vec<String> = crate::discover_repos(&[root.to_path_buf()], depth, &skip)
             .iter()
-            .map(|p| p.strip_prefix(root).expect("under").display().to_string())
+            // Joined with `/` on every system: Windows displays its own separator.
+            .map(|p| {
+                let rel = p.strip_prefix(root).expect("under");
+                rel.components()
+                    .map(|c| c.as_os_str().to_string_lossy().into_owned())
+                    .collect::<Vec<_>>()
+                    .join("/")
+            })
             .collect();
         names.sort();
         names

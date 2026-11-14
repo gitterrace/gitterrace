@@ -148,7 +148,8 @@ mod tests {
             if p.is_dir() && p.file_name().is_some_and(|n| n != "vendor") {
                 walk(&p, ext, out);
             } else if p.extension().is_some_and(|x| x == ext) {
-                let name = p.to_string_lossy();
+                // `/` on every system, so the folder check matches on Windows too.
+                let name = p.to_string_lossy().replace('\\', "/");
                 if !name.ends_with("tests.rs") && !name.contains("/markdown") {
                     out.push(std::fs::read_to_string(&p).expect("read"));
                 }

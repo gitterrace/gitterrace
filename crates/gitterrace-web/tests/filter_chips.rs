@@ -1,5 +1,8 @@
 //! Filter chips show what the visitor filtered on, escaped exactly once: a second pass
 //! would print entities such as `&amp;` as text.
+//!
+//! Not on Windows: it refuses `<` and `>` in a folder name, so no checkout there holds one.
+#![cfg(not(windows))]
 
 use gitterrace_testkit::git;
 

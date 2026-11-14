@@ -393,8 +393,10 @@ fn fallback_stays_off_without_the_variable() {
     assert!(super::fallback_for(None, git).is_none());
     assert!(super::fallback_for(Some("".into()), git).is_none());
     assert!(super::fallback_for(Some("cache".into()), git).is_none());
-    let (dir, real) = super::fallback_for(Some("/cache/index".into()), git).expect("set");
-    assert!(dir.starts_with("/cache/index"));
+    // A folder absolute on this system: `/cache/index` has no drive and is relative on Windows.
+    let abs = std::env::temp_dir().join("cache").join("index");
+    let (dir, real) = super::fallback_for(Some(abs.clone().into()), git).expect("set");
+    assert!(dir.starts_with(&abs));
     assert_eq!(real, git);
 }
 

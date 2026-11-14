@@ -438,6 +438,12 @@ async fn restart_keys_name_only_what_the_edit_changes() {
     assert_eq!(v["restart"], serde_json::json!([]), "{reply}");
 }
 
+/// An executable on every system, as a TOML literal string: the test binary itself. Windows
+/// has no `/usr/bin/true`, and a command that does not exist fails the load before the edit.
+fn any_program() -> String {
+    format!("'{}'", std::env::current_exe().expect("exe").display())
+}
+
 /// A server whose actions.toml is `text`, in `dir`.
 fn with_actions(root: &Path, dir: &Path, text: &str) -> axum::Router {
     let file = dir.join("actions.toml");
@@ -456,13 +462,16 @@ fn with_actions(root: &Path, dir: &Path, text: &str) -> axum::Router {
 
 #[tokio::test]
 async fn an_actions_form_edit_keeps_comments_and_is_checked() {
-    const FILE: &str = "version = 1\n# mine\n[[action]]\nid = \"e\"\nlabel = \"Edit\" # shown\n\
-                        kinds = [\"file\"]\ncommand = [\"/usr/bin/true\"]\n";
+    let file_text = format!(
+        "version = 1\n# mine\n[[action]]\nid = \"e\"\nlabel = \"Edit\" # shown\n\
+         kinds = [\"file\"]\ncommand = [{}]\n",
+        any_program()
+    );
     let (root, dir) = (
         tempfile::tempdir().expect("t"),
         tempfile::tempdir().expect("t"),
     );
-    let app = with_actions(root.path(), dir.path(), FILE);
+    let app = with_actions(root.path(), dir.path(), &file_text);
     let token = token_of(&app);
     let file = dir.path().join("actions.toml");
     let (status, html) = page(&app, "/_settings?f=actions").await;
@@ -487,7 +496,8 @@ async fn an_actions_form_edit_keeps_comments_and_is_checked() {
     let saved = std::fs::read_to_string(&file).expect("r");
     assert_eq!(
         saved,
-        FILE.replace("\"Edit\"", "'Open \"it\"'")
+        file_text
+            .replace("\"Edit\"", "'Open \"it\"'")
             .replace("[\"file\"]", "[\"file\", \"line\"]")
     );
     let stamp = gitterrace_config::Stamp::tag(gitterrace_config::Stamp::of(&file).expect("s"));
@@ -505,14 +515,17 @@ async fn an_actions_form_edit_keeps_comments_and_is_checked() {
 
 #[tokio::test]
 async fn a_vars_edit_saves_and_the_loader_reads_it() {
-    const FILE: &str = "version = 1\n# mine\n[[action]]\nid = \"e\"\nlabel = \"Edit\"\n\
-                        kinds = [\"file\"]\ncommand = [\"/usr/bin/true\"]\n\n\
-                        [action.vars]\nold = \"1\"\n";
+    let file_text = format!(
+        "version = 1\n# mine\n[[action]]\nid = \"e\"\nlabel = \"Edit\"\n\
+         kinds = [\"file\"]\ncommand = [{}]\n\n\
+         [action.vars]\nold = \"1\"\n",
+        any_program()
+    );
     let (root, dir) = (
         tempfile::tempdir().expect("t"),
         tempfile::tempdir().expect("t"),
     );
-    let app = with_actions(root.path(), dir.path(), FILE);
+    let app = with_actions(root.path(), dir.path(), &file_text);
     let token = token_of(&app);
     let file = dir.path().join("actions.toml");
     let (_, html) = page(&app, "/_settings?f=actions").await;

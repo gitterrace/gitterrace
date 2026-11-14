@@ -31,25 +31,38 @@ fn collect<R: Send>(
 }
 
 /// One slow item must not hold back the items queued behind it: the others drain on free
-/// threads, so the whole run takes about the slowest item, not the slowest item plus its
-/// share. A fixed split runs items 1..25 after item 0 on one thread (0.98 s), and a
-/// barrier per batch of 25 waits 0.5 s on the first batch (1.0 s in all); a shared queue
-/// spreads them over the other three (about 0.66 s).
+/// threads while it runs. Counted, not timed: item 0 waits until the other 99 are done, which
+/// only a shared queue allows (a fixed split runs items 1..25 after item 0 on its thread, a
+/// barrier per batch waits for it), so either of those never finishes and the bound trips.
 #[test]
 fn one_slow_item_does_not_serialize_the_rest() -> crate::Result<()> {
+    use std::sync::atomic::{AtomicUsize, Ordering};
     let items: Vec<u64> = (0..100).collect();
+    let done = AtomicUsize::new(0);
     let t0 = Instant::now();
     let out = collect(&items, 4, 100, |i| {
-        gitterrace_testkit::wait::pause_blocking(Duration::from_millis(if *i == 0 {
-            500
+        if *i == 0 {
+            // Generous: a loaded runner is slow, but never this slow at 99 sleeps of 20 ms.
+            while done.load(Ordering::Acquire) < 99 && t0.elapsed() < Duration::from_secs(30) {
+                gitterrace_testkit::wait::pause_blocking(Duration::from_millis(5));
+            }
         } else {
-            20
-        }));
+            gitterrace_testkit::wait::pause_blocking(Duration::from_millis(20));
+            done.fetch_add(1, Ordering::Release);
+        }
         Ok(i * 2)
     })?;
-    let took = t0.elapsed();
     assert_eq!(out, items.iter().map(|i| i * 2).collect::<Vec<_>>());
-    assert!(took < Duration::from_millis(880), "took {took:?}");
+    assert_eq!(
+        done.load(Ordering::Acquire),
+        99,
+        "item 0 held back the queue for {:?}",
+        t0.elapsed()
+    );
+    assert!(
+        t0.elapsed() < Duration::from_secs(30),
+        "the others waited on item 0"
+    );
     Ok(())
 }
 

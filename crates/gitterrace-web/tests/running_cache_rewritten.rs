@@ -22,7 +22,11 @@ async fn until_api_answers(
         match status {
             200 => return (Some(t0.elapsed()), errors),
             503 if retry.is_some() => {}
-            s => errors.push(format!("{u} -> {s}, Retry-After {retry:?}")),
+            // The body names the error code: a CI log has no other way to show which one.
+            s => {
+                let (_, body) = get(router, &u).await;
+                errors.push(format!("{u} -> {s}, Retry-After {retry:?}, then {body}"));
+            }
         }
         wait::pause(std::time::Duration::from_millis(100)).await;
     }
