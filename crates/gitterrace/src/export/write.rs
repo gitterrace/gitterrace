@@ -150,3 +150,32 @@ pub(crate) async fn fetch_within(
     })?;
     Ok((status, content_type, body.to_vec()))
 }
+
+/// The files every export holds besides its pages: the snapshot style, the host's headers and
+/// the not-found page.
+pub(super) async fn write_fixed(
+    out: &Path,
+    router: &Router,
+    snapshot_css: &str,
+    headers: &str,
+) -> anyhow::Result<()> {
+    write_page(out, "/snapshot.css", "text/css", snapshot_css.as_bytes())?;
+    write_page(out, "/_headers", "text/plain", headers.as_bytes())?;
+    write_not_found(out, router).await
+}
+
+/// `404.html` at the root: the server's own page for a path nothing serves, which a static host
+/// answers a missing file with. Without it a wrong link got the host's bare error. Written as
+/// the root page is, so its styles resolve.
+async fn write_not_found(out: &Path, router: &Router) -> anyhow::Result<()> {
+    let (status, content_type, body) = fetch(router, "/_gitterrace/not-found").await?;
+    anyhow::ensure!(
+        status == StatusCode::NOT_FOUND && content_type.starts_with("text/html"),
+        "the not-found page answered {status} {content_type}"
+    );
+    let raw = String::from_utf8_lossy(&body);
+    let page = crate::export::fonts::drop_font_preloads(&raw);
+    let text = crate::export::relative::relativize(&page, "/", true);
+    gitterrace_git::write_atomic(out, "404.html", text.as_bytes(), 0o644)
+        .context("writing 404.html")
+}

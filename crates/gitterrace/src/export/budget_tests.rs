@@ -108,9 +108,9 @@ async fn a_wide_export_writes_the_expected_pages_within_one_budget() {
         .await
         .expect("export");
     assert_eq!(fragments(&out), want, "fragment pages");
-    // Every file but the forward page, the marker and the two fixed files took a page.
-    let pages = tree(&out).len() - 4;
-    assert_eq!(n, pages + 2, "files reported");
+    // Every file but the forward page, the marker and the three fixed files took a page.
+    let pages = tree(&out).len() - 5;
+    assert_eq!(n, pages + 3, "files reported");
     assert!(
         pages > want.len(),
         "{pages} pages, {} fragments",

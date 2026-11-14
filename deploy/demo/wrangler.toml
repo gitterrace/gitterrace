@@ -17,4 +17,7 @@ routes = [{ pattern = "demo.gitterrace.dev", custom_domain = true }]
 
 [assets]
 directory = "../../target/demo"
+# The export's 404.html for a path it never wrote, as the site does: a wrong link gets the app's
+# not-found page with a way back, not the host's bare error.
+not_found_handling = "404-page"
 html_handling = "auto-trailing-slash"

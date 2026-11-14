@@ -65,7 +65,7 @@ impl Credit {
             parts.push(format!("<a href=\"{}\">{}</a>", esc(url), esc(shown)));
         }
         format!(
-            "<footer class=\"snapshot credit\" role=\"contentinfo\"><div \
+            "<footer class=\"credit\" role=\"contentinfo\"><div \
             class=\"wrap\">{}</div></footer>",
             parts.join(", ")
         )

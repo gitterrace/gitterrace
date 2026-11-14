@@ -334,6 +334,21 @@ async fn export_writes_every_prewarmed_page() {
         out.join("snapshot.css").is_file(),
         "the banner style is missing"
     );
+    // A static host answers a missing file with `404.html`: the app's not-found page, whose
+    // stylesheets and way back resolve from the root it sits in.
+    let lost = std::fs::read_to_string(out.join("404.html")).expect("404.html is written");
+    assert!(
+        lost.contains("404") && lost.contains("static/app.css"),
+        "{lost}"
+    );
+    assert!(!lost.contains("type=\"font/woff2\""), "{lost}");
+    // The credit is a footer of its own, not a second snapshot banner.
+    let page = std::fs::read_to_string(target(&out, "/r/r/", "text/html").expect("home"))
+        .expect("home page");
+    assert!(
+        page.contains("<footer class=\"credit\" role=\"contentinfo\">"),
+        "the credit footer is missing"
+    );
 }
 
 /// Several repositories export like the server serves them: an index at `/`, each one
@@ -516,7 +531,7 @@ async fn export_skips_what_features_turn_off() {
                     p.display()
                 );
                 assert!(
-                    !html.contains("snapshot credit"),
+                    !html.contains("role=\"contentinfo\""),
                     "{} has a credit",
                     p.display()
                 );

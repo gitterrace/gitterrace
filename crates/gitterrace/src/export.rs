@@ -284,9 +284,8 @@ async fn crawl(
             }
         }
     }
-    write_page(out, "/snapshot.css", "text/css", SNAPSHOT_CSS.as_bytes())?;
-    write_page(out, "/_headers", "text/plain", headers_file().as_bytes())?;
-    Ok(written + 2)
+    write::write_fixed(out, &router, SNAPSHOT_CSS, &headers_file()).await?;
+    Ok(written + 3)
 }
 
 /// Writes a page the way it must sit on disk: HTML and CSS links made relative, so the folder

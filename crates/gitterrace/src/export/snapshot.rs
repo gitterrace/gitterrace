@@ -17,6 +17,11 @@ pub(super) const SNAPSHOT_CSS: &str = ".snapshot{background:var(--accent-soft);c
  border-bottom:1px solid var(--line-strong);\
  font:var(--text-sm)/1.4 var(--sans);padding:var(--space-2) 0}\
  .snapshot a{color:var(--accent-fg);font-weight:var(--weight-semibold)}\
+ body[data-static]{display:flex;flex-direction:column;min-height:100dvh}\
+ body[data-static]>main{flex:1 0 auto;width:100%;box-sizing:border-box}\
+ body[data-static]>.credit{margin-top:auto;background:var(--header);border-top:var(--border);\
+ font:var(--text-sm)/1.4 var(--sans);color:var(--muted);padding:var(--space-4) 0}\
+ .credit a{color:var(--fg)}\
  body[data-static] .topsearch,body[data-static] .actbtn,body[data-static] .wtchip,\
  body[data-static] .livenote,body[data-static] .actnote,\
  body[data-static] form{display:none!important}\n";
