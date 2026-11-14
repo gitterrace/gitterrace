@@ -125,3 +125,8 @@ github-attestations = true
 # The licence texts of the embedded fonts and script travel in every archive.
 extra-files = ["THIRD-PARTY-NOTICES"]
 pr-run-mode = "plan"
+
+# dist 0.31 builds aarch64-apple-darwin on macos-14, which GitHub retired on 2026-11-02: the job
+# is cancelled before it starts. macos-15 is the oldest Apple silicon image still served.
+[workspace.metadata.dist.github-custom-runners]
+aarch64-apple-darwin = "macos-15"
