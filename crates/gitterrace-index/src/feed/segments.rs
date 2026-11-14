@@ -22,10 +22,8 @@ use crate::seg::{SegResult, Sink};
 
 /// Writes the tables of one segment in section order: postings (3, 4, 5), aggregates (6 to 10)
 /// and the rank of each local ordinal (33).
-#[cfg_attr(
-    not(test),
-    expect(dead_code, reason = "the merge (step 2) and tests write tables whole")
-)]
+// Tests write tables whole.
+#[cfg(test)]
 pub(crate) fn write_tables(
     agg: &Aggregates,
     post: &Postings,

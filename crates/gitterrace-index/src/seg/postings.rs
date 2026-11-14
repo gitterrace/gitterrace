@@ -3,8 +3,6 @@
 //! canonical positions. Path postings skip merges, as the follow table does today. Author
 //! postings keep every commit, so a chip can still decide about merges on read.
 
-use std::collections::BTreeSet;
-
 use crate::CommitRecord;
 use crate::seg::agg::{Packer, Strings, pack};
 use crate::seg::bounds::{Cursor, put_varint};
@@ -131,23 +129,18 @@ impl Postings {
     /// Every hit that the follow rule files under `head`, newest first: the same answer as
     /// replaying all rows newest first with an alias table, but reading only the postings of
     /// names that can reach `head` through renames.
-    #[cfg_attr(
-        not(test),
-        expect(
-            dead_code,
-            reason = "path follow reads segments through the source, this is the test reference"
-        )
-    )]
+    // The test reference: path follow reads segments through the source.
+    #[cfg(test)]
     pub(crate) fn follow(&self, head: u32) -> Vec<Hit> {
         follow(&self.by_path, &self.edges, head)
     }
 }
 
 /// See [`Postings::follow`]. `edges` ascending by (ordinal, row).
-#[cfg_attr(not(test), expect(dead_code, reason = "see Postings::follow"))]
+#[cfg(test)]
 pub(crate) fn follow(by_path: &[Vec<Hit>], edges: &[Edge], head: u32) -> Vec<Hit> {
     // Names that could resolve to head: closure backwards over edges.
-    let mut cand: BTreeSet<u32> = BTreeSet::from([head]);
+    let mut cand = std::collections::BTreeSet::from([head]);
     loop {
         let before = cand.len();
         for e in edges {
@@ -210,13 +203,8 @@ impl Postings {
     /// Writes sections path postings, rename edges and author postings. An item is
     /// (id delta, count, entries), a list longer than [`CHUNK`] spans several items of the
     /// same id (delta 0). Empty lists are left out.
-    #[cfg_attr(
-        not(test),
-        expect(
-            dead_code,
-            reason = "the build encodes spilled postings, whole tables serve the merge (step 2)"
-        )
-    )]
+    // The build encodes spilled postings, whole tables serve the tests.
+    #[cfg(test)]
     pub(crate) fn encode(&self, sink: &mut Sink<'_>) -> SegResult<()> {
         let paths = chunks(&self.by_path);
         pack(
