@@ -30,13 +30,28 @@ pub(super) fn inline_fonts(css: &str) -> String {
     out
 }
 
-/// `html` without its `<link rel="preload" ... as="font">` lines.
+/// `html` without its `<link rel="preload" ... as="font">` tags, each removed whole with the
+/// line break after it: a tag the template wraps over two lines must not leave its second line
+/// behind as text.
 pub(super) fn drop_font_preloads(html: &str) -> String {
-    html.lines()
-        .filter(|l| !(l.contains("rel=\"preload\"") && l.contains("as=\"font\"")))
-        .collect::<Vec<_>>()
-        .join("\n")
-        + if html.ends_with('\n') { "\n" } else { "" }
+    let mut out = String::with_capacity(html.len());
+    let mut rest = html;
+    while let Some(at) = rest.find("<link") {
+        let Some(len) = rest[at..].find('>').map(|e| e + 1) else {
+            break;
+        };
+        let tag = &rest[at..at + len];
+        out.push_str(&rest[..at]);
+        if tag.contains("rel=\"preload\"") && tag.contains("as=\"font\"") {
+            rest = &rest[at + len..];
+            rest = rest.strip_prefix('\n').unwrap_or(rest);
+        } else {
+            out.push_str(tag);
+            rest = &rest[at + len..];
+        }
+    }
+    out.push_str(rest);
+    out
 }
 
 #[cfg(test)]
@@ -68,6 +83,30 @@ mod tests {
         assert_eq!(
             drop_font_preloads(html),
             "<head>\n<link rel=\"stylesheet\" href=\"/static/app.css\">\n"
+        );
+    }
+
+    /// A preload the template wraps over two lines goes whole: dropping it line by line left
+    /// ` type="font/woff2" crossorigin>` as text on every exported page.
+    #[test]
+    fn a_wrapped_font_preload_leaves_no_text_behind() {
+        let html = concat!(
+            "<head>\n",
+            "<link rel=\"preload\" href=\"/static/fonts/a.woff2\" as=\"font\"\n",
+            " type=\"font/woff2\" crossorigin>\n",
+            "<link rel=\"stylesheet\" href=\"/static/app.css\">\n",
+        );
+        assert_eq!(
+            drop_font_preloads(html),
+            "<head>\n<link rel=\"stylesheet\" href=\"/static/app.css\">\n"
+        );
+        // The base template the pages are rendered from, as it is now.
+        let base = include_str!("../../../gitterrace-web/templates/_base.html");
+        let out = drop_font_preloads(base);
+        assert!(!out.contains("as=\"font\""), "a font preload stayed");
+        assert!(
+            !out.contains("type=\"font/woff2\""),
+            "a preload left text behind"
         );
     }
 }
