@@ -11,6 +11,10 @@ CARGO_OUT := $${CARGO_TARGET_DIR:-target}
 RELEASE_BIN := target/release/git-terrace
 BENCH_REPOS := --repos control,git,rust
 
+# This make's flags stay here: `make -k check` put `k` in MAKEFLAGS, and the C builds cargo
+# runs (jemalloc's) read it as a target and failed. A recipe's own `make` passes its flags.
+unexport MAKEFLAGS MFLAGS
+
 ##@ Build and run
 .PHONY: deps setup build install preview
 
