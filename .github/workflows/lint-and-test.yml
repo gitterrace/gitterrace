@@ -62,7 +62,8 @@ jobs:
             ${{ runner.os }}-cargo-${{ steps.toolchain.outputs.cachekey }}-
       - uses: ./.github/actions/lint-tools
       - run: sudo apt-get install -y --no-install-recommends gcc-mingw-w64-x86-64
-      - run: make check CROSS=x86_64-pc-windows-gnu
+      # -k: every gate runs after one fails, so one run lists them all; the job still fails.
+      - run: make -k check CROSS=x86_64-pc-windows-gnu
 
   deny:
     name: Cargo deny
@@ -152,7 +153,7 @@ jobs:
             ${{ runner.os }}-cargo-${{ steps.toolchain.outputs.cachekey }}-
       - uses: ./.github/actions/lint-tools
       # The Ubuntu job cross-checks Windows; this runner has neither that target nor Docker.
-      - run: make check CROSS=none
+      - run: make -k check CROSS=none
 
   # The Windows binary builds, its tests pass and it serves a repository. The runtime smoke test is
   # the same script the release check and scripts/dev/wine-run.sh use.

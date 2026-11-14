@@ -83,10 +83,14 @@ harness-links:
 	python3 "$$h/harness-link.py" --check || { echo "links missing: run python3 $$h/harness-link.py" >&2; exit 1; }
 
 ## test: All tests
+# Every suite runs even after one fails, and every test binary within it (--no-fail-fast), so
+# one run lists every failure; the target still fails at the end if any did.
 test:
-	cargo test --workspace
-	cargo test --release -p gitterrace-web --test memory_budget
-	cargo test --release -p gitterrace-index --test latency
+	@rc=0; \
+	cargo test --workspace --no-fail-fast || rc=1; \
+	cargo test --release --no-fail-fast -p gitterrace-web --test memory_budget || rc=1; \
+	cargo test --release --no-fail-fast -p gitterrace-index --test latency || rc=1; \
+	exit $$rc
 
 # doc: Docs, warnings are errors
 doc:

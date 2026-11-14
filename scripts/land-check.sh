@@ -354,7 +354,7 @@ if ((${#scope[@]})); then
     command -v x86_64-w64-mingw32-gcc >/dev/null; then
     step cargo clippy "${scope[@]}" --all-targets --target x86_64-pc-windows-gnu -- -D warnings
   fi
-  step cargo test "${scope[@]}"
+  step cargo test --no-fail-fast "${scope[@]}"
   # Rustdoc as `make doc` runs it: a link to an item that only exists under cfg(test) passes
   # clippy and the tests and fails here alone.
   step env RUSTDOCFLAGS="-D warnings" cargo doc --no-deps "${scope[@]}"

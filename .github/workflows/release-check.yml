@@ -37,7 +37,8 @@ jobs:
           toolchain: ${{ steps.pin.outputs.channel }}
           components: clippy, rustfmt
       - uses: ./.github/actions/lint-tools
-      - run: make check
+      # -k: every gate runs after one fails, so one run lists them all; the job still fails.
+      - run: make -k check
 
   # The advisory and MSRV checks run on the release commit itself: this workflow is a needs of
   # build-global-artifacts, so a red job here stops host, publish and the tap.
@@ -70,7 +71,9 @@ jobs:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     strategy:
-      fail-fast: true
+      # Every system runs to the end: a red one does not cancel the others, so one release run
+      # shows all three. The release still waits for the whole matrix.
+      fail-fast: false
       matrix:
         os: [ubuntu-22.04, macos-latest, windows-latest]
     steps:
