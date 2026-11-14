@@ -1,0 +1,5 @@
+jobs:
+  t:
+    runs-on: x
+    steps:
+      - run: make lint test

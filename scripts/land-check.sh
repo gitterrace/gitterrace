@@ -365,13 +365,14 @@ if ((${#scope[@]})); then
     [[ " ${scope[*]} " == *" $t "* ]] && run_oracle=1
   done < <(land_cfg oracle.triggers)
   if ((run_oracle)); then
-    step cargo test -p "$(land_cfg oracle.crate)" --test "$(land_cfg oracle.test)"
+    step cargo test --no-fail-fast -p "$(land_cfg oracle.crate)" --test "$(land_cfg oracle.test)"
   fi
 fi
 step make lines names
 step "$py" vendor/schwarzwald/kit/tools/ratchet-check.py --self-test
 step "$py" vendor/schwarzwald/kit/tools/ratchet-check.py --base "$base"
-step cargo test -p "$(land_cfg conventions.crate)" --test "$(land_cfg conventions.test)"
+step cargo test --no-fail-fast -p "$(land_cfg conventions.crate)" \
+  --test "$(land_cfg conventions.test)"
 step bash vendor/schwarzwald/kit/lint/run.sh
 step python3 vendor/schwarzwald/kit/lint/root-entries.py
 step make docs-check

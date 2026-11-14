@@ -2,7 +2,7 @@
 
 A copy of schwarzwald, written by its `sync.py`. Do not edit these files here.
 
-- From: schwarzwald, synced 2026-11-14T02:21:35Z
+- From: schwarzwald, synced 2026-11-14T12:08:58Z
 - Parts: configs, fonts, guards, hooks, lint, rules, rust, tokens, tools
 - Excluded (left out of this copy, still in the kit): tools/bulk-read.py, tools/bulk-read_test.py, tools/id-scan.py, tools/selftest.py
 - Change anything: edit `source/` in schwarzwald, run `make deploy` there and commit the

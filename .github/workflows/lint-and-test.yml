@@ -186,7 +186,7 @@ jobs:
       # The segment store on Windows: the seek_read shim, rename over an open file, retired
       # files that cannot be deleted while a reader holds them. Named, so a red one is visible.
       - name: Segment store guards
-        run: cargo test --locked -p gitterrace-index --test unreadable --test hostile --test deterministic
+        run: cargo test --locked --no-fail-fast -p gitterrace-index --test unreadable --test hostile --test deterministic
       - name: Smoke test
         shell: bash
         run: bash scripts/verify/smoke-check.sh target/debug/git-terrace.exe

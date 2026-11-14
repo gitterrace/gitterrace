@@ -1,0 +1,10 @@
+jobs:
+  t:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [a, b]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - run: make -k lint test
+      - run: make check

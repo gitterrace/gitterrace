@@ -20,7 +20,7 @@ test=$(oracle_cfg test)
 
 classify() {
   TEST_CHANGE_OLD=$1 TEST_CHANGE_NEW=$2 TEST_CHANGE_REPORT=$3 \
-    cargo test --release -q -p "$crate" --test "$test" \
+    cargo test --release --no-fail-fast -q -p "$crate" --test "$test" \
     a_rebless_proof_classifies_old_against_new -- --exact >/dev/null 2>&1 || true
   # A build that lacks the test writes nothing: that must never read as a pass.
   [[ -s $3 ]] || {
@@ -35,7 +35,7 @@ dump)
   : "${GOLDEN_DUMP:?set by vendor/schwarzwald/kit/tools/golden.py}"
   # Its own target dir: the old build must not replace the binary classify uses.
   CARGO_TARGET_DIR=$PWD/target/golden-check TEST_ORACLE_DUMP=$GOLDEN_DUMP \
-    cargo test --release -q -p "$crate" --test "$test" \
+    cargo test --release --no-fail-fast -q -p "$crate" --test "$test" \
     every_cell_matches_the_oracle other_revisions_match_the_oracle -- --exact
   ;;
 classify)

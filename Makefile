@@ -161,12 +161,12 @@ bench-guard:
 # Red until every page reads one Counted.
 ## counting-parity: Count parity fuzz, pages against reducers
 counting-parity:
-	cargo test -p gitterrace-index --test it count_parity -- --include-ignored
+	cargo test --no-fail-fast -p gitterrace-index --test it count_parity -- --include-ignored
 
 ## memory-check: An idle server's memory stays flat as history and tree grow (about 5 minutes)
 memory-check: build
 	python3 scripts/bench/memory-check.py --bin $(RELEASE_BIN)
-	TEST_MEMORY_WIDE=100000 cargo test --release -p gitterrace-web --test memory_budget idle_memory_is_flat_in_tree_size
+	TEST_MEMORY_WIDE=100000 cargo test --release --no-fail-fast -p gitterrace-web --test memory_budget idle_memory_is_flat_in_tree_size
 
 ## speed-check: Cold insights pages on the rust bench clone stay in budget (about 10 minutes)
 speed-check: build

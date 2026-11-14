@@ -1,0 +1,8 @@
+jobs:
+  t:
+    strategy:
+      matrix:
+        os: [a, b]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - run: echo ok
