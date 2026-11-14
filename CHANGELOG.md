@@ -4,7 +4,10 @@ All notable changes are listed here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
-## [0.1.0] - 2026-11-12
+<!-- BEGIN GENERATED: unreleased -->
+<!-- END GENERATED: unreleased -->
+
+## [0.1.0] - 2026-11-14
 
 ### Added
 
@@ -26,6 +29,3 @@ All notable changes are listed here. The format follows
   tracker, notes app or mail draft. Off until configured.
 - A public mode for hosting, a Docker image, and installers for Linux, macOS
   and Windows (shell, PowerShell, Homebrew).
-
-<!-- BEGIN GENERATED: unreleased -->
-<!-- END GENERATED: unreleased -->
