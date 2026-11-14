@@ -10,9 +10,11 @@ runs:
       shell: bash
       run: |
         cargo install cargo-machete --version 0.9.2 --locked
-        pip install --user ruff==0.17.3
-        # pip --user installs to ~/.local/bin on Linux but ~/Library/Python/X.Y/bin on macOS.
+        # One interpreter for the install and the folder: on macOS `pip` and `python3` can be
+        # different Pythons, and pip --user lands in ~/Library/Python/X.Y/bin there.
+        python3 -m pip install --user ruff==0.17.3
         echo "$(python3 -m site --user-base)/bin" >> "$GITHUB_PATH"
+        "$(python3 -m site --user-base)/bin/ruff" --version
         if [ "$RUNNER_OS" = macOS ]; then
           cargo install typos-cli --version 1.51.1 --locked
           # Pinned arm64 release archives, digest-checked before unpacking, as on Linux.
