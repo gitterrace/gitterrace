@@ -68,6 +68,21 @@ Next: [getting started](https://gitterrace.dev/docs/getting-started/) and
 `http://localhost:8080`
 ([run with Docker](https://gitterrace.dev/docs/online/#run-with-docker)).
 
+## Send a finding with its context
+
+Review a change before you push it, then send each finding on: back to an
+agent, or as a task or ticket. Open **Working tree** (`/worktree`) for your
+uncommitted changes, or any file, diff or commit. Select the lines, press `.`
+and pick a **Send to** target. The note carries the marked source lines and
+ends with a line agents and scripts can parse:
+
+```text
+source: <repo>@<sha>:<path>#L<a>-L<b>
+```
+
+`<sha>` is the full commit id, so the reference holds after more commits.
+Without a target, **Copy as markdown** puts the same note on the clipboard.
+
 ## Commands
 
 <!-- BEGIN GENERATED: commands -->
