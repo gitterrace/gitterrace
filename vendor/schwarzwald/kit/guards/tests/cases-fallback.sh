@@ -34,7 +34,9 @@ _fc_run() {
     local starve='[ -z "$1" ] || ulimit -u 1; shift; exec bash "$@"'
     case "$a" in *-starved) lim=1 a="${a%-starved}" ;; esac
     local input
-    input=$(jq -cn --arg c "$c" '{command:$c}')
+    # Through stdin, not --arg: Linux caps one argument at 128 KB, so a 300 KB case made jq
+    # fail, the adapter got no input and allowed it.
+    input=$(printf '%s' "$c" | jq -Rsc '{command:.}')
     case "$a" in
         cli)
             FC_OUT=$(env -u GUARD_SCRATCH_DIR bash -c "$starve" \
