@@ -12,6 +12,9 @@
    history lints refuse a shallow clone.
 5. The git-cliff version in lint.toml is the one the lint-tools action downloads, digest-checked,
    for both runner kinds.
+6. The release gate runs `make check` with the same arguments as the Linux gate of
+   lint-and-test.yml (check-linux): a flag only CI sets, such as the Windows cross-check, would
+   let a tag skip a check main passed, or fail on a step main never ran.
 
 Read with a small indentation reader (2-space job keys under `jobs:`), no YAML library.
 
@@ -103,7 +106,29 @@ def problems(repo: Path) -> list[str]:
                 f"release-check.yml: job {j} runs make check on a shallow checkout; "
                 f"add fetch-depth: 0 to its checkout"
             )
+    bad += gate_problems(tiers, release)
     bad += cliff_problems(repo)
+    return bad
+
+
+# `make [-k] check ARGS`, the arguments as one string.
+MAKE_CHECK = re.compile(r"^\s+- run: make (?:-k )?check\b(.*)$", re.M)
+
+
+def gate_problems(tiers: dict[str, str], release: dict[str, str]) -> list[str]:
+    """Rule 6: each release-check `make check` takes check-linux's arguments."""
+    linux = MAKE_CHECK.findall(tiers.get("check-linux", ""))
+    if not linux:
+        return []
+    want = linux[0].split()
+    bad = []
+    for j, body in release.items():
+        for got in MAKE_CHECK.findall(body):
+            if sorted(got.split()) != sorted(want):
+                bad.append(
+                    f"release-check.yml: job {j} runs make check{got}, the Linux gate "
+                    f"runs make check {' '.join(want)}: give both the same arguments"
+                )
     return bad
 
 
@@ -137,6 +162,10 @@ def cliff_problems(repo: Path) -> list[str]:
 
 CALL = "  t:\n    uses: ./.github/workflows/lint-and-test.yml\n"
 FAST = "  deny:\n    runs-on: ubuntu-latest\n"
+LINUX = (
+    "  check-linux:\n    runs-on: ubuntu-latest\n    steps:\n"
+    "      - run: make -k check CROSS=x MEMORY=0\n"
+)
 MAC = "  check-macos:\n    if: inputs.full\n    runs-on: macos-latest\n"
 WIN = "  windows:\n    if: inputs.full\n    runs-on: windows-latest\n"
 REL = (
@@ -191,6 +220,25 @@ def self_test() -> int:
             CALL,
             FAST + MAC + WIN,
             REL + GATE.format(depth="          fetch-depth: 0\n"),
+            False,
+        ),
+        # The release gate drops a flag the Linux gate sets (the Windows cross-check).
+        (
+            CALL,
+            LINUX + MAC + WIN,
+            REL
+            + GATE.format(depth="          fetch-depth: 0\n").replace(
+                "make check", "make -k check MEMORY=0"
+            ),
+            True,
+        ),
+        (
+            CALL,
+            LINUX + MAC + WIN,
+            REL
+            + GATE.format(depth="          fetch-depth: 0\n").replace(
+                "make check", "make -k check MEMORY=0 CROSS=x"
+            ),
             False,
         ),
     ]

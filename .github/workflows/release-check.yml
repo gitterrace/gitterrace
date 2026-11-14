@@ -38,9 +38,12 @@ jobs:
         with:
           toolchain: ${{ steps.pin.outputs.channel }}
           components: clippy, rustfmt
+          # As on CI's Linux job: make check cross-checks Windows (clippy-cross).
+          targets: x86_64-pc-windows-gnu
       - uses: ./.github/actions/lint-tools
+      - run: sudo apt-get install -y --no-install-recommends gcc-mingw-w64-x86-64
       # -k: every gate runs after one fails, so one run lists them all; the job still fails.
-      - run: make -k check MEMORY=0
+      - run: make -k check CROSS=x86_64-pc-windows-gnu MEMORY=0
 
   # The release memory budget, beside the gate: about 35 minutes on a 4-core runner. A job of
   # this workflow, so the release waits for it like every other.
