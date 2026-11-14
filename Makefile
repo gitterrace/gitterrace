@@ -10,6 +10,8 @@ TOOLCHAIN := $(shell sed -n 's/^channel *= *"\(.*\)"/\1/p' rust-toolchain.toml)
 CARGO_OUT := $${CARGO_TARGET_DIR:-target}
 RELEASE_BIN := target/release/git-terrace
 BENCH_REPOS := --repos control,git,rust
+# The release memory budget, `make test-memory`: about 35 minutes on a 4-core runner.
+MEMORY_TEST := cargo test --release --no-fail-fast -p gitterrace-web --test memory_budget
 
 # This make's flags stay here: `make -k check` put `k` in MAKEFLAGS, and the C builds cargo
 # runs (jemalloc's) read it as a target and failed. A recipe's own `make` passes its flags.
@@ -88,13 +90,18 @@ harness-links:
 
 ## test: All tests
 # Every suite runs even after one fails, and every test binary within it (--no-fail-fast), so
-# one run lists every failure; the target still fails at the end if any did.
+# one run lists every failure; the target still fails at the end if any did. MEMORY=0 leaves
+# the release memory budget out: CI runs it as a job of its own, beside the gate.
 test:
 	@rc=0; \
 	cargo test --workspace --no-fail-fast || rc=1; \
-	cargo test --release --no-fail-fast -p gitterrace-web --test memory_budget || rc=1; \
+	$(if $(filter 0,$(MEMORY)),,$(MEMORY_TEST) || rc=1;) \
 	cargo test --release --no-fail-fast -p gitterrace-index --test latency || rc=1; \
 	exit $$rc
+
+# test-memory: The release memory budget alone
+test-memory:
+	$(MEMORY_TEST)
 
 # doc: Docs, warnings are errors
 doc:

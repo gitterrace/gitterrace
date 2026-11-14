@@ -63,7 +63,8 @@ jobs:
       - uses: ./.github/actions/lint-tools
       - run: sudo apt-get install -y --no-install-recommends gcc-mingw-w64-x86-64
       # -k: every gate runs after one fails, so one run lists them all; the job still fails.
-      - run: make -k check CROSS=x86_64-pc-windows-gnu
+      # MEMORY=0: the memory budget runs as its own job below, beside this one.
+      - run: make -k check CROSS=x86_64-pc-windows-gnu MEMORY=0
 
   deny:
     name: Cargo deny
@@ -123,6 +124,37 @@ jobs:
       - if: steps.paths.outputs.run == 'true'
         run: bash scripts/verify/docker-check.sh
 
+  # The release memory budget, beside the gates: alone it takes about 35 minutes on a 4-core
+  # runner, which the gate jobs could not also hold. Linux always, macOS on the full tier.
+  memory:
+    name: Memory budget (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ${{ fromJSON(inputs.full && '["ubuntu-latest","macos-latest"]' || '["ubuntu-latest"]') }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - id: pin
+        run: echo "channel=$(sed -n 's/^channel *= *"\(.*\)"/\1/p' rust-toolchain.toml)" >> "$GITHUB_OUTPUT"
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # v1
+        id: toolchain
+        with:
+          toolchain: ${{ steps.pin.outputs.channel }}
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-memory-${{ steps.toolchain.outputs.cachekey }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-memory-${{ steps.toolchain.outputs.cachekey }}-
+      - run: make test-memory
+
   # Full tier from here on.
   check-macos:
     if: inputs.full
@@ -153,7 +185,7 @@ jobs:
             ${{ runner.os }}-cargo-${{ steps.toolchain.outputs.cachekey }}-
       - uses: ./.github/actions/lint-tools
       # The Ubuntu job cross-checks Windows; this runner has neither that target nor Docker.
-      - run: make -k check CROSS=none
+      - run: make -k check CROSS=none MEMORY=0
 
   # The Windows binary builds, its tests pass and it serves a repository. The runtime smoke test is
   # the same script the release check and scripts/dev/wine-run.sh use.

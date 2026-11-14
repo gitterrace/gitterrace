@@ -22,7 +22,8 @@ jobs:
   gate:
     name: Gate
     runs-on: ubuntu-latest
-    # The whole gate, every step after a failure too (make -k): the memory suite alone is 20 min.
+    # The whole gate, every step after a failure too (make -k). The memory budget is a job of its
+    # own below, so this one stays well inside the hour.
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -39,7 +40,24 @@ jobs:
           components: clippy, rustfmt
       - uses: ./.github/actions/lint-tools
       # -k: every gate runs after one fails, so one run lists them all; the job still fails.
-      - run: make -k check
+      - run: make -k check MEMORY=0
+
+  # The release memory budget, beside the gate: about 35 minutes on a 4-core runner. A job of
+  # this workflow, so the release waits for it like every other.
+  memory:
+    name: Memory budget
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - id: pin
+        run: echo "channel=$(sed -n 's/^channel *= *"\(.*\)"/\1/p' rust-toolchain.toml)" >> "$GITHUB_OUTPUT"
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # v1
+        with:
+          toolchain: ${{ steps.pin.outputs.channel }}
+      - run: make test-memory
 
   # The advisory and MSRV checks run on the release commit itself: this workflow is a needs of
   # build-global-artifacts, so a red job here stops host, publish and the tap.
