@@ -44,7 +44,9 @@ pub fn on_port(host: &str) -> String {
 }
 
 /// A global git config holding the identity and switches every fixture needs. It sits below a
-/// repository's own config, so a test that sets `user.name` still wins.
+/// repository's own config, so a test that sets `user.name` still wins. Automatic maintenance is
+/// off: a detached `git maintenance` left a lock file in a fixture after the test had compared
+/// its tree, on a macOS runner only.
 fn global_config() -> &'static Path {
     static CONFIG: OnceLock<std::path::PathBuf> = OnceLock::new();
     CONFIG.get_or_init(|| {
@@ -55,7 +57,8 @@ fn global_config() -> &'static Path {
         std::fs::write(
             &path,
             "[user]\n\tname = T\n\temail = t@e.x\n[commit]\n\tgpgsign = false\n[tag]\n\tgpgsign = \
-            false\n[init]\n\tdefaultBranch = main\n",
+            false\n[init]\n\tdefaultBranch = main\n[maintenance]\n\tauto = false\n[gc]\n\t\
+            auto = 0\n",
         )
         .expect("write git config");
         path
