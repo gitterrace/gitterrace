@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """The CI tiers hold: every job runs on each pull request, or a tag cannot ship without it.
 
-1. ci.yml has exactly one job, a `uses:` of lint-and-test.yml. A job added straight to ci.yml
-   would dodge the tiers, so it is red here.
-2. A lint-and-test.yml job gated `if: inputs.full` (the full tier, manual and weekly runs only)
+1. ci.yml has one job that tests, a `uses:` of lint-and-test.yml. A job added straight to ci.yml
+   would dodge the tiers, so it is red here. Beside it may stand a job gated on the schedule
+   alone that runs no make, cargo or workflow: it only decides whether the nightly run goes.
+2. A lint-and-test.yml job gated `if: inputs.full` (the full tier, nightly and manual runs only)
    must be in COVERS, naming the release-check.yml job that runs the same OS again before dist
    publishes, and that job's matrix must hold that OS. Every other job is the fast tier, which
    runs on every pull request and push.
@@ -35,6 +36,8 @@ WF = ".github/workflows"
 COVERS = {
     "check-macos": ("check", "macos-latest"),
     "windows": ("check", "windows-latest"),
+    # The memory budget runs on the full tier only: the release check runs it on Linux.
+    "memory": ("memory", "ubuntu-latest"),
 }
 
 
@@ -71,8 +74,19 @@ def problems(repo: Path) -> list[str]:
             r"^    uses: \./\.github/workflows/lint-and-test\.yml\s*$", body, re.M
         )
     ]
-    if len(ci) != 1 or len(calls) != 1:
-        extra = sorted(set(ci) - set(calls))
+    # A job that runs on the schedule alone and only decides whether the nightly run goes ahead
+    # tests nothing, so it cannot dodge a tier.
+    gates = [
+        j
+        for j, body in ci.items()
+        if j not in calls
+        and re.search(r"^    if: github\.event_name == 'schedule'\s*$", body, re.M)
+        and "uses:" not in body.replace("uses: actions/", "")
+        and "make " not in body
+        and "cargo " not in body
+    ]
+    if len(ci) - len(gates) != 1 or len(calls) != 1:
+        extra = sorted(set(ci) - set(calls) - set(gates))
         bad.append(
             f"ci.yml: one job, the lint-and-test.yml call, expected; has {sorted(ci)}. "
             f"Move {extra or 'the jobs'} into lint-and-test.yml under a tier"
@@ -161,16 +175,24 @@ def cliff_problems(repo: Path) -> list[str]:
 
 
 CALL = "  t:\n    uses: ./.github/workflows/lint-and-test.yml\n"
+NIGHTLY = (
+    "  changed:\n    if: github.event_name == 'schedule'\n    runs-on: ubuntu-latest\n"
+    "    steps:\n      - run: {run}\n"
+)
 FAST = "  deny:\n    runs-on: ubuntu-latest\n"
 LINUX = (
     "  check-linux:\n    runs-on: ubuntu-latest\n    steps:\n"
     "      - run: make -k check CROSS=x MEMORY=0\n"
 )
 MAC = "  check-macos:\n    if: inputs.full\n    runs-on: macos-latest\n"
-WIN = "  windows:\n    if: inputs.full\n    runs-on: windows-latest\n"
+WIN = (
+    "  windows:\n    if: inputs.full\n    runs-on: windows-latest\n"
+    "  memory:\n    if: inputs.full\n    runs-on: ubuntu-latest\n"
+)
 REL = (
     "  check:\n    strategy:\n      matrix:\n"
     "        os: [ubuntu-22.04, macos-latest, windows-latest]\n"
+    "  memory:\n    runs-on: ubuntu-latest\n"
 )
 TOOLS = (
     "runs:\n  steps:\n    - run: |\n"
@@ -208,6 +230,16 @@ def self_test() -> int:
         (CALL, FAST + MAC + WIN, REL, False),
         # A new job added only to ci.yml.
         (CALL + FAST, FAST + MAC + WIN, REL, True),
+        # A nightly gate that only decides whether to run passes; one that runs the tests,
+        # or is not gated on the schedule, is a job dodging the tiers.
+        (CALL + NIGHTLY.format(run="gh run list"), FAST + MAC + WIN, REL, False),
+        (CALL + NIGHTLY.format(run="cargo test"), FAST + MAC + WIN, REL, True),
+        (
+            CALL + NIGHTLY.format(run="gh run list").replace("'schedule'", "'push'"),
+            FAST + MAC + WIN,
+            REL,
+            True,
+        ),
         # A new full-tier job no release check covers.
         (CALL, FAST + MAC + WIN + "  msrv:\n    if: inputs.full\n", REL, True),
         # The release check stops running Windows.

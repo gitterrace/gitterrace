@@ -2,9 +2,10 @@ name: Lint and test
 
 # The jobs behind ci.yml, in two tiers. The fast tier runs on every pull request and push: the
 # Linux gate, cargo deny, the MSRV check, and the Docker image when a Docker path changed. The
-# full tier (input `full`) adds macOS and Windows; it runs on a manual run and weekly. A tag
-# never ships on the fast tier alone: release-check.yml runs macOS and Windows again before
-# dist publishes. scripts/lint/ci-check.py holds both rules.
+# full tier (input `full`) adds macOS, Windows and the memory budget; it runs nightly when main
+# moved, and by hand. A tag never ships on the fast tier alone: release-check.yml runs macOS,
+# Windows and the memory budget again before dist publishes. scripts/lint/ci-check.py holds both
+# rules.
 
 on:
   workflow_call:
@@ -125,15 +126,17 @@ jobs:
         run: bash scripts/verify/docker-check.sh
 
   # The release memory budget, beside the gates: alone it takes about 35 minutes on a 4-core
-  # runner, which the gate jobs could not also hold. Linux always, macOS on the full tier.
+  # runner, which the gate jobs could not also hold. Full tier only (nightly, manual, and the
+  # release check runs it again before a tag ships): a push stays on the fast gate.
   memory:
+    if: inputs.full
     name: Memory budget (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
-        os: ${{ fromJSON(inputs.full && '["ubuntu-latest","macos-latest"]' || '["ubuntu-latest"]') }}
+        os: [ubuntu-latest, macos-latest]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

@@ -1,8 +1,10 @@
 name: CI
 
-# Pull requests and pushes to main run the fast tier. A manual run (full by default) and the
-# weekly run add macOS and Windows. The jobs live in lint-and-test.yml. Tags are pushed by hand;
-# release.yml and release-check.yml gate what they ship.
+# Pull requests and pushes to main run the fast tier: the Linux gate, deny and MSRV, the checks
+# that keep main mergeable. The full tier adds macOS, Windows and the memory budget: nightly when
+# main moved since the last green nightly, and by hand (full by default). The jobs live in
+# lint-and-test.yml. Tags are pushed by hand; release.yml and release-check.yml gate what they
+# ship, on every system.
 
 on:
   push:
@@ -12,21 +14,43 @@ on:
   workflow_dispatch:
     inputs:
       full:
-        description: Also run the macOS and Windows jobs
+        description: Also run the macOS, Windows and memory budget jobs
         type: boolean
         default: true
   schedule:
-    - cron: "17 5 * * 1"
+    - cron: "17 2 * * *"
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}
   cancel-in-progress: true
 
 permissions:
   contents: read
 
 jobs:
+  # The nightly run only when main has a commit the last green nightly did not test: a quiet
+  # night costs one short job, not the full matrix.
+  changed:
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+    outputs:
+      moved: ${{ steps.last.outputs.moved }}
+    steps:
+      - id: last
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          HEAD: ${{ github.sha }}
+        run: |
+          tested=$(gh run list -R "$REPO" -w ci.yml -e schedule -s success -L 1 \
+            --json headSha -q '.[0].headSha // ""')
+          if [ "$tested" = "$HEAD" ]; then echo moved=false; else echo moved=true; fi >> "$GITHUB_OUTPUT"
+
   lint-and-test:
+    needs: changed
+    if: ${{ !cancelled() && (github.event_name != 'schedule' || needs.changed.outputs.moved == 'true') }}
     uses: ./.github/workflows/lint-and-test.yml
     with:
       full: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.full) }}
