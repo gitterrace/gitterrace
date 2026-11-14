@@ -9,7 +9,7 @@
 //! and on a shared screen anyone could press it.
 
 use std::{
-    path::{Path, PathBuf},
+    path::{Component, Path, PathBuf},
     sync::Arc,
 };
 
@@ -284,6 +284,14 @@ async fn remove(State(adder): State<Arc<Adder>>, req: Request) -> Response {
 fn checked_root(path: &Path, actions_file: Option<&Path>) -> Result<(PathBuf, String), RootError> {
     if !path.is_absolute() {
         return Err(RootError::NotAbsolute);
+    }
+    // Refused by name, before any resolving: a verbatim `\\?\` path on Windows keeps `..` as a
+    // plain name, so comparing it with its canonical form let `x\..\a` through as canonical.
+    if path
+        .components()
+        .any(|c| matches!(c, Component::CurDir | Component::ParentDir))
+    {
+        return Err(RootError::NotCanonical);
     }
     let canon = path
         .canonicalize()
