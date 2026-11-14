@@ -1,3 +1,6 @@
+# LF on every checkout, Windows included: tests and generators read sources and goldens as
+# text and split on "\n", and a CRLF checkout made a source-reading guard find nothing.
+* text=auto eol=lf
 vendor/schwarzwald/kit/tokens/theme-tokens.json linguist-generated
 crates/gitterrace-web/static/vendor/** linguist-vendored
 docs/openapi.json linguist-generated
