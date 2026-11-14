@@ -43,13 +43,8 @@ fn every_nav_link_keeps_the_selected_branch() {
         let router = gitterrace_web::app_router(dir.path()).expect("router");
         // `dev` and HEAD name one commit: a memo the HEAD page filled first must not answer
         // `?rev=dev`, so the warm-up's page is in place before the branch is asked for.
-        for _ in 0..250 {
-            let (_, body) = page(&router, "/stats").await;
-            if !body.contains("Indexing history") {
-                break;
-            }
-            tokio::time::sleep(std::time::Duration::from_millis(20)).await;
-        }
+        gitterrace_testkit::wait::page_until(&router, "/stats", gitterrace_testkit::wait::indexed)
+            .await;
         for url in [
             "/?rev=dev",
             "/tree/dev",
