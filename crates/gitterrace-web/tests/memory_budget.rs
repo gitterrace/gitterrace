@@ -8,7 +8,7 @@
 //!
 //! Red on the in-memory implementation by design: it holds the parsed history. Runs in every
 //! `cargo test --release` and in CI. `TEST_RUSTGIT=<path>` adds a real history.
-#![cfg(not(debug_assertions))]
+#![cfg(all(not(debug_assertions), not(windows)))]
 #![expect(clippy::expect_used, reason = "setup failures should panic")]
 
 #[global_allocator]
