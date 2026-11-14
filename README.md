@@ -15,7 +15,7 @@ database, accounts or network ([why](https://gitterrace.dev/docs/why/)).
 
 <!-- BEGIN GENERATED: demo -->
 Try it without installing: [the live demo](https://demo.gitterrace.dev): jq
-1.8.2 and ripgrep 15.2.0, exported.
+1.8.2, ripgrep 15.2.0 and gitterrace v0.1.0, exported.
 
 [The screenshots](docs/screenshots/) show the open source projects
 [jq](https://github.com/jqlang/jq/tree/jq-1.8.2) and

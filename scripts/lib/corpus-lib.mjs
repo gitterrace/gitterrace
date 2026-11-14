@@ -1,6 +1,7 @@
 // The demo corpus, shared by the screenshots (scripts/release/site/site-shots-run.mjs) and the
 // live demo (scripts/release/demo-export.mjs). Not run on its own.
-// - PINS: jq and ripgrep at the releases `[workspace.metadata.demo] repos` in Cargo.toml names.
+// - PINS: jq, ripgrep and gitterrace at the releases `[workspace.metadata.demo] repos` in
+//   Cargo.toml names.
 //   An xtask test fails when the two drift, so the demo and the screenshots show the same trees.
 // - checkout(): clones each into ~/.cache/gitterrace-shots (reused when present) and puts a
 //   `release` branch at the pin with a clean worktree.
@@ -22,6 +23,13 @@ export const PINS = {
     tag: '15.2.0',
     commit: 'e89fff89ac9af12e8d4ce9d5fd07beb408ca730f',
   },
+  // gitterrace itself at its release: the demo shows the code that serves it. Pinned by its
+  // tag alone (a commit of this repository is never written in its own tree); checkout()
+  // resolves it. Each release moves this pin and the Cargo.toml demo entry to the new tag.
+  gitterrace: {
+    url: 'https://github.com/gitterrace/gitterrace',
+    tag: 'v0.1.0',
+  },
 };
 
 export const corpus = join(homedir(), '.cache/gitterrace-shots');
@@ -35,11 +43,14 @@ const git = (cwd, ...a) =>
 export function checkout() {
   mkdirSync(corpus, { recursive: true });
   const dirs = {};
-  for (const [name, { url, commit }] of Object.entries(PINS)) {
+  for (const [name, { url, tag, commit: pinned }] of Object.entries(PINS)) {
     const dir = join(corpus, name);
     if (!existsSync(join(dir, '.git'))) {
       execFileSync('git', ['clone', '-q', `${url}.git`, dir], { stdio: 'inherit' });
     }
+    // A pin without a commit is a tag of this repository: fetched, then read as its commit.
+    if (!pinned) git(dir, 'fetch', '-q', '--force', 'origin', `refs/tags/${tag}:refs/tags/${tag}`);
+    const commit = pinned ?? git(dir, 'rev-parse', `refs/tags/${tag}^{commit}`);
     try {
       git(dir, 'cat-file', '-e', `${commit}^{commit}`);
     } catch {

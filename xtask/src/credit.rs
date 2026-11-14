@@ -26,10 +26,12 @@ fn pins() -> Vec<(String, String, String)> {
 }
 
 /// The credit for the projects the screenshots show: each name links its pinned release tree,
-/// "The screenshots" links the folder they live in.
+/// "The screenshots" links the folder they live in. gitterrace's own pin, which the demo
+/// shows beside them, is no third party to credit.
 pub(crate) fn credit_md() -> String {
     let links: Vec<String> = pins()
         .iter()
+        .filter(|(n, _, _)| n != "gitterrace")
         .map(|(n, u, t)| format!("[{n}]({u}/tree/{t})"))
         .collect();
     let names = match links.as_slice() {
