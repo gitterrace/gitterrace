@@ -180,7 +180,8 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-${{ steps.toolchain.outputs.cachekey }}-
       - run: cargo build --locked -p gitterrace
-      - run: cargo test --locked --workspace
+      # Every test binary runs even after one fails, so one run lists every Windows failure.
+      - run: cargo test --locked --workspace --no-fail-fast
       # The segment store on Windows: the seek_read shim, rename over an open file, retired
       # files that cannot be deleted while a reader holds them. Named, so a red one is visible.
       - name: Segment store guards

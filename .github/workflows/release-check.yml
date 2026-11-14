@@ -83,7 +83,8 @@ jobs:
       - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # v1
         with:
           toolchain: ${{ steps.pin.outputs.channel }}
-      - run: cargo test --locked --workspace
+      # Every test binary runs even after one fails, so a red release lists all it found.
+      - run: cargo test --locked --workspace --no-fail-fast
       # The binary dist ships is built with this profile; the smoke test runs it, so a build
       # that links but cannot serve stops the release.
       - run: cargo build --locked --profile dist -p gitterrace
