@@ -129,6 +129,10 @@ def memory_measure_test() -> None:
         with path.open("wb") as f:
             for _ in range(big // 2**20):
                 f.write(os.urandom(2**20))
+            # Written back before the child maps it: Linux counts a page still dirty in the page
+            # cache as Private_Dirty of the mapping process, which is not what the gate measures.
+            f.flush()
+            os.fsync(f.fileno())
         got = []
         for heap in (8 * 2**20, big):
             p = subprocess.Popen(
