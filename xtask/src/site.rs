@@ -169,9 +169,37 @@ pub fn render(root: &Path, ws: &Workspace) -> Result<Vec<Out>> {
 /// `/assets/*` a year without a page ever meeting a stale picture, font or stylesheet. The
 /// absolute link-preview URL (`og:image`) is left alone: crawlers fetch it once, by name.
 fn version_assets(outs: Vec<Out>) -> Vec<Out> {
+    // Stylesheets name fonts, so they are versioned first: a stylesheet's own hash then covers
+    // the bytes it is served with, and its URL changes when a font it names does.
+    let fonts = sums(&outs);
+    let outs: Vec<Out> = outs
+        .into_iter()
+        .map(|o| match o {
+            Out::File { path, body } if has_ext(&path, "css") => {
+                let body = versioned(&body, &fonts);
+                Out::File { path, body }
+            }
+            other => other,
+        })
+        .collect();
+    let all = sums(&outs);
+    outs.into_iter()
+        .map(|o| match o {
+            // A page is fitted again: a version can push a line past the width.
+            Out::File { path, body } if has_ext(&path, "html") => {
+                let body = fit::fit(&versioned(&body, &all));
+                Out::File { path, body }
+            }
+            other => other,
+        })
+        .collect()
+}
+
+/// The first 12 hex digits of each `/assets/` file's sha256, by its path under `assets/`.
+fn sums(outs: &[Out]) -> std::collections::BTreeMap<String, String> {
     use sha2::Digest as _;
     let mut sums = std::collections::BTreeMap::new();
-    for o in &outs {
+    for o in outs {
         let (path, bytes) = match o {
             Out::File { path, body } => (path, body.as_bytes()),
             Out::Bytes { path, body } => (path, body.as_slice()),
@@ -186,20 +214,7 @@ fn version_assets(outs: Vec<Out>) -> Vec<Out> {
             sums.insert(rel.to_owned(), hex);
         }
     }
-    outs.into_iter()
-        .map(|o| match o {
-            // A page is fitted again: a version can push a line past the width.
-            Out::File { path, body } if has_ext(&path, "html") => {
-                let body = fit::fit(&versioned(&body, &sums));
-                Out::File { path, body }
-            }
-            Out::File { path, body } if has_ext(&path, "css") => {
-                let body = versioned(&body, &sums);
-                Out::File { path, body }
-            }
-            other => other,
-        })
-        .collect()
+    sums
 }
 
 fn has_ext(path: &str, ext: &str) -> bool {

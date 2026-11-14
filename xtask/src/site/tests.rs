@@ -541,3 +541,45 @@ fn site_css_carries_the_app_syntax_colours() {
     assert!(css.contains("var(--syn-keyword)"), "{css}");
     assert!(!css.contains("--md-k"), "{css}");
 }
+
+/// The class this guards: an asset URL whose `?v=` is not the hash of the bytes served under it,
+/// so a year-long cache could keep a stale stylesheet or font. Every `/assets/x?v=h` on every
+/// page and stylesheet must name the sha256 of the built `assets/x` as written.
+#[test]
+fn every_asset_version_is_the_hash_of_the_file_served() {
+    let root = crate::repo_root();
+    let ws = crate::facts::load(&root).expect("facts");
+    let outs = render(&root, &ws).expect("render");
+    // The hash of each file as built, the same digest the versioning names.
+    let built = super::sums(&outs);
+    let texts: Vec<(String, String)> = outs
+        .iter()
+        .filter_map(|o| match o {
+            Out::File { path, body } => Some((path.clone(), body.clone())),
+            _ => None,
+        })
+        .collect();
+    let mut bad = Vec::new();
+    let mut seen = 0;
+    for (path, text) in &texts {
+        for (at, _) in text.match_indices("/assets/") {
+            let rest = &text[at + "/assets/".len()..];
+            let Some((file, tail)) = rest.split_once("?v=") else {
+                continue;
+            };
+            if file.contains(['"', ')', ' ', '<']) {
+                continue;
+            }
+            let v: String = tail.chars().take_while(char::is_ascii_hexdigit).collect();
+            seen += 1;
+            if built.get(file) != Some(&v) {
+                bad.push(format!(
+                    "{path}: /assets/{file}?v={v}, built {:?}",
+                    built.get(file)
+                ));
+            }
+        }
+    }
+    assert!(seen > 10, "the site names its assets");
+    assert!(bad.is_empty(), "{}", bad.join("\n"));
+}
