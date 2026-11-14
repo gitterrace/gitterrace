@@ -1,6 +1,5 @@
 use gitterrace_config::{Config, parse};
 use gitterrace_testkit::git;
-use rmcp::model::RawContent;
 
 use super::McpServer;
 use crate::{ApiError, ApiState};
@@ -20,10 +19,7 @@ fn server(config: &str) -> (tempfile::TempDir, McpServer) {
 fn text(res: &rmcp::model::CallToolResult) -> String {
     res.content
         .iter()
-        .filter_map(|c| match &c.raw {
-            RawContent::Text(t) => Some(t.text.clone()),
-            _ => None,
-        })
+        .filter_map(|c| c.as_text().map(|t| t.text.clone()))
         .collect()
 }
 

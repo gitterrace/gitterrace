@@ -6,7 +6,7 @@ use std::sync::Arc;
 
 use gitterrace_config::{Config, Feature};
 use rmcp::handler::server::wrapper::Parameters;
-use rmcp::model::{CallToolResult, Content};
+use rmcp::model::{CallToolResult, ContentBlock};
 use rmcp::{ErrorData, ServerHandler, ServiceExt, tool, tool_handler, tool_router};
 use schemars::JsonSchema;
 use serde::Deserialize;
@@ -178,7 +178,11 @@ impl McpServer {
     {
         let entry = match self.repos.pick(repo.as_deref()) {
             Ok(e) => e.clone(),
-            Err(e) => return Ok(CallToolResult::error(vec![Content::text(e.to_string())])),
+            Err(e) => {
+                return Ok(CallToolResult::error(vec![ContentBlock::text(
+                    e.to_string(),
+                )]));
+            }
         };
         // Overrides are keyed by folder name, as `[repo.NAME]` is for the web.
         let folder = entry
@@ -186,7 +190,7 @@ impl McpServer {
             .file_name()
             .map(|n| n.to_string_lossy().into_owned());
         if !tool_on(&self.cfg, folder.as_deref(), tool) {
-            return Ok(CallToolResult::error(vec![Content::text(format!(
+            return Ok(CallToolResult::error(vec![ContentBlock::text(format!(
                 "the {tool} tool is switched off in [features] for {}",
                 entry.name
             ))]));
@@ -200,9 +204,9 @@ impl McpServer {
             Ok(v) => {
                 let text = serde_json::to_string(&v)
                     .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
-                CallToolResult::success(vec![Content::text(text)])
+                CallToolResult::success(vec![ContentBlock::text(text)])
             }
-            Err(e) => CallToolResult::error(vec![Content::text(tool_error_text(&e))]),
+            Err(e) => CallToolResult::error(vec![ContentBlock::text(tool_error_text(&e))]),
         })
     }
 }
@@ -366,7 +370,7 @@ impl McpServer {
     #[tool(name = "list_repos", annotations(read_only_hint = true))]
     async fn list_repos(&self) -> Result<CallToolResult, ErrorData> {
         if !self.cfg.feature_on(Feature::Api, None) {
-            return Ok(CallToolResult::error(vec![Content::text(
+            return Ok(CallToolResult::error(vec![ContentBlock::text(
                 "the list_repos tool is switched off in [features]",
             )]));
         }
@@ -377,7 +381,7 @@ impl McpServer {
             .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
         let text = serde_json::to_string(&list)
             .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
-        Ok(CallToolResult::success(vec![Content::text(text)]))
+        Ok(CallToolResult::success(vec![ContentBlock::text(text)]))
     }
 
     /// Commit history, newest first, with paging. Pass `path` to see only commits that touched a
