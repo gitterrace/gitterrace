@@ -9,7 +9,7 @@
 //! and on a shared screen anyone could press it.
 
 use std::{
-    path::{Component, Path, PathBuf},
+    path::{Path, PathBuf},
     sync::Arc,
 };
 
@@ -285,12 +285,11 @@ fn checked_root(path: &Path, actions_file: Option<&Path>) -> Result<(PathBuf, St
     if !path.is_absolute() {
         return Err(RootError::NotAbsolute);
     }
-    // Refused by name, before any resolving: a verbatim `\\?\` path on Windows keeps `..` as a
-    // plain name, so comparing it with its canonical form let `x\..\a` through as canonical.
-    if path
-        .components()
-        .any(|c| matches!(c, Component::CurDir | Component::ParentDir))
-    {
+    // Refused by name, before any resolving. A verbatim `\\?\` path on Windows keeps `..` and
+    // `/` as plain text, so `components()` sees one part `a/../b`: the parts are split on
+    // both separators here, and a path through `..` compared equal to its canonical form.
+    let parts = path.as_os_str().to_string_lossy();
+    if parts.split(['/', '\\']).any(|c| c == "." || c == "..") {
         return Err(RootError::NotCanonical);
     }
     let canon = path
@@ -355,6 +354,31 @@ mod error_tests {
         );
         let body = serde_json::to_string(&AddReply::error("x")).expect("json");
         assert_eq!(body, r#"{"error":"x"}"#);
+    }
+
+    /// A `.` or `..` is refused however the path spells its separators, before the folder is
+    /// read. Red when only `components()` was asked: a Windows verbatim path keeps `/` and `..`
+    /// as text, so a path through `..` passed as one plain part. Spelled by hand, so every
+    /// system runs it.
+    #[test]
+    fn a_dot_or_dot_dot_is_refused_in_any_spelling() {
+        let here = std::env::temp_dir();
+        for tail in ["x/../y", "x\\..\\y", "./y", "x/.", "x/..\\y"] {
+            let p = here.join(tail);
+            assert!(
+                matches!(checked_root(&p, None), Err(RootError::NotCanonical)),
+                "{}",
+                p.display()
+            );
+        }
+        let verbatim = PathBuf::from(r"\\?\C:\repos/a/../b");
+        assert!(
+            matches!(
+                checked_root(&verbatim, None),
+                Err(RootError::NotCanonical | RootError::NotAbsolute)
+            ),
+            "verbatim"
+        );
     }
 }
 
