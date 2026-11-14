@@ -73,16 +73,17 @@ impl App {
         pairs.join("&")
     }
 
-    /// Key for a rendered page: moves with HEAD, the selected ref's commit, the index file, the
-    /// branch name, the dirty chip and the query, so any of them changing yields a fresh render.
+    /// Key for a rendered page: moves with HEAD, the selected ref and its commit, the index
+    /// file, the branch name, the dirty chip and the query, so any of them changing yields a
+    /// fresh render. The ref's name counts on its own: links carry it, so `?rev=dev` must not
+    /// get the `HEAD` page when both name one commit.
     pub(crate) fn memo_key(&self, tab: &str, query: Option<&str>) -> String {
+        let rev = crate::fmt::selected();
         format!(
-            "{tab}\u{0}{}\u{0}{}\u{0}{}\u{0}{}\u{0}{}\u{0}{}\u{0}{}",
+            "{tab}\u{0}{}\u{0}{}\u{0}{rev}\u{0}{}\u{0}{}\u{0}{}\u{0}{}\u{0}{}",
             self.base,
             self.repo.resolve("HEAD").unwrap_or_default(),
-            self.repo
-                .resolve(&crate::fmt::selected())
-                .unwrap_or_default(),
+            self.repo.resolve(&rev).unwrap_or_default(),
             self.index.generation(),
             self.repo.head_branch().unwrap_or_default(),
             self.dirty(),
