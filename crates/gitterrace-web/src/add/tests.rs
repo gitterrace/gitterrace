@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::path::{MAIN_SEPARATOR, Path, PathBuf};
 
 use axum::{body::Body, http::Request};
 use gitterrace_testkit::Fixture;
@@ -108,11 +108,15 @@ async fn adds_and_guards(several: bool) {
         let link = tmp.path().canonicalize().expect("c").join("link");
         assert_eq!(send(&r, post(tok), body(&link)).await.0, 400, "symlink");
     }
-    assert_eq!(
-        send(&r, post(tok), body(&b.join("../a"))).await.0,
-        400,
-        "dot-dot"
-    );
+    // Spelled as text: on Windows `b` is a verbatim `\\?\` path, and `join("../a")` folds the
+    // `..` there, which sent `b` itself and was rightly added.
+    let dot_dot = PathBuf::from(format!(
+        "{}{}..{}a",
+        b.display(),
+        MAIN_SEPARATOR,
+        MAIN_SEPARATOR
+    ));
+    assert_eq!(send(&r, post(tok), body(&dot_dot)).await.0, 400, "dot-dot");
 
     let (s, js) = send(&r, post(tok), body(&b)).await;
     assert_eq!(s, 201, "{js}");
