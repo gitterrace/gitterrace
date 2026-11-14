@@ -123,29 +123,33 @@ The newest run against its budgets. The charts and every page of each kept run
 are in [tests/bench/results](../tests/bench/results/README.md).
 
 <!-- BEGIN GENERATED: results -->
-Run 2026-11-12 on Apple M1 Max, 10 cores, 64 GB RAM, 4.0 TB SSD disk, macOS
-26.6.2 (arm64). gitterrace v0.1.0-548f044, git version 2.54.0 (Apple Git-157).
+Run 2026-11-13 on Apple M1 Max, 10 cores, 64 GB RAM, 4.0 TB SSD disk, macOS
+26.6.2 (arm64). gitterrace v0.1.0-46ca3fd, git version 2.54.0 (Apple Git-157).
 Measured on a quiet machine.
 
-| Repo | Metric | Value | Budget | Status |
-| --- | --- | --- | --- | --- |
-| control | index build | 0.8 s (0.6 to 0.8) | 30 s | pass |
-| control | warm page | 2 ms | 300 ms | pass |
-| control | cold page | 25 ms (25 to 25) | 1500 ms | pass |
-| control | peak memory | 117 MB | 500 MB | pass |
-| control | export | 34.4 s (33.5 to 34.7) | 60 s | pass |
-| git | index build | 22.6 s (22.1 to 23.2) | 300 s | pass |
-| git | warm page | 87 ms | 300 ms | pass |
-| git | cold page | 2427 ms (2409 to 2448) | 3000 ms | pass |
-| git | peak memory | 366 MB | 1500 MB | pass |
-| git | export | 55.1 s (53.1 to 56.8) | 300 s | pass |
-| rust | index build | 97.1 s (96.9 to 98.0) | 2400 s | pass |
-| rust | warm page | 122 ms | 300 ms | pass |
-| rust | cold page | 1736 ms (1720 to 1737) | 10000 ms | pass |
-| rust | peak memory | 914 MB | 6000 MB | pass |
-| linux | index build | 477.0 s (477.0 to 477.0) | 600 s | pass |
-| linux | warm page | 45 ms | 500 ms | pass |
-| linux | cold page | 3887 ms (3887 to 3887) | 20000 ms | pass |
-| linux | peak memory | 1937 MB | 8000 MB | pass |
+- **rust:** not measured on a quiet machine (other processes used 5 or more
+  cores during export, idle), so its numbers are withheld.
+
+| Repo | Metric | Value | Budget | Status | Change against previous |
+| --- | --- | --- | --- | --- | --- |
+| control | index build | 0.6 s (0.3 to 0.8) | 30 s | pass | 27% faster |
+| control | warm page | 145 ms | 300 ms | pass | 7359% slower |
+| control | cold page | 156 ms (153 to 161) | 1500 ms | pass | 519% slower |
+| control | peak memory | 114 MB | 500 MB | pass | 3% less memory |
+| control | export | 38.4 s (37.7 to 38.7) | 60 s | pass | 12% slower |
+| git | index build | 24.2 s (24.2 to 24.9) | 300 s | pass | 7% slower |
+| git | warm page | 87 ms | 300 ms | pass | unchanged |
+| git | cold page | 2378 ms (2377 to 2518) | 3000 ms | pass | 2% faster |
+| git | peak memory | 366 MB | 1500 MB | pass | unchanged |
+| git | export | 61.3 s (61.0 to 61.7) | 300 s | pass | 11% slower |
+| linux | index build | 486.3 s (486.3 to 486.3) | 600 s | pass | 2% slower |
+| linux | warm page | 50 ms | 500 ms | pass | 11% slower |
+| linux | cold page | 4216 ms (4216 to 4216) | 20000 ms | pass | 8% slower |
+| linux | peak memory | 1985 MB | 8000 MB | pass | 2% more memory |
+| rust | index build | withheld (load) | - | withheld | - |
+| rust | warm page | withheld (load) | - | withheld | - |
+| rust | cold page | withheld (load) | - | withheld | - |
+| rust | peak memory | withheld (load) | - | withheld | - |
+| rust | export | withheld (load) | - | withheld | - |
 
 <!-- END GENERATED: results -->
