@@ -300,6 +300,9 @@ mod tests {
         let t = Target::resolve(&dir.path().join("a/b/site")).expect("resolve");
         assert_eq!(t.parent, real.join("a/b"));
         assert_eq!(t.name, "site");
-        assert!(Target::resolve(&dir.path().join("a/..")).is_err());
+        // On Windows `std::path::absolute` folds `a/..` away, so only Unix sees the name `..`.
+        if cfg!(not(windows)) {
+            assert!(Target::resolve(&dir.path().join("a/..")).is_err());
+        }
     }
 }

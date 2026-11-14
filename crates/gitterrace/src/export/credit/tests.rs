@@ -68,6 +68,8 @@ fn unknown_license_links_the_file() {
     );
 }
 
+// Windows refuses `<` and `>` in a folder name, so no repository there can be named this way.
+#[cfg(not(windows))]
 #[test]
 fn names_are_escaped() {
     let d = tempfile::tempdir().expect("tempdir");
