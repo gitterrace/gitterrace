@@ -131,3 +131,8 @@ pub fn git_at(dir: &Path, date: &str, args: &[&str]) -> String {
 pub fn git_stdin(dir: &Path, args: &[&str], input: &[u8]) -> String {
     try_run_with(dir, None, args, Some(input)).unwrap_or_else(|e| panic!("git {args:?}: {e}"))
 }
+
+/// [`git_stdin`] with the dates of [`git_at`] when `date` is set.
+pub fn git_stdin_at(dir: &Path, date: Option<&str>, args: &[&str], input: &[u8]) -> String {
+    try_run_with(dir, date, args, Some(input)).unwrap_or_else(|e| panic!("git {args:?}: {e}"))
+}

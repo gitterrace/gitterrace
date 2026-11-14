@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 
-use crate::{git, git_at, git_stdin};
+use crate::{git, git_at, git_stdin, git_stdin_at};
 
 /// Author time of the commit dated far past any calendar the charts know: year ~950 million.
 pub const FAR_FUTURE: i64 = 30_000_000_000_000_000;
@@ -213,7 +213,14 @@ impl Fixture {
     #[must_use]
     pub fn commit(self, msg: &str) -> Self {
         self.git(&["add", "-A"]);
-        self.git(&["commit", "-q", "--allow-empty", "-m", msg]);
+        // The message on stdin, not `-m`: Windows caps a command line at 32 KB, which a
+        // fixture with a block-sized message passed.
+        git_stdin_at(
+            &self.dir,
+            self.date.as_deref(),
+            &["commit", "-q", "--allow-empty", "-F", "-"],
+            msg.as_bytes(),
+        );
         self
     }
 
