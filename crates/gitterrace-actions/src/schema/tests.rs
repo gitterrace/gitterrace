@@ -134,8 +134,10 @@ fn send_placeholder_table_is_the_fields() {
 /// The limits the tables state are the limits the loader enforces.
 #[test]
 fn stated_limits_hold() {
+    // Disabled, so the program need not exist: Windows has no /bin/echo, and the limits are
+    // checked on a disabled action all the same.
     let head = "version = 1\n[[action]]\nid = \"a\"\nlabel = \"A\"\nkinds = [\"line\"]\n\
-                    command = [\"/bin/echo\"]\n";
+                    enabled = false\ncommand = [\"/bin/echo\"]\n";
     assert!(Config::parse(&format!("{head}timeout = \"120s\"\n"), Path::new("/")).is_ok());
     assert!(Config::parse(&format!("{head}timeout = \"121s\"\n"), Path::new("/")).is_err());
     let vars = |n: usize| {
