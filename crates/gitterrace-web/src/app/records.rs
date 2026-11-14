@@ -217,8 +217,7 @@ impl App {
     }
 
     /// Marks warm-up work until the guard drops: reads meanwhile do not delay
-    /// [`App::release_idle`]. A visitor's page during a warm-up is served as always, only the
-    /// release may come one period sooner and the next page builds again.
+    /// [`App::release_idle`], which waits for the warm-up to end and then releases what it built.
     pub(crate) fn warming(self: &Arc<Self>) -> Warming {
         self.warming.fetch_add(1, Ordering::Relaxed);
         Warming(Arc::clone(self))
@@ -229,6 +228,11 @@ impl App {
     /// Returns whether it released anything. A page in flight keeps its own `Arc`, so it is
     /// never cut short; the next page builds again. Only the rendered-page memo stays.
     pub(crate) fn release_idle(&self, idle: Duration) -> bool {
+        // Not while a warm-up runs: it fills the caches again right after, so the server sat
+        // at its warm size until the next period (46 MB against 1 MB on a loaded runner).
+        if self.warming.load(Ordering::Relaxed) > 0 {
+            return false;
+        }
         let quiet = self.records_used.lock().is_ok_and(|g| g.elapsed() >= idle);
         if !quiet {
             return false;
