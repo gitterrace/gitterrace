@@ -286,17 +286,19 @@ fn names_one_disk_stores_as_one_file_are_skipped_with_a_line() {
     let home = dir.path();
     let nfd = "no\u{308}te.txt";
     let nfc = "n\u{f6}te.txt";
-    let src = names_repo(
-        &home.join("src"),
-        &[
-            ("README.md", "upper body"),
-            ("readme.md", "lower body"),
-            (nfd, "decomposed body"),
-            (nfc, "composed body"),
-            ("NUL.txt", "device body"),
-            ("ok.txt", "plain body"),
-        ],
-    );
+    let mut files = vec![
+        ("README.md", "upper body"),
+        ("readme.md", "lower body"),
+        (nfd, "decomposed body"),
+        (nfc, "composed body"),
+        ("ok.txt", "plain body"),
+    ];
+    // Git for Windows refuses a device name in a commit, so only other systems can carry one.
+    let device = cfg!(not(windows));
+    if device {
+        files.push(("NUL.txt", "device body"));
+    }
+    let src = names_repo(&home.join("src"), &files);
     let out = home.join("site");
     let o = export(home, &out, &[src.path()], &[]);
     let err = stderr(&o);
@@ -314,7 +316,7 @@ fn names_one_disk_stores_as_one_file_are_skipped_with_a_line() {
         );
     }
     assert!(
-        err.contains("NUL.txt"),
+        !device || err.contains("NUL.txt"),
         "the device name was not reported: {err}"
     );
     let blob = out.join("r/src/blob/HEAD");
