@@ -102,7 +102,7 @@ repos = ["jq jq-1.8.2", "ripgrep 15.2.0", "gitterrace v0.1.0"]
 # Release automation (cargo-dist): GitHub releases with prebuilt binaries, a
 # shell installer and a formula in gitterrace/homebrew-tap, which the release job fills. Run `dist plan` to preview.
 [workspace.metadata.dist]
-cargo-dist-version = "0.31.0"
+cargo-dist-version = "0.34.0"
 ci = ["github"]
 installers = ["shell", "powershell", "homebrew"]
 tap = "gitterrace/homebrew-tap"
@@ -126,7 +126,7 @@ github-attestations = true
 extra-files = ["THIRD-PARTY-NOTICES"]
 pr-run-mode = "plan"
 
-# dist 0.31 builds aarch64-apple-darwin on macos-14, which GitHub retired on 2026-11-02: the job
+# dist builds aarch64-apple-darwin on macos-14, which GitHub retired on 2026-11-02: the job
 # is cancelled before it starts. macos-15 is the oldest Apple silicon image still served.
 [workspace.metadata.dist.github-custom-runners]
 aarch64-apple-darwin = "macos-15"
