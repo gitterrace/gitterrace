@@ -166,6 +166,8 @@ struct BlobPage {
     /// The cut notice, naming `limits.blob_lines`.
     cut_note: String,
     media: Option<String>,
+    /// An archive's entry list (`filetype::archive::html`, escaped there).
+    archive: Option<String>,
     too_large: bool,
     raw_href: String,
     /// The format of a binary blob the page does not preview; empty otherwise.
@@ -182,6 +184,17 @@ fn is_markdown(path: &str) -> bool {
     [".md", ".markdown", ".mdown"]
         .iter()
         .any(|e| lower.ends_with(e))
+}
+
+/// Whether the blob view reads `path`'s bytes: an archive it lists.
+fn wants_bytes(path: &str) -> bool {
+    crate::filetype::archive::kind(path).is_some()
+}
+
+/// An archive's entry list. Past `limits.preview_mb` `bytes` is empty and nothing lists.
+fn archive_html(path: &str, bytes: &[u8]) -> Option<String> {
+    use crate::filetype::archive;
+    archive::list(archive::kind(path)?, bytes, archive::ENTRY_CAP).map(|l| archive::html(path, &l))
 }
 
 /// A CSV or TSV under the row cap as a table, with its source a switch away.
@@ -215,7 +228,7 @@ pub(super) async fn blob(
         let path = path.trim_matches('/').to_owned();
         // One content read serves the text and, for media small enough to want facts about,
         // the bytes.
-        let (b, bytes) = if crate::media::kind(&path).is_some() {
+        let (b, bytes) = if crate::media::kind(&path).is_some() || wants_bytes(&path) {
             a.repo
                 .blob_with_bytes(&id, &path, a.cfg().limits.preview_mb << 20)?
         } else {
@@ -315,6 +328,7 @@ fn blob_page(
     });
     let doc = doc.or_else(|| markdown::notebook::doc(text?, &path, rev, views::Render::of(a)));
     let table = table_html(&path, text.filter(|_| doc.is_none()));
+    let archive = archive_html(&path, bytes);
     let symbols = match (&doc, text, media.is_some()) {
         (None, Some(t), false) => {
             crate::symbols::outline(&path, t, views::Render::of(a).blob_lines, named)
@@ -378,6 +392,7 @@ fn blob_page(
         cut,
         cut_note: format!("Truncated after {} lines.", a.cfg().limits.blob_lines),
         media,
+        archive,
         too_large,
     }
 }

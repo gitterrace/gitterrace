@@ -1,0 +1,8 @@
+{#- An archive's entries (filetype/archive.rs): name, size, date. Names are escaped. -#}
+<table class="data-table"><caption class="vh">Entries of {{ name }}</caption>
+<thead><tr><th scope="col">Name</th><th scope="col">Size</th>
+<th scope="col">Modified</th></tr></thead>
+<tbody>{% for e in l.entries %}<tr><td>{{ e.name }}</td><td>{{ e.size }}</td>
+<td>{{ e.date }}</td></tr>
+{% endfor %}</tbody></table>
+{%- if l.more %}<p class="muted pad">Showing the first {{ cap }} entries.</p>{% endif %}

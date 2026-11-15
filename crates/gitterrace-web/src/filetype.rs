@@ -3,6 +3,7 @@
 //! and the download link. No parser runs on the content, only prefix compares. The
 //! submodules render the formats that are previewed instead.
 
+pub(crate) mod archive;
 pub(crate) mod table;
 
 /// Magic numbers: (offset, bytes, format). The first match wins, so a container sits after
