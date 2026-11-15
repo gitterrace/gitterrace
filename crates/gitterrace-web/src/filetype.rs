@@ -1,6 +1,9 @@
 //! What the blob view says about a binary file it does not preview: the format, named from
 //! the magic number in its first bytes or else from its extension. The template adds the size
-//! and the download link. No parser runs on the content, only prefix compares.
+//! and the download link. No parser runs on the content, only prefix compares. The
+//! submodules render the formats that are previewed instead.
+
+pub(crate) mod table;
 
 /// Magic numbers: (offset, bytes, format). The first match wins, so a container sits after
 /// the formats built on it (EPUB and the Office formats are ZIP files).

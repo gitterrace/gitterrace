@@ -184,6 +184,13 @@ fn is_markdown(path: &str) -> bool {
         .any(|e| lower.ends_with(e))
 }
 
+/// A CSV or TSV under the row cap as a table, with its source a switch away.
+fn table_html(path: &str, text: Option<&str>) -> Option<String> {
+    use crate::filetype::table;
+    let t = table::parse(text?, table::delimiter(path)?, table::ROW_CAP)?;
+    Some(table::html(path, &t))
+}
+
 /// The highlighted chunks a big blob's first paint left plain; `nav.js` swaps them in.
 pub(super) async fn highlight_tail(
     State(app): Shared,
@@ -307,6 +314,7 @@ fn blob_page(
         )
     });
     let doc = doc.or_else(|| markdown::notebook::doc(text?, &path, rev, views::Render::of(a)));
+    let table = table_html(&path, text.filter(|_| doc.is_none()));
     let symbols = match (&doc, text, media.is_some()) {
         (None, Some(t), false) => {
             crate::symbols::outline(&path, t, views::Render::of(a).blob_lines, named)
@@ -335,7 +343,7 @@ fn blob_page(
     let page_head = PageHead {
         // A source file's path stays in view while its lines scroll; a document's own card
         // head pins instead.
-        pin: doc.is_none() && media.is_none(),
+        pin: doc.is_none() && media.is_none() && table.is_none(),
         tools: if doc.is_none() {
             markdown::outline_menu(&symbols, false)
         } else {
@@ -343,13 +351,15 @@ fn blob_page(
         },
         ..base_head
     };
-    let head = doc.as_ref().map(|d| DocHead {
+    let head = (doc.is_some() || table.is_some()).then(|| DocHead {
         title: path.rsplit('/').next().unwrap_or(&path).to_owned(),
         views: true,
-        outline: markdown::outline_menu(&d.outline, true),
+        outline: doc
+            .as_ref()
+            .map_or_else(String::new, |d| markdown::outline_menu(&d.outline, true)),
         ..DocHead::default()
     });
-    let rendered = doc.map(|d| d.html);
+    let rendered = doc.map(|d| d.html).or(table);
     let (raw_href, chrome) = blob_links(a, at, &path);
     BlobPage {
         c: Chrome {

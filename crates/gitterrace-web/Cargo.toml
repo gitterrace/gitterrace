@@ -33,6 +33,7 @@ two-face.workspace = true
 ammonia.workspace = true
 serde_json.workspace = true
 regex = "1"
+csv = "1"
 tower.workspace = true
 tower-http.workspace = true
 

@@ -1,0 +1,5 @@
+{#- A CSV or TSV blob as a table (filetype/table.rs). Every cell is escaped. -#}
+<table class="data-table"><caption class="vh">{{ name }}</caption>
+<thead><tr>{% for h in t.head %}<th scope="col">{{ h }}</th>{% endfor %}</tr></thead>
+<tbody>{% for r in t.rows %}<tr>{% for c in r %}<td>{{ c }}</td>{% endfor %}</tr>{% endfor %}
+</tbody></table>

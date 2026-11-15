@@ -578,3 +578,7 @@ svg.chart a:focus-visible .bar{fill:Highlight}}
 .sharebar b,.dbar b{width:var(--w)}
 
 [data-tip]:focus-visible{outline-color:var(--focus)}
+/* A CSV or TSV blob as a table, and an archive's entries (filetype/). */
+.data-table{border-collapse:collapse;font:85%/1.45 var(--mono);margin:16px}
+.data-table :is(th,td){border:1px solid var(--line);padding:4px 8px;text-align:left}
+.data-table :is(th,td){vertical-align:top;white-space:pre-wrap}
