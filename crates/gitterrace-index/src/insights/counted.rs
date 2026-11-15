@@ -82,7 +82,7 @@ impl<'a> Counted<'a> {
         shifted: bool,
     ) -> Self {
         let axis = cx.axis(scope);
-        let span = super::scope::span_of(&days);
+        let span = crate::insights::scope::span_of(&days);
         Self {
             ins,
             scope,

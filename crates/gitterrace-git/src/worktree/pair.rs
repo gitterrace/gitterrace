@@ -60,7 +60,8 @@ pub(super) fn exact_moves(
             continue;
         }
         // The view's own reader: it refuses a path behind a symlinked directory.
-        let super::Read::Data(bytes) = &super::read_worktree(root, path, big) else {
+        let crate::worktree::Read::Data(bytes) = &crate::worktree::read_worktree(root, path, big)
+        else {
             continue;
         };
         let Ok(id) = gix::objs::compute_hash(r.object_hash(), gix::objs::Kind::Blob, bytes) else {
