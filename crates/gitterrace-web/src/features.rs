@@ -29,6 +29,7 @@ pub(crate) const FEATURE_ROUTES: &[(Feature, &[&str])] = &[
             "/worktree",
             "/worktree/diff/{*path}",
             "/worktree/raw/{*path}",
+            "/worktree/blob/{*path}",
             "/worktrees",
             "/stashes",
             "/_dirty",

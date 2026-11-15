@@ -68,6 +68,6 @@ pub use walk::{
 };
 pub use watch::{Parts, Watcher};
 pub use worktree::{
-    WORKTREE_DIFF_BYTES, WORKTREE_FILES, is_dirty, worktree_bytes, worktree_diff,
+    WORKTREE_DIFF_BYTES, WORKTREE_FILES, is_dirty, worktree_blob, worktree_bytes, worktree_diff,
     worktree_file_diff, worktree_signature,
 };

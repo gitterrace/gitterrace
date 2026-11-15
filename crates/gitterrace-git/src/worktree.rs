@@ -14,7 +14,7 @@ use gix::bstr::ByteSlice;
 use gix::diff::blob::{Algorithm, Diff, InternedInput};
 
 use crate::error::git;
-use crate::{ChangeKind, FileDiff, Repo, Result};
+use crate::{Blob, ChangeKind, FileDiff, Repo, Result};
 
 /// Changed files the view lists by default (`limits.worktree_files`): untracked trees can be
 /// enormous (a forgotten `node_modules`), so the view stops there.
@@ -211,6 +211,16 @@ pub fn worktree_bytes(repo: &Repo, path: &str, max: u64) -> Result<Option<Vec<u8
     // `Read` counts held bytes on drop in tests, so the bytes are copied out, not moved.
     let read = read_worktree(&root, path, max);
     Ok(matches!(read, Read::Data(_)).then(|| read.bytes().to_vec()))
+}
+
+/// One changed file as it is on disk, for the working tree's blob view: the same guard and
+/// `max` as [`worktree_bytes`], with the text decoded under the repository's text limit.
+pub fn worktree_blob(repo: &Repo, path: &str, max: u64) -> Result<Option<(Blob, Vec<u8>)>> {
+    let Some(bytes) = worktree_bytes(repo, path, max)? else {
+        return Ok(None);
+    };
+    let blob = crate::repo::blob_of(path, &bytes, repo.text_limit());
+    Ok(Some((blob, bytes)))
 }
 
 /// One uncommitted file against HEAD: the body a folded file of the working tree page loads.

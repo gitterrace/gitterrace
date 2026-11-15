@@ -528,3 +528,28 @@ async fn worktree_raw_refuses_ignored_git_and_clean_paths() {
     let public = router(&p, with(|c| c.server.is_public = true));
     assert_eq!(get(&public, "/worktree/raw/small.txt").await.0, 404);
 }
+
+/// An untracked file opens in the blob view from disk, linked from the working tree page;
+/// a file that is not changed and a public server both answer not found.
+#[tokio::test]
+async fn worktree_blob_shows_an_untracked_file_and_hides_it_on_a_public_server() {
+    let dir = tempfile::tempdir().expect("tmp");
+    let p = repo(dir.path(), "r");
+    std::fs::write(p.join("fresh.rs"), "fn fresh_marker() {}\n").expect("write");
+    let r = router(&p, Config::default());
+    let (s, body) = get(&r, "/worktree/blob/fresh.rs").await;
+    assert_eq!(s, 200, "{body}");
+    assert!(body.contains("fresh_marker"), "{body}");
+    assert!(body.contains("id=\"L1\""), "line anchors: {body}");
+    let (_, list) = get(&r, "/worktree").await;
+    assert!(list.contains("/worktree/blob/fresh.rs\""), "{list}");
+    for bad in [".git/config", "mid.txt", "d/../fresh.rs"] {
+        assert_eq!(
+            get(&r, &format!("/worktree/blob/{bad}")).await.0,
+            404,
+            "{bad}"
+        );
+    }
+    let public = router(&p, with(|c| c.server.is_public = true));
+    assert_eq!(get(&public, "/worktree/blob/fresh.rs").await.0, 404);
+}

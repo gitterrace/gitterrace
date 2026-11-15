@@ -203,12 +203,12 @@ fn source_details(src: &str) -> String {
 pub(crate) fn blob_html(
     k: Kind,
     len: u64,
-    rev: &str,
-    path: &str,
+    side: Side<'_>,
     bytes: &[u8],
     svg_src: Option<&str>,
 ) -> String {
-    let url = raw_url(rev, path);
+    let path = side.file();
+    let url = side.url();
     let px = dimensions(path, bytes);
     let dims = px.map_or_else(String::new, |(w, h)| format!("{w} x {h} · "));
     // Without `/raw` there is no byte to show or download, only the facts.

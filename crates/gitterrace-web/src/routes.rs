@@ -68,6 +68,7 @@ pub(crate) fn router(app: Arc<App>) -> Router {
         .route("/worktree", get(worktree))
         .route("/worktree/diff/{*path}", get(views::worktree_fragment))
         .route("/worktree/raw/{*path}", get(raw::worktree_raw))
+        .route("/worktree/blob/{*path}", get(files::worktree_blob))
         .route("/api/files/{rev}", get(api::files))
         .route("/api/refs", get(api::refs))
         .route("/api/last/{rev}", get(api::last_root))
@@ -437,11 +438,18 @@ struct WorktreePage {
     c: Chrome,
     head: crate::pagehead::PageHead,
     files_summary: String,
-    files: Vec<FileStatRow>,
+    files: Vec<WorktreeFileRow>,
     diff: String,
     clean: bool,
     adds: String,
     dels: String,
+}
+
+/// One row of the working tree's file list: its stat and where the file opens on disk, empty
+/// for a deleted file.
+struct WorktreeFileRow {
+    stat: FileStatRow,
+    blob: String,
 }
 
 async fn worktree(State(app): Shared) -> Result<Html<String>> {
@@ -459,14 +467,21 @@ async fn worktree(State(app): Shared) -> Result<Html<String>> {
         let (adds, dels) = files
             .iter()
             .fold((0, 0), |(x, y), f| (x + f.additions, y + f.deletions));
-        let stats: Vec<FileStatRow> = files
+        let stats: Vec<WorktreeFileRow> = files
             .iter()
             .enumerate()
-            .map(|(i, f)| FileStatRow {
-                anchor: format!("f{i}"),
-                label: views::file_label(f),
-                additions: fmt::thousands(f.additions),
-                deletions: fmt::thousands(f.deletions),
+            .map(|(i, f)| WorktreeFileRow {
+                stat: FileStatRow {
+                    anchor: format!("f{i}"),
+                    label: views::file_label(f),
+                    additions: fmt::thousands(f.additions),
+                    deletions: fmt::thousands(f.deletions),
+                },
+                blob: if f.kind == gitterrace_git::ChangeKind::Deleted {
+                    String::new()
+                } else {
+                    fmt::href(&format!("/worktree/blob/{}", fmt::enc_path(&f.path)))
+                },
             })
             .collect();
         Ok(WorktreePage {

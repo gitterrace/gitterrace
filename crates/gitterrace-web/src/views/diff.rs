@@ -209,7 +209,15 @@ pub(crate) fn diff_html_with(r: &Render, src: DiffSource<'_>, files: &[FileDiff]
                 );
             }
             _ if f.kind == ChangeKind::Deleted => out.push_str(&esc(&f.path)),
-            _ => out.push_str(&esc(&file_label(f))),
+            DiffSource::Worktree => {
+                let _ = write!(
+                    out,
+                    "<a href=\"{}\">{}</a>",
+                    crate::fmt::href(&format!("/worktree/blob/{}", enc_path(&f.path))),
+                    esc(&file_label(f))
+                );
+            }
+            DiffSource::Commit { .. } => out.push_str(&esc(&file_label(f))),
         }
         let facts = match src {
             DiffSource::Commit { media, .. } if f.binary => media.get(&f.path),

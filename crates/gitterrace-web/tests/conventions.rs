@@ -333,6 +333,8 @@ const NOT_PAGES: &[&str] = &[
     "/stashes",
     "/worktree/diff/{*path}",
     "/worktree/raw/{*path}",
+    // The blob page's own template, walked at `/blob`; the check's fixture has a clean tree.
+    "/worktree/blob/{*path}",
     "/events",
     "/api/files/{rev}",
     "/api/refs",

@@ -19,6 +19,21 @@ fn head_of(data: &[u8], text: bool) -> Vec<u8> {
     }
 }
 
+/// A blob over bytes already read: text when it is valid UTF-8 within `limit` and not binary,
+/// else the prefix that names its format.
+pub(crate) fn blob_of(path: &str, data: &[u8], limit: u64) -> Blob {
+    let size = data.len() as u64;
+    let text = (size <= limit && !crate::diff::is_binary(data))
+        .then(|| std::str::from_utf8(data).ok().map(str::to_owned))
+        .flatten();
+    Blob {
+        path: path.to_owned(),
+        size,
+        head: head_of(data, text.is_some()),
+        text,
+    }
+}
+
 impl Repo {
     /// Entries of the directory at `path` in `rev`, dirs first then by name.
     pub fn tree(&self, rev: &str, path: &str) -> Result<Vec<TreeEntry>> {

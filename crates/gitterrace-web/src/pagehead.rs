@@ -15,7 +15,7 @@ mod heads;
 
 pub(crate) use heads::{
     FileView, file_head, insights_head, lead_tagline, overview_head, refs_head, waiting_head,
-    worktree_head,
+    worktree_file_head, worktree_head,
 };
 
 /// A link in the title row, right of the title: the page's main jump (History, Compare).

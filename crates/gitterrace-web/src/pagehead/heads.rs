@@ -102,6 +102,18 @@ pub(crate) fn file_head(rev: &str, path: &str, on: FileView, tagline: Tagline) -
     }
 }
 
+/// A changed file's head on the working tree: its path, linked back to the working tree page.
+pub(crate) fn worktree_file_head(path: &str, tagline: Tagline) -> PageHead {
+    PageHead {
+        qualifier: "working tree".to_owned(),
+        actions: vec![Action {
+            label: "Working tree",
+            href: fmt::href("/worktree"),
+        }],
+        ..PageHead::new(path, tagline)
+    }
+}
+
 /// The overview's head: the repository's name, its branch and what was counted (`None` while
 /// history is indexing).
 pub(crate) fn overview_head(name: &str, branch: &str, counted: Option<&str>) -> PageHead {

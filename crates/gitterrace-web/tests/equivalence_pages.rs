@@ -221,7 +221,7 @@ fn the_pairwise_golden_agrees_with_the_full_matrix() {
 
 /// The browsing pages, one or more cells each, over the matrix repository at HEAD. Every page
 /// kind the router serves has a cell here or on an insights page, or is exempt below.
-const BROWSE: [&str; 55] = [
+const BROWSE: [&str; 57] = [
     "/log",
     "/log/HEAD",
     "/log/HEAD?q=path:src",
@@ -280,6 +280,8 @@ const BROWSE: [&str; 55] = [
     "/compare?base=HEAD&head=HEAD",
     "/worktree/raw/src/lib.rs",
     "/worktree/raw/missing.rs",
+    "/worktree/blob/src/lib.rs",
+    "/worktree/blob/missing.rs",
 ];
 
 /// Routes with no golden cell, each with the reason. A route listed here that does not exist

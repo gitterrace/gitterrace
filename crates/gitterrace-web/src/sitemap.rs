@@ -54,11 +54,11 @@ pub const PAGES: &[Page] = &[
     page(
         concat!(
             "`/refs`, `/tag/{name}`, `/worktrees`, `/stashes`, `/worktree`, ",
-            "`/worktree/diff/{path}`, `/worktree/raw/{path}`",
+            "`/worktree/diff/{path}`, `/worktree/raw/{path}`, `/worktree/blob/{path}`",
         ),
         concat!(
-            "Git state: branches, tags, linked worktrees, stashes, uncommitted changes, ",
-            "their folded files and changed images",
+            "Git state: branches, tags, linked worktrees, stashes and uncommitted changes, ",
+            "each changed file as diff, bytes or page",
         ),
         &[
             "/refs",
@@ -68,6 +68,7 @@ pub const PAGES: &[Page] = &[
             "/worktree",
             "/worktree/diff/{*path}",
             "/worktree/raw/{*path}",
+            "/worktree/blob/{*path}",
         ],
     ),
     page("`/search`", "Code and commit search", &["/search"]),

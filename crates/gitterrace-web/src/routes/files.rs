@@ -206,98 +206,170 @@ pub(super) async fn blob(
     let p = blocking(&app, move |a| {
         let id = a.repo.resolve(&rev)?;
         let path = path.trim_matches('/').to_owned();
-        let kind = crate::media::kind(&path);
         // One content read serves the text and, for media small enough to want facts about,
         // the bytes.
-        let (b, bytes) = if kind.is_some() {
+        let (b, bytes) = if crate::media::kind(&path).is_some() {
             a.repo
                 .blob_with_bytes(&id, &path, a.cfg().limits.preview_mb << 20)?
         } else {
             (a.repo.blob(&id, &path)?, Vec::new())
         };
-        let media = match kind {
-            Some(k) => {
-                let src = (k == crate::media::Kind::Svg)
-                    .then(|| std::str::from_utf8(&bytes).ok())
-                    .flatten()
-                    .filter(|t| t.len() as u64 <= a.repo.text_limit());
-                Some(crate::media::blob_html(k, b.size, &rev, &path, &bytes, src))
-            }
-            None => None,
-        };
-        let too_large = b.size > a.repo.text_limit();
-        let text = b.text.as_deref().filter(|_| !too_large);
-        let code = text.map(|t| views::code_first(&views::Render::of(a), &path, t));
-        let cut = code.as_ref().is_some_and(|c| c.cut);
-        let (html, named) = code.map_or((None, Vec::new()), |c| (Some(c.html), c.symbols));
-        let preview = crate::features::on(Feature::MarkdownPreview);
-        let doc = text.filter(|_| preview && is_markdown(&path)).map(|t| {
-            let dir = path.rsplit_once('/').map_or("", |(d, _)| d);
-            markdown::render_doc(
-                t,
-                markdown::Base::new(&rev, dir).highlight(views::Render::of(a).highlight_bytes),
-            )
-        });
-        let doc = doc.or_else(|| markdown::notebook::doc(text?, &path, &rev, views::Render::of(a)));
-        let symbols = match (&doc, text, media.is_some()) {
-            (None, Some(t), false) => {
-                crate::symbols::outline(&path, t, views::Render::of(a).blob_lines, named)
-            }
-            _ => Vec::new(),
-        };
-        let outline_rail = doc.as_ref().map_or_else(
-            || markdown::outline_rail(&symbols),
-            |d| markdown::outline_rail(&d.outline),
-        );
-        let (r, pe) = (fmt::enc_seg(&rev), fmt::enc_path(&path));
-        let mut said = fmt::size(b.size);
-        if let Some(t) = text {
-            let _ = write!(
-                said,
-                " \u{b7} {}",
-                fmt::count(t.lines().count(), "line", "lines")
-            );
-        }
-        let page_head = PageHead {
-            // A source file's path stays in view while its lines scroll; a document's own card
-            // head pins instead.
-            pin: doc.is_none() && media.is_none(),
-            tools: if doc.is_none() {
-                markdown::outline_menu(&symbols, false)
-            } else {
-                String::new()
-            },
-            ..crate::pagehead::file_head(&rev, &path, FileView::File, Tagline::of(&said))
-        };
-        let head = doc.as_ref().map(|d| DocHead {
-            title: path.rsplit('/').next().unwrap_or(&path).to_owned(),
-            views: true,
-            outline: markdown::outline_menu(&d.outline, true),
-            ..DocHead::default()
-        });
-        let rendered = doc.map(|d| d.html);
-        Ok(BlobPage {
-            c: Chrome {
-                md: rendered.is_some(),
-                ..views::chrome_at(a, "files", &rev)
-            },
-            rendered,
-            outline_rail,
-            head,
-            page_head,
-            size: fmt::size(b.size),
-            raw_href: crate::features::href_if(Feature::Raw, &format!("/raw/{r}/{pe}")),
-            format: crate::filetype::describe(&path, &b.head),
-            title: path,
-            html,
-            cut,
-            cut_note: format!("Truncated after {} lines.", a.cfg().limits.blob_lines),
-            media,
-            too_large,
-        })
+        Ok(blob_page(a, BlobAt::Rev(&rev), path, &b, &bytes))
     })
     .await?;
     page(&p)
+}
+
+/// `/worktree/blob/{path}`: the blob view over one changed file as it is on disk, read only
+/// through `gitterrace-git`'s worktree module under `limits.raw_mb`. Not found for anything
+/// that is not a changed file; a public server never routes here (`public.rs`).
+pub(super) async fn worktree_blob(
+    State(app): Shared,
+    Path(path): Path<String>,
+) -> Result<axum::response::Response> {
+    use axum::response::IntoResponse as _;
+    let path = path.trim_matches('/').to_owned();
+    let p = blocking(&app, move |a| {
+        let limit = a.cfg().limits.raw_mb << 20;
+        Ok(gitterrace_git::worktree_blob(&a.repo, &path, limit)?
+            .map(|(b, bytes)| blob_page(a, BlobAt::Worktree, path, &b, &bytes)))
+    })
+    .await?;
+    match p {
+        Some(p) => Ok(page(&p)?.into_response()),
+        None => Ok(crate::error::not_found(
+            "This file is not a changed file of the working tree.",
+        )),
+    }
+}
+
+/// Where a blob page's content was read: a revision, or the working tree on disk.
+#[derive(Clone, Copy)]
+enum BlobAt<'a> {
+    Rev(&'a str),
+    Worktree,
+}
+
+/// The blob page's raw link and chrome: the revision's `/raw`, or the file on disk.
+fn blob_links(a: &App, at: BlobAt<'_>, path: &str) -> (String, Chrome) {
+    let pe = fmt::enc_path(path);
+    match at {
+        BlobAt::Rev(r) => (
+            crate::features::href_if(Feature::Raw, &format!("/raw/{}/{pe}", fmt::enc_seg(r))),
+            views::chrome_at(a, "files", r),
+        ),
+        BlobAt::Worktree => (
+            fmt::href(&format!("/worktree/raw/{pe}")),
+            views::chrome(a, "files"),
+        ),
+    }
+}
+
+/// The blob page for content already read: highlight, outline, Markdown preview and media.
+fn blob_page(
+    a: &App,
+    at: BlobAt<'_>,
+    path: String,
+    b: &gitterrace_git::Blob,
+    bytes: &[u8],
+) -> BlobPage {
+    // Relative Markdown links and the chrome's revision resolve against HEAD for the worktree.
+    let rev = match at {
+        BlobAt::Rev(r) => r,
+        BlobAt::Worktree => "HEAD",
+    };
+    let media = crate::media::kind(&path).map(|k| {
+        let src = (k == crate::media::Kind::Svg)
+            .then(|| std::str::from_utf8(bytes).ok())
+            .flatten()
+            .filter(|t| t.len() as u64 <= a.repo.text_limit());
+        let side = match at {
+            BlobAt::Rev(r) => crate::media::Side::At(r, &path),
+            BlobAt::Worktree => crate::media::Side::Worktree(&path),
+        };
+        crate::media::blob_html(k, b.size, side, bytes, src)
+    });
+    let too_large = b.size > a.repo.text_limit();
+    let text = b.text.as_deref().filter(|_| !too_large);
+    // The worktree has no `/hl` tail route, so its file highlights whole on first paint.
+    let code = text.map(|t| match at {
+        BlobAt::Rev(_) => views::code_first(&views::Render::of(a), &path, t),
+        BlobAt::Worktree => views::code(&views::Render::of(a), &path, t),
+    });
+    let cut = code.as_ref().is_some_and(|c| c.cut);
+    let (html, named) = code.map_or((None, Vec::new()), |c| (Some(c.html), c.symbols));
+    let preview = crate::features::on(Feature::MarkdownPreview);
+    let doc = text.filter(|_| preview && is_markdown(&path)).map(|t| {
+        let dir = path.rsplit_once('/').map_or("", |(d, _)| d);
+        markdown::render_doc(
+            t,
+            markdown::Base::new(rev, dir).highlight(views::Render::of(a).highlight_bytes),
+        )
+    });
+    let doc = doc.or_else(|| markdown::notebook::doc(text?, &path, rev, views::Render::of(a)));
+    let symbols = match (&doc, text, media.is_some()) {
+        (None, Some(t), false) => {
+            crate::symbols::outline(&path, t, views::Render::of(a).blob_lines, named)
+        }
+        _ => Vec::new(),
+    };
+    let outline_rail = doc.as_ref().map_or_else(
+        || markdown::outline_rail(&symbols),
+        |d| markdown::outline_rail(&d.outline),
+    );
+    let mut said = fmt::size(b.size);
+    if let Some(t) = text {
+        let _ = write!(
+            said,
+            " \u{b7} {}",
+            fmt::count(t.lines().count(), "line", "lines")
+        );
+    }
+    let base_head = match at {
+        BlobAt::Rev(r) => crate::pagehead::file_head(r, &path, FileView::File, Tagline::of(&said)),
+        BlobAt::Worktree => {
+            said.push_str(" \u{b7} read from disk, not committed");
+            crate::pagehead::worktree_file_head(&path, Tagline::of(&said))
+        }
+    };
+    let page_head = PageHead {
+        // A source file's path stays in view while its lines scroll; a document's own card
+        // head pins instead.
+        pin: doc.is_none() && media.is_none(),
+        tools: if doc.is_none() {
+            markdown::outline_menu(&symbols, false)
+        } else {
+            String::new()
+        },
+        ..base_head
+    };
+    let head = doc.as_ref().map(|d| DocHead {
+        title: path.rsplit('/').next().unwrap_or(&path).to_owned(),
+        views: true,
+        outline: markdown::outline_menu(&d.outline, true),
+        ..DocHead::default()
+    });
+    let rendered = doc.map(|d| d.html);
+    let (raw_href, chrome) = blob_links(a, at, &path);
+    BlobPage {
+        c: Chrome {
+            md: rendered.is_some(),
+            ..chrome
+        },
+        rendered,
+        outline_rail,
+        head,
+        page_head,
+        size: fmt::size(b.size),
+        raw_href,
+        format: crate::filetype::describe(&path, &b.head),
+        title: path,
+        html,
+        cut,
+        cut_note: format!("Truncated after {} lines.", a.cfg().limits.blob_lines),
+        media,
+        too_large,
+    }
 }
 
 #[derive(Template)]
