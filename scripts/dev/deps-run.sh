@@ -15,9 +15,9 @@ set -euo pipefail
 root=$(cd "$(dirname "$0")/../.." && pwd)
 cd "$root"
 
-RUFF_VERSION=0.17.3
+RUFF_VERSION=0.17.5
 MACHETE_VERSION=0.9.2
-TYPOS_VERSION=1.51.1
+TYPOS_VERSION=1.52.2
 BREW_TOOLS=(typos-cli vale gitleaks shellcheck shfmt actionlint ast-grep node uv)
 # command name for each brew formula above, in the same order
 BREW_CMDS=(typos vale gitleaks shellcheck shfmt actionlint ast-grep node uv)

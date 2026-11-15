@@ -13,11 +13,11 @@ runs:
         # A venv of its own: Homebrew's Python on macOS refuses pip --user (PEP 668), and the
         # venv's bin is one known folder on every runner.
         python3 -m venv "$RUNNER_TEMP/ruff"
-        "$RUNNER_TEMP/ruff/bin/pip" install --quiet ruff==0.17.3
+        "$RUNNER_TEMP/ruff/bin/pip" install --quiet ruff==0.17.5
         "$RUNNER_TEMP/ruff/bin/ruff" --version
         echo "$RUNNER_TEMP/ruff/bin" >> "$GITHUB_PATH"
         if [ "$RUNNER_OS" = macOS ]; then
-          cargo install typos-cli --version 1.51.1 --locked
+          cargo install typos-cli --version 1.52.2 --locked
           # Pinned arm64 release archives, digest-checked before unpacking, as on Linux.
           bin="$HOME/.local/bin"
           dl="$RUNNER_TEMP/lint-tools"
@@ -26,9 +26,9 @@ runs:
           curl -fsSL -o "$dl/vale.tar.gz" $gh/vale-cli/vale/releases/download/v3.26.0/vale_3.26.0_macOS_arm64.tar.gz
           curl -fsSL -o "$dl/gitleaks.tar.gz" $gh/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_darwin_arm64.tar.gz
           curl -fsSL -o "$dl/actionlint.tar.gz" $gh/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_darwin_arm64.tar.gz
-          curl -fsSL -o "$dl/ast-grep.zip" $gh/ast-grep/ast-grep/releases/download/0.51.0/app-aarch64-apple-darwin.zip
+          curl -fsSL -o "$dl/ast-grep.zip" $gh/ast-grep/ast-grep/releases/download/0.51.2/app-aarch64-apple-darwin.zip
           curl -fsSL -o "$dl/shellcheck.tar.xz" $gh/koalaman/shellcheck/releases/download/v0.11.0/shellcheck-v0.11.0.darwin.aarch64.tar.xz
-          curl -fsSL -o "$dl/shfmt" $gh/mvdan/sh/releases/download/v3.12.0/shfmt_v3.12.0_darwin_arm64
+          curl -fsSL -o "$dl/shfmt" $gh/mvdan/sh/releases/download/v3.14.1/shfmt_v3.14.1_darwin_arm64
           curl -fsSL -o "$dl/git-cliff.tar.gz" $gh/orhun/git-cliff/releases/download/v2.14.2/git-cliff-2.14.2-aarch64-apple-darwin.tar.gz
           # One digest per line, no heredoc: YAML keeps the indent, so a SUMS end marker
           # would never match and the step would not parse.
@@ -36,9 +36,9 @@ runs:
             'a6c3370f53bad93086c6b85f3163676e44e08049d69743afdcc13f3aab5b7482  vale.tar.gz' \
             'b40ab0ae55c505963e365f271a8d3846efbc170aa17f2607f13df610a9aeb6a5  gitleaks.tar.gz' \
             'aba9ced2dee8d27fecca3dc7feb1a7f9a52caefa1eb46f3271ea66b6e0e6953f  actionlint.tar.gz' \
-            'e18e13c27ed6c4b3ec4de00745b0755dee9dc26c035e226f4dd5d147dca99cc8  ast-grep.zip' \
+            'ea4f4082d25e5f8e0450add6fd488dd008a373c90483cc2031759c8431f1dcfb  ast-grep.zip' \
             '56affdd8de5527894dca6dc3d7e0a99a873b0f004d7aabc30ae407d3f48b0a79  shellcheck.tar.xz' \
-            'd903802e0ce3ecbc82b98512f55ba370b0d37a93f3f78de394f5b657052b33dd  shfmt' \
+            'b7c872db63553ccffc7253aba3ed7d4885a27d83f1ba567b1138c6315a5847e5  shfmt' \
             'a0be97e237d440d34c5e508ec21d070b2c85cbb8be48a46a56f9a4e8bd247f05  git-cliff.tar.gz' \
             | (cd "$dl" && shasum -a 256 -c -)
           tar -xzf "$dl/vale.tar.gz" -C "$bin" vale
@@ -52,7 +52,7 @@ runs:
         else
           sudo apt-get update
           sudo apt-get install -y shellcheck shfmt
-          cargo install typos-cli --version 1.51.1 --locked
+          cargo install typos-cli --version 1.52.2 --locked
           # Pinned release archives, each checked by digest before it is unpacked: a failed
           # fetch, digest or unpack fails the step, so a missing or altered tool is red.
           bin="$HOME/.local/bin"
@@ -62,14 +62,14 @@ runs:
           curl -fsSL -o "$dl/gitleaks.tar.gz" https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz
           curl -fsSL -o "$dl/actionlint.tar.gz" https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz
           curl -fsSL -o "$dl/git-cliff.tar.gz" https://github.com/orhun/git-cliff/releases/download/v2.14.2/git-cliff-2.14.2-x86_64-unknown-linux-gnu.tar.gz
-          curl -fsSL -o "$dl/ast-grep.zip" https://github.com/ast-grep/ast-grep/releases/download/0.51.0/app-x86_64-unknown-linux-gnu.zip
+          curl -fsSL -o "$dl/ast-grep.zip" https://github.com/ast-grep/ast-grep/releases/download/0.51.2/app-x86_64-unknown-linux-gnu.zip
           # One digest per line, no heredoc: YAML keeps the indent, so a SUMS end marker
           # would never match and the step would not parse.
           printf '%s\n' \
             '22aa69a556558e4a9dfc63c17030777383d8d3c48dcdfad655fa98e839d666ed  vale.tar.gz' \
             '551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb  gitleaks.tar.gz' \
             '8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8  actionlint.tar.gz' \
-            'a7eead5552d3a8daad70f5d50d935da44bd0c138e946b5b0a96b1d38169fa639  ast-grep.zip' \
+            '40604c21c38d4c7581c56bdddeef277c56bf3c0113620aa96e78ae87e82366df  ast-grep.zip' \
             '24f397c733add5390fdceee3a2088588ab0d5f944ce00d34cb7029b888cf2db4  git-cliff.tar.gz' \
             | (cd "$dl" && sha256sum -c -)
           tar -xzf "$dl/vale.tar.gz" -C "$bin" vale
