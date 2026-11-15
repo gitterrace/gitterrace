@@ -157,6 +157,22 @@ export function inkInsets(png, boxes, k) {
   });
 }
 
+/** The cap-only probes are judged on their own centering. A real label is judged against the
+ * probe of its size instead: its first capital may be round (S, C), and a round glyph dips about
+ * a quarter pixel past the line, which reads as off-center though the text box is placed
+ * exactly. So each edge of a real label may differ from the probe's by one screenshot row
+ * (1 / INK_SCALE px), and a label set apart by padding or line height differs by far more. */
+export function byProbe(rows) {
+  const probe = rows.find((x) => x.cell === '#ink-sm');
+  const row = 1 / INK_SCALE;
+  return rows.map((x) => (x.cell.startsWith('#ink') || x.cell.endsWith('select') || !probe ? x : {
+    cell: `${x.cell} against #ink-sm`,
+    top: Math.abs(x.top - probe.top) <= row ? 0 : x.top - probe.top,
+    bottom: Math.abs(x.bottom - probe.bottom) <= row ? 0 : x.bottom - probe.bottom,
+    tol: 0,
+  }));
+}
+
 /** Left and right gap between the popup and its title field, against the Notes label's. */
 export function titleInsets() {
   const box = document.querySelector('.ov.send').getBoundingClientRect();
@@ -206,7 +222,7 @@ export function checks(env) {
         sum.set(x.cell, t);
       }
     }
-    return [...sum.values()];
+    return byProbe([...sum.values()]);
   }
   async function insetBalance() {
     const srv = await serve(bin, oneLineRepo());
