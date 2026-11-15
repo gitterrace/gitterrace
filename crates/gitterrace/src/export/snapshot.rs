@@ -13,10 +13,9 @@ use crate::export::Project;
 /// action buttons (their menu runs scripts and Send to), the working-tree chip and live notes,
 /// and every form (the log's path filter, compare, the search page): each asks the server for
 /// a page the export never wrote. Copy permalink stays: it needs nothing but the page.
-pub(super) const SNAPSHOT_CSS: &str = ".snapshot{background:var(--accent-soft);color:var(--fg);\
- border-bottom:1px solid var(--line-strong);\
- font:var(--text-sm)/1.4 var(--sans);padding:var(--space-2) 0}\
- .snapshot a{color:var(--accent-fg);font-weight:var(--weight-semibold)}\
+pub(super) const SNAPSHOT_CSS: &str = ".snapshot{background:var(--header);color:var(--muted);\
+ border-bottom:var(--border);font:var(--text-sm)/1.4 var(--sans);padding:var(--space-2) 0}\
+ .snapshot a{color:var(--fg)}\
  body[data-static]{display:flex;flex-direction:column;min-height:100dvh}\
  body[data-static]>main{flex:1 0 auto;width:100%;box-sizing:border-box}\
  body[data-static]>.credit{margin-top:auto;background:var(--header);border-top:var(--border);\
@@ -39,7 +38,7 @@ pub(super) fn snapshot_label(repo: &gitterrace_git::Repo, head: &str) -> anyhow:
 }
 
 /// The banner every exported page carries, so nobody mistakes a frozen copy for a live view:
-/// it says what it is, which revision it froze, and where the real thing comes from. Inserted
+/// it says what it is, which revision it froze, and what made it. Inserted
 /// right after `<body ...>`, outside the app's chrome, so no template has to know about export.
 pub(super) fn mark_snapshot(html: &[u8], label: &str, project: Option<&Project>) -> Vec<u8> {
     mark_snapshot_as(html, label, project, env!("GITTERRACE_VERSION"))
@@ -71,24 +70,19 @@ pub(super) fn mark_snapshot_as(
     };
     let what = match project {
         Some(p) => format!(
-            "Static snapshot of <a href=\"{}\">{}</a> at <b>{}</b>, shown in gitterrace.",
-            gitterrace_types::esc(&p.url),
+            // The project's link lives in the footer, so the banner names it once, plainly.
+            "Snapshot of {} at {}.",
             gitterrace_types::esc(&p.name),
             gitterrace_types::esc(label)
         ),
         // The index of several repositories names no revision of its own.
-        None if label.is_empty() => "Static snapshot.".to_owned(),
-        None => format!(
-            "Static snapshot at <b>{}</b>.",
-            gitterrace_types::esc(label)
-        ),
+        None if label.is_empty() => "Snapshot.".to_owned(),
+        None => format!("Snapshot at {}.", gitterrace_types::esc(label)),
     };
     let banner = format!(
         "<link rel=\"stylesheet\" href=\"/snapshot.css\">\
          <div class=\"snapshot\" role=\"note\"><div class=\"wrap\">{what} \
-         Made with gitterrace {version}. \
-         Search, live updates and actions need the real thing. \
-         <a href=\"https://gitterrace.dev\">Install gitterrace</a></div></div>"
+         Made with <a href=\"https://gitterrace.dev\">gitterrace</a> {version}.</div></div>"
     );
     // The same version as a generator tag, so a copy of a single page still says what made it.
     let generator = format!("<meta name=\"generator\" content=\"gitterrace {version}\">");

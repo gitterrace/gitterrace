@@ -126,7 +126,17 @@ fn snapshot_names_the_gitterrace_version() {
     let html = b"<html><head><title>t</title></head><body><main>m</main></body></html>";
     let out = String::from_utf8(mark_snapshot(html, "v1", None)).expect("utf8");
     let v = env!("GITTERRACE_VERSION");
-    assert!(out.contains(&format!("Made with gitterrace {v}.")), "{out}");
+    assert!(
+        out.contains(&format!(
+            "Made with <a href=\"https://gitterrace.dev\">gitterrace</a> {v}.</div>"
+        )),
+        "{out}"
+    );
+    // One line of facts, no pitch: the banner ends on its own period.
+    assert!(
+        !out.contains("Install") && !out.contains("real thing"),
+        "{out}"
+    );
     assert!(
         out.contains(&format!(
             "<meta name=\"generator\" content=\"gitterrace {v}\"></head>"
@@ -141,10 +151,7 @@ fn snapshot_escapes_the_version() {
     let html = b"<html><head></head><body><main>m</main></body></html>";
     let out = String::from_utf8(mark_snapshot_as(html, "v1", None, "1<b>&\"x")).expect("utf8");
     assert!(!out.contains("1<b>"), "{out}");
-    assert!(
-        out.contains("Made with gitterrace 1&lt;b&gt;&amp;&quot;x."),
-        "{out}"
-    );
+    assert!(out.contains("</a> 1&lt;b&gt;&amp;&quot;x."), "{out}");
     assert!(
         out.contains("content=\"gitterrace 1&lt;b&gt;&amp;&quot;x\""),
         "{out}"
@@ -326,8 +333,8 @@ async fn export_writes_every_prewarmed_page() {
         );
         let html = std::fs::read_to_string(&file).expect("read page");
         assert!(
-            html.contains("class=\"snapshot\"") && html.contains("Static snapshot at"),
-            "{page} does not say it is a static snapshot"
+            html.contains("class=\"snapshot\"") && html.contains("Snapshot at"),
+            "{page} does not say it is a snapshot"
         );
     }
     assert!(
@@ -540,4 +547,45 @@ async fn export_skips_what_features_turn_off() {
         }
     }
     assert!(seen > 3, "pages were written");
+}
+
+/// Guard class: the banner states facts, never a pitch, and every sentence ends with a period,
+/// for every kind of label (named project, revision only, no revision).
+#[test]
+fn snapshot_banner_is_plain_sentences_without_a_pitch() {
+    let html = b"<html><head></head><body><main>m</main></body></html>";
+    let project = crate::export::Project {
+        name: "jq".to_owned(),
+        url: "https://github.com/jqlang/jq".to_owned(),
+    };
+    for (label, p) in [("v1", Some(&project)), ("v1", None), ("", None)] {
+        let out = String::from_utf8(mark_snapshot(html, label, p)).expect("utf8");
+        let start = out.find("<div class=\"wrap\">").expect("banner") + 18;
+        let end = start + out[start..].find("</div>").expect("banner end");
+        let text = strip_tags(&out[start..end]);
+        assert!(text.ends_with('.'), "{text}");
+        for pitch in ["install", "real thing", "need", "try", "get "] {
+            assert!(!text.to_lowercase().contains(pitch), "{text}");
+        }
+        for sentence in text.split(". ") {
+            assert!(
+                sentence.chars().next().is_some_and(char::is_uppercase),
+                "{text}"
+            );
+        }
+    }
+}
+
+fn strip_tags(s: &str) -> String {
+    let mut out = String::new();
+    let mut tag = false;
+    for c in s.chars() {
+        match c {
+            '<' => tag = true,
+            '>' => tag = false,
+            c if !tag => out.push(c),
+            _ => {}
+        }
+    }
+    out
 }

@@ -54,7 +54,7 @@ fn credentials_are_stripped() {
 fn no_remote_and_no_license_gives_a_bare_line() {
     let d = tempfile::tempdir().expect("tempdir");
     let line = credit_for(&d.path().join("proj"), None, None);
-    assert!(line.contains(">Source: proj</div>"), "{line}");
+    assert!(line.contains(">Source: proj.</div>"), "{line}");
     assert!(!line.contains("license") && !line.contains("<a "), "{line}");
 }
 

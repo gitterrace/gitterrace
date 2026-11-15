@@ -25,7 +25,7 @@ fresh page never runs a stale script. Netlify and Cloudflare Pages apply the
 file. Elsewhere, set the same headers on the host.
 
 Every page ends with a credit line such as
-`Source: name, MIT license, https://github.com/owner/name`. The license comes
+`Source: name, MIT license, github.com/owner/name.`. The license comes
 from the root `LICENSE`, `LICENCE` or `COPYING` (an uncommon text links to the
 file). The link is the `origin` remote or `--project` URL without credentials,
 only for public https and ssh hosts. An unknown part is left out. The

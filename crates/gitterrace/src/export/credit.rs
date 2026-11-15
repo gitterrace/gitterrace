@@ -66,7 +66,7 @@ impl Credit {
         }
         format!(
             "<footer class=\"credit\" role=\"contentinfo\"><div \
-            class=\"wrap\">{}</div></footer>",
+            class=\"wrap\">{}.</div></footer>",
             parts.join(", ")
         )
     }

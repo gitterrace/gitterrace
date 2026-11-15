@@ -65,7 +65,7 @@ pub(crate) struct Project {
 }
 
 impl Project {
-    /// `name=url`, with an http(s) URL: the banner links it, so nothing else may get in.
+    /// `name=url`, with an http(s) URL: the footer links it, so nothing else may get in.
     pub(crate) fn parse(s: &str) -> anyhow::Result<Self> {
         let (name, url) = s
             .split_once('=')
