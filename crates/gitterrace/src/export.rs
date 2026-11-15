@@ -4,9 +4,8 @@
 //! is tens of thousands of pages. The export is therefore scoped: the
 //! overview, the insights pages, branches and tags, the newest N commits with
 //! their log pages, and the file tree plus files at HEAD up to a size cap.
-//! Links to anything outside that set are left pointing at their original path
-//! and 404 in the exported copy, the same as a link to a page that was
-//! never published.
+//! A link to anything outside that set, or one that asks a page for a query a
+//! static file cannot read, is left as text (see `unlink.rs`).
 
 mod caps;
 mod credit;
@@ -18,6 +17,7 @@ mod seeds;
 mod seen;
 mod snapshot;
 mod swap;
+mod unlink;
 mod write;
 
 use std::{
@@ -285,6 +285,7 @@ async fn crawl(
         }
     }
     write::write_fixed(out, &router, SNAPSHOT_CSS, &headers_file()).await?;
+    unlink::unlink_dead(out)?;
     Ok(written + 3)
 }
 
