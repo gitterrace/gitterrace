@@ -15,12 +15,14 @@ fn num(n: Option<u32>) -> String {
 #[cfg(test)]
 pub(crate) fn diff_html(r: &Render, rev: &str, parent: Option<&str>, files: &[FileDiff]) -> String {
     let none = MediaFacts::new();
+    let generated = std::collections::HashSet::new();
     diff_html_with(
         r,
         DiffSource::Commit {
             rev,
             parent,
             media: &none,
+            generated: &generated,
         },
         files,
     )
@@ -129,6 +131,8 @@ pub(crate) enum DiffSource<'a> {
         rev: &'a str,
         parent: Option<&'a str>,
         media: &'a MediaFacts,
+        /// Paths `gitterrace_git::generated_paths` marks generated: folded under a tag.
+        generated: &'a std::collections::HashSet<String>,
     },
     /// The working tree: no blob URLs, folded files load from `/worktree/diff/{path}`.
     Worktree,
@@ -191,6 +195,10 @@ pub(crate) fn diff_html_with(r: &Render, src: DiffSource<'_>, files: &[FileDiff]
             a = esc(&crate::fmt::file_anchor(&f.path)),
             h = content_tag(f)
         );
+        let generated = is_generated(src, f);
+        if generated {
+            out.push_str("<span class=\"tag\">Generated</span> ");
+        }
         match src {
             DiffSource::Commit { rev, .. } if f.kind != ChangeKind::Deleted => {
                 let _ = write!(
@@ -221,6 +229,14 @@ pub(crate) fn diff_html_with(r: &Render, src: DiffSource<'_>, files: &[FileDiff]
         out.push_str("</section>");
     }
     out
+}
+
+/// Whether a commit's file is generated. The working tree has no commit to read attributes at.
+fn is_generated(src: DiffSource<'_>, f: &FileDiff) -> bool {
+    match src {
+        DiffSource::Commit { generated, .. } => generated.contains(&f.path),
+        DiffSource::Worktree => false,
+    }
 }
 
 /// A short tag of a file's diff content. `live.js` carries a loaded body over a live refresh
@@ -288,6 +304,20 @@ fn file_body(r: &Render, src: DiffSource<'_>, i: usize, f: &FileDiff, used: &mut
         .flat_map(|h| &h.lines)
         .map(|l| l.text.len() + 48)
         .sum();
+    // Generated files fold whatever their size and spend no budget, so a lockfile never
+    // pushes the hand-written files below it into folds.
+    if is_generated(src, f) {
+        return fold_button(
+            src,
+            i,
+            f,
+            &format!(
+                "Generated, load diff ({} changed)",
+                crate::fmt::count(changed, "line", "lines")
+            ),
+            false,
+        );
+    }
     let alone = changed > r.fold_lines || bytes > FILE_DIFF_BYTES;
     let page_full = used.files >= TOTAL_DIFF_FILES
         || used.lines + changed > TOTAL_DIFF_BUDGET

@@ -21,7 +21,7 @@
 {% for r in commits %}{{ r }}{% endfor %}
 </ul>
 {% else %}
-{% for f in files %}<section class="card hits" data-path="{{ f.path }}"><header><a href="{{ f.href }}">{{ f.path }}</a>{% call bd::tag("", f.matches()) %}{% endcall %}</header>
+{% for f in files %}<section class="card hits" data-path="{{ f.path }}"><header><a href="{{ f.href }}">{{ f.path }}</a>{% if f.generated %}{% call bd::tag("", "Generated") %}{% endcall %}{% endif %}{% call bd::tag("", f.matches()) %}{% endcall %}</header>
 <table class="code">{% call t::caption(format!("Matches in {}", f.path)) %}{% endcall %}<thead class="quiet"><tr>{% call t::quiet("Line") %}{% endcall %}{% call t::quiet("Code") %}{% endcall %}</tr></thead>{% for l in f.lines %}{% if l.n == 0 %}<tr class="gap"><td class="n"></td><td class="c">...</td></tr>{% else %}<tr{% if l.hit %} class="hit" data-act="search-hit" data-line="{{ l.n }}"{% endif %}><td class="n"><a href="{{ f.href }}#L{{ l.n }}">{{ l.n }}</a></td><td class="c">{{ l.html|safe }}</td></tr>{% endif %}{% endfor %}</table></section>{% endfor %}
 {% endif %}
 {% if let Some(e) = nothing %}{{ e }}{% endif %}

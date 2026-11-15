@@ -7,6 +7,7 @@ mod divergence;
 mod error;
 mod fnv;
 mod fs_events;
+mod generated;
 mod gitdir;
 mod graph;
 mod ident;
@@ -29,6 +30,7 @@ pub use atomic::{
 };
 pub use error::{Error, Result};
 pub use fnv::{fnv1a32, fnv1a64};
+pub use generated::{generated_paths, is_lockfile};
 
 /// How many hex digits of a commit id any surface shows. One constant, so a short id looks the
 /// same in the web pages, the action payloads and the CLI.

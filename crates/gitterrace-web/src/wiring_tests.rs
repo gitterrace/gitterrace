@@ -126,6 +126,63 @@ async fn limits_search_matches_caps_the_results() {
     assert!(body.contains("Showing the first results only"), "{body}");
 }
 
+/// The first commit id on `/log/HEAD`, the newest.
+async fn newest_commit(r: &Router) -> String {
+    let (_, head) = get(r, "/log/HEAD").await;
+    head.split("/commit/")
+        .nth(1)
+        .and_then(|s| s.split(['"', '#']).next())
+        .expect("a commit link")
+        .to_owned()
+}
+
+/// A lockfile and a `linguist-generated` file fold under a Generated tag, a normal file stays
+/// open, and `-linguist-generated` unfolds a lockfile. Search lists generated hits last.
+#[tokio::test]
+async fn generated_files_fold_in_the_diff_and_sort_last_in_search() {
+    let dir = tempfile::tempdir().expect("tmp");
+    let p = Fixture::init(&dir.path().join("g"))
+        .write(
+            ".gitattributes",
+            "gen.rs linguist-generated\nkeep/yarn.lock -linguist-generated\n",
+        )
+        .write("Cargo.lock", "needle\n")
+        .write("gen.rs", "needle\n")
+        .write("main.rs", "needle\n")
+        .write("keep/yarn.lock", "needle\n")
+        .commit("feat: all")
+        .path()
+        .to_owned();
+    let r = router(&p, Config::default());
+    let id = newest_commit(&r).await;
+    let (_, page) = get(&r, &format!("/commit/{id}")).await;
+    let section = |path: &str| {
+        let at = page
+            .find(&format!("data-path=\"{path}\""))
+            .expect("section");
+        let rest = &page[at..];
+        rest[..rest.find("</section>").expect("end")].to_owned()
+    };
+    for folded in ["Cargo.lock", "gen.rs"] {
+        let s = section(folded);
+        assert!(
+            s.contains(">Generated</span>") && s.contains("data-load-diff"),
+            "{s}"
+        );
+    }
+    for open in ["main.rs", "keep/yarn.lock"] {
+        let s = section(open);
+        assert!(
+            !s.contains("Generated") && !s.contains("data-load-diff"),
+            "{s}"
+        );
+    }
+    let (_, hits) = get(&r, "/search?q=needle").await;
+    let pos = |path: &str| hits.find(&format!("data-path=\"{path}\"")).expect(path);
+    assert!(pos("keep/yarn.lock") < pos("Cargo.lock"));
+    assert!(pos("main.rs") < pos("Cargo.lock") && pos("main.rs") < pos("gen.rs"));
+}
+
 #[tokio::test]
 async fn limits_diff_fold_lines_folds_a_big_file_diff() {
     let dir = tempfile::tempdir().expect("tmp");

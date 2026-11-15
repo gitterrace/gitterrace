@@ -500,12 +500,15 @@ pub(super) async fn commit(State(app): Shared, Path(id): Path<String>) -> Result
             diff: {
                 let parent = d.summary.parents.first().map(String::as_str);
                 let media = media_facts(a, &id, parent, &d.files);
+                let paths = d.files.iter().map(|f| f.path.as_str());
+                let generated = gitterrace_git::generated_paths(&a.repo, &id, paths)?;
                 views::diff_html_with(
                     &views::Render::of(a),
                     views::DiffSource::Commit {
                         rev: &id,
                         parent,
                         media: &media,
+                        generated: &generated,
                     },
                     &d.files,
                 )

@@ -77,6 +77,7 @@ struct FileHits {
     pub(crate) href: String,
     pub(crate) count: usize,
     pub(crate) lines: Vec<Line>,
+    pub(crate) generated: bool,
 }
 
 impl FileHits {
@@ -289,7 +290,7 @@ fn run(a: &App, q: SearchQuery) -> Result<SearchPage> {
         page.skipped = out.skipped;
         page.matches = out.matches;
         page.capped = out.capped;
-        page.files = out.files;
+        page.files = generated::generated_last(a, &rev, out.files)?;
     }
     page.ms = start.elapsed().as_millis();
     if page.matches == 0 {
@@ -548,6 +549,7 @@ fn file_hits(path: &str, rev_enc: &str, text: &str, re: &Regex, per_file: usize)
         path: path.to_owned(),
         count: hit_idx.len(),
         lines: out,
+        generated: false,
     }
 }
 
@@ -589,6 +591,7 @@ pub(crate) fn highlight(line: &str, re: &Regex) -> String {
 }
 
 pub(crate) mod commits;
+mod generated;
 use commits::search_commits;
 
 #[cfg(test)]
