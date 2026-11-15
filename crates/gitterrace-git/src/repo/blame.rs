@@ -1,7 +1,10 @@
 //! Line blame and its per-handle cache.
 
-use std::collections::{HashMap, VecDeque};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::Arc;
+
+use gix::revision::walk::Sorting;
+use gix::traverse::commit::simple::CommitTimeOrder;
 
 use crate::error::git;
 use crate::ident;
@@ -10,6 +13,11 @@ use crate::{BlameLine, Result};
 
 /// Blame results kept per (commit id, path), bounded by approximate bytes.
 pub(super) const BLAME_CACHE_BYTES: usize = 32 * 1024 * 1024;
+/// Bytes of past versions one blame may read. gix keeps every version it diffed in its blob
+/// cache until the blame ends and offers no hook to clear it per step, so without a bound a
+/// 2 MB file with 500 versions holds 1 GB. Lines older than the oldest version that fits are
+/// blamed on the boundary commit, as `git blame --since` does.
+pub(crate) const BLAME_HISTORY_BYTES: u64 = 96 * 1024 * 1024;
 
 pub(super) struct BlameCache {
     /// Approximate bytes kept before the oldest entries go.
@@ -94,7 +102,7 @@ impl Repo {
         let Ok(text) = String::from_utf8(data) else {
             return Ok(Vec::new());
         };
-        let outcome = blame_outcome(&repo, tip, path)?;
+        let outcome = blame_outcome(&repo, tip, path, BLAME_HISTORY_BYTES)?;
         let mailmap = ident::mailmap(&repo, tip);
         let mut commits: HashMap<gix::ObjectId, (String, i64)> = HashMap::new();
         let mut lines: Vec<BlameLine> = Vec::new();
@@ -160,14 +168,19 @@ impl Repo {
     }
 }
 
-/// Blame of `path` at `tip` with the options `Repository::blame_file` uses by default. That
-/// shortcut builds its diff cache through the repository's shared index snapshot, which keeps
-/// the whole HEAD index alive for the life of the server; this one owns its index.
+/// Blame of `path` at `tip` with the options `Repository::blame_file` uses by default, except
+/// that history stops where the versions of `path` would exceed `budget` bytes (see
+/// [`history_horizon`]). That shortcut builds its diff cache through the repository's shared
+/// index snapshot, which keeps the whole HEAD index alive for the life of the server; this one
+/// owns its index.
 pub(crate) fn blame_outcome(
     repo: &gix::Repository,
     tip: gix::ObjectId,
     path: &str,
+    budget: u64,
 ) -> Result<gix::blame::Outcome> {
+    let since = history_horizon(repo, tip, path, budget)?
+        .map(|seconds| gix::date::Time { seconds, offset: 0 });
     let mut cache = crate::diff::resource_cache(repo)?;
     gix::blame::file(
         &repo.objects,
@@ -178,12 +191,49 @@ pub(crate) fn blame_outcome(
         gix::blame::Options {
             diff_algorithm: repo.diff_algorithm().map_err(git)?,
             ranges: gix::blame::BlameRanges::default(),
-            since: None,
+            since,
             rewrites: None,
             debug_track_path: false,
         },
     )
     .map_err(git)
+}
+
+/// The commit time blame must not look past so the distinct versions of `path` it reads sum
+/// to at most `budget` bytes, or `None` when the whole history fits. Walks ancestors newest
+/// first, as blame does, and stops at the first version that does not fit. Renames are not
+/// followed, matching `rewrites: None`.
+fn history_horizon(
+    repo: &gix::Repository,
+    tip: gix::ObjectId,
+    path: &str,
+    budget: u64,
+) -> Result<Option<i64>> {
+    let walk = repo
+        .rev_walk([tip])
+        .sorting(Sorting::ByCommitTime(CommitTimeOrder::NewestFirst))
+        .all()
+        .map_err(git)?;
+    let mut seen = HashSet::new();
+    let mut held = 0u64;
+    for info in walk {
+        let commit = info.map_err(git)?.object().map_err(git)?;
+        let tree = commit.tree().map_err(git)?;
+        let Some(entry) = crate::treepath::lookup(&tree, path)? else {
+            continue;
+        };
+        let id = entry.object_id();
+        if !seen.insert(id) {
+            continue;
+        }
+        held += repo.find_header(id).map_err(git)?.size();
+        if held > budget {
+            // Blame skips commits strictly older than `since`: one past this commit's time
+            // keeps every newer version and drops this one.
+            return Ok(Some(commit.time().map_err(git)?.seconds + 1));
+        }
+    }
+    Ok(None)
 }
 
 #[cfg(test)]
@@ -220,7 +270,7 @@ mod tests {
         let gix = repo.repo();
         let tip = repo.resolve_id(&gix, "HEAD")?;
         for path in ["moved.txt", "b.md", ".gitattributes"] {
-            let ours = super::blame_outcome(&gix, tip, path)?;
+            let ours = super::blame_outcome(&gix, tip, path, u64::MAX)?;
             let theirs = gix
                 .blame_file(
                     path.into(),
@@ -234,6 +284,42 @@ mod tests {
                 "{path}"
             );
         }
+        Ok(())
+    }
+
+    /// A file with many large versions: blame diffs only the versions that fit its budget, so
+    /// the blobs gix holds stay bounded however long the history is, and every line is still
+    /// blamed. Red when the bound is dropped, not passed to gix, or counted past the boundary.
+    #[test]
+    fn blame_holds_only_the_versions_that_fit_its_budget() -> crate::Result<()> {
+        let dir = tempfile::tempdir().map_err(crate::error::git)?;
+        let p = dir.path();
+        let version = |n: usize| {
+            (0..4000).fold(format!("v{n}\n"), |b, l| {
+                b + &format!("line {l} xxxxxxxxxx\n")
+            })
+        };
+        gitterrace_testkit::git_at(p, "2024-01-01T00:00:00Z", &["init", "-q", "-b", "main"]);
+        for n in 0..40 {
+            std::fs::write(p.join("big.txt"), version(n)).map_err(crate::error::git)?;
+            let date = format!("2024-01-01T{:02}:{:02}:00Z", n / 60, n % 60);
+            gitterrace_testkit::git_at(p, &date, &["add", "big.txt"]);
+            gitterrace_testkit::git_at(p, &date, &["commit", "-qm", &format!("v{n}")]);
+        }
+        let repo = crate::Repo::discover(p)?;
+        let gix = repo.repo();
+        let tip = repo.resolve_id(&gix, "HEAD")?;
+        let size = version(39).len() as u64;
+        let full = super::blame_outcome(&gix, tip, "big.txt", u64::MAX)?;
+        assert_eq!(full.statistics.blobs_diffed, 39);
+        let bounded = super::blame_outcome(&gix, tip, "big.txt", size * 5)?;
+        assert!(
+            bounded.statistics.blobs_diffed <= 5,
+            "diffed {} versions",
+            bounded.statistics.blobs_diffed
+        );
+        let lines: u32 = bounded.entries.iter().map(|e| e.len.get()).sum();
+        assert_eq!(lines, 4001);
         Ok(())
     }
 }
