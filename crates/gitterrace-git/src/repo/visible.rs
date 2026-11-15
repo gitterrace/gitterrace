@@ -5,6 +5,9 @@
 //! The reachable set is walked once and kept for one key, the raw targets of the public roots.
 //! A moved, new or deleted root changes the key. When the roots only grew, the walk covers the
 //! new history alone, otherwise the set is rebuilt: a deleted ref may have hidden commits.
+//! The set holds the first 8 bytes of each id. A prefix hit is only an answer when the object
+//! store holds no other object with that 16-hex prefix: then the reachable commit it came from
+//! is the asked id itself. A shared prefix is decided by a fresh walk that keeps nothing.
 //! An idle server drops the set ([`crate::Repo::clear_visible`]) and the next raw id walks
 //! again.
 
@@ -22,9 +25,9 @@ const PUBLIC_PREFIXES: [&str; 3] = ["refs/heads/", "refs/tags/", "refs/remotes/"
 pub(crate) struct Visible {
     key: Option<u64>,
     roots: HashSet<gix::ObjectId>,
-    /// Sorted and deduplicated: 20 bytes a commit, 26 MB on a 1.3M-commit history, where a
-    /// hash set costs three to four times that.
-    reachable: Vec<gix::ObjectId>,
+    /// Sorted id prefixes: 8 bytes a commit, 10 MB on a 1.3M-commit history, where full ids
+    /// cost 20 and a hash set three to four times that.
+    reachable: Vec<u64>,
     built: bool,
 }
 
@@ -57,7 +60,14 @@ impl Visible {
             walk_into(repo, roots, Vec::new(), &mut self.reachable)?;
             self.built = true;
         }
-        Ok(self.reachable.binary_search(&id).is_ok())
+        if self.reachable.binary_search(&prefix(&id)).is_err() {
+            return Ok(false);
+        }
+        if unique_prefix(repo, id) {
+            return Ok(true);
+        }
+        let roots: Vec<_> = self.roots.iter().copied().collect();
+        walk_has(repo, roots, id)
     }
 
     /// Drops the set and its key, returning whether it held commits. The next raw id walks
@@ -77,7 +87,7 @@ impl Visible {
     /// Heap bytes the set holds.
     #[cfg(test)]
     pub(crate) const fn heap_bytes(&self) -> usize {
-        self.reachable.capacity() * size_of::<gix::ObjectId>()
+        self.reachable.capacity() * size_of::<u64>()
     }
 }
 
@@ -138,7 +148,7 @@ fn walk_into(
     repo: &gix::Repository,
     tips: Vec<gix::ObjectId>,
     hidden: Vec<gix::ObjectId>,
-    into: &mut Vec<gix::ObjectId>,
+    into: &mut Vec<u64>,
 ) -> Result<()> {
     if tips.is_empty() {
         return Ok(());
@@ -150,10 +160,44 @@ fn walk_into(
         .all()
         .map_err(git)?;
     for info in walk {
-        into.push(info.map_err(git)?.id);
+        into.push(prefix(&info.map_err(git)?.id));
     }
     into.sort_unstable();
     into.dedup();
     into.shrink_to_fit();
     Ok(())
+}
+
+/// The first 8 bytes of `id`, big-endian so the order matches the ids'.
+fn prefix(id: &gix::oid) -> u64 {
+    let mut b = [0u8; 8];
+    b.copy_from_slice(&id.as_bytes()[..8]);
+    u64::from_be_bytes(b)
+}
+
+/// Whether `id` is the only object in the store whose id starts with its 16-hex prefix. An
+/// error answers no, which sends the caller to the exact walk.
+fn unique_prefix(repo: &gix::Repository, id: gix::ObjectId) -> bool {
+    let Ok(p) = gix::hash::Prefix::new(&id, 16) else {
+        return false;
+    };
+    matches!(repo.objects.lookup_prefix(p, None), Ok(Some(Ok(found))) if found == id)
+}
+
+/// Whether `id` is reachable from `tips`, by a walk that keeps nothing.
+fn walk_has(repo: &gix::Repository, tips: Vec<gix::ObjectId>, id: gix::ObjectId) -> Result<bool> {
+    if tips.is_empty() {
+        return Ok(false);
+    }
+    let walk = repo
+        .rev_walk(tips)
+        .with_commit_graph(crate::graph::commit_graph(repo))
+        .all()
+        .map_err(git)?;
+    for info in walk {
+        if info.map_err(git)?.id == id {
+            return Ok(true);
+        }
+    }
+    Ok(false)
 }

@@ -199,11 +199,12 @@ fn the_visible_set_is_walked_once_per_ref_state() {
     }
 }
 
-/// The set costs one id per commit and nothing for a hash table: at most `BYTES_PER_COMMIT`
-/// heap bytes for each commit it holds, so a 1.3M-commit history stays near 26 MB.
+/// The set costs an 8-byte prefix per commit and nothing for a hash table: at most
+/// `BYTES_PER_COMMIT` heap bytes for each commit it holds, so a 1.3M-commit history stays near
+/// 10 MB. Full 20-byte ids fail it.
 #[test]
 fn the_visible_set_costs_one_id_per_commit() {
-    const BYTES_PER_COMMIT: usize = 20;
+    const BYTES_PER_COMMIT: usize = 8;
     let (tmp, ids) = repo();
     let repo = Repo::discover(tmp.path()).expect("repo").committed_only();
     assert!(repo.resolve(&ids.old).is_ok());
