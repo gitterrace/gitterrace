@@ -9,6 +9,10 @@ So a step added to `make check` cannot reach main unseen by the gate: it is red 
 gated or skipped on purpose. Also red: a skip entry for a step `make check` no longer has, an
 empty reason, and a step both gated and skipped.
 
+`make check-static` is the `check` steps whose recipe builds nothing, in the same order, so one
+target runs every gate step that needs no build. A step whose recipe calls cargo (other
+than `cargo fmt`) or clippy is a build step. Red when the two lists drift either way.
+
   python3 scripts/lint/gate-check.py [--repo DIR]
   python3 scripts/lint/gate-check.py --self-test   red and green on fixture trees
 """
@@ -25,14 +29,37 @@ from pathlib import Path
 import tomllib  # pyright: ignore[reportMissingImports]
 
 ROOT = Path(__file__).resolve().parents[2]
+# A recipe that builds: any cargo subcommand but fmt, or a clippy wrapper.
+BUILDS = re.compile(r"\bcargo (?!fmt\b)|clippy")
 MAKE_CMD = re.compile(r"(?:^|[;&|]\s*)make\s+((?:[a-z][a-z0-9-]*\s*)+)")
 
 
-def check_steps(makefile: str) -> list[str]:
-    """The prerequisites of `check:`, backslash continuations joined."""
+def prerequisites(makefile: str, target: str) -> list[str]:
+    """The prerequisites of `target:`, backslash continuations joined."""
     text = makefile.replace("\\\n", " ")
-    m = re.search(r"^check:([^=\n][^\n]*)$", text, re.M)
+    m = re.search(rf"^{re.escape(target)}:([^=\n][^\n]*)$", text, re.M)
     return m.group(1).split() if m else []
+
+
+def check_steps(makefile: str) -> list[str]:
+    return prerequisites(makefile, "check")
+
+
+def recipe(makefile: str, target: str) -> str:
+    text = makefile.replace("\\\n", " ")
+    m = re.search(rf"^{re.escape(target)}:[^\n]*\n((?:\t[^\n]*\n)*)", text, re.M)
+    return m.group(1) if m else ""
+
+
+def static_problems(makefile: str, steps: list[str]) -> list[str]:
+    want = [s for s in steps if not BUILDS.search(recipe(makefile, s))]
+    got = prerequisites(makefile, "check-static")
+    if got == want:
+        return []
+    return [
+        f"check-static: is {' '.join(got) or 'missing'}, the build-free `check` steps in "
+        f"order are {' '.join(want)}"
+    ]
 
 
 def gated(gate: list[str]) -> set[str]:
@@ -48,9 +75,9 @@ def problems(repo: Path) -> list[str]:
     landing = tomllib.loads((repo / "schwarzwald/config/land.toml").read_text())[
         "landing"
     ]
+    bad = static_problems((repo / "Makefile").read_text(), steps)
     run = gated(landing.get("gate", []))
     skip: dict[str, str] = landing.get("skip", {})
-    bad = []
     for s in steps:
         if s in run and s in skip:
             bad.append(f"{s}: both in [landing] gate and skip, pick one")
@@ -67,9 +94,20 @@ def problems(repo: Path) -> list[str]:
     return bad
 
 
-def fixture(d: Path, check: str, gate: list[str], skip: dict[str, str]) -> Path:
+def fixture(
+    d: Path,
+    check: str,
+    gate: list[str],
+    skip: dict[str, str],
+    static: str | None = None,
+) -> Path:
     (d / "schwarzwald/config").mkdir(parents=True, exist_ok=True)
-    (d / "Makefile").write_text(f"check: {check}\n\nfmt:\n\ttrue\n")
+    if static is None:
+        static = " ".join(s for s in check.replace("\\\n", " ").split() if s != "test")
+    (d / "Makefile").write_text(
+        f"check: {check}\n\ncheck-static: {static}\n\nfmt:\n\tcargo fmt --check\n"
+        "test:\n\tcargo test\n"
+    )
     lines = [
         "[landing]",
         "gate = [" + ", ".join(f'"{g}"' for g in gate) + "]",
@@ -91,10 +129,15 @@ def self_test() -> int:
         ("fmt", ["make fmt"], {"gone": "was slow"}, True),
         ("fmt lint", ["make fmt"], {"lint": " "}, True),
         ("fmt", ["make fmt"], {"fmt": "both"}, True),
+        # check-static: a build step in it, a build-free step missing, the order changed.
+        ("fmt test", ["make fmt test"], {}, False, None),
+        ("fmt test", ["make fmt test"], {}, True, "fmt test"),
+        ("fmt lint", ["make fmt lint"], {}, True, "fmt"),
+        ("fmt lint", ["make fmt lint"], {}, True, "lint fmt"),
     ]
-    for i, (check, gate, skip, red) in enumerate(cases):
+    for i, (check, gate, skip, red, *static) in enumerate(cases):
         with tempfile.TemporaryDirectory() as t:
-            got = problems(fixture(Path(t), check, gate, skip))
+            got = problems(fixture(Path(t), check, gate, skip, *static))
         if bool(got) != red:
             print(
                 f"gate-check self-test: case {i} {'passed' if red else 'failed'}: {got}"
