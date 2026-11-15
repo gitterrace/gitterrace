@@ -4,6 +4,7 @@
 //! submodules render the formats that are previewed instead.
 
 pub(crate) mod archive;
+pub(crate) mod sheet;
 pub(crate) mod table;
 
 /// Magic numbers: (offset, bytes, format). The first match wins, so a container sits after
@@ -92,6 +93,29 @@ pub(crate) fn describe(path: &str, head: &[u8]) -> &'static str {
         (Some(m), _) => m,
         (None, None) => "Binary file",
     }
+}
+
+/// Whether the blob view reads `path`'s bytes: an archive or a workbook it previews.
+pub(crate) fn wants_bytes(path: &str) -> bool {
+    self::archive::kind(path).is_some() || self::sheet::is_sheet(path)
+}
+
+/// An archive's entry list. Past `limits.preview_mb` `bytes` is empty and nothing lists.
+pub(crate) fn archive_html(path: &str, bytes: &[u8]) -> Option<String> {
+    use self::archive;
+    archive::list(archive::kind(path)?, bytes, archive::ENTRY_CAP).map(|l| archive::html(path, &l))
+}
+
+/// A CSV or TSV under the row cap, or a workbook's first sheet, as a table. A CSV keeps its
+/// source a switch away.
+pub(crate) fn table_html(path: &str, text: Option<&str>, bytes: &[u8]) -> Option<String> {
+    use self::{sheet, table};
+    let t = match (text, table::delimiter(path)) {
+        (Some(t), Some(d)) => table::parse(t, d, table::ROW_CAP),
+        _ if sheet::is_sheet(path) => sheet::table(bytes),
+        _ => None,
+    }?;
+    Some(table::html(path, &t))
 }
 
 #[cfg(test)]

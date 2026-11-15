@@ -186,24 +186,6 @@ fn is_markdown(path: &str) -> bool {
         .any(|e| lower.ends_with(e))
 }
 
-/// Whether the blob view reads `path`'s bytes: an archive it lists.
-fn wants_bytes(path: &str) -> bool {
-    crate::filetype::archive::kind(path).is_some()
-}
-
-/// An archive's entry list. Past `limits.preview_mb` `bytes` is empty and nothing lists.
-fn archive_html(path: &str, bytes: &[u8]) -> Option<String> {
-    use crate::filetype::archive;
-    archive::list(archive::kind(path)?, bytes, archive::ENTRY_CAP).map(|l| archive::html(path, &l))
-}
-
-/// A CSV or TSV under the row cap as a table, with its source a switch away.
-fn table_html(path: &str, text: Option<&str>) -> Option<String> {
-    use crate::filetype::table;
-    let t = table::parse(text?, table::delimiter(path)?, table::ROW_CAP)?;
-    Some(table::html(path, &t))
-}
-
 /// The highlighted chunks a big blob's first paint left plain; `nav.js` swaps them in.
 pub(super) async fn highlight_tail(
     State(app): Shared,
@@ -228,12 +210,13 @@ pub(super) async fn blob(
         let path = path.trim_matches('/').to_owned();
         // One content read serves the text and, for media small enough to want facts about,
         // the bytes.
-        let (b, bytes) = if crate::media::kind(&path).is_some() || wants_bytes(&path) {
-            a.repo
-                .blob_with_bytes(&id, &path, a.cfg().limits.preview_mb << 20)?
-        } else {
-            (a.repo.blob(&id, &path)?, Vec::new())
-        };
+        let (b, bytes) =
+            if crate::media::kind(&path).is_some() || crate::filetype::wants_bytes(&path) {
+                a.repo
+                    .blob_with_bytes(&id, &path, a.cfg().limits.preview_mb << 20)?
+            } else {
+                (a.repo.blob(&id, &path)?, Vec::new())
+            };
         Ok(blob_page(a, BlobAt::Rev(&rev), path, &b, &bytes))
     })
     .await?;
@@ -327,8 +310,8 @@ fn blob_page(
         )
     });
     let doc = doc.or_else(|| markdown::notebook::doc(text?, &path, rev, views::Render::of(a)));
-    let table = table_html(&path, text.filter(|_| doc.is_none()));
-    let archive = archive_html(&path, bytes);
+    let table = crate::filetype::table_html(&path, text.filter(|_| doc.is_none()), bytes);
+    let archive = crate::filetype::archive_html(&path, bytes);
     let symbols = match (&doc, text, media.is_some()) {
         (None, Some(t), false) => {
             crate::symbols::outline(&path, t, views::Render::of(a).blob_lines, named)
@@ -367,7 +350,8 @@ fn blob_page(
     };
     let head = (doc.is_some() || table.is_some()).then(|| DocHead {
         title: path.rsplit('/').next().unwrap_or(&path).to_owned(),
-        views: true,
+        // A workbook has no text source to switch to.
+        views: text.is_some(),
         outline: doc
             .as_ref()
             .map_or_else(String::new, |d| markdown::outline_menu(&d.outline, true)),
