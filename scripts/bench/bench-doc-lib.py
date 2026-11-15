@@ -42,6 +42,11 @@ picture = bc.picture
 # The doc block ------------------------------------------------------------------------------
 
 
+def slowest_page(b: Json) -> str:
+    """The page a page budget was set by, when the run named it."""
+    return f" ({b['page']})" if "page" in b else ""
+
+
 def spread(key: str, b: Json) -> str:
     return f" ({num(key, b['min'])} to {num(key, b['max'])})" if "min" in b else ""
 
@@ -107,7 +112,8 @@ def summary(name: str, r: Json, when: str) -> list[str]:
         )
         + " Against budget: "
         + ", ".join(
-            f"{SHORT[k]} {fmt(k, b['value'])}{spread(k, b)} of {b['limit']} {METRICS[k][1]}"
+            f"{SHORT[k]} {fmt(k, b['value'])}{spread(k, b)}{slowest_page(b)} of {b['limit']} "
+            f"{METRICS[k][1]}"
             for k, b in r["budget"].items()
             if k in METRICS
         )
@@ -300,6 +306,7 @@ def block(cur: Json, old: Json | None, d: str) -> str:
             + f" | {samples_note(r)} |"
         )
     L.append("")
+    L += bc.by_page(cur)
     L += idle_cause(cur)
     names = charts(cur, old)
     for key in METRICS:

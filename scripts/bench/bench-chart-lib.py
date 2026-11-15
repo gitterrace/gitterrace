@@ -281,3 +281,48 @@ def picture(run: Json, key: str, d: str | None = None) -> list[str]:
         "</picture>",
         "",
     ]
+
+
+def by_page(run: Json) -> list[str]:
+    """Warm median per page kind across repositories: the same page compared with itself. The
+    headline is each repo's slowest page, which is a different page from repo to repo."""
+    repos = run["repos"]
+    kinds = list(dict.fromkeys(k for r in repos.values() for k in r["pages"]))
+    if not kinds:
+        return []
+    L = [
+        "Warm page time per page kind (median), so each column compares one page:",
+        "",
+        "| Page | " + " | ".join(repos) + " |",
+        "| --- |" + " --- |" * len(repos),
+    ]
+    for k in kinds:
+        cells = [
+            ms(r["pages"][k]["warm_total_ms"]["median"]) if k in r["pages"] else "-"
+            for r in repos.values()
+        ]
+        L.append(f"| {k} | " + " | ".join(cells) + " |")
+    return L + [""]
+
+
+def slowest_page_test(br: Any) -> None:
+    """The page budget names the page that set it, and the per-page table puts one page kind
+    of every repo on one row, so a reader compares a page with the same page."""
+    pg = lambda w: {"warm_total_ms": {"median": w}, "cold": {"total_ms": 1}}  # noqa: E731
+    res: Json = {
+        "class": "c",
+        "pages": {"blame": pg(90), "diff": pg(10)},
+        "index": {"secs": 1, "peak_rss_mb": 1, "peak_footprint_mb": 1},
+        "idle": {"cpu_pct": 0.1, "cpu_pct_events_client": 0.1},
+        "memory": {"rss_after_pages_mb": 1, "footprint_after_pages_mb": 1},
+    }
+    got = br.judge(res, {"c": {"page_warm_ms": 300}})["page_warm_ms"].get("page")
+    if got != "blame":
+        sys.exit(f"bench-report self-test failed: the slowest page reads {got}")
+    other = {**res, "pages": {"blame": pg(5), "diff": pg(70)}}
+    table = by_page({"repos": {"a": res, "b": other}})
+    if (
+        "| blame | 90 ms | 5 ms |" not in table
+        or "| diff | 10 ms | 70 ms |" not in table
+    ):
+        sys.exit(f"bench-report self-test failed: per-page rows {table}")

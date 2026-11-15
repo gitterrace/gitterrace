@@ -323,11 +323,11 @@ def judge(res: Json, budgets: Json) -> Json:
                 out[key]["min"], out[key]["max"] = min(samples), max(samples)
 
     pg = res["pages"].values()
-    put(
-        "page_warm_ms",
-        max(p["warm_total_ms"]["median"] for p in pg),
-        b.get("page_warm_ms"),
-    )
+    warm = bl.slowest_page(res["pages"])
+    top = res["pages"][warm]["warm_total_ms"]["median"]
+    put("page_warm_ms", top, b.get("page_warm_ms"))
+    if "page_warm_ms" in out:
+        out["page_warm_ms"]["page"] = warm
     slow = max(pg, key=lambda p: p["cold"]["total_ms"])
     put(
         "page_cold_ms",

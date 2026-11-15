@@ -452,6 +452,12 @@ def phase_table(
     return out
 
 
+def slowest_page(pages: Json) -> str:
+    """The page with the highest warm median. The page budget is a ceiling, so this page sets
+    it, and which page that is differs per repo (a big blame on one, a big diff on another)."""
+    return max(pages, key=lambda k: pages[k]["warm_total_ms"]["median"])
+
+
 def slowest(phases: list[Json], key: str) -> str:
     """The step with the most `key`, "unknown" without a step table. A sub-step (dotted
     name) is part of its parent, so it only names the cause when it is the larger part."""

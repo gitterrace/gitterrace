@@ -83,6 +83,26 @@ Idle CPU is the larger of two windows: 0.12 % with no client and 0.02 % with one
 | linux | huge | `cbbddb6b08` | 486.3 s | 8226 MB | 1469 MB | 6601 MB | 26 MB | 0.12% | 0.02% | 1456.9 s, 1 run, 7094 MB | 1 sample |
 | rust | large | `f90a2d27c2` | withheld (load) | withheld (load) | withheld (load) | withheld (load) | withheld (load) | withheld (load) | withheld (load) | withheld (load) | median of 3 |
 
+Warm page time per page kind (median), so each column compares one page:
+
+| Page | control | git | linux |
+| --- | --- | --- | --- |
+| blame-long-history | 1 ms | 87 ms | 19 ms |
+| blob-largest | 2 ms | 13 ms | 13 ms |
+| commit-largest | 145 ms | 1 ms | 3 ms |
+| diff-fragment | 4 ms | 3 ms | 50 ms |
+| log | 1 ms | 2 ms | 5 ms |
+| overview | 2 ms | 4 ms | 11 ms |
+| refs | 1 ms | 1 ms | 2 ms |
+| search | 1 ms | 1 ms | 1 ms |
+| stats-overview | 0 ms | 1 ms | 1 ms |
+| stats/contributors | 0 ms | 1 ms | 0 ms |
+| stats/hotspots | 1 ms | 1 ms | 1 ms |
+| stats/languages | 1 ms | 1 ms | 1 ms |
+| stats/ownership | 0 ms | 0 ms | 1 ms |
+| tree-deep | 1 ms | 0 ms | 1 ms |
+| tree-root | 0 ms | 1 ms | 1 ms |
+
 control is a working checkout, so with a tab open the server also checks it for
 uncommitted changes every second. git, linux, rust are bare clones with no
 working tree, so they have nothing to check and idle lower.

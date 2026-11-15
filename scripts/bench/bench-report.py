@@ -179,6 +179,7 @@ def self_test() -> None:
     footprint_test()
     export_test()
     gate_test()
+    bc.slowest_page_test(importlib.import_module("bench-run"))
     memory_measure_test()
     print("bench-report self-test: ok")
 
