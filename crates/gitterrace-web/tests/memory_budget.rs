@@ -71,14 +71,23 @@ fn report_heap(out: PathBuf) {
         );
         let tmp = out.with_extension("tmp");
         // Runs for the life of the test process.
+        let reset = out.with_extension("reset");
         let mut seq = 0_u64;
+        let mut peak = 0_u64;
         loop {
             seq += 1;
             e.advance().expect("advance");
-            let n = allocated.read().expect("read allocated");
-            std::fs::write(&tmp, format!("{seq} {n}")).expect("write heap");
-            std::fs::rename(&tmp, &out).expect("publish heap");
-            gitterrace_testkit::wait::pause_blocking(Duration::from_millis(100));
+            let n = allocated.read().expect("read allocated") as u64;
+            if std::fs::remove_file(&reset).is_ok() {
+                peak = 0;
+            }
+            peak = peak.max(n);
+            // Published every 100 ms, sampled every 10 ms so a request's peak is seen.
+            if seq.is_multiple_of(10) {
+                std::fs::write(&tmp, format!("{} {n} {peak}", seq / 10)).expect("write heap");
+                std::fs::rename(&tmp, &out).expect("publish heap");
+            }
+            gitterrace_testkit::wait::pause_blocking(Duration::from_millis(10));
         }
     });
 }
@@ -227,11 +236,28 @@ impl Server {
     /// Live heap of the server in bytes, as its allocator counts it: the newest of the
     /// reports written after this call, so a reading never predates the caller's last step.
     fn heap(&self) -> u64 {
+        self.heap_report().0
+    }
+
+    /// Starts a new peak: the next [`Server::heap_peak`] counts from here.
+    fn reset_peak(&self) {
+        std::fs::write(self.heap.path().join("heap.reset"), "").expect("reset peak");
+        // The reporter takes the reset on its next sample; a report after that counts from it.
+        self.heap_report();
+    }
+
+    /// Highest live heap sampled since the last [`Server::reset_peak`].
+    fn heap_peak(&self) -> u64 {
+        self.heap_report().1
+    }
+
+    /// Live heap and the sampled peak, from a report written after this call.
+    fn heap_report(&self) -> (u64, u64) {
         let file = self.heap.path().join("heap");
-        let read = || -> Option<(u64, u64)> {
+        let read = || -> Option<(u64, (u64, u64))> {
             let text = std::fs::read_to_string(&file).ok()?;
-            let (seq, n) = text.trim().split_once(' ')?;
-            Some((seq.parse().ok()?, n.parse().ok()?))
+            let mut f = text.split_whitespace().map(str::parse::<u64>);
+            Some((f.next()?.ok()?, (f.next()?.ok()?, f.next()?.ok()?)))
         };
         // Two reports on: the first may have been read before the caller's last step.
         let asked = read().map_or(0, |(seq, _)| seq + 2);

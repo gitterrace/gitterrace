@@ -194,8 +194,15 @@ fn peak_run(test: &str) -> Option<PeakRun> {
     // state, another memo key. Another period would leave state that `all` reads unbuilt.
     for p in &pages {
         let w = format!("{p}&bots=0");
+        s.reset_peak();
         let (status, _) = s.get(&w);
         assert_eq!(status, 200, "{w}");
+        writeln!(
+            std::io::stderr(),
+            "{w}: heap peak {} MB",
+            s.heap_peak() / MB
+        )
+        .expect("stderr");
     }
     let warm = s.dirty();
     writeln!(
@@ -214,7 +221,14 @@ fn peak_run(test: &str) -> Option<PeakRun> {
     }
     for p in &pages {
         let idle = s.dirty();
+        s.reset_peak();
         let (status, _) = s.get(p);
+        writeln!(
+            std::io::stderr(),
+            "{p}: warm heap peak {} MB",
+            s.heap_peak() / MB
+        )
+        .expect("stderr");
         assert_eq!(status, 200, "{p}");
         let peak = s.dirty();
         writeln!(
