@@ -84,9 +84,12 @@ lint: harness-links
 # Skipped, with a line saying so, on a clone without the shared kit checkout.
 harness-links:
 	@set -e; h="$${HARNESS_KIT:-$(CURDIR)/../harness-kit}/source/harness/tools"; \
-	if [ ! -d "$$h" ]; then echo "harness-links: skipped, no shared kit checkout (set HARNESS_KIT)"; exit 0; fi; \
+	if [ ! -d "$$h" ]; then \
+		echo "harness-links: skipped, no shared kit checkout (set HARNESS_KIT)"; exit 0; \
+	fi; \
 	python3 "$$h/harness-env-check.py" schwarzwald/config/harness.env; \
-	python3 "$$h/harness-link.py" --check || { echo "links missing: run python3 $$h/harness-link.py" >&2; exit 1; }
+	python3 "$$h/harness-link.py" --check || \
+		{ echo "links missing: run python3 $$h/harness-link.py" >&2; exit 1; }
 
 ## test: All tests
 # Every suite runs even after one fails, and every test binary within it (--no-fail-fast), so
@@ -177,7 +180,8 @@ counting-parity:
 ## memory-check: An idle server's memory stays flat as history and tree grow (about 5 minutes)
 memory-check: build
 	python3 scripts/bench/memory-check.py --bin $(RELEASE_BIN)
-	TEST_MEMORY_WIDE=100000 cargo test --release --no-fail-fast -p gitterrace-web --test memory_budget idle_memory_is_flat_in_tree_size
+	TEST_MEMORY_WIDE=100000 cargo test --release --no-fail-fast -p gitterrace-web \
+		--test memory_budget idle_memory_is_flat_in_tree_size
 
 ## speed-check: Cold insights pages on the rust bench clone stay in budget (about 10 minutes)
 speed-check: build
@@ -205,7 +209,8 @@ docker-check:
 
 ## bench: Benchmark the pinned corpus (needs the network). LARGE=1 adds linux (about 30 GB)
 bench: build
-	$(if $(LARGE),BENCH_LARGE=1 )python3 scripts/bench/bench-run.py --bin $(RELEASE_BIN) $(if $(LARGE),--large,$(BENCH_REPOS))
+	$(if $(LARGE),BENCH_LARGE=1 )python3 scripts/bench/bench-run.py --bin $(RELEASE_BIN) \
+		$(if $(LARGE),--large,$(BENCH_REPOS))
 	python3 scripts/bench/bench-report.py
 
 ## bench-report: Write the newest results into docs/benchmarks.md
@@ -229,7 +234,8 @@ domains:
 ## changelog: Prepend the release's section to CHANGELOG.md (VERSION=x.y.z)
 changelog:
 	python3 scripts/release/changelog-run.py
-	bash vendor/schwarzwald/kit/tools/changelog-gen.sh $(or $(VERSION),$(error VERSION=x.y.z is required))
+	bash vendor/schwarzwald/kit/tools/changelog-gen.sh \
+		$(or $(VERSION),$(error VERSION=x.y.z is required))
 
 # site: Refuse to publish install lines before the repository, tap and release tag answer
 site: docs-check
@@ -237,7 +243,8 @@ site: docs-check
 
 ## deploy: Build the site from a clean HEAD into target/site and ship it with wrangler deploy
 deploy: shipped site site-render
-	@test -s target/site/404.html || { echo "target/site/404.html missing: not_found_handling has nothing to serve"; exit 1; }
+	@test -s target/site/404.html || \
+		{ echo "target/site/404.html missing: not_found_handling has nothing to serve"; exit 1; }
 	cargo run -q -p xtask -- deploy-check
 	npx wrangler@4 deploy
 
@@ -260,11 +267,13 @@ site-preview:
 	cargo xtask site
 	npx --yes wrangler@4 dev --ip 127.0.0.1 --port $(or $(SITE_PORT),4343)
 
-# app-icon: Render the macOS icon install-handler gives gitterrace-open.app, from docs/brand/mark-dark.svg (macOS, needs browsers)
+# app-icon: Render the macOS icon install-handler gives gitterrace-open.app, from
+# docs/brand/mark-dark.svg (macOS, needs browsers)
 app-icon:
 	node scripts/release/site/icon-render.mjs
 
-# site-render: Render the touch icon from docs/brand, the link preview into target/site, and the WebPs from target/site-shots when present (needs cwebp then)
+# site-render: Render the touch icon from docs/brand, the link preview into target/site, and the
+# WebPs from target/site-shots when present (needs cwebp then)
 site-render:
 	node scripts/release/site/site-render.mjs
 
@@ -274,7 +283,8 @@ site-render:
 # Needs browsers (make browser-deps), so not in check.
 ## site-shots: Retake every screenshot (needs browsers, so not in check)
 site-shots: build
-	@test -f node_modules/playwright-core/index.mjs || { echo "site-shots: no browsers, run make browser-deps first" >&2; exit 1; }
+	@test -f node_modules/playwright-core/index.mjs || \
+		{ echo "site-shots: no browsers, run make browser-deps first" >&2; exit 1; }
 	node scripts/release/site/site-shots-run.mjs
 	cargo xtask site
 	node scripts/release/site/site-render.mjs
@@ -282,7 +292,9 @@ site-shots: build
 
 # shipped: The tree is clean, so the site deploy builds is the one HEAD builds
 shipped:
-	@test -z "$$(git status --porcelain)" || { echo "uncommitted changes: commit them, a deploy builds HEAD only"; git status --short; exit 1; }
+	@test -z "$$(git status --porcelain)" || \
+		{ echo "uncommitted changes: commit them, a deploy builds HEAD only"; \
+		git status --short; exit 1; }
 
 ##@ Maintenance
 .PHONY: gc keep
@@ -290,10 +302,12 @@ shipped:
 # DRY=1 only reports. BENCH=1 also removes the cached benchmark clones.
 ## gc: Prune cargo units and scratch output unused for DAYS (default 7, DRY=1, BENCH=1)
 gc:
-	python3 scripts/dev/target-run.py --days $(or $(DAYS),7) $(if $(filter 1,$(DRY)),--dry-run) $(if $(filter 1,$(BENCH)),--bench)
+	python3 scripts/dev/target-run.py --days $(or $(DAYS),7) \
+		$(if $(filter 1,$(DRY)),--dry-run) $(if $(filter 1,$(BENCH)),--bench)
 
 ## keep: Every item with its prod and test callers, as TSV in target/keep-inventory.tsv
 keep:
-	python3 scripts/dev/keep-report.py . --config schwarzwald/config/keep-inventory.json --out target/keep-inventory.tsv
+	python3 scripts/dev/keep-report.py . --config schwarzwald/config/keep-inventory.json \
+		--out target/keep-inventory.tsv
 
 include vendor/schwarzwald/kit/configs/help.mk

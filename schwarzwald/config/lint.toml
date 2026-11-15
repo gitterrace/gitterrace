@@ -98,7 +98,7 @@ max_width = 100
 # Code lines too: rustfmt leaves strings, macro bodies and comments alone, so a wide one is
 # caught here. Allowances in schwarzwald/config/wide-allowed.json only fall.
 max_code_width = 100
-globs = ["*.rs", "*.py", "*.mjs", "*.js", "*.sh", "*.css", "*.html"]
+globs = ["*.rs", "*.py", "*.mjs", "*.js", "*.sh", "*.css", "*.html", "Makefile", "*.mk"]
 # Vendored third-party files are not ours to split.
 exclude = ["*/static/vendor/*"]
 
