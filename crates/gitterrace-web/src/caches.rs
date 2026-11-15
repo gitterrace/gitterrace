@@ -48,7 +48,8 @@ pub(crate) struct Caches {
     pub(crate) head_lines: Mutex<Option<(String, Arc<Vec<gitterrace_index::HeadFile>>)>>,
     /// The derived tables of this repository's unfiltered sources. Owned per repository: a
     /// process-wide set let one repository's pages evict or release another's tables.
-    pub(crate) tables: gitterrace_index::SharedTables,
+    /// Shared with this repository's `/api/v1`, see [`gitterrace_api::Pages`].
+    pub(crate) tables: std::sync::Arc<gitterrace_index::SharedTables>,
 }
 
 impl Caches {
@@ -64,7 +65,7 @@ impl Caches {
             compares: Mutex::new(Bounded::new(cfg.cache_bytes(Cache::Compares))),
             chain: Mutex::new(None),
             head_lines: Mutex::new(None),
-            tables: gitterrace_index::SharedTables::new(),
+            tables: std::sync::Arc::default(),
         }
     }
 

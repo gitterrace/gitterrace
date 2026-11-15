@@ -1,7 +1,10 @@
 //! Transport-neutral reads. Both the HTTP router and the MCP tools call these,
 //! so the two surfaces cannot drift apart. Everything here is blocking.
 
+mod page_tables;
 mod rebuild;
+
+pub use page_tables::Pages;
 
 use std::path::Path;
 use std::sync::{Arc, Mutex, RwLock};
@@ -9,7 +12,7 @@ use std::sync::{Arc, Mutex, RwLock};
 use gitterrace_actions::{Lines, styled};
 use gitterrace_git::Repo;
 use gitterrace_index::feed::{Checked, InsightsSource};
-use gitterrace_index::{Index, Insights, Options, Selected};
+use gitterrace_index::{Index, Options, Selected};
 use gitterrace_types::LinkStyle;
 use gitterrace_types::api::{
     BlameResponse, BlobResponse, CommitResponse, ContributorsResponse, LogResponse, RefsResponse,
@@ -56,6 +59,9 @@ pub struct ApiState {
     /// What an unreadable cache sets off: the server's own rebuild when it runs the API, so the
     /// pages and the API share one, else this state's ([`ApiState::rebuild_alone`]).
     on_unreadable: Arc<RwLock<Option<Rebuild>>>,
+    /// The web pages' source and derived tables, when the server runs the API: a request over
+    /// the tip the pages read slices their tables instead of building a second copy.
+    pages: Arc<RwLock<Option<Pages>>>,
     /// A rebuild this state started itself is running.
     rebuilding: Arc<std::sync::atomic::AtomicBool>,
 }
@@ -101,6 +107,7 @@ impl ApiState {
             tables: Arc::default(),
             settings: Arc::default(),
             on_unreadable: Arc::default(),
+            pages: Arc::default(),
             rebuilding: Arc::default(),
         }
     }
@@ -191,9 +198,8 @@ impl ApiState {
     /// The source over the history reachable from `rev`, readable only through
     /// [`Checked::run`]: an answer built while the cache failed a read is refused.
     /// Shared between calls while the tip and the cache are unchanged. A source that met a
-    /// storage error is dropped, so the next call opens the cache again.
-    /// The checked source of `rev`, for [`ApiState::read`] and the cache tests: an answer
-    /// reads through `read`, which turns a storage error into the rebuild.
+    /// storage error is dropped, so the next call opens the cache again. Answers read it
+    /// through [`ApiState::read`], which turns a storage error into the rebuild.
     pub(crate) fn records(&self, rev: &str) -> Result<Checked<dyn InsightsSource>, ApiError> {
         let tip = self.repo.resolve(rev)?;
         let key = (tip.clone(), self.index.generation());
@@ -206,6 +212,12 @@ impl ApiState {
             {
                 return Ok(v.share());
             }
+        }
+        // After a newer build took the cache the API answers 503 `index_newer`, not the pages'.
+        if self.index.newer_owner().is_none()
+            && let Some((src, _)) = self.pages_source(&tip)
+        {
+            return Ok(src);
         }
         // Another rev reads the same segments through a reach view. Without a segment set yet
         // HEAD's is built first: an answer never comes from anything but the set.
@@ -307,7 +319,7 @@ impl ApiState {
     pub fn repo_info(&self) -> Result<RepoResponse, ApiError> {
         let head = self.repo.resolve(DEFAULT_REV).ok();
         let (totals, every) = self.read(DEFAULT_REV, |records| {
-            let ins = self.insights(DEFAULT_REV, &**records, self.settings().defaults);
+            let ins = self.insights(DEFAULT_REV, records, self.settings().defaults);
             (
                 ins.period_summary(gitterrace_index::Period::All).current,
                 ins.every_totals().commits.value(),
@@ -499,16 +511,6 @@ impl ApiState {
         })
     }
 
-    /// Statistics over `src` under `opts`, with the ignore rules of `rev` when asked: what
-    /// the web pages build for the same options.
-    fn insights<'a>(&self, rev: &str, src: &'a dyn InsightsSource, opts: Options) -> Insights<'a> {
-        let respect = opts.respect_ignore;
-        let key = format!("{rev}\u{0}{}", self.index.generation());
-        Insights::shared_source(&self.tables, src, opts, &key, || {
-            respect.then(|| self.ignore_set(rev)).flatten()
-        })
-    }
-
     /// The ignore rules committed at `rev`. The files are found once per commit.
     fn ignore_set(&self, rev: &str) -> Option<gitterrace_git::IgnoreSet> {
         let id = self.repo.resolve(rev).ok()?;
@@ -558,7 +560,7 @@ impl ApiState {
         let mut commits_indexed = 0;
         let data = self.read(rev, |all| {
             commits_indexed = all.len();
-            let ins = self.insights(&tip, &**all, scope.options().clone());
+            let ins = self.insights(&tip, all, scope.options().clone());
             let counted = insights::counted(&ins, &scope, &**all);
             insights::compute(name, &counted, params, || self.head_lines(&tip))
         })??;
@@ -584,7 +586,7 @@ impl ApiState {
         let tip = self.repo.resolve(rev)?;
         let scope = insights::scope(params, self.settings().defaults)?;
         let report = self.read(rev, |all| {
-            let ins = self.insights(&tip, &**all, scope.options().clone());
+            let ins = self.insights(&tip, all, scope.options().clone());
             insights::counted(&ins, &scope, &**all).contributors(gitterrace_index::Metric::Commits)
         })?;
         let people = report.contributors;

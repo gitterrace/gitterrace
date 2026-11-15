@@ -263,10 +263,15 @@ pub(crate) fn shared_on<'a>(
     o: Options,
 ) -> Insights<'a> {
     let respect = o.respect_ignore;
-    let key = format!("{}\u{0}{head}\u{0}{}", a.base, a.index.generation());
+    let key = tables_key(a, head);
     Insights::shared_source(&a.caches.tables, src, o, &key, || {
         respect.then(|| a.ignore_set(head)).flatten()
     })
+}
+
+/// The key the full set of `head` keeps its shared tables under, the API's too.
+pub(crate) fn tables_key(a: &App, head: &str) -> String {
+    format!("{}\u{0}{head}\u{0}{}", a.base, a.index.generation())
 }
 
 /// Builds the tables every per-file page slices (path filter decisions, period anchors, the

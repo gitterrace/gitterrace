@@ -441,10 +441,9 @@ impl App {
         self.env.actions_note()
     }
 
-    /// Takes a reloaded config: limits, stream cap, rendered pages and open tabs.
-    /// Hands the app its `/api/v1` state, once, so a reload reconfigures it too.
-    /// Links this repository's `/api/v1` state. An API answer that meets an unreadable cache
-    /// starts the same rebuild a page does ([`App::unreadable_now`]), one for both.
+    /// Links this repository's `/api/v1` state, once, so a reload reconfigures it too. An API
+    /// answer that meets an unreadable cache starts the same rebuild a page does
+    /// ([`App::unreadable_now`]), and an API answer over the pages' tip reads their tables.
     pub(crate) fn set_api(self: &Arc<Self>, api: gitterrace_api::ApiState) {
         let app = Arc::downgrade(self);
         api.on_unreadable(Arc::new(move || {
@@ -454,6 +453,7 @@ impl App {
                 tracing::warn!("rebuilding the unreadable cache for the API failed: {e}");
             }
         }));
+        api.share_pages(self.pages_share());
         self.api.set(api).ok();
     }
 

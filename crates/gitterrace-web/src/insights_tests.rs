@@ -325,3 +325,50 @@ async fn another_repository_going_idle_keeps_these_tables() {
         "table sets rebuilt after another app idled"
     );
 }
+
+/// Guard class: the API reads the pages' copy of the derived tables. One page and one API
+/// insight over the same tip build one set: red at 2 when the API built its own beside the
+/// pages'. Second catch: the API opening a second source of the tip instead of the pages'.
+#[tokio::test]
+async fn a_page_and_an_api_request_over_one_tip_build_the_tables_once() {
+    let dir = tempfile::tempdir().expect("tmp");
+    let p = gitterrace_testkit::Fixture::init(dir.path())
+        .write("a.txt", "a\n")
+        .commit("feat: a")
+        .path()
+        .to_owned();
+    let repo = gitterrace_git::Repo::discover(&p).expect("repo");
+    let index = gitterrace_index::Index::open(&repo).expect("index");
+    let app = Arc::new(App::new(repo, index));
+    app.index
+        .update(&app.repo, "HEAD", &|_| {})
+        .expect("update");
+    app.mark_ready();
+    let api = gitterrace_api::ApiState::open(&p).expect("api");
+    app.set_api(api.clone());
+    let router = crate::routes::router(Arc::clone(&app))
+        .nest("/api/v1", gitterrace_api::router(api.clone()));
+    let (status, _) = gitterrace_testkit::get(&router, "/stats").await;
+    assert_eq!(status, 200);
+    let (status, body) =
+        gitterrace_testkit::get(&router, "/api/v1/insights/summary?period=all").await;
+    assert_eq!(status, 200, "{body}");
+    let head = app.repo.resolve("HEAD").expect("head");
+    let pages = app.source(&head).expect("source").expect("ready");
+    let ours = api.insights_source("HEAD").expect("api source");
+    let count = |s: gitterrace_index::feed::Checked<dyn gitterrace_index::feed::InsightsSource>| {
+        s.run(|s| (gitterrace_index::table_builds(&**s), Arc::clone(s)))
+            .expect("run")
+    };
+    let (by_pages, pages) = count(pages);
+    let (by_api, ours) = count(ours);
+    let built = if Arc::ptr_eq(&pages, &ours) {
+        by_pages
+    } else {
+        by_pages + by_api
+    };
+    assert_eq!(
+        built, 1,
+        "table sets built over one page and one API request"
+    );
+}

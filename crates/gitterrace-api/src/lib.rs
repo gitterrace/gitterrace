@@ -16,7 +16,7 @@ mod insights;
 mod mcp;
 mod wire;
 
-pub use core::{ApiState, Rebuild, options_from};
+pub use core::{ApiState, Pages, Rebuild, options_from};
 pub use endpoints::{ENDPOINTS, Endpoint, Param, generator as schema_generator};
 pub use error::{ApiError, ERROR_CODES, RETRY_AFTER_SECS, SERVER_ERROR_MESSAGE};
 pub use http::{index_body, router};

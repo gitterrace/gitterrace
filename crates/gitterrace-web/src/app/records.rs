@@ -47,6 +47,27 @@ impl App {
         self.open_set(key, head)
     }
 
+    /// What the API reads of the pages: their source of a tip and the tables over it.
+    pub(crate) fn pages_share(self: &std::sync::Arc<Self>) -> gitterrace_api::Pages {
+        let app = std::sync::Arc::downgrade(self);
+        gitterrace_api::Pages {
+            tables: std::sync::Arc::clone(&self.caches.tables),
+            source: std::sync::Arc::new(move |tip| {
+                let a = app.upgrade()?;
+                let src = a.held_source(tip)?;
+                Some((src, crate::insights::tables_key(&a, tip)))
+            }),
+        }
+    }
+
+    /// The source of `head` the pages hold now, without opening one.
+    pub(crate) fn held_source(&self, head: &str) -> Option<crate::insights::CheckedSrc> {
+        let key = (head.to_owned(), self.index.generation());
+        let g = self.caches.source.lock().ok()?;
+        let (k, s) = g.as_ref()?;
+        (*k == key && s.failure().is_none()).then(|| s.share())
+    }
+
     /// Opens and keeps the set of `head` without the ready check: the refresh builds the
     /// tables the per-file pages share over it just before it marks the index ready.
     pub(crate) fn source_before_ready(
