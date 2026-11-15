@@ -112,5 +112,39 @@ async function pathCells() {
   }
 }
 
-  return { inlineControls, sectionGaps, pathCells };
+// Every code row is as tall as its gutter number, an empty row included: a row of 24px text
+// beside a 20px empty one leaves the gutter band stepping by the difference. And a file page
+// and a diff set code at one size, so a shared rule cannot enlarge one of them.
+async function codeRows() {
+  writeFileSync(join(dir, 'rows.txt'), 'one\n\nthree\n');
+  sh(dir, 'git', 'add', '-A');
+  sh(dir, 'git', 'commit', '-q', '-m', 'docs: rows with an empty line');
+  await new Promise((ok) => setTimeout(ok, 600));
+  for (const name of browsers) {
+    const { b, ctx } = await context(name);
+    const p = await ctx.newPage();
+    const seen = {};
+    for (const [path, rows, num] of [['/blob/HEAD/rows.txt', '.src .l', '::before'],
+      ['/commit/HEAD', 'div.diff :is(.add,.del,.ctx)', '::after']]) {
+      await p.goto(srv.base + path, { waitUntil: 'load' });
+      seen[path] = await p.$$eval(rows, (els, num) => els.map((e) => {
+        const s = getComputedStyle(e);
+        const n = parseFloat(getComputedStyle(e, num).height);
+        return { h: e.getBoundingClientRect().height, n, fs: s.fontSize };
+      }), num);
+    }
+    const all = Object.values(seen).flat();
+    const bad = all.filter((x) => Math.abs(x.h - x.n) > 0.5)
+      .map((x) => `row ${x.h}px, number ${x.n}px`);
+    const sizes = new Set(all.map((x) => x.fs));
+    if (!seen['/commit/HEAD'].length) bad.push('no diff rows');
+    if (sizes.size > 1) bad.push(`code sizes ${[...sizes].join(', ')}`);
+    const where = `code-rows ${name}`;
+    if (bad.length) r.fail(`${where}: ${bad.slice(0, 3).join('; ')}`);
+    else r.ok(`${where}: ${all.length} rows as tall as their numbers, one code size`);
+    await b.close();
+  }
+}
+
+  return { inlineControls, sectionGaps, pathCells, codeRows };
 }

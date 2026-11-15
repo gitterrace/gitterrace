@@ -1,7 +1,9 @@
 /* Rendered markdown. Everything is scoped to .markdown-body and themed
    through the app variables. Syntax classes carry the s- prefix. */
-:is(.markdown-body,.code,.diff){--md-note:var(--info);--md-tip:var(--add);--md-important:var(--done);--md-warning:var(--warn);--md-caution:var(--del);--md-k1:var(--syn-keyword);--md-k2:var(--syn-entity);--md-k3:var(--syn-constant);--md-k4:var(--syn-string);--md-k5:var(--syn-comment);--md-k6:var(--syn-tag);--md-k7:var(--syn-param);
-  color:var(--fg);font-size:16px;line-height:1.5;overflow-wrap:break-word}
+:is(.markdown-body,.code,.diff){--md-note:var(--info);--md-tip:var(--add);--md-important:var(--done);--md-warning:var(--warn);--md-caution:var(--del);--md-k1:var(--syn-keyword);--md-k2:var(--syn-entity);--md-k3:var(--syn-constant);--md-k4:var(--syn-string);--md-k5:var(--syn-comment);--md-k6:var(--syn-tag);--md-k7:var(--syn-param)}
+/* Code and diffs share only the colours above. Their size and leading are the code tokens,
+   so a gutter number and its line have one height. */
+.markdown-body{color:var(--fg);font-size:16px;line-height:1.5;overflow-wrap:break-word}
 .markdown-body>:first-child{margin-top:0!important}
 .markdown-body>:last-child{margin-bottom:0!important}
 .markdown-body a{color:var(--accent);text-decoration:none}
