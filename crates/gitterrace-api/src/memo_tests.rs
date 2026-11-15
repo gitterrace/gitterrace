@@ -49,3 +49,30 @@ fn release_records_empties_the_head_memo() {
     s.release_records();
     assert!(!s.head_memo_held(), "the release keeps a per-commit value");
 }
+
+#[test]
+fn insight_requests_over_one_tip_build_the_derived_tables_once() {
+    let dir = tempfile::tempdir().expect("tmp");
+    let s = state(dir.path());
+    let params = Params {
+        period: Some("all".to_owned()),
+        ..Params::default()
+    };
+    s.insight("summary", None, &params).expect("first");
+    let src = s.records("HEAD").expect("records");
+    let built = src
+        .share()
+        .run(|a| gitterrace_index::table_builds(&**a))
+        .expect("run");
+    assert_eq!(built, 1, "the first request builds the tables");
+    for name in ["summary", "contributors", "hotspots"] {
+        s.insight(name, None, &params).expect(name);
+    }
+    let after = src
+        .run(|a| gitterrace_index::table_builds(&**a))
+        .expect("run");
+    assert_eq!(
+        after, 1,
+        "later requests over the same tip slice the same tables"
+    );
+}

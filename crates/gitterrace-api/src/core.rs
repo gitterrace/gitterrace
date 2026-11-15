@@ -47,6 +47,9 @@ pub struct ApiState {
     cache: Arc<Mutex<Option<RecordsCache>>>,
     /// What the head tree costs to read, kept for the last commit asked about.
     head: Arc<Mutex<HeadMemo>>,
+    /// Derived tables of the sources above, so each insights request slices them instead of
+    /// building its own: on a 1.3M-commit history one build peaked at about 350 MB.
+    tables: Arc<gitterrace_index::SharedTables>,
     /// `links.style` and the counting options a request leaves unset. Shared with every clone,
     /// so a config reload ([`ApiState::reconfigure`]) reaches routers already built.
     settings: Arc<RwLock<Settings>>,
@@ -95,6 +98,7 @@ impl ApiState {
             index,
             cache: Arc::default(),
             head: Arc::default(),
+            tables: Arc::default(),
             settings: Arc::default(),
             on_unreadable: Arc::default(),
             rebuilding: Arc::default(),
@@ -251,6 +255,7 @@ impl ApiState {
         if let Ok(mut g) = self.head.lock() {
             *g = HeadMemo::default();
         }
+        self.tables.clear();
         self.repo.clear_visible();
     }
 
@@ -497,8 +502,11 @@ impl ApiState {
     /// Statistics over `src` under `opts`, with the ignore rules of `rev` when asked: what
     /// the web pages build for the same options.
     fn insights<'a>(&self, rev: &str, src: &'a dyn InsightsSource, opts: Options) -> Insights<'a> {
-        let ignore = opts.respect_ignore.then(|| self.ignore_set(rev)).flatten();
-        Insights::from_source(src, opts, ignore)
+        let respect = opts.respect_ignore;
+        let key = format!("{rev}\u{0}{}", self.index.generation());
+        Insights::shared_source(&self.tables, src, opts, &key, || {
+            respect.then(|| self.ignore_set(rev)).flatten()
+        })
     }
 
     /// The ignore rules committed at `rev`. The files are found once per commit.
