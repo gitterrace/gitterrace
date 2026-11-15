@@ -395,3 +395,41 @@ fn a_version_6_cache_is_rebuilt_to_7_without_a_500() {
         }
     });
 }
+
+/// A repository whose `.git` is deleted and initialized again under a running server: the
+/// cache folder is gone with it. The insights pages and the API answer again after one rebuild,
+/// never a lasting 500. Red when a rebuild assumed the folder exists: every page stayed 500
+/// until a restart. A cleanup that removes only `.git/gitterrace/` is the same case.
+#[test]
+fn a_repository_initialized_again_under_a_running_server_recovers() {
+    let rt = tokio::runtime::Runtime::new().expect("runtime");
+    rt.block_on(async {
+        let tmp = tempfile::tempdir().expect("tmp");
+        let (repo, router, prefix) = built(tmp.path()).await;
+        let (s, _) = get(&router, &format!("{prefix}/stats")).await;
+        assert_eq!(s, 200, "insights answer before the reset");
+        std::fs::remove_dir_all(repo.join(".git")).expect("drop .git");
+        let again = Fixture::init(&repo)
+            .write("again.txt", "x\n")
+            .commit("feat: start over");
+        assert_eq!(again.path(), repo, "the same folder, a new history");
+        let (took, errors) = until_api_answers(&router, &prefix, REBUILT_WITHIN).await;
+        assert!(
+            errors.is_empty(),
+            "while rebuilding:\n{}",
+            errors.join("\n")
+        );
+        assert!(
+            took.is_some(),
+            "the API answers 200 again after the rebuild"
+        );
+        assert!(
+            repo.join(".git/gitterrace").is_dir(),
+            "the cache folder was made again"
+        );
+        for p in ["/", "/stats", "/log/HEAD"] {
+            let (s, _) = get(&router, &format!("{prefix}{p}")).await;
+            assert!(s < 500, "{p} -> {s} after the reset");
+        }
+    });
+}

@@ -263,7 +263,14 @@ impl Index {
         store::newer_version(&self.dir).ok().flatten()
     }
 
+    /// Checks the cache may be written, creating its folder again when it is gone: a `.git`
+    /// deleted and initialized again, or a cleanup that removed `.git/gitterrace/`, under a
+    /// running server. Without it every write and rebuild failed on the missing folder until
+    /// a restart. A newer build's cache is still refused.
     fn writable(&self) -> io::Result<()> {
+        if !self.dir.is_dir() {
+            store::ensure_dir(&self.dir)?;
+        }
         store::check_writable(&self.dir)
     }
 
