@@ -49,7 +49,9 @@ pub fn short_id(id: &str) -> &str {
 /// Not configurable itself: `limits.text_kb` sets the display cap per handle; this constant is
 /// the default and the index's fixed bound, so stored numbers never depend on a setting.
 pub const MAX_TEXT_BYTES: u64 = 2 * 1024 * 1024;
-pub use gitdir::{BranchStatus, HeadState, InProgress, LinkedWorktree, Stash, TagAnnotation};
+pub use gitdir::{
+    BranchStatus, HeadState, InProgress, LinkedWorktree, Stash, TagAnnotation, Upstream,
+};
 pub use ignore::IgnoreSet;
 pub use nudge::{Nudge, NudgeConfig, NudgeError, Nudger, Skip};
 pub use repo::{ChangeMemo, REJECTED_REV, Repo};

@@ -168,6 +168,14 @@ async fn overview(State(app): Shared, Query(q): Query<DocQuery>) -> Result<Html<
         };
         let (side, totals) = built;
         let c = views::chrome(a, "files").live(Mode::NOTICE);
+        // Only while the overview shows HEAD's commit: another revision has no upstream here.
+        let upstream = if a.repo.head_state().commit.as_deref() == Some(head.as_str()) {
+            // A walk that fails (a shallow clone's missing parents) leaves the counts out,
+            // never the overview.
+            a.repo.upstream().ok().flatten()
+        } else {
+            None
+        };
         let counted = totals.as_ref().map(|t| {
             format!(
                 "{} {} by {} {}",
@@ -175,7 +183,12 @@ async fn overview(State(app): Shared, Query(q): Query<DocQuery>) -> Result<Html<
             )
         });
         Ok(OverviewPage {
-            head: crate::pagehead::overview_head(&c.name, &c.branch, counted.as_deref()),
+            head: crate::pagehead::overview_head(
+                &c.name,
+                &c.branch,
+                upstream.as_ref(),
+                counted.as_deref(),
+            ),
             c: Chrome {
                 md: about.as_ref().is_some_and(|d| d.markdown),
                 ..c

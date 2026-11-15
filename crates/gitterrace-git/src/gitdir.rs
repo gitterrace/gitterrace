@@ -39,6 +39,16 @@ pub struct HeadState {
     pub in_progress: Option<InProgress>,
 }
 
+/// The current branch against its upstream's remote-tracking ref, as last fetched. Never
+/// fetched here: the counts are as fresh as the local refs.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Upstream {
+    /// The tracking ref, shortened (`origin/main`).
+    pub name: String,
+    pub ahead: usize,
+    pub behind: usize,
+}
+
 /// One linked worktree, read from the common git directory only.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LinkedWorktree {
@@ -103,6 +113,33 @@ impl Repo {
             commit: repo.head_id().ok().map(|id| id.to_string()),
             in_progress,
         }
+    }
+
+    /// The current branch against its configured upstream, from local refs only. `None` when
+    /// HEAD is detached or unborn, the branch has no upstream or its tracking ref is missing.
+    pub fn upstream(&self) -> Result<Option<Upstream>> {
+        let repo = self.repo();
+        let Ok(Some(head)) = repo.head_name() else {
+            return Ok(None);
+        };
+        let Some(Ok(tracking)) =
+            repo.branch_remote_tracking_ref_name(head.as_ref(), gix::remote::Direction::Fetch)
+        else {
+            return Ok(None);
+        };
+        let (Ok(Some(mut local)), Ok(Some(mut remote))) = (
+            repo.try_find_reference(head.as_ref()),
+            repo.try_find_reference(tracking.as_ref()),
+        ) else {
+            return Ok(None);
+        };
+        let tip = local.peel_to_id().map_err(git)?.detach();
+        let base = remote.peel_to_id().map_err(git)?.detach();
+        Ok(Some(Upstream {
+            name: tracking.shorten().to_str_lossy().into_owned(),
+            ahead: count_only(&repo, tip, base)?,
+            behind: count_only(&repo, base, tip)?,
+        }))
     }
 
     /// Linked worktrees, sorted by id. Entries that are symlinks, oversized or unreadable are

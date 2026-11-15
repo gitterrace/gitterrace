@@ -116,12 +116,36 @@ pub(crate) fn worktree_file_head(path: &str, tagline: Tagline) -> PageHead {
 
 /// The overview's head: the repository's name, its branch and what was counted (`None` while
 /// history is indexing).
-pub(crate) fn overview_head(name: &str, branch: &str, counted: Option<&str>) -> PageHead {
-    let said = format!(
-        "On {branch} \u{b7} {}",
-        counted.unwrap_or("indexing history")
-    );
+pub(crate) fn overview_head(
+    name: &str,
+    branch: &str,
+    upstream: Option<&gitterrace_git::Upstream>,
+    counted: Option<&str>,
+) -> PageHead {
+    let mut said = format!("On {branch}");
+    if let Some(u) = upstream {
+        said.push_str(" \u{b7} ");
+        said.push_str(&upstream_said(u));
+    }
+    said.push_str(" \u{b7} ");
+    said.push_str(counted.unwrap_or("indexing history"));
     PageHead::new(name, Tagline::of(&said))
+}
+
+/// "2 ahead, 1 behind origin/main", or "up to date with origin/main".
+fn upstream_said(u: &gitterrace_git::Upstream) -> String {
+    let mut parts = Vec::new();
+    if u.ahead > 0 {
+        parts.push(format!("{} ahead", u.ahead));
+    }
+    if u.behind > 0 {
+        parts.push(format!("{} behind", u.behind));
+    }
+    if parts.is_empty() {
+        format!("up to date with {}", u.name)
+    } else {
+        format!("{} {}", parts.join(", "), u.name)
+    }
 }
 
 /// The working tree's head: what differs from HEAD, read from disk.

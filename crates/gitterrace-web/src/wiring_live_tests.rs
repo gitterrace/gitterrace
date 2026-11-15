@@ -553,3 +553,46 @@ async fn worktree_blob_shows_an_untracked_file_and_hides_it_on_a_public_server()
     let public = router(&p, with(|c| c.server.is_public = true));
     assert_eq!(get(&public, "/worktree/blob/fresh.rs").await.0, 404);
 }
+
+/// The overview counts the checked-out branch against its upstream's tracking ref, read from
+/// local refs, and says nothing when the branch has no upstream.
+#[tokio::test]
+async fn overview_shows_how_far_behind_its_upstream_the_branch_is() {
+    let dir = tempfile::tempdir().expect("tmp");
+    let p = gitterrace_testkit::Fixture::init(&dir.path().join("r"))
+        .write("a.txt", "a\n")
+        .commit("feat: one")
+        .write("a.txt", "b\n")
+        .commit("feat: two")
+        .write("a.txt", "c\n")
+        .commit("feat: three")
+        .path()
+        .to_owned();
+    let (_, plain) = get(&router(&p, Config::default()), "/").await;
+    assert!(
+        !plain.contains("behind") && !plain.contains("up to date"),
+        "{plain}"
+    );
+    let tip = git(&p, &["rev-parse", "HEAD"]);
+    let branch = git(&p, &["rev-parse", "--abbrev-ref", "HEAD"]);
+    let (tip, branch) = (tip.trim(), branch.trim());
+    git(
+        &p,
+        &["update-ref", &format!("refs/remotes/origin/{branch}"), tip],
+    );
+    git(
+        &p,
+        &["remote", "add", "origin", "https://example.invalid/r.git"],
+    );
+    git(
+        &p,
+        &["config", &format!("branch.{branch}.remote"), "origin"],
+    );
+    let merge = format!("refs/heads/{branch}");
+    git(&p, &["config", &format!("branch.{branch}.merge"), &merge]);
+    let (_, even) = get(&router(&p, Config::default()), "/").await;
+    assert!(even.contains("up to date with origin/"), "{even}");
+    git(&p, &["reset", "-q", "--hard", "HEAD~2"]);
+    let (_, two) = get(&router(&p, Config::default()), "/").await;
+    assert!(two.contains("<b>2</b> behind origin/"), "{two}");
+}
