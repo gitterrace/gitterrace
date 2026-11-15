@@ -196,3 +196,20 @@ async fn a_changed_image_header_says_its_size() {
     assert!(head.contains(">7 x 5, 39 B to 2.0 KiB<"), "{head}");
     assert!(!head.contains("+0"), "{head}");
 }
+
+#[tokio::test]
+async fn an_unknown_binary_names_its_format_size_and_a_download() {
+    let dir = tempfile::tempdir().expect("tmp");
+    let root = dir.path().join("r");
+    let f = Fixture::init(&root);
+    let mut db = b"SQLite format 3\0".to_vec();
+    db.resize(4096, 0);
+    std::fs::write(root.join("app.data"), &db).expect("write");
+    let p = f.commit("feat: database").path().to_owned();
+    let (_, page) = get(&router(&p, Config::default()), "/blob/HEAD/app.data").await;
+    assert!(page.contains("SQLite database \u{b7} 4.0 KiB"), "{page}");
+    assert!(
+        page.contains("/raw/HEAD/app.data\" download>Download</a>"),
+        "{page}"
+    );
+}

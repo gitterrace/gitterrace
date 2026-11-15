@@ -20,6 +20,7 @@ mod empty;
 mod error;
 mod far;
 mod features;
+mod filetype;
 mod filter;
 mod fmt;
 mod frequency;

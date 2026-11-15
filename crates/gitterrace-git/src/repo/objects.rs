@@ -6,6 +6,19 @@ use crate::error::git;
 use crate::repo::Repo;
 use crate::{Blob, Error, RawBlob, Result, TreeEntry, TreeEntryKind};
 
+/// Enough of a binary blob to name its format: the longest magic checked sits in the first
+/// 512 bytes (tar's `ustar` at 257).
+const HEAD_BYTES: usize = 512;
+
+/// The bytes `Blob::head` keeps: a prefix of binary data, nothing of text.
+fn head_of(data: &[u8], text: bool) -> Vec<u8> {
+    if text {
+        Vec::new()
+    } else {
+        data[..data.len().min(HEAD_BYTES)].to_vec()
+    }
+}
+
 impl Repo {
     /// Entries of the directory at `path` in `rev`, dirs first then by name.
     pub fn tree(&self, rev: &str, path: &str) -> Result<Vec<TreeEntry>> {
@@ -130,6 +143,7 @@ impl Repo {
         let blob = Blob {
             path: path.to_string(),
             size,
+            head: head_of(&bytes, text.is_some()),
             text,
         };
         Ok((blob, bytes))
@@ -143,20 +157,25 @@ impl Repo {
         let path = path.trim_matches('/');
         let id = Self::blob_id_at(&repo, tip, path)?;
         let size = repo.find_header(id).map_err(git)?.size();
-        let text = if size > self.text_limit() {
-            None
+        let (text, head) = if size > self.text_limit() {
+            (None, Vec::new())
         } else {
             let data = repo.find_object(id).map_err(git)?.detach().data;
             if crate::diff::is_binary(&data) {
-                None
+                let head = head_of(&data, false);
+                (None, head)
             } else {
-                String::from_utf8(data).ok()
+                match String::from_utf8(data) {
+                    Ok(t) => (Some(t), Vec::new()),
+                    Err(e) => (None, head_of(e.as_bytes(), false)),
+                }
             }
         };
         Ok(Blob {
             path: path.to_string(),
             size,
             text,
+            head,
         })
     }
 }

@@ -11,6 +11,6 @@
 {% else if let Some(m) = media %}<div class="card">{{ m|safe }}</div>
 {% else %}{% if !outline_rail.is_empty() %}<div class="cols outline-cols code-cols">{% endif %}
 <div class="card scroll" data-copyable>
-{% if let Some(h) = html %}{{ h|safe }}{% if cut %}<p class="muted pad">{{ cut_note }}</p>{% endif %}{% else if too_large %}<p class="muted pad">File too large to display ({{ size }}).{% if !raw_href.is_empty() %} <a href="{{ raw_href }}">View raw</a>.{% endif %}</p>{% else %}<p class="muted pad">Binary file, {{ size }}.</p>{% endif %}
+{% if let Some(h) = html %}{{ h|safe }}{% if cut %}<p class="muted pad">{{ cut_note }}</p>{% endif %}{% else if too_large %}<p class="muted pad">File too large to display ({{ size }}).{% if !raw_href.is_empty() %} <a href="{{ raw_href }}">View raw</a>.{% endif %}</p>{% else %}<p class="muted pad">{{ format }} · {{ size }}{% if !raw_href.is_empty() %} · <a href="{{ raw_href }}" download>Download</a>{% endif %}</p>{% endif %}
 </div>{% if !outline_rail.is_empty() %}{{ outline_rail|safe }}</div>{% endif %}{% endif %}
 {% endblock %}

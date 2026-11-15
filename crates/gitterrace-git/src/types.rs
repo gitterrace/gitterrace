@@ -74,6 +74,9 @@ pub struct Blob {
     pub path: String,
     pub size: u64,
     pub text: Option<String>,
+    /// The first bytes of a binary blob read for its text, so a view can name its format
+    /// from the magic number. Empty for text and for a blob too large to read.
+    pub head: Vec<u8>,
 }
 
 /// A blob for `/raw`: `bytes` is `None` when the caller skipped reading it.

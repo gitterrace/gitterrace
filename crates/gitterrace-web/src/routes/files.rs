@@ -155,6 +155,8 @@ struct BlobPage {
     media: Option<String>,
     too_large: bool,
     raw_href: String,
+    /// The format of a binary blob the page does not preview; empty otherwise.
+    format: &'static str,
     rendered: Option<String>,
     /// "On this page" as the rail: the document's headings, or a source file's symbols.
     outline_rail: String,
@@ -271,6 +273,7 @@ pub(super) async fn blob(
             page_head,
             size: fmt::size(b.size),
             raw_href: crate::features::href_if(Feature::Raw, &format!("/raw/{r}/{pe}")),
+            format: crate::filetype::describe(&path, &b.head),
             title: path,
             html,
             cut,
