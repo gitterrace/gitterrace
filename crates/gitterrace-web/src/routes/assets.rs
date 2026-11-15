@@ -9,7 +9,7 @@ use axum::{
 };
 
 /// The diagram library: a page's script loads it by name, so no link names it.
-pub const MERMAID_JS: &str = "/static/vendor/mermaid-11.17.2.min.js";
+pub const MERMAID_JS: &str = "/static/vendor/mermaid-12.3.0.min.js";
 
 /// The scripts and styles `app.js` adds on first use: no page links them, so `export` seeds them.
 pub const LAZY_ASSETS: [&str; 5] = [

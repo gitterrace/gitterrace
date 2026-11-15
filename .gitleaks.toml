@@ -7,6 +7,9 @@ paths = [
   # The schwarzwald snapshot manifest: a sha256 per file, public digests, no secret. The scan
   # reads history, so the copy's earlier shared/ and theme/ paths stay listed.
   '''(vendor/schwarzwald/kit|shared/schwarzwald|theme/schwarzwald)/manifest\.json$''',
+  # Vendored minified Mermaid: short minified names (`atlasCount`) match the generic-api-key
+  # rule. Third-party code, pinned by version and digest, holds no secret of ours.
+  '''crates/gitterrace-web/static/vendor/mermaid\.min\.js$''',
 ]
 regexTarget = "line"
 regexes = [

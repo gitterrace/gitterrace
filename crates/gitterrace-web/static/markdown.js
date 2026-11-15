@@ -33,7 +33,7 @@
   var s = document.createElement("script");
   // Beside this script, not at the root: an export opened from disk has its static folder
   // under the site, written with relative links, so `/static/` would leave the copy.
-  s.src = new URL("vendor/mermaid-11.17.2.min.js" + new URL(HERE).search, HERE).href;
+  s.src = new URL("vendor/mermaid-12.3.0.min.js" + new URL(HERE).search, HERE).href;
   s.onload = function () {
     var n = 0;
     function draw() {

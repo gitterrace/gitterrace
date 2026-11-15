@@ -59,7 +59,7 @@ fn every_route() -> BTreeSet<String> {
                 .map(|e| format!("/api/v1{}", e.path)),
         )
         .chain(std::iter::once(
-            "/static/vendor/mermaid-11.17.2.min.js".to_owned(),
+            "/static/vendor/mermaid-12.3.0.min.js".to_owned(),
         ))
         .collect()
 }
