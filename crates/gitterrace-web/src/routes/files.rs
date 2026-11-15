@@ -308,15 +308,27 @@ struct BlamePage {
     html: String,
 }
 
+/// Rows of blame per page and per fragment. About 400 bytes a row, so a page stays near
+/// 1 MB however many lines the file has.
+pub(crate) const BLAME_PAGE_LINES: usize = 2000;
+
+/// `?from=` asks for the blame rows from that zero-based line on, without the page around them.
+#[derive(serde::Deserialize)]
+pub(super) struct BlameQuery {
+    pub(super) from: Option<usize>,
+}
+
 /// Blame at one commit never changes, and its HTML is a row per line, so the page is rendered
 /// once per (rev, commit, path), as the tree is.
 pub(super) async fn blame(
     State(app): Shared,
     Path((rev, path)): Path<(String, String)>,
+    Query(q): Query<BlameQuery>,
 ) -> Result<Html<String>> {
     let (key, rev, path) = blocking(&app, move |a| {
         let id = a.repo.resolve(&rev)?;
-        let query = format!("{rev}\0{id}\0{}", path.trim_matches('/'));
+        let from = q.from.map_or_else(String::new, |f| f.to_string());
+        let query = format!("{rev}\0{id}\0{}\0{from}", path.trim_matches('/'));
         Ok((a.memo_key("blame", Some(&query)), rev, path))
     })
     .await?;
@@ -327,6 +339,19 @@ pub(super) async fn blame(
         let id = a.repo.resolve(&rev)?;
         let path = path.trim_matches('/').to_owned();
         let lines = a.repo.blame(&id, &path)?;
+        let render = views::Render::of(a);
+        let more = format!("/blame/{}/{}", fmt::enc_seg(&rev), fmt::enc_path(&path));
+        if let Some(from) = q.from {
+            return Ok(Err(views::blame_rows(
+                &render,
+                &path,
+                &lines,
+                from,
+                fmt::now(),
+                BLAME_PAGE_LINES,
+                &fmt::href(&more),
+            )));
+        }
         // Blame is empty for binary and oversized files; say which, from the header size.
         // `raw_blob` told to skip reads the header only, not the content.
         let too_large = lines.is_empty()
@@ -335,7 +360,7 @@ pub(super) async fn blame(
             Feature::Raw,
             &format!("/raw/{}/{}", fmt::enc_seg(&rev), fmt::enc_path(&path)),
         );
-        Ok(BlamePage {
+        Ok(Ok(BlamePage {
             c: views::chrome_at(a, "files", &rev),
             head: PageHead {
                 pin: true,
@@ -355,13 +380,23 @@ pub(super) async fn blame(
                     fmt::esc(&raw)
                 )
             } else {
-                views::blame_html(&views::Render::of(a), &path, &lines, fmt::now())
+                views::blame_first(
+                    &render,
+                    &path,
+                    &lines,
+                    fmt::now(),
+                    BLAME_PAGE_LINES,
+                    &fmt::href(&more),
+                )
             },
             title: path,
-        })
+        }))
     })
     .await?;
-    let html = p.render()?;
+    let html = match p {
+        Ok(page) => page.render()?,
+        Err(rows) => rows,
+    };
     app.memo_put(key, Arc::new(html.clone()));
     Ok(Html(html))
 }

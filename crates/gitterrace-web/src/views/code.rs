@@ -235,23 +235,70 @@ const HEAT_WORDS: [&str; 5] = [
     "Changed over 6 years ago",
 ];
 
+/// The whole blame table. A page shows [`blame_first`] and loads the rest in
+/// [`blame_rows`] pages, so a file of many lines does not arrive as one body.
+#[cfg(test)]
 pub(crate) fn blame_html(r: &Render, path: &str, lines: &[BlameLine], now: i64) -> String {
+    let mut out = String::from(BLAME_HEAD);
+    out.push_str(&blame_rows(r, path, lines, 0, now, usize::MAX, ""));
+    out.push_str("</table>");
+    out
+}
+
+/// The caption and quiet header row `_table.html` writes for a table the design shows without
+/// a header row.
+const BLAME_HEAD: &str = "<table class=\"code blame\"><caption class=\"vh\">Blame</caption>\
+     <thead class=\"quiet\"><tr>\
+     <th scope=\"col\"><span class=\"vh\">Commit</span></th>\
+     <th scope=\"col\"><span class=\"vh\">Line</span></th>\
+     <th scope=\"col\"><span class=\"vh\">Code</span></th></tr></thead>";
+
+/// The blame table with its first `page` rows. When more follow, the last row names the
+/// fragment at `more` (which gets `?from=` appended) that `nav.js` swaps in.
+pub(crate) fn blame_first(
+    r: &Render,
+    path: &str,
+    lines: &[BlameLine],
+    now: i64,
+    page: usize,
+    more: &str,
+) -> String {
+    let mut out = String::from(BLAME_HEAD);
+    out.push_str(&blame_rows(r, path, lines, 0, now, page, more));
+    out.push_str("</table>");
+    out
+}
+
+/// Rows `from..from + page` of the blame table, then the row that loads the next page when the
+/// file goes on. Byte for byte the rows [`blame_html`] writes for that range: a run that
+/// started before `from` keeps its bar and stays unlabelled, and the highlighter runs over the
+/// skipped lines so its state at `from` is the same.
+pub(crate) fn blame_rows(
+    r: &Render,
+    path: &str,
+    lines: &[BlameLine],
+    from: usize,
+    now: i64,
+    page: usize,
+    more: &str,
+) -> String {
     let total: usize = lines.iter().map(|l| l.text.len()).sum();
     let mut hl = (total <= r.highlight_bytes)
         .then(|| crate::highlight::for_file(path, lines.first().map_or("", |l| l.text.as_str())))
         .flatten();
-    // The same caption and quiet header row as `_table.html` writes for a table the design
-    // shows without a header row.
-    let mut out = String::from(
-        "<table class=\"code blame\"><caption class=\"vh\">Blame</caption>\
-         <thead class=\"quiet\"><tr>\
-         <th scope=\"col\"><span class=\"vh\">Commit</span></th>\
-         <th scope=\"col\"><span class=\"vh\">Line</span></th>\
-         <th scope=\"col\"><span class=\"vh\">Code</span></th></tr></thead>",
-    );
-    let mut prev = "";
-    let mut heat = 0;
-    for l in lines {
+    let from = from.min(lines.len());
+    if let Some(h) = hl.as_mut() {
+        for l in &lines[..from] {
+            h.line(&l.text);
+        }
+    }
+    let to = from.saturating_add(page).min(lines.len());
+    let mut out = String::new();
+    let mut prev = from.checked_sub(1).map_or("", |i| lines[i].commit.as_str());
+    let mut heat = from
+        .checked_sub(1)
+        .map_or(0, |i| heat_bucket(lines[i].time, now));
+    for l in &lines[from..to] {
         let first = l.commit != prev;
         prev = &l.commit;
         if first {
@@ -285,7 +332,16 @@ pub(crate) fn blame_html(r: &Render, path: &str, lines: &[BlameLine], now: i64) 
             n = l.line_no
         );
     }
-    out.push_str("</table>");
+    if to < lines.len() {
+        let _ = write!(
+            out,
+            "<tr class=\"more\" data-more=\"{}\"><td></td><td></td>\
+             <td class=\"c muted\">Loading lines {} to {}...</td></tr>",
+            esc(&format!("{more}?from={to}")),
+            to + 1,
+            lines.len()
+        );
+    }
     out
 }
 
@@ -302,6 +358,39 @@ mod tests {
             .map(|d| heat_bucket(ago(d), now))
             .collect();
         assert_eq!(got, [0, 1, 2, 3, 4]);
+    }
+
+    /// The blame pages, joined, are the whole table byte for byte, with highlighting on and a
+    /// run that crosses a page edge. Red when a page restarts the highlighter, labels a run
+    /// that began on the page before, or loses a row.
+    #[test]
+    fn blame_pages_join_to_the_whole_table() {
+        let now = 10 * 365 * 86_400;
+        let lines: Vec<_> = (0..23u32)
+            .map(|i| gitterrace_git::BlameLine {
+                line_no: i + 1,
+                commit: ["a", "b", "c"][(i / 5 % 3) as usize].repeat(40),
+                author: "A".into(),
+                time: now - i64::from(i) * 40 * 86_400,
+                text: if i == 3 {
+                    "/* open".into()
+                } else {
+                    format!("let x{i} = 1; */")
+                },
+            })
+            .collect();
+        let r = crate::views::Render::fold(400);
+        let whole = super::blame_html(&r, "a.rs", &lines, now);
+        let mut joined = super::blame_first(&r, "a.rs", &lines, now, 7, "/m");
+        let mut from = 7;
+        while from < lines.len() {
+            let tail = super::blame_rows(&r, "a.rs", &lines, from, now, 7, "/m");
+            let cut = joined.rfind("<tr class=\"more\"").expect("more row");
+            let end = joined[cut..].find("</tr>").expect("row end") + cut + "</tr>".len();
+            joined.replace_range(cut..end, &tail);
+            from += 7;
+        }
+        assert_eq!(joined, whole);
     }
 
     /// Each run of a blame says the age its heat bar shows, in words, once per run.

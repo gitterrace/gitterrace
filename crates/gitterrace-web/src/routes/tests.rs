@@ -74,6 +74,63 @@ async fn an_export_run_warms_no_blame() {
     assert!(!app.repo.blame_is_cached(&head, "big.txt"));
 }
 
+/// Guard class: a page body that grows with the file. A blame of many lines arrives as a page
+/// of at most `BLAME_PAGE_LINES` rows plus pages fetched through `?from=`, and following the
+/// pages yields every line once, in order. Red when any one answer holds the whole file (the
+/// 13 MB rust blame), or a page skips or repeats a line.
+#[tokio::test]
+async fn a_long_blame_arrives_in_bounded_pages() {
+    use axum::extract::Query;
+
+    use super::files::{BLAME_PAGE_LINES, BlameQuery};
+
+    let lines = 2 * BLAME_PAGE_LINES + 7;
+    let body = "line\n".repeat(lines);
+    let dir = tempfile::tempdir().expect("tmp");
+    let f = gitterrace_testkit::Fixture::init(dir.path())
+        .write("big.txt", &body)
+        .commit("feat: a");
+    let repo = gitterrace_git::Repo::discover(f.path()).expect("repo");
+    let index = gitterrace_index::Index::open(&repo).expect("index");
+    let env = crate::app::Env::new(gitterrace_config::Config::default());
+    let app = Arc::new(crate::app::App::configured(repo, index, &env));
+    let get = |from: Option<usize>| {
+        let app = Arc::clone(&app);
+        async move {
+            super::blame(
+                State(app),
+                Path(("HEAD".into(), "big.txt".into())),
+                Query(BlameQuery { from }),
+            )
+            .await
+            .expect("blame")
+            .0
+        }
+    };
+    let mut seen = Vec::new();
+    let mut page = get(None).await;
+    loop {
+        let rows = page.matches("<tr id=\"L").count();
+        assert!(rows <= BLAME_PAGE_LINES, "{rows} rows in one answer");
+        assert!(page.len() < BLAME_PAGE_LINES * 1024, "{} bytes", page.len());
+        seen.extend(
+            page.split("<tr id=\"L")
+                .skip(1)
+                .filter_map(|s| s.split('"').next()?.parse::<usize>().ok()),
+        );
+        let Some(next) = page.split("data-more=\"").nth(1) else {
+            break;
+        };
+        let from = next
+            .split("?from=")
+            .nth(1)
+            .and_then(|s| s.split('"').next()?.parse().ok())
+            .expect("from");
+        page = get(Some(from)).await;
+    }
+    assert_eq!(seen, (1..=lines).collect::<Vec<_>>());
+}
+
 /// Guard: the commit page (diff and diffstat) is rendered once per commit. The memo entry
 /// is swapped for a marker; a handler that diffs again would not return it.
 #[tokio::test]
@@ -210,12 +267,13 @@ async fn blame_page_is_memoized_until_the_branch_moves() {
         super::files::blame(
             State(Arc::clone(app)),
             Path(("main".into(), "a.txt".into())),
+            axum::extract::Query(super::files::BlameQuery { from: None }),
         )
     };
     let first = get(&app).await.expect("page").0;
     assert!(first.contains("one"), "{first}");
     let head = app.repo.resolve("main").expect("head");
-    let key = app.memo_key("blame", Some(&format!("main\0{head}\0a.txt")));
+    let key = app.memo_key("blame", Some(&format!("main\0{head}\0a.txt\0")));
     app.memo_put(key, Arc::new("memo".into()));
     assert_eq!(
         get(&app).await.expect("page").0,

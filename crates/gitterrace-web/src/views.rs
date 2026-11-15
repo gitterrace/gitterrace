@@ -14,7 +14,9 @@ use crate::fmt::{enc_path, enc_seg, esc_text, href};
 pub(crate) use crate::views::code::code_is_cached;
 #[cfg(test)]
 pub(crate) use crate::views::code::{CodeMemo, code_html, code_memo_has, code_memo_put};
-pub(crate) use crate::views::code::{blame_html, clear_code_memo, code_first, code_tail_html};
+pub(crate) use crate::views::code::{
+    blame_first, blame_rows, clear_code_memo, code_first, code_tail_html,
+};
 #[cfg(test)]
 pub(crate) use crate::views::code::{code, code_html_first};
 pub(crate) use crate::views::diff::{

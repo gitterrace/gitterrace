@@ -440,6 +440,42 @@
     }).catch(function () {});
   }
 
+  // ---- a long blame arrives a page at a time: the last row of each page names the next. It
+  // loads when it scrolls near, or at once while a #L anchor points past the loaded lines.
+  function wantedLine() {
+    var m = /^#L(\d+)/.exec(location.hash);
+    return m && !document.getElementById("L" + m[1]) ? +m[1] : 0;
+  }
+  function loadBlame(row) {
+    if (row.dataset.busy) return;
+    row.dataset.busy = "1";
+    if (blameObs) blameObs.unobserve(row);
+    var got = function (r) { if (!r.ok) throw r; return r.text(); };
+    fetch(row.dataset.more).then(got).then(function (h) {
+      row.insertAdjacentHTML("afterend", h);
+      row.remove();
+      paintLines();
+      var next = document.querySelector("tr[data-more]");
+      if (next && blameObs && !wantedLine()) blameObs.observe(next);
+      else if (next) loadBlame(next);
+    }, function () {
+      delete row.dataset.busy;
+      if (blameObs) blameObs.observe(row);
+    });
+  }
+  var blameObs = window.IntersectionObserver ? new IntersectionObserver(function (es) {
+    es.forEach(function (x) { if (x.isIntersecting) loadBlame(x.target); });
+  }, { rootMargin: "2000px 0px" }) : null;
+  var blameMore = document.querySelector("tr[data-more]");
+  if (blameMore) {
+    if (wantedLine() || !blameObs) loadBlame(blameMore);
+    else blameObs.observe(blameMore);
+    window.addEventListener("hashchange", function () {
+      var row = document.querySelector("tr[data-more]");
+      if (row && wantedLine()) loadBlame(row);
+    });
+  }
+
   // ---- folded diffs -----------------------------------------------------------
   // A folded file is a link to its body. Clicking it (or Enter on it) swaps the body in; a file
   // folded only for the page budget (data-lazy) also loads when it scrolls near the viewport,
