@@ -29,6 +29,9 @@ pub(crate) struct Visible {
     /// cost 20 and a hash set three to four times that.
     reachable: Vec<u64>,
     built: bool,
+    /// Test seam: treat every prefix as shared, so a hit always takes the exact walk.
+    #[cfg(test)]
+    ambiguous: bool,
 }
 
 impl Visible {
@@ -63,7 +66,11 @@ impl Visible {
         if self.reachable.binary_search(&prefix(&id)).is_err() {
             return Ok(false);
         }
-        if unique_prefix(repo, id) {
+        #[cfg(test)]
+        let shared = self.ambiguous;
+        #[cfg(not(test))]
+        let shared = false;
+        if !shared && unique_prefix(repo, id) {
             return Ok(true);
         }
         let roots: Vec<_> = self.roots.iter().copied().collect();
@@ -82,6 +89,16 @@ impl Visible {
     #[cfg(test)]
     pub(crate) const fn len(&self) -> usize {
         self.reachable.len()
+    }
+
+    /// Adds `id`'s prefix as a colliding reachable commit would, and marks every prefix shared.
+    #[cfg(test)]
+    pub(crate) fn inject_collision(&mut self, id: gix::ObjectId) {
+        let p = prefix(&id);
+        if let Err(i) = self.reachable.binary_search(&p) {
+            self.reachable.insert(i, p);
+        }
+        self.ambiguous = true;
     }
 
     /// Heap bytes the set holds.

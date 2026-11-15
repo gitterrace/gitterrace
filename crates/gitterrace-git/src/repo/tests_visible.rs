@@ -232,3 +232,26 @@ fn a_cleared_visible_set_rebuilds_on_the_next_full_id() {
     assert!(repo.resolve(&ids.old).is_ok());
     assert!(repo.visible.lock().expect("lock").len() > 0, "not rebuilt");
 }
+
+/// An unreachable id whose 8-byte prefix a reachable commit shares is refused by the exact
+/// walk, and a reachable id on a shared prefix is still served.
+#[test]
+fn a_shared_prefix_refuses_the_unreachable_id_and_serves_the_reachable_one() {
+    let (tmp, ids) = repo();
+    let repo = Repo::discover(tmp.path()).expect("repo").committed_only();
+    assert!(repo.resolve(&ids.old).is_ok(), "an old id builds the set");
+    let dangling = gix::ObjectId::from_hex(ids.dangling.as_bytes()).expect("hex");
+    repo.visible
+        .lock()
+        .expect("lock")
+        .inject_collision(dangling);
+    assert!(
+        repo.resolve(&ids.dangling).is_err(),
+        "a shared prefix served a hidden commit"
+    );
+    assert!(repo.resolve(&ids.stash).is_err(), "a stash leaked");
+    assert!(
+        repo.resolve(&ids.old).is_ok(),
+        "a shared prefix refused a reachable commit"
+    );
+}
