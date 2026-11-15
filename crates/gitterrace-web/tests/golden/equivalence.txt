@@ -1,4 +1,3 @@
-# asset URLs read as ?v=_, the overview drops its index bar, old insights paths 404; no insight moves
 62df12b1556b9acf5172fa6f1ce80df3 fc900536596665b8eb24ecf1ff249d29 [as-is] /?period=1m&bots=0&q=author%3Abob%40y.io
 62df12b1556b9acf5172fa6f1ce80df3 fc900536596665b8eb24ecf1ff249d29 [as-is] /?period=1m&bots=0&q=path%3Asrc
 62df12b1556b9acf5172fa6f1ce80df3 fc900536596665b8eb24ecf1ff249d29 [as-is] /?period=1m&bots=0&q=scope%3Acore

@@ -1,4 +1,3 @@
-# asset URLs read as ?v=_, the overview drops its index bar, old insights paths 404; no insight moves
 3d6331935b06992963d36c2eaffb6666 3d6331935b06992963d36c2eaffb6666 [browse] /api/files/HEAD
 5926060c7e0029dde61fa7387dbc2baf 5926060c7e0029dde61fa7387dbc2baf [browse] /api/refs
 0327ff173cdf7f080649b471f116c554 30fcf47c65cf16b258a2ccc42a80b236 [browse] /blame/HEAD/missing.rs
@@ -45,10 +44,10 @@ e479b3e0d0b922da0a75d49c285af6ca f42eb01356bd7c28dd74f6c9df00c1fa [browse] /tag/
 1d0ba04f03463405078b12c1ead01137 680fcc30343f4c0bba16d49319b6ac41 [browse] /tag/v1
 b7587570501040a99b5b1eb44146a716 b7587570501040a99b5b1eb44146a716 [browse] /tree/HEAD
 b7587570501040a99b5b1eb44146a716 b7587570501040a99b5b1eb44146a716 [browse] /tree/HEAD/
-340b8a029b714019babc54d9b8a0eddb 340b8a029b714019babc54d9b8a0eddb [browse] /tree/HEAD/docs
+4cc9c57e4ae8b227f5a030a9eda45538 4cc9c57e4ae8b227f5a030a9eda45538 [browse] /tree/HEAD/docs
 ed2685253ba13fbd3037f1f86981ff49 f33f3cf91d5c0eab79b4bb5ea699c16d [browse] /tree/HEAD/missing
-c90b436b8dabbc49615f17886f57cf1c c90b436b8dabbc49615f17886f57cf1c [browse] /tree/HEAD/src
-b8a34db412f0643570fc6149130028b6 b8a34db412f0643570fc6149130028b6 [browse] /tree/HEAD~1/src
+180ecca41e7f98535dceef1490d75930 180ecca41e7f98535dceef1490d75930 [browse] /tree/HEAD/src
+a13a2b4ec2da68752ffef0644c2970c3 a13a2b4ec2da68752ffef0644c2970c3 [browse] /tree/HEAD~1/src
 972aa68e556dc90a618a519524738a5f 972aa68e556dc90a618a519524738a5f [browse] /worktree
 64b0449b741409027c0e1bcc47459a42 64b0449b741409027c0e1bcc47459a42 [browse] /worktree/diff/src/lib.rs
 11d2ef2fe988d1b73ff52f2ae1a88336 2e58a733d69adeb2f766ca44a4b94038 [browse] /worktree/raw/missing.rs

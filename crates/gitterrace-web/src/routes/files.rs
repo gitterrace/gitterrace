@@ -127,16 +127,29 @@ fn tree_head(rev: &str, path: &str, list: &[gitterrace_git::TreeEntry]) -> PageH
         ),
     };
     let r = fmt::enc_seg(rev);
+    let mut actions = vec![Action {
+        label: "History",
+        href: crate::filter::Filter::default().link(
+            &format!("/log/{r}"),
+            crate::filter::Dim::Path,
+            path,
+        ),
+    }];
+    // A sub folder offers a code search scoped to it: the search form opens with its path glob
+    // filled in. The root needs none, the header search already covers it.
+    let search = crate::features::href_if(
+        Feature::Search,
+        &format!("/search?rev={r}&glob={}", fmt::enc_seg(&format!("{path}/"))),
+    );
+    if !path.is_empty() && !search.is_empty() {
+        actions.push(Action {
+            label: "Search here",
+            href: search,
+        });
+    }
     PageHead {
         crumbs: views::crumbs(rev, path, false),
-        actions: vec![Action {
-            label: "History",
-            href: crate::filter::Filter::default().link(
-                &format!("/log/{r}"),
-                crate::filter::Dim::Path,
-                path,
-            ),
-        }],
+        actions,
         ..PageHead::new(path, Tagline::of(&said))
     }
 }

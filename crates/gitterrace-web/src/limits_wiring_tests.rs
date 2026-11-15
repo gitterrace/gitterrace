@@ -213,3 +213,37 @@ async fn an_unknown_binary_names_its_format_size_and_a_download() {
         "{page}"
     );
 }
+
+#[tokio::test]
+async fn a_folder_offers_a_search_scoped_to_itself() {
+    let dir = tempfile::tempdir().expect("tmp");
+    let p = Fixture::init(&dir.path().join("r"))
+        .write("src/a/x.txt", "needle in a\n")
+        .write("src/b/y.txt", "needle in b\n")
+        .commit("feat: two folders")
+        .path()
+        .to_owned();
+    let app = router(&p, Config::default());
+    let (_, root) = get(&app, "/tree/HEAD").await;
+    assert!(
+        !root.contains(">Search here</a>"),
+        "the root has the header search"
+    );
+    let (_, folder) = get(&app, "/tree/HEAD/src/a").await;
+    let href = folder
+        .split("\">Search here</a>")
+        .next()
+        .and_then(|s| s.rsplit("href=\"").next())
+        .filter(|_| folder.contains(">Search here</a>"))
+        .expect("a Search here action")
+        .replace("&#38;", "&")
+        .replace("&amp;", "&");
+    // Links carry the repo base (`/r/<name>`), and the test router serves the repo at `/`.
+    let href = href[href.find("/search").expect("a search link")..].to_owned();
+    assert!(href.ends_with("glob=src%2Fa%2F"), "{href}");
+    let (_, hits) = get(&app, &format!("{href}&q=needle")).await;
+    assert!(hits.contains("src/a/x.txt"), "{hits}");
+    assert!(!hits.contains("src/b/y.txt"), "only the folder: {hits}");
+    let (_, form) = get(&app, &href).await;
+    assert!(form.contains("name=\"glob\" value=\"src/a/\""), "{form}");
+}
