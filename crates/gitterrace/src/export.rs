@@ -30,7 +30,7 @@ use axum::{Router, http::StatusCode};
 use gitterrace_git::percent_decode;
 
 use crate::export::caps::{Caps, is_fragment};
-use crate::export::credit::{Credit, add_footer};
+use crate::export::credit::{Credit, add_footer, repo_list};
 use crate::export::out::{Target, check_out};
 pub(crate) use crate::export::progress::{Mode, Progress};
 use crate::export::relative::relativize;
@@ -183,7 +183,7 @@ async fn crawl(
     let sites = sites(&router, repos).await?;
 
     let mut queue: VecDeque<String> = root_page(out, &sites)?.into_iter().collect();
-    let mut site_of = Vec::with_capacity(sites.len());
+    let (mut site_of, list) = (Vec::with_capacity(sites.len()), repo_list(&sites));
     for (repo_path, site) in repos.iter().zip(&sites) {
         wait_for_index(&router, site, progress).await?;
         let repo = gitterrace_git::Repo::discover(repo_path).context("opening the repository")?;
@@ -200,7 +200,7 @@ async fn crawl(
             prefix: site.clone(),
             stamp: snapshot_label(&repo, &head)?,
             credit: scope.projects.iter().position(|p| p.name == name),
-            footer: footer_for(&repo, &head, &name, site, scope),
+            footer: footer_for(&repo, &head, &name, site, scope) + &list,
             allowed: Allowed::new(&repo, &head, scope)?,
         });
     }

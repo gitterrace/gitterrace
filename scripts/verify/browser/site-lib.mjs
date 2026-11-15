@@ -1,10 +1,10 @@
 // Checks of marks and the generated site: mark seam, about placement, site theme.
 // Imported by scripts/verify/browser/browser-check.mjs, not run on its own.
-import { readFileSync, readdirSync, existsSync, mkdtempSync, rmSync } from 'node:fs';
+import { readFileSync, readdirSync, existsSync, mkdtempSync, renameSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { pathToFileURL } from 'node:url';
-import { root, launch, sh } from '../../lib/browser-lib.mjs';
+import { root, launch, makeRepo, sh } from '../../lib/browser-lib.mjs';
 
 /** @param {any} env what browser-check.mjs set up (pw, dir, srv, r, bin, cfg, arg, ...) */
 export function checks(env) {
@@ -347,5 +347,52 @@ async function installTabs() {
     }
   } finally { server.close(); }
 }
-  return { markSeam, aboutPlace, siteTheme, exportFromDisk, installTabs };
+// The repository switcher of an export of two repositories, opened from disk: it shows, ticks
+// the repository the page is in, and choosing the other opens that repository's pages. An
+// export has no /api, so the list comes from the page itself.
+async function exportSwitch() {
+  const out = join(mkdtempSync(join(tmpdir(), 'gt-export-')), 'site');
+  // A second repository under another folder name, so the export names two sites.
+  const other = join(mkdtempSync(join(tmpdir(), 'gt-other-')), 'other');
+  renameSync(makeRepo(), other);
+  sh(root, bin, 'export', out, dir, other);
+  const sites = readdirSync(join(out, 'r'));
+  for (const name of browsers) {
+    const b = await launch(pw, name);
+    const p = await b.newPage();
+    const where = `export-switch ${name}`;
+    const errors = [];
+    p.on('pageerror', (e) => errors.push(String(e)));
+    try {
+      await p.goto(pathToFileURL(join(out, 'r', sites[0], 'log', 'HEAD', 'index.html')).href);
+      await p.waitForTimeout(300);
+      const bad = [];
+      if (await p.$eval('#reposwitch', (e) => e.hidden)) bad.push('the switcher is hidden');
+      await p.click('#repobtn', { timeout: 3000 }).catch(() => bad.push('no switcher button'));
+      await p.waitForSelector('.repopanel li', { timeout: 3000 }).catch(() => {});
+      const items = await p.$$eval('.repopanel li', (l) => l.map((x) => ({
+        name: x.querySelector('.name')?.textContent, here: x.hasAttribute('aria-current'),
+      })));
+      if (items.length !== 2) bad.push(`${items.length} repositories listed`);
+      const ticked = items.some((x) => x.name === sites[0] && x.here);
+      if (!ticked) bad.push('the current one is not ticked');
+      const other = items.find((x) => !x.here);
+      if (other) {
+        await p.click(`.repopanel li:has(.name:text-is("${other.name}"))`);
+        await p.waitForLoadState('load');
+        const want = `/r/${other.name}/index.html`;
+        if (!p.url().endsWith(want)) bad.push(`choosing ${other.name} opens ${p.url()}`);
+      }
+      if (errors.length) bad.push(`script errors: ${errors.join('; ')}`);
+      if (bad.length) r.fail(`${where}: ${bad.join(', ')}`);
+      else r.ok(`${where}: two repositories, the current ticked, the other opens from disk`);
+    } catch (e) {
+      r.fail(`${where}: ${String(e.message).split('\n')[0]}`);
+    } finally { await b.close(); }
+  }
+  rmSync(join(out, '..'), { recursive: true, force: true });
+  rmSync(join(other, '..'), { recursive: true, force: true });
+}
+
+  return { markSeam, aboutPlace, siteTheme, exportFromDisk, exportSwitch, installTabs };
 }

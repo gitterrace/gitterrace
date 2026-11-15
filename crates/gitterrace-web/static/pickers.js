@@ -78,13 +78,13 @@
     x.addEventListener("click", closeOverlay);
     head.appendChild(x);
     box.appendChild(head);
-    var here = B.replace(/\/$/, "") + "/";
+    var here = STATIC ? location.href : B.replace(/\/$/, "") + "/";
     var p = listPicker(box, "Filter repositories", function (q) {
       return (repos || []).filter(function (x) {
         return !q || x.name.toLowerCase().indexOf(q) >= 0;
       });
     }, function (li, it) {
-      var on = it.href === here;
+      var on = STATIC ? here.indexOf(it.href.replace(/index\.html$/, "")) === 0 : it.href === here;
       var slot = el("span", "tick");
       if (on) { slot.appendChild(icon(TICK)); li.setAttribute("aria-current", "true"); }
       li.appendChild(slot);
@@ -95,23 +95,34 @@
     }, function (it) { location.href = it.href; }, "Enter to open", "No repositories match");
     n.ov.place(box, btn);
     if (repos) p.refresh();
-    else fetch("/api/repos").then(function (r) { return r.json(); })
-      .then(function (l) { repos = l; p.refresh(); });
+    else load(function (l) { repos = l; p.refresh(); });
   }
   var repoBtn = document.getElementById("repobtn");
+  // An export has no /api: it lists its repositories as hidden links on every page, already
+  // relative to it, and the current one is the link this page sits under.
+  function load(done) {
+    var nav = document.getElementById("gt-repolist");
+    if (!STATIC) {
+      return fetch("/api/repos", { cache: "no-store" })
+        .then(function (r) { return r.json(); }).then(done);
+    }
+    done(nav ? [].map.call(nav.querySelectorAll("a"), function (a) {
+      return { name: a.textContent, href: a.href, when: { text: "" } };
+    }) : []);
+    return Promise.resolve();
+  }
   function loadRepos() {
-    fetch("/api/repos", { cache: "no-store" }).then(function (r) { return r.json(); })
-      .then(function (l) {
+    load(function (l) {
       repos = l;
       var box = document.getElementById("reposwitch");
       if (box) box.hidden = l.length < 2;
     }).catch(function () {});
   }
-  if (repoBtn && !isOff("picker") && !STATIC) { // an export lists no repositories
+  if (repoBtn && !isOff("picker")) {
     repoBtn.addEventListener("click", openRepos);
     loadRepos();
     // live.js: a repository joined or left, so the switcher follows without a reload.
-    document.addEventListener("gt:repos-changed", loadRepos);
+    if (!STATIC) document.addEventListener("gt:repos-changed", loadRepos);
   }
   var rb = document.getElementById("refbtn");
   if (rb) rb.addEventListener("click", openRefs);

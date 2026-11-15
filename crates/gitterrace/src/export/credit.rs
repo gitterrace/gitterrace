@@ -81,6 +81,24 @@ pub(super) fn add_footer(html: &[u8], footer: &str) -> Vec<u8> {
     format!("{}{footer}{}", &page[..at], &page[at..]).into_bytes()
 }
 
+/// The repositories of an export as links, hidden, for the repository switcher: a static host
+/// has no `/api/repos`, and plain links are made relative like every other one. Empty for one
+/// repository, which shows no switcher.
+pub(super) fn repo_list(sites: &[String]) -> String {
+    if sites.len() < 2 {
+        return String::new();
+    }
+    let esc = gitterrace_types::esc;
+    let mut out = String::from("<nav id=\"gt-repolist\" hidden>");
+    for s in sites {
+        let name = s.rsplit('/').next().unwrap_or(s);
+        for part in ["<a href=\"", &esc(s), "/\">", &esc(name), "</a>"] {
+            out.push_str(part);
+        }
+    }
+    out + "</nav>"
+}
+
 fn find_license(repo: &Repo, head: &str) -> Option<License> {
     let mut names: Vec<String> = repo
         .tree(head, "")
