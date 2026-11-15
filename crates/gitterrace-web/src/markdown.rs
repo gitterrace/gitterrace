@@ -13,6 +13,7 @@ mod ids;
 mod image_tests;
 mod levels;
 mod lines;
+pub(crate) mod notebook;
 mod outline;
 
 use std::borrow::Cow;

@@ -238,6 +238,7 @@ pub(super) async fn blob(
                 markdown::Base::new(&rev, dir).highlight(views::Render::of(a).highlight_bytes),
             )
         });
+        let doc = doc.or_else(|| markdown::notebook::doc(text?, &path, &rev, views::Render::of(a)));
         let symbols = match (&doc, text, media.is_some()) {
             (None, Some(t), false) => {
                 crate::symbols::outline(&path, t, views::Render::of(a).blob_lines, named)

@@ -76,3 +76,10 @@
 .markdown-body table.fm th,.markdown-body table.fm td{padding:2px 12px 2px 0;border:0;background:none;vertical-align:top}
 .markdown-body table.fm th{color:var(--muted);font-weight:400;text-align:left;white-space:nowrap}
 .markdown-body table.fm tr{background:none}
+/* Jupyter notebooks: cells stacked, outputs under their input. */
+.markdown-body .nb-cell{margin:0 0 var(--space-4)}
+.markdown-body .nb-in{display:flex;gap:var(--space-2);align-items:flex-start}
+.markdown-body .nb-in .nb-code{flex:1;margin:0}
+.markdown-body .nb-count{font:var(--text-2xs)/1.4 var(--mono);padding-top:var(--space-2)}
+.markdown-body .nb-out{margin:var(--space-2) 0 0;background:none;border-left:var(--border)}
+.markdown-body .nb-img{max-width:100%;margin-top:var(--space-2)}

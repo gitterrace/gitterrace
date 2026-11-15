@@ -1,0 +1,15 @@
+<div class="notebook">
+{% for c in cells %}<div class="nb-cell">
+{% match c %}{% when Cell::Markdown with (html) %}<div class="nb-md">{{ html|safe }}</div>
+{% when Cell::Code with { count, html, outputs } %}<div class="nb-in">
+<span class="nb-count muted">[{{ count }}]</span>
+<pre class="nb-code"><code>{{ html|safe }}</code></pre></div>
+{% for o in outputs %}{% match o %}{% when Out::Text with (t) %}<pre class="nb-out">{{ t }}</pre>
+{% when Out::Image with { mime, data } %}<img class="nb-img" alt="image output"
+  src="data:{{ mime }};base64,{{ data }}">
+{% when Out::Dropped %}<p class="nb-out muted">Output not shown</p>
+{% endmatch %}{% endfor %}
+{% when Cell::Raw with (t) %}<pre class="nb-out">{{ t }}</pre>
+{% endmatch %}</div>
+{% endfor %}{% if cut > 0 %}<p class="muted pad">{{ cut }} more cells not shown.</p>{% endif %}
+</div>
