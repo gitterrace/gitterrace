@@ -288,7 +288,7 @@ async function periodSteady() {
     const { b, ctx } = await context(name);
     for (const width of [1400, 360]) {
       const at = [];
-      for (const q of ['', '?period=1w', '?period=1w&path=src']) {
+      for (const q of ['', '?period=1w', '?period=1w&q=path%3Asrc']) {
         const p = await ctx.newPage();
         await p.setViewportSize({ width, height: 700 });
         await p.goto(srv.base + '/stats' + q, { waitUntil: 'load' });
