@@ -46,6 +46,8 @@ gate = [
   # The whole workspace with every target: a lint in one crate's tests reaches main unseen
   # otherwise, and only the nightly full tier would fail on it. Seconds once warm.
   "make clippy",
+  # Rustdoc with warnings as errors: a doc link to a private item fails only here.
+  "make doc",
   "make lint",
 ]
 # The landing runs in a fresh clone, which has no core.hooksPath yet: set it there first. The
@@ -61,4 +63,3 @@ bench-guard = "builds a debug binary and runs the bench harness, minutes per lan
 docs-check = "the gate runs its cargo xtask check; the rest are self-tests of the dev scripts"
 test = "the gate runs the golden and xtask tests; the full workspace run is CI's"
 clippy-cross = "land-check runs the Windows target scoped to the touched crates; the workspace run is CI's"
-doc = "a full rustdoc build takes minutes; CI runs it on every push and pull request"

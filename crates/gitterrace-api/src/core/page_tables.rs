@@ -9,8 +9,7 @@ use gitterrace_index::{Insights, Options};
 use crate::core::ApiState;
 use crate::error::ApiError;
 
-/// The pages' source of a resolved tip and the key their tables hold it under, `None` while
-/// the pages hold no source for it.
+/// What [`Pages::source`] calls.
 pub type PageSource =
     Arc<dyn Fn(&str) -> Option<(Checked<dyn InsightsSource>, String)> + Send + Sync>;
 
@@ -19,7 +18,8 @@ pub type PageSource =
 pub struct Pages {
     /// The tables the pages slice.
     pub tables: Arc<gitterrace_index::SharedTables>,
-    /// See [`PageSource`].
+    /// The pages' source of a resolved tip and the key their tables hold it under, `None`
+    /// while the pages hold no source for it.
     pub source: PageSource,
 }
 
