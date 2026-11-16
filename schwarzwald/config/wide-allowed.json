@@ -65,7 +65,7 @@
     "crates/gitterrace-web/templates/worktree.html": 2,
     "crates/gitterrace/src/export/tests.rs": 1,
     "docs/actions/obsidian.sh": 1,
-    "scripts/lint/actions-check.sh": 6,
+    "scripts/lint/actions-check.sh": 5,
     "scripts/bench/bench-doc-lib.py": 4,
     "scripts/bench/bench-lib.py": 1,
     "scripts/bench/bench-quiet-lib.py": 1,

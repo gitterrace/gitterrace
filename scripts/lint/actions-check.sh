@@ -73,7 +73,11 @@ runa() {
 }
 expect_log() { case $log in *"$2"*) ;; *) fail "$1: log lacks '$2': $log" ;; esac }
 expect_rc() { [ "$rc" = "$2" ] || fail "$1: rc $rc, want $2 ($out)"; }
-expect_clean() { [ ! -e "$tmp/$1/work/PWNED" ] && [ ! -e "$tmp/$1/work/PWNED2" ] || fail "$1: payload was executed"; }
+expect_clean() {
+  if [ -e "$tmp/$1/work/PWNED" ] || [ -e "$tmp/$1/work/PWNED2" ]; then
+    fail "$1: payload was executed"
+  fi
+}
 one_line() {
   [ "$(printf '%s\n' "$out" | wc -l | tr -d ' ')" = 1 ] || fail "$1: not one line: $out"
   case $out in "gitterrace:"*) ;; *) fail "$1: message: $out" ;; esac

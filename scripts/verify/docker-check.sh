@@ -33,8 +33,9 @@ self_test() {
   local df=$root/Dockerfile ig=$root/.dockerignore want got
   want=$(toolchain_pin "$root/rust-toolchain.toml")
   got=$(toolchain_pin "$df")
-  [ -n "$want" ] && [ "$want" = "$got" ] ||
+  if [ -z "$want" ] || [ "$want" != "$got" ]; then
     fail "Dockerfile pins '$got', rust-toolchain.toml pins '$want'"
+  fi
   grep -q '^ENTRYPOINT .*"--public"' "$df" || fail "the entrypoint does not pass --public"
   grep -q '^USER 65532' "$df" || fail "the image does not run as the nonroot user"
   grep -q 'directory = \*' "$df" || fail "mounted repositories are not trusted by git"
@@ -62,7 +63,7 @@ tmp=$(mktemp -d)
 volume=gitterrace-check-$$
 cid=
 cleanup() {
-  [ -n "$cid" ] && docker rm -f "$cid" >/dev/null 2>&1 || true
+  if [ -n "$cid" ]; then docker rm -f "$cid" >/dev/null 2>&1 || true; fi
   docker volume rm "$volume" >/dev/null 2>&1 || true
   rm -rf "$tmp"
 }

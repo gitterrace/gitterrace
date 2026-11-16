@@ -11,7 +11,7 @@ tmp=$(mktemp -d)
 fails=0
 pid=
 cleanup() {
-  [ -n "$pid" ] && kill "$pid" 2>/dev/null || true
+  if [ -n "$pid" ]; then kill "$pid" 2>/dev/null || true; fi
   rm -rf "$tmp"
 }
 trap cleanup EXIT

@@ -59,8 +59,8 @@ hooks_wired() {
   fi
   top=$(git -C "$1" rev-parse --show-toplevel)
   [[ $set == /* ]] || set="$top/$set"
-  have=$(cd "$set" 2>/dev/null && pwd -P || true)
-  want=$(cd "$2" 2>/dev/null && pwd -P || true)
+  have=$( (cd "$set" 2>/dev/null && pwd -P) || true)
+  want=$( (cd "$2" 2>/dev/null && pwd -P) || true)
   if [[ -z $have || $have != "$want" ]]; then
     echo "land-check: core.hooksPath is $set, not the repo's scripts/hooks." >&2
     echo "land-check: fix: git config core.hooksPath scripts/hooks" >&2
