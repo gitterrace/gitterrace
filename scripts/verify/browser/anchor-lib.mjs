@@ -36,8 +36,8 @@ function png(w, h) {
 export function checks(env) {
   const { dir, srv, r, browsers, context, cfg } = env;
   // Heading ids are plain, as a user writes them, so the link resolves with JS on and off. A
-  // heading named like a chrome id ("theme") is prefixed; every heading also answers to its
-  // prefixed form, so a typed #main or an old #user-content-x link lands without script. The
+  // heading named like a chrome id ("theme") is prefixed, and its pilcrow and outline links say
+  // so; a typed #main still lands on the heading, not the page's <main>. The
   // commit goes on a side ref through a private index, so HEAD and the work tree the other checks
   // use stay put.
   async function mdAnchor() {
@@ -163,7 +163,6 @@ export function checks(env) {
         await land(`/blob/${sha}/anchor/lines.txt`, 'L120', -2, 350);
         const typed = await land(`/blob/${sha}/anchor/guide.md`, 'main', -2, 200);
         if (typed && typed.tag === 'MAIN') r.fail(`${how}: #main resolved to the page's <main>`);
-        await land(`/blob/${sha}/anchor/guide.md`, 'user-content-syntax-highlighting', -2, 200);
         await land(`/blob/${sha}/anchor/guide.md`, 'user-content-theme', -2, 200);
         await jb.close();
       }
