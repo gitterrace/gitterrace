@@ -214,24 +214,97 @@ fn history_horizon(
         .sorting(Sorting::ByCommitTime(CommitTimeOrder::NewestFirst))
         .all()
         .map_err(git)?;
+    // The walk reads every ancestor's root tree and the trees on `path`. Decoded through the
+    // repository's caches they stay resident after the blame (the blame prewarm runs this on
+    // many files at startup), so it reads raw bytes into two reused buffers with no object or
+    // pack cache, and skips commits whose root tree it already looked up.
+    let odb = horizon_odb(repo);
+    let mut commit_buf = Vec::new();
+    let mut tree_buf = Vec::new();
+    let mut trees = HashSet::new();
     let mut seen = HashSet::new();
     let mut held = 0u64;
     for info in walk {
-        let commit = info.map_err(git)?.object().map_err(git)?;
-        let tree = commit.tree().map_err(git)?;
-        let Some(entry) = crate::treepath::lookup(&tree, path)? else {
+        let info = info.map_err(git)?;
+        let data = gix::objs::Find::try_find(&odb, &info.id, &mut commit_buf)
+            .map_err(git)?
+            .ok_or_else(|| git(format!("missing commit {}", info.id)))?;
+        let mut iter = gix::objs::CommitRefIter::from_bytes(data.data, data.object_hash);
+        let root = iter.tree_id().map_err(git)?;
+        if !trees.insert(root) {
+            continue;
+        }
+        let Some(id) = blob_at(&odb, root, path, &mut tree_buf)? else {
             continue;
         };
-        let id = entry.object_id();
         if !seen.insert(id) {
             continue;
         }
-        held += repo.find_header(id).map_err(git)?.size();
+        held += gix::objs::FindHeader::try_header(&odb, &id)
+            .map_err(git)?
+            .map_or(0, |h| h.size);
         if held > budget {
+            let data = gix::objs::Find::try_find(&odb, &info.id, &mut commit_buf)
+                .map_err(git)?
+                .ok_or_else(|| git(format!("missing commit {}", info.id)))?;
+            let time = gix::objs::CommitRefIter::from_bytes(data.data, data.object_hash)
+                .committer()
+                .map_err(git)?
+                .time()
+                .map_err(git)?
+                .seconds;
             // Blame skips commits strictly older than `since`: one past this commit's time
             // keeps every newer version and drops this one.
-            return Ok(Some(commit.time().map_err(git)?.seconds + 1));
+            return Ok(Some(time + 1));
         }
+    }
+    Ok(None)
+}
+
+/// The object store the horizon walk reads through: the repository's, with no object cache
+/// and no pack delta cache, so nothing it reads outlives the walk.
+fn horizon_odb(repo: &gix::Repository) -> gix::OdbHandle {
+    let mut odb = repo.objects.clone();
+    odb.unset_object_cache();
+    odb.unset_pack_cache();
+    odb
+}
+
+/// The id at `path` below `root`, descending only through trees, as [`crate::treepath::lookup`].
+fn blob_at(
+    odb: &gix::OdbHandle,
+    root: gix::ObjectId,
+    path: &str,
+    buf: &mut Vec<u8>,
+) -> Result<Option<gix::ObjectId>> {
+    let mut id = root;
+    let mut parts = path.split('/').filter(|c| !c.is_empty()).peekable();
+    while let Some(name) = parts.next() {
+        let Some(data) = gix::objs::Find::try_find(odb, &id, buf).map_err(git)? else {
+            return Ok(None);
+        };
+        if data.kind != gix::objs::Kind::Tree {
+            return Ok(None);
+        }
+        let tree = gix::objs::TreeRefIter::from_bytes(data.data, data.object_hash);
+        let mut found = None;
+        for entry in tree {
+            let entry = entry.map_err(git)?;
+            if entry.filename == name.as_bytes() {
+                found = Some((entry.oid.to_owned(), entry.mode));
+                break;
+            }
+        }
+        let Some((oid, mode)) = found else {
+            return Ok(None);
+        };
+        if parts.peek().is_none() {
+            return Ok(Some(oid));
+        }
+        if !mode.is_tree() {
+            return Ok(None);
+        }
+        id = oid;
     }
     Ok(None)
 }
@@ -284,6 +357,39 @@ mod tests {
                 "{path}"
             );
         }
+        Ok(())
+    }
+
+    /// The horizon walk reads through a store with no object or pack cache even when the
+    /// blame's repository has both, and finds the boundary for a nested path through
+    /// commits that share a root tree. Red when the walk goes back to the repository's
+    /// cached store, or the raw tree lookup misses a nested path.
+    #[test]
+    fn the_horizon_walk_reads_uncached_and_finds_nested_paths() -> crate::Result<()> {
+        let dir = tempfile::tempdir().map_err(crate::error::git)?;
+        let p = dir.path();
+        std::fs::create_dir_all(p.join("d/e")).map_err(crate::error::git)?;
+        gitterrace_testkit::git_at(p, "2024-01-01T00:00:00Z", &["init", "-q", "-b", "main"]);
+        for n in 0..4 {
+            std::fs::write(p.join("d/e/f.txt"), "x".repeat(100) + &n.to_string())
+                .map_err(crate::error::git)?;
+            let date = format!("2024-01-01T00:0{n}:00Z");
+            gitterrace_testkit::git_at(p, &date, &["add", "-A"]);
+            gitterrace_testkit::git_at(p, &date, &["commit", "-qm", &format!("v{n}")]);
+            gitterrace_testkit::git_at(p, &date, &["commit", "-q", "--allow-empty", "-m", "e"]);
+        }
+        let repo = crate::Repo::discover(p)?;
+        let mut gix = repo.repo();
+        gix.object_cache_size(1024 * 1024);
+        let odb = super::horizon_odb(&gix);
+        assert!(gix.objects.has_object_cache());
+        assert!(!odb.has_object_cache() && !odb.has_pack_cache());
+        let tip = repo.resolve_id(&gix, "HEAD")?;
+        assert_eq!(super::history_horizon(&gix, tip, "d/e/f.txt", 1000)?, None);
+        // Two versions fit 250 bytes, the third (v1, at 00:01) does not.
+        let since = super::history_horizon(&gix, tip, "d/e/f.txt", 250)?;
+        assert_eq!(since, Some(1_704_067_260 + 1));
+        assert_eq!(super::history_horizon(&gix, tip, "d/missing", 0)?, None);
         Ok(())
     }
 
