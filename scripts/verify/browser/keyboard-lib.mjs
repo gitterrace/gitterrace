@@ -252,6 +252,8 @@ export function checks(env) {
       if (back && await back.isVisible()) r.ok(`keys-off ${bname}: back on after unchecking`);
       else r.fail(`keys-off ${bname}: t does nothing after turning shortcuts back on`);
       await p.keyboard.press('Escape');
+      // The field is folded behind the search button until it is opened.
+      await p.click('#searchbtn');
       await p.focus('#q');
       await p.keyboard.type('gtby');
       const typed = await p.$eval('#q', (i) => i.value);
