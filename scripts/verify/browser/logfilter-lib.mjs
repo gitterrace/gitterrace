@@ -67,7 +67,7 @@ export function checks(env) {
   // without script, at both widths. Escape closes it and gives focus back; a click outside
   // closes it (script only: without script a details only toggles).
   async function logFilterHelp() {
-    const names = ['type', 'scope', 'author', 'path', 'after', 'before', 'period', 'merge'];
+    const names = ['type', 'scope', 'author', 'path', 'after', 'before', 'merge'];
     for (const name of browsers) {
       for (const js of [true, false]) {
         const { b, ctx } = await context(name, { javaScriptEnabled: js });
@@ -94,7 +94,7 @@ export function checks(env) {
               const t = h.textContent;
               const rc = h.getBoundingClientRect();
               return { vis: h.getClientRects().length > 0, text: t,
-                more: !!h.querySelector('a[href*="log-filter"]'),
+                more: !!h.querySelector('a[href*="#find-commits"]'),
                 fits: rc.left >= 0 && rc.right <= innerWidth,
                 sideways: document.documentElement.scrollWidth - innerWidth };
             });
