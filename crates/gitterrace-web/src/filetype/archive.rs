@@ -6,7 +6,8 @@ use std::io::{Cursor, Read};
 
 use askama::Template;
 
-/// Entries past this many are counted out, not listed.
+/// Entries past this many are counted out, not listed. Not configurable: a read bound on a
+/// file from the repository, which may be hostile.
 pub(crate) const ENTRY_CAP: usize = 1000;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

@@ -37,6 +37,9 @@ gate = [
   # own unit tests pass (xtask check runs the binary, not its tests).
   "cargo xtask check",
   "cargo test -q -p xtask",
+  # The tree conventions (classified limits, one escaping, no shelled git): seconds, and a
+  # new crate file breaks them as easily as a new step does.
+  "cargo test -q -p gitterrace-testkit --test conventions",
   # The crates with features, built without them: the shipped build's lints (one crate pair,
   # seconds once warm), which the feature-unified workspace clippy of CI never sees.
   "make clippy-features",

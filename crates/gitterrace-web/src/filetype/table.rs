@@ -4,7 +4,7 @@
 use askama::Template;
 
 /// Rows past this many render as source instead: a table that long helps no one and costs
-/// the page its paint.
+/// the page its paint. Not configurable: past it the source view is the better page anyway.
 pub(crate) const ROW_CAP: usize = 5000;
 
 #[derive(Debug, PartialEq, Eq)]

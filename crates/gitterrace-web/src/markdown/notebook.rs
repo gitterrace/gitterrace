@@ -11,10 +11,12 @@ use crate::markdown;
 #[cfg(test)]
 mod wiring_tests;
 
-/// Most cells rendered; the rest are counted below the last one.
+/// Most cells rendered; the rest are counted below the last one. Not configurable: a read
+/// bound on a file from the repository, which may be hostile.
 const MAX_CELLS: usize = 500;
-/// Most bytes of outputs (text and image data) rendered across the notebook.
-const MAX_OUTPUT_BYTES: usize = 4 << 20;
+/// Most bytes of outputs (text and image data) rendered across the notebook. Not
+/// configurable: a read bound on a file from the repository, which may be hostile.
+const NOTEBOOK_OUTPUT_CAP: usize = 4 << 20;
 
 enum Out {
     Text(String),
@@ -73,7 +75,7 @@ pub(crate) fn render(src: &str, base: impl Fn() -> markdown::Base) -> Option<Str
         .or_else(|| v.pointer("/metadata/kernelspec/language"))
         .and_then(Value::as_str)
         .unwrap_or("python");
-    let mut budget = MAX_OUTPUT_BYTES;
+    let mut budget = NOTEBOOK_OUTPUT_CAP;
     let cells = all
         .iter()
         .take(MAX_CELLS)
@@ -239,7 +241,7 @@ mod tests {
 
     #[test]
     fn outputs_past_the_byte_budget_are_dropped() {
-        let big = "x".repeat(MAX_OUTPUT_BYTES / 2 + 1);
+        let big = "x".repeat(NOTEBOOK_OUTPUT_CAP / 2 + 1);
         let o = format!(r#"{{"output_type":"stream","text":"{big}"}}"#);
         let h = go(&nb(&format!(
             r#"{{"cell_type":"code","source":"","outputs":[{o},{o}]}}"#

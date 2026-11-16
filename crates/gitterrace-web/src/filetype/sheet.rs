@@ -8,7 +8,8 @@ use calamine::{Reader as _, open_workbook_auto_from_rs};
 
 use crate::filetype::table::Table;
 
-/// Bytes the members of a workbook may inflate to, in total: a zip bomb stops here.
+/// Bytes the members of a workbook may inflate to, in total: a zip bomb stops here. Not
+/// configurable: a read bound on a file from the repository, which may be hostile.
 const INFLATED_CAP: u64 = 64 << 20;
 
 /// Whether `path` is a workbook this module reads.
