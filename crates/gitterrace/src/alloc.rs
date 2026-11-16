@@ -12,8 +12,9 @@ use tikv_jemalloc_ctl::{Access, AsName};
 
 /// Applies the decay and notes a build without the arena setting. Returns true when the
 /// harness asked only for the allocator settings in effect (`TEST_ALLOC_DECAY` for the decay,
-/// `TEST_ALLOC_ARENAS` for the arena count, read by the guards in `tests/alloc.rs`), which are
-/// then printed.
+/// `TEST_ALLOC_ARENAS` for the arena count, `TEST_ALLOC_TCACHE` for the thread cache of the
+/// main thread and of a worker while and after it runs, read by the guards in
+/// `tests/alloc.rs`), which are then printed. Installs the index workers' thread cache hook.
 #[expect(
     clippy::print_stdout,
     clippy::print_stderr,
@@ -22,6 +23,24 @@ use tikv_jemalloc_ctl::{Access, AsName};
 )]
 pub(crate) fn start() -> std::io::Result<bool> {
     release_freed_pages()?;
+    gitterrace_git::set_worker_hook(thread_cache);
+    if std::env::var_os("TEST_ALLOC_TCACHE").is_some() {
+        let read =
+            || -> std::io::Result<bool> { "thread.tcache.enabled\0".name().read().map_err(ctl) };
+        let main = read()?;
+        let worker = std::thread::scope(|s| {
+            s.spawn(|| {
+                thread_cache(true);
+                let on = read();
+                thread_cache(false);
+                Ok::<_, std::io::Error>((on?, read()?))
+            })
+            .join()
+        })
+        .map_err(|_| std::io::Error::other("tcache probe panicked"))??;
+        println!("{main} {} {}", worker.0, worker.1);
+        return Ok(true);
+    }
     let arenas: u32 = "opt.narenas\0".name().read().map_err(ctl)?;
     if std::env::var_os("TEST_ALLOC_ARENAS").is_some() {
         println!("{arenas}");
@@ -39,6 +58,15 @@ pub(crate) fn start() -> std::io::Result<bool> {
     let [dirty, muzzy, dirty0, muzzy0] = decay()?;
     println!("{dirty} {muzzy} {dirty0} {muzzy0}");
     Ok(true)
+}
+
+/// The index workers' thread cache: on while a worker runs, off (which flushes it into the
+/// arena) when it ends. Off everywhere else, so an idle server's freed objects pin no pages.
+/// A failed switch only costs speed, so it is not reported.
+fn thread_cache(on: bool) {
+    if "thread.tcache.enabled\0".name().write(on).is_err() {
+        tracing::debug!("thread.tcache.enabled not switched");
+    }
 }
 
 /// Sets dirty and muzzy page decay to zero for every arena, now and later.

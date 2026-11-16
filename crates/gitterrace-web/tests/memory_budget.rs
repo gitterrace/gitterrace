@@ -45,6 +45,13 @@ fn apply_and_assert_allocator() {
         .name()
         .read()
         .expect("jemalloc is the global allocator");
+    // The binary's index workers run with a thread cache, flushed when each ends.
+    gitterrace_git::set_worker_hook(|on| {
+        b"thread.tcache.enabled\0"
+            .name()
+            .write(on)
+            .expect("switch thread cache");
+    });
     for key in ["dirty_decay_ms", "muzzy_decay_ms"] {
         for at in ["arenas", "arena.0"] {
             let name = format!("{at}.{key}\0");

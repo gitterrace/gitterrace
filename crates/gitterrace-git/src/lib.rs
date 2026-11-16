@@ -23,6 +23,7 @@ mod types;
 mod url;
 mod walk;
 mod watch;
+mod worker_hook;
 mod worktree;
 
 pub use atomic::{
@@ -69,6 +70,7 @@ pub use walk::{
     last_commits_among, scan_commits, tree_id,
 };
 pub use watch::{Parts, Watcher};
+pub use worker_hook::set_worker_hook;
 pub use worktree::{
     WORKTREE_DIFF_BYTES, WORKTREE_FILES, is_dirty, worktree_blob, worktree_bytes, worktree_diff,
     worktree_file_diff, worktree_signature,

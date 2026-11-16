@@ -313,3 +313,18 @@ fn code_counts_ignores_out_of_range_hunk() {
 fn build_hunks_ignores_out_of_range_hunk() {
     assert!(crate::diff::hunks::build_hunks(b"a\n", b"b\n", &stale_diff()).is_empty());
 }
+
+#[test]
+fn stream_workers_run_the_installed_hook_on_and_off() {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    static ON: AtomicUsize = AtomicUsize::new(0);
+    static OFF: AtomicUsize = AtomicUsize::new(0);
+    crate::set_worker_hook(|on| {
+        if on { &ON } else { &OFF }.fetch_add(1, Ordering::Relaxed);
+    });
+    let out = collect(&[1, 2, 3, 4], 3, 8, |i| Ok(*i));
+    assert!(out.is_ok());
+    // Other tests stream on their own workers meanwhile, so these are floors.
+    assert!(ON.load(Ordering::Relaxed) >= 3, "one on per worker");
+    assert!(OFF.load(Ordering::Relaxed) >= 3, "one off per worker");
+}

@@ -69,6 +69,7 @@ pub(crate) fn stream<T: Sync, S, R: Send>(
             let (next, stop, emitted, setup, work, weight) =
                 (&next, &stop, &emitted, &setup, &work, &weight);
             scope.spawn(move || {
+                let _hook = crate::worker_hook::WorkerGuard::start();
                 let mut state = match setup() {
                     Ok(s) => s,
                     Err(e) => {
