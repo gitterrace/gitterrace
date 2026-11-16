@@ -164,6 +164,23 @@ export function checks(env) {
         const typed = await land(`/blob/${sha}/anchor/guide.md`, 'main', -2, 200);
         if (typed && typed.tag === 'MAIN') r.fail(`${how}: #main resolved to the page's <main>`);
         await land(`/blob/${sha}/anchor/guide.md`, 'user-content-theme', -2, 200);
+        // The about card lands flush at the top, its border just above the window.
+        // A short page cannot scroll that far, so the window height makes it tall enough.
+        {
+          const pg = await jctx.newPage();
+          await pg.setViewportSize({ width: 1100, height: 300 });
+          await pg.goto(`${srv.base}/#about`, { waitUntil: 'load' });
+          await pg.waitForTimeout(1500);
+          const at = await pg.evaluate(() => {
+            const t = document.getElementById('about').getBoundingClientRect().top;
+            const end = scrollY >= document.documentElement.scrollHeight - innerHeight - 1;
+            return { top: Math.round(t * 10) / 10, end };
+          });
+          await pg.close();
+          at.top > -1.5 && at.top <= 0 && !at.end
+            ? r.ok(`${how}: #about lands flush at ${at.top} px`)
+            : r.fail(`${how}: #about at ${at.top} px${at.end ? ', page at its end' : ''}`);
+        }
         await jb.close();
       }
     }

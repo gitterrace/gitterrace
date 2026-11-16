@@ -8,6 +8,8 @@ section.file>header,.dochead{position:sticky;top:0;z-index:2}
 main>.ph.pin[data-stuck]::after{content:"";position:absolute;left:0;right:0;bottom:0;height:1px;background:var(--line);pointer-events:none}
 /* Focus and anchors inside a document card land below its pinned head. */
 html:has(.dochead){scroll-padding-top:calc(44px + var(--space-2))}
+/* The card itself sits flush, its top border 1px above the window like a diff file. */
+.card.doccard[id]{scroll-margin-top:calc(-44px - var(--space-2) - 1px)}
 section.file [id]{scroll-margin-top:calc(40px + var(--space-2))}
 .doccard [id^="L"],.doccard .markdown-body :is(h1,h2,h3,h4,h5,h6,.anchor){scroll-margin-top:calc(44px + var(--space-4))}
 [id^="L"]{scroll-margin-top:var(--space-2)}
