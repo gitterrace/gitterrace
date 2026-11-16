@@ -42,6 +42,13 @@ async fn blame_prewarm_fills_the_cache_for_the_costliest_files() {
     );
     assert_eq!(super::files::blame_warm_list(&files, &*src, 1), ["big.txt"]);
     assert!(!app.repo.blame_is_cached(&head, "big.txt"));
+    // Guard class: warm-up work that outlasts the idle period. The warm-up defers the idle
+    // release, so a spent budget starts no further blame. Red when the loop ignores time.
+    super::files::prewarm_blame_within(Arc::clone(&app), std::time::Duration::ZERO).await;
+    assert!(
+        !app.repo.blame_is_cached(&head, "big.txt"),
+        "the blame warm-up ran past its time budget"
+    );
     super::prewarm_blame(Arc::clone(&app)).await;
     assert!(app.repo.blame_is_cached(&head, "big.txt"));
     assert!(app.repo.blame_is_cached(&head, "small.txt"));

@@ -502,6 +502,10 @@ fn blame_said(lines: &[gitterrace_git::BlameLine]) -> String {
 
 /// Files blamed ahead of the first visitor after each index move.
 const BLAME_WARM_FILES: usize = 20;
+/// Longest the blame warm-up keeps starting files. It holds the warming guard, which defers the
+/// idle release, and one large blame took 9 s on a Linux runner: 20 of them kept a server that
+/// nobody browsed at its warm size for three minutes. Half the idle period bounds that.
+const BLAME_WARM_BUDGET: std::time::Duration = std::time::Duration::from_secs(15);
 
 /// The files whose first blame costs most: line count times lines changed over history. That
 /// tracks gix-blame's per-commit hunks x changes bookkeeping better than a commit count, and
@@ -546,10 +550,16 @@ pub(crate) fn blame_warm_list(
 /// An export run (the env with a change memo) skips it: it writes no blame page, and gix holds
 /// every past version of a blamed file while it runs, about 1 GB for one rust file.
 pub(crate) async fn prewarm_blame(app: Arc<App>) {
+    prewarm_blame_within(app, BLAME_WARM_BUDGET).await;
+}
+
+/// [`prewarm_blame`], starting no file once `budget` has passed.
+pub(crate) async fn prewarm_blame_within(app: Arc<App>, budget: std::time::Duration) {
     if app.env.changes.is_some() {
         return;
     }
     let work = tokio::task::spawn_blocking(move || {
+        let end = std::time::Instant::now() + budget;
         let Ok(head) = app.repo.resolve("HEAD") else {
             return;
         };
@@ -563,7 +573,10 @@ pub(crate) async fn prewarm_blame(app: Arc<App>) {
         };
         for path in list {
             let (used, limit) = app.repo.blame_cache_fill();
-            if used * 4 >= limit * 3 || app.repo.resolve("HEAD").ok().as_ref() != Some(&head) {
+            if std::time::Instant::now() >= end
+                || used * 4 >= limit * 3
+                || app.repo.resolve("HEAD").ok().as_ref() != Some(&head)
+            {
                 return;
             }
             if app.repo.blame_is_cached(&head, &path) {
