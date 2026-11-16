@@ -112,6 +112,47 @@ async function pathCells() {
   }
 }
 
+// The working tree's "View file" links form one column beside the counts, whatever the path
+// length or count width: a short path with a one-line change, a long one with thousands.
+async function viewFileColumn() {
+  const long = ['pkgs', 'long-package-name', 'src', 'a-rather-long-module-name.rs'].join('/');
+  const files = ['a.txt', long];
+  mkdirSync(join(dir, 'pkgs/long-package-name/src'), { recursive: true });
+  for (const f of files) writeFileSync(join(dir, f), 'base\n');
+  sh(dir, 'git', 'add', '-A');
+  sh(dir, 'git', 'commit', '-q', '-m', 'test: files for the working tree list');
+  writeFileSync(join(dir, files[0]), 'edited\n');
+  writeFileSync(join(dir, files[1]), 'x\n'.repeat(2500));
+  await new Promise((ok) => setTimeout(ok, 1500));
+  try {
+    for (const name of browsers) {
+      const { b, ctx } = await context(name);
+      for (const width of [1440, 900]) {
+        const p = await ctx.newPage();
+        await p.setViewportSize({ width, height: 700 });
+        await p.goto(`${srv.base}/worktree`, { waitUntil: 'load' });
+        const cells = await p.evaluate(() => [...document.querySelectorAll('.files li a.muted')]
+          .map((a) => ({
+            x: Math.round(a.getBoundingClientRect().right),
+            lines: a.getClientRects().length,
+          })));
+        const where = `view-file ${name} ${width}`;
+        const xs = new Set(cells.map((c) => c.x));
+        if (cells.length < 2) r.fail(`${where}: ${cells.length} View file links`);
+        else if (xs.size !== 1 || cells.some((c) => c.lines !== 1)) {
+          const lines = cells.map((c) => c.lines).join(',');
+          r.fail(`${where}: right edges ${[...xs].join(',')}, lines ${lines}`);
+        }
+        else r.ok(`${where}: ${cells.length} links in one column`);
+        await p.close();
+      }
+      await b.close();
+    }
+  } finally {
+    sh(dir, 'git', 'checkout', '-q', '--', '.');
+  }
+}
+
 // Every code row is as tall as its gutter number, an empty row included: a row of 24px text
 // beside a 20px empty one leaves the gutter band stepping by the difference. And a file page
 // and a diff set code at one size, so a shared rule cannot enlarge one of them.
@@ -146,5 +187,5 @@ async function codeRows() {
   }
 }
 
-  return { inlineControls, sectionGaps, pathCells, codeRows };
+  return { inlineControls, sectionGaps, pathCells, codeRows, viewFileColumn };
 }

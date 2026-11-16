@@ -186,6 +186,10 @@ thead.quiet th{padding:0;border:0;line-height:0;height:0}
 .files summary{display:flex;justify-content:space-between;gap:var(--space-4);padding:var(--space-3) var(--space-4);cursor:pointer;font-weight:var(--weight-semibold);background:var(--soft)}
 .files ul{list-style:none;margin:0;padding:0}
 .files li{display:flex;justify-content:space-between;gap:var(--space-4);padding:6px var(--space-4);border-top:var(--border);font-family:var(--mono);font-size:var(--text-sm)}
+/* The path takes the room; "View file" sits in one column just before the counts. */
+.files li>a:first-child{flex:1 1 auto;min-width:0}
+.files li>a.muted{flex:none;white-space:nowrap}
+.files li>.counts{flex:none;min-width:14ch;text-align:right}
 .files li:hover{background:var(--soft)}
 /* A file anchor scrolls the file to the top, its header where it pins. The file's own top
    border goes just above the window, so the header reads as already stuck. The app bar
