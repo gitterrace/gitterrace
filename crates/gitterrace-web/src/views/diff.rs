@@ -209,15 +209,11 @@ pub(crate) fn diff_html_with(r: &Render, src: DiffSource<'_>, files: &[FileDiff]
                 );
             }
             _ if f.kind == ChangeKind::Deleted => out.push_str(&esc(&f.path)),
-            DiffSource::Worktree => {
-                let _ = write!(
-                    out,
-                    "<a href=\"{}\">{}</a>",
-                    crate::fmt::href(&format!("/worktree/blob/{}", enc_path(&f.path))),
-                    esc(&file_label(f))
-                );
+            // The working tree's file list links each file once ("View file"): a second link in
+            // every diff header costs a 2,000-file diff 2,000 elements and opens nothing new.
+            DiffSource::Worktree | DiffSource::Commit { .. } => {
+                out.push_str(&esc(&file_label(f)));
             }
-            DiffSource::Commit { .. } => out.push_str(&esc(&file_label(f))),
         }
         let facts = match src {
             DiffSource::Commit { media, .. } if f.binary => media.get(&f.path),
