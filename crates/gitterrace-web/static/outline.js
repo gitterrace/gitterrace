@@ -28,16 +28,16 @@
       }
     });
   }
-  // A heading lands at the top, so the item is the last one above 30% of the window. A code
-  // line (a source file's symbol) is scrolled to the middle by the line link, so it is measured
-  // there, or the item above the followed one would light up. Both are measured in the part of
-  // the window below a pinned page head.
+  // A heading is the last one above 30% of the window. A followed code line (a source file's
+  // symbol) lands just under the pinned head by its scroll margin, and symbols sit a few lines
+  // apart, so it is measured near the top, or the item below the followed one would light up.
+  // Both are measured in the part of the window below a pinned page head.
   var mid = heads.length > 0 && !!heads[0].closest(".src");
   var pin = document.querySelector("main>.ph.pin");
   function current() {
     var pinned = pin && getComputedStyle(pin).position === "sticky";
     var top = pinned ? pin.getBoundingClientRect().height : 0;
-    var line = top + (window.innerHeight - top) * (mid ? 0.55 : 0.3);
+    var line = top + (window.innerHeight - top) * (mid ? 0.1 : 0.3);
     var id = heads.length ? heads[0].id : "";
     // Looked up by id each time: a live refresh swaps <main> and the first-screen highlight swaps
     // the code chunks, so an element held from load is detached, and its rect is all zeros,
