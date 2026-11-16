@@ -4,6 +4,37 @@ All notable changes are listed here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [0.1.1] - 2026-11-16
+
+### Added
+
+- export: a footer like the header, and a not-found page
+- web: a binary file names its format, size and a download link
+- web: a folder page offers a code search scoped to that folder
+- web: render Jupyter notebooks on the blob page
+- diff: fold generated files in diffs and search
+- web: open a changed file from the working tree in the blob view
+- web: show how far the branch is ahead of or behind its upstream
+- web: render CSV and TSV blobs as a table
+- web: list the entries of zip, jar, tar and tar.gz blobs
+- web: render the first sheet of xlsx and ods blobs as a table
+
+### Fixed
+
+- export: drop a font preload whole, however it is wrapped
+- index: make the cache folder again when it is gone before a write
+- web: diff and code rows keep the code size, so the gutter band is even
+- export: leave links the export cannot serve as text
+- export: the repository switcher works between exported repositories
+- web: light the followed symbol, not the one below it
+
+### Performance
+
+- web: page the blame view in rows of 2000
+- git: bound the past versions one blame reads
+- git: keep 8-byte id prefixes in the public reachable set
+- api: read the web pages' derived tables for insights
+- alloc: enable thread caches inside index workers only
 <!-- BEGIN GENERATED: unreleased -->
 <!-- END GENERATED: unreleased -->
 

@@ -3,21 +3,21 @@ members = ["crates/*", "xtask"]
 resolver = "2"
 
 [workspace.package]
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 rust-version = "1.96"
 license = "MIT"
 repository = "https://github.com/gitterrace/gitterrace"
 
 [workspace.dependencies]
-gitterrace-git = { path = "crates/gitterrace-git", version = "0.1.0" }
-gitterrace-index = { path = "crates/gitterrace-index", version = "0.1.0" }
-gitterrace-web = { path = "crates/gitterrace-web", version = "0.1.0" }
-gitterrace-api = { path = "crates/gitterrace-api", version = "0.1.0" }
-gitterrace-config = { path = "crates/gitterrace-config", version = "0.1.0" }
-gitterrace-actions = { path = "crates/gitterrace-actions", version = "0.1.0" }
+gitterrace-git = { path = "crates/gitterrace-git", version = "0.1.1" }
+gitterrace-index = { path = "crates/gitterrace-index", version = "0.1.1" }
+gitterrace-web = { path = "crates/gitterrace-web", version = "0.1.1" }
+gitterrace-api = { path = "crates/gitterrace-api", version = "0.1.1" }
+gitterrace-config = { path = "crates/gitterrace-config", version = "0.1.1" }
+gitterrace-actions = { path = "crates/gitterrace-actions", version = "0.1.1" }
 gitterrace-testkit = { path = "crates/gitterrace-testkit" }
-gitterrace-types = { path = "crates/gitterrace-types", version = "0.1.0" }
+gitterrace-types = { path = "crates/gitterrace-types", version = "0.1.1" }
 schwarzwald = { path = "vendor/schwarzwald/kit/rust" }
 gix = { version = "0.90", default-features = false, features = ["max-performance", "sha1", "blob-diff", "blame", "revision", "index", "mailmap", "status"] }
 axum = "0.8"
