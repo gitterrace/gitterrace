@@ -25,6 +25,8 @@ allow = [
     "MIT",
     "Apache-2.0",
     "Apache-2.0 WITH LLVM-exception",
+    # zstd-sys labels its legacy-format decoders (zstd/lib/legacy) with the 2-clause form.
+    "BSD-2-Clause",
     "BSD-3-Clause",
     "ISC",
     "Unicode-3.0",
