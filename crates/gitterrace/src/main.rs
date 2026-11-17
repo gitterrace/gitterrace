@@ -31,6 +31,8 @@ async fn main() -> anyhow::Result<()> {
     if alloc::start()? {
         return Ok(());
     }
+    // An index child runs its update and exits here, before any argument is parsed.
+    gitterrace_web::index_child();
     let cli = Cli::parse();
     let path = cli
         .paths

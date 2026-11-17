@@ -117,6 +117,7 @@ fn serve_if_child() -> bool {
         return false;
     };
     apply_and_assert_allocator();
+    gitterrace_web::index_child(); // As `main`: index updates run in a child of this exe.
     if let Ok(out) = std::env::var(HEAP_VAR) {
         report_heap(PathBuf::from(out));
     }

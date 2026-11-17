@@ -89,6 +89,7 @@ use std::{
     sync::Arc,
 };
 
+pub use crate::app::index_child;
 pub use add::TOKEN_HEADER as ADD_TOKEN_HEADER;
 use gitterrace_config::Config;
 use gitterrace_git::Repo;
@@ -107,12 +108,11 @@ pub use views::stats_tab_labels;
 
 use crate::app::{App, Env};
 
-/// The full router `serve` uses: pages and `/api/v1`. Starts the index
-/// refresher, so call it inside a tokio runtime. Drive it in-process with tower's `oneshot`.
+/// The full router `serve` uses: pages and `/api/v1`. Starts the index refresher, so call it
+/// inside a tokio runtime. Drive it in-process with tower's `oneshot`.
 ///
-/// Requests must carry a loopback `Host` header (`localhost`, `127.0.0.1`, `[::1]`), which
-/// stops DNS-rebinding pages from reading the repository. In-process callers send
-/// `Host: localhost`.
+/// Requests must carry a loopback `Host` header (`localhost`, `127.0.0.1`, `[::1]`), so
+/// DNS-rebinding pages cannot read the repository. In-process callers send `Host: localhost`.
 pub fn app_router(repo_path: impl AsRef<Path>) -> io::Result<axum::Router> {
     app_router_with(repo_path, Config::default())
 }

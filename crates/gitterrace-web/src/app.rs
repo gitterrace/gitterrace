@@ -27,6 +27,7 @@ pub(crate) const DIRTY_TTL: Duration = Duration::from_secs(2);
 /// the set again. The page memo still answers the unfiltered pages in between.
 pub(crate) const RECORDS_IDLE: Duration = Duration::from_secs(30);
 
+mod child;
 mod events;
 mod history;
 mod memo;
@@ -34,11 +35,11 @@ mod records;
 mod refresh;
 mod touched;
 
+pub use child::index_child;
 pub(crate) use history::PathLog;
 pub(crate) use refresh::{keep_index_fresh_supervised, on_refreshed, release_when_idle};
 
-/// What every repository of one server shares: the settings in force, the cap on page-building
-/// jobs and the shutdown signal that ends live streams.
+/// What every repository of one server shares: settings, job cap and the shutdown signal.
 #[derive(Clone)]
 pub(crate) struct Env {
     cfg: Arc<RwLock<Arc<Config>>>,
@@ -565,7 +566,6 @@ impl App {
     }
 }
 
-/// Runs git or index work off the async threads.
 pub(crate) async fn blocking<T: Send + 'static>(
     app: &Arc<App>,
     f: impl FnOnce(&App) -> Result<T> + Send + 'static,

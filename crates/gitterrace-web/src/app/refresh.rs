@@ -272,7 +272,7 @@ async fn refresh(app: &Arc<App>, rev: &str, warm: Option<&str>) {
     let a = Arc::clone(app);
     let spec = rev.to_owned();
     let run = tokio::task::spawn_blocking(move || {
-        a.index.update(&a.repo, &spec, &|p| a.set_progress(p))?;
+        crate::app::child::update(&a, &spec)?;
         // Every page's chrome shows the repo id, which walks the whole history once per
         // process: walk it here, before ready, not inside the first page.
         a.repo.id();

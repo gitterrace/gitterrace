@@ -5,6 +5,20 @@
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
+/// Every step name an update records, so steps read back from another process keep a
+/// static name.
+const NAMES: [&str; 9] = [
+    "rev_list",
+    "held",
+    "stream",
+    "stream.fold",
+    "append",
+    "finish",
+    "messages",
+    "chain",
+    "tip",
+];
+
 /// One step of the last update and its wall time in seconds.
 #[derive(Debug, Clone, PartialEq, serde::Serialize)]
 pub struct PhaseTime {
@@ -54,6 +68,20 @@ impl Phases {
                 name,
                 secs: took.as_secs_f64(),
             });
+        }
+    }
+
+    /// Replaces the steps with those of an update run elsewhere, by name.
+    pub(crate) fn adopt(&self, steps: &[(String, f64)]) {
+        let done = steps
+            .iter()
+            .filter_map(|(n, secs)| {
+                let name = NAMES.iter().find(|k| **k == n.as_str())?;
+                Some(PhaseTime { name, secs: *secs })
+            })
+            .collect();
+        if let Ok(mut s) = self.inner.lock() {
+            *s = State { done, now: None };
         }
     }
 

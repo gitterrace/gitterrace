@@ -154,6 +154,8 @@ pub struct Index {
     messages: std::sync::atomic::AtomicBool,
     /// Wall time per step of the last update, see [`Index::phases`].
     phases: phases::Phases,
+    /// Run a segment merge on the updating thread, see [`Index::set_merge_inline`].
+    merge_inline: std::sync::atomic::AtomicBool,
 }
 
 impl Index {
@@ -192,6 +194,7 @@ impl Index {
             newer,
             messages: std::sync::atomic::AtomicBool::new(false),
             phases: phases::Phases::default(),
+            merge_inline: std::sync::atomic::AtomicBool::new(false),
         })
     }
 
@@ -201,6 +204,18 @@ impl Index {
     pub fn set_message_index(&self, on: bool) {
         self.messages
             .store(on, std::sync::atomic::Ordering::Relaxed);
+    }
+
+    /// Runs a segment merge inside [`Index::update`], not on a thread of its own: for a process
+    /// that exits when the update returns, which would kill the merge half done.
+    pub fn set_merge_inline(&self, on: bool) {
+        self.merge_inline
+            .store(on, std::sync::atomic::Ordering::Relaxed);
+    }
+
+    /// Takes the steps of an update another process ran, by name, for [`Index::phases`].
+    pub fn adopt_phases(&self, steps: &[(String, f64)]) {
+        self.phases.adopt(steps);
     }
 
     /// The setting [`Index::set_message_index`] put in force.
@@ -460,6 +475,9 @@ impl Index {
         let dir = self.dir.clone();
         let (order, shallow) = (order.to_vec(), shallow.to_vec());
         let run = move || store::merge_stored(&dir, &order, &shallow);
+        if self.merge_inline.load(std::sync::atomic::Ordering::Relaxed) {
+            return run().map_or_else(|e| eprintln!("gitterrace: segment merge failed: {e}"), drop);
+        }
         let spawned = std::thread::Builder::new()
             .name("gitterrace-merge".into())
             .spawn(move || {

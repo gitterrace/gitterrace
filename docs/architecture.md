@@ -45,6 +45,11 @@ config keys lives in `gitterrace_config::naming`.
   worktree.
 - **Browsing never waits on the cache.** Only insights pages show "Indexing
   history" while the index builds. The overview shows no progress.
+- **The index builds in a child process.** The server starts its own executable
+  again to update the cache, then reads the segment set from disk. The build's
+  peak (allocator metadata, worker stacks) exits with the child, so an idle
+  server holds the same at 100k commits as at 2k
+  (`gitterrace-web/src/app/child.rs`).
 - **Assets are versioned by build.** Every `/static/` asset is linked as
   `/static/<name>?v=<build hash>` (`asset_url` in
   `gitterrace-web/src/routes/assets.rs`). At the current version it is
