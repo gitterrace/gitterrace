@@ -41,6 +41,16 @@ const RELEASE_WAIT_SECS: u64 = 120;
 /// measures retained pages instead of held memory, so it fails here instead of reporting.
 fn apply_and_assert_allocator() {
     use tikv_jemalloc_ctl::{Access, AsName};
+    // As the binary's `main` does: no transparent huge pages, which the kernel keeps resident
+    // after jemalloc returns the pages in them.
+    #[cfg(target_os = "linux")]
+    {
+        rustix::thread::disable_transparent_huge_pages(true).expect("disable THP");
+        assert!(
+            rustix::thread::transparent_huge_pages_are_disabled().expect("read THP"),
+            "transparent huge pages still on"
+        );
+    }
     let version: &str = b"version\0"
         .name()
         .read()

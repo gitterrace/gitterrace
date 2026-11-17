@@ -63,3 +63,22 @@ fn the_binary_enables_thread_caches_only_inside_index_workers() {
         "thread cache: main thread, worker running, worker done"
     );
 }
+
+/// The binary turns transparent huge pages off before it allocates anything that matters:
+/// with them on, a released server on Linux kept about 6 MB of huge pages resident.
+#[cfg(target_os = "linux")]
+#[test]
+fn the_binary_runs_with_transparent_huge_pages_disabled() {
+    let out = std::process::Command::new(env!("CARGO_BIN_EXE_git-terrace"))
+        .env("TEST_ALLOC_THP", "1")
+        .output();
+    let Ok(out) = out else {
+        panic!("run git-terrace: {out:?}");
+    };
+    assert!(out.status.success(), "{out:?}");
+    assert_eq!(
+        String::from_utf8_lossy(&out.stdout).trim(),
+        "true",
+        "PR_GET_THP_DISABLE of the binary"
+    );
+}

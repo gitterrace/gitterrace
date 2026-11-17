@@ -22,6 +22,14 @@ use tikv_jemalloc_ctl::{Access, AsName};
         logging starts"
 )]
 pub(crate) fn start() -> std::io::Result<bool> {
+    #[cfg(target_os = "linux")]
+    {
+        no_huge_pages()?;
+        if std::env::var_os("TEST_ALLOC_THP").is_some() {
+            println!("{}", rustix::thread::transparent_huge_pages_are_disabled()?);
+            return Ok(true);
+        }
+    }
     release_freed_pages()?;
     gitterrace_git::set_worker_hook(thread_cache);
     if std::env::var_os("TEST_ALLOC_TCACHE").is_some() {
@@ -67,6 +75,16 @@ fn thread_cache(on: bool) {
     if "thread.tcache.enabled\0".name().write(on).is_err() {
         tracing::debug!("thread.tcache.enabled not switched");
     }
+}
+
+/// Turns transparent huge pages off for this process. With THP on (the default on many
+/// kernels) the kernel backs jemalloc's extents with 2 MB pages and keeps a whole huge page
+/// resident while any of it is in use, so an idle server stayed about 6 MB above what it holds
+/// after jemalloc returned its freed pages. jemalloc's own `thp:never` does not stop the kernel.
+#[cfg(target_os = "linux")]
+fn no_huge_pages() -> std::io::Result<()> {
+    rustix::thread::disable_transparent_huge_pages(true)?;
+    Ok(())
 }
 
 /// Sets dirty and muzzy page decay to zero for every arena, now and later.

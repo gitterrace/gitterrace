@@ -47,7 +47,7 @@ tikv-jemallocator = "0.7"
 tikv-jemalloc-ctl = "0.7"
 # Whether the process that left an export's staging folder still runs, and moves of the
 # output through a handle on its real folder, never a path a link could redirect.
-rustix = { version = "1", default-features = false, features = ["std", "process", "fs"] }
+rustix = { version = "1", default-features = false, features = ["std", "process", "fs", "thread"] }
 
 # One binary: you run `git terrace`, because git runs any `git-<name>` on PATH.
 [[bin]]

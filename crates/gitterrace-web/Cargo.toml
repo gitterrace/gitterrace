@@ -56,3 +56,7 @@ http-body-util = "0.1"
 tikv-jemallocator = "0.7"
 # `stats`: the memory budget reads live heap (`stats.allocated`), which load cannot move.
 tikv-jemalloc-ctl = { version = "0.7", features = ["stats"] }
+
+# The memory budget's server turns transparent huge pages off, as the binary does.
+[target.'cfg(target_os = "linux")'.dev-dependencies]
+rustix = { version = "1", default-features = false, features = ["std", "thread"] }
