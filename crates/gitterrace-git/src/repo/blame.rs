@@ -3,6 +3,7 @@
 use std::cell::{Cell, RefCell};
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use crate::error::git;
 use crate::ident;
@@ -191,23 +192,48 @@ pub(crate) fn blame_outcome(
     Ok(blame_bounded(repo, tip, path, budget)?.0)
 }
 
-/// [`blame_outcome`] and the commits the horizon walk visited. Most files fit the budget, so
-/// the blame first runs with no horizon, counting the versions it reads, and gives up at the
-/// first one past the budget: only then does the walk find the horizon and the blame rerun.
-/// Walking first made every cold blame read the file's history twice.
+/// [`blame_outcome`] and the commits the horizon walk visited before the bounded blame. Most
+/// files fit the budget, so the blame first runs with no horizon, counting the versions it
+/// reads, and gives up at the first one past the budget. The horizon walk runs beside it on
+/// its own thread: when the blame fits, the walk stops and nothing reruns; when it does not,
+/// the blame gives up as soon as the walk has found the horizon, so a file past the cap pays
+/// the walk and the bounded blame, not a whole aborted pass before the walk starts.
 fn blame_bounded(
     repo: &gix::Repository,
     tip: gix::ObjectId,
     path: &str,
     budget: u64,
 ) -> Result<(gix::blame::Outcome, usize)> {
-    let counted = Budgeted::new(&repo.objects, budget);
-    match run_blame(repo, &counted, tip, path, None) {
+    let blamed = AtomicBool::new(false);
+    let found = AtomicBool::new(false);
+    // gix::Repository is not Send: the walk opens its own handle from the shared one.
+    let shared = repo.clone().into_sync();
+    let (first, over, horizon) = std::thread::scope(|s| {
+        let walk = s.spawn(|| {
+            let walk_repo = shared.to_thread_local();
+            let horizon = history_horizon(&walk_repo, tip, path, budget, &blamed);
+            if matches!(&horizon, Ok(h) if h.since.is_some()) {
+                found.store(true, Ordering::Relaxed);
+            }
+            horizon
+        });
+        let counted = Budgeted::new(&repo.objects, budget, &found);
+        let first = run_blame(repo, &counted, tip, path, None);
+        let over = counted.over.get();
+        if !over {
+            blamed.store(true, Ordering::Relaxed);
+        }
+        let horizon = walk
+            .join()
+            .unwrap_or_else(|_| Err(git("blame horizon walk panicked")));
+        (first, over, horizon)
+    });
+    match first {
         Ok(outcome) => return Ok((outcome, 0)),
-        Err(e) if !counted.over.get() => return Err(e),
+        Err(e) if !over => return Err(e),
         Err(_) => {}
     }
-    let horizon = history_horizon(repo, tip, path, budget)?;
+    let horizon = horizon?;
     let since = horizon
         .since
         .map(|seconds| gix::date::Time { seconds, offset: 0 });
@@ -241,13 +267,15 @@ fn run_blame(
 }
 
 /// An object store that sums the distinct blobs read through it and fails the read that takes
-/// the sum past `budget`, so a blame gives up before it holds more than the cap.
+/// the sum past `budget`, or any blob read once `found` says the horizon walk already proved
+/// the history does not fit, so a blame gives up before it holds more than the cap.
 struct Budgeted<'a> {
     odb: &'a gix::OdbHandle,
     budget: u64,
     held: Cell<u64>,
     seen: RefCell<HashSet<gix::ObjectId>>,
     over: Cell<bool>,
+    found: &'a AtomicBool,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -255,13 +283,14 @@ struct Budgeted<'a> {
 struct OverBudget;
 
 impl<'a> Budgeted<'a> {
-    fn new(odb: &'a gix::OdbHandle, budget: u64) -> Self {
+    fn new(odb: &'a gix::OdbHandle, budget: u64, found: &'a AtomicBool) -> Self {
         Self {
             odb,
             budget,
             held: Cell::new(0),
             seen: RefCell::new(HashSet::new()),
             over: Cell::new(false),
+            found,
         }
     }
 }
@@ -279,7 +308,7 @@ impl gix::objs::Find for Budgeted<'_> {
         {
             let held = self.held.get() + d.data.len() as u64;
             self.held.set(held);
-            if held > self.budget {
+            if held > self.budget || self.found.load(Ordering::Relaxed) {
                 self.over.set(true);
                 return Err(gix::error::Error::from_error(OverBudget));
             }
@@ -297,12 +326,14 @@ impl gix::objs::FindHeader for Budgeted<'_> {
 /// The commit time blame must not look past so the distinct versions of `path` it reads sum
 /// to at most `budget` bytes, or `None` when the whole history fits. Walks ancestors newest
 /// first, as blame does, and stops at the first version that does not fit. Renames are not
-/// followed, matching `rewrites: None`.
+/// followed, matching `rewrites: None`. Gives up with no horizon once `stop` is set: the
+/// blame it runs beside has finished within the budget.
 fn history_horizon(
     repo: &gix::Repository,
     tip: gix::ObjectId,
     path: &str,
     budget: u64,
+    stop: &AtomicBool,
 ) -> Result<Horizon> {
     // The walk reads each ancestor's root tree and the trees on `path`. Decoded through the
     // repository's caches they stay resident after the blame (the blame prewarm runs this on
@@ -330,6 +361,9 @@ fn history_horizon(
     queue.push((time, tip, first));
     let mut held = 0u64;
     while let Some((time, id, blob)) = queue.pop() {
+        if stop.load(Ordering::Relaxed) {
+            return Ok(Horizon::default());
+        }
         out.commits += 1;
         commit_node(&odb, graph.as_ref(), id, &mut commit_buf, &mut parents)?;
         let mut sides = Vec::new();

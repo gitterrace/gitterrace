@@ -1,5 +1,7 @@
 //! Tests of blame and its history horizon.
 
+use std::sync::atomic::AtomicBool;
+
 /// Blame through the owned index is gix's own blame, entry for entry, on a history with
 /// moves, edits under `.gitattributes` rules and a merge. Red when an option differs from
 /// the shortcut's default (rewrites, since, ranges, algorithm) or attributes are dropped.
@@ -74,14 +76,14 @@ fn the_horizon_walk_owns_its_caches_and_finds_nested_paths() -> crate::Result<()
     assert!(!odb.has_object_cache() && odb.has_pack_cache());
     let tip = repo.resolve_id(&gix, "HEAD")?;
     assert_eq!(
-        super::history_horizon(&gix, tip, "d/e/f.txt", 1000)?.since,
+        super::history_horizon(&gix, tip, "d/e/f.txt", 1000, &AtomicBool::new(false))?.since,
         None
     );
     // Two versions fit 250 bytes, the third (v1, at 00:01) does not.
-    let since = super::history_horizon(&gix, tip, "d/e/f.txt", 250)?.since;
+    let since = super::history_horizon(&gix, tip, "d/e/f.txt", 250, &AtomicBool::new(false))?.since;
     assert_eq!(since, Some(1_704_067_260 + 1));
     assert_eq!(
-        super::history_horizon(&gix, tip, "d/missing", 0)?.since,
+        super::history_horizon(&gix, tip, "d/missing", 0, &AtomicBool::new(false))?.since,
         None
     );
     Ok(())
@@ -128,7 +130,7 @@ fn the_horizon_walk_visits_only_the_files_own_history() -> crate::Result<()> {
     let repo = crate::Repo::discover(p)?;
     let gix = repo.repo();
     let tip = repo.resolve_id(&gix, "HEAD")?;
-    let horizon = super::history_horizon(&gix, tip, "f.txt", u64::MAX)?;
+    let horizon = super::history_horizon(&gix, tip, "f.txt", u64::MAX, &AtomicBool::new(false))?;
     // The 20 merges and the commit that added f.txt: the first parent always holds the
     // same version, so no side commit and nothing before the file is read.
     assert_eq!(horizon.commits, 21, "walked {} commits", horizon.commits);
@@ -199,5 +201,38 @@ fn blame_holds_only_the_versions_that_fit_its_budget() -> crate::Result<()> {
     );
     let lines: u32 = bounded.entries.iter().map(|e| e.len.get()).sum();
     assert_eq!(lines, 4001);
+    Ok(())
+}
+
+/// A file past the budget: once the horizon walk has found the horizon, the counting blame
+/// fails its next version read however much budget is left, and a walk told the blame fit
+/// gives up with no horizon. Red when a file past the cap pays a whole aborted blame pass
+/// before the walk starts, or the walk keeps running after a blame that fit.
+#[test]
+fn the_counting_blame_stops_once_the_walk_finds_the_horizon() -> crate::Result<()> {
+    let dir = tempfile::tempdir().map_err(crate::error::git)?;
+    let p = dir.path();
+    gitterrace_testkit::git_at(p, "2024-01-01T00:00:00Z", &["init", "-q", "-b", "main"]);
+    let mut body = String::new();
+    for n in 0..10 {
+        body.push_str(&"x".repeat(40));
+        body.push_str(&n.to_string());
+        body.push('\n');
+        std::fs::write(p.join("f.txt"), &body).map_err(crate::error::git)?;
+        let date = format!("2024-01-01T00:0{n}:00Z");
+        gitterrace_testkit::git_at(p, &date, &["add", "-A"]);
+        gitterrace_testkit::git_at(p, &date, &["commit", "-qm", &format!("v{n}")]);
+    }
+    let repo = crate::Repo::discover(p)?;
+    let gix = repo.repo();
+    let tip = repo.resolve_id(&gix, "HEAD")?;
+    let found = AtomicBool::new(true);
+    let counted = super::Budgeted::new(&gix.objects, u64::MAX, &found);
+    assert!(super::run_blame(&gix, &counted, tip, "f.txt", None).is_err());
+    let stopped = super::history_horizon(&gix, tip, "f.txt", 500, &AtomicBool::new(true))?;
+    assert_eq!((stopped.since, stopped.commits), (None, 0));
+    let (bounded, walked) = super::blame_bounded(&gix, tip, "f.txt", 500)?;
+    assert!(walked > 0);
+    assert!(bounded.statistics.blobs_diffed < 9);
     Ok(())
 }
