@@ -13,3 +13,9 @@ xtask = "run -q -p xtask --"
 # install, the release builds) get them, `cargo install --git` does not.
 [env]
 JEMALLOC_SYS_WITH_MALLOC_CONF = "narenas:1,tcache:false"
+# aarch64 Linux kernels run 64 KB pages, and jemalloc packs small classes into slabs of up to 7
+# pages: one object left in a class pins 448 KB. After a release some 40 classes hold a few
+# objects each (1.3 MB live), which kept 10 MB of slabs. One-page slabs for every class cut a
+# released 100k server from 14 to 11 MB and the 50k-file tree from 13 to 9. On macOS (16 KB
+# pages) the same setting raised the released idle, so it stays on this target.
+AARCH64_UNKNOWN_LINUX_GNU_JEMALLOC_SYS_WITH_MALLOC_CONF = "narenas:1,tcache:false,slab_sizes:1-1048576:1"
