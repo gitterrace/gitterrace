@@ -490,3 +490,41 @@ fn a_fresh_build_times_every_step_by_name() -> io::Result<()> {
     assert!(steps.iter().all(|p| p.secs >= 0.0));
     Ok(())
 }
+
+/// An inline segment merge, as the index child runs it, finishes inside the update: twelve
+/// appends push the set past the merge limit, and each update returns. Red when the merge runs
+/// under the update's own writer lock, which it then waits for forever.
+#[test]
+fn an_inline_merge_past_the_segment_limit_finishes_the_update() -> io::Result<()> {
+    let dir = tempfile::tempdir()?;
+    let path = dir.path().join("gitterrace");
+    let (tx, rx) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        let run = || -> io::Result<usize> {
+            let idx = Index::open_dir(path)?;
+            idx.set_merge_inline(true);
+            let names: Vec<String> = (0..12).map(|i| format!("c{i}")).collect();
+            for n in 1..=names.len() {
+                let these: Vec<&str> = names[..n].iter().map(String::as_str).collect();
+                idx.update(&Fake::new(&these), "HEAD", &|_| {})?;
+            }
+            crate::seg::manifest::Manifest::load(idx.dir())
+                .map_err(io::Error::other)?
+                .map_or(Ok(0), |m| {
+                    let seg = crate::seg::format::Kind::Segment as u8;
+                    Ok(m.live.iter().filter(|f| f.kind == seg).count())
+                })
+        };
+        drop(tx.send(run()));
+    });
+    let segs = rx
+        .recv_timeout(std::time::Duration::from_secs(30))
+        .map_err(|_| {
+            io::Error::other("the update never returned: the inline merge waits on its own lock")
+        })??;
+    assert!(
+        segs <= crate::store::MAX_SEGMENTS,
+        "{segs} segments: no merge ran"
+    );
+    Ok(())
+}
