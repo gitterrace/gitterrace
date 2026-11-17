@@ -97,18 +97,33 @@ pub(super) fn write_page(
         }
     }
     // The parents are real directories inside `out`; the leaf itself may still be a link.
-    write_leaf(&file, body)?;
+    write_staged(&file, body)?;
     Ok(true)
 }
 
 /// Through the shared no-follow temp-and-rename writer: a link at the leaf is refused, never
 /// written through, and a crash leaves the old page whole.
 pub(super) fn write_leaf(file: &Path, body: &[u8]) -> anyhow::Result<()> {
+    leaf(file, body, gitterrace_git::write_atomic)
+}
+
+/// [`write_leaf`] for a file in the staging folder, without a sync per file: one flush
+/// before publishing covers them all (`Staging::publish`), and a crash before it leaves only
+/// a staging folder that is removed. A sync per page doubled the export time on macOS, where
+/// it is a full device flush.
+pub(super) fn write_staged(file: &Path, body: &[u8]) -> anyhow::Result<()> {
+    leaf(file, body, gitterrace_git::write_atomic_unsynced)
+}
+
+fn leaf(
+    file: &Path,
+    body: &[u8],
+    write: fn(&Path, &str, &[u8], u32) -> std::io::Result<()>,
+) -> anyhow::Result<()> {
     let (Some(dir), Some(name)) = (file.parent(), file.file_name().and_then(|n| n.to_str())) else {
         bail!("refusing to write {}: no file name", file.display());
     };
-    gitterrace_git::write_atomic(dir, name, body, 0o644)
-        .with_context(|| format!("refusing to write {}", file.display()))
+    write(dir, name, body, 0o644).with_context(|| format!("refusing to write {}", file.display()))
 }
 
 pub(crate) async fn fetch(
@@ -176,6 +191,5 @@ async fn write_not_found(out: &Path, router: &Router) -> anyhow::Result<()> {
     let raw = String::from_utf8_lossy(&body);
     let page = crate::export::fonts::drop_font_preloads(&raw);
     let text = crate::export::relative::relativize(&page, "/", true);
-    gitterrace_git::write_atomic(out, "404.html", text.as_bytes(), 0o644)
-        .context("writing 404.html")
+    write_staged(&out.join("404.html"), text.as_bytes()).context("writing 404.html")
 }

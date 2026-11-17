@@ -196,6 +196,10 @@ impl Staging {
     ) -> anyhow::Result<()> {
         let parent = Dir::open(&self.target.parent)
             .with_context(|| format!("opening {}", self.target.parent.display()))?;
+        // Pages are staged unsynced (`write_staged`): one flush here makes them durable
+        // before any rename can expose them.
+        #[cfg(unix)]
+        rustix::fs::sync();
         match owned {
             None | Some(Owned::All) => {
                 write_leaf(

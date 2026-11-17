@@ -313,3 +313,29 @@ fn the_default_budget_has_no_page_limit() {
     capped.take("/log").expect("second");
     assert!(capped.take("/refs").is_err(), "a set cap still refuses");
 }
+
+/// Class: per-file flushes in an export, which scale its time with the page count (a full
+/// device flush each on macOS, double the export when a post-pass rewrote every page). The
+/// flush count stays far below the page count; red when any page writer, the crawl's or a
+/// later rewrite's, syncs per file. The counter is per thread, and the test runtime writes on
+/// this one.
+#[tokio::test]
+async fn an_export_does_not_flush_per_page() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let repo = wide(&dir.path().join("r"), 20, 5);
+    let before = gitterrace_git::synced_files();
+    let written = export(
+        &[repo.path().to_path_buf()],
+        &dir.path().join("out"),
+        &scope(20),
+        None,
+    )
+    .await
+    .expect("export");
+    let synced = gitterrace_git::synced_files() - before;
+    assert!(written > 40, "{written} pages written");
+    assert!(
+        synced * 4 < written as u64,
+        "{synced} files synced for {written} pages"
+    );
+}

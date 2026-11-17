@@ -94,6 +94,31 @@ fn read_flags(o: &mut OpenOptions) -> &mut OpenOptions {
 /// # Errors
 /// When `dir` is not a real folder, an entry at `name` is not a regular file, or the write fails.
 pub fn write_atomic(dir: &Path, name: &str, bytes: &[u8], mode: u32) -> io::Result<()> {
+    write_replacing(dir, name, bytes, mode, true)
+}
+
+/// [`write_atomic`] without the sync, for a folder discarded unless the whole job finishes.
+///
+/// An export's staging folder is one: a per-file flush there buys nothing and costs a full
+/// device flush per file on macOS.
+///
+/// # Errors
+/// As [`write_atomic`].
+pub fn write_atomic_unsynced(dir: &Path, name: &str, bytes: &[u8], mode: u32) -> io::Result<()> {
+    write_replacing(dir, name, bytes, mode, false)
+}
+
+/// Files synced on this thread. Per thread, so a test bounds its own job's flushes while
+/// other tests write in parallel.
+pub fn synced_files() -> u64 {
+    SYNCED.with(std::cell::Cell::get)
+}
+
+thread_local! {
+    static SYNCED: std::cell::Cell<u64> = const { std::cell::Cell::new(0) };
+}
+
+fn write_replacing(dir: &Path, name: &str, bytes: &[u8], mode: u32, sync: bool) -> io::Result<()> {
     static SEQ: AtomicU64 = AtomicU64::new(0);
     let path = regular_entry(dir, name)?;
     let tmp = dir.join(format!(
@@ -112,7 +137,14 @@ pub fn write_atomic(dir: &Path, name: &str, bytes: &[u8], mode: u32) -> io::Resu
     let _ = mode;
     let written = no_follow(&mut o)
         .open(&tmp)
-        .and_then(|mut f| f.write_all(bytes).and_then(|()| f.sync_all()))
+        .and_then(|mut f| {
+            f.write_all(bytes)?;
+            if sync {
+                SYNCED.with(|n| n.set(n.get() + 1));
+                f.sync_all()?;
+            }
+            Ok(())
+        })
         .and_then(|()| fs::rename(&tmp, &path));
     if written.is_err() {
         // Best effort: the temp name is this process's alone.

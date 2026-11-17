@@ -27,7 +27,7 @@ pub(super) fn unlink_dead(out: &Path) -> anyhow::Result<usize> {
                 let (text, n) = unlink(&html, |link| written(out, &base, link));
                 if n > 0 {
                     dropped += n;
-                    crate::export::write::write_leaf(&p, text.as_bytes())?;
+                    crate::export::write::write_staged(&p, text.as_bytes())?;
                 }
             }
         }
