@@ -26,6 +26,8 @@ use gitterrace_testkit::synthetic::{self, Shape};
 const BUDGET_MB: u64 = 32 + 16;
 /// Most that idle memory may grow from 2k commits to the largest size measured.
 const GROWTH_MB: u64 = 4;
+/// Live heap an idle server may hold more at the largest size than at 2k commits.
+const HEAP_GROWTH_KB: u64 = 512;
 const SERVE_VAR: &str = "TEST_MEMORY_SERVE";
 /// File the child writes its live heap bytes to, see `report_heap`.
 const HEAP_VAR: &str = "TEST_MEMORY_HEAP";
@@ -398,9 +400,9 @@ fn sweep(s: &Server, base: &str, side: usize) {
 
 const MB: u64 = 1024 * 1024;
 
-/// Returns (just started, idle, after sweep) in bytes. The caller asserts, after every size
-/// is measured, so one red size never hides the others.
-fn measure(repo: &Path, test: &str, side: usize) -> (u64, u64, u64) {
+/// Returns (just started, idle, after sweep, idle live heap) in bytes. The caller asserts once
+/// every size is measured, so one red size never hides the others.
+fn measure(repo: &Path, test: &str, side: usize) -> (u64, u64, u64, u64) {
     // "Just started" is a server on a one-commit repository: on `repo` itself indexing begins
     // at once, so its first reading would already hold the build.
     let start = {
@@ -423,19 +425,21 @@ fn measure(repo: &Path, test: &str, side: usize) -> (u64, u64, u64) {
     // Idle means after the server released what it built: wait for that release, not a time.
     s.wait_released(&base, 0);
     let idle = s.dirty();
+    let heap = s.heap();
     sweep(&s, &base, side);
     let swept = s.dirty();
     // The measurements, for the record of a red run: stderr is the test's report channel.
     writeln!(
         std::io::stderr(),
-        "{}: start {} MB, idle {} MB, after sweep {} MB",
+        "{}: start {} MB, idle {} MB, after sweep {} MB, idle heap {} KB",
         repo.display(),
         start / MB,
         idle / MB,
-        swept / MB
+        swept / MB,
+        heap / 1024
     )
     .expect("stderr");
-    (start, idle, swept)
+    (start, idle, swept, heap)
 }
 
 /// Red until the pages read from the segment store on disk: today the server holds the
@@ -479,7 +483,7 @@ fn memory_stays_in_budget_at_every_size() {
         ));
     }
     let mut bad = Vec::new();
-    for &(n, (start, idle, swept)) in &got {
+    for &(n, (start, idle, swept, _)) in &got {
         for (what, v) in [("idle", idle), ("after sweep", swept)] {
             if v > start + BUDGET_MB * MB {
                 bad.push(format!(
@@ -494,10 +498,16 @@ fn memory_stays_in_budget_at_every_size() {
     // Growth with history, idle and after the sweep (HEAD and the side branch): what a server
     // keeps per commit. The budget alone allows 48 MB at any size, which hides a per-commit
     // cost until a large repository (0.7 KB per commit is 12 MB at 20k but 1 GB on linux).
-    if let (Some(&(_, (_, idle0, swept0))), Some(&(n, (_, idle1, swept1)))) =
+    if let (Some(&(_, (_, idle0, swept0, heap0))), Some(&(n, (_, idle1, swept1, heap1)))) =
         (got.first(), got.last())
         && n > 2_000
     {
+        // No released object scales with history (live heap 629 KB at 2k, 662 at 100k): an id
+        // map or a cleared Vec keeping its capacity is MBs here before dirty pages show it.
+        if heap1 > heap0 + HEAP_GROWTH_KB * 1024 {
+            let (a, b) = (heap1 / 1024, heap0 / 1024);
+            bad.push(format!("released live heap {a} KB at {n}, {b} KB at 2000"));
+        }
         for (what, small, large) in [("idle", idle0, idle1), ("after sweep", swept0, swept1)] {
             if large > small + GROWTH_MB * MB {
                 bad.push(format!(
