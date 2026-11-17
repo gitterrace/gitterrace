@@ -3,9 +3,6 @@
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::Arc;
 
-use gix::revision::walk::Sorting;
-use gix::traverse::commit::simple::CommitTimeOrder;
-
 use crate::error::git;
 use crate::ident;
 use crate::repo::{BLAME_OBJECT_CACHE_BYTES, Repo};
@@ -18,6 +15,17 @@ pub(super) const BLAME_CACHE_BYTES: usize = 32 * 1024 * 1024;
 /// 2 MB file with 500 versions holds 1 GB. Lines older than the oldest version that fits are
 /// blamed on the boundary commit, as `git blame --since` does.
 pub(crate) const BLAME_HISTORY_BYTES: u64 = 96 * 1024 * 1024;
+/// Delta cache of one horizon walk, freed when the walk ends.
+const HORIZON_PACK_CACHE_BYTES: usize = 8 * 1024 * 1024;
+
+/// What [`history_horizon`] found.
+#[derive(Debug, Default)]
+struct Horizon {
+    /// The commit time blame must not look past, `None` when the whole history fits.
+    since: Option<i64>,
+    /// Commits the walk visited: the cost a cold blame pays before gix starts.
+    commits: usize,
+}
 
 pub(super) struct BlameCache {
     /// Approximate bytes kept before the oldest entries go.
@@ -180,6 +188,7 @@ pub(crate) fn blame_outcome(
     budget: u64,
 ) -> Result<gix::blame::Outcome> {
     let since = history_horizon(repo, tip, path, budget)?
+        .since
         .map(|seconds| gix::date::Time { seconds, offset: 0 });
     let mut cache = crate::diff::resource_cache(repo)?;
     gix::blame::file(
@@ -208,83 +217,142 @@ fn history_horizon(
     tip: gix::ObjectId,
     path: &str,
     budget: u64,
-) -> Result<Option<i64>> {
-    let walk = repo
-        .rev_walk([tip])
-        .sorting(Sorting::ByCommitTime(CommitTimeOrder::NewestFirst))
-        .all()
-        .map_err(git)?;
-    // The walk reads every ancestor's root tree and the trees on `path`. Decoded through the
+) -> Result<Horizon> {
+    // The walk reads each ancestor's root tree and the trees on `path`. Decoded through the
     // repository's caches they stay resident after the blame (the blame prewarm runs this on
-    // many files at startup), so it reads raw bytes into two reused buffers with no object or
-    // pack cache, and skips commits whose root tree it already looked up.
+    // many files at startup), so it reads raw bytes into two reused buffers with no object
+    // cache, and skips commits whose root tree it already looked up.
     let odb = horizon_odb(repo);
+    let graph = repo.commit_graph_if_enabled().map_err(git)?;
     let mut commit_buf = Vec::new();
     let mut tree_buf = Vec::new();
-    let mut trees = HashSet::new();
+    let mut trees = HashMap::new();
     let mut seen = HashSet::new();
+    let mut queued = HashSet::from([tip]);
+    // Newest first, as blame walks, and pruned as blame prunes: a commit without `path` ends
+    // its line (no renames are followed), and a commit whose parent holds the same version
+    // passes everything to that one parent, so the other sides of a merge are never read.
+    // Walking every ancestor instead read each commit since the file was added, ninety
+    // seconds for a header added once to linux.
+    let mut queue = std::collections::BinaryHeap::new();
+    let mut parents = Vec::new();
+    let (time, root) = commit_node(&odb, graph.as_ref(), tip, &mut commit_buf, &mut parents)?;
+    let mut out = Horizon::default();
+    let Some(first) = blob_at(&odb, root, path, &mut tree_buf, &mut trees)? else {
+        return Ok(out);
+    };
+    queue.push((time, tip, first));
     let mut held = 0u64;
-    for info in walk {
-        let info = info.map_err(git)?;
-        let data = gix::objs::Find::try_find(&odb, &info.id, &mut commit_buf)
-            .map_err(git)?
-            .ok_or_else(|| git(format!("missing commit {}", info.id)))?;
-        let mut iter = gix::objs::CommitRefIter::from_bytes(data.data, data.object_hash);
-        let root = iter.tree_id().map_err(git)?;
-        if !trees.insert(root) {
-            continue;
+    while let Some((time, id, blob)) = queue.pop() {
+        out.commits += 1;
+        commit_node(&odb, graph.as_ref(), id, &mut commit_buf, &mut parents)?;
+        let mut sides = Vec::new();
+        for parent in std::mem::take(&mut parents) {
+            let (t, root) = commit_node(
+                &odb,
+                graph.as_ref(),
+                parent,
+                &mut commit_buf,
+                &mut Vec::new(),
+            )?;
+            if let Some(b) = blob_at(&odb, root, path, &mut tree_buf, &mut trees)? {
+                sides.push((t, parent, b));
+            }
         }
-        let Some(id) = blob_at(&odb, root, path, &mut tree_buf)? else {
-            continue;
-        };
-        if !seen.insert(id) {
-            continue;
+        if let Some(same) = sides.iter().position(|s| s.2 == blob) {
+            let keep = sides.swap_remove(same);
+            sides.clear();
+            sides.push(keep);
         }
-        held += gix::objs::FindHeader::try_header(&odb, &id)
-            .map_err(git)?
-            .map_or(0, |h| h.size);
-        if held > budget {
-            let data = gix::objs::Find::try_find(&odb, &info.id, &mut commit_buf)
+        if seen.insert(blob) {
+            held += gix::objs::FindHeader::try_header(&odb, &blob)
                 .map_err(git)?
-                .ok_or_else(|| git(format!("missing commit {}", info.id)))?;
-            let time = gix::objs::CommitRefIter::from_bytes(data.data, data.object_hash)
-                .committer()
-                .map_err(git)?
-                .time()
-                .map_err(git)?
-                .seconds;
-            // Blame skips commits strictly older than `since`: one past this commit's time
-            // keeps every newer version and drops this one.
-            return Ok(Some(time + 1));
+                .map_or(0, |h| h.size);
+            if held > budget {
+                // Blame skips commits strictly older than `since`: one past this commit's
+                // time keeps every newer version and drops this one.
+                out.since = Some(time + 1);
+                return Ok(out);
+            }
+        }
+        for side in sides {
+            if queued.insert(side.1) {
+                queue.push(side);
+            }
         }
     }
-    Ok(None)
+    Ok(out)
+}
+
+/// The committer time and root tree of commit `id`, with its parents in `parents`. Read from
+/// the commit-graph when it holds `id`: that costs no object read, where decoding the commit
+/// from a pack costs a delta chain.
+fn commit_node(
+    odb: &gix::OdbHandle,
+    graph: Option<&gix::commitgraph::Graph>,
+    id: gix::ObjectId,
+    buf: &mut Vec<u8>,
+    parents: &mut Vec<gix::ObjectId>,
+) -> Result<(i64, gix::ObjectId)> {
+    parents.clear();
+    if let Some(commit) = graph.and_then(|g| g.commit_by_id(id)) {
+        let g = graph.ok_or_else(|| git("commit-graph vanished"))?;
+        for pos in commit.iter_parents() {
+            parents.push(g.id_at(pos.map_err(git)?).to_owned());
+        }
+        let time = i64::try_from(commit.committer_timestamp()).map_err(git)?;
+        return Ok((time, commit.root_tree_id().to_owned()));
+    }
+    let data = gix::objs::Find::try_find(odb, &id, buf)
+        .map_err(git)?
+        .ok_or_else(|| git(format!("missing commit {id}")))?;
+    let mut iter = gix::objs::CommitRefIter::from_bytes(data.data, data.object_hash);
+    let root = iter.tree_id().map_err(git)?;
+    parents.extend(iter.parent_ids());
+    let time = iter.committer().map_err(git)?.time().map_err(git)?.seconds;
+    Ok((time, root))
 }
 
 /// The object store the horizon walk reads through: the repository's, with no object cache
-/// and no pack delta cache, so nothing it reads outlives the walk.
+/// and a pack delta cache of its own, so nothing it reads outlives the walk. Without a delta
+/// cache every tree rebuilds its whole delta chain from the base, which made a cold blame of
+/// a long-history file several times slower.
 fn horizon_odb(repo: &gix::Repository) -> gix::OdbHandle {
     let mut odb = repo.objects.clone();
     odb.unset_object_cache();
-    odb.unset_pack_cache();
+    odb.set_pack_cache(|| {
+        Box::new(gix::odb::pack::cache::lru::StaticLinkedList::<64>::new(
+            HORIZON_PACK_CACHE_BYTES,
+        ))
+    });
     odb
 }
 
 /// The id at `path` below `root`, descending only through trees, as [`crate::treepath::lookup`].
+/// `memo` maps a tree below the root on `path` to the answer below it: most commits change
+/// the root tree but share the subtree that holds `path`, so a walk decodes that once.
 fn blob_at(
     odb: &gix::OdbHandle,
     root: gix::ObjectId,
     path: &str,
     buf: &mut Vec<u8>,
+    memo: &mut HashMap<(usize, gix::ObjectId), Option<gix::ObjectId>>,
 ) -> Result<Option<gix::ObjectId>> {
+    let parts: Vec<&str> = path.split('/').filter(|c| !c.is_empty()).collect();
     let mut id = root;
-    let mut parts = path.split('/').filter(|c| !c.is_empty()).peekable();
-    while let Some(name) = parts.next() {
+    let mut path_trees = Vec::new();
+    let mut answer = None;
+    for (depth, name) in parts.iter().enumerate() {
+        if let Some(known) = memo.get(&(depth, id)) {
+            answer = *known;
+            break;
+        }
+        path_trees.push((depth, id));
         let Some(data) = gix::objs::Find::try_find(odb, &id, buf).map_err(git)? else {
-            return Ok(None);
+            break;
         };
         if data.kind != gix::objs::Kind::Tree {
-            return Ok(None);
+            break;
         }
         let tree = gix::objs::TreeRefIter::from_bytes(data.data, data.object_hash);
         let mut found = None;
@@ -296,17 +364,22 @@ fn blob_at(
             }
         }
         let Some((oid, mode)) = found else {
-            return Ok(None);
+            break;
         };
-        if parts.peek().is_none() {
-            return Ok(Some(oid));
+        if depth + 1 == parts.len() {
+            answer = Some(oid);
+            break;
         }
         if !mode.is_tree() {
-            return Ok(None);
+            break;
         }
         id = oid;
     }
-    Ok(None)
+    // Root trees differ on almost every commit: keeping them would only grow the memo.
+    for key in path_trees.into_iter().filter(|(depth, _)| *depth > 0) {
+        memo.insert(key, answer);
+    }
+    Ok(answer)
 }
 
 #[cfg(test)]
@@ -360,12 +433,12 @@ mod tests {
         Ok(())
     }
 
-    /// The horizon walk reads through a store with no object or pack cache even when the
-    /// blame's repository has both, and finds the boundary for a nested path through
-    /// commits that share a root tree. Red when the walk goes back to the repository's
-    /// cached store, or the raw tree lookup misses a nested path.
+    /// The horizon walk reads through a store with no object cache and a delta cache of its
+    /// own even when the blame's repository has both, and finds the boundary for a nested
+    /// path through commits that share a root tree. Red when the walk goes back to the
+    /// repository's cached store, or the raw tree lookup misses a nested path.
     #[test]
-    fn the_horizon_walk_reads_uncached_and_finds_nested_paths() -> crate::Result<()> {
+    fn the_horizon_walk_owns_its_caches_and_finds_nested_paths() -> crate::Result<()> {
         let dir = tempfile::tempdir().map_err(crate::error::git)?;
         let p = dir.path();
         std::fs::create_dir_all(p.join("d/e")).map_err(crate::error::git)?;
@@ -383,13 +456,68 @@ mod tests {
         gix.object_cache_size(1024 * 1024);
         let odb = super::horizon_odb(&gix);
         assert!(gix.objects.has_object_cache());
-        assert!(!odb.has_object_cache() && !odb.has_pack_cache());
+        assert!(!odb.has_object_cache() && odb.has_pack_cache());
         let tip = repo.resolve_id(&gix, "HEAD")?;
-        assert_eq!(super::history_horizon(&gix, tip, "d/e/f.txt", 1000)?, None);
+        assert_eq!(
+            super::history_horizon(&gix, tip, "d/e/f.txt", 1000)?.since,
+            None
+        );
         // Two versions fit 250 bytes, the third (v1, at 00:01) does not.
-        let since = super::history_horizon(&gix, tip, "d/e/f.txt", 250)?;
+        let since = super::history_horizon(&gix, tip, "d/e/f.txt", 250)?.since;
         assert_eq!(since, Some(1_704_067_260 + 1));
-        assert_eq!(super::history_horizon(&gix, tip, "d/missing", 0)?, None);
+        assert_eq!(
+            super::history_horizon(&gix, tip, "d/missing", 0)?.since,
+            None
+        );
+        Ok(())
+    }
+
+    /// A file added late to a long history full of merges whose other side never touches it:
+    /// the horizon walk visits only the file's own line of commits, as blame does, never the
+    /// rest of the graph. Red when the walk goes back to every ancestor (a cold blame of a
+    /// header added once to linux took 90 s), follows a merge side that has the same version,
+    /// or keeps walking past the commit that added the file.
+    #[test]
+    fn the_horizon_walk_visits_only_the_files_own_history() -> crate::Result<()> {
+        let dir = tempfile::tempdir().map_err(crate::error::git)?;
+        let p = dir.path();
+        let at = |n: usize, args: &[&str]| {
+            let date = format!("2024-01-01T{:02}:{:02}:00Z", n / 60, n % 60);
+            gitterrace_testkit::git_at(p, &date, args);
+        };
+        at(0, &["init", "-q", "-b", "main"]);
+        // 100 commits of other work before the file exists.
+        for n in 0..100 {
+            std::fs::write(p.join("other.txt"), n.to_string()).map_err(crate::error::git)?;
+            at(n, &["add", "-A"]);
+            at(n, &["commit", "-qm", &format!("o{n}")]);
+        }
+        // The file, then 20 merges of side branches that change only other files.
+        std::fs::write(p.join("f.txt"), "one\n").map_err(crate::error::git)?;
+        at(100, &["add", "-A"]);
+        at(100, &["commit", "-qm", "add f"]);
+        for n in 0..20 {
+            let t = 101 + n * 4;
+            at(t, &["checkout", "-q", "-b", &format!("s{n}")]);
+            for k in 0..3 {
+                std::fs::write(p.join("side.txt"), format!("{n} {k}"))
+                    .map_err(crate::error::git)?;
+                at(t + k, &["add", "-A"]);
+                at(t + k, &["commit", "-qm", "side"]);
+            }
+            at(t + 3, &["checkout", "-q", "main"]);
+            at(
+                t + 3,
+                &["merge", "-q", "--no-ff", "--no-edit", &format!("s{n}")],
+            );
+        }
+        let repo = crate::Repo::discover(p)?;
+        let gix = repo.repo();
+        let tip = repo.resolve_id(&gix, "HEAD")?;
+        let horizon = super::history_horizon(&gix, tip, "f.txt", u64::MAX)?;
+        // The 20 merges and the commit that added f.txt: the first parent always holds the
+        // same version, so no side commit and nothing before the file is read.
+        assert_eq!(horizon.commits, 21, "walked {} commits", horizon.commits);
         Ok(())
     }
 
