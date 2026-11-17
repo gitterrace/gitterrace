@@ -4,7 +4,7 @@ All notable changes are listed here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
-## [0.1.1] - 2026-11-16
+## [0.1.1] - 2026-11-17
 
 ### Added
 
@@ -27,6 +27,9 @@ All notable changes are listed here. The format follows
 - export: leave links the export cannot serve as text
 - export: the repository switcher works between exported repositories
 - web: light the followed symbol, not the one below it
+- web: land the about card flush at the top of the window
+- web: line up the working tree's file links in one column
+- alloc: turn transparent huge pages off on Linux
 
 ### Performance
 
@@ -35,6 +38,13 @@ All notable changes are listed here. The format follows
 - git: keep 8-byte id prefixes in the public reachable set
 - api: read the web pages' derived tables for insights
 - alloc: enable thread caches inside index workers only
+- web: bound the blame warm-up by time so an idle server releases
+- web: keep memoized pages deflated
+- alloc: keep small objects in one-page slabs on aarch64 Linux
+- web: build the index in a child process
+- git: walk only the blamed file's history before a blame
+- git: skip the blame horizon walk when the versions fit
+- git: walk the blame horizon beside the counting pass
 <!-- BEGIN GENERATED: unreleased -->
 <!-- END GENERATED: unreleased -->
 
