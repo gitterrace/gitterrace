@@ -30,6 +30,7 @@ All notable changes are listed here. The format follows
 - web: land the about card flush at the top of the window
 - web: line up the working tree's file links in one column
 - alloc: turn transparent huge pages off on Linux
+- index: run a segment merge after the update releases its lock
 
 ### Performance
 
