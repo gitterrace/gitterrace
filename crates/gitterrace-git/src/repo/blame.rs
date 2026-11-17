@@ -1,5 +1,6 @@
 //! Line blame and its per-handle cache.
 
+use std::cell::{Cell, RefCell};
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::Arc;
 
@@ -187,12 +188,43 @@ pub(crate) fn blame_outcome(
     path: &str,
     budget: u64,
 ) -> Result<gix::blame::Outcome> {
-    let since = history_horizon(repo, tip, path, budget)?
+    Ok(blame_bounded(repo, tip, path, budget)?.0)
+}
+
+/// [`blame_outcome`] and the commits the horizon walk visited. Most files fit the budget, so
+/// the blame first runs with no horizon, counting the versions it reads, and gives up at the
+/// first one past the budget: only then does the walk find the horizon and the blame rerun.
+/// Walking first made every cold blame read the file's history twice.
+fn blame_bounded(
+    repo: &gix::Repository,
+    tip: gix::ObjectId,
+    path: &str,
+    budget: u64,
+) -> Result<(gix::blame::Outcome, usize)> {
+    let counted = Budgeted::new(&repo.objects, budget);
+    match run_blame(repo, &counted, tip, path, None) {
+        Ok(outcome) => return Ok((outcome, 0)),
+        Err(e) if !counted.over.get() => return Err(e),
+        Err(_) => {}
+    }
+    let horizon = history_horizon(repo, tip, path, budget)?;
+    let since = horizon
         .since
         .map(|seconds| gix::date::Time { seconds, offset: 0 });
+    let outcome = run_blame(repo, &repo.objects, tip, path, since)?;
+    Ok((outcome, horizon.commits))
+}
+
+fn run_blame(
+    repo: &gix::Repository,
+    odb: impl gix::objs::Find + gix::objs::FindHeader,
+    tip: gix::ObjectId,
+    path: &str,
+    since: Option<gix::date::Time>,
+) -> Result<gix::blame::Outcome> {
     let mut cache = crate::diff::resource_cache(repo)?;
     gix::blame::file(
-        &repo.objects,
+        odb,
         gix::blame::Start::Commit(tip),
         repo.commit_graph_if_enabled().map_err(git)?,
         &mut cache,
@@ -206,6 +238,60 @@ pub(crate) fn blame_outcome(
         },
     )
     .map_err(git)
+}
+
+/// An object store that sums the distinct blobs read through it and fails the read that takes
+/// the sum past `budget`, so a blame gives up before it holds more than the cap.
+struct Budgeted<'a> {
+    odb: &'a gix::OdbHandle,
+    budget: u64,
+    held: Cell<u64>,
+    seen: RefCell<HashSet<gix::ObjectId>>,
+    over: Cell<bool>,
+}
+
+#[derive(Debug, thiserror::Error)]
+#[error("blame history exceeds its byte budget")]
+struct OverBudget;
+
+impl<'a> Budgeted<'a> {
+    fn new(odb: &'a gix::OdbHandle, budget: u64) -> Self {
+        Self {
+            odb,
+            budget,
+            held: Cell::new(0),
+            seen: RefCell::new(HashSet::new()),
+            over: Cell::new(false),
+        }
+    }
+}
+
+impl gix::objs::Find for Budgeted<'_> {
+    fn try_find<'b>(
+        &self,
+        id: &gix::hash::oid,
+        buffer: &'b mut Vec<u8>,
+    ) -> gix::error::Result<Option<gix::objs::Data<'b>>> {
+        let data = gix::objs::Find::try_find(self.odb, id, buffer)?;
+        if let Some(d) = &data
+            && d.kind == gix::objs::Kind::Blob
+            && self.seen.borrow_mut().insert(id.to_owned())
+        {
+            let held = self.held.get() + d.data.len() as u64;
+            self.held.set(held);
+            if held > self.budget {
+                self.over.set(true);
+                return Err(gix::error::Error::from_error(OverBudget));
+            }
+        }
+        Ok(data)
+    }
+}
+
+impl gix::objs::FindHeader for Budgeted<'_> {
+    fn try_header(&self, id: &gix::hash::oid) -> gix::error::Result<Option<gix::objs::Header>> {
+        gix::objs::FindHeader::try_header(self.odb, id)
+    }
 }
 
 /// The commit time blame must not look past so the distinct versions of `path` it reads sum
@@ -383,177 +469,4 @@ fn blob_at(
 }
 
 #[cfg(test)]
-mod tests {
-    /// Blame through the owned index is gix's own blame, entry for entry, on a history with
-    /// moves, edits under `.gitattributes` rules and a merge. Red when an option differs from
-    /// the shortcut's default (rewrites, since, ranges, algorithm) or attributes are dropped.
-    #[test]
-    fn the_owned_index_blame_is_gix_blame() -> crate::Result<()> {
-        let dir = tempfile::tempdir().map_err(crate::error::git)?;
-        let p = dir.path();
-        let at = |args: &[&str]| gitterrace_testkit::git_at(p, "2024-01-02T12:00:00Z", args);
-        let body = |tag: &str| (0..30).fold(String::new(), |b, l| b + &format!("{tag} {l}\n"));
-        at(&["init", "-q", "-b", "main"]);
-        std::fs::write(
-            p.join(".gitattributes"),
-            "*.txt text eol=crlf\n*.md diff=markdown\n",
-        )
-        .map_err(crate::error::git)?;
-        std::fs::write(p.join("a.txt"), body("a")).map_err(crate::error::git)?;
-        std::fs::write(p.join("b.md"), body("b")).map_err(crate::error::git)?;
-        at(&["add", "-A"]);
-        at(&["commit", "-qm", "one"]);
-        at(&["mv", "a.txt", "moved.txt"]);
-        std::fs::write(p.join("moved.txt"), body("a") + "tail\n").map_err(crate::error::git)?;
-        at(&["commit", "-qam", "move and edit"]);
-        at(&["checkout", "-q", "-b", "side", "HEAD~1"]);
-        std::fs::write(p.join("b.md"), "side\n".to_owned() + &body("b"))
-            .map_err(crate::error::git)?;
-        at(&["commit", "-qam", "side edit"]);
-        at(&["checkout", "-q", "main"]);
-        at(&["merge", "-q", "--no-edit", "side"]);
-        let repo = crate::Repo::discover(p)?;
-        let gix = repo.repo();
-        let tip = repo.resolve_id(&gix, "HEAD")?;
-        for path in ["moved.txt", "b.md", ".gitattributes"] {
-            let ours = super::blame_outcome(&gix, tip, path, u64::MAX)?;
-            let theirs = gix
-                .blame_file(
-                    path.into(),
-                    tip,
-                    gix::repository::blame_file::Options::default(),
-                )
-                .map_err(crate::error::git)?;
-            assert_eq!(
-                format!("{:?}", ours.entries),
-                format!("{:?}", theirs.entries),
-                "{path}"
-            );
-        }
-        Ok(())
-    }
-
-    /// The horizon walk reads through a store with no object cache and a delta cache of its
-    /// own even when the blame's repository has both, and finds the boundary for a nested
-    /// path through commits that share a root tree. Red when the walk goes back to the
-    /// repository's cached store, or the raw tree lookup misses a nested path.
-    #[test]
-    fn the_horizon_walk_owns_its_caches_and_finds_nested_paths() -> crate::Result<()> {
-        let dir = tempfile::tempdir().map_err(crate::error::git)?;
-        let p = dir.path();
-        std::fs::create_dir_all(p.join("d/e")).map_err(crate::error::git)?;
-        gitterrace_testkit::git_at(p, "2024-01-01T00:00:00Z", &["init", "-q", "-b", "main"]);
-        for n in 0..4 {
-            std::fs::write(p.join("d/e/f.txt"), "x".repeat(100) + &n.to_string())
-                .map_err(crate::error::git)?;
-            let date = format!("2024-01-01T00:0{n}:00Z");
-            gitterrace_testkit::git_at(p, &date, &["add", "-A"]);
-            gitterrace_testkit::git_at(p, &date, &["commit", "-qm", &format!("v{n}")]);
-            gitterrace_testkit::git_at(p, &date, &["commit", "-q", "--allow-empty", "-m", "e"]);
-        }
-        let repo = crate::Repo::discover(p)?;
-        let mut gix = repo.repo();
-        gix.object_cache_size(1024 * 1024);
-        let odb = super::horizon_odb(&gix);
-        assert!(gix.objects.has_object_cache());
-        assert!(!odb.has_object_cache() && odb.has_pack_cache());
-        let tip = repo.resolve_id(&gix, "HEAD")?;
-        assert_eq!(
-            super::history_horizon(&gix, tip, "d/e/f.txt", 1000)?.since,
-            None
-        );
-        // Two versions fit 250 bytes, the third (v1, at 00:01) does not.
-        let since = super::history_horizon(&gix, tip, "d/e/f.txt", 250)?.since;
-        assert_eq!(since, Some(1_704_067_260 + 1));
-        assert_eq!(
-            super::history_horizon(&gix, tip, "d/missing", 0)?.since,
-            None
-        );
-        Ok(())
-    }
-
-    /// A file added late to a long history full of merges whose other side never touches it:
-    /// the horizon walk visits only the file's own line of commits, as blame does, never the
-    /// rest of the graph. Red when the walk goes back to every ancestor (a cold blame of a
-    /// header added once to linux took 90 s), follows a merge side that has the same version,
-    /// or keeps walking past the commit that added the file.
-    #[test]
-    fn the_horizon_walk_visits_only_the_files_own_history() -> crate::Result<()> {
-        let dir = tempfile::tempdir().map_err(crate::error::git)?;
-        let p = dir.path();
-        let at = |n: usize, args: &[&str]| {
-            let date = format!("2024-01-01T{:02}:{:02}:00Z", n / 60, n % 60);
-            gitterrace_testkit::git_at(p, &date, args);
-        };
-        at(0, &["init", "-q", "-b", "main"]);
-        // 100 commits of other work before the file exists.
-        for n in 0..100 {
-            std::fs::write(p.join("other.txt"), n.to_string()).map_err(crate::error::git)?;
-            at(n, &["add", "-A"]);
-            at(n, &["commit", "-qm", &format!("o{n}")]);
-        }
-        // The file, then 20 merges of side branches that change only other files.
-        std::fs::write(p.join("f.txt"), "one\n").map_err(crate::error::git)?;
-        at(100, &["add", "-A"]);
-        at(100, &["commit", "-qm", "add f"]);
-        for n in 0..20 {
-            let t = 101 + n * 4;
-            at(t, &["checkout", "-q", "-b", &format!("s{n}")]);
-            for k in 0..3 {
-                std::fs::write(p.join("side.txt"), format!("{n} {k}"))
-                    .map_err(crate::error::git)?;
-                at(t + k, &["add", "-A"]);
-                at(t + k, &["commit", "-qm", "side"]);
-            }
-            at(t + 3, &["checkout", "-q", "main"]);
-            at(
-                t + 3,
-                &["merge", "-q", "--no-ff", "--no-edit", &format!("s{n}")],
-            );
-        }
-        let repo = crate::Repo::discover(p)?;
-        let gix = repo.repo();
-        let tip = repo.resolve_id(&gix, "HEAD")?;
-        let horizon = super::history_horizon(&gix, tip, "f.txt", u64::MAX)?;
-        // The 20 merges and the commit that added f.txt: the first parent always holds the
-        // same version, so no side commit and nothing before the file is read.
-        assert_eq!(horizon.commits, 21, "walked {} commits", horizon.commits);
-        Ok(())
-    }
-
-    /// A file with many large versions: blame diffs only the versions that fit its budget, so
-    /// the blobs gix holds stay bounded however long the history is, and every line is still
-    /// blamed. Red when the bound is dropped, not passed to gix, or counted past the boundary.
-    #[test]
-    fn blame_holds_only_the_versions_that_fit_its_budget() -> crate::Result<()> {
-        let dir = tempfile::tempdir().map_err(crate::error::git)?;
-        let p = dir.path();
-        let version = |n: usize| {
-            (0..4000).fold(format!("v{n}\n"), |b, l| {
-                b + &format!("line {l} xxxxxxxxxx\n")
-            })
-        };
-        gitterrace_testkit::git_at(p, "2024-01-01T00:00:00Z", &["init", "-q", "-b", "main"]);
-        for n in 0..40 {
-            std::fs::write(p.join("big.txt"), version(n)).map_err(crate::error::git)?;
-            let date = format!("2024-01-01T{:02}:{:02}:00Z", n / 60, n % 60);
-            gitterrace_testkit::git_at(p, &date, &["add", "big.txt"]);
-            gitterrace_testkit::git_at(p, &date, &["commit", "-qm", &format!("v{n}")]);
-        }
-        let repo = crate::Repo::discover(p)?;
-        let gix = repo.repo();
-        let tip = repo.resolve_id(&gix, "HEAD")?;
-        let size = version(39).len() as u64;
-        let full = super::blame_outcome(&gix, tip, "big.txt", u64::MAX)?;
-        assert_eq!(full.statistics.blobs_diffed, 39);
-        let bounded = super::blame_outcome(&gix, tip, "big.txt", size * 5)?;
-        assert!(
-            bounded.statistics.blobs_diffed <= 5,
-            "diffed {} versions",
-            bounded.statistics.blobs_diffed
-        );
-        let lines: u32 = bounded.entries.iter().map(|e| e.len.get()).sum();
-        assert_eq!(lines, 4001);
-        Ok(())
-    }
-}
+mod tests;
