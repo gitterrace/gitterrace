@@ -1,16 +1,55 @@
 //! The rendered-page memo and its keys.
 
-use std::{sync::Arc, time::Instant};
+use std::{
+    io::{Read, Write},
+    sync::Arc,
+    time::Instant,
+};
 
 use crate::app::{App, MEMO_TTL};
+
+/// A rendered page held deflated. The memo is the one cache an idle release keeps, and pages
+/// of tens of KB fall into multi-page slab classes on 64 KB page kernels, where a few kept
+/// pages pinned whole slabs: 15 MB resident after the release on aarch64 Linux against a
+/// 12 MB cap. Deflated, the same pages weigh a tenth and pin a tenth of the slabs.
+pub(crate) struct Packed(Box<[u8]>);
+
+impl Packed {
+    /// `None` only when the encoder fails, which in memory it does not: the page is not kept.
+    fn pack(html: &str) -> Option<Self> {
+        let mut z = flate2::write::DeflateEncoder::new(
+            Vec::with_capacity(html.len() / 8),
+            flate2::Compression::fast(),
+        );
+        z.write_all(html.as_bytes()).ok()?;
+        Some(Self(z.finish().ok()?.into_boxed_slice()))
+    }
+
+    fn unpack(&self) -> Option<String> {
+        let mut out = String::new();
+        flate2::read::DeflateDecoder::new(&self.0[..])
+            .read_to_string(&mut out)
+            .ok()?;
+        Some(out)
+    }
+}
+
+impl crate::bounded::Weight for Packed {
+    fn weight(&self) -> usize {
+        self.0.len()
+    }
+}
 
 impl App {
     /// A rendered page for `key`, if fresh, carrying the live version of now. The key does not
     /// move with the version (it moves on every worktree change, which would empty the memo),
     /// so the page's `data-live-v` is stamped here: a stale one makes the tab hear everything.
     pub(crate) fn memo_get(&self, key: &str) -> Option<String> {
-        let (at, html) = self.memo.lock().ok()?.get(key)?;
-        (at.elapsed() < MEMO_TTL).then(|| stamp(&html, self.version()))
+        let (at, packed) = self.memo.lock().ok()?.get(key)?;
+        if at.elapsed() >= MEMO_TTL {
+            return None;
+        }
+        Some(stamp(&packed.unpack()?, self.version()))
     }
 
     /// The lock held while `key` is rendered. A second request for the same cold key waits on
@@ -29,9 +68,12 @@ impl App {
         }
     }
 
-    pub(crate) fn memo_put(&self, key: String, html: Arc<String>) {
+    pub(crate) fn memo_put(&self, key: String, html: &str) {
+        let Some(packed) = Packed::pack(html) else {
+            return;
+        };
         if let Ok(mut g) = self.memo.lock() {
-            g.put(key, (Instant::now(), html));
+            g.put(key, (Instant::now(), Arc::new(packed)));
         }
     }
 

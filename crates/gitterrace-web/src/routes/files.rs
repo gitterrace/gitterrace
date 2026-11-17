@@ -104,7 +104,7 @@ pub(super) async fn tree(
     })
     .await?;
     let html = p.render()?;
-    app.memo_put(key, Arc::new(html.clone()));
+    app.memo_put(key, &html);
     Ok(Html(html))
 }
 
@@ -479,7 +479,7 @@ pub(super) async fn blame(
         Ok(page) => page.render()?,
         Err(rows) => rows,
     };
-    app.memo_put(key, Arc::new(html.clone()));
+    app.memo_put(key, &html);
     Ok(Html(html))
 }
 

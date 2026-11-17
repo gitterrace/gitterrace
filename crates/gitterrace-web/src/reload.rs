@@ -146,7 +146,7 @@ mod tests {
         let mut f = fixture("");
         assert!(f.reloader.poll(&f.env).is_empty(), "no edit, no work");
         let mut tab = f.app.changes.subscribe();
-        f.app.memo_put("k".into(), Arc::new("page".into()));
+        f.app.memo_put("k".into(), "page");
         edit(&f, "[insights]\nperiod = \"1y\"\n[limits]\ntext_kb = 7\n");
         f.reloader.poll(&f.env);
         assert_eq!(f.env.cfg().insights.period, Period::Year);

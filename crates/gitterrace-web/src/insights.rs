@@ -346,7 +346,7 @@ pub(crate) async fn cached_keyed<T: askama::Template + Send + 'static>(
     }
     let (html, served) = with_records(app, tab, build).await?;
     if served {
-        app.memo_put(key, Arc::new(html.0.clone()));
+        app.memo_put(key, &html.0);
     }
     Ok(html)
 }

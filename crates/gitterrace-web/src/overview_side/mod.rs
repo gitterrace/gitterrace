@@ -105,7 +105,7 @@ pub(crate) fn html(a: &App, head: &str, src: &dyn InsightsSource) -> String {
             tracing::warn!("sidebar not rendered: {e}");
             String::new()
         });
-    a.memo_put(key, std::sync::Arc::new(out.clone()));
+    a.memo_put(key, &out);
     out
 }
 

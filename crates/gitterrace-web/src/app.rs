@@ -334,7 +334,7 @@ pub(crate) struct App {
     releases: AtomicU64,
     /// Ranges read from git for a compare, so a test can tell a memo hit from a read.
     pub(crate) git_ranges: AtomicU64,
-    memo: Mutex<crate::bounded::Bounded<(Instant, Arc<String>)>>,
+    memo: Mutex<crate::bounded::Bounded<(Instant, Arc<memo::Packed>)>>,
     /// One lock per memo key being rendered, see [`App::render_lock`].
     pub(crate) rendering: Mutex<std::collections::HashMap<String, Arc<tokio::sync::Mutex<()>>>>,
     dirty: Mutex<Option<(Instant, bool)>>,

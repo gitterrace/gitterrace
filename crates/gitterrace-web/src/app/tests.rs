@@ -34,7 +34,7 @@ fn memo_key_moves_with_head_and_index_and_the_source_follows() {
     let head = app.repo.resolve("HEAD").expect("head");
     let key = app.memo_key("t", Some("q=type:fix"));
     assert_ne!(key, app.memo_key("t", Some("q=type:feat")));
-    app.memo_put(key.clone(), std::sync::Arc::new("page".into()));
+    app.memo_put(key.clone(), "page");
     assert!(app.memo_get(&key).is_some());
     let first = app
         .source(&head)
@@ -253,7 +253,7 @@ fn one_commit_app() -> (tempfile::TempDir, Arc<App>, String) {
 fn an_unreadable_cache_drops_every_memoized_page() {
     let (_dir, app, _head) = one_commit_app();
     let page = app.memo_key("overview", None);
-    app.memo_put(page.clone(), Arc::new("built over a failing read".into()));
+    app.memo_put(page.clone(), "built over a failing read");
     assert!(app.memo_get(&page).is_some());
     app.unreadable_now().expect("rebuild");
     assert!(

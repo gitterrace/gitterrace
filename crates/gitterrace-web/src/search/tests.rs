@@ -28,7 +28,7 @@ async fn repeat_search_at_one_tip_is_memoized() {
         .expect("page")
         .0;
     assert!(first.contains("1 match"), "{first}");
-    app.memo_put(memo_key(&app, &q()), Arc::new("memo".into()));
+    app.memo_put(memo_key(&app, &q()), "memo");
     let again = search(State(Arc::clone(&app)), Query(q()))
         .await
         .expect("page")

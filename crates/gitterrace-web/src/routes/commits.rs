@@ -1,7 +1,6 @@
 //! The log and commit pages, with the commit filter.
 
 use std::fmt::Write as _;
-use std::sync::Arc;
 
 use askama::Template;
 use axum::{
@@ -518,7 +517,7 @@ pub(super) async fn commit(State(app): Shared, Path(id): Path<String>) -> Result
     })
     .await?;
     let html = p.render()?;
-    app.memo_put(key, Arc::new(html.clone()));
+    app.memo_put(key, &html);
     Ok(Html(html))
 }
 

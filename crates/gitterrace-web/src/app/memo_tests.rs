@@ -1,6 +1,6 @@
 //! The memo never serves a page with a stale live version.
 
-use std::sync::{Arc, atomic::Ordering};
+use std::sync::atomic::Ordering;
 
 use crate::wiring_tests::{app, repo};
 
@@ -10,7 +10,7 @@ fn a_memo_hit_carries_the_version_of_now() {
     let a = app(&repo(dir.path(), "r"), gitterrace_config::Config::default());
     let key = a.memo_key("stats", Some("q=type:fix"));
     let page = |v: u64| format!("<body data-live=\"notice\" data-live-v=\"{v}\">x</body>");
-    a.memo_put(key.clone(), Arc::new(page(a.version())));
+    a.memo_put(key.clone(), &page(a.version()));
     // A change the key does not see (staging into a tree already dirty): only the version moves.
     let next = a.version().wrapping_add(7);
     a.version.store(next, Ordering::Release);
@@ -57,4 +57,25 @@ fn only_memo_get_reads_the_page_memo() {
         bad.is_empty(),
         "read the memo through App::memo_get: {bad:?}"
     );
+}
+
+/// The memo survives the idle release, so what it keeps must be small: pages of tens of KB
+/// held as is pinned multi-page slabs on 64 KB page kernels. A rendered page is repetitive
+/// markup, so it must sit in the memo at a fraction of its size and come back byte for byte.
+#[test]
+fn the_memo_keeps_a_page_at_a_fraction_of_its_size() {
+    let page = (0..400)
+        .map(|i| {
+            format!("<tr><td class=\"name\"><a href=\"/c/{i:040x}\">fix: item {i}</a></td></tr>\n")
+        })
+        .collect::<Vec<_>>()
+        .concat();
+    let packed = super::Packed::pack(&page).expect("pack");
+    assert!(
+        crate::bounded::Weight::weight(&packed) * 4 < page.len(),
+        "{} bytes kept for a {} byte page",
+        crate::bounded::Weight::weight(&packed),
+        page.len()
+    );
+    assert_eq!(packed.unpack().as_deref(), Some(page.as_str()));
 }

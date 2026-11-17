@@ -137,7 +137,7 @@ pub(crate) async fn search(
         return Ok(Html(h));
     }
     let html = blocking(&app, move |a| run(a, q)).await?.render()?;
-    app.memo_put(key, Arc::new(html.clone()));
+    app.memo_put(key, &html);
     Ok(Html(html))
 }
 

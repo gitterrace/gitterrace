@@ -158,7 +158,7 @@ async fn commit_page_is_memoized_per_commit() {
         .expect("page")
         .0;
     assert!(first.contains("fix: b"), "{first}");
-    app.memo_put(app.memo_key("commit", Some(&head)), Arc::new("memo".into()));
+    app.memo_put(app.memo_key("commit", Some(&head)), "memo");
     let again = commit(State(Arc::clone(&app)), Path(head.clone()))
         .await
         .expect("page")
@@ -244,7 +244,7 @@ async fn tree_page_is_memoized_until_the_branch_moves() {
     assert!(first.contains("a.txt"), "{first}");
     let head = app.repo.resolve("main").expect("head");
     let key = app.memo_key("tree", Some(&format!("main\0{head}\0\0")));
-    app.memo_put(key, Arc::new("memo".into()));
+    app.memo_put(key, "memo");
     assert_eq!(
         get(&app).await.expect("page").0,
         "memo",
@@ -281,7 +281,7 @@ async fn blame_page_is_memoized_until_the_branch_moves() {
     assert!(first.contains("one"), "{first}");
     let head = app.repo.resolve("main").expect("head");
     let key = app.memo_key("blame", Some(&format!("main\0{head}\0a.txt\0")));
-    app.memo_put(key, Arc::new("memo".into()));
+    app.memo_put(key, "memo");
     assert_eq!(
         get(&app).await.expect("page").0,
         "memo",
