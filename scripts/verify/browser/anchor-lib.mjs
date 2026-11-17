@@ -52,6 +52,8 @@ export function checks(env) {
         `## main\n\nClobber bait.\n\n${filler}`, `## theme\n\nChrome id.\n\n${filler}`,
       ].join('\n'),
       'anchor/lines.txt': Array.from({ length: 200 }, (_, i) => `line ${i + 1}`).join('\n') + '\n',
+      // The folder's own README, long enough that its card can always scroll to the top.
+      'anchor/README.md': `# Anchor folder\n\n${filler}`,
     };
     for (const [path, body] of Object.entries(files)) {
       git(undefined, 'update-index', '--add', '--cacheinfo', `100644,${git(body, 'hash-object', '-w', '--stdin')},${path}`);
@@ -164,12 +166,12 @@ export function checks(env) {
         const typed = await land(`/blob/${sha}/anchor/guide.md`, 'main', -2, 200);
         if (typed && typed.tag === 'MAIN') r.fail(`${how}: #main resolved to the page's <main>`);
         await land(`/blob/${sha}/anchor/guide.md`, 'user-content-theme', -2, 200);
-        // The about card lands flush at the top, its border just above the window.
-        // A short page cannot scroll that far, so the window height makes it tall enough.
+        // The about card lands flush at the top, its border just above the window. The folder's
+        // own long README keeps the page tall, whatever the other checks did to the repo's root.
         {
           const pg = await jctx.newPage();
-          await pg.setViewportSize({ width: 1100, height: 300 });
-          await pg.goto(`${srv.base}/#about`, { waitUntil: 'load' });
+          await pg.setViewportSize({ width: 1100, height: 600 });
+          await pg.goto(`${srv.base}/tree/${sha}/anchor#about`, { waitUntil: 'load' });
           await pg.waitForTimeout(1500);
           const at = await pg.evaluate(() => {
             const t = document.getElementById('about').getBoundingClientRect().top;
