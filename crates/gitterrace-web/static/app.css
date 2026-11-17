@@ -87,9 +87,11 @@ input:focus-visible{outline:2px solid var(--focus);outline-offset:0;border-color
 .pager{display:flex;justify-content:space-between;margin-top:var(--space-6)}
 .add{color:var(--add)}.del{color:var(--del)}
 .counts{font:var(--weight-semibold) var(--text-xs) var(--mono);font-variant-numeric:tabular-nums}
+/* The counts sit in muted text of nearly their color: the underline tells the link apart. */
+.crow>.cnums a{text-decoration:underline;text-underline-offset:2px}
 .badge{font:var(--weight-semibold) var(--text-xs)/1 var(--sans);padding:3px 8px;border-radius:var(--radius);border:var(--border);color:var(--muted)}
 .badge.added{color:var(--add);border-color:var(--add-hl);background:var(--add-bg)}.badge.deleted{color:var(--del);border-color:var(--del-hl);background:var(--del-bg)}
-.av{display:inline-grid;place-items:center;width:20px;height:20px;border-radius:50%;font:var(--weight-semibold) 9px/1.2 var(--sans);letter-spacing:-.02em;overflow:hidden;color:var(--on-accent);background:hsl(var(--hue) 38% 48%);flex:none}
+.av{display:inline-grid;place-items:center;width:20px;height:20px;border-radius:50%;font:var(--weight-semibold) 9px/1.2 var(--sans);letter-spacing:-.02em;overflow:hidden;color:var(--on-accent);background:light-dark(hsl(var(--hue) 38% var(--av-l-light)),hsl(var(--hue) 38% var(--av-l-dark)));flex:none}
 .sha{font:var(--text-xs) var(--mono);color:var(--muted);border:var(--border);border-radius:var(--radius);padding:3px var(--space-2);background:transparent;white-space:nowrap}
 .sha:hover{text-decoration:none;color:var(--accent-fg);border-color:var(--line-strong)}
 
@@ -207,7 +209,9 @@ table.code{border-collapse:collapse;width:100%}
 .diffwrap{overflow-x:auto}
 .code td{padding:0 var(--space-3);line-height:var(--leading-code);white-space:pre;vertical-align:top}
 .n{width:1%;min-width:48px;text-align:right;color:var(--faint);user-select:none}
-.n a{color:inherit}.n a:hover{color:var(--accent-fg)}
+.n a{color:inherit}
+/* A line-number link is a 24px target: rows touch, so no spacing exemption applies. */
+.code td.n a{display:block;line-height:24px}.n a:hover{color:var(--accent-fg)}
 div.diff .add,div.diff .del{color:inherit}
 .code tr:target td,.src .l:target{background:var(--accent-soft);box-shadow:inset 2px 0 0 var(--accent)}
 /* The gutter: inside each cell a grid of sha, author and age. The column takes its widest

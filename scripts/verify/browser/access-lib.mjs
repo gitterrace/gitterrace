@@ -188,6 +188,17 @@ export function checks({ dir, srv, r, browsers, context }) {
     const { root } = await import('../../lib/browser-lib.mjs');
     const axePath = createRequire(`${root}/package.json`).resolve('axe-core');
     const report = process.env.AXE_REPORT === '1';
+    // The pages walked carry their crowded state whatever ran before: a search with numbered
+    // hits and a branch ahead of main, so /refs shows its compare-count links.
+    const { sh } = await import('../../lib/browser-lib.mjs');
+    const { writeFileSync } = await import('node:fs');
+    writeFileSync(`${dir}/axe-hits.txt`, 'one\ntwo one\n');
+    sh(dir, 'git', 'add', 'axe-hits.txt');
+    sh(dir, 'git', 'commit', '-q', '--allow-empty', '-m', 'test: lines that match a search');
+    sh(dir, 'git', 'checkout', '-q', '-B', 'axe-ahead');
+    sh(dir, 'git', 'commit', '-q', '--allow-empty', '-m', 'Work ahead of main');
+    sh(dir, 'git', 'checkout', '-q', 'main');
+    await new Promise((ok) => setTimeout(ok, 600));
     const seen = new Set();
     let walked = new Set();
     for (const name of browsers) {
@@ -205,11 +216,12 @@ export function checks({ dir, srv, r, browsers, context }) {
           if (key.startsWith('insights')) await until(p, 'svg.chart');
           await p.evaluate(() => document.fonts.ready);
           await p.addScriptTag({ path: axePath });
-          /** @type {Array<[string, number]>} */
+          /** @type {Array<[string, number, string]>} */
           const found = await p.evaluate(async (tags) => {
             // @ts-ignore injected by addScriptTag
             const res = await axe.run(document, { runOnly: tags });
-            return res.violations.map((v) => [v.id, v.nodes.length]);
+            return res.violations.map((v) => [v.id, v.nodes.length,
+              v.nodes.slice(0, 2).map((n) => n.target.join(' ')).join(' | ')]);
           }, AXE_TAGS);
           const where = `axe-all ${name} ${scheme} ${width} ${key}`;
           const bad = found.filter(([id]) => {
@@ -218,7 +230,9 @@ export function checks({ dir, srv, r, browsers, context }) {
           });
           const counts = found.map(([i, n]) => `${i}=${n}`).join(' ') || 'clean';
           if (report) console.log(`${where}: ${counts}`);
-          else if (bad.length) r.fail(`${where}: ${bad.map(([i, n]) => `${i} (${n})`).join(', ')}`);
+          else if (bad.length) {
+            r.fail(`${where}: ${bad.map(([i, n, at]) => `${i} (${n}: ${at})`).join(', ')}`);
+          }
           else r.ok(where);
         }
       }
