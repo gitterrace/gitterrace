@@ -43,11 +43,11 @@ preview:
 
 ##@ Check gates
 .PHONY: check check-static fmt clippy clippy-features clippy-cross lint harness-links test doc \
-	theme actions send-vectors names lines docs-check gc-guard bench-guard
+	theme actions send-vectors names lines docs-check gc-guard bench-guard deny
 
 ## check: Every gate, in the order CI runs them
 check: gc-guard theme actions send-vectors names lines bench-guard docs-check fmt clippy \
-	clippy-features clippy-cross lint test doc
+	clippy-features clippy-cross lint deny test doc
 
 ## check-static: The check steps that build nothing, in the same order, fast and cargo-build free
 check-static: gc-guard theme actions send-vectors names lines fmt lint
@@ -82,6 +82,15 @@ clippy-cross:
 ## lint: External linters (typos, vale, shellcheck, ruff, pyright, ast-grep, ...)
 lint: harness-links
 	bash vendor/schwarzwald/kit/lint/run.sh
+
+## deny: cargo deny, as CI's job runs it: a new advisory against a locked crate is red here
+## first, not on a tag. Skipped with a note where cargo-deny is not installed.
+deny:
+	@if ! command -v cargo-deny >/dev/null 2>&1; then \
+		echo "deny: cargo-deny not installed, skipped (cargo install cargo-deny --locked)"; \
+		exit 0; \
+	fi; \
+	cargo deny --locked check
 
 # harness-links: The shared skills and agents are linked and harness.env names every key.
 # Skipped, with a line saying so, on a clone without the shared kit checkout.

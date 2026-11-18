@@ -49,6 +49,9 @@ gate = [
   # Rustdoc with warnings as errors: a doc link to a private item fails only here.
   "make doc",
   "make lint",
+  # A new advisory against a locked crate fails CI's deny job on the next push, and the
+  # release check's on a tag: seconds, no build.
+  "make deny",
 ]
 # The landing runs in a fresh clone, which has no core.hooksPath yet: set it there first. The
 # dates of the landed commits are read by the shared commit-dates lint.
