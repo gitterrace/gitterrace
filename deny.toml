@@ -18,6 +18,11 @@ ignore = [
     # dropped paste, so drop this ignore with the first release after 0.7.0.
     # Expires 2027-02-05: if that date passes with no such release, decide again.
     "RUSTSEC-2024-0436",
+    # chrono (unmaintained, no vulnerability): rmcp depends on it unconditionally for the MCP
+    # protocol's timestamp fields, and schemars through rmcp's chrono04 feature. No feature
+    # drops it. Drop this ignore when rmcp moves to jiff or time.
+    # Expires 2027-05-18: if that date passes with rmcp still on chrono, decide again.
+    "RUSTSEC-2026-0543",
 ]
 
 [licenses]
