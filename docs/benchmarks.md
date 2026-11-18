@@ -124,11 +124,8 @@ are in [tests/bench/results](../tests/bench/results/README.md).
 
 <!-- BEGIN GENERATED: results -->
 Run 2026-11-18 on Apple M1 Max, 10 cores, 64 GB RAM, 4.0 TB SSD disk, macOS
-26.6.2 (arm64). gitterrace v0.1.1-b0aa2da, git version 2.54.0 (Apple Git-157).
+26.6.2 (arm64). gitterrace v0.1.1-831e731, git version 2.54.0 (Apple Git-157).
 Measured on a quiet machine.
-
-- **git:** not measured on a quiet machine (other processes used 5 or more cores
-  during idle), so its numbers are withheld.
 
 | Repo | Metric | Value | Budget | Status | Change against previous |
 | --- | --- | --- | --- | --- | --- |
@@ -137,10 +134,10 @@ Measured on a quiet machine.
 | control | cold page | 31 ms (29 to 37) | 1500 ms | pass | 5% slower |
 | control | peak memory | 15 MB | 500 MB | pass | 25% less memory |
 | control | export | 24.1 s (23.7 to 24.1) | 60 s | pass | 60% faster |
-| git | index build | withheld (load) | - | withheld | - |
-| git | warm page | withheld (load) | - | withheld | - |
-| git | cold page | withheld (load) | - | withheld | - |
-| git | peak memory | withheld (load) | - | withheld | - |
-| git | export | withheld (load) | - | withheld | - |
+| git | index build | 11.0 s (10.7 to 11.7) | 300 s | pass | 11% slower |
+| git | warm page | 12 ms | 300 ms | pass | 3% faster |
+| git | cold page | 2387 ms (2385 to 2387) | 3000 ms | pass | 3% slower |
+| git | peak memory | 31 MB | 1500 MB | pass | 3% more memory |
+| git | export | 26.1 s (25.8 to 26.6) | 300 s | pass | 78% faster |
 
 <!-- END GENERATED: results -->

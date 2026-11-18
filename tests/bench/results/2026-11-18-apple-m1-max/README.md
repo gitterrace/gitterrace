@@ -1,11 +1,8 @@
 # Benchmark run 2026-11-18-apple-m1-max
 
 Run 2026-11-18 on Apple M1 Max, 10 cores, 64 GB RAM, 4.0 TB SSD disk, macOS
-26.6.2 (arm64). gitterrace v0.1.1-b0aa2da, git version 2.54.0 (Apple Git-157).
+26.6.2 (arm64). gitterrace v0.1.1-831e731, git version 2.54.0 (Apple Git-157).
 Measured on a quiet machine.
-
-- **git:** not measured on a quiet machine (other processes used 5 or more cores
-  during idle), so its numbers are withheld.
 
 Numbers: [`../2026-11-18-apple-m1-max.json`](../2026-11-18-apple-m1-max.json).
 Method: [docs/benchmarks.md](../../../../docs/benchmarks.md).
