@@ -408,7 +408,12 @@ fn a_repository_initialized_again_under_a_running_server_recovers() {
         let (repo, router, prefix) = built(tmp.path()).await;
         let (s, _) = get(&router, &format!("{prefix}/stats")).await;
         assert_eq!(s, 200, "insights answer before the reset");
-        std::fs::remove_dir_all(repo.join(".git")).expect("drop .git");
+        // The server may still be writing its cache below `.git` (warm-up runs after ready), so
+        // one pass can find a file it just made: `rm -rf` racing a writer. Retry until gone.
+        let git = repo.join(".git");
+        wait::until_blocking("drop .git", || {
+            std::fs::remove_dir_all(&git).is_ok() || !git.exists()
+        });
         let again = Fixture::init(&repo)
             .write("again.txt", "x\n")
             .commit("feat: start over");
