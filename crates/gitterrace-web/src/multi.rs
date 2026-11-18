@@ -43,7 +43,9 @@ pub(crate) struct Served {
     pub(crate) root: PathBuf,
     router: OnceCell<Router>,
     /// The background tasks the router started, stopped when the repository is taken off.
-    tasks: Mutex<Vec<tokio::task::AbortHandle>>,
+    /// `None` once stopped: a router built after that (its build was already under way) has
+    /// its tasks aborted at once instead of stored, so they never outlive the removal.
+    tasks: Mutex<Option<Vec<tokio::task::AbortHandle>>>,
     /// Newest commit and the sparkline's counts at the HEAD they were read for, so the index page
     /// opens a repository once per HEAD move or new local day instead of once per hit.
     recent: Mutex<Option<(String, Arc<Recent>)>>,
@@ -281,9 +283,7 @@ impl Table {
             .router
             .get_or_try_init(|| async {
                 let (router, tasks) = repo_router(served, self.live.clone(), &self.env)?;
-                if let Ok(mut g) = served.tasks.lock() {
-                    *g = tasks;
-                }
+                served.adopt(tasks);
                 Ok::<_, io::Error>(router)
             })
             .await
@@ -317,7 +317,7 @@ impl Repos {
             path,
             root,
             router: OnceCell::new(),
-            tasks: Mutex::default(),
+            tasks: Mutex::new(Some(Vec::new())),
             recent: Mutex::new(None),
             dirty: Mutex::new(None),
         });
@@ -337,10 +337,23 @@ impl Repos {
 impl Served {
     /// Stops the background tasks its router started.
     fn stop(&self) {
-        if let Ok(mut g) = self.tasks.lock() {
-            for t in g.drain(..) {
-                t.abort();
-            }
+        let held = self.tasks.lock().map(|mut g| g.take()).unwrap_or_default();
+        for t in held.unwrap_or_default() {
+            t.abort();
+        }
+    }
+
+    /// Keeps the tasks a fresh router started, or aborts them when the repository was taken
+    /// off while its router was being built.
+    fn adopt(&self, tasks: Vec<tokio::task::AbortHandle>) {
+        let mut late = tasks;
+        if let Ok(mut g) = self.tasks.lock()
+            && let Some(held) = g.as_mut()
+        {
+            held.append(&mut late);
+        }
+        for t in late {
+            t.abort();
         }
     }
 

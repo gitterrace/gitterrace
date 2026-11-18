@@ -460,3 +460,30 @@ async fn the_first_log_does_not_wait_for_a_held_root_walk() {
     })
     .await;
 }
+
+/// A repository taken off while its router is still being built (a sweep or the first visit
+/// opened it, then it was deleted) keeps no background task: the tasks the late router
+/// starts are aborted, not stored where no later stop reaches them. The order is forced:
+/// stop first, then the build's tasks arrive. Red when the late tasks replaced the list.
+#[tokio::test]
+async fn a_router_built_after_the_stop_starts_no_lasting_task() {
+    let dir = tempfile::tempdir().expect("tmp");
+    let table = Table::new(
+        Vec::new(),
+        crate::app::Env::new(gitterrace_config::Config::default()),
+        None,
+    )
+    .expect("table");
+    let p = dir.path().to_path_buf();
+    let served = table.write().insert("gone".into(), p.clone(), p);
+    served.stop();
+    let late = tokio::spawn(std::future::pending::<()>());
+    served.adopt(vec![late.abort_handle()]);
+    let ended = tokio::time::timeout(std::time::Duration::from_secs(10), late)
+        .await
+        .expect("the late task was left running");
+    assert!(
+        ended.is_err_and(|e| e.is_cancelled()),
+        "the late task is aborted"
+    );
+}
