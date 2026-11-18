@@ -4,6 +4,9 @@ All notable changes are listed here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
+<!-- BEGIN GENERATED: unreleased -->
+<!-- END GENERATED: unreleased -->
+
 ## [0.1.1] - 2026-11-18
 
 ### Added
@@ -32,6 +35,8 @@ All notable changes are listed here. The format follows
 - alloc: turn transparent huge pages off on Linux
 - index: run a segment merge after the update releases its lock
 - web: meet target size, link and avatar contrast rules
+- ci: shellcheck composite action run blocks
+- deps: ignore the chrono unmaintained advisory
 
 ### Performance
 
@@ -48,8 +53,6 @@ All notable changes are listed here. The format follows
 - git: skip the blame horizon walk when the versions fit
 - git: walk the blame horizon beside the counting pass
 - export: stage pages without a sync per file
-<!-- BEGIN GENERATED: unreleased -->
-<!-- END GENERATED: unreleased -->
 
 ## [0.1.0] - 2026-11-14
 
