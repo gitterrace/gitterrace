@@ -29,8 +29,21 @@ pub(crate) fn cache_dir(dir: &Path) -> io::Result<()> {
         Err(e) if e.kind() == io::ErrorKind::NotFound => {}
         Err(e) => return Err(e),
     }
+    // A cache inside a repository's `.git` is made again alone, never with its parent: a
+    // `.git` that is gone (the repository deleted under a running server) made again here
+    // would bring the folder back as a repository, served forever. A cache folder outside a
+    // repository (the one used when `.git` is read-only) gets its parents.
     if let Some(parent) = dir.parent() {
-        fs::create_dir_all(parent)?;
+        if parent.file_name() == Some(std::ffi::OsStr::new(".git")) {
+            if !parent.is_dir() {
+                return Err(io::Error::new(
+                    io::ErrorKind::NotFound,
+                    format!("{} is gone", parent.display()),
+                ));
+            }
+        } else {
+            fs::create_dir_all(parent)?;
+        }
     }
     match fs::create_dir(dir) {
         Err(e) if e.kind() == io::ErrorKind::AlreadyExists => {

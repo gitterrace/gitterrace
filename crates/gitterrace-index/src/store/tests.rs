@@ -503,3 +503,22 @@ fn appends_and_a_failed_then_good_merge_keep_every_named_file() -> io::Result<()
     assert_eq!(got, want, "the merged set is the one-step build");
     Ok(())
 }
+
+/// A repository deleted under a running server stays deleted: making the cache folder again
+/// never makes its `.git` again, which would bring the folder back as a repository. Red when
+/// the cache folder's parents were created with it.
+#[test]
+fn a_cache_never_makes_a_deleted_git_folder_again() -> io::Result<()> {
+    let t = tempfile::tempdir()?;
+    let git = t.path().join("repo").join(".git");
+    let dir = git.join("gitterrace");
+    fs::create_dir_all(&git)?;
+    ensure_dir(&dir)?;
+    fs::remove_dir_all(t.path().join("repo"))?;
+    assert!(
+        ensure_dir(&dir).is_err(),
+        "the cache came back without its repository"
+    );
+    assert!(!git.exists(), "a deleted .git was made again");
+    Ok(())
+}
